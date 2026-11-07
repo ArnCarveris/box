@@ -781,6 +781,37 @@ void box_gpu_upload(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Record the overdraw count of a view: its depth prepass again, early then late arguments, into
+ * a depth buffer of its own cleared to 0 with compare Greater.
+ *
+ * A fragment that passes the depth and alpha tests adds one to red (plain) or green (cutout).
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ * @param count The count target, cleared to 0
+ * @param format Format of the count target, with at least a red and a green channel
+ * @param depth Depth target of the count, of BOX_GPU_DEPTH_FORMAT and the size of the count
+ * @param width Width of the view in the count
+ * @param height Height of the view in the count
+ * @return Whether the pass was recorded, false without a mesh shader
+ */
+bool box_gpu_draw_overdraw(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot,
+    WGPUTextureView count,
+    WGPUTextureFormat format,
+    WGPUTextureView depth,
+    uint32_t width,
+    uint32_t height);
+
 /** Render the views of a target in order with the forward pass.
  *
  * A lit view with opaque meshes records its depth prepasses before its forward pass. Between

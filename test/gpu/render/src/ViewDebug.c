@@ -32,6 +32,10 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
+
 /** Edge of the square captures */
 #define DG_SIZE (128)
 
@@ -2774,7 +2778,7 @@ void ViewDebug_wire_box_edges(void) {
 void ViewDebug_overdraw_layers(void) {
     ecs_world_t *world = dg_world();
     ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
-    ecs_get_mut(world, view, View)->debug.overdraw = true;
+    ecs_get_mut(world, view, View)->debug.overdraw = OverdrawAll;
     ecs_modified(world, view, View);
     ecs_entity_t back = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
     ecs_set(world, back, Quad, {6, 6});
@@ -2807,7 +2811,7 @@ void ViewDebug_overdraw_layers(void) {
 void ViewDebug_overdraw_back_faces(void) {
     ecs_world_t *world = dg_world();
     ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
-    ecs_get_mut(world, view, View)->debug.overdraw = true;
+    ecs_get_mut(world, view, View)->debug.overdraw = OverdrawAll;
     ecs_modified(world, view, View);
     ecs_entity_t culled = dw_shape(world, -2, 0, 0, (Rgb){255, 0, 0});
     ecs_set(world, culled, Box, {1, 1, 1});
@@ -2834,12 +2838,12 @@ void ViewDebug_overdraw_stacked(void) {
     ecs_world_t *world = dg_world();
     ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
     View *v = ecs_get_mut(world, view, View);
-    v->debug.overdraw = true;
+    v->debug.overdraw = OverdrawAll;
     v->culling.occlusion = false;
     ecs_modified(world, view, View);
     int32_t i;
     for (i = 0; i < 10; i ++) {
-        ecs_entity_t quad = dw_shape(world, 0, 0, -(float)i * 0.1f, (Rgb){255, 0, 0});
+        ecs_entity_t quad = dw_shape(world, 0, 0, -(float)(9 - i) * 0.1f, (Rgb){255, 0, 0});
         ecs_set(world, quad, Quad, {2, 2});
     }
 
@@ -2849,6 +2853,156 @@ void ViewDebug_overdraw_stacked(void) {
     test_int(p[0], 255);
     test_int(p[1], 255);
     test_int(p[2], 255);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_front_to_back(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    View *v = ecs_get_mut(world, view, View);
+    v->debug.overdraw = OverdrawAll;
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_entity_t quad = dw_shape(world, 0, 0, -(float)i * 0.1f, (Rgb){255, 0, 0});
+        ecs_set(world, quad, Quad, {2, 2});
+    }
+
+    unsigned char *px = dg_render(world, "overdraw_front_to_back.png");
+
+    const unsigned char *p = dg_px(px, 64, 64);
+    test_assert(abs(p[0] - 13) <= 2);
+    test_assert(abs(p[1] - 26) <= 2);
+    test_assert(abs(p[2] - 115) <= 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_all(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    View *v = ecs_get_mut(world, view, View);
+    v->debug.overdraw = OverdrawAll;
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    ecs_entity_t back = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, back, Quad, {6, 6});
+    ecs_entity_t front = dw_shape(world, 0, 0, 1, (Rgb){0, 0, 255});
+    ecs_set(world, front, Quad, {2, 2});
+    ecs_set(world, front, AlphaCutoff, {0.5f});
+    unsigned char *px = dg_render(world, "overdraw_all.png");
+
+    const unsigned char *one = dg_px(px, 64 + (int32_t)(2.0f * dw_scale(10)), 64);
+    test_assert(abs(one[0] - 13) <= 2);
+    test_assert(abs(one[1] - 26) <= 2);
+    test_assert(abs(one[2] - 115) <= 2);
+
+    const unsigned char *two = dg_px(px, 64, 64);
+    test_assert(abs(two[0] - 0) <= 2);
+    test_assert(abs(two[1] - 115) <= 2);
+    test_assert(abs(two[2] - 217) <= 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_plain(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    View *v = ecs_get_mut(world, view, View);
+    v->debug.overdraw = OverdrawPlain;
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    ecs_entity_t back = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, back, Quad, {6, 6});
+    ecs_entity_t front = dw_shape(world, 0, 0, 1, (Rgb){0, 0, 255});
+    ecs_set(world, front, Quad, {2, 2});
+    ecs_set(world, front, AlphaCutoff, {0.5f});
+    unsigned char *px = dg_render(world, "overdraw_plain.png");
+
+    const unsigned char *outside = dg_px(px, 64 + (int32_t)(2.0f * dw_scale(10)), 64);
+    test_assert(abs(outside[0] - 13) <= 2);
+    test_assert(abs(outside[1] - 26) <= 2);
+    test_assert(abs(outside[2] - 115) <= 2);
+
+    const unsigned char *center = dg_px(px, 64, 64);
+    test_assert(abs(center[0] - 13) <= 2);
+    test_assert(abs(center[1] - 26) <= 2);
+    test_assert(abs(center[2] - 115) <= 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_cutout(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    View *v = ecs_get_mut(world, view, View);
+    v->debug.overdraw = OverdrawCutout;
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    ecs_entity_t back = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, back, Quad, {6, 6});
+    ecs_entity_t front = dw_shape(world, 0, 0, 1, (Rgb){0, 0, 255});
+    ecs_set(world, front, Quad, {2, 2});
+    ecs_set(world, front, AlphaCutoff, {0.5f});
+    unsigned char *px = dg_render(world, "overdraw_cutout.png");
+
+    const unsigned char *outside = dg_px(px, 64 + (int32_t)(2.0f * dw_scale(10)), 64);
+    test_int(outside[0], 0);
+    test_int(outside[1], 0);
+    test_int(outside[2], 0);
+
+    const unsigned char *center = dg_px(px, 64, 64);
+    test_assert(abs(center[0] - 13) <= 2);
+    test_assert(abs(center[1] - 26) <= 2);
+    test_assert(abs(center[2] - 115) <= 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_cutout_discard(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    View *v = ecs_get_mut(world, view, View);
+    v->debug.overdraw = OverdrawAll;
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    unsigned char texels[8 * 8 * 4];
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        texels[i * 4 + 0] = 255;
+        texels[i * 4 + 1] = 255;
+        texels[i * 4 + 2] = 255;
+        texels[i * 4 + 3] = 0;
+    }
+
+    char *file = flecs_asprintf("%s/overdraw_clear.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    test_assert(stbi_write_png(file, 8, 8, 4, texels, 8 * 4) != 0);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    ecs_entity_t back = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, back, Quad, {6, 6});
+    ecs_entity_t front = dw_shape(world, 0, 0, 1, (Rgb){0, 0, 255});
+    ecs_set(world, front, Quad, {2, 2});
+    ecs_set(world, front, PbrTextures, {.albedo = tex});
+    ecs_set(world, front, AlphaCutoff, {0.5f});
+    int32_t frames = 0;
+    while (frames < 100 && ecs_get(world, tex, TextureStatus)->state == TextureLoading) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        frames ++;
+    }
+
+    test_assert(ecs_get(world, tex, TextureStatus)->state == TextureReady);
+    unsigned char *px = dg_render(world, "overdraw_cutout_discard.png");
+
+    const unsigned char *center = dg_px(px, 64, 64);
+    test_assert(abs(center[0] - 13) <= 2);
+    test_assert(abs(center[1] - 26) <= 2);
+    test_assert(abs(center[2] - 115) <= 2);
+    ecs_os_free(file);
     stbi_image_free(px);
     ecs_fini(world);
 }

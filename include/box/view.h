@@ -130,6 +130,21 @@ ECS_ENUM(WireframeMode, {
     WireframeOnly = 2     /**< Only the lines: see through, no shaded meshes */
 });
 
+/** Overdraw heat map of a view (ViewDebug.overdraw).
+ *
+ * It replays the depth prepass of the view in its draw order and with its depth test, counting
+ * per pixel the opaque mesh fragments that pass it and, alpha tested, pass their alpha test.
+ *
+ * A heat map goes from black for none through blue, green, yellow and red to white for 8 or
+ * more. Blended meshes, 2D shapes, text, particles and the sky do not count.
+ */
+ECS_ENUM(OverdrawMode, {
+    OverdrawOff = 0,      /**< No heat map */
+    OverdrawAll = 1,      /**< Fragments of the plain and the alpha tested meshes */
+    OverdrawPlain = 2,    /**< Fragments of the meshes without an alpha test */
+    OverdrawCutout = 3    /**< Fragments of the alpha tested meshes (AlphaCutoff) */
+});
+
 /** Debug drawing of a view, in a pass after its effects into the color of its target, with the
  * depth of the view read only. All zero (a C literal View) draws nothing and records no pass.
  *
@@ -146,9 +161,8 @@ ECS_STRUCT(ViewDebug, {
     WireframeMode wireframe; /**< Wireframe of the meshes, default WireframeOff */
     rgba wireframe_color;   /**< Color of the wireframe lines, default white with alpha 200 */
     float wireframe_width;  /**< Width of the wireframe lines in pixels, default 1 */
-    bool overdraw;          /**< Heat map of the mesh triangles over each pixel, depth ignored:
-                             *   black for none through blue, green, yellow and red to white for
-                             *   8 or more; 2D shapes, text, particles and the sky do not count */
+    OverdrawMode overdraw;  /**< Heat map of the mesh fragments over each pixel that pass the
+                             *   depth test of the prepass, default OverdrawOff */
     bool light_probes;      /**< Spheres at the probes of the volume the view samples, lit by
                              *   their SH, unshadowed; a probe invalid for every cell around it
                              *   (inside static geometry) in a dark red hatch */

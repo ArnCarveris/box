@@ -1,41 +1,13 @@
 #include "include/lights.wgsl"
-#include "include/place.wgsl"
 #include "include/fullscreen.wgsl"
-
-const OVERDRAW_VERTEX_FLOATS: u32 = 8u;
 
 const OVERDRAW_STOPS: u32 = 9u;
 
+override mode: u32 = 1u;
+
 @group(0) @binding(0) var<uniform> view: View;
 
-@group(1) @binding(0) var<storage, read> overdraw_vertices: array<f32>;
-@group(1) @binding(1) var<storage, read> overdraw_indices: array<u32>;
-
-@group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
-@group(2) @binding(1) var<storage, read> surface_assets: array<vec4f>;
-@group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
-
 @group(1) @binding(3) var overdraw_count: texture_2d<f32>;
-
-@vertex fn vs_count(@builtin(vertex_index) i: u32, @location(0) slot: u32)
-    -> @builtin(position) @invariant vec4f
-{
-    let index = overdraw_indices[i];
-    let base = index * OVERDRAW_VERTEX_FLOATS;
-    var v: VertexIn;
-    v.vertex = index;
-    v.position = vec3f(overdraw_vertices[base], overdraw_vertices[base + 1u],
-        overdraw_vertices[base + 2u]);
-    v.normal = vec3f(overdraw_vertices[base + 3u], overdraw_vertices[base + 4u],
-        overdraw_vertices[base + 5u]);
-    v.uv = vec2f(overdraw_vertices[base + 6u], overdraw_vertices[base + 7u]);
-    v.slot = slot;
-    return place(v).pos;
-}
-
-@fragment fn fs_count() -> @location(0) vec4f {
-    return vec4f(1.0, 0.0, 0.0, 0.0);
-}
 
 fn overdraw_linear(c: vec3f) -> vec3f {
     return select(pow((c + 0.055) / 1.055, vec3f(2.4)), c / 12.92, c <= vec3f(0.04045));
@@ -57,7 +29,16 @@ fn overdraw_ramp(layers: f32) -> vec3f {
     return overdraw_linear(stops[n]);
 }
 
+// The count holds the fragments of the plain meshes in red and of the alpha tested meshes in
+// green; mode is the OverdrawMode of the view: 1 shows both, 2 the plain, 3 the alpha tested.
 @fragment fn fs(f: FullscreenOut) -> @location(0) vec4f {
-    let layers = textureLoad(overdraw_count, vec2i(f.pos.xy), 0).r;
+    let count = textureLoad(overdraw_count, vec2i(f.pos.xy), 0).rg;
+    var layers = count.r + count.g;
+    if (mode == 2u) {
+        layers = count.r;
+    } else if (mode == 3u) {
+        layers = count.g;
+    }
+
     return vec4f(overdraw_ramp(layers), 1.0);
 }

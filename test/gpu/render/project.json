@@ -1239,7 +1239,12 @@
                     "probes_not_in_captures",
                     "overdraw_layers",
                     "overdraw_back_faces",
-                    "overdraw_stacked"
+                    "overdraw_stacked",
+                    "overdraw_front_to_back",
+                    "overdraw_all",
+                    "overdraw_plain",
+                    "overdraw_cutout",
+                    "overdraw_cutout_discard"
                 ]
             }
         ]

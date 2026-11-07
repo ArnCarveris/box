@@ -382,6 +382,33 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     }
 }
 
+// Overdraw heat map of a view (box_gpu_debug_overdraw_record): the prepass again, each entry
+// point adding one to the count of its kind where its fragment passes, the plain meshes in red
+// and the alpha tested ones in green.
+@fragment fn fs_count(f: VertexOut) -> @location(0) vec4f {
+    return vec4f(1.0, 0.0, 0.0, 0.0);
+}
+
+@fragment fn fs_count_cutout(f: VertexOut) -> @location(0) vec4f {
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, f.scalars.w, f.object,
+        f.object_normal);
+    if (f.color.a * albedo < f.scalars.x) {
+        discard;
+    }
+
+    return vec4f(0.0, 1.0, 0.0, 0.0);
+}
+
+@fragment fn fs_count_cutout_blend(f: VertexOut) -> @location(0) vec4f {
+    let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
+        f.uv.xy, f.scalars.w, f.object, f.object_normal);
+    if (f.color.a * albedo < f.scalars.x) {
+        discard;
+    }
+
+    return vec4f(0.0, 1.0, 0.0, 0.0);
+}
+
 // Indirect light of a fragment, irradiance over pi: in the direction of its normal for the
 // diffuse term and in the direction its specular term samples.
 struct Indirect {

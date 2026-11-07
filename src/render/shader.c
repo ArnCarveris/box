@@ -516,7 +516,7 @@ static bool box_shader_used(
 
     if (handle == BOX_RENDER_SHADER_DEBUG_OVERDRAW) {
         for (i = 0; i < ecs_vec_count(&p->views); i ++) {
-            if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.overdraw) {
+            if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.overdraw != OverdrawOff) {
                 result = true;
             }
         }

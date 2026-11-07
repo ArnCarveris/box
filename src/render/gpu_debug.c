@@ -66,13 +66,14 @@ typedef enum box_gpu_debug_kind_t {
     BOX_GPU_DEBUG_GRID = 0,         /**< The grid */
     BOX_GPU_DEBUG_WIRE_OVERLAY = 1, /**< Wireframe over the shaded image, WireframeOverlay */
     BOX_GPU_DEBUG_WIRE_ONLY = 2,    /**< Wireframe on its own, WireframeOnly */
-    BOX_GPU_DEBUG_OVERDRAW_CULL = 3, /**< Overdraw count of meshes that cull back faces */
-    BOX_GPU_DEBUG_OVERDRAW_BOTH = 4, /**< Overdraw count of meshes that draw back faces */
-    BOX_GPU_DEBUG_OVERDRAW_MAP = 5  /**< Heat map of the overdraw count */
+    BOX_GPU_DEBUG_OVERDRAW_ALL = 3, /**< Heat map of the plain and alpha tested overdraw */
+    BOX_GPU_DEBUG_OVERDRAW_PLAIN = 4, /**< Heat map of the plain overdraw */
+    BOX_GPU_DEBUG_OVERDRAW_CUTOUT = 5 /**< Heat map of the alpha tested overdraw */
 } box_gpu_debug_kind_t;
 
-/** Format of the texture the overdraw pass counts the triangles of a pixel in */
-#define BOX_GPU_DEBUG_OVERDRAW_FORMAT (WGPUTextureFormat_R16Float)
+/** Format of the texture the overdraw pass counts the fragments of a pixel in: the plain meshes
+ * in red, the alpha tested meshes in green */
+#define BOX_GPU_DEBUG_OVERDRAW_FORMAT (WGPUTextureFormat_RG16Float)
 
 /** Constant depth bias of the overlay wireframe toward the camera, in the smallest depth steps */
 #define BOX_GPU_DEBUG_WIRE_BIAS (4)
@@ -107,13 +108,14 @@ struct box_gpu_debug_t {
     WGPUBindGroup probe_group;      /**< Binds the whole probe buffer at a dynamic offset */
     uint64_t probe_size;            /**< Bytes of the probe buffer */
     uint64_t probe_used;            /**< Bytes of the probe buffer the draws of the packet took */
-    WGPUPipelineLayout overdraw_pipeline_layout; /**< View, mesh and depth only instance groups */
     WGPUBindGroupLayout overdraw_map_layout; /**< Overdraw count texture of the heat map */
     WGPUPipelineLayout overdraw_map_pipeline_layout; /**< View and overdraw count groups */
     int32_t overdraw_revision;      /**< Revision of the overdraw shader of the pipelines */
     WGPUTexture overdraw;           /**< Overdraw count texture, NULL until the first one */
     WGPUTextureView overdraw_view;  /**< View of the overdraw count texture */
     WGPUBindGroup overdraw_group;   /**< Binds the overdraw count texture to the heat map */
+    WGPUTexture overdraw_depth;     /**< Depth of the overdraw pass, the size of the count */
+    WGPUTextureView overdraw_depth_view; /**< View of the overdraw depth texture */
     uint32_t overdraw_width;        /**< Width of the overdraw count texture */
     uint32_t overdraw_height;       /**< Height of the overdraw count texture */
 };
@@ -222,14 +224,6 @@ void box_gpu_debug_init(
         });
     ecs_map_init(&d->probe_pipelines, NULL);
 
-    WGPUBindGroupLayout overdraw_groups[3] = {
-        gpu->view_layout, d->wire_mesh_layout, gpu->transform_layout
-    };
-    d->overdraw_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
-        &(WGPUPipelineLayoutDescriptor){
-            .bindGroupLayoutCount = 3,
-            .bindGroupLayouts = overdraw_groups
-        });
     WGPUBindGroupLayoutEntry map_entry = {
         .binding = 3,
         .visibility = WGPUShaderStage_Fragment,
@@ -349,9 +343,16 @@ void box_gpu_debug_fini(
         wgpuTextureRelease(d->overdraw);
     }
 
+    if (d->overdraw_depth_view) {
+        wgpuTextureViewRelease(d->overdraw_depth_view);
+    }
+
+    if (d->overdraw_depth) {
+        wgpuTextureRelease(d->overdraw_depth);
+    }
+
     wgpuPipelineLayoutRelease(d->overdraw_map_pipeline_layout);
     wgpuBindGroupLayoutRelease(d->overdraw_map_layout);
-    wgpuPipelineLayoutRelease(d->overdraw_pipeline_layout);
 
     wgpuPipelineLayoutRelease(d->pipeline_layout);
     wgpuBindGroupLayoutRelease(d->layout);
@@ -398,7 +399,7 @@ bool box_gpu_debug_enabled(
     const box_render_view_t *v)
 {
     return v->debug.grid.enabled || v->debug.wireframe != WireframeOff ||
-        v->debug.overdraw || box_gpu_debug_light_probes(v) ||
+        v->debug.overdraw != OverdrawOff || box_gpu_debug_light_probes(v) ||
         box_gpu_debug_reflection_probes(v);
 }
 
@@ -624,8 +625,8 @@ static WGPUShaderModule box_gpu_debug_overdraw_module(
     }
 
     if (d->overdraw_revision != shader->revision) {
-        box_gpu_debug_pipelines_free(d, (1u << BOX_GPU_DEBUG_OVERDRAW_CULL) |
-            (1u << BOX_GPU_DEBUG_OVERDRAW_BOTH) | (1u << BOX_GPU_DEBUG_OVERDRAW_MAP));
+        box_gpu_debug_pipelines_free(d, (1u << BOX_GPU_DEBUG_OVERDRAW_ALL) |
+            (1u << BOX_GPU_DEBUG_OVERDRAW_PLAIN) | (1u << BOX_GPU_DEBUG_OVERDRAW_CUTOUT));
         d->overdraw_revision = shader->revision;
     }
 
@@ -634,102 +635,19 @@ done:
     return result;
 }
 
-/** Get the pipeline that counts the triangles over each pixel into the overdraw texture,
- * created on first use and again when the shader was recompiled.
- *
- * It has no depth and adds one per fragment, culling back faces or not as the forward pipeline
- * of the material does.
- *
- * @param gpu The backend
- * @param cull Whether the pipeline culls back faces
- * @return The pipeline, NULL until the shader exists
- */
-static WGPURenderPipeline box_gpu_debug_overdraw_pipeline(
-    box_gpu_t *gpu,
-    bool cull)
-{
-    box_gpu_debug_t *d = gpu->debug;
-    WGPUShaderModule module = box_gpu_debug_overdraw_module(gpu);
-    WGPURenderPipeline result = NULL;
-    ecs_map_val_t *cached;
-    ecs_map_key_t key;
-    if (!module) {
-        goto done;
-    }
-
-    key = box_gpu_debug_key(
-        cull ? BOX_GPU_DEBUG_OVERDRAW_CULL : BOX_GPU_DEBUG_OVERDRAW_BOTH,
-        BOX_GPU_DEBUG_OVERDRAW_FORMAT);
-    cached = ecs_map_get(&d->pipelines, key);
-    if (cached && *cached) {
-        result = (WGPURenderPipeline)(uintptr_t)*cached;
-        goto done;
-    }
-
-    WGPUVertexAttribute slot_attr = {
-        .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 0
-    };
-    WGPUVertexBufferLayout slots = {
-        .stepMode = WGPUVertexStepMode_Instance,
-        .arrayStride = sizeof(uint32_t),
-        .attributeCount = 1,
-        .attributes = &slot_attr
-    };
-    WGPUBlendState blend = {
-        .color = {
-            .operation = WGPUBlendOperation_Add,
-            .srcFactor = WGPUBlendFactor_One,
-            .dstFactor = WGPUBlendFactor_One
-        },
-        .alpha = {
-            .operation = WGPUBlendOperation_Add,
-            .srcFactor = WGPUBlendFactor_One,
-            .dstFactor = WGPUBlendFactor_One
-        }
-    };
-    WGPUColorTargetState target = {
-        .format = BOX_GPU_DEBUG_OVERDRAW_FORMAT,
-        .blend = &blend,
-        .writeMask = WGPUColorWriteMask_All
-    };
-    WGPUFragmentState fragment = {
-        .module = module,
-        .entryPoint = { .data = "fs_count", .length = WGPU_STRLEN },
-        .targetCount = 1,
-        .targets = &target
-    };
-    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
-        .layout = d->overdraw_pipeline_layout,
-        .vertex = {
-            .module = module,
-            .entryPoint = { .data = "vs_count", .length = WGPU_STRLEN },
-            .bufferCount = 1,
-            .buffers = &slots
-        },
-        .primitive = {
-            .topology = WGPUPrimitiveTopology_TriangleList,
-            .frontFace = WGPUFrontFace_CCW,
-            .cullMode = cull ? WGPUCullMode_Back : WGPUCullMode_None
-        },
-        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
-        .fragment = &fragment
-    });
-    *ecs_map_ensure(&d->pipelines, key) = (ecs_map_val_t)(uintptr_t)result;
-done:
-    return result;
-}
-
-/** Get the pipeline that draws the heat map of the overdraw count over a color format, created
+/** Get the pipeline that draws the heat map of an overdraw mode over a color format, created
  * on first use and again when the shader was recompiled.
  *
  * It covers the target with an opaque color, ignoring the depth of the view.
  *
  * @param gpu The backend
+ * @param mode The OverdrawMode, not OverdrawOff
  * @param format The format of the color target
  * @return The pipeline, NULL until the shader exists
  */
 static WGPURenderPipeline box_gpu_debug_overdraw_map_pipeline(
     box_gpu_t *gpu,
+    OverdrawMode mode,
     WGPUTextureFormat format)
 {
     box_gpu_debug_t *d = gpu->debug;
@@ -741,7 +659,9 @@ static WGPURenderPipeline box_gpu_debug_overdraw_map_pipeline(
         goto done;
     }
 
-    key = box_gpu_debug_key(BOX_GPU_DEBUG_OVERDRAW_MAP, format);
+    key = box_gpu_debug_key(
+        (box_gpu_debug_kind_t)(BOX_GPU_DEBUG_OVERDRAW_ALL + (int32_t)mode - OverdrawAll),
+        format);
     cached = ecs_map_get(&d->pipelines, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -752,9 +672,15 @@ static WGPURenderPipeline box_gpu_debug_overdraw_map_pipeline(
         .format = format,
         .writeMask = WGPUColorWriteMask_All
     };
+    WGPUConstantEntry constant = {
+        .key = { .data = "mode", .length = WGPU_STRLEN },
+        .value = (double)mode
+    };
     WGPUFragmentState fragment = {
         .module = module,
         .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
+        .constantCount = 1,
+        .constants = &constant,
         .targetCount = 1,
         .targets = &target
     };
@@ -1566,8 +1492,9 @@ done:
     return;
 }
 
-/** Make the overdraw count texture at least the size of a target, replacing it and its bind
- * group with larger ones when it is smaller; passes recorded before keep the old ones.
+/** Make the overdraw count and depth textures at least the size of a target, replacing them and
+ * the bind group with larger ones when they are smaller; passes recorded before keep the old
+ * ones.
  *
  * @param gpu The backend
  * @param width Width of the target
@@ -1597,6 +1524,23 @@ static void box_gpu_debug_overdraw_texture(
         wgpuTextureRelease(d->overdraw);
     }
 
+    if (d->overdraw_depth_view) {
+        wgpuTextureViewRelease(d->overdraw_depth_view);
+    }
+
+    if (d->overdraw_depth) {
+        wgpuTextureRelease(d->overdraw_depth);
+    }
+
+    d->overdraw_depth = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_RenderAttachment,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width, height, 1 },
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    d->overdraw_depth_view = wgpuTextureCreateView(d->overdraw_depth, NULL);
     d->overdraw = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
         .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
         .dimension = WGPUTextureDimension_2D,
@@ -1621,14 +1565,14 @@ done:
     return;
 }
 
-/** Record the overdraw pass of a view: a render pass that clears the overdraw count texture and
- * adds one for every fragment of the mesh batches of its cull view, with the early and the late
- * arguments the cull pass wrote, without depth.
+/** Record the overdraw pass of a view into the overdraw count texture: its depth prepass again,
+ * in its draw order with its depth test (box_gpu_draw_overdraw).
  *
  * @param gpu The backend
  * @param t The target, whose size the pass covers
  * @param encoder The encoder of the frame
  * @param packet The packet
+ * @param v The view
  * @param group The bind group of the view
  * @param slot Slot of the view in the view buffer
  * @return Whether the count texture holds the overdraw of the view
@@ -1638,80 +1582,21 @@ static bool box_gpu_debug_overdraw_record(
     box_gpu_target_t *t,
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
+    const box_render_view_t *v,
     WGPUBindGroup group,
     int32_t slot)
 {
-    WGPURenderPipeline cull = box_gpu_debug_overdraw_pipeline(gpu, true);
-    WGPURenderPipeline both = box_gpu_debug_overdraw_pipeline(gpu, false);
-    const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
-    WGPUBindGroup instances = NULL, mesh = NULL;
-    WGPURenderPipeline bound = NULL;
     uint32_t width = wgpuTextureGetWidth(t->depth);
     uint32_t height = wgpuTextureGetHeight(t->depth);
-    bool result = cull && both && width && height;
-    int32_t i;
+    bool result = width && height;
     if (!result) {
         goto done;
     }
 
-    bool drawn = box_gpu_debug_view_sequence(gpu, packet, cv);
     box_gpu_debug_overdraw_texture(gpu, width, height);
-    WGPURenderPassColorAttachment attachment = {
-        .view = gpu->debug->overdraw_view,
-        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = WGPULoadOp_Clear,
-        .storeOp = WGPUStoreOp_Store,
-        .clearValue = { 0, 0, 0, 0 }
-    };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
-        &(WGPURenderPassDescriptor){
-            .colorAttachmentCount = 1,
-            .colorAttachments = &attachment
-        });
-    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
-    wgpuRenderPassEncoderSetViewport(pass, 0, 0, (float)width, (float)height, 0, 1);
-    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-    for (i = 0; drawn && i < cv->draw_count; i ++) {
-        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
-            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
-        const box_render_batch_t *b = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, d->batch);
-        if (!box_gpu_debug_wired(b)) {
-            continue;
-        }
-
-        box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-        WGPUBindGroup mesh_group = m ? box_gpu_debug_mesh_group(gpu, m) : NULL;
-        if (!mesh_group) {
-            continue;
-        }
-
-        WGPURenderPipeline pipeline = b->back_face == BackFaceCull ? cull : both;
-        if (pipeline != bound) {
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-            bound = pipeline;
-        }
-
-        if (mesh_group != mesh) {
-            wgpuRenderPassEncoderSetBindGroup(pass, 1, mesh_group, 0, NULL);
-            mesh = mesh_group;
-        }
-
-        if (box_gpu_cull_draw_wire(gpu, pass, packet, d, 2, false, gpu->debug->sequence,
-            &instances))
-        {
-            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
-        }
-
-        if (box_gpu_cull_draw_wire(gpu, pass, packet, d, 2, true, gpu->debug->sequence,
-            &instances))
-        {
-            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
-        }
-    }
-
-    wgpuRenderPassEncoderEnd(pass);
-    wgpuRenderPassEncoderRelease(pass);
+    result = box_gpu_draw_overdraw(gpu, encoder, packet, v, group, slot,
+        gpu->debug->overdraw_view, BOX_GPU_DEBUG_OVERDRAW_FORMAT,
+        gpu->debug->overdraw_depth_view, width, height);
 done:
     return result;
 }
@@ -1754,9 +1639,9 @@ void box_gpu_debug_record(
         }
     }
 
-    if (v->debug.overdraw) {
-        overdraw = box_gpu_debug_overdraw_map_pipeline(gpu, t->format);
-        if (overdraw && !box_gpu_debug_overdraw_record(gpu, t, encoder, packet, group, slot)) {
+    if (v->debug.overdraw >= OverdrawAll && v->debug.overdraw <= OverdrawCutout) {
+        overdraw = box_gpu_debug_overdraw_map_pipeline(gpu, v->debug.overdraw, t->format);
+        if (overdraw && !box_gpu_debug_overdraw_record(gpu, t, encoder, packet, v, group, slot)) {
             overdraw = NULL;
         }
     }
