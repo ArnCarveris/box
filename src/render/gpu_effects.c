@@ -33,6 +33,12 @@
 /** Prefilter levels of a bloom at most, the halvings of the image above the first mip */
 #define BOX_GPU_BLOOM_PREFILTER (12)
 
+#define BOX_GPU_BLOOM_GROUP (8)
+
+#define BOX_GPU_BLOOM_STEP (256)
+
+#define BOX_GPU_BLOOM_ENTRIES (5)
+
 /** Bins of the luminance histogram of the exposure */
 #define BOX_GPU_EXPOSURE_BINS (256)
 
@@ -91,6 +97,9 @@ typedef struct box_gpu_fx_state_t {
                                      *   NULL when the first mip is half the image */
     WGPUTextureView prefilter_mips[BOX_GPU_BLOOM_PREFILTER]; /**< View of every level */
     int32_t prefilter_count;        /**< Levels of the prefilter */
+    WGPUTexture up;
+    WGPUTextureView up_mips[BOX_GPU_BLOOM_MIPS];
+    WGPUBuffer steps;
     WGPUTexture history[2];         /**< First mip of the previous and the current frame */
     WGPUTextureView history_views[2]; /**< Views of the history images */
     int32_t history_index;          /**< History image that holds the last frame */
@@ -121,6 +130,10 @@ struct box_gpu_effects_t {
     WGPUComputePipeline histogram;  /**< Pipeline that fills the luminance histogram */
     WGPUComputePipeline adapt;      /**< Pipeline that adapts the exposure */
     int32_t measure_revision;       /**< Revision of the exposure shader of those pipelines */
+    WGPUBindGroupLayout bloom_layout;
+    WGPUPipelineLayout bloom_pipeline_layout;
+    WGPUComputePipeline bloom[BOX_GPU_BLOOM_ENTRIES];
+    int32_t bloom_revision;
     WGPUSampler sampler;            /**< Linear clamp sampler */
     WGPUTexture placeholder;        /**< 1x1 image bound where a pass reads no second image */
     WGPUTextureView placeholder_view; /**< View of the placeholder image */
@@ -262,6 +275,24 @@ static WGPUTexture box_gpu_fx_texture(
         .dimension = WGPUTextureDimension_2D,
         .size = { width ? width : 1, height ? height : 1, 1 },
         .format = format,
+        .mipLevelCount = mips,
+        .sampleCount = 1
+    };
+
+    return wgpuDeviceCreateTexture(gpu->device, &desc);
+}
+
+static WGPUTexture box_gpu_fx_chain_texture(
+    box_gpu_t *gpu,
+    uint32_t width,
+    uint32_t height,
+    uint32_t mips)
+{
+    WGPUTextureDescriptor desc = {
+        .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width ? width : 1, height ? height : 1, 1 },
+        .format = BOX_GPU_HDR_FORMAT,
         .mipLevelCount = mips,
         .sampleCount = 1
     };
@@ -441,6 +472,24 @@ void box_gpu_effects_init(
         { .binding = 3, .visibility = comp, .buffer = {
             .type = WGPUBufferBindingType_Uniform } }
     };
+    WGPUBindGroupLayoutEntry bloom[6] = {
+        { .binding = 0, .visibility = comp, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 1, .visibility = comp, .sampler = {
+            .type = WGPUSamplerBindingType_Filtering } },
+        { .binding = 2, .visibility = comp, .buffer = {
+            .type = WGPUBufferBindingType_Uniform } },
+        { .binding = 4, .visibility = comp, .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 5, .visibility = comp, .storageTexture = {
+            .access = WGPUStorageTextureAccess_WriteOnly,
+            .format = BOX_GPU_HDR_FORMAT,
+            .viewDimension = WGPUTextureViewDimension_2D } },
+        { .binding = 6, .visibility = comp, .buffer = {
+            .type = WGPUBufferBindingType_Uniform } }
+    };
     WGPUSamplerDescriptor sampler = {
         .addressModeU = WGPUAddressMode_ClampToEdge,
         .addressModeV = WGPUAddressMode_ClampToEdge,
@@ -469,6 +518,11 @@ void box_gpu_effects_init(
     fx->measure_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &fx->measure_layout });
+    fx->bloom_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = bloom });
+    fx->bloom_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &fx->bloom_layout });
     fx->sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
     fx->placeholder = box_gpu_fx_texture(gpu, 1, 1, BOX_GPU_HDR_FORMAT, 1);
     fx->placeholder_view = wgpuTextureCreateView(fx->placeholder, NULL);
@@ -524,6 +578,16 @@ static void box_gpu_fx_mips_free(
         s->prefilter = NULL;
     }
 
+    for (i = 0; i < s->mip_count - 1; i ++) {
+        wgpuTextureViewRelease(s->up_mips[i]);
+        s->up_mips[i] = NULL;
+    }
+
+    if (s->up) {
+        wgpuTextureRelease(s->up);
+        s->up = NULL;
+    }
+
     s->mip_count = 0;
     s->prefilter_count = 0;
     s->width = 0;
@@ -551,6 +615,10 @@ static void box_gpu_fx_state_free(
 
     if (s->exposure) {
         wgpuBufferRelease(s->exposure);
+    }
+
+    if (s->steps) {
+        wgpuBufferRelease(s->steps);
     }
 
     ecs_os_free(s);
@@ -609,6 +677,10 @@ static void box_gpu_fx_pipelines_free(
         fx->adapt = NULL;
     }
 
+    for (i = 0; i < BOX_GPU_BLOOM_ENTRIES; i ++) {
+        box_gpu_fx_compute_release(&fx->bloom[i]);
+    }
+
 }
 
 void box_gpu_effects_fini(
@@ -644,6 +716,8 @@ void box_gpu_effects_fini(
     wgpuBindGroupLayoutRelease(fx->smaa_layout);
     wgpuPipelineLayoutRelease(fx->measure_pipeline_layout);
     wgpuBindGroupLayoutRelease(fx->measure_layout);
+    wgpuPipelineLayoutRelease(fx->bloom_pipeline_layout);
+    wgpuBindGroupLayoutRelease(fx->bloom_layout);
     wgpuPipelineLayoutRelease(fx->pipeline_layout);
     wgpuBindGroupLayoutRelease(fx->layout);
     ecs_os_free(fx);
@@ -1170,7 +1244,7 @@ static void box_gpu_fx_bloom_mips(
             level >>= 1;
         }
 
-        s->prefilter = box_gpu_fx_texture(gpu, hw, hh, BOX_GPU_HDR_FORMAT, levels);
+        s->prefilter = box_gpu_fx_chain_texture(gpu, hw, hh, levels);
         for (i = 0; i < levels; i ++) {
             s->prefilter_mips[i] = box_gpu_fx_level(s->prefilter, i);
         }
@@ -1182,9 +1256,16 @@ static void box_gpu_fx_bloom_mips(
         shorter >>= 1;
     }
 
-    s->bloom = box_gpu_fx_texture(gpu, w, h, BOX_GPU_HDR_FORMAT, count);
+    s->bloom = box_gpu_fx_chain_texture(gpu, w, h, count);
     for (i = 0; i < count; i ++) {
         s->mips[i] = box_gpu_fx_level(s->bloom, i);
+    }
+
+    if (count > 1) {
+        s->up = box_gpu_fx_chain_texture(gpu, w, h, count - 1);
+        for (i = 0; i < count - 1; i ++) {
+            s->up_mips[i] = box_gpu_fx_level(s->up, i);
+        }
     }
 
     s->mip_count = (int32_t)count;
@@ -1231,9 +1312,10 @@ static void box_gpu_fx_bloom_settings(
 static WGPUTextureView box_gpu_fx_bloom_history(
     box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
-    box_gpu_fx_state_t *s)
+    box_gpu_fx_state_t *s,
+    WGPUTextureView first)
 {
-    WGPUTextureView result = s->mips[0];
+    WGPUTextureView result = first;
     int32_t i, next = s->history_index ^ 1;
     for (i = 0; i < 2; i ++) {
         if (!s->history[i]) {
@@ -1245,7 +1327,7 @@ static WGPUTextureView box_gpu_fx_bloom_history(
     bool drawn = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_BLOOM,
         .entry = "history",
-        .input = s->mips[0],
+        .input = first,
         .aux = s->history_views[s->history_index],
         .uniforms = s->uniforms,
         .output = s->history_views[next],
@@ -1259,6 +1341,82 @@ static WGPUTextureView box_gpu_fx_bloom_history(
     }
 
     return result;
+}
+
+static const char *box_gpu_fx_bloom_entries[BOX_GPU_BLOOM_ENTRIES] = {
+    "downsample_first", "downsample_first_tent", "downsample", "downsample_fit", "upsample"
+};
+
+static bool box_gpu_fx_bloom_pipelines(
+    box_gpu_t *gpu)
+{
+    box_gpu_effects_t *fx = gpu->effects;
+    WGPUShaderModule module = NULL;
+    WGPUComputePipeline *current[BOX_GPU_BLOOM_ENTRIES];
+    WGPUComputePipeline next[BOX_GPU_BLOOM_ENTRIES];
+    int32_t revision = box_gpu_fx_module(gpu, BOX_RENDER_SHADER_BLOOM, &module);
+    int32_t i;
+    bool result = module != NULL;
+    if (!module || (fx->bloom[0] && fx->bloom_revision == revision)) {
+        goto done;
+    }
+
+    for (i = 0; i < BOX_GPU_BLOOM_ENTRIES; i ++) {
+        current[i] = &fx->bloom[i];
+        next[i] = box_gpu_compute_pipeline(gpu, &(WGPUComputePipelineDescriptor){
+            .layout = fx->bloom_pipeline_layout,
+            .compute = { .module = module, .entryPoint = {
+                .data = box_gpu_fx_bloom_entries[i], .length = WGPU_STRLEN } }
+        });
+    }
+
+    if (box_gpu_compute_pipelines_swap(current, next, BOX_GPU_BLOOM_ENTRIES)) {
+        fx->bloom_revision = revision;
+    }
+
+done:
+    for (i = 0; i < BOX_GPU_BLOOM_ENTRIES; i ++) {
+        result &= fx->bloom[i] != NULL;
+    }
+
+    return result;
+}
+
+static void box_gpu_fx_bloom_dispatch(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder cp,
+    box_gpu_fx_state_t *s,
+    int32_t entry,
+    WGPUTextureView input,
+    WGPUTextureView aux,
+    WGPUTextureView output,
+    int32_t step,
+    uint32_t width,
+    uint32_t height)
+{
+    box_gpu_effects_t *fx = gpu->effects;
+    WGPUBindGroupEntry entries[6] = {
+        { .binding = 0, .textureView = input },
+        { .binding = 1, .sampler = fx->sampler },
+        { .binding = 2, .buffer = s->uniforms, .size = BOX_GPU_FX_UNIFORMS },
+        { .binding = 4, .textureView = aux ? aux : fx->placeholder_view },
+        { .binding = 5, .textureView = output },
+        { .binding = 6, .buffer = s->steps, .offset = (uint64_t)step * BOX_GPU_BLOOM_STEP,
+            .size = 4 * sizeof(float) }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = fx->bloom_layout,
+        .entryCount = 6,
+        .entries = entries
+    });
+    width = width ? width : 1;
+    height = height ? height : 1;
+    wgpuComputePassEncoderSetPipeline(cp, fx->bloom[entry]);
+    wgpuComputePassEncoderSetBindGroup(cp, 0, group, 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(cp,
+        (width + BOX_GPU_BLOOM_GROUP - 1) / BOX_GPU_BLOOM_GROUP,
+        (height + BOX_GPU_BLOOM_GROUP - 1) / BOX_GPU_BLOOM_GROUP, 1);
+    wgpuBindGroupRelease(group);
 }
 
 /** Record the passes of a bloom: halve the image, downsample it through the prefilter levels
@@ -1279,59 +1437,68 @@ static bool box_gpu_fx_bloom(
     const Bloom *b = &e->bloom;
     box_gpu_bloom_uniforms_t u;
     box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
-    box_gpu_fx_pass_t pass = {
-        .shader = BOX_RENDER_SHADER_BLOOM,
-        .uniforms = s->uniforms,
-        .format = BOX_GPU_HDR_FORMAT,
-        .blend = BOX_GPU_FX_REPLACE
-    };
+    float steps[BOX_GPU_BLOOM_MIPS * BOX_GPU_BLOOM_STEP / sizeof(float)] = {0};
+    uint32_t hw, hh;
+    int32_t i, last;
     bool result = false;
-    int32_t i;
     box_gpu_fx_bloom_mips(gpu, ctx, s, b);
+    hw = s->render_width >> 1;
+    hh = s->render_height >> 1;
     if (b->temporal <= 0) {
         box_gpu_fx_history_free(s);
     }
 
-    box_gpu_fx_bloom_settings(s, b, &u);
-    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
-    pass.entry = s->prefilter_count > 1 ? "downsample_first_tent" : "downsample_first";
-    pass.input = ctx->input;
-    pass.output = s->prefilter_count ? s->prefilter_mips[0] : s->mips[0];
-    if (!box_gpu_fx_draw(gpu, ctx, &pass)) {
+    if (!box_gpu_fx_bloom_pipelines(gpu)) {
         goto done;
     }
 
-    pass.entry = "downsample";
-    for (i = 1; i < s->prefilter_count; i ++) {
-        pass.input = s->prefilter_mips[i - 1];
-        pass.output = s->prefilter_mips[i];
-        box_gpu_fx_draw(gpu, ctx, &pass);
+    if (!s->steps) {
+        s->steps = box_gpu_fx_buffer(gpu, BOX_GPU_BLOOM_MIPS * BOX_GPU_BLOOM_STEP,
+            WGPUBufferUsage_Uniform);
     }
 
+    box_gpu_fx_bloom_settings(s, b, &u);
+    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
+    last = s->mip_count - 1;
+    for (i = 1; i <= last; i ++) {
+        steps[i * BOX_GPU_BLOOM_STEP / sizeof(float)] =
+            box_gpu_fx_bloom_blend(b, (float)i, (float)last);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, s->steps, 0, steps,
+        (size_t)s->mip_count * BOX_GPU_BLOOM_STEP);
+
+    WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(ctx->encoder, NULL);
     if (s->prefilter_count) {
-        pass.entry = "downsample_fit";
-        pass.input = s->prefilter_mips[s->prefilter_count - 1];
-        pass.output = s->mips[0];
-        box_gpu_fx_draw(gpu, ctx, &pass);
-        pass.entry = "downsample";
+        box_gpu_fx_bloom_dispatch(gpu, cp, s, s->prefilter_count > 1 ? 1 : 0, ctx->input,
+            NULL, s->prefilter_mips[0], 0, hw, hh);
+        for (i = 1; i < s->prefilter_count; i ++) {
+            box_gpu_fx_bloom_dispatch(gpu, cp, s, 2, s->prefilter_mips[i - 1], NULL,
+                s->prefilter_mips[i], 0, hw >> i, hh >> i);
+        }
+
+        box_gpu_fx_bloom_dispatch(gpu, cp, s, 3, s->prefilter_mips[s->prefilter_count - 1],
+            NULL, s->mips[0], 0, s->width, s->height);
+    } else {
+        box_gpu_fx_bloom_dispatch(gpu, cp, s, 0, ctx->input, NULL, s->mips[0], 0,
+            s->width, s->height);
     }
 
-    for (i = 1; i < s->mip_count; i ++) {
-        pass.input = s->mips[i - 1];
-        pass.output = s->mips[i];
-        box_gpu_fx_draw(gpu, ctx, &pass);
+    for (i = 1; i <= last; i ++) {
+        box_gpu_fx_bloom_dispatch(gpu, cp, s, 2, s->mips[i - 1], NULL, s->mips[i], 0,
+            s->width >> i, s->height >> i);
     }
 
-    pass.entry = "upsample";
-    pass.blend = BOX_GPU_FX_ADD;
-    for (i = s->mip_count - 1; i > 0; i --) {
-        pass.input = s->mips[i];
-        pass.output = s->mips[i - 1];
-        pass.constant = box_gpu_fx_bloom_blend(b, (float)i, (float)(s->mip_count - 1));
-        box_gpu_fx_draw(gpu, ctx, &pass);
+    for (i = last; i > 0; i --) {
+        box_gpu_fx_bloom_dispatch(gpu, cp, s, 4, i == last ? s->mips[i] : s->up_mips[i],
+            s->mips[i - 1], s->up_mips[i - 1], i, s->width >> (i - 1), s->height >> (i - 1));
     }
 
-    WGPUTextureView glow = b->temporal > 0 ? box_gpu_fx_bloom_history(gpu, ctx, s) : s->mips[0];
+    wgpuComputePassEncoderEnd(cp);
+    wgpuComputePassEncoderRelease(cp);
+
+    WGPUTextureView first = last > 0 ? s->up_mips[0] : s->mips[0];
+    WGPUTextureView glow = b->temporal > 0 ? box_gpu_fx_bloom_history(gpu, ctx, s, first) : first;
     result = box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
         .shader = BOX_RENDER_SHADER_BLOOM,
         .entry = "composite",

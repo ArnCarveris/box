@@ -25,6 +25,8 @@ struct Bloom {
 
 @group(0) @binding(2) var<uniform> bloom: Bloom;
 @group(0) @binding(4) var aux_texture: texture_2d<f32>;
+@group(0) @binding(5) var bloom_out: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(6) var<uniform> bloom_step: vec4f;
 
 fn soft_threshold(color: vec3f) -> vec3f {
     let brightness = max(color.r, max(color.g, color.b));
@@ -149,13 +151,13 @@ fn bspline(t: texture_2d<f32>, uv: vec2f) -> vec3f {
     return sum;
 }
 
-@fragment fn downsample_first(v: FullscreenOut) -> @location(0) vec4f {
+fn downsample_first_at(pos: vec2f) -> vec3f {
     // The 13 tap filter at a 2x reduction, its taps at pixel corners, as weights of the 6x6
     // pixels under it: half the outer 3x3 taps (a) and half the inner 2x2 taps (b).
     var a = array<f32, 6>(0.125, 0.125, 0.25, 0.25, 0.125, 0.125);
     var b = array<f32, 6>(0.0, 0.25, 0.25, 0.25, 0.25, 0.0);
     let texel = 1.0 / vec2f(textureDimensions(input_texture, 0));
-    let corner = floor(v.pos.xy) * 2.0 - 1.0;
+    let corner = floor(pos) * 2.0 - 1.0;
     var sum = vec3f(0.0);
     for (var y = 0; y < 6; y += 2) {
         for (var x = 0; x < 6; x += 2) {
@@ -168,13 +170,13 @@ fn bspline(t: texture_2d<f32>, uv: vec2f) -> vec3f {
         }
     }
 
-    return vec4f(sum, 1.0);
+    return sum;
 }
 
-@fragment fn downsample_first_tent(v: FullscreenOut) -> @location(0) vec4f {
+fn downsample_first_tent_at(pos: vec2f) -> vec3f {
     // A 4x4 tent at a 2x reduction, 1 3 3 1 / 8 along each axis, as 2x2 quads
     let texel = 1.0 / vec2f(textureDimensions(input_texture, 0));
-    let corner = floor(v.pos.xy) * 2.0;
+    let corner = floor(pos) * 2.0;
     let outer = vec2f(0.125);
     let inner = vec2f(0.375);
     var sum = quad_sum(quad(corner, texel), outer, inner);
@@ -183,21 +185,16 @@ fn bspline(t: texture_2d<f32>, uv: vec2f) -> vec3f {
     sum += quad_sum(quad(corner + vec2f(0.0, 2.0), texel), vec2f(0.125, 0.375),
         vec2f(0.375, 0.125));
     sum += quad_sum(quad(corner + vec2f(2.0, 2.0), texel), inner, outer);
-    return vec4f(sum, 1.0);
+    return sum;
 }
 
-@fragment fn downsample(v: FullscreenOut) -> @location(0) vec4f {
-    let stride = 1.0 / vec2f(textureDimensions(input_texture, 0));
-    return vec4f(sample13(v.uv, stride), 1.0);
-}
-
-@fragment fn downsample_fit(v: FullscreenOut) -> @location(0) vec4f {
+fn downsample_fit_at(uv: vec2f) -> vec3f {
     // Every texel of the input weighted with the B-spline at its distance in texels of the
     // first mip, 1 to 2 input texels each. Two texels next to each other are one bilinear tap
     // between them, so a tap reads 2x2 texels.
     let size = vec2f(textureDimensions(input_texture, 0));
     let ratio = size * bloom.first.xy;
-    let center = v.uv * size;
+    let center = uv * size;
     let lo = ceil(center - 2.0 * ratio - 0.5);
     let hi = floor(center + 2.0 * ratio - 0.5);
     var sum = vec3f(0.0);
@@ -218,11 +215,54 @@ fn bspline(t: texture_2d<f32>, uv: vec2f) -> vec3f {
         }
     }
 
-    return vec4f(sum / max(total, 1e-5), 1.0);
+    return sum / max(total, 1e-5);
 }
 
-@fragment fn upsample(v: FullscreenOut) -> @location(0) vec4f {
-    return vec4f(tent(input_texture, v.uv), 1.0);
+fn bloom_texel(id: vec3u) -> vec2f {
+    return vec2f(id.xy) + 0.5;
+}
+
+fn bloom_inside(id: vec3u) -> bool {
+    return all(id.xy < textureDimensions(bloom_out));
+}
+
+fn bloom_uv(id: vec3u) -> vec2f {
+    return bloom_texel(id) / vec2f(textureDimensions(bloom_out));
+}
+
+@compute @workgroup_size(8, 8) fn downsample_first(@builtin(global_invocation_id) id: vec3u) {
+    if (bloom_inside(id)) {
+        textureStore(bloom_out, id.xy, vec4f(downsample_first_at(bloom_texel(id)), 1.0));
+    }
+}
+
+@compute @workgroup_size(8, 8) fn downsample_first_tent(
+    @builtin(global_invocation_id) id: vec3u)
+{
+    if (bloom_inside(id)) {
+        textureStore(bloom_out, id.xy, vec4f(downsample_first_tent_at(bloom_texel(id)), 1.0));
+    }
+}
+
+@compute @workgroup_size(8, 8) fn downsample(@builtin(global_invocation_id) id: vec3u) {
+    if (bloom_inside(id)) {
+        let stride = 1.0 / vec2f(textureDimensions(input_texture, 0));
+        textureStore(bloom_out, id.xy, vec4f(sample13(bloom_uv(id), stride), 1.0));
+    }
+}
+
+@compute @workgroup_size(8, 8) fn downsample_fit(@builtin(global_invocation_id) id: vec3u) {
+    if (bloom_inside(id)) {
+        textureStore(bloom_out, id.xy, vec4f(downsample_fit_at(bloom_uv(id)), 1.0));
+    }
+}
+
+@compute @workgroup_size(8, 8) fn upsample(@builtin(global_invocation_id) id: vec3u) {
+    if (bloom_inside(id)) {
+        let below = textureLoad(aux_texture, id.xy, 0).rgb;
+        let glow = tent(input_texture, bloom_uv(id)) * bloom_step.x;
+        textureStore(bloom_out, id.xy, vec4f(below + glow, 1.0));
+    }
 }
 
 @fragment fn history(v: FullscreenOut) -> @location(0) vec4f {
