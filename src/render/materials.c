@@ -984,15 +984,23 @@ void box_draws_materials_send(
         const box_render_material_t *records = ecs_vec_first_t(&m->records,
             box_render_material_t);
         m->features = 0;
+        m->transmission_roughness = 0;
         m->features_valid = true;
         for (i = 0; i < (int32_t)total; i ++) {
             m->features |= records[i].sheen ? BOX_RENDER_MATERIAL_SHEEN : 0u;
             m->features |= records[i].anisotropy ? BOX_RENDER_MATERIAL_ANISOTROPY : 0u;
             m->features |= records[i].clear_coat ? BOX_RENDER_MATERIAL_CLEAR_COAT : 0u;
+            if (records[i].transmission_factor > 0) {
+                float r = records[i].diffuse_blur > 0 ? 1.0f : records[i].roughness;
+                if (r > m->transmission_roughness) {
+                    m->transmission_roughness = r;
+                }
+            }
         }
     }
 
     p->material_features = m->features;
+    p->transmission_roughness = m->transmission_roughness;
 
     if (!m->capacity || total > m->capacity) {
         uint32_t capacity = m->capacity ? m->capacity : BOX_RENDER_MATERIALS_MIN;

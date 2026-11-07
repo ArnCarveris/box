@@ -1331,6 +1331,7 @@ typedef struct box_render_packet_t {
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     uint32_t material_features;
+    float transmission_roughness;
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */

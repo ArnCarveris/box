@@ -519,6 +519,7 @@ typedef struct box_draw_materials_t {
     int64_t uploaded_frame; /**< Frame of the packet of the last send that uploaded */
     ecs_vec_t uploaded;     /**< box_draw_material_upload_t of that send */
     uint32_t features;
+    float transmission_roughness;
     bool features_valid;
 } box_draw_materials_t;
 

@@ -12,11 +12,14 @@
  */
 
 #include "gpu.h"
+#include <math.h>
 
 #ifdef BOX_RENDER_WGPU
 
 /** Mip levels of a snapshot at most, the full chain of a 32768 pixel edge minus one */
 #define BOX_GPU_SNAPSHOT_MIPS (16)
+
+#define BOX_GPU_TRANSMISSION_MIN_ROUGHNESS (0.045f)
 
 struct box_gpu_snapshot_t {
     WGPUTexture texture;            /**< The snapshot and its blur pyramid */
@@ -27,6 +30,7 @@ struct box_gpu_snapshot_t {
     uint32_t width;                 /**< Width of mip 0, the render width of the target */
     uint32_t height;                /**< Height of mip 0, the render height of the target */
     uint32_t mip_count;             /**< Mip levels */
+    uint32_t mip_rendered;
     WGPUTextureFormat format;       /**< Format of the color attachment it copies */
     WGPUTexture depth;              /**< Copy of the depth of the target, which a blur reads
                                      *   as the forward pass cannot bind its own depth */
@@ -350,6 +354,16 @@ static bool box_gpu_transmission_draws(
     return result;
 }
 
+static uint32_t box_gpu_transmission_mips(
+    const box_gpu_snapshot_t *s,
+    float roughness)
+{
+    float top = (float)(s->mip_count - 1);
+    float lod = ceilf(fmaxf(roughness, BOX_GPU_TRANSMISSION_MIN_ROUGHNESS) * top);
+    uint32_t result = lod >= top ? s->mip_count : (uint32_t)lod + 1;
+    return result < 1 ? 1 : result;
+}
+
 box_gpu_snapshot_t* box_gpu_transmission_begin(
     box_gpu_t *gpu,
     box_gpu_target_t *t,
@@ -386,6 +400,7 @@ box_gpu_snapshot_t* box_gpu_transmission_begin(
     }
 
     result->pipeline = box_gpu_transmission_pipeline(gpu, format);
+    result->mip_rendered = box_gpu_transmission_mips(result, packet->transmission_roughness);
 done:
     return result;
 }
@@ -429,7 +444,7 @@ void box_gpu_transmission_record(
             &(WGPUExtent3D){ s->width, s->height, 1 });
     }
 
-    for (i = 1; pipeline && i < s->mip_count; i ++) {
+    for (i = 1; pipeline && i < s->mip_rendered; i ++) {
         WGPURenderPassColorAttachment attachment = {
             .view = s->mips[i],
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
