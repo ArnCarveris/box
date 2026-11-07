@@ -208,36 +208,52 @@ struct VertexOut {
     @location(0) world: vec3f,
     @location(1) normal: vec3f,
     @location(2) color: vec4f,
-    @location(3) emissive: vec3f,
-    // A MappingObject material with a blend: the rotation of the instance as a quaternion,
-    // which turns the axes of the projections to the world; the identity for MappingWorld
-    @location(4) @interpolate(flat) rotation: vec4f,
-    // The UV of the mesh after the TextureTransform in xy, for a mapped material what mapping_uv
-    // adds after the projection (mapping_offset); metallic and roughness in zw
+    @location(3) @interpolate(flat) flat0: vec4u,
+    @location(4) @interpolate(flat) flat1: vec4u,
     @location(5) uv: vec4f,
-    // Flat scalars of the material: the AlphaCutoff in x, the thickness of the
-    // DiffuseTransmission in y and its blur in z; w is 1 plus the TextureMapping.blend for a
-    // MappingObject or MappingWorld material, else 0
-    @location(6) @interpolate(flat) scalars: vec4f,
-    // ClearCoat of the material in xy: strength and roughness, 0 strength without one;
-    // SpecularAnisotropy in zw: strength and rotation over 2 pi, 0 strength without one
-    @location(10) @interpolate(flat) layers: vec4f,
-    // A MappingObject material: the object position as mapping_object makes it and the object
-    // normal; a MappingWorld material the world position and normal; zero for the UVs of the
-    // mesh. The fragment stage reads at most 16 inter-stage
-    // variables, front_facing included, so the layers share a location to leave room for them.
+    @location(6) @interpolate(flat) flat2: vec4u,
+    @location(7) @interpolate(flat) flat3: vec4u,
     @location(11) object: vec4f,
     @location(14) object_normal: vec3f,
-    // Sheen of the material: linear color and roughness, a black color without one
-    @location(12) @interpolate(flat) sheen: vec4f,
-    // DiffuseTransmission of the material: linear color and factor, 0 factor without one
-    @location(13) @interpolate(flat) diffuse_transmission: vec4f,
-    // Transmission of the material: factor, index of refraction, thickness and attenuation
-    // distance, its linear attenuation color and the scale of the instance along its axes
-    @location(7) @interpolate(flat) transmission: vec4f,
-    @location(8) @interpolate(flat) attenuation: vec3f,
-    @location(9) @interpolate(flat) model_scale: vec3f,
 };
+
+fn vo_emissive(f: VertexOut) -> vec3f {
+    return vec3f(unpack2x16float(f.flat0.x), unpack2x16float(f.flat0.y).x);
+}
+
+fn vo_model_scale(f: VertexOut) -> vec3f {
+    return vec3f(unpack2x16float(f.flat0.y).y, unpack2x16float(f.flat0.z));
+}
+
+fn vo_sheen(f: VertexOut) -> vec4f {
+    let sheen = unpack4x8unorm(f.flat0.w);
+    return vec4f(material_linear(sheen.rgb), sheen.a);
+}
+
+fn vo_scalars(f: VertexOut) -> vec4f {
+    return vec4f(unpack2x16float(f.flat1.x), unpack2x16float(f.flat1.y));
+}
+
+fn vo_layers(f: VertexOut) -> vec4f {
+    return vec4f(unpack2x16unorm(f.flat1.z), unpack2x16unorm(f.flat1.w));
+}
+
+fn vo_diffuse_transmission(f: VertexOut) -> vec4f {
+    let d = unpack4x8unorm(f.flat2.x);
+    return vec4f(material_linear(d.rgb), d.a);
+}
+
+fn vo_attenuation(f: VertexOut) -> vec3f {
+    return material_linear(unpack4x8unorm(f.flat2.y).rgb);
+}
+
+fn vo_transmission(f: VertexOut) -> vec4f {
+    return bitcast<vec4f>(vec4u(f.flat2.zw, f.flat3.zw));
+}
+
+fn vo_rotation(f: VertexOut) -> vec4f {
+    return vec4f(unpack2x16snorm(f.flat3.x), unpack2x16snorm(f.flat3.y));
+}
 
 // Color, metallic and roughness, and UV of a vertex from the shading of its instance and its
 // material, with the tint and material of its region on a parametric surface. Reads the
@@ -340,22 +356,19 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     o.world = p.world.xyz;
     o.normal = normal;
     o.color = s.color;
-    o.emissive = material.emissive;
-    o.rotation = s.rotation;
-    o.scalars = vec4f(material.cutoff, material.thickness, material.diffuse_blur, s.mapped);
-    o.layers = vec4f(unpack2x16unorm(material.clear_coat), unpack2x16unorm(material.anisotropy));
+    o.flat0 = vec4u(pack2x16float(material.emissive.xy),
+        pack2x16float(vec2f(material.emissive.z, model_scale.x)),
+        pack2x16float(model_scale.yz), material.sheen);
+    o.flat1 = vec4u(pack2x16float(vec2f(material.cutoff, material.thickness)),
+        pack2x16float(vec2f(material.diffuse_blur, s.mapped)), material.clear_coat,
+        material.anisotropy);
+    o.flat2 = vec4u(material.diffuse_transmission, material.attenuation_color,
+        bitcast<u32>(material.transmission_factor), bitcast<u32>(material.ior));
+    o.flat3 = vec4u(pack2x16snorm(s.rotation.xy), pack2x16snorm(s.rotation.zw),
+        bitcast<u32>(material.thickness_factor), bitcast<u32>(material.attenuation_distance));
     o.object = s.object;
     o.object_normal = s.object_normal;
-    let sheen = unpack4x8unorm(material.sheen);
-    o.sheen = vec4f(material_linear(sheen.rgb), sheen.a);
-    let diffuse_transmission = unpack4x8unorm(material.diffuse_transmission);
-    o.diffuse_transmission = vec4f(material_linear(diffuse_transmission.rgb),
-        diffuse_transmission.a);
     o.uv = vec4f(s.uv, s.material);
-    o.transmission = vec4f(material.transmission_factor, material.ior,
-        material.thickness_factor, material.attenuation_distance);
-    o.attenuation = material_linear(unpack4x8unorm(material.attenuation_color).rgb);
-    o.model_scale = model_scale;
     return o;
 }
 
@@ -368,9 +381,9 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
 }
 
 @fragment fn fs_depth_cutout(f: VertexOut) {
-    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, f.scalars.w, f.object,
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, vo_scalars(f).w, f.object,
         f.object_normal);
-    if (f.color.a * albedo < f.scalars.x) {
+    if (f.color.a * albedo < vo_scalars(f).x) {
         discard;
     }
 }
@@ -380,8 +393,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
 // (blend_alpha).
 @fragment fn fs_depth_cutout_blend(f: VertexOut) {
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv.xy, f.scalars.w, f.object, f.object_normal);
-    if (f.color.a * albedo < f.scalars.x) {
+        f.uv.xy, vo_scalars(f).w, f.object, f.object_normal);
+    if (f.color.a * albedo < vo_scalars(f).x) {
         discard;
     }
 }
@@ -394,9 +407,9 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
 }
 
 @fragment fn fs_count_cutout(f: VertexOut) -> @location(0) vec4f {
-    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, f.scalars.w, f.object,
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, vo_scalars(f).w, f.object,
         f.object_normal);
-    if (f.color.a * albedo < f.scalars.x) {
+    if (f.color.a * albedo < vo_scalars(f).x) {
         discard;
     }
 
@@ -405,8 +418,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
 
 @fragment fn fs_count_cutout_blend(f: VertexOut) -> @location(0) vec4f {
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv.xy, f.scalars.w, f.object, f.object_normal);
-    if (f.color.a * albedo < f.scalars.x) {
+        f.uv.xy, vo_scalars(f).w, f.object, f.object_normal);
+    if (f.color.a * albedo < vo_scalars(f).x) {
         discard;
     }
 
@@ -762,13 +775,13 @@ struct Layers {
 
 // The layers of a fragment without a triplanar blend, at the interpolated UV or the projection
 // of a MappingObject or MappingWorld material on its dominant axis, with the cotangent frame of
-// that UV. surface calls it for the fragments without a blend (f.scalars.w at most 1, flat),
+// that UV. surface calls it for the fragments without a blend (vo_scalars(f).w at most 1, flat),
 // which are all those of a primitive and so of a quad, so the implicit derivatives of its
 // samples and frame hold.
 @diagnostic(off, derivative_uniformity)
 fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
     var uv = f.uv.xy;
-    if (f.scalars.w != 0.0) {
+    if (vo_scalars(f).w != 0.0) {
         uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
     }
     var o: Layers;
@@ -792,16 +805,16 @@ fn tangent_along(v: vec3f, n: vec3f) -> vec3f {
 // f.object, so a quad that straddles a change of the dominant axis keeps its mip level; a
 // fragment whose normal is along an axis samples once. The tangent normal of each projection
 // turns to the world with the tangent and bitangent of its axes (mapping_tangent, turned by
-// f.rotation), made perpendicular to the geometric normal, and the world normals blend; the
+// vo_rotation(f)), made perpendicular to the geometric normal, and the world normals blend; the
 // frame is that of the dominant projection. surface calls it for the fragments whose blend
-// (f.scalars.w, flat) is above 0, which are all those of a primitive and so of a quad, so the
+// (vo_scalars(f).w, flat) is above 0, which are all those of a primitive and so of a quad, so the
 // derivatives taken here hold.
 @diagnostic(off, derivative_uniformity)
 fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
     let dx = dpdx(f.object);
     let dy = dpdy(f.object);
     let n = f.object_normal;
-    let w = mapping_weights(n, f.scalars.w - 1.0);
+    let w = mapping_weights(n, vo_scalars(f).w - 1.0);
     let s = mapping_signs(n);
     let dominant = mapping_axis(n);
     var planes = mapping_planes(f.object, s);
@@ -823,8 +836,8 @@ fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
         o.orm += w[k] * textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
         let m = textureSampleGrad(normal_map, material_sampler, uv, gx[k], gy[k]).xyz * 2.0 -
             1.0;
-        let tangent = tangent_along(mapping_rotate(f.rotation, mapping_tangent(k, s)), geometric);
-        let bitangent = tangent_along(mapping_rotate(f.rotation, mapping_bitangent(k)),
+        let tangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_tangent(k, s)), geometric);
+        let bitangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_bitangent(k)),
             geometric);
         normal += w[k] * (tangent * m.x + bitangent * m.y + geometric * m.z);
         if (k == dominant) {
@@ -878,13 +891,13 @@ fn blend_sample(uv: vec2f, gx: vec2f, gy: vec2f, w: vec4f, maps: bool) -> BlendS
 // The derivatives of the coordinates are taken before the layers branch on their weights; the
 // normal perturbs the geometric normal with the cotangent frame of the coordinates of the shape.
 // A back face (front false) samples no layer, but the albedo of an alpha tested pipeline, whose
-// alpha surface_of takes. surface_blend calls it for the fragments without a blend (f.scalars.w
+// alpha surface_of takes. surface_blend calls it for the fragments without a blend (vo_scalars(f).w
 // at most 1, flat), which are all those of a primitive and so of a quad, so the implicit
 // derivatives hold.
 @diagnostic(off, derivative_uniformity)
 fn blend_layers(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     var uv = f.uv.xy;
-    if (f.scalars.w != 0.0) {
+    if (vo_scalars(f).w != 0.0) {
         uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
     }
     let gx = dpdx(uv);
@@ -913,14 +926,14 @@ fn blend_layers(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
 // samples each map once. The blended tangent normal of each projection turns to the world with
 // the axes of that projection and the world normals blend; the frame is that of the dominant
 // projection. A back face samples no layer, but the albedo of an alpha tested pipeline.
-// surface_blend calls it for the fragments whose blend (f.scalars.w, flat) is above 0, which are
+// surface_blend calls it for the fragments whose blend (vo_scalars(f).w, flat) is above 0, which are
 // all those of a primitive and so of a quad, so the derivatives taken here hold.
 @diagnostic(off, derivative_uniformity)
 fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     let dx = dpdx(f.object);
     let dy = dpdy(f.object);
     let n = f.object_normal;
-    let w = mapping_weights(n, f.scalars.w - 1.0);
+    let w = mapping_weights(n, vo_scalars(f).w - 1.0);
     let s = mapping_signs(n);
     let dominant = mapping_axis(n);
     let sampled = front || kind.alpha_cutout != 0u;
@@ -936,8 +949,8 @@ fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
         if (w[k] == 0.0) {
             continue;
         }
-        let tangent = tangent_along(mapping_rotate(f.rotation, mapping_tangent(k, s)), geometric);
-        let bitangent = tangent_along(mapping_rotate(f.rotation, mapping_bitangent(k)),
+        let tangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_tangent(k, s)), geometric);
+        let bitangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_bitangent(k)),
             geometric);
         if (k == dominant) {
             o.frame = Frame(tangent, bitangent, false);
@@ -967,7 +980,7 @@ fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
 fn surface(f: VertexOut, front: bool) -> Surface {
     let geometric = normalize(f.normal);
     var layers: Layers;
-    if (f.scalars.w > 1.0) {
+    if (vo_scalars(f).w > 1.0) {
         layers = triplanar(f, geometric);
     } else {
         layers = hard_layers(f, geometric);
@@ -979,7 +992,7 @@ fn surface(f: VertexOut, front: bool) -> Surface {
 fn surface_blend(f: VertexOut, front: bool) -> Surface {
     let geometric = normalize(f.normal);
     var layers: Layers;
-    if (f.scalars.w > 1.0) {
+    if (vo_scalars(f).w > 1.0) {
         layers = blend_triplanar(f, geometric, front);
     } else {
         layers = blend_layers(f, geometric, front);
@@ -1002,13 +1015,13 @@ fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Su
     s.metallic = clamp(f.uv.z, 0.0, 1.0);
     s.roughness = clamp(f.uv.w, MIN_ROUGHNESS, 1.0);
     s.occlusion = 1.0;
-    s.emissive = f.emissive;
+    s.emissive = vo_emissive(f);
     s.normal = -geometric;
     s.geometric = -geometric;
-    s.coat = clamp(f.layers.x, 0.0, 1.0);
-    s.coat_roughness = clamp(f.layers.y, MIN_ROUGHNESS, 1.0);
-    s.sheen = max(f.sheen.rgb, vec3f(0.0));
-    s.sheen_roughness = clamp(f.sheen.w, SHEEN_MIN_ROUGHNESS, 1.0);
+    s.coat = clamp(vo_layers(f).x, 0.0, 1.0);
+    s.coat_roughness = clamp(vo_layers(f).y, MIN_ROUGHNESS, 1.0);
+    s.sheen = max(vo_sheen(f).rgb, vec3f(0.0));
+    s.sheen_roughness = clamp(vo_sheen(f).w, SHEEN_MIN_ROUGHNESS, 1.0);
     if (front) {
         s.albedo *= albedo.rgb;
         s.alpha *= albedo.a;
@@ -1022,13 +1035,13 @@ fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Su
         s.alpha *= albedo.a;
     }
 
-    s.back_factor = clamp(f.diffuse_transmission.w, 0.0, 1.0);
+    s.back_factor = clamp(vo_diffuse_transmission(f).w, 0.0, 1.0);
     s.back_color = vec3f(0.0);
     s.thickness = 0.0;
     if (s.back_factor > 0.0) {
-        s.back_color = max(f.diffuse_transmission.rgb, vec3f(0.0)) * s.albedo *
+        s.back_color = max(vo_diffuse_transmission(f).rgb, vec3f(0.0)) * s.albedo *
             (1.0 - s.metallic) * s.back_factor;
-        s.thickness = max(f.scalars.y, 0.0);
+        s.thickness = max(vo_scalars(f).y, 0.0);
     }
 
     // The direction of the anisotropy: the tangent of the frame turned by the rotation around
@@ -1036,13 +1049,13 @@ fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Su
     s.anisotropy = 0.0;
     s.tangent = vec3f(0.0);
     s.bitangent = vec3f(0.0);
-    if (material_anisotropy && f.layers.z > 0.0 && !frame.degenerate) {
-        let rotation = f.layers.w * (2.0 * PI);
+    if (material_anisotropy && vo_layers(f).z > 0.0 && !frame.degenerate) {
+        let rotation = vo_layers(f).w * (2.0 * PI);
         let dir = frame.tangent * cos(rotation) + frame.bitangent * sin(rotation);
         let along = dir - s.normal * dot(dir, s.normal);
         let len2 = dot(along, along);
         if (len2 > 1e-12) {
-            s.anisotropy = clamp(f.layers.z, 0.0, 1.0);
+            s.anisotropy = clamp(vo_layers(f).z, 0.0, 1.0);
             s.tangent = along * inverseSqrt(len2);
             s.bitangent = cross(s.normal, s.tangent);
         }
@@ -1489,10 +1502,10 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
         ap = aerial_sample(f.pos, f.world);
     }
 
-    let factor = f.transmission.x;
-    let ior = f.transmission.y;
-    let thickness = f.transmission.z;
-    let att_distance = f.transmission.w;
+    let factor = vo_transmission(f).x;
+    let ior = vo_transmission(f).y;
+    let thickness = vo_transmission(f).z;
+    let att_distance = vo_transmission(f).w;
     if (factor <= 0.0) {
         let lit = reflected.diffuse + reflected.specular;
         return vec4f(lit * ap.a + ap.rgb, s.alpha);
@@ -1509,7 +1522,7 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
 
     // Screen-space refraction: project refracted exit point through VP
     let refracted = refract(-v, s.normal, 1.0 / max(ior, 0.001));
-    let exit_pos = f.world + normalize(refracted) * thickness * f.model_scale;
+    let exit_pos = f.world + normalize(refracted) * thickness * vo_model_scale(f);
     let exit_clip = view.view_proj * vec4f(exit_pos, 1.0);
     var screen_uv = exit_clip.xy / exit_clip.w * vec2f(0.5, -0.5) + vec2f(0.5, 0.5);
     screen_uv = clamp(screen_uv, vec2f(0.0), vec2f(1.0));
@@ -1517,7 +1530,7 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     // Sample opaque scene at refracted UV with roughness-dependent LOD
     let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
     var bg_lod = s.roughness * max_mip;
-    let diffuse_blur = f.scalars.z;
+    let diffuse_blur = vo_scalars(f).z;
     if (diffuse_blur > 0.0) {
         bg_lod = transmission_blur_lod(f.world, screen_uv, diffuse_blur, bg_lod, max_mip);
     }
@@ -1525,7 +1538,7 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
         bg_lod).rgb;
 
     // Beer-Lambert absorption
-    let att_color = max(f.attenuation, vec3f(0.001));
+    let att_color = max(vo_attenuation(f), vec3f(0.001));
     let att_ratio = thickness / max(att_distance, 0.001);
     let transmittance = pow(att_color, vec3f(att_ratio));
     let transmitted = (1.0 - fresnel) * background * transmittance * s.albedo;
@@ -1564,7 +1577,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (kind.alpha_cutout != 0u && s.alpha < f.scalars.x) {
+    if (kind.alpha_cutout != 0u && s.alpha < vo_scalars(f).x) {
         discard;
     }
 
@@ -1574,7 +1587,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 // A TextureBlend batch, of any blend mode, alpha tested or transmissive as fs is.
 @fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface_blend(f, front);
-    if (kind.alpha_cutout != 0u && s.alpha < f.scalars.x) {
+    if (kind.alpha_cutout != 0u && s.alpha < vo_scalars(f).x) {
         discard;
     }
 
