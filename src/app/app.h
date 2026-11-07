@@ -17,6 +17,8 @@ int box_app_views(ecs_world_t *world);
  */
 double box_app_cpu_time(void);
 
+void box_app_precise_sleep(void);
+
 /** Read the wall clock.
  *
  * @return Seconds since an arbitrary epoch

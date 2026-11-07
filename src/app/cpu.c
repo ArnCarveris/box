@@ -6,6 +6,7 @@
 #include "app.h"
 #include <stdlib.h>
 #include <unistd.h>
+#include <sched.h>
 #include <sys/resource.h>
 
 /** Seconds left below which a wait sleeps the rest in one go */
@@ -20,6 +21,48 @@
 
 /** Seconds before a deadline at which a wait counts it as reached, below the sleep resolution */
 #define BOX_WAIT_EPSILON (1e-6)
+
+static ecs_os_api_sleep_t box_os_sleep_next;
+
+static void box_os_sleep(
+    int32_t sec,
+    int32_t nanosec)
+{
+    ecs_time_t start;
+    double duration = (double)sec + (double)nanosec * 1e-9, left = duration;
+    if (duration <= BOX_WAIT_STEP) {
+        box_os_sleep_next(sec, nanosec);
+        goto done;
+    }
+
+    ecs_os_get_time(&start);
+    while (left > BOX_WAIT_STEP) {
+        double step = left * BOX_WAIT_FRACTION;
+        int32_t whole = (int32_t)step;
+        ecs_time_t now = start;
+        box_os_sleep_next(whole, (int32_t)((step - (double)whole) * 1e9));
+        left = duration - ecs_time_measure(&now);
+    }
+
+    while (left > BOX_WAIT_EPSILON) {
+        ecs_time_t now = start;
+        sched_yield();
+        left = duration - ecs_time_measure(&now);
+    }
+
+done:
+    return;
+}
+
+void box_app_precise_sleep(void)
+{
+#ifndef __EMSCRIPTEN__
+    if (ecs_os_api.sleep_ && ecs_os_api.sleep_ != box_os_sleep) {
+        box_os_sleep_next = ecs_os_api.sleep_;
+        ecs_os_api.sleep_ = box_os_sleep;
+    }
+#endif
+}
 
 double box_app_cpu_time(void)
 {
