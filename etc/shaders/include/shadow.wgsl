@@ -124,7 +124,21 @@ fn shadow_cascade(index: u32, world: vec3f, normal: vec3f, l: vec3f) -> f32 {
     let p = view.shadow_matrix[index] * vec4f(offset, 1.0);
     let uv = p.xy * vec2f(0.5, -0.5) + vec2f(0.5);
     let depth = p.z + view.shadow_bias[index];
-    let t = shadow_filter_taps(uv, vec2f(view.shadow_params.z), view.shadow_config.y);
+    let texel = vec2f(view.shadow_params.z);
+    if (view.shadow_config.y == 3u) {
+        let q = shadow_filter_taps(uv, texel, 3u);
+        let a = textureSampleCompareLevel(shadow_map, shadow_sampler,
+            q.base + vec2f(q.x.x, q.y.x), index, depth);
+        let b = textureSampleCompareLevel(shadow_map, shadow_sampler,
+            q.base + vec2f(q.x.y, q.y.x), index, depth);
+        let c = textureSampleCompareLevel(shadow_map, shadow_sampler,
+            q.base + vec2f(q.x.x, q.y.y), index, depth);
+        let d = textureSampleCompareLevel(shadow_map, shadow_sampler,
+            q.base + vec2f(q.x.y, q.y.y), index, depth);
+        return q.wy.x * (q.wx.x * a + q.wx.y * b) + q.wy.y * (q.wx.x * c + q.wx.y * d);
+    }
+
+    let t = shadow_filter_taps(uv, texel, view.shadow_config.y);
     var sum = 0.0;
     var y = t.y;
     var wy = t.wy;
