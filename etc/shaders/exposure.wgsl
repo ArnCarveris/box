@@ -41,8 +41,10 @@ fn histogram_main(
     atomicStore(&local_bins[lid], 0u);
     workgroupBarrier();
     let size = textureDimensions(input_texture, 0);
-    if (gid.x < size.x && gid.y < size.y) {
-        let c = textureLoad(input_texture, vec2i(gid.xy), 0);
+    let stride = u32(max(settings.frame.z, 1.0));
+    let pixel = gid.xy * stride + vec2u(stride / 2u);
+    if (pixel.x < size.x && pixel.y < size.y) {
+        let c = textureLoad(input_texture, vec2i(pixel), 0);
         if (c.a > 0.0) {
             let luma = dot(max(c.rgb, vec3f(0.0)), vec3f(0.2126, 0.7152, 0.0722));
             var bin = 0u;

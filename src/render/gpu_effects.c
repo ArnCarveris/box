@@ -39,6 +39,8 @@
 /** Pixels along each axis of a workgroup of the histogram pass */
 #define BOX_GPU_EXPOSURE_GROUP (16)
 
+#define BOX_GPU_EXPOSURE_SAMPLES (1u << 21)
+
 /** Stops the exposure is clamped to when no bound is set */
 #define BOX_GPU_EXPOSURE_LIMIT (60.0f)
 
@@ -1013,7 +1015,13 @@ static WGPUBuffer box_gpu_fx_measure(
         s->exposure = box_gpu_fx_buffer(gpu, 4 * sizeof(float), WGPUBufferUsage_Storage);
     }
 
+    uint32_t w = (uint32_t)ctx->ft->width, h = (uint32_t)ctx->ft->height, stride = 1;
+    while ((uint64_t)(w / stride) * (h / stride) > BOX_GPU_EXPOSURE_SAMPLES) {
+        stride *= 2;
+    }
+
     box_gpu_fx_measure_settings(&e->auto_exposure, ctx->packet->delta, &u);
+    u.frame[2] = (float)stride;
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
     WGPUBindGroupEntry entries[4] = {
         { .binding = 0, .textureView = ctx->input },
@@ -1027,7 +1035,8 @@ static WGPUBuffer box_gpu_fx_measure(
         .entryCount = 4,
         .entries = entries
     });
-    uint32_t w = (uint32_t)ctx->ft->width, h = (uint32_t)ctx->ft->height;
+    w = (w + stride - 1) / stride;
+    h = (h + stride - 1) / stride;
     WGPUComputePassEncoder cp = wgpuCommandEncoderBeginComputePass(ctx->encoder, NULL);
     wgpuComputePassEncoderSetBindGroup(cp, 0, group, 0, NULL);
     wgpuComputePassEncoderSetPipeline(cp, fx->histogram);
