@@ -30,6 +30,7 @@ async {
   hud_latitude = -2
   hud_north = 305
   hud_fog = 0.002
+  hud_baked = false
 }
 
 jungle_city {
