@@ -2770,3 +2770,85 @@ void ViewDebug_wire_box_edges(void) {
     stbi_image_free(px);
     ecs_fini(world);
 }
+
+void ViewDebug_overdraw_layers(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    ecs_get_mut(world, view, View)->debug.overdraw = true;
+    ecs_modified(world, view, View);
+    ecs_entity_t back = dw_shape(world, 0, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, back, Quad, {6, 6});
+    ecs_entity_t front = dw_shape(world, 0, 0, 1, (Rgb){0, 0, 255});
+    ecs_set(world, front, Quad, {2, 2});
+    unsigned char *px = dg_render(world, "overdraw_layers.png");
+
+    const unsigned char *none = dg_px(px, 2, 2);
+    test_int(none[0], 0);
+    test_int(none[1], 0);
+    test_int(none[2], 0);
+
+    const unsigned char *one = dg_px(px, 64 + (int32_t)(2.0f * dw_scale(10)), 64);
+    test_assert(abs(one[0] - 13) <= 2);
+    test_assert(abs(one[1] - 26) <= 2);
+    test_assert(abs(one[2] - 115) <= 2);
+
+    const unsigned char *two = dg_px(px, 64, 64);
+    test_assert(abs(two[0] - 0) <= 2);
+    test_assert(abs(two[1] - 115) <= 2);
+    test_assert(abs(two[2] - 217) <= 2);
+
+    int32_t draws, passes;
+    dw_count(world, &draws, &passes);
+    test_int(passes, 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_back_faces(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    ecs_get_mut(world, view, View)->debug.overdraw = true;
+    ecs_modified(world, view, View);
+    ecs_entity_t culled = dw_shape(world, -2, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, culled, Box, {1, 1, 1});
+    ecs_entity_t plain = dw_shape(world, 2, 0, 0, (Rgb){255, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    ecs_set(world, plain, BackFaceMode, {BackFacePlain});
+    unsigned char *px = dg_render(world, "overdraw_back_faces.png");
+
+    int32_t offset = (int32_t)(2.0f * dw_scale(10));
+    const unsigned char *one = dg_px(px, 64 - offset, 64);
+    test_assert(abs(one[0] - 13) <= 2);
+    test_assert(abs(one[1] - 26) <= 2);
+    test_assert(abs(one[2] - 115) <= 2);
+
+    const unsigned char *two = dg_px(px, 64 + offset, 64);
+    test_assert(abs(two[0] - 0) <= 2);
+    test_assert(abs(two[1] - 115) <= 2);
+    test_assert(abs(two[2] - 217) <= 2);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void ViewDebug_overdraw_stacked(void) {
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
+    View *v = ecs_get_mut(world, view, View);
+    v->debug.overdraw = true;
+    v->culling.occlusion = false;
+    ecs_modified(world, view, View);
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_entity_t quad = dw_shape(world, 0, 0, -(float)i * 0.1f, (Rgb){255, 0, 0});
+        ecs_set(world, quad, Quad, {2, 2});
+    }
+
+    unsigned char *px = dg_render(world, "overdraw_stacked.png");
+
+    const unsigned char *p = dg_px(px, 64, 64);
+    test_int(p[0], 255);
+    test_int(p[1], 255);
+    test_int(p[2], 255);
+    stbi_image_free(px);
+    ecs_fini(world);
+}

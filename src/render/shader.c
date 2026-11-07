@@ -459,7 +459,7 @@ static void box_shader_changed(
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
  * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
  * a view of the packet has one, or it draws the probe debug views and a view of the packet has
- * one enabled
+ * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -509,6 +509,14 @@ static bool box_shader_used(
             if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.wireframe !=
                 WireframeOff)
             {
+                result = true;
+            }
+        }
+    }
+
+    if (handle == BOX_RENDER_SHADER_DEBUG_OVERDRAW) {
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug.overdraw) {
                 result = true;
             }
         }
@@ -927,4 +935,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_DEBUG_WIRE, true);
     box_shader_builtin(world, state, builtin, "debug_probes", "etc/shaders/debug_probes.wgsl",
         BOX_RENDER_SHADER_DEBUG_PROBES, true);
+    box_shader_builtin(world, state, builtin, "debug_overdraw",
+        "etc/shaders/debug_overdraw.wgsl", BOX_RENDER_SHADER_DEBUG_OVERDRAW, true);
 }

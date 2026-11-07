@@ -526,3 +526,25 @@ void ViewDebug_capture_copies_debug(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void ViewDebug_overdraw_script(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, View);
+    test_bool(ecs_get(world, e, View)->debug.overdraw, false);
+
+    test_assert(ecs_script_run(world, "debug_overdraw",
+        "using box.view\n"
+        "heat { View: {debug: {overdraw: true}} }\n", NULL) == 0);
+    const View *v = ecs_get(world, ecs_lookup(world, "heat"), View);
+    test_assert(v != NULL);
+    test_bool(v->debug.overdraw, true);
+    test_int(v->debug.wireframe, WireframeOff);
+    test_int(v->debug.wireframe_color.a, 200);
+    test_flt(v->debug.wireframe_width, 1);
+    test_bool(v->debug.grid.enabled, false);
+    test_flt(v->debug.grid.cell_size, 1);
+    test_bool(v->culling.occlusion, true);
+    ecs_fini(world);
+}

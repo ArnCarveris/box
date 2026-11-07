@@ -1236,7 +1236,10 @@
                     "probe_size",
                     "probes_per_view",
                     "probes_with_effects",
-                    "probes_not_in_captures"
+                    "probes_not_in_captures",
+                    "overdraw_layers",
+                    "overdraw_back_faces",
+                    "overdraw_stacked"
                 ]
             }
         ]

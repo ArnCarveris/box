@@ -146,6 +146,9 @@ ECS_STRUCT(ViewDebug, {
     WireframeMode wireframe; /**< Wireframe of the meshes, default WireframeOff */
     rgba wireframe_color;   /**< Color of the wireframe lines, default white with alpha 200 */
     float wireframe_width;  /**< Width of the wireframe lines in pixels, default 1 */
+    bool overdraw;          /**< Heat map of the mesh triangles over each pixel, depth ignored:
+                             *   black for none through blue, green, yellow and red to white for
+                             *   8 or more; 2D shapes, text, particles and the sky do not count */
     bool light_probes;      /**< Spheres at the probes of the volume the view samples, lit by
                              *   their SH, unshadowed; a probe invalid for every cell around it
                              *   (inside static geometry) in a dark red hatch */
