@@ -260,7 +260,8 @@ static void box_perf_orbit(
     ecs_set(world, camera, Rotation, { -elevation, angle, 0 });
 }
 
-/** Measure the bounds of every shape and the camera distance that fits them.
+/** Measure the bounds of the shapes in the scene of the camera and the camera distance that
+ * fits them.
  *
  * @param world The world
  * @param perf The state of the module
@@ -274,7 +275,7 @@ static void box_perf_measure_bounds(
     const Camera *cam = camera ? ecs_get(world, camera, Camera) : NULL;
     float fov = cam ? cam->fov : BOX_CAMERA_FOV;
     vec3 min, max;
-    int32_t shapes = box_perf_bounds(world, min, max);
+    int32_t shapes = box_perf_bounds(world, camera, min, max);
     PerfStatus *status;
     if (!shapes) {
         glm_vec3_zero(min);

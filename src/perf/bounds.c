@@ -5,6 +5,7 @@
 
 #include "perf.h"
 #include "../geometry/mesh_cache.h"
+#include "../render/render.h"
 #include <float.h>
 
 /** Grow bounds by the eight corners of a mesh box transformed into world space.
@@ -38,10 +39,12 @@ static void box_perf_grow(
 
 int32_t box_perf_bounds(
     ecs_world_t *world,
+    ecs_entity_t camera,
     vec3 min,
     vec3 max)
 {
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t scene = camera ? box_render_scene_of(world, camera) : 0;
     int32_t result = 0;
     ecs_query_t *q;
     ecs_iter_t it;
@@ -54,7 +57,8 @@ int32_t box_perf_bounds(
     q = ecs_query(world, {
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn }
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
+            { .id = ecs_id(Scene), .src.id = EcsSelf | EcsUp, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheNone
     });
@@ -66,7 +70,7 @@ int32_t box_perf_bounds(
         for (i = 0; i < it.count; i ++) {
             const box_mesh_t *mesh = box_mesh_cache_get(cache, shape[i].mesh);
             vec3 a, b, lo, hi;
-            if (!mesh) {
+            if (!mesh || box_render_scene_field(&it, 2, i) != scene) {
                 continue;
             }
 

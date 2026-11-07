@@ -56,15 +56,18 @@ typedef struct box_perf_stats_t {
 /** Replacement for the wall clock, NULL for the real one, lets tests drive time. */
 extern double (*box_perf_clock)(void);
 
-/** Measure the world space bounds of every shape with a world transform.
+/** Measure the world space bounds of every shape with a world transform in the scene of a
+ * camera.
  *
  * @param world The world
+ * @param camera The camera whose scene the shapes belong to, 0 for the default scene
  * @param min The minimum corner to fill
  * @param max The maximum corner to fill
  * @return The number of shapes, 0 when there are none and the corners are not written
  */
 int32_t box_perf_bounds(
     ecs_world_t *world,
+    ecs_entity_t camera,
     vec3 min,
     vec3 max);
 
