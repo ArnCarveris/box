@@ -265,8 +265,8 @@ void Fit_frames_scene(void) {
     fit_result_t r;
     fit_run(world, s, "fit", "camera", &r);
     test_int(r.count, 3);
-    test_flt(r.center[0], 0.75f);
-    test_flt(r.center[1], 0.5f);
+    test_flt(r.center[0], 0.12f);
+    test_flt(r.center[1], -0.65f);
     test_flt(r.center[2], 0.75f);
     ecs_progress(world, 0);
 

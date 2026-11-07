@@ -2,9 +2,9 @@
  * @file command/cmd_fit.c
  * @brief The fit command: move a camera to a tight fit of the scene it draws.
  *
- * The camera keeps its direction and backs off from the center of the content until the
- * corners of every mesh lie inside its frustum. The distance follows from the corners of the
- * local bounds of the meshes, not from a bounding sphere, so the content fills the view.
+ * The camera keeps its direction and moves to the closest position where the corners of every
+ * mesh lie inside its frustum, with the projection of the corners centered in the view. The
+ * corners of the local bounds of the meshes set the fit, so the content fills the view.
  */
 
 #include "command.h"
@@ -235,7 +235,9 @@ static void box_cmd_fit(
     float near_ = cam->near_ > 0 ? cam->near_ : BOX_CAMERA_NEAR;
     float tan_y = tanf(glm_rad(fov) * 0.5f) * BOX_CMD_FIT_FILL;
     float tan_x = tan_y * aspect;
-    float distance = -FLT_MAX, extent_x = 0, extent_y = 0, depth = -FLT_MAX;
+    float lo_x = FLT_MAX, hi_x = -FLT_MAX, lo_y = FLT_MAX, hi_y = -FLT_MAX;
+    float lo_z = FLT_MAX, hi_z = -FLT_MAX;
+    float left = -FLT_MAX, right_ = FLT_MAX, bottom = -FLT_MAX, top = FLT_MAX;
     glm_vec3_center(content.min, content.max, center);
     box_cmd_fit_axes(ecs_get(world, camera, WorldTransform), right, up, forward);
 
@@ -256,21 +258,38 @@ static void box_cmd_fit(
     for (i = 0; i < ecs_vec_count(&content.corners); i ++) {
         vec3 offset;
         glm_vec3_sub(*ecs_vec_get_t(&content.corners, vec3, i), center, offset);
-        float x = fabsf(glm_vec3_dot(offset, right));
-        float y = fabsf(glm_vec3_dot(offset, up));
+        float x = glm_vec3_dot(offset, right);
+        float y = glm_vec3_dot(offset, up);
         float z = glm_vec3_dot(offset, forward);
-        float need = near_ - z;
-        if (!cam->ortho) {
-            need = glm_max(glm_max(x / tan_x, y / tan_y) - z, need);
-        }
-
-        distance = glm_max(distance, need);
-        depth = glm_max(depth, z);
-        extent_x = glm_max(extent_x, x);
-        extent_y = glm_max(extent_y, y);
+        lo_x = glm_min(lo_x, x);
+        hi_x = glm_max(hi_x, x);
+        lo_y = glm_min(lo_y, y);
+        hi_y = glm_max(hi_y, y);
+        lo_z = glm_min(lo_z, z);
+        hi_z = glm_max(hi_z, z);
+        left = glm_max(left, x - tan_x * z);
+        right_ = glm_min(right_, x + tan_x * z);
+        bottom = glm_max(bottom, y - tan_y * z);
+        top = glm_min(top, y + tan_y * z);
     }
 
-    depth += distance;
+    float eye_x, eye_y, eye_z = lo_z - near_;
+    if (cam->ortho) {
+        eye_x = (lo_x + hi_x) * 0.5f;
+        eye_y = (lo_y + hi_y) * 0.5f;
+    } else {
+        eye_x = (left + right_) * 0.5f;
+        eye_y = (bottom + top) * 0.5f;
+        eye_z = glm_min(eye_z, (right_ - left) / (2.0f * tan_x));
+        eye_z = glm_min(eye_z, (top - bottom) / (2.0f * tan_y));
+    }
+
+    glm_vec3_muladds(right, eye_x, center);
+    glm_vec3_muladds(up, eye_y, center);
+    float distance = -eye_z;
+    float depth = hi_z - eye_z;
+    float extent_x = (hi_x - lo_x) * 0.5f, extent_y = (hi_y - lo_y) * 0.5f;
+
     bool modified = false;
     if (cam->ortho) {
         cam->ortho_height = glm_max(extent_y, extent_x / aspect) * 2.0f / BOX_CMD_FIT_FILL;
