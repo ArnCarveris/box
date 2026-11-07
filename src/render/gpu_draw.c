@@ -991,6 +991,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         compare = WGPUCompareFunction_GreaterEqual;
     } else if (equal) {
         compare = WGPUCompareFunction_Equal;
+        entry = texture_blend ? "fs_blend_opaque" : "fs_opaque";
     }
 
     WGPUVertexAttribute vertex_attrs[3] = {

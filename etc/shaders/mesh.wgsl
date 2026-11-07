@@ -1593,3 +1593,13 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
     return lit(f, s);
 }
+
+@fragment fn fs_opaque(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, surface(f, front));
+}
+
+@fragment fn fs_blend_opaque(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    return lit(f, surface_blend(f, front));
+}
