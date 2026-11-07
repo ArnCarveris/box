@@ -439,6 +439,11 @@ static void box_gpu_render(
 {
     box_gpu_t *gpu = ctx;
     int32_t i, count = ecs_vec_count(&packet->resources);
+    if (packet->material_features != gpu->material_features) {
+        gpu->material_features = packet->material_features;
+        box_gpu_forward_reset(gpu, true);
+    }
+
     box_gpu_pipelines_deliver(gpu, packet);
     box_gpu_shader_deliver(gpu);
     for (i = 0; i < count; i ++) {
@@ -802,6 +807,7 @@ box_render_backend_t box_render_gpu_backend(void)
     box_gpu_t *gpu = ecs_os_calloc_t(box_gpu_t);
     gpu->lock = ecs_os_mutex_new();
     gpu->cull_window = BOX_GPU_CULL_WINDOW;
+    gpu->material_features = BOX_RENDER_MATERIAL_ALL;
     ecs_vec_init_t(NULL, &gpu->results, box_render_shader_result_t, 0);
     box_render_backend_t result = {
         .ctx = gpu,

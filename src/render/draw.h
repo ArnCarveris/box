@@ -518,6 +518,8 @@ typedef struct box_draw_materials_t {
     bool overflow;          /**< An id past what the binding holds was logged */
     int64_t uploaded_frame; /**< Frame of the packet of the last send that uploaded */
     ecs_vec_t uploaded;     /**< box_draw_material_upload_t of that send */
+    uint32_t features;
+    bool features_valid;
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */

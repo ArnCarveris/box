@@ -1030,11 +1030,20 @@ static WGPURenderPipeline box_gpu_forward_create(
         .key = { .data = "polygon", .length = WGPU_STRLEN },
         .value = polygon && !box_shadow ? 1.0 : 0.0
     };
+    bool mesh = handle == BOX_RENDER_SHADER_MESH;
+    WGPUConstantEntry features[3] = {
+        { .key = { .data = "material_sheen", .length = WGPU_STRLEN },
+          .value = gpu->material_features & BOX_RENDER_MATERIAL_SHEEN ? 1.0 : 0.0 },
+        { .key = { .data = "material_anisotropy", .length = WGPU_STRLEN },
+          .value = gpu->material_features & BOX_RENDER_MATERIAL_ANISOTROPY ? 1.0 : 0.0 },
+        { .key = { .data = "material_clear_coat", .length = WGPU_STRLEN },
+          .value = gpu->material_features & BOX_RENDER_MATERIAL_CLEAR_COAT ? 1.0 : 0.0 }
+    };
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = entry, .length = WGPU_STRLEN },
-        .constantCount = shape2d ? 1 : 0,
-        .constants = shape2d ? &constant : NULL,
+        .constantCount = shape2d ? 1 : mesh ? 3 : 0,
+        .constants = shape2d ? &constant : mesh ? features : NULL,
         .targetCount = 1,
         .targets = &target
     };

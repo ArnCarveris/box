@@ -1308,6 +1308,12 @@ typedef struct box_render_transition_record_t {
                                      *   padding zeroed */
 } box_render_transition_record_t;
 
+#define BOX_RENDER_MATERIAL_SHEEN (1u << 0)
+#define BOX_RENDER_MATERIAL_ANISOTROPY (1u << 1)
+#define BOX_RENDER_MATERIAL_CLEAR_COAT (1u << 2)
+#define BOX_RENDER_MATERIAL_ALL (BOX_RENDER_MATERIAL_SHEEN | BOX_RENDER_MATERIAL_ANISOTROPY | \
+    BOX_RENDER_MATERIAL_CLEAR_COAT)
+
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
@@ -1324,6 +1330,7 @@ typedef struct box_render_packet_t {
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
+    uint32_t material_features;
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */

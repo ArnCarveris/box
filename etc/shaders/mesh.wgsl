@@ -102,6 +102,10 @@
 // fragment stage serves every kind: blend_mode is the BlendMode the output is shaped for,
 // alpha_cutout tests the fragments against the cutoff of their material (AlphaCutoff), and
 // transmissive draws Transmission shapes, through which the opaque snapshot of the view shows.
+override material_sheen: bool = true;
+override material_anisotropy: bool = true;
+override material_clear_coat: bool = true;
+
 struct DrawKind {
     blend_mode: u32,
     transmissive: u32,
@@ -1032,7 +1036,7 @@ fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Su
     s.anisotropy = 0.0;
     s.tangent = vec3f(0.0);
     s.bitangent = vec3f(0.0);
-    if (f.layers.z > 0.0 && !frame.degenerate) {
+    if (material_anisotropy && f.layers.z > 0.0 && !frame.degenerate) {
         let rotation = f.layers.w * (2.0 * PI);
         let dir = frame.tangent * cos(rotation) + frame.bitangent * sin(rotation);
         let along = dir - s.normal * dot(dir, s.normal);
@@ -1153,7 +1157,7 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let ldh = max(dot(l, h), 0.0);
     let f = fresnel_schlick(ldh, f0);
     var specular = distribution_ggx(ndh, a) * visibility_smith(ndv, ndl, a) * f;
-    if (s.anisotropy > 0.0) {
+    if (material_anisotropy && s.anisotropy > 0.0) {
         let ab = max(a, 0.001);
         let at = mix(ab, 1.0, s.anisotropy * s.anisotropy);
         let t = s.tangent;
@@ -1164,7 +1168,7 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     }
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
     var lit = Lit(diffuse * radiance * ndl, specular * radiance * ndl);
-    if (any(s.sheen > vec3f(0.0))) {
+    if (material_sheen && any(s.sheen > vec3f(0.0))) {
         let alpha = s.sheen_roughness * s.sheen_roughness;
         let comp = sheen_compensation(s.sheen);
         let sheen_specular = s.sheen * distribution_charlie(alpha, ndh) *
@@ -1172,7 +1176,7 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
         lit.diffuse *= comp;
         lit.specular = lit.specular * comp + sheen_specular * radiance * ndl;
     }
-    if (s.coat > 0.0) {
+    if (material_clear_coat && s.coat > 0.0) {
         let nc = s.geometric;
         let ac = s.coat_roughness * s.coat_roughness;
         let ndv_coat = max(dot(nc, v), 1e-4);
@@ -1195,10 +1199,10 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
 // diffuse lobe.
 fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     var back = s.back_color / PI * radiance * max(dot(-s.normal, l), 0.0);
-    if (any(s.sheen > vec3f(0.0))) {
+    if (material_sheen && any(s.sheen > vec3f(0.0))) {
         back *= sheen_compensation(s.sheen);
     }
-    if (s.coat > 0.0) {
+    if (material_clear_coat && s.coat > 0.0) {
         let ndv_coat = max(dot(s.geometric, v), 1e-4);
         back *= 1.0 - fresnel_schlick(ndv_coat, vec3f(0.04)).x * s.coat;
     }
@@ -1327,7 +1331,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 
     // An anisotropic base reflects about a normal bent toward the direction of the anisotropy,
     // as the glTF sample viewer does.
-    if (s.anisotropy > 0.0) {
+    if (material_anisotropy && s.anisotropy > 0.0) {
         let along = cross(cross(s.bitangent, v), s.bitangent);
         let len2 = dot(along, along);
         let x = 1.0 - s.anisotropy * (1.0 - s.roughness);
@@ -1362,7 +1366,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 
     // A sheen reflects the indirect diffuse light by the fit of its albedo, and the base keeps
     // its compensation of what it reflects without one; the coat below covers both.
-    if (any(s.sheen > vec3f(0.0))) {
+    if (material_sheen && any(s.sheen > vec3f(0.0))) {
         let comp = sheen_compensation(s.sheen);
         let indirect_sheen = e.diffuse * s.sheen * sheen_albedo(ndv, s.sheen_roughness) *
             s.occlusion;
@@ -1373,7 +1377,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 
     // The clear coat reflects the light along the reflection about its own normal at its own
     // roughness, by the split sum albedo of a dielectric, and the base below it what it does not.
-    if (s.coat > 0.0) {
+    if (material_clear_coat && s.coat > 0.0) {
         let nc = s.geometric;
         let ac = s.coat_roughness * s.coat_roughness;
         let ndv_coat = max(dot(nc, v), 1e-4);
