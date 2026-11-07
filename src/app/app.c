@@ -1013,7 +1013,6 @@ void BoxAppImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxApp);
-    box_app_precise_sleep();
 
     ECS_META_COMPONENT(world, App);
     ECS_META_COMPONENT(world, AppStatus);
