@@ -1639,10 +1639,15 @@ static void BoxRenderExtractParticles(
         const ParticleEffect *shared_effect = effect_src
             ? ecs_get(world, effect_src, ParticleEffect)
             : NULL;
+        ecs_entity_t effect_parent = 0;
         for (i = 0; i < qit.count; i ++) {
             if (effect_rows) {
-                box_particles_effect_of(world, qit.table, qit.entities[i], &effect_src);
-                shared_effect = effect_src ? ecs_get(world, effect_src, ParticleEffect) : NULL;
+                ecs_entity_t parent = ecs_get_parent(world, qit.entities[i]);
+                if (!parent || parent != effect_parent) {
+                    box_particles_effect_of(world, qit.table, qit.entities[i], &effect_src);
+                    shared_effect = effect_src ? ecs_get(world, effect_src, ParticleEffect) : NULL;
+                    effect_parent = parent;
+                }
             }
 
             const WorldTransform *t = &transforms[shared ? 0 : i];
