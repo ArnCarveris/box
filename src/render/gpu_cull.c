@@ -35,8 +35,8 @@
  * visible entry, counters and two unused, as ENTRY_WORDS of cull.wgsl */
 #define BOX_GPU_CULL_ENTRY_WORDS (8)
 
-/** Words of a workgroup of the cull_instances list: job, first scan word, workgroups of the job
- * and the workgroup in the job, as LIST_WORDS of cull.wgsl */
+/** Words of a workgroup of the cull_instances list: job, first scan word, first table entry of
+ * the job and the workgroup in the job, as LIST_WORDS of cull.wgsl */
 #define BOX_GPU_CULL_LIST_WORDS (4)
 
 /** State of a counter copy */
@@ -642,8 +642,9 @@ static bool box_gpu_cull_tabled(
 /** Add the table of the parallel jobs of a cull group, phase and page.
  *
  * Appends to the table data of the page an entry per (job, frustum) (job, scan words,
- * workgroups, arguments and visible entry of the phase, counters), a cull_write list entry per
- * workgroup of each, a cull_instances list entry per workgroup of each job, and the uniforms.
+ * workgroups, arguments and visible entry of the phase, counters), those of the jobs of more
+ * than one workgroup first, then a list entry per workgroup of each job that cull_instances and
+ * cull_write share, and the uniforms.
  *
  * The consecutive jobs that read the same instance page and history are a run, one
  * cull_instances dispatch over its part of the list with its own copy of those uniforms. A job
@@ -664,70 +665,49 @@ static void box_gpu_cull_table(
     const box_gpu_cull_group_t *grp = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, index);
     box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, (int32_t)page);
     box_gpu_cull_table_t table = { .group = index, .late = late, .page = page };
-    int32_t d, g, k, f, first = -1, end = grp->first_dispatch + grp->dispatch_count;
+    int32_t d, g, k, f, pass, first = -1, end = grp->first_dispatch + grp->dispatch_count;
     uint32_t entries = pg->table_base + (uint32_t)ecs_vec_count(&pg->table_data);
-    for (d = grp->first_dispatch; d < end; d ++) {
-        const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
-            &c->dispatches, box_gpu_cull_dispatch_t, d);
-        if (!box_gpu_cull_tabled(dp, late, page)) {
-            continue;
-        }
-
-        for (f = 0, k = 0; f < BOX_GPU_CULL_GROUP_VIEWS; f ++) {
-            if (!((dp->mask >> f) & 1u)) {
+    for (pass = 0; pass < 2; pass ++) {
+        for (d = grp->first_dispatch; d < end; d ++) {
+            const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
+                &c->dispatches, box_gpu_cull_dispatch_t, d);
+            if (!box_gpu_cull_tabled(dp, late, page) || (dp->groups > 1) == (pass != 0)) {
                 continue;
             }
 
-            const box_gpu_cull_draw_t *draw = ecs_vec_get_t(&c->draws, box_gpu_cull_draw_t,
-                *ecs_vec_get_t(&c->entries, int32_t, dp->first_entry + k));
-            bool second = late && draw->late != UINT32_MAX;
-            uint32_t *e = ecs_vec_grow_t(NULL, &pg->table_data, uint32_t,
-                BOX_GPU_CULL_ENTRY_WORDS);
-            e[0] = dp->first;
-            e[1] = dp->scan + (uint32_t)k * dp->groups * BOX_GPU_CULL_SCAN_WORDS;
-            e[2] = dp->groups;
-            e[3] = second ? draw->late : draw->args;
-            e[4] = second ? draw->base + draw->count : draw->base;
-            e[5] = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, grp->first_view + f)->counter;
-            e[6] = 0;
-            e[7] = 0;
-            table.entries ++;
-            k ++;
-        }
+            for (f = 0, k = 0; f < BOX_GPU_CULL_GROUP_VIEWS; f ++) {
+                if (!((dp->mask >> f) & 1u)) {
+                    continue;
+                }
 
-        first = first < 0 ? d : first;
-        table.buffer = dp->buffer;
+                const box_gpu_cull_draw_t *draw = ecs_vec_get_t(&c->draws, box_gpu_cull_draw_t,
+                    *ecs_vec_get_t(&c->entries, int32_t, dp->first_entry + k));
+                bool second = late && draw->late != UINT32_MAX;
+                uint32_t *e = ecs_vec_grow_t(NULL, &pg->table_data, uint32_t,
+                    BOX_GPU_CULL_ENTRY_WORDS);
+                e[0] = dp->first;
+                e[1] = dp->scan + (uint32_t)k * dp->groups * BOX_GPU_CULL_SCAN_WORDS;
+                e[2] = dp->groups;
+                e[3] = second ? draw->late : draw->args;
+                e[4] = second ? draw->base + draw->count : draw->base;
+                e[5] = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, grp->first_view + f)->counter;
+                e[6] = 0;
+                e[7] = 0;
+                table.entries += pass ? 0 : 1;
+                k ++;
+            }
+
+            first = first < 0 || d < first ? d : first;
+            table.buffer = dp->buffer;
+        }
     }
 
     if (first < 0) {
         goto done;
     }
 
-    uint32_t list = pg->table_base + (uint32_t)ecs_vec_count(&pg->table_data);
-    uint32_t entry = entries;
-    for (d = first; d < end; d ++) {
-        const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
-            &c->dispatches, box_gpu_cull_dispatch_t, d);
-        int32_t frustums = (int32_t)box_gpu_cull_bits(dp->mask);
-        if (!box_gpu_cull_tabled(dp, late, page)) {
-            continue;
-        }
-
-        for (k = 0; k < frustums; k ++) {
-            uint32_t scan = dp->scan + (uint32_t)k * dp->groups * BOX_GPU_CULL_SCAN_WORDS;
-            uint32_t *l = ecs_vec_grow_t(NULL, &pg->table_data, uint32_t,
-                (int32_t)dp->groups * 2);
-            for (g = 0; g < (int32_t)dp->groups; g ++) {
-                l[g * 2] = scan + (uint32_t)g * BOX_GPU_CULL_SCAN_WORDS;
-                l[g * 2 + 1] = entry;
-            }
-
-            table.groups += dp->groups;
-            entry += BOX_GPU_CULL_ENTRY_WORDS;
-        }
-    }
-
     uint32_t jobs = pg->table_base + (uint32_t)ecs_vec_count(&pg->table_data), listed = 0;
+    uint32_t multi = entries, single = entries + table.entries * BOX_GPU_CULL_ENTRY_WORDS;
     int32_t first_run = ecs_vec_count(&c->runs), run = -1, r;
     for (d = first; d < end; d ++) {
         const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
@@ -736,6 +716,9 @@ static void box_gpu_cull_table(
             continue;
         }
 
+        uint32_t *cursor = dp->groups > 1 ? &multi : &single;
+        uint32_t entry = *cursor;
+        *cursor += box_gpu_cull_bits(dp->mask) * BOX_GPU_CULL_ENTRY_WORDS;
         box_gpu_cull_run_t *last = run < 0 ? NULL
             : ecs_vec_get_t(&c->runs, box_gpu_cull_run_t, run);
         if (!last || last->buffer != dp->buffer ||
@@ -753,20 +736,21 @@ static void box_gpu_cull_table(
         for (g = 0; g < (int32_t)dp->groups; g ++) {
             l[g * BOX_GPU_CULL_LIST_WORDS] = dp->first;
             l[g * BOX_GPU_CULL_LIST_WORDS + 1] = dp->scan;
-            l[g * BOX_GPU_CULL_LIST_WORDS + 2] = dp->groups;
+            l[g * BOX_GPU_CULL_LIST_WORDS + 2] = entry;
             l[g * BOX_GPU_CULL_LIST_WORDS + 3] = (uint32_t)g;
         }
 
         listed += dp->groups;
     }
 
+    table.groups = listed;
     box_gpu_cull_uniforms_t u = grp->base;
     WGPUBindGroup history = grp->history;
     u.jobs[2] = late ? BOX_GPU_CULL_PHASE_LATE
         : grp->occlusion ? BOX_GPU_CULL_PHASE_EARLY : BOX_GPU_CULL_PHASE_ALL;
     u.scan[0] = entries;
     u.scan[1] = table.entries;
-    u.scan[2] = list;
+    u.scan[2] = jobs;
     u.scan[3] = table.groups;
     table.uniform = box_gpu_cull_uniform(c, &u, sizeof(u));
     *ecs_vec_append_t(NULL, &c->tables, box_gpu_cull_table_t) = table;
@@ -1004,11 +988,12 @@ static void box_gpu_cull_dispatches(
         for (d = g->first_dispatch; d < g->first_dispatch + g->dispatch_count; d ++) {
             const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
                 &c->dispatches, box_gpu_cull_dispatch_t, d);
-            uint32_t groups[2] = { dp->groups, 1 };
+            uint32_t groups[2];
             if (dp->late != late || !dp->ordered) {
                 continue;
             }
 
+            box_gpu_cull_rows(dp->groups, groups);
             box_gpu_cull_pass(encoder, &pass, writes);
             if (c->ordered != bound) {
                 wgpuComputePassEncoderSetPipeline(pass, c->ordered);
@@ -1058,7 +1043,7 @@ static void box_gpu_cull_dispatches(
                 continue;
             }
 
-            box_gpu_cull_rows(stage ? t->groups : t->entries, groups);
+            box_gpu_cull_rows(stage ? (t->entries ? t->groups : 0) : t->entries, groups);
             box_gpu_cull_pass(encoder, &pass, writes);
             if (pipeline != bound) {
                 wgpuComputePassEncoderSetPipeline(pass, pipeline);

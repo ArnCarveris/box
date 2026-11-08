@@ -278,6 +278,8 @@ typedef struct box_gpu_copy_write_t {
 /** Levels of a depth pyramid at most, enough for a 16384 pixel axis */
 #define BOX_GPU_HIZ_LEVELS (15)
 
+#define BOX_GPU_HIZ_STEP (4)
+
 /** Depth pyramid of a render size: power of two levels, each texel the farthest depth below it.
  *
  * The views of every target of that render size share it; a view builds it from its own depth
@@ -416,7 +418,7 @@ typedef struct box_gpu_cull_table_t {
     uint32_t uniform;               /**< Byte offset of its uniforms in the uniform buffer */
     uint32_t buffer;                /**< An instance page of its jobs, for group 1 */
     uint32_t entries;               /**< (job, frustum) entries, the workgroups of cull_scan */
-    uint32_t groups;                /**< Workgroups of all its entries, those of cull_write */
+    uint32_t groups;                /**< Workgroups of its jobs, those of cull_write */
 } box_gpu_cull_table_t;
 
 /** One cull_instances dispatch over consecutive parallel jobs of a table that share an
@@ -578,6 +580,8 @@ typedef struct box_gpu_cull_t {
     WGPUBuffer empty_history;       /**< History of the cull views without occlusion */
     WGPUTexture empty_hiz;          /**< Pyramid of the cull views without occlusion */
     WGPUTextureView empty_hiz_view; /**< View of the empty pyramid */
+    WGPUTexture hiz_spare;
+    WGPUTextureView hiz_spares[BOX_GPU_HIZ_STEP - 1];
     WGPUBindGroup empty_group;      /**< Binds the empty history and pyramid */
     ecs_map_t histories;            /**< View and target key to box_gpu_cull_history_t */
     ecs_map_t pyramids;             /**< Render size to box_gpu_hiz_t */

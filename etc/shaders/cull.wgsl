@@ -27,21 +27,22 @@
 // frustum (two u32 atomics) with its count in the scan words of the (job, frustum) entry, and
 // counts the frustum culled instances per frustum. A dispatch covers a run of the jobs of a
 // table that share an instance page and a history: its part of the workgroup list (scan.z,
-// scan.w workgroups) gives each workgroup its job, the first scan word and workgroups of the
-// job and its workgroup in the job.
+// scan.w workgroups) gives each workgroup its job, the first scan word and table entry of the
+// job and its workgroup in the job. A job of one workgroup writes its drawn slots and instance
+// counts itself.
 // One cull_scan dispatch per group, phase and page turns the counts of the workgroups of each of
-// its (job, frustum) entries into exclusive offsets, in workgroup order, and writes their instance
-// counts (a workgroup per entry, from a table of job, first scan word, workgroups, draw
-// arguments, first visible entry and counters); one cull_write dispatch over the workgroups of
-// all those entries (a list of their scan words and table entries) puts every drawn slot at the
+// the (job, frustum) entries of its jobs of more workgroups into exclusive offsets, in workgroup
+// order, and writes their instance counts (a workgroup per entry, from a table of job, first scan
+// word, workgroups, draw arguments, first visible entry and counters); one cull_write dispatch
+// over the workgroup list puts every drawn slot of those jobs, in each of their frustums, at the
 // offset of its workgroup plus the drawn slots before it in the mask. The visible slots of each
 // frustum keep slot order, so exact depth ties resolve the same way every frame (a prefix sum
 // stream compaction, GPU Gems 3 chapter 39, in passes because WebGPU gives no forward progress
-// guarantee for a single pass scan). cull_ordered tests one job per invocation against one
-// frustum (jobs.w) in the order of its slots, for the blended draws of a view that are sorted
-// back to front: their jobs list the slots (list is 1, first indexes slot_lists), so a run of
-// one batch in the sorted order is one draw. All of them add the drawn and the frustum culled
-// instances to the counters of each frustum.
+// guarantee for a single pass scan). cull_ordered tests one job per workgroup against one
+// frustum (jobs.w), 64 of its slots at a time in their order, for the blended draws of a view
+// that are sorted back to front: their jobs list the slots (list is 1, first indexes
+// slot_lists), so a run of one batch in the sorted order is one draw. All of them add the drawn
+// and the frustum culled instances to the counters of each frustum.
 
 #include "include/instance.wgsl"
 
@@ -107,8 +108,8 @@ const FRUSTUM_HISTORY: u32 = 4u;
 // counters, two unused.
 const ENTRY_WORDS: u32 = 8u;
 
-// Words of a workgroup of the cull_instances list: job, first scan word of the job, workgroups
-// of the job, the workgroup in the job.
+// Words of a workgroup of the cull_instances list: job, first scan word of the job, first table
+// entry of the job, the workgroup in the job.
 const LIST_WORDS: u32 = 4u;
 
 @group(0) @binding(0) var<uniform> cull: Cull;
@@ -127,6 +128,9 @@ const LIST_WORDS: u32 = 4u;
 @group(0) @binding(8) var hiz_depth: texture_depth_2d;
 @group(0) @binding(9) var hiz_src: texture_2d<f32>;
 @group(0) @binding(10) var hiz_dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(11) var hiz_dst1: texture_storage_2d<r32float, write>;
+@group(0) @binding(12) var hiz_dst2: texture_storage_2d<r32float, write>;
+@group(0) @binding(13) var hiz_dst3: texture_storage_2d<r32float, write>;
 
 // Scan words per workgroup and frustum of a parallel dispatch: two mask words and the count,
 // which cull_scan replaces with the offset of the workgroup.
@@ -135,6 +139,7 @@ const SCAN_WORDS: u32 = 3u;
 var<workgroup> group_masks: array<atomic<u32>, 64>;
 var<workgroup> group_culled: array<atomic<u32>, 32>;
 var<workgroup> scan_sums: array<u32, 256>;
+var<workgroup> hiz_tile: array<f32, 64>;
 
 // The box around the bounds of a job moved into world space by a model matrix.
 fn bounds(job: Job, m: mat4x4f) -> Bounds {
@@ -278,9 +283,13 @@ fn cull_instances(
     let at = cull.scan.z + g * LIST_WORDS;
     let job = jobs[scan_words[at]];
     let scan = scan_words[at + 1u];
-    let job_groups = scan_words[at + 2u];
+    let entry = scan_words[at + 2u];
     let part = scan_words[at + 3u];
+    let job_groups = scan_words[entry + 2u];
     let index = part * 64u + local;
+    let word = local / 32u;
+    let bit = local % 32u;
+    var own = 0u;
     atomicStore(&group_masks[local], 0u);
     if (local < GROUP_VIEWS) {
         atomicStore(&group_culled[local], 0u);
@@ -311,12 +320,11 @@ fn cull_instances(
             }
         }
 
-        let word = local / 32u;
-        let bit = 1u << (local % 32u);
+        own = drawn;
         while (drawn != 0u) {
             let f = firstTrailingBit(drawn);
             drawn &= drawn - 1u;
-            atomicOr(&group_masks[f * 2u + word], bit);
+            atomicOr(&group_masks[f * 2u + word], 1u << bit);
         }
 
         while (culled != 0u) {
@@ -327,14 +335,37 @@ fn cull_instances(
     }
 
     workgroupBarrier();
+    if (job_groups == 1u) {
+        while (own != 0u) {
+            let f = firstTrailingBit(own);
+            own &= own - 1u;
+            let k = countOneBits(job.mask & ((1u << f) - 1u));
+            let low = atomicLoad(&group_masks[f * 2u]);
+            let mask = select(atomicLoad(&group_masks[f * 2u + 1u]), low, local < 32u);
+            let below = countOneBits(mask & ((1u << bit) - 1u)) +
+                select(countOneBits(low), 0u, local < 32u);
+            visible_slots[scan_words[entry + k * ENTRY_WORDS + 4u] + below] = job.first + index;
+        }
+    }
+
     if (local < GROUP_VIEWS && ((job.mask >> local) & 1u) != 0u) {
         let k = countOneBits(job.mask & ((1u << local) - 1u));
-        let words = scan + (k * job_groups + part) * SCAN_WORDS;
         let low = atomicLoad(&group_masks[local * 2u]);
         let high = atomicLoad(&group_masks[local * 2u + 1u]);
-        scan_words[words] = low;
-        scan_words[words + 1u] = high;
-        scan_words[words + 2u] = countOneBits(low) + countOneBits(high);
+        let total = countOneBits(low) + countOneBits(high);
+        if (job_groups == 1u) {
+            let e = entry + k * ENTRY_WORDS;
+            atomicStore(&args[scan_words[e + 3u] * ARGS + 1u], total);
+            if (total > 0u) {
+                atomicAdd(&counters[scan_words[e + 5u] * COUNTERS], total);
+            }
+        } else {
+            let words = scan + (k * job_groups + part) * SCAN_WORDS;
+            scan_words[words] = low;
+            scan_words[words + 1u] = high;
+            scan_words[words + 2u] = total;
+        }
+
         let culled = atomicLoad(&group_culled[local]);
         if (culled > 0u) {
             atomicAdd(&counters[frustums[local].flags.x * COUNTERS + 1u], culled);
@@ -396,9 +427,9 @@ fn cull_scan(
     }
 }
 
-// Writes the drawn slots of the (job, frustum) entries of a table at their offsets, in slot
-// order. The workgroups of all its entries are listed at scan.z (scan.w of them) as their scan
-// words and their table entry.
+// Writes the drawn slots of the jobs of more than one workgroup of a table at their offsets, in
+// slot order: a workgroup per workgroup of the cull_instances list of the table (scan.z, scan.w
+// of them), over each frustum of its job.
 @compute @workgroup_size(64)
 fn cull_write(
     @builtin(local_invocation_index) local: u32,
@@ -410,91 +441,223 @@ fn cull_write(
         return;
     }
 
-    let at = scan_words[cull.scan.z + g * 2u];
-    let entry = scan_words[cull.scan.z + g * 2u + 1u];
-    let job = jobs[scan_words[entry]];
-    let index = (at - scan_words[entry + 1u]) / SCAN_WORDS * 64u + local;
-    let low = scan_words[at];
-    let mask = select(scan_words[at + 1u], low, local < 32u);
+    let at = cull.scan.z + g * LIST_WORDS;
+    let entry = scan_words[at + 2u];
+    let job_groups = scan_words[entry + 2u];
+    let job = jobs[scan_words[at]];
+    let part = scan_words[at + 3u];
+    let index = part * 64u + local;
+    if (job_groups == 1u || index >= job.count) {
+        return;
+    }
+
+    let scan = scan_words[at + 1u];
     let bit = local % 32u;
-    if (index < job.count && ((mask >> bit) & 1u) != 0u) {
-        let below = countOneBits(mask & ((1u << bit) - 1u)) +
-            select(countOneBits(low), 0u, local < 32u);
-        visible_slots[scan_words[entry + 4u] + scan_words[at + 2u] + below] = job.first + index;
+    let frustums = countOneBits(job.mask);
+    for (var k = 0u; k < frustums; k++) {
+        let words = scan + (k * job_groups + part) * SCAN_WORDS;
+        let low = scan_words[words];
+        let mask = select(scan_words[words + 1u], low, local < 32u);
+        if (((mask >> bit) & 1u) != 0u) {
+            let below = countOneBits(mask & ((1u << bit) - 1u)) +
+                select(countOneBits(low), 0u, local < 32u);
+            visible_slots[scan_words[entry + k * ENTRY_WORDS + 4u] + scan_words[words + 2u] +
+                below] = job.first + index;
+        }
     }
 }
 
 @compute @workgroup_size(64)
-fn cull_ordered(@builtin(global_invocation_id) id: vec3u) {
-    if (id.x >= cull.jobs.y) {
+fn cull_ordered(
+    @builtin(local_invocation_index) local: u32,
+    @builtin(workgroup_id) group: vec3u,
+    @builtin(num_workgroups) groups: vec3u)
+{
+    let j = group.y * groups.x + group.x;
+    if (j >= cull.jobs.y) {
         return;
     }
 
-    let job = jobs[cull.jobs.x + id.x];
+    let job = jobs[cull.jobs.x + j];
     let f = cull.jobs.w;
+    let bit = local % 32u;
     var count = 0u;
-    var culled = 0u;
-    for (var i = 0u; i < job.count; i++) {
-        var slot = job.first + i;
-        if (job.list != 0u) {
-            slot = slot_lists[job.first + i];
-        }
-
-        let m = instance_model(transforms[slot]);
-        let d = decide(job, slot, m, bounds(job, m), f);
-        if (d.x) {
-            visible_slots[job.base + count] = slot;
-            count++;
-        }
-
-        if (d.y) {
-            culled++;
-        }
+    if (local == 0u) {
+        atomicStore(&group_culled[0], 0u);
     }
 
-    let counter = frustums[f].flags.x * COUNTERS;
-    atomicStore(&args[job.args * ARGS + 1u], count);
-    atomicAdd(&counters[counter], count);
-    atomicAdd(&counters[counter + 1u], culled);
+    for (var at = 0u; at < job.count; at += 64u) {
+        atomicStore(&group_masks[local], 0u);
+        workgroupBarrier();
+        let i = at + local;
+        var slot = 0u;
+        var draw = false;
+        if (i < job.count) {
+            slot = job.first + i;
+            if (job.list != 0u) {
+                slot = slot_lists[job.first + i];
+            }
+
+            let m = instance_model(transforms[slot]);
+            let d = decide(job, slot, m, bounds(job, m), f);
+            draw = d.x;
+            if (draw) {
+                atomicOr(&group_masks[local / 32u], 1u << bit);
+            }
+
+            if (d.y) {
+                atomicAdd(&group_culled[0], 1u);
+            }
+        }
+
+        workgroupBarrier();
+        let low = atomicLoad(&group_masks[0]);
+        let high = atomicLoad(&group_masks[1]);
+        if (draw) {
+            let mask = select(high, low, local < 32u);
+            let below = countOneBits(mask & ((1u << bit) - 1u)) +
+                select(countOneBits(low), 0u, local < 32u);
+            visible_slots[job.base + count + below] = slot;
+        }
+
+        count += countOneBits(low) + countOneBits(high);
+        workgroupBarrier();
+    }
+
+    if (local == 0u) {
+        let counter = frustums[f].flags.x * COUNTERS;
+        atomicStore(&args[job.args * ARGS + 1u], count);
+        atomicAdd(&counters[counter], count);
+        atomicAdd(&counters[counter + 1u], atomicLoad(&group_culled[0]));
+    }
 }
 
-// First level of the pyramid from the depth of the early phase. A level has a power of two
-// size no larger than the depth, so a texel covers up to three by three depth pixels: every
-// pixel its area touches.
-@compute @workgroup_size(8, 8)
-fn hiz_first(@builtin(global_invocation_id) id: vec3u) {
-    let size = textureDimensions(hiz_dst);
-    if (any(id.xy >= size)) {
-        return;
-    }
-
-    let depth = textureDimensions(hiz_depth);
-    let lo = id.xy * depth / size;
-    let hi = min(((id.xy + 1u) * depth + size - 1u) / size, depth);
+fn hiz_next(local: vec2u, n: u32, below: vec2u) -> f32 {
+    let inside = all(local < vec2u(n));
     var result = 1.0;
-    for (var y = lo.y; y < hi.y; y++) {
-        for (var x = lo.x; x < hi.x; x++) {
-            result = min(result, textureLoad(hiz_depth, vec2u(x, y), 0));
+    if (inside) {
+        let last = min(below, vec2u(n * 2u)) - 1u;
+        let a = min(local * 2u, last);
+        let b = min(local * 2u + 1u, last);
+        result = min(min(hiz_tile[a.y * 8u + a.x], hiz_tile[a.y * 8u + b.x]),
+            min(hiz_tile[b.y * 8u + a.x], hiz_tile[b.y * 8u + b.x]));
+    }
+
+    workgroupBarrier();
+    if (inside) {
+        hiz_tile[local.y * 8u + local.x] = result;
+    }
+
+    workgroupBarrier();
+    return result;
+}
+
+fn hiz_rest(local: vec2u, group: vec2u, size: vec2u) {
+    workgroupBarrier();
+    let one = hiz_next(local, 4u, size);
+    let at_one = group * 4u + local;
+    if (all(local < vec2u(4u)) && all(at_one < textureDimensions(hiz_dst1))) {
+        textureStore(hiz_dst1, at_one, vec4f(one, 0.0, 0.0, 0.0));
+    }
+
+    let two = hiz_next(local, 2u, textureDimensions(hiz_dst1));
+    let at_two = group * 2u + local;
+    if (all(local < vec2u(2u)) && all(at_two < textureDimensions(hiz_dst2))) {
+        textureStore(hiz_dst2, at_two, vec4f(two, 0.0, 0.0, 0.0));
+    }
+
+    let three = hiz_next(local, 1u, textureDimensions(hiz_dst2));
+    if (all(local == vec2u(0u)) && all(group < textureDimensions(hiz_dst3))) {
+        textureStore(hiz_dst3, group, vec4f(three, 0.0, 0.0, 0.0));
+    }
+}
+
+// First four levels of the pyramid from the depth of the early phase, two by two texels of the
+// first level per invocation. The first level has a power of two size no larger than the depth,
+// so a texel covers up to three by three depth pixels: every pixel its area touches.
+@compute @workgroup_size(8, 8)
+fn hiz_first(
+    @builtin(local_invocation_id) local: vec3u,
+    @builtin(workgroup_id) group: vec3u)
+{
+    let size = textureDimensions(hiz_dst);
+    let depth = textureDimensions(hiz_depth);
+    let id = group.xy * 8u + local.xy;
+    let at = id * 2u;
+    var texels = vec4f(1.0);
+    if (all(at < size)) {
+        let lo = at * depth / size;
+        let split_lo = (at + 1u) * depth / size;
+        let split_hi = min(((at + 1u) * depth + size - 1u) / size, depth);
+        let hi = min(((at + 2u) * depth + size - 1u) / size, depth);
+        for (var y = lo.y; y < hi.y; y++) {
+            for (var x = lo.x; x < hi.x; x++) {
+                let d = textureLoad(hiz_depth, vec2u(x, y), 0);
+                let left = x < split_hi.x;
+                let right = x >= split_lo.x;
+                let top = y < split_hi.y;
+                let bottom = y >= split_lo.y;
+                texels.x = select(texels.x, min(texels.x, d), left && top);
+                texels.y = select(texels.y, min(texels.y, d), right && top);
+                texels.z = select(texels.z, min(texels.z, d), left && bottom);
+                texels.w = select(texels.w, min(texels.w, d), right && bottom);
+            }
+        }
+
+        textureStore(hiz_dst, at, vec4f(texels.x, 0.0, 0.0, 0.0));
+        if (at.x + 1u < size.x) {
+            textureStore(hiz_dst, at + vec2u(1u, 0u), vec4f(texels.y, 0.0, 0.0, 0.0));
+        }
+
+        if (at.y + 1u < size.y) {
+            textureStore(hiz_dst, at + vec2u(0u, 1u), vec4f(texels.z, 0.0, 0.0, 0.0));
+        }
+
+        if (all(at + 1u < size)) {
+            textureStore(hiz_dst, at + 1u, vec4f(texels.w, 0.0, 0.0, 0.0));
         }
     }
 
-    textureStore(hiz_dst, id.xy, vec4f(result, 0.0, 0.0, 0.0));
-}
-
-// Next level of the pyramid: the farthest depth of the two by two texels below a texel, one by
-// two once an axis is down to one texel.
-@compute @workgroup_size(8, 8)
-fn hiz_reduce(@builtin(global_invocation_id) id: vec3u) {
-    let size = textureDimensions(hiz_dst);
-    if (any(id.xy >= size)) {
-        return;
+    let result = min(min(texels.x, texels.y), min(texels.z, texels.w));
+    if (all(id < textureDimensions(hiz_dst1))) {
+        textureStore(hiz_dst1, id, vec4f(result, 0.0, 0.0, 0.0));
     }
 
-    let src = textureDimensions(hiz_src) - 1u;
-    let a = min(id.xy * 2u, src);
-    let b = min(id.xy * 2u + 1u, src);
-    let result = min(
-        min(textureLoad(hiz_src, a, 0).r, textureLoad(hiz_src, vec2u(b.x, a.y), 0).r),
-        min(textureLoad(hiz_src, vec2u(a.x, b.y), 0).r, textureLoad(hiz_src, b, 0).r));
-    textureStore(hiz_dst, id.xy, vec4f(result, 0.0, 0.0, 0.0));
+    hiz_tile[local.y * 8u + local.x] = result;
+    workgroupBarrier();
+    let two = hiz_next(local.xy, 4u, textureDimensions(hiz_dst1));
+    let at_two = group.xy * 4u + local.xy;
+    if (all(local.xy < vec2u(4u)) && all(at_two < textureDimensions(hiz_dst2))) {
+        textureStore(hiz_dst2, at_two, vec4f(two, 0.0, 0.0, 0.0));
+    }
+
+    let three = hiz_next(local.xy, 2u, textureDimensions(hiz_dst2));
+    let at_three = group.xy * 2u + local.xy;
+    if (all(local.xy < vec2u(2u)) && all(at_three < textureDimensions(hiz_dst3))) {
+        textureStore(hiz_dst3, at_three, vec4f(three, 0.0, 0.0, 0.0));
+    }
+}
+
+// Next four levels of the pyramid: the farthest depth of the two by two texels below a texel,
+// one by two once an axis is down to one texel.
+@compute @workgroup_size(8, 8)
+fn hiz_reduce(
+    @builtin(local_invocation_id) local: vec3u,
+    @builtin(workgroup_id) group: vec3u)
+{
+    let size = textureDimensions(hiz_dst);
+    let id = group.xy * 8u + local.xy;
+    var result = 1.0;
+    if (all(id < size)) {
+        let src = textureDimensions(hiz_src) - 1u;
+        let a = min(id * 2u, src);
+        let b = min(id * 2u + 1u, src);
+        result = min(
+            min(textureLoad(hiz_src, a, 0).r, textureLoad(hiz_src, vec2u(b.x, a.y), 0).r),
+            min(textureLoad(hiz_src, vec2u(a.x, b.y), 0).r, textureLoad(hiz_src, b, 0).r));
+        textureStore(hiz_dst, id, vec4f(result, 0.0, 0.0, 0.0));
+    }
+
+    hiz_tile[local.y * 8u + local.x] = result;
+    hiz_rest(local.xy, group.xy, size);
 }

@@ -24,7 +24,7 @@ void box_gpu_hiz_init(
     box_gpu_t *gpu)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    WGPUBindGroupLayoutEntry first[2] = {
+    WGPUBindGroupLayoutEntry first[1 + BOX_GPU_HIZ_STEP] = {
         {
             .binding = 8,
             .visibility = WGPUShaderStage_Compute,
@@ -32,18 +32,9 @@ void box_gpu_hiz_init(
                 .sampleType = WGPUTextureSampleType_Depth,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
-        },
-        {
-            .binding = 10,
-            .visibility = WGPUShaderStage_Compute,
-            .storageTexture = {
-                .access = WGPUStorageTextureAccess_WriteOnly,
-                .format = WGPUTextureFormat_R32Float,
-                .viewDimension = WGPUTextureViewDimension_2D
-            }
         }
     };
-    WGPUBindGroupLayoutEntry reduce[2] = {
+    WGPUBindGroupLayoutEntry reduce[1 + BOX_GPU_HIZ_STEP] = {
         {
             .binding = 9,
             .visibility = WGPUShaderStage_Compute,
@@ -51,9 +42,22 @@ void box_gpu_hiz_init(
                 .sampleType = WGPUTextureSampleType_UnfilterableFloat,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
-        },
-        first[1]
+        }
     };
+    int32_t i;
+    for (i = 0; i < BOX_GPU_HIZ_STEP; i ++) {
+        first[1 + i] = (WGPUBindGroupLayoutEntry){
+            .binding = 10 + (uint32_t)i,
+            .visibility = WGPUShaderStage_Compute,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_WriteOnly,
+                .format = WGPUTextureFormat_R32Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        };
+        reduce[1 + i] = first[1 + i];
+    }
+
     WGPUBindGroupLayoutEntry history[2] = {
         {
             .binding = 0,
@@ -70,9 +74,12 @@ void box_gpu_hiz_init(
         }
     };
     c->hiz_first_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = first });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1 + BOX_GPU_HIZ_STEP, .entries = first });
     c->hiz_reduce_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = reduce });
+        &(WGPUBindGroupLayoutDescriptor){
+            .entryCount = 1 + BOX_GPU_HIZ_STEP,
+            .entries = reduce
+        });
     c->history_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = history });
     c->hiz_first_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -98,6 +105,25 @@ void box_gpu_hiz_init(
         .sampleCount = 1
     });
     c->empty_hiz_view = wgpuTextureCreateView(c->empty_hiz, NULL);
+    c->hiz_spare = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_StorageBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { 1, 1, BOX_GPU_HIZ_STEP - 1 },
+        .format = WGPUTextureFormat_R32Float,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    for (i = 0; i < BOX_GPU_HIZ_STEP - 1; i ++) {
+        c->hiz_spares[i] = wgpuTextureCreateView(c->hiz_spare, &(WGPUTextureViewDescriptor){
+            .format = WGPUTextureFormat_R32Float,
+            .dimension = WGPUTextureViewDimension_2D,
+            .baseMipLevel = 0,
+            .mipLevelCount = 1,
+            .baseArrayLayer = (uint32_t)i,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_All
+        });
+    }
     WGPUBindGroupEntry entries[2] = {
         { .binding = 0, .buffer = c->empty_history, .size = 16 },
         { .binding = 1, .textureView = c->empty_hiz_view }
@@ -200,6 +226,11 @@ void box_gpu_hiz_fini(
     wgpuBindGroupRelease(c->empty_group);
     wgpuTextureViewRelease(c->empty_hiz_view);
     wgpuTextureRelease(c->empty_hiz);
+    for (int32_t i = 0; i < BOX_GPU_HIZ_STEP - 1; i ++) {
+        wgpuTextureViewRelease(c->hiz_spares[i]);
+    }
+
+    wgpuTextureRelease(c->hiz_spare);
     wgpuBufferRelease(c->empty_history);
     wgpuPipelineLayoutRelease(c->hiz_first_pipeline_layout);
     wgpuPipelineLayoutRelease(c->hiz_reduce_pipeline_layout);
@@ -253,6 +284,22 @@ static uint32_t box_gpu_hiz_floor_pow2(
     return result;
 }
 
+static void box_gpu_hiz_targets(
+    const box_gpu_cull_t *c,
+    const box_gpu_hiz_t *hiz,
+    uint32_t level,
+    WGPUBindGroupEntry *out)
+{
+    uint32_t i;
+    for (i = 0; i < BOX_GPU_HIZ_STEP; i ++) {
+        out[i] = (WGPUBindGroupEntry){
+            .binding = 10 + i,
+            .textureView = i && level + i >= hiz->levels
+                ? c->hiz_spares[i - 1] : hiz->mips[level + i]
+        };
+    }
+}
+
 /** Create a pyramid for a first level size.
  *
  * @param gpu The backend
@@ -297,14 +344,14 @@ static box_gpu_hiz_t* box_gpu_hiz_create(
         });
     }
 
-    for (i = 1; i < hiz->levels; i ++) {
-        WGPUBindGroupEntry entries[2] = {
-            { .binding = 9, .textureView = hiz->mips[i - 1] },
-            { .binding = 10, .textureView = hiz->mips[i] }
+    for (i = BOX_GPU_HIZ_STEP; i < hiz->levels; i += BOX_GPU_HIZ_STEP) {
+        WGPUBindGroupEntry entries[1 + BOX_GPU_HIZ_STEP] = {
+            { .binding = 9, .textureView = hiz->mips[i - 1] }
         };
+        box_gpu_hiz_targets(c, hiz, i, &entries[1]);
         hiz->reduce[i] = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = c->hiz_reduce_layout,
-            .entryCount = 2,
+            .entryCount = 1 + BOX_GPU_HIZ_STEP,
             .entries = entries
         });
     }
@@ -575,15 +622,16 @@ static void box_gpu_hiz_dispatch(
     WGPUComputePipeline pipeline,
     WGPUBindGroup group,
     const box_gpu_hiz_t *hiz,
-    uint32_t level)
+    uint32_t level,
+    uint32_t texels)
 {
     uint32_t w = hiz->width >> level, h = hiz->height >> level;
+    uint32_t tile = BOX_GPU_HIZ_GROUP * texels;
     w = w ? w : 1;
     h = h ? h : 1;
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
-    wgpuComputePassEncoderDispatchWorkgroups(pass, (w + BOX_GPU_HIZ_GROUP - 1) / BOX_GPU_HIZ_GROUP,
-        (h + BOX_GPU_HIZ_GROUP - 1) / BOX_GPU_HIZ_GROUP, 1);
+    wgpuComputePassEncoderDispatchWorkgroups(pass, (w + tile - 1) / tile, (h + tile - 1) / tile, 1);
 }
 
 void box_gpu_hiz_build(
@@ -598,19 +646,19 @@ void box_gpu_hiz_build(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[2] = {
-        { .binding = 8, .textureView = depth },
-        { .binding = 10, .textureView = hiz->mips[0] }
+    WGPUBindGroupEntry entries[1 + BOX_GPU_HIZ_STEP] = {
+        { .binding = 8, .textureView = depth }
     };
+    box_gpu_hiz_targets(c, hiz, 0, &entries[1]);
     WGPUBindGroup first = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = c->hiz_first_layout,
-        .entryCount = 2,
+        .entryCount = 1 + BOX_GPU_HIZ_STEP,
         .entries = entries
     });
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-    box_gpu_hiz_dispatch(pass, c->hiz_first, first, hiz, 0);
-    for (i = 1; i < hiz->levels; i ++) {
-        box_gpu_hiz_dispatch(pass, c->hiz_reduce, hiz->reduce[i], hiz, i);
+    box_gpu_hiz_dispatch(pass, c->hiz_first, first, hiz, 0, 2);
+    for (i = BOX_GPU_HIZ_STEP; i < hiz->levels; i += BOX_GPU_HIZ_STEP) {
+        box_gpu_hiz_dispatch(pass, c->hiz_reduce, hiz->reduce[i], hiz, i, 1);
     }
 
     wgpuComputePassEncoderEnd(pass);

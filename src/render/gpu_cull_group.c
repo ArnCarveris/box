@@ -288,7 +288,7 @@ static void box_gpu_cull_ordered_dispatch(
     ecs_os_memset_t(d, 0, box_gpu_cull_dispatch_t);
     d->group = group;
     d->buffer = buffer;
-    d->groups = (count + BOX_GPU_CULL_GROUP - 1) / BOX_GPU_CULL_GROUP;
+    d->groups = count;
     d->ordered = true;
     d->late = phase == BOX_GPU_CULL_PHASE_LATE;
     d->page = page;
