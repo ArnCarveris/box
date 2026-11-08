@@ -427,6 +427,31 @@ static void box_gpu_targets_render(
     }
 }
 
+static void box_gpu_pace(
+    box_gpu_t *gpu)
+{
+#ifndef __EMSCRIPTEN__
+    if (gpu->paced_device != gpu->device) {
+        gpu->paced_device = gpu->device;
+        gpu->paced_count = 0;
+        gpu->paced_next = 0;
+    }
+
+    WGPUSubmissionIndex index = wgpuQueueSubmitForIndex(gpu->queue, 0, NULL);
+    if (gpu->paced_count == BOX_GPU_FRAMES_IN_FLIGHT) {
+        WGPUSubmissionIndex oldest = gpu->paced[gpu->paced_next];
+        wgpuDevicePoll(gpu->device, true, &oldest);
+    } else {
+        gpu->paced_count ++;
+    }
+
+    gpu->paced[gpu->paced_next] = index;
+    gpu->paced_next = (gpu->paced_next + 1) % BOX_GPU_FRAMES_IN_FLIGHT;
+#else
+    (void)gpu;
+#endif
+}
+
 /** Apply the resources of a packet, build its atmosphere LUTs, write and process its
  * environments, capture its probes, render its shadow atlases and render its targets.
  *
@@ -514,6 +539,7 @@ static void box_gpu_render(
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atlas_render(gpu, packet);
     box_gpu_targets_render(gpu, packet);
+    box_gpu_pace(gpu);
 
     box_gpu_effects_sweep(gpu, packet);
     box_gpu_atmosphere_sweep(gpu, packet);

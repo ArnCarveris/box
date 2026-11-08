@@ -159,6 +159,8 @@ typedef struct box_gpu_mesh_t {
     float extent[3];                /**< Half size of the box around the vertex positions */
 } box_gpu_mesh_t;
 
+#define BOX_GPU_FRAMES_IN_FLIGHT (2)
+
 typedef struct box_gpu_mesh_range_t {
     uint64_t offset;
     uint64_t size;
@@ -883,6 +885,10 @@ typedef struct box_gpu_t {
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_vec_t mesh_pages;
     uint64_t mesh_ids;
+    WGPUDevice paced_device;
+    uint64_t paced[BOX_GPU_FRAMES_IN_FLIGHT];
+    int32_t paced_count;
+    int32_t paced_next;
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
     WGPUBuffer copy_staging;        /**< Staging buffer of the staged copies of a packet, NULL
                                      *   until one stages: the smallest power of two from 64 KiB
