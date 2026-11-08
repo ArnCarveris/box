@@ -1,18 +1,18 @@
-// Particle draw: one indirect draw per pool of the scene of a view, draw.x vertices per used
-// slot, in slot order or, for a pool sorted back to front, in the order of its sort keys. A live
-// particle faces the camera, its size wide and turned by its rotation; a free slot collapses
-// outside the clip volume. Size, rotation, spin and opacity are drawn from the seed and the spawn
-// index, each from its own stream, then the curves of the emitter scale them by the age over the
-// life (particle.wgsl), read from their rows of the curve table unless they are constant, a curve
-// with max_keys blended toward its max curve by a draw of its own stream; the size, opacity and
-// color clamp at 0.
+// Particle draw: one instanced draw per blend and sprite of the pools of the scene of a view,
+// every instance a slot of a chunk of CHUNK slots of a pool that the chunk buffer names. A live
+// particle faces the camera, its size wide and turned by its rotation; a free slot or one past
+// the used slots of its pool collapses outside the clip volume. Size, rotation, spin and opacity
+// are drawn from the seed and the spawn index, each from its own stream, then the curves of the
+// emitter scale them by the age over the life (particle.wgsl), read from their rows of the curve
+// table unless they are constant, a curve with max_keys blended toward its max curve by a draw
+// of its own stream; the size, opacity and color clamp at 0.
 //
-// A circle is shaded smoothstep(1, 0, d^2) over its quad, a sprite shows a frame of its sheet and
-// a billboard is the mesh of the corner buffer turned to face the camera. A soft particle fades
-// in front of the depth of the view (group 2), a lit one is shaded by the lights of the scene
-// with a wrapped diffuse term, the first directional light through its shadows and light cookie
-// (cookie.wgsl), and an emitter with an appearance gets the aerial perspective of
-// the view. An additive pool adds color times opacity, an alpha pool blends over the image.
+// A circle is shaded smoothstep(1, 0, d^2) over its quad and a sprite shows a frame of its
+// sheet. A soft particle fades in front of the depth of the view (group 2), a lit one is shaded
+// by the lights of the scene with a wrapped diffuse term, the first directional light through
+// its shadows and light cookie (cookie.wgsl), and an emitter with an appearance gets the aerial
+// perspective of the view. An additive pool adds color times opacity, an alpha pool blends over
+// the image.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/cookie.wgsl"
@@ -26,10 +26,18 @@ const PI: f32 = 3.141592653589793;
 @group(0) @binding(9) var aerial_volume: texture_3d<f32>;
 @group(0) @binding(10) var aerial_sampler: sampler;
 
-@group(1) @binding(0) var<uniform> emitter: Emitter;
+// The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
+struct EmitterBlock {
+    @size(512) emitter: Emitter,
+};
+
+// Slots of a pool one entry of the chunk buffer draws, BOX_GPU_PARTICLE_CHUNK
+const CHUNK: u32 = 64u;
+
+@group(1) @binding(0) var<storage, read> blocks: array<EmitterBlock>;
 @group(1) @binding(1) var<storage, read> particles: array<Particle>;
-@group(1) @binding(2) var<storage, read> keys: array<vec2u>;
-@group(1) @binding(3) var<storage, read> corners: array<Corner>;
+// The pool and the first slot of every chunk the views of the packet draw
+@group(1) @binding(2) var<storage, read> chunks: array<vec2u>;
 @group(1) @binding(4) var sprite_texture: texture_2d<f32>;
 @group(1) @binding(5) var sprite_sampler: sampler;
 @group(1) @binding(6) var<storage, read> curves: array<f32>;
@@ -46,6 +54,10 @@ struct VertexOut {
     @location(5) normal: vec3f,
     @location(6) depth: f32,
     @location(7) @interpolate(flat) proj: vec4f,
+    // x: ParticleShape, y: ParticleBlend, z: 1 when the emitter has a ParticleAppearance
+    @location(8) @interpolate(flat) look: vec4u,
+    // x: softness, y: fraction lit
+    @location(9) @interpolate(flat) params: vec2f,
 };
 
 // Corners of the two triangles of the quad.
@@ -67,15 +79,20 @@ fn view_projection_depth() -> vec4f {
 fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32) -> VertexOut {
     var out: VertexOut;
     out.clip = vec4f(2.0, 2.0, 2.0, 1.0);
-    var slot = instance;
-    if (emitter.draw.y != 0u) {
-        slot = keys[emitter.life.w + instance].y;
+    let chunk = chunks[instance / CHUNK];
+    let emitter = blocks[chunk.x].emitter;
+    let slot = chunk.y + instance % CHUNK;
+    if (slot >= emitter.pool.x) {
+        return out;
     }
 
     let p = particles[emitter.gradient_max.z + slot];
     if (p.remaining == 0u) {
         return out;
     }
+
+    out.look = vec4u(emitter.look.x, emitter.look.y, emitter.draw.w, 0u);
+    out.params = emitter.params.yw;
 
     let seed = emitter.spawn.y;
     let life_us = particle_life(seed, p.index, emitter.life.y, emitter.life.z);
@@ -97,44 +114,33 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     let right = vec3f(view.view[0].x, view.view[1].x, view.view[2].x);
     let up = vec3f(view.view[0].y, view.view[1].y, view.view[2].y);
     let toward = vec3f(view.view[0].z, view.view[1].z, view.view[2].z);
-    var world: vec3f;
     out.normal = toward;
-    if (emitter.look.x == PARTICLE_BILLBOARD) {
-        let corner = corners[vertex];
-        let local = corner.position.xyz * size;
-        let n = corner.normal.xyz;
-        world = p.position + right * (local.x * c - local.y * s) +
-            up * (local.x * s + local.y * c) + toward * local.z;
-        out.normal = right * (n.x * c - n.y * s) + up * (n.x * s + n.y * c) + toward * n.z;
-        out.tex = vec2f(corner.position.w, corner.normal.w);
-    } else {
-        let corner = CORNERS[vertex % 6u];
-        var axis_x = vec2f(c, s);
-        var axis_y = vec2f(-s, c);
-        var stretched = 1.0;
-        var moving = p.velocity;
-        if (emitter.params.z > 0.0 && emitter.gradient_max.y != 0u) {
-            moving = particle_moving(p.velocity,
-                particle_motion_velocity(emitter.motion, seed, p.index, t));
-        }
+    let corner = CORNERS[vertex % 6u];
+    var axis_x = vec2f(c, s);
+    var axis_y = vec2f(-s, c);
+    var stretched = 1.0;
+    var moving = p.velocity;
+    if (emitter.params.z > 0.0 && emitter.gradient_max.y != 0u) {
+        moving = particle_moving(p.velocity,
+            particle_motion_velocity(emitter.motion, seed, p.index, t));
+    }
 
-        let velocity = (view.view * vec4f(moving, 0.0)).xy;
-        let speed = sqrt(dot(velocity, velocity));
-        if (emitter.params.z > 0.0 && speed > 1e-6) {
-            axis_x = velocity / speed;
-            axis_y = vec2f(-axis_x.y, axis_x.x);
-            stretched = particle_stretch(emitter.params.z, speed);
-        }
+    let velocity = (view.view * vec4f(moving, 0.0)).xy;
+    let speed = sqrt(dot(velocity, velocity));
+    if (emitter.params.z > 0.0 && speed > 1e-6) {
+        axis_x = velocity / speed;
+        axis_y = vec2f(-axis_x.y, axis_x.x);
+        stretched = particle_stretch(emitter.params.z, speed);
+    }
 
-        let turned = axis_x * (corner.x * stretched) + axis_y * corner.y;
-        world = p.position + (right * turned.x + up * turned.y) * (0.5 * size);
-        out.uv = corner;
-        if (emitter.look.x == PARTICLE_SPRITE) {
-            let frame = particle_frame(emitter.look.z, emitter.look.w, emitter.params.x, age,
-                life);
-            let rect = particle_frame_rect(frame, emitter.look.z, emitter.look.w);
-            out.tex = rect.xy + (corner * vec2f(0.5, -0.5) + 0.5) * rect.zw;
-        }
+    let turned = axis_x * (corner.x * stretched) + axis_y * corner.y;
+    let world = p.position + (right * turned.x + up * turned.y) * (0.5 * size);
+    out.uv = corner;
+    if (emitter.look.x == PARTICLE_SPRITE) {
+        let frame = particle_frame(emitter.look.z, emitter.look.w, emitter.params.x, age,
+            life);
+        let rect = particle_frame_rect(frame, emitter.look.z, emitter.look.w);
+        out.tex = rect.xy + (corner * vec2f(0.5, -0.5) + 0.5) * rect.zw;
     }
 
     out.clip = view.view_proj * vec4f(world, 1.0);
@@ -169,15 +175,10 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
     return window * window / (near_ * near_) * cone * cone;
 }
 
-// Diffuse term of a light from direction l: wrapped around a flat particle, which stands for a
-// volume, and Lambert for the faces of a billboard mesh.
+// Diffuse term of a light from direction l, wrapped around a flat particle, which stands for a
+// volume.
 fn diffuse(n: vec3f, l: vec3f) -> f32 {
-    let ndl = dot(n, l);
-    if (emitter.look.x == PARTICLE_BILLBOARD) {
-        return max(ndl, 0.0);
-    }
-
-    return clamp(ndl * 0.5 + 0.5, 0.0, 1.0);
+    return clamp(dot(n, l) * 0.5 + 0.5, 0.0, 1.0);
 }
 
 // Light a white particle reflects toward the eye: the directional lights, the first through its
@@ -215,13 +216,13 @@ fn particle_light(world: vec3f, n: vec3f) -> vec3f {
 
 // Color of a fragment seen through the atmosphere: an alpha particle is attenuated and adds the
 // in scattered light by its coverage, the light an additive one adds is only attenuated.
-fn aerial_perspective(color: vec3f, pos: vec4f, world: vec3f) -> vec3f {
+fn aerial_perspective(color: vec3f, pos: vec4f, world: vec3f, blend: u32) -> vec3f {
     let uv = pos.xy * view.viewport.zw;
     let km = length(world - view.camera.xyz) * view.aerial.x;
     let slices = view.aerial.z;
     let w = (km * view.aerial.y * (slices - 1.0) + 0.5) / slices;
     let ap = textureSampleLevel(aerial_volume, aerial_sampler, vec3f(uv, w), 0.0);
-    if (emitter.look.y == PARTICLE_ADDITIVE) {
+    if (blend == PARTICLE_ADDITIVE) {
         return color * ap.a;
     }
 
@@ -233,33 +234,33 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
     let texel = textureSample(sprite_texture, sprite_sampler, in.tex);
     var alpha = clamp(in.opacity, 0.0, 1.0);
     var color = in.color;
-    if (emitter.look.x == PARTICLE_CIRCLE) {
+    if (in.look.x == PARTICLE_CIRCLE) {
         // smoothstep(1, 0, d2), written with ascending edges
         alpha *= 1.0 - smoothstep(0.0, 1.0, dot(in.uv, in.uv));
-    } else if (emitter.look.x == PARTICLE_SPRITE) {
+    } else if (in.look.x == PARTICLE_SPRITE) {
         color *= texel.rgb;
         alpha *= texel.a;
     }
 
-    if (emitter.params.y > 0.0) {
+    if (in.params.x > 0.0) {
         let d = textureLoad(depth_texture, vec2i(in.clip.xy), 0);
-        alpha *= particle_soft(particle_view_depth(in.proj, d), in.depth, emitter.params.y);
+        alpha *= particle_soft(particle_view_depth(in.proj, d), in.depth, in.params.x);
     }
 
     if (alpha <= 0.0) {
         discard;
     }
 
-    if (emitter.params.w > 0.0 && view.lights.z != 0u) {
+    if (in.params.y > 0.0 && view.lights.z != 0u) {
         let lit = particle_light(in.world, normalize(in.normal));
-        color *= mix(vec3f(1.0), lit, emitter.params.w);
+        color *= mix(vec3f(1.0), lit, in.params.y);
     }
 
-    if (emitter.draw.w != 0u && view.aerial.w > 0.0) {
-        color = aerial_perspective(color, in.clip, in.world);
+    if (in.look.z != 0u && view.aerial.w > 0.0) {
+        color = aerial_perspective(color, in.clip, in.world, in.look.y);
     }
 
-    if (emitter.look.y == PARTICLE_ADDITIVE) {
+    if (in.look.y == PARTICLE_ADDITIVE) {
         return vec4f(max(color, vec3f(0.0)) * alpha, 0.0);
     }
 

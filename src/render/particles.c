@@ -37,9 +37,10 @@ typedef struct box_particle_death_t {
     uint32_t pad;           /**< Unused */
 } box_particle_death_t;
 
-/** A storage buffer that holds pools of one size */
+/** A range of the arena that holds pools of one size */
 typedef struct box_particle_page_t {
-    uint32_t handle;        /**< Buffer handle */
+    uint32_t base;          /**< First slot of the page in the arena */
+    uint32_t slots;         /**< Slots of the page */
     uint32_t capacity;      /**< Slots of each of its pools */
     uint32_t pools;         /**< Pools it holds */
     uint64_t occupied;      /**< Bit per pool in use */
@@ -50,8 +51,8 @@ typedef struct box_particle_pool_t {
     ecs_entity_t entity;    /**< Entity with the ParticleEmitter */
     ecs_entity_t scene;     /**< Scene of the emitter in this frame */
     int32_t max;            /**< Clamped ParticleEmitter.max the pool was made for */
-    uint32_t page;          /**< Handle of its page */
-    uint32_t base;          /**< First slot of the pool in its page */
+    uint32_t page;          /**< Index of its page plus one, 0 for none */
+    uint32_t base;          /**< First slot of the pool in the arena */
     uint32_t capacity;      /**< Slots of the pool */
     bool fresh;             /**< The range was not cleared on the backend yet */
     bool seen;              /**< The emitter is enabled in this frame */
@@ -69,7 +70,7 @@ typedef struct box_particle_pool_t {
     uint32_t used;          /**< Slots from the start that were handed out */
     ecs_vec_t deaths;       /**< box_particle_death_t, a heap by clock and slot */
     ecs_vec_t free_slots;   /**< uint32_t, slots below used whose particle died */
-    uint32_t table;         /**< Buffer handle of the mesh table, 0 for none */
+    uint32_t table;         /**< Index of its shared mesh table plus one, 0 for none */
     int32_t points;         /**< Points of the mesh table */
     bool table_built;       /**< The table matches the key below */
     ecs_entity_t table_source; /**< Entity the table was sampled from */
@@ -78,12 +79,6 @@ typedef struct box_particle_pool_t {
     uint32_t table_seed;    /**< Seed the table was sampled with */
     vec3 last_position;     /**< World position of the emitter in the last frame */
     bool has_last;          /**< last_position holds a position */
-    uint32_t mesh;          /**< Buffer handle of the corners of a billboard, 0 for none */
-    uint32_t corners;       /**< Corners in the billboard buffer */
-    bool mesh_built;        /**< The corners match the key below */
-    ecs_entity_t mesh_entity; /**< Entity the corners were built from */
-    uint32_t mesh_handle;   /**< Mesh handle the corners were built from */
-    vec3 mesh_scale;        /**< Shape scale the corners were built with */
     bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
     bool lingering;         /**< The emitter was deleted and the pool runs out its particles,
                              *   no longer in by_entity */
@@ -103,6 +98,16 @@ typedef struct box_particle_pool_t {
     box_particle_rows_motion_t motion; /**< Rows of the curve table its ParticleMotion uses */
 } box_particle_pool_t;
 
+/** A mesh table that the EmitterMesh pools of the same shape and seed share, a slot of
+ * BOX_PARTICLE_MESH_POINTS points of the table buffer */
+typedef struct box_particle_table_t {
+    uint32_t mesh;          /**< Mesh handle it was sampled from */
+    vec3 scale;             /**< Shape scale it was sampled with */
+    uint32_t seed;          /**< Seed it was sampled with */
+    int32_t points;         /**< Points sampled */
+    int32_t refs;           /**< Pools that use it, 0 for a free slot */
+} box_particle_table_t;
+
 /** A burst of the frame and the emitter whose pool it spawns into */
 typedef struct box_particle_burst_t {
     ecs_entity_t emitter;   /**< Nearest ParticleEmitter at or above the burst */
@@ -119,15 +124,12 @@ typedef struct box_render_particles_t {
     ecs_vec_t bursts;       /**< box_particle_burst_t of the frame, sorted by emitter */
     ecs_vec_t pools;        /**< box_particle_pool_t* */
     ecs_map_t by_entity;    /**< Entity to box_particle_pool_t* */
-    ecs_vec_t pages;        /**< box_particle_page_t */
-    ecs_vec_t page_handles; /**< uint32_t, page handles to reuse */
-    uint32_t next_page;     /**< Next page handle */
-    ecs_vec_t table_handles; /**< uint32_t, table handles to reuse */
-    uint32_t next_table;    /**< Next table handle */
+    ecs_vec_t pages;        /**< box_particle_page_t, kept when empty to be reused */
+    uint32_t arena_slots;   /**< Slots of the arena the pages take */
+    uint32_t arena_capacity; /**< Slots of the arena buffer sent to the backend */
+    ecs_vec_t tables;       /**< box_particle_table_t, a slot of the table buffer each */
+    uint32_t table_capacity; /**< Tables the table buffer sent to the backend holds */
     ecs_vec_t points;       /**< box_particle_point_t, the table being sampled */
-    ecs_vec_t mesh_handles; /**< uint32_t, billboard corner buffer handles to reuse */
-    uint32_t next_mesh;     /**< Next billboard corner buffer handle */
-    ecs_vec_t corners;      /**< box_render_particle_corner_t, the corners being built */
     const void *backend;    /**< Context of the backend the pages were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;     /**< Generation of that backend, see box_render_backend_t */
@@ -230,32 +232,87 @@ static uint32_t box_particles_class(
     return result;
 }
 
-/** Find the page of a handle.
+/** Make the arena buffer hold its pages, created again twice as large with its particles kept
+ * when they outgrow it.
  *
  * @param s The state
- * @param handle The handle
- * @return Index of the page, -1 when there is none
+ * @param p The packet, receives the arena when it grows
+ * @return Whether the pages fit the largest arena
  */
-static int32_t box_particles_page_find(
-    const box_render_particles_t *s,
-    uint32_t handle)
+static bool box_particles_arena_fit(
+    box_render_particles_t *s,
+    box_render_packet_t *p)
 {
-    int32_t i, result = -1;
+    uint32_t capacity = s->arena_capacity ? s->arena_capacity : BOX_PARTICLE_PAGE_SLOTS;
+    bool result = s->arena_slots <= BOX_RENDER_PARTICLE_ARENA_MAX;
+    if (!result) {
+        ecs_err("particle pools need %u slots, more than the %u of the arena",
+            s->arena_slots, BOX_RENDER_PARTICLE_ARENA_MAX);
+        goto done;
+    }
+
+    if (s->arena_slots <= s->arena_capacity) {
+        goto done;
+    }
+
+    while (capacity < s->arena_slots) {
+        capacity *= 2;
+    }
+
+    capacity = capacity < BOX_RENDER_PARTICLE_ARENA_MAX ? capacity : BOX_RENDER_PARTICLE_ARENA_MAX;
+    box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
+        BOX_RENDER_CREATE, BOX_RENDER_BUFFER_PARTICLE_FIRST, sizeof(box_render_buffer_desc_t));
+    desc->size = (uint64_t)capacity * BOX_RENDER_PARTICLE_SIZE;
+    desc->usage = BOX_RENDER_BUFFER_STORAGE | BOX_RENDER_BUFFER_KEEP;
+    s->arena_capacity = capacity;
+done:
+    return result;
+}
+
+/** Destroy the arena once no pool holds a range of it and the mesh tables once no pool reads
+ * one, so a world without emitters keeps no particle memory.
+ *
+ * @param s The state
+ * @param p The packet, receives the destroys
+ */
+static void box_particles_arena_release(
+    box_render_particles_t *s,
+    box_render_packet_t *p)
+{
+    int32_t i;
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
-        if (ecs_vec_get_t(&s->pages, box_particle_page_t, i)->handle == handle) {
-            result = i;
+        if (ecs_vec_get_t(&s->pages, box_particle_page_t, i)->occupied) {
             break;
         }
     }
 
-    return result;
+    if (s->arena_capacity && i == ecs_vec_count(&s->pages)) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY,
+            BOX_RENDER_BUFFER_PARTICLE_FIRST, 0);
+        ecs_vec_clear(&s->pages);
+        s->arena_slots = 0;
+        s->arena_capacity = 0;
+    }
+
+    for (i = 0; i < ecs_vec_count(&s->tables); i ++) {
+        if (ecs_vec_get_t(&s->tables, box_particle_table_t, i)->refs) {
+            break;
+        }
+    }
+
+    if (s->table_capacity && i == ecs_vec_count(&s->tables)) {
+        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY,
+            BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST, 0);
+        ecs_vec_clear(&s->tables);
+        s->table_capacity = 0;
+    }
 }
 
-/** Give a pool a range of slots in a page of its size, creating a page when every page of that
- * size is full.
+/** Give a pool a range of slots in a page of its size: a page of that size with a free range,
+ * else an empty page of as many slots, else a new page at the end of the arena.
  *
  * @param s The state
- * @param p The packet, receives a new page
+ * @param p The packet, receives the arena when it grows
  * @param pool The pool, its capacity set
  */
 static void box_particles_range_alloc(
@@ -264,38 +321,41 @@ static void box_particles_range_alloc(
     box_particle_pool_t *pool)
 {
     box_particle_page_t *page = NULL;
-    uint32_t bit;
-    int32_t i;
+    uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / pool->capacity, bit;
+    int32_t i, index = -1;
+    pools = pools < 1 ? 1 : pools > BOX_PARTICLE_PAGE_POOLS ? BOX_PARTICLE_PAGE_POOLS : pools;
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
         box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
         uint64_t full = candidate->pools >= 64 ? UINT64_MAX
             : (((uint64_t)1 << candidate->pools) - 1);
         if (candidate->capacity == pool->capacity && candidate->occupied != full) {
-            page = candidate;
+            index = i;
             break;
         }
     }
 
-    if (!page) {
-        uint32_t pools = BOX_PARTICLE_PAGE_SLOTS / pool->capacity;
-        pools = pools < 1 ? 1 : pools > BOX_PARTICLE_PAGE_POOLS ? BOX_PARTICLE_PAGE_POOLS : pools;
-        page = ecs_vec_append_t(NULL, &s->pages, box_particle_page_t);
-        ecs_os_memset_t(page, 0, box_particle_page_t);
-        page->capacity = pool->capacity;
-        page->pools = pools;
-        if (ecs_vec_count(&s->page_handles)) {
-            page->handle = *ecs_vec_last_t(&s->page_handles, uint32_t);
-            ecs_vec_remove_last(&s->page_handles);
-        } else {
-            page->handle = s->next_page ++;
+    for (i = 0; index < 0 && i < ecs_vec_count(&s->pages); i ++) {
+        box_particle_page_t *candidate = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
+        if (!candidate->occupied && candidate->slots == pools * pool->capacity) {
+            candidate->capacity = pool->capacity;
+            candidate->pools = pools;
+            index = i;
         }
-
-        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
-            BOX_RENDER_CREATE, page->handle, sizeof(box_render_buffer_desc_t));
-        desc->size = (uint64_t)pools * pool->capacity * BOX_RENDER_PARTICLE_SIZE;
-        desc->usage = BOX_RENDER_BUFFER_STORAGE;
     }
 
+    if (index < 0) {
+        page = ecs_vec_append_t(NULL, &s->pages, box_particle_page_t);
+        ecs_os_memset_t(page, 0, box_particle_page_t);
+        page->base = s->arena_slots;
+        page->slots = pools * pool->capacity;
+        page->capacity = pool->capacity;
+        page->pools = pools;
+        s->arena_slots += page->slots;
+        index = ecs_vec_count(&s->pages) - 1;
+        box_particles_arena_fit(s, p);
+    }
+
+    page = ecs_vec_get_t(&s->pages, box_particle_page_t, index);
     for (bit = 0; bit < page->pools; bit ++) {
         if (!(page->occupied & ((uint64_t)1 << bit))) {
             break;
@@ -303,15 +363,15 @@ static void box_particles_range_alloc(
     }
 
     page->occupied |= (uint64_t)1 << bit;
-    pool->page = page->handle;
-    pool->base = bit * page->capacity;
+    pool->page = (uint32_t)index + 1;
+    pool->base = page->base + bit * page->capacity;
     pool->fresh = true;
 }
 
-/** Return the range of a pool to its page, destroying the page when it is empty.
+/** Return the range of a pool to its page, which stays in the arena when it empties.
  *
  * @param s The state
- * @param p The packet, receives the destroy of an empty page
+ * @param p The packet
  * @param pool The pool
  */
 static void box_particles_range_free(
@@ -319,20 +379,13 @@ static void box_particles_range_free(
     box_render_packet_t *p,
     box_particle_pool_t *pool)
 {
-    int32_t index = box_particles_page_find(s, pool->page);
-    if (index < 0) {
-        goto done;
+    (void)p;
+    if (pool->page && pool->page <= (uint32_t)ecs_vec_count(&s->pages)) {
+        box_particle_page_t *page = ecs_vec_get_t(
+            &s->pages, box_particle_page_t, (int32_t)pool->page - 1);
+        page->occupied &= ~((uint64_t)1 << ((pool->base - page->base) / page->capacity));
     }
 
-    box_particle_page_t *page = ecs_vec_get_t(&s->pages, box_particle_page_t, index);
-    page->occupied &= ~((uint64_t)1 << (pool->base / page->capacity));
-    if (!page->occupied) {
-        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, page->handle, 0);
-        *ecs_vec_append_t(NULL, &s->page_handles, uint32_t) = page->handle;
-        ecs_vec_remove_t(&s->pages, box_particle_page_t, index);
-    }
-
-done:
     pool->page = 0;
 }
 
@@ -353,7 +406,7 @@ static void box_particles_empty(
     ecs_vec_clear(&pool->free_slots);
 }
 
-/** Destroy the mesh table of a pool on the backend.
+/** Release the shared mesh table of a pool.
  *
  * @param s The state
  * @param p The packet
@@ -364,35 +417,14 @@ static void box_particles_table_free(
     box_render_packet_t *p,
     box_particle_pool_t *pool)
 {
-    if (pool->table) {
-        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, pool->table, 0);
-        *ecs_vec_append_t(NULL, &s->table_handles, uint32_t) = pool->table;
+    (void)p;
+    if (pool->table && pool->table <= (uint32_t)ecs_vec_count(&s->tables)) {
+        ecs_vec_get_t(&s->tables, box_particle_table_t, (int32_t)pool->table - 1)->refs --;
     }
 
     pool->table = 0;
     pool->points = 0;
     pool->table_built = false;
-}
-
-/** Destroy the billboard corners of a pool on the backend.
- *
- * @param s The state
- * @param p The packet
- * @param pool The pool
- */
-static void box_particles_mesh_free(
-    box_render_particles_t *s,
-    box_render_packet_t *p,
-    box_particle_pool_t *pool)
-{
-    if (pool->mesh) {
-        box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY, pool->mesh, 0);
-        *ecs_vec_append_t(NULL, &s->mesh_handles, uint32_t) = pool->mesh;
-    }
-
-    pool->mesh = 0;
-    pool->corners = 0;
-    pool->mesh_built = false;
 }
 
 /** Make the pool of an emitter.
@@ -437,7 +469,6 @@ static void box_particles_pool_free(
     if (p) {
         box_particles_range_free(s, p, pool);
         box_particles_table_free(s, p, pool);
-        box_particles_mesh_free(s, p, pool);
     }
 
     box_particle_rows_release(&s->curves, &pool->curves);
@@ -465,13 +496,11 @@ static void box_particles_reset_backend(
     }
 
     ecs_vec_clear(&s->pages);
-    ecs_vec_clear(&s->page_handles);
-    ecs_vec_clear(&s->table_handles);
-    ecs_vec_clear(&s->mesh_handles);
+    ecs_vec_clear(&s->tables);
     box_particle_rows_reset(&s->curves);
-    s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
-    s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
-    s->next_mesh = BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST;
+    s->arena_slots = 0;
+    s->arena_capacity = 0;
+    s->table_capacity = 0;
 }
 
 /** Sample the mesh table of an EmitterMesh again when its source, its shape or its seed
@@ -509,133 +538,72 @@ static void box_particles_table_update(
         goto done;
     }
 
-    const box_mesh_t *m = mesh && cache ? box_mesh_cache_get(cache, mesh) : NULL;
-    ecs_vec_set_count_t(NULL, &s->points, box_particle_point_t, BOX_PARTICLE_MESH_POINTS);
-    int32_t points = box_particle_mesh_table(m, scale, emitter->seed,
-        ecs_vec_first(&s->points), BOX_PARTICLE_MESH_POINTS);
     box_particles_table_free(s, p, pool);
-    if (points) {
-        uint32_t size = (uint32_t)points * (uint32_t)sizeof(box_particle_point_t);
-        if (ecs_vec_count(&s->table_handles)) {
-            pool->table = *ecs_vec_last_t(&s->table_handles, uint32_t);
-            ecs_vec_remove_last(&s->table_handles);
-        } else {
-            pool->table = s->next_table ++;
+    int32_t i, free_slot = -1;
+    for (i = 0; i < ecs_vec_count(&s->tables); i ++) {
+        box_particle_table_t *t = ecs_vec_get_t(&s->tables, box_particle_table_t, i);
+        if (t->refs && t->mesh == mesh && t->seed == emitter->seed &&
+            glm_vec3_eqv(t->scale, scale))
+        {
+            break;
         }
 
-        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
-            BOX_RENDER_CREATE, pool->table, sizeof(box_render_buffer_desc_t));
-        desc->size = size;
-        desc->usage = BOX_RENDER_BUFFER_STORAGE;
-        ecs_os_memcpy(box_render_packet_upload(p, pool->table, 0, size),
-            ecs_vec_first(&s->points), (ecs_size_t)size);
-        pool->points = points;
+        if (!t->refs && free_slot < 0) {
+            free_slot = i;
+        }
     }
 
+    if (i == ecs_vec_count(&s->tables)) {
+        const box_mesh_t *m = mesh && cache ? box_mesh_cache_get(cache, mesh) : NULL;
+        ecs_vec_set_count_t(NULL, &s->points, box_particle_point_t, BOX_PARTICLE_MESH_POINTS);
+        int32_t points = box_particle_mesh_table(m, scale, emitter->seed,
+            ecs_vec_first(&s->points), BOX_PARTICLE_MESH_POINTS);
+        if (!points) {
+            goto built;
+        }
+
+        i = free_slot >= 0 ? free_slot : ecs_vec_count(&s->tables);
+        if (i == ecs_vec_count(&s->tables)) {
+            ecs_vec_append_t(NULL, &s->tables, box_particle_table_t);
+        }
+
+        box_particle_table_t *t = ecs_vec_get_t(&s->tables, box_particle_table_t, i);
+        t->mesh = mesh;
+        t->seed = emitter->seed;
+        glm_vec3_copy(scale, t->scale);
+        t->points = points;
+        t->refs = 0;
+        if ((uint32_t)ecs_vec_count(&s->tables) > s->table_capacity) {
+            uint32_t capacity = s->table_capacity ? s->table_capacity : 4;
+            while (capacity < (uint32_t)ecs_vec_count(&s->tables)) {
+                capacity *= 2;
+            }
+
+            box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
+                BOX_RENDER_CREATE, BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST,
+                sizeof(box_render_buffer_desc_t));
+            desc->size = (uint64_t)capacity * BOX_PARTICLE_MESH_POINTS *
+                sizeof(box_particle_point_t);
+            desc->usage = BOX_RENDER_BUFFER_STORAGE | BOX_RENDER_BUFFER_KEEP;
+            s->table_capacity = capacity;
+        }
+
+        uint32_t size = (uint32_t)points * (uint32_t)sizeof(box_particle_point_t);
+        ecs_os_memcpy(box_render_packet_upload(p, BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST,
+            (uint32_t)i * BOX_PARTICLE_MESH_POINTS * (uint32_t)sizeof(box_particle_point_t),
+            size), ecs_vec_first(&s->points), (ecs_size_t)size);
+    }
+
+    box_particle_table_t *t = ecs_vec_get_t(&s->tables, box_particle_table_t, i);
+    t->refs ++;
+    pool->table = (uint32_t)i + 1;
+    pool->points = t->points;
+built:
     pool->table_built = true;
     pool->table_source = source;
     pool->table_mesh = mesh;
     pool->table_seed = emitter->seed;
     glm_vec3_copy(scale, pool->table_scale);
-done:
-    return;
-}
-
-/** Write the corners of the triangles of a mesh, scaled by the shape, as a billboard draws them.
- *
- * @param m The mesh
- * @param scale Scale of the shape
- * @param out Receives a corner per index
- */
-static void box_particles_corners(
-    const box_mesh_t *m,
-    const float *scale,
-    box_render_particle_corner_t *out)
-{
-    int32_t i, c;
-    for (i = 0; i < m->index_count; i ++) {
-        uint32_t v = m->indices[i];
-        const box_vertex_t *vertex = (int32_t)v < m->vertex_count ? &m->vertices[v] : NULL;
-        vec3 n = {0, 0, 1};
-        ecs_os_memset_t(&out[i], 0, box_render_particle_corner_t);
-        if (!vertex) {
-            continue;
-        }
-
-        for (c = 0; c < 3; c ++) {
-            out[i].position[c] = vertex->position[c] * scale[c];
-            n[c] = scale[c] != 0 ? vertex->normal[c] / scale[c] : 0.0f;
-        }
-
-        if (glm_vec3_norm2(n) > 0) {
-            glm_vec3_normalize(n);
-        }
-
-        glm_vec3_copy(n, out[i].normal);
-        out[i].position[3] = vertex->uv[0];
-        out[i].normal[3] = vertex->uv[1];
-    }
-}
-
-/** Build the corners of the mesh a billboard draws again when its entity, its shape or its
- * scale changed, and send them.
- *
- * @param world The world
- * @param s The state
- * @param p The packet
- * @param pool The pool
- * @param source Entity of the mesh, 0 for none
- */
-static void box_particles_mesh_update(
-    ecs_world_t *world,
-    box_render_particles_t *s,
-    box_render_packet_t *p,
-    box_particle_pool_t *pool,
-    ecs_entity_t source)
-{
-    const ShapeMesh *shape = source && ecs_is_alive(world, source)
-        ? ecs_get(world, source, ShapeMesh)
-        : NULL;
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
-    uint32_t mesh = shape ? shape->mesh : 0;
-    vec3 scale = {0, 0, 0};
-    if (shape) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, shape->scale), scale);
-    }
-
-    if (pool->mesh_built && pool->mesh_entity == source && pool->mesh_handle == mesh &&
-        glm_vec3_eqv(scale, pool->mesh_scale))
-    {
-        goto done;
-    }
-
-    const box_mesh_t *m = mesh && cache ? box_mesh_cache_get(cache, mesh) : NULL;
-    box_particles_mesh_free(s, p, pool);
-    if (m && m->index_count >= 3 && m->vertex_count) {
-        int32_t count = m->index_count - m->index_count % 3;
-        uint32_t size = (uint32_t)count * (uint32_t)sizeof(box_render_particle_corner_t);
-        ecs_vec_set_count_t(NULL, &s->corners, box_render_particle_corner_t, m->index_count);
-        box_particles_corners(m, scale, ecs_vec_first(&s->corners));
-        if (ecs_vec_count(&s->mesh_handles)) {
-            pool->mesh = *ecs_vec_last_t(&s->mesh_handles, uint32_t);
-            ecs_vec_remove_last(&s->mesh_handles);
-        } else {
-            pool->mesh = s->next_mesh ++;
-        }
-
-        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
-            BOX_RENDER_CREATE, pool->mesh, sizeof(box_render_buffer_desc_t));
-        desc->size = size;
-        desc->usage = BOX_RENDER_BUFFER_STORAGE;
-        ecs_os_memcpy(box_render_packet_upload(p, pool->mesh, 0, size),
-            ecs_vec_first(&s->corners), (ecs_size_t)size);
-        pool->corners = (uint32_t)count;
-    }
-
-    pool->mesh_built = m != NULL || !mesh;
-    pool->mesh_entity = source;
-    pool->mesh_handle = mesh;
-    glm_vec3_copy(scale, pool->mesh_scale);
 done:
     return;
 }
@@ -1022,25 +990,7 @@ static void box_particles_velocity(
     pool->has_last = true;
 }
 
-/** Get the keys the sort of a pool sorts: the used slots rounded up to a power of two.
- *
- * @param used Slots that may hold a particle
- * @param capacity Slots of the pool, a power of two
- * @return The keys
- */
-static uint32_t box_particles_sort_count(
-    uint32_t used,
-    uint32_t capacity)
-{
-    uint32_t result = 1u;
-    while (result < used) {
-        result *= 2;
-    }
-
-    return result < capacity ? result : capacity;
-}
-
-_Static_assert(offsetof(box_render_particle_block_t, corners) ==
+_Static_assert(offsetof(box_render_particle_block_t, pad1) ==
     offsetof(box_render_particle_block_t, gradient_row) + sizeof(uint32_t),
     "the curves of a block end at gradient_row");
 _Static_assert(sizeof(box_render_particle_block_t) ==
@@ -1074,7 +1024,7 @@ static void box_particles_block_still(
     box_render_particle_block_t *out)
 {
     size_t first = offsetof(box_render_particle_block_t, curve_rows);
-    size_t end = offsetof(box_render_particle_block_t, corners);
+    size_t end = offsetof(box_render_particle_block_t, pad1);
     ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
         (ecs_size_t)(end - first));
     first = offsetof(box_render_particle_block_t, curve_max_rows);
@@ -1086,13 +1036,10 @@ static void box_particles_block_still(
 /** Write the changes over the life and the appearance of an emitter into its block.
  *
  * Without ParticleCurves the curves change nothing; without ParticleAppearance the particles
- * are soft alpha blended circles, unsorted unless their colors can differ: a color curve that
- * changes their color over their life or a color variance that gives each its own color.
- * Particles of one color blend the same in any order, whatever their opacity and size.
+ * are soft alpha blended circles.
  *
  * @param look The ParticleAppearance of the emitter, NULL for none
- * @param pool The pool, with its billboard corners and the rows of its curves and of its
- *             ParticleMotion
+ * @param pool The pool, with the rows of its curves and of its ParticleMotion
  * @param out The block, its other members written, its color variance among them
  */
 static void box_particles_block_look(
@@ -1130,7 +1077,6 @@ static void box_particles_block_look(
     out->blend = ParticleAlpha;
     out->columns = 1;
     out->rows = 1;
-    out->corners = 6;
     if (look) {
         out->look = (uint32_t)look->shape;
         out->blend = look->blend == ParticleAdditive ? ParticleAdditive : ParticleAlpha;
@@ -1140,19 +1086,12 @@ static void box_particles_block_look(
         out->softness = look->softness > 0 ? look->softness : 0.0f;
         out->stretch = look->stretch > 0 ? look->stretch : 0.0f;
         out->lit = glm_clamp(look->lit, 0.0f, 1.0f);
-        if (look->shape == ParticleBillboard && pool->corners) {
-            out->corners = pool->corners;
-        } else if (look->shape != ParticleSprite) {
+        if (look->shape != ParticleSprite) {
             out->look = ParticleCircle;
         }
     }
 
     out->styled = look ? 1u : 0u;
-    out->sorted = out->blend == ParticleAlpha && (look ||
-        out->variance[0] != 0 || out->variance[1] != 0 || out->variance[2] != 0 ||
-        out->gradient_row != BOX_PARTICLE_CURVE_CONSTANT ||
-        out->gradient_max_row != BOX_PARTICLE_CURVE_CONSTANT) ? 1u : 0u;
-    out->sort_count = out->sorted ? box_particles_sort_count(pool->used, pool->capacity) : 0;
 }
 
 /** Get the texture handle of the sprite of an appearance.
@@ -1368,13 +1307,6 @@ static void box_particles_emitter(
         pool->faded = 0;
     }
 
-    if (look && look->shape == ParticleBillboard) {
-        box_particles_mesh_update(world, s, p, pool, look->mesh);
-    } else if (pool->mesh_built) {
-        box_particles_mesh_free(s, p, pool);
-    }
-
-
     box_particles_velocity(pool, transform, p->delta, velocity);
     age_us = reset || state == ParticlePaused ? 0 : delta_us;
     pool->clock += age_us;
@@ -1408,14 +1340,13 @@ static void box_particles_emitter(
     ecs_os_memset_t(entry, 0, box_render_particle_pool_t);
     entry->entity = e;
     entry->scene = scene;
-    entry->buffer = pool->page;
+    entry->buffer = BOX_RENDER_BUFFER_PARTICLE_FIRST;
     entry->offset = pool->base * BOX_RENDER_PARTICLE_SIZE;
     entry->capacity = pool->capacity;
     entry->clear = pool->fresh;
-    entry->table = pool->table;
+    entry->table = pool->table ? BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST : 0;
     entry->slots = slots;
     entry->texture = box_particles_texture(world, look);
-    entry->mesh = pool->mesh;
     const ParticleForces *own = e != ecs_id(ParticleForces)
         ? ecs_get(world, e, ParticleForces)
         : NULL;
@@ -1447,6 +1378,9 @@ static void box_particles_emitter(
     entry->block.first = first;
     entry->block.used = pool->used;
     entry->block.points = (uint32_t)pool->points;
+    entry->block.table_first = pool->table
+        ? (pool->table - 1) * BOX_PARTICLE_MESH_POINTS
+        : 0;
     entry->block.delta_us = age_us;
     entry->block.life_min = life_min;
     entry->block.life_span = life_max > life_min ? life_max - life_min : 0;
@@ -1514,9 +1448,6 @@ static bool box_particles_linger(
     entry->block.first = pool->next;
     entry->block.used = pool->used;
     entry->block.delta_us = delta_us;
-    entry->block.sort_count = entry->block.sorted
-        ? box_particles_sort_count(pool->used, pool->capacity)
-        : 0;
     stats->particles += pool->live;
     stats->simulated ++;
     stats->lingering ++;
@@ -1699,8 +1630,12 @@ static void BoxRenderExtractParticles(
     box_particle_rows_send(&s->curves, p);
     for (i = 0; i < ecs_vec_count(&s->pages); i ++) {
         const box_particle_page_t *page = ecs_vec_get_t(&s->pages, box_particle_page_t, i);
-        stats.bytes += (int64_t)page->pools * page->capacity * BOX_RENDER_PARTICLE_SIZE;
+        if (page->occupied) {
+            stats.bytes += (int64_t)page->slots * BOX_RENDER_PARTICLE_SIZE;
+        }
     }
+
+    box_particles_arena_release(s, p);
 
     const ParticleStats *prev = ecs_singleton_get(world, ParticleStats);
     if (prev) {
@@ -1727,12 +1662,9 @@ static void box_particles_free(
     ecs_vec_fini_t(NULL, &s->pools, box_particle_pool_t*);
     ecs_map_fini(&s->by_entity);
     ecs_vec_fini_t(NULL, &s->pages, box_particle_page_t);
-    ecs_vec_fini_t(NULL, &s->page_handles, uint32_t);
-    ecs_vec_fini_t(NULL, &s->table_handles, uint32_t);
+    ecs_vec_fini_t(NULL, &s->tables, box_particle_table_t);
     ecs_vec_fini_t(NULL, &s->points, box_particle_point_t);
     ecs_vec_fini_t(NULL, &s->bursts, box_particle_burst_t);
-    ecs_vec_fini_t(NULL, &s->mesh_handles, uint32_t);
-    ecs_vec_fini_t(NULL, &s->corners, box_render_particle_corner_t);
     box_particle_rows_fini(&s->curves);
     ecs_os_free(s);
 }
@@ -1758,16 +1690,10 @@ void box_render_particles_init(
     ecs_vec_init_t(NULL, &s->pools, box_particle_pool_t*, 0);
     ecs_map_init(&s->by_entity, NULL);
     ecs_vec_init_t(NULL, &s->pages, box_particle_page_t, 0);
-    ecs_vec_init_t(NULL, &s->page_handles, uint32_t, 0);
-    ecs_vec_init_t(NULL, &s->table_handles, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->tables, box_particle_table_t, 0);
     ecs_vec_init_t(NULL, &s->points, box_particle_point_t, 0);
     ecs_vec_init_t(NULL, &s->bursts, box_particle_burst_t, 0);
-    ecs_vec_init_t(NULL, &s->mesh_handles, uint32_t, 0);
-    ecs_vec_init_t(NULL, &s->corners, box_render_particle_corner_t, 0);
     box_particle_rows_init(&s->curves);
-    s->next_mesh = BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST;
-    s->next_page = BOX_RENDER_BUFFER_PARTICLE_FIRST;
-    s->next_table = BOX_RENDER_BUFFER_PARTICLE_TABLE_FIRST;
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractParticles" }),

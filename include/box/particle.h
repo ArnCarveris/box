@@ -328,14 +328,13 @@ ECS_STRUCT(ParticleMotion, {
 /** What a particle is drawn as */
 ECS_ENUM(ParticleShape, {
     ParticleCircle = 0,     /**< A soft round sprite, the look without an appearance */
-    ParticleSprite = 1,     /**< The texture of the appearance over a sheet of frames */
-    ParticleBillboard = 2   /**< The mesh of the appearance kept facing the camera */
+    ParticleSprite = 1      /**< The texture of the appearance over a sheet of frames */
 });
 
 /** How the particles of an emitter blend with the image */
 ECS_ENUM(ParticleBlend, {
-    ParticleAlpha = 0,      /**< Blended by opacity and drawn back to front, for smoke and
-                             *   debris */
+    ParticleAlpha = 0,      /**< Blended by opacity, emitters of one texture drawn back to
+                             *   front, for smoke and debris */
     ParticleAdditive = 1    /**< Color times opacity added in any order, never darkening, for
                              *   fire, sparks and magic */
 });
@@ -349,8 +348,6 @@ ECS_STRUCT(ParticleAppearance, {
     ParticleShape shape;    /**< What a particle is drawn as, default ParticleCircle */
     ParticleBlend blend;    /**< How it blends, default ParticleAlpha */
     ecs_entity_t texture;   /**< TexturePath or Texture entity a sprite reads, white without */
-    ecs_entity_t mesh;      /**< Entity whose Mesh3 or shape a billboard draws, scaled by the
-                             *   size; a circle is drawn while it has none */
     int32_t columns;        /**< Frames across the texture, 0 and 1 for one */
     int32_t rows;           /**< Frames down the texture, 0 and 1 for one, read row by row */
     float fps;              /**< Frames a second, 0 to play the sheet once over the life */

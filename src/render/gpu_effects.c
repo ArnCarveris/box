@@ -77,6 +77,19 @@ typedef struct box_gpu_fx_pipeline_t {
 } box_gpu_fx_pipeline_t;
 
 /** State of an effect of a view in a target, kept while the effect runs every frame */
+/** Bind groups of the dispatches of a bloom a state keeps, enough for every dispatch of its
+ * chain */
+#define BOX_GPU_BLOOM_GROUPS (2 * BOX_GPU_BLOOM_MIPS + BOX_GPU_BLOOM_PREFILTER + 4)
+
+/** The bind group of a dispatch of a bloom, kept while its mip chain lives */
+typedef struct box_gpu_fx_bloom_group_t {
+    WGPUTextureView input;          /**< View it reads */
+    WGPUTextureView aux;            /**< Second view it reads, NULL for none */
+    WGPUTextureView output;         /**< View it writes */
+    int32_t step;                   /**< Step of the upsample it reads the blend of */
+    WGPUBindGroup group;            /**< The group */
+} box_gpu_fx_bloom_group_t;
+
 typedef struct box_gpu_fx_state_t {
     uint32_t target;                /**< Handle of the target */
     ecs_entity_t view;              /**< View entity */
@@ -104,6 +117,9 @@ typedef struct box_gpu_fx_state_t {
     WGPUTextureView history_views[2]; /**< Views of the history images */
     int32_t history_index;          /**< History image that holds the last frame */
     bool history_valid;             /**< The history holds a frame */
+    box_gpu_fx_bloom_group_t groups[BOX_GPU_BLOOM_GROUPS]; /**< Bind groups of the dispatches
+                                     *   of a bloom */
+    int32_t group_count;            /**< Bind groups kept */
 } box_gpu_fx_state_t;
 
 /** HDR images of a target, the size it renders at */
@@ -558,6 +574,11 @@ static void box_gpu_fx_mips_free(
     box_gpu_fx_state_t *s)
 {
     int32_t i;
+    for (i = 0; i < s->group_count; i ++) {
+        wgpuBindGroupRelease(s->groups[i].group);
+    }
+
+    s->group_count = 0;
     for (i = 0; i < s->mip_count; i ++) {
         wgpuTextureViewRelease(s->mips[i]);
         s->mips[i] = NULL;
@@ -1395,20 +1416,40 @@ static void box_gpu_fx_bloom_dispatch(
     uint32_t height)
 {
     box_gpu_effects_t *fx = gpu->effects;
-    WGPUBindGroupEntry entries[6] = {
-        { .binding = 0, .textureView = input },
-        { .binding = 1, .sampler = fx->sampler },
-        { .binding = 2, .buffer = s->uniforms, .size = BOX_GPU_FX_UNIFORMS },
-        { .binding = 4, .textureView = aux ? aux : fx->placeholder_view },
-        { .binding = 5, .textureView = output },
-        { .binding = 6, .buffer = s->steps, .offset = (uint64_t)step * BOX_GPU_BLOOM_STEP,
-            .size = 4 * sizeof(float) }
-    };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = fx->bloom_layout,
-        .entryCount = 6,
-        .entries = entries
-    });
+    WGPUBindGroup group = NULL;
+    bool transient = false;
+    int32_t i;
+    for (i = 0; i < s->group_count && !group; i ++) {
+        const box_gpu_fx_bloom_group_t *g = &s->groups[i];
+        if (g->input == input && g->aux == aux && g->output == output && g->step == step) {
+            group = g->group;
+        }
+    }
+
+    if (!group) {
+        WGPUBindGroupEntry entries[6] = {
+            { .binding = 0, .textureView = input },
+            { .binding = 1, .sampler = fx->sampler },
+            { .binding = 2, .buffer = s->uniforms, .size = BOX_GPU_FX_UNIFORMS },
+            { .binding = 4, .textureView = aux ? aux : fx->placeholder_view },
+            { .binding = 5, .textureView = output },
+            { .binding = 6, .buffer = s->steps, .offset = (uint64_t)step * BOX_GPU_BLOOM_STEP,
+                .size = 4 * sizeof(float) }
+        };
+        group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+            .layout = fx->bloom_layout,
+            .entryCount = 6,
+            .entries = entries
+        });
+        if (s->group_count < BOX_GPU_BLOOM_GROUPS) {
+            s->groups[s->group_count ++] = (box_gpu_fx_bloom_group_t){
+                .input = input, .aux = aux, .output = output, .step = step, .group = group
+            };
+        } else {
+            transient = true;
+        }
+    }
+
     width = width ? width : 1;
     height = height ? height : 1;
     wgpuComputePassEncoderSetPipeline(cp, fx->bloom[entry]);
@@ -1416,7 +1457,9 @@ static void box_gpu_fx_bloom_dispatch(
     wgpuComputePassEncoderDispatchWorkgroups(cp,
         (width + BOX_GPU_BLOOM_GROUP - 1) / BOX_GPU_BLOOM_GROUP,
         (height + BOX_GPU_BLOOM_GROUP - 1) / BOX_GPU_BLOOM_GROUP, 1);
-    wgpuBindGroupRelease(group);
+    if (transient) {
+        wgpuBindGroupRelease(group);
+    }
 }
 
 /** Record the passes of a bloom: halve the image, downsample it through the prefilter levels

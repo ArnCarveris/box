@@ -2104,7 +2104,6 @@ void box_gpu_draw_views(
         box_gpu_light_cluster(gpu, t, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
-        box_gpu_particles_sort(gpu, encoder, v, slot);
         bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
         WGPUTextureView ao = prepasses ? box_gpu_gtao_begin(gpu, t, packet, v) : NULL;
         box_gpu_snapshot_t *snapshot = v->debug.wireframe == WireframeOnly ? NULL :

@@ -1,6 +1,6 @@
-// Spin over life: lit box billboards whose spin speeds up along their spin curve, so the angle
-// they turned is the area under it, next to alpha sprites of the letter texture that add turns
-// from their rotation curve, both drawn back to front.
+// Spin over life: lit sprites of the letter texture whose spin speeds up along their spin
+// curve, so the angle they turned is the area under it, next to alpha sprites of the letter
+// texture that add turns from their rotation curve.
 using box.transform
 using box.geometry
 using box.material
@@ -34,12 +34,6 @@ letter_tex {
   TexturePath: {path: "test/integration/visual/assets/letter.png"}
 }
 
-// Mesh of the debris, out of view: billboards draw its shape scaled by their size
-rock {
-  Position: {0, -1000, 0}
-  Box: {1, 0.6, 0.4}
-}
-
 debris {
   Position: {-2, 1, 0}
   ParticleEmitter: {
@@ -50,7 +44,7 @@ debris {
   ParticleCurves: {
     spin: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 2}, {1, 4}]}
   }
-  ParticleAppearance: {shape: ParticleBillboard, mesh: rock, lit: 1}
+  ParticleAppearance: {shape: ParticleSprite, texture: letter_tex, lit: 1}
 }
 
 letters {

@@ -711,8 +711,6 @@ void Radial_zero_keeps_results(void) {
     test_assert(b != NULL);
     box_render_particle_block_t ba = a->block, bb = b->block;
     ba.slot_first = bb.slot_first = 0;
-    ba.args = bb.args = 0;
-    ba.sort_first = bb.sort_first = 0;
     test_assert(memcmp(&ba, &bb, sizeof(ba)) == 0);
     test_flt(b->block.radial[0], 0);
     test_flt(b->block.radial[1], 0);

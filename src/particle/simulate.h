@@ -110,9 +110,6 @@
 /** Longest lifetime in microseconds, so a lifetime and a frame delta fit in 32 bits */
 #define BOX_PARTICLE_LIFE_MAX_US (4000000000u)
 
-/** Sort key of a free slot, after every live particle */
-#define BOX_PARTICLE_SORT_DEAD (0xFFFFFFFFu)
-
 /** Period of each axis of the argument of the wander field: sin(q) and sin(1.618 q) both repeat
  * after 1000 pi, up to 1e-4 radians for the float 1.618 */
 #define BOX_PARTICLE_WANDER_PERIOD (3141.592653589793)
@@ -1354,22 +1351,6 @@ static inline float box_particle_stretch(
     float speed)
 {
     return 1.0f + fmaxf(stretch, 0.0f) * fmaxf(speed, 0.0f);
-}
-
-/** Get the sort key of a live particle: ascending keys draw back to front.
- *
- * @param depth View depth of the particle
- * @return The key, below BOX_PARTICLE_SORT_DEAD
- */
-static inline uint32_t box_particle_sort_key(
-    float depth)
-{
-    uint32_t bits;
-    memcpy(&bits, &depth, sizeof(bits));
-    bits ^= (bits >> 31) ? 0xFFFFFFFFu : 0x80000000u;
-    bits = ~bits;
-
-    return bits == BOX_PARTICLE_SORT_DEAD ? BOX_PARTICLE_SORT_DEAD - 1u : bits;
 }
 
 /** Sample points over the surface of a mesh, area weighted, as the table of an EmitterMesh.

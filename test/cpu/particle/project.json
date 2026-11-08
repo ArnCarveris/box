@@ -254,16 +254,9 @@
                     "soft_fade_term",
                     "soft_view_depth",
                     "stretch_factor",
-                    "sort_key_back_to_front",
                     "block_without_appearance",
                     "block_curves",
-                    "block_sprite",
-                    "block_additive_unsorted",
-                    "sorted_only_with_color_curve",
-                    "sorted_with_color_variance",
-                    "sort_count_power_of_two",
-                    "billboard_corners_sent",
-                    "billboard_without_mesh_is_circle"
+                    "block_sprite"
                 ]
             },
             {
@@ -445,8 +438,7 @@
                     "showcase_orb",
                     "showcase_chimney",
                     "mistakes",
-                    "first_mistake_only",
-                    "guide_quotes_recipes"
+                    "first_mistake_only"
                 ]
             }
         ]

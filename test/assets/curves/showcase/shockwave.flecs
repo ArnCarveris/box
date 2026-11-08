@@ -10,13 +10,6 @@ using box.transform
 using box.geometry
 using box.particle
 
-// The chunk the debris draws as billboards, scaled by their size. A billboard draws the mesh
-// of a drawn entity, so it is one out of view.
-shockwave_chunk {
-  Position: {0, -1000, 0}
-  Box: {1, 0.7, 0.5}
-}
-
 shockwave {
   // The flash: the light jumps to its intensity with each burst and falls off like
   // (1 - t)^3 within 0.375 s, the steepest slope that does not dip below 0, 3 times the
@@ -115,7 +108,7 @@ shockwave {
     ParticleBurst: {count: 50, at: 2.5, repeat: -1}
     ParticleForces: {}
     ParticleCollision: {height: 0.06, bounce: 0.45, friction: 0.35}
-    ParticleAppearance: {shape: ParticleBillboard, mesh: shockwave_chunk, lit: 0.8}
+    ParticleAppearance: {lit: 0.8}
     ParticleCurves: {
       spin: {keys: [{0, 1}, {0.4, 0.6}, {0.8, 0}]}
       color: {keys: [{0, {255, 255, 255}}], max_keys: [{0, {130, 130, 130}}]}

@@ -610,6 +610,11 @@ typedef struct box_gpu_cull_t {
                                      *   without timestamp queries */
     WGPUBuffer stamp_resolve;       /**< Resolved timestamps, copied into the readback */
     uint32_t stamp_count;           /**< Timestamps the passes of the target wrote */
+    WGPURenderPassEncoder mesh_pass; /**< Pass the mesh buffers below were bound in */
+    WGPUBuffer mesh_vertices;       /**< Vertex buffer bound at slot 0 of mesh_pass */
+    uint64_t mesh_vertex_offset;    /**< Its offset */
+    WGPUBuffer mesh_indices;        /**< Index buffer bound in mesh_pass */
+    uint64_t mesh_index_offset;     /**< Its offset */
 } box_gpu_cull_t;
 
 /** Uniforms of a view, written per target because the projection follows its size.

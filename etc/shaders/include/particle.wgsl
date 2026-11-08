@@ -49,10 +49,9 @@ struct Emitter {
     // x: EmitterShape, y: seed, z: particles to spawn, w: spawn index of the first of them
     spawn: vec4u,
     // x: used slots, y: first spawn slot in the slot buffer, z: mesh table points,
-    // w: index of the draw arguments
+    // w: first point of the mesh table in the table buffer
     pool: vec4u,
-    // x: microseconds of the frame, y: shortest lifetime, z: microseconds the longest is above,
-    // w: first sort key of the pool in the key buffer
+    // x: microseconds of the frame, y: shortest lifetime, z: microseconds the longest is above
     life: vec4u,
     // xyz: world velocity the drag pulls toward, w: drag rate
     wind: vec4f,
@@ -84,8 +83,7 @@ struct Emitter {
     gradient: vec3f,
     // First of the GRADIENT_ROWS rows of the gradient, CURVE_CONSTANT for a constant one
     gradient_row: u32,
-    // x: vertices per particle, y: 1 when drawn through the sort keys, z: keys sorted, w: 1 when
-    // the emitter has a ParticleAppearance
+    // w: 1 when the emitter has a ParticleAppearance
     draw: vec4u,
     // Rows of the max curves of the size, opacity, rotation and spin, which each particle blends
     // toward by its own draw, CURVE_CONSTANT for a curve without max_keys; the area of the max
@@ -93,17 +91,10 @@ struct Emitter {
     curve_max: vec4u,
     // x: first of the GRADIENT_ROWS rows of the max gradient, CURVE_CONSTANT for none, y: 1
     // when the emitter has a ParticleMotion that changes its motion, z: first slot of the pool
-    // in the particle page bound
+    // in the particle arena
     gradient_max: vec4u,
     // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
     motion: MotionRows,
-};
-
-// A corner of a triangle of a billboard mesh, box_render_particle_corner_t: xyz the position
-// times the shape scale and the normal, w the texture coordinates.
-struct Corner {
-    position: vec4f,
-    normal: vec4f,
 };
 
 // A pool slot, box_particle_t: remaining is 0 for a free slot.
@@ -129,14 +120,10 @@ const EMITTER_MESH: u32 = 4u;
 // ParticleShape
 const PARTICLE_CIRCLE: u32 = 0u;
 const PARTICLE_SPRITE: u32 = 1u;
-const PARTICLE_BILLBOARD: u32 = 2u;
 
 // ParticleBlend
 const PARTICLE_ALPHA: u32 = 0u;
 const PARTICLE_ADDITIVE: u32 = 1u;
-
-// Sort key of a free slot, after every live particle
-const SORT_DEAD: u32 = 0xFFFFFFFFu;
 
 // Hash streams, BOX_PARTICLE_STREAM_*
 const STREAM_LIFE: u32 = 0u;
@@ -578,9 +565,3 @@ fn particle_stretch(stretch: f32, speed: f32) -> f32 {
     return 1.0 + max(stretch, 0.0) * max(speed, 0.0);
 }
 
-// Sort key of a live particle; ascending keys draw back to front.
-fn particle_sort_key(depth: f32) -> u32 {
-    let bits = bitcast<u32>(depth);
-    let ordered = bits ^ select(0x80000000u, 0xFFFFFFFFu, (bits >> 31u) != 0u);
-    return min(~ordered, SORT_DEAD - 1u);
-}

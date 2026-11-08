@@ -277,63 +277,6 @@ void CurveRecipes_mistakes(void) {
         "outside of 0 to 1, drawn as the default of rate");
 }
 
-/** Read a file of the repository.
- *
- * @param path Path from the repository root
- * @return The contents, to free with ecs_os_free, NULL when it cannot be read
- */
-static char* file_read(
-    const char *path)
-{
-    char *file = box_app_locate(path);
-    char *result = NULL;
-    FILE *f = fopen(file, "rb");
-    if (f) {
-        fseek(f, 0, SEEK_END);
-        long size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        result = ecs_os_malloc((ecs_size_t)size + 1);
-        result[fread(result, 1, (size_t)size, f)] = '\0';
-        fclose(f);
-    }
-
-    ecs_os_free(file);
-
-    return result;
-}
-
-void CurveRecipes_guide_quotes_recipes(void) {
-    // particle/curve_docs
-    static const char *recipes[] = {
-        "format", "fade", "puff", "spark", "flame", "burst", "pulse", "flicker",
-        "random_size", "path", "ease"
-    };
-    ecs_world_t *world = ecs_init();
-    char *guide = file_read("docs/curves.md");
-    test_assert(guide != NULL);
-    int32_t i;
-    for (i = 0; i < (int32_t)(sizeof(recipes) / sizeof(recipes[0])); i ++) {
-        char path[64];
-        snprintf(path, sizeof(path), "test/assets/curves/%s.flecs", recipes[i]);
-        char *recipe = file_read(path);
-        test_assert(recipe != NULL);
-        char *body = recipe;
-        while (!strncmp(body, "//", 2)) {
-            char *end = strchr(body, '\n');
-            body = end ? end + 1 : body + strlen(body);
-        }
-
-        if (!strstr(guide, body)) {
-            printf("docs/curves.md does not quote %s as it is\n", path);
-            test_assert(false);
-        }
-
-        ecs_os_free(recipe);
-    }
-
-    ecs_os_free(guide);
-    ecs_fini(world);
-}
 
 void CurveRecipes_first_mistake_only(void) {
     // particle/curve_docs

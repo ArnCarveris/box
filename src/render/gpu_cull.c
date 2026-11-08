@@ -1301,18 +1301,34 @@ bool box_gpu_cull_draw(
         goto done;
     }
 
+    if (pass != c->mesh_pass || !*bound) {
+        c->mesh_pass = pass;
+        c->mesh_vertices = NULL;
+        c->mesh_indices = NULL;
+    }
+
     if (instances != *bound) {
         wgpuRenderPassEncoderSetBindGroup(pass, group, instances, 0, NULL);
         box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
         *bound = instances;
     }
 
-    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->buffer, m->offset, m->vertex_size);
+    if (c->mesh_vertices != m->buffer || c->mesh_vertex_offset != m->offset) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->buffer, m->offset, m->vertex_size);
+        c->mesh_vertices = m->buffer;
+        c->mesh_vertex_offset = m->offset;
+    }
+
     wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,
         box_gpu_cull_page_t, (int32_t)draw->page)->visible,
         (uint64_t)base * sizeof(uint32_t), (uint64_t)draw->count * sizeof(uint32_t));
-    wgpuRenderPassEncoderSetIndexBuffer(
-        pass, m->buffer, WGPUIndexFormat_Uint32, m->index_offset, m->index_size);
+    if (c->mesh_indices != m->buffer || c->mesh_index_offset != m->index_offset) {
+        wgpuRenderPassEncoderSetIndexBuffer(
+            pass, m->buffer, WGPUIndexFormat_Uint32, m->index_offset, m->index_size);
+        c->mesh_indices = m->buffer;
+        c->mesh_index_offset = m->index_offset;
+    }
+
     wgpuRenderPassEncoderDrawIndexedIndirect(pass, c->args,
         (uint64_t)args * BOX_GPU_CULL_ARGS * sizeof(uint32_t));
 done:
@@ -1342,6 +1358,8 @@ bool box_gpu_cull_draw_wire(
         goto done;
     }
 
+    c->mesh_vertices = NULL;
+    c->mesh_indices = NULL;
     ecs_assert(!ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[2] &&
         !ecs_vec_get_t(&c->arg_data, uint32_t, (int32_t)args * BOX_GPU_CULL_ARGS)[3],
         ECS_INTERNAL_ERROR, "a wire draw needs firstIndex and baseVertex 0");

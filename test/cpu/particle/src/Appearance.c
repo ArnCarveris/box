@@ -1,7 +1,7 @@
 /**
  * @file Appearance.c
- * @brief Tests for the appearance of particles: the sprite frames, the soft fade, the stretch,
- * the sort key and the block and billboard corners the extract sends for an emitter.
+ * @brief Tests for the appearance of particles: the sprite frames, the soft fade, the stretch
+ * and the block the extract sends for an emitter.
  */
 
 #include <box.h>
@@ -169,7 +169,6 @@ void Appearance_c_defaults(void) {
     test_int(a->shape, ParticleCircle);
     test_int(a->blend, ParticleAlpha);
     test_uint(a->texture, 0);
-    test_uint(a->mesh, 0);
     test_int(a->columns, 0);
     test_int(a->rows, 0);
     test_flt(a->fps, 0);
@@ -188,11 +187,9 @@ void Appearance_script_values(void) {
     test_assert(ecs_script_run(world, "appearance",
         "using box.particle\n"
         "smoke_tex {}\n"
-        "rock {}\n"
         "sprite { ParticleAppearance: {shape: ParticleSprite, blend: ParticleAdditive, "
         "texture: smoke_tex, columns: 4, rows: 2, fps: 12, softness: 0.5, stretch: 0.1, "
-        "lit: 0.75} }\n"
-        "debris { ParticleAppearance: {shape: ParticleBillboard, mesh: rock} }\n", NULL) == 0);
+        "lit: 0.75} }\n", NULL) == 0);
 
     const ParticleAppearance *a = ecs_get(
         world, ecs_lookup(world, "sprite"), ParticleAppearance);
@@ -206,12 +203,6 @@ void Appearance_script_values(void) {
     test_flt(a->softness, 0.5f);
     test_flt(a->stretch, 0.1f);
     test_flt(a->lit, 0.75f);
-
-    a = ecs_get(world, ecs_lookup(world, "debris"), ParticleAppearance);
-    test_assert(a != NULL);
-    test_int(a->shape, ParticleBillboard);
-    test_int(a->blend, ParticleAlpha);
-    test_uint(a->mesh, ecs_lookup(world, "rock"));
 
     ecs_fini(world);
 }
@@ -305,19 +296,6 @@ void Appearance_stretch_factor(void) {
     test_flt(box_particle_stretch(2, 0), 1);
 }
 
-void Appearance_sort_key_back_to_front(void) {
-    // particle/sort
-    float depths[6] = {1000, 10, 5, 0.5f, 0, -3};
-    int32_t i;
-    for (i = 0; i < 5; i ++) {
-        test_assert(box_particle_sort_key(depths[i]) < box_particle_sort_key(depths[i + 1]));
-    }
-
-    for (i = 0; i < 6; i ++) {
-        test_assert(box_particle_sort_key(depths[i]) < BOX_PARTICLE_SORT_DEAD);
-    }
-}
-
 void Appearance_block_without_appearance(void) {
     // particle/appearance
     box_render_null_t *null;
@@ -337,12 +315,8 @@ void Appearance_block_without_appearance(void) {
     test_flt(b->softness, 0);
     test_flt(b->stretch, 0);
     test_flt(b->lit, 0);
-    test_uint(b->corners, 6);
-    test_uint(b->sorted, 0);
-    test_uint(b->sort_count, 0);
     test_uint(b->styled, 0);
     test_uint(pool->texture, 0);
-    test_uint(pool->mesh, 0);
 
     ecs_add(world, e, ParticleCurves);
     ecs_add(world, e, ParticleAppearance);
@@ -351,7 +325,6 @@ void Appearance_block_without_appearance(void) {
     test_assert(pool != NULL);
     check_identity_curves(&pool->block);
     test_uint(pool->block.look, ParticleCircle);
-    test_uint(pool->block.corners, 6);
     test_uint(pool->block.styled, 1);
 
     ecs_fini(world);
@@ -400,10 +373,6 @@ void Appearance_block_curves(void) {
     box_particle_gradient(table, b->gradient_row, b->gradient, 1, c);
     test_assert(fabsf(c[0] - box_particle_linear(128)) < 1e-6f);
     test_uint(b->look, ParticleCircle);
-    test_uint(b->sorted, 1);
-    test_assert(b->sort_count >= b->used);
-    test_assert(b->sort_count < 2 * b->used || b->sort_count == 1);
-    test_uint(b->sort_count & (b->sort_count - 1), 0);
     test_uint(b->styled, 0);
 
     ecs_fini(world);
@@ -433,256 +402,8 @@ void Appearance_block_sprite(void) {
     test_flt(b->softness, 0.5f);
     test_flt(b->stretch, 0.1f);
     test_flt(b->lit, 1);
-    test_uint(b->corners, 6);
-    test_uint(b->sorted, 1);
-    test_assert(b->sort_count >= b->used);
-    test_assert(b->sort_count < 2 * b->used || b->sort_count == 1);
-    test_uint(b->sort_count & (b->sort_count - 1), 0);
     test_uint(b->styled, 1);
     test_uint(pool->texture, 0);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Appearance_block_additive_unsorted(void) {
-    // particle/sort
-    box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
-    ecs_entity_t e = emitter_new(world, 2, 100);
-    ecs_set(world, e, ParticleAppearance, {.blend = ParticleAdditive});
-    ecs_add(world, e, ParticleCurves);
-    frame(world);
-
-    const box_render_particle_pool_t *pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->block.blend, ParticleAdditive);
-    test_uint(pool->block.sorted, 0);
-    test_uint(pool->block.sort_count, 0);
-
-    ecs_set(world, e, ParticleAppearance, {.blend = ParticleAlpha});
-    frame(world);
-    pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->block.blend, ParticleAlpha);
-    test_uint(pool->block.sorted, 1);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Appearance_sorted_only_with_color_curve(void) {
-    // particle/curve_cost
-    box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
-    ecs_entity_t e = emitter_new(world, 2, 100);
-    ecs_set(world, e, ParticleCurves, {
-        .size = { .keys = BOX_CURVE_KEYS({0, 0.5f}, {1, 2}) },
-        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) },
-        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 100, 50}}) }
-    });
-    frame(world);
-
-    const box_render_particle_pool_t *pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_assert(pool->block.curve_rows[0] != BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(pool->block.gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(pool->block.sorted, 0);
-    test_uint(pool->block.sort_count, 0);
-
-    ecs_set(world, e, ParticleCurves, {
-        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey,
-            {0, {200, 100, 50}}, {1, {50, 50, 50}}) }
-    });
-    frame(world);
-    pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_assert(pool->block.gradient_row != BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(pool->block.sorted, 1);
-    test_assert(pool->block.sort_count >= pool->block.used);
-    test_assert(pool->block.sort_count < 2 * pool->block.used || pool->block.sort_count == 1);
-    test_uint(pool->block.sort_count & (pool->block.sort_count - 1), 0);
-
-    ecs_set(world, e, ParticleCurves, {
-        .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 100, 50}}),
-            .max_keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {50, 100, 200}}) }
-    });
-    frame(world);
-    pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_assert(pool->block.gradient_max_row != BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(pool->block.sorted, 1);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Appearance_sorted_with_color_variance(void) {
-    // particle/curve_cost
-    box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
-    ecs_entity_t e = emitter_new(world, 2, 100);
-    ecs_entity_t plain = emitter_new(world, 2, 100);
-    ecs_entity_t bare = emitter_new(world, 2, 100);
-    ecs_entity_t added = emitter_new(world, 2, 100);
-    ecs_get_mut(world, e, ParticleEmitter)->color_variance = (rgb){40, 0, 0};
-    ecs_modified(world, e, ParticleEmitter);
-    ecs_get_mut(world, bare, ParticleEmitter)->color_variance = (rgb){0, 0, 30};
-    ecs_modified(world, bare, ParticleEmitter);
-    ecs_get_mut(world, added, ParticleEmitter)->color_variance = (rgb){0, 20, 0};
-    ecs_modified(world, added, ParticleEmitter);
-    ecs_set(world, e, ParticleCurves, {
-        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) }
-    });
-    ecs_set(world, plain, ParticleCurves, {
-        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) }
-    });
-    ecs_set(world, added, ParticleAppearance, {.blend = ParticleAdditive});
-    ecs_set(world, added, ParticleCurves, {
-        .opacity = { .keys = BOX_CURVE_KEYS({0, 0}, {0.2f, 1}, {1, 0}) }
-    });
-    frame(world);
-
-    const box_render_particle_pool_t *pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->block.blend, ParticleAlpha);
-    test_uint(pool->block.gradient_row, BOX_PARTICLE_CURVE_CONSTANT);
-    test_uint(pool->block.gradient_max_row, BOX_PARTICLE_CURVE_CONSTANT);
-    test_assert(pool->block.variance[0] != 0);
-    test_uint(pool->block.sorted, 1);
-    test_assert(pool->block.sort_count >= pool->block.used);
-    test_assert(pool->block.sort_count < 2 * pool->block.used || pool->block.sort_count == 1);
-    test_uint(pool->block.sort_count & (pool->block.sort_count - 1), 0);
-
-    pool = pool_of(null, plain);
-    test_assert(pool != NULL);
-    test_uint(pool->block.blend, ParticleAlpha);
-    test_flt(pool->block.variance[0], 0);
-    test_flt(pool->block.variance[1], 0);
-    test_flt(pool->block.variance[2], 0);
-    test_uint(pool->block.sorted, 0);
-    test_uint(pool->block.sort_count, 0);
-
-    pool = pool_of(null, bare);
-    test_assert(pool != NULL);
-    test_uint(pool->block.blend, ParticleAlpha);
-    test_assert(pool->block.variance[2] != 0);
-    test_uint(pool->block.sorted, 1);
-
-    pool = pool_of(null, added);
-    test_assert(pool != NULL);
-    test_uint(pool->block.blend, ParticleAdditive);
-    test_uint(pool->block.sorted, 0);
-    test_uint(pool->block.sort_count, 0);
-
-    ecs_get_mut(world, e, ParticleEmitter)->color_variance = (rgb){0, 0, 0};
-    ecs_modified(world, e, ParticleEmitter);
-    frame(world);
-    pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->block.sorted, 0);
-    test_uint(pool->block.sort_count, 0);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Appearance_sort_count_power_of_two(void) {
-    // particle/sort
-    box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
-    ecs_entity_t e = emitter_new(world, 700, 2000);
-    ecs_entity_t full = emitter_new(world, 1000, 1000);
-    ecs_add(world, e, ParticleAppearance);
-    ecs_add(world, full, ParticleAppearance);
-    frame(world);
-
-    const box_render_particle_pool_t *pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->capacity, 2048);
-    test_uint(pool->block.used, 700);
-    test_uint(pool->block.sort_count, 1024);
-    pool = pool_of(null, full);
-    test_assert(pool != NULL);
-    test_uint(pool->capacity, 1024);
-    test_uint(pool->block.used, 1000);
-    test_uint(pool->block.sort_count, 1024);
-
-    frame(world);
-    pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->block.used, 1400);
-    test_uint(pool->block.sort_count, 2048);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Appearance_billboard_corners_sent(void) {
-    // particle/billboard
-    box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
-    ecs_entity_t rock = ecs_new(world);
-    ecs_set(world, rock, Box, {2, 2, 2});
-    ecs_set(world, rock, Position, {0, 0, 0});
-    ecs_entity_t e = emitter_new(world, 2, 100);
-    ecs_set(world, e, ParticleAppearance, {.shape = ParticleBillboard, .mesh = rock});
-    frame(world);
-
-    const ShapeMesh *shape = ecs_get(world, rock, ShapeMesh);
-    test_assert(shape != NULL);
-    const box_mesh_t *m = box_mesh_cache_get(box_mesh_cache_of(world), shape->mesh);
-    test_assert(m != NULL);
-    const box_render_particle_pool_t *pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_assert(pool->mesh >= BOX_RENDER_BUFFER_PARTICLE_MESH_FIRST);
-    test_uint(pool->block.look, ParticleBillboard);
-    test_uint(pool->block.corners, (uint32_t)m->index_count);
-    const box_render_upload_t *u = upload_of(null, pool->mesh);
-    test_assert(u != NULL);
-    test_uint(u->size, (uint32_t)m->index_count * sizeof(box_render_particle_corner_t));
-    const box_render_particle_corner_t *c = box_render_packet_data(&null->last, u->data);
-    const box_vertex_t *v = &m->vertices[m->indices[0]];
-    test_flt(c[0].position[0], v->position[0] * shape->scale[0]);
-    test_flt(c[0].position[1], v->position[1] * shape->scale[1]);
-    test_flt(c[0].position[3], v->uv[0]);
-    test_flt(c[0].normal[3], v->uv[1]);
-    uint32_t handle = pool->mesh;
-
-    frame(world);
-    pool = pool_of(null, e);
-    test_uint(pool->mesh, handle);
-    test_assert(upload_of(null, handle) == NULL);
-
-    ecs_set(world, rock, Box, {4, 1, 1});
-    frame(world);
-    pool = pool_of(null, e);
-    test_assert(upload_of(null, pool->mesh) != NULL);
-
-    ecs_set(world, e, ParticleAppearance, {.shape = ParticleCircle});
-    frame(world);
-    pool = pool_of(null, e);
-    test_uint(pool->mesh, 0);
-    test_uint(pool->block.corners, 6);
-    test_assert(destroyed(null, handle));
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Appearance_billboard_without_mesh_is_circle(void) {
-    // particle/billboard
-    box_render_null_t *null;
-    ecs_world_t *world = world_new(&null);
-    ecs_entity_t e = emitter_new(world, 2, 100);
-    ecs_set(world, e, ParticleAppearance, {.shape = ParticleBillboard});
-    frame(world);
-
-    const box_render_particle_pool_t *pool = pool_of(null, e);
-    test_assert(pool != NULL);
-    test_uint(pool->mesh, 0);
-    test_uint(pool->block.look, ParticleCircle);
-    test_uint(pool->block.corners, 6);
 
     ecs_fini(world);
     box_render_null_free(null);
