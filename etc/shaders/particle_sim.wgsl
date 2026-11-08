@@ -1,4 +1,5 @@
-// Particle simulation: one dispatch of each entry point per pool of the packet. integrate ages
+// Particle simulation: one dispatch of each entry point per batch of pools that bind the same
+// page, every workgroup taking the pool and the chunk of it its work item names. integrate ages
 // the used slots of the pool by the frame, frees the particles whose age reached their
 // lifetime, moves the others under the acceleration, gravity, wander field and drag toward the
 // wind, by the curves of their ParticleMotion at their age and with the drift of their frame of
@@ -17,7 +18,20 @@
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
 
-@group(0) @binding(0) var<uniform> emitter: Emitter;
+// The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
+struct EmitterBlock {
+    @size(512) emitter: Emitter,
+};
+
+// The first work item of the batch of a dispatch
+struct Batch {
+    first: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
+};
+
+@group(0) @binding(0) var<storage, read> blocks: array<EmitterBlock>;
 // The particle page of the pool, its slots from emitter.gradient_max.z
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read> slots: array<u32>;
@@ -28,6 +42,9 @@
 @group(0) @binding(7) var<uniform> step: SortStep;
 // Rows of the curves of the emitters, which integrate reads for the curves of ParticleMotion
 @group(0) @binding(8) var<storage, read> curves: array<f32>;
+// The pool and the chunk of it of every workgroup of the batches of the packet
+@group(0) @binding(9) var<storage, read> work: array<vec2u>;
+@group(0) @binding(10) var<uniform> batch: Batch;
 
 // Run length k and compare distance j of a step of the bitonic sort.
 struct SortStep {
@@ -43,8 +60,10 @@ const SORT_GROUP: u32 = 512u;
 var<workgroup> sorting: array<vec2u, 512>;
 
 @compute @workgroup_size(256)
-fn integrate(@builtin(global_invocation_id) id: vec3u) {
-    let i = id.x;
+fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
+    let item = work[batch.first + group.x];
+    let emitter = blocks[item.x].emitter;
+    let i = item.y * 256u + local.x;
     if (i == 0u) {
         let at = emitter.pool.w * 4u;
         args[at] = emitter.draw.x;
@@ -86,8 +105,10 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
 }
 
 @compute @workgroup_size(256)
-fn spawn(@builtin(global_invocation_id) id: vec3u) {
-    let k = id.x;
+fn spawn(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) lane: vec3u) {
+    let item = work[batch.first + group.x];
+    let emitter = blocks[item.x].emitter;
+    let k = item.y * 256u + lane.x;
     if (k >= emitter.spawn.z) {
         return;
     }
@@ -131,8 +152,10 @@ fn spawn(@builtin(global_invocation_id) id: vec3u) {
 // Write the sort key and slot of every key of a pool, free slots and slots past the used ones
 // last.
 @compute @workgroup_size(256)
-fn sort_keys(@builtin(global_invocation_id) id: vec3u) {
-    let i = id.x;
+fn sort_keys(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
+    let item = work[batch.first + group.x];
+    let emitter = blocks[item.x].emitter;
+    let i = item.y * 256u + local.x;
     if (i >= emitter.draw.z) {
         return;
     }
@@ -170,7 +193,9 @@ fn sort_shared_step(base: u32, t: u32, k: u32, j: u32) {
 // that sorts fewer, a power of two, ascending.
 @compute @workgroup_size(256)
 fn sort_local(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
-    let base = group.x * SORT_GROUP;
+    let item = work[batch.first + group.x];
+    let emitter = blocks[item.x].emitter;
+    let base = item.y * SORT_GROUP;
     let first = emitter.life.w + base;
     let n = min(emitter.draw.z, SORT_GROUP);
     let t = local.x;
@@ -201,7 +226,9 @@ fn sort_local(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id)
 // The steps of a run length below SORT_GROUP, in workgroup memory.
 @compute @workgroup_size(256)
 fn sort_merge(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
-    let base = group.x * SORT_GROUP;
+    let item = work[batch.first + group.x];
+    let emitter = blocks[item.x].emitter;
+    let base = item.y * SORT_GROUP;
     let first = emitter.life.w + base;
     let t = local.x;
     sorting[t] = keys[first + t];
@@ -218,8 +245,10 @@ fn sort_merge(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id)
 
 // One step of compare distance SORT_GROUP or more, over the keys of the pool.
 @compute @workgroup_size(256)
-fn sort_global(@builtin(global_invocation_id) id: vec3u) {
-    let t = id.x;
+fn sort_global(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
+    let item = work[batch.first + group.x];
+    let emitter = blocks[item.x].emitter;
+    let t = item.y * 256u + local.x;
     let j = step.j;
     let i = 2u * j * (t / j) + (t % j);
     let l = i + j;
