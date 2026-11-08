@@ -28,7 +28,7 @@
 /** Rows of the curve table when it is first created, doubled when it grows */
 #define BOX_RENDER_PARTICLE_CURVE_ROWS (32u)
 
-/** Fewest keys a sort of a pool sorts, the keys one workgroup sorts in shared memory */
+/** Keys one workgroup sorts in shared memory, the run a longer sort merges */
 #define BOX_RENDER_PARTICLE_SORT_MIN (512u)
 
 /** A corner of a triangle of a billboard mesh, as Corner in etc/shaders/include/particle.wgsl */
@@ -107,8 +107,7 @@ typedef struct box_render_particle_block_t {
     uint32_t corners;       /**< Vertices drawn per particle: 6 for a quad, else the corners of
                              *   the billboard mesh */
     uint32_t sorted;        /**< 1 when the pool is drawn back to front through its sort keys */
-    uint32_t sort_count;    /**< Keys sorted, a power of two of at least
-                             *   BOX_RENDER_PARTICLE_SORT_MIN, 0 when not sorted */
+    uint32_t sort_count;    /**< Keys sorted, a power of two, 0 when not sorted */
     uint32_t styled;        /**< 1 when the emitter has a ParticleAppearance */
     uint32_t curve_max_rows[4]; /**< Rows of the max curves of the size, opacity, rotation and
                              *   spin, BOX_PARTICLE_CURVE_CONSTANT for none; the area of the

@@ -401,7 +401,9 @@ void Appearance_block_curves(void) {
     test_assert(fabsf(c[0] - box_particle_linear(128)) < 1e-6f);
     test_uint(b->look, ParticleCircle);
     test_uint(b->sorted, 1);
-    test_uint(b->sort_count, BOX_RENDER_PARTICLE_SORT_MIN);
+    test_assert(b->sort_count >= b->used);
+    test_assert(b->sort_count < 2 * b->used || b->sort_count == 1);
+    test_uint(b->sort_count & (b->sort_count - 1), 0);
     test_uint(b->styled, 0);
 
     ecs_fini(world);
@@ -433,7 +435,9 @@ void Appearance_block_sprite(void) {
     test_flt(b->lit, 1);
     test_uint(b->corners, 6);
     test_uint(b->sorted, 1);
-    test_uint(b->sort_count, BOX_RENDER_PARTICLE_SORT_MIN);
+    test_assert(b->sort_count >= b->used);
+    test_assert(b->sort_count < 2 * b->used || b->sort_count == 1);
+    test_uint(b->sort_count & (b->sort_count - 1), 0);
     test_uint(b->styled, 1);
     test_uint(pool->texture, 0);
 
@@ -495,7 +499,9 @@ void Appearance_sorted_only_with_color_curve(void) {
     test_assert(pool != NULL);
     test_assert(pool->block.gradient_row != BOX_PARTICLE_CURVE_CONSTANT);
     test_uint(pool->block.sorted, 1);
-    test_uint(pool->block.sort_count, BOX_RENDER_PARTICLE_SORT_MIN);
+    test_assert(pool->block.sort_count >= pool->block.used);
+    test_assert(pool->block.sort_count < 2 * pool->block.used || pool->block.sort_count == 1);
+    test_uint(pool->block.sort_count & (pool->block.sort_count - 1), 0);
 
     ecs_set(world, e, ParticleCurves, {
         .color = { .keys = BOX_VEC_VIEW(ParticleGradientKey, {0, {200, 100, 50}}),
@@ -544,7 +550,9 @@ void Appearance_sorted_with_color_variance(void) {
     test_uint(pool->block.gradient_max_row, BOX_PARTICLE_CURVE_CONSTANT);
     test_assert(pool->block.variance[0] != 0);
     test_uint(pool->block.sorted, 1);
-    test_uint(pool->block.sort_count, BOX_RENDER_PARTICLE_SORT_MIN);
+    test_assert(pool->block.sort_count >= pool->block.used);
+    test_assert(pool->block.sort_count < 2 * pool->block.used || pool->block.sort_count == 1);
+    test_uint(pool->block.sort_count & (pool->block.sort_count - 1), 0);
 
     pool = pool_of(null, plain);
     test_assert(pool != NULL);

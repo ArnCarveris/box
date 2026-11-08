@@ -1022,8 +1022,7 @@ static void box_particles_velocity(
     pool->has_last = true;
 }
 
-/** Get the keys the sort of a pool sorts: the used slots rounded up to a power of two, at least
- * the keys of a workgroup.
+/** Get the keys the sort of a pool sorts: the used slots rounded up to a power of two.
  *
  * @param used Slots that may hold a particle
  * @param capacity Slots of the pool, a power of two
@@ -1033,7 +1032,7 @@ static uint32_t box_particles_sort_count(
     uint32_t used,
     uint32_t capacity)
 {
-    uint32_t result = BOX_RENDER_PARTICLE_SORT_MIN;
+    uint32_t result = 1u;
     while (result < used) {
         result *= 2;
     }

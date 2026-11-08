@@ -10,9 +10,10 @@
 //
 // An alpha blended pool that is drawn back to front is sorted for each view that draws it:
 // sort_keys writes the key of every slot from its view depth, then a bitonic sort orders the
-// keys ascending. sort_local sorts every run of SORT_GROUP keys in workgroup memory, and for
-// every larger run length k sort_global does the steps of k down to SORT_GROUP and sort_merge
-// the rest in workgroup memory. Keys tie break on the slot, so a sort is the same every run.
+// keys ascending. sort_local sorts every run of SORT_GROUP keys in workgroup memory, or all the
+// keys of a pool that sorts fewer, and for every larger run length k sort_global does the steps
+// of k down to SORT_GROUP and sort_merge the rest in workgroup memory. Keys tie break on the
+// slot, so a sort is the same every run.
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
 
@@ -164,24 +165,36 @@ fn sort_shared_step(base: u32, t: u32, k: u32, j: u32) {
     }
 }
 
-// Sort every run of SORT_GROUP keys, ascending and descending in turn.
+// Sort every run of SORT_GROUP keys, ascending and descending in turn, or the keys of a pool
+// that sorts fewer, a power of two, ascending.
 @compute @workgroup_size(256)
 fn sort_local(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
     let base = group.x * SORT_GROUP;
     let first = emitter.life.w + base;
+    let n = min(emitter.draw.z, SORT_GROUP);
     let t = local.x;
-    sorting[t] = keys[first + t];
-    sorting[t + 256u] = keys[first + t + 256u];
+    if (t < n) {
+        sorting[t] = keys[first + t];
+    }
+    if (t + 256u < n) {
+        sorting[t + 256u] = keys[first + t + 256u];
+    }
     workgroupBarrier();
-    for (var k = 2u; k <= SORT_GROUP; k = k * 2u) {
+    for (var k = 2u; k <= n; k = k * 2u) {
         for (var j = k / 2u; j > 0u; j = j / 2u) {
-            sort_shared_step(base, t, k, j);
+            if (t < n / 2u) {
+                sort_shared_step(base, t, k, j);
+            }
             workgroupBarrier();
         }
     }
 
-    keys[first + t] = sorting[t];
-    keys[first + t + 256u] = sorting[t + 256u];
+    if (t < n) {
+        keys[first + t] = sorting[t];
+    }
+    if (t + 256u < n) {
+        keys[first + t + 256u] = sorting[t + 256u];
+    }
 }
 
 // The steps of a run length below SORT_GROUP, in workgroup memory.

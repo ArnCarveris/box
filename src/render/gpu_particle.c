@@ -991,7 +991,8 @@ static void box_gpu_particle_sort_pool(
     int32_t slot)
 {
     box_gpu_particles_t *s = gpu->particles;
-    uint32_t n = d->sort_count, groups = n / BOX_RENDER_PARTICLE_SORT_MIN, m, i;
+    uint32_t n = d->sort_count, m, i;
+    uint32_t groups = n > BOX_RENDER_PARTICLE_SORT_MIN ? n / BOX_RENDER_PARTICLE_SORT_MIN : 1u;
     uint32_t offsets[3] = {
         d->block * BOX_GPU_PARTICLE_STRIDE, (uint32_t)slot * BOX_GPU_VIEW_STRIDE, 0
     };
@@ -1017,7 +1018,8 @@ static void box_gpu_particle_sort_pool(
     });
     box_gpu_particle_sort_bind(pass, group, offsets, 1, 0);
     wgpuComputePassEncoderSetPipeline(pass, s->sort_keys);
-    wgpuComputePassEncoderDispatchWorkgroups(pass, n / BOX_GPU_PARTICLE_GROUP, 1, 1);
+    wgpuComputePassEncoderDispatchWorkgroups(pass,
+        (n + BOX_GPU_PARTICLE_GROUP - 1) / BOX_GPU_PARTICLE_GROUP, 1, 1);
     wgpuComputePassEncoderSetPipeline(pass, s->sort_local);
     wgpuComputePassEncoderDispatchWorkgroups(pass, groups, 1, 1);
     for (m = BOX_GPU_PARTICLE_SORT_GROUP_LOG + 1; (1u << m) <= n; m ++) {
