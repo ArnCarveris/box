@@ -123,7 +123,7 @@ static void ore_stress_ring(
 }
 
 /** Place solar panels on the free tiles of successive rings, cfg.stressSolarInset in from the
- * edge of the map and further in, four at a time, until the production is at least
+ * outer wall ring and further in, four at a time, until the production is at least
  * cfg.stressPowerMargin times the watts of the consumers.
  *
  * @param s The layout
@@ -135,11 +135,14 @@ static void ore_stress_solar(
 {
     float margin = ORE_CFG(s->world, "stressPowerMargin");
     int32_t inset = ORE_CFG_I32(s->world, "stressSolarInset");
+    int32_t edge = ORE_CFG_I32(s->world, "stressEdge");
+    int32_t far = ORE_CFG_I32(s->world, "stressFar");
+    int32_t center = ORE_CFG_I32(s->world, "stressCenter");
     int32_t lo, hi, i;
     bool done = false;
-    for (; !done && inset <= s->grid.rows - 1 - inset; inset ++) {
-        lo = inset;
-        hi = s->grid.rows - 1 - inset;
+    for (; !done && inset < center - edge; inset ++) {
+        lo = edge + inset;
+        hi = far - inset;
         for (i = lo; !done && i <= hi; i ++) {
             done = s->production >= s->demand * margin;
             if (!done) {

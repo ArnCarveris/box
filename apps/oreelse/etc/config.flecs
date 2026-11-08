@@ -234,7 +234,7 @@ cfg {
   // minutes in (N when above 0) as a late game base. Its wall rings are the perimeters of rows
   // and columns stressEdge to stressFar and one in, the turret ring two in; a building of its
   // sites goes on the first free cell within stressSearch square shells of its tile; the solar
-  // panels fill rings stressSolarInset in from the edge of the map and further in until the
+  // panels fill rings stressSolarInset in from the outer wall ring and further in until the
   // production is stressPowerMargin times the watts of the consumers. The astronaut stands on
   // the free tile nearest to (stressCenter, stressCenter), the next wave stressWaveLead away
   export const stressMinutes: f32 = 30
