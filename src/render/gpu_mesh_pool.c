@@ -1,0 +1,147 @@
+#include "gpu.h"
+
+#ifdef BOX_RENDER_WGPU
+
+#define BOX_GPU_MESH_PAGE_SIZE (32ull * 1024 * 1024)
+
+static uint64_t box_gpu_mesh_pool_align(
+    uint64_t size)
+{
+    return (size + BOX_GPU_MESH_ALIGN - 1) & ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
+}
+
+static bool box_gpu_mesh_pool_take(
+    box_gpu_mesh_page_t *pg,
+    uint64_t size,
+    uint64_t *offset)
+{
+    int32_t i, count = ecs_vec_count(&pg->free);
+    bool result = false;
+    for (i = 0; i < count; i ++) {
+        box_gpu_mesh_range_t *r = ecs_vec_get_t(&pg->free, box_gpu_mesh_range_t, i);
+        if (r->size < size) {
+            continue;
+        }
+
+        *offset = r->offset;
+        r->offset += size;
+        r->size -= size;
+        if (!r->size) {
+            ecs_os_memmove_n(r, r + 1, box_gpu_mesh_range_t, count - i - 1);
+            ecs_vec_remove_last(&pg->free);
+        }
+
+        result = true;
+        break;
+    }
+
+    return result;
+}
+
+static box_gpu_mesh_page_t* box_gpu_mesh_pool_page_new(
+    box_gpu_t *gpu,
+    uint64_t size)
+{
+    box_gpu_mesh_page_t *pg = ecs_vec_append_t(NULL, &gpu->mesh_pages, box_gpu_mesh_page_t);
+    pg->size = size > BOX_GPU_MESH_PAGE_SIZE ? size : BOX_GPU_MESH_PAGE_SIZE;
+    pg->buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_Index |
+            WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .size = pg->size
+    });
+    ecs_vec_init_t(NULL, &pg->free, box_gpu_mesh_range_t, 1);
+    *ecs_vec_append_t(NULL, &pg->free, box_gpu_mesh_range_t) = (box_gpu_mesh_range_t){
+        .offset = 0,
+        .size = pg->size
+    };
+    return pg;
+}
+
+bool box_gpu_mesh_pool_alloc(
+    box_gpu_t *gpu,
+    uint64_t size,
+    int32_t *page,
+    uint64_t *offset)
+{
+    int32_t i, count = ecs_vec_count(&gpu->mesh_pages);
+    bool result = false;
+    size = box_gpu_mesh_pool_align(size);
+    for (i = 0; i < count; i ++) {
+        box_gpu_mesh_page_t *pg = ecs_vec_get_t(&gpu->mesh_pages, box_gpu_mesh_page_t, i);
+        if (box_gpu_mesh_pool_take(pg, size, offset)) {
+            *page = i;
+            result = true;
+            goto done;
+        }
+    }
+
+    box_gpu_mesh_page_t *pg = box_gpu_mesh_pool_page_new(gpu, size);
+    if (pg->buffer && box_gpu_mesh_pool_take(pg, size, offset)) {
+        *page = count;
+        result = true;
+    }
+
+done:
+    return result;
+}
+
+void box_gpu_mesh_pool_free(
+    box_gpu_t *gpu,
+    int32_t page,
+    uint64_t offset,
+    uint64_t size)
+{
+    box_gpu_mesh_page_t *pg = ecs_vec_get_t(&gpu->mesh_pages, box_gpu_mesh_page_t, page);
+    int32_t i, count = ecs_vec_count(&pg->free);
+    size = box_gpu_mesh_pool_align(size);
+    for (i = 0; i < count; i ++) {
+        if (ecs_vec_get_t(&pg->free, box_gpu_mesh_range_t, i)->offset > offset) {
+            break;
+        }
+    }
+
+    box_gpu_mesh_range_t *prev = i ? ecs_vec_get_t(&pg->free, box_gpu_mesh_range_t, i - 1) : NULL;
+    box_gpu_mesh_range_t *next = i < count ?
+        ecs_vec_get_t(&pg->free, box_gpu_mesh_range_t, i) : NULL;
+    if (prev && prev->offset + prev->size == offset) {
+        prev->size += size;
+        if (next && offset + size == next->offset) {
+            prev->size += next->size;
+            ecs_os_memmove_n(next, next + 1, box_gpu_mesh_range_t, count - i - 1);
+            ecs_vec_remove_last(&pg->free);
+        }
+    } else if (next && offset + size == next->offset) {
+        next->offset = offset;
+        next->size += size;
+    } else {
+        ecs_vec_append_t(NULL, &pg->free, box_gpu_mesh_range_t);
+        box_gpu_mesh_range_t *r = ecs_vec_get_t(&pg->free, box_gpu_mesh_range_t, i);
+        ecs_os_memmove_n(r + 1, r, box_gpu_mesh_range_t, count - i);
+        *r = (box_gpu_mesh_range_t){ .offset = offset, .size = size };
+    }
+}
+
+WGPUBuffer box_gpu_mesh_pool_buffer(
+    const box_gpu_t *gpu,
+    int32_t page)
+{
+    return ecs_vec_get_t(&gpu->mesh_pages, box_gpu_mesh_page_t, page)->buffer;
+}
+
+void box_gpu_mesh_pool_fini(
+    box_gpu_t *gpu)
+{
+    int32_t i, count = ecs_vec_count(&gpu->mesh_pages);
+    for (i = 0; i < count; i ++) {
+        box_gpu_mesh_page_t *pg = ecs_vec_get_t(&gpu->mesh_pages, box_gpu_mesh_page_t, i);
+        if (pg->buffer) {
+            wgpuBufferRelease(pg->buffer);
+        }
+
+        ecs_vec_fini_t(NULL, &pg->free, box_gpu_mesh_range_t);
+    }
+
+    ecs_vec_fini_t(NULL, &gpu->mesh_pages, box_gpu_mesh_page_t);
+}
+
+#endif

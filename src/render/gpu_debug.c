@@ -1291,13 +1291,15 @@ static WGPUBindGroup box_gpu_debug_mesh_group(
     WGPUBindGroupEntry entries[3] = {
         {
             .binding = 0,
-            .buffer = m->vertices,
-            .size = wgpuBufferGetSize(m->vertices)
+            .buffer = m->buffer,
+            .offset = m->offset,
+            .size = (m->vertex_size + 3) & ~(uint64_t)3
         },
         {
             .binding = 1,
-            .buffer = m->indices,
-            .size = wgpuBufferGetSize(m->indices)
+            .buffer = m->buffer,
+            .offset = m->index_offset,
+            .size = m->index_size
         },
         {
             .binding = 2,

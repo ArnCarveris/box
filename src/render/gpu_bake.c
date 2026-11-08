@@ -169,14 +169,12 @@ static void box_gpu_bake_hold(
             wgpuRenderPipelineAddRef(draw->pipeline);
             wgpuBindGroupAddRef(draw->material);
             wgpuBindGroupAddRef(draw->instances);
-            wgpuBufferAddRef(draw->vertices);
-            wgpuBufferAddRef(draw->indices);
+            wgpuBufferAddRef(draw->buffer);
         } else {
             wgpuRenderPipelineRelease(draw->pipeline);
             wgpuBindGroupRelease(draw->material);
             wgpuBindGroupRelease(draw->instances);
-            wgpuBufferRelease(draw->vertices);
-            wgpuBufferRelease(draw->indices);
+            wgpuBufferRelease(draw->buffer);
         }
     }
 }
@@ -646,8 +644,12 @@ static void box_gpu_bake_draws(
                 .kind = box_gpu_draw_kind(rb, false),
                 .instances = box_gpu_instance_group(gpu, rb->instances, rb->mesh, m, true),
                 .page = box_gpu_instance_group(gpu, rb->instances, 0, NULL, false),
-                .vertices = m->vertices,
-                .indices = m->indices
+                .buffer = m->buffer,
+                .mesh = m->id,
+                .vertex_offset = m->offset,
+                .vertex_size = m->vertex_size,
+                .index_offset = m->index_offset,
+                .index_size = m->index_size
             };
             b->stride += rb->instance_count;
         }
@@ -967,8 +969,7 @@ static bool box_gpu_bake_draws_equal(
         const box_gpu_bake_draw_t *y = ecs_vec_get_t(b, box_gpu_bake_draw_t, d);
         result = x->region == y->region && x->count == y->count &&
             x->pipeline == y->pipeline && x->material == y->material && x->kind == y->kind &&
-            x->instances == y->instances && x->vertices == y->vertices &&
-            x->indices == y->indices;
+            x->instances == y->instances && x->mesh == y->mesh;
     }
 
     return result;
@@ -1029,11 +1030,12 @@ static WGPURenderBundle box_gpu_bake_bundle(
             instances = draw->instances;
         }
 
-        wgpuRenderBundleEncoderSetVertexBuffer(e, 0, draw->vertices, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderBundleEncoderSetVertexBuffer(
+            e, 0, draw->buffer, draw->vertex_offset, draw->vertex_size);
         wgpuRenderBundleEncoderSetVertexBuffer(e, 1, b->slots, first * sizeof(uint32_t),
             (uint64_t)draw->count * sizeof(uint32_t));
         wgpuRenderBundleEncoderSetIndexBuffer(
-            e, draw->indices, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
+            e, draw->buffer, WGPUIndexFormat_Uint32, draw->index_offset, draw->index_size);
         wgpuRenderBundleEncoderDrawIndexedIndirect(e, b->args,
             args * BOX_GPU_BAKE_ARGS * sizeof(uint32_t));
     }

@@ -138,8 +138,14 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer surface_assets;      /**< Surface assets the shaders read, one vec4 without any */
     uint64_t surface_asset_size;    /**< Bytes of the surface assets */
     bool assets;                    /**< The mesh has surface assets, so its draws bind them */
-    WGPUBuffer vertices;            /**< box_vertex_t */
-    WGPUBuffer indices;             /**< uint32_t, three per triangle */
+    WGPUBuffer buffer;
+    int32_t page;
+    uint64_t offset;
+    uint64_t alloc_size;
+    uint64_t vertex_size;
+    uint64_t index_offset;
+    uint64_t index_size;
+    uint64_t id;
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
                                      *   draw (debug_wire.wgsl), NULL until the first one */
@@ -152,6 +158,17 @@ typedef struct box_gpu_mesh_t {
     float center[3];                /**< Center of the box around the vertex positions */
     float extent[3];                /**< Half size of the box around the vertex positions */
 } box_gpu_mesh_t;
+
+typedef struct box_gpu_mesh_range_t {
+    uint64_t offset;
+    uint64_t size;
+} box_gpu_mesh_range_t;
+
+typedef struct box_gpu_mesh_page_t {
+    WGPUBuffer buffer;
+    uint64_t size;
+    ecs_vec_t free;
+} box_gpu_mesh_page_t;
 
 /** A sampled texture with its mip chain and the two views the layers bind */
 typedef struct box_gpu_texture_t {
@@ -864,6 +881,8 @@ typedef struct box_gpu_t {
     WGPUComputePipeline scatter;    /**< Scatter pipeline, NULL until the shader exists */
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
+    ecs_vec_t mesh_pages;
+    uint64_t mesh_ids;
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
     WGPUBuffer copy_staging;        /**< Staging buffer of the staged copies of a packet, NULL
                                      *   until one stages: the smallest power of two from 64 KiB

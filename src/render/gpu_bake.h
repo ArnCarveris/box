@@ -144,8 +144,12 @@ typedef struct box_gpu_bake_draw_t {
     uint32_t kind;                  /**< Dynamic offset of the DrawKind in material */
     WGPUBindGroup instances;        /**< Instance page with the surface assets of the mesh */
     WGPUBindGroup page;             /**< Instance page the cull reads, not held by the bundles */
-    WGPUBuffer vertices;            /**< Vertices of the mesh */
-    WGPUBuffer indices;             /**< Indices of the mesh */
+    WGPUBuffer buffer;
+    uint64_t mesh;
+    uint64_t vertex_offset;
+    uint64_t vertex_size;
+    uint64_t index_offset;
+    uint64_t index_size;
 } box_gpu_bake_draw_t;
 
 /** What the render bundles of the faces bind besides their batches */

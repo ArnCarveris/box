@@ -1322,12 +1322,12 @@ bool box_gpu_cull_draw(
         *bound = instances;
     }
 
-    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
+    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->buffer, m->offset, m->vertex_size);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,
         box_gpu_cull_page_t, (int32_t)draw->page)->visible,
         (uint64_t)base * sizeof(uint32_t), (uint64_t)draw->count * sizeof(uint32_t));
     wgpuRenderPassEncoderSetIndexBuffer(
-        pass, m->indices, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
+        pass, m->buffer, WGPUIndexFormat_Uint32, m->index_offset, m->index_size);
     wgpuRenderPassEncoderDrawIndexedIndirect(pass, c->args,
         (uint64_t)args * BOX_GPU_CULL_ARGS * sizeof(uint32_t));
 done:

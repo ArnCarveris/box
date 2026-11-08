@@ -235,6 +235,7 @@ void box_gpu_draw_init(
         .entryCount = 0
     });
     ecs_map_init(&gpu->meshes, NULL);
+    ecs_vec_init_t(NULL, &gpu->mesh_pages, box_gpu_mesh_page_t, 0);
     ecs_map_init(&gpu->buffers, NULL);
     ecs_map_init(&gpu->forward, NULL);
     ecs_map_init(&gpu->forward_previous, NULL);
@@ -262,8 +263,10 @@ static void box_gpu_mesh_free(
 {
     box_gpu_debug_mesh_free(m);
     wgpuBufferRelease(m->surface_assets);
-    wgpuBufferRelease(m->vertices);
-    wgpuBufferRelease(m->indices);
+    if (m->buffer) {
+        box_gpu_mesh_pool_free(gpu, m->page, m->offset, m->alloc_size);
+    }
+
     ecs_os_free(m);
     box_gpu_count(gpu, BOX_GPU_STAT_MESH_DESTROYED);
 }
@@ -612,6 +615,7 @@ void box_gpu_draw_fini(
     }
 
     ecs_map_fini(&gpu->meshes);
+    box_gpu_mesh_pool_fini(gpu);
     ecs_map_fini(&gpu->buffers);
     box_gpu_copy_fini(gpu);
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
@@ -722,13 +726,29 @@ void box_gpu_mesh_apply(
     }
 
     const uint8_t *vertices = (const uint8_t*)(desc + 1);
+    uint64_t vertex_span = (vertex_size + BOX_GPU_MESH_ALIGN - 1) &
+        ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
+    uint64_t alloc_size = vertex_span + index_size;
+    if (alloc_size > limits.maxBufferSize) {
+        ecs_err("surface mesh exceeds device buffer capacity");
+        goto done;
+    }
+
     m = ecs_os_calloc_t(box_gpu_mesh_t);
-    m->vertices = box_gpu_buffer_new(gpu, vertex_size,
-        WGPUBufferUsage_Vertex | WGPUBufferUsage_Storage);
+    if (!box_gpu_mesh_pool_alloc(gpu, alloc_size, &m->page, &m->offset)) {
+        ecs_err("failed to allocate mesh buffer space");
+        ecs_os_free(m);
+        goto done;
+    }
+
+    m->buffer = box_gpu_mesh_pool_buffer(gpu, m->page);
+    m->alloc_size = alloc_size;
+    m->vertex_size = vertex_size;
+    m->index_offset = m->offset + vertex_span;
+    m->index_size = index_size;
+    m->id = ++ gpu->mesh_ids;
     m->wireable = vertex_size <= limits.maxStorageBufferBindingSize &&
         index_size <= limits.maxStorageBufferBindingSize;
-    m->indices = box_gpu_buffer_new(gpu, index_size,
-        WGPUBufferUsage_Index | WGPUBufferUsage_Storage);
     m->surface_asset_size = desc->surface_asset_count ?
         (uint64_t)desc->surface_asset_count * sizeof(vec4) : sizeof(vec4);
     m->assets = desc->surface_asset_count != 0;
@@ -740,8 +760,9 @@ void box_gpu_mesh_apply(
 
     m->index_count = desc->index_count;
     box_gpu_mesh_bounds(m, (const box_vertex_t*)vertices, desc->vertex_count);
-    wgpuQueueWriteBuffer(gpu->queue, m->vertices, 0, vertices, (size_t)vertex_size);
-    wgpuQueueWriteBuffer(gpu->queue, m->indices, 0, vertices + vertex_size, (size_t)index_size);
+    wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->offset, vertices, (size_t)vertex_size);
+    wgpuQueueWriteBuffer(gpu->queue, m->buffer, m->index_offset, vertices + vertex_size,
+        (size_t)index_size);
     box_gpu_debug_mesh_adjacency(gpu, m, (const box_vertex_t*)vertices, desc->vertex_count,
         (const uint32_t*)(vertices + vertex_size));
     ecs_map_insert_ptr(&gpu->meshes, handle, m);

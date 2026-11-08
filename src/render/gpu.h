@@ -705,6 +705,27 @@ void box_gpu_forward_reset(
     box_gpu_t *gpu,
     bool keep);
 
+#define BOX_GPU_MESH_ALIGN (256)
+
+bool box_gpu_mesh_pool_alloc(
+    box_gpu_t *gpu,
+    uint64_t size,
+    int32_t *page,
+    uint64_t *offset);
+
+void box_gpu_mesh_pool_free(
+    box_gpu_t *gpu,
+    int32_t page,
+    uint64_t offset,
+    uint64_t size);
+
+WGPUBuffer box_gpu_mesh_pool_buffer(
+    const box_gpu_t *gpu,
+    int32_t page);
+
+void box_gpu_mesh_pool_fini(
+    box_gpu_t *gpu);
+
 /** Create or release a mesh from a BOX_RENDER_MESH resource.
  *
  * @param gpu The backend
