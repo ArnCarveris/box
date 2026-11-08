@@ -57,6 +57,7 @@ typedef struct box_gpu_particle_draw_t {
     WGPUBindGroup group;            /**< Binds its block, particles, keys, mesh, sprite and the
                                      *   curve table */
     WGPUBuffer page;                /**< Particle page of the pool */
+    uint64_t page_size;             /**< Bytes of the page */
     uint32_t offset;                /**< Byte offset of the pool in the page */
     uint64_t size;                  /**< Bytes of the pool */
     uint32_t sort_count;            /**< Keys the sort of a view sorts, 0 when unsorted */
@@ -64,6 +65,17 @@ typedef struct box_gpu_particle_draw_t {
     bool soft;                      /**< It fades in front of the depth of the view */
     float origin[3];                /**< World position of the emitter */
 } box_gpu_particle_draw_t;
+
+/** A bind group of the particle passes, shared by the pools of a packet that bind the same
+ * resources: the pools of a page differ only in their block, bound with a dynamic offset */
+typedef struct box_gpu_particle_group_t {
+    WGPUBuffer page;                /**< Particle page */
+    WGPUBuffer keys;                /**< Sort keys, no_table when unsorted */
+    WGPUBuffer table;               /**< Mesh table or billboard corners, no_table for none */
+    WGPUTextureView texture;        /**< Sprite of a draw group, NULL for the compute groups */
+    WGPUBuffer curves;              /**< Curve table, no_table for none */
+    WGPUBindGroup group;            /**< The group */
+} box_gpu_particle_group_t;
 
 /** A draw pipeline of a color format and a blend */
 typedef struct box_gpu_particle_pipeline_t {
@@ -111,6 +123,10 @@ struct box_gpu_particles_t {
     ecs_vec_t block_data;           /**< Bytes of the blocks of the packet */
     ecs_vec_t slot_data;            /**< uint32_t, the spawn slots of the packet */
     ecs_vec_t draws_of_packet;      /**< box_gpu_particle_draw_t of the last packet */
+    ecs_vec_t groups_of_packet;     /**< box_gpu_particle_group_t, the draw groups the draws of
+                                     *   the last packet share */
+    ecs_vec_t groups_of_pass;       /**< box_gpu_particle_group_t, the groups of the compute
+                                     *   pass being recorded */
     ecs_vec_t order;                /**< box_gpu_particle_order_t, the draws of a view */
 };
 
@@ -406,8 +422,68 @@ void box_gpu_particles_init(
     ecs_vec_init_t(NULL, &s->block_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &s->slot_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->draws_of_packet, box_gpu_particle_draw_t, 0);
+    ecs_vec_init_t(NULL, &s->groups_of_packet, box_gpu_particle_group_t, 0);
+    ecs_vec_init_t(NULL, &s->groups_of_pass, box_gpu_particle_group_t, 0);
     ecs_vec_init_t(NULL, &s->order, box_gpu_particle_order_t, 0);
     gpu->particles = s;
+}
+
+/** Find a shared group that binds the same resources as a key.
+ *
+ * @param groups The groups, box_gpu_particle_group_t
+ * @param key The resources
+ * @return The group, NULL when there is none
+ */
+static WGPUBindGroup box_gpu_particle_group_find(
+    const ecs_vec_t *groups,
+    const box_gpu_particle_group_t *key)
+{
+    const box_gpu_particle_group_t *g = ecs_vec_first_t(groups, box_gpu_particle_group_t);
+    WGPUBindGroup result = NULL;
+    int32_t i, count = ecs_vec_count(groups);
+    for (i = count - 1; i >= 0 && !result; i --) {
+        if (g[i].page == key->page && g[i].keys == key->keys && g[i].table == key->table &&
+            g[i].texture == key->texture && g[i].curves == key->curves)
+        {
+            result = g[i].group;
+        }
+    }
+
+    return result;
+}
+
+/** Keep a new shared group with the resources of its key.
+ *
+ * @param groups The groups, box_gpu_particle_group_t
+ * @param key The resources
+ * @param group The group, released with the groups
+ * @return The group
+ */
+static WGPUBindGroup box_gpu_particle_group_add(
+    ecs_vec_t *groups,
+    const box_gpu_particle_group_t *key,
+    WGPUBindGroup group)
+{
+    box_gpu_particle_group_t *g = ecs_vec_append_t(NULL, groups, box_gpu_particle_group_t);
+    *g = *key;
+    g->group = group;
+
+    return group;
+}
+
+/** Release the shared groups.
+ *
+ * @param groups The groups, box_gpu_particle_group_t
+ */
+static void box_gpu_particle_groups_clear(
+    ecs_vec_t *groups)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(groups); i ++) {
+        wgpuBindGroupRelease(ecs_vec_get_t(groups, box_gpu_particle_group_t, i)->group);
+    }
+
+    ecs_vec_clear(groups);
 }
 
 /** Release the draw groups of the pools of the last packet.
@@ -417,12 +493,7 @@ void box_gpu_particles_init(
 static void box_gpu_particle_draws_clear(
     box_gpu_particles_t *s)
 {
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&s->draws_of_packet); i ++) {
-        wgpuBindGroupRelease(ecs_vec_get_t(
-            &s->draws_of_packet, box_gpu_particle_draw_t, i)->group);
-    }
-
+    box_gpu_particle_groups_clear(&s->groups_of_packet);
     ecs_vec_clear(&s->draws_of_packet);
 }
 
@@ -496,6 +567,8 @@ void box_gpu_particles_fini(
     ecs_vec_fini_t(NULL, &s->block_data, uint8_t);
     ecs_vec_fini_t(NULL, &s->slot_data, uint32_t);
     ecs_vec_fini_t(NULL, &s->draws_of_packet, box_gpu_particle_draw_t);
+    ecs_vec_fini_t(NULL, &s->groups_of_packet, box_gpu_particle_group_t);
+    ecs_vec_fini_t(NULL, &s->groups_of_pass, box_gpu_particle_group_t);
     ecs_vec_fini_t(NULL, &s->order, box_gpu_particle_order_t);
     ecs_os_free(s);
     gpu->particles = NULL;
@@ -710,6 +783,7 @@ static void box_gpu_particle_upload(
         box_render_particle_block_t *b = (box_render_particle_block_t*)ecs_vec_get_t(
             &s->block_data, uint8_t, i * (int32_t)BOX_GPU_PARTICLE_STRIDE);
         *b = pool->block;
+        b->base = pool->offset / BOX_RENDER_PARTICLE_SIZE;
         b->slot_first = (uint32_t)ecs_vec_count(&s->slot_data);
         b->args = (uint32_t)i;
         b->sort_first = (uint32_t)keys;
@@ -775,7 +849,8 @@ static const box_gpu_buffer_t* box_gpu_particle_curves(
 }
 
 /** Keep the draw of a pool for the views of its scene, with the bind group of its block, its
- * particles, its sort keys, its billboard corners and its sprite.
+ * particle page, its sort keys, its billboard corners and its sprite, shared with the pools that
+ * bind the same.
  *
  * @param gpu The backend
  * @param pool The pool
@@ -796,35 +871,47 @@ static void box_gpu_particle_keep(
         : NULL;
     const box_gpu_buffer_t *curves = box_gpu_particle_curves(gpu, pool);
     uint64_t size = (uint64_t)pool->capacity * BOX_RENDER_PARTICLE_SIZE;
-    WGPUBindGroupEntry draw[7] = {
-        {
-            .binding = 0, .buffer = s->blocks, .offset = 0,
-            .size = sizeof(box_render_particle_block_t)
-        },
-        { .binding = 1, .buffer = page->buffer, .offset = pool->offset, .size = size },
-        {
-            .binding = 2, .buffer = b->sorted ? s->keys : s->no_table, .offset = 0,
-            .size = b->sorted ? s->keys_size : 32
-        },
-        {
-            .binding = 3, .buffer = mesh ? mesh->buffer : s->no_table, .offset = 0,
-            .size = mesh ? mesh->size : 32
-        },
-        {
-            .binding = 4,
-            .textureView = box_gpu_texture_color(gpu, b->look == ParticleSprite ? pool->texture : 0)
-        },
-        { .binding = 5, .sampler = box_gpu_texture_sampler(gpu, WrapClamp, 1) },
-        {
-            .binding = 6, .buffer = curves ? curves->buffer : s->no_table, .offset = 0,
-            .size = curves ? curves->size : 32
-        }
+    box_gpu_particle_group_t key = {
+        .page = page->buffer,
+        .keys = b->sorted ? s->keys : s->no_table,
+        .table = mesh ? mesh->buffer : s->no_table,
+        .texture = box_gpu_texture_color(gpu, b->look == ParticleSprite ? pool->texture : 0),
+        .curves = curves ? curves->buffer : s->no_table
     };
+    WGPUBindGroup group = box_gpu_particle_group_find(&s->groups_of_packet, &key);
+    if (!group) {
+        WGPUBindGroupEntry draw[7] = {
+            {
+                .binding = 0, .buffer = s->blocks, .offset = 0,
+                .size = sizeof(box_render_particle_block_t)
+            },
+            { .binding = 1, .buffer = page->buffer, .offset = 0, .size = page->size },
+            {
+                .binding = 2, .buffer = key.keys, .offset = 0,
+                .size = b->sorted ? s->keys_size : 32
+            },
+            { .binding = 3, .buffer = key.table, .offset = 0, .size = mesh ? mesh->size : 32 },
+            { .binding = 4, .textureView = key.texture },
+            { .binding = 5, .sampler = box_gpu_texture_sampler(gpu, WrapClamp, 1) },
+            {
+                .binding = 6, .buffer = key.curves, .offset = 0,
+                .size = curves ? curves->size : 32
+            }
+        };
+        group = box_gpu_particle_group_add(&s->groups_of_packet, &key,
+            wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+                .layout = s->draw_layout,
+                .entryCount = 7,
+                .entries = draw
+            }));
+    }
+
     box_gpu_particle_draw_t *d = ecs_vec_append_t(
         NULL, &s->draws_of_packet, box_gpu_particle_draw_t);
     d->scene = pool->scene;
     d->block = index;
     d->page = page->buffer;
+    d->page_size = page->size;
     d->offset = pool->offset;
     d->size = size;
     d->sort_count = b->sorted ? b->sort_count : 0;
@@ -833,14 +920,11 @@ static void box_gpu_particle_keep(
     d->origin[0] = b->model[3][0];
     d->origin[1] = b->model[3][1];
     d->origin[2] = b->model[3][2];
-    d->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = s->draw_layout,
-        .entryCount = 7,
-        .entries = draw
-    });
+    d->group = group;
 }
 
-/** Record the integrate and spawn dispatches of a pool and keep its draw.
+/** Record the integrate and spawn dispatches of a pool, with the group of its page shared with
+ * the pools of the pass that bind the same, and keep its draw.
  *
  * @param gpu The backend
  * @param pass The compute pass
@@ -868,28 +952,36 @@ static void box_gpu_particle_dispatch(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[6] = {
-        {
-            .binding = 0, .buffer = s->blocks, .offset = 0,
-            .size = sizeof(box_render_particle_block_t)
-        },
-        { .binding = 1, .buffer = page->buffer, .offset = pool->offset, .size = size },
-        { .binding = 2, .buffer = s->slots, .offset = 0, .size = s->slots_size },
-        {
-            .binding = 3, .buffer = table ? table->buffer : s->no_table, .offset = 0,
-            .size = table ? table->size : 32
-        },
-        { .binding = 4, .buffer = s->args, .offset = 0, .size = s->args_size },
-        {
-            .binding = 8, .buffer = curves ? curves->buffer : s->no_table, .offset = 0,
-            .size = curves ? curves->size : 32
-        }
+    box_gpu_particle_group_t key = {
+        .page = page->buffer,
+        .keys = s->no_table,
+        .table = table ? table->buffer : s->no_table,
+        .curves = curves ? curves->buffer : s->no_table
     };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = s->sim_layout,
-        .entryCount = 6,
-        .entries = entries
-    });
+    WGPUBindGroup group = box_gpu_particle_group_find(&s->groups_of_pass, &key);
+    if (!group) {
+        WGPUBindGroupEntry entries[6] = {
+            {
+                .binding = 0, .buffer = s->blocks, .offset = 0,
+                .size = sizeof(box_render_particle_block_t)
+            },
+            { .binding = 1, .buffer = page->buffer, .offset = 0, .size = page->size },
+            { .binding = 2, .buffer = s->slots, .offset = 0, .size = s->slots_size },
+            { .binding = 3, .buffer = key.table, .offset = 0, .size = table ? table->size : 32 },
+            { .binding = 4, .buffer = s->args, .offset = 0, .size = s->args_size },
+            {
+                .binding = 8, .buffer = key.curves, .offset = 0,
+                .size = curves ? curves->size : 32
+            }
+        };
+        group = box_gpu_particle_group_add(&s->groups_of_pass, &key,
+            wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+                .layout = s->sim_layout,
+                .entryCount = 6,
+                .entries = entries
+            }));
+    }
+
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuComputePassEncoderSetPipeline(pass, s->integrate);
     wgpuComputePassEncoderDispatchWorkgroups(pass,
@@ -900,7 +992,6 @@ static void box_gpu_particle_dispatch(
             (pool->block.count + BOX_GPU_PARTICLE_GROUP - 1) / BOX_GPU_PARTICLE_GROUP, 1, 1);
     }
 
-    wgpuBindGroupRelease(group);
     box_gpu_particle_keep(gpu, pool, index, page);
 done:
     return;
@@ -948,6 +1039,7 @@ void box_gpu_particles_simulate(
 
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
+    box_gpu_particle_groups_clear(&s->groups_of_pass);
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
@@ -996,26 +1088,34 @@ static void box_gpu_particle_sort_pool(
     uint32_t offsets[3] = {
         d->block * BOX_GPU_PARTICLE_STRIDE, (uint32_t)slot * BOX_GPU_VIEW_STRIDE, 0
     };
-    WGPUBindGroupEntry entries[5] = {
-        {
-            .binding = 0, .buffer = s->blocks, .offset = 0,
-            .size = sizeof(box_render_particle_block_t)
-        },
-        { .binding = 1, .buffer = d->page, .offset = d->offset, .size = d->size },
-        { .binding = 5, .buffer = s->keys, .offset = 0, .size = s->keys_size },
-        {
-            .binding = 6, .buffer = gpu->view_buffer, .offset = 0,
-            .size = sizeof(box_gpu_view_uniforms_t)
-        },
-        {
-            .binding = 7, .buffer = s->steps, .offset = 0, .size = 16
-        }
+    box_gpu_particle_group_t key = {
+        .page = d->page, .keys = s->keys, .table = s->no_table, .curves = s->no_table
     };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = s->sort_layout,
-        .entryCount = 5,
-        .entries = entries
-    });
+    WGPUBindGroup group = box_gpu_particle_group_find(&s->groups_of_pass, &key);
+    if (!group) {
+        WGPUBindGroupEntry entries[5] = {
+            {
+                .binding = 0, .buffer = s->blocks, .offset = 0,
+                .size = sizeof(box_render_particle_block_t)
+            },
+            { .binding = 1, .buffer = d->page, .offset = 0, .size = d->page_size },
+            { .binding = 5, .buffer = s->keys, .offset = 0, .size = s->keys_size },
+            {
+                .binding = 6, .buffer = gpu->view_buffer, .offset = 0,
+                .size = sizeof(box_gpu_view_uniforms_t)
+            },
+            {
+                .binding = 7, .buffer = s->steps, .offset = 0, .size = 16
+            }
+        };
+        group = box_gpu_particle_group_add(&s->groups_of_pass, &key,
+            wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+                .layout = s->sort_layout,
+                .entryCount = 5,
+                .entries = entries
+            }));
+    }
+
     box_gpu_particle_sort_bind(pass, group, offsets, 1, 0);
     wgpuComputePassEncoderSetPipeline(pass, s->sort_keys);
     wgpuComputePassEncoderDispatchWorkgroups(pass,
@@ -1033,8 +1133,6 @@ static void box_gpu_particle_sort_pool(
         wgpuComputePassEncoderSetPipeline(pass, s->sort_merge);
         wgpuComputePassEncoderDispatchWorkgroups(pass, groups, 1, 1);
     }
-
-    wgpuBindGroupRelease(group);
 }
 
 void box_gpu_particles_sort(
@@ -1063,6 +1161,10 @@ void box_gpu_particles_sort(
     if (pass) {
         wgpuComputePassEncoderEnd(pass);
         wgpuComputePassEncoderRelease(pass);
+    }
+
+    if (s) {
+        box_gpu_particle_groups_clear(&s->groups_of_pass);
     }
 }
 

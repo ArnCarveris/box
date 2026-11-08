@@ -92,7 +92,8 @@ struct Emitter {
     // spin is in the row after it
     curve_max: vec4u,
     // x: first of the GRADIENT_ROWS rows of the max gradient, CURVE_CONSTANT for none, y: 1
-    // when the emitter has a ParticleMotion that changes its motion
+    // when the emitter has a ParticleMotion that changes its motion, z: first slot of the pool
+    // in the particle page bound
     gradient_max: vec4u,
     // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
     motion: MotionRows,

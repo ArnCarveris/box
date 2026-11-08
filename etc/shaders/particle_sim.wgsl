@@ -18,6 +18,7 @@
 #include "include/particle.wgsl"
 
 @group(0) @binding(0) var<uniform> emitter: Emitter;
+// The particle page of the pool, its slots from emitter.gradient_max.z
 @group(0) @binding(1) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(2) var<storage, read> slots: array<u32>;
 @group(0) @binding(3) var<storage, read> table: array<TablePoint>;
@@ -56,7 +57,7 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
         return;
     }
 
-    var p = particles[i];
+    var p = particles[emitter.gradient_max.z + i];
     if (p.remaining == 0u) {
         return;
     }
@@ -81,7 +82,7 @@ fn integrate(@builtin(global_invocation_id) id: vec3u) {
         }
     }
 
-    particles[i] = p;
+    particles[emitter.gradient_max.z + i] = p;
 }
 
 @compute @workgroup_size(256)
@@ -124,7 +125,7 @@ fn spawn(@builtin(global_invocation_id) id: vec3u) {
     p.remaining = particle_life(seed, index, emitter.life.y, emitter.life.z);
     p.velocity = direction * speed + particle_radial(offset, radial) + emitter.inherit.xyz;
     p.index = index;
-    particles[slot] = p;
+    particles[emitter.gradient_max.z + slot] = p;
 }
 
 // Write the sort key and slot of every key of a pool, free slots and slots past the used ones
@@ -138,7 +139,7 @@ fn sort_keys(@builtin(global_invocation_id) id: vec3u) {
 
     var key = SORT_DEAD;
     if (i < emitter.pool.x) {
-        let p = particles[i];
+        let p = particles[emitter.gradient_max.z + i];
         if (p.remaining != 0u) {
             key = particle_sort_key(-(view.view * vec4f(p.position, 1.0)).z);
         }

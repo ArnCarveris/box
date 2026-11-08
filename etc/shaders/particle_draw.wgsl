@@ -72,7 +72,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
         slot = keys[emitter.life.w + instance].y;
     }
 
-    let p = particles[slot];
+    let p = particles[emitter.gradient_max.z + slot];
     if (p.remaining == 0u) {
         return out;
     }
