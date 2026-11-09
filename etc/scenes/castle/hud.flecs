@@ -450,7 +450,6 @@ template HintLine {
   const tip = !painting && ht > 0
   const tg = cost_gold(ht, 1)
   const ts = cost_stone(ht, 1)
-  const tw = upkeep_of(ht)
   const tf = food_need(ht, 1)
   const short: Rgb = {168, 44, 30}
   const text = match painting {
@@ -505,10 +504,9 @@ template HintLine {
           TipLabel cost_(text: tg > 0 || ts > 0 ? "Cost:" : "", gap: 0)
           TipAmount cost_gold(tex: castle_icon_coin, amount: tg > 0 ? "{tg}" : "", color: gold < tg ? short : C_INK)
           TipAmount cost_stone(tex: castle_icon_stone, amount: ts > 0 ? "{ts}" : "", color: stone < ts ? short : C_INK)
-          TipLabel upkeep_(text: tw > 0 || tf > 0 ? "Upkeep:" : "", gap: tg > 0 || ts > 0 ? 22 : 0)
-          TipAmount upkeep_gold(tex: castle_icon_coin, amount: tw > 0 ? "{tw:.0}/s" : "")
+          TipLabel upkeep_(text: tf > 0 ? "Upkeep:" : "", gap: tg > 0 || ts > 0 ? 22 : 0)
           TipAmount upkeep_food(tex: castle_icon_food, amount: tf > 0 ? "{tf:.0}/s" : "")
-          TipLabel hotkey_(text: "Hotkey:", gap: tg > 0 || ts > 0 || tw > 0 || tf > 0 ? 22 : 0)
+          TipLabel hotkey_(text: "Hotkey:", gap: tg > 0 || ts > 0 || tf > 0 ? 22 : 0)
           key_ {
             Layout: {direction: Row, v: Middle, padding: {0, 0, 6, 0}}
             cap {
@@ -698,7 +696,6 @@ template InfoPanel {
     const eats = food_need(k, lvl)
     const people = folk_of(k, lvl)
     const coin = gold_of(k, lvl, safe)
-    const wages = upkeep_of(k)
     const r = research
     const rg = research_gold(r)
     const rs = research_stone(r)
@@ -774,8 +771,6 @@ template InfoPanel {
             LayoutItem: {width: {mode: Grow}}
             if !ruined && coin > 0 {
               InfoLine line_(label: "Taxes", value: "{coin:.0} gold a second")
-            } else if wages > 0 {
-              InfoLine line_(label: "Wages", value: "{wages:.0} gold a second", color: gold_rate < 0 ? C_RED : C_TEXT)
             }
           }
           extra_slot {
@@ -807,7 +802,7 @@ template InfoPanel {
           if k == K_HOUSE && !ruined && !top {
             ProgressBar bar_(ratio: pts / protect_need(lvl), width: 300)
           } else if smith && researching {
-            ProgressBar bar_(ratio: 1 - research_left / busy ? mining_time(m) : research_time(r), width: 300)
+            ProgressBar bar_(ratio: 1 - research_left / (busy ? mining_time(m) : research_time(r)), width: 300)
           }
         }
         grow { LayoutItem: {height: {mode: Grow}} }
@@ -874,7 +869,7 @@ template InfoPanel {
           }
           PanelButton demolish_(
             label: ruined ? "Demolish the ruin" : "Demolish",
-            detail: ruined ? "Salvage {floor(spent_stone(k, lvl) / 4):.0} stone" : "Get back {floor(spent_gold(k, lvl) / 2):.0}g {floor(spent_stone(k, lvl) / 2):.0}s",
+            detail: ruined ? "Salvage {floor(spent_stone(k, lvl) / 4):.0} stone" : "Get back {refund_gold(k, lvl):.0}g {refund_stone(k, lvl):.0}s",
             danger: true, action: 2, cell: i)
         }
       }

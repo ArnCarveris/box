@@ -89,7 +89,7 @@ fn kind_blurb(k: i32) -> string {
     9: "A moat of still water."
     10: "An oak or a pine. Cheap, and pleasant to look at."
     11: "A cobbled path."
-    12: "Tear a piece down and get half of its cost back. Abandoned buildings only give back some stone."
+    12: "Tear a piece down and get half of its cost back, or all of it for farms and quarries. Abandoned buildings only give back some stone."
     _: ""
   }
 }
@@ -111,7 +111,7 @@ fn cost_gold(k: i32, lvl: i32) -> i32 {
     2: 10 + (lvl - 1) * 20
     3: match lvl { 1: 20; _: 25 }
     4: match lvl { 1: 80; 2: 160; 3: 300; _: 500 }
-    5: match lvl { 1: 25; 2: 50; _: 110 }
+    5: match lvl { 1: 0; 2: 50; _: 110 }
     6: 40
     7: 60
     8: 40
@@ -128,7 +128,7 @@ fn cost_stone(k: i32, lvl: i32) -> i32 {
     2: 30 + (lvl - 1) * 20
     3: match lvl { 1: 0; _: 40 }
     4: match lvl { 1: 120; 2: 200; 3: 320; _: 480 }
-    5: match lvl { 1: 5; 2: 25; _: 60 }
+    5: match lvl { 1: 20; 2: 25; _: 60 }
     7: 40
     11: 1
     _: 0
@@ -168,6 +168,18 @@ fn spent_stone(k: i32, lvl: i32) -> i32 {
     4: cost_stone(k, 1) + cost_stone(k, 2) + cost_stone(k, 3) + cost_stone(k, 4)
     _: 0
   }
+}
+
+fn full_refund(k: i32) -> bool {
+  k == K_FARM || k == K_QUARRY
+}
+
+fn refund_gold(k: i32, lvl: i32) -> f64 {
+  full_refund(k) ? spent_gold(k, lvl) : floor(spent_gold(k, lvl) / 2)
+}
+
+fn refund_stone(k: i32, lvl: i32) -> f64 {
+  full_refund(k) ? spent_stone(k, lvl) : floor(spent_stone(k, lvl) / 2)
 }
 
 fn drag_tool(t: i32) -> bool {
@@ -253,14 +265,6 @@ fn gold_of(k: i32, lvl: i32, safe: bool) -> f64 {
   match k {
     4: lvl * 3
     5: match lvl { 1: safe ? 2 : 1; 2: 4; _: 8 }
-    _: 0
-  }
-}
-
-fn upkeep_of(k: i32) -> f64 {
-  match k {
-    6: 5
-    8: 10
     _: 0
   }
 }

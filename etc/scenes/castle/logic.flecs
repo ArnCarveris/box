@@ -93,7 +93,7 @@ proc recompute() {
     }
     if !abandoned[i] && !part {
       p += prestige_of(k, lvl, in_court)
-      g += gold_of(k, lvl, in_court) - upkeep_of(k)
+      g += gold_of(k, lvl, in_court)
       eat += food_need(k, lvl)
       people += folk_of(k, lvl)
       if k == K_KEEP {
@@ -256,8 +256,8 @@ proc demolish_cell(c: i32) {
     if abandoned[i] {
       stone += floor(spent_stone(k, lvl) / 4)
     } else {
-      gold += floor(spent_gold(k, lvl) / 2)
-      stone += floor(spent_stone(k, lvl) / 2)
+      gold += refund_gold(k, lvl)
+      stone += refund_stone(k, lvl)
     }
     if k == K_SMITH && researching {
       const lost = study_name(research_track, research_track == R_MINING ? mining : research)
@@ -428,9 +428,7 @@ proc build_at(i: i32, painting: bool) {
         const played = box.audio.play_at(SfxBuild, {ax, 0.2, az}, painting ? 0.5 : 0.9)
         const fx = box.particle.burst_at(DustBurst, {ax, 0.2, az}, painting ? 0.6 : 1)
       }
-      if upkeep_of(t) > 0 && gold_rate < 0 {
-        emit Toast(text: "Your realm now pays more in wages than it collects in taxes. Build cottages, or the treasury will run dry.")
-      } else if food_need(t, 1) > 0 && food_rate < 0 {
+      if food_need(t, 1) > 0 && food_rate < 0 {
         emit Toast(text: "Your folk eat more than your farms grow. Build farms before the granary runs dry.")
       }
     }
