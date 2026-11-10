@@ -82,6 +82,32 @@ static void box_atmosphere_ctor(
     }
 }
 
+/** Construct CloudLayer values with the defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_cloud_layer_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    CloudLayer *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (CloudLayer){
+            .size = 4000.0f,
+            .altitude = 1500.0f,
+            .threshold = 0.55f,
+            .softness = 0.15f,
+            .density = 1.0f,
+            .tint = {255, 255, 255}
+        };
+    }
+}
+
 /** Add AtmosphereStatus to an entity that got Atmosphere, and Environment with the defaults of
  * an atmosphere unless it has one.
  *
@@ -301,6 +327,8 @@ void BoxAtmosphereImport(
     ecs_set_hooks(world, Atmosphere, { .ctor = box_atmosphere_ctor });
     ECS_META_COMPONENT(world, AtmosphereStatus);
     box_owned_hooks(world, AtmosphereStatus, BOX_OWNED_STR(AtmosphereStatus, error));
+    ECS_META_COMPONENT(world, CloudLayer);
+    ecs_set_hooks(world, CloudLayer, { .ctor = box_cloud_layer_ctor });
     ECS_META_COMPONENT(world, TimeOfDay);
     ECS_META_COMPONENT(world, TimeOfDayStatus);
 

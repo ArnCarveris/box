@@ -477,6 +477,23 @@ typedef struct box_render_view_shadows_t {
     uint32_t tiles;         /**< Tile records of that atlas */
 } box_render_view_shadows_t;
 
+/** A CloudLayer of the scene of a view, resolved for the sky pass of the view */
+typedef struct box_render_cloud_layer_t {
+    uint32_t texture;       /**< Backend handle of its texture */
+    float inv_size;         /**< One over the world units the texture repeats over */
+    float height;           /**< World Y of the layer minus that of the camera */
+    float altitude;         /**< World Y of the layer */
+    float offset[2];        /**< Offset plus velocity times the total time in world units,
+                             *   wrapped to [0, size) */
+    float origin[2];        /**< Texture coordinate of the camera: its world X and Z plus the
+                             *   offset over the size, wrapped to [0, 1) in double precision */
+    float threshold;        /**< Value at which the coverage is one half */
+    float softness;         /**< Half the range of values the coverage ramps over */
+    float density;          /**< Opacity of fully covered clouds */
+    float tint[3];          /**< Linear tint */
+    ecs_entity_t entity;    /**< Entity with the CloudLayer */
+} box_render_cloud_layer_t;
+
 /** What the sky view and aerial perspective passes of a view read besides the medium of the
  * atmosphere of its scene */
 typedef struct box_render_view_atmos_t {
@@ -506,6 +523,9 @@ typedef struct box_render_view_atmos_t {
     bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
                              *   the aerial perspective to its 3D meshes */
     ecs_entity_t entity;    /**< Entity with the Atmosphere of the scene of the view */
+    box_render_cloud_layer_t clouds[BOX_CLOUD_LAYER_MAX]; /**< The cloud layers with a loaded
+                             *   texture by ascending altitude, for views with sky */
+    int32_t cloud_count;    /**< Layers in clouds */
 } box_render_view_atmos_t;
 
 /** The environment a view is lit with, resolved from LightSettings.environment */

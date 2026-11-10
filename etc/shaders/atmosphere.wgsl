@@ -1,7 +1,8 @@
 // Lookup tables of the physically based atmosphere after Hillaire 2020, distances in km. The
 // transmittance and multi scattering LUTs belong to a scene, the sky view and aerial perspective
 // to a view. Every pass is a compute entry point with 8x8x1 workgroups that writes an
-// rgba16float storage texture, the 2D LUTs included, so no pass needs a render target.
+// rgba16float storage texture, the 2D LUTs included, so no pass needs a render target. The sky
+// draw of a view is a fragment entry point that also composites its cloud layers (CloudLayer).
 #include "include/atmosphere_medium.h"
 #include "include/cube.wgsl"
 
@@ -41,6 +42,21 @@ struct Atmosphere {
     fog_light: vec4f,
     // rgb: radiance toward the moon when it is the main light, w: 1 when it is, per view
     fog_moon: vec4f,
+    // x: cloud layers of the sky draw, y: km per world unit, per view
+    clouds: vec4f,
+    // the cloud layers by ascending altitude, per view
+    cloud_layers: array<CloudLayer, 4>,
+};
+
+// A cloud layer of the sky draw
+struct CloudLayer {
+    // x: world Y of the layer minus that of the camera, y: one over its size, zw: texture
+    // coordinate of the camera, wrapped
+    plane: vec4f,
+    // threshold, softness, density
+    shape: vec4f,
+    // rgb: linear tint
+    tint: vec4f,
 };
 
 struct Medium {
@@ -64,6 +80,11 @@ struct Scatter {
 @group(0) @binding(5) var out_2d: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(6) var out_3d: texture_storage_3d<rgba16float, write>;
 @group(0) @binding(7) var out_cube: texture_storage_2d_array<rgba16float, write>;
+@group(0) @binding(8) var cloud_sampler: sampler;
+@group(0) @binding(9) var cloud_0: texture_2d<f32>;
+@group(0) @binding(10) var cloud_1: texture_2d<f32>;
+@group(0) @binding(11) var cloud_2: texture_2d<f32>;
+@group(0) @binding(12) var cloud_3: texture_2d<f32>;
 
 const PI: f32 = 3.14159265358979323846;
 const TRANSMITTANCE_STEPS: i32 = BOX_ATMOS_TRANSMITTANCE_STEPS;
@@ -604,6 +625,147 @@ fn moon_disk(rd: vec3f, r: f32, moon_cos: f32, sin_moon: f32, aa_w: f32) -> vec3
     return result;
 }
 
+// Smallest ramp of the coverage remap, which makes a softness of 0 a step at the threshold,
+// BOX_RENDER_CLOUD_MIN_RAMP
+const CLOUD_MIN_RAMP: f32 = 1e-5;
+// Smallest |y| of a ray direction that hits a cloud layer, which keeps the distance and the
+// texture gradients finite at the horizon
+const CLOUD_MIN_GRAZING: f32 = 1e-4;
+// Fraction of the light a cloud scatters rather than absorbs
+const CLOUD_ALBEDO: f32 = 0.9;
+// Henyey-Greenstein asymmetry of the glow of the clouds toward the sun and moon
+const CLOUD_FORWARD_G: f32 = 0.6;
+// Weight of the forward glow in the phase of the clouds, the rest isotropic
+const CLOUD_FORWARD_WEIGHT: f32 = 0.5;
+// Optical depth of a fully opaque layer for the light that crosses it, seen from the side away
+// from the light
+const CLOUD_THICKNESS: f32 = 1.6;
+// Weight of the zenith in the sky light of the clouds, the rest from the horizon
+const CLOUD_ZENITH_MIX: f32 = 0.6;
+
+fn hg_phase(c: f32, g: f32) -> f32 {
+    let d = 1.0 + g * g - 2.0 * g * c;
+    return (1.0 - g * g) / (4.0 * PI * pow(max(d, 1e-6), 1.5));
+}
+
+// Texture value of cloud layer i, sampled with explicit gradients, which need no uniform
+// control flow.
+fn cloud_texture(i: i32, uv: vec2f, dx: vec2f, dy: vec2f) -> f32 {
+    var result = 0.0;
+    switch (i) {
+        case 0: {
+            result = textureSampleGrad(cloud_0, cloud_sampler, uv, dx, dy).r;
+        }
+        case 1: {
+            result = textureSampleGrad(cloud_1, cloud_sampler, uv, dx, dy).r;
+        }
+        case 2: {
+            result = textureSampleGrad(cloud_2, cloud_sampler, uv, dx, dy).r;
+        }
+        default: {
+            result = textureSampleGrad(cloud_3, cloud_sampler, uv, dx, dy).r;
+        }
+    }
+
+    return result;
+}
+
+// Coverage of a texture value t, saturate((t - threshold) / (2 softness) + 0.5)
+fn cloud_coverage(t: f32, threshold: f32, softness: f32) -> f32 {
+    return saturate((t - threshold) / max(2.0 * softness, CLOUD_MIN_RAMP) + 0.5);
+}
+
+// Radiance a light (the sun or the moon) of top of atmosphere irradiance color in direction l
+// scatters toward the camera along rd from a cloud at pos, relative to the planet center in km.
+// From the side of the layer away from the light the light first crosses the cloud.
+fn cloud_light(pos: vec3f, rd: vec3f, l: vec3f, color: vec3f, alpha: f32, lit_side: bool)
+    -> vec3f
+{
+    let r = length(pos);
+    let mu = clamp(dot(pos / max(r, 1e-4), l), -1.0, 1.0);
+    let t = sample_transmittance(r, mu) * earth_shadow(r, mu);
+    let iso = 1.0 / (4.0 * PI);
+    // The layer sends the light it scatters into the two hemispheres, so twice the phase
+    let phase = 2.0 * mix(iso, hg_phase(dot(rd, l), CLOUD_FORWARD_G), CLOUD_FORWARD_WEIGHT);
+    let crossed = select(exp(-CLOUD_THICKNESS * alpha), 1.0, lit_side);
+    return color * t * (CLOUD_ALBEDO * phase * crossed);
+}
+
+// Transmittance of the atmosphere between the camera at radius r0 and the point at radius r1
+// along rd, mu0 and mu1 the cosines of rd with the up direction at both, from the ratio of the
+// transmittances toward the top; a ray down takes the reverse ray, which does not hit the ground.
+fn cloud_aerial_transmittance(r0: f32, mu0: f32, r1: f32, mu1: f32) -> vec3f {
+    var t = vec3f(1.0);
+    if (mu0 >= 0.0) {
+        t = sample_transmittance(r0, mu0) / max(sample_transmittance(r1, mu1), vec3f(1e-6));
+    } else {
+        t = sample_transmittance(r1, -mu1) / max(sample_transmittance(r0, -mu0), vec3f(1e-6));
+    }
+
+    return clamp(t, vec3f(0.0), vec3f(1.0));
+}
+
+// The cloud layers composited over a background along rd from far to near: above the camera
+// from the highest, below from the lowest. haze is the sky in the direction, which the clouds
+// fade into with the aerial perspective; drd_x and drd_y the change of rd over a pixel.
+fn clouds(background: vec3f, haze: vec3f, rd: vec3f, drd_x: vec3f, drd_y: vec3f) -> vec3f {
+    let count = min(i32(u.clouds.x), 4);
+    var color = background;
+    if (count == 0) {
+        return color;
+    }
+
+    let r0 = camera_radius();
+    let ro = vec3f(0.0, r0, 0.0);
+    let ambient = CLOUD_ALBEDO * mix(sky_horizon(rd), sky_sample(vec3f(0.0, 1.0, 0.0)),
+        CLOUD_ZENITH_MIX);
+    let moon_color = u.moon_color.rgb * u.moon.w;
+    let y = select(-1.0, 1.0, rd.y >= 0.0) * max(abs(rd.y), CLOUD_MIN_GRAZING);
+    for (var k = 0; k < count; k = k + 1) {
+        let i = select(k, count - 1 - k, rd.y > 0.0);
+        let layer = u.cloud_layers[i];
+        let height = layer.plane.x;
+        let dist = height / y;
+        if (height == 0.0 || dist <= 0.0) {
+            continue;
+        }
+
+        // uv = origin + rd.xz height / (rd.y size) and its change over a pixel
+        let s = height * layer.plane.y;
+        let uv = layer.plane.zw + rd.xz * (s / y);
+        let duv_x = s * (drd_x.xz * y - rd.xz * drd_x.y) / (y * y);
+        let duv_y = s * (drd_y.xz * y - rd.xz * drd_y.y) / (y * y);
+        let value = cloud_texture(i, uv, duv_x, duv_y);
+        let alpha = saturate(cloud_coverage(value, layer.shape.x, layer.shape.y) *
+            layer.shape.z);
+        if (alpha <= 0.0) {
+            continue;
+        }
+
+        let pos = ro + rd * (dist * u.clouds.y);
+        let r1 = length(pos);
+        let mu1 = clamp(dot(pos / max(r1, 1e-4), rd), -1.0, 1.0);
+        let below = height > 0.0;
+        var light = cloud_light(pos, rd, u.sun.xyz, u.sun_color.rgb, alpha,
+            below == (u.sun.y < 0.0));
+        if (any(moon_color > vec3f(0.0))) {
+            light += cloud_light(pos, rd, u.moon.xyz, moon_color, alpha,
+                below == (u.moon.y < 0.0));
+        }
+
+        var t = vec3f(1.0);
+        if (u.view.w > 0.0) {
+            t = pow(cloud_aerial_transmittance(r0, clamp(rd.y, -1.0, 1.0), r1, mu1),
+                vec3f(u.view.w));
+        }
+
+        let seen = (light + ambient) * layer.tint.rgb * t + haze * (1.0 - t);
+        color = mix(color, seen, alpha);
+    }
+
+    return color;
+}
+
 @fragment fn sky_fs(f: SkyOut) -> @location(0) vec4f {
     let rd = normalize(unproject(f.ndc, 0.5) - unproject(f.ndc, 1.0));
     let r = camera_radius();
@@ -615,9 +777,12 @@ fn moon_disk(rd: vec3f, r: f32, moon_cos: f32, sin_moon: f32, aa_w: f32) -> vec3
     let moon_cos = dot(rd, u.moon.xyz);
     let sin_moon = length(cross(rd, u.moon.xyz));
     let moon_aa_w = max(fwidth(moon_cos) * min(1.0, u.moon_disk.y / max(sin_moon, 1e-6)), 1e-6);
+    let drd_x = dpdx(rd);
+    let drd_y = dpdy(rd);
     var uv = direction_to_sky_uv(rd, r);
     uv.y = min(uv.y, 0.5);
     let sky = sample_sky_lut(uv);
-    return vec4f(sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w) +
-        moon_disk(rd, r, moon_cos, sin_moon, moon_aa_w), 1.0);
+    let background = sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w) +
+        moon_disk(rd, r, moon_cos, sin_moon, moon_aa_w);
+    return vec4f(clouds(background, sky, rd, drd_x, drd_y), 1.0);
 }

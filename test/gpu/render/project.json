@@ -1007,6 +1007,17 @@
                 ]
             },
             {
+                "id": "AtmosphereClouds",
+                "testcases": [
+                    "white_layer_covers_sky",
+                    "density_zero_leaves_sky",
+                    "geometry_unchanged",
+                    "velocity_moves_pattern",
+                    "camera_above_sees_layer_below",
+                    "sunset_warmer_than_noon"
+                ]
+            },
+            {
                 "id": "Environment",
                 "testcases": [
                     "axes_faces_show_axis_colors"

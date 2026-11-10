@@ -251,6 +251,18 @@
                 ]
             },
             {
+                "id": "CloudLayer",
+                "testcases": [
+                    "defaults",
+                    "coverage_remap",
+                    "packet_view_layer",
+                    "layer_on_atmosphere_entity",
+                    "offset_wraps_at_large_time",
+                    "layer_limit_and_order",
+                    "layers_of_other_scene_ignored"
+                ]
+            },
+            {
                 "id": "Environment",
                 "testcases": [
                     "script_defaults",

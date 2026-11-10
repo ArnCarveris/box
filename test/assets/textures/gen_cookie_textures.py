@@ -13,6 +13,7 @@ cookie_stripes.png 64 x 64, stripes 2 rows high, alternately 0 and 255: the valu
                    with v, and its mip levels from the 16 x 16 one on are a uniform half
 cookie_columns.png 64 x 64, stripes 2 columns wide, alternately 0 and 255: the value changes
                    with u, and its mip levels from the 16 x 16 one on are a uniform half
+cloud_white.png    8 x 8 of 255, a fully covered CloudLayer of the AtmosphereClouds tests
 """
 import os
 import sys
@@ -32,6 +33,7 @@ def main():
         "cookie_stripes.png": [bytes([255 * ((y // 2) % 2)] * 64) for y in range(64)],
         "cookie_columns.png": [bytes([255 * ((x // 2) % 2) for x in range(64)])
                                for _ in range(64)],
+        "cloud_white.png": [bytes([255] * 8) for _ in range(8)],
     }
     for name, rows in images.items():
         write_png(os.path.join(HERE, name), rows)
