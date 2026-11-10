@@ -193,6 +193,24 @@ ECS_STRUCT(Smaa, {
                                     *   clamped to 0..100 */
 });
 
+/** Darkens or tints the edges of the image toward the corners, as a lens does.
+ *
+ * Belongs after the Tonemap: it multiplies the color by mix(1, color, v * intensity), where
+ * v = smoothstep(radius, radius + smoothness, d) and d is the distance from the center in half
+ * diagonals, so a black vignette darkens and a colored one tints. Alpha passes through.
+ */
+ECS_STRUCT(Vignette, {
+    float intensity;  /**< Strength, 0 none to 1 full, default 0.3, clamped to 0..1 */
+    float radius;     /**< Distance from the center in half diagonals where the falloff starts,
+                       *   default 0.75, at least 0 */
+    float smoothness; /**< Width of the falloff, default 0.45, at least 0; 0 is a hard edge */
+    float roundness;  /**< 1 is a circle regardless of the aspect ratio, 0 follows the
+                       *   rectangle of the image, default 1, clamped to 0..1 */
+    vec2 center;      /**< Center in normalized image coordinates, 0, 0 the top left, default
+                       *   0.5, 0.5 */
+    rgb color;        /**< Color of the vignette, display encoded, default 0 0 0 */
+});
+
 /** Register the box.effects module.
  *
  * @param world The world

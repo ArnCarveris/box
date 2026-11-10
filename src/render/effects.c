@@ -130,6 +130,17 @@ void box_render_grading_settings(
     out->lut_strength = glm_clamp(in->lut_strength, 0.0f, 1.0f);
 }
 
+void box_render_vignette_settings(
+    const Vignette *in,
+    Vignette *out)
+{
+    *out = *in;
+    out->intensity = glm_clamp(in->intensity, 0.0f, 1.0f);
+    out->radius = glm_max(in->radius, 0.0f);
+    out->smoothness = glm_max(in->smoothness, 0.0f);
+    out->roundness = glm_clamp(in->roundness, 0.0f, 1.0f);
+}
+
 /** Resolve the strip LUT of a color grading pass: its texture handle once the image is loaded,
  * when its width is the square of its height. Another shape logs an error once.
  *
@@ -237,6 +248,7 @@ static void box_effects_entity(
     const AutoExposure *exposure = ecs_get(world, e, AutoExposure);
     const Tonemap *tonemap = ecs_get(world, e, Tonemap);
     const ColorGrading *grading = ecs_get(world, e, ColorGrading);
+    const Vignette *vignette = ecs_get(world, e, Vignette);
     const Smaa *smaa = ecs_get(world, e, Smaa);
     if (fog) {
         box_render_fog_settings(fog, &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog);
@@ -275,6 +287,11 @@ static void box_effects_entity(
         box_render_grading_settings(grading, &g->settings);
         g->display = display;
         box_effects_grading_lut(world, state, g);
+    }
+
+    if (vignette) {
+        box_render_vignette_settings(vignette, &box_effects_append(
+            p, v, BOX_RENDER_EFFECT_VIGNETTE, e)->vignette);
     }
 
     if (smaa) {
@@ -391,6 +408,9 @@ bool box_render_effects_use(
             break;
         case BOX_RENDER_SHADER_GRADING:
             result = e->kind == BOX_RENDER_EFFECT_GRADING;
+            break;
+        case BOX_RENDER_SHADER_VIGNETTE:
+            result = e->kind == BOX_RENDER_EFFECT_VIGNETTE;
             break;
         default:
             break;

@@ -857,7 +857,19 @@
                     "color_grading_follows_surface_resize",
                     "color_grading_lut_identity_no_op",
                     "color_grading_lut_sepia_matches",
-                    "color_grading_lut_wrong_shape_ignored"
+                    "color_grading_lut_wrong_shape_ignored",
+                    "vignette_default_settings",
+                    "vignette_settings_clamped",
+                    "vignette_center_unchanged",
+                    "vignette_corners_darken_by_intensity",
+                    "vignette_zero_intensity_no_op",
+                    "vignette_zero_literal_applies_as_set",
+                    "vignette_round_on_wide_image",
+                    "vignette_center_moves_bright_spot",
+                    "vignette_color_tints_edges",
+                    "vignette_disabled_entry_no_op",
+                    "vignette_same_entity_after_tonemap",
+                    "vignette_follows_surface_resize"
                 ]
             },
             {

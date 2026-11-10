@@ -467,6 +467,17 @@
                 ]
             },
             {
+                "id": "Vignette",
+                "testcases": [
+                    "center_is_zero",
+                    "radius_starts_falloff",
+                    "corner",
+                    "hard_edge",
+                    "roundness",
+                    "color_tints"
+                ]
+            },
+            {
                 "id": "Tonemap",
                 "setup": true,
                 "testcases": [

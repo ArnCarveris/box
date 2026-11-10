@@ -1180,6 +1180,49 @@ void box_render_grading_settings(
     const ColorGrading *in,
     ColorGrading *out);
 
+/** Resolve the settings of a vignette pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_vignette_settings(
+    const Vignette *in,
+    Vignette *out);
+
+/** Get the vignette factor at a point of the image as etc/shaders/vignette.wgsl computes it:
+ * smoothstep(radius, radius + smoothness, d), a hard step when smoothness is 0, where d is the
+ * distance from the center in half diagonals with the aspect corrected by roundness.
+ *
+ * @param v The resolved settings
+ * @param aspect Width over height of the image
+ * @param u Horizontal normalized image coordinate, 0 left
+ * @param w Vertical normalized image coordinate, 0 top
+ * @return The factor, 0 inside the radius to 1 past the falloff, before the intensity
+ */
+float box_render_vignette_factor(
+    const Vignette *v,
+    float aspect,
+    float u,
+    float w);
+
+/** Apply a vignette to a linear color as etc/shaders/vignette.wgsl does:
+ * mix(c, c * color, factor * intensity) with the color decoded to linear.
+ *
+ * @param v The resolved settings
+ * @param aspect Width over height of the image
+ * @param u Horizontal normalized image coordinate, 0 left
+ * @param w Vertical normalized image coordinate, 0 top
+ * @param in The linear color
+ * @param out Receives the color
+ */
+void box_render_vignette_apply(
+    const Vignette *v,
+    float aspect,
+    float u,
+    float w,
+    const float *in,
+    float *out);
+
 /** Get the matrix of the white balance and exposure of a color grading: a chromatic adaptation
  * in LMS space as in Unity and Bevy, times the exposure; the identity times the exposure when
  * temperature and tint are 0.
