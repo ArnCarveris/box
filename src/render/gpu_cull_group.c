@@ -107,6 +107,12 @@ static bool box_gpu_cull_wants(
         goto done;
     }
 
+    if (f->flags & BOX_GPU_CULL_REFLECT) {
+        result = b->scene == scene && box_render_is_mesh(b->pipeline) && b->instance_count &&
+            !b->transmissive && (b->view == -1 || b->view == f->index);
+        goto done;
+    }
+
     if (b->scene != scene || !pipeline || !b->instance_count) {
         goto done;
     }
@@ -199,6 +205,10 @@ static uint32_t box_gpu_cull_job(
     job->history = history;
     job->mask = mask;
     job->fixture = b->fixture ? 1u : 0u;
+    if (c->exclude_page && b->instances == c->exclude_page) {
+        job->exclude = c->exclude_slot + 1u;
+    }
+
     if (b->bounded) {
         glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);
         glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), job->extent);
@@ -898,6 +908,48 @@ void box_gpu_cull_add(
 
     box_gpu_cull_groups_add(gpu, packet, v->scene, ecs_vec_first(&c->frustums),
         ecs_vec_count(&c->frustums), &base, history, hiz);
+}
+
+void box_gpu_cull_reflect_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    int32_t index,
+    int32_t slot,
+    mat4 view_proj,
+    float pixels,
+    uint32_t exclude_page,
+    uint32_t exclude_slot)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
+    box_gpu_cull_uniforms_t base;
+    box_gpu_cull_desc_t f;
+    int32_t j;
+    ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    ecs_os_memset_t(&f, 0, box_gpu_cull_desc_t);
+    f.view = v->view;
+    f.slot = slot;
+    f.cascade = -1;
+    f.index = index;
+    f.flags = BOX_GPU_CULL_REFLECT;
+    box_gpu_cull_frustum_all(&f.frustum);
+    if (v->cull.enabled) {
+        box_gpu_cull_planes(view_proj, f.frustum.planes);
+        for (j = 0; j < 4; j ++) {
+            f.frustum.clip_w[j] = view_proj[j][3];
+        }
+
+        f.frustum.size[0] = pixels;
+        f.frustum.size[1] = v->cull.min_dimension > 0 ? v->cull.min_dimension : 0.0f;
+        f.frustum.size[2] = 1.0f;
+        f.flags |= f.frustum.size[1] > 0 ? BOX_GPU_CULL_SIZE : 0;
+    }
+
+    c->exclude_page = exclude_page;
+    c->exclude_slot = exclude_slot;
+    box_gpu_cull_group_add(gpu, packet, v->scene, &f, 1, &base, NULL, NULL);
+    c->exclude_page = 0;
+    c->exclude_slot = 0;
 }
 
 void box_gpu_cull_casters_add(

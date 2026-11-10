@@ -101,6 +101,10 @@ typedef struct box_gpu_atmos_view_t {
     WGPUTexture fog;                /**< Fog in scatter color, created on first use */
     WGPUTextureView fog_view;       /**< View sampled and written */
     int64_t fog_frame;              /**< Frame of the last packet that wrote the fog color */
+    box_gpu_atmos_uniforms_t last;  /**< Uniforms of the view written last, which the planar
+                                     *   reflections copy */
+    WGPUBuffer mirrors[BOX_PLANAR_REFLECTION_MAX]; /**< Uniforms of the sky of each planar
+                                     *   reflection slot, created on first use */
 } box_gpu_atmos_view_t;
 
 /** The atmosphere state of the backend */
@@ -435,6 +439,12 @@ static void box_gpu_atmos_view_free(
     box_gpu_atmos_release(&v->aerial, &v->aerial_view);
     box_gpu_atmos_release(&v->fog, &v->fog_view);
     wgpuBufferRelease(v->uniforms);
+    for (int32_t i = 0; i < BOX_PLANAR_REFLECTION_MAX; i ++) {
+        if (v->mirrors[i]) {
+            wgpuBufferRelease(v->mirrors[i]);
+        }
+    }
+
     ecs_os_free(v);
     gpu->pending.atmosphere_views --;
 }
@@ -1181,6 +1191,7 @@ void box_gpu_atmosphere_view(
     glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     glm_mat4_inv(view_proj, u.inv_view_proj);
     wgpuQueueWriteBuffer(gpu->queue, s->uniforms, 0, &u, sizeof(u));
+    s->last = u;
 
     uint64_t size = sizeof(box_gpu_atmos_uniforms_t);
     WGPUBindGroupEntry sky[5] = {
@@ -1330,6 +1341,79 @@ static WGPURenderPipeline box_gpu_atmos_sky_pipeline(
         };
     }
 
+done:
+    return result;
+}
+
+/** Record the fullscreen sky of a view with a uniform buffer.
+ *
+ * @param gpu The backend
+ * @param pass The render pass
+ * @param format The format of the color target
+ * @param l The LUTs of the scene of the view
+ * @param s The sky view of the view
+ * @param uniforms The uniforms the sky reads
+ * @return Whether the sky was drawn
+ */
+static bool box_gpu_atmos_sky_record(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    box_gpu_atmos_luts_t *l,
+    box_gpu_atmos_view_t *s,
+    WGPUBuffer uniforms)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    WGPURenderPipeline pipeline = box_gpu_atmos_sky_pipeline(gpu, a, format);
+    bool result = pipeline != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    WGPUBindGroupEntry entries[4] = {
+        { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
+        { .binding = 1, .textureView = l->transmittance_view },
+        { .binding = 2, .sampler = a->sampler },
+        { .binding = 4, .textureView = s->sky_view }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = a->sky_layout,
+        .entryCount = 4,
+        .entries = entries
+    });
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
+    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+    wgpuBindGroupRelease(group);
+done:
+    return result;
+}
+
+bool box_gpu_atmosphere_draw_sky_mirrored(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    int32_t mirror,
+    mat4 inv_view_proj)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    box_gpu_atmos_luts_t *l = a && v->atmos.sky ? box_gpu_atmos_luts_ready(a, v) : NULL;
+    box_gpu_atmos_view_t *s = l ? box_gpu_atmos_view_find(a, t, v) : NULL;
+    bool result = false;
+    if (!s || mirror < 0 || mirror >= BOX_PLANAR_REFLECTION_MAX) {
+        goto done;
+    }
+
+    box_gpu_atmos_uniforms_t u = s->last;
+    glm_mat4_copy(inv_view_proj, u.inv_view_proj);
+    if (!s->mirrors[mirror]) {
+        s->mirrors[mirror] = box_gpu_atmos_uniform_buffer(gpu);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, s->mirrors[mirror], 0, &u, sizeof(u));
+    result = box_gpu_atmos_sky_record(gpu, pass, format, l, s, s->mirrors[mirror]);
 done:
     return result;
 }

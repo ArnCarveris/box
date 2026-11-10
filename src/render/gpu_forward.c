@@ -139,6 +139,8 @@ static void box_gpu_feature_constants(
  * point of the mesh shaders; ignored by the 2D shape shader
  * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene it draws, the overrides
  * of the mesh shaders; ignored by the 2D shape shader
+ * @param mirrored Whether the view is mirrored (a planar reflection), which turns the winding of
+ * the front faces to clockwise
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -156,7 +158,8 @@ static WGPURenderPipeline box_gpu_forward_create(
     bool texture_blend,
     bool polygon,
     bool surface,
-    uint32_t features)
+    uint32_t features,
+    bool mirrored)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     bool extended = handle == BOX_RENDER_SHADER_MESH_EXTENDED;
@@ -249,7 +252,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         },
         .primitive = {
             .topology = WGPUPrimitiveTopology_TriangleList,
-            .frontFace = WGPUFrontFace_CCW,
+            .frontFace = mirrored ? WGPUFrontFace_CW : WGPUFrontFace_CCW,
             .cullMode = back_face == BackFaceCull ? WGPUCullMode_Back : WGPUCullMode_None
         },
         .depthStencil = &depth,
@@ -395,6 +398,7 @@ typedef enum box_gpu_depth_mode_t {
  * @param depth Depth state of the pipeline
  * @param features BOX_RENDER_FEATURE_OVERRIDES features of the mesh shader overrides, 0 for the
  * 2D shape shader and the depth prepass
+ * @param mirrored Whether the front faces wind clockwise, for a planar reflection
  * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
@@ -407,13 +411,15 @@ static uint64_t box_gpu_forward_key(
     bool texture_blend,
     bool surface,
     box_gpu_depth_mode_t depth,
-    uint32_t features)
+    uint32_t features,
+    bool mirrored)
 {
     ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(shader < (1u << 17), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(features <= BOX_RENDER_FEATURE_OVERRIDES, ECS_INTERNAL_ERROR, NULL);
 
-    return ((uint64_t)shader << 47) | ((uint64_t)surface << 46) | ((uint64_t)features << 34) |
+    return ((uint64_t)shader << 47) | ((uint64_t)surface << 46) |
+        ((uint64_t)mirrored << 45) | ((uint64_t)features << 34) |
         ((uint64_t)texture_blend << 33) |
         ((uint64_t)transmissive << 32) |
         ((uint64_t)format << 8) | ((uint64_t)blend << 4) | ((uint64_t)depth << 2) |
@@ -482,6 +488,16 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b,
     bool equal)
 {
+    return box_gpu_forward_pipeline_mirrored(gpu, format, b, equal, false);
+}
+
+WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
+    box_gpu_t *gpu,
+    WGPUTextureFormat format,
+    const box_render_batch_t *b,
+    bool equal,
+    bool mirrored)
+{
     WGPURenderPipeline result = NULL;
     uint32_t features = b->features & (b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED
         ? BOX_RENDER_FEATURE_OVERRIDES : BOX_RENDER_FEATURE_LIGHTING);
@@ -512,7 +528,7 @@ WGPURenderPipeline box_gpu_forward_pipeline(
         shape2d ? b->box_shadow : cutout,
         shape2d ? b->slice : b->transmissive,
         shape2d ? b->polygon : texture_blend, surface,
-        equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER, features);
+        equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER, features, mirrored);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -521,7 +537,7 @@ WGPURenderPipeline box_gpu_forward_pipeline(
 
     result = box_gpu_forward_cache(gpu, key, box_gpu_forward_create(gpu, b->pipeline, shader,
         format, b->blend, b->back_face, cutout, b->transmissive, equal, b->box_shadow, b->slice,
-        texture_blend, b->polygon, surface, features));
+        texture_blend, b->polygon, surface, features, mirrored));
 done:
     return result;
 }
@@ -552,7 +568,8 @@ WGPURenderPipeline box_gpu_prepass_pipeline(
     texture_blend = box_gpu_texture_blends(b);
     key = box_gpu_forward_key(b->pipeline, count, Opaque, b->back_face, b->cutout,
         false, texture_blend, b->surface,
-        count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS, 0);
+        count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS, 0,
+        false);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;

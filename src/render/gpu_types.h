@@ -103,6 +103,9 @@ typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
 /** Pipelines and the uniform buffer of the debug passes of the views */
 typedef struct box_gpu_debug_t box_gpu_debug_t;
 
+/** Images of the planar reflections of the views, per target, view and plane slot */
+typedef struct box_gpu_planar_t box_gpu_planar_t;
+
 /** A capture on its way from the GPU to its PNG file */
 typedef struct box_gpu_capture_t box_gpu_capture_t;
 
@@ -345,6 +348,10 @@ typedef struct box_gpu_cull_history_t {
 /** Flag of a frustum that draws nothing, a camera without a depth range */
 #define BOX_GPU_CULL_EMPTY (1u << 4)
 
+/** Flag of a frustum of a planar reflection: the 3D meshes of the scene and of its view that
+ * are not transmissive, without occlusion */
+#define BOX_GPU_CULL_REFLECT (1u << 5)
+
 /** Bytes between the uniforms of two dispatches, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CULL_STRIDE (256)
 
@@ -453,7 +460,10 @@ typedef struct box_gpu_cull_job_t {
     uint32_t mask;                  /**< Frustums of its group that draw a parallel job */
     uint32_t fixture;               /**< 1 for a batch of LightFixture shapes: a frustum with a
                                      *   light inside the world box of an instance skips it */
-    uint32_t pad[2];                /**< Pads the job to the size of Job in cull.wgsl */
+    uint32_t exclude;               /**< Page slot plus one of the instance no frustum of the
+                                     *   group draws, the shape of a planar reflection, 0 for
+                                     *   none */
+    uint32_t pad;                   /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
 /** A frustum of a cull group in the uniforms, as in Frustum of cull.wgsl */
@@ -622,6 +632,9 @@ typedef struct box_gpu_cull_t {
                                      *   added in the order of their draws */
     ecs_vec_t frustums;             /**< Frustums of the view being added */
     int32_t copies;                 /**< Copies of cascade 0 added to each view, for tests */
+    uint32_t exclude_page;          /**< Instance page of the instance the jobs of the group
+                                     *   being added leave out, 0 for none */
+    uint32_t exclude_slot;          /**< Its slot in the page */
     int64_t counting;               /**< History ranges passes, marks the pages counted */
     WGPUQuerySet stamps;            /**< Begin and end of the cull passes of a target, NULL
                                      *   without timestamp queries */
@@ -958,6 +971,7 @@ typedef struct box_gpu_t {
     box_gpu_particles_t *particles; /**< Particle passes */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
     box_gpu_debug_t *debug;         /**< Debug passes of the views */
+    box_gpu_planar_t *planar;       /**< Planar reflections of the views */
     struct box_gpu_env_process_t *environment_process; /**< Processing of the environments,
                                                         *   created on first use */
     struct box_gpu_env_background_t *environment_background; /**< Background draw of the

@@ -203,6 +203,32 @@ bool box_render_gpu_read_reflection(
     float *out,
     int32_t count);
 
+/** Copy the image of a planar reflection of a view into memory, waiting for the copy, for
+ * tests. Texel (x, y), y down, lines up with the screen of the view.
+ *
+ * Only call this when the main thread renders, after box_render_sync, as
+ * box_render_gpu_read_buffer. A view rendered by several targets has one image per target;
+ * the first one found is read.
+ *
+ * @param world The world
+ * @param view The view entity
+ * @param slot Slot of the plane in the view, 0 for the nearest
+ * @param width Receives the width of the image, NULL for none
+ * @param height Receives the height of the image, NULL for none
+ * @param out Receives width times height linear RGBA texels, four floats each, NULL to only
+ * check the image exists and get its size
+ * @param count Floats out holds
+ * @return Whether the image exists and, with out, its texels were copied
+ */
+bool box_render_gpu_read_planar(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    int32_t slot,
+    int32_t *width,
+    int32_t *height,
+    float *out,
+    int32_t count);
+
 /** Copy the L2 SH irradiance of a reflection probe cubemap slot into memory, waiting for the
  * copy.
  *

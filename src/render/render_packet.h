@@ -542,6 +542,26 @@ typedef struct box_render_fog_volume_t {
     float pad[2];           /**< Pads the record to the 16 byte stride of its WGSL array */
 } box_render_fog_volume_t;
 
+/** A PlanarReflection a view renders a mirrored image of, resolved by the extract
+ * (planar_reflections.c). The planes and matrices are in world space. */
+typedef struct box_render_planar_t {
+    ecs_entity_t entity;    /**< Entity with the PlanarReflection */
+    int32_t slot;           /**< Slot of the reflection in its view, 0 for the plane nearest to
+                             *   the camera, below BOX_PLANAR_REFLECTION_MAX */
+    float plane[4];         /**< Unit normal, the local +Y of the entity, and minus its dot with
+                             *   the position: positive on the front side */
+    float clip[4];          /**< The plane moved by PlanarReflection.clip_offset against its
+                             *   normal, which keeps what is on its positive side */
+    mat4 reflection;        /**< Mirrors a point about the plane */
+    mat4 view_matrix;       /**< View matrix of the mirrored camera: the view matrix of the view
+                             *   times the reflection */
+    float camera[3];        /**< World position of the mirrored camera */
+    float resolution;       /**< PlanarReflection.resolution, 0.125 to 1 */
+    uint32_t exclude_page;  /**< Handle of the transform stream of the instance page of the shape
+                             *   of the entity, which the reflection does not draw, 0 for none */
+    uint32_t exclude_slot;  /**< Slot of that shape in the page */
+} box_render_planar_t;
+
 /** Noise scales over which the noise of a fog volume repeats: the coarse sample repeats every
  * scale and the detail sample, at 3.1 times it, every 10 */
 #define BOX_RENDER_FOG_NOISE_PERIOD (10.0)
@@ -647,6 +667,10 @@ typedef struct box_render_view_t {
                                  *   prepass */
     uint32_t scene_features;    /**< BOX_RENDER_FEATURE_* features of its scene, which key the
                                  *   pipelines of its batches */
+    int32_t planar_first;       /**< Index of the first planar reflection of the view in the
+                                 *   packet */
+    int32_t planar_count;       /**< Planar reflections the view renders, nearest first, at most
+                                 *   BOX_PLANAR_REFLECTION_MAX */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -1396,6 +1420,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t shadow_atlases; /**< box_render_shadow_atlas_t, the atlases with tiles */
     ecs_vec_t shadow_tiles; /**< box_render_shadow_tile_t of those atlases */
     ecs_vec_t fog_volumes;  /**< box_render_fog_volume_t, the fog volumes of the views */
+    ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
+                             *   views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
                              *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */

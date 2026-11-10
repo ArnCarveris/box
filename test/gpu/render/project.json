@@ -1245,6 +1245,17 @@
                     "overdraw_cutout",
                     "overdraw_cutout_discard"
                 ]
+            },
+            {
+                "id": "PlanarReflection",
+                "testcases": [
+                    "box_mirrored",
+                    "below_plane_hidden",
+                    "own_shape_hidden",
+                    "camera_behind_plane",
+                    "one_sided_winding",
+                    "remove_frees_texture"
+                ]
             }
         ]
     }

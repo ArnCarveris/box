@@ -313,6 +313,85 @@ bool box_render_view_sees(
     const float *center,
     float radius);
 
+/** A reflection plane a view may render, for box_render_planar_select */
+typedef struct box_render_planar_plane_t {
+    float plane[4];         /**< Unit normal and minus its dot with a point of the plane,
+                             *   positive on the front side */
+} box_render_planar_plane_t;
+
+/** Write the matrix that mirrors points about a plane.
+ *
+ * It maps p to p - 2 (n . p + d) n for the unit normal n and the offset d, so its determinant
+ * is -1 and it is its own inverse.
+ *
+ * @param plane Unit normal and minus its dot with a point of the plane
+ * @param out Receives the matrix
+ */
+void box_render_planar_matrix(
+    const float *plane,
+    mat4 out);
+
+/** Make the near plane of a reversed Z perspective projection the clip plane of a reflection
+ * (Lengyel, "Oblique View Frustum Depth Projection and Clipping").
+ *
+ * Its z row becomes w - a * plane: a point on the plane gets depth 1, a point on its negative
+ * side a depth above 1, which is clipped. The x, y and w rows do not change, so the image keeps
+ * the screen of the projection.
+ *
+ * The far plane passes through the corner of the frustum farthest along the plane, so depth
+ * stays at or above 0 within the frustum, for a finite and an infinite far plane alike.
+ *
+ * @param proj The projection, as box_camera_projection makes it
+ * @param plane The clip plane in view space, keeping its positive side
+ * @param out Receives the projection, which may be proj
+ * @return Whether the plane crosses the frustum; when not, out is proj
+ */
+bool box_render_planar_oblique(
+    mat4 proj,
+    const float *plane,
+    mat4 out);
+
+/** Pick the planes a view renders reflections of: those that cross its frustum and have its
+ * camera on their front side, at most BOX_PLANAR_REFLECTION_MAX, nearest to the camera first,
+ * then by index.
+ *
+ * The frustum is the one box_render_view_sees tests, a camera that follows the aspect of its
+ * surface taken at an aspect of 4; the planes are unbounded.
+ *
+ * @param v The view, with a perspective camera
+ * @param planes The planes
+ * @param count Planes
+ * @param out Receives the indices of the planes picked, BOX_PLANAR_REFLECTION_MAX of room
+ * @return Planes picked
+ */
+int32_t box_render_planar_select(
+    const box_render_view_t *v,
+    const box_render_planar_plane_t *planes,
+    int32_t count,
+    int32_t *out);
+
+/** Register the system that gives every lit perspective view the PlanarReflections of the
+ * scene of its camera it renders (box_render_planar_select), after the light extract.
+ *
+ * @param world The world
+ */
+void box_render_planar_init(
+    ecs_world_t *world);
+
+/** Get the instance of the shape of an entity in the instance pages.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param page Receives the handle of the transform stream of its page
+ * @param slot Receives its slot in the page
+ * @return Whether the entity is drawn in a batch
+ */
+bool box_render_draws_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t *page,
+    uint32_t *slot);
+
 /** Register the system that sends the lights of every scene and the lights of every view.
  *
  * Lights are collected per scene into a light buffer that is uploaded when it changed; every

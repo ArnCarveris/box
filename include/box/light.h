@@ -269,6 +269,49 @@ ECS_STRUCT(ReflectionProbe, {
     vec3 offset;          /**< Capture point relative to the entity, default {0, 0, 0} */
 });
 
+/** Reflection planes a view renders a mirrored image of at most: the PlanarReflections of its
+ * scene nearest to its camera among those it sees from their front side */
+#define BOX_PLANAR_REFLECTION_MAX (2)
+
+/** An exact mirror image of the scene, set on the entity of the mirroring shape: a Box, a plane,
+ * the water surface. The plane passes through the world position of the entity and faces its
+ * local +Y in world space; scale is ignored.
+ *
+ * Each lit view with a perspective camera renders the scene mirrored about the plane into an
+ * HDR image before its forward pass, aligned with its screen and lit like it, when the plane
+ * crosses its frustum and has the camera on its front side.
+ *
+ * Only the BOX_PLANAR_REFLECTION_MAX nearest such planes of a view render; a plane is unbounded
+ * for these tests. Probe, reflection and bake captures and orthographic views render none.
+ *
+ * @par Limits:
+ * - It draws the opaque, alpha tested and blended meshes, the sky and the particles, not the
+ *   shape of the entity itself, transmissive shapes (no reflections of reflections), fog
+ *   volumes, 2D shapes, text, debug drawing or the effects of the view.
+ * - Shadows and point and spot lights come from the shadow maps and light clusters of the view,
+ *   so what the view itself does not see may miss them; it has no ambient occlusion and no
+ *   aerial perspective.
+ * - It culls with the mirrored frustum but not by occlusion; particles face the mirrored camera
+ *   and are not soft; blended meshes keep the back to front order of the view.
+ *
+ * @par A wall mirror facing +Z, its local +Y turned toward +Z by a pitch of 90 degrees:
+ * @code
+ * mirror {
+ *   Position: {0, 1.5, -4}
+ *   Rotation: {1.5708, 0, 0}
+ *   Box: {2, 0.05, 3}
+ *   PlanarReflection: {}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(PlanarReflection, {
+    float resolution;     /**< Size of the reflection image relative to the view, default 0.5,
+                           *   clamped to 0.125..1 */
+    float clip_offset;    /**< World units the clip plane is moved along the normal, default
+                           *   0.02: positive keeps geometry slightly below the plane (shore
+                           *   lines, objects that touch the surface), negative removes it */
+});
+
 /** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
  * position and rotation of the entity. Probe and reflection captures and bakes do not see it.
  *
