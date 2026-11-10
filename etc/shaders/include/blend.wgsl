@@ -30,9 +30,8 @@ const BLEND_HEIGHT: u32 = 4u;
 // step of an 8 bit channel, so the fragments past a border sample the maps of one layer only.
 const BLEND_HEIGHT_DROP: f32 = 1.0 / 256.0;
 
-// Weights of the layers of a TextureBlend from its mask: red, green, blue and alpha, or 1 - r and
-// r for a single channel mask, without the layers past the slice count, normalized by their sum;
-// layer 0 alone where the sum is 0 and without a mask.
+// Normalized layer weights from the mask (rgba, or 1 - r and r for a single channel mask); layer 0
+// alone where the sum is 0 or without a mask.
 fn blend_weights(mask: vec4f, u: BlendUniforms) -> vec4f {
     var w = mask;
     if ((u.flags & BLEND_SINGLE) != 0u) {
@@ -44,14 +43,9 @@ fn blend_weights(mask: vec4f, u: BlendUniforms) -> vec4f {
     return select(w / max(sum, 1e-6), vec4f(1.0, 0.0, 0.0, 0.0), alone);
 }
 
-// Weights of the layers of a TextureBlend shaped by their heights: each layer with a weight w
-// takes its height h (0.5 without a height image) at its coordinates, uv times its
-// TextureTransform with the gradients gx and gy scaled by it, and its weight is multiplied by
-// exp(contrast * (h + w - m)), m the largest h + w, then normalized. Near a border the higher
-// layer wins, with a transition about 1 / contrast wide; a layer the mask weighs alone keeps its
-// weight of 1. Only the layers with a weight sample their height, and a layer whose shaped
-// weight is under BLEND_HEIGHT_DROP of the sum is dropped, so it samples no maps. With a
-// contrast of 0 it returns w and samples nothing.
+// Height shaped weights: each weight w is multiplied by exp(contrast * (h + w - m)), m the largest
+// h + w, then normalized. Near a border the higher layer wins, with a transition about
+// 1 / contrast wide. Layers under BLEND_HEIGHT_DROP of the sum are dropped.
 fn blend_height_weights(heights: texture_2d_array<f32>, smp: sampler, u: BlendUniforms,
     w: vec4f, uv: vec2f, gx: vec2f, gy: vec2f) -> vec4f {
     if (!(u.contrast > 0.0)) {
@@ -85,10 +79,7 @@ fn blend_height_weights(heights: texture_2d_array<f32>, smp: sampler, u: BlendUn
     return o / (o.x + o.y + o.z + o.w);
 }
 
-// Weighted albedo alpha of the layers at the texture coordinates uv of the shape, whose screen
-// gradients are gx and gy: the mask at uv, shaped by the heights with a contrast, and each layer
-// with a weight once, at uv times its TextureTransform with the gradients scaled by it.
-// Explicit gradients, so it holds in any control flow.
+// Weighted albedo alpha of the layers at uv. Explicit gradients, so it holds in any control flow.
 fn blend_alpha_at(albedo: texture_2d_array<f32>, mask: texture_2d<f32>,
     heights: texture_2d_array<f32>, smp: sampler, u: BlendUniforms, uv: vec2f, gx: vec2f,
     gy: vec2f) -> f32 {
@@ -106,12 +97,9 @@ fn blend_alpha_at(albedo: texture_2d_array<f32>, mask: texture_2d<f32>,
     return alpha;
 }
 
-// Blended albedo alpha of an alpha tested fragment of a TextureBlend, as mapping_alpha makes the
-// alpha of one albedo layer: at the interpolated UV, or for a MappingObject or MappingWorld
-// material (mapped not 0) projected with mapping_uv, uv its offset; with a blend (mapped above 1)
-// the alpha of each projection with a weight, with the gradients of that projection, so a
-// fragment whose normal is along an axis blends once. mapped is flat, the same for every
-// fragment of a primitive and so of a quad, so the derivatives of either branch hold.
+// Blended albedo alpha of an alpha tested fragment, as mapping_alpha does for one layer. mapped is
+// flat, the same for every fragment of a primitive and so of a quad, so the derivatives of either
+// branch hold.
 @diagnostic(off, derivative_uniformity)
 fn blend_alpha(albedo: texture_2d_array<f32>, mask: texture_2d<f32>,
     heights: texture_2d_array<f32>, smp: sampler, u: BlendUniforms, uv: vec2f, mapped: f32,

@@ -1,18 +1,4 @@
 // Cascaded shadow map of the first directional light of the scene, read by the forward pass.
-//
-// A position is looked up in the first (tightest) cascade whose light space box contains it,
-// the box shrunk by shadow_edge.x: the reach of the filter and the largest normal offset, so
-// taps never read texels of another cascade or outside the map. Within shadow_edge.y half
-// extents of the edge of that box the lookup blends into the next cascade with a smoothstep;
-// the last cascade does not blend, it fades out from shadow_params.x to shadow_params.y.
-// Positions beyond the shadows or outside every cascade are lit.
-//
-// The lookup moves along the geometric normal by the normal offset of its cascade times
-// 1 - N.L (none facing the light, all of it at grazing light), adds the depth bias and filters
-// with a tent of filter_size texels (shadow_config.y, odd): 1 is one bilinear comparison (the
-// hardware 2x2 PCF), 3 four, 5 nine and 7 sixteen, the optimized PCF of The Witness as in
-// Esoterica and MJP's Shadows sample. Depth is reversed: 1 is nearest the light, so a fragment
-// is lit when its depth is at least the stored one.
 #pragma once
 
 @group(0) @binding(3) var shadow_map: texture_depth_2d_array;

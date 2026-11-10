@@ -2,47 +2,6 @@
 // shadows, against the frustum of each, its smallest projected size and, for a view, the depth
 // pyramid of the geometry it drew first, and writes the slots of the instances to draw,
 // compacted per draw, with the instance count of its indexed indirect draw arguments.
-//
-// A cull group is up to 32 frustums, one bit each of a u32 (frustums, binding 7): its planes in
-// world space, its smallest projected size, the index of its counters and its flags. A job is
-// the slot range of one batch in its instance page, whose transform stream group 1 binds, and
-// mask, the frustums of the group that draw it: every batch owns a run of slots of a page shared
-// by many batches, so a job's first is its page slot. Its bounds are the box around the mesh,
-// or around the parametric surfaces of its batch, moved into world space by the model matrix
-// (local bounds times the instance scale and the world transform).
-//
-// A view that culls by occlusion runs two phases. The early phase draws the instances in the
-// frustum that its history (group 2, one word per instance slot, 0 when the instance was
-// drawn the previous frame) marks as drawn. The pyramid is reduced from the depth of that
-// draw (hiz_first, hiz_reduce): with reversed Z a texel keeps the smallest, farthest depth of
-// its footprint. The late phase tests every instance against the frustum and the pyramid,
-// draws the visible ones the early phase did not draw and writes the history, so an instance
-// that comes into view is drawn the same frame. The early phase of a group tests its cascades
-// too, which have one phase that draws everything in the frustum; the late phase is a pass over
-// the view alone. Groups without occlusion run one phase.
-//
-// cull_instances tests one instance per invocation: it loads the transform once, moves the box
-// into world space once and tests it against the frustum of each bit of its job's mask, giving
-// the mask of the frustums it is drawn in. The workgroup turns those into a 64 bit mask per
-// frustum (two u32 atomics) with its count in the scan words of the (job, frustum) entry, and
-// counts the frustum culled instances per frustum. A dispatch covers a run of the jobs of a
-// table that share an instance page and a history: its part of the workgroup list (scan.z,
-// scan.w workgroups) gives each workgroup its job, the first scan word and table entry of the
-// job and its workgroup in the job. A job of one workgroup writes its drawn slots and instance
-// counts itself.
-// One cull_scan dispatch per group, phase and page turns the counts of the workgroups of each of
-// the (job, frustum) entries of its jobs of more workgroups into exclusive offsets, in workgroup
-// order, and writes their instance counts (a workgroup per entry, from a table of job, first scan
-// word, workgroups, draw arguments, first visible entry and counters); one cull_write dispatch
-// over the workgroup list puts every drawn slot of those jobs, in each of their frustums, at the
-// offset of its workgroup plus the drawn slots before it in the mask. The visible slots of each
-// frustum keep slot order, so exact depth ties resolve the same way every frame (a prefix sum
-// stream compaction, GPU Gems 3 chapter 39, in passes because WebGPU gives no forward progress
-// guarantee for a single pass scan). cull_ordered tests one job per workgroup against one
-// frustum (jobs.w), 64 of its slots at a time in their order, for the blended draws of a view
-// that are sorted back to front: their jobs list the slots (list is 1, first indexes
-// slot_lists), so a run of one batch in the sorted order is one draw. All of them add the drawn
-// and the frustum culled instances to the counters of each frustum.
 
 #include "include/instance.wgsl"
 

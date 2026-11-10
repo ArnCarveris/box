@@ -2,18 +2,6 @@
 // sphere at every probe of the irradiance volume the view samples, lit by its own SH, a mirror
 // sphere at the capture point of every reflection probe its clusters list, and the influence and
 // projection boxes of those probes as lines.
-//
-// It binds the groups of the forward pass that it reads: group 0 the view as mesh.wgsl declares
-// it, group 3 the volume (probes.wgsl), and group 1 the uniform of the draw.
-//
-// A sphere is a camera facing quad, 6 vertices from vertex_index and one instance per probe,
-// scaled so that it covers the outline of the sphere in perspective. The fragment stage
-// intersects the ray of its pixel with the sphere, discards a miss and writes the depth of the
-// hit, so the depth of the view (compare Greater, no writes) hides it behind geometry. The boxes
-// are one pixel lines, 24 vertices from vertex_index per box, two instances per probe: its
-// influence box and its projection box.
-//
-// The colors are linear and not tone mapped, the spheres opaque.
 #include "include/lights.wgsl"
 #include "include/probes.wgsl"
 
@@ -60,7 +48,6 @@ struct SphereOut {
     @location(0) world: vec3f,
     // Center and radius of the sphere
     @location(1) @interpolate(flat) sphere: vec4f,
-    // Index of the probe
     @location(2) @interpolate(flat) index: u32,
 };
 

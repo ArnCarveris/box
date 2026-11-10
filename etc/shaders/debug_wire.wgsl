@@ -1,22 +1,6 @@
 // Wireframe of the debug pass of a view (ViewDebug.wireframe): the triangles of the mesh draws of
 // the view, drawn with the indirect arguments and visible slots its cull pass wrote, as its
 // depth prepass draws them (group 2 is the instance group without the shading stream).
-//
-// It needs no line polygon mode: the draw binds a shared index buffer of the sequence 0, 1, 2,
-// ..., so vertex_index is the position in the index list of the mesh. The vertex stage loads the
-// index from wire_indices and the vertex from wire_vertices (box_vertex_t, eight floats) and
-// places it with place() of place.wgsl, as mesh.wgsl does, so a parametric surface lies where it
-// is shaded. The corner of a vertex in its triangle, vertex_index % 3, gives its barycentric
-// coordinates; the fragment stage turns the distance to the nearest edge into pixels with
-// fwidth and covers the pixels within the width of the line, anti aliased over one pixel.
-//
-// wire_adjacency holds, for each triangle and each of its edges (the edge opposite corner k is
-// where bary[k] is 0), the vertex of the neighbor triangle across the edge that is not on it, or
-// WIRE_NONE on a border, from edges matched by position on the CPU. The vertex stage places the
-// three corners of its triangle and the opposite vertex of each neighbor, and marks an edge one
-// sided when it has no neighbor or the neighbor faces the other way (a silhouette).
-//
-// The output is premultiplied and linear, the color of the uniform is decoded on the CPU.
 #include "include/lights.wgsl"
 #include "include/place.wgsl"
 
@@ -52,7 +36,6 @@ struct WireOut {
     @location(1) @interpolate(flat) single: vec3u,
 };
 
-// Place a vertex of the mesh for an instance slot.
 fn wire_place(index: u32, slot: u32) -> Placed {
     let base = index * WIRE_VERTEX_FLOATS;
     var v: VertexIn;

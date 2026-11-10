@@ -532,8 +532,7 @@ fn surface_normal(region: i32, u: f32, v: f32) -> vec3f {
         region == 7;
     // Central differences at v, and again at a v inside (0, 1) when they meet in a point. The
     // samples share one call of surface_position in a loop: D3D compilers inline every call, and
-    // eight inlined copies made the mesh pipelines take tens of seconds to compile, long enough
-    // for the GPU watchdog of the browser to kill the device.
+    // unrolled copies make the mesh pipelines compile slowly enough to trip the GPU watchdog.
     var delta = 0.0001;
     var at = v;
     var du = sv(0.0, 0.0, 0.0);

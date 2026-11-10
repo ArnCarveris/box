@@ -1,29 +1,5 @@
 // Shadow pass: draws the shadow casters of a view into one cascade of its shadow map, depth
-// only. The cull pass writes the slots of the casters inside the cascade, which step per
-// instance. Every caster draws with vs, which reads the instance page with the shading stream
-// and the material table (group 1) and passes the alpha of the instance and the UV transform and
-// the cutoff of its material on, so a compiler that compiles the vertex stage for the inputs of
-// the fragment stage compiles it once. Plain casters draw with fs, which takes those inputs and
-// writes nothing. Alpha tested casters (AlphaCutoff) draw with fs_cutout, which discards where the
-// alpha times the albedo alpha of the batch (group 2) is below the cutoff, as the forward pass
-// does. A MappingObject or MappingWorld
-// material projects the UV in the fragment stage, as mesh.wgsl does (mapping_uv), and with a
-// blend above 0 blends the alpha of its three axis projections (mapping_alpha). Alpha tested
-// casters with a TextureBlend draw with fs_cutout_blend and fs_point_cutout_blend, which bind the
-// blend group of their batch in group 2 instead and discard where the alpha times the weighted
-// alpha of the layer albedos is below the cutoff (blend_alpha), so they cast the shadow they
-// show.
-//
-// Spot light tiles of the shadow atlas draw with vs too. A point light tile is drawn once per
-// octant of its octahedron with vs_point, the octant in the uniforms (Praun and Hoppe, as Esoterica's octahedral shadows): each octant is a perspective
-// along the axis signs / sqrt(3) with fixed signs, and a triangle is kept to its octant by 3
-// half spaces. With BOX_SHADOW_CLIP_DISTANCES (the device has clip distances) they are clip
-// distances, and the plain casters draw with fs; without, fs_point and fs_point_cutout discard
-// where one is negative.
-//
-// An atlas pass that keeps the tiles that did not change loads the atlas and clears each tile it
-// renders with vs_clear: a triangle over the viewport of the tile at depth 0, the reversed Z
-// clear value, drawn with depth compare always and no bind groups.
+// only.
 #ifdef BOX_SHADOW_CLIP_DISTANCES
 enable clip_distances;
 #endif
@@ -101,9 +77,8 @@ struct PointOut {
 #endif
 };
 
-// World position of a vertex of a caster; sets surface_data to the surface of its instance. A
-// plain mesh page binds one zero record as its surface stream, so the record is loaded only for a
-// slot inside the buffer and surface_data stays zero otherwise, the plain mesh path.
+// World position of a vertex of a caster; sets surface_data. A plain mesh page binds one zero
+// record as its surface stream, so a slot past it leaves surface_data zero (the plain mesh path).
 fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
     if (slot < arrayLength(&surfaces)) {
         surface_data = surfaces[slot];
@@ -162,11 +137,8 @@ fn octant_distances(world: vec3f) -> vec3f {
     return vec4f(corner * 2.0 - 1.0, 0.0, 1.0);
 }
 
-// The alpha test attributes of a vertex: the UV as vs of mesh.wgsl transforms it (the side
-// region of a kind 7 surface, whose UVs start two tiles over, moves back, and a MappingObject
-// material on a Sweep takes lengths over its size), or the projection of
-// a MappingObject or MappingWorld material on a plain mesh, the alpha of the instance and the
-// cutoff of its material. Reads surface_data, so the position comes first.
+// The alpha test attributes of a vertex, with the UV transformed as vs of mesh.wgsl does. Reads
+// surface_data, so the position comes first.
 fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);

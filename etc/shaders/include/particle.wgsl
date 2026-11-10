@@ -30,7 +30,6 @@ struct Motion {
 
 // box_render_particle_block_t: ranges are (min, max) pairs, a max not above min hands out min.
 struct Emitter {
-    // World transform of the emitter
     model: mat4x4f,
     // xyz: unit direction in emitter space or zero, w: cosine of the spread
     direction: vec4f,

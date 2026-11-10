@@ -112,7 +112,6 @@ fn mapping_rotation(c0: vec3f, c1: vec3f, c2: vec3f) -> vec4f {
     return normalize(q);
 }
 
-// A vector turned by a unit quaternion.
 fn mapping_rotate(q: vec4f, v: vec3f) -> vec3f {
     let t = 2.0 * cross(q.xyz, v);
     return v + q.w * t + cross(q.xyz, t);
@@ -125,14 +124,11 @@ fn mapping_offset(m: Material) -> vec2f {
 }
 
 // Texture coordinates of a Sweep vertex as lengths in the units of its path, for a MappingObject
-// material: on the walls the fractions of the length around the profile and along the path that
-// the mesh stores in uv times those lengths (p[9].x around the outer ring, p[9].y around the
-// holes, whose u starts at 2, and p[9].z along the path), on the caps the profile x and y in uv
-// times the scale p[2].xy. The region is the z of a grid vertex (0 and 1 the walls, 8 and 9 the
-// caps), or on a baked render mesh (p[19]) the material region surface_assets holds per vertex
-// (0 and 1 the walls, 3 the caps). Reads the surface_data of surface.wgsl and the surface_assets
-// of the shader; box_surface_build_lengths and box_surface_profile_length of
-// src/geometry/surface_math.c compute the lengths.
+// material: on the walls the uv fractions times the lengths in p[9] (x outer ring, y holes, whose
+// u starts at 2, z along the path), on the caps uv times p[2].xy. The region is the z of a grid
+// vertex (0 and 1 the walls, 8 and 9 the caps), or on a baked render mesh (p[19]) the per vertex
+// region in surface_assets (0 and 1 the walls, 3 the caps). See box_surface_build_lengths of
+// src/geometry/surface_math.c.
 fn surface_sweep_lengths(uv: vec2f, position: vec3f, vertex: u32) -> vec2f {
     let p = surface_data.p;
     var region = i32(position.z);
@@ -209,11 +205,8 @@ fn mapping_bitangent(axis: u32) -> vec3f {
     return select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), axis == 1u);
 }
 
-// Albedo alpha of an alpha tested fragment from albedo (its albedo layer), at the interpolated
-// UV, or for a MappingObject or MappingWorld material (mapped not 0) projected with mapping_uv,
-// uv its offset. With a blend (mapped above 1) it blends the alpha of each projection with a
-// weight, sampled with the gradients of its projection from the screen derivatives of object,
-// once for a fragment whose normal is along an axis. mapped is flat, the same for every
+// Albedo alpha of an alpha tested fragment. mapped is 0 for mesh UVs, nonzero for a projected
+// mapping (uv its offset), above 1 for a triplanar blend. mapped is flat, the same for every
 // fragment of a primitive and so of a quad, so the derivatives of either branch hold.
 @diagnostic(off, derivative_uniformity)
 fn mapping_alpha(albedo: texture_2d<f32>, smp: sampler, uv: vec2f, mapped: f32, object: vec4f,

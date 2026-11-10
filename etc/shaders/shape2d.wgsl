@@ -1,99 +1,6 @@
 // 2D shapes: instanced unit quads shaded with the analytic signed distance of a rounded
 // rectangle (Rect, Circle) or a line segment, anti-aliased over the screen footprint of each
-// fragment so edges stay crisp at any scale, distance and angle. The vertex stage grows the
-// quad by a pixel so the fringe outside the edge is drawn too. A side thinner than a pixel is
-// widened to one and faded by as much, so thin lines keep an even brightness instead of
-// breaking into dashes. Unlit: the base color times the albedo layer plus the emission, with
-// the border mixed over it.
-//
-// Instance words of a rectangle: shape.x is the corner radius and shape.y the border width, in
-// units of half its smaller side, shape.zw the linear border color as four half floats, and
-// emissive.w its width over its height. A line: shape.xy is the start, shape.zw the end and
-// emissive.w the negated width; its quad is scaled to bounds centered on the origin that hold
-// both ends, twice the largest coordinate plus the width on each axis. A glyph of a Text has an
-// emissive.w of 0: its quad is the glyph area, uv the area of the atlas page and shape.xy the
-// distance range of the page; its coverage comes from the multi channel signed distance field
-// of the page (distance_map, a linear layer), so the edge stays sharp at any scale. shape.z of a
-// glyph (f32 bits) is the part of the field its threshold falls by, 0 for a regular glyph, so a
-// bold glyph grows its outline; an italic glyph leans through the shear of its transform.
-// Instances are read by the slot the cull pass wrote, from the transform and shading streams of
-// the instance page of the batch (group 2).
-//
-// The shadow of a Rect or Circle with a BoxShadow is a rectangle instance with a negative border
-// width: shape.y is the negated standard deviation of its edge and shape.x the corner radius of
-// the shadow box, the quad minus a margin of 3 standard deviations on each side, both in units of
-// half the smaller side of the quad. Its coverage is the Gaussian falloff of the distance to the
-// shadow box (an erf of the distance, the approximation of a blurred rounded box with one sample),
-// softened by the footprint of the pixel so a shadow without blur keeps an anti-aliased edge.
-//
-// As in CSS a shadow is not drawn under its element, so it does not show through a translucent
-// one. uv.xy is the center of the rounded box of the element relative to the shadow, uv.zw its half
-// extents, shape.z its corner radius (f32 bits), all in the units of the shadow, and shape.w (f32
-// bits) the alpha the element covers what is under it with at its edge, 0 when its blend mode does
-// not cover (Additive and the like). Where the element covers a part c of the pixel with an alpha
-// a, the shadow is weighted by (1 - c) / (1 - a c): the element drawn over it then leaves the
-// shadow exactly on the part of the pixel outside the element, so no light or dark seam shows
-// along its edge, and an opaque element looks as without the cutout. The distance to the element
-// is taken in uniform control flow, a rounded box per fragment of every instance, for the
-// derivatives that anti-alias it the same way the element is. Wide, faint shadows band on 8-bit
-// sRGB targets, so the alpha of a shadow is dithered by about a step of the target with
-// interleaved gradient noise of the pixel position, stable from frame to frame (shadow_dither).
-// The shadows are drawn by pipelines of their own with the fs_shadow entry point (a batch of
-// box_shadow instances), so fs takes none of these steps and a shadow pays for no texture
-// samples.
-//
-// A Rect with an ImageSlice is drawn by pipelines of their own with the fs_slice entry point:
-// uv.x of its shading is the index of its slice record (box_render_slice_t), which takes two
-// consecutive records of the clip buffer, so it needs no binding of its own. The record cuts the
-// element into nine parts at fractions of its size and holds the texture coordinates at those
-// edges: a fragment maps its position on the element through its column and row to the texture,
-// a corner scaled, an edge or the center stretched or repeated at its period. The texture is
-// sampled with the gradients of the mapping of its part, so a seam between parts or tiles does not
-// pick a coarse mip. Everything else is fs: the border, the corner radius, the tint and the clip.
-// A plain Image pays nothing for it.
-//
-// A Polygon2D is drawn by pipelines of their own (a batch with polygon set): the polygon constant
-// turns the vertex stage to it and fs_polygon shades it. emissive.w of its shading is the index of
-// its polygon record in the clip buffer (box_render_polygon_t), which needs no binding of its own:
-// a header with the center and half extents of the bounds of its outline, its edge count and half
-// the width of a stroke (0 for a filled polygon), then its edges in chunks of 5 records: the bounds
-// of the edges of the chunk and 14 edges, each the start and the end of a segment in the local
-// units of the polygon. The vertex stage places the quad on
-// the bounds (the instance scale is that of a line, bounds centered on the origin), so local is
-// the position in the local units of the polygon. The fragment takes the signed distance to the
-// nearest edge, negative where a ray crosses the edges an odd number of times (the even-odd rule,
-// so holes need no winding of their own), or the distance to the polyline minus half the width
-// of a stroke, and anti-aliases it over the footprint of the pixel along its gradient, which
-// comes from the nearest edge; a stroke thinner than a pixel is widened to one and faded, as a
-// line is. shape.y is the border width in local units and shape.zw its color, as for a rectangle.
-// The cost per fragment is linear in the edges a fragment cannot skip, a few operations each: a
-// chunk whose bounds lie farther than the nearest edge found and that the ray of the even-odd
-// rule does not cross costs one test, so a pixel pays for the chunks near it and those its ray
-// crosses, and a stroke only for those near it.
-//
-// The shadow of a polygon (fs_shadow_polygon) is a shadow quad of the plain vertex stage: the
-// bounds of the outline moved by the offset and grown by the spread and 3 standard deviations.
-// shape.x (f32) is the index of the polygon record, shape.y the negated standard deviation in
-// units of half the smaller side of the quad, shape.z (f32 bits) the spread and shape.w the alpha
-// the polygon covers it with; uv.xy the center of the bounds of the polygon relative to the
-// shadow and uv.z half the smaller side of the quad in local units of the polygon. Its coverage is
-// the Gaussian falloff of the distance to the outline moved by the offset, minus the spread, cut
-// out by the coverage of the polygon itself as the shadow of a rectangle is.
-//
-// ids.x of the shading is the clip index of the instance, 0 when no ClipChildren ancestor clips
-// it. A clip maps the world position of a fragment into the local plane of its
-// element, where the coverage of its rounded area multiplies the alpha, anti-aliased over the
-// footprint of the fragment there; the clips it is nested in follow through its parent index.
-//
-// ids.y is the rank of the instance in the 2D draw order of its tree (order.c). The elements of
-// a UI lie in one plane and draw in order over equal depths, but quads of different sizes
-// interpolate their depths from different vertices: in a plane rotated under perspective the
-// depths of two of them round differently at the same pixel, and the one drawn later can fail
-// the test. The fragment lifts its depth by its rank times a part of the depth slope (more than
-// the subpixel snapping of the vertices moves the depth) and, in perspective, a part of the
-// depth (more than the rounding of the vertex transform), so it wins over every coplanar element
-// of its tree drawn before it without moving its pixels. A camera facing plane in an ortho view
-// has neither, so screen space UI keeps the depths of its geometry.
+// fragment so edges stay crisp at any scale, distance and angle.
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
@@ -315,13 +222,9 @@ fn srgb_step(l: f32) -> f32 {
 }
 
 // Dithered alpha of a shadow of a linear color at a pixel: interleaved gradient noise (Jimenez
-// 2014) of the pixel position, the same every frame, of about one step of an 8-bit sRGB target
-// from end to end. The step it changes the target by depends on what is under the shadow, which
-// the shader does not know, so the amplitude is the smaller of the one for black under it (its
-// brightest channel lightening it) and for white under it (its darkest channel darkening it),
-// which keeps the noise within a step over any background. It is bounded by the distance of the
-// alpha to 0 and 1, so it never clamps: the average stays the alpha and the faint tail of a shadow
-// is not speckled out to the edge of its quad.
+// 2014) of about one step of an 8-bit sRGB target. The amplitude is the smaller of the step over
+// black and over white, so the noise stays within a step over any background, and is bounded by
+// the distance of the alpha to 0 and 1, so it never clamps and the average stays the alpha.
 fn shadow_dither(alpha: f32, color: vec3f, pos: vec2f) -> f32 {
     let bright = max(max(color.r, color.g), color.b);
     let dark = 1.0 - min(min(color.r, color.g), color.b);
@@ -341,17 +244,10 @@ fn median(v: vec3f) -> f32 {
 // scaled from the range of the page to screen pixels with the Euclidean footprint of a pixel, so
 // rotation changes nothing. Below one pixel of range the edge stays one pixel wide and the glyph
 // fades with the range instead of aliasing. offset is added to the distance, 0 for a regular
-// glyph and the bold weight for a bold one. A small bold glyph spreads its edge over more of the
-// field than the offset leaves below the threshold, so the empty field of the quad would cover
-// a little: the coverage is scaled so that it is 0 there, which leaves a regular glyph as is.
+// glyph and the bold weight for a bold one; the coverage is rescaled so the empty field of a
+// small bold glyph stays 0.
 //
-// The coverage is linear in screen pixels and blended in linear light, which the target then
-// encodes: a pixel half covered by light text on a dark background shows about two thirds of the
-// text, by dark text on a light background about a third, so small dark text loses its edges and
-// looks thin and faint next to the same text in light (glyph_contrast corrects for it).
-//
-// uv_dx and uv_dy are the derivatives of uv, taken by the caller in uniform control flow, so the
-// coverage takes none itself and runs under a branch for the glyph fragments only.
+// uv_dx and uv_dy are the derivatives of uv, taken by the caller in uniform control flow.
 fn glyph_coverage(uv: vec2f, uv_dx: vec2f, uv_dy: vec2f, range: vec2f, offset: f32) -> f32 {
     let field = textureSampleLevel(distance_map, material_sampler, uv, 0.0);
     let footprint = vec2f(length(vec2f(uv_dx.x, uv_dy.x)), length(vec2f(uv_dx.y, uv_dy.y)));
@@ -375,14 +271,10 @@ fn srgb_decode(e: f32) -> f32 {
 // Coverage of a glyph of a linear color corrected for the blend in linear light, so dark text on
 // a light background is as heavy to the eye as light text on a dark one. The background is not
 // known to the shader: a text of display luminance t is taken to lie on a background of 1 - t.
-// Light text (t of 0.5 and up) keeps its coverage, the look it has today. Dark text gets the
-// alpha that moves the display value of the background toward it by as much as the coverage
-// moves the display value of the mirrored pair, light text of 1 - t on a background of t:
-// 1 - enc(L + c (B - L)) is the display value it should reach, L and B the linear luminances
-// of the text and of the background. The alpha is 0 and 1 where the coverage is, so the inside of
-// a glyph and the empty field stay as they are, and it goes to the coverage as the text nears
-// mid gray. The same correction holds in views with effects, whose tone mapping and encoding
-// shape the display values the same way.
+// Light text (t of 0.5 and up) keeps its coverage. Dark text gets the alpha that moves the
+// display value of the background toward it by as much as the coverage moves the mirrored pair,
+// light text of 1 - t on a background of t: 1 - enc(L + c (B - L)), L and B the linear
+// luminances of the text and of the background.
 fn glyph_contrast(cover: f32, color: vec3f) -> f32 {
     let lum = clamp(dot(color, vec3f(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
     let t = srgb_encode(lum);

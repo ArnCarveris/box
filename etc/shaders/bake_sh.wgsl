@@ -1,55 +1,5 @@
 // Probe projection: turns the six capture faces of each probe of a chunk into the L2 SH
-// irradiance of the probe (Ramamoorthi and Hanrahan), in the basis and coefficient order of
-// mesh.wgsl. One workgroup per probe sums radiance times basis times the solid angle of every
-// texel (Sloan, "Stupid Spherical Harmonics Tricks"), then scales each band by the clamped
-// cosine convolution A_l. Texels no shape covered (alpha 0) see the sky: the hemisphere ambient
-// as radiance a + 1.5 b y, whose irradiance over pi is exactly the a + b y the forward pass
-// uses, or with params.size.z the radiance E_lm / A_l of the SH of an environment source, so
-// an open probe gets the SH of the environment.
-//
-// Baked lights exist only in the probes, so their direct light at the probe is added too, as
-// Unity's light probes hold the direct light of baked lights: a point, spot or directional
-// light of irradiance c from direction w projects to c Y_lm(w) before the convolution. It is
-// occluded when the face texel toward the light saw a surface nearer than the light, for a
-// directional light any surface.
-//
-// The projection also writes the visibility of each probe: an octahedral map of the mean and
-// mean square distance to the surfaces its faces saw, which mesh.wgsl tests a point against
-// before it blends the probe in (DDGI's Chebyshev visibility).
-//
-// The cull entry point lists, before the faces render, the instances of one batch each face of
-// each probe of the chunk draws: those whose sphere spans the smallest size at their depth in
-// the face their center is in, and whose box reaches into the 90 degree frustum of the face.
-// The slots of a face keep slot order, compacted by a workgroup prefix sum, so depth ties
-// resolve the same way in every bake. One dispatch covers the batches of an instance page, a
-// workgroup per probe and batch: a dispatch costs the GPU far more than its workgroups do.
-// The cull_bounds entry point first takes the bounds of every block of CULL_GROUP instances of
-// a batch; a block whose bounds fail the smallest size at the probe skips its instances, which
-// would all fail the same test, so the lists are the same with or without the bounds.
-//
-// The reflect_store entry point writes the faces of the reflection probes of a chunk into mip 0
-// of their cubemap slot instead (params.probes holds the slots), mirrored to the WebGPU cubemap
-// convention, with the sky radiance where nothing covered a texel (mip 0 of the environment cube
-// with params.size.z, the hemisphere of the projection otherwise). It writes
-// them into a source cube array of the chunk too, one cube per probe, whose full mip chain
-// reflect_mip box filters level by level. reflect_prefilter then fills each higher mip level of
-// the slots with the GGX prefiltered radiance of the source (split sum, Karis), sampling a
-// lower source mip by the solid angle of each sample (filtered importance sampling). The
-// projection runs on the reflection captures too, writing the SH of each slot.
-//
-// The environment processing reuses reflect_mip and reflect_prefilter on one cube (params.probes
-// all 0, params.size.y 1): a Box environment box filters its own mips, a Ggx one box filters a
-// source cube and prefilters its mips from it. environment_sh projects a mip of at most 16
-// texels per edge of the box filtered chain onto the same SH as project.
-//
-// A texel whose radiance is not finite (a NaN or infinity a draw shaded) counts as uncovered in
-// the projection and the store: the prefilter and the SH sum spread one such texel over the
-// whole probe, while the forward pass shows it as one pixel.
-//
-// Face f of probe p is the tile at column f and row p of the atlas, size texels on each side.
-// Its texel (x, y), y down, looks along
-// forward + u right + v up with u, v in [-1, 1] and right = cross(forward, up). The depth of
-// a face is reversed with an infinite far plane: near over the view depth, 0 where nothing is.
+// irradiance of the probe (Ramamoorthi and Hanrahan).
 
 #include "include/instance.wgsl"
 #include "include/cube.wgsl"
@@ -73,7 +23,7 @@ struct Params {
     environment: array<vec4f, 9>,
 };
 
-// A light as in mesh.wgsl: position is the direction toward a directional light.
+// A light as in include/lights.wgsl: position is the direction toward a directional light.
 struct Light {
     position: vec3f,
     range: f32,

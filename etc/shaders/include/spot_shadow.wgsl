@@ -1,15 +1,4 @@
 // Spot light shadows from the shadow atlas of the scene, read by the forward pass.
-//
-// A shadow casting spot light has a square tile of the atlas with a reversed Z perspective along
-// its axis: clip depth near * (far - z) / (z * (far - near)) at the distance z along the axis, 1
-// at the near plane, the depth the shadow pass writes. A position behind the light, beyond the
-// far plane or outside the frustum of the tile is lit.
-//
-// The lookup moves along the geometric normal by normal_offset texels of the tile at its
-// distance, times 1 - N.L with l toward the light, compares the depth of its distance moved
-// toward the light by depth_bias texels and filters with the tent of shadow.wgsl; every tap is
-// clamped half a texel inside the tile, so none reads a neighbouring tile. Ported from
-// SampleSpotLightShadow of Esoterica.
 #pragma once
 
 #include "shadow.wgsl"

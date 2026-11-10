@@ -1,20 +1,6 @@
 // Infinite grid of the debug pass of a view (GridSettings): a triangle covers the target and
 // every fragment casts the ray of its pixel from the near plane through inv_view_proj, which
-// works for an orthographic camera too, onto the plane y = height. A ray that does not hit the
-// plane in front of the camera discards; a hit writes its own depth, so the depth of the view
-// (compare Greater, no writes) hides it behind geometry and it stays on its plane.
-//
-// The lines are anti aliased as Ben Golus's "pristine grid": a line keeps its width in pixels
-// close up, thinner than a pixel it fades by its coverage instead of breaking up, and where a
-// cell gets under a pixel it turns into its average coverage, so there is no moire. The change
-// of the plane over a pixel comes from the rays of points around the pixel rather than from
-// screen derivatives, which a 2x2 quad on the horizon would make huge. Minor and major lines
-// fade out besides where their cells get under a few pixels. The world X axis (z = 0) is red
-// and the Z axis (x = 0) blue, as wide as the major lines.
-//
-// The alpha fades out between half the fade distance and the fade distance from the camera and
-// for grazing rays near the horizon. The output is premultiplied and linear, the colors of the
-// uniform are decoded on the CPU.
+// works for an orthographic camera too, onto the plane y = height.
 #include "include/lights.wgsl"
 #include "include/fullscreen.wgsl"
 
@@ -94,9 +80,8 @@ fn grid_lines(p: vec2f, deriv: vec2f, cell: f32, width: f32) -> f32 {
 }
 
 // Coverage of the two axes of the plane at the distances of a point to them in world units and
-// their change over a pixel: lines of a width in pixels that, unlike the repeating lines, never
-// turn into an average. They fade out with the largest cells of the grid, before the
-// linearized change of a pixel near the horizon gets so large that it covers the axes.
+// their change over a pixel. They fade out with the largest cells of the grid, before the
+// change of a pixel near the horizon gets so large that it covers the axes.
 fn grid_axes(dist: vec2f, deriv: vec2f, width: f32) -> vec2f {
     let d = max(deriv, vec2f(1e-6));
     let target_width = width * d;

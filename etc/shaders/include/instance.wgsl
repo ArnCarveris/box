@@ -1,22 +1,4 @@
-// Instance data of a batch, one per slot of each stream of its instance page. The streams are
-// separate buffers of the page with the same slots, bound together as the instance group:
-//
-// - binding 0, InstanceTransform (box_render_transform_t): the three rows of the affine model
-//   matrix with the instance scale, which the cull, the shadow casters and the capture cull
-//   read, and which a moved instance uploads;
-// - binding 2, the shading stream. A mesh page holds MeshShading (box_render_mesh_shading_t):
-//   the slot of the material table (material.wgsl) the instance renders with, the composed tint
-//   of its ancestors and its own Tint as four unorm16 (the display encoded base color becomes
-//   color * keep + add) and its alpha. A 2D page holds the whole material of a 2D shape or glyph
-//   (Shape2DShading of shape2d.wgsl);
-// - binding 3, SurfaceData (box_render_surface_t): the parametric surface the vertex stage
-//   evaluates (surface.wgsl). Only the mesh pages of shapes with a parametric surface have this
-//   stream; a plain mesh page and a 2D page bind one zero record here. The vertex stages of
-//   mesh.wgsl and shadow.wgsl load the record of a slot only when it is inside the buffer, so a
-//   plain mesh keeps a zero surface_data, and shape2d.wgsl does not read it;
-// - binding 4, the material table (box_render_material_t), which every page binds.
-//
-// Binding 1 holds the surface assets of the mesh of the draw.
+// Instance data of a batch, one per slot of each stream of its instance page.
 #pragma once
 #include "surface.wgsl"
 

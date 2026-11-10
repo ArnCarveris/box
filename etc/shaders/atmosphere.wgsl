@@ -2,49 +2,6 @@
 // transmittance and multi scattering LUTs belong to a scene, the sky view and aerial perspective
 // to a view. Every pass is a compute entry point with 8x8x1 workgroups that writes an
 // rgba16float storage texture, the 2D LUTs included, so no pass needs a render target.
-//
-// transmittance (256x64): Bruneton's (r, mu) mapping, x the distance to the top between its
-// shortest and its horizon value, y the distance to the horizon; 40 midpoint steps.
-// multi_scattering (32x32): x the cosine of the sun zenith from -1 to 1, y the altitude;
-// psi_ms = L2 / (1 - F) over 64 directions of 20 steps, the ground bouncing ground_albedo.
-// sky_view (192x108): x the absolute world azimuth atan2(x, z), wrapping at world -Z where
-// sample_sky_lut blends the first and last column, y the zenith angle, squared on both sides of
-// the horizon at y = 0.5; single scattering of the sun plus multi scattering and
-// the single scattering of the moon times its illumination, integrated as (S - S T) / sigma_t,
-// plus the night floor that fades in as the sun sets.
-// aerial (32x32x32, a 3D texture): x and y the uv of the screen, slice z the in scatter (blended
-// toward the horizon color of the sky view by 1 - T) and the mean transmittance T from the
-// camera to the distance z / (N - 1) * aerial_distance along the ray of its texel, 6 steps.
-// Slice 0 is the identity (0, 0, 0, 1), so a distance d samples the volume at
-// w = (d / aerial_distance * (N - 1) + 0.5) / N and a distance of 0 gives the identity.
-//
-// environment (6 layers of the cubemap of an environment source): the sky view of the scene
-// at its ground altitude in the direction of each texel, cube_direction of include/cube.wgsl,
-// without the sun and moon disks. A direction that hits the planet sees the ground instead:
-// ground_albedo times the irradiance of the sun and moon at the ground and the mean irradiance
-// of the sky, over pi. Each 8x8 workgroup integrates that sky irradiance from 64 cosine
-// weighted directions of the sky view, one per invocation, summed by a tree reduction.
-//
-// fog (2x1): the in scatter color of a HeightFog that refers to the atmosphere, once per view. Texel 0 is the
-// ambient, the mean of 6 horizon samples of the sky view mixed 15% toward its zenith; texel 1
-// the glow toward the main light, the horizon sample at its azimuth minus the ambient times
-// its horizon fade, or the radiance of the moon when it is the main light, whose faint glow the
-// horizon of the sky view hardly holds. fog.wgsl adds the phase and the inscatter scales per pixel.
-//
-// The planet center is under the camera: a world direction is a direction of the planet frame,
-// the camera at (0, bottom + altitude, 0). The earth shadow is analytic, a smoothstep around
-// the cosine of the horizon, instead of a ray test against the planet.
-//
-// sky_vs and sky_fs draw the sky of a view in its forward pass: a fullscreen triangle at the far
-// plane (reversed Z depth 0) that samples the sky view LUT in the direction of its pixel, the
-// horizon row for a direction below the horizon. Pixels near the sun that do not look at the
-// ground add the sun disk: the transmittance from the camera toward the sun times the sun's top
-// of atmosphere radiance and the disk intensity, limb darkened with the linear law and with an
-// edge one pixel wide. Pixels near the moon add the moon disk the same way: a ray cast at a unit
-// sphere seen at the moon radius, its top of atmosphere radiance times the disk intensity and
-// albedo times the cosine of the sun at the hit, so the phase follows from the sun and moon
-// directions, the dark side lit by the earthshine fraction. The target clips them in a view
-// without effects.
 #include "include/atmosphere_medium.h"
 #include "include/cube.wgsl"
 
@@ -258,7 +215,7 @@ fn sky_uv_to_direction(uv: vec2f, r: f32) -> vec3f {
 // The sky view LUT at a uv, the azimuth u wrapping and the zenith v clamped. The shared sampler
 // clamps both axes, so the two texels of u are each sampled at their center, where only v is
 // filtered, and blended here; texel 0 and the last texel then blend across world -Z, where
-// atan2(x, z) wraps from +pi to -pi, instead of each fading toward its own edge.
+// atan2(x, z) wraps from +pi to -pi.
 fn sample_sky_lut(uv: vec2f) -> vec3f {
     let width = f32(textureDimensions(sky_lut).x);
     let x = uv.x * width - 0.5;

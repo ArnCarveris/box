@@ -1,17 +1,5 @@
-// Bloom: `downsample_first` and `downsample_first_tent` halve the image exactly. They gather
-// the pixels under their filter and clamp every pixel against fireflies, weight it with the
-// Karis weight and keep what lies above the threshold with a soft knee before they filter, so a
-// small bright detail adds the same glow wherever it lands on the pixel grid. `downsample_first`
-// uses the 13 tap filter, as 6x6 pixels, where the half size image is the last one above the
-// first mip; `downsample_first_tent` a cheaper 4x4 tent where it is halved again, which smooths
-// it further. `downsample` filters a level into the next, half its size, with the 13 tap
-// filter: the halvings of the image above the first mip and every mip into the next.
-// `downsample_fit` filters the last halving into the first mip, at most half its size, with a
-// cubic B-spline 4 texels of the first mip wide, which spreads every texel over the first mip
-// with the same total weight at any ratio. `upsample` adds a 3x3 tent of a mip into the one
-// above it with the blend constant of the pass, `history` blends the first mip with the
-// previous frame and `composite` adds a cubic B-spline of the first mip (binding 4) to the
-// image, times the blend of the first mip, which stays smooth where the first mip is upscaled.
+// Bloom: thresholded downsamples into a mip chain, tent upsamples, a history blend and a
+// composite of the first mip into the image.
 #include "include/effect.wgsl"
 
 struct Bloom {

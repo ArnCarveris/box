@@ -42,9 +42,8 @@ struct View {
     shadow_edge: vec4f,
     // x: cascades, 0 without shadows, y: width of the tent filter in texels
     shadow_config: vec4u,
-    // x: reflection probes of the reflection probe buffer the view samples, 0 for none; the
-    // scene probe is the last of them when there are more than the clusters list (grid.w); y: 1
-    // when the view ignores tints, as the captures do
+    // x: reflection probes the view samples, 0 for none; the scene probe is the last of them when
+    // there are more than the clusters list (grid.w); y: 1 when the view ignores tints
     reflection: vec4u,
     // Aerial perspective: x km per world unit, y the inverse of the distance in km the volume
     // reaches, z its slices, w 1 when the view applies it
@@ -126,7 +125,6 @@ fn cluster_view_position(v: View, world: vec3f) -> vec3f {
     return vec3f(p.x, p.y, -p.z);
 }
 
-// Number of clusters of a view.
 fn cluster_count(v: View) -> u32 {
     return v.grid.x * v.grid.y * v.grid.z;
 }
@@ -137,7 +135,6 @@ fn cluster_slice_depth(v: View, slice: u32) -> f32 {
     return v.cluster.z * pow(v.cluster.w / v.cluster.z, t);
 }
 
-// Index of the cluster a view space position falls in.
 fn cluster_index(v: View, p: vec3f) -> u32 {
     let depth = max(p.z, 1e-4);
     var ndc = p.xy / v.cluster.xy;

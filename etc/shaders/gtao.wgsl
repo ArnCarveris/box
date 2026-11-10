@@ -1,17 +1,6 @@
 // Ground truth ambient occlusion, a port of XeGTAO (Intel, MIT) as Esoterica runs it, computed
 // from the reversed Z depth of the depth prepass before the forward pass, which multiplies the
 // indirect light by it (mesh.wgsl).
-//
-// `prefilter` turns the depth into positive view space depth at the working resolution (the
-// render size, or half of it rounded up, where mip 0 takes the top left depth of every 2x2 block
-// so the upsample compares real depths) and its mips 1 to 3; `prefilter_last` filters mip 4 from
-// mip 3, because a stage binds at most 4 storage textures. `main_pass` reconstructs the normal
-// from the depth and searches the horizons of the slices of a pixel, with Hilbert curve driven R2
-// noise of a fixed index, and writes the working visibility and the packed edges. `denoise` and
-// `denoise_final` blur it within the edges, the last pass scaling it back by the occlusion term
-// scale. At half resolution `upsample` writes the AO image at the render size with the bilateral
-// filter of Esoterica. Every texture is read with textureLoad: R32Float is not filterable and
-// XeGTAO samples depth with a point sampler anyway. A pixel without depth (0) is unoccluded.
 #include "include/fullscreen.wgsl"
 
 struct Gtao {

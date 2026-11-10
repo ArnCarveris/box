@@ -1,18 +1,5 @@
 // Particle draw: one instanced draw per blend and sprite of the pools of the scene of a view,
-// every instance a slot of a chunk of CHUNK slots of a pool that the chunk buffer names. A live
-// particle faces the camera, its size wide and turned by its rotation; a free slot or one past
-// the used slots of its pool collapses outside the clip volume. Size, rotation, spin and opacity
-// are drawn from the seed and the spawn index, each from its own stream, then the curves of the
-// emitter scale them by the age over the life (particle.wgsl), read from their rows of the curve
-// table unless they are constant, a curve with max_keys blended toward its max curve by a draw
-// of its own stream; the size, opacity and color clamp at 0.
-//
-// A circle is shaded smoothstep(1, 0, d^2) over its quad and a sprite shows a frame of its
-// sheet. A soft particle fades in front of the depth of the view (group 2), a lit one is shaded
-// by the lights of the scene with a wrapped diffuse term, the first directional light through
-// its shadows and light cookie (cookie.wgsl), and an emitter with an appearance gets the aerial
-// perspective of the view. An additive pool adds color times opacity, an alpha pool blends over
-// the image.
+// every instance a slot of a chunk of CHUNK slots of a pool that the chunk buffer names.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/cookie.wgsl"
@@ -166,7 +153,7 @@ fn ambient(dir: vec3f) -> vec3f {
     return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
 }
 
-// Radiance of a point or spot light at a distance, as attenuation in mesh.wgsl.
+// Radiance of a point or spot light at a distance, as attenuation in include/attenuation.wgsl.
 fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
     let ratio = dist / max(light.range, 1e-4);
     let window = clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0);

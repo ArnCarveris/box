@@ -1,90 +1,3 @@
-// Forward pass: draws shape meshes with a physically based surface, a GGX distribution with
-// height correlated Smith visibility and Schlick Fresnel, lit by the lights of the scene; the
-// first directional light is shadowed by its cascades, a spot or point light with a tile by the
-// shadow atlas of the scene (spot_shadow.wgsl, point_shadow.wgsl), and the first directional
-// light is scaled by its light cookie (cookie.wgsl).
-// Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
-// a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
-// with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
-// A MappingObject material (TextureMapping) projects its texture coordinates in the fragment
-// stage from the object position times the instance scale, on the plane of the dominant axis of
-// the interpolated object normal (mapping_uv of material.wgsl), so the axis never blends inside
-// a triangle; its tangent frame follows from the derivatives of the projected UV. A MappingWorld
-// material projects the world position on the dominant axis of the world normal the same way.
-// With a TextureMapping.blend above 0 the three axis projections blend (triplanar): each layer
-// is sampled once per projection with a weight, with the gradients of that projection, so a
-// face along an axis samples once; the normal map of each projection turns to the world with
-// the axes of that projection (turned by the rotation of the instance for MappingObject) and
-// the world normals blend. The blend is flat, so the fragments of a quad all take the triplanar
-// path or all the hard one, and only the triplanar one takes the derivatives of the position.
-// The ORM layer holds the glTF occlusion (red, of the indirect light only), roughness (green)
-// and metallic (blue) multipliers.
-// The cull pass writes the slots of the visible instances, which step per instance; the
-// instance data is read from the transform, shading and surface streams of the instance page of
-// the batch (group 2). The vertex stage fetches the material of its instance from the material
-// table by the id of its shading and mixes the base color toward the tint of the instance in
-// display encoding before converting it to linear light. Indirect light comes
-// from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
-// probe volume of its scene (group 3). The indirect specular light of a view that samples
-// reflection probes comes from the prefiltered cubemaps of the probes its clusters list. A view
-// lit by an environment takes its SH in place of the hemisphere ambient and its prefiltered
-// cubemap as an infinitely distant probe below the scene probe. A view
-// that renders the atmosphere of its scene attenuates the shaded color and adds the in scattered
-// light from one trilinear tap of its aerial perspective volume.
-// The occlusion of opaque and alpha tested fragments is the smaller of the ambient occlusion of
-// the view (Gtao, white without one) at their pixel and the occlusion of their ORM layer; it
-// scales the indirect diffuse light, and the indirect specular light by the specular occlusion
-// of Lagarde that follows from it. Blended draws take the ORM occlusion alone.
-// An alpha tested draw (kind.alpha_cutout) discards the fragments whose alpha, the instance alpha
-// times the albedo alpha, is below the cutoff of their material, once every texture is sampled.
-// A lit view draws its opaque meshes depth only first (vs with fs_depth and fs_depth_cutout),
-// then shades them with depth compare Equal and without the alpha test.
-// A transmissive draw (kind.transmissive, Transmission) draws in the sorted blended stream
-// without blending: it refracts the snapshot of the view taken right before it (opaque_snapshot,
-// everything drawn before it back to front, at most 4 snapshots a view and frame), reduced by
-// its Fresnel reflection, absorbed over its volume and tinted by its albedo, and adds its own
-// specular light and emission on top.
-// A clear coated material (ClearCoat) has a dielectric layer of f0 0.04 over its base, on the
-// geometric normal and of its own roughness: a GGX lobe in direct light and a second specular
-// lookup in indirect light, which take what they reflect from the base. Without a coat (strength
-// 0) a fragment skips both.
-// An anisotropic material (SpecularAnisotropy, KHR_materials_anisotropy) stretches the base lobe
-// along a tangent of the cotangent frame of its UVs turned by its rotation: an anisotropic GGX
-// distribution and Smith visibility in direct light and a reflection about a bent normal in
-// indirect light. The clear coat stays isotropic. Without it (strength 0), and on a triangle whose
-// UVs are degenerate, a fragment skips both.
-// A material with a sheen (Sheen, KHR_materials_sheen) adds a soft rim at grazing angles over its
-// base, as three.js does: a Charlie distribution with the Neubelt visibility in direct light, the
-// indirect diffuse light times an analytic fit of its albedo in indirect light, and a constant
-// energy compensation of the base lobes, 1 - 0.157 times the largest channel of its color. It
-// lies under the clear coat. Without it (a black color) a fragment skips all of it.
-// A material with diffuse transmission (DiffuseTransmission, KHR_materials_diffuse_transmission)
-// adds a second Lambert lobe on the inverted normal, of its linear color times the diffuse color
-// times its factor, and keeps 1 - factor of its front diffuse lobe. Direct light reaches it
-// through the shadow at the position thickness behind the surface along the view ray, looked up
-// with the inverted geometric normal, so a thin sheet does not shadow itself; indirect light from
-// the far side reaches it without ambient occlusion. The clear coat and the sheen attenuate it as
-// they do the front diffuse lobe. It stays in the opaque pass. Without it (factor 0) a fragment
-// skips all of it, and every texture it reads is read without implicit derivatives.
-// A TextureBlend batch draws with the fs_blend entry point and its own group 1 (blend_*): the
-// mask, sampled once at the texture coordinates of the shape, weighs up to four layers whose
-// albedo, ORM and normal are slices of three texture arrays, each at the coordinates of the
-// shape times the TextureTransform of its layer. Only the layers with a weight are sampled, with
-// explicit gradients scaled from those of the shape, so a fragment with one weight samples each
-// map once; the decoded normals blend and renormalize before they perturb the normal. With a
-// triplanar TextureMapping each projection with a weight samples the mask and each layer with a
-// weight once, with the gradients of the projection, so a flat face with one visible layer
-// samples each map once and the worst case (three projections, four layers) twelve times. The
-// alpha of the fragment is the weighted alpha of the layer albedos, which the alpha test, the
-// blend modes and the transmissive pipeline take as fs takes the albedo alpha; the alpha tested
-// depth prepass blends it with fs_depth_cutout_blend. A plain back face samples no layer, but
-// the albedo of an alpha tested one. The emissive layer, the material constants and everything
-// after the layers are those of fs, and fs itself binds and samples nothing of the blend: an
-// override cannot hide the bindings of a branch from the static use of an entry point, so the
-// variant is an entry point of its own.
-// With a contrast above 0 the weights of the layers are first shaped by their heights, a fourth
-// array (blend_heights), so the higher layer wins near a border, in every projection, the
-// prepass and the shadows alike; with a contrast of 0 the blend is linear and samples no heights.
 #include "include/instance.wgsl"
 #include "include/material.wgsl"
 #include "include/blend.wgsl"
@@ -157,19 +70,15 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(14) var gtao_image: texture_2d<f32>;
 
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
-// transmissive draw, with everything drawn before it back to front (opaque meshes, sky, fog
-// volumes, particles, 2D shapes and the blended and transmissive meshes behind it), and a blur
-// pyramid, mip k + 1 downsampled from mip k. A view takes one before its first transmissive draw
-// and one before each later one that follows other draws, at most 4 a frame, into this same
-// texture; beyond that later glass samples the last one. A view without transmissive draws, and
+// transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
+// are taken a frame; later glass samples the last one. A view without transmissive draws, and
 // the captures, bind a 1x1 white image.
 @group(0) @binding(19) var opaque_snapshot: texture_2d<f32>;
 
-// Depth of the target copied with the first snapshot of the view (gpu_transmission.c), reversed
-// Z with 0 for the sky, which the blur of a DiffuseTransmission reads with textureLoad. Blended
-// and transmissive draws write no depth, so a blended shape in the snapshot blurs like whatever
-// lies behind it. A view without
-// transmissive draws, and the captures, bind a 1x1 placeholder.
+// Depth of the target copied with the first snapshot of the view, reversed Z with 0 for the sky.
+// Blended and transmissive draws write no depth, so a blended shape in the snapshot blurs like
+// whatever lies behind it. A view without transmissive draws, and the captures, bind a 1x1
+// placeholder.
 @group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
 
 @group(2) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
@@ -255,13 +164,9 @@ fn vo_rotation(f: VertexOut) -> vec4f {
     return vec4f(unpack2x16snorm(f.flat3.x), unpack2x16snorm(f.flat3.y));
 }
 
-// Color, metallic and roughness, and UV of a vertex from the shading of its instance and its
-// material, with the tint and material of its region on a parametric surface. Reads the
-// surface_data place set. A MappingObject or MappingWorld material on a plain mesh sets mapped
-// to 1 plus its blend, uv to the offset of its projection and object and object_normal to what
-// mapping_uv projects in the fragment stage, and rotation to what turns the axes of its
-// projections to the world; a parametric surface keeps its own UVs, which a MappingObject
-// material on a Sweep turns into lengths over the mapping size (surface_sweep_lengths).
+// A MappingObject or MappingWorld material on a plain mesh sets mapped to 1 plus its blend, uv to
+// the offset of its projection and object and object_normal to what mapping_uv projects in the
+// fragment stage. A parametric surface keeps its own UVs.
 struct VertexShading {
     color: vec4f,
     material: vec2f,
@@ -372,11 +277,8 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     return o;
 }
 
-// Depth prepass of a lit view (box_gpu_draw_prepass): the opaque meshes draw depth only with vs,
-// as the forward pass does, and fs_depth, which takes the inputs fs takes and writes nothing. The
-// alpha tested meshes draw with fs_depth_cutout, which discards what fs discards: the alpha of
-// the vertex times the albedo alpha, below the cutoff of the material. The forward pass after the
-// prepass does not alpha test, its Equal depth test rejects those.
+// Depth prepass of a lit view (box_gpu_draw_prepass). fs_depth_cutout discards what fs discards;
+// the forward pass after the prepass does not alpha test, its Equal depth test rejects those.
 @fragment fn fs_depth(f: VertexOut) {
 }
 
@@ -388,9 +290,6 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     }
 }
 
-// The alpha tested meshes of a TextureBlend draw with fs_depth_cutout_blend, which binds the blend
-// group and discards what fs_blend discards: the weighted alpha of the layer albedos
-// (blend_alpha).
 @fragment fn fs_depth_cutout_blend(f: VertexOut) {
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
         f.uv.xy, vo_scalars(f).w, f.object, f.object_normal);
@@ -502,17 +401,10 @@ fn visibility_from(index: u32, offset: vec3f) -> f32 {
     return p * p * p;
 }
 
-// Irradiance at a position with a normal, blended from the 8 probes around it: trilinear
-// weights, times the wrap of the direction toward the probe around the normal as in DDGI, so
-// probes behind the surface count less, times the visibility of the position, moved off the
-// surface along the normal, from the probe. Invalid probes are skipped; outside the grid the
-// position clamps to the border probes. Without a valid probe it is the ambient (the SH of the
-// environment of the view, else the hemisphere), which also makes up the weight the visible
-// probes lack below VISIBILITY_FALLBACK of the weight of every valid probe, so a surface that
-// sees none of its probes does not take the light of the probes behind it. The SH evaluation is
-// linear in the coefficients, so every probe
-// is evaluated in the two directions and the results are blended; the hemisphere ambient is
-// the irradiance its SH projection evaluates to.
+// Irradiance blended from the 8 probes around a position: trilinear weights times the wrapped
+// cosine toward the probe and the visibility from the probe, as in DDGI. Invalid probes are
+// skipped. The ambient makes up the weight the visible probes lack below VISIBILITY_FALLBACK, so
+// a surface that sees none of its probes does not take the light of the probes behind it.
 fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
     let size = volume.size.xyz;
     let g = clamp((world - volume.origin.xyz) / volume.origin.w, vec3f(0.0), vec3f(size - 1u));
@@ -634,11 +526,8 @@ fn probe_radiance(p: ReflectionProbe, world: vec3f, spec: vec3f, mip: f32, grid:
     return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
 }
 
-// Prefiltered radiance the environment of the view reflects along the specular direction spec,
-// an infinitely distant probe turned by the yaw of the view, at the mip level of a perceptual
-// roughness, times its intensity. For a view that samples baked lighting it is normalized as
-// probe_radiance normalizes a probe, by the luminance of the irradiance grid over that of the
-// SH of the environment, both in direction spec.
+// Prefiltered radiance of the environment of the view along spec, an infinitely distant probe.
+// For a view that samples baked lighting it is normalized as probe_radiance normalizes a probe.
 fn environment_radiance(spec: vec3f, roughness: f32, grid: vec3f) -> vec3f {
     let mip = roughness * f32(textureNumLevels(environment_cube) - 1u);
     let d = environment_direction(view, normalize(spec));
@@ -653,13 +542,9 @@ fn environment_radiance(spec: vec3f, roughness: f32, grid: vec3f) -> vec3f {
     return radiance * clamp(scale, REFLECTION_NORMALIZE_MIN, REFLECTION_NORMALIZE_MAX);
 }
 
-// Indirect specular light of a fragment from the reflection probes of its cluster, along the
-// specular direction spec. The cluster lists its probes in blend order: each one takes its fade
-// weight of the weight still left, until none is; the scene probe, last in the probe buffer,
-// takes what is left, else the environment of the view does, else the fallback: the ambient or,
-// for a view that samples baked lighting, the irradiance grid, both in direction spec. A probe
-// whose slot holds no capture yet is skipped. The mip level follows the perceptual roughness as
-// the prefilter wrote them.
+// Indirect specular light from the reflection probes of a cluster, in blend order: each one takes
+// its fade weight of the weight still left. The scene probe, last in the probe buffer, takes what
+// is left, else the environment of the view, else the fallback.
 fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback: vec3f) -> vec3f {
     let mip = roughness * f32(textureNumLevels(reflection_cubes) - 1u);
     var sum = vec3f(0.0);
@@ -694,21 +579,14 @@ fn reflections(world: vec3f, spec: vec3f, roughness: f32, cluster: u32, fallback
     return sum;
 }
 
-// Surface of a fragment from the material constants of its instance. Texture layers apply
-// here on front faces; a plain back face keeps the constants, is unoccluded and faces the
-// camera, except that an alpha tested one takes the albedo alpha, so its holes go through both
-// sides. The occlusion scales the indirect light only. geometric is the interpolated vertex
-// normal before the normal map, negated on back faces as normal is, which the shadow lookup
-// is offset along. coat and coat_roughness are the strength and roughness of the clear coat,
-// material constants that apply on both faces; the coat lies on geometric. anisotropy is the
-// strength of the anisotropy of the base, a material constant that applies on both faces too,
-// along tangent, perpendicular to normal, with bitangent = cross(normal, tangent); it is 0
-// without one and where the UVs give no direction. sheen is the linear color of the sheen,
-// black without one, and sheen_roughness its roughness clamped to 0.07..1, material constants
-// that apply on both faces. back_factor is the factor of the diffuse transmission, 0 without
-// one, back_color the light its back lobe passes through, its linear color times the diffuse
-// color times the factor, and thickness the distance behind the surface of its shadow lookup;
-// they apply on front faces and plain back faces.
+// Texture layers apply on front faces; a plain back face keeps the material constants, is
+// unoccluded and faces the camera, except that an alpha tested one takes the albedo alpha, so its
+// holes go through both sides. The occlusion scales the indirect light only. geometric is the
+// vertex normal before the normal map, negated on back faces, which the shadow lookup is offset
+// along; the clear coat lies on it. bitangent = cross(normal, tangent); anisotropy is 0 where the
+// UVs give no direction. sheen is linear, sheen_roughness clamped to 0.07..1. back_color is the
+// diffuse transmission color times the diffuse color times back_factor, and thickness the
+// distance behind the surface of its shadow lookup.
 struct Surface {
     albedo: vec3f,
     alpha: f32,
@@ -763,8 +641,6 @@ fn perturb(n: vec3f, frame: Frame, m: vec3f) -> vec3f {
     return select(normalize(tangent * m), n, frame.degenerate);
 }
 
-// The texture layers of a fragment: albedo, emissive and ORM, the world normal the normal map
-// makes of the geometric normal, and the tangent frame of the normal map.
 struct Layers {
     albedo: vec4f,
     emissive: vec3f,
@@ -773,11 +649,8 @@ struct Layers {
     frame: Frame,
 };
 
-// The layers of a fragment without a triplanar blend, at the interpolated UV or the projection
-// of a MappingObject or MappingWorld material on its dominant axis, with the cotangent frame of
-// that UV. surface calls it for the fragments without a blend (vo_scalars(f).w at most 1, flat),
-// which are all those of a primitive and so of a quad, so the implicit derivatives of its
-// samples and frame hold.
+// The layers of a fragment without a triplanar blend. Only called when vo_scalars(f).w (flat) is
+// at most 1, the same for every fragment of a quad, so the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
 fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
     var uv = f.uv.xy;
@@ -800,15 +673,10 @@ fn tangent_along(v: vec3f, n: vec3f) -> vec3f {
     return p * inverseSqrt(max(dot(p, p), 1e-12));
 }
 
-// The layers of a triplanar fragment (blend above 0): each projection with a weight samples
-// every layer once, with the gradients of its projection from the screen derivatives of
-// f.object, so a quad that straddles a change of the dominant axis keeps its mip level; a
-// fragment whose normal is along an axis samples once. The tangent normal of each projection
-// turns to the world with the tangent and bitangent of its axes (mapping_tangent, turned by
-// vo_rotation(f)), made perpendicular to the geometric normal, and the world normals blend; the
-// frame is that of the dominant projection. surface calls it for the fragments whose blend
-// (vo_scalars(f).w, flat) is above 0, which are all those of a primitive and so of a quad, so the
-// derivatives taken here hold.
+// The layers of a triplanar fragment. Explicit gradients from the derivatives of f.object, so a
+// quad that straddles a change of the dominant axis keeps its mip level. The world normals of the
+// projections blend; the frame is that of the dominant projection. Only called when
+// vo_scalars(f).w (flat) is above 1, so the derivatives taken here hold.
 @diagnostic(off, derivative_uniformity)
 fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
     let dx = dpdx(f.object);
@@ -848,11 +716,8 @@ fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
     return o;
 }
 
-// The albedo, ORM and tangent space normal of the layers of a TextureBlend at the texture
-// coordinates uv of the shape, whose screen gradients are gx and gy, weighed by w: each layer
-// with a weight is sampled once at uv times its TextureTransform, with the gradients scaled by
-// it; the normals blend and renormalize. maps false samples the albedo alone (the alpha of a
-// plain back face), and ORM and normal stay 0 and along z.
+// The weighted albedo, ORM and tangent space normal of the layers of a TextureBlend. maps false
+// samples the albedo alone (the alpha of a plain back face).
 struct BlendSample {
     albedo: vec4f,
     orm: vec3f,
@@ -884,16 +749,10 @@ fn blend_sample(uv: vec2f, gx: vec2f, gy: vec2f, w: vec4f, maps: bool) -> BlendS
     return o;
 }
 
-// The layers of a fragment of a TextureBlend without a triplanar blend: the mask and the
-// emissive layer at the texture coordinates of the shape (the UV, or the projection of a
-// MappingObject or MappingWorld material on its dominant axis), and the albedo, ORM and normal
-// of each layer with a weight at those coordinates times its TextureTransform (blend_sample).
-// The derivatives of the coordinates are taken before the layers branch on their weights; the
-// normal perturbs the geometric normal with the cotangent frame of the coordinates of the shape.
-// A back face (front false) samples no layer, but the albedo of an alpha tested pipeline, whose
-// alpha surface_of takes. surface_blend calls it for the fragments without a blend (vo_scalars(f).w
-// at most 1, flat), which are all those of a primitive and so of a quad, so the implicit
-// derivatives hold.
+// The layers of a fragment of a TextureBlend without a triplanar blend. The derivatives of the
+// coordinates are taken before the layers branch on their weights. A back face samples only the
+// albedo of an alpha tested pipeline. Only called when vo_scalars(f).w (flat) is at most 1, so
+// the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
 fn blend_layers(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     var uv = f.uv.xy;
@@ -919,15 +778,9 @@ fn blend_layers(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     return o;
 }
 
-// The layers of a triplanar fragment of a TextureBlend (blend above 0), as triplanar makes those
-// of one set of textures: each projection with a weight samples the mask, the emissive layer and
-// each layer with a weight of its mask once (blend_sample), with the gradients of the
-// projection, so a fragment whose normal is along an axis and whose mask weighs one layer
-// samples each map once. The blended tangent normal of each projection turns to the world with
-// the axes of that projection and the world normals blend; the frame is that of the dominant
-// projection. A back face samples no layer, but the albedo of an alpha tested pipeline.
-// surface_blend calls it for the fragments whose blend (vo_scalars(f).w, flat) is above 0, which are
-// all those of a primitive and so of a quad, so the derivatives taken here hold.
+// The layers of a triplanar fragment of a TextureBlend, as triplanar does for one set of textures.
+// A back face samples only the albedo of an alpha tested pipeline. Only called when
+// vo_scalars(f).w (flat) is above 1, so the derivatives taken here hold.
 @diagnostic(off, derivative_uniformity)
 fn blend_triplanar(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
     let dx = dpdx(f.object);
@@ -988,7 +841,6 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     return surface_of(f, front, geometric, layers);
 }
 
-// The surface of a fragment of a TextureBlend batch (fs_blend), with the blended layers.
 fn surface_blend(f: VertexOut, front: bool) -> Surface {
     let geometric = normalize(f.normal);
     var layers: Layers;
@@ -1000,9 +852,6 @@ fn surface_blend(f: VertexOut, front: bool) -> Surface {
     return surface_of(f, front, geometric, layers);
 }
 
-// The surface of a fragment from its material, its interpolated geometric normal and its texture
-// layers, which a front face applies and a back face (BackFacePlain) ignores but for the albedo
-// alpha of an alpha tested pipeline.
 fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Surface {
     let mapped = layers.normal;
     let albedo = layers.albedo;
@@ -1222,14 +1071,11 @@ fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     return back;
 }
 
-// Light inputs. Every direct light the forward pass uses comes from here: the directional
-// lights of the scene, the first one through its shadow map and light cookie, then the point
-// and spot lights of the cluster of the fragment, a spot or point light with a tile of the
-// shadow atlas through it. The back lobe of a diffuse transmission (brdf_back) adds to the
-// diffuse part, with its shadow, cookie and attenuation at the position thickness behind the
-// surface along the view ray, looked up with the inverted geometric normal. The directional and
-// the cluster lights share one loop, and the front and the back one loop per light, so the
-// shadows, the cookie and the lobes each have one call: D3D compilers inline every call.
+// Direct light: the directional lights, then the lights of the cluster. The back lobe of a
+// diffuse transmission is evaluated thickness behind the surface along the view ray. The
+// directional and cluster lights share one loop, and the front and back sides one loop per light,
+// so the shadows, the cookie and the lobes each have one call site: D3D compilers inline every
+// call.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
     var sum = Lit(vec3f(0.0), vec3f(0.0));
     let directional = view.lights.x;
@@ -1288,7 +1134,6 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32) -> Lit {
     return sum;
 }
 
-// Ambient occlusion of the view at the pixel of a fragment.
 fn view_occlusion(pos: vec4f) -> f32 {
     let size = vec2i(textureDimensions(gtao_image));
     return textureLoad(gtao_image, min(vec2i(pos.xy), size - 1), 0).r;
@@ -1300,10 +1145,8 @@ fn specular_occlusion(ndv: f32, ao: f32, a: f32) -> f32 {
     return clamp(pow(ndv + ao, exp2(-16.0 * a - 1.0)) - 1.0 + ao, 0.0, 1.0);
 }
 
-// Indirect light of a fragment at a normal n, its diffuse part in direction n and its specular
-// part along spec at a perceptual roughness: the ambient or the probe volume, then for the
-// specular part the reflection probes of its cluster or the environment of the view. Every
-// texture it reads is read with textureSampleLevel, so it may run in non uniform control flow.
+// Every texture it reads is read with textureSampleLevel, so it may run in non uniform control
+// flow.
 fn indirect_light(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: u32) -> Indirect {
     var e: Indirect;
     if (volume.size.w == 0u) {
@@ -1321,11 +1164,8 @@ fn indirect_light(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: 
     return e;
 }
 
-// Light a surface reflects toward the eye, the indirect and direct diffuse light apart from
-// the indirect and direct specular light and the emission. An unlit view shows the albedo as
-// the diffuse part and the emission as the specular one. The back lobe of a diffuse
-// transmission adds the indirect diffuse light from the far side, in direction -n, without
-// ambient occlusion, which describes the front; the front keeps 1 - its factor.
+// An unlit view shows the albedo as the diffuse part and the emission as the specular one. The
+// back lobe of a diffuse transmission takes no ambient occlusion, which describes the front.
 fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     if (view.lights.z == 0u) {
         return Lit(s.albedo, s.emissive);
@@ -1452,12 +1292,9 @@ fn output(color: vec3f, alpha: f32) -> vec4f {
     }
 }
 
-// Mip of the opaque snapshot a Transmission shape with a DiffuseTransmission.blur samples: the
-// blur radius grows by blur world units per world unit between the surface and the opaque
-// image behind it, read from the depth copy of the snapshot, and is measured in pixels of mip 0
-// at the distance of what is blurred (in a perspective view) or at the scale of an orthographic
-// one. Contact is sharp, the sky (depth 0) takes the top mip, and the roughness blur stays the
-// least it samples.
+// Mip of the opaque snapshot for a DiffuseTransmission.blur: the blur radius grows by blur world
+// units per world unit between the surface and what is behind it. Contact is sharp, the sky
+// (depth 0) takes the top mip, and the roughness blur is the minimum.
 fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f32,
     max_mip: f32) -> f32
 {
@@ -1470,10 +1307,8 @@ fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f
             depth, 1.0);
         let behind = max(length(h.xyz / h.w - world), 0.0);
 
-        // The blur radius in world units, seen at the distance of what is blurred, in pixels of
-        // mip 0. view.cluster.y is the inverse of the projection scale of y: the tangent of
-        // half the vertical field of view, or the half height of an orthographic view, where
-        // the distance does not matter.
+        // view.cluster.y is the tangent of half the vertical field of view, or the half height
+        // of an orthographic view, where the distance does not matter.
         let radius = behind * blur;
         var eye = 1.0;
         if (view.lights.w == 0u) {
@@ -1486,16 +1321,10 @@ fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f
     return clamp(max(rough_lod, blur_lod), 0.0, max_mip);
 }
 
-// Color of a transmissive fragment (Transmission), as flecs-engine shades it: the opaque
-// snapshot seen where the ray refracted by the index of refraction leaves a volume of the
-// thickness of the material times the scale of the instance, at a mip that follows the
-// roughness, reduced by the Fresnel reflection of the index (Schlick), absorbed toward the
-// attenuation color over the attenuation distance (Beer-Lambert) and tinted by the albedo. The
-// transmission factor replaces the diffuse light by it; the specular light and the emission are
-// added on top. The atmosphere between the fragment and the camera attenuates its own light
-// and the transmitted light and adds its in scattered light by what is not transmitted. A
-// factor of 0 is the lit surface. It writes no depth, so it takes no ambient occlusion of the
-// view, which belongs to what is behind it.
+// Color of a transmissive fragment, as flecs-engine shades it: the opaque snapshot where the
+// refracted ray leaves a volume of the material thickness, reduced by Fresnel and absorbed
+// (Beer-Lambert). The transmission factor replaces the diffuse light; specular and emission are
+// added on top. It writes no depth, so it takes no ambient occlusion of the view.
 fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (view.aerial.w > 0.0) {
@@ -1520,14 +1349,12 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     let fx2 = fx * fx;
     let fresnel = f0_ior + (1.0 - f0_ior) * (fx2 * fx2 * fx);
 
-    // Screen-space refraction: project refracted exit point through VP
     let refracted = refract(-v, s.normal, 1.0 / max(ior, 0.001));
     let exit_pos = f.world + normalize(refracted) * thickness * vo_model_scale(f);
     let exit_clip = view.view_proj * vec4f(exit_pos, 1.0);
     var screen_uv = exit_clip.xy / exit_clip.w * vec2f(0.5, -0.5) + vec2f(0.5, 0.5);
     screen_uv = clamp(screen_uv, vec2f(0.0), vec2f(1.0));
 
-    // Sample opaque scene at refracted UV with roughness-dependent LOD
     let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
     var bg_lod = s.roughness * max_mip;
     let diffuse_blur = vo_scalars(f).z;
@@ -1543,7 +1370,6 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     let transmittance = pow(att_color, vec3f(att_ratio));
     let transmitted = (1.0 - fresnel) * background * transmittance * s.albedo;
 
-    // Blend: transmission replaces diffuse, specular always added on top
     let tf = saturate(factor);
     let own = reflected.diffuse * (1.0 - tf) + reflected.specular;
     let seen = mix(background * (1.0 - fresnel), transmitted, ap.a);
@@ -1551,10 +1377,8 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     return vec4f(final_color, 1.0);
 }
 
-// The output of a shaded fragment: the ambient occlusion of the view applies to an opaque one,
-// then its lighting, the aerial perspective of the view and the blend output; a transmissive one
-// is lit and passed to transmission. Both take the light from one call of shade_split, as D3D
-// compilers inline every call.
+// Opaque and transmissive fragments share one call of shade_split, as D3D compilers inline every
+// call.
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     var s = shaded;
     if (kind.transmissive == 0u && kind.blend_mode == 0u) {
@@ -1584,7 +1408,6 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     return lit(f, s);
 }
 
-// A TextureBlend batch, of any blend mode, alpha tested or transmissive as fs is.
 @fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface_blend(f, front);
     if (kind.alpha_cutout != 0u && s.alpha < vo_scalars(f).x) {

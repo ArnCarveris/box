@@ -1,55 +1,6 @@
 // Fog volumes: one box per FogVolume a view draws (box_render_fog_volume_t), raymarched in its
 // forward pass after the opaque meshes and the sky, in a pass that reads the depth of the view
 // (group 1) instead of writing it.
-//
-// The vertex stage builds the 36 vertices of the box from the vertex index, one instance per
-// volume, centered on its center, along its axes by its extent. The pipeline culls the front
-// faces, so the back faces cover the box from outside and from inside alike, and draws without
-// a depth test; the clip depth is kept above the far plane, so a box that reaches past it still
-// covers its pixels.
-//
-// A fragment casts the ray of its pixel from the near plane through inv_view_proj, which works
-// for orthographic cameras too, intersects the box in its local frame and clamps the segment to
-// the camera side of the near plane and to the distance of the scene depth; depth 0 is no
-// geometry. A pixel whose ray misses the box, or meets geometry before it, is discarded.
-//
-// The segment is marched in steps scaled by its share of the diagonal of the box, at least 4,
-// or 8 with noise, from an offset of one interleaved gradient noise step of the pixel, which does
-// not change with the frame. The density is the density of the volume times a smoothstep from 0
-// at the faces of the box to 1 at edge_fade inside.
-//
-// With a noise_strength above 0 the density is also scaled by the tileable 3D noise texture
-// (group 1), sampled twice at the world position moved back by the offset of the volume and
-// divided by noise_scale: a coarse sample and a detail sample at 3.1 times the frequency. The
-// offset is the wind times the world time, computed on the CPU in double precision and wrapped to
-// 10 noise_scale, over which both samples repeat, so the drift stays smooth after hours. The
-// noise is in world space, not in the frame of the box, so a volume that moves or turns does not
-// drag its billows along, and volumes that overlap share them. A volume without noise takes no
-// samples. Each step integrates the in scattered light of the step analytically over its
-// extinction (Frostbite, Hillaire 2015) and the march stops once the transmittance falls under
-// TRANSMITTANCE_MIN.
-//
-// The light scattered at a point is the mean ambient of the view over up and down (ambient.wgsl,
-// the environment or the hemisphere, not the probe volume) times ambient_inscatter, plus the
-// first directional light over pi through its cascades (shadow_point) and light cookie, times
-// the Henyey-Greenstein phase of the volume times 4 pi, as in fog.wgsl, and sun_inscatter, plus
-// the point and spot lights of the clusters of the view (light_at). The other directional lights
-// are not marched. A view that applies the aerial perspective attenuates the scattered light by
-// the transmittance of the atmosphere at the middle of the segment.
-//
-// The point and spot lights are marched when light_inscatter is above 0 and the view has any. To
-// bound their cost the march is split into FOG_LIGHT_SEGMENTS segments of its steps; the first
-// step of a segment with density looks up the cluster of the middle of the segment and keeps its
-// first FOG_LIGHT_SEGMENTS lights for the steps of the segment, so a ray makes at most that many
-// cluster lookups and a dense cluster may lose lights. A light adds its color times attenuation
-// (attenuation.wgsl) over pi, the phase and light_inscatter, through one depth comparison of its
-// shadow tile when it has one (punctual_shadow_point). A volume or a view without them takes
-// none of this path.
-//
-// The output is the scattered light in rgb and the transmittance of the background in a, blended
-// as color = src + dst * src.a with the alpha of the target kept. The fragment discards and
-// marches in non uniform control flow, so every texture read is a textureLoad or an explicit
-// level or gradient sample.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/point_shadow.wgsl"

@@ -1,15 +1,5 @@
 // Environment image conversion: writes an equirectangular image into mip 0 of the cubemap of an
 // environment source, six layers in WebGPU cube order, the texel directions of cube_direction.
-//
-// Column u of the image is the longitude and row v the latitude: direction d is at
-// u = 0.5 + atan2(d.x, -d.z) / 2 pi and v = acos(d.y) / pi, so the center column looks along -Z,
-// the image goes toward +X to its right, its edges look along +Z and its top row is +Y. Each
-// texel averages four samples at the centers of its quarters, so a large image does not alias.
-//
-// background_vs and background_fs draw the environment of a view behind its geometry: one
-// triangle over the view as the first draw of its forward pass, in place of the clear color,
-// that samples mip 0 of the cubemap in the direction of each pixel, turned by the yaw of the view
-// and times its intensity. The bindings of the background follow those of the conversion.
 
 #include "include/cube.wgsl"
 #include "include/lights.wgsl"

@@ -1,29 +1,6 @@
 // Light cookie of the first directional light of the scene (LightCookie), read by the forward
 // pass and the particle draw: a tileable single channel texture that scales the direct light of
 // that light, diffuse and specular, together with its shadow.
-//
-// The plane projection moves a world position p along the direction l toward the light onto the
-// plane y = height, q = p + l * (height - p.y) / l.y, and reads (q.xz + offset) / size; positions
-// at or above the plane and a light at or below the horizon are not affected. The light
-// projection reads the position along the local X and Y axes of the light plus offset, over
-// size. The offset already holds the velocity times the time, wrapped to the size on the CPU.
-//
-// The texture is read as stored through a repeat sampler with anisotropic filtering, by
-// textureSampleGrad with the screen space gradients of the uv computed analytically, as the
-// plane projection skips positions and derivatives would need uniform control flow. The world
-// step of one pixel to the right or up is the camera's right or up axis r, scaled by the world
-// size of a pixel at the view depth of the position, moved along the camera ray v onto the
-// tangent plane of the geometric normal n: dp = r - v * dot(n, r) / dot(n, v). |dot(n, v)| is
-// clamped to COOKIE_MIN_GRAZING with its sign, so the step stays finite at exact grazing. Under
-// the plane projection a step dp moves q by dq = dp - l * dp.y / l.y, which a wall or a steep
-// slope under a low sun stretches vertically; the light projection reads dp along its axes. The
-// footprint is then long along the view on a floor seen at a shallow angle and along the
-// stretch on a wall under a low sun, and the sampler filters along its long axis while it
-// keeps the detail along the short one. A particle passes a zero normal, as a billboard has no
-// meaningful surface: it reads the isotropic footprint of the world size of a pixel at its
-// distance. With t the value read the cookie is
-// mix(1, saturate((t - threshold) / (2 * softness) + 0.5), strength). A view without a cookie
-// (cookie_config.x 0) binds a white texture and skips the lookup in uniform control flow.
 #pragma once
 
 @group(0) @binding(17) var cookie_texture: texture_2d<f32>;

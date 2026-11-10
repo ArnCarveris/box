@@ -1,20 +1,4 @@
 // Point light shadows from the shadow atlas of the scene, read by the forward pass.
-//
-// A shadow casting point light has a square tile of the atlas holding the whole sphere around
-// it: the octahedron of directions unfolded into the square (Praun and Hoppe; Cigolle et al.),
-// each of its 8 octants a perspective along the axis signs / sqrt(3) with reversed Z, clip depth
-// near * (far - z) / (z * (far - near)) at the distance z along the axis, the depth the shadow
-// pass writes. The 4 octants with z >= 0 fill the inner diamond, those with z < 0 fold out to
-// the corners. A position beyond the far plane is lit.
-//
-// The lookup moves along the geometric normal by normal_offset texels of the tile at its
-// distance, times 1 - N.L with l toward the light, rebuilds the octahedral uv from the moved
-// position and filters with the tent of shadow.wgsl. A tap across an octant edge reads another
-// projection, so every tap compares the depth along the axis of its own octant, moved toward the
-// light by depth_bias texels. The inner octant edges are continuous; the outer edges of the
-// square wrap to the opposite side, which the taps do not follow: they are clamped half a texel
-// inside the tile, so none reads a neighbouring tile. Ported from SamplePointLightShadow of
-// Esoterica.
 #pragma once
 
 #include "spot_shadow.wgsl"

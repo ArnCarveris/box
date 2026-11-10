@@ -12,15 +12,10 @@ struct VertexIn {
     @location(3) slot: u32,
 };
 
-// A vertex placed in the world: the model matrix of its instance, the normal of its mesh or
-// parametric surface in the frame of the instance, its world and its clip position. vs and the
-// depth prepass entry points all place their vertices with it, and the clip position is
-// invariant, so the forward pass of a view with a depth prepass rasterizes the depths the
-// prepass wrote and tests them with Equal. It reads the transform and surface streams and the
-// surface assets only, which the plain prepass binds, and sets surface_data. A plain mesh page
-// binds one zero record as its surface stream, so the record of a slot is loaded only when it is
-// inside the buffer, without relying on robust buffer access; surface_data stays zero otherwise,
-// which is the plain mesh path.
+// A vertex placed in the world; normal is in the frame of the instance. vs and the depth prepass
+// both place vertices with it so the forward pass can depth test the prepass with Equal. It reads
+// only the bindings the plain prepass has, and sets surface_data. A plain mesh page binds one zero
+// record as its surface stream, so a slot past it leaves surface_data zero (the plain mesh path).
 struct Placed {
     model: mat4x4f,
     normal: vec3f,
