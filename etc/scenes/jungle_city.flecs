@@ -40,12 +40,27 @@ async {
 }
 
 jungle_city {
-  Scene: {baked: true, reflections: true, cookies: true, environment: true, aerial_perspective: true, alpha_cutout: true, blend_modes: true, transmission: true, texture_blend: true, triplanar: true, clear_coat: true, diffuse_transmission: true}
+  Scene: {
+    baked: true, 
+    reflections: false, 
+    cookies: false, 
+    environment: false, 
+    aerial_perspective: false, 
+    alpha_cutout: true, 
+    blend_modes: false, 
+    transmission: true, 
+    texture_blend: false, 
+    triplanar: false, 
+    clear_coat: false, 
+    diffuse_transmission: false
+  }
+
   sun {
     DirectionalLight: {intensity: 2.6 * math.PI}
     Rgb: {255, 244, 222}
     LightCookie: {texture: canopy_tex_clouds, size: 360, height: 140, threshold: 0.3, softness: 0.15, strength: 0.45, velocity: {2.4, 0.9}}
   }
+
   sky {
     Atmosphere: {
       sun: sun,
@@ -72,6 +87,7 @@ jungle_city {
       atmosphere: sky
     }
   }
+
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 28, environment: sky}
   LightBake: {environment: sky, probe_spacing: 12, bounds_padding: 0.3, bounces: 0, capture_size: 32, budget_ms: 8, compute: hud.screen.options.body.baked[Checkbox.mut].current}
   assets.JungleCity city(rows: 15, columns: 15, spacing: 17, seed: 17) { camera {} }
