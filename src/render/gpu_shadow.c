@@ -170,6 +170,24 @@ static void box_gpu_shadow_capture_free(
     }
 }
 
+/** Release the shadow pipelines made on first use of the cascades or the point light octants.
+ *
+ * @param gpu The backend
+ * @param point Whether to release those of the point light octants
+ */
+static void box_gpu_shadow_variants_release(
+    box_gpu_t *gpu,
+    bool point)
+{
+    int32_t i;
+    for (i = 0; i < BOX_GPU_SHADOW_VARIANTS; i ++) {
+        if (gpu->shadow_variants[point][i]) {
+            wgpuRenderPipelineRelease(gpu->shadow_variants[point][i]);
+            gpu->shadow_variants[point][i] = NULL;
+        }
+    }
+}
+
 void box_gpu_shadow_fini(
     box_gpu_t *gpu)
 {
@@ -238,15 +256,8 @@ void box_gpu_shadow_fini(
         gpu->shadow_point_cutout = NULL;
     }
 
-    if (gpu->shadow_cutout_blend) {
-        wgpuRenderPipelineRelease(gpu->shadow_cutout_blend);
-        gpu->shadow_cutout_blend = NULL;
-    }
-
-    if (gpu->shadow_point_cutout_blend) {
-        wgpuRenderPipelineRelease(gpu->shadow_point_cutout_blend);
-        gpu->shadow_point_cutout_blend = NULL;
-    }
+    box_gpu_shadow_variants_release(gpu, false);
+    box_gpu_shadow_variants_release(gpu, true);
 
     gpu->shadow_point_shader = 0;
 
@@ -404,9 +415,9 @@ done:
 
 /** Create a shadow pipeline from the shadow shader.
  *
- * Every pipeline has the same vertex stage and layout and a fragment stage with its inputs, so a
- * compiler that compiles the vertex stage for the inputs of the fragment stage compiles it once.
- * The plain fragment stage writes nothing, the alpha tested one discards below the cutoff.
+ * The plain vertex stages pass on the position only and the plain fragment stage writes nothing;
+ * the alpha tested ones pass on what the alpha test reads and discard below the cutoff. The
+ * surface variants of the vertex stages place the vertices of parametric surfaces.
  *
  * The point light pipelines project into an octant of the tile; without clip distances their
  * fragment stages discard outside the octant. An alpha tested pipeline of
@@ -419,6 +430,7 @@ done:
  * @param discard Whether that pipeline discards outside the octant instead of clipping
  * @param texture_blend Whether the alpha tested pipeline blends the layers of a TextureBlend;
  * ignored without cutout
+ * @param surface Whether the casters are parametric surfaces
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_shadow_create(
@@ -427,9 +439,14 @@ static WGPURenderPipeline box_gpu_shadow_create(
     bool cutout,
     bool point,
     bool discard,
-    bool texture_blend)
+    bool texture_blend,
+    bool surface)
 {
-    const char *vs = point ? "vs_point" : "vs";
+    static const char *vertex[2][2][2] = {
+        { { "vs", "vs_surface" }, { "vs_cutout", "vs_cutout_surface" } },
+        { { "vs_point", "vs_point_surface" }, { "vs_point_cutout", "vs_point_cutout_surface" } }
+    };
+    const char *vs = vertex[point][cutout][surface];
     const char *fs = point
         ? (cutout ? "fs_point_cutout" : (discard ? "fs_point" : "fs"))
         : (cutout ? "fs_cutout" : "fs");
@@ -563,19 +580,15 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
 
     WGPURenderPipeline *current[3] = { &gpu->shadow, &gpu->shadow_cutout, &gpu->shadow_clear };
     WGPURenderPipeline next[3] = {
-        box_gpu_shadow_create(gpu, s->module, false, false, false, false),
-        box_gpu_shadow_create(gpu, s->module, true, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, false, false, false, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, false, false, false, false),
         box_gpu_shadow_clear_create(gpu, s->module)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 3)) {
         goto done;
     }
 
-    if (gpu->shadow_cutout_blend) {
-        wgpuRenderPipelineRelease(gpu->shadow_cutout_blend);
-        gpu->shadow_cutout_blend = NULL;
-    }
-
+    box_gpu_shadow_variants_release(gpu, false);
     gpu->shadow_revision = s->revision;
 done:
     return s && s->module ? gpu->shadow : NULL;
@@ -619,28 +632,18 @@ static WGPURenderPipeline box_gpu_shadow_point_pipeline(
     bool discard = handle == BOX_RENDER_SHADER_SHADOW;
     WGPURenderPipeline *current[2] = { &gpu->shadow_point, &gpu->shadow_point_cutout };
     WGPURenderPipeline next[2] = {
-        box_gpu_shadow_create(gpu, s->module, false, true, discard, false),
-        box_gpu_shadow_create(gpu, s->module, true, true, discard, false)
+        box_gpu_shadow_create(gpu, s->module, false, true, discard, false, false),
+        box_gpu_shadow_create(gpu, s->module, true, true, discard, false, false)
     };
     if (!box_gpu_render_pipelines_swap(current, next, 2)) {
         goto done;
     }
 
-    if (gpu->shadow_point_cutout_blend) {
-        wgpuRenderPipelineRelease(gpu->shadow_point_cutout_blend);
-        gpu->shadow_point_cutout_blend = NULL;
-    }
-
+    box_gpu_shadow_variants_release(gpu, true);
     gpu->shadow_point_shader = handle;
     gpu->shadow_point_revision = s->revision;
 done:
     return s && s->module ? gpu->shadow_point : NULL;
-}
-
-void box_gpu_shadow_request(
-    box_gpu_t *gpu)
-{
-    box_gpu_shadow_pipeline(gpu);
 }
 
 /** Make the shadow map hold the cascades of a view at its resolution.
@@ -694,19 +697,27 @@ done:
     return;
 }
 
-/** Get the alpha tested shadow pipeline of the casters with a TextureBlend, created on first
- * use from the shader the other pipelines of the cascades, or of the point light tiles, were
- * made with, and released with them.
+/** Get a shadow pipeline of the alpha tested casters with a TextureBlend or of the parametric
+ * surfaces, created on first use from the shader the other pipelines of the cascades, or of the
+ * point light tiles, were made with, and released with them.
  *
  * @param gpu The backend
  * @param point Whether to get the pipeline of the octants of the point light tiles
- * @return The pipeline, NULL without a shader module
+ * @param cutout Whether the casters are alpha tested
+ * @param texture_blend Whether the alpha tested casters blend the layers of a TextureBlend
+ * @param surface Whether the casters are parametric surfaces
+ * @return The pipeline, NULL without a shader module or while it is being created
  */
-static WGPURenderPipeline box_gpu_shadow_blend_pipeline(
+static WGPURenderPipeline box_gpu_shadow_variant(
     box_gpu_t *gpu,
-    bool point)
+    bool point,
+    bool cutout,
+    bool texture_blend,
+    bool surface)
 {
-    WGPURenderPipeline *slot = point ? &gpu->shadow_point_cutout_blend : &gpu->shadow_cutout_blend;
+    texture_blend = texture_blend && cutout;
+    int32_t index = surface ? 1 + (int32_t)cutout + (int32_t)texture_blend : 0;
+    WGPURenderPipeline *slot = &gpu->shadow_variants[point][index];
     uint32_t handle = point && gpu->shadow_point_shader
         ? gpu->shadow_point_shader : BOX_RENDER_SHADER_SHADOW;
     box_gpu_shader_t *s = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_t, handle);
@@ -714,10 +725,33 @@ static WGPURenderPipeline box_gpu_shadow_blend_pipeline(
         goto done;
     }
 
-    *slot = box_gpu_shadow_create(gpu, s->module, true, point,
-        handle == BOX_RENDER_SHADER_SHADOW, true);
+    *slot = box_gpu_shadow_create(gpu, s->module, cutout, point,
+        handle == BOX_RENDER_SHADER_SHADOW, texture_blend, surface);
 done:
     return *slot;
+}
+
+void box_gpu_shadow_request(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i;
+    if (!box_gpu_shadow_pipeline(gpu)) {
+        goto done;
+    }
+
+    for (i = 0; i < ecs_vec_count(&packet->batches); i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
+        bool blend = b->cutout && box_gpu_texture_blends(b);
+        if (b->shadow && b->view == -1 && b->blend == Opaque &&
+            box_render_is_mesh(b->pipeline) && (b->surface || blend))
+        {
+            box_gpu_shadow_variant(gpu, false, b->cutout, blend, b->surface);
+        }
+    }
+
+done:
+    return;
 }
 
 /** Record the indirect draws of the shadow casters the cull pass kept in a cascade or a tile.
@@ -726,8 +760,9 @@ done:
  * and the material group of a batch without textures; alpha tested ones with the alpha tested
  * pipeline and the material group of their batch, whose albedo texture they sample.
  *
- * Alpha tested casters with a TextureBlend draw with box_gpu_shadow_blend_pipeline and the
- * blend group of their batch, whose layers they blend.
+ * Alpha tested casters with a TextureBlend draw with a pipeline of box_gpu_shadow_variant and
+ * the blend group of their batch, whose layers they blend. Parametric surfaces draw with the
+ * surface pipelines of box_gpu_shadow_variant, and wait for them.
  *
  * @param gpu The backend
  * @param pass The shadow pass of the cascade or the atlas
@@ -739,7 +774,8 @@ done:
  * @param counted Whether the draws count in the shadow draws of the stats, false for the
  * probe captures
  * @return Whether every caster drew with its own pipeline, false when an alpha tested caster
- * with a TextureBlend drew with the plain one while its pipeline is being created
+ * with a TextureBlend drew with the plain one or a parametric surface did not draw while its
+ * pipeline is being created
  */
 static bool box_gpu_shadow_draw(
     box_gpu_t *gpu,
@@ -761,12 +797,20 @@ static bool box_gpu_shadow_draw(
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
         bool cutout = b->cutout && alpha;
+        bool blend = cutout && box_gpu_texture_blends(b);
         WGPURenderPipeline pipeline = cutout ? alpha : plain;
-        if (cutout && box_gpu_texture_blends(b)) {
-            pipeline = box_gpu_shadow_blend_pipeline(gpu, point);
-            cutout = pipeline != NULL;
-            pipeline = cutout ? pipeline : plain;
-            result = result && cutout;
+        if (blend || b->surface) {
+            pipeline = box_gpu_shadow_variant(gpu, point, cutout, blend, b->surface);
+            result = result && pipeline != NULL;
+        }
+
+        if (!pipeline && !b->surface) {
+            cutout = false;
+            pipeline = plain;
+        }
+
+        if (!pipeline) {
+            continue;
         }
 
         if (pipeline != bound) {

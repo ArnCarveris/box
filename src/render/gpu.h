@@ -689,8 +689,8 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b,
     bool equal);
 
-/** Overrides of the scene features of the extended mesh shader, the bits of
- * BOX_RENDER_FEATURE_OVERRIDES in order; the mesh shader has the first 6 */
+/** Overrides of the extended mesh shader: the bits of BOX_RENDER_FEATURE_OVERRIDES in order,
+ * then transmissive; the mesh shader has the first 6 */
 #define BOX_GPU_FEATURE_OVERRIDES (12)
 
 /** Create the layouts the forward pass shares.
@@ -1168,12 +1168,15 @@ WGPUTextureView box_gpu_shadow_capture(
     const box_render_cascade_t *cascade);
 
 /** Request the shadow pipelines of the cascades, created on first use, so that a capture that
- * renders the casters can wait for them (box_gpu_pipelines_building).
+ * renders the casters can wait for them (box_gpu_pipelines_building), with those the casters of
+ * the packet with a TextureBlend or a parametric surface draw with.
  *
  * @param gpu The backend
+ * @param packet The packet
  */
 void box_gpu_shadow_request(
-    box_gpu_t *gpu);
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Get the shadow map a view samples.
  *

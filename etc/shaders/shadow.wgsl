@@ -77,6 +77,23 @@ struct PointOut {
 #endif
 };
 
+struct ShadowOut {
+    @builtin(position) pos: vec4f,
+};
+
+struct PointShadowOut {
+    @builtin(position) pos: vec4f,
+#ifdef BOX_SHADOW_CLIP_DISTANCES
+    @builtin(clip_distances) clip: array<f32, 3>,
+#else
+    @location(6) clip: vec3f,
+#endif
+};
+
+fn caster_world_mesh(slot: u32, vertex: vec3f) -> vec3f {
+    return (instance_model(transforms[slot]) * vec4f(vertex, 1.0)).xyz;
+}
+
 // World position of a vertex of a caster; sets surface_data. A plain mesh page binds one zero
 // record as its surface stream, so a slot past it leaves surface_data zero (the plain mesh path).
 fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
@@ -155,28 +172,61 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     (*o).object = vec4f(0.0);
     (*o).object_normal = vec3f(0.0);
     if (material_mapped(material) && surface_data.p[0].x == 0.0) {
-        let model = instance_model(transforms[v.slot]);
-        let c0 = model[0].xyz;
-        let c1 = model[1].xyz;
-        let c2 = model[2].xyz;
-        let scale = vec3f(length(c0), length(c1), length(c2));
-        (*o).mapped = 1.0 + material_blend(material);
-        (*o).uv = mapping_offset(material);
-        (*o).object = mapping_object(material, v.position, scale);
-        (*o).object_normal = v.normal;
-        if (material_world(material)) {
-            let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-            (*o).object = mapping_object(material, (model * vec4f(v.position, 1.0)).xyz,
-                vec3f(1.0));
-            (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
-                v.normal * flip;
-        }
+        cutout_mapping(v, material, o);
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
 }
 
-@vertex fn vs(v: VertexIn) -> CasterOut {
+fn cutout_mapping(v: VertexIn, material: Material, o: ptr<function, CasterOut>) {
+    let model = instance_model(transforms[v.slot]);
+    let c0 = model[0].xyz;
+    let c1 = model[1].xyz;
+    let c2 = model[2].xyz;
+    let scale = vec3f(length(c0), length(c1), length(c2));
+    (*o).mapped = 1.0 + material_blend(material);
+    (*o).uv = mapping_offset(material);
+    (*o).object = mapping_object(material, v.position, scale);
+    (*o).object_normal = v.normal;
+    if (material_world(material)) {
+        let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
+        (*o).object = mapping_object(material, (model * vec4f(v.position, 1.0)).xyz,
+            vec3f(1.0));
+        (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
+            v.normal * flip;
+    }
+}
+
+fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
+    let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
+    (*o).uv = v.uv * material.uv.xy + material.uv.zw;
+    (*o).mapped = 0.0;
+    (*o).object = vec4f(0.0);
+    (*o).object_normal = vec3f(0.0);
+    if (material_mapped(material)) {
+        cutout_mapping(v, material, o);
+    }
+    (*o).alpha = shading.alpha;
+    (*o).cutoff = material.cutoff;
+}
+
+@vertex fn vs(v: VertexIn) -> ShadowOut {
+    return ShadowOut(cascade.matrix * vec4f(caster_world_mesh(v.slot, v.position), 1.0));
+}
+
+@vertex fn vs_surface(v: VertexIn) -> ShadowOut {
+    return ShadowOut(caster_position(v.slot, v.position));
+}
+
+@vertex fn vs_cutout(v: VertexIn) -> CasterOut {
+    var o: CasterOut;
+    o.pos = cascade.matrix * vec4f(caster_world_mesh(v.slot, v.position), 1.0);
+    cutout_attributes_mesh(v, &o);
+    return o;
+}
+
+@vertex fn vs_cutout_surface(v: VertexIn) -> CasterOut {
     var o: CasterOut;
     o.pos = caster_position(v.slot, v.position);
     cutout_attributes(v, &o);
@@ -194,7 +244,7 @@ fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     }
 }
 
-@fragment fn fs(f: CasterOut) {
+@fragment fn fs() {
 }
 
 @fragment fn fs_cutout(f: CasterOut) {
@@ -216,11 +266,18 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
     cutout_test_blend(f.uv, f.alpha, f.cutoff, f.mapped, f.object, f.object_normal);
 }
 
-@vertex fn vs_point(v: VertexIn) -> PointOut {
-    let world = caster_world(v.slot, v.position);
+#ifdef BOX_SHADOW_CLIP_DISTANCES
+fn octant_clip(world: vec3f) -> array<f32, 3> {
     let d = octant_distances(world);
-    var c: CasterOut;
-    cutout_attributes(v, &c);
+    return array<f32, 3>(d.x, d.y, d.z);
+}
+#else
+fn octant_clip(world: vec3f) -> vec3f {
+    return octant_distances(world);
+}
+#endif
+
+fn point_out(world: vec3f, c: CasterOut) -> PointOut {
     var o: PointOut;
     o.pos = octant_position(world);
     o.uv = c.uv;
@@ -229,12 +286,32 @@ fn cutout_test_blend(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: ve
     o.mapped = c.mapped;
     o.object = c.object;
     o.object_normal = c.object_normal;
-#ifdef BOX_SHADOW_CLIP_DISTANCES
-    o.clip = array<f32, 3>(d.x, d.y, d.z);
-#else
-    o.clip = d;
-#endif
+    o.clip = octant_clip(world);
     return o;
+}
+
+@vertex fn vs_point(v: VertexIn) -> PointShadowOut {
+    let world = caster_world_mesh(v.slot, v.position);
+    return PointShadowOut(octant_position(world), octant_clip(world));
+}
+
+@vertex fn vs_point_surface(v: VertexIn) -> PointShadowOut {
+    let world = caster_world(v.slot, v.position);
+    return PointShadowOut(octant_position(world), octant_clip(world));
+}
+
+@vertex fn vs_point_cutout(v: VertexIn) -> PointOut {
+    let world = caster_world_mesh(v.slot, v.position);
+    var c: CasterOut;
+    cutout_attributes_mesh(v, &c);
+    return point_out(world, c);
+}
+
+@vertex fn vs_point_cutout_surface(v: VertexIn) -> PointOut {
+    let world = caster_world(v.slot, v.position);
+    var c: CasterOut;
+    cutout_attributes(v, &c);
+    return point_out(world, c);
 }
 
 #ifdef BOX_SHADOW_CLIP_DISTANCES
@@ -254,7 +331,7 @@ fn octant_discard(clip: vec3f) {
     }
 }
 
-@fragment fn fs_point(f: PointOut) {
+@fragment fn fs_point(f: PointShadowOut) {
     octant_discard(f.clip);
 }
 

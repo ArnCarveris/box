@@ -592,8 +592,9 @@ done:
     return result;
 }
 
-/** Check whether a 3D shape draws with the extended mesh shader: its key alpha tests, blends,
- * is transmissive or has a TextureBlend, or it uses a material feature its scene enables.
+/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or has
+ * a TextureBlend, or it uses a material feature its scene enables. Alpha tested and blended
+ * shapes without those draw with the mesh shader.
  *
  * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy
  * or DiffuseTransmission; only a scene with some of those off checks which.
@@ -613,8 +614,7 @@ static bool box_draws_extended(
     const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
         BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION;
     uint32_t f = key->features;
-    bool result = key->cutout || key->blend != Opaque || key->transmissive ||
-        key->texture_blend;
+    bool result = key->transmissive || key->texture_blend;
     const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
         ? NULL : ecs_get(world, e, TextureMapping);
     ecs_iter_t it;

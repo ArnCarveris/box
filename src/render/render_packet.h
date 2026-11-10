@@ -579,8 +579,8 @@ typedef struct box_render_view_gtao_t {
 #define BOX_RENDER_FEATURE_TRIPLANAR (1u << 10)
 #define BOX_RENDER_FEATURE_TRANSMISSION (1u << 11)
 
-/** Scene features of the extended mesh shader without an override: the TextureBlend entry
- * points, and the alpha test and blend modes of its DrawKind */
+/** Scene features of the mesh shaders without an override: the TextureBlend entry points of the
+ * extended mesh shader, and the alpha test and blend modes of the DrawKind */
 #define BOX_RENDER_FEATURE_TEXTURE_BLEND (1u << 12)
 #define BOX_RENDER_FEATURE_ALPHA_CUTOUT (1u << 13)
 #define BOX_RENDER_FEATURE_BLEND_MODES (1u << 14)
@@ -593,10 +593,11 @@ typedef struct box_render_view_gtao_t {
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
 /** The scene features that draw with the extended mesh shader */
-#define BOX_RENDER_FEATURE_MATERIALS (0x7FC0u)
+#define BOX_RENDER_FEATURE_MATERIALS (0x1FC0u)
 
-/** The scene features that are overrides, which key the pipelines of the mesh shaders */
-#define BOX_RENDER_FEATURE_OVERRIDES (0xFFFu)
+/** The scene features that are overrides, which key the pipelines of the mesh shaders; the
+ * transmission override follows the transmissive pipelines instead */
+#define BOX_RENDER_FEATURE_OVERRIDES (0x7FFu)
 
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
@@ -1222,6 +1223,9 @@ typedef struct box_render_batch_t {
     bool texture_blend;         /**< The instances have a TextureBlend: the texture_blend variant
                                  *   of the mesh pipeline samples the layers at blend_layers in
                                  *   place of the albedo, ORM and normal textures */
+    bool surface;               /**< The instances are parametric surfaces, drawn with the
+                                 *   surface variants of the vertex stages of the mesh and shadow
+                                 *   shaders */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t blend_layers;      /**< Data offset of the box_render_texture_blend_t of a batch

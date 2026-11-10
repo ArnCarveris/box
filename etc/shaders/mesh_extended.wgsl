@@ -1,33 +1,21 @@
-// Forward pass of the meshes the mesh shader does not draw (box_draws_extended): alpha tested,
-// blended (BlendMode) or transmissive (Transmission), with a TextureBlend, a triplanar
-// TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or DiffuseTransmission.
+// Forward pass of the meshes the mesh shader does not draw (box_draws_extended): transmissive
+// (Transmission), with a TextureBlend, a triplanar TextureMapping, Sheen, ClearCoat,
+// SpecularAnisotropy or DiffuseTransmission.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
 #include "include/blend.wgsl"
 
-// What a draw shades, at the dynamic offset of its batch (box_gpu_draw_kind), so one compiled
-// fragment stage serves every kind: blend_mode is the BlendMode the output is shaped for,
-// alpha_cutout tests the fragments against the cutoff of their material (AlphaCutoff), and
-// transmissive draws Transmission shapes, through which the opaque snapshot of the view shows.
-// The material features of the scene (Scene) compile out the code of those it lacks;
-// the alpha test, the blend modes and the TextureBlend have no override.
+// The material features of the scene (Scene) compile out the code of those it lacks; the alpha
+// test, the blend modes and the TextureBlend have no override. transmissive is set for the
+// pipelines of Transmission shapes, through which the opaque snapshot of the view shows.
 override material_sheen: bool = true;
 override material_anisotropy: bool = true;
 override material_clear_coat: bool = true;
 override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
-override material_transmission: bool = true;
-
-struct DrawKind {
-    blend_mode: u32,
-    transmissive: u32,
-    alpha_cutout: u32,
-    pad: u32,
-};
-
-@group(1) @binding(11) var<uniform> kind: DrawKind;
+override transmissive: bool = false;
 
 // Group 1 of fs_blend and fs_depth_cutout_blend besides emissive_map and material_sampler: the
 // albedo (decoded from sRGB), ORM and normal of each layer as a slice of an array, the mask as
@@ -52,39 +40,21 @@ struct DrawKind {
 // placeholder.
 @group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
 
-// Depth prepass of a lit view (box_gpu_draw_prepass_draws). fs_depth_cutout discards what fs
-// discards; the forward pass after the prepass does not alpha test, its Equal depth test rejects
-// those.
-@fragment fn fs_depth_cutout(f: VertexOut) {
-    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, vo_scalars(f).w, f.object,
-        f.object_normal);
-    if (f.color.a * albedo < vo_scalars(f).x) {
-        discard;
-    }
-}
-
-@fragment fn fs_depth_cutout_blend(f: VertexOut) {
+// Depth prepass of a lit view (box_gpu_draw_prepass_draws). fs_depth_cutout_blend discards what
+// fs_blend_cutout discards; the forward pass after the prepass does not alpha test, its Equal
+// depth test rejects those.
+@fragment fn fs_depth_cutout_blend(f: CutoutOut) {
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv.xy, vo_scalars(f).w, f.object, f.object_normal);
-    if (f.color.a * albedo < vo_scalars(f).x) {
+        f.uv, cutout_scalars(f).w, f.object, f.object_normal);
+    if (f.alpha * albedo < cutout_scalars(f).x) {
         discard;
     }
 }
 
-@fragment fn fs_count_cutout(f: VertexOut) -> @location(0) vec4f {
-    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv.xy, vo_scalars(f).w, f.object,
-        f.object_normal);
-    if (f.color.a * albedo < vo_scalars(f).x) {
-        discard;
-    }
-
-    return vec4f(0.0, 1.0, 0.0, 0.0);
-}
-
-@fragment fn fs_count_cutout_blend(f: VertexOut) -> @location(0) vec4f {
+@fragment fn fs_count_cutout_blend(f: CutoutOut) -> @location(0) vec4f {
     let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv.xy, vo_scalars(f).w, f.object, f.object_normal);
-    if (f.color.a * albedo < vo_scalars(f).x) {
+        f.uv, cutout_scalars(f).w, f.object, f.object_normal);
+    if (f.alpha * albedo < cutout_scalars(f).x) {
         discard;
     }
 
@@ -536,7 +506,12 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     }
     let spec = mix(r, n, a);
     let cluster = fragment_cluster(world);
-    let e = indirect_light(world, n, spec, s.roughness, cluster);
+    let nc = s.geometric;
+    let ac = s.coat_roughness * s.coat_roughness;
+    let spec_coat = mix(reflect(-v, nc), nc, ac);
+    let coat = material_clear_coat && s.coat > 0.0;
+    let e = indirect_lobes(world, n, spec, s.roughness, cluster, s.back_factor > 0.0, nc,
+        spec_coat, s.coat_roughness, coat);
     let specular_light = e.specular;
     let diffuse_light = e.diffuse;
 
@@ -550,7 +525,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         s.occlusion;
     var indirect_back = vec3f(0.0);
     if (s.back_factor > 0.0) {
-        indirect_back = s.back_color * indirect_light(world, -n, -n, 1.0, cluster).diffuse;
+        indirect_back = s.back_color * e.back;
     }
 
     // A sheen reflects the indirect diffuse light by the fit of its albedo, and the base keeps
@@ -566,16 +541,12 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 
     // The clear coat reflects the light along the reflection about its own normal at its own
     // roughness, by the split sum albedo of a dielectric, and the base below it what it does not.
-    if (material_clear_coat && s.coat > 0.0) {
-        let nc = s.geometric;
-        let ac = s.coat_roughness * s.coat_roughness;
+    if (coat) {
         let ndv_coat = max(dot(nc, v), 1e-4);
         let ab_coat = env_brdf(s.coat_roughness, ndv_coat);
-        let spec_coat = mix(reflect(-v, nc), nc, ac);
-        let coat_light = indirect_light(world, nc, spec_coat, s.coat_roughness, cluster).specular;
         let coat_albedo = (0.04 * ab_coat.x + ab_coat.y) * s.coat;
         indirect_specular = indirect_specular * (1.0 - coat_albedo) +
-            coat_albedo * coat_light * specular_occlusion(ndv_coat, s.occlusion, ac);
+            coat_albedo * e.coat * specular_occlusion(ndv_coat, s.occlusion, ac);
         indirect_diffuse *= 1.0 - coat_albedo;
         indirect_back *= 1.0 - coat_albedo;
     }
@@ -588,45 +559,6 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     let direct = lights_direct(s, v, world, cluster, sides, s.thickness);
     return Lit(direct.diffuse + indirect_diffuse, direct.specular + indirect_specular +
         s.emissive);
-}
-
-// Color of a fragment seen through the atmosphere between it and the camera, shaped for the
-// blend equation: a fragment that covers the target is attenuated and adds the in scattered
-// light weighted by its coverage, light added to or taken from the target is only attenuated,
-// and a filter of the target is left as it is.
-fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
-    let ap = aerial_sample(pos, world);
-    switch kind.blend_mode {
-        case 0u, 1u: {
-            return color * ap.a + ap.rgb;
-        }
-        case 2u: {
-            return color * ap.a + ap.rgb * alpha;
-        }
-        case 4u, 7u: {
-            return color;
-        }
-        default: {
-            return color * ap.a;
-        }
-    }
-}
-
-fn output(color: vec3f, alpha: f32) -> vec4f {
-    switch kind.blend_mode {
-        case 0u: {
-            return vec4f(color, 1.0);
-        }
-        case 4u, 7u: {
-            return vec4f(mix(vec3f(1.0), color, alpha), alpha);
-        }
-        case 5u, 8u: {
-            return vec4f(color * alpha, alpha);
-        }
-        default: {
-            return vec4f(color, alpha);
-        }
-    }
 }
 
 // Mip of the opaque snapshot for a DiffuseTransmission.blur: the blur radius grows by blur world
@@ -718,13 +650,13 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
 // call.
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     var s = shaded;
-    if (kind.transmissive == 0u && kind.blend_mode == 0u) {
+    if (!transmissive && kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
     let v = normalize(view.camera.xyz - f.world);
     let reflected = shade_split(s, v, f.world);
-    if (material_transmission && kind.transmissive != 0u) {
+    if (transmissive) {
         return transmission(f, s, v, reflected);
     }
 
@@ -737,8 +669,12 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 }
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, surface(f, front));
+}
+
+@fragment fn fs_cutout(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let s = surface(f, front);
-    if (kind.alpha_cutout != 0u && s.alpha < vo_scalars(f).x) {
+    if (s.alpha < vo_scalars(f).x) {
         discard;
     }
 
@@ -746,20 +682,16 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 }
 
 @fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, surface_blend(f, front));
+}
+
+@fragment fn fs_blend_cutout(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
     let s = surface_blend(f, front);
-    if (kind.alpha_cutout != 0u && s.alpha < vo_scalars(f).x) {
+    if (s.alpha < vo_scalars(f).x) {
         discard;
     }
 
     return lit(f, s);
-}
-
-@fragment fn fs_opaque(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
-    return lit(f, surface(f, front));
-}
-
-@fragment fn fs_blend_opaque(f: VertexOut, @builtin(front_facing) front: bool)
-    -> @location(0) vec4f
-{
-    return lit(f, surface_blend(f, front));
 }

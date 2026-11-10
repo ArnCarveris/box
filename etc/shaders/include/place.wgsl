@@ -23,11 +23,20 @@ struct Placed {
     pos: vec4f,
 };
 
+fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
+    let model = instance_model(transforms[v.slot]);
+    let world = model * vec4f(position, 1.0);
+    return Placed(model, normal, world, view.view_proj * world);
+}
+
+fn place_mesh(v: VertexIn) -> Placed {
+    return place_at(v, v.position, v.normal);
+}
+
 fn place(v: VertexIn) -> Placed {
     if (v.slot < arrayLength(&surfaces)) {
         surface_data = surfaces[v.slot];
     }
-    let model = instance_model(transforms[v.slot]);
     var position = v.position;
     var normal = v.normal;
     // One call of surface_normal for both branches that need it, as D3D compilers inline each
@@ -51,6 +60,5 @@ fn place(v: VertexIn) -> Placed {
     if (derive) {
         normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
     }
-    let world = model * vec4f(position, 1.0);
-    return Placed(model, normal, world, view.view_proj * world);
+    return place_at(v, position, normal);
 }

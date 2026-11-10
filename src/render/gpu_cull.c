@@ -137,6 +137,7 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->groups, box_gpu_cull_group_t, 0);
     ecs_vec_init_t(NULL, &c->entries, int32_t, 0);
     ecs_vec_init_t(NULL, &c->masks, uint32_t, 0);
+    ecs_vec_init_t(NULL, &c->sort, box_gpu_cull_sort_t, 0);
     ecs_vec_init_t(NULL, &c->frustums, box_gpu_cull_desc_t, 0);
     if (gpu->timestamps) {
         c->stamps = wgpuDeviceCreateQuerySet(gpu->device, &(WGPUQuerySetDescriptor){
@@ -247,6 +248,7 @@ void box_gpu_cull_fini(
     ecs_vec_fini_t(NULL, &c->groups, box_gpu_cull_group_t);
     ecs_vec_fini_t(NULL, &c->entries, int32_t);
     ecs_vec_fini_t(NULL, &c->masks, uint32_t);
+    ecs_vec_fini_t(NULL, &c->sort, box_gpu_cull_sort_t);
     ecs_vec_fini_t(NULL, &c->frustums, box_gpu_cull_desc_t);
     if (c->stamps) {
         wgpuQuerySetRelease(c->stamps);

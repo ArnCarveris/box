@@ -1,7 +1,7 @@
-// Forward pass of the opaque meshes without an alpha test, a TextureBlend, a triplanar
-// TextureMapping, Sheen, ClearCoat, SpecularAnisotropy, DiffuseTransmission or Transmission,
-// which mesh_extended.wgsl draws (box_draws_extended). It writes depth and shades the metallic
-// roughness base of the material: a GGX specular and a Lambert diffuse lobe.
+// Forward pass of the meshes without a TextureBlend, a triplanar TextureMapping, Sheen,
+// ClearCoat, SpecularAnisotropy, DiffuseTransmission or Transmission, which mesh_extended.wgsl
+// draws (box_draws_extended). It shades the metallic roughness base of the material: a GGX
+// specular and a Lambert diffuse lobe.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
@@ -13,6 +13,7 @@
 // offset along.
 struct Surface {
     albedo: vec3f,
+    alpha: f32,
     metallic: f32,
     roughness: f32,
     occlusion: f32,
@@ -26,6 +27,7 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     let layers = hard_layers(f, geometric);
     var s: Surface;
     s.albedo = f.color.rgb;
+    s.alpha = f.color.a;
     s.metallic = clamp(f.uv.z, 0.0, 1.0);
     s.roughness = clamp(f.uv.w, MIN_ROUGHNESS, 1.0);
     s.occlusion = 1.0;
@@ -34,12 +36,15 @@ fn surface(f: VertexOut, front: bool) -> Surface {
     s.geometric = -geometric;
     if (front) {
         s.albedo *= layers.albedo.rgb;
+        s.alpha *= layers.albedo.a;
         s.metallic = clamp(f.uv.z * layers.orm.b, 0.0, 1.0);
         s.roughness = clamp(f.uv.w * layers.orm.g, MIN_ROUGHNESS, 1.0);
         s.occlusion = layers.orm.r;
         s.emissive *= layers.emissive;
         s.normal = layers.normal;
         s.geometric = geometric;
+    } else if (kind.alpha_cutout != 0u) {
+        s.alpha *= layers.albedo.a;
     }
 
     return s;
@@ -90,17 +95,31 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
         s.emissive);
 }
 
-// The forward pass of a view with and without a depth prepass, compare Equal and Greater.
-@fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
-    var s = surface(f, front);
-    s.occlusion = min(s.occlusion, view_occlusion(f.pos));
-    let v = normalize(view.camera.xyz - f.world);
-    let lit = shade(s, v, f.world);
-    var color = lit.diffuse + lit.specular;
-    if (scene_aerial && view.aerial.w > 0.0) {
-        let ap = aerial_sample(f.pos, f.world);
-        color = color * ap.a + ap.rgb;
+fn lit(f: VertexOut, shaded: Surface) -> vec4f {
+    var s = shaded;
+    if (kind.blend_mode == 0u) {
+        s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
-    return vec4f(color, 1.0);
+    let v = normalize(view.camera.xyz - f.world);
+    let reflected = shade(s, v, f.world);
+    var color = reflected.diffuse + reflected.specular;
+    if (scene_aerial && view.aerial.w > 0.0) {
+        color = aerial_perspective(color, s.alpha, f.pos, f.world);
+    }
+
+    return output(color, s.alpha);
+}
+
+@fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, surface(f, front));
+}
+
+@fragment fn fs_cutout(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    let s = surface(f, front);
+    if (s.alpha < vo_scalars(f).x) {
+        discard;
+    }
+
+    return lit(f, s);
 }

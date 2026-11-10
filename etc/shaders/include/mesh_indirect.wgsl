@@ -94,6 +94,22 @@ fn visibility_from(index: u32, offset: vec3f) -> f32 {
     return p * p * p;
 }
 
+fn volume_reached(n: vec3f, to_probe: vec3f, dist: f32, trilinear: vec3f, valid: u32) -> f32 {
+    let dir = select(n, to_probe / max(dist, 1e-4), dist > 1e-4);
+    let wrap = (dot(dir, n) + 1.0) * 0.5;
+    return trilinear.x * trilinear.y * trilinear.z * (wrap * wrap + 0.2) * f32(valid);
+}
+
+fn volume_resolve(sum: vec3f, total: f32, reach: f32, dir: vec3f) -> vec3f {
+    if (reach <= 0.0) {
+        return view_ambient(dir);
+    }
+
+    let fallback = max(VISIBILITY_FALLBACK * reach - total, 0.0);
+    let scale = 1.0 / (PI * (total + fallback));
+    return max((sum + view_ambient(dir) * (PI * fallback)) * scale, vec3f(0.0));
+}
+
 // Irradiance blended from the 8 probes around a position: trilinear weights times the wrapped
 // cosine toward the probe and the visibility from the probe, as in DDGI. Invalid probes are
 // skipped. The ambient makes up the weight the visible probes lack below VISIBILITY_FALLBACK, so
@@ -120,9 +136,7 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
         let position = volume.origin.xyz + vec3f(p) * volume.origin.w;
         let to_probe = position - world;
         let dist = length(to_probe);
-        let dir = select(n, to_probe / max(dist, 1e-4), dist > 1e-4);
-        let wrap = (dot(dir, n) + 1.0) * 0.5;
-        let reached = trilinear.x * trilinear.y * trilinear.z * (wrap * wrap + 0.2) * f32(valid);
+        let reached = volume_reached(n, to_probe, dist, trilinear, valid);
         if (reached > 0.0) {
             let w = reached * visibility_from(index, biased - position);
             let at = index * SH_COEFFICIENTS;
@@ -142,15 +156,8 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
         }
     }
 
-    if (reach <= 0.0) {
-        return Indirect(view_ambient(n), view_ambient(spec));
-    }
-
-    let fallback = max(VISIBILITY_FALLBACK * reach - total, 0.0);
-    let scale = 1.0 / (PI * (total + fallback));
-    diffuse = (diffuse + view_ambient(n) * (PI * fallback)) * scale;
-    specular = (specular + view_ambient(spec) * (PI * fallback)) * scale;
-    return Indirect(max(diffuse, vec3f(0.0)), max(specular, vec3f(0.0)));
+    return Indirect(volume_resolve(diffuse, total, reach, n),
+        volume_resolve(specular, total, reach, spec));
 }
 
 // A world direction or offset in the frame of the boxes of a reflection probe.
@@ -319,4 +326,171 @@ fn env_brdf(roughness: f32, ndv: f32) -> vec2f {
     let r = roughness * c0 + c1;
     let a004 = min(r.x * r.x, exp2(-9.28 * ndv)) * r.x + r.y;
     return vec2f(-1.04, 1.04) * a004 + r.zw;
+}
+
+struct IndirectLobes {
+    diffuse: vec3f,
+    specular: vec3f,
+    back: vec3f,
+    coat: vec3f,
+};
+
+fn volume_lobes(world: vec3f, n: vec3f, spec: vec3f, back: bool, nc: vec3f, spec_coat: vec3f,
+    coat: bool) -> IndirectLobes {
+    let size = volume.size.xyz;
+    let g = clamp((world - volume.origin.xyz) / volume.origin.w, vec3f(0.0), vec3f(size - 1u));
+    let base = min(vec3u(floor(g)), max(size, vec3u(2u)) - 2u);
+    let t = clamp(g - vec3f(base), vec3f(0.0), vec3f(1.0));
+    let cells = max(size, vec3u(2u)) - 1u;
+    let cell = base.x + (base.y + base.z * cells.y) * cells.x;
+    let corners = cell_valid[cell >> 2u] >> ((cell & 3u) * 8u);
+    let nb = -n;
+    let biased = world + n * (VISIBILITY_BIAS * volume.origin.w);
+    let biased_back = world + nb * (VISIBILITY_BIAS * volume.origin.w);
+    let biased_coat = world + nc * (VISIBILITY_BIAS * volume.origin.w);
+    var diffuse = vec3f(0.0);
+    var specular = vec3f(0.0);
+    var back_diffuse = vec3f(0.0);
+    var coat_specular = vec3f(0.0);
+    var total = 0.0;
+    var reach = 0.0;
+    var back_total = 0.0;
+    var back_reach = 0.0;
+    var coat_total = 0.0;
+    var coat_reach = 0.0;
+    for (var i = 0u; i < 8u; i++) {
+        let o = vec3u(i & 1u, (i >> 1u) & 1u, (i >> 2u) & 1u);
+        let p = min(base + o, size - 1u);
+        let index = p.x + (p.y + p.z * size.y) * size.x;
+        let valid = (corners >> i) & 1u;
+        let trilinear = select(1.0 - t, t, o == vec3u(1u));
+        let position = volume.origin.xyz + vec3f(p) * volume.origin.w;
+        let to_probe = position - world;
+        let dist = length(to_probe);
+        let reached = volume_reached(n, to_probe, dist, trilinear, valid);
+        var reached_back = 0.0;
+        if (back) {
+            reached_back = volume_reached(nb, to_probe, dist, trilinear, valid);
+        }
+        var reached_coat = 0.0;
+        if (coat) {
+            reached_coat = volume_reached(nc, to_probe, dist, trilinear, valid);
+        }
+        if (reached > 0.0 || reached_back > 0.0 || reached_coat > 0.0) {
+            let at = index * SH_COEFFICIENTS;
+            let e0 = probes[at].rgb;
+            let e1 = probes[at + 1u].rgb;
+            let e2 = probes[at + 2u].rgb;
+            let e3 = probes[at + 3u].rgb;
+            let e4 = probes[at + 4u].rgb;
+            let e5 = probes[at + 5u].rgb;
+            let e6 = probes[at + 6u].rgb;
+            let e7 = probes[at + 7u].rgb;
+            let e8 = probes[at + 8u].rgb;
+            if (reached > 0.0) {
+                let w = reached * visibility_from(index, biased - position);
+                diffuse += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, n) * w;
+                specular += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, spec) * w;
+                total += w;
+                reach += reached;
+            }
+            if (reached_back > 0.0) {
+                let w = reached_back * visibility_from(index, biased_back - position);
+                back_diffuse += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, nb) * w;
+                back_total += w;
+                back_reach += reached_back;
+            }
+            if (reached_coat > 0.0) {
+                let w = reached_coat * visibility_from(index, biased_coat - position);
+                coat_specular += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, spec_coat) * w;
+                coat_total += w;
+                coat_reach += reached_coat;
+            }
+        }
+    }
+
+    return IndirectLobes(volume_resolve(diffuse, total, reach, n),
+        volume_resolve(specular, total, reach, spec),
+        volume_resolve(back_diffuse, back_total, back_reach, nb),
+        volume_resolve(coat_specular, coat_total, coat_reach, spec_coat));
+}
+
+struct Reflected {
+    base: vec3f,
+    coat: vec3f,
+};
+
+fn reflections_lobes(world: vec3f, spec: vec3f, roughness: f32, fallback: vec3f, coat: bool,
+    spec_coat: vec3f, coat_roughness: f32, coat_fallback: vec3f, cluster: u32) -> Reflected {
+    let levels = f32(textureNumLevels(reflection_cubes) - 1u);
+    let mip = roughness * levels;
+    let mip_coat = coat_roughness * levels;
+    var sum = vec3f(0.0);
+    var sum_coat = vec3f(0.0);
+    var left = 1.0;
+    if (view.grid.w > 0u) {
+        let count = clusters[2u + 2u * cluster];
+        let listed = cluster_probes(count);
+        let first = 1u + 2u * cluster_count(view) + clusters[1u + 2u * cluster] +
+            cluster_lights(count);
+        for (var i = 0u; i < listed && left > REFLECTION_EPSILON; i++) {
+            let p = reflection_probes[clusters[first + i]];
+            let w = probe_fade(p, world) * left * f32(p.ready);
+            if (w > 0.0) {
+                sum += probe_radiance(p, world, spec, mip, fallback) * w;
+                if (coat) {
+                    sum_coat += probe_radiance(p, world, spec_coat, mip_coat, coat_fallback) * w;
+                }
+                left -= w;
+            }
+        }
+    }
+
+    if (left > REFLECTION_EPSILON) {
+        let last = view.reflection.x - 1u;
+        var rest = fallback;
+        var rest_coat = coat_fallback;
+        if (view.reflection.x > view.grid.w && reflection_probes[last].ready != 0u) {
+            rest = probe_radiance(reflection_probes[last], world, spec, mip, fallback);
+            if (coat) {
+                rest_coat = probe_radiance(reflection_probes[last], world, spec_coat, mip_coat,
+                    coat_fallback);
+            }
+        } else if (scene_environment && view.environment.w > 0.0) {
+            rest = environment_radiance(spec, roughness, fallback);
+            if (coat) {
+                rest_coat = environment_radiance(spec_coat, coat_roughness, coat_fallback);
+            }
+        }
+
+        sum += rest * left;
+        sum_coat += rest_coat * left;
+    }
+
+    return Reflected(sum, sum_coat);
+}
+
+fn indirect_lobes(world: vec3f, n: vec3f, spec: vec3f, roughness: f32, cluster: u32, back: bool,
+    nc: vec3f, spec_coat: vec3f, coat_roughness: f32, coat: bool) -> IndirectLobes {
+    var e: IndirectLobes;
+    if (view_samples_volume()) {
+        e = volume_lobes(world, n, spec, back, nc, spec_coat, coat);
+    } else {
+        e = IndirectLobes(view_ambient(n), view_ambient(spec), view_ambient(-n),
+            view_ambient(spec_coat));
+    }
+
+    if (scene_reflections && view.reflection.x > 0u) {
+        let r = reflections_lobes(world, spec, roughness, e.specular, coat, spec_coat,
+            coat_roughness, e.coat, cluster);
+        e.specular = r.base;
+        e.coat = r.coat;
+    } else if (scene_environment && view.environment.w > 0.0) {
+        e.specular = environment_radiance(spec, roughness, e.specular);
+        if (coat) {
+            e.coat = environment_radiance(spec_coat, coat_roughness, e.coat);
+        }
+    }
+
+    return e;
 }

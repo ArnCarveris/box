@@ -1360,6 +1360,7 @@ static void box_draws_send_batch(
     out->shadow = b->key.shadow;
     out->fixture = b->key.fixture;
     out->bake = b->key.bake;
+    out->surface = b->key.surface;
     out->mesh = b->key.mesh;
     box_draws_batch_textures(d, b, out);
     box_draws_batch_blend(p, d, b, out);
@@ -1474,6 +1475,7 @@ static void box_draws_send_blended(
             out->transmissive = b->key.transmissive;
             out->shadow = b->key.shadow;
             out->fixture = b->key.fixture;
+            out->surface = b->key.surface;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             box_draws_batch_blend(p, d, b, out);

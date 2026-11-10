@@ -1479,7 +1479,7 @@ static void box_gpu_bake_chunk_capture(
     int32_t i, faces = count * 6;
     bool caster = cascade && !*shadow;
     if (cascade) {
-        box_gpu_shadow_request(gpu);
+        box_gpu_shadow_request(gpu, packet);
     }
 
     if (!pipeline || !box_gpu_bake_fits(pass, probes, count) || box_gpu_pipelines_building(gpu)) {

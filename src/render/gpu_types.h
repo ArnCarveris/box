@@ -60,6 +60,8 @@
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
 
+#define BOX_GPU_SHADOW_VARIANTS (4)
+
 /** Color format of the HDR target a view with effects renders into */
 #define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
 
@@ -553,6 +555,14 @@ typedef struct box_gpu_cull_page_t {
 /** Copies of the cull counters in flight at most */
 #define BOX_GPU_CULL_READBACKS (4)
 
+/** A batch of the packet in the order a cull group adds its draws */
+typedef struct box_gpu_cull_sort_t {
+    int32_t phase;                  /**< Phase of the batch, see box_gpu_cull_phase */
+    int32_t batch;                  /**< Index of the batch in the packet */
+    uint64_t state;                 /**< Pipeline state of an opaque mesh batch, else 0 */
+    uint64_t material;              /**< Hash of its material group, else 0 */
+} box_gpu_cull_sort_t;
+
 /** Cull pass state: the frustums, draws and buffers of the target being rendered */
 typedef struct box_gpu_cull_t {
     WGPUBindGroupLayout layout;     /**< Bind group layout of the cull pass */
@@ -608,6 +618,8 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t entries;              /**< int32_t, the draw of each frustum of a parallel job */
     ecs_vec_t masks;                /**< uint32_t, the frustums of the group being added that
                                      *   draw each batch of the packet */
+    ecs_vec_t sort;                 /**< box_gpu_cull_sort_t, the batches of the group being
+                                     *   added in the order of their draws */
     ecs_vec_t frustums;             /**< Frustums of the view being added */
     int32_t copies;                 /**< Copies of cascade 0 added to each view, for tests */
     int64_t counting;               /**< History ranges passes, marks the pages counted */
@@ -834,12 +846,9 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout shadow_blend_layout; /**< Pipeline layout of the alpha tested casters
                                      *   with a TextureBlend: the shadow pass groups and the blend
                                      *   group, NULL until the first one draws */
-    WGPURenderPipeline shadow_cutout_blend; /**< Shadow pipeline of the alpha tested casters with
-                                     *   a TextureBlend (fs_cutout_blend), NULL until the first
-                                     *   one draws with the current shader */
-    WGPURenderPipeline shadow_point_cutout_blend; /**< Its point light pipeline
-                                     *   (fs_point_cutout_blend), NULL until the first one draws
-                                     *   with the current variant */
+    WGPURenderPipeline shadow_variants[2][BOX_GPU_SHADOW_VARIANTS]; /**< Pipelines made on
+                                     *   first use by box_gpu_shadow_variant, of the cascades and
+                                     *   spot tiles, then of the point light octants */
     uint32_t shadow_point_shader;   /**< Handle of the shadow shader variant they were made
                                      *   with, BOX_RENDER_SHADER_SHADOW_CLIP or _SHADOW */
     int32_t shadow_point_revision;  /**< Revision of that shader */

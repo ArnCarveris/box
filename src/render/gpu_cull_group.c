@@ -582,11 +582,73 @@ static int32_t box_gpu_cull_phase(
     return result;
 }
 
+/** Get the order of the draws of a cull group: by phase, the opaque meshes by pipeline state and
+ * then by material group, else in packet order.
+ *
+ * @param a The first batch
+ * @param b The second batch
+ * @return Negative when a draws first
+ */
+static int box_gpu_cull_sort_cmp(
+    const void *a,
+    const void *b)
+{
+    const box_gpu_cull_sort_t *sa = a, *sb = b;
+    int result = (sa->phase > sb->phase) - (sa->phase < sb->phase);
+    if (!result) {
+        result = (sa->state > sb->state) - (sa->state < sb->state);
+    }
+
+    if (!result) {
+        result = (sa->material > sb->material) - (sa->material < sb->material);
+    }
+
+    if (!result) {
+        result = (sa->batch > sb->batch) - (sa->batch < sb->batch);
+    }
+
+    return result;
+}
+
+/** Describe a batch a cull group draws for the order of its draws.
+ *
+ * @param b The batch
+ * @param batch Index of the batch in the packet
+ * @param out Receives the description
+ */
+static void box_gpu_cull_sort_key(
+    const box_render_batch_t *b,
+    int32_t batch,
+    box_gpu_cull_sort_t *out)
+{
+    uint64_t h = (uint64_t)b->wrap * 0x9E3779B97F4A7C15ull + b->blend_layers;
+    int32_t i;
+    out->phase = box_gpu_cull_phase(b);
+    out->batch = batch;
+    out->state = 0;
+    out->material = 0;
+    if (out->phase > 1) {
+        goto done;
+    }
+
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + b->textures[i];
+    }
+
+    out->state = ((uint64_t)b->pipeline << 40) | ((uint64_t)b->texture_blend << 39) |
+        ((uint64_t)b->surface << 38) | ((uint64_t)(b->back_face != BackFaceCull) << 37) |
+        b->features;
+    out->material = h;
+done:
+    return;
+}
+
 /** Add a cull group: frustums of a scene that one pass tests together, with their cull views,
  * draws, jobs and dispatches.
  *
- * Each frustum is a cull view with its own draws, added by phase, in packet order within a
- * phase, so the alpha tested casters follow the plain ones.
+ * Each frustum is a cull view with its own draws, added by phase, so the alpha tested casters
+ * follow the plain ones. The opaque meshes are grouped by pipeline state and material group
+ * within their phase (box_gpu_cull_sort_cmp), the rest keep packet order.
  *
  * A batch several frustums draw is one job with their mask. At most one frustum has a history.
  *
@@ -687,13 +749,23 @@ static void box_gpu_cull_group_add(
         ecs_vec_grow_t(NULL, &c->draws, box_gpu_cull_draw_t, total);
     }
 
-    for (i = 0; i < batches * BOX_GPU_CULL_DRAW_PHASES; i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(
-            &packet->batches, box_render_batch_t, i % batches);
-        if (masks[i % batches] && box_gpu_cull_phase(b) == i / batches) {
-            box_gpu_cull_batch_add(gpu, packet, group, i % batches, masks[i % batches],
-                filled, history, hist);
+    ecs_vec_clear(&c->sort);
+    for (i = 0; i < batches; i ++) {
+        if (masks[i]) {
+            box_gpu_cull_sort_key(ecs_vec_get_t(&packet->batches, box_render_batch_t, i), i,
+                ecs_vec_append_t(NULL, &c->sort, box_gpu_cull_sort_t));
         }
+    }
+
+    int32_t sorted = ecs_vec_count(&c->sort);
+    box_gpu_cull_sort_t *order = ecs_vec_first(&c->sort);
+    if (sorted > 1) {
+        qsort(order, (size_t)sorted, sizeof(box_gpu_cull_sort_t), box_gpu_cull_sort_cmp);
+    }
+
+    for (i = 0; i < sorted; i ++) {
+        box_gpu_cull_batch_add(gpu, packet, group, order[i].batch, masks[order[i].batch],
+            filled, history, hist);
     }
 
     for (f = 0; f < count; f ++) {

@@ -387,40 +387,6 @@ void MeshShader_no_scene_features_draws_with_mesh_shader(void) {
     box_render_null_free(null);
 }
 
-void MeshShader_alpha_cutoff_draws_with_extended(void) {
-    // render/mesh_shader
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-    box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
-    ecs_entity_t shape = ecs_new(world);
-    ecs_set(world, shape, Position, {0, 0, 0});
-    ecs_set(world, shape, Box, {1, 1, 1});
-    ecs_set(world, shape, AlphaCutoff, {0.5f});
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
-    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
-    box_draw_batch_t *b = box_draws_batch(d, shape_slot->batch);
-    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
-    test_bool(b->key.cutout, true);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
 void MeshShader_alpha_cutoff_off_draws_opaque(void) {
     // render/mesh_shader
     ecs_world_t *world = ecs_init();
@@ -449,40 +415,6 @@ void MeshShader_alpha_cutoff_off_draws_opaque(void) {
     test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
     test_bool(b->key.cutout, false);
     test_int(b->key.blend, Opaque);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void MeshShader_blend_mode_draws_with_extended(void) {
-    // render/mesh_shader
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-    box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
-    ecs_entity_t shape = ecs_new(world);
-    ecs_set(world, shape, Position, {0, 0, 0});
-    ecs_set(world, shape, Box, {1, 1, 1});
-    ecs_set(world, shape, BlendMode, {Additive});
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
-    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
-    box_draw_batch_t *b = box_draws_batch(d, shape_slot->batch);
-    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
-    test_int(b->key.blend, Additive);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -524,38 +456,6 @@ void MeshShader_blend_modes_off_draw_opaque(void) {
     b = box_draws_batch(d, faded_slot->batch);
     test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
     test_int(b->key.blend, Opaque);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void MeshShader_opacity_draws_with_extended(void) {
-    // render/mesh_shader
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
-    box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
-    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
-        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
-        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
-    ecs_entity_t shape = ecs_new(world);
-    ecs_set(world, shape, Position, {0, 0, 0});
-    ecs_set(world, shape, Box, {1, 1, 1});
-    ecs_set(world, shape, Opacity, {0.5f});
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
-    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
-    test_int(box_draws_batch(d, shape_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
 
     ecs_fini(world);
     box_render_null_free(null);

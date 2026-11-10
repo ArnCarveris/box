@@ -1,5 +1,5 @@
 // Bindings, vertex stage and depth only entry points shared by the mesh shaders: mesh.wgsl draws
-// the opaque meshes without the material features of mesh_extended.wgsl, which draws the rest.
+// the meshes without the material features of mesh_extended.wgsl, which draws the rest.
 // Both share the pipeline layouts of the forward pass and the scene features below, set per
 // pipeline from the Scene of the scene it draws (box_gpu_feature_constants): a scene
 // with a feature off compiles its pipelines without that code.
@@ -163,10 +163,7 @@ struct VertexShading {
     rotation: vec4f,
 };
 
-// p: the placed vertex; scale: the lengths of the model matrix columns of the instance; normal:
-// the world normal of the vertex.
-fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Placed, scale: vec3f,
-    normal: vec3f) -> VertexShading {
+fn vertex_base(v: VertexIn, shading: MeshShading, material: Material) -> VertexShading {
     var o: VertexShading;
     let tint = select(mesh_shading_tint(shading), vec4f(0.0, 0.0, 0.0, 1.0),
         view.reflection.y != 0u);
@@ -177,20 +174,42 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     o.object = vec4f(0.0);
     o.object_normal = vec3f(0.0);
     o.rotation = vec4f(0.0, 0.0, 0.0, 1.0);
-    if (material_mapped(material) && surface_data.p[0].x == 0.0) {
-        let blend = material_blend(material);
-        o.mapped = 1.0 + blend;
-        o.uv = mapping_offset(material);
-        if (material_world(material)) {
-            o.object = mapping_object(material, p.world.xyz, vec3f(1.0));
-            o.object_normal = normal;
-        } else {
-            o.object = mapping_object(material, v.position, scale);
-            o.object_normal = v.normal;
-            if (blend > 0.0) {
-                o.rotation = mapping_rotation(p.model[0].xyz, p.model[1].xyz, p.model[2].xyz);
-            }
+    return o;
+}
+
+fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Material, p: Placed,
+    scale: vec3f, normal: vec3f) {
+    let blend = material_blend(material);
+    (*o).mapped = 1.0 + blend;
+    (*o).uv = mapping_offset(material);
+    if (material_world(material)) {
+        (*o).object = mapping_object(material, p.world.xyz, vec3f(1.0));
+        (*o).object_normal = normal;
+    } else {
+        (*o).object = mapping_object(material, v.position, scale);
+        (*o).object_normal = v.normal;
+        if (blend > 0.0) {
+            (*o).rotation = mapping_rotation(p.model[0].xyz, p.model[1].xyz, p.model[2].xyz);
         }
+    }
+}
+
+// p: the placed vertex; scale: the lengths of the model matrix columns of the instance; normal:
+// the world normal of the vertex.
+fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Placed, scale: vec3f,
+    normal: vec3f) -> VertexShading {
+    var o = vertex_base(v, shading, material);
+    if (material_mapped(material)) {
+        vertex_mapping(&o, v, material, p, scale, normal);
+    }
+    return o;
+}
+
+fn vertex_shading_surface(v: VertexIn, shading: MeshShading, material: Material, p: Placed,
+    scale: vec3f, normal: vec3f) -> VertexShading {
+    var o = vertex_base(v, shading, material);
+    if (material_mapped(material) && surface_data.p[0].x == 0.0) {
+        vertex_mapping(&o, v, material, p, scale, normal);
     }
     if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0) {
         o.uv = surface_sweep_lengths(v.uv, v.position, v.vertex) / material.mapping_size *
@@ -230,28 +249,36 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     return o;
 }
 
-@vertex fn vs(v: VertexIn) -> VertexOut {
-    let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
-    let p = place(v);
+struct ModelFrame {
+    normal: vec3f,
+    scale: vec3f,
+};
+
+fn model_frame(p: Placed) -> ModelFrame {
     let c0 = p.model[0].xyz;
     let c1 = p.model[1].xyz;
     let c2 = p.model[2].xyz;
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-    let model_scale = vec3f(length(c0), length(c1), length(c2));
-    let normal = cofactor * p.normal * flip;
-    let s = vertex_shading(v, shading, material, p, model_scale, normal);
+    let scale = vec3f(length(c0), length(c1), length(c2));
+    return ModelFrame(cofactor * p.normal * flip, scale);
+}
+
+fn vertex_scalars(material: Material, mapped: f32) -> vec2u {
+    return vec2u(pack2x16float(vec2f(material.cutoff, material.thickness)),
+        pack2x16float(vec2f(material.diffuse_blur, mapped)));
+}
+
+fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading) -> VertexOut {
     var o: VertexOut;
     o.pos = p.pos;
     o.world = p.world.xyz;
-    o.normal = normal;
+    o.normal = frame.normal;
     o.color = s.color;
     o.flat0 = vec4u(pack2x16float(material.emissive.xy),
-        pack2x16float(vec2f(material.emissive.z, model_scale.x)),
-        pack2x16float(model_scale.yz), material.sheen);
-    o.flat1 = vec4u(pack2x16float(vec2f(material.cutoff, material.thickness)),
-        pack2x16float(vec2f(material.diffuse_blur, s.mapped)), material.clear_coat,
+        pack2x16float(vec2f(material.emissive.z, frame.scale.x)),
+        pack2x16float(frame.scale.yz), material.sheen);
+    o.flat1 = vec4u(vertex_scalars(material, s.mapped), material.clear_coat,
         material.anisotropy);
     o.flat2 = vec4u(material.diffuse_transmission, material.attenuation_color,
         bitcast<u32>(material.transmission_factor), bitcast<u32>(material.ior));
@@ -263,13 +290,145 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
     return o;
 }
 
+struct DepthOut {
+    @builtin(position) @invariant pos: vec4f,
+};
+
+struct CutoutOut {
+    @builtin(position) @invariant pos: vec4f,
+    @location(0) uv: vec2f,
+    @location(1) alpha: f32,
+    @location(2) @interpolate(flat) scalars: vec2u,
+    @location(3) object: vec4f,
+    @location(4) object_normal: vec3f,
+};
+
+fn cutout_out(p: Placed, material: Material, s: VertexShading) -> CutoutOut {
+    return CutoutOut(p.pos, s.uv, s.color.a, vertex_scalars(material, s.mapped), s.object,
+        s.object_normal);
+}
+
+fn cutout_scalars(f: CutoutOut) -> vec4f {
+    return vec4f(unpack2x16float(f.scalars.x), unpack2x16float(f.scalars.y));
+}
+
+@vertex fn vs(v: VertexIn) -> VertexOut {
+    let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
+    let p = place_mesh(v);
+    let frame = model_frame(p);
+    return vertex_out(p, material, frame,
+        vertex_shading(v, shading, material, p, frame.scale, frame.normal));
+}
+
+@vertex fn vs_surface(v: VertexIn) -> VertexOut {
+    let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
+    let p = place(v);
+    let frame = model_frame(p);
+    return vertex_out(p, material, frame,
+        vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
+}
+
+@vertex fn vs_depth(v: VertexIn) -> DepthOut {
+    return DepthOut(place_mesh(v).pos);
+}
+
+@vertex fn vs_depth_surface(v: VertexIn) -> DepthOut {
+    return DepthOut(place(v).pos);
+}
+
+@vertex fn vs_cutout(v: VertexIn) -> CutoutOut {
+    let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
+    let p = place_mesh(v);
+    let frame = model_frame(p);
+    return cutout_out(p, material,
+        vertex_shading(v, shading, material, p, frame.scale, frame.normal));
+}
+
+@vertex fn vs_cutout_surface(v: VertexIn) -> CutoutOut {
+    let shading = shadings[v.slot];
+    let material = material_fetch(shading.material);
+    let p = place(v);
+    let frame = model_frame(p);
+    return cutout_out(p, material,
+        vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
+}
+
+struct DrawKind {
+    blend_mode: u32,
+    transmissive: u32,
+    alpha_cutout: u32,
+    pad: u32,
+};
+
+@group(1) @binding(11) var<uniform> kind: DrawKind;
+
+// Color of a fragment seen through the atmosphere between it and the camera, shaped for the
+// blend equation: a fragment that covers the target is attenuated and adds the in scattered
+// light weighted by its coverage, light added to or taken from the target is only attenuated,
+// and a filter of the target is left as it is.
+fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec3f {
+    let ap = aerial_sample(pos, world);
+    switch kind.blend_mode {
+        case 0u, 1u: {
+            return color * ap.a + ap.rgb;
+        }
+        case 2u: {
+            return color * ap.a + ap.rgb * alpha;
+        }
+        case 4u, 7u: {
+            return color;
+        }
+        default: {
+            return color * ap.a;
+        }
+    }
+}
+
+fn output(color: vec3f, alpha: f32) -> vec4f {
+    switch kind.blend_mode {
+        case 0u: {
+            return vec4f(color, 1.0);
+        }
+        case 4u, 7u: {
+            return vec4f(mix(vec3f(1.0), color, alpha), alpha);
+        }
+        case 5u, 8u: {
+            return vec4f(color * alpha, alpha);
+        }
+        default: {
+            return vec4f(color, alpha);
+        }
+    }
+}
+
 // Depth prepass of a lit view (box_gpu_draw_prepass) for the meshes without an alpha test.
-@fragment fn fs_depth(f: VertexOut) {
+@fragment fn fs_depth() {
 }
 
 // Overdraw heat map of a view (box_gpu_debug_overdraw_record): the prepass again, each entry
 // point adding one to the count of its kind where its fragment passes, the plain meshes in red
 // and the alpha tested ones in green.
-@fragment fn fs_count(f: VertexOut) -> @location(0) vec4f {
+@fragment fn fs_count() -> @location(0) vec4f {
     return vec4f(1.0, 0.0, 0.0, 0.0);
+}
+
+@fragment fn fs_depth_cutout(f: CutoutOut) {
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, cutout_scalars(f).w, f.object,
+        f.object_normal);
+    if (f.alpha * albedo < cutout_scalars(f).x) {
+        discard;
+    }
+}
+
+@fragment fn fs_count_cutout(f: CutoutOut) -> @location(0) vec4f {
+    let albedo = mapping_alpha(albedo_map, material_sampler, f.uv, cutout_scalars(f).w, f.object,
+        f.object_normal);
+    if (f.alpha * albedo < cutout_scalars(f).x) {
+        discard;
+    }
+
+    return vec4f(0.0, 1.0, 0.0, 0.0);
 }
