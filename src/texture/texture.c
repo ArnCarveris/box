@@ -13,6 +13,7 @@
 #include <math.h>
 
 ECS_COMPONENT_DECLARE(TextureRegistry);
+ECS_COMPONENT_DECLARE(TexturePixels);
 
 /** Loading textures a timed out headless wait names in its warning */
 #define BOX_TEXTURE_WARN_NAMES (4)
@@ -545,8 +546,50 @@ done:
     return;
 }
 
-/** Load the image of a texture entity from its TexturePath or its TextureGen; both on one
- * entity is an error.
+/** Hand the image of a TexturePixels to its texture at once, dropping a load in flight.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param pixels Its TexturePixels
+ */
+static void box_texture_set_pixels(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    const TexturePixels *pixels)
+{
+    box_texture_t *tex = box_texture_entry(t, e);
+    int32_t revision = box_texture_revision(world, e);
+    int32_t size = pixels->width * pixels->height * (pixels->single_channel ? 1 : 4);
+    tex->generation ++;
+    tex->waiting = false;
+    ecs_os_free(tex->pixels);
+    tex->pixels = NULL;
+    if (!pixels->pixels || pixels->width <= 0 || pixels->height <= 0) {
+        tex->loaded = false;
+        box_texture_status(world, e, TextureLoading, revision, NULL);
+        goto done;
+    }
+
+    tex->pixels = ecs_os_memdup(pixels->pixels, size);
+    tex->width = pixels->width;
+    tex->height = pixels->height;
+    tex->single_channel = pixels->single_channel;
+    tex->loaded = true;
+    if (!tex->queued) {
+        tex->queued = true;
+        *ecs_vec_append_t(NULL, &t->queued, ecs_entity_t) = e;
+    }
+
+    ecs_set(world, e, Texture, { .width = pixels->width, .height = pixels->height });
+    box_texture_status(world, e, TextureReady, revision + 1, NULL);
+done:
+    return;
+}
+
+/** Load the image of a texture entity from its TexturePixels, TexturePath or TextureGen; a
+ * TexturePath and a TextureGen on one entity is an error.
  *
  * @param world The world or a stage
  * @param t The registry
@@ -559,7 +602,10 @@ static void box_texture_load(
 {
     const TexturePath *path = ecs_get(world, e, TexturePath);
     const TextureGen *gen = ecs_get(world, e, TextureGen);
-    if (path && gen) {
+    const TexturePixels *pixels = path || gen ? NULL : ecs_get(world, e, TexturePixels);
+    if (pixels) {
+        box_texture_set_pixels(world, t, e, pixels);
+    } else if (path && gen) {
         char *name = ecs_get_path(world, e);
         char *error = flecs_asprintf(
             "texture '%s' has both a TexturePath and a TextureGen", name);
@@ -688,6 +734,131 @@ done:
     return;
 }
 
+/** Forget the registry entry of a texture and release its backend image.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param alive The entity stays alive, so it loses its Texture and TextureStatus
+ */
+static void box_texture_forget(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    bool alive)
+{
+    box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
+    if (tex) {
+        if (tex->handle) {
+            *ecs_vec_append_t(NULL, &t->released, uint32_t) = tex->handle;
+        }
+
+        ecs_map_remove(&t->textures, e);
+        ecs_os_free(tex->pixels);
+        ecs_os_free(tex->source_name);
+        ecs_os_free(tex);
+    }
+
+    if (alive) {
+        ecs_remove(world, e, Texture);
+        ecs_remove(world, e, TextureStatus);
+    }
+}
+
+/** Forget the textures whose TexturePixels is removed, unless a TexturePath or a TextureGen
+ * stays to load them.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTexturePixelsOnRemove(
+    ecs_iter_t *it)
+{
+    box_textures_t *t = box_textures_get(it->world);
+    bool alive = it->other_table && ecs_table_get_type(it->other_table)->count;
+    bool keep = alive && (ecs_table_has_id(it->world, it->other_table, ecs_id(TexturePath)) ||
+        ecs_table_has_id(it->world, it->other_table, ecs_id(TextureGen)));
+    int32_t i;
+    if (!t || keep || ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_texture_forget(it->stage, t, it->entities[i], alive);
+    }
+
+done:
+    return;
+}
+
+/** Free the image of TexturePixels components.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_pixels_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexturePixels *p = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_free(p[i].pixels);
+    }
+}
+
+/** Copy TexturePixels components with their images.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_pixels_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexturePixels *d = dst;
+    const TexturePixels *s = src;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        int32_t size = s[i].width * s[i].height * (s[i].single_channel ? 1 : 4);
+        uint8_t *pixels = s[i].pixels && size > 0 ? ecs_os_memdup(s[i].pixels, size) : NULL;
+        ecs_os_free(d[i].pixels);
+        d[i] = s[i];
+        d[i].pixels = pixels;
+    }
+}
+
+/** Move TexturePixels components, the source keeps no image.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_pixels_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexturePixels *d = dst;
+    TexturePixels *s = src;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_free(d[i].pixels);
+        d[i] = s[i];
+        s[i].pixels = NULL;
+    }
+}
+
 /** Forget the textures whose TexturePath or TextureGen is removed and release their backend
  * image; one that keeps the other loads from it instead, keeping its entry and image.
  *
@@ -712,7 +883,6 @@ static void BoxTextureOnRemove(
 
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
         box_file_watch_clear(it->world, t->watch, e);
         if (keep && is_path) {
             box_texture_request_gen(it->stage, t, e, ecs_get(it->world, e, TextureGen), true);
@@ -722,21 +892,7 @@ static void BoxTextureOnRemove(
             continue;
         }
 
-        if (tex) {
-            if (tex->handle) {
-                *ecs_vec_append_t(NULL, &t->released, uint32_t) = tex->handle;
-            }
-
-            ecs_map_remove(&t->textures, e);
-            ecs_os_free(tex->pixels);
-            ecs_os_free(tex->source_name);
-            ecs_os_free(tex);
-        }
-
-        if (alive) {
-            ecs_remove(it->stage, e, Texture);
-            ecs_remove(it->stage, e, TextureStatus);
-        }
+        box_texture_forget(it->stage, t, e, alive);
     }
 
     for (i = 0; !is_path && i < it->count; i ++) {
@@ -914,6 +1070,13 @@ void BoxTextureImport(
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
+    ECS_COMPONENT_DEFINE(world, TexturePixels);
+    ecs_set_hooks(world, TexturePixels, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_texture_pixels_dtor,
+        .copy = box_texture_pixels_copy,
+        .move = box_texture_pixels_move
+    });
     ecs_set_hooks(world, TextureRegistry, {
         .ctor = flecs_default_ctor,
         .dtor = box_texture_registry_dtor,
@@ -957,6 +1120,20 @@ void BoxTextureImport(
         .query.terms = {{ .id = ecs_id(TextureGen) }},
         .events = { EcsOnSet },
         .callback = BoxTextureGenOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TexturePixelsOnSet" }),
+        .query.terms = {{ .id = ecs_id(TexturePixels) }},
+        .events = { EcsOnSet },
+        .callback = BoxTextureOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TexturePixelsOnRemove" }),
+        .query.terms = {{ .id = ecs_id(TexturePixels) }},
+        .events = { EcsOnRemove },
+        .callback = BoxTexturePixelsOnRemove
     });
 
     ecs_observer(world, {

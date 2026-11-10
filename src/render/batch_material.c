@@ -7,6 +7,7 @@
  */
 
 #include "draw.h"
+#include "../terrain/terrain.h"
 #include <math.h>
 
 /** Color of a shape without Rgb, display encoded */
@@ -472,6 +473,43 @@ void box_draws_surface(
         for (int j = 0; j < 3; j ++) {
             out->p[22][j] = (shape->min[j] + shape->max[j]) * 0.5f;
             out->p[23][j] = (shape->max[j] - shape->min[j]) * 0.5f;
+        }
+    }
+}
+
+uint32_t box_draws_texture_handle(
+    const box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    uint32_t result = e ? box_textures_handle(d->textures, e) : 0;
+    if (e && !result && d->world) {
+        result = box_render_texture_target_handle(d->world, e);
+    }
+
+    return result;
+}
+
+void box_draws_batch_tiles(
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const TileTerrain *terrain,
+    box_render_texture_blend_t *r)
+{
+    const TileTerrainGrid *grid = ecs_get(d->world, e, TileTerrainGrid);
+    const TileKind *kinds = ecs_vec_first(&terrain->kinds);
+    int32_t k, count = ecs_vec_count(&terrain->kinds);
+    count = count < BOX_RENDER_BLEND_SLICES ? count : BOX_RENDER_BLEND_SLICES;
+    r->tiles = 1;
+    r->mask = grid ? box_draws_texture_handle(d, grid->texture) : 0;
+    r->count = count > 0 ? (uint32_t)count : 1;
+    for (k = 0; k < count; k ++) {
+        ecs_entity_t kind = kinds[k].textures;
+        const PbrTextures *textures = kind && ecs_is_alive(d->world, kind)
+            ? ecs_get(d->world, kind, PbrTextures) : NULL;
+        if (textures) {
+            r->layers[k][BOX_RENDER_BLEND_ALBEDO] = box_draws_texture_handle(d, textures->albedo);
+            r->layers[k][BOX_RENDER_BLEND_ORM] = box_draws_texture_handle(d, textures->orm);
+            r->layers[k][BOX_RENDER_BLEND_NORMAL] = box_draws_texture_handle(d, textures->normal);
         }
     }
 }

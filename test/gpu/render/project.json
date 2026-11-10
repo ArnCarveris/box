@@ -398,6 +398,16 @@
                 ]
             },
             {
+                "id": "TileTerrain",
+                "testcases": [
+                    "corner_variant",
+                    "kind_order",
+                    "whole_tile",
+                    "extended_variant",
+                    "alpha_over"
+                ]
+            },
+            {
                 "id": "Light",
                 "testcases": [
                     "point_light_reaches_its_range",

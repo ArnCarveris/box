@@ -1707,6 +1707,31 @@ void box_draws_batch_textures(
     const box_draw_batch_t *b,
     box_render_batch_t *out);
 
+/** Get the texture handle a layer of a batch samples a texture entity through: its image, or
+ * the image of the surface that renders into it.
+ *
+ * @param d The state
+ * @param e The texture entity, 0 for none
+ * @return The handle, 0 while the entity has no image
+ */
+uint32_t box_draws_texture_handle(
+    const box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Write a TileTerrain into the blend record of its batch: its grid as the mask and the
+ * albedo, ORM and normal atlases of each kind as a layer.
+ *
+ * @param d The state
+ * @param e The terrain entity
+ * @param terrain Its TileTerrain
+ * @param r The record, zeroed with default transforms
+ */
+void box_draws_batch_tiles(
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const TileTerrain *terrain,
+    box_render_texture_blend_t *r);
+
 /** Write the TextureBlend of a texture_blend batch into the packet data of its draw.
  *
  * Writes the texture handles of the mask, layers and heights, the TextureTransform of each layer
@@ -1725,9 +1750,9 @@ void box_draws_batch_blend(
     const box_draw_batch_t *b,
     box_render_batch_t *out);
 
-/** Get the entity whose TextureBlend a 3D shape draws with: the owner of the TextureBlend it
- * has or inherits, 0 when it has none or is no mesh shape of the mesh shader. Alpha tested,
- * blended, transmissive and triplanar shapes blend as opaque ones do.
+/** Get the entity whose TextureBlend a 3D shape draws with: the shape itself when it owns a
+ * TileTerrain, else the owner of the TextureBlend it has or inherits, 0 when it has neither or
+ * is no mesh shape. Alpha tested, blended, transmissive and triplanar shapes blend alike.
  *
  * @param world The world
  * @param e The shape

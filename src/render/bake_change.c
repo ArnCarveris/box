@@ -857,7 +857,11 @@ void box_bake_observers(
         ecs_id(Rgb), ecs_id(Emissive), ecs_id(PbrMaterial), ecs_id(BlendMode),
         ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh),
         ecs_id(ClearCoat), ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission),
+<<<<<<< HEAD
         ecs_id(TextureMapping), ecs_id(TextureScroll)
+=======
+        ecs_id(TextureMapping), ecs_id(TileTerrain)
+>>>>>>> 54884aa10ecc582a6af292f4dd128345f349f3ff
     };
     ecs_entity_t added[2] = { ecs_id(AlphaCutoff), ecs_id(Transmission) };
     ecs_entity_t flags[2] = { ManualTransform, NoBake };
