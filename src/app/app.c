@@ -34,7 +34,7 @@ typedef struct box_app_clock_t {
                                  *   previous frame, its wall time when it did not wait */
     ecs_world_t *world;         /**< World of the frame loop, for the browser's frame callback */
     double begin;               /**< Wall seconds at the start of the previous frame, 0 none */
-    double web_next;            /**< Wall seconds the next browser frame is due at App.fps */
+    double web_next;            /**< Wall seconds the next browser frame is due at the cap */
     int32_t presented;          /**< RenderStatus.presented at the previous frame */
     box_app_series_t delta;     /**< Deltas of the recent frames */
     box_app_series_t interval;  /**< Intervals of the recent frames */
@@ -72,24 +72,56 @@ static void box_app_clock_free(
     ecs_os_free(ctx);
 }
 
-/** Make App.fps the target fps of flecs, which caps the frames; 0 for no cap. The browser keeps
- * flecs uncapped, since a flecs sleep spins its main thread, and box_app_web_frame skips
- * animation frames to match App.fps instead.
+float box_app_fps(
+    const ecs_world_t *world)
+{
+    const App *app = ecs_singleton_get(world, App);
+    const FpsTarget *target = ecs_singleton_get(world, FpsTarget);
+    float result = 0;
+    if (app && app->fps > 0) {
+        result = app->fps;
+    } else if (target && target->value > 0) {
+        result = target->value;
+    }
+
+    return result;
+}
+
+/** Make a cap the target fps of flecs; 0 for no cap. The browser keeps flecs uncapped, since a
+ * flecs sleep spins its main thread, and box_app_web_frame skips animation frames to match the
+ * cap instead.
  *
  * @param world The world
- * @param app The App singleton
+ * @param fps The cap, box_app_fps
  */
 static void box_app_target_fps(
     ecs_world_t *world,
-    const App *app)
+    float fps)
 {
 #ifdef __EMSCRIPTEN__
-    float fps = 0;
-    (void)app;
+    (void)fps;
+    ecs_set_target_fps(world, 0);
 #else
-    float fps = app->fps > 0 ? app->fps : 0;
-#endif
     ecs_set_target_fps(world, fps);
+#endif
+}
+
+/** Make a FpsTarget that is set or removed the target fps of flecs. On remove the component is
+ * still there, so the cap is App.fps alone.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxAppFpsTargetOnSet(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
+    const App *app = ecs_singleton_get(world, App);
+    float fps = box_app_fps(world);
+    if (it->event == EcsOnRemove) {
+        fps = app && app->fps > 0 ? app->fps : 0;
+    }
+
+    box_app_target_fps(world, fps);
 }
 
 /** Read the delta time the next frame advances from the App singleton, so a change through the
@@ -106,7 +138,7 @@ static float box_app_frame_delta(
     return app ? app->delta_time : 0;
 }
 
-/** Make a new App true: flecs caps the frames at App.fps and a headless process gets its
+/** Make a new App true: flecs caps the frames at box_app_fps and a headless process gets its
  * temporary folder.
  *
  * @param it The iterator of the observer
@@ -117,7 +149,7 @@ static void BoxAppOnSet(
     ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
     const App *app = ecs_field(it, App, 0);
     AppStatus *status = ecs_singleton_get_mut(world, AppStatus);
-    box_app_target_fps(world, app);
+    box_app_target_fps(world, box_app_fps(world));
     if (!status) {
         goto done;
     }
@@ -823,7 +855,6 @@ static void BoxAppTiming(
     ecs_iter_t *it)
 {
     box_app_clock_t *clock = it->ctx;
-    const App *app = ecs_singleton_get(it->world, App);
     const RenderStatus *render = ecs_id(RenderStatus)
         ? ecs_singleton_get(it->world, RenderStatus)
         : NULL;
@@ -833,7 +864,8 @@ static void BoxAppTiming(
     double now = box_app_wall_time();
     double delta = (double)ecs_get_world_info(it->world)->delta_time_raw * 1000.0;
     double interval = clock->begin > 0 ? (now - clock->begin) * 1000.0 : 0;
-    double target = app && app->fps > 0 ? 1000.0 / (double)app->fps : 0;
+    float fps = box_app_fps(it->world);
+    double target = fps > 0 ? 1000.0 / (double)fps : 0;
     bool late, dropped;
     clock->begin = now;
     if (!timing || interval <= 0) {
@@ -991,7 +1023,7 @@ static int box_app_start(
         box_app_serve(world, app->port);
     }
 
-    box_app_target_fps(world, app);
+    box_app_target_fps(world, box_app_fps(world));
 
     if (app->no_audio) {
         ecs_trace("audio disabled");
@@ -1010,8 +1042,8 @@ done:
 
 #ifdef __EMSCRIPTEN__
 /** Run a frame from the animation frame callback of the browser and end the loop when the
- * world quits. The target fps of flecs stays 0: with App.fps set, animation frames that come
- * before the next frame is due are skipped, so the frames match App.fps without a sleep.
+ * world quits. The target fps of flecs stays 0: with a box_app_fps cap, animation frames that
+ * come before the next frame is due are skipped, so the frames match the cap without a sleep.
  *
  * @param arg The clock of the frame loop
  */
@@ -1021,9 +1053,10 @@ static void box_app_web_frame(
     box_app_clock_t *clock = arg;
     ecs_world_t *world = clock->world;
     const App *app = ecs_singleton_get(world, App);
-    if (app && app->fps > 0) {
+    float fps = box_app_fps(world);
+    if (fps > 0) {
         double now = box_app_wall_time();
-        double interval = 1.0 / (double)app->fps;
+        double interval = 1.0 / (double)fps;
         if (now < clock->web_next - 0.002) {
             goto done;
         }
@@ -1075,6 +1108,7 @@ void BoxAppImport(
     ECS_MODULE(world, BoxApp);
 
     ECS_META_COMPONENT(world, App);
+    ECS_META_COMPONENT(world, FpsTarget);
     ECS_META_COMPONENT(world, AppStatus);
     ECS_META_COMPONENT(world, FrameRange);
     ECS_META_COMPONENT(world, FrameTiming);
@@ -1109,6 +1143,13 @@ void BoxAppImport(
         .query.terms = {{ .id = ecs_id(App) }},
         .events = { EcsOnSet },
         .callback = BoxAppOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "FpsTargetOnSet" }),
+        .query.terms = {{ .id = ecs_id(FpsTarget) }},
+        .events = { EcsOnSet, EcsOnRemove },
+        .callback = BoxAppFpsTargetOnSet
     });
 
     box_app_set_at_t *set_at = ecs_os_calloc_t(box_app_set_at_t);

@@ -54,7 +54,7 @@ ECS_STRUCT(App, {
     int32_t frames;     /**< Stop after this many frames, 0 for no limit */
     double timeout;     /**< Stop after this many seconds, 0 for none, negative for infinite */
     float cpu_budget;   /**< Percent of one core a headless run may use, default 100, 0 no limit */
-    float fps;          /**< Target fps flecs caps the frames at, default 0: no cap */
+    float fps;          /**< Target fps flecs caps the frames at, default 0: FpsTarget */
     float delta_time;   /**< Seconds every frame advances, default 0: flecs measures the delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
     int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
@@ -66,6 +66,16 @@ ECS_STRUCT(App, {
     char *camera;       /**< Name of the Camera the surface shows, set by --camera, NULL for none */
     char *out;          /**< Image file the surface is written to, set by --out, NULL for none */
     bool no_audio;      /**< Open no audio output, set by --no-audio */
+});
+
+/** Frame rate cap of a scene, a singleton a scene script sets, such as
+ * `$ { box.app.FpsTarget: {30} }`.
+ *
+ * It paces the frames like App.fps, which takes precedence when it is above 0, so --fps and the
+ * fps command override the scene. Removing it, or a value of 0, leaves the frames uncapped.
+ */
+ECS_STRUCT(FpsTarget, {
+    float value;        /**< Frames per second, 0 for no cap */
 });
 
 /** State of the process the engine writes, read only for applications */
@@ -91,7 +101,7 @@ ECS_STRUCT(FrameRange, {
  */
 ECS_STRUCT(FrameTiming, {
     int32_t frames;         /**< Frames the ranges cover, at most BOX_FRAME_WINDOW */
-    double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped */
+    double target_ms;       /**< Interval of the box_app_fps cap, 0 when uncapped */
     bool vsync;             /**< Frames present with vsync */
     double delta_ms;        /**< Delta of the last frame */
     double interval_ms;     /**< Interval before the last frame */
@@ -188,6 +198,14 @@ int box_app_parse(
     ecs_world_t *world,
     int argc,
     char *argv[]);
+
+/** The frame rate cap the engine paces the frames at: App.fps when above 0, else FpsTarget.
+ *
+ * @param world The world
+ * @return Frames per second, 0 for no cap
+ */
+float box_app_fps(
+    const ecs_world_t *world);
 
 /** Find a file: the path as given, or a relative path in the working directory or one of its
  * ancestors, so a run from inside the repository finds `etc/...`.

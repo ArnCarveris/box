@@ -1382,7 +1382,7 @@ typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
-    float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
+    float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */
     bool headless;          /**< App.headless: the frame waits for the pipelines it draws
                              *   with, so its output does not depend on how long they take */
     bool vsync;             /**< A window target of the frame presents with vsync */

@@ -682,7 +682,7 @@ done:
 }
 
 /** Measure the frame, the interval between its start and the start of the previous frame, which
- * flecs caps at App.fps, and advance the run.
+ * flecs caps at box_app_fps, and advance the run.
  *
  * @param it The iterator of the system
  */
