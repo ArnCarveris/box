@@ -41,6 +41,8 @@ typedef struct box_gpu_planar_pass_t {
     bool clips;                     /**< The plane crosses the frustum, so it draws */
     box_gpu_view_uniforms_t uniforms; /**< Uniforms of the slot its meshes draw with */
     mat4 view_matrix;               /**< View matrix of the mirrored camera */
+    mat4 sky_inv_view_proj;         /**< Inverse view projection of the mirrored camera without
+                                     *   the oblique near plane, whose rays the sky casts */
 } box_gpu_planar_pass_t;
 
 struct box_gpu_planar_t {
@@ -180,6 +182,8 @@ int32_t box_gpu_planar_add(
         *r = *u;
         glm_mat4_mul(oblique, pass->view_matrix, r->view_proj);
         glm_mat4_inv(r->view_proj, r->inv_view_proj);
+        glm_mat4_mul(proj, pass->view_matrix, inv);
+        glm_mat4_inv(inv, pass->sky_inv_view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, rec->camera), r->camera);
         r->camera[3] = 1;
         r->viewport[0] = (float)pass->width;
@@ -316,7 +320,7 @@ static void box_gpu_planar_sky(
     uint32_t lit = (uint32_t)(pass->slot * BOX_GPU_VIEW_STRIDE);
     uint32_t mirrored = (uint32_t)((pass->slot + 1) * BOX_GPU_VIEW_STRIDE);
     mat4 inv_view_proj;
-    glm_mat4_copy(ECS_CONST_CAST(vec4*, pass->uniforms.inv_view_proj), inv_view_proj);
+    glm_mat4_copy(ECS_CONST_CAST(vec4*, pass->sky_inv_view_proj), inv_view_proj);
     box_gpu_atmosphere_draw_sky_mirrored(gpu, t, rp, BOX_GPU_HDR_FORMAT, v, mirror,
         inv_view_proj);
     wgpuRenderPassEncoderSetBindGroup(rp, 0, group, 1, &mirrored);

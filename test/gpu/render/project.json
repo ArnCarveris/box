@@ -1254,7 +1254,8 @@
                     "own_shape_hidden",
                     "camera_behind_plane",
                     "one_sided_winding",
-                    "remove_frees_texture"
+                    "remove_frees_texture",
+                    "sky_mirrored"
                 ]
             }
         ]

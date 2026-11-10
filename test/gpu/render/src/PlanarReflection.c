@@ -402,3 +402,53 @@ void PlanarReflection_remove_frees_texture(void) {
 
     ecs_fini(world);
 }
+
+void PlanarReflection_sky_mirrored(void) {
+    ecs_world_t *world = pr_world();
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {0});
+    ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, sun, Rotation, {1.3f, 0.5f, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = GLM_PIf});
+    ecs_set(world, sun, Rgb, {255, 255, 255});
+    ecs_add(world, scene, Atmosphere);
+    Atmosphere *a = ecs_get_mut(world, scene, Atmosphere);
+    a->units_per_km = 100;
+    a->sun = sun;
+    ecs_modified(world, scene, Atmosphere);
+    ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, camera, Position, {0, 2, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    ecs_get_mut(world, view, View)->camera = camera;
+    ecs_modified(world, view, View);
+    ecs_entity_t mirror = pr_mirror(world);
+    ecs_add_pair(world, mirror, EcsChildOf, scene);
+    pr_surface(world, "planar_sky.png");
+    pr_frames(world, 3);
+
+    // Below the horizon the reflection shows the sky above it: bright at the horizon and bluer
+    // toward the zenith, without a seam where the oblique near plane would bend its rays
+    float *texels = pr_read(world, view);
+    float previous = 0;
+    int32_t y;
+    for (y = PR_SIZE / 2 + 2; y < PR_SIZE; y ++) {
+        const float *t = pr_texel(texels, PR_SIZE / 4, y);
+        float ratio = t[2] / t[0];
+        test_assert(t[0] > 0.01f && t[2] > t[0]);
+        if (previous) {
+            test_assert(ratio > previous - 0.05f && ratio < previous + 0.4f);
+        }
+
+        previous = ratio;
+    }
+
+    test_assert(pr_texel(texels, PR_SIZE / 4, PR_SIZE - 1)[2] /
+        pr_texel(texels, PR_SIZE / 4, PR_SIZE - 1)[0] >
+        pr_texel(texels, PR_SIZE / 4, PR_SIZE / 2 + 2)[2] /
+        pr_texel(texels, PR_SIZE / 4, PR_SIZE / 2 + 2)[0] + 0.5f);
+
+    ecs_os_free(texels);
+    ecs_fini(world);
+}
