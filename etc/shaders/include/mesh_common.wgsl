@@ -113,6 +113,10 @@ struct VertexOut {
     // Wrapped TextureScroll.normal_velocity offset of the material, added to the UVs of the
     // normal map only
     @location(15) @interpolate(flat) normal_offset: vec2f,
+    // Fresnel strength, power, bias and opacity of the material, 0 without one
+    @location(12) @interpolate(flat) fresnel: vec4f,
+    // Fresnel color of the material in linear light as unorm16: r | g << 16, b
+    @location(13) @interpolate(flat) fresnel_color: vec2u,
 };
 
 fn vo_emissive(f: VertexOut) -> vec3f {
@@ -291,6 +295,9 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     o.object_normal = s.object_normal;
     o.uv = vec4f(s.uv, s.material);
     o.normal_offset = material.normal_offset;
+    o.fresnel = vec4f(material.fresnel_strength, material.fresnel_power, material.fresnel_bias,
+        material.fresnel_opacity);
+    o.fresnel_color = material.fresnel_color;
     return o;
 }
 

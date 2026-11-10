@@ -9,6 +9,7 @@
 #include "render.h"
 #include "draw.h"
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -836,7 +837,7 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.anisotropy, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 112);
+    test_int(ECS_SIZEOF(box_render_material_t), 128);
 
     SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
@@ -952,7 +953,7 @@ void Material_sheen_pack(void) {
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 112);
+    test_int(ECS_SIZEOF(box_render_material_t), 128);
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -1067,7 +1068,7 @@ void Material_diffuse_transmission_defaults(void) {
 void Material_diffuse_transmission_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 112);
+    test_int(ECS_SIZEOF(box_render_material_t), 128);
     test_int(offsetof(box_render_material_t, diffuse_transmission), 76);
     test_int(offsetof(box_render_material_t, thickness), 80);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
@@ -1181,7 +1182,7 @@ void Material_diffuse_transmission_blur_defaults(void) {
 void Material_diffuse_transmission_blur_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 112);
+    test_int(ECS_SIZEOF(box_render_material_t), 128);
     test_int(offsetof(box_render_material_t, diffuse_blur), 84);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
@@ -2358,10 +2359,10 @@ void Material_texture_scroll_pack(void) {
     test_flt(record.uv[3], -0.5f);
     test_flt(record.normal_offset[0], 0);
     test_flt(record.normal_offset[1], 0);
-    test_flt(record.pad[0], 0);
-    test_flt(record.pad[1], 0);
+    test_uint(record.fresnel_color[0], 0);
+    test_uint(record.fresnel_color[1], 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 112);
+    test_int(ECS_SIZEOF(box_render_material_t), 128);
 
     box_draws_material_pack(&record, &(box_draw_material_t){
         .uv = &uv, .fade = 1, .time = 1000 });
@@ -2381,8 +2382,8 @@ void Material_texture_scroll_pack(void) {
     test_flt(record.uv[3], -0.5f + 0.5f);
     test_flt(record.normal_offset[0], 0.375f);
     test_flt(record.normal_offset[1], 0.25f);
-    test_flt(record.pad[0], 0);
-    test_flt(record.pad[1], 0);
+    test_uint(record.fresnel_color[0], 0);
+    test_uint(record.fresnel_color[1], 0);
 
     box_draws_material_pack(&record, &(box_draw_material_t){
         .scroll = &scroll, .time = 3, .fade = 1 });
@@ -2469,4 +2470,173 @@ void Material_texture_scroll_wrap(void) {
     test_flt(out[1], 0);
     test_flt(out[2], 0);
     test_flt(out[3], 0.5f);
+}
+
+void Material_fresnel_defaults(void) {
+    // materials/fresnel
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "fresnel",
+        "using box.material\n"
+        "thin { Fresnel: {power: 8} }\n"
+        "field { Fresnel: {color: {0, 128, 255}, opacity: 0.5} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Fresnel);
+    const Fresnel *f = ecs_get(world, added, Fresnel);
+    test_assert(f != NULL);
+    test_uint(f->color.r, 255);
+    test_uint(f->color.g, 255);
+    test_uint(f->color.b, 255);
+    test_flt(f->strength, BOX_MATERIAL_FRESNEL_STRENGTH);
+    test_flt(f->strength, 1);
+    test_flt(f->power, BOX_MATERIAL_FRESNEL_POWER);
+    test_flt(f->power, 5);
+    test_flt(f->bias, BOX_MATERIAL_FRESNEL_BIAS);
+    test_flt(f->bias, 0);
+    test_flt(f->opacity, BOX_MATERIAL_FRESNEL_OPACITY);
+    test_flt(f->opacity, 0);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    f = ecs_get(world, ecs_lookup(world, "thin"), Fresnel);
+    test_assert(f != NULL);
+    test_uint(f->color.g, 255);
+    test_flt(f->strength, 1);
+    test_flt(f->power, 8);
+    test_flt(f->bias, 0);
+    test_flt(f->opacity, 0);
+    test_bool(ecs_owns(world, ecs_lookup(world, "thin"), MaterialId), true);
+
+    f = ecs_get(world, ecs_lookup(world, "field"), Fresnel);
+    test_assert(f != NULL);
+    test_uint(f->color.r, 0);
+    test_uint(f->color.g, 128);
+    test_uint(f->color.b, 255);
+    test_flt(f->strength, 1);
+    test_flt(f->power, 5);
+    test_flt(f->opacity, 0.5f);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Fresnel, {.color = {10, 20, 30}, .strength = 2, .power = 3});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Fresnel), false);
+    test_uint(ecs_get(world, instance, Fresnel)->color.g, 20);
+    test_flt(ecs_get(world, instance, Fresnel)->power, 3);
+
+    ecs_fini(world);
+}
+
+/** The record holds the Fresnel color in linear light as unorm16, the strength, power, bias and
+ * the opacity clamped to 0..1; a material without one packs zeros and the bytes it did before,
+ * and a transition of another component encodes the record again with it. */
+void Material_fresnel_pack(void) {
+    // materials/fresnel
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_uint(record.fresnel_color[0], 0);
+    test_uint(record.fresnel_color[1], 0);
+    test_flt(record.fresnel_strength, 0);
+    test_flt(record.fresnel_power, 0);
+    test_flt(record.fresnel_bias, 0);
+    test_flt(record.fresnel_opacity, 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t) % 16, 0);
+    test_int(offsetof(box_render_material_t, fresnel_color), 104);
+    test_int(offsetof(box_render_material_t, fresnel_strength), 112);
+    test_int(offsetof(box_render_material_t, fresnel_opacity), 124);
+
+    Fresnel red = { .color = {255, 0, 128}, .strength = 2.5f, .power = 3, .bias = 0.25f,
+        .opacity = 0.75f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fresnel = &red, .fade = 1 });
+    test_uint(record.fresnel_color[0] & 0xFFFFu, 0xFFFFu);
+    test_uint(record.fresnel_color[0] >> 16, 0);
+    uint32_t b = record.fresnel_color[1] & 0xFFFFu;
+    uint32_t expect = (uint32_t)(0.2158605f * 65535.0f + 0.5f);
+    test_assert(b + 2 >= expect && b <= expect + 2);
+    test_uint(record.fresnel_color[1] >> 16, 0);
+    test_flt(record.fresnel_strength, 2.5f);
+    test_flt(record.fresnel_power, 3);
+    test_flt(record.fresnel_bias, 0.25f);
+    test_flt(record.fresnel_opacity, 0.75f);
+
+    /* Fresnel leaves the emission of the record alone: the shader adds it */
+    test_flt(record.emissive[0], 0);
+    test_flt(record.emissive[1], 0);
+    test_flt(record.emissive[2], 0);
+
+    Fresnel broken = { .color = {255, 255, 255}, .strength = -1, .power = NAN, .bias = INFINITY,
+        .opacity = 3 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fresnel = &broken, .fade = 1 });
+    test_flt(record.fresnel_strength, 0);
+    test_flt(record.fresnel_power, 0);
+    test_flt(record.fresnel_bias, 0);
+    test_flt(record.fresnel_opacity, 1);
+    test_uint(record.fresnel_color[0], 0xFFFFFFFFu);
+    test_uint(record.fresnel_color[1], 0xFFFFu);
+
+    Fresnel low = { .color = {0, 0, 0}, .strength = 1, .power = 5, .bias = -0.5f,
+        .opacity = -1 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fresnel = &low, .fade = 1 });
+    test_flt(record.fresnel_bias, -0.5f);
+    test_flt(record.fresnel_opacity, 0);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fresnel = &red, .fade = 1 });
+    record.fresnel_color[0] = 0;
+    record.fresnel_color[1] = 0;
+    record.fresnel_strength = 0;
+    record.fresnel_power = 0;
+    record.fresnel_bias = 0;
+    record.fresnel_opacity = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .fresnel = &red, .pbr = &pbr, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .fresnel = &red, .pbr = &pbr, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+
+    box_render_shading_t sa, sb;
+    box_draws_material(&sa, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
+    box_draws_material(&sb, &(box_draw_material_t){
+        .fresnel = &red, .pbr = &pbr, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&sa, &sb, box_render_shading_t));
+}
+
+/** The C twin of fresnel_factor of material.wgsl: at 0 degrees (facing the viewer) only the
+ * bias, at 60 degrees 0.5^power plus the bias, at 90 degrees (grazing) 1, all clamped to 0..1. */
+void Material_fresnel_factor(void) {
+    // materials/fresnel
+    float c0 = 1.0f;
+    float c60 = cosf(glm_rad(60.0f));
+    float c90 = cosf(glm_rad(90.0f));
+
+    test_assert(fabsf(box_draws_fresnel_factor(c0, 5, 0)) < 1e-6f);
+    test_assert(fabsf(box_draws_fresnel_factor(c60, 5, 0) - 0.03125f) < 1e-5f);
+    test_assert(fabsf(box_draws_fresnel_factor(c90, 5, 0) - 1.0f) < 1e-5f);
+
+    test_assert(fabsf(box_draws_fresnel_factor(c0, 2, 0)) < 1e-6f);
+    test_assert(fabsf(box_draws_fresnel_factor(c60, 2, 0) - 0.25f) < 1e-5f);
+    test_assert(fabsf(box_draws_fresnel_factor(c90, 2, 0) - 1.0f) < 1e-5f);
+
+    test_assert(fabsf(box_draws_fresnel_factor(c0, 5, 0.25f) - 0.25f) < 1e-5f);
+    test_assert(fabsf(box_draws_fresnel_factor(c60, 5, 0.25f) - 0.28125f) < 1e-5f);
+    test_flt(box_draws_fresnel_factor(c90, 5, 0.25f), 1);
+
+    test_flt(box_draws_fresnel_factor(c0, 5, -0.5f), 0);
+    test_assert(fabsf(box_draws_fresnel_factor(c60, 1, -0.25f) - 0.25f) < 1e-5f);
+    test_flt(box_draws_fresnel_factor(c0, 5, 2), 1);
+
+    /* Power 0 glows everywhere, a back facing normal counts as grazing */
+    test_flt(box_draws_fresnel_factor(c0, 0, 0), 1);
+    test_flt(box_draws_fresnel_factor(-0.5f, 5, 0), 1);
+
+    /* A higher power gives a thinner rim */
+    test_assert(box_draws_fresnel_factor(c60, 8, 0) < box_draws_fresnel_factor(c60, 2, 0));
 }

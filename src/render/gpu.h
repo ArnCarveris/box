@@ -691,7 +691,7 @@ WGPURenderPipeline box_gpu_forward_pipeline(
 
 /** Overrides of the extended mesh shader: the bits of BOX_RENDER_FEATURE_OVERRIDES in order,
  * then transmissive; the mesh shader has the first 6 */
-#define BOX_GPU_FEATURE_OVERRIDES (12)
+#define BOX_GPU_FEATURE_OVERRIDES (13)
 
 /** Create the layouts the forward pass shares.
  *
