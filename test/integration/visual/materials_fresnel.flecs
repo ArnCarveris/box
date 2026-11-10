@@ -9,7 +9,7 @@ $ {
   Scene: {blend_modes: true, fresnel: true}
 }
 
-// The artistic rim of Fresnel, lit by a sun from the upper left and a dim ambient, over a dark
+// The artistic rim of Fresnel, lit by a sun from above and a dim ambient, over a dark
 // floor. On the left a force field: a faint cyan blended sphere (Opacity 0.12) with a cyan
 // Fresnel of strength 3, power 3 and opacity 0.85, around an orange box that shows through its
 // clear middle while the field turns bright and solid toward its silhouette. In the middle an
@@ -21,13 +21,13 @@ field {
   AmbientLight: {sky: {120, 130, 150}, ground: {30, 30, 30}, intensity: 0.4}
 
   sun {
-    Rotation: {-0.7, -0.6, 0}
-    DirectionalLight: {intensity: 2.5}
+    Rotation: {0.7, 2.7, 0}
+    DirectionalLight: {intensity: 3}
   }
 
   camera {
-    Position: {0, 1.6, 7}
-    Rotation: {-0.12, 0, 0}
+    Position: {0, 2.2, 7}
+    Rotation: {-0.2, 0, 0}
     Camera: {fov: 50}
   }
 
@@ -75,7 +75,7 @@ field {
   }
 
   selected {
-    Position: {0.6, 0.35, 2.2}
+    Position: {1.5, 0.3, 2.3}
     Rotation: {0.9, 0.3, 0}
     Torus: {segments: 64, rings: 32, smooth: true, radius: 0.45, tube: 0.18}
     Rgb: {70, 70, 80}

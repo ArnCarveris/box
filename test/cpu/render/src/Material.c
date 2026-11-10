@@ -2533,6 +2533,7 @@ void Material_fresnel_defaults(void) {
 void Material_fresnel_pack(void) {
     // materials/fresnel
     box_render_material_t record, plain;
+    box_draws_tables_init();
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.fresnel_color[0], 0);
