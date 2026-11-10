@@ -40,27 +40,6 @@ assets {
     bloop { SynthOscillator: {wave: SynthSine, frequency: 300, frequency_end: 750, sweep: 0.12, level: 0.35} }
   }
 
-  prefab SfxGust {
-    AudioOutput: {bus: mv_sfx}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 5, pitch_variance: 0.08}
-    SynthEnvelope: {attack: 0.08, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 500, resonance: 0.5}
-    SynthFilterEnvelope: {attack: 0.6, sustain: 1, hold: 0.29, amount: 2.263}
-    air { SynthOscillator: {wave: SynthNoise, level: 0.8} }
-  }
-
-  prefab SfxBloom {
-    AudioOutput: {bus: mv_sfx}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {pitch_variance: 0.03}
-    SynthEnvelope: {attack: 0.02, decay: 0.6}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4000}
-    a { SynthOscillator: {wave: SynthTriangle, frequency: 523.25, frequency_end: 784, sweep: 0.3, level: 0.3} }
-    b { SynthOscillator: {wave: SynthSine, frequency: 659.25, frequency_end: 1046.5, sweep: 0.35, level: 0.25} }
-    sparkle { SynthOscillator: {wave: SynthSine, frequency: 1568, level: 0.1}; SynthEnvelope: {attack: 0.1, decay: 0.4} }
-  }
-
   prefab SfxFrost {
     AudioOutput: {bus: mv_sfx}
     AudioSpatial: {min_distance: 36, max_distance: 90}
@@ -72,17 +51,6 @@ assets {
     chime { SynthOscillator: {wave: SynthTriangle, frequency: 2637, level: 0.2} }
   }
 
-  prefab SfxLift {
-    AudioOutput: {bus: mv_sfx}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {pitch_variance: 0.04}
-    SynthEnvelope: {attack: 0.05, decay: 0.3, sustain: 0.6, hold: 0.3, release: 0.4}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1800}
-    SynthFilterEnvelope: {attack: 0.6, sustain: 1, hold: 0.45, amount: 1}
-    rise { SynthOscillator: {wave: SynthSaw, frequency: 180, frequency_end: 520, sweep: 0.8, level: 0.25} }
-    hum { SynthOscillator: {wave: SynthSine, frequency: 360, frequency_end: 1040, sweep: 0.8, level: 0.3} }
-  }
-
   prefab SfxFizzle {
     AudioOutput: {bus: mv_sfx}
     SynthSound: {}
@@ -92,14 +60,217 @@ assets {
     beat { SynthOscillator: {wave: SynthSquare, frequency: 117, level: 0.18} }
   }
 
-  prefab SfxCast {
+  prefab SfxFireWhoomp {
     AudioOutput: {bus: mv_sfx}
-    SynthSound: {pitch_variance: 0.06}
-    SynthEnvelope: {attack: 0.01, decay: 0.25}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1200, resonance: 0.4}
-    SynthFilterEnvelope: {attack: 0.2, sustain: 1, hold: 0.06, amount: 1.322}
-    swish { SynthOscillator: {wave: SynthNoise, level: 0.4} }
-    tone { SynthOscillator: {wave: SynthSine, frequency: 660, frequency_end: 990, sweep: 0.2, level: 0.15} }
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 3, pitch_variance: 0.08}
+    SynthEnvelope: {attack: 0.012, decay: 0.6, curve: 3}
+    SynthFilter: {kind: SynthLowPass, cutoff: 240, resonance: 0.2}
+    SynthFilterEnvelope: {attack: 0.03, decay: 0.45, curve: 2, amount: 2.6}
+    roar { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, level: 1.1} }
+    body { SynthOscillator: {wave: SynthSine, frequency: 90, frequency_end: 45, sweep: 0.3, level: 0.45} }
+  }
+
+  prefab SfxFireBed {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 21}
+    SynthEnvelope: {attack: 0.1, sustain: 1, hold: 0.9, release: 0.8, curve: 2}
+    SynthFilter: {kind: SynthLowPass, cutoff: 650, resonance: 0.15}
+    SynthLfo: {wave: SynthLfoRandom, rate: 11, cutoff: 0.7, amplitude: 0.55}
+    rumble { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, level: 0.75} }
+    hiss { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.1} }
+  }
+
+  prefab SfxFireCrackle {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 7, pitch_variance: 0.4, level_variance: 0.6}
+    SynthEnvelope: {attack: 0.0005, decay: 0.016, curve: 6}
+    SynthFilter: {kind: SynthBandPass, cutoff: 2400, resonance: 0.2, keytrack: 1}
+    pop { SynthOscillator: {wave: SynthNoise, level: 1.6} }
+  }
+
+  prefab SfxRainHiss {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 13}
+    SynthEnvelope: {attack: 0.15, sustain: 1, hold: 1, release: 0.9, curve: 2}
+    SynthFilter: {kind: SynthHighPass, cutoff: 1600, resonance: 0.1}
+    SynthLfo: {wave: SynthLfoRandom, rate: 30, amplitude: 0.4}
+    sheet { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.3} }
+  }
+
+  prefab SfxRainDrop {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 29, pitch_variance: 0.3, level_variance: 0.5}
+    SynthEnvelope: {attack: 0.001, decay: 0.05, curve: 4}
+    SynthFilter: {kind: SynthHighPass, cutoff: 900}
+    bubble { SynthOscillator: {wave: SynthSine, frequency: 1400, frequency_end: 2900, sweep: 0.035, level: 0.5} }
+    tick { SynthOscillator: {wave: SynthNoise, level: 0.35}; SynthEnvelope: {attack: 0.0005, decay: 0.006} }
+  }
+
+  prefab SfxGust {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 5, pitch_variance: 0.08}
+    SynthEnvelope: {attack: 0.25, decay: 0.3, sustain: 0.7, hold: 0.3, release: 0.6, curve: 2}
+    SynthFilter: {kind: SynthBandPass, cutoff: 420, resonance: 0.75}
+    SynthFilterEnvelope: {attack: 0.45, decay: 0.7, curve: 2, amount: 2}
+    SynthLfo: {rate: 2.2, cutoff: 0.6}
+    gusts { SynthLfo: {wave: SynthLfoRandom, rate: 6, amplitude: 0.45} }
+    air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 1.2} }
+  }
+
+  prefab SfxRustle {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 19, level_variance: 0.5}
+    SynthEnvelope: {attack: 0.004, decay: 0.06, curve: 3}
+    SynthFilter: {kind: SynthHighPass, cutoff: 2600, resonance: 0.2, keytrack: 1}
+    leaf { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.5} }
+  }
+
+  prefab SfxWoodCreak {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 37, pitch_variance: 0.1}
+    SynthEnvelope: {attack: 0.12, sustain: 1, hold: 0.35, release: 0.25}
+    SynthFilter: {kind: SynthBandPass, cutoff: 650, resonance: 0.4}
+    SynthLfo: {wave: SynthLfoRandom, rate: 14, pitch: 40}
+    groan {
+      SynthOscillator: {wave: SynthBowed, frequency: 70, frequency_end: 95, sweep: 0.8, level: 0.9}
+      SynthBow: {pressure: 0.95, speed: 0.25, position: 0.06, brightness: 0.25, noise: 0.4}
+    }
+  }
+
+  prefab SfxWoodCrack {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 23, pitch_variance: 0.2, level_variance: 0.3}
+    SynthEnvelope: {attack: 0.0005, decay: 0.03, curve: 5}
+    SynthFilter: {kind: SynthBandPass, cutoff: 1800, resonance: 0.15}
+    SynthFilterEnvelope: {attack: 0.0005, decay: 0.05, amount: 1.5}
+    snap { SynthOscillator: {wave: SynthNoise, level: 1.3} }
+    knock {
+      SynthOscillator: {wave: SynthPluck, frequency: 220, level: 0.9}
+      SynthString: {decay: 0.12, brightness: 0.15, hardness: 1}
+    }
+    knock_hi {
+      SynthOscillator: {wave: SynthPluck, frequency: 347, level: 0.55}
+      SynthString: {decay: 0.09, brightness: 0.2, hardness: 1}
+    }
+  }
+
+  prefab SfxWoodSplinter {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 31}
+    SynthEnvelope: {attack: 0.002, decay: 0.2, curve: 3}
+    SynthFilter: {kind: SynthHighPass, cutoff: 1800, resonance: 0.2}
+    SynthLfo: {wave: SynthLfoRandom, rate: 70}
+    grain { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 3} }
+    fibers { SynthOscillator: {wave: SynthNoise, level: 0.4} }
+  }
+
+  prefab SfxLift {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 41, pitch_variance: 0.03, drift: 8}
+    SynthEnvelope: {attack: 0.35, decay: 0.2, sustain: 0.8, hold: 0.6, release: 0.9, curve: 2}
+    SynthFilter: {kind: SynthFormant, vowel: 4, resonance: 0.5}
+    SynthFilterEnvelope: {attack: 0.9, sustain: 1, hold: 0.5, release: 0.6, vowel: -3.5}
+    SynthLfo: {rate: 5.5, pitch: 18, fade: 0.4}
+    murmur { SynthLfo: {wave: SynthLfoRandom, rate: 7, vowel: 0.6} }
+    voice {
+      SynthOscillator: {wave: SynthSaw, frequency: 196, frequency_end: 294, sweep: 1.2, level: 0.35}
+      SynthUnison: {voices: 5, detune: 30}
+    }
+    fifth { SynthOscillator: {wave: SynthSaw, frequency: 294, frequency_end: 440, sweep: 1.2, level: 0.18} }
+    glass {
+      SynthOscillator: {wave: SynthSine, frequency: 1568, frequency_end: 2349, sweep: 1.2, level: 0.08}
+      tremble { SynthOscillator: {wave: SynthSine, frequency: 41, modulation: SynthRing, index: 0.7} }
+    }
+  }
+
+  prefab SfxLiftGlint {
+    AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
+    SynthSound: {seed: 43, level_variance: 0.3}
+    SynthEnvelope: {attack: 0.002, decay: 0.5, curve: 4}
+    bell {
+      SynthOscillator: {wave: SynthSine, frequency: 1760, level: 0.22}
+      ring { SynthOscillator: {wave: SynthSine, frequency: 4857, modulation: SynthPhase, index: 3}; SynthEnvelope: {attack: 0.001, decay: 0.25} }
+    }
+  }
+
+  prefab SfxCastFire {
+    AudioOutput: {bus: mv_sfx}
+    SynthSound: {seed: 47, pitch_variance: 0.06}
+    SynthEnvelope: {attack: 0.004, decay: 0.3, curve: 3}
+    SynthFilter: {kind: SynthBandPass, cutoff: 3000, resonance: 0.3}
+    SynthFilterEnvelope: {attack: 0.0005, decay: 0.2, amount: -1.8}
+    strike { SynthOscillator: {wave: SynthNoise, level: 0.8} }
+    flame { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, level: 0.9}; SynthEnvelope: {attack: 0.04, decay: 0.3, curve: 2} }
+  }
+
+  prefab SfxCastWater {
+    AudioOutput: {bus: mv_sfx}
+    SynthSound: {seed: 53, pitch_variance: 0.08}
+    SynthEnvelope: {attack: 0.01, decay: 0.32, curve: 2}
+    SynthFilter: {kind: SynthBandPass, cutoff: 900, resonance: 0.3}
+    SynthLfo: {wave: SynthLfoRandom, rate: 22, pitch: 900}
+    blub { SynthOscillator: {wave: SynthSine, frequency: 420, frequency_end: 900, sweep: 0.3, level: 0.4} }
+    swish { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.25} }
+  }
+
+  prefab SfxCastWind {
+    AudioOutput: {bus: mv_sfx}
+    SynthSound: {seed: 59, pitch_variance: 0.06}
+    SynthEnvelope: {attack: 0.1, decay: 0.28, curve: 2}
+    SynthFilter: {kind: SynthBandPass, cutoff: 400, resonance: 0.6}
+    SynthFilterEnvelope: {attack: 0.18, decay: 0.2, amount: 2.5}
+    air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.9} }
+  }
+
+  prefab SfxCastWood {
+    AudioOutput: {bus: mv_sfx}
+    SynthSound: {seed: 61, pitch_variance: 0.08}
+    SynthEnvelope: {attack: 0.05, sustain: 1, hold: 0.15, release: 0.12}
+    SynthFilter: {kind: SynthBandPass, cutoff: 700, resonance: 0.35}
+    groan {
+      SynthOscillator: {wave: SynthBowed, frequency: 90, frequency_end: 120, sweep: 0.3, level: 0.8}
+      SynthBow: {pressure: 0.9, speed: 0.3, position: 0.06, brightness: 0.3, noise: 0.35}
+    }
+    knock {
+      SynthOscillator: {wave: SynthPluck, frequency: 260, level: 0.6}
+      SynthString: {decay: 0.1, brightness: 0.15, hardness: 1}
+    }
+  }
+
+  prefab SfxCastFrost {
+    AudioOutput: {bus: mv_sfx}
+    SynthSound: {seed: 67, pitch_variance: 0.04}
+    SynthEnvelope: {attack: 0.03, decay: 0.35, curve: 2}
+    SynthFilter: {kind: SynthHighPass, cutoff: 1800}
+    SynthLfo: {wave: SynthLfoRandom, rate: 30, pitch: 30}
+    crystal { SynthOscillator: {wave: SynthSine, frequency: 2637, frequency_end: 3520, sweep: 0.3, level: 0.2} }
+    chime { SynthOscillator: {wave: SynthTriangle, frequency: 3136, level: 0.1} }
+    frost { SynthOscillator: {wave: SynthNoise, level: 0.15}; SynthEnvelope: {attack: 0.01, decay: 0.2} }
+  }
+
+  prefab SfxCastLift {
+    AudioOutput: {bus: mv_sfx}
+    SynthSound: {seed: 71, pitch_variance: 0.03}
+    SynthEnvelope: {attack: 0.15, decay: 0.15, sustain: 0.6, hold: 0.05, release: 0.2, curve: 2}
+    SynthFilter: {kind: SynthFormant, vowel: 4, resonance: 0.5}
+    SynthFilterEnvelope: {attack: 0.3, sustain: 1, hold: 0.1, release: 0.2, vowel: -3}
+    SynthLfo: {rate: 6, pitch: 20}
+    voice {
+      SynthOscillator: {wave: SynthSaw, frequency: 220, frequency_end: 440, sweep: 0.35, level: 0.4}
+      SynthUnison: {voices: 3, detune: 25}
+    }
   }
 
   prefab SfxTalk {
@@ -346,6 +517,46 @@ state {
   fn impact_y(s: i32) -> f32 {
     match s { 6: 0.3; 3: 0.8; _: 0.7 }
   }
+
+  export mut sfx_on: bool[8] = {}
+  export mut sfx_x: f32[8] = {}
+  export mut sfx_z: f32[8] = {}
+  export mut sfx_until: f64[8] = {}
+}
+
+mossvale {
+  mv_spell_sounds {
+    crackles {
+      if sfx_on[SP_SPARK] {
+        Position: {sfx_x[SP_SPARK], 0.7, sfx_z[SP_SPARK]}
+        AudioEmitter: {sound: assets.SfxFireCrackle, interval_min: 0.02, interval_max: 0.14, shape: AudioEmitterSphere, radius: 0.8, volume_min: 0.25, volume_max: 1, pitch_min: 0.6, pitch_max: 1.6}
+      }
+    }
+    raindrops {
+      if sfx_on[SP_SPLASH] {
+        Position: {sfx_x[SP_SPLASH], 0.7, sfx_z[SP_SPLASH]}
+        AudioEmitter: {sound: assets.SfxRainDrop, interval_min: 0.012, interval_max: 0.06, shape: AudioEmitterDisc, radius: 2.5, volume_min: 0.2, volume_max: 0.9, pitch_min: 0.7, pitch_max: 1.4}
+      }
+    }
+    leaves {
+      if sfx_on[SP_GUST] {
+        Position: {sfx_x[SP_GUST], 0.8, sfx_z[SP_GUST]}
+        AudioEmitter: {sound: assets.SfxRustle, interval_min: 0.02, interval_max: 0.08, shape: AudioEmitterDisc, radius: 1.5, volume_min: 0.2, volume_max: 0.8, pitch_min: 0.7, pitch_max: 1.4}
+      }
+    }
+    branches {
+      if sfx_on[SP_BLOOM] {
+        Position: {sfx_x[SP_BLOOM], 0.7, sfx_z[SP_BLOOM]}
+        AudioEmitter: {sound: assets.SfxWoodCrack, interval_min: 0.06, interval_max: 0.25, shape: AudioEmitterSphere, radius: 1, volume_min: 0.35, volume_max: 1, pitch_min: 0.7, pitch_max: 1.3}
+      }
+    }
+    glints {
+      if sfx_on[SP_LIFT] {
+        Position: {sfx_x[SP_LIFT], 1.2, sfx_z[SP_LIFT]}
+        AudioEmitter: {sound: assets.SfxLiftGlint, interval_min: 0.06, interval_max: 0.2, shape: AudioEmitterHemisphere, radius: 1.2, volume_min: 0.3, volume_max: 0.8, pitch_min: 0.75, pitch_max: 1.5}
+      }
+    }
+  }
 }
 
 async {
@@ -354,16 +565,20 @@ async {
     const y = impact_y(e.spell)
     if e.spell == SP_SPARK {
       const b = box.particle.burst_at(SparkBurst, {e.x, y, e.z}, 1)
-      const a = box.audio.play_at(SfxSpark, {e.x, y, e.z}, 0.9)
+      const a = box.audio.play_at(SfxFireWhoomp, {e.x, y, e.z}, 0.9)
+      const c = box.audio.play_at(SfxFireBed, {e.x, y, e.z}, 0.8)
     } else if e.spell == SP_SPLASH {
       const b = box.particle.burst_at(SplashBurst, {e.x, y, e.z}, 1)
-      const a = box.audio.play_at(SfxSplash, {e.x, y, e.z}, 0.9)
+      const a = box.audio.play_at(SfxSplash, {e.x, y, e.z}, 0.7)
+      const c = box.audio.play_at(SfxRainHiss, {e.x, y, e.z}, 0.8)
     } else if e.spell == SP_GUST {
       const b = box.particle.burst_at(GustBurst, {e.x, y, e.z}, 1)
       const a = box.audio.play_at(SfxGust, {e.x, y, e.z}, 0.9)
     } else if e.spell == SP_BLOOM {
       const b = box.particle.burst_at(BloomBurst, {e.x, y, e.z}, 1)
-      const a = box.audio.play_at(SfxBloom, {e.x, y, e.z}, 0.8)
+      const a = box.audio.play_at(SfxWoodCrack, {e.x, y, e.z}, 1)
+      const c = box.audio.play_at(SfxWoodCreak, {e.x, y, e.z}, 0.8)
+      const d = box.audio.play_at(SfxWoodSplinter, {e.x, y, e.z}, 0.7)
     } else if e.spell == SP_FROST {
       const b = box.particle.burst_at(FrostBurst, {e.x, y, e.z}, 1)
       const a = box.audio.play_at(SfxFrost, {e.x, y, e.z}, 0.8)
@@ -371,13 +586,42 @@ async {
       const b = box.particle.burst_at(LiftBurst, {e.x, y, e.z}, 1)
       const a = box.audio.play_at(SfxLift, {e.x, y, e.z}, 0.8)
     }
+    if e.spell != SP_FROST {
+      sfx_x[e.spell] = e.x
+      sfx_z[e.spell] = e.z
+      sfx_until[e.spell] = clock + match e.spell { 1: 1.5; 2: 1.6; 3: 1.0; 4: 1.0; _: 1.3 }
+      sfx_on[e.spell] = true
+    }
   }
 }
 
 async {
   while true {
-    await CastStart
-    const a = box.audio.play(SfxCast, 0.5)
+    await next_frame()
+    for s in 1..7 {
+      if sfx_on[s] && clock > sfx_until[s] {
+        sfx_on[s] = false
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    const e = await CastStart
+    if e.spell == SP_SPARK {
+      const a = box.audio.play(SfxCastFire, 0.5)
+    } else if e.spell == SP_SPLASH {
+      const a = box.audio.play(SfxCastWater, 0.5)
+    } else if e.spell == SP_GUST {
+      const a = box.audio.play(SfxCastWind, 0.5)
+    } else if e.spell == SP_BLOOM {
+      const a = box.audio.play(SfxCastWood, 0.5)
+    } else if e.spell == SP_FROST {
+      const a = box.audio.play(SfxCastFrost, 0.5)
+    } else if e.spell == SP_LIFT {
+      const a = box.audio.play(SfxCastLift, 0.5)
+    }
   }
 }
 
