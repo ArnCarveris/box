@@ -93,6 +93,33 @@ int32_t box_render_environment_sent(
     ecs_world_t *world,
     ecs_entity_t e);
 
+/** Record that a source sends new content into its cubemap in the packet of this frame that
+ * only moved, such as drifting clouds: the captures that fill with the cubemap do not capture
+ * again for it.
+ *
+ * Increments EnvironmentStatus.version as box_render_environment_sent, but leaves the version
+ * box_render_environment_captured returns.
+ *
+ * @param world The world
+ * @param e Entity with Environment, whose handle the source got this frame and whose cubemap
+ *          has content
+ * @return The new version
+ */
+int32_t box_render_environment_sent_moved(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the content of the cubemap of an environment source that reflection captures and probe
+ * volumes follow: the version of the last send that did more than move.
+ *
+ * @param world The world
+ * @param e Entity with Environment
+ * @return The version, 0 when the cubemap is empty or does not exist
+ */
+int32_t box_render_environment_captured(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Report why a source has no content; EnvironmentStatus.error shows it unless the resolution
  * is invalid.
  *

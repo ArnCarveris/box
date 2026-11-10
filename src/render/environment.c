@@ -28,6 +28,8 @@ typedef struct box_env_t {
     int32_t resolution;     /**< Resolution the cubemap was created with */
     uint32_t filter;        /**< Filter the cubemap was created or updated with */
     int32_t content;        /**< Version the cubemap holds, 0 when it is empty */
+    int32_t captured;       /**< Version of the last send that did more than move, 0 when the
+                             *   cubemap is empty */
     char *error;            /**< Why the source has no content, NULL for none */
     bool seen;              /**< The entity has Environment in this frame */
 } box_env_t;
@@ -125,6 +127,7 @@ static void box_env_backend(
         box_env_t *env = ecs_map_ptr(&it);
         env->created = false;
         env->content = 0;
+        env->captured = 0;
     }
 
     state->backend = backend->ctx;
@@ -157,6 +160,7 @@ static void box_env_release(
     env->handle = 0;
     env->created = false;
     env->content = 0;
+    env->captured = 0;
 }
 
 /** Write EnvironmentStatus.error when it differs from what the status holds.
@@ -370,6 +374,7 @@ uint32_t box_render_environment_handle(
         env->resolution = value->resolution;
         env->filter = (uint32_t)value->filter;
         env->content = create ? 0 : env->content;
+        env->captured = create ? 0 : env->captured;
     }
 
     result = env->handle;
@@ -397,9 +402,17 @@ int32_t box_render_environment_content(
     return env && env->created ? env->content : 0;
 }
 
-int32_t box_render_environment_sent(
+/** Record that a source sends new content into its cubemap in the packet of this frame.
+ *
+ * @param world The world
+ * @param e Entity with Environment
+ * @param moved Whether the content only moved, so the captured version stays
+ * @return The new version
+ */
+static int32_t box_env_sent(
     ecs_world_t *world,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    bool moved)
 {
     box_render_env_t *state = box_env_state(world);
     box_env_t *env = state ? box_env_find(state, e) : NULL;
@@ -413,10 +426,37 @@ int32_t box_render_environment_sent(
     ecs_modified(world, e, EnvironmentStatus);
     if (env) {
         env->content = result;
+        if (!moved || !env->captured) {
+            env->captured = result;
+        }
     }
 
 done:
     return result;
+}
+
+int32_t box_render_environment_sent(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return box_env_sent(world, e, false);
+}
+
+int32_t box_render_environment_sent_moved(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return box_env_sent(world, e, true);
+}
+
+int32_t box_render_environment_captured(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const box_render_env_t *state = box_env_state(world);
+    const box_env_t *env = state ? box_env_find(state, e) : NULL;
+
+    return env && env->created && env->content ? env->captured : 0;
 }
 
 void box_render_environment_error(

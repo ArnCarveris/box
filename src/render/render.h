@@ -626,6 +626,24 @@ float box_render_cloud_alpha(
     float coverage,
     float density);
 
+/** Fraction of the size of a CloudLayer its offset moves before the environment of its
+ * Atmosphere is rendered again */
+#define BOX_RENDER_CLOUD_ENV_MOVE (1.0f / 64.0f)
+
+/** Check whether the offset of a CloudLayer moved far enough since the last render of the
+ * environment of its Atmosphere to render it again: by more than BOX_RENDER_CLOUD_ENV_MOVE of
+ * its size, the shortest way around the wrap of the offsets to [0, size).
+ *
+ * @param was Offset along X and Z at the last render
+ * @param now Offset along X and Z now
+ * @param size World units the texture repeats over
+ * @return Whether it moved far enough, false for a size at or below 0
+ */
+bool box_render_cloud_moved(
+    const float *was,
+    const float *now,
+    float size);
+
 /** Copy the transmittance or the multi scattering LUT of an atmosphere into memory, waiting for
  * the copy.
  *

@@ -266,6 +266,21 @@
                 ]
             },
             {
+                "id": "CloudEnvironment",
+                "testcases": [
+                    "moved_rule",
+                    "layer_added_renders",
+                    "layer_changed_renders",
+                    "layer_removed_renders",
+                    "move_past_fraction_renders",
+                    "move_with_wrap",
+                    "small_move_does_not_render",
+                    "velocity_renders_periodically",
+                    "moving_clouds_keep_reflection_probes",
+                    "moving_clouds_keep_probe_volume"
+                ]
+            },
+            {
                 "id": "Environment",
                 "testcases": [
                     "script_defaults",

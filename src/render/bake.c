@@ -749,7 +749,7 @@ static void box_bake_environment(
     uint32_t handle = v->environment
         ? box_render_environment_handle(world, v->environment)
         : 0;
-    int32_t content = handle ? box_render_environment_content(world, v->environment) : 0;
+    int32_t content = handle ? box_render_environment_captured(world, v->environment) : 0;
     v->env_handle = content ? handle : 0;
     v->env_content = content;
 }

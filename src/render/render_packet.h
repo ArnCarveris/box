@@ -955,7 +955,8 @@ typedef struct box_render_atmosphere_desc_t {
  * scene, rendered into mip 0 of the cubemap of the BOX_RENDER_ENVIRONMENT of the handle.
  *
  * The backend renders a sky view LUT of the scene at its ground altitude, then the cubemap
- * from it before the environments are processed, and reports the cubemap written with version.
+ * from it with the cloud layers before the environments are processed, and reports the cubemap
+ * written with version.
  *
  * The request waits while the LUTs, the atmosphere shader or the processing are not ready; a
  * newer one for the handle replaces it, one whose cubemap is gone is dropped.
@@ -971,6 +972,13 @@ typedef struct box_render_atmosphere_env_t {
                              *   (0, -1, 0) without one */
     float moon_color[4];    /**< Top of atmosphere irradiance of the moon, 0 without one */
     float night[4];         /**< Linear night_tint times night_intensity */
+    float aerial_intensity; /**< Scale of the aerial perspective of the cloud layers */
+    float km_per_unit;      /**< Kilometers in a world unit, the inverse of units_per_km */
+    int32_t cloud_count;    /**< Layers in clouds */
+    box_render_cloud_layer_t clouds[BOX_CLOUD_LAYER_MAX]; /**< The cloud layers with a loaded
+                             *   texture by ascending altitude, seen from the capture point of
+                             *   the cubemap: world X and Z 0 at the sea_level of the
+                             *   Atmosphere */
 } box_render_atmosphere_env_t;
 
 /** How a buffer is used, flags of box_render_buffer_desc_t */
