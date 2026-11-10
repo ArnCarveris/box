@@ -11,26 +11,28 @@ using box.surface
 using box.controllers
 using box.text
 
-template BellArch {
-  prop width: f32 = 1.1
-  prop height: f32 = 1.55
-  const radius = width / 2
-  for side in 0..2 {
-    { Position: {(side - 0.5) * (width + 0.22), (height - radius) / 2, 0}; RoundedBox: {0.23, height - radius, 0.46, 0.05}; Rgb: IslandChalk }
-  }
-  arch_path {
-    Path3D: {
-      start: {radius + 0.12, height - radius, 0},
-      segments: [
-        {kind: CubicBezier, end: {0, height - radius + radius + 0.12, 0}, control1: {radius + 0.12, height - radius + radius + 0.12 * 0.5523, 0}, control2: {radius + 0.12 * 0.5523, height - radius + radius + 0.12, 0}},
-        {kind: CubicBezier, end: {0 - radius + 0.12, height - radius, 0}, control1: {0 - radius + 0.12 * 0.5523, height - radius + radius + 0.12, 0}, control2: {0 - radius + 0.12, height - radius + radius + 0.12 * 0.5523, 0}}
-      ]
+assets {
+  template BellArch {
+    prop width: f32 = 1.1
+    prop height: f32 = 1.55
+    const radius = width / 2
+    for side in 0..2 {
+      { Position: {(side - 0.5) * (width + 0.22), (height - radius) / 2, 0}; RoundedBox: {0.23, height - radius, 0.46, 0.05}; Rgb: IslandChalk }
     }
+    arch_path {
+      Path3D: {
+        start: {radius + 0.12, height - radius, 0},
+        segments: [
+          {kind: CubicBezier, end: {0, height - radius + radius + 0.12, 0}, control1: {radius + 0.12, height - radius + radius + 0.12 * 0.5523, 0}, control2: {radius + 0.12 * 0.5523, height - radius + radius + 0.12, 0}},
+          {kind: CubicBezier, end: {0 - radius + 0.12, height - radius, 0}, control1: {0 - radius + 0.12 * 0.5523, height - radius + radius + 0.12, 0}, control2: {0 - radius + 0.12, height - radius + radius + 0.12 * 0.5523, 0}}
+        ]
+      }
+    }
+    arch { Position: {0, 0, 0}; Sweep: {path: arch_path, profile: IslandSquareProfile, scale: {0.46, 0.24}, rings: 32}; Rgb: IslandChalk }
+    axle { Position: {0, height - radius + 0.04, 0}; Box: {width, 0.07, 0.08}; Rgb: IslandWood }
+    bell { Position: {0, height - radius - 0.26, 0}; Frustum: {radius_bottom: 0.22, radius_top: 0.1, length: 0.36, segments: 20, smooth: true}; Rgb: {176, 140, 74}; PbrMaterial: {metallic: 0.65, roughness: 0.4} }
+    lip { Position: {0, height - radius - 0.44, 0}; Torus: {radius: 0.21, tube: 0.035, segments: 20, rings: 8}; Rgb: {184, 147, 80} }
+    clapper { Position: {0, height - radius - 0.5, 0}; Sphere: {radius: 0.055, segments: 10}; Rgb: IslandIron }
+    rope { Position: {0.08, 0.45, 0.05}; Cylinder: {radius: 0.012, length: 0.75, segments: 6}; Rgb: IslandWood }
   }
-  arch { Position: {0, 0, 0}; Sweep: {path: arch_path, profile: IslandSquareProfile, scale: {0.46, 0.24}, rings: 32}; Rgb: IslandChalk }
-  axle { Position: {0, height - radius + 0.04, 0}; Box: {width, 0.07, 0.08}; Rgb: IslandWood }
-  bell { Position: {0, height - radius - 0.26, 0}; Frustum: {radius_bottom: 0.22, radius_top: 0.1, length: 0.36, segments: 20, smooth: true}; Rgb: {176, 140, 74}; PbrMaterial: {metallic: 0.65, roughness: 0.4} }
-  lip { Position: {0, height - radius - 0.44, 0}; Torus: {radius: 0.21, tube: 0.035, segments: 20, rings: 8}; Rgb: {184, 147, 80} }
-  clapper { Position: {0, height - radius - 0.5, 0}; Sphere: {radius: 0.055, segments: 10}; Rgb: IslandIron }
-  rope { Position: {0.08, 0.45, 0.05}; Cylinder: {radius: 0.012, length: 0.75, segments: 6}; Rgb: IslandWood }
 }

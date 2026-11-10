@@ -1,9 +1,11 @@
 using box.material
 
-export const MarketOak: Rgb = {116, 73, 43}
-export const MarketHoney: Rgb = {184, 127, 68}
-export const MarketCream: Rgb = {250, 234, 196}
-export const MarketIron: Rgb = {53, 66, 63}
-export const MarketSage: Rgb = {81, 124, 111}
-export const MarketRind: Rgb = {222, 157, 48}
-export const MarketStone: Rgb = {189, 172, 144}
+assets {
+  export const MarketOak: Rgb = {116, 73, 43}
+  export const MarketHoney: Rgb = {184, 127, 68}
+  export const MarketCream: Rgb = {250, 234, 196}
+  export const MarketIron: Rgb = {53, 66, 63}
+  export const MarketSage: Rgb = {81, 124, 111}
+  export const MarketRind: Rgb = {222, 157, 48}
+  export const MarketStone: Rgb = {189, 172, 144}
+}

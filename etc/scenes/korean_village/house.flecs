@@ -7,71 +7,73 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanHouse {
-  prop harvest: bool = false
-  { (IsA, KoreanStone); Position: {0, 0.2, 0}; RoundedBox: {6.1, 0.4, 4.3, 0.08} }
-  for side in 0..2 {
-    for block in 0..13 {
-      const tone = (block * 5 + side) % 4
-      { Position: {-2.82 + block * 0.47, 0.2, (side - 0.5) * 4.31}; RoundedBox: {0.44, 0.31, 0.04, 0.03}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+assets {
+  template KoreanHouse {
+    prop harvest: bool = false
+    { (IsA, KoreanStone); Position: {0, 0.2, 0}; RoundedBox: {6.1, 0.4, 4.3, 0.08} }
+    for side in 0..2 {
+      for block in 0..13 {
+        const tone = (block * 5 + side) % 4
+        { Position: {-2.82 + block * 0.47, 0.2, (side - 0.5) * 4.31}; RoundedBox: {0.44, 0.31, 0.04, 0.03}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+      }
+      for block in 0..9 {
+        const tone = (block * 3 + side) % 4
+        { Position: {(side - 0.5) * 6.11, 0.2, -1.88 + block * 0.47}; RoundedBox: {0.04, 0.31, 0.44, 0.03}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+      }
     }
-    for block in 0..9 {
-      const tone = (block * 3 + side) % 4
-      { Position: {(side - 0.5) * 6.11, 0.2, -1.88 + block * 0.47}; RoundedBox: {0.04, 0.31, 0.44, 0.03}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
-    }
-  }
-  { (IsA, KoreanPlaster); Position: {0, 1.4, 0}; Box: {5.5, 2.0, 3.5} }
-  for side in 0..2 {
-    for post in 0..4 {
-      const x = (post - 1.5) * 1.78
-      const z = (side - 0.5) * 3.6
-      { Position: {x, 1.43, z}; Box: {0.13, 2.12, 0.13}; Rgb: {103, 66, 42} }
-      { (IsA, KoreanStone); Position: {x, 0.42, z}; Cylinder: {radius: 0.15, length: 0.05, segments: 8} }
-    }
-    for rail in 0..2 {
-      { Position: {0, 0.48 + rail * 1.94, (side - 0.5) * 3.6}; Box: {5.7, 0.14, 0.15}; Rgb: {103, 66, 42} }
-    }
-  }
-  for side in 0..2 {
-    {
-      Position: {(side - 0.5) * 5.56, 0, 0}
-      Rotation: {0, (side * 2 - 1) * math.PI / 2, 0}
-      { KoreanDoor: {}; Position: {0, 1.55, 0.04}; Scale: {0.76, 0.65, 1} }
+    { (IsA, KoreanPlaster); Position: {0, 1.4, 0}; Box: {5.5, 2.0, 3.5} }
+    for side in 0..2 {
+      for post in 0..4 {
+        const x = (post - 1.5) * 1.78
+        const z = (side - 0.5) * 3.6
+        { Position: {x, 1.43, z}; Box: {0.13, 2.12, 0.13}; Rgb: {103, 66, 42} }
+        { (IsA, KoreanStone); Position: {x, 0.42, z}; Cylinder: {radius: 0.15, length: 0.05, segments: 8} }
+      }
       for rail in 0..2 {
-        { (IsA, KoreanTimber); Position: {0, 0.48 + rail * 1.94, 0}; Box: {3.65, 0.13, 0.12} }
-      }
-      for post in 0..2 {
-        { (IsA, KoreanTimber); Position: {(post - 0.5) * 2.2, 1.45, 0}; Box: {0.1, 2, 0.12} }
+        { Position: {0, 0.48 + rail * 1.94, (side - 0.5) * 3.6}; Box: {5.7, 0.14, 0.15}; Rgb: {103, 66, 42} }
       }
     }
-  }
-  for door in 0..3 {
-    { KoreanDoor: {}; Position: {(door - 1) * 1.78, 1.45, 1.81}; Scale: {0.92, 0.94, 1} }
-    { KoreanDoor: {}; Position: {(door - 1) * 1.78, 1.45, -1.81}; Rotation: {0, math.PI, 0}; Scale: {0.92, 0.94, 1} }
-  }
-  for plank in 0..20 {
-    const tone = (plank * 7) % 5
-    { Position: {(plank - 9.5) * 0.285, 0.46, 2}; Box: {0.27, 0.1, 0.65}; Rgb: {88 + tone * 7, 54 + tone * 4, 34 + tone * 3}; PbrMaterial: {roughness: 0.72} }
-  }
-  { (IsA, KoreanTimber); Position: {0, 0.42, 2.34}; Box: {5.72, 0.1, 0.06} }
-  { (IsA, KoreanStone); Position: {0, 0.16, 2.45}; RoundedBox: {1.8, 0.3, 0.55, 0.05} }
-  for shoe in 0..2 {
-    { Position: {(shoe - 0.5) * 0.2, 0.34, 2.45}; Scale: {0.42, 0.26, 1}; Sphere: {radius: 0.13, segments: 10}; Rgb: {214, 212, 200} }
-  }
-  { KoreanSilkLantern: {drop: 0.08}; Position: {0, 2.6, 1.98} }
-  if harvest {
-    for rack in 0..2 {
-      { KoreanPersimmons: {}; Position: {(rack - 0.5) * 3.56, 2.48, 2} }
+    for side in 0..2 {
+      {
+        Position: {(side - 0.5) * 5.56, 0, 0}
+        Rotation: {0, (side * 2 - 1) * math.PI / 2, 0}
+        { KoreanDoor: {}; Position: {0, 1.55, 0.04}; Scale: {0.76, 0.65, 1} }
+        for rail in 0..2 {
+          { (IsA, KoreanTimber); Position: {0, 0.48 + rail * 1.94, 0}; Box: {3.65, 0.13, 0.12} }
+        }
+        for post in 0..2 {
+          { (IsA, KoreanTimber); Position: {(post - 0.5) * 2.2, 1.45, 0}; Box: {0.1, 2, 0.12} }
+        }
+      }
     }
-  }
-  { KoreanRoof: {}; Position: {0, 2.58, 0}; Scale: {0.79, 0.75, 0.78} }
-  {
-    Position: {2.35, 0, -2.3}
-    { (IsA, KoreanStone); Position: {0, 1.1, 0}; Box: {0.55, 2.2, 0.6} }
-    for row in 0..7 {
-      { Position: {0, 0.2 + row * 0.29, 0}; Box: {0.57, 0.035, 0.62}; Rgb: {111, 106, 91} }
+    for door in 0..3 {
+      { KoreanDoor: {}; Position: {(door - 1) * 1.78, 1.45, 1.81}; Scale: {0.92, 0.94, 1} }
+      { KoreanDoor: {}; Position: {(door - 1) * 1.78, 1.45, -1.81}; Rotation: {0, math.PI, 0}; Scale: {0.92, 0.94, 1} }
     }
-    { Position: {0, 2.25, 0}; Box: {0.35, 0.16, 0.38}; Rgb: {42, 42, 37} }
-    { (IsA, KoreanTile); Position: {0, 2.39, 0}; RoundedBox: {0.76, 0.15, 0.8, 0.04} }
+    for plank in 0..20 {
+      const tone = (plank * 7) % 5
+      { Position: {(plank - 9.5) * 0.285, 0.46, 2}; Box: {0.27, 0.1, 0.65}; Rgb: {88 + tone * 7, 54 + tone * 4, 34 + tone * 3}; PbrMaterial: {roughness: 0.72} }
+    }
+    { (IsA, KoreanTimber); Position: {0, 0.42, 2.34}; Box: {5.72, 0.1, 0.06} }
+    { (IsA, KoreanStone); Position: {0, 0.16, 2.45}; RoundedBox: {1.8, 0.3, 0.55, 0.05} }
+    for shoe in 0..2 {
+      { Position: {(shoe - 0.5) * 0.2, 0.34, 2.45}; Scale: {0.42, 0.26, 1}; Sphere: {radius: 0.13, segments: 10}; Rgb: {214, 212, 200} }
+    }
+    { KoreanSilkLantern: {drop: 0.08}; Position: {0, 2.6, 1.98} }
+    if harvest {
+      for rack in 0..2 {
+        { KoreanPersimmons: {}; Position: {(rack - 0.5) * 3.56, 2.48, 2} }
+      }
+    }
+    { KoreanRoof: {}; Position: {0, 2.58, 0}; Scale: {0.79, 0.75, 0.78} }
+    {
+      Position: {2.35, 0, -2.3}
+      { (IsA, KoreanStone); Position: {0, 1.1, 0}; Box: {0.55, 2.2, 0.6} }
+      for row in 0..7 {
+        { Position: {0, 0.2 + row * 0.29, 0}; Box: {0.57, 0.035, 0.62}; Rgb: {111, 106, 91} }
+      }
+      { Position: {0, 2.25, 0}; Box: {0.35, 0.16, 0.38}; Rgb: {42, 42, 37} }
+      { (IsA, KoreanTile); Position: {0, 2.39, 0}; RoundedBox: {0.76, 0.15, 0.8, 0.04} }
+    }
   }
 }

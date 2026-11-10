@@ -11,33 +11,35 @@ using box.surface
 using box.controllers
 using box.movement
 
-template PaperLantern {
-  prop tint: Rgb = {255, 197, 133}
+assets {
+  template PaperLantern {
+    prop tint: Rgb = {255, 197, 133}
 
-  cord {
-    Position: {0, 0.43, 0}
-    Cylinder: {radius: 0.015, length: 0.4, segments: 6}
-    Rgb: GardenCedar
-  }
-  shade {
-    Scale: {1, 1.18, 1}
-    Sphere: {radius: 0.29, segments: 16, smooth: true}
-    Rgb: tint
-    Emissive: {strength: 7, color: tint}
-    DiffuseTransmission: GardenShoji
-  }
-  for i in 0..5 {
-    {
-      Position: {0, (i - 2) * 0.115, 0}
-      Torus: {radius: 0.29 * math.sqrt(1 - (i - 2) * (i - 2) * 0.11), tube: 0.012, segments: 16, rings: 4}
-      Rgb: {161, 96, 64}
-    }
-  }
-  for i in 0..2 {
-    {
-      Position: {0, (i - 0.5) * 0.65, 0}
-      Cylinder: {radius: 0.105, length: 0.055, segments: 12}
+    cord {
+      Position: {0, 0.43, 0}
+      Cylinder: {radius: 0.015, length: 0.4, segments: 6}
       Rgb: GardenCedar
+    }
+    shade {
+      Scale: {1, 1.18, 1}
+      Sphere: {radius: 0.29, segments: 16, smooth: true}
+      Rgb: tint
+      Emissive: {strength: 7, color: tint}
+      DiffuseTransmission: GardenShoji
+    }
+    for i in 0..5 {
+      {
+        Position: {0, (i - 2) * 0.115, 0}
+        Torus: {radius: 0.29 * math.sqrt(1 - (i - 2) * (i - 2) * 0.11), tube: 0.012, segments: 16, rings: 4}
+        Rgb: {161, 96, 64}
+      }
+    }
+    for i in 0..2 {
+      {
+        Position: {0, (i - 0.5) * 0.65, 0}
+        Cylinder: {radius: 0.105, length: 0.055, segments: 12}
+        Rgb: GardenCedar
+      }
     }
   }
 }

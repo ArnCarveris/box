@@ -5,6 +5,7 @@ using box.transform
 using box.camera
 using box.view
 using box.light
+using assets
 component { FrigateCockpit: {} }
 camera { Position: {11, 9, 15}; Rotation: {-0.4, 0.63, 0}; Camera: {fov: 48} }
 main_view { View: {camera: camera, clear: {enabled: true, color: {9, 16, 24, 255}}, shadows: {enabled: true}} }

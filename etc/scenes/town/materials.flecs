@@ -2,26 +2,28 @@ using flecs.script
 using box.geometry
 using box.material
 
-export const TownTimber: Rgb = {91, 65, 57}
-export const TownRoofTile: Rgb = {66, 83, 99}
-export const TownCream: Rgb = {248, 230, 196}
-export const TownGlass: Rgb = {119, 176, 183}
-export const TownIron: Rgb = {62, 77, 80}
-export const TownLeaf: Rgb = {112, 158, 109}
-export const TownPink: Rgb = {242, 178, 191}
+assets {
+  export const TownTimber: Rgb = {91, 65, 57}
+  export const TownRoofTile: Rgb = {66, 83, 99}
+  export const TownCream: Rgb = {248, 230, 196}
+  export const TownGlass: Rgb = {119, 176, 183}
+  export const TownIron: Rgb = {62, 77, 80}
+  export const TownLeaf: Rgb = {112, 158, 109}
+  export const TownPink: Rgb = {242, 178, 191}
 
-prefab TownGlassPane { Rgb: TownGlass; PbrMaterial: {roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.04} }
-prefab TownPaper { PbrMaterial: {roughness: 0.9}; DiffuseTransmission: {factor: 0.5, color: {255, 200, 170}} }
-prefab TownBlossom { PbrMaterial: {roughness: 0.85}; Sheen: {color: {255, 214, 226}, roughness: 0.4} }
-prefab TownWireShape {
-  Path2D: {
-    start: {1, 0},
-    segments: [
-      {kind: CatmullRom, end: {0, 1}},
-      {kind: CatmullRom, end: {-1, 0}},
-      {kind: CatmullRom, end: {0, -1}}
-    ],
-    closed: true
+  prefab TownGlassPane { Rgb: TownGlass; PbrMaterial: {roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.04} }
+  prefab TownPaper { PbrMaterial: {roughness: 0.9}; DiffuseTransmission: {factor: 0.5, color: {255, 200, 170}} }
+  prefab TownBlossom { PbrMaterial: {roughness: 0.85}; Sheen: {color: {255, 214, 226}, roughness: 0.4} }
+  prefab TownWireShape {
+    Path2D: {
+      start: {1, 0},
+      segments: [
+        {kind: CatmullRom, end: {0, 1}},
+        {kind: CatmullRom, end: {-1, 0}},
+        {kind: CatmullRom, end: {0, -1}}
+      ],
+      closed: true
+    }
   }
+  prefab TownWireProfile { Profile2D: {outer: TownWireShape} }
 }
-prefab TownWireProfile { Profile2D: {outer: TownWireShape} }

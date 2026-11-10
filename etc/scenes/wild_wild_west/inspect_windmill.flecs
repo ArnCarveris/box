@@ -1,4 +1,4 @@
 include windmill
 using box.transform
 
-asset { WestWindmill: {}; Position: {} }
+asset { assets.WestWindmill: {}; Position: {} }

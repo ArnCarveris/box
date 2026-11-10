@@ -10,39 +10,41 @@ using box.surface
 using box.controllers
 using box.text
 
-template MarketBeam {
-  prop ax: f32 = 0
-  prop ay: f32 = 0
-  prop az: f32 = 0
-  prop bx: f32 = 0
-  prop by: f32 = 1
-  prop bz: f32 = 0
-  prop radius: f32 = 0.035
-  prop tint: Rgb = {53, 66, 63}
+assets {
+  template MarketBeam {
+    prop ax: f32 = 0
+    prop ay: f32 = 0
+    prop az: f32 = 0
+    prop bx: f32 = 0
+    prop by: f32 = 1
+    prop bz: f32 = 0
+    prop radius: f32 = 0.035
+    prop tint: Rgb = {53, 66, 63}
 
-  const dx = bx - ax
-  const dy = by - ay
-  const dz = bz - az
-  const length = math.sqrt(dx * dx + dy * dy + dz * dz)
-  Position: {(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2}
-  Rotation: {math.acos(dy / length), math.atan2(dx, dz), 0}
-  Cylinder: {radius: radius, length: length, segments: 8}
-  Rgb: tint
-}
-
-prefab MarketRoundShape {
-  Path2D: {
-    start: {1, 0},
-    segments: [
-      {kind: CatmullRom, end: {0.7071, 0.7071}},
-      {kind: CatmullRom, end: {0, 1}},
-      {kind: CatmullRom, end: {-0.7071, 0.7071}},
-      {kind: CatmullRom, end: {-1, 0}},
-      {kind: CatmullRom, end: {-0.7071, -0.7071}},
-      {kind: CatmullRom, end: {0, -1}},
-      {kind: CatmullRom, end: {0.7071, -0.7071}}
-    ],
-    closed: true
+    const dx = bx - ax
+    const dy = by - ay
+    const dz = bz - az
+    const length = math.sqrt(dx * dx + dy * dy + dz * dz)
+    Position: {(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2}
+    Rotation: {math.acos(dy / length), math.atan2(dx, dz), 0}
+    Cylinder: {radius: radius, length: length, segments: 8}
+    Rgb: tint
   }
+
+  prefab MarketRoundShape {
+    Path2D: {
+      start: {1, 0},
+      segments: [
+        {kind: CatmullRom, end: {0.7071, 0.7071}},
+        {kind: CatmullRom, end: {0, 1}},
+        {kind: CatmullRom, end: {-0.7071, 0.7071}},
+        {kind: CatmullRom, end: {-1, 0}},
+        {kind: CatmullRom, end: {-0.7071, -0.7071}},
+        {kind: CatmullRom, end: {0, -1}},
+        {kind: CatmullRom, end: {0.7071, -0.7071}}
+      ],
+      closed: true
+    }
+  }
+  prefab MarketRoundProfile { Profile2D: {outer: MarketRoundShape} }
 }
-prefab MarketRoundProfile { Profile2D: {outer: MarketRoundShape} }

@@ -10,21 +10,23 @@ using box.surface
 using box.controllers
 using box.text
 
-template Brie {
-  prop radius: f32 = 0.27
+assets {
+  template Brie {
+    prop radius: f32 = 0.27
 
-  body {
-    Position: {}
-    Cylinder: {radius: radius, length: 0.14, segments: 28, smooth: true}
-    Rgb: {246, 238, 208}
-    PbrMaterial: {roughness: 0.95}
-    Sheen: {color: {255, 252, 240}, roughness: 0.55}
-  }
-  for i in 0..6 {
-    {
-      Position: {0, 0.075, (i - 2.5) * radius * 0.24}
-      Box: {radius * 1.5, 0.008, 0.012}
-      Rgb: {219, 212, 177}
+    body {
+      Position: {}
+      Cylinder: {radius: radius, length: 0.14, segments: 28, smooth: true}
+      Rgb: {246, 238, 208}
+      PbrMaterial: {roughness: 0.95}
+      Sheen: {color: {255, 252, 240}, roughness: 0.55}
+    }
+    for i in 0..6 {
+      {
+        Position: {0, 0.075, (i - 2.5) * radius * 0.24}
+        Box: {radius * 1.5, 0.008, 0.012}
+        Rgb: {219, 212, 177}
+      }
     }
   }
 }

@@ -9,264 +9,267 @@ using box.light
 using box.particle
 using box.app
 using box.transition
+using state
 
-prefab LockBarrelShape {
-  Path2D: {
-    start: {0.2, 0},
-    segments: [{kind: CubicBezier, end: {0.2, 0.62}, control1: {0.29, 0.18}, control2: {0.29, 0.44}}]
+assets {
+  prefab LockBarrelShape {
+    Path2D: {
+      start: {0.2, 0},
+      segments: [{kind: CubicBezier, end: {0.2, 0.62}, control1: {0.29, 0.18}, control2: {0.29, 0.44}}]
+    }
   }
-}
 
-prefab LockBollardShape {
-  Path2D: {
-    start: {0.11, 0},
-    segments: [
-      {kind: CubicBezier, end: {0.07, 0.34}, control1: {0.09, 0.12}, control2: {0.06, 0.24}},
-      {kind: CubicBezier, end: {0.13, 0.46}, control1: {0.08, 0.38}, control2: {0.13, 0.38}},
-      {kind: CubicBezier, end: {0, 0.56}, control1: {0.13, 0.52}, control2: {0.07, 0.56}}
+  prefab LockBollardShape {
+    Path2D: {
+      start: {0.11, 0},
+      segments: [
+        {kind: CubicBezier, end: {0.07, 0.34}, control1: {0.09, 0.12}, control2: {0.06, 0.24}},
+        {kind: CubicBezier, end: {0.13, 0.46}, control1: {0.08, 0.38}, control2: {0.13, 0.38}},
+        {kind: CubicBezier, end: {0, 0.56}, control1: {0.13, 0.52}, control2: {0.07, 0.56}}
+      ]
+    }
+  }
+
+  template LockCottageDoorBody {
+    panel : CanalGreen { Position: {0.45, 0.95, 0}; RoundedBox: {0.88, 1.9, 0.07, 0.012, segments: 1} }
+    for p in 0..2 {
+      { (IsA, CanalGreen); Position: {0.45, 0.5 + p * 0.85, 0.042}; RoundedBox: {0.62, 0.66, 0.018, 0.008, segments: 1} }
+    }
+    knob : CanalBrass { Position: {0.76, 0.95, 0.07}; Sphere: {radius: 0.045, segments: 12, smooth: true} }
+    knocker : CanalBrass { Position: {0.45, 1.42, 0.07}; Torus: {radius: 0.05, tube: 0.012, segments: 14, rings: 6}; Rotation: {math.PI / 2, 0, 0} }
+  }
+
+  template LockCottageDoor : LockControl {
+    Rotation: {0, lock_door_open ? 1.75 : 0.0, 0}
+    Transition: [
+      Rotation: {duration: 0.9, timing_function: EaseInOut},
+      Tint: {duration: 0.12}
     ]
-  }
-}
-
-template LockCottageDoorBody {
-  panel : CanalGreen { Position: {0.45, 0.95, 0}; RoundedBox: {0.88, 1.9, 0.07, 0.012, segments: 1} }
-  for p in 0..2 {
-    { (IsA, CanalGreen); Position: {0.45, 0.5 + p * 0.85, 0.042}; RoundedBox: {0.62, 0.66, 0.018, 0.008, segments: 1} }
-  }
-  knob : CanalBrass { Position: {0.76, 0.95, 0.07}; Sphere: {radius: 0.045, segments: 12, smooth: true} }
-  knocker : CanalBrass { Position: {0.45, 1.42, 0.07}; Torus: {radius: 0.05, tube: 0.012, segments: 14, rings: 6}; Rotation: {math.PI / 2, 0, 0} }
-}
-
-template LockCottageDoor : LockControl {
-  Rotation: {0, lock_door_open ? 1.75 : 0.0, 0}
-  Transition: [
-    Rotation: {duration: 0.9, timing_function: EaseInOut},
-    Tint: {duration: 0.12}
-  ]
-  LockCottageDoorBody body()
-  async {
-    while true {
-      await on.click(this)
-      lock_door_open = !lock_door_open
-      hover = false
+    LockCottageDoorBody body()
+    async {
+      while true {
+        await on.click(this)
+        lock_door_open = !lock_door_open
+        hover = false
+      }
     }
   }
-}
 
-template LockLanternBody {
-  foot : CanalDarkStone { Position: {0, 0.09, 0}; RoundedBox: {0.5, 0.18, 0.5, 0.03, segments: 1} }
-  post : CanalBlack { Position: {0, 1.1, 0}; Frustum: {radius_bottom: 0.085, radius_top: 0.05, length: 2, segments: 14, smooth: true} }
-  collar : CanalBlack { Position: {0, 0.5, 0}; Cylinder: {radius: 0.095, length: 0.06, segments: 14, smooth: true} }
-  arm_x : CanalBlack { Position: {0, 2.02, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.018, length: 0.46, segments: 8} }
-  base : CanalBlack { Position: {0, 2.14, 0}; Frustum: {radius_bottom: 0.1, radius_top: 0.17, length: 0.05, segments: 4} }
-  cap : CanalBlack { Position: {0, 2.72, 0}; Cone: {radius: 0.28, length: 0.24, segments: 4} }
-  finial : CanalBrass { Position: {0, 2.88, 0}; Sphere: {radius: 0.035, segments: 10, smooth: true} }
-  for i in 0..4 {
-    const a = i * math.PI / 2 + math.PI / 4
-    { (IsA, CanalBlack); Position: {math.sin(a) * 0.19, 2.4, math.cos(a) * 0.19}; Box: {0.025, 0.44, 0.025} }
-  }
-}
-
-template LockLanternGlass {
-  Box: {0.25, 0.36, 0.25}
-  Rgb: lock_lantern_on ? {255, 226, 160} : {120, 128, 128}
-  Emissive: {strength: lock_lantern_on ? 5 : 0, color: {255, 182, 96}}
-  PbrMaterial: {roughness: 0.15}
-  LightFixture
-  Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
-}
-
-template LockLantern : LockControl {
-  Transition: [Tint: {duration: 0.12}]
-  LockLanternBody body()
-  LockLanternGlass glass() { Position: {0, 2.4, 0} }
-  flame {
-    Position: {0, 2.4, 0}
-    Rgb: {255, 196, 120}
-    PointLight: {intensity: lock_lantern_on ? 26 : 0, range: 15, shadows: true}
-  }
-  async {
-    while true {
-      await on.click(this)
-      lock_lantern_on = !lock_lantern_on
+  template LockLanternBody {
+    foot : CanalDarkStone { Position: {0, 0.09, 0}; RoundedBox: {0.5, 0.18, 0.5, 0.03, segments: 1} }
+    post : CanalBlack { Position: {0, 1.1, 0}; Frustum: {radius_bottom: 0.085, radius_top: 0.05, length: 2, segments: 14, smooth: true} }
+    collar : CanalBlack { Position: {0, 0.5, 0}; Cylinder: {radius: 0.095, length: 0.06, segments: 14, smooth: true} }
+    arm_x : CanalBlack { Position: {0, 2.02, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.018, length: 0.46, segments: 8} }
+    base : CanalBlack { Position: {0, 2.14, 0}; Frustum: {radius_bottom: 0.1, radius_top: 0.17, length: 0.05, segments: 4} }
+    cap : CanalBlack { Position: {0, 2.72, 0}; Cone: {radius: 0.28, length: 0.24, segments: 4} }
+    finial : CanalBrass { Position: {0, 2.88, 0}; Sphere: {radius: 0.035, segments: 10, smooth: true} }
+    for i in 0..4 {
+      const a = i * math.PI / 2 + math.PI / 4
+      { (IsA, CanalBlack); Position: {math.sin(a) * 0.19, 2.4, math.cos(a) * 0.19}; Box: {0.025, 0.44, 0.025} }
     }
   }
-}
 
-template LockCottageWindow {
-  sill : CanalCoping { Position: {0, -0.56, 0.06}; RoundedBox: {1.14, 0.07, 0.2, 0.012, segments: 1} }
-  frame_l : CanalWhite { Position: {-0.5, 0, 0.012}; Box: {0.07, 1.08, 0.05} }
-  frame_r : CanalWhite { Position: {0.5, 0, 0.012}; Box: {0.07, 1.08, 0.05} }
-  frame_t : CanalWhite { Position: {0, 0.54, 0.012}; Box: {1.07, 0.07, 0.05} }
-  frame_b : CanalWhite { Position: {0, -0.52, 0.012}; Box: {1.07, 0.05, 0.05} }
-  bar_v : CanalWhite { Position: {0, 0, 0.018}; Box: {0.035, 1, 0.024} }
-  bar_h : CanalWhite { Position: {0, 0.08, 0.018}; Box: {0.94, 0.035, 0.024} }
-  box : CanalPlanks { Position: {0, -0.74, 0.17}; RoundedBox: {1.16, 0.2, 0.26, 0.02, segments: 1}; TextureTransform: {scale_x: 0.5, scale_y: 0.2} }
-  for i in 0..15 {
-    { (IsA, CanalLeafCard); Position: {-0.49 + i * 0.07, -0.58, 0.17 + (i % 3 - 1) * 0.07}; Rotation: {-0.9, i * 1.3, 0}; Quad: {0.2, 0.2} }
+  template LockLanternGlass {
+    Box: {0.25, 0.36, 0.25}
+    Rgb: lock_lantern_on ? {255, 226, 160} : {120, 128, 128}
+    Emissive: {strength: lock_lantern_on ? 5 : 0, color: {255, 182, 96}}
+    PbrMaterial: {roughness: 0.15}
+    LightFixture
+    Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
   }
-  for i in 0..15 {
-    { Position: {-0.5 + i * 0.07, -0.5 + (i % 2) * 0.05, 0.17 + (i % 3 - 1) * 0.08}; IcoSphere: {radius: 0.032, segments: 1}; Rgb: {214 + (i % 5) * 8, 60 + (i % 3) * 66, 70 + (i % 2) * 120}; PbrMaterial: {roughness: 0.9} }
-  }
-}
 
-template LockWindowPane {
-  Box: {0.95, 1.02, 0.02}
-  Rgb: lock_lantern_on ? {240, 214, 150} : {52, 66, 74}
-  Emissive: {strength: lock_lantern_on ? 1.4 : 0, color: {255, 186, 104}}
-  PbrMaterial: {roughness: 0.06}
-  ClearCoat: {strength: 1, roughness: 0.03}
-  Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
-}
-
-template LockCottage {
-  foundation : CanalDarkStone { Position: {0, 0.17, 0}; RoundedBox: {6.3, 0.34, 4.3, 0.03, segments: 1}; TextureTransform: {scale_x: 6, scale_y: 0.5} }
-  walls : CanalPlaster { Position: {0, 1.66, 0}; Box: {6, 2.66, 4}; TextureTransform: {scale_x: 2.2, scale_y: 1} }
-
-  for i in 0..5 {
-    const tx = -2.98 + i * 1.49
-    if i != 1 {
-      { (IsA, CanalOldTimber); Position: {tx, 1.66, 2.02}; Box: {0.13, 2.64, 0.05} }
+  template LockLantern : LockControl {
+    Transition: [Tint: {duration: 0.12}]
+    LockLanternBody body()
+    LockLanternGlass glass() { Position: {0, 2.4, 0} }
+    flame {
+      Position: {0, 2.4, 0}
+      Rgb: {255, 196, 120}
+      PointLight: {intensity: lock_lantern_on ? 26 : 0, range: 15, shadows: true}
     }
-    { (IsA, CanalOldTimber); Position: {tx, 1.66, -2.02}; Box: {0.13, 2.64, 0.05} }
-  }
-  for i in 0..4 {
-    const tz = -1.5 + i
-    { (IsA, CanalOldTimber); Position: {3.02, 1.66, tz}; Box: {0.05, 2.64, 0.12} }
-    { (IsA, CanalOldTimber); Position: {-3.02, 1.66, tz}; Box: {0.05, 2.64, 0.12} }
-  }
-  sill_s : CanalOldTimber { Position: {0, 0.41, 2.04}; Box: {6.1, 0.14, 0.08} }
-  plate_s : CanalOldTimber { Position: {0, 2.96, 2.04}; Box: {6.1, 0.14, 0.08} }
-  sill_n : CanalOldTimber { Position: {0, 0.41, -2.04}; Box: {6.1, 0.14, 0.08} }
-  plate_n : CanalOldTimber { Position: {0, 2.96, -2.04}; Box: {6.1, 0.14, 0.08} }
-  sill_e : CanalOldTimber { Position: {3.04, 0.41, 0}; Box: {0.08, 0.14, 4.02} }
-  sill_w : CanalOldTimber { Position: {-3.04, 0.41, 0}; Box: {0.08, 0.14, 4.02} }
-
-  gable_w : CanalPlaster { Position: {-2.96, 2.99, 0}; Rotation: {0, 0, math.PI / 2}; BeveledPrism: {footprint: [{0, -2}, {0, 2}, {1.83, 0}], depth: 0.07} }
-  gable_e : CanalPlaster { Position: {2.96, 2.99, 0}; Rotation: {0, 0, math.PI / 2}; BeveledPrism: {footprint: [{0, -2}, {0, 2}, {1.83, 0}], depth: 0.07} }
-  king_w : CanalOldTimber { Position: {-3.01, 3.72, 0}; Box: {0.05, 1.46, 0.13} }
-  king_e : CanalOldTimber { Position: {3.01, 3.72, 0}; Box: {0.05, 1.46, 0.13} }
-
-  roof_s : CanalOldTimber { Position: {0, 3.925, 1.13}; Rotation: {0.74, 0, 0}; Box: {6.76, 0.1, 2.94} }
-  roof_n : CanalOldTimber { Position: {0, 3.925, -1.13}; Rotation: {-0.74, 0, 0}; Box: {6.76, 0.1, 2.94} }
-  { (IsA, CanalSlate); Quad: {6.86, 3.08}; Position: {0, 4.0, 1.146}; Rotation: {-0.8308, 0, 0} }
-  { (IsA, CanalSlate); Quad: {6.86, 3.08}; Position: {0, 4.0, -1.146}; Rotation: {-0.8308, math.PI, 0} }
-  for s in 0..2 {
-    const b = s * 2 - 1
-    { (IsA, CanalWhite); Position: {b * 3.42, 3.93, 1.14}; Rotation: {0.74, 0, 0}; Box: {0.05, 0.2, 2.98} }
-    { (IsA, CanalWhite); Position: {b * 3.42, 3.93, -1.14}; Rotation: {-0.74, 0, 0}; Box: {0.05, 0.2, 2.98} }
-  }
-  gutter_s : CanalBlack { Position: {0, 2.86, 2.32}; Rotation: {0, 0, math.PI / 2}; Tube: {radius: 0.07, length: 6.8, thickness: 0.012, arc: 3.14, segments: 12} }
-  downpipe : CanalBlack { Position: {3.28, 1.4, 2.3}; Cylinder: {radius: 0.035, length: 2.8, segments: 8} }
-  for i in 0..9 {
-    { (IsA, CanalBrick); Position: {-3.04 + i * 0.76, 5.02, 0}; Rotation: {0, 0, math.PI / 2}; Tube: {radius: 0.13, length: 0.74, thickness: 0.04, arc: 3.14, segments: 10} }
-  }
-
-  chimney_stack : CanalBrick { Position: {2.2, 4.5, -0.7}; Box: {0.74, 2.2, 0.74} }
-  chimney_band : CanalDarkStone { Position: {2.2, 5.44, -0.7}; RoundedBox: {0.84, 0.09, 0.84, 0.02, segments: 1} }
-  chimney_cap : CanalDarkStone { Position: {2.2, 5.66, -0.7}; RoundedBox: {0.84, 0.06, 0.84, 0.015, segments: 1} }
-  chimney_top : CanalBrick { Position: {2.2, 5.55, -0.7}; Box: {0.72, 0.15, 0.72} }
-  pot_a : CanalBrick { Position: {2.06, 5.86, -0.7}; Frustum: {radius_bottom: 0.11, radius_top: 0.08, length: 0.34, segments: 12, smooth: true} }
-  pot_b : CanalBrick { Position: {2.34, 5.86, -0.7}; Frustum: {radius_bottom: 0.11, radius_top: 0.08, length: 0.34, segments: 12, smooth: true} }
-  smoke {
-    Position: {2.06, 6.1, -0.7}
-    ParticleEmitter: {
-      max: 180, rate: 14, shape: EmitterDisc, radius: 0.07, spread: 10,
-      speed: {0.4, 0.75}, lifetime: {3, 5}, size: {0.14, 0.5},
-      opacity: {0.05, 0.14}, color: {128, 128, 132}, seed: 7
-    }
-    ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
-    ParticleForces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
-  }
-
-  doorway { Position: {-0.9, 1.29, 2.015}; Box: {0.92, 1.92, 0.015}; Rgb: {26, 20, 16} }
-  door_frame_l : CanalWhite { Position: {-1.39, 1.3, 2.03}; Box: {0.08, 2, 0.06} }
-  door_frame_r : CanalWhite { Position: {-0.41, 1.3, 2.03}; Box: {0.08, 2, 0.06} }
-  lintel : CanalWhite { Position: {-0.9, 2.34, 2.03}; Box: {1.06, 0.08, 0.06} }
-  porch_l : CanalOldTimber { Position: {-1.56, 1.42, 2.75}; Box: {0.08, 2.22, 0.08} }
-  porch_r : CanalOldTimber { Position: {-0.24, 1.42, 2.75}; Box: {0.08, 2.22, 0.08} }
-  for s in 0..2 {
-    const sign = s * 2 - 1
-    {
-      Position: {-0.9 + sign * 0.37, 2.68, 2.42}
-      Rotation: {0, 0, -sign * 0.42}
-      { (IsA, CanalOldTimber); Position: {sign * 0.01, 0, 0}; Box: {0.82, 0.05, 0.86} }
-      { (IsA, CanalSlate); Quad: {0.86, 0.9}; Position: {0, 0.04, 0}; Rotation: {-math.PI / 2, 0, 0} }
+    async {
+      while true {
+        await on.click(this)
+        lock_lantern_on = !lock_lantern_on
+      }
     }
   }
-  step : CanalCoping { Position: {-0.9, 0.09, 2.62}; RoundedBox: {1.5, 0.18, 0.5, 0.025, segments: 1} }
-  LockCottageDoor door() { Position: {-1.35, 0.34, 2.03} }
 
-  for w in 0..2 {
-    const wx = 0.745 + w * 1.49
-    LockWindowPane() { Position: {wx, 1.75, 2.008} }
-    LockCottageWindow() { Position: {wx, 1.75, 2} }
+  template LockCottageWindow {
+    sill : CanalCoping { Position: {0, -0.56, 0.06}; RoundedBox: {1.14, 0.07, 0.2, 0.012, segments: 1} }
+    frame_l : CanalWhite { Position: {-0.5, 0, 0.012}; Box: {0.07, 1.08, 0.05} }
+    frame_r : CanalWhite { Position: {0.5, 0, 0.012}; Box: {0.07, 1.08, 0.05} }
+    frame_t : CanalWhite { Position: {0, 0.54, 0.012}; Box: {1.07, 0.07, 0.05} }
+    frame_b : CanalWhite { Position: {0, -0.52, 0.012}; Box: {1.07, 0.05, 0.05} }
+    bar_v : CanalWhite { Position: {0, 0, 0.018}; Box: {0.035, 1, 0.024} }
+    bar_h : CanalWhite { Position: {0, 0.08, 0.018}; Box: {0.94, 0.035, 0.024} }
+    box : CanalPlanks { Position: {0, -0.74, 0.17}; RoundedBox: {1.16, 0.2, 0.26, 0.02, segments: 1}; TextureTransform: {scale_x: 0.5, scale_y: 0.2} }
+    for i in 0..15 {
+      { (IsA, CanalLeafCard); Position: {-0.49 + i * 0.07, -0.58, 0.17 + (i % 3 - 1) * 0.07}; Rotation: {-0.9, i * 1.3, 0}; Quad: {0.2, 0.2} }
+    }
+    for i in 0..15 {
+      { Position: {-0.5 + i * 0.07, -0.5 + (i % 2) * 0.05, 0.17 + (i % 3 - 1) * 0.08}; IcoSphere: {radius: 0.032, segments: 1}; Rgb: {214 + (i % 5) * 8, 60 + (i % 3) * 66, 70 + (i % 2) * 120}; PbrMaterial: {roughness: 0.9} }
+    }
   }
-  for w in 0..2 {
-    const wx = -0.745 + w * 1.49
-    LockWindowPane() { Position: {wx, 1.75, -2.008} }
-    LockCottageWindow() { Position: {wx, 1.75, -2}; Rotation: {0, math.PI, 0} }
-  }
-}
 
-template CanalBarrel {
-  staves : CanalTimber { Position: {}; Lathe: {profile: LockBarrelShape, cap_start: true, cap_end: true, segments: 18, rings: 10} }
-  hoop_a : CanalIron { Position: {0, 0.14, 0}; Torus: {radius: 0.245, tube: 0.014, segments: 22, rings: 6} }
-  hoop_b : CanalIron { Position: {0, 0.48, 0}; Torus: {radius: 0.245, tube: 0.014, segments: 22, rings: 6} }
-}
-
-template CanalCrate {
-  prop size: f32 = 0.5
-  core : CanalPlanks { Position: {0, size / 2, 0}; RoundedBox: {size, size, size, 0.012, segments: 1}; TextureTransform: {scale_x: 0.5, scale_y: 0.5} }
-  for i in 0..4 {
-    const a = i * math.PI / 2
-    { (IsA, CanalOldTimber); Position: {math.sin(a) * size * 0.51, size / 2, math.cos(a) * size * 0.51}; Rotation: {0, a, 0}; Box: {size * 0.14, size * 0.96, 0.02} }
+  template LockWindowPane {
+    Box: {0.95, 1.02, 0.02}
+    Rgb: lock_lantern_on ? {240, 214, 150} : {52, 66, 74}
+    Emissive: {strength: lock_lantern_on ? 1.4 : 0, color: {255, 186, 104}}
+    PbrMaterial: {roughness: 0.06}
+    ClearCoat: {strength: 1, roughness: 0.03}
+    Transition: [Emissive: {duration: 0.5}, Rgb: {duration: 0.5}]
   }
-}
 
-template CanalBollard {
-  iron : CanalBlack { Position: {}; Lathe: {profile: LockBollardShape, cap_start: true, cap_end: true, segments: 16, rings: 12} }
-}
+  template LockCottage {
+    foundation : CanalDarkStone { Position: {0, 0.17, 0}; RoundedBox: {6.3, 0.34, 4.3, 0.03, segments: 1}; TextureTransform: {scale_x: 6, scale_y: 0.5} }
+    walls : CanalPlaster { Position: {0, 1.66, 0}; Box: {6, 2.66, 4}; TextureTransform: {scale_x: 2.2, scale_y: 1} }
 
-template CanalLifebuoy {
-  post : CanalWhite { Position: {0, 0.75, 0}; RoundedBox: {0.1, 1.5, 0.1, 0.015, segments: 1} }
-  ring : CanalWhite { Position: {0, 1.1, 0.1}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.19, tube: 0.055, segments: 20, rings: 8, smooth: true} }
-  for i in 0..4 {
-    const a = i * math.PI / 2 + math.PI / 4
-    { (IsA, CanalRed); Position: {math.cos(a) * 0.19, 1.1 + math.sin(a) * 0.19, 0.1}; Rotation: {0, 0, a}; Box: {0.13, 0.08, 0.125} }
-  }
-}
+    for i in 0..5 {
+      const tx = -2.98 + i * 1.49
+      if i != 1 {
+        { (IsA, CanalOldTimber); Position: {tx, 1.66, 2.02}; Box: {0.13, 2.64, 0.05} }
+      }
+      { (IsA, CanalOldTimber); Position: {tx, 1.66, -2.02}; Box: {0.13, 2.64, 0.05} }
+    }
+    for i in 0..4 {
+      const tz = -1.5 + i
+      { (IsA, CanalOldTimber); Position: {3.02, 1.66, tz}; Box: {0.05, 2.64, 0.12} }
+      { (IsA, CanalOldTimber); Position: {-3.02, 1.66, tz}; Box: {0.05, 2.64, 0.12} }
+    }
+    sill_s : CanalOldTimber { Position: {0, 0.41, 2.04}; Box: {6.1, 0.14, 0.08} }
+    plate_s : CanalOldTimber { Position: {0, 2.96, 2.04}; Box: {6.1, 0.14, 0.08} }
+    sill_n : CanalOldTimber { Position: {0, 0.41, -2.04}; Box: {6.1, 0.14, 0.08} }
+    plate_n : CanalOldTimber { Position: {0, 2.96, -2.04}; Box: {6.1, 0.14, 0.08} }
+    sill_e : CanalOldTimber { Position: {3.04, 0.41, 0}; Box: {0.08, 0.14, 4.02} }
+    sill_w : CanalOldTimber { Position: {-3.04, 0.41, 0}; Box: {0.08, 0.14, 4.02} }
 
-template CanalBench {
-  for i in 0..3 {
-    { (IsA, CanalPlanks); Position: {0, 0.44, 0.14 - i * 0.14}; RoundedBox: {1.5, 0.04, 0.12, 0.01, segments: 1}; TextureTransform: {scale_x: 0.6, scale_y: 0.1} }
-  }
-  for i in 0..2 {
-    { (IsA, CanalPlanks); Position: {0, 0.68 + i * 0.16, -0.22}; RoundedBox: {1.5, 0.12, 0.03, 0.008, segments: 1}; TextureTransform: {scale_x: 0.6, scale_y: 0.1} }
-  }
-  for s in 0..2 {
-    const x = (s * 2 - 1) * 0.6
-    { (IsA, CanalIron); Position: {x, 0.21, 0.14}; Box: {0.05, 0.42, 0.05} }
-    { (IsA, CanalIron); Position: {x, 0.46, -0.2}; Box: {0.05, 0.9, 0.05} }
-    { (IsA, CanalIron); Position: {x, 0.4, 0}; Box: {0.05, 0.03, 0.42} }
-  }
-}
+    gable_w : CanalPlaster { Position: {-2.96, 2.99, 0}; Rotation: {0, 0, math.PI / 2}; BeveledPrism: {footprint: [{0, -2}, {0, 2}, {1.83, 0}], depth: 0.07} }
+    gable_e : CanalPlaster { Position: {2.96, 2.99, 0}; Rotation: {0, 0, math.PI / 2}; BeveledPrism: {footprint: [{0, -2}, {0, 2}, {1.83, 0}], depth: 0.07} }
+    king_w : CanalOldTimber { Position: {-3.01, 3.72, 0}; Box: {0.05, 1.46, 0.13} }
+    king_e : CanalOldTimber { Position: {3.01, 3.72, 0}; Box: {0.05, 1.46, 0.13} }
 
-template CanalPicket {
-  prop length: f32 = 4
-  const n = length / 0.24
-  rail_a : CanalWhite { Position: {length / 2, 0.42, 0}; Box: {length, 0.04, 0.02} }
-  rail_b : CanalWhite { Position: {length / 2, 0.2, 0}; Box: {length, 0.04, 0.02} }
-  for i in 0..n + 1 {
-    { (IsA, CanalWhite); Position: {i * 0.24, 0.27, 0.018}; Box: {0.06, 0.54, 0.014} }
-  }
-}
+    roof_s : CanalOldTimber { Position: {0, 3.925, 1.13}; Rotation: {0.74, 0, 0}; Box: {6.76, 0.1, 2.94} }
+    roof_n : CanalOldTimber { Position: {0, 3.925, -1.13}; Rotation: {-0.74, 0, 0}; Box: {6.76, 0.1, 2.94} }
+    { (IsA, CanalSlate); Quad: {6.86, 3.08}; Position: {0, 4.0, 1.146}; Rotation: {-0.8308, 0, 0} }
+    { (IsA, CanalSlate); Quad: {6.86, 3.08}; Position: {0, 4.0, -1.146}; Rotation: {-0.8308, math.PI, 0} }
+    for s in 0..2 {
+      const b = s * 2 - 1
+      { (IsA, CanalWhite); Position: {b * 3.42, 3.93, 1.14}; Rotation: {0.74, 0, 0}; Box: {0.05, 0.2, 2.98} }
+      { (IsA, CanalWhite); Position: {b * 3.42, 3.93, -1.14}; Rotation: {-0.74, 0, 0}; Box: {0.05, 0.2, 2.98} }
+    }
+    gutter_s : CanalBlack { Position: {0, 2.86, 2.32}; Rotation: {0, 0, math.PI / 2}; Tube: {radius: 0.07, length: 6.8, thickness: 0.012, arc: 3.14, segments: 12} }
+    downpipe : CanalBlack { Position: {3.28, 1.4, 2.3}; Cylinder: {radius: 0.035, length: 2.8, segments: 8} }
+    for i in 0..9 {
+      { (IsA, CanalBrick); Position: {-3.04 + i * 0.76, 5.02, 0}; Rotation: {0, 0, math.PI / 2}; Tube: {radius: 0.13, length: 0.74, thickness: 0.04, arc: 3.14, segments: 10} }
+    }
 
-template CanalVegRow {
-  prop length: f32 = 2.8
-  soil : CanalMud { Position: {length / 2, 0.03, 0}; RoundedBox: {length, 0.1, 0.36, 0.04, segments: 1} }
-  const n = length / 0.28
-  for i in 0..n {
-    { (IsA, CanalLeafLight); Position: {0.14 + i * 0.28, 0.17, 0}; Scale: {1, 0.8, 1}; IcoSphere: {radius: 0.13 + (i % 3) * 0.015, segments: 1} }
+    chimney_stack : CanalBrick { Position: {2.2, 4.5, -0.7}; Box: {0.74, 2.2, 0.74} }
+    chimney_band : CanalDarkStone { Position: {2.2, 5.44, -0.7}; RoundedBox: {0.84, 0.09, 0.84, 0.02, segments: 1} }
+    chimney_cap : CanalDarkStone { Position: {2.2, 5.66, -0.7}; RoundedBox: {0.84, 0.06, 0.84, 0.015, segments: 1} }
+    chimney_top : CanalBrick { Position: {2.2, 5.55, -0.7}; Box: {0.72, 0.15, 0.72} }
+    pot_a : CanalBrick { Position: {2.06, 5.86, -0.7}; Frustum: {radius_bottom: 0.11, radius_top: 0.08, length: 0.34, segments: 12, smooth: true} }
+    pot_b : CanalBrick { Position: {2.34, 5.86, -0.7}; Frustum: {radius_bottom: 0.11, radius_top: 0.08, length: 0.34, segments: 12, smooth: true} }
+    smoke {
+      Position: {2.06, 6.1, -0.7}
+      ParticleEmitter: {
+        max: 180, rate: 14, shape: EmitterDisc, radius: 0.07, spread: 10,
+        speed: {0.4, 0.75}, lifetime: {3, 5}, size: {0.14, 0.5},
+        opacity: {0.05, 0.14}, color: {128, 128, 132}, seed: 7
+      }
+      ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
+      ParticleForces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
+    }
+
+    doorway { Position: {-0.9, 1.29, 2.015}; Box: {0.92, 1.92, 0.015}; Rgb: {26, 20, 16} }
+    door_frame_l : CanalWhite { Position: {-1.39, 1.3, 2.03}; Box: {0.08, 2, 0.06} }
+    door_frame_r : CanalWhite { Position: {-0.41, 1.3, 2.03}; Box: {0.08, 2, 0.06} }
+    lintel : CanalWhite { Position: {-0.9, 2.34, 2.03}; Box: {1.06, 0.08, 0.06} }
+    porch_l : CanalOldTimber { Position: {-1.56, 1.42, 2.75}; Box: {0.08, 2.22, 0.08} }
+    porch_r : CanalOldTimber { Position: {-0.24, 1.42, 2.75}; Box: {0.08, 2.22, 0.08} }
+    for s in 0..2 {
+      const sign = s * 2 - 1
+      {
+        Position: {-0.9 + sign * 0.37, 2.68, 2.42}
+        Rotation: {0, 0, -sign * 0.42}
+        { (IsA, CanalOldTimber); Position: {sign * 0.01, 0, 0}; Box: {0.82, 0.05, 0.86} }
+        { (IsA, CanalSlate); Quad: {0.86, 0.9}; Position: {0, 0.04, 0}; Rotation: {-math.PI / 2, 0, 0} }
+      }
+    }
+    step : CanalCoping { Position: {-0.9, 0.09, 2.62}; RoundedBox: {1.5, 0.18, 0.5, 0.025, segments: 1} }
+    LockCottageDoor door() { Position: {-1.35, 0.34, 2.03} }
+
+    for w in 0..2 {
+      const wx = 0.745 + w * 1.49
+      LockWindowPane() { Position: {wx, 1.75, 2.008} }
+      LockCottageWindow() { Position: {wx, 1.75, 2} }
+    }
+    for w in 0..2 {
+      const wx = -0.745 + w * 1.49
+      LockWindowPane() { Position: {wx, 1.75, -2.008} }
+      LockCottageWindow() { Position: {wx, 1.75, -2}; Rotation: {0, math.PI, 0} }
+    }
+  }
+
+  template CanalBarrel {
+    staves : CanalTimber { Position: {}; Lathe: {profile: LockBarrelShape, cap_start: true, cap_end: true, segments: 18, rings: 10} }
+    hoop_a : CanalIron { Position: {0, 0.14, 0}; Torus: {radius: 0.245, tube: 0.014, segments: 22, rings: 6} }
+    hoop_b : CanalIron { Position: {0, 0.48, 0}; Torus: {radius: 0.245, tube: 0.014, segments: 22, rings: 6} }
+  }
+
+  template CanalCrate {
+    prop size: f32 = 0.5
+    core : CanalPlanks { Position: {0, size / 2, 0}; RoundedBox: {size, size, size, 0.012, segments: 1}; TextureTransform: {scale_x: 0.5, scale_y: 0.5} }
+    for i in 0..4 {
+      const a = i * math.PI / 2
+      { (IsA, CanalOldTimber); Position: {math.sin(a) * size * 0.51, size / 2, math.cos(a) * size * 0.51}; Rotation: {0, a, 0}; Box: {size * 0.14, size * 0.96, 0.02} }
+    }
+  }
+
+  template CanalBollard {
+    iron : CanalBlack { Position: {}; Lathe: {profile: LockBollardShape, cap_start: true, cap_end: true, segments: 16, rings: 12} }
+  }
+
+  template CanalLifebuoy {
+    post : CanalWhite { Position: {0, 0.75, 0}; RoundedBox: {0.1, 1.5, 0.1, 0.015, segments: 1} }
+    ring : CanalWhite { Position: {0, 1.1, 0.1}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.19, tube: 0.055, segments: 20, rings: 8, smooth: true} }
+    for i in 0..4 {
+      const a = i * math.PI / 2 + math.PI / 4
+      { (IsA, CanalRed); Position: {math.cos(a) * 0.19, 1.1 + math.sin(a) * 0.19, 0.1}; Rotation: {0, 0, a}; Box: {0.13, 0.08, 0.125} }
+    }
+  }
+
+  template CanalBench {
+    for i in 0..3 {
+      { (IsA, CanalPlanks); Position: {0, 0.44, 0.14 - i * 0.14}; RoundedBox: {1.5, 0.04, 0.12, 0.01, segments: 1}; TextureTransform: {scale_x: 0.6, scale_y: 0.1} }
+    }
+    for i in 0..2 {
+      { (IsA, CanalPlanks); Position: {0, 0.68 + i * 0.16, -0.22}; RoundedBox: {1.5, 0.12, 0.03, 0.008, segments: 1}; TextureTransform: {scale_x: 0.6, scale_y: 0.1} }
+    }
+    for s in 0..2 {
+      const x = (s * 2 - 1) * 0.6
+      { (IsA, CanalIron); Position: {x, 0.21, 0.14}; Box: {0.05, 0.42, 0.05} }
+      { (IsA, CanalIron); Position: {x, 0.46, -0.2}; Box: {0.05, 0.9, 0.05} }
+      { (IsA, CanalIron); Position: {x, 0.4, 0}; Box: {0.05, 0.03, 0.42} }
+    }
+  }
+
+  template CanalPicket {
+    prop length: f32 = 4
+    const n = length / 0.24
+    rail_a : CanalWhite { Position: {length / 2, 0.42, 0}; Box: {length, 0.04, 0.02} }
+    rail_b : CanalWhite { Position: {length / 2, 0.2, 0}; Box: {length, 0.04, 0.02} }
+    for i in 0..n + 1 {
+      { (IsA, CanalWhite); Position: {i * 0.24, 0.27, 0.018}; Box: {0.06, 0.54, 0.014} }
+    }
+  }
+
+  template CanalVegRow {
+    prop length: f32 = 2.8
+    soil : CanalMud { Position: {length / 2, 0.03, 0}; RoundedBox: {length, 0.1, 0.36, 0.04, segments: 1} }
+    const n = length / 0.28
+    for i in 0..n {
+      { (IsA, CanalLeafLight); Position: {0.14 + i * 0.28, 0.17, 0}; Scale: {1, 0.8, 1}; IcoSphere: {radius: 0.13 + (i % 3) * 0.015, segments: 1} }
+    }
   }
 }

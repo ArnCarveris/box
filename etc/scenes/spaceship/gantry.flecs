@@ -8,75 +8,77 @@ using box.material
 using box.texture
 using box.light
 
-template ServiceGantry {
-  for side in 0..2 {
-    const x = (side - 0.5) * 173
-    "foundation_{side}" : DarkArmor { Position: {x, 5.4, 0}; Box: {14, 2.2, 21} }
-    "base_{side}" : DarkArmor { Position: {x, 8, 0}; Box: {14, 3, 21} }
-    for leg in 0..2 {
-      const z = (leg - 0.5) * 15
-      "pillar_{side}_{leg}" : DockYellow { Position: {x, 27, z}; BeveledPrism: {footprint: [{-3, -2}, {3, -2}, {2, 2}, {-2, 2}], depth: 39, inset: 0.35, bevel: 0.3} }
-      "inset_{side}_{leg}" : RecessMetal { Position: {x - 3.05, 28, z}; Box: {0.12, 26, 1.8} }
-      "piston_{side}_{leg}" : PistonChrome { Position: {x - 3.3, 29, z}; Cylinder: {radius: 0.38, length: 24, segments: 12} }
-      "foot_{side}_{leg}" : RustRed { Position: {x, 11, z}; Box: {6.8, 4, 5} }
-      "beacon_{side}_{leg}" : BeaconLight { Position: {x, 51, z}; Cylinder: {radius: 0.4, length: 1, segments: 12} }
-    }
-    for tier in 0..4 {
-      "tie_{side}_{tier}" : DarkArmor { Position: {x, 15 + tier * 9, 0}; Box: {6.5, 1.2, 18} }
-      "brace_{side}_{tier}" { ShipBeam: {ax: x, ay: 15 + tier * 8, az: -7, bx: x, by: 23 + tier * 8, bz: 7, radius: 0.45} }
-      "landing_{side}_{tier}" { DockCatwalk: {length: 16}; Position: {x - 5.5, 15.7 + tier * 9, 0} }
-    }
-    "ladder_{side}" {
-      Position: {x - 6.5, 10, -6}
-      for rail in 0..2 {
-        "stile_{side}_{rail}" : Titanium { Position: {(rail - 0.5) * 1.4, 19, 0}; Box: {0.12, 38, 0.12} }
-      }
-      for rung in 0..64 {
-        "step_{side}_{rung}" : Titanium { Position: {0, rung * 0.6, 0}; Box: {1.4, 0.08, 0.18} }
-      }
-      for hoop in 0..12 {
-        "cage_{side}_{hoop}" : DockYellow { Position: {0, 4 + hoop * 3, -0.5}; Tube: {radius: 1, thickness: 0.07, length: 0.09, segments: 12} }
-      }
-    }
-  }
-  for face in 0..2 {
-    const z = (face - 0.5) * 14
-    "lower_{face}" : DockYellow { Position: {0, 44, z}; Box: {179, 1.5, 1.8} }
-    "upper_{face}" : DockYellow { Position: {0, 52, z}; Box: {179, 1.4, 1.8} }
-    for cell in 0..16 {
-      "diagonal_{face}_{cell}" { ShipBeam: {ax: -86 + cell * 10.75, ay: 44.5, az: z, bx: -75.25 + cell * 10.75, by: 51.5, bz: z, radius: 0.42} }
-      "upright_{face}_{cell}" : Titanium { Position: {-86 + cell * 10.75, 48, z}; Box: {0.42, 7, 0.65} }
-      "gusset_{face}_{cell}" : RustRed { Position: {-86 + cell * 10.75, 44.7, z}; Box: {2.4, 1.9, 2} }
-    }
-    "rail_{face}" : Titanium { Position: {0, 43, z}; Box: {172, 0.35, 0.45} }
-  }
-  for i in 0..9 {
-    "bridge_{i}" : DarkArmor { Position: {-84 + i * 21, 44.2, 0}; Box: {1, 1, 15} }
-    "light_{i}" : WhiteLight { Position: {-80 + i * 20, 43.1, 0}; Box: {3, 0.18, 0.8} }
-  }
-  walkway { DockCatwalk: {length: 173}; Position: {0, 52.8, 7}; Rotation: {0, 1.5707963, 0} }
-  conduit : ServiceTeal { Position: {0, 50, -7.9}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.3, length: 175, segments: 12} }
-  cable_tray : RecessMetal { Position: {0, 45.7, -6}; Box: {172, 0.5, 1.4} }
-  trolley {
-    Position: {-29, 41, 0}
-    frame : RustRed { Position: {}; Box: {13, 3, 17} }
-    cap : PaleArmor { Position: {0, 1.7, 0}; Box: {14, 0.5, 18} }
-    motor : ServiceTeal { Position: {3, -2, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.3, length: 7, segments: 16} }
-    drum : Titanium { Position: {-2, -2, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.1, length: 5, segments: 16} }
+assets {
+  template ServiceGantry {
     for side in 0..2 {
-      "cable_{side}" : Titanium { Position: {-2, -10, (side - 0.5) * 4}; Cylinder: {radius: 0.08, length: 16, segments: 8} }
-      "pulley_{side}" : DarkArmor { Position: {-2, -18, (side - 0.5) * 4}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.7, length: 0.5, segments: 16} }
+      const x = (side - 0.5) * 173
+      "foundation_{side}" : DarkArmor { Position: {x, 5.4, 0}; Box: {14, 2.2, 21} }
+      "base_{side}" : DarkArmor { Position: {x, 8, 0}; Box: {14, 3, 21} }
+      for leg in 0..2 {
+        const z = (leg - 0.5) * 15
+        "pillar_{side}_{leg}" : DockYellow { Position: {x, 27, z}; BeveledPrism: {footprint: [{-3, -2}, {3, -2}, {2, 2}, {-2, 2}], depth: 39, inset: 0.35, bevel: 0.3} }
+        "inset_{side}_{leg}" : RecessMetal { Position: {x - 3.05, 28, z}; Box: {0.12, 26, 1.8} }
+        "piston_{side}_{leg}" : PistonChrome { Position: {x - 3.3, 29, z}; Cylinder: {radius: 0.38, length: 24, segments: 12} }
+        "foot_{side}_{leg}" : RustRed { Position: {x, 11, z}; Box: {6.8, 4, 5} }
+        "beacon_{side}_{leg}" : BeaconLight { Position: {x, 51, z}; Cylinder: {radius: 0.4, length: 1, segments: 12} }
+      }
+      for tier in 0..4 {
+        "tie_{side}_{tier}" : DarkArmor { Position: {x, 15 + tier * 9, 0}; Box: {6.5, 1.2, 18} }
+        "brace_{side}_{tier}" { ShipBeam: {ax: x, ay: 15 + tier * 8, az: -7, bx: x, by: 23 + tier * 8, bz: 7, radius: 0.45} }
+        "landing_{side}_{tier}" { DockCatwalk: {length: 16}; Position: {x - 5.5, 15.7 + tier * 9, 0} }
+      }
+      "ladder_{side}" {
+        Position: {x - 6.5, 10, -6}
+        for rail in 0..2 {
+          "stile_{side}_{rail}" : Titanium { Position: {(rail - 0.5) * 1.4, 19, 0}; Box: {0.12, 38, 0.12} }
+        }
+        for rung in 0..64 {
+          "step_{side}_{rung}" : Titanium { Position: {0, rung * 0.6, 0}; Box: {1.4, 0.08, 0.18} }
+        }
+        for hoop in 0..12 {
+          "cage_{side}_{hoop}" : DockYellow { Position: {0, 4 + hoop * 3, -0.5}; Tube: {radius: 1, thickness: 0.07, length: 0.09, segments: 12} }
+        }
+      }
     }
-    spreader : DockYellow { Position: {-2, -19, 0}; Box: {5, 0.8, 9} }
-    load { DockCargo: {length: 7, color: {67, 117, 127}}; Position: {-2, -24, 0} }
-    for side in 0..2 {
-      "sling_{side}" { ShipBeam: {ax: -2, ay: -19, az: (side - 0.5) * 7, bx: -2, by: -19.6, bz: (side - 0.5) * 7, radius: 0.08} }
+    for face in 0..2 {
+      const z = (face - 0.5) * 14
+      "lower_{face}" : DockYellow { Position: {0, 44, z}; Box: {179, 1.5, 1.8} }
+      "upper_{face}" : DockYellow { Position: {0, 52, z}; Box: {179, 1.4, 1.8} }
+      for cell in 0..16 {
+        "diagonal_{face}_{cell}" { ShipBeam: {ax: -86 + cell * 10.75, ay: 44.5, az: z, bx: -75.25 + cell * 10.75, by: 51.5, bz: z, radius: 0.42} }
+        "upright_{face}_{cell}" : Titanium { Position: {-86 + cell * 10.75, 48, z}; Box: {0.42, 7, 0.65} }
+        "gusset_{face}_{cell}" : RustRed { Position: {-86 + cell * 10.75, 44.7, z}; Box: {2.4, 1.9, 2} }
+      }
+      "rail_{face}" : Titanium { Position: {0, 43, z}; Box: {172, 0.35, 0.45} }
     }
-    cab : DarkArmor { Position: {8, -2, 5}; Box: {4, 4, 5} }
-    window : IceLight { Position: {8, -1.5, 7.55}; Box: {3.3, 2, 0.1}; Emissive: {strength: 0.4, color: {78, 207, 255}} }
-    worklight { Position: {0, -4, 0}; PointLight: {intensity: 200, range: 35}; Rgb: {170, 220, 255} }
+    for i in 0..9 {
+      "bridge_{i}" : DarkArmor { Position: {-84 + i * 21, 44.2, 0}; Box: {1, 1, 15} }
+      "light_{i}" : WhiteLight { Position: {-80 + i * 20, 43.1, 0}; Box: {3, 0.18, 0.8} }
+    }
+    walkway { DockCatwalk: {length: 173}; Position: {0, 52.8, 7}; Rotation: {0, 1.5707963, 0} }
+    conduit : ServiceTeal { Position: {0, 50, -7.9}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.3, length: 175, segments: 12} }
+    cable_tray : RecessMetal { Position: {0, 45.7, -6}; Box: {172, 0.5, 1.4} }
+    trolley {
+      Position: {-29, 41, 0}
+      frame : RustRed { Position: {}; Box: {13, 3, 17} }
+      cap : PaleArmor { Position: {0, 1.7, 0}; Box: {14, 0.5, 18} }
+      motor : ServiceTeal { Position: {3, -2, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.3, length: 7, segments: 16} }
+      drum : Titanium { Position: {-2, -2, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.1, length: 5, segments: 16} }
+      for side in 0..2 {
+        "cable_{side}" : Titanium { Position: {-2, -10, (side - 0.5) * 4}; Cylinder: {radius: 0.08, length: 16, segments: 8} }
+        "pulley_{side}" : DarkArmor { Position: {-2, -18, (side - 0.5) * 4}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.7, length: 0.5, segments: 16} }
+      }
+      spreader : DockYellow { Position: {-2, -19, 0}; Box: {5, 0.8, 9} }
+      load { DockCargo: {length: 7, color: {67, 117, 127}}; Position: {-2, -24, 0} }
+      for side in 0..2 {
+        "sling_{side}" { ShipBeam: {ax: -2, ay: -19, az: (side - 0.5) * 7, bx: -2, by: -19.6, bz: (side - 0.5) * 7, radius: 0.08} }
+      }
+      cab : DarkArmor { Position: {8, -2, 5}; Box: {4, 4, 5} }
+      window : IceLight { Position: {8, -1.5, 7.55}; Box: {3.3, 2, 0.1}; Emissive: {strength: 0.4, color: {78, 207, 255}} }
+      worklight { Position: {0, -4, 0}; PointLight: {intensity: 200, range: 35}; Rgb: {170, 220, 255} }
+    }
+    signboard : RecessMetal { Position: {28, 48.5, 8.1}; Box: {29, 5.5, 0.4} }
+    sign { Position: {28, 48.5, 8.35}; Quad: {27, 4.5}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_registry} }
+    operator { DockCrew: {}; Position: {18, 53.1, 7}; Rotation: {0, -0.7, 0} }
   }
-  signboard : RecessMetal { Position: {28, 48.5, 8.1}; Box: {29, 5.5, 0.4} }
-  sign { Position: {28, 48.5, 8.35}; Quad: {27, 4.5}; Rgb: {255, 255, 255}; PbrTextures: {albedo: dock_registry} }
-  operator { DockCrew: {}; Position: {18, 53.1, 7}; Rotation: {0, -0.7, 0} }
 }

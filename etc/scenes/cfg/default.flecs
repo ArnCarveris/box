@@ -22,18 +22,12 @@ window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
 
-gtao {
-  Gtao: {radius: 0.6, final_value_power: 2.2}
-}
-
-sun {
+sky {
   DirectionalLight: {intensity: 1.4 * math.PI}
   Rgb: {255, 255, 255}
-}
 
-sky {
   Atmosphere: {
-    sun: sun,
+    sun: sky,
     units_per_km: 100,
     rayleigh: {scale_height: 8, scattering_scale: 3},
     ozone_scale: 4,
@@ -46,7 +40,7 @@ sky {
     day_of_year: hud.screen.options.body.day_of_year[Slider.mut].current,
     latitude: hud.screen.options.body.latitude[Slider.mut].current,
     north: hud.screen.options.body.north[Slider.mut].current,
-    sun: sun
+    sun: sky
   }
 
   HeightFog: {
@@ -58,28 +52,32 @@ sky {
   }
 }
 
-exposure {
-  AutoExposure: {min_log_luma: -10.8}
-}
-
-bloom {
-  Bloom: {intensity: 0.25, threshold: 1, threshold_softness: 0.5}
-}
-
-tonemap {
-  Tonemap: {auto_exposure: exposure}
-}
-
-smaa {
-  Smaa: {}
-}
-
 camera {
   Camera: {fov: 55, near_: 0.1}
   CameraController: {speed: 14, boost: 4, sensitivity: 0.003}
 }
 
 view {
+  gtao {
+    Gtao: {radius: 0.6, final_value_power: 2.2}
+  }
+
+  exposure {
+    AutoExposure: {min_log_luma: -10.8}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.25, threshold: 1, threshold_softness: 0.5}
+  }
+
+  tonemap {
+    Tonemap: {auto_exposure: exposure}
+  }
+
+  smaa {
+    Smaa: {}
+  }
+
   View: {
     camera: camera,
     clear: {enabled: true, color: {150, 178, 210, 255}},

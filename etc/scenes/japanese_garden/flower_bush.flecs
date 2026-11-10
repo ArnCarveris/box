@@ -11,21 +11,23 @@ using box.surface
 using box.controllers
 using box.movement
 
-template FlowerBush {
-  prop tint: Rgb = {193, 164, 222}
+assets {
+  template FlowerBush {
+    prop tint: Rgb = {193, 164, 222}
 
-  for i in 0..3 {
-    {
-      Position: {math.cos(i * 2.1) * 0.19, 0.22, math.sin(i * 2.1) * 0.19}
-      Scale: {1, 0.65, 1}
-      IcoSphere: {radius: 0.32, segments: 1, smooth: true}
-      Rgb: GardenMoss
-    }
-    for j in 0..7 {
+    for i in 0..3 {
       {
-        Position: {math.cos(i * 2.1) * 0.23 + math.cos(j * 2.4) * 0.13, 0.4 + math.sin(j * 1.7) * 0.075, math.sin(i * 2.1) * 0.23 + math.sin(j * 2.4) * 0.13}
-        Sphere: {radius: 0.08, segments: 8, smooth: true}
-        Rgb: tint
+        Position: {math.cos(i * 2.1) * 0.19, 0.22, math.sin(i * 2.1) * 0.19}
+        Scale: {1, 0.65, 1}
+        IcoSphere: {radius: 0.32, segments: 1, smooth: true}
+        Rgb: GardenMoss
+      }
+      for j in 0..7 {
+        {
+          Position: {math.cos(i * 2.1) * 0.23 + math.cos(j * 2.4) * 0.13, 0.4 + math.sin(j * 1.7) * 0.075, math.sin(i * 2.1) * 0.23 + math.sin(j * 2.4) * 0.13}
+          Sphere: {radius: 0.08, segments: 8, smooth: true}
+          Rgb: tint
+        }
       }
     }
   }

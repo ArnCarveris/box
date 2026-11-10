@@ -26,36 +26,93 @@ using box.particle
 using box.transition
 using box.widgets
 using box.app
+using state
+using assets
+
+window { Surface: {width: 1600, height: 1000, vsync: true} }
+
+async {
+  state.hud_hour = 15.5
+  state.hud_day_of_year = 150
+  state.hud_latitude = 52
+  state.hud_north = 215
+  state.hud_fog = 0.001
+}
+
+camera {
+  Position: {15, 32, 46}
+  Rotation: {-0.61, 0.31, 0}
+  Camera: {fov: 33, near_: 0.3, far_: 400}
+  CameraController: {speed: 10}
+}
+
+sky {
+  DirectionalLight: {intensity: 2.8 * math.PI}
+  Rgb: {255, 250, 240}
+  Atmosphere: {
+    sun: sky,
+    units_per_km: 600,
+    rayleigh: {scale_height: 8, scattering_scale: 2.4},
+    mie: {scale_height: 1.6, anisotropy: 0.75, scattering_scale: 3, tint: {255, 226, 190}},
+    ozone_scale: 3,
+    ground_albedo: {112, 128, 84},
+    sun_disk_intensity: 10,
+    sun_radius: 0.75
+  }
+  TimeOfDay: {
+    hour: hud.screen.options.body.hour[Slider.mut].current,
+    day_of_year: hud.screen.options.body.day_of_year[Slider.mut].current,
+    latitude: hud.screen.options.body.latitude[Slider.mut].current,
+    north: hud.screen.options.body.north[Slider.mut].current,
+    sun: sky
+  }
+  HeightFog: {
+    density: hud.screen.options.body.fog[Slider.mut].current,
+    falloff: 0.14,
+    base_height: -6,
+    max_opacity: 0.12,
+    atmosphere: sky
+  }
+}
 
 $ {
   Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true,
     aerial_perspective: true, alpha_cutout: true, transmission: true, triplanar: true,
     clear_coat: true, diffuse_transmission: true}
+  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 6, environment: sky}
+  LightBake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
 }
 
-window { Surface: {width: 1600, height: 1000, vsync: true} }
-canal_contact { Gtao: {radius: 0.5, final_value_power: 1.9} }
-canal_bloom { Bloom: {intensity: 0.1, threshold: 1.4} }
-canal_exposure { AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.75, max_exposure: 20} }
-canal_film { Tonemap: {auto_exposure: canal_exposure, operator_: TonyMcMapface} }
-canal_edges { Smaa: {} }
+view {
+  canal_contact { Gtao: {radius: 0.5, final_value_power: 1.9} }
+  canal_bloom { Bloom: {intensity: 0.1, threshold: 1.4} }
+  canal_exposure { AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.75, max_exposure: 20} }
+  canal_film { Tonemap: {auto_exposure: canal_exposure, operator_: TonyMcMapface} }
+  canal_edges { Smaa: {} }
 
-async {
-  hud_hour = 15.5
-  hud_day_of_year = 150
-  hud_latitude = 52
-  hud_north = 215
-  hud_fog = 0.001
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {40, 38, 36, 255}},
+    lighting: {
+      enabled: true,
+      baked: hud.screen.options.body.baked[Checkbox.mut].current,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 0.9, yaw: 0, background: false}
+    },
+    shadows: {enabled: hud.screen.options.body.shadows[Checkbox.mut].current, resolution: 4096, max_distance: 120},
+    effects: [
+      {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: canal_contact},
+      {enabled: true, effect: sky},
+      {enabled: true, effect: canal_bloom},
+      {enabled: true, effect: canal_film},
+      {enabled: true, effect: canal_edges}
+    ]
+  }
 }
+
 
 canal_lock {
-  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true, aerial_perspective: true, alpha_cutout: true, transmission: true, triplanar: true, clear_coat: true, diffuse_transmission: true}
-  camera {
-    Position: {15, 32, 46}
-    Rotation: {-0.61, 0.31, 0}
-    Camera: {fov: 33, near_: 0.3, far_: 400}
-    CameraController: {speed: 10}
-  }
   chamber_camera {
     Position: {7.5, 6.5, 8.5}
     Rotation: {-0.56, 0.7, 0}
@@ -68,39 +125,6 @@ canal_lock {
     Camera: {fov: 48, near_: 0.1, far_: 400}
     CameraController: {speed: 5}
   }
-  sun {
-    DirectionalLight: {intensity: 2.8 * math.PI}
-    Rgb: {255, 250, 240}
-  }
-  sky {
-    Atmosphere: {
-      sun: sun,
-      units_per_km: 600,
-      rayleigh: {scale_height: 8, scattering_scale: 2.4},
-      mie: {scale_height: 1.6, anisotropy: 0.75, scattering_scale: 3, tint: {255, 226, 190}},
-      ozone_scale: 3,
-      ground_albedo: {112, 128, 84},
-      sun_disk_intensity: 10,
-      sun_radius: 0.75
-    }
-    TimeOfDay: {
-      hour: hud.screen.options.body.hour[Slider.mut].current,
-      day_of_year: hud.screen.options.body.day_of_year[Slider.mut].current,
-      latitude: hud.screen.options.body.latitude[Slider.mut].current,
-      north: hud.screen.options.body.north[Slider.mut].current,
-      sun: sun
-    }
-    HeightFog: {
-      density: hud.screen.options.body.fog[Slider.mut].current,
-      falloff: 0.14,
-      base_height: -6,
-      max_opacity: 0.12,
-      atmosphere: sky
-    }
-  }
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 6, environment: sky}
-  LightBake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
-
   landscape { CanalLandscape: {} }
 
   CanalWaterFace low_water(x0: -21, x1: -6.5, z0: -3, z1: 3) { Position = {-13.75, -2.25, 0} }
@@ -228,30 +252,8 @@ canal_lock {
   CanalDuck(radius: 0.8, bob: 1.5) { Position: {19, -0.47, -0.7}; Rotation: {0, 2.4, 0} }
   CanalDuck(radius: 0.8, bob: 1.7) { Position: {19, -0.47, -0.7}; Rotation: {0, 3.1, 0} }
   CanalDuck(radius: 0.6, bob: 1.3) { Position: {-16.8, -2.27, 1.95}; Rotation: {0, -0.8, 0} }
-}
 
-for target in [canal_lock.low_water, canal_lock.low_neck, canal_lock.high_water, canal_lock.high_neck, canal_lock.chamber_water.surface] {
-  { SetAt: {frame: 2, entity: target}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: 720, offset_y: -300} }
-}
-
-main_view {
-  View: {
-    camera: canal_lock.camera,
-    clear: {enabled: true, color: {40, 38, 36, 255}},
-    lighting: {
-      enabled: true,
-      baked: hud.screen.options.body.baked[Checkbox.mut].current,
-      reflections: true,
-      atmosphere: true,
-      environment: {source: canal_lock.sky, intensity: 0.9, yaw: 0, background: false}
-    },
-    shadows: {enabled: hud.screen.options.body.shadows[Checkbox.mut].current, resolution: 4096, max_distance: 120},
-    effects: [
-      {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: canal_contact},
-      {enabled: true, effect: canal_lock.sky},
-      {enabled: true, effect: canal_bloom},
-      {enabled: true, effect: canal_film},
-      {enabled: true, effect: canal_edges}
-    ]
+  for target in [low_water, low_neck, high_water, high_neck, chamber_water.surface] {
+    { SetAt: {frame: 2, entity: target}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: 720, offset_y: -300} }
   }
 }

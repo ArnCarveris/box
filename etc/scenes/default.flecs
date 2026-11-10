@@ -24,28 +24,6 @@ window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
 
-// Post effects, applied in the order the view lists them
-exposure {
-  AutoExposure: {}
-}
-
-bloom {
-  Bloom: {intensity: 0.2, threshold: 1}
-}
-
-gtao {
-  Gtao: {radius: 0.5, final_value_power: 2.2}
-}
-
-tonemap {
-  Tonemap: {auto_exposure: exposure}
-}
-
-// Anti aliasing on the tone mapped image
-smaa {
-  Smaa: {}
-}
-
 camera {
   Position: {0, 2.5, 6}
   Rotation: {-0.35, 0, 0}
@@ -53,7 +31,35 @@ camera {
   CameraController: {}
 }
 
-main_view {
+sky {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 244, 225}
+}
+
+view {
+  exposure {
+    AutoExposure: {}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.2, threshold: 1}
+  }
+
+  gtao {
+    Gtao: {radius: 0.5, final_value_power: 2.2}
+  }
+
+  tonemap {
+    Tonemap: {auto_exposure: exposure}
+  }
+
+  // Anti aliasing on the tone mapped image
+  smaa {
+    Smaa: {}
+  }
+
+  // Post effects, applied in the order the view lists them
   View: {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
@@ -62,27 +68,23 @@ main_view {
   }
 }
 
-sun {
-  Rotation: {0.7359, 2.3726, 0}
-  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
-  Rgb: {255, 244, 225}
-}
-
 $ {
   AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
-ground {
-  Position: {0, -0.05, 0}
-  Box: {20, 0.1, 20}
-  Rgb: {170, 170, 165}
-  PbrMaterial: {roughness: 0.9}
-}
+default {
+  ground {
+    Position: {0, -0.05, 0}
+    Box: {20, 0.1, 20}
+    Rgb: {170, 170, 165}
+    PbrMaterial: {roughness: 0.9}
+  }
 
-cube {
-  Position: {0, 0.5, 0}
-  Rotation: {0, 0.4, 0}
-  Box: {1, 1, 1}
-  Rgb: {220, 90, 60}
-  PbrMaterial: {roughness: 0.4, metallic: 0}
+  cube {
+    Position: {0, 0.5, 0}
+    Rotation: {0, 0.4, 0}
+    Box: {1, 1, 1}
+    Rgb: {220, 90, 60}
+    PbrMaterial: {roughness: 0.4, metallic: 0}
+  }
 }

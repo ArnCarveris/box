@@ -4,11 +4,13 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanBench {
-  for plank in 0..3 {
-    { (IsA, KoreanTimber); Position: {0, 0.45, (plank - 1) * 0.2}; Box: {2.5, 0.13, 0.185} }
-  }
-  for side in 0..2 {
-    { (IsA, KoreanStone); Position: {(side - 0.5) * 1.8, 0.22, 0}; Box: {0.3, 0.44, 0.45} }
+assets {
+  template KoreanBench {
+    for plank in 0..3 {
+      { (IsA, KoreanTimber); Position: {0, 0.45, (plank - 1) * 0.2}; Box: {2.5, 0.13, 0.185} }
+    }
+    for side in 0..2 {
+      { (IsA, KoreanStone); Position: {(side - 0.5) * 1.8, 0.22, 0}; Box: {0.3, 0.44, 0.45} }
+    }
   }
 }

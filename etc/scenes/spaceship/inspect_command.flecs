@@ -10,6 +10,7 @@ using box.spatial
 using box.material
 using box.texture
 using box.light
+using assets
 
 bridge { FrigateBridge: {} }
 cockpit { FrigateCockpit: {}; Position: {-25, 0, 0} }

@@ -10,29 +10,31 @@ using box.light
 using box.text
 
 
-template WestLandscape {
-  foundation : WestStone { Position: {0, -0.73, 0}; RoundedBox: {38, 1.5, 30, 0.55} }
-  strata { Position: {0, -0.28, 0}; RoundedBox: {38.05, 0.23, 30.05, 0.5}; Rgb: {173, 112, 65} }
-  surface : WestSand { Position: {0, -0.015, 0}; RoundedBox: {37.9, 0.2, 29.9, 0.45} }
-  road { Position: {0, 0.09, 2}; RoundedBox: {32, 0.035, 7, 0.017}; Rgb: {207, 164, 106} }
-  for side in 0..2 {
-    WestRut(z: (side - 0.5) * 2.55) { Position: {} }
-  }
-  WestMesa(height: 5.3, width: 4.8) { Position: {-15.4, 0.09, -10.4} }
-  WestMesa(height: 3.4, width: 3.1) { Position: {-17, 0.09, -6.4} }
-  WestMesa(height: 2.8, width: 3.5) { Position: {16.2, 0.09, -11.6}; Rotation: {0, 0.9, 0} }
-  WestCactus(height: 3.5) { Position: {-15.9, 0.09, -2} }
-  WestCactus(height: 2.4) { Position: {16.5, 0.09, 4.5}; Rotation: {0, 0.6, 0} }
-  WestCactus(height: 2.9) { Position: {-16.7, 0.09, 7.3}; Rotation: {0, -0.5, 0} }
-  WestCactus(height: 1.7) { Position: {13.9, 0.09, -12.5}; Scale: {0.8, 0.8, 0.8} }
-  for i in 0..62 {
-    const a = i * 2.4
-    const x = math.sin(a) * (15.8 + i % 3 * 0.65)
-    const z = math.cos(a) * (12.4 + i % 2 * 0.5)
-    WestScrub() { Position: {x, 0.1, z}; Scale: {0.65 + i % 3 * 0.2, 0.65 + i % 3 * 0.2, 0.65 + i % 3 * 0.2} }
-    { Position: {x + 0.4, 0.15, z - 0.25}; Scale: {1.2, 0.45, 0.9}; IcoSphere: {radius: 0.12 + i % 4 * 0.055, segments: 0}; Rgb: {174 + i % 3 * 10, 124 + i % 3 * 8, 74} }
-  }
-  for i in 0..140 {
-    { Position: {-17 + (i * 71 % 341) * 0.1, 0.115, -13.5 + (i * 43 % 271) * 0.1}; Scale: {1.5, 0.3, 1}; IcoSphere: {radius: 0.035 + i % 3 * 0.014, segments: 0}; Rgb: {174, 133, 80} }
+assets {
+  template WestLandscape {
+    foundation : WestStone { Position: {0, -0.73, 0}; RoundedBox: {38, 1.5, 30, 0.55} }
+    strata { Position: {0, -0.28, 0}; RoundedBox: {38.05, 0.23, 30.05, 0.5}; Rgb: {173, 112, 65} }
+    surface : WestSand { Position: {0, -0.015, 0}; RoundedBox: {37.9, 0.2, 29.9, 0.45} }
+    road { Position: {0, 0.09, 2}; RoundedBox: {32, 0.035, 7, 0.017}; Rgb: {207, 164, 106} }
+    for side in 0..2 {
+      WestRut(z: (side - 0.5) * 2.55) { Position: {} }
+    }
+    WestMesa(height: 5.3, width: 4.8) { Position: {-15.4, 0.09, -10.4} }
+    WestMesa(height: 3.4, width: 3.1) { Position: {-17, 0.09, -6.4} }
+    WestMesa(height: 2.8, width: 3.5) { Position: {16.2, 0.09, -11.6}; Rotation: {0, 0.9, 0} }
+    WestCactus(height: 3.5) { Position: {-15.9, 0.09, -2} }
+    WestCactus(height: 2.4) { Position: {16.5, 0.09, 4.5}; Rotation: {0, 0.6, 0} }
+    WestCactus(height: 2.9) { Position: {-16.7, 0.09, 7.3}; Rotation: {0, -0.5, 0} }
+    WestCactus(height: 1.7) { Position: {13.9, 0.09, -12.5}; Scale: {0.8, 0.8, 0.8} }
+    for i in 0..62 {
+      const a = i * 2.4
+      const x = math.sin(a) * (15.8 + i % 3 * 0.65)
+      const z = math.cos(a) * (12.4 + i % 2 * 0.5)
+      WestScrub() { Position: {x, 0.1, z}; Scale: {0.65 + i % 3 * 0.2, 0.65 + i % 3 * 0.2, 0.65 + i % 3 * 0.2} }
+      { Position: {x + 0.4, 0.15, z - 0.25}; Scale: {1.2, 0.45, 0.9}; IcoSphere: {radius: 0.12 + i % 4 * 0.055, segments: 0}; Rgb: {174 + i % 3 * 10, 124 + i % 3 * 8, 74} }
+    }
+    for i in 0..140 {
+      { Position: {-17 + (i * 71 % 341) * 0.1, 0.115, -13.5 + (i * 43 % 271) * 0.1}; Scale: {1.5, 0.3, 1}; IcoSphere: {radius: 0.035 + i % 3 * 0.014, segments: 0}; Rgb: {174, 133, 80} }
+    }
   }
 }

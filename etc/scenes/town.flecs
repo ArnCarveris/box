@@ -16,4 +16,6 @@ camera {
   Rotation: {-0.1141, -0.6959, 0}
 }
 
-assets.Town sakura_machi(rows: 4, columns: 4, seed: 42)
+town {
+  assets.Town sakura_machi(rows: 4, columns: 4, seed: 42)
+}

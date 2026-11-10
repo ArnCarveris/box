@@ -4,16 +4,18 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanBracket {
-  for tier in 0..3 {
-    const w = 0.44 + tier * 0.24
-    { Position: {0, tier * 0.17, 0}; Box: {w, 0.14, 0.2}; Rgb: {42, 112 + tier * 17, 89} }
-    { Position: {0, tier * 0.17 + 0.045, 0}; Box: {w + 0.025, 0.025, 0.225}; Rgb: {194, 207, 148} }
-    { Position: {0, tier * 0.17, 0}; Box: {0.2, 0.13, w}; Rgb: {49, 125, 102} }
-    for end in 0..2 {
-      { Position: {(end - 0.5) * (w - 0.1), tier * 0.17 + 0.09, 0}; Box: {0.11, 0.12, 0.24}; Rgb: {151, 63, 46} }
-      { Position: {0, tier * 0.17 + 0.09, (end - 0.5) * (w - 0.1)}; Box: {0.24, 0.12, 0.11}; Rgb: {151, 63, 46} }
+assets {
+  template KoreanBracket {
+    for tier in 0..3 {
+      const w = 0.44 + tier * 0.24
+      { Position: {0, tier * 0.17, 0}; Box: {w, 0.14, 0.2}; Rgb: {42, 112 + tier * 17, 89} }
+      { Position: {0, tier * 0.17 + 0.045, 0}; Box: {w + 0.025, 0.025, 0.225}; Rgb: {194, 207, 148} }
+      { Position: {0, tier * 0.17, 0}; Box: {0.2, 0.13, w}; Rgb: {49, 125, 102} }
+      for end in 0..2 {
+        { Position: {(end - 0.5) * (w - 0.1), tier * 0.17 + 0.09, 0}; Box: {0.11, 0.12, 0.24}; Rgb: {151, 63, 46} }
+        { Position: {0, tier * 0.17 + 0.09, (end - 0.5) * (w - 0.1)}; Box: {0.24, 0.12, 0.11}; Rgb: {151, 63, 46} }
+      }
     }
+    { KoreanLotus: {}; Position: {0, 0.15, 0.27}; Scale: {0.65, 0.65, 0.65} }
   }
-  { KoreanLotus: {}; Position: {0, 0.15, 0.27}; Scale: {0.65, 0.65, 0.65} }
 }

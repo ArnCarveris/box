@@ -28,6 +28,7 @@ using box.surface
 using box.controllers
 using box.text
 using box.atmosphere
+using assets
 
 $ {
   Scene: {baked: true, reflections: true, environment: true, aerial_perspective: true,
@@ -39,54 +40,36 @@ window {
   Surface: {width: 1440, height: 960, vsync: true}
 }
 
-contact_shadows {
-  Gtao: {radius: 0.5, final_value_power: 2}
+camera {
+  Position: {-23.5, 20, 29}
+  Rotation: {-0.48, -0.681, 0}
+  Camera: {fov: 43, near_: 0.1, far_: 150}
+  CameraController: {speed: 10}
 }
 
-lantern_bloom {
-  Bloom: {intensity: 0.12, threshold: 1.4}
+sky {
+  Rotation: {0.85, -2.4, 0}
+  DirectionalLight: {intensity: 1.8 * math.PI}
+  Rgb: {255, 236, 208}
+  Atmosphere: {
+    sun: sky,
+    units_per_km: 60,
+    rayleigh: {scale_height: 8, scattering_scale: 1.6},
+    mie: {scale_height: 1.4, anisotropy: 0.76, scattering_scale: 2.2, tint: {255, 232, 196}},
+    ground_albedo: {92, 110, 118},
+    sun_disk_intensity: 6,
+    sun_radius: 0.6
+  }
+  HeightFog: {density: 0.004, falloff: 0.12, base_height: 0, max_opacity: 0.2, atmosphere: sky}
 }
 
-tonemap {
-  Tonemap: {}
-}
-
-market_aa {
-  Smaa: {}
+$ {
+  AmbientLight: {sky: {171, 193, 211}, ground: {119, 99, 72}, intensity: 0.35}
+  LightBake: {environment: sky, probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
+  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.5, environment: sky}
 }
 
 cheese_market {
-  Scene: {baked: true, reflections: true, environment: true, aerial_perspective: true, transmission: true, sheen: true, clear_coat: true, anisotropy: true, diffuse_transmission: true}
-  AmbientLight: {sky: {171, 193, 211}, ground: {119, 99, 72}, intensity: 0.35}
-
-  camera {
-    Position: {-23.5, 20, 29}
-    Rotation: {-0.48, -0.681, 0}
-    Camera: {fov: 43, near_: 0.1, far_: 150}
-    CameraController: {speed: 10}
-  }
-
-  afternoon {
-    Rotation: {0.85, -2.4, 0}
-    DirectionalLight: {intensity: 1.8 * math.PI}
-    Rgb: {255, 236, 208}
-  }
-
-  sky {
-    Atmosphere: {
-      sun: afternoon,
-      units_per_km: 60,
-      rayleigh: {scale_height: 8, scattering_scale: 1.6},
-      mie: {scale_height: 1.4, anisotropy: 0.76, scattering_scale: 2.2, tint: {255, 232, 196}},
-      ground_albedo: {92, 110, 118},
-      sun_disk_intensity: 6,
-      sun_radius: 0.6
-    }
-    HeightFog: {density: 0.004, falloff: 0.12, base_height: 0, max_opacity: 0.2, atmosphere: sky}
-  }
-  LightBake: {environment: sky, probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.5, environment: sky}
-
   island {
     Position: {0, -0.48, 0}
     RoundedBox: {28, 0.95, 24, 0.35}
@@ -254,24 +237,40 @@ cheese_market {
   }
 }
 
-main_view {
+view {
+  gtao {
+    Gtao: {radius: 0.5, final_value_power: 2}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.12, threshold: 1.4}
+  }
+
+  tonemap {
+    Tonemap: {}
+  }
+
+  smaa {
+    Smaa: {}
+  }
+
   View: {
-    camera: cheese_market.camera,
+    camera: camera,
     clear: {enabled: true, color: {91, 112, 123, 255}},
     lighting: {
       enabled: true,
       baked: true,
       reflections: true,
       atmosphere: true,
-      environment: {source: cheese_market.sky, intensity: 0.6, yaw: 0, background: false}
+      environment: {source: sky, intensity: 0.6, yaw: 0, background: false}
     },
     shadows: {enabled: true, resolution: 2048, max_distance: 90},
     effects: [
-      {effect: contact_shadows},
-      {effect: cheese_market.sky},
-      {effect: lantern_bloom},
+      {effect: gtao},
+      {effect: sky},
+      {effect: bloom},
       {effect: tonemap},
-      {effect: market_aa}
+      {effect: smaa}
     ]
   }
 }

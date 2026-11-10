@@ -4,12 +4,14 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanLotus {
-  { (IsA, KoreanBlue); Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.19, length: 0.012, segments: 24} }
-  for petal in 0..8 {
-    const a = petal * math.PI / 4
-    { Position: {math.sin(a) * 0.105, math.cos(a) * 0.105, 0.012}; Rotation: {0, 0, -a}; Scale: {0.55, 1, 0.16}; Sphere: {radius: 0.082, segments: 10, smooth: true}; Rgb: {224, 192, 141} }
-    { Position: {math.sin(a) * 0.1, math.cos(a) * 0.1, 0.025}; Rotation: {0, 0, -a}; Scale: {0.42, 1, 0.14}; Sphere: {radius: 0.055, segments: 8, smooth: true}; Rgb: {181, 72, 54} }
+assets {
+  template KoreanLotus {
+    { (IsA, KoreanBlue); Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.19, length: 0.012, segments: 24} }
+    for petal in 0..8 {
+      const a = petal * math.PI / 4
+      { Position: {math.sin(a) * 0.105, math.cos(a) * 0.105, 0.012}; Rotation: {0, 0, -a}; Scale: {0.55, 1, 0.16}; Sphere: {radius: 0.082, segments: 10, smooth: true}; Rgb: {224, 192, 141} }
+      { Position: {math.sin(a) * 0.1, math.cos(a) * 0.1, 0.025}; Rotation: {0, 0, -a}; Scale: {0.42, 1, 0.14}; Sphere: {radius: 0.055, segments: 8, smooth: true}; Rgb: {181, 72, 54} }
+    }
+    { (IsA, KoreanGold); Position: {0, 0, 0.04}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.052, length: 0.015, segments: 16} }
   }
-  { (IsA, KoreanGold); Position: {0, 0, 0.04}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.052, length: 0.015, segments: 16} }
 }

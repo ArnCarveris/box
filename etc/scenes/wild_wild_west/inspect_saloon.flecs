@@ -1,4 +1,4 @@
 include saloon
 using box.transform
 
-asset { WestSaloon: {}; Position: {} }
+asset { assets.WestSaloon: {}; Position: {} }

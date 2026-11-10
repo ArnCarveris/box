@@ -7,88 +7,91 @@ using box.geometry
 using box.material
 using box.app
 using box.transition
+using state
 
-template LockGateBody {
-  prop side: f32 = 1
-  prop bottom: f32 = -4.5
-  prop height: f32 = 1
-  prop middle: f32 = 0
+assets {
+  template LockGateBody {
+    prop side: f32 = 1
+    prop bottom: f32 = -4.5
+    prop height: f32 = 1
+    prop middle: f32 = 0
 
-  heel : CanalOldTimber { Position: {0, middle, 0}; Cylinder: {radius: 0.13, length: height + 0.06, segments: 14, smooth: true} }
-  core : CanalOldTimber { Position: {0, middle, side * 0.72}; Box: {0.14, height - 0.02, 1.33} }
-  meeting : CanalOldTimber { Position: {0, middle, side * 1.395}; Box: {0.24, height, 0.14} }
-  CanalFace(w: 1.33, h: height, u: 0.5, v: height / 1.4) { (IsA, CanalGatePlanks); Position: {0.08, middle, side * 0.72}; Rotation: {0, math.PI / 2, 0} }
-  CanalFace(w: 1.33, h: height, u: 0.5, v: height / 1.4) { (IsA, CanalGatePlanks); Position: {-0.08, middle, side * 0.72}; Rotation: {0, -math.PI / 2, 0} }
+    heel : CanalOldTimber { Position: {0, middle, 0}; Cylinder: {radius: 0.13, length: height + 0.06, segments: 14, smooth: true} }
+    core : CanalOldTimber { Position: {0, middle, side * 0.72}; Box: {0.14, height - 0.02, 1.33} }
+    meeting : CanalOldTimber { Position: {0, middle, side * 1.395}; Box: {0.24, height, 0.14} }
+    CanalFace(w: 1.33, h: height, u: 0.5, v: height / 1.4) { (IsA, CanalGatePlanks); Position: {0.08, middle, side * 0.72}; Rotation: {0, math.PI / 2, 0} }
+    CanalFace(w: 1.33, h: height, u: 0.5, v: height / 1.4) { (IsA, CanalGatePlanks); Position: {-0.08, middle, side * 0.72}; Rotation: {0, -math.PI / 2, 0} }
 
-  for b in 0..3 {
-    const by = bottom + height * (0.14 + b * 0.36)
-    { (IsA, CanalRust); Position: {0.095, by, side * 0.72}; Box: {0.02, 0.09, 1.36} }
-    { (IsA, CanalRust); Position: {-0.095, by, side * 0.72}; Box: {0.02, 0.09, 1.36} }
-    for n in 0..5 {
-      { (IsA, CanalIron); Position: {0.11, by, side * (0.16 + n * 0.28)}; Sphere: {radius: 0.022, segments: 6} }
+    for b in 0..3 {
+      const by = bottom + height * (0.14 + b * 0.36)
+      { (IsA, CanalRust); Position: {0.095, by, side * 0.72}; Box: {0.02, 0.09, 1.36} }
+      { (IsA, CanalRust); Position: {-0.095, by, side * 0.72}; Box: {0.02, 0.09, 1.36} }
+      for n in 0..5 {
+        { (IsA, CanalIron); Position: {0.11, by, side * (0.16 + n * 0.28)}; Sphere: {radius: 0.022, segments: 6} }
+      }
+    }
+    brace : CanalRust { Position: {0.135, middle, side * 0.72}; Rotation: {side * -math.atan2(1.2, height), 0, 0}; Box: {0.02, 0.07, math.sqrt(1.2 * 1.2 + height * height) * 0.92} }
+
+    beam_a : CanalBlack { Position: {0, 0.5, side * -0.05}; RoundedBox: {0.32, 0.3, 3, 0.03, segments: 2} }
+    beam_white_a : CanalWhite { Position: {0, 0.5, side * -1.65}; RoundedBox: {0.31, 0.29, 0.2, 0.02, segments: 2} }
+    beam_b : CanalBlack { Position: {0, 0.5, side * -2.15}; RoundedBox: {0.3, 0.28, 0.8, 0.03, segments: 2} }
+    beam_white_b : CanalWhite { Position: {0, 0.5, side * -2.75}; RoundedBox: {0.29, 0.27, 0.4, 0.04, segments: 2} }
+    collar : CanalIron { Position: {0, 0.44, 0}; Cylinder: {radius: 0.2, length: 0.08, segments: 16} }
+    walkway : CanalDeckPlanks { Position: {-0.27, 0.27, side * 0.72}; Box: {0.3, 0.05, 1.36} }
+    for n in 0..3 {
+      { (IsA, CanalIron); Position: {-0.27, 0.27, side * (0.2 + n * 0.5)}; Box: {0.34, 0.08, 0.05} }
+      { (IsA, CanalIron); Position: {-0.4, 0.68, side * (0.2 + n * 0.5)}; Cylinder: {radius: 0.02, length: 0.8, segments: 8} }
+    }
+    rail : CanalIron { Position: {-0.4, 1.08, side * 0.7}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.024, length: 1.2, segments: 8} }
+  }
+
+  template LockGateLeaf : LockControl {
+    prop side: f32 = 1
+    prop top: bool = false
+    prop bottom: f32 = -4.5
+
+    const open = (top && lock_top_gate) || (!top && lock_bottom_gate)
+    const height = 0.35 - bottom
+    const middle = (0.35 + bottom) / 2
+
+    Rotation: {0, side * (open ? 1.46 : 0.18), 0}
+    Transition: [
+      Rotation: {duration: 3.5, timing_function: EaseInOut},
+      Tint: {duration: 0.12}
+    ]
+
+    LockGateBody body(side: side, bottom: bottom, height: height, middle: middle)
+
+    async {
+      while true {
+        await on.click(this)
+        if lock_busy || top != lock_high {
+          continue
+        }
+        if top {
+          lock_top_gate = !lock_top_gate
+        } else {
+          lock_bottom_gate = !lock_bottom_gate
+        }
+        hover = false
+        emit LockBusy(seconds: 3.6)
+      }
     }
   }
-  brace : CanalRust { Position: {0.135, middle, side * 0.72}; Rotation: {side * -math.atan2(1.2, height), 0, 0}; Box: {0.02, 0.07, math.sqrt(1.2 * 1.2 + height * height) * 0.92} }
 
-  beam_a : CanalBlack { Position: {0, 0.5, side * -0.05}; RoundedBox: {0.32, 0.3, 3, 0.03, segments: 2} }
-  beam_white_a : CanalWhite { Position: {0, 0.5, side * -1.65}; RoundedBox: {0.31, 0.29, 0.2, 0.02, segments: 2} }
-  beam_b : CanalBlack { Position: {0, 0.5, side * -2.15}; RoundedBox: {0.3, 0.28, 0.8, 0.03, segments: 2} }
-  beam_white_b : CanalWhite { Position: {0, 0.5, side * -2.75}; RoundedBox: {0.29, 0.27, 0.4, 0.04, segments: 2} }
-  collar : CanalIron { Position: {0, 0.44, 0}; Cylinder: {radius: 0.2, length: 0.08, segments: 16} }
-  walkway : CanalDeckPlanks { Position: {-0.27, 0.27, side * 0.72}; Box: {0.3, 0.05, 1.36} }
-  for n in 0..3 {
-    { (IsA, CanalIron); Position: {-0.27, 0.27, side * (0.2 + n * 0.5)}; Box: {0.34, 0.08, 0.05} }
-    { (IsA, CanalIron); Position: {-0.4, 0.68, side * (0.2 + n * 0.5)}; Cylinder: {radius: 0.02, length: 0.8, segments: 8} }
-  }
-  rail : CanalIron { Position: {-0.4, 1.08, side * 0.7}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.024, length: 1.2, segments: 8} }
-}
+  template LockSignal {
+    prop lit: bool = false
 
-template LockGateLeaf : LockControl {
-  prop side: f32 = 1
-  prop top: bool = false
-  prop bottom: f32 = -4.5
-
-  const open = (top && lock_top_gate) || (!top && lock_bottom_gate)
-  const height = 0.35 - bottom
-  const middle = (0.35 + bottom) / 2
-
-  Rotation: {0, side * (open ? 1.46 : 0.18), 0}
-  Transition: [
-    Rotation: {duration: 3.5, timing_function: EaseInOut},
-    Tint: {duration: 0.12}
-  ]
-
-  LockGateBody body(side: side, bottom: bottom, height: height, middle: middle)
-
-  async {
-    while true {
-      await on.click(this)
-      if lock_busy || top != lock_high {
-        continue
-      }
-      if top {
-        lock_top_gate = !lock_top_gate
-      } else {
-        lock_bottom_gate = !lock_bottom_gate
-      }
-      hover = false
-      emit LockBusy(seconds: 3.6)
+    foot : CanalDarkStone { Position: {0, 0.08, 0}; RoundedBox: {0.4, 0.16, 0.4, 0.03, segments: 1} }
+    post : CanalWhite { Position: {0, 0.82, 0}; Cylinder: {radius: 0.05, length: 1.34, segments: 12, smooth: true} }
+    head : CanalBlack { Position: {0, 1.62, 0}; RoundedBox: {0.3, 0.42, 0.3, 0.05, segments: 2} }
+    hood_e : CanalBlack { Position: {0, 1.74, 0.17}; Box: {0.24, 0.02, 0.1} }
+    lamp {
+      Position: {0, 1.62, 0.08}
+      Sphere: {radius: 0.11, segments: 16, smooth: true}
+      Rgb: lit ? {120, 240, 130} : {240, 80, 60}
+      Emissive: {strength: 3, color: lit ? {90, 255, 110} : {255, 60, 40}}
+      Transition: [Rgb: {duration: 1}, Emissive: {duration: 1}]
     }
-  }
-}
-
-template LockSignal {
-  prop lit: bool = false
-
-  foot : CanalDarkStone { Position: {0, 0.08, 0}; RoundedBox: {0.4, 0.16, 0.4, 0.03, segments: 1} }
-  post : CanalWhite { Position: {0, 0.82, 0}; Cylinder: {radius: 0.05, length: 1.34, segments: 12, smooth: true} }
-  head : CanalBlack { Position: {0, 1.62, 0}; RoundedBox: {0.3, 0.42, 0.3, 0.05, segments: 2} }
-  hood_e : CanalBlack { Position: {0, 1.74, 0.17}; Box: {0.24, 0.02, 0.1} }
-  lamp {
-    Position: {0, 1.62, 0.08}
-    Sphere: {radius: 0.11, segments: 16, smooth: true}
-    Rgb: lit ? {120, 240, 130} : {240, 80, 60}
-    Emissive: {strength: 3, color: lit ? {90, 255, 110} : {255, 60, 40}}
-    Transition: [Rgb: {duration: 1}, Emissive: {duration: 1}]
   }
 }

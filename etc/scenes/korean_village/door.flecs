@@ -4,30 +4,32 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanDoor {
-  { (IsA, KoreanLitPaper); Position: {}; Box: {1.38, 1.68, 0.06} }
-  for side in 0..2 {
-    { (IsA, KoreanTimber); Position: {(side - 0.5) * 1.4, 0, 0.05}; Box: {0.07, 1.82, 0.1} }
-    { (IsA, KoreanTimber); Position: {0, (side - 0.5) * 1.76, 0.05}; Box: {1.48, 0.075, 0.1} }
-  }
-  for bar in 0..9 {
-    { Position: {(bar - 4) * 0.15, 0.2, 0.06}; Box: {0.025, 1.3, 0.045}; Rgb: {125, 87, 53} }
-  }
-  for bar in 0..8 {
-    { Position: {0, (bar - 3) * 0.16, 0.065}; Box: {1.38, 0.025, 0.045}; Rgb: {125, 87, 53} }
-  }
-  for leaf in 0..2 {
-    const x = (leaf - 0.5) * 0.68
-    { (IsA, KoreanTimber); Position: {x, -0.64, 0.06}; Box: {0.64, 0.42, 0.06} }
-    { Position: {x, -0.64, 0.095}; Box: {0.5, 0.29, 0.02}; Rgb: {118, 74, 46}; PbrMaterial: {roughness: 0.8} }
-    { (IsA, KoreanTimber); Position: {x, -0.42, 0.085}; Box: {0.64, 0.05, 0.05} }
-  }
-  { (IsA, KoreanTimber); Position: {0, 0, 0.09}; Box: {0.06, 1.74, 0.07} }
-  for side in 0..2 {
-    { Position: {(side - 0.5) * 0.17, -0.17, 0.14}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.045, tube: 0.009, segments: 12, rings: 6}; Rgb: {70, 63, 48}; PbrMaterial: {metallic: 0.6, roughness: 0.5} }
-    { (IsA, KoreanIron); Position: {(side - 0.5) * 0.17, -0.13, 0.13}; Cylinder: {radius: 0.022, length: 0.012, segments: 10}; Rotation: {math.PI / 2, 0, 0} }
-    for hinge in 0..2 {
-      { (IsA, KoreanIron); Position: {(side - 0.5) * 1.3, -0.5 + hinge * 1, 0.11}; Box: {0.15, 0.05, 0.015} }
+assets {
+  template KoreanDoor {
+    { (IsA, KoreanLitPaper); Position: {}; Box: {1.38, 1.68, 0.06} }
+    for side in 0..2 {
+      { (IsA, KoreanTimber); Position: {(side - 0.5) * 1.4, 0, 0.05}; Box: {0.07, 1.82, 0.1} }
+      { (IsA, KoreanTimber); Position: {0, (side - 0.5) * 1.76, 0.05}; Box: {1.48, 0.075, 0.1} }
+    }
+    for bar in 0..9 {
+      { Position: {(bar - 4) * 0.15, 0.2, 0.06}; Box: {0.025, 1.3, 0.045}; Rgb: {125, 87, 53} }
+    }
+    for bar in 0..8 {
+      { Position: {0, (bar - 3) * 0.16, 0.065}; Box: {1.38, 0.025, 0.045}; Rgb: {125, 87, 53} }
+    }
+    for leaf in 0..2 {
+      const x = (leaf - 0.5) * 0.68
+      { (IsA, KoreanTimber); Position: {x, -0.64, 0.06}; Box: {0.64, 0.42, 0.06} }
+      { Position: {x, -0.64, 0.095}; Box: {0.5, 0.29, 0.02}; Rgb: {118, 74, 46}; PbrMaterial: {roughness: 0.8} }
+      { (IsA, KoreanTimber); Position: {x, -0.42, 0.085}; Box: {0.64, 0.05, 0.05} }
+    }
+    { (IsA, KoreanTimber); Position: {0, 0, 0.09}; Box: {0.06, 1.74, 0.07} }
+    for side in 0..2 {
+      { Position: {(side - 0.5) * 0.17, -0.17, 0.14}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.045, tube: 0.009, segments: 12, rings: 6}; Rgb: {70, 63, 48}; PbrMaterial: {metallic: 0.6, roughness: 0.5} }
+      { (IsA, KoreanIron); Position: {(side - 0.5) * 0.17, -0.13, 0.13}; Cylinder: {radius: 0.022, length: 0.012, segments: 10}; Rotation: {math.PI / 2, 0, 0} }
+      for hinge in 0..2 {
+        { (IsA, KoreanIron); Position: {(side - 0.5) * 1.3, -0.5 + hinge * 1, 0.11}; Box: {0.15, 0.05, 0.015} }
+      }
     }
   }
 }

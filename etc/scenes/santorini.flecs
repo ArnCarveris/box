@@ -26,37 +26,40 @@ using box.controllers
 using box.text
 using box.movement
 using box.texture
+using assets
 
 $ {
   Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true,
     diffuse_transmission: true}
 }
 
-window { Surface: {width: 1440, height: 960, vsync: true} }
-contact_shadows { Gtao: {radius: 0.6, final_value_power: 2.2} }
-sun_bloom { Bloom: {intensity: 0.07, threshold: 1.5} }
-tonemap { Tonemap: {} }
-smaa { Smaa: {} }
-clouds { TextureGen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
-
-santorini {
-  Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true, diffuse_transmission: true}
+$ {
   LightBake: {probe_spacing: 1.4, bounds_padding: 0.3, bounces: 1, capture_size: 32, budget_ms: 8}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 8}
   AmbientLight: {sky: {153, 198, 228}, ground: {134, 113, 91}, intensity: 0.45}
+}
 
-  camera {
-    Position: {-32, 28, 42}
-    Rotation: {-0.46, -0.651, 0}
-    Camera: {fov: 46, near_: 0.1, far_: 180}
-    CameraController: {speed: 12}
-  }
-  aegean_sun {
-    Rotation: {0.83, -2.3, 0}
-    DirectionalLight: {intensity: 2.1 * math.PI}
-    Rgb: {255, 237, 208}
-    LightCookie: {texture: clouds, size: 48, height: 40, velocity: {0.7, 0.25}, threshold: 0.42, softness: 0.22, strength: 0.55}
-  }
+window { Surface: {width: 1440, height: 960, vsync: true} }
+
+assets {
+  clouds { TextureGen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
+}
+
+camera {
+  Position: {-32, 28, 42}
+  Rotation: {-0.46, -0.651, 0}
+  Camera: {fov: 46, near_: 0.1, far_: 180}
+  CameraController: {speed: 12}
+}
+
+sky {
+  Rotation: {0.83, -2.3, 0}
+  DirectionalLight: {intensity: 2.1 * math.PI}
+  Rgb: {255, 237, 208}
+  LightCookie: {texture: assets.clouds, size: 48, height: 40, velocity: {0.7, 0.25}, threshold: 0.42, softness: 0.22, strength: 0.55}
+}
+
+santorini {
   sea_base { Position: {0, -0.8, 1}; RoundedBox: {37, 1.4, 33, 0.65, segments: 6}; Rgb: {19, 89, 133} }
   water {
     Position: {0, -0.06, 1}
@@ -269,12 +272,17 @@ santorini {
   sea_reflection { Position: {0, 2.2, 11.5}; ReflectionProbe: {extent: {17, 3, 6}, blend: 1, priority: 1, projection: {18, 9, 15}, offset: {0, 5, -7}} }
 }
 
-main_view {
+view {
+  gtao { Gtao: {radius: 0.6, final_value_power: 2.2} }
+  bloom { Bloom: {intensity: 0.07, threshold: 1.5} }
+  tonemap { Tonemap: {} }
+  smaa { Smaa: {} }
+
   View: {
-    camera: santorini.camera,
+    camera: camera,
     clear: {enabled: true, color: {139, 191, 214, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 120},
-    effects: [{effect: contact_shadows}, {effect: sun_bloom}, {effect: tonemap}, {effect: smaa}]
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

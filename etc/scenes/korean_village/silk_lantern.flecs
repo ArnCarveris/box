@@ -5,25 +5,27 @@ using box.geometry
 using box.material
 using box.light
 
-template KoreanSilkLantern {
-  prop drop: f32 = 0.35
-  { (IsA, KoreanIron); Position: {0, -drop / 2, 0}; Cylinder: {radius: 0.009, length: drop, segments: 6} }
-  {
-    Position: {0, -drop, 0}
-    { Position: {0, -0.06, 0}; Frustum: {radius_bottom: 0.15, radius_top: 0.05, length: 0.1, segments: 8}; Rgb: {39, 70, 122}; PbrMaterial: {roughness: 0.6} }
-    { (IsA, KoreanSilk); Position: {0, -0.25, 0}; Rotation: {0, math.PI / 8, 0}; Cylinder: {radius: 0.15, length: 0.28, segments: 8} }
-    for rib in 0..8 {
-      const a = rib * math.PI / 4
-      { (IsA, KoreanGold); Position: {math.sin(a) * 0.145, -0.25, math.cos(a) * 0.145}; Box: {0.012, 0.3, 0.012} }
+assets {
+  template KoreanSilkLantern {
+    prop drop: f32 = 0.35
+    { (IsA, KoreanIron); Position: {0, -drop / 2, 0}; Cylinder: {radius: 0.009, length: drop, segments: 6} }
+    {
+      Position: {0, -drop, 0}
+      { Position: {0, -0.06, 0}; Frustum: {radius_bottom: 0.15, radius_top: 0.05, length: 0.1, segments: 8}; Rgb: {39, 70, 122}; PbrMaterial: {roughness: 0.6} }
+      { (IsA, KoreanSilk); Position: {0, -0.25, 0}; Rotation: {0, math.PI / 8, 0}; Cylinder: {radius: 0.15, length: 0.28, segments: 8} }
+      for rib in 0..8 {
+        const a = rib * math.PI / 4
+        { (IsA, KoreanGold); Position: {math.sin(a) * 0.145, -0.25, math.cos(a) * 0.145}; Box: {0.012, 0.3, 0.012} }
+      }
+      for band in 0..2 {
+        { Position: {0, -0.25 + (band - 0.5) * 0.2, 0}; Torus: {radius: 0.148, tube: 0.008, segments: 16, rings: 4}; Rgb: {39, 70, 122} }
+      }
+      { Position: {0, -0.42, 0}; Frustum: {radius_bottom: 0.05, radius_top: 0.15, length: 0.06, segments: 8}; Rgb: {39, 70, 122}; PbrMaterial: {roughness: 0.6} }
+      { (IsA, KoreanGold); Position: {0, -0.47, 0}; Sphere: {radius: 0.028, segments: 8} }
+      for thread in 0..3 {
+        { Position: {(thread - 1) * 0.02, -0.57, 0}; Cylinder: {radius: 0.008, length: 0.18, segments: 5}; Rgb: {198, 60, 50} }
+      }
+      { Position: {0, -0.25, 0}; PointLight: {intensity: 1.2, range: 4, shadows: true, shadow_resolution: 256}; Rgb: {255, 150, 92} }
     }
-    for band in 0..2 {
-      { Position: {0, -0.25 + (band - 0.5) * 0.2, 0}; Torus: {radius: 0.148, tube: 0.008, segments: 16, rings: 4}; Rgb: {39, 70, 122} }
-    }
-    { Position: {0, -0.42, 0}; Frustum: {radius_bottom: 0.05, radius_top: 0.15, length: 0.06, segments: 8}; Rgb: {39, 70, 122}; PbrMaterial: {roughness: 0.6} }
-    { (IsA, KoreanGold); Position: {0, -0.47, 0}; Sphere: {radius: 0.028, segments: 8} }
-    for thread in 0..3 {
-      { Position: {(thread - 1) * 0.02, -0.57, 0}; Cylinder: {radius: 0.008, length: 0.18, segments: 5}; Rgb: {198, 60, 50} }
-    }
-    { Position: {0, -0.25, 0}; PointLight: {intensity: 1.2, range: 4, shadows: true, shadow_resolution: 256}; Rgb: {255, 150, 92} }
   }
 }

@@ -11,60 +11,62 @@ using box.surface
 using box.controllers
 using box.text
 
-template CheeseWheel {
-  prop radius: f32 = 0.42
-  prop height: f32 = 0.24
-  prop tint: Rgb = {222, 157, 48}
-  prop wax: bool = false
+assets {
+  template CheeseWheel {
+    prop radius: f32 = 0.42
+    prop height: f32 = 0.24
+    prop tint: Rgb = {222, 157, 48}
+    prop wax: bool = false
 
-  body {
-    Position: {0, height / 2, 0}
-    Cylinder: {radius: radius, length: height, segments: 32, smooth: true}
-    Rgb: tint
-    PbrMaterial: {roughness: 0.72}
-    ClearCoat: {strength: wax ? 0.85 : 0, roughness: 0.18}
-  }
-  for side in 0..2 {
-    {
-      Position: {0, 0.018 + side * (height - 0.036), 0}
-      Torus: {radius: radius - 0.018, tube: 0.024, segments: 32, rings: 6}
+    body {
+      Position: {0, height / 2, 0}
+      Cylinder: {radius: radius, length: height, segments: 32, smooth: true}
       Rgb: tint
+      PbrMaterial: {roughness: 0.72}
+      ClearCoat: {strength: wax ? 0.85 : 0, roughness: 0.18}
     }
-  }
-  top {
-    Position: {0, height + 0.003, 0}
-    Cylinder: {radius: radius * 0.9, length: 0.012, segments: 32}
-    Rgb: {245, 208, 116}
-  }
-  if wax {
-    seal {
-      Position: {0, height + 0.014, 0}
-      Cylinder: {radius: radius * 0.35, length: 0.012, segments: 20}
-      Rgb: MarketCream
-    }
-    seal_ring {
-      Position: {0, height + 0.023, 0}
-      Torus: {radius: radius * 0.24, tube: 0.009, segments: 20, rings: 4}
-      Rgb: tint
-    }
-  } else {
-    for i in 0..11 {
-      const angle = i * 2.4
-      const reach = radius * (0.23 + i % 3 * 0.22)
+    for side in 0..2 {
       {
-        Position: {math.sin(angle) * reach, height + 0.011, math.cos(angle) * reach}
-        Scale: {1, 0.14, 0.8}
-        Sphere: {radius: radius * (0.055 + i % 3 * 0.018), segments: 10, smooth: true}
-        Rgb: {187, 129, 47}
+        Position: {0, 0.018 + side * (height - 0.036), 0}
+        Torus: {radius: radius - 0.018, tube: 0.024, segments: 32, rings: 6}
+        Rgb: tint
       }
     }
-    for i in 0..18 {
-      const angle = i * math.PI / 9
-      {
-        Position: {math.sin(angle) * (radius + 0.001), height * 0.51, math.cos(angle) * (radius + 0.001)}
-        Rotation: {0, angle, 0}
-        Box: {0.018, height * 0.65, 0.008}
-        Rgb: {196, 135, 43}
+    top {
+      Position: {0, height + 0.003, 0}
+      Cylinder: {radius: radius * 0.9, length: 0.012, segments: 32}
+      Rgb: {245, 208, 116}
+    }
+    if wax {
+      seal {
+        Position: {0, height + 0.014, 0}
+        Cylinder: {radius: radius * 0.35, length: 0.012, segments: 20}
+        Rgb: MarketCream
+      }
+      seal_ring {
+        Position: {0, height + 0.023, 0}
+        Torus: {radius: radius * 0.24, tube: 0.009, segments: 20, rings: 4}
+        Rgb: tint
+      }
+    } else {
+      for i in 0..11 {
+        const angle = i * 2.4
+        const reach = radius * (0.23 + i % 3 * 0.22)
+        {
+          Position: {math.sin(angle) * reach, height + 0.011, math.cos(angle) * reach}
+          Scale: {1, 0.14, 0.8}
+          Sphere: {radius: radius * (0.055 + i % 3 * 0.018), segments: 10, smooth: true}
+          Rgb: {187, 129, 47}
+        }
+      }
+      for i in 0..18 {
+        const angle = i * math.PI / 9
+        {
+          Position: {math.sin(angle) * (radius + 0.001), height * 0.51, math.cos(angle) * (radius + 0.001)}
+          Rotation: {0, angle, 0}
+          Box: {0.018, height * 0.65, 0.008}
+          Rgb: {196, 135, 43}
+        }
       }
     }
   }

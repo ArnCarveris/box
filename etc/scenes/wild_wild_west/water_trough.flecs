@@ -7,12 +7,14 @@ using box.light
 using box.text
 
 
-template WestWaterTrough {
-  bottom : WestTimber { Position: {0, 0.2, 0}; Box: {2.7, 0.2, 0.95} }
-  for side in 0..2 {
-    { Position: {0, 0.45, (side - 0.5) * 0.95}; Box: {2.8, 0.6, 0.1}; Rgb: {125, 89, 52} }
-    { Position: {(side - 0.5) * 2.7, 0.45, 0}; Box: {0.1, 0.6, 0.95}; Rgb: {125, 89, 52} }
-    { (IsA, WestIron); Position: {(side - 0.5) * 1.8, 0.45, 0.535}; Box: {0.07, 0.62, 0.035} }
+assets {
+  template WestWaterTrough {
+    bottom : WestTimber { Position: {0, 0.2, 0}; Box: {2.7, 0.2, 0.95} }
+    for side in 0..2 {
+      { Position: {0, 0.45, (side - 0.5) * 0.95}; Box: {2.8, 0.6, 0.1}; Rgb: {125, 89, 52} }
+      { Position: {(side - 0.5) * 2.7, 0.45, 0}; Box: {0.1, 0.6, 0.95}; Rgb: {125, 89, 52} }
+      { (IsA, WestIron); Position: {(side - 0.5) * 1.8, 0.45, 0.535}; Box: {0.07, 0.62, 0.035} }
+    }
+    water { Position: {0, 0.62, 0}; Box: {2.6, 0.025, 0.84}; Rgb: {150, 190, 176}; PbrMaterial: {roughness: 0.06}; Transmission: {transmission_factor: 0.85, ior: 1.33, thickness_factor: 0.4, attenuation_distance: 0.35, attenuation_color: {63, 99, 91}} }
   }
-  water { Position: {0, 0.62, 0}; Box: {2.6, 0.025, 0.84}; Rgb: {150, 190, 176}; PbrMaterial: {roughness: 0.06}; Transmission: {transmission_factor: 0.85, ior: 1.33, thickness_factor: 0.4, attenuation_distance: 0.35, attenuation_color: {63, 99, 91}} }
 }

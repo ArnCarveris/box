@@ -18,6 +18,7 @@ using flecs.script.math
 
 $ {
   Scene: {blend_modes: true}
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
 window {
@@ -33,7 +34,7 @@ camera {
   CameraController: {}
 }
 
-world_view {
+view {
   View: {
     camera: camera,
     clear: {enabled: true, color: {120, 150, 190, 255}},
@@ -41,158 +42,158 @@ world_view {
   }
 }
 
-sun {
+sky {
   Rotation: {0.7359, 2.3726, 0}
   DirectionalLight: {intensity: 2 * PI}
   Rgb: {255, 244, 225}
 }
 
-$ {
-  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
-}
+assets {
+  template Row {
+    prop label: string = "Item"
+    prop value: string = "0"
 
-ground {
-  Position: {0, -0.05, 0}
-  Box: {30, 0.1, 30}
-  Rgb: {140, 150, 125}
-  PbrMaterial: {roughness: 0.9}
-}
-
-hero {
-  Position: {-1.2, 0.9, 1}
-  Capsule: {segments: 24, smooth: true, length: 0.8, radius: 0.45}
-  Rgb: {220, 90, 60}
-}
-
-crate {
-  Position: {1.6, 0.5, 1.4}
-  Rotation: {0, 0.4, 0}
-  Box: {1, 1, 1}
-  Rgb: {200, 150, 80}
-}
-
-// World space UI: layout content in the 3D scene, logical pixels scaled to world units
-
-template Row {
-  prop label: string = "Item"
-  prop value: string = "0"
-
-  Layout: {direction: Row, spacing: 8, padding: {6, 6, 8, 8}, v: Middle}
-  LayoutItem: {width: {mode: Grow}}
-  Rect: {1, 1}
-  Rgb: {52, 58, 76}
-  Border: {radius: 6}
-
-  name {
-    Text: {value: label, size: 16}
-    Rgb: {225, 230, 240}
-  }
-
-  gap {
+    Layout: {direction: Row, spacing: 8, padding: {6, 6, 8, 8}, v: Middle}
     LayoutItem: {width: {mode: Grow}}
-  }
-
-  amount {
-    Text: {value: value, size: 16}
-    Rgb: {255, 220, 90}
-  }
-}
-
-board {
-  Position: {-2.8, 1.8, 0.6}
-  Rotation: {0, 0.5, 0}
-  Scale: {0.008, 0.008, 0.008}
-  Layout: {direction: Column, spacing: 8, padding: {14, 14, 16, 16}}
-  LayoutItem: {width: {mode: Fixed, value: 300}}
-  Rect: {1, 1}
-  Rgb: {30, 34, 46}
-  Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
-  BoxShadow: {offset_y: -6, blur: 18, color: {0, 0, 0, 110}}
-
-  title {
-    Text: {value: "Quest Board", size: 28}
-    Rgb: {255, 255, 255}
-  }
-
-  wolves {
-    Row: {label: "Wolves", value: "3 / 5"}
-  }
-
-  herbs {
-    Row: {label: "Herbs", value: "8 / 8"}
-  }
-}
-
-// Render-to-texture UI: a surface with a texture renders the view of a UI scene and the
-// slices of a curved screen sample that texture
-
-screen_texture {}
-
-screen_ui {
-  Scene: {blend_modes: true}
-
-  camera {
-    Position: {0, 0, 100}
-    Camera: {ortho: true, ortho_scale: 1}
-  }
-
-  dashboard {
-    Position: {0, 0, 0}
-    Layout: {direction: Column, spacing: 10, padding: {16, 16, 20, 20}}
-    LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
     Rect: {1, 1}
-    Rgb: {14, 22, 40}
-    Border: {width: 3, color: {60, 200, 230, 255}}
+    Rgb: {52, 58, 76}
+    Border: {radius: 6}
+
+    name {
+      Text: {value: label, size: 16}
+      Rgb: {225, 230, 240}
+    }
+
+    gap {
+      LayoutItem: {width: {mode: Grow}}
+    }
+
+    amount {
+      Text: {value: value, size: 16}
+      Rgb: {255, 220, 90}
+    }
+  }
+
+  screen_texture {}
+
+  template Slice {
+    prop offset: f32 = 0
+
+    Quad: {0.305, 0.94}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 0, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {albedo: screen_texture, emissive: screen_texture}
+    TextureTransform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
+    TextureWrap: WrapClamp
+  }
+}
+
+ui {
+  ground {
+    Position: {0, -0.05, 0}
+    Box: {30, 0.1, 30}
+    Rgb: {140, 150, 125}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  hero {
+    Position: {-1.2, 0.9, 1}
+    Capsule: {segments: 24, smooth: true, length: 0.8, radius: 0.45}
+    Rgb: {220, 90, 60}
+  }
+
+  crate {
+    Position: {1.6, 0.5, 1.4}
+    Rotation: {0, 0.4, 0}
+    Box: {1, 1, 1}
+    Rgb: {200, 150, 80}
+  }
+
+  // World space UI: layout content in the 3D scene, logical pixels scaled to world units
+
+  board {
+    Position: {-2.8, 1.8, 0.6}
+    Rotation: {0, 0.5, 0}
+    Scale: {0.008, 0.008, 0.008}
+    Layout: {direction: Column, spacing: 8, padding: {14, 14, 16, 16}}
+    LayoutItem: {width: {mode: Fixed, value: 300}}
+    Rect: {1, 1}
+    Rgb: {30, 34, 46}
+    Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
+    BoxShadow: {offset_y: -6, blur: 18, color: {0, 0, 0, 110}}
 
     title {
-      Text: {value: "REACTOR", size: 36}
-      Rgb: {120, 230, 250}
+      Text: {value: "Quest Board", size: 28}
+      Rgb: {255, 255, 255}
     }
 
-    status {
-      Text: {value: "Output 82%   Coolant low", size: 22}
-      Rgb: {250, 210, 90}
-      TextSpans: {spans: [{start: 13, end: 24, color: {250, 110, 80, 255}, bold: true}]}
+    wolves {
+      assets.Row: {label: "Wolves", value: "3 / 5"}
     }
-  }
-}
 
-screen_views {
-  view {
-    View: {
-      camera: screen_ui.camera,
-      clear: {enabled: true, color: {0, 0, 0, 255}},
-      lighting: {enabled: false},
-      culling: {enabled: false}
+    herbs {
+      assets.Row: {label: "Herbs", value: "8 / 8"}
     }
   }
-}
 
-screen_surface {
-  Surface: {width: 512, height: 160, texture: screen_texture, view_root: screen_views}
-}
+  // Render-to-texture UI: a surface with a texture renders the view of a UI scene and the
+  // slices of a curved screen sample that texture
 
-template Slice {
-  prop offset: f32 = 0
+  screen_ui {
+    Scene: {blend_modes: true}
 
-  Quad: {0.305, 0.94}
-  Rgb: {0, 0, 0}
-  PbrMaterial: {metallic: 0, roughness: 1}
-  Emissive: {strength: 1, color: {255, 255, 255}}
-  PbrTextures: {albedo: screen_texture, emissive: screen_texture}
-  TextureTransform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
-  TextureWrap: WrapClamp
-}
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
 
-screen {
-  Position: {2.6, 2.1, 1.8}
+    dashboard {
+      Position: {0, 0, 0}
+      Layout: {direction: Column, spacing: 10, padding: {16, 16, 20, 20}}
+      LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
+      Rect: {1, 1}
+      Rgb: {14, 22, 40}
+      Border: {width: 3, color: {60, 200, 230, 255}}
 
-  for i in 0..16 {
-    "slice_{i}" {
-      const angle = 0.75 - i * 0.1
-      Position: {-3 * sin(angle), 0, -3 * cos(angle)}
-      Rotation: {0, angle, 0}
-      Slice: {offset: i * 0.0625}
+      title {
+        Text: {value: "REACTOR", size: 36}
+        Rgb: {120, 230, 250}
+      }
+
+      status {
+        Text: {value: "Output 82%   Coolant low", size: 22}
+        Rgb: {250, 210, 90}
+        TextSpans: {spans: [{start: 13, end: 24, color: {250, 110, 80, 255}, bold: true}]}
+      }
+    }
+  }
+
+  screen_views {
+    view {
+      View: {
+        camera: screen_ui.camera,
+        clear: {enabled: true, color: {0, 0, 0, 255}},
+        lighting: {enabled: false},
+        culling: {enabled: false}
+      }
+    }
+  }
+
+  screen_surface {
+    Surface: {width: 512, height: 160, texture: assets.screen_texture, view_root: screen_views}
+  }
+
+  screen {
+    Position: {2.6, 2.1, 1.8}
+
+    for i in 0..16 {
+      "slice_{i}" {
+        const angle = 0.75 - i * 0.1
+        Position: {-3 * sin(angle), 0, -3 * cos(angle)}
+        Rotation: {0, angle, 0}
+        assets.Slice: {offset: i * 0.0625}
+      }
     }
   }
 }
@@ -240,7 +241,7 @@ hud {
 
   // A nameplate that follows the hero: its position is projected through the 3D view
   hero_plate {
-    ProjectedAnchor: {target: hero, view: world_view, offset: {0, 1.2, 0}}
+    ProjectedAnchor: {target: ui.hero, view: view, offset: {0, 1.2, 0}}
     Layout: {direction: Column, spacing: 3, padding: {4, 4, 6, 6}, h: Center}
     Rect: {1, 1}
     Rgb: {16, 20, 28}
@@ -257,64 +258,64 @@ hud {
       Rgb: {90, 210, 110}
     }
   }
-}
 
-hud_view {
-  View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
-}
-
-// A menu is another UI scene, stacked over the HUD because its view comes later
-
-menu {
-  Scene: {blend_modes: true}
-
-  camera {
-    Position: {0, 0, 100}
-    Camera: {ortho: true, ortho_scale: 1}
+  view {
+    View: {camera: camera, lighting: {enabled: false}, culling: {enabled: false}}
   }
 
-  panel {
-    Position: {470, 280, 0}
-    Layout: {direction: Column, spacing: 8, padding: {12, 12, 14, 14}, h: Center}
-    LayoutItem: {width: {mode: Fixed, value: 200}}
-    Rect: {1, 1}
-    Rgb: {34, 38, 50}
-    Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
-    BoxShadow: {offset_y: -6, blur: 20, color: {0, 0, 0, 140}}
+  // A menu is another UI scene, stacked over the HUD because its view comes later
 
-    title {
-      Text: {value: "Menu", size: 20}
-      Rgb: {255, 255, 255}
+  menu {
+    Scene: {blend_modes: true}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
     }
 
-    resume {
-      Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
-      LayoutItem: {width: {mode: Grow}}
+    panel {
+      Position: {470, 280, 0}
+      Layout: {direction: Column, spacing: 8, padding: {12, 12, 14, 14}, h: Center}
+      LayoutItem: {width: {mode: Fixed, value: 200}}
       Rect: {1, 1}
-      Rgb: {70, 150, 90}
-      Border: {radius: 6}
+      Rgb: {34, 38, 50}
+      Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
+      BoxShadow: {offset_y: -6, blur: 20, color: {0, 0, 0, 140}}
 
-      text {
-        Text: {value: "Resume", size: 16}
+      title {
+        Text: {value: "Menu", size: 20}
         Rgb: {255, 255, 255}
+      }
+
+      resume {
+        Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
+        LayoutItem: {width: {mode: Grow}}
+        Rect: {1, 1}
+        Rgb: {70, 150, 90}
+        Border: {radius: 6}
+
+        text {
+          Text: {value: "Resume", size: 16}
+          Rgb: {255, 255, 255}
+        }
+      }
+
+      quit {
+        Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
+        LayoutItem: {width: {mode: Grow}}
+        Rect: {1, 1}
+        Rgb: {170, 70, 60}
+        Border: {radius: 6}
+
+        text {
+          Text: {value: "Quit", size: 16}
+          Rgb: {255, 255, 255}
+        }
       }
     }
 
-    quit {
-      Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
-      LayoutItem: {width: {mode: Grow}}
-      Rect: {1, 1}
-      Rgb: {170, 70, 60}
-      Border: {radius: 6}
-
-      text {
-        Text: {value: "Quit", size: 16}
-        Rgb: {255, 255, 255}
-      }
+    view {
+      View: {camera: camera, lighting: {enabled: false}, culling: {enabled: false}}
     }
   }
-}
-
-menu_view {
-  View: {camera: menu.camera, lighting: {enabled: false}, culling: {enabled: false}}
 }

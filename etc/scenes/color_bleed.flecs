@@ -3,7 +3,7 @@
 // light, so the white surfaces next to the red wall turn pink and those next to the green wall
 // turn green as the bounces bake. The room is made of quads that face inward: the bake sees a
 // closed room, the camera looks in through the front. Fly with WASD (QE for down/up, Shift to
-// go faster), hold the right mouse button to look around. Set room.LightBake.bounces to 0, 1 or
+// go faster), hold the right mouse button to look around. Set LightBake.bounces to 0, 1 or
 // 3 to compare.
 
 using box.transform
@@ -18,35 +18,41 @@ using box.controllers
 
 $ {
   Scene: {baked: true}
+  LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 }
 
 window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
 
-tonemap {
-  Tonemap: {}
+camera {
+  Position: {0, 2, 7.6}
+  Camera: {fov: 46}
+  CameraController: {speed: 2, boost: 3}
 }
 
-smaa {
-  Smaa: {}
+sky {
+  DirectionalLight: {intensity: 0}
 }
 
-room {
-  Scene: {baked: true}
-  LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
-  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
-
-  camera {
-    Position: {0, 2, 7.6}
-    Camera: {fov: 46}
-    CameraController: {speed: 2, boost: 3}
+view {
+  tonemap {
+    Tonemap: {}
   }
 
-  darkness {
-    DirectionalLight: {intensity: 0}
+  smaa {
+    Smaa: {}
   }
 
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {0, 0, 0, 255}},
+    effects: [{effect: tonemap}, {effect: smaa}]
+  }
+}
+
+color_bleed {
   floor {
     Position: {0, 0, 0}
     Rotation: {-1.5708, 0, 0}
@@ -114,13 +120,5 @@ room {
     Rotation: {1.5708, 0, 0}
     SpotLight: {intensity: 35 * flecs.script.math.PI, range: 10, inner_angle: 15, outer_angle: 25}
     Rgb: {255, 255, 255}
-  }
-}
-
-main_view {
-  View: {
-    camera: room.camera,
-    clear: {enabled: true, color: {0, 0, 0, 255}},
-    effects: [{effect: tonemap}, {effect: smaa}]
   }
 }

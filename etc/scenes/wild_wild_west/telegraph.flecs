@@ -7,35 +7,37 @@ using box.light
 using box.text
 
 
-template WestTelegraph {
-  pole : WestTimber { Position: {0, 2.9, 0}; Cylinder: {radius: 0.11, length: 5.8, segments: 10} }
-  for row in 0..2 {
-    { Position: {0, 5 + row * 0.6, 0}; Box: {2.1, 0.13, 0.13}; Rgb: {103, 64, 38} }
-    for i in 0..4 {
-      { Position: {-0.85 + i * 0.57, 5.14 + row * 0.6, 0}; Cylinder: {radius: 0.07, length: 0.2, segments: 12}; Rgb: {92, 164, 150}; PbrMaterial: {roughness: 0.1}; Transmission: {transmission_factor: 0.8, ior: 1.5, thickness_factor: 0.1, attenuation_distance: 0.08, attenuation_color: {60, 140, 120}} }
-      { Position: {-0.85 + i * 0.57, 5.15 + row * 0.6, 0}; Torus: {radius: 0.075, tube: 0.025, segments: 12, rings: 6}; Rgb: {92, 146, 133} }
+assets {
+  template WestTelegraph {
+    pole : WestTimber { Position: {0, 2.9, 0}; Cylinder: {radius: 0.11, length: 5.8, segments: 10} }
+    for row in 0..2 {
+      { Position: {0, 5 + row * 0.6, 0}; Box: {2.1, 0.13, 0.13}; Rgb: {103, 64, 38} }
+      for i in 0..4 {
+        { Position: {-0.85 + i * 0.57, 5.14 + row * 0.6, 0}; Cylinder: {radius: 0.07, length: 0.2, segments: 12}; Rgb: {92, 164, 150}; PbrMaterial: {roughness: 0.1}; Transmission: {transmission_factor: 0.8, ior: 1.5, thickness_factor: 0.1, attenuation_distance: 0.08, attenuation_color: {60, 140, 120}} }
+        { Position: {-0.85 + i * 0.57, 5.15 + row * 0.6, 0}; Torus: {radius: 0.075, tube: 0.025, segments: 12, rings: 6}; Rgb: {92, 146, 133} }
+      }
     }
+    WestBeam(ax: -0.8, ay: 5, az: 0, bx: 0, by: 4.4, bz: 0, width: 0.065) {}
+    WestBeam(ax: 0.8, ay: 5, az: 0, bx: 0, by: 4.4, bz: 0, width: 0.065) {}
   }
-  WestBeam(ax: -0.8, ay: 5, az: 0, bx: 0, by: 4.4, bz: 0, width: 0.065) {}
-  WestBeam(ax: 0.8, ay: 5, az: 0, bx: 0, by: 4.4, bz: 0, width: 0.065) {}
-}
 
-template WestWire {
-  prop length: f32 = 15.6
-  prop height: f32 = 5.44
-  prop sag: f32 = 0.65
-  route {
-    Path3D: {
-      start: {0, height, 0},
-      segments: [
-        {kind: CatmullRom, end: {length * 0.25, height - sag * 0.75, 0}},
-        {kind: CatmullRom, end: {length * 0.5, height - sag, 0}},
-        {kind: CatmullRom, end: {length * 0.75, height - sag * 0.75, 0}},
-        {kind: CatmullRom, end: {length, height, 0}}
-      ]
+  template WestWire {
+    prop length: f32 = 15.6
+    prop height: f32 = 5.44
+    prop sag: f32 = 0.65
+    route {
+      Path3D: {
+        start: {0, height, 0},
+        segments: [
+          {kind: CatmullRom, end: {length * 0.25, height - sag * 0.75, 0}},
+          {kind: CatmullRom, end: {length * 0.5, height - sag, 0}},
+          {kind: CatmullRom, end: {length * 0.75, height - sag * 0.75, 0}},
+          {kind: CatmullRom, end: {length, height, 0}}
+        ]
+      }
     }
+    Sweep: {path: route, profile: WestRoundProfile, scale: {0.01, 0.01}, rings: 48}
+    Rgb: {59, 53, 40}
+    PbrMaterial: {roughness: 0.85}
   }
-  Sweep: {path: route, profile: WestRoundProfile, scale: {0.01, 0.01}, rings: 48}
-  Rgb: {59, 53, 40}
-  PbrMaterial: {roughness: 0.85}
 }

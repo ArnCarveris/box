@@ -7,21 +7,23 @@ using box.light
 using box.text
 
 
-template WestCrate {
-  for side in 0..2 {
-    for row in 0..4 {
-      { Position: {0, 0.11 + row * 0.2, (side - 0.5) * 0.86}; Box: {1, 0.18, 0.06}; Rgb: {163 + row * 4, 116 + row * 3, 66} }
-      { Position: {(side - 0.5) * 0.94, 0.11 + row * 0.2, 0}; Box: {0.06, 0.18, 0.86}; Rgb: {153 + row * 4, 105 + row * 3, 58} }
-    }
-    for end in 0..2 {
-      { Position: {(end - 0.5) * 0.82, 0.4, (side - 0.5) * 0.94}; Box: {0.1, 0.8, 0.08}; Rgb: {115, 75, 40} }
-      for nail in 0..2 {
-        { (IsA, WestIron); Position: {(end - 0.5) * 0.82, 0.1 + nail * 0.6, (side - 0.5) * 1.03}; Sphere: {radius: 0.018, segments: 6} }
+assets {
+  template WestCrate {
+    for side in 0..2 {
+      for row in 0..4 {
+        { Position: {0, 0.11 + row * 0.2, (side - 0.5) * 0.86}; Box: {1, 0.18, 0.06}; Rgb: {163 + row * 4, 116 + row * 3, 66} }
+        { Position: {(side - 0.5) * 0.94, 0.11 + row * 0.2, 0}; Box: {0.06, 0.18, 0.86}; Rgb: {153 + row * 4, 105 + row * 3, 58} }
       }
+      for end in 0..2 {
+        { Position: {(end - 0.5) * 0.82, 0.4, (side - 0.5) * 0.94}; Box: {0.1, 0.8, 0.08}; Rgb: {115, 75, 40} }
+        for nail in 0..2 {
+          { (IsA, WestIron); Position: {(end - 0.5) * 0.82, 0.1 + nail * 0.6, (side - 0.5) * 1.03}; Sphere: {radius: 0.018, segments: 6} }
+        }
+      }
+      WestBeam(ax: -0.38, ay: 0.09, az: (side - 0.5) * 0.95, bx: 0.38, by: 0.71, bz: (side - 0.5) * 0.95, width: 0.075) {}
     }
-    WestBeam(ax: -0.38, ay: 0.09, az: (side - 0.5) * 0.95, bx: 0.38, by: 0.71, bz: (side - 0.5) * 0.95, width: 0.075) {}
-  }
-  for i in 0..5 {
-    { Position: {(i - 2) * 0.19, 0.8, 0}; Box: {0.18, 0.06, 0.92}; Rgb: {171, 123, 74} }
+    for i in 0..5 {
+      { Position: {(i - 2) * 0.19, 0.8, 0}; Box: {0.18, 0.06, 0.92}; Rgb: {171, 123, 74} }
+    }
   }
 }

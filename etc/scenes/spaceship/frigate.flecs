@@ -12,18 +12,20 @@ using box.material
 using box.texture
 using box.light
 
-template Frigate {
-  hull {
-    FrigateHull: {}
-    command { AttachmentFrame: {position: {0, 8, -25}} }
-    port_engine { AttachmentFrame: {position: {-27, -1, -61}} }
-    starboard_engine { AttachmentFrame: {position: {27, -1, -61}} }
-    port_shoulder { AttachmentFrame: {position: {-15, 0, -25}} }
-    starboard_shoulder { AttachmentFrame: {position: {15, 0, -25}} }
+assets {
+  template Frigate {
+    hull {
+      FrigateHull: {}
+      command { AttachmentFrame: {position: {0, 8, -25}} }
+      port_engine { AttachmentFrame: {position: {-27, -1, -61}} }
+      starboard_engine { AttachmentFrame: {position: {27, -1, -61}} }
+      port_shoulder { AttachmentFrame: {position: {-15, 0, -25}} }
+      starboard_shoulder { AttachmentFrame: {position: {15, 0, -25}} }
+    }
+    bridge { FrigateBridge: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: bridge.root}, other: {frame: hull.command}} }
+    starboard_engine { FrigateEngine: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: starboard_engine.root}, other: {frame: hull.starboard_engine}} }
+    port_engine { FrigateEngine: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: port_engine.root}, other: {frame: hull.port_engine}} }
+    starboard_shoulder { FrigateShoulder: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: starboard_shoulder.root}, other: {frame: hull.starboard_shoulder}} }
+    port_shoulder { FrigateShoulder: {side: -1}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: port_shoulder.root}, other: {frame: hull.port_shoulder}} }
   }
-  bridge { FrigateBridge: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: bridge.root}, other: {frame: hull.command}} }
-  starboard_engine { FrigateEngine: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: starboard_engine.root}, other: {frame: hull.starboard_engine}} }
-  port_engine { FrigateEngine: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: port_engine.root}, other: {frame: hull.port_engine}} }
-  starboard_shoulder { FrigateShoulder: {}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: starboard_shoulder.root}, other: {frame: hull.starboard_shoulder}} }
-  port_shoulder { FrigateShoulder: {side: -1}; root { AttachmentFrame: {} }; Align: {target: hull, self: {frame: port_shoulder.root}, other: {frame: hull.port_shoulder}} }
 }

@@ -11,28 +11,30 @@ using box.surface
 using box.controllers
 using box.text
 
-template IslandStairs {
-  prop width: f32 = 1.8
-  prop rise: f32 = 3
-  prop run: f32 = 4.2
-  prop steps: i32 = 16
-  for i in 0..steps {
-    const h = rise * (i + 1) / steps
-    {
-      Position: {0, h / 2, -run * (i + 0.5) / steps}
-      Box: {width, h, run / steps + 0.01}
-      Rgb: IslandPlaster
-    }
-    {
-      Position: {0, h + 0.018, -run * (i + 0.5) / steps}
-      Box: {width + 0.035, 0.035, run / steps - 0.018}
-      Rgb: IslandChalk
-    }
-    for side in 0..2 {
+assets {
+  template IslandStairs {
+    prop width: f32 = 1.8
+    prop rise: f32 = 3
+    prop run: f32 = 4.2
+    prop steps: i32 = 16
+    for i in 0..steps {
+      const h = rise * (i + 1) / steps
       {
-        Position: {(side - 0.5) * (width + 0.18), h / 2 + 0.28, -run * (i + 0.5) / steps}
-        RoundedBox: {0.22, h + 0.56, run / steps + 0.04, 0.055}
+        Position: {0, h / 2, -run * (i + 0.5) / steps}
+        Box: {width, h, run / steps + 0.01}
+        Rgb: IslandPlaster
+      }
+      {
+        Position: {0, h + 0.018, -run * (i + 0.5) / steps}
+        Box: {width + 0.035, 0.035, run / steps - 0.018}
         Rgb: IslandChalk
+      }
+      for side in 0..2 {
+        {
+          Position: {(side - 0.5) * (width + 0.18), h / 2 + 0.28, -run * (i + 0.5) / steps}
+          RoundedBox: {0.22, h + 0.56, run / steps + 0.04, 0.055}
+          Rgb: IslandChalk
+        }
       }
     }
   }

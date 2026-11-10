@@ -7,36 +7,38 @@ using box.light
 using box.text
 
 
-template WestHandcar {
-  deck : WestRed { Position: {0, 0.62, 0}; Box: {2.7, 0.17, 1.9} }
-  for i in 0..12 {
-    { Position: {-1.23 + i * 0.22, 0.73, 0}; Box: {0.2, 0.07, 1.85}; Rgb: {166 + i % 3 * 9, 113 + i % 3 * 7, 60} }
-  }
-  for end in 0..2 {
-    { (IsA, WestIron); Position: {(end - 0.5) * 1.85, 0.38, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.055, length: 1.8, segments: 12} }
-    for side in 0..2 {
-      {
-        Position: {(end - 0.5) * 1.85, 0.38, (side - 0.5) * 1.45}
-        Rotation: {math.PI / 2, 0, 0}
-        wheel : WestIron { Position: {}; Cylinder: {radius: 0.31, length: 0.12, segments: 24} }
-        rim : WestSteel { Position: {}; Tube: {radius: 0.33, thickness: 0.035, length: 0.14, segments: 24} }
-        hub : WestBrass { Position: {0, (side - 0.5) * -0.19, 0}; Cylinder: {radius: 0.09, length: 0.075, segments: 12} }
+assets {
+  template WestHandcar {
+    deck : WestRed { Position: {0, 0.62, 0}; Box: {2.7, 0.17, 1.9} }
+    for i in 0..12 {
+      { Position: {-1.23 + i * 0.22, 0.73, 0}; Box: {0.2, 0.07, 1.85}; Rgb: {166 + i % 3 * 9, 113 + i % 3 * 7, 60} }
+    }
+    for end in 0..2 {
+      { (IsA, WestIron); Position: {(end - 0.5) * 1.85, 0.38, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.055, length: 1.8, segments: 12} }
+      for side in 0..2 {
+        {
+          Position: {(end - 0.5) * 1.85, 0.38, (side - 0.5) * 1.45}
+          Rotation: {math.PI / 2, 0, 0}
+          wheel : WestIron { Position: {}; Cylinder: {radius: 0.31, length: 0.12, segments: 24} }
+          rim : WestSteel { Position: {}; Tube: {radius: 0.33, thickness: 0.035, length: 0.14, segments: 24} }
+          hub : WestBrass { Position: {0, (side - 0.5) * -0.19, 0}; Cylinder: {radius: 0.09, length: 0.075, segments: 12} }
+        }
       }
     }
-  }
-  gearbox : WestIron { Position: {0, 0.9, 0}; RoundedBox: {0.6, 0.35, 0.7, 0.06} }
-  for side in 0..2 {
-    { Position: {0, 1.31, (side - 0.5) * 0.48}; Box: {0.14, 1.15, 0.12}; Rgb: {139, 52, 38} }
-  }
-  lever {
-    Position: {0, 1.83, 0}
-    Rotation: {0, 0, 0.13}
-    bar : WestRed { Position: {}; Box: {2.15, 0.12, 0.14} }
+    gearbox : WestIron { Position: {0, 0.9, 0}; RoundedBox: {0.6, 0.35, 0.7, 0.06} }
     for side in 0..2 {
-      { Position: {(side - 0.5) * 1.95, 0, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.055, length: 1.05, segments: 12}; Rgb: {103, 64, 38} }
+      { Position: {0, 1.31, (side - 0.5) * 0.48}; Box: {0.14, 1.15, 0.12}; Rgb: {139, 52, 38} }
     }
-  }
-  for side in 0..2 {
-    { (IsA, WestIron); Position: {(side - 0.5) * 2.85, 0.48, 0}; Box: {0.2, 0.08, 0.9} }
+    lever {
+      Position: {0, 1.83, 0}
+      Rotation: {0, 0, 0.13}
+      bar : WestRed { Position: {}; Box: {2.15, 0.12, 0.14} }
+      for side in 0..2 {
+        { Position: {(side - 0.5) * 1.95, 0, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.055, length: 1.05, segments: 12}; Rgb: {103, 64, 38} }
+      }
+    }
+    for side in 0..2 {
+      { (IsA, WestIron); Position: {(side - 0.5) * 2.85, 0.48, 0}; Box: {0.2, 0.08, 0.9} }
+    }
   }
 }

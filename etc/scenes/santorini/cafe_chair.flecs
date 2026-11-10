@@ -11,16 +11,18 @@ using box.surface
 using box.controllers
 using box.text
 
-template CafeChair {
-  seat { Position: {0, 0.45, 0}; RoundedBox: {0.48, 0.09, 0.48, 0.035}; Rgb: {194, 168, 118} }
-  for side in 0..2 {
-    for end in 0..2 {
-      { Position: {(side - 0.5) * 0.4, 0.23, (end - 0.5) * 0.4}; Box: {0.055, 0.46, 0.055}; Rgb: IslandCobalt }
+assets {
+  template CafeChair {
+    seat { Position: {0, 0.45, 0}; RoundedBox: {0.48, 0.09, 0.48, 0.035}; Rgb: {194, 168, 118} }
+    for side in 0..2 {
+      for end in 0..2 {
+        { Position: {(side - 0.5) * 0.4, 0.23, (end - 0.5) * 0.4}; Box: {0.055, 0.46, 0.055}; Rgb: IslandCobalt }
+      }
+      { Position: {(side - 0.5) * 0.4, 0.72, -0.2}; Box: {0.055, 0.56, 0.055}; Rgb: IslandCobalt }
+      { Position: {0, 0.69 + side * 0.22, -0.2}; RoundedBox: {0.45, 0.11, 0.055, 0.02}; Rgb: IslandCobalt }
     }
-    { Position: {(side - 0.5) * 0.4, 0.72, -0.2}; Box: {0.055, 0.56, 0.055}; Rgb: IslandCobalt }
-    { Position: {0, 0.69 + side * 0.22, -0.2}; RoundedBox: {0.45, 0.11, 0.055, 0.02}; Rgb: IslandCobalt }
-  }
-  for i in 0..6 {
-    { Position: {-0.19 + i * 0.076, 0.503, 0}; Box: {0.025, 0.008, 0.41}; Rgb: {161, 130, 85} }
+    for i in 0..6 {
+      { Position: {-0.19 + i * 0.076, 0.503, 0}; Box: {0.025, 0.008, 0.41}; Rgb: {161, 130, 85} }
+    }
   }
 }

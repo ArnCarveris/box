@@ -12,30 +12,51 @@ using box.light
 using box.effects
 using box.surface
 using box.controllers
+using assets
 
 $ {
   Scene: {baked: true, reflections: true, environment: true, alpha_cutout: true,
     transmission: true, triplanar: true, sheen: true, clear_coat: true, anisotropy: true}
-}
-
-window { Surface: {width: 1800, height: 1000, vsync: true} }
-contact_shadows { Gtao: {radius: 1.3, final_value_power: 2.2} }
-engine_bloom { Bloom: {intensity: 0.15, threshold: 1.4} }
-film { Tonemap: {} }
-edge_smoothing { Smaa: {} }
-starfield { EnvironmentImage: {path: "etc/scenes/spaceship/assets/starfield.hdr"}; Environment: {resolution: 1024} }
-
-shipyard {
-  Scene: {baked: true, reflections: true, environment: true, alpha_cutout: true, transmission: true, triplanar: true, sheen: true, clear_coat: true, anisotropy: true}
   AmbientLight: {sky: {130, 165, 195}, ground: {45, 65, 88}, intensity: 0.65}
   LightBake: {probe_spacing: 16, bounds_padding: 2, bounces: 1, capture_size: 16, budget_ms: 6}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 25}
-  camera {
-    Position: {-180, 165, 240}
-    Rotation: {-0.55, -0.6435, 0}
-    Camera: {fov: 42, near_: 0.5, far_: 1400}
-    CameraController: {speed: 55}
+}
+
+window { Surface: {width: 1800, height: 1000, vsync: true} }
+
+camera {
+  Position: {-180, 165, 240}
+  Rotation: {-0.55, -0.6435, 0}
+  Camera: {fov: 42, near_: 0.5, far_: 1400}
+  CameraController: {speed: 55}
+}
+
+sky {
+  Rotation: {0.85, -2.5, 0}
+  DirectionalLight: {intensity: 4.2}
+  Rgb: {213, 231, 255}
+}
+
+assets {
+  starfield { EnvironmentImage: {path: "etc/scenes/spaceship/assets/starfield.hdr"}; Environment: {resolution: 1024} }
+}
+
+view {
+  contact_shadows { Gtao: {radius: 1.3, final_value_power: 2.2} }
+  engine_bloom { Bloom: {intensity: 0.15, threshold: 1.4} }
+  film { Tonemap: {} }
+  edge_smoothing { Smaa: {} }
+
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {3, 6, 12, 255}},
+    shadows: {enabled: true, max_distance: 600},
+    lighting: {environment: {source: assets.starfield, intensity: 0.035, background: true}},
+    effects: [{effect: contact_shadows}, {effect: engine_bloom}, {effect: film}, {effect: edge_smoothing}]
   }
+}
+
+spaceship {
   gantry_camera {
     Position: {-142, 78, 42}
     Rotation: {-0.31, -0.69, 0}
@@ -65,11 +86,6 @@ shipyard {
     Rotation: {-0.46, -0.45, 0}
     Camera: {fov: 48, near_: 0.1, far_: 1000}
     CameraController: {speed: 12}
-  }
-  key {
-    Rotation: {0.85, -2.5, 0}
-    DirectionalLight: {intensity: 4.2}
-    Rgb: {213, 231, 255}
   }
   rim {
     Rotation: {0.35, 0.65, 0}
@@ -112,15 +128,5 @@ shipyard {
     root { AttachmentFrame: {} }
     Rotation: {0, 1.5707963, 0}
     Align: {target: frigate, self: {frame: starboard_b.root}, other: {frame: frigate.starboard_b}}
-  }
-}
-
-main_view {
-  View: {
-    camera: shipyard.camera,
-    clear: {enabled: true, color: {3, 6, 12, 255}},
-    shadows: {enabled: true, max_distance: 600},
-    lighting: {environment: {source: starfield, intensity: 0.035, background: true}},
-    effects: [{effect: contact_shadows}, {effect: engine_bloom}, {effect: film}, {effect: edge_smoothing}]
   }
 }

@@ -25,57 +25,12 @@ using box.transition
 
 $ {
   Scene: {punctual_shadows: true, blend_modes: true}
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }
 
 window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
-
-// Actions: a widget and a key drive the same action, the scene only awaits the action
-
-actions {
-  count {
-    Action: {description: "Count a click"}
-    Binding: {key: C}
-  }
-
-  shadows {
-    Action: {description: "Toggle the shadows of the 3D view"}
-    Binding: {key: H}
-  }
-
-  select {
-    Action: {description: "Select the crate"}
-  }
-
-  lamp {
-    Action: {description: "Switch the lamp"}
-    Binding: {key: L}
-  }
-
-  paint {
-    Action: {description: "Paint the crate"}
-    Binding: {key: P}
-  }
-
-  reactor {
-    Action: {description: "Toggle the reactor"}
-    Binding: {key: R}
-  }
-
-  reactor_start {
-    Action: {description: "Start the reactor"}
-  }
-
-  reactor_stop {
-    Action: {description: "Stop the reactor"}
-  }
-}
-
-// The 3D scene: the default scene. Its view, the sun, the crate, the lamp and the reactor core
-// follow the state of the showcase, so they are part of the Showcase template below: a read of
-// showcase[Showcase.mut] outside the template does not update when an async block assigns a mut
-// variable
 
 camera {
   Position: {0, 2.2, 7}
@@ -84,299 +39,340 @@ camera {
   CameraController: {}
 }
 
-$ {
-  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
-}
+state {
+  // Actions: a widget and a key drive the same action, the scene only awaits the action
 
-ground {
-  Position: {0, -0.05, 0}
-  Box: {80, 0.1, 80}
-  Rgb: {140, 150, 125}
-  PbrMaterial: {roughness: 0.9}
-}
+  actions {
+    count {
+      Action: {description: "Count a click"}
+      Binding: {key: C}
+    }
 
-hero {
-  Position: {0.4, 0.9, -0.5}
-  Capsule: {segments: 24, smooth: true, length: 0.8, radius: 0.45}
-  Rgb: {220, 90, 60}
-}
+    shadows {
+      Action: {description: "Toggle the shadows of the 3D view"}
+      Binding: {key: H}
+    }
 
-pillar {
-  Position: {4.6, 1.2, -3.5}
-  Cylinder: {segments: 24, smooth: true, radius: 0.4, length: 2.4}
-  Rgb: {170, 175, 190}
-}
+    select {
+      Action: {description: "Select the crate"}
+    }
 
-ball {
-  Position: {2.2, 0.5, 1.5}
-  Sphere: {segments: 32, smooth: true, radius: 0.5}
-  Rgb: {80, 140, 210}
-  PbrMaterial: {roughness: 0.3}
-}
+    lamp {
+      Action: {description: "Switch the lamp"}
+      Binding: {key: L}
+    }
 
-// Widgets: the looks of the showcase on the behavior of the headless templates of box.widgets,
-// which drive an action or report a change
+    paint {
+      Action: {description: "Paint the crate"}
+      Binding: {key: P}
+    }
 
-// A button that taps its action when clicked, lighter while hovered and darker while pressed
-template Button : box.widgets.HeadlessButton {
-  Layout: {direction: Row, padding: {8, 8, 12, 12}, h: Center, v: Middle}
-  LayoutItem: {width: {mode: Grow}}
-  Rect: {1, 1}
-  Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
+    reactor {
+      Action: {description: "Toggle the reactor"}
+      Binding: {key: R}
+    }
 
-  if down {
-    Rgb: {40, 90, 170}
-    Border: {radius: 6, width: 2, color: {255, 220, 90, 255}}
-  } else if hover {
-    Rgb: {90, 140, 220}
-    Border: {radius: 6, width: 2, color: {170, 200, 255, 255}}
-  } else {
-    Rgb: {60, 100, 170}
-    Border: {radius: 6, width: 2, color: {60, 100, 170, 255}}
-  }
+    reactor_start {
+      Action: {description: "Start the reactor"}
+    }
 
-  text {
-    Text: {value: label, size: 16}
-    Rgb: {255, 255, 255}
-  }
-}
-
-// A check box that taps its action when clicked; it shows the state it is given, the action
-// changes that state where it is owned
-template Toggle : box.widgets.HeadlessButton {
-  prop label: string = "Toggle"
-  prop checked = false
-
-  Layout: {direction: Row, spacing: 10, padding: {4, 4, 4, 4}, v: Middle}
-  LayoutItem: {width: {mode: Grow}}
-
-  check {
-    Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
-    Rect: {1, 1}
-    Rgb: {30, 34, 46}
-    Border: {radius: 5, width: 2, color: hover ? {170, 200, 255, 255} : {120, 130, 150, 255}}
-
-    mark {
-      LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
-      Rect: {1, 1}
-      Rgb: {90, 210, 110}
-      Opacity: {checked ? 1 : 0}
-      Border: {radius: 3}
-      Transition: [Opacity: {duration: 0.12, timing_function: EaseOut}]
+    reactor_stop {
+      Action: {description: "Stop the reactor"}
     }
   }
 
-  text {
-    Text: {value: label, size: 16}
-    Rgb: {225, 230, 240}
+  // The state of the app in mut variables. The 3D scene and the widgets follow the state
+  // reactively.
+
+  export mut clicks: i32 = 0
+  export mut shadows = true
+  export mut sun: f32 = 2
+  export mut selected = false
+  export mut last: string = "none"
+  export mut lamp = false
+  export mut paint: i32 = 0
+  export mut reactor = false
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.count)
+    state.clicks += 1
+    state.last = "count"
   }
 }
 
-// A slider that shows its current value between min and max on a track of width points with a
-// knob. A press on the track or a drag of the knob changes the value and reports a change, which
-// the scope that owns the value awaits.
-const SliderKnob: f32 = 16
+async {
+  while true {
+    await on.pressed(state.actions.shadows)
+    state.shadows = !state.shadows
+    state.last = "shadows"
+  }
+}
 
-template Slider : box.widgets.HeadlessSlider {
-  prop label: string = "Slider"
-  prop max: f32 = 1
-  prop step: f32 = 0
-  prop width: f32 = 200
-  prop thumb: f32 = SliderKnob
+async {
+  while true {
+    await on.pressed(state.actions.select)
+    state.selected = !state.selected
+    state.last = "select"
+  }
+}
 
-  const t = clamp((current - min) / (max - min), 0, 1)
+async {
+  while true {
+    await on.pressed(state.actions.lamp)
+    state.lamp = !state.lamp
+    state.last = "lamp"
+  }
+}
 
-  Layout: {direction: Column, spacing: 6}
-  LayoutItem: {width: {mode: Fixed, value: width}}
+async {
+  while true {
+    await on.pressed(state.actions.paint)
+    state.paint = (state.paint + 1) % 3
+    state.last = "paint"
+  }
+}
 
-  head {
-    Layout: {direction: Row, v: Middle}
+async {
+  while true {
+    await on.pressed(state.actions.reactor)
+    state.reactor = !state.reactor
+    state.last = "reactor"
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.reactor_start)
+    state.reactor = true
+    state.last = "reactor_start"
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.reactor_stop)
+    state.reactor = false
+    state.last = "reactor_stop"
+  }
+}
+
+// The 3D view is created before the HUD view, and views draw in the order they were created,
+// so the UI draws over the 3D scene
+view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: state.shadows}
+  }
+}
+
+sky {
+  Rotation: {0.7359, 2.3726, 0}
+  DirectionalLight: {intensity: state.sun * PI}
+  Rgb: {255, 244, 225}
+}
+
+assets {
+  // Widgets: the looks of the showcase on the behavior of the headless templates of box.widgets,
+  // which drive an action or report a change
+
+  // A button that taps its action when clicked, lighter while hovered and darker while pressed
+  template Button : box.widgets.HeadlessButton {
+    Layout: {direction: Row, padding: {8, 8, 12, 12}, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+    Rect: {1, 1}
+    Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
+
+    if down {
+      Rgb: {40, 90, 170}
+      Border: {radius: 6, width: 2, color: {255, 220, 90, 255}}
+    } else if hover {
+      Rgb: {90, 140, 220}
+      Border: {radius: 6, width: 2, color: {170, 200, 255, 255}}
+    } else {
+      Rgb: {60, 100, 170}
+      Border: {radius: 6, width: 2, color: {60, 100, 170, 255}}
+    }
+
+    text {
+      Text: {value: label, size: 16}
+      Rgb: {255, 255, 255}
+    }
+  }
+
+  // A check box that taps its action when clicked; it shows the state it is given, the action
+  // changes that state where it is owned
+  template Toggle : box.widgets.HeadlessButton {
+    prop label: string = "Toggle"
+    prop checked = false
+
+    Layout: {direction: Row, spacing: 10, padding: {4, 4, 4, 4}, v: Middle}
     LayoutItem: {width: {mode: Grow}}
 
-    name {
+    check {
+      Layout: {}
+      LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+      Rect: {1, 1}
+      Rgb: {30, 34, 46}
+      Border: {radius: 5, width: 2, color: hover ? {170, 200, 255, 255} : {120, 130, 150, 255}}
+
+      mark {
+        LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
+        Rect: {1, 1}
+        Rgb: {90, 210, 110}
+        Opacity: {checked ? 1 : 0}
+        Border: {radius: 3}
+        Transition: [Opacity: {duration: 0.12, timing_function: EaseOut}]
+      }
+    }
+
+    text {
       Text: {value: label, size: 16}
       Rgb: {225, 230, 240}
     }
+  }
 
-    gap {
+  // A slider that shows its current value between min and max on a track of width points with a
+  // knob. A press on the track or a drag of the knob changes the value and reports a change, which
+  // the scope that owns the value awaits.
+  const SliderKnob: f32 = 16
+
+  template Slider : box.widgets.HeadlessSlider {
+    prop label: string = "Slider"
+    prop max: f32 = 1
+    prop step: f32 = 0
+    prop width: f32 = 200
+    prop thumb: f32 = SliderKnob
+
+    const t = clamp((current - min) / (max - min), 0, 1)
+
+    Layout: {direction: Column, spacing: 6}
+    LayoutItem: {width: {mode: Fixed, value: width}}
+
+    head {
+      Layout: {direction: Row, v: Middle}
       LayoutItem: {width: {mode: Grow}}
+
+      name {
+        Text: {value: label, size: 16}
+        Rgb: {225, 230, 240}
+      }
+
+      gap {
+        LayoutItem: {width: {mode: Grow}}
+      }
+
+      amount {
+        Text: {value: "{current:.2}", size: 16}
+        Rgb: {255, 220, 90}
+      }
     }
 
-    amount {
-      Text: {value: "{current:.2}", size: 16}
-      Rgb: {255, 220, 90}
+    track {
+      Layout: {}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: SliderKnob}}
+
+      rail {
+        LayoutItem: {v: Middle, width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+        Rect: {1, 1}
+        Rgb: {40, 44, 56}
+        Border: {radius: 3}
+      }
+
+      fill {
+        LayoutItem: {h: Left, v: Middle, width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)}, height: {mode: Fixed, value: 6}}
+        Rect: {1, 1}
+        Rgb: {250, 200, 90}
+        Border: {radius: 3}
+      }
+
+      knob {
+        LayoutItem: {h: Left, v: Middle, x: t * (width - SliderKnob), width: {mode: Fixed, value: SliderKnob}, height: {mode: Fixed, value: SliderKnob}}
+        Rect: {1, 1}
+        Rgb: down || hover ? {255, 236, 170} : {255, 255, 255}
+        Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
+        Border: {radius: 8}
+      }
     }
   }
 
-  track {
-    Layout: {}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: SliderKnob}}
+  // Render-to-texture UI: the reactor screen of the showcase renders its UI scene into this
+  // texture, and the slices of a curved screen sample it, each a sixteenth of its width. A click on
+  // a slice maps through its TextureTransform into the texture and picks the UI under it.
 
-    rail {
-      LayoutItem: {v: Middle, width: {mode: Grow}, height: {mode: Fixed, value: 6}}
-      Rect: {1, 1}
-      Rgb: {40, 44, 56}
-      Border: {radius: 3}
-    }
+  screen_texture {}
 
-    fill {
-      LayoutItem: {h: Left, v: Middle, width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)}, height: {mode: Fixed, value: 6}}
-      Rect: {1, 1}
-      Rgb: {250, 200, 90}
-      Border: {radius: 3}
-    }
+  template Slice {
+    prop offset: f32 = 0
 
-    knob {
-      LayoutItem: {h: Left, v: Middle, x: t * (width - SliderKnob), width: {mode: Fixed, value: SliderKnob}, height: {mode: Fixed, value: SliderKnob}}
-      Rect: {1, 1}
-      Rgb: down || hover ? {255, 236, 170} : {255, 255, 255}
-      Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
-      Border: {radius: 8}
-    }
-  }
-}
-
-// A world space panel with a lamp switch behind a cabinet that hides it from the default
-// camera: a click where its button would be hits the cabinet, occluded world UI gets no input
-cabinet {
-  Position: {-0.9, 0.75, -2.4}
-  Rotation: {0, 0.09, 0}
-  Box: {1.1, 1.5, 0.5}
-  Rgb: {95, 85, 75}
-  PbrMaterial: {roughness: 0.8}
-}
-
-service {
-  Position: {-0.9, 0.85, -3.0}
-  Rotation: {0, 0.09, 0}
-  Scale: {0.005, 0.005, 0.005}
-  Layout: {direction: Column, spacing: 6, padding: {8, 8, 10, 10}}
-  LayoutItem: {width: {mode: Fixed, value: 140}}
-  Rect: {1, 1}
-  Rgb: {30, 34, 46}
-  Border: {width: 2, radius: 8, color: {120, 140, 200, 255}}
-
-  title {
-    Text: {value: "Service", size: 16}
-    Rgb: {255, 255, 255}
-  }
-
-  switch {
-    Button: {label: "Lamp", action: actions.lamp}
+    Quad: {0.305, 1.5}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 0, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {albedo: screen_texture, emissive: screen_texture}
+    TextureTransform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
+    TextureWrap: WrapClamp
   }
 }
 
-// Render-to-texture UI: the reactor screen of the showcase renders its UI scene into this
-// texture, and the slices of a curved screen sample it, each a sixteenth of its width. A click on
-// a slice maps through its TextureTransform into the texture and picks the UI under it.
-
-screen_texture {}
-
-template Slice {
-  prop offset: f32 = 0
-
-  Quad: {0.305, 1.5}
-  Rgb: {0, 0, 0}
-  PbrMaterial: {metallic: 0, roughness: 1}
-  Emissive: {strength: 1, color: {255, 255, 255}}
-  PbrTextures: {albedo: screen_texture, emissive: screen_texture}
-  TextureTransform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
-  TextureWrap: WrapClamp
-}
-
-// The showcase: the state of the app in mut variables, one async block per action, and the
-// screen space, world space and render-to-texture UI. The 3D scene and the widgets follow the
-// state reactively.
-
-template Showcase {
-  mut clicks: i32 = 0
-  mut shadows = true
-  mut sun: f32 = 2
-  mut selected = false
-  mut last: string = "none"
-  mut lamp = false
-  mut paint: i32 = 0
-  mut reactor = false
-
-  async {
-    while true {
-      await on.pressed(actions.count)
-      clicks += 1
-      last = "count"
-    }
+// The 3D scene: the default scene
+ui_showcase {
+  ground {
+    Position: {0, -0.05, 0}
+    Box: {80, 0.1, 80}
+    Rgb: {140, 150, 125}
+    PbrMaterial: {roughness: 0.9}
   }
 
-  async {
-    while true {
-      await on.pressed(actions.shadows)
-      shadows = !shadows
-      last = "shadows"
-    }
+  hero {
+    Position: {0.4, 0.9, -0.5}
+    Capsule: {segments: 24, smooth: true, length: 0.8, radius: 0.45}
+    Rgb: {220, 90, 60}
   }
 
-  async {
-    while true {
-      await on.pressed(actions.select)
-      selected = !selected
-      last = "select"
-    }
+  pillar {
+    Position: {4.6, 1.2, -3.5}
+    Cylinder: {segments: 24, smooth: true, radius: 0.4, length: 2.4}
+    Rgb: {170, 175, 190}
   }
 
-  async {
-    while true {
-      await on.pressed(actions.lamp)
-      lamp = !lamp
-      last = "lamp"
-    }
+  ball {
+    Position: {2.2, 0.5, 1.5}
+    Sphere: {segments: 32, smooth: true, radius: 0.5}
+    Rgb: {80, 140, 210}
+    PbrMaterial: {roughness: 0.3}
   }
 
-  async {
-    while true {
-      await on.pressed(actions.paint)
-      paint = (paint + 1) % 3
-      last = "paint"
-    }
+  // A world space panel with a lamp switch behind a cabinet that hides it from the default
+  // camera: a click where its button would be hits the cabinet, occluded world UI gets no input
+  cabinet {
+    Position: {-0.9, 0.75, -2.4}
+    Rotation: {0, 0.09, 0}
+    Box: {1.1, 1.5, 0.5}
+    Rgb: {95, 85, 75}
+    PbrMaterial: {roughness: 0.8}
   }
 
-  async {
-    while true {
-      await on.pressed(actions.reactor)
-      reactor = !reactor
-      last = "reactor"
-    }
-  }
+  service {
+    Position: {-0.9, 0.85, -3.0}
+    Rotation: {0, 0.09, 0}
+    Scale: {0.005, 0.005, 0.005}
+    Layout: {direction: Column, spacing: 6, padding: {8, 8, 10, 10}}
+    LayoutItem: {width: {mode: Fixed, value: 140}}
+    Rect: {1, 1}
+    Rgb: {30, 34, 46}
+    Border: {width: 2, radius: 8, color: {120, 140, 200, 255}}
 
-  async {
-    while true {
-      await on.pressed(actions.reactor_start)
-      reactor = true
-      last = "reactor_start"
+    title {
+      Text: {value: "Service", size: 16}
+      Rgb: {255, 255, 255}
     }
-  }
 
-  async {
-    while true {
-      await on.pressed(actions.reactor_stop)
-      reactor = false
-      last = "reactor_stop"
+    switch {
+      assets.Button: {label: "Lamp", action: state.actions.lamp}
     }
-  }
-
-  // The parts of the 3D scene that follow the state. The 3D view is created before the HUD
-  // view, and views draw in the order they were created, so the UI draws over the 3D scene
-  world_view {
-    View: {
-      camera: camera,
-      clear: {enabled: true, color: {120, 150, 190, 255}},
-      shadows: {enabled: shadows}
-    }
-  }
-
-  sun {
-    Rotation: {0.7359, 2.3726, 0}
-    DirectionalLight: {intensity: sun * PI}
-    Rgb: {255, 244, 225}
   }
 
   // A click on the crate taps actions.select; the panel covers its left part, where the
@@ -385,14 +381,14 @@ template Showcase {
     Position: {-4.4, 0.6, -1.5}
     Rotation: {0, 0.4, 0}
     Box: {1.2, 1.2, 1.2}
-    ActionTrigger: {action: actions.select}
+    ActionTrigger: {action: state.actions.select}
 
-    Rgb: match paint {
+    Rgb: match state.paint {
       1: {70, 150, 200}
       2: {120, 190, 90}
       _: {200, 150, 80}
     }
-    Tint: {255, 220, 90, selected ? 150 : 0}
+    Tint: {255, 220, 90, state.selected ? 150 : 0}
     Transition: [
       Rgb: {duration: 0.4, timing_function: EaseInOut},
       Tint: {duration: 0.2, timing_function: EaseOut}
@@ -404,7 +400,7 @@ template Showcase {
     Position: {-2.5, 1.8, -1.1}
     Rgb: {255, 214, 150}
 
-    PointLight: {intensity: lamp ? 12 * PI : 0, range: 8, shadows: true}
+    PointLight: {intensity: state.lamp ? 12 * PI : 0, range: 8, shadows: true}
 
     // The post reaches into the bulb so the light is inside its bounds, not on their edge
     post {
@@ -420,7 +416,7 @@ template Showcase {
       Sphere: {segments: 24, smooth: true, radius: 0.16}
       Rgb: {240, 236, 220}
       LightFixture
-      Emissive: {strength: lamp ? 6 : 0, color: {255, 214, 150}}
+      Emissive: {strength: state.lamp ? 6 : 0, color: {255, 214, 150}}
       Transition: [Emissive: {duration: 0.25, timing_function: EaseOut}]
     }
   }
@@ -443,11 +439,11 @@ template Showcase {
     }
 
     lamp_button {
-      Button: {label: "Lamp (L)", action: actions.lamp}
+      assets.Button: {label: "Lamp (L)", action: state.actions.lamp}
     }
 
     paint_button {
-      Button: {label: "Color (P)", action: actions.paint}
+      assets.Button: {label: "Color (P)", action: state.actions.paint}
     }
   }
 
@@ -457,7 +453,7 @@ template Showcase {
     Cylinder: {segments: 32, smooth: true, radius: 0.35, length: 1.2}
     Rgb: {70, 80, 95}
     PbrMaterial: {metallic: 0.6, roughness: 0.35}
-    Emissive: {strength: reactor ? 2.5 : 0, color: {90, 220, 255}}
+    Emissive: {strength: state.reactor ? 2.5 : 0, color: {90, 220, 255}}
     Transition: [Emissive: {duration: 0.6, timing_function: EaseInOut}]
   }
 
@@ -494,8 +490,8 @@ template Showcase {
         }
 
         status {
-          Text: {value: reactor ? "ONLINE" : "OFFLINE", size: 30}
-          Rgb: reactor ? {110, 230, 120} : {250, 120, 90}
+          Text: {value: state.reactor ? "ONLINE" : "OFFLINE", size: 30}
+          Rgb: state.reactor ? {110, 230, 120} : {250, 120, 90}
           Transition: [Rgb: {duration: 0.3, timing_function: EaseOut}]
         }
       }
@@ -505,7 +501,7 @@ template Showcase {
         LayoutItem: {width: {mode: Grow}}
 
         start {
-          Button: {label: "START", action: actions.reactor_start}
+          assets.Button: {label: "START", action: state.actions.reactor_start}
         }
 
         gap {
@@ -513,7 +509,7 @@ template Showcase {
         }
 
         stop {
-          Button: {label: "STOP", action: actions.reactor_stop}
+          assets.Button: {label: "STOP", action: state.actions.reactor_stop}
         }
       }
     }
@@ -531,7 +527,7 @@ template Showcase {
   }
 
   screen_surface {
-    Surface: {width: 512, height: 160, texture: screen_texture, view_root: screen_views}
+    Surface: {width: 512, height: 160, texture: assets.screen_texture, view_root: screen_views}
   }
 
   // A curved screen of sixteen slices on an arc of radius 3 around its position
@@ -543,90 +539,86 @@ template Showcase {
         const angle = 0.75 - i * 0.1
         Position: {-3 * sin(angle), 0, -3 * cos(angle)}
         Rotation: {0, angle, 0}
-        Slice: {offset: i * 0.0625}
+        assets.Slice: {offset: i * 0.0625}
       }
     }
   }
+}
 
-  // Screen space UI: a scene with an orthographic camera at ortho_scale 1, so one logical
-  // pixel is one point. Its root fills the window, so the panel anchors to the left edge
-  // and stays there when the window is resized.
-  hud {
-    Scene: {punctual_shadows: true, blend_modes: true}
+// Screen space UI: a scene with an orthographic camera at ortho_scale 1, so one logical
+// pixel is one point. Its root fills the window, so the panel anchors to the left edge
+// and stays there when the window is resized.
+hud {
+  Scene: {punctual_shadows: true, blend_modes: true}
 
-    camera {
-      Position: {0, 0, 100}
-      Camera: {ortho: true, ortho_scale: 1}
-    }
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
 
-    screen {
-      LayoutFill: {surface: window}
-      Layout: {}
+  screen {
+    LayoutFill: {surface: window}
+    Layout: {}
 
-      // InputBlocker: clicks on the panel never reach the 3D scene behind it
-      panel {
-        InputBlocker
-        Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
-        LayoutItem: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: 300}}
-        Rect: {1, 1}
-        Rgb: {16, 20, 28}
-        Opacity: {0.9}
-        Border: {width: 1, radius: 10, color: {90, 110, 150, 255}}
-        BoxShadow: {offset_y: -4, blur: 16, color: {0, 0, 0, 120}}
+    // InputBlocker: clicks on the panel never reach the 3D scene behind it
+    panel {
+      InputBlocker
+      Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
+      LayoutItem: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: 300}}
+      Rect: {1, 1}
+      Rgb: {16, 20, 28}
+      Opacity: {0.9}
+      Border: {width: 1, radius: 10, color: {90, 110, 150, 255}}
+      BoxShadow: {offset_y: -4, blur: 16, color: {0, 0, 0, 120}}
 
-        title {
-          Text: {value: "UI Showcase", size: 22}
-          Rgb: {255, 255, 255}
-        }
+      title {
+        Text: {value: "UI Showcase", size: 22}
+        Rgb: {255, 255, 255}
+      }
 
-        counter {
-          Button: {label: "Clicks: {clicks}", action: actions.count}
-        }
+      counter {
+        assets.Button: {label: "Clicks: {state.clicks}", action: state.actions.count}
+      }
 
-        shadow_toggle {
-          Toggle: {label: "Shadows (H)", action: actions.shadows, checked: shadows}
-        }
+      shadow_toggle {
+        assets.Toggle: {label: "Shadows (H)", action: state.actions.shadows, checked: state.shadows}
+      }
 
-        // The slider reports a change when the pointer or the keys move it
-        sun_slider {
-          Slider: {label: "Sun", min: 0, max: 4, value: sun, width: 268}
+      // The slider reports a change when the pointer or the keys move it
+      sun_slider {
+        assets.Slider: {label: "Sun", min: 0, max: 4, value: state.sun, width: 268}
+      }
 
-          async {
-            while true {
-              await on.change(this)
-              sun = this[Slider.mut].current
-            }
-          }
-        }
+      status {
+        Text: {value: "Last action: {state.last}", size: 15}
+        Rgb: {200, 210, 230}
+        TextSpans: {spans: [{start: 13, end: 64, color: {255, 220, 90, 255}, bold: true}]}
+      }
 
-        status {
-          Text: {value: "Last action: {last}", size: 15}
-          Rgb: {200, 210, 230}
-          TextSpans: {spans: [{start: 13, end: 64, color: {255, 220, 90, 255}, bold: true}]}
-        }
-
-        hint {
-          Text: {value: "C counts, H shadows, L lamp, P paint, R reactor, click the crate", size: 13, width: 268}
-          Rgb: {140, 150, 170}
-          TextSpans: {spans: [
-            {start: 0, end: 1, color: {225, 230, 240, 255}, bold: true},
-            {start: 10, end: 11, color: {225, 230, 240, 255}, bold: true},
-            {start: 21, end: 22, color: {225, 230, 240, 255}, bold: true},
-            {start: 29, end: 30, color: {225, 230, 240, 255}, bold: true},
-            {start: 38, end: 39, color: {225, 230, 240, 255}, bold: true}
-          ]}
-        }
+      hint {
+        Text: {value: "C counts, H shadows, L lamp, P paint, R reactor, click the crate", size: 13, width: 268}
+        Rgb: {140, 150, 170}
+        TextSpans: {spans: [
+          {start: 0, end: 1, color: {225, 230, 240, 255}, bold: true},
+          {start: 10, end: 11, color: {225, 230, 240, 255}, bold: true},
+          {start: 21, end: 22, color: {225, 230, 240, 255}, bold: true},
+          {start: 29, end: 30, color: {225, 230, 240, 255}, bold: true},
+          {start: 38, end: 39, color: {225, 230, 240, 255}, bold: true}
+        ]}
       }
     }
   }
 
   // The HUD view is created after the 3D view, so the UI draws over it, without clear,
   // lighting or culling
-  hud_view {
-    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  view {
+    View: {camera: camera, lighting: {enabled: false}, culling: {enabled: false}}
   }
 }
 
-showcase {
-  Showcase: {}
+async {
+  while true {
+    await on.change(hud.screen.panel.sun_slider)
+    state.sun = hud.screen.panel.sun_slider[assets.Slider.mut].current
+  }
 }

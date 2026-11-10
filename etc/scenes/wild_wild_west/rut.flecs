@@ -4,36 +4,38 @@ using box.transform
 using box.geometry
 using box.material
 
-fn west_rut_z(x: f32, z: f32) -> f32 {
-  z + 0.65 - 1.25 * math.tanh((x - 1.5) * 0.55) + math.sin(x * 0.35) * 0.12
-}
-
-template WestRut {
-  prop z: f32 = 0
-  prop width: f32 = 0.2
-  prop tint: Rgb = {170, 128, 76}
-  route {
-    Path3D: {
-      start: {-16, 0.112, west_rut_z(-16, z)},
-      segments: [
-        {kind: CatmullRom, end: {-13.8, 0.112, west_rut_z(-13.8, z)}},
-        {kind: CatmullRom, end: {-11.6, 0.112, west_rut_z(-11.6, z)}},
-        {kind: CatmullRom, end: {-9.4, 0.112, west_rut_z(-9.4, z)}},
-        {kind: CatmullRom, end: {-7.2, 0.112, west_rut_z(-7.2, z)}},
-        {kind: CatmullRom, end: {-5, 0.112, west_rut_z(-5, z)}},
-        {kind: CatmullRom, end: {-2.8, 0.112, west_rut_z(-2.8, z)}},
-        {kind: CatmullRom, end: {-1.2, 0.112, west_rut_z(-1.2, z)}},
-        {kind: CatmullRom, end: {0.4, 0.112, west_rut_z(0.4, z)}},
-        {kind: CatmullRom, end: {1.5, 0.112, west_rut_z(1.5, z)}},
-        {kind: CatmullRom, end: {2.6, 0.112, west_rut_z(2.6, z)}},
-        {kind: CatmullRom, end: {4.2, 0.112, west_rut_z(4.2, z)}},
-        {kind: CatmullRom, end: {5.8, 0.112, west_rut_z(5.8, z)}},
-        {kind: CatmullRom, end: {8, 0.112, west_rut_z(8, z)}},
-        {kind: CatmullRom, end: {10.4, 0.112, west_rut_z(10.4, z)}}
-      ]
-    }
+assets {
+  fn west_rut_z(x: f32, z: f32) -> f32 {
+    z + 0.65 - 1.25 * math.tanh((x - 1.5) * 0.55) + math.sin(x * 0.35) * 0.12
   }
-  Sweep: {path: route, profile: WestFlatProfile, scale: {width, 0.012}, rings: 96}
-  Rgb: tint
-  PbrMaterial: {roughness: 1}
+
+  template WestRut {
+    prop z: f32 = 0
+    prop width: f32 = 0.2
+    prop tint: Rgb = {170, 128, 76}
+    route {
+      Path3D: {
+        start: {-16, 0.112, west_rut_z(-16, z)},
+        segments: [
+          {kind: CatmullRom, end: {-13.8, 0.112, west_rut_z(-13.8, z)}},
+          {kind: CatmullRom, end: {-11.6, 0.112, west_rut_z(-11.6, z)}},
+          {kind: CatmullRom, end: {-9.4, 0.112, west_rut_z(-9.4, z)}},
+          {kind: CatmullRom, end: {-7.2, 0.112, west_rut_z(-7.2, z)}},
+          {kind: CatmullRom, end: {-5, 0.112, west_rut_z(-5, z)}},
+          {kind: CatmullRom, end: {-2.8, 0.112, west_rut_z(-2.8, z)}},
+          {kind: CatmullRom, end: {-1.2, 0.112, west_rut_z(-1.2, z)}},
+          {kind: CatmullRom, end: {0.4, 0.112, west_rut_z(0.4, z)}},
+          {kind: CatmullRom, end: {1.5, 0.112, west_rut_z(1.5, z)}},
+          {kind: CatmullRom, end: {2.6, 0.112, west_rut_z(2.6, z)}},
+          {kind: CatmullRom, end: {4.2, 0.112, west_rut_z(4.2, z)}},
+          {kind: CatmullRom, end: {5.8, 0.112, west_rut_z(5.8, z)}},
+          {kind: CatmullRom, end: {8, 0.112, west_rut_z(8, z)}},
+          {kind: CatmullRom, end: {10.4, 0.112, west_rut_z(10.4, z)}}
+        ]
+      }
+    }
+    Sweep: {path: route, profile: WestFlatProfile, scale: {width, 0.012}, rings: 96}
+    Rgb: tint
+    PbrMaterial: {roughness: 1}
+  }
 }

@@ -1,44 +1,46 @@
 using box.geometry
 using box.material
 
-export const GardenCedar: Rgb = {109, 65, 53}
-export const GardenVermilion: Rgb = {191, 62, 48}
-export const GardenSlate: Rgb = {65, 83, 101}
-export const GardenStone: Rgb = {176, 183, 172}
-export const GardenMoss: Rgb = {99, 139, 104}
-export const GardenPaper: Rgb = {255, 225, 169}
-export const GardenBlossom: Rgb = {247, 181, 204}
-export const GardenLacquer: ClearCoat = {strength: 0.6, roughness: 0.18}
-export const GardenShoji: DiffuseTransmission = {factor: 0.45, color: {255, 214, 158}}
-export const GardenSilk: Sheen = {color: {236, 214, 226}, roughness: 0.55}
-export const GardenLeafLight: DiffuseTransmission = {factor: 0.35, color: {214, 240, 168}}
+assets {
+  export const GardenCedar: Rgb = {109, 65, 53}
+  export const GardenVermilion: Rgb = {191, 62, 48}
+  export const GardenSlate: Rgb = {65, 83, 101}
+  export const GardenStone: Rgb = {176, 183, 172}
+  export const GardenMoss: Rgb = {99, 139, 104}
+  export const GardenPaper: Rgb = {255, 225, 169}
+  export const GardenBlossom: Rgb = {247, 181, 204}
+  export const GardenLacquer: ClearCoat = {strength: 0.6, roughness: 0.18}
+  export const GardenShoji: DiffuseTransmission = {factor: 0.45, color: {255, 214, 158}}
+  export const GardenSilk: Sheen = {color: {236, 214, 226}, roughness: 0.55}
+  export const GardenLeafLight: DiffuseTransmission = {factor: 0.35, color: {214, 240, 168}}
 
-prefab GardenRoundShape {
-  Path2D: {
-    start: {1, 0},
-    segments: [
-      {kind: CatmullRom, end: {0.7071, 0.7071}},
-      {kind: CatmullRom, end: {0, 1}},
-      {kind: CatmullRom, end: {-0.7071, 0.7071}},
-      {kind: CatmullRom, end: {-1, 0}},
-      {kind: CatmullRom, end: {-0.7071, -0.7071}},
-      {kind: CatmullRom, end: {0, -1}},
-      {kind: CatmullRom, end: {0.7071, -0.7071}}
-    ],
-    closed: true
+  prefab GardenRoundShape {
+    Path2D: {
+      start: {1, 0},
+      segments: [
+        {kind: CatmullRom, end: {0.7071, 0.7071}},
+        {kind: CatmullRom, end: {0, 1}},
+        {kind: CatmullRom, end: {-0.7071, 0.7071}},
+        {kind: CatmullRom, end: {-1, 0}},
+        {kind: CatmullRom, end: {-0.7071, -0.7071}},
+        {kind: CatmullRom, end: {0, -1}},
+        {kind: CatmullRom, end: {0.7071, -0.7071}}
+      ],
+      closed: true
+    }
   }
-}
-prefab GardenRoundProfile { Profile2D: {outer: GardenRoundShape} }
+  prefab GardenRoundProfile { Profile2D: {outer: GardenRoundShape} }
 
-prefab GardenDeckShape {
-  Path2D: {
-    start: {-0.5, -0.5},
-    segments: [
-      {kind: Line, end: {0.5, -0.5}},
-      {kind: Line, end: {0.5, 0.5}},
-      {kind: Line, end: {-0.5, 0.5}}
-    ],
-    closed: true
+  prefab GardenDeckShape {
+    Path2D: {
+      start: {-0.5, -0.5},
+      segments: [
+        {kind: Line, end: {0.5, -0.5}},
+        {kind: Line, end: {0.5, 0.5}},
+        {kind: Line, end: {-0.5, 0.5}}
+      ],
+      closed: true
+    }
   }
+  prefab GardenDeckProfile { Profile2D: {outer: GardenDeckShape} }
 }
-prefab GardenDeckProfile { Profile2D: {outer: GardenDeckShape} }

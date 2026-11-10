@@ -6,38 +6,40 @@ using box.material
 using box.texture
 using box.light
 
-template FrigateRadiator {
-  prop width: f32 = 5
-  prop length: f32 = 12
-  backing : RecessMetal { Position: {}; Box: {width, 0.4, length} }
-  fins {
-    Array: {axis: Z, count: 22, spacing: length / 23}
-    Align: {target: backing, self: {y: Min}, other: {y: Max}}
-    fin : Titanium { Rotation: {0.28, 0, 0}; Box: {width - 0.4, 0.28, 0.15} }
+assets {
+  template FrigateRadiator {
+    prop width: f32 = 5
+    prop length: f32 = 12
+    backing : RecessMetal { Position: {}; Box: {width, 0.4, length} }
+    fins {
+      Array: {axis: Z, count: 22, spacing: length / 23}
+      Align: {target: backing, self: {y: Min}, other: {y: Max}}
+      fin : Titanium { Rotation: {0.28, 0, 0}; Box: {width - 0.4, 0.28, 0.15} }
+    }
+    for side in 0..2 {
+    "channel_{side}" : RustRed { Position: {(side - 0.5) * (width - 0.3), 0.22, 0}; Box: {0.18, 0.3, length} }
+    "pipe_{side}" : Titanium { Position: {(side - 0.5) * (width + 0.3), 0.15, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.12, length: length, segments: 8} }
   }
-  for side in 0..2 {
-  "channel_{side}" : RustRed { Position: {(side - 0.5) * (width - 0.3), 0.22, 0}; Box: {0.18, 0.3, length} }
-  "pipe_{side}" : Titanium { Position: {(side - 0.5) * (width + 0.3), 0.15, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.12, length: length, segments: 8} }
-}
-  headers {
-    Align: {target: backing, self: {y: Min}, other: {y: Max}}
-    Array: {axis: Z, count: 2, spacing: length - 0.42}
-    header : DarkArmor { Position: {};
-      Box: {width + 0.5, 0.48, 0.38}
-      shield : PaleArmor { Box: {width - 0.2, 0.12, 0.26}; Position: {0, 0.3, 0} }
-      for k in 0..4 {
-        "bolt_{k}" : Titanium { Position: {(k / 3.0 - 0.5) * (width - 0.55), 0.31, 0}; Cylinder: {radius: 0.07, length: 0.12, segments: 6} }
+    headers {
+      Align: {target: backing, self: {y: Min}, other: {y: Max}}
+      Array: {axis: Z, count: 2, spacing: length - 0.42}
+      header : DarkArmor { Position: {};
+        Box: {width + 0.5, 0.48, 0.38}
+        shield : PaleArmor { Box: {width - 0.2, 0.12, 0.26}; Position: {0, 0.3, 0} }
+        for k in 0..4 {
+          "bolt_{k}" : Titanium { Position: {(k / 3.0 - 0.5) * (width - 0.55), 0.31, 0}; Cylinder: {radius: 0.07, length: 0.12, segments: 6} }
+        }
       }
     }
-  }
-  for side in 0..2 {
-    "return_elbow_{side}" : Titanium { Position: {(side - 0.5) * (width + 0.3), 0.22, length * 0.5 - 0.2}; Sphere: {radius: 0.19} }
-    "valve_{side}" : DarkArmor { Position: {(side - 0.5) * (width + 0.3), 0.3, -length * 0.5 + 0.65}; Cylinder: {radius: 0.26, length: 0.18, segments: 8} }
-    "status_{side}" : AmberLight { Position: {(side - 0.5) * (width + 0.3), 0.4, -length * 0.5 + 0.65}; Box: {0.12, 0.06, 0.12} }
-    "clips_{side}" {
-      Position: {(side - 0.5) * (width + 0.3), 0.15, -length * 0.32}
-      Array: {axis: Z, count: 4, spacing: length * 0.21}
-      clip : DarkArmor { Position: {}; Box: {0.4, 0.38, 0.15} }
+    for side in 0..2 {
+      "return_elbow_{side}" : Titanium { Position: {(side - 0.5) * (width + 0.3), 0.22, length * 0.5 - 0.2}; Sphere: {radius: 0.19} }
+      "valve_{side}" : DarkArmor { Position: {(side - 0.5) * (width + 0.3), 0.3, -length * 0.5 + 0.65}; Cylinder: {radius: 0.26, length: 0.18, segments: 8} }
+      "status_{side}" : AmberLight { Position: {(side - 0.5) * (width + 0.3), 0.4, -length * 0.5 + 0.65}; Box: {0.12, 0.06, 0.12} }
+      "clips_{side}" {
+        Position: {(side - 0.5) * (width + 0.3), 0.15, -length * 0.32}
+        Array: {axis: Z, count: 4, spacing: length * 0.21}
+        clip : DarkArmor { Position: {}; Box: {0.4, 0.38, 0.15} }
+      }
     }
   }
 }

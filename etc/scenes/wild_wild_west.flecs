@@ -36,30 +36,57 @@ $ {
 }
 
 window { Surface: {width: 1600, height: 1100, vsync: true} }
-west_contact_shadows { Gtao: {radius: 0.65, final_value_power: 1.8} }
-west_lantern_bloom { Bloom: {intensity: 0.1, threshold: 1.8} }
-west_exposure { AutoExposure: {min_log_luma: -10.8} }
-west_film { Tonemap: {auto_exposure: west_exposure} }
-west_edges { Smaa: {} }
 
 async {
-  hud_hour = 16.5
-  hud_day_of_year = 200
-  hud_latitude = 34
-  hud_north = 280
-  hud_fog = 0.004
+  state.hud_hour = 16.5
+  state.hud_day_of_year = 200
+  state.hud_latitude = 34
+  state.hud_north = 280
+  state.hud_fog = 0.004
+}
+
+camera {
+  Position: {-34, 29, 44}
+  Rotation: {-0.54, -0.658, 0}
+  Camera: {fov: 40, near_: 0.1, far_: 200}
+  CameraController: {speed: 12}
+}
+
+sky {
+  DirectionalLight: {intensity: 2.4 * math.PI}
+  Rgb: {255, 255, 255}
+  Atmosphere: {
+    sun: sky,
+    units_per_km: 100,
+    rayleigh: {scale_height: 8, scattering_scale: 2},
+    mie: {scale_height: 1.6, anisotropy: 0.75, scattering_scale: 4, tint: {255, 214, 164}},
+    ozone_scale: 3,
+    ground_albedo: {196, 150, 104},
+    sun_disk_intensity: 10,
+    sun_radius: 0.75
+  }
+  TimeOfDay: {
+    hour: hud.screen.options.body.hour[Slider.mut].current,
+    day_of_year: hud.screen.options.body.day_of_year[Slider.mut].current,
+    latitude: hud.screen.options.body.latitude[Slider.mut].current,
+    north: hud.screen.options.body.north[Slider.mut].current,
+    sun: sky
+  }
+  HeightFog: {
+    density: hud.screen.options.body.fog[Slider.mut].current,
+    falloff: 0.14,
+    base_height: 0,
+    max_opacity: 0.3,
+    atmosphere: sky
+  }
+}
+
+$ {
+  ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 3}
+  LightBake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
 }
 
 wild_wild_west {
-  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true, aerial_perspective: true, transmission: true, sheen: true, clear_coat: true, diffuse_transmission: true}
-  ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 3}
-
-  camera {
-    Position: {-34, 29, 44}
-    Rotation: {-0.54, -0.658, 0}
-    Camera: {fov: 40, near_: 0.1, far_: 200}
-    CameraController: {speed: 12}
-  }
   street_camera {
     Position: {-20, 9, 21}
     Rotation: {-0.2, -0.64, 0}
@@ -72,87 +99,62 @@ wild_wild_west {
     Camera: {fov: 46, near_: 0.1, far_: 200}
     CameraController: {speed: 8}
   }
-  afternoon {
-    DirectionalLight: {intensity: 2.4 * math.PI}
-    Rgb: {255, 255, 255}
-  }
-  sky {
-    Atmosphere: {
-      sun: afternoon,
-      units_per_km: 100,
-      rayleigh: {scale_height: 8, scattering_scale: 2},
-      mie: {scale_height: 1.6, anisotropy: 0.75, scattering_scale: 4, tint: {255, 214, 164}},
-      ozone_scale: 3,
-      ground_albedo: {196, 150, 104},
-      sun_disk_intensity: 10,
-      sun_radius: 0.75
-    }
-    TimeOfDay: {
-      hour: hud.screen.options.body.hour[Slider.mut].current,
-      day_of_year: hud.screen.options.body.day_of_year[Slider.mut].current,
-      latitude: hud.screen.options.body.latitude[Slider.mut].current,
-      north: hud.screen.options.body.north[Slider.mut].current,
-      sun: afternoon
-    }
-    HeightFog: {
-      density: hud.screen.options.body.fog[Slider.mut].current,
-      falloff: 0.14,
-      base_height: 0,
-      max_opacity: 0.3,
-      atmosphere: sky
-    }
-  }
-  LightBake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
 
-  landscape { WestLandscape: {}; Position: {} }
-  saloon { WestSaloon: {}; Position: {-8.9, 0.11, -7.4} }
-  general_store { WestGeneralStore: {}; Position: {-1.35, 0.11, -7.4} }
-  sheriff { WestSheriff: {}; Position: {5.6, 0.11, -7.4} }
-  windmill { WestWindmill: {}; Position: {13.8, 0.11, -7.2} }
-  water_tower { WestWaterTower: {}; Position: {12.6, 0.11, -0.6} }
-  wagon { WestWagon: {}; Position: {-7.2, 0.11, 3.8}; Rotation: {0, -0.7, 0} }
-  waiting_horse { WestHorse: {}; Position: {-2.4, 0.11, -1.2}; Rotation: {0, -1.35, 0} }
-  corral { WestCorral: {}; Position: {8.5, 0.11, 4.2} }
-  handcar { WestHandcar: {}; Position: {7.5, 0.29, 11.8} }
-  rancher { WestCowboy: {}; Position: {2.7, 0.11, 0.7}; Rotation: {0, 1.4, 0} }
-  saloon_patron { WestCowboy: {}; Position: {-9.9, 0.59, -3.9}; Rotation: {0, -0.2, 0} }
-  station_hand { WestCowboy: {shirt: {154, 84, 48}}; Position: {9.5, 0.11, 10.1}; Rotation: {0, -0.9, 0} }
-  railway { WestRailway: {}; Position: {0, 0.11, 11.8} }
+  landscape { assets.WestLandscape: {}; Position: {} }
+  saloon { assets.WestSaloon: {}; Position: {-8.9, 0.11, -7.4} }
+  general_store { assets.WestGeneralStore: {}; Position: {-1.35, 0.11, -7.4} }
+  sheriff { assets.WestSheriff: {}; Position: {5.6, 0.11, -7.4} }
+  windmill { assets.WestWindmill: {}; Position: {13.8, 0.11, -7.2} }
+  water_tower { assets.WestWaterTower: {}; Position: {12.6, 0.11, -0.6} }
+  wagon { assets.WestWagon: {}; Position: {-7.2, 0.11, 3.8}; Rotation: {0, -0.7, 0} }
+  waiting_horse { assets.WestHorse: {}; Position: {-2.4, 0.11, -1.2}; Rotation: {0, -1.35, 0} }
+  corral { assets.WestCorral: {}; Position: {8.5, 0.11, 4.2} }
+  handcar { assets.WestHandcar: {}; Position: {7.5, 0.29, 11.8} }
+  rancher { assets.WestCowboy: {}; Position: {2.7, 0.11, 0.7}; Rotation: {0, 1.4, 0} }
+  saloon_patron { assets.WestCowboy: {}; Position: {-9.9, 0.59, -3.9}; Rotation: {0, -0.2, 0} }
+  station_hand { assets.WestCowboy: {shirt: {154, 84, 48}}; Position: {9.5, 0.11, 10.1}; Rotation: {0, -0.9, 0} }
+  railway { assets.WestRailway: {}; Position: {0, 0.11, 11.8} }
   for i in 0..3 {
-    WestTelegraph() { Position: {-15.6 + i * 15.6, 0.11, 9.4} }
+    assets.WestTelegraph() { Position: {-15.6 + i * 15.6, 0.11, 9.4} }
   }
   for span in 0..2 {
     for wire in 0..2 {
-      WestWire() { Position: {-16.45 + span * 15.6 + wire * 1.71, 0, 9.4} }
+      assets.WestWire() { Position: {-16.45 + span * 15.6 + wire * 1.71, 0, 9.4} }
     }
   }
   street_dust {
     Position: {0, 0.9, 2}
     FogVolume: {extent: {17, 0.9, 5.5}, density: 0.06, color: {236, 196, 150}, asymmetry: 0.5, edge_fade: 0.8, noise_strength: 0.7, noise_scale: 5, wind: {0.6, 0, 0.15}, light_inscatter: 0}
   }
-  freight { WestFreight: {}; Position: {-13.3, 0.11, 3.8} }
-  hitching_rail { WestHitchingRail: {}; Position: {-1.4, 0.11, -2.2} }
-  town_marker { WestTownMarker: {}; Position: {-12.7, 0.11, 8} }
+  freight { assets.WestFreight: {}; Position: {-13.3, 0.11, 3.8} }
+  hitching_rail { assets.WestHitchingRail: {}; Position: {-1.4, 0.11, -2.2} }
+  town_marker { assets.WestTownMarker: {}; Position: {-12.7, 0.11, 8} }
 }
 
-main_view {
+view {
+  gtao { Gtao: {radius: 0.65, final_value_power: 1.8} }
+  bloom { Bloom: {intensity: 0.1, threshold: 1.8} }
+  exposure { AutoExposure: {min_log_luma: -10.8} }
+  tonemap { Tonemap: {auto_exposure: exposure} }
+  smaa { Smaa: {} }
+
   View: {
-    camera: wild_wild_west.camera,
+    camera: camera,
     clear: {enabled: true, color: {108, 136, 146, 255}},
     lighting: {
       enabled: true,
       baked: hud.screen.options.body.baked[Checkbox.mut].current,
       reflections: true,
       atmosphere: true,
-      environment: {source: wild_wild_west.sky, intensity: 0.8, yaw: 0, background: false}
+      environment: {source: sky, intensity: 0.8, yaw: 0, background: false}
     },
     shadows: {enabled: hud.screen.options.body.shadows[Checkbox.mut].current, resolution: 2048, max_distance: 130},
     effects: [
-      {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: west_contact_shadows},
-      {enabled: true, effect: wild_wild_west.sky},
-      {enabled: true, effect: west_lantern_bloom},
-      {enabled: true, effect: west_film},
-      {enabled: true, effect: west_edges}
+      {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: gtao},
+      {enabled: true, effect: sky},
+      {enabled: true, effect: bloom},
+      {enabled: true, effect: tonemap},
+      {enabled: true, effect: smaa}
     ]
   }
 }

@@ -7,25 +7,27 @@ using box.light
 using box.text
 
 
-template WestCactus {
-  prop height: f32 = 3.2
-  prop tint: Rgb = {81, 111, 66}
-  trunk { Position: {0, height / 2, 0}; Capsule: {radius: 0.23, length: height - 0.46, segments: 16, smooth: true}; Rgb: tint }
-  for i in 0..9 {
-    const a = i * math.PI * 2 / 9
-    { Position: {math.sin(a) * 0.225, height / 2, math.cos(a) * 0.225}; Capsule: {radius: 0.017, length: height - 0.5, segments: 6}; Rgb: {115, 137, 78} }
-  }
-  for side in 0..2 {
-    const s = side * 2 - 1
-    const y = height * (0.43 + side * 0.15)
-    { Position: {s * 0.36, y, 0}; Rotation: {0, 0, math.PI / 2}; Capsule: {radius: 0.16, length: 0.42, segments: 12, smooth: true}; Rgb: tint }
-    { Position: {s * 0.63, y + 0.43, 0}; Capsule: {radius: 0.16, length: 0.85, segments: 12, smooth: true}; Rgb: tint }
-    for i in 0..5 {
-      { Position: {s * 0.63 + math.sin(i * 1.256) * 0.155, y + 0.47, math.cos(i * 1.256) * 0.155}; Cylinder: {radius: 0.013, length: 0.68, segments: 6}; Rgb: {115, 137, 78} }
+assets {
+  template WestCactus {
+    prop height: f32 = 3.2
+    prop tint: Rgb = {81, 111, 66}
+    trunk { Position: {0, height / 2, 0}; Capsule: {radius: 0.23, length: height - 0.46, segments: 16, smooth: true}; Rgb: tint }
+    for i in 0..9 {
+      const a = i * math.PI * 2 / 9
+      { Position: {math.sin(a) * 0.225, height / 2, math.cos(a) * 0.225}; Capsule: {radius: 0.017, length: height - 0.5, segments: 6}; Rgb: {115, 137, 78} }
     }
-  }
-  for i in 0..15 {
-    const a = i * 2.4
-    { Position: {math.sin(a) * 0.245, 0.4 + i * (height - 0.8) / 15, math.cos(a) * 0.245}; Rotation: {0, a, 0.9}; Box: {0.015, 0.075, 0.015}; Rgb: {207, 191, 133} }
+    for side in 0..2 {
+      const s = side * 2 - 1
+      const y = height * (0.43 + side * 0.15)
+      { Position: {s * 0.36, y, 0}; Rotation: {0, 0, math.PI / 2}; Capsule: {radius: 0.16, length: 0.42, segments: 12, smooth: true}; Rgb: tint }
+      { Position: {s * 0.63, y + 0.43, 0}; Capsule: {radius: 0.16, length: 0.85, segments: 12, smooth: true}; Rgb: tint }
+      for i in 0..5 {
+        { Position: {s * 0.63 + math.sin(i * 1.256) * 0.155, y + 0.47, math.cos(i * 1.256) * 0.155}; Cylinder: {radius: 0.013, length: 0.68, segments: 6}; Rgb: {115, 137, 78} }
+      }
+    }
+    for i in 0..15 {
+      const a = i * 2.4
+      { Position: {math.sin(a) * 0.245, 0.4 + i * (height - 0.8) / 15, math.cos(a) * 0.245}; Rotation: {0, a, 0.9}; Box: {0.015, 0.075, 0.015}; Rgb: {207, 191, 133} }
+    }
   }
 }

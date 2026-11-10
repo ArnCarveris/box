@@ -13,54 +13,56 @@ using box.surface
 using box.controllers
 using box.text
 
-template CheeseScale {
-  base {
-    Position: {0, 0.08, 0}
-    RoundedBox: {0.76, 0.16, 0.48, 0.09}
-    Rgb: MarketSage
-    PbrMaterial: {metallic: 0.4, roughness: 0.3}
-  }
-  column {
-    Position: {0, 0.4, 0}
-    Frustum: {radius_bottom: 0.12, radius_top: 0.07, length: 0.65, segments: 12}
-    Rgb: {171, 133, 65}
-    PbrMaterial: {metallic: 0.7, roughness: 0.3}
-    SpecularAnisotropy: {strength: 0.6, rotation: 0}
-  }
-  arm {
-    Position: {0, 0.73, 0}
-    Rotation: {0, 0, 0.06}
-    Box: {1.1, 0.045, 0.055}
-    Rgb: {171, 133, 65}
-  }
-  for side in 0..2 {
-    {
-      Position: {(side - 0.5) * 0.98, 0.35 + side * 0.06, 0}
-      Cylinder: {radius: 0.24, length: 0.035, segments: 24}
-      Rgb: {196, 161, 90}
-      PbrMaterial: {metallic: 0.65, roughness: 0.3}
+assets {
+  template CheeseScale {
+    base {
+      Position: {0, 0.08, 0}
+      RoundedBox: {0.76, 0.16, 0.48, 0.09}
+      Rgb: MarketSage
+      PbrMaterial: {metallic: 0.4, roughness: 0.3}
+    }
+    column {
+      Position: {0, 0.4, 0}
+      Frustum: {radius_bottom: 0.12, radius_top: 0.07, length: 0.65, segments: 12}
+      Rgb: {171, 133, 65}
+      PbrMaterial: {metallic: 0.7, roughness: 0.3}
       SpecularAnisotropy: {strength: 0.6, rotation: 0}
     }
-    for chain in 0..3 {
-      const a = chain * math.PI * 2 / 3
-      MarketBeam(ax: (side - 0.5) * 0.98, ay: 0.7 + side * 0.06,
-        bx: (side - 0.5) * 0.98 + math.sin(a) * 0.22, by: 0.37 + side * 0.06,
-        bz: math.cos(a) * 0.22, radius: 0.009, tint: {171, 133, 65})
+    arm {
+      Position: {0, 0.73, 0}
+      Rotation: {0, 0, 0.06}
+      Box: {1.1, 0.045, 0.055}
+      Rgb: {171, 133, 65}
     }
-  }
-  CheeseWedge() {
-    Position: {-0.49, 0.38, 0}
-    Scale: {0.37, 0.37, 0.37}
-  }
-  weight {
-    Position: {0.49, 0.48, 0}
-    Frustum: {radius_bottom: 0.09, radius_top: 0.06, length: 0.13, segments: 12}
-    Rgb: MarketIron
-  }
-  weight_handle {
-    Position: {0.49, 0.57, 0}
-    Rotation: {math.PI / 2, 0, 0}
-    Torus: {radius: 0.035, tube: 0.012, segments: 12, rings: 6}
-    Rgb: MarketIron
+    for side in 0..2 {
+      {
+        Position: {(side - 0.5) * 0.98, 0.35 + side * 0.06, 0}
+        Cylinder: {radius: 0.24, length: 0.035, segments: 24}
+        Rgb: {196, 161, 90}
+        PbrMaterial: {metallic: 0.65, roughness: 0.3}
+        SpecularAnisotropy: {strength: 0.6, rotation: 0}
+      }
+      for chain in 0..3 {
+        const a = chain * math.PI * 2 / 3
+        MarketBeam(ax: (side - 0.5) * 0.98, ay: 0.7 + side * 0.06,
+          bx: (side - 0.5) * 0.98 + math.sin(a) * 0.22, by: 0.37 + side * 0.06,
+          bz: math.cos(a) * 0.22, radius: 0.009, tint: {171, 133, 65})
+      }
+    }
+    CheeseWedge() {
+      Position: {-0.49, 0.38, 0}
+      Scale: {0.37, 0.37, 0.37}
+    }
+    weight {
+      Position: {0.49, 0.48, 0}
+      Frustum: {radius_bottom: 0.09, radius_top: 0.06, length: 0.13, segments: 12}
+      Rgb: MarketIron
+    }
+    weight_handle {
+      Position: {0.49, 0.57, 0}
+      Rotation: {math.PI / 2, 0, 0}
+      Torus: {radius: 0.035, tube: 0.012, segments: 12, rings: 6}
+      Rgb: MarketIron
+    }
   }
 }

@@ -10,26 +10,28 @@ using box.light
 using box.text
 
 
-template WestGeneralStore {
-  WestStorefront(width: 6.1, height: 3.8, tint: {66, 108, 101}) { Position: {} }
-  front : WestTeal { Position: {0, 4.45, 2.48}; Box: {6.35, 1.2, 0.2} }
-  crown : WestCream { Position: {0, 5.08, 2.5}; Box: {6.65, 0.18, 0.4} }
-  WestSign(label: "GENERAL STORE", width: 5.9, height: 0.9, size: 0.5) { Position: {0, 4.47, 2.62} }
-  WestSign(label: "DRY GOODS  -  FEED  -  TOOLS", width: 5.3, height: 0.35, size: 0.22) { Position: {0, 3.72, 2.55} }
-  for side in 0..2 {
-    WestWindow(width: 1.5, height: 1.55) { Position: {(side - 0.5) * 3.9, 1.85, 2.5} }
-  }
-  door : WestTimber { Position: {0, 1.57, 2.51}; Box: {1.15, 2.2, 0.14} }
-  door_pane : WestGlass { Position: {0, 1.95, 2.6}; Box: {0.87, 1.06, 0.05} }
-  door_panel : WestTeal { Position: {0, 0.99, 2.6}; Box: {0.86, 0.64, 0.06} }
-  handle : WestBrass { Position: {0.4, 1.45, 2.72}; Sphere: {radius: 0.06, segments: 12, smooth: true} }
-  for i in 0..3 {
-    WestCrate() { Position: {-2.55 + i * 0.98, 0.48, 3.5} }
-  }
-  WestCrate() { Position: {-2.55, 1.31, 3.5}; Rotation: {0, 0.08, 0} }
-  WestBarrel() { Position: {2.38, 0.48, 3.55} }
-  for i in 0..3 {
-    { Position: {1.1 + i * 0.35, 0.78, 3.6}; Scale: {0.75, 1, 0.7}; Sphere: {radius: 0.36, segments: 16, smooth: true}; Rgb: {208, 183, 133} }
-    { Position: {1.1 + i * 0.35, 1.1, 3.6}; Torus: {radius: 0.06, tube: 0.022, segments: 10, rings: 6}; Rgb: {103, 64, 38} }
+assets {
+  template WestGeneralStore {
+    WestStorefront(width: 6.1, height: 3.8, tint: {66, 108, 101}) { Position: {} }
+    front : WestTeal { Position: {0, 4.45, 2.48}; Box: {6.35, 1.2, 0.2} }
+    crown : WestCream { Position: {0, 5.08, 2.5}; Box: {6.65, 0.18, 0.4} }
+    WestSign(label: "GENERAL STORE", width: 5.9, height: 0.9, size: 0.5) { Position: {0, 4.47, 2.62} }
+    WestSign(label: "DRY GOODS  -  FEED  -  TOOLS", width: 5.3, height: 0.35, size: 0.22) { Position: {0, 3.72, 2.55} }
+    for side in 0..2 {
+      WestWindow(width: 1.5, height: 1.55) { Position: {(side - 0.5) * 3.9, 1.85, 2.5} }
+    }
+    door : WestTimber { Position: {0, 1.57, 2.51}; Box: {1.15, 2.2, 0.14} }
+    door_pane : WestGlass { Position: {0, 1.95, 2.6}; Box: {0.87, 1.06, 0.05} }
+    door_panel : WestTeal { Position: {0, 0.99, 2.6}; Box: {0.86, 0.64, 0.06} }
+    handle : WestBrass { Position: {0.4, 1.45, 2.72}; Sphere: {radius: 0.06, segments: 12, smooth: true} }
+    for i in 0..3 {
+      WestCrate() { Position: {-2.55 + i * 0.98, 0.48, 3.5} }
+    }
+    WestCrate() { Position: {-2.55, 1.31, 3.5}; Rotation: {0, 0.08, 0} }
+    WestBarrel() { Position: {2.38, 0.48, 3.55} }
+    for i in 0..3 {
+      { Position: {1.1 + i * 0.35, 0.78, 3.6}; Scale: {0.75, 1, 0.7}; Sphere: {radius: 0.36, segments: 16, smooth: true}; Rgb: {208, 183, 133} }
+      { Position: {1.1 + i * 0.35, 1.1, 3.6}; Torus: {radius: 0.06, tube: 0.022, segments: 10, rings: 6}; Rgb: {103, 64, 38} }
+    }
   }
 }

@@ -13,21 +13,23 @@ using box.surface
 using box.controllers
 using box.text
 
-template CafeTable {
-  top { Position: {0, 0.76, 0}; Cylinder: {radius: 0.57, length: 0.08, segments: 32, smooth: true}; Rgb: IslandChalk }
-  edge { Position: {0, 0.77, 0}; Torus: {radius: 0.56, tube: 0.025, segments: 32, rings: 6}; Rgb: IslandCobalt }
-  stem { Position: {0, 0.4, 0}; Cylinder: {radius: 0.055, length: 0.72, segments: 12}; Rgb: IslandCobalt }
-  for i in 0..3 {
-    const a = i * math.PI * 2 / 3
-    IslandBeam(ax: 0, ay: 0.22, bx: math.sin(a) * 0.4, by: 0.05, bz: math.cos(a) * 0.4, radius: 0.035, tint: IslandCobalt) {}
-    CafeChair() { Position: {math.sin(a) * 0.96, 0, math.cos(a) * 0.96}; Rotation: {0, a + math.PI, 0} }
+assets {
+  template CafeTable {
+    top { Position: {0, 0.76, 0}; Cylinder: {radius: 0.57, length: 0.08, segments: 32, smooth: true}; Rgb: IslandChalk }
+    edge { Position: {0, 0.77, 0}; Torus: {radius: 0.56, tube: 0.025, segments: 32, rings: 6}; Rgb: IslandCobalt }
+    stem { Position: {0, 0.4, 0}; Cylinder: {radius: 0.055, length: 0.72, segments: 12}; Rgb: IslandCobalt }
+    for i in 0..3 {
+      const a = i * math.PI * 2 / 3
+      IslandBeam(ax: 0, ay: 0.22, bx: math.sin(a) * 0.4, by: 0.05, bz: math.cos(a) * 0.4, radius: 0.035, tint: IslandCobalt) {}
+      CafeChair() { Position: {math.sin(a) * 0.96, 0, math.cos(a) * 0.96}; Rotation: {0, a + math.PI, 0} }
+    }
+    for i in 0..2 {
+      saucer { Position: {-0.22 + i * 0.45, 0.814, 0.12}; Cylinder: {radius: 0.13, length: 0.022, segments: 20}; Rgb: IslandCobalt }
+      cup { Position: {-0.22 + i * 0.45, 0.88, 0.12}; Tube: {radius: 0.075, thickness: 0.015, length: 0.12, segments: 20}; Rgb: IslandChalk }
+      coffee { Position: {-0.22 + i * 0.45, 0.916, 0.12}; Cylinder: {radius: 0.058, length: 0.01, segments: 16}; Rgb: {72, 45, 27} }
+      handle { Position: {-0.12 + i * 0.45, 0.88, 0.12}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.035, tube: 0.012, segments: 12, rings: 6}; Rgb: IslandChalk }
+    }
+    vase { Position: {0, 0.91, -0.18}; Sphere: {radius: 0.09, segments: 16, smooth: true}; Scale: {0.7, 1.3, 0.7}; Rgb: IslandAzure }
+    sprig { Position: {0, 1.08, -0.18}; Scale: {0.5, 1.7, 0.7}; IcoSphere: {radius: 0.085, segments: 1}; Rgb: IslandLeaf }
   }
-  for i in 0..2 {
-    saucer { Position: {-0.22 + i * 0.45, 0.814, 0.12}; Cylinder: {radius: 0.13, length: 0.022, segments: 20}; Rgb: IslandCobalt }
-    cup { Position: {-0.22 + i * 0.45, 0.88, 0.12}; Tube: {radius: 0.075, thickness: 0.015, length: 0.12, segments: 20}; Rgb: IslandChalk }
-    coffee { Position: {-0.22 + i * 0.45, 0.916, 0.12}; Cylinder: {radius: 0.058, length: 0.01, segments: 16}; Rgb: {72, 45, 27} }
-    handle { Position: {-0.12 + i * 0.45, 0.88, 0.12}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.035, tube: 0.012, segments: 12, rings: 6}; Rgb: IslandChalk }
-  }
-  vase { Position: {0, 0.91, -0.18}; Sphere: {radius: 0.09, segments: 16, smooth: true}; Scale: {0.7, 1.3, 0.7}; Rgb: IslandAzure }
-  sprig { Position: {0, 1.08, -0.18}; Scale: {0.5, 1.7, 0.7}; IcoSphere: {radius: 0.085, segments: 1}; Rgb: IslandLeaf }
 }

@@ -26,57 +26,55 @@ using box.controllers
 using box.movement
 using box.particle
 using box.animation
+using assets
 
 $ {
   Scene: {baked: true, reflections: true, transmission: true, sheen: true,
     clear_coat: true, diffuse_transmission: true}
 }
 
+$ {
+  LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
+  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.6}
+  AmbientLight: {sky: {130, 155, 207}, ground: {66, 73, 107}, intensity: 0.28}
+}
+
 window {
   Surface: {width: 1440, height: 960, vsync: true}
 }
 
-contact_shadows {
-  Gtao: {radius: 0.5, final_value_power: 2}
+assets {
+  firefly_drift {
+    AnimationClip: {duration: 4}
+    rise {
+      AnimationTrack: {component: Position, member: "y", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.14}, {2.3, 0.04}, {3.2, 0.18}, {4, 0}]}}
+    }
+    sway {
+      AnimationTrack: {component: Position, member: "x", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.4, 0.09}, {2.7, -0.07}, {4, 0}]}}
+    }
+  }
 }
 
-lantern_bloom {
-  Bloom: {intensity: 0.18, threshold: 1.2}
+camera {
+  Position: {0, 0, 0}
+  Rotation: {0, 0, 0}
+  // AngularVelocity: {0, 0.15, 0}
+
+  eye {
+    Position: {-19.13, 11.83, 16.21}
+    Rotation: {-0.4408, -0.8679, 0}
+    Camera: {fov: 40, near_: 0.1, far_: 150}
+    CameraController: {}
+  }
 }
 
-tonemap {
-  Tonemap: {}
-}
-
-smaa {
-  Smaa: {}
+sky {
+  Rotation: {0.18, -2.3, 0}
+  DirectionalLight: {intensity: 0.28 * math.PI}
+  Rgb: {155, 179, 236}
 }
 
 japanese_garden {
-  Scene: {baked: true, reflections: true, transmission: true, sheen: true, clear_coat: true, diffuse_transmission: true}
-  LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.6}
-  AmbientLight: {sky: {130, 155, 207}, ground: {66, 73, 107}, intensity: 0.28}
-
-  orbit {
-    Position: {0, 0, 0}
-    Rotation: {0, 0, 0}
-    // AngularVelocity: {0, 0.15, 0}
-
-    camera {
-      Position: {-19.13, 11.83, 16.21}
-      Rotation: {-0.4408, -0.8679, 0}
-      Camera: {fov: 40, near_: 0.1, far_: 150}
-      CameraController: {}
-    }
-  }
-
-  predawn {
-    Rotation: {0.18, -2.3, 0}
-    DirectionalLight: {intensity: 0.28 * math.PI}
-    Rgb: {155, 179, 236}
-  }
-
   island {
     Position: {0, -0.43, 0}
     RoundedBox: {32, 0.85, 28, 0.4}
@@ -537,20 +535,10 @@ japanese_garden {
     }
   }
 
-  firefly_drift {
-    AnimationClip: {duration: 4}
-    rise {
-      AnimationTrack: {component: Position, member: "y", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.14}, {2.3, 0.04}, {3.2, 0.18}, {4, 0}]}}
-    }
-    sway {
-      AnimationTrack: {component: Position, member: "x", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.4, 0.09}, {2.7, -0.07}, {4, 0}]}}
-    }
-  }
-
   for i in 0..8 {
     {
       Position: {0.4 + i * 0.77, 0.65 + math.sin(i * 2.1) * 0.3, 3.7 + math.sin(i * 2.4) * 0.6}
-      Animator: {clip: firefly_drift, time: i * 0.53, speed: 0.8 + (i % 3) * 0.15}
+      Animator: {clip: assets.firefly_drift, time: i * 0.53, speed: 0.8 + (i % 3) * 0.15}
       DynamicTransform
       glow {
         Position: {0, 0, 0}
@@ -587,12 +575,28 @@ japanese_garden {
   }
 }
 
-main_view {
+view {
+  gtao {
+    Gtao: {radius: 0.5, final_value_power: 2}
+  }
+
+  bloom {
+    Bloom: {intensity: 0.18, threshold: 1.2}
+  }
+
+  tonemap {
+    Tonemap: {}
+  }
+
+  smaa {
+    Smaa: {}
+  }
+
   View: {
-    camera: japanese_garden.orbit.camera,
+    camera: camera.eye,
     clear: {enabled: true, color: {51, 56, 81, 255}},
     lighting: {enabled: true, baked: true, reflections: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 85},
-    effects: [{effect: contact_shadows}, {effect: lantern_bloom}, {effect: tonemap}, {effect: smaa}]
+    effects: [{effect: gtao}, {effect: bloom}, {effect: tonemap}, {effect: smaa}]
   }
 }

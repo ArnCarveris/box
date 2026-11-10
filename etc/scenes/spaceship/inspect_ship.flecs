@@ -6,5 +6,6 @@ using box.spatial
 using box.material
 using box.texture
 using box.light
+using assets
 
 ship { Frigate: {} }

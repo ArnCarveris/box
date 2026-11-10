@@ -11,63 +11,65 @@ using box.surface
 using box.controllers
 using box.text
 
-template IslandWindow {
-  prop tint: Rgb = {27, 86, 171}
-  prop shutters: bool = true
-  frame {
-    Position: {}
-    RoundedBox: {0.98, 1.25, 0.14, 0.055}
-    Rgb: IslandChalk
-  }
-  shadow {
-    Position: {0, 0, 0.08}
-    Box: {0.76, 1.02, 0.035}
-    Rgb: IslandRecess
-  }
-  glass {
-    Position: {0, 0, 0.105}
-    Box: {0.62, 0.88, 0.02}
-    Rgb: {81, 139, 162}
-    PbrMaterial: {roughness: 0.05}
-    Transmission: IslandGlass
-  }
-  for side in 0..2 {
-    {
-      Position: {(side - 0.5) * 0.71, 0, 0.13}
-      Box: {0.065, 1, 0.065}
-      Rgb: tint
+assets {
+  template IslandWindow {
+    prop tint: Rgb = {27, 86, 171}
+    prop shutters: bool = true
+    frame {
+      Position: {}
+      RoundedBox: {0.98, 1.25, 0.14, 0.055}
+      Rgb: IslandChalk
     }
-    {
-      Position: {0, (side - 0.5) * 0.95, 0.13}
-      Box: {0.76, 0.065, 0.065}
-      Rgb: tint
+    shadow {
+      Position: {0, 0, 0.08}
+      Box: {0.76, 1.02, 0.035}
+      Rgb: IslandRecess
     }
-    if shutters {
+    glass {
+      Position: {0, 0, 0.105}
+      Box: {0.62, 0.88, 0.02}
+      Rgb: {81, 139, 162}
+      PbrMaterial: {roughness: 0.05}
+      Transmission: IslandGlass
+    }
+    for side in 0..2 {
       {
-        Position: {(side - 0.5) * 1.28, 0, 0.15}
-        Rotation: {0, (side - 0.5) * -0.3, 0}
-        panel {
-          Position: {}
-          RoundedBox: {0.4, 1.07, 0.07, 0.025}
-          Rgb: tint
-        }
-        for slat in 0..8 {
-          {
-            Position: {0, -0.43 + slat * 0.12, 0.052}
-            Rotation: {0.25, 0, 0}
-            Box: {0.3, 0.055, 0.055}
-            Rgb: {60, 123, 181}
+        Position: {(side - 0.5) * 0.71, 0, 0.13}
+        Box: {0.065, 1, 0.065}
+        Rgb: tint
+      }
+      {
+        Position: {0, (side - 0.5) * 0.95, 0.13}
+        Box: {0.76, 0.065, 0.065}
+        Rgb: tint
+      }
+      if shutters {
+        {
+          Position: {(side - 0.5) * 1.28, 0, 0.15}
+          Rotation: {0, (side - 0.5) * -0.3, 0}
+          panel {
+            Position: {}
+            RoundedBox: {0.4, 1.07, 0.07, 0.025}
+            Rgb: tint
           }
-        }
-        hinge {
-          Position: {0, -0.28, 0.09}
-          Box: {0.23, 0.035, 0.02}
-          Rgb: IslandIron
+          for slat in 0..8 {
+            {
+              Position: {0, -0.43 + slat * 0.12, 0.052}
+              Rotation: {0.25, 0, 0}
+              Box: {0.3, 0.055, 0.055}
+              Rgb: {60, 123, 181}
+            }
+          }
+          hinge {
+            Position: {0, -0.28, 0.09}
+            Box: {0.23, 0.035, 0.02}
+            Rgb: IslandIron
+          }
         }
       }
     }
+    mullion { Position: {0, 0, 0.14}; Box: {0.045, 0.95, 0.05}; Rgb: tint }
+    crossbar { Position: {0, 0.03, 0.14}; Box: {0.7, 0.045, 0.05}; Rgb: tint }
+    sill { Position: {0, -0.65, 0.13}; RoundedBox: {1.13, 0.13, 0.4, 0.04}; Rgb: IslandChalk }
   }
-  mullion { Position: {0, 0, 0.14}; Box: {0.045, 0.95, 0.05}; Rgb: tint }
-  crossbar { Position: {0, 0.03, 0.14}; Box: {0.7, 0.045, 0.05}; Rgb: tint }
-  sill { Position: {0, -0.65, 0.13}; RoundedBox: {1.13, 0.13, 0.4, 0.04}; Rgb: IslandChalk }
 }

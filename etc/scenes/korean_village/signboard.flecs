@@ -4,46 +4,48 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanSignboard {
-  { (IsA, KoreanSignGround); Position: {}; RoundedBox: {1.02, 0.5, 0.05, 0.012} }
-  for side in 0..2 {
-    { (IsA, KoreanGold); Position: {0, (side - 0.5) * 0.46, 0.028}; Box: {1.02, 0.028, 0.012} }
-    { (IsA, KoreanGold); Position: {(side - 0.5) * 0.99, 0, 0.028}; Box: {0.028, 0.48, 0.012} }
-    { (IsA, KoreanRed); Position: {(side - 0.5) * 1.08, 0, 0}; Box: {0.06, 0.56, 0.07} }
-    { (IsA, KoreanRed); Position: {0, (side - 0.5) * 0.56, 0}; Box: {1.14, 0.06, 0.07} }
+assets {
+  template KoreanSignboard {
+    { (IsA, KoreanSignGround); Position: {}; RoundedBox: {1.02, 0.5, 0.05, 0.012} }
+    for side in 0..2 {
+      { (IsA, KoreanGold); Position: {0, (side - 0.5) * 0.46, 0.028}; Box: {1.02, 0.028, 0.012} }
+      { (IsA, KoreanGold); Position: {(side - 0.5) * 0.99, 0, 0.028}; Box: {0.028, 0.48, 0.012} }
+      { (IsA, KoreanRed); Position: {(side - 0.5) * 1.08, 0, 0}; Box: {0.06, 0.56, 0.07} }
+      { (IsA, KoreanRed); Position: {0, (side - 0.5) * 0.56, 0}; Box: {1.14, 0.06, 0.07} }
+    }
   }
-}
 
-template KoreanGlyphCenter {
-  { (IsA, KoreanGold); Position: {0, 0, 0.03}; Box: {0.03, 0.36, 0.012} }
-  for side in 0..2 {
-    { (IsA, KoreanGold); Position: {0, 0.015 + (side - 0.5) * 0.15, 0.03}; Box: {0.24, 0.03, 0.012} }
-    { (IsA, KoreanGold); Position: {(side - 0.5) * 0.24, 0.015, 0.03}; Box: {0.03, 0.15, 0.012} }
+  template KoreanGlyphCenter {
+    { (IsA, KoreanGold); Position: {0, 0, 0.03}; Box: {0.03, 0.36, 0.012} }
+    for side in 0..2 {
+      { (IsA, KoreanGold); Position: {0, 0.015 + (side - 0.5) * 0.15, 0.03}; Box: {0.24, 0.03, 0.012} }
+      { (IsA, KoreanGold); Position: {(side - 0.5) * 0.24, 0.015, 0.03}; Box: {0.03, 0.15, 0.012} }
+    }
   }
-}
 
-template KoreanGlyphRight {
-  { (IsA, KoreanGold); Position: {0, 0.15, 0.03}; Box: {0.26, 0.03, 0.012} }
-  { (IsA, KoreanGold); Position: {0, -0.15, 0.03}; Box: {0.32, 0.03, 0.012} }
-  { (IsA, KoreanGold); Position: {0, 0, 0.03}; Box: {0.03, 0.3, 0.012} }
-  { (IsA, KoreanGold); Position: {0.06, 0, 0.03}; Box: {0.12, 0.03, 0.012} }
-  { (IsA, KoreanGold); Position: {-0.1, -0.065, 0.03}; Box: {0.03, 0.17, 0.012} }
-}
-
-template KoreanGlyphGreat {
-  { (IsA, KoreanGold); Position: {0, 0.05, 0.03}; Box: {0.3, 0.03, 0.012} }
-  { (IsA, KoreanGold); Position: {0, 0.11, 0.03}; Box: {0.03, 0.12, 0.012} }
-  for side in 0..2 {
-    { (IsA, KoreanGold); Position: {(side - 0.5) * 0.14, -0.055, 0.03}; Rotation: {0, 0, (side - 0.5) * 1.176}; Box: {0.03, 0.252, 0.012} }
+  template KoreanGlyphRight {
+    { (IsA, KoreanGold); Position: {0, 0.15, 0.03}; Box: {0.26, 0.03, 0.012} }
+    { (IsA, KoreanGold); Position: {0, -0.15, 0.03}; Box: {0.32, 0.03, 0.012} }
+    { (IsA, KoreanGold); Position: {0, 0, 0.03}; Box: {0.03, 0.3, 0.012} }
+    { (IsA, KoreanGold); Position: {0.06, 0, 0.03}; Box: {0.12, 0.03, 0.012} }
+    { (IsA, KoreanGold); Position: {-0.1, -0.065, 0.03}; Box: {0.03, 0.17, 0.012} }
   }
-}
 
-template KoreanGlyphGate {
-  for side in 0..2 {
-    const sign = side * 2 - 1
-    { (IsA, KoreanGold); Position: {sign * 0.13, 0, 0.03}; Box: {0.03, 0.36, 0.012} }
-    { (IsA, KoreanGold); Position: {sign * 0.085, 0.16, 0.03}; Box: {0.1, 0.03, 0.012} }
-    { (IsA, KoreanGold); Position: {sign * 0.085, 0.07, 0.03}; Box: {0.1, 0.03, 0.012} }
-    { (IsA, KoreanGold); Position: {sign * 0.035, 0.115, 0.03}; Box: {0.03, 0.09, 0.012} }
+  template KoreanGlyphGreat {
+    { (IsA, KoreanGold); Position: {0, 0.05, 0.03}; Box: {0.3, 0.03, 0.012} }
+    { (IsA, KoreanGold); Position: {0, 0.11, 0.03}; Box: {0.03, 0.12, 0.012} }
+    for side in 0..2 {
+      { (IsA, KoreanGold); Position: {(side - 0.5) * 0.14, -0.055, 0.03}; Rotation: {0, 0, (side - 0.5) * 1.176}; Box: {0.03, 0.252, 0.012} }
+    }
+  }
+
+  template KoreanGlyphGate {
+    for side in 0..2 {
+      const sign = side * 2 - 1
+      { (IsA, KoreanGold); Position: {sign * 0.13, 0, 0.03}; Box: {0.03, 0.36, 0.012} }
+      { (IsA, KoreanGold); Position: {sign * 0.085, 0.16, 0.03}; Box: {0.1, 0.03, 0.012} }
+      { (IsA, KoreanGold); Position: {sign * 0.085, 0.07, 0.03}; Box: {0.1, 0.03, 0.012} }
+      { (IsA, KoreanGold); Position: {sign * 0.035, 0.115, 0.03}; Box: {0.03, 0.09, 0.012} }
+    }
   }
 }

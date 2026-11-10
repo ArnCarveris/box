@@ -11,21 +11,23 @@ using box.surface
 using box.controllers
 using box.text
 
-template MarketLabel {
-  prop label: string = "FARMHOUSE"
-  prop width: f32 = 1.1
-  prop size: f32 = 0.12
-  prop tint: Rgb = {250, 234, 196}
+assets {
+  template MarketLabel {
+    prop label: string = "FARMHOUSE"
+    prop width: f32 = 1.1
+    prop size: f32 = 0.12
+    prop tint: Rgb = {250, 234, 196}
 
-  board {
-    Position: {}
-    Box: {width, 0.3, 0.045}
-    Rgb: MarketIron
-  }
-  lettering {
-    Position: {0, 0, 0.026}
-    Scale: {0.01, 0.01, 0.01}
-    Text: {value: label, size: size * 100}
-    Rgb: tint
+    board {
+      Position: {}
+      Box: {width, 0.3, 0.045}
+      Rgb: MarketIron
+    }
+    lettering {
+      Position: {0, 0, 0.026}
+      Scale: {0.01, 0.01, 0.01}
+      Text: {value: label, size: size * 100}
+      Rgb: tint
+    }
   }
 }

@@ -17,32 +17,34 @@ using box.surface
 using box.controllers
 using box.text
 
-template CheeseStall {
-  prop tint: Rgb = {163, 65, 52}
-  prop variant: i32 = 0
+assets {
+  template CheeseStall {
+    prop tint: Rgb = {163, 65, 52}
+    prop variant: i32 = 0
 
-  MarketAwning(tint: tint) { Position: {} }
-  CheeseCounter(variant: variant) { Position: {0, 0, 0.42} }
-  MarketLantern() { Position: {-1.78, 2.17, 0.4} }
-  for side in 0..2 {
-    {
-      Position: {(side - 0.5) * 4.22, 1.48, -1.04}
-      Box: {0.09, 2.96, 0.09}
-      Rgb: MarketOak
-    }
-  }
-  for shelf in 0..2 {
-    {
-      Position: {0, 0.85 + shelf * 0.8, -0.92}
-      Box: {3.95, 0.085, 0.5}
-      Rgb: MarketHoney
-    }
-    for i in 0..5 {
-      CheeseWheel(radius: 0.26, height: 0.18, tint: {159, 62 + i % 2 * 21, 43}, wax: true) {
-        Position: {(i - 2) * 0.72, 0.9 + shelf * 0.8, -0.92}
+    MarketAwning(tint: tint) { Position: {} }
+    CheeseCounter(variant: variant) { Position: {0, 0, 0.42} }
+    MarketLantern() { Position: {-1.78, 2.17, 0.4} }
+    for side in 0..2 {
+      {
+        Position: {(side - 0.5) * 4.22, 1.48, -1.04}
+        Box: {0.09, 2.96, 0.09}
+        Rgb: MarketOak
       }
     }
+    for shelf in 0..2 {
+      {
+        Position: {0, 0.85 + shelf * 0.8, -0.92}
+        Box: {3.95, 0.085, 0.5}
+        Rgb: MarketHoney
+      }
+      for i in 0..5 {
+        CheeseWheel(radius: 0.26, height: 0.18, tint: {159, 62 + i % 2 * 21, 43}, wax: true) {
+          Position: {(i - 2) * 0.72, 0.9 + shelf * 0.8, -0.92}
+        }
+      }
+    }
+    MarketCrate() { Position: {-1.1, 0, -0.7} }
+    MilkCan() { Position: {1.28, 0, -0.6} }
   }
-  MarketCrate() { Position: {-1.1, 0, -0.7} }
-  MilkCan() { Position: {1.28, 0, -0.6} }
 }

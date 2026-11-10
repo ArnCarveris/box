@@ -12,29 +12,31 @@ using box.surface
 using box.controllers
 using box.movement
 
-template GardenBed {
-  prop length: f32 = 5
-  prop flowers: i32 = 5
-  prop tint: Rgb = {193, 164, 222}
+assets {
+  template GardenBed {
+    prop length: f32 = 5
+    prop flowers: i32 = 5
+    prop tint: Rgb = {193, 164, 222}
 
-  soil {
-    Position: {0, 0.09, 0}
-    RoundedBox: {length, 0.18, 1.15, 0.18}
-    Rgb: {87, 109, 81}
-  }
-  for i in 0..flowers {
-    FlowerBush(tint: tint) {
-      Position: {-length / 2 + (i + 0.5) * length / flowers, 0.13, math.sin(i * 2.4) * 0.16}
+    soil {
+      Position: {0, 0.09, 0}
+      RoundedBox: {length, 0.18, 1.15, 0.18}
+      Rgb: {87, 109, 81}
     }
-  }
-  for i in 0..12 {
-    for side in 0..2 {
-      {
-        Position: {-length / 2 + (i + 0.5) * length / 12, 0.12, (side - 0.5) * 1.12}
-        Rotation: {0, i * 0.4, 0}
-        Scale: {1, 0.6, 0.8}
-        IcoSphere: {radius: 0.13, segments: 1}
-        Rgb: GardenStone
+    for i in 0..flowers {
+      FlowerBush(tint: tint) {
+        Position: {-length / 2 + (i + 0.5) * length / flowers, 0.13, math.sin(i * 2.4) * 0.16}
+      }
+    }
+    for i in 0..12 {
+      for side in 0..2 {
+        {
+          Position: {-length / 2 + (i + 0.5) * length / 12, 0.12, (side - 0.5) * 1.12}
+          Rotation: {0, i * 0.4, 0}
+          Scale: {1, 0.6, 0.8}
+          IcoSphere: {radius: 0.13, segments: 1}
+          Rgb: GardenStone
+        }
       }
     }
   }

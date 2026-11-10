@@ -13,13 +13,15 @@ using box.surface
 using box.controllers
 using box.text
 
-template BellTower {
-  plinth { Position: {0, 0.15, 0}; RoundedBox: {3.4, 0.3, 1.15, 0.08}; Rgb: IslandChalk }
-  base { Position: {0, 0.65, 0}; RoundedBox: {3.05, 1, 0.75, 0.08}; Rgb: IslandPlaster }
-  for side in 0..2 {
-    BellArch() { Position: {(side - 0.5) * 1.42, 1.15, 0} }
+assets {
+  template BellTower {
+    plinth { Position: {0, 0.15, 0}; RoundedBox: {3.4, 0.3, 1.15, 0.08}; Rgb: IslandChalk }
+    base { Position: {0, 0.65, 0}; RoundedBox: {3.05, 1, 0.75, 0.08}; Rgb: IslandPlaster }
+    for side in 0..2 {
+      BellArch() { Position: {(side - 0.5) * 1.42, 1.15, 0} }
+    }
+    ledge { Position: {0, 2.94, 0}; RoundedBox: {3.2, 0.16, 0.7, 0.06}; Rgb: IslandChalk }
+    BellArch(width: 0.94, height: 1.32) { Position: {0, 3.02, 0} }
+    IslandCross() { Position: {0, 4.63, 0} }
   }
-  ledge { Position: {0, 2.94, 0}; RoundedBox: {3.2, 0.16, 0.7, 0.06}; Rgb: IslandChalk }
-  BellArch(width: 0.94, height: 1.32) { Position: {0, 3.02, 0} }
-  IslandCross() { Position: {0, 4.63, 0} }
 }

@@ -11,19 +11,21 @@ using box.surface
 using box.controllers
 using box.text
 
-template IslandLantern {
-  bracket { Position: {0, 0.13, 0.12}; Box: {0.035, 0.035, 0.37}; Rgb: IslandIron }
-  glass {
-    Position: {0, -0.1, 0.26}
-    Box: {0.17, 0.28, 0.15}
-    Rgb: {255, 218, 139}
-    Emissive: {strength: 0.4, color: {255, 213, 125}}
-  }
-  for side in 0..2 {
-    for end in 0..2 {
-      { Position: {(side - 0.5) * 0.2, -0.1, 0.26 + (end - 0.5) * 0.18}; Box: {0.025, 0.32, 0.025}; Rgb: IslandIron }
+assets {
+  template IslandLantern {
+    bracket { Position: {0, 0.13, 0.12}; Box: {0.035, 0.035, 0.37}; Rgb: IslandIron }
+    glass {
+      Position: {0, -0.1, 0.26}
+      Box: {0.17, 0.28, 0.15}
+      Rgb: {255, 218, 139}
+      Emissive: {strength: 0.4, color: {255, 213, 125}}
     }
-    { Position: {0, -0.27 + side * 0.34, 0.26}; Box: {0.25, 0.04, 0.23}; Rgb: IslandIron }
+    for side in 0..2 {
+      for end in 0..2 {
+        { Position: {(side - 0.5) * 0.2, -0.1, 0.26 + (end - 0.5) * 0.18}; Box: {0.025, 0.32, 0.025}; Rgb: IslandIron }
+      }
+      { Position: {0, -0.27 + side * 0.34, 0.26}; Box: {0.25, 0.04, 0.23}; Rgb: IslandIron }
+    }
+    cap { Position: {0, 0.11, 0.26}; Rotation: {0, math.PI / 4, 0}; Cone: {radius: 0.19, length: 0.12, segments: 4}; Rgb: IslandIron }
   }
-  cap { Position: {0, 0.11, 0.26}; Rotation: {0, math.PI / 4, 0}; Cone: {radius: 0.19, length: 0.12, segments: 4}; Rgb: IslandIron }
 }

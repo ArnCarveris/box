@@ -7,53 +7,55 @@ using box.material
 using box.texture
 using box.light
 
-template DockClamp {
-  prop reach: f32 = 44
-  root { AttachmentFrame: {} }
-  shoe : RecessMetal { Position: {0, 0, 0.6}; Box: {6.8, 5.4, 1.2} }
-  wrist : DockYellow { Position: {0, -1, 2.7}; BeveledPrism: {footprint: [{-4.4, -2}, {4.4, -2}, {3.2, 4}, {-3.2, 4}], depth: 6.5, inset: 0.55, bevel: 0.6} }
-  upper_jaw : Titanium { Position: {0, 3.2, 0.2}; Box: {7.8, 1.2, 3} }
-  lower_jaw : Titanium { Position: {0, -3.2, 0.2}; Box: {7.8, 1.2, 3} }
-  pivot : DarkArmor { Position: {0, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 2.7, length: 11, segments: 16} }
-  for side in 0..2 {
-    const x = (side - 0.5) * 8.4
-    "cheek_{side}" : DockYellow { Position: {x, -4.8, 7.5}; Rotation: {0, 0, 1.5707963}; BeveledPrism: {footprint: [{-4, -4}, {4, -4}, {3, 6}, {-2, 6}], depth: 1, inset: 0.3, bevel: 0.25} }
-    "axle_{side}" : Titanium { Position: {(side - 0.5) * 11.3, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 1.5, length: 0.6, segments: 12} }
-    "piston_body_{side}" : DockYellow { Position: {x, -7, reach - 11}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.65, length: 19, segments: 12} }
-    "piston_rod_{side}" : PistonChrome { Position: {x, -7, reach / 2 - 4.5}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.85, length: reach - 20, segments: 16, smooth: true} }
-    "seal_{side}" : RecessMetal { Position: {x, -7, reach - 20.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.75, thickness: 0.42, length: 0.9, segments: 16} }
-    "bearing_{side}" : Titanium { Position: {x, -7, reach - 21.2}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.4, thickness: 0.25, length: 0.4, segments: 16} }
-    for j in 0..5 {
-      "collar_{side}_{j}" : DarkArmor { Position: {x, -7, reach - 18 + j * 3.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.78, thickness: 0.26, length: 0.35, segments: 12} }
-      "hydraulic_line_{side}_{j}" : Titanium { Position: {x + 1.9, -7, reach - 18 + j * 3.6}; Box: {0.3, 0.3, 3.4} }
+assets {
+  template DockClamp {
+    prop reach: f32 = 44
+    root { AttachmentFrame: {} }
+    shoe : RecessMetal { Position: {0, 0, 0.6}; Box: {6.8, 5.4, 1.2} }
+    wrist : DockYellow { Position: {0, -1, 2.7}; BeveledPrism: {footprint: [{-4.4, -2}, {4.4, -2}, {3.2, 4}, {-3.2, 4}], depth: 6.5, inset: 0.55, bevel: 0.6} }
+    upper_jaw : Titanium { Position: {0, 3.2, 0.2}; Box: {7.8, 1.2, 3} }
+    lower_jaw : Titanium { Position: {0, -3.2, 0.2}; Box: {7.8, 1.2, 3} }
+    pivot : DarkArmor { Position: {0, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 2.7, length: 11, segments: 16} }
+    for side in 0..2 {
+      const x = (side - 0.5) * 8.4
+      "cheek_{side}" : DockYellow { Position: {x, -4.8, 7.5}; Rotation: {0, 0, 1.5707963}; BeveledPrism: {footprint: [{-4, -4}, {4, -4}, {3, 6}, {-2, 6}], depth: 1, inset: 0.3, bevel: 0.25} }
+      "axle_{side}" : Titanium { Position: {(side - 0.5) * 11.3, -3.3, 5}; Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 1.5, length: 0.6, segments: 12} }
+      "piston_body_{side}" : DockYellow { Position: {x, -7, reach - 11}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 1.65, length: 19, segments: 12} }
+      "piston_rod_{side}" : PistonChrome { Position: {x, -7, reach / 2 - 4.5}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.85, length: reach - 20, segments: 16, smooth: true} }
+      "seal_{side}" : RecessMetal { Position: {x, -7, reach - 20.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.75, thickness: 0.42, length: 0.9, segments: 16} }
+      "bearing_{side}" : Titanium { Position: {x, -7, reach - 21.2}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.4, thickness: 0.25, length: 0.4, segments: 16} }
+      for j in 0..5 {
+        "collar_{side}_{j}" : DarkArmor { Position: {x, -7, reach - 18 + j * 3.6}; Rotation: {1.5707963, 0, 0}; Tube: {radius: 1.78, thickness: 0.26, length: 0.35, segments: 12} }
+        "hydraulic_line_{side}_{j}" : Titanium { Position: {x + 1.9, -7, reach - 18 + j * 3.6}; Box: {0.3, 0.3, 3.4} }
+      }
+      "brace_{side}" { ShipBeam: {ax: x, ay: -7, az: 8, bx: x, by: -3.3, bz: 5, radius: 1} }
+      "runner_{side}" : DarkArmor { Position: {x, -10, reach / 2}; Box: {0.9, 1.5, reach - 6} }
+      "runner_edge_{side}" : Titanium { Position: {x, -9.2, reach / 2}; Box: {0.35, 0.18, reach - 7} }
+      "indicator_{side}" : AmberLight { Position: {x, -4.9, reach - 10}; Box: {0.6, 0.2, 3} }
     }
-    "brace_{side}" { ShipBeam: {ax: x, ay: -7, az: 8, bx: x, by: -3.3, bz: 5, radius: 1} }
-    "runner_{side}" : DarkArmor { Position: {x, -10, reach / 2}; Box: {0.9, 1.5, reach - 6} }
-    "runner_edge_{side}" : Titanium { Position: {x, -9.2, reach / 2}; Box: {0.35, 0.18, reach - 7} }
-    "indicator_{side}" : AmberLight { Position: {x, -4.9, reach - 10}; Box: {0.6, 0.2, 3} }
-  }
-  crosshead : DarkArmor { Position: {0, -7, 9}; Box: {11.3, 3, 3.5} }
-  ram_label { Position: {0, -5.46, 9}; Rotation: {-1.5707963, 0, 0}; Quad: {7.8, 2.6}; Rgb: {255, 255, 255}; PbrTextures: {albedo: ship_warning} }
-  mounting : DarkArmor { Position: {0, -6, reach}; Box: {13.5, 13, 4} }
-  mounting_face : DockYellow { Position: {0, -5.4, reach - 2.2}; Box: {11, 9, 0.8} }
-  foundation : Titanium { Position: {0, -13, reach}; Box: {16, 2, 10} }
-  bolts {
-    Position: {-5.8, -11, reach - 2.8}
-    Array: {axis: Y, count: 5, spacing: 2.6}
-    left : Titanium { Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.24, length: 0.3, segments: 6} }
-    right : Titanium { Position: {11.6, 0, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.24, length: 0.3, segments: 6} }
-  }
-  hose_path { Path3D: {start: {0, -5, reach - 3}, segments: [{kind: CubicBezier, control1: {0, -14, reach - 10}, control2: {0, -15, 14}, end: {0, -7, 7}}]} }
-  hose_profile { Path2D: {start: {0.3, 0}, segments: [{kind: Line, end: {0.21, 0.21}}, {kind: Line, end: {0, 0.3}}, {kind: Line, end: {-0.21, 0.21}}, {kind: Line, end: {-0.3, 0}}, {kind: Line, end: {-0.21, -0.21}}, {kind: Line, end: {0, -0.3}}, {kind: Line, end: {0.21, -0.21}}], closed: true} }
-  hose_section { Profile2D: {outer: hose_profile} }
-  hose : RecessMetal { Position: {0, 0, 0}; Sweep: {path: hose_path, profile: hose_section, scale: {1, 1}, taper: 1, cap_start: true, cap_end: true, segments: 8, rings: 32} }
-  shoe_lugs { Position: {-2.8, 3.85, 0}; Array: {axis: X, count: 8, spacing: 0.8}; tooth : DarkArmor { Position: {}; Box: {0.45, 0.5, 2.4} } }
+    crosshead : DarkArmor { Position: {0, -7, 9}; Box: {11.3, 3, 3.5} }
+    ram_label { Position: {0, -5.46, 9}; Rotation: {-1.5707963, 0, 0}; Quad: {7.8, 2.6}; Rgb: {255, 255, 255}; PbrTextures: {albedo: ship_warning} }
+    mounting : DarkArmor { Position: {0, -6, reach}; Box: {13.5, 13, 4} }
+    mounting_face : DockYellow { Position: {0, -5.4, reach - 2.2}; Box: {11, 9, 0.8} }
+    foundation : Titanium { Position: {0, -13, reach}; Box: {16, 2, 10} }
+    bolts {
+      Position: {-5.8, -11, reach - 2.8}
+      Array: {axis: Y, count: 5, spacing: 2.6}
+      left : Titanium { Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.24, length: 0.3, segments: 6} }
+      right : Titanium { Position: {11.6, 0, 0}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.24, length: 0.3, segments: 6} }
+    }
+    hose_path { Path3D: {start: {0, -5, reach - 3}, segments: [{kind: CubicBezier, control1: {0, -14, reach - 10}, control2: {0, -15, 14}, end: {0, -7, 7}}]} }
+    hose_profile { Path2D: {start: {0.3, 0}, segments: [{kind: Line, end: {0.21, 0.21}}, {kind: Line, end: {0, 0.3}}, {kind: Line, end: {-0.21, 0.21}}, {kind: Line, end: {-0.3, 0}}, {kind: Line, end: {-0.21, -0.21}}, {kind: Line, end: {0, -0.3}}, {kind: Line, end: {0.21, -0.21}}], closed: true} }
+    hose_section { Profile2D: {outer: hose_profile} }
+    hose : RecessMetal { Position: {0, 0, 0}; Sweep: {path: hose_path, profile: hose_section, scale: {1, 1}, taper: 1, cap_start: true, cap_end: true, segments: 8, rings: 32} }
+    shoe_lugs { Position: {-2.8, 3.85, 0}; Array: {axis: X, count: 8, spacing: 0.8}; tooth : DarkArmor { Position: {}; Box: {0.45, 0.5, 2.4} } }
 
-  back_panel : DockYellow { Position: {0, -5, reach + 2.1}; Box: {10.5, 8, 0.35} }
-  back_inset : RecessMetal { Position: {0, -5, reach + 2.31}; Box: {8.5, 6, 0.1} }
-  grille { Position: {-3.8, -5, reach + 2.45}; Array: {axis: X, count: 16, spacing: 0.5}; fin : Titanium { Position: {}; Box: {0.12, 5.5, 0.2} } }
-  for i in 0..4 {
-    "support_{i}" : DockYellow { Position: {-6 + i * 4, -10.6, reach + 1}; Rotation: {0.3, 0, 0}; Box: {0.45, 5, 6} }
-    "lock_{i}" : Titanium { Position: {-3 + i * 2, 0, -0.1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.22, length: 0.4, segments: 6} }
+    back_panel : DockYellow { Position: {0, -5, reach + 2.1}; Box: {10.5, 8, 0.35} }
+    back_inset : RecessMetal { Position: {0, -5, reach + 2.31}; Box: {8.5, 6, 0.1} }
+    grille { Position: {-3.8, -5, reach + 2.45}; Array: {axis: X, count: 16, spacing: 0.5}; fin : Titanium { Position: {}; Box: {0.12, 5.5, 0.2} } }
+    for i in 0..4 {
+      "support_{i}" : DockYellow { Position: {-6 + i * 4, -10.6, reach + 1}; Rotation: {0.3, 0, 0}; Box: {0.45, 5, 6} }
+      "lock_{i}" : Titanium { Position: {-3 + i * 2, 0, -0.1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.22, length: 0.4, segments: 6} }
+    }
   }
 }

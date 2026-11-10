@@ -14,34 +14,36 @@ using box.surface
 using box.controllers
 using box.text
 
-template IslandWindmill {
-  tower { Position: {0, 2, 0}; Frustum: {radius_bottom: 1.35, radius_top: 1.05, length: 4, segments: 40, smooth: true}; Rgb: IslandPlaster }
-  base { Position: {0, 0.14, 0}; Cylinder: {radius: 1.45, length: 0.28, segments: 40, smooth: true}; Rgb: IslandChalk }
-  cap { Position: {0, 4.48, 0}; Cone: {radius: 1.32, length: 1.1, segments: 40, smooth: true}; Rgb: {144, 84, 65} }
-  for i in 0..32 {
-    const a = i * math.PI / 16
-    IslandBeam(ax: math.sin(a) * 1.31, ay: 3.95, az: math.cos(a) * 1.31, bx: 0, by: 5.04, radius: 0.018, tint: {180, 115, 85}) {}
-  }
-  IslandDoor() { Position: {0, 0.14, 1.3}; Scale: {0.7, 0.78, 0.7} }
-  rotor {
-    Position: {0, 3.8, 1.45}
-    Rotation: {0, 0, 0.18}
-    AngularVelocity: {0, 0, -0.55}
-    DynamicTransform
-    hub { Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.18, length: 0.55, segments: 16}; Rgb: IslandWood }
-    for i in 0..8 {
-      const a = i * math.PI / 4
-      IslandBeam(ax: 0, ay: 0, az: 0.12, bx: math.sin(a) * 2.9, by: math.cos(a) * 2.9, bz: 0.12, radius: 0.035) {}
-      {
-        Position: {-0.48 * math.cos(a) + 1.74 * math.sin(a), 0.48 * math.sin(a) + 1.74 * math.cos(a), 0.15}
-        Rotation: {0, 0, math.PI - a}
-        RightTrianglePrism: {0.96, 2.08, 0.025}
-        Rgb: {251, 237, 204}
-        PbrMaterial: {roughness: 0.95}
-        Sheen: IslandLinen
-        DiffuseTransmission: IslandCloth
+assets {
+  template IslandWindmill {
+    tower { Position: {0, 2, 0}; Frustum: {radius_bottom: 1.35, radius_top: 1.05, length: 4, segments: 40, smooth: true}; Rgb: IslandPlaster }
+    base { Position: {0, 0.14, 0}; Cylinder: {radius: 1.45, length: 0.28, segments: 40, smooth: true}; Rgb: IslandChalk }
+    cap { Position: {0, 4.48, 0}; Cone: {radius: 1.32, length: 1.1, segments: 40, smooth: true}; Rgb: {144, 84, 65} }
+    for i in 0..32 {
+      const a = i * math.PI / 16
+      IslandBeam(ax: math.sin(a) * 1.31, ay: 3.95, az: math.cos(a) * 1.31, bx: 0, by: 5.04, radius: 0.018, tint: {180, 115, 85}) {}
+    }
+    IslandDoor() { Position: {0, 0.14, 1.3}; Scale: {0.7, 0.78, 0.7} }
+    rotor {
+      Position: {0, 3.8, 1.45}
+      Rotation: {0, 0, 0.18}
+      AngularVelocity: {0, 0, -0.55}
+      DynamicTransform
+      hub { Position: {}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.18, length: 0.55, segments: 16}; Rgb: IslandWood }
+      for i in 0..8 {
+        const a = i * math.PI / 4
+        IslandBeam(ax: 0, ay: 0, az: 0.12, bx: math.sin(a) * 2.9, by: math.cos(a) * 2.9, bz: 0.12, radius: 0.035) {}
+        {
+          Position: {-0.48 * math.cos(a) + 1.74 * math.sin(a), 0.48 * math.sin(a) + 1.74 * math.cos(a), 0.15}
+          Rotation: {0, 0, math.PI - a}
+          RightTrianglePrism: {0.96, 2.08, 0.025}
+          Rgb: {251, 237, 204}
+          PbrMaterial: {roughness: 0.95}
+          Sheen: IslandLinen
+          DiffuseTransmission: IslandCloth
+        }
+        IslandBeam(ax: math.sin(a) * 2.9, ay: math.cos(a) * 2.9, az: 0.12, bx: math.sin(a + math.PI / 4) * 2.9, by: math.cos(a + math.PI / 4) * 2.9, bz: 0.12, radius: 0.012, tint: {190, 170, 133}) {}
       }
-      IslandBeam(ax: math.sin(a) * 2.9, ay: math.cos(a) * 2.9, az: 0.12, bx: math.sin(a + math.PI / 4) * 2.9, by: math.cos(a + math.PI / 4) * 2.9, bz: 0.12, radius: 0.012, tint: {190, 170, 133}) {}
     }
   }
 }

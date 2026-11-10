@@ -8,111 +8,113 @@ using box.transform
 using box.geometry
 using box.material
 
-template KoreanHall {
-  { (IsA, KoreanStone); Position: {0, 0.25, 0}; RoundedBox: {8.1, 0.5, 5.7, 0.09} }
-  { (IsA, KoreanStone); Position: {0, 0.56, 0}; Box: {8.35, 0.14, 5.9} }
-  for course in 0..2 {
-    for block in 0..17 {
-      const tone = (block * 5 + course * 3) % 4
-      const x = -3.84 + block * 0.48 + course * 0.1
-      { Position: {x, 0.14 + course * 0.23, 2.86}; RoundedBox: {0.455, 0.205, 0.04, 0.012}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
-      { Position: {x, 0.14 + course * 0.23, -2.86}; RoundedBox: {0.455, 0.205, 0.04, 0.012}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
-    }
-    for block in 0..12 {
-      const tone = (block * 5 + course * 3) % 4
-      for side in 0..2 {
-        { Position: {(side - 0.5) * 8.12, 0.14 + course * 0.23, -2.64 + block * 0.48 + course * 0.1}; RoundedBox: {0.04, 0.205, 0.455, 0.012}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+assets {
+  template KoreanHall {
+    { (IsA, KoreanStone); Position: {0, 0.25, 0}; RoundedBox: {8.1, 0.5, 5.7, 0.09} }
+    { (IsA, KoreanStone); Position: {0, 0.56, 0}; Box: {8.35, 0.14, 5.9} }
+    for course in 0..2 {
+      for block in 0..17 {
+        const tone = (block * 5 + course * 3) % 4
+        const x = -3.84 + block * 0.48 + course * 0.1
+        { Position: {x, 0.14 + course * 0.23, 2.86}; RoundedBox: {0.455, 0.205, 0.04, 0.012}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+        { Position: {x, 0.14 + course * 0.23, -2.86}; RoundedBox: {0.455, 0.205, 0.04, 0.012}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+      }
+      for block in 0..12 {
+        const tone = (block * 5 + course * 3) % 4
+        for side in 0..2 {
+          { Position: {(side - 0.5) * 8.12, 0.14 + course * 0.23, -2.64 + block * 0.48 + course * 0.1}; RoundedBox: {0.04, 0.205, 0.455, 0.012}; Rgb: {132 + tone * 9, 135 + tone * 8, 124 + tone * 8} }
+        }
       }
     }
-  }
-  for step in 0..3 {
-    { Position: {0, 0.1 + step * 0.17, 3.5 - step * 0.28}; Box: {2.7, 0.2, 0.65}; Rgb: {175, 176, 161} }
-    { Position: {0, 0.205 + step * 0.17, 3.83 - step * 0.28}; Box: {2.7, 0.012, 0.012}; Rgb: {118, 118, 106} }
-  }
-  for side in 0..2 {
-    const x = (side - 0.5) * 3.02
     for step in 0..3 {
-      { (IsA, KoreanStone); Position: {x, 0.15 + step * 0.17, 3.5 - step * 0.28}; Box: {0.3, 0.3, 0.65} }
+      { Position: {0, 0.1 + step * 0.17, 3.5 - step * 0.28}; Box: {2.7, 0.2, 0.65}; Rgb: {175, 176, 161} }
+      { Position: {0, 0.205 + step * 0.17, 3.83 - step * 0.28}; Box: {2.7, 0.012, 0.012}; Rgb: {118, 118, 106} }
     }
-    { (IsA, KoreanStone); Position: {x, 0.42, 3.8}; Sphere: {radius: 0.11, segments: 14, smooth: true} }
-  }
-  { (IsA, KoreanPlaster); Position: {0, 1.8, -0.25}; Box: {6.7, 2.4, 3.65} }
-  for bay in 0..4 {
     for side in 0..2 {
-      const x = (bay - 1.5) * 2.15
+      const x = (side - 0.5) * 3.02
+      for step in 0..3 {
+        { (IsA, KoreanStone); Position: {x, 0.15 + step * 0.17, 3.5 - step * 0.28}; Box: {0.3, 0.3, 0.65} }
+      }
+      { (IsA, KoreanStone); Position: {x, 0.42, 3.8}; Sphere: {radius: 0.11, segments: 14, smooth: true} }
+    }
+    { (IsA, KoreanPlaster); Position: {0, 1.8, -0.25}; Box: {6.7, 2.4, 3.65} }
+    for bay in 0..4 {
+      for side in 0..2 {
+        const x = (bay - 1.5) * 2.15
+        const z = (side - 0.5) * 4.5
+        { (IsA, KoreanStone); Position: {x, 0.76, z}; Cylinder: {radius: 0.29, length: 0.28, segments: 12} }
+        { (IsA, KoreanStone); Position: {x, 0.91, z}; Cylinder: {radius: 0.21, length: 0.04, segments: 16} }
+        { (IsA, KoreanRed); Position: {x, 1.97, z}; Cylinder: {radius: 0.16, length: 2.3, segments: 16, smooth: true} }
+        { (IsA, KoreanGreen); Position: {x, 2.92, z}; Cylinder: {radius: 0.168, length: 0.12, segments: 16, smooth: true} }
+        for ring in 0..2 {
+          { (IsA, KoreanGold); Position: {x, 2.86 + ring * 0.12, z}; Torus: {radius: 0.166, tube: 0.012, segments: 18, rings: 5} }
+        }
+        { (IsA, KoreanMint); Position: {x, 3.02, z}; Box: {0.42, 0.14, 0.42} }
+        { KoreanBracket: {}; Position: {x, 3.23, z} }
+      }
+    }
+    for side in 0..2 {
       const z = (side - 0.5) * 4.5
-      { (IsA, KoreanStone); Position: {x, 0.76, z}; Cylinder: {radius: 0.29, length: 0.28, segments: 12} }
-      { (IsA, KoreanStone); Position: {x, 0.91, z}; Cylinder: {radius: 0.21, length: 0.04, segments: 16} }
-      { (IsA, KoreanRed); Position: {x, 1.97, z}; Cylinder: {radius: 0.16, length: 2.3, segments: 16, smooth: true} }
-      { (IsA, KoreanGreen); Position: {x, 2.92, z}; Cylinder: {radius: 0.168, length: 0.12, segments: 16, smooth: true} }
-      for ring in 0..2 {
-        { (IsA, KoreanGold); Position: {x, 2.86 + ring * 0.12, z}; Torus: {radius: 0.166, tube: 0.012, segments: 18, rings: 5} }
-      }
-      { (IsA, KoreanMint); Position: {x, 3.02, z}; Box: {0.42, 0.14, 0.42} }
-      { KoreanBracket: {}; Position: {x, 3.23, z} }
-    }
-  }
-  for side in 0..2 {
-    const z = (side - 0.5) * 4.5
-    { (IsA, KoreanGreen); Position: {0, 3.2, z}; Box: {7.4, 0.4, 0.23} }
-    for stripe in 0..2 {
-      { (IsA, KoreanMint); Position: {0, 3.2 + (stripe - 0.5) * 0.3, z}; Box: {7.45, 0.035, 0.26} }
-    }
-    for flower in 0..13 {
-      { KoreanLotus: {}; Position: {(flower - 6) * 0.55, 3.2, z + (side * 2 - 1) * 0.14}; Rotation: {0, (1 - side) * math.PI, 0}; Scale: {0.78, 0.78, 0.78} }
-    }
-    for rafter in 0..29 {
-      { Position: {(rafter - 14) * 0.26, 3.63, z}; Cylinder: {radius: 0.065, length: 1.05, segments: 8}; Rotation: {math.PI / 2 + (side - 0.5) * -0.35, 0, 0}; Rgb: {125, 170, 120} }
-    }
-  }
-  for bay in 0..3 {
-    { KoreanDoor: {}; Position: {(bay - 1) * 2.15, 1.8, 1.61} }
-    { (IsA, KoreanRed); Position: {(bay - 1) * 2.15, 2.8, 1.65}; Box: {2, 0.18, 0.18} }
-    { KoreanDoor: {}; Position: {(bay - 1) * 2.15, 1.8, -2.11}; Rotation: {0, math.PI, 0} }
-  }
-  for side in 0..2 {
-    const sign = side * 2 - 1
-    {
-      Position: {sign * 3.38, 0, -0.25}
-      Rotation: {0, sign * math.PI / 2, 0}
-      for panel in 0..2 {
-        { KoreanDoor: {}; Position: {(panel - 0.5) * 1.7, 1.8, 0.03}; Scale: {0.9, 1, 1} }
-      }
-      { (IsA, KoreanRed); Position: {0, 1.85, 0.09}; Box: {0.15, 2.4, 0.2} }
-      { (IsA, KoreanGreen); Position: {0, 3.2, 0.09}; Box: {4.6, 0.4, 0.25} }
+      { (IsA, KoreanGreen); Position: {0, 3.2, z}; Box: {7.4, 0.4, 0.23} }
       for stripe in 0..2 {
-        { (IsA, KoreanMint); Position: {0, 3.2 + (stripe - 0.5) * 0.3, 0.23}; Box: {4.6, 0.03, 0.03} }
+        { (IsA, KoreanMint); Position: {0, 3.2 + (stripe - 0.5) * 0.3, z}; Box: {7.45, 0.035, 0.26} }
       }
-      for flower in 0..9 {
-        { KoreanLotus: {}; Position: {(flower - 4) * 0.5, 3.2, 0.24}; Scale: {0.8, 0.8, 0.8} }
+      for flower in 0..13 {
+        { KoreanLotus: {}; Position: {(flower - 6) * 0.55, 3.2, z + (side * 2 - 1) * 0.14}; Rotation: {0, (1 - side) * math.PI, 0}; Scale: {0.78, 0.78, 0.78} }
       }
-      for bracket in 0..3 {
-        { KoreanBracket: {}; Position: {(bracket - 1) * 1.7, 3.24, 0} }
+      for rafter in 0..29 {
+        { Position: {(rafter - 14) * 0.26, 3.63, z}; Cylinder: {radius: 0.065, length: 1.05, segments: 8}; Rotation: {math.PI / 2 + (side - 0.5) * -0.35, 0, 0}; Rgb: {125, 170, 120} }
       }
     }
-  }
-  for plank in 0..26 {
-    const tone = (plank * 7) % 5
-    { Position: {(plank - 12.5) * 0.28, 0.67, 2.12}; Box: {0.265, 0.075, 1.35}; Rgb: {88 + tone * 7, 54 + tone * 4, 34 + tone * 3}; PbrMaterial: {roughness: 0.62} }
-  }
-  { (IsA, KoreanTimber); Position: {0, 0.65, 2.82}; Box: {7.34, 0.12, 0.08} }
-  for post in 0..15 {
-    const x = (post - 7) * 0.5
-    if post < 5 || post > 9 {
-      { (IsA, KoreanRed); Position: {x, 0.93, 2.72}; Box: {0.055, 0.46, 0.055} }
-      { (IsA, KoreanGold); Position: {x, 1.18, 2.72}; Sphere: {radius: 0.04, segments: 8} }
+    for bay in 0..3 {
+      { KoreanDoor: {}; Position: {(bay - 1) * 2.15, 1.8, 1.61} }
+      { (IsA, KoreanRed); Position: {(bay - 1) * 2.15, 2.8, 1.65}; Box: {2, 0.18, 0.18} }
+      { KoreanDoor: {}; Position: {(bay - 1) * 2.15, 1.8, -2.11}; Rotation: {0, math.PI, 0} }
     }
+    for side in 0..2 {
+      const sign = side * 2 - 1
+      {
+        Position: {sign * 3.38, 0, -0.25}
+        Rotation: {0, sign * math.PI / 2, 0}
+        for panel in 0..2 {
+          { KoreanDoor: {}; Position: {(panel - 0.5) * 1.7, 1.8, 0.03}; Scale: {0.9, 1, 1} }
+        }
+        { (IsA, KoreanRed); Position: {0, 1.85, 0.09}; Box: {0.15, 2.4, 0.2} }
+        { (IsA, KoreanGreen); Position: {0, 3.2, 0.09}; Box: {4.6, 0.4, 0.25} }
+        for stripe in 0..2 {
+          { (IsA, KoreanMint); Position: {0, 3.2 + (stripe - 0.5) * 0.3, 0.23}; Box: {4.6, 0.03, 0.03} }
+        }
+        for flower in 0..9 {
+          { KoreanLotus: {}; Position: {(flower - 4) * 0.5, 3.2, 0.24}; Scale: {0.8, 0.8, 0.8} }
+        }
+        for bracket in 0..3 {
+          { KoreanBracket: {}; Position: {(bracket - 1) * 1.7, 3.24, 0} }
+        }
+      }
+    }
+    for plank in 0..26 {
+      const tone = (plank * 7) % 5
+      { Position: {(plank - 12.5) * 0.28, 0.67, 2.12}; Box: {0.265, 0.075, 1.35}; Rgb: {88 + tone * 7, 54 + tone * 4, 34 + tone * 3}; PbrMaterial: {roughness: 0.62} }
+    }
+    { (IsA, KoreanTimber); Position: {0, 0.65, 2.82}; Box: {7.34, 0.12, 0.08} }
+    for post in 0..15 {
+      const x = (post - 7) * 0.5
+      if post < 5 || post > 9 {
+        { (IsA, KoreanRed); Position: {x, 0.93, 2.72}; Box: {0.055, 0.46, 0.055} }
+        { (IsA, KoreanGold); Position: {x, 1.18, 2.72}; Sphere: {radius: 0.04, segments: 8} }
+      }
+    }
+    for side in 0..2 {
+      const sign = side * 2 - 1
+      { (IsA, KoreanRed); Position: {sign * 2.5, 1.15, 2.72}; Box: {2.05, 0.05, 0.05} }
+      { (IsA, KoreanRed); Position: {sign * 2.5, 0.8, 2.72}; Box: {2.05, 0.04, 0.04} }
+    }
+    { KoreanSignboard: {}; Position: {0, 2.68, 2.1} }
+    { KoreanGlyphCenter: {}; Position: {-0.24, 2.68, 2.1} }
+    { KoreanGlyphRight: {}; Position: {0.24, 2.68, 2.1} }
+    for side in 0..2 {
+      { KoreanSilkLantern: {drop: 0.1}; Position: {(side - 0.5) * 4.3, 3, 2.25} }
+    }
+    { KoreanRoof: {ornate: true, rafter: {56, 124, 96}, rafter_end: {226, 170, 72}}; Position: {0, 3.72, 0} }
   }
-  for side in 0..2 {
-    const sign = side * 2 - 1
-    { (IsA, KoreanRed); Position: {sign * 2.5, 1.15, 2.72}; Box: {2.05, 0.05, 0.05} }
-    { (IsA, KoreanRed); Position: {sign * 2.5, 0.8, 2.72}; Box: {2.05, 0.04, 0.04} }
-  }
-  { KoreanSignboard: {}; Position: {0, 2.68, 2.1} }
-  { KoreanGlyphCenter: {}; Position: {-0.24, 2.68, 2.1} }
-  { KoreanGlyphRight: {}; Position: {0.24, 2.68, 2.1} }
-  for side in 0..2 {
-    { KoreanSilkLantern: {drop: 0.1}; Position: {(side - 0.5) * 4.3, 3, 2.25} }
-  }
-  { KoreanRoof: {ornate: true, rafter: {56, 124, 96}, rafter_end: {226, 170, 72}}; Position: {0, 3.72, 0} }
 }

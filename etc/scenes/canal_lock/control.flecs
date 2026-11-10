@@ -4,27 +4,29 @@ using box.input
 using box.picking
 using box.transition
 
-template LockControl {
-  prop enabled: bool = true
+assets {
+  template LockControl {
+    prop enabled: bool = true
 
-  mut hover = false
+    mut hover = false
 
-  Interactive
+    Interactive
 
-  Cursor: {enabled ? CursorPointer : CursorNotAllowed}
-  Tint: hover && !enabled ? {190, 50, 40, 90} : {255, 226, 130, hover ? 90 : 0}
+    Cursor: {enabled ? CursorPointer : CursorNotAllowed}
+    Tint: hover && !enabled ? {190, 50, 40, 90} : {255, 226, 130, hover ? 90 : 0}
 
-  async {
-    while true {
-      await on.enter(this)
-      hover = true
+    async {
+      while true {
+        await on.enter(this)
+        hover = true
+      }
     }
-  }
 
-  async {
-    while true {
-      await on.leave(this)
-      hover = false
+    async {
+      while true {
+        await on.leave(this)
+        hover = false
+      }
     }
   }
 }
