@@ -244,6 +244,10 @@ static inline bool box_render_is_mesh(
 /** Layers of a TextureBlend */
 #define BOX_RENDER_BLEND_LAYERS (4)
 
+/** Slices of the texture arrays of a blend: the layers of a TextureBlend or the kinds of a
+ * TileTerrain */
+#define BOX_RENDER_BLEND_SLICES (16)
+
 /** Maps each layer of a TextureBlend samples: albedo, ORM and normal */
 #define BOX_RENDER_BLEND_MAPS (3)
 
@@ -1167,16 +1171,17 @@ typedef struct box_render_target_t {
     bool exclusive;         /**< Renders only the views whose target is this handle */
 } box_render_target_t;
 
-/** The textures and transforms of a TextureBlend as a batch draws them, in the packet data of a
- * batch with texture_blend.
+/** The textures and transforms of a TextureBlend or a TileTerrain as a batch draws them, in the
+ * packet data of a batch with texture_blend.
  *
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
  * by every batch with the same sources, and binds it with the mask, textures[1] and transforms.
  *
- * The heights make a fourth array only with a contrast above 0 and a height on a layer. */
+ * The heights make a fourth array only with a contrast above 0 and a height on a layer. A
+ * TileTerrain has tiles set, its grid as the mask and an atlas per kind in each layer. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
-    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
+    uint32_t layers[BOX_RENDER_BLEND_SLICES][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
                          *   of the albedo, ORM, normal and height of each layer, 0 for the
                          *   default; the heights are 0 with a contrast of 0 */
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer: u scale,
@@ -1185,6 +1190,7 @@ typedef struct box_render_texture_blend_t {
                          *   the arrays */
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
     float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
+    uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
 } box_render_texture_blend_t;
 
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.

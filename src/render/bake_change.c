@@ -852,16 +852,16 @@ void box_bake_observers(
     ecs_world_t *world,
     box_render_bake_t *b)
 {
-    ecs_entity_t looks[13] = {
+    ecs_entity_t looks[14] = {
         ecs_id(Rgb), ecs_id(Emissive), ecs_id(PbrMaterial), ecs_id(BlendMode),
         ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh),
         ecs_id(ClearCoat), ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission),
-        ecs_id(TextureMapping)
+        ecs_id(TextureMapping), ecs_id(TileTerrain)
     };
     ecs_entity_t added[2] = { ecs_id(AlphaCutoff), ecs_id(Transmission) };
     ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
-    for (i = 0; i < 13; i ++) {
+    for (i = 0; i < 14; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = looks[i] }},
             .events = { EcsOnSet, EcsOnRemove },

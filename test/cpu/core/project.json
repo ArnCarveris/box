@@ -13,7 +13,9 @@
             "../../../src/app",
             "../../../src/jobs",
             "../../../src/render",
-            "../../../src/texture"
+            "../../../src/texture",
+            "../../../src/terrain",
+            "../../../src/geometry"
         ]
     },
     "test": {
@@ -271,6 +273,21 @@
                     "restored_while_queued_reloads_once",
                     "restored_between_passes_reloads_once",
                     "thread_fails_inline_passes"
+                ]
+            },
+            {
+                "id": "TileTerrain",
+                "testcases": [
+                    "grid_pixels",
+                    "whitespace_ignored",
+                    "unknown_symbol",
+                    "shape_scale",
+                    "size_default",
+                    "set_again",
+                    "texture_ready",
+                    "remove_deletes_grid",
+                    "delete_releases_grid",
+                    "script"
                 ]
             },
             {

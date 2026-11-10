@@ -1057,32 +1057,16 @@ void box_draws_batch_textures(
     out->wrap = b->key.wrap;
 }
 
-/** Get the texture handle a layer of a batch samples a texture entity through: its image, or
- * the image of the surface that renders into it.
- *
- * @param d The state
- * @param e The texture entity, 0 for none
- * @return The handle, 0 while the entity has no image
- */
-static uint32_t box_draws_texture_handle(
-    const box_render_draws_t *d,
-    ecs_entity_t e)
-{
-    uint32_t result = e ? box_textures_handle(d->textures, e) : 0;
-    if (e && !result && d->world) {
-        result = box_render_texture_target_handle(d->world, e);
-    }
-
-    return result;
-}
-
 void box_draws_batch_blend(
     box_render_packet_t *p,
     const box_render_draws_t *d,
     const box_draw_batch_t *b,
     box_render_batch_t *out)
 {
-    const TextureBlend *blend = b->key.texture_blend && d->world
+    const TileTerrain *terrain = b->key.texture_blend && d->world
+        ? ecs_get(d->world, b->key.textures[0], TileTerrain)
+        : NULL;
+    const TextureBlend *blend = b->key.texture_blend && d->world && !terrain
         ? ecs_get(d->world, b->key.textures[0], TextureBlend)
         : NULL;
     uint32_t offset = 0;
@@ -1102,7 +1086,9 @@ void box_draws_batch_blend(
         r->transforms[k][1] = 1.0f;
     }
 
-    if (blend) {
+    if (terrain) {
+        box_draws_batch_tiles(d, b->key.textures[0], terrain, r);
+    } else if (blend) {
         float contrast = isfinite(blend->contrast) && blend->contrast > 0.0f
             ? blend->contrast : 0.0f;
         r->mask = box_draws_texture_handle(d, blend->mask);

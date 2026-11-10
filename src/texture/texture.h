@@ -74,6 +74,18 @@ typedef struct TextureRegistry {
 /** Component id of TextureRegistry */
 extern ECS_COMPONENT_DECLARE(TextureRegistry);
 
+/** Image of a texture entity made by the engine, such as the grid of a TileTerrain, sent as it
+ * is: no decode, scaling or file watch. A TexturePath or a TextureGen on the entity wins. */
+typedef struct TexturePixels {
+    int32_t width;          /**< Width in pixels */
+    int32_t height;         /**< Height in pixels */
+    bool single_channel;    /**< The rows hold one R8 byte per pixel, else RGBA8 */
+    uint8_t *pixels;        /**< Rows of the image, the first row is the top, owned */
+} TexturePixels;
+
+/** Component id of TexturePixels */
+extern ECS_COMPONENT_DECLARE(TexturePixels);
+
 /** What a generation job makes: a TextureGen with its source resolved and its size capped */
 typedef struct box_texture_gen_t {
     int32_t width;              /**< Width of the result */

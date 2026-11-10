@@ -581,6 +581,13 @@ ecs_entity_t box_draws_blend_owner(
     const box_draw_key_t *key)
 {
     ecs_entity_t result = 0;
+    if (box_render_is_mesh(key->pipeline) && ecs_id_in_use(world, ecs_id(TileTerrain)) &&
+        ecs_owns(world, e, TileTerrain))
+    {
+        result = e;
+        goto done;
+    }
+
     if (!box_render_is_mesh(key->pipeline) || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
         !ecs_get(world, e, TextureBlend))
     {
@@ -1094,6 +1101,10 @@ static void box_draws_material_observers(
             .src.id = EcsSelf | EcsUp,
             .trav = EcsIsA
         }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+
+    box_draws_observer(world, d, "DrawsOnTileTerrain", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(TileTerrain) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
 
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
