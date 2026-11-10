@@ -20,6 +20,7 @@ $ {
 assets {
   prefab SfxSpark {
     AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 3, pitch_variance: 0.1, level_variance: 0.1}
     SynthEnvelope: {attack: 0.002, decay: 0.35}
     SynthFilter: {kind: SynthBandPass, cutoff: 800, resonance: 0.3}
@@ -30,6 +31,7 @@ assets {
 
   prefab SfxSplash {
     AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 11, pitch_variance: 0.1}
     SynthEnvelope: {attack: 0.005, decay: 0.45}
     SynthFilter: {kind: SynthBandPass, cutoff: 600, resonance: 0.55}
@@ -40,6 +42,7 @@ assets {
 
   prefab SfxGust {
     AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 5, pitch_variance: 0.08}
     SynthEnvelope: {attack: 0.08, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.4}
     SynthFilter: {kind: SynthBandPass, cutoff: 500, resonance: 0.5}
@@ -49,6 +52,7 @@ assets {
 
   prefab SfxBloom {
     AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
     SynthSound: {pitch_variance: 0.03}
     SynthEnvelope: {attack: 0.02, decay: 0.6}
     SynthFilter: {kind: SynthLowPass, cutoff: 4000}
@@ -59,6 +63,7 @@ assets {
 
   prefab SfxFrost {
     AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 17, pitch_variance: 0.05}
     SynthEnvelope: {attack: 0.003, decay: 0.5}
     SynthFilter: {kind: SynthHighPass, cutoff: 2500, resonance: 0.4}
@@ -69,6 +74,7 @@ assets {
 
   prefab SfxLift {
     AudioOutput: {bus: mv_sfx}
+    AudioSpatial: {min_distance: 36, max_distance: 90}
     SynthSound: {pitch_variance: 0.04}
     SynthEnvelope: {attack: 0.05, decay: 0.3, sustain: 0.6, hold: 0.3, release: 0.4}
     SynthFilter: {kind: SynthLowPass, cutoff: 1800}
@@ -370,10 +376,8 @@ async {
 
 async {
   while true {
-    await CastReq
-    if !casting {
-      const a = box.audio.play(SfxCast, 0.5)
-    }
+    await CastStart
+    const a = box.audio.play(SfxCast, 0.5)
   }
 }
 
