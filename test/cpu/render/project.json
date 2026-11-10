@@ -734,6 +734,8 @@
                     "triplanar_mapping_draws_with_extended",
                     "triplanar_off_draws_with_mesh_shader",
                     "planar_mapping_draws_with_mesh_shader",
+                    "texture_blend_draws_with_mesh_shader",
+                    "texture_blend_triplanar_draws_with_extended",
                     "mapping_blend_change_moves_shape",
                     "add_sheen_moves_to_extended",
                     "remove_clear_coat_moves_to_mesh_shader",

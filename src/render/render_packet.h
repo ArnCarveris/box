@@ -135,8 +135,8 @@
 /** Shader handle of the engine shader of the forward pass that draws the meshes with a feature
  * the mesh shader lacks.
  *
- * Those are an alpha test, a blend mode other than Opaque, Transmission, a TextureBlend, a
- * triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or DiffuseTransmission. */
+ * Those are Transmission, a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or
+ * DiffuseTransmission. */
 #define BOX_RENDER_SHADER_MESH_EXTENDED (10)
 
 /** Check whether a shader handle is one of the two mesh shaders.
@@ -580,7 +580,7 @@ typedef struct box_render_view_gtao_t {
 #define BOX_RENDER_FEATURE_TRANSMISSION (1u << 11)
 
 /** Scene features of the mesh shaders without an override: the TextureBlend entry points of the
- * extended mesh shader, and the alpha test and blend modes of the DrawKind */
+ * mesh shaders, and the alpha test and blend modes of the DrawKind */
 #define BOX_RENDER_FEATURE_TEXTURE_BLEND (1u << 12)
 #define BOX_RENDER_FEATURE_ALPHA_CUTOUT (1u << 13)
 #define BOX_RENDER_FEATURE_BLEND_MODES (1u << 14)

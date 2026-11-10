@@ -170,7 +170,7 @@ static WGPURenderPipeline box_gpu_forward_create(
     surface = surface && !shape2d;
     const char *entry = box_shadow ? (polygon ? "fs_shadow_polygon" : "fs_shadow") :
         polygon ? "fs_polygon" : slice ? "fs_slice" : cutout ? "fs_cutout" : "fs";
-    if (extended && texture_blend) {
+    if (texture_blend) {
         entry = cutout ? "fs_blend_cutout" : "fs_blend";
     }
 
@@ -271,8 +271,7 @@ static WGPURenderPipeline box_gpu_forward_create(
  * add one to red (plain) or green (alpha tested) per fragment.
  *
  * @param gpu The backend
- * @param shader The module of the mesh shader of the batch, the extended one for an alpha test
- * or a TextureBlend
+ * @param shader The module of the mesh shader of the batch
  * @param back_face The BackFaceMode, BackFaceCull culls the back faces
  * @param cutout Whether the fragments are alpha tested
  * @param texture_blend Whether the batch binds the blend group of a TextureBlend
@@ -570,8 +569,8 @@ done:
  * feature shapes with, so they compile before the first shape needs them; other blend modes
  * than AlphaBlend and the parametric surfaces compile on first use.
  *
- * Those are the alpha tested and alpha blended ones of the mesh shader, and the opaque, alpha
- * tested, TextureBlend, alpha blended and transmissive ones of the extended mesh shader, of both
+ * Those are the alpha tested, TextureBlend and alpha blended ones of the mesh shader, and the
+ * opaque, alpha tested, alpha blended and transmissive ones of the extended mesh shader, of both
  * back face modes with the depth states of the view, each when its scene enables it.
  *
  * @param gpu The backend
@@ -591,7 +590,7 @@ void box_gpu_draw_prewarm(
     int32_t face, kind;
     for (face = 0; face < 2; face ++) {
         for (kind = 0; kind < 8; kind ++) {
-            bool extended = kind >= 2;
+            bool extended = kind >= 2 && kind != 4 && kind != 5;
             box_render_batch_t b = {
                 .view = -1,
                 .scene = v->scene,
@@ -608,7 +607,7 @@ void box_gpu_draw_prewarm(
                 (b.texture_blend && !(f & BOX_RENDER_FEATURE_TEXTURE_BLEND)) ||
                 ((kind == 1 || kind == 6) && !(f & BOX_RENDER_FEATURE_BLEND_MODES)) ||
                 (b.transmissive && !(f & BOX_RENDER_FEATURE_TRANSMISSION)) ||
-                (extended && !b.texture_blend && !b.transmissive && !(f & shading)))
+                (extended && !b.transmissive && !(f & shading)))
             {
                 continue;
             }
