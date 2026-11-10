@@ -313,7 +313,7 @@ static void tr_test_mesh_material(
         test_int(ecs_get(world, e, DrawSlot)->batch, batch);
         test_bool(tr_batch(world, e)->key.cutout, cutout);
         tr_material_mix(mc, (float)i / 4.0f, mid);
-        box_draws_material_of(world, e, &m);
+        box_draws_material_of(world, e, 0, &m);
         tr_material_set(&m, mc->c, mid);
         box_draws_material_pack(&expected, &m);
         test_assert(tr_material_rendered(world, null, slot, &rendered));
@@ -322,7 +322,7 @@ static void tr_test_mesh_material(
 
     tr_frame(world);
     test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
-    box_draws_material_of(world, e, &m);
+    box_draws_material_of(world, e, 0, &m);
     box_draws_material_pack(&expected, &m);
     test_assert(tr_material_rendered(world, null, slot, &rendered));
     test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
@@ -953,7 +953,7 @@ void TransitionMaterial_unrelated_owners(void) {
     for (i = 0; i < 64; i ++) {
         uint32_t other = ecs_get(world, others[i], MaterialId)->value;
         test_assert(other != slot);
-        box_draws_material_of(world, others[i], &m);
+        box_draws_material_of(world, others[i], 0, &m);
         box_draws_material_pack(&expected[i], &m);
     }
 
@@ -1196,7 +1196,7 @@ void TransitionMaterial_prefab_instance_override_node(void) {
     test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
     const DrawSlot *ds = ecs_get(world, a, DrawSlot);
     uint32_t slot = box_draws_slot_mesh_shading(tr_batch(world, a), ds->slot)->material;
-    box_draws_material_of(world, a, &m);
+    box_draws_material_of(world, a, 0, &m);
     box_draws_material_pack(&expected, &m);
     test_uint(expected.color, tr_color_word(200, 100, 40));
     const box_draw_materials_t *table = &box_draws_state(world)->materials;
@@ -1413,7 +1413,7 @@ static void tr_test_prefab_material(
     int32_t batch = ecs_get(world, instances[0], DrawSlot)->batch;
     int32_t batch_o = ecs_get(world, over, DrawSlot)->batch;
     box_render_material_t own_record;
-    box_draws_material_of(world, over, &m);
+    box_draws_material_of(world, over, 0, &m);
     box_draws_material_pack(&own_record, &m);
 
     ecs_set_id(world, prefab, mc->component, (size_t)mc->size, mc->to);
@@ -1423,7 +1423,7 @@ static void tr_test_prefab_material(
         test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
         test_int(box_render_transitions_material_visited(s), 2);
         tr_material_mix(mc, (float)i / 4.0f, mid);
-        box_draws_material_of(world, prefab, &m);
+        box_draws_material_of(world, prefab, 0, &m);
         tr_material_set(&m, mc->c, mid);
         box_draws_material_pack(&expected, &m);
         test_assert(tr_material_rendered(world, null, slot_p, &rendered));
@@ -1446,7 +1446,7 @@ static void tr_test_prefab_material(
 
     tr_frame(world);
     test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
-    box_draws_material_of(world, prefab, &m);
+    box_draws_material_of(world, prefab, 0, &m);
     box_draws_material_pack(&expected, &m);
     test_assert(tr_material_rendered(world, null, slot_p, &rendered));
     test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
@@ -1492,7 +1492,7 @@ static void tr_test_material_idle(
     test_int(box_render_transitions_material_visited(s), 0);
     test_assert(!ecs_has_id(world, plain, TransitionMaterial));
     test_int(ecs_get(world, plain, DrawSlot)->batch, batch);
-    box_draws_material_of(world, plain, &m);
+    box_draws_material_of(world, plain, 0, &m);
     box_draws_material_pack(&expected, &m);
     test_assert(tr_material_rendered(world, null, slot, &rendered));
     test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
@@ -1536,7 +1536,7 @@ static void tr_test_material_final(
     const DrawSlot *ds = ecs_get(world, e, DrawSlot);
     test_uint(ecs_get(world, e, MaterialId)->value, slot_d);
     test_uint(box_draws_slot_mesh_shading(tr_batch(world, e), ds->slot)->material, slot_d);
-    box_draws_material_of(world, e, &m);
+    box_draws_material_of(world, e, 0, &m);
     box_draws_material_pack(&packed, &m);
     still = *ecs_vec_get_t(&box_draws_state(world)->materials.records, box_render_material_t,
         (int32_t)slot_d);

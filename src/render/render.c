@@ -98,7 +98,7 @@ box_render_packet_t* box_render_packet(
         result->frame = info->frame_count_total;
         result->time = info->world_time_total;
         result->delta = info->delta_time;
-        result->fps = app && app->fps > 0 ? app->fps : 0;
+        result->fps = ecs_id(App) ? box_app_fps(real) : 0;
         result->headless = app && app->headless;
     }
 
@@ -366,6 +366,7 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxCamera);
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxMaterial);
+    ECS_IMPORT(world, BoxTerrain);
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxEffects);
     ECS_IMPORT(world, BoxText);
@@ -420,6 +421,7 @@ void BoxRenderImport(
     box_render_atmosphere_init(world);
     box_render_particles_init(world);
     box_render_lights_init(world);
+    box_render_planar_init(world);
     box_render_bake_init(world);
     box_render_reflect_init(world);
     box_render_shadows_init(world);

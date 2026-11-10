@@ -68,7 +68,10 @@
                     "texture_blend_layer_deleted",
                     "texture_blend_height_record",
                     "texture_blend_height_key",
-                    "texture_blend_every_shape"
+                    "texture_blend_every_shape",
+                    "texture_scroll_defaults",
+                    "texture_scroll_pack",
+                    "texture_scroll_wrap"
                 ]
             },
             {
@@ -385,7 +388,10 @@
                     "prefab_from_shared_slot_reaches_instances",
                     "prefab_from_shared_slot_same_color",
                     "prefab_from_shared_slot_deferred",
-                    "shared_cutoff_change_records_shadow"
+                    "shared_cutoff_change_records_shadow",
+                    "texture_scroll_private_slot",
+                    "texture_scroll_repacks_only_scrolling",
+                    "texture_scroll_prefab_repacks"
                 ]
             },
             {
@@ -453,6 +459,23 @@
                     "point_tile_bounds",
                     "touched_by_scene",
                     "extract_renders_changed_tiles"
+                ]
+            },
+            {
+                "id": "ColorGrading",
+                "setup": true,
+                "testcases": [
+                    "balance_identity_at_defaults",
+                    "balance_tiny_shift_close_to_identity",
+                    "temperature_warms",
+                    "tint_magenta",
+                    "defaults_no_op",
+                    "contrast_pivots",
+                    "saturation_zero_is_grey",
+                    "vibrance_favors_muted",
+                    "lift_gamma_gain",
+                    "lut_identity_no_op",
+                    "lut_strength_blends"
                 ]
             },
             {
@@ -740,6 +763,8 @@
                     "triplanar_mapping_draws_with_extended",
                     "triplanar_off_draws_with_mesh_shader",
                     "planar_mapping_draws_with_mesh_shader",
+                    "texture_blend_draws_with_mesh_shader",
+                    "texture_blend_triplanar_draws_with_extended",
                     "mapping_blend_change_moves_shape",
                     "add_sheen_moves_to_extended",
                     "remove_clear_coat_moves_to_mesh_shader",
@@ -752,6 +777,27 @@
                     "view_features_from_scene",
                     "view_opts_out_of_scene_features",
                     "scene_features_script"
+                ]
+            },
+            {
+                "id": "PlanarReflection",
+                "testcases": [
+                    "defaults",
+                    "matrix_mirrors_points",
+                    "matrix_wall_mirror",
+                    "oblique_finite_far",
+                    "oblique_infinite_far",
+                    "oblique_offset_keeps_below",
+                    "oblique_behind_camera",
+                    "select_frustum",
+                    "select_far_plane",
+                    "select_back_side",
+                    "select_limit_nearest_first",
+                    "select_ortho_none",
+                    "extract_record",
+                    "extract_rotated_wall",
+                    "extract_limit",
+                    "extract_views_without"
                 ]
             }
         ]

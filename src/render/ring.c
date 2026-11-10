@@ -42,7 +42,7 @@ struct box_render_ring_t {
     bool vsync;                     /**< The last submitted packet presents with vsync */
     float refresh;                  /**< Refresh rate of the display of the last packet */
     double last_present;            /**< Time the last packet was presented, 0 for none */
-    double planned;                 /**< Seconds 1 / App.fps of the last presented packet,
+    double planned;                 /**< Seconds 1 / box_app_fps of the last presented packet,
                                      *   0 without a cap */
     int32_t presented;              /**< Packets presented */
     double present_ms;              /**< Interval between the last two presented packets */
@@ -84,7 +84,7 @@ static box_render_packet_t* box_render_ring_slot(
  * before it.
  *
  * @param ring The ring
- * @param planned Seconds 1 / App.fps of the packet, the expected interval to the next, 0
+ * @param planned Seconds 1 / box_app_fps of the packet, the expected interval to the next, 0
  *        without a cap
  * @param shown Seconds when the packet was presented
  */

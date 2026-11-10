@@ -224,3 +224,34 @@ void FrameClock_fps_command(void) {
     ecs_os_api.now_ = now;
     ecs_os_api.sleep_ = sleep;
 }
+
+void FrameClock_fps_command_reports_fps_target(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, FpsTarget, { .value = 30 });
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    bool error = false;
+
+    char *out = box_command_run(world, s, "fps 50", &error);
+    test_bool(error, false);
+    test_assert(out != NULL && strstr(out, "cap 50 fps") != NULL);
+    ecs_os_free(out);
+    test_flt(ecs_get_world_info(world)->target_fps, 50);
+
+    out = box_command_run(world, s, "fps 0", &error);
+    test_bool(error, false);
+    test_assert(out != NULL && strstr(out, "cap 30 fps") != NULL);
+    ecs_os_free(out);
+    test_flt(ecs_singleton_get(world, App)->fps, 0);
+    test_flt(ecs_get_world_info(world)->target_fps, 30);
+
+    ecs_singleton_remove(world, FpsTarget);
+    out = box_command_run(world, s, "fps 0", &error);
+    test_bool(error, false);
+    test_assert(out != NULL && strstr(out, "no cap") != NULL);
+    ecs_os_free(out);
+    test_flt(ecs_get_world_info(world)->target_fps, 0);
+
+    ecs_fini(world);
+}

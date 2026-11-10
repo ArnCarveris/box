@@ -581,6 +581,13 @@ ecs_entity_t box_draws_blend_owner(
     const box_draw_key_t *key)
 {
     ecs_entity_t result = 0;
+    if (box_render_is_mesh(key->pipeline) && ecs_id_in_use(world, ecs_id(TileTerrain)) &&
+        ecs_owns(world, e, TileTerrain))
+    {
+        result = e;
+        goto done;
+    }
+
     if (!box_render_is_mesh(key->pipeline) || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
         !ecs_get(world, e, TextureBlend))
     {
@@ -592,9 +599,9 @@ done:
     return result;
 }
 
-/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or has
- * a TextureBlend, or it uses a material feature its scene enables. Alpha tested and blended
- * shapes without those draw with the mesh shader.
+/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive, or it
+ * uses a material feature its scene enables. Alpha tested, blended and TextureBlend shapes
+ * without those draw with the mesh shader.
  *
  * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy
  * or DiffuseTransmission; only a scene with some of those off checks which.
@@ -614,7 +621,7 @@ static bool box_draws_extended(
     const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
         BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION;
     uint32_t f = key->features;
-    bool result = key->transmissive || key->texture_blend;
+    bool result = key->transmissive;
     const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
         ? NULL : ecs_get(world, e, TextureMapping);
     ecs_iter_t it;
@@ -1096,6 +1103,10 @@ static void box_draws_material_observers(
         }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
 
+    box_draws_observer(world, d, "DrawsOnTileTerrain", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(TileTerrain) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Opacity) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShadingMove);
@@ -1423,6 +1434,33 @@ void box_render_draws_shadow_record(
             ecs_vec_clear(&d->shadow_materials);
         }
     }
+}
+
+bool box_render_draws_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t *page,
+    uint32_t *slot)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = d && ecs_is_alive(world, e) ? ecs_get(world, e, DrawSlot) : NULL;
+    const box_draw_batch_t *b = NULL;
+    bool result = false;
+    if (!ds || ds->batch < 0 || ds->batch >= ecs_vec_count(&d->batches)) {
+        goto done;
+    }
+
+    b = ecs_vec_get_t(&d->batches, box_draw_batch_t, ds->batch);
+    if (!b->alive || b->page < 0 || ds->slot < 0) {
+        goto done;
+    }
+
+    *page = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
+        BOX_RENDER_STREAM_TRANSFORM);
+    *slot = b->first + (uint32_t)ds->slot;
+    result = true;
+done:
+    return result;
 }
 
 void box_render_draws_stats(

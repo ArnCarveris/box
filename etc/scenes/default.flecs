@@ -13,6 +13,7 @@ using box.surface
 using box.controllers
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: true}
 }
 

@@ -142,6 +142,36 @@ ECS_STRUCT(Tonemap, {
     TonemapOperator operator_;  /**< The mapping, default PbrNeutral */
 });
 
+/** Shapes the look of the image: white balance, exposure, contrast, saturation, vibrance,
+ * lift/gamma/gain and an optional strip LUT, applied in that order. Every default is a no-op.
+ *
+ * Belongs after the Tonemap: its LUT expects display range values. Placed before the Tonemap the
+ * parametric grading works on HDR values, contrast around a middle grey of 0.18 in log space,
+ * and the LUT clamps them to 0..1. After a Tonemap of the view contrast works around 0.5.
+ *
+ * The LUT is a 2D strip, the "unwrapped cube": N slices of NxN side by side, e.g. 1024x32 for
+ * 32^3 or 256x16 for 16^3. Red increases to the right within a slice, green downward and blue
+ * from slice to slice. N is the image height and the width must be N*N; an image of any other
+ * shape logs an error once and is ignored. It is applied last, on the color clamped to 0..1 and
+ * sRGB encoded, with trilinear filtering, and its result is decoded back to linear. It does
+ * nothing until the texture is loaded.
+ */
+ECS_STRUCT(ColorGrading, {
+    float temperature;  /**< White balance from blue (-1) to warm (+1), a chromatic adaptation
+                         *   in LMS space, default 0 */
+    float tint;         /**< White balance from green (-1) to magenta (+1), default 0 */
+    float exposure;     /**< Multiplier in stops, separate from AutoExposure, default 0 */
+    float contrast;     /**< Contrast around middle grey, default 1, at least 0 */
+    float saturation;   /**< 0 is grey (luminance), default 1, at least 0 */
+    float vibrance;     /**< Saturates the less saturated colors more, default 0, at least -1 */
+    vec3 lift;          /**< Added per channel after the gain, default 0 */
+    vec3 gamma;         /**< Per channel: pow(max(c * gain + lift, 0), 1 / gamma), default 1,
+                         *   at least 0.01 */
+    vec3 gain;          /**< Multiplier per channel, default 1 */
+    ecs_entity_t lut;   /**< Texture entity (TexturePath) with a strip LUT, default 0 for none */
+    float lut_strength; /**< Blend of the LUT result, default 1, clamped to 0..1 */
+});
+
 /** SMAA 1x anti aliasing: color edge detection with diagonal and corner detection.
  *
  * Belongs after the Tonemap: edges are found on the input clamped to 0..1 and sRGB encoded, while

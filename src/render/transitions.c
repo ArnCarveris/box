@@ -1668,7 +1668,7 @@ static void box_transition_send_materials(
             continue;
         }
 
-        box_draws_material_of(world, item->entity, &material);
+        box_draws_material_of(world, item->entity, p->time, &material);
         box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_TABLE);
         ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
         box_transition_send_material(s, p, BOX_RENDER_TRANSITION_MATERIAL, &target, offset);

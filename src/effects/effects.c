@@ -113,6 +113,31 @@ static void box_exposure_ctor(
     }
 }
 
+/** Construct ColorGrading values with the documented defaults, which leave the image as is.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_grading_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ColorGrading *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ColorGrading){
+            .contrast = 1.0f,
+            .saturation = 1.0f,
+            .gamma = {1.0f, 1.0f, 1.0f},
+            .gain = {1.0f, 1.0f, 1.0f},
+            .lut_strength = 1.0f
+        };
+    }
+}
+
 /** Construct Smaa values with the documented defaults.
  *
  * @param ptr The components
@@ -150,6 +175,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, AutoExposure);
     ECS_META_COMPONENT(world, TonemapOperator);
     ECS_META_COMPONENT(world, Tonemap);
+    ECS_META_COMPONENT(world, ColorGrading);
     ECS_META_COMPONENT(world, Smaa);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
@@ -157,5 +183,6 @@ void BoxEffectsImport(
     ecs_set_hooks(world, HeightFog, { .ctor = box_fog_ctor });
     ecs_set_hooks(world, AutoExposure, { .ctor = box_exposure_ctor });
     ecs_set_hooks(world, Tonemap, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ColorGrading, { .ctor = box_grading_ctor });
     ecs_set_hooks(world, Smaa, { .ctor = box_smaa_ctor });
 }

@@ -13,7 +13,9 @@
             "../../../src/app",
             "../../../src/jobs",
             "../../../src/render",
-            "../../../src/texture"
+            "../../../src/texture",
+            "../../../src/terrain",
+            "../../../src/geometry"
         ]
     },
     "test": {
@@ -215,7 +217,8 @@
                     "late_delta_counted",
                     "dropped_frame_counted",
                     "presents_late_against_cap",
-                    "fps_command"
+                    "fps_command",
+                    "fps_command_reports_fps_target"
                 ]
             },
             {
@@ -228,6 +231,11 @@
                     "fps_sets_target_fps",
                     "fps_change_while_running",
                     "fps_caps_headless",
+                    "fps_target_sets_target_fps",
+                    "fps_target_removed",
+                    "app_fps_overrides_fps_target",
+                    "fps_target_from_scene",
+                    "fps_target_change_while_running",
                     "headless_measures_delta",
                     "parse_delta_time",
                     "parse_delta_time_negative",
@@ -271,6 +279,21 @@
                     "restored_while_queued_reloads_once",
                     "restored_between_passes_reloads_once",
                     "thread_fails_inline_passes"
+                ]
+            },
+            {
+                "id": "TileTerrain",
+                "testcases": [
+                    "grid_pixels",
+                    "whitespace_ignored",
+                    "unknown_symbol",
+                    "shape_scale",
+                    "size_default",
+                    "set_again",
+                    "texture_ready",
+                    "remove_deletes_grid",
+                    "delete_releases_grid",
+                    "script"
                 ]
             },
             {

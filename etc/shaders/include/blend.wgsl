@@ -26,6 +26,8 @@ const BLEND_SINGLE: u32 = 2u;
 // Layer 0 has a height image, shifted left by k for layer k; a layer without one is flat at 0.5.
 const BLEND_HEIGHT: u32 = 4u;
 
+const BLEND_TILES: u32 = 256u;
+
 // Share of the shaped weights below which a layer of a blend with a contrast is dropped, under a
 // step of an 8 bit channel, so the fragments past a border sample the maps of one layer only.
 const BLEND_HEIGHT_DROP: f32 = 1.0 / 256.0;
@@ -105,7 +107,9 @@ fn blend_alpha(albedo: texture_2d_array<f32>, mask: texture_2d<f32>,
     heights: texture_2d_array<f32>, smp: sampler, u: BlendUniforms, uv: vec2f, mapped: f32,
     object: vec4f, normal: vec3f) -> f32 {
     var alpha = 0.0;
-    if (mapped > 1.0) {
+    if ((u.flags & BLEND_TILES) != 0u) {
+        alpha = 1.0;
+    } else if (mapped > 1.0) {
         let dx = dpdx(object);
         let dy = dpdy(object);
         let w = mapping_weights(normal, mapped - 1.0);

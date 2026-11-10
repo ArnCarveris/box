@@ -840,7 +840,8 @@ void box_bake_lights(
  * see and a transmissive shape leaves them.
  *
  * A TextureBlend counts like PbrTextures, and so does a change of the PbrTextures or
- * TextureTransform of an entity that is a layer of one.
+ * TextureTransform of an entity that is a layer of one. A set or removed TextureScroll counts,
+ * the offsets it moves every frame do not.
  *
  * The terms take the default source, so the change of a material component of a prefab
  * reaches the instances that inherit it.
@@ -852,16 +853,16 @@ void box_bake_observers(
     ecs_world_t *world,
     box_render_bake_t *b)
 {
-    ecs_entity_t looks[13] = {
+    ecs_entity_t looks[15] = {
         ecs_id(Rgb), ecs_id(Emissive), ecs_id(PbrMaterial), ecs_id(BlendMode),
         ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh),
         ecs_id(ClearCoat), ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission),
-        ecs_id(TextureMapping)
+        ecs_id(TextureMapping), ecs_id(TextureScroll), ecs_id(TileTerrain)
     };
     ecs_entity_t added[2] = { ecs_id(AlphaCutoff), ecs_id(Transmission) };
     ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
-    for (i = 0; i < 13; i ++) {
+    for (i = 0; i < 15; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = looks[i] }},
             .events = { EcsOnSet, EcsOnRemove },

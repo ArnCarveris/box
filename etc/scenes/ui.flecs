@@ -17,6 +17,7 @@ using box.projection
 using flecs.script.math
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {blend_modes: true}
   AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
 }

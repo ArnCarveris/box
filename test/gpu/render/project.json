@@ -297,6 +297,15 @@
                 ]
             },
             {
+                "id": "TextureScroll",
+                "testcases": [
+                    "shifts_checker",
+                    "adds_to_texture_transform",
+                    "normal_velocity_moves_normal_only",
+                    "ignored_by_2d"
+                ]
+            },
+            {
                 "id": "Tint",
                 "testcases": [
                     "mix_by_strength",
@@ -386,6 +395,16 @@
                     "height_contrast",
                     "flat_heights_contrast",
                     "flat_heights_switch"
+                ]
+            },
+            {
+                "id": "TileTerrain",
+                "testcases": [
+                    "corner_variant",
+                    "kind_order",
+                    "whole_tile",
+                    "extended_variant",
+                    "alpha_over"
                 ]
             },
             {
@@ -820,7 +839,25 @@
                     "smaa_last_composites_over",
                     "smaa_default_settings",
                     "smaa_settings_clamped",
-                    "smaa_follows_surface_resize"
+                    "smaa_follows_surface_resize",
+                    "color_grading_default_settings",
+                    "color_grading_settings_clamped",
+                    "color_grading_defaults_no_op",
+                    "color_grading_zero_literal_applies_as_set",
+                    "color_grading_temperature_warms",
+                    "color_grading_tint_magenta",
+                    "color_grading_exposure_scales",
+                    "color_grading_contrast_hdr",
+                    "color_grading_contrast_display",
+                    "color_grading_saturation",
+                    "color_grading_vibrance_favors_muted",
+                    "color_grading_lift_gamma_gain",
+                    "color_grading_disabled_entry_no_op",
+                    "color_grading_same_entity_after_tonemap",
+                    "color_grading_follows_surface_resize",
+                    "color_grading_lut_identity_no_op",
+                    "color_grading_lut_sepia_matches",
+                    "color_grading_lut_wrong_shape_ignored"
                 ]
             },
             {
@@ -1255,6 +1292,18 @@
                     "overdraw_plain",
                     "overdraw_cutout",
                     "overdraw_cutout_discard"
+                ]
+            },
+            {
+                "id": "PlanarReflection",
+                "testcases": [
+                    "box_mirrored",
+                    "below_plane_hidden",
+                    "own_shape_hidden",
+                    "camera_behind_plane",
+                    "one_sided_winding",
+                    "remove_frees_texture",
+                    "sky_mirrored"
                 ]
             }
         ]
