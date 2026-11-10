@@ -105,7 +105,6 @@ view {
   bloom { Bloom: {intensity: 0.1, threshold: 1.35, threshold_softness: 0.45} }
   exposure { AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.55, max_exposure: 18} }
   tonemap { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
-  smaa { Smaa: {} }
 
   View: {
     camera: camera,
@@ -124,7 +123,6 @@ view {
       {enabled: true, effect: sky},
       {enabled: true, effect: bloom},
       {enabled: true, effect: tonemap},
-      {enabled: true, effect: smaa}
     ]
   }
 }
