@@ -7,6 +7,7 @@ using box.geometry
 using box.material
 
 $ {
+  box.app.FpsTarget: {60}
   box.view.Scene: {baked: true, environment: true, aerial_perspective: true, sheen: true,
     clear_coat: true, diffuse_transmission: true}
 }

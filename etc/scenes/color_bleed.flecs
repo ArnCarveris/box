@@ -17,6 +17,7 @@ using box.surface
 using box.controllers
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: true}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}

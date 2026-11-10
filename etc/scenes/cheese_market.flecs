@@ -31,6 +31,7 @@ using box.atmosphere
 using assets
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, environment: true, aerial_perspective: true,
     transmission: true, sheen: true, clear_coat: true, anisotropy: true,
     diffuse_transmission: true}

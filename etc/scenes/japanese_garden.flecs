@@ -29,6 +29,7 @@ using box.animation
 using assets
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, transmission: true, sheen: true,
     clear_coat: true, diffuse_transmission: true}
 }
