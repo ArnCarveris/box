@@ -122,15 +122,12 @@ typedef struct box_gpu_atmos_view_t {
     WGPUTexture fog;                /**< Fog in scatter color, created on first use */
     WGPUTextureView fog_view;       /**< View sampled and written */
     int64_t fog_frame;              /**< Frame of the last packet that wrote the fog color */
-<<<<<<< HEAD
     uint32_t clouds[BOX_CLOUD_LAYER_MAX]; /**< Texture handles of the cloud layers in the
                                      *   uniforms, 0 for none */
-=======
     box_gpu_atmos_uniforms_t last;  /**< Uniforms of the view written last, which the planar
                                      *   reflections copy */
     WGPUBuffer mirrors[BOX_PLANAR_REFLECTION_MAX]; /**< Uniforms of the sky of each planar
                                      *   reflection slot, created on first use */
->>>>>>> b758679fd5faa2d5f1d4ec2ddf86c2be42590e56
 } box_gpu_atmos_view_t;
 
 /** The atmosphere state of the backend */
@@ -1454,15 +1451,28 @@ static bool box_gpu_atmos_sky_record(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[4] = {
+    WGPUBindGroupEntry entries[5 + BOX_CLOUD_LAYER_MAX] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
         { .binding = 1, .textureView = l->transmittance_view },
         { .binding = 2, .sampler = a->sampler },
-        { .binding = 4, .textureView = s->sky_view }
+        { .binding = 4, .textureView = s->sky_view },
+        { .binding = 8, .sampler = box_gpu_texture_sampler(gpu, WrapRepeat,
+            BOX_GPU_ATMOS_CLOUD_ANISOTROPY) }
     };
+    int32_t i;
+    for (i = 0; i < BOX_CLOUD_LAYER_MAX; i ++) {
+        WGPUTextureView cloud = s->clouds[i]
+            ? box_gpu_texture_cookie(gpu, s->clouds[i])
+            : NULL;
+        entries[5 + i] = (WGPUBindGroupEntry){
+            .binding = (uint32_t)(BOX_GPU_ATMOS_CLOUD_BINDING + i),
+            .textureView = cloud ? cloud : gpu->no_cookie->linear
+        };
+    }
+
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = a->sky_layout,
-        .entryCount = 4,
+        .entryCount = 5 + BOX_CLOUD_LAYER_MAX,
         .entries = entries
     });
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
@@ -1512,42 +1522,8 @@ bool box_gpu_atmosphere_draw_sky(
     box_gpu_atmos_t *a = gpu->atmosphere;
     box_gpu_atmos_luts_t *l = v->atmos.sky ? box_gpu_atmos_luts_ready(a, v) : NULL;
     box_gpu_atmos_view_t *s = l ? box_gpu_atmos_view_find(a, t, v) : NULL;
-    WGPURenderPipeline pipeline = s ? box_gpu_atmos_sky_pipeline(gpu, a, format) : NULL;
-    bool result = pipeline != NULL;
-    if (!result) {
-        goto done;
-    }
 
-    WGPUBindGroupEntry entries[5 + BOX_CLOUD_LAYER_MAX] = {
-        { .binding = 0, .buffer = s->uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
-        { .binding = 1, .textureView = l->transmittance_view },
-        { .binding = 2, .sampler = a->sampler },
-        { .binding = 4, .textureView = s->sky_view },
-        { .binding = 8, .sampler = box_gpu_texture_sampler(gpu, WrapRepeat,
-            BOX_GPU_ATMOS_CLOUD_ANISOTROPY) }
-    };
-    int32_t i;
-    for (i = 0; i < BOX_CLOUD_LAYER_MAX; i ++) {
-        WGPUTextureView cloud = s->clouds[i]
-            ? box_gpu_texture_cookie(gpu, s->clouds[i])
-            : NULL;
-        entries[5 + i] = (WGPUBindGroupEntry){
-            .binding = (uint32_t)(BOX_GPU_ATMOS_CLOUD_BINDING + i),
-            .textureView = cloud ? cloud : gpu->no_cookie->linear
-        };
-    }
-
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = a->sky_layout,
-        .entryCount = 5 + BOX_CLOUD_LAYER_MAX,
-        .entries = entries
-    });
-    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
-    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
-    wgpuBindGroupRelease(group);
-done:
-    return result;
+    return s && box_gpu_atmos_sky_record(gpu, pass, format, l, s, s->uniforms);
 }
 
 void box_gpu_atmosphere_sweep(
