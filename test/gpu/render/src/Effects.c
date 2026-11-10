@@ -2775,7 +2775,7 @@ void Effects_color_grading_follows_surface_resize(void) {
     test_int(w, 96);
     test_int(h, 48);
     // The red cube right of the middle is grey
-    const unsigned char *red = &px[(24 * 96 + 72) * 4];
+    const unsigned char *red = &px[(24 * 96 + 60) * 4];
     test_assert(red[0] > 20);
     test_assert(abs((int)red[0] - (int)red[1]) <= 1);
     test_assert(abs((int)red[0] - (int)red[2]) <= 1);

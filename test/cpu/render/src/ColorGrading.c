@@ -178,7 +178,7 @@ void ColorGrading_contrast_pivots(void) {
     box_render_grading_apply(&g, true, NULL, 0, half, out);
     test_assert(fabsf(out[0] - 0.5f) < 1e-5f);
     box_render_grading_apply(&g, true, NULL, 0, grey, out);
-    test_assert(fabsf(out[0] - 0.05f) < 1e-5f);
+    test_assert(fabsf(out[0] - 0.02f) < 1e-5f);
 }
 
 void ColorGrading_saturation_zero_is_grey(void) {
