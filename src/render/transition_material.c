@@ -52,6 +52,13 @@ void box_draws_transition_target(
         out->mapping = *material->mapping;
     }
 
+    if (material->scroll) {
+        out->scrolled = true;
+        out->scroll = *material->scroll;
+    }
+
+    out->time = material->time;
+
     if (material->transmission) {
         out->present |= 1u << BOX_RENDER_TRANSITION_TRANSMISSION;
         out->transmission = *material->transmission;
@@ -196,6 +203,8 @@ static void box_draws_transition_parts(
         .uv = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM,
             &material->uv),
         .mapping = material->mapped ? &material->mapping : NULL,
+        .scroll = material->scrolled ? &material->scroll : NULL,
+        .time = material->time,
         .transmission = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TRANSMISSION,
             &material->transmission),
         .clear_coat = box_draws_transition_part(material, BOX_RENDER_TRANSITION_CLEAR_COAT,

@@ -224,6 +224,8 @@ typedef struct box_draw_material_t {
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
     const TextureMapping *mapping; /**< Source of the texture coordinates of a 3D shape, ignored
                                  *   by 2D shapes */
+    const TextureScroll *scroll; /**< Endless UV scrolling of a 3D shape, ignored by 2D shapes */
+    double time;                /**< Total render time the scroll offsets are computed at */
     const Transmission *transmission; /**< Light passing through a 3D shape */
     const ClearCoat *clear_coat; /**< Dielectric layer over a 3D shape, ignored by 2D shapes */
     const SpecularAnisotropy *anisotropy; /**< Stretched highlight of a 3D shape, ignored by 2D
@@ -277,6 +279,9 @@ typedef struct box_draw_transition_material_t {
     TextureTransform uv;    /**< TextureTransform */
     TextureMapping mapping; /**< TextureMapping, which has no transition: the record keeps it */
     bool mapped;            /**< The material has a TextureMapping */
+    TextureScroll scroll;   /**< TextureScroll, which has no transition: the record keeps it */
+    bool scrolled;          /**< The material has a TextureScroll */
+    double time;            /**< Total render time the scroll offsets are computed at */
     Transmission transmission; /**< Transmission */
     ClearCoat clear_coat;   /**< ClearCoat */
     SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
@@ -497,8 +502,8 @@ typedef struct box_draw_material_slot_t {
  * GPU still needs of it.
  *
  * Mesh shapes that own material components share a slot per distinct record, with reference
- * counts. Prefabs, shapes of DynamicMaterial batches and shapes with a running material
- * transition own a private slot, which is packed from its owner and patched by slot.
+ * counts. Prefabs, shapes of DynamicMaterial batches, with a TextureScroll (packed every send)
+ * or a running material transition own a private slot, packed from its owner, patched by slot.
  *
  * Slots are handed out from the free list, last freed first, else after the highest slot, so
  * the same adds and removes give the same slots.
@@ -513,6 +518,10 @@ typedef struct box_draw_materials_t {
     ecs_map_t contents;     /**< Hash of a record to the shared slot that holds it */
     ecs_vec_t pending;      /**< ecs_entity_t, owners of shared slots whose material changed */
     ecs_vec_t transiting;   /**< uint32_t, private slots of running material transitions */
+    ecs_vec_t scrolling;    /**< uint32_t, private slots whose owner has a TextureScroll, packed
+                             *   again every send */
+    double time;            /**< Total render time of the packet the table packs for, which
+                             *   moves the TextureScroll offsets */
     int32_t stamp;          /**< Extracts the table resolved, which dates the transitions */
     uint32_t capacity;      /**< Records the table buffer holds, 0 before it is created */
     int32_t alive;          /**< Slots alive, slot 0 included */
@@ -1106,12 +1115,28 @@ void box_draws_range_region(
  *
  * @param world The world
  * @param owner The owner, 0 for the default material
+ * @param time Total render time the TextureScroll offsets are computed at
  * @param out Receives the material
  */
 void box_draws_material_of(
     const ecs_world_t *world,
     ecs_entity_t owner,
+    double time,
     box_draw_material_t *out);
+
+/** Compute the offsets of a TextureScroll at a time: velocity times time per axis in double
+ * precision, wrapped to 0..2 and kept positive, so WrapMirror tiles stay continuous. A velocity
+ * that is not finite does not move.
+ *
+ * @param scroll The component, NULL for none
+ * @param time Total render time
+ * @param out Receives the u and v offsets of every layer, then the u and v offsets the normal
+ *        map adds on top, all 0 without a TextureScroll
+ */
+void box_draws_texture_scroll(
+    const TextureScroll *scroll,
+    double time,
+    float *out);
 
 /** Get the material components the shading of a 2D shape is written from.
  *
@@ -1505,8 +1530,8 @@ void box_draws_materials_observers(
 /** Get the slot of the material table an entity renders with.
  *
  * A mesh shape that owns a MaterialId renders with the shared slot of its material, which it
- * takes or creates when it has none or its material changed since, or with a private slot while
- * it is in a DynamicMaterial batch or a material transition runs.
+ * takes or creates when it has none or its material changed since, or with a private slot in a
+ * DynamicMaterial batch, with a TextureScroll or while a material transition runs.
  *
  * Any other entity renders with the MaterialId it inherits, or slot 0, and gives back an own
  * slot it had. A slot past what the binding holds is logged once and renders as slot 0.
@@ -1567,7 +1592,7 @@ bool box_draws_material_owns(
  * else the owner gets a new slot and its sharers keep theirs.
  *
  * The first box_draws_materials_resolve after a frame that did not take the slot returns the
- * owner to a shared slot, unless it is a prefab or in a DynamicMaterial batch.
+ * owner to a shared slot, unless it is a prefab, in a DynamicMaterial batch or scrolls.
  *
  * @param world The world
  * @param d The state
@@ -1596,6 +1621,9 @@ void box_draws_materials_resolve(
  *
  * A shared slot uploads the record it was hashed with, a freed slot nothing. While recording
  * shadow regions, the slots whose cutoff or UV transform changed go to shadow_materials.
+ *
+ * The private slots of TextureScroll owners pack at the packet time every send and upload when
+ * they moved; a table without one packs nothing per frame.
  *
  * @param world The world
  * @param d The state
@@ -1679,6 +1707,31 @@ void box_draws_batch_textures(
     const box_draw_batch_t *b,
     box_render_batch_t *out);
 
+/** Get the texture handle a layer of a batch samples a texture entity through: its image, or
+ * the image of the surface that renders into it.
+ *
+ * @param d The state
+ * @param e The texture entity, 0 for none
+ * @return The handle, 0 while the entity has no image
+ */
+uint32_t box_draws_texture_handle(
+    const box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Write a TileTerrain into the blend record of its batch: its grid as the mask and the
+ * albedo, ORM and normal atlases of each kind as a layer.
+ *
+ * @param d The state
+ * @param e The terrain entity
+ * @param terrain Its TileTerrain
+ * @param r The record, zeroed with default transforms
+ */
+void box_draws_batch_tiles(
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const TileTerrain *terrain,
+    box_render_texture_blend_t *r);
+
 /** Write the TextureBlend of a texture_blend batch into the packet data of its draw.
  *
  * Writes the texture handles of the mask, layers and heights, the TextureTransform of each layer
@@ -1697,9 +1750,9 @@ void box_draws_batch_blend(
     const box_draw_batch_t *b,
     box_render_batch_t *out);
 
-/** Get the entity whose TextureBlend a 3D shape draws with: the owner of the TextureBlend it
- * has or inherits, 0 when it has none or is no mesh shape of the mesh shader. Alpha tested,
- * blended, transmissive and triplanar shapes blend as opaque ones do.
+/** Get the entity whose TextureBlend a 3D shape draws with: the shape itself when it owns a
+ * TileTerrain, else the owner of the TextureBlend it has or inherits, 0 when it has neither or
+ * is no mesh shape. Alpha tested, blended, transmissive and triplanar shapes blend alike.
  *
  * @param world The world
  * @param e The shape

@@ -203,9 +203,9 @@ typedef struct box_gpu_blend_array_t {
     uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL or _HEIGHT */
     uint32_t count;                 /**< Slices */
     uint32_t quality;               /**< Largest dimension of a slice */
-    uint32_t sources[BOX_RENDER_BLEND_LAYERS]; /**< Texture handle of each slice, 0 for the
+    uint32_t sources[BOX_RENDER_BLEND_SLICES]; /**< Texture handle of each slice, 0 for the
                                      *   default of the map */
-    uint32_t serials[BOX_RENDER_BLEND_LAYERS]; /**< Serial of the image of each source it was
+    uint32_t serials[BOX_RENDER_BLEND_SLICES]; /**< Serial of the image of each source it was
                                      *   built from, 0 for none: another serial rebuilds it */
     uint32_t version;               /**< Builds of the array, which the bind groups compare */
     WGPUTexture texture;            /**< The array, BOX_GPU_TEXTURE_FORMAT */

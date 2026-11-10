@@ -138,8 +138,8 @@
 /** Shader handle of the engine shader of the forward pass that draws the meshes with a feature
  * the mesh shader lacks.
  *
- * Those are an alpha test, a blend mode other than Opaque, Transmission, a TextureBlend, a
- * triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or DiffuseTransmission. */
+ * Those are Transmission, a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or
+ * DiffuseTransmission. */
 #define BOX_RENDER_SHADER_MESH_EXTENDED (10)
 
 /** Check whether a shader handle is one of the two mesh shaders.
@@ -246,6 +246,10 @@ static inline bool box_render_is_mesh(
 
 /** Layers of a TextureBlend */
 #define BOX_RENDER_BLEND_LAYERS (4)
+
+/** Slices of the texture arrays of a blend: the layers of a TextureBlend or the kinds of a
+ * TileTerrain */
+#define BOX_RENDER_BLEND_SLICES (16)
 
 /** Maps each layer of a TextureBlend samples: albedo, ORM and normal */
 #define BOX_RENDER_BLEND_MAPS (3)
@@ -583,7 +587,7 @@ typedef struct box_render_view_gtao_t {
 #define BOX_RENDER_FEATURE_TRANSMISSION (1u << 11)
 
 /** Scene features of the mesh shaders without an override: the TextureBlend entry points of the
- * extended mesh shader, and the alpha test and blend modes of the DrawKind */
+ * mesh shaders, and the alpha test and blend modes of the DrawKind */
 #define BOX_RENDER_FEATURE_TEXTURE_BLEND (1u << 12)
 #define BOX_RENDER_FEATURE_ALPHA_CUTOUT (1u << 13)
 #define BOX_RENDER_FEATURE_BLEND_MODES (1u << 14)
@@ -1060,7 +1064,8 @@ typedef struct box_render_material_t {
     float emissive[3];      /**< Linear emitted color times its strength */
     uint32_t attenuation_color; /**< Transmission.attenuation_color, display encoded bytes:
                              *   r | g << 8 | b << 16, white without Transmission */
-    float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset */
+    float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset; the
+                             *   offset plus the wrapped TextureScroll.velocity offset */
     float transmission_factor; /**< Transmission.transmission_factor, 0 without one */
     float ior;              /**< Transmission.ior, BOX_MATERIAL_IOR without one */
     float thickness_factor; /**< Transmission.thickness_factor, 0 without one or when negative */
@@ -1086,6 +1091,9 @@ typedef struct box_render_material_t {
     float mapping_size;     /**< TextureMapping.size of MappingObject and MappingWorld, 1 when
                              *   it is not positive and finite; 0 for MappingUv, so it matches
                              *   the record without one */
+    float normal_offset[2]; /**< Wrapped TextureScroll.normal_velocity offset the normal map
+                             *   adds to uv, 0 without one */
+    float pad[2];           /**< Zero, the record is a multiple of 16 bytes */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of
@@ -1181,16 +1189,17 @@ typedef struct box_render_target_t {
     bool exclusive;         /**< Renders only the views whose target is this handle */
 } box_render_target_t;
 
-/** The textures and transforms of a TextureBlend as a batch draws them, in the packet data of a
- * batch with texture_blend.
+/** The textures and transforms of a TextureBlend or a TileTerrain as a batch draws them, in the
+ * packet data of a batch with texture_blend.
  *
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
  * by every batch with the same sources, and binds it with the mask, textures[1] and transforms.
  *
- * The heights make a fourth array only with a contrast above 0 and a height on a layer. */
+ * The heights make a fourth array only with a contrast above 0 and a height on a layer. A
+ * TileTerrain has tiles set, its grid as the mask and an atlas per kind in each layer. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
-    uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
+    uint32_t layers[BOX_RENDER_BLEND_SLICES][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
                          *   of the albedo, ORM, normal and height of each layer, 0 for the
                          *   default; the heights are 0 with a contrast of 0 */
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer: u scale,
@@ -1199,6 +1208,7 @@ typedef struct box_render_texture_blend_t {
                          *   the arrays */
     uint32_t quality;   /**< Largest dimension of a slice, the texture quality of the surfaces */
     float contrast;     /**< TextureBlend.contrast, 0 for the linear blend without heights */
+    uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
 } box_render_texture_blend_t;
 
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.

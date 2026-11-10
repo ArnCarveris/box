@@ -1,11 +1,12 @@
-// Forward pass of the meshes without a TextureBlend, a triplanar TextureMapping, Sheen,
-// ClearCoat, SpecularAnisotropy, DiffuseTransmission or Transmission, which mesh_extended.wgsl
-// draws (box_draws_extended). It shades the metallic roughness base of the material: a GGX
+// Forward pass of the meshes without a triplanar TextureMapping, Sheen, ClearCoat,
+// SpecularAnisotropy, DiffuseTransmission or Transmission, which mesh_extended.wgsl draws
+// (box_draws_extended). It shades the metallic roughness base of the material: a GGX
 // specular and a Lambert diffuse lobe.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
+#include "include/mesh_blend.wgsl"
 
 // The texture layers apply on front faces; a back face keeps the material constants, is
 // unoccluded and faces the camera. The occlusion scales the indirect light only. geometric is
@@ -24,7 +25,10 @@ struct Surface {
 
 fn surface(f: VertexOut, front: bool) -> Surface {
     let geometric = normalize(f.normal);
-    let layers = hard_layers(f, geometric);
+    return surface_of(f, front, geometric, hard_layers(f, geometric));
+}
+
+fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Surface {
     var s: Surface;
     s.albedo = f.color.rgb;
     s.alpha = f.color.a;
@@ -122,4 +126,22 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     }
 
     return lit(f, s);
+}
+
+@fragment fn fs_blend(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    let geometric = normalize(f.normal);
+    return lit(f, surface_of(f, front, geometric, blend_layers(f, geometric, front)));
+}
+
+@fragment fn fs_blend_cutout(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let b = blend_fragment(f);
+    let albedo = blend_fragment_albedo(b);
+    if (f.color.a * albedo.a < vo_scalars(f).x) {
+        discard;
+    }
+
+    return lit(f, surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front)));
 }

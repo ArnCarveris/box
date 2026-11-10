@@ -73,6 +73,7 @@ assets {
     Transmission: {transmission_factor: 0.85, ior: 1.33, thickness_factor: 1.2, attenuation_distance: 0.8, attenuation_color: {38, 110, 100}}
     PbrTextures: {normal: canal_tex_water_normal}
     TextureMapping: {mode: MappingWorld, size: 5}
+    TextureScroll: {velocity: {0.05, -300.0 / 14400.0}}
   }
   prefab CanalPondWater { Rgb: {38, 76, 70}; PbrMaterial: {roughness: 0.06}; ClearCoat: {strength: 1, roughness: 0.03}; PbrTextures: {normal: canal_tex_water_normal} }
   prefab CanalResin { Rgb: {42, 92, 84}; PbrMaterial: {roughness: 0.1}; ClearCoat: {strength: 1, roughness: 0.05} }

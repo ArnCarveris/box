@@ -7,6 +7,7 @@
  */
 
 #include "draw.h"
+#include "../terrain/terrain.h"
 #include <math.h>
 
 /** Color of a shape without Rgb, display encoded */
@@ -306,10 +307,48 @@ static uint32_t box_draws_diffuse_transmission_pack(
     return result;
 }
 
+/** Wrap one axis of a scroll offset to 0..2.
+ *
+ * @param velocity Texture widths per second
+ * @param time Total render time
+ * @return The offset, 0 for a velocity that is not finite
+ */
+static float box_draws_scroll_axis(
+    float velocity,
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(velocity) && isfinite(time)) {
+        double v = fmod((double)velocity * time, 2.0);
+        if (v < 0.0) {
+            v += 2.0;
+        }
+
+        result = (float)v;
+        if (result >= 2.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+void box_draws_texture_scroll(
+    const TextureScroll *scroll,
+    double time,
+    float *out)
+{
+    out[0] = scroll ? box_draws_scroll_axis(scroll->velocity[0], time) : 0.0f;
+    out[1] = scroll ? box_draws_scroll_axis(scroll->velocity[1], time) : 0.0f;
+    out[2] = scroll ? box_draws_scroll_axis(scroll->normal_velocity[0], time) : 0.0f;
+    out[3] = scroll ? box_draws_scroll_axis(scroll->normal_velocity[1], time) : 0.0f;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
 {
+    float scroll[4];
     const Rgb *color = material->color;
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
@@ -334,6 +373,19 @@ void box_draws_material_pack(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    if (material->scroll) {
+        box_draws_texture_scroll(material->scroll, material->time, scroll);
+        out->uv[2] += scroll[0];
+        out->uv[3] += scroll[1];
+        out->normal_offset[0] = scroll[2];
+        out->normal_offset[1] = scroll[3];
+    } else {
+        out->normal_offset[0] = 0.0f;
+        out->normal_offset[1] = 0.0f;
+    }
+
+    out->pad[0] = 0.0f;
+    out->pad[1] = 0.0f;
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;
@@ -421,6 +473,43 @@ void box_draws_surface(
         for (int j = 0; j < 3; j ++) {
             out->p[22][j] = (shape->min[j] + shape->max[j]) * 0.5f;
             out->p[23][j] = (shape->max[j] - shape->min[j]) * 0.5f;
+        }
+    }
+}
+
+uint32_t box_draws_texture_handle(
+    const box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    uint32_t result = e ? box_textures_handle(d->textures, e) : 0;
+    if (e && !result && d->world) {
+        result = box_render_texture_target_handle(d->world, e);
+    }
+
+    return result;
+}
+
+void box_draws_batch_tiles(
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const TileTerrain *terrain,
+    box_render_texture_blend_t *r)
+{
+    const TileTerrainGrid *grid = ecs_get(d->world, e, TileTerrainGrid);
+    const TileKind *kinds = ecs_vec_first(&terrain->kinds);
+    int32_t k, count = ecs_vec_count(&terrain->kinds);
+    count = count < BOX_RENDER_BLEND_SLICES ? count : BOX_RENDER_BLEND_SLICES;
+    r->tiles = 1;
+    r->mask = grid ? box_draws_texture_handle(d, grid->texture) : 0;
+    r->count = count > 0 ? (uint32_t)count : 1;
+    for (k = 0; k < count; k ++) {
+        ecs_entity_t kind = kinds[k].textures;
+        const PbrTextures *textures = kind && ecs_is_alive(d->world, kind)
+            ? ecs_get(d->world, kind, PbrTextures) : NULL;
+        if (textures) {
+            r->layers[k][BOX_RENDER_BLEND_ALBEDO] = box_draws_texture_handle(d, textures->albedo);
+            r->layers[k][BOX_RENDER_BLEND_ORM] = box_draws_texture_handle(d, textures->orm);
+            r->layers[k][BOX_RENDER_BLEND_NORMAL] = box_draws_texture_handle(d, textures->normal);
         }
     }
 }

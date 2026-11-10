@@ -68,7 +68,10 @@
                     "texture_blend_layer_deleted",
                     "texture_blend_height_record",
                     "texture_blend_height_key",
-                    "texture_blend_every_shape"
+                    "texture_blend_every_shape",
+                    "texture_scroll_defaults",
+                    "texture_scroll_pack",
+                    "texture_scroll_wrap"
                 ]
             },
             {
@@ -373,7 +376,10 @@
                     "prefab_from_shared_slot_reaches_instances",
                     "prefab_from_shared_slot_same_color",
                     "prefab_from_shared_slot_deferred",
-                    "shared_cutoff_change_records_shadow"
+                    "shared_cutoff_change_records_shadow",
+                    "texture_scroll_private_slot",
+                    "texture_scroll_repacks_only_scrolling",
+                    "texture_scroll_prefab_repacks"
                 ]
             },
             {
@@ -745,6 +751,8 @@
                     "triplanar_mapping_draws_with_extended",
                     "triplanar_off_draws_with_mesh_shader",
                     "planar_mapping_draws_with_mesh_shader",
+                    "texture_blend_draws_with_mesh_shader",
+                    "texture_blend_triplanar_draws_with_extended",
                     "mapping_blend_change_moves_shape",
                     "add_sheen_moves_to_extended",
                     "remove_clear_coat_moves_to_mesh_shader",

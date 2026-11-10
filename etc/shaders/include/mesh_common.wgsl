@@ -110,6 +110,9 @@ struct VertexOut {
     @location(7) @interpolate(flat) flat3: vec4u,
     @location(11) object: vec4f,
     @location(14) object_normal: vec3f,
+    // Wrapped TextureScroll.normal_velocity offset of the material, added to the UVs of the
+    // normal map only
+    @location(15) @interpolate(flat) normal_offset: vec2f,
 };
 
 fn vo_emissive(f: VertexOut) -> vec3f {
@@ -287,6 +290,7 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     o.object = s.object;
     o.object_normal = s.object_normal;
     o.uv = vec4f(s.uv, s.material);
+    o.normal_offset = material.normal_offset;
     return o;
 }
 

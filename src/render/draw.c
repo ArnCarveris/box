@@ -581,6 +581,13 @@ ecs_entity_t box_draws_blend_owner(
     const box_draw_key_t *key)
 {
     ecs_entity_t result = 0;
+    if (box_render_is_mesh(key->pipeline) && ecs_id_in_use(world, ecs_id(TileTerrain)) &&
+        ecs_owns(world, e, TileTerrain))
+    {
+        result = e;
+        goto done;
+    }
+
     if (!box_render_is_mesh(key->pipeline) || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
         !ecs_get(world, e, TextureBlend))
     {
@@ -592,9 +599,9 @@ done:
     return result;
 }
 
-/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or has
- * a TextureBlend, or it uses a material feature its scene enables. Alpha tested and blended
- * shapes without those draw with the mesh shader.
+/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive, or it
+ * uses a material feature its scene enables. Alpha tested, blended and TextureBlend shapes
+ * without those draw with the mesh shader.
  *
  * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy
  * or DiffuseTransmission; only a scene with some of those off checks which.
@@ -614,7 +621,7 @@ static bool box_draws_extended(
     const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
         BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION;
     uint32_t f = key->features;
-    bool result = key->transmissive || key->texture_blend;
+    bool result = key->transmissive;
     const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
         ? NULL : ecs_get(world, e, TextureMapping);
     ecs_iter_t it;
@@ -1094,6 +1101,10 @@ static void box_draws_material_observers(
             .src.id = EcsSelf | EcsUp,
             .trav = EcsIsA
         }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+
+    box_draws_observer(world, d, "DrawsOnTileTerrain", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(TileTerrain) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
 
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){

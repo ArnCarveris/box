@@ -25,8 +25,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * The material components, such as Rgb, PbrMaterial and Transmission, bring it along. A prefab
- * that owns one gets a slot its instances share, a 3D shape that owns one a slot of its own.
+ * The material components, such as Rgb, PbrMaterial, Transmission and TextureScroll, bring it
+ * along. A prefab that owns one gets a slot its instances share, a 3D shape that owns one a slot
+ * of its own.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -273,6 +274,27 @@ ECS_STRUCT(TextureTransform, {
     float scale_y;  /**< V multiplier */
     float offset_x; /**< U addend, applied after the scale */
     float offset_y; /**< V addend, applied after the scale */
+});
+
+/** Velocity of a constructed TextureScroll, in texture widths per second: still */
+#define BOX_MATERIAL_SCROLL_VELOCITY (0.0f)
+
+/** Endless scrolling of the UVs of a 3D mesh (water, lava, conveyor belts, force fields),
+ * default velocities of 0, inherited by instances like TextureTransform. Only 3D meshes scroll,
+ * 2D shapes and text ignore it.
+ *
+ * Every PbrTextures layer moves by velocity times the total render time (that of LightCookie),
+ * after TextureMapping and TextureTransform, whose offset and transitions it adds to; the normal
+ * map moves by normal_velocity on top. Offsets wrap in double precision to 0..2 (WrapMirror).
+ *
+ * Its record is packed every frame; a capture sees the offset of its frame and is not redone for
+ * the motion. TextureBlend layers keep their TextureTransform and do not scroll; the velocity of
+ * the shape moves its mask and layers like its offset does, normal_velocity does not.
+ */
+ECS_STRUCT(TextureScroll, {
+    vec2 velocity;        /**< Texture widths per second added to the UV offset of every layer */
+    vec2 normal_velocity; /**< Texture widths per second added to the UV offset of the normal map
+                           *   only, on top of velocity */
 });
 
 /** Where the texture coordinates of a material come from */
