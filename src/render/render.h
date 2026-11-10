@@ -1092,6 +1092,43 @@ void box_render_smaa_settings(
     const Smaa *in,
     Smaa *out);
 
+/** Resolve the settings of a color grading pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_grading_settings(
+    const ColorGrading *in,
+    ColorGrading *out);
+
+/** Get the matrix of the white balance and exposure of a color grading: a chromatic adaptation
+ * in LMS space as in Unity and Bevy, times the exposure; the identity times the exposure when
+ * temperature and tint are 0.
+ *
+ * @param g The resolved settings
+ * @param out Receives the rows of the matrix, which multiplies a linear color
+ */
+void box_render_grading_balance(
+    const ColorGrading *g,
+    float out[3][3]);
+
+/** Grade a linear color as etc/shaders/grading.wgsl does.
+ *
+ * @param g The resolved settings
+ * @param display The input is in display range, after a Tonemap
+ * @param lut RGBA8 rows of a strip LUT of lut_size slices as stored, sRGB encoded, NULL for none
+ * @param lut_size Slices of the LUT, its height
+ * @param in The color
+ * @param out Receives the graded color
+ */
+void box_render_grading_apply(
+    const ColorGrading *g,
+    bool display,
+    const uint8_t *lut,
+    int32_t lut_size,
+    const float *in,
+    float *out);
+
 /** Texels along each edge of the Tony McMapface LUT */
 #define BOX_RENDER_TONY_SIZE (48)
 

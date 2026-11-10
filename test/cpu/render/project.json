@@ -444,6 +444,23 @@
                 ]
             },
             {
+                "id": "ColorGrading",
+                "setup": true,
+                "testcases": [
+                    "balance_identity_at_defaults",
+                    "balance_tiny_shift_close_to_identity",
+                    "temperature_warms",
+                    "tint_magenta",
+                    "defaults_no_op",
+                    "contrast_pivots",
+                    "saturation_zero_is_grey",
+                    "vibrance_favors_muted",
+                    "lift_gamma_gain",
+                    "lut_identity_no_op",
+                    "lut_strength_blends"
+                ]
+            },
+            {
                 "id": "Tonemap",
                 "setup": true,
                 "testcases": [

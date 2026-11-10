@@ -83,6 +83,9 @@
  * view */
 #define BOX_RENDER_SHADER_DEBUG_OVERDRAW (55)
 
+/** Shader handle of the engine shader of the color grading pass */
+#define BOX_RENDER_SHADER_GRADING (56)
+
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most; the bake
  * warns once about a volume with more for the first view that shows it */
 #define BOX_RENDER_DEBUG_PROBES_MAX (65536)
@@ -655,8 +658,18 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_EXPOSURE, /**< AutoExposure on its own: scales by the adapted exposure */
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
     BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
-    BOX_RENDER_EFFECT_SMAA      /**< Smaa */
+    BOX_RENDER_EFFECT_SMAA,     /**< Smaa */
+    BOX_RENDER_EFFECT_GRADING   /**< ColorGrading */
 } box_render_effect_kind_t;
+
+/** Resolved settings of a color grading pass */
+typedef struct box_render_grading_t {
+    ColorGrading settings;      /**< Clamped settings, lut is the entity */
+    uint32_t lut;               /**< Texture handle of a strip LUT of a valid shape, 0 for none */
+    int32_t lut_size;           /**< Slices of the LUT, its height, 0 for none */
+    bool display;               /**< A Tonemap of the view runs before it, so the input is in
+                                 *   display range */
+} box_render_grading_t;
 
 /** An effect pass of a view with its settings resolved, in the order of View.effects */
 typedef struct box_render_effect_t {
@@ -668,6 +681,7 @@ typedef struct box_render_effect_t {
     Bloom bloom;                /**< Resolved settings of a bloom pass */
     HeightFog fog;              /**< Resolved settings of a fog pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
+    box_render_grading_t grading; /**< Resolved settings of a color grading pass */
 } box_render_effect_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */

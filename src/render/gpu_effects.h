@@ -229,6 +229,15 @@ typedef struct box_gpu_smaa_uniforms_t {
                                      *   corner rounding 0..1 */
 } box_gpu_smaa_uniforms_t;
 
+/** Uniforms of the color grading pass, matching Grading in etc/shaders/grading.wgsl */
+typedef struct box_gpu_grading_uniforms_t {
+    float balance[3][4];            /**< Rows of the white balance matrix times the exposure */
+    float params[4];                /**< Contrast, saturation, vibrance, 1 for display range */
+    float lift[4];                  /**< Lift, LUT strength */
+    float gain[4];                  /**< Gain, slices of the LUT or 0 for none */
+    float inv_gamma[4];             /**< 1 / gamma, 1 when lift or gamma change the color */
+} box_gpu_grading_uniforms_t;
+
 /** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Inverse of the projection times the view matrix */

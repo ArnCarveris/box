@@ -10,6 +10,7 @@
  */
 
 #include "render.h"
+#include "../texture/texture.h"
 
 /** Shortest edge of the first bloom mip */
 #define BOX_EFFECTS_BLOOM_MIP_MIN (8)
@@ -30,6 +31,15 @@
 
 /** Most edge aware denoise passes of Gtao */
 #define BOX_EFFECTS_GTAO_DENOISE_MAX (3)
+
+/** Smallest gamma of a color grading */
+#define BOX_EFFECTS_GRADING_GAMMA_MIN (0.01f)
+
+/** State of the extract of the effects, kept across frames */
+typedef struct box_effects_state_t {
+    ecs_map_t lut_errors;   /**< LUT entity to the shape it was rejected for, width << 32 |
+                             *   height, so each shape logs once */
+} box_effects_state_t;
 
 void box_render_bloom_settings(
     const Bloom *in,
@@ -104,6 +114,85 @@ void box_render_smaa_settings(
     out->corner_rounding = glm_imax(glm_imin(in->corner_rounding, 100), 0);
 }
 
+void box_render_grading_settings(
+    const ColorGrading *in,
+    ColorGrading *out)
+{
+    int32_t i;
+    *out = *in;
+    out->contrast = glm_max(in->contrast, 0.0f);
+    out->saturation = glm_max(in->saturation, 0.0f);
+    out->vibrance = glm_max(in->vibrance, -1.0f);
+    for (i = 0; i < 3; i ++) {
+        out->gamma[i] = glm_max(in->gamma[i], BOX_EFFECTS_GRADING_GAMMA_MIN);
+    }
+
+    out->lut_strength = glm_clamp(in->lut_strength, 0.0f, 1.0f);
+}
+
+/** Resolve the strip LUT of a color grading pass: its texture handle once the image is loaded,
+ * when its width is the square of its height. Another shape logs an error once.
+ *
+ * @param world The world
+ * @param state The state of the extract
+ * @param g The pass
+ */
+static void box_effects_grading_lut(
+    ecs_world_t *world,
+    box_effects_state_t *state,
+    box_render_grading_t *g)
+{
+    ecs_entity_t e = g->settings.lut;
+    const box_textures_t *t = e && g->settings.lut_strength > 0 && ecs_is_alive(world, e)
+        ? box_textures_get(world)
+        : NULL;
+    uint32_t handle = t ? box_textures_handle(t, e) : 0;
+    const box_texture_t *tex = handle ? ecs_map_get_deref(&t->textures, box_texture_t, e) : NULL;
+    if (!tex) {
+        goto done;
+    }
+
+    if (tex->height < 2 || tex->width != tex->height * tex->height || tex->single_channel) {
+        uint64_t shape = ((uint64_t)(uint32_t)tex->width << 32) | (uint32_t)tex->height;
+        ecs_map_val_t *logged = ecs_map_ensure(&state->lut_errors, e);
+        if (*logged != shape + 1) {
+            char *name = ecs_get_path(world, e);
+            ecs_err("ColorGrading LUT %s is %dx%d%s, a strip LUT is N*N x N", name,
+                tex->width, tex->height, tex->single_channel ? " single channel" : "");
+            ecs_os_free(name);
+            *logged = shape + 1;
+        }
+
+        goto done;
+    }
+
+    ecs_map_remove(&state->lut_errors, e);
+    g->lut = handle;
+    g->lut_size = tex->height;
+done:
+    return;
+}
+
+/** Check whether a Tonemap pass of a view comes before the passes appended next.
+ *
+ * @param p The packet
+ * @param v The view
+ * @return Whether the view has a tone map pass so far
+ */
+static bool box_effects_tonemapped(
+    const box_render_packet_t *p,
+    const box_render_view_t *v)
+{
+    int32_t i;
+    bool result = false;
+    for (i = 0; i < v->effect_count && !result; i ++) {
+        result = ecs_vec_get_t(&p->effects, box_render_effect_t,
+            v->effect_first + i)->kind == BOX_RENDER_EFFECT_TONEMAP;
+    }
+
+    return result;
+}
+
 /** Append an effect pass to the packet and count it for its view.
  *
  * @param p The packet
@@ -131,12 +220,14 @@ static box_render_effect_t* box_effects_append(
  * the settings of several effects.
  *
  * @param world The world
+ * @param state The state of the extract
  * @param p The packet
  * @param v The view
  * @param e The effect entity
  */
 static void box_effects_entity(
     ecs_world_t *world,
+    box_effects_state_t *state,
     box_render_packet_t *p,
     box_render_view_t *v,
     ecs_entity_t e)
@@ -145,6 +236,7 @@ static void box_effects_entity(
     const Bloom *bloom = ecs_get(world, e, Bloom);
     const AutoExposure *exposure = ecs_get(world, e, AutoExposure);
     const Tonemap *tonemap = ecs_get(world, e, Tonemap);
+    const ColorGrading *grading = ecs_get(world, e, ColorGrading);
     const Smaa *smaa = ecs_get(world, e, Smaa);
     if (fog) {
         box_render_fog_settings(fog, &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog);
@@ -176,6 +268,15 @@ static void box_effects_entity(
         }
     }
 
+    if (grading) {
+        bool display = box_effects_tonemapped(p, v);
+        box_render_grading_t *g = &box_effects_append(
+            p, v, BOX_RENDER_EFFECT_GRADING, e)->grading;
+        box_render_grading_settings(grading, &g->settings);
+        g->display = display;
+        box_effects_grading_lut(world, state, g);
+    }
+
     if (smaa) {
         box_render_smaa_settings(smaa, &box_effects_append(
             p, v, BOX_RENDER_EFFECT_SMAA, e)->smaa);
@@ -185,11 +286,13 @@ static void box_effects_entity(
 /** Add the effect passes of a view of the packet.
  *
  * @param world The world
+ * @param state The state of the extract
  * @param p The packet
  * @param v The view
  */
 static void box_effects_view(
     ecs_world_t *world,
+    box_effects_state_t *state,
     box_render_packet_t *p,
     box_render_view_t *v)
 {
@@ -218,7 +321,7 @@ static void box_effects_view(
             box_render_gtao_settings(ao, &v->gtao.settings);
         }
 
-        box_effects_entity(world, p, v, e);
+        box_effects_entity(world, state, p, v, e);
     }
 }
 
@@ -232,7 +335,8 @@ static void BoxRenderExtractEffects(
     box_render_packet_t *p = box_render_packet(it->world);
     int32_t i, count = ecs_vec_count(&p->views);
     for (i = 0; i < count; i ++) {
-        box_effects_view(it->world, p, ecs_vec_get_t(&p->views, box_render_view_t, i));
+        box_effects_view(it->world, it->ctx, p,
+            ecs_vec_get_t(&p->views, box_render_view_t, i));
     }
 }
 
@@ -260,6 +364,9 @@ bool box_render_effects_use(
         case BOX_RENDER_SHADER_SMAA:
             result = e->kind == BOX_RENDER_EFFECT_SMAA;
             break;
+        case BOX_RENDER_SHADER_GRADING:
+            result = e->kind == BOX_RENDER_EFFECT_GRADING;
+            break;
         default:
             break;
         }
@@ -273,12 +380,28 @@ bool box_render_effects_use(
     return result;
 }
 
+/** Free the state of the extract.
+ *
+ * @param ctx The state
+ */
+static void box_effects_state_free(
+    void *ctx)
+{
+    box_effects_state_t *state = ctx;
+    ecs_map_fini(&state->lut_errors);
+    ecs_os_free(state);
+}
+
 void box_render_effects_init(
     ecs_world_t *world)
 {
+    box_effects_state_t *state = ecs_os_calloc_t(box_effects_state_t);
+    ecs_map_init(&state->lut_errors, NULL);
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractEffects" }),
         .phase = RenderExtract,
-        .run = BoxRenderExtractEffects
+        .run = BoxRenderExtractEffects,
+        .ctx = state,
+        .ctx_free = box_effects_state_free
     });
 }

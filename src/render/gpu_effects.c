@@ -1661,6 +1661,60 @@ WGPUTexture box_gpu_effects_image(
     return fx && fx->current ? fx->current->hdr[0] : NULL;
 }
 
+/** Record a color grading pass, with its strip LUT once the backend has the image.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the pass was recorded
+ */
+static bool box_gpu_fx_grading(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e)
+{
+    const box_render_grading_t *g = &e->grading;
+    const ColorGrading *c = &g->settings;
+    box_gpu_grading_uniforms_t u;
+    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
+    WGPUTextureView lut = g->lut && g->lut_size > 1 ? box_gpu_texture_cookie(gpu, g->lut) : NULL;
+    float balance[3][3];
+    bool curve = false;
+    int32_t i, j;
+    ecs_os_memset_t(&u, 0, box_gpu_grading_uniforms_t);
+    box_render_grading_balance(c, balance);
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 3; j ++) {
+            u.balance[i][j] = balance[i][j];
+        }
+
+        u.lift[i] = c->lift[i];
+        u.gain[i] = c->gain[i];
+        u.inv_gamma[i] = 1.0f / c->gamma[i];
+        curve = curve || c->lift[i] != 0.0f || c->gamma[i] != 1.0f;
+    }
+
+    u.params[0] = c->contrast;
+    u.params[1] = c->saturation;
+    u.params[2] = c->vibrance;
+    u.params[3] = g->display ? 1.0f : 0.0f;
+    u.lift[3] = c->lut_strength;
+    u.gain[3] = lut ? (float)g->lut_size : 0.0f;
+    u.inv_gamma[3] = curve ? 1.0f : 0.0f;
+    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
+
+    return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
+        .shader = BOX_RENDER_SHADER_GRADING,
+        .entry = "fs",
+        .input = ctx->input,
+        .aux = lut,
+        .uniforms = s->uniforms,
+        .output = ctx->output,
+        .format = ctx->format,
+        .blend = ctx->blend
+    });
+}
+
 /** Record one effect pass of a chain.
  *
  * @param gpu The backend
@@ -1687,6 +1741,9 @@ static bool box_gpu_fx_effect(
         break;
     case BOX_RENDER_EFFECT_SMAA:
         result = box_gpu_fx_smaa(gpu, ctx, e);
+        break;
+    case BOX_RENDER_EFFECT_GRADING:
+        result = box_gpu_fx_grading(gpu, ctx, e);
         break;
     default:
         break;
