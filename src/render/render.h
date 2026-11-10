@@ -1243,6 +1243,29 @@ box_render_transition_record_t* box_render_packet_transition(
 box_render_packet_t* box_render_packet(
     ecs_world_t *world);
 
+/** Get the BOX_RENDER_FEATURE_* features of a scene from its Scene.
+ *
+ * @param world The world
+ * @param scene The scene root, 0 for the default scene, whose features are the Scene singleton
+ * @return The features, 0 without a Scene
+ */
+uint32_t box_render_scene_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene);
+
+/** Get the features of a view: those of its scene without the lighting ones its LightSettings
+ * turn off (baked, reflections, atmosphere), and the depth prepass.
+ *
+ * @param world The world
+ * @param scene The scene the view draws
+ * @param lighting The LightSettings of the view, NULL for a capture without a view
+ * @return The features
+ */
+uint32_t box_render_view_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    const LightSettings *lighting);
+
 /** Append a view to a packet.
  *
  * @param p The packet

@@ -63,7 +63,6 @@ void box_render_packet_reset(
     p->vsync = false;
     p->refresh = 0;
     p->anisotropy = 0;
-    p->material_features = BOX_RENDER_MATERIAL_ALL;
     p->transmission_roughness = 1.0f;
     ecs_vec_clear(&p->resources);
     ecs_vec_clear(&p->uploads);
@@ -127,7 +126,6 @@ void box_render_packet_copy(
     dst->vsync = src->vsync;
     dst->refresh = src->refresh;
     dst->anisotropy = src->anisotropy;
-    dst->material_features = src->material_features;
     dst->transmission_roughness = src->transmission_roughness;
     box_render_vec_copy(&dst->resources, &src->resources, ECS_SIZEOF(box_render_resource_t));
     box_render_vec_copy(&dst->uploads, &src->uploads, ECS_SIZEOF(box_render_upload_t));

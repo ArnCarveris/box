@@ -60,6 +60,11 @@ static ecs_world_t* sheen_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -282,7 +287,8 @@ static float sheen_half(
     return sum;
 }
 
-/** Check that two sheen captures are identical and free them.
+/** Check that two sheen captures differ by at most one step per channel and free them: a shape
+ * with a Sheen draws with the extended mesh shader, which rounds as the mesh shader may not.
  *
  * @param a The first capture
  * @param b The second capture
@@ -291,7 +297,11 @@ static void sheen_expect_same(
     unsigned char *a,
     unsigned char *b)
 {
-    test_int(memcmp(a, b, SHEEN_W * SHEEN_W * 4), 0);
+    int32_t i;
+    for (i = 0; i < SHEEN_W * SHEEN_W * 4; i ++) {
+        test_assert(abs((int)a[i] - (int)b[i]) <= 1);
+    }
+
     stbi_image_free(a);
     stbi_image_free(b);
 }
@@ -590,6 +600,11 @@ void Sheen_ignored_by_2d(void) {
 void Sheen_prefab(void) {
     // materials/pbr
     ecs_world_t *world = sheen_world(true, 3);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_set(world, prefab, Sphere, {.segments = 64, .smooth = true, .radius = 0.6f});
     ecs_set(world, prefab, Rgb, {60, 60, 60});
@@ -625,6 +640,11 @@ void Sheen_change_and_remove(void) {
     sheen_ring_t base = sheen_rim(before);
 
     ecs_world_t *world = sheen_world(true, 3);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t ball = sheen_sphere(world, 0,
         &(Sheen){.color = {255, 255, 255}, .roughness = 0.5f});
     unsigned char *px = sheen_render(world, "sheen_change.png");
@@ -802,6 +822,11 @@ void Sheen_transition_mid(void) {
     ecs_fini(still);
 
     ecs_world_t *world = sheen_world(true, 3);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     ecs_entity_t e = sheen_sphere(world, 0, &black);
     box_transition_set(world, e, ecs_id(Sheen), &(TransitionSpec){ .duration = 1.0f });

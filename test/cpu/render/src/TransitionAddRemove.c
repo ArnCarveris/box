@@ -650,6 +650,11 @@ void TransitionAddRemove_opacity_add_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_mesh_shading_t rendered;
     int32_t i;
@@ -681,6 +686,11 @@ void TransitionAddRemove_opacity_remove_mesh(void) {
     // engine_core/transition
     box_render_null_t *null;
     ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t e = tr_shape(world, 0, 0);
     box_render_mesh_shading_t rendered;
     int32_t i;

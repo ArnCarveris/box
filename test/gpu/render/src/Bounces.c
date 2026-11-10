@@ -237,6 +237,11 @@ void Bounces_image_stable_once_converged(void) {
 
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
@@ -323,6 +328,11 @@ void Bounces_view_keeps_last_complete_pass(void) {
 
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
@@ -422,6 +432,11 @@ void Bounces_far_end_brightens_with_bounces(void) {
     for (i = 0; i < 3; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -518,6 +533,11 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
     for (i = 0; i < 3; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);

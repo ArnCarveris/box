@@ -237,7 +237,7 @@ static void box_shadows_view(
     out->normal_offset = s.normal_offset;
     out->tiles = box_render_lights_atlas(box_render_lights_state(world),
         view->lighting.scene ? view->lighting.scene : v->scene, &out->atlas);
-    out->spots = out->tiles > 0;
+    out->spots = out->tiles > 0 && (v->features & BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS);
     if (!v->lights.directional || glm_vec3_norm(v->lights.sun) < 1e-6f) {
         goto done;
     }

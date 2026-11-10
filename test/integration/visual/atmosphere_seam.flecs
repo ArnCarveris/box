@@ -6,6 +6,10 @@ using box.light
 using box.effects
 using box.atmosphere
 
+$ {
+  Scene: {aerial_perspective: true}
+}
+
 // Only the sky at low sun, the camera looking 11 degrees up at world -Z, where atan2(x, z) of
 // the sky view LUT wraps from +pi to -pi, the sun 4 degrees up and about 25 degrees to the side.
 // The sky is smooth across the center of the image from the horizon, near the bottom, up; a

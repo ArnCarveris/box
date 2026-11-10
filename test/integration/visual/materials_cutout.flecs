@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {alpha_cutout: true, blend_modes: true}
+}
+
 // Alpha tested materials (AlphaCutoff) on a floor lit by a sun from behind on the right, whose
 // shadows fall toward the camera.
 // Two panels of a lattice fence (fence.png, BackFacePlain) form a corner, the right one turned

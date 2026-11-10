@@ -17,6 +17,12 @@ using box.atmosphere
 using box.layout
 using box.widgets
 
+$ {
+  Scene: {baked: true, reflections: true, cookies: true, environment: true,
+    aerial_perspective: true, alpha_cutout: true, blend_modes: true, transmission: true,
+    texture_blend: true, triplanar: true, clear_coat: true, diffuse_transmission: true}
+}
+
 window { Surface: {width: 1600, height: 1100, vsync: true} }
 canopy_ao { Gtao: {radius: 1.3, final_value_power: 1.7} }
 canopy_bloom { Bloom: {intensity: 0.1, threshold: 1.35, threshold_softness: 0.45} }
@@ -34,7 +40,7 @@ async {
 }
 
 jungle_city {
-  Scene: {}
+  Scene: {baked: true, reflections: true, cookies: true, environment: true, aerial_perspective: true, alpha_cutout: true, blend_modes: true, transmission: true, texture_blend: true, triplanar: true, clear_coat: true, diffuse_transmission: true}
   sun {
     DirectionalLight: {intensity: 2.6 * math.PI}
     Rgb: {255, 244, 222}

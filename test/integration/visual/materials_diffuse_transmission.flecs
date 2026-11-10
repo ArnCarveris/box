@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {punctual_shadows: true, alpha_cutout: true, diffuse_transmission: true}
+}
+
 // Diffuse transmission (DiffuseTransmission) of thin surfaces lit from behind by a low sun that
 // shines toward the camera, with the shadows of the view on. Top left, leaf quads (leaf.png,
 // alpha tested, BackFacePlain) hang in front of the sun and glow a yellow green through their
@@ -15,7 +19,7 @@ using box.light
 // around a point light glows warm on its outside. In front, a row of white panels has a
 // factor of 0, 0.25, 0.5, 0.75 and 1 from left to right: the glow through them grows.
 backlit {
-  Scene: {}
+  Scene: {punctual_shadows: true, alpha_cutout: true, diffuse_transmission: true}
   AmbientLight: {sky: {90, 100, 130}, ground: {50, 45, 40}, intensity: 0.4}
 
   camera {

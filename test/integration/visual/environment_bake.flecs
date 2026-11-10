@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {baked: true, environment: true}
+}
+
 // A baked room on the left next to an exterior on the right, both under the environment
 // sky.hdr, which the first view draws as the background. The room is a `Scene` with
 // `LightBake`, open toward the camera and lit only by a warm point light inside; the exterior is
@@ -16,7 +20,7 @@ using box.light
 // by the sky: blue from above, the mirror ball showing the sky, the bright horizon band and the
 // brown ground.
 room {
-  Scene: {}
+  Scene: {baked: true, environment: true}
   LightBake: {probe_spacing: 0.5, bounces: 1, bounds_padding: 0.5}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
@@ -81,7 +85,7 @@ room {
 }
 
 outside {
-  Scene: {}
+  Scene: {baked: true, environment: true}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
   sky {

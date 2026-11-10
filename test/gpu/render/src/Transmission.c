@@ -30,6 +30,11 @@ static ecs_world_t* tr_world(void)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -76,7 +81,7 @@ static ecs_entity_t tr_view(
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}},
-        .lighting = {.enabled = lit},
+        .lighting = {.enabled = lit, .depth_prepass = true},
         .culling = {.enabled = occlusion, .occlusion = occlusion, .min_dimension_px = 1}});
 
     return view;
@@ -255,6 +260,11 @@ static unsigned char* tr_script(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -585,6 +595,11 @@ void Transmission_partial_factor_keeps_diffuse(void) {
     int32_t k, c;
     for (k = 0; k < 3; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_singleton_set(world, AmbientLight, {.sky = {200, 200, 200},
             .ground = {200, 200, 200}, .intensity = 0.6f});
         tr_view(world, tr_camera(world, 0), true, false);
@@ -620,6 +635,11 @@ void Transmission_specular_on_top(void) {
     int32_t k, c;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), true, false);
         tr_wall(world, 0, -10, 40, 40, 30, 30, 30);
         ecs_entity_t glass = ecs_new(world);
@@ -660,6 +680,11 @@ void Transmission_specular_on_top(void) {
 void Transmission_no_depth_write_no_shadow(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -12, 40, 40, 0, 200, 0);
 
@@ -798,6 +823,11 @@ void Transmission_blended_behind_shows(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), true, false);
         tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
         ecs_entity_t quad = tr_quad(world, 0, 0, -7, 8, 200, 0, 0, k ? 1 : 0.5f);
@@ -828,6 +858,11 @@ void Transmission_blended_behind_shows(void) {
 void Transmission_transmissive_behind_shows(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 200, 200, 0);
     tr_glass(world, 0, -4, 2, 2, 1, 1, 0);
@@ -857,6 +892,11 @@ void Transmission_blended_in_front_draws_over(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), true, false);
         tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
         if (k) {
@@ -883,6 +923,11 @@ void Transmission_one_snapshot_single_layer(void) {
     int32_t snapshots[2], passes[2], k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), true, false);
         tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
         tr_quad(world, 0, 0, -7, 4, 200, 0, 0, 0.5f);
@@ -921,6 +966,11 @@ static void tr_layers(
 void Transmission_layers_take_snapshots(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_layers(world);
     box_render_gpu_stats_t before = tr_frames(world, 0);
@@ -946,6 +996,11 @@ void Transmission_layers_take_snapshots(void) {
 void Transmission_snapshot_budget(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -12, 40, 40, 0, 200, 0);
     int32_t i, snapshots, passes;
@@ -966,6 +1021,11 @@ void Transmission_snapshot_budget(void) {
 void Transmission_adjacent_runs_one_snapshot(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
     tr_quad(world, 0, 0, -8, 2, 200, 0, 0, 0.5f);
@@ -990,6 +1050,11 @@ void Transmission_occlusion_view_layers(void) {
     int32_t k, i, c, wrong = 0;
     for (k = 0; k < 3; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), k == 2, k == 1);
 
         tr_layers(world);
@@ -1034,6 +1099,11 @@ void Transmission_occlusion_view_layers(void) {
 void Transmission_diffuse_blur_behind_blended(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 0, 200, 0);
     tr_quad(world, 0, 0, -5, 1, 200, 0, 0, 0.5f);
@@ -1114,6 +1184,11 @@ void Transmission_opaque_and_sky_in_snapshot(void) {
 void Transmission_snapshot_counter(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
     ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
@@ -1153,6 +1228,11 @@ void Transmission_snapshot_counter(void) {
 void Transmission_resize_recreates_snapshot(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
     tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
@@ -1178,6 +1258,11 @@ void Transmission_resize_recreates_snapshot(void) {
 void Transmission_two_views_one_target(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t front = tr_camera(world, 0);
     ecs_entity_t back = tr_camera(world, 0);
     ecs_set(world, back, Rotation, {0, 3.14159265f, 0});
@@ -1213,6 +1298,11 @@ void Transmission_view_without_effects(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), k == 1, false);
         tr_wall(world, 0, -10, 40, 40, bg[0], bg[1], bg[2]);
         ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1.5f, 0);
@@ -1258,6 +1348,11 @@ void Transmission_occlusion_view_transmits(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), k == 1, true);
         tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
         tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
@@ -1287,6 +1382,11 @@ void Transmission_forward_passes_by_phase(void) {
         bool lit = k == 1;
         int32_t passes = lit ? 1 : 2;
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), lit, true);
         tr_wall(world, 0, -10, 40, 40, 200, 120, 60);
         ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
@@ -1321,6 +1421,11 @@ void Transmission_forward_passes_lit_no_prepass(void) {
     for (k = 0; k < 2; k ++) {
         bool transmissive = k == 0;
         ecs_world_t *world = tr_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         tr_view(world, tr_camera(world, 0), true, true);
         ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
         if (!transmissive) {
@@ -1355,6 +1460,11 @@ void Transmission_forward_passes_lit_no_prepass(void) {
 void Transmission_two_formats_one_target(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t smaa = ecs_new(world);
     ecs_add(world, smaa, Smaa);
     View value = {.camera = tr_camera(world, 0),
@@ -1445,6 +1555,11 @@ static void tr_first_frame(
 void Transmission_first_frame_not_dark(void) {
     // materials/transmission
     ecs_world_t *world = tr_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     tr_view(world, tr_camera(world, 0), true, false);
     tr_wall(world, 0, -10, 40, 40, 230, 230, 230);
     tr_surface(world, TR_SIZE, TR_SIZE, "first_frame.png");

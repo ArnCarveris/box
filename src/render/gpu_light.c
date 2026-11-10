@@ -596,7 +596,7 @@ void box_gpu_cookie_uniforms(
 {
     const box_render_view_cookie_t *c = &v->lights.cookie;
     if (!v->lights.enabled || !v->lights.directional || !c->texture ||
-        !box_gpu_texture_cookie(gpu, c->texture))
+        !(v->features & BOX_RENDER_FEATURE_COOKIES) || !box_gpu_texture_cookie(gpu, c->texture))
     {
         goto done;
     }

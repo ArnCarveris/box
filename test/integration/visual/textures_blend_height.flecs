@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {texture_blend: true}
+}
+
 // Height based TextureBlend transitions: two quads blend a cobble layer (top half of the mask)
 // and a grass layer (bottom half) under the mask of textures_blend.flecs, whose red and green
 // weigh the cobble and blue and alpha the grass, so the border is a soft horizontal band through

@@ -8,6 +8,10 @@ using box.layout
 using box.text
 using box.projection
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 world_camera {
   Position: {0, 3, 8}
   Rotation: {-0.32, 0, 0}
@@ -86,7 +90,7 @@ template Bar {
 }
 
 hud {
-  Scene: {}
+  Scene: {blend_modes: true}
 
   camera {
     Position: {0, 0, 100}

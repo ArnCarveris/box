@@ -7,6 +7,10 @@ using box.light
 using box.effects
 using box.atmosphere
 
+$ {
+  Scene: {aerial_perspective: true}
+}
+
 tonemap {
   Tonemap: {}
 }

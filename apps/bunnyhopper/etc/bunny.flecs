@@ -11,6 +11,10 @@ using box.animation
 using box.transition
 using bunnyhopper
 
+$ {
+  box.view.Scene: {sheen: true}
+}
+
 // Soft white fur with a sheen at grazing angles
 prefab BunnyFur {
   Rgb: {240, 240, 240}

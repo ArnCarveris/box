@@ -1009,11 +1009,8 @@ static void box_reflect_views(
             continue;
         }
 
-        const View *view = rv->view && ecs_is_alive(world, rv->view)
-            ? ecs_get(world, rv->view, View)
-            : NULL;
         if (s->sent && ecs_vec_count(&s->list) && rv->lights.enabled &&
-            (view ? view->lighting.reflections : true))
+            (rv->features & BOX_RENDER_FEATURE_REFLECTIONS))
         {
             const box_render_reflection_probe_t *last = ecs_vec_last_t(
                 &s->list, box_render_reflection_probe_t);

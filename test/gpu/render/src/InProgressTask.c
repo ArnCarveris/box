@@ -167,6 +167,7 @@ void InProgressTask_held_pipeline_blocks(void) {
     const InProgressTask *t = NULL;
     box_render_gpu_stats_t before, stats;
     int32_t i, frames, building = 0;
+    ecs_singleton_set(world, Scene, {.blend_modes = true});
     for (i = 0; i < 20; i ++) {
         t = task_frame(world);
     }
@@ -222,6 +223,7 @@ void InProgressTask_fini_with_held_pipeline(void) {
     ecs_world_t *world = task_world();
     box_render_gpu_stats_t stats;
     int32_t i;
+    ecs_singleton_set(world, Scene, {.blend_modes = true});
     for (i = 0; i < 20; i ++) {
         task_frame(world);
     }

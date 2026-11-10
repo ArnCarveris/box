@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {cookies: true}
+}
+
 // A classic directional cookie: the sun carries a LightCookie of a grid (cookie_grid.png, white
 // with black lines and a black square in one cell, loaded single_channel) in its own space
 // (projection Light), repeating every 3 units. The sun is rolled about its axis, so the grid

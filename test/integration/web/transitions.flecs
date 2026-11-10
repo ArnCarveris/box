@@ -15,6 +15,10 @@ using box.app
 using box.transition
 using box.surface
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 window {
   Surface: {width: 640, height: 480}
 }

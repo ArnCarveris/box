@@ -29,6 +29,12 @@ using box.controllers
 using box.atmosphere
 using box.widgets
 
+$ {
+  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true,
+    aerial_perspective: true, transmission: true, sheen: true, clear_coat: true,
+    diffuse_transmission: true}
+}
+
 window { Surface: {width: 1600, height: 1100, vsync: true} }
 west_contact_shadows { Gtao: {radius: 0.65, final_value_power: 1.8} }
 west_lantern_bloom { Bloom: {intensity: 0.1, threshold: 1.8} }
@@ -45,7 +51,7 @@ async {
 }
 
 wild_wild_west {
-  Scene: {}
+  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true, aerial_perspective: true, transmission: true, sheen: true, clear_coat: true, diffuse_transmission: true}
   ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 3}
 
   camera {

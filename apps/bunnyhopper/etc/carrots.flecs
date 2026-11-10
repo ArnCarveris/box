@@ -9,6 +9,10 @@ using box.geometry
 using box.material
 using bunnyhopper
 
+$ {
+  box.view.Scene: {diffuse_transmission: true}
+}
+
 // Depth the carrot reaches into the ground
 const sink: f32 = 0.45
 

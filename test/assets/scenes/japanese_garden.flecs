@@ -10,6 +10,10 @@ using box.surface
 using box.controllers
 using box.movement
 
+$ {
+  Scene: {baked: true, reflections: true}
+}
+
 const cedar: Rgb = {109, 65, 53}
 const vermilion: Rgb = {191, 62, 48}
 const slate: Rgb = {65, 83, 101}
@@ -2218,7 +2222,7 @@ smaa {
 }
 
 japanese_garden {
-  Scene: {}
+  Scene: {baked: true, reflections: true}
   LightBake: {probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.6}
   AmbientLight: {sky: {130, 155, 207}, ground: {66, 73, 107}, intensity: 0.28}

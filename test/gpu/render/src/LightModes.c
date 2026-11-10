@@ -62,6 +62,11 @@ void LightModes_realtime_light_left_out_of_bake(void) {
     for (i = 0; i < 3; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -166,6 +171,11 @@ void LightModes_baked_light_only_in_probes(void) {
     for (i = 0; i < 4; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -516,6 +526,11 @@ void LightModes_baked_light_lights_probes_like_mixed(void) {
     for (i = 0; i < 3; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);
@@ -599,6 +614,11 @@ void LightModes_captures_follow_first_non_realtime_sun(void) {
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         App *app = ecs_singleton_get_mut(world, App);
         app->headless = true;
         ecs_singleton_modified(world, App);

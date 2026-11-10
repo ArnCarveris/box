@@ -20,6 +20,10 @@ using box.text
 using box.input
 using box.picking
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
@@ -504,7 +508,7 @@ template Showcase {
   // which the curved screen below samples. Its buttons sit at opposite ends of the texture, so
   // they are on different slices of the screen
   screen_ui {
-    Scene: {}
+    Scene: {blend_modes: true}
 
     camera {
       Position: {0, 0, 100}
@@ -682,7 +686,7 @@ template Showcase {
   // pixel is one point. Its root fills the window, so the panel anchors to the left edge
   // and stays there when the window is resized.
   hud {
-    Scene: {}
+    Scene: {blend_modes: true}
 
     camera {
       Position: {0, 0, 100}

@@ -58,6 +58,11 @@ static ecs_world_t* dg_world(void)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1353,6 +1358,11 @@ void ViewDebug_probes_off_unchanged(void) {
 void ViewDebug_light_probes_at_grid(void) {
     // debug/probes
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ViewDebug debug = {.light_probes = true};
     ecs_entity_t scene = dp_grid_scene(world, &debug);
     int32_t passes;
@@ -1431,6 +1441,11 @@ void ViewDebug_light_probes_colors(void) {
 void ViewDebug_light_probes_hidden_by_geometry(void) {
     // debug/probes
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ViewDebug debug = {.light_probes = true};
     ecs_entity_t scene = dp_grid_scene(world, &debug);
     ecs_entity_t cover = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -1470,6 +1485,11 @@ void ViewDebug_light_probes_hidden_by_geometry(void) {
 void ViewDebug_light_probes_invalid_marked(void) {
     // debug/probes
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     LightBake bake = dp_light_bake(2, 0);
     ecs_entity_t scene = dp_scene(world, &bake, NULL, 1);
     ecs_entity_t floor = dp_box(world, scene, (float[]){0, 0, 0}, (float[]){20, 1, 20},
@@ -1591,6 +1611,11 @@ static ecs_entity_t dp_room(
 void ViewDebug_reflection_probes_mirror(void) {
     // debug/probes
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ViewDebug debug = {.reflection_probes = true, .probe_size = 0.5f};
     ecs_entity_t scene = dp_room(world, 1, &debug);
     int32_t passes;
@@ -1614,6 +1639,11 @@ void ViewDebug_reflection_probes_mirror(void) {
 void ViewDebug_reflection_probes_not_ready(void) {
     // debug/probes
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ViewDebug debug = {.reflection_probes = true, .probe_size = 0.5f};
     ecs_entity_t scene = dp_room(world, 0, &debug);
     dg_surface(world, DG_SIZE, DG_SIZE, "reflection_not_ready.png");
@@ -1651,6 +1681,11 @@ void ViewDebug_reflection_boxes(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = dg_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ReflectionBake bake = dp_reflection_bake(1);
         ecs_entity_t scene = dp_scene(world, NULL, &bake, 0);
         dp_box(world, scene, (float[]){0, -3, 0}, (float[]){1, 0.2f, 1}, (Rgb){0, 0, 0}, 0);
@@ -1770,6 +1805,11 @@ void ViewDebug_probe_size(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = dg_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ViewDebug debug = {.reflection_probes = true, .probe_size = sizes[k]};
         dp_gray_scene(world, &debug, NULL);
         unsigned char *px = dp_render(world, 0, k ? "probe_size_b.png" : "probe_size_a.png",
@@ -1791,6 +1831,11 @@ void ViewDebug_probes_per_view(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = dg_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t scene = dp_gray_scene(world, k ? NULL : &debug, NULL);
         ecs_entity_t camera = dp_camera(world, scene, (float[]){0, 0, 4}, (float[]){0, 0, 0},
             0);
@@ -1822,6 +1867,11 @@ void ViewDebug_probes_with_effects(void) {
     int32_t k;
     for (k = 0; k < 2; k ++) {
         ecs_world_t *world = dg_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t view;
         ecs_entity_t scene = dp_gray_scene(world, &debug, &view);
         ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -2909,6 +2959,11 @@ void ViewDebug_overdraw_all(void) {
 
 void ViewDebug_overdraw_plain(void) {
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
     View *v = ecs_get_mut(world, view, View);
     v->debug.overdraw = OverdrawPlain;
@@ -2936,6 +2991,11 @@ void ViewDebug_overdraw_plain(void) {
 
 void ViewDebug_overdraw_cutout(void) {
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
     View *v = ecs_get_mut(world, view, View);
     v->debug.overdraw = OverdrawCutout;
@@ -2963,6 +3023,11 @@ void ViewDebug_overdraw_cutout(void) {
 
 void ViewDebug_overdraw_cutout_discard(void) {
     ecs_world_t *world = dg_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t view = dg_view(world, dw_camera(world, 10), NULL);
     View *v = ecs_get_mut(world, view, View);
     v->debug.overdraw = OverdrawAll;

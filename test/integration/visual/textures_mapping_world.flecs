@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {triplanar: true}
+}
+
 // World space and triplanar texture mapping (TextureMapping MappingWorld and blend).
 // On the left a 6 x 6 board of touching tiles like the castle board, every other one turned by
 // 90 degrees around y, with one grass-like texture projected from the world position

@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.perf
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 // The worst case of Polygon2D: 12 overlapping polygons of 512 curved edges each, a ring with a
 // hole, each covering most of the view, so every pixel lies over 6,000 edges (a quarter of them
 // blended over others), of which it tests the chunks of 14 near it and those its ray crosses. It

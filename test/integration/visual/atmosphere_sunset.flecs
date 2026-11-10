@@ -7,6 +7,10 @@ using box.light
 using box.effects
 using box.atmosphere
 
+$ {
+  Scene: {aerial_perspective: true}
+}
+
 camera {
   Position: {0, 2, 12}
   Rotation: {0.12, 0, 0}

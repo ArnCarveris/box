@@ -27,6 +27,11 @@ using box.text
 using box.movement
 using box.texture
 
+$ {
+  Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true,
+    diffuse_transmission: true}
+}
+
 window { Surface: {width: 1440, height: 960, vsync: true} }
 contact_shadows { Gtao: {radius: 0.6, final_value_power: 2.2} }
 sun_bloom { Bloom: {intensity: 0.07, threshold: 1.5} }
@@ -35,7 +40,7 @@ smaa { Smaa: {} }
 clouds { TextureGen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
 
 santorini {
-  Scene: {}
+  Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true, diffuse_transmission: true}
   LightBake: {probe_spacing: 1.4, bounds_padding: 0.3, bounces: 1, capture_size: 32, budget_ms: 8}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 8}
   AmbientLight: {sky: {153, 198, 228}, ground: {134, 113, 91}, intensity: 0.45}

@@ -1338,7 +1338,7 @@ void box_gpu_debug_mesh_free(
 static bool box_gpu_debug_wired(
     const box_render_batch_t *b)
 {
-    return b->pipeline == BOX_RENDER_SHADER_MESH;
+    return box_render_is_mesh(b->pipeline);
 }
 
 /** Make the sequence index buffer hold at least a number of indices, replacing it with a

@@ -39,6 +39,11 @@ static ecs_world_t* fv_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1277,6 +1282,7 @@ static void fv_view_shadows(
     View *v = ecs_get_mut(world, view, View);
     v->shadows = fv_shadows;
     ecs_modified(world, view, View);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true});
 }
 
 /** Render a volume lit by the ambient with light_inscatter 0, with or without a bright point

@@ -50,6 +50,11 @@ static ecs_world_t* dt_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -490,6 +495,11 @@ void DiffuseTransmission_color_tints(void) {
     test_assert(glow.c[2] < 0.002f);
 
     ecs_world_t *world = dt_world(true, false);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     dt_sun(world, false, GLM_PIf);
     dt_quad(world, 0, 2, DT_GRAY, NULL);
     unsigned char *plain = dt_render(world, "dt_tint_front_plain.png");
@@ -682,6 +692,11 @@ static unsigned char* dt_sky(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -779,6 +794,11 @@ void DiffuseTransmission_ignored_by_2d(void) {
 void DiffuseTransmission_prefab(void) {
     // materials/pbr
     ecs_world_t *world = dt_world(true, false);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     dt_sun(world, true, GLM_PIf);
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_set(world, prefab, Quad, {1, 1});
@@ -814,6 +834,11 @@ void DiffuseTransmission_change_and_remove(void) {
     unsigned char *before = dt_backlit(NULL, true, "dt_before.png");
 
     ecs_world_t *world = dt_world(true, false);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     dt_sun(world, true, GLM_PIf);
     ecs_entity_t quad = dt_quad(world, 0, 2, DT_GRAY,
         &(DiffuseTransmission){.factor = 1, .color = {255, 255, 255}});
@@ -893,6 +918,11 @@ static ecs_world_t* db_world(void)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1281,6 +1311,11 @@ void DiffuseTransmission_blur_contact_sharp(void) {
     const float angle = 0.6f, x0 = -1.5f, z0 = -3.03f;
     DiffuseTransmission dt = db_blur(0.15f);
     ecs_world_t *world = db_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     db_view(world, 0, 0, false, black);
     ecs_entity_t panel = ecs_new(world);
     ecs_set(world, panel, Position, {x0, 0, z0});
@@ -1406,6 +1441,11 @@ void DiffuseTransmission_blur_resize(void) {
     const uint8_t black[3] = { 0, 0, 0 };
     DiffuseTransmission dt = db_blur(0.25f);
     ecs_world_t *world = db_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     db_view(world, 0, 0, false, black);
     db_edge_walls(world, 0, 0, 4, 40, 40);
     db_pane(world, 0, 0, 6, 0, &dt);
@@ -1443,6 +1483,11 @@ void DiffuseTransmission_blur_two_views(void) {
     const uint8_t black[3] = { 0, 0, 0 };
     DiffuseTransmission dt = db_blur(0.25f);
     ecs_world_t *world = db_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     db_view(world, 0, 0, false, black);
     db_edge_walls(world, 0, -1.5f, 0.1f, 20, 20);
     db_pane(world, 0, -1.8f, 3.4f, 0, &dt);
@@ -1623,6 +1668,11 @@ void DiffuseTransmission_transition_mid(void) {
     ecs_fini(still);
 
     ecs_world_t *world = dt_world(true, false);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     dt_sun(world, true, GLM_PIf);
     ecs_entity_t e = dt_quad(world, 0, 2, DT_GRAY, &none);

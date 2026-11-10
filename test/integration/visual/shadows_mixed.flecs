@@ -10,6 +10,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {punctual_shadows: true}
+}
+
 camera {
   Position: {0, 6, 10}
   Rotation: {-0.5, 0, 0}

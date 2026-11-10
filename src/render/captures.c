@@ -147,7 +147,8 @@ static const box_render_view_t* box_render_capture_view_of(
  * shadows and effects, which the later extracts resolve from the view entity, and its culling
  * and debug drawing, copied together so that a WireframeOnly capture also skips occlusion.
  *
- * A camera without a view, or the camera of a description, draws no debug pass.
+ * A camera without a view, or the camera of a description, draws no debug pass and has the
+ * features of its scene.
  *
  * @param world The world
  * @param p The packet
@@ -170,6 +171,8 @@ static int box_render_capture_camera(
         v->scene = d->scene;
         v->cull.enabled = true;
         v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
+        v->features = box_render_view_features(world, v->scene, NULL);
+        v->scene_features = box_render_scene_features(world, v->scene);
         ecs_os_memcpy_t(v->camera_transform, d->transform, mat4);
         result = 0;
         goto done;
@@ -185,6 +188,8 @@ static int box_render_capture_camera(
         v->view = source->view;
         v->cull = source->cull;
         v->debug = source->debug;
+        v->features = source->features;
+        v->scene_features = source->scene_features;
     } else {
         v->cull.enabled = true;
         v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
@@ -194,6 +199,10 @@ static int box_render_capture_camera(
     v->camera = d->camera;
     v->camera_data = *data;
     v->scene = box_render_scene_of(world, d->camera);
+    if (!source) {
+        v->features = box_render_view_features(world, v->scene, NULL);
+        v->scene_features = box_render_scene_features(world, v->scene);
+    }
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {

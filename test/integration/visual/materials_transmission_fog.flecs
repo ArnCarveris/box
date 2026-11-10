@@ -11,6 +11,10 @@ using box.view
 using box.light
 using box.atmosphere
 
+$ {
+  Scene: {aerial_perspective: true, transmission: true}
+}
+
 camera {
   Position: {0, 2, 0}
   Camera: {fov: 12, far_: 0}

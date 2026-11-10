@@ -677,6 +677,10 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b,
     bool equal);
 
+/** Overrides of the scene features of the extended mesh shader, the bits of
+ * BOX_RENDER_FEATURE_OVERRIDES in order; the mesh shader has the first 6 */
+#define BOX_GPU_FEATURE_OVERRIDES (12)
+
 /** Create the layouts the forward pass shares.
  *
  * Group 0 binds 9 sampled textures to the fragment stage, the depth copy of the opaque snapshot

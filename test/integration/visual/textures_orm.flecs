@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {environment: true}
+}
+
 // A gold panel and a gold ball with the ORM map orm.png on a grey floor, lit by the environment
 // sky.hdr, which the view draws as the background, and a sun from the upper left. The map tiles
 // the material four by four: dark grooves between the tiles (occlusion, only the sky light is
@@ -13,7 +17,7 @@ using box.light
 // metal columns (sharp sky reflections, no diffuse) next to dielectric ones (gold diffuse with
 // a faint white sheen).
 orm_scene {
-  Scene: {}
+  Scene: {environment: true}
 
   sky {
     Environment: {resolution: 64}

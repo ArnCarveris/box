@@ -318,6 +318,7 @@ static ecs_world_t* extract_world(
     v->camera = camera;
     v->shadows.enabled = true;
     ecs_modified(world, *view, View);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true});
 
     return world;
 }
@@ -548,6 +549,24 @@ void ShadowAtlas_extract_view_shadows_disabled_no_tile(void) {
     test_int(ecs_vec_count(&p->shadow_atlases), 0);
     test_int(extract_tile(world, light), BOX_RENDER_SHADOW_NONE);
     test_int(ecs_singleton_get(world, RenderStatus)->shadow_dropped, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ShadowAtlas_extract_scene_punctual_shadows_disabled_no_tile(void) {
+    // lighting/shadows
+    box_render_null_t *null;
+    ecs_entity_t view;
+    ecs_world_t *world = extract_world(&null, &view);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = false});
+    ecs_entity_t light = spot_new(world, (vec3){0, 4, 0}, true, LightBakeModeMixed);
+    const box_render_packet_t *p = extract_frame(world, null);
+
+    test_int(ecs_vec_count(&p->shadow_atlases), 0);
+    test_int(extract_tile(world, light), BOX_RENDER_SHADOW_NONE);
+    const box_render_view_t *rv = ecs_vec_first(&p->views);
+    test_bool(rv->shadows.spots, false);
 
     ecs_fini(world);
     box_render_null_free(null);

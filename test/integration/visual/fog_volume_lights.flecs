@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {punctual_shadows: true}
+}
+
 // Fog volumes lit by point and spot lights: a street at night with four lamps on the left
 // side, spot lights shining down, in a long fog volume, so each lamp draws its cone through the
 // fog onto the road. A pole stands inside the cone of the second lamp, which casts shadows, and

@@ -225,6 +225,11 @@ void Material_opacity_hierarchy(void) {
     // materials/pbr
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -284,6 +289,11 @@ void Material_parent_opacity_updates_children(void) {
     // materials/pbr
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -347,6 +357,11 @@ void Material_blend_mode_change(void) {
     // materials/pbr
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -447,6 +462,11 @@ void Material_blended_after_opaque_back_to_front(void) {
     // materials/pbr
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -778,6 +798,11 @@ void Material_dynamic_opacity_blends(void) {
     // materials/pbr
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -872,6 +897,11 @@ void Material_gpu_alpha_blend(void) {
     // materials/pbr
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1259,6 +1289,11 @@ static ecs_entity_t cutout_quad(
 void Material_cutout_discards_below_cutoff(void) {
     // materials/cutout
     ecs_world_t *world = cutout_world("cutout.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     uint8_t alpha[64];
     char *file = NULL;
     cutout_quadrants(alpha, 77, 179, 179, 77);
@@ -1297,6 +1332,11 @@ void Material_cutout_discards_below_cutoff(void) {
 void Material_cutout_opaque_with_opacity(void) {
     // materials/cutout
     ecs_world_t *world = cutout_world("cutout_opacity.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t kept = cutout_quad(world, 0, 0.5f);
     ecs_set(world, kept, Position, {-1.5f, 0, 0});
     ecs_set(world, kept, Quad, {2, 2});
@@ -1318,6 +1358,11 @@ void Material_cutout_opaque_with_opacity(void) {
 void Material_cutout_writes_depth(void) {
     // materials/cutout
     ecs_world_t *world = cutout_world("cutout_depth.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     uint8_t alpha[64];
     char *file = NULL;
     cutout_quadrants(alpha, 0, 255, 0, 255);
@@ -1353,6 +1398,11 @@ void Material_cutout_writes_depth(void) {
 void Material_cutout_back_face_plain_keeps_holes(void) {
     // materials/cutout
     ecs_world_t *world = cutout_world("cutout_back.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     uint8_t alpha[64];
     char *file = NULL;
     cutout_quadrants(alpha, 0, 255, 0, 255);
@@ -1376,6 +1426,11 @@ void Material_cutout_back_face_plain_keeps_holes(void) {
 void Material_cutout_change_and_remove(void) {
     // materials/cutout
     ecs_world_t *world = cutout_world("cutout_change.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     uint8_t alpha[16 * 4];
     char *file = NULL;
     int32_t i;
@@ -1432,6 +1487,11 @@ void Material_cutout_change_and_remove(void) {
 void Material_cutout_blended_discards(void) {
     // materials/cutout
     ecs_world_t *world = cutout_world("cutout_blend.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     uint8_t alpha[64];
     char *file = NULL;
     cutout_quadrants(alpha, 77, 179, 77, 179);

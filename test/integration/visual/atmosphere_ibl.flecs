@@ -6,6 +6,10 @@ using box.view
 using box.light
 using box.atmosphere
 
+$ {
+  Scene: {environment: true, aerial_perspective: true}
+}
+
 // Spheres lit by the sun and by the environment of the atmosphere of their scene, which is the
 // scene root: noon in the top row, sunset in the bottom row, drawn over it by a second view.
 // From left to right a smooth and a rough metal, a smooth and a rough white dielectric. At noon
@@ -13,7 +17,7 @@ using box.atmosphere
 // above; at sunset the metal mirrors an orange horizon toward the sun on the left and the white
 // balls are warm on their left and dim blue on their right.
 noon {
-  Scene: {}
+  Scene: {environment: true, aerial_perspective: true}
 
   sun {
     Rotation: {1.047, 0.524, 0}
@@ -58,7 +62,7 @@ noon {
 }
 
 sunset {
-  Scene: {}
+  Scene: {environment: true, aerial_perspective: true}
 
   sun {
     Rotation: {0.052, 1.571, 0}

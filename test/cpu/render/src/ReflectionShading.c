@@ -20,7 +20,7 @@ static ecs_entity_t scene_new(
     ecs_world_t *world)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, Scene, {.baked = true, .reflections = true});
     ecs_add(world, scene, ReflectionBake);
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, floor, Position, {0, 0, 0});

@@ -8,6 +8,10 @@ using box.light
 using box.text
 using box.picking
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 const wait = box.command.commands.mouse_sweep("[220, 295]", "[220, 295]", 1, 1)
 const click = box.command.commands.mouse_click("left", "[220, 295]", 1)
 const move = box.command.commands.mouse_move("[320, 180]", false)
@@ -113,7 +117,7 @@ template PickCheck {
 }
 
 menu {
-  Scene: {}
+  Scene: {blend_modes: true}
 
   camera {
     Position: {0, 0, 100}

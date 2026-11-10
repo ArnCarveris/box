@@ -26,6 +26,10 @@ using box.text
 using box.app
 using box.transition
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 camera {
   Position: {0, 0, 100}
   Camera: {ortho: true, ortho_scale: 1}

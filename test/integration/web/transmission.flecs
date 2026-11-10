@@ -16,6 +16,10 @@ using box.light
 using box.app
 using box.surface
 
+$ {
+  Scene: {transmission: true}
+}
+
 window {
   Surface: {width: 640, height: 480}
 }

@@ -13,6 +13,10 @@ using box.view
 using box.light
 using box.surface
 
+$ {
+  Scene: {texture_blend: true}
+}
+
 window {
   Surface: {width: 640, height: 480}
 }

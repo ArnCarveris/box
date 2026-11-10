@@ -75,6 +75,7 @@ static ecs_entity_t spot_view(
     v->clear = (ClearSettings){.enabled = true, .color = {0, 0, 0, 255}};
     v->shadows.enabled = shadows;
     ecs_modified(world, view, View);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true});
 
     return view;
 }

@@ -617,7 +617,7 @@ int box_app_views(
         ecs_set(world, light, Rgb, {255, 255, 255});
         View *v = ecs_ensure(world, target_view, View);
         v->camera = camera;
-        v->lighting = (LightSettings){.enabled = true, .scene = light};
+        v->lighting = (LightSettings){.enabled = true, .depth_prepass = true, .scene = light};
         v->clear = (ClearSettings){.enabled = true, .color = {24, 24, 24, 255}};
         v->shadows.enabled = true;
         v->shadows.fade = 0;

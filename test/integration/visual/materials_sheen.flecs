@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {environment: true, sheen: true}
+}
+
 // Sheen (Sheen) over dark rough cloth like bases, lit by a low sun from the side and behind the
 // camera and by the environment sky.hdr, which the view also draws as its background. The top
 // row of dark red balls has a white sheen of roughness 0.1, 0.3, 0.5, 0.75 and 1 from left to
@@ -14,7 +18,7 @@ using box.light
 // tipped toward the camera, with a pale blue sheen, next to the same cushion without one, which
 // stays a flat matte blue.
 velvet {
-  Scene: {}
+  Scene: {environment: true, sheen: true}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
   sky {

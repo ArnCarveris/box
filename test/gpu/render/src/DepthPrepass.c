@@ -62,7 +62,7 @@ static ecs_entity_t prepass_view(
     ecs_entity_t view = root ? ecs_new_w_pair(world, EcsChildOf, root) : ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}},
-        .lighting = {.enabled = lit},
+        .lighting = {.enabled = lit, .depth_prepass = true},
         .culling = {.enabled = occlusion, .occlusion = occlusion, .min_dimension_px = 1}});
 
     return view;
@@ -397,6 +397,11 @@ void DepthPrepass_equal_matches_unlit(void) {
 void DepthPrepass_cutout_prepass_holes(void) {
     // render_quality/depth_prepass
     ecs_world_t *world = prepass_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
@@ -457,6 +462,11 @@ void DepthPrepass_cutout_prepass_holes(void) {
 void DepthPrepass_blended_and_2d_after_prepass(void) {
     // render_quality/depth_prepass
     ecs_world_t *world = prepass_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});

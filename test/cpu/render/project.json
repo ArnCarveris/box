@@ -423,6 +423,7 @@
                     "extract_assigns_tile",
                     "extract_shadows_false_no_tile",
                     "extract_view_shadows_disabled_no_tile",
+                    "extract_scene_punctual_shadows_disabled_no_tile",
                     "extract_baked_light_no_tile",
                     "extract_unseen_light_no_tile",
                     "extract_uploads_on_change",
@@ -703,6 +704,44 @@
                     "delete_during_remove",
                     "no_neutral_logs",
                     "neutral_values"
+                ]
+            },
+            {
+                "id": "MeshShader",
+                "testcases": [
+                    "plain_mesh_draws_with_mesh_shader",
+                    "sheen_draws_with_extended",
+                    "clear_coat_draws_with_extended",
+                    "specular_anisotropy_draws_with_extended",
+                    "diffuse_transmission_draws_with_extended",
+                    "sheen_off_draws_with_mesh_shader",
+                    "clear_coat_off_draws_with_mesh_shader",
+                    "specular_anisotropy_off_draws_with_mesh_shader",
+                    "diffuse_transmission_off_draws_with_mesh_shader",
+                    "one_enabled_feature_draws_with_extended",
+                    "no_scene_features_draws_with_mesh_shader",
+                    "alpha_cutoff_draws_with_extended",
+                    "alpha_cutoff_off_draws_opaque",
+                    "blend_mode_draws_with_extended",
+                    "blend_modes_off_draw_opaque",
+                    "opacity_draws_with_extended",
+                    "transmission_draws_with_extended",
+                    "transmission_off_draws_with_mesh_shader",
+                    "triplanar_mapping_draws_with_extended",
+                    "triplanar_off_draws_with_mesh_shader",
+                    "planar_mapping_draws_with_mesh_shader",
+                    "mapping_blend_change_moves_shape",
+                    "add_sheen_moves_to_extended",
+                    "remove_clear_coat_moves_to_mesh_shader",
+                    "inherited_sheen_draws_with_extended",
+                    "prefab_anisotropy_change_moves_instances",
+                    "scene_features_change_moves_shapes",
+                    "scene_root_features",
+                    "view_features_default",
+                    "view_features_literal",
+                    "view_features_from_scene",
+                    "view_opts_out_of_scene_features",
+                    "scene_features_script"
                 ]
             }
         ]

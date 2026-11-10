@@ -1239,7 +1239,7 @@ void box_gpu_atmosphere_uniforms(
 {
     const box_render_view_atmos_t *in = &v->atmos;
     glm_vec4_zero(u->aerial);
-    if (box_gpu_atmosphere_sky(gpu, v)) {
+    if ((v->features & BOX_RENDER_FEATURE_AERIAL) && box_gpu_atmosphere_sky(gpu, v)) {
         u->aerial[0] = in->km_per_unit;
         u->aerial[1] = in->aerial_distance > 0 ? 1.0f / in->aerial_distance : 0.0f;
         u->aerial[2] = (float)BOX_RENDER_ATMOS_AERIAL_SIZE;

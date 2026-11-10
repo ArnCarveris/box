@@ -767,6 +767,21 @@ static void BoxMaterialsOnIsA(
     }
 }
 
+/** Check whether adding or removing a material component changes the batch key of the shapes
+ * that have it: the alpha test, the transmission, and the material features that draw with the
+ * extended mesh shader. A TextureMapping changes it when set too, by its blend.
+ *
+ * @param component The component
+ * @return Whether its OnAdd and OnRemove move the shapes to a new key
+ */
+static bool box_materials_keyed(
+    ecs_entity_t component)
+{
+    return component == ecs_id(AlphaCutoff) || component == ecs_id(Transmission) ||
+        component == ecs_id(Sheen) || component == ecs_id(ClearCoat) ||
+        component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission);
+}
+
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
  * it to the entities that inherit it, which the default source of the term matches.
  *
@@ -775,7 +790,8 @@ static void BoxMaterialsOnIsA(
  * changed field is left alone. 2D shapes and texts write their shading again.
  *
  * Mesh shapes reference the slot and write nothing, unless their batch changes (an added or
- * removed AlphaCutoff or Transmission) or the owner of a shared slot moves to another slot.
+ * removed component of box_materials_keyed, or a set TextureMapping) or the owner of a shared
+ * slot moves to another slot.
  *
  * @param it The iterator of the observer
  */
@@ -795,8 +811,8 @@ static void BoxMaterialsOnComponent(
     bool inline_ = !ecs_table_has_id(world, table, ecs_id(ShapeMesh)) ||
         ecs_table_has_id(world, table, ecs_id(Shape2D)) ||
         ecs_table_has_id(world, table, ecs_id(Text));
-    bool keyed = (it->event_id == ecs_id(AlphaCutoff) || it->event_id == ecs_id(Transmission)) &&
-        it->event != EcsOnSet;
+    bool keyed = (box_materials_keyed(it->event_id) && it->event != EcsOnSet) ||
+        it->event_id == ecs_id(TextureMapping);
     bool mark = !prefab && (inline_ || keyed);
     for (i = 0; i < it->count; i ++) {
         if (owners) {
@@ -851,8 +867,7 @@ void box_draws_materials_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
     for (i = 0; i < 11; i ++) {
-        bool keyed = components[i] == ecs_id(AlphaCutoff) ||
-            components[i] == ecs_id(Transmission);
+        bool keyed = box_materials_keyed(components[i]);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
                 .id = components[i],
@@ -983,13 +998,9 @@ void box_draws_materials_send(
     if (count || !m->features_valid) {
         const box_render_material_t *records = ecs_vec_first_t(&m->records,
             box_render_material_t);
-        m->features = 0;
         m->transmission_roughness = 0;
         m->features_valid = true;
         for (i = 0; i < (int32_t)total; i ++) {
-            m->features |= records[i].sheen ? BOX_RENDER_MATERIAL_SHEEN : 0u;
-            m->features |= records[i].anisotropy ? BOX_RENDER_MATERIAL_ANISOTROPY : 0u;
-            m->features |= records[i].clear_coat ? BOX_RENDER_MATERIAL_CLEAR_COAT : 0u;
             if (records[i].transmission_factor > 0) {
                 float r = records[i].diffuse_blur > 0 ? 1.0f : records[i].roughness;
                 if (r > m->transmission_roughness) {
@@ -999,7 +1010,6 @@ void box_draws_materials_send(
         }
     }
 
-    p->material_features = m->features;
     p->transmission_roughness = m->transmission_roughness;
 
     if (!m->capacity || total > m->capacity) {

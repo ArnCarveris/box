@@ -114,6 +114,11 @@ void PipelineCache_invalid_back_face_mode_keeps_states_apart(void) {
     // render_fixes/pipeline_cache
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -164,6 +169,7 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_singleton_set(world, FileWatch, {.interval = -1});
+    ecs_singleton_set(world, Scene, {.blend_modes = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -212,10 +218,16 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
 
     int32_t root = (int32_t)(strstr(__FILE__, "test/gpu/render/src/") - __FILE__);
     char *mesh = flecs_asprintf("%s/magenta_mesh.wgsl", tmp);
+    char *extended = flecs_asprintf("%s/magenta_mesh_extended.wgsl", tmp);
     char *shape = flecs_asprintf("%s/magenta_shape2d.wgsl", tmp);
     FILE *f = fopen(mesh, "w");
     fprintf(f, "#define fs fs_original\n#include \"%.*setc/shaders/mesh.wgsl\"\n#undef fs\n"
         "@fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> "
+        "@location(0) vec4f { return vec4f(1.0, 0.0, 1.0, 1.0); }\n", root, __FILE__);
+    fclose(f);
+    f = fopen(extended, "w");
+    fprintf(f, "#define fs fs_original\n#include \"%.*setc/shaders/mesh_extended.wgsl\"\n"
+        "#undef fs\n@fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> "
         "@location(0) vec4f { return vec4f(1.0, 0.0, 1.0, 1.0); }\n", root, __FILE__);
     fclose(f);
     f = fopen(shape, "w");
@@ -224,8 +236,10 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
         "{ return vec4f(1.0, 0.0, 1.0, 1.0); }\n", root, __FILE__);
     fclose(f);
     ecs_entity_t mesh_shader = ecs_lookup(world, "box.shader.builtin.mesh");
+    ecs_entity_t extended_shader = ecs_lookup(world, "box.shader.builtin.mesh_extended");
     ecs_entity_t shape_shader = ecs_lookup(world, "box.shader.builtin.shape2d");
     ecs_set(world, mesh_shader, Shader, {.path = mesh});
+    ecs_set(world, extended_shader, Shader, {.path = extended});
     ecs_set(world, shape_shader, Shader, {.path = shape});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
@@ -233,6 +247,7 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
     box_render_sync(world);
 
     test_bool(ecs_get(world, mesh_shader, ShaderStatus)->ok, true);
+    test_bool(ecs_get(world, extended_shader, ShaderStatus)->ok, true);
     test_bool(ecs_get(world, shape_shader, ShaderStatus)->ok, true);
     px = stbi_load(png, &w, &h, &n, 4);
     test_assert(px != NULL);
@@ -245,6 +260,7 @@ void PipelineCache_shader_reload_redraws_every_state(void) {
 
     stbi_image_free(px);
     ecs_os_free(mesh);
+    ecs_os_free(extended);
     ecs_os_free(shape);
     ecs_os_free(png);
     ecs_fini(world);

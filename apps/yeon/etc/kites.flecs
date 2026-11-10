@@ -6,6 +6,10 @@ using box.animation
 using box.curve
 using yeon
 
+$ {
+  box.view.Scene: {diffuse_transmission: true}
+}
+
 const hanji: Rgb = {246, 240, 225}
 const bamboo: Rgb = {125, 88, 48}
 const thread: Rgb = {235, 230, 215}

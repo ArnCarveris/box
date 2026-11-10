@@ -79,6 +79,11 @@ using box.surface
 using box.atmosphere
 using oreelse
 
+$ {
+  Scene: {cookies: true, environment: true, aerial_perspective: true, alpha_cutout: true,
+    blend_modes: true}
+}
+
 window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
@@ -240,7 +245,7 @@ $ {
 // under the panels of the HUD. OreHealthBarsShow gives the view its camera only while playing;
 // the game creates the bars under bars
 health_bars {
-  Scene: {}
+  Scene: {cookies: true, environment: true, aerial_perspective: true, alpha_cutout: true, blend_modes: true}
 
   camera {
     Position: {0, 0, 100}

@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.layout
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 // Nine slice images (ImageSlice) of test/integration/visual/assets/frame.png, a 48 texel frame
 // with 16 texel corners: solid corners, striped edges and a checker center. Top row: a small
 // and a wide panel that stretch, a wide one that tiles and a tall one that tiles at a scale of

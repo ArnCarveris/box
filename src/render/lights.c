@@ -1273,8 +1273,8 @@ static void box_lights_collect_atlases(
 }
 
 /** Check whether a view of the packet renders the shadows of the spot and point lights of a
- * scene: it is
- * lit by the lights of the scene, renders shadows and its camera has a depth range.
+ * scene: it is lit by the lights of the scene, renders shadows, has
+ * LightSettings.punctual_shadows and its camera has a depth range.
  *
  * @param world The world
  * @param v The view
@@ -1292,7 +1292,7 @@ static bool box_lights_shadow_view(
     ecs_entity_t lit = view && view->lighting.scene ? view->lighting.scene : v->scene;
 
     return view && view->lighting.enabled && view->shadows.enabled && lit == scene &&
-        box_camera_has_depth(&v->camera_data);
+        (v->features & BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS) && box_camera_has_depth(&v->camera_data);
 }
 
 /** Check whether a tile must render because it or its light changed since the last frame: it

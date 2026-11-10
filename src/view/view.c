@@ -34,6 +34,7 @@ static void box_view_ctor(
         values[i].lighting.enabled = true;
         values[i].lighting.baked = true;
         values[i].lighting.reflections = true;
+        values[i].lighting.depth_prepass = true;
         values[i].lighting.atmosphere = true;
         values[i].lighting.fog_volumes = true;
         values[i].lighting.environment.intensity = 1.0f;

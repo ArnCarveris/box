@@ -6,6 +6,11 @@ using box.transform
 using box.geometry
 using box.material
 
+$ {
+  box.view.Scene: {baked: true, environment: true, aerial_perspective: true, sheen: true,
+    clear_coat: true, diffuse_transmission: true}
+}
+
 camera {
   Position: {-23.767, 7.484, 30.355}
   Rotation: {-0.1141, -0.6959, 0}

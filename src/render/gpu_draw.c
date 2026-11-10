@@ -948,6 +948,30 @@ static void box_gpu_blend_state(
     out->alpha = alpha;
 }
 
+/** Set the overrides of the scene features of a mesh pipeline.
+ *
+ * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene the pipeline draws
+ * @param out Receives BOX_GPU_FEATURE_OVERRIDES constants, the first 6 those of the mesh shader
+ */
+static void box_gpu_feature_constants(
+    uint32_t features,
+    WGPUConstantEntry *out)
+{
+    static const char *keys[BOX_GPU_FEATURE_OVERRIDES] = {
+        "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
+        "scene_environment", "scene_aerial", "material_sheen", "material_clear_coat",
+        "material_anisotropy", "material_diffuse_transmission", "material_triplanar",
+        "material_transmission"
+    };
+    int32_t i;
+    for (i = 0; i < BOX_GPU_FEATURE_OVERRIDES; i ++) {
+        out[i] = (WGPUConstantEntry){
+            .key = { .data = keys[i], .length = WGPU_STRLEN },
+            .value = features & (1u << i) ? 1.0 : 0.0
+        };
+    }
+}
+
 /** Create the forward pipeline of a shader, color format, blend mode, back face mode, alpha
  * test and depth mode.
  *
@@ -955,12 +979,12 @@ static void box_gpu_blend_state(
  * coplanar shapes draw in order; it lifts the depth of a fragment by the rank of its instance,
  * so the order holds where coplanar quads interpolate their depths differently.
  *
- * A mesh pipeline sets no constants: the blend mode, the alpha test and the transmission of a
- * draw are in the DrawKind its material group binds (box_gpu_draw_kind), so every kind shares one
- * compiled fragment stage. The 2D shape shader sets its blend_mode constant.
+ * A mesh pipeline sets the scene features as constants, an extended one the material features
+ * too; the blend mode, alpha test and transmission of its draws are in the DrawKind of their
+ * material group (box_gpu_draw_kind). The 2D shape shader sets its blend_mode constant.
  *
  * @param gpu The backend
- * @param handle Handle of the shader, the mesh or the 2D shape shader
+ * @param handle Handle of the shader, a mesh shader or the 2D shape shader
  * @param shader The shader module
  * @param format The format of the color target
  * @param blend The BlendMode, Opaque writes depth and does not blend
@@ -981,6 +1005,8 @@ static void box_gpu_blend_state(
  * vertex stage of the 2D shape shader (its polygon constant) with the fs_polygon entry point,
  * or for shadows the plain vertex stage with fs_shadow_polygon; ignored by the mesh shader and
  * for sliced shapes
+ * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene it draws, the overrides
+ * of the mesh shaders; ignored by the 2D shape shader
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
@@ -995,9 +1021,11 @@ static WGPURenderPipeline box_gpu_forward_create(
     bool box_shadow,
     bool slice,
     bool texture_blend,
-    bool polygon)
+    bool polygon,
+    uint32_t features)
 {
     bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
+    bool extended = handle == BOX_RENDER_SHADER_MESH_EXTENDED;
     box_shadow = box_shadow && shape2d;
     slice = slice && shape2d && !box_shadow;
     polygon = polygon && shape2d && !slice;
@@ -1013,6 +1041,10 @@ static WGPURenderPipeline box_gpu_forward_create(
     } else if (equal) {
         compare = WGPUCompareFunction_Equal;
         entry = texture_blend ? "fs_blend_opaque" : "fs_opaque";
+    }
+
+    if (handle == BOX_RENDER_SHADER_MESH) {
+        entry = "fs";
     }
 
     WGPUVertexAttribute vertex_attrs[3] = {
@@ -1052,20 +1084,14 @@ static WGPURenderPipeline box_gpu_forward_create(
         .key = { .data = "polygon", .length = WGPU_STRLEN },
         .value = polygon && !box_shadow ? 1.0 : 0.0
     };
-    bool mesh = handle == BOX_RENDER_SHADER_MESH;
-    WGPUConstantEntry features[3] = {
-        { .key = { .data = "material_sheen", .length = WGPU_STRLEN },
-          .value = gpu->material_features & BOX_RENDER_MATERIAL_SHEEN ? 1.0 : 0.0 },
-        { .key = { .data = "material_anisotropy", .length = WGPU_STRLEN },
-          .value = gpu->material_features & BOX_RENDER_MATERIAL_ANISOTROPY ? 1.0 : 0.0 },
-        { .key = { .data = "material_clear_coat", .length = WGPU_STRLEN },
-          .value = gpu->material_features & BOX_RENDER_MATERIAL_CLEAR_COAT ? 1.0 : 0.0 }
-    };
+    bool mesh = box_render_is_mesh(handle);
+    WGPUConstantEntry constants[BOX_GPU_FEATURE_OVERRIDES];
+    box_gpu_feature_constants(features, constants);
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = entry, .length = WGPU_STRLEN },
-        .constantCount = shape2d ? 1 : mesh ? 3 : 0,
-        .constants = shape2d ? &constant : mesh ? features : NULL,
+        .constantCount = shape2d ? 1 : extended ? BOX_GPU_FEATURE_OVERRIDES : mesh ? 6 : 0,
+        .constants = shape2d ? &constant : mesh ? constants : NULL,
         .targetCount = 1,
         .targets = &target
     };
@@ -1100,7 +1126,7 @@ static WGPURenderPipeline box_gpu_forward_create(
     return box_gpu_render_pipeline(gpu, &desc);
 }
 
-/** Create a depth prepass pipeline of the mesh shader and a back face mode.
+/** Create a depth prepass pipeline of a mesh shader and a back face mode.
  *
  * It has no color target, writes the depth with compare Greater as an unlit view does, and has
  * the vs and layout of the forward pass, so a compiler compiles that vs once for both passes.
@@ -1110,7 +1136,8 @@ static WGPURenderPipeline box_gpu_forward_create(
  * points discard the same and add one to red (plain) or green (alpha tested) per fragment.
  *
  * @param gpu The backend
- * @param shader The mesh shader module
+ * @param shader The module of the mesh shader of the batch, the extended one for an alpha test
+ * or a TextureBlend
  * @param back_face The BackFaceMode, BackFaceCull culls the back faces
  * @param cutout Whether the fragments are alpha tested
  * @param texture_blend Whether the batch binds the blend group of a TextureBlend
@@ -1225,6 +1252,8 @@ typedef enum box_gpu_depth_mode_t {
  * @param texture_blend Whether the fragments blend the layers of a TextureBlend (fs_blend), for
  * the 2D shape shader, which never blends layers, whether they are polygons (polygon)
  * @param depth Depth state of the pipeline
+ * @param features BOX_RENDER_FEATURE_OVERRIDES features of the mesh shader overrides, 0 for the
+ * 2D shape shader and the depth prepass
  * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
@@ -1235,18 +1264,21 @@ static uint64_t box_gpu_forward_key(
     bool cutout,
     bool transmissive,
     bool texture_blend,
-    box_gpu_depth_mode_t depth)
+    box_gpu_depth_mode_t depth,
+    uint32_t features)
 {
     ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(shader < (1u << 30), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(shader < (1u << 18), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(features <= BOX_RENDER_FEATURE_OVERRIDES, ECS_INTERNAL_ERROR, NULL);
 
-    return ((uint64_t)shader << 34) | ((uint64_t)texture_blend << 33) |
+    return ((uint64_t)shader << 46) | ((uint64_t)features << 34) |
+        ((uint64_t)texture_blend << 33) |
         ((uint64_t)transmissive << 32) |
         ((uint64_t)format << 8) | ((uint64_t)blend << 4) | ((uint64_t)depth << 2) |
         (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
 }
 
-/** Check whether a batch draws in the depth prepass of a lit view: an opaque mesh of the mesh
+/** Check whether a batch draws in the depth prepass of a lit view: an opaque mesh of a mesh
  * shader, plain or alpha tested. Its forward pipeline in such a view tests with Equal.
  *
  * @param b The batch
@@ -1255,7 +1287,7 @@ static uint64_t box_gpu_forward_key(
 static bool box_gpu_prepass_draws(
     const box_render_batch_t *b)
 {
-    return b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH && b->blend == Opaque;
+    return b->view == -1 && box_render_is_mesh(b->pipeline) && b->blend == Opaque;
 }
 
 /** Keep a requested forward pipeline in the cache. Until it exists, a draw of its key uses the
@@ -1309,6 +1341,8 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     bool equal)
 {
     WGPURenderPipeline result = NULL;
+    uint32_t features = b->features & (b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED
+        ? BOX_RENDER_FEATURE_OVERRIDES : BOX_RENDER_FEATURE_LIGHTING);
     WGPUShaderModule shader;
     ecs_map_val_t *cached;
     uint64_t key;
@@ -1324,11 +1358,15 @@ WGPURenderPipeline box_gpu_forward_pipeline(
 
     equal = equal && box_gpu_prepass_draws(b);
     texture_blend = box_gpu_texture_blends(b);
+    if (!box_render_is_mesh(b->pipeline)) {
+        features = 0;
+    }
+
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
         b->pipeline == BOX_RENDER_SHADER_SHAPE2D && b->box_shadow,
         b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->slice : b->transmissive,
         b->pipeline == BOX_RENDER_SHADER_SHAPE2D ? b->polygon : texture_blend,
-        equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER);
+        equal ? BOX_GPU_DEPTH_EQUAL : BOX_GPU_DEPTH_GREATER, features);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -1337,13 +1375,14 @@ WGPURenderPipeline box_gpu_forward_pipeline(
 
     result = box_gpu_forward_cache(gpu, key, box_gpu_forward_create(gpu, b->pipeline, shader,
         format, b->blend, b->back_face, b->transmissive, equal, b->box_shadow, b->slice,
-        texture_blend, b->polygon));
+        texture_blend, b->polygon, features));
 done:
     return result;
 }
 
 /** Get the depth prepass pipeline of a batch the prepass draws, created on first use in the
- * forward cache, so a recompiled or released mesh shader empties it too.
+ * forward cache from the mesh shader of the batch, so a recompiled or released mesh shader
+ * empties it too.
  *
  * @param gpu The backend
  * @param b The batch, box_gpu_prepass_draws
@@ -1356,7 +1395,7 @@ static WGPURenderPipeline box_gpu_prepass_pipeline(
     WGPUTextureFormat count)
 {
     WGPURenderPipeline result = NULL;
-    WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH);
+    WGPUShaderModule shader = box_gpu_shader_get(gpu, b->pipeline);
     ecs_map_val_t *cached;
     uint64_t key;
     bool texture_blend;
@@ -1365,9 +1404,9 @@ static WGPURenderPipeline box_gpu_prepass_pipeline(
     }
 
     texture_blend = box_gpu_texture_blends(b);
-    key = box_gpu_forward_key(BOX_RENDER_SHADER_MESH, count, Opaque, b->back_face, b->cutout,
+    key = box_gpu_forward_key(b->pipeline, count, Opaque, b->back_face, b->cutout,
         false, texture_blend,
-        count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS);
+        count != WGPUTextureFormat_Undefined ? BOX_GPU_DEPTH_COUNT : BOX_GPU_DEPTH_PREPASS, 0);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached && *cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
@@ -1378,6 +1417,65 @@ static WGPURenderPipeline box_gpu_prepass_pipeline(
         box_gpu_prepass_create(gpu, shader, b->back_face, b->cutout, texture_blend, count));
 done:
     return result;
+}
+
+/** Request the pipelines of the extended mesh shader a view of a scene with material features
+ * draws with, so they compile before the first shape needs them; other blend modes than
+ * AlphaBlend compile on first use.
+ *
+ * Those are the opaque, alpha tested and TextureBlend ones of both back face modes with the
+ * depth states of the view, the alpha blended and the transmissive ones, each when enabled.
+ *
+ * @param gpu The backend
+ * @param format The format of the color target of the view
+ * @param v The view
+ * @param prepass Whether the view draws a depth prepass, so the opaque draws test Equal
+ */
+static void box_gpu_draw_prewarm(
+    box_gpu_t *gpu,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    bool prepass)
+{
+    uint32_t f = v->scene_features;
+    int32_t face, kind;
+    if (!(f & BOX_RENDER_FEATURE_MATERIALS) ||
+        !box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH_EXTENDED))
+    {
+        goto done;
+    }
+
+    for (face = 0; face < 2; face ++) {
+        for (kind = 0; kind < 6; kind ++) {
+            box_render_batch_t b = {
+                .view = -1,
+                .scene = v->scene,
+                .pipeline = BOX_RENDER_SHADER_MESH_EXTENDED,
+                .features = f,
+                .blend = kind == 4 || kind == 5 ? AlphaBlend : Opaque,
+                .back_face = face ? BackFacePlain : BackFaceCull,
+                .cutout = kind == 1 || kind == 3,
+                .texture_blend = kind == 2 || kind == 3,
+                .transmissive = kind == 5
+            };
+            if ((b.cutout && !(f & BOX_RENDER_FEATURE_ALPHA_CUTOUT)) ||
+                (b.texture_blend && !(f & BOX_RENDER_FEATURE_TEXTURE_BLEND)) ||
+                (kind == 4 && !(f & BOX_RENDER_FEATURE_BLEND_MODES)) ||
+                (kind == 5 && !(f & BOX_RENDER_FEATURE_TRANSMISSION)))
+            {
+                continue;
+            }
+
+            box_gpu_forward_pipeline(gpu, format, &b, false);
+            if (prepass && b.blend == Opaque) {
+                box_gpu_forward_pipeline(gpu, format, &b, true);
+                box_gpu_prepass_pipeline(gpu, &b, WGPUTextureFormat_Undefined);
+            }
+        }
+    }
+
+done:
+    return;
 }
 
 /** Make the view buffer hold the uniforms of a number of views.
@@ -1714,7 +1812,7 @@ static void box_gpu_draw_batches(
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     bool particles = phase == 1;
     bool late = phase == 3 && box_gpu_cull_occludes(gpu, slot);
-    uint32_t wired = v->debug.wireframe == WireframeOnly ? BOX_RENDER_SHADER_MESH : UINT32_MAX;
+    bool wired = v->debug.wireframe == WireframeOnly;
     int32_t i;
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
@@ -1722,7 +1820,7 @@ static void box_gpu_draw_batches(
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
         WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b, phase == 3);
-        bool mesh = b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
+        bool mesh = b->view == -1 && box_render_is_mesh(b->pipeline);
         if (!sky && !mesh) {
             sky = true;
             if (box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset)) {
@@ -1751,7 +1849,7 @@ static void box_gpu_draw_batches(
             instances = NULL;
         }
 
-        if (!pipeline || (phase == 1 && !mesh) || b->pipeline == wired) {
+        if (!pipeline || (phase == 1 && !mesh) || (wired && box_render_is_mesh(b->pipeline))) {
             continue;
         }
 
@@ -1884,8 +1982,9 @@ static void box_gpu_draw_pass(
     wgpuRenderPassEncoderRelease(vp.pass);
 }
 
-/** Check whether a view draws a depth prepass: it is lit, not WireframeOnly, its camera has a
- * depth range and it draws an opaque or alpha tested mesh with the mesh shader.
+/** Check whether a view draws a depth prepass: it is lit with LightSettings.depth_prepass, not
+ * WireframeOnly, its camera has a depth range and it draws an opaque or alpha tested mesh with a
+ * mesh shader.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -1902,9 +2001,8 @@ static bool box_gpu_draw_prepasses(
     const box_gpu_cull_view_t *cv = NULL;
     bool result = false;
     int32_t i;
-    if (!v->lights.enabled || !box_camera_has_depth(&v->camera_data) ||
-        v->debug.wireframe == WireframeOnly ||
-        !box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH))
+    if (!v->lights.enabled || !(v->features & BOX_RENDER_FEATURE_DEPTH_PREPASS) ||
+        !box_camera_has_depth(&v->camera_data) || v->debug.wireframe == WireframeOnly)
     {
         goto done;
     }
@@ -2039,7 +2137,8 @@ bool box_gpu_draw_overdraw(
     uint32_t width,
     uint32_t height)
 {
-    bool result = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH) != NULL;
+    bool result = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH) != NULL ||
+        box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH_EXTENDED) != NULL;
     if (!result) {
         goto done;
     }
@@ -2105,6 +2204,9 @@ void box_gpu_draw_views(
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
+        box_gpu_draw_prewarm(gpu, hdr ? BOX_GPU_HDR_FORMAT : t->format, v,
+            v->lights.enabled && (v->features & BOX_RENDER_FEATURE_DEPTH_PREPASS) &&
+            box_camera_has_depth(&v->camera_data));
         WGPUTextureView ao = prepasses ? box_gpu_gtao_begin(gpu, t, packet, v) : NULL;
         box_gpu_snapshot_t *snapshot = v->debug.wireframe == WireframeOnly ? NULL :
             box_gpu_transmission_begin(gpu, t, packet, slot, source,

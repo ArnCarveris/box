@@ -15,6 +15,10 @@ using box.texture
 using box.transition
 using bunnyhopper
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 // Opacity of the icon of a lost life
 const lostAlpha: f32 = 70.0 / 255.0
 
@@ -51,7 +55,7 @@ template BunnyHud {
 
   // Screen space UI: an orthographic camera at ortho_scale 1, so one logical pixel is one point
   ui {
-    Scene: {}
+    Scene: {blend_modes: true}
 
     camera {
       Position: {0, 0, 100}

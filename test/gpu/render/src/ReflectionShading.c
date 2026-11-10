@@ -362,6 +362,11 @@ void ReflectionShading_mirror_reflects_probe(void) {
     int i, w = 0, h = 0, c[2][3];
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = world_new();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t scene = scene_new(world, &(ReflectionBake){
             .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = false});
         enclosure_new(world, scene, 6, (Rgb){255, 0, 0});
@@ -384,6 +389,11 @@ void ReflectionShading_higher_priority_probe_covers_lower(void) {
     int i, w = 0, h = 0, c[2][3];
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = world_new();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t scene = scene_new(world, &(ReflectionBake){
             .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = false});
         enclosure_new(world, scene, 6, (Rgb){255, 0, 0});
@@ -409,6 +419,11 @@ void ReflectionShading_blend_mixes_overlapping_probes(void) {
     // reflection_probes/shading
     int w = 0, h = 0, c[3];
     ecs_world_t *world = world_new();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t scene = scene_new(world, &(ReflectionBake){
         .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = false});
     enclosure_new(world, scene, 6, (Rgb){255, 0, 0});
@@ -434,6 +449,11 @@ void ReflectionShading_scene_probe_fills_outside_probes(void) {
     int i, w = 0, h = 0, c[2][3];
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = world_new();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t scene = scene_new(world, &(ReflectionBake){
             .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = i == 0,
             .scene_probe_height = 5.1f});
@@ -471,6 +491,11 @@ void ReflectionShading_box_projection_corrects_parallax(void) {
     int i, w = 0, h = 0, c[2][3];
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = world_new();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t scene = scene_new(world, &(ReflectionBake){
             .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = false});
         int32_t k;
@@ -517,6 +542,11 @@ void ReflectionShading_grid_darkens_dim_fragment(void) {
     int i, w = 0, h = 0, c[2][3];
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = world_new();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t scene = scene_new(world, &(ReflectionBake){
             .resolution = RESOLUTION, .budget_ms = 1, .scene_probe = false});
         ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounces = 0, .capture_size = 8,

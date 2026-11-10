@@ -41,6 +41,11 @@ static ecs_world_t* coat_world(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -396,6 +401,11 @@ static void coat_probe(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -657,6 +667,11 @@ void ClearCoat_clear_coat_ignored_by_2d(void) {
 void ClearCoat_clear_coat_prefab(void) {
     // materials/pbr
     ecs_world_t *world = coat_world(true);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     coat_light(world, -2.5f, 100);
     coat_light(world, 2.5f, 100);
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
@@ -696,6 +711,11 @@ void ClearCoat_clear_coat_change_and_remove(void) {
     int base = coat_peak(before, 0, COAT_W, NULL, NULL);
 
     ecs_world_t *world = coat_world(true);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t quad = coat_quad(world, 0, &(ClearCoat){.strength = 1, .roughness = 0.1f});
     coat_light(world, 0, 100);
     unsigned char *px = coat_render(world, "coat_change.png");

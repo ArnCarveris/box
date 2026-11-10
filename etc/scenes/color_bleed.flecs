@@ -16,6 +16,10 @@ using box.effects
 using box.surface
 using box.controllers
 
+$ {
+  Scene: {baked: true}
+}
+
 window {
   Surface: {width: 1280, height: 720, vsync: true}
 }
@@ -29,7 +33,7 @@ smaa {
 }
 
 room {
-  Scene: {}
+  Scene: {baked: true}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 

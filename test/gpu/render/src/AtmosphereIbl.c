@@ -260,6 +260,11 @@ static float ibl_sum(
 void AtmosphereIbl_noon_sphere_bluish_brighter_on_top(void) {
     // atmosphere/environment
     ecs_world_t *world = ibl_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t sun;
     ecs_entity_t sky = sky_new(world, 60, 30, &sun);
     ecs_get_mut(world, sky, Atmosphere)->ground_albedo = (rgb){40, 40, 40};
@@ -292,6 +297,11 @@ void AtmosphereIbl_noon_sphere_bluish_brighter_on_top(void) {
 void AtmosphereIbl_sunset_side_toward_sun_warmer(void) {
     // atmosphere/environment
     ecs_world_t *world = ibl_world();
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t sun;
     ecs_entity_t sky = sky_new(world, 3, 90, &sun);
     sphere_new(world, sky, "sunset.png");
@@ -475,6 +485,11 @@ void AtmosphereIbl_background_matches_sky(void) {
     int32_t i, largest = 0, sum = 0;
     for (i = 0; i < 2; i ++) {
         ecs_world_t *world = ibl_world();
+        ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+            .punctual_shadows = true, .cookies = true, .environment = true,
+            .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+            .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+            .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
         ecs_entity_t sun;
         ecs_entity_t sky = sky_new(world, 45, 30, &sun);
         ecs_get_mut(world, sky, Atmosphere)->sun_disk_intensity = 0;

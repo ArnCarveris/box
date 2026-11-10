@@ -5,10 +5,14 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {reflections: true}
+}
+
 // A closed room with colored walls, lit by a lamp under the ceiling, holds a mirror ball and a
 // glossy floor. One room probe, box projected onto the room, gives both their reflections.
 room {
-  Scene: {}
+  Scene: {reflections: true}
   ReflectionBake: {resolution: 128}
   AmbientLight: {intensity: 0.1}
 

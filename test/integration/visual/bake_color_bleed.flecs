@@ -9,12 +9,16 @@ using box.surface
 using box.layout
 using box.text
 
+$ {
+  Scene: {baked: true}
+}
+
 tonemap {
   Tonemap: {}
 }
 
 zero {
-  Scene: {}
+  Scene: {baked: true}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 0}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
@@ -98,7 +102,7 @@ zero {
 }
 
 one {
-  Scene: {}
+  Scene: {baked: true}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 1}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
@@ -182,7 +186,7 @@ one {
 }
 
 three {
-  Scene: {}
+  Scene: {baked: true}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
@@ -302,7 +306,7 @@ three_surface {
 }
 
 gallery {
-  Scene: {}
+  Scene: {baked: true}
 
   camera {
     Position: {0, 0, 100}

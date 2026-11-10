@@ -422,7 +422,7 @@ static uint32_t box_gpu_hiz_words(
 {
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
     uint32_t result = 0;
-    if (b->view != -1 || b->scene != v->scene || b->pipeline != BOX_RENDER_SHADER_MESH) {
+    if (b->view != -1 || b->scene != v->scene || !box_render_is_mesh(b->pipeline)) {
         goto done;
     }
 

@@ -23,7 +23,7 @@ static ecs_entity_t scene_new(
     bool scene_probe)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, Scene, {.baked = true, .reflections = true});
     ecs_add(world, scene, ReflectionBake);
     ecs_get_mut(world, scene, ReflectionBake)->scene_probe = scene_probe;
     ecs_modified(world, scene, ReflectionBake);

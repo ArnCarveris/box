@@ -178,6 +178,8 @@ typedef struct box_draw_key_t {
                              *   are 0, so the key does not grow */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
+    uint32_t features;      /**< BOX_RENDER_FEATURE_* features of the scene of a 3D shape, 0 for
+                             *   2D shapes and texts */
 } box_draw_key_t;
 
 /** Batch and slot of one glyph of a Text */
@@ -518,7 +520,6 @@ typedef struct box_draw_materials_t {
     bool overflow;          /**< An id past what the binding holds was logged */
     int64_t uploaded_frame; /**< Frame of the packet of the last send that uploaded */
     ecs_vec_t uploaded;     /**< box_draw_material_upload_t of that send */
-    uint32_t features;
     float transmission_roughness;
     bool features_valid;
 } box_draw_materials_t;
@@ -536,6 +537,9 @@ typedef struct box_render_draws_t {
                                      *   DynamicTransform */
     ecs_query_t *dynamic_texts;     /**< Texts with DynamicTransform */
     ecs_query_t *dynamic_text_materials; /**< Texts with DynamicMaterial, self or up */
+    ecs_query_t *extended;          /**< Shapes with Sheen, ClearCoat, SpecularAnisotropy or
+                                     *   DiffuseTransmission, self or up IsA, which draw with
+                                     *   the extended mesh shader */
     uint32_t text_mesh;         /**< Mesh handle of the glyph quad */
     ecs_vec_t batches;          /**< box_draw_batch_t by index */
     ecs_vec_t free_batches;     /**< int32_t, indices of batches not in use */
@@ -1222,6 +1226,36 @@ uint8_t box_draws_blend(
 bool box_draws_cutout(
     const AlphaCutoff *cutoff,
     const Shape2D *shape2d);
+
+/** Check whether a shape is alpha tested in its scene: box_draws_cutout, for a 3D shape only
+ * when its scene has BOX_RENDER_FEATURE_ALPHA_CUTOUT.
+ *
+ * @param cutoff The AlphaCutoff of the shape, NULL for none
+ * @param shape2d The resolved 2D shape, NULL for a 3D shape
+ * @param features BOX_RENDER_FEATURE_* features of the scene of a 3D shape
+ * @return Whether its fragments are tested against the cutoff
+ */
+bool box_draws_scene_cutout(
+    const AlphaCutoff *cutoff,
+    const Shape2D *shape2d,
+    uint32_t features);
+
+/** Resolve the blend mode a shape draws with in its scene: box_draws_blend, Opaque for a 3D
+ * shape whose scene lacks BOX_RENDER_FEATURE_BLEND_MODES.
+ *
+ * @param mode The BlendMode of the shape, NULL for Opaque
+ * @param alpha The resolved alpha of the shape
+ * @param cutout Whether the shape is alpha tested (box_draws_scene_cutout)
+ * @param shape2d The resolved 2D shape, NULL for a 3D shape
+ * @param features BOX_RENDER_FEATURE_* features of the scene of a 3D shape
+ * @return The blend mode
+ */
+uint8_t box_draws_scene_blend(
+    const BlendMode *mode,
+    float alpha,
+    bool cutout,
+    const Shape2D *shape2d,
+    uint32_t features);
 
 /** Get the resolved alpha of a shape.
  *

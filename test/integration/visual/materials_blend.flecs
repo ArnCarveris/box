@@ -4,6 +4,10 @@ using box.material
 using box.camera
 using box.view
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 camera {
   Position: {0, 4, 9}
   Rotation: {-0.4, 0, 0}

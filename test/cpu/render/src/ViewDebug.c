@@ -244,7 +244,7 @@ void ViewDebug_light_probes_warn_once(void) {
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, Scene, {.baked = true});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0,
         .budget_ms = 0, .compute = true});
     ecs_entity_t floor = ecs_new_w_pair(world, EcsChildOf, scene);

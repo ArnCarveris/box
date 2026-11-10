@@ -6,6 +6,10 @@ using box.geometry
 using box.material
 using bunnyhopper
 
+$ {
+  box.view.Scene: {diffuse_transmission: true}
+}
+
 // A tuft of grass beside the track
 prefab GrassTuft {
   BunnyScenery: {parallax: 1, wrap_min: -32, wrap_span: 64}

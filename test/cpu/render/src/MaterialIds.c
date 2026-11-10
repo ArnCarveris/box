@@ -105,7 +105,7 @@ static const box_render_mesh_shading_t* shading_of(
     const DrawSlot *slot = ecs_get(world, e, DrawSlot);
     test_assert(slot != NULL && slot->batch >= 0);
     box_draw_batch_t *b = box_draws_batch(draws_of(world), slot->batch);
-    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_assert(box_render_is_mesh(b->key.pipeline));
 
     return box_draws_slot_mesh_shading(b, slot->slot);
 }
@@ -774,6 +774,11 @@ void MaterialIds_transmission_prefab_slot(void) {
     // materials/transmission
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t prefab = prefab_new(world);
     ecs_set(world, prefab, Transmission, {.transmission_factor = 1, .ior = 1.45f,
         .thickness_factor = 0.5f, .attenuation_distance = 2,
@@ -1451,6 +1456,11 @@ void MaterialIds_shared_cutoff_change_records_shadow(void) {
     // gpu_instance_data/material_dedup
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_vec_t *regions = regions_of(world);
     ecs_entity_t a = shape_new(world, 0, 10, 200, 30);
     ecs_entity_t b = shape_new(world, 6, 10, 200, 30);

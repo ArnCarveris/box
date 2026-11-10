@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {alpha_cutout: true, triplanar: true}
+}
+
 // An alpha tested shape with a world mapped texture (TextureMapping MappingWorld, AlphaCutoff)
 // casts the shadow it shows: a row of three touching fence panels of different widths, the
 // middle one turned around, shows one continuous lattice (fence.png) projected from the world

@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {baked: true, reflections: true}
+}
+
 // The light and reflection probe debug views of a view in a colored room: a glowing red wall on
 // the left, a glowing blue wall on the right, a green back wall, a white ceiling and a gray floor,
 // lit by a point light under the ceiling. The irradiance probes of the bake show as spheres of
@@ -14,7 +18,7 @@ using box.light
 // reflection probes show as mirror spheres of their captures with their influence boxes in
 // yellow; the right one is turned about Y and has a projection box, in cyan.
 room {
-  Scene: {}
+  Scene: {baked: true, reflections: true}
   LightBake: {probe_spacing: 1.25, bounds_padding: 0}
   ReflectionBake: {resolution: 64, scene_probe: false}
   AmbientLight: {intensity: 0.1}

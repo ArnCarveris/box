@@ -7,6 +7,10 @@ using box.light
 using box.layout
 using box.text
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 world_camera {
   Position: {0, 2.5, 7}
   Rotation: {-0.3, 0, 0}
@@ -43,7 +47,7 @@ ball {
 }
 
 hud {
-  Scene: {}
+  Scene: {blend_modes: true}
 
   camera {
     Position: {0, 0, 100}
@@ -106,7 +110,7 @@ template Button {
 }
 
 menu {
-  Scene: {}
+  Scene: {blend_modes: true}
 
   camera {
     Position: {0, 0, 100}

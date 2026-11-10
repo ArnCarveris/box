@@ -5,8 +5,12 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {baked: true}
+}
+
 room {
-  Scene: {}
+  Scene: {baked: true}
   LightBake: {probe_spacing: 1.5, bounds_padding: 1, budget_ms: 0}
   AmbientLight: {sky: {150, 185, 255}, ground: {190, 110, 60}, intensity: 1.5}
 

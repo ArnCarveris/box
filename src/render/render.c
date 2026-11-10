@@ -220,6 +220,54 @@ static int box_render_view_compare(
     return box_view_compare(x->order, x->view, y->order, y->view);
 }
 
+uint32_t box_render_scene_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene)
+{
+    const Scene *f = scene && ecs_is_alive(world, scene)
+        ? ecs_get(world, scene, Scene)
+        : ecs_singleton_get(world, Scene);
+
+    uint32_t result = 0;
+    if (!f) {
+        goto done;
+    }
+
+    result |= f->baked ? BOX_RENDER_FEATURE_BAKED : 0u;
+    result |= f->reflections ? BOX_RENDER_FEATURE_REFLECTIONS : 0u;
+    result |= f->punctual_shadows ? BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS : 0u;
+    result |= f->cookies ? BOX_RENDER_FEATURE_COOKIES : 0u;
+    result |= f->environment ? BOX_RENDER_FEATURE_ENVIRONMENT : 0u;
+    result |= f->aerial_perspective ? BOX_RENDER_FEATURE_AERIAL : 0u;
+    result |= f->sheen ? BOX_RENDER_FEATURE_SHEEN : 0u;
+    result |= f->clear_coat ? BOX_RENDER_FEATURE_CLEAR_COAT : 0u;
+    result |= f->anisotropy ? BOX_RENDER_FEATURE_ANISOTROPY : 0u;
+    result |= f->diffuse_transmission ? BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION : 0u;
+    result |= f->triplanar ? BOX_RENDER_FEATURE_TRIPLANAR : 0u;
+    result |= f->transmission ? BOX_RENDER_FEATURE_TRANSMISSION : 0u;
+    result |= f->texture_blend ? BOX_RENDER_FEATURE_TEXTURE_BLEND : 0u;
+    result |= f->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;
+    result |= f->blend_modes ? BOX_RENDER_FEATURE_BLEND_MODES : 0u;
+done:
+    return result;
+}
+
+uint32_t box_render_view_features(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    const LightSettings *lighting)
+{
+    uint32_t result = box_render_scene_features(world, scene) | BOX_RENDER_FEATURE_DEPTH_PREPASS;
+    if (lighting) {
+        result &= lighting->baked ? ~0u : ~BOX_RENDER_FEATURE_BAKED;
+        result &= lighting->reflections ? ~0u : ~BOX_RENDER_FEATURE_REFLECTIONS;
+        result &= lighting->atmosphere ? ~0u : ~BOX_RENDER_FEATURE_AERIAL;
+        result &= lighting->depth_prepass ? ~0u : ~BOX_RENDER_FEATURE_DEPTH_PREPASS;
+    }
+
+    return result;
+}
+
 /** Describe a view whose camera has a Camera in the packet.
  *
  * @param world The world
@@ -255,6 +303,8 @@ static void box_render_extract_view(
     v->cull.occlusion = view->culling.enabled && view->culling.occlusion &&
         view->debug.wireframe != WireframeOnly;
     v->cull.min_dimension = view->culling.min_dimension_px;
+    v->features = box_render_view_features(world, v->scene, &view->lighting);
+    v->scene_features = box_render_scene_features(world, v->scene);
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {

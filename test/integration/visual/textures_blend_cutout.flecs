@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {alpha_cutout: true, blend_modes: true, texture_blend: true}
+}
+
 // TextureBlend on alpha tested and blended shapes. On the left a blended fence panel, a Quad with
 // AlphaCutoff, whose mask (blend_mask.png, red top left, green top right) shows the lattice of
 // fence.png on its left and bottom and the leaf of leaf.png, tiled twice so that one leaf fills

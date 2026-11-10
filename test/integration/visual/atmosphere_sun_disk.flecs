@@ -6,6 +6,10 @@ using box.light
 using box.effects
 using box.atmosphere
 
+$ {
+  Scene: {aerial_perspective: true}
+}
+
 bloom {
   Bloom: {intensity: 0.35, threshold: 1, threshold_softness: 0.5}
 }

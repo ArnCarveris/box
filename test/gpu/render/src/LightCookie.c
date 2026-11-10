@@ -89,6 +89,7 @@ static ecs_world_t* cookie_world(
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_singleton_set(world, Scene, {.cookies = true});
 
     return world;
 }
@@ -736,6 +737,7 @@ void LightCookie_bake_ignores_cookie(void) {
         ecs_entity_t view = ecs_new(world);
         ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
             .color = {0, 0, 0, 255}}, .lighting.enabled = true, .lighting.baked = true});
+        ecs_singleton_set(world, Scene, {.baked = true, .cookies = true});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "bake.png",
             .resolution_scale = 1});

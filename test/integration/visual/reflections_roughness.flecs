@@ -5,12 +5,16 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {reflections: true}
+}
+
 // A smooth and a rough gold ball side by side in a dark room whose walls carry bright red,
 // green, blue and white panels, all in one box projected room probe. The smooth ball mirrors
 // the panels sharply, the rough one, sampling a blurrier mip of the same probe, shows them as
 // soft colored glows. Two small balls in front repeat both roughnesses in silver.
 room {
-  Scene: {}
+  Scene: {reflections: true}
   ReflectionBake: {resolution: 128}
   AmbientLight: {intensity: 0.05}
 

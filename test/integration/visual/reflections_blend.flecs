@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {reflections: true}
+}
+
 // A closed hall, blue on the left half and orange on the right, with a row of mirror balls on a
 // glossy floor and the camera inside. A probe of priority 0 captures near the blue half of the
 // wall behind the camera and covers the whole hall, a probe of priority 1 captures near its
@@ -12,7 +16,7 @@ using box.light
 // ball is at half weight. Without box projection each ball reflects the wall behind the camera
 // as its probe saw it: blue on the left, orange on the right and a blend of both in the middle.
 hall {
-  Scene: {}
+  Scene: {reflections: true}
   ReflectionBake: {resolution: 128, scene_probe: false}
   AmbientLight: {intensity: 0.2}
 

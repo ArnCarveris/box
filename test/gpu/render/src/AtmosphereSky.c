@@ -117,6 +117,7 @@ static ecs_entity_t view_new(
     v->lighting.enabled = lit;
     v->lighting.atmosphere = atmosphere;
     ecs_modified(world, view, View);
+    ecs_singleton_set(world, Scene, {.aerial_perspective = atmosphere});
 
     return view;
 }
@@ -246,6 +247,7 @@ static unsigned char* render_boxes(
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = CLEAR},
         .lighting = {.atmosphere = atmosphere}});
+    ecs_singleton_set(world, Scene, {.aerial_perspective = atmosphere});
     box_new(world, scene, (float[3]){-0.75f, 0, -2}, 0.5f, (Rgb){200, 40, 40});
     box_new(world, scene, (float[3]){0, 0, -3000}, 600, (Rgb){200, 40, 40});
 

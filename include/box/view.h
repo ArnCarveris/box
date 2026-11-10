@@ -37,15 +37,20 @@ ECS_STRUCT(EnvironmentSettings, {
 
 /** Light settings for a view.
  *
- * A lit view whose camera has a depth range draws its opaque and alpha tested 3D meshes into the
- * depth buffer first (two prepasses when it culls by occlusion), then shades them once per pixel
- * with an Equal depth test; an unlit view shades every opaque fragment passing the depth test.
+ * With depth_prepass, a lit view whose camera has a depth range draws its opaque 3D meshes depth
+ * only first (twice when it culls by occlusion), then shades them once per pixel with an Equal
+ * depth test; otherwise it shades every fragment that passes. Gtao needs the prepass.
+ *
+ * baked, reflections and atmosphere only take effect for the features the Scene of the view
+ * enables; turning them off does not compile other pipelines.
  */
 ECS_STRUCT(LightSettings, {
     bool enabled;           /**< Enable lighting for the view */
     bool baked;             /**< Sample the baked lighting of the scene, View ctor sets true */
     bool reflections;       /**< Sample the reflection probes of the scene, View ctor sets
                              *   true */
+    bool depth_prepass;     /**< Draw the opaque meshes depth only before shading them, View
+                             *   ctor sets true */
     bool atmosphere;        /**< Render the Atmosphere of the scene: the sky behind the
                              *   geometry and the aerial perspective of the 3D meshes, View
                              *   ctor sets true */
@@ -227,9 +232,35 @@ ECS_STRUCT(View, {
  *
  * An entity belongs to its nearest ancestor with Scene (itself included), so
  * scenes nest; entities outside any Scene belong to the default scene.
+ *
+ * Its members are the features the mesh shaders of the scene support; the Scene singleton holds
+ * those of the default scene. All false (the default) compiles the smallest shaders.
+ *
+ * The scene compiles one pipeline set of the mesh shader and, with a material feature on, one of
+ * the extended mesh shader up front. A shape that needs an enabled material feature draws with
+ * the extended shader; a feature that is off is ignored, as if the shape did not have it.
  */
 ECS_STRUCT(Scene, {
-    int32_t dummy_; /**< Unused, gives the component a size */
+    bool baked;             /**< Probe volume irradiance with the visibility of the probes, for
+                             *   the views with LightSettings.baked */
+    bool reflections;       /**< Reflection probes, normalized by the probe volume with baked, for
+                             *   the views with LightSettings.reflections */
+    bool punctual_shadows;  /**< Shadows of the spot and point lights with a tile in the shadow
+                             *   atlas, for the views with ShadowSettings.enabled */
+    bool cookies;           /**< The LightCookie of the first directional light */
+    bool environment;       /**< The prefiltered cubemap and SH ambient of the environment of a
+                             *   view (LightSettings.environment), else the hemisphere ambient */
+    bool aerial_perspective; /**< Aerial perspective of the Atmosphere on the 3D meshes, for the
+                             *   views with LightSettings.atmosphere */
+    bool alpha_cutout;      /**< AlphaCutoff, else alpha tested shapes draw opaque */
+    bool blend_modes;       /**< BlendMode and Opacity below 1, else the shapes draw opaque */
+    bool transmission;      /**< Transmission */
+    bool texture_blend;     /**< TextureBlend, else the shapes draw with their PbrTextures */
+    bool triplanar;         /**< A TextureMapping blend above 0, else the hard projection */
+    bool sheen;             /**< Sheen */
+    bool clear_coat;        /**< ClearCoat */
+    bool anisotropy;        /**< SpecularAnisotropy */
+    bool diffuse_transmission; /**< DiffuseTransmission */
 });
 
 /** Compare the render order of two views: by order, then by entity id.
@@ -248,9 +279,9 @@ int box_view_compare(
 
 /** Register the box.view module.
  *
- * View gets a constructor that enables lighting, baked lighting, reflections, the atmosphere
- * and the fog volumes, sets the environment intensity to 1 and the ShadowSettings defaults with
- * shadows disabled, enables culling with occlusion and a smallest size of one pixel.
+ * View gets a constructor that enables lighting, baked lighting, reflections, the depth prepass,
+ * the atmosphere and the fog volumes, sets the environment intensity to 1 and the ShadowSettings
+ * defaults with shadows disabled, enables culling with occlusion and a smallest size of 1 pixel.
  *
  * It sets the GridSettings defaults with the grid disabled, and the wireframe defaults with the
  * wireframe off. A C literal View starts from zero

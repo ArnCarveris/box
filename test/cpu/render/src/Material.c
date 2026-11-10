@@ -165,6 +165,11 @@ void Material_alpha_cutoff_batches(void) {
     // materials/cutout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -225,6 +230,11 @@ void Material_alpha_cutoff_prefab_and_dynamic(void) {
     // materials/cutout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -316,6 +326,7 @@ static void oreelse_cutout(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -527,6 +538,11 @@ void Material_transmission_override_permutations(void) {
     // materials/transmission
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -621,6 +637,11 @@ void Material_transmission_dynamic_material_keeps_batch(void) {
     // materials/transmission
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
@@ -1780,6 +1801,11 @@ void Material_texture_blend_batches(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -1851,6 +1877,11 @@ void Material_texture_blend_prefab(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t mask = blend_texture(world, BLEND_MASK_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -1899,6 +1930,11 @@ void Material_texture_blend_layer_changes(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);
@@ -1951,6 +1987,11 @@ void Material_texture_blend_layer_deleted(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -1996,6 +2037,11 @@ void Material_texture_blend_height_record(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t h = blend_texture(world, BLEND_GRAY_PNG);
@@ -2076,6 +2122,11 @@ void Material_texture_blend_height_key(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t grass = ecs_new(world);
@@ -2171,6 +2222,11 @@ void Material_texture_blend_every_shape(void) {
     // materials/texture_blend
     box_render_null_t *null;
     ecs_world_t *world = blend_world(&null);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t a = blend_texture(world, BLEND_RGB_PNG);
     ecs_entity_t g = blend_texture(world, BLEND_GRAY_PNG);
     ecs_entity_t layer = ecs_new(world);

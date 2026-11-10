@@ -5,6 +5,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 camera {
   Position: {0, 5, 14}
   Rotation: {-0.3, 0, 0}

@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {texture_blend: true, triplanar: true}
+}
+
 // TextureBlend with a triplanar world mapping (TextureMapping MappingWorld, blend 0.5): a sphere
 // and a rotated box blend two layers, a checker tiled twice and stripes with a bump map, under a
 // mask projected with them (blend_mask.png, red and green). Each projection samples the mask and

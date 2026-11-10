@@ -16,7 +16,8 @@
 /** Shader handle of the engine shader that scales a scene texture to the presented image */
 #define BOX_RENDER_SHADER_BLIT (1)
 
-/** Shader handle of the engine shader of the forward pass that draws meshes */
+/** Shader handle of the engine shader of the forward pass that draws the opaque meshes without
+ * the material features of BOX_RENDER_SHADER_MESH_EXTENDED */
 #define BOX_RENDER_SHADER_MESH (2)
 
 /** Shader handle of the engine compute shader that scatters changed instances into slots */
@@ -130,6 +131,24 @@
 /** Shader handle of the variant of the shadow shader that clips the octants of the point light
  * tiles with clip distances, compiled only by a device with that feature */
 #define BOX_RENDER_SHADER_SHADOW_CLIP (9)
+
+/** Shader handle of the engine shader of the forward pass that draws the meshes with a feature
+ * the mesh shader lacks.
+ *
+ * Those are an alpha test, a blend mode other than Opaque, Transmission, a TextureBlend, a
+ * triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or DiffuseTransmission. */
+#define BOX_RENDER_SHADER_MESH_EXTENDED (10)
+
+/** Check whether a shader handle is one of the two mesh shaders.
+ *
+ * @param pipeline The shader handle of a batch
+ * @return Whether it is BOX_RENDER_SHADER_MESH or BOX_RENDER_SHADER_MESH_EXTENDED
+ */
+static inline bool box_render_is_mesh(
+    uint32_t pipeline)
+{
+    return pipeline == BOX_RENDER_SHADER_MESH || pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
+}
 
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
@@ -549,6 +568,40 @@ typedef struct box_render_view_gtao_t {
     Gtao settings;          /**< Resolved settings */
 } box_render_view_gtao_t;
 
+/** Scene features (the members of Scene) of the mesh shaders, each the override of the same name; the
+ * lighting ones also gate the uniforms of the views of the scene */
+#define BOX_RENDER_FEATURE_BAKED (1u << 0)
+#define BOX_RENDER_FEATURE_REFLECTIONS (1u << 1)
+#define BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS (1u << 2)
+#define BOX_RENDER_FEATURE_COOKIES (1u << 3)
+#define BOX_RENDER_FEATURE_ENVIRONMENT (1u << 4)
+#define BOX_RENDER_FEATURE_AERIAL (1u << 5)
+#define BOX_RENDER_FEATURE_SHEEN (1u << 6)
+#define BOX_RENDER_FEATURE_CLEAR_COAT (1u << 7)
+#define BOX_RENDER_FEATURE_ANISOTROPY (1u << 8)
+#define BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION (1u << 9)
+#define BOX_RENDER_FEATURE_TRIPLANAR (1u << 10)
+#define BOX_RENDER_FEATURE_TRANSMISSION (1u << 11)
+
+/** Scene features of the extended mesh shader without an override: the TextureBlend entry
+ * points, and the alpha test and blend modes of its DrawKind */
+#define BOX_RENDER_FEATURE_TEXTURE_BLEND (1u << 12)
+#define BOX_RENDER_FEATURE_ALPHA_CUTOUT (1u << 13)
+#define BOX_RENDER_FEATURE_BLEND_MODES (1u << 14)
+
+/** A view draws a depth prepass before its forward pass (LightSettings.depth_prepass), in the
+ * features of a view only */
+#define BOX_RENDER_FEATURE_DEPTH_PREPASS (1u << 15)
+
+/** The scene features of the mesh shader */
+#define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
+
+/** The scene features that draw with the extended mesh shader */
+#define BOX_RENDER_FEATURE_MATERIALS (0x7FC0u)
+
+/** The scene features that are overrides, which key the pipelines of the mesh shaders */
+#define BOX_RENDER_FEATURE_OVERRIDES (0xFFFu)
+
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
  * The projection is built by the renderer per target, because its aspect follows the
@@ -592,6 +645,11 @@ typedef struct box_render_view_t {
     ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
                                  *   all zero for the other captures (probes, reflections,
                                  *   bakes, no view), which draw no debug pass */
+    uint32_t features;          /**< BOX_RENDER_FEATURE_* features: those of its scene, without
+                                 *   the lighting ones its LightSettings turn off, and the depth
+                                 *   prepass */
+    uint32_t scene_features;    /**< BOX_RENDER_FEATURE_* features of its scene, which key the
+                                 *   pipelines of its batches */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -1169,6 +1227,8 @@ typedef struct box_render_batch_t {
                                  *   with the polygon variant of the vertex stage of the 2D
                                  *   shape shader and its fs_polygon entry point, fs_shadow_polygon
                                  *   for the shadows */
+    uint32_t features;          /**< BOX_RENDER_FEATURE_* features of the scene of the instances,
+                                 *   0 for other pipelines than the mesh shaders */
     bool texture_blend;         /**< The instances have a TextureBlend: the texture_blend variant
                                  *   of the mesh pipeline samples the layers at blend_layers in
                                  *   place of the albedo, ORM and normal textures */
@@ -1308,12 +1368,6 @@ typedef struct box_render_transition_record_t {
                                      *   padding zeroed */
 } box_render_transition_record_t;
 
-#define BOX_RENDER_MATERIAL_SHEEN (1u << 0)
-#define BOX_RENDER_MATERIAL_ANISOTROPY (1u << 1)
-#define BOX_RENDER_MATERIAL_CLEAR_COAT (1u << 2)
-#define BOX_RENDER_MATERIAL_ALL (BOX_RENDER_MATERIAL_SHEEN | BOX_RENDER_MATERIAL_ANISOTROPY | \
-    BOX_RENDER_MATERIAL_CLEAR_COAT)
-
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
@@ -1330,7 +1384,6 @@ typedef struct box_render_packet_t {
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
-    uint32_t material_features;
     float transmission_roughness;
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */

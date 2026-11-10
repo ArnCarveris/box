@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {texture_blend: true}
+}
+
 // TextureBlend: the large plane blends four layers under a mask of four quadrants with soft
 // borders (checker top left, letter top right, stripes bottom left, a normal mapped layer with
 // bumps and an ORM bottom right), each layer tiled by its own TextureTransform. On the right, the

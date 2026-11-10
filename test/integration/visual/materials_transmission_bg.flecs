@@ -12,6 +12,10 @@ using box.light
 using box.atmosphere
 using box.effects
 
+$ {
+  Scene: {aerial_perspective: true, blend_modes: true, transmission: true}
+}
+
 gtao {
   Gtao: {radius: 1.5}
 }

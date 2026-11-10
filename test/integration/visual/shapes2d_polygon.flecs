@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.layout
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 // Polygon2D in screen UI: a concave outline, one with a hole, curved outlines from Bezier and
 // Catmull-Rom segments, borders, an image, a box shadow, a clipped polygon, a translucent one,
 // a tinted one, a tilted one and stroked open paths, with Rects for comparison of the edges.

@@ -96,7 +96,7 @@ static bool box_gpu_cull_wants(
 {
     bool result = false;
     bool casters = (f->flags & BOX_GPU_CULL_CASTERS) != 0;
-    bool pipeline = b->pipeline == BOX_RENDER_SHADER_MESH ||
+    bool pipeline = box_render_is_mesh(b->pipeline) ||
         (!casters && b->pipeline == BOX_RENDER_SHADER_SHAPE2D);
     if (f->flags & BOX_GPU_CULL_EMPTY) {
         goto done;
@@ -412,7 +412,7 @@ static void box_gpu_cull_batch_part(
     const box_gpu_cull_group_t *g = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, group);
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
     bool view = hist >= 0 && ((mask >> hist) & 1u);
-    bool late = view && b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
+    bool late = view && b->view == -1 && box_render_is_mesh(b->pipeline);
     int32_t draws[BOX_GPU_CULL_GROUP_VIEWS], first[BOX_GPU_CULL_GROUP_VIEWS];
     int32_t f, i, k = 0, n = 0;
     uint64_t slots = 0;
@@ -531,7 +531,7 @@ static void box_gpu_cull_batch_add(
     const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, batch);
     const box_gpu_cull_group_t *g = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, group);
     bool late = hist >= 0 && ((mask >> hist) & 1u) && b->view == -1 &&
-        b->pipeline == BOX_RENDER_SHADER_MESH;
+        box_render_is_mesh(b->pipeline);
     uint32_t part = 0;
     uint64_t slots = 0;
     int32_t f;
@@ -894,7 +894,7 @@ bool box_gpu_cull_capture_draws(
     int32_t cascade)
 {
     bool result = b->scene == scene && b->bake && b->view == -1 && b->blend == Opaque &&
-        b->pipeline == BOX_RENDER_SHADER_MESH && b->instance_count &&
+        box_render_is_mesh(b->pipeline) && b->instance_count &&
         (cascade < 0 || b->shadow);
     if (result) {
         result = box_gpu_cull_ready(gpu, b);

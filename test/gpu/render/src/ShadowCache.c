@@ -137,6 +137,7 @@ static void cache_scene(
     v->clear = (ClearSettings){.enabled = true, .color = {0, 0, 0, 255}};
     v->shadows.enabled = true;
     ecs_modified(world, view, View);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true, .alpha_cutout = true});
 
     out->world = world;
     out->camera = camera;

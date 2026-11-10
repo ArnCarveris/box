@@ -679,9 +679,6 @@ static void box_bake_views(
             continue;
         }
 
-        const View *view = rv->view && ecs_is_alive(world, rv->view)
-            ? ecs_get(world, rv->view, View)
-            : NULL;
         if (!v->viewed) {
             box_bake_ambient(&rv->lights, v->ambient);
             box_bake_scene_lights(b->lights_state, v->scene, &rv->lights, &v->lights);
@@ -690,7 +687,7 @@ static void box_bake_views(
 
         glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &v->cameras, vec3));
 
-        if (rv->lights.enabled && (view ? view->lighting.baked : true)) {
+        if (rv->lights.enabled && (rv->features & BOX_RENDER_FEATURE_BAKED)) {
             rv->volume = v->handle;
             if (rv->debug.light_probes && v->probes > BOX_RENDER_DEBUG_PROBES_MAX &&
                 !v->debug_warned)

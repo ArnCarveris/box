@@ -13,6 +13,10 @@ using box.effects
 using box.editor
 using box.console
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 exposure {
   AutoExposure: {}
 }

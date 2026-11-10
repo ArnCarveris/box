@@ -27,6 +27,12 @@ using box.transition
 using box.widgets
 using box.app
 
+$ {
+  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true,
+    aerial_perspective: true, alpha_cutout: true, transmission: true, triplanar: true,
+    clear_coat: true, diffuse_transmission: true}
+}
+
 window { Surface: {width: 1600, height: 1000, vsync: true} }
 canal_contact { Gtao: {radius: 0.5, final_value_power: 1.9} }
 canal_bloom { Bloom: {intensity: 0.1, threshold: 1.4} }
@@ -43,7 +49,7 @@ async {
 }
 
 canal_lock {
-  Scene: {}
+  Scene: {baked: true, reflections: true, punctual_shadows: true, environment: true, aerial_perspective: true, alpha_cutout: true, transmission: true, triplanar: true, clear_coat: true, diffuse_transmission: true}
   camera {
     Position: {15, 32, 46}
     Rotation: {-0.61, 0.31, 0}

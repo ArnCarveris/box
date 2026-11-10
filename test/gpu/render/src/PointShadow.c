@@ -95,6 +95,7 @@ static ecs_entity_t point_view(
     v->clear = (ClearSettings){.enabled = true, .color = {0, 0, 0, 255}};
     v->shadows.enabled = shadows;
     ecs_modified(world, view, View);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true});
     if (camera) {
         *camera = c;
     }
@@ -275,6 +276,7 @@ static ecs_world_t* point_room(
     v->clear = (ClearSettings){.enabled = true, .color = {0, 0, 0, 255}};
     v->shadows.enabled = true;
     ecs_modified(world, view, View);
+    ecs_singleton_set(world, Scene, {.punctual_shadows = true});
 
     return world;
 }

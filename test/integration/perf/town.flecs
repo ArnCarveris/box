@@ -12,6 +12,10 @@ using box.effects
 using box.perf
 
 $ {
+  Scene: {baked: true}
+}
+
+$ {
   AmbientLight: {sky: {150, 178, 210}, ground: {60, 56, 50}, intensity: 0.25}
   LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, capture_size: 64, bounces: 3, budget_ms: 16}
 }

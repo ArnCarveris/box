@@ -121,6 +121,11 @@ static void render_compare(
 void TextureBlend_layer_zero_alone(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_alone.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t tex = ecs_new(world);
     ecs_set(world, tex, TexturePath, {.path = MASK_RGB_PNG});
     ecs_entity_t layer = ecs_new(world);
@@ -143,6 +148,11 @@ void TextureBlend_layer_zero_alone(void) {
 void TextureBlend_single_channel_mask(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_single.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t mask = ecs_new(world);
     ecs_set(world, mask, TexturePath, {.path = MASK_RED_PNG, .single_channel = true});
     ecs_entity_t red = ecs_new(world);
@@ -167,6 +177,11 @@ void TextureBlend_single_channel_mask(void) {
 void TextureBlend_rgba_mask(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_rgba.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t mask = ecs_new(world);
     ecs_set(world, mask, TexturePath, {.path = MASK_RGB_PNG});
     ecs_entity_t red = ecs_new(world);
@@ -191,6 +206,11 @@ void TextureBlend_rgba_mask(void) {
 void TextureBlend_arrays_shared_released(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_shared.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t red = ecs_new(world);
     ecs_set(world, red, TexturePath, {.path = MASK_RED_PNG});
     ecs_entity_t layer0 = ecs_new(world);
@@ -237,6 +257,11 @@ void TextureBlend_arrays_shared_released(void) {
 void TextureBlend_layer_change_rebuilds(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_change.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t red = ecs_new(world);
     ecs_set(world, red, TexturePath, {.path = MASK_RED_PNG});
     ecs_entity_t rgb = ecs_new(world);
@@ -269,6 +294,11 @@ void TextureBlend_layer_change_rebuilds(void) {
 void TextureBlend_height_contrast(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_height.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t mask = ecs_new(world);
     ecs_set(world, mask, TexturePath, {.path = MASK_RED_PNG, .single_channel = true});
     ecs_entity_t red = ecs_new(world);
@@ -339,6 +369,11 @@ static void render_read(
 void TextureBlend_flat_heights_contrast(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_flat.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t mask = ecs_new(world);
     ecs_set(world, mask, TexturePath, {.path = MASK_RGB_PNG});
     ecs_entity_t red = ecs_new(world);
@@ -372,6 +407,11 @@ void TextureBlend_flat_heights_contrast(void) {
 void TextureBlend_flat_heights_switch(void) {
     // materials/texture_blend
     ecs_world_t *world = world_new("blend_flat_switch.png");
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t mask = ecs_new(world);
     ecs_set(world, mask, TexturePath, {.path = MASK_RGB_PNG});
     ecs_entity_t red = ecs_new(world);

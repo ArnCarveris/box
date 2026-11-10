@@ -448,8 +448,8 @@ static void box_shader_changed(
  * @param handle Handle of the shader
  * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, or
  * it assigns lights to clusters or draws shadow casters (either variant of the shadow shader)
- * and a batch draws with the mesh shader,
- * or it culls and a batch draws with the mesh or the 2D shape shader, or an effect pass of a
+ * and a batch draws with a mesh shader,
+ * or it culls and a batch draws with a mesh or the 2D shape shader, or an effect pass of a
  * view runs it, or it projects probe captures and the packet captures probes or reflections or
  * may process environments, or it builds atmosphere LUTs and the packet has an atmosphere, or
  * it converts environment images or draws environment backgrounds and the packet carries an
@@ -459,7 +459,8 @@ static void box_shader_changed(
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
  * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
  * a view of the packet has one, or it draws the probe debug views and a view of the packet has
- * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled
+ * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled, or it
+ * is the extended mesh shader and the scene of a view enables a material feature
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
@@ -467,11 +468,10 @@ static bool box_shader_used(
 {
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
 
-    uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER ||
+    bool meshes = handle == BOX_RENDER_SHADER_CLUSTER ||
         handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_SHADOW_CLIP ||
-        handle == BOX_RENDER_SHADER_CULL
-        ? BOX_RENDER_SHADER_MESH
-        : handle;
+        handle == BOX_RENDER_SHADER_CULL;
+    uint32_t pipeline = meshes ? UINT32_MAX : handle;
     uint32_t also = handle == BOX_RENDER_SHADER_CULL ? BOX_RENDER_SHADER_SHAPE2D : pipeline;
     int32_t i;
     if (box_render_effects_use(p, handle)) {
@@ -480,6 +480,15 @@ static bool box_shader_used(
 
     if (handle == BOX_RENDER_SHADER_ATMOSPHERE && box_render_atmosphere_use(p)) {
         result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_MESH_EXTENDED) {
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+            if (v->scene_features & BOX_RENDER_FEATURE_MATERIALS) {
+                result = true;
+            }
+        }
     }
 
     if (handle == BOX_RENDER_SHADER_ENVIRONMENT && box_render_environment_use(p)) {
@@ -540,6 +549,7 @@ static bool box_shader_used(
     for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
         if (b->pipeline == pipeline || b->pipeline == also ||
+            (meshes && box_render_is_mesh(b->pipeline)) ||
             (handle == BOX_RENDER_SHADER_TRANSMISSION && b->transmissive))
         {
             result = true;
@@ -891,6 +901,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_BLIT, false);
     box_shader_builtin(world, state, builtin, "mesh", "etc/shaders/mesh.wgsl",
         BOX_RENDER_SHADER_MESH, true);
+    box_shader_builtin(world, state, builtin, "mesh_extended", "etc/shaders/mesh_extended.wgsl",
+        BOX_RENDER_SHADER_MESH_EXTENDED, true);
     box_shader_builtin(world, state, builtin, "scatter", "etc/shaders/scatter.wgsl",
         BOX_RENDER_SHADER_SCATTER, true);
     box_shader_builtin(world, state, builtin, "cluster", "etc/shaders/cluster.wgsl",

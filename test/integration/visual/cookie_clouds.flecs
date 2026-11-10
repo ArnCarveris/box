@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {cookies: true}
+}
+
 // Cloud shadows: the sun carries a LightCookie of the seamless fbm noise (CookieNoise, the
 // 256 texel copy of the tests, loaded single_channel so its stored values are read), projected
 // along the sun onto a plane 30 units up and repeating every 60 units. Threshold 0.4 and

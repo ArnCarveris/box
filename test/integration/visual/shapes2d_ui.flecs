@@ -5,6 +5,10 @@ using box.texture
 using box.camera
 using box.view
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 camera {
   Position: {0, 0, 100}
   Camera: {ortho: true, ortho_scale: 1}

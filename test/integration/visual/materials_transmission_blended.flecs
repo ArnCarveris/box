@@ -11,6 +11,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {blend_modes: true, transmission: true}
+}
+
 camera {
   Position: {0, 0, 6}
   Camera: {fov: 50, far_: 100}

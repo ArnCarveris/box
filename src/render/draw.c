@@ -532,7 +532,36 @@ static void BoxDrawsOnLightBake(
         for (b = 0; b < ecs_vec_count(&d->batches); b ++) {
             box_draw_batch_t *batch = box_draws_batch(d, b);
             if (!batch->alive || batch->key.scene != scene || batch->key.atlas ||
-                batch->key.pipeline != BOX_RENDER_SHADER_MESH)
+                !box_render_is_mesh(batch->key.pipeline))
+            {
+                continue;
+            }
+
+            for (s = 0; s < ecs_vec_count(&batch->entities); s ++) {
+                box_draws_mark(it->world, d, *ecs_vec_get_t(&batch->entities, ecs_entity_t, s),
+                    BOX_DRAW_ALL);
+            }
+        }
+    }
+}
+
+/** Mark every shape in the mesh batches of a scene whose Scene was set, which changes the
+ * features, the pipeline and the fallbacks of their keys. The singleton is the Scene of the
+ * default scene.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnSceneFeatures(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i, b, s;
+    for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
+        ecs_entity_t scene = it->entities[i] == ecs_id(Scene) ? 0 : it->entities[i];
+        for (b = 0; b < ecs_vec_count(&d->batches); b ++) {
+            box_draw_batch_t *batch = box_draws_batch(d, b);
+            if (!batch->alive || batch->key.scene != scene || batch->key.atlas ||
+                !box_render_is_mesh(batch->key.pipeline))
             {
                 continue;
             }
@@ -551,7 +580,7 @@ ecs_entity_t box_draws_blend_owner(
     const box_draw_key_t *key)
 {
     ecs_entity_t result = 0;
-    if (key->pipeline != BOX_RENDER_SHADER_MESH || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
+    if (!box_render_is_mesh(key->pipeline) || !ecs_id_in_use(world, ecs_id(TextureBlend)) ||
         !ecs_get(world, e, TextureBlend))
     {
         goto done;
@@ -562,10 +591,59 @@ done:
     return result;
 }
 
+/** Check whether a 3D shape draws with the extended mesh shader: its key alpha tests, blends,
+ * is transmissive or has a TextureBlend, or it uses a material feature its scene enables.
+ *
+ * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy
+ * or DiffuseTransmission; only a scene with some of those off checks which.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param key Its key, with every field but the pipeline set
+ * @return Whether it draws with BOX_RENDER_SHADER_MESH_EXTENDED
+ */
+static bool box_draws_extended(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key)
+{
+    const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
+        BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION;
+    uint32_t f = key->features;
+    bool result = key->cutout || key->blend != Opaque || key->transmissive ||
+        key->texture_blend;
+    const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
+        ? NULL : ecs_get(world, e, TextureMapping);
+    ecs_iter_t it;
+    if (mapping && mapping->mode != MappingUv && isfinite(mapping->blend) &&
+        mapping->blend >= 0.5f / 65535.0f)
+    {
+        result = true;
+    }
+
+    if (result || !(f & lobes) ||
+        !ecs_query_has_table(d->extended, ecs_get_table(world, e), &it))
+    {
+        goto done;
+    }
+
+    ecs_iter_fini(&it);
+    result = (f & lobes) == lobes ||
+        ((f & BOX_RENDER_FEATURE_SHEEN) && ecs_get(world, e, Sheen)) ||
+        ((f & BOX_RENDER_FEATURE_CLEAR_COAT) && ecs_get(world, e, ClearCoat)) ||
+        ((f & BOX_RENDER_FEATURE_ANISOTROPY) && ecs_get(world, e, SpecularAnisotropy)) ||
+        ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) && ecs_get(world, e, DiffuseTransmission));
+done:
+    return result;
+}
+
 /** Compute the batch key of a shape.
  *
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
- * below 1, as it renders below its target alpha during the transition.
+ * below 1, as it renders below its target alpha during the transition. A 3D shape draws with the
+ * extended mesh shader when box_draws_extended says so; the Scene features that are off are ignored.
  *
  * A 3D shape that has or inherits Transmission is transmissive whatever its factor: it draws in
  * the sorted blended pass (AlphaBlend), is not alpha tested and casts no shadow, whatever its
@@ -592,9 +670,11 @@ static void box_draws_key(
     const Shape2D *shape2d = ecs_get(world, e, Shape2D);
     bool fading = ecs_has_id(world, e, TransitionOpacity);
     ecs_os_memset_t(key, 0, box_draw_key_t);
-    key->cutout = box_draws_cutout(ecs_get(world, e, AlphaCutoff), shape2d);
-    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha,
-        key->cutout);
+    key->scene = box_draws_scene(world, d, e);
+    key->features = shape2d ? 0u : box_render_scene_features(world, key->scene);
+    key->cutout = box_draws_scene_cutout(ecs_get(world, e, AlphaCutoff), shape2d, key->features);
+    key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode), fading ? 0.0f : alpha,
+        key->cutout, shape2d, key->features);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->wrap = wrap ? (uint8_t)*wrap : (uint8_t)WrapRepeat;
     if (textures) {
@@ -604,7 +684,6 @@ static void box_draws_key(
         key->textures[3] = textures->normal;
     }
 
-    key->scene = box_draws_scene(world, d, e);
     key->mesh = shape->render_mesh ? shape->render_mesh : shape->mesh;
     key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
     key->surface = shape->surface.p[0][0] != 0.0f;
@@ -624,7 +703,8 @@ static void box_draws_key(
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->fixture = key->shadow && (ecs_has_id(world, e, LightFixture) ||
         ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
-    key->transmissive = !shape2d && ecs_get(world, e, Transmission) != NULL;
+    key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
+        ecs_get(world, e, Transmission) != NULL;
     if (key->transmissive) {
         key->blend = AlphaBlend;
         key->cutout = false;
@@ -632,12 +712,17 @@ static void box_draws_key(
         key->fixture = false;
     }
 
-    ecs_entity_t blend = shape2d ? 0 : box_draws_blend_owner(world, e, key);
+    ecs_entity_t blend = shape2d || !(key->features & BOX_RENDER_FEATURE_TEXTURE_BLEND)
+        ? 0 : box_draws_blend_owner(world, e, key);
     if (blend) {
         key->texture_blend = true;
         key->textures[0] = blend;
         key->textures[2] = 0;
         key->textures[3] = 0;
+    }
+
+    if (!shape2d && box_draws_extended(world, d, e, key)) {
+        key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
     }
 
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
@@ -1092,6 +1177,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnLightBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(LightBake) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
+    box_draws_observer(world, d, "DrawsOnSceneFeatures", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Scene) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnSceneFeatures);
     box_draws_observer(world, d, "DrawsOnReflectionBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ReflectionBake) }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnLightBake);
@@ -1199,6 +1287,41 @@ static void box_draws_queries(
             },
             { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(AlphaCutoff), .inout = EcsIn, .oper = EcsOptional }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    d->extended = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "RenderExtendedMaterials" }),
+        .terms = {
+            { .id = ecs_id(ShapeMesh), .inout = EcsInOutNone },
+            {
+                .id = ecs_id(Sheen),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsIsA,
+                .inout = EcsInOutNone,
+                .oper = EcsOr
+            },
+            {
+                .id = ecs_id(ClearCoat),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsIsA,
+                .inout = EcsInOutNone,
+                .oper = EcsOr
+            },
+            {
+                .id = ecs_id(SpecularAnisotropy),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsIsA,
+                .inout = EcsInOutNone,
+                .oper = EcsOr
+            },
+            {
+                .id = ecs_id(DiffuseTransmission),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsIsA,
+                .inout = EcsInOutNone
+            }
         },
         .cache_kind = EcsQueryCacheAuto
     });

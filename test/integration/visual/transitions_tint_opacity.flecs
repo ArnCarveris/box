@@ -14,6 +14,10 @@ using box.view
 using box.app
 using box.transition
 
+$ {
+  Scene: {blend_modes: true}
+}
+
 camera {
   Position: {0, 3.2, 9}
   Rotation: {-0.3, 0, 0}

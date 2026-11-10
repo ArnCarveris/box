@@ -890,7 +890,7 @@ static void gtao_view_set(
     int32_t count)
 {
     View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
-        .lighting.enabled = lit};
+        .lighting.enabled = lit, .lighting.depth_prepass = true};
     int32_t i;
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, count);
     for (i = 0; i < count; i ++) {
@@ -1062,6 +1062,11 @@ void Effects_gtao_spares_emission_and_blended(void) {
     // lighting/effects
     ecs_entity_t camera, floor, wall;
     ecs_world_t *world = gtao_world(0.5f, 0, 10, &camera, &floor, &wall);
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
     ecs_entity_t lamp = ecs_new(world);
     ecs_set(world, lamp, Position, {0, 0.5f, -0.5f});
     ecs_set(world, lamp, Box, {1, 1, 1});

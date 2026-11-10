@@ -547,7 +547,7 @@ void box_gpu_environment_uniforms(
     box_gpu_view_uniforms_t *u)
 {
     glm_vec4_zero(u->environment);
-    if (box_gpu_environment_of(gpu, v)) {
+    if ((v->features & BOX_RENDER_FEATURE_ENVIRONMENT) && box_gpu_environment_of(gpu, v)) {
         u->environment[0] = v->environment.intensity;
         u->environment[1] = cosf(v->environment.yaw);
         u->environment[2] = sinf(v->environment.yaw);

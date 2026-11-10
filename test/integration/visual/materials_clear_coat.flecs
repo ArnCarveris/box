@@ -6,6 +6,10 @@ using box.camera
 using box.view
 using box.light
 
+$ {
+  Scene: {reflections: true, clear_coat: true}
+}
+
 // Clear coat (ClearCoat) over rough bases in a room open at the top, lit by a sun from above
 // and behind the camera, with a box projected room probe of a bright window and two colored
 // panels. The top row of rough red balls has a coat of roughness 0.1 and strength 0, 0.25, 0.5,
@@ -15,7 +19,7 @@ using box.light
 // coat next to the same metal without one, and two normal mapped panels, the right one coated,
 // whose coat reflects the window smoothly over the bumps.
 room {
-  Scene: {}
+  Scene: {reflections: true, clear_coat: true}
   ReflectionBake: {resolution: 128}
   AmbientLight: {intensity: 0.15}
 

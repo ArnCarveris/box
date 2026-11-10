@@ -139,6 +139,7 @@ static uint64_t box_draws_hash(
     h ^= (((((((uint64_t)key->shadow * 2 + key->bake) * 2 + key->box_shadow) * 2 + key->slice) *
         2 + key->texture_blend) * 2 + key->polygon) * 2 + key->fixture) * 0x94D049BB133111EBull;
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
+    h ^= ((uint64_t)key->features + 1) * 0xA0761D6478BD642Full;
 
     return h ^ (h >> 29);
 }
@@ -160,7 +161,7 @@ static bool box_draws_key_eq(
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
-        a->atlas == b->atlas &&
+        a->atlas == b->atlas && a->features == b->features &&
         a->surface == b->surface && a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon;
 }
@@ -542,7 +543,7 @@ static void box_draws_glyph_moved(
 bool box_draws_caster(
     const box_draw_batch_t *b)
 {
-    return b->key.pipeline == BOX_RENDER_SHADER_MESH && b->key.shadow &&
+    return box_render_is_mesh(b->key.pipeline) && b->key.shadow &&
         b->key.blend == Opaque && !b->key.atlas;
 }
 
@@ -792,6 +793,29 @@ uint8_t box_draws_blend(
     uint8_t result = mode ? (uint8_t)*mode : (uint8_t)Opaque;
     if (result == Opaque && alpha < 1.0f && !cutout) {
         result = AlphaBlend;
+    }
+
+    return result;
+}
+
+bool box_draws_scene_cutout(
+    const AlphaCutoff *cutoff,
+    const Shape2D *shape2d,
+    uint32_t features)
+{
+    return box_draws_cutout(cutoff, shape2d) && (features & BOX_RENDER_FEATURE_ALPHA_CUTOUT);
+}
+
+uint8_t box_draws_scene_blend(
+    const BlendMode *mode,
+    float alpha,
+    bool cutout,
+    const Shape2D *shape2d,
+    uint32_t features)
+{
+    uint8_t result = box_draws_blend(mode, alpha, cutout);
+    if (!shape2d && !(features & BOX_RENDER_FEATURE_BLEND_MODES)) {
+        result = Opaque;
     }
 
     return result;
@@ -1750,6 +1774,7 @@ static void box_draws_send_batch(
     box_render_batch_t *out = box_render_packet_batch(p);
     out->scene = b->key.scene;
     out->pipeline = b->key.pipeline;
+    out->features = b->key.features;
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
     out->cutout = b->key.cutout;
@@ -1864,6 +1889,7 @@ static void box_draws_send_blended(
             out->view = v;
             out->scene = b->key.scene;
             out->pipeline = b->key.pipeline;
+            out->features = b->key.features;
             out->blend = b->key.blend;
             out->back_face = b->key.back_face;
             out->cutout = b->key.cutout;
@@ -2131,8 +2157,10 @@ static void box_draws_fill_material(
             }
         }
 
-        bool cutout = box_draws_cutout(material.cutoff, material.shape2d);
-        uint8_t blend = box_draws_blend(box_draws_at(modes, mode_step, i), alpha, cutout);
+        bool cutout = box_draws_scene_cutout(material.cutoff, material.shape2d,
+            b->key.features);
+        uint8_t blend = box_draws_scene_blend(box_draws_at(modes, mode_step, i), alpha, cutout,
+            material.shape2d, b->key.features);
         if (!b->key.transmissive && (blend != b->key.blend || cutout != b->key.cutout)) {
             box_draws_mark(it->world, d, it->entities[i], BOX_DRAW_ALL);
         }
