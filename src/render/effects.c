@@ -325,6 +325,30 @@ static void box_effects_view(
     }
 }
 
+/** Forget the LUT errors of deleted texture entities.
+ *
+ * @param world The world
+ * @param state The state of the extract
+ */
+static void box_effects_sweep_lut_errors(
+    ecs_world_t *world,
+    box_effects_state_t *state)
+{
+    bool removed = true;
+    while (removed) {
+        removed = false;
+        ecs_map_iter_t it = ecs_map_iter(&state->lut_errors);
+        while (ecs_map_next(&it)) {
+            ecs_entity_t e = ecs_map_key(&it);
+            if (!ecs_is_alive(world, e)) {
+                ecs_map_remove(&state->lut_errors, e);
+                removed = true;
+                break;
+            }
+        }
+    }
+}
+
 /** Add the effect passes of every view of the packet.
  *
  * @param it The iterator of the system
@@ -334,6 +358,7 @@ static void BoxRenderExtractEffects(
 {
     box_render_packet_t *p = box_render_packet(it->world);
     int32_t i, count = ecs_vec_count(&p->views);
+    box_effects_sweep_lut_errors(it->world, it->ctx);
     for (i = 0; i < count; i ++) {
         box_effects_view(it->world, it->ctx, p,
             ecs_vec_get_t(&p->views, box_render_view_t, i));

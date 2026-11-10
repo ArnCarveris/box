@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
+#include "../texture/texture.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -2804,6 +2805,43 @@ static ecs_entity_t grading_lut(
     return result;
 }
 
+/** Test that the image of a LUT texture entity is loaded with a shape.
+ *
+ * @param world The world
+ * @param lut The texture entity
+ * @param width The expected width
+ * @param height The expected height
+ */
+static void grading_lut_loaded(
+    ecs_world_t *world,
+    ecs_entity_t lut,
+    int32_t width,
+    int32_t height)
+{
+    const box_textures_t *t = box_textures_get(world);
+    test_assert(t != NULL);
+    test_assert(box_textures_handle(t, lut) != 0);
+    const box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, lut);
+    test_assert(tex != NULL);
+    test_int(tex->width, width);
+    test_int(tex->height, height);
+}
+
+static int32_t grading_errors = 0;
+
+static void grading_count_errors(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -3 && strstr(msg, "ColorGrading LUT")) {
+        grading_errors ++;
+    }
+}
+
 void Effects_color_grading_lut_identity_no_op(void) {
     // lighting/effects
     ecs_entity_t camera, view;
@@ -2820,6 +2858,8 @@ void Effects_color_grading_lut_identity_no_op(void) {
     unsigned char *a = grading_frame(world, view, camera, chain, 2, "grading_identity.png");
     chain[1] = large;
     unsigned char *b = grading_frame(world, view, camera, chain, 2, "grading_identity.png");
+    grading_lut_loaded(world, ecs_get(world, small, ColorGrading)->lut, 256, 16);
+    grading_lut_loaded(world, value.lut, 1024, 32);
     test_assert(grading_diff(base, a) <= 1);
     test_assert(grading_diff(base, b) <= 1);
 
@@ -2921,10 +2961,14 @@ void Effects_color_grading_lut_wrong_shape_ignored(void) {
     value.lut = grading_lut(world, "not_a_strip.png");
     ecs_entity_t grading = grading_effect(world, &value);
     unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_shape.png");
-    ecs_log_set_level(-4);
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    grading_errors = 0;
+    ecs_os_api.log_ = grading_count_errors;
     unsigned char *px = grading_frame(world, view, camera, &grading, 1, "grading_shape.png");
     unsigned char *again = smaa_frame(world, "grading_shape.png");
-    ecs_log_set_level(-1);
+    ecs_os_api.log_ = log;
+    grading_lut_loaded(world, value.lut, 32, 16);
+    test_int(grading_errors, 1);
     test_assert(grading_diff(base, px) <= 1);
     test_assert(grading_diff(base, again) <= 1);
 
