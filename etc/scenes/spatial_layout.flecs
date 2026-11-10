@@ -26,6 +26,7 @@ sky {
 }
 
 $ {
+    box.app.FpsTarget: {60}
     AmbientLight: {sky: {100, 130, 170}, ground: {50, 45, 40}, intensity: 0.7}
 }
 
