@@ -766,6 +766,27 @@
                     "view_opts_out_of_scene_features",
                     "scene_features_script"
                 ]
+            },
+            {
+                "id": "PlanarReflection",
+                "testcases": [
+                    "defaults",
+                    "matrix_mirrors_points",
+                    "matrix_wall_mirror",
+                    "oblique_finite_far",
+                    "oblique_infinite_far",
+                    "oblique_offset_keeps_below",
+                    "oblique_behind_camera",
+                    "select_frustum",
+                    "select_far_plane",
+                    "select_back_side",
+                    "select_limit_nearest_first",
+                    "select_ortho_none",
+                    "extract_record",
+                    "extract_rotated_wall",
+                    "extract_limit",
+                    "extract_views_without"
+                ]
             }
         ]
     }

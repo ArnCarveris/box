@@ -250,6 +250,7 @@ void box_gpu_draw_init(
     box_gpu_particles_init(gpu);
     box_gpu_fog_volumes_init(gpu);
     box_gpu_debug_init(gpu);
+    box_gpu_planar_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -636,6 +637,7 @@ void box_gpu_draw_fini(
     box_gpu_particles_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
     box_gpu_debug_fini(gpu);
+    box_gpu_planar_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -936,7 +938,8 @@ static bool box_gpu_target_has_view(
     return assigned ? v->target == frame->handle : root;
 }
 
-/** Write the uniforms of the views a target renders into the view buffer.
+/** Write the uniforms of the views a target renders into the view buffer, then those of their
+ * planar reflections after them (box_gpu_planar_add).
  *
  * @param gpu The backend
  * @param t The target
@@ -950,9 +953,10 @@ static int32_t box_gpu_view_write(
     const box_render_packet_t *packet,
     const box_render_target_t *frame)
 {
-    int32_t i, result = 0, count = ecs_vec_count(&packet->views);
+    int32_t i, result = 0, extra = 0, slot = 0, count = ecs_vec_count(&packet->views);
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
     box_gpu_cull_begin(gpu, packet);
+    box_gpu_planar_begin(gpu);
     for (i = 0; i < count; i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
         if (!box_gpu_target_has_view(frame, v)) {
@@ -983,12 +987,31 @@ static int32_t box_gpu_view_write(
         result ++;
     }
 
+    for (i = 0; i < count && result; i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
+        if (!box_gpu_target_has_view(frame, v)) {
+            continue;
+        }
+
+        extra += box_gpu_planar_add(gpu, t, packet, i, slot,
+            (const box_gpu_view_uniforms_t*)ecs_vec_get_t(
+                &gpu->view_data, uint8_t, slot * BOX_GPU_VIEW_STRIDE),
+            result + extra);
+        slot ++;
+    }
+
+    if (extra) {
+        ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t,
+            (result + extra) * BOX_GPU_VIEW_STRIDE);
+        box_gpu_planar_uniforms(gpu, ecs_vec_first(&gpu->view_data));
+    }
+
     if (result) {
         box_gpu_cull_upload(gpu);
         box_gpu_shadow_upload(gpu, result);
-        box_gpu_view_reserve(gpu, result);
+        box_gpu_view_reserve(gpu, result + extra);
         wgpuQueueWriteBuffer(gpu->queue, gpu->view_buffer, 0,
-            ecs_vec_first(&gpu->view_data), (size_t)result * BOX_GPU_VIEW_STRIDE);
+            ecs_vec_first(&gpu->view_data), (size_t)(result + extra) * BOX_GPU_VIEW_STRIDE);
     }
 
     return result;
@@ -1614,6 +1637,7 @@ void box_gpu_draw_views(
         box_gpu_light_cluster(gpu, t, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
+        box_gpu_planar_render(gpu, t, encoder, packet, v, slot);
         bool prepasses = box_gpu_draw_prepasses(gpu, packet, v, slot);
         box_gpu_draw_prewarm(gpu, hdr ? BOX_GPU_HDR_FORMAT : t->format, v,
             v->lights.enabled && (v->features & BOX_RENDER_FEATURE_DEPTH_PREPASS) &&

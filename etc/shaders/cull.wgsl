@@ -34,6 +34,9 @@ struct Job {
     // 1 for a batch of LightFixture shapes: a frustum with a light inside the world box of an
     // instance does not draw it.
     fixture: u32,
+    // Page slot plus one of the instance no frustum of the group draws, the shape of a planar
+    // reflection, 0 for none.
+    exclude: u32,
 };
 
 // World space box around an instance.
@@ -212,7 +215,7 @@ fn phase_of(f: u32) -> u32 {
 // phase writes the history of a job that has one.
 fn decide(job: Job, slot: u32, m: mat4x4f, b: Bounds, f: u32) -> vec2<bool> {
     let phase = phase_of(f);
-    let inside = visible(b, f);
+    let inside = visible(b, f) && slot + 1u != job.exclude;
     var draw = inside;
     if (phase == PHASE_EARLY) {
         draw = inside && (job.history == NONE || history[job.history + slot] == 0u);

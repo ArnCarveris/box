@@ -76,6 +76,7 @@ sky {
 }
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: false, reflections: false, punctual_shadows: false, environment: false,
     aerial_perspective: false, transmission: false, texture_blend: true, sheen: true,
     clear_coat: false, diffuse_transmission: false}

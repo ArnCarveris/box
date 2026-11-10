@@ -1436,6 +1436,33 @@ void box_render_draws_shadow_record(
     }
 }
 
+bool box_render_draws_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t *page,
+    uint32_t *slot)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = d && ecs_is_alive(world, e) ? ecs_get(world, e, DrawSlot) : NULL;
+    const box_draw_batch_t *b = NULL;
+    bool result = false;
+    if (!ds || ds->batch < 0 || ds->batch >= ecs_vec_count(&d->batches)) {
+        goto done;
+    }
+
+    b = ecs_vec_get_t(&d->batches, box_draw_batch_t, ds->batch);
+    if (!b->alive || b->page < 0 || ds->slot < 0) {
+        goto done;
+    }
+
+    *page = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
+        BOX_RENDER_STREAM_TRANSFORM);
+    *slot = b->first + (uint32_t)ds->slot;
+    result = true;
+done:
+    return result;
+}
+
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats)

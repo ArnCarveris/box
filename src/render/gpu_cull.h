@@ -97,6 +97,30 @@ void box_gpu_cull_add(
     mat4 proj,
     const box_gpu_view_uniforms_t *u);
 
+/** Add the cull view of a planar reflection of a view, a group of its own: the 3D meshes of the
+ * scene of the view and of the view itself that are not transmissive, but the shape of the plane.
+ *
+ * They are tested against the mirrored frustum and the smallest size of the view, not by occlusion.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param index Index of the view in the packet
+ * @param slot Slot of the reflection in the view buffer, which identifies its cull view
+ * @param view_proj World to clip space of the reflection, with its oblique near plane
+ * @param pixels Pixels per unit at w 1 of the reflection image
+ * @param exclude_page Handle of the instance page of the shape of the plane, 0 for none
+ * @param exclude_slot Slot of that shape in the page
+ */
+void box_gpu_cull_reflect_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    int32_t index,
+    int32_t slot,
+    mat4 view_proj,
+    float pixels,
+    uint32_t exclude_page,
+    uint32_t exclude_slot);
+
 /** Add the tiles of a shadow atlas as cull groups of shadow casters of its scene, at most
  * BOX_GPU_CULL_GROUP_VIEWS frustums per group; octant o of tile i is cascade
  * BOX_GPU_ATLAS_FRUSTUM(i, o) of the slot, a spot light tile only having octant 0.

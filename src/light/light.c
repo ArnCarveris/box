@@ -240,6 +240,29 @@ static void box_reflection_probe_ctor(
     }
 }
 
+/** Construct PlanarReflection values with half the resolution of the view and a clip plane
+ * 0.02 units below the plane.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_planar_reflection_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    PlanarReflection *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (PlanarReflection){
+            .resolution = 0.5f,
+            .clip_offset = 0.02f
+        };
+    }
+}
+
 /** Construct FogVolume values.
  *
  * A white box of 5 units each way with a density of 0.1 that scatters all it extinguishes, a
@@ -380,6 +403,8 @@ void BoxLightImport(
     box_owned_hooks(world, ReflectionBakeStatus, BOX_OWNED_STR(ReflectionBakeStatus, error));
     ECS_META_COMPONENT(world, ReflectionProbe);
     ecs_set_hooks(world, ReflectionProbe, { .ctor = box_reflection_probe_ctor });
+    ECS_META_COMPONENT(world, PlanarReflection);
+    ecs_set_hooks(world, PlanarReflection, { .ctor = box_planar_reflection_ctor });
     ECS_META_COMPONENT(world, FogVolume);
     ecs_set_hooks(world, FogVolume, { .ctor = box_fog_volume_ctor });
     ECS_META_COMPONENT(world, EnvironmentFilter);
