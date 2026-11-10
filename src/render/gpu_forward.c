@@ -87,7 +87,7 @@ static void box_gpu_feature_constants(
         "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
         "scene_environment", "scene_aerial", "material_sheen", "material_clear_coat",
         "material_anisotropy", "material_diffuse_transmission", "material_triplanar",
-        "transmissive"
+        "material_fresnel", "transmissive"
     };
     uint32_t bits = (features & BOX_RENDER_FEATURE_OVERRIDES) |
         (transmissive ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 1) : 0u);

@@ -256,6 +256,7 @@ ECS_STRUCT(Scene, {
     bool clear_coat;        /**< ClearCoat */
     bool anisotropy;        /**< SpecularAnisotropy */
     bool diffuse_transmission; /**< DiffuseTransmission */
+    bool fresnel;           /**< Fresnel */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

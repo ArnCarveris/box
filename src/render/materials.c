@@ -816,7 +816,8 @@ static bool box_materials_keyed(
 {
     return component == ecs_id(AlphaCutoff) || component == ecs_id(Transmission) ||
         component == ecs_id(Sheen) || component == ecs_id(ClearCoat) ||
-        component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission);
+        component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission) ||
+        component == ecs_id(Fresnel);
 }
 
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
@@ -869,16 +870,17 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[12] = {
+    ecs_entity_t components[13] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll)
+        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
+        ecs_id(Fresnel)
     };
-    const char *names[12] = {
+    const char *names[13] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
-        "DrawsOnTextureMapping", "DrawsOnTextureScroll"
+        "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -903,7 +905,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 12; i ++) {
+    for (i = 0; i < 13; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
@@ -937,6 +939,7 @@ void box_draws_material_of(
         out->anisotropy = ecs_get(world, owner, SpecularAnisotropy);
         out->sheen = ecs_get(world, owner, Sheen);
         out->diffuse_transmission = ecs_get(world, owner, DiffuseTransmission);
+        out->fresnel = ecs_get(world, owner, Fresnel);
     }
 }
 

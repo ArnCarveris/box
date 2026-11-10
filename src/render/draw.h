@@ -233,6 +233,7 @@ typedef struct box_draw_material_t {
     const Sheen *sheen;         /**< Grazing rim of a 3D shape, ignored by 2D shapes */
     const DiffuseTransmission *diffuse_transmission; /**< Back lit glow of a 3D shape, ignored
                                  *   by 2D shapes */
+    const Fresnel *fresnel;     /**< Artistic rim of a 3D shape, ignored by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -287,6 +288,8 @@ typedef struct box_draw_transition_material_t {
     SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
     Sheen sheen;            /**< Sheen */
     DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission */
+    Fresnel fresnel;        /**< Fresnel, which has no transition: the record keeps it */
+    bool rimmed;            /**< The material has a Fresnel */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -546,9 +549,9 @@ typedef struct box_render_draws_t {
                                      *   DynamicTransform */
     ecs_query_t *dynamic_texts;     /**< Texts with DynamicTransform */
     ecs_query_t *dynamic_text_materials; /**< Texts with DynamicMaterial, self or up */
-    ecs_query_t *extended;          /**< Shapes with Sheen, ClearCoat, SpecularAnisotropy or
-                                     *   DiffuseTransmission, self or up IsA, which draw with
-                                     *   the extended mesh shader */
+    ecs_query_t *extended;          /**< Shapes with Sheen, ClearCoat, SpecularAnisotropy,
+                                     *   DiffuseTransmission or Fresnel, self or up IsA, which
+                                     *   draw with the extended mesh shader */
     uint32_t text_mesh;         /**< Mesh handle of the glyph quad */
     ecs_vec_t batches;          /**< box_draw_batch_t by index */
     ecs_vec_t free_batches;     /**< int32_t, indices of batches not in use */
@@ -884,7 +887,8 @@ void box_draws_color_unpack(
  * was, the Transmission (factor 0 without one) and the lobes of the other material components.
  *
  * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color,
- * DiffuseTransmission 0 without one, its blur 0 when negative or not finite.
+ * DiffuseTransmission 0 without one, its blur 0 when negative or not finite, Fresnel 0 without
+ * one.
  * Opacity, tints and the 2D shape are not.
  *
  * @param out The record
@@ -1123,6 +1127,19 @@ void box_draws_material_of(
     ecs_entity_t owner,
     double time,
     box_draw_material_t *out);
+
+/** Compute the rim factor of a Fresnel, the C twin of fresnel_factor of material.wgsl:
+ * saturate(bias + pow(1 - saturate(ndv), power)), 1 - ndv kept above 1e-6.
+ *
+ * @param ndv Cosine between the shading normal and the direction toward the camera
+ * @param power Fresnel.power
+ * @param bias Fresnel.bias
+ * @return The factor, 0..1
+ */
+float box_draws_fresnel_factor(
+    float ndv,
+    float power,
+    float bias);
 
 /** Compute the offsets of a TextureScroll at a time: velocity times time per axis in double
  * precision, wrapped to 0..2 and kept positive, so WrapMirror tiles stay continuous. A velocity

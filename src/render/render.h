@@ -598,6 +598,34 @@ void box_render_atmos_transmittance_uv(
     float mu,
     float *uv);
 
+/** Smallest ramp of the coverage remap of a CloudLayer, which makes a softness of 0 a step at
+ * the threshold, COOKIE_MIN_RAMP of the cookie remap */
+#define BOX_RENDER_CLOUD_MIN_RAMP (1e-5f)
+
+/** Get the coverage of a CloudLayer from a texture value, as atmosphere.wgsl remaps it:
+ * saturate((t - threshold) / (2 * softness) + 0.5), with a ramp of at least
+ * BOX_RENDER_CLOUD_MIN_RAMP.
+ *
+ * @param t The texture value
+ * @param threshold Value at which the coverage is one half
+ * @param softness Half the range of values the coverage ramps over
+ * @return The coverage, 0 to 1
+ */
+float box_render_cloud_coverage(
+    float t,
+    float threshold,
+    float softness);
+
+/** Get the opacity of a CloudLayer from its coverage: saturate(coverage * density).
+ *
+ * @param coverage The coverage
+ * @param density The density
+ * @return The opacity, 0 to 1
+ */
+float box_render_cloud_alpha(
+    float coverage,
+    float density);
+
 /** Copy the transmittance or the multi scattering LUT of an atmosphere into memory, waiting for
  * the copy.
  *

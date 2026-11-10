@@ -1,7 +1,7 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
- * diffuse transmission, emission and transmission.
+ * diffuse transmission, emission, Fresnel rim and transmission.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -25,9 +25,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * The material components, such as Rgb, PbrMaterial, Transmission and TextureScroll, bring it
- * along. A prefab that owns one gets a slot its instances share, a 3D shape that owns one a slot
- * of its own.
+ * The material components, such as Rgb, PbrMaterial, Transmission, TextureScroll and Fresnel,
+ * bring it along. A prefab that owns one gets a slot its instances share, a 3D shape that owns
+ * one a slot of its own.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -207,6 +207,44 @@ ECS_STRUCT(DiffuseTransmission, {
 ECS_STRUCT(Emissive, {
     float strength; /**< Emission intensity */
     Rgb color;      /**< Emission color */
+});
+
+/** Strength of a constructed Fresnel: the emission of an Emissive of strength 1 at a grazing
+ * angle */
+#define BOX_MATERIAL_FRESNEL_STRENGTH (1.0f)
+
+/** Power of a constructed Fresnel: a thin rim, as the Schlick term */
+#define BOX_MATERIAL_FRESNEL_POWER (5.0f)
+
+/** Bias of a constructed Fresnel: nothing where the surface faces the viewer */
+#define BOX_MATERIAL_FRESNEL_BIAS (0.0f)
+
+/** Opacity of a constructed Fresnel: the rim adds no alpha */
+#define BOX_MATERIAL_FRESNEL_OPACITY (0.0f)
+
+/** Artistic rim of a 3D mesh where its surface turns away from the viewer (force fields,
+ * holograms, ghost and selection glows, the rim light of stylized characters), default a white
+ * color, strength 1, power 5, bias 0 and opacity 0, inherited like Emissive.
+ *
+ * The factor is f = saturate(bias + pow(1 - saturate(dot(n, v)), power)), with n the shading
+ * normal after normal mapping and v toward the camera; back faces use the flipped normal, so a
+ * two sided shape rims on both sides. color times strength times f adds to the emission, which
+ * Tint does not change, and probe and reflection captures include it. opacity times f adds to
+ * the alpha (up to 1) of a shape the blended pass draws (Opacity under 1 or a BlendMode); an
+ * opaque shape ignores it. It is separate from the physical Fresnel of the specular lobes, which
+ * it does not change.
+ *
+ * Needs Scene.fresnel: a scene without it draws the shape as if it had no Fresnel. Only 3D
+ * meshes have it, 2D shapes and text ignore it.
+ */
+ECS_STRUCT(Fresnel, {
+    Rgb color;      /**< Color of the rim, display encoded */
+    float strength; /**< Emission intensity at a grazing angle, in the units of
+                     *   Emissive.strength, 0 emits nothing */
+    float power;    /**< Exponent of the falloff, higher for a thinner rim */
+    float bias;     /**< Added to the factor before it is clamped, so a surface facing the viewer
+                     *   can glow too */
+    float opacity;  /**< Alpha added at the rim of a blended shape, 0..1 */
 });
 
 /** Index of refraction of a constructed Transmission and of a surface without one */

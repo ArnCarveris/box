@@ -7,15 +7,25 @@
  * were built from changes; the sun, the colors and the cameras only reach the per view passes.
  *
  * The entity of the LUTs is also an environment source: its sky goes into the cubemap of its
- * Environment as a BOX_RENDER_ATMOSPHERE_ENVIRONMENT, throttled to the changes that show.
+ * Environment as a BOX_RENDER_ATMOSPHERE_ENVIRONMENT, throttled to the changes that show. Its
+ * CloudLayers, at most BOX_CLOUD_LAYER_MAX by entity id, reach the views that draw the sky.
  */
 
 #include "environment.h"
 #include "../atmosphere/atmosphere.h"
+#include "../texture/texture.h"
 #include <math.h>
+#include <stdlib.h>
 
 /** First handle of the LUTs of an atmosphere */
 #define BOX_ATMOS_HANDLE_FIRST (1)
+
+/** A CloudLayer of a scene in this frame */
+typedef struct box_atmos_cloud_t {
+    ecs_entity_t entity;    /**< Entity with the CloudLayer */
+    CloudLayer value;       /**< Its values */
+    float offset[2];        /**< Its offset at the total time, wrapped to [0, size) */
+} box_atmos_cloud_t;
 
 /** The LUTs of the atmosphere of a scene */
 typedef struct box_atmos_scene_t {
@@ -32,11 +42,17 @@ typedef struct box_atmos_scene_t {
     uint32_t env_handle;    /**< Handle of the cubemap it was rendered into */
     box_render_atmosphere_desc_t env_key; /**< Medium of that render */
     box_render_atmosphere_env_t env; /**< Inputs of that render */
+    box_atmos_cloud_t clouds[BOX_CLOUD_LAYER_MAX]; /**< Cloud layers of this frame by ascending
+                             *   altitude */
+    int32_t cloud_count;    /**< Layers in clouds */
 } box_atmos_scene_t;
 
 /** Main thread state of the atmosphere extract */
 typedef struct box_render_atmos_t {
     ecs_query_t *atmospheres;   /**< Atmosphere and Scene(self|up), NULL without box.atmosphere */
+    ecs_query_t *clouds;        /**< CloudLayer and Scene(self|up), NULL without box.atmosphere */
+    double time;                /**< Seconds the world advanced in total, the wind time */
+    bool clouds_warned;         /**< A scene had more than BOX_CLOUD_LAYER_MAX layers */
     ecs_vec_t scenes;           /**< box_atmos_scene_t */
     ecs_vec_t free_handles;     /**< uint32_t, handles to reuse */
     uint32_t next_handle;       /**< Next handle */
@@ -234,6 +250,108 @@ static void box_atmos_collect(
     }
 }
 
+/** Add a CloudLayer to the layers of its scene, which keep the BOX_CLOUD_LAYER_MAX lowest entity
+ * ids; warn once when a scene has more.
+ *
+ * @param a The state
+ * @param s The LUTs of the scene
+ * @param entity Entity with the CloudLayer
+ * @param value Its values
+ */
+static void box_atmos_cloud_add(
+    box_render_atmos_t *a,
+    box_atmos_scene_t *s,
+    ecs_entity_t entity,
+    const CloudLayer *value)
+{
+    box_atmos_cloud_t *slot = NULL;
+    int32_t i;
+    if (s->cloud_count < BOX_CLOUD_LAYER_MAX) {
+        slot = &s->clouds[s->cloud_count ++];
+    } else {
+        if (!a->clouds_warned) {
+            ecs_warn("box.atmosphere: a scene has more than %d CloudLayers, the others are "
+                "ignored", BOX_CLOUD_LAYER_MAX);
+            a->clouds_warned = true;
+        }
+
+        for (i = 0; i < s->cloud_count; i ++) {
+            if (s->clouds[i].entity > entity &&
+                (!slot || s->clouds[i].entity > slot->entity))
+            {
+                slot = &s->clouds[i];
+            }
+        }
+    }
+
+    if (slot) {
+        slot->entity = entity;
+        slot->value = *value;
+    }
+}
+
+/** Order two cloud layers by ascending altitude, then entity id.
+ *
+ * @param p1 The first layer
+ * @param p2 The second layer
+ * @return Their order
+ */
+static int box_atmos_cloud_compare(
+    const void *p1,
+    const void *p2)
+{
+    const box_atmos_cloud_t *c1 = p1, *c2 = p2;
+    int result = (c1->value.altitude > c2->value.altitude) -
+        (c1->value.altitude < c2->value.altitude);
+    if (!result) {
+        result = (c1->entity > c2->entity) - (c1->entity < c2->entity);
+    }
+
+    return result;
+}
+
+/** Collect the CloudLayers of every scene with LUTs, sort them by altitude and compute the
+ * offsets of their wind at the total time.
+ *
+ * @param world The world
+ * @param a The state
+ */
+static void box_atmos_collect_clouds(
+    ecs_world_t *world,
+    box_render_atmos_t *a)
+{
+    int32_t i, j;
+    for (i = 0; i < ecs_vec_count(&a->scenes); i ++) {
+        ecs_vec_get_t(&a->scenes, box_atmos_scene_t, i)->cloud_count = 0;
+    }
+
+    ecs_iter_t it = ecs_query_iter(world, a->clouds);
+    while (ecs_query_next(&it)) {
+        const CloudLayer *values = ecs_field(&it, CloudLayer, 0);
+        for (i = 0; i < it.count; i ++) {
+            box_atmos_scene_t *s = box_atmos_find(a, box_render_scene_field(&it, 1, i));
+            if (s && s->seen) {
+                box_atmos_cloud_add(a, s, it.entities[i], &values[i]);
+            }
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&a->scenes); i ++) {
+        box_atmos_scene_t *s = ecs_vec_get_t(&a->scenes, box_atmos_scene_t, i);
+        qsort(s->clouds, (size_t)s->cloud_count, sizeof(box_atmos_cloud_t),
+            box_atmos_cloud_compare);
+        for (j = 0; j < s->cloud_count; j ++) {
+            box_atmos_cloud_t *c = &s->clouds[j];
+            LightCookie wind = {
+                .size = c->value.size,
+                .offset = { c->value.offset[0], c->value.offset[1] },
+                .velocity = { c->value.velocity[0], c->value.velocity[1] }
+            };
+            box_render_cookie_offset(&wind, a->time, c->offset);
+        }
+    }
+}
+
 /** Keep the LUTs of the scenes with a valid Atmosphere and destroy those of the other scenes.
  *
  * @param it The iterator of the system
@@ -246,6 +364,7 @@ static void BoxRenderExtractAtmosphere(
     const box_render_backend_t *backend = box_render_get_backend(world);
     box_render_packet_t *p = NULL;
     int32_t i;
+    a->time += (double)it->delta_time;
     if (!a->atmospheres && !ecs_vec_count(&a->scenes)) {
         goto done;
     }
@@ -277,6 +396,10 @@ static void BoxRenderExtractAtmosphere(
         }
     }
 
+    if (a->clouds) {
+        box_atmos_collect_clouds(world, a);
+    }
+
 done:
     return;
 }
@@ -301,6 +424,67 @@ static void box_atmos_view_fog(
             glm_vec3_scale(color, 1.0f / GLM_PIf, out->fog_moon);
             out->fog_moon[3] = 1.0f;
         }
+    }
+}
+
+/** Wrap a texture coordinate to [0, 1).
+ *
+ * @param v The coordinate
+ * @return The wrapped coordinate
+ */
+static float box_atmos_cloud_wrap(
+    double v)
+{
+    double w = v - floor(v);
+    float result = (float)w;
+
+    return result >= 1.0f ? 0.0f : result;
+}
+
+/** Write the cloud layers of a view that draws the sky: those with a size above 0 and a texture
+ * the backend has an image of, in the order of the scene.
+ *
+ * @param world The world
+ * @param s The LUTs of the scene of the view
+ * @param v The view
+ */
+static void box_atmos_view_clouds(
+    const ecs_world_t *world,
+    const box_atmos_scene_t *s,
+    box_render_view_t *v)
+{
+    const box_textures_t *textures = box_textures_get(world);
+    box_render_view_atmos_t *out = &v->atmos;
+    double x = v->camera_transform[3][0], z = v->camera_transform[3][2];
+    float camera_y = v->camera_transform[3][1];
+    int32_t i;
+    for (i = 0; i < s->cloud_count; i ++) {
+        const box_atmos_cloud_t *c = &s->clouds[i];
+        const CloudLayer *value = &c->value;
+        uint32_t handle = value->texture && value->size > 0
+            ? box_textures_handle(textures, value->texture)
+            : 0;
+        if (!handle) {
+            continue;
+        }
+
+        box_render_cloud_layer_t *l = &out->clouds[out->cloud_count ++];
+        double size = value->size;
+        l->texture = handle;
+        l->inv_size = 1.0f / value->size;
+        l->height = value->altitude - camera_y;
+        l->altitude = value->altitude;
+        l->offset[0] = c->offset[0];
+        l->offset[1] = c->offset[1];
+        l->origin[0] = box_atmos_cloud_wrap((x + (double)c->offset[0]) / size);
+        l->origin[1] = box_atmos_cloud_wrap((z + (double)c->offset[1]) / size);
+        l->threshold = value->threshold;
+        l->softness = glm_max(value->softness, 0.0f);
+        l->density = glm_max(value->density, 0.0f);
+        l->tint[0] = box_atmos_extract_linear(value->tint.r);
+        l->tint[1] = box_atmos_extract_linear(value->tint.g);
+        l->tint[2] = box_atmos_extract_linear(value->tint.b);
+        l->entity = c->entity;
     }
 }
 
@@ -360,6 +544,9 @@ static void box_atmos_view(
     box_atmos_view_fog(lights, v->scene, out);
     out->sky = view ? view->lighting.atmosphere : true;
     out->entity = s->entity;
+    if (out->sky) {
+        box_atmos_view_clouds(world, s, v);
+    }
 }
 
 /** Give every view of a scene with LUTs its atmosphere, after the light extract found the sun.
@@ -629,6 +816,23 @@ void box_render_atmosphere_import(
             .cache_kind = EcsQueryCacheAuto
         });
     }
+
+    if (a && !a->clouds) {
+        a->clouds = ecs_query(world, {
+            .entity = ecs_entity(world, { .name = "RenderCloudLayers" }),
+            .terms = {
+                { .id = ecs_id(CloudLayer), .inout = EcsIn },
+                {
+                    .id = ecs_id(Scene),
+                    .src.id = EcsSelf | EcsUp,
+                    .trav = EcsChildOf,
+                    .inout = EcsInOutNone,
+                    .oper = EcsOptional
+                }
+            },
+            .cache_kind = EcsQueryCacheAuto
+        });
+    }
 }
 
 int32_t box_render_atmosphere_version(
@@ -687,4 +891,21 @@ void box_render_atmos_transmittance_uv(
     float x_mu = d_max > d_min + 1e-6f ? (d - d_min) / (d_max - d_min) : 0.0f;
     uv[0] = glm_clamp(x_mu, 0.0f, 1.0f);
     uv[1] = glm_clamp(rho / glm_max(h, 1e-6f), 0.0f, 1.0f);
+}
+
+float box_render_cloud_coverage(
+    float t,
+    float threshold,
+    float softness)
+{
+    float ramp = glm_max(2.0f * softness, BOX_RENDER_CLOUD_MIN_RAMP);
+
+    return glm_clamp((t - threshold) / ramp + 0.5f, 0.0f, 1.0f);
+}
+
+float box_render_cloud_alpha(
+    float coverage,
+    float density)
+{
+    return glm_clamp(coverage * density, 0.0f, 1.0f);
 }

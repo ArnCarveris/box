@@ -141,8 +141,8 @@
 /** Shader handle of the engine shader of the forward pass that draws the meshes with a feature
  * the mesh shader lacks.
  *
- * Those are Transmission, a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or
- * DiffuseTransmission. */
+ * Those are Transmission, a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy,
+ * DiffuseTransmission or Fresnel. */
 #define BOX_RENDER_SHADER_MESH_EXTENDED (10)
 
 /** Check whether a shader handle is one of the two mesh shaders.
@@ -487,6 +487,23 @@ typedef struct box_render_view_shadows_t {
     uint32_t tiles;         /**< Tile records of that atlas */
 } box_render_view_shadows_t;
 
+/** A CloudLayer of the scene of a view, resolved for the sky pass of the view */
+typedef struct box_render_cloud_layer_t {
+    uint32_t texture;       /**< Backend handle of its texture */
+    float inv_size;         /**< One over the world units the texture repeats over */
+    float height;           /**< World Y of the layer minus that of the camera */
+    float altitude;         /**< World Y of the layer */
+    float offset[2];        /**< Offset plus velocity times the total time in world units,
+                             *   wrapped to [0, size) */
+    float origin[2];        /**< Texture coordinate of the camera: its world X and Z plus the
+                             *   offset over the size, wrapped to [0, 1) in double precision */
+    float threshold;        /**< Value at which the coverage is one half */
+    float softness;         /**< Half the range of values the coverage ramps over */
+    float density;          /**< Opacity of fully covered clouds */
+    float tint[3];          /**< Linear tint */
+    ecs_entity_t entity;    /**< Entity with the CloudLayer */
+} box_render_cloud_layer_t;
+
 /** What the sky view and aerial perspective passes of a view read besides the medium of the
  * atmosphere of its scene */
 typedef struct box_render_view_atmos_t {
@@ -516,6 +533,9 @@ typedef struct box_render_view_atmos_t {
     bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
                              *   the aerial perspective to its 3D meshes */
     ecs_entity_t entity;    /**< Entity with the Atmosphere of the scene of the view */
+    box_render_cloud_layer_t clouds[BOX_CLOUD_LAYER_MAX]; /**< The cloud layers with a loaded
+                             *   texture by ascending altitude, for views with sky */
+    int32_t cloud_count;    /**< Layers in clouds */
 } box_render_view_atmos_t;
 
 /** The environment a view is lit with, resolved from LightSettings.environment */
@@ -607,27 +627,28 @@ typedef struct box_render_view_gtao_t {
 #define BOX_RENDER_FEATURE_ANISOTROPY (1u << 8)
 #define BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION (1u << 9)
 #define BOX_RENDER_FEATURE_TRIPLANAR (1u << 10)
-#define BOX_RENDER_FEATURE_TRANSMISSION (1u << 11)
+#define BOX_RENDER_FEATURE_FRESNEL (1u << 11)
+#define BOX_RENDER_FEATURE_TRANSMISSION (1u << 12)
 
 /** Scene features of the mesh shaders without an override: the TextureBlend entry points of the
  * mesh shaders, and the alpha test and blend modes of the DrawKind */
-#define BOX_RENDER_FEATURE_TEXTURE_BLEND (1u << 12)
-#define BOX_RENDER_FEATURE_ALPHA_CUTOUT (1u << 13)
-#define BOX_RENDER_FEATURE_BLEND_MODES (1u << 14)
+#define BOX_RENDER_FEATURE_TEXTURE_BLEND (1u << 13)
+#define BOX_RENDER_FEATURE_ALPHA_CUTOUT (1u << 14)
+#define BOX_RENDER_FEATURE_BLEND_MODES (1u << 15)
 
 /** A view draws a depth prepass before its forward pass (LightSettings.depth_prepass), in the
  * features of a view only */
-#define BOX_RENDER_FEATURE_DEPTH_PREPASS (1u << 15)
+#define BOX_RENDER_FEATURE_DEPTH_PREPASS (1u << 16)
 
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
 /** The scene features that draw with the extended mesh shader */
-#define BOX_RENDER_FEATURE_MATERIALS (0x1FC0u)
+#define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u)
 
 /** The scene features that are overrides, which key the pipelines of the mesh shaders; the
  * transmission override follows the transmissive pipelines instead */
-#define BOX_RENDER_FEATURE_OVERRIDES (0x7FFu)
+#define BOX_RENDER_FEATURE_OVERRIDES (0xFFFu)
 
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
@@ -1122,7 +1143,14 @@ typedef struct box_render_material_t {
                              *   the record without one */
     float normal_offset[2]; /**< Wrapped TextureScroll.normal_velocity offset the normal map
                              *   adds to uv, 0 without one */
-    float pad[2];           /**< Zero, the record is a multiple of 16 bytes */
+    uint32_t fresnel_color[2]; /**< Fresnel.color in linear light as unorm16: r | g << 16,
+                             *   b | 0 << 16; 0 without one */
+    float fresnel_strength; /**< Fresnel.strength, 0 without one or when negative or not
+                             *   finite */
+    float fresnel_power;    /**< Fresnel.power, 0 without one or when negative or not finite */
+    float fresnel_bias;     /**< Fresnel.bias, 0 without one or when not finite */
+    float fresnel_opacity;  /**< Fresnel.opacity clamped to 0..1, 0 without one or when not
+                             *   finite */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

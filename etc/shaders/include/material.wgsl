@@ -53,7 +53,13 @@ struct Material {
     mapping_size: f32,
     // Wrapped TextureScroll.normal_velocity offset the normal map adds to its UVs, 0 without one
     normal_offset: vec2f,
-    pad: vec2f,
+    // Fresnel.color in linear light as unorm16 (unpack2x16unorm): r | g << 16, b | 0 << 16
+    fresnel_color: vec2u,
+    // Fresnel strength, power, bias and opacity (0..1), all 0 without one
+    fresnel_strength: f32,
+    fresnel_power: f32,
+    fresnel_bias: f32,
+    fresnel_opacity: f32,
 };
 
 // Below this weight a projection of a triplanar mapping is dropped and the others renormalized,
@@ -237,6 +243,14 @@ fn mapping_alpha(albedo: texture_2d<f32>, smp: sampler, uv: vec2f, mapped: f32, 
         alpha = textureSample(albedo, smp, at).a;
     }
     return alpha;
+}
+
+// Rim factor of a Fresnel: saturate(bias + pow(1 - saturate(ndv), power)), ndv the cosine
+// between the shading normal and the direction toward the camera. box_draws_fresnel_factor is
+// its C twin.
+fn fresnel_factor(ndv: f32, power: f32, bias: f32) -> f32 {
+    let x = max(1.0 - saturate(ndv), 1e-6);
+    return saturate(bias + pow(x, power));
 }
 
 // Display encoded color to linear light.

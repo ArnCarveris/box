@@ -57,6 +57,11 @@ void box_draws_transition_target(
         out->scroll = *material->scroll;
     }
 
+    if (material->fresnel) {
+        out->rimmed = true;
+        out->fresnel = *material->fresnel;
+    }
+
     out->time = material->time;
 
     if (material->transmission) {
@@ -215,6 +220,7 @@ static void box_draws_transition_parts(
             &material->sheen),
         .diffuse_transmission = box_draws_transition_part(material,
             BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, &material->diffuse_transmission),
+        .fresnel = material->rimmed ? &material->fresnel : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),
         .inherited = material->tinted ? &material->inherited : NULL,

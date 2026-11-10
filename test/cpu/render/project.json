@@ -71,7 +71,10 @@
                     "texture_blend_every_shape",
                     "texture_scroll_defaults",
                     "texture_scroll_pack",
-                    "texture_scroll_wrap"
+                    "texture_scroll_wrap",
+                    "fresnel_defaults",
+                    "fresnel_pack",
+                    "fresnel_factor"
                 ]
             },
             {
@@ -251,6 +254,18 @@
                     "packet_view_fog_light_without_lights",
                     "packet_view_moon_disk",
                     "packet_view_without_moon"
+                ]
+            },
+            {
+                "id": "CloudLayer",
+                "testcases": [
+                    "defaults",
+                    "coverage_remap",
+                    "packet_view_layer",
+                    "layer_on_atmosphere_entity",
+                    "offset_wraps_at_large_time",
+                    "layer_limit_and_order",
+                    "layers_of_other_scene_ignored"
                 ]
             },
             {
@@ -753,6 +768,9 @@
                     "clear_coat_off_draws_with_mesh_shader",
                     "specular_anisotropy_off_draws_with_mesh_shader",
                     "diffuse_transmission_off_draws_with_mesh_shader",
+                    "fresnel_draws_with_extended",
+                    "fresnel_off_draws_with_mesh_shader",
+                    "add_fresnel_moves_to_extended",
                     "one_enabled_feature_draws_with_extended",
                     "no_scene_features_draws_with_mesh_shader",
                     "alpha_cutoff_off_draws_opaque",

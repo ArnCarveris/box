@@ -1,0 +1,85 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {blend_modes: true, fresnel: true}
+}
+
+// The artistic rim of Fresnel, lit by a sun from above and a dim ambient, over a dark
+// floor. On the left a force field: a faint cyan blended sphere (Opacity 0.12) with a cyan
+// Fresnel of strength 3, power 3 and opacity 0.85, around an orange box that shows through its
+// clear middle while the field turns bright and solid toward its silhouette. In the middle an
+// opaque gray ball with the warm rim light of a stylized character (color 255, 170, 90,
+// strength 2, power 4), next to the same ball without a Fresnel on the right. In front, a green
+// selection glow on an opaque torus (power 2, bias 0.1), whose rim follows the tube.
+field {
+  Scene: {blend_modes: true, fresnel: true}
+  AmbientLight: {sky: {120, 130, 150}, ground: {30, 30, 30}, intensity: 0.4}
+
+  sun {
+    Rotation: {0.7, 2.7, 0}
+    DirectionalLight: {intensity: 3}
+  }
+
+  camera {
+    Position: {0, 2.2, 7}
+    Rotation: {-0.2, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {8, 10, 16, 255}}}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {14, 0.2, 10}
+    Rgb: {40, 40, 44}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  core {
+    Position: {-2.4, 1.2, 0}
+    Rotation: {0.4, 0.6, 0}
+    Box: {0.7, 0.7, 0.7}
+    Rgb: {230, 120, 40}
+    PbrMaterial: {roughness: 0.5}
+  }
+
+  force_field {
+    Position: {-2.4, 1.2, 0}
+    Sphere: {segments: 64, smooth: true, radius: 1.1}
+    Rgb: {60, 200, 255}
+    Opacity: {0.12}
+    PbrMaterial: {roughness: 0.2}
+    Fresnel: {color: {80, 220, 255}, strength: 3, power: 3, opacity: 0.85}
+  }
+
+  rim_ball {
+    Position: {0.4, 1.0, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.9}
+    Rgb: {110, 110, 120}
+    PbrMaterial: {roughness: 0.6}
+    Fresnel: {color: {255, 170, 90}, strength: 2, power: 4}
+  }
+
+  plain_ball {
+    Position: {2.6, 1.0, 0}
+    Sphere: {segments: 64, smooth: true, radius: 0.9}
+    Rgb: {110, 110, 120}
+    PbrMaterial: {roughness: 0.6}
+  }
+
+  selected {
+    Position: {1.5, 0.3, 2.3}
+    Rotation: {0.9, 0.3, 0}
+    Torus: {segments: 64, rings: 32, smooth: true, radius: 0.45, tube: 0.18}
+    Rgb: {70, 70, 80}
+    PbrMaterial: {roughness: 0.4}
+    Fresnel: {color: {90, 255, 120}, strength: 1.5, power: 2, bias: 0.1}
+  }
+}

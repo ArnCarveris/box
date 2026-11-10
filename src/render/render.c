@@ -244,6 +244,7 @@ uint32_t box_render_scene_features(
     result |= f->anisotropy ? BOX_RENDER_FEATURE_ANISOTROPY : 0u;
     result |= f->diffuse_transmission ? BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION : 0u;
     result |= f->triplanar ? BOX_RENDER_FEATURE_TRIPLANAR : 0u;
+    result |= f->fresnel ? BOX_RENDER_FEATURE_FRESNEL : 0u;
     result |= f->transmission ? BOX_RENDER_FEATURE_TRANSMISSION : 0u;
     result |= f->texture_blend ? BOX_RENDER_FEATURE_TEXTURE_BLEND : 0u;
     result |= f->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;

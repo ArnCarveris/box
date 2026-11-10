@@ -174,6 +174,30 @@ static void box_diffuse_transmission_ctor(
     }
 }
 
+/** Construct Fresnel values: a white rim of strength 1 and power 5, no bias nor opacity.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_fresnel_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Fresnel *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Fresnel){
+            .color = { 255, 255, 255 },
+            .strength = BOX_MATERIAL_FRESNEL_STRENGTH,
+            .power = BOX_MATERIAL_FRESNEL_POWER,
+            .bias = BOX_MATERIAL_FRESNEL_BIAS,
+            .opacity = BOX_MATERIAL_FRESNEL_OPACITY };
+    }
+}
+
 /** Construct Transmission values of a surface without volume: no transmission, the index of
  * refraction of glass and no absorption.
  *
@@ -275,6 +299,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Sheen);
     ECS_META_COMPONENT(world, DiffuseTransmission);
     ECS_META_COMPONENT(world, Emissive);
+    ECS_META_COMPONENT(world, Fresnel);
     ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
@@ -296,18 +321,20 @@ void BoxMaterialImport(
     ecs_set_hooks(world, TextureMapping, { .ctor = box_texture_mapping_ctor });
     ecs_set_hooks(world, TextureScroll, { .ctor = box_texture_scroll_ctor });
     ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
+    ecs_set_hooks(world, Fresnel, { .ctor = box_fresnel_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[12] = {
+    ecs_entity_t materials[13] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll)
+        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
+        ecs_id(Fresnel)
     };
     int32_t i;
-    for (i = 0; i < 12; i ++) {
+    for (i = 0; i < 13; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

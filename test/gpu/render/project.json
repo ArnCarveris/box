@@ -297,6 +297,17 @@
                 ]
             },
             {
+                "id": "Fresnel",
+                "testcases": [
+                    "red_rim_at_silhouette",
+                    "bias_lights_center",
+                    "opacity_raises_rim_alpha",
+                    "opacity_ignored_when_opaque",
+                    "scene_off_unchanged",
+                    "ignored_by_2d"
+                ]
+            },
+            {
                 "id": "TextureScroll",
                 "testcases": [
                     "shifts_checker",
@@ -1053,6 +1064,17 @@
                     "fog_with_other_atmosphere_uses_color",
                     "full_moon_lights_more_pixels_than_quarter",
                     "new_moon_draws_no_disk"
+                ]
+            },
+            {
+                "id": "AtmosphereClouds",
+                "testcases": [
+                    "white_layer_covers_sky",
+                    "density_zero_leaves_sky",
+                    "geometry_unchanged",
+                    "velocity_moves_pattern",
+                    "camera_above_sees_layer_below",
+                    "sunset_warmer_than_noon"
                 ]
             },
             {
