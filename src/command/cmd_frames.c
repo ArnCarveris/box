@@ -152,8 +152,8 @@ done:
     return;
 }
 
-/** The fps command: set App.fps, the target fps of flecs, when given a rate, else toggle the
- * fps panel.
+/** The fps command: set App.fps, which overrides FpsTarget, when given a rate and print the
+ * cap, else toggle the fps panel.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -187,6 +187,7 @@ static void box_cmd_fps(
 
     app->fps = (float)fps;
     ecs_singleton_modified(ctx->world, App);
+    fps = box_app_fps(ctx->world);
     if (fps > 0) {
         *(char**)result->ptr = flecs_asprintf("cap %g fps\n", fps);
     } else {

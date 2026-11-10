@@ -197,6 +197,101 @@ void FrameLoop_fps_caps_headless(void) {
     loop_fini(world);
 }
 
+void FrameLoop_fps_target_sets_target_fps(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, FpsTarget, { .value = 30 });
+    test_flt(ecs_get_world_info(world)->target_fps, 30);
+    test_flt(box_app_fps(world), 30);
+
+    ecs_singleton_set(world, FpsTarget, { .value = 0 });
+    test_flt(ecs_get_world_info(world)->target_fps, 0);
+    test_flt(box_app_fps(world), 0);
+
+    ecs_fini(world);
+}
+
+void FrameLoop_fps_target_removed(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, FpsTarget, { .value = 30 });
+    test_flt(ecs_get_world_info(world)->target_fps, 30);
+
+    ecs_singleton_remove(world, FpsTarget);
+    test_flt(ecs_get_world_info(world)->target_fps, 0);
+    test_flt(box_app_fps(world), 0);
+
+    ecs_singleton_set(world, FpsTarget, { .value = 30 });
+    ecs_singleton_set(world, App, { .fps = 45 });
+    ecs_singleton_remove(world, FpsTarget);
+    test_flt(ecs_get_world_info(world)->target_fps, 45);
+    test_flt(box_app_fps(world), 45);
+
+    ecs_fini(world);
+}
+
+void FrameLoop_app_fps_overrides_fps_target(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, App, { .fps = 60 });
+    ecs_singleton_set(world, FpsTarget, { .value = 30 });
+    test_flt(ecs_get_world_info(world)->target_fps, 60);
+    test_flt(box_app_fps(world), 60);
+
+    ecs_singleton_set(world, App, { .fps = 0 });
+    test_flt(ecs_get_world_info(world)->target_fps, 30);
+    test_flt(box_app_fps(world), 30);
+
+    ecs_singleton_set(world, App, { .fps = 20 });
+    test_flt(ecs_get_world_info(world)->target_fps, 20);
+
+    ecs_fini(world);
+}
+
+void FrameLoop_fps_target_from_scene(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = loop_world(0.002);
+    test_int(ecs_script_run(world, "scene",
+        "$ { box.app.FpsTarget: {40} }", NULL), 0);
+    test_flt(ecs_get_world_info(world)->target_fps, 40);
+
+    ecs_singleton_set(world, App, { .frames = 5, .no_audio = true });
+    test_int(box_app_run(world), 0);
+    test_flt(ecs_get_world_info(world)->target_fps, 40);
+    for (int i = 1; i < 5; i ++) {
+        test_assert(fabsf(loop_deltas[i] - 0.025f) < 1e-5f);
+    }
+
+    const FrameTiming *timing = ecs_singleton_get(world, FrameTiming);
+    test_assert(fabs(timing->target_ms - 25.0) < 1e-6);
+
+    loop_fini(world);
+}
+
+void FrameLoop_fps_target_change_while_running(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = loop_world(0.002);
+    loop_change_at = 2;
+    loop_change_fps = 0;
+    ecs_singleton_set(world, FpsTarget, { .value = 20 });
+    ecs_singleton_set(world, App, { .frames = 7, .fps = 50, .no_audio = true });
+
+    test_int(box_app_run(world), 0);
+    test_flt(ecs_get_world_info(world)->target_fps, 20);
+    test_assert(fabsf(loop_deltas[2] - 0.020f) < 1e-5f);
+    for (int i = 4; i < 7; i ++) {
+        test_assert(fabsf(loop_deltas[i] - 0.050f) < 1e-5f);
+    }
+
+    loop_fini(world);
+}
+
 void FrameLoop_headless_measures_delta(void) {
     // engine/builtin_frame_pacing
     ecs_world_t *world = loop_world(0.007);
