@@ -1087,3 +1087,82 @@ void MeshShader_scene_features_script(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MeshShader_texture_blend_draws_with_mesh_shader(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_entity_t layer = ecs_new(world);
+    ecs_set(world, layer, PbrTextures, {0});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {0, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    ecs_set(world, plain, TextureBlend, {.layers = {layer}});
+    ecs_entity_t cutout = ecs_new(world);
+    ecs_set(world, cutout, Position, {2, 0, 0});
+    ecs_set(world, cutout, Box, {1, 1, 1});
+    ecs_set(world, cutout, AlphaCutoff, {0.5f});
+    ecs_set(world, cutout, TextureBlend, {.layers = {layer}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *plain_slot = ecs_get(world, plain, DrawSlot);
+    test_assert(plain_slot != NULL && plain_slot->batch >= 0);
+    test_bool(box_draws_batch(d, plain_slot->batch)->key.texture_blend, true);
+    test_int(box_draws_batch(d, plain_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH);
+    const DrawSlot *cutout_slot = ecs_get(world, cutout, DrawSlot);
+    test_assert(cutout_slot != NULL && cutout_slot->batch >= 0);
+    test_bool(box_draws_batch(d, cutout_slot->batch)->key.texture_blend, true);
+    test_bool(box_draws_batch(d, cutout_slot->batch)->key.cutout, true);
+    test_int(box_draws_batch(d, cutout_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MeshShader_texture_blend_triplanar_draws_with_extended(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_entity_t layer = ecs_new(world);
+    ecs_set(world, layer, PbrTextures, {0});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, TextureBlend, {.layers = {layer}});
+    ecs_set(world, shape, TextureMapping, {.mode = MappingWorld, .size = 1, .blend = 0.5f});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    test_bool(box_draws_batch(d, shape_slot->batch)->key.texture_blend, true);
+    test_int(box_draws_batch(d, shape_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

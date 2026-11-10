@@ -1,11 +1,11 @@
 // Forward pass of the meshes the mesh shader does not draw (box_draws_extended): transmissive
-// (Transmission), with a TextureBlend, a triplanar TextureMapping, Sheen, ClearCoat,
-// SpecularAnisotropy or DiffuseTransmission.
+// (Transmission), with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or
+// DiffuseTransmission, with or without a TextureBlend.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
-#include "include/blend.wgsl"
+#include "include/mesh_blend.wgsl"
 
 // The material features of the scene (Scene) compile out the code of those it lacks; the alpha
 // test, the blend modes and the TextureBlend have no override. transmissive is set for the
@@ -16,17 +16,6 @@ override material_clear_coat: bool = true;
 override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
 override transmissive: bool = false;
-
-// Group 1 of fs_blend and fs_depth_cutout_blend besides emissive_map and material_sampler: the
-// albedo (decoded from sRGB), ORM and normal of each layer as a slice of an array, the mask as
-// stored, the uniforms (BlendUniforms of blend.wgsl) and the height of each layer in the red of
-// a slice, as stored (a one slice placeholder with a contrast of 0 or without height images).
-@group(1) @binding(5) var blend_albedo: texture_2d_array<f32>;
-@group(1) @binding(6) var blend_orm: texture_2d_array<f32>;
-@group(1) @binding(7) var blend_normal: texture_2d_array<f32>;
-@group(1) @binding(8) var blend_mask: texture_2d<f32>;
-@group(1) @binding(9) var<uniform> blending: BlendUniforms;
-@group(1) @binding(10) var blend_heights: texture_2d_array<f32>;
 
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
@@ -39,27 +28,6 @@ override transmissive: bool = false;
 // whatever lies behind it. A view without transmissive draws, and the captures, bind a 1x1
 // placeholder.
 @group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
-
-// Depth prepass of a lit view (box_gpu_draw_prepass_draws). fs_depth_cutout_blend discards what
-// fs_blend_cutout discards; the forward pass after the prepass does not alpha test, its Equal
-// depth test rejects those.
-@fragment fn fs_depth_cutout_blend(f: CutoutOut) {
-    let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv, cutout_scalars(f).w, f.object, f.object_normal);
-    if (f.alpha * albedo < cutout_scalars(f).x) {
-        discard;
-    }
-}
-
-@fragment fn fs_count_cutout_blend(f: CutoutOut) -> @location(0) vec4f {
-    let albedo = blend_alpha(blend_albedo, blend_mask, blend_heights, material_sampler, blending,
-        f.uv, cutout_scalars(f).w, f.object, f.object_normal);
-    if (f.alpha * albedo < cutout_scalars(f).x) {
-        discard;
-    }
-
-    return vec4f(0.0, 1.0, 0.0, 0.0);
-}
 
 // Texture layers apply on front faces; a plain back face keeps the material constants, is
 // unoccluded and faces the camera, except that an alpha tested one takes the albedo alpha, so its
@@ -170,35 +138,6 @@ fn blend_sample(uv: vec2f, gx: vec2f, gy: vec2f, w: vec4f, maps: bool) -> BlendS
             1.0);
     }
     o.normal = select(vec3f(0.0, 0.0, 1.0), normalize(m), dot(m, m) > 1e-12);
-    return o;
-}
-
-// The layers of a fragment of a TextureBlend without a triplanar blend. The derivatives of the
-// coordinates are taken before the layers branch on their weights. A back face samples only the
-// albedo of an alpha tested pipeline. Only called when vo_scalars(f).w (flat) is at most 1, so
-// the implicit derivatives hold.
-@diagnostic(off, derivative_uniformity)
-fn blend_layers(f: VertexOut, geometric: vec3f, front: bool) -> Layers {
-    var uv = f.uv.xy;
-    if (vo_scalars(f).w != 0.0) {
-        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
-    }
-    let gx = dpdx(uv);
-    let gy = dpdy(uv);
-    var o: Layers;
-    o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
-    o.frame = cotangent_frame(geometric, f.world, uv);
-    let w = blend_height_weights(blend_heights, material_sampler, blending,
-        blend_weights(textureSample(blend_mask, material_sampler, uv), blending), uv, gx, gy);
-    o.albedo = vec4f(0.0);
-    o.orm = vec3f(0.0);
-    o.normal = geometric;
-    if (front || kind.alpha_cutout != 0u) {
-        let b = blend_sample(uv, gx, gy, w, front);
-        o.albedo = b.albedo;
-        o.orm = b.orm;
-        o.normal = perturb(geometric, o.frame, b.normal);
-    }
     return o;
 }
 
@@ -688,7 +627,20 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 @fragment fn fs_blend_cutout(f: VertexOut, @builtin(front_facing) front: bool)
     -> @location(0) vec4f
 {
-    let s = surface_blend(f, front);
+    let geometric = normalize(f.normal);
+    var layers: Layers;
+    if (material_triplanar && vo_scalars(f).w > 1.0) {
+        layers = blend_triplanar(f, geometric, front);
+    } else {
+        let b = blend_fragment(f);
+        let albedo = blend_fragment_albedo(b);
+        if (f.color.a * albedo.a < vo_scalars(f).x) {
+            discard;
+        }
+        layers = blend_maps(geometric, b, albedo, front);
+    }
+
+    let s = surface_of(f, front, geometric, layers);
     if (s.alpha < vo_scalars(f).x) {
         discard;
     }

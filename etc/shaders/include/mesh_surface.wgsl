@@ -16,10 +16,10 @@ struct Frame {
 
 @diagnostic(off, derivative_uniformity)
 fn cotangent_frame(n: vec3f, p: vec3f, uv: vec2f) -> Frame {
-    let dp1 = dpdx(p);
-    let dp2 = dpdy(p);
-    let duv1 = dpdx(uv);
-    let duv2 = dpdy(uv);
+    return cotangent_frame_grad(n, dpdx(p), dpdy(p), dpdx(uv), dpdy(uv));
+}
+
+fn cotangent_frame_grad(n: vec3f, dp1: vec3f, dp2: vec3f, duv1: vec2f, duv2: vec2f) -> Frame {
     let dp2perp = cross(dp2, n);
     let dp1perp = cross(n, dp1);
     let t = dp2perp * duv1.x + dp1perp * duv2.x;
