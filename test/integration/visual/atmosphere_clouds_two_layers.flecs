@@ -1,0 +1,70 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// Two cloud layers in the afternoon: dense cumulus at 1.2 km over thin, soft cirrus at 7 km
+// with a wider tile and a slight blue tint. The low layer covers the high one wherever both
+// are in a ray, and the high one shows through the gaps.
+
+$ {
+  Scene: {aerial_perspective: true}
+}
+
+camera {
+  Position: {0, 2, 12}
+  Rotation: {0.45, 0.3, 0}
+  Camera: {fov: 70, far_: 0}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {0.7, 2.2, 0}
+  DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 100, sun: sun}
+}
+
+cumulus_noise {
+  TextureGen: {
+    width: 512, height: 512, seed: 3
+    layers: [
+      {kind: GenNoise, frequency: 12, octaves: 5, gain: 0.5}
+    ]
+  }
+}
+
+cirrus_noise {
+  TextureGen: {
+    width: 256, height: 256, seed: 19
+    layers: [
+      {kind: GenNoise, frequency: 2, octaves: 4, gain: 0.6}
+      {kind: GenNoise, frequency: 16, octaves: 2, amount: 0.3, seed: 1}
+    ]
+  }
+}
+
+cumulus {
+  CloudLayer: {texture: cumulus_noise, size: 1500, altitude: 120, threshold: 0.56, softness: 0.1}
+}
+
+cirrus {
+  CloudLayer: {texture: cirrus_noise, size: 2500, altitude: 700, threshold: 0.45, softness: 0.3, density: 0.6, tint: {225, 235, 255}}
+}
+
+ground {
+  Position: {0, -0.1, -4000}
+  Box: {12000, 0.2, 8100}
+  Rgb: {110, 130, 90}
+  PbrMaterial: {roughness: 0.9}
+}

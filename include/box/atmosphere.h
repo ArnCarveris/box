@@ -95,6 +95,49 @@ ECS_STRUCT(AtmosphereStatus, {
     char *error;             /**< Why nothing renders, such as an invalid value, NULL for none */
 });
 
+/** Layers of clouds a scene draws at most, see CloudLayer */
+#define BOX_CLOUD_LAYER_MAX (4)
+
+/** A horizontal plane of clouds at an altitude, drawn from a tileable texture in the sky of the
+ * Atmosphere of its scene. Place it on any entity of a scene with an Atmosphere, the entity of
+ * the Atmosphere or another one, one layer per entity.
+ *
+ * The sky pass draws the layers where no geometry is, so clouds are behind every mesh. A ray
+ * from the camera hits the plane y = altitude, ahead of the camera, at a point whose texture
+ * value t becomes the coverage c = saturate((t - threshold) / (2 * softness) + 0.5) and the
+ * opacity saturate(c * density). The cloud is lit by the sun and moon through the atmosphere,
+ * with a forward glow toward them, and by the sky, then fades into the haze with distance; a
+ * camera above the plane sees its top. Layers composite from far to near along each ray.
+ *
+ * A scene draws at most BOX_CLOUD_LAYER_MAX layers, the first ones by entity id; more are
+ * ignored with a warning. Only views that render the atmosphere (LightSettings.atmosphere)
+ * show clouds, not views with another environment as background; the environment cubemap of
+ * the Atmosphere and the reflection captures do not include them.
+ *
+ * size, altitude, offset and velocity mean what size, height, offset and velocity of a
+ * LightCookie with the Plane projection mean: a cookie on the sun with the same texture and
+ * values casts the shadows of these clouds, moving with them.
+ */
+ECS_STRUCT(CloudLayer, {
+    ecs_entity_t texture;   /**< Any texture entity, a TextureGen (GenHeight is ideal) or a
+                             *   TexturePath, whose red channel is read as stored; default 0 for
+                             *   none, no clouds until it is loaded */
+    float size;             /**< World units the texture repeats over, default 4000; none at or
+                             *   below 0 */
+    float altitude;         /**< World Y of the layer, default 1500 */
+    vec2 offset;            /**< World units the pattern is moved by along world X and Z, the
+                             *   texture read at (x + offset) / size, default 0 */
+    vec2 velocity;          /**< Wind: world units per second the pattern moves along X and Z,
+                             *   default 0; offset plus velocity times the total time is
+                             *   computed in double precision and wrapped to size */
+    float threshold;        /**< Value at which the coverage is one half, default 0.55 */
+    float softness;         /**< Half the range of values the coverage ramps over, default
+                             *   0.15; 0 is a hard step at threshold */
+    float density;          /**< Opacity of fully covered clouds, default 1, 0 for none */
+    rgb tint;               /**< Display encoded color the lit cloud is multiplied by, default
+                             *   {255, 255, 255} */
+});
+
 /** Time of day of a scene, placed on a Scene root or as a singleton for the default scene.
  * Adding it adds TimeOfDayStatus, removing it removes it.
  *

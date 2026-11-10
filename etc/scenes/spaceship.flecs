@@ -15,6 +15,7 @@ using box.controllers
 using assets
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, environment: true, alpha_cutout: true,
     transmission: true, triplanar: true, sheen: true, clear_coat: true, anisotropy: true}
   AmbientLight: {sky: {130, 165, 195}, ground: {45, 65, 88}, intensity: 0.65}

@@ -83,6 +83,9 @@
  * view */
 #define BOX_RENDER_SHADER_DEBUG_OVERDRAW (55)
 
+/** Shader handle of the engine shader of the color grading pass */
+#define BOX_RENDER_SHADER_GRADING (56)
+
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most; the bake
  * warns once about a volume with more for the first view that shows it */
 #define BOX_RENDER_DEBUG_PROBES_MAX (65536)
@@ -481,6 +484,23 @@ typedef struct box_render_view_shadows_t {
     uint32_t tiles;         /**< Tile records of that atlas */
 } box_render_view_shadows_t;
 
+/** A CloudLayer of the scene of a view, resolved for the sky pass of the view */
+typedef struct box_render_cloud_layer_t {
+    uint32_t texture;       /**< Backend handle of its texture */
+    float inv_size;         /**< One over the world units the texture repeats over */
+    float height;           /**< World Y of the layer minus that of the camera */
+    float altitude;         /**< World Y of the layer */
+    float offset[2];        /**< Offset plus velocity times the total time in world units,
+                             *   wrapped to [0, size) */
+    float origin[2];        /**< Texture coordinate of the camera: its world X and Z plus the
+                             *   offset over the size, wrapped to [0, 1) in double precision */
+    float threshold;        /**< Value at which the coverage is one half */
+    float softness;         /**< Half the range of values the coverage ramps over */
+    float density;          /**< Opacity of fully covered clouds */
+    float tint[3];          /**< Linear tint */
+    ecs_entity_t entity;    /**< Entity with the CloudLayer */
+} box_render_cloud_layer_t;
+
 /** What the sky view and aerial perspective passes of a view read besides the medium of the
  * atmosphere of its scene */
 typedef struct box_render_view_atmos_t {
@@ -510,6 +530,9 @@ typedef struct box_render_view_atmos_t {
     bool sky;               /**< LightSettings.atmosphere: the view draws the sky and applies
                              *   the aerial perspective to its 3D meshes */
     ecs_entity_t entity;    /**< Entity with the Atmosphere of the scene of the view */
+    box_render_cloud_layer_t clouds[BOX_CLOUD_LAYER_MAX]; /**< The cloud layers with a loaded
+                             *   texture by ascending altitude, for views with sky */
+    int32_t cloud_count;    /**< Layers in clouds */
 } box_render_view_atmos_t;
 
 /** The environment a view is lit with, resolved from LightSettings.environment */
@@ -545,6 +568,26 @@ typedef struct box_render_fog_volume_t {
     float light_inscatter;  /**< FogVolume.light_inscatter, at least 0 */
     float pad[2];           /**< Pads the record to the 16 byte stride of its WGSL array */
 } box_render_fog_volume_t;
+
+/** A PlanarReflection a view renders a mirrored image of, resolved by the extract
+ * (planar_reflections.c). The planes and matrices are in world space. */
+typedef struct box_render_planar_t {
+    ecs_entity_t entity;    /**< Entity with the PlanarReflection */
+    int32_t slot;           /**< Slot of the reflection in its view, 0 for the plane nearest to
+                             *   the camera, below BOX_PLANAR_REFLECTION_MAX */
+    float plane[4];         /**< Unit normal, the local +Y of the entity, and minus its dot with
+                             *   the position: positive on the front side */
+    float clip[4];          /**< The plane moved by PlanarReflection.clip_offset against its
+                             *   normal, which keeps what is on its positive side */
+    mat4 reflection;        /**< Mirrors a point about the plane */
+    mat4 view_matrix;       /**< View matrix of the mirrored camera: the view matrix of the view
+                             *   times the reflection */
+    float camera[3];        /**< World position of the mirrored camera */
+    float resolution;       /**< PlanarReflection.resolution, 0.125 to 1 */
+    uint32_t exclude_page;  /**< Handle of the transform stream of the instance page of the shape
+                             *   of the entity, which the reflection does not draw, 0 for none */
+    uint32_t exclude_slot;  /**< Slot of that shape in the page */
+} box_render_planar_t;
 
 /** Noise scales over which the noise of a fog volume repeats: the coarse sample repeats every
  * scale and the detail sample, at 3.1 times it, every 10 */
@@ -652,6 +695,10 @@ typedef struct box_render_view_t {
                                  *   prepass */
     uint32_t scene_features;    /**< BOX_RENDER_FEATURE_* features of its scene, which key the
                                  *   pipelines of its batches */
+    int32_t planar_first;       /**< Index of the first planar reflection of the view in the
+                                 *   packet */
+    int32_t planar_count;       /**< Planar reflections the view renders, nearest first, at most
+                                 *   BOX_PLANAR_REFLECTION_MAX */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -660,8 +707,18 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_EXPOSURE, /**< AutoExposure on its own: scales by the adapted exposure */
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
     BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
-    BOX_RENDER_EFFECT_SMAA      /**< Smaa */
+    BOX_RENDER_EFFECT_SMAA,     /**< Smaa */
+    BOX_RENDER_EFFECT_GRADING   /**< ColorGrading */
 } box_render_effect_kind_t;
+
+/** Resolved settings of a color grading pass */
+typedef struct box_render_grading_t {
+    ColorGrading settings;      /**< Clamped settings, lut is the entity */
+    uint32_t lut;               /**< Texture handle of a strip LUT of a valid shape, 0 for none */
+    int32_t lut_size;           /**< Slices of the LUT, its height, 0 for none */
+    bool display;               /**< A Tonemap of the view runs before it, so the input is in
+                                 *   display range */
+} box_render_grading_t;
 
 /** An effect pass of a view with its settings resolved, in the order of View.effects */
 typedef struct box_render_effect_t {
@@ -673,6 +730,7 @@ typedef struct box_render_effect_t {
     Bloom bloom;                /**< Resolved settings of a bloom pass */
     HeightFog fog;              /**< Resolved settings of a fog pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
+    box_render_grading_t grading; /**< Resolved settings of a color grading pass */
 } box_render_effect_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -1390,7 +1448,7 @@ typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
-    float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
+    float fps;              /**< Frame rate cap of the frame, box_app_fps, 0 uncapped */
     bool headless;          /**< App.headless: the frame waits for the pipelines it draws
                              *   with, so its output does not depend on how long they take */
     bool vsync;             /**< A window target of the frame presents with vsync */
@@ -1414,6 +1472,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t shadow_atlases; /**< box_render_shadow_atlas_t, the atlases with tiles */
     ecs_vec_t shadow_tiles; /**< box_render_shadow_tile_t of those atlases */
     ecs_vec_t fog_volumes;  /**< box_render_fog_volume_t, the fog volumes of the views */
+    ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
+                             *   views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
                              *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */

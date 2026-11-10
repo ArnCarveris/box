@@ -1942,6 +1942,7 @@ bool box_gpu_capture_pending(
     const char *path);
 
 #include "gpu_cull.h"
+#include "gpu_planar.h"
 
 #endif
 

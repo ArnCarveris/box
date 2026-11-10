@@ -1,0 +1,72 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.texture
+using box.effects
+
+tonemap {
+  Tonemap: {}
+}
+
+sepia_lut {
+  TexturePath: {path: "test/assets/luts/sepia_16.png"}
+}
+
+// A warm, contrasty look with lifted blue shadows, partly through a sepia LUT
+grading {
+  ColorGrading: {
+    temperature: 0.35, tint: 0.05, exposure: 0.2, contrast: 1.2, saturation: 1.1, vibrance: 0.4,
+    lift: {0, 0.01, 0.03}, gamma: {1, 1, 1.05}, gain: {1.05, 1, 0.95},
+    lut: sepia_lut, lut_strength: 0.35
+  }
+}
+
+camera {
+  Position: {0, 3, 9}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 220, 255}}, effects: [{effect: tonemap}, {effect: grading}]}
+}
+
+sun {
+  Rotation: {0.5848, 2.4751, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {180, 180, 170}
+}
+
+// A hue sweep of muted and saturated spheres, which vibrance treats differently
+for i in 0..6 {
+  {
+    Position: {i * 1.6 - 4, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {255 - i * 40, 60 + i * 30, 40 + i * 35}
+    PbrMaterial: {roughness: 0.3}
+  }
+}
+
+for i in 0..4 {
+  {
+    Position: {i * 1.6 - 2.4, 0.4, 2.2}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {150 + i * 20, 140, 130 - i * 15}
+  }
+}
+
+white_box {
+  Position: {-3.5, 0.75, 2}
+  Rotation: {0, 0.5, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+}

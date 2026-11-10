@@ -1,7 +1,7 @@
 /**
  * @file Effects.c
- * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog and SMAA, and for
- * the ambient occlusion (Gtao) of the indirect light.
+ * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog, SMAA and color
+ * grading, and for the ambient occlusion (Gtao) of the indirect light.
  *
  * Most cases render an unlit view (a C literal View) from 5 units in front of the origin into
  * a 64x64 capture; a unit cube at the origin covers columns 26 to 38 of the middle row.
@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
+#include "../texture/texture.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -2211,5 +2212,768 @@ void Effects_smaa_follows_surface_resize(void) {
 
     stbi_image_free(px);
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Columns of the middle row of the color grading scene: a muted orange, a grey and a saturated
+ * red cube, and the black background */
+#define GRADING_MUTED (15)
+#define GRADING_GREY (32)
+#define GRADING_RED (49)
+#define GRADING_BACKGROUND (2)
+
+/** Create the color grading scene: an unlit view without effects and three emissive cubes of
+ * strength 1, a muted orange, a grey and a saturated red, into a 64x64 capture.
+ *
+ * @param camera Receives the camera
+ * @param view Receives the view
+ * @param file File name of the capture in the temporary folder
+ * @return The world
+ */
+static ecs_world_t* grading_world(
+    ecs_entity_t *camera,
+    ecs_entity_t *view,
+    const char *file)
+{
+    ecs_world_t *world = effects_world(camera);
+    *view = ecs_new(world);
+    smaa_view_set(world, *view, *camera, true, NULL, 0);
+    effects_cube(world, -1.5f, 1, 1, (Rgb){200, 150, 130});
+    effects_cube(world, 0, 1, 1, (Rgb){128, 128, 128});
+    effects_cube(world, 1.5f, 1, 1, (Rgb){230, 40, 40});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64,
+        .write_to_file = ECS_CONST_CAST(char*, file),
+        .resolution_scale = 1});
+
+    return world;
+}
+
+/** Create an effect entity with color grading settings, starting from the defaults.
+ *
+ * @param world The world
+ * @param value The settings
+ * @return The entity
+ */
+static ecs_entity_t grading_effect(
+    ecs_world_t *world,
+    const ColorGrading *value)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set_ptr(world, result, ColorGrading, value);
+
+    return result;
+}
+
+/** Get the default color grading settings.
+ *
+ * @return The settings a constructed ColorGrading has
+ */
+static ColorGrading grading_defaults(void) {
+    return (ColorGrading){
+        .contrast = 1, .saturation = 1, .gamma = {1, 1, 1}, .gain = {1, 1, 1},
+        .lut_strength = 1
+    };
+}
+
+/** Set the effects of the view and render frames, enough for a LUT texture to load.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param effects The effect entities, in order
+ * @param count Number of effects
+ * @param file File name of the capture
+ * @return The RGBA pixels, freed with ecs_os_free
+ */
+static unsigned char* grading_frame(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    const ecs_entity_t *effects,
+    int32_t count,
+    const char *file)
+{
+    smaa_view_set(world, view, camera, true, effects, count);
+    ecs_progress(world, 1.0f / 60);
+
+    return smaa_frame(world, file);
+}
+
+/** Get a pixel of the middle row of a 64x64 capture.
+ *
+ * @param px The pixels
+ * @param x The column
+ * @return The pixel
+ */
+static const unsigned char* grading_px(
+    const unsigned char *px,
+    int32_t x)
+{
+    return &px[(32 * 64 + x) * 4];
+}
+
+/** Get the largest difference of a channel between two 64x64 captures.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @return The largest difference
+ */
+static int grading_diff(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t i;
+    int result = 0;
+    for (i = 0; i < 64 * 64 * 4; i ++) {
+        result = glm_imax(result, abs((int)a[i] - (int)b[i]));
+    }
+
+    return result;
+}
+
+void Effects_color_grading_default_settings(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, ColorGrading);
+    const ColorGrading *g = ecs_get(world, e, ColorGrading);
+    test_flt(g->temperature, 0);
+    test_flt(g->tint, 0);
+    test_flt(g->exposure, 0);
+    test_flt(g->contrast, 1);
+    test_flt(g->saturation, 1);
+    test_flt(g->vibrance, 0);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        test_flt(g->lift[i], 0);
+        test_flt(g->gamma[i], 1);
+        test_flt(g->gain[i], 1);
+    }
+
+    test_uint(g->lut, 0);
+    test_flt(g->lut_strength, 1);
+
+    ColorGrading resolved;
+    box_render_grading_settings(g, &resolved);
+    test_flt(resolved.contrast, 1);
+    test_flt(resolved.saturation, 1);
+    test_flt(resolved.gamma[1], 1);
+    test_flt(resolved.lut_strength, 1);
+
+    float m[3][3];
+    box_render_grading_balance(&resolved, m);
+    int32_t j;
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 3; j ++) {
+            test_flt(m[i][j], i == j ? 1.0f : 0.0f);
+        }
+    }
+
+    test_assert(ecs_script_run(world, "grading", "using box.effects\n"
+        "look { ColorGrading: {} }\n", NULL) == 0);
+    const ColorGrading *scripted = ecs_get(world, ecs_lookup(world, "look"), ColorGrading);
+    test_assert(scripted != NULL);
+    test_flt(scripted->contrast, 1);
+    test_flt(scripted->saturation, 1);
+    test_flt(scripted->gamma[2], 1);
+    test_flt(scripted->gain[0], 1);
+    test_flt(scripted->lut_strength, 1);
+
+    ecs_fini(world);
+}
+
+void Effects_color_grading_settings_clamped(void) {
+    // lighting/effects
+    ColorGrading out;
+    box_render_grading_settings(&(ColorGrading){.contrast = -1, .saturation = -2,
+        .vibrance = -3, .gamma = {0, -1, 0.5f}, .lut_strength = 2}, &out);
+    test_flt(out.contrast, 0);
+    test_flt(out.saturation, 0);
+    test_flt(out.vibrance, -1);
+    test_flt(out.gamma[0], 0.01f);
+    test_flt(out.gamma[1], 0.01f);
+    test_flt(out.gamma[2], 0.5f);
+    test_flt(out.lut_strength, 1);
+
+    box_render_grading_settings(&(ColorGrading){.contrast = 1.5f, .saturation = 3,
+        .vibrance = 2, .temperature = 4, .gamma = {2, 2, 2}, .lut_strength = -1}, &out);
+    test_flt(out.contrast, 1.5f);
+    test_flt(out.saturation, 3);
+    test_flt(out.vibrance, 2);
+    test_flt(out.temperature, 4);
+    test_flt(out.lut_strength, 0);
+}
+
+void Effects_color_grading_defaults_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_default.png");
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_default.png");
+    ecs_entity_t grading = ecs_new(world);
+    ecs_add(world, grading, ColorGrading);
+    unsigned char *graded = grading_frame(world, view, camera, &grading, 1,
+        "grading_default.png");
+    test_assert(grading_px(base, GRADING_GREY)[0] > 100);
+    test_assert(grading_diff(base, graded) <= 1);
+
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t chain[2] = {tonemap, grading};
+    unsigned char *tonemapped = grading_frame(world, view, camera, chain, 1,
+        "grading_default.png");
+    unsigned char *both = grading_frame(world, view, camera, chain, 2, "grading_default.png");
+    test_assert(grading_diff(tonemapped, both) <= 1);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(graded);
+    ecs_os_free(tonemapped);
+    ecs_os_free(both);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_zero_literal_applies_as_set(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_zero.png");
+    ecs_entity_t grading = ecs_new(world);
+    ecs_set(world, grading, ColorGrading, {0});
+    unsigned char *px = grading_frame(world, view, camera, &grading, 1, "grading_zero.png");
+    int32_t x, c;
+    for (x = 0; x < 64; x ++) {
+        for (c = 0; c < 3; c ++) {
+            test_assert(grading_px(px, x)[c] < 2);
+        }
+    }
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_temperature_warms(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_temperature.png");
+    ColorGrading value = grading_defaults();
+    value.temperature = 0.5f;
+    ecs_entity_t warm = grading_effect(world, &value);
+    value.temperature = -0.5f;
+    ecs_entity_t cool = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_temperature.png");
+    unsigned char *w = grading_frame(world, view, camera, &warm, 1, "grading_temperature.png");
+    unsigned char *k = grading_frame(world, view, camera, &cool, 1, "grading_temperature.png");
+    const unsigned char *grey = grading_px(base, GRADING_GREY);
+    const unsigned char *gw = grading_px(w, GRADING_GREY);
+    const unsigned char *gk = grading_px(k, GRADING_GREY);
+    test_assert(abs((int)grey[0] - (int)grey[2]) <= 1);
+    test_assert(gw[0] > gw[2] + 4);
+    test_assert(gw[0] > grey[0]);
+    test_assert(gw[2] < grey[2]);
+    test_assert(gk[2] > gk[0] + 4);
+    test_assert(gk[2] > grey[2]);
+    test_assert(gk[0] < grey[0]);
+    test_assert(grading_px(w, GRADING_BACKGROUND)[0] < 2);
+
+    ecs_os_free(base);
+    ecs_os_free(w);
+    ecs_os_free(k);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_tint_magenta(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_tint.png");
+    ColorGrading value = grading_defaults();
+    value.tint = 0.5f;
+    ecs_entity_t magenta = grading_effect(world, &value);
+    value.tint = -0.5f;
+    ecs_entity_t green = grading_effect(world, &value);
+    unsigned char *m = grading_frame(world, view, camera, &magenta, 1, "grading_tint.png");
+    unsigned char *g = grading_frame(world, view, camera, &green, 1, "grading_tint.png");
+    const unsigned char *gm = grading_px(m, GRADING_GREY);
+    const unsigned char *gg = grading_px(g, GRADING_GREY);
+    test_assert(gm[1] + 4 < gm[0]);
+    test_assert(gm[1] + 4 < gm[2]);
+    test_assert(gg[1] > gg[0] + 4);
+    test_assert(gg[1] > gg[2] + 4);
+
+    ecs_os_free(m);
+    ecs_os_free(g);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_exposure_scales(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_exposure.png");
+    ColorGrading value = grading_defaults();
+    value.exposure = 1;
+    ecs_entity_t brighter = grading_effect(world, &value);
+    value.exposure = -1;
+    ecs_entity_t darker = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_exposure.png");
+    unsigned char *b = grading_frame(world, view, camera, &brighter, 1, "grading_exposure.png");
+    unsigned char *d = grading_frame(world, view, camera, &darker, 1, "grading_exposure.png");
+    float grey = effects_linear(grading_px(base, GRADING_GREY)[1]);
+    test_assert(abs((int)grading_px(b, GRADING_GREY)[1] - effects_srgb8(grey * 2)) <= 2);
+    test_assert(abs((int)grading_px(d, GRADING_GREY)[1] - effects_srgb8(grey * 0.5f)) <= 2);
+    test_assert(grading_px(b, GRADING_BACKGROUND)[1] < 2);
+
+    ecs_os_free(base);
+    ecs_os_free(b);
+    ecs_os_free(d);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_contrast_hdr(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_contrast.png");
+    ColorGrading value = grading_defaults();
+    value.contrast = 1.5f;
+    ecs_entity_t grading = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_contrast.png");
+    unsigned char *px = grading_frame(world, view, camera, &grading, 1, "grading_contrast.png");
+    // Around a middle grey of 0.18: the red channel of the muted cube (0.58) brightens, its
+    // blue channel (0.22) barely moves and the green and blue of the red cube (0.02) darken
+    const unsigned char *muted = grading_px(px, GRADING_MUTED);
+    const unsigned char *red = grading_px(px, GRADING_RED);
+    test_assert(muted[0] > grading_px(base, GRADING_MUTED)[0]);
+    test_assert(red[1] < grading_px(base, GRADING_RED)[1]);
+    test_assert(red[2] < grading_px(base, GRADING_RED)[2]);
+    float in = effects_linear(grading_px(base, GRADING_GREY)[1]);
+    float expected = 0.18f * powf(in / 0.18f, 1.5f);
+    test_assert(abs((int)grading_px(px, GRADING_GREY)[1] - effects_srgb8(expected)) <= 2);
+    test_assert(grading_px(px, GRADING_BACKGROUND)[0] < 2);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_contrast_display(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_contrast_ldr.png");
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ColorGrading value = grading_defaults();
+    value.contrast = 1.5f;
+    ecs_entity_t grading = grading_effect(world, &value);
+    ecs_entity_t chain[2] = {tonemap, grading};
+    unsigned char *base = grading_frame(world, view, camera, chain, 1,
+        "grading_contrast_ldr.png");
+    unsigned char *px = grading_frame(world, view, camera, chain, 2, "grading_contrast_ldr.png");
+    // After the Tonemap contrast pivots around 0.5: linear 0.22 of the grey cube darkens
+    float in = effects_linear(grading_px(base, GRADING_GREY)[1]);
+    float expected = glm_max((in - 0.5f) * 1.5f + 0.5f, 0.0f);
+    test_assert(in < 0.5f);
+    test_assert(abs((int)grading_px(px, GRADING_GREY)[1] - effects_srgb8(expected)) <= 2);
+    test_assert(grading_px(px, GRADING_GREY)[1] < grading_px(base, GRADING_GREY)[1]);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_saturation(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_saturation.png");
+    ColorGrading value = grading_defaults();
+    value.saturation = 0;
+    ecs_entity_t grey = grading_effect(world, &value);
+    value.saturation = 1.5f;
+    ecs_entity_t vivid = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_saturation.png");
+    unsigned char *g = grading_frame(world, view, camera, &grey, 1, "grading_saturation.png");
+    unsigned char *v = grading_frame(world, view, camera, &vivid, 1, "grading_saturation.png");
+    const unsigned char *muted = grading_px(g, GRADING_MUTED);
+    test_assert(abs((int)muted[0] - (int)muted[1]) <= 1);
+    test_assert(abs((int)muted[0] - (int)muted[2]) <= 1);
+    const unsigned char *in = grading_px(base, GRADING_MUTED);
+    float luma = effects_linear(in[0]) * 0.2126f + effects_linear(in[1]) * 0.7152f +
+        effects_linear(in[2]) * 0.0722f;
+    test_assert(abs((int)muted[1] - effects_srgb8(luma)) <= 2);
+    test_assert(effects_saturation(grading_px(v, GRADING_MUTED)) >
+        effects_saturation(in) + 0.05f);
+    // Grey and black stay as they are
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs((int)grading_px(v, GRADING_GREY)[c] -
+            (int)grading_px(base, GRADING_GREY)[c]) <= 1);
+        test_assert(grading_px(v, GRADING_BACKGROUND)[c] < 2);
+    }
+
+    ecs_os_free(base);
+    ecs_os_free(g);
+    ecs_os_free(v);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_vibrance_favors_muted(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_vibrance.png");
+    ColorGrading value = grading_defaults();
+    value.vibrance = 1;
+    ecs_entity_t grading = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_vibrance.png");
+    unsigned char *px = grading_frame(world, view, camera, &grading, 1, "grading_vibrance.png");
+    float muted = effects_saturation(grading_px(px, GRADING_MUTED)) -
+        effects_saturation(grading_px(base, GRADING_MUTED));
+    float red = effects_saturation(grading_px(px, GRADING_RED)) -
+        effects_saturation(grading_px(base, GRADING_RED));
+    test_assert(muted > 0.05f);
+    test_assert(muted > red);
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs((int)grading_px(px, GRADING_GREY)[c] -
+            (int)grading_px(base, GRADING_GREY)[c]) <= 1);
+    }
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_lift_gamma_gain(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_lgg.png");
+    ColorGrading value = grading_defaults();
+    glm_vec3_copy((vec3){1, 0.5f, 0.5f}, value.gain);
+    ecs_entity_t gain = grading_effect(world, &value);
+    value = grading_defaults();
+    glm_vec3_copy((vec3){0, 0, 0.1f}, value.lift);
+    ecs_entity_t lift = grading_effect(world, &value);
+    value = grading_defaults();
+    glm_vec3_copy((vec3){2, 2, 2}, value.gamma);
+    ecs_entity_t gamma = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_lgg.png");
+    unsigned char *a = grading_frame(world, view, camera, &gain, 1, "grading_lgg.png");
+    unsigned char *b = grading_frame(world, view, camera, &lift, 1, "grading_lgg.png");
+    unsigned char *c = grading_frame(world, view, camera, &gamma, 1, "grading_lgg.png");
+    float grey = effects_linear(grading_px(base, GRADING_GREY)[0]);
+
+    // Gain halves green and blue, keeps red
+    const unsigned char *ga = grading_px(a, GRADING_GREY);
+    test_assert(abs((int)ga[0] - (int)grading_px(base, GRADING_GREY)[0]) <= 1);
+    test_assert(abs((int)ga[1] - effects_srgb8(grey * 0.5f)) <= 2);
+
+    // Lift adds to every pixel, the black background turns blue
+    const unsigned char *bg = grading_px(b, GRADING_BACKGROUND);
+    test_assert(bg[0] < 2);
+    test_assert(abs((int)bg[2] - effects_srgb8(0.1f)) <= 2);
+
+    // Gamma 2 is a square root
+    test_assert(abs((int)grading_px(c, GRADING_GREY)[1] - effects_srgb8(sqrtf(grey))) <= 2);
+    test_assert(grading_px(c, GRADING_BACKGROUND)[1] < 2);
+
+    ecs_os_free(base);
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_os_free(c);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_disabled_entry_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_disabled.png");
+    ColorGrading value = grading_defaults();
+    value.saturation = 0;
+    value.exposure = 2;
+    ecs_entity_t grading = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_disabled.png");
+    View v = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+    ecs_vec_init_t(NULL, &v.effects, ViewEffect, 1);
+    *ecs_vec_append_t(NULL, &v.effects, ViewEffect) = (ViewEffect){
+        .enabled = false, .effect = grading };
+    ecs_set_ptr(world, view, View, &v);
+    ecs_vec_fini_t(NULL, &v.effects, ViewEffect);
+    unsigned char *px = smaa_frame(world, "grading_disabled.png");
+    test_assert(grading_diff(base, px) <= 1);
+
+    ecs_add_id(world, grading, EcsDisabled);
+    unsigned char *off = grading_frame(world, view, camera, &grading, 1,
+        "grading_disabled.png");
+    test_assert(grading_diff(base, off) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_os_free(off);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_same_entity_after_tonemap(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_order.png");
+    ColorGrading value = grading_defaults();
+    value.contrast = 2;
+    value.saturation = 0.5f;
+    ecs_entity_t both = grading_effect(world, &value);
+    ecs_add(world, both, Tonemap);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t grading = grading_effect(world, &value);
+    ecs_entity_t chain[2] = {tonemap, grading};
+    ecs_entity_t reversed[2] = {grading, tonemap};
+    unsigned char *a = grading_frame(world, view, camera, &both, 1, "grading_order.png");
+    unsigned char *b = grading_frame(world, view, camera, chain, 2, "grading_order.png");
+    unsigned char *c = grading_frame(world, view, camera, reversed, 2, "grading_order.png");
+    test_assert(grading_diff(a, b) <= 1);
+    test_assert(grading_diff(a, c) > 8);
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_os_free(c);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_follows_surface_resize(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_resize.png");
+    ColorGrading value = grading_defaults();
+    value.saturation = 0;
+    ecs_entity_t grading = grading_effect(world, &value);
+    smaa_view_set(world, view, camera, true, &grading, 1);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_iter_t it = ecs_each(world, Surface);
+    ecs_entity_t surface = 0;
+    while (ecs_each_next(&it)) {
+        surface = it.entities[0];
+    }
+
+    test_assert(surface != 0);
+    ecs_set(world, surface, Surface, {.width = 128, .height = 64, .resolution_scale = 2,
+        .write_to_file = "grading_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, surface, Surface, {.width = 96, .height = 48, .resolution_scale = 0.5f,
+        .write_to_file = "grading_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/grading_resize.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 96);
+    test_int(h, 48);
+    // The red cube right of the middle is grey
+    const unsigned char *red = &px[(24 * 96 + 60) * 4];
+    test_assert(red[0] > 20);
+    test_assert(abs((int)red[0] - (int)red[1]) <= 1);
+    test_assert(abs((int)red[0] - (int)red[2]) <= 1);
+    test_assert(px[(2 * 96 + 2) * 4] < 2);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Create a texture entity that loads a strip LUT of test/assets/luts.
+ *
+ * @param world The world
+ * @param file File name in test/assets/luts
+ * @return The texture entity
+ */
+static ecs_entity_t grading_lut(
+    ecs_world_t *world,
+    const char *file)
+{
+    char *path = flecs_asprintf("test/assets/luts/%s", file);
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, TexturePath, {.path = path});
+    ecs_os_free(path);
+
+    return result;
+}
+
+/** Test that the image of a LUT texture entity is loaded with a shape.
+ *
+ * @param world The world
+ * @param lut The texture entity
+ * @param width The expected width
+ * @param height The expected height
+ */
+static void grading_lut_loaded(
+    ecs_world_t *world,
+    ecs_entity_t lut,
+    int32_t width,
+    int32_t height)
+{
+    const box_textures_t *t = box_textures_get(world);
+    test_assert(t != NULL);
+    test_assert(box_textures_handle(t, lut) != 0);
+    const box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, lut);
+    test_assert(tex != NULL);
+    test_int(tex->width, width);
+    test_int(tex->height, height);
+}
+
+static int32_t grading_errors = 0;
+
+static void grading_count_errors(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -3 && strstr(msg, "ColorGrading LUT")) {
+        grading_errors ++;
+    }
+}
+
+void Effects_color_grading_lut_identity_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_identity.png");
+    ColorGrading value = grading_defaults();
+    value.lut = grading_lut(world, "identity_16.png");
+    ecs_entity_t small = grading_effect(world, &value);
+    value.lut = grading_lut(world, "identity_32.png");
+    ecs_entity_t large = grading_effect(world, &value);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t chain[2] = {tonemap, small};
+    unsigned char *base = grading_frame(world, view, camera, chain, 1, "grading_identity.png");
+    unsigned char *a = grading_frame(world, view, camera, chain, 2, "grading_identity.png");
+    chain[1] = large;
+    unsigned char *b = grading_frame(world, view, camera, chain, 2, "grading_identity.png");
+    grading_lut_loaded(world, ecs_get(world, small, ColorGrading)->lut, 256, 16);
+    grading_lut_loaded(world, value.lut, 1024, 32);
+    test_assert(grading_diff(base, a) <= 1);
+    test_assert(grading_diff(base, b) <= 1);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_fini(world);
+}
+
+/** Load a strip LUT of test/assets/luts as stored.
+ *
+ * @param file File name in test/assets/luts
+ * @param size Receives the slices of the LUT, its height
+ * @return The RGBA rows, freed with stbi_image_free
+ */
+static unsigned char* grading_lut_pixels(
+    const char *file,
+    int32_t *size)
+{
+    char *rel = flecs_asprintf("test/assets/luts/%s", file);
+    char *path = box_app_locate(rel);
+    int w = 0, h = 0, n = 0;
+    unsigned char *result = stbi_load(path, &w, &h, &n, 4);
+    test_assert(result != NULL);
+    test_int(w, h * h);
+    *size = h;
+    ecs_os_free(path);
+    ecs_os_free(rel);
+
+    return result;
+}
+
+void Effects_color_grading_lut_sepia_matches(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_sepia.png");
+    ColorGrading value = grading_defaults();
+    value.lut = grading_lut(world, "sepia_16.png");
+    ecs_entity_t sepia = grading_effect(world, &value);
+    value.lut_strength = 0.5f;
+    ecs_entity_t half = grading_effect(world, &value);
+    value.lut_strength = 0;
+    ecs_entity_t none = grading_effect(world, &value);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t chain[2] = {tonemap, sepia};
+    unsigned char *base = grading_frame(world, view, camera, chain, 1, "grading_sepia.png");
+    unsigned char *full = grading_frame(world, view, camera, chain, 2, "grading_sepia.png");
+    chain[1] = half;
+    unsigned char *blend = grading_frame(world, view, camera, chain, 2, "grading_sepia.png");
+    chain[1] = none;
+    unsigned char *off = grading_frame(world, view, camera, chain, 2, "grading_sepia.png");
+    int32_t size = 0;
+    unsigned char *lut = grading_lut_pixels("sepia_16.png", &size);
+    test_int(size, 16);
+
+    const int32_t columns[3] = {GRADING_MUTED, GRADING_GREY, GRADING_RED};
+    int32_t i, c;
+    ColorGrading resolved;
+    for (i = 0; i < 3; i ++) {
+        const unsigned char *in = grading_px(base, columns[i]);
+        float lin[3] = {effects_linear(in[0]), effects_linear(in[1]), effects_linear(in[2])};
+        float expected[3], expected_half[3];
+        box_render_grading_settings(&(ColorGrading){.contrast = 1, .saturation = 1,
+            .gamma = {1, 1, 1}, .gain = {1, 1, 1}, .lut_strength = 1}, &resolved);
+        box_render_grading_apply(&resolved, true, lut, size, lin, expected);
+        resolved.lut_strength = 0.5f;
+        box_render_grading_apply(&resolved, true, lut, size, lin, expected_half);
+        const unsigned char *out = grading_px(full, columns[i]);
+        const unsigned char *mid = grading_px(blend, columns[i]);
+        for (c = 0; c < 3; c ++) {
+            test_assert(abs((int)out[c] - effects_srgb8(expected[c])) <= 2);
+            test_assert(abs((int)mid[c] - effects_srgb8(expected_half[c])) <= 2);
+        }
+
+        // Sepia: red above green above blue
+        test_assert(out[0] > out[1]);
+        test_assert(out[1] > out[2]);
+    }
+
+    test_assert(grading_diff(base, off) <= 1);
+
+    stbi_image_free(lut);
+    ecs_os_free(base);
+    ecs_os_free(full);
+    ecs_os_free(blend);
+    ecs_os_free(off);
+    ecs_fini(world);
+}
+
+void Effects_color_grading_lut_wrong_shape_ignored(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = grading_world(&camera, &view, "grading_shape.png");
+    ColorGrading value = grading_defaults();
+    value.lut = grading_lut(world, "not_a_strip.png");
+    ecs_entity_t grading = grading_effect(world, &value);
+    unsigned char *base = grading_frame(world, view, camera, NULL, 0, "grading_shape.png");
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    grading_errors = 0;
+    ecs_os_api.log_ = grading_count_errors;
+    unsigned char *px = grading_frame(world, view, camera, &grading, 1, "grading_shape.png");
+    unsigned char *again = smaa_frame(world, "grading_shape.png");
+    ecs_os_api.log_ = log;
+    grading_lut_loaded(world, value.lut, 32, 16);
+    test_int(grading_errors, 1);
+    test_assert(grading_diff(base, px) <= 1);
+    test_assert(grading_diff(base, again) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_os_free(again);
     ecs_fini(world);
 }

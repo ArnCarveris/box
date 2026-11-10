@@ -313,6 +313,85 @@ bool box_render_view_sees(
     const float *center,
     float radius);
 
+/** A reflection plane a view may render, for box_render_planar_select */
+typedef struct box_render_planar_plane_t {
+    float plane[4];         /**< Unit normal and minus its dot with a point of the plane,
+                             *   positive on the front side */
+} box_render_planar_plane_t;
+
+/** Write the matrix that mirrors points about a plane.
+ *
+ * It maps p to p - 2 (n . p + d) n for the unit normal n and the offset d, so its determinant
+ * is -1 and it is its own inverse.
+ *
+ * @param plane Unit normal and minus its dot with a point of the plane
+ * @param out Receives the matrix
+ */
+void box_render_planar_matrix(
+    const float *plane,
+    mat4 out);
+
+/** Make the near plane of a reversed Z perspective projection the clip plane of a reflection
+ * (Lengyel, "Oblique View Frustum Depth Projection and Clipping").
+ *
+ * Its z row becomes w - a * plane: a point on the plane gets depth 1, a point on its negative
+ * side a depth above 1, which is clipped. The x, y and w rows do not change, so the image keeps
+ * the screen of the projection.
+ *
+ * The far plane passes through the corner of the frustum farthest along the plane, so depth
+ * stays at or above 0 within the frustum, for a finite and an infinite far plane alike.
+ *
+ * @param proj The projection, as box_camera_projection makes it
+ * @param plane The clip plane in view space, keeping its positive side
+ * @param out Receives the projection, which may be proj
+ * @return Whether the plane crosses the frustum; when not, out is proj
+ */
+bool box_render_planar_oblique(
+    mat4 proj,
+    const float *plane,
+    mat4 out);
+
+/** Pick the planes a view renders reflections of: those that cross its frustum and have its
+ * camera on their front side, at most BOX_PLANAR_REFLECTION_MAX, nearest to the camera first,
+ * then by index.
+ *
+ * The frustum is the one box_render_view_sees tests, a camera that follows the aspect of its
+ * surface taken at an aspect of 4; the planes are unbounded.
+ *
+ * @param v The view, with a perspective camera
+ * @param planes The planes
+ * @param count Planes
+ * @param out Receives the indices of the planes picked, BOX_PLANAR_REFLECTION_MAX of room
+ * @return Planes picked
+ */
+int32_t box_render_planar_select(
+    const box_render_view_t *v,
+    const box_render_planar_plane_t *planes,
+    int32_t count,
+    int32_t *out);
+
+/** Register the system that gives every lit perspective view the PlanarReflections of the
+ * scene of its camera it renders (box_render_planar_select), after the light extract.
+ *
+ * @param world The world
+ */
+void box_render_planar_init(
+    ecs_world_t *world);
+
+/** Get the instance of the shape of an entity in the instance pages.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param page Receives the handle of the transform stream of its page
+ * @param slot Receives its slot in the page
+ * @return Whether the entity is drawn in a batch
+ */
+bool box_render_draws_instance(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t *page,
+    uint32_t *slot);
+
 /** Register the system that sends the lights of every scene and the lights of every view.
  *
  * Lights are collected per scene into a light buffer that is uploaded when it changed; every
@@ -518,6 +597,34 @@ void box_render_atmos_transmittance_uv(
     float r,
     float mu,
     float *uv);
+
+/** Smallest ramp of the coverage remap of a CloudLayer, which makes a softness of 0 a step at
+ * the threshold, COOKIE_MIN_RAMP of the cookie remap */
+#define BOX_RENDER_CLOUD_MIN_RAMP (1e-5f)
+
+/** Get the coverage of a CloudLayer from a texture value, as atmosphere.wgsl remaps it:
+ * saturate((t - threshold) / (2 * softness) + 0.5), with a ramp of at least
+ * BOX_RENDER_CLOUD_MIN_RAMP.
+ *
+ * @param t The texture value
+ * @param threshold Value at which the coverage is one half
+ * @param softness Half the range of values the coverage ramps over
+ * @return The coverage, 0 to 1
+ */
+float box_render_cloud_coverage(
+    float t,
+    float threshold,
+    float softness);
+
+/** Get the opacity of a CloudLayer from its coverage: saturate(coverage * density).
+ *
+ * @param coverage The coverage
+ * @param density The density
+ * @return The opacity, 0 to 1
+ */
+float box_render_cloud_alpha(
+    float coverage,
+    float density);
 
 /** Copy the transmittance or the multi scattering LUT of an atmosphere into memory, waiting for
  * the copy.
@@ -1091,6 +1198,43 @@ void box_render_exposure_settings(
 void box_render_smaa_settings(
     const Smaa *in,
     Smaa *out);
+
+/** Resolve the settings of a color grading pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_grading_settings(
+    const ColorGrading *in,
+    ColorGrading *out);
+
+/** Get the matrix of the white balance and exposure of a color grading: a chromatic adaptation
+ * in LMS space as in Unity and Bevy, times the exposure; the identity times the exposure when
+ * temperature and tint are 0.
+ *
+ * @param g The resolved settings
+ * @param out Receives the rows of the matrix, which multiplies a linear color
+ */
+void box_render_grading_balance(
+    const ColorGrading *g,
+    float out[3][3]);
+
+/** Grade a linear color as etc/shaders/grading.wgsl does.
+ *
+ * @param g The resolved settings
+ * @param display The input is in display range, after a Tonemap
+ * @param lut RGBA8 rows of a strip LUT of lut_size slices as stored, sRGB encoded, NULL for none
+ * @param lut_size Slices of the LUT, its height
+ * @param in The color
+ * @param out Receives the graded color
+ */
+void box_render_grading_apply(
+    const ColorGrading *g,
+    bool display,
+    const uint8_t *lut,
+    int32_t lut_size,
+    const float *in,
+    float *out);
 
 /** Texels along each edge of the Tony McMapface LUT */
 #define BOX_RENDER_TONY_SIZE (48)

@@ -29,6 +29,7 @@ using box.texture
 using assets
 
 $ {
+  box.app.FpsTarget: {60}
   Scene: {baked: true, reflections: true, cookies: true, transmission: true, sheen: true,
     diffuse_transmission: true}
 }

@@ -19,7 +19,15 @@
 #define BOX_GPU_ATMOS_TEXEL (8)
 
 /** Bytes of the uniform buffer of an atmosphere pass */
-#define BOX_GPU_ATMOS_UNIFORMS (512)
+#define BOX_GPU_ATMOS_UNIFORMS (1024)
+
+/** Anisotropic samples of the sampler of the cloud layers. The sky shader splits the long
+ * footprint of the grazing plane near the horizon into up to 4 taps, so each tap filters a
+ * footprint 4 times longer than wide at most; more samples cost more than they show */
+#define BOX_GPU_ATMOS_CLOUD_ANISOTROPY (4)
+
+/** First binding of the textures of the cloud layers in the sky draw, one per layer */
+#define BOX_GPU_ATMOS_CLOUD_BINDING (9)
 
 /** Invocations per axis of a workgroup, along x and y */
 #define BOX_GPU_ATMOS_GROUP (8)
@@ -55,6 +63,14 @@ typedef struct box_gpu_atmos_readback_t {
     uint8_t kinds[BOX_GPU_ATMOS_STAMPS / 2]; /**< box_render_atmos_pass_t of each pass */
 } box_gpu_atmos_readback_t;
 
+/** A cloud layer of the sky draw, as CloudLayer in etc/shaders/atmosphere.wgsl */
+typedef struct box_gpu_atmos_cloud_t {
+    float plane[4];                 /**< Height above the camera, one over the size, texture
+                                     *   coordinate of the camera */
+    float shape[4];                 /**< Threshold, softness, density, w unused */
+    float tint[4];                  /**< Linear tint, w unused */
+} box_gpu_atmos_cloud_t;
+
 /** Uniforms of an atmosphere pass, as Atmosphere in etc/shaders/atmosphere.wgsl */
 typedef struct box_gpu_atmos_uniforms_t {
     box_render_atmosphere_desc_t medium; /**< The medium, the uniforms of the scene LUTs */
@@ -70,7 +86,12 @@ typedef struct box_gpu_atmos_uniforms_t {
     mat4 inv_view_proj;             /**< Clip to world space of the view */
     float fog_light[4];             /**< Direction toward the main light, its horizon fade */
     float fog_moon[4];              /**< Radiance toward the moon as the main light, 1 if it is */
+    float clouds[4];                /**< Cloud layers of the sky draw, km per world unit */
+    box_gpu_atmos_cloud_t cloud_layers[BOX_CLOUD_LAYER_MAX]; /**< By ascending altitude */
 } box_gpu_atmos_uniforms_t;
+
+_Static_assert(sizeof(box_gpu_atmos_uniforms_t) <= BOX_GPU_ATMOS_UNIFORMS,
+    "the uniforms of an atmosphere pass fit its buffer");
 
 /** The transmittance and multi scattering LUTs of the atmosphere of a scene */
 typedef struct box_gpu_atmos_luts_t {
@@ -101,6 +122,12 @@ typedef struct box_gpu_atmos_view_t {
     WGPUTexture fog;                /**< Fog in scatter color, created on first use */
     WGPUTextureView fog_view;       /**< View sampled and written */
     int64_t fog_frame;              /**< Frame of the last packet that wrote the fog color */
+    uint32_t clouds[BOX_CLOUD_LAYER_MAX]; /**< Texture handles of the cloud layers in the
+                                     *   uniforms, 0 for none */
+    box_gpu_atmos_uniforms_t last;  /**< Uniforms of the view written last, which the planar
+                                     *   reflections copy */
+    WGPUBuffer mirrors[BOX_PLANAR_REFLECTION_MAX]; /**< Uniforms of the sky of each planar
+                                     *   reflection slot, created on first use */
 } box_gpu_atmos_view_t;
 
 /** The atmosphere state of the backend */
@@ -283,6 +310,9 @@ static void box_gpu_atmos_layout(
  * at 0, the transmittance LUT of the sun disk at 1, the sampler at 2 and the sky view LUT at 4,
  * as the aerial perspective pass binds them.
  *
+ * The cloud layers add their repeating sampler at 8 and their textures from
+ * BOX_GPU_ATMOS_CLOUD_BINDING.
+ *
  * @param gpu The backend
  * @param a The atmosphere state
  */
@@ -291,7 +321,7 @@ static void box_gpu_atmos_sky_layout(
     box_gpu_atmos_t *a)
 {
     WGPUShaderStage frag = WGPUShaderStage_Fragment;
-    WGPUBindGroupLayoutEntry entries[4] = {
+    WGPUBindGroupLayoutEntry entries[5 + BOX_CLOUD_LAYER_MAX] = {
         { .binding = 0, .visibility = frag, .buffer = { .type = WGPUBufferBindingType_Uniform,
             .minBindingSize = sizeof(box_gpu_atmos_uniforms_t) } },
         { .binding = 1, .visibility = frag, .texture = {
@@ -303,10 +333,25 @@ static void box_gpu_atmos_sky_layout(
         { .binding = 4, .visibility = frag, .texture = {
             .sampleType = WGPUTextureSampleType_Float,
             .viewDimension = WGPUTextureViewDimension_2D
-        } }
+        } },
+        { .binding = 8, .visibility = frag,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering } }
     };
+    int32_t i;
+    for (i = 0; i < BOX_CLOUD_LAYER_MAX; i ++) {
+        entries[5 + i] = (WGPUBindGroupLayoutEntry){
+            .binding = (uint32_t)(BOX_GPU_ATMOS_CLOUD_BINDING + i),
+            .visibility = frag,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        };
+    }
+
     a->sky_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5 + BOX_CLOUD_LAYER_MAX,
+            .entries = entries });
     a->sky_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &a->sky_layout });
@@ -435,6 +480,12 @@ static void box_gpu_atmos_view_free(
     box_gpu_atmos_release(&v->aerial, &v->aerial_view);
     box_gpu_atmos_release(&v->fog, &v->fog_view);
     wgpuBufferRelease(v->uniforms);
+    for (int32_t i = 0; i < BOX_PLANAR_REFLECTION_MAX; i ++) {
+        if (v->mirrors[i]) {
+            wgpuBufferRelease(v->mirrors[i]);
+        }
+    }
+
     ecs_os_free(v);
     gpu->pending.atmosphere_views --;
 }
@@ -1112,6 +1163,45 @@ done:
     return result;
 }
 
+/** Write the cloud layers of a view into its uniforms: those whose texture the backend has, in
+ * the order of the view, and remember their textures for the sky draw.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param s The view state
+ * @param u The uniforms
+ */
+static void box_gpu_atmos_clouds(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_atmos_view_t *s,
+    box_gpu_atmos_uniforms_t *u)
+{
+    const box_render_view_atmos_t *in = &v->atmos;
+    int32_t i, count = 0;
+    ecs_os_memset_n(s->clouds, 0, uint32_t, BOX_CLOUD_LAYER_MAX);
+    for (i = 0; in->sky && i < in->cloud_count && i < BOX_CLOUD_LAYER_MAX; i ++) {
+        const box_render_cloud_layer_t *l = &in->clouds[i];
+        if (!box_gpu_texture_cookie(gpu, l->texture)) {
+            continue;
+        }
+
+        box_gpu_atmos_cloud_t *c = &u->cloud_layers[count];
+        c->plane[0] = l->height;
+        c->plane[1] = l->inv_size;
+        c->plane[2] = l->origin[0];
+        c->plane[3] = l->origin[1];
+        c->shape[0] = l->threshold;
+        c->shape[1] = l->softness;
+        c->shape[2] = l->density;
+        glm_vec3_copy(ECS_CONST_CAST(float*, l->tint), c->tint);
+        s->clouds[count ++] = l->texture;
+    }
+
+    u->clouds[0] = (float)count;
+    u->clouds[1] = in->km_per_unit;
+}
+
 /** Record the pass that writes the fog in scatter color of a view from its sky view.
  *
  * @param gpu The backend
@@ -1180,7 +1270,9 @@ void box_gpu_atmosphere_view(
         (float)t->desc.point_width, (float)t->desc.point_height, proj);
     glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     glm_mat4_inv(view_proj, u.inv_view_proj);
+    box_gpu_atmos_clouds(gpu, v, s, &u);
     wgpuQueueWriteBuffer(gpu->queue, s->uniforms, 0, &u, sizeof(u));
+    s->last = u;
 
     uint64_t size = sizeof(box_gpu_atmos_uniforms_t);
     WGPUBindGroupEntry sky[5] = {
@@ -1334,6 +1426,92 @@ done:
     return result;
 }
 
+/** Record the fullscreen sky of a view with a uniform buffer.
+ *
+ * @param gpu The backend
+ * @param pass The render pass
+ * @param format The format of the color target
+ * @param l The LUTs of the scene of the view
+ * @param s The sky view of the view
+ * @param uniforms The uniforms the sky reads
+ * @return Whether the sky was drawn
+ */
+static bool box_gpu_atmos_sky_record(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    box_gpu_atmos_luts_t *l,
+    box_gpu_atmos_view_t *s,
+    WGPUBuffer uniforms)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    WGPURenderPipeline pipeline = box_gpu_atmos_sky_pipeline(gpu, a, format);
+    bool result = pipeline != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    WGPUBindGroupEntry entries[5 + BOX_CLOUD_LAYER_MAX] = {
+        { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
+        { .binding = 1, .textureView = l->transmittance_view },
+        { .binding = 2, .sampler = a->sampler },
+        { .binding = 4, .textureView = s->sky_view },
+        { .binding = 8, .sampler = box_gpu_texture_sampler(gpu, WrapRepeat,
+            BOX_GPU_ATMOS_CLOUD_ANISOTROPY) }
+    };
+    int32_t i;
+    for (i = 0; i < BOX_CLOUD_LAYER_MAX; i ++) {
+        WGPUTextureView cloud = s->clouds[i]
+            ? box_gpu_texture_cookie(gpu, s->clouds[i])
+            : NULL;
+        entries[5 + i] = (WGPUBindGroupEntry){
+            .binding = (uint32_t)(BOX_GPU_ATMOS_CLOUD_BINDING + i),
+            .textureView = cloud ? cloud : gpu->no_cookie->linear
+        };
+    }
+
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = a->sky_layout,
+        .entryCount = 5 + BOX_CLOUD_LAYER_MAX,
+        .entries = entries
+    });
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
+    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+    wgpuBindGroupRelease(group);
+done:
+    return result;
+}
+
+bool box_gpu_atmosphere_draw_sky_mirrored(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    WGPURenderPassEncoder pass,
+    WGPUTextureFormat format,
+    const box_render_view_t *v,
+    int32_t mirror,
+    mat4 inv_view_proj)
+{
+    box_gpu_atmos_t *a = gpu->atmosphere;
+    box_gpu_atmos_luts_t *l = a && v->atmos.sky ? box_gpu_atmos_luts_ready(a, v) : NULL;
+    box_gpu_atmos_view_t *s = l ? box_gpu_atmos_view_find(a, t, v) : NULL;
+    bool result = false;
+    if (!s || mirror < 0 || mirror >= BOX_PLANAR_REFLECTION_MAX) {
+        goto done;
+    }
+
+    box_gpu_atmos_uniforms_t u = s->last;
+    glm_mat4_copy(inv_view_proj, u.inv_view_proj);
+    if (!s->mirrors[mirror]) {
+        s->mirrors[mirror] = box_gpu_atmos_uniform_buffer(gpu);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, s->mirrors[mirror], 0, &u, sizeof(u));
+    result = box_gpu_atmos_sky_record(gpu, pass, format, l, s, s->mirrors[mirror]);
+done:
+    return result;
+}
+
 bool box_gpu_atmosphere_draw_sky(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
@@ -1344,29 +1522,8 @@ bool box_gpu_atmosphere_draw_sky(
     box_gpu_atmos_t *a = gpu->atmosphere;
     box_gpu_atmos_luts_t *l = v->atmos.sky ? box_gpu_atmos_luts_ready(a, v) : NULL;
     box_gpu_atmos_view_t *s = l ? box_gpu_atmos_view_find(a, t, v) : NULL;
-    WGPURenderPipeline pipeline = s ? box_gpu_atmos_sky_pipeline(gpu, a, format) : NULL;
-    bool result = pipeline != NULL;
-    if (!result) {
-        goto done;
-    }
 
-    WGPUBindGroupEntry entries[4] = {
-        { .binding = 0, .buffer = s->uniforms, .size = sizeof(box_gpu_atmos_uniforms_t) },
-        { .binding = 1, .textureView = l->transmittance_view },
-        { .binding = 2, .sampler = a->sampler },
-        { .binding = 4, .textureView = s->sky_view }
-    };
-    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-        .layout = a->sky_layout,
-        .entryCount = 4,
-        .entries = entries
-    });
-    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);
-    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
-    wgpuBindGroupRelease(group);
-done:
-    return result;
+    return s && box_gpu_atmos_sky_record(gpu, pass, format, l, s, s->uniforms);
 }
 
 void box_gpu_atmosphere_sweep(

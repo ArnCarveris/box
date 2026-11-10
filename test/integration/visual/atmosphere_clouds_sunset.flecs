@@ -1,0 +1,71 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.atmosphere
+
+// The cloud layer of atmosphere_clouds_noon with the sun 3 degrees above the horizon in front
+// of the camera: the light reaching the clouds crossed a long path of air, so they turn orange
+// and glow toward the sun, and their bases away from it go dark against the evening sky.
+
+$ {
+  Scene: {aerial_perspective: true}
+}
+
+camera {
+  Position: {0, 2, 12}
+  Rotation: {0.25, 0, 0}
+  Camera: {fov: 70, far_: 0}
+}
+
+bloom {
+  Bloom: {intensity: 0.35, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+sun {
+  Rotation: {0.05236, 0.4, 0}
+  DirectionalLight: {intensity: 6 * flecs.script.math.PI}
+  Rgb: {255, 255, 255}
+}
+
+$ {
+  Atmosphere: {units_per_km: 100, sun_disk_intensity: 20, sun: sun}
+}
+
+cloud_noise {
+  TextureGen: {
+    width: 512, height: 512, seed: 7
+    layers: [
+      {kind: GenNoise, frequency: 10, octaves: 5, gain: 0.5}
+    ]
+  }
+}
+
+clouds {
+  CloudLayer: {texture: cloud_noise, size: 1500, altitude: 150, threshold: 0.5, softness: 0.12}
+}
+
+ground {
+  Position: {0, -0.1, -4000}
+  Box: {12000, 0.2, 8100}
+  Rgb: {110, 130, 90}
+  PbrMaterial: {roughness: 0.9}
+}
+
+box_40 {
+  Position: {-10.7, 3, -28}
+  Box: {6, 6, 6}
+  Rgb: {220, 220, 220}
+}
