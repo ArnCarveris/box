@@ -6,6 +6,10 @@ using state
 
 state {
   export const GROUND_SPAN: f32 = 700
+  export const TERRAIN_X0: f32 = -64
+  export const TERRAIN_X1: f32 = 96
+  export const TERRAIN_Z0: f32 = -92
+  export const TERRAIN_Z1: f32 = 94
 }
 
 assets {
@@ -100,6 +104,38 @@ assets {
   }
   prefab MvHillGround : MvHillGrass {
     TextureBlend: {mask: mv_ground_mask, layers: [mv_ground_layers.grass, mv_ground_layers.grass, mv_ground_layers.hills_patch, 0]}
+  }
+
+  mv_tex_terrain_mask { TexturePath: {path: "etc/scenes/mossvale/textures/terrain_mask.png"} }
+  mv_tex_terrain_clear { TexturePath: {path: "etc/scenes/mossvale/textures/terrain_clear.png"} }
+  mv_tex_terrain_dirt { TexturePath: {path: "etc/scenes/mossvale/textures/terrain_dirt.jpg"} }
+  mv_tex_terrain_cobble { TexturePath: {path: "etc/scenes/mossvale/textures/terrain_cobble.jpg"} }
+  mv_tex_terrain_rubble { TexturePath: {path: "etc/scenes/mossvale/textures/terrain_rubble.jpg"} }
+  mv_tex_grass_h { TexturePath: {path: "etc/scenes/mossvale/textures/grass_height.jpg", single_channel: true} }
+  mv_tex_dirt_h { TexturePath: {path: "etc/scenes/mossvale/textures/dirt_height.jpg", single_channel: true} }
+  mv_tex_cobble_h { TexturePath: {path: "etc/scenes/mossvale/textures/cobble_height.jpg", single_channel: true} }
+  mv_tex_rubble_h { TexturePath: {path: "etc/scenes/mossvale/textures/rubble_height.jpg", single_channel: true} }
+
+  mv_terrain_layers {
+    const tw = TERRAIN_Z1 - TERRAIN_Z0
+    const th = TERRAIN_X1 - TERRAIN_X0
+    clear { PbrTextures: {albedo: mv_tex_terrain_clear, normal: mv_tex_grass_n}; TextureTransform: {tw / 9, th / 9, 0, 0} }
+    dirt { PbrTextures: {albedo: mv_tex_terrain_dirt, normal: mv_tex_dirt_n}; TextureTransform: {tw / 4.5, th / 4.5, 0, 0} }
+    cobble { PbrTextures: {albedo: mv_tex_terrain_cobble, normal: mv_tex_cobble_n}; TextureTransform: {tw / 3.2, th / 3.2, 0, 0} }
+    rubble { PbrTextures: {albedo: mv_tex_terrain_rubble, normal: mv_tex_rubble_n}; TextureTransform: {tw / 3.0, th / 3.0, 0, 0} }
+  }
+
+  prefab MvTerrain {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    AlphaCutoff: {0.5}
+    NoShadow
+    TextureBlend: {
+      mask: mv_tex_terrain_mask,
+      layers: [mv_terrain_layers.clear, mv_terrain_layers.dirt, mv_terrain_layers.cobble, mv_terrain_layers.rubble],
+      heights: [mv_tex_grass_h, mv_tex_dirt_h, mv_tex_cobble_h, mv_tex_rubble_h],
+      contrast: 16
+    }
   }
 
   prefab MvStone { Rgb: {196, 188, 172}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_ashlar, normal: mv_tex_ashlar_n} }

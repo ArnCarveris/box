@@ -92,11 +92,11 @@ mossvale {
 
   square_detail {
     Position: {SQ_X, 0, SQ_Z}
-    band_w : MvStone { Position: {-7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; TextureTransform: {6.8 / TILE_FLAGS, 1 / TILE_FLAGS, 0, 0} }
-    band_e : MvStone { Position: {7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; TextureTransform: {6.8 / TILE_FLAGS, 1 / TILE_FLAGS, 0, 0} }
-    band_n : MvStone { Position: {0, 0.061, -4.7}; Box: {1.0, 0.01, 3.0}; TextureTransform: {1 / TILE_FLAGS, 3 / TILE_FLAGS, 0, 0} }
-    band_s : MvStone { Position: {0, 0.061, 4.7}; Box: {1.0, 0.01, 3.0}; TextureTransform: {1 / TILE_FLAGS, 3 / TILE_FLAGS, 0, 0} }
-    ring_a : MvStone { Position: {0, 0.062, 0}; Tube: {length: 0.01, radius: 4.6, thickness: 0.45, segments: 48}; TextureTransform: {9.2 * PI / TILE_FLAGS, 0.45 / TILE_FLAGS, 0, 0} }
+    band_w : MvStone { Position: {-7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_e : MvStone { Position: {7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_n : MvStone { Position: {0, 0.061, -4.7}; Box: {1.0, 0.01, 3.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_s : MvStone { Position: {0, 0.061, 4.7}; Box: {1.0, 0.01, 3.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    ring_a : MvStone { Position: {0, 0.062, 0}; Tube: {length: 0.01, radius: 4.6, thickness: 0.45, segments: 48}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
   }
 
   road_edges {

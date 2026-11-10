@@ -735,7 +735,7 @@ assets {
     prop z: f32 = 0
     const full = ts[id] > 0
     Position: {x, 0, z}
-    step : MvStone { Position: {0, 0.1, 0}; Cylinder: {length: 0.2, radius: 3.5, segments: 32}; TextureTransform: {9, 0.15, 0, 0} }
+    step : MvStone { Position: {0, 0.1, 0}; Cylinder: {length: 0.2, radius: 3.5, segments: 32}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS, blend: 0.3} }
     basin : MvStone { Position: {0, 0.55, 0}; Tube: {length: 0.7, radius: 3.0, thickness: 0.35, segments: 32}; TextureTransform: {8, 0.35, 0, 0} }
     rim : MvStone { Position: {0, 0.93, 0}; Torus: {radius: 2.83, tube: 0.2, segments: 40, rings: 6, smooth: true}; Rgb: {214, 206, 190}; TextureTransform: {8, 0.5, 0, 0} }
     floor_ : MvDarkStone { Position: {0, 0.25, 0}; Cylinder: {length: 0.1, radius: 2.7, segments: 28}; TextureTransform: {1.8, 1.8, 0, 0} }

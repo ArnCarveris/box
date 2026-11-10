@@ -145,6 +145,7 @@ def grass():
     save("grass", albedo)
     height = blades * 0.6 + fine * 0.4 + clover * 0.5
     save("grass_normal", normal_map(height, 2.2))
+    save("grass_height", height / height.max())
 
 
 def forest_floor():
@@ -179,7 +180,9 @@ def dirt():
     tufts = smooth(0.72, 0.85, noise(h, w, 1.3, 35)) * stretch(noise(h, w, 0.4, 36), 1, 3)
     albedo = mix(albedo, rgb(150, 190, 110), smooth(0.4, 0.7, tufts) * 0.8)
     save("dirt", albedo)
-    save("dirt_normal", normal_map(pebble * 0.8 + grit * 0.25 + fine * 0.3 + big * 0.3 + ruts * 0.3, 3))
+    height = pebble * 0.8 + grit * 0.25 + fine * 0.3 + big * 0.3 + ruts * 0.3
+    save("dirt_normal", normal_map(height, 3))
+    save("dirt_height", (height - height.min()) / (height.max() - height.min()))
 
 
 def cobble():
@@ -196,6 +199,7 @@ def cobble():
     albedo = albedo * (0.8 + 0.2 * dome[..., None])
     save("cobble", albedo)
     save("cobble_normal", normal_map(dome * 1.4 + n * 0.12, 4))
+    save("cobble_height", dome * 0.9 + n * 0.1)
 
 
 def rubble():
@@ -214,6 +218,7 @@ def rubble():
     albedo = mix(albedo, rgb(140, 170, 90) * (0.7 + n[..., None] * 0.4), moss * 0.7)
     save("rubble", albedo)
     save("rubble_normal", normal_map(dome * 1.3 + n * 0.2, 4))
+    save("rubble_height", dome * 0.85 + n * 0.15)
 
 
 def ashlar():
@@ -467,7 +472,10 @@ def wheat():
 
 
 if __name__ == "__main__":
+    import sys
     for fn in (grass, forest_floor, dirt, cobble, rubble, ashlar, rock, plaster, wood, timber,
                shingles, thatch, bark, birch, foliage, water, cloth, sand, wheat):
+        if len(sys.argv) > 1 and fn.__name__ not in sys.argv[1:]:
+            continue
         fn()
         print(fn.__name__)
