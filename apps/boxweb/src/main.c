@@ -1,3 +1,8 @@
+/**
+ * @file main.c
+ * @brief Runs a box world in the browser with the settings of the command line.
+ */
+
 #include <box.h>
 
 int main(

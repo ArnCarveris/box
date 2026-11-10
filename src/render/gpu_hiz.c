@@ -124,6 +124,7 @@ void box_gpu_hiz_init(
             .aspect = WGPUTextureAspect_All
         });
     }
+
     WGPUBindGroupEntry entries[2] = {
         { .binding = 0, .buffer = c->empty_history, .size = 16 },
         { .binding = 1, .textureView = c->empty_hiz_view }
@@ -284,6 +285,14 @@ static uint32_t box_gpu_hiz_floor_pow2(
     return result;
 }
 
+/** Fill the bind group entries of the BOX_GPU_HIZ_STEP levels a dispatch writes from a level,
+ * binding spare layers for the levels past the last of the pyramid.
+ *
+ * @param c The cull pass state
+ * @param hiz The pyramid
+ * @param level The first level written
+ * @param out Receives BOX_GPU_HIZ_STEP entries
+ */
 static void box_gpu_hiz_targets(
     const box_gpu_cull_t *c,
     const box_gpu_hiz_t *hiz,
@@ -616,6 +625,7 @@ done:
  * @param group Its bind group
  * @param hiz The pyramid
  * @param level The level it writes
+ * @param texels Texels of the level each invocation covers along each axis
  */
 static void box_gpu_hiz_dispatch(
     WGPUComputePassEncoder pass,

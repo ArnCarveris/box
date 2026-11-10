@@ -172,10 +172,9 @@ typedef struct box_draw_key_t {
                              *   of the 2D shape shader */
     bool polygon;           /**< Polygons (Polygon2D), drawn with the polygon variant of the 2D
                              *   shape shader */
-    bool texture_blend;     /**< 3D shapes with a TextureBlend, drawn with the
-                             *   texture_blend variant of the mesh pipeline: textures[0] is the
-                             *   entity that owns the TextureBlend, textures[2] and textures[3]
-                             *   are 0, so the key does not grow */
+    bool texture_blend;     /**< 3D shapes with a TextureBlend (texture_blend pipeline):
+                             *   textures[0] is the owner of the TextureBlend, textures[2] and
+                             *   textures[3] are 0, so the key does not grow */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
     uint32_t features;      /**< BOX_RENDER_FEATURE_* features of the scene of a 3D shape, 0 for
@@ -201,9 +200,10 @@ extern ECS_COMPONENT_DECLARE(TextSlots);
 /** Batch, slot and rank of the shadow of a 2D shape with a BoxShadow, added with every BoxShadow.
  *
  * The shadow is a second instance of the entity drawn just before its shape, in the batch of the
- * shape with the AlphaBlend blend mode, no textures and box_shadow set. A removed BoxShadow frees the slot and
- * leaves the component without a batch; the changes of the entity then skip it, as they check
- * for BoxShadow. */
+ * shape with the AlphaBlend blend mode, no textures and box_shadow set.
+ *
+ * A removed BoxShadow frees the slot and leaves the component without a batch; the changes of
+ * the entity then skip it, as they check for BoxShadow. */
 typedef struct BoxShadowSlot {
     int32_t batch;  /**< Index of the batch, -1 when no shadow is drawn */
     int32_t slot;   /**< Slot of the shadow in the batch */
@@ -452,10 +452,9 @@ typedef struct box_draw_polygon_run_t {
  */
 typedef struct box_draw_clips_t {
     ecs_map_t index;        /**< Element to its clip index */
-    ecs_map_t floats;       /**< Float that hides while its anchor is clipped out
-                             *   (LayoutFloat.hide_clipped) to its clip index, whose area is
-                             *   empty while it hides and unbounded else; freed in a send once
-                             *   the float is gone or no longer hides */
+    ecs_map_t floats;       /**< Float with LayoutFloat.hide_clipped to its clip index, whose
+                             *   area is empty while its anchor is clipped out; freed in a send
+                             *   once the float is gone or no longer hides */
     ecs_vec_t entities;     /**< ecs_entity_t per clip index, 0 for a free index */
     ecs_vec_t records;      /**< box_render_clip_t per clip index, as the backend has them */
     ecs_vec_t free;         /**< int32_t, clip indices to reuse */
@@ -520,8 +519,9 @@ typedef struct box_draw_materials_t {
     bool overflow;          /**< An id past what the binding holds was logged */
     int64_t uploaded_frame; /**< Frame of the packet of the last send that uploaded */
     ecs_vec_t uploaded;     /**< box_draw_material_upload_t of that send */
-    float transmission_roughness;
-    bool features_valid;
+    float transmission_roughness; /**< Largest roughness of the transmissive materials, 1 for a
+                             *   diffuse blur, 0 without any */
+    bool features_valid;    /**< transmission_roughness was computed from the records */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -571,9 +571,8 @@ typedef struct box_render_draws_t {
     ecs_map_t tree_ranks;       /**< Tree of the order to its next rank and its count of ranks,
                                  *   while the runs are made */
     ecs_map_t overlays;         /**< Clipped overlays (LayoutFloat.clip) to 1 and floats with
-                                 *   hide_clipped to 2, so a set LayoutFloat changes the order
-                                 *   only when its clip changed, and the clip indices of the
-                                 *   subtree only when either changed */
+                                 *   hide_clipped to 2, so a set LayoutFloat changes the order or
+                                 *   the clip indices of the subtree only when these changed */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
@@ -825,12 +824,11 @@ void box_draws_surface(
 
 /** Write the material of a 2D shape or glyph into its instance data.
  *
- * The base color is mixed toward the tints of the ancestors from the root down and then toward
- * the tint of the shape, in display encoding, before it and the emission are converted to
- * linear light. The alpha is the opacity of the shape times the opacity of its ancestors. The
- * color and alpha are stored as unorm16x4 (box_draws_color_pack).
+ * The base color is mixed toward the tints of the ancestors and then of the shape in display
+ * encoding, then it and the emission are converted to linear light.
  *
- * The clip index goes into ids[0].
+ * The alpha is the opacity of the shape times that of its ancestors. Color and alpha are stored
+ * as unorm16x4 (box_draws_color_pack); the clip index goes into ids[0].
  *
  * @param out The shading
  * @param material Material components of the entity
@@ -913,13 +911,11 @@ void box_draws_transition_shape(
     Shape2D *out);
 
 /** Encode a record from a material transition with the encoding of the game thread: a table
- * record with box_draws_material_pack, a 2D shading (color, emission, material, UV words) or a
- * glyph (color, emission) with box_draws_material, a mesh shading with box_draws_mesh_shading.
+ * record with box_draws_material_pack, a 2D shading or glyph with box_draws_material, a mesh
+ * shading with box_draws_mesh_shading, a shadow with box_draws_box_shadow_encode.
  *
- * A shadow encodes its color and material.w with box_draws_box_shadow_encode. The other words
- * (the clip, the rank, the atlas area of a glyph, the material slot of a mesh) do not depend on
- * a transitioned component and are left as they are, as is emissive.w of a polygon, the index of
- * its polygon record, which the material does not hold.
+ * Words that do not depend on a transitioned component (clip, rank, glyph atlas area, mesh
+ * material slot, emissive.w of a polygon) are left as they are.
  *
  * Pure: reads no world, so the resolver calls it on the render thread.
  *
@@ -955,10 +951,10 @@ void* box_draws_transition_value(
     box_render_transition_component_t component);
 
 /** Write the transform and the shading of a shadow from a box shadow record with the encoding
- * of the game thread (box_draws_box_shadow_patch), from the material of the record with the
- * rendered Tint, Opacity and fade. The rendered Border of the material is applied to its shape
- * first, so the cutout radius and the cover alpha follow it. Pure: the resolver calls it on the
- * render thread.
+ * of the game thread (box_draws_box_shadow_patch), using the rendered Tint, Opacity and fade.
+ *
+ * The rendered Border is applied to the shape first, so the cutout radius and the cover alpha
+ * follow it. Pure: the resolver calls it on the render thread.
  *
  * @param record The record, its material holding the rendered values
  * @param shadow The BoxShadow its node renders
@@ -1190,10 +1186,10 @@ void box_draws_mesh_shading(
 /** Write the shape of a 2D shape into its instance data, over the 3D surface constants.
  *
  * Material holds the corner radius, border width and border color of a rectangle or the end
- * points of a line, emissive w the aspect of a rectangle or the negated width of a line. A
- * sliced rectangle holds its slice index in uv.x instead of the area of its image. A polygon
- * holds its border width and color as a rectangle does, in its local units, and the index of
- * its polygon record (material slice) in emissive w.
+ * points of a line, emissive w the aspect of a rectangle or the negated width of a line.
+ *
+ * A sliced rectangle holds its slice index in uv.x. A polygon holds its border as a rectangle
+ * does, in local units, and the index of its polygon record in emissive w.
  *
  * @param out The shading
  * @param material Material components of the entity, with its Shape2D
@@ -1401,10 +1397,9 @@ void box_draws_store_free(
  * BOX_DRAWS_MIN_CAPACITY, each step adds half and rounds up to BOX_DRAWS_GROW_ALIGN slots. From
  * the minimum the steps are 16, 24, 36, 56, 84, 128, 192, 288, ...
  *
- * A batch that outgrows its run grows to the step at or above its count, from 0, so a run of
- * 1,000 slots grows to 1,460. A new batch has no growth headroom: from its own count the result
- * is the count rounded up to BOX_DRAWS_GROW_ALIGN slots, at least BOX_DRAWS_MIN_CAPACITY
- * (box_draws_reserve).
+ * A batch that outgrows its run grows to the step at or above its count, so a run of 1,000
+ * slots grows to 1,460. From its own count, the result is the count rounded up to
+ * BOX_DRAWS_GROW_ALIGN slots, at least BOX_DRAWS_MIN_CAPACITY (box_draws_reserve).
  *
  * @param capacity Slots to grow from, 0 for the minimum
  * @param count Slots the result holds at least
@@ -1684,11 +1679,12 @@ void box_draws_batch_textures(
     const box_draw_batch_t *b,
     box_render_batch_t *out);
 
-/** Write the TextureBlend of a texture_blend batch into the packet data of its draw, as it is
- * now: the texture handles of the mask, the layers and the heights, the TextureTransform of each
- * layer and the contrast, so a change of a layer reaches the draw without a change of the key.
- * Without a contrast the heights stay 0, so they neither split the bind groups nor make an
- * array.
+/** Write the TextureBlend of a texture_blend batch into the packet data of its draw.
+ *
+ * Writes the texture handles of the mask, layers and heights, the TextureTransform of each layer
+ * and the contrast, so a change of a layer reaches the draw without a change of the key.
+ *
+ * Without a contrast the heights stay 0. A deleted layer counts as one without PbrTextures.
  *
  * @param p The packet
  * @param d The state
@@ -1760,227 +1756,6 @@ void box_draws_text_dynamic(
     ecs_world_t *world,
     box_render_draws_t *d);
 
-/** Register the shadows of the 2D shapes: the BoxShadowSlot of every BoxShadow.
- *
- * @param world The world
- */
-void box_draws_box_shadow_init(
-    ecs_world_t *world);
-
-/** Register the observers of the shadows: a set BoxShadow writes the shadow again, a removed one
- * frees its slot, also on a deleted or disabled entity.
- *
- * @param world The world
- * @param d The state
- */
-void box_draws_box_shadow_observers(
-    ecs_world_t *world,
-    box_render_draws_t *d);
-
-/** Bring the shadow of a changed entity into the batch of its shape and write its instance, or
- * free its slot when it draws no shadow: without a BoxShadow, without a drawn Rect or Circle, or
- * with an empty shadow box.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- * @param s The DrawSlot of the entity, its shape already updated
- */
-void box_draws_box_shadow_update(
-    ecs_world_t *world,
-    box_render_draws_t *d,
-    ecs_entity_t e,
-    const DrawSlot *s);
-
-/** Get the shadow slots of the rows of a query result, so the per frame paths check for a shadow
- * once per table.
- *
- * @param it The query result
- * @return The BoxShadowSlot of each row, NULL when the table has none. A slot stays when its
- *         BoxShadow is removed, without a batch, so it costs a check of the batch per row
- */
-const BoxShadowSlot* box_draws_box_shadows(
-    const ecs_iter_t *it);
-
-/** Write the streams of the shadow of an entity that its batch uploads every frame, as the
- * shape of the entity writes them: the transform of a DynamicTransform shape, the shading of a
- * DynamicMaterial shape. A shadow without a slot is left as it is.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- * @param bs The BoxShadowSlot of the entity
- * @param s The DrawSlot of the entity
- * @param transform World transform of the entity, NULL for the identity
- * @param material Material components of the shape, read when kinds has the shading
- * @param kinds box_draw_kind_t, the streams to write
- */
-void box_draws_box_shadow_write(
-    ecs_world_t *world,
-    box_render_draws_t *d,
-    ecs_entity_t e,
-    const BoxShadowSlot *bs,
-    const DrawSlot *s,
-    const WorldTransform *transform,
-    const box_draw_material_t *material,
-    uint8_t kinds);
-
-/** Get the instance matrix of the shadow of an entity relative to the world transform of its
- * shape, as box_draws_box_shadow_write writes it: the quad of the shape stretched, moved by
- * the offset and scaled to the quad of the shadow.
- *
- * A transform transition moves the shadow with the world matrix it renders the shape at times
- * this matrix.
- *
- * @param world The world
- * @param e The entity
- * @param out Receives the matrix
- * @return Whether the entity draws a shadow box
- */
-bool box_draws_box_shadow_instance(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    mat4 out);
-
-/** Get the target material of the shading record of the shadow of an entity, which a Tint or
- * Opacity transition patches: the Tint and Opacity of its shape, the inherited tints and fade,
- * the color of the shadow and the alpha the shape covers it with. No node is set.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- * @param s The DrawSlot of the entity
- * @param material Material components of the shape (box_draws_shape_material)
- * @param out Receives the target material
- * @return Whether the entity draws a shadow
- */
-bool box_draws_box_shadow_target(
-    const ecs_world_t *world,
-    box_render_draws_t *d,
-    ecs_entity_t e,
-    const DrawSlot *s,
-    const box_draw_material_t *material,
-    box_draw_transition_material_t *out);
-
-/** Get the target of the box shadow record of an entity whose BoxShadow transitions: the
- * target material of box_draws_box_shadow_target with the resolved Rect in shape2d, the
- * BoxShadow, the mesh scale and the world matrix of its shape.
- *
- * No node is set, rel is the identity and transform 0.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- * @param s The DrawSlot of the entity
- * @param material Material components of the shape (box_draws_shape_material)
- * @param out Receives the target
- * @return Whether the entity has a shadow slot
- */
-bool box_draws_box_shadow_transition(
-    const ecs_world_t *world,
-    box_render_draws_t *d,
-    ecs_entity_t e,
-    const DrawSlot *s,
-    const box_draw_material_t *material,
-    box_draw_transition_box_shadow_t *out);
-
-/** Write the transform and the shading of a shadow from the target of a box shadow record and
- * a BoxShadow, as box_draws_box_shadow_update writes them. Pure: the resolver calls it on the
- * render thread.
- *
- * A shadow box without an area writes an instance that draws nothing. The clip and rank of the
- * shading are kept.
- *
- * @param material The material components, with the rendered Tint, Opacity and fade
- * @param record The target of the record
- * @param shadow The BoxShadow to draw, the value its node renders
- * @param world World matrix of the shape, the one it renders at
- * @param transform The box_render_transform_t of the shadow in the packet data, unaligned
- * @param shading The box_render_shading_t of the shadow in the packet data, unaligned
- */
-void box_draws_box_shadow_patch(
-    const box_draw_material_t *material,
-    const box_draw_transition_box_shadow_t *record,
-    const BoxShadow *shadow,
-    mat4 world,
-    void *transform,
-    void *shading);
-
-/** Get an instance matrix of the shadow of an entity, relative to the world transform of its
- * shape, whose quad holds every shadow a BoxShadow transition renders between per field bounds.
- *
- * It has the widest blur and spread, grown by half the range of the offset around its middle.
- *
- * @param world The world
- * @param e The entity
- * @param lo Per field minimum of offset_x, offset_y, blur and spread
- * @param hi Per field maximum of them
- * @param out Receives the matrix
- * @return Whether that shadow box has an area
- */
-bool box_draws_box_shadow_bound(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    const float *lo,
-    const float *hi,
-    mat4 out);
-
-/** Get the alpha a shape covers what is under it with at its edge, which the shadow is cut out
- * by: its opacity, times the alpha of its border when it has one, for the blend modes that draw
- * over the target, 0 for the others (Additive, Multiply and the like), which cover nothing.
- *
- * Pure, so the resolver computes it again for the Border a transition renders.
- *
- * @param shape The resolved shape
- * @param blend The blend mode of the shape
- * @param alpha Resolved opacity of the shape
- * @return The alpha from 0 to 1
- */
-float box_draws_box_shadow_cover(
-    const Shape2D *shape,
-    uint8_t blend,
-    float alpha);
-
-/** Encode the color and the cover alpha of the shading of a shadow from a shadow record, as
- * box_draws_box_shadow_update writes them. Pure: the resolver calls it on the render thread.
- *
- * @param material The material components, with the rendered Tint, Opacity and fade
- * @param target The target material of the record
- * @param dst The box_render_shading_t of the shadow in the packet data, unaligned
- */
-void box_draws_box_shadow_encode(
-    const box_draw_material_t *material,
-    const box_draw_transition_material_t *target,
-    void *dst);
-
-/** Free the shadow slot of an entity.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- */
-void box_draws_box_shadow_remove(
-    ecs_world_t *world,
-    box_render_draws_t *d,
-    ecs_entity_t e);
-
-/** Point the BoxShadowSlot of an entity at the slot its shadow moves to, when the shadow is the
- * instance that moves.
- *
- * @param world The world
- * @param moved The entity of the instance that moves
- * @param batch Index of the batch
- * @param from The slot the instance was in
- * @param to The slot the instance moves to
- * @return Whether the instance is the shadow of the entity
- */
-bool box_draws_box_shadow_moved(
-    ecs_world_t *world,
-    ecs_entity_t moved,
-    int32_t batch,
-    int32_t from,
-    int32_t to);
-
 /** Initialize the clip areas of the 2D draws.
  *
  * @param d The state
@@ -1996,9 +1771,10 @@ void box_draws_clips_fini(
     box_render_draws_t *d);
 
 /** Get the clip index of the nearest ClipChildren ancestor of an entity, giving the ancestor
- * an index when it has none. The walk stops at a floating element (LayoutFloat) that is not a
- * clipped overlay (LayoutFloat.clip); when that float has hide_clipped, the entity takes the
- * clip index of the float, which hides it while the anchor of the float is clipped out.
+ * an index when it has none.
+ *
+ * The walk stops at a LayoutFloat that is not a clipped overlay; when that float has
+ * hide_clipped, the entity takes the clip index of the float, which hides with its anchor.
  *
  * @param world The world
  * @param d The state
@@ -2128,5 +1904,7 @@ void box_draws_batches_fini(
 void box_draws_reset_backend(
     box_render_draws_t *d,
     box_mesh_cache_t *cache);
+
+#include "draw_box_shadow.h"
 
 #endif

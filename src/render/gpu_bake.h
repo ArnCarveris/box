@@ -22,10 +22,10 @@
 #define BOX_GPU_BAKE_MEASURE_MAX (1000.0)
 
 /** Timestamp queries of a readback: the beginning of the span, a scratch end of the pass that
- * begins it, a scratch beginning of the pass that ends it and the end of the span. Every timed
- * pass writes both of its timestamps: the browser (emdawnwebgpu) passes
- * WGPU_QUERY_SET_INDEX_UNDEFINED on as the index 4294967295, out of range of the query set,
- * which makes the pass and its command buffer invalid */
+ * begins it, a scratch beginning of the pass that ends it and the end of the span.
+ *
+ * Every timed pass writes both of its timestamps: the browser passes an undefined index on as
+ * 4294967295, out of range of the query set, which makes the command buffer invalid */
 #define BOX_GPU_BAKE_QUERIES (4)
 
 /** Byte alignment of the destination of a query resolve */
@@ -144,12 +144,12 @@ typedef struct box_gpu_bake_draw_t {
     uint32_t kind;                  /**< Dynamic offset of the DrawKind in material */
     WGPUBindGroup instances;        /**< Instance page with the surface assets of the mesh */
     WGPUBindGroup page;             /**< Instance page the cull reads, not held by the bundles */
-    WGPUBuffer buffer;
-    uint64_t mesh;
-    uint64_t vertex_offset;
-    uint64_t vertex_size;
-    uint64_t index_offset;
-    uint64_t index_size;
+    WGPUBuffer buffer;              /**< Buffer with the vertices and indices of the mesh */
+    uint64_t mesh;                  /**< Id of the mesh (box_gpu_mesh_t.id) */
+    uint64_t vertex_offset;         /**< Offset of the vertices in buffer */
+    uint64_t vertex_size;           /**< Bytes of the vertices */
+    uint64_t index_offset;          /**< Offset of the indices in buffer */
+    uint64_t index_size;            /**< Bytes of the indices */
 } box_gpu_bake_draw_t;
 
 /** What the render bundles of the faces bind besides their batches */

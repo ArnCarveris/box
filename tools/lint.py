@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
-"""Checks C sources against CODING_STYLE.md.
+"""Checks a C source against CODING_STYLE.md. Runs as the bake3 "lint" command.
 
-Usage: lint.py [--fix] [paths...]
-       lint.py <file> <log|error|autofix>   (bake3 "lint" command)
+Usage: lint.py <file> <log|error|autofix>
 """
 import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_PATHS = ["include", "src", "apps", "test", "bench"]
-LEGACY = ["test/cpu/transform"]
-EXTENSIONS = (".c", ".h", ".m")
 BAKE_ACTIONS = ("log", "error", "autofix")
 MAX_LINE = 100
 MAX_FUNCTION_LINES = 200
 MAX_FILE_LINES = 2000
 MAX_PARAGRAPH_LINES = 3
 MAX_PARAGRAPHS = 2
-TEST_REF = re.compile(r"^\s*// [a-z0-9_]+(/[a-z0-9_]+){0,2}$")
 FUNC_START = re.compile(r"^(?:static\s+|inline\s+|extern\s+)*[A-Za-z_][A-Za-z0-9_ \*]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\($")
 FUNC_ONE_LINE = re.compile(r"^(?:static\s+|inline\s+|extern\s+)*[A-Za-z_][A-Za-z0-9_ \*]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*\{?\s*$")
 CONTROL = {"if", "for", "while", "switch", "return", "sizeof", "else", "do"}
@@ -29,8 +23,6 @@ class Lint:
         self.path = path
         self.lines = lines
         self.problems = []
-        self.is_bench = path.startswith("bench/") or "/bench/" in path
-        self.is_test = self.is_bench or path.startswith("test/") or "/test/" in path
         self.is_header = path.endswith(".h")
 
     def report(self, line, message):
@@ -127,7 +119,7 @@ class Lint:
             j -= 1
         if j < 0 or not self.lines[j].strip().endswith("*/"):
             is_static = self.lines[start].startswith("static")
-            if (self.is_bench or not self.is_test) and (is_static or self.is_header):
+            if is_static or self.is_header:
                 self.report(start + 1, f"{name}: missing doc comment")
             return
         k = j
@@ -159,9 +151,7 @@ class Lint:
             stripped = line.strip()
             code = self.strip_strings(line)
             if "//" in code or "/*" in code:
-                allowed = self.is_test and idx == 0 and TEST_REF.match(line)
-                if not allowed:
-                    self.report(lineno, f"{name}: comment inside function body")
+                self.report(lineno, f"{name}: comment inside function body")
             if re.match(r"return\b", stripped):
                 if depth > 0:
                     self.report(lineno, f"{name}: return inside a block, use a single exit point")
@@ -180,14 +170,6 @@ class Lint:
         for name, start, brace_line, end in self.function_bodies():
             if end is None:
                 self.check_comment(name, start, brace_line)
-                continue
-            if self.is_bench and self.lines[start].startswith("static"):
-                self.check_signature(name, start, brace_line)
-                self.check_comment(name, start, brace_line)
-                self.check_body(name, brace_line, end)
-                continue
-            if self.is_test:
-                self.check_body(name, brace_line, end)
                 continue
             self.check_signature(name, start, brace_line)
             self.check_comment(name, start, brace_line)
@@ -274,26 +256,6 @@ class Lint:
                 k += 1
 
 
-def collect(paths):
-    for path in paths:
-        full = os.path.join(ROOT, path)
-        if os.path.isfile(full):
-            yield full
-            continue
-        for dirpath, dirs, files in os.walk(full):
-            if os.path.relpath(dirpath, ROOT) in LEGACY:
-                dirs[:] = []
-                continue
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "deliverable"]
-            for name in sorted(files):
-                inside = dirpath + "/"
-                generated = "apps" not in dirpath or "/test/" in inside or "/bench/" in inside
-                if name == "bake_config.h" or (name == "main.c" and generated):
-                    continue
-                if name.endswith(EXTENSIONS):
-                    yield os.path.join(dirpath, name)
-
-
 def fix_signature(lines, i):
     stripped = lines[i].strip()
     match = FUNC_ONE_LINE.match(stripped)
@@ -343,20 +305,15 @@ def fix_blank_lines(lines, lint):
     return out
 
 
-def fix_file(path, rel=None):
+def fix_file(path):
     with open(path) as f:
         original = f.read()
     lines = original.splitlines(True)
-    rel = rel or os.path.relpath(path, ROOT)
-    lint = Lint(rel, lines)
     i = 0
     while i < len(lines):
-        if lint.is_test and not (lint.is_bench and lines[i].startswith("static")):
-            i += 1
-            continue
         i = fix_signature(lines, i)
     lines = "".join(lines).splitlines(True)
-    lint = Lint(rel, lines)
+    lint = Lint(path, lines)
     lines = fix_blank_lines(lines, lint)
     text = "".join(lines)
     if text != original:
@@ -369,30 +326,20 @@ def lint_one(path, action):
         fix_file(path)
     with open(path) as f:
         lines = f.readlines()
-    problems = Lint(os.path.relpath(path, ROOT), lines).run()
-    for rel, line, message in problems:
-        print(f"{rel}:{line}: {message}")
+    problems = Lint(path, lines).run()
+    for file, line, message in problems:
+        print(f"{os.path.relpath(file)}:{line}: {message}")
 
     return 1 if problems else 0
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[2] in BAKE_ACTIONS and os.path.isfile(sys.argv[1]):
-        return lint_one(os.path.abspath(sys.argv[1]), sys.argv[2])
-    fix = "--fix" in sys.argv
-    paths = [a for a in sys.argv[1:] if a != "--fix"] or DEFAULT_PATHS
-    if fix:
-        for path in collect(paths):
-            fix_file(path)
-    problems = []
-    for path in collect(paths):
-        with open(path) as f:
-            lines = f.readlines()
-        problems.extend(Lint(os.path.relpath(path, ROOT), lines).run())
-    for path, line, message in problems:
-        print(f"{path}:{line}: {message}")
-    print(f"{len(problems)} problem(s)")
-    return 1 if problems else 0
+    args = sys.argv[1:]
+    if len(args) != 2 or args[1] not in BAKE_ACTIONS or not os.path.isfile(args[0]):
+        print("usage: lint.py <file> <log|error|autofix>", file=sys.stderr)
+        return 2
+
+    return lint_one(os.path.abspath(args[0]), args[1])
 
 
 if __name__ == "__main__":

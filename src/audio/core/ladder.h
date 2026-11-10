@@ -3,28 +3,20 @@
  * @brief The transistor ladder of the core: the 4-pole filter of the synth for
  * BOX_AUDIO_SYNTH_LADDER.
  *
- * Four one-pole stages, each with the tanh of its input and of its output as a transistor
- * ladder has them, inside a feedback loop with a tanh of its own, in the style of
- * Huovilainen. It is solved with zero delay feedback, after the cheap non-linear filters of
- * Mystran: the slope tanh(v) / v of each nonlinearity is taken from the state of its stage,
- * which makes the frame a linear system that is solved at once. Every stage is integrated with
- * the trapezoidal rule from g = tan(pi cutoff / rate), so the ladder is in tune up to the
- * clamp of the cutoff under Nyquist without oversampling, and the slopes never exceed 1, so it
- * stays bounded at any cutoff while it moves.
+ * Four one-pole stages with the tanh of their input and output in a feedback loop with a tanh
+ * of its own, after Huovilainen, solved with zero delay feedback after Mystran. Trapezoidal
+ * stages keep it in tune without oversampling and bounded at any cutoff while it moves.
  *
- * The feedback is BOX_AUDIO_LADDER_K times the resonance, with BOX_AUDIO_LADDER_EXCESS more at
- * the top, so it passes 4, where the linear ladder oscillates, close to resonance 1; the tanh
- * of the loop holds the oscillation at a steady level, a near sine at the cutoff. The lowpass
- * takes a share BOX_AUDIO_LADDER_BASS of the input into the feedback sum, which gives back
- * most of the passband a ladder loses as its resonance rises. The other kinds mix the outputs
- * of the stages, as a multimode ladder does. Private to src/audio/core; included by
- * internal.h.
+ * The feedback, BOX_AUDIO_LADDER_K times the resonance plus BOX_AUDIO_LADDER_EXCESS at the top,
+ * self-oscillates near resonance 1; the lowpass feeds back a share BOX_AUDIO_LADDER_BASS of the
+ * input to keep its passband. Private to src/audio/core; included by internal.h.
  */
 
 #ifndef BOX_AUDIO_CORE_LADDER_H
 #define BOX_AUDIO_CORE_LADDER_H
 
 #include "core.h"
+#include "clean.h"
 
 /** Feedback of the ladder at resonance 1 without the excess: the linear ladder oscillates at
  * a feedback of 4 */

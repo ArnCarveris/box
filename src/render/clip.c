@@ -5,11 +5,9 @@
  * Every clip has an index into the clip buffer that the 2D instances below it hold; its area is
  * computed every frame from the element and uploaded when one changed.
  *
- * Slice records (Rects with an ImageSlice) take two clip records and polygon records (Polygon2D)
- * a header and chunks of five per 14 edges, so the 2D shape shader reads them without a binding
- * of its own; a polygon that outgrows its run of records moves to a free run that it fits. Slice
- * records are computed when the shape changed or the texture of its image changed size, as when
- * it finished loading or its Surface resized.
+ * Slice records (ImageSlice) take two clip records and polygon records (Polygon2D) a header and
+ * chunks of five per 14 edges; a polygon that outgrows its run moves to a free run. Slices are
+ * recomputed when the shape or the size of the texture of its image changed.
  */
 
 #include "draw.h"

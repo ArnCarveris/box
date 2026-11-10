@@ -1,15 +1,36 @@
+/**
+ * @file render/gpu_mesh_pool.c
+ * @brief Pool of large buffers the vertices and indices of meshes are suballocated from.
+ *
+ * Each page is a buffer with a sorted list of free ranges. A range is taken from the first page
+ * that fits it, and a new page is created when none does.
+ */
+
 #include "gpu.h"
 
 #ifdef BOX_RENDER_WGPU
 
+/** Bytes of a page of the mesh pool, unless a range needs a larger one */
 #define BOX_GPU_MESH_PAGE_SIZE (32ull * 1024 * 1024)
 
+/** Round a size up to a multiple of BOX_GPU_MESH_ALIGN.
+ *
+ * @param size Bytes
+ * @return The rounded size
+ */
 static uint64_t box_gpu_mesh_pool_align(
     uint64_t size)
 {
     return (size + BOX_GPU_MESH_ALIGN - 1) & ~(uint64_t)(BOX_GPU_MESH_ALIGN - 1);
 }
 
+/** Take a range from the first free range of a page that fits it.
+ *
+ * @param pg The page
+ * @param size Bytes of the range, aligned
+ * @param offset Receives the offset of the range
+ * @return Whether the page had a free range that fits
+ */
 static bool box_gpu_mesh_pool_take(
     box_gpu_mesh_page_t *pg,
     uint64_t size,
@@ -38,6 +59,12 @@ static bool box_gpu_mesh_pool_take(
     return result;
 }
 
+/** Add a page to the mesh pool with a single free range over its buffer.
+ *
+ * @param gpu The backend
+ * @param size Bytes the page must hold at least
+ * @return The page, whose buffer is NULL when it could not be created
+ */
 static box_gpu_mesh_page_t* box_gpu_mesh_pool_page_new(
     box_gpu_t *gpu,
     uint64_t size)
@@ -54,6 +81,7 @@ static box_gpu_mesh_page_t* box_gpu_mesh_pool_page_new(
         .offset = 0,
         .size = pg->size
     };
+
     return pg;
 }
 

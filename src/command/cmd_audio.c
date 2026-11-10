@@ -135,34 +135,6 @@ static const char* box_cmd_audio_effect_state(
     return result;
 }
 
-/** Name a kind of a band of an equalizer.
- *
- * @param kind The kind
- * @return Its name
- */
-static const char* box_cmd_audio_eq_kind(
-    AudioEqKind kind)
-{
-    static const char *names[] = {
-        "off", "peak", "low shelf", "high shelf", "low cut", "high cut"
-    };
-
-    return (uint32_t)kind < 6 ? names[kind] : "?";
-}
-
-/** Name a kind of a filter.
- *
- * @param kind The kind
- * @return Its name
- */
-static const char* box_cmd_audio_filter_kind(
-    SynthFilterKind kind)
-{
-    static const char *names[] = { "lowpass", "highpass", "bandpass", "notch" };
-
-    return (uint32_t)kind < 4 ? names[kind] : "?";
-}
-
 /** Append the modulators that move a member of a bus or an effect: each with its source, its
  * timing, its depth, its member and whether it runs.
  *
@@ -248,26 +220,9 @@ static void box_cmd_audio_effects(
     int32_t j;
     for (j = 0; j < BOX_AUDIO_EFFECT_SLOTS; j ++) {
         ecs_entity_t e = bus->effects[j];
-        const Reverb *reverb;
-        const Equalizer *eq;
-        const AudioFilter *filter;
-        const Compressor *comp;
-        const Gate *gate;
-        const Delay *delay;
-        const Phaser *phaser;
-        const Chorus *chorus;
-        const Saturator *saturator;
-        const TransientShaper *shaper;
-        const FrequencyShifter *shifter;
-        const PitchShifter *pitch;
-        const PatternGate *pattern;
-        const Rotary *rotary;
-        const BeatRepeat *repeat;
-        const TapeStop *stop;
-        const Vocoder *vocoder;
         const box_audio_module_t *state = box_audio_module_get(world);
         char *path;
-        int32_t b, slot;
+        int32_t slot;
         if (!e) {
             continue;
         }
@@ -281,160 +236,7 @@ static void box_cmd_audio_effects(
 
         path = ecs_get_path(world, e);
         ecs_strbuf_append(buf, ", insert %d %s: ", j, path);
-        reverb = ecs_get(world, e, Reverb);
-        if (reverb) {
-            ecs_strbuf_append(buf, "reverb decay %.2f damping %.2f predelay %.3f size %.2f "
-                "mix %.2f", (double)reverb->decay, (double)reverb->damping,
-                (double)reverb->predelay, (double)reverb->size, (double)reverb->mix);
-            if (reverb->shimmer > 0) {
-                ecs_strbuf_append(buf, " shimmer %.2f pitch %+.1f", (double)reverb->shimmer,
-                    (double)reverb->shimmer_pitch);
-            }
-        } else if ((eq = ecs_get(world, e, Equalizer))) {
-            ecs_strbuf_appendstr(buf, "eq");
-            for (b = 0; b < BOX_AUDIO_EQ_BANDS; b ++) {
-                const AudioEqBand *band = &eq->bands[b];
-                if (band->kind == AudioEqOff) {
-                    ecs_strbuf_appendstr(buf, " [off]");
-                } else {
-                    ecs_strbuf_append(buf, " [%s %.0f Hz %.1f dB q %.2f]",
-                        box_cmd_audio_eq_kind(band->kind), (double)band->frequency,
-                        (double)band->gain, (double)band->q);
-                }
-            }
-        } else if ((filter = ecs_get(world, e, AudioFilter))) {
-            ecs_strbuf_append(buf, "filter %s %d dB cutoff %.0f resonance %.2f mix %.2f",
-                box_cmd_audio_filter_kind(filter->kind),
-                filter->slope == SynthSlope24 ? 24 : 12, (double)filter->cutoff,
-                (double)filter->resonance, (double)filter->mix);
-        } else if ((comp = ecs_get(world, e, Compressor))) {
-            ecs_strbuf_append(buf, "compressor threshold %.1f dB ratio %.1f attack %.3f "
-                "release %.3f knee %.1f dB makeup %.1f dB mix %.2f", (double)comp->threshold,
-                (double)comp->ratio, (double)comp->attack, (double)comp->release,
-                (double)comp->knee, (double)comp->makeup, (double)comp->mix);
-            if (comp->sidechain) {
-                char *key = ecs_is_alive(world, comp->sidechain) ?
-                    ecs_get_path(world, comp->sidechain) : NULL;
-                ecs_strbuf_append(buf, " sidechain %s", key ? key : "(deleted)");
-                ecs_os_free(key);
-            }
-        } else if ((gate = ecs_get(world, e, Gate))) {
-            ecs_strbuf_append(buf, "gate threshold %.1f dB attack %.4f hold %.3f release %.3f "
-                "range %.1f dB", (double)gate->threshold, (double)gate->attack,
-                (double)gate->hold, (double)gate->release, (double)gate->range);
-        } else if ((delay = ecs_get(world, e, Delay))) {
-            if (delay->sync > 0) {
-                ecs_strbuf_append(buf, "delay sync %.3f beats", (double)delay->sync);
-            } else {
-                ecs_strbuf_append(buf, "delay time %.3f", (double)delay->time);
-            }
-
-            ecs_strbuf_append(buf, " feedback %.2f damping %.0f Hz mix %.2f%s",
-                (double)delay->feedback, (double)delay->damping, (double)delay->mix,
-                delay->ping_pong ? " ping pong" : "");
-        } else if ((phaser = ecs_get(world, e, Phaser))) {
-            ecs_strbuf_append(buf, "phaser stages %d rate %.2f Hz depth %.2f center %.0f Hz "
-                "feedback %.2f mix %.2f stereo %.2f", phaser->stages, (double)phaser->rate,
-                (double)phaser->depth, (double)phaser->center, (double)phaser->feedback,
-                (double)phaser->mix, (double)phaser->stereo);
-        } else if ((chorus = ecs_get(world, e, Chorus))) {
-            ecs_strbuf_append(buf, "chorus voices %d rate %.2f Hz depth %.2f ms delay %.2f ms "
-                "mix %.2f spread %.2f feedback %.2f", chorus->voices, (double)chorus->rate,
-                (double)chorus->depth, (double)chorus->delay, (double)chorus->mix,
-                (double)chorus->spread, (double)chorus->feedback);
-        } else if ((saturator = ecs_get(world, e, Saturator))) {
-            static const char *modes[] = { "tanh", "tube", "hard", "fold", "rectify" };
-            ecs_strbuf_appendstr(buf, "saturator");
-            if (saturator->mode != SaturatorTanh && saturator->mode >= 0 &&
-                saturator->mode <= SaturatorRectify)
-            {
-                ecs_strbuf_append(buf, " %s", modes[saturator->mode]);
-            }
-
-            ecs_strbuf_append(buf, " drive %.2f asymmetry %.2f",
-                (double)saturator->drive, (double)saturator->asymmetry);
-            if (saturator->low_cut > 0) {
-                ecs_strbuf_append(buf, " low cut %.0f Hz", (double)saturator->low_cut);
-            }
-
-            if (saturator->tone != 0) {
-                ecs_strbuf_append(buf, " tone %.2f", (double)saturator->tone);
-            }
-
-            if (saturator->high_cut > 0) {
-                ecs_strbuf_append(buf, " high cut %.0f Hz", (double)saturator->high_cut);
-            }
-
-            if (saturator->rate > 0) {
-                ecs_strbuf_append(buf, " rate %.0f Hz", (double)saturator->rate);
-            }
-
-            if (saturator->bits < 16) {
-                ecs_strbuf_append(buf, " bits %.1f", (double)saturator->bits);
-            } else {
-                ecs_strbuf_appendstr(buf, " bits off");
-            }
-
-            ecs_strbuf_append(buf, " mix %.2f", (double)saturator->mix);
-        } else if ((shaper = ecs_get(world, e, TransientShaper))) {
-            ecs_strbuf_append(buf, "transient shaper attack %.2f sustain %.2f",
-                (double)shaper->attack, (double)shaper->sustain);
-        } else if ((shifter = ecs_get(world, e, FrequencyShifter))) {
-            ecs_strbuf_append(buf, "frequency shifter %s %+.1f Hz stereo %.2f feedback %.2f "
-                "mix %.2f", shifter->mode == FrequencyRing ? "ring" : "shift",
-                (double)shifter->shift, (double)shifter->stereo, (double)shifter->feedback,
-                (double)shifter->mix);
-        } else if ((pitch = ecs_get(world, e, PitchShifter))) {
-            ecs_strbuf_append(buf, "pitch shifter semitones %+.1f cents %+.1f stereo %.2f "
-                "window %.1f ms feedback %.2f mix %.2f", (double)pitch->semitones,
-                (double)pitch->cents, (double)pitch->stereo, (double)pitch->window,
-                (double)pitch->feedback, (double)pitch->mix);
-        } else if ((pattern = ecs_get(world, e, PatternGate))) {
-            int32_t length = pattern->length < 1 ? 1 : (pattern->length > 16 ? 16 :
-                pattern->length);
-            ecs_strbuf_appendstr(buf, "pattern gate steps [");
-            for (b = 0; b < length; b ++) {
-                ecs_strbuf_append(buf, b ? " %g" : "%g", (double)pattern->steps[b]);
-            }
-
-            ecs_strbuf_append(buf, "] rate %.3f beats swing %.2f gate %.2f attack %.4f "
-                "release %.3f floor %.1f dB mix %.2f", (double)pattern->rate,
-                (double)pattern->swing, (double)pattern->gate, (double)pattern->attack,
-                (double)pattern->release, (double)pattern->floor, (double)pattern->mix);
-        } else if ((rotary = ecs_get(world, e, Rotary))) {
-            ecs_strbuf_append(buf, "rotary speed %.2f horn %.2f-%.2f Hz drum %.2f-%.2f Hz "
-                "acceleration %.2f s balance %.2f spread %.2f drive %.2f mix %.2f",
-                (double)rotary->speed, (double)rotary->horn_slow, (double)rotary->horn_fast,
-                (double)rotary->drum_slow, (double)rotary->drum_fast,
-                (double)rotary->acceleration, (double)rotary->balance,
-                (double)rotary->spread, (double)rotary->drive, (double)rotary->mix);
-        } else if ((repeat = ecs_get(world, e, BeatRepeat))) {
-            ecs_strbuf_append(buf, "beat repeat %s slice %.4g beats", repeat->active >= 0.5f ?
-                "active" : "inactive", (double)repeat->slice);
-            if (repeat->grid < 0) {
-                ecs_strbuf_appendstr(buf, " grid slice");
-            } else {
-                ecs_strbuf_append(buf, " grid %.4g", (double)repeat->grid);
-            }
-
-            ecs_strbuf_append(buf, " decay %.2f pitch %+.1f gate %.2f mix %.2f%s",
-                (double)repeat->decay, (double)repeat->pitch, (double)repeat->gate,
-                (double)repeat->mix, repeat->reverse >= 0.5f ? " reverse" : "");
-        } else if ((stop = ecs_get(world, e, TapeStop))) {
-            ecs_strbuf_append(buf, "tape stop %s stop %.3f s start %.3f s curve %+.2f",
-                stop->active >= 0.5f ? "active" : "inactive", (double)stop->stop_time,
-                (double)stop->start_time, (double)stop->curve);
-        } else if ((vocoder = ecs_get(world, e, Vocoder))) {
-            char *key = vocoder->modulator && ecs_is_alive(world, vocoder->modulator) ?
-                ecs_get_path(world, vocoder->modulator) : NULL;
-            ecs_strbuf_append(buf, "vocoder modulator %s bands %d low %.0f Hz high %.0f Hz "
-                "q %.2f attack %.4f release %.3f shift %.2f unvoiced %.2f mix %.2f",
-                key ? key : (vocoder->modulator ? "(deleted)" : "(none)"), vocoder->bands,
-                (double)vocoder->low, (double)vocoder->high, (double)vocoder->q,
-                (double)vocoder->attack, (double)vocoder->release, (double)vocoder->shift,
-                (double)vocoder->unvoiced, (double)vocoder->mix);
-            ecs_os_free(key);
-        }
+        box_cmd_audio_effect_params(world, buf, e);
 
         slot = box_audio_module_effect_slot(world, e);
         if ((ecs_has(world, e, Compressor) || ecs_has(world, e, Gate) ||
@@ -1022,6 +824,12 @@ static char* box_cmd_audio_print(
     return ecs_strbuf_get(&buf);
 }
 
+/** Set the master volume.
+ *
+ * @param world The world
+ * @param volume The volume, 0 to BOX_AUDIO_VOLUME_MAX
+ * @return The new volume, NULL with an error logged when it is out of range
+ */
 static char* box_cmd_audio_volume(
     ecs_world_t *world,
     double volume)
@@ -1042,6 +850,12 @@ done:
     return result;
 }
 
+/** Set or toggle the mute of everything.
+ *
+ * @param world The world
+ * @param state On, off or toggle
+ * @return The new mute state
+ */
 static char* box_cmd_audio_mute(
     ecs_world_t *world,
     box_cmd_switch_t state)
@@ -1054,6 +868,14 @@ static char* box_cmd_audio_mute(
     return ecs_os_strdup(mute ? "mute on" : "mute off");
 }
 
+/** Start a capture of the master output to a WAV file.
+ *
+ * @param world The world
+ * @param seconds Seconds to record, at most BOX_AUDIO_CAPTURE_MAX
+ * @param resource Receives the WAV resource, unused in the browser
+ * @return The name of the resource, or the path of the file in the browser; NULL with an error
+ * logged
+ */
 static char* box_cmd_audio_capture(
     ecs_world_t *world,
     double seconds,
@@ -1092,6 +914,11 @@ done:
     return result;
 }
 
+/** Tell whether box.audio is imported, logging an error when it is not.
+ *
+ * @param world The world
+ * @return Whether box.audio is imported
+ */
 static bool box_cmd_audio_ready(
     ecs_world_t *world)
 {
@@ -1103,6 +930,11 @@ static bool box_cmd_audio_ready(
     return result;
 }
 
+/** Tell whether the sequencer of box.audio is imported, logging an error when it is not.
+ *
+ * @param world The world
+ * @return Whether Track is registered
+ */
 static bool box_cmd_audio_sequencer_ready(
     ecs_world_t *world)
 {
@@ -1114,6 +946,13 @@ static bool box_cmd_audio_sequencer_ready(
     return result;
 }
 
+/** Get a string argument of a command.
+ *
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param index Index of the argument
+ * @return The argument, an empty string when it is missing
+ */
 static const char* box_cmd_audio_arg(
     int32_t argc,
     const ecs_value_t *argv,
@@ -1124,6 +963,13 @@ static const char* box_cmd_audio_arg(
     return result ? result : "";
 }
 
+/** Get a Switch argument of a command.
+ *
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param index Index of the argument
+ * @return The state, BoxCmdSwitchToggle when the argument is missing
+ */
 static box_cmd_switch_t box_cmd_audio_arg_switch(
     int32_t argc,
     const ecs_value_t *argv,
@@ -1133,6 +979,14 @@ static box_cmd_switch_t box_cmd_audio_arg_switch(
         BoxCmdSwitchToggle;
 }
 
+/** Get a number argument of a command.
+ *
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param index Index of the argument
+ * @param fallback Value when the argument is missing
+ * @return The number
+ */
 static double box_cmd_audio_arg_number(
     int32_t argc,
     const ecs_value_t *argv,
@@ -1142,6 +996,14 @@ static double box_cmd_audio_arg_number(
     return argc > index ? *(const double*)argv[index].ptr : fallback;
 }
 
+/** Collect the string arguments of a command from an index on.
+ *
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param first Index of the first argument
+ * @param out Receives the arguments, room for BOX_CMD_AUDIO_OPTIONS_MAX + 1
+ * @return Number of arguments collected
+ */
 static int32_t box_cmd_audio_arg_list(
     int32_t argc,
     const ecs_value_t *argv,
@@ -1156,6 +1018,11 @@ static int32_t box_cmd_audio_arg_list(
     return count;
 }
 
+/** Get the resource a command result receives.
+ *
+ * @param result The result of the command
+ * @return The resource, NULL in the browser
+ */
 static ecs_shell_resource_t* box_cmd_audio_resource(
     ecs_value_t *result)
 {
@@ -1169,6 +1036,11 @@ static ecs_shell_resource_t* box_cmd_audio_resource(
     return out;
 }
 
+/** Store the output of a command that returns a resource.
+ *
+ * @param result The result of the command
+ * @param out The output, which becomes the result string in the browser and is freed otherwise
+ */
 static void box_cmd_audio_resource_set(
     ecs_value_t *result,
     char *out)
@@ -1181,6 +1053,13 @@ static void box_cmd_audio_resource_set(
 #endif
 }
 
+/** The audio command: print the status of the audio.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv Unused
+ * @param result Receives the status
+ */
 static void box_cmd_audio_status_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1194,6 +1073,13 @@ static void box_cmd_audio_status_cmd(
     }
 }
 
+/** The audio.volume command: set the master volume.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The volume
+ * @param result Receives the new volume
+ */
 static void box_cmd_audio_volume_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1206,6 +1092,13 @@ static void box_cmd_audio_volume_cmd(
     }
 }
 
+/** The audio.mute command: set or toggle the mute of everything.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The optional state
+ * @param result Receives the new mute state
+ */
 static void box_cmd_audio_mute_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1218,6 +1111,13 @@ static void box_cmd_audio_mute_cmd(
     }
 }
 
+/** The audio.mute_bus command: set or toggle the mute of a bus.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The bus and the optional state
+ * @param result Receives the new mute state
+ */
 static void box_cmd_audio_mute_bus_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1230,6 +1130,13 @@ static void box_cmd_audio_mute_bus_cmd(
     }
 }
 
+/** The audio.solo command: set or toggle the solo of a bus.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The bus and the optional state
+ * @param result Receives the new solo state
+ */
 static void box_cmd_audio_solo_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1242,6 +1149,13 @@ static void box_cmd_audio_solo_cmd(
     }
 }
 
+/** The audio.bypass command: bypass an effect, or stop bypassing it.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The effect and the optional state
+ * @param result Receives the new bypass state
+ */
 static void box_cmd_audio_bypass_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1254,6 +1168,13 @@ static void box_cmd_audio_bypass_cmd(
     }
 }
 
+/** The audio.note command: play one note of a sound or an instrument now.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The subject, the note and the optional velocity and duration
+ * @param result Receives what plays
+ */
 static void box_cmd_audio_note_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1268,6 +1189,13 @@ static void box_cmd_audio_note_cmd(
     }
 }
 
+/** The audio.play command: play the transport.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv Unused
+ * @param result Receives the position it plays from
+ */
 static void box_cmd_audio_play_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1284,6 +1212,13 @@ static void box_cmd_audio_play_cmd(
     }
 }
 
+/** The audio.stop command: stop the transport.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv Unused
+ * @param result Receives a confirmation
+ */
 static void box_cmd_audio_stop_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1299,6 +1234,13 @@ static void box_cmd_audio_stop_cmd(
     }
 }
 
+/** The audio.seek command: move the transport to a position in beats.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The position
+ * @param result Receives the new position
+ */
 static void box_cmd_audio_seek_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1322,6 +1264,13 @@ done:
     return;
 }
 
+/** The audio.tempo command: set the tempo of the transport.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The tempo in quarter notes per minute
+ * @param result Receives the new tempo
+ */
 static void box_cmd_audio_tempo_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1345,6 +1294,13 @@ done:
     return;
 }
 
+/** The audio.song command: show the song, load a song file or unload it.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The optional file
+ * @param result Receives the song
+ */
 static void box_cmd_audio_song_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1357,6 +1313,13 @@ static void box_cmd_audio_song_cmd(
     }
 }
 
+/** The audio.capture command: record the master output to a WAV resource.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The seconds to record
+ * @param result Receives the WAV resource
+ */
 static void box_cmd_audio_capture_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1370,6 +1333,13 @@ static void box_cmd_audio_capture_cmd(
     }
 }
 
+/** The audio.render command: render a subject on its own to a WAV resource.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The subject and its options
+ * @param result Receives the WAV resource
+ */
 static void box_cmd_audio_render_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1385,6 +1355,13 @@ static void box_cmd_audio_render_cmd(
     }
 }
 
+/** The audio.analyze command: print the analysis of a WAV.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The WAV and the optional span
+ * @param result Receives the analysis
+ */
 static void box_cmd_audio_analyze_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1398,6 +1375,13 @@ static void box_cmd_audio_analyze_cmd(
     }
 }
 
+/** The audio.diff command: print how one WAV differs from another.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The two WAVs and the optional span
+ * @param result Receives the comparison
+ */
 static void box_cmd_audio_diff_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1412,6 +1396,13 @@ static void box_cmd_audio_diff_cmd(
     }
 }
 
+/** The audio.plot command: draw a PNG resource of a WAV.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The WAV and the options
+ * @param result Receives the PNG resource
+ */
 static void box_cmd_audio_plot_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1426,6 +1417,13 @@ static void box_cmd_audio_plot_cmd(
     }
 }
 
+/** The audio.meter command: measure the levels of the buses over a span of the live output.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The options
+ * @param result Receives the progress or the table
+ */
 static void box_cmd_audio_meter_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1439,6 +1437,13 @@ static void box_cmd_audio_meter_cmd(
     }
 }
 
+/** The audio.check command: lint the song or the tracks of the scene.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The options
+ * @param result Receives the report
+ */
 static void box_cmd_audio_check_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1452,6 +1457,13 @@ static void box_cmd_audio_check_cmd(
     }
 }
 
+/** The audio.notes command: print the notes of a track per bar, or as a piano roll.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The track and the options
+ * @param result Receives the notes
+ */
 static void box_cmd_audio_notes_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1465,6 +1477,13 @@ static void box_cmd_audio_notes_cmd(
     }
 }
 
+/** The audio.chords command: print the chords and the key of a section.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The options
+ * @param result Receives the chords
+ */
 static void box_cmd_audio_chords_cmd(
     const ecs_function_ctx_t *ctx,
     int32_t argc,
@@ -1478,6 +1497,13 @@ static void box_cmd_audio_chords_cmd(
     }
 }
 
+/** Add the optional string parameters of a command that takes a list of options.
+ *
+ * @param desc The command
+ * @param first Index of the first option parameter
+ * @param name Name of the parameters
+ * @param brief Description of the parameters
+ */
 static void box_cmd_audio_options(
     ecs_function_desc_t *desc,
     int32_t first,
@@ -1491,6 +1517,13 @@ static void box_cmd_audio_options(
     }
 }
 
+/** Register a subcommand of the audio command.
+ *
+ * @param world The world
+ * @param audio The audio command
+ * @param brief Description of the subcommand
+ * @param desc The subcommand
+ */
 static void box_cmd_audio_sub(
     ecs_world_t *world,
     ecs_entity_t audio,
@@ -1501,6 +1534,12 @@ static void box_cmd_audio_sub(
     box_command_register(world, brief, desc);
 }
 
+/** Register audio.volume, audio.mute, audio.mute_bus, audio.solo, audio.bypass and audio.note.
+ *
+ * @param world The world
+ * @param audio The audio command
+ * @param sw The Switch enum of on and off
+ */
 static void box_cmd_audio_init_mixer(
     ecs_world_t *world,
     ecs_entity_t audio,
@@ -1584,6 +1623,11 @@ static void box_cmd_audio_init_mixer(
         });
 }
 
+/** Register audio.play, audio.stop, audio.seek, audio.tempo and audio.song.
+ *
+ * @param world The world
+ * @param audio The audio command
+ */
 static void box_cmd_audio_init_transport(
     ecs_world_t *world,
     ecs_entity_t audio)
@@ -1635,6 +1679,11 @@ static void box_cmd_audio_init_transport(
         });
 }
 
+/** Register audio.capture, audio.render, audio.analyze, audio.diff and audio.plot.
+ *
+ * @param world The world
+ * @param audio The audio command
+ */
 static void box_cmd_audio_init_wav(
     ecs_world_t *world,
     ecs_entity_t audio)
@@ -1715,6 +1764,11 @@ static void box_cmd_audio_init_wav(
     box_cmd_audio_sub(world, audio, "Draw a PNG resource of a WAV", plot);
 }
 
+/** Register audio.meter, audio.notes, audio.chords and audio.check.
+ *
+ * @param world The world
+ * @param audio The audio command
+ */
 static void box_cmd_audio_init_sequencer(
     ecs_world_t *world,
     ecs_entity_t audio)

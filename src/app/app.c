@@ -926,10 +926,11 @@ done:
     return result ? result : ecs_os_strdup(path);
 }
 
-/** Check the settings of a run and load its scene. ecs_script returns the entity of a managed
- * script also when it fails to parse or evaluate; both leave EcsScript without a script and
- * set its error. A scene that fails to load is logged and the world still runs, so a scene
- * that waits for something that does not exist yet evaluates again once it does.
+/** Check the settings of a run and load its scene.
+ *
+ * ecs_script returns the entity of a managed script also when it fails to parse or evaluate. A
+ * scene that fails to load is logged and the world still runs, so a scene that waits for
+ * something that does not exist yet evaluates again once it does.
  *
  * The audio output opens here and nowhere else, so a world that imports box opens no device.
  *

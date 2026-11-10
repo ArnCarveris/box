@@ -1545,7 +1545,8 @@ static void box_audio_module_free(
 }
 
 /** Give SynthWavetable its full name. The reflection of a C enum strips the name of the enum
- * from its constants, which would leave it as "table" in scripts.
+ * from its constants, which would leave it as "table" in scripts. Setting the value of the
+ * constant again stores the new name in the constants of the enum.
  *
  * @param world The world
  */
@@ -1555,7 +1556,6 @@ static void box_audio_synth_wave_names(
     ecs_entity_t c = ecs_lookup_child(world, ecs_id(SynthWave), "table");
     ecs_assert(c != 0, ECS_INTERNAL_ERROR, NULL);
     ecs_set_name(world, c, "SynthWavetable");
-    /* Setting the value again stores the new name in the constants of the enum */
     ecs_set_pair_second(world, c, EcsConstant, ecs_i32_t, {SynthWavetable});
 }
 
@@ -1626,17 +1626,14 @@ static void box_audio_functions_init(
     });
 }
 
-void BoxAudioImport(
+/** Register the components of the output, the mixer, sounds, sources, streams,
+ * spatial audio, the reverb and the equalizer.
+ *
+ * @param world The world
+ */
+static void box_audio_mixer_register(
     ecs_world_t *world)
 {
-    ECS_MODULE(world, BoxAudio);
-    ECS_IMPORT(world, BoxTypes);
-    ECS_IMPORT(world, BoxTask);
-    ECS_IMPORT(world, BoxTransform);
-    ECS_IMPORT(world, BoxView);
-    ECS_IMPORT(world, BoxJobs);
-    ECS_IMPORT(world, BoxCurve);
-
     ECS_META_COMPONENT(world, AudioState);
     ECS_META_COMPONENT(world, AudioChannelKind);
     ECS_META_COMPONENT(world, AudioSend);
@@ -1672,6 +1669,16 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, AudioEqBand);
     ECS_META_COMPONENT(world, Equalizer);
     ecs_set_hooks(world, Equalizer, { .ctor = box_audio_equalizer_ctor });
+}
+
+/** Register the waves, oscillators, strings, bows, wavetables, envelopes and
+ * filters of synth sounds.
+ *
+ * @param world The world
+ */
+static void box_audio_synth_register(
+    ecs_world_t *world)
+{
     ECS_META_COMPONENT(world, SynthWave);
     box_audio_synth_wave_names(world);
     ECS_META_COMPONENT(world, SynthFilterKind);
@@ -1694,6 +1701,15 @@ void BoxAudioImport(
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
+}
+
+/** Register the effect components from AudioFilter to TapeStop.
+ *
+ * @param world The world
+ */
+static void box_audio_effects_register(
+    ecs_world_t *world)
+{
     ECS_META_COMPONENT(world, AudioFilter);
     ecs_set_hooks(world, AudioFilter, { .ctor = box_audio_filter_ctor });
     ECS_META_COMPONENT(world, Compressor);
@@ -1726,6 +1742,16 @@ void BoxAudioImport(
     ecs_set_hooks(world, BeatRepeat, { .ctor = box_audio_beat_repeat_ctor });
     ECS_META_COMPONENT(world, TapeStop);
     ecs_set_hooks(world, TapeStop, { .ctor = box_audio_tape_stop_ctor });
+}
+
+/** Register the synth envelopes, LFOs and routes, SynthSound, the settings, the
+ * status, the transport, songs, instruments, clips, modulators, macros and tracks.
+ *
+ * @param world The world
+ */
+static void box_audio_music_register(
+    ecs_world_t *world)
+{
     ECS_META_COMPONENT(world, SynthFilterEnvelope);
     ECS_META_COMPONENT(world, SynthPitchEnvelope);
     ECS_META_COMPONENT(world, SynthGlide);
@@ -1784,7 +1810,16 @@ void BoxAudioImport(
     ecs_set_hooks(world, Track, { .ctor = box_audio_track_ctor });
     ECS_META_COMPONENT(world, ClipPlacement);
     ecs_set_hooks(world, ClipPlacement, { .ctor = box_audio_placement_ctor });
+}
 
+/** Register the components the module keeps its state in, and add them with the
+ * With trait to the components they belong to.
+ *
+ * @param world The world
+ */
+static void box_audio_state_register(
+    ecs_world_t *world)
+{
     ECS_COMPONENT_DEFINE(world, AudioSoundId);
     ECS_COMPONENT_DEFINE(world, AudioBusState);
     ECS_COMPONENT_DEFINE(world, AudioVoice);
@@ -1839,6 +1874,24 @@ void BoxAudioImport(
     ecs_add_pair(world, ecs_id(Instrument), EcsWith, ecs_id(AudioInstrumentState));
     ecs_add_pair(world, ecs_id(Track), EcsWith, ecs_id(AudioBus));
     ecs_add_pair(world, ecs_id(Track), EcsWith, ecs_id(AudioTrackState));
+}
+
+void BoxAudioImport(
+    ecs_world_t *world)
+{
+    ECS_MODULE(world, BoxAudio);
+    ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxTask);
+    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, BoxView);
+    ECS_IMPORT(world, BoxJobs);
+    ECS_IMPORT(world, BoxCurve);
+
+    box_audio_mixer_register(world);
+    box_audio_synth_register(world);
+    box_audio_effects_register(world);
+    box_audio_music_register(world);
+    box_audio_state_register(world);
 
     ecs_entity_t master = ecs_entity(world, { .name = "master" });
     ecs_singleton_add(world, AudioSettings);

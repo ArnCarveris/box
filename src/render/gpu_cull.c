@@ -641,9 +641,8 @@ static bool box_gpu_cull_tabled(
 
 /** Add the table of the parallel jobs of a cull group, phase and page.
  *
- * Appends to the table data of the page an entry per (job, frustum) (job, scan words,
- * workgroups, arguments and visible entry of the phase, counters), those of the jobs of more
- * than one workgroup first, then a list entry per workgroup of each job that cull_instances and
+ * Appends an entry per (job, frustum) to the table data of the page, jobs of more than one
+ * workgroup first, then a list entry per workgroup of each job that cull_instances and
  * cull_write share, and the uniforms.
  *
  * The consecutive jobs that read the same instance page and history are a run, one

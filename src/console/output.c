@@ -1445,9 +1445,8 @@ static void box_console_fmt_value(
 
 /**
  * Run the commands of a line one at a time, recording the session scope
- * each command ran in. A line with a single command runs as a whole. Like
- * ecs_shell_run, this stops at the first command that reports an error (a
- * failing command always reports one).
+ * each command ran in. A line with a single command runs as a whole. Stops
+ * at the first command that reports an error, like ecs_shell_run.
  *
  * @param world The world
  * @param con The console
@@ -1464,40 +1463,40 @@ static ecs_shell_result_t box_console_out_run_line(
     ecs_vec_t *scopes)
 {
     int32_t start, end, at = 0;
+    ecs_shell_result_t r;
     if (!box_console_syntax_split(line, 0, &start, &end) ||
         !box_console_syntax_split(line, end, &start, &end))
     {
-        return ecs_shell_run(world, session, line);
-    }
+        r = ecs_shell_run(world, session, line);
+    } else {
+        ecs_vec_init_t(NULL, &r.results, ecs_value_t, 0);
+        ecs_vec_init_t(NULL, &r.errors, char*, 0);
 
-    ecs_shell_result_t r;
-    ecs_vec_init_t(NULL, &r.results, ecs_value_t, 0);
-    ecs_vec_init_t(NULL, &r.errors, char*, 0);
+        while (box_console_syntax_split(line, at, &start, &end)) {
+            ecs_entity_t scope = box_console_session_scope(world, con);
+            char *text = flecs_asprintf("%.*s", end - start, &line[start]);
+            ecs_shell_result_t cmd = ecs_shell_run(world, session, text);
+            ecs_os_free(text);
+            at = end;
 
-    while (box_console_syntax_split(line, at, &start, &end)) {
-        ecs_entity_t scope = box_console_session_scope(world, con);
-        char *text = flecs_asprintf("%.*s", end - start, &line[start]);
-        ecs_shell_result_t cmd = ecs_shell_run(world, session, text);
-        ecs_os_free(text);
-        at = end;
+            ecs_value_t *values = ecs_vec_first(&cmd.results);
+            int32_t i, count = ecs_vec_count(&cmd.results);
+            for (i = 0; i < count; i ++) {
+                ecs_vec_append_t(NULL, &r.results, ecs_value_t)[0] = values[i];
+                ecs_vec_append_t(NULL, scopes, ecs_entity_t)[0] = scope;
+            }
 
-        ecs_value_t *values = ecs_vec_first(&cmd.results);
-        int32_t i, count = ecs_vec_count(&cmd.results);
-        for (i = 0; i < count; i ++) {
-            ecs_vec_append_t(NULL, &r.results, ecs_value_t)[0] = values[i];
-            ecs_vec_append_t(NULL, scopes, ecs_entity_t)[0] = scope;
-        }
+            char **errors = ecs_vec_first(&cmd.errors);
+            int32_t error_count = ecs_vec_count(&cmd.errors);
+            for (i = 0; i < error_count; i ++) {
+                ecs_vec_append_t(NULL, &r.errors, char*)[0] = errors[i];
+            }
 
-        char **errors = ecs_vec_first(&cmd.errors);
-        int32_t error_count = ecs_vec_count(&cmd.errors);
-        for (i = 0; i < error_count; i ++) {
-            ecs_vec_append_t(NULL, &r.errors, char*)[0] = errors[i];
-        }
-
-        ecs_vec_fini_t(NULL, &cmd.results, ecs_value_t);
-        ecs_vec_fini_t(NULL, &cmd.errors, char*);
-        if (error_count) {
-            break;
+            ecs_vec_fini_t(NULL, &cmd.results, ecs_value_t);
+            ecs_vec_fini_t(NULL, &cmd.errors, char*);
+            if (error_count) {
+                break;
+            }
         }
     }
 

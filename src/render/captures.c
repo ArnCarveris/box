@@ -203,6 +203,7 @@ static int box_render_capture_camera(
         v->features = box_render_view_features(world, v->scene, NULL);
         v->scene_features = box_render_scene_features(world, v->scene);
     }
+
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {

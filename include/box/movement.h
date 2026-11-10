@@ -2,17 +2,13 @@
  * @file box/movement.h
  * @brief Velocity components integrated into Position and Rotation every frame.
  *
- * Systems in EcsOnUpdate add Velocity times the world delta time to the local Position and
- * AngularVelocity times the delta time to the local Rotation of the same entity, before the
- * transform systems of EcsPreStore run. Children follow through their parent's transform.
+ * Systems in EcsOnUpdate add Velocity times the delta time to the local Position and
+ * AngularVelocity times the delta time to the local Rotation, before the transform systems of
+ * EcsPreStore run. Children follow through their parent's transform.
  *
- * Systems write without notifying observers, so Velocity and AngularVelocity imply
- * DynamicTransform (also from script), which spreads to every descendant and stays when the
- * velocity is removed.
- *
- * Velocity implies Position and AngularVelocity implies Rotation (which implies Position), also
- * from script and in prefab instances, so an entity with only a velocity moves from the next
- * frame. An existing Position or Rotation keeps its value; a missing one starts at zero.
+ * Velocity and AngularVelocity imply DynamicTransform, which stays when the velocity is removed.
+ * Velocity implies Position and AngularVelocity implies Rotation, so an entity with only a
+ * velocity moves from the next frame; a missing Position or Rotation starts at zero.
  */
 
 #ifndef BOX_MOVEMENT_H

@@ -97,9 +97,11 @@ struct box_audio_transport_t {
         box_audio_stream_status_t *status);
 
     /** Give the core at least floats of memory for an effect slot, before the effect command
-     * of a kind that needs it. The transport allocates it where the core runs and frees it
-     * after the core; a slot that has as many floats keeps its memory and the call returns
-     * true, a slot that needs more gets new memory.
+     * of a kind that needs it.
+     *
+     * The transport allocates it where the core runs and frees it after the core; a slot that
+     * has as many floats keeps its memory and the call returns true, a slot that needs more gets
+     * new memory.
      * @return Whether the memory went out */
     bool (*effect_memory)(box_audio_transport_t *t, uint32_t slot, int32_t floats);
 
@@ -109,10 +111,11 @@ struct box_audio_transport_t {
 
     /** Take the levels of the buses and the values of the effects the core measured since
      * the last call, which start over: buses receives BOX_AUDIO_BUS_MAX meters by bus index,
-     * effects BOX_AUDIO_EFFECT_MAX by slot, zero for what did not render. The null transport
-     * reads the core, the native one the atomic words its audio thread publishes after each
-     * callback, the web one the meters messages of the worklet. They follow the clock of the
-     * output: what does not render, such as a suspended page, reports nothing */
+     * effects BOX_AUDIO_EFFECT_MAX by slot, zero for what did not render.
+     *
+     * The null transport reads the core, the native one the atomic words its audio thread
+     * publishes after each callback, the web one the meters messages of the worklet. What does
+     * not render, such as a suspended page, reports nothing */
     void (*meters)(box_audio_transport_t *t, box_audio_meter_t *buses,
         box_audio_effect_meter_t *effects);
 

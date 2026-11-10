@@ -2,18 +2,12 @@
  * @file box/transform.h
  * @brief Transform components: local pose, world matrix and static/dynamic tags.
  *
- * WorldTransform is kept equal to parent * T * R * S: by observers for static
- * entities, every frame in EcsPreStore for DynamicTransform entities.
+ * WorldTransform is kept equal to parent * T * R * S: by observers for static entities, every
+ * frame in EcsPreStore for DynamicTransform entities. Descendants inherit DynamicTransform
+ * through `(IsA, DynamicTransformSpread)`; one that owns the tag stays dynamic.
  *
- * Descendants inherit DynamicTransform through `(IsA, DynamicTransformSpread)` and lose it
- * with the root. One that owns the tag stays dynamic: tagged by the application at any time,
- * in C or in a script, or by a component that implies it, such as Velocity.
- *
- * Rotation and Scale imply Position, and every pose component implies WorldTransform. Velocity
- * implies Position and AngularVelocity implies Rotation (see box/movement.h).
- *
- * An entity without a WorldTransform has no place in the world: its shape, text, point or spot
- * light, fog volume, reflection probe or particle emitter is not drawn, and it is not picked.
+ * Rotation and Scale imply Position, and every pose component implies WorldTransform. An entity
+ * without a WorldTransform has no place in the world: it is not drawn and not picked.
  */
 
 #ifndef BOX_TRANSFORM_H

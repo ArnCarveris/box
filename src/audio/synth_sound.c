@@ -4,11 +4,8 @@
  * marks it for a new compile when one of its components changes.
  *
  * The layers are the root and its children with a SynthOscillator, and the children of layers
- * with one, the modulators of their parent; a SynthPluck layer takes its SynthString, a
- * SynthBowed layer its SynthBow, a SynthWavetable layer its SynthTable, whose table the patch
- * names by the sound id of its Wavetable in the current output. The LFOs are the SynthLfo of
- * the root, of the layers and of the other children of the root. The routes of the modulation matrix are the SynthModRoute
- * children of the root, for every layer, then those of each layer, for that layer.
+ * with one, the modulators of their parent. The LFOs are the SynthLfo of the root, of the layers
+ * and of the other children of the root; the routes are the SynthModRoute children.
  *
  * The sync system sends the patch with a SYNTH command when it changed; the core plays every
  * voice from a copy of it, so a play allocates nothing.

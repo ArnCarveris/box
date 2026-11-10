@@ -48,15 +48,13 @@ ECS_STRUCT(ParticleRange, {
 /** Forces on the particles of emitters, as a world singleton, on an entity that
  * ParticleEmitter.forces names or on the emitter entity itself.
  *
- * An emitter adds up the forces of the three, multiplying their turbulence scales. The default
- * gravity is that of a ParticleForces that exists: with none of the three, particles feel no
- * force at all, so ParticleForces: {} on the emitter entity is what makes them fall. A frame
- * adds (acceleration + gravity + wander) * delta to the velocity v, pulls it toward the wind
- * with v = wind + (v - wind) * exp(-drag * delta), then moves by (v + drift) * delta.
+ * An emitter adds up the forces of the three; with none, particles feel no force at all, so
+ * ParticleForces: {} on the emitter is what makes them fall. A frame adds the accelerations to
+ * the velocity, pulls it toward the wind by drag, then moves by velocity plus drift.
  *
  * The drift is the velocity of a frame of reference the particles move with, as a world that
  * scrolls past a fixed camera: velocities, forces, curves and the wander field are relative to
- * it, so a layer looks as without drift. The ground plane of ParticleCollision stays put.
+ * it. The ground plane of ParticleCollision stays put.
  */
 ECS_STRUCT(ParticleForces, {
     vec3 gravity;           /**< Acceleration in world units per second squared added to the

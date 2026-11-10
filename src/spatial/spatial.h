@@ -6,9 +6,8 @@
  * bounds of shapes: the unit mesh bounds scaled by the shape and placed by WorldTransform.
  *
  * UI elements without a shape (LayoutBounds, else TextBounds, flat in the XY plane of their
- * WorldTransform) are indexed too, and only ray casts that ask for them see them.
- *
- * An entity without a WorldTransform has no place in the world: it is not drawn, and not indexed.
+ * WorldTransform) are indexed too, and only ray casts that ask for them see them. An entity
+ * without a WorldTransform is not indexed.
  */
 
 #ifndef BOX_SPATIAL_PRIVATE_H

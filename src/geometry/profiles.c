@@ -52,14 +52,15 @@ static void box_path2_tangent(
     vec2 out)
 {
     out[0] = out[1] = 0;
-    for (int i = 1; i < 4; i ++) {
+    bool found = false;
+    for (int i = 1; i < 4 && !found; i ++) {
         const float *a = end ? cubic[3 - i] : cubic[0];
         const float *b = end ? cubic[3] : cubic[i];
         float x = b[0] - a[0], y = b[1] - a[1], length = hypotf(x, y);
         if (length > 1e-6f) {
             out[0] = x / length;
             out[1] = y / length;
-            return;
+            found = true;
         }
     }
 }
@@ -93,6 +94,7 @@ static void box_path2_corners(
         {
             flags[index] = 1;
         }
+
         box_path2_tangent(cubic, true, in);
 
         index += kind == PathLine ? 1 : 16;

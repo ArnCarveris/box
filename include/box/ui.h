@@ -150,12 +150,11 @@ ECS_STRUCT(TextEditStatus, {
 /** Register the box.ui module.
  *
  * Registers on.change, on.submit, ui.changed, ui.submit and ui.activation(e), which tells which
- * entity box.ui counts an on.activate of flecs for (see etc/scenes/ui/widgets.flecs). The focus events,
- * focus() and on.activate are those of flecs.script.input, whose focus box.ui drives.
+ * entity box.ui counts an on.activate of flecs for. The focus events, focus() and on.activate
+ * are those of flecs.script.input, whose focus box.ui drives.
  *
- * Creates box.ui.theme with a UiTheme. The widget library box.widgets (etc/scenes/ui/widgets.flecs) is
- * not loaded: an application that uses widgets loads it as a script.
- * Clears the flecs focus, which box.input gave its screen, since nothing is Focused yet.
+ * Creates box.ui.theme with a UiTheme and clears the flecs focus that box.input gave its screen.
+ * The widget library box.widgets is not loaded: an application that uses widgets loads it.
  *
  * @param world The world
  */

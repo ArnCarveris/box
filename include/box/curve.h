@@ -31,10 +31,8 @@ extern "C" {
 ECS_ENUM(CurveKind, {
     CurveLinear = 0,     /**< Straight: controls at 1/3 and 2/3 of the way, the default */
     CurveCatmullRom = 1, /**< Smooth: slope (v[k + 1] - v[k - 1]) / (t[k + 1] - t[k - 1]) at a
-                          *   key; an end key mirrors itself one span away, so even keys get
-                          *   c1 = p1 + (p2 - p0) / 6 and c2 = p2 - (p3 - p1) / 6; looping over
-                          *   a period the ends take their neighbours across the wrap, see
-                          *   box_curve_loop_span_controls */
+                          *   key, an end key mirrors itself one span away; looping over a
+                          *   period, see box_curve_loop_span_controls */
     CurveBezier = 2      /**< Authored: controls a third along in time at the out and in slopes */
 });
 
@@ -141,13 +139,12 @@ float box_curve_area(
 
 /** Control values of the cubic of one span of a curve that loops over a period.
  *
- * Like box_curve_span_controls, except that a CurveCatmullRom curve whose first key is at 0 and
- * whose last key is at period treats its keys as a cycle: the neighbour before the first key is
- * the second to last key one period earlier, and the neighbour after the last key is the second
- * key one period later, so the slope out of the last key is the slope into the first. Keys that
- * do not span the period exactly, which hold before the first or after the last key, keep the
- * mirrored end neighbours, as do linear and Bezier curves and a period of 0. The curve still
- * jumps at the wrap when its last value is not its first.
+ * Like box_curve_span_controls, except that a CurveCatmullRom curve whose keys span 0 to period
+ * exactly treats its keys as a cycle: the neighbours of the end keys are taken across the wrap,
+ * so the slope out of the last key is the slope into the first.
+ *
+ * Other keys, linear and Bezier curves and a period of 0 keep the mirrored end neighbours. The
+ * curve still jumps at the wrap when its last value is not its first.
  *
  * @param curve The curve
  * @param period The period, 0 for box_curve_span_controls

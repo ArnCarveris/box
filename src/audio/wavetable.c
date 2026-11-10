@@ -8,10 +8,8 @@
  * its forward FFT, whose real and imaginary parts are the sums by the cosine and the sine.
  *
  * Level k of a frame keeps the harmonics up to BOX_AUDIO_TABLE_HARMONICS >> k in
- * BOX_AUDIO_TABLE_LEVEL_LENGTH(k) samples, so the core picks for an oscillator the first level
- * whose highest harmonic stays under Nyquist at its speed. The tables are the same at every
- * rate: the speed in turns per frame holds the rate. Each harmonic is divided by the gain of
- * the interpolator of the core at its frequency, so the core plays it at its amplitude.
+ * BOX_AUDIO_TABLE_LEVEL_LENGTH(k) samples, so the core picks the first level whose highest
+ * harmonic stays under Nyquist. Each harmonic is divided by the gain of the interpolator.
  */
 
 #include "module.h"

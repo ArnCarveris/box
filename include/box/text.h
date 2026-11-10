@@ -40,6 +40,10 @@ ECS_STRUCT(Font, {
  * synthesizes what the face lacks. A variant loads once a glyph needs it; until then, or when its
  * load fails, the glyph takes the next row, and its Text lays out again once the variant loaded.
  *
+ * Advance, glyph and kerning come from the face; ascent, descent, line height and baseline stay
+ * those of f, so a line keeps its height. A deleted variant counts as none.
+ *
+ * @par Faces:
  * | Style                              | Face                 | Synthesized on top |
  * |------------------------------------|----------------------|--------------------|
  * | bold italic                        | f.bold_italic        | nothing            |
@@ -48,10 +52,6 @@ ECS_STRUCT(Font, {
  * | bold italic, without any           | f                    | bold and italic    |
  * | bold                               | f.bold, or f         | bold if f          |
  * | italic                             | f.italic, or f       | italic if f        |
- *
- * Advance, glyph and kerning come from the face, kerning only within one face; ascent, descent,
- * line height and baseline stay those of f, so a line keeps its height. A variant that is
- * deleted, or whose Font is removed, counts as none.
  */
 ECS_STRUCT(FontVariants, {
     ecs_entity_t bold;        /**< Font of bold glyphs, 0 for none */
@@ -82,17 +82,12 @@ ECS_ENUM(TextWrap, {
 /** A string drawn as one quad per glyph in the local XY plane of the entity, facing +Z.
  *
  * Lengths are logical pixels, the block of lines is centered on the origin, y up, and measures
- * TextBounds. Lines break at newlines and at a width between words, inside a wider word. In a
- * layout a Text fits its lines at Text.width and narrows to its widest word in a narrower parent.
+ * TextBounds. Lines break at newlines and at a width between words. Color, opacity, emission and
+ * tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
  *
- * Color, opacity, emission and tint come from Rgb, Opacity, Emissive, Tint and BlendMode.
- *
- * The anti-aliased edges of the glyphs blend in linear light, which makes small dark text on a
- * light background look thinner than light text on a dark one. Dark text gets fuller edges for
- * it, keyed on the luminance of the color of each glyph (a TextSpan color too), so both look
- * equally heavy; text from mid gray up keeps its edges. The background is not known, the
- * correction takes it to be the opposite of the text. It holds in views with and without
- * effects, for source over blend modes only.
+ * Glyph edges blend in linear light, so dark text gets fuller edges, keyed on the luminance of
+ * the color of each glyph, to look as heavy as light text; text from mid gray up keeps its edges.
+ * This holds for source over blend modes only.
  */
 ECS_STRUCT(Text, {
     char *value;        /**< The string, UTF-8 */

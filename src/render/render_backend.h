@@ -60,17 +60,12 @@ typedef struct box_render_gpu_stats_t {
                                  *   two (early and late) for a view that culls by occlusion
                                  *   without a depth prepass.
                                  *
-                                 *   A view has none when it is unlit, its camera has no depth,
-                                 *   the mesh shader is not compiled yet or none of its culled
-                                 *   batches draws in it (only blended or transmissive draws).
-                                 *
                                  *   Plus a split after each transmission snapshot, one that
-                                 *   reads the depth for its fog volumes and soft particles
-                                 *   and one more when draws follow those.
+                                 *   reads the depth for fog volumes and soft particles and one
+                                 *   more when draws follow those.
                                  *
-                                 *   Not the depth prepasses, the snapshot downsample passes,
-                                 *   nor the shadow, cull, atmosphere, particle simulation or
-                                 *   effect passes. */
+                                 *   Not the depth prepasses, snapshot downsamples, shadow, cull,
+                                 *   atmosphere, particle simulation or effect passes. */
     int32_t instance_binds;     /**< Instance bind groups set in the cull, depth prepass,
                                  *   forward, shadow and capture passes, only when the page or
                                  *   surface assets differ from the ones bound last in the pass */

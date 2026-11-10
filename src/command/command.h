@@ -119,10 +119,11 @@ char* box_cmd_render_resource(
     const char *content_type,
     ecs_shell_resource_t *resource);
 
+/** State argument of an on/off command such as audio.mute */
 typedef enum box_cmd_switch_t {
-    BoxCmdSwitchOff = 0,
-    BoxCmdSwitchOn = 1,
-    BoxCmdSwitchToggle = 2
+    BoxCmdSwitchOff = 0,   /**< Turn off */
+    BoxCmdSwitchOn = 1,    /**< Turn on */
+    BoxCmdSwitchToggle = 2 /**< Flip the current state, when no argument is given */
 } box_cmd_switch_t;
 
 /** Register the audio command that prints the status of the audio and its subcommands, such
@@ -371,6 +372,18 @@ char* box_cmd_audio_notes(
     ecs_world_t *world,
     int32_t argc,
     const char **argv);
+
+/** Append the kind and the parameters of an effect, as the audio command prints an insert slot.
+ *
+ * @param world The world
+ * @param buf The output
+ * @param e The effect entity
+ * @return Whether the entity has an effect the command knows
+ */
+bool box_cmd_audio_effect_params(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf,
+    ecs_entity_t e);
 
 /** Measure the levels of buses over a span of the live output: audio.meter [bus...]
  * [seconds|bars=a..b] starts a measurement, audio.meter without arguments prints its progress

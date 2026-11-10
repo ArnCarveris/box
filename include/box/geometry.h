@@ -229,10 +229,8 @@ ECS_ENUM(PathSegmentKind, {
     PathLine,       /**< Straight line to the end, the control points are ignored */
     PathCubicBezier, /**< Cubic Bezier curve to the end through control1 and control2 */
     PathCatmullRom   /**< Uniform Catmull-Rom curve to the end, the control points are ignored.
-                      *   Its tangents come from the anchors of the adjacent segments, whatever
-                      *   their kind: the endpoint itself at the ends of an open path, wrapping
-                      *   around a closed one. Resolves to the cubic Bezier with
-                      *   c1 = p1 + (p2 - p0) / 6 and c2 = p2 - (p3 - p1) / 6. */
+                      *   Its tangents come from the anchors of the adjacent segments, which
+                      *   wrap around a closed path and are the endpoint at an open end */
 });
 
 /** Segment of a Path2D that continues from the end of the previous segment */
@@ -255,8 +253,7 @@ ECS_STRUCT(PathSegment3D, {
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
  * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
- * Catmull-Rom, so that a closed Catmull-Rom path is smooth all the way round, otherwise a line.
- * Profiles sample a cubic Bezier or Catmull-Rom segment in 16 steps.
+ * Catmull-Rom, otherwise a line. Profiles sample a curved segment in 16 steps.
  */
 ECS_STRUCT(Path2D, {
     vec2 start;                     /**< Start point */
@@ -268,8 +265,7 @@ ECS_STRUCT(Path2D, {
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
  * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
- * Catmull-Rom, otherwise a line. Every segment resolves to a cubic Bezier, so a Sweep evaluates
- * all kinds alike.
+ * Catmull-Rom, otherwise a line. Every segment resolves to a cubic Bezier.
  */
 ECS_STRUCT(Path3D, {
     vec3 start;                     /**< Start point */
@@ -279,25 +275,13 @@ ECS_STRUCT(Path3D, {
 
 /** Sweeps a profile along a Path3D, with u around the profile and v along the path.
  *
- * The profile x follows a rotation minimizing frame of the path and its y the binormal. The
- * scale, taper and roll apply to the profile; taper and roll grow linearly with the path
- * parameter, segment by segment.
+ * The profile x follows a rotation minimizing frame that starts at cross(up, tangent), up being
+ * +Y (+X for a path along Y), and its y the binormal, so along a horizontal path the profile y
+ * points down. The scale, taper and roll apply to the profile, taper and roll linearly.
  *
- * The frame starts with its x axis at cross(up, tangent), up being +Y (+X for a path that starts
- * along Y), and the binormal is cross(x, tangent). Along a horizontal path the profile y
- * therefore points down, toward -Y: a road profile puts its top surface at negative y.
- *
- * The walls map u and v by arc length: u is the fraction of the length around the profile, with
- * the scale (the holes run from 2 to 3, all holes after another), and v the fraction of the
- * length along the path, so a texel covers the same distance on every profile edge and every
- * path segment however the points are spaced. The rings sit at even lengths along the path.
- * SurfaceAttachment and box_surface_evaluate take the same fractions on SurfaceOuter and
- * SurfaceInner. The caps map the profile x and y, without the scale.
- *
- * With a MappingObject TextureMapping (box/material.h) the coordinates are lengths in the units
- * of the path instead, over the mapping size: the walls the length around the profile and along
- * the path, the caps the profile x and y times the scale, so a road gets a texture density in
- * meters without knowing its length. The taper and the instance Scale do not change them.
+ * The walls map u and v by arc length, around the profile and along the path, the caps the
+ * profile x and y. With a MappingObject TextureMapping they are lengths in the units of the path
+ * over the mapping size instead, so a road gets a texture density in meters.
  */
 ECS_STRUCT(Sweep, {
     ecs_entity_t path;    /**< Entity with the Path3D to follow */
@@ -529,41 +513,30 @@ ECS_STRUCT(Line, {
 
 /** Filled 2D polygon in the XY plane from a Path2D outline, in the local space of the entity.
  *
- * The path entity holds a closed Path2D, its outline, or a Profile2D, its outline with holes, the
- * same assets a ProfileExtrusion extrudes, so one outline drives a shape in the world and a
- * polygon on a map. Its points are sampled as the profiles sample them (a cubic Bezier or
- * Catmull-Rom segment in 16 steps), times the scale plus the offset: a map that shows the world
- * from above at a size of s per meter maps a profile with a scale of {s, -s}, as the profile y
- * runs along the world Z. The fill follows the even-odd rule, so holes cut through whatever the
- * winding of their paths and a self intersecting outline leaves its doubly covered parts open.
+ * The path entity holds a closed Path2D, a Profile2D with holes, or a Path3D seen from above, its
+ * points sampled as profiles do, times the scale plus the offset. The fill follows the even-odd
+ * rule; an open Path2D draws a stroke of the width with round joins and ends instead.
  *
- * An open Path2D draws a stroke of the width centered on it instead, with round joins and ends,
- * for map roads and graphs. The path entity may also hold a Path3D, which is seen from above,
- * its x and z as the x and y of the polygon, so a map draws the road a Sweep follows: with a
- * scale of {s, -s} north (-Z) is up.
+ * Shaded like Rect, Circle and Line with an analytic signed distance, with their Border, Image,
+ * BoxShadow, ClipChildren, Opacity, transitions and picking. An outline of more than
+ * BOX_POLYGON2D_MAX_EDGES edges is not drawn; a Rect, Circle or Line of the entity draws instead.
  *
- * Like Rect, Circle and Line it is shaded with an analytic signed distance (to the edges of the
- * outline), anti-aliased at any scale, distance and angle, with a Border inside its edge, an
- * Image over its bounds, a BoxShadow of its outline, ClipChildren, Opacity, Rgb, Tint, the
- * transitions and picking of the other 2D shapes. Its cost per pixel grows with the edges near
- * the pixel and those in its row, so outlines of up to a few hundred edges suit it; one of more
- * than BOX_POLYGON2D_MAX_EDGES is not drawn. A Rect, Circle or Line of the same entity draws
- * instead.
- *
- *     plaza_outline {
- *       Path2D: {start: {-6, -4}, closed: true, segments: [
- *         {kind: Line, end: {6, -4}},
- *         {kind: CatmullRom, end: {7, 3}},
- *         {kind: CatmullRom, end: {0, 6}},
- *         {kind: Line, end: {-6, 3}}
- *       ]}
- *     }
- *
- *     map_plaza {
- *       Polygon2D: {path: plaza_outline, scale: {4, -4}}
- *       Rgb: {200, 190, 160}
- *       Border: {width: 1.5, color: {90, 80, 60, 255}}
- *     }
+ * @par A plaza on a map at 4 units per meter, with north (-Z) up:
+ * @code
+ * plaza_outline {
+ *   Path2D: {start: {-6, -4}, closed: true, segments: [
+ *     {kind: Line, end: {6, -4}},
+ *     {kind: CatmullRom, end: {7, 3}},
+ *     {kind: CatmullRom, end: {0, 6}},
+ *     {kind: Line, end: {-6, 3}}
+ *   ]}
+ * }
+ * map_plaza {
+ *   Polygon2D: {path: plaza_outline, scale: {4, -4}}
+ *   Rgb: {200, 190, 160}
+ *   Border: {width: 1.5, color: {90, 80, 60, 255}}
+ * }
+ * @endcode
  */
 ECS_STRUCT(Polygon2D, {
     ecs_entity_t path; /**< Entity with a Path2D, a Profile2D or a Path3D */
@@ -578,14 +551,10 @@ ECS_STRUCT(Polygon2D, {
 /** Rounded corners and an inner border of the Rect, Circle or Polygon2D of the entity.
  *
  * The border lies inside the edge of the shape and the fill (the Rgb of the entity) inside the
- * border. The radius rounds the corners of a Rect and is clamped to half its smaller side; a
- * Polygon2D keeps its corners.
+ * border. The radius rounds the corners of a Rect and is clamped to half its smaller side.
  *
- * Transitionable (Transition): the width and radius interpolate linearly by the timing function
- * and the color per channel in display encoding; a negative width or radius an overshooting
- * curve renders draws as 0. The BoxShadow of the shape follows the rendered border. Picking,
- * layout and the clip area of ClipChildren use the target, so clipped children keep the target
- * corner radius while the radius transitions.
+ * Transitionable: width and radius interpolate linearly, the color per channel in display
+ * encoding, negative values draw as 0. Picking, layout and ClipChildren use the target values.
  */
 ECS_STRUCT(Border, {
     float width;  /**< Width of the border, 0 for none */
@@ -595,15 +564,11 @@ ECS_STRUCT(Border, {
 
 /** Soft shadow drawn behind the Rect, Circle or Polygon2D of the entity, like a CSS box-shadow.
  *
- * Lengths are in the units of the shape. The shadow box is the shape moved by the offset and
- * grown by the spread on each side with its corner radius; a negative spread shrinks it, down to
- * nothing. As in CSS the edge is a Gaussian of a standard deviation of half the blur.
+ * Lengths are in the units of the shape. The shadow is the outline moved by the offset and grown
+ * by the spread, with a Gaussian edge of a standard deviation of half the blur.
  *
- * The alpha is that of the color times the opacity of the entity. As in CSS it is not drawn under
- * the Rect or Circle, so it does not show through a translucent one. It follows the outline of a
- * Rect, Circle or Polygon2D (the outline moved by the offset and grown by the spread, which
- * rounds its outer corners), not the alpha of an Image, and draws nothing on a Line, a stroked
- * open Polygon2D or Text. Picking and layout ignore it.
+ * Its alpha is that of the color times the opacity of the entity. It is not drawn under the
+ * shape, nor on a Line, a stroked Polygon2D or Text. Picking and layout ignore it.
  */
 ECS_STRUCT(BoxShadow, {
     float offset_x; /**< Horizontal offset of the shadow */
@@ -616,9 +581,8 @@ ECS_STRUCT(BoxShadow, {
 /** Area of a texture shown on the Rect, Circle or Polygon2D of the entity.
  *
  * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image, over
- * the shape, or over the bounds of the outline of a Polygon2D; a
- * constructed Image shows the whole texture. The texture is multiplied
- * with the Rgb of the entity, which defaults to white for an Image.
+ * the shape or the bounds of a Polygon2D outline; a constructed Image shows the whole texture.
+ * The texture is multiplied with the Rgb of the entity, which defaults to white for an Image.
  */
 ECS_STRUCT(Image, {
     ecs_entity_t texture; /**< Entity with a TexturePath, or the texture of a Surface */
@@ -636,50 +600,27 @@ ECS_ENUM(SliceFill, {
 
 /** Nine-slice scaling of the Image of a Rect, the CSS border-image model.
  *
- * The insets cut the area of the Image (u0, v0 to u1, v1) into nine parts. The corners draw at
- * their size in texels times scale; the top and bottom edges fill the width between them, the
- * left and right edges the height and the center the rest, each stretched or tiled as edges and
- * center say. A tiled part repeats at its size in texels times scale, starting at its top left
- * and cut at the far end. When the corners do not fit, because the element is smaller than the
- * insets, they scale down together until they meet, edges and tiles with them, as CSS does.
+ * The insets, in texels of the texture, cut the area of the Image into nine parts. Corners draw
+ * at their size times scale, edges and center fill the rest, stretched or tiled. Corners that do
+ * not fit scale down together, as in CSS. Until the texture size is known the plain Image draws.
  *
- * The insets are in texels of the texture of the image: its loaded Texture, or for the texture
- * of a Surface, which has no Texture, the image the surface renders (box_surface_texture_size,
- * SurfaceStatus.width by height, its point size times pixel_ratio). The slicing waits for that
- * size: while the texture loads, or before its surface rendered once, the element draws as with
- * the plain Image, and it slices again when the size changes, as when a surface resizes. Insets
- * are clamped to the area, the left one first, so left plus right never exceed its width; a
- * scale that is not above 0 or not finite draws at 1.
+ * Rgb, Opacity, Border and ClipChildren apply as for a plain Image, TextureTransform does not,
+ * and a Circle shows the plain Image. Picking onto a Surface texture maps the hit through the
+ * same parts (box_image_slice_map).
  *
- * The Rgb and Opacity tint the sliced image, a Border draws over it, the corner radius of the
- * Border rounds it and ClipChildren cuts it, as for a plain Image. The TextureTransform of the
- * entity does not apply to it. A Circle with an ImageSlice is not sliced, it shows the plain
- * Image. Picking onto the texture of a Surface shown by an Image maps the hit through the same
- * parts as the drawing (box_image_slice_map), so a hit in a corner lands in the corner of the
- * surface.
- *
- * The castle WoodPanel as one entity: a 64 by 64 frame texture holds the dark edge and the iron
- * corners in its 20 texel insets and wood in its center, whose grain tiles at its own scale on
- * every size (instead of the hand cropped wood, the Border outline and four IronCorner children):
- *
- *     template WoodPanel {
- *       prop w: f32 = 300
- *       prop h: f32 = 120
- *       prop pad: f32 = 16
- *       prop row: bool = false
- *
- *       Layout: {direction: match row { true: Row; _: Column }, padding: {pad, pad, pad + 4,
- *         pad + 4}, spacing: 6, h: match row { true: Center; _: Left }, v: Middle}
- *       LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
- *       Rect: {1, 1}
- *       Image: {texture: castle_ui_frame}
- *       ImageSlice: {left: 20, top: 20, right: 20, bottom: 20, edges: SliceTile,
- *         center: SliceTile}
- *       Rgb: {214, 196, 180}
- *       Border: {radius: 6}
- *       BoxShadow: {offset_y: -5, blur: 18, spread: 1, color: {0, 0, 0, 140}}
- *       InputBlocker
- *     }
+ * @par A wood panel from a 64 by 64 frame texture with 20 texel corners and a tiled center:
+ * @code
+ * template WoodPanel {
+ *   prop w: f32 = 300
+ *   prop h: f32 = 120
+ *   LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+ *   Rect: {1, 1}
+ *   Image: {texture: castle_ui_frame}
+ *   ImageSlice: {left: 20, top: 20, right: 20, bottom: 20, edges: SliceTile,
+ *     center: SliceTile}
+ *   Border: {radius: 6}
+ * }
+ * @endcode
  */
 ECS_STRUCT(ImageSlice, {
     float left;         /**< Inset of the left slices in texels of the texture, from the area */

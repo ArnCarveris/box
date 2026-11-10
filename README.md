@@ -38,7 +38,6 @@ bake3 run test/cpu/core --local-env -- -j 8 --ignore /tmp/core.json             
 bake3 run test/gpu/render --local-env -- -j 4                 # a GPU test project, needs a GPU
 python3 tools/integration.py visual                           # render the visual scenes and compare with the baselines
 python3 tools/integration.py visual --update-baseline <scene> # store the render of a scene as its baseline
-python3 tools/lint.py                                         # lint the sources, --fix fixes what it can
 ```
 
 ## Docs

@@ -82,10 +82,9 @@ ECS_STRUCT(Gtao, {
 /** Exponential fog that thins out with height, lit by the sun and ambient light of the scene.
  * The fog applies on top of the aerial perspective.
  *
- * With atmosphere set to the entity with the Atmosphere that a view renders, the view takes the
- * in scatter color from its sky, ignoring color: the ambient is the sky horizon mixed a little
- * toward its zenith, the glow the horizon toward the main light (sun by day, moon by night) with
- * the Mie phase.
+ * With atmosphere set to the entity with the Atmosphere that a view renders, the in scatter
+ * color comes from its sky instead of color: the ambient from the horizon toward the zenith, the
+ * glow from the horizon toward the main light with the Mie phase.
  */
 ECS_STRUCT(HeightFog, {
     float density;           /**< Fog density at the base height, default 0.1 */

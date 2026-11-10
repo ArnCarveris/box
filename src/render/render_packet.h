@@ -175,16 +175,12 @@ static inline bool box_render_is_mesh(
 /** Buffer handle of the first instance page, the first handle of the instance pages.
  *
  * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
- * the chunk of its store, 128 MiB over the largest stride of its layout (box_draws_layout_chunk;
- * BOX_DRAWS_CHUNK for the surface store). A mesh page with parametric surfaces has
- * BOX_RENDER_INSTANCE_STREAMS, a plain mesh page and a 2D page have
- * BOX_RENDER_INSTANCE_STREAMS_PLAIN, without the surface stream, for which the backend binds a
- * zero record.
+ * the chunk of its store (box_draws_layout_chunk). Plain mesh and 2D pages have no surface
+ * stream (BOX_RENDER_INSTANCE_STREAMS_PLAIN), for which the backend binds a zero record.
  *
- * box_render_batch_t.instances is the transform stream of the page, first_instance its slot. The
- * pages from BOX_RENDER_BUFFER_FIRST hold the plain meshes: page p has the handle
- * BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. A released page
- * index is reused by the next page the store needs. */
+ * box_render_batch_t.instances is the transform stream of the page, first_instance its slot.
+ * Page p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream
+ * s; a released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
 /** Buffers of a mesh instance page with parametric surfaces, one per stream, at consecutive
@@ -568,8 +564,8 @@ typedef struct box_render_view_gtao_t {
     Gtao settings;          /**< Resolved settings */
 } box_render_view_gtao_t;
 
-/** Scene features (the members of Scene) of the mesh shaders, each the override of the same name; the
- * lighting ones also gate the uniforms of the views of the scene */
+/** Scene features (the members of Scene) of the mesh shaders, each the override of the same
+ * name; the lighting ones also gate the uniforms of the views of the scene */
 #define BOX_RENDER_FEATURE_BAKED (1u << 0)
 #define BOX_RENDER_FEATURE_REFLECTIONS (1u << 1)
 #define BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS (1u << 2)
@@ -922,9 +918,8 @@ typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_COPY = 1 << 3,     /**< Source of GPU copies (box_render_copy_t), such as
                                           *   an instance page whose runs move */
     BOX_RENDER_BUFFER_KEEP = 1 << 4      /**< A create that replaces a buffer of the handle
-                                          *   copies the bytes the two have in common from the
-                                          *   old buffer on the GPU before releasing it, which
-                                          *   needs BOX_RENDER_BUFFER_COPY on the old buffer */
+                                          *   copies the bytes both have from the old buffer,
+                                          *   which needs BOX_RENDER_BUFFER_COPY */
 } box_render_buffer_usage_t;
 
 /** The area of a ClipChildren element as shape2d.wgsl reads it from the clip buffer.
@@ -943,9 +938,10 @@ typedef struct box_render_clip_t {
  * the clip buffer, followed by its edges in chunks of BOX_RENDER_POLYGON_CHUNK_RECORDS records.
  *
  * Every vec4 of a chunk after its first is an edge, its start x, y and end x, y in the local
- * units of the polygon; the first vec4 is the bounds of the edges of the chunk (min x, y, max x,
- * y), which lets a fragment skip the chunks that are too far to be nearest and that its ray
- * does not cross. The chunks hold BOX_RENDER_POLYGON_CHUNK_EDGES edges, the last fewer.
+ * units of the polygon. The first vec4 is the bounds of the edges of the chunk, which lets a
+ * fragment skip chunks too far to be nearest that its ray does not cross.
+ *
+ * The chunks hold BOX_RENDER_POLYGON_CHUNK_EDGES edges, the last fewer.
  */
 typedef struct box_render_polygon_t {
     float bounds[4];        /**< Center x, y and half width, half height of the bounds */
@@ -999,45 +995,40 @@ typedef struct box_render_transform_t {
 /** Shading constants of a 2D shape or glyph, the shading stream of a 2D instance page, which
  * changes with its material, Shape2DShading of shape2d.wgsl.
  *
- * The words of emissive.w and material depend on what the instance draws (box_draws_shape2d,
- * box_draws_glyph):
- * - A rectangle (Rect, Circle): emissive.w is its width over its height, material.x its corner
- *   radius and material.y its border width in units of half its smaller side, material.zw its
- *   linear border color as four half floats (r | g << 16, b | a << 16). A Rect with an
- *   ImageSlice (a batch with slice set) has the index of its slice record in the clip buffer in
- *   uv.x, as a float, and uv.yzw 0: the record holds the area of its image.
- * - The shadow of a rectangle (BoxShadow, box_shadow.c): a rectangle whose quad is the shadow
- *   box plus 3 standard deviations on each side; material.y is negative, the negated standard
- *   deviation of its edge, material.x the corner radius of the shadow box, both in units of half
- *   the smaller side of the quad. It is cut out by the rounded box of its shape, in the same
- *   units: uv.xy is the center of that box relative to the shadow, uv.zw its half extents,
- *   material.z its corner radius and material.w the alpha the shape covers the shadow with at
- *   its edge (0 for a blend mode that does not cover). emissive.xyz and the texture are unused.
- * - A polygon (Polygon2D, a batch with polygon set): emissive.w is the index of its polygon
- *   record in the clip buffer (box_render_polygon_t), as a float, material.y its border width in
- *   its local units (f32 bits), material.zw its linear border color as for a rectangle,
- *   material.x 0 and uv the area of its image over its bounds. The vertex stage places the quad
- *   on the bounds the record holds.
- * - The shadow of a polygon (a batch with box_shadow and polygon set): a rectangle whose quad is
- *   the bounds of the outline moved by the offset and grown by the spread and 3 standard
- *   deviations on each side, as for a rectangle; material.x (f32) is the index of the polygon
- *   record, material.y the negated standard deviation in units of half the smaller side of the
- *   quad, material.z (f32 bits) the spread in the local units of the polygon, material.w the
- *   alpha the shape covers the shadow with; uv.xy the center of the bounds of the polygon
- *   relative to the shadow and uv.z half the smaller side of the quad in local units.
- * - A line: emissive.w is its negated width, material.xy its start and material.zw its end.
- * - A glyph of a Text: emissive.w is 0, material.xy the distance range of its atlas page,
- *   material.z (f32 bits) the part of the field its threshold falls by, 0 regular and
- *   BOX_TEXT_BOLD_FIELD bold, material.w 0 and uv the area of the glyph on the page. An italic
- *   glyph leans through the shear of its transform.
- * - A shape without a 2D shape: material.xy metallic and roughness, emissive.w and material.zw 0.
+ * emissive.w, material and uv depend on what the instance draws (box_draws_shape2d,
+ * box_draws_glyph), see the members. A shape without a 2D shape holds metallic and roughness in
+ * material.xy and 0 in emissive.w and material.zw.
+ *
+ * A shadow (BoxShadow, box_shadow.c) is a rectangle whose quad is the box of its shape, moved and
+ * spread for a polygon, plus 3 standard deviations per side, cut out by the shape.
  */
 typedef struct box_render_shading_t {
-    vec4 emissive;          /**< Linear emitted color times its strength; w the aspect, the
-                             *   negated line width or 0 for a glyph */
-    vec4 material;          /**< The words of the shape, or metallic and roughness */
-    vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset; the
-                             *   rounded box of its shape for a shadow */
+    vec4 emissive;          /**< Linear emitted color times its strength, xyz unused by a
+                             *   rectangle shadow.
+                             *
+                             *   w: width over height of a rectangle, negated width of a line,
+                             *   index of the box_render_polygon_t in the clip buffer of a
+                             *   polygon as a float, 0 for a glyph */
+    vec4 material;          /**< Rectangle: x corner radius, y border width, in half its
+                             *   smaller side, zw linear border color as half floats (r | g <<
+                             *   16, b | a << 16). Line: xy start, zw end.
+                             *
+                             *   Polygon: x 0, y border width (f32 bits, local units), zw border
+                             *   color. Glyph: xy distance range of its atlas page, z (f32 bits)
+                             *   BOX_TEXT_BOLD_FIELD when bold, else 0, w 0.
+                             *
+                             *   Shadow: y negated standard deviation, w alpha its shape covers
+                             *   it with; xz shadow and cutout corner radius, or polygon record
+                             *   index (f32) and spread (f32 bits, local units). */
+    vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset.
+                             *
+                             *   Sliced Rect: x index of its slice record (float), yzw 0.
+                             *   Polygon: area of its image over its bounds. Glyph: its area on
+                             *   its atlas page.
+                             *
+                             *   Shadow: xy center of the cutout box (rectangle) or bounds
+                             *   (polygon) relative to the shadow, zw half extents of that box,
+                             *   or z half the smaller side of the quad in local units. */
     uint32_t color[2];      /**< Linear base color and alpha (the opacity with its ancestors) as
                              *   unorm16x4: r | g << 16, b | a << 16 (box_draws_color_pack) */
     uint32_t ids[2];        /**< Clip index of a 2D instance (0 for none), its rank in the draw
@@ -1133,12 +1124,12 @@ typedef struct box_render_scatter_t {
 /** GPU copy of bytes from one buffer into another or into the same one, such as the instances
  * of a run of an instance page that moved to another run.
  *
- * The copies of a packet run after its resources and before its uploads and scatters, which
- * write the slots that changed over the copied ones. Every copy reads its source as it was
- * before the copies of the packet, so one copy may write where another reads, and source and
- * destination may overlap. The offsets and the size are BOX_RENDER_COPY_ALIGN multiples and the
- * sizes of a packet add up to at most BOX_RENDER_COPY_MAX; the source has
- * BOX_RENDER_BUFFER_COPY.
+ * The copies of a packet run after its resources and before its uploads and scatters. Every
+ * copy reads its source as it was before the copies of the packet, so one copy may write where
+ * another reads, and source and destination may overlap.
+ *
+ * Offsets and sizes are BOX_RENDER_COPY_ALIGN multiples, the sizes of a packet add up to at most
+ * BOX_RENDER_COPY_MAX, and the source has BOX_RENDER_BUFFER_COPY.
  */
 typedef struct box_render_copy_t {
     uint32_t src;           /**< Handle of the buffer read */
@@ -1179,9 +1170,9 @@ typedef struct box_render_target_t {
  * batch with texture_blend.
  *
  * The backend blits the textures of each map into a texture array with a slice per layer, shared
- * by every batch with the same sources, and binds it with the mask, the emissive layer of the
- * batch (textures[1]) and the transforms in the texture_blend variant of the mesh pipeline. The
- * heights make a fourth array only with a contrast above 0 and a height on at least one layer. */
+ * by every batch with the same sources, and binds it with the mask, textures[1] and transforms.
+ *
+ * The heights make a fourth array only with a contrast above 0 and a height on a layer. */
 typedef struct box_render_texture_blend_t {
     uint32_t mask;      /**< Texture handle of the mask, 0 while it is not loaded */
     uint32_t layers[BOX_RENDER_BLEND_LAYERS][BOX_RENDER_BLEND_SOURCES]; /**< Texture handles
@@ -1223,10 +1214,9 @@ typedef struct box_render_batch_t {
                                  *   drawn with the fs_shadow entry point of the 2D shape shader */
     bool slice;                 /**< The instances are Rects with an ImageSlice, drawn with the
                                  *   fs_slice entry point of the 2D shape shader */
-    bool polygon;               /**< The instances are Polygon2D shapes or their shadows, drawn
-                                 *   with the polygon variant of the vertex stage of the 2D
-                                 *   shape shader and its fs_polygon entry point, fs_shadow_polygon
-                                 *   for the shadows */
+    bool polygon;               /**< The instances are Polygon2D shapes or their shadows,
+                                 *   drawn with the polygon vertex stage of the 2D shape shader
+                                 *   and fs_polygon, or fs_shadow_polygon for the shadows */
     uint32_t features;          /**< BOX_RENDER_FEATURE_* features of the scene of the instances,
                                  *   0 for other pipelines than the mesh shaders */
     bool texture_blend;         /**< The instances have a TextureBlend: the texture_blend variant
@@ -1384,7 +1374,8 @@ typedef struct box_render_packet_t {
     bool vsync;             /**< A window target of the frame presents with vsync */
     float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
-    float transmission_roughness;
+    float transmission_roughness; /**< Largest roughness of the transmissive materials, which
+                             *   bounds the mips of the opaque snapshot that render */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */

@@ -109,10 +109,8 @@ ECS_STRUCT(TextureGenLayer, {
                              *   varies the stones on top of their tone; GenNoise has no id */
     int32_t seed;           /**< Mixed with TextureGen.seed for the randomness of the layer */
     int32_t tones;          /**< GenBlocks and GenCells: number of tones a block or cell takes,
-                             *   which pick the TextureGen.palette color; 0 for none. The
-                             *   checker and courses repeat over the texture when courses is a
-                             *   multiple of tones, the checker and columns when per_course is,
-                             *   otherwise they have a seam at the wrap */
+                             *   which pick the TextureGen.palette color; 0 for none. Without a
+                             *   seam when courses or per_course is a multiple of tones */
     TextureGenToneOrder tone_order; /**< GenBlocks: order of the tones, default GenToneRandom;
                                      *   GenCells take every order as GenToneRandom */
     float tone_amount;      /**< Weight of the tone level tone / (tones - 1) in the height, 0
@@ -155,13 +153,9 @@ ECS_STRUCT(TextureGenKey, {
  * by its op from 0, scaled to span 0..1. With a source, the output derives from the field of the
  * source at its size: GenAlbedo through colors, GenNormal by central differences across the wrap.
  *
- * It tiles and gives the same bytes on every platform. Surface.texture_quality caps its size; a
- * change of it or its source generates it again, keeping the previous image until the new one is
- * ready. A TextureGen and a TexturePath on one entity is an error.
- *
- * A source that exists without a TextureGen yet, such as one declared first and given its
- * TextureGen later in the script, keeps the texture in TextureLoading; it fails at the next frame
- * when none arrived. A source that loses its TextureGen or is deleted fails it the same way.
+ * It tiles, gives the same bytes on every platform and is capped by Surface.texture_quality. A
+ * change regenerates it, keeping the previous image meanwhile. A source without a TextureGen by
+ * the next frame fails it. A TextureGen and a TexturePath on one entity is an error.
  *
  * @par Ashlar of generate.py: the blocks are the face mask, their id the tone of each stone (ids *
  * 0.2), the two noise layers its fine and big noise.
@@ -237,9 +231,7 @@ ECS_STRUCT(TextureGen, {
                                      *   white with a palette */
     ecs_vec(rgb) palette;           /**< GenAlbedo: display encoded color per tone of the layer
                                      *   palette_layer, palette[tone % count], multiplied by the
-                                     *   ramp color per channel (a * b / 255); ignored by the
-                                     *   other outputs. A layer without tones takes one per
-                                     *   color */
+                                     *   ramp color; a layer without tones takes one per color */
     int32_t palette_layer;          /**< Layer of the height field (of the source with one)
                                      *   whose tone picks the palette color, default 0; it must
                                      *   exist and not be GenNoise */

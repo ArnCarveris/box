@@ -2,11 +2,11 @@
  * @file audio/core/chorus.c
  * @brief The chorus kind of effect: up to BOX_AUDIO_CHORUS_VOICES_MAX taps of a stereo line,
  * each moved by a sine LFO around a delay, spread in phase and panned across the stereo field.
+ * Every BOX_AUDIO_MODULATION_CONTROL frames it aims each tap at its next place and moves it there.
  *
  * The lines live on the memory of the slot, read with linear interpolation and, for the feedback
  * of the first tap, with a cubic one; like the delay it reads frames older than it wrote since it
- * was silent as silence. Every
- * BOX_AUDIO_MODULATION_CONTROL frames it aims each tap at its next place and moves it there.
+ * was silent as silence.
  *
  * The phase of the LFO is a fixed point count of turns that advances by a whole step per frame,
  * the same whatever the render sizes and over the skipped blocks of an idle chorus; a change of
@@ -263,8 +263,10 @@ static inline float box_audio_chorus_read(
 
 /** Read a line frames back for the feedback, with Catmull-Rom interpolation between the frames
  * either side; its gain is at most 1 at any fraction, and it keeps the highs that a linear read
- * would damp more on every pass through the loop. Under 2 frames back the frame on the near side
- * is not written yet, and it reads with linear interpolation.
+ * would damp more on every pass through the loop.
+ *
+ * Under 2 frames back the frame on the near side is not written yet, and it reads with linear
+ * interpolation.
  *
  * @param ch The chorus
  * @param line The line
@@ -322,10 +324,11 @@ static void box_audio_chorus_control(
     }
 }
 
-/** Run the chorus over a block. The first tap of each channel times the feedback adds to the
- * input of its line: one tap through a read whose gain is at most 1 keeps the loop stable under
- * a feedback of 1 at any voices. The feedback reads the tap with a cubic, the voices with a
- * linear interpolation.
+/** Run the chorus over a block.
+ *
+ * The first tap of each channel times the feedback adds to the input of its line: one tap through
+ * a read whose gain is at most 1 keeps the loop stable under a feedback of 1 at any voices. The
+ * feedback reads the tap with a cubic, the voices with a linear interpolation.
  *
  * @param core The core
  * @param ch The chorus

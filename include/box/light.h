@@ -172,19 +172,13 @@ ECS_STRUCT(ShadowAtlas, {
 /** Baked indirect lighting of a scene, placed on a Scene root or as a singleton for the default
  * scene. Adding it adds LightBakeStatus.
  *
- * A bake is bounces + 1 passes: direct light and emission, then a pass per bounce. A change of
- * static shapes or lights rebakes the probes it can reach; dynamic shapes rebake none. Probes
- * no static surface blends are not baked: a dynamic shape in open air shows the ambient.
+ * A bake is bounces + 1 passes. A change of static shapes or lights rebakes the probes it can
+ * reach; dynamic shapes rebake none. A capture_size outside 1 to 256 or bounces outside 0 to 16
+ * bakes nothing and sets LightBakeStatus.error.
  *
- * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
- * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets
- * LightBakeStatus.error.
- *
- * Computing the bake and applying it are separate: compute decides whether the engine schedules
- * captures, View.lighting.baked whether a view samples the probes. A volume that does not
- * compute keeps the grid, loads from the cache and records changes, and views with
- * lighting.baked show it as it was when computing stopped; captures already submitted finish.
- * Once compute is true again the bake catches up on what changed meanwhile.
+ * compute decides whether the engine schedules captures, View.lighting.baked whether a view
+ * samples the probes. A volume that does not compute keeps its grid and records changes, and
+ * catches up on them once compute is true again.
  */
 ECS_STRUCT(LightBake, {
     float probe_spacing; /**< World units between probes, default 2 */
@@ -276,21 +270,15 @@ ECS_STRUCT(ReflectionProbe, {
 });
 
 /** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
- * position and rotation of the entity as a ReflectionProbe is (scale ignored). Probe and
- * reflection captures and bakes do not see it.
+ * position and rotation of the entity. Probe and reflection captures and bakes do not see it.
  *
- * It draws in the forward pass after the opaque meshes and the sky, back to front, at most 32 in
- * the frustum per view, the nearest kept. Glass shows it through its snapshot; blended shapes and
- * particles in or behind it are not fogged, and a view without clear keeps its alpha.
+ * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Blended
+ * shapes and particles in or behind it are not fogged. It is lit by the ambient of the view, the
+ * first directional light and the point and spot lights of the clusters of the view.
  *
- * It is lit by the ambient of the view (environment or hemisphere, not the probe volume), the
- * first directional light through its cascades and LightCookie, and the point and spot lights of
- * the clusters of the view through their shadow tiles, dimmed by the aerial perspective of the
- * view; further directional lights are not marched. To bound the cost, a ray looks up its
- * clusters at most BOX_FOG_VOLUME_LIGHT_STEPS times: the march is split into that many
- * segments, each lit by the first BOX_FOG_VOLUME_LIGHT_STEPS lights of the cluster at its middle,
- * so a dense cluster or a segment that crosses several clusters may lose lights. Their shadows
- * are one depth comparison per step, without the filter of the meshes.
+ * A ray looks up its clusters at most BOX_FOG_VOLUME_LIGHT_STEPS times, each segment lit by the
+ * first BOX_FOG_VOLUME_LIGHT_STEPS lights of the cluster at its middle, so dense clusters may
+ * lose lights. Shadows are one depth comparison per step.
  */
 ECS_STRUCT(FogVolume, {
     vec3 extent;             /**< Half size of the box, default {5, 5, 5} */

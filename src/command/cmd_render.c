@@ -536,8 +536,8 @@ static ecs_entity_t box_cmd_render_copy(
 /** The render command: render an entity, prefab or template on its own.
  *
  * A prefab is instantiated, a template added and an entity copied into a private scene, at its
- * origin when the subject has no Position of its own; the camera is fitted to the subject in the frame of the command and the scene is deleted in
- * the next frame.
+ * origin when it has no Position of its own, as an entity without one is not drawn. The camera
+ * is fitted to the subject in the frame of the command and the scene is deleted in the next one.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -584,7 +584,6 @@ static void box_cmd_render(
         instance = box_cmd_render_copy(world, subject, root);
     }
 
-    /* A prefab has no Position, and an entity without one is not drawn */
     if (!ecs_has(world, instance, Position)) {
         ecs_set(world, instance, Position, {0, 0, 0});
     }

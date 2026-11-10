@@ -282,10 +282,11 @@ bool box_msdf_inside(
     box_msdf_point_t p);
 
 /** Correct the artifacts of the field after msdfgen's MSDFErrorCorrection without a distance
- * check: protect corners and edges, then flatten the texels whose interpolation leaves the range
- * their distance allows. Around each corner where the interpolated median leaves the side the
- * distance of the edges near the corner gives, move the clashing channels without changing the
- * median of their texel.
+ * check.
+ *
+ * Protects corners and edges, then flattens the texels whose interpolation leaves the range
+ * their distance allows. Where the interpolated median around a corner leaves the side its edges
+ * give, moves the clashing channels without changing the median of their texel.
  *
  * @param gen The generation
  */

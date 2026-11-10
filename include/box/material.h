@@ -25,10 +25,8 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * Rgb, PbrMaterial, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission, Emissive,
- * Transmission, TextureTransform, TextureMapping and AlphaCutoff bring it along. A prefab that
- * owns one gets a slot its instances share, a 3D shape that owns one a slot of what it owns and
- * still inherits.
+ * The material components, such as Rgb, PbrMaterial and Transmission, bring it along. A prefab
+ * that owns one gets a slot its instances share, a 3D shape that owns one a slot of its own.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -145,21 +143,14 @@ ECS_STRUCT(ClearCoat, {
 #define BOX_MATERIAL_ANISOTROPY_ROTATION (0.0f)
 
 /** Highlight of a 3D mesh stretched along a direction in its surface (brushed metal, satin),
- * glTF's KHR_materials_anisotropy, default strength 1 and rotation 0, inherited like Rgb; a field
- * a scene does not set keeps its default. Only 3D meshes have it, 2D shapes and text ignore it.
+ * glTF's KHR_materials_anisotropy, default strength 1 and rotation 0, inherited like Rgb.
  *
- * The base lobe only, not the clear coat: an anisotropic GGX lobe in direct light, its roughness
- * along the direction mixed toward 1 by strength squared, and in indirect light a reflection about
- * a normal bent toward the direction, as the glTF sample viewer does. An unlit view ignores it.
+ * Applies to the base lobe in direct and indirect light, not the clear coat. The direction is
+ * +U of the cotangent frame of the UVs turned by rotation, so a continuous highlight needs a
+ * continuous UV mapping. 2D shapes, text and unlit views ignore it.
  *
- * Vertices have no tangents: the direction is +U of the screen space cotangent frame of the UVs,
- * turned by rotation, constant per triangle, so a continuous highlight needs a continuous UV
- * mapping. A triangle with degenerate (constant) UVs shades isotropic.
- *
- * Transitionable (Transition): strength and rotation interpolate linearly by the timing function,
- * through a strength of 0 too; the rotation takes no shortest path and wraps only when rendered.
- * Adding or removing SpecularAnisotropy animates from and to a strength of 0 with on_add and
- * on_remove of TransitionSpec, else it snaps.
+ * Transitionable: strength and rotation interpolate linearly; adding or removing it animates
+ * from and to a strength of 0 with on_add and on_remove of TransitionSpec, else it snaps.
  */
 ECS_STRUCT(SpecularAnisotropy, {
     float strength; /**< 0 isotropic to 1 fully stretched, clamped to 0..1 */
@@ -191,26 +182,14 @@ ECS_STRUCT(Sheen, {
 #define BOX_MATERIAL_DIFFUSE_TRANSMISSION_FACTOR (0.5f)
 
 /** Diffuse light passing through a thin 3D surface (leaf, paper, lampshade), glTF's
- * KHR_materials_diffuse_transmission, default factor 0.5, white, thickness 0 and blur 0,
- * inherited like Rgb; a field a scene does not set keeps its default. 2D shapes and text ignore
- * it.
+ * KHR_materials_diffuse_transmission, default factor 0.5, white, thickness 0 and blur 0.
  *
- * A Lambert lobe on the inverted normal of base color * color * factor, the front keeping 1 -
- * factor, none on metals. It stays in the opaque pass (depth, shadows, no snapshot), its shadow
- * is not tinted, and a single sided quad needs BackFacePlain to be seen from behind.
+ * A Lambert lobe on the inverted normal, none on metals; the shape stays opaque and its shadow
+ * is not tinted. The blur applies only with Transmission (frosted glass): what shows through is
+ * blurred by its distance behind the surface, so a touching object stays sharp.
  *
- * The blur applies only to a shape that also has Transmission (frosted glass, a shower door):
- * what it shows of the opaque snapshot is blurred by the distance between its surface and what
- * is behind it, read from a depth copy of the snapshot, on top of the blur of its roughness. An
- * object touching the surface stays sharp and one further behind gets softer; the sky, with no
- * depth, takes the softest mip. A shape with DiffuseTransmission and no Transmission is opaque
- * and ignores the blur. Blended and transmissive shapes behind it are in the snapshot (see
- * Transmission) but write no depth, so they blur like whatever lies behind them.
- *
- * Transitionable (Transition): factor, thickness and blur interpolate linearly by the timing
- * function and color per channel like Rgb, through a factor of 0 too; adding or removing
- * DiffuseTransmission animates from and to a factor of 0 with on_add and on_remove of
- * TransitionSpec, else it snaps.
+ * Transitionable: factor, thickness and blur interpolate linearly and color like Rgb; adding or
+ * removing it animates from and to a factor of 0 with on_add and on_remove, else it snaps.
  */
 ECS_STRUCT(DiffuseTransmission, {
     float factor;    /**< 0 all diffuse light is reflected to 1 all of it passes through,
@@ -237,24 +216,14 @@ ECS_STRUCT(Emissive, {
 #define BOX_MATERIAL_ATTENUATION_DISTANCE (1e10f)
 
 /** Light passing through a 3D shape (glass), inherited by instances like Rgb, default factor 0,
- * ior 1.5, thickness 0, attenuation distance 1e10 and a white attenuation color; a field a scene
- * does not set keeps its default.
+ * ior 1.5, thickness 0, attenuation distance 1e10 and a white attenuation color.
  *
- * A shape with it, whatever its factor, draws in the sorted blended pass, back to front with the
- * alpha blended and additive shapes, without blending or depth writes. It casts no shadow, is not
- * in the probe, reflection or bake captures and ignores Opacity, BlendMode and AlphaCutoff.
+ * It draws in the sorted blended pass without depth writes, casts no shadow, is not captured and
+ * ignores Opacity, BlendMode and AlphaCutoff. It shows a refracted, blurred and absorbed snapshot
+ * of what its view drew before it, taken again at most 4 times a frame.
  *
- * It shows a snapshot of its view where the ray refracted by ior leaves thickness_factor times
- * the scale, blurred by roughness, absorbed toward attenuation_color and tinted by Rgb, with its
- * own specular light on top. The snapshot holds everything drawn before it back to front.
- *
- * That is the opaque shapes, sky, fog volumes, particles and 2D shapes (even those in front of
- * it) and the blended and transmissive shapes behind it. A view snapshots again before glass
- * that follows a shape that is not glass, at most 4 times a frame; then glass shows the last.
- *
- * Transitionable (Transition): the four floats interpolate linearly by the timing function and
- * attenuation_color per channel like Rgb. The shape keeps its transmissive batch while its
- * factor moves, through 0 too; adding or removing Transmission changes the batch at once.
+ * Transitionable: the four floats interpolate linearly and attenuation_color like Rgb; adding or
+ * removing Transmission changes the batch at once.
  */
 ECS_STRUCT(Transmission, {
     float transmission_factor;  /**< 0 opaque to 1 fully transmissive */
@@ -316,38 +285,12 @@ ECS_ENUM(TextureMappingMode, {
 /** How the texture coordinates of a material are made, default MappingUv with a size of 1 and a
  * blend of 0, inherited by instances, like TextureTransform.
  *
- * MappingObject projects each fragment onto the plane of the dominant axis of its object space
- * normal, from its object space position times the scale of the instance (the lengths of the
- * columns of its model matrix, which hold the size of a Box), divided by size. The texture has
- * the same density in world units on every face and every size of a shape, and moves with it.
- * The projection is oriented as the faces of a Box: on the side faces (±x, ±z) u runs
- * horizontally seen from outside and v down the image, toward -y; the top has u along +z and v
- * along -x, the bottom u along -z and v along -x; no face is mirrored. A unit cube with a size
- * of 1 maps as its UVs do. TextureTransform applies after the mapping.
+ * MappingObject projects the object space position times the instance scale, MappingWorld the
+ * world position, divided by size, onto the plane of the dominant normal axis, oriented as the
+ * faces of a Box. A blend above 0 mixes the three projections (triplanar) to hide seams.
  *
- * MappingWorld projects the world position of each fragment, divided by size, onto the plane of
- * the dominant axis of its world normal, with the same orientation. The texture is fixed in the
- * world and does not move with the object: a shape that moves or turns slides under it, and
- * shapes that touch show one continuous texture across the seam, whatever their size, rotation
- * or shape. TextureTransform applies after the projection, so its offset moves the texture over
- * the world and its scale stretches it.
- *
- * With a blend of 0 the axis is chosen per fragment, so a smooth mesh changes axis inside a
- * triangle where its normal turns, with a seam there. A blend above 0 (up to 1) mixes the three
- * axis projections (triplanar mapping) with weights from the normal raised to the power
- * 1 / blend, so curved shapes have no hard seams; the larger the blend the wider the transition.
- * Each texture layer is sampled once per projection with a weight, so a flat face aligned with
- * an axis still samples once; the normal map of each projection turns to the world with the
- * axes of that projection before the results are blended. The blend applies to MappingObject
- * and MappingWorld; MappingUv ignores it.
- *
- * Parametric surfaces (Sweep, Extrude and the other shapes of box/geometry.h that evaluate a
- * surface in the vertex stage) keep their own UVs and ignore the mapping, except a Sweep with
- * MappingObject: its UVs, by arc length, become lengths over the size, around the profile and
- * along the path on its walls and the scaled profile on its caps (see Sweep). Picking onto a
- * surface texture (PbrTextures of a Surface) follows the mapping on the dominant axis, with the
- * normal of the mesh interpolated at the hit. Alpha tested shapes (AlphaCutoff) test and cast
- * shadows with the mapped texture.
+ * TextureTransform applies after the mapping. Parametric surfaces keep their own UVs, except a
+ * Sweep with MappingObject (see Sweep).
  */
 ECS_STRUCT(TextureMapping, {
     TextureMappingMode mode; /**< Source of the texture coordinates */
@@ -380,56 +323,15 @@ ECS_STRUCT(PbrTextures, {
 });
 
 /** Blend of up to four texture layers weighed by a mask (terrain, a path worn into turf), for
- * 3D shapes, inherited by instances like PbrTextures and, like it, part of the batch of a shape,
- * not the material table. Shapes with the same TextureBlend (owned by the same entity, such as
- * a prefab) share their batches.
+ * 3D shapes, inherited by instances and part of the batch of a shape like PbrTextures.
  *
- * The mask is sampled with the texture coordinates of the shape: its mesh UV, TextureMapping
- * and TextureTransform. Its red, green, blue and alpha weigh layers 0..3, read as stored
- * (linear) whatever TexturePath.linear says; a TexturePath.single_channel mask weighs layers 0
- * and 1 by 1 - r and r. The weights are normalized by their sum; where the sum is 0, and until
- * the mask is loaded, layer 0 shows alone.
+ * The red, green, blue and alpha of the mask, normalized, weigh the PbrTextures of layers 0..3,
+ * each with its own TextureTransform; where the sum is 0 layer 0 shows. The PbrTextures of the
+ * shape are ignored except emissive; its Rgb, PbrMaterial, Tint and Emissive still apply.
  *
- * Each layer entity samples the albedo, ORM and normal textures of its own PbrTextures (its
- * emissive is ignored), with its own TextureTransform on top of the texture coordinates of the
- * shape, so a layer with a scale of 20 tiles 20 times across a mask that covers the mesh once.
- * A layer that is 0, deleted, has no PbrTextures or whose texture is not loaded yet contributes
- * white albedo and ORM and a flat normal, except that the layers after the last one that is not
- * 0 are unused: their mask channels are ignored, so an RGB mask weighs a 3 layer blend. A
- * TextureGen texture works as a mask or a layer.
- *
- * While a shape draws with a TextureBlend the albedo, ORM and normal of its own PbrTextures are
- * ignored; its PbrTextures.emissive, Rgb, PbrMaterial, Tint and Emissive apply to the blended
- * result. Changing the mask, a layer, the PbrTextures or TextureTransform of a layer, or a
- * reload of one of their images updates the shapes.
- *
- * The alpha of a blended shape is the weighted alpha of the albedos of its layers: AlphaCutoff
- * tests it in the forward pass, the depth prepass and the shadow pass, so a blended fence casts
- * the shadow of its holes, and a BlendMode, an Opacity under 1 and Transmission draw with it. A
- * MappingObject or MappingWorld TextureMapping with a blend above 0 (triplanar) samples the mask
- * and each layer with a weight once per projection with a weight: a face along an axis whose
- * mask weighs one layer samples each map once, a corner where three projections and four layers
- * meet twelve times. BackFacePlain back faces sample no layer, but the albedo of an alpha tested
- * shape. 2D shapes ignore a TextureBlend.
- *
- * With a contrast above 0 the layers meet at their heights rather than cross fading: each
- * layer with a weight has a height, the red of its texture in heights (stored, sampled with
- * the texture coordinates and TextureTransform of the layer, so it lines up with its albedo),
- * or 0.5 for a layer without one, and its weight w is multiplied by
- * exp(contrast * (height + w - m)), where m is the largest height + w of the layers with a
- * weight, then the weights are normalized again. Where two layers meet the layer that is
- * higher there wins (grass fills the gaps between cobbles instead of fading over them); where
- * the mask weighs one layer alone it shows alone, as in the linear blend. The larger the
- * contrast the sharper the border: about 1 / contrast in height + weight units wide, so 8 is
- * soft and 32 crisp. A contrast of 0, the default, is the linear blend and samples no heights.
- * A TextureGen height map works as a height. Changing a height, the contrast, or a reload of a
- * height image updates the shapes. The heights shape the weights of every projection of a
- * triplanar blend, and those the alpha test of the depth prepass and the shadow pass blends.
- *
- * Picking onto the texture of a blended shape (a mask, a layer albedo or the PbrTextures.emissive
- * that a Surface renders) reports the texture coordinates of the shape, those the mask is
- * sampled with, not those of a layer with its TextureTransform; it does not tell which layer
- * weighs most at the hit, as the mask is not read back from the GPU.
+ * With a contrast above 0 layers meet at their heights instead of cross fading, the larger the
+ * contrast the sharper the border; 0 is the linear blend. The alpha is the weighted alpha of the
+ * layers, which AlphaCutoff tests. 2D shapes ignore it.
  */
 ECS_STRUCT(TextureBlend, {
     ecs_entity_t mask;      /**< Texture entity whose red, green, blue and alpha weigh layers

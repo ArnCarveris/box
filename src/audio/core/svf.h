@@ -4,20 +4,19 @@
  * and the filter effect.
  *
  * A stage is the SVF of Simper, integrated with the trapezoidal rule from g = tan(pi cutoff /
- * rate). Each output is a fixed mix of its two states, and the states stay bounded for any
- * positive g and damping, so a stage is stable at any cutoff and resonance and while they
- * move. The 24 dB filter is a cascade of two stages, each stable on its own, so the cascade is
- * too. Private to src/audio/core; included by internal.h.
+ * rate). Its states stay bounded for any positive g and damping, so a stage, and the 24 dB
+ * cascade of two, is stable at any cutoff and resonance and while they move.
  *
  * Drive soft clips the input and the bandpass state of a stage, which bounds the resonance
- * peak; the clipper never grows a value, so a driven stage is as stable as a linear one.
- * Drive 0 skips it.
+ * peak; the clipper never grows a value, so a driven stage stays stable. Drive 0 skips it.
+ * Private to src/audio/core; included by internal.h.
  */
 
 #ifndef BOX_AUDIO_CORE_SVF_H
 #define BOX_AUDIO_CORE_SVF_H
 
 #include "core.h"
+#include "clean.h"
 
 /** Square root of 2: the damping of a stage at resonance 0, a Butterworth response */
 #define BOX_AUDIO_SVF_SQRT2 1.41421356237309504880

@@ -51,8 +51,7 @@ typedef struct box_render_draws_stats_t {
                                  *   for DynamicMaterial) and scatter segments of materials */
     int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams
                                  *   of the mesh pages with parametric surfaces, runs and
-                                 *   scatter segments, only when a ShapeMesh changed; plain mesh
-                                 *   and 2D pages have no surface stream */
+                                 *   scatter segments, only when a ShapeMesh changed */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int32_t runs;               /**< Runs of consecutive 2D slots of the order, the draws of
                                  *   the ordered 2D shapes before a view splits them: a shadow
@@ -105,6 +104,7 @@ float box_render_clip_area(
 
 /** Check whether a world position is inside the clip areas of the ClipChildren ancestors of an
  * entity, in the local XY plane of each, as the 2D shader clips it; an empty area contains none.
+ *
  * The ancestors of a floating element (LayoutFloat without clip) do not clip it, and nothing
  * inside a float that hides (box_render_float_hidden) contains the position.
  *
@@ -119,10 +119,10 @@ bool box_render_clip_contains(
     const float point[3]);
 
 /** Check whether a floating element hides while its anchor is clipped out (LayoutFloat with
- * hide_clipped and without clip): the ClipChildren ancestors of the anchor, scroll views
- * included, clip all of the anchor away, as box_render_clip_hides checks it without skipping
- * the clips that scroll. An anchor inside another hide_clipped float that hides is clipped out
- * too.
+ * hide_clipped and without clip).
+ *
+ * The anchor is clipped out when its ClipChildren ancestors, scroll views included, clip all of
+ * it away (box_render_clip_hides without skipping scrolls), or it is inside a hiding float.
  *
  * @param world The world
  * @param e The entity
@@ -137,10 +137,9 @@ bool box_render_float_hidden(
  * Its bounds (its LayoutBounds, else its Rect, else its origin) have no part of positive size
  * inside the area of one of them. A clip with an empty area hides everything below it.
  *
- * A clip that scrolls (with a LayoutScroll) is skipped so Tab can scroll its content into view,
- * and the ancestors of a floating element (LayoutFloat) do not clip it, unless it is a clipped
- * overlay (LayoutFloat.clip). Everything inside a float that hides (box_render_float_hidden) is
- * hidden.
+ * A clip that scrolls (LayoutScroll) is skipped so Tab can scroll its content into view, and the
+ * ancestors of a LayoutFloat that is not a clipped overlay do not clip it. Everything inside a
+ * float that hides (box_render_float_hidden) is hidden.
  *
  * @param world The world
  * @param e The entity
@@ -270,10 +269,9 @@ void box_render_fog_noise(
 /** Give every lit view with LightSettings.fog_volumes the FogVolumes of the scene of its camera
  * that may be in its frustum, back to front by the distance of their centers from the camera.
  *
- * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and is warned about
- * once when it goes over. Views without a view entity, unlit views and cameras without a depth
- * range get none; the records go into the packet after those of the views before. The noise
- * offsets of the records are those at the time of the packet.
+ * A view that sees more than BOX_RENDER_FOG_VOLUMES_MAX keeps the nearest and warns once.
+ * Views without a view entity, unlit views and cameras without a depth range get none. The
+ * records go after those of the views before, with the noise offsets at the time of the packet.
  *
  * @param world The world
  * @param fog The state
@@ -999,8 +997,8 @@ uint32_t box_render_reflect_texture(
  * Captures can progress when the resolution is valid, budget_ms is positive, a view of the
  * scene was in the packet of the last frame and the GPU backend renders.
  *
- * Once the light bake of the scene settled, or stopped computing, a scene settles when it first converges, or when
- * every resident probe has a capture after a light, ambient, environment or bake change
+ * Once its light bake settled or stopped computing, a scene settles when it first converges, or
+ * when every resident probe has a capture after a light, ambient, environment or bake change
  * queued every probe.
  *
  * @param world The world
@@ -1620,9 +1618,10 @@ void box_render_transition_mix(
     void *out);
 
 /** Get the neutral value of a component for a target: the value that renders like not having
- * the component, with the fields that have no neutral of their own taken from the target, so a
- * Tint fades in its own color. The value an added component animates from (on_add) and a
- * removed one animates to (on_remove).
+ * the component, with the fields that have no neutral of their own taken from the target.
+ *
+ * An added component animates from it (on_add) and a removed one to it (on_remove), so a Tint
+ * fades in its own color.
  *
  * Pure, with no world access. A component without a neutral value (Position, Rgb, AlphaCutoff,
  * Transmission) gives the target.
@@ -1847,10 +1846,11 @@ bool box_render_transitions_node_active(
     uint32_t node,
     double time);
 
-/** Count the entities the material extract visited in the last frame: the entities of the
- * nodes with an active material transition and those of their IsA instances that own a slot of
- * the material table, have 2D or text shading or are IsA bases themselves, 0 in a frame without
- * one. Mesh instances that inherit their material are skipped per table and not counted.
+/** Count the entities the material extract visited in the last frame, 0 in a frame without an
+ * active material transition.
+ *
+ * Those are the nodes of the transitions and their IsA instances that own a material slot, have
+ * 2D or text shading or are IsA bases; mesh instances that inherit their material are skipped.
  *
  * @param s The state of the transition extract
  * @return The entities

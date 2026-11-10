@@ -138,36 +138,15 @@ ECS_STRUCT(LayoutContent, {
 });
 
 /** Places an element next to an anchor outside the flow of its parent, for dropdowns, popup
- * menus and tooltips. The parent must have a Layout and leaves the element out of its fit size
- * and flow.
+ * menus and tooltips. The parent must have a Layout and leaves the element out of its flow.
  *
- * A LayoutFloat on a root (see LayoutItem), without a parent or whose parent has no Layout, is
- * ignored: the root keeps its own Position. The layout warns once per mistake, naming it.
+ * Its h/v point sits on the anchor_h/anchor_v point of the anchor plus the x/y offset (y up). It
+ * draws and picks above non floating elements, is not clipped by the ClipChildren ancestors of
+ * its parent, and follows its anchor in the same frame. On a root it is ignored with a warning.
  *
- * Its h/v point sits on the anchor_h/anchor_v point of the anchor plus the x/y offset (y up, as
- * LayoutItem.y); a dropdown list has h: Left, v: Top, anchor_h: Left, anchor_v: Bottom. It sizes
- * from its LayoutItem, a grow axis taking the size of the anchor within min and max.
- *
- * It draws and picks above every non floating element of its scene, floats among each other in
- * hierarchy order, and ClipChildren ancestors of its parent do not clip it or its descendants.
- * It follows its anchor when the anchor moves, scrolls or resizes, in the same frame.
- *
- * With hide_clipped the float and its descendants are neither drawn nor picked, and Tab skips
- * them, while its anchor is clipped out: the area of the anchor (its LayoutBounds, else its Rect)
- * is fully outside the area of one of the ClipChildren ancestors of the anchor, scroll views
- * included, the way a dropdown list hides once its button scrolls out of view. An anchor that
- * is still partly inside keeps the float shown, and the float is never clipped by those
- * ancestors. It is checked against the world transforms each frame, so it takes effect in the
- * frame of the scroll. An anchor inside another hide_clipped float is also clipped out while
- * that float hides. A clipped overlay ignores it.
- *
- * With clip the element is a clipped overlay instead, such as the scroll bars of a scroll view:
- * placed the same way, out of the flow and not shifted by a LayoutScroll of its parent, but the
- * ClipChildren ancestors of its parent clip it and its descendants as any other child, in the
- * 2D shader and in picking. It does not count as floating: it draws and picks in the hierarchy
- * order of its parent, after its siblings of the same Position z and their descendants, as if
- * it were the last child, whatever its place among the children. A clipped overlay inside a
- * regular float draws with that float, above the non floating elements, and is clipped up to it.
+ * With hide_clipped it hides, and Tab skips it, while the area of its anchor is fully outside a
+ * ClipChildren ancestor of the anchor. With clip it is a clipped overlay instead, such as a scroll
+ * bar: out of the flow, but clipped and drawn in hierarchy order as the last child of its parent.
  */
 ECS_STRUCT(LayoutFloat, {
     ecs_entity_t anchor; /**< Element the float is placed against, 0 for its parent; found
@@ -202,14 +181,11 @@ ECS_STRUCT(LayoutFill, {
 /** Clips the Rect, Circle, Line, Polygon2D, Border, Image and Text of the descendants of an
  * element to its area, like CSS overflow: hidden; the element itself is not clipped.
  *
- * The area is its LayoutBounds, else its Rect, centered in its local XY plane, inside its Border:
- * shrunk by Border.width on each side and rounded by Border.radius less the width, both at least
- * 0, so content that scrolls under the edge does not cover the border or a focus ring. Nested
- * clips intersect, anti-aliased per pixel in screen, world and texture UI; picking misses
- * outside the area. 3D shapes below the element are not clipped.
+ * The area is its LayoutBounds, else its Rect, inside its Border width and rounded by its radius.
+ * Nested clips intersect and picking misses outside the area. 3D shapes are not clipped.
  *
- * An empty area (zero width or height) hides everything below it, and Tab skips the Focusable
- * entities it clips away entirely, unless the element has a LayoutScroll.
+ * An empty area hides everything below it, and Tab skips the Focusable entities it clips away
+ * entirely, unless the element has a LayoutScroll.
  */
 extern ECS_TAG_DECLARE(ClipChildren);
 

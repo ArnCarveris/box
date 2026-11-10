@@ -427,6 +427,11 @@ static void box_gpu_targets_render(
     }
 }
 
+/** Keep at most BOX_GPU_FRAMES_IN_FLIGHT frames in flight, waiting for the oldest submission
+ * once that many are. The browser paces frames itself, so there it does nothing.
+ *
+ * @param gpu The backend
+ */
 static void box_gpu_pace(
     box_gpu_t *gpu)
 {

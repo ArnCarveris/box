@@ -1292,7 +1292,8 @@ static bool box_lights_shadow_view(
     ecs_entity_t lit = view && view->lighting.scene ? view->lighting.scene : v->scene;
 
     return view && view->lighting.enabled && view->shadows.enabled && lit == scene &&
-        (v->features & BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS) && box_camera_has_depth(&v->camera_data);
+        (v->features & BOX_RENDER_FEATURE_PUNCTUAL_SHADOWS) &&
+        box_camera_has_depth(&v->camera_data);
 }
 
 /** Check whether a tile must render because it or its light changed since the last frame: it

@@ -138,14 +138,14 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer surface_assets;      /**< Surface assets the shaders read, one vec4 without any */
     uint64_t surface_asset_size;    /**< Bytes of the surface assets */
     bool assets;                    /**< The mesh has surface assets, so its draws bind them */
-    WGPUBuffer buffer;
-    int32_t page;
-    uint64_t offset;
-    uint64_t alloc_size;
-    uint64_t vertex_size;
-    uint64_t index_offset;
-    uint64_t index_size;
-    uint64_t id;
+    WGPUBuffer buffer;              /**< Mesh pool page buffer with the vertices and indices */
+    int32_t page;                   /**< Page of the mesh pool */
+    uint64_t offset;                /**< Offset of the vertices in the page buffer */
+    uint64_t alloc_size;            /**< Bytes allocated from the page */
+    uint64_t vertex_size;           /**< Bytes of the vertices */
+    uint64_t index_offset;          /**< Offset of the indices in the page buffer */
+    uint64_t index_size;            /**< Bytes of the indices */
+    uint64_t id;                    /**< Id unique to this mesh, unlike its reusable handle */
     uint32_t index_count;           /**< Indices to draw */
     WGPUBindGroup wire;             /**< Vertices and indices as the storage buffers of a wire
                                      *   draw (debug_wire.wgsl), NULL until the first one */
@@ -159,17 +159,20 @@ typedef struct box_gpu_mesh_t {
     float extent[3];                /**< Half size of the box around the vertex positions */
 } box_gpu_mesh_t;
 
+/** Frames the CPU may submit before it waits for the GPU to finish the oldest */
 #define BOX_GPU_FRAMES_IN_FLIGHT (2)
 
+/** A free range of a page of the mesh pool */
 typedef struct box_gpu_mesh_range_t {
-    uint64_t offset;
-    uint64_t size;
+    uint64_t offset;                /**< Offset of the range in the page buffer */
+    uint64_t size;                  /**< Bytes of the range */
 } box_gpu_mesh_range_t;
 
+/** A buffer of the mesh pool that meshes take ranges of */
 typedef struct box_gpu_mesh_page_t {
-    WGPUBuffer buffer;
-    uint64_t size;
-    ecs_vec_t free;
+    WGPUBuffer buffer;              /**< The buffer, NULL when it could not be created */
+    uint64_t size;                  /**< Bytes of the buffer */
+    ecs_vec_t free;                 /**< box_gpu_mesh_range_t, the free ranges by offset */
 } box_gpu_mesh_page_t;
 
 /** A sampled texture with its mip chain and the two views the layers bind */
@@ -278,6 +281,7 @@ typedef struct box_gpu_copy_write_t {
 /** Levels of a depth pyramid at most, enough for a 16384 pixel axis */
 #define BOX_GPU_HIZ_LEVELS (15)
 
+/** Levels of a depth pyramid one dispatch of the pyramid shader writes */
 #define BOX_GPU_HIZ_STEP (4)
 
 /** Depth pyramid of a render size: power of two levels, each texel the farthest depth below it.
@@ -580,8 +584,9 @@ typedef struct box_gpu_cull_t {
     WGPUBuffer empty_history;       /**< History of the cull views without occlusion */
     WGPUTexture empty_hiz;          /**< Pyramid of the cull views without occlusion */
     WGPUTextureView empty_hiz_view; /**< View of the empty pyramid */
-    WGPUTexture hiz_spare;
-    WGPUTextureView hiz_spares[BOX_GPU_HIZ_STEP - 1];
+    WGPUTexture hiz_spare;          /**< Layers written instead of the levels past the last of a
+                                     *   pyramid by a dispatch of BOX_GPU_HIZ_STEP levels */
+    WGPUTextureView hiz_spares[BOX_GPU_HIZ_STEP - 1]; /**< View of each spare layer */
     WGPUBindGroup empty_group;      /**< Binds the empty history and pyramid */
     ecs_map_t histories;            /**< View and target key to box_gpu_cull_history_t */
     ecs_map_t pyramids;             /**< Render size to box_gpu_hiz_t */
@@ -801,10 +806,9 @@ typedef struct box_gpu_t {
     WGPUSampler reflect_sampler;    /**< Trilinear sampler of the source cubes */
     box_gpu_reflect_t *reflect_source; /**< Source cubes of a chunk, NULL before the first */
     box_gpu_reflect_t *no_reflection; /**< One black slot, bound by views without probes */
-    ecs_map_t forward;              /**< Forward pipeline by shader, format, blend, back face,
-                                     *   alpha test, texture blend and depth mode, and the
-                                     *   depth prepass pipelines by back face, alpha test and
-                                     *   texture blend */
+    ecs_map_t forward;              /**< Forward and depth prepass pipelines by shader, format,
+                                     *   blend, back face, alpha test, texture blend and depth
+                                     *   mode (box_gpu_forward_key) */
     ecs_map_t forward_previous;     /**< Forward pipelines of the modules a recompile replaced,
                                      *   by the same key, drawn with until the pipeline of the
                                      *   new module of their key exists */
@@ -893,12 +897,12 @@ typedef struct box_gpu_t {
     WGPUComputePipeline scatter;    /**< Scatter pipeline, NULL until the shader exists */
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
-    ecs_vec_t mesh_pages;
-    uint64_t mesh_ids;
-    WGPUDevice paced_device;
-    uint64_t paced[BOX_GPU_FRAMES_IN_FLIGHT];
-    int32_t paced_count;
-    int32_t paced_next;
+    ecs_vec_t mesh_pages;           /**< box_gpu_mesh_page_t, the pages of the mesh pool */
+    uint64_t mesh_ids;              /**< Last id given to a mesh */
+    WGPUDevice paced_device;        /**< Device the submissions of paced were made on */
+    uint64_t paced[BOX_GPU_FRAMES_IN_FLIGHT]; /**< Submission index of each frame in flight */
+    int32_t paced_count;            /**< Frames in paced */
+    int32_t paced_next;             /**< Entry of paced the next frame writes */
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
     WGPUBuffer copy_staging;        /**< Staging buffer of the staged copies of a packet, NULL
                                      *   until one stages: the smallest power of two from 64 KiB

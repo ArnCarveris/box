@@ -4,11 +4,11 @@
  * pool of a packet, before its targets, and one instanced draw per blend and sprite of the pools
  * of a view's scene.
  *
- * Pools are ranges of the particle arena, one storage buffer; the blocks of a packet are a
- * storage buffer read by pool index, so every pass binds the same buffers and the bind groups
- * live until a buffer they bind is replaced. A draw walks chunks of BOX_GPU_PARTICLE_CHUNK slots
- * of its pools that the view writes into the chunk buffer, so the CPU never reads particle data
- * back.
+ * Pools are ranges of the particle arena and the blocks of a packet are read by pool index, so
+ * every pass binds the same buffers and the bind groups live until a buffer they bind changes.
+ *
+ * A draw walks chunks of BOX_GPU_PARTICLE_CHUNK slots of its pools that the view writes into the
+ * chunk buffer, so the CPU never reads particle data back.
  */
 
 #include "gpu.h"
@@ -1036,11 +1036,13 @@ static WGPUBindGroup box_gpu_particle_draw_group(
     WGPUTextureView texture)
 {
     box_gpu_particles_t *s = gpu->particles;
+    WGPUBindGroup result = NULL;
     int32_t i;
     for (i = 0; i < ecs_vec_count(&s->groups); i ++) {
         box_gpu_particle_group_t *g = ecs_vec_get_t(&s->groups, box_gpu_particle_group_t, i);
         if (g->texture == texture) {
-            return g->group;
+            result = g->group;
+            goto done;
         }
     }
 
@@ -1059,8 +1061,9 @@ static WGPUBindGroup box_gpu_particle_draw_group(
         .entryCount = 6,
         .entries = entries
     });
-
-    return g->group;
+    result = g->group;
+done:
+    return result;
 }
 
 /** Write the chunks of the draws of a view after those of the views before it in the packet.

@@ -3,16 +3,12 @@
  * @brief The effects of the module: the entities that the insert slots of the channels name,
  * their slots of the pool of the core, their memory and their commands.
  *
- * An effect entity is any entity with an effect component: Reverb, Equalizer, AudioFilter,
- * Compressor, Gate, Delay, Phaser, Chorus, Saturator, TransientShaper, FrequencyShifter,
- * PitchShifter, PatternGate, Rotary, BeatRepeat, TapeStop or Vocoder, the first of them in
- * that order.
+ * An effect entity is any entity with an effect component, the first of them in the order of
+ * box_audio_module_effect_components.
  *
  * The module sends an EFFECT command when the kind, the channel, the slot or a parameter of an
- * effect changes and takes it off when no slot names it. A compressor gets the key bus the
- * order compile accepted for its insert, a vocoder its modulator the same way; a vocoder
- * without one logs an error once. A pattern gate and a beat repeat ask the timeline for the
- * beat clock.
+ * effect changes and takes it off when no slot names it. A compressor and a vocoder get the key
+ * bus the order compile accepted; a pattern gate and a beat repeat ask for the beat clock.
  */
 
 #include "module.h"
@@ -74,7 +70,16 @@ done:
     return result;
 }
 
-uint32_t box_audio_module_effect_params(
+/** Get the kind and the parameters of a Reverb, Equalizer, AudioFilter, Compressor, Gate,
+ * Delay, Phaser or Chorus.
+ *
+ * @param world The world
+ * @param component The component
+ * @param ptr The value of the component, may be NULL
+ * @param params Receives the parameters when not NULL
+ * @return The kind of the effect, BOX_AUDIO_EFFECT_NONE for another component
+ */
+static uint32_t box_audio_effect_params_first(
     const ecs_world_t *world,
     ecs_entity_t component,
     const void *ptr,
@@ -82,14 +87,6 @@ uint32_t box_audio_module_effect_params(
 {
     uint32_t result = BOX_AUDIO_EFFECT_NONE;
     int32_t i;
-    for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
-        params[i] = 0;
-    }
-
-    if (!component) {
-        goto done;
-    }
-
     if (component == ecs_id(Reverb)) {
         const Reverb *reverb = ptr;
         result = BOX_AUDIO_EFFECT_REVERB;
@@ -179,7 +176,27 @@ uint32_t box_audio_module_effect_params(
             params[5] = chorus->spread;
             params[6] = chorus->feedback;
         }
-    } else if (component == ecs_id(Saturator)) {
+    }
+
+    return result;
+}
+
+/** Get the kind and the parameters of a Saturator, TransientShaper, Vocoder, FrequencyShifter,
+ * PitchShifter, PatternGate, Rotary, BeatRepeat or TapeStop.
+ *
+ * @param component The component
+ * @param ptr The value of the component, may be NULL
+ * @param params Receives the parameters when not NULL
+ * @return The kind of the effect, BOX_AUDIO_EFFECT_NONE for another component
+ */
+static uint32_t box_audio_effect_params_second(
+    ecs_entity_t component,
+    const void *ptr,
+    float *params)
+{
+    uint32_t result = BOX_AUDIO_EFFECT_NONE;
+    int32_t i;
+    if (component == ecs_id(Saturator)) {
         const Saturator *saturator = ptr;
         result = BOX_AUDIO_EFFECT_SATURATOR;
         if (params && ptr) {
@@ -289,6 +306,30 @@ uint32_t box_audio_module_effect_params(
             params[2] = stop->start_time;
             params[3] = stop->curve;
         }
+    }
+
+    return result;
+}
+
+uint32_t box_audio_module_effect_params(
+    const ecs_world_t *world,
+    ecs_entity_t component,
+    const void *ptr,
+    float *params)
+{
+    uint32_t result = BOX_AUDIO_EFFECT_NONE;
+    int32_t i;
+    for (i = 0; params && i < BOX_AUDIO_EFFECT_PARAMS; i ++) {
+        params[i] = 0;
+    }
+
+    if (!component) {
+        goto done;
+    }
+
+    result = box_audio_effect_params_first(world, component, ptr, params);
+    if (result == BOX_AUDIO_EFFECT_NONE) {
+        result = box_audio_effect_params_second(component, ptr, params);
     }
 
 done:

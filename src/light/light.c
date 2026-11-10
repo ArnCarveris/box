@@ -240,10 +240,11 @@ static void box_reflection_probe_ctor(
     }
 }
 
-/** Construct FogVolume values: a white box of 5 units each way with a density of 0.1 that
- * scatters all it extinguishes, a forward phase of 0.3, faces that fade over 1 unit, full sun,
- * ambient, point and spot light, 24 march steps and no noise, whose billows would be 4 units
- * across.
+/** Construct FogVolume values.
+ *
+ * A white box of 5 units each way with a density of 0.1 that scatters all it extinguishes, a
+ * forward phase of 0.3, faces that fade over 1 unit, full sun, ambient, point and spot light, 24
+ * march steps and no noise, whose billows would be 4 units across.
  *
  * @param ptr The components
  * @param count Number of components

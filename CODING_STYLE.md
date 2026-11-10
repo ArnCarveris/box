@@ -1,7 +1,7 @@
 # Coding style
 
-`python3 tools/lint.py` checks these rules for `.c`, `.h` and `.m` files in `include`, `src`,
-`apps`, `test` and `bench`. `--fix` fixes signatures and blank lines.
+`tools/lint.py` checks these rules for the sources bake compiles, as the `lint` command of
+`project.json`. `bake3 --fix-lint` fixes signatures and blank lines.
 
 ## Files
 - Start with a doc comment that has `@file <name>` (matching the file name) and `@brief`.

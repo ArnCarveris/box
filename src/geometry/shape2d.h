@@ -23,6 +23,7 @@ typedef enum box_shape2d_kind_t {
 /** What the Rect, Circle, Line, Polygon2D, Border and Image of an entity resolve to.
  *
  * Added with every 2D shape; ShapeMesh holds the shared unit quad and the size of a rectangle.
+ *
  * A polygon scales the quad to bounds centered on the origin that hold its outline, twice the
  * largest distance of the bounds from the origin on each axis, as a line does; the shader draws
  * the bounds themselves (center and size) from its record (box_draws_polygon_of).

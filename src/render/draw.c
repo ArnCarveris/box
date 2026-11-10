@@ -260,10 +260,11 @@ static void BoxDrawsOnHierarchy(
     box_draws_on_move(it, BOX_DRAW_BOTH);
 }
 
-/** Follow an element that got or lost LayoutFloat, or whose clip or hide_clipped changed: a
- * float leaves the clips of its ancestors and draws after the rest, a clipped overlay keeps the
- * clips and draws after its siblings, a float with hide_clipped gives its subtree its own clip
- * index, so the subtree takes its clip index again and the order is made again.
+/** Follow an element that got or lost LayoutFloat, or whose clip or hide_clipped changed.
+ *
+ * A float leaves the clips of its ancestors and draws after the rest, a clipped overlay keeps the
+ * clips and draws after its siblings, and a float with hide_clipped gives its subtree its own
+ * clip index. The subtree takes its clip index again and the order is made again.
  *
  * @param it The iterator of the observer
  */
@@ -642,8 +643,8 @@ done:
 /** Compute the batch key of a shape.
  *
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
- * below 1, as it renders below its target alpha during the transition. A 3D shape draws with the
- * extended mesh shader when box_draws_extended says so; the Scene features that are off are ignored.
+ * below 1. A 3D shape draws with the extended mesh shader when box_draws_extended says so; the
+ * Scene features that are off are ignored.
  *
  * A 3D shape that has or inherits Transmission is transmissive whatever its factor: it draws in
  * the sorted blended pass (AlphaBlend), is not alpha tested and casts no shadow, whatever its

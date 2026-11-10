@@ -84,9 +84,8 @@ ECS_STRUCT(ShadowSettings, {
                           *   that blends into the next cascade, 0 for hard seams, the last one
                           *   fades instead; default 0.1, 0 to 0.5 */
     float min_caster_texels; /**< Projected size in texels of a cascade below which a caster is
-                          *   not drawn into that cascade, so small casters drop out of the
-                          *   coarser cascades first; needs CullSettings.enabled, default 0 for
-                          *   none */
+                          *   not drawn into that cascade; needs CullSettings.enabled, default 0
+                          *   for none */
 });
 
 /** Culling settings of a view, applied as specified: all zero draws every instance.
@@ -230,15 +229,11 @@ ECS_STRUCT(View, {
 /** Component added to scene root.
  * A view renders only the scene of its camera, lit by the lights of that scene.
  *
- * An entity belongs to its nearest ancestor with Scene (itself included), so
- * scenes nest; entities outside any Scene belong to the default scene.
+ * An entity belongs to its nearest ancestor with Scene (itself included), so scenes nest;
+ * entities outside any Scene belong to the default scene, whose features the singleton holds.
  *
- * Its members are the features the mesh shaders of the scene support; the Scene singleton holds
- * those of the default scene. All false (the default) compiles the smallest shaders.
- *
- * The scene compiles one pipeline set of the mesh shader and, with a material feature on, one of
- * the extended mesh shader up front. A shape that needs an enabled material feature draws with
- * the extended shader; a feature that is off is ignored, as if the shape did not have it.
+ * Its members are the features the mesh shaders of the scene support, all false by default for
+ * the smallest shaders. A shape that needs a feature that is off draws as if it did not have it.
  */
 ECS_STRUCT(Scene, {
     bool baked;             /**< Probe volume irradiance with the visibility of the probes, for

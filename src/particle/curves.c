@@ -7,6 +7,10 @@
 #include "curves.h"
 #include <math.h>
 
+/** Check of one curve, NULL when it is valid, else the first problem */
+typedef char* (*box_particle_curve_check_t)(
+    const ParticleCurve *curve);
+
 /** Check one list of keys of a ParticleCurve: a valid Curve whose times are from 0 to 1.
  *
  * @param kind The kind of the curve
@@ -273,7 +277,7 @@ static bool box_particle_motion_validate(
 static char* box_particle_clock_curve_check(
     const ParticleCurve *curve,
     float period,
-    char* (*check)(const ParticleCurve*))
+    box_particle_curve_check_t check)
 {
     char *result = check(curve);
     if (!result && ecs_vec_count(&curve->keys) && !(period > 0.0f)) {

@@ -354,6 +354,12 @@ static bool box_gpu_transmission_draws(
     return result;
 }
 
+/** Count the mips of a snapshot a roughness samples, so only those are rendered.
+ *
+ * @param s The snapshot
+ * @param roughness Largest roughness of the transmissive draws
+ * @return Mips from the first, at least 1 and at most the mips of the snapshot
+ */
 static uint32_t box_gpu_transmission_mips(
     const box_gpu_snapshot_t *s,
     float roughness)
@@ -361,6 +367,7 @@ static uint32_t box_gpu_transmission_mips(
     float top = (float)(s->mip_count - 1);
     float lod = ceilf(fmaxf(roughness, BOX_GPU_TRANSMISSION_MIN_ROUGHNESS) * top);
     uint32_t result = lod >= top ? s->mip_count : (uint32_t)lod + 1;
+
     return result < 1 ? 1 : result;
 }
 
