@@ -585,7 +585,8 @@ static bool box_gpu_lost(
         obj = NULL; \
     }
 
-/** Release everything init created.
+/** Release everything init created. Forget the submissions box_gpu_pace waits on, as a
+ * restarted device may get the address of this one.
  *
  * @param ctx The backend
  */
@@ -610,6 +611,9 @@ static void box_gpu_fini(
     BOX_GPU_RELEASE(gpu->blit_layout, wgpuBindGroupLayoutRelease);
     BOX_GPU_RELEASE(gpu->queue, wgpuQueueRelease);
     BOX_GPU_RELEASE(gpu->device, wgpuDeviceRelease);
+    gpu->paced_device = NULL;
+    gpu->paced_count = 0;
+    gpu->paced_next = 0;
     BOX_GPU_RELEASE(gpu->adapter, wgpuAdapterRelease);
     BOX_GPU_RELEASE(gpu->instance, wgpuInstanceRelease);
     box_gpu_stats_publish(gpu);
