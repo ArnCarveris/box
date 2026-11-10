@@ -37,9 +37,9 @@ $ {
 
 cumulus_noise {
   TextureGen: {
-    width: 256, height: 256, seed: 3
+    width: 512, height: 512, seed: 3
     layers: [
-      {kind: GenNoise, frequency: 4, octaves: 5, gain: 0.5}
+      {kind: GenNoise, frequency: 12, octaves: 5, gain: 0.5}
     ]
   }
 }
@@ -55,7 +55,7 @@ cirrus_noise {
 }
 
 cumulus {
-  CloudLayer: {texture: cumulus_noise, size: 500, altitude: 120, threshold: 0.56, softness: 0.1}
+  CloudLayer: {texture: cumulus_noise, size: 1500, altitude: 120, threshold: 0.56, softness: 0.1}
 }
 
 cirrus {

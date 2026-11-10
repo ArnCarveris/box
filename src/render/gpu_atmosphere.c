@@ -21,9 +21,10 @@
 /** Bytes of the uniform buffer of an atmosphere pass */
 #define BOX_GPU_ATMOS_UNIFORMS (1024)
 
-/** Anisotropic samples of the sampler of the cloud layers, which filters along the long axis of
- * the footprint of the grazing plane near the horizon, as the light cookie does */
-#define BOX_GPU_ATMOS_CLOUD_ANISOTROPY (16)
+/** Anisotropic samples of the sampler of the cloud layers. The sky shader splits the long
+ * footprint of the grazing plane near the horizon into up to 4 taps, so each tap filters a
+ * footprint 4 times longer than wide at most; more samples cost more than they show */
+#define BOX_GPU_ATMOS_CLOUD_ANISOTROPY (4)
 
 /** First binding of the textures of the cloud layers in the sky draw, one per layer */
 #define BOX_GPU_ATMOS_CLOUD_BINDING (9)

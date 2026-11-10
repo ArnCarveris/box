@@ -642,6 +642,14 @@ const CLOUD_FORWARD_WEIGHT: f32 = 0.5;
 const CLOUD_THICKNESS: f32 = 1.6;
 // Weight of the zenith in the sky light of the clouds, the rest from the horizon
 const CLOUD_ZENITH_MIX: f32 = 0.6;
+// Most taps of the coverage of a pixel along the long axis of its texture footprint. The remap
+// sharpens a filtered value, so toward the horizon, where a pixel covers a long strip of the
+// plane, one tap turns rows of pixels into hard stripes; the mean of the remapped taps is the
+// coverage of the strip.
+const CLOUD_TAPS: i32 = 4;
+// Ratio of the long to the short axis of the footprint per tap: a rounder footprint takes
+// fewer taps, one up to this ratio
+const CLOUD_TAP_ANISOTROPY: f32 = 4.0;
 
 fn hg_phase(c: f32, g: f32) -> f32 {
     let d = 1.0 + g * g - 2.0 * g * c;
@@ -673,6 +681,26 @@ fn cloud_texture(i: i32, uv: vec2f, dx: vec2f, dy: vec2f) -> f32 {
 // Coverage of a texture value t, saturate((t - threshold) / (2 softness) + 0.5)
 fn cloud_coverage(t: f32, threshold: f32, softness: f32) -> f32 {
     return saturate((t - threshold) / max(2.0 * softness, CLOUD_MIN_RAMP) + 0.5);
+}
+
+// Mean coverage of cloud layer i over the texture footprint of a pixel at uv, dx and dy the
+// change of uv over the pixel and shape its threshold and softness: up to CLOUD_TAPS remapped
+// taps spread over the long axis, each filtered over its part of it.
+fn cloud_footprint(i: i32, uv: vec2f, dx: vec2f, dy: vec2f, shape: vec2f) -> f32 {
+    let lx = dot(dx, dx);
+    let ly = dot(dy, dy);
+    let long_x = lx >= ly;
+    let ratio = sqrt(max(lx, ly) / max(min(lx, ly), 1e-30));
+    let taps = clamp(i32(ceil(ratio / CLOUD_TAP_ANISOTROPY)), 1, CLOUD_TAPS);
+    let major = select(dy, dx, long_x) / f32(taps);
+    let minor = select(dx, dy, long_x);
+    var result = 0.0;
+    for (var k = 0; k < taps; k = k + 1) {
+        let p = uv + major * (f32(k) + 0.5 - 0.5 * f32(taps));
+        result += cloud_coverage(cloud_texture(i, p, major, minor), shape.x, shape.y);
+    }
+
+    return result / f32(taps);
 }
 
 // Radiance a light (the sun or the moon) of top of atmosphere irradiance color in direction l
@@ -735,8 +763,7 @@ fn clouds(background: vec3f, haze: vec3f, rd: vec3f, drd_x: vec3f, drd_y: vec3f)
         let uv = layer.plane.zw + rd.xz * (s / y);
         let duv_x = s * (drd_x.xz * y - rd.xz * drd_x.y) / (y * y);
         let duv_y = s * (drd_y.xz * y - rd.xz * drd_y.y) / (y * y);
-        let value = cloud_texture(i, uv, duv_x, duv_y);
-        let alpha = saturate(cloud_coverage(value, layer.shape.x, layer.shape.y) *
+        let alpha = saturate(cloud_footprint(i, uv, duv_x, duv_y, layer.shape.xy) *
             layer.shape.z);
         if (alpha <= 0.0) {
             continue;

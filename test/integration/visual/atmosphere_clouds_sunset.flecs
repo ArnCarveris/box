@@ -46,15 +46,15 @@ $ {
 
 cloud_noise {
   TextureGen: {
-    width: 256, height: 256, seed: 7
+    width: 512, height: 512, seed: 7
     layers: [
-      {kind: GenNoise, frequency: 4, octaves: 5, gain: 0.5}
+      {kind: GenNoise, frequency: 10, octaves: 5, gain: 0.5}
     ]
   }
 }
 
 clouds {
-  CloudLayer: {texture: cloud_noise, size: 600, altitude: 150, threshold: 0.5, softness: 0.12}
+  CloudLayer: {texture: cloud_noise, size: 1500, altitude: 150, threshold: 0.5, softness: 0.12}
 }
 
 ground {
