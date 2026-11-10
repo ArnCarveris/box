@@ -1046,7 +1046,8 @@ typedef struct box_render_material_t {
     float emissive[3];      /**< Linear emitted color times its strength */
     uint32_t attenuation_color; /**< Transmission.attenuation_color, display encoded bytes:
                              *   r | g << 8 | b << 16, white without Transmission */
-    float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset */
+    float uv[4];            /**< TextureTransform: u scale, v scale, u offset, v offset; the
+                             *   offset plus the wrapped TextureScroll.velocity offset */
     float transmission_factor; /**< Transmission.transmission_factor, 0 without one */
     float ior;              /**< Transmission.ior, BOX_MATERIAL_IOR without one */
     float thickness_factor; /**< Transmission.thickness_factor, 0 without one or when negative */
@@ -1072,6 +1073,9 @@ typedef struct box_render_material_t {
     float mapping_size;     /**< TextureMapping.size of MappingObject and MappingWorld, 1 when
                              *   it is not positive and finite; 0 for MappingUv, so it matches
                              *   the record without one */
+    float normal_offset[2]; /**< Wrapped TextureScroll.normal_velocity offset the normal map
+                             *   adds to uv, 0 without one */
+    float pad[2];           /**< Zero, the record is a multiple of 16 bytes */
 } box_render_material_t;
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of

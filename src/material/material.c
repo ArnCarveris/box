@@ -217,6 +217,27 @@ static void box_texture_transform_ctor(
     }
 }
 
+/** Construct TextureScroll values that do not move.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_scroll_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TextureScroll *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TextureScroll){
+            .velocity = { BOX_MATERIAL_SCROLL_VELOCITY, BOX_MATERIAL_SCROLL_VELOCITY },
+            .normal_velocity = { BOX_MATERIAL_SCROLL_VELOCITY, BOX_MATERIAL_SCROLL_VELOCITY } };
+    }
+}
+
 /** Construct TextureMapping values that keep the UVs of the mesh, with a size of 1 and no
  * blend.
  *
@@ -259,6 +280,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, TextureWrap);
     ECS_META_COMPONENT(world, TextureTransform);
+    ECS_META_COMPONENT(world, TextureScroll);
     ECS_META_COMPONENT(world, TextureMappingMode);
     ECS_META_COMPONENT(world, TextureMapping);
     ECS_META_COMPONENT(world, PbrTextures);
@@ -272,19 +294,20 @@ void BoxMaterialImport(
     ecs_set_hooks(world, DiffuseTransmission, { .ctor = box_diffuse_transmission_ctor });
     ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
     ecs_set_hooks(world, TextureMapping, { .ctor = box_texture_mapping_ctor });
+    ecs_set_hooks(world, TextureScroll, { .ctor = box_texture_scroll_ctor });
     ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[11] = {
+    ecs_entity_t materials[12] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping)
+        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll)
     };
     int32_t i;
-    for (i = 0; i < 11; i ++) {
+    for (i = 0; i < 12; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

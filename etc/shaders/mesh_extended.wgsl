@@ -125,8 +125,8 @@ fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
         o.emissive += w[k] * textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
             gy[k]).rgb;
         o.orm += w[k] * textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
-        let m = textureSampleGrad(normal_map, material_sampler, uv, gx[k], gy[k]).xyz * 2.0 -
-            1.0;
+        let m = textureSampleGrad(normal_map, material_sampler, uv + f.normal_offset, gx[k],
+            gy[k]).xyz * 2.0 - 1.0;
         let tangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_tangent(k, s)),
             geometric);
         let bitangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_bitangent(k)),

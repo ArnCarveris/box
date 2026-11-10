@@ -297,6 +297,15 @@
                 ]
             },
             {
+                "id": "TextureScroll",
+                "testcases": [
+                    "shifts_checker",
+                    "adds_to_texture_transform",
+                    "normal_velocity_moves_normal_only",
+                    "ignored_by_2d"
+                ]
+            },
+            {
                 "id": "Tint",
                 "testcases": [
                     "mix_by_strength",

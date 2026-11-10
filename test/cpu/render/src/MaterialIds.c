@@ -11,6 +11,7 @@
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
+#include <math.h>
 
 /** Instances of the cases with many instances */
 #define COUNT (1000)
@@ -1701,6 +1702,177 @@ void MaterialIds_diffuse_transmission_prefab_change_reaches_slot(void) {
     test_uint(record_of(world, shared)->diffuse_transmission, 0);
     test_uint(record_of(world, own)->diffuse_transmission, 0);
     test_uint(record_of(world, red)->diffuse_transmission, 0xFFu);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Run a frame that advances the world by a fixed time and wait until the backend has its
+ * packet.
+ *
+ * @param world The world
+ * @param delta Seconds the frame advances the world
+ * @return The counters of the batches of the frame
+ */
+static box_render_draws_stats_t frame_dt(
+    ecs_world_t *world,
+    float delta)
+{
+    box_render_draws_stats_t stats;
+    ecs_progress(world, delta);
+    box_render_sync(world);
+    box_render_draws_stats(world, &stats);
+
+    return stats;
+}
+
+void MaterialIds_texture_scroll_private_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {200, 100, 50});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Rgb, {200, 100, 50});
+    frame_dt(world, 1.0f / 60.0f);
+    test_bool(ecs_owns(world, a, MaterialId), true);
+    test_uint(id_of(world, a), id_of(world, b));
+
+    /* A scrolling shape leaves the shared slot for one of its own */
+    ecs_set(world, a, TextureScroll, {.velocity = {0.5f, 0}});
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t own = id_of(world, a);
+    test_assert(own != id_of(world, b) && own != 0 && own != UINT32_MAX);
+    test_uint(shading_of(world, a)->material, own);
+    test_uint(shading_of(world, b)->material, id_of(world, b));
+    test_uint(record_of(world, own)->color, color_word(200, 100, 50));
+    test_assert(record_of(world, own)->uv[2] > 0);
+    test_flt(record_of(world, id_of(world, b))->uv[2], 0);
+
+    /* Without it the shape shares the slot of its content again */
+    ecs_remove(world, a, TextureScroll);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(shading_of(world, a)->material, id_of(world, b));
+    box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+    test_int(stats.material_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_texture_scroll_repacks_only_scrolling(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Rgb, {200, 100, 50});
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        instance_new(world, prefab, (float)i);
+    }
+
+    ecs_entity_t still = ecs_new(world);
+    ecs_set(world, still, Box, {1, 1, 1});
+    ecs_set(world, still, Position, {0, 2, 0});
+    ecs_set(world, still, Rgb, {10, 20, 30});
+    ecs_set(world, still, TextureTransform, {1, 1, 0.25f, 0});
+
+    /* A scene without TextureScroll packs no material per frame */
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    ecs_entity_t water = ecs_new(world);
+    ecs_set(world, water, Box, {1, 1, 1});
+    ecs_set(world, water, Position, {0, -2, 0});
+    ecs_set(world, water, Rgb, {40, 80, 120});
+    ecs_set(world, water, TextureTransform, {1, 1, 0.25f, 0});
+    ecs_set(world, water, TextureScroll, {
+        .velocity = {0.3f, -0.1f}, .normal_velocity = {0, 0.2f}});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t id = id_of(world, water);
+    test_assert(id != 0 && id != UINT32_MAX && id != id_of(world, still));
+    float u = record_of(world, id)->uv[2];
+    float v = record_of(world, id)->uv[3];
+    float n = record_of(world, id)->normal_offset[1];
+
+    /* Only the record of the scrolling shape is packed and uploaded, each frame */
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, MATERIAL);
+        test_int(stats.upload_bytes, 0);
+        const box_render_material_t *record = record_of(world, id);
+        test_assert(fabsf(record->uv[2] - u - 0.3f / 60.0f) < 1e-4f);
+        test_assert(fabsf(record->uv[3] - v + 0.1f / 60.0f) < 1e-4f);
+        test_assert(fabsf(record->normal_offset[1] - n - 0.2f / 60.0f) < 1e-4f);
+        test_flt(record->normal_offset[0], 0);
+        u = record->uv[2];
+        v = record->uv[3];
+        n = record->normal_offset[1];
+
+        int32_t j, found = 0;
+        for (j = 0; j < ecs_vec_count(&null->last.uploads); j ++) {
+            const box_render_upload_t *up = ecs_vec_get_t(
+                &null->last.uploads, box_render_upload_t, j);
+            if (up->buffer == BOX_RENDER_BUFFER_MATERIALS) {
+                test_uint(up->offset, id * (uint32_t)MATERIAL);
+                test_uint(up->size, (uint32_t)MATERIAL);
+                found ++;
+            }
+        }
+
+        test_int(found, 1);
+        test_flt(record_of(world, id_of(world, still))->uv[2], 0.25f);
+        test_flt(record_of(world, id_of(world, prefab))->uv[2], 0);
+    }
+
+    ecs_remove(world, water, TextureScroll);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_texture_scroll_prefab_repacks(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Rgb, {40, 80, 120});
+    ecs_set(world, prefab, TextureScroll, {.velocity = {0.25f, 0}});
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        instance_new(world, prefab, (float)i);
+    }
+
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t id = id_of(world, prefab);
+    test_assert(id != 0 && id != UINT32_MAX);
+    float u = record_of(world, id)->uv[2];
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, MATERIAL);
+        test_int(stats.shading_bytes, 0);
+        test_int(stats.materials, 2);
+        test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.25f / 60.0f) < 1e-4f);
+        u = record_of(world, id)->uv[2];
+    }
 
     ecs_fini(world);
     box_render_null_free(null);

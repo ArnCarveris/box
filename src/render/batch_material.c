@@ -306,10 +306,48 @@ static uint32_t box_draws_diffuse_transmission_pack(
     return result;
 }
 
+/** Wrap one axis of a scroll offset to 0..2.
+ *
+ * @param velocity Texture widths per second
+ * @param time Total render time
+ * @return The offset, 0 for a velocity that is not finite
+ */
+static float box_draws_scroll_axis(
+    float velocity,
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(velocity) && isfinite(time)) {
+        double v = fmod((double)velocity * time, 2.0);
+        if (v < 0.0) {
+            v += 2.0;
+        }
+
+        result = (float)v;
+        if (result >= 2.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+void box_draws_texture_scroll(
+    const TextureScroll *scroll,
+    double time,
+    float *out)
+{
+    out[0] = scroll ? box_draws_scroll_axis(scroll->velocity[0], time) : 0.0f;
+    out[1] = scroll ? box_draws_scroll_axis(scroll->velocity[1], time) : 0.0f;
+    out[2] = scroll ? box_draws_scroll_axis(scroll->normal_velocity[0], time) : 0.0f;
+    out[3] = scroll ? box_draws_scroll_axis(scroll->normal_velocity[1], time) : 0.0f;
+}
+
 void box_draws_material_pack(
     box_render_material_t *out,
     const box_draw_material_t *material)
 {
+    float scroll[4];
     const Rgb *color = material->color;
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
@@ -334,6 +372,19 @@ void box_draws_material_pack(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    if (material->scroll) {
+        box_draws_texture_scroll(material->scroll, material->time, scroll);
+        out->uv[2] += scroll[0];
+        out->uv[3] += scroll[1];
+        out->normal_offset[0] = scroll[2];
+        out->normal_offset[1] = scroll[3];
+    } else {
+        out->normal_offset[0] = 0.0f;
+        out->normal_offset[1] = 0.0f;
+    }
+
+    out->pad[0] = 0.0f;
+    out->pad[1] = 0.0f;
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;
