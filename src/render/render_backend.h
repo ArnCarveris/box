@@ -511,7 +511,8 @@ bool box_render_gpu_cull_frustum(
  *
  * @param world The world
  * @param tile Index of the tile in the shadow tiles of the packet
- * @param out Receives the casters tested and drawn in tested and visible
+ * @param out Receives the casters tested and drawn in tested and visible, summed over the
+ * octants of a point light tile
  * @return Whether the last packet culled the tile, false for a tile it kept instead of rendering
  */
 bool box_render_gpu_cull_tile(

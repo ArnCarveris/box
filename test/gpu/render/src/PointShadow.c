@@ -454,8 +454,8 @@ void PointShadow_range_culls_casters(void) {
 
     box_render_cull_stats_t tile;
     test_bool(box_render_gpu_cull_tile(world, 0, &tile), true);
-    test_int(tile.tested, 3);
-    test_int(tile.visible, 2);
+    test_int(tile.tested, 24);
+    test_int(tile.visible, 8);
     test_bool(box_render_gpu_cull_tile(world, 1, &tile), false);
     point_no_errors(world);
     ecs_fini(world);

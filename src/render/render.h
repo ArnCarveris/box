@@ -776,6 +776,19 @@ void box_render_shadow_point_planes(
     const box_render_shadow_tile_t *tile,
     vec4 *out);
 
+/** Write the 6 world planes of the box of one octant of a point light tile: the part of the box
+ * of box_render_shadow_point_planes on the side of the light the octant faces, bit 0 of the
+ * octant negating x, bit 1 y and bit 2 z, inside where non negative, normalized.
+ *
+ * @param tile The tile, octahedral
+ * @param octant The octant, 0 to 7
+ * @param out Receives the planes
+ */
+void box_render_shadow_octant_planes(
+    const box_render_shadow_tile_t *tile,
+    int32_t octant,
+    vec4 *out);
+
 /** Get the world bounds of what a shadow atlas tile holds: the box around the sphere of the far
  * plane of a point light tile, or for a spot light tile the box around its frustum (the cone
  * through its corners) within that sphere.

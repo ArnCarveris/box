@@ -432,6 +432,7 @@
                     "extract_full_atlas_drops",
                     "point_projection",
                     "point_cull_planes",
+                    "point_octant_planes",
                     "extract_point_assigns_tile",
                     "extract_point_shadows_false_no_tile",
                     "extract_point_baked_no_tile",

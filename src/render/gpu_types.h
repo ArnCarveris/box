@@ -684,6 +684,8 @@ typedef struct box_gpu_atlas_t {
     int32_t point_revision;         /**< Revision of that variant */
 } box_gpu_atlas_t;
 
+#define BOX_GPU_ATLAS_FRUSTUM(tile, octant) ((tile) * BOX_RENDER_SHADOW_OCTANTS + (octant))
+
 /** A draw of the casters of a tile of the last packet, read by box_render_gpu_cull_tile */
 typedef struct box_gpu_atlas_read_t {
     int32_t tile;                   /**< Index of the tile in the shadow tiles of the packet */

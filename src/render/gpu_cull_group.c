@@ -839,29 +839,32 @@ void box_gpu_cull_casters_add(
 {
     box_gpu_cull_t *c = &gpu->cull;
     box_gpu_cull_uniforms_t base;
-    int32_t i;
+    int32_t i, o;
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
     ecs_vec_clear(&c->frustums);
     for (i = 0; i < count; i ++) {
+        bool octahedral = tiles[i].projection == BOX_RENDER_SHADOW_OCTAHEDRAL;
         if (renders && !renders[i]) {
             continue;
         }
 
-        box_gpu_cull_desc_t *f = ecs_vec_append_t(NULL, &c->frustums, box_gpu_cull_desc_t);
-        ecs_os_memset_t(f, 0, box_gpu_cull_desc_t);
-        f->slot = slot;
-        f->cascade = i;
-        f->index = -1;
-        f->flags = BOX_GPU_CULL_CASTERS;
-        box_gpu_cull_frustum_all(&f->frustum);
-        if (tiles[i].projection == BOX_RENDER_SHADOW_OCTAHEDRAL) {
-            box_render_shadow_point_planes(&tiles[i], f->frustum.planes);
-        } else {
-            box_gpu_cull_planes(ECS_CONST_CAST(vec4*, tiles[i].matrix), f->frustum.planes);
-        }
+        for (o = 0; o < (octahedral ? BOX_RENDER_SHADOW_OCTANTS : 1); o ++) {
+            box_gpu_cull_desc_t *f = ecs_vec_append_t(NULL, &c->frustums, box_gpu_cull_desc_t);
+            ecs_os_memset_t(f, 0, box_gpu_cull_desc_t);
+            f->slot = slot;
+            f->cascade = BOX_GPU_ATLAS_FRUSTUM(i, o);
+            f->index = -1;
+            f->flags = BOX_GPU_CULL_CASTERS;
+            box_gpu_cull_frustum_all(&f->frustum);
+            if (octahedral) {
+                box_render_shadow_octant_planes(&tiles[i], o, f->frustum.planes);
+            } else {
+                box_gpu_cull_planes(ECS_CONST_CAST(vec4*, tiles[i].matrix), f->frustum.planes);
+            }
 
-        glm_vec3_copy(ECS_CONST_CAST(float*, tiles[i].position), f->frustum.light);
-        f->frustum.light[3] = 1.0f;
+            glm_vec3_copy(ECS_CONST_CAST(float*, tiles[i].position), f->frustum.light);
+            f->frustum.light[3] = 1.0f;
+        }
     }
 
     if (ecs_vec_count(&c->frustums)) {

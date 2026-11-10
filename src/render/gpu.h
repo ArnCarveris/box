@@ -1936,10 +1936,12 @@ void box_gpu_cull_add(
     const box_gpu_view_uniforms_t *u);
 
 /** Add the tiles of a shadow atlas as cull groups of shadow casters of its scene, at most
- * BOX_GPU_CULL_GROUP_VIEWS tiles per group; tile i is cascade i of the slot.
+ * BOX_GPU_CULL_GROUP_VIEWS frustums per group; octant o of tile i is cascade
+ * BOX_GPU_ATLAS_FRUSTUM(i, o) of the slot, a spot light tile only having octant 0.
  *
- * A spot light tile culls by the frustum of its matrix, a point light tile by the 6 planes of
- * the box around the sphere of its range, as the multi view cull only tests planes.
+ * A spot light tile culls by the frustum of its matrix, each octant of a point light tile by
+ * the 6 planes of its part of the box around the sphere of its range
+ * (box_render_shadow_octant_planes), as the multi view cull only tests planes.
  *
  * @param gpu The backend
  * @param packet The packet

@@ -6,8 +6,9 @@
  * into each cascade before its view draws and into each atlas tile once per packet; alpha tested
  * ones discard below their cutoff. Probe captures use a map of their own with one cascade.
  *
- * A point light tile records each caster draw once per octant, the octant in the dynamic offset;
- * the shadow_clip variant clips to the octant with clip distances, the core one discards.
+ * A point light tile records the casters of each octant, which the cull keeps per octant, the
+ * octant in the dynamic offset; the shadow_clip variant clips to the octant with clip distances,
+ * the core one discards.
  */
 
 #include "gpu.h"
@@ -1220,8 +1221,8 @@ static bool box_gpu_atlas_renders(
 }
 
 /** Record the render pass that draws the casters of each tile of an atlas that renders, within
- * the viewport of the tile; a point light tile draws them once per octant. No pass when no tile
- * renders.
+ * the viewport of the tile; a point light tile draws the casters of each octant, skipping an
+ * octant without any. No pass when no tile renders.
  *
  * When every tile renders the pass clears the atlas, else it loads it and clears each tile it
  * renders with gpu->shadow_clear, so the other tiles stay. The atlas then remembers the shadow
@@ -1272,7 +1273,6 @@ static void box_gpu_atlas_pass(
     for (i = 0; i < a->count; i ++) {
         const box_render_shadow_tile_t *tile = ecs_vec_get_t(
             &packet->shadow_tiles, box_render_shadow_tile_t, a->first + i);
-        const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, index, i);
         int32_t block = *ecs_vec_get_t(&gpu->atlas_blocks, int32_t, a->first + i);
         bool octahedral = tile->projection == BOX_RENDER_SHADOW_OCTAHEDRAL;
         if (!renders[i]) {
@@ -1300,7 +1300,13 @@ static void box_gpu_atlas_pass(
         }
 
         for (o = 0; o < (octahedral ? BOX_RENDER_SHADOW_OCTANTS : 1); o ++) {
+            const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, index,
+                BOX_GPU_ATLAS_FRUSTUM(i, o));
             uint32_t offset = (uint32_t)((block + o) * BOX_GPU_CASCADE_STRIDE);
+            if (cv && !cv->draw_count) {
+                continue;
+            }
+
             wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
             if (cv && octahedral) {
                 kept = box_gpu_shadow_draw(gpu, pass, packet, cv, point,
@@ -1338,7 +1344,7 @@ static void box_gpu_atlas_counts(
 {
     box_gpu_cull_t *c = &gpu->cull;
     uint64_t size = (uint64_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t);
-    int32_t i, j, d;
+    int32_t i, j, o, d;
     ecs_vec_clear(&gpu->atlas_reads);
     if (!size || !c->args) {
         goto done;
@@ -1348,12 +1354,15 @@ static void box_gpu_atlas_counts(
         const box_render_shadow_atlas_t *a = ecs_vec_get_t(
             &packet->shadow_atlases, box_render_shadow_atlas_t, i);
         for (j = 0; j < a->count; j ++) {
-            const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, i, j);
-            for (d = 0; cv && d < cv->draw_count; d ++) {
-                const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
-                    &c->draws, box_gpu_cull_draw_t, cv->first_draw + d);
-                *ecs_vec_append_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t) =
-                    (box_gpu_atlas_read_t){ a->first + j, draw->args, draw->count };
+            for (o = 0; o < BOX_RENDER_SHADOW_OCTANTS; o ++) {
+                const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, i,
+                    BOX_GPU_ATLAS_FRUSTUM(j, o));
+                for (d = 0; cv && d < cv->draw_count; d ++) {
+                    const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
+                        &c->draws, box_gpu_cull_draw_t, cv->first_draw + d);
+                    *ecs_vec_append_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t) =
+                        (box_gpu_atlas_read_t){ a->first + j, draw->args, draw->count };
+                }
             }
         }
     }

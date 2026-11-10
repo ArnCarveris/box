@@ -808,6 +808,45 @@ void ShadowAtlas_point_cull_planes(void) {
     }
 }
 
+void ShadowAtlas_point_octant_planes(void) {
+    box_render_shadow_tile_t tile = {
+        .projection = BOX_RENDER_SHADOW_OCTAHEDRAL,
+        .position = {1, 5, 2},
+        .near_ = 0.05f,
+        .far_ = 10.0f
+    };
+    vec4 planes[6];
+    int32_t o, i;
+    for (o = 0; o < BOX_RENDER_SHADOW_OCTANTS; o ++) {
+        vec3 signs = {
+            (o & 1) ? -1.0f : 1.0f, (o & 2) ? -1.0f : 1.0f, (o & 4) ? -1.0f : 1.0f
+        };
+        vec3 inside, opposite, beyond;
+        bool in = true, at = true, out = false, far_ = false;
+        for (i = 0; i < 3; i ++) {
+            inside[i] = tile.position[i] + signs[i] * (float)(i + 1);
+            opposite[i] = tile.position[i] - signs[i] * (float)(i + 1);
+            beyond[i] = tile.position[i] + signs[i] * (i == 1 ? 10.5f : 1.0f);
+        }
+
+        box_render_shadow_octant_planes(&tile, o, planes);
+        for (i = 0; i < 6; i ++) {
+            float len = sqrtf(planes[i][0] * planes[i][0] + planes[i][1] * planes[i][1] +
+                planes[i][2] * planes[i][2]);
+            test_assert(fabsf(len - 1.0f) < 1e-6f);
+            in = in && glm_vec3_dot(planes[i], inside) + planes[i][3] >= 0;
+            at = at && glm_vec3_dot(planes[i], tile.position) + planes[i][3] >= -1e-5f;
+            out = out || glm_vec3_dot(planes[i], opposite) + planes[i][3] < 0;
+            far_ = far_ || glm_vec3_dot(planes[i], beyond) + planes[i][3] < 0;
+        }
+
+        test_bool(in, true);
+        test_bool(at, true);
+        test_bool(out, true);
+        test_bool(far_, true);
+    }
+}
+
 void ShadowAtlas_extract_point_assigns_tile(void) {
     // lighting/shadows
     box_render_null_t *null;

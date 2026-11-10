@@ -315,6 +315,20 @@ void box_render_shadow_point_planes(
     }
 }
 
+void box_render_shadow_octant_planes(
+    const box_render_shadow_tile_t *tile,
+    int32_t octant,
+    vec4 *out)
+{
+    int32_t i;
+    box_render_shadow_point_planes(tile, out);
+    for (i = 0; i < 3; i ++) {
+        int32_t negative = (octant >> i) & 1;
+        float sign = negative ? -1.0f : 1.0f;
+        out[i * 2 + negative][3] = -sign * tile->position[i];
+    }
+}
+
 void box_render_shadow_tile_bounds(
     const box_render_shadow_tile_t *tile,
     float *min,
