@@ -894,8 +894,6 @@ void box_gpu_particles_simulate(
     }
 
     if (!box_gpu_particle_sim_pipelines(gpu)) {
-        ecs_err("particle shader is not available, %d pools skipped", count);
-        box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
         goto done;
     }
 
