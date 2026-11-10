@@ -16,10 +16,10 @@ struct Frame {
 
 @diagnostic(off, derivative_uniformity)
 fn cotangent_frame(n: vec3f, p: vec3f, uv: vec2f) -> Frame {
-    let dp1 = dpdx(p);
-    let dp2 = dpdy(p);
-    let duv1 = dpdx(uv);
-    let duv2 = dpdy(uv);
+    return cotangent_frame_grad(n, dpdx(p), dpdy(p), dpdx(uv), dpdy(uv));
+}
+
+fn cotangent_frame_grad(n: vec3f, dp1: vec3f, dp2: vec3f, duv1: vec2f, duv2: vec2f) -> Frame {
     let dp2perp = cross(dp2, n);
     let dp1perp = cross(n, dp1);
     let t = dp2perp * duv1.x + dp1perp * duv2.x;
@@ -56,7 +56,7 @@ fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
     o.albedo = textureSample(albedo_map, material_sampler, uv);
     o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
     o.orm = textureSample(orm_map, material_sampler, uv).rgb;
-    let m = textureSample(normal_map, material_sampler, uv).xyz * 2.0 - 1.0;
+    let m = textureSample(normal_map, material_sampler, uv + f.normal_offset).xyz * 2.0 - 1.0;
     o.frame = cotangent_frame(geometric, f.world, uv);
     o.normal = perturb(geometric, o.frame, m);
     return o;

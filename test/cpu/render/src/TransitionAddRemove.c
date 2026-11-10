@@ -355,7 +355,7 @@ static void tr_check_record(
     box_draw_material_t m;
     uint32_t slot = ecs_get(world, e, MaterialId)->value;
     test_assert(slot != 0 && slot != UINT32_MAX);
-    box_draws_material_of(world, e, &m);
+    box_draws_material_of(world, e, 0, &m);
     tr_material_set(&m, c, value);
     box_draws_material_pack(&expected, &m);
     test_assert(tr_material_rendered(world, null, slot, &rendered));
@@ -378,7 +378,7 @@ static void tr_check_record_target(
     box_draw_material_t m;
     uint32_t slot = ecs_get(world, e, MaterialId)->value;
     const box_draw_materials_t *table = &box_draws_state(world)->materials;
-    box_draws_material_of(world, e, &m);
+    box_draws_material_of(world, e, 0, &m);
     box_draws_material_pack(&expected, &m);
     if (tr_material_rendered(world, null, slot, &rendered)) {
         test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));

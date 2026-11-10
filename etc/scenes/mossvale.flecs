@@ -9,6 +9,7 @@ include mossvale/player
 include mossvale/quests
 include mossvale/fx
 include mossvale/world
+include mossvale/tiles
 include mossvale/hud
 include mossvale/dev
 include mossvale/music

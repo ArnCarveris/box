@@ -1,0 +1,98 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Endless UV scrolling (TextureScroll), 2 s in, lit by a low sun from the right. The top row
+// has four checker quads: on the left one that does not scroll, then one whose UVs scrolled at
+// 0.0625 texture widths per second along U (half a checker cell, the pattern moves toward -x),
+// one that scrolled diagonally at 0.1, 0.2 on top of a TextureTransform offset of 0.25 with
+// WrapMirror, and one whose checker stands still while its bump normal map drifted
+// (normal_velocity 0.3, 0). The bottom row is a blue water panel whose albedo scrolls at 0.05, 0
+// and whose normal map moves on top of that at -0.15, 0.1, next to the same panel without
+// TextureScroll.
+// frames: 120
+scroll {
+  AmbientLight: {sky: {120, 140, 170}, ground: {40, 40, 40}, intensity: 0.8}
+
+  sun {
+    Rotation: {-0.5, 1.2, 0}
+    DirectionalLight: {intensity: 3}
+  }
+
+  camera {
+    Position: {0, 0, 7}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+  }
+
+  checker {
+    TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  }
+
+  bumps {
+    TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+  }
+
+  still {
+    Position: {-3.3, 1.2, 0}
+    Quad: {2, 2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: checker}
+  }
+
+  right {
+    Position: {-1.1, 1.2, 0}
+    Quad: {2, 2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: checker}
+    TextureScroll: {velocity: {0.0625, 0}}
+  }
+
+  diagonal {
+    Position: {1.1, 1.2, 0}
+    Quad: {2, 2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: checker}
+    TextureWrap: WrapMirror
+    TextureTransform: {scale_x: 1, scale_y: 1, offset_x: 0.25, offset_y: 0}
+    TextureScroll: {velocity: {0.1, 0.2}}
+  }
+
+  normal_only {
+    Position: {3.3, 1.2, 0}
+    Quad: {2, 2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.4}
+    PbrTextures: {albedo: checker, normal: bumps}
+    TextureScroll: {normal_velocity: {0.3, 0}}
+  }
+
+  water {
+    Position: {-1.6, -1.3, 0}
+    Quad: {3, 2}
+    Rgb: {60, 120, 170}
+    PbrMaterial: {roughness: 0.15}
+    PbrTextures: {albedo: checker, normal: bumps}
+    TextureTransform: {scale_x: 2, scale_y: 1.5, offset_x: 0, offset_y: 0}
+    TextureScroll: {velocity: {0.05, 0}, normal_velocity: {-0.15, 0.1}}
+  }
+
+  water_still {
+    Position: {1.6, -1.3, 0}
+    Quad: {3, 2}
+    Rgb: {60, 120, 170}
+    PbrMaterial: {roughness: 0.15}
+    PbrTextures: {albedo: checker, normal: bumps}
+    TextureTransform: {scale_x: 2, scale_y: 1.5, offset_x: 0, offset_y: 0}
+  }
+}

@@ -17,6 +17,7 @@
 #include "box/light.h"
 #include "box/texture.h"
 #include "box/material.h"
+#include "box/terrain.h"
 #include "box/surface.h"
 #include "box/view.h"
 #include "box/effects.h"

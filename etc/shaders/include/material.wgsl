@@ -20,7 +20,8 @@ struct Material {
     emissive: vec3f,
     // Display encoded Transmission.attenuation_color, r | g << 8 | b << 16, white without one
     attenuation_color: u32,
-    // TextureTransform: u scale, v scale, u offset, v offset
+    // TextureTransform: u scale, v scale, u offset, v offset, the offset plus the wrapped
+    // TextureScroll.velocity offset
     uv: vec4f,
     // Transmission: factor (0 without one), index of refraction, thickness and the distance at
     // which light has the attenuation color
@@ -50,6 +51,9 @@ struct Material {
     // TextureMapping.size of a MappingObject or MappingWorld material, world units per repeat;
     // 0 for the UVs
     mapping_size: f32,
+    // Wrapped TextureScroll.normal_velocity offset the normal map adds to its UVs, 0 without one
+    normal_offset: vec2f,
+    pad: vec2f,
 };
 
 // Below this weight a projection of a triplanar mapping is dropped and the others renormalized,

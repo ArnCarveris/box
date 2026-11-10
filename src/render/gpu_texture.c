@@ -51,6 +51,10 @@ static const uint8_t box_gpu_flat[4] = { 128, 128, 255, 255 };
  * image, else it is flat at 0.5 */
 #define BOX_GPU_BLEND_HEIGHT (4u)
 
+/** BlendUniforms flag: a TileTerrain, whose mask is its grid of kind indices and whose slices
+ * are the atlases of its kinds */
+#define BOX_GPU_BLEND_TILES (256u)
+
 /** BlendUniforms of mesh.wgsl */
 typedef struct box_gpu_blend_uniforms_t {
     float transforms[BOX_RENDER_BLEND_LAYERS][4]; /**< TextureTransform of each layer */
@@ -636,9 +640,9 @@ static void box_gpu_texture_mips_usage(
             }
         }
 
-        for (slot = 0; box_gpu_texture_blends(b) && slot < BOX_RENDER_BLEND_LAYERS; slot ++) {
-            const box_render_texture_blend_t *r = box_render_packet_data(packet,
-                b->blend_layers);
+        const box_render_texture_blend_t *r = box_gpu_texture_blends(b)
+            ? box_render_packet_data(packet, b->blend_layers) : NULL;
+        for (slot = 0; r && slot < (int32_t)r->count && slot < BOX_RENDER_BLEND_SLICES; slot ++) {
             uint32_t handle = r->layers[slot][BOX_RENDER_BLEND_ALBEDO];
             box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
                 ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
@@ -1004,7 +1008,7 @@ static void box_gpu_blend_array_build(
     box_gpu_t *gpu,
     box_gpu_blend_array_t *a)
 {
-    box_gpu_texture_t *src[BOX_RENDER_BLEND_LAYERS] = {0};
+    box_gpu_texture_t *src[BOX_RENDER_BLEND_SLICES] = {0};
     bool albedo = a->map == BOX_RENDER_BLEND_ALBEDO;
     WGPUTextureFormat srgb = BOX_GPU_TEXTURE_SRGB;
     WGPUTextureFormat format = albedo ? BOX_GPU_TEXTURE_SRGB : BOX_GPU_TEXTURE_FORMAT;
@@ -1115,9 +1119,9 @@ static box_gpu_blend_array_t* box_gpu_blend_array(
     const box_render_texture_blend_t *r,
     uint32_t map)
 {
-    uint32_t sources[BOX_RENDER_BLEND_LAYERS] = {0};
-    uint32_t count = r->count < 1 ? 1 : r->count > BOX_RENDER_BLEND_LAYERS
-        ? BOX_RENDER_BLEND_LAYERS : r->count;
+    uint32_t sources[BOX_RENDER_BLEND_SLICES] = {0};
+    uint32_t count = r->count < 1 ? 1 : r->count > BOX_RENDER_BLEND_SLICES
+        ? BOX_RENDER_BLEND_SLICES : r->count;
     box_gpu_blend_array_t *a;
     uint32_t s;
     bool stale = false;
@@ -1204,7 +1208,8 @@ static void box_gpu_blend_group_bind(
     ecs_os_memcpy(u.transforms, g->blend.transforms, ECS_SIZEOF(u.transforms));
     u.count = g->arrays[0]->count;
     u.flags = (mask ? BOX_GPU_BLEND_MASKED : 0) |
-        (mask && ((box_gpu_texture_entry_t*)mask)->single ? BOX_GPU_BLEND_SINGLE : 0);
+        (mask && ((box_gpu_texture_entry_t*)mask)->single ? BOX_GPU_BLEND_SINGLE : 0) |
+        (g->blend.tiles ? BOX_GPU_BLEND_TILES : 0);
     u.contrast = g->blend.contrast;
     for (m = 0; g->arrays[BOX_RENDER_BLEND_HEIGHT] && m < (int32_t)u.count; m ++) {
         uint32_t serial = g->arrays[BOX_RENDER_BLEND_HEIGHT]->serials[m];

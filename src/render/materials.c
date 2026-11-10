@@ -7,9 +7,9 @@
  * by its hash; slot 0, the default material, is never freed. A material change hashes its owners
  * in the next extract, and a frame without one hashes nothing (box_draws_materials_resolve).
  *
- * Prefabs, shapes of DynamicMaterial batches and shapes with a running material transition own
- * a private slot, packed from its owner in the send that uploads it, so a prefab change uploads
- * one record and transitions.c can patch the record by slot (box_materials_transitions_end).
+ * Prefabs, shapes of DynamicMaterial batches, with a TextureScroll (packed every frame, see
+ * box_materials_scroll) or a running material transition own a private slot, packed from its
+ * owner in the send that uploads it, so transitions.c can patch the record by slot.
  */
 
 #include "draw.h"
@@ -28,13 +28,16 @@
 typedef enum box_materials_flag_t {
     BOX_MATERIALS_MARKED = 1 << 0,      /**< The slot is in dirty */
     BOX_MATERIALS_LISTED = 1 << 1,      /**< The slot is the one contents holds for its hash */
-    BOX_MATERIALS_DYNAMIC = 1 << 2,     /**< Private for a shape of a DynamicMaterial batch */
+    BOX_MATERIALS_DYNAMIC = 1 << 2,     /**< Private for a shape of a DynamicMaterial batch or
+                                         *   with a TextureScroll */
     BOX_MATERIALS_TRANSITION = 1 << 3,  /**< Private for a running material transition */
-    BOX_MATERIALS_TRANSITING = 1 << 4   /**< The slot is in transiting */
+    BOX_MATERIALS_TRANSITING = 1 << 4,  /**< The slot is in transiting */
+    BOX_MATERIALS_SCROLLING = 1 << 5    /**< The slot is in scrolling */
 } box_materials_flag_t;
 
 /** Flags a slot keeps when it changes hands: the lists it is in */
-#define BOX_MATERIALS_LISTS (BOX_MATERIALS_MARKED | BOX_MATERIALS_TRANSITING)
+#define BOX_MATERIALS_LISTS \
+    (BOX_MATERIALS_MARKED | BOX_MATERIALS_TRANSITING | BOX_MATERIALS_SCROLLING)
 
 /** Get a slot of the table.
  *
@@ -225,20 +228,39 @@ static void box_materials_drop(
     }
 }
 
-/** Pack the record of an owner from the material components it owns or inherits.
+/** Pack the record of an owner from the material components it owns or inherits, its
+ * TextureScroll offsets at the time of the table.
  *
  * @param world The world
+ * @param m The table
  * @param owner The owner, 0 for the default material
  * @param out The record
+ * @return Whether the owner has or inherits a TextureScroll
  */
-static void box_materials_pack(
+static bool box_materials_pack(
     const ecs_world_t *world,
+    const box_draw_materials_t *m,
     ecs_entity_t owner,
     box_render_material_t *out)
 {
     box_draw_material_t material;
-    box_draws_material_of(world, owner, &material);
+    box_draws_material_of(world, owner, m->time, &material);
     box_draws_material_pack(out, &material);
+
+    return material.scroll != NULL;
+}
+
+/** Check whether an entity has or inherits a TextureScroll, whose record changes every frame.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return Whether it scrolls
+ */
+static bool box_materials_scrolls(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_get(world, e, TextureScroll) != NULL;
 }
 
 /** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff,
@@ -283,7 +305,7 @@ static uint32_t box_materials_share(
 {
     box_draw_materials_t *m = &d->materials;
     box_render_material_t record;
-    box_materials_pack(world, e, &record);
+    box_materials_pack(world, m, e, &record);
     uint64_t hash = box_materials_hash(&record);
     uint32_t result = box_materials_find(m, hash, &record);
     if (result != BOX_MATERIALS_NONE) {
@@ -431,6 +453,7 @@ void box_draws_materials_init(
     ecs_vec_init_t(NULL, &m->free, uint32_t, 0);
     ecs_vec_init_t(NULL, &m->pending, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &m->transiting, uint32_t, 0);
+    ecs_vec_init_t(NULL, &m->scrolling, uint32_t, 0);
     ecs_vec_init_t(NULL, &m->uploaded, box_draw_material_upload_t, 0);
     ecs_map_init(&m->owned, NULL);
     ecs_map_init(&m->contents, NULL);
@@ -455,6 +478,7 @@ void box_draws_materials_fini(
     ecs_vec_fini_t(NULL, &m->free, uint32_t);
     ecs_vec_fini_t(NULL, &m->pending, ecs_entity_t);
     ecs_vec_fini_t(NULL, &m->transiting, uint32_t);
+    ecs_vec_fini_t(NULL, &m->scrolling, uint32_t);
     ecs_vec_fini_t(NULL, &m->uploaded, box_draw_material_upload_t);
     ecs_map_fini(&m->owned);
     ecs_map_fini(&m->contents);
@@ -533,7 +557,8 @@ done:
  * theirs. Each frame the walk takes the slot it is stamped, and the walk uploads it again after.
  *
  * At the end the owner takes the shared slot of its content and frees the private one, or its
- * slot turns shared in place. A prefab or a shape of a DynamicMaterial batch stays private.
+ * slot turns shared in place. A prefab, a shape of a DynamicMaterial batch or one that scrolls
+ * stays private.
  *
  * @param world The world
  * @param d The state
@@ -555,7 +580,7 @@ static void box_materials_transitions_end(
 
         s->flags &= (uint8_t)~(BOX_MATERIALS_TRANSITION | BOX_MATERIALS_TRANSITING);
         if (e && !(s->flags & BOX_MATERIALS_DYNAMIC) && ecs_is_alive(world, e) &&
-            !ecs_has_id(world, e, EcsPrefab))
+            !ecs_has_id(world, e, EcsPrefab) && !box_materials_scrolls(world, e))
         {
             uint32_t shared = box_materials_share(world, d, e, slot);
             box_materials_set(world, d, e, shared, shared != slot);
@@ -629,7 +654,7 @@ uint32_t box_draws_material_id(
         uint32_t old = own ? (uint32_t)*own : BOX_MATERIALS_NONE;
         bool pending = own && (*own & BOX_MATERIALS_PENDING);
         box_draw_material_slot_t *s = own ? box_materials_slot(m, old) : NULL;
-        if (dynamic) {
+        if (dynamic || box_materials_scrolls(world, e)) {
             result = box_materials_private(m, e, old);
             box_materials_slot(m, result)->flags |= BOX_MATERIALS_DYNAMIC;
         } else if (s && s->owner == e) {
@@ -767,6 +792,18 @@ static void BoxMaterialsOnIsA(
     }
 }
 
+/** Check whether adding or removing a material component moves the mesh shapes that own their
+ * material between a shared and a private slot: TextureScroll, whose record changes every frame.
+ *
+ * @param component The component
+ * @return Whether its OnAdd and OnRemove make the shapes take their slot again
+ */
+static bool box_materials_slotted(
+    ecs_entity_t component)
+{
+    return component == ecs_id(TextureScroll);
+}
+
 /** Check whether adding or removing a material component changes the batch key of the shapes
  * that have it: the alpha test, the transmission, and the material features that draw with the
  * extended mesh shader. A TextureMapping changes it when set too, by its blend.
@@ -790,8 +827,8 @@ static bool box_materials_keyed(
  * changed field is left alone. 2D shapes and texts write their shading again.
  *
  * Mesh shapes reference the slot and write nothing, unless their batch changes (an added or
- * removed component of box_materials_keyed, or a set TextureMapping) or the owner of a shared
- * slot moves to another slot.
+ * removed component of box_materials_keyed, or a set TextureMapping), they move between a shared
+ * and a private slot (box_materials_slotted) or the owner of a shared slot moves to another slot.
  *
  * @param it The iterator of the observer
  */
@@ -811,8 +848,8 @@ static void BoxMaterialsOnComponent(
     bool inline_ = !ecs_table_has_id(world, table, ecs_id(ShapeMesh)) ||
         ecs_table_has_id(world, table, ecs_id(Shape2D)) ||
         ecs_table_has_id(world, table, ecs_id(Text));
-    bool keyed = (box_materials_keyed(it->event_id) && it->event != EcsOnSet) ||
-        it->event_id == ecs_id(TextureMapping);
+    bool keyed = ((box_materials_keyed(it->event_id) || box_materials_slotted(it->event_id)) &&
+        it->event != EcsOnSet) || it->event_id == ecs_id(TextureMapping);
     bool mark = !prefab && (inline_ || keyed);
     for (i = 0; i < it->count; i ++) {
         if (owners) {
@@ -832,16 +869,16 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[11] = {
+    ecs_entity_t components[12] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
-        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping)
+        ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll)
     };
-    const char *names[11] = {
+    const char *names[12] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
-        "DrawsOnTextureMapping"
+        "DrawsOnTextureMapping", "DrawsOnTextureScroll"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -866,8 +903,8 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 11; i ++) {
-        bool keyed = box_materials_keyed(components[i]);
+    for (i = 0; i < 12; i ++) {
+        bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
                 .id = components[i],
@@ -883,15 +920,17 @@ void box_draws_materials_observers(
 void box_draws_material_of(
     const ecs_world_t *world,
     ecs_entity_t owner,
+    double time,
     box_draw_material_t *out)
 {
-    *out = (box_draw_material_t){ .fade = 1.0f };
+    *out = (box_draw_material_t){ .fade = 1.0f, .time = time };
     if (owner) {
         out->color = ecs_get(world, owner, Rgb);
         out->pbr = ecs_get(world, owner, PbrMaterial);
         out->emissive = ecs_get(world, owner, Emissive);
         out->uv = ecs_get(world, owner, TextureTransform);
         out->mapping = ecs_get(world, owner, TextureMapping);
+        out->scroll = ecs_get(world, owner, TextureScroll);
         out->cutoff = ecs_get(world, owner, AlphaCutoff);
         out->transmission = ecs_get(world, owner, Transmission);
         out->clear_coat = ecs_get(world, owner, ClearCoat);
@@ -964,12 +1003,46 @@ static void box_materials_upload(
         };
 }
 
+/** Mark the scrolling slots whose record moved at the time of the table, and drop the slots
+ * whose owner is gone, shares its slot or lost its TextureScroll from the list.
+ *
+ * @param world The world
+ * @param m The table
+ */
+static void box_materials_scroll(
+    const ecs_world_t *world,
+    box_draw_materials_t *m)
+{
+    box_render_material_t record;
+    int32_t i, kept = 0;
+    for (i = 0; i < ecs_vec_count(&m->scrolling); i ++) {
+        uint32_t slot = *ecs_vec_get_t(&m->scrolling, uint32_t, i);
+        box_draw_material_slot_t *s = box_materials_slot(m, slot);
+        ecs_entity_t owner = s->owner;
+        if (!owner || !ecs_is_alive(world, owner) ||
+            !box_materials_pack(world, m, owner, &record))
+        {
+            s->flags &= (uint8_t)~BOX_MATERIALS_SCROLLING;
+            continue;
+        }
+
+        *ecs_vec_get_t(&m->scrolling, uint32_t, kept ++) = slot;
+        if (ecs_os_memcmp_t(&record, box_materials_record(m, slot), box_render_material_t)) {
+            box_materials_mark(m, slot);
+        }
+    }
+
+    ecs_vec_set_count_t(NULL, &m->scrolling, uint32_t, kept);
+}
+
 void box_draws_materials_send(
     ecs_world_t *world,
     box_render_draws_t *d,
     box_render_packet_t *p)
 {
     box_draw_materials_t *m = &d->materials;
+    m->time = p->time;
+    box_materials_scroll(world, m);
     int32_t i, j, count = ecs_vec_count(&m->dirty);
     uint32_t *dirty = ecs_vec_first_t(&m->dirty, uint32_t);
     uint32_t total = (uint32_t)ecs_vec_count(&m->records);
@@ -988,7 +1061,13 @@ void box_draws_materials_send(
         if (owner && ecs_is_alive(world, owner)) {
             box_render_material_t *record = box_materials_record(m, slot);
             box_render_material_t was = *record;
-            box_materials_pack(world, owner, record);
+            if (box_materials_pack(world, m, owner, record) &&
+                !(s->flags & BOX_MATERIALS_SCROLLING))
+            {
+                s->flags |= BOX_MATERIALS_SCROLLING;
+                *ecs_vec_append_t(NULL, &m->scrolling, uint32_t) = slot;
+            }
+
             box_materials_shadow(d, slot, &was, record);
         }
     }

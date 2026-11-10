@@ -8,6 +8,7 @@
 #include <bake_test.h>
 #include "render.h"
 #include "draw.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -835,7 +836,7 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.anisotropy, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 96);
+    test_int(ECS_SIZEOF(box_render_material_t), 112);
 
     SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
@@ -951,7 +952,7 @@ void Material_sheen_pack(void) {
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 96);
+    test_int(ECS_SIZEOF(box_render_material_t), 112);
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -1066,7 +1067,7 @@ void Material_diffuse_transmission_defaults(void) {
 void Material_diffuse_transmission_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 96);
+    test_int(ECS_SIZEOF(box_render_material_t), 112);
     test_int(offsetof(box_render_material_t, diffuse_transmission), 76);
     test_int(offsetof(box_render_material_t, thickness), 80);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
@@ -1180,7 +1181,7 @@ void Material_diffuse_transmission_blur_defaults(void) {
 void Material_diffuse_transmission_blur_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 96);
+    test_int(ECS_SIZEOF(box_render_material_t), 112);
     test_int(offsetof(box_render_material_t, diffuse_blur), 84);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
@@ -2299,4 +2300,173 @@ void Material_texture_blend_every_shape(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+void Material_texture_scroll_defaults(void) {
+    // materials/texture_scroll
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "scroll",
+        "using box.material\n"
+        "river { TextureScroll: {velocity: {0.5, -0.25}} }\n"
+        "ripples { TextureScroll: {normal_velocity: {0, 0.1}} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, TextureScroll);
+    const TextureScroll *s = ecs_get(world, added, TextureScroll);
+    test_assert(s != NULL);
+    test_flt(s->velocity[0], BOX_MATERIAL_SCROLL_VELOCITY);
+    test_flt(s->velocity[0], 0);
+    test_flt(s->velocity[1], 0);
+    test_flt(s->normal_velocity[0], 0);
+    test_flt(s->normal_velocity[1], 0);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    s = ecs_get(world, ecs_lookup(world, "river"), TextureScroll);
+    test_assert(s != NULL);
+    test_flt(s->velocity[0], 0.5f);
+    test_flt(s->velocity[1], -0.25f);
+    test_flt(s->normal_velocity[0], 0);
+    test_flt(s->normal_velocity[1], 0);
+
+    s = ecs_get(world, ecs_lookup(world, "ripples"), TextureScroll);
+    test_assert(s != NULL);
+    test_flt(s->velocity[0], 0);
+    test_flt(s->normal_velocity[1], 0.1f);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, TextureScroll, {.velocity = {0.25f, 0.75f}});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, TextureScroll), false);
+    test_flt(ecs_get(world, instance, TextureScroll)->velocity[0], 0.25f);
+    test_flt(ecs_get(world, instance, TextureScroll)->velocity[1], 0.75f);
+
+    ecs_fini(world);
+}
+
+/** The record adds the wrapped velocity offset to the TextureTransform offset and holds the
+ * wrapped normal_velocity offset on its own; a material without TextureScroll packs the bytes it
+ * did before, and a transition of another component encodes the scroll again. */
+void Material_texture_scroll_pack(void) {
+    // materials/texture_scroll
+    box_render_material_t record, plain;
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    TextureTransform uv = { .scale_x = 2, .scale_y = 3, .offset_x = 0.25f, .offset_y = -0.5f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .uv = &uv, .fade = 1 });
+    test_flt(record.uv[2], 0.25f);
+    test_flt(record.uv[3], -0.5f);
+    test_flt(record.normal_offset[0], 0);
+    test_flt(record.normal_offset[1], 0);
+    test_flt(record.pad[0], 0);
+    test_flt(record.pad[1], 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 112);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .uv = &uv, .fade = 1, .time = 1000 });
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    TextureScroll still = {0};
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .uv = &uv, .scroll = &still, .time = 1000, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    TextureScroll scroll = { .velocity = {0.25f, -0.5f}, .normal_velocity = {0.125f, 0.75f} };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .uv = &uv, .scroll = &scroll, .time = 3, .fade = 1 });
+    test_flt(record.uv[0], 2);
+    test_flt(record.uv[1], 3);
+    test_flt(record.uv[2], 0.25f + 0.75f);
+    test_flt(record.uv[3], -0.5f + 0.5f);
+    test_flt(record.normal_offset[0], 0.375f);
+    test_flt(record.normal_offset[1], 0.25f);
+    test_flt(record.pad[0], 0);
+    test_flt(record.pad[1], 0);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .scroll = &scroll, .time = 3, .fade = 1 });
+    test_flt(record.uv[0], 1);
+    test_flt(record.uv[1], 1);
+    test_flt(record.uv[2], 0.75f);
+    test_flt(record.uv[3], 0.5f);
+
+    record.uv[2] = plain.uv[2];
+    record.uv[3] = plain.uv[3];
+    record.uv[0] = plain.uv[0];
+    record.uv[1] = plain.uv[1];
+    record.normal_offset[0] = 0;
+    record.normal_offset[1] = 0;
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0.25f, .roughness = 0.125f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .uv = &uv, .scroll = &scroll, .time = 12345.5, .pbr = &pbr, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .uv = &uv, .scroll = &scroll, .time = 12345.5, .pbr = &pbr, .fade = 1 },
+        BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+
+    box_render_shading_t a, b;
+    box_draws_material(&a, &(box_draw_material_t){ .uv = &uv, .fade = 1 });
+    box_draws_material(&b, &(box_draw_material_t){
+        .uv = &uv, .scroll = &scroll, .time = 3, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&a, &b, box_render_shading_t));
+}
+
+/** The offsets wrap to 0..2, stay positive and keep their precision after hours: two frames
+ * 1/60 s apart at 10^6 s differ by velocity / 60, and the wrap does not jump. */
+void Material_texture_scroll_wrap(void) {
+    // materials/texture_scroll
+    float out[4], next[4];
+    box_draws_texture_scroll(NULL, 1000, out);
+    test_flt(out[0], 0);
+    test_flt(out[1], 0);
+    test_flt(out[2], 0);
+    test_flt(out[3], 0);
+
+    TextureScroll scroll = { .velocity = {0.37f, -0.23f}, .normal_velocity = {-1.3f, 0.051f} };
+    box_draws_texture_scroll(&scroll, 0, out);
+    test_flt(out[0], 0);
+    test_flt(out[1], 0);
+
+    box_draws_texture_scroll(&scroll, 1, out);
+    test_assert(fabsf(out[0] - 0.37f) < 1e-6f);
+    test_assert(fabsf(out[1] - (2.0f - 0.23f)) < 1e-6f);
+    test_assert(fabsf(out[2] - (2.0f - 1.3f)) < 1e-6f);
+    test_assert(fabsf(out[3] - 0.051f) < 1e-6f);
+
+    const float *v = scroll.velocity;
+    const float *n = scroll.normal_velocity;
+    float velocity[4] = { v[0], v[1], n[0], n[1] };
+    double starts[3] = { 1e6, 4.0 * 3600.0, 1e6 + 12345.678 };
+    int32_t s, f, k;
+    for (s = 0; s < 3; s ++) {
+        for (f = 0; f < 600; f ++) {
+            double t = starts[s] + (double)f / 60.0;
+            box_draws_texture_scroll(&scroll, t, out);
+            box_draws_texture_scroll(&scroll, t + 1.0 / 60.0, next);
+            for (k = 0; k < 4; k ++) {
+                test_assert(out[k] >= 0.0f && out[k] < 2.0f);
+                float d = next[k] - out[k];
+                if (d > 1.0f) {
+                    d -= 2.0f;
+                } else if (d < -1.0f) {
+                    d += 2.0f;
+                }
+
+                test_assert(fabsf(d - velocity[k] / 60.0f) < 1e-5f);
+            }
+        }
+    }
+
+    TextureScroll broken = { .velocity = {NAN, INFINITY}, .normal_velocity = {-INFINITY, 1} };
+    box_draws_texture_scroll(&broken, 10.5, out);
+    test_flt(out[0], 0);
+    test_flt(out[1], 0);
+    test_flt(out[2], 0);
+    test_flt(out[3], 0.5f);
 }
