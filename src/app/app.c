@@ -34,6 +34,7 @@ typedef struct box_app_clock_t {
                                  *   previous frame, its wall time when it did not wait */
     ecs_world_t *world;         /**< World of the frame loop, for the browser's frame callback */
     double begin;               /**< Wall seconds at the start of the previous frame, 0 none */
+    double web_next;            /**< Wall seconds the next browser frame is due at App.fps */
     int32_t presented;          /**< RenderStatus.presented at the previous frame */
     box_app_series_t delta;     /**< Deltas of the recent frames */
     box_app_series_t interval;  /**< Intervals of the recent frames */
@@ -72,7 +73,8 @@ static void box_app_clock_free(
 }
 
 /** Make App.fps the target fps of flecs, which caps the frames; 0 for no cap. The browser keeps
- * no cap: the animation frames pace it and a flecs sleep would block its main thread.
+ * flecs uncapped, since a flecs sleep spins its main thread, and box_app_web_frame skips
+ * animation frames to match App.fps instead.
  *
  * @param world The world
  * @param app The App singleton
@@ -965,7 +967,8 @@ done:
 
 #ifdef __EMSCRIPTEN__
 /** Run a frame from the animation frame callback of the browser and end the loop when the
- * world quits. The browser paces the frames, so the target fps of flecs stays 0.
+ * world quits. The target fps of flecs stays 0: with App.fps set, animation frames that come
+ * before the next frame is due are skipped, so the frames match App.fps without a sleep.
  *
  * @param arg The clock of the frame loop
  */
@@ -975,10 +978,24 @@ static void box_app_web_frame(
     box_app_clock_t *clock = arg;
     ecs_world_t *world = clock->world;
     const App *app = ecs_singleton_get(world, App);
+    if (app && app->fps > 0) {
+        double now = box_app_wall_time();
+        double interval = 1.0 / (double)app->fps;
+        if (now < clock->web_next - 0.002) {
+            goto done;
+        }
+
+        clock->web_next = now - clock->web_next > interval
+            ? now + interval
+            : clock->web_next + interval;
+    }
+
     if (!ecs_progress(world, app ? app->delta_time : 0)) {
         ecs_singleton_get_mut(world, AppStatus)->running = false;
         emscripten_cancel_main_loop();
     }
+done:
+    return;
 }
 #endif
 

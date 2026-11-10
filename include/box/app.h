@@ -47,7 +47,7 @@ extern "C" {
  *
  * flecs paces the frames: fps is its target fps (ecs_set_target_fps), applied at the start and
  * whenever App is set, and every frame is ecs_progress(world, delta_time), read from App each
- * frame. In the browser the animation frames pace the loop and fps has no effect.
+ * frame. In the browser the loop skips animation frames to match fps, without a flecs sleep.
  */
 ECS_STRUCT(App, {
     bool headless;      /**< Run without a window */
