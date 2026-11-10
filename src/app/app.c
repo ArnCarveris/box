@@ -533,13 +533,54 @@ static void BoxAppSetAtOnAddRemove(
     }
 }
 
+/** Check whether two values of a type are equal. A reflected struct is compared member by member,
+ * so the padding between its members, such as after a bool, is not compared.
+ *
+ * @param world The world
+ * @param type The type of the values
+ * @param a The first value
+ * @param b The second value
+ * @param size The size of the values
+ * @return Whether the values are equal
+ */
+static bool box_app_set_at_equal(
+    const ecs_world_t *world,
+    ecs_entity_t type,
+    const void *a,
+    const void *b,
+    ecs_size_t size)
+{
+    const EcsStruct *st = ecs_get(world, type, EcsStruct);
+    const ecs_member_t *members = st ? ecs_vec_first_t(&st->members, ecs_member_t) : NULL;
+    int32_t count = st ? ecs_vec_count(&st->members) : 0;
+    bool result = st || !ecs_os_memcmp(a, b, size);
+    int32_t i;
+    for (i = 0; i < count && result; i ++) {
+        const ecs_member_t *m = &members[i];
+        const ecs_type_info_t *ti = ecs_get_type_info(world, m->type);
+        int32_t elements = m->count ? m->count : 1;
+        int32_t e;
+        for (e = 0; ti && e < elements && result; e ++) {
+            ecs_size_t offset = m->offset + e * ti->size;
+            result = box_app_set_at_equal(world, m->type,
+                ECS_OFFSET(a, offset), ECS_OFFSET(b, offset), ti->size);
+        }
+    }
+
+    return result;
+}
+
 /** Check whether a component holds the value it is constructed with.
  *
+ * @param world The world
+ * @param id The component
  * @param ti The type info of the component
  * @param value The value of the component
  * @return Whether value is the constructed value
  */
 static bool box_app_set_at_constructed(
+    const ecs_world_t *world,
+    ecs_id_t id,
     const ecs_type_info_t *ti,
     const void *value)
 {
@@ -548,7 +589,7 @@ static bool box_app_set_at_constructed(
         ti->hooks.ctor(constructed, 1, ti);
     }
 
-    bool result = !ecs_os_memcmp(constructed, value, ti->size);
+    bool result = box_app_set_at_equal(world, id, constructed, value, ti->size);
     if (ti->hooks.dtor) {
         ti->hooks.dtor(constructed, 1, ti);
     }
@@ -586,7 +627,7 @@ static bool box_app_set_at_implied(
         result = !ECS_IS_PAIR(other) && other != id && ecs_has_pair(world, other, EcsWith, id);
     }
 
-    return result && box_app_set_at_constructed(ti, value);
+    return result && box_app_set_at_constructed(world, id, ti, value);
 }
 
 /** Copy the components written to a SetAt entity to its target entity: the ones set since it
@@ -622,7 +663,8 @@ static void box_app_set_at_copy(
         const void *value = ti ? ecs_get_id(world, from, id) : NULL;
         if (value && (written ||
             (before && !box_app_set_at_implied(world, type, id, ti, value)) ||
-            (!before && id < FLECS_HI_COMPONENT_ID && !box_app_set_at_constructed(ti, value))))
+            (!before && id < FLECS_HI_COMPONENT_ID &&
+                !box_app_set_at_constructed(world, id, ti, value))))
         {
             ecs_set_id(world, to, id, (size_t)ti->size, value);
         }

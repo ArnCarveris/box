@@ -1194,7 +1194,8 @@ void Transmission_snapshot_counter(void) {
     ecs_entity_t glass = tr_glass(world, 0, -4, 3, 3, 1, 1, 0);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_set(world, scene, Scene, {0});
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_entity_t other = tr_view(world, tr_camera(world, scene), true, false);
     ecs_set(world, other, View, {.camera = ecs_get(world, other, View)->camera,
         .clear = {.enabled = false}, .lighting = {.enabled = true}, .order = 1});
@@ -1481,7 +1482,8 @@ void Transmission_two_formats_one_target(void) {
 
     uint8_t tint[3] = { 255, 128, 255 };
     ecs_entity_t scene = ecs_new(world);
-    ecs_set(world, scene, Scene, {0});
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, View, {.camera = tr_camera(world, scene),
         .clear = {.enabled = false}, .order = 1});

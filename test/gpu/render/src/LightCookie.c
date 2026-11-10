@@ -708,7 +708,8 @@ void LightCookie_bake_ignores_cookie(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
             .capture_size = 16, .budget_ms = 2, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -737,7 +738,7 @@ void LightCookie_bake_ignores_cookie(void) {
         ecs_entity_t view = ecs_new(world);
         ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
             .color = {0, 0, 0, 255}}, .lighting.enabled = true, .lighting.baked = true});
-        ecs_singleton_set(world, Scene, {.baked = true, .cookies = true});
+        ecs_set(world, scene, Scene, {.baked = true, .cookies = true});
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "bake.png",
             .resolution_scale = 1});

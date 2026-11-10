@@ -630,7 +630,8 @@ void ViewDebug_grid_per_view(void) {
             k ? NULL : &dg_grid);
         (void)first;
         ecs_entity_t scene = ecs_new(world);
-        ecs_set(world, scene, Scene, {0});
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, camera, Position, {0, 10, 0});
         ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
@@ -727,7 +728,8 @@ static void dg_capture(
     bool grid = debug != NULL;
     ecs_world_t *world = dg_world();
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, ReflectionBake, {.resolution = 16, .budget_ms = 1,
         .scene_probe = false});
     if (bake) {
@@ -973,7 +975,8 @@ static ecs_entity_t dp_scene(
     float ambient)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     if (light) {
         ecs_set_ptr(world, scene, LightBake, light);
     }
@@ -2574,7 +2577,8 @@ void ViewDebug_wire_per_view(void) {
         ecs_set(world, left, Quad, {3, 3});
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_set(world, scene, Scene, {0});
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, camera, Position, {0, 0, 10});
         ecs_set(world, camera, Rotation, {0, 0, 0});

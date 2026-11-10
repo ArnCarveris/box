@@ -22,7 +22,8 @@ void Invalidation_static_move_rebakes_nearby_probes(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -112,7 +113,8 @@ void Invalidation_dynamic_move_rebakes_nothing(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -165,7 +167,8 @@ void Invalidation_point_light_change_limited_to_range(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -231,7 +234,8 @@ void Invalidation_directional_light_change_rebakes_scene(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -291,7 +295,8 @@ void Invalidation_removed_and_recolored_shapes_rebake(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -381,7 +386,8 @@ void Invalidation_moved_emissive_leaves_no_light_behind(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
             .capture_size = 8, .budget_ms = 2, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -482,7 +488,8 @@ void Invalidation_requeued_probes_keep_values(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 1000000, .bounces = 1, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -588,7 +595,8 @@ void Invalidation_edge_changes_keep_the_volume(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 1000000, .bounces = 0, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -707,7 +715,8 @@ void Invalidation_deleting_uncaptured_shapes_rebakes_nothing(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -768,7 +777,8 @@ void Invalidation_parent_opacity_and_prefab_textures_rebake(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -847,7 +857,8 @@ void Invalidation_newly_valid_probe_hidden_until_baked(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 1000000, .bounces = 0, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -948,7 +959,8 @@ void Invalidation_full_rebakes_keep_values(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_set(world, scene, LightBake, {.probe_spacing = 3, .bounds_padding = 0,
             .capture_size = 8, .budget_ms = 1000000, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.sky = {40, 40, 40}, .ground = {40, 40, 40},
@@ -1050,7 +1062,8 @@ void Invalidation_tint_rebakes_nothing(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -1121,7 +1134,8 @@ void Invalidation_bake_ignores_tint(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 1,
         .capture_size = 16, .budget_ms = 1000000, .bounces = 0, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -1185,7 +1199,8 @@ void Invalidation_same_transform_rebakes_nothing(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = 2, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -1246,7 +1261,8 @@ void Invalidation_moved_caster_matches_fresh_bake(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
             .capture_size = 16, .budget_ms = 2, .bounces = 1, .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});

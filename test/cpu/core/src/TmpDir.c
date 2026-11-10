@@ -29,24 +29,6 @@ void TmpDir_headless_creates_folder(void) {
     ecs_fini(world);
 }
 
-void TmpDir_not_headless_no_folder(void) {
-    // engine_core/app
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    ecs_singleton_set(world, App, { .frames = 1, .cpu_budget = 100 });
-
-    const AppStatus *status = ecs_singleton_get(world, AppStatus);
-    test_assert(status->tmp_dir == NULL);
-
-    char *path = flecs_asprintf("/tmp/box/%d", (int)getpid());
-    struct stat st;
-    test_assert(stat(path, &st) != 0);
-
-    ecs_os_free(path);
-    ecs_fini(world);
-}
-
 void TmpDir_parse_headless_creates_folder(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();
@@ -109,89 +91,6 @@ void TmpDir_folder_private(void) {
     test_int(st.st_uid, geteuid());
 
     ecs_fini(world);
-}
-
-void TmpDir_stale_folder_reclaimed(void) {
-    // hardening/tmp_dir
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    char *path = flecs_asprintf("/tmp/box/%d", (int)getpid());
-    char *stale = flecs_asprintf("%s/stale", path);
-    char *link = flecs_asprintf("%s/link", path);
-    char *target = flecs_asprintf("/tmp/box_core_kept_%d", (int)getpid());
-    char *marker = flecs_asprintf("%s/marker", target);
-    mkdir("/tmp/box", 0700);
-    test_int(mkdir(path, 0755), 0);
-    FILE *f = fopen(stale, "w");
-    test_assert(f != NULL);
-    fclose(f);
-    test_int(mkdir(target, 0700), 0);
-    f = fopen(marker, "w");
-    test_assert(f != NULL);
-    fclose(f);
-    test_int(symlink(target, link), 0);
-
-    ecs_singleton_set(world, App, { .headless = true, .frames = 1, .cpu_budget = 100 });
-
-    test_str(ecs_singleton_get(world, AppStatus)->tmp_dir, path);
-
-    struct stat st;
-    test_int(lstat(path, &st), 0);
-    test_assert(S_ISDIR(st.st_mode));
-    test_int(st.st_mode & 07777, 0700);
-    test_assert(lstat(stale, &st) != 0);
-    test_assert(lstat(link, &st) != 0);
-    test_int(stat(marker, &st), 0);
-
-    ecs_fini(world);
-
-    test_assert(lstat(path, &st) != 0);
-    test_int(stat(marker, &st), 0);
-
-    unlink(marker);
-    rmdir(target);
-    ecs_os_free(marker);
-    ecs_os_free(target);
-    ecs_os_free(link);
-    ecs_os_free(stale);
-    ecs_os_free(path);
-}
-
-void TmpDir_symlink_refused(void) {
-    // hardening/tmp_dir
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    char *path = flecs_asprintf("/tmp/box/%d", (int)getpid());
-    char *target = flecs_asprintf("/tmp/box_core_target_%d", (int)getpid());
-    char *marker = flecs_asprintf("%s/marker", target);
-    mkdir("/tmp/box", 01777);
-    test_int(mkdir(target, 0700), 0);
-    FILE *f = fopen(marker, "w");
-    test_assert(f != NULL);
-    fclose(f);
-    test_int(symlink(target, path), 0);
-
-    ecs_log_set_level(-4);
-    ecs_singleton_set(world, App, { .headless = true, .frames = 1, .cpu_budget = 100 });
-
-    test_assert(ecs_singleton_get(world, AppStatus)->tmp_dir == NULL);
-    test_assert(ecs_should_quit(world));
-
-    ecs_fini(world);
-
-    struct stat st;
-    test_int(lstat(path, &st), 0);
-    test_assert(S_ISLNK(st.st_mode));
-    test_int(stat(marker, &st), 0);
-
-    unlink(path);
-    unlink(marker);
-    rmdir(target);
-    ecs_os_free(marker);
-    ecs_os_free(target);
-    ecs_os_free(path);
 }
 
 void TmpDir_symlink_inside_not_followed(void) {

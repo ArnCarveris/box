@@ -18,6 +18,7 @@ typedef struct box_gpu_shader_slot_t {
     box_gpu_shader_t shader;        /**< Module and revision, read as box_gpu_shader_t */
     box_gpu_compile_t *pending;     /**< Compiles waiting for their outcome, oldest first */
     int32_t requested;              /**< Code revision of the newest compile started */
+    int32_t installed;              /**< Code revision of the installed module */
     char *label;                    /**< Label of the installed module, NULL when none */
 } box_gpu_shader_slot_t;
 
@@ -126,12 +127,14 @@ static void box_gpu_shader_slot_free(
  * @param gpu The backend
  * @param handle Handle of the shader
  * @param module The module
+ * @param revision Code revision of the module
  * @param label Label of the module
  */
 static void box_gpu_shader_install(
     box_gpu_t *gpu,
     uint32_t handle,
     WGPUShaderModule module,
+    int32_t revision,
     const char *label)
 {
     box_gpu_shader_slot_t *slot = box_gpu_shader_slot(gpu, handle);
@@ -143,6 +146,7 @@ static void box_gpu_shader_install(
 
     slot->shader.module = module;
     slot->shader.revision ++;
+    slot->installed = revision;
     ecs_os_free(slot->label);
     slot->label = ecs_os_strdup(label);
     if (handle == BOX_RENDER_SHADER_BLIT) {
@@ -186,7 +190,8 @@ static void box_gpu_compile_finish(
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
         if (compile->revision == slot->requested) {
-            box_gpu_shader_install(gpu, compile->handle, compile->module, compile->label);
+            box_gpu_shader_install(gpu, compile->handle, compile->module, compile->revision,
+                compile->label);
             compile->module = NULL;
         }
     }
@@ -523,6 +528,23 @@ const char* box_gpu_shader_label(
     }
 
     return result;
+}
+
+void box_gpu_shader_pipeline_failed(
+    box_gpu_t *gpu,
+    WGPUShaderModule module,
+    const char *message)
+{
+    bool found = false;
+    ecs_map_iter_t it = ecs_map_iter(&gpu->shaders);
+    while (module && !found && ecs_map_next(&it)) {
+        box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
+        found = slot->shader.module == module;
+        if (found) {
+            box_gpu_shader_report(gpu, (uint32_t)ecs_map_key(&it), slot->installed, message,
+                slot->label);
+        }
+    }
 }
 
 void box_gpu_shader_fini(

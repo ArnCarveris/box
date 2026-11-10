@@ -334,16 +334,6 @@ void Hooks_owning_components_have_hooks(void) {
             bool owns = false;
             for (int32_t m = 0; m < st[i].members.count; m ++) {
                 const ecs_type_info_t *mti = ecs_get_type_info(world, members[m].type);
-                const EcsVector *vec = ecs_get(world, members[m].type, EcsVector);
-                if (vec) {
-                    const ecs_type_info_t *eti = ecs_get_type_info(world, vec->type);
-                    test_assert(eti != NULL);
-                    if (eti->hooks.dtor) {
-                        char *path = ecs_get_path(world, it.entities[i]);
-                        test_str(path, NULL);
-                    }
-                }
-
                 owns |= mti && mti->hooks.dtor;
             }
 

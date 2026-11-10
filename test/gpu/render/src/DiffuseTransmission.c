@@ -1493,7 +1493,8 @@ void DiffuseTransmission_blur_two_views(void) {
     db_pane(world, 0, -1.8f, 3.4f, 0, &dt);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_set(world, scene, Scene, {0});
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_entity_t second = db_view(world, scene, 0, false, black);
     ecs_set(world, second, View, {.camera = ecs_get(world, second, View)->camera,
         .clear = {.enabled = false}, .lighting = {.enabled = true}, .order = 1});

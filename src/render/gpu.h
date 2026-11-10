@@ -244,6 +244,19 @@ const char* box_gpu_shader_label(
     box_gpu_t *gpu,
     WGPUShaderModule module);
 
+/** Report the error of a pipeline that failed to create as the outcome of the shader whose
+ * installed module it was created from, so its ShaderStatus shows the error. A pipeline of a
+ * module that is no longer installed is not reported.
+ *
+ * @param gpu The backend
+ * @param module The module of the first stage of the pipeline
+ * @param message Error text
+ */
+void box_gpu_shader_pipeline_failed(
+    box_gpu_t *gpu,
+    WGPUShaderModule module,
+    const char *message);
+
 /** Finish the compiles whose outcome box_render_gpu_compile_delivery held.
  *
  * @param gpu The backend

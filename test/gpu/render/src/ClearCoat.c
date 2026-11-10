@@ -412,7 +412,8 @@ static void coat_probe(
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, ReflectionBake, {.resolution = 32, .budget_ms = 1,
         .scene_probe = false});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});

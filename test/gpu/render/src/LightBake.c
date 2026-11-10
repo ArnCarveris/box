@@ -103,7 +103,8 @@ void LightBake_status_follows_bake(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     test_assert(!ecs_has(world, scene, LightBakeStatus));
 
     ecs_add(world, scene, LightBake);
@@ -228,7 +229,8 @@ void LightBake_scene_renders_identically(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         if (i == 1) {
             ecs_set(world, scene, LightBake, {.bounces = 1, .compute = true});
         }
@@ -281,7 +283,8 @@ void LightBake_projected_anchor_not_baked(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0.001f, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -361,7 +364,8 @@ static lb_scene_t lb_scene(
     ecs_singleton_modified(world, App);
 
     result.scene = ecs_new(world);
-    ecs_add(world, result.scene, Scene);
+    ecs_set_ptr(world, result.scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, result.scene, LightBake, {.probe_spacing = 2, .bounds_padding = 1,
         .capture_size = 8, .budget_ms = budget_ms, .bounces = bounces, .compute = compute});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, result.scene);

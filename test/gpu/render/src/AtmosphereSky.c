@@ -57,7 +57,8 @@ static ecs_entity_t scene_new(
     float elevation)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_add(world, scene, Atmosphere);
     ecs_get_mut(world, scene, Atmosphere)->units_per_km = units_per_km;
     ecs_modified(world, scene, Atmosphere);
@@ -247,7 +248,7 @@ static unsigned char* render_boxes(
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = CLEAR},
         .lighting = {.atmosphere = atmosphere}});
-    ecs_singleton_set(world, Scene, {.aerial_perspective = atmosphere});
+    ecs_set(world, scene, Scene, {.aerial_perspective = atmosphere});
     box_new(world, scene, (float[3]){-0.75f, 0, -2}, 0.5f, (Rgb){200, 40, 40});
     box_new(world, scene, (float[3]){0, 0, -3000}, 600, (Rgb){200, 40, 40});
 

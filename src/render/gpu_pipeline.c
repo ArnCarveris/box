@@ -948,9 +948,11 @@ static void box_gpu_pipeline_finish(
     }
 
     if (p->failed) {
-        ecs_err("pipeline '%s' failed to create: %s", label ? label : "",
-            p->message ? p->message : "the pipeline cannot be created");
+        const char *message = p->message ? p->message : "the pipeline cannot be created";
+        ecs_err("pipeline '%s' failed to create: %s", label ? label : "", message);
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
+        box_gpu_shader_pipeline_failed(gpu, p->compute ? p->compute_desc.compute.module
+            : p->render.vertex.module, message);
     }
 }
 

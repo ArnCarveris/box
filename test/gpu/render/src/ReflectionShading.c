@@ -52,7 +52,8 @@ static ecs_entity_t scene_new(
     const ReflectionBake *bake)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     if (bake) {
         ecs_set_ptr(world, scene, ReflectionBake, bake);
     }
@@ -273,7 +274,8 @@ static unsigned char* render_lit(
     ecs_world_t *world = world_new();
     int w = 0, h = 0;
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     if (bake) {
         ecs_set_ptr(world, scene, ReflectionBake, bake);
     }

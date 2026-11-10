@@ -71,7 +71,8 @@ static ecs_entity_t sky_new(
     ecs_entity_t *sun)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_add(world, scene, Atmosphere);
     *sun = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, *sun, DirectionalLight, {.intensity = GLM_PIf});
@@ -97,7 +98,8 @@ static ecs_entity_t sphere_new(
     const char *file)
 {
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -497,7 +499,8 @@ void AtmosphereIbl_background_matches_sky(void) {
         ecs_entity_t scene = sky;
         if (i == 1) {
             scene = ecs_new(world);
-            ecs_add(world, scene, Scene);
+            ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+                ? ecs_singleton_get(world, Scene) : &(Scene){0});
         }
 
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -544,7 +547,8 @@ void AtmosphereIbl_reflection_capture_sees_environment(void) {
     ecs_entity_t sky = sky_new(world, 30, 60, &sun);
     ecs_set(world, sky, Environment, {.resolution = 16, .filter = EnvironmentFilterBox});
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, AmbientLight, {.sky = {255, 0, 0}, .ground = {0, 255, 0},
         .intensity = 1});
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);

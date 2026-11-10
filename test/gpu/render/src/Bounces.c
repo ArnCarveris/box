@@ -19,7 +19,8 @@ void Bounces_pass_reaches_bounces(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0.001f, .bounces = 3, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -78,7 +79,8 @@ void Bounces_zero_bounces_bakes_one_pass(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0.001f, .bounces = 0, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -177,7 +179,8 @@ void Bounces_changing_bounces_restarts(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0.001f, .bounces = 1, .compute = true});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -244,7 +247,8 @@ void Bounces_image_stable_once_converged(void) {
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0.05f, .bounces = 2, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -335,7 +339,8 @@ void Bounces_view_keeps_last_complete_pass(void) {
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
 
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+        ? ecs_singleton_get(world, Scene) : &(Scene){0});
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
         .capture_size = 8, .budget_ms = 0.001f, .bounces = 1, .compute = true});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -442,7 +447,8 @@ void Bounces_far_end_brightens_with_bounces(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.7f,
             .capture_size = 16, .budget_ms = 2, .bounces = bounces[i], .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
@@ -543,7 +549,8 @@ void Bounces_colored_walls_bleed_with_bounces(void) {
         ecs_singleton_modified(world, App);
 
         ecs_entity_t scene = ecs_new(world);
-        ecs_add(world, scene, Scene);
+        ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
+            ? ecs_singleton_get(world, Scene) : &(Scene){0});
         ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.7f,
             .capture_size = 16, .budget_ms = 2, .bounces = bounces[i], .compute = true});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
