@@ -80,6 +80,12 @@ typedef struct box_light_atmos_t {
     float moon_illumination; /**< Lit fraction of the moon, 0 without a sun or a moon */
 } box_light_atmos_t;
 
+/** A directional light of a scene in this frame, as its entity sets it */
+typedef struct box_light_sun_t {
+    ecs_entity_t entity;    /**< The light entity */
+    box_render_light_t light; /**< The light before any attenuation */
+} box_light_sun_t;
+
 /** A shadow casting spot or point light of the view list of a scene in this frame */
 typedef struct box_light_caster_t {
     ecs_entity_t entity;    /**< The light entity */
@@ -137,6 +143,7 @@ typedef struct box_light_scene_t {
     box_light_list_t lists[BOX_LIGHTS_LISTS]; /**< The lists, by box_light_list_kind_t */
     ecs_vec_t casters;      /**< box_light_caster_t, the shadow casting spot and point lights
                              *   of this frame */
+    ecs_vec_t suns;         /**< box_light_sun_t, the directional lights of this frame */
     box_light_atlas_t atlas; /**< The shadow atlas of the scene */
 } box_light_scene_t;
 
@@ -271,6 +278,7 @@ static void box_lights_atlas_init(
     box_light_scene_t *s)
 {
     ecs_vec_init_t(NULL, &s->casters, box_light_caster_t, 0);
+    ecs_vec_init_t(NULL, &s->suns, box_light_sun_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.records, box_render_shadow_record_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t, 0);
     ecs_vec_init_t(NULL, &s->atlas.sent, box_render_shadow_record_t, 0);
@@ -285,6 +293,7 @@ static void box_lights_atlas_fini(
     box_light_scene_t *s)
 {
     ecs_vec_fini_t(NULL, &s->casters, box_light_caster_t);
+    ecs_vec_fini_t(NULL, &s->suns, box_light_sun_t);
     ecs_vec_fini_t(NULL, &s->atlas.records, box_render_shadow_record_t);
     ecs_vec_fini_t(NULL, &s->atlas.tiles, box_render_shadow_tile_t);
     ecs_vec_fini_t(NULL, &s->atlas.sent, box_render_shadow_record_t);
@@ -343,6 +352,7 @@ static void box_lights_reset(
         glm_vec3_zero(s->sky);
         glm_vec3_zero(s->ground);
         ecs_vec_clear(&s->casters);
+        ecs_vec_clear(&s->suns);
         ecs_vec_clear(&s->atlas.records);
         ecs_vec_clear(&s->atlas.tiles);
         s->atlas.found = false;
@@ -615,6 +625,8 @@ static void box_lights_collect(
                 box_lights_point(NULL, rgb, d->intensity, 0, &out);
                 box_lights_axis(transform, out.position);
                 glm_vec3_negate(out.position);
+                *ecs_vec_append_t(NULL, &s->suns, box_light_sun_t) =
+                    (box_light_sun_t){ it.entities[i], out };
                 box_lights_atmos_directional(s, it.entities[i], &out);
                 box_lights_tod_directional(s, it.entities[i], &out);
                 if (d->intensity > 0) {
@@ -1796,6 +1808,30 @@ bool box_render_lights_atmos_sun(
     if (result) {
         glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.sun.direction), direction);
         glm_vec3_copy(ECS_CONST_CAST(float*, s->atmos.sun.color), color);
+    }
+
+    return result;
+}
+
+bool box_render_lights_planet_sun(
+    const void *state,
+    ecs_entity_t scene,
+    ecs_entity_t light,
+    float *direction,
+    float *color)
+{
+    const box_render_lights_t *l = state;
+    int32_t i, index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const ecs_vec_t *suns = index != -1
+        ? &ecs_vec_get_t(&l->scenes, box_light_scene_t, index)->suns : NULL;
+    bool result = false;
+    for (i = 0; suns && !result && i < ecs_vec_count(suns); i ++) {
+        const box_light_sun_t *sun = ecs_vec_get_t(suns, box_light_sun_t, i);
+        result = !light || sun->entity == light;
+        if (result) {
+            glm_vec3_copy(ECS_CONST_CAST(float*, sun->light.position), direction);
+            glm_vec3_copy(ECS_CONST_CAST(float*, sun->light.color), color);
+        }
     }
 
     return result;

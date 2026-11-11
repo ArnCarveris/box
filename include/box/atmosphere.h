@@ -95,6 +95,54 @@ ECS_STRUCT(AtmosphereStatus, {
     char *error;             /**< Why nothing renders, such as an invalid value, NULL for none */
 });
 
+/** Atmosphere of a planet seen from space, a shell around the ground sphere of the planet whose
+ * center is the world position of the entity. Adding it adds PlanetAtmosphereStatus, removing it
+ * removes it.
+ *
+ * Unlike Atmosphere it does not attenuate any DirectionalLight in the light extract, adds no
+ * Environment and draws no sky, sun disk or clouds; it leaves the Atmosphere of its scene alone,
+ * and both can be in one scene. A scene can have many.
+ *
+ * Every view of its scene that is lit and has a depth draws the shell after its opaque meshes and
+ * its sky, and before its fog volumes, particles, 2D shapes and blended draws: transparent
+ * geometry in front of the planet, such as the ring of a gas giant, is not hazed, while blended
+ * geometry behind the shell but in front of the ground is not hazed either. Transmissive meshes
+ * draw before the shell and are hazed as opaque ones at their depth. Each pixel of the shell
+ * marches the ray inside the atmosphere up to the ground sphere or the scene depth with single
+ * and multi scattering of the sun, and blends as dst * transmittance + inscatter * intensity,
+ * the transmittance the mean of its channels. Reflection captures, reflection probes and
+ * environment cubes do not include the shell.
+ *
+ * Its transmittance and multi scattering LUTs are built again only when the medium changes.
+ *
+ * Values apply as specified; a radius, planet_radius, thickness or scale height that is not
+ * positive, a negative scale or an anisotropy outside -1 to 1 sets PlanetAtmosphereStatus.error
+ * and renders nothing.
+ */
+ECS_STRUCT(PlanetAtmosphere, {
+    ecs_entity_t sun;       /**< DirectionalLight that lights it, default 0 for the first
+                             *   DirectionalLight of the scene; its intensity and Rgb are top
+                             *   of atmosphere values */
+    float radius;           /**< Radius of the ground sphere in world units, default 1 */
+    float planet_radius;    /**< The same radius in km, default 6360; with radius it sets the
+                             *   km in a world unit */
+    float thickness;        /**< Height of the atmosphere above the ground in km, default 100 */
+    AtmosphereRayleigh rayleigh; /**< Air molecules, default {8, 1} */
+    AtmosphereMie mie;      /**< Aerosols, default {1.2, 0.8, 1, {255, 255, 255}}; the tint
+                             *   colors the haze */
+    float ozone_scale;      /**< Scale of the absorption of the ozone layer, default 1 */
+    rgb ground_albedo;      /**< Display encoded albedo of the planet, which the multi
+                             *   scattering LUT bounces, default {77, 77, 77} */
+    float intensity;        /**< Scale of the drawn in scattered light, default 1 */
+});
+
+/** State of the atmosphere of a planet, written by the engine next to PlanetAtmosphere */
+ECS_STRUCT(PlanetAtmosphereStatus, {
+    int32_t lut_version;    /**< Incremented each time the transmittance and multi scattering
+                             *   lookup tables are built again */
+    char *error;            /**< Why nothing renders, such as an invalid value, NULL for none */
+});
+
 /** Layers of clouds a scene draws at most, see CloudLayer */
 #define BOX_CLOUD_LAYER_MAX (4)
 

@@ -1305,6 +1305,21 @@
                 ]
             },
             {
+                "id": "PlanetAtmosphereShell",
+                "testcases": [
+                    "day_limb_blue",
+                    "outside_top_unchanged",
+                    "night_limb_dark",
+                    "surface_hazed",
+                    "no_scattering_unchanged",
+                    "front_geometry_unchanged",
+                    "two_planets_independent",
+                    "camera_inside",
+                    "backlit_ring",
+                    "draws_per_planet"
+                ]
+            },
+            {
                 "id": "ViewDebug",
                 "testcases": [
                     "off_records_nothing",

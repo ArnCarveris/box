@@ -257,6 +257,7 @@ void box_gpu_draw_init(
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
     box_gpu_fog_volumes_init(gpu);
+    box_gpu_planets_init(gpu);
     box_gpu_debug_init(gpu);
     box_gpu_planar_init(gpu);
 }
@@ -644,6 +645,7 @@ void box_gpu_draw_fini(
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
+    box_gpu_planets_fini(gpu);
     box_gpu_debug_fini(gpu);
     box_gpu_planar_fini(gpu);
     if (gpu->view_buffer) {
@@ -1066,6 +1068,8 @@ typedef struct box_gpu_view_pass_t {
                                      *   the depth instead of writing it */
     bool fog;                       /**< The fog volumes draw in a pass of their own that reads
                                      *   the depth instead of writing it */
+    bool planets;                   /**< The planet atmosphere shells draw in a pass of their own
+                                     *   that reads the depth instead of writing it */
     box_gpu_snapshot_t *snapshot;   /**< Snapshot the image is copied into before transmissive
                                      *   draws (box_gpu_draw_snapshot), NULL without them */
     int32_t snapshots;              /**< Snapshots the pass took, at most
@@ -1198,11 +1202,12 @@ static void box_gpu_draw_glass(
     wgpuRenderPassEncoderRelease(pass);
 }
 
-/** Record the fog volumes of a view, then the particles of its scene, then bind the groups of
- * the forward pass again, which their pipelines do not share.
+/** Record the planet atmosphere shells of a view, then its fog volumes, then the particles of
+ * its scene, then bind the groups of the forward pass again, which their pipelines do not share.
  *
- * A view with fog volumes or a soft pool ends its pass, draws both in a pass that samples the
- * depth it reads and, unless they are the last draws of the view, continues in a new pass.
+ * A view with planet shells, fog volumes or a soft pool ends its pass, draws them in a pass that
+ * samples the depth it reads and, unless they are the last draws of the view, continues in a new
+ * pass. The shells come before the blended draws, so those in front of a planet are not hazed.
  *
  * The fog volumes of a view with transmissive draws march only the rays behind the glass
  * (box_gpu_draw_glass), which its snapshot then holds.
@@ -1231,7 +1236,7 @@ static bool box_gpu_draw_particles(
 {
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool result = true, rebind = true;
-    if (!vp->soft && !vp->fog) {
+    if (!vp->soft && !vp->fog && !vp->planets) {
         result = box_gpu_particles_draw(gpu, vp->pass, format, v, NULL);
         rebind = result;
     } else {
@@ -1243,6 +1248,10 @@ static bool box_gpu_draw_particles(
 
         vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
         wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+        if (vp->planets) {
+            box_gpu_planets_draw(gpu, vp->pass, t, format, packet, v, vp->depth);
+        }
+
         if (vp->fog) {
             box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth,
                 vp->glass, BOX_GPU_FOG_SEGMENT_BEHIND);
@@ -1339,9 +1348,9 @@ static void box_gpu_draw_snapshot(
 
 /** Record the indirect draws of the batches a view renders in a pass, in packet order.
  *
- * The sky of a view that renders its atmosphere, then its fog volumes, then the particles of
- * its scene, draw after the opaque 3D meshes and before the 2D shapes and the blended draws, in
- * the phases that draw those.
+ * The sky of a view that renders its atmosphere, then its planet atmosphere shells, then its fog
+ * volumes, then the particles of its scene, draw after the 3D meshes shared by every view and
+ * before the 2D shapes and the blended draws, in the phases that draw those.
  *
  * After a depth prepass the opaque meshes draw with the Equal pipelines, both the early and the
  * late arguments of a view that culls by occlusion, so they draw what the prepasses drew. A
@@ -1534,15 +1543,17 @@ static void box_gpu_draw_pass(
     }
 
     bool fog = phase != 1 && box_gpu_fog_volumes_ready(gpu, v);
+    bool planets = phase != 1 && box_gpu_planets_ready(gpu, v);
     box_gpu_view_pass_t vp = {
         .encoder = encoder,
         .color = hdr ? hdr : color,
         .depth = t->depth_view,
-        .depth_store = phase == 1 || hdr || fog || box_gpu_debug_enabled(v)
+        .depth_store = phase == 1 || hdr || fog || planets || box_gpu_debug_enabled(v)
             ? WGPUStoreOp_Store
             : WGPUStoreOp_Discard,
         .soft = phase != 1 && box_gpu_particles_soft(gpu, v),
         .fog = fog,
+        .planets = planets,
         .snapshot = phase != 1 ? snapshot : NULL,
         .source = source,
         .depth_texture = t->depth
@@ -1550,7 +1561,9 @@ static void box_gpu_draw_pass(
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_view,
         .depthLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
-        .depthStoreOp = vp.soft || vp.snapshot || vp.fog ? WGPUStoreOp_Store : vp.depth_store,
+        .depthStoreOp = vp.soft || vp.snapshot || vp.fog || vp.planets
+            ? WGPUStoreOp_Store
+            : vp.depth_store,
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = {

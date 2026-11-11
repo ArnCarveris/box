@@ -3,8 +3,9 @@
  * @brief Keeps the transmittance and multi scattering LUTs of every scene with an Atmosphere and
  * gives the views of those scenes the inputs of their sky view and aerial perspective.
  *
- * The LUTs are a BOX_RENDER_ATMOSPHERE resource per scene, built again only when the medium they
- * were built from changes; the sun, the colors and the cameras only reach the per view passes.
+ * The LUTs are a BOX_RENDER_ATMOSPHERE per scene and per valid PlanetAtmosphere, built again only
+ * when their medium changes; the sun, the colors and the cameras only reach the per view passes,
+ * and the lit views of the scene of a planet draw its shell.
  *
  * The entity of the LUTs is also an environment source: its sky goes into the cubemap of its
  * Environment as a BOX_RENDER_ATMOSPHERE_ENVIRONMENT, throttled to the changes that show. Its
@@ -16,6 +17,7 @@
 #include "../texture/texture.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 /** First handle of the LUTs of an atmosphere */
 #define BOX_ATMOS_HANDLE_FIRST (1)
@@ -47,6 +49,25 @@ typedef struct box_atmos_scene_t {
     int32_t cloud_count;    /**< Layers in clouds */
 } box_atmos_scene_t;
 
+/** The LUTs of a PlanetAtmosphere */
+typedef struct box_atmos_planet_t {
+    ecs_entity_t entity;    /**< Entity with the PlanetAtmosphere */
+    ecs_entity_t scene;     /**< Its scene root, 0 for the default scene */
+    uint32_t handle;        /**< Handle of the BOX_RENDER_ATMOSPHERE */
+    bool sent;              /**< The backend has the LUTs */
+    bool seen;              /**< The entity has a valid PlanetAtmosphere in this frame */
+    int32_t version;        /**< lut_version of the last build */
+    box_render_atmosphere_desc_t key; /**< Medium of the last build */
+    PlanetAtmosphere value; /**< Values of the PlanetAtmosphere in this frame */
+    float center[3];        /**< World position of the entity in this frame */
+} box_atmos_planet_t;
+
+/** A planet shell a view sees, by its distance from the camera */
+typedef struct box_atmos_planet_order_t {
+    float distance;         /**< Distance of the center from the camera */
+    int32_t index;          /**< Index of the planet in the planets of the state */
+} box_atmos_planet_order_t;
+
 /** Main thread state of the atmosphere extract */
 typedef struct box_render_atmos_t {
     ecs_query_t *atmospheres;   /**< Atmosphere and Scene(self|up), NULL without box.atmosphere */
@@ -54,6 +75,10 @@ typedef struct box_render_atmos_t {
     double time;                /**< Seconds the world advanced in total, the wind time */
     bool clouds_warned;         /**< A scene had more than BOX_CLOUD_LAYER_MAX layers */
     ecs_vec_t scenes;           /**< box_atmos_scene_t */
+    ecs_query_t *planets;       /**< PlanetAtmosphere, WorldTransform and Scene(self|up), NULL
+                                 *   without box.atmosphere */
+    ecs_vec_t planet_luts;      /**< box_atmos_planet_t */
+    ecs_vec_t planet_order;     /**< box_atmos_planet_order_t, scratch: the planets of a view */
     ecs_vec_t free_handles;     /**< uint32_t, handles to reuse */
     uint32_t next_handle;       /**< Next handle */
     const void *backend;        /**< Context of the backend the LUTs were sent to */
@@ -186,6 +211,25 @@ static void box_atmos_remove(
     ecs_vec_remove_t(&a->scenes, box_atmos_scene_t, index);
 }
 
+/** Take a handle of a BOX_RENDER_ATMOSPHERE, a released one first.
+ *
+ * @param a The state
+ * @return The handle
+ */
+static uint32_t box_atmos_handle(
+    box_render_atmos_t *a)
+{
+    uint32_t result;
+    if (ecs_vec_count(&a->free_handles)) {
+        result = *ecs_vec_last_t(&a->free_handles, uint32_t);
+        ecs_vec_remove_last(&a->free_handles);
+    } else {
+        result = a->next_handle ++;
+    }
+
+    return result;
+}
+
 /** Add the LUTs of a scene that got a valid atmosphere.
  *
  * @param a The state
@@ -199,12 +243,7 @@ static box_atmos_scene_t* box_atmos_add(
     box_atmos_scene_t *result = ecs_vec_append_t(NULL, &a->scenes, box_atmos_scene_t);
     ecs_os_memset_t(result, 0, box_atmos_scene_t);
     result->scene = scene;
-    if (ecs_vec_count(&a->free_handles)) {
-        result->handle = *ecs_vec_last_t(&a->free_handles, uint32_t);
-        ecs_vec_remove_last(&a->free_handles);
-    } else {
-        result->handle = a->next_handle ++;
-    }
+    result->handle = box_atmos_handle(a);
 
     return result;
 }
@@ -352,7 +391,149 @@ static void box_atmos_collect_clouds(
     }
 }
 
-/** Keep the LUTs of the scenes with a valid Atmosphere and destroy those of the other scenes.
+/** Find the LUTs of a PlanetAtmosphere.
+ *
+ * @param a The state
+ * @param entity The entity with the PlanetAtmosphere
+ * @return Index of the LUTs, -1 when the entity has none
+ */
+static int32_t box_atmos_planet_find(
+    const box_render_atmos_t *a,
+    ecs_entity_t entity)
+{
+    int32_t i, result = -1;
+    for (i = 0; i < ecs_vec_count(&a->planet_luts); i ++) {
+        if (ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i)->entity == entity) {
+            result = i;
+            break;
+        }
+    }
+
+    return result;
+}
+
+/** Write the lut_version and the error of a PlanetAtmosphere into its status when they changed.
+ *
+ * @param world The world
+ * @param entity The entity with the PlanetAtmosphere
+ * @param version The lut_version
+ * @param error The error, NULL for none
+ */
+static void box_atmos_planet_status(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    int32_t version,
+    const char *error)
+{
+    const PlanetAtmosphereStatus *status = ecs_get(world, entity, PlanetAtmosphereStatus);
+    if (!status) {
+        goto done;
+    }
+
+    bool same_error = error ? status->error && !strcmp(status->error, error) : !status->error;
+    if (!same_error || status->lut_version != version) {
+        PlanetAtmosphereStatus value = {
+            .lut_version = version,
+            .error = ECS_CONST_CAST(char*, error)
+        };
+        ecs_set_ptr(world, entity, PlanetAtmosphereStatus, &value);
+    }
+
+done:
+    return;
+}
+
+/** Visit every PlanetAtmosphere, build the LUTs of a valid one when the backend lacks them or
+ * its medium changed, and write its status.
+ *
+ * @param world The world
+ * @param a The state
+ * @param p The packet
+ */
+static void box_atmos_collect_planets(
+    ecs_world_t *world,
+    box_render_atmos_t *a,
+    box_render_packet_t *p)
+{
+    ecs_iter_t it = ecs_query_iter(world, a->planets);
+    while (ecs_query_next(&it)) {
+        const PlanetAtmosphere *values = ecs_field(&it, PlanetAtmosphere, 0);
+        const WorldTransform *transforms = ecs_field(&it, WorldTransform, 1);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t e = it.entities[i];
+            const PlanetAtmosphereStatus *status = ecs_get(world, e, PlanetAtmosphereStatus);
+            const char *error = box_atmos_planet_error(&values[i]);
+            int32_t index = box_atmos_planet_find(a, e);
+            int32_t version = status ? status->lut_version : 0;
+            box_atmos_planet_t *l = index != -1
+                ? ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, index)
+                : NULL;
+            if (!error && (!l || !l->seen)) {
+                box_render_atmosphere_desc_t key;
+                Atmosphere medium;
+                if (!l) {
+                    l = ecs_vec_append_t(NULL, &a->planet_luts, box_atmos_planet_t);
+                    ecs_os_memset_t(l, 0, box_atmos_planet_t);
+                    l->entity = e;
+                    l->handle = box_atmos_handle(a);
+                    l->version = version;
+                }
+
+                box_atmos_planet_medium(&values[i], &medium);
+                box_atmos_desc(&medium, &key);
+                l->seen = true;
+                l->scene = box_render_scene_field(&it, 2, i);
+                l->value = values[i];
+                if (transforms) {
+                    glm_vec3_copy(ECS_CONST_CAST(float*, transforms[i].m[3]), l->center);
+                } else {
+                    glm_vec3_zero(l->center);
+                }
+
+                if (!l->sent || ecs_os_memcmp_t(&key, &l->key, box_render_atmosphere_desc_t)) {
+                    box_render_atmosphere_desc_t *desc = box_render_packet_resource(p,
+                        BOX_RENDER_ATMOSPHERE, l->sent ? BOX_RENDER_UPDATE : BOX_RENDER_CREATE,
+                        l->handle, sizeof(box_render_atmosphere_desc_t));
+                    if (desc) {
+                        *desc = key;
+                    }
+
+                    l->key = key;
+                    l->sent = true;
+                    l->version = version + 1;
+                }
+
+                version = l->version;
+            }
+
+            box_atmos_planet_status(world, e, version, error);
+        }
+    }
+}
+
+/** Destroy the LUTs of a PlanetAtmosphere on the backend and remove them.
+ *
+ * @param a The state
+ * @param p The packet, receives the destroy
+ * @param index Index of the LUTs
+ */
+static void box_atmos_planet_remove(
+    box_render_atmos_t *a,
+    box_render_packet_t *p,
+    int32_t index)
+{
+    box_atmos_planet_t *l = ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, index);
+    if (l->sent) {
+        box_render_packet_resource(p, BOX_RENDER_ATMOSPHERE, BOX_RENDER_DESTROY, l->handle, 0);
+    }
+
+    *ecs_vec_append_t(NULL, &a->free_handles, uint32_t) = l->handle;
+    ecs_vec_remove_t(&a->planet_luts, box_atmos_planet_t, index);
+}
+
+/** Keep the LUTs of the scenes with a valid Atmosphere and of the valid PlanetAtmospheres, and
+ * destroy the others.
  *
  * @param it The iterator of the system
  */
@@ -365,7 +546,7 @@ static void BoxRenderExtractAtmosphere(
     box_render_packet_t *p = NULL;
     int32_t i;
     a->time += (double)it->delta_time;
-    if (!a->atmospheres && !ecs_vec_count(&a->scenes)) {
+    if (!a->atmospheres && !ecs_vec_count(&a->scenes) && !ecs_vec_count(&a->planet_luts)) {
         goto done;
     }
 
@@ -375,6 +556,10 @@ static void BoxRenderExtractAtmosphere(
     {
         for (i = 0; i < ecs_vec_count(&a->scenes); i ++) {
             ecs_vec_get_t(&a->scenes, box_atmos_scene_t, i)->sent = false;
+        }
+
+        for (i = 0; i < ecs_vec_count(&a->planet_luts); i ++) {
+            ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i)->sent = false;
         }
 
         a->backend = backend->ctx;
@@ -398,6 +583,20 @@ static void BoxRenderExtractAtmosphere(
 
     if (a->clouds) {
         box_atmos_collect_clouds(world, a);
+    }
+
+    for (i = 0; i < ecs_vec_count(&a->planet_luts); i ++) {
+        ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i)->seen = false;
+    }
+
+    if (a->planets) {
+        box_atmos_collect_planets(world, a, p);
+    }
+
+    for (i = ecs_vec_count(&a->planet_luts) - 1; i >= 0; i --) {
+        if (!ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i)->seen) {
+            box_atmos_planet_remove(a, p, i);
+        }
     }
 
 done:
@@ -571,18 +770,126 @@ static void box_atmos_view(
     }
 }
 
-/** Give every view of a scene with LUTs its atmosphere, after the light extract found the sun.
+/** Order planet shells by their distance from the camera, farthest first, then by index.
+ *
+ * @param p1 The first planet
+ * @param p2 The second planet
+ * @return Negative when the first is farther
+ */
+static int box_atmos_planet_compare(
+    const void *p1,
+    const void *p2)
+{
+    const box_atmos_planet_order_t *o1 = p1, *o2 = p2;
+    int result = (o1->distance < o2->distance) - (o1->distance > o2->distance);
+    if (!result) {
+        result = (o1->index > o2->index) - (o1->index < o2->index);
+    }
+
+    return result;
+}
+
+/** Write the shell of a planet as a view draws it, lit by its sun.
+ *
+ * @param lights The state of the light extract
+ * @param l The LUTs of the planet
+ * @param out Receives the shell
+ */
+static void box_atmos_planet_record(
+    const void *lights,
+    const box_atmos_planet_t *l,
+    box_render_planet_atmos_t *out)
+{
+    const PlanetAtmosphere *value = &l->value;
+    ecs_os_memset_t(out, 0, box_render_planet_atmos_t);
+    out->medium = l->key;
+    glm_vec3_copy(ECS_CONST_CAST(float*, l->center), out->center);
+    out->center[3] = value->planet_radius / value->radius;
+    if (!box_render_lights_planet_sun(lights, l->scene, value->sun, out->sun, out->sun_color)) {
+        glm_vec3_copy((vec3){0, -1, 0}, out->sun);
+        glm_vec3_zero(out->sun_color);
+    }
+
+    out->sun[3] = value->mie.anisotropy;
+    out->sun_color[3] = glm_max(value->intensity, 0.0f);
+    out->atmosphere = l->handle;
+    out->entity = l->entity;
+}
+
+/** Give a view the shells of the planets of its scene that may be in its frustum, back to front:
+ * a lit view of a View entity with a depth.
+ *
+ * @param world The world
+ * @param lights The state of the light extract
+ * @param a The state
+ * @param p The packet
+ * @param v The view
+ */
+static void box_atmos_view_planets(
+    const ecs_world_t *world,
+    const void *lights,
+    box_render_atmos_t *a,
+    box_render_packet_t *p,
+    box_render_view_t *v)
+{
+    const View *view = v->view && ecs_is_alive(world, v->view)
+        ? ecs_get(world, v->view, View)
+        : NULL;
+    int32_t i, count;
+    v->planet_first = ecs_vec_count(&p->planet_atmospheres);
+    v->planet_count = 0;
+    if (!view || !view->lighting.enabled || !box_camera_has_depth(&v->camera_data)) {
+        goto done;
+    }
+
+    ecs_vec_clear(&a->planet_order);
+    for (i = 0; i < ecs_vec_count(&a->planet_luts); i ++) {
+        const box_atmos_planet_t *l = ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i);
+        float top = (l->value.planet_radius + l->value.thickness) * l->value.radius /
+            l->value.planet_radius;
+        if (!l->seen || l->scene != v->scene || !box_render_view_sees(v, l->center, top)) {
+            continue;
+        }
+
+        box_atmos_planet_order_t *o = ecs_vec_append_t(
+            NULL, &a->planet_order, box_atmos_planet_order_t);
+        o->distance = glm_vec3_distance(v->camera_transform[3],
+            ECS_CONST_CAST(float*, l->center));
+        o->index = i;
+    }
+
+    count = ecs_vec_count(&a->planet_order);
+    box_atmos_planet_order_t *order = ecs_vec_first_t(
+        &a->planet_order, box_atmos_planet_order_t);
+    if (count > 1) {
+        qsort(order, (size_t)count, sizeof(box_atmos_planet_order_t),
+            box_atmos_planet_compare);
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_atmos_planet_record(lights, ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t,
+            order[i].index), ecs_vec_append_t(NULL, &p->planet_atmospheres,
+                box_render_planet_atmos_t));
+    }
+
+    v->planet_count = count;
+done:
+    return;
+}
+
+/** Give every view of a scene with LUTs its atmosphere and every lit view the planet shells of
+ * its scene, after the light extract found the suns.
  *
  * @param it The iterator of the system
  */
 static void BoxRenderExtractAtmosphereViews(
     ecs_iter_t *it)
 {
-    const box_render_atmos_t *a = box_atmos_state(it->world);
+    box_render_atmos_t *a = box_atmos_state(it->world);
     const void *lights = box_render_lights_state(it->world);
     box_render_packet_t *p = NULL;
     int32_t i, count;
-    if (!a || !ecs_vec_count(&a->scenes)) {
+    if (!a || (!ecs_vec_count(&a->scenes) && !ecs_vec_count(&a->planet_luts))) {
         goto done;
     }
 
@@ -594,6 +901,8 @@ static void BoxRenderExtractAtmosphereViews(
         if (s && s->seen) {
             box_atmos_view(it->world, lights, s, v);
         }
+
+        box_atmos_view_planets(it->world, lights, a, p, v);
     }
 
 done:
@@ -840,6 +1149,8 @@ static void box_atmos_free(
 {
     box_render_atmos_t *a = ctx;
     ecs_vec_fini_t(NULL, &a->scenes, box_atmos_scene_t);
+    ecs_vec_fini_t(NULL, &a->planet_luts, box_atmos_planet_t);
+    ecs_vec_fini_t(NULL, &a->planet_order, box_atmos_planet_order_t);
     ecs_vec_fini_t(NULL, &a->free_handles, uint32_t);
     ecs_os_free(a);
 }
@@ -849,6 +1160,8 @@ void box_render_atmosphere_init(
 {
     box_render_atmos_t *a = ecs_os_calloc_t(box_render_atmos_t);
     ecs_vec_init_t(NULL, &a->scenes, box_atmos_scene_t, 0);
+    ecs_vec_init_t(NULL, &a->planet_luts, box_atmos_planet_t, 0);
+    ecs_vec_init_t(NULL, &a->planet_order, box_atmos_planet_order_t, 0);
     ecs_vec_init_t(NULL, &a->free_handles, uint32_t, 0);
     a->next_handle = BOX_ATMOS_HANDLE_FIRST;
 
@@ -890,6 +1203,24 @@ void box_render_atmosphere_import(
             .entity = ecs_entity(world, { .name = "RenderAtmospheres" }),
             .terms = {
                 { .id = ecs_id(Atmosphere), .inout = EcsIn },
+                {
+                    .id = ecs_id(Scene),
+                    .src.id = EcsSelf | EcsUp,
+                    .trav = EcsChildOf,
+                    .inout = EcsInOutNone,
+                    .oper = EcsOptional
+                }
+            },
+            .cache_kind = EcsQueryCacheAuto
+        });
+    }
+
+    if (a && !a->planets) {
+        a->planets = ecs_query(world, {
+            .entity = ecs_entity(world, { .name = "RenderPlanetAtmospheres" }),
+            .terms = {
+                { .id = ecs_id(PlanetAtmosphere), .inout = EcsIn },
+                { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
                 {
                     .id = ecs_id(Scene),
                     .src.id = EcsSelf | EcsUp,
@@ -950,6 +1281,8 @@ bool box_render_atmosphere_use(
     for (i = 0; !result && i < ecs_vec_count(&p->views); i ++) {
         result = ecs_vec_get_t(&p->views, box_render_view_t, i)->atmosphere != 0;
     }
+
+    result |= ecs_vec_count(&p->planet_atmospheres) > 0;
 
     for (i = 0; !result && i < ecs_vec_count(&p->resources); i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(

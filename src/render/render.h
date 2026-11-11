@@ -481,6 +481,23 @@ bool box_render_lights_atmos_sun(
     float *direction,
     float *color);
 
+/** Get the sun of a PlanetAtmosphere as the light extract of this frame found it: a
+ * DirectionalLight of a scene with its top of atmosphere values, which no atmosphere attenuated.
+ *
+ * @param state The state of the light extract, see box_render_lights_state
+ * @param scene The scene, 0 for the default scene
+ * @param light The DirectionalLight entity, 0 for the first one of the scene
+ * @param direction Receives the normalized direction toward the light
+ * @param color Receives its linear color times intensity
+ * @return Whether the scene has the light
+ */
+bool box_render_lights_planet_sun(
+    const void *state,
+    ecs_entity_t scene,
+    ecs_entity_t light,
+    float *direction,
+    float *color);
+
 /** Get the moon of the valid atmosphere of a scene as the light extract of this frame found it.
  *
  * @param state The state of the light extract, see box_render_lights_state

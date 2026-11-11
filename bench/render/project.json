@@ -136,6 +136,15 @@
                 ]
             },
             {
+                "id": "PlanetAtmosphere",
+                "benchcases": [
+                    "one_bare",
+                    "one",
+                    "many_bare",
+                    "many"
+                ]
+            },
+            {
                 "id": "FogVolume",
                 "benchcases": [
                     "none",

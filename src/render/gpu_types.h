@@ -100,6 +100,9 @@ typedef struct box_gpu_particles_t box_gpu_particles_t;
 /** Pipelines and the buffer of the draws of the fog volumes */
 typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
 
+/** Pipelines and the buffer of the draws of the planet atmosphere shells */
+typedef struct box_gpu_planets_t box_gpu_planets_t;
+
 /** Pipelines and the uniform buffer of the debug passes of the views */
 typedef struct box_gpu_debug_t box_gpu_debug_t;
 
@@ -981,6 +984,7 @@ typedef struct box_gpu_t {
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
+    box_gpu_planets_t *planets;     /**< Planet atmosphere shell draws */
     box_gpu_debug_t *debug;         /**< Debug passes of the views */
     box_gpu_planar_t *planar;       /**< Planar reflections of the views */
     struct box_gpu_env_process_t *environment_process; /**< Processing of the environments,

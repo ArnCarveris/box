@@ -73,6 +73,10 @@
 /** Shader handle of the engine shader that raymarches the fog volumes of a view */
 #define BOX_RENDER_SHADER_FOG_VOLUME (51)
 
+/** Shader handle of the engine shader that raymarches the atmosphere shells of the planets of a
+ * view */
+#define BOX_RENDER_SHADER_PLANET_ATMOSPHERE (61)
+
 /** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_GRID (52)
 
@@ -797,6 +801,10 @@ typedef struct box_render_view_t {
                                  *   atmosphere pass */
     box_render_view_atmos_t atmos; /**< Inputs of its sky view and aerial perspective */
     box_render_view_env_t environment; /**< Environment the view is lit with */
+    int32_t planet_first;       /**< Index of the first planet atmosphere of the view in the
+                                 *   packet */
+    int32_t planet_count;       /**< Planet atmospheres the view draws, back to front, filled
+                                 *   by the atmosphere extract for a lit view with a depth */
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
@@ -1071,6 +1079,19 @@ typedef struct box_render_atmosphere_desc_t {
     float ozone[4];         /**< Ozone absorption in km^-1 at the peak of its tent, w unused */
     float ground_albedo[4]; /**< Linear albedo of the ground, w unused */
 } box_render_atmosphere_desc_t;
+
+/** The atmosphere shell of a PlanetAtmosphere a view draws, resolved by the atmosphere extract
+ * (atmosphere.c); its first members are the layout of Planet in planet_atmosphere.wgsl. */
+typedef struct box_render_planet_atmos_t {
+    box_render_atmosphere_desc_t medium; /**< The medium its LUTs were built from */
+    float center[4];        /**< World position of the entity, w km per world unit */
+    float sun[4];           /**< Direction toward its sun, w the Mie anisotropy; (0, -1, 0)
+                             *   without a sun */
+    float sun_color[4];     /**< Top of atmosphere irradiance of its sun, 0 without one, w
+                             *   PlanetAtmosphere.intensity */
+    uint32_t atmosphere;    /**< Handle of its BOX_RENDER_ATMOSPHERE, the LUTs */
+    ecs_entity_t entity;    /**< Entity with the PlanetAtmosphere */
+} box_render_planet_atmos_t;
 
 /** Description of a BOX_RENDER_ATMOSPHERE_ENVIRONMENT update: the sky of the atmosphere of a
  * scene, rendered into mip 0 of the cubemap of the BOX_RENDER_ENVIRONMENT of the handle.
@@ -1628,6 +1649,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t shadow_atlases; /**< box_render_shadow_atlas_t, the atlases with tiles */
     ecs_vec_t shadow_tiles; /**< box_render_shadow_tile_t of those atlases */
     ecs_vec_t fog_volumes;  /**< box_render_fog_volume_t, the fog volumes of the views */
+    ecs_vec_t planet_atmospheres; /**< box_render_planet_atmos_t, the planet atmosphere shells
+                             *   of the views */
     ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
                              *   views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,

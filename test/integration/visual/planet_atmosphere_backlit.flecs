@@ -1,0 +1,33 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// A planet between the camera and the sun: a bright ring of forward scattered light around
+// the dark disk, brightest on the side of the sun.
+
+camera {
+  Position: {0, 0, 3.6}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {0.12, 0.15, 0}
+  DirectionalLight: {intensity: 6}
+  Rgb: {255, 255, 255}
+}
+
+planet {
+  Position: {0, 0, 0}
+  Sphere: {segments: 96, smooth: true, radius: 1}
+  Rgb: {90, 110, 80}
+  PbrMaterial: {roughness: 0.9}
+  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 2000, thickness: 100}
+}
