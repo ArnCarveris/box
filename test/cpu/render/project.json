@@ -507,6 +507,21 @@
                 ]
             },
             {
+                "id": "DepthOfField",
+                "testcases": [
+                    "focus_is_sharp",
+                    "range_edges",
+                    "transition_ends",
+                    "hard_step",
+                    "near_blur_off",
+                    "sky_is_far",
+                    "perspective_depth",
+                    "perspective_infinite_far",
+                    "orthographic",
+                    "settings_clamped"
+                ]
+            },
+            {
                 "id": "Vignette",
                 "testcases": [
                     "center_is_zero",

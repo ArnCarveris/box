@@ -1,0 +1,84 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+
+// A row of pillars from 3 to 45 units, focused on the one at 10: the pillars in front and behind
+// blur with their distance, the glowing spheres far behind make bokeh discs and the sky is far.
+dof {
+  DepthOfField: {focus_distance: 10, focus_range: 2, near_transition: 4, far_transition: 20, max_radius: 0.012, near_blur: true}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 1.5, 0}
+  Rotation: {-0.05, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {110, 150, 210, 255}}, effects: [{effect: dof}, {effect: tonemap}]}
+}
+
+sun {
+  Rotation: {0.5, 2.6, 0}
+  DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, -40}
+  Box: {40, 0.2, 90}
+  Rgb: {110, 120, 100}
+}
+
+near_pillar {
+  Position: {-0.9, 1, -3}
+  Box: {0.4, 2, 0.4}
+  Rgb: {200, 70, 60}
+}
+
+focus_pillar {
+  Position: {0, 1.5, -10}
+  Box: {1, 3, 1}
+  Rgb: {230, 230, 230}
+}
+
+checker_a {
+  Position: {-0.25, 1.75, -9.49}
+  Box: {0.5, 0.5, 0.02}
+  Rgb: {20, 20, 20}
+}
+
+checker_b {
+  Position: {0.25, 1.25, -9.49}
+  Box: {0.5, 0.5, 0.02}
+  Rgb: {20, 20, 20}
+}
+
+mid_pillar {
+  Position: {3, 1.5, -20}
+  Box: {1.2, 3, 1.2}
+  Rgb: {80, 120, 210}
+}
+
+far_pillar {
+  Position: {-6, 2.5, -45}
+  Box: {2, 5, 2}
+  Rgb: {90, 170, 90}
+}
+
+for i in 0..8 {
+  {
+    Position: {i * 3 - 10.5, 3 + (i % 3) * 1.5, -40}
+    Sphere: {segments: 16, smooth: true, radius: 0.15}
+    Rgb: {20, 20, 20}
+    Emissive: {strength: 20, color: {255, 180 - (i % 4) * 30, 80 + (i % 3) * 60}}
+  }
+}

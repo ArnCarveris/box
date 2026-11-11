@@ -49,6 +49,30 @@ ECS_STRUCT(Bloom, {
                                           *   image, default 512, at least 8 */
 });
 
+/** Bokeh blur by view depth, the distance along the forward axis of the camera, not the ray.
+ *
+ * Sharp within focus_range around focus_distance, the blur ramps up to max_radius over the near
+ * and far transitions. Depth 0 (the sky, and every pixel of a view of only 2D shapes) is far at
+ * full blur. Perspective and orthographic cameras, lit or unlit, work the same way.
+ *
+ * Belongs before the Tonemap, in HDR, so bright highlights make bokeh discs, and before Bloom.
+ * An entity with several effects runs HeightFog, DepthOfField, Bloom, AutoExposure, Tonemap,
+ * ColorGrading, ChromaticAberration, Vignette and Smaa.
+ */
+ECS_STRUCT(DepthOfField, {
+    float focus_distance;  /**< View depth of the focus plane, default 10, at least 0 */
+    float focus_range;     /**< Depth around focus_distance that stays fully sharp, default 2,
+                            *   at least 0 */
+    float near_transition; /**< Depth over which the blur ramps from 0 to max in front of the
+                            *   sharp range, default 4, at least 0; 0 is a hard step */
+    float far_transition;  /**< Depth over which the blur ramps from 0 to max behind the sharp
+                            *   range, default 20, at least 0; 0 is a hard step */
+    float max_radius;      /**< Largest blur radius as a fraction of the image height, default
+                            *   0.01, clamped to 0..0.05; 0 leaves the image as is */
+    bool near_blur;        /**< Blur in front of the focus, default true; false only blurs the
+                            *   background */
+});
+
 /** Slices and steps per slice of the horizon search of Gtao, the quality levels of XeGTAO */
 ECS_ENUM(GtaoQuality, {
     GtaoLow = 0,    /**< 1 slice of 2 steps */

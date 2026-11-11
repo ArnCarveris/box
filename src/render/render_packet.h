@@ -92,6 +92,9 @@
 /** Shader handle of the engine shader of the chromatic aberration pass */
 #define BOX_RENDER_SHADER_CHROMATIC_ABERRATION (58)
 
+/** Shader handle of the engine shader of the depth of field passes */
+#define BOX_RENDER_SHADER_DEPTH_OF_FIELD (59)
+
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most; the bake
  * warns once about a volume with more for the first view that shows it */
 #define BOX_RENDER_DEBUG_PROBES_MAX (65536)
@@ -716,7 +719,8 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_SMAA,     /**< Smaa */
     BOX_RENDER_EFFECT_GRADING,  /**< ColorGrading */
     BOX_RENDER_EFFECT_VIGNETTE, /**< Vignette */
-    BOX_RENDER_EFFECT_CHROMATIC_ABERRATION /**< ChromaticAberration */
+    BOX_RENDER_EFFECT_CHROMATIC_ABERRATION, /**< ChromaticAberration */
+    BOX_RENDER_EFFECT_DEPTH_OF_FIELD /**< DepthOfField */
 } box_render_effect_kind_t;
 
 /** Resolved settings of a color grading pass */
@@ -737,6 +741,7 @@ typedef struct box_render_effect_t {
     TonemapOperator tonemap;    /**< Operator of a tone map pass */
     Bloom bloom;                /**< Resolved settings of a bloom pass */
     HeightFog fog;              /**< Resolved settings of a fog pass */
+    DepthOfField depth_of_field; /**< Resolved settings of a depth of field pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
     box_render_grading_t grading; /**< Resolved settings of a color grading pass */
     Vignette vignette;          /**< Resolved settings of a vignette pass */

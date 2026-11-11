@@ -929,6 +929,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_VIGNETTE, true);
     box_shader_builtin(world, state, builtin, "chromatic_aberration",
         "etc/shaders/chromatic_aberration.wgsl", BOX_RENDER_SHADER_CHROMATIC_ABERRATION, true);
+    box_shader_builtin(world, state, builtin, "depth_of_field",
+        "etc/shaders/depth_of_field.wgsl", BOX_RENDER_SHADER_DEPTH_OF_FIELD, true);
     box_shader_builtin(world, state, builtin, "gtao", "etc/shaders/gtao.wgsl",
         BOX_RENDER_SHADER_GTAO, true);
     box_shader_builtin(world, state, builtin, "fog", "etc/shaders/fog.wgsl",
