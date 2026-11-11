@@ -14,7 +14,7 @@ using box.surface
 using box.perf
 
 $ {
-  Scene: {baked: true}
+  Scene: {baked: true, planar_reflections: true}
 }
 
 $ {

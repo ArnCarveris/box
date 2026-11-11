@@ -250,6 +250,7 @@ uint32_t box_render_scene_features(
     result |= f->alpha_cutout ? BOX_RENDER_FEATURE_ALPHA_CUTOUT : 0u;
     result |= f->blend_modes ? BOX_RENDER_FEATURE_BLEND_MODES : 0u;
     result |= f->water ? BOX_RENDER_FEATURE_WATER : 0u;
+    result |= f->planar_reflections ? BOX_RENDER_FEATURE_PLANAR : 0u;
 done:
     return result;
 }

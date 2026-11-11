@@ -3,9 +3,9 @@
  * @brief Gives every lit perspective view the PlanarReflections of its scene it renders a
  * mirrored image of, for the planar reflection pass of the backend (gpu_planar.c).
  *
- * A view takes the planes of the scene of its camera that cross its frustum and have the camera
- * on their front side, the nearest BOX_PLANAR_REFLECTION_MAX; each record holds the mirrored
- * camera and the instance of the shape of the plane, which the reflection does not draw.
+ * A view of a scene with Scene.planar_reflections takes the planes of its scene that cross its
+ * frustum with the camera on their front side, the nearest BOX_PLANAR_REFLECTION_MAX; a record
+ * holds the mirrored camera and the instance of the shape of the plane, which samples the image.
  */
 
 #include "render.h"
@@ -25,6 +25,7 @@ typedef struct box_planar_entry_t {
     box_render_planar_plane_t plane; /**< Its plane */
     float clip_offset;      /**< PlanarReflection.clip_offset */
     float resolution;       /**< PlanarReflection.resolution, clamped */
+    float distortion;       /**< PlanarReflection.distortion, 0 when not finite */
 } box_planar_entry_t;
 
 /** The state of the planar reflection extract */
@@ -204,6 +205,8 @@ static void box_planar_collect(
             if (!isfinite(e->resolution)) {
                 e->resolution = 0.5f;
             }
+
+            e->distortion = isfinite(planars[i].distortion) ? planars[i].distortion : 0.0f;
         }
     }
 }
@@ -237,13 +240,18 @@ static void box_planar_record(
     glm_mat4_mulv(out->reflection, eye, eye);
     glm_vec3_copy(eye, out->camera);
     out->resolution = e->resolution;
-    if (!box_render_draws_instance(world, e->entity, &out->exclude_page, &out->exclude_slot)) {
+    out->distortion = e->distortion;
+    if (!box_render_draws_instance(world, e->entity, &out->exclude_page, &out->exclude_slot) ||
+        !box_render_draws_instance_transform(world, e->entity, out->owner))
+    {
         out->exclude_page = 0;
         out->exclude_slot = 0;
+        ecs_os_memset(out->owner, 0, ECS_SIZEOF(out->owner));
     }
 }
 
-/** Give every lit perspective view the planes of the scene of its camera it renders.
+/** Give every lit perspective view of a scene with Scene.planar_reflections the planes of the
+ * scene of its camera it renders.
  *
  * @param it The iterator of the system
  */
@@ -266,6 +274,7 @@ static void BoxRenderExtractPlanar(
         v->planar_first = ecs_vec_count(&p->planar_reflections);
         v->planar_count = 0;
         if (!entry_count || !view || !view->lighting.enabled || v->camera_data.ortho ||
+            !(v->scene_features & BOX_RENDER_FEATURE_PLANAR) ||
             !box_camera_has_depth(&v->camera_data))
         {
             continue;

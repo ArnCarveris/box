@@ -76,7 +76,7 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[21] = {
+    WGPUBindGroupLayoutEntry entries[22] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -218,9 +218,17 @@ void box_gpu_draw_init(
                 .sampleType = WGPUTextureSampleType_Depth,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        },
+        {
+            .binding = 21,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 21, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 22, .entries = entries };
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);

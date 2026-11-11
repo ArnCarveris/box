@@ -866,7 +866,10 @@
                     "extract_record",
                     "extract_rotated_wall",
                     "extract_limit",
-                    "extract_views_without"
+                    "extract_views_without",
+                    "extract_needs_scene_feature",
+                    "shape_draws_with_extended",
+                    "feature_off_draws_with_mesh_shader"
                 ]
             }
         ]

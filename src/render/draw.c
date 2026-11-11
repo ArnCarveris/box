@@ -600,8 +600,8 @@ done:
 }
 
 /** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or
- * water, or it uses a material feature its scene enables. Alpha tested, blended and TextureBlend
- * shapes without those draw with the mesh shader.
+ * water, it has a PlanarReflection with Scene.planar_reflections or a material feature its scene
+ * enables. Alpha tested, blended and TextureBlend shapes without those use the mesh shader.
  *
  * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy,
  * DiffuseTransmission or Fresnel; only a scene with some of those off checks which.
@@ -622,7 +622,8 @@ static bool box_draws_extended(
         BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION |
         BOX_RENDER_FEATURE_FRESNEL;
     uint32_t f = key->features;
-    bool result = key->transmissive || key->water;
+    bool result = key->transmissive || key->water ||
+        ((f & BOX_RENDER_FEATURE_PLANAR) && ecs_get(world, e, PlanarReflection) != NULL);
     const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
         ? NULL : ecs_get(world, e, TextureMapping);
     ecs_iter_t it;
@@ -1476,6 +1477,35 @@ bool box_render_draws_instance(
     *page = box_draws_store_handle(box_draws_batch_store(d, b), b->page,
         BOX_RENDER_STREAM_TRANSFORM);
     *slot = b->first + (uint32_t)ds->slot;
+    result = true;
+done:
+    return result;
+}
+
+bool box_render_draws_instance_transform(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    vec4 *rows)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = d && ecs_is_alive(world, e) ? ecs_get(world, e, DrawSlot) : NULL;
+    box_draw_batch_t *b = NULL;
+    bool result = false;
+    int32_t i;
+    if (!ds || ds->batch < 0 || ds->batch >= ecs_vec_count(&d->batches)) {
+        goto done;
+    }
+
+    b = ecs_vec_get_t(&d->batches, box_draw_batch_t, ds->batch);
+    if (!b->alive || b->page < 0 || ds->slot < 0 || ds->slot >= ecs_vec_count(&b->transforms)) {
+        goto done;
+    }
+
+    const box_render_transform_t *t = box_draws_slot_transform(b, ds->slot);
+    for (i = 0; i < 3; i ++) {
+        glm_vec4_copy(ECS_CONST_CAST(float*, t->rows[i]), rows[i]);
+    }
+
     result = true;
 done:
     return result;

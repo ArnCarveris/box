@@ -1,6 +1,6 @@
 // Forward pass of the meshes the mesh shader does not draw (box_draws_extended): transmissive
 // (Transmission), Water, with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy,
-// DiffuseTransmission or Fresnel, with or without a TextureBlend.
+// DiffuseTransmission or Fresnel, or with a PlanarReflection, with or without a TextureBlend.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
@@ -18,6 +18,9 @@ override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
 override material_fresnel: bool = true;
 override transmissive: bool = false;
+
+// The shapes of PlanarReflections reflect the mirrored images of the view (Scene.planar_reflections).
+override scene_planar: bool = false;
 
 // Foam texture of a Water (Water.foam_texture), its red as stored; white without one. Only fs
 // samples it, so the TextureBlend entry points keep the blend group without it.
@@ -37,6 +40,16 @@ const WATER_F0: f32 = 0.02;
 // whatever lies behind it. A view without transmissive draws, and the captures, bind a 1x1
 // placeholder.
 @group(0) @binding(20) var opaque_snapshot_depth: texture_depth_2d;
+
+// Planar reflections of the view (gpu_planar.c): layer k holds the mirrored image of reflection
+// slot k in the corner of its share of the array (view.planar[k].yz), its colors multiplied by
+// its coverage, which is 0 where the reflection drew nothing; mip m + 1 is downsampled from mip
+// m. A view without planar reflections, and the captures, bind a 1x1 transparent array.
+@group(0) @binding(21) var planar_images: texture_2d_array<f32>;
+
+// Roughness from which the planar reflection fades to the probes, and to which it has faded.
+const PLANAR_FADE_START: f32 = 0.6;
+const PLANAR_FADE_END: f32 = 0.8;
 
 // Texture layers apply on front faces; a plain back face keeps the material constants, is
 // unoccluded and faces the camera, except that an alpha tested one takes the albedo alpha, so its
@@ -425,9 +438,60 @@ fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Li
     return brdf(s, v, l, radiance);
 }
 
+// The planar reflection a fragment samples: its slot plus one, 0 for none, and its point on the
+// screen in [0, 1].
+struct PlanarLookup {
+    slot: u32,
+    screen: vec2f,
+};
+
+// The planar reflection of a fragment of an instance that is the shape of a reflection plane of
+// the view with an image this frame (planar_owner).
+fn planar_lookup(f: VertexOut) -> PlanarLookup {
+    var slot = 0u;
+    if (scene_planar && f.planar > 0u && f.planar <= 2u && view.planar[f.planar - 1u].w > 0.0) {
+        slot = f.planar;
+    }
+    return PlanarLookup(slot, f.pos.xy * view.viewport.zw);
+}
+
+// Radiance the planar reflection of a fragment reflects along its normal n, in place of the
+// probe and environment radiance fallback: the image at the screen point moved by the
+// distortion times the view space tilt of n off the geometric normal, by a fraction of the image
+// height on both axes, clamped to the image, at the mip of the roughness. It fades to fallback
+// where the image shows nothing and between PLANAR_FADE_START and PLANAR_FADE_END.
+fn planar_radiance(p: PlanarLookup, n: vec3f, geometric: vec3f, roughness: f32,
+    fallback: vec3f) -> vec3f {
+    if (!scene_planar || p.slot == 0u) {
+        return fallback;
+    }
+
+    let fade = 1.0 - smoothstep(PLANAR_FADE_START, PLANAR_FADE_END, roughness);
+    if (fade <= 0.0) {
+        return fallback;
+    }
+
+    let info = view.planar[p.slot - 1u];
+    let tilt = (view.view * vec4f(n - geometric * dot(n, geometric), 0.0)).xy;
+    let aspect = view.viewport.y * view.viewport.z;
+    let uv = clamp(p.screen + info.x * vec2f(tilt.x * aspect, -tilt.y), vec2f(0.0),
+        vec2f(1.0));
+    let top = max(info.w - 1.0, 0.0);
+    let lod = clamp(roughness, 0.0, 1.0) * top;
+    let level = min(u32(ceil(lod)), u32(top));
+    let half_texel = 0.5 / vec2f(textureDimensions(planar_images, level));
+    let at = clamp(uv * info.yz, half_texel, max(info.yz - half_texel, half_texel));
+    let image = textureSampleLevel(planar_images, reflection_sampler, at, p.slot - 1u, lod);
+    let coverage = clamp(image.a, 0.0, 1.0);
+    let radiance = max(image.rgb, vec3f(0.0)) / max(coverage, 1e-4);
+    return mix(fallback, radiance, coverage * fade);
+}
+
 // An unlit view shows the albedo as the diffuse part and the emission as the specular one. The
 // back lobe of a diffuse transmission takes no ambient occlusion, which describes the front.
-fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
+// The shape of a planar reflection reflects its image (planar_radiance) in place of the probes,
+// with the base and the clear coat.
+fn shade_split(s: Surface, v: vec3f, world: vec3f, planar: PlanarLookup) -> Lit {
     if (view.lights.z == 0u) {
         return Lit(s.albedo, s.emissive);
     }
@@ -466,8 +530,12 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
     let coat = material_clear_coat && s.coat > 0.0;
     let e = indirect_lobes(world, n, spec, s.roughness, cluster, s.back_factor > 0.0, nc,
         spec_coat, s.coat_roughness, coat);
-    let specular_light = e.specular;
+    let specular_light = planar_radiance(planar, n, s.geometric, s.roughness, e.specular);
     let diffuse_light = e.diffuse;
+    var coat_light = e.coat;
+    if (coat) {
+        coat_light = planar_radiance(planar, nc, nc, s.coat_roughness, e.coat);
+    }
 
     // The split sum scale and bias already integrate the Fresnel over the GGX lobe of the
     // roughness, so the grazing reflection of a rough surface fades without a roughness aware
@@ -500,7 +568,7 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
         let ab_coat = env_brdf(s.coat_roughness, ndv_coat);
         let coat_albedo = (0.04 * ab_coat.x + ab_coat.y) * s.coat;
         indirect_specular = indirect_specular * (1.0 - coat_albedo) +
-            coat_albedo * e.coat * specular_occlusion(ndv_coat, s.occlusion, ac);
+            coat_albedo * coat_light * specular_occlusion(ndv_coat, s.occlusion, ac);
         indirect_diffuse *= 1.0 - coat_albedo;
         indirect_back *= 1.0 - coat_albedo;
     }
@@ -684,7 +752,8 @@ fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
 // shows through exp(-3 ray / visibility) of the body; the body, shallow_color mixed toward
 // deep_color by the water depth along the geometric normal, covers the rest. The foam band
 // replaces both. Body and foam are lit diffusely with the light of the surface; the specular of
-// an F0 of 0.02, direct and indirect (indirect_lobes, as every shape), adds on top. Nothing
+// an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
+// as every shape), adds on top. Nothing
 // behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
 fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
     let m = vo_water(f);
@@ -697,7 +766,7 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
     s.anisotropy = 0.0;
     s.albedo = vec3f(1.0);
     let v = normalize(view.camera.xyz - f.world);
-    let reflected = shade_split(s, v, f.world);
+    let reflected = shade_split(s, v, f.world, planar_lookup(f));
 
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (scene_aerial && view.aerial.w > 0.0) {
@@ -779,7 +848,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     if (material_fresnel) {
         s = fresnel_rim(f, s, v);
     }
-    let reflected = shade_split(s, v, f.world);
+    let reflected = shade_split(s, v, f.world, planar_lookup(f));
     if (transmissive) {
         return transmission(f, s, v, reflected);
     }
