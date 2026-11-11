@@ -57,17 +57,6 @@ assets {
     }
   }
 
-  template Gantry {
-    tower : YardGirder { Position: {0, 4, 0}; Box: {1.1, 14, 1.1} }
-    for j in 0..4 {
-      "brace_{j}" : YardGirder { Position: {0, -1.6 + j * 3.4, 0.6}; Rotation: {0.55, 0, 0}; Box: {0.8, 3.6, 0.12} }
-      "band_{j}" : ShipHazard { Position: {0, -2.4 + j * 3.4, 0}; Box: {1.16, 0.3, 1.16} }
-    }
-    head : YardGirder { Position: {0, 11.2, 0}; Box: {1.6, 0.5, 1.6} }
-    beacon : ShipBeaconRed { Position: {0, 11.6, 0}; Sphere: {radius: 0.18, segments: 10} }
-    lamp : ShipWhiteLight { Position: {0, 10.8, 0}; Box: {1.4, 0.12, 1.4} }
-  }
-
   template Slipway {
     const w = GX * CW + 8
     const l = GZ * CW + 8
@@ -92,11 +81,6 @@ assets {
         }
       }
     }
-    for i in 0..4 {
-      const gx = i % 2 == 0 ? -1 : 1
-      const gz = i < 2 ? -1 : 1
-      Gantry "tower_{i}"() { Position: {gx * (w / 2 - 1), 0, gz * (l / 2 - 2)}; Scale: {1, 1.5, 1} }
-    }
     for i in 0..2 {
       "end_light_{i}" : ShipAmberLight { Position: {0, -2.9, i == 0 ? -0.1 - l / 2 : l / 2 + 0.1}; Box: {w - 1, 0.08, 0.06} }
     }
@@ -107,7 +91,7 @@ assets {
       Position: {0, 0, 0}
       Rotation: {0, 0, 0.3}
       AngularVelocity: {0, 0.004, 0}
-      Sphere: {radius: 420, segments: 128, smooth: true}
+      Sphere: {radius: 420, segments: 64, smooth: true}
       Rgb: {255, 255, 255}
       PbrMaterial: {roughness: 0.75}
       Emissive: {strength: 0.8, color: {255, 214, 160}}
@@ -119,7 +103,7 @@ assets {
       Position: {0, 0, 0}
       Rotation: {0, 0, 0.3}
       AngularVelocity: {0, 0.006, 0}
-      Sphere: {radius: 424, segments: 128, smooth: true}
+      Sphere: {radius: 424, segments: 64, smooth: true}
       Rgb: {255, 255, 255}
       PbrMaterial: {roughness: 0.9}
       BlendMode: AlphaBlend

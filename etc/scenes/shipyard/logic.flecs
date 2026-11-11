@@ -13,7 +13,6 @@ state {
     Deck6 { Action: {description: "Work on deck 6"}; Binding: {key: Num6} }
     Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
     Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
-    View { Action: {description: "Switch between the exterior and the interior"}; Binding: {key: Tab} }
     DeckUp { Action: {description: "Work on the deck above"}; Binding: {key: PageUp} }
     DeckDown { Action: {description: "Work on the deck below"}; Binding: {key: PageDown} }
   }
@@ -61,7 +60,6 @@ state {
     assets.HotKey d6(action: actions.Deck6, op: OP_DECK + 5)
     assets.HotKey kx(action: actions.Remove, op: T_REMOVE)
     assets.HotKey kc(action: actions.Cancel, op: OP_CANCEL)
-    assets.HotKey kv(action: actions.View, op: OP_VIEW)
     assets.HotKey ku(action: actions.DeckUp, op: OP_DECK_UP)
     assets.HotKey kd(action: actions.DeckDown, op: OP_DECK_DOWN)
   }
@@ -101,12 +99,6 @@ async {
       tool = tool == op ? 0 : op
     } else if op == OP_CANCEL {
       tool = 0
-    } else if op == OP_EXTERIOR {
-      interior = false
-    } else if op == OP_INTERIOR {
-      interior = true
-    } else if op == OP_VIEW {
-      interior = !interior
     } else if op >= OP_DECK && op < OP_DECK + GY {
       hover = -1
       deck = op - OP_DECK

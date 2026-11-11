@@ -2,7 +2,6 @@ include shipyard/state
 include shipyard/materials
 include shipyard/hull
 include shipyard/exterior
-include shipyard/interior
 include shipyard/cell
 include shipyard/stage
 include shipyard/logic
