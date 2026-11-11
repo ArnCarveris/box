@@ -110,9 +110,17 @@ ECS_STRUCT(AtmosphereStatus, {
  * camera above the plane sees its top. Layers composite from far to near along each ray.
  *
  * A scene draws at most BOX_CLOUD_LAYER_MAX layers, the first ones by entity id; more are
- * ignored with a warning. Only views that render the atmosphere (LightSettings.atmosphere)
- * show clouds, not views with another environment as background; the environment cubemap of
- * the Atmosphere and the reflection captures do not include them.
+ * ignored with a warning. Views that render the atmosphere (LightSettings.atmosphere) draw the
+ * clouds, views with another environment as background do not.
+ *
+ * The environment cubemap of the Atmosphere includes the layers, seen from world X and Z 0 at
+ * the sea_level, so image based lighting, the ambient and reflections show them, and so do the
+ * reflection captures where they see the environment. Adding, removing or changing a layer
+ * renders the cubemap again. A moving layer, by offset or velocity, renders it again only once
+ * its offset, wrapped to size, moved more than 1/64 of size since the last render, the shortest
+ * way around the wrap: wind renders it periodically, every size / (64 * |velocity|) seconds,
+ * not every frame. Such a move does not capture reflection probes or probe volumes again; they
+ * keep the clouds of their last capture.
  *
  * size, altitude, offset and velocity mean what size, height, offset and velocity of a
  * LightCookie with the Plane projection mean: a cookie on the sun with the same texture and

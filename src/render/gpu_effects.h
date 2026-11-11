@@ -245,6 +245,14 @@ typedef struct box_gpu_vignette_uniforms_t {
     float color[4];                 /**< Linear color of the vignette, unused */
 } box_gpu_vignette_uniforms_t;
 
+/** Uniforms of the chromatic aberration pass, matching ChromaticAberration in
+ * etc/shaders/chromatic_aberration.wgsl */
+typedef struct box_gpu_chromatic_aberration_uniforms_t {
+    float params[4];                /**< Largest offset in pixels, taps, falloff, 1 / distance
+                                     *   from the center to its farthest corner in pixels */
+    float shape[4];                 /**< Center x and y in pixels, 1 / width, 1 / height */
+} box_gpu_chromatic_aberration_uniforms_t;
+
 /** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Inverse of the projection times the view matrix */

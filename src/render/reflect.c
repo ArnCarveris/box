@@ -99,7 +99,8 @@ typedef struct box_reflect_scene_t {
     uint32_t env_handle;    /**< Cubemap of ReflectionBake.environment the captures see where
                              *   nothing covers them, 0 for the hemisphere while it has no
                              *   content */
-    int32_t env_content;    /**< EnvironmentStatus.version that cubemap holds, 0 without one */
+    int32_t env_content;    /**< EnvironmentStatus.version that cubemap holds, of its last
+                             *   content that did more than move, 0 without one */
     bool env_known;         /**< env_was_handle and env_was_content hold those of a frame */
     uint32_t env_was_handle; /**< env_handle when the probes were last invalidated */
     int32_t env_was_content; /**< env_content when the probes were last invalidated */
@@ -900,7 +901,7 @@ static void box_reflect_bakes(
                 ? box_render_environment_handle(world, bake->environment)
                 : 0;
             s->env_content = s->env_handle
-                ? box_render_environment_content(world, bake->environment)
+                ? box_render_environment_captured(world, bake->environment)
                 : 0;
             s->env_handle = s->env_content ? s->env_handle : 0;
             if (changed || !s->bounded) {
@@ -1224,6 +1225,8 @@ static void box_reflect_mark_light(
  * Another source of the environment the captures see queues every probe, and so does a new
  * version of it unless a directional light is held within the thresholds of its captured
  * state, which the source then follows.
+ *
+ * Content that only moved, such as drifting clouds, is no new version here.
  *
  * @param r The state
  * @param s The scene

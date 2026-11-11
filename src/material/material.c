@@ -222,6 +222,40 @@ static void box_transmission_ctor(
     }
 }
 
+/** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
+ * refraction of 0.02 and an off white foam band of width 0.3 without texture or ripples.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Water *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Water){
+            .shallow_color = { BOX_MATERIAL_WATER_SHALLOW_R, BOX_MATERIAL_WATER_SHALLOW_G,
+                BOX_MATERIAL_WATER_SHALLOW_B },
+            .deep_color = { BOX_MATERIAL_WATER_DEEP_R, BOX_MATERIAL_WATER_DEEP_G,
+                BOX_MATERIAL_WATER_DEEP_B },
+            .depth = BOX_MATERIAL_WATER_DEPTH,
+            .visibility = BOX_MATERIAL_WATER_VISIBILITY,
+            .refraction = BOX_MATERIAL_WATER_REFRACTION,
+            .foam_color = { BOX_MATERIAL_WATER_FOAM_R, BOX_MATERIAL_WATER_FOAM_G,
+                BOX_MATERIAL_WATER_FOAM_B },
+            .foam_width = BOX_MATERIAL_WATER_FOAM_WIDTH,
+            .foam_texture = 0,
+            .foam_scale = BOX_MATERIAL_WATER_FOAM_SCALE,
+            .ripple_scale = BOX_MATERIAL_WATER_RIPPLE_SCALE,
+            .ripple_velocity = { 0.0f, 0.0f } };
+    }
+}
+
 /** Construct TextureTransform values that leave the texture coordinates unchanged.
  *
  * @param ptr The components
@@ -301,6 +335,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Emissive);
     ECS_META_COMPONENT(world, Fresnel);
     ECS_META_COMPONENT(world, Transmission);
+    ECS_META_COMPONENT(world, Water);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, TextureWrap);
@@ -322,19 +357,20 @@ void BoxMaterialImport(
     ecs_set_hooks(world, TextureScroll, { .ctor = box_texture_scroll_ctor });
     ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
     ecs_set_hooks(world, Fresnel, { .ctor = box_fresnel_ctor });
+    ecs_set_hooks(world, Water, { .ctor = box_water_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[13] = {
+    ecs_entity_t materials[14] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel)
+        ecs_id(Fresnel), ecs_id(Water)
     };
     int32_t i;
-    for (i = 0; i < 13; i ++) {
+    for (i = 0; i < 14; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

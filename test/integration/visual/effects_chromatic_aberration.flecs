@@ -1,0 +1,57 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+
+// Before the Tonemap, so the bright fringes of the emissive bars spread wider
+lens {
+  ChromaticAberration: {intensity: 0.02, samples: 12, center: {0.5, 0.5}, falloff: 1.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 3, 9}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 30, 255}}, effects: [{effect: lens}, {effect: tonemap}]}
+}
+
+sun {
+  Rotation: {0.5848, 2.4751, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {120, 120, 115}
+}
+
+// White emissive bars from the center to the edges, the outer ones fringe the most
+for i in 0..9 {
+  {
+    Position: {i * 1.4 - 5.6, 1.5, 0}
+    Box: {0.12, 3, 0.12}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 4, color: {255, 255, 255}}
+  }
+}
+
+for i in 0..6 {
+  {
+    Position: {i * 1.6 - 4, 0.6, 2}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {255 - i * 30, 200, 120 + i * 20}
+    PbrMaterial: {roughness: 0.4}
+  }
+}

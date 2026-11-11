@@ -257,6 +257,7 @@ ECS_STRUCT(Scene, {
     bool anisotropy;        /**< SpecularAnisotropy */
     bool diffuse_transmission; /**< DiffuseTransmission */
     bool fresnel;           /**< Fresnel */
+    bool water;             /**< Water, else the shapes draw as without it */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

@@ -235,7 +235,7 @@ static void box_materials_drop(
  * @param m The table
  * @param owner The owner, 0 for the default material
  * @param out The record
- * @return Whether the owner has or inherits a TextureScroll
+ * @return Whether the owner has or inherits a TextureScroll or a Water, whose ripples move
  */
 static bool box_materials_pack(
     const ecs_world_t *world,
@@ -247,10 +247,11 @@ static bool box_materials_pack(
     box_draws_material_of(world, owner, m->time, &material);
     box_draws_material_pack(out, &material);
 
-    return material.scroll != NULL;
+    return material.scroll != NULL || material.water != NULL;
 }
 
-/** Check whether an entity has or inherits a TextureScroll, whose record changes every frame.
+/** Check whether an entity has or inherits a TextureScroll or a Water, whose record changes
+ * every frame.
  *
  * @param world The world
  * @param e The entity
@@ -260,7 +261,7 @@ static bool box_materials_scrolls(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
-    return ecs_get(world, e, TextureScroll) != NULL;
+    return ecs_get(world, e, TextureScroll) != NULL || ecs_get(world, e, Water) != NULL;
 }
 
 /** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff,
@@ -793,7 +794,8 @@ static void BoxMaterialsOnIsA(
 }
 
 /** Check whether adding or removing a material component moves the mesh shapes that own their
- * material between a shared and a private slot: TextureScroll, whose record changes every frame.
+ * material between a shared and a private slot: TextureScroll and Water, whose records change
+ * every frame.
  *
  * @param component The component
  * @return Whether its OnAdd and OnRemove make the shapes take their slot again
@@ -801,12 +803,12 @@ static void BoxMaterialsOnIsA(
 static bool box_materials_slotted(
     ecs_entity_t component)
 {
-    return component == ecs_id(TextureScroll);
+    return component == ecs_id(TextureScroll) || component == ecs_id(Water);
 }
 
 /** Check whether adding or removing a material component changes the batch key of the shapes
- * that have it: the alpha test, the transmission, and the material features that draw with the
- * extended mesh shader. A TextureMapping changes it when set too, by its blend.
+ * that have it: the alpha test, the transmission, the water, and the material features that draw
+ * with the extended mesh shader. A TextureMapping changes it when set too, by its blend.
  *
  * @param component The component
  * @return Whether its OnAdd and OnRemove move the shapes to a new key
@@ -817,7 +819,7 @@ static bool box_materials_keyed(
     return component == ecs_id(AlphaCutoff) || component == ecs_id(Transmission) ||
         component == ecs_id(Sheen) || component == ecs_id(ClearCoat) ||
         component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission) ||
-        component == ecs_id(Fresnel);
+        component == ecs_id(Fresnel) || component == ecs_id(Water);
 }
 
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
@@ -828,8 +830,8 @@ static bool box_materials_keyed(
  * changed field is left alone. 2D shapes and texts write their shading again.
  *
  * Mesh shapes reference the slot and write nothing, unless their batch changes (an added or
- * removed component of box_materials_keyed, or a set TextureMapping), they move between a shared
- * and a private slot (box_materials_slotted) or the owner of a shared slot moves to another slot.
+ * removed component of box_materials_keyed, or a set TextureMapping or Water), they move between
+ * a shared and a private slot (box_materials_slotted) or the owner of a shared slot moves.
  *
  * @param it The iterator of the observer
  */
@@ -850,7 +852,8 @@ static void BoxMaterialsOnComponent(
         ecs_table_has_id(world, table, ecs_id(Shape2D)) ||
         ecs_table_has_id(world, table, ecs_id(Text));
     bool keyed = ((box_materials_keyed(it->event_id) || box_materials_slotted(it->event_id)) &&
-        it->event != EcsOnSet) || it->event_id == ecs_id(TextureMapping);
+        it->event != EcsOnSet) || it->event_id == ecs_id(TextureMapping) ||
+        it->event_id == ecs_id(Water);
     bool mark = !prefab && (inline_ || keyed);
     for (i = 0; i < it->count; i ++) {
         if (owners) {
@@ -870,17 +873,17 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[13] = {
+    ecs_entity_t components[14] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel)
+        ecs_id(Fresnel), ecs_id(Water)
     };
-    const char *names[13] = {
+    const char *names[14] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
-        "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel"
+        "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -905,7 +908,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 13; i ++) {
+    for (i = 0; i < 14; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
@@ -940,6 +943,7 @@ void box_draws_material_of(
         out->sheen = ecs_get(world, owner, Sheen);
         out->diffuse_transmission = ecs_get(world, owner, DiffuseTransmission);
         out->fresnel = ecs_get(world, owner, Fresnel);
+        out->water = ecs_get(world, owner, Water);
     }
 }
 
@@ -1083,7 +1087,7 @@ void box_draws_materials_send(
         m->transmission_roughness = 0;
         m->features_valid = true;
         for (i = 0; i < (int32_t)total; i ++) {
-            if (records[i].transmission_factor > 0) {
+            if (records[i].transmission_factor > 0 || records[i].water_depth > 0) {
                 float r = records[i].diffuse_blur > 0 ? 1.0f : records[i].roughness;
                 if (r > m->transmission_roughness) {
                     m->transmission_roughness = r;

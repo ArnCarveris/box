@@ -1,5 +1,5 @@
 // Forward pass of the meshes the mesh shader does not draw (box_draws_extended): transmissive
-// (Transmission), with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy,
+// (Transmission), Water, with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy,
 // DiffuseTransmission or Fresnel, with or without a TextureBlend.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
@@ -9,7 +9,8 @@
 
 // The material features of the scene (Scene) compile out the code of those it lacks; the alpha
 // test, the blend modes and the TextureBlend have no override. transmissive is set for the
-// pipelines of Transmission shapes, through which the opaque snapshot of the view shows.
+// pipelines of Transmission shapes, through which the opaque snapshot of the view shows, and
+// water, with transmissive, for those of Water shapes of a scene with Scene.water.
 override material_sheen: bool = true;
 override material_anisotropy: bool = true;
 override material_clear_coat: bool = true;
@@ -17,6 +18,13 @@ override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
 override material_fresnel: bool = true;
 override transmissive: bool = false;
+
+// Foam texture of a Water (Water.foam_texture), its red as stored; white without one. Only fs
+// samples it, so the TextureBlend entry points keep the blend group without it.
+@group(1) @binding(12) var foam_map: texture_2d<f32>;
+
+// F0 of a Water surface, of an index of refraction of 1.33.
+const WATER_F0: f32 = 0.02;
 
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
@@ -340,7 +348,10 @@ fn sheen_compensation(sheen: vec3f) -> f32 {
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
-    let f0 = mix(vec3f(0.04), s.albedo, s.metallic);
+    var f0 = mix(vec3f(0.04), s.albedo, s.metallic);
+    if (water) {
+        f0 = vec3f(WATER_F0);
+    }
     var diffuse_color = s.albedo * (1.0 - s.metallic);
     if (s.back_factor > 0.0) {
         diffuse_color *= 1.0 - s.back_factor;
@@ -423,7 +434,10 @@ fn shade_split(s: Surface, v: vec3f, world: vec3f) -> Lit {
 
     let n = s.normal;
     let a = s.roughness * s.roughness;
-    let f0 = mix(vec3f(0.04), s.albedo, s.metallic);
+    var f0 = mix(vec3f(0.04), s.albedo, s.metallic);
+    if (water) {
+        f0 = vec3f(WATER_F0);
+    }
     var diffuse_color = s.albedo * (1.0 - s.metallic);
     if (s.back_factor > 0.0) {
         diffuse_color *= 1.0 - s.back_factor;
@@ -586,6 +600,154 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     return vec4f(final_color, 1.0);
 }
 
+// Texture coordinates of the layers of a fragment without a triplanar blend, as hard_layers
+// takes them.
+fn water_uv(f: VertexOut) -> vec2f {
+    var uv = f.uv.xy;
+    if (vo_scalars(f).w != 0.0) {
+        uv = mapping_uv(f.object, f.object_normal, f.uv.xy);
+    }
+    return uv;
+}
+
+// The layers of a Water fragment: those of hard_layers, its normal map blended with a second
+// sample at ripple_scale times the UVs moved by the ripple offset (whiteout blend). Water draws
+// with the hard projection of a TextureMapping. ripple_scale is flat, the same for every
+// fragment of a quad, so the implicit derivatives hold.
+@diagnostic(off, derivative_uniformity)
+fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> Layers {
+    var layers = hard_layers(f, geometric);
+    if (m.water_ripple_scale > 0.0) {
+        let uv = water_uv(f);
+        let n1 = textureSample(normal_map, material_sampler, uv + f.normal_offset).xyz * 2.0 -
+            1.0;
+        let n2 = textureSample(normal_map, material_sampler,
+            uv * m.water_ripple_scale + m.water_ripple_offset).xyz * 2.0 - 1.0;
+        layers.normal = perturb(geometric, layers.frame, vec3f(n1.xy + n2.xy, n1.z * n2.z));
+    }
+    return layers;
+}
+
+// Red of the foam texture of a Water at foam_scale times the UVs, 1 without one. The record is
+// flat, so the implicit derivatives hold.
+@diagnostic(off, derivative_uniformity)
+fn water_foam_texture(f: VertexOut, m: Material) -> f32 {
+    var tex = 1.0;
+    if ((m.water_flags & WATER_FOAM_TEXTURE) != 0u) {
+        tex = textureSample(foam_map, material_sampler, water_uv(f) * m.water_foam_scale).r;
+    }
+    return tex;
+}
+
+// What lies behind a Water fragment at a point of the screen in the depth copy of the opaque
+// snapshot: its world position, and whether anything is there (the sky has a depth of 0).
+struct WaterBehind {
+    world: vec3f,
+    depth: f32,
+    found: bool,
+};
+
+fn water_depth(screen_uv: vec2f) -> f32 {
+    let size = vec2i(textureDimensions(opaque_snapshot_depth));
+    return textureLoad(opaque_snapshot_depth, clamp(vec2i(screen_uv * vec2f(size)), vec2i(0),
+        size - 1), 0);
+}
+
+fn water_behind(screen_uv: vec2f) -> WaterBehind {
+    let depth = water_depth(screen_uv);
+    var o: WaterBehind;
+    o.depth = depth;
+    o.found = depth > 0.0;
+    o.world = vec3f(0.0);
+    if (o.found) {
+        let h = view.inv_view_proj * vec4f(screen_uv.x * 2.0 - 1.0, 1.0 - screen_uv.y * 2.0,
+            depth, 1.0);
+        o.world = h.xyz / h.w;
+    }
+    return o;
+}
+
+// Whether the depth copy shows something in front of a Water fragment of a depth at a point of
+// the screen or a radius around it, the footprint of the blurred snapshot sample there.
+fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
+    let nearest = max(max(water_depth(screen_uv),
+        max(water_depth(screen_uv + vec2f(radius.x, 0.0)),
+            water_depth(screen_uv - vec2f(radius.x, 0.0)))),
+        max(water_depth(screen_uv + vec2f(0.0, radius.y)),
+            water_depth(screen_uv - vec2f(0.0, radius.y))));
+    return nearest > depth;
+}
+
+// Color of a Water fragment seen from above. The scene behind, the opaque snapshot at the screen
+// point moved by refraction times the view space tilt of the normal map (back at the point
+// itself where the moved one shows something in front of the water), blurred by the roughness,
+// shows through exp(-3 ray / visibility) of the body; the body, shallow_color mixed toward
+// deep_color by the water depth along the geometric normal, covers the rest. The foam band
+// replaces both. Body and foam are lit diffusely with the light of the surface; the specular of
+// an F0 of 0.02, direct and indirect (indirect_lobes, as every shape), adds on top. Nothing
+// behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
+fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
+    let m = vo_water(f);
+    var s = shaded;
+    s.metallic = 0.0;
+    s.back_factor = 0.0;
+    s.back_color = vec3f(0.0);
+    s.coat = 0.0;
+    s.sheen = vec3f(0.0);
+    s.anisotropy = 0.0;
+    s.albedo = vec3f(1.0);
+    let v = normalize(view.camera.xyz - f.world);
+    let reflected = shade_split(s, v, f.world);
+
+    var ap = vec4f(0.0, 0.0, 0.0, 1.0);
+    if (scene_aerial && view.aerial.w > 0.0) {
+        ap = aerial_sample(f.pos, f.world);
+    }
+
+    // The tilt of the normal map in view space moves the screen point, by a fraction of the
+    // image height on both axes.
+    let pixel_uv = f.pos.xy * view.viewport.zw;
+    let tilt = (view.view * vec4f(s.normal - s.geometric, 0.0)).xy;
+    let aspect = view.viewport.y * view.viewport.z;
+    var screen_uv = clamp(pixel_uv + m.water_refraction * vec2f(tilt.x * aspect, -tilt.y),
+        vec2f(0.0), vec2f(1.0));
+    let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
+    let lod = s.roughness * max_mip;
+    var behind = water_behind(screen_uv);
+    if (water_in_front(screen_uv, exp2(lod + 1.0) * view.viewport.zw, f.pos.z)) {
+        screen_uv = pixel_uv;
+        behind = water_behind(screen_uv);
+    }
+
+    let deep = !behind.found;
+    var d = 0.0;
+    var ray = 0.0;
+    if (!deep) {
+        d = max(dot(f.world - behind.world, s.geometric), 0.0);
+        ray = length(behind.world - f.world);
+    }
+
+    let background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
+        lod).rgb;
+
+    let shallow = material_linear(unpack4x8unorm(m.water_shallow).rgb);
+    let deep_color = material_linear(unpack4x8unorm(m.water_deep).rgb);
+    let foam_color = material_linear(unpack4x8unorm(m.water_foam).rgb);
+    let body = mix(shallow, deep_color, water_depth_mix(d, m.water_depth, deep)) *
+        reflected.diffuse;
+    let through = water_transmittance(ray, m.water_visibility, deep);
+    let foam = water_foam(d, m.water_foam_width, deep,
+        (m.water_flags & WATER_FOAM_TEXTURE) != 0u, water_foam_texture(f, m));
+
+    let ndv = saturate(dot(s.normal, v));
+    let fresnel = fresnel_schlick(ndv, vec3f(WATER_F0)).x;
+    let seen = background * (1.0 - fresnel) * through * (1.0 - foam);
+    let own = body * (1.0 - through) * (1.0 - foam) + foam_color * reflected.diffuse * foam +
+        reflected.specular;
+    let veil = 1.0 - through * (1.0 - foam);
+    return vec4f(own * ap.a + ap.rgb * veil + seen, 1.0);
+}
+
 // The artistic rim of a Fresnel (not the physical term of the lobes): its color times its
 // strength times fresnel_factor of the shading normal, which back faces flip, adds to the
 // emission, untinted; its opacity times the factor adds to the alpha of a blended draw. A
@@ -631,6 +793,12 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 }
 
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    if (water) {
+        let geometric = normalize(f.normal);
+        let layers = water_layers(f, geometric, vo_water(f));
+        return water_lit(f, surface_of(f, front, geometric, layers));
+    }
+
     return lit(f, surface(f, front));
 }
 

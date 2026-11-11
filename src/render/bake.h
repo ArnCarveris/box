@@ -133,7 +133,8 @@ typedef struct box_bake_volume_t {
     ecs_entity_t environment; /**< LightBake.environment of this frame */
     uint32_t env_handle;    /**< Cubemap of that source the captures see where nothing covers
                              *   them, 0 for the hemisphere while it has no content */
-    int32_t env_content;    /**< EnvironmentStatus.version that cubemap holds, 0 without one */
+    int32_t env_content;    /**< EnvironmentStatus.version that cubemap holds, of its last
+                             *   content that did more than move, 0 without one */
     uint32_t filled_env;    /**< env_handle the probes were filled with, or rebaked for */
     int32_t filled_content; /**< env_content the probes were filled with, or rebaked for */
     float ambient[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance of the views of this frame */

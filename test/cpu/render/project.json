@@ -74,7 +74,12 @@
                     "texture_scroll_wrap",
                     "fresnel_defaults",
                     "fresnel_pack",
-                    "fresnel_factor"
+                    "fresnel_factor",
+                    "water_defaults",
+                    "water_pack",
+                    "water_depth_mix",
+                    "water_transmittance",
+                    "water_foam"
                 ]
             },
             {
@@ -266,6 +271,21 @@
                     "offset_wraps_at_large_time",
                     "layer_limit_and_order",
                     "layers_of_other_scene_ignored"
+                ]
+            },
+            {
+                "id": "CloudEnvironment",
+                "testcases": [
+                    "moved_rule",
+                    "layer_added_renders",
+                    "layer_changed_renders",
+                    "layer_removed_renders",
+                    "move_past_fraction_renders",
+                    "move_with_wrap",
+                    "small_move_does_not_render",
+                    "velocity_renders_periodically",
+                    "moving_clouds_keep_reflection_probes",
+                    "moving_clouds_keep_probe_volume"
                 ]
             },
             {
@@ -479,6 +499,16 @@
                     "lift_gamma_gain",
                     "lut_identity_no_op",
                     "lut_strength_blends"
+                ]
+            },
+            {
+                "id": "ChromaticAberration",
+                "testcases": [
+                    "center_not_shifted",
+                    "corner_is_intensity",
+                    "falloff",
+                    "weights_sum_to_one",
+                    "weights_spectral"
                 ]
             },
             {
@@ -793,7 +823,9 @@
                     "view_features_literal",
                     "view_features_from_scene",
                     "view_opts_out_of_scene_features",
-                    "scene_features_script"
+                    "scene_features_script",
+                    "water_draws_transmissive_extended",
+                    "water_off_draws_with_mesh_shader"
                 ]
             },
             {

@@ -150,6 +150,10 @@ typedef struct box_draw_key_t {
     bool transmissive;      /**< A 3D shape that has or inherits Transmission: blend is
                              *   AlphaBlend, so it draws in the sorted blended pass, cutout and
                              *   shadow are false */
+    bool water;             /**< A 3D shape that has or inherits Water in a scene with
+                             *   Scene.water: transmissive too, drawn by the extended mesh
+                             *   shader without a TextureBlend */
+    ecs_entity_t foam;      /**< Water.foam_texture of a water shape, 0 for none */
     uint8_t back_face;      /**< BackFaceMode */
     uint8_t wrap;           /**< TextureWrap of the texture samplers */
     bool dynamic_transform; /**< The shapes have DynamicTransform, owned or inherited, or are
@@ -234,6 +238,7 @@ typedef struct box_draw_material_t {
     const DiffuseTransmission *diffuse_transmission; /**< Back lit glow of a 3D shape, ignored
                                  *   by 2D shapes */
     const Fresnel *fresnel;     /**< Artistic rim of a 3D shape, ignored by 2D shapes */
+    const Water *water;         /**< Water surface of a 3D shape, ignored by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
     const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
@@ -290,6 +295,8 @@ typedef struct box_draw_transition_material_t {
     DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission */
     Fresnel fresnel;        /**< Fresnel, which has no transition: the record keeps it */
     bool rimmed;            /**< The material has a Fresnel */
+    Water water;            /**< Water, which has no transition: the record keeps it */
+    bool watered;           /**< The material has a Water */
     Opacity opacity;        /**< Opacity of the shape itself */
     Tint tint;              /**< Tint of the shape itself */
     box_draw_tint_t inherited; /**< Tints of the ancestors, when tinted */
@@ -1140,6 +1147,45 @@ float box_draws_fresnel_factor(
     float ndv,
     float power,
     float bias);
+
+/** Mix factor of the deep color of a Water body, the C twin of water_depth_mix of
+ * material.wgsl: 1 - exp(-3 d / depth), 1 for an infinite depth (the sky behind).
+ *
+ * @param d Depth of the water at the pixel along its normal, world units
+ * @param depth Water.depth, at least BOX_RENDER_WATER_MIN
+ * @return The factor, 0..1
+ */
+float box_draws_water_depth_mix(
+    float d,
+    float depth);
+
+/** Share of the scene behind a Water that shows through its body, the C twin of
+ * water_transmittance of material.wgsl: exp(-3 ray_length / visibility), 0 for an infinite
+ * ray (the sky behind).
+ *
+ * @param ray_length Water along the view ray, world units
+ * @param visibility Water.visibility, at least BOX_RENDER_WATER_MIN
+ * @return The transmittance, 0..1
+ */
+float box_draws_water_transmittance(
+    float ray_length,
+    float visibility);
+
+/** Foam factor of a Water, the C twin of water_foam of material.wgsl: saturate(1 - d /
+ * foam_width), 0 for a width of 0. With a texture the band is cut at the red of the texture,
+ * smoothstep(t, t + 0.1, tex) with t = 1 - band, so the foam thins out toward its edge.
+ *
+ * @param d Depth of the water at the pixel along its normal, world units
+ * @param foam_width Water.foam_width
+ * @param textured Whether the foam is broken up by a texture
+ * @param tex Red of the foam texture at the pixel, ignored without one
+ * @return The foam, 0..1
+ */
+float box_draws_water_foam(
+    float d,
+    float foam_width,
+    bool textured,
+    float tex);
 
 /** Compute the offsets of a TextureScroll at a time: velocity times time per axis in double
  * precision, wrapped to 0..2 and kept positive, so WrapMirror tiles stay continuous. A velocity
