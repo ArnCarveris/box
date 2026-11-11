@@ -42,16 +42,7 @@ static WGPUBuffer box_gpu_fx_buffer(
     return wgpuDeviceCreateBuffer(gpu->device, &desc);
 }
 
-/** Create a 2D image that passes render into and sample.
- *
- * @param gpu The backend
- * @param width Width in pixels
- * @param height Height in pixels
- * @param format Color format
- * @param mips Mip levels
- * @return The texture
- */
-static WGPUTexture box_gpu_fx_texture(
+WGPUTexture box_gpu_fx_texture(
     box_gpu_t *gpu,
     uint32_t width,
     uint32_t height,
@@ -190,12 +181,7 @@ done:
     return fx->tony_view;
 }
 
-/** Release a texture and its view when they exist.
- *
- * @param texture The texture
- * @param view The view
- */
-static void box_gpu_fx_release(
+void box_gpu_fx_release(
     WGPUTexture *texture,
     WGPUTextureView *view)
 {
@@ -436,6 +422,7 @@ static void box_gpu_fx_target_free(
     box_gpu_fx_release(&ft->hdr[1], &ft->hdr_views[1]);
     box_gpu_fx_release(&ft->smaa_edges, &ft->smaa_edges_view);
     box_gpu_fx_release(&ft->smaa_weights, &ft->smaa_weights_view);
+    box_gpu_fx_dof_release(ft);
     ecs_os_free(ft);
 }
 
@@ -699,14 +686,7 @@ static void box_gpu_fx_record(
     wgpuBindGroupRelease(group);
 }
 
-/** Record a fullscreen effect pass.
- *
- * @param gpu The backend
- * @param ctx The chain
- * @param pass The pass
- * @return Whether the pass was recorded, false while its shader has no module
- */
-static bool box_gpu_fx_draw(
+bool box_gpu_fx_draw(
     box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
     const box_gpu_fx_pass_t *pass)
@@ -738,15 +718,7 @@ done:
     return pipeline != NULL;
 }
 
-/** Get the state of an effect of a view in a target, created on first use.
- *
- * @param gpu The backend
- * @param ctx The chain
- * @param effect The effect entity
- * @param kind Kind of state
- * @return The state, marked as used by the packet
- */
-static box_gpu_fx_state_t* box_gpu_fx_state(
+box_gpu_fx_state_t* box_gpu_fx_state(
     box_gpu_t *gpu,
     const box_gpu_fx_ctx_t *ctx,
     ecs_entity_t effect,
@@ -780,14 +752,7 @@ static box_gpu_fx_state_t* box_gpu_fx_state(
     return result;
 }
 
-/** Write the uniforms of a state.
- *
- * @param gpu The backend
- * @param s The state
- * @param data The uniforms
- * @param size Bytes of the uniforms, at most BOX_GPU_FX_UNIFORMS
- */
-static void box_gpu_fx_uniforms(
+void box_gpu_fx_uniforms(
     box_gpu_t *gpu,
     box_gpu_fx_state_t *s,
     const void *data,
@@ -1613,6 +1578,7 @@ static box_gpu_fx_target_t* box_gpu_fx_target(
     box_gpu_fx_release(&result->hdr[1], &result->hdr_views[1]);
     box_gpu_fx_release(&result->smaa_edges, &result->smaa_edges_view);
     box_gpu_fx_release(&result->smaa_weights, &result->smaa_weights_view);
+    box_gpu_fx_dof_release(result);
     result->width = t->desc.render_width;
     result->height = t->desc.render_height;
     for (i = 0; i < 2; i ++) {
@@ -1827,6 +1793,9 @@ static bool box_gpu_fx_effect(
         break;
     case BOX_RENDER_EFFECT_CHROMATIC_ABERRATION:
         result = box_gpu_fx_chromatic_aberration(gpu, ctx, e);
+        break;
+    case BOX_RENDER_EFFECT_DEPTH_OF_FIELD:
+        result = box_gpu_fx_depth_of_field(gpu, ctx, e);
         break;
     default:
         break;

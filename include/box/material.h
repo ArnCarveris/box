@@ -259,7 +259,8 @@ ECS_STRUCT(Fresnel, {
  *
  * It draws in the sorted blended pass without depth writes, casts no shadow, is not captured and
  * ignores Opacity, BlendMode and AlphaCutoff. It shows a refracted, blurred and absorbed snapshot
- * of what its view drew before it, taken again at most 4 times a frame.
+ * of what its view drew before it, taken again at most 4 times a frame. A FogVolume between the
+ * camera and the surface fogs the surface itself; the snapshot holds only the fog behind it.
  *
  * Transitionable: the four floats interpolate linearly and attenuation_color like Rgb; adding or
  * removing Transmission changes the batch at once.

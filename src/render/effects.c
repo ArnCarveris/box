@@ -39,6 +39,9 @@
 #define BOX_EFFECTS_CA_SAMPLES_MIN (3)
 #define BOX_EFFECTS_CA_SAMPLES_MAX (16)
 
+/** Largest blur radius of a depth of field, a fraction of the image height */
+#define BOX_EFFECTS_DOF_RADIUS_MAX (0.05f)
+
 /** State of the extract of the effects, kept across frames */
 typedef struct box_effects_state_t {
     ecs_map_t lut_errors;   /**< LUT entity to the shape it was rejected for, width << 32 |
@@ -86,6 +89,18 @@ void box_render_fog_settings(
     out->max_opacity = glm_clamp(in->max_opacity, 0.0f, 1.0f);
     out->sun_inscatter = glm_max(in->sun_inscatter, 0.0f);
     out->ambient_inscatter = glm_max(in->ambient_inscatter, 0.0f);
+}
+
+void box_render_depth_of_field_settings(
+    const DepthOfField *in,
+    DepthOfField *out)
+{
+    *out = *in;
+    out->focus_distance = glm_max(in->focus_distance, 0.0f);
+    out->focus_range = glm_max(in->focus_range, 0.0f);
+    out->near_transition = glm_max(in->near_transition, 0.0f);
+    out->far_transition = glm_max(in->far_transition, 0.0f);
+    out->max_radius = glm_clamp(in->max_radius, 0.0f, BOX_EFFECTS_DOF_RADIUS_MAX);
 }
 
 void box_render_exposure_settings(
@@ -259,6 +274,7 @@ static void box_effects_entity(
     ecs_entity_t e)
 {
     const HeightFog *fog = ecs_get(world, e, HeightFog);
+    const DepthOfField *dof = ecs_get(world, e, DepthOfField);
     const Bloom *bloom = ecs_get(world, e, Bloom);
     const AutoExposure *exposure = ecs_get(world, e, AutoExposure);
     const Tonemap *tonemap = ecs_get(world, e, Tonemap);
@@ -268,6 +284,11 @@ static void box_effects_entity(
     const Smaa *smaa = ecs_get(world, e, Smaa);
     if (fog) {
         box_render_fog_settings(fog, &box_effects_append(p, v, BOX_RENDER_EFFECT_FOG, e)->fog);
+    }
+
+    if (dof) {
+        box_render_depth_of_field_settings(dof, &box_effects_append(
+            p, v, BOX_RENDER_EFFECT_DEPTH_OF_FIELD, e)->depth_of_field);
     }
 
     if (bloom) {
@@ -435,6 +456,9 @@ bool box_render_effects_use(
             break;
         case BOX_RENDER_SHADER_CHROMATIC_ABERRATION:
             result = e->kind == BOX_RENDER_EFFECT_CHROMATIC_ABERRATION;
+            break;
+        case BOX_RENDER_SHADER_DEPTH_OF_FIELD:
+            result = e->kind == BOX_RENDER_EFFECT_DEPTH_OF_FIELD;
             break;
         default:
             break;

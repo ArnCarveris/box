@@ -329,9 +329,15 @@ ECS_STRUCT(PlanarReflection, {
 /** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
  * position and rotation of the entity. Probe and reflection captures and bakes do not see it.
  *
- * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Blended
+ * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Other blended
  * shapes and particles in or behind it are not fogged. It is lit by the ambient of the view, the
  * first directional light and the point and spot lights of the clusters of the view.
+ *
+ * A shape with Transmission in or behind it is fogged as an opaque surface at its depth: the fog
+ * behind the nearest glass of a pixel is marched before the snapshot the glass shows, the fog in
+ * front of it after the last transmissive draw, from a depth only pass of the transmissive shapes.
+ * Blended shapes drawn in front of glass before the last glass are fogged as the glass; the fog
+ * between two layers of glass is lost.
  *
  * A ray looks up its clusters at most BOX_FOG_VOLUME_LIGHT_STEPS times, each segment lit by the
  * first BOX_FOG_VOLUME_LIGHT_STEPS lights of the cluster at its middle, so dense clusters may

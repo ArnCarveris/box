@@ -1212,6 +1212,61 @@ void box_render_fog_settings(
     const HeightFog *in,
     HeightFog *out);
 
+/** Resolve the settings of a depth of field pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_depth_of_field_settings(
+    const DepthOfField *in,
+    DepthOfField *out);
+
+/** Get the constants that turn a reversed Z depth of a camera into view depth, as
+ * etc/shaders/depth_of_field.wgsl does: z = (k[0] + k[1] * d) / (k[2] * d + k[3]). Depth is 1
+ * at the near plane and 0 at the far plane, or at infinity for a perspective camera without one.
+ *
+ * @param camera The camera
+ * @param out Receives the four constants
+ */
+void box_render_depth_of_field_linearize(
+    const Camera *camera,
+    float *out);
+
+/** Get the view depth of a reversed Z depth with the constants of
+ * box_render_depth_of_field_linearize.
+ *
+ * @param k The constants
+ * @param depth The depth, above 0
+ * @return The distance from the camera along its forward axis
+ */
+float box_render_depth_of_field_view_depth(
+    const float *k,
+    float depth);
+
+/** Get the signed circle of confusion of a view depth as etc/shaders/depth_of_field.wgsl
+ * computes it: -1 in front of the focus at the largest blur, 0 sharp, +1 behind it at the
+ * largest blur. The near side is 0 without near_blur.
+ *
+ * @param dof The resolved settings
+ * @param z The view depth, INFINITY for a pixel without geometry
+ * @return The circle of confusion
+ */
+float box_render_depth_of_field_coc(
+    const DepthOfField *dof,
+    float z);
+
+/** Get the signed circle of confusion of a pixel from its reversed Z depth; depth 0 is the sky.
+ *
+ * @param dof The resolved settings
+ * @param k The constants of box_render_depth_of_field_linearize
+ * @param depth The depth of the pixel
+ * @return The circle of confusion
+ */
+float box_render_depth_of_field_coc_depth(
+    const DepthOfField *dof,
+    const float *k,
+    float depth);
+
 /** Resolve the settings of an adapted exposure.
  *
  * @param in The settings of an effect entity

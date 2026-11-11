@@ -902,7 +902,16 @@
                     "chromatic_aberration_fringe_grows_with_intensity",
                     "chromatic_aberration_disabled_entry_no_op",
                     "chromatic_aberration_same_entity_order",
-                    "chromatic_aberration_follows_surface_resize"
+                    "chromatic_aberration_follows_surface_resize",
+                    "depth_of_field_default_settings",
+                    "depth_of_field_settings_clamped",
+                    "depth_of_field_blurs_near_and_far",
+                    "depth_of_field_near_blur_off",
+                    "depth_of_field_zero_radius_no_op",
+                    "depth_of_field_zero_literal_applies_as_set",
+                    "depth_of_field_disabled_entry_no_op",
+                    "depth_of_field_same_entity_before_tonemap",
+                    "depth_of_field_follows_surface_resize"
                 ]
             },
             {
@@ -1261,6 +1270,10 @@
                     "asymmetry_toward_sun",
                     "overlap_order",
                     "in_transmission_snapshot",
+                    "transmissive_inside_fogged",
+                    "transmissive_in_front_not_fogged",
+                    "transmissive_inside_fogged_once",
+                    "transmissive_pass_count",
                     "orthographic",
                     "resize",
                     "two_views",

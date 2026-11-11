@@ -676,6 +676,161 @@ void FogVolume_in_transmission_snapshot(void) {
     test_assert(fogged > clear + 80);
 }
 
+/** Render an emissive panel of black albedo in the middle of a purely absorbing volume, with
+ * nothing behind it, and get the green of the center pixel.
+ *
+ * @param transmissive Whether the panel is transmissive
+ * @param file Name of the PNG
+ * @return The green of the center pixel, on the panel
+ */
+static int32_t fv_panel_inside(
+    bool transmissive,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    ecs_entity_t panel = fv_wall(world, 0, -10, 3, FV_WALL);
+    if (transmissive) {
+        ecs_set(world, panel, Transmission, {.transmission_factor = 1, .ior = 1,
+            .thickness_factor = 0, .attenuation_distance = 1e10f,
+            .attenuation_color = {255, 255, 255}});
+    }
+
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+    unsigned char *px = fv_render(world, file);
+    int32_t result = fv_px(px, 32, 32)[1];
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A transmissive panel inside a volume is fogged over the part of the volume in front of it,
+ * like an opaque panel at the same place. */
+void FogVolume_transmissive_inside_fogged(void) {
+    // fog_volume/order
+    int32_t opaque = fv_panel_inside(false, "fog_panel_opaque.png");
+    int32_t glass = fv_panel_inside(true, "fog_panel_glass.png");
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * 3.9f));
+    printf("opaque %d, transmissive %d, want %d\n", opaque, glass, want);
+    test_assert(abs(opaque - want) <= 6);
+    test_assert(abs(glass - opaque) <= 6);
+}
+
+/** Add a clear transmissive panel 0.2 thick facing the camera: black albedo with a gray
+ * emission, ior 1, no thickness and no absorption, so it adds its emission to what it shows.
+ *
+ * @param world The world
+ * @param z Z of its center
+ * @param size Width and height
+ * @param gray Emission, display encoded
+ * @return The panel
+ */
+static ecs_entity_t fv_glass_panel(
+    ecs_world_t *world,
+    float z,
+    float size,
+    uint8_t gray)
+{
+    ecs_entity_t e = fv_wall(world, 0, z, size, gray);
+    ecs_set(world, e, Rgb, {255, 255, 255});
+    ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 0});
+    ecs_set(world, e, Transmission, {.transmission_factor = 1, .ior = 1,
+        .thickness_factor = 0, .attenuation_distance = 1e10f,
+        .attenuation_color = {255, 255, 255}});
+
+    return e;
+}
+
+/** Render an emissive transmissive panel at z -4, in front of a purely absorbing volume from
+ * z -6 to -14 or without it, with nothing behind, and get the green of the center pixel.
+ *
+ * @param volume Whether the volume is there
+ * @param file Name of the PNG
+ * @return The green of the center pixel, on the panel
+ */
+static int32_t fv_panel_in_front(
+    bool volume,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_glass_panel(world, -4, 2, FV_WALL);
+    if (volume) {
+        fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+    }
+
+    unsigned char *px = fv_render(world, file);
+    int32_t result = fv_px(px, 32, 32)[1];
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A transmissive panel in front of a volume is not fogged by it: its own light reaches the
+ * camera unattenuated, as without the volume. */
+void FogVolume_transmissive_in_front_not_fogged(void) {
+    // fog_volume/order
+    int32_t clear = fv_panel_in_front(false, "fog_front_none.png");
+    int32_t fogged = fv_panel_in_front(true, "fog_front.png");
+    test_assert(abs(clear - FV_WALL) <= 4);
+    test_assert(abs(fogged - clear) <= 3);
+}
+
+/** A clear transmissive panel inside a volume, in front of a wall behind the volume, shows the
+ * wall fogged over the whole depth of the volume once: the part behind the panel through the
+ * snapshot, the part in front of it over the panel. */
+void FogVolume_transmissive_inside_fogged_once(void) {
+    // fog_volume/order
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_glass_panel(world, -10, 3, 0);
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+    unsigned char *px = fv_render(world, "fog_panel_once.png");
+    int32_t x[2] = {32, 4}, i;
+    for (i = 0; i < 2; i ++) {
+        /* The ray of the pixel crosses the 8 units of the volume at an angle */
+        float t = ((float)x[i] + 0.5f) / (FV_SIZE / 2.0f) - 1.0f;
+        t *= tanf(30.0f * (float)GLM_PI / 180.0f);
+        float depth = 8.0f * sqrtf(1.0f + t * t);
+        fv_expect(fv_px(px, x[i], 32), fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * depth)), 6);
+    }
+    stbi_image_free(px);
+
+    ecs_fini(world);
+}
+
+/** A view with transmissive shapes and no fog volumes keeps its passes: the snapshot splits its
+ * forward pass once a frame. With a volume it also draws its glass depth only, marches the fog
+ * behind the glass before the snapshot and the fog in front of it after the glass, each in a pass
+ * of its own, and counts the volume once a frame. */
+void FogVolume_transmissive_pass_count(void) {
+    // fog_volume/draw
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    fv_wall(world, 0, -20, 40, FV_WALL);
+    fv_glass_panel(world, -10, 3, 0);
+    unsigned char *px = fv_render(world, "fog_glass_passes.png");
+    stbi_image_free(px);
+    box_render_gpu_stats_t before = fv_frames(world, 0);
+    box_render_gpu_stats_t after = fv_frames(world, 2);
+    test_int(after.forward_passes - before.forward_passes, 4);
+    test_int(after.fog_volumes - before.fog_volumes, 0);
+    test_int(after.errors, before.errors);
+
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+    fv_frames(world, 2);
+    before = fv_frames(world, 0);
+    after = fv_frames(world, 2);
+    test_int(after.forward_passes - before.forward_passes, 12);
+    test_int(after.fog_volumes - before.fog_volumes, 2);
+    test_int(after.errors, before.errors);
+
+    ecs_fini(world);
+}
+
 /** An orthographic camera marches parallel rays through the volume. */
 void FogVolume_orthographic(void) {
     // fog_volume/views

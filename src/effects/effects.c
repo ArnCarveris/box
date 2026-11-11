@@ -33,6 +33,32 @@ static void box_bloom_ctor(
     }
 }
 
+/** Construct DepthOfField values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_depth_of_field_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    DepthOfField *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (DepthOfField){
+            .focus_distance = 10.0f,
+            .focus_range = 2.0f,
+            .near_transition = 4.0f,
+            .far_transition = 20.0f,
+            .max_radius = 0.01f,
+            .near_blur = true
+        };
+    }
+}
+
 /** Construct Gtao values with the documented defaults.
  *
  * @param ptr The components
@@ -218,6 +244,7 @@ void BoxEffectsImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Bloom);
+    ECS_META_COMPONENT(world, DepthOfField);
     ECS_META_COMPONENT(world, GtaoQuality);
     ECS_META_COMPONENT(world, Gtao);
     ECS_META_COMPONENT(world, HeightFog);
@@ -230,6 +257,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, Vignette);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
+    ecs_set_hooks(world, DepthOfField, { .ctor = box_depth_of_field_ctor });
     ecs_set_hooks(world, Gtao, { .ctor = box_gtao_ctor });
     ecs_set_hooks(world, HeightFog, { .ctor = box_fog_ctor });
     ecs_set_hooks(world, AutoExposure, { .ctor = box_exposure_ctor });

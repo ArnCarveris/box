@@ -19,6 +19,9 @@
 /** Bindings of the SMAA passes */
 #define BOX_GPU_SMAA_BINDINGS (7)
 
+/** Half resolution images of the depth of field passes */
+#define BOX_GPU_DOF_IMAGES (4)
+
 /** Bytes of the uniforms of an effect pass */
 #define BOX_GPU_FX_UNIFORMS (256)
 
@@ -135,6 +138,9 @@ typedef struct box_gpu_fx_target_t {
     WGPUTextureView smaa_edges_view; /**< View of the edges */
     WGPUTexture smaa_weights;       /**< Blending weights of SMAA, created on first use */
     WGPUTextureView smaa_weights_view; /**< View of the blending weights */
+    WGPUTexture dof[BOX_GPU_DOF_IMAGES]; /**< Half resolution images of the depth of field,
+                                     *   created on first use */
+    WGPUTextureView dof_views[BOX_GPU_DOF_IMAGES]; /**< Views of the depth of field images */
 } box_gpu_fx_target_t;
 
 struct box_gpu_effects_t {
@@ -253,6 +259,16 @@ typedef struct box_gpu_chromatic_aberration_uniforms_t {
     float shape[4];                 /**< Center x and y in pixels, 1 / width, 1 / height */
 } box_gpu_chromatic_aberration_uniforms_t;
 
+/** Uniforms of the depth of field passes, matching Dof in etc/shaders/depth_of_field.wgsl */
+typedef struct box_gpu_dof_uniforms_t {
+    float depth[4];                 /**< View depth of a reversed Z depth d:
+                                     *   (x + y * d) / (z * d + w) */
+    float focus[4];                 /**< Focus distance, focus range, near and far transition */
+    float params[4];                /**< Largest radius in half resolution pixels, 1 when the
+                                     *   near field blurs, CoC of a pixel without geometry,
+                                     *   unused */
+} box_gpu_dof_uniforms_t;
+
 /** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Inverse of the projection times the view matrix */
@@ -264,6 +280,91 @@ typedef struct box_gpu_fog_uniforms_t {
     float atmos[4];                 /**< 1 for the color of the atmosphere, phase g, sun and
                                      *   ambient inscatter */
 } box_gpu_fog_uniforms_t;
+
+/** Create a 2D image that passes render into and sample.
+ *
+ * @param gpu The backend
+ * @param width Width in pixels
+ * @param height Height in pixels
+ * @param format Color format
+ * @param mips Mip levels
+ * @return The texture
+ */
+WGPUTexture box_gpu_fx_texture(
+    box_gpu_t *gpu,
+    uint32_t width,
+    uint32_t height,
+    WGPUTextureFormat format,
+    uint32_t mips);
+
+/** Release a texture and its view when they exist.
+ *
+ * @param texture The texture
+ * @param view The view
+ */
+void box_gpu_fx_release(
+    WGPUTexture *texture,
+    WGPUTextureView *view);
+
+/** Record a fullscreen effect pass.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param pass The pass
+ * @return Whether the pass was recorded, false while its shader has no module
+ */
+bool box_gpu_fx_draw(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_gpu_fx_pass_t *pass);
+
+/** Get the state of an effect of a view in a target, created on first use.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param effect The effect entity
+ * @param kind Kind of state
+ * @return The state, marked as used by the packet
+ */
+box_gpu_fx_state_t* box_gpu_fx_state(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    ecs_entity_t effect,
+    int32_t kind);
+
+/** Write the uniforms of a state.
+ *
+ * @param gpu The backend
+ * @param s The state
+ * @param data The uniforms
+ * @param size Bytes of the uniforms, at most BOX_GPU_FX_UNIFORMS
+ */
+void box_gpu_fx_uniforms(
+    box_gpu_t *gpu,
+    box_gpu_fx_state_t *s,
+    const void *data,
+    size_t size);
+
+/** Release the half resolution images of the depth of field of a target.
+ *
+ * @param ft The images
+ */
+void box_gpu_fx_dof_release(
+    box_gpu_fx_target_t *ft);
+
+/** Record the depth of field passes: the half resolution image with its circle of confusion,
+ * the dilated near CoC, the far and near gathers, their median filter and the composite at full
+ * resolution. A largest radius of 0 records nothing.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the image was written to the output
+ */
+bool box_gpu_fx_depth_of_field(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e);
 
 #endif
 

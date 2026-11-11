@@ -7,9 +7,9 @@
  * continues in a pass that reads its depth, where one instanced draw of 36 vertices per volume
  * marches the boxes back to front before the particles. Without volumes nothing is recorded.
  *
- * Group 1 holds the records of the view, the inverse view projection of the target, the depth and
- * the noise texture; the uniforms and records of every draw of a packet follow each other in one
- * buffer, which grows when a draw does not fit.
+ * Group 1 holds the records, the inverse view projection and segment, the depth, the noise and the
+ * glass depth (box_gpu_fog_segment_t); the uniforms and records of every draw of a packet follow
+ * each other in one buffer, which grows when a draw does not fit.
  */
 
 #include "gpu.h"
@@ -21,7 +21,7 @@
 #define BOX_GPU_FOG_UNIFORM_STRIDE (256u)
 
 /** Bytes of the uniform of a draw, FogDraw in fog_volume.wgsl */
-#define BOX_GPU_FOG_UNIFORM_SIZE (64u)
+#define BOX_GPU_FOG_UNIFORM_SIZE (80u)
 
 /** Smallest buffer of the draws of a packet in bytes */
 #define BOX_GPU_FOG_BUFFER_MIN (16384u)
@@ -33,6 +33,8 @@
 /** Uniform of a draw, matching FogDraw in fog_volume.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Clip space of the target to world */
+    uint32_t segment;               /**< box_gpu_fog_segment_t the draw marches */
+    uint32_t pad[3];                /**< Padding to the size of FogDraw */
 } box_gpu_fog_uniforms_t;
 
 struct box_gpu_fog_volumes_t {
@@ -119,7 +121,7 @@ void box_gpu_fog_volumes_init(
     box_gpu_fog_volumes_t *f = ecs_os_calloc_t(box_gpu_fog_volumes_t);
     WGPULimits limits = WGPU_LIMITS_INIT;
     const uint8_t placeholder = 128;
-    WGPUBindGroupLayoutEntry entries[5] = {
+    WGPUBindGroupLayoutEntry entries[6] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -156,10 +158,18 @@ void box_gpu_fog_volumes_init(
             .binding = 4,
             .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        },
+        {
+            .binding = 5,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
         }
     };
     f->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     f->sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
         .addressModeU = WGPUAddressMode_Repeat,
         .addressModeV = WGPUAddressMode_Repeat,
@@ -393,7 +403,9 @@ bool box_gpu_fog_volumes_draw(
     WGPUTextureFormat format,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
-    WGPUTextureView depth)
+    WGPUTextureView depth,
+    WGPUTextureView glass,
+    box_gpu_fog_segment_t segment)
 {
     box_gpu_fog_volumes_t *f = gpu->fog_volumes;
     WGPURenderPipeline pipeline = box_gpu_fog_volumes_ready(gpu, v)
@@ -401,6 +413,11 @@ bool box_gpu_fog_volumes_draw(
         : NULL;
     bool result = false;
     int32_t i;
+    if (!glass) {
+        glass = depth;
+        segment = BOX_GPU_FOG_SEGMENT_FULL;
+    }
+
     if (!pipeline || v->fog_first + v->fog_count > ecs_vec_count(&packet->fog_volumes)) {
         goto done;
     }
@@ -424,11 +441,12 @@ bool box_gpu_fog_volumes_draw(
         (float)t->desc.point_width, (float)t->desc.point_height, proj);
     glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), view_proj);
     glm_mat4_inv(view_proj, u.inv_view_proj);
+    u.segment = (uint32_t)segment;
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset, &u, sizeof(u));
     wgpuQueueWriteBuffer(gpu->queue, f->buffer, offset + BOX_GPU_FOG_UNIFORM_STRIDE,
         fogs, (size_t)records);
 
-    WGPUBindGroupEntry entries[5] = {
+    WGPUBindGroupEntry entries[6] = {
         {
             .binding = 0,
             .buffer = f->buffer,
@@ -452,11 +470,15 @@ bool box_gpu_fog_volumes_draw(
         {
             .binding = 4,
             .sampler = f->sampler
+        },
+        {
+            .binding = 5,
+            .textureView = glass
         }
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = f->layout,
-        .entryCount = 5,
+        .entryCount = 6,
         .entries = entries
     });
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
@@ -464,7 +486,7 @@ bool box_gpu_fog_volumes_draw(
     wgpuRenderPassEncoderDraw(pass, 36, (uint32_t)v->fog_count, 0, 0);
     wgpuBindGroupRelease(group);
     box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
-    for (i = 0; i < v->fog_count; i ++) {
+    for (i = 0; segment != BOX_GPU_FOG_SEGMENT_FRONT && i < v->fog_count; i ++) {
         box_gpu_count(gpu, BOX_GPU_STAT_FOG_VOLUME);
     }
 

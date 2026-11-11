@@ -1,8 +1,8 @@
 /**
  * @file Effects.c
  * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog, SMAA, color
- * grading, vignette and chromatic aberration, and for the ambient occlusion (Gtao) of the
- * indirect light.
+ * grading, vignette, chromatic aberration and depth of field, and for the ambient occlusion
+ * (Gtao) of the indirect light.
  *
  * Most cases render an unlit view (a C literal View) from 5 units in front of the origin into
  * a 64x64 capture; a unit cube at the origin covers columns 26 to 38 of the middle row.
@@ -3961,6 +3961,440 @@ void Effects_chromatic_aberration_follows_surface_resize(void) {
     test_assert(px[(24 * 96 + 48) * 4 + 1] >= 200);
     test_assert(px[0] < 8);
     test_assert(px[(47 * 96 + 95) * 4] < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Width and height of the depth of field captures */
+#define DOF_W (384)
+#define DOF_H (128)
+
+/** Column of the center of the quads at 5, 10 and 40 units */
+static const int32_t dof_centers[3] = {64, 192, 320};
+
+/** Create a world that renders headless into a surface, with a camera at the origin that looks
+ * down -Z and three white quads facing it at view depth 5, 10 and 40, each 64x64 pixels of a
+ * 384x128 capture, centered on row 64 and columns 64, 192 and 320.
+ *
+ * @param camera Receives the camera
+ * @param view Receives the view
+ * @param file File name of the capture in the temporary folder
+ * @return The world
+ */
+static ecs_world_t* dof_world(
+    ecs_entity_t *camera,
+    ecs_entity_t *view,
+    const char *file)
+{
+    const float depths[3] = {5, 10, 40};
+    const float ndc[3] = {-2.0f / 3.0f, 0, 2.0f / 3.0f};
+    float t = tanf(glm_rad(30));
+    int32_t i;
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    *camera = ecs_new(world);
+    ecs_set(world, *camera, Position, {0, 0, 0});
+    ecs_set(world, *camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    *view = ecs_new(world);
+    for (i = 0; i < 3; i ++) {
+        float z = depths[i], size = t * z;
+        ecs_entity_t q = ecs_new(world);
+        ecs_set(world, q, Position, {ndc[i] * t * z * 3.0f, 0, -z});
+        ecs_set(world, q, Quad, {size, size});
+        ecs_set(world, q, Rgb, {255, 255, 255});
+    }
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = DOF_W, .height = DOF_H,
+        .write_to_file = ECS_CONST_CAST(char*, file),
+        .resolution_scale = 1});
+
+    return world;
+}
+
+/** Get the default depth of field settings with the largest radius, 6.4 pixels of the capture.
+ *
+ * @return The settings
+ */
+static DepthOfField dof_wide(void) {
+    return (DepthOfField){
+        .focus_distance = 10, .focus_range = 2, .near_transition = 4, .far_transition = 20,
+        .max_radius = 0.05f, .near_blur = true
+    };
+}
+
+/** Create an effect entity with depth of field settings.
+ *
+ * @param world The world
+ * @param value The settings
+ * @return The entity
+ */
+static ecs_entity_t dof_effect(
+    ecs_world_t *world,
+    const DepthOfField *value)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set_ptr(world, result, DepthOfField, value);
+
+    return result;
+}
+
+/** Set the effects of the view with a black clear, render frames and keep a copy of the capture.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param effects The effect entities, in order
+ * @param count Number of effects
+ * @param enabled Whether the entries are enabled
+ * @param file File name of the capture
+ * @return The RGBA pixels of a DOF_W x DOF_H capture, freed with ecs_os_free
+ */
+static unsigned char* dof_frame(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    const ecs_entity_t *effects,
+    int32_t count,
+    bool enabled,
+    const char *file)
+{
+    View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+    int32_t i;
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, count);
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = enabled, .effect = effects[i] };
+    }
+
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, DOF_W);
+    test_int(h, DOF_H);
+    ecs_os_free(path);
+    unsigned char *result = ecs_os_malloc(DOF_W * DOF_H * 4);
+    ecs_os_memcpy(result, px, DOF_W * DOF_H * 4);
+    stbi_image_free(px);
+
+    return result;
+}
+
+/** Get the edge contrast of a quad: the largest step of the red channel between neighbors
+ * along the middle row, within 12 pixels of its left edge.
+ *
+ * @param px The pixels of a DOF_W x DOF_H capture
+ * @param quad Index of the quad, 0 near, 1 in focus, 2 far
+ * @return The largest step
+ */
+static int dof_edge(
+    const unsigned char *px,
+    int32_t quad)
+{
+    int32_t edge = dof_centers[quad] - 32, x, y = DOF_H / 2;
+    int result = 0;
+    for (x = edge - 12; x < edge + 12; x ++) {
+        result = glm_imax(result, abs((int)px[(y * DOF_W + x + 1) * 4] -
+            (int)px[(y * DOF_W + x) * 4]));
+    }
+
+    return result;
+}
+
+/** Count the pixels of the middle row within 12 pixels of the left edge of a quad whose red
+ * channel lies strictly between 16 and 239.
+ *
+ * @param px The pixels of a DOF_W x DOF_H capture
+ * @param quad Index of the quad, 0 near, 1 in focus, 2 far
+ * @return The count
+ */
+static int32_t dof_partial(
+    const unsigned char *px,
+    int32_t quad)
+{
+    int32_t edge = dof_centers[quad] - 32, x, y = DOF_H / 2, result = 0;
+    for (x = edge - 12; x < edge + 12; x ++) {
+        unsigned char r = px[(y * DOF_W + x) * 4];
+        result += r > 16 && r < 239;
+    }
+
+    return result;
+}
+
+/** Get the largest difference of a channel between two depth of field captures.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @return The largest difference
+ */
+static int dof_diff(
+    const unsigned char *a,
+    const unsigned char *b)
+{
+    int32_t i;
+    int result = 0;
+    for (i = 0; i < DOF_W * DOF_H * 4; i ++) {
+        result = glm_imax(result, abs((int)a[i] - (int)b[i]));
+    }
+
+    return result;
+}
+
+void Effects_depth_of_field_default_settings(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, DepthOfField);
+    const DepthOfField *d = ecs_get(world, e, DepthOfField);
+    test_flt(d->focus_distance, 10);
+    test_flt(d->focus_range, 2);
+    test_flt(d->near_transition, 4);
+    test_flt(d->far_transition, 20);
+    test_flt(d->max_radius, 0.01f);
+    test_bool(d->near_blur, true);
+
+    DepthOfField resolved;
+    box_render_depth_of_field_settings(d, &resolved);
+    test_flt(resolved.focus_distance, 10);
+    test_flt(resolved.focus_range, 2);
+    test_flt(resolved.near_transition, 4);
+    test_flt(resolved.far_transition, 20);
+    test_flt(resolved.max_radius, 0.01f);
+    test_bool(resolved.near_blur, true);
+
+    test_assert(ecs_script_run(world, "dof", "using box.effects\n"
+        "lens { DepthOfField: {} }\n", NULL) == 0);
+    const DepthOfField *scripted = ecs_get(world, ecs_lookup(world, "lens"), DepthOfField);
+    test_assert(scripted != NULL);
+    test_flt(scripted->focus_distance, 10);
+    test_flt(scripted->far_transition, 20);
+    test_flt(scripted->max_radius, 0.01f);
+    test_bool(scripted->near_blur, true);
+
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_settings_clamped(void) {
+    // lighting/effects
+    DepthOfField out;
+    box_render_depth_of_field_settings(&(DepthOfField){.focus_distance = -1, .focus_range = -1,
+        .near_transition = -1, .far_transition = -1, .max_radius = 1}, &out);
+    test_flt(out.focus_distance, 0);
+    test_flt(out.focus_range, 0);
+    test_flt(out.near_transition, 0);
+    test_flt(out.far_transition, 0);
+    test_flt(out.max_radius, 0.05f);
+    test_bool(out.near_blur, false);
+}
+
+void Effects_depth_of_field_blurs_near_and_far(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_blur.png");
+    DepthOfField value = dof_wide();
+    ecs_entity_t dof = dof_effect(world, &value);
+    unsigned char *base = dof_frame(world, view, camera, NULL, 0, true, "dof_blur.png");
+    unsigned char *px = dof_frame(world, view, camera, &dof, 1, true, "dof_blur.png");
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        // Every quad has a hard edge without the effect, white inside
+        test_assert(dof_edge(base, i) > 200);
+        test_assert(base[(DOF_H / 2 * DOF_W + dof_centers[i]) * 4] > 250);
+    }
+
+    // The quad in focus keeps its edge, the near and far ones are blurred
+    test_assert(dof_edge(px, 1) >= dof_edge(base, 1) - 16);
+    test_assert(dof_partial(px, 1) <= dof_partial(base, 1) + 1);
+    test_assert(dof_edge(px, 0) < dof_edge(base, 0) / 2);
+    test_assert(dof_edge(px, 2) < dof_edge(base, 2) / 2);
+    test_assert(dof_partial(px, 0) >= dof_partial(base, 0) + 4);
+    test_assert(dof_partial(px, 2) >= dof_partial(base, 2) + 4);
+
+    // The middle of every quad and the black far from them stay as they are
+    for (i = 0; i < 3; i ++) {
+        test_assert(px[(DOF_H / 2 * DOF_W + dof_centers[i]) * 4] > 245);
+    }
+
+    test_assert(px[(4 * DOF_W + 128) * 4] < 4);
+    test_assert(px[(4 * DOF_W + 256) * 4] < 4);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_near_blur_off(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_near_off.png");
+    DepthOfField value = dof_wide();
+    value.near_blur = false;
+    ecs_entity_t dof = dof_effect(world, &value);
+    unsigned char *base = dof_frame(world, view, camera, NULL, 0, true, "dof_near_off.png");
+    unsigned char *px = dof_frame(world, view, camera, &dof, 1, true, "dof_near_off.png");
+    test_assert(dof_edge(px, 0) >= dof_edge(base, 0) - 16);
+    test_assert(dof_partial(px, 0) <= dof_partial(base, 0) + 1);
+    test_assert(dof_edge(px, 1) >= dof_edge(base, 1) - 16);
+    test_assert(dof_edge(px, 2) < dof_edge(base, 2) / 2);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_zero_radius_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_zero.png");
+    DepthOfField value = dof_wide();
+    value.max_radius = 0;
+    ecs_entity_t dof = dof_effect(world, &value);
+    unsigned char *base = dof_frame(world, view, camera, NULL, 0, true, "dof_zero.png");
+    unsigned char *px = dof_frame(world, view, camera, &dof, 1, true, "dof_zero.png");
+    test_assert(dof_diff(base, px) <= 1);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_zero_literal_applies_as_set(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_literal.png");
+    ecs_entity_t zero = ecs_new(world);
+    ecs_set(world, zero, DepthOfField, {0});
+    ecs_entity_t wide = ecs_new(world);
+    ecs_set(world, wide, DepthOfField, {.max_radius = 0.05f});
+    unsigned char *base = dof_frame(world, view, camera, NULL, 0, true, "dof_literal.png");
+    unsigned char *z = dof_frame(world, view, camera, &zero, 1, true, "dof_literal.png");
+    // A largest radius of 0 leaves the image as is
+    test_assert(dof_diff(base, z) <= 1);
+
+    // Focus 0 with a hard step: everything is far at full blur
+    unsigned char *w = dof_frame(world, view, camera, &wide, 1, true, "dof_literal.png");
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        test_assert(dof_edge(w, i) < dof_edge(base, i) / 2);
+    }
+
+    ecs_os_free(base);
+    ecs_os_free(z);
+    ecs_os_free(w);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_disabled_entry_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_disabled.png");
+    DepthOfField value = dof_wide();
+    ecs_entity_t dof = dof_effect(world, &value);
+    unsigned char *base = dof_frame(world, view, camera, NULL, 0, true, "dof_disabled.png");
+    unsigned char *off = dof_frame(world, view, camera, &dof, 1, false, "dof_disabled.png");
+    test_assert(dof_diff(base, off) <= 1);
+    ecs_os_free(off);
+
+    ecs_add_id(world, dof, EcsDisabled);
+    off = dof_frame(world, view, camera, &dof, 1, true, "dof_disabled.png");
+    test_assert(dof_diff(base, off) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(off);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_same_entity_before_tonemap(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_order.png");
+    DepthOfField value = dof_wide();
+    ecs_entity_t both = dof_effect(world, &value);
+    ecs_add(world, both, Tonemap);
+    ecs_entity_t dof = dof_effect(world, &value);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t chain[2] = {dof, tonemap};
+    unsigned char *a = dof_frame(world, view, camera, &both, 1, true, "dof_order.png");
+    unsigned char *b = dof_frame(world, view, camera, chain, 2, true, "dof_order.png");
+    test_assert(dof_diff(a, b) <= 1);
+    test_assert(dof_edge(a, 2) < dof_edge(a, 1) / 2);
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_follows_surface_resize(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_resize.png");
+    DepthOfField value = dof_wide();
+    ecs_entity_t dof = dof_effect(world, &value);
+    unsigned char *first = dof_frame(world, view, camera, &dof, 1, true, "dof_resize.png");
+    test_assert(dof_edge(first, 2) < 128);
+    ecs_os_free(first);
+    ecs_iter_t it = ecs_each(world, Surface);
+    ecs_entity_t surface = 0;
+    while (ecs_each_next(&it)) {
+        surface = it.entities[0];
+    }
+
+    test_assert(surface != 0);
+    ecs_set(world, surface, Surface, {.width = 2 * DOF_W, .height = 2 * DOF_H,
+        .resolution_scale = 0.5f, .write_to_file = "dof_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, surface, Surface, {.width = 3 * DOF_W / 2, .height = 3 * DOF_H / 2,
+        .resolution_scale = 1, .write_to_file = "dof_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/dof_resize.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    int32_t x, y = 3 * DOF_H / 4, sharp = 0, soft = 0;
+    test_assert(px != NULL);
+    test_int(w, 3 * DOF_W / 2);
+    test_int(h, 3 * DOF_H / 2);
+    // The quad in focus keeps its hard left edge at column 240, the far one at 432 is soft
+    for (x = 222; x < 258; x ++) {
+        sharp = glm_imax(sharp, abs((int)px[(y * w + x + 1) * 4] - (int)px[(y * w + x) * 4]));
+    }
+
+    for (x = 414; x < 450; x ++) {
+        soft = glm_imax(soft, abs((int)px[(y * w + x + 1) * 4] - (int)px[(y * w + x) * 4]));
+    }
+
+    test_assert(sharp > 200);
+    test_assert(soft < 128);
+    test_assert(px[(y * w + 288) * 4] > 245);
+    test_assert(px[(4 * w + 192) * 4] < 4);
 
     stbi_image_free(px);
     ecs_os_free(path);

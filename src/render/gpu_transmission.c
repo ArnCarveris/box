@@ -35,6 +35,10 @@ struct box_gpu_snapshot_t {
     WGPUTexture depth;              /**< Copy of the depth of the target, which a blur reads
                                      *   as the forward pass cannot bind its own depth */
     WGPUTextureView depth_view;     /**< View of the depth copy */
+    WGPUTexture glass;              /**< Depth of the nearest transmissive surfaces over the
+                                     *   opaque depth, which splits the fog volumes of a view;
+                                     *   NULL until a view with fog volumes needs it */
+    WGPUTextureView glass_view;     /**< View of the glass depth */
     WGPURenderPipeline pipeline;    /**< Downsample pipeline of its format in this frame, NULL
                                      *   until the shader exists, which leaves the mips above 0
                                      *   unwritten and unsampled */
@@ -315,6 +319,11 @@ static void box_gpu_snapshot_free(
     wgpuTextureRelease(s->texture);
     wgpuTextureViewRelease(s->depth_view);
     wgpuTextureRelease(s->depth);
+    if (s->glass) {
+        wgpuTextureViewRelease(s->glass_view);
+        wgpuTextureRelease(s->glass);
+    }
+
     ecs_os_free(s);
 done:
     return;
@@ -429,6 +438,33 @@ WGPUTextureView box_gpu_transmission_depth_view(
     const box_gpu_snapshot_t *s)
 {
     return s ? s->depth_view : gpu->transmission->no_depth_view;
+}
+
+WGPUTextureView box_gpu_transmission_glass(
+    box_gpu_t *gpu,
+    box_gpu_snapshot_t *s,
+    WGPUCommandEncoder encoder,
+    WGPUTexture depth)
+{
+    if (!s->glass) {
+        s->glass = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+            .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
+                WGPUTextureUsage_RenderAttachment,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { s->width, s->height, 1 },
+            .format = BOX_GPU_DEPTH_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1
+        });
+        s->glass_view = wgpuTextureCreateView(s->glass, NULL);
+    }
+
+    wgpuCommandEncoderCopyTextureToTexture(encoder,
+        &(WGPUTexelCopyTextureInfo){ .texture = depth, .aspect = WGPUTextureAspect_All },
+        &(WGPUTexelCopyTextureInfo){ .texture = s->glass, .aspect = WGPUTextureAspect_All },
+        &(WGPUExtent3D){ s->width, s->height, 1 });
+
+    return s->glass_view;
 }
 
 void box_gpu_transmission_record(
