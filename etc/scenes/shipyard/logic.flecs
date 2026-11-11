@@ -8,7 +8,7 @@ state {
     Tool1 { Action: {description: "Pick the cockpit"}; Binding: {key: Num1} }
     Tool2 { Action: {description: "Pick the habitat"}; Binding: {key: Num2} }
     Tool3 { Action: {description: "Pick life support"}; Binding: {key: Num3} }
-    Tool4 { Action: {description: "Pick engineering"}; Binding: {key: Num4} }
+    Tool4 { Action: {description: "Pick the power plant"}; Binding: {key: Num4} }
     Tool5 { Action: {description: "Pick the cargo bay"}; Binding: {key: Num5} }
     Tool6 { Action: {description: "Pick the fuel tank"}; Binding: {key: Num6} }
     Tool7 { Action: {description: "Pick weapons"}; Binding: {key: Num7} }
@@ -17,6 +17,7 @@ state {
     Tool10 { Action: {description: "Pick the observation deck"}; Binding: {key: Num0} }
     Tool11 { Action: {description: "Pick the docking port"}; Binding: {key: P} }
     Tool12 { Action: {description: "Pick the hull fairing"}; Binding: {key: H} }
+    Tool13 { Action: {description: "Pick the radiator"}; Binding: {key: R} }
     Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
     Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
     View { Action: {description: "Switch between the exterior and the interior"}; Binding: {key: Tab} }
@@ -35,7 +36,9 @@ state {
         top = max(top, py)
       }
     }
+    mut fresh: i32[1080] = {}
     grid = g
+    placed = fresh
     deck = top
     validate()
   }
@@ -60,7 +63,7 @@ state {
     assets.HotKey k1(action: actions.Tool1, op: K_COCKPIT)
     assets.HotKey k2(action: actions.Tool2, op: K_HAB)
     assets.HotKey k3(action: actions.Tool3, op: K_LIFE)
-    assets.HotKey k4(action: actions.Tool4, op: K_ENG)
+    assets.HotKey k4(action: actions.Tool4, op: K_POWER)
     assets.HotKey k5(action: actions.Tool5, op: K_CARGO)
     assets.HotKey k6(action: actions.Tool6, op: K_FUEL)
     assets.HotKey k7(action: actions.Tool7, op: K_WEAPON)
@@ -69,6 +72,7 @@ state {
     assets.HotKey k10(action: actions.Tool10, op: K_OBS)
     assets.HotKey k11(action: actions.Tool11, op: K_DOCK)
     assets.HotKey k12(action: actions.Tool12, op: K_HULL)
+    assets.HotKey k13(action: actions.Tool13, op: K_RADIATOR)
     assets.HotKey kx(action: actions.Remove, op: T_REMOVE)
     assets.HotKey kc(action: actions.Cancel, op: OP_CANCEL)
     assets.HotKey kv(action: actions.View, op: OP_VIEW)
@@ -88,10 +92,12 @@ async {
     const k = grid[i]
     if tool > 0 && tool != T_REMOVE {
       if k != tool {
-        const placed = tool
+        const built = tool
         emit Built(cell: i)
         await next_frame()
-        grid[i] = placed
+        grid[i] = built
+        stamp += 1
+        placed[i] = stamp
         validate()
       }
     } else if tool == T_REMOVE && k != K_EMPTY {

@@ -57,7 +57,8 @@ assets {
   yard_icon_cockpit { TexturePath: {path: "etc/scenes/shipyard/assets/icons/cockpit.svg", width: 96} }
   yard_icon_hab { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hab.svg", width: 96} }
   yard_icon_life { TexturePath: {path: "etc/scenes/shipyard/assets/icons/life.svg", width: 96} }
-  yard_icon_eng { TexturePath: {path: "etc/scenes/shipyard/assets/icons/eng.svg", width: 96} }
+  yard_icon_reactor { TexturePath: {path: "etc/scenes/shipyard/assets/icons/reactor.svg", width: 96} }
+  yard_icon_radiator { TexturePath: {path: "etc/scenes/shipyard/assets/icons/radiator.svg", width: 96} }
   yard_icon_cargo { TexturePath: {path: "etc/scenes/shipyard/assets/icons/cargo.svg", width: 96} }
   yard_icon_fuel { TexturePath: {path: "etc/scenes/shipyard/assets/icons/fuel.svg", width: 96} }
   yard_icon_weapon { TexturePath: {path: "etc/scenes/shipyard/assets/icons/weapon.svg", width: 96} }
@@ -96,7 +97,7 @@ state {
       1: assets.yard_icon_cockpit
       2: assets.yard_icon_hab
       3: assets.yard_icon_life
-      4: assets.yard_icon_eng
+      4: assets.yard_icon_reactor
       5: assets.yard_icon_cargo
       6: assets.yard_icon_fuel
       7: assets.yard_icon_weapon
@@ -105,6 +106,7 @@ state {
       10: assets.yard_icon_obs
       11: assets.yard_icon_dock
       12: assets.yard_icon_hull
+      13: assets.yard_icon_radiator
       _: assets.yard_icon_remove
     }
   }
@@ -421,11 +423,12 @@ assets {
     const c8 = counts[8]
     const c9 = counts[9]
     const c10 = counts[10]
+    const c13 = counts[13]
     const crew = c1 * 2 + c2 * 3
     const air = c3 * 10 + c9 * 5
     const gen: f32 = c4 * 30
     const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3 + c9 + c10
-    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10)
+    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10) + c13 * kind_mass(13)
     const accel: f32 = c8 * 260.0 / max(mass, 1)
     const reach: f32 = c6 * 900.0 / max(mass, 1)
     const has_helm = c1 > 0
@@ -433,8 +436,9 @@ assets {
     const power_ok = gen >= use && use > 0
     const air_ok = crew > 0 && air >= crew
     const fuel_ok = c6 > 0
+    const cool_ok = c13 >= c4
     const sound = problems == 0 && modules > 0
-    const ready = has_helm && has_drive && power_ok && air_ok && fuel_ok && sound
+    const ready = has_helm && has_drive && power_ok && cool_ok && air_ok && fuel_ok && sound
 
     Scene: {}
 
@@ -531,7 +535,8 @@ assets {
               YardTile t1(label: "Cockpit", op: K_COCKPIT, key_hint: "1")
               YardTile t2(label: "Habitat", op: K_HAB, key_hint: "2")
               YardTile t3(label: "Life Support", op: K_LIFE, key_hint: "3")
-              YardTile t4(label: "Engineering", op: K_ENG, key_hint: "4")
+              YardTile t4(label: "Power", op: K_POWER, key_hint: "4")
+              YardTile tr(label: "Radiator", op: K_RADIATOR, key_hint: "R")
               YardTile t5(label: "Cargo Bay", op: K_CARGO, key_hint: "5")
               YardTile t6(label: "Fuel Tank", op: K_FUEL, key_hint: "6")
               YardTile t7(label: "Weapons", op: K_WEAPON, key_hint: "7")
@@ -565,6 +570,7 @@ assets {
               YardCheck chk_drive(label: "Engines to push her", ok: has_drive)
               YardCheck chk_fuel(label: "Fuel for the engines", ok: fuel_ok)
               YardCheck chk_power(label: "Enough power", ok: power_ok)
+              YardCheck chk_cool(label: "A radiator for every power plant", ok: cool_ok)
               YardCheck chk_air(label: "Air for every crew member", ok: air_ok)
               YardCheck chk_rules(label: problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: sound)
             }

@@ -113,9 +113,10 @@ ICONS = {
            '<path d="M6 46v8M58 46v8"/></g>',
     "life": f'<g {S}><path d="M32 57C16 46 7 37 7 24c0-8 6-14 13-14 5 0 9 3 12 8 3-5 7-8 12-8 7 0 13 6 13 14 0 13-9 22-25 33z"/>'
             '<path d="M13 31h11l4-8 7 15 4-7h12"/></g>',
-    "eng": f'<g {S}><circle cx="32" cy="32" r="7"/><ellipse cx="32" cy="32" rx="27" ry="10"/>'
-           '<ellipse cx="32" cy="32" rx="27" ry="10" transform="rotate(60 32 32)"/>'
-           '<ellipse cx="32" cy="32" rx="27" ry="10" transform="rotate(120 32 32)"/></g>',
+    "reactor": f'<g {S}><circle cx="32" cy="32" r="17"/><circle cx="32" cy="32" r="5"/>'
+               '<path d="M32 4v10M32 50v10M4 32h10M50 32h10M12 12l7 7M45 45l7 7M52 12l-7 7M19 45l-7 7"/></g>',
+    "radiator": f'<g {S}><path d="M6 32h8"/><path d="M14 10v44M14 10l40 8v28l-40 8"/>'
+                '<path d="M24 16v32M34 18v28M44 20v24"/></g>',
     "cargo": f'<g {S}><path d="M32 6l24 12v28L32 58 8 46V18z"/><path d="M8 18l24 12 24-12M32 30v28"/>'
              '<path d="M20 12l24 12"/></g>',
     "fuel": f'<g {S}><path d="M14 58V14a8 8 0 0 1 8-8h12a8 8 0 0 1 8 8v44"/><path d="M8 58h40"/>'

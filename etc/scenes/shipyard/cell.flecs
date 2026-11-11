@@ -69,13 +69,10 @@ assets {
       DockMount mount(side: dock_at(x, y, z), seed: seed)
     } else if k == K_ENGINE {
       EngineMount mount(seed: seed, mounted: kind_at(x, y, z + 1) != 0)
-    } else if k == K_HULL && hull_shape(x, y, z) != H_BLOCK {
-      const shape = hull_shape(x, y, z)
-      const hip = shape == H_HIP
-      HullFairing fairing(
-        shape: shape, sx: hip ? hull_dx(x, y, z) : hull_sx(x, y, z), sy: hull_sy(x, y, z),
-        sz: hip ? hull_dz(x, y, z) : hull_sz(x, y, z)
-      )
+    } else if k == K_RADIATOR {
+      RadiatorMount mount(side: cool_at(x, y, z))
+    } else if k == K_HULL && hull_drawn(x, y, z) != 0 {
+      HullFairing fairing(shape: hull_drawn(x, y, z), sx: hull_sx(x, y, z), sy: hull_sy(x, y, z), sz: hull_sz(x, y, z))
     } else if inner && k != K_HULL {
       ModuleInterior room(
         k: k, px: !room_at(x + 1, y, z), nx: !room_at(x - 1, y, z), pz: !room_at(x, y, z + 1), nz: !room_at(x, y, z - 1),
@@ -88,6 +85,8 @@ assets {
         px: !rack_at(x + 1, y, z), nx: !rack_at(x - 1, y, z), pz: !rack_at(x, y, z + 1), nz: !rack_at(x, y, z - 1),
         tp: kind_at(x, y, z + 1) == K_FUEL, tn: kind_at(x, y, z - 1) == K_FUEL
       )
+    } else if k == K_POWER {
+      PowerPlant plant(pz: kind_at(x, y, z + 1) != K_POWER, nz: kind_at(x, y, z - 1) != K_POWER, roof: shown_at(x, y + 1, z))
     } else if k == K_LIFE {
       LifePlant plant(pz: kind_at(x, y, z + 1) != K_LIFE, nz: kind_at(x, y, z - 1) != K_LIFE, roof: shown_at(x, y + 1, z), seed: seed)
     } else if k == K_BIOME {
@@ -223,8 +222,10 @@ assets {
 
     async {
       while true {
-        await on.click(this)
-        emit Click(cell: idx)
+        const ev = await on.click(this)
+        if ev.button == 0 {
+          emit Click(cell: idx)
+        }
       }
     }
 
