@@ -1101,7 +1101,9 @@
                     "version_follows_throttle",
                     "bake_open_probe_matches_environment",
                     "background_matches_sky",
-                    "reflection_capture_sees_environment"
+                    "reflection_capture_sees_environment",
+                    "mirror_sphere_reflects_clouds",
+                    "dense_layer_changes_ambient_sh"
                 ]
             },
             {

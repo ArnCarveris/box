@@ -2,7 +2,8 @@
 // transmittance and multi scattering LUTs belong to a scene, the sky view and aerial perspective
 // to a view. Every pass is a compute entry point with 8x8x1 workgroups that writes an
 // rgba16float storage texture, the 2D LUTs included, so no pass needs a render target. The sky
-// draw of a view is a fragment entry point that also composites its cloud layers (CloudLayer).
+// draw of a view is a fragment entry point that also composites its cloud layers (CloudLayer),
+// and so does the environment cubemap of a scene, seen from its capture point.
 #include "include/atmosphere_medium.h"
 #include "include/cube.wgsl"
 
@@ -42,7 +43,7 @@ struct Atmosphere {
     fog_light: vec4f,
     // rgb: radiance toward the moon when it is the main light, w: 1 when it is, per view
     fog_moon: vec4f,
-    // x: cloud layers of the sky draw, y: km per world unit, per view
+    // x: cloud layers of the sky draw or the environment, y: km per world unit, per view
     clouds: vec4f,
     // the cloud layers by ascending altitude, per view
     cloud_layers: array<CloudLayer, 4>,
@@ -497,12 +498,22 @@ fn environment(@builtin(global_invocation_id) gid: vec3u,
     }
 
     let rd = cube_direction(gid.z, gid.xy, dims.x);
-    let ground = ray_sphere(vec3f(0.0, camera_radius(), 0.0), rd, bottom_radius());
-    var radiance = sky_sample(rd);
+    let r = camera_radius();
+    let ground = ray_sphere(vec3f(0.0, r, 0.0), rd, bottom_radius());
+    let haze = sky_sample(rd);
+    var radiance = haze;
     if (ground.x > 0.0) {
         let irradiance = env_ground_light(u.sun.xyz, u.sun_color.rgb) +
             env_ground_light(u.moon.xyz, u.moon_color.rgb) + sky * (PI / f32(ENV_SAMPLES));
         radiance = u.ground_albedo.rgb * irradiance / PI;
+    }
+
+    // The clouds seen from the capture point, the texel footprint from the next texels
+    if (u.clouds.x > 0.0) {
+        let drd_x = cube_direction(gid.z, gid.xy + vec2u(1u, 0u), dims.x) - rd;
+        let drd_y = cube_direction(gid.z, gid.xy + vec2u(0u, 1u), dims.x) - rd;
+        let clouds = cloud_layers(r, rd, haze, drd_x, drd_y);
+        radiance = radiance * (1.0 - clouds.a) + clouds.rgb;
     }
 
     textureStore(out_cube, vec2i(gid.xy), i32(gid.z), vec4f(radiance, 1.0));
@@ -733,17 +744,20 @@ fn cloud_aerial_transmittance(r0: f32, mu0: f32, r1: f32, mu1: f32) -> vec3f {
     return clamp(t, vec3f(0.0), vec3f(1.0));
 }
 
-// The cloud layers composited over a background along rd from far to near: above the camera
-// from the highest, below from the lowest. haze is the sky in the direction, which the clouds
-// fade into with the aerial perspective; drd_x and drd_y the change of rd over a pixel.
-fn clouds(background: vec3f, haze: vec3f, rd: vec3f, drd_x: vec3f, drd_y: vec3f) -> vec3f {
+// The cloud layers along rd seen from a camera at radius r0, whose world X and Z the layers
+// hold as their texture coordinate and whose world Y as their height, composited from far to
+// near: above the camera from the highest, below from the lowest. haze is the sky in the
+// direction, which the clouds fade into with the aerial perspective; drd_x and drd_y the change
+// of rd over a pixel. The result is the premultiplied color and the alpha of the layers, over a
+// background b: b (1 - a) + rgb.
+fn cloud_layers(r0: f32, rd: vec3f, haze: vec3f, drd_x: vec3f, drd_y: vec3f) -> vec4f {
     let count = min(i32(u.clouds.x), 4);
-    var color = background;
+    var color = vec3f(0.0);
+    var clear_sky = 1.0;
     if (count == 0) {
-        return color;
+        return vec4f(0.0);
     }
 
-    let r0 = camera_radius();
     let ro = vec3f(0.0, r0, 0.0);
     let ambient = CLOUD_ALBEDO * mix(sky_horizon(rd), sky_sample(vec3f(0.0, 1.0, 0.0)),
         CLOUD_ZENITH_MIX);
@@ -788,9 +802,10 @@ fn clouds(background: vec3f, haze: vec3f, rd: vec3f, drd_x: vec3f, drd_y: vec3f)
 
         let seen = (light + ambient) * layer.tint.rgb * t + haze * (1.0 - t);
         color = mix(color, seen, alpha);
+        clear_sky = clear_sky * (1.0 - alpha);
     }
 
-    return color;
+    return vec4f(color, 1.0 - clear_sky);
 }
 
 @fragment fn sky_fs(f: SkyOut) -> @location(0) vec4f {
@@ -811,5 +826,6 @@ fn clouds(background: vec3f, haze: vec3f, rd: vec3f, drd_x: vec3f, drd_y: vec3f)
     let sky = sample_sky_lut(uv);
     let background = sky + sun_disk(rd, r, sun_cos, sin_sun, aa_w) +
         moon_disk(rd, r, moon_cos, sin_moon, moon_aa_w);
-    return vec4f(clouds(background, sky, rd, drd_x, drd_y), 1.0);
+    let clouds = cloud_layers(r, rd, sky, drd_x, drd_y);
+    return vec4f(background * (1.0 - clouds.a) + clouds.rgb, 1.0);
 }

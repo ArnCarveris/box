@@ -25,6 +25,9 @@
 /** Frames a wait renders at most */
 #define WAIT_FRAMES (500)
 
+/** 8 x 8 of 255: a CloudLayer reading it covers the whole sky */
+#define CLOUD_WHITE_PNG "test/assets/textures/cloud_white.png"
+
 /** Create a headless world that renders with the GPU on the main thread.
  *
  * @return The world
@@ -84,18 +87,22 @@ static ecs_entity_t sky_new(
     return scene;
 }
 
-/** Create a scene without light with a white diffuse sphere at the origin, seen by a view lit
- * only by an environment source, that renders into a surface.
+/** Create a scene without light with a white sphere of a material at the origin, seen by a
+ * view lit only by an environment source, that renders into a surface.
  *
  * @param world The world
  * @param source The environment source
  * @param file Name of the image the surface writes
+ * @param metallic Metallic of the sphere
+ * @param roughness Roughness of the sphere
  * @return The scene
  */
-static ecs_entity_t sphere_new(
+static ecs_entity_t sphere_material_new(
     ecs_world_t *world,
     ecs_entity_t source,
-    const char *file)
+    const char *file,
+    float metallic,
+    float roughness)
 {
     ecs_entity_t scene = ecs_new(world);
     ecs_set_ptr(world, scene, Scene, ecs_singleton_get(world, Scene)
@@ -107,7 +114,7 @@ static ecs_entity_t sphere_new(
     ecs_set(world, sphere, Position, {0, 0, 0});
     ecs_set(world, sphere, Sphere, {.segments = 48, .smooth = true, .radius = 1});
     ecs_set(world, sphere, Rgb, {255, 255, 255});
-    ecs_set(world, sphere, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_set(world, sphere, PbrMaterial, {.metallic = metallic, .roughness = roughness});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 0, 3.2f});
     ecs_set(world, camera, Camera, {.fov = 45, .near_ = 0.1f});
@@ -122,6 +129,22 @@ static ecs_entity_t sphere_new(
         .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
 
     return scene;
+}
+
+/** Create a scene without light with a white diffuse sphere at the origin, seen by a view lit
+ * only by an environment source, that renders into a surface.
+ *
+ * @param world The world
+ * @param source The environment source
+ * @param file Name of the image the surface writes
+ * @return The scene
+ */
+static ecs_entity_t sphere_new(
+    ecs_world_t *world,
+    ecs_entity_t source,
+    const char *file)
+{
+    return sphere_material_new(world, source, file, 0, 1);
 }
 
 /** Render a frame and wait until the GPU rendered it.
@@ -612,5 +635,189 @@ void AtmosphereIbl_reflection_capture_sees_environment(void) {
         (double)largest, (double)diff);
     test_assert(largest > 0.01f);
     test_assert(diff <= largest * 0.01f);
+    ecs_fini(world);
+}
+
+/** Enable every feature of the scenes created after it.
+ *
+ * @param world The world
+ */
+static void ibl_features(
+    ecs_world_t *world)
+{
+    ecs_singleton_set(world, Scene, {.baked = true, .reflections = true,
+        .punctual_shadows = true, .cookies = true, .environment = true,
+        .aerial_perspective = true, .alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+}
+
+/** Load a single channel texture and render frames until it is ready.
+ *
+ * @param world The world
+ * @param path Image file
+ * @return The texture entity
+ */
+static ecs_entity_t ibl_cloud_texture(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t tex = ecs_new(world);
+    int32_t i;
+    ecs_set(world, tex, TexturePath, {.path = ECS_CONST_CAST(char*, path),
+        .single_channel = true});
+    for (i = 0; i < 200; i ++) {
+        const TextureStatus *s = ecs_get(world, tex, TextureStatus);
+        if (s && s->state != TextureLoading) {
+            break;
+        }
+
+        ibl_frame(world);
+    }
+
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+
+    return tex;
+}
+
+/** Add a fully covering layer of a texture to the scene of a sky.
+ *
+ * @param world The world
+ * @param sky The scene with the Atmosphere
+ * @param texture The texture
+ * @param density Opacity of the clouds
+ * @return The layer
+ */
+static ecs_entity_t ibl_cloud_layer(
+    ecs_world_t *world,
+    ecs_entity_t sky,
+    ecs_entity_t texture,
+    float density)
+{
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, sky);
+    ecs_add(world, e, CloudLayer);
+    CloudLayer *c = ecs_get_mut(world, e, CloudLayer);
+    c->texture = texture;
+    c->altitude = 1000;
+    c->threshold = 0.5f;
+    c->softness = 0;
+    c->density = density;
+    ecs_modified(world, e, CloudLayer);
+
+    return e;
+}
+
+/** Get the mean linear color of the +Y face of the cubemap of a source.
+ *
+ * @param world The world
+ * @param source The source
+ * @param out Receives red, green and blue
+ */
+static void ibl_zenith(
+    ecs_world_t *world,
+    ecs_entity_t source,
+    float out[3])
+{
+    box_render_environment_state_t state;
+    test_assert(ibl_state(world, source, &state));
+    int32_t res = ecs_get(world, source, Environment)->resolution;
+    int32_t i, count = res * res * 4;
+    float *texels = ecs_os_malloc_n(float, count);
+    test_assert(box_render_gpu_read_environment(world,
+        box_render_environment_find(world, source), 2, texels, count));
+    out[0] = out[1] = out[2] = 0;
+    for (i = 0; i < res * res; i ++) {
+        out[0] += texels[i * 4] / (float)(res * res);
+        out[1] += texels[i * 4 + 1] / (float)(res * res);
+        out[2] += texels[i * 4 + 2] / (float)(res * res);
+    }
+
+    ecs_os_free(texels);
+}
+
+/** Render a mirror sphere lit by a noon sky, with or without a fully covering white layer.
+ *
+ * @param layer Whether the sky has the layer
+ * @param top Receives the color of the top of the sphere, display encoded
+ * @param zenith Receives the mean linear color of the +Y face of the environment
+ */
+static void ibl_mirror(
+    bool layer,
+    float top[3],
+    float zenith[3])
+{
+    const char *file = layer ? "mirror_clouds.png" : "mirror_sky.png";
+    ecs_world_t *world = ibl_world();
+    ibl_features(world);
+    ecs_entity_t sun;
+    ecs_entity_t sky = sky_new(world, 60, 30, &sun);
+    sphere_material_new(world, sky, file, 1, 0);
+    if (layer) {
+        ecs_entity_t tex = ibl_cloud_texture(world, CLOUD_WHITE_PNG);
+        ibl_cloud_layer(world, sky, tex, 1);
+    }
+
+    test_assert(ibl_wait(world, sky));
+    ibl_frame(world);
+    ibl_frame(world);
+    ibl_no_errors(world);
+    ibl_zenith(world, sky, zenith);
+    unsigned char *pixels = ibl_image(world, file);
+    ibl_patch(pixels, SIZE / 2, SIZE / 2 - 16, top);
+    printf("mirror %s: top %.0f %.0f %.0f, zenith %.4f %.4f %.4f\n",
+        layer ? "clouds" : "sky", (double)top[0], (double)top[1], (double)top[2],
+        (double)zenith[0], (double)zenith[1], (double)zenith[2]);
+    stbi_image_free(pixels);
+    ecs_fini(world);
+}
+
+void AtmosphereIbl_mirror_sphere_reflects_clouds(void) {
+    // atmosphere/clouds
+    float sky_top[3], sky_zenith[3], cloud_top[3], cloud_zenith[3];
+    ibl_mirror(false, sky_top, sky_zenith);
+    ibl_mirror(true, cloud_top, cloud_zenith);
+
+    /* The cubemap holds the clouds: the zenith is no longer blue */
+    test_assert(sky_zenith[2] > sky_zenith[0] * 1.5f);
+    test_assert(cloud_zenith[2] < cloud_zenith[0] * 1.3f);
+
+    /* The mirror reflects a blue sky without the layer, a gray to white cloud with it, which
+     * the sky ambient and the haze tint slightly blue */
+    test_assert(sky_top[2] > sky_top[0] + 20);
+    test_assert(ibl_sum(cloud_top) > 30);
+    test_assert(cloud_top[2] < cloud_top[0] * 1.3f);
+    test_assert(cloud_top[2] * ibl_sum(sky_top) < sky_top[2] * ibl_sum(cloud_top));
+}
+
+void AtmosphereIbl_dense_layer_changes_ambient_sh(void) {
+    // atmosphere/clouds
+    ecs_world_t *world = ibl_world();
+    ibl_features(world);
+    ecs_entity_t sun;
+    ecs_entity_t sky = sky_new(world, 60, 30, &sun);
+    sphere_new(world, sky, "ambient.png");
+    ecs_entity_t tex = ibl_cloud_texture(world, CLOUD_WHITE_PNG);
+    test_assert(ibl_wait(world, sky));
+    ibl_frame(world);
+    uint32_t handle = box_render_environment_find(world, sky);
+    float clear[BOX_RENDER_SH_COEFFICIENTS][4], cloudy[BOX_RENDER_SH_COEFFICIENTS][4];
+    test_assert(box_render_gpu_read_environment_sh(world, handle, clear));
+    int32_t version = ibl_version(world, sky);
+
+    ibl_cloud_layer(world, sky, tex, 1);
+    test_assert(ibl_wait(world, sky));
+    test_assert(ibl_version(world, sky) > version);
+    ibl_frame(world);
+    test_assert(box_render_gpu_read_environment_sh(world, handle, cloudy));
+    ibl_no_errors(world);
+
+    printf("ambient L0 clear %.4f %.4f %.4f, cloudy %.4f %.4f %.4f, error %.3f\n",
+        (double)clear[0][0], (double)clear[0][1], (double)clear[0][2], (double)cloudy[0][0],
+        (double)cloudy[0][1], (double)cloudy[0][2], (double)ibl_sh_error(clear, cloudy));
+    test_assert(ibl_sh_error(clear, cloudy) > 0.05f);
+
+    /* The ambient from the clouds is less blue than that of the clear sky */
+    test_assert(cloudy[0][2] / glm_max(cloudy[0][0], 1e-6f) <
+        clear[0][2] / glm_max(clear[0][0], 1e-6f));
     ecs_fini(world);
 }

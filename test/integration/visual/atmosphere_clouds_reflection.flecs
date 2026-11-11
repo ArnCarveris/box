@@ -1,0 +1,66 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// A mirror ball on a glossy dark floor under the cloud layer of atmosphere_clouds_noon. The
+// environment cubemap of the atmosphere holds the clouds, so the ball mirrors white clouds in
+// a blue sky above its equator and the floor reflects them, blurred, toward the horizon, as
+// the sky behind them shows them.
+sky {
+  Scene: {environment: true, aerial_perspective: true, reflections: true}
+
+  sun {
+    Rotation: {1.1, 0.5, 0}
+    DirectionalLight: {intensity: 3 * flecs.script.math.PI}
+    Rgb: {255, 255, 255}
+  }
+
+  Atmosphere: {units_per_km: 100, sun: sun}
+
+  cloud_noise {
+    TextureGen: {
+      width: 512, height: 512, seed: 7
+      layers: [
+        {kind: GenNoise, frequency: 10, octaves: 5, gain: 0.5}
+      ]
+    }
+  }
+
+  clouds {
+    CloudLayer: {texture: cloud_noise, size: 1500, altitude: 150, threshold: 0.5, softness: 0.12}
+  }
+
+  camera {
+    Position: {0, 1.6, 7}
+    Rotation: {0.05, 0, 0}
+    Camera: {fov: 60, far_: 0}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {400, 0.2, 400}
+    Rgb: {30, 32, 36}
+    PbrMaterial: {metallic: 0, roughness: 0.08}
+  }
+
+  mirror {
+    Position: {0, 1.2, 0}
+    Sphere: {segments: 64, smooth: true, radius: 1.2}
+    Rgb: {245, 245, 245}
+    PbrMaterial: {metallic: 1, roughness: 0}
+  }
+}
+
+main_view {
+  View: {
+    camera: sky.camera,
+    clear: {enabled: true, color: {0, 0, 0, 255}},
+    lighting: {enabled: true, baked: true, reflections: true, atmosphere: true,
+      environment: {source: sky, intensity: 1, yaw: 0, background: false}}
+  }
+}

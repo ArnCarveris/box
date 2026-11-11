@@ -8,7 +8,7 @@
  *
  * The entity of the LUTs is also an environment source: its sky goes into the cubemap of its
  * Environment as a BOX_RENDER_ATMOSPHERE_ENVIRONMENT, throttled to the changes that show. Its
- * CloudLayers, at most BOX_CLOUD_LAYER_MAX by entity id, reach the views that draw the sky.
+ * CloudLayers, at most BOX_CLOUD_LAYER_MAX by entity id, reach the sky and that cubemap.
  */
 
 #include "environment.h"
@@ -441,24 +441,28 @@ static float box_atmos_cloud_wrap(
     return result >= 1.0f ? 0.0f : result;
 }
 
-/** Write the cloud layers of a view that draws the sky: those with a size above 0 and a texture
+/** Write the cloud layers of a scene seen from a point: those with a size above 0 and a texture
  * the backend has an image of, in the order of the scene.
  *
  * @param world The world
- * @param s The LUTs of the scene of the view
- * @param v The view
+ * @param s The LUTs of the scene
+ * @param x World X of the point
+ * @param y World Y of the point
+ * @param z World Z of the point
+ * @param out Receives the layers, BOX_CLOUD_LAYER_MAX at most
+ * @return The layers written
  */
-static void box_atmos_view_clouds(
+static int32_t box_atmos_clouds_from(
     const ecs_world_t *world,
     const box_atmos_scene_t *s,
-    box_render_view_t *v)
+    double x,
+    float y,
+    double z,
+    box_render_cloud_layer_t *out)
 {
     const box_textures_t *textures = box_textures_get(world);
-    box_render_view_atmos_t *out = &v->atmos;
-    double x = v->camera_transform[3][0], z = v->camera_transform[3][2];
-    float camera_y = v->camera_transform[3][1];
-    int32_t i;
-    for (i = 0; i < s->cloud_count; i ++) {
+    int32_t i, result = 0;
+    for (i = 0; i < s->cloud_count && result < BOX_CLOUD_LAYER_MAX; i ++) {
         const box_atmos_cloud_t *c = &s->clouds[i];
         const CloudLayer *value = &c->value;
         uint32_t handle = value->texture && value->size > 0
@@ -468,11 +472,11 @@ static void box_atmos_view_clouds(
             continue;
         }
 
-        box_render_cloud_layer_t *l = &out->clouds[out->cloud_count ++];
+        box_render_cloud_layer_t *l = &out[result ++];
         double size = value->size;
         l->texture = handle;
         l->inv_size = 1.0f / value->size;
-        l->height = value->altitude - camera_y;
+        l->height = value->altitude - y;
         l->altitude = value->altitude;
         l->offset[0] = c->offset[0];
         l->offset[1] = c->offset[1];
@@ -486,6 +490,24 @@ static void box_atmos_view_clouds(
         l->tint[2] = box_atmos_extract_linear(value->tint.b);
         l->entity = c->entity;
     }
+
+    return result;
+}
+
+/** Write the cloud layers of a view that draws the sky, seen from its camera.
+ *
+ * @param world The world
+ * @param s The LUTs of the scene of the view
+ * @param v The view
+ */
+static void box_atmos_view_clouds(
+    const ecs_world_t *world,
+    const box_atmos_scene_t *s,
+    box_render_view_t *v)
+{
+    box_render_view_atmos_t *out = &v->atmos;
+    out->cloud_count = box_atmos_clouds_from(world, s, v->camera_transform[3][0],
+        v->camera_transform[3][1], v->camera_transform[3][2], out->clouds);
 }
 
 /** Write the inputs of the sky view and aerial perspective of a view of a scene with LUTs.
@@ -578,13 +600,16 @@ done:
     return;
 }
 
-/** Write the inputs of the environment of a scene with LUTs: its sky seen from the ground.
+/** Write the inputs of the environment of a scene with LUTs: its sky seen from the ground, the
+ * ground altitude at world X and Z 0, and its cloud layers seen from there.
  *
+ * @param world The world
  * @param lights The state of the light extract
  * @param s The LUTs of the scene
  * @param out Receives the inputs, version 0
  */
 static void box_atmos_env_inputs(
+    const ecs_world_t *world,
     const void *lights,
     const box_atmos_scene_t *s,
     box_render_atmosphere_env_t *out)
@@ -608,6 +633,10 @@ static void box_atmos_env_inputs(
     out->night[0] = box_atmos_extract_linear(value->night_tint.r) * scale;
     out->night[1] = box_atmos_extract_linear(value->night_tint.g) * scale;
     out->night[2] = box_atmos_extract_linear(value->night_tint.b) * scale;
+    out->aerial_intensity = value->aerial_intensity;
+    out->km_per_unit = 1.0f / value->units_per_km;
+    out->cloud_count = box_atmos_clouds_from(world, s, 0.0, value->sea_level, 0.0,
+        out->clouds);
 }
 
 /** Check whether a light of an environment changed enough since its last render to show: its
@@ -639,16 +668,66 @@ static bool box_atmos_env_light_changed(
     return result;
 }
 
+/** How the inputs of the environment of a scene changed since its last render */
+typedef enum box_atmos_env_change_t {
+    BOX_ATMOS_ENV_SAME,     /**< Not enough to show, the environment is not rendered */
+    BOX_ATMOS_ENV_MOVED,    /**< Only cloud layers moved, rendered without new captures */
+    BOX_ATMOS_ENV_CHANGED   /**< Rendered, and the captures that fill with it capture again */
+} box_atmos_env_change_t;
+
+/** Check how the cloud layers of an environment changed since its last render: a layer was
+ * added, removed or changed, or one only moved more than BOX_RENDER_CLOUD_ENV_MOVE of its size.
+ *
+ * @param was The inputs of the last render
+ * @param in The inputs of this frame
+ * @return The change
+ */
+static box_atmos_env_change_t box_atmos_env_clouds_changed(
+    const box_render_atmosphere_env_t *was,
+    const box_render_atmosphere_env_t *in)
+{
+    box_atmos_env_change_t result = BOX_ATMOS_ENV_SAME;
+    int32_t i;
+    if (was->cloud_count != in->cloud_count || was->km_per_unit != in->km_per_unit ||
+        was->aerial_intensity != in->aerial_intensity)
+    {
+        result = in->cloud_count || was->cloud_count
+            ? BOX_ATMOS_ENV_CHANGED
+            : BOX_ATMOS_ENV_SAME;
+        goto done;
+    }
+
+    for (i = 0; i < in->cloud_count; i ++) {
+        const box_render_cloud_layer_t *w = &was->clouds[i], *l = &in->clouds[i];
+        if (w->entity != l->entity || w->texture != l->texture ||
+            w->inv_size != l->inv_size || w->height != l->height ||
+            w->threshold != l->threshold || w->softness != l->softness ||
+            w->density != l->density || ecs_os_memcmp(w->tint, l->tint, ECS_SIZEOF(w->tint)))
+        {
+            result = BOX_ATMOS_ENV_CHANGED;
+            break;
+        }
+
+        if (box_render_cloud_moved(w->offset, l->offset, 1.0f / l->inv_size)) {
+            result = BOX_ATMOS_ENV_MOVED;
+        }
+    }
+
+done:
+    return result;
+}
+
 /** Check whether the environment of a scene is rendered again with new inputs: it never was,
- * its cubemap is new or empty, the medium changed, or the sun or moon changed enough to show.
+ * its cubemap is new or empty, the medium changed, the sun or moon changed enough to show, or
+ * its cloud layers changed or moved enough to show.
  *
  * @param world The world
  * @param s The LUTs of the scene
  * @param handle Handle of the cubemap
  * @param in The inputs of this frame
- * @return Whether the environment is rendered
+ * @return The change
  */
-static bool box_atmos_env_changed(
+static box_atmos_env_change_t box_atmos_env_changed(
     const ecs_world_t *world,
     const box_atmos_scene_t *s,
     uint32_t handle,
@@ -657,21 +736,24 @@ static bool box_atmos_env_changed(
     const box_render_atmosphere_env_t *was = &s->env;
     float angle = glm_clamp(s->value.ibl_update_angle, 0.0f, 180.0f);
     float cos_angle = cosf(glm_rad(angle));
-    bool result = !s->env_sent || s->env_entity != s->entity || s->env_handle != handle ||
+    bool changed = !s->env_sent || s->env_entity != s->entity || s->env_handle != handle ||
         !box_render_environment_content(world, s->entity);
-    if (!result) {
-        result = ecs_os_memcmp_t(&s->env_key, &s->key, box_render_atmosphere_desc_t) ||
+    box_atmos_env_change_t result = BOX_ATMOS_ENV_SAME;
+    if (!changed) {
+        changed = ecs_os_memcmp_t(&s->env_key, &s->key, box_render_atmosphere_desc_t) ||
             was->atmosphere != in->atmosphere || was->altitude != in->altitude ||
             was->mie_anisotropy != in->mie_anisotropy ||
             ecs_os_memcmp(was->night, in->night, ECS_SIZEOF(float) * 4);
     }
 
-    if (!result) {
-        result = box_atmos_env_light_changed(was->sun, was->sun_color, in->sun, in->sun_color,
+    if (!changed) {
+        changed = box_atmos_env_light_changed(was->sun, was->sun_color, in->sun, in->sun_color,
             cos_angle) ||
             box_atmos_env_light_changed(was->moon, was->moon_color, in->moon, in->moon_color,
                 cos_angle);
     }
+
+    result = changed ? BOX_ATMOS_ENV_CHANGED : box_atmos_env_clouds_changed(was, in);
 
     return result;
 }
@@ -697,12 +779,15 @@ static void box_atmos_environment(
         goto done;
     }
 
-    box_atmos_env_inputs(lights, s, &in);
-    if (!box_atmos_env_changed(world, s, handle, &in)) {
+    box_atmos_env_inputs(world, lights, s, &in);
+    box_atmos_env_change_t change = box_atmos_env_changed(world, s, handle, &in);
+    if (change == BOX_ATMOS_ENV_SAME) {
         goto done;
     }
 
-    in.version = box_render_environment_sent(world, s->entity);
+    in.version = change == BOX_ATMOS_ENV_MOVED
+        ? box_render_environment_sent_moved(world, s->entity)
+        : box_render_environment_sent(world, s->entity);
     box_render_atmosphere_env_t *desc = box_render_packet_resource(p,
         BOX_RENDER_ATMOSPHERE_ENVIRONMENT, BOX_RENDER_UPDATE, handle,
         sizeof(box_render_atmosphere_env_t));
@@ -891,6 +976,29 @@ void box_render_atmos_transmittance_uv(
     float x_mu = d_max > d_min + 1e-6f ? (d - d_min) / (d_max - d_min) : 0.0f;
     uv[0] = glm_clamp(x_mu, 0.0f, 1.0f);
     uv[1] = glm_clamp(rho / glm_max(h, 1e-6f), 0.0f, 1.0f);
+}
+
+bool box_render_cloud_moved(
+    const float *was,
+    const float *now,
+    float size)
+{
+    float d[2];
+    int32_t c;
+    bool result = false;
+    if (!(size > 0)) {
+        goto done;
+    }
+
+    for (c = 0; c < 2; c ++) {
+        d[c] = fmodf(fabsf(now[c] - was[c]), size);
+        d[c] = glm_min(d[c], size - d[c]);
+    }
+
+    result = d[0] * d[0] + d[1] * d[1] > (size * BOX_RENDER_CLOUD_ENV_MOVE) *
+        (size * BOX_RENDER_CLOUD_ENV_MOVE);
+done:
+    return result;
 }
 
 float box_render_cloud_coverage(
