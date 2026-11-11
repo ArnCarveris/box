@@ -74,7 +74,8 @@ static void box_gpu_blend_state(
 
 /** Set the overrides of the scene features of a mesh pipeline.
  *
- * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene the pipeline draws
+ * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene the pipeline draws, and
+ * BOX_GPU_FEATURE_PLANAR
  * @param transmissive Whether the pipeline draws transmissive shapes
  * @param water Whether the pipeline draws water shapes (Water)
  * @param out Receives BOX_GPU_FEATURE_OVERRIDES constants, the first 6 those of the mesh shader
@@ -89,11 +90,12 @@ static void box_gpu_feature_constants(
         "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
         "scene_environment", "scene_aerial", "material_sheen", "material_clear_coat",
         "material_anisotropy", "material_diffuse_transmission", "material_triplanar",
-        "material_fresnel", "transmissive", "water"
+        "material_fresnel", "transmissive", "water", "scene_planar"
     };
     uint32_t bits = (features & BOX_RENDER_FEATURE_OVERRIDES) |
-        (transmissive ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 2) : 0u) |
-        (water ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 1) : 0u);
+        (transmissive ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 3) : 0u) |
+        (water ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 2) : 0u) |
+        (features & BOX_GPU_FEATURE_PLANAR ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 1) : 0u);
     int32_t i;
     for (i = 0; i < BOX_GPU_FEATURE_OVERRIDES; i ++) {
         out[i] = (WGPUConstantEntry){
@@ -407,8 +409,8 @@ typedef enum box_gpu_depth_mode_t {
  * the 2D shape shader, which never blends layers, whether they are polygons (polygon)
  * @param surface Whether the instances are parametric surfaces (vs_surface)
  * @param depth Depth state of the pipeline
- * @param features BOX_RENDER_FEATURE_OVERRIDES features of the mesh shader overrides, 0 for the
- * 2D shape shader and the depth prepass
+ * @param features BOX_RENDER_FEATURE_OVERRIDES features of the mesh shader overrides with
+ * BOX_GPU_FEATURE_PLANAR, 0 for the 2D shape shader and the depth prepass
  * @param mirrored Whether the front faces wind clockwise, for a planar reflection
  * @param water Whether the pipeline draws Water shapes (the water override)
  * @return The key, distinct for every distinct pipeline
@@ -428,11 +430,12 @@ static uint64_t box_gpu_forward_key(
     bool water)
 {
     ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(shader < (1u << 15), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(features <= BOX_RENDER_FEATURE_OVERRIDES, ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(shader < (1u << 14), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(features <= (BOX_RENDER_FEATURE_OVERRIDES | BOX_GPU_FEATURE_PLANAR),
+        ECS_INTERNAL_ERROR, NULL);
 
-    return ((uint64_t)shader << 49) | ((uint64_t)water << 48) | ((uint64_t)surface << 47) |
-        ((uint64_t)mirrored << 46) | ((uint64_t)features << 34) |
+    return ((uint64_t)shader << 50) | ((uint64_t)water << 49) | ((uint64_t)surface << 48) |
+        ((uint64_t)mirrored << 47) | ((uint64_t)features << 34) |
         ((uint64_t)texture_blend << 33) |
         ((uint64_t)transmissive << 32) |
         ((uint64_t)format << 8) | ((uint64_t)blend << 4) | ((uint64_t)depth << 2) |
@@ -535,6 +538,12 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     surface = mesh && b->surface;
     water = b->water && b->transmissive && b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
     texture_blend = texture_blend && !water;
+    if (b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED &&
+        (b->features & BOX_RENDER_FEATURE_PLANAR))
+    {
+        features |= BOX_GPU_FEATURE_PLANAR;
+    }
+
     if (!mesh) {
         features = 0;
     }

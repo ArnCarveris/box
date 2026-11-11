@@ -14,8 +14,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
+#include "draw.h"
 
-/** Create a world that renders into a null backend.
+/** Create a world that renders into a null backend, its default scene with
+ * Scene.planar_reflections.
  *
  * @param null Receives the backend
  * @return The world
@@ -28,8 +30,27 @@ static ecs_world_t* world_new(
     *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(*null);
     box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, Scene, {.planar_reflections = true});
 
     return world;
+}
+
+/** Get the shader of the batch a shape draws in.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return The pipeline of its batch key
+ */
+static uint32_t pipeline_of(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    const DrawSlot *slot = ecs_get(world, e, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+
+    return box_draws_batch(d, slot->batch)->key.pipeline;
 }
 
 /** Run a frame and wait until the backend rendered it.
@@ -179,12 +200,14 @@ void PlanarReflection_defaults(void) {
     test_assert(p != NULL);
     test_flt(p->resolution, 0.5f);
     test_flt(p->clip_offset, 0.02f);
+    test_flt(p->distortion, 0.02f);
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, PlanarReflection);
     p = ecs_get(world, e, PlanarReflection);
     test_flt(p->resolution, 0.5f);
     test_flt(p->clip_offset, 0.02f);
+    test_flt(p->distortion, 0.02f);
 
     test_assert(ecs_script_run(world, "partial",
         "using box.light\n"
@@ -192,6 +215,7 @@ void PlanarReflection_defaults(void) {
     p = ecs_get(world, ecs_lookup(world, "partial"), PlanarReflection);
     test_flt(p->resolution, 1.0f);
     test_flt(p->clip_offset, 0.02f);
+    test_flt(p->distortion, 0.02f);
     test_int(BOX_PLANAR_REFLECTION_MAX, 2);
 
     ecs_fini(world);
@@ -436,7 +460,8 @@ void PlanarReflection_extract_record(void) {
     ecs_entity_t mirror = ecs_new(world);
     ecs_set(world, mirror, Position, {0, -1, 0});
     ecs_set(world, mirror, Box, {20, 0.1f, 20});
-    ecs_set(world, mirror, PlanarReflection, {.resolution = 4, .clip_offset = 0.25f});
+    ecs_set(world, mirror, PlanarReflection, {.resolution = 4, .clip_offset = 0.25f,
+        .distortion = 0.1f});
     frame(world);
     frame(world);
 
@@ -451,6 +476,7 @@ void PlanarReflection_extract_record(void) {
     test_flt(r->plane[3], 1);
     test_flt(r->clip[3], 1.25f);
     test_flt(r->resolution, 1.0f);
+    test_flt(r->distortion, 0.1f);
 
     // The camera at (0, 1, 10) mirrors to (0, -3, 10)
     test_flt(r->camera[0], 0);
@@ -474,6 +500,18 @@ void PlanarReflection_extract_record(void) {
     test_assert(page != 0);
     test_uint(r->exclude_page, page);
     test_uint(r->exclude_slot, slot);
+
+    // The record holds the transform of that instance as its page does, the box scaled by its
+    // size and moved to the mirror
+    vec4 rows[3];
+    test_bool(box_render_draws_instance_transform(world, mirror, rows), true);
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 4; j ++) {
+            test_flt(r->owner[i][j], rows[i][j]);
+        }
+    }
+
+    test_assert(fabsf(r->owner[1][3] + 1.0f) < 1e-5f);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -499,6 +537,9 @@ void PlanarReflection_extract_rotated_wall(void) {
     test_assert(fabsf(r->plane[3] - 4.0f) < 1e-4f);
     test_flt(r->resolution, 0.5f);
     test_uint(r->exclude_page, 0);
+    test_flt(r->distortion, 0.02f);
+    test_flt(r->owner[0][0], 0);
+    test_flt(r->owner[1][3], 0);
 
     // The camera at z 10 mirrors to z -18
     test_assert(fabsf(r->camera[2] + 18.0f) < 1e-4f);
@@ -554,7 +595,7 @@ void PlanarReflection_extract_views_without(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t unlit = view_new(world, 0, false);
     ecs_entity_t scene = ecs_new(world);
-    ecs_add(world, scene, Scene);
+    ecs_set(world, scene, Scene, {.planar_reflections = true});
     ecs_entity_t other = view_new(world, scene, true);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 1, 10});
@@ -570,6 +611,96 @@ void PlanarReflection_extract_views_without(void) {
     test_int(packet_view(null, unlit)->planar_count, 0);
     test_int(packet_view(null, other)->planar_count, 0);
     test_int(packet_view(null, ortho)->planar_count, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanarReflection_extract_needs_scene_feature(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.planar_reflections = false});
+    ecs_entity_t view = view_new(world, 0, true);
+    ecs_entity_t mirror = ecs_new(world);
+    ecs_set(world, mirror, Position, {0, 0, 0});
+    ecs_add(world, mirror, PlanarReflection);
+    frame(world);
+
+    // Without Scene.planar_reflections the view renders no reflection
+    const box_render_view_t *v = packet_view(null, view);
+    test_int(v->planar_count, 0);
+    test_int(ecs_vec_count(&null->last.planar_reflections), 0);
+    test_assert(!(v->scene_features & BOX_RENDER_FEATURE_PLANAR));
+
+    ecs_singleton_set(world, Scene, {.planar_reflections = true});
+    frame(world);
+    v = packet_view(null, view);
+    test_assert(v->scene_features & BOX_RENDER_FEATURE_PLANAR);
+    test_int(v->planar_count, 1);
+    test_assert(record_of(null, v, 0)->entity == mirror);
+
+    // A scene of its own without the feature renders none, whatever the default scene does
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add(world, scene, Scene);
+    ecs_entity_t other = view_new(world, scene, true);
+    ecs_entity_t inner = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, inner, Position, {0, 0, 0});
+    ecs_add(world, inner, PlanarReflection);
+    frame(world);
+    test_int(packet_view(null, other)->planar_count, 0);
+    test_int(packet_view(null, view)->planar_count, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanarReflection_shape_draws_with_extended(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    view_new(world, 0, true);
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {3, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    ecs_entity_t mirror = ecs_new(world);
+    ecs_set(world, mirror, Position, {0, 0, 0});
+    ecs_set(world, mirror, Box, {4, 0.1f, 4});
+    ecs_add(world, mirror, PlanarReflection);
+    frame(world);
+
+    test_int(pipeline_of(world, mirror), BOX_RENDER_SHADER_MESH_EXTENDED);
+    test_int(pipeline_of(world, plain), BOX_RENDER_SHADER_MESH);
+
+    // Removing the component moves the shape back to the mesh shader
+    ecs_remove(world, mirror, PlanarReflection);
+    frame(world);
+    test_int(pipeline_of(world, mirror), BOX_RENDER_SHADER_MESH);
+
+    ecs_add(world, mirror, PlanarReflection);
+    frame(world);
+    test_int(pipeline_of(world, mirror), BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanarReflection_feature_off_draws_with_mesh_shader(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.planar_reflections = false});
+    view_new(world, 0, true);
+    ecs_entity_t mirror = ecs_new(world);
+    ecs_set(world, mirror, Position, {0, 0, 0});
+    ecs_set(world, mirror, Box, {4, 0.1f, 4});
+    ecs_add(world, mirror, PlanarReflection);
+    frame(world);
+
+    // A scene without Scene.planar_reflections draws the shape as without the component
+    test_int(pipeline_of(world, mirror), BOX_RENDER_SHADER_MESH);
+
+    // Turning the feature on moves it to the extended mesh shader
+    ecs_singleton_set(world, Scene, {.planar_reflections = true});
+    frame(world);
+    test_int(pipeline_of(world, mirror), BOX_RENDER_SHADER_MESH_EXTENDED);
 
     ecs_fini(world);
     box_render_null_free(null);

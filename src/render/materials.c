@@ -807,8 +807,8 @@ static bool box_materials_slotted(
 }
 
 /** Check whether adding or removing a material component changes the batch key of the shapes
- * that have it: the alpha test, the transmission, the water, and the material features that draw
- * with the extended mesh shader. A TextureMapping changes it when set too, by its blend.
+ * that have it: the alpha test, the transmission, the water, a PlanarReflection and the material
+ * features that draw with the extended mesh shader. A TextureMapping changes it when set too.
  *
  * @param component The component
  * @return Whether its OnAdd and OnRemove move the shapes to a new key
@@ -819,7 +819,8 @@ static bool box_materials_keyed(
     return component == ecs_id(AlphaCutoff) || component == ecs_id(Transmission) ||
         component == ecs_id(Sheen) || component == ecs_id(ClearCoat) ||
         component == ecs_id(SpecularAnisotropy) || component == ecs_id(DiffuseTransmission) ||
-        component == ecs_id(Fresnel) || component == ecs_id(Water);
+        component == ecs_id(Fresnel) || component == ecs_id(Water) ||
+        component == ecs_id(PlanarReflection);
 }
 
 /** Follow a set or removal of a material component on its owner, or on a base that propagates
@@ -873,17 +874,18 @@ void box_draws_materials_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[14] = {
+    ecs_entity_t components[15] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(PlanarReflection)
     };
-    const char *names[14] = {
+    const char *names[15] = {
         "DrawsOnColor", "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnTextureTransform",
         "DrawsOnAlphaCutoff", "DrawsOnTransmission", "DrawsOnClearCoat",
         "DrawsOnSpecularAnisotropy", "DrawsOnSheen", "DrawsOnDiffuseTransmission",
-        "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater"
+        "DrawsOnTextureMapping", "DrawsOnTextureScroll", "DrawsOnFresnel", "DrawsOnWater",
+        "DrawsOnPlanarReflection"
     };
     int32_t i;
     box_draws_observer(world, d, "MaterialsOnPrefab", (ecs_observer_desc_t){
@@ -908,7 +910,7 @@ void box_draws_materials_observers(
         .query.flags = EcsQueryMatchPrefab,
         .events = { EcsOnAdd, EcsOnRemove } }, BoxMaterialsOnIsA);
 
-    for (i = 0; i < 14; i ++) {
+    for (i = 0; i < 15; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{

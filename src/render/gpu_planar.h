@@ -98,7 +98,8 @@ int32_t box_gpu_planar_add(
     int32_t first);
 
 /** Write the uniforms of the reflections added for a target into the view data, which must
- * hold their slots.
+ * hold their slots, and the planar fields of their views: the share of the reflection array
+ * each image covers and the instance of the shape of each plane, which samples it.
  *
  * @param gpu The backend
  * @param data The view data of the target, BOX_GPU_VIEW_STRIDE per slot
@@ -108,8 +109,11 @@ void box_gpu_planar_uniforms(
     uint8_t *data);
 
 /** Record the planar reflections of a view into their images, before its forward pass: the
- * cull of each, then a pass that draws its background, its opaque and alpha tested meshes, its
- * sky, its particles and its blended meshes, mirrored.
+ * cull of each, then a pass that draws its background, its meshes, sky and particles mirrored
+ * onto a transparent clear, then its copy into the reflection array (box_gpu_planar_view).
+ *
+ * The alpha of an image is the coverage of what the reflection drew; the shape of the plane
+ * shows the probes where it is 0.
  *
  * @param gpu The backend
  * @param t The target
@@ -126,8 +130,21 @@ void box_gpu_planar_render(
     const box_render_view_t *v,
     int32_t slot);
 
-/** Release the images of the reflections no target rendered in a packet: of a plane or view
- * that went away, or a slot a view no longer fills.
+/** Get the reflection array of a view, which its forward pass samples (binding 21 of the view
+ * group): a layer per plane slot with the image of its last reflection in a corner and a blur
+ * pyramid.
+ * @param gpu The backend
+ * @param t The target, NULL for the captures
+ * @param v The view, NULL for the captures
+ * @return The 2D array view of every mip, the 1x1 transparent array without one
+ */
+WGPUTextureView box_gpu_planar_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v);
+
+/** Release the images and reflection arrays of the reflections no target rendered in a packet:
+ * of a plane or view that went away, or a slot a view no longer fills.
  *
  * @param gpu The backend
  * @param packet The packet that rendered

@@ -1351,7 +1351,13 @@
                     "one_sided_winding",
                     "remove_frees_texture",
                     "sky_mirrored",
-                    "water_hidden"
+                    "water_hidden",
+                    "shading_mirror_floor",
+                    "shading_roughness_blurs",
+                    "shading_rough_matches_probe",
+                    "shading_water",
+                    "shading_feature_off",
+                    "shading_over_limit"
                 ]
             }
         ]

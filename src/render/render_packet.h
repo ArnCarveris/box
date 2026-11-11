@@ -67,6 +67,9 @@
 /** Shader handle of the engine shader that blurs the opaque snapshot of transmission */
 #define BOX_RENDER_SHADER_TRANSMISSION (50)
 
+/** Shader handle of the engine shader that builds the mip pyramid of the planar reflections */
+#define BOX_RENDER_SHADER_PLANAR (59)
+
 /** Shader handle of the engine shader that raymarches the fog volumes of a view */
 #define BOX_RENDER_SHADER_FOG_VOLUME (51)
 
@@ -593,6 +596,9 @@ typedef struct box_render_planar_t {
     uint32_t exclude_page;  /**< Handle of the transform stream of the instance page of the shape
                              *   of the entity, which the reflection does not draw, 0 for none */
     uint32_t exclude_slot;  /**< Slot of that shape in the page */
+    vec4 owner[3];          /**< Rows of the transform of that instance as its page holds it,
+                             *   which its vertices compare to find their reflection slot */
+    float distortion;       /**< PlanarReflection.distortion */
 } box_render_planar_t;
 
 /** Noise scales over which the noise of a fog volume repeats: the coarse sample repeats every
@@ -647,11 +653,17 @@ typedef struct box_render_view_gtao_t {
  * mesh shader, which follows the water pipelines like the transmission override */
 #define BOX_RENDER_FEATURE_WATER (1u << 17)
 
+/** Planar reflections (Scene.planar_reflections): the views render the images of the
+ * PlanarReflections of the scene, and their shapes draw with the extended mesh shader, whose
+ * scene_planar override samples them */
+#define BOX_RENDER_FEATURE_PLANAR (1u << 18)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
 /** The scene features that draw with the extended mesh shader */
-#define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u | BOX_RENDER_FEATURE_WATER)
+#define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u | BOX_RENDER_FEATURE_WATER | \
+    BOX_RENDER_FEATURE_PLANAR)
 
 /** The scene features that are overrides, which key the pipelines of the mesh shaders; the
  * transmission override follows the transmissive pipelines instead */

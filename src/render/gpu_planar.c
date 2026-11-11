@@ -5,16 +5,20 @@
  *
  * A reflection draws with the projection of its view, its near plane made oblique to the plane
  * (box_render_planar_oblique), and the view matrix of the view times the reflection; its front
- * faces wind clockwise. It is lit like the view and culled by a frustum of its own.
+ * faces wind clockwise, it is lit like the view and culled by a frustum of its own.
  *
- * The images live per target, view and plane slot, sized by the render size of the target and
- * the resolution of the plane, and are released once no packet renders them.
+ * Its image, kept per target, view and slot, is copied with its coverage into a layer of the
+ * reflection array of the view and blurred into its mips (planar.wgsl), which the forward pass
+ * samples; both are released once no packet renders them.
  */
 
 #include "gpu_environment.h"
 #include <math.h>
 
 #ifdef BOX_RENDER_WGPU
+
+/** Mips of a reflection array at most */
+#define BOX_GPU_PLANAR_MIPS (12)
 
 /** The images of a planar reflection of a view in a target */
 typedef struct box_gpu_planar_image_t {
@@ -30,10 +34,26 @@ typedef struct box_gpu_planar_image_t {
     WGPUTextureView depth_view;     /**< View rendered into */
 } box_gpu_planar_image_t;
 
+/** The reflection array of a view in a target: a layer per plane slot, each image in the
+ * corner of its layer, and a blur pyramid */
+typedef struct box_gpu_planar_array_t {
+    uint32_t target;                /**< Handle of the target */
+    ecs_entity_t view;              /**< View entity */
+    int64_t frame;                  /**< Frame of the last packet that rendered it */
+    uint32_t width;                 /**< Width of mip 0, the widest image of the view */
+    uint32_t height;                /**< Height of mip 0, the tallest image of the view */
+    uint32_t mip_count;             /**< Mip levels */
+    WGPUTexture texture;            /**< BOX_GPU_HDR_FORMAT, BOX_PLANAR_REFLECTION_MAX layers */
+    WGPUTextureView all;            /**< 2D array view of every layer and mip, sampled */
+    WGPUTextureView mips[BOX_PLANAR_REFLECTION_MAX][BOX_GPU_PLANAR_MIPS]; /**< 2D view of
+                                     *   each mip of each layer */
+} box_gpu_planar_array_t;
+
 /** A planar reflection of a view of the target being rendered */
 typedef struct box_gpu_planar_pass_t {
     int32_t view_slot;              /**< Slot of its view in the view buffer */
     int32_t record;                 /**< Index of its box_render_planar_t in the packet */
+    int32_t mirror;                 /**< Slot of the plane in the view */
     int32_t slot;                   /**< Slot its meshes draw with; the next one draws its
                                      *   background and particles */
     uint32_t width;                 /**< Width of its image */
@@ -43,20 +63,202 @@ typedef struct box_gpu_planar_pass_t {
     mat4 view_matrix;               /**< View matrix of the mirrored camera */
     mat4 sky_inv_view_proj;         /**< Inverse view projection of the mirrored camera without
                                      *   the oblique near plane, whose rays the sky casts */
+    uint32_t array_width;           /**< Width of the reflection array of its view */
+    uint32_t array_height;          /**< Height of the reflection array of its view */
+    uint32_t mip_count;             /**< Mips of the reflection array of its view */
+    bool sampled;                   /**< The pyramid is built, so the shape of the plane samples
+                                     *   the image; false until the shader compiles */
+    float distortion;               /**< PlanarReflection.distortion */
+    vec4 owner[3];                  /**< Transform of the instance of the shape of the plane */
+    uint32_t owner_slot;            /**< Page slot plus one of that instance, 0 for none */
 } box_gpu_planar_pass_t;
 
 struct box_gpu_planar_t {
     ecs_vec_t images;               /**< box_gpu_planar_image_t* */
+    ecs_vec_t arrays;               /**< box_gpu_planar_array_t* */
     ecs_vec_t passes;               /**< box_gpu_planar_pass_t of the target being rendered */
+    WGPUBindGroupLayout layout;     /**< Source image and sampler of a pyramid pass */
+    WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the pyramid passes */
+    WGPUSampler sampler;            /**< Linear clamp sampler of the downsample */
+    WGPURenderPipeline copy;        /**< Pipeline that writes mip 0, NULL until the shader exists */
+    WGPURenderPipeline down;        /**< Pipeline that writes the mips above */
+    int32_t revision;               /**< Revision of the shader of the pipelines */
+    WGPUTexture none;               /**< 1x1 transparent array of the views without reflections */
+    WGPUTextureView none_view;      /**< 2D array view of it */
 };
 
 void box_gpu_planar_init(
     box_gpu_t *gpu)
 {
     box_gpu_planar_t *result = ecs_os_calloc_t(box_gpu_planar_t);
+    WGPUBindGroupLayoutEntry entries[2] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        }
+    };
     ecs_vec_init_t(NULL, &result->images, box_gpu_planar_image_t*, 0);
+    ecs_vec_init_t(NULL, &result->arrays, box_gpu_planar_array_t*, 0);
     ecs_vec_init_t(NULL, &result->passes, box_gpu_planar_pass_t, 0);
+    result->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = entries });
+    result->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){ .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &result->layout });
+    result->sampler = wgpuDeviceCreateSampler(gpu->device, &(WGPUSamplerDescriptor){
+        .addressModeU = WGPUAddressMode_ClampToEdge,
+        .addressModeV = WGPUAddressMode_ClampToEdge,
+        .addressModeW = WGPUAddressMode_ClampToEdge,
+        .magFilter = WGPUFilterMode_Linear,
+        .minFilter = WGPUFilterMode_Linear,
+        .mipmapFilter = WGPUMipmapFilterMode_Nearest,
+        .lodMaxClamp = 32.0f,
+        .maxAnisotropy = 1
+    });
+    result->none = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { 1, 1, BOX_PLANAR_REFLECTION_MAX },
+        .format = BOX_GPU_HDR_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    result->none_view = wgpuTextureCreateView(result->none, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_HDR_FORMAT,
+        .dimension = WGPUTextureViewDimension_2DArray,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = BOX_PLANAR_REFLECTION_MAX,
+        .aspect = WGPUTextureAspect_All
+    });
     gpu->planar = result;
+}
+
+/** Release the textures of a reflection array.
+ *
+ * @param a The array
+ */
+static void box_gpu_planar_array_release(
+    box_gpu_planar_array_t *a)
+{
+    int32_t k;
+    uint32_t m;
+    for (k = 0; k < BOX_PLANAR_REFLECTION_MAX; k ++) {
+        for (m = 0; m < BOX_GPU_PLANAR_MIPS; m ++) {
+            if (a->mips[k][m]) {
+                wgpuTextureViewRelease(a->mips[k][m]);
+                a->mips[k][m] = NULL;
+            }
+        }
+    }
+
+    if (a->all) {
+        wgpuTextureViewRelease(a->all);
+        a->all = NULL;
+    }
+
+    if (a->texture) {
+        wgpuTextureRelease(a->texture);
+        a->texture = NULL;
+    }
+}
+
+/** Release the pyramid pipelines.
+ *
+ * @param p The planar reflection state
+ */
+static void box_gpu_planar_pipelines_free(
+    box_gpu_planar_t *p)
+{
+    if (p->copy) {
+        wgpuRenderPipelineRelease(p->copy);
+        p->copy = NULL;
+    }
+
+    if (p->down) {
+        wgpuRenderPipelineRelease(p->down);
+        p->down = NULL;
+    }
+}
+
+/** Create a pyramid pipeline of the planar shader into the HDR format.
+ *
+ * @param gpu The backend
+ * @param module The shader module
+ * @param entry Its fragment entry point
+ * @return The pipeline, NULL while it is being created
+ */
+static WGPURenderPipeline box_gpu_planar_pipeline_new(
+    box_gpu_t *gpu,
+    WGPUShaderModule module,
+    const char *entry)
+{
+    WGPUColorTargetState target = {
+        .format = BOX_GPU_HDR_FORMAT,
+        .writeMask = WGPUColorWriteMask_All
+    };
+    WGPUFragmentState fragment = {
+        .module = module,
+        .entryPoint = { .data = entry, .length = WGPU_STRLEN },
+        .targetCount = 1,
+        .targets = &target
+    };
+
+    return box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
+        .layout = gpu->planar->pipeline_layout,
+        .vertex = {
+            .module = module,
+            .entryPoint = { .data = "vs", .length = WGPU_STRLEN }
+        },
+        .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = &fragment
+    });
+}
+
+/** Get whether the pyramid pipelines exist, created on first use and again when the shader was
+ * recompiled.
+ *
+ * @param gpu The backend
+ * @return Whether both pipelines exist
+ */
+static bool box_gpu_planar_pipelines(
+    box_gpu_t *gpu)
+{
+    box_gpu_planar_t *p = gpu->planar;
+    box_gpu_shader_t *shader = ecs_map_get_deref(
+        &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_PLANAR);
+    bool result = false;
+    if (!shader || !shader->module) {
+        goto done;
+    }
+
+    if (p->revision != shader->revision) {
+        box_gpu_planar_pipelines_free(p);
+        p->revision = shader->revision;
+    }
+
+    if (!p->copy) {
+        p->copy = box_gpu_planar_pipeline_new(gpu, shader->module, "fs_copy");
+    }
+
+    if (!p->down) {
+        p->down = box_gpu_planar_pipeline_new(gpu, shader->module, "fs_down");
+    }
+
+    result = p->copy && p->down;
+done:
+    return result;
 }
 
 /** Release the textures of a reflection image.
@@ -102,7 +304,20 @@ void box_gpu_planar_fini(
         ecs_os_free(img);
     }
 
+    for (i = 0; i < ecs_vec_count(&p->arrays); i ++) {
+        box_gpu_planar_array_t *a = *ecs_vec_get_t(&p->arrays, box_gpu_planar_array_t*, i);
+        box_gpu_planar_array_release(a);
+        ecs_os_free(a);
+    }
+
+    box_gpu_planar_pipelines_free(p);
+    wgpuPipelineLayoutRelease(p->pipeline_layout);
+    wgpuBindGroupLayoutRelease(p->layout);
+    wgpuSamplerRelease(p->sampler);
+    wgpuTextureViewRelease(p->none_view);
+    wgpuTextureRelease(p->none);
     ecs_vec_fini_t(NULL, &p->images, box_gpu_planar_image_t*);
+    ecs_vec_fini_t(NULL, &p->arrays, box_gpu_planar_array_t*);
     ecs_vec_fini_t(NULL, &p->passes, box_gpu_planar_pass_t);
     ecs_os_free(p);
     gpu->planar = NULL;
@@ -134,6 +349,28 @@ static uint32_t box_gpu_planar_size(
     return scaled < 1.0f ? 1u : (uint32_t)scaled;
 }
 
+/** Count the mips of a reflection array: the full chain of its size minus one, at least one
+ * and at most BOX_GPU_PLANAR_MIPS.
+ *
+ * @param width Width of mip 0
+ * @param height Height of mip 0
+ * @return The mips
+ */
+static uint32_t box_gpu_planar_mips(
+    uint32_t width,
+    uint32_t height)
+{
+    uint32_t edge = width > height ? width : height, chain = 1, result;
+    while (edge > 1) {
+        edge >>= 1;
+        chain ++;
+    }
+
+    result = chain > 1 ? chain - 1 : 1;
+
+    return result > BOX_GPU_PLANAR_MIPS ? BOX_GPU_PLANAR_MIPS : result;
+}
+
 int32_t box_gpu_planar_add(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
@@ -144,7 +381,9 @@ int32_t box_gpu_planar_add(
     int32_t first)
 {
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
-    int32_t result = 0, k, i, j;
+    int32_t result = 0, k, i, j, start = gpu->planar ? ecs_vec_count(&gpu->planar->passes) : 0;
+    uint32_t array_width = 1, array_height = 1, mips;
+    bool sampled;
     mat4 proj;
     if (!gpu->planar || v->planar_count <= 0 ||
         v->planar_first + v->planar_count > ecs_vec_count(&packet->planar_reflections))
@@ -165,9 +404,18 @@ int32_t box_gpu_planar_add(
         ecs_os_memset_t(pass, 0, box_gpu_planar_pass_t);
         pass->view_slot = slot;
         pass->record = v->planar_first + k;
+        pass->mirror = rec->slot;
         pass->slot = first + result;
         pass->width = box_gpu_planar_size(t->desc.render_width, rec->resolution);
         pass->height = box_gpu_planar_size(t->desc.render_height, rec->resolution);
+        pass->distortion = rec->distortion;
+        pass->owner_slot = rec->exclude_page ? rec->exclude_slot + 1u : 0u;
+        for (i = 0; i < 3; i ++) {
+            glm_vec4_copy(ECS_CONST_CAST(float*, rec->owner[i]), pass->owner[i]);
+        }
+
+        array_width = pass->width > array_width ? pass->width : array_width;
+        array_height = pass->height > array_height ? pass->height : array_height;
         glm_mat4_copy(ECS_CONST_CAST(vec4*, rec->view_matrix), pass->view_matrix);
 
         glm_mat4_inv(pass->view_matrix, inv);
@@ -196,6 +444,18 @@ int32_t box_gpu_planar_add(
         result += 2;
     }
 
+    mips = box_gpu_planar_mips(array_width, array_height);
+    sampled = box_gpu_planar_pipelines(gpu);
+    for (k = start; k < ecs_vec_count(&gpu->planar->passes); k ++) {
+        box_gpu_planar_pass_t *pass = ecs_vec_get_t(
+            &gpu->planar->passes, box_gpu_planar_pass_t, k);
+        pass->array_width = array_width;
+        pass->array_height = array_height;
+        pass->mip_count = mips;
+        pass->sampled = sampled && pass->mirror >= 0 &&
+            pass->mirror < BOX_PLANAR_REFLECTION_MAX;
+    }
+
 done:
     return result;
 }
@@ -215,6 +475,27 @@ void box_gpu_planar_uniforms(
         *lit = pass->uniforms;
         *mirror = pass->uniforms;
         glm_mat4_copy(ECS_CONST_CAST(vec4*, pass->view_matrix), mirror->view);
+    }
+
+    for (i = 0; gpu->planar && i < ecs_vec_count(&gpu->planar->passes); i ++) {
+        const box_gpu_planar_pass_t *pass = ecs_vec_get_t(
+            &gpu->planar->passes, box_gpu_planar_pass_t, i);
+        box_gpu_view_uniforms_t *owner = (box_gpu_view_uniforms_t*)
+            (data + (size_t)pass->view_slot * BOX_GPU_VIEW_STRIDE);
+        int32_t k = pass->mirror, j;
+        if (!pass->sampled) {
+            continue;
+        }
+
+        owner->planar[k][0] = pass->distortion;
+        owner->planar[k][1] = (float)pass->width / (float)pass->array_width;
+        owner->planar[k][2] = (float)pass->height / (float)pass->array_height;
+        owner->planar[k][3] = (float)pass->mip_count;
+        for (j = 0; j < 3; j ++) {
+            glm_vec4_copy(ECS_CONST_CAST(float*, pass->owner[j]), owner->planar_owner[k * 3 + j]);
+        }
+
+        owner->planar_slots[k] = pass->owner_slot;
     }
 }
 
@@ -281,6 +562,189 @@ static box_gpu_planar_image_t* box_gpu_planar_image(
     });
     result->depth_view = wgpuTextureCreateView(result->depth, NULL);
 done:
+    return result;
+}
+
+/** Get the reflection array of a view in a target, created or resized.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param view The view entity
+ * @param width Width of mip 0
+ * @param height Height of mip 0
+ * @param mips Mips
+ * @return The array
+ */
+static box_gpu_planar_array_t* box_gpu_planar_array(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    ecs_entity_t view,
+    uint32_t width,
+    uint32_t height,
+    uint32_t mips)
+{
+    box_gpu_planar_t *p = gpu->planar;
+    box_gpu_planar_array_t *result = NULL;
+    int32_t i, k;
+    uint32_t m;
+    for (i = 0; i < ecs_vec_count(&p->arrays) && !result; i ++) {
+        box_gpu_planar_array_t *a = *ecs_vec_get_t(&p->arrays, box_gpu_planar_array_t*, i);
+        if (a->target == t->handle && a->view == view) {
+            result = a;
+        }
+    }
+
+    if (!result) {
+        result = ecs_os_calloc_t(box_gpu_planar_array_t);
+        result->target = t->handle;
+        result->view = view;
+        *ecs_vec_append_t(NULL, &p->arrays, box_gpu_planar_array_t*) = result;
+    }
+
+    if (result->texture && result->width == width && result->height == height &&
+        result->mip_count == mips)
+    {
+        goto done;
+    }
+
+    box_gpu_planar_array_release(result);
+    result->width = width;
+    result->height = height;
+    result->mip_count = mips;
+    result->texture = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width, height, BOX_PLANAR_REFLECTION_MAX },
+        .format = BOX_GPU_HDR_FORMAT,
+        .mipLevelCount = mips,
+        .sampleCount = 1
+    });
+    result->all = wgpuTextureCreateView(result->texture, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_HDR_FORMAT,
+        .dimension = WGPUTextureViewDimension_2DArray,
+        .baseMipLevel = 0,
+        .mipLevelCount = mips,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = BOX_PLANAR_REFLECTION_MAX,
+        .aspect = WGPUTextureAspect_All
+    });
+    for (k = 0; k < BOX_PLANAR_REFLECTION_MAX; k ++) {
+        for (m = 0; m < mips; m ++) {
+            result->mips[k][m] = wgpuTextureCreateView(result->texture,
+                &(WGPUTextureViewDescriptor){
+                    .format = BOX_GPU_HDR_FORMAT,
+                    .dimension = WGPUTextureViewDimension_2D,
+                    .baseMipLevel = m,
+                    .mipLevelCount = 1,
+                    .baseArrayLayer = (uint32_t)k,
+                    .arrayLayerCount = 1,
+                    .aspect = WGPUTextureAspect_All
+                });
+        }
+    }
+
+done:
+    return result;
+}
+
+/** Record a pass of the pyramid of a reflection: one draw into the corner of a mip of its layer
+ * from a source image, the rest of the mip cleared to transparent.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param pipeline The pipeline, copy or down
+ * @param target The mip of the layer
+ * @param source The image it reads
+ * @param width Width of the corner
+ * @param height Height of the corner
+ */
+static void box_gpu_planar_pyramid_pass(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    WGPURenderPipeline pipeline,
+    WGPUTextureView target,
+    WGPUTextureView source,
+    uint32_t width,
+    uint32_t height)
+{
+    box_gpu_planar_t *p = gpu->planar;
+    WGPUBindGroupEntry entries[2] = {
+        { .binding = 0, .textureView = source },
+        { .binding = 1, .sampler = p->sampler }
+    };
+    WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = p->layout,
+        .entryCount = 2,
+        .entries = entries
+    });
+    WGPURenderPassColorAttachment attachment = {
+        .view = target,
+        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+        .loadOp = WGPULoadOp_Clear,
+        .storeOp = WGPUStoreOp_Store,
+        .clearValue = { 0, 0, 0, 0 }
+    };
+    WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(encoder,
+        &(WGPURenderPassDescriptor){
+            .colorAttachmentCount = 1,
+            .colorAttachments = &attachment
+        });
+    wgpuRenderPassEncoderSetViewport(rp, 0, 0, (float)width, (float)height, 0, 1);
+    wgpuRenderPassEncoderSetScissorRect(rp, 0, 0, width, height);
+    wgpuRenderPassEncoderSetPipeline(rp, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(rp, 0, group, 0, NULL);
+    wgpuRenderPassEncoderDraw(rp, 3, 1, 0, 0);
+    wgpuRenderPassEncoderEnd(rp);
+    wgpuRenderPassEncoderRelease(rp);
+    wgpuBindGroupRelease(group);
+}
+
+/** Record the pyramid of a reflection: its image copied into mip 0 of its layer of the array,
+ * its colors multiplied by its coverage, then every mip above downsampled from the one below,
+ * each into the corner its image covers.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param a The reflection array of the view
+ * @param img The image of the reflection
+ * @param layer Slot of the plane in the view, its layer
+ */
+static void box_gpu_planar_pyramid(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_gpu_planar_array_t *a,
+    const box_gpu_planar_image_t *img,
+    int32_t layer)
+{
+    box_gpu_planar_t *p = gpu->planar;
+    uint32_t m, width = img->width, height = img->height;
+    box_gpu_planar_pyramid_pass(gpu, encoder, p->copy, a->mips[layer][0], img->color_view,
+        width, height);
+    for (m = 1; m < a->mip_count; m ++) {
+        width = width > 1 ? width >> 1 : 1;
+        height = height > 1 ? height >> 1 : 1;
+        box_gpu_planar_pyramid_pass(gpu, encoder, p->down, a->mips[layer][m],
+            a->mips[layer][m - 1], width, height);
+    }
+}
+
+WGPUTextureView box_gpu_planar_view(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_view_t *v)
+{
+    box_gpu_planar_t *p = gpu->planar;
+    WGPUTextureView result = p ? p->none_view : NULL;
+    int32_t i;
+    for (i = 0; p && t && v && i < ecs_vec_count(&p->arrays); i ++) {
+        const box_gpu_planar_array_t *a = *ecs_vec_get_t(
+            &p->arrays, box_gpu_planar_array_t*, i);
+        if (a->target == t->handle && a->view == v->view && a->all) {
+            result = a->all;
+            break;
+        }
+    }
+
     return result;
 }
 
@@ -413,6 +877,7 @@ void box_gpu_planar_render(
 {
     box_gpu_planar_t *p = gpu->planar;
     WGPUBindGroup group = NULL;
+    box_gpu_planar_array_t *array = NULL;
     int32_t i;
     for (i = 0; p && i < ecs_vec_count(&p->passes); i ++) {
         const box_gpu_planar_pass_t *pass = ecs_vec_get_t(
@@ -443,7 +908,7 @@ void box_gpu_planar_render(
                 box_gpu_planar_linear(v->clear.color.r),
                 box_gpu_planar_linear(v->clear.color.g),
                 box_gpu_planar_linear(v->clear.color.b),
-                (double)v->clear.color.a / 255.0
+                0.0
             };
         }
 
@@ -465,6 +930,17 @@ void box_gpu_planar_render(
 
         wgpuRenderPassEncoderEnd(rp);
         wgpuRenderPassEncoderRelease(rp);
+        if (!pass->sampled || !p->copy || !p->down) {
+            continue;
+        }
+
+        if (!array) {
+            array = box_gpu_planar_array(gpu, t, v->view, pass->array_width,
+                pass->array_height, pass->mip_count);
+            array->frame = packet->frame;
+        }
+
+        box_gpu_planar_pyramid(gpu, encoder, array, img, pass->mirror);
     }
 
     if (group) {
@@ -484,6 +960,15 @@ void box_gpu_planar_sweep(
             box_gpu_planar_image_release(img);
             ecs_os_free(img);
             ecs_vec_remove_t(&p->images, box_gpu_planar_image_t*, i);
+        }
+    }
+
+    for (i = p ? ecs_vec_count(&p->arrays) - 1 : -1; i >= 0; i --) {
+        box_gpu_planar_array_t *a = *ecs_vec_get_t(&p->arrays, box_gpu_planar_array_t*, i);
+        if (a->frame != packet->frame) {
+            box_gpu_planar_array_release(a);
+            ecs_os_free(a);
+            ecs_vec_remove_t(&p->arrays, box_gpu_planar_array_t*, i);
         }
     }
 }

@@ -68,6 +68,14 @@ struct View {
     cookie_config: vec4u,
     // Inverse of view_proj, clip space of the target to world
     inv_view_proj: mat4x4f,
+    // Per planar reflection slot (gpu_planar.c): x its distortion, y, z the share of the width
+    // and height of the reflection array its image covers, w the mips of the array; all zero for
+    // a slot without an image
+    planar: array<vec4f, 2>,
+    // Rows of the transform of the instance of the shape of each slot, three per slot
+    planar_owner: array<vec4f, 6>,
+    // Page slot plus one of the instance of the shape of each slot, 0 for none
+    planar_slots: vec4u,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

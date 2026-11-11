@@ -1,0 +1,127 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {reflections: true, planar_reflections: true}
+}
+
+// A room with a glossy dark floor and a wall mirror, both with a PlanarReflection. A red box, a
+// gold ball and a blue cylinder stand on the floor, lit by a lamp and the white strip of the
+// ceiling. The floor (roughness 0.15) shows them mirrored and slightly blurred below them; the
+// mirror on the back wall (roughness 0) shows the room behind the camera sharply, the front of
+// the objects and the floor with its own reflections absent (no reflections of reflections).
+// Both mirror images have the exposure of the probe of the room, which the floor fades to where
+// its image shows nothing.
+room {
+  Scene: {reflections: true, planar_reflections: true}
+  ReflectionBake: {resolution: 128}
+  AmbientLight: {intensity: 0.05}
+
+  camera {
+    Position: {0.6, 1.5, 3.4}
+    Rotation: {-0.18, 0.12, 0}
+    Camera: {fov: 60}
+  }
+
+  lamp {
+    Position: {0, 2.6, 1}
+    PointLight: {intensity: 4 * flecs.script.math.PI, range: 10}
+  }
+
+  floor {
+    Position: {0, 0, 0}
+    Box: {6.4, 0.02, 8.4}
+    Rgb: {40, 40, 46}
+    PbrMaterial: {metallic: 0.6, roughness: 0.15}
+    PlanarReflection: {resolution: 0.5}
+  }
+
+  ceiling {
+    Position: {0, 3.1, 0}
+    Box: {6.4, 0.2, 8.4}
+    Rgb: {60, 60, 64}
+  }
+
+  back_wall {
+    Position: {0, 1.5, -4.1}
+    Box: {6.4, 3, 0.2}
+    Rgb: {140, 130, 120}
+  }
+
+  front_wall {
+    Position: {0, 1.5, 4.1}
+    Box: {6.4, 3, 0.2}
+    Rgb: {120, 140, 160}
+  }
+
+  left_wall {
+    Position: {-3.1, 1.5, 0}
+    Box: {0.2, 3, 8}
+    Rgb: {150, 120, 100}
+  }
+
+  right_wall {
+    Position: {3.1, 1.5, 0}
+    Box: {0.2, 3, 8}
+    Rgb: {100, 130, 110}
+  }
+
+  white_strip {
+    Position: {0, 2.95, 0}
+    Box: {0.3, 0.1, 5}
+    Rgb: {0, 0, 0}
+    Emissive: {strength: 3, color: {255, 250, 240}}
+  }
+
+  // The mirror faces +Z: its local +Y turned toward +Z by a pitch of 90 degrees
+  mirror_frame {
+    Position: {0, 1.5, -3.98}
+    Box: {2.4, 2.0, 0.04}
+    Rgb: {60, 40, 30}
+    PbrMaterial: {roughness: 0.6}
+  }
+
+  mirror {
+    Position: {0, 1.5, -3.94}
+    Rotation: {1.5708, 0, 0}
+    Box: {2.2, 0.02, 1.8}
+    Rgb: {235, 235, 240}
+    PbrMaterial: {metallic: 1, roughness: 0}
+    PlanarReflection: {resolution: 0.75, distortion: 0}
+  }
+
+  red_box {
+    Position: {-1.0, 0.4, -1.4}
+    Rotation: {0, 0.5, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {200, 40, 30}
+    PbrMaterial: {roughness: 0.5}
+  }
+
+  gold_ball {
+    Position: {0.4, 0.5, -0.6}
+    Sphere: {segments: 48, smooth: true, radius: 0.5}
+    Rgb: {255, 205, 120}
+    PbrMaterial: {metallic: 1, roughness: 0.2}
+  }
+
+  blue_cylinder {
+    Position: {1.4, 0.6, -2.0}
+    Cylinder: {segments: 32, smooth: true, length: 1.2, radius: 0.35}
+    Rgb: {40, 80, 200}
+    PbrMaterial: {roughness: 0.4}
+  }
+
+  probe {
+    Position: {0, 1.5, 0}
+    ReflectionProbe: {extent: {3.2, 1.7, 4.2}, blend: 0.2, projection: {3, 1.5, 4}}
+  }
+}
+
+room_view {
+  View: {camera: room.camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}

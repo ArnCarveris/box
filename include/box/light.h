@@ -284,6 +284,16 @@ ECS_STRUCT(ReflectionProbe, {
  * Only the BOX_PLANAR_REFLECTION_MAX nearest such planes of a view render; a plane is unbounded
  * for these tests. Probe, reflection and bake captures and orthographic views render none.
  *
+ * Only a scene with Scene.planar_reflections renders the images; without it the shape draws as
+ * if it did not have the component and no reflection pass runs.
+ *
+ * The 3D mesh of the entity, a Water surface too, shows the image as its indirect specular
+ * light, in place of the reflection probes and the environment: sampled at the screen point of
+ * a fragment moved by distortion times the tilt of its normal map, blurred by its roughness and
+ * fading to the probes above a roughness of 0.6; Fresnel, specular occlusion and ClearCoat apply
+ * as to the probes. Where the image shows nothing, and in a view that renders no image of the
+ * plane (over the limit, behind it), the probes reflect as before. 2D shapes and text ignore it.
+ *
  * @par Limits:
  * - It draws the opaque, alpha tested and blended meshes, the sky and the particles, not the
  *   shape of the entity itself, transmissive shapes or Water shapes (no reflections of
@@ -311,6 +321,9 @@ ECS_STRUCT(PlanarReflection, {
     float clip_offset;    /**< World units the clip plane is moved along the normal, default
                            *   0.02: positive keeps geometry slightly below the plane (shore
                            *   lines, objects that touch the surface), negative removes it */
+    float distortion;     /**< Screen space offset of the reflection lookup by the normal mapped
+                           *   normal, as a fraction of the image height, default 0.02; 0 is a
+                           *   perfect mirror */
 });
 
 /** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the

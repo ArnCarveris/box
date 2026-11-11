@@ -700,6 +700,13 @@ typedef struct box_gpu_view_uniforms_t {
     mat4 inv_view_proj;             /**< Inverse of view_proj, clip space of the target to
                                      *   world, which the blur of a DiffuseTransmission reads
                                      *   the depth of the opaque snapshot with */
+    vec4 planar[BOX_PLANAR_REFLECTION_MAX]; /**< Per planar reflection slot: distortion, share
+                                     *   of the width and height of the reflection array its
+                                     *   image covers, mips of the array; 0 without an image */
+    vec4 planar_owner[BOX_PLANAR_REFLECTION_MAX * 3]; /**< Rows of the transform of the
+                                     *   instance of the shape of each slot */
+    uint32_t planar_slots[4];       /**< Page slot plus one of the instance of the shape of
+                                     *   each slot, 0 for none */
 } box_gpu_view_uniforms_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,

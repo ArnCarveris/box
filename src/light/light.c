@@ -240,8 +240,8 @@ static void box_reflection_probe_ctor(
     }
 }
 
-/** Construct PlanarReflection values with half the resolution of the view and a clip plane
- * 0.02 units below the plane.
+/** Construct PlanarReflection values with half the resolution of the view, a clip plane
+ * 0.02 units below the plane and a distortion of 0.02.
  *
  * @param ptr The components
  * @param count Number of components
@@ -258,7 +258,8 @@ static void box_planar_reflection_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (PlanarReflection){
             .resolution = 0.5f,
-            .clip_offset = 0.02f
+            .clip_offset = 0.02f,
+            .distortion = 0.02f
         };
     }
 }

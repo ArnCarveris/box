@@ -370,7 +370,8 @@ int32_t box_render_planar_select(
     int32_t count,
     int32_t *out);
 
-/** Register the system that gives every lit perspective view the PlanarReflections of the
+/** Register the system that gives every lit perspective view of a scene with
+ * Scene.planar_reflections the PlanarReflections of the
  * scene of its camera it renders (box_render_planar_select), after the light extract.
  *
  * @param world The world
@@ -391,6 +392,18 @@ bool box_render_draws_instance(
     ecs_entity_t e,
     uint32_t *page,
     uint32_t *slot);
+
+/** Get the transform of the instance of the shape of an entity as its instance page holds it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param rows Receives the three rows of its model matrix (box_render_transform_t)
+ * @return Whether the entity is drawn in a batch
+ */
+bool box_render_draws_instance_transform(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    vec4 *rows);
 
 /** Register the system that sends the lights of every scene and the lights of every view.
  *

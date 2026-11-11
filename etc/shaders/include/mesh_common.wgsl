@@ -125,6 +125,9 @@ struct VertexOut {
     // pipeline (water), which reuses flat2 and flat3.zw for the other Water fields: Water
     // ignores Transmission, and the fragment stage cannot read the material table.
     @location(8) @interpolate(flat) flat4: vec4u,
+    // Planar reflection slot of the view plus one whose image the instance shows, 0 for none
+    // (planar_owner)
+    @location(9) @interpolate(flat) planar: u32,
 };
 
 // The Water fields of the material of a fragment of a Water pipeline, the others zero.
@@ -360,13 +363,33 @@ fn cutout_scalars(f: CutoutOut) -> vec4f {
     return vec4f(unpack2x16float(f.scalars.x), unpack2x16float(f.scalars.y));
 }
 
+// Planar reflection slot plus one of the view whose plane an instance is the shape of, 0 for
+// none: the slot of the instance in its page and its transform match those the view records
+// for the slot. The views without planar reflections, and the reflections themselves, record
+// none.
+fn planar_owner(slot: u32) -> u32 {
+    let rows = transforms[slot].rows;
+    var result = 0u;
+    for (var k = 0u; k < 2u; k++) {
+        if (view.planar_slots[k] == slot + 1u && all(rows[0] == view.planar_owner[k * 3u]) &&
+            all(rows[1] == view.planar_owner[k * 3u + 1u]) &&
+            all(rows[2] == view.planar_owner[k * 3u + 2u]))
+        {
+            result = k + 1u;
+        }
+    }
+    return result;
+}
+
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
     let material = material_fetch(shading.material);
     let p = place_mesh(v);
     let frame = model_frame(p);
-    return vertex_out(p, material, frame,
+    var o = vertex_out(p, material, frame,
         vertex_shading(v, shading, material, p, frame.scale, frame.normal));
+    o.planar = planar_owner(v.slot);
+    return o;
 }
 
 @vertex fn vs_surface(v: VertexIn) -> VertexOut {
@@ -374,8 +397,10 @@ fn cutout_scalars(f: CutoutOut) -> vec4f {
     let material = material_fetch(shading.material);
     let p = place(v);
     let frame = model_frame(p);
-    return vertex_out(p, material, frame,
+    var o = vertex_out(p, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
+    o.planar = planar_owner(v.slot);
+    return o;
 }
 
 @vertex fn vs_depth(v: VertexIn) -> DepthOut {

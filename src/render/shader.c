@@ -499,6 +499,10 @@ static bool box_shader_used(
         result = true;
     }
 
+    if (handle == BOX_RENDER_SHADER_PLANAR && ecs_vec_count(&p->planar_reflections)) {
+        result = true;
+    }
+
     if ((handle == BOX_RENDER_SHADER_FOG_VOLUME || handle == BOX_RENDER_SHADER_CLUSTER) &&
         ecs_vec_count(&p->fog_volumes))
     {
@@ -945,6 +949,8 @@ void BoxShaderImport(
         "etc/shaders/particle_draw.wgsl", BOX_RENDER_SHADER_PARTICLE_DRAW, true);
     box_shader_builtin(world, state, builtin, "transmission", "etc/shaders/transmission.wgsl",
         BOX_RENDER_SHADER_TRANSMISSION, true);
+    box_shader_builtin(world, state, builtin, "planar", "etc/shaders/planar.wgsl",
+        BOX_RENDER_SHADER_PLANAR, true);
     box_shader_builtin(world, state, builtin, "fog_volume", "etc/shaders/fog_volume.wgsl",
         BOX_RENDER_SHADER_FOG_VOLUME, true);
     box_shader_builtin(world, state, builtin, "debug_grid", "etc/shaders/debug_grid.wgsl",
