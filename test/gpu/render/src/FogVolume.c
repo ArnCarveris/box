@@ -676,6 +676,47 @@ void FogVolume_in_transmission_snapshot(void) {
     test_assert(fogged > clear + 80);
 }
 
+/** Render an emissive panel of black albedo in the middle of a purely absorbing volume, with
+ * nothing behind it, and get the green of the center pixel.
+ *
+ * @param transmissive Whether the panel is transmissive
+ * @param file Name of the PNG
+ * @return The green of the center pixel, on the panel
+ */
+static int32_t fv_panel_inside(
+    bool transmissive,
+    const char *file)
+{
+    ecs_world_t *world = fv_world(0);
+    fv_view(world, fv_camera(world, 0, 0), true);
+    ecs_entity_t panel = fv_wall(world, 0, -10, 3, FV_WALL);
+    if (transmissive) {
+        ecs_set(world, panel, Transmission, {.transmission_factor = 1, .ior = 1,
+            .thickness_factor = 0, .attenuation_distance = 1e10f,
+            .attenuation_color = {255, 255, 255}});
+    }
+
+    fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
+    unsigned char *px = fv_render(world, file);
+    int32_t result = fv_px(px, 32, 32)[1];
+    stbi_image_free(px);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A transmissive panel inside a volume is fogged over the part of the volume in front of it,
+ * like an opaque panel at the same place. */
+void FogVolume_transmissive_inside_fogged(void) {
+    // fog_volume/order
+    int32_t opaque = fv_panel_inside(false, "fog_panel_opaque.png");
+    int32_t glass = fv_panel_inside(true, "fog_panel_glass.png");
+    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * 3.9f));
+    printf("opaque %d, transmissive %d, want %d\n", opaque, glass, want);
+    test_assert(abs(opaque - want) <= 6);
+    test_assert(abs(glass - opaque) <= 6);
+}
+
 /** An orthographic camera marches parallel rays through the volume. */
 void FogVolume_orthographic(void) {
     // fog_volume/views

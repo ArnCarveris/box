@@ -1237,6 +1237,7 @@
                     "asymmetry_toward_sun",
                     "overlap_order",
                     "in_transmission_snapshot",
+                    "transmissive_inside_fogged",
                     "orthographic",
                     "resize",
                     "two_views",
