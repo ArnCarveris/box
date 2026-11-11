@@ -56,7 +56,7 @@ fn hard_layers(f: VertexOut, geometric: vec3f) -> Layers {
     o.albedo = textureSample(albedo_map, material_sampler, uv);
     o.emissive = textureSample(emissive_map, material_sampler, uv).rgb;
     o.orm = textureSample(orm_map, material_sampler, uv).rgb;
-    let m = textureSample(normal_map, material_sampler, uv + f.normal_offset).xyz * 2.0 - 1.0;
+    let m = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 - 1.0;
     o.frame = cotangent_frame(geometric, f.world, uv);
     o.normal = perturb(geometric, o.frame, m);
     return o;

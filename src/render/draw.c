@@ -547,8 +547,8 @@ static void BoxDrawsOnLightBake(
 }
 
 /** Mark every shape in the mesh batches of a scene whose Scene was set, which changes the
- * features, the pipeline and the fallbacks of their keys. The singleton is the Scene of the
- * default scene.
+ * features, the pipeline and the fallbacks of their keys, and their material records (TextureScroll
+ * and Water follow their flags). The singleton is the Scene of the default scene.
  *
  * @param it The iterator of the observer
  */
@@ -568,8 +568,9 @@ static void BoxDrawsOnSceneFeatures(
             }
 
             for (s = 0; s < ecs_vec_count(&batch->entities); s ++) {
-                box_draws_mark(it->world, d, *ecs_vec_get_t(&batch->entities, ecs_entity_t, s),
-                    BOX_DRAW_ALL);
+                ecs_entity_t e = *ecs_vec_get_t(&batch->entities, ecs_entity_t, s);
+                box_draws_material_changed(d, e);
+                box_draws_mark(it->world, d, e, BOX_DRAW_ALL);
             }
         }
     }

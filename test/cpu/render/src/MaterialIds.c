@@ -1730,6 +1730,7 @@ void MaterialIds_texture_scroll_private_slot(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_set(world, a, Position, {0, 0, 0});
@@ -1770,6 +1771,7 @@ void MaterialIds_texture_scroll_repacks_only_scrolling(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
     ecs_entity_t prefab = prefab_new(world);
     ecs_set(world, prefab, Rgb, {200, 100, 50});
     int32_t i;
@@ -1783,7 +1785,7 @@ void MaterialIds_texture_scroll_repacks_only_scrolling(void) {
     ecs_set(world, still, Rgb, {10, 20, 30});
     ecs_set(world, still, TextureTransform, {1, 1, 0.25f, 0});
 
-    /* A scene without TextureScroll packs no material per frame */
+    /* A scene without a TextureScroll packs no material per frame */
     frame_dt(world, 1.0f / 60.0f);
     frame_dt(world, 1.0f / 60.0f);
     for (i = 0; i < 3; i ++) {
@@ -1852,6 +1854,7 @@ void MaterialIds_texture_scroll_prefab_repacks(void) {
     // materials/material_ids
     box_render_null_t *null;
     ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
     ecs_entity_t prefab = prefab_new(world);
     ecs_set(world, prefab, Rgb, {40, 80, 120});
     ecs_set(world, prefab, TextureScroll, {.velocity = {0.25f, 0}});
@@ -1872,6 +1875,172 @@ void MaterialIds_texture_scroll_prefab_repacks(void) {
         test_int(stats.materials, 2);
         test_assert(fabsf(record_of(world, id)->uv[2] - u - 0.25f / 60.0f) < 1e-4f);
         u = record_of(world, id)->uv[2];
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_texture_scroll_off_shares_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {200, 100, 50});
+    ecs_set(world, a, TextureScroll, {.velocity = {0.5f, 0}, .normal_velocity = {0.25f, 0}});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Rgb, {200, 100, 50});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+
+    /* A scene without Scene.texture_scroll shares the slot and does not scroll */
+    test_uint(id_of(world, a), id_of(world, b));
+    test_flt(record_of(world, id_of(world, a))->uv[2], 0);
+    test_flt(record_of(world, id_of(world, a))->normal_offset[0], 0);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+        test_flt(record_of(world, id_of(world, a))->uv[2], 0);
+    }
+
+    /* Turning the flag on gives the scrolling shape its own slot, packed every frame */
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t own = id_of(world, a);
+    test_assert(own != id_of(world, b) && own != 0 && own != UINT32_MAX);
+    test_uint(shading_of(world, a)->material, own);
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, MATERIAL);
+        test_assert(record_of(world, own)->uv[2] > 0);
+        test_assert(record_of(world, own)->normal_offset[0] > 0);
+    }
+
+    /* Off again, it shares the slot of its content */
+    ecs_singleton_set(world, Scene, {.texture_scroll = false});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(shading_of(world, a)->material, id_of(world, b));
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_still_water_shares_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.water = true});
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {40, 80, 120});
+    ecs_add(world, a, Water);
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Rgb, {40, 80, 120});
+    ecs_add(world, b, Water);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+
+    /* Still Water shares its slot and packs nothing per frame */
+    uint32_t shared = id_of(world, a);
+    test_assert(shared != 0 && shared != UINT32_MAX);
+    test_uint(id_of(world, b), shared);
+    test_assert(record_of(world, shared)->water_depth > 0);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    /* Ripples that move give the shape its own slot, packed every frame */
+    Water *w = ecs_get_mut(world, a, Water);
+    w->ripple_scale = 2.0f;
+    w->ripple_velocity[0] = 0.1f;
+    ecs_modified(world, a, Water);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t own = id_of(world, a);
+    test_assert(own != id_of(world, b) && own != 0 && own != UINT32_MAX);
+    test_uint(shading_of(world, a)->material, own);
+    float offset = record_of(world, own)->water_ripple_offset[0];
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, MATERIAL);
+        test_assert(record_of(world, own)->water_ripple_offset[0] != offset);
+        offset = record_of(world, own)->water_ripple_offset[0];
+    }
+
+    /* A ripple scale without a velocity does not move */
+    w = ecs_get_mut(world, a, Water);
+    w->ripple_velocity[0] = 0.0f;
+    ecs_modified(world, a, Water);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    /* Without a ripple scale it shares the slot of b again */
+    w = ecs_get_mut(world, a, Water);
+    w->ripple_scale = 0.0f;
+    w->ripple_velocity[0] = 0.1f;
+    ecs_modified(world, a, Water);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(shading_of(world, a)->material, id_of(world, b));
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_water_off_not_repacked(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {40, 80, 120});
+    ecs_add(world, a, Water);
+    Water *w = ecs_get_mut(world, a, Water);
+    w->ripple_scale = 2.0f;
+    w->ripple_velocity[0] = 0.1f;
+    ecs_modified(world, a, Water);
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Rgb, {40, 80, 120});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+
+    /* A scene without Scene.water packs the shape as without its Water */
+    test_uint(id_of(world, a), id_of(world, b));
+    test_flt(record_of(world, id_of(world, a))->water_depth, 0);
+    test_flt(record_of(world, id_of(world, a))->water_ripple_scale, 0);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
     }
 
     ecs_fini(world);

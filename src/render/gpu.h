@@ -693,14 +693,6 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b,
     bool equal);
 
-/** Overrides of the extended mesh shader: the bits of BOX_RENDER_FEATURE_OVERRIDES in order,
- * then transmissive, water and scene_planar; the mesh shader has the first 6 */
-#define BOX_GPU_FEATURE_OVERRIDES (15)
-
-/** Bit of the features of a forward pipeline of the extended mesh shader, above those of
- * BOX_RENDER_FEATURE_OVERRIDES, for its scene_planar override (BOX_RENDER_FEATURE_PLANAR) */
-#define BOX_GPU_FEATURE_PLANAR (1u << 12)
-
 /** Create the layouts the forward pass shares.
  *
  * Group 0 binds 10 sampled textures to the fragment stage, the planar reflection array (binding

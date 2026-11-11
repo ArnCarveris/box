@@ -13,6 +13,7 @@
  */
 
 #include "draw.h"
+#include <math.h>
 
 /** Slot of the default material */
 #define BOX_MATERIALS_DEFAULT (0u)
@@ -228,14 +229,42 @@ static void box_materials_drop(
     }
 }
 
+/** Get the features of the scene of the owner of a material.
+ *
+ * @param world The world
+ * @param owner The owner
+ * @return The BOX_RENDER_FEATURE_* features of its scene
+ */
+static uint32_t box_materials_features(
+    const ecs_world_t *world,
+    ecs_entity_t owner)
+{
+    return box_render_scene_features(world, box_render_scene_of(world, owner));
+}
+
+/** Check whether a Water moves its ripples over time: a ripple_scale above 0 with a ripple
+ * velocity, the only part of its record that changes with the time.
+ *
+ * @param water The component, NULL for none
+ * @return Whether its record changes every frame
+ */
+static bool box_materials_water_moves(
+    const Water *water)
+{
+    return water && isfinite(water->ripple_scale) && water->ripple_scale > 0.0f &&
+        (water->ripple_velocity[0] != 0.0f || water->ripple_velocity[1] != 0.0f);
+}
+
 /** Pack the record of an owner from the material components it owns or inherits, its
- * TextureScroll offsets at the time of the table.
+ * TextureScroll offsets at the time of the table. A TextureScroll or a Water that its scene
+ * does not enable (Scene.texture_scroll, Scene.water) is left out.
  *
  * @param world The world
  * @param m The table
  * @param owner The owner, 0 for the default material
  * @param out The record
- * @return Whether the owner has or inherits a TextureScroll or a Water, whose ripples move
+ * @return Whether the record changes with the time: the owner has or inherits a TextureScroll,
+ * or a Water whose ripples move (box_materials_water_moves)
  */
 static bool box_materials_pack(
     const ecs_world_t *world,
@@ -247,11 +276,11 @@ static bool box_materials_pack(
     box_draws_material_of(world, owner, m->time, &material);
     box_draws_material_pack(out, &material);
 
-    return material.scroll != NULL || material.water != NULL;
+    return material.scroll != NULL || box_materials_water_moves(material.water);
 }
 
-/** Check whether an entity has or inherits a TextureScroll or a Water, whose record changes
- * every frame.
+/** Check whether an entity has or inherits a TextureScroll or a Water whose ripples move, whose
+ * record changes every frame, in a scene that enables it (Scene.texture_scroll, Scene.water).
  *
  * @param world The world
  * @param e The entity
@@ -261,7 +290,19 @@ static bool box_materials_scrolls(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
-    return ecs_get(world, e, TextureScroll) != NULL || ecs_get(world, e, Water) != NULL;
+    const TextureScroll *scroll = ecs_get(world, e, TextureScroll);
+    const Water *water = ecs_get(world, e, Water);
+    bool moves = box_materials_water_moves(water);
+    bool result = false;
+    if (!scroll && !moves) {
+        goto done;
+    }
+
+    uint32_t features = box_materials_features(world, e);
+    result = (scroll && (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL)) ||
+        (moves && (features & BOX_RENDER_FEATURE_WATER));
+done:
+    return result;
 }
 
 /** Record the shadow regions of the alpha tested casters that render with a slot whose cutoff,
@@ -947,6 +988,12 @@ void box_draws_material_of(
         out->diffuse_transmission = ecs_get(world, owner, DiffuseTransmission);
         out->fresnel = ecs_get(world, owner, Fresnel);
         out->water = ecs_get(world, owner, Water);
+    }
+
+    if (out->scroll || out->water) {
+        uint32_t features = box_materials_features(world, owner);
+        out->scroll = features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? out->scroll : NULL;
+        out->water = features & BOX_RENDER_FEATURE_WATER ? out->water : NULL;
     }
 }
 

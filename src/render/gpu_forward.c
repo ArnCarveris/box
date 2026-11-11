@@ -74,33 +74,19 @@ static void box_gpu_blend_state(
 
 /** Set the overrides of the scene features of a mesh pipeline.
  *
- * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene the pipeline draws, and
- * BOX_GPU_FEATURE_PLANAR
- * @param transmissive Whether the pipeline draws transmissive shapes
- * @param water Whether the pipeline draws water shapes (Water)
- * @param out Receives BOX_GPU_FEATURE_OVERRIDES constants, the first 6 those of the mesh shader
+ * @param overrides The overrides that are true (box_render_mesh_overrides)
+ * @param out Receives BOX_RENDER_MESH_OVERRIDES constants, the first
+ * BOX_RENDER_MESH_OVERRIDES_PLAIN those of the mesh shader
  */
 static void box_gpu_feature_constants(
-    uint32_t features,
-    bool transmissive,
-    bool water,
+    uint32_t overrides,
     WGPUConstantEntry *out)
 {
-    static const char *keys[BOX_GPU_FEATURE_OVERRIDES] = {
-        "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
-        "scene_environment", "scene_aerial", "material_sheen", "material_clear_coat",
-        "material_anisotropy", "material_diffuse_transmission", "material_triplanar",
-        "material_fresnel", "transmissive", "water", "scene_planar"
-    };
-    uint32_t bits = (features & BOX_RENDER_FEATURE_OVERRIDES) |
-        (transmissive ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 3) : 0u) |
-        (water ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 2) : 0u) |
-        (features & BOX_GPU_FEATURE_PLANAR ? 1u << (BOX_GPU_FEATURE_OVERRIDES - 1) : 0u);
     int32_t i;
-    for (i = 0; i < BOX_GPU_FEATURE_OVERRIDES; i ++) {
+    for (i = 0; i < BOX_RENDER_MESH_OVERRIDES; i ++) {
         out[i] = (WGPUConstantEntry){
-            .key = { .data = keys[i], .length = WGPU_STRLEN },
-            .value = bits & (1u << i) ? 1.0 : 0.0
+            .key = { .data = box_render_mesh_override_key(i), .length = WGPU_STRLEN },
+            .value = overrides & (1u << i) ? 1.0 : 0.0
         };
     }
 }
@@ -112,9 +98,9 @@ static void box_gpu_feature_constants(
  * coplanar shapes draw in order; it lifts the depth of a fragment by the rank of its instance,
  * so the order holds where coplanar quads interpolate their depths differently.
  *
- * A mesh pipeline sets the scene features as constants, an extended one the material features,
- * transmissive and water (both stages) too; the blend mode and alpha test of its draws are in the
- * DrawKind of their material group (box_gpu_draw_kind). The 2D shape shader sets blend_mode.
+ * Mesh pipelines set the overrides of box_render_mesh_overrides, their vertex stage those it
+ * reads; blend mode and alpha test are in the DrawKind of the material group (box_gpu_draw_kind).
+ * The 2D shape shader sets blend_mode.
  *
  * @param gpu The backend
  * @param handle Handle of the shader, a mesh shader or the 2D shape shader
@@ -144,8 +130,8 @@ static void box_gpu_feature_constants(
  * for sliced shapes
  * @param surface Whether the instances are parametric surfaces, placed by the vs_surface entry
  * point of the mesh shaders; ignored by the 2D shape shader
- * @param features BOX_RENDER_FEATURE_OVERRIDES features of the scene it draws, the overrides
- * of the mesh shaders; ignored by the 2D shape shader
+ * @param features BOX_RENDER_OVERRIDE_SCENE overrides of the mesh shaders from the features of
+ * the scene it draws (box_render_mesh_overrides); ignored by the 2D shape shader
  * @param mirrored Whether the view is mirrored (a planar reflection), which turns the winding of
  * the front faces to clockwise
  * @return The pipeline
@@ -231,17 +217,34 @@ static WGPURenderPipeline box_gpu_forward_create(
         .key = { .data = "polygon", .length = WGPU_STRLEN },
         .value = polygon && !box_shadow ? 1.0 : 0.0
     };
-    WGPUConstantEntry water_constant = {
-        .key = { .data = "water", .length = WGPU_STRLEN },
-        .value = water ? 1.0 : 0.0
+    WGPUConstantEntry mesh_vertex_constants[4] = {
+        {
+            .key = { .data = "material_texture_scroll", .length = WGPU_STRLEN },
+            .value = features & BOX_RENDER_OVERRIDE_TEXTURE_SCROLL ? 1.0 : 0.0
+        },
+        {
+            .key = { .data = "water", .length = WGPU_STRLEN },
+            .value = water ? 1.0 : 0.0
+        },
+        {
+            .key = { .data = "material_fresnel", .length = WGPU_STRLEN },
+            .value = features & BOX_RENDER_OVERRIDE_FRESNEL ? 1.0 : 0.0
+        },
+        {
+            .key = { .data = "scene_planar", .length = WGPU_STRLEN },
+            .value = features & BOX_RENDER_OVERRIDE_PLANAR ? 1.0 : 0.0
+        }
     };
     bool mesh = box_render_is_mesh(handle);
-    WGPUConstantEntry constants[BOX_GPU_FEATURE_OVERRIDES];
-    box_gpu_feature_constants(features, transmissive, water, constants);
+    WGPUConstantEntry constants[BOX_RENDER_MESH_OVERRIDES];
+    box_gpu_feature_constants((features & BOX_RENDER_OVERRIDE_SCENE) |
+        (transmissive && extended ? BOX_RENDER_OVERRIDE_TRANSMISSIVE : 0u) |
+        (water ? BOX_RENDER_OVERRIDE_WATER : 0u), constants);
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = entry, .length = WGPU_STRLEN },
-        .constantCount = shape2d ? 1 : extended ? BOX_GPU_FEATURE_OVERRIDES : mesh ? 6 : 0,
+        .constantCount = shape2d ? 1 : extended ? BOX_RENDER_MESH_OVERRIDES :
+            mesh ? BOX_RENDER_MESH_OVERRIDES_PLAIN : 0,
         .constants = shape2d ? &constant : mesh ? constants : NULL,
         .targetCount = 1,
         .targets = &target
@@ -259,8 +262,8 @@ static WGPURenderPipeline box_gpu_forward_create(
         .vertex = {
             .module = shader,
             .entryPoint = { .data = surface ? "vs_surface" : "vs", .length = WGPU_STRLEN },
-            .constantCount = shape2d || extended ? 1 : 0,
-            .constants = shape2d ? &vertex_constant : extended ? &water_constant : NULL,
+            .constantCount = shape2d ? 1 : extended ? 4 : mesh ? 1 : 0,
+            .constants = shape2d ? &vertex_constant : mesh ? mesh_vertex_constants : NULL,
             .bufferCount = 2,
             .buffers = buffers
         },
@@ -397,7 +400,7 @@ typedef enum box_gpu_depth_mode_t {
 /** Pack the state a forward or depth prepass pipeline is created for into its cache key.
  *
  * @param shader Shader handle, below 2^17
- * @param format Format of the color target, below 2^24, Undefined for a depth prepass, the count
+ * @param format Format of the color target, below 2^23, Undefined for a depth prepass, the count
  * format for an overdraw count
  * @param blend BlendMode, below 16
  * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
@@ -409,8 +412,8 @@ typedef enum box_gpu_depth_mode_t {
  * the 2D shape shader, which never blends layers, whether they are polygons (polygon)
  * @param surface Whether the instances are parametric surfaces (vs_surface)
  * @param depth Depth state of the pipeline
- * @param features BOX_RENDER_FEATURE_OVERRIDES features of the mesh shader overrides with
- * BOX_GPU_FEATURE_PLANAR, 0 for the 2D shape shader and the depth prepass
+ * @param features BOX_RENDER_OVERRIDE_SCENE overrides of the mesh shaders
+ * (box_render_mesh_overrides), 0 for the 2D shape shader and the depth prepass
  * @param mirrored Whether the front faces wind clockwise, for a planar reflection
  * @param water Whether the pipeline draws Water shapes (the water override)
  * @return The key, distinct for every distinct pipeline
@@ -429,15 +432,14 @@ static uint64_t box_gpu_forward_key(
     bool mirrored,
     bool water)
 {
-    ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert((uint32_t)format < (1u << 23), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(shader < (1u << 14), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(features <= (BOX_RENDER_FEATURE_OVERRIDES | BOX_GPU_FEATURE_PLANAR),
-        ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(features <= BOX_RENDER_OVERRIDE_SCENE, ECS_INTERNAL_ERROR, NULL);
 
     return ((uint64_t)shader << 50) | ((uint64_t)water << 49) | ((uint64_t)surface << 48) |
-        ((uint64_t)mirrored << 47) | ((uint64_t)features << 34) |
-        ((uint64_t)texture_blend << 33) |
-        ((uint64_t)transmissive << 32) |
+        ((uint64_t)mirrored << 47) | ((uint64_t)features << 33) |
+        ((uint64_t)texture_blend << 32) |
+        ((uint64_t)transmissive << 31) |
         ((uint64_t)format << 8) | ((uint64_t)blend << 4) | ((uint64_t)depth << 2) |
         (cutout ? 2u : 0u) | (back_face == BackFaceCull ? 0u : 1u);
 }
@@ -515,8 +517,7 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     bool mirrored)
 {
     WGPURenderPipeline result = NULL;
-    uint32_t features = b->features & (b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED
-        ? BOX_RENDER_FEATURE_OVERRIDES : BOX_RENDER_FEATURE_LIGHTING);
+    uint32_t features = box_render_mesh_overrides(b->pipeline, b->features, false, false);
     bool shape2d = b->pipeline == BOX_RENDER_SHADER_SHAPE2D;
     bool mesh = box_render_is_mesh(b->pipeline);
     WGPUShaderModule shader;
@@ -538,15 +539,6 @@ WGPURenderPipeline box_gpu_forward_pipeline_mirrored(
     surface = mesh && b->surface;
     water = b->water && b->transmissive && b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
     texture_blend = texture_blend && !water;
-    if (b->pipeline == BOX_RENDER_SHADER_MESH_EXTENDED &&
-        (b->features & BOX_RENDER_FEATURE_PLANAR))
-    {
-        features |= BOX_GPU_FEATURE_PLANAR;
-    }
-
-    if (!mesh) {
-        features = 0;
-    }
 
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face,
         shape2d ? b->box_shadow : cutout,

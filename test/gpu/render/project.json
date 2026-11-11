@@ -305,7 +305,9 @@
                     "foam_texture_breaks_up",
                     "sky_counts_as_deep",
                     "above_not_leaked",
-                    "off_draws_without_water"
+                    "off_draws_without_water",
+                    "off_equals_without_water",
+                    "still_uploads_nothing"
                 ]
             },
             {
@@ -325,7 +327,8 @@
                     "shifts_checker",
                     "adds_to_texture_transform",
                     "normal_velocity_moves_normal_only",
-                    "ignored_by_2d"
+                    "ignored_by_2d",
+                    "flag_off_draws_without"
                 ]
             },
             {

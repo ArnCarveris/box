@@ -11,6 +11,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <string.h>
 #include "render.h"
 #include "draw.h"
 
@@ -1368,4 +1369,266 @@ void MeshShader_water_off_draws_with_mesh_shader(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+/** Get the value of an override of the mesh shaders by name.
+ *
+ * @param overrides The overrides that are true (box_render_mesh_overrides)
+ * @param name Name of the override
+ * @return Its value, false for a name the mesh shaders do not have
+ */
+static bool override_on(
+    uint32_t overrides,
+    const char *name)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_MESH_OVERRIDES; i ++) {
+        if (!strcmp(box_render_mesh_override_key(i), name)) {
+            result = (overrides & (1u << i)) != 0;
+        }
+    }
+
+    return result;
+}
+
+/** Count the overrides that are true.
+ *
+ * @param overrides The overrides
+ * @return How many are true
+ */
+static int32_t override_count(
+    uint32_t overrides)
+{
+    int32_t result = 0;
+    int32_t i;
+    for (i = 0; i < 32; i ++) {
+        result += (overrides >> i) & 1u;
+    }
+
+    return result;
+}
+
+void MeshShader_texture_scroll_scene_feature(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_uint(box_render_scene_features(world, 0), 0);
+    ecs_singleton_set(world, Scene, {.sheen = true});
+    test_uint(box_render_scene_features(world, 0) & BOX_RENDER_FEATURE_TEXTURE_SCROLL, 0);
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_TEXTURE_SCROLL);
+    ecs_singleton_set(world, Scene, {.fresnel = true});
+    test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_FRESNEL);
+    ecs_singleton_set(world, Scene, {.water = true});
+    test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_WATER);
+    ecs_singleton_set(world, Scene, {.planar_reflections = true});
+    test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_PLANAR);
+
+    /* A scene root has its own */
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {.texture_scroll = true, .fresnel = true});
+    test_uint(box_render_scene_features(world, scene),
+        BOX_RENDER_FEATURE_TEXTURE_SCROLL | BOX_RENDER_FEATURE_FRESNEL);
+
+    ecs_fini(world);
+}
+
+void MeshShader_texture_scroll_draws_with_mesh_shader(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, TextureScroll, {.velocity = {0.5f, 0}, .normal_velocity = {0, 0.5f}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_assert(b->key.features & BOX_RENDER_FEATURE_TEXTURE_SCROLL);
+
+    /* The overrides of its pipeline scroll the normal map */
+    uint32_t overrides = box_render_mesh_overrides(b->key.pipeline, b->key.features, false,
+        false);
+    test_bool(override_on(overrides, "material_texture_scroll"), true);
+
+    test_int(ecs_vec_count(&null->last.views), 1);
+    const box_render_view_t *v = ecs_vec_first(&null->last.views);
+    test_uint(v->scene_features, BOX_RENDER_FEATURE_TEXTURE_SCROLL);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MeshShader_texture_scroll_off_draws_with_mesh_shader(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.sheen = true});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, TextureScroll, {.velocity = {0.5f, 0}, .normal_velocity = {0, 0.5f}});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_uint(b->key.features & BOX_RENDER_FEATURE_TEXTURE_SCROLL, 0);
+    uint32_t overrides = box_render_mesh_overrides(b->key.pipeline, b->key.features, false,
+        false);
+    test_bool(override_on(overrides, "material_texture_scroll"), false);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MeshShader_overrides_off_by_default(void) {
+    // render/mesh_shader
+    test_uint(box_render_mesh_overrides(BOX_RENDER_SHADER_MESH, 0, false, false), 0);
+    test_uint(box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED, 0, false, false), 0);
+    test_uint(box_render_mesh_overrides(BOX_RENDER_SHADER_SHAPE2D, ~0u, true, true), 0);
+
+    /* Every override has a distinct name */
+    int32_t i, j;
+    for (i = 0; i < BOX_RENDER_MESH_OVERRIDES; i ++) {
+        for (j = i + 1; j < BOX_RENDER_MESH_OVERRIDES; j ++) {
+            test_assert(strcmp(box_render_mesh_override_key(i),
+                box_render_mesh_override_key(j)) != 0);
+        }
+    }
+
+    /* The mesh shader has the lighting ones and material_texture_scroll, the first ones */
+    uint32_t mesh = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH, ~0u, true, true);
+    test_uint(mesh, (1u << BOX_RENDER_MESH_OVERRIDES_PLAIN) - 1u);
+    test_bool(override_on(mesh, "material_texture_scroll"), true);
+    test_bool(override_on(mesh, "material_fresnel"), false);
+    test_bool(override_on(mesh, "scene_planar"), false);
+    test_bool(override_on(mesh, "water"), false);
+    uint32_t extended = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED, ~0u, true,
+        true);
+    test_uint(extended, (1u << BOX_RENDER_MESH_OVERRIDES) - 1u);
+
+    /* Water follows the transmissive pipelines */
+    extended = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED, ~0u, false, true);
+    test_bool(override_on(extended, "water"), false);
+    test_bool(override_on(extended, "transmissive"), false);
+}
+
+void MeshShader_overrides_independent(void) {
+    // render/mesh_shader
+    const struct { uint32_t feature; const char *name; } features[] = {
+        { BOX_RENDER_FEATURE_TEXTURE_SCROLL, "material_texture_scroll" },
+        { BOX_RENDER_FEATURE_FRESNEL, "material_fresnel" },
+        { BOX_RENDER_FEATURE_PLANAR, "scene_planar" },
+        { BOX_RENDER_FEATURE_SHEEN, "material_sheen" },
+        { BOX_RENDER_FEATURE_CLEAR_COAT, "material_clear_coat" }
+    };
+    int32_t i, count = (int32_t)(sizeof(features) / sizeof(features[0]));
+    for (i = 0; i < count; i ++) {
+        uint32_t o = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED,
+            features[i].feature, false, false);
+        test_int(override_count(o), 1);
+        test_bool(override_on(o, features[i].name), true);
+    }
+
+    /* Scene.water turns on no override by itself, a transmissive Water pipeline does */
+    test_uint(box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED,
+        BOX_RENDER_FEATURE_WATER, false, false), 0);
+    uint32_t o = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED,
+        BOX_RENDER_FEATURE_WATER, true, true);
+    test_int(override_count(o), 2);
+    test_bool(override_on(o, "water"), true);
+    test_bool(override_on(o, "transmissive"), true);
+
+    /* The flags combine like sheen and clear coat */
+    o = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED,
+        BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
+        BOX_RENDER_FEATURE_TEXTURE_SCROLL | BOX_RENDER_FEATURE_FRESNEL |
+        BOX_RENDER_FEATURE_PLANAR | BOX_RENDER_FEATURE_WATER, true, true);
+    test_int(override_count(o), 7);
+    test_bool(override_on(o, "material_sheen"), true);
+    test_bool(override_on(o, "material_clear_coat"), true);
+    test_bool(override_on(o, "material_texture_scroll"), true);
+    test_bool(override_on(o, "material_fresnel"), true);
+    test_bool(override_on(o, "scene_planar"), true);
+    test_bool(override_on(o, "water"), true);
+    test_bool(override_on(o, "transmissive"), true);
+
+    /* The mesh shader takes TextureScroll alone of the new ones */
+    o = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH, BOX_RENDER_FEATURE_TEXTURE_SCROLL |
+        BOX_RENDER_FEATURE_FRESNEL | BOX_RENDER_FEATURE_PLANAR | BOX_RENDER_FEATURE_WATER,
+        true, true);
+    test_int(override_count(o), 1);
+    test_bool(override_on(o, "material_texture_scroll"), true);
+}
+
+void MeshShader_overrides_without_new_features(void) {
+    // render/mesh_shader
+    /* The overrides of the mesh shaders before TextureScroll, Fresnel, Water and planar
+     * reflections, in the order of the scene features they followed */
+    static const char *old[] = {
+        "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
+        "scene_environment", "scene_aerial", "material_sheen", "material_clear_coat",
+        "material_anisotropy", "material_diffuse_transmission", "material_triplanar"
+    };
+    const char *added[] = {
+        "material_texture_scroll", "material_fresnel", "scene_planar", "water"
+    };
+    uint32_t others = BOX_RENDER_FEATURE_TRANSMISSION | BOX_RENDER_FEATURE_TEXTURE_BLEND |
+        BOX_RENDER_FEATURE_ALPHA_CUTOUT | BOX_RENDER_FEATURE_BLEND_MODES;
+    uint32_t shaders[2] = { BOX_RENDER_SHADER_MESH, BOX_RENDER_SHADER_MESH_EXTENDED };
+    uint32_t bits;
+    int32_t s, t, i;
+    for (s = 0; s < 2; s ++) {
+        for (t = 0; t < 2; t ++) {
+            for (bits = 0; bits < (1u << 11); bits ++) {
+                bool extended = shaders[s] == BOX_RENDER_SHADER_MESH_EXTENDED;
+                bool transmissive = t == 1;
+                uint32_t o = box_render_mesh_overrides(shaders[s], bits | others, transmissive,
+                    false);
+                int32_t expected = 0;
+                for (i = 0; i < 11; i ++) {
+                    bool on = (bits & (1u << i)) != 0 && (extended || i < 6);
+                    test_bool(override_on(o, old[i]), on);
+                    expected += on;
+                }
+
+                test_bool(override_on(o, "transmissive"), extended && transmissive);
+                expected += extended && transmissive;
+                for (i = 0; i < 4; i ++) {
+                    test_bool(override_on(o, added[i]), false);
+                }
+
+                test_int(override_count(o), expected);
+            }
+        }
+    }
 }

@@ -414,7 +414,10 @@
                     "shared_cutoff_change_records_shadow",
                     "texture_scroll_private_slot",
                     "texture_scroll_repacks_only_scrolling",
-                    "texture_scroll_prefab_repacks"
+                    "texture_scroll_prefab_repacks",
+                    "texture_scroll_off_shares_slot",
+                    "still_water_shares_slot",
+                    "water_off_not_repacked"
                 ]
             },
             {
@@ -840,7 +843,13 @@
                     "view_opts_out_of_scene_features",
                     "scene_features_script",
                     "water_draws_transmissive_extended",
-                    "water_off_draws_with_mesh_shader"
+                    "water_off_draws_with_mesh_shader",
+                    "texture_scroll_scene_feature",
+                    "texture_scroll_draws_with_mesh_shader",
+                    "texture_scroll_off_draws_with_mesh_shader",
+                    "overrides_off_by_default",
+                    "overrides_independent",
+                    "overrides_without_new_features"
                 ]
             },
             {

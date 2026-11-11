@@ -11,16 +11,13 @@
 // test, the blend modes and the TextureBlend have no override. transmissive is set for the
 // pipelines of Transmission shapes, through which the opaque snapshot of the view shows, and
 // water, with transmissive, for those of Water shapes of a scene with Scene.water.
+// material_fresnel and scene_planar are in mesh_common.wgsl, the vertex stage reads them too.
 override material_sheen: bool = true;
 override material_anisotropy: bool = true;
 override material_clear_coat: bool = true;
 override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
-override material_fresnel: bool = true;
 override transmissive: bool = false;
-
-// The shapes of PlanarReflections reflect the mirrored images of the view (Scene.planar_reflections).
-override scene_planar: bool = false;
 
 // Foam texture of a Water (Water.foam_texture), its red as stored; white without one. Only fs
 // samples it, so the TextureBlend entry points keep the blend group without it.
@@ -115,7 +112,7 @@ fn triplanar(f: VertexOut, geometric: vec3f) -> Layers {
         o.emissive += w[k] * textureSampleGrad(emissive_map, material_sampler, uv, gx[k],
             gy[k]).rgb;
         o.orm += w[k] * textureSampleGrad(orm_map, material_sampler, uv, gx[k], gy[k]).rgb;
-        let m = textureSampleGrad(normal_map, material_sampler, uv + f.normal_offset, gx[k],
+        let m = textureSampleGrad(normal_map, material_sampler, normal_uv(f, uv), gx[k],
             gy[k]).xyz * 2.0 - 1.0;
         let tangent = tangent_along(mapping_rotate(vo_rotation(f), mapping_tangent(k, s)),
             geometric);
@@ -687,7 +684,7 @@ fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> Layers {
     var layers = hard_layers(f, geometric);
     if (m.water_ripple_scale > 0.0) {
         let uv = water_uv(f);
-        let n1 = textureSample(normal_map, material_sampler, uv + f.normal_offset).xyz * 2.0 -
+        let n1 = textureSample(normal_map, material_sampler, normal_uv(f, uv)).xyz * 2.0 -
             1.0;
         let n2 = textureSample(normal_map, material_sampler,
             uv * m.water_ripple_scale + m.water_ripple_offset).xyz * 2.0 - 1.0;

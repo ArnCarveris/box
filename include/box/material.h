@@ -328,8 +328,9 @@ ECS_STRUCT(Transmission, {
  * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
  *
  * Waves are the PbrTextures.normal of the shape, scrolled by TextureScroll; ripple_scale adds a
- * second sample of it, moved by ripple_velocity and whiteout blended. Its record is packed every
- * frame, like that of a TextureScroll.
+ * second sample of it, moved by ripple_velocity and whiteout blended. With a ripple_scale above 0
+ * and a ripple_velocity its record is packed every frame, like that of a TextureScroll; a still
+ * Water shares its record like the other material components.
  *
  * Underwater views and the back faces are not supported: the surface is seen from above. Needs
  * Scene.water: a scene without it draws the shape as if it had no Water. Only 3D meshes have it,
@@ -409,6 +410,9 @@ ECS_STRUCT(TextureTransform, {
  * Its record is packed every frame; a capture sees the offset of its frame and is not redone for
  * the motion. TextureBlend layers keep their TextureTransform and do not scroll; the velocity of
  * the shape moves its mask and layers like its offset does, normal_velocity does not.
+ *
+ * Needs Scene.texture_scroll: a scene without it draws the shape as if it had no TextureScroll
+ * and does not pack its record every frame.
  */
 ECS_STRUCT(TextureScroll, {
     vec2 velocity;        /**< Texture widths per second added to the UV offset of every layer */

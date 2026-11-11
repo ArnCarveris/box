@@ -261,6 +261,7 @@ ECS_STRUCT(Scene, {
     bool planar_reflections; /**< PlanarReflection: the views render the mirrored images and the
                              *   shapes of the planes reflect them, else no reflection pass runs
                              *   and the shapes draw as without it */
+    bool texture_scroll;    /**< TextureScroll, else the shapes draw as without it */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

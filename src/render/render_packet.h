@@ -661,6 +661,11 @@ typedef struct box_render_view_gtao_t {
  * scene_planar override samples them */
 #define BOX_RENDER_FEATURE_PLANAR (1u << 18)
 
+/** TextureScroll (Scene.texture_scroll): the materials pack the scroll offsets, and both mesh
+ * shaders sample the normal map at the offset of its normal_velocity (material_texture_scroll
+ * override); without it a shape with a TextureScroll draws as without one */
+#define BOX_RENDER_FEATURE_TEXTURE_SCROLL (1u << 19)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
@@ -668,9 +673,92 @@ typedef struct box_render_view_gtao_t {
 #define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u | BOX_RENDER_FEATURE_WATER | \
     BOX_RENDER_FEATURE_PLANAR)
 
-/** The scene features that are overrides, which key the pipelines of the mesh shaders; the
+/** The scene features that are overrides in the order of their bits, which key the pipelines
+ * of the mesh shaders with BOX_RENDER_FEATURE_TEXTURE_SCROLL and BOX_RENDER_FEATURE_PLANAR; the
  * transmission override follows the transmissive pipelines instead */
 #define BOX_RENDER_FEATURE_OVERRIDES (0xFFFu)
+
+/** Overrides of the extended mesh shader, bit i the override box_render_mesh_override_key(i):
+ * the lighting ones, material_texture_scroll, the material ones, scene_planar, transmissive and
+ * water. The mesh shader has the first BOX_RENDER_MESH_OVERRIDES_PLAIN. */
+#define BOX_RENDER_MESH_OVERRIDES (16)
+
+/** Overrides of the mesh shader: the lighting ones and material_texture_scroll */
+#define BOX_RENDER_MESH_OVERRIDES_PLAIN (7)
+
+/** Bit of the material_texture_scroll override */
+#define BOX_RENDER_OVERRIDE_TEXTURE_SCROLL (1u << 6)
+
+/** Bit of the material_fresnel override */
+#define BOX_RENDER_OVERRIDE_FRESNEL (1u << 12)
+
+/** Bit of the scene_planar override */
+#define BOX_RENDER_OVERRIDE_PLANAR (1u << 13)
+
+/** Bit of the transmissive override */
+#define BOX_RENDER_OVERRIDE_TRANSMISSIVE (1u << 14)
+
+/** Bit of the water override */
+#define BOX_RENDER_OVERRIDE_WATER (1u << 15)
+
+/** The overrides that come from the scene features, without transmissive and water */
+#define BOX_RENDER_OVERRIDE_SCENE (0x3FFFu)
+
+/** Get the name of an override of the mesh shaders.
+ *
+ * @param index Index of the override, below BOX_RENDER_MESH_OVERRIDES
+ * @return Its name in the mesh shaders
+ */
+static inline const char* box_render_mesh_override_key(
+    int32_t index)
+{
+    static const char *keys[BOX_RENDER_MESH_OVERRIDES] = {
+        "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
+        "scene_environment", "scene_aerial", "material_texture_scroll", "material_sheen",
+        "material_clear_coat", "material_anisotropy", "material_diffuse_transmission",
+        "material_triplanar", "material_fresnel", "scene_planar", "transmissive", "water"
+    };
+
+    return keys[index];
+}
+
+/** Compute the override values of a pipeline of a mesh shader, a scene feature that is off
+ * compiles out its code.
+ *
+ * The mesh shader takes the lighting features and the TextureScroll one, the extended mesh
+ * shader all of them, transmissive for the pipelines of transmissive shapes and water for those
+ * of transmissive Water shapes.
+ *
+ * @param shader The shader handle, 0 overrides for one that is not a mesh shader
+ * @param features BOX_RENDER_FEATURE_* features of the scene the pipeline draws
+ * @param transmissive Whether the pipeline draws transmissive shapes
+ * @param water Whether the pipeline draws Water shapes, with transmissive
+ * @return The overrides that are true, bit i the override box_render_mesh_override_key(i)
+ */
+static inline uint32_t box_render_mesh_overrides(
+    uint32_t shader,
+    uint32_t features,
+    bool transmissive,
+    bool water)
+{
+    uint32_t result = 0;
+    if (!box_render_is_mesh(shader)) {
+        goto done;
+    }
+
+    result = (features & BOX_RENDER_FEATURE_LIGHTING) |
+        (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? BOX_RENDER_OVERRIDE_TEXTURE_SCROLL : 0u);
+    if (shader != BOX_RENDER_SHADER_MESH_EXTENDED) {
+        goto done;
+    }
+
+    result |= (features & BOX_RENDER_FEATURE_OVERRIDES & ~BOX_RENDER_FEATURE_LIGHTING) << 1;
+    result |= features & BOX_RENDER_FEATURE_PLANAR ? BOX_RENDER_OVERRIDE_PLANAR : 0u;
+    result |= transmissive ? BOX_RENDER_OVERRIDE_TRANSMISSIVE : 0u;
+    result |= transmissive && water ? BOX_RENDER_OVERRIDE_WATER : 0u;
+done:
+    return result;
+}
 
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *

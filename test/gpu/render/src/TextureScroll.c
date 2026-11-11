@@ -38,7 +38,8 @@
 #define SCROLL_UNIT ((float)SCROLL_H / (12.0f * tanf(GLM_PIf / 6.0f)))
 
 /** Create the world of the cases: a camera 6 units in front of the origin, no ambient light and
- * a directional light of intensity 0, so there is no default sun.
+ * a directional light of intensity 0, so there is no default sun, in a scene with
+ * Scene.texture_scroll.
  *
  * @param lit Whether the view is lit
  * @return The world
@@ -59,6 +60,7 @@ static ecs_world_t* scroll_world(
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = lit});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_singleton_set(world, Scene, {.texture_scroll = true});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, DirectionalLight, {.intensity = 0});
 
@@ -387,6 +389,43 @@ void TextureScroll_ignored_by_2d(void) {
     scroll_frames(world, 18);
     unsigned char *b = scroll_render(world, "scroll_2d_b.png");
     test_int(memcmp(a, b, SCROLL_W * SCROLL_H * 4), 0);
+    stbi_image_free(a);
+    stbi_image_free(b);
+
+    ecs_fini(world);
+}
+
+void TextureScroll_flag_off_draws_without(void) {
+    // materials/texture_scroll
+    ecs_world_t *world = scroll_world(true);
+    ecs_singleton_set(world, Scene, {.texture_scroll = false});
+    ecs_entity_t halves = scroll_halves(world);
+    ecs_entity_t bumps = scroll_bumps(world);
+    ecs_entity_t quad = scroll_quad(world);
+    ecs_set(world, quad, PbrTextures, {.albedo = halves, .normal = bumps});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {0, 0, 3});
+    ecs_set(world, light, PointLight, {.intensity = 20, .range = 20});
+    unsigned char *without = scroll_render(world, "scroll_off_without.png");
+
+    /* A scene without Scene.texture_scroll draws the shape as without its TextureScroll: no
+     * UV scroll and no normal scroll, however many frames pass */
+    ecs_set(world, quad, TextureScroll, {.velocity = {0.5f, 0}, .normal_velocity = {0.25f, 0}});
+    scroll_frames(world, 2);
+    unsigned char *a = scroll_render(world, "scroll_off_a.png");
+    scroll_frames(world, 18);
+    unsigned char *b = scroll_render(world, "scroll_off_b.png");
+    int ra[8];
+    test_assert(scroll_rises(a, ra, 8) >= 1);
+    test_int(memcmp(a, without, SCROLL_W * SCROLL_H * 4), 0);
+    test_int(memcmp(a, b, SCROLL_W * SCROLL_H * 4), 0);
+
+    /* No material is packed per frame for it */
+    box_render_draws_stats_t stats;
+    scroll_frames(world, 1);
+    box_render_draws_stats(world, &stats);
+    test_int(stats.material_bytes, 0);
+    stbi_image_free(without);
     stbi_image_free(a);
     stbi_image_free(b);
 

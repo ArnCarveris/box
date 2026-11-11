@@ -36,6 +36,19 @@ override scene_environment: bool = false;
 // Aerial perspective of the atmosphere (Scene.aerial_perspective).
 override scene_aerial: bool = false;
 
+// Normal map offset of a TextureScroll (Scene.texture_scroll), its UV scroll is in the uv
+// transform of the material record.
+override material_texture_scroll: bool = false;
+
+// Fresnel of the extended mesh shader (Scene.fresnel): the vertex stage passes the Fresnel of the
+// material and the fragment stage adds its rim. The mesh shader leaves it false.
+override material_fresnel: bool = false;
+
+// The shapes of PlanarReflections reflect the mirrored images of the view
+// (Scene.planar_reflections): the vertex stage finds the reflection slot of an instance
+// (planar_owner). The mesh shader leaves it false.
+override scene_planar: bool = false;
+
 // Water shapes of a scene with Scene.water, set by the extended mesh shader with transmissive:
 // the vertex stage passes the Water fields of the material (vo_water).
 override water: bool = false;
@@ -115,9 +128,10 @@ struct VertexOut {
     @location(11) object: vec4f,
     @location(14) object_normal: vec3f,
     // Wrapped TextureScroll.normal_velocity offset of the material, added to the UVs of the
-    // normal map only
+    // normal map only (normal_uv), 0 without material_texture_scroll
     @location(15) @interpolate(flat) normal_offset: vec2f,
-    // Fresnel strength, power, bias and opacity of the material, 0 without one
+    // Fresnel strength, power, bias and opacity of the material, 0 without one or without
+    // material_fresnel
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b
     @location(13) @interpolate(flat) fresnel_color: vec2u,
@@ -126,9 +140,18 @@ struct VertexOut {
     // ignores Transmission, and the fragment stage cannot read the material table.
     @location(8) @interpolate(flat) flat4: vec4u,
     // Planar reflection slot of the view plus one whose image the instance shows, 0 for none
-    // (planar_owner)
+    // or without scene_planar (planar_owner)
     @location(9) @interpolate(flat) planar: u32,
 };
+
+// UVs of the normal map of a fragment: the UVs moved by the TextureScroll.normal_velocity offset
+// with material_texture_scroll, else the UVs.
+fn normal_uv(f: VertexOut, uv: vec2f) -> vec2f {
+    if (material_texture_scroll) {
+        return uv + f.normal_offset;
+    }
+    return uv;
+}
 
 // The Water fields of the material of a fragment of a Water pipeline, the others zero.
 fn vo_water(f: VertexOut) -> Material {
@@ -324,10 +347,17 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     o.object = s.object;
     o.object_normal = s.object_normal;
     o.uv = vec4f(s.uv, s.material);
-    o.normal_offset = material.normal_offset;
-    o.fresnel = vec4f(material.fresnel_strength, material.fresnel_power, material.fresnel_bias,
-        material.fresnel_opacity);
-    o.fresnel_color = material.fresnel_color;
+    o.normal_offset = vec2f(0.0);
+    if (material_texture_scroll) {
+        o.normal_offset = material.normal_offset;
+    }
+    o.fresnel = vec4f(0.0);
+    o.fresnel_color = vec2u(0u);
+    if (material_fresnel) {
+        o.fresnel = vec4f(material.fresnel_strength, material.fresnel_power,
+            material.fresnel_bias, material.fresnel_opacity);
+        o.fresnel_color = material.fresnel_color;
+    }
     o.flat4 = vec4u(0u);
     if (water) {
         o.flat2 = vec4u((material.water_shallow & 0xFFFFFFu) | (material.water_flags << 24u),
@@ -388,7 +418,9 @@ fn planar_owner(slot: u32) -> u32 {
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading(v, shading, material, p, frame.scale, frame.normal));
-    o.planar = planar_owner(v.slot);
+    if (scene_planar) {
+        o.planar = planar_owner(v.slot);
+    }
     return o;
 }
 
@@ -399,7 +431,9 @@ fn planar_owner(slot: u32) -> u32 {
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
-    o.planar = planar_owner(v.slot);
+    if (scene_planar) {
+        o.planar = planar_owner(v.slot);
+    }
     return o;
 }
 
