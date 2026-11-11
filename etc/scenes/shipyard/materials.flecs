@@ -13,6 +13,7 @@ assets {
   yard_tex_floor_orm { TexturePath: {path: "etc/scenes/shipyard/assets/floor_orm.jpg"} }
   yard_tex_screen { TexturePath: {path: "etc/scenes/shipyard/assets/screen.svg", width: 512} }
   yard_tex_hazard { TexturePath: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
+  yard_tex_plume_core { TexturePath: {path: "etc/scenes/shipyard/assets/plume_core.png"} }
 
   prefab ShipHull { Rgb: {222, 226, 232}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingWorld, size: 7, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
   prefab ShipHullDark { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingWorld, size: 5, blend: 0.3} }
@@ -72,6 +73,12 @@ assets {
   }
   prefab ShipFusion { Rgb: {236, 176, 255}; Emissive: {strength: 7, color: {200, 110, 255}}; Animator: {clip: yard_flicker} }
   prefab ShipFusionHot { Rgb: {255, 236, 255}; Emissive: {strength: 14, color: {246, 196, 255}} }
+
+  prefab yard_drive_flicker {
+    AnimationClip: {duration: 0.6}
+    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 16}, {0.09, 20}, {0.17, 14}, {0.3, 19}, {0.41, 14.5}, {0.52, 18}, {0.6, 16}]}} }
+  }
+  prefab ShipPlumeCore { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Opacity: {0.2}; BlendMode: Additive; Emissive: {strength: 16, color: {255, 255, 255}}; PbrTextures: {emissive: yard_tex_plume_core}; Animator: {clip: yard_drive_flicker} }
 
   prefab ShipWarning { Rgb: {255, 70, 50}; Emissive: {strength: 3, color: {255, 50, 30}}; Animator: {clip: yard_pulse} }
 

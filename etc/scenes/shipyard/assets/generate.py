@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generates the floor textures, the console screen, the hazard stripes and the icons of the
-shipyard scene into this folder. The hull textures, the environment and the planet come from the
-space station scene (etc/scenes/space_station/assets/generate.py).
+"""Generates the floor textures, the console screen, the hazard stripes, the icons and the drive
+plume of the shipyard scene into this folder. The hull textures, the environment and the planet
+come from the space station scene (etc/scenes/space_station/assets/generate.py).
 
 Needs numpy and Pillow. Run it from anywhere: python3 etc/scenes/shipyard/assets/generate.py
 """
@@ -74,6 +74,36 @@ def floor(size=1024):
     rough = np.clip(0.55 + 0.4 * grime, 0, 1)
     occl = np.clip(relief * 1.8, 0.35, 1)
     save_rgb("floor_orm.jpg", np.dstack([occl * 255, rough * 255, np.full_like(rough, 190)]), 90)
+
+
+def periodic_streaks(width, height, seed, lo, hi, drift):
+    rng = np.random.default_rng(seed)
+    u = np.arange(width)[None, :] / width
+    v = np.arange(height)[:, None] / height
+    s = np.zeros((height, width))
+    for f in range(lo, hi):
+        a = rng.uniform(0.4, 1) / f ** 0.6
+        s += a * np.sin(2 * np.pi * (f * u + rng.uniform() + drift * rng.uniform(-1, 1) * v))
+    return (s - s.min()) / (s.max() - s.min())
+
+
+def save_emissive(name, lin):
+    Image.fromarray((np.clip(lin, 0, 1) ** (1 / 2.2) * 255).astype(np.uint8)).save(os.path.join(OUT, name))
+
+
+def plume(width=64, height=256):
+    v = (np.arange(height)[:, None] + 0.5) / height
+    lin = lambda c: (np.array(c, float) / 255) ** 2.2
+    ramp = lambda stops: np.dstack([np.interp(v[:, 0], [t for t, _ in stops], [lin(c)[i] for _, c in stops])[:, None]
+                                    * np.ones((1, width)) for i in range(3)])
+
+    knots = sum(np.exp(-((v - t) / w) ** 2) * a for t, w, a in
+                ((0.0, 0.07, 0.7), (0.21, 0.035, 1), (0.39, 0.032, 0.8), (0.55, 0.03, 0.6), (0.69, 0.03, 0.4)))
+    fade = np.clip(1 - v, 0, 1) ** 1.4
+    streak = 0.8 + 0.2 * periodic_streaks(width, height, 11, 3, 14, 0.6)
+    core = (fade * (0.2 + 0.8 * knots) * streak)[:, :, None] * ramp(
+        [(0, (255, 255, 255)), (0.3, (205, 236, 255)), (0.7, (120, 170, 255)), (1, (110, 90, 255))])
+    save_emissive("plume_core.png", core)
 
 
 SCREEN = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 160" width="512" height="320">
@@ -154,3 +184,4 @@ if __name__ == "__main__":
     with open(os.path.join(OUT, "hazard.svg"), "w") as f:
         f.write(HAZARD)
     icons()
+    plume()
