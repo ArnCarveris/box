@@ -8,8 +8,16 @@
 
 #include "mesh_cache.h"
 
+#define BOX_PATH_STEPS 16
+#define BOX_PATH_MAX_STEPS 64
+
 bool box_path2_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec_t *points);
 bool box_path3_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec_t *points);
+bool box_path2_sample_steps(const ecs_world_t *world, ecs_entity_t entity, int steps,
+    ecs_vec_t *points);
+bool box_path3_sample_steps(const ecs_world_t *world, ecs_entity_t entity, int steps,
+    ecs_vec_t *points);
+int box_path_steps(int32_t value);
 bool box_path2_evaluate(const Path2D *path, float t, vec2 point);
 bool box_path3_evaluate(const Path3D *path, float t, vec3 point);
 

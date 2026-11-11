@@ -32,7 +32,8 @@
                     "inherited_surface_child_script",
                     "inherited_invalid_surface_child",
                     "negative_bevel_rims",
-                    "infinite_bevel_rims"
+                    "infinite_bevel_rims",
+                    "profile_segments"
                 ]
             },
             {
@@ -421,7 +422,10 @@
                     "prism",
                     "inherited_edit",
                     "script_authoring",
-                    "attachment_chain"
+                    "attachment_chain",
+                    "loft_segments",
+                    "sweep_segments",
+                    "segments_clamped"
                 ]
             },
             {

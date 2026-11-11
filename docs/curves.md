@@ -313,7 +313,8 @@ for the whole life of a particle, so a particle never jumps between the two.
 
 Path segments use `CatmullRom`, not `CurveCatmullRom`. Tangents use neighboring
 anchors regardless of segment kind. Closed Catmull-Rom paths join across the wrap;
-profiles sample curved segments in 16 steps. Sweep UVs follow arc length. On a
+profiles sample curved segments in 16 steps, or in the `segments` of the Sweep or
+Loft. Sweep UVs follow arc length. On a
 horizontal path, profile y points down (-Y), so road profiles put their top at
 negative y.
 

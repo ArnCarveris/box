@@ -395,3 +395,71 @@ void Parametric_attachment_chain(void) {
     }
     ecs_fini(world);
 }
+
+void Parametric_loft_segments(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces",
+        "using box.geometry\n"
+        "ring { Path2D: {start: {1,0}, segments: ["
+        "{kind: CubicBezier, end: {0,1}, control1: {1,0.5523}, control2: {0.5523,1}},"
+        "{kind: CubicBezier, end: {-1,0}, control1: {-0.5523,1}, control2: {-1,0.5523}},"
+        "{kind: CubicBezier, end: {0,-1}, control1: {-1,-0.5523}, control2: {-0.5523,-1}},"
+        "{kind: CubicBezier, end: {1,0}, control1: {0.5523,-1}, control2: {1,-0.5523}}], closed: true}}\n"
+        "profile { Profile2D: {outer: ring}}\n"
+        "fine { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], cap_end: true}}\n"
+        "coarse { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], cap_end: true, segments: 4}}\n"
+        "chord { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], cap_end: true, segments: 1}}\n", NULL), 0);
+    const ShapeMesh *fine = ecs_get(world, ecs_lookup(world, "fine"), ShapeMesh);
+    const ShapeMesh *coarse = ecs_get(world, ecs_lookup(world, "coarse"), ShapeMesh);
+    const ShapeMesh *chord = ecs_get(world, ecs_lookup(world, "chord"), ShapeMesh);
+    test_int(fine->surface.p[5][1], 64);
+    test_int(coarse->surface.p[5][1], 16);
+    test_int(chord->surface.p[5][1], 4);
+    const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const box_mesh_t *fine_mesh = box_mesh_cache_get(cache, fine->mesh);
+    const box_mesh_t *coarse_mesh = box_mesh_cache_get(cache, coarse->mesh);
+    test_assert(fine_mesh != NULL);
+    test_assert(coarse_mesh != NULL);
+    test_assert(coarse_mesh->index_count * 3 < fine_mesh->index_count);
+    box_surface_sample_t sample;
+    test_bool(box_surface_evaluate(world, ecs_lookup(world, "coarse"), SurfaceOuter, 0.25f, 0.5f,
+        &sample), true);
+    test_assert(fabsf(hypotf(sample.position[0], sample.position[2]) - 1) < 0.001f);
+    ecs_fini(world);
+}
+
+void Parametric_sweep_segments(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces",
+        "using box.geometry\n"
+        "ring { Path2D: {start: {1,0}, segments: ["
+        "{kind: CubicBezier, end: {0,1}, control1: {1,0.5523}, control2: {0.5523,1}},"
+        "{kind: CubicBezier, end: {-1,0}, control1: {-0.5523,1}, control2: {-1,0.5523}},"
+        "{kind: CubicBezier, end: {0,-1}, control1: {-1,-0.5523}, control2: {-0.5523,-1}},"
+        "{kind: CubicBezier, end: {1,0}, control1: {0.5523,-1}, control2: {1,-0.5523}}], closed: true}}\n"
+        "profile { Profile2D: {outer: ring}}\n"
+        "route { Path3D: {segments: [{kind: Line, end: {0,3,0}}]}}\n"
+        "fine { Sweep: {path: route, profile: profile}}\n"
+        "coarse { Sweep: {path: route, profile: profile, segments: 6}}\n", NULL), 0);
+    const ShapeMesh *fine = ecs_get(world, ecs_lookup(world, "fine"), ShapeMesh);
+    const ShapeMesh *coarse = ecs_get(world, ecs_lookup(world, "coarse"), ShapeMesh);
+    test_int(fine->surface.p[5][1], 64);
+    test_int(coarse->surface.p[5][1], 24);
+    test_assert(fine->mesh != coarse->mesh);
+    ecs_fini(world);
+}
+
+void Parametric_segments_clamped(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces",
+        "using box.geometry\n"
+        "ring { Path2D: {start: {1,0}, segments: ["
+        "{kind: CubicBezier, end: {0,1}, control1: {1,0.5523}, control2: {0.5523,1}},"
+        "{kind: CubicBezier, end: {-1,0}, control1: {-0.5523,1}, control2: {-1,0.5523}},"
+        "{kind: CubicBezier, end: {0,-1}, control1: {-1,-0.5523}, control2: {-0.5523,-1}},"
+        "{kind: CubicBezier, end: {1,0}, control1: {0.5523,-1}, control2: {1,-0.5523}}], closed: true}}\n"
+        "profile { Profile2D: {outer: ring}}\n"
+        "body { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], segments: 1000}}\n", NULL), 0);
+    test_int(ecs_get(world, ecs_lookup(world, "body"), ShapeMesh)->surface.p[5][1], 256);
+    ecs_fini(world);
+}

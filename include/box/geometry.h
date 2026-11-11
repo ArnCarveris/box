@@ -253,7 +253,8 @@ ECS_STRUCT(PathSegment3D, {
  *
  * A path needs at least one segment and finite points. A closed path whose last segment does
  * not end at the start gets a segment back to it: Catmull-Rom when the last segment is
- * Catmull-Rom, otherwise a line. Profiles sample a curved segment in 16 steps.
+ * Catmull-Rom, otherwise a line. Profiles sample a curved segment in 16 steps, or in the
+ * segments of the Sweep or Loft that uses them.
  */
 ECS_STRUCT(Path2D, {
     vec2 start;                     /**< Start point */
@@ -293,7 +294,8 @@ ECS_STRUCT(Sweep, {
     float roll;           /**< Rotation of the profile about the path at its end, in radians */
     bool cap_start;       /**< Close the start of the path, default true, not with a contour */
     bool cap_end;         /**< Close the end of the path, default true, not with a contour */
-    int32_t segments;     /**< Unused for the mesh, the profile samples set the steps around */
+    int32_t segments;     /**< Steps of each curved segment of the profile, default 16,
+                           *   clamped to 1..64 */
     int32_t rings;        /**< Steps along the path, default 24, clamped to 3..256 */
 });
 
@@ -314,7 +316,8 @@ ECS_STRUCT(Loft, {
     ecs_vec(LoftSection) sections; /**< Sections in order, at least two */
     bool cap_start;                /**< Close the first section */
     bool cap_end;                  /**< Close the last section */
-    int32_t segments;              /**< Unused for the mesh, the profile samples set the steps */
+    int32_t segments;              /**< Steps of each curved segment of the profiles, default
+                                    *   16, clamped to 1..64 */
     int32_t rings;                 /**< Steps from the first to the last section, default 24,
                                     *   clamped to 3..256 */
 });

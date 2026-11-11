@@ -16,13 +16,15 @@
  * @param entity The path entity
  * @param three True to check Path3D, false to check Path2D
  * @param closed 1 if the path must be closed, 0 if it must be open, -1 if either
+ * @param steps Steps of each curve segment, 0 for the default
  * @return NULL if the path is valid, otherwise a reason string
  */
 static const char* box_validate_path(
     const ecs_world_t *world,
     ecs_entity_t entity,
     bool three,
-    int32_t closed)
+    int32_t closed,
+    int32_t steps)
 {
     const char *reason = NULL;
     ecs_vec_t points = {0};
@@ -34,8 +36,8 @@ static const char* box_validate_path(
         goto out;
     }
 
-    bool ok = three ? box_path3_sample(world, entity, &points) :
-        box_path2_sample(world, entity, &points);
+    bool ok = three ? box_path3_sample_steps(world, entity, steps, &points) :
+        box_path2_sample_steps(world, entity, steps, &points);
     if (!ok) {
         reason = "path has no usable segments or contains invalid coordinates";
         goto done;
@@ -94,11 +96,13 @@ out:
  *
  * @param world The world
  * @param entity The profile entity
+ * @param steps Steps of each curve segment, 0 for the default
  * @return NULL if the profile is valid, otherwise a reason string
  */
 static const char* box_validate_profile(
     const ecs_world_t *world,
-    ecs_entity_t entity)
+    ecs_entity_t entity,
+    int32_t steps)
 {
     const Profile2D *profile = entity && ecs_is_alive(world, entity) ?
         ecs_get(world, entity, Profile2D) : NULL;
@@ -106,10 +110,10 @@ static const char* box_validate_profile(
     if (!profile) {
         reason = "missing Profile2D with a closed outer Path2D";
     } else {
-        reason = box_validate_path(world, profile->outer, false, true);
+        reason = box_validate_path(world, profile->outer, false, true, steps);
         const ecs_entity_t *holes = ecs_vec_first(&profile->holes);
         for (int32_t i = 0; !reason && i < ecs_vec_count(&profile->holes); i ++) {
-            reason = box_validate_path(world, holes[i], false, true);
+            reason = box_validate_path(world, holes[i], false, true, steps);
         }
     }
 
@@ -172,7 +176,7 @@ static bool box_validate_path2_hook(
     }
 
     box_validate_report(world, entity, "Path2D",
-        box_validate_path(world, entity, false, path->closed));
+        box_validate_path(world, entity, false, path->closed, 0));
 done:
     return true;
 }
@@ -195,7 +199,7 @@ static bool box_validate_path3_hook(
     }
 
     box_validate_report(world, entity, "Path3D",
-        box_validate_path(world, entity, true, path->closed));
+        box_validate_path(world, entity, true, path->closed, 0));
 done:
     return true;
 }
@@ -213,7 +217,7 @@ static bool box_validate_profile_hook(
     void *ptr)
 {
     if (ptr) {
-        box_validate_report(world, entity, "Profile2D", box_validate_profile(world, entity));
+        box_validate_report(world, entity, "Profile2D", box_validate_profile(world, entity, 0));
     }
 
     return true;
@@ -240,10 +244,11 @@ static bool box_validate_sweep_hook(
     if (!!sweep->profile == !!sweep->contour) {
         reason = "set exactly one of profile or contour";
     } else {
-        reason = box_validate_path(world, sweep->path, true, -1);
+        reason = box_validate_path(world, sweep->path, true, -1, 0);
         if (!reason) {
-            reason = sweep->profile ? box_validate_profile(world, sweep->profile) :
-                box_validate_path(world, sweep->contour, false, false);
+            reason = sweep->profile ?
+                box_validate_profile(world, sweep->profile, sweep->segments) :
+                box_validate_path(world, sweep->contour, false, false, sweep->segments);
         }
     }
 
@@ -279,7 +284,7 @@ static bool box_validate_loft_hook(
     const char *reason = count < 2 ? "at least two sections are required" : NULL;
     const LoftSection *sections = ecs_vec_first(&loft->sections);
     for (int32_t i = 0; !reason && i < count; i ++) {
-        reason = box_validate_profile(world, sections[i].profile);
+        reason = box_validate_profile(world, sections[i].profile, loft->segments);
         if (!reason) {
             for (int32_t j = 0; j < 3; j ++) {
                 if (!isfinite(sections[i].offset[j]) || !isfinite(sections[i].rotation[j])) {
@@ -315,9 +320,9 @@ static bool box_validate_lathe_hook(
         goto done;
     }
 
-    const char *reason = box_validate_path(world, lathe->profile, false, -1);
+    const char *reason = box_validate_path(world, lathe->profile, false, -1, 0);
     if (!reason && lathe->inner) {
-        reason = box_validate_path(world, lathe->inner, false, -1);
+        reason = box_validate_path(world, lathe->inner, false, -1, 0);
     }
 
     box_validate_report(world, entity, "Lathe", reason);
@@ -342,7 +347,7 @@ static bool box_validate_extrusion_hook(
         goto done;
     }
 
-    const char *reason = box_validate_profile(world, extrusion->profile);
+    const char *reason = box_validate_profile(world, extrusion->profile, 0);
     if (!reason && !isfinite(extrusion->depth)) {
         reason = "depth must be finite";
     }
