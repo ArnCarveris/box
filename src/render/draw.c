@@ -599,9 +599,9 @@ done:
     return result;
 }
 
-/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive, or it
- * uses a material feature its scene enables. Alpha tested, blended and TextureBlend shapes
- * without those draw with the mesh shader.
+/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or
+ * water, or it uses a material feature its scene enables. Alpha tested, blended and TextureBlend
+ * shapes without those draw with the mesh shader.
  *
  * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy,
  * DiffuseTransmission or Fresnel; only a scene with some of those off checks which.
@@ -622,7 +622,7 @@ static bool box_draws_extended(
         BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION |
         BOX_RENDER_FEATURE_FRESNEL;
     uint32_t f = key->features;
-    bool result = key->transmissive;
+    bool result = key->transmissive || key->water;
     const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
         ? NULL : ecs_get(world, e, TextureMapping);
     ecs_iter_t it;
@@ -655,9 +655,9 @@ done:
  * below 1. A 3D shape draws with the extended mesh shader when box_draws_extended says so; the
  * Scene features that are off are ignored.
  *
- * A 3D shape that has or inherits Transmission is transmissive whatever its factor: it draws in
- * the sorted blended pass (AlphaBlend), is not alpha tested and casts no shadow, whatever its
- * BlendMode, Opacity and AlphaCutoff.
+ * A 3D shape that has or inherits Transmission, or Water with Scene.water (without its
+ * TextureBlend), is transmissive: it draws in the sorted blended pass (AlphaBlend), is not alpha
+ * tested and casts no shadow, whatever its factor, BlendMode, Opacity and AlphaCutoff.
  *
  * @param world The world
  * @param d The state
@@ -715,6 +715,14 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
     key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
         ecs_get(world, e, Transmission) != NULL;
+    const Water *water = shape2d || !(key->features & BOX_RENDER_FEATURE_WATER)
+        ? NULL : ecs_get(world, e, Water);
+    if (water) {
+        key->water = true;
+        key->transmissive = true;
+        key->foam = water->foam_texture;
+    }
+
     if (key->transmissive) {
         key->blend = AlphaBlend;
         key->cutout = false;
@@ -722,7 +730,8 @@ static void box_draws_key(
         key->fixture = false;
     }
 
-    ecs_entity_t blend = shape2d || !(key->features & BOX_RENDER_FEATURE_TEXTURE_BLEND)
+    ecs_entity_t blend = shape2d || key->water ||
+        !(key->features & BOX_RENDER_FEATURE_TEXTURE_BLEND)
         ? 0 : box_draws_blend_owner(world, e, key);
     if (blend) {
         key->texture_blend = true;

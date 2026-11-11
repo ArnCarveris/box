@@ -74,7 +74,12 @@
                     "texture_scroll_wrap",
                     "fresnel_defaults",
                     "fresnel_pack",
-                    "fresnel_factor"
+                    "fresnel_factor",
+                    "water_defaults",
+                    "water_pack",
+                    "water_depth_mix",
+                    "water_transmittance",
+                    "water_foam"
                 ]
             },
             {
@@ -782,7 +787,9 @@
                     "view_features_literal",
                     "view_features_from_scene",
                     "view_opts_out_of_scene_features",
-                    "scene_features_script"
+                    "scene_features_script",
+                    "water_draws_transmissive_extended",
+                    "water_off_draws_with_mesh_shader"
                 ]
             },
             {

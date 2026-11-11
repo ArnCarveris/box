@@ -348,6 +348,111 @@ float box_draws_fresnel_factor(
     return glm_clamp(bias + powf(x, power), 0.0f, 1.0f);
 }
 
+float box_draws_water_depth_mix(
+    float d,
+    float depth)
+{
+    float result = 1.0f;
+    if (isfinite(d)) {
+        result = 1.0f - expf(-3.0f * glm_max(d, 0.0f) / glm_max(depth, BOX_RENDER_WATER_MIN));
+    }
+
+    return glm_clamp(result, 0.0f, 1.0f);
+}
+
+float box_draws_water_transmittance(
+    float ray_length,
+    float visibility)
+{
+    float result = 0.0f;
+    if (isfinite(ray_length)) {
+        result = expf(-3.0f * glm_max(ray_length, 0.0f) /
+            glm_max(visibility, BOX_RENDER_WATER_MIN));
+    }
+
+    return glm_clamp(result, 0.0f, 1.0f);
+}
+
+float box_draws_water_foam(
+    float d,
+    float foam_width,
+    bool textured,
+    float tex)
+{
+    float result = 0.0f;
+    if (foam_width > 0.0f && isfinite(d)) {
+        result = glm_clamp(1.0f - glm_max(d, 0.0f) / foam_width, 0.0f, 1.0f);
+    }
+
+    if (textured) {
+        float t = 1.0f - result;
+        float x = glm_clamp((tex - t) / 0.1f, 0.0f, 1.0f);
+        result = result > 0.0f ? x * x * (3.0f - 2.0f * x) : 0.0f;
+    }
+
+    return result;
+}
+
+/** Pack a Water into the water words of a material record: the colors display encoded, the
+ * depth and visibility at least BOX_RENDER_WATER_MIN, the other floats when finite (foam width
+ * and ripple scale when positive), the ripple offset wrapped at the time; 0 without one.
+ *
+ * @param out The record
+ * @param water The component, NULL for none
+ * @param time Total render time the ripple offset is computed at
+ */
+static void box_draws_water_pack(
+    box_render_material_t *out,
+    const Water *water,
+    double time)
+{
+    out->water_ripple_offset[0] = 0.0f;
+    out->water_ripple_offset[1] = 0.0f;
+    out->water_shallow = 0u;
+    out->water_deep = 0u;
+    out->water_foam = 0u;
+    out->water_depth = 0.0f;
+    out->water_visibility = 0.0f;
+    out->water_refraction = 0.0f;
+    out->water_foam_width = 0.0f;
+    out->water_foam_scale = 0.0f;
+    out->water_ripple_scale = 0.0f;
+    out->water_flags = 0u;
+    if (!water) {
+        goto done;
+    }
+
+    out->water_shallow = (uint32_t)water->shallow_color.r |
+        ((uint32_t)water->shallow_color.g << 8) | ((uint32_t)water->shallow_color.b << 16);
+    out->water_deep = (uint32_t)water->deep_color.r | ((uint32_t)water->deep_color.g << 8) |
+        ((uint32_t)water->deep_color.b << 16);
+    out->water_foam = (uint32_t)water->foam_color.r | ((uint32_t)water->foam_color.g << 8) |
+        ((uint32_t)water->foam_color.b << 16);
+    out->water_depth = isfinite(water->depth) && water->depth > BOX_RENDER_WATER_MIN
+        ? water->depth : BOX_RENDER_WATER_MIN;
+    out->water_visibility = isfinite(water->visibility) &&
+        water->visibility > BOX_RENDER_WATER_MIN ? water->visibility : BOX_RENDER_WATER_MIN;
+    out->water_refraction = isfinite(water->refraction) ? water->refraction : 0.0f;
+    out->water_foam_width = isfinite(water->foam_width) && water->foam_width > 0.0f
+        ? water->foam_width : 0.0f;
+    out->water_foam_scale = isfinite(water->foam_scale) ? water->foam_scale : 0.0f;
+    out->water_ripple_scale = isfinite(water->ripple_scale) && water->ripple_scale > 0.0f
+        ? water->ripple_scale : 0.0f;
+    out->water_flags = water->foam_texture ? BOX_RENDER_WATER_FOAM_TEXTURE : 0u;
+    if (out->water_ripple_scale > 0.0f) {
+        TextureScroll ripple = {
+            .velocity = { water->ripple_velocity[0], water->ripple_velocity[1] }
+        };
+        float offsets[4];
+        box_draws_texture_scroll(&ripple, time, offsets);
+        out->water_ripple_offset[0] = offsets[0];
+        out->water_ripple_offset[1] = offsets[1];
+    }
+
+done:
+    return;
+}
+
 /** Wrap one axis of a scroll offset to 0..2.
  *
  * @param velocity Texture widths per second
@@ -426,6 +531,7 @@ void box_draws_material_pack(
     }
 
     box_draws_fresnel_pack(out, material->fresnel);
+    box_draws_water_pack(out, material->water, material->time);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;

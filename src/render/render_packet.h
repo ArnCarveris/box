@@ -637,11 +637,15 @@ typedef struct box_render_view_gtao_t {
  * features of a view only */
 #define BOX_RENDER_FEATURE_DEPTH_PREPASS (1u << 16)
 
+/** Water (Scene.water): its shapes draw transmissive with the water override of the extended
+ * mesh shader, which follows the water pipelines like the transmission override */
+#define BOX_RENDER_FEATURE_WATER (1u << 17)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
 /** The scene features that draw with the extended mesh shader */
-#define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u)
+#define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u | BOX_RENDER_FEATURE_WATER)
 
 /** The scene features that are overrides, which key the pipelines of the mesh shaders; the
  * transmission override follows the transmissive pipelines instead */
@@ -1146,7 +1150,30 @@ typedef struct box_render_material_t {
     float fresnel_bias;     /**< Fresnel.bias, 0 without one or when not finite */
     float fresnel_opacity;  /**< Fresnel.opacity clamped to 0..1, 0 without one or when not
                              *   finite */
+    float water_ripple_offset[2]; /**< Wrapped Water.ripple_velocity offset of the second normal
+                             *   sample, 0 without one */
+    uint32_t water_shallow; /**< Water.shallow_color, display encoded bytes: r | g << 8 | b << 16,
+                             *   0 without one */
+    uint32_t water_deep;    /**< Water.deep_color, display encoded bytes, 0 without one */
+    uint32_t water_foam;    /**< Water.foam_color, display encoded bytes, 0 without one */
+    float water_depth;      /**< Water.depth, at least BOX_RENDER_WATER_MIN (the depth of a
+                             *   Water that is not positive and finite); 0 without one, which
+                             *   tells a record without Water */
+    float water_visibility; /**< Water.visibility, at least BOX_RENDER_WATER_MIN, 0 without one */
+    float water_refraction; /**< Water.refraction, 0 without one or when not finite */
+    float water_foam_width; /**< Water.foam_width, 0 without one or when negative or not
+                             *   finite */
+    float water_foam_scale; /**< Water.foam_scale, 0 without one or when not finite */
+    float water_ripple_scale; /**< Water.ripple_scale, 0 without one, when negative or not
+                             *   finite */
+    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags, 0 without one */
 } box_render_material_t;
+
+/** Smallest depth and visibility of a Water record */
+#define BOX_RENDER_WATER_MIN (1e-3f)
+
+/** Flag of a Water record: it has a foam_texture, which the foam samples */
+#define BOX_RENDER_WATER_FOAM_TEXTURE (1u << 0)
 
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of
  * instance.wgsl.
@@ -1281,6 +1308,9 @@ typedef struct box_render_batch_t {
     bool transmissive;          /**< The instances have Transmission: a blended draw of a view
                                  *   whose pipeline does not blend nor write depth and samples
                                  *   the snapshot of the opaque image of the view */
+    bool water;                 /**< The instances have Water: transmissive too, drawn with the
+                                 *   water override of the extended mesh shader, which binds
+                                 *   foam as its foam texture */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool fixture;               /**< The instances are LightFixture shapes: the cull keeps them
                                  *   out of the tile of a light inside their world bounds. Only
@@ -1304,6 +1334,8 @@ typedef struct box_render_batch_t {
                                  *   shaders */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
+    uint32_t foam;              /**< Texture handle of the Water.foam_texture of a water batch,
+                                 *   0 for none */
     uint32_t blend_layers;      /**< Data offset of the box_render_texture_blend_t of a batch
                                  *   with texture_blend */
     uint32_t wrap;              /**< TextureWrap of the samplers */

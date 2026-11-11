@@ -217,7 +217,7 @@ void box_gpu_materials_clear(
 void box_gpu_texture_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[BOX_RENDER_TEXTURE_SLOTS + 2];
+    WGPUBindGroupLayoutEntry entries[BOX_RENDER_TEXTURE_SLOTS + 3];
     WGPUBindGroupLayoutEntry kind = {
         .binding = BOX_GPU_DRAW_KIND_BINDING,
         .visibility = WGPUShaderStage_Fragment,
@@ -246,8 +246,16 @@ void box_gpu_texture_init(
         .sampler = { .type = WGPUSamplerBindingType_Filtering }
     };
     entries[BOX_RENDER_TEXTURE_SLOTS + 1] = kind;
+    entries[BOX_RENDER_TEXTURE_SLOTS + 2] = (WGPUBindGroupLayoutEntry){
+        .binding = BOX_GPU_MATERIAL_FOAM_BINDING,
+        .visibility = WGPUShaderStage_Fragment,
+        .texture = {
+            .sampleType = WGPUTextureSampleType_Float,
+            .viewDimension = WGPUTextureViewDimension_2D
+        }
+    };
     WGPUBindGroupLayoutDescriptor layout = {
-        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 2,
+        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 3,
         .entries = entries
     };
     gpu->material_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
@@ -730,7 +738,7 @@ WGPUSampler box_gpu_texture_sampler(
 
 /** Hash the key of a texture layer bind group.
  *
- * @param textures Texture handles of the layers
+ * @param textures Texture handles of the layers, then of the foam texture
  * @param wrap The TextureWrap
  * @param anisotropy Anisotropic samples
  * @return The hash
@@ -742,7 +750,7 @@ static uint64_t box_gpu_material_hash(
 {
     uint64_t h = ((uint64_t)wrap * 32 + anisotropy + 1) * 0x9E3779B97F4A7C15ull;
     int32_t i;
-    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+    for (i = 0; i < BOX_GPU_MATERIAL_TEXTURES; i ++) {
         h = (h ^ (h >> 31)) * 0xC2B2AE3D27D4EB4Full + textures[i];
     }
 
@@ -784,7 +792,8 @@ static void box_gpu_material_mips(
  *
  * @param gpu The backend
  * @param handle Texture handle, 0 for the default
- * @param slot The layer
+ * @param slot The layer, BOX_RENDER_TEXTURE_SLOTS for the foam texture of a water batch, stored
+ * with a white default
  * @return The view
  */
 static WGPUTextureView box_gpu_material_view(
@@ -841,8 +850,8 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_packet_t *packet,
     const box_render_batch_t *b)
 {
-    uint32_t textures[BOX_RENDER_TEXTURE_SLOTS];
-    WGPUBindGroupEntry entries[BOX_RENDER_TEXTURE_SLOTS + 2];
+    uint32_t textures[BOX_GPU_MATERIAL_TEXTURES];
+    WGPUBindGroupEntry entries[BOX_RENDER_TEXTURE_SLOTS + 3];
     uint32_t anisotropy = packet->anisotropy;
     WGPUBindGroup result = NULL;
     box_gpu_material_t *m = NULL;
@@ -859,6 +868,9 @@ WGPUBindGroup box_gpu_material_group(
             b->textures[i] == (BOX_RENDER_TEXTURE_TARGET | gpu->rendering);
         textures[i] = self ? 0 : b->textures[i];
     }
+
+    textures[BOX_RENDER_TEXTURE_SLOTS] = b->water && !(gpu->rendering &&
+        b->foam == (BOX_RENDER_TEXTURE_TARGET | gpu->rendering)) ? b->foam : 0;
 
     hash = box_gpu_material_hash(textures, b->wrap, anisotropy);
     head = ecs_map_ensure(&gpu->materials, hash);
@@ -891,9 +903,14 @@ WGPUBindGroup box_gpu_material_group(
         .buffer = gpu->draw_kinds,
         .size = 4 * sizeof(uint32_t)
     };
+    entries[BOX_RENDER_TEXTURE_SLOTS + 2] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_MATERIAL_FOAM_BINDING,
+        .textureView = box_gpu_material_view(gpu, textures[BOX_RENDER_TEXTURE_SLOTS],
+            BOX_RENDER_TEXTURE_SLOTS)
+    };
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->material_layout,
-        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 2,
+        .entryCount = BOX_RENDER_TEXTURE_SLOTS + 3,
         .entries = entries
     };
     m = ecs_os_calloc_t(box_gpu_material_t);

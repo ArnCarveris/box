@@ -286,8 +286,9 @@ ECS_STRUCT(ReflectionProbe, {
  *
  * @par Limits:
  * - It draws the opaque, alpha tested and blended meshes, the sky and the particles, not the
- *   shape of the entity itself, transmissive shapes (no reflections of reflections), fog
- *   volumes, 2D shapes, text, debug drawing or the effects of the view.
+ *   shape of the entity itself, transmissive shapes or Water shapes (no reflections of
+ *   reflections: water never reflects itself or other water), fog volumes, 2D shapes, text,
+ *   debug drawing or the effects of the view.
  * - Shadows and point and spot lights come from the shadow maps and light clusters of the view,
  *   so what the view itself does not see may miss them; it has no ambient occlusion and no
  *   aerial perspective.

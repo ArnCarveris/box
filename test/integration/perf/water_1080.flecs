@@ -1,0 +1,111 @@
+// A water plane (Water) that fills the view at 1920x1080 pixels over a seabed of bumps, with
+// shore foam broken up by a generated texture, a scrolled generated normal map with a ripple
+// sample, and a sun. The orbit looks down steeply from close by, so every pixel of the view is
+// water: its frame time is the cost of a full screen of water shading, its opaque snapshot and
+// the depth copy.
+
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.light
+using box.camera
+using box.view
+using box.surface
+using box.perf
+
+$ {
+  Scene: {water: true}
+}
+
+$ {
+  AmbientLight: {sky: {150, 175, 210}, ground: {70, 64, 52}, intensity: 0.7}
+}
+
+sun {
+  Rotation: {-0.6, -1.1, 0}
+  DirectionalLight: {intensity: 3}
+  Rgb: {255, 244, 226}
+}
+
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 150, 190, 255}}}
+}
+
+perf_surface {
+  Surface: {width: 1920, height: 1080}
+}
+
+waves_height {
+  TextureGen: {
+    width: 256, height: 256, seed: 7
+    layers: [
+      {kind: GenNoise, frequency: 4, octaves: 4, amount: 1}
+    ]
+  }
+}
+
+waves {
+  TextureGen: {source: waves_height, output: GenNormal, strength: 2}
+}
+
+foam_noise {
+  TextureGen: {
+    width: 256, height: 256, seed: 3
+    layers: [
+      {kind: GenNoise, frequency: 8, octaves: 3, amount: 1}
+    ]
+  }
+}
+
+seabed {
+  Position: {0, -1.5, 0}
+  Rotation: {-1.5708, 0, 0}
+  Quad: {60, 60}
+  Rgb: {196, 176, 136}
+  PbrMaterial: {metallic: 0, roughness: 0.95}
+}
+
+for x in 0..6 {
+  for z in 0..6 {
+    {
+      Position: {x * 3 - 7.5, -1.6 + ((x * 5 + z * 3) % 4) * 0.4, z * 3 - 7.5}
+      Sphere: {segments: 16, smooth: true, radius: 0.8}
+      Rgb: {110, 106, 100}
+      PbrMaterial: {metallic: 0, roughness: 0.9}
+    }
+  }
+}
+
+sea {
+  Position: {0, 0, 0}
+  Rotation: {-1.5708, 0, 0}
+  Quad: {60, 60}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {metallic: 0, roughness: 0.08}
+  PbrTextures: {normal: waves}
+  TextureTransform: {scale_x: 10, scale_y: 10, offset_x: 0, offset_y: 0}
+  TextureScroll: {velocity: {0.01, 0.004}, normal_velocity: {0.02, 0.01}}
+  Water: {
+    shallow_color: {60, 170, 160}
+    deep_color: {8, 40, 64}
+    depth: 2
+    visibility: 1.5
+    refraction: 0.02
+    foam_color: {240, 245, 245}
+    foam_width: 0.25
+    foam_texture: foam_noise
+    foam_scale: 2
+    ripple_scale: 2.7
+    ripple_velocity: {-0.03, 0.02}
+  }
+}
+
+$ {
+  PerfRun: {fps: 60, frames: 300, warmup: 60, period: 5, elevation: 70, camera: camera}
+}

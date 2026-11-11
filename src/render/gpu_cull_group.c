@@ -109,7 +109,7 @@ static bool box_gpu_cull_wants(
 
     if (f->flags & BOX_GPU_CULL_REFLECT) {
         result = b->scene == scene && box_render_is_mesh(b->pipeline) && b->instance_count &&
-            !b->transmissive && (b->view == -1 || b->view == f->index);
+            !b->transmissive && !b->water && (b->view == -1 || b->view == f->index);
         goto done;
     }
 

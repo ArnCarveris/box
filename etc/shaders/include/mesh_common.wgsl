@@ -117,6 +117,9 @@ struct VertexOut {
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b
     @location(13) @interpolate(flat) fresnel_color: vec2u,
+    // Slot of the material table of the instance, which the fragments of a Water fetch its
+    // record from (material_fetch)
+    @location(8) @interpolate(flat) material_id: u32,
 };
 
 fn vo_emissive(f: VertexOut) -> vec3f {
@@ -276,8 +279,11 @@ fn vertex_scalars(material: Material, mapped: f32) -> vec2u {
         pack2x16float(vec2f(material.diffuse_blur, mapped)));
 }
 
-fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading) -> VertexOut {
+fn vertex_out(p: Placed, id: u32, material: Material, frame: ModelFrame, s: VertexShading)
+    -> VertexOut
+{
     var o: VertexOut;
+    o.material_id = id;
     o.pos = p.pos;
     o.world = p.world.xyz;
     o.normal = frame.normal;
@@ -328,7 +334,7 @@ fn cutout_scalars(f: CutoutOut) -> vec4f {
     let material = material_fetch(shading.material);
     let p = place_mesh(v);
     let frame = model_frame(p);
-    return vertex_out(p, material, frame,
+    return vertex_out(p, shading.material, material, frame,
         vertex_shading(v, shading, material, p, frame.scale, frame.normal));
 }
 
@@ -337,7 +343,7 @@ fn cutout_scalars(f: CutoutOut) -> vec4f {
     let material = material_fetch(shading.material);
     let p = place(v);
     let frame = model_frame(p);
-    return vertex_out(p, material, frame,
+    return vertex_out(p, shading.material, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
 }
 

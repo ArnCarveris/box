@@ -393,6 +393,10 @@ WGPUBindGroup box_gpu_material_group(
  * dynamic offset */
 #define BOX_GPU_DRAW_KIND_BINDING (11)
 
+/** Binding of the foam texture of a water batch in the material group (foam_map of
+ * mesh_extended.wgsl), white for a batch without one */
+#define BOX_GPU_MATERIAL_FOAM_BINDING (12)
+
 /** Bytes between two DrawKinds in draw_kinds, the largest uniform offset alignment */
 #define BOX_GPU_DRAW_KIND_STRIDE (256)
 
@@ -690,14 +694,15 @@ WGPURenderPipeline box_gpu_forward_pipeline(
     bool equal);
 
 /** Overrides of the extended mesh shader: the bits of BOX_RENDER_FEATURE_OVERRIDES in order,
- * then transmissive; the mesh shader has the first 6 */
-#define BOX_GPU_FEATURE_OVERRIDES (13)
+ * then transmissive and water; the mesh shader has the first 6 */
+#define BOX_GPU_FEATURE_OVERRIDES (14)
 
 /** Create the layouts the forward pass shares.
  *
  * Group 0 binds 9 sampled textures to the fragment stage, the depth copy of the opaque snapshot
- * (binding 20) the last: with the 4 material maps the mesh pipelines sample 13 of the 16 a
- * device has at least, the particle and fog volume pipelines fewer.
+ * (binding 20) the last: with the 4 material maps and the foam texture of the material group the
+ * mesh pipelines sample 14 of the 16 a device has at least, the particle and fog volume
+ * pipelines fewer.
  *
  * @param gpu The backend
  */
