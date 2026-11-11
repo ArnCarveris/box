@@ -345,14 +345,16 @@ assets {
           Rgb: {128, 160, 182}
         }
       }
-      hint {
-        Layout: {padding: {1, 1, 4, 4}}
-        Rect: {1, 1}
-        Rgb: {8, 20, 30}
-        Border: {width: 1, radius: 2, color: {44, 104, 134, 255}}
-        key {
-          Text: {value: key_hint, size: 10}
-          Rgb: {140, 190, 214}
+      if key_hint != "" {
+        hint {
+          Layout: {padding: {1, 1, 4, 4}}
+          Rect: {1, 1}
+          Rgb: {8, 20, 30}
+          Border: {width: 1, radius: 2, color: {44, 104, 134, 255}}
+          key {
+            Text: {value: key_hint, size: 10}
+            Rgb: {140, 190, 214}
+          }
         }
       }
     }
@@ -532,19 +534,19 @@ assets {
         YardHalo ops_a(strength: 10) {
           YardHalo ops_b(strength: 24, pad: 1) {
             YardCard ops(title: "MODULES", width: 292, spacing: 6) {
-              YardTile t1(label: "Cockpit", op: K_COCKPIT, key_hint: "1")
-              YardTile t2(label: "Habitat", op: K_HAB, key_hint: "2")
-              YardTile t3(label: "Life Support", op: K_LIFE, key_hint: "3")
-              YardTile t4(label: "Power", op: K_POWER, key_hint: "4")
-              YardTile tr(label: "Radiator", op: K_RADIATOR, key_hint: "R")
-              YardTile t5(label: "Cargo Bay", op: K_CARGO, key_hint: "5")
-              YardTile t6(label: "Fuel Tank", op: K_FUEL, key_hint: "6")
-              YardTile t7(label: "Weapons", op: K_WEAPON, key_hint: "7")
-              YardTile t8(label: "Engine", op: K_ENGINE, key_hint: "8")
-              YardTile t9(label: "Biome", op: K_BIOME, key_hint: "9")
-              YardTile t0(label: "Observation Deck", op: K_OBS, key_hint: "0")
-              YardTile tp(label: "Docking Port", op: K_DOCK, key_hint: "P")
-              YardTile th(label: "Hull Fairing", op: K_HULL, key_hint: "H")
+              YardTile t1(label: "Cockpit", op: K_COCKPIT)
+              YardTile t2(label: "Habitat", op: K_HAB)
+              YardTile t3(label: "Life Support", op: K_LIFE)
+              YardTile t4(label: "Power", op: K_POWER)
+              YardTile tr(label: "Radiator", op: K_RADIATOR)
+              YardTile t5(label: "Cargo Bay", op: K_CARGO)
+              YardTile t6(label: "Fuel Tank", op: K_FUEL)
+              YardTile t7(label: "Weapons", op: K_WEAPON)
+              YardTile t8(label: "Engine", op: K_ENGINE)
+              YardTile t9(label: "Biome", op: K_BIOME)
+              YardTile t0(label: "Observation Deck", op: K_OBS)
+              YardTile tp(label: "Docking Port", op: K_DOCK)
+              YardTile th(label: "Hull Fairing", op: K_HULL)
               YardTile tx(label: "Remove", op: T_REMOVE, key_hint: "X")
 
             }

@@ -5,24 +5,17 @@ using state
 
 state {
   actions {
-    Tool1 { Action: {description: "Pick the cockpit"}; Binding: {key: Num1} }
-    Tool2 { Action: {description: "Pick the habitat"}; Binding: {key: Num2} }
-    Tool3 { Action: {description: "Pick life support"}; Binding: {key: Num3} }
-    Tool4 { Action: {description: "Pick the power plant"}; Binding: {key: Num4} }
-    Tool5 { Action: {description: "Pick the cargo bay"}; Binding: {key: Num5} }
-    Tool6 { Action: {description: "Pick the fuel tank"}; Binding: {key: Num6} }
-    Tool7 { Action: {description: "Pick weapons"}; Binding: {key: Num7} }
-    Tool8 { Action: {description: "Pick the engine"}; Binding: {key: Num8} }
-    Tool9 { Action: {description: "Pick the biome"}; Binding: {key: Num9} }
-    Tool10 { Action: {description: "Pick the observation deck"}; Binding: {key: Num0} }
-    Tool11 { Action: {description: "Pick the docking port"}; Binding: {key: P} }
-    Tool12 { Action: {description: "Pick the hull fairing"}; Binding: {key: H} }
-    Tool13 { Action: {description: "Pick the radiator"}; Binding: {key: R} }
+    Deck1 { Action: {description: "Work on deck 1"}; Binding: {key: Num1} }
+    Deck2 { Action: {description: "Work on deck 2"}; Binding: {key: Num2} }
+    Deck3 { Action: {description: "Work on deck 3"}; Binding: {key: Num3} }
+    Deck4 { Action: {description: "Work on deck 4"}; Binding: {key: Num4} }
+    Deck5 { Action: {description: "Work on deck 5"}; Binding: {key: Num5} }
+    Deck6 { Action: {description: "Work on deck 6"}; Binding: {key: Num6} }
     Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
     Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
     View { Action: {description: "Switch between the exterior and the interior"}; Binding: {key: Tab} }
-    DeckUp { Action: {description: "Work on the deck above"}; Binding: {key: PageUp}; alt { Binding: {key: E} } }
-    DeckDown { Action: {description: "Work on the deck below"}; Binding: {key: PageDown}; alt { Binding: {key: Q} } }
+    DeckUp { Action: {description: "Work on the deck above"}; Binding: {key: PageUp} }
+    DeckDown { Action: {description: "Work on the deck below"}; Binding: {key: PageDown} }
   }
 
   fn load(design: i32) {
@@ -60,19 +53,12 @@ assets {
 
 state {
   hotkeys {
-    assets.HotKey k1(action: actions.Tool1, op: K_COCKPIT)
-    assets.HotKey k2(action: actions.Tool2, op: K_HAB)
-    assets.HotKey k3(action: actions.Tool3, op: K_LIFE)
-    assets.HotKey k4(action: actions.Tool4, op: K_POWER)
-    assets.HotKey k5(action: actions.Tool5, op: K_CARGO)
-    assets.HotKey k6(action: actions.Tool6, op: K_FUEL)
-    assets.HotKey k7(action: actions.Tool7, op: K_WEAPON)
-    assets.HotKey k8(action: actions.Tool8, op: K_ENGINE)
-    assets.HotKey k9(action: actions.Tool9, op: K_BIOME)
-    assets.HotKey k10(action: actions.Tool10, op: K_OBS)
-    assets.HotKey k11(action: actions.Tool11, op: K_DOCK)
-    assets.HotKey k12(action: actions.Tool12, op: K_HULL)
-    assets.HotKey k13(action: actions.Tool13, op: K_RADIATOR)
+    assets.HotKey d1(action: actions.Deck1, op: OP_DECK + 0)
+    assets.HotKey d2(action: actions.Deck2, op: OP_DECK + 1)
+    assets.HotKey d3(action: actions.Deck3, op: OP_DECK + 2)
+    assets.HotKey d4(action: actions.Deck4, op: OP_DECK + 3)
+    assets.HotKey d5(action: actions.Deck5, op: OP_DECK + 4)
+    assets.HotKey d6(action: actions.Deck6, op: OP_DECK + 5)
     assets.HotKey kx(action: actions.Remove, op: T_REMOVE)
     assets.HotKey kc(action: actions.Cancel, op: OP_CANCEL)
     assets.HotKey kv(action: actions.View, op: OP_VIEW)
