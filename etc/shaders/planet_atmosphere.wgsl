@@ -11,8 +11,12 @@
 // Group 0 is the view group of the forward pass, which this shader does not read.
 #include "include/atmosphere_common.wgsl"
 
-// Steps of a march
+// Steps of a march along the longest chord of the shell, the one that grazes the ground
 const SHELL_STEPS: i32 = 32;
+
+// Fewest steps of a march; shorter rays, such as those that look down on the ground, take
+// fewer steps in proportion to their length
+const SHELL_MIN_STEPS: i32 = 8;
 
 struct Planet {
     // bottom radius, top radius, Rayleigh scale height, Mie scale height in km
@@ -109,13 +113,17 @@ fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
         discard;
     }
 
-    let top = ray_sphere(ro, rd, top_radius());
-    if (top.y <= 0.0) {
+    let seg = ray_segment(ro, rd, max_t, true);
+    if (seg.y <= seg.x) {
         discard;
     }
 
-    let s = scatter_ray(ro, rd, max_t, SHELL_STEPS, 1.0, true, u.sun.xyz, u.sun_color.rgb,
-        u.sun.w);
+    let rt = top_radius();
+    let rb = bottom_radius();
+    let chord = 2.0 * sqrt(max(rt * rt - rb * rb, 1e-6));
+    let steps = clamp(i32(ceil(f32(SHELL_STEPS) * (seg.y - seg.x) / chord)), SHELL_MIN_STEPS,
+        SHELL_STEPS);
+    let s = scatter_ray(ro, rd, max_t, steps, 1.0, true, u.sun.xyz, u.sun_color.rgb, u.sun.w);
     let light = s.light * u.sun_color.w;
     let t = clamp((s.throughput.x + s.throughput.y + s.throughput.z) / 3.0, 0.0, 1.0);
     if (any(light != light) || t != t) {
