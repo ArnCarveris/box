@@ -85,7 +85,7 @@ view {
   View: {
     camera: rig.arm.eye,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, resolution: 4096, max_distance: 140},
+    shadows: {enabled: true, resolution: 4096, max_distance: 200},
     lighting: {reflections: true, baked: false, environment: {source: assets.yard_stars, intensity: 0.7, background: true}},
     effects: [{effect: yard_contact}, {effect: yard_bloom}, {effect: yard_film}, {effect: yard_edges}]
   }

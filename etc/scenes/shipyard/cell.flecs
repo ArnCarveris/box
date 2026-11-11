@@ -65,7 +65,13 @@ assets {
 
     if k == K_WEAPON {
       WeaponMount mount(side: mount_at(x, y, z))
-    } else if inner {
+    } else if k == K_DOCK {
+      DockMount mount(side: dock_at(x, y, z), seed: seed)
+    } else if k == K_ENGINE {
+      EngineMount mount(seed: seed, mounted: kind_at(x, y, z + 1) != 0)
+    } else if k == K_HULL && hull_shape(x, y, z) != H_BLOCK {
+      HullFairing fairing(shape: hull_shape(x, y, z), sx: hull_sx(x, y, z), sy: hull_sy(x, y, z), sz: hull_sz(x, y, z))
+    } else if inner && k != K_HULL {
       ModuleInterior room(
         k: k, px: !room_at(x + 1, y, z), nx: !room_at(x - 1, y, z), pz: !room_at(x, y, z + 1), nz: !room_at(x, y, z - 1),
         kpx: kpx, knx: knx, kpz: kpz, knz: knz, open: !room_at(x, y + 1, z) || y == deck, seed: seed
@@ -77,10 +83,17 @@ assets {
         px: !rack_at(x + 1, y, z), nx: !rack_at(x - 1, y, z), pz: !rack_at(x, y, z + 1), nz: !rack_at(x, y, z - 1),
         tp: kind_at(x, y, z + 1) == K_FUEL, tn: kind_at(x, y, z - 1) == K_FUEL
       )
+    } else if k == K_LIFE {
+      LifePlant plant(pz: kind_at(x, y, z + 1) != K_LIFE, nz: kind_at(x, y, z - 1) != K_LIFE, roof: shown_at(x, y + 1, z), seed: seed)
+    } else if k == K_BIOME {
+      BiomeHouse house(
+        px: kind_at(x + 1, y, z) != K_BIOME, nx: kind_at(x - 1, y, z) != K_BIOME,
+        pz: kind_at(x, y, z + 1) != K_BIOME, nz: kind_at(x, y, z - 1) != K_BIOME, seed: seed
+      )
     } else {
       HullShell skin(
-        px: !solid_at(x + 1, y, z), nx: !solid_at(x - 1, y, z), py: !solid_at(x, y + 1, z),
-        ny: !solid_at(x, y - 1, z), pz: !solid_at(x, y, z + 1), nz: !solid_at(x, y, z - 1),
+        px: !skin_at(x + 1, y, z, -1, 0), nx: !skin_at(x - 1, y, z, 1, 0), py: !skin_y(x, y + 1, z, -1),
+        ny: !skin_y(x, y - 1, z, 1), pz: !skin_at(x, y, z + 1, 0, -1) && k != K_COCKPIT, nz: !skin_at(x, y, z - 1, 0, 1),
         xy_pp: solid_at(x + 1, y + 1, z), xy_pn: solid_at(x + 1, y - 1, z),
         xy_np: solid_at(x - 1, y + 1, z), xy_nn: solid_at(x - 1, y - 1, z),
         xz_pp: solid_at(x + 1, y, z + 1), xz_pn: solid_at(x + 1, y, z - 1),
@@ -88,7 +101,10 @@ assets {
         yz_pp: solid_at(x, y + 1, z + 1), yz_pn: solid_at(x, y + 1, z - 1),
         yz_np: solid_at(x, y - 1, z + 1), yz_nn: solid_at(x, y - 1, z - 1)
       )
-      ModuleExterior outfit(k: k, px: px, nx: nx, py: py, ny: ny, pz: pz, nz: nz, seed: seed)
+      ModuleExterior outfit(
+        k: k, px: px, nx: nx, py: py, ny: ny, pz: pz, nz: nz, seed: seed,
+        fpx: faired(x + 1, y, z, -1, 0), fnx: faired(x - 1, y, z, 1, 0)
+      )
     }
   }
 
@@ -138,7 +154,7 @@ assets {
       }
     }
 
-    if active && k == 0 {
+    if active && k == 0 && t > 0 {
       pad {
         Position: {0, 0.02, 0}
         Box: {3.9, 0.04, 3.9}
