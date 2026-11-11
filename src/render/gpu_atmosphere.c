@@ -103,6 +103,8 @@ typedef struct box_gpu_atmos_luts_t {
     box_render_atmosphere_desc_t medium; /**< The medium */
     bool dirty;                     /**< Build before the next targets */
     int32_t revision;               /**< Revision of the shader of the last build, 0 for none */
+    int32_t builds;                 /**< Builds of the LUTs, which the copies of the
+                                     *   transmittance LUT compare */
     WGPUBuffer env_uniforms;        /**< Uniforms of the sky of the environment, NULL before the
                                      *   first one */
     WGPUTexture env_sky;            /**< Sky view LUT of the scene at its ground altitude */
@@ -898,6 +900,7 @@ static void box_gpu_atmos_build(
         BOX_RENDER_ATMOS_MULTI_SIZE, BOX_RENDER_ATMOS_MULTI_SIZE, 1);
     l->dirty = false;
     l->revision = a->revision;
+    l->builds ++;
     gpu->pending.atmosphere_builds ++;
 }
 
@@ -1202,6 +1205,25 @@ bool box_gpu_atmosphere_luts(
         *transmittance = l->transmittance_view;
         *multi = l->multi_view;
         *sampler = a->sampler;
+    }
+
+    return result;
+}
+
+bool box_gpu_atmosphere_transmittance(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUTexture *texture,
+    int32_t *builds)
+{
+    const box_gpu_atmos_t *a = gpu->atmosphere;
+    const box_gpu_atmos_luts_t *l = a && handle
+        ? ecs_map_get_deref(&a->luts, box_gpu_atmos_luts_t, handle)
+        : NULL;
+    bool result = l && !l->dirty && a->revision && l->revision == a->revision;
+    if (result) {
+        *texture = l->transmittance;
+        *builds = l->builds;
     }
 
     return result;

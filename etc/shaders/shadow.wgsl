@@ -158,7 +158,7 @@ fn octant_distances(world: vec3f) -> vec3f {
 // surface_data, so the position comes first.
 fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
+    let material = material_fetch(shading.material & 0xFFFFFFu);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     if (surface_data.p[0].x == 7.0 && v.uv.x >= 2.0 &&
         !(v.normal.x == 0.0 && v.normal.z == 0.0 && v.normal.y != 0.0)) {
@@ -199,7 +199,7 @@ fn cutout_mapping(v: VertexIn, material: Material, o: ptr<function, CasterOut>) 
 
 fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
     let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
+    let material = material_fetch(shading.material & 0xFFFFFFu);
     (*o).uv = v.uv * material.uv.xy + material.uv.zw;
     (*o).mapped = 0.0;
     (*o).object = vec4f(0.0);

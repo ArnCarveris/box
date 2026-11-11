@@ -530,6 +530,7 @@ static void box_gpu_render(
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
     box_gpu_atmosphere_build(gpu, packet);
+    box_gpu_planet_lights_prepare(gpu, packet);
     box_gpu_environment_image_render(gpu, packet);
     box_gpu_atmosphere_environment(gpu, packet);
     box_gpu_environment_process(gpu, packet);

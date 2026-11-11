@@ -993,6 +993,30 @@ void box_render_shadow_touched(
     const box_render_shadow_region_t *regions,
     int32_t region_count);
 
+/** Make the draw extract follow PlanetAtmosphere: a mesh shape whose nearest PlanetAtmosphere
+ * at or above it changes, by an added or removed PlanetAtmosphere or by a new parent, takes the
+ * planet light slot of the new one in its batch key. Called by box.atmosphere.
+ *
+ * @param world The world
+ */
+void box_render_planet_observers(
+    ecs_world_t *world);
+
+/** Get the planet light slot the mesh shapes at or below a PlanetAtmosphere entity reference in
+ * their shading, which the planet light of the entity in the packet carries.
+ *
+ * A slot is taken by the first mesh shape the draw extract keys under the entity in a scene
+ * with Scene.planet_light, the lowest free one, and given back when the entity loses its
+ * PlanetAtmosphere.
+ *
+ * @param world The world
+ * @param planet The entity with the PlanetAtmosphere
+ * @return The slot, 1 to BOX_RENDER_PLANET_LIGHT_MAX - 1, 0 for none
+ */
+uint32_t box_render_planet_light_slot(
+    const ecs_world_t *world,
+    ecs_entity_t planet);
+
 /** Get the regions the shadow casters of a world covered before and after their changes since
  * the light extract last took them, recorded on the main thread by the draw extract.
  *

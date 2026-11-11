@@ -16,6 +16,7 @@
 #include "ambient.wgsl"
 #include "probes.wgsl"
 #include "aerial.wgsl"
+#include "planet_light.wgsl"
 
 // Probe volume irradiance with the visibility of the probes (Scene.baked).
 override scene_baked: bool = false;
@@ -39,6 +40,11 @@ override scene_aerial: bool = false;
 // Normal map offset of a TextureScroll (Scene.texture_scroll), its UV scroll is in the uv
 // transform of the material record.
 override material_texture_scroll: bool = false;
+
+// The sun of the PlanetAtmosphere of an instance reaches its fragments through the
+// transmittance of the atmosphere (Scene.planet_light): the vertex stage passes the planet light
+// slot of the instance and the direct light attenuates the sun (planet_light.wgsl).
+override scene_planet_light: bool = false;
 
 // Fresnel of the extended mesh shader (Scene.fresnel): the vertex stage passes the Fresnel of the
 // material and the fragment stage adds its rim. The mesh shader leaves it false.
@@ -142,7 +148,26 @@ struct VertexOut {
     // Planar reflection slot of the view plus one whose image the instance shows, 0 for none
     // or without scene_planar (planar_owner)
     @location(9) @interpolate(flat) planar: u32,
+    // Planet light slot of the instance, 0 for none or without scene_planet_light
+    @location(10) @interpolate(flat) planet: u32,
 };
+
+// Slot of the material table of an instance, below the planet light slot of its shading.
+fn shading_material(s: MeshShading) -> u32 {
+    return s.material & 0xFFFFFFu;
+}
+
+// Planet light slot of an instance (box_render_mesh_shading_t), 0 for none.
+fn shading_planet(s: MeshShading) -> u32 {
+    return s.material >> 24u;
+}
+
+// Make the sun of the planet of a fragment light it, with scene_planet_light.
+fn planet_fragment(f: VertexOut) {
+    if (scene_planet_light) {
+        fragment_planet = f.planet;
+    }
+}
 
 // UVs of the normal map of a fragment: the UVs moved by the TextureScroll.normal_velocity offset
 // with material_texture_scroll, else the UVs.
@@ -413,7 +438,7 @@ fn planar_owner(slot: u32) -> u32 {
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
+    let material = material_fetch(shading_material(shading));
     let p = place_mesh(v);
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
@@ -421,18 +446,24 @@ fn planar_owner(slot: u32) -> u32 {
     if (scene_planar) {
         o.planar = planar_owner(v.slot);
     }
+    if (scene_planet_light) {
+        o.planet = shading_planet(shading);
+    }
     return o;
 }
 
 @vertex fn vs_surface(v: VertexIn) -> VertexOut {
     let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
+    let material = material_fetch(shading_material(shading));
     let p = place(v);
     let frame = model_frame(p);
     var o = vertex_out(p, material, frame,
         vertex_shading_surface(v, shading, material, p, frame.scale, frame.normal));
     if (scene_planar) {
         o.planar = planar_owner(v.slot);
+    }
+    if (scene_planet_light) {
+        o.planet = shading_planet(shading);
     }
     return o;
 }
@@ -447,7 +478,7 @@ fn planar_owner(slot: u32) -> u32 {
 
 @vertex fn vs_cutout(v: VertexIn) -> CutoutOut {
     let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
+    let material = material_fetch(shading_material(shading));
     let p = place_mesh(v);
     let frame = model_frame(p);
     return cutout_out(p, material,
@@ -456,7 +487,7 @@ fn planar_owner(slot: u32) -> u32 {
 
 @vertex fn vs_cutout_surface(v: VertexIn) -> CutoutOut {
     let shading = shadings[v.slot];
-    let material = material_fetch(shading.material);
+    let material = material_fetch(shading_material(shading));
     let p = place(v);
     let frame = model_frame(p);
     return cutout_out(p, material,

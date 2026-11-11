@@ -877,6 +877,50 @@ done:
     return;
 }
 
+/** Write the planet light of every valid PlanetAtmosphere whose meshes took a planet light
+ * slot: its center, radii and the direction toward its sun.
+ *
+ * @param world The world
+ * @param lights The state of the light extract
+ * @param a The state
+ * @param p The packet
+ */
+static void box_atmos_planet_lights(
+    const ecs_world_t *world,
+    const void *lights,
+    const box_render_atmos_t *a,
+    box_render_packet_t *p)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&a->planet_luts); i ++) {
+        const box_atmos_planet_t *l = ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i);
+        uint32_t slot = l->seen ? box_render_planet_light_slot(world, l->entity) : 0u;
+        float color[4];
+        if (!slot) {
+            continue;
+        }
+
+        box_render_planet_light_t *out = ecs_vec_append_t(
+            NULL, &p->planet_lights, box_render_planet_light_t);
+        ecs_os_memset_t(out, 0, box_render_planet_light_t);
+        glm_vec3_copy(ECS_CONST_CAST(float*, l->center), out->center);
+        out->center[3] = l->value.planet_radius / l->value.radius;
+        out->radii[0] = l->key.radii[0];
+        out->radii[1] = l->key.radii[1];
+        if (box_render_lights_planet_sun(lights, l->scene, l->value.sun, out->sun, color) &&
+            glm_vec3_norm(out->sun) > 0.0f)
+        {
+            glm_vec3_normalize(out->sun);
+        } else {
+            glm_vec3_copy((vec3){0, -1, 0}, out->sun);
+        }
+
+        out->slot = slot;
+        out->atmosphere = l->handle;
+        out->entity = l->entity;
+    }
+}
+
 /** Give every view of a scene with LUTs its atmosphere and every lit view the planet shells of
  * its scene, after the light extract found the suns.
  *
@@ -894,6 +938,7 @@ static void BoxRenderExtractAtmosphereViews(
     }
 
     p = box_render_packet(it->world);
+    box_atmos_planet_lights(it->world, lights, a, p);
     count = ecs_vec_count(&p->views);
     for (i = 0; i < count; i ++) {
         box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
@@ -1231,6 +1276,7 @@ void box_render_atmosphere_import(
             },
             .cache_kind = EcsQueryCacheAuto
         });
+        box_render_planet_observers(world);
     }
 
     if (a && !a->clouds) {
@@ -1283,6 +1329,7 @@ bool box_render_atmosphere_use(
     }
 
     result |= ecs_vec_count(&p->planet_atmospheres) > 0;
+    result |= ecs_vec_count(&p->planet_lights) > 0;
 
     for (i = 0; !result && i < ecs_vec_count(&p->resources); i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(

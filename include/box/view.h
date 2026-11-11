@@ -262,6 +262,9 @@ ECS_STRUCT(Scene, {
                              *   shapes of the planes reflect them, else no reflection pass runs
                              *   and the shapes draw as without it */
     bool texture_scroll;    /**< TextureScroll, else the shapes draw as without it */
+    bool planet_light;      /**< The sun of a PlanetAtmosphere attenuated by its transmittance on
+                             *   the meshes at or below its entity, else they are lit as
+                             *   without it */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

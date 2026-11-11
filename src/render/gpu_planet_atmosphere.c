@@ -9,6 +9,7 @@
  *
  * Group 1 holds the uniform of a draw, the depth and the LUTs of its planet; the uniforms of
  * every draw of a packet follow each other in one buffer, which grows when a draw does not fit.
+ * The planet lights of the meshes (planet_light.wgsl) are bound in the view group instead.
  */
 
 #include "gpu.h"
@@ -46,7 +47,56 @@ struct box_gpu_planets_t {
     WGPUBuffer buffer;              /**< Uniforms of the draws of the packet */
     uint64_t size;                  /**< Bytes of the buffer */
     uint64_t used;                  /**< Bytes of the buffer the draws of the packet took */
+    WGPUBuffer lights;              /**< box_gpu_planet_light_t by planet light slot */
+    bool lights_written;            /**< The table has a planet since it was last cleared */
+    WGPUTexture luts;               /**< Transmittance LUT array, layer slot - 1, NULL before
+                                     *   the first planet light */
+    WGPUTextureView luts_view;      /**< 2D array view of luts */
+    uint32_t layers;                /**< Layers of luts */
+    WGPUTexture placeholder;        /**< 1x1 LUT array bound before the first planet light */
+    WGPUTextureView placeholder_view; /**< 2D array view of the placeholder */
+    uint32_t copied[BOX_RENDER_PLANET_LIGHT_MAX]; /**< By slot, the handle of the atmosphere
+                                     *   whose LUT its layer holds, 0 for none */
+    int32_t builds[BOX_RENDER_PLANET_LIGHT_MAX]; /**< By slot, the builds of that LUT */
 };
+
+/** Create a 2D array of transmittance LUTs that the planet light binding reads, a read only
+ * storage texture: the sampled textures of the mesh pipelines are at the limit of the device.
+ *
+ * @param gpu The backend
+ * @param width Texels of a row
+ * @param height Rows
+ * @param layers Layers
+ * @param view Receives the 2D array view
+ * @return The texture
+ */
+static WGPUTexture box_gpu_planet_luts_new(
+    box_gpu_t *gpu,
+    uint32_t width,
+    uint32_t height,
+    uint32_t layers,
+    WGPUTextureView *view)
+{
+    WGPUTexture result = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width, height, layers },
+        .format = WGPUTextureFormat_RGBA16Float,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    *view = wgpuTextureCreateView(result, &(WGPUTextureViewDescriptor){
+        .format = WGPUTextureFormat_RGBA16Float,
+        .dimension = WGPUTextureViewDimension_2DArray,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = layers,
+        .aspect = WGPUTextureAspect_All
+    });
+
+    return result;
+}
 
 void box_gpu_planets_init(
     box_gpu_t *gpu)
@@ -100,6 +150,11 @@ void box_gpu_planets_init(
             .bindGroupLayouts = groups
         });
     ecs_map_init(&f->pipelines, NULL);
+    f->lights = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+        .size = BOX_GPU_PLANET_LIGHTS_SIZE
+    });
+    f->placeholder = box_gpu_planet_luts_new(gpu, 1, 1, 1, &f->placeholder_view);
     gpu->planets = f;
 }
 
@@ -135,6 +190,14 @@ void box_gpu_planets_fini(
         wgpuBufferRelease(f->buffer);
     }
 
+    if (f->luts) {
+        wgpuTextureViewRelease(f->luts_view);
+        wgpuTextureRelease(f->luts);
+    }
+
+    wgpuTextureViewRelease(f->placeholder_view);
+    wgpuTextureRelease(f->placeholder);
+    wgpuBufferRelease(f->lights);
     wgpuPipelineLayoutRelease(f->pipeline_layout);
     wgpuBindGroupLayoutRelease(f->layout);
     ecs_os_free(f);
@@ -237,6 +300,152 @@ static WGPURenderPipeline box_gpu_planet_pipeline(
 
 done:
     return result;
+}
+
+/** Make the LUT array hold a layer per slot up to a slot, replacing it with a larger one,
+ * whose layers are copied again.
+ *
+ * @param gpu The backend
+ * @param f The planet state
+ * @param slots Highest slot that needs a layer
+ */
+static void box_gpu_planet_luts_reserve(
+    box_gpu_t *gpu,
+    box_gpu_planets_t *f,
+    uint32_t slots)
+{
+    uint32_t layers = f->layers ? f->layers : 1u;
+    if (f->luts && slots <= f->layers) {
+        goto done;
+    }
+
+    while (layers < slots) {
+        layers *= 2u;
+    }
+
+    if (f->luts) {
+        wgpuTextureViewRelease(f->luts_view);
+        wgpuTextureRelease(f->luts);
+    }
+
+    f->luts = box_gpu_planet_luts_new(gpu, BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH,
+        BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, layers, &f->luts_view);
+    f->layers = layers;
+    ecs_os_memset_n(f->copied, 0, uint32_t, BOX_RENDER_PLANET_LIGHT_MAX);
+done:
+    return;
+}
+
+void box_gpu_planet_lights_prepare(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    box_gpu_planets_t *f = gpu->planets;
+    box_gpu_planet_light_t table[BOX_RENDER_PLANET_LIGHT_MAX];
+    WGPUTexture sources[BOX_RENDER_PLANET_LIGHT_MAX];
+    int32_t builds[BOX_RENDER_PLANET_LIGHT_MAX];
+    WGPUCommandEncoder encoder = NULL;
+    int32_t i, count = ecs_vec_count(&packet->planet_lights);
+    uint32_t slots = 0, slot;
+    bool any = false;
+    if (!f || (!count && !f->lights_written)) {
+        goto done;
+    }
+
+    ecs_os_memset_n(table, 0, box_gpu_planet_light_t, BOX_RENDER_PLANET_LIGHT_MAX);
+    ecs_os_memset_n(sources, 0, WGPUTexture, BOX_RENDER_PLANET_LIGHT_MAX);
+    for (i = 0; i < count; i ++) {
+        const box_render_planet_light_t *l = ecs_vec_get_t(
+            &packet->planet_lights, box_render_planet_light_t, i);
+        slot = l->slot;
+        if (!slot || slot >= BOX_RENDER_PLANET_LIGHT_MAX ||
+            !box_gpu_atmosphere_transmittance(gpu, l->atmosphere, &sources[slot],
+                &builds[slot]))
+        {
+            continue;
+        }
+
+        ecs_os_memcpy_n(table[slot].center, l->center, float, 4);
+        table[slot].radii[0] = l->radii[0];
+        table[slot].radii[1] = l->radii[1];
+        table[slot].radii[2] = (float)(slot - 1u);
+        ecs_os_memcpy_n(table[slot].sun, l->sun, float, 3);
+        if (!(table[slot].center[3] > 0.0f)) {
+            sources[slot] = NULL;
+            ecs_os_memset_t(&table[slot], 0, box_gpu_planet_light_t);
+            continue;
+        }
+
+        slots = slot > slots ? slot : slots;
+        any = true;
+    }
+
+    if (any) {
+        box_gpu_planet_luts_reserve(gpu, f, slots);
+    }
+
+    for (slot = 1; any && slot < BOX_RENDER_PLANET_LIGHT_MAX; slot ++) {
+        const box_render_planet_light_t *l = NULL;
+        if (!sources[slot]) {
+            continue;
+        }
+
+        for (i = 0; i < count && !l; i ++) {
+            l = ecs_vec_get_t(&packet->planet_lights, box_render_planet_light_t, i);
+            l = l->slot == slot ? l : NULL;
+        }
+
+        if (!l || (f->copied[slot] == l->atmosphere && f->builds[slot] == builds[slot])) {
+            continue;
+        }
+
+        if (!encoder) {
+            encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+        }
+
+        wgpuCommandEncoderCopyTextureToTexture(encoder,
+            &(WGPUTexelCopyTextureInfo){
+                .texture = sources[slot], .aspect = WGPUTextureAspect_All
+            },
+            &(WGPUTexelCopyTextureInfo){
+                .texture = f->luts,
+                .origin = { 0, 0, slot - 1u },
+                .aspect = WGPUTextureAspect_All
+            },
+            &(WGPUExtent3D){
+                BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH, BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, 1
+            });
+        f->copied[slot] = l->atmosphere;
+        f->builds[slot] = builds[slot];
+    }
+
+    if (encoder) {
+        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+        wgpuQueueSubmit(gpu->queue, 1, &commands);
+        wgpuCommandBufferRelease(commands);
+        wgpuCommandEncoderRelease(encoder);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, f->lights, 0, table, sizeof(table));
+    f->lights_written = any;
+done:
+    return;
+}
+
+void box_gpu_planet_lights_bindings(
+    box_gpu_t *gpu,
+    WGPUBindGroupEntry *out)
+{
+    box_gpu_planets_t *f = gpu->planets;
+    out[0] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_PLANET_LIGHTS_BINDING,
+        .buffer = f->lights,
+        .size = BOX_GPU_PLANET_LIGHTS_SIZE
+    };
+    out[1] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_PLANET_LUTS_BINDING,
+        .textureView = f->luts ? f->luts_view : f->placeholder_view
+    };
 }
 
 bool box_gpu_planets_ready(

@@ -73,10 +73,17 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
     });
 }
 
-void box_gpu_draw_init(
+/** Create the layout of the view group of the forward pass: the view uniforms, the lights and
+ * clusters, the shadows, the reflections, the aerial perspective, the environment, the
+ * ambient occlusion, the cookie, the opaque snapshot, the planar images and the planet lights.
+ *
+ * @param gpu The backend
+ * @return The layout
+ */
+static WGPUBindGroupLayout box_gpu_view_layout(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[22] = {
+    WGPUBindGroupLayoutEntry entries[24] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -226,14 +233,38 @@ void box_gpu_draw_init(
                 .sampleType = WGPUTextureSampleType_Float,
                 .viewDimension = WGPUTextureViewDimension_2DArray
             }
+        },
+        {
+            .binding = BOX_GPU_PLANET_LIGHTS_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_PLANET_LIGHTS_SIZE
+            }
+        },
+        {
+            .binding = BOX_GPU_PLANET_LUTS_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_ReadOnly,
+                .format = WGPUTextureFormat_RGBA16Float,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 22, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 24, .entries = entries };
+
+    return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+}
+
+void box_gpu_draw_init(
+    box_gpu_t *gpu)
+{
     box_gpu_cull_init(gpu);
     box_gpu_volume_init(gpu);
     box_gpu_reflect_init(gpu);
     box_gpu_environment_init(gpu);
-    gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+    gpu->view_layout = box_gpu_view_layout(gpu);
     gpu->mesh_layout = box_gpu_mesh_layout(gpu, gpu->material_layout);
     gpu->blend_mesh_layout = box_gpu_mesh_layout(gpu, gpu->blend_layout);
     gpu->prepass_empty_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,

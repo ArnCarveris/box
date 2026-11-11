@@ -670,6 +670,10 @@ typedef struct box_render_view_gtao_t {
  * override); without it a shape with a TextureScroll draws as without one */
 #define BOX_RENDER_FEATURE_TEXTURE_SCROLL (1u << 19)
 
+/** Planet surface light (Scene.planet_light): both mesh shaders attenuate the sun of the
+ * PlanetAtmosphere of an instance by its transmittance (scene_planet_light override) */
+#define BOX_RENDER_FEATURE_PLANET_LIGHT (1u << 20)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
@@ -678,35 +682,39 @@ typedef struct box_render_view_gtao_t {
     BOX_RENDER_FEATURE_PLANAR)
 
 /** The scene features that are overrides in the order of their bits, which key the pipelines
- * of the mesh shaders with BOX_RENDER_FEATURE_TEXTURE_SCROLL and BOX_RENDER_FEATURE_PLANAR; the
+ * of the mesh shaders with the TEXTURE_SCROLL, PLANET_LIGHT and PLANAR features; the
  * transmission override follows the transmissive pipelines instead */
 #define BOX_RENDER_FEATURE_OVERRIDES (0xFFFu)
 
 /** Overrides of the extended mesh shader, bit i the override box_render_mesh_override_key(i):
- * the lighting ones, material_texture_scroll, the material ones, scene_planar, transmissive and
- * water. The mesh shader has the first BOX_RENDER_MESH_OVERRIDES_PLAIN. */
-#define BOX_RENDER_MESH_OVERRIDES (16)
+ * the lighting ones, material_texture_scroll, scene_planet_light, the material ones,
+ * scene_planar, transmissive and water; the mesh shader has the first PLAIN ones. */
+#define BOX_RENDER_MESH_OVERRIDES (17)
 
-/** Overrides of the mesh shader: the lighting ones and material_texture_scroll */
-#define BOX_RENDER_MESH_OVERRIDES_PLAIN (7)
+/** Overrides of the mesh shader: the lighting ones, material_texture_scroll and
+ * scene_planet_light */
+#define BOX_RENDER_MESH_OVERRIDES_PLAIN (8)
 
 /** Bit of the material_texture_scroll override */
 #define BOX_RENDER_OVERRIDE_TEXTURE_SCROLL (1u << 6)
 
+/** Bit of the scene_planet_light override */
+#define BOX_RENDER_OVERRIDE_PLANET_LIGHT (1u << 7)
+
 /** Bit of the material_fresnel override */
-#define BOX_RENDER_OVERRIDE_FRESNEL (1u << 12)
+#define BOX_RENDER_OVERRIDE_FRESNEL (1u << 13)
 
 /** Bit of the scene_planar override */
-#define BOX_RENDER_OVERRIDE_PLANAR (1u << 13)
+#define BOX_RENDER_OVERRIDE_PLANAR (1u << 14)
 
 /** Bit of the transmissive override */
-#define BOX_RENDER_OVERRIDE_TRANSMISSIVE (1u << 14)
+#define BOX_RENDER_OVERRIDE_TRANSMISSIVE (1u << 15)
 
 /** Bit of the water override */
-#define BOX_RENDER_OVERRIDE_WATER (1u << 15)
+#define BOX_RENDER_OVERRIDE_WATER (1u << 16)
 
 /** The overrides that come from the scene features, without transmissive and water */
-#define BOX_RENDER_OVERRIDE_SCENE (0x3FFFu)
+#define BOX_RENDER_OVERRIDE_SCENE (0x7FFFu)
 
 /** Get the name of an override of the mesh shaders.
  *
@@ -718,9 +726,10 @@ static inline const char* box_render_mesh_override_key(
 {
     static const char *keys[BOX_RENDER_MESH_OVERRIDES] = {
         "scene_baked", "scene_reflections", "scene_punctual_shadows", "scene_cookies",
-        "scene_environment", "scene_aerial", "material_texture_scroll", "material_sheen",
-        "material_clear_coat", "material_anisotropy", "material_diffuse_transmission",
-        "material_triplanar", "material_fresnel", "scene_planar", "transmissive", "water"
+        "scene_environment", "scene_aerial", "material_texture_scroll", "scene_planet_light",
+        "material_sheen", "material_clear_coat", "material_anisotropy",
+        "material_diffuse_transmission", "material_triplanar", "material_fresnel",
+        "scene_planar", "transmissive", "water"
     };
 
     return keys[index];
@@ -729,9 +738,9 @@ static inline const char* box_render_mesh_override_key(
 /** Compute the override values of a pipeline of a mesh shader, a scene feature that is off
  * compiles out its code.
  *
- * The mesh shader takes the lighting features and the TextureScroll one, the extended mesh
- * shader all of them, transmissive for the pipelines of transmissive shapes and water for those
- * of transmissive Water shapes.
+ * The mesh shader takes the lighting features, the TextureScroll and the planet light ones,
+ * the extended mesh shader all of them, transmissive for the pipelines of transmissive shapes
+ * and water for those of transmissive Water shapes.
  *
  * @param shader The shader handle, 0 overrides for one that is not a mesh shader
  * @param features BOX_RENDER_FEATURE_* features of the scene the pipeline draws
@@ -751,12 +760,13 @@ static inline uint32_t box_render_mesh_overrides(
     }
 
     result = (features & BOX_RENDER_FEATURE_LIGHTING) |
-        (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? BOX_RENDER_OVERRIDE_TEXTURE_SCROLL : 0u);
+        (features & BOX_RENDER_FEATURE_TEXTURE_SCROLL ? BOX_RENDER_OVERRIDE_TEXTURE_SCROLL : 0u) |
+        (features & BOX_RENDER_FEATURE_PLANET_LIGHT ? BOX_RENDER_OVERRIDE_PLANET_LIGHT : 0u);
     if (shader != BOX_RENDER_SHADER_MESH_EXTENDED) {
         goto done;
     }
 
-    result |= (features & BOX_RENDER_FEATURE_OVERRIDES & ~BOX_RENDER_FEATURE_LIGHTING) << 1;
+    result |= (features & BOX_RENDER_FEATURE_OVERRIDES & ~BOX_RENDER_FEATURE_LIGHTING) << 2;
     result |= features & BOX_RENDER_FEATURE_PLANAR ? BOX_RENDER_OVERRIDE_PLANAR : 0u;
     result |= transmissive ? BOX_RENDER_OVERRIDE_TRANSMISSIVE : 0u;
     result |= transmissive && water ? BOX_RENDER_OVERRIDE_WATER : 0u;
@@ -1093,6 +1103,23 @@ typedef struct box_render_planet_atmos_t {
     ecs_entity_t entity;    /**< Entity with the PlanetAtmosphere */
 } box_render_planet_atmos_t;
 
+/** Planet light slots, slot 0 is none: a mesh shape whose nearest PlanetAtmosphere at or above
+ * it has a slot from 1 to BOX_RENDER_PLANET_LIGHT_MAX - 1 attenuates the light of its sun */
+#define BOX_RENDER_PLANET_LIGHT_MAX (64)
+
+/** The sun of a PlanetAtmosphere as the meshes at or below its entity are lit by it, resolved
+ * by the atmosphere extract (atmosphere.c) for every valid PlanetAtmosphere with a planet light
+ * slot; its first members are the layout of PlanetLight in planet_light.wgsl. */
+typedef struct box_render_planet_light_t {
+    float center[4];        /**< World position of the entity, w km per world unit */
+    float radii[4];         /**< Bottom and top radius in km, z and w unused */
+    float sun[4];           /**< Direction toward its sun, w unused; (0, -1, 0) without a sun */
+    uint32_t slot;          /**< Planet light slot the mesh instances reference, 1 to
+                             *   BOX_RENDER_PLANET_LIGHT_MAX - 1 */
+    uint32_t atmosphere;    /**< Handle of its BOX_RENDER_ATMOSPHERE, the LUTs */
+    ecs_entity_t entity;    /**< Entity with the PlanetAtmosphere */
+} box_render_planet_light_t;
+
 /** Description of a BOX_RENDER_ATMOSPHERE_ENVIRONMENT update: the sky of the atmosphere of a
  * scene, rendered into mip 0 of the cubemap of the BOX_RENDER_ENVIRONMENT of the handle.
  *
@@ -1320,6 +1347,13 @@ typedef struct box_render_material_t {
 /** Flag of a Water record: it has a foam_texture, which the foam samples */
 #define BOX_RENDER_WATER_FOAM_TEXTURE (1u << 0)
 
+/** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
+ * planet light slot is above them */
+#define BOX_RENDER_MESH_MATERIAL_BITS (24)
+
+/** Mask of the slot of the material table in box_render_mesh_shading_t.material */
+#define BOX_RENDER_MESH_MATERIAL_MASK ((1u << BOX_RENDER_MESH_MATERIAL_BITS) - 1u)
+
 /** Shading of a mesh instance, the shading stream of a mesh instance page, MeshShading of
  * instance.wgsl.
  *
@@ -1327,7 +1361,9 @@ typedef struct box_render_material_t {
  * (box_draw_tint_t): a display encoded color becomes color * keep + add, as four unorm16.
  */
 typedef struct box_render_mesh_shading_t {
-    uint32_t material;      /**< Slot of the material table the instance renders with */
+    uint32_t material;      /**< Slot of the material table the instance renders with, or
+                             *   with the planet light slot of the instance shifted by
+                             *   BOX_RENDER_MESH_MATERIAL_BITS (box_draws_planet_material) */
     uint32_t tint[2];       /**< Tint add red | add green << 16, add blue | keep << 16 */
     float alpha;            /**< The opacity of the instance times that of its ancestors */
 } box_render_mesh_shading_t;
@@ -1651,6 +1687,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t fog_volumes;  /**< box_render_fog_volume_t, the fog volumes of the views */
     ecs_vec_t planet_atmospheres; /**< box_render_planet_atmos_t, the planet atmosphere shells
                              *   of the views */
+    ecs_vec_t planet_lights; /**< box_render_planet_light_t, the planets whose sun the mesh
+                             *   instances with a planet light slot are lit by */
     ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
                              *   views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,

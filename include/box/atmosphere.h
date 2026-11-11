@@ -115,6 +115,18 @@ ECS_STRUCT(AtmosphereStatus, {
  *
  * Its transmittance and multi scattering LUTs are built again only when the medium changes.
  *
+ * With Scene.planet_light the meshes of the entity and its descendants, such as the planet body
+ * and its cloud sphere, opaque, blended or transmissive, get the light of the sun attenuated per
+ * fragment, which reddens and darkens the terminator.
+ *
+ * At p = (world - center) * km per unit, r = max(|p|, planet_radius) and mu = dot(p / |p|, sun)
+ * the sun is multiplied by the transmittance LUT at (r, mu) and the fade of the shell into the
+ * shadow of the planet. A mesh belongs to its nearest PlanetAtmosphere along ChildOf.
+ *
+ * Only the DirectionalLight along the direction of the sun is attenuated; other lights, the
+ * ambient, the image based lighting and the meshes outside any PlanetAtmosphere are lit as
+ * without one. The meshes of at most 63 planets of a world are lit so, further ones are not.
+ *
  * Values apply as specified; a radius, planet_radius, thickness or scale height that is not
  * positive, a negative scale or an anisotropy outside -1 to 1 sets PlanetAtmosphereStatus.error
  * and renders nothing.

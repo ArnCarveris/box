@@ -741,6 +741,24 @@ typedef struct box_gpu_atlas_read_t {
 #define BOX_GPU_ATLAS_TILES_SIZE \
     ((uint64_t)BOX_RENDER_SHADOW_TILES * sizeof(box_render_shadow_record_t))
 
+/** Binding of the planet light table in the view group, PlanetLight of planet_light.wgsl per
+ * planet light slot */
+#define BOX_GPU_PLANET_LIGHTS_BINDING (22)
+
+/** Binding of the transmittance LUT array of the planet lights in the view group */
+#define BOX_GPU_PLANET_LUTS_BINDING (23)
+
+/** Planet light of a slot in the view group, PlanetLight of planet_light.wgsl */
+typedef struct box_gpu_planet_light_t {
+    float center[4];                /**< World center, km per world unit, 0 for an empty slot */
+    float radii[4];                 /**< Bottom and top radius in km, layer of its LUT */
+    float sun[4];                   /**< Direction toward its sun */
+} box_gpu_planet_light_t;
+
+/** Bytes of the planet light table */
+#define BOX_GPU_PLANET_LIGHTS_SIZE \
+    ((uint64_t)BOX_RENDER_PLANET_LIGHT_MAX * sizeof(box_gpu_planet_light_t))
+
 /** Pipeline of the blit or the forward pass for one color format */
 typedef struct box_gpu_blit_t {
     WGPUTextureFormat format;       /**< Format of the color target */
