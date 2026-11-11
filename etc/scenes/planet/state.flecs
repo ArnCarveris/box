@@ -1,0 +1,115 @@
+using flecs.script
+using flecs.script.math
+using box.input
+
+state {
+  actions {
+    show_planet {
+      Action: {description: "Show the planet"}
+      Binding: {key: Num1}
+    }
+
+    show_types {
+      Action: {description: "Show the planet types"}
+      Binding: {key: Num2}
+    }
+
+    show_stages {
+      Action: {description: "Show the terraforming stages"}
+      Binding: {key: Num3}
+    }
+
+    show_rings {
+      Action: {description: "Show the ringed giant"}
+      Binding: {key: Num4}
+    }
+
+    show_night {
+      Action: {description: "Show the night side"}
+      Binding: {key: Num5}
+    }
+
+    terraform {
+      Action: {description: "Start or stop terraforming"}
+      Binding: {key: T}
+    }
+
+    random_seed {
+      Action: {description: "Pick another seed"}
+      Binding: {key: R}
+    }
+
+    reset {
+      Action: {description: "Reset the planet"}
+      Binding: {key: Backspace}
+    }
+  }
+
+  export const PAGE_PLANET: i32 = 0
+  export const PAGE_TYPES: i32 = 1
+  export const PAGE_STAGES: i32 = 2
+  export const PAGE_RINGS: i32 = 3
+  export const PAGE_NIGHT: i32 = 4
+
+  export const KIND_GAS: i32 = 4
+  export const KIND_GARDEN: i32 = 5
+
+  export const SUN_DAY: f32 = 123
+  export const SUN_NIGHT: f32 = 40
+
+  export const GOAL_ATM: f32 = 88
+  export const GOAL_WATER: f32 = 64
+  export const GOAL_TEMP: f32 = 52
+  export const GOAL_BIO: f32 = 82
+
+  fn kind_name(kind: i32) -> string {
+    match kind { 0: "Rock"; 1: "Desert"; 2: "Ice"; 3: "Lava"; 4: "Gas giant"; _: "Garden" }
+  }
+
+  fn kind_atm(kind: i32) -> f32 {
+    match kind { 0: 7; 1: 22; 2: 14; 3: 28; 4: 100; _: 92 }
+  }
+
+  fn kind_water(kind: i32) -> f32 {
+    match kind { 0: 4; 1: 6; 2: 48; 3: 0; 4: 0; _: 66 }
+  }
+
+  fn kind_temp(kind: i32) -> f32 {
+    match kind { 0: 40; 1: 72; 2: 14; 3: 94; 4: 40; _: 52 }
+  }
+
+  fn kind_bio(kind: i32) -> f32 {
+    match kind { 1: 2; 5: 85; _: 0 }
+  }
+
+  fn toward(value: f32, goal: f32, step: f32) -> f32 {
+    value < goal ? min(value + step, goal) : max(value - step, goal)
+  }
+
+  export mut page: i32 = PAGE_PLANET
+  export mut reveal: i32 = 0
+  export mut kind: i32 = KIND_GARDEN
+  export mut seed: i32 = 23
+  export mut atm: f32 = 92
+  export mut water: f32 = 66
+  export mut temp: f32 = 52
+  export mut bio: f32 = 85
+  export mut detail: i32 = 2
+  export mut lights: bool = true
+  export mut rings: bool = false
+  export mut radius: f32 = 2.2
+  export mut spin: f32 = 0.12
+  export mut sun_angle: f32 = SUN_DAY
+  export mut terraform: bool = false
+  export mut orbit_yaw: f32 = 0
+  export mut orbit_pitch: f32 = 0
+
+  export mut shown_kind: i32 = KIND_GARDEN
+  export mut shown_seed: i32 = 23
+  export mut shown_atm: f32 = 92
+  export mut shown_water: f32 = 66
+  export mut shown_temp: f32 = 52
+  export mut shown_bio: f32 = 85
+  export mut shown_detail: i32 = 2
+  export mut shown_lights: bool = true
+}

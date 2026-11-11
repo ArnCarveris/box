@@ -1,0 +1,157 @@
+using flecs.script
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.projection
+using box.ui
+using box.widgets
+using state
+
+assets {
+  template Tag {
+    prop text: string = ""
+    prop target: entity = 0
+
+    ProjectedAnchor: {target: target, view: view}
+    Layout: {direction: Row, padding: {2, 2, 6, 6}, h: Center}
+
+    caption {
+      Text: {value: text, size: 13}
+      Rgb: {164, 170, 180}
+    }
+  }
+
+  template PageButton {
+    prop label: string = ""
+    prop action: entity = 0
+    prop target: i32 = 0
+
+    Layout: {}
+
+    Button face(label: label, action: action, variant: page == target ? "primary" : "secondary")
+  }
+
+  template Field {
+    prop text: string = ""
+
+    Layout: {direction: Row, spacing: 6, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+
+    if text != "" {
+      Label name(text: text)
+
+      gap {
+        LayoutItem: {width: {mode: Grow}}
+      }
+    }
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  tags {
+    if page == PAGE_TYPES {
+      for i in 0..6 {
+        assets.Tag "kind_{i}"(text: kind_name(i), target: stage.marks.lookup("column_{i}"))
+      }
+
+      for i in 0..3 {
+        assets.Tag "detail_{i}"(text: "Detail {2 - i}", target: stage.marks.lookup("row_{i}"))
+      }
+    } else if page == PAGE_STAGES {
+      for i in 0..5 {
+        assets.Tag "stage_{i}"(text: "{i * 25}%", target: stage.marks.lookup("column_{i}"))
+      }
+    }
+  }
+
+  screen {
+    LayoutFill: {surface: window}
+    Layout: {padding: {16, 16, 16, 16}}
+    FocusScope
+
+    bar {
+      Layout: {direction: Row, spacing: 6}
+      LayoutItem: {h: Center, v: Top}
+      InputBlocker
+
+      assets.PageButton planet(label: "1 Planet", action: actions.show_planet, target: PAGE_PLANET)
+      assets.PageButton types(label: "2 Types", action: actions.show_types, target: PAGE_TYPES)
+      assets.PageButton stages(label: "3 Stages", action: actions.show_stages, target: PAGE_STAGES)
+      assets.PageButton rings(label: "4 Rings", action: actions.show_rings, target: PAGE_RINGS)
+      assets.PageButton night(label: "5 Night", action: actions.show_night, target: PAGE_NIGHT)
+    }
+
+    side {
+      Layout: {}
+      LayoutItem: {h: Left, v: Middle}
+      InputBlocker
+
+      Panel panel(title: "Planet", width: 276) {
+        assets.Field type(text: "Type") {
+          Dropdown kind(
+            options: ["Rock", "Desert", "Ice", "Lava", "Gas giant", "Garden"],
+            value: state.kind, width: 150
+          )
+        }
+
+        assets.Field variant(text: "Seed") {
+          Button random(label: "Random", variant: "secondary", action: actions.random_seed)
+          Stepper seed(min: 0, max: 999, value: state.seed, width: 104)
+        }
+
+        Slider atm(label: "Atmosphere", width: 252, value: state.atm)
+        Slider water(label: "Water", width: 252, value: state.water)
+        Slider temp(label: "Temperature", width: 252, value: state.temp)
+        Slider bio(label: "Biomass", width: 252, value: state.bio)
+        Slider radius(
+          label: "Radius", width: 252, min: 0.5, max: 3, step: 0.1, value: state.radius, decimals: 1
+        )
+        Slider spin(
+          label: "Spin", width: 252, min: 0, max: 1, step: 0.01, value: state.spin, decimals: 2
+        )
+        Slider sun(label: "Sun", width: 252, min: 0, max: 360, value: state.sun_angle, unit: "°")
+
+        assets.Field level(text: "Detail") {
+          Stepper detail(min: 0, max: 2, value: state.detail, width: 104)
+        }
+
+        checks {
+          Layout: {direction: Row, spacing: 20, v: Middle}
+          LayoutItem: {width: {mode: Grow}}
+
+          Checkbox lights(label: "City lights", value: state.lights)
+          Checkbox rings(label: "Rings", value: state.rings)
+        }
+
+        Separator rule()
+
+        assets.Field run(text: "") {
+          Switch terraform(label: "Terraform", value: state.terraform)
+
+          gap {
+            LayoutItem: {width: {mode: Grow}}
+          }
+
+          Button reset(label: "Reset", variant: "secondary", action: actions.reset)
+        }
+      }
+    }
+  }
+
+  view {
+    View: {camera: camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}

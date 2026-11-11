@@ -1,0 +1,225 @@
+using flecs.script
+using flecs.script.math
+using box.input
+using box.ui
+using box.widgets
+using box.task
+using state
+
+state {
+  proc show(target: i32) {
+    if target == PAGE_NIGHT {
+      state.sun_angle = SUN_NIGHT
+      state.lights = true
+    } else if state.page == PAGE_NIGHT {
+      state.sun_angle = SUN_DAY
+    }
+
+    state.orbit_yaw = 0
+    state.orbit_pitch = 0
+    state.reveal = 0
+    state.page = target
+  }
+
+  proc preset(target: i32) {
+    state.kind = target
+    state.atm = kind_atm(target)
+    state.water = kind_water(target)
+    state.temp = kind_temp(target)
+    state.bio = kind_bio(target)
+    state.lights = target == KIND_GARDEN
+    state.rings = target == KIND_GAS
+    state.terraform = false
+  }
+
+  proc reset() {
+    preset(KIND_GARDEN)
+    state.seed = 23
+    state.detail = 2
+    state.radius = 2.2
+    state.spin = 0.12
+    state.sun_angle = state.page == PAGE_NIGHT ? SUN_NIGHT : SUN_DAY
+    state.orbit_yaw = 0
+    state.orbit_pitch = 0
+  }
+
+  proc barren() {
+    state.atm = 5
+    state.water = 0
+    state.temp = 30
+    state.bio = 0
+  }
+
+  proc grow(dt: f32) {
+    state.atm = toward(state.atm, GOAL_ATM, 3 * dt)
+    state.water = toward(state.water, GOAL_WATER, 2.3 * dt)
+    state.temp = toward(state.temp, GOAL_TEMP, dt)
+    if state.atm >= 40 && state.water >= 30 {
+      state.bio = toward(state.bio, GOAL_BIO, 4.5 * dt)
+    }
+  }
+
+  proc apply() {
+    state.shown_kind = state.kind
+    state.shown_seed = state.seed
+    state.shown_atm = state.atm
+    state.shown_water = state.water
+    state.shown_temp = state.temp
+    state.shown_bio = state.bio
+    state.shown_detail = state.detail
+    state.shown_lights = state.lights
+  }
+
+  fn grown(slack: f32) -> bool {
+    atm >= GOAL_ATM - slack && water >= GOAL_WATER - slack && bio >= GOAL_BIO - slack
+  }
+
+  fn stale() -> bool {
+    shown_kind != kind || shown_seed != seed || shown_atm != atm || shown_water != water ||
+    shown_temp != temp || shown_bio != bio || shown_detail != detail || shown_lights != lights
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_planet)
+    show(state.PAGE_PLANET)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_types)
+    show(state.PAGE_TYPES)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_stages)
+    show(state.PAGE_STAGES)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_rings)
+    show(state.PAGE_RINGS)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_night)
+    show(state.PAGE_NIGHT)
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.terraform)
+    state.terraform = !state.terraform
+  }
+}
+
+async {
+  while true {
+    await next_frame()
+    await next_frame()
+    await next_frame()
+    if state.reveal < 6 {
+      state.reveal += 1
+    }
+  }
+}
+
+async {
+  while true {
+    await on.change(hud.screen.side.panel)
+    const picked: i32 = hud.screen.side.panel.type.kind[Dropdown.mut].current
+    if picked != state.kind {
+      preset(picked)
+    } else {
+      state.seed = hud.screen.side.panel.variant.seed[Stepper.mut].current
+      state.atm = hud.screen.side.panel.atm[Slider.mut].current
+      state.water = hud.screen.side.panel.water[Slider.mut].current
+      state.temp = hud.screen.side.panel.temp[Slider.mut].current
+      state.bio = hud.screen.side.panel.bio[Slider.mut].current
+      state.radius = hud.screen.side.panel.radius[Slider.mut].current
+      state.spin = hud.screen.side.panel.spin[Slider.mut].current
+      state.sun_angle = hud.screen.side.panel.sun[Slider.mut].current
+      state.detail = hud.screen.side.panel.level.detail[Stepper.mut].current
+      state.lights = hud.screen.side.panel.checks.lights[Checkbox.mut].current
+      state.rings = hud.screen.side.panel.checks.rings[Checkbox.mut].current
+      state.terraform = hud.screen.side.panel.run.terraform[Switch.mut].current
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.random_seed)
+    state.seed = (state.seed * 621 + 271) % 1000
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.reset)
+    reset()
+  }
+}
+
+async {
+  while true {
+    const e = await on.drag(stage.orbit)
+    state.orbit_yaw = state.orbit_yaw - e.delta_x * 0.006
+    state.orbit_pitch = clamp(state.orbit_pitch + e.delta_y * 0.006, -1.2, 1.2)
+  }
+}
+
+async {
+  mut waited: f32 = 0
+  while true {
+    await delay(0.1)
+    if stale() {
+      if InProgressTask[InProgressTask].blocking == 0 || waited >= 1.5 {
+        apply()
+        waited = 0
+      } else {
+        waited += 0.1
+      }
+    } else {
+      waited = 0
+    }
+  }
+}
+
+async {
+  mut running: bool = false
+  while true {
+    await delay(0.1)
+    if state.terraform && state.kind == state.KIND_GAS {
+      state.terraform = false
+    }
+
+    if state.terraform {
+      if !running {
+        if grown(2) {
+          barren()
+        }
+
+        state.lights = false
+      }
+
+      running = true
+      grow(0.1)
+      if grown(0) && state.temp == state.GOAL_TEMP {
+        state.terraform = false
+        state.lights = true
+      }
+    } else {
+      running = false
+    }
+  }
+}

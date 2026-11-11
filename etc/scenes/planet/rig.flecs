@@ -1,0 +1,48 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using state
+
+window {
+  Surface: {width: 1600, height: 1000, vsync: true}
+}
+
+rig {
+  Position: {0, 0, 0}
+  Rotation: {0 - orbit_pitch, orbit_yaw, 0}
+
+  camera {
+    Position: match page {
+      1: {-2.6, -0.5, 64}
+      2: {-2.2, 0, 52}
+      3: {-1.6, 3.6, 27}
+      _: {-1.4, 0, 27}
+    }
+    Rotation: {page == PAGE_RINGS ? -0.133 : 0, 0, 0}
+    Camera: {fov: 16, near_: 0.5, far_: 20000}
+  }
+}
+
+sun {
+  Rotation: {0.3, sun_angle * PI / 180, 0}
+  DirectionalLight: {intensity: 6.5}
+  Rgb: {255, 246, 232}
+}
+
+view {
+  bloom { Bloom: {intensity: 0.22, threshold: 1.1, threshold_softness: 0.5} }
+  film { Tonemap: {operator_: TonyMcMapface} }
+  edges { Smaa: {} }
+
+  View: {
+    camera: rig.camera,
+    clear: {enabled: true, color: {2, 3, 6, 255}},
+    effects: [{effect: bloom}, {effect: film}, {effect: edges}]
+  }
+}

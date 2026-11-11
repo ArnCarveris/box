@@ -1,0 +1,16 @@
+include ui/widgets
+include planet/planet
+include planet/state
+include planet/rig
+include planet/stage
+include planet/hud
+include planet/logic
+
+using box.view
+using box.light
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {blend_modes: true, fresnel: true}
+  AmbientLight: {sky: {26, 30, 44}, ground: {10, 10, 16}, intensity: 0.12}
+}
