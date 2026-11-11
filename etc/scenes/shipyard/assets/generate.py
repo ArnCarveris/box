@@ -126,9 +126,6 @@ ICONS = {
     "engine": f'<g {S}><path d="M6 20h20l10 6v12l-10 6H6z"/><path d="M36 26l12-8v28l-12-8"/>'
               '<path d="M52 24h8M52 32h10M52 40h8"/></g>',
     "remove": f'<g {S}><path d="M10 16h44M24 16V8h16v8M15 16l3 40h28l3-40"/><path d="M27 27v18M37 27v18"/></g>',
-    "exterior": f'<g {S}><path d="M4 36c6-10 18-16 30-16h14l12 8v8l-12 8H34c-12 0-24-6-30-8z"/>'
-                '<path d="M40 22l6 14"/></g>',
-    "interior": f'<g {S}><path d="M8 18h48v32H8z"/><path d="M28 18v32M8 34h20M40 50V38h10v12"/></g>',
     "deck": f'<g {S}><path d="M32 8l26 10-26 10L6 18z"/><path d="M6 30l26 10 26-10"/><path d="M6 42l26 10 26-10"/></g>',
     "power": f'<path {F} d="M37 3L11 37h17l-3 24 28-36H35z"/>',
     "crew": f'<g {S}><circle cx="24" cy="20" r="10"/><path d="M6 56c0-13 8-20 18-20s18 7 18 20"/>'

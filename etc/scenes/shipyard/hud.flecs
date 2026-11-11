@@ -68,8 +68,6 @@ assets {
   yard_icon_obs { TexturePath: {path: "etc/scenes/shipyard/assets/icons/obs.svg", width: 96} }
   yard_icon_hull { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hull.svg", width: 96} }
   yard_icon_remove { TexturePath: {path: "etc/scenes/shipyard/assets/icons/remove.svg", width: 96} }
-  yard_icon_exterior { TexturePath: {path: "etc/scenes/shipyard/assets/icons/exterior.svg", width: 96} }
-  yard_icon_interior { TexturePath: {path: "etc/scenes/shipyard/assets/icons/interior.svg", width: 96} }
   yard_icon_deck { TexturePath: {path: "etc/scenes/shipyard/assets/icons/deck.svg", width: 96} }
   yard_icon_power { TexturePath: {path: "etc/scenes/shipyard/assets/icons/power.svg", width: 96} }
   yard_icon_crew { TexturePath: {path: "etc/scenes/shipyard/assets/icons/crew.svg", width: 96} }
@@ -115,8 +113,8 @@ state {
     n == 0 ? "NO HULL" : n < 6 ? "SHUTTLE" : n < 14 ? "SCOUT" : n < 24 ? "CORVETTE" : n < 36 ? "FRIGATE" : n < 52 ? "DESTROYER" : "CRUISER"
   }
 
-  fn op_selected(op: i32, t: i32, inner: bool, d: i32) -> bool {
-    op == t || (op == OP_EXTERIOR && !inner) || (op == OP_INTERIOR && inner) || op == OP_DECK + d
+  fn op_selected(op: i32, t: i32, d: i32) -> bool {
+    op == t || op == OP_DECK + d
   }
 }
 
@@ -251,7 +249,7 @@ assets {
     prop hover: bool = false
     prop down: bool = false
 
-    const selected = op_selected(op, tool, interior, deck)
+    const selected = op_selected(op, tool, deck)
 
     Layout: {direction: Row, padding: {0, 0, 9, 9}, spacing: 6, h: Center, v: Middle}
     LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
@@ -491,13 +489,6 @@ assets {
             YardCard views(spacing: 0) {
               bar {
                 Layout: {direction: Row, spacing: 6, v: Middle}
-                YardButton b_ext(label: "Exterior", icon: yard_icon_exterior, op: OP_EXTERIOR, size: 104)
-                YardButton b_int(label: "Interior", icon: yard_icon_interior, op: OP_INTERIOR, size: 104)
-                sep_a {
-                  LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 22}}
-                  Rect: {1, 1}
-                  Rgb: {40, 96, 124}
-                }
                 YardIcon deck_glyph(icon: yard_icon_deck, size: 16, state: UI_OK)
                 deck_label {
                   Text: {value: "DECK", size: 11}

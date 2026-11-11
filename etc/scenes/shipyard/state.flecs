@@ -42,9 +42,6 @@ state {
   export const H_HIP: i32 = 5
 
   export const OP_CANCEL: i32 = 100
-  export const OP_EXTERIOR: i32 = 101
-  export const OP_INTERIOR: i32 = 102
-  export const OP_VIEW: i32 = 103
   export const OP_DECK: i32 = 110
   export const OP_DECK_UP: i32 = 120
   export const OP_DECK_DOWN: i32 = 121
@@ -131,7 +128,6 @@ state {
 
   export mut tool: i32 = 0
   export mut deck: i32 = 2
-  export mut interior: bool = false
   export mut hover: i32 = -1
 
   fn cell_x(i: i32) -> i32 { i % GX }
@@ -271,11 +267,6 @@ state {
 
   fn rack_at(x: i32, y: i32, z: i32) -> bool {
     (kind_at(x, y, z) == K_CARGO || kind_at(x, y, z) == K_FUEL) && y <= deck
-  }
-
-  fn room_at(x: i32, y: i32, z: i32) -> bool {
-    const k = kind_at(x, y, z)
-    shown_at(x, y, z) && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL && k != K_RADIATOR
   }
 
   fn open_side(x: i32, y: i32, z: i32) -> bool {
