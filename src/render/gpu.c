@@ -535,6 +535,7 @@ static void box_gpu_render(
     box_gpu_environment_process(gpu, packet);
     box_gpu_particles_simulate(gpu, packet);
     box_gpu_fog_volumes_begin(gpu);
+    box_gpu_planets_begin(gpu);
     box_gpu_debug_begin(gpu);
     box_gpu_bake_capture(gpu, packet);
     box_gpu_atlas_render(gpu, packet);

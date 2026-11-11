@@ -1463,6 +1463,76 @@ bool box_gpu_particles_draw(
     const box_render_view_t *v,
     WGPUTextureView depth);
 
+/** Get the LUTs of an atmosphere that are built, for a pass that samples them.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the BOX_RENDER_ATMOSPHERE
+ * @param transmittance Receives the view of the transmittance LUT
+ * @param multi Receives the view of the multi scattering LUT
+ * @param sampler Receives the linear clamp sampler of the LUTs
+ * @return Whether the LUTs exist and are built with the current shader
+ */
+bool box_gpu_atmosphere_luts(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUTextureView *transmittance,
+    WGPUTextureView *multi,
+    WGPUSampler *sampler);
+
+/** Create the layouts of the planet atmosphere shell draws, after the view layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_planets_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and buffer of the planet atmosphere shell draws.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_planets_fini(
+    box_gpu_t *gpu);
+
+/** Start the planet shell draws of a packet, which fill the buffer of the draws from its start.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_planets_begin(
+    box_gpu_t *gpu);
+
+/** Check whether a view draws planet atmosphere shells: it has records and the shader is
+ * compiled, so its forward pass splits around them.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return Whether the view draws its planet shells in this frame
+ */
+bool box_gpu_planets_ready(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
+
+/** Record the planet atmosphere shells of a view, one draw per planet back to front, skipping
+ * a planet whose LUTs are not built. Replaces the pipeline and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view, which reads its depth, with the bind group of the
+ * view at 0
+ * @param t The target, whose size the projection follows
+ * @param format The format of the color target
+ * @param packet The packet, which holds the records
+ * @param v The view
+ * @param depth The depth of the view, read only in the pass
+ * @return Whether a shell was drawn
+ */
+bool box_gpu_planets_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_gpu_target_t *t,
+    WGPUTextureFormat format,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUTextureView depth);
+
 /** Create the layouts of the fog volume draws, after the view layout.
  *
  * @param gpu The backend

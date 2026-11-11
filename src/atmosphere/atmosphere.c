@@ -23,6 +23,9 @@
 /** Error of a ground altitude outside the atmosphere */
 #define BOX_ATMOS_GROUND_ERROR "ground_altitude must be within 0 and thickness"
 
+/** Error of a planet atmosphere radius that is not positive */
+#define BOX_ATMOS_PLANET_RADIUS_ERROR "radius must be positive"
+
 /** Error of a units_per_km that is not positive */
 #define BOX_ATMOS_UNITS_ERROR "units_per_km must be positive"
 
@@ -78,6 +81,37 @@ static void box_atmosphere_ctor(
             .aerial_distance = 32.0f,
             .aerial_intensity = 1.0f,
             .ibl_update_angle = 0.5f
+        };
+    }
+}
+
+/** Construct PlanetAtmosphere values with the Earth defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_planet_atmosphere_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    PlanetAtmosphere *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (PlanetAtmosphere){
+            .radius = 1.0f,
+            .planet_radius = 6360.0f,
+            .thickness = 100.0f,
+            .rayleigh = { .scale_height = 8.0f, .scattering_scale = 1.0f },
+            .mie = {
+                .scale_height = 1.2f, .anisotropy = 0.8f, .scattering_scale = 1.0f,
+                .tint = {255, 255, 255}
+            },
+            .ozone_scale = 1.0f,
+            .ground_albedo = {77, 77, 77},
+            .intensity = 1.0f
         };
     }
 }
@@ -139,6 +173,68 @@ static void box_atmosphere_remove(
     for (i = 0; i < it->count; i ++) {
         ecs_remove(it->stage, it->entities[i], AtmosphereStatus);
     }
+}
+
+/** Add PlanetAtmosphereStatus to an entity that got PlanetAtmosphere.
+ *
+ * @param it The observer iterator
+ */
+static void box_planet_atmosphere_add(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_set(it->stage, it->entities[i], PlanetAtmosphereStatus, {0});
+    }
+}
+
+/** Remove PlanetAtmosphereStatus from an entity that lost PlanetAtmosphere.
+ *
+ * @param it The observer iterator
+ */
+static void box_planet_atmosphere_remove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_remove(it->stage, it->entities[i], PlanetAtmosphereStatus);
+    }
+}
+
+const char* box_atmos_planet_error(
+    const PlanetAtmosphere *a)
+{
+    const char *result = NULL;
+    if (!(a->radius > 0)) {
+        result = BOX_ATMOS_PLANET_RADIUS_ERROR;
+    } else if (!(a->planet_radius > 0)) {
+        result = BOX_ATMOS_RADIUS_ERROR;
+    } else if (!(a->thickness > 0)) {
+        result = BOX_ATMOS_THICKNESS_ERROR;
+    } else if (!(a->rayleigh.scale_height > 0) || !(a->mie.scale_height > 0)) {
+        result = BOX_ATMOS_HEIGHT_ERROR;
+    } else if (!(a->rayleigh.scattering_scale >= 0) || !(a->mie.scattering_scale >= 0) ||
+        !(a->ozone_scale >= 0))
+    {
+        result = BOX_ATMOS_SCALE_ERROR;
+    } else if (!(a->mie.anisotropy > -1 && a->mie.anisotropy < 1)) {
+        result = BOX_ATMOS_ANISOTROPY_ERROR;
+    }
+
+    return result;
+}
+
+void box_atmos_planet_medium(
+    const PlanetAtmosphere *a,
+    Atmosphere *out)
+{
+    box_atmosphere_ctor(out, 1, NULL);
+    out->planet_radius = a->planet_radius;
+    out->thickness = a->thickness;
+    out->rayleigh = a->rayleigh;
+    out->mie = a->mie;
+    out->ozone_scale = a->ozone_scale;
+    out->ground_albedo = a->ground_albedo;
 }
 
 const char* box_atmos_error(
@@ -327,6 +423,11 @@ void BoxAtmosphereImport(
     ecs_set_hooks(world, Atmosphere, { .ctor = box_atmosphere_ctor });
     ECS_META_COMPONENT(world, AtmosphereStatus);
     box_owned_hooks(world, AtmosphereStatus, BOX_OWNED_STR(AtmosphereStatus, error));
+    ECS_META_COMPONENT(world, PlanetAtmosphere);
+    ecs_set_hooks(world, PlanetAtmosphere, { .ctor = box_planet_atmosphere_ctor });
+    ECS_META_COMPONENT(world, PlanetAtmosphereStatus);
+    box_owned_hooks(world, PlanetAtmosphereStatus,
+        BOX_OWNED_STR(PlanetAtmosphereStatus, error));
     ECS_META_COMPONENT(world, CloudLayer);
     ecs_set_hooks(world, CloudLayer, { .ctor = box_cloud_layer_ctor });
     ECS_META_COMPONENT(world, TimeOfDay);
@@ -341,6 +442,17 @@ void BoxAtmosphereImport(
         .query.terms = {{ .id = ecs_id(Atmosphere) }},
         .events = { EcsOnRemove },
         .callback = box_atmosphere_remove
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(PlanetAtmosphere) }},
+        .events = { EcsOnAdd },
+        .callback = box_planet_atmosphere_add
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(PlanetAtmosphere) }},
+        .events = { EcsOnRemove },
+        .callback = box_planet_atmosphere_remove
     });
 
     box_render_lights_atmosphere(world);

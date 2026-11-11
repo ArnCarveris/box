@@ -32,6 +32,24 @@ typedef struct box_atmos_medium_t {
 const char* box_atmos_error(
     const Atmosphere *a);
 
+/** Check the values of the atmosphere of a planet.
+ *
+ * @param a The atmosphere of the planet
+ * @return Why it renders nothing, NULL when it is valid
+ */
+const char* box_atmos_planet_error(
+    const PlanetAtmosphere *a);
+
+/** Write the atmosphere of a planet as an Atmosphere with the same medium: its planet_radius,
+ * thickness, rayleigh, mie, ozone_scale and ground_albedo, the defaults for the rest.
+ *
+ * @param a The atmosphere of the planet
+ * @param out Receives the atmosphere
+ */
+void box_atmos_planet_medium(
+    const PlanetAtmosphere *a,
+    Atmosphere *out);
+
 /** Compute the medium of an atmosphere, as the shaders get it.
  *
  * @param a The atmosphere, valid by box_atmos_error

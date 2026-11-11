@@ -1186,6 +1186,27 @@ static box_gpu_atmos_luts_t* box_gpu_atmos_luts_ready(
     return result;
 }
 
+bool box_gpu_atmosphere_luts(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUTextureView *transmittance,
+    WGPUTextureView *multi,
+    WGPUSampler *sampler)
+{
+    const box_gpu_atmos_t *a = gpu->atmosphere;
+    const box_gpu_atmos_luts_t *l = a && handle
+        ? ecs_map_get_deref(&a->luts, box_gpu_atmos_luts_t, handle)
+        : NULL;
+    bool result = l && !l->dirty && a->revision && l->revision == a->revision;
+    if (result) {
+        *transmittance = l->transmittance_view;
+        *multi = l->multi_view;
+        *sampler = a->sampler;
+    }
+
+    return result;
+}
+
 /** Get the sky view and aerial perspective of a view in a target, created on first use.
  *
  * @param gpu The backend

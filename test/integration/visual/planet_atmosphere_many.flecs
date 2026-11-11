@@ -1,0 +1,96 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// Planets with different media lit by one sun: Earth like blue, dusty orange, red, a thick
+// pale haze and a planet without air; the ringed giant has a blended ring in front of it,
+// which is not hazed.
+
+$ {
+  Scene: {blend_modes: true}
+}
+
+camera {
+  Position: {0, 0, 9}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {-0.3, -2.3, 0}
+  DirectionalLight: {intensity: 6}
+  Rgb: {255, 255, 255}
+}
+
+blue {
+  Position: {-4, 1.6, 0}
+  Sphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {70, 100, 140}
+  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 1000, thickness: 100}
+}
+
+dusty {
+  Position: {0, 1.6, 0}
+  Sphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {170, 120, 80}
+  PlanetAtmosphere: {
+    sun: sun, radius: 1, planet_radius: 1000, thickness: 100,
+    rayleigh: {scale_height: 8, scattering_scale: 0.3},
+    mie: {scale_height: 6, anisotropy: 0.5, scattering_scale: 3, tint: {255, 170, 90}}
+  }
+}
+
+red {
+  Position: {4, 1.6, 0}
+  Sphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {150, 70, 50}
+  PlanetAtmosphere: {
+    sun: sun, radius: 1, planet_radius: 1000, thickness: 100,
+    rayleigh: {scale_height: 8, scattering_scale: 0.1},
+    mie: {scale_height: 8, anisotropy: 0.3, scattering_scale: 4, tint: {255, 80, 50}},
+    ozone_scale: 0
+  }
+}
+
+thick {
+  Position: {-4, -1.8, 0}
+  Sphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {120, 120, 110}
+  PlanetAtmosphere: {
+    sun: sun, radius: 1, planet_radius: 1000, thickness: 150,
+    rayleigh: {scale_height: 20, scattering_scale: 2},
+    mie: {scale_height: 10, anisotropy: 0.6, scattering_scale: 1, tint: {230, 230, 200}}
+  }
+}
+
+giant {
+  Position: {0, -1.8, 0}
+  Rotation: {0.35, 0, 0.25}
+  Sphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {200, 170, 120}
+  PlanetAtmosphere: {
+    sun: sun, radius: 1, planet_radius: 6000, thickness: 400,
+    rayleigh: {scale_height: 40, scattering_scale: 0.5},
+    mie: {scale_height: 30, anisotropy: 0.7, scattering_scale: 0.5, tint: {255, 220, 170}}
+  }
+
+  ring {
+    Torus: {segments: 96, rings: 4, radius: 1.8, tube: 0.35}
+    Scale: {1, 0.05, 1}
+    Rgb: {220, 200, 160}
+    Opacity: {0.6}
+  }
+}
+
+bare {
+  Position: {4, -1.8, 0}
+  Sphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {130, 130, 130}
+}

@@ -221,6 +221,27 @@
                 ]
             },
             {
+                "id": "PlanetAtmosphere",
+                "testcases": [
+                    "defaults",
+                    "script_defaults",
+                    "status_follows_component",
+                    "invalid_values_set_error",
+                    "error_clears_when_valid",
+                    "sun_not_attenuated",
+                    "no_environment",
+                    "next_to_atmosphere",
+                    "lut_version_follows_medium",
+                    "view_gets_shell",
+                    "first_light_is_default_sun",
+                    "no_light_no_sun",
+                    "other_scene_not_drawn",
+                    "behind_camera_not_drawn",
+                    "shells_back_to_front",
+                    "removed_frees_luts"
+                ]
+            },
+            {
                 "id": "TimeOfDay",
                 "testcases": [
                     "script_defaults",
