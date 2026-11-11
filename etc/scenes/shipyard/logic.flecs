@@ -13,6 +13,10 @@ state {
     Tool6 { Action: {description: "Pick the fuel tank"}; Binding: {key: Num6} }
     Tool7 { Action: {description: "Pick weapons"}; Binding: {key: Num7} }
     Tool8 { Action: {description: "Pick the engine"}; Binding: {key: Num8} }
+    Tool9 { Action: {description: "Pick the biome"}; Binding: {key: Num9} }
+    Tool10 { Action: {description: "Pick the observation deck"}; Binding: {key: Num0} }
+    Tool11 { Action: {description: "Pick the docking port"}; Binding: {key: P} }
+    Tool12 { Action: {description: "Pick the hull fairing"}; Binding: {key: H} }
     Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
     Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
     View { Action: {description: "Switch between the exterior and the interior"}; Binding: {key: Tab} }
@@ -21,14 +25,18 @@ state {
   }
 
   proc load(design: i32) {
-    if design == OP_FRIGATE {
-      grid = frigate_grid
-    } else if design == OP_SCOUT {
-      grid = scout_grid
-    } else {
-      mut empty: i32[135] = {}
-      grid = empty
+    mut g: i32[1080] = {}
+    mut top: i32 = 0
+    for i in 0..PLAN_CELLS {
+      const k = design == OP_FRIGATE ? frigate_plan[i] : design == OP_SCOUT ? scout_plan[i] : 0
+      if k != 0 {
+        const py = (i - i % PLAN_LAYER) / PLAN_LAYER
+        g[cell_at(i % PLAN_X + PLAN_OX, py, ((i - i % PLAN_X) / PLAN_X) % PLAN_Z + PLAN_OZ)] = k
+        top = max(top, py)
+      }
     }
+    grid = g
+    deck = top
     validate()
   }
 }
@@ -57,6 +65,10 @@ state {
     assets.HotKey k6(action: actions.Tool6, op: K_FUEL)
     assets.HotKey k7(action: actions.Tool7, op: K_WEAPON)
     assets.HotKey k8(action: actions.Tool8, op: K_ENGINE)
+    assets.HotKey k9(action: actions.Tool9, op: K_BIOME)
+    assets.HotKey k10(action: actions.Tool10, op: K_OBS)
+    assets.HotKey k11(action: actions.Tool11, op: K_DOCK)
+    assets.HotKey k12(action: actions.Tool12, op: K_HULL)
     assets.HotKey kx(action: actions.Remove, op: T_REMOVE)
     assets.HotKey kc(action: actions.Cancel, op: OP_CANCEL)
     assets.HotKey kv(action: actions.View, op: OP_VIEW)
@@ -66,7 +78,7 @@ state {
 }
 
 async {
-  validate()
+  load(OP_FRIGATE)
 }
 
 async {
@@ -75,35 +87,16 @@ async {
     const i = e.cell
     const k = grid[i]
     if tool > 0 && tool != T_REMOVE {
-      if k == K_EMPTY {
-        const code = place_code(i, tool)
-        if code == 0 {
-          const placed = tool
-          emit Built(cell: i)
-          await next_frame()
-          grid[i] = placed
-          validate()
-          notify("{kind_name(placed)} added.")
-        } else {
-          notify(code_text(code))
-        }
+      if k != tool {
+        const placed = tool
+        emit Built(cell: i)
+        await next_frame()
+        grid[i] = placed
+        validate()
       }
     } else if tool == T_REMOVE && k != K_EMPTY {
       grid[i] = K_EMPTY
       validate()
-      if problems == 1 {
-        notify("{kind_name(k)} removed. One module now breaks a rule.")
-      } else if problems > 1 {
-        notify("{kind_name(k)} removed. {problems} modules now break a rule.")
-      } else {
-        notify("{kind_name(k)} removed.")
-      }
-    } else if k != K_EMPTY {
-      if status[i] != 0 {
-        notify("{kind_name(k)}: {code_text(status[i])}")
-      } else {
-        notify("{kind_name(k)}: {kind_rule(k)}")
-      }
     }
   }
 }
@@ -133,30 +126,6 @@ async {
       deck = max(deck - 1, 0)
     } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_CLEAR {
       load(op)
-      deck = GY - 1
-      if op == OP_CLEAR {
-        notify("An empty slipway. Lay down a first module anywhere, then grow the ship from it.")
-      } else {
-        const design = op == OP_FRIGATE ? "frigate" : "scout"
-        notify("Loaded the {design} design.")
-      }
-    }
-  }
-}
-
-async {
-  mut seen: i32 = 0
-  mut age: f32 = 0
-  while true {
-    await delay(0.25)
-    if alert_seq != seen {
-      seen = alert_seq
-      age = 0
-    } else if alert != "" {
-      age += 0.25
-      if age >= 7 {
-        alert = ""
-      }
     }
   }
 }
