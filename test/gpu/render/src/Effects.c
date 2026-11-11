@@ -4582,8 +4582,9 @@ void Effects_depth_of_field_tilt_shift_stripes(void) {
         test_assert(tilt_contrast(px[i], 141) > 240);
         test_assert(tilt_contrast(px[i], 8) < 64);
         test_assert(tilt_contrast(px[i], 247) < 64);
-        // The blur grows away from the band on both sides
-        test_assert(tilt_contrast(px[i], 70) > tilt_contrast(px[i], 8));
+        // The blur grows away from the band on both sides, measured on the ramp next to the band
+        // edges at rows 120 and 161, before a disc blur of the stripes first cancels them out
+        test_assert(tilt_contrast(px[i], 88) > tilt_contrast(px[i], 8));
         test_assert(tilt_contrast(px[i], 200) > tilt_contrast(px[i], 247));
 
         box_render_gpu_stats_t stats;
