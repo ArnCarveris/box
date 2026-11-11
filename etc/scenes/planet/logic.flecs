@@ -7,7 +7,7 @@ using box.task
 using state
 
 state {
-  proc show(target: i32) {
+  fn show(target: i32) {
     if target == PAGE_NIGHT {
       state.sun_angle = SUN_NIGHT
       state.lights = true
@@ -21,7 +21,7 @@ state {
     state.page = target
   }
 
-  proc preset(target: i32) {
+  fn preset(target: i32) {
     state.kind = target
     state.atm = kind_atm(target)
     state.water = kind_water(target)
@@ -32,7 +32,7 @@ state {
     state.terraform = false
   }
 
-  proc reset() {
+  fn reset() {
     preset(KIND_GARDEN)
     state.seed = 23
     state.detail = 2
@@ -43,14 +43,14 @@ state {
     state.orbit_pitch = 0
   }
 
-  proc barren() {
+  fn barren() {
     state.atm = 5
     state.water = 0
     state.temp = 30
     state.bio = 0
   }
 
-  proc grow(dt: f32) {
+  fn grow(dt: f32) {
     state.atm = toward(state.atm, GOAL_ATM, 3 * dt)
     state.water = toward(state.water, GOAL_WATER, 2.3 * dt)
     state.temp = toward(state.temp, GOAL_TEMP, dt)
@@ -59,7 +59,7 @@ state {
     }
   }
 
-  proc apply() {
+  fn apply() {
     state.shown_kind = state.kind
     state.shown_seed = state.seed
     state.shown_atm = state.atm

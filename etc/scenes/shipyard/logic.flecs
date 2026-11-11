@@ -25,7 +25,7 @@ state {
     DeckDown { Action: {description: "Work on the deck below"}; Binding: {key: PageDown}; alt { Binding: {key: Q} } }
   }
 
-  proc load(design: i32) {
+  fn load(design: i32) {
     mut g: i32[1080] = {}
     mut top: i32 = 0
     for i in 0..PLAN_CELLS {
