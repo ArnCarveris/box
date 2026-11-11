@@ -1,0 +1,44 @@
+include test/assets/town/town
+
+// The town of test/assets/town seen from above at an angle with only the tilt shift mode of a
+// DepthOfField set: the band across the middle of the image stays sharp, the streets above and
+// below it blur, so the town looks like a miniature.
+
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.camera
+using box.view
+using box.effects
+
+$ {
+  AmbientLight: {sky: {150, 178, 210}, ground: {60, 56, 50}, intensity: 0.35}
+}
+
+sun {
+  Rotation: {0.9, -0.8332, 0}
+  DirectionalLight: {intensity: 1.2 * math.PI}
+  Rgb: {255, 250, 240}
+}
+
+assets.Town sakura_machi(rows: 4, columns: 4, seed: 42)
+
+tilt_shift {
+  DepthOfField: {mode: DofTiltShift}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {-20, 24, 24}
+  Rotation: {-0.656, -0.6947, 0}
+  Camera: {fov: 45, near_: 0.1}
+}
+
+view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 120}, effects: [{enabled: true, effect: tilt_shift}, {enabled: true, effect: tonemap}]}
+}

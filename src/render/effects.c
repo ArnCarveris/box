@@ -101,6 +101,13 @@ void box_render_depth_of_field_settings(
     out->near_transition = glm_max(in->near_transition, 0.0f);
     out->far_transition = glm_max(in->far_transition, 0.0f);
     out->max_radius = glm_clamp(in->max_radius, 0.0f, BOX_EFFECTS_DOF_RADIUS_MAX);
+    out->tilt_band = glm_max(in->tilt_band, 0.0f);
+    out->tilt_transition = glm_max(in->tilt_transition, 0.0f);
+    if (in->mode == DofTiltShift) {
+        out->near_blur = false;
+    } else {
+        out->mode = DofCamera;
+    }
 }
 
 void box_render_exposure_settings(

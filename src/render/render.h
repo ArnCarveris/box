@@ -1254,6 +1254,23 @@ float box_render_depth_of_field_coc_depth(
     const float *k,
     float depth);
 
+/** Get the circle of confusion of a pixel of a tilt shift as etc/shaders/depth_of_field.wgsl
+ * computes it: 0 within tilt_band of the line through tilt_center turned by tilt_angle, up to 1
+ * at tilt_transition past the band edge, positive on both sides. Distances are in units of the
+ * image height.
+ *
+ * @param dof The resolved settings
+ * @param x Normalized image X of the pixel, 0 at the left
+ * @param y Normalized image Y of the pixel, 0 at the top
+ * @param aspect Width of the image over its height
+ * @return The circle of confusion
+ */
+float box_render_depth_of_field_tilt_coc(
+    const DepthOfField *dof,
+    float x,
+    float y,
+    float aspect);
+
 /** Resolve the settings of an adapted exposure.
  *
  * @param in The settings of an effect entity

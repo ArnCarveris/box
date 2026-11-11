@@ -523,7 +523,12 @@
                     "perspective_depth",
                     "perspective_infinite_far",
                     "orthographic",
-                    "settings_clamped"
+                    "settings_clamped",
+                    "tilt_inside_band",
+                    "tilt_past_transition",
+                    "tilt_symmetric",
+                    "tilt_rotated",
+                    "tilt_settings"
                 ]
             },
             {

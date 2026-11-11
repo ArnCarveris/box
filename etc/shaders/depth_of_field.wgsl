@@ -13,7 +13,9 @@
 // full resolution pixel, upsampled from the texels that are blurred themselves, and fs_near draws
 // the premultiplied near field over it.
 //
-// circle_of_confusion is the one function that turns a pixel into its CoC.
+// circle_of_confusion is the one function that turns a pixel into its CoC, by mode: depth_coc
+// by its view depth, or tilt_coc by its distance to the sharp band of a tilt shift. A tilt shift
+// is far on both sides of the band, so it never reads depth and its near field stays off.
 #include "include/effect.wgsl"
 
 struct Dof {
@@ -24,6 +26,11 @@ struct Dof {
     // x: largest radius in half resolution pixels, y: 1 when the near field blurs, z: CoC of a
     // pixel without geometry
     params: vec4f,
+    // x: normalized image y of the band center, y: half height of the band, z: transition, all
+    // in units of the image height; w: 1 for a tilt shift
+    tilt: vec4f,
+    // x, y: sin and cos of the band angle, the normal of the band, z: width over height
+    tilt_normal: vec4f,
 };
 
 @group(0) @binding(2) var<uniform> dof: Dof;
@@ -61,8 +68,25 @@ fn depth_coc(z: f32) -> f32 {
     return 0.0;
 }
 
-// Signed CoC of the pixel at uv with depth d; depth 0, a pixel without geometry, is far.
-fn circle_of_confusion(uv: vec2f, d: f32) -> f32 {
+// CoC of a tilt shift of the pixel at uv: 0 in the band, up to 1 past the transition.
+fn tilt_coc(uv: vec2f) -> f32 {
+    let p = vec2f((uv.x - 0.5) * dof.tilt_normal.z, uv.y - dof.tilt.x);
+    let dist = abs(dot(p, dof.tilt_normal.xy));
+    if (dof.tilt.z <= 0.0) {
+        return select(0.0, 1.0, dist > dof.tilt.y);
+    }
+
+    let t = saturate((dist - dof.tilt.y) / dof.tilt.z);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// Signed CoC of the full resolution pixel p at uv; depth 0, a pixel without geometry, is far.
+fn circle_of_confusion(p: vec2i, uv: vec2f) -> f32 {
+    if (dof.tilt.w > 0.5) {
+        return tilt_coc(uv);
+    }
+
+    let d = textureLoad(depth_texture, p, 0);
     if (d <= 0.0) {
         return dof.params.z;
     }
@@ -81,7 +105,7 @@ fn circle_of_confusion(uv: vec2f, d: f32) -> f32 {
     for (var i = 0; i < 4; i++) {
         let p = min(base + vec2i(i & 1, i >> 1u), size - 1);
         let c = max(textureLoad(input_texture, p, 0).rgb, vec3f(0.0));
-        let coc = circle_of_confusion((vec2f(p) + 0.5) / full, textureLoad(depth_texture, p, 0));
+        let coc = circle_of_confusion(p, (vec2f(p) + 0.5) / full);
         let w = 1.0 / (1.0 + luminance(c));
         color += c * w;
         weight += w;
@@ -216,7 +240,7 @@ fn sort_pair(m: ptr<function, array<vec4f, 9>>, a: i32, b: i32) {
 @fragment fn fs_composite(v: FullscreenOut) -> @location(0) vec4f {
     let p = vec2i(v.pos.xy);
     let src = textureLoad(input_texture, p, 0);
-    let coc = circle_of_confusion(v.uv, textureLoad(depth_texture, p, 0));
+    let coc = circle_of_confusion(p, v.uv);
     let w = saturate(coc * dof.params.x * 2.0 - 0.5);
     if (w <= 0.0) {
         return src;

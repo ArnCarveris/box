@@ -911,7 +911,13 @@
                     "depth_of_field_zero_literal_applies_as_set",
                     "depth_of_field_disabled_entry_no_op",
                     "depth_of_field_same_entity_before_tonemap",
-                    "depth_of_field_follows_surface_resize"
+                    "depth_of_field_follows_surface_resize",
+                    "depth_of_field_tilt_default_settings",
+                    "depth_of_field_tilt_shift_stripes",
+                    "depth_of_field_tilt_shift_center",
+                    "depth_of_field_tilt_shift_zero_radius_no_op",
+                    "depth_of_field_camera_ignores_tilt",
+                    "depth_of_field_tilt_shift_follows_surface_resize"
                 ]
             },
             {

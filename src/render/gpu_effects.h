@@ -267,6 +267,10 @@ typedef struct box_gpu_dof_uniforms_t {
     float params[4];                /**< Largest radius in half resolution pixels, 1 when the
                                      *   near field blurs, CoC of a pixel without geometry,
                                      *   unused */
+    float tilt[4];                  /**< Band center, band half height, transition, in units
+                                     *   of the image height, 1 for a tilt shift */
+    float tilt_normal[4];           /**< Sin and cos of the band angle, width over height,
+                                     *   unused */
 } box_gpu_dof_uniforms_t;
 
 /** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
