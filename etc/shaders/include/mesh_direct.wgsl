@@ -31,7 +31,9 @@ fn fresnel_schlick(cos_theta: f32, f0: vec3f) -> vec3f {
     return f0 + (vec3f(1.0) - f0) * (x2 * x2 * x);
 }
 
-// Direct light: the directional lights, then the lights of the cluster. With sides 2 each light
+// Direct light: the directional lights, then the lights of the cluster. With
+// scene_planet_light the sun of the planet of the fragment (fragment_planet) is attenuated by
+// the transmittance of its atmosphere at world. With sides 2 each light
 // is evaluated again thickness behind the surface along the view ray, for the back lobe of a
 // diffuse transmission, which light_lobes returns for side 1. The directional and cluster lights
 // share one loop, and the sides one loop per light, so the shadows, the cookie and the lobes each
@@ -40,6 +42,10 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
     thickness: f32) -> Lit
 {
     var sum = Lit(vec3f(0.0), vec3f(0.0));
+    var planet = PlanetSun(vec3f(0.0), vec3f(1.0));
+    if (scene_planet_light) {
+        planet = planet_light_sun(fragment_planet, world);
+    }
     let directional = view.lights.x;
     var count = directional;
     var first = 0u;
@@ -69,6 +75,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
             var visible = 1.0;
             if (i < directional) {
                 l = normalize(light.position);
+                if (scene_planet_light) {
+                    radiance *= planet_light_factor(planet, l);
+                }
                 if (i == 0u) {
                     visible = shadow_factor(at, n);
                     if (scene_cookies) {

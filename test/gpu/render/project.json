@@ -1320,6 +1320,20 @@
                 ]
             },
             {
+                "id": "PlanetSurfaceLight",
+                "testcases": [
+                    "terminator_reddens",
+                    "without_atmosphere_neutral",
+                    "feature_off_neutral",
+                    "not_descendant_unaffected",
+                    "child_affected",
+                    "no_planet_unchanged",
+                    "cloud_sphere_reddens",
+                    "extended_reddens",
+                    "transmission_reddens"
+                ]
+            },
+            {
                 "id": "ViewDebug",
                 "testcases": [
                     "off_records_nothing",

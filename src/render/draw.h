@@ -183,6 +183,8 @@ typedef struct box_draw_key_t {
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
     uint32_t features;      /**< BOX_RENDER_FEATURE_* features of the scene of a 3D shape, 0 for
                              *   2D shapes and texts */
+    uint32_t planet;        /**< Planet light slot of the nearest PlanetAtmosphere at or above a
+                             *   3D shape of a scene with Scene.planet_light, 0 for none */
 } box_draw_key_t;
 
 /** Batch and slot of one glyph of a Text */
@@ -608,6 +610,9 @@ typedef struct box_render_draws_t {
     int32_t box_shadows;        /**< BoxShadowSlot values with a batch, so the paths every 2D
                                  *   shape takes (the runs, the transitions) skip the lookup of
                                  *   the slot while no shadow is drawn */
+    ecs_vec_t planets;          /**< ecs_entity_t by planet light slot minus one: the entities
+                                 *   with a PlanetAtmosphere whose meshes took the slot, 0 for a
+                                 *   free one */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 
@@ -622,6 +627,52 @@ box_render_draws_t* box_draws_state(
 /** Fill the conversion tables of the instance data, once per process.
  */
 void box_draws_tables_init(void);
+
+/** Put the planet light slot of an instance above the slot of the material table it renders
+ * with, as box_render_mesh_shading_t.material holds them.
+ *
+ * @param material Slot of the material table
+ * @param planet Planet light slot, 0 for none
+ * @return The material word of the shading
+ */
+static inline uint32_t box_draws_planet_material(
+    uint32_t material,
+    uint32_t planet)
+{
+    return (material & BOX_RENDER_MESH_MATERIAL_MASK) |
+        (planet << BOX_RENDER_MESH_MATERIAL_BITS);
+}
+
+/** Get the planet light slot of a PlanetAtmosphere entity, taking the lowest free one when it
+ * has none.
+ *
+ * @param d The state
+ * @param planet The entity with the PlanetAtmosphere
+ * @return The slot, 0 when every slot below BOX_RENDER_PLANET_LIGHT_MAX is taken
+ */
+uint32_t box_draws_planet_slot(
+    box_render_draws_t *d,
+    ecs_entity_t planet);
+
+/** Find the planet light slot of a PlanetAtmosphere entity.
+ *
+ * @param d The state
+ * @param planet The entity
+ * @return The slot, 0 when it has none
+ */
+uint32_t box_draws_planet_find(
+    const box_render_draws_t *d,
+    ecs_entity_t planet);
+
+/** Find the nearest entity with a PlanetAtmosphere at or above an entity along ChildOf.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The entity with the PlanetAtmosphere, 0 for none or without box.atmosphere
+ */
+ecs_entity_t box_draws_planet_of(
+    const ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Get a batch by index.
  *

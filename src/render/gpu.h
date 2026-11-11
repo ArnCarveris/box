@@ -1479,6 +1479,45 @@ bool box_gpu_atmosphere_luts(
     WGPUTextureView *multi,
     WGPUSampler *sampler);
 
+/** Get the transmittance LUT of an atmosphere that is built, for a copy of it.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the BOX_RENDER_ATMOSPHERE
+ * @param texture Receives the transmittance LUT, BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH by
+ * BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT RGBA16Float texels
+ * @param builds Receives how often the LUTs were built, which changes with every build
+ * @return Whether the LUTs exist and are built with the current shader
+ */
+bool box_gpu_atmosphere_transmittance(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    WGPUTexture *texture,
+    int32_t *builds);
+
+/** Write the planet light table of a packet, a PlanetLight of planet_light.wgsl per slot, and
+ * copy the transmittance LUT of each of its planets into its layer of the LUT array when the
+ * LUT was built again or its slot changed, after the LUTs are built and before the targets.
+ *
+ * A planet whose LUTs are not built leaves its slot empty: its meshes are lit as without it.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_planet_lights_prepare(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Write the planet light bindings of the view group: the table at BOX_GPU_PLANET_LIGHTS_BINDING
+ * and the transmittance LUT array, a read only storage texture, at
+ * BOX_GPU_PLANET_LUTS_BINDING; a 1 layer placeholder before any planet.
+ *
+ * @param gpu The backend
+ * @param out Receives the two entries
+ */
+void box_gpu_planet_lights_bindings(
+    box_gpu_t *gpu,
+    WGPUBindGroupEntry *out);
+
 /** Create the layouts of the planet atmosphere shell draws, after the view layout.
  *
  * @param gpu The backend

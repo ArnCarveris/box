@@ -91,6 +91,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &d->planets, ecs_entity_t);
     box_draws_order_fini(d);
     box_draws_clips_fini(d);
     box_draws_materials_fini(d);
@@ -473,6 +474,73 @@ float box_draws_fade(
     return result;
 }
 
+uint32_t box_draws_planet_find(
+    const box_render_draws_t *d,
+    ecs_entity_t planet)
+{
+    uint32_t result = 0;
+    int32_t i;
+    for (i = 0; planet && i < ecs_vec_count(&d->planets); i ++) {
+        if (*ecs_vec_get_t(&d->planets, ecs_entity_t, i) == planet) {
+            result = (uint32_t)i + 1u;
+            break;
+        }
+    }
+
+    return result;
+}
+
+uint32_t box_draws_planet_slot(
+    box_render_draws_t *d,
+    ecs_entity_t planet)
+{
+    uint32_t result = box_draws_planet_find(d, planet);
+    int32_t i;
+    if (result || !planet) {
+        goto done;
+    }
+
+    for (i = 0; i < ecs_vec_count(&d->planets); i ++) {
+        ecs_entity_t *slot = ecs_vec_get_t(&d->planets, ecs_entity_t, i);
+        if (!*slot) {
+            *slot = planet;
+            result = (uint32_t)i + 1u;
+            goto done;
+        }
+    }
+
+    if (ecs_vec_count(&d->planets) < BOX_RENDER_PLANET_LIGHT_MAX - 1) {
+        *ecs_vec_append_t(NULL, &d->planets, ecs_entity_t) = planet;
+        result = (uint32_t)ecs_vec_count(&d->planets);
+    }
+
+done:
+    return result;
+}
+
+ecs_entity_t box_draws_planet_of(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    ecs_entity_t cur = e;
+    if (!ecs_id(PlanetAtmosphere) || !ecs_id_in_use(world, ecs_id(PlanetAtmosphere))) {
+        goto done;
+    }
+
+    while (cur) {
+        if (ecs_has_id(world, cur, ecs_id(PlanetAtmosphere))) {
+            result = cur;
+            break;
+        }
+
+        cur = ecs_get_parent(world, cur);
+    }
+
+done:
+    return result;
+}
+
 /** Get the scene of a changed shape, looked up once per table while the changes are processed.
  *
  * Every entity of a table without Scene and without a non fragmenting parent has the scene of
@@ -746,6 +814,11 @@ static void box_draws_key(
         key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
     }
 
+    if (!shape2d && (key->features & BOX_RENDER_FEATURE_PLANET_LIGHT)) {
+        ecs_entity_t planet = box_draws_planet_of(world, e);
+        key->planet = planet ? box_draws_planet_slot(d, planet) : 0u;
+    }
+
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
         !ecs_has_id(world, e, TransitionTransform) &&
         !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
@@ -911,7 +984,9 @@ write:
         box_draws_material(box_draws_slot_shading(b, s->slot), &material);
     } else if (kinds & BOX_DRAW_SHADING) {
         box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
-            box_draws_material_id(world, d, e, true, b->key.dynamic_material), &material);
+            box_draws_planet_material(
+                box_draws_material_id(world, d, e, true, b->key.dynamic_material),
+                b->key.planet), &material);
     }
 
     if (kinds & BOX_DRAW_SURFACE) {
@@ -1057,6 +1132,52 @@ static void BoxRenderExtractDraws(
 
 done:
     return;
+}
+
+/** Remember the entities that got or lost a PlanetAtmosphere as roots of subtrees whose planet
+ * light slot changed, and give back the slot of an entity that lost it.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnPlanetAtmosphere(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (it->event == EcsOnRemove) {
+        for (i = 0; i < it->count; i ++) {
+            uint32_t slot = box_draws_planet_find(d, it->entities[i]);
+            if (slot) {
+                *ecs_vec_get_t(&d->planets, ecs_entity_t, (int32_t)slot - 1) = 0;
+            }
+        }
+    }
+
+    box_draws_on_move(it, BOX_DRAW_ALL);
+}
+
+void box_render_planet_observers(
+    ecs_world_t *world)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    if (!d || !ecs_id(PlanetAtmosphere)) {
+        goto done;
+    }
+
+    box_draws_observer(world, d, "DrawsOnPlanetAtmosphere", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(PlanetAtmosphere) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnPlanetAtmosphere);
+done:
+    return;
+}
+
+uint32_t box_render_planet_light_slot(
+    const ecs_world_t *world,
+    ecs_entity_t planet)
+{
+    const box_render_draws_t *d = box_draws_state(world);
+
+    return d ? box_draws_planet_find(d, planet) : 0u;
 }
 
 void box_draws_observer(
@@ -1382,6 +1503,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_regions, box_render_shadow_region_t, 0);
     ecs_vec_init_t(NULL, &d->shadow_materials, uint32_t, 0);
+    ecs_vec_init_t(NULL, &d->planets, ecs_entity_t, 0);
     ecs_map_init(&d->lookup, NULL);
     ecs_map_init(&d->meshes, NULL);
     box_draws_order_init(d);

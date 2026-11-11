@@ -100,6 +100,7 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
 }
 
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
+    planet_fragment(f);
     var s = shaded;
     if (kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));

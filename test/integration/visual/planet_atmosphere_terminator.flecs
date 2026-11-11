@@ -1,0 +1,54 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// An Earth sized planet lit from the side with Scene.planet_light: the sunlight reaching the
+// ground and the cloud sphere through the atmosphere turns the terminator orange and red, while
+// the subsolar side stays white and the night side is dark. The station outside the planet's
+// hierarchy is lit by the unattenuated sun.
+
+$ {
+  Scene: {blend_modes: true, planet_light: true}
+}
+
+camera {
+  Position: {0, 0, 3.6}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {-0.1, -2.2, 0}
+  DirectionalLight: {intensity: 5}
+  Rgb: {255, 255, 255}
+}
+
+planet {
+  Position: {0, 0, 0}
+  Sphere: {segments: 128, smooth: true, radius: 1}
+  Rgb: {200, 200, 200}
+  PbrMaterial: {roughness: 0.9}
+  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 6360, thickness: 100}
+
+  clouds {
+    Position: {0, 0, 0}
+    Sphere: {segments: 128, smooth: true, radius: 1.004}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    Opacity: {0.45}
+  }
+}
+
+station {
+  Position: {-1.25, 0.75, 0.6}
+  Sphere: {segments: 48, smooth: true, radius: 0.08}
+  Rgb: {220, 220, 220}
+  PbrMaterial: {roughness: 0.8}
+}

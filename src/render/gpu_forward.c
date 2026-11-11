@@ -217,10 +217,14 @@ static WGPURenderPipeline box_gpu_forward_create(
         .key = { .data = "polygon", .length = WGPU_STRLEN },
         .value = polygon && !box_shadow ? 1.0 : 0.0
     };
-    WGPUConstantEntry mesh_vertex_constants[4] = {
+    WGPUConstantEntry mesh_vertex_constants[5] = {
         {
             .key = { .data = "material_texture_scroll", .length = WGPU_STRLEN },
             .value = features & BOX_RENDER_OVERRIDE_TEXTURE_SCROLL ? 1.0 : 0.0
+        },
+        {
+            .key = { .data = "scene_planet_light", .length = WGPU_STRLEN },
+            .value = features & BOX_RENDER_OVERRIDE_PLANET_LIGHT ? 1.0 : 0.0
         },
         {
             .key = { .data = "water", .length = WGPU_STRLEN },
@@ -262,7 +266,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         .vertex = {
             .module = shader,
             .entryPoint = { .data = surface ? "vs_surface" : "vs", .length = WGPU_STRLEN },
-            .constantCount = shape2d ? 1 : extended ? 4 : mesh ? 1 : 0,
+            .constantCount = shape2d ? 1 : extended ? 5 : mesh ? 2 : 0,
             .constants = shape2d ? &vertex_constant : mesh ? mesh_vertex_constants : NULL,
             .bufferCount = 2,
             .buffers = buffers
@@ -399,7 +403,7 @@ typedef enum box_gpu_depth_mode_t {
 
 /** Pack the state a forward or depth prepass pipeline is created for into its cache key.
  *
- * @param shader Shader handle, below 2^17
+ * @param shader Shader handle, below 2^13
  * @param format Format of the color target, below 2^23, Undefined for a depth prepass, the count
  * format for an overdraw count
  * @param blend BlendMode, below 16
@@ -433,11 +437,11 @@ static uint64_t box_gpu_forward_key(
     bool water)
 {
     ecs_assert((uint32_t)format < (1u << 23), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(shader < (1u << 14), ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(shader < (1u << 13), ECS_INTERNAL_ERROR, NULL);
     ecs_assert(features <= BOX_RENDER_OVERRIDE_SCENE, ECS_INTERNAL_ERROR, NULL);
 
-    return ((uint64_t)shader << 50) | ((uint64_t)water << 49) | ((uint64_t)surface << 48) |
-        ((uint64_t)mirrored << 47) | ((uint64_t)features << 33) |
+    return ((uint64_t)shader << 51) | ((uint64_t)water << 50) | ((uint64_t)surface << 49) |
+        ((uint64_t)mirrored << 48) | ((uint64_t)features << 33) |
         ((uint64_t)texture_blend << 32) |
         ((uint64_t)transmissive << 31) |
         ((uint64_t)format << 8) | ((uint64_t)blend << 4) | ((uint64_t)depth << 2) |

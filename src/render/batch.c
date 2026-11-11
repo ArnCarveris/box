@@ -27,6 +27,8 @@ _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of insta
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
 _Static_assert(sizeof(box_render_material_t) == 176, "Material of material.wgsl");
+_Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
+    "the material slots fit below the planet light slot of a mesh shading");
 
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
@@ -568,7 +570,8 @@ static void box_draws_shadow_materials(
         }
 
         for (j = 0; j < ecs_vec_count(&b->entities); j ++) {
-            uint32_t material = box_draws_slot_mesh_shading(b, j)->material;
+            uint32_t material = box_draws_slot_mesh_shading(b, j)->material &
+                BOX_RENDER_MESH_MATERIAL_MASK;
             bool hit = false;
             for (k = 0; k < count && !hit; k ++) {
                 hit = changed[k] == material;
@@ -1722,7 +1725,8 @@ static void box_draws_fill_material(
             box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, slots[i].slot);
             box_render_mesh_shading_t was = *out;
             box_draws_material_changed(d, it->entities[i]);
-            box_draws_mesh_shading(out, id, &material);
+            box_draws_mesh_shading(out, box_draws_planet_material(id, b->key.planet),
+                &material);
             alpha = box_draws_alpha(&material);
             if (b->key.cutout && (was.material != out->material || was.alpha != out->alpha)) {
                 box_render_transform_t *transform = box_draws_slot_transform(b, slots[i].slot);
