@@ -135,17 +135,6 @@ assets {
     }
   }
 
-  template EngSide {
-    mount : ShipTrim { Position: {0, 1.2, 0.025}; Box: {3, 1.6, 0.05} }
-    for i in 0..6 {
-      const fx = -1.25 + i * 0.5
-      "fin_{i}" : ShipSteel { Position: {fx, 1.2, 0.3}; Box: {0.05, 1.5, 0.5} }
-      "heat_{i}" : ShipHeat { Position: {fx, 1.2, 0.56}; Box: {0.06, 1.4, 0.03} }
-    }
-    rail_a : ShipHullDark { Position: {0, 2.02, 0.12}; Box: {3, 0.06, 0.22} }
-    rail_b : ShipHullDark { Position: {0, 0.38, 0.12}; Box: {3, 0.06, 0.22} }
-  }
-
   template ObsSide {
     backdrop : ShipLounge { Position: {0, 1.66, 0.012}; Box: {3.3, 1.66, 0.02} }
     sill : ShipHull { Position: {0, 0.78, 0.32}; Box: {3.56, 0.12, 0.64} }
@@ -170,8 +159,6 @@ assets {
 
     if k == K_HAB {
       HabSide f()
-    } else if k == K_ENG {
-      EngSide f()
     } else if k == K_OBS {
       ObsSide f()
     }
@@ -222,21 +209,6 @@ assets {
       vent_a : ShipRecess { Position: {-0.76, 0.38, -0.3}; Box: {0.02, 0.36, 0.9} }
       vent_b : ShipRecess { Position: {0.76, 0.38, -0.3}; Box: {0.02, 0.36, 0.9} }
     }
-  }
-
-  template EngVent {
-    stack : ShipTrim { Position: {0, 0.2, 0}; Cylinder: {radius: 0.6, length: 0.4, segments: 28, smooth: true} }
-    well : ShipRecess { Position: {0, 0.405, 0}; Cylinder: {radius: 0.48, length: 0.01, segments: 28} }
-    glow : ShipCyanLight { Position: {0, 0.41, 0}; Torus: {radius: 0.5, tube: 0.035, segments: 32, rings: 6} }
-    core : ShipPlasma { Position: {0, 0.3, 0}; Cylinder: {radius: 0.22, length: 0.22, segments: 20} }
-    for i in 0..4 {
-      const a = i * HALF_PI + 0.785
-      "rib_{i}" : ShipSteel { Position: {cos(a) * 0.62, 0.2, sin(a) * 0.62}; Rotation: {0, -a, 0}; Box: {0.08, 0.42, 0.18} }
-    }
-    rad_a : ShipSteel { Position: {-1.2, 0.05, 0}; Box: {0.5, 0.1, 3.2} }
-    rad_b : ShipSteel { Position: {1.2, 0.05, 0}; Box: {0.5, 0.1, 3.2} }
-    heat_a : ShipHeat { Position: {-1.2, 0.11, 0}; Box: {0.3, 0.02, 3} }
-    heat_b : ShipHeat { Position: {1.2, 0.11, 0}; Box: {0.3, 0.02, 3} }
   }
 
   template HabTop {
@@ -804,6 +776,167 @@ assets {
     tag_b : ShipGreenLight { Position: {1.89, 2.3, 0}; Box: {0.04, 0.05, 0.6} }
   }
 
+  template FusionCoil {
+    coil : ShipCopper { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: 0.6, thickness: 0.13, length: 0.16, segments: 32, smooth: true} }
+    case_a : ShipTrim { Position: {0, 0, 0.09}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: 0.62, thickness: 0.04, length: 0.02, segments: 32, smooth: true} }
+    case_b : ShipTrim { Position: {0, 0, -0.09}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: 0.62, thickness: 0.04, length: 0.02, segments: 32, smooth: true} }
+    clamp : ShipHullDark { Position: {0.62, 0, 0}; RoundedBox: {0.14, 0.42, 0.26, 0.04, segments: 2} }
+    tag : ShipFusion { Position: {0.695, 0, 0}; Box: {0.01, 0.26, 0.05} }
+    foot : ShipTrim { Position: {0, -0.775, 0}; Box: {0.3, 0.45, 0.2} }
+  }
+
+  template FusionReactor {
+    const R = 1.08
+    const cy = 1.2
+
+    plinth : ShipHullDark { Position: {0, 0.1, 0}; Cylinder: {radius: 1.3, length: 0.2, segments: 48, smooth: true} }
+    plinth_lip : ShipTrim { Position: {0, 0.2, 0}; Torus: {radius: 1.3, tube: 0.035, segments: 48, rings: 6} }
+
+    vessel : ShipWhite {
+      Position: {0, cy, 0}
+      TorusShell: {radius: R, tube: 0.42, ring_start: 0, ring_end: 6.2832, tube_start: 2.3, tube_end: 7.0332, thickness: 0.05, rims: true, segments: 64, rings: 24}
+    }
+    lip_out : ShipChrome { Position: {0, cy + 0.287, 0}; Torus: {radius: R + 0.307, tube: 0.03, segments: 64, rings: 6} }
+    lip_in : ShipChrome { Position: {0, cy + 0.313, 0}; Torus: {radius: R - 0.28, tube: 0.03, segments: 48, rings: 6} }
+    belt : ShipStripe { Position: {0, cy, 0}; Tube: {radius: R + 0.43, thickness: 0.02, length: 0.12, segments: 64, smooth: true} }
+
+    plasma : ShipFusion { Position: {0, cy, 0}; Torus: {radius: R, tube: 0.2, segments: 64, rings: 14, smooth: true} }
+    swirl {
+      Position: {0, cy, 0}
+      AngularVelocity: {0, 2.6, 0}
+      for i in 0..3 {
+        const u = i * 2.0944
+        "streak_{i}" : ShipFusionHot { Position: {0, 0, 0}; TorusShell: {radius: R, tube: 0.215, ring_start: u, ring_end: u + 0.55, tube_start: 0, tube_end: 6.2832, segments: 10, rings: 10} }
+      }
+    }
+
+    for i in 0..8 {
+      const a = 0.3927 + i * 0.7854
+      "coil_{i}" {
+        Rotation: {0, 0 - a, 0}
+        FusionCoil c() { Position: {R, cy, 0} }
+      }
+    }
+
+    solenoid : ShipSteel { Position: {0, 1.3, 0}; Cylinder: {radius: 0.28, length: 2.2, segments: 28, smooth: true} }
+    for i in 0..7 {
+      "wind_{i}" : ShipCopper { Position: {0, 0.55 + i * 0.25, 0}; Cylinder: {radius: 0.33, length: 0.17, segments: 28, smooth: true} }
+    }
+    hub : ShipTrim { Position: {0, 2.45, 0}; Cylinder: {radius: 0.42, length: 0.14, segments: 32, smooth: true} }
+    hub_glow : ShipFusion { Position: {0, 2.53, 0}; Torus: {radius: 0.3, tube: 0.03, segments: 32, rings: 6} }
+    hub_cap : ShipChrome { Position: {0, 2.53, 0}; HemiSphere: {radius: 0.2, segments: 20, smooth: true} }
+
+    light { Position: {0, cy + 0.2, 0}; PointLight: {intensity: 7, range: 4.5}; Rgb: {200, 130, 255} }
+  }
+
+  template Capacitor {
+    skirt : ShipTrim { Position: {0, 0.08, 0}; Cylinder: {radius: 0.26, length: 0.16, segments: 20, smooth: true} }
+    body : ShipWhite { Position: {0, 0.86, 0}; Cylinder: {radius: 0.22, length: 1.4, segments: 24, smooth: true} }
+    for i in 0..3 {
+      "band_{i}" : ShipStripe { Position: {0, 0.4 + i * 0.46, 0}; Cylinder: {radius: 0.225, length: 0.07, segments: 24, smooth: true} }
+    }
+    level : ShipFusion { Position: {0, 0.86, 0.221}; Box: {0.05, 1.1, 0.01} }
+    top : ShipTrim { Position: {0, 1.6, 0}; Cylinder: {radius: 0.24, length: 0.08, segments: 24, smooth: true} }
+    for s in 0..2 {
+      const tx = s == 0 ? -0.09 : 0.09
+      "post_{s}" : ShipChrome { Position: {tx, 1.7, 0}; Cylinder: {radius: 0.04, length: 0.12, segments: 10} }
+      "cap_{s}" : ShipCopper { Position: {tx, 1.77, 0}; Sphere: {radius: 0.05, segments: 10} }
+    }
+  }
+
+  template RadiatorSlat {
+    plate : ShipHullDark { Position: {0, 0, 0}; Box: {3.3, 0.05, 2.5} }
+    for j in 0..4 {
+      "pipe_a_{j}" : ShipRadiant { Position: {0.05, 0.03, -0.9 + j * 0.6}; Box: {3.2, 0.014, 0.035} }
+      "pipe_b_{j}" : ShipRadiant { Position: {0.05, -0.03, -0.9 + j * 0.6}; Box: {3.2, 0.014, 0.035} }
+    }
+    rim_a : ShipTrim { Position: {0, 0, -1.25}; Box: {3.34, 0.09, 0.05} }
+    rim_b : ShipTrim { Position: {0, 0, 1.25}; Box: {3.34, 0.09, 0.05} }
+    tip : ShipTrim { Position: {1.67, 0, 0}; Box: {0.05, 0.09, 2.54} }
+    header : ShipCopper { Position: {-1.72, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.075, length: 2.5, segments: 12, smooth: true} }
+  }
+
+  template RadiatorArray {
+    for i in 0..4 {
+      RadiatorSlat "slat_{i}"() { Position: {0, CH / 2, -1.35 + i * 0.9}; Rotation: {1.25, 0, 0} }
+    }
+    for c in 0..2 {
+      const pz = c == 0 ? -1.89 : 1.89
+      "post_{c}" : ShipHullDark { Position: {-1.89, CH / 2, pz}; Box: {0.2, CH, 0.2} }
+      "cap_{c}" : ShipHazard { Position: {-1.89, CH - 0.02, pz}; Box: {0.22, 0.06, 0.22} }
+      "skid_{c}" : ShipHullDark { Position: {0, 0.08, pz}; Box: {3.8, 0.16, 0.16} }
+    }
+    sill : ShipHullDark { Position: {-1.89, 0.1, 0}; Box: {0.2, 0.2, 3.6} }
+    lintel : ShipHullDark { Position: {-1.89, CH - 0.1, 0}; Box: {0.2, 0.2, 3.6} }
+    supply : ShipCopper { Position: {-1.7, 0.32, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.09, length: 4, segments: 14, smooth: true} }
+    return : ShipCopper { Position: {-1.7, CH - 0.32, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.09, length: 4, segments: 14, smooth: true} }
+    pump : ShipTeal { Position: {-1.62, 0.62, 0}; RoundedBox: {0.3, 0.4, 0.5, 0.05, segments: 2} }
+    pump_led : ShipGreenLight { Position: {-1.465, 0.7, 0}; Box: {0.01, 0.05, 0.18} }
+    for r in 0..2 {
+      const ry = r == 0 ? 0.12 : CH - 0.12
+      "truss_{r}" : ShipSteel { Position: {1.78, ry, 0}; Box: {0.08, 0.08, 3.9} }
+    }
+    for c in 0..2 {
+      "strut_{c}" : ShipSteel { Position: {1.78, CH / 2, c == 0 ? -1.89 : 1.89}; Box: {0.08, CH - 0.2, 0.08} }
+      "lamp_{c}" : ShipBeaconRed { Position: {1.78, CH, c == 0 ? -1.89 : 1.89}; Sphere: {radius: 0.07, segments: 10} }
+    }
+    glow { Position: {0.2, CH / 2, 0}; PointLight: {intensity: 1.5, range: 3.5}; Rgb: {255, 130, 60} }
+  }
+
+  template RadiatorMount {
+    prop side: i32 = 2
+
+    if side == 3 {
+      turn { Rotation: {0, PI, 0}; RadiatorArray array() }
+    } else if side == 5 {
+      turn { Rotation: {0, 0 - HALF_PI, 0}; RadiatorArray array() }
+    } else if side == 4 {
+      turn { Rotation: {0, HALF_PI, 0}; RadiatorArray array() }
+    } else {
+      RadiatorArray array()
+    }
+  }
+
+  template PowerPlant {
+    prop pz: bool = true
+    prop nz: bool = true
+    prop roof: bool = false
+
+    RackFrame frame(pz: pz, nz: nz)
+    deck : ShipHullDark { Position: {0, 0.19, 0}; Box: {3.56, 0.06, 3.56} }
+    for i in 0..9 {
+      "grate_{i}" : ShipRecess { Position: {0, 0.225, -1.6 + i * 0.4}; Box: {3.4, 0.012, 0.04} }
+    }
+    ring : ShipHazard { Position: {0, 0.228, 0}; Tube: {radius: 1.56, thickness: 0.14, length: 0.01, segments: 48} }
+    if roof {
+      lid : ShipHullDark { Position: {0, CH - 0.05, 0}; Box: {3.56, 0.08, 3.56} }
+    }
+
+    FusionReactor reactor() { Position: {0, 0.22, 0} }
+
+    for c in 0..4 {
+      const cx = c % 2 == 0 ? -1.46 : 1.46
+      const cz = c < 2 ? -1.46 : 1.46
+      Capacitor "cap_{c}"() { Position: {cx, 0.22, cz} }
+    }
+
+    for s in 0..2 {
+      const sx = s == 0 ? -1.62 : 1.62
+      "sleeve_{s}" : ShipTrim { Position: {sx, 0.36, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.1, length: 4, segments: 14, smooth: true} }
+      "conduit_{s}" : ShipFusion { Position: {sx, 0.465, 0}; Box: {0.05, 0.02, 4} }
+      for i in 0..3 {
+        "clip_{s}_{i}" : ShipSteel { Position: {sx, 0.36, -1.3 + i * 1.3}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.13, length: 0.1, segments: 14, smooth: true} }
+      }
+      "tray_{s}" : ShipHullDark { Position: {sx, CH - 0.32, 0}; Box: {0.3, 0.03, 4} }
+      "cable_a_{s}" : ShipRed { Position: {sx - 0.08, CH - 0.28, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 8} }
+      "cable_b_{s}" : ShipYellow { Position: {sx, CH - 0.28, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 8} }
+      "cable_c_{s}" : ShipStripe { Position: {sx + 0.08, CH - 0.28, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 8} }
+    }
+
+    tag : ShipFusion { Position: {-1.89, 2.3, 0}; Box: {0.04, 0.05, 0.6} }
+    tag_b : ShipFusion { Position: {1.89, 2.3, 0}; Box: {0.04, 0.05, 0.6} }
+  }
+
   template BiomeTree {
     prop size: f32 = 1
     prop dark: bool = false
@@ -965,9 +1098,7 @@ assets {
       }
     } else {
       Sides sides(k: k, px: px, nx: nx, pz: pz, nz: nz)
-      if k == K_ENG && py {
-        EngVent vent() { Position: {0, CH, 0} }
-      } else if k == K_HAB && py {
+      if k == K_HAB && py {
         HabTop top() { Position: {0, CH, 0} }
       } else if k == K_OBS && py {
         ObsTop top() { Position: {0, CH, 0} }

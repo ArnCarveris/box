@@ -1,17 +1,3 @@
-// Shipyard: design a modular spaceship on a 5 x 9 x 3 grid of cells, written entirely in flecs
-// script.
-//
-//   bake3 run apps/boxrun --local-env -- etc/scenes/shipyard.flecs
-//
-// Pick a module from the panel (or press 1 to 8) and click a cell of the glowing deck to build it.
-// Every module has a placement rule: a cockpit needs a module behind it and a clear view ahead, an
-// engine a module in front of it and a clear exhaust behind, weapons the top or side of a boxy
-// module, fuel tanks an engine or another tank, habitats life support, and engineering keeps its
-// distance from the crew. Modules merge into one hull, and rooms of one kind into one space. Tab
-// switches between the exterior and the interior, Q and E (or Page Up and Page Down) pick the deck
-// to work on, X removes modules and Escape puts the tool away. The right mouse button turns the
-// view, the wheel zooms and Home resets it.
-
 include shipyard/state
 include shipyard/materials
 include shipyard/hull
@@ -47,7 +33,6 @@ $ {
   Scene: {reflections: true, environment: true, blend_modes: true, transmission: true,
     clear_coat: true, sheen: true, diffuse_transmission: true, fresnel: true}
   AmbientLight: {sky: {120, 140, 180}, ground: {50, 60, 84}, intensity: 0.4}
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 10, environment: assets.yard_stars}
 }
 
 window { Surface: {width: 1600, height: 1000, vsync: true} }
