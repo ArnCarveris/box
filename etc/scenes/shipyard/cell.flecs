@@ -70,7 +70,12 @@ assets {
     } else if k == K_ENGINE {
       EngineMount mount(seed: seed, mounted: kind_at(x, y, z + 1) != 0)
     } else if k == K_HULL && hull_shape(x, y, z) != H_BLOCK {
-      HullFairing fairing(shape: hull_shape(x, y, z), sx: hull_sx(x, y, z), sy: hull_sy(x, y, z), sz: hull_sz(x, y, z))
+      const shape = hull_shape(x, y, z)
+      const hip = shape == H_HIP
+      HullFairing fairing(
+        shape: shape, sx: hip ? hull_dx(x, y, z) : hull_sx(x, y, z), sy: hull_sy(x, y, z),
+        sz: hip ? hull_dz(x, y, z) : hull_sz(x, y, z)
+      )
     } else if inner && k != K_HULL {
       ModuleInterior room(
         k: k, px: !room_at(x + 1, y, z), nx: !room_at(x - 1, y, z), pz: !room_at(x, y, z + 1), nz: !room_at(x, y, z - 1),
@@ -122,6 +127,7 @@ assets {
     const hovered = hover == idx
     const t = tool
     const placing = t > 0 && t != T_REMOVE
+    const swap = placing && k != t
     const fault = status[idx]
 
 
@@ -138,6 +144,8 @@ assets {
         Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
         if hovered && t == T_REMOVE {
           Tint: {255, 70, 50, 150}
+        } else if hovered && swap {
+          Tint: {90, 255, 160, 120}
         }
         ModuleView view(k: k, x: x, y: y, z: z, inner: interior, seed: idx)
       }
@@ -166,22 +174,16 @@ assets {
     }
 
     if hovered {
-      const code = placing && k == 0 ? place_code(idx, t) : 0
-      const ok = placing && k == 0 && code == 0
-      const color: Rgb = match placing && k == 0 {
-        true: match ok { true: {90, 255, 140}; _: {255, 70, 50} }
+      const color: Rgb = match swap {
+        true: {90, 255, 140}
         _: match t == T_REMOVE && k != 0 { true: {255, 110, 60}; _: {140, 220, 255} }
       }
       CellCursor cursor(color: color)
 
       if placing && k == 0 {
         ghost {
-          Opacity: {ok ? 0.55 : 0.32}
-          if ok {
-            Tint: {90, 255, 160, 120}
-          } else {
-            Tint: {255, 60, 40, 150}
-          }
+          Opacity: {0.55}
+          Tint: {90, 255, 160, 120}
           SpatialIgnore
           NoShadow
           ModuleView view(k: t, x: x, y: y, z: z, inner: interior, seed: idx)
