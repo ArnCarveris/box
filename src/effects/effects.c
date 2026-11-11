@@ -162,6 +162,31 @@ static void box_smaa_ctor(
     }
 }
 
+/** Construct Vignette values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_vignette_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Vignette *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Vignette){
+            .intensity = 0.3f,
+            .radius = 0.75f,
+            .smoothness = 0.45f,
+            .roundness = 1.0f,
+            .center = {0.5f, 0.5f}
+        };
+    }
+}
+
 void BoxEffectsImport(
     ecs_world_t *world)
 {
@@ -177,6 +202,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, Tonemap);
     ECS_META_COMPONENT(world, ColorGrading);
     ECS_META_COMPONENT(world, Smaa);
+    ECS_META_COMPONENT(world, Vignette);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
     ecs_set_hooks(world, Gtao, { .ctor = box_gtao_ctor });
@@ -185,4 +211,5 @@ void BoxEffectsImport(
     ecs_set_hooks(world, Tonemap, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ColorGrading, { .ctor = box_grading_ctor });
     ecs_set_hooks(world, Smaa, { .ctor = box_smaa_ctor });
+    ecs_set_hooks(world, Vignette, { .ctor = box_vignette_ctor });
 }

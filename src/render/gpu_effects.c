@@ -1715,6 +1715,45 @@ static bool box_gpu_fx_grading(
     });
 }
 
+/** Record a vignette pass.
+ *
+ * @param gpu The backend
+ * @param ctx The chain
+ * @param e The pass
+ * @return Whether the pass was recorded
+ */
+static bool box_gpu_fx_vignette(
+    box_gpu_t *gpu,
+    const box_gpu_fx_ctx_t *ctx,
+    const box_render_effect_t *e)
+{
+    const Vignette *v = &e->vignette;
+    box_gpu_vignette_uniforms_t u;
+    box_gpu_fx_state_t *s = box_gpu_fx_state(gpu, ctx, e->entity, (int32_t)e->kind);
+    ecs_os_memset_t(&u, 0, box_gpu_vignette_uniforms_t);
+    u.params[0] = v->intensity;
+    u.params[1] = v->radius;
+    u.params[2] = v->smoothness;
+    u.params[3] = v->roundness;
+    u.shape[0] = v->center[0];
+    u.shape[1] = v->center[1];
+    u.shape[2] = ctx->ft->height > 0 ? (float)ctx->ft->width / (float)ctx->ft->height : 1.0f;
+    u.color[0] = box_gpu_fx_linear(v->color.r);
+    u.color[1] = box_gpu_fx_linear(v->color.g);
+    u.color[2] = box_gpu_fx_linear(v->color.b);
+    box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
+
+    return box_gpu_fx_draw(gpu, ctx, &(box_gpu_fx_pass_t){
+        .shader = BOX_RENDER_SHADER_VIGNETTE,
+        .entry = "fs",
+        .input = ctx->input,
+        .uniforms = s->uniforms,
+        .output = ctx->output,
+        .format = ctx->format,
+        .blend = ctx->blend
+    });
+}
+
 /** Record one effect pass of a chain.
  *
  * @param gpu The backend
@@ -1744,6 +1783,9 @@ static bool box_gpu_fx_effect(
         break;
     case BOX_RENDER_EFFECT_GRADING:
         result = box_gpu_fx_grading(gpu, ctx, e);
+        break;
+    case BOX_RENDER_EFFECT_VIGNETTE:
+        result = box_gpu_fx_vignette(gpu, ctx, e);
         break;
     default:
         break;

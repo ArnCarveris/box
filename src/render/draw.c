@@ -603,8 +603,8 @@ done:
  * uses a material feature its scene enables. Alpha tested, blended and TextureBlend shapes
  * without those draw with the mesh shader.
  *
- * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy
- * or DiffuseTransmission; only a scene with some of those off checks which.
+ * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy,
+ * DiffuseTransmission or Fresnel; only a scene with some of those off checks which.
  *
  * @param world The world
  * @param d The state
@@ -619,7 +619,8 @@ static bool box_draws_extended(
     const box_draw_key_t *key)
 {
     const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
-        BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION;
+        BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION |
+        BOX_RENDER_FEATURE_FRESNEL;
     uint32_t f = key->features;
     bool result = key->transmissive;
     const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
@@ -642,7 +643,8 @@ static bool box_draws_extended(
         ((f & BOX_RENDER_FEATURE_SHEEN) && ecs_get(world, e, Sheen)) ||
         ((f & BOX_RENDER_FEATURE_CLEAR_COAT) && ecs_get(world, e, ClearCoat)) ||
         ((f & BOX_RENDER_FEATURE_ANISOTROPY) && ecs_get(world, e, SpecularAnisotropy)) ||
-        ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) && ecs_get(world, e, DiffuseTransmission));
+        ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) && ecs_get(world, e, DiffuseTransmission)) ||
+        ((f & BOX_RENDER_FEATURE_FRESNEL) && ecs_get(world, e, Fresnel));
 done:
     return result;
 }
@@ -1330,6 +1332,13 @@ static void box_draws_queries(
             },
             {
                 .id = ecs_id(DiffuseTransmission),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsIsA,
+                .inout = EcsInOutNone,
+                .oper = EcsOr
+            },
+            {
+                .id = ecs_id(Fresnel),
                 .src.id = EcsSelf | EcsUp,
                 .trav = EcsIsA,
                 .inout = EcsInOutNone

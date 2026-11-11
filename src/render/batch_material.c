@@ -307,6 +307,47 @@ static uint32_t box_draws_diffuse_transmission_pack(
     return result;
 }
 
+/** Pack a Fresnel into the fresnel words of a material record: the color in linear light as
+ * unorm16, the strength and power when positive and finite, the bias when finite and the
+ * opacity clamped to 0..1; all 0 without one.
+ *
+ * @param out The record
+ * @param fresnel The component, NULL for none
+ */
+static void box_draws_fresnel_pack(
+    box_render_material_t *out,
+    const Fresnel *fresnel)
+{
+    out->fresnel_color[0] = 0u;
+    out->fresnel_color[1] = 0u;
+    out->fresnel_strength = 0.0f;
+    out->fresnel_power = 0.0f;
+    out->fresnel_bias = 0.0f;
+    out->fresnel_opacity = 0.0f;
+    if (fresnel) {
+        out->fresnel_color[0] = box_draws_unorm16(box_draws_linear(fresnel->color.r)) |
+            (box_draws_unorm16(box_draws_linear(fresnel->color.g)) << 16);
+        out->fresnel_color[1] = box_draws_unorm16(box_draws_linear(fresnel->color.b));
+        out->fresnel_strength = isfinite(fresnel->strength) && fresnel->strength > 0.0f
+            ? fresnel->strength : 0.0f;
+        out->fresnel_power = isfinite(fresnel->power) && fresnel->power > 0.0f
+            ? fresnel->power : 0.0f;
+        out->fresnel_bias = isfinite(fresnel->bias) ? fresnel->bias : 0.0f;
+        out->fresnel_opacity = isfinite(fresnel->opacity)
+            ? glm_clamp(fresnel->opacity, 0.0f, 1.0f) : 0.0f;
+    }
+}
+
+float box_draws_fresnel_factor(
+    float ndv,
+    float power,
+    float bias)
+{
+    float x = glm_max(1.0f - glm_clamp(ndv, 0.0f, 1.0f), 1e-6f);
+
+    return glm_clamp(bias + powf(x, power), 0.0f, 1.0f);
+}
+
 /** Wrap one axis of a scroll offset to 0..2.
  *
  * @param velocity Texture widths per second
@@ -384,8 +425,7 @@ void box_draws_material_pack(
         out->normal_offset[1] = 0.0f;
     }
 
-    out->pad[0] = 0.0f;
-    out->pad[1] = 0.0f;
+    box_draws_fresnel_pack(out, material->fresnel);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
     out->thickness_factor = transmission ? glm_max(transmission->thickness_factor, 0.0f) : 0.0f;

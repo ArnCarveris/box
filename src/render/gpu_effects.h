@@ -238,6 +238,13 @@ typedef struct box_gpu_grading_uniforms_t {
     float inv_gamma[4];             /**< 1 / gamma, 1 when lift or gamma change the color */
 } box_gpu_grading_uniforms_t;
 
+/** Uniforms of the vignette pass, matching Vignette in etc/shaders/vignette.wgsl */
+typedef struct box_gpu_vignette_uniforms_t {
+    float params[4];                /**< Intensity, radius, smoothness, roundness */
+    float shape[4];                 /**< Center x and y, width over height of the image, unused */
+    float color[4];                 /**< Linear color of the vignette, unused */
+} box_gpu_vignette_uniforms_t;
+
 /** Uniforms of the fog pass, matching Fog in etc/shaders/fog.wgsl */
 typedef struct box_gpu_fog_uniforms_t {
     mat4 inv_view_proj;             /**< Inverse of the projection times the view matrix */

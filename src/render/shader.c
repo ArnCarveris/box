@@ -925,6 +925,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_SMAA, true);
     box_shader_builtin(world, state, builtin, "grading", "etc/shaders/grading.wgsl",
         BOX_RENDER_SHADER_GRADING, true);
+    box_shader_builtin(world, state, builtin, "vignette", "etc/shaders/vignette.wgsl",
+        BOX_RENDER_SHADER_VIGNETTE, true);
     box_shader_builtin(world, state, builtin, "gtao", "etc/shaders/gtao.wgsl",
         BOX_RENDER_SHADER_GTAO, true);
     box_shader_builtin(world, state, builtin, "fog", "etc/shaders/fog.wgsl",

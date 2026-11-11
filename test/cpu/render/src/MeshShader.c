@@ -1166,3 +1166,118 @@ void MeshShader_texture_blend_triplanar_draws_with_extended(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MeshShader_fresnel_draws_with_extended(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_entity_t plain = ecs_new(world);
+    ecs_set(world, plain, Position, {0, 0, 0});
+    ecs_set(world, plain, Box, {1, 1, 1});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {2, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_add(world, shape, Fresnel);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    const box_draw_batch_t *batch = box_draws_batch(d, shape_slot->batch);
+    test_int(batch->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    test_assert(batch->key.features & BOX_RENDER_FEATURE_FRESNEL);
+    const DrawSlot *plain_slot = ecs_get(world, plain, DrawSlot);
+    test_assert(plain_slot != NULL && plain_slot->batch >= 0);
+    test_int(box_draws_batch(d, plain_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MeshShader_fresnel_off_draws_with_mesh_shader(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, Fresnel, {.color = {255, 0, 0}, .strength = 1, .power = 5});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    test_int(box_draws_batch(d, shape_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MeshShader_add_fresnel_moves_to_extended(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.sheen = true, .fresnel = true});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    test_int(box_draws_batch(d, shape_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    ecs_add(world, shape, Fresnel);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    test_int(box_draws_batch(d, shape_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_remove(world, shape, Fresnel);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    test_int(box_draws_batch(d, shape_slot->batch)->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

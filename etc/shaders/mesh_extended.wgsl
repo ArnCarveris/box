@@ -1,6 +1,6 @@
 // Forward pass of the meshes the mesh shader does not draw (box_draws_extended): transmissive
-// (Transmission), with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy or
-// DiffuseTransmission, with or without a TextureBlend.
+// (Transmission), with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy,
+// DiffuseTransmission or Fresnel, with or without a TextureBlend.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
@@ -15,6 +15,7 @@ override material_anisotropy: bool = true;
 override material_clear_coat: bool = true;
 override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
+override material_fresnel: bool = true;
 override transmissive: bool = false;
 
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
@@ -585,6 +586,25 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     return vec4f(final_color, 1.0);
 }
 
+// The artistic rim of a Fresnel (not the physical term of the lobes): its color times its
+// strength times fresnel_factor of the shading normal, which back faces flip, adds to the
+// emission, untinted; its opacity times the factor adds to the alpha of a blended draw. A
+// material without one has a zero record and adds nothing.
+fn fresnel_rim(f: VertexOut, shaded: Surface, v: vec3f) -> Surface {
+    var s = shaded;
+    let strength = f.fresnel.x;
+    let opacity = f.fresnel.w;
+    if (strength > 0.0 || opacity > 0.0) {
+        let rim = fresnel_factor(dot(s.normal, v), f.fresnel.y, f.fresnel.z);
+        let color = vec3f(unpack2x16unorm(f.fresnel_color.x), unpack2x16unorm(f.fresnel_color.y).x);
+        s.emissive += color * (strength * rim);
+        if (kind.blend_mode != 0u) {
+            s.alpha = min(s.alpha + opacity * rim, 1.0);
+        }
+    }
+    return s;
+}
+
 // Opaque and transmissive fragments share one call of shade_split, as D3D compilers inline every
 // call.
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
@@ -594,6 +614,9 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     }
 
     let v = normalize(view.camera.xyz - f.world);
+    if (material_fresnel) {
+        s = fresnel_rim(f, s, v);
+    }
     let reflected = shade_split(s, v, f.world);
     if (transmissive) {
         return transmission(f, s, v, reflected);
