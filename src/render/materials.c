@@ -912,11 +912,12 @@ void box_draws_materials_observers(
 
     for (i = 0; i < 15; i ++) {
         bool keyed = box_materials_keyed(components[i]) || box_materials_slotted(components[i]);
+        bool owned = components[i] == ecs_id(PlanarReflection);
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{
                 .id = components[i],
-                .src.id = EcsSelf | EcsUp,
-                .trav = EcsIsA
+                .src.id = owned ? EcsSelf : EcsSelf | EcsUp,
+                .trav = owned ? 0 : EcsIsA
             }},
             .query.flags = EcsQueryMatchPrefab,
             .events = { EcsOnSet, EcsOnRemove, keyed ? EcsOnAdd : 0 } },
