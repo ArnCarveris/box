@@ -381,11 +381,16 @@ void PlanetAtmosphereShell_outside_top_unchanged(void) {
     stbi_image_free(base);
 }
 
-/** The limb of the night side, away from the sun, stays dark. */
+/** The limb of the night side, away from the sun, stays dark. The sun lights the planet from +X,
+ * so the whole ray of the -X limb runs through the shadow of the planet. */
 void PlanetAtmosphereShell_night_limb_dark(void) {
     // planet_atmosphere/shell
     int32_t day[2], night[2];
-    unsigned char *px = pa_day(true, "planet_night_limb.png");
+    ecs_world_t *world = pa_world(0, -90);
+    pa_view(world, 3, 0);
+    pa_atmosphere(world, pa_planet(world, 0, 0));
+    unsigned char *px = pa_render(world, "planet_night_limb.png");
+    ecs_fini(world);
     pa_limb(3, 0, 0, 1, 0, PA_LIMB, day);
     pa_limb(3, 0, 0, -1, 0, PA_LIMB, night);
     const unsigned char *d = pa_px(px, day[0], day[1]);

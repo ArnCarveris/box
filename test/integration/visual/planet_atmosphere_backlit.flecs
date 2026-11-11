@@ -10,8 +10,8 @@ using box.atmosphere
 // the dark disk, brightest on the side of the sun.
 
 camera {
-  Position: {0, 0, 3.6}
-  Camera: {fov: 60}
+  Position: {0, 0, 8}
+  Camera: {fov: 30}
 }
 
 main_view {
@@ -19,7 +19,7 @@ main_view {
 }
 
 sun {
-  Rotation: {0.12, 0.15, 0}
+  Rotation: {0.25, 0.3, 0}
   DirectionalLight: {intensity: 6}
   Rgb: {255, 255, 255}
 }
@@ -29,5 +29,5 @@ planet {
   Sphere: {segments: 96, smooth: true, radius: 1}
   Rgb: {90, 110, 80}
   PbrMaterial: {roughness: 0.9}
-  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 2000, thickness: 100}
+  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 1000, thickness: 100}
 }
