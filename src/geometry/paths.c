@@ -80,6 +80,14 @@ static void box_path_cubic(const float *p0, const float *p1, const float *p2,
     }
 }
 
+int box_path_steps(
+    int32_t value)
+{
+    int result = value > BOX_PATH_MAX_STEPS ? BOX_PATH_MAX_STEPS : value;
+
+    return result <= 0 ? BOX_PATH_STEPS : result;
+}
+
 #define BOX_PATH_IMPLEMENT(D, POINT, SEGMENT, PATH) \
 static bool box_path##D##_valid(const PATH *path) \
 { \
@@ -90,7 +98,7 @@ static bool box_path##D##_valid(const PATH *path) \
     if (count <= 0) { \
         return false; \
     } \
-    if (count > (INT_MAX / (int)sizeof(POINT) - 1) / 16 - 1) { \
+    if (count > (INT_MAX / (int)sizeof(POINT) - 1) / BOX_PATH_MAX_STEPS - 1) { \
         ecs_err("path segment capacity exceeded"); \
         return false; \
     } \
@@ -158,18 +166,20 @@ bool box_path##D##_evaluate(const PATH *path, float t, POINT out) \
     ecs_os_memcpy(out, point, sizeof(POINT)); \
     return box_path_point(out, D); \
 } \
-bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec_t *points) \
+bool box_path##D##_sample_steps(const ecs_world_t *world, ecs_entity_t entity, int steps, \
+    ecs_vec_t *points) \
 { \
     const PATH *path = entity && ecs_is_alive(world, entity) ? \
         ecs_get(world, entity, PATH) : NULL; \
     if (!box_path##D##_valid(path)) { \
         return false; \
     } \
+    steps = box_path_steps(steps); \
     int total = box_path##D##_count(path); \
     int length = 1; \
     for (int i = 0; i < total; i ++) { \
         vec3 cubic[4]; \
-        length += box_path##D##_cubic(path, i, cubic) == PathLine ? 1 : 16; \
+        length += box_path##D##_cubic(path, i, cubic) == PathLine ? 1 : steps; \
     } \
     if ((int64_t)ecs_vec_count(points) + length > INT_MAX / (int)sizeof(POINT)) { \
         ecs_err("path sample allocation exceeds capacity"); \
@@ -180,14 +190,14 @@ bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec
     ecs_os_memcpy(*first, path->start, sizeof(POINT)); \
     for (int i = 0; i < total; i ++) { \
         vec3 cubic[4], point; \
-        int steps = box_path##D##_cubic(path, i, cubic) == PathLine ? 1 : 16; \
-        for (int j = 1; j <= steps; j ++) { \
+        int count = box_path##D##_cubic(path, i, cubic) == PathLine ? 1 : steps; \
+        for (int j = 1; j <= count; j ++) { \
             POINT *sample = ecs_vec_append_t(NULL, points, POINT); \
-            if (j == steps) { \
+            if (j == count) { \
                 glm_vec3_copy(cubic[3], point); \
             } else { \
                 box_curve_cubic3(cubic[0], cubic[1], cubic[2], cubic[3], \
-                    (float)j / steps, point); \
+                    (float)j / count, point); \
             } \
             ecs_os_memcpy(*sample, point, sizeof(POINT)); \
         } \
@@ -196,6 +206,10 @@ bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec
         ecs_vec_remove_last(points); \
     } \
     return true; \
+} \
+bool box_path##D##_sample(const ecs_world_t *world, ecs_entity_t entity, ecs_vec_t *points) \
+{ \
+    return box_path##D##_sample_steps(world, entity, BOX_PATH_STEPS, points); \
 }
 
 BOX_PATH_IMPLEMENT(2, vec2, PathSegment2D, Path2D)

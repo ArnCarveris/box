@@ -71,12 +71,14 @@ static void box_path2_tangent(
 /** Flag the samples of a closed Path2D that are corner anchors: between a Line and a curve
  * segment, or between two curve segments whose tangents do not line up.
  *
- * @param path The path, sampled by box_path2_sample
+ * @param path The path, sampled by box_path2_sample_steps
+ * @param steps Steps of each curve segment of the samples
  * @param count Number of samples of the path
  * @param flags Receives 1 for each corner sample, 0 otherwise
  */
 static void box_path2_corners(
     const Path2D *path,
+    int steps,
     int count,
     int *flags)
 {
@@ -97,14 +99,15 @@ static void box_path2_corners(
 
         box_path2_tangent(cubic, true, in);
 
-        index += kind == PathLine ? 1 : 16;
+        index += kind == PathLine ? 1 : steps;
         previous = kind;
     }
 }
 
 static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
-    ecs_entity_t contour, ecs_vec_t *data, int *outer, ecs_vec_t *corners)
+    ecs_entity_t contour, int steps, ecs_vec_t *data, int *outer, ecs_vec_t *corners)
 {
+    steps = box_path_steps(steps);
     const Profile2D *profile = entity && ecs_is_alive(world, entity) ?
         ecs_get(world, entity, Profile2D) : NULL;
     if ((!profile && !contour) || (entity && contour)) {
@@ -123,7 +126,7 @@ static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
             return false;
         }
         ecs_vec_t samples = {0};
-        if (!box_path2_sample(world, path_entity, &samples)) {
+        if (!box_path2_sample_steps(world, path_entity, steps, &samples)) {
             ecs_vec_fini_t(NULL, &samples, vec2);
             return false;
         }
@@ -151,7 +154,7 @@ static bool box_profile_resolve(const ecs_world_t *world, ecs_entity_t entity,
                 return false;
             }
             if (profile) {
-                box_path2_corners(path, count, flags);
+                box_path2_corners(path, steps, count, flags);
             }
         }
         for (int i = 0; i < count; i ++) {
@@ -553,6 +556,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
         end = s->cap_end;
     } else {
         ecs_entity_t entity = 0, contour = 0;
+        int steps = BOX_PATH_STEPS;
         const Loft *loft = kind == 2 ? value : NULL;
         const LoftSection *sections = loft ? ecs_vec_first(&loft->sections) : NULL;
         int section_count = loft ? ecs_vec_count(&loft->sections) : 0;
@@ -560,6 +564,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
             const Sweep *s = value;
             entity = s->profile;
             contour = s->contour;
+            steps = s->segments;
             if (!box_finite(s->scale, 2) || !isfinite(s->taper) || !isfinite(s->roll) ||
                 !box_path_pack(world, s->path, true, &data, &offset, &segments))
             {
@@ -602,6 +607,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
                 goto done;
             }
             entity = sections[0].profile;
+            steps = loft->segments;
             start = loft->cap_start;
             end = loft->cap_end;
             d->p[0][2] = section_count;
@@ -615,7 +621,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
             start = s->cap_start;
             end = s->cap_end;
         }
-        if (!box_profile_resolve(world, entity, contour, &profile, &outer, &corners)) {
+        if (!box_profile_resolve(world, entity, contour, steps, &profile, &outer, &corners)) {
             goto done;
         }
         count = ecs_vec_count(&profile);
@@ -654,7 +660,7 @@ static bool box_resolve(const ecs_world_t *world, const void *value, int kind,
                 const LoftSection *s = &sections[section];
                 if (!box_finite(s->offset, 3) || !box_finite(s->rotation, 3) ||
                     !box_finite(s->scale, 2) ||
-                    !box_profile_resolve(world, s->profile, 0, &next, &next_outer, NULL))
+                    !box_profile_resolve(world, s->profile, 0, steps, &next, &next_outer, NULL))
                 {
                     ecs_vec_fini_t(NULL, &next, vec4);
                     goto done;
@@ -1285,7 +1291,8 @@ static void box_profile_bevel_generate(
     float depth = d.p[1][1];
     int regions = (int)d.p[3][3];
     int steps = bevel.steps;
-    if (!box_profile_resolve(world, v->host.profile, 0, &profile, &outer, &corners) ||
+    if (!box_profile_resolve(world, v->host.profile, 0, BOX_PATH_STEPS, &profile, &outer,
+        &corners) ||
         ecs_vec_count(&profile) != count || outer != (int)d.p[5][2] ||
         !box_profile_normals(ecs_vec_first(&profile), ecs_vec_first(&corners), count, &normals))
     {

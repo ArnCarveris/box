@@ -337,3 +337,19 @@ void Validation_infinite_bevel_rims(void)
     test_assert(ecs_get(world, entity, ShapeMesh)->mesh != 0);
     ecs_fini(world);
 }
+
+void Validation_profile_segments(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_int(ecs_script_run(world, "profiles",
+        "using box.geometry\n"
+        "lens { Path2D: {start: {1,0}, segments: ["
+        "{kind: CubicBezier, end: {-1,0}, control1: {1,1.333}, control2: {-1,1.333}},"
+        "{kind: CubicBezier, end: {1,0}, control1: {-1,-1.333}, control2: {1,-1.333}}], closed: true}}\n"
+        "profile { Profile2D: {outer: lens}}\n"
+        "subject { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], segments: 1}}\n",
+        NULL), 0);
+    Validation_logs(world, "invalid Loft on subject: closed path needs at least three distinct points");
+    ecs_fini(world);
+}

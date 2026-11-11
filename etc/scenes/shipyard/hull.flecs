@@ -40,7 +40,7 @@ assets {
     const fx = sx * (2 - RAD / 2)
     const fy = sy > 0 ? CH - RAD / 2 : RAD / 2
 
-    rod : ShipHull { Position: {ex, ey, (z0 + z1) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: RAD, length: z1 - z0, segments: 20, smooth: true} }
+    rod : ShipHull { Position: {ex, ey, (z0 + z1) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: RAD, length: z1 - z0, segments: 8, smooth: true} }
     if f0 {
       fill_a : ShipHull { Position: {fx, fy, -2 + 0.015}; Box: {RAD, RAD, 0.03} }
     }
@@ -62,7 +62,7 @@ assets {
     const fy = sy > 0 ? CH - RAD / 2 : RAD / 2
     const fz = sz * (2 - RAD / 2)
 
-    rod : ShipHull { Position: {(x0 + x1) / 2, ey, ez}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: RAD, length: x1 - x0, segments: 20, smooth: true} }
+    rod : ShipHull { Position: {(x0 + x1) / 2, ey, ez}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: RAD, length: x1 - x0, segments: 8, smooth: true} }
     if f0 {
       fill_a : ShipHull { Position: {-2 + 0.015, fy, fz}; Box: {0.03, RAD, RAD} }
     }
@@ -84,7 +84,7 @@ assets {
     const fx = sx * (2 - RAD / 2)
     const fz = sz * (2 - RAD / 2)
 
-    rod : ShipHull { Position: {ex, (y0 + y1) / 2, ez}; Cylinder: {radius: RAD, length: y1 - y0, segments: 20, smooth: true} }
+    rod : ShipHull { Position: {ex, (y0 + y1) / 2, ez}; Cylinder: {radius: RAD, length: y1 - y0, segments: 8, smooth: true} }
     if f0 {
       fill_a : ShipHull { Position: {fx, 0.015, fz}; Box: {RAD, 0.03, RAD} }
     }
@@ -98,7 +98,7 @@ assets {
     prop sy: f32 = 1
     prop sz: f32 = 1
 
-    ball : ShipHull { Position: {sx * (2 - RAD), sy > 0 ? CH - RAD : RAD, sz * (2 - RAD)}; Sphere: {radius: RAD, segments: 20, smooth: true} }
+    ball : ShipHull { Position: {sx * (2 - RAD), sy > 0 ? CH - RAD : RAD, sz * (2 - RAD)}; Sphere: {radius: RAD, segments: 4, smooth: true} }
   }
 
   // The skin of one cell: a plate on every face that no visible module covers, rounded where two
@@ -240,9 +240,9 @@ assets {
       Rotation: {0, 0 - PI / 4, 0}
       for s in 0..2 {
         const ey = s == 0 ? RAD : CH - RAD
-        "rod_{s}" : ShipHull { Position: {0 - RAD, ey, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: RAD, length: len, segments: 20, smooth: true} }
-        "ball_a_{s}" : ShipHull { Position: {0 - RAD, ey, len / 2}; Sphere: {radius: RAD, segments: 20, smooth: true} }
-        "ball_b_{s}" : ShipHull { Position: {0 - RAD, ey, 0 - len / 2}; Sphere: {radius: RAD, segments: 20, smooth: true} }
+        "rod_{s}" : ShipHull { Position: {0 - RAD, ey, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: RAD, length: len, segments: 8, smooth: true} }
+        "ball_a_{s}" : ShipHull { Position: {0 - RAD, ey, len / 2}; Sphere: {radius: RAD, segments: 4, smooth: true} }
+        "ball_b_{s}" : ShipHull { Position: {0 - RAD, ey, 0 - len / 2}; Sphere: {radius: RAD, segments: 4, smooth: true} }
       }
       band : ShipStripe { Position: {0.006, 1.98, 0}; Box: {0.012, 0.22, 4 * 1.41421} }
       line : ShipTrim { Position: {0.006, 1.74, 0}; Box: {0.012, 0.05, 4 * 1.41421} }
