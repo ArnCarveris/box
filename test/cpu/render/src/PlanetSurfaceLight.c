@@ -299,6 +299,7 @@ void PlanetSurfaceLight_added_planet_binds(void) {
     ecs_world_t *world = world_new(&null);
     ecs_entity_t scene = scene_new(world, true);
     ecs_entity_t body = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, body, Position, {0, 0, 0});
     ecs_set(world, body, Sphere, {.radius = 1, .segments = 16});
     ecs_entity_t clouds = shape_new(world, body, 0);
     frame(world);

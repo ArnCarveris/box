@@ -8,11 +8,13 @@ using box.atmosphere
 
 // An Earth sized planet lit from the side with Scene.planet_light: the sunlight reaching the
 // ground and the cloud sphere through the atmosphere turns the terminator orange and red, while
-// the subsolar side stays white and the night side is dark. The station outside the planet's
-// hierarchy is lit by the unattenuated sun.
+// the subsolar side stays white and the night side, without ambient light, is dark. The cloud
+// sphere is 3 km up, low in the air. The station outside the planet's hierarchy is lit by the
+// unattenuated sun.
 
 $ {
   Scene: {blend_modes: true, planet_light: true}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 }
 
 camera {
@@ -25,8 +27,8 @@ main_view {
 }
 
 sun {
-  Rotation: {-0.1, -2.2, 0}
-  DirectionalLight: {intensity: 5}
+  Rotation: {-0.1, -1.7, 0}
+  DirectionalLight: {intensity: 6}
   Rgb: {255, 255, 255}
 }
 
@@ -39,10 +41,10 @@ planet {
 
   clouds {
     Position: {0, 0, 0}
-    Sphere: {segments: 128, smooth: true, radius: 1.004}
+    Sphere: {segments: 128, smooth: true, radius: 1.0005}
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 1}
-    Opacity: {0.45}
+    Opacity: {0.35}
   }
 }
 
