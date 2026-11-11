@@ -1,0 +1,223 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using state
+
+assets {
+  template HullPlate {
+    prop x0: f32 = -2
+    prop x1: f32 = 2
+    prop y0: f32 = 0
+    prop y1: f32 = 3
+    prop z0: f32 = -2
+    prop z1: f32 = 2
+    prop dark: bool = false
+
+    if dark {
+      plate : ShipHullDark { Position: {(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2}; Box: {x1 - x0, y1 - y0, z1 - z0} }
+    } else {
+      plate : ShipHull { Position: {(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2}; Box: {x1 - x0, y1 - y0, z1 - z0} }
+    }
+  }
+
+  template HullEdgeZ {
+    prop sx: f32 = 1
+    prop sy: f32 = 1
+    prop z0: f32 = -2
+    prop z1: f32 = 2
+    prop f0: bool = false
+    prop f1: bool = false
+
+    const ex = sx * (2 - RAD)
+    const ey = sy > 0 ? CH - RAD : RAD
+    const fx = sx * (2 - RAD / 2)
+    const fy = sy > 0 ? CH - RAD / 2 : RAD / 2
+
+    rod : ShipHull { Position: {ex, ey, (z0 + z1) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: RAD, length: z1 - z0, segments: 20, smooth: true} }
+    if f0 {
+      fill_a : ShipHull { Position: {fx, fy, -2 + 0.015}; Box: {RAD, RAD, 0.03} }
+    }
+    if f1 {
+      fill_b : ShipHull { Position: {fx, fy, 2 - 0.015}; Box: {RAD, RAD, 0.03} }
+    }
+  }
+
+  template HullEdgeX {
+    prop sy: f32 = 1
+    prop sz: f32 = 1
+    prop x0: f32 = -2
+    prop x1: f32 = 2
+    prop f0: bool = false
+    prop f1: bool = false
+
+    const ey = sy > 0 ? CH - RAD : RAD
+    const ez = sz * (2 - RAD)
+    const fy = sy > 0 ? CH - RAD / 2 : RAD / 2
+    const fz = sz * (2 - RAD / 2)
+
+    rod : ShipHull { Position: {(x0 + x1) / 2, ey, ez}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: RAD, length: x1 - x0, segments: 20, smooth: true} }
+    if f0 {
+      fill_a : ShipHull { Position: {-2 + 0.015, fy, fz}; Box: {0.03, RAD, RAD} }
+    }
+    if f1 {
+      fill_b : ShipHull { Position: {2 - 0.015, fy, fz}; Box: {0.03, RAD, RAD} }
+    }
+  }
+
+  template HullEdgeY {
+    prop sx: f32 = 1
+    prop sz: f32 = 1
+    prop y0: f32 = 0
+    prop y1: f32 = 3
+    prop f0: bool = false
+    prop f1: bool = false
+
+    const ex = sx * (2 - RAD)
+    const ez = sz * (2 - RAD)
+    const fx = sx * (2 - RAD / 2)
+    const fz = sz * (2 - RAD / 2)
+
+    rod : ShipHull { Position: {ex, (y0 + y1) / 2, ez}; Cylinder: {radius: RAD, length: y1 - y0, segments: 20, smooth: true} }
+    if f0 {
+      fill_a : ShipHull { Position: {fx, 0.015, fz}; Box: {RAD, 0.03, RAD} }
+    }
+    if f1 {
+      fill_b : ShipHull { Position: {fx, CH - 0.015, fz}; Box: {RAD, 0.03, RAD} }
+    }
+  }
+
+  template HullCorner {
+    prop sx: f32 = 1
+    prop sy: f32 = 1
+    prop sz: f32 = 1
+
+    ball : ShipHull { Position: {sx * (2 - RAD), sy > 0 ? CH - RAD : RAD, sz * (2 - RAD)}; Sphere: {radius: RAD, segments: 20, smooth: true} }
+  }
+
+  // The skin of one cell: a plate on every face that no visible module covers, rounded where two
+  // exposed faces meet. The xy, xz and yz flags tell whether the diagonal neighbor in that plane
+  // is there (p for the positive side, n for the negative one), which decides whether a rounded
+  // edge runs on into the next cell or ends against a wall and needs its gap filled.
+  template HullShell {
+    prop px: bool = true
+    prop nx: bool = true
+    prop py: bool = true
+    prop ny: bool = true
+    prop pz: bool = true
+    prop nz: bool = true
+    prop xy_pp: bool = false
+    prop xy_pn: bool = false
+    prop xy_np: bool = false
+    prop xy_nn: bool = false
+    prop xz_pp: bool = false
+    prop xz_pn: bool = false
+    prop xz_np: bool = false
+    prop xz_nn: bool = false
+    prop yz_pp: bool = false
+    prop yz_pn: bool = false
+    prop yz_np: bool = false
+    prop yz_nn: bool = false
+    prop stripe: bool = true
+    prop front: bool = true
+
+    const ax0 = nx ? -2 + RAD : -2
+    const ax1 = px ? 2 - RAD : 2
+    const ay0 = ny ? RAD : 0
+    const ay1 = py ? CH - RAD : CH
+    const az0 = nz ? -2 + RAD : -2
+    const az1 = pz ? 2 - RAD : 2
+
+    if px {
+      HullPlate side_px(x0: 2 - SKIN, x1: 2, y0: ay0, y1: ay1, z0: az0, z1: az1)
+      if stripe {
+        band_px : ShipStripe { Position: {2 + 0.006, 1.98, (az0 + az1) / 2}; Box: {0.012, 0.22, az1 - az0} }
+        line_px : ShipTrim { Position: {2 + 0.006, 1.74, (az0 + az1) / 2}; Box: {0.012, 0.05, az1 - az0} }
+      }
+    }
+    if nx {
+      HullPlate side_nx(x0: -2, x1: -2 + SKIN, y0: ay0, y1: ay1, z0: az0, z1: az1)
+      if stripe {
+        band_nx : ShipStripe { Position: {-2 - 0.006, 1.98, (az0 + az1) / 2}; Box: {0.012, 0.22, az1 - az0} }
+        line_nx : ShipTrim { Position: {-2 - 0.006, 1.74, (az0 + az1) / 2}; Box: {0.012, 0.05, az1 - az0} }
+      }
+    }
+    if py {
+      HullPlate side_py(x0: ax0, x1: ax1, y0: CH - SKIN, y1: CH, z0: az0, z1: az1)
+    }
+    if ny {
+      HullPlate side_ny(x0: ax0, x1: ax1, y0: 0, y1: SKIN, z0: az0, z1: az1, dark: true)
+    }
+    if pz && front {
+      HullPlate side_pz(x0: ax0, x1: ax1, y0: ay0, y1: ay1, z0: 2 - SKIN, z1: 2)
+    }
+    if nz {
+      HullPlate side_nz(x0: ax0, x1: ax1, y0: ay0, y1: ay1, z0: -2, z1: -2 + SKIN)
+    }
+
+    if px && py {
+      HullEdgeZ ez_pp(sx: 1, sy: 1, z0: az0, z1: az1, f0: !nz && (xz_pn || yz_pn), f1: !pz && (xz_pp || yz_pp))
+    }
+    if px && ny {
+      HullEdgeZ ez_pn(sx: 1, sy: -1, z0: az0, z1: az1, f0: !nz && (xz_pn || yz_nn), f1: !pz && (xz_pp || yz_np))
+    }
+    if nx && py {
+      HullEdgeZ ez_np(sx: -1, sy: 1, z0: az0, z1: az1, f0: !nz && (xz_nn || yz_pn), f1: !pz && (xz_np || yz_pp))
+    }
+    if nx && ny {
+      HullEdgeZ ez_nn(sx: -1, sy: -1, z0: az0, z1: az1, f0: !nz && (xz_nn || yz_nn), f1: !pz && (xz_np || yz_np))
+    }
+
+    if py && pz {
+      HullEdgeX ex_pp(sy: 1, sz: 1, x0: ax0, x1: ax1, f0: !nx && (xy_np || xz_np), f1: !px && (xy_pp || xz_pp))
+    }
+    if py && nz {
+      HullEdgeX ex_pn(sy: 1, sz: -1, x0: ax0, x1: ax1, f0: !nx && (xy_np || xz_nn), f1: !px && (xy_pp || xz_pn))
+    }
+    if ny && pz {
+      HullEdgeX ex_np(sy: -1, sz: 1, x0: ax0, x1: ax1, f0: !nx && (xy_nn || xz_np), f1: !px && (xy_pn || xz_pp))
+    }
+    if ny && nz {
+      HullEdgeX ex_nn(sy: -1, sz: -1, x0: ax0, x1: ax1, f0: !nx && (xy_nn || xz_nn), f1: !px && (xy_pn || xz_pn))
+    }
+
+    if px && pz {
+      HullEdgeY ey_pp(sx: 1, sz: 1, y0: ay0, y1: ay1, f0: !ny && (xy_pn || yz_np), f1: !py && (xy_pp || yz_pp))
+    }
+    if px && nz {
+      HullEdgeY ey_pn(sx: 1, sz: -1, y0: ay0, y1: ay1, f0: !ny && (xy_pn || yz_nn), f1: !py && (xy_pp || yz_pn))
+    }
+    if nx && pz {
+      HullEdgeY ey_np(sx: -1, sz: 1, y0: ay0, y1: ay1, f0: !ny && (xy_nn || yz_np), f1: !py && (xy_np || yz_pp))
+    }
+    if nx && nz {
+      HullEdgeY ey_nn(sx: -1, sz: -1, y0: ay0, y1: ay1, f0: !ny && (xy_nn || yz_nn), f1: !py && (xy_np || yz_pn))
+    }
+
+    if px && py && pz {
+      HullCorner c_ppp(sx: 1, sy: 1, sz: 1)
+    }
+    if px && py && nz {
+      HullCorner c_ppn(sx: 1, sy: 1, sz: -1)
+    }
+    if px && ny && pz {
+      HullCorner c_pnp(sx: 1, sy: -1, sz: 1)
+    }
+    if px && ny && nz {
+      HullCorner c_pnn(sx: 1, sy: -1, sz: -1)
+    }
+    if nx && py && pz {
+      HullCorner c_npp(sx: -1, sy: 1, sz: 1)
+    }
+    if nx && py && nz {
+      HullCorner c_npn(sx: -1, sy: 1, sz: -1)
+    }
+    if nx && ny && pz {
+      HullCorner c_nnp(sx: -1, sy: -1, sz: 1)
+    }
+    if nx && ny && nz {
+      HullCorner c_nnn(sx: -1, sy: -1, sz: -1)
+    }
+  }
+}
