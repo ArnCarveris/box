@@ -1,0 +1,16 @@
+include shipyard
+using state
+using flecs.script
+async {
+  view_yaw = 0.9
+  cam_yaw = 0.9
+  view_pitch = 0.55
+  cam_pitch = 0.55
+  view_dist = 30
+  cam_dist = 30
+  view_z = 10
+  cam_z = 10
+  deck = 1
+  tool = 9
+  hover = 82
+}
