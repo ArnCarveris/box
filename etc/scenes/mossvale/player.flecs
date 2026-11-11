@@ -81,7 +81,7 @@ state {
   export const CAM_FOV: f32 = 40
   export const CAST_RANGE: f32 = 9
 
-  proc pick_target() {
+  fn pick_target() {
     mut best: f64 = CAST_RANGE * CAST_RANGE
     mut bi: i32 = -1
     for i in 0..TARGETS {
