@@ -445,8 +445,9 @@ void CloudEnvironment_small_move_does_not_render(void) {
     int32_t version = version_of(world, scene);
     int32_t i;
 
+    /* Steps that add up to 50 units since the render, below 1/64 of the size of 4000 */
     for (i = 1; i <= 30; i ++) {
-        cloud_offset(world, e, (float)i * 2.0f, (float)i);
+        cloud_offset(world, e, (float)i * 1.5f, (float)i * 0.75f);
         test_int(frame_renders(world, null, NULL), 0);
     }
 

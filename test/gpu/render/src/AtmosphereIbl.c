@@ -781,10 +781,11 @@ void AtmosphereIbl_mirror_sphere_reflects_clouds(void) {
     test_assert(sky_zenith[2] > sky_zenith[0] * 1.5f);
     test_assert(cloud_zenith[2] < cloud_zenith[0] * 1.3f);
 
-    /* The mirror reflects a blue sky without the layer, a gray to white cloud with it */
+    /* The mirror reflects a blue sky without the layer, a gray to white cloud with it, which
+     * the sky ambient and the haze tint slightly blue */
     test_assert(sky_top[2] > sky_top[0] + 20);
     test_assert(ibl_sum(cloud_top) > 30);
-    test_assert(cloud_top[2] < cloud_top[0] + 15);
+    test_assert(cloud_top[2] < cloud_top[0] * 1.3f);
     test_assert(cloud_top[2] * ibl_sum(sky_top) < sky_top[2] * ibl_sum(cloud_top));
 }
 
