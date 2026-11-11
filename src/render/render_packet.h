@@ -86,6 +86,12 @@
 /** Shader handle of the engine shader of the color grading pass */
 #define BOX_RENDER_SHADER_GRADING (56)
 
+/** Shader handle of the engine shader of the vignette pass */
+#define BOX_RENDER_SHADER_VIGNETTE (57)
+
+/** Shader handle of the engine shader of the chromatic aberration pass */
+#define BOX_RENDER_SHADER_CHROMATIC_ABERRATION (58)
+
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most; the bake
  * warns once about a volume with more for the first view that shows it */
 #define BOX_RENDER_DEBUG_PROBES_MAX (65536)
@@ -712,7 +718,9 @@ typedef enum box_render_effect_kind_t {
     BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
     BOX_RENDER_EFFECT_FOG,      /**< HeightFog */
     BOX_RENDER_EFFECT_SMAA,     /**< Smaa */
-    BOX_RENDER_EFFECT_GRADING   /**< ColorGrading */
+    BOX_RENDER_EFFECT_GRADING,  /**< ColorGrading */
+    BOX_RENDER_EFFECT_VIGNETTE, /**< Vignette */
+    BOX_RENDER_EFFECT_CHROMATIC_ABERRATION /**< ChromaticAberration */
 } box_render_effect_kind_t;
 
 /** Resolved settings of a color grading pass */
@@ -735,6 +743,9 @@ typedef struct box_render_effect_t {
     HeightFog fog;              /**< Resolved settings of a fog pass */
     Smaa smaa;                  /**< Resolved settings of an anti aliasing pass */
     box_render_grading_t grading; /**< Resolved settings of a color grading pass */
+    Vignette vignette;          /**< Resolved settings of a vignette pass */
+    ChromaticAberration chromatic_aberration; /**< Resolved settings of a chromatic aberration
+                                               *   pass */
 } box_render_effect_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -960,7 +971,8 @@ typedef struct box_render_atmosphere_desc_t {
  * scene, rendered into mip 0 of the cubemap of the BOX_RENDER_ENVIRONMENT of the handle.
  *
  * The backend renders a sky view LUT of the scene at its ground altitude, then the cubemap
- * from it before the environments are processed, and reports the cubemap written with version.
+ * from it with the cloud layers before the environments are processed, and reports the cubemap
+ * written with version.
  *
  * The request waits while the LUTs, the atmosphere shader or the processing are not ready; a
  * newer one for the handle replaces it, one whose cubemap is gone is dropped.
@@ -976,6 +988,13 @@ typedef struct box_render_atmosphere_env_t {
                              *   (0, -1, 0) without one */
     float moon_color[4];    /**< Top of atmosphere irradiance of the moon, 0 without one */
     float night[4];         /**< Linear night_tint times night_intensity */
+    float aerial_intensity; /**< Scale of the aerial perspective of the cloud layers */
+    float km_per_unit;      /**< Kilometers in a world unit, the inverse of units_per_km */
+    int32_t cloud_count;    /**< Layers in clouds */
+    box_render_cloud_layer_t clouds[BOX_CLOUD_LAYER_MAX]; /**< The cloud layers with a loaded
+                             *   texture by ascending altitude, seen from the capture point of
+                             *   the cubemap: world X and Z 0 at the sea_level of the
+                             *   Atmosphere */
 } box_render_atmosphere_env_t;
 
 /** How a buffer is used, flags of box_render_buffer_desc_t */

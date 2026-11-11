@@ -880,7 +880,29 @@
                     "color_grading_follows_surface_resize",
                     "color_grading_lut_identity_no_op",
                     "color_grading_lut_sepia_matches",
-                    "color_grading_lut_wrong_shape_ignored"
+                    "color_grading_lut_wrong_shape_ignored",
+                    "vignette_default_settings",
+                    "vignette_settings_clamped",
+                    "vignette_center_unchanged",
+                    "vignette_corners_darken_by_intensity",
+                    "vignette_zero_intensity_no_op",
+                    "vignette_zero_literal_applies_as_set",
+                    "vignette_round_on_wide_image",
+                    "vignette_center_moves_bright_spot",
+                    "vignette_color_tints_edges",
+                    "vignette_disabled_entry_no_op",
+                    "vignette_same_entity_after_tonemap",
+                    "vignette_follows_surface_resize",
+                    "chromatic_aberration_default_settings",
+                    "chromatic_aberration_settings_clamped",
+                    "chromatic_aberration_flat_unchanged",
+                    "chromatic_aberration_edge_line_fringes",
+                    "chromatic_aberration_zero_intensity_no_op",
+                    "chromatic_aberration_zero_literal_applies_as_set",
+                    "chromatic_aberration_fringe_grows_with_intensity",
+                    "chromatic_aberration_disabled_entry_no_op",
+                    "chromatic_aberration_same_entity_order",
+                    "chromatic_aberration_follows_surface_resize"
                 ]
             },
             {
@@ -1091,7 +1113,9 @@
                     "version_follows_throttle",
                     "bake_open_probe_matches_environment",
                     "background_matches_sky",
-                    "reflection_capture_sees_environment"
+                    "reflection_capture_sees_environment",
+                    "mirror_sphere_reflects_clouds",
+                    "dense_layer_changes_ambient_sh"
                 ]
             },
             {

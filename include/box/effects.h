@@ -193,6 +193,44 @@ ECS_STRUCT(Smaa, {
                                     *   clamped to 0..100 */
 });
 
+/** Lateral color fringing that grows toward the edges of the image, as in a cheap lens.
+ *
+ * The input is sampled along the line from the pixel toward the center, from -offset to +offset,
+ * where offset = intensity * (d / d_corner)^falloff and d is the distance from the center. Each
+ * tap is weighted by a red, green, blue spectral ramp normalized per channel, so a white image
+ * stays white. The center pixel is never shifted, the edges clamp and alpha is taken from the
+ * center tap.
+ *
+ * Works before or after the Tonemap. Before it, bright HDR fringes bloom stronger.
+ */
+ECS_STRUCT(ChromaticAberration, {
+    float intensity; /**< Largest offset at the image corners as a fraction of the image width,
+                      *   default 0.005, at least 0 */
+    int32_t samples; /**< Taps along the offset, default 8, clamped to 3..16 */
+    vec2 center;     /**< Center in normalized image coordinates, 0, 0 the top left, default
+                      *   0.5, 0.5 */
+    float falloff;   /**< Exponent of the offset over the distance from the center, default 2,
+                      *   1 is linear, at least 0 */
+});
+
+/** Darkens or tints the edges of the image toward the corners, as a lens does.
+ *
+ * Belongs after the Tonemap: it multiplies the color by mix(1, color, v * intensity), where
+ * v = smoothstep(radius, radius + smoothness, d) and d is the distance from the center in half
+ * diagonals, so a black vignette darkens and a colored one tints. Alpha passes through.
+ */
+ECS_STRUCT(Vignette, {
+    float intensity;  /**< Strength, 0 none to 1 full, default 0.3, clamped to 0..1 */
+    float radius;     /**< Distance from the center in half diagonals where the falloff starts,
+                       *   default 0.75, at least 0 */
+    float smoothness; /**< Width of the falloff, default 0.45, at least 0; 0 is a hard edge */
+    float roundness;  /**< 1 is a circle regardless of the aspect ratio, 0 follows the
+                       *   rectangle of the image, default 1, clamped to 0..1 */
+    vec2 center;      /**< Center in normalized image coordinates, 0, 0 the top left, default
+                       *   0.5, 0.5 */
+    rgb color;        /**< Color of the vignette, display encoded, default 0 0 0 */
+});
+
 /** Register the box.effects module.
  *
  * @param world The world

@@ -1,7 +1,8 @@
 /**
  * @file Effects.c
- * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog, SMAA and color
- * grading, and for the ambient occlusion (Gtao) of the indirect light.
+ * @brief Tests for the effect chain of a view: bloom, tonemap, exposure, fog, SMAA, color
+ * grading, vignette and chromatic aberration, and for the ambient occlusion (Gtao) of the
+ * indirect light.
  *
  * Most cases render an unlit view (a C literal View) from 5 units in front of the origin into
  * a 64x64 capture; a unit cube at the origin covers columns 26 to 38 of the middle row.
@@ -2975,5 +2976,993 @@ void Effects_color_grading_lut_wrong_shape_ignored(void) {
     ecs_os_free(base);
     ecs_os_free(px);
     ecs_os_free(again);
+    ecs_fini(world);
+}
+
+/** Create the vignette scene: a view that clears to white without geometry, a flat white input,
+ * into a capture of the given size.
+ *
+ * @param camera Receives the camera
+ * @param view Receives the view
+ * @param width Width of the surface
+ * @param height Height of the surface
+ * @param file File name of the capture in the temporary folder
+ * @return The world
+ */
+static ecs_world_t* vignette_world(
+    ecs_entity_t *camera,
+    ecs_entity_t *view,
+    int32_t width,
+    int32_t height,
+    const char *file)
+{
+    ecs_world_t *world = effects_world(camera);
+    *view = ecs_new(world);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = width, .height = height,
+        .write_to_file = ECS_CONST_CAST(char*, file),
+        .resolution_scale = 1});
+
+    return world;
+}
+
+/** Get the default vignette settings.
+ *
+ * @return The settings a constructed Vignette has
+ */
+static Vignette vignette_defaults(void) {
+    return (Vignette){
+        .intensity = 0.3f, .radius = 0.75f, .smoothness = 0.45f, .roundness = 1,
+        .center = {0.5f, 0.5f}
+    };
+}
+
+/** Create an effect entity with vignette settings.
+ *
+ * @param world The world
+ * @param value The settings
+ * @return The entity
+ */
+static ecs_entity_t vignette_effect(
+    ecs_world_t *world,
+    const Vignette *value)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set_ptr(world, result, Vignette, value);
+
+    return result;
+}
+
+/** Set the effects of the white view, render frames and keep a copy of the capture.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param effects The effect entities, in order
+ * @param count Number of effects
+ * @param width Width of the capture
+ * @param height Height of the capture
+ * @param file File name of the capture
+ * @return The RGBA pixels, freed with ecs_os_free
+ */
+static unsigned char* vignette_frame(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    const ecs_entity_t *effects,
+    int32_t count,
+    int32_t width,
+    int32_t height,
+    const char *file)
+{
+    View value = {.camera = camera,
+        .clear = {.enabled = true, .color = {255, 255, 255, 255}}};
+    int32_t i;
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, count);
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = effects[i] };
+    }
+
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, width);
+    test_int(h, height);
+    ecs_os_free(path);
+    unsigned char *result = ecs_os_malloc(width * height * 4);
+    ecs_os_memcpy(result, px, width * height * 4);
+    stbi_image_free(px);
+
+    return result;
+}
+
+/** Get a pixel of a capture.
+ *
+ * @param px The pixels
+ * @param width Width of the capture
+ * @param x The column
+ * @param y The row
+ * @return The pixel
+ */
+static const unsigned char* vignette_px(
+    const unsigned char *px,
+    int32_t width,
+    int32_t x,
+    int32_t y)
+{
+    return &px[(y * width + x) * 4];
+}
+
+/** Get the largest difference of a channel between two captures.
+ *
+ * @param a The first capture
+ * @param b The second capture
+ * @param size Pixels of a capture
+ * @return The largest difference
+ */
+static int vignette_diff(
+    const unsigned char *a,
+    const unsigned char *b,
+    int32_t size)
+{
+    int32_t i;
+    int result = 0;
+    for (i = 0; i < size * 4; i ++) {
+        result = glm_imax(result, abs((int)a[i] - (int)b[i]));
+    }
+
+    return result;
+}
+
+void Effects_vignette_default_settings(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, Vignette);
+    const Vignette *v = ecs_get(world, e, Vignette);
+    test_flt(v->intensity, 0.3f);
+    test_flt(v->radius, 0.75f);
+    test_flt(v->smoothness, 0.45f);
+    test_flt(v->roundness, 1);
+    test_flt(v->center[0], 0.5f);
+    test_flt(v->center[1], 0.5f);
+    test_int(v->color.r, 0);
+    test_int(v->color.g, 0);
+    test_int(v->color.b, 0);
+
+    Vignette resolved;
+    box_render_vignette_settings(v, &resolved);
+    test_flt(resolved.intensity, 0.3f);
+    test_flt(resolved.radius, 0.75f);
+    test_flt(resolved.smoothness, 0.45f);
+    test_flt(resolved.roundness, 1);
+    test_flt(resolved.center[0], 0.5f);
+
+    test_assert(ecs_script_run(world, "vignette", "using box.effects\n"
+        "lens { Vignette: {} }\n", NULL) == 0);
+    const Vignette *scripted = ecs_get(world, ecs_lookup(world, "lens"), Vignette);
+    test_assert(scripted != NULL);
+    test_flt(scripted->intensity, 0.3f);
+    test_flt(scripted->radius, 0.75f);
+    test_flt(scripted->smoothness, 0.45f);
+    test_flt(scripted->roundness, 1);
+    test_flt(scripted->center[1], 0.5f);
+
+    ecs_fini(world);
+}
+
+void Effects_vignette_settings_clamped(void) {
+    // lighting/effects
+    Vignette out;
+    box_render_vignette_settings(&(Vignette){.intensity = 2, .radius = -1, .smoothness = -1,
+        .roundness = 3, .center = {-0.5f, 2}, .color = {10, 20, 30}}, &out);
+    test_flt(out.intensity, 1);
+    test_flt(out.radius, 0);
+    test_flt(out.smoothness, 0);
+    test_flt(out.roundness, 1);
+    test_flt(out.center[0], -0.5f);
+    test_flt(out.center[1], 2);
+    test_int(out.color.g, 20);
+
+    box_render_vignette_settings(&(Vignette){.intensity = -1, .radius = 1.5f,
+        .smoothness = 0.2f, .roundness = -1}, &out);
+    test_flt(out.intensity, 0);
+    test_flt(out.radius, 1.5f);
+    test_flt(out.smoothness, 0.2f);
+    test_flt(out.roundness, 0);
+}
+
+void Effects_vignette_center_unchanged(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_center.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 1;
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    unsigned char *px = vignette_frame(world, view, camera, &vignette, 1, 64, 64,
+        "vignette_center.png");
+    const unsigned char *center = vignette_px(px, 64, 32, 32);
+    test_assert(center[0] >= 254);
+    test_assert(center[1] >= 254);
+    test_assert(center[2] >= 254);
+    test_assert(vignette_px(px, 64, 0, 0)[0] < 250);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_vignette_corners_darken_by_intensity(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_corners.png");
+    Vignette value = vignette_defaults();
+    value.radius = 0.4f;
+    value.smoothness = 0.3f;
+    value.intensity = 0.3f;
+    ecs_entity_t light = vignette_effect(world, &value);
+    value.intensity = 0.8f;
+    ecs_entity_t strong = vignette_effect(world, &value);
+    unsigned char *l = vignette_frame(world, view, camera, &light, 1, 64, 64,
+        "vignette_corners.png");
+    unsigned char *s = vignette_frame(world, view, camera, &strong, 1, 64, 64,
+        "vignette_corners.png");
+    const int32_t corners[4][2] = {{0, 0}, {63, 0}, {0, 63}, {63, 63}};
+    int32_t i, c;
+    for (i = 0; i < 4; i ++) {
+        const unsigned char *pl = vignette_px(l, 64, corners[i][0], corners[i][1]);
+        const unsigned char *ps = vignette_px(s, 64, corners[i][0], corners[i][1]);
+        for (c = 0; c < 3; c ++) {
+            test_assert(abs((int)pl[c] - effects_srgb8(0.7f)) <= 2);
+            test_assert(abs((int)ps[c] - effects_srgb8(0.2f)) <= 2);
+        }
+
+        test_int(pl[3], 255);
+    }
+
+    test_assert(vignette_px(l, 64, 32, 32)[0] >= 254);
+    test_assert(vignette_px(s, 64, 32, 32)[0] >= 254);
+
+    ecs_os_free(l);
+    ecs_os_free(s);
+    ecs_fini(world);
+}
+
+void Effects_vignette_zero_intensity_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_zero.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 0;
+    value.radius = 0;
+    value.color = (rgb){255, 0, 0};
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    unsigned char *base = vignette_frame(world, view, camera, NULL, 0, 64, 64,
+        "vignette_zero.png");
+    unsigned char *px = vignette_frame(world, view, camera, &vignette, 1, 64, 64,
+        "vignette_zero.png");
+    test_assert(vignette_px(base, 64, 0, 0)[0] >= 254);
+    test_assert(vignette_diff(base, px, 64 * 64) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_vignette_zero_literal_applies_as_set(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_literal.png");
+    ecs_entity_t zero = ecs_new(world);
+    ecs_set(world, zero, Vignette, {0});
+    ecs_entity_t hard = ecs_new(world);
+    ecs_set(world, hard, Vignette, {.intensity = 1});
+    unsigned char *base = vignette_frame(world, view, camera, NULL, 0, 64, 64,
+        "vignette_literal.png");
+    unsigned char *z = vignette_frame(world, view, camera, &zero, 1, 64, 64,
+        "vignette_literal.png");
+    // Intensity 0 leaves the image as is
+    test_assert(vignette_diff(base, z, 64 * 64) <= 1);
+
+    // Radius and smoothness 0 are a hard edge at the center: every pixel is black
+    unsigned char *h = vignette_frame(world, view, camera, &hard, 1, 64, 64,
+        "vignette_literal.png");
+    int32_t i, c;
+    for (i = 0; i < 64 * 64; i ++) {
+        for (c = 0; c < 3; c ++) {
+            test_assert(h[i * 4 + c] < 2);
+        }
+    }
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(z);
+    ecs_os_free(h);
+    ecs_fini(world);
+}
+
+void Effects_vignette_round_on_wide_image(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 128, 72, "vignette_round.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 1;
+    value.radius = 0.1f;
+    value.smoothness = 0.8f;
+    ecs_entity_t round = vignette_effect(world, &value);
+    value.roundness = 0;
+    ecs_entity_t rect = vignette_effect(world, &value);
+    unsigned char *r = vignette_frame(world, view, camera, &round, 1, 128, 72,
+        "vignette_round.png");
+    unsigned char *q = vignette_frame(world, view, camera, &rect, 1, 128, 72,
+        "vignette_round.png");
+    int32_t k;
+    for (k = 14; k <= 34; k += 10) {
+        // The same distance in pixels right and down of the center darkens the same
+        int h = vignette_px(r, 128, 64 + k, 36)[0];
+        int v = vignette_px(r, 128, 64, 36 + k)[0];
+        test_assert(abs(h - v) <= 2);
+        test_assert(v < 254);
+
+        // Following the rectangle, the horizontal falloff is stretched by 16:9
+        int qh = vignette_px(q, 128, 64 + k, 36)[0];
+        int qv = vignette_px(q, 128, 64, 36 + k)[0];
+        test_assert(qh > qv + 4);
+    }
+
+    // Following the rectangle, the edge midpoints darken the same
+    int left = vignette_px(q, 128, 0, 36)[0];
+    int top = vignette_px(q, 128, 64, 0)[0];
+    test_assert(abs(left - top) <= 6);
+
+    ecs_os_free(r);
+    ecs_os_free(q);
+    ecs_fini(world);
+}
+
+void Effects_vignette_center_moves_bright_spot(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_moved.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 1;
+    value.radius = 0.1f;
+    value.smoothness = 0.5f;
+    value.center[0] = 0.25f;
+    value.center[1] = 0.75f;
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    unsigned char *px = vignette_frame(world, view, camera, &vignette, 1, 64, 64,
+        "vignette_moved.png");
+    const unsigned char *spot = vignette_px(px, 64, 16, 48);
+    test_assert(spot[0] >= 254);
+    test_assert(vignette_px(px, 64, 32, 32)[0] < spot[0] - 4);
+    test_assert(vignette_px(px, 64, 48, 16)[0] < vignette_px(px, 64, 32, 32)[0]);
+    // Left of the moved center is as bright as the same distance right of it
+    int left = vignette_px(px, 64, 16 - 10, 48)[0];
+    int right = vignette_px(px, 64, 16 + 9, 48)[0];
+    test_assert(abs(left - right) <= 2);
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_vignette_color_tints_edges(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_color.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 1;
+    value.radius = 0.3f;
+    value.smoothness = 0.3f;
+    value.color = (rgb){255, 64, 0};
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    unsigned char *px = vignette_frame(world, view, camera, &vignette, 1, 64, 64,
+        "vignette_color.png");
+    const unsigned char *corner = vignette_px(px, 64, 0, 0);
+    test_assert(corner[0] >= 253);
+    test_assert(abs((int)corner[1] - 64) <= 2);
+    test_assert(corner[2] < 2);
+    test_int(corner[3], 255);
+    const unsigned char *center = vignette_px(px, 64, 32, 32);
+    test_assert(center[0] >= 254);
+    test_assert(center[1] >= 254);
+    test_assert(center[2] >= 254);
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_vignette_disabled_entry_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_disabled.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 1;
+    value.radius = 0.2f;
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    unsigned char *base = vignette_frame(world, view, camera, NULL, 0, 64, 64,
+        "vignette_disabled.png");
+    View v = {.camera = camera, .clear = {.enabled = true, .color = {255, 255, 255, 255}}};
+    ecs_vec_init_t(NULL, &v.effects, ViewEffect, 1);
+    *ecs_vec_append_t(NULL, &v.effects, ViewEffect) = (ViewEffect){
+        .enabled = false, .effect = vignette };
+    ecs_set_ptr(world, view, View, &v);
+    ecs_vec_fini_t(NULL, &v.effects, ViewEffect);
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    unsigned char *px = effects_load(world, "vignette_disabled.png");
+    test_assert(vignette_diff(base, px, 64 * 64) <= 1);
+    stbi_image_free(px);
+
+    ecs_add_id(world, vignette, EcsDisabled);
+    unsigned char *off = vignette_frame(world, view, camera, &vignette, 1, 64, 64,
+        "vignette_disabled.png");
+    test_assert(vignette_diff(base, off, 64 * 64) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(off);
+    ecs_fini(world);
+}
+
+void Effects_vignette_same_entity_after_tonemap(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_order.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 0.6f;
+    value.radius = 0.3f;
+    ecs_entity_t both = vignette_effect(world, &value);
+    ecs_add(world, both, Tonemap);
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    ecs_entity_t chain[2] = {tonemap, vignette};
+    unsigned char *a = vignette_frame(world, view, camera, &both, 1, 64, 64,
+        "vignette_order.png");
+    unsigned char *b = vignette_frame(world, view, camera, chain, 2, 64, 64,
+        "vignette_order.png");
+    test_assert(vignette_diff(a, b, 64 * 64) <= 1);
+    test_assert(vignette_px(a, 64, 0, 0)[0] < vignette_px(a, 64, 32, 32)[0] - 8);
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_fini(world);
+}
+
+void Effects_vignette_follows_surface_resize(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "vignette_resize.png");
+    Vignette value = vignette_defaults();
+    value.intensity = 1;
+    value.radius = 0.4f;
+    value.smoothness = 0.3f;
+    ecs_entity_t vignette = vignette_effect(world, &value);
+    unsigned char *first = vignette_frame(world, view, camera, &vignette, 1, 64, 64,
+        "vignette_resize.png");
+    ecs_os_free(first);
+    ecs_iter_t it = ecs_each(world, Surface);
+    ecs_entity_t surface = 0;
+    while (ecs_each_next(&it)) {
+        surface = it.entities[0];
+    }
+
+    test_assert(surface != 0);
+    ecs_set(world, surface, Surface, {.width = 128, .height = 64, .resolution_scale = 2,
+        .write_to_file = "vignette_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, surface, Surface, {.width = 96, .height = 48, .resolution_scale = 0.5f,
+        .write_to_file = "vignette_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/vignette_resize.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 96);
+    test_int(h, 48);
+    test_assert(px[(24 * 96 + 48) * 4] >= 250);
+    test_assert(px[0] < 8);
+    test_assert(px[(47 * 96 + 95) * 4] < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Get the default chromatic aberration settings.
+ *
+ * @return The settings a constructed ChromaticAberration has
+ */
+static ChromaticAberration ca_defaults(void) {
+    return (ChromaticAberration){
+        .intensity = 0.005f, .samples = 8, .center = {0.5f, 0.5f}, .falloff = 2
+    };
+}
+
+/** Create an effect entity with chromatic aberration settings.
+ *
+ * @param world The world
+ * @param value The settings
+ * @return The entity
+ */
+static ecs_entity_t ca_effect(
+    ecs_world_t *world,
+    const ChromaticAberration *value)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set_ptr(world, result, ChromaticAberration, value);
+
+    return result;
+}
+
+/** Create a white vertical line through the image that reflects nothing.
+ *
+ * @param world The world
+ * @param x Position of its center along X; 1 unit is about 11 pixels of a 64x64 capture
+ * @return The line
+ */
+static ecs_entity_t ca_line(
+    ecs_world_t *world,
+    float x)
+{
+    ecs_entity_t result = ecs_new(world);
+    ecs_set(world, result, Position, {x, 0, 0});
+    ecs_set(world, result, Box, {0.2f, 10, 0.2f});
+    ecs_set(world, result, Rgb, {0, 0, 0});
+    ecs_set(world, result, Emissive, {.strength = 1, .color = {255, 255, 255}});
+
+    return result;
+}
+
+/** Set the effects of the view with a clear color, render frames and keep a copy of the capture.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param clear The clear color
+ * @param effects The effect entities, in order
+ * @param count Number of effects
+ * @param width Width of the capture
+ * @param height Height of the capture
+ * @param file File name of the capture
+ * @return The RGBA pixels, freed with ecs_os_free
+ */
+static unsigned char* ca_frame(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    rgba clear,
+    const ecs_entity_t *effects,
+    int32_t count,
+    int32_t width,
+    int32_t height,
+    const char *file)
+{
+    View value = {.camera = camera, .clear = {.enabled = true, .color = clear}};
+    int32_t i;
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, count);
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = effects[i] };
+    }
+
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, width);
+    test_int(h, height);
+    ecs_os_free(path);
+    unsigned char *result = ecs_os_malloc(width * height * 4);
+    ecs_os_memcpy(result, px, width * height * 4);
+    stbi_image_free(px);
+
+    return result;
+}
+
+/** Find the brightest column of a row of a 64 wide capture within a range.
+ *
+ * @param px The pixels
+ * @param y The row
+ * @param x0 First column
+ * @param x1 Last column
+ * @return The column
+ */
+static int32_t ca_peak(
+    const unsigned char *px,
+    int32_t y,
+    int32_t x0,
+    int32_t x1)
+{
+    int32_t x, result = x0;
+    for (x = x0; x <= x1; x ++) {
+        if (vignette_px(px, 64, x, y)[1] > vignette_px(px, 64, result, y)[1]) {
+            result = x;
+        }
+    }
+
+    return result;
+}
+
+/** Count the pixels of a row of a 64 wide capture whose red and blue differ by more than a
+ * threshold, the width of the color fringes.
+ *
+ * @param px The pixels
+ * @param y The row
+ * @param x0 First column
+ * @param x1 Last column
+ * @param threshold Smallest difference that counts
+ * @return The number of pixels
+ */
+static int32_t ca_fringe(
+    const unsigned char *px,
+    int32_t y,
+    int32_t x0,
+    int32_t x1,
+    int threshold)
+{
+    int32_t x, result = 0;
+    for (x = x0; x <= x1; x ++) {
+        const unsigned char *p = vignette_px(px, 64, x, y);
+        result += abs((int)p[0] - (int)p[2]) > threshold;
+    }
+
+    return result;
+}
+
+void Effects_chromatic_aberration_default_settings(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, ChromaticAberration);
+    const ChromaticAberration *v = ecs_get(world, e, ChromaticAberration);
+    test_flt(v->intensity, 0.005f);
+    test_int(v->samples, 8);
+    test_flt(v->center[0], 0.5f);
+    test_flt(v->center[1], 0.5f);
+    test_flt(v->falloff, 2);
+
+    ChromaticAberration resolved;
+    box_render_chromatic_aberration_settings(v, &resolved);
+    test_flt(resolved.intensity, 0.005f);
+    test_int(resolved.samples, 8);
+    test_flt(resolved.center[0], 0.5f);
+    test_flt(resolved.falloff, 2);
+
+    test_assert(ecs_script_run(world, "chromatic_aberration", "using box.effects\n"
+        "lens { ChromaticAberration: {} }\n", NULL) == 0);
+    const ChromaticAberration *scripted = ecs_get(world, ecs_lookup(world, "lens"),
+        ChromaticAberration);
+    test_assert(scripted != NULL);
+    test_flt(scripted->intensity, 0.005f);
+    test_int(scripted->samples, 8);
+    test_flt(scripted->center[1], 0.5f);
+    test_flt(scripted->falloff, 2);
+
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_settings_clamped(void) {
+    // lighting/effects
+    ChromaticAberration out;
+    box_render_chromatic_aberration_settings(&(ChromaticAberration){.intensity = -1,
+        .samples = 1, .center = {-0.5f, 2}, .falloff = -1}, &out);
+    test_flt(out.intensity, 0);
+    test_int(out.samples, 3);
+    test_flt(out.center[0], -0.5f);
+    test_flt(out.center[1], 2);
+    test_flt(out.falloff, 0);
+
+    box_render_chromatic_aberration_settings(&(ChromaticAberration){.intensity = 0.5f,
+        .samples = 40, .falloff = 3}, &out);
+    test_flt(out.intensity, 0.5f);
+    test_int(out.samples, 16);
+    test_flt(out.falloff, 3);
+}
+
+void Effects_chromatic_aberration_flat_unchanged(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_flat.png");
+    ChromaticAberration value = ca_defaults();
+    value.intensity = 0.1f;
+    value.samples = 16;
+    value.falloff = 1;
+    ecs_entity_t ca = ca_effect(world, &value);
+    const rgba clears[2] = {{255, 255, 255, 255}, {200, 100, 50, 255}};
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        unsigned char *base = ca_frame(world, view, camera, clears[i], NULL, 0, 64, 64,
+            "ca_flat.png");
+        unsigned char *px = ca_frame(world, view, camera, clears[i], &ca, 1, 64, 64,
+            "ca_flat.png");
+        // The weights of each channel sum to 1: a white image stays white
+        test_assert(vignette_diff(base, px, 64 * 64) <= 1);
+        ecs_os_free(base);
+        ecs_os_free(px);
+    }
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_edge_line_fringes(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_line.png");
+    ca_line(world, 0);
+    ca_line(world, 2.2f);
+    // The default falloff of 2: about 1.9 pixels at the edge line, a hundredth at the center
+    ChromaticAberration value = ca_defaults();
+    value.intensity = 0.1f;
+    ecs_entity_t ca = ca_effect(world, &value);
+    const rgba black = {0, 0, 0, 255};
+    unsigned char *base = ca_frame(world, view, camera, black, NULL, 0, 64, 64,
+        "ca_line.png");
+    unsigned char *px = ca_frame(world, view, camera, black, &ca, 1, 64, 64, "ca_line.png");
+    int32_t edge = ca_peak(base, 32, 44, 62);
+    test_assert(vignette_px(base, 64, edge, 32)[1] > 200);
+    test_assert(edge > 50);
+
+    // Red moves away from the center and blue toward it: red right of the line, blue left
+    int32_t x;
+    bool red = false, blue = false;
+    for (x = edge + 1; x <= glm_imin(edge + 5, 63); x ++) {
+        const unsigned char *p = vignette_px(px, 64, x, 32);
+        red |= (int)p[0] > (int)p[2] + 24;
+    }
+
+    for (x = edge - 5; x < edge; x ++) {
+        const unsigned char *p = vignette_px(px, 64, x, 32);
+        blue |= (int)p[2] > (int)p[0] + 24;
+    }
+
+    test_assert(red);
+    test_assert(blue);
+
+    // The line at the center keeps its colors, compared in linear light since a hundredth of
+    // a pixel of white on black encodes far above 1/255
+    int32_t y;
+    for (y = 30; y <= 34; y ++) {
+        for (x = 24; x <= 40; x ++) {
+            const unsigned char *p = vignette_px(px, 64, x, y);
+            test_assert(fabsf(effects_linear(p[0]) - effects_linear(p[2])) < 0.05f);
+            test_assert(fabsf(effects_linear(p[0]) - effects_linear(p[1])) < 0.05f);
+        }
+    }
+
+    // The center tap keeps alpha
+    test_int(vignette_px(px, 64, edge, 32)[3], 255);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_zero_intensity_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_zero.png");
+    ca_line(world, 0);
+    ca_line(world, 2.2f);
+    ChromaticAberration value = ca_defaults();
+    value.intensity = 0;
+    value.falloff = 0;
+    ecs_entity_t ca = ca_effect(world, &value);
+    const rgba black = {0, 0, 0, 255};
+    unsigned char *base = ca_frame(world, view, camera, black, NULL, 0, 64, 64,
+        "ca_zero.png");
+    unsigned char *px = ca_frame(world, view, camera, black, &ca, 1, 64, 64, "ca_zero.png");
+    test_assert(ca_peak(base, 32, 44, 62) > 50);
+    test_assert(vignette_diff(base, px, 64 * 64) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_zero_literal_applies_as_set(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_literal.png");
+    ca_line(world, 0);
+    ecs_entity_t zero = ecs_new(world);
+    ecs_set(world, zero, ChromaticAberration, {0});
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, ChromaticAberration, {.intensity = 0.08f});
+    const rgba black = {0, 0, 0, 255};
+    unsigned char *base = ca_frame(world, view, camera, black, NULL, 0, 64, 64,
+        "ca_literal.png");
+    unsigned char *z = ca_frame(world, view, camera, black, &zero, 1, 64, 64,
+        "ca_literal.png");
+    // Intensity 0 leaves the image as is
+    test_assert(vignette_diff(base, z, 64 * 64) <= 1);
+
+    // Falloff 0 is the full offset everywhere but the center: the center line fringes too,
+    // with 0 samples clamped to 3
+    unsigned char *f = ca_frame(world, view, camera, black, &flat, 1, 64, 64,
+        "ca_literal.png");
+    test_assert(ca_fringe(f, 32, 20, 44, 24) >= 2);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    ecs_os_free(base);
+    ecs_os_free(z);
+    ecs_os_free(f);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_fringe_grows_with_intensity(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_grow.png");
+    ca_line(world, 2.2f);
+    ChromaticAberration value = ca_defaults();
+    value.falloff = 1;
+    value.samples = 16;
+    value.intensity = 0.04f;
+    ecs_entity_t weak = ca_effect(world, &value);
+    value.intensity = 0.12f;
+    ecs_entity_t strong = ca_effect(world, &value);
+    const rgba black = {0, 0, 0, 255};
+    unsigned char *w = ca_frame(world, view, camera, black, &weak, 1, 64, 64, "ca_grow.png");
+    unsigned char *s = ca_frame(world, view, camera, black, &strong, 1, 64, 64,
+        "ca_grow.png");
+    int32_t fw = ca_fringe(w, 32, 40, 63, 12);
+    int32_t fs = ca_fringe(s, 32, 40, 63, 12);
+    test_assert(fw >= 1);
+    test_assert(fs > fw);
+
+    ecs_os_free(w);
+    ecs_os_free(s);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_disabled_entry_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_disabled.png");
+    ca_line(world, 2.2f);
+    ChromaticAberration value = ca_defaults();
+    value.intensity = 0.1f;
+    value.falloff = 1;
+    ecs_entity_t ca = ca_effect(world, &value);
+    const rgba black = {0, 0, 0, 255};
+    unsigned char *base = ca_frame(world, view, camera, black, NULL, 0, 64, 64,
+        "ca_disabled.png");
+    View v = {.camera = camera, .clear = {.enabled = true, .color = black}};
+    ecs_vec_init_t(NULL, &v.effects, ViewEffect, 1);
+    *ecs_vec_append_t(NULL, &v.effects, ViewEffect) = (ViewEffect){
+        .enabled = false, .effect = ca };
+    ecs_set_ptr(world, view, View, &v);
+    ecs_vec_fini_t(NULL, &v.effects, ViewEffect);
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    unsigned char *px = effects_load(world, "ca_disabled.png");
+    test_assert(vignette_diff(base, px, 64 * 64) <= 1);
+    stbi_image_free(px);
+
+    ecs_add_id(world, ca, EcsDisabled);
+    unsigned char *off = ca_frame(world, view, camera, black, &ca, 1, 64, 64,
+        "ca_disabled.png");
+    test_assert(vignette_diff(base, off, 64 * 64) <= 1);
+
+    ecs_os_free(base);
+    ecs_os_free(off);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_same_entity_order(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_order.png");
+    ca_line(world, 2.2f);
+    ChromaticAberration value = ca_defaults();
+    value.intensity = 0.1f;
+    value.falloff = 1;
+    Vignette vig = vignette_defaults();
+    vig.intensity = 0.6f;
+    vig.radius = 0.3f;
+    ecs_entity_t all = ca_effect(world, &value);
+    ecs_add(world, all, Tonemap);
+    ecs_set_ptr(world, all, Vignette, &vig);
+    ecs_entity_t chain[3] = {ecs_new(world), ca_effect(world, &value),
+        vignette_effect(world, &vig)};
+    ecs_add(world, chain[0], Tonemap);
+    const rgba black = {0, 0, 0, 255};
+    unsigned char *a = ca_frame(world, view, camera, black, &all, 1, 64, 64, "ca_order.png");
+    unsigned char *b = ca_frame(world, view, camera, black, chain, 3, 64, 64, "ca_order.png");
+    // One entity runs Tonemap, ChromaticAberration and Vignette in that order
+    test_assert(vignette_diff(a, b, 64 * 64) <= 1);
+    test_assert(ca_fringe(a, 32, 40, 63, 8) >= 1);
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_fini(world);
+}
+
+void Effects_chromatic_aberration_follows_surface_resize(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = vignette_world(&camera, &view, 64, 64, "ca_resize.png");
+    ca_line(world, 0);
+    ChromaticAberration value = ca_defaults();
+    value.intensity = 0.05f;
+    ecs_entity_t ca = ca_effect(world, &value);
+    unsigned char *first = ca_frame(world, view, camera, (rgba){0, 0, 0, 255}, &ca, 1, 64, 64,
+        "ca_resize.png");
+    ecs_os_free(first);
+    ecs_iter_t it = ecs_each(world, Surface);
+    ecs_entity_t surface = 0;
+    while (ecs_each_next(&it)) {
+        surface = it.entities[0];
+    }
+
+    test_assert(surface != 0);
+    ecs_set(world, surface, Surface, {.width = 128, .height = 64, .resolution_scale = 2,
+        .write_to_file = "ca_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, surface, Surface, {.width = 96, .height = 48, .resolution_scale = 0.5f,
+        .write_to_file = "ca_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/ca_resize.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 96);
+    test_int(h, 48);
+    // The line at the center stays white, the black edges stay black
+    test_assert(px[(24 * 96 + 48) * 4 + 1] >= 200);
+    test_assert(px[0] < 8);
+    test_assert(px[(47 * 96 + 95) * 4] < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
 }
