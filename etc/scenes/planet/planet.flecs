@@ -7,6 +7,7 @@ using box.movement
 using box.texture
 using box.transition
 using box.spatial
+using box.atmosphere
 
 planets {
   struct Col(r: f32, g: f32, b: f32)
@@ -124,6 +125,7 @@ planets {
     prop rings: bool = false
     prop detail: i32 = 1
     prop spin: f32 = 0.05
+    prop air_scale: f32 = 1
 
     const qa: i32 = clamp(floor(atm / 5 + 0.5), 0, 20)
     const qw: i32 = clamp(floor(water / 5 + 0.5), 0, 20)
@@ -190,17 +192,15 @@ planets {
     const breath: f32 = smoothstep(0.3, 0.8, a) * sat(0.25 + w + b)
     const airc: Col = mixc(mixc(haze(k), {96, 160, 255}, breath), mixc(g2, g1, 0.4), is_gas ? 1 : 0)
     const air_k: f32 = is_gas ? 0.5 : a
-    const hz: Col = mixc(airc, {255, 255, 255}, 0.15)
-    const hz_max: f32 = max(max(hz.r, hz.g), max(hz.b, 1))
+    const air_max: f32 = max(max(airc.r, airc.g), max(airc.b, 1))
     const air_on: bool = detail > 0 && air_k > 0.02
-    const ex: f32 = 6
-    const dens: f32 = is_gas ? 1 : 0.3 + 0.7 * a
-    const ray_k: f32 = match k { 0: 1; 1: 0.3; 2: 0.45; 3: 0.5; 4: 0.7; _: 1.1 }
-    const mie_k: f32 = match k { 0: 0.5; 1: 4; 2: 0.6; 3: 3.5; 4: 3; _: 0.8 }
-    const ray_h: f32 = match k { 0: 8; 1: 10; 2: 5; 3: 12; 4: 14; _: 8 }
-    const mie_h: f32 = match k { 0: 1.2; 1: 3; 2: 0.9; 3: 2.5; 4: 4; _: 1.2 }
-    const mie_g: f32 = match k { 0: 0.8; 1: 0.7; 2: 0.76; 3: 0.65; 4: 0.6; _: 0.8 }
-    const air_h: f32 = ex * (0.7 + 0.6 * air_k)
+    const lift: f32 = 16 * air_scale * (0.7 + 0.6 * air_k)
+    const dens: f32 = is_gas ? 1 : 0.1 + 0.9 * a
+    const ray_k: f32 = match k { 0: 1.1; 1: 0.3; 2: 1.2; 3: 0.4; 4: 0.25; _: 1 }
+    const mie_k: f32 = match k { 0: 2; 1: 28; 2: 22; 3: 44; 4: 6; _: 2 }
+    const ray_h: f32 = match k { 0: 8; 1: 9; 2: 5; 3: 11; 4: 9; _: 8 }
+    const mie_h: f32 = match k { 0: 1.5; 1: 8; 2: 3; 3: 10; 4: 7; _: 1.5 }
+    const mie_g: f32 = match k { 0: 0.75; 1: 0.4; 2: 0.7; 3: 0.4; 4: 0.5; _: 0.75 }
     const dust: Col = mixc({214, 204, 184}, {196, 170, 140}, v1)
     const ringc: Col = mixc(dust, mixc(g2, {255, 255, 255}, 0.4), is_gas ? 0.35 : 0)
     const mist: Col = mixc(mixc(haze(k), {255, 255, 255}, 0.25), {255, 255, 255}, sat(w * 4))
@@ -229,13 +229,13 @@ planets {
       PlanetAtmosphere: {
         sun: sun
         radius: radius
-        thickness: ray_h * air_h * 7
-        rayleigh: {scale_height: ray_h * air_h, scattering_scale: ray_k * dens * 2.5 / ex}
+        thickness: max(ray_h, mie_h) * lift * 6
+        rayleigh: {scale_height: ray_h * lift, scattering_scale: ray_k * dens / lift}
         mie: {
-          scale_height: mie_h * air_h, anisotropy: mie_g, scattering_scale: mie_k * dens * 2.5 / ex,
-          tint: {hz.r * 255 / hz_max, hz.g * 255 / hz_max, hz.b * 255 / hz_max}
+          scale_height: mie_h * lift, anisotropy: mie_g, scattering_scale: mie_k * dens / lift,
+          tint: {airc.r * 255 / air_max, airc.g * 255 / air_max, airc.b * 255 / air_max}
         }
-        ozone_scale: k == 5 ? 1 : 0
+        ozone_scale: 0
       }
     }
 
