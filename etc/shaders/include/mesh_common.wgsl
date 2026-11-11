@@ -36,6 +36,10 @@ override scene_environment: bool = false;
 // Aerial perspective of the atmosphere (Scene.aerial_perspective).
 override scene_aerial: bool = false;
 
+// Water shapes of a scene with Scene.water, set by the extended mesh shader with transmissive:
+// the vertex stage passes the Water fields of the material (vo_water).
+override water: bool = false;
+
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
 
@@ -117,7 +121,28 @@ struct VertexOut {
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b
     @location(13) @interpolate(flat) fresnel_color: vec2u,
+    // Water foam width, ripple and foam scale (pack2x16float) and ripple offset of a Water
+    // pipeline (water), which reuses flat2 and flat3.zw for the other Water fields: Water
+    // ignores Transmission, and the fragment stage cannot read the material table.
+    @location(8) @interpolate(flat) flat4: vec4u,
 };
+
+// The Water fields of the material of a fragment of a Water pipeline, the others zero.
+fn vo_water(f: VertexOut) -> Material {
+    var m: Material;
+    m.water_shallow = f.flat2.x & 0xFFFFFFu;
+    m.water_flags = f.flat2.x >> 24u;
+    m.water_deep = f.flat2.y;
+    m.water_foam = f.flat2.z;
+    m.water_depth = bitcast<f32>(f.flat2.w);
+    m.water_visibility = bitcast<f32>(f.flat3.z);
+    m.water_refraction = bitcast<f32>(f.flat3.w);
+    m.water_foam_width = bitcast<f32>(f.flat4.x);
+    m.water_ripple_scale = unpack2x16float(f.flat4.y).x;
+    m.water_foam_scale = unpack2x16float(f.flat4.y).y;
+    m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
+    return m;
+}
 
 fn vo_emissive(f: VertexOut) -> vec3f {
     return vec3f(unpack2x16float(f.flat0.x), unpack2x16float(f.flat0.y).x);
@@ -276,7 +301,9 @@ fn vertex_scalars(material: Material, mapped: f32) -> vec2u {
         pack2x16float(vec2f(material.diffuse_blur, mapped)));
 }
 
-fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading) -> VertexOut {
+fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading)
+    -> VertexOut
+{
     var o: VertexOut;
     o.pos = p.pos;
     o.world = p.world.xyz;
@@ -298,6 +325,16 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     o.fresnel = vec4f(material.fresnel_strength, material.fresnel_power, material.fresnel_bias,
         material.fresnel_opacity);
     o.fresnel_color = material.fresnel_color;
+    o.flat4 = vec4u(0u);
+    if (water) {
+        o.flat2 = vec4u((material.water_shallow & 0xFFFFFFu) | (material.water_flags << 24u),
+            material.water_deep, material.water_foam, bitcast<u32>(material.water_depth));
+        o.flat3.z = bitcast<u32>(material.water_visibility);
+        o.flat3.w = bitcast<u32>(material.water_refraction);
+        o.flat4 = vec4u(bitcast<u32>(material.water_foam_width),
+            pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),
+            bitcast<vec2u>(material.water_ripple_offset));
+    }
     return o;
 }
 

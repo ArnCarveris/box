@@ -1,6 +1,12 @@
 // Fog volumes: one box per FogVolume a view draws (box_render_fog_volume_t), raymarched in its
 // forward pass after the opaque meshes and the sky, in a pass that reads the depth of the view
 // (group 1) instead of writing it.
+//
+// A view with transmissive draws splits each ray at the nearest transmissive surface of its
+// pixel (glass_texture, the depth of the transmissive draws over the opaque depth): before its
+// snapshot it marches the part behind the surface (SEGMENT_BEHIND), which the surface refracts,
+// and after its last transmissive draw the part from the camera to the surface (SEGMENT_FRONT),
+// which fogs the surface as it fogs an opaque one at its depth.
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 #include "include/point_shadow.wgsl"
@@ -23,6 +29,13 @@ const STEPS_MIN_NOISE: i32 = 8;
 // Cluster lookups of a march at most, and the lights of each it keeps at most,
 // BOX_FOG_VOLUME_LIGHT_STEPS.
 const FOG_LIGHT_SEGMENTS: i32 = 8;
+
+// Segments of the ray a draw marches (FogDraw.segment): the whole ray to the opaque depth, the
+// part behind the transmissive surface of the pixel, else the whole ray, and the part in front of
+// it, nothing where the pixel has none.
+const SEGMENT_FULL: u32 = 0u;
+const SEGMENT_BEHIND: u32 = 1u;
+const SEGMENT_FRONT: u32 = 2u;
 
 struct FogVolume {
     center: vec3f,
@@ -47,6 +60,10 @@ struct FogVolume {
 
 struct FogDraw {
     inv_view_proj: mat4x4f,
+    segment: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
@@ -58,6 +75,9 @@ struct FogDraw {
 @group(1) @binding(2) var depth_texture: texture_depth_2d;
 @group(1) @binding(3) var noise: texture_3d<f32>;
 @group(1) @binding(4) var noise_sampler: sampler;
+// Depth of the nearest transmissive surface over the opaque depth, the opaque depth itself for
+// SEGMENT_FULL.
+@group(1) @binding(5) var glass_texture: texture_depth_2d;
 
 struct VertexOut {
     @builtin(position) clip: vec4f,
@@ -204,10 +224,29 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
     let t1 = (fog.extent - o) * inv;
     let lo = min(t0, t1);
     let hi = max(t0, t1);
-    let t_near = max(max(max(lo.x, lo.y), lo.z), 0.0);
+    var t_near = max(max(max(lo.x, lo.y), lo.z), 0.0);
     var t_far = min(min(hi.x, hi.y), hi.z);
     if (depth > 0.0) {
         t_far = min(t_far, scene);
+    }
+
+    if (draw.segment != SEGMENT_FULL) {
+        // Reversed Z: a transmissive surface in front of the opaque depth is greater.
+        let glass = textureLoad(glass_texture, vec2i(in.clip.xy), 0);
+        let has_glass = glass > depth;
+        if (draw.segment == SEGMENT_FRONT && !has_glass) {
+            discard;
+        }
+
+        if (has_glass) {
+            let at = world_at(uv, glass);
+            let surface = length(at.xyz / at.w - origin);
+            if (draw.segment == SEGMENT_FRONT) {
+                t_far = min(t_far, surface);
+            } else {
+                t_near = max(t_near, surface);
+            }
+        }
     }
 
     if (t_far <= t_near) {

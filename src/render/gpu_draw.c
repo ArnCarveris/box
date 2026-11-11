@@ -1068,6 +1068,11 @@ typedef struct box_gpu_view_pass_t {
                                      *   copies */
     WGPUTexture depth_texture;      /**< Texture of the depth attachment, which the snapshot
                                      *   copies next to its color */
+    int32_t front;                  /**< Index of the draw after the last transmissive draw of
+                                     *   a view with fog volumes, before which the volumes march
+                                     *   the rays in front of the glass, -1 for none */
+    WGPUTextureView glass;          /**< Depth of the nearest transmissive surfaces over the
+                                     *   opaque depth, NULL until box_gpu_draw_glass */
 } box_gpu_view_pass_t;
 
 /** Begin a pass of a view that continues the image and depth of the pass before it, counted
@@ -1113,11 +1118,86 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
     return wgpuCommandEncoderBeginRenderPass(vp->encoder, &desc);
 }
 
+/** Record the transmissive draws of a view depth only into the glass depth of its snapshot, a
+ * copy of its opaque depth (box_gpu_transmission_glass), so it holds the nearest transmissive
+ * surface in front of the opaque depth. Called between two passes, before the fog volumes.
+ *
+ * The transmissive draws use the depth prepass pipelines of their batches (vs_depth and
+ * fs_depth), which write the depth with compare Greater.
+ *
+ * @param gpu The backend
+ * @param vp The pass of the view, whose glass it sets
+ * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
+ * @param slot Slot of the view in the view buffer
+ */
+static void box_gpu_draw_glass(
+    box_gpu_t *gpu,
+    box_gpu_view_pass_t *vp,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    int32_t slot)
+{
+    const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
+    WGPURenderPipeline bound = NULL;
+    WGPUBindGroup material = NULL, instances = NULL;
+    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    int32_t i;
+    vp->glass = box_gpu_transmission_glass(gpu, vp->snapshot, vp->encoder, vp->depth_texture);
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = vp->glass,
+        .depthLoadOp = WGPULoadOp_Load,
+        .depthStoreOp = WGPUStoreOp_Store
+    };
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(vp->encoder,
+        &(WGPURenderPassDescriptor){ .depthStencilAttachment = &depth });
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
+    for (i = 0; cv && i < cv->draw_count; i ++) {
+        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+        const box_render_batch_t *b = ecs_vec_get_t(
+            &packet->batches, box_render_batch_t, d->batch);
+        if (!b->transmissive) {
+            continue;
+        }
+
+        WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b,
+            WGPUTextureFormat_Undefined);
+        if (!pipeline) {
+            continue;
+        }
+
+        if (pipeline != bound) {
+            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+            bound = pipeline;
+        }
+
+        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
+        if (layers != material) {
+            wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
+            material = layers;
+        }
+
+        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, false, true, &instances)) {
+            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
+        }
+    }
+
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+}
+
 /** Record the fog volumes of a view, then the particles of its scene, then bind the groups of
  * the forward pass again, which their pipelines do not share.
  *
  * A view with fog volumes or a soft pool ends its pass, draws both in a pass that samples the
  * depth it reads and, unless they are the last draws of the view, continues in a new pass.
+ *
+ * The fog volumes of a view with transmissive draws march only the rays behind the glass
+ * (box_gpu_draw_glass), which its snapshot then holds.
  *
  * @param gpu The backend
  * @param t The target
@@ -1126,7 +1206,7 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
  * @param packet The packet
  * @param v The view
  * @param group The bind group of the view
- * @param offset Offset of the uniforms of the view in the view buffer
+ * @param slot Slot of the view in the view buffer
  * @param last Whether nothing draws after the particles
  * @return Whether the pipeline and material bound before are lost
  */
@@ -1138,9 +1218,10 @@ static bool box_gpu_draw_particles(
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     WGPUBindGroup group,
-    uint32_t offset,
+    int32_t slot,
     bool last)
 {
+    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool result = true, rebind = true;
     if (!vp->soft && !vp->fog) {
         result = box_gpu_particles_draw(gpu, vp->pass, format, v, NULL);
@@ -1148,10 +1229,15 @@ static bool box_gpu_draw_particles(
     } else {
         wgpuRenderPassEncoderEnd(vp->pass);
         wgpuRenderPassEncoderRelease(vp->pass);
+        if (vp->fog && vp->front >= 0) {
+            box_gpu_draw_glass(gpu, vp, packet, v, group, slot);
+        }
+
         vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
         wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
         if (vp->fog) {
-            box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth);
+            box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth,
+                vp->glass, BOX_GPU_FOG_SEGMENT_BEHIND);
         }
 
         box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth);
@@ -1169,6 +1255,46 @@ static bool box_gpu_draw_particles(
     }
 
     return result;
+}
+
+/** End the pass of a view after its last transmissive draw, march its fog volumes from the
+ * camera to the nearest transmissive surface of each pixel that has one in a pass that reads the
+ * depth, then continue in a new pass with the groups of the forward pass bound again.
+ *
+ * Together with the part behind the glass, which the snapshot holds, every ray is marched once,
+ * so the glass is fogged as an opaque surface at its depth. Blended shapes drawn in front of the
+ * glass before its last transmissive draw are fogged as the glass behind them.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param vp The pass of the view, its pass replaced
+ * @param format The format of the color target
+ * @param packet The packet
+ * @param v The view
+ * @param group The bind group of the view
+ * @param offset Offset of the uniforms of the view in the view buffer
+ */
+static void box_gpu_draw_fog_front(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    box_gpu_view_pass_t *vp,
+    WGPUTextureFormat format,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUBindGroup group,
+    uint32_t offset)
+{
+    wgpuRenderPassEncoderEnd(vp->pass);
+    wgpuRenderPassEncoderRelease(vp->pass);
+    vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
+    wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+    box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth, vp->glass,
+        BOX_GPU_FOG_SEGMENT_FRONT);
+    wgpuRenderPassEncoderEnd(vp->pass);
+    wgpuRenderPassEncoderRelease(vp->pass);
+    vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
+    wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
+    wgpuRenderPassEncoderSetBindGroup(vp->pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
 }
 
 /** End the pass of a view before a transmissive draw, copy its image into the snapshot and
@@ -1217,7 +1343,9 @@ static void box_gpu_draw_snapshot(
  * @param t The target
  * @param vp The render pass of the view, which the fog volumes and particles may split, and its
  * snapshot, taken right before the first transmissive draw and again before a later one that
- * follows other draws, BOX_GPU_TRANSMISSION_SNAPSHOTS at most (box_gpu_draw_snapshot)
+ * follows other draws, BOX_GPU_TRANSMISSION_SNAPSHOTS at most (box_gpu_draw_snapshot). A view
+ * with fog volumes and transmissive draws marches the rays behind the glass before the snapshot
+ * and those in front of it after the last transmissive draw (box_gpu_draw_fog_front)
  * @param format The format of the color target
  * @param packet The packet
  * @param v The view
@@ -1248,11 +1376,28 @@ static void box_gpu_draw_batches(
     bool late = phase == 3 && box_gpu_cull_occludes(gpu, slot);
     bool wired = v->debug.wireframe == WireframeOnly;
     int32_t i;
+    vp->front = -1;
+    vp->glass = NULL;
+    for (i = 0; vp->fog && vp->snapshot && cv && i < cv->draw_count; i ++) {
+        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+        if (ecs_vec_get_t(&packet->batches, box_render_batch_t, d->batch)->transmissive) {
+            vp->front = i + 1;
+        }
+    }
+
     for (i = 0; cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
+        if (i == vp->front && vp->glass) {
+            box_gpu_draw_fog_front(gpu, t, vp, format, packet, v, group, offset);
+            bound = NULL;
+            material = NULL;
+            instances = NULL;
+        }
+
         WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b, phase == 3);
         bool mesh = b->view == -1 && box_render_is_mesh(b->pipeline);
         if (!sky && !mesh) {
@@ -1266,7 +1411,7 @@ static void box_gpu_draw_batches(
 
         if (!particles && !mesh) {
             particles = true;
-            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, offset, false)) {
+            if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, false)) {
                 bound = NULL;
                 material = NULL;
                 instances = NULL;
@@ -1315,12 +1460,16 @@ static void box_gpu_draw_batches(
         }
     }
 
+    if (cv && vp->front == cv->draw_count && vp->glass) {
+        box_gpu_draw_fog_front(gpu, t, vp, format, packet, v, group, offset);
+    }
+
     if (!sky) {
         box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset);
     }
 
     if (!particles) {
-        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, offset, true);
+        box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, true);
     }
 }
 

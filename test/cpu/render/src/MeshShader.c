@@ -1281,3 +1281,91 @@ void MeshShader_add_fresnel_moves_to_extended(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void MeshShader_water_draws_transmissive_extended(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.water = true, .texture_blend = true});
+    ecs_entity_t foam = ecs_new(world);
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_add(world, shape, Water);
+    ecs_get_mut(world, shape, Water)->foam_texture = foam;
+    ecs_modified(world, shape, Water);
+    ecs_set(world, shape, AlphaCutoff, {0.5f});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, shape_slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    test_bool(b->key.water, true);
+    test_bool(b->key.transmissive, true);
+    test_int(b->key.blend, AlphaBlend);
+    test_bool(b->key.cutout, false);
+    test_bool(b->key.shadow, false);
+    test_bool(b->key.bake, false);
+    test_bool(b->key.texture_blend, false);
+    test_uint(b->key.foam, foam);
+
+    /* A new foam texture moves the shape to the batch of its key */
+    ecs_entity_t other = ecs_new(world);
+    ecs_get_mut(world, shape, Water)->foam_texture = other;
+    ecs_modified(world, shape, Water);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    test_uint(box_draws_batch(d, shape_slot->batch)->key.foam, other);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MeshShader_water_off_draws_with_mesh_shader(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.sheen = true, .transmission = true});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_add(world, shape, Water);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, shape_slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_bool(b->key.water, false);
+    test_bool(b->key.transmissive, false);
+    test_int(b->key.blend, Opaque);
+    test_bool(b->key.shadow, true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

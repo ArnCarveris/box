@@ -1,7 +1,7 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
- * diffuse transmission, emission, Fresnel rim and transmission.
+ * diffuse transmission, emission, Fresnel rim, transmission and water.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -25,9 +25,9 @@ extern "C" {
 /** Slot of the material table a shape renders with, set by the engine and read only for
  * applications, inherited by instances.
  *
- * The material components, such as Rgb, PbrMaterial, Transmission, TextureScroll and Fresnel,
- * bring it along. A prefab that owns one gets a slot its instances share, a 3D shape that owns
- * one a slot of its own.
+ * The material components, such as Rgb, PbrMaterial, Transmission, Water, TextureScroll and
+ * Fresnel, bring it along. A prefab that owns one gets a slot its instances share, a 3D shape
+ * that owns one a slot of its own.
  *
  * Slot 0 is the default material, of a shape without any material component. An owned id that
  * was never handed a slot (a light, a 2D shape, a text) is UINT32_MAX.
@@ -55,7 +55,7 @@ ECS_STRUCT(Rgb, {
  *
  * A shape whose resulting alpha is under 1 is drawn by the sorted blended pass and casts no
  * shadow; at 1 it stays in its opaque batch. A shape with AlphaCutoff tests the alpha against
- * its cutoff in the opaque pass instead. A shape with Transmission ignores it.
+ * its cutoff in the opaque pass instead. A shape with Transmission or Water ignores it.
  */
 ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
@@ -74,7 +74,7 @@ ECS_STRUCT(Opacity, {
  *
  * With an Opaque or missing BlendMode it draws in the opaque pass whatever its Opacity, with its
  * holes in depth, shadows, captures and BackFacePlain back faces; otherwise it discards in the
- * sorted blended pass and casts no shadow. A shape with Transmission ignores it.
+ * sorted blended pass and casts no shadow. A shape with Transmission or Water ignores it.
  */
 ECS_STRUCT(AlphaCutoff, {
     float value; /**< Alpha below which a fragment is discarded */
@@ -259,7 +259,8 @@ ECS_STRUCT(Fresnel, {
  *
  * It draws in the sorted blended pass without depth writes, casts no shadow, is not captured and
  * ignores Opacity, BlendMode and AlphaCutoff. It shows a refracted, blurred and absorbed snapshot
- * of what its view drew before it, taken again at most 4 times a frame.
+ * of what its view drew before it, taken again at most 4 times a frame. A FogVolume between the
+ * camera and the surface fogs the surface itself; the snapshot holds only the fog behind it.
  *
  * Transitionable: the four floats interpolate linearly and attenuation_color like Rgb; adding or
  * removing Transmission changes the batch at once.
@@ -274,8 +275,88 @@ ECS_STRUCT(Transmission, {
                                  *   encoded */
 });
 
+/** Shallow color of a constructed Water, display encoded */
+#define BOX_MATERIAL_WATER_SHALLOW_R (60)
+#define BOX_MATERIAL_WATER_SHALLOW_G (170)
+#define BOX_MATERIAL_WATER_SHALLOW_B (160)
+
+/** Deep color of a constructed Water, display encoded */
+#define BOX_MATERIAL_WATER_DEEP_R (8)
+#define BOX_MATERIAL_WATER_DEEP_G (40)
+#define BOX_MATERIAL_WATER_DEEP_B (64)
+
+/** Depth of a constructed Water at which its body is about 95% deep_color, world units */
+#define BOX_MATERIAL_WATER_DEPTH (3.0f)
+
+/** Visibility of a constructed Water: world units along the view ray the scene behind shows
+ * through */
+#define BOX_MATERIAL_WATER_VISIBILITY (2.0f)
+
+/** Refraction of a constructed Water, a fraction of the image height */
+#define BOX_MATERIAL_WATER_REFRACTION (0.02f)
+
+/** Foam color of a constructed Water, display encoded */
+#define BOX_MATERIAL_WATER_FOAM_R (240)
+#define BOX_MATERIAL_WATER_FOAM_G (245)
+#define BOX_MATERIAL_WATER_FOAM_B (245)
+
+/** Foam width of a constructed Water: the water depth below which foam appears, world units */
+#define BOX_MATERIAL_WATER_FOAM_WIDTH (0.3f)
+
+/** Foam scale of a constructed Water: the foam texture repeats as the UVs */
+#define BOX_MATERIAL_WATER_FOAM_SCALE (1.0f)
+
+/** Ripple scale of a constructed Water: no second normal sample */
+#define BOX_MATERIAL_WATER_RIPPLE_SCALE (0.0f)
+
+/** Surface of a body of water seen from above (ponds, lakes, canals, the sea), on a 3D mesh,
+ * default a teal shallow and a dark blue deep color, depth 3, visibility 2, refraction 0.02,
+ * an off white foam of width 0.3 without a texture and no ripples. Inherited by instances like
+ * Rgb; a field a scene does not set keeps its default.
+ *
+ * It draws like Transmission: in the sorted blended pass without depth writes, casting no
+ * shadow, not captured, over a snapshot of what its view drew before it, and it ignores
+ * Transmission, Opacity, BlendMode, AlphaCutoff and TextureBlend.
+ *
+ * The depth d of a pixel is the distance from the surface to the opaque surface behind it along
+ * the geometric normal, the ray length that along the view ray; with nothing behind (the sky)
+ * both are infinite. The body color mixes shallow_color toward deep_color by
+ * 1 - exp(-3 d / depth) and is lit diffusely by the light of the surface; it covers the scene
+ * behind, refracted by refraction times the normal in screen space, by 1 - exp(-3 ray length /
+ * visibility). Below foam_width the opaque, diffusely lit foam replaces both by
+ * saturate(1 - d / foam_width), broken up by the red of foam_texture. The direct and indirect
+ * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
+ *
+ * Waves are the PbrTextures.normal of the shape, scrolled by TextureScroll; ripple_scale adds a
+ * second sample of it, moved by ripple_velocity and whiteout blended. Its record is packed every
+ * frame, like that of a TextureScroll.
+ *
+ * Underwater views and the back faces are not supported: the surface is seen from above. Needs
+ * Scene.water: a scene without it draws the shape as if it had no Water. Only 3D meshes have it,
+ * 2D shapes and text ignore it.
+ */
+ECS_STRUCT(Water, {
+    Rgb shallow_color;      /**< Color of the body where it is shallow, display encoded */
+    Rgb deep_color;         /**< Color of the body where it is deep, display encoded */
+    float depth;            /**< Water depth at which the body is about 95% deep_color, world
+                             *   units */
+    float visibility;       /**< World units of water along the view ray through which the scene
+                             *   behind still shows */
+    float refraction;       /**< Screen space distortion of the scene behind by the normal, a
+                             *   fraction of the image height */
+    Rgb foam_color;         /**< Color of the foam, display encoded */
+    float foam_width;       /**< Water depth below which foam appears, world units, 0 for none */
+    ecs_entity_t foam_texture; /**< Texture whose red breaks up the foam, sampled with the UVs of
+                             *   the shape times foam_scale; 0 for a smooth band */
+    float foam_scale;       /**< Repeats of the foam texture per repeat of the UVs */
+    float ripple_scale;     /**< Scale of the UVs of a second sample of the normal map, 0 for
+                             *   none */
+    vec2 ripple_velocity;   /**< Texture widths per second the second sample moves, wrapped
+                             *   in double precision like TextureScroll */
+});
+
 /** Equation the fragments of a material are combined with, default Opaque. A shape with
- * Transmission ignores it. */
+ * Transmission or Water ignores it. */
 ECS_ENUM(BlendMode, {
     Opaque = 0,             /**< No blending, the fragment replaces the target */
     AlphaBlend = 1,         /**< Source over, the fragment is weighted by its alpha */

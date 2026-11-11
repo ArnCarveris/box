@@ -837,7 +837,7 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.anisotropy, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
 
     SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
@@ -953,7 +953,7 @@ void Material_sheen_pack(void) {
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -1068,7 +1068,7 @@ void Material_diffuse_transmission_defaults(void) {
 void Material_diffuse_transmission_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
     test_int(offsetof(box_render_material_t, diffuse_transmission), 76);
     test_int(offsetof(box_render_material_t, thickness), 80);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
@@ -1182,7 +1182,7 @@ void Material_diffuse_transmission_blur_defaults(void) {
 void Material_diffuse_transmission_blur_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
     test_int(offsetof(box_render_material_t, diffuse_blur), 84);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
@@ -2362,7 +2362,7 @@ void Material_texture_scroll_pack(void) {
     test_uint(record.fresnel_color[0], 0);
     test_uint(record.fresnel_color[1], 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
 
     box_draws_material_pack(&record, &(box_draw_material_t){
         .uv = &uv, .fade = 1, .time = 1000 });
@@ -2543,7 +2543,7 @@ void Material_fresnel_pack(void) {
     test_flt(record.fresnel_bias, 0);
     test_flt(record.fresnel_opacity, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 128);
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
     test_int(ECS_SIZEOF(box_render_material_t) % 16, 0);
     test_int(offsetof(box_render_material_t, fresnel_color), 104);
     test_int(offsetof(box_render_material_t, fresnel_strength), 112);
@@ -2640,4 +2640,261 @@ void Material_fresnel_factor(void) {
 
     /* A higher power gives a thinner rim */
     test_assert(box_draws_fresnel_factor(c60, 8, 0) < box_draws_fresnel_factor(c60, 2, 0));
+}
+
+void Material_water_defaults(void) {
+    // materials/water
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "water",
+        "using box.material\n"
+        "pond { Water: {depth: 5, foam_width: 0} }\n"
+        "sea { Water: {shallow_color: {10, 20, 30}, ripple_scale: 2.5,"
+        " ripple_velocity: {0.25, -0.5}} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Water);
+    const Water *w = ecs_get(world, added, Water);
+    test_assert(w != NULL);
+    test_uint(w->shallow_color.r, 60);
+    test_uint(w->shallow_color.g, 170);
+    test_uint(w->shallow_color.b, 160);
+    test_uint(w->deep_color.r, 8);
+    test_uint(w->deep_color.g, 40);
+    test_uint(w->deep_color.b, 64);
+    test_flt(w->depth, BOX_MATERIAL_WATER_DEPTH);
+    test_flt(w->depth, 3);
+    test_flt(w->visibility, 2);
+    test_flt(w->refraction, 0.02f);
+    test_uint(w->foam_color.r, 240);
+    test_uint(w->foam_color.g, 245);
+    test_uint(w->foam_color.b, 245);
+    test_flt(w->foam_width, 0.3f);
+    test_uint(w->foam_texture, 0);
+    test_flt(w->foam_scale, 1);
+    test_flt(w->ripple_scale, 0);
+    test_flt(w->ripple_velocity[0], 0);
+    test_flt(w->ripple_velocity[1], 0);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    w = ecs_get(world, ecs_lookup(world, "pond"), Water);
+    test_assert(w != NULL);
+    test_flt(w->depth, 5);
+    test_flt(w->foam_width, 0);
+    test_flt(w->visibility, 2);
+    test_uint(w->shallow_color.g, 170);
+    test_bool(ecs_owns(world, ecs_lookup(world, "pond"), MaterialId), true);
+
+    w = ecs_get(world, ecs_lookup(world, "sea"), Water);
+    test_assert(w != NULL);
+    test_uint(w->shallow_color.r, 10);
+    test_uint(w->shallow_color.g, 20);
+    test_uint(w->shallow_color.b, 30);
+    test_uint(w->deep_color.b, 64);
+    test_flt(w->ripple_scale, 2.5f);
+    test_flt(w->ripple_velocity[0], 0.25f);
+    test_flt(w->ripple_velocity[1], -0.5f);
+    test_flt(w->depth, 3);
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_add(world, prefab, Water);
+    ecs_get_mut(world, prefab, Water)->depth = 7;
+    ecs_modified(world, prefab, Water);
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Water), false);
+    test_flt(ecs_get(world, instance, Water)->depth, 7);
+    test_flt(ecs_get(world, instance, Water)->visibility, 2);
+
+    ecs_fini(world);
+}
+
+/** The record holds the Water colors display encoded, its floats sanitized and the ripple offset
+ * wrapped at the time; a material without one packs zeros and the bytes it did before, and a
+ * transition of another component encodes the record again with it. */
+void Material_water_pack(void) {
+    // materials/water
+    box_render_material_t record, plain;
+    box_draws_tables_init();
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_flt(record.water_ripple_offset[0], 0);
+    test_flt(record.water_ripple_offset[1], 0);
+    test_uint(record.water_shallow, 0);
+    test_uint(record.water_deep, 0);
+    test_uint(record.water_foam, 0);
+    test_flt(record.water_depth, 0);
+    test_flt(record.water_visibility, 0);
+    test_flt(record.water_refraction, 0);
+    test_flt(record.water_foam_width, 0);
+    test_flt(record.water_foam_scale, 0);
+    test_flt(record.water_ripple_scale, 0);
+    test_uint(record.water_flags, 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(offsetof(box_render_material_t, water_ripple_offset), 128);
+    test_int(offsetof(box_render_material_t, water_shallow), 136);
+    test_int(offsetof(box_render_material_t, water_depth), 148);
+    test_int(offsetof(box_render_material_t, water_flags), 172);
+
+    Water pond = {
+        .shallow_color = {60, 170, 160}, .deep_color = {8, 40, 64},
+        .depth = 3, .visibility = 2, .refraction = 0.02f, .foam_color = {240, 245, 245},
+        .foam_width = 0.3f, .foam_texture = 0, .foam_scale = 1, .ripple_scale = 0,
+        .ripple_velocity = {0.5f, 0.25f}
+    };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &pond, .time = 3, .fade = 1 });
+    test_uint(record.water_shallow, 60u | (170u << 8) | (160u << 16));
+    test_uint(record.water_deep, 8u | (40u << 8) | (64u << 16));
+    test_uint(record.water_foam, 240u | (245u << 8) | (245u << 16));
+    test_flt(record.water_depth, 3);
+    test_flt(record.water_visibility, 2);
+    test_flt(record.water_refraction, 0.02f);
+    test_flt(record.water_foam_width, 0.3f);
+    test_flt(record.water_foam_scale, 1);
+    test_flt(record.water_ripple_scale, 0);
+    test_uint(record.water_flags, 0);
+
+    /* Without ripples the velocity does not move anything */
+    test_flt(record.water_ripple_offset[0], 0);
+    test_flt(record.water_ripple_offset[1], 0);
+
+    /* Water leaves the transmission of the record alone */
+    test_flt(record.transmission_factor, 0);
+
+    Water rippled = pond;
+    rippled.ripple_scale = 4;
+    rippled.ripple_velocity[0] = 0.25f;
+    rippled.ripple_velocity[1] = -0.5f;
+    rippled.foam_texture = 1234;
+    rippled.foam_scale = 8;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &rippled, .time = 3, .fade = 1 });
+    test_flt(record.water_ripple_scale, 4);
+    test_flt(record.water_ripple_offset[0], 0.75f);
+    test_flt(record.water_ripple_offset[1], 0.5f);
+    test_flt(record.water_foam_scale, 8);
+    test_uint(record.water_flags, BOX_RENDER_WATER_FOAM_TEXTURE);
+
+    /* The ripple offset wraps like TextureScroll, in double precision */
+    float scroll[4];
+    TextureScroll same = { .velocity = {0.25f, -0.5f} };
+    box_draws_texture_scroll(&same, 12345.5, scroll);
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &rippled, .time = 12345.5, .fade = 1 });
+    test_flt(record.water_ripple_offset[0], scroll[0]);
+    test_flt(record.water_ripple_offset[1], scroll[1]);
+
+    Water broken = pond;
+    broken.depth = -1;
+    broken.visibility = NAN;
+    broken.refraction = INFINITY;
+    broken.foam_width = -2;
+    broken.foam_scale = NAN;
+    broken.ripple_scale = -1;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &broken, .time = 3, .fade = 1 });
+    test_flt(record.water_depth, BOX_RENDER_WATER_MIN);
+    test_flt(record.water_visibility, BOX_RENDER_WATER_MIN);
+    test_flt(record.water_refraction, 0);
+    test_flt(record.water_foam_width, 0);
+    test_flt(record.water_foam_scale, 0);
+    test_flt(record.water_ripple_scale, 0);
+    test_flt(record.water_ripple_offset[0], 0);
+
+    Water zero = pond;
+    zero.depth = 0;
+    box_draws_material_pack(&record, &(box_draw_material_t){ .water = &zero, .fade = 1 });
+    test_assert(record.water_depth > 0);
+
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+
+    PbrMaterial pbr = { .metallic = 0, .roughness = 0.05f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &rippled, .pbr = &pbr, .time = 7.25, .fade = 1 });
+    box_draw_transition_material_t target;
+    box_render_material_t encoded;
+    box_draws_transition_target(&target, &(box_draw_material_t){
+        .water = &rippled, .pbr = &pbr, .time = 7.25, .fade = 1 }, BOX_DRAW_TRANSITION_TABLE);
+    box_draws_transition_encode(&target, &encoded);
+    test_assert(!ecs_os_memcmp_t(&encoded, &record, box_render_material_t));
+
+    box_render_shading_t sa, sb;
+    box_draws_material(&sa, &(box_draw_material_t){ .pbr = &pbr, .fade = 1 });
+    box_draws_material(&sb, &(box_draw_material_t){
+        .water = &rippled, .pbr = &pbr, .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&sa, &sb, box_render_shading_t));
+}
+
+/** The C twin of water_depth_mix of material.wgsl: 0 at the surface, about 95% of the deep
+ * color at the depth, 1 - exp(-3) in general, monotonic, and 1 where nothing is behind. */
+void Material_water_depth_mix(void) {
+    // materials/water
+    test_flt(box_draws_water_depth_mix(0, 3), 0);
+    test_assert(fabsf(box_draws_water_depth_mix(3, 3) - (1.0f - expf(-3.0f))) < 1e-6f);
+    test_assert(box_draws_water_depth_mix(3, 3) > 0.94f);
+    test_assert(box_draws_water_depth_mix(3, 3) < 0.96f);
+    test_assert(fabsf(box_draws_water_depth_mix(1, 2) - (1.0f - expf(-1.5f))) < 1e-6f);
+    test_assert(box_draws_water_depth_mix(0.5f, 3) < box_draws_water_depth_mix(1, 3));
+    test_assert(box_draws_water_depth_mix(1, 3) < box_draws_water_depth_mix(2, 3));
+
+    /* A deeper Water.depth keeps the color shallow longer */
+    test_assert(box_draws_water_depth_mix(1, 6) < box_draws_water_depth_mix(1, 3));
+
+    /* Negative depths (above the surface) are shallow, the sky is deep */
+    test_flt(box_draws_water_depth_mix(-1, 3), 0);
+    test_flt(box_draws_water_depth_mix(INFINITY, 3), 1);
+    test_flt(box_draws_water_depth_mix(1e9f, 3), 1);
+
+    /* A depth of 0 is the smallest one */
+    test_assert(box_draws_water_depth_mix(0.01f, 0) > 0.99f);
+}
+
+/** The C twin of water_transmittance of material.wgsl: 1 at the surface, exp(-3) at the
+ * visibility, falling with the ray length, and 0 where nothing is behind. */
+void Material_water_transmittance(void) {
+    // materials/water
+    test_flt(box_draws_water_transmittance(0, 2), 1);
+    test_assert(fabsf(box_draws_water_transmittance(2, 2) - expf(-3.0f)) < 1e-6f);
+    test_assert(fabsf(box_draws_water_transmittance(1, 2) - expf(-1.5f)) < 1e-6f);
+    test_assert(box_draws_water_transmittance(0.5f, 2) > box_draws_water_transmittance(1, 2));
+
+    /* A larger visibility shows more of the scene behind */
+    test_assert(box_draws_water_transmittance(1, 4) > box_draws_water_transmittance(1, 2));
+
+    test_flt(box_draws_water_transmittance(-1, 2), 1);
+    test_flt(box_draws_water_transmittance(INFINITY, 2), 0);
+    test_assert(box_draws_water_transmittance(0.01f, 0) < 0.01f);
+}
+
+/** The C twin of water_foam of material.wgsl: a band from 1 at the shore to 0 at foam_width,
+ * none at a width of 0 or over the sky; a texture cuts the band at its red. */
+void Material_water_foam(void) {
+    // materials/water
+    test_flt(box_draws_water_foam(0, 0.3f, false, 0), 1);
+    test_assert(fabsf(box_draws_water_foam(0.15f, 0.3f, false, 0) - 0.5f) < 1e-5f);
+    test_flt(box_draws_water_foam(0.3f, 0.3f, false, 0), 0);
+    test_flt(box_draws_water_foam(1, 0.3f, false, 0), 0);
+    test_flt(box_draws_water_foam(-1, 0.3f, false, 0), 1);
+
+    /* No foam at a width of 0 or where nothing is behind */
+    test_flt(box_draws_water_foam(0, 0, false, 0), 0);
+    test_flt(box_draws_water_foam(0, -1, false, 0), 0);
+    test_flt(box_draws_water_foam(INFINITY, 0.3f, false, 0), 0);
+    test_flt(box_draws_water_foam(INFINITY, 0.3f, true, 1), 0);
+
+    /* A texture keeps the band where its red is above 1 - band, softened by 0.1 */
+    test_flt(box_draws_water_foam(0, 0.3f, true, 0.5f), 1);
+    test_flt(box_draws_water_foam(0.15f, 0.3f, true, 0.9f), 1);
+    test_flt(box_draws_water_foam(0.15f, 0.3f, true, 0.4f), 0);
+    test_assert(fabsf(box_draws_water_foam(0.15f, 0.3f, true, 0.55f) - 0.5f) < 1e-4f);
+    test_flt(box_draws_water_foam(0.3f, 0.3f, true, 1), 0);
+    test_flt(box_draws_water_foam(0, 0, true, 1), 0);
+
+    /* Less of the texture shows farther from the shore */
+    float near_ = box_draws_water_foam(0.03f, 0.3f, true, 0.2f);
+    float far_ = box_draws_water_foam(0.27f, 0.3f, true, 0.2f);
+    test_assert(near_ > far_);
 }

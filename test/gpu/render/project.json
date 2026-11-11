@@ -297,6 +297,18 @@
                 ]
             },
             {
+                "id": "Water",
+                "testcases": [
+                    "shallow_closer_to_shallow_color",
+                    "object_fades_with_depth",
+                    "foam_at_shore",
+                    "foam_texture_breaks_up",
+                    "sky_counts_as_deep",
+                    "above_not_leaked",
+                    "off_draws_without_water"
+                ]
+            },
+            {
                 "id": "Fresnel",
                 "testcases": [
                     "red_rim_at_silhouette",
@@ -1258,6 +1270,10 @@
                     "asymmetry_toward_sun",
                     "overlap_order",
                     "in_transmission_snapshot",
+                    "transmissive_inside_fogged",
+                    "transmissive_in_front_not_fogged",
+                    "transmissive_inside_fogged_once",
+                    "transmissive_pass_count",
                     "orthographic",
                     "resize",
                     "two_views",
@@ -1347,7 +1363,8 @@
                     "camera_behind_plane",
                     "one_sided_winding",
                     "remove_frees_texture",
-                    "sky_mirrored"
+                    "sky_mirrored",
+                    "water_hidden"
                 ]
             }
         ]

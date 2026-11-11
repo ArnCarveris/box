@@ -26,7 +26,7 @@
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
-_Static_assert(sizeof(box_render_material_t) == 128, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 176, "Material of material.wgsl");
 
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
@@ -46,7 +46,8 @@ static uint64_t box_draws_hash(
         0x165667B19E3779F9ull;
     h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
-    h ^= (uint64_t)key->surface * 0x85EBCA77C2B2AE63ull;
+    h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2) * 0x85EBCA77C2B2AE63ull;
+    h ^= ((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -71,7 +72,7 @@ static bool box_draws_key_eq(
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
         a->blend == b->blend && a->cutout == b->cutout && a->back_face == b->back_face &&
-        a->transmissive == b->transmissive &&
+        a->transmissive == b->transmissive && a->water == b->water && a->foam == b->foam &&
         a->dynamic_transform == b->dynamic_transform &&
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
@@ -1054,6 +1055,11 @@ void box_draws_batch_textures(
         out->textures[2] = b->key.atlas;
     }
 
+    out->foam = b->key.foam ? box_textures_handle(d->textures, b->key.foam) : 0;
+    if (b->key.foam && !out->foam && d->world) {
+        out->foam = box_render_texture_target_handle(d->world, b->key.foam);
+    }
+
     out->wrap = b->key.wrap;
 }
 
@@ -1343,6 +1349,7 @@ static void box_draws_send_batch(
     out->back_face = b->key.back_face;
     out->cutout = b->key.cutout;
     out->transmissive = b->key.transmissive;
+    out->water = b->key.water;
     out->shadow = b->key.shadow;
     out->fixture = b->key.fixture;
     out->bake = b->key.bake;
@@ -1459,6 +1466,7 @@ static void box_draws_send_blended(
             out->back_face = b->key.back_face;
             out->cutout = b->key.cutout;
             out->transmissive = b->key.transmissive;
+    out->water = b->key.water;
             out->shadow = b->key.shadow;
             out->fixture = b->key.fixture;
             out->surface = b->key.surface;

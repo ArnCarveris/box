@@ -452,3 +452,36 @@ void PlanarReflection_sky_mirrored(void) {
     ecs_os_free(texels);
     ecs_fini(world);
 }
+
+void PlanarReflection_water_hidden(void) {
+    ecs_world_t *world = pr_world();
+    ecs_singleton_set(world, Scene, {.transmission = true, .water = true});
+    ecs_entity_t view = pr_view(world, 2);
+    pr_mirror(world);
+
+    // A green Water box above the plane, not the owner of the PlanarReflection, in front of the
+    // mirror image of a red box behind it
+    ecs_entity_t water = ecs_new(world);
+    ecs_set(world, water, Position, {0, 1.5f, 0});
+    ecs_set(world, water, Box, {2, 2, 2});
+    pr_emissive(world, water, 0, 255, 0);
+    ecs_add(world, water, Water);
+    Water *w = ecs_get_mut(world, water, Water);
+    w->shallow_color = (Rgb){0, 255, 0};
+    w->deep_color = (Rgb){0, 255, 0};
+    ecs_modified(world, water, Water);
+    pr_red_box(world, 0, 2, -4, 1.5f);
+    pr_surface(world, "planar_water_hidden.png");
+    pr_frames(world, 3);
+
+    float *texels = pr_read(world, view);
+    int32_t mx, my, wx, wy;
+    pr_project((float[]){0, -2, -4}, &mx, &my);
+    pr_project((float[]){0, -1.5f, 0}, &wx, &wy);
+    test_int(pr_count(texels, 1, 0.2f), 0);
+    test_assert(pr_red(pr_texel(texels, mx, my)));
+    test_assert(pr_texel(texels, wx, wy)[1] < 0.1f);
+
+    ecs_os_free(texels);
+    ecs_fini(world);
+}

@@ -191,9 +191,13 @@ typedef struct box_gpu_texture_t {
     bool mipped;                    /**< The levels below the first were generated */
 } box_gpu_texture_t;
 
+/** Textures of the key of a material group: the layers, then the foam texture of a water batch */
+#define BOX_GPU_MATERIAL_TEXTURES (BOX_RENDER_TEXTURE_SLOTS + 1)
+
 /** Bind group of the texture layers and sampler of a batch, cached by its key */
 typedef struct box_gpu_material_t {
-    uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles, 0 for the default */
+    uint32_t textures[BOX_GPU_MATERIAL_TEXTURES]; /**< Texture handles of the layers, then of
+                                     *   the foam texture of a water batch, 0 for the default */
     uint32_t wrap;                  /**< TextureWrap of the sampler */
     uint32_t anisotropy;            /**< Anisotropic samples of the sampler */
     WGPUBindGroup group;            /**< The bind group */

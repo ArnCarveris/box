@@ -60,7 +60,32 @@ struct Material {
     fresnel_power: f32,
     fresnel_bias: f32,
     fresnel_opacity: f32,
+    // Wrapped Water.ripple_velocity offset of the second normal sample, 0 without one
+    water_ripple_offset: vec2f,
+    // Water shallow, deep and foam colors, display encoded, r | g << 8 | b << 16, 0 without one
+    water_shallow: u32,
+    water_deep: u32,
+    water_foam: u32,
+    // Water depth and visibility, at least WATER_MIN; 0 without one
+    water_depth: f32,
+    water_visibility: f32,
+    // Water refraction, a fraction of the image height
+    water_refraction: f32,
+    // Water depth below which foam appears, 0 for none
+    water_foam_width: f32,
+    // Repeats of the foam texture per repeat of the UVs
+    water_foam_scale: f32,
+    // Scale of the UVs of the second normal sample, 0 for none
+    water_ripple_scale: f32,
+    // WATER_FOAM_TEXTURE when the foam samples its texture
+    water_flags: u32,
 };
+
+// Smallest depth and visibility of a Water record (BOX_RENDER_WATER_MIN).
+const WATER_MIN: f32 = 1e-3;
+
+// Flag of a Water record whose foam samples its texture (BOX_RENDER_WATER_FOAM_TEXTURE).
+const WATER_FOAM_TEXTURE: u32 = 1u;
 
 // Below this weight a projection of a triplanar mapping is dropped and the others renormalized,
 // so a fragment whose normal is (nearly) along an axis samples once.
@@ -251,6 +276,41 @@ fn mapping_alpha(albedo: texture_2d<f32>, smp: sampler, uv: vec2f, mapped: f32, 
 fn fresnel_factor(ndv: f32, power: f32, bias: f32) -> f32 {
     let x = max(1.0 - saturate(ndv), 1e-6);
     return saturate(bias + pow(x, power));
+}
+
+// Mix factor of the deep color of a Water body at a water depth d along its normal:
+// 1 - exp(-3 d / depth), 1 where nothing is behind (deep). box_draws_water_depth_mix is its C
+// twin.
+fn water_depth_mix(d: f32, depth: f32, deep: bool) -> f32 {
+    if (deep) {
+        return 1.0;
+    }
+    return saturate(1.0 - exp(-3.0 * max(d, 0.0) / max(depth, WATER_MIN)));
+}
+
+// Share of the scene behind a Water that shows through ray_length of its body:
+// exp(-3 ray_length / visibility), 0 where nothing is behind (deep).
+// box_draws_water_transmittance is its C twin.
+fn water_transmittance(ray_length: f32, visibility: f32, deep: bool) -> f32 {
+    if (deep) {
+        return 0.0;
+    }
+    return saturate(exp(-3.0 * max(ray_length, 0.0) / max(visibility, WATER_MIN)));
+}
+
+// Foam of a Water at a water depth d: saturate(1 - d / foam_width), 0 for a width of 0 or where
+// nothing is behind; a texture cuts the band at its red, smoothstep(t, t + 0.1, tex) with
+// t = 1 - band. box_draws_water_foam is its C twin.
+fn water_foam(d: f32, foam_width: f32, deep: bool, textured: bool, tex: f32) -> f32 {
+    var band = 0.0;
+    if (foam_width > 0.0 && !deep) {
+        band = saturate(1.0 - max(d, 0.0) / foam_width);
+    }
+    if (textured) {
+        let t = 1.0 - band;
+        band = select(0.0, smoothstep(t, t + 0.1, tex), band > 0.0);
+    }
+    return band;
 }
 
 // Display encoded color to linear light.
