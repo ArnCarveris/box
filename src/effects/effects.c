@@ -162,6 +162,30 @@ static void box_smaa_ctor(
     }
 }
 
+/** Construct ChromaticAberration values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_chromatic_aberration_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ChromaticAberration *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ChromaticAberration){
+            .intensity = 0.005f,
+            .samples = 8,
+            .center = {0.5f, 0.5f},
+            .falloff = 2.0f
+        };
+    }
+}
+
 /** Construct Vignette values with the documented defaults.
  *
  * @param ptr The components
@@ -202,6 +226,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, Tonemap);
     ECS_META_COMPONENT(world, ColorGrading);
     ECS_META_COMPONENT(world, Smaa);
+    ECS_META_COMPONENT(world, ChromaticAberration);
     ECS_META_COMPONENT(world, Vignette);
 
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
@@ -211,5 +236,6 @@ void BoxEffectsImport(
     ecs_set_hooks(world, Tonemap, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ColorGrading, { .ctor = box_grading_ctor });
     ecs_set_hooks(world, Smaa, { .ctor = box_smaa_ctor });
+    ecs_set_hooks(world, ChromaticAberration, { .ctor = box_chromatic_aberration_ctor });
     ecs_set_hooks(world, Vignette, { .ctor = box_vignette_ctor });
 }

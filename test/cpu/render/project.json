@@ -482,6 +482,16 @@
                 ]
             },
             {
+                "id": "ChromaticAberration",
+                "testcases": [
+                    "center_not_shifted",
+                    "corner_is_intensity",
+                    "falloff",
+                    "weights_sum_to_one",
+                    "weights_spectral"
+                ]
+            },
+            {
                 "id": "Vignette",
                 "testcases": [
                     "center_is_zero",

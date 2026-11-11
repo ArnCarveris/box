@@ -1217,6 +1217,59 @@ void box_render_vignette_settings(
     const Vignette *in,
     Vignette *out);
 
+/** Resolve the settings of a chromatic aberration pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_chromatic_aberration_settings(
+    const ChromaticAberration *in,
+    ChromaticAberration *out);
+
+/** Get the distance from the center to its farthest image corner in pixels, the distance at
+ * which the offset of a chromatic aberration reaches its intensity.
+ *
+ * @param ca The resolved settings
+ * @param width Width of the image in pixels
+ * @param height Height of the image in pixels
+ * @return The distance, at least 1
+ */
+float box_render_chromatic_aberration_corner(
+    const ChromaticAberration *ca,
+    float width,
+    float height);
+
+/** Get the offset of a chromatic aberration at a pixel as
+ * etc/shaders/chromatic_aberration.wgsl computes it: intensity * width * (d / d_corner)^falloff,
+ * 0 at the center.
+ *
+ * @param ca The resolved settings
+ * @param width Width of the image in pixels
+ * @param height Height of the image in pixels
+ * @param x Horizontal position in pixels, 0 left
+ * @param y Vertical position in pixels, 0 top
+ * @return The offset in pixels
+ */
+float box_render_chromatic_aberration_offset(
+    const ChromaticAberration *ca,
+    float width,
+    float height,
+    float x,
+    float y);
+
+/** Get the spectral weights of a tap of a chromatic aberration as
+ * etc/shaders/chromatic_aberration.wgsl computes them: a red, green, blue ramp over the taps from
+ * -offset (red) to +offset (blue), normalized so that the weights of each channel sum to 1.
+ *
+ * @param samples Taps, 3..16
+ * @param i Tap, 0 at -offset
+ * @param out Receives the red, green and blue weights
+ */
+void box_render_chromatic_aberration_weights(
+    int32_t samples,
+    int32_t i,
+    float *out);
+
 /** Get the vignette factor at a point of the image as etc/shaders/vignette.wgsl computes it:
  * smoothstep(radius, radius + smoothness, d), a hard step when smoothness is 0, where d is the
  * distance from the center in half diagonals with the aspect corrected by roundness.

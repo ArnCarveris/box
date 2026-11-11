@@ -880,7 +880,17 @@
                     "vignette_color_tints_edges",
                     "vignette_disabled_entry_no_op",
                     "vignette_same_entity_after_tonemap",
-                    "vignette_follows_surface_resize"
+                    "vignette_follows_surface_resize",
+                    "chromatic_aberration_default_settings",
+                    "chromatic_aberration_settings_clamped",
+                    "chromatic_aberration_flat_unchanged",
+                    "chromatic_aberration_edge_line_fringes",
+                    "chromatic_aberration_zero_intensity_no_op",
+                    "chromatic_aberration_zero_literal_applies_as_set",
+                    "chromatic_aberration_fringe_grows_with_intensity",
+                    "chromatic_aberration_disabled_entry_no_op",
+                    "chromatic_aberration_same_entity_order",
+                    "chromatic_aberration_follows_surface_resize"
                 ]
             },
             {

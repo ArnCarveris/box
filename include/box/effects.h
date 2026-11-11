@@ -193,6 +193,26 @@ ECS_STRUCT(Smaa, {
                                     *   clamped to 0..100 */
 });
 
+/** Lateral color fringing that grows toward the edges of the image, as in a cheap lens.
+ *
+ * The input is sampled along the line from the pixel toward the center, from -offset to +offset,
+ * where offset = intensity * (d / d_corner)^falloff and d is the distance from the center. Each
+ * tap is weighted by a red, green, blue spectral ramp normalized per channel, so a white image
+ * stays white. The center pixel is never shifted, the edges clamp and alpha is taken from the
+ * center tap.
+ *
+ * Works before or after the Tonemap. Before it, bright HDR fringes bloom stronger.
+ */
+ECS_STRUCT(ChromaticAberration, {
+    float intensity; /**< Largest offset at the image corners as a fraction of the image width,
+                      *   default 0.005, at least 0 */
+    int32_t samples; /**< Taps along the offset, default 8, clamped to 3..16 */
+    vec2 center;     /**< Center in normalized image coordinates, 0, 0 the top left, default
+                      *   0.5, 0.5 */
+    float falloff;   /**< Exponent of the offset over the distance from the center, default 2,
+                      *   1 is linear, at least 0 */
+});
+
 /** Darkens or tints the edges of the image toward the corners, as a lens does.
  *
  * Belongs after the Tonemap: it multiplies the color by mix(1, color, v * intensity), where
