@@ -315,7 +315,7 @@ ECS_STRUCT(PlanarReflection, {
 /** A box of fog the lit views of its scene with LightSettings.fog_volumes raymarch, placed by the
  * position and rotation of the entity. Probe and reflection captures and bakes do not see it.
  *
- * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Blended
+ * It draws after the opaque meshes and the sky, back to front, at most 32 per view. Other blended
  * shapes and particles in or behind it are not fogged. It is lit by the ambient of the view, the
  * first directional light and the point and spot lights of the clusters of the view.
  *

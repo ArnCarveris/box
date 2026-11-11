@@ -789,9 +789,14 @@ void FogVolume_transmissive_inside_fogged_once(void) {
     fv_glass_panel(world, -10, 3, 0);
     fv_volume(world, (float[]){0, 0, -10}, (float[]){10, 10, 4}, 0.3f, 1);
     unsigned char *px = fv_render(world, "fog_panel_once.png");
-    int32_t want = fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * 8.0f));
-    fv_expect(fv_px(px, 32, 32), want, 6);
-    fv_expect(fv_px(px, 4, 32), want, 6);
+    int32_t x[2] = {32, 4}, i;
+    for (i = 0; i < 2; i ++) {
+        /* The ray of the pixel crosses the 8 units of the volume at an angle */
+        float t = ((float)x[i] + 0.5f) / (FV_SIZE / 2.0f) - 1.0f;
+        t *= tanf(30.0f * (float)GLM_PI / 180.0f);
+        float depth = 8.0f * sqrtf(1.0f + t * t);
+        fv_expect(fv_px(px, x[i], 32), fv_srgb(fv_lin(FV_WALL) * expf(-0.3f * depth)), 6);
+    }
     stbi_image_free(px);
 
     ecs_fini(world);
