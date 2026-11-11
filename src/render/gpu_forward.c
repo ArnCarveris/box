@@ -110,9 +110,9 @@ static void box_gpu_feature_constants(
  * coplanar shapes draw in order; it lifts the depth of a fragment by the rank of its instance,
  * so the order holds where coplanar quads interpolate their depths differently.
  *
- * A mesh pipeline sets the scene features as constants, an extended one the material features
- * and transmissive too; the blend mode and alpha test of its draws are in the DrawKind of their
- * material group (box_gpu_draw_kind). The 2D shape shader sets its blend_mode constant.
+ * A mesh pipeline sets the scene features as constants, an extended one the material features,
+ * transmissive and water (both stages) too; the blend mode and alpha test of its draws are in the
+ * DrawKind of their material group (box_gpu_draw_kind). The 2D shape shader sets blend_mode.
  *
  * @param gpu The backend
  * @param handle Handle of the shader, a mesh shader or the 2D shape shader
@@ -229,6 +229,10 @@ static WGPURenderPipeline box_gpu_forward_create(
         .key = { .data = "polygon", .length = WGPU_STRLEN },
         .value = polygon && !box_shadow ? 1.0 : 0.0
     };
+    WGPUConstantEntry water_constant = {
+        .key = { .data = "water", .length = WGPU_STRLEN },
+        .value = water ? 1.0 : 0.0
+    };
     bool mesh = box_render_is_mesh(handle);
     WGPUConstantEntry constants[BOX_GPU_FEATURE_OVERRIDES];
     box_gpu_feature_constants(features, transmissive, water, constants);
@@ -253,8 +257,8 @@ static WGPURenderPipeline box_gpu_forward_create(
         .vertex = {
             .module = shader,
             .entryPoint = { .data = surface ? "vs_surface" : "vs", .length = WGPU_STRLEN },
-            .constantCount = shape2d ? 1 : 0,
-            .constants = shape2d ? &vertex_constant : NULL,
+            .constantCount = shape2d || extended ? 1 : 0,
+            .constants = shape2d ? &vertex_constant : extended ? &water_constant : NULL,
             .bufferCount = 2,
             .buffers = buffers
         },

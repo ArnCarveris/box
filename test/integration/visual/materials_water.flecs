@@ -107,7 +107,7 @@ water {
   pond {
     Position: {0, 0, 0}
     Rotation: {-1.5708, 0, 0}
-    Quad: {16, 16}
+    NGon: {sides: 64, radius: 7.2}
     Rgb: {255, 255, 255}
     PbrMaterial: {metallic: 0, roughness: 0.08}
     PbrTextures: {normal: waves}

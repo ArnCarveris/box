@@ -18,7 +18,6 @@ override material_diffuse_transmission: bool = true;
 override material_triplanar: bool = true;
 override material_fresnel: bool = true;
 override transmissive: bool = false;
-override water: bool = false;
 
 // Foam texture of a Water (Water.foam_texture), its red as stored; white without one. Only fs
 // samples it, so the TextureBlend entry points keep the blend group without it.
@@ -648,10 +647,14 @@ struct WaterBehind {
     found: bool,
 };
 
-fn water_behind(screen_uv: vec2f) -> WaterBehind {
+fn water_depth(screen_uv: vec2f) -> f32 {
     let size = vec2i(textureDimensions(opaque_snapshot_depth));
-    let depth = textureLoad(opaque_snapshot_depth, clamp(vec2i(screen_uv * vec2f(size)),
-        vec2i(0), size - 1), 0);
+    return textureLoad(opaque_snapshot_depth, clamp(vec2i(screen_uv * vec2f(size)), vec2i(0),
+        size - 1), 0);
+}
+
+fn water_behind(screen_uv: vec2f) -> WaterBehind {
+    let depth = water_depth(screen_uv);
     var o: WaterBehind;
     o.depth = depth;
     o.found = depth > 0.0;
@@ -664,6 +667,17 @@ fn water_behind(screen_uv: vec2f) -> WaterBehind {
     return o;
 }
 
+// Whether the depth copy shows something in front of a Water fragment of a depth at a point of
+// the screen or a radius around it, the footprint of the blurred snapshot sample there.
+fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
+    let nearest = max(max(water_depth(screen_uv),
+        max(water_depth(screen_uv + vec2f(radius.x, 0.0)),
+            water_depth(screen_uv - vec2f(radius.x, 0.0)))),
+        max(water_depth(screen_uv + vec2f(0.0, radius.y)),
+            water_depth(screen_uv - vec2f(0.0, radius.y))));
+    return nearest > depth;
+}
+
 // Color of a Water fragment seen from above. The scene behind, the opaque snapshot at the screen
 // point moved by refraction times the view space tilt of the normal map (back at the point
 // itself where the moved one shows something in front of the water), blurred by the roughness,
@@ -673,10 +687,11 @@ fn water_behind(screen_uv: vec2f) -> WaterBehind {
 // an F0 of 0.02, direct and indirect (indirect_lobes, as every shape), adds on top. Nothing
 // behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
 fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
-    let m = material_fetch(f.material_id);
+    let m = vo_water(f);
     var s = shaded;
     s.metallic = 0.0;
     s.back_factor = 0.0;
+    s.back_color = vec3f(0.0);
     s.coat = 0.0;
     s.sheen = vec3f(0.0);
     s.anisotropy = 0.0;
@@ -696,8 +711,10 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
     let aspect = view.viewport.y * view.viewport.z;
     var screen_uv = clamp(pixel_uv + m.water_refraction * vec2f(tilt.x * aspect, -tilt.y),
         vec2f(0.0), vec2f(1.0));
+    let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
+    let lod = s.roughness * max_mip;
     var behind = water_behind(screen_uv);
-    if (behind.depth > f.pos.z) {
+    if (water_in_front(screen_uv, exp2(lod + 1.0) * view.viewport.zw, f.pos.z)) {
         screen_uv = pixel_uv;
         behind = water_behind(screen_uv);
     }
@@ -710,9 +727,8 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
         ray = length(behind.world - f.world);
     }
 
-    let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
     let background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
-        s.roughness * max_mip).rgb;
+        lod).rgb;
 
     let shallow = material_linear(unpack4x8unorm(m.water_shallow).rgb);
     let deep_color = material_linear(unpack4x8unorm(m.water_deep).rgb);
@@ -779,7 +795,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     if (water) {
         let geometric = normalize(f.normal);
-        let layers = water_layers(f, geometric, material_fetch(f.material_id));
+        let layers = water_layers(f, geometric, vo_water(f));
         return water_lit(f, surface_of(f, front, geometric, layers));
     }
 

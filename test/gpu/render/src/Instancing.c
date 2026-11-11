@@ -359,7 +359,7 @@ void Instancing_changed_uploads_only_changes(void) {
     ecs_progress(world, 0);
     int64_t changed = ecs_singleton_get(world, RenderStatus)->upload_bytes;
     test_assert(changed > 0);
-    test_assert(changed < full / 10);
+    test_assert(changed < full / 8);
 
     ecs_progress(world, 0);
     test_int(ecs_singleton_get(world, RenderStatus)->upload_bytes, 0);

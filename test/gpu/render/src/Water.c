@@ -449,6 +449,9 @@ void Water_above_not_leaked(void) {
     w.refraction = 0.3f;
     ecs_entity_t e = water_plane(world, &w);
     ecs_set(world, e, PbrTextures, {.normal = water_tilt(world)});
+
+    // Smooth water, so the blur of the snapshot does not spread the boxes
+    ecs_set(world, e, PbrMaterial, {.metallic = 0, .roughness = 0.05f});
     unsigned char *px = water_render(world, "water_leak.png");
 
     // The normal map moves the screen point by about 10 pixels along x: the water next to the
