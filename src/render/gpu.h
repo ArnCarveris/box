@@ -1495,8 +1495,20 @@ bool box_gpu_fog_volumes_ready(
     box_gpu_t *gpu,
     const box_render_view_t *v);
 
+/** Segment of the rays of a view a fog volume draw marches (FogDraw.segment of
+ * fog_volume.wgsl) */
+typedef enum box_gpu_fog_segment_t {
+    BOX_GPU_FOG_SEGMENT_FULL,       /**< From the camera to the opaque depth */
+    BOX_GPU_FOG_SEGMENT_BEHIND,     /**< From the nearest transmissive surface of a pixel to the
+                                     *   opaque depth, the full segment where it has none; drawn
+                                     *   before the snapshot of transmission */
+    BOX_GPU_FOG_SEGMENT_FRONT       /**< From the camera to the nearest transmissive surface of
+                                     *   a pixel, nothing where it has none; drawn after the last
+                                     *   transmissive draw */
+} box_gpu_fog_segment_t;
+
 /** Record the fog volumes of a view, one instanced draw back to front. Replaces the pipeline
- * and the bind group at 1.
+ * and the bind group at 1. A draw of the front segment does not count its volumes again.
  *
  * @param gpu The backend
  * @param pass The render pass of the view, which reads its depth, with the bind group of the
@@ -1506,6 +1518,9 @@ bool box_gpu_fog_volumes_ready(
  * @param packet The packet, which holds the records
  * @param v The view
  * @param depth The depth of the view, read only in the pass
+ * @param glass The depth of the nearest transmissive surfaces over the opaque depth
+ * (box_gpu_transmission_glass), NULL to march the full segment
+ * @param segment The segment of the rays to march, FULL without glass
  * @return Whether the volumes were drawn
  */
 bool box_gpu_fog_volumes_draw(
@@ -1515,7 +1530,9 @@ bool box_gpu_fog_volumes_draw(
     WGPUTextureFormat format,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
-    WGPUTextureView depth);
+    WGPUTextureView depth,
+    WGPUTextureView glass,
+    box_gpu_fog_segment_t segment);
 
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most */
 #define BOX_GPU_DEBUG_PROBES_MAX ((uint32_t)BOX_RENDER_DEBUG_PROBES_MAX)
@@ -1825,6 +1842,22 @@ void box_gpu_transmission_record(
     box_gpu_snapshot_t *s,
     WGPUCommandEncoder encoder,
     WGPUTexture source,
+    WGPUTexture depth);
+
+/** Copy the depth of a view into the glass depth of its snapshot, created on first use, for
+ * the depth only pass of its transmissive draws that splits its fog volumes
+ * (box_gpu_fog_volumes_draw). Called between two render passes.
+ *
+ * @param gpu The backend
+ * @param s The snapshot of the view
+ * @param encoder The encoder of the frame
+ * @param depth Texture of the depth attachment of the view (CopySrc), the size of the snapshot
+ * @return The view of the glass depth, which the transmissive draws then write
+ */
+WGPUTextureView box_gpu_transmission_glass(
+    box_gpu_t *gpu,
+    box_gpu_snapshot_t *s,
+    WGPUCommandEncoder encoder,
     WGPUTexture depth);
 
 /** Release the snapshots of a target, of every format.
