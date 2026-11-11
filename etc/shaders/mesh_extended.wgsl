@@ -446,8 +446,9 @@ struct PlanarLookup {
 // the view with an image this frame (planar_owner).
 fn planar_lookup(f: VertexOut) -> PlanarLookup {
     var slot = 0u;
-    if (scene_planar && f.planar > 0u && f.planar <= 2u && view.planar[f.planar - 1u].w > 0.0) {
-        slot = f.planar;
+    let planar = f.planar & 0xFFu;
+    if (scene_planar && planar > 0u && planar <= 2u && view.planar[planar - 1u].w > 0.0) {
+        slot = planar;
     }
     return PlanarLookup(slot, f.pos.xy * view.viewport.zw);
 }

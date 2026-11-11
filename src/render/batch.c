@@ -58,6 +58,7 @@ static uint64_t box_draws_hash(
         2 + key->texture_blend) * 2 + key->polygon) * 2 + key->fixture) * 0x94D049BB133111EBull;
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
     h ^= ((uint64_t)key->features + 1) * 0xA0761D6478BD642Full;
+    h ^= ((uint64_t)key->planet + 1) * 0xE7037ED1A0B428DBull;
 
     return h ^ (h >> 29);
 }
@@ -79,7 +80,7 @@ static bool box_draws_key_eq(
         a->dynamic_material == b->dynamic_material &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
-        a->atlas == b->atlas && a->features == b->features &&
+        a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
         a->surface == b->surface && a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon;
 }

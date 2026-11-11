@@ -339,9 +339,9 @@ void PlanetSurfaceLight_cloud_sphere_reddens(void) {
     ecs_world_t *world = ps_world(true);
     ecs_entity_t planet = ps_sphere(world, 0);
     ecs_set(world, planet, Rgb, {0, 0, 0});
+    ecs_set(world, planet, Sphere, {.segments = 96, .smooth = true, .radius = 0.98f});
     ps_atmosphere(world, planet);
     ecs_entity_t clouds = ps_sphere(world, planet);
-    ecs_set(world, clouds, Sphere, {.segments = 96, .smooth = true, .radius = 1.005f});
     ecs_set(world, clouds, Opacity, {0.6f});
     float subsolar, terminator;
     ps_ratios(world, "planet_light_clouds.png", &subsolar, &terminator);

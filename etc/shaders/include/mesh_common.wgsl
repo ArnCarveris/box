@@ -145,11 +145,11 @@ struct VertexOut {
     // pipeline (water), which reuses flat2 and flat3.zw for the other Water fields: Water
     // ignores Transmission, and the fragment stage cannot read the material table.
     @location(8) @interpolate(flat) flat4: vec4u,
-    // Planar reflection slot of the view plus one whose image the instance shows, 0 for none
-    // or without scene_planar (planar_owner)
+    // Low byte: planar reflection slot of the view plus one whose image the instance shows, 0
+    // for none or without scene_planar (planar_owner). Above it: the planet light slot of the
+    // instance, 0 for none or without scene_planet_light; one varying, as the fragment stage
+    // has no inter stage variable left.
     @location(9) @interpolate(flat) planar: u32,
-    // Planet light slot of the instance, 0 for none or without scene_planet_light
-    @location(10) @interpolate(flat) planet: u32,
 };
 
 // Slot of the material table of an instance, below the planet light slot of its shading.
@@ -165,7 +165,7 @@ fn shading_planet(s: MeshShading) -> u32 {
 // Make the sun of the planet of a fragment light it, with scene_planet_light.
 fn planet_fragment(f: VertexOut) {
     if (scene_planet_light) {
-        fragment_planet = f.planet;
+        fragment_planet = f.planar >> 8u;
     }
 }
 
@@ -447,7 +447,7 @@ fn planar_owner(slot: u32) -> u32 {
         o.planar = planar_owner(v.slot);
     }
     if (scene_planet_light) {
-        o.planet = shading_planet(shading);
+        o.planar |= shading_planet(shading) << 8u;
     }
     return o;
 }
@@ -463,7 +463,7 @@ fn planar_owner(slot: u32) -> u32 {
         o.planar = planar_owner(v.slot);
     }
     if (scene_planet_light) {
-        o.planet = shading_planet(shading);
+        o.planar |= shading_planet(shading) << 8u;
     }
     return o;
 }
