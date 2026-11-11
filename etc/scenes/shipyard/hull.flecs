@@ -6,6 +6,11 @@ using box.material
 using state
 
 assets {
+  yard_wedge_core_shape { Path2D: {start: {0, 0}, segments: [{kind: Line, end: {3.406, 0}}, {kind: Line, end: {0, 3.406}}], closed: true} }
+  yard_wedge_core { Profile2D: {outer: yard_wedge_core_shape} }
+  yard_wedge_wall_shape { Path2D: {start: {0, 0}, segments: [{kind: Line, end: {4, 0}}, {kind: Line, end: {0, 4}}], closed: true} }
+  yard_wedge_wall { Profile2D: {outer: yard_wedge_wall_shape} }
+
   template HullPlate {
     prop x0: f32 = -2
     prop x1: f32 = 2
@@ -218,6 +223,59 @@ assets {
     }
     if nx && ny && nz {
       HullCorner c_nnn(sx: -1, sy: -1, sz: -1)
+    }
+  }
+
+  // The wedge in the corner between two hulls, with the corner at the origin and the hulls on
+  // its -x and -z sides. Its angled wall runs from (4, 0) to (0, 4), and the rounded edges along
+  // it meet the edges of the hulls beside it in a ball at each end.
+  template HullWedge {
+    const len = 4 * 1.41421 - RAD * 0.82843
+
+    core : ShipHull { Position: {0, (CH + SKIN) / 2, 0}; ProfileExtrusion: {profile: yard_wedge_core, depth: CH - SKIN, cap_start: true, cap_end: true} }
+    belly : ShipHullDark { Position: {0, SKIN / 2, 0}; ProfileExtrusion: {profile: yard_wedge_core, depth: SKIN, cap_start: true, cap_end: true} }
+    wall : ShipHull { Position: {0, CH / 2, 0}; ProfileExtrusion: {profile: yard_wedge_wall, depth: CH - RAD * 2, cap_start: true, cap_end: true} }
+    face {
+      Position: {2, 0, 2}
+      Rotation: {0, 0 - PI / 4, 0}
+      for s in 0..2 {
+        const ey = s == 0 ? RAD : CH - RAD
+        "rod_{s}" : ShipHull { Position: {0 - RAD, ey, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: RAD, length: len, segments: 20, smooth: true} }
+        "ball_a_{s}" : ShipHull { Position: {0 - RAD, ey, len / 2}; Sphere: {radius: RAD, segments: 20, smooth: true} }
+        "ball_b_{s}" : ShipHull { Position: {0 - RAD, ey, 0 - len / 2}; Sphere: {radius: RAD, segments: 20, smooth: true} }
+      }
+      band : ShipStripe { Position: {0.006, 1.98, 0}; Box: {0.012, 0.22, 4 * 1.41421} }
+      line : ShipTrim { Position: {0.006, 1.74, 0}; Box: {0.012, 0.05, 4 * 1.41421} }
+    }
+  }
+
+  // The ramp from the top of a hull on its -x side down to the hull below it, which it covers,
+  // centered on the cell. A hanging ramp runs from the bottom of the hull up to the hull above it.
+  template HullSlope {
+    prop hang: bool = false
+
+    if hang {
+      ramp : ShipHull { Position: {0, 0, 0}; Rotation: {PI, 0, 0}; RightTrianglePrism: {4, CH, 4} }
+    } else {
+      ramp : ShipHull { Position: {0, 0, 0}; RightTrianglePrism: {4, CH, 4} }
+    }
+  }
+
+  // A hull fairing takes its shape from the hulls around it; sx, sy and sz are their sides. Between
+  // a hull along x and one along z it is a wedge with its corner against both. Beside one hull and
+  // on top of another it ramps down from the first to the second, and under one it ramps up.
+  template HullFairing {
+    prop shape: i32 = H_WEDGE
+    prop sx: i32 = 0
+    prop sy: i32 = 0
+    prop sz: i32 = 0
+
+    if shape == H_WEDGE {
+      const yaw: f32 = sx < 0 ? (sz < 0 ? 0 : HALF_PI) : (sz < 0 ? 0 - HALF_PI : PI)
+      wedge { Position: {sx * 2, 0, sz * 2}; Rotation: {0, yaw, 0}; HullWedge body() }
+    } else {
+      const yaw: f32 = sx < 0 ? 0 : sx > 0 ? PI : sz > 0 ? HALF_PI : 0 - HALF_PI
+      slope { Position: {0, CH / 2, 0}; Rotation: {0, yaw, 0}; HullSlope body(hang: sy > 0) }
     }
   }
 }

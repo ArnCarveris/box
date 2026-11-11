@@ -62,6 +62,10 @@ assets {
   yard_icon_fuel { TexturePath: {path: "etc/scenes/shipyard/assets/icons/fuel.svg", width: 96} }
   yard_icon_weapon { TexturePath: {path: "etc/scenes/shipyard/assets/icons/weapon.svg", width: 96} }
   yard_icon_engine { TexturePath: {path: "etc/scenes/shipyard/assets/icons/engine.svg", width: 96} }
+  yard_icon_biome { TexturePath: {path: "etc/scenes/shipyard/assets/icons/biome.svg", width: 96} }
+  yard_icon_dock { TexturePath: {path: "etc/scenes/shipyard/assets/icons/dock.svg", width: 96} }
+  yard_icon_obs { TexturePath: {path: "etc/scenes/shipyard/assets/icons/obs.svg", width: 96} }
+  yard_icon_hull { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hull.svg", width: 96} }
   yard_icon_remove { TexturePath: {path: "etc/scenes/shipyard/assets/icons/remove.svg", width: 96} }
   yard_icon_exterior { TexturePath: {path: "etc/scenes/shipyard/assets/icons/exterior.svg", width: 96} }
   yard_icon_interior { TexturePath: {path: "etc/scenes/shipyard/assets/icons/interior.svg", width: 96} }
@@ -97,6 +101,10 @@ state {
       6: assets.yard_icon_fuel
       7: assets.yard_icon_weapon
       8: assets.yard_icon_engine
+      9: assets.yard_icon_biome
+      10: assets.yard_icon_obs
+      11: assets.yard_icon_dock
+      12: assets.yard_icon_hull
       _: assets.yard_icon_remove
     }
   }
@@ -110,12 +118,9 @@ state {
   }
 
   fn op_text(op: i32) -> string {
-    match op {
+    op >= OP_DECK && op < OP_DECK + GY ? "Work on deck {op - OP_DECK + 1}. Decks above it are hidden. [Q] [E]" : match op {
       101: "Show the hull of the ship. [Tab]"
       102: "Cut the hull away and look inside. [Tab]"
-      110: "Work on the lowest deck. Decks above it are hidden. [Q]"
-      111: "Work on the middle deck. [Q] [E]"
-      112: "Work on the top deck. [E]"
       130: "Load the frigate design."
       131: "Load the scout design."
       132: "Clear the slipway and start over."
@@ -381,7 +386,7 @@ assets {
   template YardTile : YardAction {
     prop key_hint: string = ""
 
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 44}}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 40}}
     Layout: {direction: Column}
 
     YardTileFace face(op: op, label: label, key_hint: key_hint, hover: hover, down: down)
@@ -441,11 +446,13 @@ assets {
     const c6 = counts[6]
     const c7 = counts[7]
     const c8 = counts[8]
+    const c9 = counts[9]
+    const c10 = counts[10]
     const crew = c1 * 2 + c2 * 3
-    const air = c3 * 10
+    const air = c3 * 10 + c9 * 5
     const gen: f32 = c4 * 30
-    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3
-    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8)
+    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3 + c9 + c10
+    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10)
     const accel: f32 = c8 * 260.0 / max(mass, 1)
     const reach: f32 = c6 * 900.0 / max(mass, 1)
     const has_helm = c1 > 0
@@ -520,9 +527,9 @@ assets {
                   Text: {value: "DECK", size: 11}
                   Rgb: {146, 176, 196}
                 }
-                YardButton b_d0(label: "1", op: OP_DECK, size: 34)
-                YardButton b_d1(label: "2", op: OP_DECK + 1, size: 34)
-                YardButton b_d2(label: "3", op: OP_DECK + 2, size: 34)
+                for d in 0..GY {
+                  YardButton "b_d{d}"(label: "{d + 1}", op: OP_DECK + d, size: 30)
+                }
                 sep_b {
                   LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 22}}
                   Rect: {1, 1}
@@ -559,7 +566,11 @@ assets {
               YardTile t6(label: "Fuel Tank", op: K_FUEL, key_hint: "6")
               YardTile t7(label: "Weapons", op: K_WEAPON, key_hint: "7")
               YardTile t8(label: "Engine", op: K_ENGINE, key_hint: "8")
-              YardTile t9(label: "Remove", op: T_REMOVE, key_hint: "X")
+              YardTile t9(label: "Biome", op: K_BIOME, key_hint: "9")
+              YardTile t0(label: "Observation Deck", op: K_OBS, key_hint: "0")
+              YardTile tp(label: "Docking Port", op: K_DOCK, key_hint: "P")
+              YardTile th(label: "Hull Fairing", op: K_HULL, key_hint: "H")
+              YardTile tx(label: "Remove", op: T_REMOVE, key_hint: "X")
 
               const shown_k = hover_op > 0 && hover_op <= T_REMOVE ? hover_op : tool
               if shown_k > 0 {
@@ -620,7 +631,7 @@ assets {
           } else if hover >= 0 && hover_kind != 0 {
             Text: {value: "{kind_name(hover_kind)}: {kind_rule(hover_kind)}", size: 14}
           } else {
-            Text: {value: "Deck {deck + 1} of 3  ·  1-8 pick a module  ·  X remove  ·  Tab interior  ·  Q / E deck  ·  right drag turns, WASD moves, wheel zooms", size: 13}
+            Text: {value: "Deck {deck + 1} of {GY}  ·  1-0, P, H pick a module  ·  X remove  ·  Tab interior  ·  Q / E deck  ·  right drag turns, WASD moves, wheel zooms", size: 13}
           }
           if hover_code != 0 || hover_fault != 0 {
             Rgb: {255, 170, 150}
