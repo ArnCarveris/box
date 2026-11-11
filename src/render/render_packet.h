@@ -68,7 +68,7 @@
 #define BOX_RENDER_SHADER_TRANSMISSION (50)
 
 /** Shader handle of the engine shader that builds the mip pyramid of the planar reflections */
-#define BOX_RENDER_SHADER_PLANAR (59)
+#define BOX_RENDER_SHADER_PLANAR (60)
 
 /** Shader handle of the engine shader that raymarches the fog volumes of a view */
 #define BOX_RENDER_SHADER_FOG_VOLUME (51)
