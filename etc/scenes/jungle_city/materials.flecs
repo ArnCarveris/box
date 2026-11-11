@@ -55,7 +55,7 @@ assets {
   }
   prefab CanopyGlass { Rgb: {24, 83, 78}; PbrMaterial: {metallic: 0.35, roughness: 0.23}; ClearCoat: {strength: 0.7, roughness: 0.12} }
   prefab CanopyPalmGlass { Rgb: {196, 232, 226}; PbrMaterial: {metallic: 0.1, roughness: 0.06}; ClearCoat: {strength: 1, roughness: 0.03}; Transmission: {transmission_factor: 0.92, ior: 1.45, thickness_factor: 0.03}; NoShadow }
-  prefab CanopyLeaf { Rgb: {74, 122, 62}; PbrMaterial: {roughness: 0.87}; PbrTextures: {albedo: canopy_tex_broadleaf}; TextureTransform: {scale_x: 5, scale_y: 1} }
+  prefab CanopyLeaf { Rgb: {74, 122, 62}; PbrMaterial: {roughness: 0.87}; PbrTextures: {albedo: canopy_tex_broadleaf}; TextureMapping: {mode: MappingObject, size: 1.6} }
   prefab CanopyCrownCore { Rgb: {30, 66, 36}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: canopy_tex_broadleaf}; TextureTransform: {scale_x: 2, scale_y: 2} }
   prefab CanopyLime { Rgb: {113, 153, 65}; PbrMaterial: {roughness: 0.85} }
   prefab CanopyJade { Rgb: {31, 78, 55}; PbrMaterial: {roughness: 0.9} }
