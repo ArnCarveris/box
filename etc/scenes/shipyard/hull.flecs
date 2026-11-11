@@ -261,6 +261,41 @@ assets {
     }
   }
 
+  template HullValley {
+    prop hang: bool = false
+
+    const s = hang ? -1 : 1
+    const ty = hang ? 0 : CH
+    const by = hang ? CH : 0
+
+    body : ShipHull {
+      Position: {0, 0, 0}
+      Mesh3: {
+        vertices: [
+          {-2, ty, -2}, {2 * s, ty, -2 * s}, {-2 * s, ty, 2 * s},
+          {-2, by, -2}, {2 * s, by, -2 * s}, {2, by, 2}, {-2 * s, by, 2 * s}
+        ],
+        indices: [0, 5, 1, 0, 2, 5, 3, 4, 5, 3, 5, 6, 3, 0, 1, 3, 1, 4, 3, 6, 2, 3, 2, 0, 4, 1, 5, 6, 5, 2]
+      }
+    }
+  }
+
+  template HullHip {
+    prop hang: bool = false
+
+    const s = hang ? -1 : 1
+    const ty = hang ? 0 : CH
+    const by = hang ? CH : 0
+
+    body : ShipHull {
+      Position: {0, 0, 0}
+      Mesh3: {
+        vertices: [{-2, ty, -2}, {-2, by, -2}, {2 * s, by, -2 * s}, {2, by, 2}, {-2 * s, by, 2 * s}],
+        indices: [1, 2, 3, 1, 3, 4, 0, 2, 1, 0, 1, 4, 0, 3, 2, 0, 4, 3]
+      }
+    }
+  }
+
   // A hull fairing takes its shape from the hulls around it; sx, sy and sz are their sides. Between
   // a hull along x and one along z it is a wedge with its corner against both. Beside one hull and
   // on top of another it ramps down from the first to the second, and under one it ramps up.
@@ -273,9 +308,20 @@ assets {
     if shape == H_WEDGE {
       const yaw: f32 = sx < 0 ? (sz < 0 ? 0 : HALF_PI) : (sz < 0 ? 0 - HALF_PI : PI)
       wedge { Position: {sx * 2, 0, sz * 2}; Rotation: {0, yaw, 0}; HullWedge body() }
-    } else {
+    } else if shape == H_SLOPE {
       const yaw: f32 = sx < 0 ? 0 : sx > 0 ? PI : sz > 0 ? HALF_PI : 0 - HALF_PI
       slope { Position: {0, CH / 2, 0}; Rotation: {0, yaw, 0}; HullSlope body(hang: sy > 0) }
+    } else {
+      const yaw: f32 = sx < 0 ? (sz < 0 ? 0 : HALF_PI) : (sz < 0 ? 0 - HALF_PI : PI)
+      corner {
+        Position: {0, 0, 0}
+        Rotation: {0, yaw, 0}
+        if shape == H_VALLEY {
+          HullValley body(hang: sy > 0)
+        } else {
+          HullHip body(hang: sy > 0)
+        }
+      }
     }
   }
 }

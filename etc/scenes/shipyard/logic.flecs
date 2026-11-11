@@ -87,35 +87,16 @@ async {
     const i = e.cell
     const k = grid[i]
     if tool > 0 && tool != T_REMOVE {
-      if k == K_EMPTY {
-        const code = place_code(i, tool)
+      if k != tool {
         const placed = tool
         emit Built(cell: i)
         await next_frame()
         grid[i] = placed
         validate()
-        if code == 0 {
-          notify("{kind_name(placed)} added.")
-        } else {
-          notify("{kind_name(placed)} added, but it breaks a rule: {code_text(code)}")
-        }
       }
     } else if tool == T_REMOVE && k != K_EMPTY {
       grid[i] = K_EMPTY
       validate()
-      if problems == 1 {
-        notify("{kind_name(k)} removed. One module now breaks a rule.")
-      } else if problems > 1 {
-        notify("{kind_name(k)} removed. {problems} modules now break a rule.")
-      } else {
-        notify("{kind_name(k)} removed.")
-      }
-    } else if k != K_EMPTY {
-      if status[i] != 0 {
-        notify("{kind_name(k)}: {code_text(status[i])}")
-      } else {
-        notify("{kind_name(k)}: {kind_rule(k)}")
-      }
     }
   }
 }
@@ -145,29 +126,6 @@ async {
       deck = max(deck - 1, 0)
     } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_CLEAR {
       load(op)
-      if op == OP_CLEAR {
-        notify("An empty slipway. Lay down a first module anywhere, then grow the ship from it.")
-      } else {
-        const design = op == OP_FRIGATE ? "frigate" : "scout"
-        notify("Loaded the {design} design.")
-      }
-    }
-  }
-}
-
-async {
-  mut seen: i32 = 0
-  mut age: f32 = 0
-  while true {
-    await delay(0.25)
-    if alert_seq != seen {
-      seen = alert_seq
-      age = 0
-    } else if alert != "" {
-      age += 0.25
-      if age >= 7 {
-        alert = ""
-      }
     }
   }
 }

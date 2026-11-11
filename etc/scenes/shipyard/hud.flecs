@@ -116,17 +116,6 @@ state {
   fn op_selected(op: i32, t: i32, inner: bool, d: i32) -> bool {
     op == t || (op == OP_EXTERIOR && !inner) || (op == OP_INTERIOR && inner) || op == OP_DECK + d
   }
-
-  fn op_text(op: i32) -> string {
-    op >= OP_DECK && op < OP_DECK + GY ? "Work on deck {op - OP_DECK + 1}. Decks above it are hidden. [Q] [E]" : match op {
-      101: "Show the hull of the ship. [Tab]"
-      102: "Cut the hull away and look inside. [Tab]"
-      130: "Load the frigate design."
-      131: "Load the scout design."
-      132: "Clear the slipway and start over."
-      _: ""
-    }
-  }
 }
 
 assets {
@@ -248,22 +237,6 @@ assets {
         const e = await on.activate(this)
         if ui.activation(e) == this {
           emit Request(op: op)
-        }
-      }
-    }
-
-    async {
-      while true {
-        await on.enter(this)
-        hover_op = op
-      }
-    }
-
-    async {
-      while true {
-        await on.leave(this)
-        if hover_op == op {
-          hover_op = -1
         }
       }
     }
@@ -462,9 +435,6 @@ assets {
     const fuel_ok = c6 > 0
     const sound = problems == 0 && modules > 0
     const ready = has_helm && has_drive && power_ok && air_ok && fuel_ok && sound
-    const hover_kind = hover >= 0 ? grid[max(hover, 0)] : 0
-    const hover_code = hover >= 0 && tool > 0 && tool != T_REMOVE && hover_kind == 0 ? place_code(max(hover, 0), tool) : 0
-    const hover_fault = hover >= 0 ? status[max(hover, 0)] : 0
 
     Scene: {}
 
@@ -572,14 +542,6 @@ assets {
               YardTile th(label: "Hull Fairing", op: K_HULL, key_hint: "H")
               YardTile tx(label: "Remove", op: T_REMOVE, key_hint: "X")
 
-              const shown_k = hover_op > 0 && hover_op <= T_REMOVE ? hover_op : tool
-              if shown_k > 0 {
-                YardSectionTitle rule_title(title: "PLACEMENT", state: UI_OK)
-                rule {
-                  Text: {value: kind_rule(shown_k), size: 11, width: 262}
-                  Rgb: {176, 214, 232}
-                }
-              }
             }
           }
         }
@@ -605,51 +567,6 @@ assets {
               YardCheck chk_power(label: "Enough power", ok: power_ok)
               YardCheck chk_air(label: "Air for every crew member", ok: air_ok)
               YardCheck chk_rules(label: problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: sound)
-            }
-          }
-        }
-      }
-
-      bottom {
-        Layout: {direction: Column, spacing: 6, h: Center}
-        LayoutItem: {width: {mode: Grow}}
-        info {
-          if hover_op > 0 && hover_op <= T_REMOVE {
-            Text: {value: "{kind_name(hover_op)}: {kind_rule(hover_op)}", size: 14}
-          } else if hover_op > T_REMOVE && op_text(hover_op) != "" {
-            Text: {value: op_text(hover_op), size: 14}
-          } else if hover >= 0 && tool > 0 && tool != T_REMOVE && hover_kind == 0 {
-            if hover_code == 0 {
-              Text: {value: "Build a {kind_name(tool)} here.", size: 14}
-            } else {
-              Text: {value: code_text(hover_code), size: 14}
-            }
-          } else if hover >= 0 && hover_kind != 0 && tool == T_REMOVE {
-            Text: {value: "Remove this {kind_name(hover_kind)}.", size: 14}
-          } else if hover >= 0 && hover_kind != 0 && hover_fault != 0 {
-            Text: {value: "{kind_name(hover_kind)}: {code_text(hover_fault)}", size: 14}
-          } else if hover >= 0 && hover_kind != 0 {
-            Text: {value: "{kind_name(hover_kind)}: {kind_rule(hover_kind)}", size: 14}
-          } else {
-            Text: {value: "Deck {deck + 1} of {GY}  ·  1-0, P, H pick a module  ·  X remove  ·  Tab interior  ·  Q / E deck  ·  right drag turns, WASD moves, wheel zooms", size: 13}
-          }
-          if hover_code != 0 || hover_fault != 0 {
-            Rgb: {255, 170, 150}
-          } else {
-            Rgb: {176, 226, 246}
-          }
-        }
-        if alert != "" {
-          YardHalo alert_glow(strength: 12, pad: 2, radius: 6) {
-            alert_box {
-              Layout: {direction: Row, padding: {6, 6, 16, 16}}
-              Rect: {1, 1}
-              Rgb: {30, 22, 8}
-              Border: {width: 1, radius: 3, color: {255, 190, 84, 255}}
-              message {
-                Text: {value: alert, size: 14}
-                Rgb: {255, 220, 140}
-              }
             }
           }
         }
