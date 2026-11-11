@@ -4400,3 +4400,324 @@ void Effects_depth_of_field_follows_surface_resize(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+/** Width and height of the tilt shift captures */
+#define TILT_W (256)
+#define TILT_H (256)
+
+/** Create a world that renders headless into a surface, with a camera at the origin that looks
+ * down -Z and vertical stripes at view depth z facing it: 16 white quads 8 pixels wide every 16
+ * pixels, starting at column 0, over the whole height of a 256x256 capture.
+ *
+ * @param camera Receives the camera
+ * @param view Receives the view
+ * @param z View depth of the stripes
+ * @param file File name of the capture in the temporary folder
+ * @return The world
+ */
+static ecs_world_t* tilt_world(
+    ecs_entity_t *camera,
+    ecs_entity_t *view,
+    float z,
+    const char *file)
+{
+    float t = tanf(glm_rad(30)), px = 2.0f * t * z / TILT_H;
+    int32_t i;
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    *camera = ecs_new(world);
+    ecs_set(world, *camera, Position, {0, 0, 0});
+    ecs_set(world, *camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    *view = ecs_new(world);
+    for (i = 0; i < 16; i ++) {
+        ecs_entity_t q = ecs_new(world);
+        ecs_set(world, q, Position, {((float)(16 * i + 4) - TILT_W / 2) * px, 0, -z});
+        ecs_set(world, q, Quad, {8 * px, 1.2f * TILT_H * px});
+        ecs_set(world, q, Rgb, {255, 255, 255});
+    }
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = TILT_W, .height = TILT_H,
+        .write_to_file = ECS_CONST_CAST(char*, file),
+        .resolution_scale = 1});
+
+    return world;
+}
+
+/** Set the effects of the view with a black clear, render frames and keep a copy of the capture.
+ *
+ * @param world The world
+ * @param view The view
+ * @param camera The camera
+ * @param effect The effect entity, 0 for none
+ * @param file File name of the capture
+ * @return The RGBA pixels of a TILT_W x TILT_H capture, freed with ecs_os_free
+ */
+static unsigned char* tilt_frame(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    ecs_entity_t camera,
+    ecs_entity_t effect,
+    const char *file)
+{
+    View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
+    if (effect) {
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = effect };
+    }
+
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/%s", ecs_singleton_get(world, AppStatus)->tmp_dir, file);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, TILT_W);
+    test_int(h, TILT_H);
+    ecs_os_free(path);
+    unsigned char *result = ecs_os_malloc(TILT_W * TILT_H * 4);
+    ecs_os_memcpy(result, px, TILT_W * TILT_H * 4);
+    stbi_image_free(px);
+
+    return result;
+}
+
+/** Get the contrast of a row of a tilt shift capture: the largest minus the smallest red channel
+ * of the columns 32 to 223.
+ *
+ * @param px The pixels of a TILT_W x TILT_H capture
+ * @param y The row
+ * @return The contrast
+ */
+static int tilt_contrast(
+    const unsigned char *px,
+    int32_t y)
+{
+    int32_t x;
+    int lo = 255, hi = 0;
+    for (x = 32; x < 224; x ++) {
+        int r = px[(y * TILT_W + x) * 4];
+        lo = glm_imin(lo, r);
+        hi = glm_imax(hi, r);
+    }
+
+    return hi - lo;
+}
+
+/** Create a tilt shift effect entity with the defaults and the largest radius, 12.8 pixels of
+ * the capture.
+ *
+ * @param world The world
+ * @return The entity
+ */
+static ecs_entity_t tilt_effect(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = ecs_new(world);
+    DepthOfField *d = ecs_ensure(world, result, DepthOfField);
+    d->mode = DofTiltShift;
+    d->max_radius = 0.05f;
+    ecs_modified(world, result, DepthOfField);
+
+    return result;
+}
+
+void Effects_depth_of_field_tilt_default_settings(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, DepthOfField);
+    const DepthOfField *d = ecs_get(world, e, DepthOfField);
+    test_int(d->mode, DofCamera);
+    test_flt(d->tilt_center, 0.55f);
+    test_flt(d->tilt_band, 0.08f);
+    test_flt(d->tilt_transition, 0.3f);
+    test_flt(d->tilt_angle, 0);
+
+    test_assert(ecs_script_run(world, "tilt", "using box.effects\n"
+        "lens { DepthOfField: {mode: DofTiltShift} }\n", NULL) == 0);
+    const DepthOfField *scripted = ecs_get(world, ecs_lookup(world, "lens"), DepthOfField);
+    test_assert(scripted != NULL);
+    test_int(scripted->mode, DofTiltShift);
+    test_flt(scripted->tilt_center, 0.55f);
+    test_flt(scripted->tilt_band, 0.08f);
+    test_flt(scripted->tilt_transition, 0.3f);
+    test_flt(scripted->tilt_angle, 0);
+    test_flt(scripted->max_radius, 0.01f);
+
+    DepthOfField resolved;
+    box_render_depth_of_field_settings(scripted, &resolved);
+    test_int(resolved.mode, DofTiltShift);
+    test_bool(resolved.near_blur, false);
+
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_tilt_shift_stripes(void) {
+    // lighting/effects
+    const float depths[2] = {5, 40};
+    unsigned char *px[2];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_entity_t camera, view;
+        ecs_world_t *world = tilt_world(&camera, &view, depths[i], "tilt_stripes.png");
+        ecs_entity_t tilt = tilt_effect(world);
+        unsigned char *base = tilt_frame(world, view, camera, 0, "tilt_stripes.png");
+        px[i] = tilt_frame(world, view, camera, tilt, "tilt_stripes.png");
+        // The stripes are sharp everywhere without the effect
+        test_assert(tilt_contrast(base, 8) > 240);
+        test_assert(tilt_contrast(base, 141) > 240);
+        test_assert(tilt_contrast(base, 247) > 240);
+        // Sharp at tilt_center, row 141, blurred at the top and bottom
+        test_assert(tilt_contrast(px[i], 141) > 240);
+        test_assert(tilt_contrast(px[i], 8) < 64);
+        test_assert(tilt_contrast(px[i], 247) < 64);
+        // The blur grows away from the band on both sides, measured on the ramp next to the band
+        // edges at rows 120 and 161, before a disc blur of the stripes first cancels them out
+        test_assert(tilt_contrast(px[i], 88) > tilt_contrast(px[i], 8));
+        test_assert(tilt_contrast(px[i], 200) > tilt_contrast(px[i], 247));
+
+        box_render_gpu_stats_t stats;
+        test_assert(box_render_gpu_stats(world, &stats));
+        test_int(stats.errors, 0);
+        ecs_os_free(base);
+        ecs_fini(world);
+    }
+
+    // The same image at a different depth blurs the same
+    int32_t diff = 0;
+    for (i = 0; i < TILT_W * TILT_H * 4; i ++) {
+        diff = glm_imax(diff, abs((int)px[0][i] - (int)px[1][i]));
+    }
+
+    test_assert(diff <= 8);
+    ecs_os_free(px[0]);
+    ecs_os_free(px[1]);
+}
+
+void Effects_depth_of_field_tilt_shift_center(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = tilt_world(&camera, &view, 10, "tilt_center.png");
+    ecs_entity_t tilt = tilt_effect(world);
+    DepthOfField *d = ecs_ensure(world, tilt, DepthOfField);
+    d->tilt_center = 0.25f;
+    ecs_modified(world, tilt, DepthOfField);
+    unsigned char *px = tilt_frame(world, view, camera, tilt, "tilt_center.png");
+    // The band moves up to row 64, the bottom is blurred
+    test_assert(tilt_contrast(px, 64) > 240);
+    test_assert(tilt_contrast(px, 247) < 64);
+    test_assert(tilt_contrast(px, 141) < tilt_contrast(px, 64) / 2);
+
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_tilt_shift_zero_radius_no_op(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = tilt_world(&camera, &view, 10, "tilt_zero.png");
+    ecs_entity_t tilt = tilt_effect(world);
+    DepthOfField *d = ecs_ensure(world, tilt, DepthOfField);
+    d->max_radius = 0;
+    ecs_modified(world, tilt, DepthOfField);
+    unsigned char *base = tilt_frame(world, view, camera, 0, "tilt_zero.png");
+    unsigned char *px = tilt_frame(world, view, camera, tilt, "tilt_zero.png");
+    int32_t i;
+    int diff = 0;
+    for (i = 0; i < TILT_W * TILT_H * 4; i ++) {
+        diff = glm_imax(diff, abs((int)base[i] - (int)px[i]));
+    }
+
+    test_assert(diff <= 1);
+    ecs_os_free(base);
+    ecs_os_free(px);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_camera_ignores_tilt(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = dof_world(&camera, &view, "dof_camera_tilt.png");
+    DepthOfField value = dof_wide();
+    ecs_entity_t plain = dof_effect(world, &value);
+    value.tilt_center = 0.1f;
+    value.tilt_band = 0;
+    value.tilt_transition = 0.01f;
+    value.tilt_angle = 1;
+    ecs_entity_t tilted = dof_effect(world, &value);
+    unsigned char *a = dof_frame(world, view, camera, &plain, 1, true, "dof_camera_tilt.png");
+    unsigned char *b = dof_frame(world, view, camera, &tilted, 1, true, "dof_camera_tilt.png");
+    test_assert(dof_diff(a, b) <= 1);
+    test_assert(dof_edge(a, 1) > 200);
+    test_assert(dof_edge(a, 2) < dof_edge(a, 1) / 2);
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_fini(world);
+}
+
+void Effects_depth_of_field_tilt_shift_follows_surface_resize(void) {
+    // lighting/effects
+    ecs_entity_t camera, view;
+    ecs_world_t *world = tilt_world(&camera, &view, 10, "tilt_resize.png");
+    ecs_entity_t tilt = tilt_effect(world);
+    unsigned char *first = tilt_frame(world, view, camera, tilt, "tilt_resize.png");
+    test_assert(tilt_contrast(first, 8) < 64);
+    ecs_os_free(first);
+    ecs_iter_t it = ecs_each(world, Surface);
+    ecs_entity_t surface = 0;
+    while (ecs_each_next(&it)) {
+        surface = it.entities[0];
+    }
+
+    test_assert(surface != 0);
+    ecs_set(world, surface, Surface, {.width = 2 * TILT_W, .height = TILT_H,
+        .resolution_scale = 1, .write_to_file = "tilt_resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/tilt_resize.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 2 * TILT_W);
+    test_int(h, TILT_H);
+    // The band keeps its height on the wider image: sharp at row 141, blurred at the top and
+    // bottom, measured over the stripes in the middle of the image
+    int32_t x, rows[3] = {141, 8, 247}, r;
+    int contrast[3];
+    for (r = 0; r < 3; r ++) {
+        int lo = 255, hi = 0;
+        for (x = TILT_W / 2 + 32; x < TILT_W / 2 + 224; x ++) {
+            int v = px[(rows[r] * w + x) * 4];
+            lo = glm_imin(lo, v);
+            hi = glm_imax(hi, v);
+        }
+
+        contrast[r] = hi - lo;
+    }
+
+    test_assert(contrast[0] > 200);
+    test_assert(contrast[1] < 64);
+    test_assert(contrast[2] < 64);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

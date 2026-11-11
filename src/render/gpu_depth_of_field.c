@@ -96,6 +96,16 @@ bool box_gpu_fx_depth_of_field(
     u.params[0] = d->max_radius * (float)ft->height * 0.5f;
     u.params[1] = d->near_blur ? 1.0f : 0.0f;
     u.params[2] = box_render_depth_of_field_coc(d, INFINITY);
+    if (d->mode == DofTiltShift) {
+        u.tilt[0] = d->tilt_center;
+        u.tilt[1] = d->tilt_band;
+        u.tilt[2] = d->tilt_transition;
+        u.tilt[3] = 1.0f;
+    }
+
+    u.tilt_normal[0] = sinf(d->tilt_angle);
+    u.tilt_normal[1] = cosf(d->tilt_angle);
+    u.tilt_normal[2] = (float)ft->width / (float)ft->height;
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
     box_gpu_fx_dof_images(gpu, ft);
     if (!box_gpu_fx_dof_pass(gpu, ctx, s, "fs_prefilter", ctx->input, NULL, img[0])) {

@@ -1,7 +1,7 @@
 /**
  * @file render/depth_of_field.c
- * @brief The C twin of the view depth and the circle of confusion of
- * etc/shaders/depth_of_field.wgsl.
+ * @brief The C twin of the view depth and the circles of confusion of the camera and the tilt
+ * shift of etc/shaders/depth_of_field.wgsl.
  */
 
 #include "render.h"
@@ -77,4 +77,22 @@ float box_render_depth_of_field_coc_depth(
     float z = depth > 0 ? box_render_depth_of_field_view_depth(k, depth) : INFINITY;
 
     return box_render_depth_of_field_coc(dof, z);
+}
+
+float box_render_depth_of_field_tilt_coc(
+    const DepthOfField *dof,
+    float x,
+    float y,
+    float aspect)
+{
+    float px = (x - 0.5f) * aspect, py = y - dof->tilt_center;
+    float dist = fabsf(px * sinf(dof->tilt_angle) + py * cosf(dof->tilt_angle));
+    float t = 0.0f;
+    if (dof->tilt_transition > 0) {
+        t = glm_clamp((dist - dof->tilt_band) / dof->tilt_transition, 0.0f, 1.0f);
+    } else {
+        t = dist > dof->tilt_band ? 1.0f : 0.0f;
+    }
+
+    return t * t * (3.0f - 2.0f * t);
 }

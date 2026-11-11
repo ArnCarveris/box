@@ -49,11 +49,25 @@ ECS_STRUCT(Bloom, {
                                           *   image, default 512, at least 8 */
 });
 
+/** What decides the blur of a pixel of a DepthOfField */
+ECS_ENUM(DepthOfFieldMode, {
+    DofCamera = 0,   /**< Blur by view depth around the focus distance, like a camera lens */
+    DofTiltShift = 1 /**< Blur by screen position: a sharp band across the image with the blur
+                      *   growing above and below it, independent of depth, the miniature look */
+});
+
 /** Bokeh blur by view depth, the distance along the forward axis of the camera, not the ray.
  *
  * Sharp within focus_range around focus_distance, the blur ramps up to max_radius over the near
  * and far transitions. Depth 0 (the sky, and every pixel of a view of only 2D shapes) is far at
  * full blur. Perspective and orthographic cameras, lit or unlit, work the same way.
+ *
+ * DofTiltShift blurs by screen position instead: sharp within tilt_band of the line through
+ * tilt_center turned by tilt_angle, the blur ramps up to max_radius over tilt_transition, in
+ * units of the image height. focus_distance, focus_range, near_transition, far_transition and
+ * near_blur are ignored. {mode: DofTiltShift} alone gives a miniature look; a max_radius of 0.015
+ * to 0.02 is typical for it, and a ColorGrading with a saturation of about 1.3 and a contrast of
+ * about 1.1 strengthens it.
  *
  * Belongs before the Tonemap, in HDR, so bright highlights make bokeh discs, and before Bloom.
  * An entity with several effects runs HeightFog, DepthOfField, Bloom, AutoExposure, Tonemap,
@@ -71,6 +85,15 @@ ECS_STRUCT(DepthOfField, {
                             *   0.01, clamped to 0..0.05; 0 leaves the image as is */
     bool near_blur;        /**< Blur in front of the focus, default true; false only blurs the
                             *   background */
+    DepthOfFieldMode mode; /**< Blur by depth or by screen position, default DofCamera */
+    float tilt_center;     /**< Normalized image Y of the center of the sharp band, 0 at the top,
+                            *   default 0.55 */
+    float tilt_band;       /**< Half height of the fully sharp band as a fraction of the image
+                            *   height, default 0.08, at least 0 */
+    float tilt_transition; /**< Distance from the band edge, as a fraction of the image height,
+                            *   over which the blur ramps to max, default 0.3, at least 0; 0 is
+                            *   a hard step */
+    float tilt_angle;      /**< Counterclockwise rotation of the band in radians, default 0 */
 });
 
 /** Slices and steps per slice of the horizon search of Gtao, the quality levels of XeGTAO */

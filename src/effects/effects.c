@@ -54,7 +54,11 @@ static void box_depth_of_field_ctor(
             .near_transition = 4.0f,
             .far_transition = 20.0f,
             .max_radius = 0.01f,
-            .near_blur = true
+            .near_blur = true,
+            .mode = DofCamera,
+            .tilt_center = 0.55f,
+            .tilt_band = 0.08f,
+            .tilt_transition = 0.3f
         };
     }
 }
@@ -244,6 +248,7 @@ void BoxEffectsImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Bloom);
+    ECS_META_COMPONENT(world, DepthOfFieldMode);
     ECS_META_COMPONENT(world, DepthOfField);
     ECS_META_COMPONENT(world, GtaoQuality);
     ECS_META_COMPONENT(world, Gtao);
