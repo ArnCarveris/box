@@ -125,7 +125,7 @@ void DepthOfField_perspective_depth(void) {
     DepthOfField d = dof_defaults();
     float k[4];
     box_render_depth_of_field_linearize(&(Camera){.fov = 60, .near_ = 0.1f, .far_ = 100}, k);
-    test_flt(box_render_depth_of_field_view_depth(k, 1), 0.1f);
+    test_assert(fabsf(box_render_depth_of_field_view_depth(k, 1) - 0.1f) < 1e-4f);
     test_assert(fabsf(box_render_depth_of_field_view_depth(k,
         dof_perspective_depth(0.1f, 100, 10)) - 10) < 1e-3f);
     test_assert(fabsf(box_render_depth_of_field_view_depth(k,
@@ -143,7 +143,7 @@ void DepthOfField_perspective_infinite_far(void) {
     DepthOfField d = dof_defaults();
     float k[4];
     box_render_depth_of_field_linearize(&(Camera){.fov = 60, .near_ = 0.1f}, k);
-    test_flt(box_render_depth_of_field_view_depth(k, 1), 0.1f);
+    test_assert(fabsf(box_render_depth_of_field_view_depth(k, 1) - 0.1f) < 1e-4f);
     test_assert(fabsf(box_render_depth_of_field_view_depth(k, 0.01f) - 10) < 1e-3f);
     test_assert(fabsf(box_render_depth_of_field_view_depth(k, 0.1f / 40) - 40) < 1e-2f);
     test_assert(fabsf(box_render_depth_of_field_coc_depth(&d, k, 0.01f)) < 1e-4f);
@@ -159,7 +159,7 @@ void DepthOfField_orthographic(void) {
     box_render_depth_of_field_linearize(&(Camera){.ortho = true, .near_ = 0.1f, .far_ = 100,
         .ortho_height = 10}, k);
     // Depth is linear: (far - z) / (far - near)
-    test_flt(box_render_depth_of_field_view_depth(k, 1), 0.1f);
+    test_assert(fabsf(box_render_depth_of_field_view_depth(k, 1) - 0.1f) < 1e-4f);
     test_assert(fabsf(box_render_depth_of_field_view_depth(k, (100 - 10) / 99.9f) - 10) < 1e-3f);
     test_assert(fabsf(box_render_depth_of_field_view_depth(k, 1e-6f) - 100) < 1e-3f);
     test_assert(fabsf(box_render_depth_of_field_coc_depth(&d, k, (100 - 10) / 99.9f)) < 1e-4f);

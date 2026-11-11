@@ -31,7 +31,8 @@ struct Dof {
 @group(0) @binding(4) var aux_texture: texture_2d<f32>;
 
 const TAPS: i32 = 48;
-const GOLDEN_ANGLE: f32 = 2.39996323;
+// cos and sin of the golden angle, the turn from one tap to the next
+const GOLDEN_TURN = vec2f(-0.7373689, 0.6754903);
 
 // Distance from the camera along its forward axis of a reversed Z depth above 0.
 fn view_depth(d: f32) -> f32 {
@@ -117,10 +118,13 @@ fn dilate(p: vec2i, axis: vec2i, from_alpha: bool) -> vec4f {
     return dilate(vec2i(v.pos.xy), vec2i(0, 1), false);
 }
 
-// Offset of tap i of a disc of radius 1, golden angle spiral of uniform density.
-fn tap(i: i32) -> vec2f {
-    let a = f32(i) * GOLDEN_ANGLE;
-    return vec2f(cos(a), sin(a)) * sqrt((f32(i) + 0.5) / f32(TAPS));
+// Offset of tap i of a disc of radius 1, a golden angle spiral of uniform density. dir is the
+// direction of the tap, turned by the golden angle for the next one, so a tap needs no sin or cos.
+fn tap(i: i32, dir: ptr<function, vec2f>) -> vec2f {
+    let d = *dir;
+    let t = GOLDEN_TURN;
+    *dir = vec2f(d.x * t.x - d.y * t.y, d.x * t.y + d.y * t.x);
+    return d * sqrt((f32(i) + 0.5) / f32(TAPS));
 }
 
 // Texel of the half image under a tap: the nearest one, so the CoC of a tap is exact.
@@ -140,8 +144,9 @@ fn tap_texel(p: vec2f, o: vec2f) -> vec4f {
 
     var sum = center.rgb;
     var weight = 1.0;
+    var dir = vec2f(1.0, 0.0);
     for (var i = 0; i < TAPS; i++) {
-        let o = tap(i) * radius;
+        let o = tap(i, &dir) * radius;
         let s = tap_texel(v.pos.xy, o);
         let c = min(max(s.a, 0.0), c0);
         let w = select(0.0, saturate(c * dof.params.x - length(o) + 0.5), c > 0.0);
@@ -163,8 +168,9 @@ fn tap_texel(p: vec2f, o: vec2f) -> vec4f {
     let own = max(-textureLoad(input_texture, p, 0).a, 0.0) * dof.params.x;
     var sum = vec3f(0.0);
     var weight = 0.0;
+    var dir = vec2f(1.0, 0.0);
     for (var i = 0; i < TAPS; i++) {
-        let o = tap(i) * radius;
+        let o = tap(i, &dir) * radius;
         let s = tap_texel(v.pos.xy, o);
         let n = max(-s.a, 0.0);
         let w = select(0.0, saturate(n * dof.params.x - length(o) + 0.5), n > 0.0);

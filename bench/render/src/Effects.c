@@ -8,6 +8,9 @@
  *
  * The 2160p cases render into a 3840x2160 surface, where bloom halves the image twice before
  * it filters it into its first mip.
+ *
+ * The 1080p cases render into a 1920x1080 surface, the size the cost of the depth of field is
+ * reported at.
  */
 
 #include <box.h>
@@ -24,6 +27,7 @@ typedef enum bench_effect_t {
     BENCH_EFFECT_GTAO,      /**< Gtao, before the forward pass and outside the chain */
     BENCH_EFFECT_FOG,       /**< HeightFog */
     BENCH_EFFECT_SMAA,      /**< Tonemap then Smaa, its cost is the difference with tonemap */
+    BENCH_EFFECT_DOF,       /**< DepthOfField focused in the middle of the boxes */
     BENCH_EFFECT_ALL        /**< Gtao, fog, bloom and tonemap with exposure */
 } bench_effect_t;
 
@@ -76,6 +80,9 @@ static void bench_effects_sized(
     ecs_add(world, fog, HeightFog);
     ecs_entity_t smaa = ecs_new(world);
     ecs_add(world, smaa, Smaa);
+    ecs_entity_t dof = ecs_new(world);
+    ecs_set(world, dof, DepthOfField, {.focus_distance = 30, .focus_range = 4,
+        .near_transition = 10, .far_transition = 20, .max_radius = 0.01f, .near_blur = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 8, 30});
     ecs_set(world, camera, Rotation, {-0.3f, 0, 0});
@@ -90,6 +97,10 @@ static void bench_effects_sized(
 
     if (kind == BENCH_EFFECT_FOG || kind == BENCH_EFFECT_ALL || disabled) {
         bench_effects_add(&value, fog, !disabled);
+    }
+
+    if (kind == BENCH_EFFECT_DOF || disabled) {
+        bench_effects_add(&value, dof, !disabled);
     }
 
     if (kind == BENCH_EFFECT_BLOOM || kind == BENCH_EFFECT_ALL || disabled) {
@@ -234,4 +245,25 @@ void Effects_all(
 {
     // lighting/effects
     bench_effects(b, BENCH_EFFECT_ALL);
+}
+
+void Effects_depth_of_field(
+    bench_t *b)
+{
+    // lighting/effects
+    bench_effects(b, BENCH_EFFECT_DOF);
+}
+
+void Effects_none_1080p(
+    bench_t *b)
+{
+    // lighting/effects
+    bench_effects_sized(b, BENCH_EFFECT_NONE, 1920, 1080);
+}
+
+void Effects_depth_of_field_1080p(
+    bench_t *b)
+{
+    // lighting/effects
+    bench_effects_sized(b, BENCH_EFFECT_DOF, 1920, 1080);
 }

@@ -158,7 +158,10 @@
                     "smaa",
                     "gtao",
                     "fog",
-                    "all"
+                    "all",
+                    "depth_of_field",
+                    "none_1080p",
+                    "depth_of_field_1080p"
                 ]
             },
             {
