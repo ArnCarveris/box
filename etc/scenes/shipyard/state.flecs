@@ -1,0 +1,375 @@
+using flecs.script
+using flecs.script.math
+
+state {
+  export const GX: i32 = 5
+  export const GZ: i32 = 9
+  export const GY: i32 = 3
+  export const LAYER: i32 = 45
+  export const CELLS: i32 = 135
+  export const CW: f32 = 4
+  export const CH: f32 = 3
+  export const RAD: f32 = 0.42
+  export const SKIN: f32 = 0.12
+  export const HALF_PI: f32 = 1.5707963
+
+  export const K_EMPTY: i32 = 0
+  export const K_COCKPIT: i32 = 1
+  export const K_HAB: i32 = 2
+  export const K_LIFE: i32 = 3
+  export const K_ENG: i32 = 4
+  export const K_CARGO: i32 = 5
+  export const K_FUEL: i32 = 6
+  export const K_WEAPON: i32 = 7
+  export const K_ENGINE: i32 = 8
+  export const T_REMOVE: i32 = 9
+
+  export const OP_CANCEL: i32 = 100
+  export const OP_EXTERIOR: i32 = 101
+  export const OP_INTERIOR: i32 = 102
+  export const OP_VIEW: i32 = 103
+  export const OP_DECK: i32 = 110
+  export const OP_DECK_UP: i32 = 120
+  export const OP_DECK_DOWN: i32 = 121
+  export const OP_FRIGATE: i32 = 130
+  export const OP_SCOUT: i32 = 131
+  export const OP_CLEAR: i32 = 132
+
+  event Click(cell: i32)
+  event Built(cell: i32)
+  event Request(op: i32)
+
+  export const frigate_grid: i32[135] = [
+    0, 0, 0, 0, 0,
+    0, 8, 0, 8, 0,
+    0, 6, 0, 6, 0,
+    0, 5, 5, 5, 0,
+    7, 5, 5, 5, 7,
+    0, 5, 5, 5, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 8, 8, 8, 0,
+    0, 6, 6, 6, 0,
+    0, 6, 4, 6, 0,
+    0, 6, 4, 6, 0,
+    7, 3, 3, 3, 7,
+    0, 2, 3, 2, 0,
+    0, 2, 2, 2, 0,
+    0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 7, 0, 7, 0,
+    0, 0, 7, 0, 0,
+    0, 0, 2, 0, 0,
+    0, 0, 0, 0, 0
+  ]
+
+  export const scout_grid: i32[135] = [
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 5, 0, 0,
+    0, 0, 5, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 8, 8, 8, 0,
+    0, 6, 6, 6, 0,
+    0, 0, 4, 0, 0,
+    0, 7, 3, 7, 0,
+    0, 0, 2, 0, 0,
+    0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0
+  ]
+
+  export mut grid: i32[135] = frigate_grid
+  export mut status: i32[135] = {}
+  export mut counts: i32[10] = {}
+  export mut modules: i32 = 0
+  export mut problems: i32 = 0
+
+  export mut tool: i32 = 0
+  export mut deck: i32 = 2
+  export mut interior: bool = false
+  export mut hover: i32 = -1
+  export mut hover_op: i32 = -1
+  export mut alert: string = "Pick a module on the left and click the grid to build. Tab shows the interior."
+  export mut alert_seq: i32 = 0
+
+  fn cell_x(i: i32) -> i32 { i % GX }
+  fn cell_z(i: i32) -> i32 { ((i - i % GX) / GX) % GZ }
+  fn cell_y(i: i32) -> i32 { (i - i % LAYER) / LAYER }
+  fn cell_at(x: i32, y: i32, z: i32) -> i32 { y * LAYER + z * GX + x }
+
+  fn inside(x: i32, y: i32, z: i32) -> bool {
+    x >= 0 && x < GX && y >= 0 && y < GY && z >= 0 && z < GZ
+  }
+
+  fn kind_at(x: i32, y: i32, z: i32) -> i32 {
+    const k = grid[cell_at(clamp(x, 0, GX - 1), clamp(y, 0, GY - 1), clamp(z, 0, GZ - 1))]
+    inside(x, y, z) ? k : 0
+  }
+
+  fn shown_at(x: i32, y: i32, z: i32) -> bool {
+    kind_at(x, y, z) != 0 && y <= deck
+  }
+
+  fn boxy(k: i32) -> bool {
+    k == K_HAB || k == K_LIFE || k == K_ENG || k == K_CARGO
+  }
+
+  fn hulled(k: i32) -> bool {
+    k != 0 && k != K_CARGO && k != K_FUEL && k != K_WEAPON
+  }
+
+  fn solid_at(x: i32, y: i32, z: i32) -> bool {
+    hulled(kind_at(x, y, z)) && y <= deck
+  }
+
+  fn rack_at(x: i32, y: i32, z: i32) -> bool {
+    (kind_at(x, y, z) == K_CARGO || kind_at(x, y, z) == K_FUEL) && y <= deck
+  }
+
+  fn room_at(x: i32, y: i32, z: i32) -> bool {
+    shown_at(x, y, z) && kind_at(x, y, z) != K_WEAPON
+  }
+
+  fn mount_at(x: i32, y: i32, z: i32) -> i32 {
+    boxy(kind_at(x, y - 1, z)) ? 1 :
+    boxy(kind_at(x - 1, y, z)) ? 2 :
+    boxy(kind_at(x + 1, y, z)) ? 3 :
+    0
+  }
+
+  fn wx(i: i32) -> f32 { (cell_x(i) - 2) * CW }
+  fn wy(i: i32) -> f32 { cell_y(i) * CH }
+  fn wz(i: i32) -> f32 { (cell_z(i) - 4) * CW }
+
+  fn touches(x: i32, y: i32, z: i32, k: i32) -> bool {
+    kind_at(x - 1, y, z) == k || kind_at(x + 1, y, z) == k || kind_at(x, y - 1, z) == k ||
+    kind_at(x, y + 1, z) == k || kind_at(x, y, z - 1) == k || kind_at(x, y, z + 1) == k
+  }
+
+  fn touches_any(x: i32, y: i32, z: i32) -> bool {
+    kind_at(x - 1, y, z) != 0 || kind_at(x + 1, y, z) != 0 || kind_at(x, y - 1, z) != 0 ||
+    kind_at(x, y + 1, z) != 0 || kind_at(x, y, z - 1) != 0 || kind_at(x, y, z + 1) != 0
+  }
+
+  fn clear_ahead(x: i32, y: i32, z: i32) -> bool {
+    match z >= GZ - 1 {
+      true: true
+      _: kind_at(x, y, z + 1) == 0 && clear_ahead(x, y, z + 1)
+    }
+  }
+
+  fn clear_behind(x: i32, y: i32, z: i32) -> bool {
+    match z <= 0 {
+      true: true
+      _: kind_at(x, y, z - 1) == 0 && clear_behind(x, y, z - 1)
+    }
+  }
+
+  fn engine_ahead(x: i32, y: i32, z: i32) -> bool {
+    match z >= GZ - 1 {
+      true: false
+      _: kind_at(x, y, z + 1) == K_ENGINE || engine_ahead(x, y, z + 1)
+    }
+  }
+
+  fn cockpit_behind(x: i32, y: i32, z: i32) -> bool {
+    match z <= 0 {
+      true: false
+      _: kind_at(x, y, z - 1) == K_COCKPIT || cockpit_behind(x, y, z - 1)
+    }
+  }
+
+  fn rule_code(x: i32, y: i32, z: i32, k: i32) -> i32 {
+    !touches_any(x, y, z) ? 0 :
+    k == K_COCKPIT && kind_at(x, y, z - 1) == 0 ? 3 :
+    k == K_COCKPIT && !clear_ahead(x, y, z) ? 4 :
+    k == K_ENGINE && kind_at(x, y, z + 1) == 0 ? 5 :
+    k == K_ENGINE && !clear_behind(x, y, z) ? 6 :
+    k == K_WEAPON && mount_at(x, y, z) == 0 ? 7 :
+    k == K_FUEL && !touches(x, y, z, K_ENGINE) && !touches(x, y, z, K_FUEL) ? 9 :
+    k == K_ENG && (touches(x, y, z, K_HAB) || touches(x, y, z, K_COCKPIT)) ? 10 :
+    0
+  }
+
+  fn place_code(i: i32, k: i32) -> i32 {
+    const x = cell_x(i)
+    const y = cell_y(i)
+    const z = cell_z(i)
+    const own = rule_code(x, y, z, k)
+    grid[i] != 0 ? 1 :
+    !touches_any(x, y, z) ? 0 :
+    own != 0 ? own :
+    k == K_HAB && !touches(x, y, z, K_LIFE) && !touches(x, y, z, K_HAB) ? 11 :
+    engine_ahead(x, y, z) ? 12 :
+    cockpit_behind(x, y, z) ? 13 :
+    (k == K_HAB || k == K_COCKPIT) && touches(x, y, z, K_ENG) ? 15 :
+    0
+  }
+
+  fn code_text(c: i32) -> string {
+    match c {
+      1: "That cell is already taken."
+      3: "A cockpit needs a module behind it."
+      4: "A cockpit needs a clear view ahead."
+      5: "An engine needs a module in front of it."
+      6: "An engine needs a clear exhaust path behind it."
+      7: "Weapons mount on the top or side of a habitat, life support, engineering or cargo module."
+      9: "Fuel tanks must feed an engine or another tank."
+      10: "Engineering can't sit next to crew quarters or the cockpit."
+      11: "Habitats need life support next door."
+      12: "That would block an engine's exhaust."
+      13: "That would block a cockpit's view."
+      15: "Too close to the reactor in engineering."
+      17: "This habitat has no air: link it to life support."
+      _: ""
+    }
+  }
+
+  fn kind_name(k: i32) -> string {
+    match k {
+      1: "Cockpit"
+      2: "Habitat"
+      3: "Life Support"
+      4: "Engineering"
+      5: "Cargo Bay"
+      6: "Fuel Tank"
+      7: "Weapons"
+      8: "Engine"
+      9: "Remove"
+      _: "Empty"
+    }
+  }
+
+  fn kind_rule(k: i32) -> string {
+    match k {
+      1: "Flies the ship and houses 2 crew. Needs a module behind it and a clear view ahead."
+      2: "Bunks for 3 crew. Needs life support next door, directly or through other habitats."
+      3: "Keeps 10 crew breathing. Connects anywhere."
+      4: "A reactor that makes 30 MW. Can't touch habitats or the cockpit."
+      5: "Holds 120 t. Connects anywhere."
+      6: "Fuel for the engines. Must touch an engine or another fuel tank."
+      7: "A turret. Mounts on the top or side of a boxy module: habitat, life support, engineering or cargo."
+      8: "Pushes the ship. Needs a module in front and a clear exhaust behind."
+      9: "Click a module to take it off the ship."
+      _: ""
+    }
+  }
+
+  fn kind_mass(k: i32) -> f32 {
+    match k { 1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; _: 0 }
+  }
+
+  fn kind_power(k: i32) -> f32 {
+    match k { 1: 2; 2: 1; 3: 2; 4: -30; 5: 0.5; 7: 3; 8: 3; _: 0 }
+  }
+
+  proc notify(message: string) {
+    alert = message
+    alert_seq += 1
+  }
+
+  proc validate() {
+    mut st: i32[135] = {}
+    mut aired: bool[135] = {}
+    mut queue: i32[135] = {}
+    mut tally: i32[10] = {}
+    mut total: i32 = 0
+
+    for i in 0..CELLS {
+      const k = grid[i]
+      if k != 0 {
+        total += 1
+        tally[k] += 1
+      }
+    }
+
+    mut head: i32 = 0
+    mut tail: i32 = 0
+    for i in 0..CELLS {
+      if grid[i] == K_HAB && touches(cell_x(i), cell_y(i), cell_z(i), K_LIFE) {
+        aired[i] = true
+        queue[tail] = i
+        tail += 1
+      }
+    }
+    while head < tail {
+      const c = queue[head]
+      head += 1
+      const x = cell_x(c)
+      const y = cell_y(c)
+      const z = cell_z(c)
+      if x > 0 && grid[c - 1] == K_HAB && !aired[c - 1] {
+        aired[c - 1] = true
+        queue[tail] = c - 1
+        tail += 1
+      }
+      if x < GX - 1 && grid[c + 1] == K_HAB && !aired[c + 1] {
+        aired[c + 1] = true
+        queue[tail] = c + 1
+        tail += 1
+      }
+      if z > 0 && grid[c - GX] == K_HAB && !aired[c - GX] {
+        aired[c - GX] = true
+        queue[tail] = c - GX
+        tail += 1
+      }
+      if z < GZ - 1 && grid[c + GX] == K_HAB && !aired[c + GX] {
+        aired[c + GX] = true
+        queue[tail] = c + GX
+        tail += 1
+      }
+      if y > 0 && grid[c - LAYER] == K_HAB && !aired[c - LAYER] {
+        aired[c - LAYER] = true
+        queue[tail] = c - LAYER
+        tail += 1
+      }
+      if y < GY - 1 && grid[c + LAYER] == K_HAB && !aired[c + LAYER] {
+        aired[c + LAYER] = true
+        queue[tail] = c + LAYER
+        tail += 1
+      }
+    }
+
+    mut bad: i32 = 0
+    for i in 0..CELLS {
+      const k = grid[i]
+      if k != 0 {
+        const own = rule_code(cell_x(i), cell_y(i), cell_z(i), k)
+        if own != 0 {
+          st[i] = own
+        } else if k == K_HAB && !aired[i] && touches_any(cell_x(i), cell_y(i), cell_z(i)) {
+          st[i] = 17
+        }
+        if st[i] != 0 {
+          bad += 1
+        }
+      }
+    }
+
+    status = st
+    counts = tally
+    modules = total
+    problems = bad
+  }
+}
