@@ -1,0 +1,162 @@
+using flecs.script
+using flecs.script.math
+using box.input
+using state
+
+state {
+  actions {
+    Tool1 { Action: {description: "Pick the cockpit"}; Binding: {key: Num1} }
+    Tool2 { Action: {description: "Pick the habitat"}; Binding: {key: Num2} }
+    Tool3 { Action: {description: "Pick life support"}; Binding: {key: Num3} }
+    Tool4 { Action: {description: "Pick engineering"}; Binding: {key: Num4} }
+    Tool5 { Action: {description: "Pick the cargo bay"}; Binding: {key: Num5} }
+    Tool6 { Action: {description: "Pick the fuel tank"}; Binding: {key: Num6} }
+    Tool7 { Action: {description: "Pick weapons"}; Binding: {key: Num7} }
+    Tool8 { Action: {description: "Pick the engine"}; Binding: {key: Num8} }
+    Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
+    Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
+    View { Action: {description: "Switch between the exterior and the interior"}; Binding: {key: Tab} }
+    DeckUp { Action: {description: "Work on the deck above"}; Binding: {key: PageUp}; alt { Binding: {key: E} } }
+    DeckDown { Action: {description: "Work on the deck below"}; Binding: {key: PageDown}; alt { Binding: {key: Q} } }
+  }
+
+  proc load(design: i32) {
+    if design == OP_FRIGATE {
+      grid = frigate_grid
+    } else if design == OP_SCOUT {
+      grid = scout_grid
+    } else {
+      mut empty: i32[135] = {}
+      grid = empty
+    }
+    validate()
+  }
+}
+
+assets {
+  template HotKey {
+    prop action: entity = 0
+    prop op: i32 = 0
+
+    async {
+      while true {
+        await on.pressed(action)
+        emit Request(op: op)
+      }
+    }
+  }
+}
+
+state {
+  hotkeys {
+    assets.HotKey k1(action: actions.Tool1, op: K_COCKPIT)
+    assets.HotKey k2(action: actions.Tool2, op: K_HAB)
+    assets.HotKey k3(action: actions.Tool3, op: K_LIFE)
+    assets.HotKey k4(action: actions.Tool4, op: K_ENG)
+    assets.HotKey k5(action: actions.Tool5, op: K_CARGO)
+    assets.HotKey k6(action: actions.Tool6, op: K_FUEL)
+    assets.HotKey k7(action: actions.Tool7, op: K_WEAPON)
+    assets.HotKey k8(action: actions.Tool8, op: K_ENGINE)
+    assets.HotKey kx(action: actions.Remove, op: T_REMOVE)
+    assets.HotKey kc(action: actions.Cancel, op: OP_CANCEL)
+    assets.HotKey kv(action: actions.View, op: OP_VIEW)
+    assets.HotKey ku(action: actions.DeckUp, op: OP_DECK_UP)
+    assets.HotKey kd(action: actions.DeckDown, op: OP_DECK_DOWN)
+  }
+}
+
+async {
+  validate()
+}
+
+async {
+  while true {
+    const e = await Click
+    const i = e.cell
+    const k = grid[i]
+    if tool > 0 && tool != T_REMOVE {
+      if k == K_EMPTY {
+        const code = place_code(i, tool)
+        if code == 0 {
+          const placed = tool
+          emit Built(cell: i)
+          await next_frame()
+          grid[i] = placed
+          validate()
+          notify("{kind_name(placed)} added.")
+        } else {
+          notify(code_text(code))
+        }
+      }
+    } else if tool == T_REMOVE && k != K_EMPTY {
+      grid[i] = K_EMPTY
+      validate()
+      if problems == 1 {
+        notify("{kind_name(k)} removed. One module now breaks a rule.")
+      } else if problems > 1 {
+        notify("{kind_name(k)} removed. {problems} modules now break a rule.")
+      } else {
+        notify("{kind_name(k)} removed.")
+      }
+    } else if k != K_EMPTY {
+      if status[i] != 0 {
+        notify("{kind_name(k)}: {code_text(status[i])}")
+      } else {
+        notify("{kind_name(k)}: {kind_rule(k)}")
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    const e = await Request
+    const op = e.op
+    if op > 0 && op <= T_REMOVE {
+      tool = tool == op ? 0 : op
+    } else if op == OP_CANCEL {
+      tool = 0
+    } else if op == OP_EXTERIOR {
+      interior = false
+    } else if op == OP_INTERIOR {
+      interior = true
+    } else if op == OP_VIEW {
+      interior = !interior
+    } else if op >= OP_DECK && op < OP_DECK + GY {
+      hover = -1
+      deck = op - OP_DECK
+    } else if op == OP_DECK_UP {
+      hover = -1
+      deck = min(deck + 1, GY - 1)
+    } else if op == OP_DECK_DOWN {
+      hover = -1
+      deck = max(deck - 1, 0)
+    } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_CLEAR {
+      load(op)
+      deck = GY - 1
+      if op == OP_CLEAR {
+        notify("An empty slipway. Lay down a first module anywhere, then grow the ship from it.")
+      } else {
+        const design = op == OP_FRIGATE ? "frigate" : "scout"
+        notify("Loaded the {design} design.")
+      }
+    }
+  }
+}
+
+async {
+  mut seen: i32 = 0
+  mut age: f32 = 0
+  while true {
+    await delay(0.25)
+    if alert_seq != seen {
+      seen = alert_seq
+      age = 0
+    } else if alert != "" {
+      age += 0.25
+      if age >= 7 {
+        alert = ""
+      }
+    }
+  }
+}

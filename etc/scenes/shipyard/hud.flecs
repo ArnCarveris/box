@@ -1,0 +1,654 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.camera
+using box.view
+using box.effects
+using box.surface
+using box.geometry
+using box.input
+using box.layout
+using box.material
+using box.picking
+using box.text
+using box.texture
+using box.transform
+using box.transition
+using box.ui
+using box.widgets
+using state
+
+window {}
+
+box {
+  ui {
+    theme {
+      UiTheme: {
+        background: {6, 12, 20},
+        surface: {7, 13, 23},
+        surface_alt: {11, 24, 37},
+        border: {44, 104, 134},
+        text: {214, 236, 246},
+        text_muted: {146, 176, 196},
+        accent: {92, 222, 255},
+        accent_text: {6, 18, 26},
+        hover: {18, 44, 62},
+        pressed: {8, 22, 34},
+        focus: {150, 240, 255},
+        danger: {255, 88, 74},
+        selection: {20, 78, 104},
+        caret: {214, 236, 246},
+        disabled_opacity: 0.38,
+        font_size: 13,
+        small_font_size: 11,
+        heading_font_size: 13,
+        radius: 2,
+        padding: 8,
+        spacing: 6,
+        control_height: 26,
+        focus_width: 2,
+        caret_blink: 0.5
+      }
+    }
+  }
+}
+
+assets {
+  yard_icon_cockpit { TexturePath: {path: "etc/scenes/shipyard/assets/icons/cockpit.svg", width: 96} }
+  yard_icon_hab { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hab.svg", width: 96} }
+  yard_icon_life { TexturePath: {path: "etc/scenes/shipyard/assets/icons/life.svg", width: 96} }
+  yard_icon_eng { TexturePath: {path: "etc/scenes/shipyard/assets/icons/eng.svg", width: 96} }
+  yard_icon_cargo { TexturePath: {path: "etc/scenes/shipyard/assets/icons/cargo.svg", width: 96} }
+  yard_icon_fuel { TexturePath: {path: "etc/scenes/shipyard/assets/icons/fuel.svg", width: 96} }
+  yard_icon_weapon { TexturePath: {path: "etc/scenes/shipyard/assets/icons/weapon.svg", width: 96} }
+  yard_icon_engine { TexturePath: {path: "etc/scenes/shipyard/assets/icons/engine.svg", width: 96} }
+  yard_icon_remove { TexturePath: {path: "etc/scenes/shipyard/assets/icons/remove.svg", width: 96} }
+  yard_icon_exterior { TexturePath: {path: "etc/scenes/shipyard/assets/icons/exterior.svg", width: 96} }
+  yard_icon_interior { TexturePath: {path: "etc/scenes/shipyard/assets/icons/interior.svg", width: 96} }
+  yard_icon_deck { TexturePath: {path: "etc/scenes/shipyard/assets/icons/deck.svg", width: 96} }
+  yard_icon_power { TexturePath: {path: "etc/scenes/shipyard/assets/icons/power.svg", width: 96} }
+  yard_icon_crew { TexturePath: {path: "etc/scenes/shipyard/assets/icons/crew.svg", width: 96} }
+  yard_icon_thrust { TexturePath: {path: "etc/scenes/shipyard/assets/icons/thrust.svg", width: 96} }
+  yard_icon_range { TexturePath: {path: "etc/scenes/shipyard/assets/icons/range.svg", width: 96} }
+  yard_icon_ok { TexturePath: {path: "etc/scenes/shipyard/assets/icons/ok.svg", width: 96} }
+  yard_icon_warn { TexturePath: {path: "etc/scenes/shipyard/assets/icons/warn.svg", width: 96} }
+  yard_icon_ship { TexturePath: {path: "etc/scenes/shipyard/assets/icons/ship.svg", width: 96} }
+}
+
+state {
+  export const UI_OK: i32 = 0
+  export const UI_WARN: i32 = 1
+  export const UI_BAD: i32 = 2
+  export const UI_GOOD: i32 = 3
+  export const UI_DIM: i32 = 4
+  export const UI_MUTED: i32 = 5
+
+  fn ui_r(s: i32) -> i32 { match s { 0: 92; 1: 255; 2: 255; 3: 110; 5: 128; _: 34 } }
+  fn ui_g(s: i32) -> i32 { match s { 0: 222; 1: 190; 2: 88; 3: 240; 5: 156; _: 56 } }
+  fn ui_b(s: i32) -> i32 { match s { 0: 255; 1: 84; 2: 74; 3: 156; 5: 176; _: 76 } }
+
+  fn kind_icon(k: i32) -> entity {
+    match k {
+      1: assets.yard_icon_cockpit
+      2: assets.yard_icon_hab
+      3: assets.yard_icon_life
+      4: assets.yard_icon_eng
+      5: assets.yard_icon_cargo
+      6: assets.yard_icon_fuel
+      7: assets.yard_icon_weapon
+      8: assets.yard_icon_engine
+      _: assets.yard_icon_remove
+    }
+  }
+
+  fn ship_class(n: i32) -> string {
+    n == 0 ? "NO HULL" : n < 6 ? "SHUTTLE" : n < 14 ? "SCOUT" : n < 24 ? "CORVETTE" : n < 36 ? "FRIGATE" : n < 52 ? "DESTROYER" : "CRUISER"
+  }
+
+  fn op_selected(op: i32, t: i32, inner: bool, d: i32) -> bool {
+    op == t || (op == OP_EXTERIOR && !inner) || (op == OP_INTERIOR && inner) || op == OP_DECK + d
+  }
+
+  fn op_text(op: i32) -> string {
+    match op {
+      101: "Show the hull of the ship. [Tab]"
+      102: "Cut the hull away and look inside. [Tab]"
+      110: "Work on the lowest deck. Decks above it are hidden. [Q]"
+      111: "Work on the middle deck. [Q] [E]"
+      112: "Work on the top deck. [E]"
+      130: "Load the frigate design."
+      131: "Load the scout design."
+      132: "Clear the slipway and start over."
+      _: ""
+    }
+  }
+}
+
+assets {
+  template YardIcon {
+    prop icon: entity = 0
+    prop size: f32 = 20
+    prop state: i32 = 0
+
+    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Rect: {1, 1}
+    Image: {texture: icon}
+    Rgb: {ui_r(state), ui_g(state), ui_b(state)}
+  }
+
+  template YardHalo {
+    prop strength: i32 = 8
+    prop pad: f32 = 2
+    prop radius: f32 = 10
+    prop grow: bool = false
+
+    Layout: {direction: Column, padding: {pad, pad, pad, pad}}
+    if grow {
+      LayoutItem: {width: {mode: Grow}}
+    }
+    Rect: {1, 1}
+    Rgb: {strength * 0.35, strength * 0.85, strength * 1.1}
+    BlendMode: Additive
+    Border: {radius: radius}
+  }
+
+  template YardCornerBar {
+    prop w: f32 = 14
+    prop h: f32 = 2
+
+    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Rect: {1, 1}
+    Rgb: {150, 240, 255}
+    box.spatial.SpatialIgnore
+  }
+
+  template YardSectionTitle {
+    prop title: string = ""
+    prop state: i32 = 0
+
+    Layout: {direction: Row, spacing: 8, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+    tick {
+      LayoutItem: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 12}}
+      Rect: {1, 1}
+      Rgb: {ui_r(state), ui_g(state), ui_b(state)}
+    }
+    name {
+      Text: {value: title, size: 12}
+      Rgb: {ui_r(state), ui_g(state), ui_b(state)}
+    }
+    rule {
+      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+      Rect: {1, 1}
+      Rgb: {40, 96, 124}
+    }
+  }
+
+  template YardCard {
+    prop title: string = ""
+    prop width: f32 = 0
+    prop spacing: f32 = 8
+
+    Layout: {direction: Column, padding: {12, 12, 14, 14}, spacing: spacing}
+    if width == 0 {
+      LayoutItem: {width: {mode: Grow}}
+    } else {
+      LayoutItem: {width: {min: width, max: width}}
+    }
+    Rect: {1, 1}
+    Rgb: {7, 13, 23}
+    Opacity: {0.9}
+    Border: {width: 1, radius: 3, color: {52, 150, 190, 255}}
+    InputBlocker
+
+    YardCornerBar tl_a() { LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Top} }
+    YardCornerBar tl_b(w: 2, h: 14) { LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Top} }
+    YardCornerBar tr_a() { LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Top} }
+    YardCornerBar tr_b(w: 2, h: 14) { LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Top} }
+    YardCornerBar bl_a() { LayoutFloat: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom} }
+    YardCornerBar bl_b(w: 2, h: 14) { LayoutFloat: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom} }
+    YardCornerBar br_a() { LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom} }
+    YardCornerBar br_b(w: 2, h: 14) { LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom} }
+
+    if title != "" {
+      YardSectionTitle heading(title: title)
+    }
+  }
+
+  template YardSegBar {
+    prop ratio: f32 = 0
+    prop cells: i32 = 12
+    prop height: f32 = 8
+    prop state: i32 = 0
+
+    Layout: {direction: Row, spacing: 2}
+    LayoutItem: {width: {mode: Grow}}
+    for i in 0..cells {
+      "cell_{i}" {
+        const lit = (i + 0.5) / cells < ratio
+        const s = lit ? state : UI_DIM
+        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: height}}
+        Rect: {1, 1}
+        Rgb: {ui_r(s), ui_g(s), ui_b(s)}
+        Border: {radius: 1}
+      }
+    }
+  }
+
+  template YardAction : HeadlessButton {
+    prop op: i32 = 0
+
+    async {
+      while true {
+        const e = await on.activate(this)
+        if ui.activation(e) == this {
+          emit Request(op: op)
+        }
+      }
+    }
+
+    async {
+      while true {
+        await on.enter(this)
+        hover_op = op
+      }
+    }
+
+    async {
+      while true {
+        await on.leave(this)
+        if hover_op == op {
+          hover_op = -1
+        }
+      }
+    }
+  }
+
+  template YardButtonFace {
+    prop op: i32 = 0
+    prop label: string = ""
+    prop icon: entity = 0
+    prop hover: bool = false
+    prop down: bool = false
+
+    const selected = op_selected(op, tool, interior, deck)
+
+    Layout: {direction: Row, padding: {0, 0, 9, 9}, spacing: 6, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    if selected {
+      Rgb: {20, 78, 104}
+      Border: {width: 1, radius: 2, color: {120, 236, 255, 255}}
+    } else if down {
+      Rgb: {8, 22, 34}
+      Border: {width: 1, radius: 2, color: {92, 222, 255, 255}}
+    } else if hover {
+      Rgb: {18, 44, 62}
+      Border: {width: 1, radius: 2, color: {92, 222, 255, 255}}
+    } else {
+      Rgb: {11, 24, 37}
+      Border: {width: 1, radius: 2, color: {44, 104, 134, 255}}
+    }
+    Transition: [Rgb: {duration: 0.1}]
+
+    if icon != 0 {
+      YardIcon glyph(icon: icon, size: 15, state: selected ? UI_GOOD : UI_OK)
+    }
+    if label != "" {
+      name {
+        Text: {value: label, size: 12}
+        Rgb: {214, 236, 246}
+      }
+    }
+  }
+
+  template YardButton : YardAction {
+    prop icon: entity = 0
+    prop size: f32 = 0
+
+    LayoutItem: {
+      width: {mode: match size { 0.0: Grow; _: Fixed }, value: match size { 0.0: 1; _: size }},
+      height: {mode: Fixed, value: 28}
+    }
+    Layout: {}
+
+    YardButtonFace face(op: op, label: label, icon: icon, hover: hover, down: down)
+  }
+
+  template YardTileFace {
+    prop op: i32 = 0
+    prop label: string = ""
+    prop key_hint: string = ""
+    prop hover: bool = false
+    prop down: bool = false
+
+    const selected = op == tool
+    const glow = selected ? 26 : hover ? 10 : 0
+    const n = counts[op]
+
+    Layout: {direction: Column, padding: {2, 2, 2, 2}}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: {glow * 0.35, glow * 0.85, glow * 1.1}
+    BlendMode: Additive
+    Border: {radius: 5}
+
+    plate {
+      Layout: {direction: Row, padding: {6, 6, 8, 8}, spacing: 8, v: Middle}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Rect: {1, 1}
+      if selected {
+        Rgb: {18, 72, 98}
+        Border: {width: 1, radius: 3, color: {140, 240, 255, 255}}
+      } else if down {
+        Rgb: {8, 22, 34}
+        Border: {width: 1, radius: 3, color: {92, 222, 255, 255}}
+      } else if hover {
+        Rgb: {18, 44, 62}
+        Border: {width: 1, radius: 3, color: {92, 222, 255, 255}}
+      } else {
+        Rgb: {11, 24, 37}
+        Border: {width: 1, radius: 3, color: {44, 104, 134, 255}}
+      }
+      Transition: [Rgb: {duration: 0.1}]
+
+      YardIcon glyph(icon: kind_icon(op), size: 24, state: selected ? UI_GOOD : UI_OK)
+      words {
+        Layout: {direction: Column, spacing: 2}
+        LayoutItem: {width: {mode: Grow}}
+        name {
+          Text: {value: label, size: 12}
+          Rgb: {214, 236, 246}
+        }
+        info {
+          Text: {value: op == T_REMOVE ? "Take modules off" : n == 0 ? "None fitted" : "{n} fitted", size: 10}
+          Rgb: {128, 160, 182}
+        }
+      }
+      hint {
+        Layout: {padding: {1, 1, 4, 4}}
+        Rect: {1, 1}
+        Rgb: {8, 20, 30}
+        Border: {width: 1, radius: 2, color: {44, 104, 134, 255}}
+        key {
+          Text: {value: key_hint, size: 10}
+          Rgb: {140, 190, 214}
+        }
+      }
+    }
+  }
+
+  template YardTile : YardAction {
+    prop key_hint: string = ""
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 44}}
+    Layout: {direction: Column}
+
+    YardTileFace face(op: op, label: label, key_hint: key_hint, hover: hover, down: down)
+  }
+
+  template YardStat {
+    prop icon: entity = 0
+    prop label: string = ""
+    prop value: string = ""
+    prop ratio: f32 = 0
+    prop state: i32 = 0
+
+    Layout: {direction: Column, spacing: 4}
+    LayoutItem: {width: {mode: Grow}}
+    head {
+      Layout: {direction: Row, spacing: 8, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      YardIcon glyph(icon: icon, size: 16, state: state)
+      name {
+        Text: {value: label, size: 11}
+        Rgb: {146, 176, 196}
+      }
+      gap {
+        LayoutItem: {width: {mode: Grow}}
+      }
+      amount {
+        Text: {value: value, size: 12}
+        Rgb: {ui_r(state), ui_g(state), ui_b(state)}
+      }
+    }
+    YardSegBar bar(ratio: ratio, cells: 18, height: 5, state: state)
+  }
+
+  template YardCheck {
+    prop label: string = ""
+    prop ok: bool = false
+
+    Layout: {direction: Row, spacing: 8, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+    YardIcon glyph(icon: ok ? yard_icon_ok : yard_icon_warn, size: 14, state: ok ? UI_GOOD : UI_WARN)
+    name {
+      Text: {value: label, size: 11}
+      if ok {
+        Rgb: {176, 214, 196}
+      } else {
+        Rgb: {255, 206, 140}
+      }
+    }
+  }
+
+  template ShipyardHud {
+    const c1 = counts[1]
+    const c2 = counts[2]
+    const c3 = counts[3]
+    const c4 = counts[4]
+    const c5 = counts[5]
+    const c6 = counts[6]
+    const c7 = counts[7]
+    const c8 = counts[8]
+    const crew = c1 * 2 + c2 * 3
+    const air = c3 * 10
+    const gen: f32 = c4 * 30
+    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3
+    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8)
+    const accel: f32 = c8 * 260.0 / max(mass, 1)
+    const reach: f32 = c6 * 900.0 / max(mass, 1)
+    const has_helm = c1 > 0
+    const has_drive = c8 > 0
+    const power_ok = gen >= use && use > 0
+    const air_ok = crew > 0 && air >= crew
+    const fuel_ok = c6 > 0
+    const sound = problems == 0 && modules > 0
+    const ready = has_helm && has_drive && power_ok && air_ok && fuel_ok && sound
+    const hover_kind = hover >= 0 ? grid[max(hover, 0)] : 0
+    const hover_code = hover >= 0 && tool > 0 && tool != T_REMOVE && hover_kind == 0 ? place_code(max(hover, 0), tool) : 0
+    const hover_fault = hover >= 0 ? status[max(hover, 0)] : 0
+
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    screen {
+      LayoutFill: {surface: window}
+      Layout: {direction: Column, padding: {12, 12, 12, 12}, spacing: 10}
+      FocusScope
+
+      top {
+        Layout: {direction: Row, spacing: 10, v: Top}
+        LayoutItem: {width: {mode: Grow}}
+
+        YardHalo title_a(strength: 10) {
+          YardHalo title_b(strength: 24, pad: 1) {
+            YardCard title(spacing: 4, width: 292) {
+              row {
+                Layout: {direction: Row, spacing: 10, v: Middle}
+                LayoutItem: {width: {mode: Grow}}
+                YardIcon emblem(icon: yard_icon_ship, size: 34, state: ready ? UI_GOOD : UI_OK)
+                words {
+                  Layout: {direction: Column, spacing: 3}
+                  LayoutItem: {width: {mode: Grow}}
+                  name {
+                    Text: {value: "SHIPYARD", size: 16}
+                    Rgb: {150, 236, 255}
+                  }
+                  sub {
+                    Text: {value: "{ship_class(modules)}  ·  {modules} modules  ·  {mass:.0} t", size: 11}
+                    Rgb: {146, 176, 196}
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        spacer_a {
+          LayoutItem: {width: {mode: Grow}}
+        }
+
+        YardHalo view_a(strength: 10) {
+          YardHalo view_b(strength: 24, pad: 1) {
+            YardCard views(spacing: 0) {
+              bar {
+                Layout: {direction: Row, spacing: 6, v: Middle}
+                YardButton b_ext(label: "Exterior", icon: yard_icon_exterior, op: OP_EXTERIOR, size: 104)
+                YardButton b_int(label: "Interior", icon: yard_icon_interior, op: OP_INTERIOR, size: 104)
+                sep_a {
+                  LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 22}}
+                  Rect: {1, 1}
+                  Rgb: {40, 96, 124}
+                }
+                YardIcon deck_glyph(icon: yard_icon_deck, size: 16, state: UI_OK)
+                deck_label {
+                  Text: {value: "DECK", size: 11}
+                  Rgb: {146, 176, 196}
+                }
+                YardButton b_d0(label: "1", op: OP_DECK, size: 34)
+                YardButton b_d1(label: "2", op: OP_DECK + 1, size: 34)
+                YardButton b_d2(label: "3", op: OP_DECK + 2, size: 34)
+                sep_b {
+                  LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 22}}
+                  Rect: {1, 1}
+                  Rgb: {40, 96, 124}
+                }
+                YardButton b_frigate(label: "Frigate", op: OP_FRIGATE, size: 74)
+                YardButton b_scout(label: "Scout", op: OP_SCOUT, size: 64)
+                YardButton b_clear(label: "Clear", icon: yard_icon_remove, op: OP_CLEAR, size: 76)
+              }
+            }
+          }
+        }
+
+        spacer_b {
+          LayoutItem: {width: {mode: Grow}}
+        }
+        gap_right {
+          LayoutItem: {width: {mode: Fixed, value: 280}}
+        }
+      }
+
+      middle {
+        Layout: {direction: Row}
+        LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+
+        YardHalo ops_a(strength: 10) {
+          YardHalo ops_b(strength: 24, pad: 1) {
+            YardCard ops(title: "MODULES", width: 292, spacing: 6) {
+              YardTile t1(label: "Cockpit", op: K_COCKPIT, key_hint: "1")
+              YardTile t2(label: "Habitat", op: K_HAB, key_hint: "2")
+              YardTile t3(label: "Life Support", op: K_LIFE, key_hint: "3")
+              YardTile t4(label: "Engineering", op: K_ENG, key_hint: "4")
+              YardTile t5(label: "Cargo Bay", op: K_CARGO, key_hint: "5")
+              YardTile t6(label: "Fuel Tank", op: K_FUEL, key_hint: "6")
+              YardTile t7(label: "Weapons", op: K_WEAPON, key_hint: "7")
+              YardTile t8(label: "Engine", op: K_ENGINE, key_hint: "8")
+              YardTile t9(label: "Remove", op: T_REMOVE, key_hint: "X")
+
+              const shown_k = hover_op > 0 && hover_op <= T_REMOVE ? hover_op : tool
+              if shown_k > 0 {
+                YardSectionTitle rule_title(title: "PLACEMENT", state: UI_OK)
+                rule {
+                  Text: {value: kind_rule(shown_k), size: 11, width: 262}
+                  Rgb: {176, 214, 232}
+                }
+              }
+            }
+          }
+        }
+
+        spacer {
+          LayoutItem: {width: {mode: Grow}}
+        }
+
+        YardHalo stats_a(strength: 10) {
+          YardHalo stats_b(strength: 24, pad: 1) {
+            YardCard stats(title: "SHIP SYSTEMS", width: 280, spacing: 9) {
+              YardStat power(icon: yard_icon_power, label: "POWER", value: "{use:.1} / {gen:.0} MW", ratio: use / max(gen, 1), state: gen == 0 && use == 0 ? UI_MUTED : gen >= use ? UI_OK : UI_BAD)
+              YardStat crew_stat(icon: yard_icon_crew, label: "CREW / AIR", value: "{crew} / {air}", ratio: crew / max(air, 1.0), state: crew == 0 ? UI_MUTED : air >= crew ? UI_OK : UI_BAD)
+              YardStat thrust(icon: yard_icon_thrust, label: "ACCELERATION", value: "{accel:.1} g", ratio: accel / 4, state: c8 == 0 ? UI_MUTED : accel >= 1 ? UI_GOOD : UI_WARN)
+              YardStat range(icon: yard_icon_range, label: "RANGE", value: "{reach:.1} ly", ratio: reach / 25, state: c6 == 0 ? UI_MUTED : UI_OK)
+              YardStat hold(icon: yard_icon_cargo, label: "CARGO", value: "{c5 * 120} t", ratio: c5 / 12.0, state: c5 == 0 ? UI_MUTED : UI_OK)
+              YardStat guns(icon: yard_icon_weapon, label: "FIREPOWER", value: "{c7 * 25}", ratio: c7 / 8.0, state: c7 == 0 ? UI_MUTED : UI_WARN)
+
+              YardSectionTitle checks_title(title: ready ? "SPACEWORTHY" : "NOT READY", state: ready ? UI_GOOD : UI_WARN)
+              YardCheck chk_helm(label: "A cockpit to fly her", ok: has_helm)
+              YardCheck chk_drive(label: "Engines to push her", ok: has_drive)
+              YardCheck chk_fuel(label: "Fuel for the engines", ok: fuel_ok)
+              YardCheck chk_power(label: "Enough power", ok: power_ok)
+              YardCheck chk_air(label: "Air for every crew member", ok: air_ok)
+              YardCheck chk_rules(label: problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: sound)
+            }
+          }
+        }
+      }
+
+      bottom {
+        Layout: {direction: Column, spacing: 6, h: Center}
+        LayoutItem: {width: {mode: Grow}}
+        info {
+          if hover_op > 0 && hover_op <= T_REMOVE {
+            Text: {value: "{kind_name(hover_op)}: {kind_rule(hover_op)}", size: 14}
+          } else if hover_op > T_REMOVE && op_text(hover_op) != "" {
+            Text: {value: op_text(hover_op), size: 14}
+          } else if hover >= 0 && tool > 0 && tool != T_REMOVE && hover_kind == 0 {
+            if hover_code == 0 {
+              Text: {value: "Build a {kind_name(tool)} here.", size: 14}
+            } else {
+              Text: {value: code_text(hover_code), size: 14}
+            }
+          } else if hover >= 0 && hover_kind != 0 && tool == T_REMOVE {
+            Text: {value: "Remove this {kind_name(hover_kind)}.", size: 14}
+          } else if hover >= 0 && hover_kind != 0 && hover_fault != 0 {
+            Text: {value: "{kind_name(hover_kind)}: {code_text(hover_fault)}", size: 14}
+          } else if hover >= 0 && hover_kind != 0 {
+            Text: {value: "{kind_name(hover_kind)}: {kind_rule(hover_kind)}", size: 14}
+          } else {
+            Text: {value: "Deck {deck + 1} of 3  ·  1-8 pick a module  ·  X remove  ·  Tab interior  ·  Q / E deck  ·  right drag turns, WASD moves, wheel zooms", size: 13}
+          }
+          if hover_code != 0 || hover_fault != 0 {
+            Rgb: {255, 170, 150}
+          } else {
+            Rgb: {176, 226, 246}
+          }
+        }
+        if alert != "" {
+          YardHalo alert_glow(strength: 12, pad: 2, radius: 6) {
+            alert_box {
+              Layout: {direction: Row, padding: {6, 6, 16, 16}}
+              Rect: {1, 1}
+              Rgb: {30, 22, 8}
+              Border: {width: 1, radius: 3, color: {255, 190, 84, 255}}
+              message {
+                Text: {value: alert, size: 14}
+                Rgb: {255, 220, 140}
+              }
+            }
+          }
+        }
+      }
+    }
+
+    view {
+      bloom { Bloom: {intensity: 0.9, threshold: 0.5, threshold_softness: 0.25} }
+
+      View: {camera: camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}, effects: [{effect: bloom}]}
+    }
+  }
+}

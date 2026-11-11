@@ -1,0 +1,127 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.light
+using box.movement
+using box.spatial
+using box.transition
+using state
+
+assets {
+  yard_planet_tex { TexturePath: {path: "etc/scenes/shipyard/assets/planet.jpg"} }
+  yard_planet_night_tex { TexturePath: {path: "etc/scenes/shipyard/assets/planet_night.jpg"} }
+  yard_cloud_tex { TexturePath: {path: "etc/scenes/shipyard/assets/clouds.png"} }
+  yard_halo_tex { TexturePath: {path: "etc/scenes/shipyard/assets/halo.png"} }
+
+  template HoloLine {
+    prop len: f32 = 1
+    prop glow: f32 = 1.2
+
+    Box: {len, 0.03, 0.03}
+    Rgb: {70, 200, 255}
+    Emissive: {strength: glow, color: {60, 190, 255}}
+    NoShadow
+    SpatialIgnore
+  }
+
+  template DeckGrid {
+    prop level: i32 = 0
+
+    const y = level * CH + 0.14
+    for i in 0..GX + 1 {
+      HoloLine "z_{i}"(len: GZ * CW, glow: i == 0 || i == GX ? 2.4 : 0.9) { Position: {(i - GX / 2.0) * CW, y, 0}; Rotation: {0, HALF_PI, 0} }
+    }
+    for i in 0..GZ + 1 {
+      HoloLine "x_{i}"(len: GX * CW, glow: i == 0 || i == GZ ? 2.4 : 0.9) { Position: {0, y, (i - GZ / 2.0) * CW} }
+    }
+    for i in 0..4 {
+      const sx = i % 2 == 0 ? -1 : 1
+      const sz = i < 2 ? -1 : 1
+      "corner_{i}" : YardHolo { Position: {sx * GX * CW / 2, y + 0.02, sz * GZ * CW / 2}; Cylinder: {radius: 0.22, length: 0.04, segments: 16}; NoShadow; SpatialIgnore }
+    }
+  }
+
+  template BuildFrame {
+    const hx = GX * CW / 2 + 0.6
+    const hz = GZ * CW / 2 + 0.6
+    const top = GY * CH + 0.6
+    for i in 0..4 {
+      const sx = i % 2 == 0 ? -1 : 1
+      const sz = i < 2 ? -1 : 1
+      HoloLine "post_{i}"(len: top + 2.2, glow: 0.6) { Position: {sx * hx, top / 2 - 1.1, sz * hz}; Rotation: {0, 0, HALF_PI} }
+      HoloLine "cap_x_{i}"(len: 2.4, glow: 2) { Position: {sx * (hx - 1.2), top, sz * hz} }
+      HoloLine "cap_z_{i}"(len: 2.4, glow: 2) { Position: {sx * hx, top, sz * (hz - 1.2)}; Rotation: {0, HALF_PI, 0} }
+    }
+  }
+
+  template Gantry {
+    tower : YardGirder { Position: {0, 4, 0}; Box: {1.1, 14, 1.1} }
+    for j in 0..4 {
+      "brace_{j}" : YardGirder { Position: {0, -1.6 + j * 3.4, 0.6}; Rotation: {0.55, 0, 0}; Box: {0.8, 3.6, 0.12} }
+      "band_{j}" : ShipHazard { Position: {0, -2.4 + j * 3.4, 0}; Box: {1.16, 0.3, 1.16} }
+    }
+    head : YardGirder { Position: {0, 11.2, 0}; Box: {1.6, 0.5, 1.6} }
+    beacon : ShipBeaconRed { Position: {0, 11.6, 0}; Sphere: {radius: 0.18, segments: 10} }
+    lamp : ShipWhiteLight { Position: {0, 10.8, 0}; Box: {1.4, 0.12, 1.4} }
+  }
+
+  template Slipway {
+    slab : YardDeck { Position: {0, -3.2, 0}; Box: {40, 0.6, 58} }
+    rim_a : YardGirder { Position: {-20, -2.84, 0}; Box: {0.5, 0.18, 58.4} }
+    rim_b : YardGirder { Position: {20, -2.84, 0}; Box: {0.5, 0.18, 58.4} }
+    rim_c : YardGirder { Position: {0, -2.84, -29}; Box: {40.4, 0.18, 0.5} }
+    rim_d : YardGirder { Position: {0, -2.84, 29}; Box: {40.4, 0.18, 0.5} }
+    for s in 0..2 {
+      const sx = s == 0 ? -1 : 1
+      "edge_light_{s}" : ShipCyanLight { Position: {sx * 20.1, -2.9, 0}; Box: {0.06, 0.08, 57.6} }
+      "rail_{s}" : ShipHullDark { Position: {sx * 6, -2.85, 0}; Box: {0.5, 0.2, 49} }
+    }
+    for i in 0..9 {
+      "cradle_{i}" {
+        Position: {0, -2.9, (i - 4) * CW}
+        beam : YardGirder { Position: {0, 0.2, 0}; Box: {13, 0.4, 0.5} }
+        for s in 0..2 {
+          "pad_{s}" : ShipHazard { Position: {(s - 0.5) * 9, 0.42, 0}; Box: {1.6, 0.06, 0.6} }
+        }
+      }
+    }
+    for i in 0..4 {
+      const gx = i % 2 == 0 ? -1 : 1
+      const gz = i < 2 ? -1 : 1
+      Gantry "tower_{i}"() { Position: {gx * 19, 0, gz * 27} }
+    }
+    for i in 0..2 {
+      "end_light_{i}" : ShipAmberLight { Position: {0, -2.9, i == 0 ? -29.1 : 29.1}; Box: {39, 0.08, 0.06} }
+    }
+  }
+
+  template YardPlanet {
+    surface {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, 0.3}
+      AngularVelocity: {0, 0.004, 0}
+      Sphere: {radius: 420, segments: 128, smooth: true}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 0.75}
+      Emissive: {strength: 0.8, color: {255, 214, 160}}
+      PbrTextures: {albedo: yard_planet_tex, emissive: yard_planet_night_tex}
+      NoShadow
+      SpatialIgnore
+    }
+    clouds {
+      Position: {0, 0, 0}
+      Rotation: {0, 0, 0.3}
+      AngularVelocity: {0, 0.006, 0}
+      Sphere: {radius: 424, segments: 128, smooth: true}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 0.9}
+      BlendMode: AlphaBlend
+      PbrTextures: {albedo: yard_cloud_tex}
+      NoShadow
+      SpatialIgnore
+    }
+  }
+}
