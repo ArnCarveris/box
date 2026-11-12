@@ -86,9 +86,8 @@ ecs_entity_t ore_combust(
         ORE_CFG(real, "combustRadiusMin"), ORE_CFG(real, "combustRadiusMax"));
     float s = sqrtf(r);
     vec3 at = { position[0], position[1] + ORE_CFG(real, "combustLift") * r, position[2] };
-    ecs_entity_t result = ore_burst(w, effect, at, s);
+    ecs_entity_t result = ore_burst(w, effect, at, r);
     if (result) {
-        ecs_set(w, result, Scale, {r, r, r});
         ecs_set(w, result, OreBlastFlash, {
             .peak = ORE_CFG(real, "combustPeak") * s,
             .range = ORE_CFG(real, "combustRange") + ORE_CFG(real, "combustRangeRadius") * r

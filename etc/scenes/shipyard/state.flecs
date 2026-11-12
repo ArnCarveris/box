@@ -33,7 +33,11 @@ state {
   export const K_DOCK: i32 = 11
   export const K_HULL: i32 = 12
   export const K_RADIATOR: i32 = 13
-  export const T_REMOVE: i32 = 14
+  export const K_DRILL: i32 = 14
+  export const K_BUILDER: i32 = 15
+  export const K_DATA: i32 = 16
+  export const K_AUTO: i32 = 17
+  export const T_REMOVE: i32 = 18
 
   export const H_WEDGE: i32 = 1
   export const H_SLOPE: i32 = 2
@@ -48,6 +52,7 @@ state {
   export const OP_FRIGATE: i32 = 130
   export const OP_SCOUT: i32 = 131
   export const OP_CLEAR: i32 = 132
+  export const OP_MINER: i32 = 133
 
   event Click(cell: i32)
   event Built(cell: i32)
@@ -113,9 +118,39 @@ state {
     0, 0, 0, 0, 0
   ]
 
+  export const miner_plan: i32[135] = [
+    0, 0, 0, 0, 0,
+    0, 8, 0, 8, 0,
+    0, 6, 6, 6, 0,
+    13, 4, 5, 4, 13,
+    0, 5, 5, 5, 0,
+    0, 5, 5, 5, 0,
+    0, 5, 5, 5, 0,
+    0, 14, 17, 14, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 13, 16, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 15, 0, 15, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0
+  ]
+
   export mut grid: i32[1080] = {}
   export mut status: i32[1080] = {}
-  export mut counts: i32[15] = {}
+  export mut counts: i32[19] = {}
   export mut modules: i32 = 0
   export mut problems: i32 = 0
   export mut air: bool[1080] = {}
@@ -149,7 +184,7 @@ state {
   }
 
   fn boxy(k: i32) -> bool {
-    k == K_HAB || k == K_LIFE || k == K_POWER || k == K_CARGO
+    k == K_HAB || k == K_LIFE || k == K_POWER || k == K_CARGO || k == K_DATA
   }
 
   fn crewed(k: i32) -> bool {
@@ -157,11 +192,16 @@ state {
   }
 
   fn hulled(k: i32) -> bool {
-    k == K_COCKPIT || k == K_HAB || k == K_OBS
+    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_AUTO
+  }
+
+  fn piloted(k: i32) -> bool {
+    k == K_COCKPIT || k == K_AUTO
   }
 
   fn fairable(k: i32) -> bool {
-    k != K_EMPTY && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL && k != K_RADIATOR
+    k != K_EMPTY && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL && k != K_RADIATOR &&
+    k != K_DRILL && k != K_BUILDER
   }
 
   fn slot(x: i32, y: i32, z: i32) -> i32 {
@@ -274,7 +314,7 @@ state {
   }
 
   fn dockable(k: i32) -> bool {
-    boxy(k) || k == K_COCKPIT || k == K_OBS
+    boxy(k) || piloted(k) || k == K_OBS
   }
 
   fn dock_at(x: i32, y: i32, z: i32) -> i32 {
@@ -287,15 +327,19 @@ state {
     0
   }
 
+  fn hot(k: i32) -> bool {
+    k == K_POWER || k == K_DATA
+  }
+
   fn cooled(k: i32) -> bool {
-    k == K_POWER || k == K_RADIATOR
+    hot(k) || k == K_RADIATOR
   }
 
   fn cool_at(x: i32, y: i32, z: i32) -> i32 {
-    kind_at(x - 1, y, z) == K_POWER ? 2 :
-    kind_at(x + 1, y, z) == K_POWER ? 3 :
-    kind_at(x, y, z - 1) == K_POWER ? 5 :
-    kind_at(x, y, z + 1) == K_POWER ? 4 :
+    hot(kind_at(x - 1, y, z)) ? 2 :
+    hot(kind_at(x + 1, y, z)) ? 3 :
+    hot(kind_at(x, y, z - 1)) ? 5 :
+    hot(kind_at(x, y, z + 1)) ? 4 :
     cooled(kind_at(x - 1, y, z)) ? 2 :
     cooled(kind_at(x + 1, y, z)) ? 3 :
     cooled(kind_at(x, y, z - 1)) ? 5 :
@@ -307,6 +351,15 @@ state {
     boxy(kind_at(x, y - 1, z)) ? 1 :
     boxy(kind_at(x - 1, y, z)) ? 2 :
     boxy(kind_at(x + 1, y, z)) ? 3 :
+    0
+  }
+
+  fn drill_at(x: i32, y: i32, z: i32) -> i32 {
+    boxy(kind_at(x, y, z - 1)) ? 5 :
+    boxy(kind_at(x - 1, y, z)) ? 2 :
+    boxy(kind_at(x + 1, y, z)) ? 3 :
+    boxy(kind_at(x, y + 1, z)) ? 6 :
+    boxy(kind_at(x, y - 1, z)) ? 1 :
     0
   }
 
@@ -340,8 +393,8 @@ state {
 
   fn rule_code(x: i32, y: i32, z: i32, k: i32) -> i32 {
     !touches_any(x, y, z) ? 0 :
-    k == K_COCKPIT && kind_at(x, y, z - 1) == 0 ? 3 :
-    k == K_COCKPIT && !clear_ahead(x, y, z) ? 4 :
+    piloted(k) && kind_at(x, y, z - 1) == 0 ? 3 :
+    piloted(k) && !clear_ahead(x, y, z) ? 4 :
     k == K_ENGINE && kind_at(x, y, z + 1) == 0 ? 5 :
     k == K_ENGINE && !clear_behind(x, y, z) ? 6 :
     k == K_WEAPON && mount_at(x, y, z) == 0 ? 7 :
@@ -352,22 +405,25 @@ state {
     k == K_DOCK && dock_at(x, y, z) == 0 ? 21 :
     k == K_HULL && fshape[cell_at(x, y, z)] == 0 ? 22 :
     k == K_RADIATOR && cool_at(x, y, z) == 0 ? 23 :
+    k == K_DRILL && drill_at(x, y, z) == 0 ? 24 :
+    k == K_BUILDER && mount_at(x, y, z) == 0 ? 25 :
+    k == K_DATA && !touches(x, y, z, K_RADIATOR) ? 26 :
     0
   }
 
   fn kind_mass(k: i32) -> f32 {
-    match k { 1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; 9: 11; 10: 9; 11: 4; 12: 3; 13: 5; _: 0 }
+    match k { 1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; 9: 11; 10: 9; 11: 4; 12: 3; 13: 5; 14: 12; 15: 8; 16: 14; 17: 10; _: 0 }
   }
 
   fn kind_power(k: i32) -> f32 {
-    match k { 1: 2; 2: 1; 3: 2; 4: -30; 5: 0.5; 7: 3; 8: 3; 9: 1; 10: 1; _: 0 }
+    match k { 1: 2; 2: 1; 3: 2; 4: -30; 5: 0.5; 7: 3; 8: 3; 9: 1; 10: 1; 14: 4; 15: 2; 16: 12; 17: 2; _: 0 }
   }
 
   fn validate() {
     mut st: i32[1080] = {}
     mut aired: bool[1080] = {}
     mut queue: i32[1080] = {}
-    mut tally: i32[15] = {}
+    mut tally: i32[19] = {}
     mut total: i32 = 0
 
     for i in 0..CELLS {

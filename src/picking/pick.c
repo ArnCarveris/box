@@ -623,12 +623,32 @@ static void box_pick_candidate(
     c->ui = ui;
 }
 
+/** Get whether a UI element is bare: it draws nothing and handles nothing, such as a layout
+ * root that only places its children. A bare element is transparent to the pointer, so a
+ * full-window root does not hide the elements of the roots under it.
+ *
+ * @param world The world
+ * @param e The UI element
+ * @return Whether the element is bare
+ */
+static bool box_pick_ui_bare(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return !ecs_has(world, e, Rect) && !ecs_has(world, e, Circle) &&
+        !ecs_has(world, e, Line) && !ecs_has(world, e, Polygon2D) &&
+        !ecs_has(world, e, Image) && !ecs_has(world, e, Border) &&
+        !ecs_has(world, e, Text) && !ecs_has(world, e, TextBounds) &&
+        !ecs_has(world, e, ShapeMesh) &&
+        !ecs_has_id(world, e, Interactive) && !ecs_has_id(world, e, InputBlocker);
+}
+
 /** Narrow phase of the spatial ray: the area of a UI element, the outline of a polygon or the
  * triangles of a shape.
  *
  * A hit on a UI element or a 2D shape outside the area of a ClipChildren ancestor is no hit, as
  * it is not drawn there, and an element with PickThrough is never hit. Neither is a disabled
- * entity, which the index skips, nor an entity that is no longer alive.
+ * entity, which the index skips, an entity no longer alive or a bare element (box_pick_ui_bare).
  *
  * The distance it reports is moved out by the tie margin, so the walk still reaches every hit
  * that ties with the nearest one, which the selection weighs.
@@ -653,7 +673,8 @@ static bool box_pick_filter(
     bool ui = polygon || (alive && box_pick_ui_size(cast->world, e, size, &circle));
     bool result;
     if (!alive || ecs_has_id(cast->world, e, PickThrough) ||
-        ecs_has_id(cast->world, e, EcsDisabled))
+        ecs_has_id(cast->world, e, EcsDisabled) ||
+        (ui && !polygon && box_pick_ui_bare(cast->world, e)))
     {
         result = false;
     } else if (ui) {
