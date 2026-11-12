@@ -421,8 +421,8 @@ void Args_surface_not_created_when_present(void) {
 
     test_int(ecs_count(world, Surface), 1);
     const Surface *s = ecs_get(world, own, Surface);
-    test_int(s->width, 64);
-    test_int(s->height, 48);
+    test_int(s->width, 320);
+    test_int(s->height, 200);
 
     ecs_fini(world);
     box_render_null_free(null);

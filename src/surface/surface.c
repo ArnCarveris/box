@@ -555,6 +555,59 @@ static void BoxSurfacePoll(
     }
 }
 
+/** Find the first Surface that presents itself, one without a texture, the one --out uses.
+ *
+ * @param world The world
+ * @return The surface entity, 0 if there is none
+ */
+static ecs_entity_t box_surface_first_window(
+    const ecs_world_t *world)
+{
+    ecs_entity_t result = 0;
+    int32_t i;
+    ecs_iter_t it = ecs_each(world, Surface);
+    while (!result && ecs_each_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count && !result; i ++) {
+            if (!s[i].texture) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+/** Give the first window surface the size of the --surface option, when the run has one.
+ *
+ * @param world The world
+ * @param e The surface entity
+ * @param s The surface, written in place
+ * @return Whether the size of the surface changed
+ */
+static bool box_surface_apply_app_size(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    Surface *s)
+{
+    bool result = false;
+    const App *app = ecs_singleton_get(world, App);
+    if (app && app->surface_width > 0 && app->surface_height > 0 && !s->texture &&
+        (s->width != app->surface_width || s->height != app->surface_height) &&
+        box_surface_first_window(world) == e)
+    {
+        s->width = app->surface_width;
+        s->height = app->surface_height;
+        result = true;
+    }
+
+    return result;
+}
+
 /** Give a set surface its engine side and make the world render with the GPU.
  *
  * @param it The iterator of the observer
@@ -563,10 +616,14 @@ static void BoxSurfaceOnSet(
     ecs_iter_t *it)
 {
     box_surface_state_t *state = it->ctx;
-    const Surface *s = ecs_field(it, Surface, 0);
+    Surface *s = ecs_field(it, Surface, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t texture = s[i].texture;
+        if (!texture) {
+            box_surface_apply_app_size(it->world, it->entities[i], &s[i]);
+        }
+
         SurfaceImpl *impl = ecs_ensure(it->stage, it->entities[i], SurfaceImpl);
         if (texture) {
             if (!impl->handle) {
@@ -617,7 +674,10 @@ static bool box_surface_has_window(
 }
 
 /** Create the Surface the command line asks for when the world has none that presents itself
- * after its scene loaded, then disable the system: it decides once, on the first frame.
+ * after its scene loaded, or else give the first such surface the size of the command line.
+ * The system then disables itself: it decides once, on the first frame.
+ *
+ * Later writes of the Surface keep the size of the command line through BoxSurfaceOnSet.
  *
  * @param it The iterator of the system
  */
@@ -626,7 +686,16 @@ static void BoxSurfaceFromApp(
 {
     ecs_world_t *world = it->world;
     const App *app = ecs_singleton_get(world, App);
-    if (app && app->surface_width > 0 && app->surface_height > 0 &&
+    ecs_entity_t window = box_surface_first_window(world);
+    if (window && app && app->surface_width > 0 && app->surface_height > 0) {
+        const Surface *cur = ecs_get(world, window, Surface);
+        if (cur->width != app->surface_width || cur->height != app->surface_height) {
+            Surface *s = ecs_ensure(world, window, Surface);
+            s->width = app->surface_width;
+            s->height = app->surface_height;
+            ecs_modified(world, window, Surface);
+        }
+    } else if (app && app->surface_width > 0 && app->surface_height > 0 &&
         !box_surface_has_window(world))
     {
         ecs_entity_t e = ecs_new(world);

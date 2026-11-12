@@ -57,8 +57,8 @@ ECS_STRUCT(App, {
     float fps;          /**< Target fps flecs caps the frames at, default 0: FpsTarget */
     float delta_time;   /**< Seconds every frame advances, default 0: flecs measures the delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
-    int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
-    int32_t surface_height; /**< Height of the Surface a run creates when it has none */
+    int32_t surface_width;  /**< Width of the window Surface, set or created by the run, 0 none */
+    int32_t surface_height; /**< Height of the window Surface, set or created by the run */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
     bool unpaced;       /**< A headless run ignores its CPU budget */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
