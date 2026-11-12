@@ -1032,7 +1032,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 4);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1069,7 +1069,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 4);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1161,7 +1161,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 3);
+    test_int(second->texture_node_kinds, 4);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1188,7 +1188,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 4);
+    test_int(null->texture_node_kinds, 5);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1200,4 +1200,62 @@ void TextureGraph_custom_kind_sent(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+void TextureGraph_blocks_kind(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    test_assert(kind_id(world, ecs_id(TexBlocks)) > 0);
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexBlocks), TextureNodeKind);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "coords");
+    test_int(kind->inputs[0].type, TexVector);
+    test_bool(kind->inputs[0].fallback, false);
+    test_int(kind->param_count, 11);
+    test_str(kind->params[0].name, "courses");
+    test_str(kind->params[9].name, "layer_seed");
+    test_str(kind->params[10].name, "coords");
+    test_int(kind->params[10].offset, 40);
+    test_int(kind->params[10].size, 8);
+    test_int(kind->param_size, 48);
+    test_str(kind->function, "box_tex_blocks");
+    test_bool(kind->plane, true);
+    test_bool(kind->neighbourhood, false);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_blocks_plane(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t blocks = ecs_entity(world, { .name = "blocks" });
+    ecs_set(world, blocks, TexBlocks, { .courses = 4, .per_course = 3, .gap = 0.02f });
+    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 32 });
+    const TextureStatus *status = frame_status(world, tex);
+    test_int(status->state, TextureReady);
+    test_assert(graph_of(world, tex)->node_count == 1);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_blocks_sphere_error(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t blocks = ecs_entity(world, { .name = "blocks" });
+    ecs_set(world, blocks, TexBlocks, { .courses = 4, .per_course = 3, .gap = 0.02f });
+    ecs_log_set_level(-4);
+    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
+        .domain = DomainSphere });
+    frame_status(world, tex);
+    test_failed(world, tex, "'blocks'", "DomainPlane");
+    test_failed(world, tex, "TexBlocks", "'graph'");
+
+    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
+        .domain = DomainPlane });
+    test_int(frame_status(world, tex)->state, TextureReady);
+
+    ecs_fini(world);
 }

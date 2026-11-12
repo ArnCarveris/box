@@ -50,6 +50,125 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexBlocks node: the courses of blocks of box_gen_blocks of texture/gen.c.
+ *
+ * The cuts of the course of the texel are made again rather than sorted: the block starts at
+ * the largest cut at or before u, the last in index order among equal cuts as the stable sort
+ * keeps them; its id comes from its rank among the cuts and its tone from its index.
+ *
+ * Before the first cut the block is the last one with its end one past the first cut, as gen.c
+ * has it. Lengths are in widths of the image. The coords parameter is nonzero with a node. */
+static const char *box_texture_blocks_wgsl =
+    "fn box_tex_blocks_mix(v: u32) -> u32 {\n"
+    "    var x = v;\n"
+    "    x ^= x >> 16u;\n"
+    "    x *= 0x7feb352du;\n"
+    "    x ^= x >> 15u;\n"
+    "    x *= 0x846ca68bu;\n"
+    "    x ^= x >> 16u;\n"
+    "    return x;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks_hash(h: u32, v: u32) -> u32 {\n"
+    "    return box_tex_blocks_mix(h ^ box_tex_blocks_mix(v + 0x9e3779b9u));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks_unit(h: u32) -> f32 {\n"
+    "    return f32(h >> 8u) / 16777216.0;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks_cut(hk: u32, b: i32, n: i32, jitter: f32, shift: f32) -> f32 {\n"
+    "    let r = box_tex_blocks_unit(box_tex_blocks_hash(hk, u32(b)));\n"
+    "    let cut = (f32(b) + (r * 2.0 - 1.0) * jitter + shift) / f32(n);\n"
+    "    return cut - floor(cut);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let counts = bitcast<vec4i>(p[0]);\n"
+    "    let shape = bitcast<vec4f>(p[1]);\n"
+    "    let courses = select(min(counts.x, 4096), 8, counts.x <= 0);\n"
+    "    let n = select(min(counts.y, 4096), 4, counts.y <= 0);\n"
+    "    let tones = clamp(counts.z, 0, 4096);\n"
+    "    let tone_order = counts.w;\n"
+    "    let gap = shape.x;\n"
+    "    let jitter = shape.y;\n"
+    "    let softness = shape.w;\n"
+    "    let at = select(coords, i[0], any(p[2].zw != vec2u(0u)));\n"
+    "    var seed = box_tex_blocks_hash(0x5bd1e995u, p[2].x);\n"
+    "    seed = box_tex_blocks_hash(seed, p[2].y);\n"
+    "    seed = box_tex_blocks_hash(seed, 1u);\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let v = (at.y - floor(at.y)) * f32(courses);\n"
+    "    let u = at.x - floor(at.x);\n"
+    "    let k = min(i32(floor(v)), courses - 1);\n"
+    "    let dy = min(v - f32(k), f32(k + 1) - v) * size.y / (f32(courses) * size.x);\n"
+    "    let hk = box_tex_blocks_hash(seed, u32(k));\n"
+    "    let shift = select(0.0, shape.z, (k % 2) == 1);\n"
+    "    var start = -1.0;\n"
+    "    var start_b = -1;\n"
+    "    var end = 2.0;\n"
+    "    var lo = 2.0;\n"
+    "    var hi = -1.0;\n"
+    "    var hi_b = 0;\n"
+    "    for (var b = 0; b < n; b ++) {\n"
+    "        let c = box_tex_blocks_cut(hk, b, n, jitter, shift);\n"
+    "        if (c <= u && c >= start) {\n"
+    "            start = c;\n"
+    "            start_b = b;\n"
+    "        }\n"
+    "        if (c > u) {\n"
+    "            end = min(end, c);\n"
+    "        }\n"
+    "        if (c >= hi) {\n"
+    "            hi = c;\n"
+    "            hi_b = b;\n"
+    "        }\n"
+    "        lo = min(lo, c);\n"
+    "    }\n"
+    "    if (start_b < 0) {\n"
+    "        start = hi - 1.0;\n"
+    "        start_b = hi_b;\n"
+    "        end = lo + 1.0;\n"
+    "    } else if (end > 1.5) {\n"
+    "        end = lo + 1.0;\n"
+    "    }\n"
+    "    let cut = select(start, start + 1.0, start < 0.0);\n"
+    "    var rank = 0;\n"
+    "    for (var b = 0; b < n; b ++) {\n"
+    "        let c = box_tex_blocks_cut(hk, b, n, jitter, shift);\n"
+    "        if (c < cut || (c == cut && b < start_b)) {\n"
+    "            rank ++;\n"
+    "        }\n"
+    "    }\n"
+    "    let hid = box_tex_blocks_hash(hk ^ 0xa511e9b3u, 1u);\n"
+    "    let htone = box_tex_blocks_hash(hk ^ 0x3c6ef372u, 2u);\n"
+    "    let hrandom = box_tex_blocks_hash(hk ^ 0x85ebca6bu, 3u);\n"
+    "    let id = box_tex_blocks_unit(box_tex_blocks_hash(hid, u32(rank)));\n"
+    "    let random = box_tex_blocks_unit(box_tex_blocks_hash(hrandom, u32(rank)));\n"
+    "    var tone = 0;\n"
+    "    if (tones > 0) {\n"
+    "        if (tone_order == 1) {\n"
+    "            tone = (k + start_b) % tones;\n"
+    "        } else if (tone_order == 2) {\n"
+    "            tone = k % tones;\n"
+    "        } else if (tone_order == 3) {\n"
+    "            tone = start_b % tones;\n"
+    "        } else {\n"
+    "            let r = box_tex_blocks_unit(box_tex_blocks_hash(htone, u32(start_b)));\n"
+    "            tone = min(i32(floor(r * f32(tones))), tones - 1);\n"
+    "        }\n"
+    "    }\n"
+    "    let d = min(min(u - start, end - u), dy);\n"
+    "    let half = 0.5 * gap;\n"
+    "    let bevel = select(1.3 * gap, softness, softness > 0.0);\n"
+    "    var mask = select(0.0, 1.0, d >= half);\n"
+    "    if (bevel > 0.0) {\n"
+    "        mask = smoothstep(half, half + bevel, d);\n"
+    "    }\n"
+    "    let level = select(0.0, f32(tone) / f32(max(tones - 1, 1)), tones > 1);\n"
+    "    return vec4f(mask, id, level, random);\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -60,6 +179,7 @@ typedef struct box_texture_graph_build_t {
     ecs_vec_t nodes;            /**< box_texture_graph_node_t in topological order */
     ecs_vec_t params;           /**< uint8_t, parameter bytes of the nodes */
     ecs_vec_t *reached;         /**< ecs_entity_t, the entities the walk reached */
+    TextureGraphDomain domain;  /**< Coordinates of the texels of the graph */
     char *error;                /**< Why the build failed, NULL while it did not */
     bool wait;                  /**< Wait for a node without a node component */
     bool waiting;               /**< The walk found a node without a node component */
@@ -282,7 +402,8 @@ static void box_texture_node_kind_reflect(
         .param_size = kind->param_size,
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
-        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
+        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0,
+        .plane = (kind->flags & BOX_TEXTURE_NODE_PLANE) != 0
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -588,6 +709,13 @@ static int32_t box_texture_graph_visit(
     }
 
     box_texture_graph_check_type(b, e, kind->output, from, input, expected);
+    if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain == DomainSphere) {
+        char *component = ecs_get_path(b->world, kind->component);
+        box_texture_graph_error(b, "node '%s' (%s) works on DomainPlane only, the graph is on "
+            "DomainSphere", name, component);
+        ecs_os_free(component);
+    }
+
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
         box_texture_graph_error(b, "more than %d nodes", BOX_TEXTURE_GRAPH_NODES);
     }
@@ -760,7 +888,8 @@ static void box_texture_graph_build(
     const TextureGraph *graph = ecs_get(world, e, TextureGraph);
     box_texture_t *tex = box_texture_entry(t, e);
     box_texture_graph_build_t b = {
-        .world = world, .t = t, .graph = e, .reached = &tex->reached, .wait = wait
+        .world = world, .t = t, .graph = e, .reached = &tex->reached, .wait = wait,
+        .domain = graph->domain
     };
     tex->graph_dirty = false;
     tex->graph_waiting = false;
@@ -861,7 +990,7 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexBlocks.
  *
  * @param world The world
  */
@@ -895,6 +1024,28 @@ static void box_texture_nodes_register(
         .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexBlocks),
+        .output = TexVector,
+        .inputs = {{ "coords", offsetof(TexBlocks, coords), TexVector, NULL, 0 }},
+        .params = {
+            { "courses", offsetof(TexBlocks, courses), 4, BOX_TEXTURE_PARAM_I32 },
+            { "per_course", offsetof(TexBlocks, per_course), 4, BOX_TEXTURE_PARAM_I32 },
+            { "tones", offsetof(TexBlocks, tones), 4, BOX_TEXTURE_PARAM_I32 },
+            { "tone_order", offsetof(TexBlocks, tone_order), 4, BOX_TEXTURE_PARAM_I32 },
+            { "gap", offsetof(TexBlocks, gap), 4, BOX_TEXTURE_PARAM_F32 },
+            { "jitter", offsetof(TexBlocks, jitter), 4, BOX_TEXTURE_PARAM_F32 },
+            { "stagger", offsetof(TexBlocks, stagger), 4, BOX_TEXTURE_PARAM_F32 },
+            { "softness", offsetof(TexBlocks, softness), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexBlocks, seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "layer_seed", offsetof(TexBlocks, layer_seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "coords", offsetof(TexBlocks, coords), 8, BOX_TEXTURE_PARAM_U32 }
+        },
+        .function = "box_tex_blocks",
+        .source = box_texture_blocks_wgsl,
+        .flags = BOX_TEXTURE_NODE_PLANE
     });
 }
 

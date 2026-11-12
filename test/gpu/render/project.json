@@ -1471,7 +1471,13 @@
                     "shared_structure",
                     "compile_failure_reports_node",
                     "status_transitions",
-                    "material_samples_graph"
+                    "material_samples_graph",
+                    "blocks_match_gen",
+                    "blocks_match_gen_aspect",
+                    "blocks_match_gen_tones",
+                    "blocks_match_gen_hard",
+                    "blocks_tiling",
+                    "blocks_sphere_error"
                 ]
             }
         ]

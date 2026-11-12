@@ -323,11 +323,46 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** Node of a TextureGraph of courses of blocks or planks, as a GenBlocks layer of TextureGen
+ * makes them: the same parameters and seeds give the same blocks, ids and tones.
+ *
+ * Its value is (mask, id, tone, random): mask 1 on a face and 0 in the joints, beveled; id the
+ * random id of the block in 0..1 as GenBlocks gives it; tone the tone level of the block,
+ * tone / (tones - 1), 0 with fewer than two tones; random a second random number of the block
+ * in 0..1, independent of id. Lengths are fractions of the width of the image, the courses
+ * repeat down v and the cuts wrap along u, so it tiles over 0..1.
+ *
+ * DomainPlane only: on DomainSphere it fails the graph.
+ *
+ * @code
+ * ashlar {
+ *   blocks { TexBlocks: {courses: 8, per_course: 4, gap: 0.006, jitter: 0.22, stagger: 0.5,
+ *                        seed: 11} }
+ *   TextureGraph: {output: blocks, format: GraphLinear}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexBlocks, {
+    ecs_entity_t coords;    /**< Vector input node of the (u, v) the blocks are evaluated at, 0
+                             *   for the coordinates of the domain */
+    int32_t courses;        /**< Courses down the texture, default 8 */
+    int32_t per_course;     /**< Blocks along a course, default 4 */
+    float gap;              /**< Width of the joints as a fraction of the width */
+    float jitter;           /**< Random shift of each cut, up to +-jitter blocks */
+    float stagger;          /**< Shift of every second course in blocks */
+    float softness;         /**< Width of the bevel from a joint to the face as a fraction of the
+                             *   width, default 1.3 times gap; with neither a hard edge */
+    int32_t tones;          /**< Number of tones a block takes, 0 for none */
+    TextureGenToneOrder tone_order; /**< Order of the tones, default GenToneRandom */
+    int32_t seed;           /**< Seed, as TextureGen.seed */
+    int32_t layer_seed;     /**< Seed mixed with seed, as TextureGenLayer.seed */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
 /** Most parameters of a node kind */
-#define BOX_TEXTURE_NODE_PARAMS (8)
+#define BOX_TEXTURE_NODE_PARAMS (16)
 
 /** Most bytes of the parameters of a node kind in the parameter buffer */
 #define BOX_TEXTURE_NODE_PARAM_BYTES (64)
@@ -337,6 +372,9 @@ ECS_STRUCT(TexMath, {
 
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
+
+/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
+#define BOX_TEXTURE_NODE_PLANE (1u << 2)
 
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
@@ -360,11 +398,12 @@ ECS_STRUCT(TextureNodeKind, {
     int32_t input_count;     /**< Inputs in inputs */
     TextureNodePort inputs[4]; /**< The BOX_TEXTURE_NODE_INPUTS inputs, in order */
     int32_t param_count;     /**< Parameters in params */
-    TextureNodeParam params[8]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
+    TextureNodeParam params[16]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
     int32_t param_size;      /**< Bytes of the parameters of a node, a multiple of 16 */
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
+    bool plane;              /**< The node works on DomainPlane only */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -407,7 +446,8 @@ typedef struct box_texture_node_desc_t {
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters in order */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_PLANE */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

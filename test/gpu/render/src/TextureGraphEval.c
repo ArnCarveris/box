@@ -2,7 +2,8 @@
  * @file TextureGraphEval.c
  * @brief Tests for the evaluation of TextureGraph on the GPU backend: the images of constant,
  * coordinate and math graphs in both domains read back, nodes read back, compiles shared by
- * structure and kept by parameter edits, failures, status and a material that samples a graph.
+ * structure and kept by parameter edits, failures, status and a material that samples a graph,
+ * and the TexBlocks node against the GenBlocks layers of TextureGen.
  */
 
 #include <box.h>
@@ -10,6 +11,7 @@
 #include <math.h>
 #include <string.h>
 #include "render.h"
+#include "../../../../src/texture/texture.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -930,5 +932,220 @@ void TextureGraphEval_material_samples_graph(void) {
     test_assert(center[2] <= 30);
     stbi_image_free(img);
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Texels whose block or mask may differ from GenBlocks, of every 1000: those whose center
+ * falls within float rounding of a cut or a course */
+#define TG_BLOCKS_OUTLIERS (5)
+
+/** Create a graph of one TexBlocks node, stored as HDR.
+ *
+ * @param world The world
+ * @param blocks The node
+ * @param coords The node of its coordinates, 0 for the domain
+ * @param width Width
+ * @param height Height
+ * @param domain Domain
+ * @return The texture entity
+ */
+static ecs_entity_t tg_blocks(
+    ecs_world_t *world,
+    const TexBlocks *blocks,
+    ecs_entity_t coords,
+    int32_t width,
+    int32_t height,
+    TextureGraphDomain domain)
+{
+    ecs_entity_t tex = ecs_entity(world, { .name = "blocks_graph" });
+    ecs_entity_t node = ecs_entity(world, { .name = "blocks_node" });
+    TexBlocks value = *blocks;
+    value.coords = coords;
+    ecs_set_ptr(world, node, TexBlocks, &value);
+    ecs_set(world, tex, TextureGraph, {.output = node, .width = width, .height = height,
+        .domain = domain, .format = GraphHdr});
+
+    return tex;
+}
+
+/** Check the image of a TexBlocks node against the face mask, ids and tones of the GenBlocks
+ * layer of the same parameters that TextureGen generates on the CPU.
+ *
+ * @param blocks The node; its seed is the seed of the generator, layer_seed that of the layer
+ * @param width Width
+ * @param height Height
+ */
+static void tg_blocks_match(
+    const TexBlocks *blocks,
+    int32_t width,
+    int32_t height)
+{
+    ecs_world_t *world = tg_world();
+    ecs_entity_t tex = tg_blocks(world, blocks, 0, width, height, DomainPlane);
+    int32_t count = width * height, i, outliers = 0;
+    int32_t tones = blocks->tones;
+    test_int(tg_wait(world, tex, 1)->state, TextureReady);
+
+    TextureGenLayer layer = {
+        .kind = GenBlocks, .seed = blocks->layer_seed, .tones = blocks->tones,
+        .tone_order = blocks->tone_order, .courses = blocks->courses,
+        .per_course = blocks->per_course, .gap = blocks->gap, .jitter = blocks->jitter,
+        .stagger = blocks->stagger, .softness = blocks->softness
+    };
+    float *value = ecs_os_malloc_n(float, count);
+    float *id = ecs_os_malloc_n(float, count);
+    int32_t *tone = ecs_os_malloc_n(int32_t, count);
+    box_texture_gen_pattern(&layer, blocks->seed, width, height, value, id, tone);
+
+    float *texels = tg_read(world, tex, 0, width, height);
+    for (i = 0; i < count; i ++) {
+        const float *t = &texels[i * 4];
+        float level = tones > 1 ? (float)tone[i] / (float)(tones - 1) : 0.0f;
+        bool ok = fabsf(t[0] - value[i]) <= 5e-3f && fabsf(t[1] - id[i]) <= TG_TOLERANCE_16 &&
+            fabsf(t[2] - level) <= TG_TOLERANCE_16 && t[3] >= 0.0f && t[3] <= 1.0f;
+        if (!ok) {
+            if (outliers < 8) {
+                printf("texel %d, %d: (%f, %f, %f, %f), GenBlocks (%f, %f, %f)\n",
+                    i % width, i / width, t[0], t[1], t[2], t[3], value[i], id[i], level);
+            }
+
+            outliers ++;
+        }
+    }
+
+    test_assert(outliers * 1000 <= count * TG_BLOCKS_OUTLIERS);
+
+    ecs_os_free(texels);
+    ecs_os_free(value);
+    ecs_os_free(id);
+    ecs_os_free(tone);
+    ecs_fini(world);
+}
+
+void TextureGraphEval_blocks_match_gen(void) {
+    // textures/graph
+    tg_blocks_match(&(TexBlocks){
+        .courses = 8, .per_course = 4, .gap = 0.006f, .jitter = 0.22f, .stagger = 0.5f,
+        .seed = 11
+    }, 128, 128);
+}
+
+void TextureGraphEval_blocks_match_gen_aspect(void) {
+    // textures/graph
+    tg_blocks_match(&(TexBlocks){
+        .courses = 6, .per_course = 5, .gap = 0.02f, .softness = 0.03f, .jitter = 0.4f,
+        .stagger = 0.3f, .seed = 3, .layer_seed = 52
+    }, 128, 64);
+}
+
+void TextureGraphEval_blocks_match_gen_tones(void) {
+    // textures/graph
+    TextureGenToneOrder orders[] = {
+        GenToneRandom, GenToneChecker, GenToneCourses, GenToneColumns
+    };
+    int32_t o;
+    for (o = 0; o < 4; o ++) {
+        tg_blocks_match(&(TexBlocks){
+            .courses = 4, .per_course = 4, .gap = 0.04f, .jitter = 0.2f, .stagger = 0.5f,
+            .tones = 3, .tone_order = orders[o], .seed = 5, .layer_seed = o
+        }, 64, 64);
+    }
+}
+
+void TextureGraphEval_blocks_match_gen_hard(void) {
+    // textures/graph
+    tg_blocks_match(&(TexBlocks){
+        .courses = 3, .per_course = 2, .jitter = 0.6f, .stagger = 0.25f, .tones = 2,
+        .seed = 9
+    }, 64, 64);
+}
+
+void TextureGraphEval_blocks_tiling(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    const TexBlocks blocks = {
+        .courses = 4, .per_course = 3, .gap = 0.02f, .jitter = 0.3f, .stagger = 0.5f,
+        .tones = 2, .seed = 7
+    };
+    int32_t w = 64, h = 64, x, y, outliers = 0;
+    ecs_entity_t plain = tg_blocks(world, &blocks, 0, w, h, DomainPlane);
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t twice = ecs_new(world);
+    ecs_entity_t shift = ecs_new(world);
+    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, twice, TexMath, {.op = MathMultiply, .a = uv,
+        .b_value = {2.0f, 2.0f, 1.0f, 1.0f}});
+    ecs_set(world, shift, TexMath, {.op = MathAdd, .a = uv,
+        .b_value = {1.0f, -2.0f, 0.0f, 0.0f}});
+    ecs_entity_t repeated = ecs_new(world);
+    ecs_entity_t repeated_node = ecs_new(world);
+    TexBlocks value = blocks;
+    value.coords = twice;
+    ecs_set_ptr(world, repeated_node, TexBlocks, &value);
+    ecs_set(world, repeated, TextureGraph, {.output = repeated_node, .width = w, .height = h,
+        .format = GraphHdr});
+    ecs_entity_t shifted = ecs_new(world);
+    ecs_entity_t shifted_node = ecs_new(world);
+    value.coords = shift;
+    ecs_set_ptr(world, shifted_node, TexBlocks, &value);
+    ecs_set(world, shifted, TextureGraph, {.output = shifted_node, .width = w, .height = h,
+        .format = GraphHdr});
+    test_int(tg_wait(world, plain, 1)->state, TextureReady);
+    test_int(tg_wait(world, repeated, 1)->state, TextureReady);
+    test_int(tg_wait(world, shifted, 1)->state, TextureReady);
+
+    float *a = tg_read(world, plain, 0, w, h);
+    float *b = tg_read(world, repeated, 0, w, h);
+    float *c = tg_read(world, shifted, 0, w, h);
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            const float *pa = &a[(y * w + x) * 4];
+            const float *pc = &c[(y * w + x) * 4];
+            const float *pb = &b[(y * w + x) * 4];
+            const float *pq = &b[(((y + h / 2) % h) * w + (x + w / 2) % w) * 4];
+            int32_t k;
+            bool ok = true;
+            for (k = 0; k < 4; k ++) {
+                ok = ok && fabsf(pa[k] - pc[k]) <= 5e-3f && fabsf(pb[k] - pq[k]) <= 5e-3f;
+            }
+
+            if (!ok) {
+                outliers ++;
+            }
+        }
+    }
+
+    test_assert(outliers * 1000 <= w * h * TG_BLOCKS_OUTLIERS);
+
+    /* Across the wrap of the plane the edge columns are in one block or in a joint */
+    for (y = 0; y < h; y ++) {
+        const float *left = &a[(y * w) * 4];
+        const float *right = &a[(y * w + w - 1) * 4];
+        test_assert(left[1] == right[1] || left[0] < 1.0f || right[0] < 1.0f);
+    }
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_os_free(c);
+    ecs_fini(world);
+}
+
+void TextureGraphEval_blocks_sphere_error(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    const TexBlocks blocks = {.courses = 4, .per_course = 3, .gap = 0.02f};
+    ecs_log_set_level(-4);
+    ecs_entity_t tex = tg_blocks(world, &blocks, 0, 32, 16, DomainSphere);
+    const TextureStatus *status = tg_wait(world, tex, 1);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    if (!strstr(status->error, "blocks_node") || !strstr(status->error, "DomainPlane")) {
+        printf("error: %s\n", status->error);
+    }
+
+    test_assert(strstr(status->error, "blocks_node") != NULL);
+    test_assert(strstr(status->error, "DomainPlane") != NULL);
+    test_assert(strstr(status->error, "blocks_graph") != NULL);
+
     ecs_fini(world);
 }
