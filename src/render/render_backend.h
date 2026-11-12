@@ -287,6 +287,104 @@ typedef struct box_render_cull_status_t {
 /** Packet ring between the main thread and the consumer of the packets */
 typedef struct box_render_ring_t box_render_ring_t;
 
+/** Description of a BOX_RENDER_TEXTURE_NODE_KIND create, followed by the name of its WGSL
+ * function and its WGSL source, each null terminated; its handle is its TextureNodeKind.id.
+ *
+ * Kinds are sent before the graphs that use them, and again to a restarted backend.
+ */
+typedef struct box_render_texture_node_kind_t {
+    uint32_t output;            /**< TextureValueType of the value of a node */
+    uint32_t input_count;       /**< Inputs of a node */
+    uint32_t input_types[BOX_TEXTURE_NODE_INPUTS]; /**< TextureValueType of each input */
+    uint32_t param_size;        /**< Bytes of the parameters of a node, a multiple of 16 */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t function_size;     /**< Bytes of the function name, its terminator included */
+    uint32_t source_size;       /**< Bytes of the source, its terminator included */
+} box_render_texture_node_kind_t;
+
+/** A node of a compiled texture graph, which comes after the nodes of its inputs */
+typedef struct box_render_texture_graph_node_t {
+    uint32_t kind;              /**< Id of its BOX_RENDER_TEXTURE_NODE_KIND */
+    uint32_t output;            /**< TextureValueType of its value */
+    int32_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Index of the node of each input, -1 for the
+                                 *   constant of the input in its parameters */
+    uint32_t params;            /**< Offset of its bytes in the parameter block: the parameters
+                                 *   of its kind, then a vec4 per input, the constant of an
+                                 *   input without a node (zero without one) */
+    uint32_t param_size;        /**< Bytes of the node in the parameter block */
+} box_render_texture_graph_node_t;
+
+/** Description of a BOX_RENDER_TEXTURE_GRAPH create, followed by node_count nodes in
+ * topological order, the output last, then param_size bytes of parameters.
+ *
+ * The handle is the texture handle the image goes to. A change of the parameters only keeps
+ * structure_hash, so the backend keeps the pipeline it evaluates the graph with.
+ */
+typedef struct box_render_texture_graph_t {
+    uint32_t width;             /**< Width of the image */
+    uint32_t height;            /**< Height of the image */
+    uint32_t domain;            /**< TextureGraphDomain of the coordinates */
+    uint32_t format;            /**< TextureGraphFormat of the image */
+    uint32_t node_count;        /**< Nodes after the description */
+    uint32_t param_size;        /**< Parameter bytes after the nodes */
+    uint64_t structure_hash;    /**< Hash of the kinds and edges of the nodes */
+    uint64_t param_hash;        /**< Hash of the parameter bytes */
+} box_render_texture_graph_t;
+
+/** Get the nodes of a compiled texture graph.
+ *
+ * @param graph The description
+ * @return Its node_count nodes
+ */
+const box_render_texture_graph_node_t* box_render_texture_graph_nodes(
+    const box_render_texture_graph_t *graph);
+
+/** Get the parameter bytes of a compiled texture graph.
+ *
+ * @param graph The description
+ * @return Its param_size bytes
+ */
+const uint8_t* box_render_texture_graph_params(
+    const box_render_texture_graph_t *graph);
+
+/** Get the name of the WGSL function of a node kind.
+ *
+ * @param kind The description
+ * @return The null terminated name
+ */
+const char* box_render_texture_node_kind_function(
+    const box_render_texture_node_kind_t *kind);
+
+/** Get the WGSL source of a node kind.
+ *
+ * @param kind The description
+ * @return The null terminated source
+ */
+const char* box_render_texture_node_kind_source(
+    const box_render_texture_node_kind_t *kind);
+
+/** Get the last texture graph a null backend received for a texture handle, for tests; call
+ * after box_render_sync.
+ *
+ * @param null The null backend
+ * @param handle The texture handle
+ * @return The description followed by its nodes and parameters, NULL when it has none
+ */
+const box_render_texture_graph_t* box_render_null_texture_graph(
+    const box_render_null_t *null,
+    uint32_t handle);
+
+/** Get the last description of a node kind a null backend received, for tests; call after
+ * box_render_sync.
+ *
+ * @param null The null backend
+ * @param id The id of the kind
+ * @return The description followed by its function name and source, NULL when it has none
+ */
+const box_render_texture_node_kind_t* box_render_null_texture_node_kind(
+    const box_render_null_t *null,
+    uint32_t id);
+
 /** Create a null backend.
  *
  * @return The backend state, freed by box_render_null_free

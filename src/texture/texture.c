@@ -62,9 +62,11 @@ static void box_textures_free(
         box_texture_t *tex = ecs_map_ptr(&it);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
+        box_texture_graph_clear(tex);
         ecs_os_free(tex);
     }
 
+    box_texture_graphs_fini(t);
     ecs_map_fini(&t->textures);
     ecs_vec_fini_t(NULL, &t->queued, ecs_entity_t);
     ecs_vec_fini_t(NULL, &t->released, uint32_t);
@@ -177,7 +179,7 @@ int32_t box_textures_quality(
  * @param revision Loads that succeeded
  * @param error Why the load failed, NULL unless it failed
  */
-static void box_texture_status(
+void box_texture_status(
     ecs_world_t *world,
     ecs_entity_t e,
     TextureState state,
@@ -197,7 +199,7 @@ static void box_texture_status(
  * @param e The texture entity
  * @return The revision of its status, 0 without one
  */
-static int32_t box_texture_revision(
+int32_t box_texture_revision(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
@@ -318,7 +320,7 @@ static void box_texture_job_free(
  * @param e The texture entity
  * @return The entry
  */
-static box_texture_t* box_texture_entry(
+box_texture_t* box_texture_entry(
     box_textures_t *t,
     ecs_entity_t e)
 {
@@ -339,7 +341,7 @@ static box_texture_t* box_texture_entry(
  * @param e The texture entity
  * @param error Why it failed
  */
-static void box_texture_fail(
+void box_texture_fail(
     ecs_world_t *world,
     box_textures_t *t,
     ecs_entity_t e,
@@ -412,6 +414,27 @@ static int32_t box_texture_quality_of(
     }
 
     return t->quality;
+}
+
+void box_texture_capped_size(
+    const ecs_world_t *world,
+    box_textures_t *t,
+    int32_t width,
+    int32_t height,
+    int32_t *width_out,
+    int32_t *height_out)
+{
+    double w = width > 0 ? width : 512;
+    double h = height > 0 ? height : w;
+    double largest = w > h ? w : h;
+    int32_t quality = box_texture_quality_of(world, t);
+    if (quality > 0 && largest > quality) {
+        w *= quality / largest;
+        h *= quality / largest;
+    }
+
+    *width_out = w < 1 ? 1 : (int32_t)floor(w + 0.5);
+    *height_out = h < 1 ? 1 : (int32_t)floor(h + 0.5);
 }
 
 /** Submit a decode of the TexturePath of an entity.
@@ -488,18 +511,10 @@ static void box_texture_request_gen(
         }
     }
 
-    double w = field->width > 0 ? field->width : 512;
-    double h = field->height > 0 ? field->height : w;
-    double largest = w > h ? w : h;
     int32_t quality = box_texture_quality_of(world, t);
-    if (quality > 0 && largest > quality) {
-        w *= quality / largest;
-        h *= quality / largest;
-    }
-
     box_texture_gen_t *desc = ecs_os_calloc_t(box_texture_gen_t);
-    desc->width = w < 1 ? 1 : (int32_t)floor(w + 0.5);
-    desc->height = h < 1 ? 1 : (int32_t)floor(h + 0.5);
+    box_texture_capped_size(world, t, field->width, field->height, &desc->width,
+        &desc->height);
     desc->seed = field->seed;
     desc->layer_count = ecs_vec_count(&field->layers);
     if (desc->layer_count) {
@@ -588,23 +603,28 @@ done:
     return;
 }
 
-/** Load the image of a texture entity from its TexturePixels, TexturePath or TextureGen; a
- * TexturePath and a TextureGen on one entity is an error.
- *
- * @param world The world or a stage
- * @param t The registry
- * @param e The texture entity
- */
-static void box_texture_load(
+void box_texture_load(
     ecs_world_t *world,
     box_textures_t *t,
     ecs_entity_t e)
 {
     const TexturePath *path = ecs_get(world, e, TexturePath);
     const TextureGen *gen = ecs_get(world, e, TextureGen);
-    const TexturePixels *pixels = path || gen ? NULL : ecs_get(world, e, TexturePixels);
+    const TextureGraph *graph = ecs_get(world, e, TextureGraph);
+    const TexturePixels *pixels = path || gen || graph
+        ? NULL
+        : ecs_get(world, e, TexturePixels);
     if (pixels) {
         box_texture_set_pixels(world, t, e, pixels);
+    } else if (graph && (path || gen)) {
+        char *name = ecs_get_path(world, e);
+        char *error = flecs_asprintf("texture '%s' has both a TextureGraph and a %s", name,
+            path ? "TexturePath" : "TextureGen");
+        box_texture_fail(world, t, e, error);
+        ecs_os_free(error);
+        ecs_os_free(name);
+    } else if (graph) {
+        box_texture_graph_request(world, t, e);
     } else if (path && gen) {
         char *name = ecs_get_path(world, e);
         char *error = flecs_asprintf(
@@ -749,6 +769,10 @@ static void box_texture_forget(
 {
     box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
     if (tex) {
+        if (tex->handle && tex->graph_sent) {
+            *ecs_vec_append_t(NULL, &t->graph_released, uint32_t) = tex->handle;
+        }
+
         if (tex->handle) {
             *ecs_vec_append_t(NULL, &t->released, uint32_t) = tex->handle;
         }
@@ -756,6 +780,7 @@ static void box_texture_forget(
         ecs_map_remove(&t->textures, e);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
+        box_texture_graph_clear(tex);
         ecs_os_free(tex);
     }
 
@@ -776,7 +801,8 @@ static void BoxTexturePixelsOnRemove(
     box_textures_t *t = box_textures_get(it->world);
     bool alive = it->other_table && ecs_table_get_type(it->other_table)->count;
     bool keep = alive && (ecs_table_has_id(it->world, it->other_table, ecs_id(TexturePath)) ||
-        ecs_table_has_id(it->world, it->other_table, ecs_id(TextureGen)));
+        ecs_table_has_id(it->world, it->other_table, ecs_id(TextureGen)) ||
+        ecs_table_has_id(it->world, it->other_table, ecs_id(TextureGraph)));
     int32_t i;
     if (!t || keep || ecs_is_fini(it->world)) {
         goto done;
@@ -860,7 +886,7 @@ static void box_texture_pixels_move(
 }
 
 /** Forget the textures whose TexturePath or TextureGen is removed and release their backend
- * image; one that keeps the other loads from it instead, keeping its entry and image.
+ * image; one that keeps the other or a TextureGraph loads from it instead, keeping its entry.
  *
  * The textures derived from a removed TextureGen, also on deletion of its entity, wait for it
  * and fail at the next frame unless they were deleted with it or got a source back. They are
@@ -876,6 +902,8 @@ static void BoxTextureOnRemove(
     bool is_path = it->event_id == ecs_id(TexturePath);
     ecs_id_t other = is_path ? ecs_id(TextureGen) : ecs_id(TexturePath);
     bool keep = alive && ecs_table_has_id(it->world, it->other_table, other);
+    bool graph = alive &&
+        ecs_table_has_id(it->world, it->other_table, ecs_id(TextureGraph));
     int32_t i;
     if (!t || ecs_is_fini(it->world)) {
         goto done;
@@ -884,7 +912,10 @@ static void BoxTextureOnRemove(
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
         box_file_watch_clear(it->world, t->watch, e);
-        if (keep && is_path) {
+        if (graph) {
+            *ecs_vec_append_t(NULL, &t->reload, ecs_entity_t) = e;
+            continue;
+        } else if (keep && is_path) {
             box_texture_request_gen(it->stage, t, e, ecs_get(it->world, e, TextureGen), true);
             continue;
         } else if (keep) {
@@ -899,6 +930,43 @@ static void BoxTextureOnRemove(
         t->removed = it->entities[i];
         box_texture_regenerate_derived(it->stage, t, it->entities[i]);
         t->removed = 0;
+    }
+
+done:
+    return;
+}
+
+/** Forget the textures whose TextureGraph is removed and release their backend image and
+ * graph; one that keeps a TexturePath or a TextureGen loads from it once the graph is gone.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxTextureGraphOnRemove(
+    ecs_iter_t *it)
+{
+    box_textures_t *t = box_textures_get(it->world);
+    bool alive = it->other_table && ecs_table_get_type(it->other_table)->count;
+    bool keep = alive && (ecs_table_has_id(it->world, it->other_table, ecs_id(TexturePath)) ||
+        ecs_table_has_id(it->world, it->other_table, ecs_id(TextureGen)));
+    int32_t i;
+    if (!t || ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, e);
+        if (keep && tex) {
+            if (tex->handle && tex->graph_sent) {
+                *ecs_vec_append_t(NULL, &t->graph_released, uint32_t) = tex->handle;
+            }
+
+            box_texture_graph_clear(tex);
+            *ecs_vec_append_t(NULL, &t->reload, ecs_entity_t) = e;
+            continue;
+        }
+
+        box_texture_forget(it->stage, t, e, alive);
     }
 
 done:
@@ -1061,6 +1129,17 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TextureGenLayer);
     ECS_META_COMPONENT(world, TextureGenKey);
     ECS_META_COMPONENT(world, TextureGen);
+    ECS_META_COMPONENT(world, TextureGraphDomain);
+    ECS_META_COMPONENT(world, TextureGraphFormat);
+    ECS_META_COMPONENT(world, TextureValueType);
+    ECS_META_COMPONENT(world, TextureGraph);
+    ECS_META_COMPONENT(world, TexConstant);
+    ECS_META_COMPONENT(world, TexCoords);
+    ECS_META_COMPONENT(world, TextureMathOp);
+    ECS_META_COMPONENT(world, TexMath);
+    ECS_META_COMPONENT(world, TextureNodePort);
+    ECS_META_COMPONENT(world, TextureNodeParam);
+    ECS_META_COMPONENT(world, TextureNodeKind);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
@@ -1100,6 +1179,7 @@ void BoxTextureImport(
     });
     t->watch = box_file_watch_kind(world, "texture", box_texture_changed, NULL);
     ecs_singleton_ensure(world, TextureRegistry)->textures = t;
+    box_texture_graphs_init(world, t);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TextureOnSet" }),
@@ -1141,6 +1221,20 @@ void BoxTextureImport(
         .query.terms = {{ .id = ecs_id(TextureGen) }},
         .events = { EcsOnRemove },
         .callback = BoxTextureOnRemove
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TextureGraphOnSet" }),
+        .query.terms = {{ .id = ecs_id(TextureGraph) }},
+        .events = { EcsOnSet },
+        .callback = BoxTextureOnSet
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TextureGraphOnRemove" }),
+        .query.terms = {{ .id = ecs_id(TextureGraph) }},
+        .events = { EcsOnRemove },
+        .callback = BoxTextureGraphOnRemove
     });
 
     ecs_system(world, {

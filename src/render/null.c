@@ -1,6 +1,8 @@
 /**
  * @file render/null.c
  * @brief Null backend that renders nothing and records the packets it receives.
+ *
+ * It keeps the last description of each texture graph and node kind, for tests.
  */
 
 #include "render.h"
@@ -30,6 +32,77 @@ static void box_render_null_check_thread(
     if (ecs_os_thread_self() != null->thread) {
         null->wrong_thread ++;
     }
+}
+
+/** Replace the copy of a description in a map of the null backend, or drop it.
+ *
+ * @param map The map, of handle to a copy
+ * @param handle The handle
+ * @param data The description, NULL to drop the copy
+ * @param size Bytes of the description
+ */
+static void box_render_null_keep(
+    ecs_map_t *map,
+    uint32_t handle,
+    const void *data,
+    uint32_t size)
+{
+    void *old = ecs_map_get_deref(map, void, handle);
+    ecs_os_free(old);
+    if (data && size) {
+        *ecs_map_ensure(map, handle) = (ecs_map_val_t)(uintptr_t)ecs_os_memdup(data,
+            (ecs_size_t)size);
+    } else if (old) {
+        ecs_map_remove(map, handle);
+    }
+}
+
+/** Record the texture graphs and node kinds of a packet.
+ *
+ * @param null The null backend
+ * @param packet The packet
+ */
+static void box_render_null_graphs(
+    box_render_null_t *null,
+    const box_render_packet_t *packet)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&packet->resources); i ++) {
+        const box_render_resource_t *r = ecs_vec_get_t(
+            &packet->resources, box_render_resource_t, i);
+        const void *data = r->op != BOX_RENDER_DESTROY && r->size
+            ? box_render_packet_data(packet, r->data)
+            : NULL;
+        if (r->kind == BOX_RENDER_TEXTURE_GRAPH && r->op == BOX_RENDER_DESTROY) {
+            null->texture_graph_destroys ++;
+            box_render_null_keep(&null->graphs, r->handle, NULL, 0);
+        } else if (r->kind == BOX_RENDER_TEXTURE_GRAPH &&
+            r->size >= sizeof(box_render_texture_graph_t))
+        {
+            null->texture_graphs ++;
+            box_render_null_keep(&null->graphs, r->handle, data, r->size);
+        } else if (r->kind == BOX_RENDER_TEXTURE_NODE_KIND &&
+            r->size >= sizeof(box_render_texture_node_kind_t))
+        {
+            null->texture_node_kinds ++;
+            box_render_null_keep(&null->node_kinds, r->handle, data, r->size);
+        }
+    }
+}
+
+/** Free the copies of a map of the null backend and the map.
+ *
+ * @param map The map
+ */
+static void box_render_null_map_fini(
+    ecs_map_t *map)
+{
+    ecs_map_iter_t it = ecs_map_iter(map);
+    while (ecs_map_next(&it)) {
+        ecs_os_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(map);
 }
 
 /** Record a packet and keep a copy of it; the reset before the copy shrinks a large data block
@@ -82,6 +155,7 @@ static void box_render_null_render(
         }
     }
 
+    box_render_null_graphs(null, packet);
     box_render_packet_reset(&null->last);
     box_render_packet_copy(&null->last, packet);
 }
@@ -102,6 +176,8 @@ box_render_null_t* box_render_null_new(void)
 {
     box_render_null_t *result = ecs_os_calloc_t(box_render_null_t);
     box_render_packet_init(&result->last);
+    ecs_map_init(&result->graphs, NULL);
+    ecs_map_init(&result->node_kinds, NULL);
 
     return result;
 }
@@ -111,6 +187,8 @@ void box_render_null_free(
 {
     box_render_null_t *null = ctx;
     box_render_packet_fini(&null->last);
+    box_render_null_map_fini(&null->graphs);
+    box_render_null_map_fini(&null->node_kinds);
     ecs_os_free(null);
 }
 
@@ -125,4 +203,42 @@ box_render_backend_t box_render_null_backend(
     };
 
     return result;
+}
+
+const box_render_texture_graph_node_t* box_render_texture_graph_nodes(
+    const box_render_texture_graph_t *graph)
+{
+    return (const box_render_texture_graph_node_t*)(graph + 1);
+}
+
+const uint8_t* box_render_texture_graph_params(
+    const box_render_texture_graph_t *graph)
+{
+    return (const uint8_t*)(box_render_texture_graph_nodes(graph) + graph->node_count);
+}
+
+const char* box_render_texture_node_kind_function(
+    const box_render_texture_node_kind_t *kind)
+{
+    return (const char*)(kind + 1);
+}
+
+const char* box_render_texture_node_kind_source(
+    const box_render_texture_node_kind_t *kind)
+{
+    return box_render_texture_node_kind_function(kind) + kind->function_size;
+}
+
+const box_render_texture_graph_t* box_render_null_texture_graph(
+    const box_render_null_t *null,
+    uint32_t handle)
+{
+    return ecs_map_get_deref(&null->graphs, box_render_texture_graph_t, handle);
+}
+
+const box_render_texture_node_kind_t* box_render_null_texture_node_kind(
+    const box_render_null_t *null,
+    uint32_t id)
+{
+    return ecs_map_get_deref(&null->node_kinds, box_render_texture_node_kind_t, id);
 }

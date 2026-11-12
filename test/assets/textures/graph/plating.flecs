@@ -1,0 +1,10 @@
+// The authoring example of TextureGraph: coordinates scaled and tinted, built from a script.
+
+using box.texture
+
+plating {
+  uv     { TexCoords: {} }
+  bright { TexMath: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
+  tinted { TexMath: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
+  TextureGraph: {output: tinted, width: 1024}
+}

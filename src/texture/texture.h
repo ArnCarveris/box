@@ -25,7 +25,7 @@ typedef struct box_texture_sync_t {
     int32_t refs;           /**< The registry and every job, changed on the main thread */
 } box_texture_sync_t;
 
-/** A texture entity with a TexturePath or a TextureGen */
+/** A texture entity with a TexturePath, a TextureGen or a TextureGraph */
 typedef struct box_texture_t {
     ecs_entity_t entity;    /**< The texture entity */
     uint32_t generation;    /**< Bumped by every load request, older results are dropped */
@@ -45,7 +45,61 @@ typedef struct box_texture_t {
                              *   fails at the next frame when none arrived */
     char *source_name;      /**< Path of the source it waits for whose TextureGen was removed,
                              *   or which was deleted, so the failure names it */
+    struct box_texture_graph_t *graph; /**< Last graph its TextureGraph compiled to, NULL
+                             *   before the first build that succeeded */
+    ecs_vec_t reached;      /**< ecs_entity_t, the entities the last build of its TextureGraph
+                             *   reached, whose changes build it again */
+    bool graph_dirty;       /**< Its TextureGraph builds at the next graph build */
+    bool graph_waiting;     /**< The last build waited for a node without a node component,
+                             *   the next build fails it unless the node got one */
+    bool graph_queued;      /**< The entity is in the list of graphs to send */
+    bool graph_sent;        /**< The current backend has the graph under handle */
 } box_texture_t;
+
+/** A node kind of the registry, see box_texture_node_register */
+typedef struct box_texture_node_kind_t {
+    int32_t id;                 /**< Id of the kind, from 1 */
+    ecs_entity_t component;     /**< Component of its nodes */
+    TextureValueType output;    /**< Type of its value */
+    int32_t input_count;        /**< Inputs in inputs */
+    box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs, names owned */
+    int32_t param_count;        /**< Parameters in params */
+    box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters, names owned */
+    int32_t param_offsets[BOX_TEXTURE_NODE_PARAMS]; /**< Offset of each parameter in the
+                                 *   parameter bytes of a node */
+    int32_t param_size;         /**< Bytes of the parameters, a multiple of 16 */
+    int32_t node_size;          /**< Parameter bytes of a node: the parameters, then a vec4 per
+                                 *   input with the constant of an input without a node */
+    char *function;             /**< Name of the WGSL function */
+    char *source;               /**< WGSL source of the function */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    bool sent;                  /**< The current backend has the kind */
+} box_texture_node_kind_t;
+
+/** A node of a compiled graph */
+typedef struct box_texture_graph_node_t {
+    ecs_entity_t entity;        /**< The node entity */
+    int32_t kind;               /**< Id of its kind */
+    TextureValueType output;    /**< Type of its value */
+    int32_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Index of the earlier node of each input, -1
+                                 *   for none: the constant in its parameters */
+    int32_t params;             /**< Offset of its parameter bytes in the graph parameters */
+    int32_t param_size;         /**< Its parameter bytes, the node_size of its kind */
+} box_texture_graph_node_t;
+
+/** A TextureGraph compiled: the nodes from its output in topological order, the output last */
+typedef struct box_texture_graph_t {
+    int32_t width;              /**< Width of the image, capped */
+    int32_t height;             /**< Height of the image, capped */
+    TextureGraphDomain domain;  /**< Coordinates of the texels */
+    TextureGraphFormat format;  /**< What the image stores */
+    int32_t node_count;         /**< Nodes in nodes */
+    box_texture_graph_node_t *nodes; /**< The nodes, inputs first */
+    int32_t param_size;         /**< Bytes in params */
+    uint8_t *params;            /**< Parameter bytes of the nodes */
+    uint64_t structure_hash;    /**< Hash of the kinds and edges of the nodes */
+    uint64_t param_hash;        /**< Hash of the parameter bytes */
+} box_texture_graph_t;
 
 /** Main thread state of the textures of a world */
 typedef struct box_textures_t {
@@ -64,6 +118,11 @@ typedef struct box_textures_t {
     int32_t gens;               /**< Generations submitted whose completion did not run */
     box_task_track_t load_task; /**< Report of loads */
     box_task_track_t gen_task;  /**< Report of gens */
+    ecs_vec_t node_kinds;       /**< box_texture_node_kind_t*, the kind of id i + 1 at i */
+    ecs_vec_t graph_queued;     /**< ecs_entity_t, textures with a compiled graph to send */
+    ecs_vec_t graph_released;   /**< uint32_t, handles of sent graphs to destroy */
+    ecs_vec_t reload;           /**< ecs_entity_t, textures to load at the next graph build,
+                                 *   once a component being removed is gone */
 } box_textures_t;
 
 /** Singleton that holds the registry of a world */
@@ -270,6 +329,127 @@ void box_texture_gen_normal(
  */
 void box_texture_gen_free(
     box_texture_gen_t *gen);
+
+/** Get the registry entry of a texture entity, creating it on first use.
+ *
+ * @param t The registry
+ * @param e The texture entity
+ * @return The entry
+ */
+box_texture_t* box_texture_entry(
+    box_textures_t *t,
+    ecs_entity_t e);
+
+/** Write the status of a texture.
+ *
+ * @param world The world or a stage
+ * @param e The texture entity
+ * @param state Progress of the load
+ * @param revision Loads that succeeded
+ * @param error Why the load failed, NULL unless it failed
+ */
+void box_texture_status(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    TextureState state,
+    int32_t revision,
+    const char *error);
+
+/** Get the loads of a texture that succeeded.
+ *
+ * @param world The world or a stage
+ * @param e The texture entity
+ * @return The revision of its status, 0 without one
+ */
+int32_t box_texture_revision(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Fail the load of a texture without a job, dropping the result of the load in flight.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ * @param error Why it failed
+ */
+void box_texture_fail(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e,
+    const char *error);
+
+/** Load the image of a texture entity from its TexturePixels, TexturePath, TextureGen or
+ * TextureGraph; two of the last three on one entity is an error.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ */
+void box_texture_load(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e);
+
+/** Compute the size of an image capped by the texture quality, keeping its aspect ratio.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param width Requested width, 0 for 512
+ * @param height Requested height, 0 for the width
+ * @param width_out Receives the width, at least 1
+ * @param height_out Receives the height, at least 1
+ */
+void box_texture_capped_size(
+    const ecs_world_t *world,
+    box_textures_t *t,
+    int32_t width,
+    int32_t height,
+    int32_t *width_out,
+    int32_t *height_out);
+
+/** Create the node kind registry, register the built in kinds and the build of the graphs.
+ *
+ * @param world The world
+ * @param t The registry
+ */
+void box_texture_graphs_init(
+    ecs_world_t *world,
+    box_textures_t *t);
+
+/** Free the node kinds and the graph lists of a registry.
+ *
+ * @param t The registry
+ */
+void box_texture_graphs_fini(
+    box_textures_t *t);
+
+/** Free the compiled graph and the reached entities of a registry entry.
+ *
+ * @param tex The entry
+ */
+void box_texture_graph_clear(
+    box_texture_t *tex);
+
+/** Build the TextureGraph of a texture at the next graph build, showing it as loading.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param e The texture entity
+ */
+void box_texture_graph_request(
+    ecs_world_t *world,
+    box_textures_t *t,
+    ecs_entity_t e);
+
+/** Get a node kind by id.
+ *
+ * @param t The registry
+ * @param id The id, from 1
+ * @return The kind, NULL when no kind has the id
+ */
+box_texture_node_kind_t* box_texture_node_kind(
+    const box_textures_t *t,
+    int32_t id);
 
 /** Get the registry of a world.
  *
