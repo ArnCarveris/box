@@ -296,6 +296,77 @@ void TextureGraph_kind_reflected_json(void) {
     ecs_fini(world);
 }
 
+/** TexCells is a built in kind: a coords input that takes the coordinates without a node, an
+ * evolve input with a constant, five parameters, and full jitter when it is added. */
+void TextureGraph_cells_kind(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    int32_t cells_id = kind_id(world, ecs_id(TexCells));
+    test_assert(cells_id > 0);
+
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexCells), TextureNodeKind);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 2);
+    test_str(kind->inputs[0].name, "coords");
+    test_int(kind->inputs[0].type, TexVector);
+    test_bool(kind->inputs[0].fallback, false);
+    test_bool(kind->inputs[0].coords, true);
+    test_str(kind->inputs[1].name, "evolve");
+    test_int(kind->inputs[1].type, TexScalar);
+    test_bool(kind->inputs[1].fallback, true);
+    test_bool(kind->inputs[1].coords, false);
+    test_int(kind->param_count, 5);
+    test_int(kind->param_size, 32);
+    test_str(kind->function, "box_tex_cells");
+    test_bool(kind->neighbourhood, false);
+
+    ecs_entity_t node = ecs_new(world);
+    ecs_add(world, node, TexCells);
+    const TexCells *cells = ecs_get(world, node, TexCells);
+    test_flt(cells->jitter, 1);
+    test_int(cells->count, 0);
+    test_int(cells->distance, CellsNearest);
+
+    TexCells *mut = ecs_get_mut(world, node, TexCells);
+    mut->count = 40;
+    mut->seed = 6;
+    mut->distance = CellsEdge;
+    mut->evolve_value = 2.5f;
+    ecs_modified(world, node, TexCells);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TextureGraph, {.output = node, .width = 16, .height = 16});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 1);
+    test_int(graph->nodes[0].kind, cells_id);
+    test_int(graph->nodes[0].param_size, 32 + 2 * 16);
+    int32_t count, seed, distance;
+    float jitter, evolve;
+    ecs_os_memcpy(&count, graph->params + kind->params[0].offset, 4);
+    ecs_os_memcpy(&jitter, graph->params + kind->params[1].offset, 4);
+    ecs_os_memcpy(&seed, graph->params + kind->params[2].offset, 4);
+    ecs_os_memcpy(&distance, graph->params + kind->params[3].offset, 4);
+    ecs_os_memcpy(&evolve, graph->params + 32 + 16, 4);
+    test_int(count, 40);
+    test_flt(jitter, 1);
+    test_int(seed, 6);
+    test_int(distance, CellsEdge);
+    test_flt(evolve, 2.5f);
+
+    const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
+        (uint32_t)cells_id);
+    test_assert(k != NULL);
+    test_int(k->input_count, 2);
+    test_int(k->input_coords, 1);
+    test_assert(strstr(box_render_texture_node_kind_source(k), "fn box_tex_cells(") != NULL);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void TextureGraph_script(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1032,7 +1103,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 4);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1069,7 +1140,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 4);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1161,7 +1232,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 3);
+    test_int(second->texture_node_kinds, 4);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1188,7 +1259,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 4);
+    test_int(null->texture_node_kinds, 5);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);

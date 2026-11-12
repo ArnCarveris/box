@@ -205,6 +205,7 @@ static void box_render_texture_kinds_send(
         desc->input_count = (uint32_t)kind->input_count;
         for (i = 0; i < kind->input_count; i ++) {
             desc->input_types[i] = (uint32_t)kind->inputs[i].type;
+            desc->input_coords |= kind->inputs[i].coords ? (1u << i) : 0u;
         }
 
         desc->param_size = (uint32_t)kind->param_size;

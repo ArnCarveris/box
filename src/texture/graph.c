@@ -50,6 +50,114 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
+ * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
+ * and w.
+ *
+ * The cells around the texel are searched inner ring first, skipping a cell whose box, which
+ * holds its point wherever evolve moves it, is farther than the second nearest point found. */
+static const char *box_texture_cells_wgsl =
+    "struct BoxTexCellsNear {\n"
+    "    f1: f32,\n"
+    "    f2: f32,\n"
+    "    h: u32,\n"
+    "};\n"
+    "\n"
+    "fn box_tex_cells_hash(cell: vec3i, seed: u32) -> u32 {\n"
+    "    return box_texgraph_hash(box_texgraph_hash3(bitcast<vec3u>(cell)) ^\n"
+    "        box_texgraph_hash(seed + 0x9e3779b9u));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells_random(h: u32, k: u32) -> f32 {\n"
+    "    return box_texgraph_random(box_texgraph_hash(h ^ (k * 0x9e3779b9u)));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells_wave(x: vec3f) -> vec3f {\n"
+    "    return abs(fract(x) * 2.0 - 1.0);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells_visit(best: ptr<function, BoxTexCellsNear>, q: vec3f, c: vec3i,\n"
+    "    period: vec3i, weight: vec3f, jitter: f32, evolve: f32, seed: u32) {\n"
+    "    let gap = max(max(vec3f(c) - q, q - vec3f(c + vec3i(1))), vec3f(0.0)) * weight;\n"
+    "    if (dot(gap, gap) >= (*best).f2 * (*best).f2) {\n"
+    "        return;\n"
+    "    }\n"
+    "\n"
+    "    var cell = c;\n"
+    "    if (period.x > 0) {\n"
+    "        cell = ((c % period) + period) % period;\n"
+    "    }\n"
+    "\n"
+    "    let h = box_tex_cells_hash(cell, seed);\n"
+    "    let r = vec3f(box_tex_cells_random(h, 0u), box_tex_cells_random(h, 1u),\n"
+    "        box_tex_cells_random(h, 2u));\n"
+    "    let speed = 0.5 + 0.5 * vec3f(box_tex_cells_random(h, 3u),\n"
+    "        box_tex_cells_random(h, 4u), box_tex_cells_random(h, 5u));\n"
+    "    let at = 0.5 + jitter * (box_tex_cells_wave(r + evolve * speed) - 0.5);\n"
+    "    let d = length((vec3f(c) + at - q) * weight);\n"
+    "    if (d < (*best).f1) {\n"
+    "        (*best).f2 = (*best).f1;\n"
+    "        (*best).f1 = d;\n"
+    "        (*best).h = h;\n"
+    "    } else if (d < (*best).f2) {\n"
+    "        (*best).f2 = d;\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let count_param = bitcast<i32>(p[0].x);\n"
+    "    let count = f32(select(count_param, 64, count_param <= 0));\n"
+    "    let jitter = clamp(bitcast<f32>(p[0].y), 0.0, 1.0);\n"
+    "    let seed = p[0].z;\n"
+    "    let mode = bitcast<i32>(p[0].w);\n"
+    "    let edge_param = bitcast<f32>(p[1].x);\n"
+    "    let edge = select(edge_param, 0.25, edge_param <= 0.0);\n"
+    "    let evolve = i[1].x;\n"
+    "    var q = vec3f(0.0);\n"
+    "    var period = vec3i(0);\n"
+    "    var weight = vec3f(1.0);\n"
+    "    var reach = 2;\n"
+    "    if (box_texgraph_stage.domain == 1u) {\n"
+    "        q = i[0].xyz * sqrt(count / (6.0 * BOX_TEXGRAPH_PI));\n"
+    "    } else {\n"
+    "        let size = vec2f(box_texgraph_stage.size);\n"
+    "        let gx = clamp(floor(sqrt(count * size.x / size.y) + 0.5), 1.0, 4096.0);\n"
+    "        let gy = clamp(floor(count / gx + 0.5), 1.0, 4096.0);\n"
+    "        let ratio = sqrt((size.x / gx) / (size.y / gy));\n"
+    "        q = vec3f(i[0].xy * vec2f(gx, gy), 0.0);\n"
+    "        period = vec3i(i32(gx), i32(gy), 1);\n"
+    "        weight = vec3f(ratio, 1.0 / ratio, 0.0);\n"
+    "        reach = 0;\n"
+    "    }\n"
+    "\n"
+    "    let base = vec3i(floor(q));\n"
+    "    var best = BoxTexCellsNear(1e30, 1e30, 0u);\n"
+    "    for (var ring = 0; ring < 2; ring ++) {\n"
+    "        for (var z = -reach; z <= reach; z ++) {\n"
+    "            for (var y = -2; y <= 2; y ++) {\n"
+    "                for (var x = -2; x <= 2; x ++) {\n"
+    "                    let o = vec3i(x, y, z);\n"
+    "                    let inner = all(abs(o) <= vec3i(1));\n"
+    "                    if (inner == (ring == 0)) {\n"
+    "                        box_tex_cells_visit(&best, q, base + o, period, weight, jitter,\n"
+    "                            evolve, seed);\n"
+    "                    }\n"
+    "                }\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+    "\n"
+    "    var d = best.f1;\n"
+    "    if (mode == 1) {\n"
+    "        d = best.f2;\n"
+    "    } else if (mode == 2) {\n"
+    "        d = smoothstep(0.0, edge, best.f2 - best.f1);\n"
+    "    }\n"
+    "\n"
+    "    return vec4f(d, box_tex_cells_random(best.h, 6u), box_tex_cells_random(best.h, 7u),\n"
+    "        box_tex_cells_random(best.h, 8u));\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -289,6 +397,7 @@ static void box_texture_node_kind_reflect(
         value.inputs[i].name = kind->inputs[i].name;
         value.inputs[i].type = kind->inputs[i].type;
         value.inputs[i].fallback = kind->inputs[i].value != NULL;
+        value.inputs[i].coords = kind->inputs[i].coords;
     }
 
     for (i = 0; i < kind->param_count; i ++) {
@@ -861,7 +970,7 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexCells.
  *
  * @param world The world
  */
@@ -895,6 +1004,25 @@ static void box_texture_nodes_register(
         .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCells),
+        .output = TexVector,
+        .inputs = {
+            { "coords", offsetof(TexCells, coords), TexVector, .coords = true },
+            { "evolve", offsetof(TexCells, evolve), TexScalar, "evolve_value",
+                offsetof(TexCells, evolve_value) }
+        },
+        .params = {
+            { "count", offsetof(TexCells, count), 4, BOX_TEXTURE_PARAM_I32 },
+            { "jitter", offsetof(TexCells, jitter), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexCells, seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "distance", offsetof(TexCells, distance), 4, BOX_TEXTURE_PARAM_I32 },
+            { "edge", offsetof(TexCells, edge), 4, BOX_TEXTURE_PARAM_F32 }
+        },
+        .function = "box_tex_cells",
+        .source = box_texture_cells_wgsl
     });
 }
 

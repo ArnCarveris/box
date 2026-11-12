@@ -816,6 +816,26 @@ done:
     return;
 }
 
+/** Construct TexCells components with full jitter and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_cells_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexCells *cells = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&cells[i], 0, TexCells);
+        cells[i].jitter = 1;
+    }
+}
+
 /** Free the image of TexturePixels components.
  *
  * @param ptr The components
@@ -1137,6 +1157,8 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
+    ECS_META_COMPONENT(world, TextureCellsDistance);
+    ECS_META_COMPONENT(world, TexCells);
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
@@ -1147,6 +1169,7 @@ void BoxTextureImport(
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
         BOX_OWNED_VEC(TextureGen, palette, rgb));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+    ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);

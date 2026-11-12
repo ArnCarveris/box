@@ -323,6 +323,50 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** What the x of a TexCells node measures */
+ECS_ENUM(TextureCellsDistance, {
+    CellsNearest = 0, /**< Distance to the nearest point (F1) in cell sizes: 0 at the point, the
+                       *   default */
+    CellsSecond = 1,  /**< Distance to the second nearest point (F2) in cell sizes */
+    CellsEdge = 2     /**< F2 - F1 through a smoothstep over edge: 0 on the border between two
+                       *   cells, 1 inside, as GenEdge */
+});
+
+/** Node of a TextureGraph with Voronoi cells of jittered lattice points: a Vector of the
+ * distance of distance in x, a random id in 0..1 of the cell in y and two more random values
+ * of the cell in z and w, for tones and per cell variation; each is the same over a cell and
+ * stable for a seed.
+ *
+ * On DomainPlane the cells are a periodic lattice of about count cells over the image, so it
+ * tiles; distances are in cell sizes as TextureGen measures them, the square root of the area
+ * of a cell in pixels. On DomainSphere they are 3D cells evaluated at the coordinates, scaled
+ * so about count cells cover the unit sphere, seamless; distances are in 3D lattice cells.
+ *
+ * Each point moves within its cell, back and forth at its own speed, as evolve changes, so a
+ * time on evolve animates the cells continuously; 0 keeps the points where the seed puts them.
+ *
+ * @code
+ * stones {
+ *   cells  { TexCells: {count: 100, distance: CellsEdge, edge: 0.15, seed: 3} }
+ *   TextureGraph: {output: cells, width: 512}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexCells, {
+    TextureCellsDistance distance; /**< What x measures, default CellsNearest */
+    int32_t count;      /**< Approximate number of cells over the domain, 0 for 64 */
+    float jitter;       /**< Random shift of the points, 0 for a regular lattice with the
+                         *   points at the cell centers to 1 for anywhere in their cell; 1
+                         *   when the component is added */
+    int32_t seed;       /**< Seed of the points and the random values of the cells */
+    float edge;         /**< Width of the smoothstep of CellsEdge in cell sizes, 0 for 0.25 */
+    ecs_entity_t coords; /**< Vector input node of the coordinates, 0 for the coordinates of
+                          *   the texel in the domain */
+    ecs_entity_t evolve; /**< Scalar input node that moves the points, 0 for evolve_value */
+    float evolve_value; /**< Value of evolve without a node: a point crosses its cell and back
+                         *   in 1 to 2 units */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
@@ -343,6 +387,7 @@ ECS_STRUCT(TextureNodePort, {
     const char *name;      /**< Member of the ecs_entity_t of the input node */
     TextureValueType type; /**< Type the input node must output */
     bool fallback;         /**< The input has a constant member used without a node */
+    bool coords;           /**< Without a node the input is the coordinates of the texel */
 });
 
 /** A parameter of a node kind, as TextureNodeKind lists it */
@@ -382,6 +427,9 @@ typedef struct box_texture_node_input_t {
     const char *value;          /**< Name of the constant member used without a node, a float
                                  *   for TexScalar or a vec4 for TexVector, NULL for none */
     ecs_size_t value_offset;    /**< Offset of that member */
+    bool coords;                /**< Without a node the input is the coordinates of the texel
+                                 *   in the domain, as the coords of a generator; value is
+                                 *   NULL then */
 } box_texture_node_input_t;
 
 /** A parameter of a node kind: a member copied into the parameter buffer */
@@ -396,7 +444,8 @@ typedef struct box_texture_node_param_t {
  *
  * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
  * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
- * order, a scalar in x and the constant of an input without a node, and the coordinates.
+ * order, a scalar in x and the constant of an input without a node (the coordinates for an
+ * input with coords), and the coordinates.
  *
  * It returns the value of the node, a scalar in x.
  */

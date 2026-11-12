@@ -53,6 +53,7 @@ typedef struct box_gpu_tg_kind_t {
     uint32_t input_count;       /**< Inputs of a node */
     uint32_t param_size;        /**< Bytes of the parameters before the input constants */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t input_coords;      /**< Bit per input that is the coordinates without a node */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint64_t hash;              /**< Hash of the description, part of the program keys */

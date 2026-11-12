@@ -362,6 +362,7 @@
                 "testcases": [
                     "builtin_kinds",
                     "kind_reflected_json",
+                    "cells_kind",
                     "script",
                     "script_declared_after",
                     "node_set_next_frame",
