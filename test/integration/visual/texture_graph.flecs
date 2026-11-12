@@ -6,14 +6,15 @@ using box.camera
 using box.view
 using box.light
 
-// Texture graphs evaluated on the GPU and sampled by materials, lit by a sun from the upper
-// right. On the left the plating example: the coordinates halved and tinted, a gradient from a
-// dark brown at the top left to a light tan at the bottom right. In the middle a per channel mix
-// of a red and a blue constant by the coordinates (u, v, 0, 1), clamped, as linear albedo: red
-// flat at 0.5 over the left half and falling to 0.1 at the right, green rising slightly down,
-// blue at 0.1. On the right a sphere whose albedo is the sphere domain direction mapped from
-// -1..1 to 0..1: red towards +x, green up, blue towards +z. Below, a panel whose emission is an
-// HDR graph of green 4 v, black at its top and brightest at its bottom.
+// Texture graphs evaluated on the GPU and sampled by materials, lit by a sun and an ambient
+// light. On the left the plating example: the coordinates halved and tinted, red growing to the
+// right and green growing down from a dark brown at the top left. In the middle a per channel mix
+// of a red and a blue constant by the coordinates (u, v, 0, 1), clamped and stored as computed
+// (GraphLinear), which the albedo layer reads as display encoded: red flat over the left half and
+// falling to near black at the right. On the right a sphere whose albedo is the sphere domain
+// direction mapped from -1..1 to 0..1, laid out as the environment images are (-z at u 0.5):
+// on the Sphere mesh the side facing the camera is teal and the left side yellow. Below, a panel
+// whose emission is an HDR graph of green 4 v, black at its top and brightest at its bottom.
 // frames: 30
 
 graphs {

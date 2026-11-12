@@ -101,7 +101,8 @@ static uint32_t box_gpu_mip_count(
     return result;
 }
 
-/** Create a view of a range of mip levels of a texture.
+/** Create a view of a range of mip levels of a texture. An sRGB view leaves out the storage
+ * usage of the texture, which sRGB formats do not have.
  *
  * @param texture The texture
  * @param format Format of the view
@@ -123,6 +124,9 @@ static WGPUTextureView box_gpu_texture_view(
     desc.baseArrayLayer = 0;
     desc.arrayLayerCount = 1;
     desc.aspect = WGPUTextureAspect_All;
+    if (format == BOX_GPU_TEXTURE_SRGB) {
+        desc.usage = wgpuTextureGetUsage(texture) & ~WGPUTextureUsage_StorageBinding;
+    }
 
     return wgpuTextureCreateView(texture, &desc);
 }
@@ -1094,6 +1098,9 @@ static WGPUTextureView box_gpu_blend_slice(
     desc.baseArrayLayer = slice;
     desc.arrayLayerCount = 1;
     desc.aspect = WGPUTextureAspect_All;
+    if (format == BOX_GPU_TEXTURE_SRGB) {
+        desc.usage = wgpuTextureGetUsage(texture) & ~WGPUTextureUsage_StorageBinding;
+    }
 
     return wgpuTextureCreateView(texture, &desc);
 }

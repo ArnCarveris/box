@@ -679,6 +679,15 @@ void TextureGraphEval_neighbourhood_materialized(void) {
     }
 
     ecs_os_free(texels);
+    box_render_bake_timing_t timing;
+    test_bool(box_render_gpu_bake_timing(world, &timing), true);
+    tg_frames(world, 4);
+    test_bool(box_render_gpu_stats(world, &after), true);
+    if (timing.measured) {
+        test_assert(after.texture_graph_timed >= 1);
+        test_assert(after.texture_graph_ns > 0);
+    }
+
     ecs_fini(world);
 }
 

@@ -35,6 +35,9 @@
 /** Timestamp readbacks of the evaluations in flight */
 #define BOX_GPU_TG_STAMPS (4)
 
+/** Bytes between the resolved timestamps of two readbacks, the alignment of a resolve */
+#define BOX_GPU_TG_STAMP_STRIDE (256)
+
 /** Longest evaluation measured in nanoseconds, longer ones are discarded as invalid */
 #define BOX_GPU_TG_MEASURE_MAX (1e9)
 

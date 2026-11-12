@@ -414,7 +414,8 @@ void TextureGraph_default_size(void) {
 
 void TextureGraph_capped_by_quality(void) {
     // materials/textures
-    ecs_world_t *world = world_new();
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {
         .width = 64, .height = 64, .texture_quality = TextureQualityLow });
@@ -428,6 +429,7 @@ void TextureGraph_capped_by_quality(void) {
     test_int(graph_of(world, tex)->width, 512);
 
     ecs_fini(world);
+    box_render_null_free(null);
 }
 
 void TextureGraph_single_format(void) {

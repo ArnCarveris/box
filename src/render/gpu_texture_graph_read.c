@@ -501,7 +501,7 @@ void box_gpu_tg_stamps_init(
     });
     tg->resolve = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
-        .size = 2 * sizeof(uint64_t) * BOX_GPU_TG_STAMPS
+        .size = BOX_GPU_TG_STAMP_STRIDE * BOX_GPU_TG_STAMPS
     });
     for (i = 0; i < BOX_GPU_TG_STAMPS; i ++) {
         tg->stamps[i].buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
@@ -520,7 +520,7 @@ void box_gpu_tg_stamps_resolve(
 {
     int32_t i;
     for (i = 0; tg->queries && i < BOX_GPU_TG_STAMPS; i ++) {
-        uint64_t offset = (uint64_t)i * 2 * sizeof(uint64_t);
+        uint64_t offset = (uint64_t)i * BOX_GPU_TG_STAMP_STRIDE;
         if (tg->stamps[i].state == BOX_GPU_TG_STAMP_WRITTEN) {
             wgpuCommandEncoderResolveQuerySet(encoder, tg->queries, (uint32_t)i * 2, 2,
                 tg->resolve, offset);
