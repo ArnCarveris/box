@@ -1045,20 +1045,48 @@ static float box_pick_wrap(
     return result;
 }
 
-/** Texture coordinates of a hit on a plain mesh with a MappingObject or MappingWorld
- * TextureMapping, before the TextureTransform, as mapping_uv of material.wgsl projects them.
+/** Find the texture frame of an entity, as the renderer does (box_draws_frame_of): the entity
+ * itself when it has TextureFrame, else the nearest ChildOf ancestor with it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The frame, 0 for none
+ */
+static ecs_entity_t box_pick_frame_of(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    if (!ecs_id_in_use(world, TextureFrame)) {
+        goto done;
+    }
+
+    result = ecs_has_id(world, e, TextureFrame)
+        ? e : ecs_get_target_for_id(world, e, EcsChildOf, TextureFrame);
+done:
+    return result;
+}
+
+/** Texture coordinates of a hit on a plain mesh with a MappingObject, MappingWorld or
+ * MappingFrame TextureMapping, before the TextureTransform, as mapping_uv of material.wgsl
+ * projects them.
  *
  * MappingObject projects the position times the scale of the world transform, MappingWorld the
- * world position, over the mapping size, onto the plane of the dominant axis of the normal
- * (in the world for MappingWorld), plus half a repeat; a blend picks on the dominant axis.
+ * world position, MappingFrame the world position in the frame without its scale.
+ *
+ * Each over the mapping size, onto the plane of the dominant axis of the normal (in the world or
+ * the frame for MappingWorld and MappingFrame), plus half a repeat; a blend picks on that axis.
  *
  * @param m The world transform of the entity, without the ShapeMesh scale
+ * @param frame The world transform of the texture frame of a MappingFrame mapping, NULL for
+ * none, which projects as MappingWorld
  * @param mapping The mapping
  * @param hit The hit
  * @param uv Receives the texture coordinates
  */
 static void box_pick_mapping_uv(
     mat4 m,
+    mat4 frame,
     const TextureMapping *mapping,
     const box_pick_mesh_hit_t *hit,
     vec2 uv)
@@ -1066,13 +1094,30 @@ static void box_pick_mapping_uv(
     float size = isfinite(mapping->size) && mapping->size > 0.0f ? mapping->size : 1.0f;
     vec3 p, n, a;
     int32_t k;
-    if (mapping->mode == MappingWorld) {
+    if (mapping->mode == MappingWorld || mapping->mode == MappingFrame) {
         mat3 r, cofactor;
         glm_mat4_mulv3(m, (float*)hit->position, 1.0f, p);
         glm_mat4_pick3(m, r);
         glm_mat3_inv(r, cofactor);
         glm_mat3_transpose(cofactor);
         glm_mat3_mulv(cofactor, (float*)hit->normal, n);
+        if (mapping->mode == MappingFrame && frame) {
+            vec3 axes[3], d, fp, fn;
+            for (k = 0; k < 3; k ++) {
+                float length = glm_vec3_norm(frame[k]);
+                glm_vec3_scale(frame[k], length > 1e-20f ? 1.0f / length : 1.0f, axes[k]);
+            }
+
+            glm_vec3_sub(p, frame[3], d);
+            for (k = 0; k < 3; k ++) {
+                fp[k] = glm_vec3_dot(axes[k], d);
+                fn[k] = glm_vec3_dot(axes[k], n);
+            }
+
+            glm_vec3_copy(fp, p);
+            glm_vec3_copy(fn, n);
+        }
+
         glm_vec3_scale(p, 1.0f / size, p);
     } else {
         for (k = 0; k < 3; k ++) {
@@ -1174,9 +1219,9 @@ static bool box_pick_blend_surface(
  * ImageSlice as the renderer draws it, in texels of the image of the surface
  * (box_surface_texture_size), the plain area until the surface has a size.
  *
- * PbrTextures map the UV of the mesh, the projection of a MappingObject or MappingWorld, or on
- * a Sweep the lengths of a MappingObject (box_pick_sweep_uv), through TextureTransform and
- * TextureWrap; a TextureBlend maps the coordinates of its mask (box_pick_blend_surface).
+ * PbrTextures map the UV of the mesh, the projection of a mapping, or on a Sweep the lengths of
+ * a MappingObject (box_pick_sweep_uv), through TextureTransform and TextureWrap; a
+ * TextureBlend maps the coordinates of its mask (box_pick_blend_surface).
  *
  * @param world The world
  * @param st The module state
@@ -1235,12 +1280,17 @@ static bool box_pick_texture(
         const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
         box_pick_mesh_hit_t hit = {0};
         result = box_pick_mesh(world, st, e, ray->origin, ray->dir, &t, uv, &hit);
-        if (result && hit.plain && mapping &&
-            (mapping->mode == MappingObject || mapping->mode == MappingWorld))
+        if (result && hit.plain && mapping && (mapping->mode == MappingObject ||
+            mapping->mode == MappingWorld || mapping->mode == MappingFrame))
         {
-            mat4 m;
+            mat4 m, fm;
+            ecs_entity_t frame = mapping->mode == MappingFrame ? box_pick_frame_of(world, e) : 0;
             box_pick_transform(world, e, m);
-            box_pick_mapping_uv(m, mapping, &hit, uv);
+            if (frame) {
+                box_pick_transform(world, frame, fm);
+            }
+
+            box_pick_mapping_uv(m, frame ? fm : NULL, mapping, &hit, uv);
         } else if (result && !hit.plain && mapping && mapping->mode == MappingObject) {
             const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
             if (shape && shape->surface.p[0][0] == 1) {

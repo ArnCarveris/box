@@ -33,6 +33,8 @@ typedef struct box_render_draws_stats_t {
     int64_t page_surface_bytes; /**< Bytes of the surface buffers of the instance pages alive,
                                  *   which only the pages of the meshes with a parametric
                                  *   surface have */
+    int64_t page_frame_bytes;   /**< Bytes of the frame buffers of the instance pages alive,
+                                 *   which only the pages of the MappingFrame materials have */
     int64_t page_bytes;         /**< Bytes of every buffer of the instance pages alive, the sum
                                  *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
@@ -52,6 +54,9 @@ typedef struct box_render_draws_stats_t {
     int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams
                                  *   of the mesh pages with parametric surfaces, runs and
                                  *   scatter segments, only when a ShapeMesh changed */
+    int64_t frame_bytes;        /**< Bytes the last extract uploaded into the frame streams of
+                                 *   the pages of the MappingFrame materials, runs and scatter
+                                 *   segments, when a transform or a frame changed */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int32_t runs;               /**< Runs of consecutive 2D slots of the order, the draws of
                                  *   the ordered 2D shapes before a view splits them: a shadow

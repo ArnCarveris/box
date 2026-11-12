@@ -95,6 +95,9 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(2) @binding(2) var<storage, read> shadings: array<MeshShading>;
 @group(2) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
 @group(2) @binding(4) var<storage, read> materials: array<Material>;
+// Transforms relative to the texture frame, read by MappingFrame materials only: the frame
+// pages have the stream, the other pages bind one zero record.
+@group(2) @binding(5) var<storage, read> frames: array<InstanceTransform>;
 
 // Texels per edge of the octahedral distance map of a probe.
 const VISIBILITY_SIZE: i32 = 8;
@@ -233,9 +236,10 @@ fn vo_rotation(f: VertexOut) -> vec4f {
     return vec4f(unpack2x16snorm(f.flat3.x), unpack2x16snorm(f.flat3.y));
 }
 
-// A MappingObject or MappingWorld material on a plain mesh sets mapped to 1 plus its blend, uv to
-// the offset of its projection and object and object_normal to what mapping_uv projects in the
-// fragment stage. A parametric surface keeps its own UVs.
+// A MappingObject or MappingWorld material on a plain mesh, or a MappingFrame material on any
+// mesh, sets mapped to 1 plus its blend, uv to the offset of its projection and object and
+// object_normal to what mapping_uv projects in the fragment stage. A parametric surface keeps
+// its own UVs otherwise.
 struct VertexShading {
     color: vec4f,
     material: vec2f,
@@ -260,6 +264,16 @@ fn vertex_base(v: VertexIn, shading: MeshShading, material: Material) -> VertexS
     return o;
 }
 
+// Transform of the instance of a slot relative to its texture frame, for a MappingFrame
+// material; the model matrix for a slot past the frame stream of its page.
+fn frame_model(slot: u32, model: mat4x4f) -> mat4x4f {
+    var result = model;
+    if (slot < arrayLength(&frames)) {
+        result = instance_frame(frames[slot], model);
+    }
+    return result;
+}
+
 fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Material, p: Placed,
     scale: vec3f, normal: vec3f) {
     let blend = material_blend(material);
@@ -268,6 +282,14 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
     if (material_world(material)) {
         (*o).object = mapping_object(material, p.world.xyz, vec3f(1.0));
         (*o).object_normal = normal;
+    } else if (material_frame(material)) {
+        let relative = frame_model(v.slot, p.model);
+        let f = mapping_frame(material, relative, p.local, p.normal);
+        (*o).object = f.object;
+        (*o).object_normal = f.normal;
+        if (blend > 0.0) {
+            (*o).rotation = mapping_frame_rotation(p.model, relative);
+        }
     } else {
         (*o).object = mapping_object(material, v.position, scale);
         (*o).object_normal = v.normal;
@@ -291,10 +313,12 @@ fn vertex_shading(v: VertexIn, shading: MeshShading, material: Material, p: Plac
 fn vertex_shading_surface(v: VertexIn, shading: MeshShading, material: Material, p: Placed,
     scale: vec3f, normal: vec3f) -> VertexShading {
     var o = vertex_base(v, shading, material);
-    if (material_mapped(material) && surface_data.p[0].x == 0.0) {
+    if (material_mapped(material) &&
+        (surface_data.p[0].x == 0.0 || material_frame(material))) {
         vertex_mapping(&o, v, material, p, scale, normal);
     }
-    if (material_mapped(material) && !material_world(material) && surface_data.p[0].x == 1.0) {
+    if (material_mapped(material) && !material_world(material) && !material_frame(material) &&
+        surface_data.p[0].x == 1.0) {
         o.uv = surface_sweep_lengths(v.uv, v.position, v.vertex) / material.mapping_size *
             material.uv.xy + material.uv.zw;
     }
@@ -306,7 +330,7 @@ fn vertex_shading_surface(v: VertexIn, shading: MeshShading, material: Material,
             region = select(0, 1, v.uv.x >= 2.0);
             if (v.normal.x == 0.0 && v.normal.z == 0.0 && v.normal.y != 0.0) {
                 region = 2;
-            } else if (region == 1) {
+            } else if (region == 1 && o.mapped == 0.0) {
                 o.uv.x -= 2.0 * material.uv.x;
             }
         }

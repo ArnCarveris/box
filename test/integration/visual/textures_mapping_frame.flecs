@@ -1,0 +1,122 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+$ {
+  Scene: {triplanar: true, alpha_cutout: true}
+}
+
+// Texture mapping relative to a frame (TextureMapping MappingFrame, TextureFrame).
+// Two hulls of the same build: a deck of touching plates, every other one turned by 90 degrees
+// around y, a wedge (ProfileExtrusion) on the deck, a triplanar box (blend 0.4) and an alpha
+// tested lattice panel that casts its holes on the deck. Each hull is a TextureFrame, so its
+// checker runs across the plates with no seam. The left hull stands at its origin; the right
+// one is moved and turned around y, and its checker is fixed to the hull, the same as on the
+// left, while the floor between them keeps the world mapping.
+
+camera {
+  Position: {0, 8.5, 10}
+  Rotation: {-0.68, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {120, 160, 210, 255}}, shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 170, 200}, ground: {70, 64, 56}, intensity: 0.5}
+}
+
+sun {
+  Rotation: {0.9, 0.4, 0}
+  DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+fence_tex {
+  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+}
+
+floor {
+  Position: {0, -0.4, 0}
+  Box: {28, 0.2, 18}
+  Rgb: {150, 154, 164}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {albedo: checker}
+  TextureMapping: {mode: MappingWorld, size: 4}
+}
+
+prefab HullPlate {
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.7}
+  PbrTextures: {albedo: checker}
+  TextureMapping: {mode: MappingFrame, size: 1.5}
+}
+
+prefab HullBlend {
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  PbrTextures: {albedo: checker}
+  TextureMapping: {mode: MappingFrame, size: 0.8, blend: 0.4}
+}
+
+prefab HullLattice {
+  Rgb: {235, 215, 190}
+  PbrTextures: {albedo: fence_tex}
+  TextureMapping: {mode: MappingFrame, size: 1.2}
+  AlphaCutoff: {value: 0.5}
+}
+
+wedge_shape { Path2D: {start: {0, 0}, segments: [{kind: Line, end: {1.6, 0}}, {kind: Line, end: {0, 1.6}}], closed: true} }
+wedge_profile { Profile2D: {outer: wedge_shape} }
+
+template Hull {
+  for row in 0..4 {
+    for col in 0..4 {
+      {
+        (IsA, HullPlate)
+        Position: {col * 1.2 - 1.8, -0.15, row * 1.2 - 1.8}
+        Rotation: {0, ((row + col) % 2) * 0.5 * flecs.script.math.PI, 0}
+        Box: {1.2, 0.3, 1.2}
+      }
+    }
+  }
+
+  wedge : HullPlate {
+    Position: {-2.2, 0, -2.2}
+    ProfileExtrusion: {profile: wedge_profile, depth: 0.8, cap_start: true, cap_end: true}
+  }
+
+  cube : HullBlend {
+    Position: {1.4, 0.5, -1.2}
+    Rotation: {0, 0.3, 0}
+    Box: {1, 1, 1}
+  }
+
+  lattice : HullLattice {
+    Position: {0, 0.7, 1.6}
+    Box: {2.4, 1.4, 0.06}
+  }
+}
+
+hull_still {
+  TextureFrame
+  Position: {-4.6, 0, 0}
+  Hull: {}
+}
+
+hull_moved {
+  TextureFrame
+  Position: {4.9, 0.2, -0.6}
+  Rotation: {0, 0.65, 0}
+  Hull: {}
+}

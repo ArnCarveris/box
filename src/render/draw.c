@@ -261,6 +261,17 @@ static void BoxDrawsOnHierarchy(
     box_draws_on_move(it, BOX_DRAW_BOTH);
 }
 
+/** Remember the entities that got or lost TextureFrame as roots of subtrees whose instances
+ * project from another frame: the MappingFrame shapes below write their frame stream.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnTextureFrame(
+    ecs_iter_t *it)
+{
+    box_draws_on_move(it, BOX_DRAW_FRAME);
+}
+
 /** Follow an element that got or lost LayoutFloat, or whose clip or hide_clipped changed.
  *
  * A float leaves the clips of its ancestors and draws after the rest, a clipped overlay keeps the
@@ -767,6 +778,11 @@ static void box_draws_key(
     key->mesh = shape->render_mesh ? shape->render_mesh : shape->mesh;
     key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
     key->surface = shape->surface.p[0][0] != 0.0f;
+    if (!shape2d) {
+        const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
+        key->frame = mapping && mapping->mode == MappingFrame;
+    }
+
     if (shape2d && shape2d->texture) {
         key->textures[0] = shape2d->texture;
         key->slice = shape2d->sliced;
@@ -934,6 +950,10 @@ static void box_draws_update_shape(
     b = box_draws_batch(d, s->batch);
     kinds = BOX_DRAW_ALL;
 write:
+    if (kinds & BOX_DRAW_TRANSFORM) {
+        kinds |= BOX_DRAW_FRAME;
+    }
+
     kinds &= box_draws_batch_kinds(b);
     if (kept && d->shadow_record && box_draws_caster(b)) {
         const box_render_surface_t *surface = box_draws_slot_surface(b, s->slot);
@@ -991,6 +1011,11 @@ write:
 
     if (kinds & BOX_DRAW_SURFACE) {
         box_draws_surface(box_draws_slot_surface(b, s->slot), shape);
+    }
+
+    if (kinds & BOX_DRAW_FRAME) {
+        box_draws_frame_of_shape(world, e, box_draws_slot_frame(b, s->slot),
+            box_draws_slot_transform(b, s->slot));
     }
 
     box_draws_shadow_update(world, d, b, s->slot, recorded ? &was_transform : NULL,
@@ -1119,6 +1144,7 @@ static void BoxRenderExtractDraws(
     d->stats.transform_bytes = 0;
     d->stats.shading_bytes = 0;
     d->stats.surface_bytes = 0;
+    d->stats.frame_bytes = 0;
     d->stats.material_bytes = 0;
     box_draws_materials_resolve(world, d);
     box_draws_process(world, d);
@@ -1302,6 +1328,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicMaterial }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnTextureFrame", (ecs_observer_desc_t){
+        .query.terms = {{ .id = TextureFrame }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnTextureFrame);
     box_draws_observer(world, d, "DrawsOnNoBake", (ecs_observer_desc_t){
         .query.terms = {{ .id = NoBake }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
@@ -1517,13 +1546,22 @@ void box_render_draws_init(
         }
     }, BOX_RENDER_BUFFER_FIRST);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_SURFACE], &(box_draw_layout_t){
-        .streams = BOX_DRAWS_STREAMS,
+        .streams = BOX_RENDER_INSTANCE_STREAMS_SURFACE,
         .stride = {
             [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
             [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
             [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t)
         }
     }, BOX_RENDER_BUFFER_FIRST_SURFACE);
+    box_draws_store_init(&d->stores[BOX_DRAWS_STORE_FRAME], &(box_draw_layout_t){
+        .streams = BOX_DRAWS_STREAMS,
+        .stride = {
+            [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
+            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t),
+            [BOX_RENDER_STREAM_FRAME] = (uint32_t)sizeof(box_render_transform_t)
+        }
+    }, BOX_RENDER_BUFFER_FIRST_FRAME);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_2D], &(box_draw_layout_t){
         .streams = BOX_RENDER_INSTANCE_STREAMS_2D,
         .stride = {

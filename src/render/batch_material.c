@@ -554,7 +554,7 @@ void box_draws_material_pack(
     out->mapping = (uint32_t)MappingUv;
     out->mapping_size = 0.0f;
     if (material->mapping && (material->mapping->mode == MappingObject ||
-        material->mapping->mode == MappingWorld))
+        material->mapping->mode == MappingWorld || material->mapping->mode == MappingFrame))
     {
         float size = material->mapping->size;
         float blend = material->mapping->blend;
@@ -607,6 +607,83 @@ void box_draws_transform(
 
         out->rows[r][3] = transform->m[3][r];
     }
+}
+
+box_render_transform_t* box_draws_slot_frame(
+    box_draw_batch_t *b,
+    int32_t slot)
+{
+    return b->key.frame ? ecs_vec_get_t(&b->frames, box_render_transform_t, slot) : NULL;
+}
+
+ecs_entity_t box_draws_frame_of(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    if (!ecs_id_in_use(world, TextureFrame)) {
+        goto done;
+    }
+
+    result = ecs_has_id(world, e, TextureFrame)
+        ? e : ecs_get_target_for_id(world, e, EcsChildOf, TextureFrame);
+done:
+    return result;
+}
+
+void box_draws_frame(
+    box_render_transform_t *out,
+    const box_render_transform_t *model,
+    const WorldTransform *frame)
+{
+    float axes[3][3], origin[3];
+    int32_t r, c, k;
+    if (!frame) {
+        *out = *model;
+        goto done;
+    }
+
+    for (k = 0; k < 3; k ++) {
+        float length = sqrtf(frame->m[k][0] * frame->m[k][0] +
+            frame->m[k][1] * frame->m[k][1] + frame->m[k][2] * frame->m[k][2]);
+        float inv = length > 1e-20f ? 1.0f / length : 1.0f;
+        for (r = 0; r < 3; r ++) {
+            axes[k][r] = frame->m[k][r] * inv;
+        }
+
+        origin[k] = frame->m[3][k];
+    }
+
+    for (k = 0; k < 3; k ++) {
+        for (c = 0; c < 3; c ++) {
+            float sum = 0.0f;
+            for (r = 0; r < 3; r ++) {
+                sum += axes[k][r] * model->rows[r][c];
+            }
+
+            out->rows[k][c] = sum;
+        }
+
+        float t = 0.0f;
+        for (r = 0; r < 3; r ++) {
+            t += axes[k][r] * (model->rows[r][3] - origin[r]);
+        }
+
+        out->rows[k][3] = t;
+    }
+
+done:
+    return;
+}
+
+void box_draws_frame_of_shape(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_render_transform_t *out,
+    const box_render_transform_t *model)
+{
+    ecs_entity_t frame = box_draws_frame_of(world, e);
+    box_draws_frame(out, model, frame ? ecs_get(world, frame, WorldTransform) : NULL);
 }
 
 void box_draws_surface(

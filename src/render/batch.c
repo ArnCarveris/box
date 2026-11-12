@@ -3,8 +3,8 @@
  * @brief Persistent instanced batches and what a frame sends of them to the renderer.
  *
  * Every batch owns a run of slots of an instance page (store.c) with transform, shading and,
- * for a mesh batch, surface streams. Changed slots upload through a segment of the change buffer
- * per page and stream; a batch that outgrows its run moves and the GPU copies the old instances.
+ * for a mesh batch, surface and frame streams. Changed slots upload through a segment of the
+ * change buffer per page and stream; a batch that outgrows its run moves and the GPU copies.
  *
  * Mesh and 2D batches take their runs from stores of their own. A batch with dynamic_transform
  * uploads its transform stream every frame, one with dynamic_material its shading stream.
@@ -48,7 +48,8 @@ static uint64_t box_draws_hash(
         0x165667B19E3779F9ull;
     h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
-    h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2) * 0x85EBCA77C2B2AE63ull;
+    h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4) *
+        0x85EBCA77C2B2AE63ull;
     h ^= ((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
@@ -81,7 +82,8 @@ static bool box_draws_key_eq(
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
-        a->surface == b->surface && a->box_shadow == b->box_shadow && a->slice == b->slice &&
+        a->surface == b->surface && a->frame == b->frame &&
+        a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon;
 }
 
@@ -124,18 +126,19 @@ static bool box_draws_is_2d(
     return b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
 }
 
-/** Check whether a batch has the surface stream: a mesh batch with a parametric surface.
+/** Check whether a batch has the surface stream: a mesh batch with a parametric surface, or a
+ * frame batch, whose pages have every stream.
  *
  * @param b The batch
- * @return Whether its pages are of the surface store
+ * @return Whether its pages are of the surface or the frame store
  */
 static bool box_draws_has_surface(
     const box_draw_batch_t *b)
 {
-    return b->key.surface && !box_draws_is_2d(b);
+    return (b->key.surface || b->key.frame) && !box_draws_is_2d(b);
 }
 
-/** Get the store of the batches of a key: 2D, surface or plain mesh.
+/** Get the store of the batches of a key: 2D, frame, surface or plain mesh.
  *
  * @param d The state
  * @param key The key
@@ -148,6 +151,8 @@ static box_draw_store_t* box_draws_key_store(
     int32_t store = BOX_DRAWS_STORE_MESH;
     if (key->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
         store = BOX_DRAWS_STORE_2D;
+    } else if (key->frame) {
+        store = BOX_DRAWS_STORE_FRAME;
     } else if (key->surface) {
         store = BOX_DRAWS_STORE_SURFACE;
     }
@@ -165,7 +170,9 @@ box_draw_store_t* box_draws_batch_store(
 uint8_t box_draws_batch_kinds(
     const box_draw_batch_t *b)
 {
-    return box_draws_has_surface(b) ? BOX_DRAW_ALL : BOX_DRAW_BOTH;
+    return b->key.frame ? BOX_DRAW_ALL
+        : box_draws_has_surface(b) ? (uint8_t)(BOX_DRAW_BOTH | BOX_DRAW_SURFACE)
+        : BOX_DRAW_BOTH;
 }
 
 box_render_surface_t* box_draws_slot_surface(
@@ -176,6 +183,7 @@ box_render_surface_t* box_draws_slot_surface(
         ? ecs_vec_get_t(&b->surfaces, box_render_surface_t, slot)
         : NULL;
 }
+
 
 /** Get the instance data of a stream of a batch.
  *
@@ -188,7 +196,9 @@ static ecs_vec_t* box_draws_stream(
     int32_t stream)
 {
     ecs_vec_t *result = &b->surfaces;
-    if (stream == BOX_RENDER_STREAM_TRANSFORM) {
+    if (stream == BOX_RENDER_STREAM_FRAME) {
+        result = &b->frames;
+    } else if (stream == BOX_RENDER_STREAM_TRANSFORM) {
         result = &b->transforms;
     } else if (stream == BOX_RENDER_STREAM_SHADING) {
         result = box_draws_is_2d(b) ? &b->shadings : &b->mesh_shadings;
@@ -212,6 +222,8 @@ static void box_draws_count_bytes(
         d->stats.transform_bytes += bytes;
     } else if (stream == BOX_RENDER_STREAM_SHADING) {
         d->stats.shading_bytes += bytes;
+    } else if (stream == BOX_RENDER_STREAM_FRAME) {
+        d->stats.frame_bytes += bytes;
     } else {
         d->stats.surface_bytes += bytes;
     }
@@ -223,6 +235,7 @@ uint8_t box_draws_dynamic_kinds(
     const box_draw_batch_t *b)
 {
     return (uint8_t)((b->key.dynamic_transform ? BOX_DRAW_TRANSFORM : 0) |
+        (b->key.dynamic_transform && b->key.frame ? BOX_DRAW_FRAME : 0) |
         (b->key.dynamic_material ? BOX_DRAW_SHADING : 0));
 }
 
@@ -292,6 +305,7 @@ int32_t box_draws_batch_ensure(
         ecs_vec_init_t(NULL, &b->shadings, box_render_shading_t, 0);
         ecs_vec_init_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t, 0);
         ecs_vec_init_t(NULL, &b->surfaces, box_render_surface_t, 0);
+        ecs_vec_init_t(NULL, &b->frames, box_render_transform_t, 0);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_init_t(NULL, &b->changed[s], int32_t, 0);
         }
@@ -359,6 +373,7 @@ static void box_draws_batch_free(
     ecs_vec_clear(&b->shadings);
     ecs_vec_clear(&b->mesh_shadings);
     ecs_vec_clear(&b->surfaces);
+    ecs_vec_clear(&b->frames);
     box_draws_changed_clear(b);
     b->alive = false;
     b->page = -1;
@@ -422,6 +437,11 @@ int32_t box_draws_slot_add(
     if (box_draws_has_surface(b)) {
         ecs_os_memset_t(ecs_vec_append_t(NULL, &b->surfaces, box_render_surface_t), 0,
             box_render_surface_t);
+    }
+
+    if (b->key.frame) {
+        ecs_os_memset_t(ecs_vec_append_t(NULL, &b->frames, box_render_transform_t), 0,
+            box_render_transform_t);
     }
 
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
@@ -675,6 +695,10 @@ void box_draws_slot_remove(
             *box_draws_slot_surface(b, slot) = *box_draws_slot_surface(b, last);
         }
 
+        if (b->key.frame) {
+            *box_draws_slot_frame(b, slot) = *box_draws_slot_frame(b, last);
+        }
+
         if (s) {
             s->slot = slot;
         }
@@ -692,6 +716,10 @@ void box_draws_slot_remove(
     ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
     if (box_draws_has_surface(b)) {
         ecs_vec_remove_last(&b->surfaces);
+    }
+
+    if (b->key.frame) {
+        ecs_vec_remove_last(&b->frames);
     }
 
     if (b->key.atlas) {
@@ -1741,6 +1769,11 @@ static void box_draws_fill_transform(
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
         box_render_transform_t was = *out;
         box_draws_transform(out, &transforms[i], &shapes[i]);
+        if (b->key.frame) {
+            box_draws_frame_of_shape(it->world, it->entities[i],
+                box_draws_slot_frame(b, slots[i].slot), out);
+        }
+
         if (shadows) {
             box_draws_box_shadow_write(it->world, d, it->entities[i], &shadows[i], &slots[i],
                 &transforms[i], NULL, BOX_DRAW_TRANSFORM);
@@ -1886,6 +1919,7 @@ done:
     d->stats.page_transform_bytes = bytes[BOX_RENDER_STREAM_TRANSFORM];
     d->stats.page_shading_bytes = bytes[BOX_RENDER_STREAM_SHADING];
     d->stats.page_surface_bytes = bytes[BOX_RENDER_STREAM_SURFACE];
+    d->stats.page_frame_bytes = bytes[BOX_RENDER_STREAM_FRAME];
     d->stats.page_bytes = 0;
     for (i = 0; i < BOX_DRAWS_STREAMS; i ++) {
         d->stats.page_bytes += bytes[i];
@@ -1908,6 +1942,7 @@ void box_draws_batches_fini(
         ecs_vec_fini_t(NULL, &b->shadings, box_render_shading_t);
         ecs_vec_fini_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t);
         ecs_vec_fini_t(NULL, &b->surfaces, box_render_surface_t);
+        ecs_vec_fini_t(NULL, &b->frames, box_render_transform_t);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_fini_t(NULL, &b->changed[s], int32_t);
         }

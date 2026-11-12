@@ -397,6 +397,15 @@
                 ]
             },
             {
+                "id": "TextureMappingFrame",
+                "testcases": [
+                    "touching_boxes_continuous",
+                    "moved_frame_matches",
+                    "surface_moved_frame_matches",
+                    "cutout_shadow_follows_frame"
+                ]
+            },
+            {
                 "id": "TextureLinear",
                 "testcases": [
                     "emissive_layer"

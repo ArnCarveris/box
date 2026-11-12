@@ -1663,6 +1663,315 @@ void Material_texture_mapping_world_ids(void) {
     box_render_null_free(null);
 }
 
+/** MappingFrame parses from a script, and its record holds the mode with its size and blend as
+ * the other projected mappings do. */
+void Material_texture_mapping_frame_pack(void) {
+    // materials/texture_mapping_frame
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_assert(ecs_script_run(world, "texture_mapping_frame",
+        "using box.material\n"
+        "hull { TextureFrame\n TextureMapping: {mode: MappingFrame, size: 2, blend: 0.5} }\n",
+        NULL) == 0);
+    ecs_entity_t hull = ecs_lookup(world, "hull");
+    test_assert(ecs_has_id(world, hull, TextureFrame));
+    const TextureMapping *m = ecs_get(world, hull, TextureMapping);
+    test_assert(m != NULL);
+    test_int(m->mode, MappingFrame);
+    test_flt(m->size, 2);
+    test_flt(m->blend, 0.5f);
+    ecs_fini(world);
+
+    box_render_material_t record;
+    TextureMapping frame = { .mode = MappingFrame, .size = 2, .blend = 0.5f };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &frame, .fade = 1 });
+    test_uint(record.mapping & 0xffffu, MappingFrame);
+    test_uint(record.mapping >> 16, 32768);
+    test_flt(record.mapping_size, 2);
+
+    TextureMapping zero = { .mode = MappingFrame, .size = 0 };
+    box_draws_material_pack(&record, &(box_draw_material_t){ .mapping = &zero, .fade = 1 });
+    test_uint(record.mapping, MappingFrame);
+    test_flt(record.mapping_size, 1);
+}
+
+/** The frame of a shape is the shape itself when it has TextureFrame, else its nearest ancestor
+ * with it, and 0 without one. */
+void Material_texture_mapping_frame_of(void) {
+    // materials/texture_mapping_frame
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t loose = ecs_new(world);
+    test_uint(box_draws_frame_of(world, loose), 0);
+
+    ecs_entity_t outer = ecs_new(world);
+    ecs_add(world, outer, TextureFrame);
+    ecs_entity_t middle = ecs_new_w_pair(world, EcsChildOf, outer);
+    ecs_entity_t inner = ecs_new_w_pair(world, EcsChildOf, middle);
+    ecs_add(world, inner, TextureFrame);
+    ecs_entity_t leaf = ecs_new_w_pair(world, EcsChildOf, inner);
+    ecs_entity_t side = ecs_new_w_pair(world, EcsChildOf, middle);
+
+    test_uint(box_draws_frame_of(world, outer), outer);
+    test_uint(box_draws_frame_of(world, inner), inner);
+    test_uint(box_draws_frame_of(world, middle), outer);
+    test_uint(box_draws_frame_of(world, side), outer);
+    test_uint(box_draws_frame_of(world, leaf), inner);
+    test_uint(box_draws_frame_of(world, loose), 0);
+
+    ecs_remove(world, inner, TextureFrame);
+    test_uint(box_draws_frame_of(world, leaf), outer);
+
+    ecs_fini(world);
+}
+
+/** The relative transform is the inverse of the frame without its scale times the model matrix:
+ * the identity frame keeps the model matrix, and a moved, turned and scaled frame leaves the
+ * scale of the instance and the frame scale of the position. */
+void Material_texture_mapping_frame_transform(void) {
+    // materials/texture_mapping_frame
+    box_render_transform_t model = {{
+        {2, 0, 0, 5}, {0, 3, 0, 6}, {0, 0, 4, 7}
+    }};
+    box_render_transform_t out;
+    box_draws_frame(&out, &model, NULL);
+    test_assert(!ecs_os_memcmp_t(&out, &model, box_render_transform_t));
+
+    /* A frame at (1, 2, 3), turned by 90 degrees around z (x to y) and scaled by 2 */
+    WorldTransform frame = {{
+        {0, 2, 0, 0}, {-2, 0, 0, 0}, {0, 0, 2, 0}, {1, 2, 3, 1}
+    }};
+    box_draws_frame(&out, &model, &frame);
+
+    /* The instance origin (5, 6, 7) is (4, 4, 4) from the frame, (4, -4, 4) in its axes */
+    test_flt(out.rows[0][3], 4);
+    test_flt(out.rows[1][3], -4);
+    test_flt(out.rows[2][3], 4);
+
+    /* The model x axis (2, 0, 0) is -y of the frame, its y axis (0, 3, 0) +x */
+    test_flt(out.rows[0][0], 0);
+    test_flt(out.rows[1][0], -2);
+    test_flt(out.rows[0][1], 3);
+    test_flt(out.rows[1][1], 0);
+    test_flt(out.rows[2][2], 4);
+}
+
+/** Find the batch and slot of a drawn shape.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param slot Receives its slot
+ * @return Its batch
+ */
+static box_draw_batch_t* frame_batch_of(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t *slot)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *ds = ecs_get(world, e, DrawSlot);
+    test_assert(d != NULL);
+    test_assert(ds != NULL && ds->batch >= 0);
+    *slot = ds->slot;
+
+    return box_draws_batch(d, ds->batch);
+}
+
+/** Check that the frame record of a shape holds an expected relative translation and the
+ * diagonal of its scale.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param x The expected x of the translation relative to its frame
+ * @param y The expected y
+ * @param z The expected z
+ * @param scale The scale of the frame the diagonal holds on top of the ShapeMesh scale, 1 for
+ * none
+ */
+static void frame_record_check(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float x,
+    float y,
+    float z,
+    float scale)
+{
+    int32_t slot;
+    box_draw_batch_t *b = frame_batch_of(world, e, &slot);
+    const box_render_transform_t *rec = box_draws_slot_frame(b, slot);
+    const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    test_assert(rec != NULL);
+    test_assert(fabsf(rec->rows[0][3] - x) < 1e-4f);
+    test_assert(fabsf(rec->rows[1][3] - y) < 1e-4f);
+    test_assert(fabsf(rec->rows[2][3] - z) < 1e-4f);
+    for (int32_t k = 0; k < 3; k ++) {
+        test_assert(fabsf(rec->rows[k][k] - scale * shape->scale[k]) < 1e-4f);
+    }
+}
+
+/** A MappingFrame shape gets the frame stream with its transform relative to its frame, its
+ * own TextureFrame, the nearest of two frames above it or none (its model matrix); the frame of
+ * a moved, turned and scaled parent leaves the instance scale and the scaled offset. */
+void Material_texture_mapping_frame_record(void) {
+    // materials/texture_mapping_frame
+    box_render_null_t *null;
+    ecs_world_t *world = mapping_world(&null);
+    TextureMapping frame_mapping = { .mode = MappingFrame, .size = 1 };
+
+    ecs_entity_t outer = ecs_new(world);
+    ecs_add(world, outer, TextureFrame);
+    ecs_set(world, outer, Position, {2, 1, -3});
+    ecs_set(world, outer, Rotation, {0, 1.5707963f, 0});
+    ecs_entity_t inner = ecs_new_w_pair(world, EcsChildOf, outer);
+    ecs_add(world, inner, TextureFrame);
+    ecs_set(world, inner, Position, {0, 4, 0});
+    ecs_set(world, inner, Rotation, {0.3f, 0, 0.2f});
+    ecs_set(world, inner, Scale, {2, 2, 2});
+
+    ecs_entity_t in_outer = ecs_new_w_pair(world, EcsChildOf, outer);
+    ecs_set(world, in_outer, Position, {1, 0, 0});
+    ecs_set(world, in_outer, Box, {1, 2, 3});
+    ecs_set_ptr(world, in_outer, TextureMapping, &frame_mapping);
+
+    ecs_entity_t in_inner = ecs_new_w_pair(world, EcsChildOf, inner);
+    ecs_set(world, in_inner, Position, {1, 0, 0});
+    ecs_set(world, in_inner, Box, {1, 2, 3});
+    ecs_set_ptr(world, in_inner, TextureMapping, &frame_mapping);
+
+    ecs_entity_t own = ecs_new(world);
+    ecs_add(world, own, TextureFrame);
+    ecs_set(world, own, Position, {-4, 0, 0});
+    ecs_set(world, own, Rotation, {0, 0.5f, 0});
+    ecs_set(world, own, Box, {1, 2, 3});
+    ecs_set_ptr(world, own, TextureMapping, &frame_mapping);
+
+    ecs_entity_t loose = mapping_box(world, 6, &frame_mapping);
+    mapping_frame(world);
+
+    frame_record_check(world, in_outer, 1, 0, 0, 1);
+    frame_record_check(world, in_inner, 2, 0, 0, 2);
+    frame_record_check(world, own, 0, 0, 0, 1);
+
+    int32_t slot;
+    box_draw_batch_t *b = frame_batch_of(world, loose, &slot);
+    test_assert(b->key.frame);
+    test_assert(!ecs_os_memcmp_t(box_draws_slot_frame(b, slot),
+        box_draws_slot_transform(b, slot), box_render_transform_t));
+
+    /* Moving the frame keeps the record */
+    ecs_set(world, outer, Position, {-7, 3, 2});
+    ecs_set(world, outer, Rotation, {0.4f, -1, 0.1f});
+    mapping_frame(world);
+    frame_record_check(world, in_outer, 1, 0, 0, 1);
+    frame_record_check(world, in_inner, 2, 0, 0, 2);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Materials without MappingFrame stay out of the frame store: their batches have no frame
+ * stream and no page has a frame buffer, until a MappingFrame shape comes. */
+void Material_texture_mapping_frame_no_stream(void) {
+    // materials/texture_mapping_frame
+    box_render_null_t *null;
+    ecs_world_t *world = mapping_world(&null);
+    box_render_draws_t *d = box_draws_state(world);
+    TextureMapping world_mapping = { .mode = MappingWorld, .size = 1 };
+    TextureMapping object_mapping = { .mode = MappingObject, .size = 1 };
+    TextureMapping frame_mapping = { .mode = MappingFrame, .size = 1 };
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, TextureFrame);
+    ecs_entity_t a = mapping_box(world, 0, NULL);
+    ecs_entity_t b = mapping_box(world, 1, &world_mapping);
+    ecs_entity_t c = mapping_box(world, 2, &object_mapping);
+    ecs_add_pair(world, b, EcsChildOf, parent);
+    ecs_add_pair(world, c, EcsChildOf, parent);
+    mapping_frame(world);
+
+    ecs_entity_t shapes[3] = { a, b, c };
+    for (int32_t i = 0; i < 3; i ++) {
+        int32_t slot;
+        box_draw_batch_t *batch = frame_batch_of(world, shapes[i], &slot);
+        test_assert(!batch->key.frame);
+        test_assert(box_draws_slot_frame(batch, slot) == NULL);
+        test_int(ecs_vec_count(&batch->frames), 0);
+        test_assert(box_draws_batch_store(d, batch) != &d->stores[BOX_DRAWS_STORE_FRAME]);
+        test_uint(box_draws_batch_kinds(batch) & BOX_DRAW_FRAME, 0);
+    }
+
+    box_render_draws_stats_t stats;
+    box_render_draws_stats(world, &stats);
+    test_int(stats.page_frame_bytes, 0);
+    test_int(stats.frame_bytes, 0);
+    test_int(d->stores[BOX_DRAWS_STORE_FRAME].alive, 0);
+
+    ecs_set_ptr(world, c, TextureMapping, &frame_mapping);
+    mapping_frame(world);
+    int32_t slot;
+    box_draw_batch_t *batch = frame_batch_of(world, c, &slot);
+    test_assert(batch->key.frame);
+    test_assert(box_draws_batch_store(d, batch) == &d->stores[BOX_DRAWS_STORE_FRAME]);
+    test_uint(box_draws_batch_kinds(batch), BOX_DRAW_ALL);
+    test_assert(box_draws_slot_frame(batch, slot) != NULL);
+    box_render_draws_stats(world, &stats);
+    test_assert(stats.page_frame_bytes > 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Adding or removing TextureFrame writes the frame record of the shapes below it, and so does
+ * reparenting a shape under another frame. */
+void Material_texture_mapping_frame_updates(void) {
+    // materials/texture_mapping_frame
+    box_render_null_t *null;
+    ecs_world_t *world = mapping_world(&null);
+    TextureMapping frame_mapping = { .mode = MappingFrame, .size = 1 };
+
+    ecs_entity_t first = ecs_new(world);
+    ecs_set(world, first, Position, {3, 0, 0});
+    ecs_entity_t second = ecs_new(world);
+    ecs_set(world, second, Position, {0, 0, -5});
+    ecs_add(world, second, TextureFrame);
+    ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, first);
+    ecs_set(world, shape, Position, {1, 2, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set_ptr(world, shape, TextureMapping, &frame_mapping);
+    mapping_frame(world);
+
+    /* No frame: the world position */
+    frame_record_check(world, shape, 4, 2, 0, 1);
+
+    ecs_add(world, first, TextureFrame);
+    mapping_frame(world);
+    frame_record_check(world, shape, 1, 2, 0, 1);
+
+    ecs_remove(world, first, TextureFrame);
+    mapping_frame(world);
+    frame_record_check(world, shape, 4, 2, 0, 1);
+
+    ecs_add(world, first, TextureFrame);
+    mapping_frame(world);
+    frame_record_check(world, shape, 1, 2, 0, 1);
+
+    /* Reparented under the second frame, its Position is relative to it */
+    ecs_add_pair(world, shape, EcsChildOf, second);
+    mapping_frame(world);
+    frame_record_check(world, shape, 1, 2, 0, 1);
+    ecs_set(world, shape, Position, {0, 1, 2});
+    mapping_frame(world);
+    frame_record_check(world, shape, 0, 1, 2, 1);
+
+    /* The shape becomes its own frame */
+    ecs_add(world, shape, TextureFrame);
+    mapping_frame(world);
+    frame_record_check(world, shape, 0, 0, 0, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 /** RGB PNG of 4 by 2 pixels, an image a layer of a TextureBlend samples */
 #define BLEND_RGB_PNG "test/assets/textures/rgb.png"
 

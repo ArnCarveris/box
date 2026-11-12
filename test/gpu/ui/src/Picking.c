@@ -508,6 +508,97 @@ void Picking_render_to_texture_mapped(void) {
     ecs_fini(world);
 }
 
+void Picking_render_to_texture_frame_mapped(void) {
+    // ui/picking
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    // The wall spans x -2..2 in the world, a child of a TextureFrame at x 1.5 turned by 180
+    // degrees around z. MappingFrame with a size of 2 projects 1.5 - x on the front face, so the
+    // button (surface x 20..80 of 200) is at x -0.3..0.3 and 1.7..2, where MappingWorld would put
+    // it at x -0.8..-0.2 and 1.2..1.8.
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.material\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "screen_texture {}\n"
+        "screen_ui {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  button {\n"
+        "    Position: {-50, 0, 0}\n"
+        "    Rect: {60, 60}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "screen_views {\n"
+        "  view {\n"
+        "    View: {camera: screen_ui.camera}\n"
+        "  }\n"
+        "}\n"
+        "screen_surface {\n"
+        "  Surface: {width: 200, height: 100, texture: screen_texture, view_root: screen_views}\n"
+        "}\n"
+        "camera {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "main_view {\n"
+        "  View: {camera: camera}\n"
+        "}\n"
+        "ship {\n"
+        "  TextureFrame\n"
+        "  Position: {1.5, 0, 0}\n"
+        "  Rotation: {0, 0, 3.1415927}\n"
+        "  wall {\n"
+        "    Position: {1.5, 0, -0.1}\n"
+        "    Box: {4, 2, 0.2}\n"
+        "    PbrTextures: {albedo: screen_texture}\n"
+        "    TextureMapping: {mode: MappingFrame, size: 2}\n"
+        "  }\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t clicks; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t button = ecs_lookup(world, "screen_ui.button");
+    ecs_progress(world, 0);
+
+    // x -0.5: on the button through MappingWorld, not through the frame
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [609, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "ship.wall"));
+
+    // x 0: on the button through the frame only
+    ecs_os_free(box_command_run(world, s, "mouse_click left [640, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, button);
+
+    ecs_fini(world);
+}
+
 void Picking_render_to_texture_sweep_mapped(void) {
     // ui/picking
     ecs_world_t *world = ecs_init();

@@ -1092,7 +1092,7 @@ void InstanceStore_parametric_shapes_use_surface_store(void) {
     test_int(stats.page_bytes, MIN_RUN * (INSTANCE + SURFACE_INSTANCE));
 
     /* The plain page has no surface buffer, the surface page one of MIN_RUN records */
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS_SURFACE; s ++) {
         bool plain_stream = s != BOX_RENDER_STREAM_SURFACE;
         test_int(buffer_ops(null, BOX_RENDER_CREATE, PAGE(0) + (uint32_t)s), plain_stream);
         const box_render_buffer_desc_t *desc = created(null, SURFACE_PAGE(0) + (uint32_t)s);
@@ -1227,7 +1227,7 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     test_int(stats.page_surface_bytes, MIN_RUN * SURFACE);
     test_assert(batch_page(null, SURFACE_PAGE(0)) != NULL);
     test_uint(batch_page(null, SURFACE_PAGE(0))->instance_count, 1);
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS_SURFACE; s ++) {
         test_int(buffer_ops(null, BOX_RENDER_CREATE, SURFACE_PAGE(0) + (uint32_t)s), 1);
         test_int(uploads_at(null, SURFACE_PAGE(0) + (uint32_t)s, 0), 1);
     }
@@ -1256,7 +1256,7 @@ void InstanceStore_shape_moves_to_surface_store_and_back(void) {
     test_int(stats.batches, 1);
     test_int(stats.surface_bytes, 0);
     test_int(stats.upload_bytes, stats.transform_bytes + stats.shading_bytes);
-    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS; s ++) {
+    for (s = 0; s < BOX_RENDER_INSTANCE_STREAMS_SURFACE; s ++) {
         test_int(uploads_at(null, SURFACE_PAGE(0) + (uint32_t)s, 0), 0);
         test_int(buffer_ops(null, BOX_RENDER_DESTROY, PAGE(0) + (uint32_t)s), 0);
     }

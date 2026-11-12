@@ -25,3 +25,14 @@ fn instance_model(t: InstanceTransform) -> mat4x4f {
     return mat4x4f(vec4f(r[0].x, r[1].x, r[2].x, 0.0), vec4f(r[0].y, r[1].y, r[2].y, 0.0),
         vec4f(r[0].z, r[1].z, r[2].z, 0.0), vec4f(r[0].w, r[1].w, r[2].w, 1.0));
 }
+
+// Transform of an instance relative to its texture frame (MappingFrame), from its record of the
+// frame stream; a zero record, which the pages without the frame stream bind, gives the model
+// matrix, which projects as MappingWorld does.
+fn instance_frame(t: InstanceTransform, model: mat4x4f) -> mat4x4f {
+    var result = model;
+    if (any(t.rows[0].xyz != vec3f(0.0)) || any(t.rows[1].xyz != vec3f(0.0))) {
+        result = instance_model(t);
+    }
+    return result;
+}
