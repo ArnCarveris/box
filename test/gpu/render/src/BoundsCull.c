@@ -507,7 +507,7 @@ static ecs_world_t* bounds_shadow_scene(
     ecs_entity_t caster = ecs_new(world);
     ecs_set(world, caster, Position, {0, 5, -8});
     ecs_set(world, caster, Box, {1.5f, 0.2f, 1.5f});
-    ecs_entity_t near = ecs_new(world);
+    ecs_entity_t near = ecs_entity(world, {.name = "near"});
     ecs_set(world, near, Position, {3, 3, 3});
     ecs_set(world, near, Sphere, {.segments = 16, .radius = 1});
     ecs_entity_t far = ecs_new(world);
@@ -572,6 +572,58 @@ void BoundsCull_same_image(void) {
     unsigned char *b = bounds_load(on, "bounds_on.png");
     test_bool(box_render_gpu_cull_stats(on, on_view, &stats), true);
     test_int(stats.skipped, 1);
+    ecs_fini(on);
+
+    test_assert(!memcmp(a, b, 64 * 64 * 4));
+    stbi_image_free(a);
+    stbi_image_free(b);
+}
+
+/** Start a Position transition of the near sphere of the shadow scene towards a target far
+ * outside the view and every cascade, then render the first frame of it. Linear over 100
+ * seconds, the sphere has moved 1.24 units of the 497 and is still in the view. */
+static ecs_world_t* bounds_transition_scene(
+    bool bounds,
+    const char *file,
+    ecs_entity_t *view_out)
+{
+    ecs_world_t *world = bounds_shadow_scene(bounds, "transition_start.png", view_out);
+    ecs_entity_t near = ecs_lookup(world, "near");
+    box_transition_set(world, near, ecs_id(Position), &(TransitionSpec){ .duration = 100 });
+    ecs_progress(world, 0.25f);
+    box_render_sync(world);
+    ecs_set(world, near, Position, {500, 3, 3});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64,
+        .write_to_file = ECS_CONST_CAST(char*, file), .resolution_scale = 1});
+    ecs_progress(world, 0.25f);
+    box_render_sync(world);
+    return world;
+}
+
+/** A shape whose Position transitions out of the view keeps drawing while the resolver renders
+ * it inside: its batch holds the target, so it sends no bounds while the transition runs. */
+void BoundsCull_transition_out_drawn(void) {
+    // culling/bounds
+    ecs_entity_t on_view = 0, off_view = 0;
+    box_render_cull_stats_t off_stats, stats;
+    ecs_world_t *off = bounds_transition_scene(false, "transition_off.png", &off_view);
+    unsigned char *a = bounds_load(off, "transition_off.png");
+    test_bool(box_render_gpu_cull_stats(off, off_view, &off_stats), true);
+    ecs_fini(off);
+
+    ecs_world_t *on = bounds_transition_scene(true, "transition_on.png", &on_view);
+    unsigned char *b = bounds_load(on, "transition_on.png");
+    test_bool(box_render_gpu_cull_stats(on, on_view, &stats), true);
+    test_flt(ecs_get(on, ecs_lookup(on, "near"), Position)->x, 500);
+    test_int(stats.skipped, 1);
+    test_int(stats.visible, off_stats.visible);
+    test_int(stats.casters_visible, off_stats.casters_visible);
+    test_assert(stats.casters_visible > 0);
+
+    box_render_cull_stats_t one;
+    test_bool(box_render_gpu_cull_frustum(on, on_view, 0, &one), true);
+    test_int(one.skipped, 1);
     ecs_fini(on);
 
     test_assert(!memcmp(a, b, 64 * 64 * 4));

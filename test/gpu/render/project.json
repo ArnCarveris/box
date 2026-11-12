@@ -732,7 +732,8 @@
                     "skipped_keeps_pipelines",
                     "dynamic_follows",
                     "cascades_skip_outside",
-                    "same_image"
+                    "same_image",
+                    "transition_out_drawn"
                 ]
             },
             {

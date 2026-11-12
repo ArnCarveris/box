@@ -417,6 +417,8 @@ typedef struct box_draw_batch_t {
     float world_min[3];     /**< Minimum corner of the world bounds of its slots, padded */
     float world_max[3];     /**< Maximum corner of the world bounds of its slots, padded */
     float world_radius;     /**< Largest radius of the world box of a slot, padded */
+    int64_t record_frame;   /**< Frame of the packet its batch record was last sent in */
+    int32_t record;         /**< Index of that record in the batches of the packet */
     int64_t transform_frame; /**< Frame of the packet the transform stream of its run was last
                              *   uploaded in */
     uint32_t transform_data; /**< Offset of that upload in the packet data, where the transform

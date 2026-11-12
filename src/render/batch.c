@@ -312,6 +312,7 @@ int32_t box_draws_batch_ensure(
     b->was_ready = false;
     b->transform_frame = -1;
     b->shading_frame = -1;
+    b->record_frame = -1;
     head = ecs_map_ensure(&d->lookup, hash);
     b->next = *head ? (int32_t)*head - 1 : -1;
     *head = (uint64_t)result + 1;
@@ -1311,6 +1312,8 @@ static void box_draws_send_batch(
     }
 
     box_render_batch_t *out = box_render_packet_batch(p);
+    b->record_frame = p->frame;
+    b->record = ecs_vec_count(&p->batches) - 1;
     out->scene = b->key.scene;
     out->pipeline = b->key.pipeline;
     out->features = b->key.features;
