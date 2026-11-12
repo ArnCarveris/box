@@ -1,0 +1,5 @@
+// A scene that uses a component the test defines after the first frame: it fails to load
+// first and evaluates again once the component exists
+waiting_root {
+  CoreWaited: {value: 3}
+}

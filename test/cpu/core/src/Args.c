@@ -77,6 +77,22 @@ void Args_unguarded(void) {
     ecs_fini(world);
 }
 
+void Args_fail_on_error(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->fail_on_error, false);
+    char *argv[] = {"boxrun", "--headless", "--fail-on-error"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->fail_on_error, true);
+    test_bool(app->headless, true);
+
+    ecs_fini(world);
+}
+
 void Args_frames(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();

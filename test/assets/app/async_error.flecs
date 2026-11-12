@@ -1,0 +1,10 @@
+// A scene that loads and divides by zero in an async block at the second frame. core_tick is
+// an async function of the test that resolves at once, so each await resumes the next frame.
+export mut divisor = 0
+
+async_error_root {}
+
+async {
+  await core_tick()
+  const ratio = 10 / divisor
+}
