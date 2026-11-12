@@ -442,8 +442,9 @@ void box_cmd_geometry_init(
     ecs_world_t *world);
 
 /** List the pairs of 3D shapes with faces that lie in the same plane, face the same way and
- * overlap: geometry.check [root] [tolerance=units] [area=units^2] [max=n]. One line per pair,
- * the largest area first, and a summary line.
+ * overlap: geometry.check [root] [tolerance=units] [area=units^2] [max=n] [hidden]. One line per
+ * pair whose faces can be seen, the largest area first, and a summary line; hidden also lists
+ * the pairs whose faces fight only inside other shapes or as flat faces that look alike.
  *
  * @param world The world
  * @param argc Number of arguments

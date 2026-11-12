@@ -7,7 +7,8 @@
  * sweeps the world bounds of the 3D shapes to find the pairs that may touch.
  *
  * Each pair of near parallel triangles of two shapes is clipped against each other in the plane
- * of the first; where the planes are closer than the tolerance, the overlap fights.
+ * of the first; where the planes are closer than the tolerance, the overlap fights. It cannot be
+ * seen when another shape covers it, or when both faces are flat shaded with the same look.
  */
 
 #include "command.h"
@@ -40,10 +41,18 @@
 /** Most vertices of a polygon of the clip, a triangle clipped by five half planes */
 #define BOX_CMD_GEOMETRY_POLY_MAX (16)
 
+/** Smallest cosine of the angle between the vertex normals of a triangle that shades flat */
+#define BOX_CMD_GEOMETRY_FLAT (0.9999f)
+
+/** Distance in world units in front of a face at which a point inside another shape means the
+ * face is covered, so it cannot be seen fighting */
+#define BOX_CMD_GEOMETRY_COVER (0.002f)
+
 /** A triangle of a shape in world space */
 typedef struct box_cmd_geometry_tri_t {
     vec3 p[3];              /**< Corners */
     vec3 n;                 /**< Unit normal pointing out of the shape */
+    bool flat;              /**< Its vertex normals are equal, so it shades as a flat face */
 } box_cmd_geometry_tri_t;
 
 /** A 3D shape and its triangles */
@@ -59,7 +68,9 @@ typedef struct box_cmd_geometry_shape_t {
 typedef struct box_cmd_geometry_finding_t {
     ecs_entity_t a;         /**< One shape */
     ecs_entity_t b;         /**< The other shape */
-    float area;             /**< Area of the faces that fight */
+    float area;             /**< Area of the faces that fight and can be seen */
+    float hidden;           /**< Area of the faces that fight inside another shape */
+    float alike;            /**< Area of flat faces that fight with the same look */
     float gap;              /**< Smallest distance between the planes in that area */
     float best;             /**< Area of the largest overlap of two triangles */
     vec3 at;                /**< Center of the area */
@@ -80,6 +91,8 @@ typedef struct box_cmd_geometry_check_t {
     float area;             /**< Smallest area of a finding */
     int32_t max;            /**< Most findings listed */
     int32_t unplaced;       /**< Shapes without a WorldTransform, which are not drawn */
+    bool list_hidden;       /**< List the pairs whose faces fight only where it cannot be
+                             *   seen */
     ecs_vec_t tris;         /**< box_cmd_geometry_tri_t, of every shape */
     ecs_vec_t shapes;       /**< box_cmd_geometry_shape_t */
     ecs_vec_t findings;     /**< box_cmd_geometry_finding_t */
@@ -238,6 +251,11 @@ static void box_cmd_geometry_add_shape(
         }
 
         glm_vec3_scale(t.n, sign / len, t.n);
+        const box_vertex_t *v0 = &mesh->vertices[mesh->indices[i]];
+        const box_vertex_t *v1 = &mesh->vertices[mesh->indices[i + 1]];
+        const box_vertex_t *v2 = &mesh->vertices[mesh->indices[i + 2]];
+        t.flat = glm_vec3_dot((float*)v0->normal, (float*)v1->normal) > BOX_CMD_GEOMETRY_FLAT &&
+            glm_vec3_dot((float*)v0->normal, (float*)v2->normal) > BOX_CMD_GEOMETRY_FLAT;
         for (j = 0; j < 3; j ++) {
             glm_vec3_minv(s->min, t.p[j], s->min);
             glm_vec3_maxv(s->max, t.p[j], s->max);
@@ -480,8 +498,117 @@ done:
     return result;
 }
 
+/** Check whether a point is inside the closed mesh of a shape: whether a ray from it crosses
+ * the triangles of the shape an odd number of times.
+ *
+ * @param c The check
+ * @param s The shape
+ * @param q The point
+ * @return Whether it is inside
+ */
+static bool box_cmd_geometry_inside(
+    const box_cmd_geometry_check_t *c,
+    const box_cmd_geometry_shape_t *s,
+    const vec3 q)
+{
+    static const vec3 dir = {0.4823f, 0.6127f, 0.6261f};
+    const box_cmd_geometry_tri_t *tris = ecs_vec_first(&c->tris);
+    int32_t i, hits = 0;
+    for (i = s->first; i < s->first + s->count; i ++) {
+        const box_cmd_geometry_tri_t *t = &tris[i];
+        vec3 e1, e2, h, d, qv;
+        glm_vec3_sub((float*)t->p[1], (float*)t->p[0], e1);
+        glm_vec3_sub((float*)t->p[2], (float*)t->p[0], e2);
+        glm_vec3_cross((float*)dir, e2, h);
+        float a = glm_vec3_dot(e1, h);
+        if (fabsf(a) < BOX_CMD_GEOMETRY_DEGENERATE) {
+            continue;
+        }
+
+        float f = 1.0f / a;
+        glm_vec3_sub((float*)q, (float*)t->p[0], d);
+        float u = f * glm_vec3_dot(d, h);
+        if (u < 0 || u > 1) {
+            continue;
+        }
+
+        glm_vec3_cross(d, e1, qv);
+        float v = f * glm_vec3_dot((float*)dir, qv);
+        if (v < 0 || u + v > 1) {
+            continue;
+        }
+
+        hits += f * glm_vec3_dot(e2, qv) > 0;
+    }
+
+    return (hits & 1) != 0;
+}
+
+/** Check whether the face of an overlap is covered: whether a point just in front of it is
+ * inside a shape other than the two of the pair.
+ *
+ * @param c The check
+ * @param a One shape of the pair
+ * @param b The other shape of the pair
+ * @param at A point of the overlap
+ * @param normal The normal of the faces
+ * @return Whether it is covered
+ */
+static bool box_cmd_geometry_covered(
+    const box_cmd_geometry_check_t *c,
+    ecs_entity_t a,
+    ecs_entity_t b,
+    const vec3 at,
+    const vec3 normal)
+{
+    const box_cmd_geometry_shape_t *shapes = ecs_vec_first(&c->shapes);
+    int32_t i, count = ecs_vec_count(&c->shapes);
+    bool result = false;
+    vec3 q;
+    glm_vec3_copy((float*)at, q);
+    glm_vec3_muladds((float*)normal, BOX_CMD_GEOMETRY_COVER, q);
+    for (i = 0; i < count && !result; i ++) {
+        const box_cmd_geometry_shape_t *s = &shapes[i];
+        if (s->e == a || s->e == b || !box_cmd_geometry_overlap(q, q, s->min, s->max, 0)) {
+            continue;
+        }
+
+        result = box_cmd_geometry_inside(c, s, q);
+    }
+
+    return result;
+}
+
+/** Check whether two shapes render their flat faces alike: the same material slot, the same
+ * textures, and textures (if any) projected from the world, so their texture coordinates match.
+ *
+ * @param world The world
+ * @param a One shape
+ * @param b The other shape
+ * @return Whether they look alike
+ */
+static bool box_cmd_geometry_alike(
+    ecs_world_t *world,
+    ecs_entity_t a,
+    ecs_entity_t b)
+{
+    const MaterialId *ma = ecs_get(world, a, MaterialId), *mb = ecs_get(world, b, MaterialId);
+    const PbrTextures *ta = ecs_get(world, a, PbrTextures);
+    const PbrTextures *tb = ecs_get(world, b, PbrTextures);
+    const TextureMapping *map = ecs_get(world, a, TextureMapping);
+    const Opacity *oa = ecs_get(world, a, Opacity), *ob = ecs_get(world, b, Opacity);
+    bool result = ma && mb && ma->value == mb->value && ta == tb &&
+        map == ecs_get(world, b, TextureMapping) && (oa ? oa->value : 1) == (ob ? ob->value : 1);
+    if (result && ta) {
+        result = map && map->mode == MappingWorld;
+    }
+
+    return result;
+}
+
 /** Check a pair of shapes whose bounds overlap, and add a finding when the area of their faces
- * that fights is at least the area of the check.
+ * that fights is at least the area of the check. Overlaps of flat faces of shapes that look
+ * alike, and overlaps whose faces are covered by another shape, cannot be seen.
  *
  * @param c The check
  * @param sa The first shape
@@ -496,6 +623,7 @@ static void box_cmd_geometry_pair(
     box_cmd_geometry_finding_t f = { .gap = INFINITY };
     vec3 min, max;
     int32_t i, j, na, nb;
+    bool alike = box_cmd_geometry_alike(c->world, sa->e, sb->e);
     glm_vec3_maxv((float*)sa->min, (float*)sb->min, min);
     glm_vec3_minv((float*)sa->max, (float*)sb->max, max);
 
@@ -524,6 +652,26 @@ static void box_cmd_geometry_pair(
                 continue;
             }
 
+            bool same = alike && t1->flat && t2->flat;
+            if (same || box_cmd_geometry_covered(c, sa->e, sb->e, at, t1->n)) {
+                if (same) {
+                    f.alike += area;
+                } else {
+                    f.hidden += area;
+                }
+
+                if (!f.area && !f.best) {
+                    glm_vec3_copy(at, f.at);
+                    glm_vec3_copy((float*)t1->n, f.normal);
+                }
+
+                continue;
+            }
+
+            if (!f.area) {
+                glm_vec3_zero(f.at);
+            }
+
             f.area += area;
             f.gap = glm_min(f.gap, gap);
             glm_vec3_muladds(at, area, f.at);
@@ -534,8 +682,14 @@ static void box_cmd_geometry_pair(
         }
     }
 
-    if (f.area > 0 && f.area >= c->area) {
-        glm_vec3_scale(f.at, 1.0f / f.area, f.at);
+    if ((f.area > 0 && f.area >= c->area) || (f.hidden + f.alike > 0 &&
+        f.hidden + f.alike >= c->area))
+    {
+        if (f.area > 0) {
+            glm_vec3_scale(f.at, 1.0f / f.area, f.at);
+        }
+
+        f.gap = isfinite(f.gap) ? f.gap : 0;
         f.a = sa->e;
         f.b = sb->e;
         *ecs_vec_append_t(NULL, &c->findings, box_cmd_geometry_finding_t) = f;
@@ -558,7 +712,7 @@ static int box_cmd_geometry_shape_cmp(
     return (ma > mb) - (ma < mb);
 }
 
-/** Order findings by area, the largest first.
+/** Order findings by the area that can be seen, then by the hidden area, the largest first.
  *
  * @param a A finding
  * @param b Another finding
@@ -568,10 +722,14 @@ static int box_cmd_geometry_finding_cmp(
     const void *a,
     const void *b)
 {
-    float fa = ((const box_cmd_geometry_finding_t*)a)->area;
-    float fb = ((const box_cmd_geometry_finding_t*)b)->area;
+    const box_cmd_geometry_finding_t *fa = a, *fb = b;
+    int result = (fa->area < fb->area) - (fa->area > fb->area);
+    if (!result) {
+        float ha = fa->hidden + fa->alike, hb = fb->hidden + fb->alike;
+        result = (ha < hb) - (ha > hb);
+    }
 
-    return (fa < fb) - (fa > fb);
+    return result;
 }
 
 /** Check every pair of shapes whose bounds overlap: sort the shapes along the axis on which
@@ -673,8 +831,10 @@ static int box_cmd_geometry_args(
             c->area = (float)value;
         } else if ((r = box_cmd_geometry_number(arg, "max", &value)) != 1) {
             c->max = (int32_t)value;
+        } else if (!ecs_os_strcmp(arg, "hidden")) {
+            c->list_hidden = true;
         } else if (strchr(arg, '=')) {
-            ecs_err("invalid option '%s', expected tolerance=, area= or max=", arg);
+            ecs_err("invalid option '%s', expected tolerance=, area=, max= or hidden", arg);
             goto done;
         } else if (c->root) {
             ecs_err("invalid argument '%s', the root is already set", arg);
@@ -728,7 +888,47 @@ static double box_cmd_geometry_print(
     return fabsf(value) < 0.005f ? 0.0 : (double)value;
 }
 
-/** Append the findings, the largest area first, and a summary line.
+/** Append one finding.
+ *
+ * @param c The check
+ * @param f The finding
+ * @param visible Whether its faces can be seen fighting
+ * @param out The output
+ */
+static void box_cmd_geometry_line(
+    const box_cmd_geometry_check_t *c,
+    const box_cmd_geometry_finding_t *f,
+    bool visible,
+    ecs_strbuf_t *out)
+{
+    char *pa = ecs_get_path(c->world, f->a), *pb = ecs_get_path(c->world, f->b);
+    if (strcmp(pa, pb) > 0) {
+        char *swap = pa;
+        pa = pb;
+        pb = swap;
+    }
+
+    if (visible) {
+        ecs_strbuf_append(out, "warning coplanar %s and %s: area %.4f, gap %.5f, ", pa, pb,
+            (double)f->area, (double)f->gap);
+    } else if (f->hidden >= f->alike) {
+        ecs_strbuf_append(out, "info coplanar-hidden %s and %s: area %.4f inside other shapes, ",
+            pa, pb, (double)(f->hidden + f->alike));
+    } else {
+        ecs_strbuf_append(out, "info coplanar-alike %s and %s: area %.4f of flat faces that look "
+            "alike, ", pa, pb, (double)(f->hidden + f->alike));
+    }
+
+    ecs_strbuf_append(out, "facing (%.2f, %.2f, %.2f) at (%.2f, %.2f, %.2f)\n",
+        box_cmd_geometry_print(f->normal[0]), box_cmd_geometry_print(f->normal[1]),
+        box_cmd_geometry_print(f->normal[2]), box_cmd_geometry_print(f->at[0]),
+        box_cmd_geometry_print(f->at[1]), box_cmd_geometry_print(f->at[2]));
+    ecs_os_free(pa);
+    ecs_os_free(pb);
+}
+
+/** Append the findings whose faces can be seen, the largest area first, then with the hidden
+ * option the ones whose faces fight only where it cannot be seen, and a summary line.
  *
  * @param c The check
  * @param out The output
@@ -738,43 +938,44 @@ static void box_cmd_geometry_report(
     ecs_strbuf_t *out)
 {
     box_cmd_geometry_finding_t *f = ecs_vec_first(&c->findings);
-    int32_t i, count = ecs_vec_count(&c->findings);
+    int32_t i, count = ecs_vec_count(&c->findings), visible = 0, listed = 0;
     if (count > 1) {
         qsort(f, (size_t)count, sizeof(box_cmd_geometry_finding_t),
             box_cmd_geometry_finding_cmp);
     }
 
-    for (i = 0; i < count && i < c->max; i ++) {
-        char *pa = ecs_get_path(c->world, f[i].a), *pb = ecs_get_path(c->world, f[i].b);
-        if (strcmp(pa, pb) > 0) {
-            char *swap = pa;
-            pa = pb;
-            pb = swap;
+    for (i = 0; i < count; i ++) {
+        visible += f[i].area > 0 && f[i].area >= c->area;
+    }
+
+    for (i = 0; i < count; i ++) {
+        bool seen = i < visible;
+        if ((seen || c->list_hidden) && listed < c->max) {
+            box_cmd_geometry_line(c, &f[i], seen, out);
+            listed ++;
         }
-
-        ecs_strbuf_append(out,
-            "warning coplanar %s and %s: area %.4f, gap %.5f, facing (%.2f, %.2f, %.2f) at "
-            "(%.2f, %.2f, %.2f)\n", pa, pb, (double)f[i].area, (double)f[i].gap,
-            box_cmd_geometry_print(f[i].normal[0]), box_cmd_geometry_print(f[i].normal[1]),
-            box_cmd_geometry_print(f[i].normal[2]), box_cmd_geometry_print(f[i].at[0]),
-            box_cmd_geometry_print(f[i].at[1]), box_cmd_geometry_print(f[i].at[2]));
-        ecs_os_free(pa);
-        ecs_os_free(pb);
     }
 
-    if (count > c->max) {
+    int32_t shown = c->list_hidden ? count : visible;
+    if (shown > listed) {
         ecs_strbuf_append(out, "warning coplanar: %d more like the ones above\n",
-            count - c->max);
+            shown - listed);
     }
 
-    if (count) {
-        ecs_strbuf_append(out, "%d coplanar pair%s", count, count == 1 ? "" : "s");
+    if (visible) {
+        ecs_strbuf_append(out, "%d coplanar pair%s", visible, visible == 1 ? "" : "s");
     } else {
         ecs_strbuf_appendstr(out, "no problems");
     }
 
     ecs_strbuf_append(out, " in %d shapes, %d triangles", ecs_vec_count(&c->shapes),
         ecs_vec_count(&c->tris));
+    if (count > visible) {
+        int32_t hidden = count - visible;
+        ecs_strbuf_append(out, "; %d pair%s only where it cannot be seen", hidden,
+            hidden == 1 ? " fights" : "s fight");
+    }
+
     if (c->unplaced) {
         ecs_strbuf_append(out, "; %d shapes without a WorldTransform are not drawn and not "
             "checked", c->unplaced);
@@ -901,7 +1102,8 @@ void box_cmd_geometry_init(
         check.params[i] = (ecs_script_parameter_t){
             .name = "options", .type = ecs_id(ecs_string_t), .optional = true,
             .brief = "Entity whose descendants to check (default: the world), tolerance=units "
-                "(default 0.0001), area=units^2 (default 0.0001), max=findings (default 100)" };
+                "(default 0.0001), area=units^2 (default 0.0001), max=findings (default 100), "
+                "hidden to also list the faces that fight where it cannot be seen" };
     }
 
     box_command_register(world,

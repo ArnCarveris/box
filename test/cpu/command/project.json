@@ -108,7 +108,10 @@
                     "skips_prefabs",
                     "errors",
                     "status",
-                    "unplaced"
+                    "unplaced",
+                    "hidden",
+                    "partly_hidden",
+                    "alike"
                 ]
             },
             {
