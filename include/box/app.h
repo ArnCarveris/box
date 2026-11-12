@@ -57,9 +57,15 @@ ECS_STRUCT(App, {
     float fps;          /**< Target fps flecs caps the frames at, default 0: FpsTarget */
     float delta_time;   /**< Seconds every frame advances, default 0: flecs measures the delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
+<<<<<<< HEAD
     int32_t surface_width;  /**< Width of the window Surface, set or created by the run, 0 none */
     int32_t surface_height; /**< Height of the window Surface, set or created by the run */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
+=======
+    int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
+    int32_t surface_height; /**< Height of the Surface a run creates when it has none */
+    bool unguarded;     /**< A headless run starts on an oversubscribed machine, by --unguarded */
+>>>>>>> 04c55ad545a8318d4e2002f4406a8d6777e8d042
     bool unpaced;       /**< A headless run ignores its CPU budget */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
     bool design;        /**< Render the gallery of design cameras, set by --design */
@@ -182,7 +188,7 @@ ECS_STRUCT(SetAt, {
 void BoxAppImport(
     ecs_world_t *world);
 
-/** Write command line arguments into the App singleton: --headless, --frames <n>,
+/** Write command line arguments into the App singleton: --headless, --unguarded, --frames <n>,
  * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --delta-time <s>, --port <n>,
  * --surface <w>x<h>, a scene.
  *

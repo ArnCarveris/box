@@ -769,3 +769,129 @@ void Emitter_collision_in_block(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Scenes of the world scale tests: a plume under a Scale 40 hull and the same plume unscaled,
+ * with ParticleForces whose gravity does not scale */
+#define SCALED_PLUMES \
+    "using box.particle\n" \
+    "using box.transform\n" \
+    "liner {\n" \
+    "  Scale: {40, 40, 40}\n" \
+    "  engine {\n" \
+    "    Position: {0, 0, -4.2}\n" \
+    "    ParticleEmitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
+    "acceleration: {0, 1, 0}, shape: EmitterSphere, radius: 0.5}\n" \
+    "    ParticleAppearance: {softness: 0.25, stretch: 0.2}\n" \
+    "    ParticleForces: {gravity: {0, -2, 0}}\n" \
+    "  }\n" \
+    "}\n" \
+    "boat {\n" \
+    "  Scale: {1, 1, 1}\n" \
+    "  engine {\n" \
+    "    Position: {0, 0, -4.2}\n" \
+    "    ParticleEmitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
+    "acceleration: {0, 1, 0}, shape: EmitterSphere, radius: 0.5}\n" \
+    "    ParticleAppearance: {softness: 0.25, stretch: 0.2}\n" \
+    "    ParticleForces: {gravity: {0, -2, 0}}\n" \
+    "  }\n" \
+    "}\n"
+
+void Emitter_world_scale_sizes_and_speeds(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    test_assert(ecs_script_run(world, "plumes", SCALED_PLUMES, NULL) == 0);
+    frame(world);
+
+    const box_render_particle_pool_t *scaled = pool_of(null, ecs_lookup(world, "liner.engine"));
+    const box_render_particle_pool_t *plain = pool_of(null, ecs_lookup(world, "boat.engine"));
+    test_assert(scaled != NULL);
+    test_assert(plain != NULL);
+    test_flt(plain->block.size[0], 0.1f);
+    test_flt(plain->block.size[1], 0.2f);
+    test_flt(plain->block.speed[0], 2);
+    test_flt(plain->block.speed[1], 3);
+    test_flt(scaled->block.size[0], plain->block.size[0] * 40);
+    test_flt(scaled->block.size[1], plain->block.size[1] * 40);
+    test_flt(scaled->block.speed[0], plain->block.speed[0] * 40);
+    test_flt(scaled->block.speed[1], plain->block.speed[1] * 40);
+    test_flt(scaled->block.radial[0], plain->block.radial[0] * 40);
+    test_flt(scaled->block.radial[1], plain->block.radial[1] * 40);
+    test_flt(scaled->block.softness, plain->block.softness * 40);
+
+    /* the stretch per unit of speed shrinks, so the scaled plume stretches as much */
+    test_flt(plain->block.stretch, 0.2f);
+    test_flt(scaled->block.stretch, plain->block.stretch / 40);
+
+    /* the acceleration of the emitter scales, the gravity of the world does not */
+    test_flt(plain->block.acceleration[1], -1);
+    test_flt(scaled->block.acceleration[1], 40 - 2);
+
+    /* the spawn volume scales through the model matrix, not its radius */
+    test_flt(scaled->block.extents[3], plain->block.extents[3]);
+    test_flt(scaled->block.model[0][0], 40);
+    test_flt(scaled->block.model[3][2], -4.2f * 40);
+    test_flt(plain->block.model[3][2], -4.2f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_world_scale_one_unchanged(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Scale, {1, 1, 1});
+    ecs_set(world, parent, Rotation, {0.3f, 1.1f, -0.7f});
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_set(world, e, ParticleEmitter, {
+        .max = 100, .rate = 60, .speed = {2, 3}, .radial = {0.5f, 1}, .size = {0.1f, 0.2f},
+        .lifetime = {1, 2}, .opacity = {1, 1}, .direction = {0, 1, 0}, .acceleration = {0, 1, 0}
+    });
+    frame(world);
+
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_assert(pool->block.size[0] == 0.1f);
+    test_assert(pool->block.size[1] == 0.2f);
+    test_assert(pool->block.speed[0] == 2.0f);
+    test_assert(pool->block.speed[1] == 3.0f);
+    test_assert(pool->block.radial[0] == 0.5f);
+    test_assert(pool->block.radial[1] == 1.0f);
+    test_assert(pool->block.acceleration[1] == 1.0f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_world_scale_non_uniform(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Scale, {2, 4, 8});
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, ParticleEmitter, {
+        .max = 100, .rate = 60, .speed = {1, 1}, .size = {0.5f, 0.5f},
+        .lifetime = {1, 2}, .opacity = {1, 1}, .shape = EmitterBox, .extents = {1, 1, 1}
+    });
+    frame(world);
+
+    /* sizes and speeds take the geometric mean of the axes, the volume each axis */
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(pool->block.size[0], 0.5f * 4);
+    test_flt(pool->block.speed[0], 4);
+    test_flt(pool->block.extents[0], 1);
+    test_flt(pool->block.model[0][0], 2);
+    test_flt(pool->block.model[1][1], 4);
+    test_flt(pool->block.model[2][2], 8);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
