@@ -781,7 +781,7 @@ void Emitter_collision_in_block(void) {
     "    Position: {0, 0, -4.2}\n" \
     "    ParticleEmitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
     "acceleration: {0, 1, 0}, shape: EmitterSphere, radius: 0.5}\n" \
-    "    ParticleAppearance: {softness: 0.25}\n" \
+    "    ParticleAppearance: {softness: 0.25, stretch: 0.2}\n" \
     "    ParticleForces: {gravity: {0, -2, 0}}\n" \
     "  }\n" \
     "}\n" \
@@ -791,7 +791,7 @@ void Emitter_collision_in_block(void) {
     "    Position: {0, 0, -4.2}\n" \
     "    ParticleEmitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
     "acceleration: {0, 1, 0}, shape: EmitterSphere, radius: 0.5}\n" \
-    "    ParticleAppearance: {softness: 0.25}\n" \
+    "    ParticleAppearance: {softness: 0.25, stretch: 0.2}\n" \
     "    ParticleForces: {gravity: {0, -2, 0}}\n" \
     "  }\n" \
     "}\n"
@@ -818,6 +818,10 @@ void Emitter_world_scale_sizes_and_speeds(void) {
     test_flt(scaled->block.radial[0], plain->block.radial[0] * 40);
     test_flt(scaled->block.radial[1], plain->block.radial[1] * 40);
     test_flt(scaled->block.softness, plain->block.softness * 40);
+
+    /* the stretch per unit of speed shrinks, so the scaled plume stretches as much */
+    test_flt(plain->block.stretch, 0.2f);
+    test_flt(scaled->block.stretch, plain->block.stretch / 40);
 
     /* the acceleration of the emitter scales, the gravity of the world does not */
     test_flt(plain->block.acceleration[1], -1);
@@ -871,6 +875,7 @@ void Emitter_world_scale_non_uniform(void) {
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Scale, {2, 4, 8});
     ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, ParticleEmitter, {
         .max = 100, .rate = 60, .speed = {1, 1}, .size = {0.5f, 0.5f},
         .lifetime = {1, 2}, .opacity = {1, 1}, .shape = EmitterBox, .extents = {1, 1, 1}
