@@ -15,8 +15,8 @@ using box.spatial
 // Behavior of a tooltip, a child of the element it explains. shown is whether it shows: it does
 // after the pointer has rested on the parent for delay seconds, and hides when the pointer leaves
 // the parent or presses it; after a press it waits for the pointer to leave and come back. It
-// never shows while the parent is disabled (its Cursor is CursorNotAllowed), and goes with the
-// parent when the parent is deleted.
+// hides and does not show while the parent is disabled (its Cursor is CursorNotAllowed), and goes
+// with the parent when the parent is deleted. ui.delay counts the seconds in world time.
 //
 // It is a LayoutFloat below the parent, centered on it, that flips above it when it does not fit
 // below; like the list of a Dropdown it draws over the other widgets and outside the clips of its
@@ -68,6 +68,13 @@ template HeadlessTooltip {
     }
   }
 
+  // Reads the Cursor of the parent, so it runs again when the parent is disabled
+  async {
+    if blocked {
+      shown = false
+    }
+  }
+
   // An enter starts the wait. When the pointer left during it and is back, it waits again.
   async {
     while true {
@@ -75,7 +82,7 @@ template HeadlessTooltip {
       waiting = true
       while waiting {
         const left = leaves
-        await delay(delay)
+        await ui.delay(delay)
         if leaves == left {
           waiting = false
           shown = over && !blocked
@@ -93,7 +100,7 @@ template Tooltip : HeadlessTooltip {
   const t = box.ui.theme[UiTheme]
   const pad = t.padding * 0.75
 
-  if shown && !blocked {
+  if shown {
     Layout: {direction: Row, padding: {pad, pad, t.padding, t.padding}, v: Middle}
     LayoutItem: {width: {max: width}}
     Rect: {1, 1}

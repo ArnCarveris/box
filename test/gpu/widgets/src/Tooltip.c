@@ -61,7 +61,7 @@ static void tooltip_expect_shown(
     const char *path,
     bool shown)
 {
-    char *line = flecs_asprintf("get %s box.widgets.Tooltip.mut.shown", path);
+    char *line = flecs_asprintf("get %s box.widgets.HeadlessTooltip.mut.shown", path);
     gallery_expect(world, s, line, shown ? "true" : "false");
     ecs_os_free(line);
     ecs_entity_t e = ecs_lookup(world, path);
@@ -204,6 +204,15 @@ void Tooltip_disabled_parent(void) {
     gallery_hover(world, s, OFF, 0, 0, PAGE);
     tooltip_wait(world, TOOLTIP_DELAY * 2);
     tooltip_expect_shown(world, s, OFF_TIP, false);
+
+    /* A parent disabled while its tooltip shows hides it */
+    gallery_hover(world, s, CANCEL, 0, 0, CANCEL);
+    tooltip_wait(world, TOOLTIP_DELAY * 1.2f);
+    tooltip_expect_shown(world, s, CANCEL_TIP, true);
+    ecs_os_free(gallery_run(world, s, "set " CANCEL " box.widgets.Button.disabled true"));
+    gallery_settle(world, s);
+    tooltip_wait(world, TOOLTIP_DELAY * 2);
+    tooltip_expect_shown(world, s, CANCEL_TIP, false);
 
     ecs_fini(world);
 }

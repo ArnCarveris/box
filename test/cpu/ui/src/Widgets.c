@@ -210,7 +210,7 @@ void Widgets_library_loads(void) {
         }
     }
 
-    test_int(scripts, 14);
+    test_int(scripts, 15);
 
     char *logs = widgets_warnings(world);
     test_str(logs, "");
