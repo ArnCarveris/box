@@ -1,7 +1,7 @@
 /**
  * @file ui/events.c
  * @brief The waiters of the box.ui script events, their delivery along the ancestors of a target,
- * and the widget reports on.change and on.submit with ui.changed and ui.submit.
+ * the widget reports on.change and on.submit with ui.changed and ui.submit, and ui.delay.
  */
 
 #include "ui.h"
@@ -175,6 +175,72 @@ static void box_ui_report(
     ecs_script_future_release(future);
 }
 
+/** Suspend a task for a number of seconds of world time.
+ *
+ * @param ctx Call context, whose ctx is the module state
+ * @param argc Number of arguments
+ * @param argv The seconds
+ * @param future Future the end of the wait resolves with the seconds
+ */
+static void box_ui_delay(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_script_future_t *future)
+{
+    box_ui_state_t *st = ctx->ctx;
+    float seconds = *(float*)argv[0].ptr;
+    (void)argc;
+    ecs_vec_append_t(NULL, &st->timers, box_ui_timer_t)[0] = (box_ui_timer_t){
+        .future = future, .seconds = seconds, .left = seconds };
+}
+
+/** Drop the timer of a cancelled task.
+ *
+ * @param ctx Call context, whose ctx is the module state
+ * @param future The cancelled future
+ */
+static void box_ui_delay_cancel(
+    const ecs_function_ctx_t *ctx,
+    ecs_script_future_t *future)
+{
+    box_ui_state_t *st = ctx->ctx;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&st->timers); i ++) {
+        if (ecs_vec_get_t(&st->timers, box_ui_timer_t, i)->future == future) {
+            ecs_script_future_release(future);
+            ecs_vec_remove_ordered_t(&st->timers, box_ui_timer_t, i);
+            break;
+        }
+    }
+}
+
+/** Count down the timers of ui.delay by the frame time and resolve the ones that ran out, before
+ * flecs resumes the tasks in PreUpdate.
+ *
+ * @param it The iterator, whose ctx is the module state
+ */
+static void BoxUiDelayUpdate(
+    ecs_iter_t *it)
+{
+    box_ui_state_t *st = it->ctx;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&st->timers); ) {
+        box_ui_timer_t *t = ecs_vec_get_t(&st->timers, box_ui_timer_t, i);
+        t->left -= it->delta_time;
+        if (t->left > 0) {
+            i ++;
+            continue;
+        }
+
+        box_ui_timer_t done = *t;
+        ecs_vec_remove_ordered_t(&st->timers, box_ui_timer_t, i);
+        ecs_script_future_resolve(done.future, &(ecs_value_t){
+            .type = ecs_id(ecs_f32_t), .ptr = &done.seconds });
+        ecs_script_future_release(done.future);
+    }
+}
+
 void box_ui_events_import(
     ecs_world_t *world,
     box_ui_state_t *st,
@@ -198,5 +264,21 @@ void box_ui_events_import(
         .params = {{ "widget", ecs_id(ecs_entity_t) }},
         .callback = box_ui_report,
         .ctx = &st->waits[BoxUiWaitSubmit]
+    });
+    ecs_async_function(world, {
+        .name = "delay",
+        .parent = ui,
+        .return_type = ecs_id(ecs_f32_t),
+        .params = {{ "seconds", ecs_id(ecs_f32_t) }},
+        .callback = box_ui_delay,
+        .cancel = box_ui_delay_cancel,
+        .ctx = st
+    });
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "UiDelayUpdate" }),
+        .phase = EcsOnLoad,
+        .run = BoxUiDelayUpdate,
+        .ctx = st,
+        .immediate = true
     });
 }
