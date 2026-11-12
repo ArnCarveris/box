@@ -291,7 +291,8 @@ void TextureGraph_kind_reflected_json(void) {
     char *json = ecs_ptr_to_json(world, ecs_id(TextureNodeKind), kind);
     test_assert(json != NULL);
     test_assert(strstr(json, "\"box_tex_math\"") != NULL);
-    test_assert(strstr(json, "\"a_value\"") == NULL);
+    test_assert(strstr(json, "\"name\":\"a_value\"") == NULL);
+    test_assert(strstr(json, "\"value\":\"a_value\"") != NULL);
     test_assert(strstr(json, "\"TexVector\"") != NULL);
     test_assert(strstr(json, "\"b\"") != NULL);
     ecs_os_free(json);

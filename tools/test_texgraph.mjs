@@ -103,11 +103,31 @@ test("connections of the wrong type and cycles are refused", () => {
   assert.match(M.connectError(s, "scene.tiles.loose", "@output", "output"), /scalar/);
 });
 
+test("only nodes the output of a graph reaches have a value to preview", () => {
+  const s = world();
+  assert.ok(M.isReached(s, "scene.tiles.dimmed"));
+  assert.ok(M.isReached(s, "scene.tiles.warm"));
+  assert.ok(!M.isReached(s, "scene.tiles.loose"));
+  s.nodes["scene.tiles.dimmed"].values[T + "TexMath"].b = "scene.shared";
+  assert.ok(M.isReached(s, "scene.shared"));
+  s.textures["scene.tiles"].graph.output = "#0";
+  assert.ok(!M.isReached(s, "scene.tiles.warm"));
+});
+
 test("the nodes an error names are found", () => {
   const err = "texture graph 'scene.tiles': node 'scene.tiles.loose' outputs TexScalar but input " +
     "'b' of node 'scene.tiles.dimmed' expects TexVector";
   assert.deepEqual(M.errorNodes(err), ["scene.tiles.loose", "scene.tiles.dimmed"]);
   assert.deepEqual(M.errorNodes(null), []);
+});
+
+test("an error marks the nodes it names and the inputs that refer to a named entity", () => {
+  const s = world();
+  s.nodes["scene.tiles.dimmed"].values[T + "TexMath"].c = "scene.camera";
+  const g = M.graphOf(s, "scene.tiles");
+  assert.deepEqual(M.errorTargets(g, "texture graph 'scene.tiles': node 'scene.camera' has no node component"),
+    ["scene.tiles.dimmed"]);
+  assert.deepEqual(M.errorTargets(g, "node 'scene.tiles.blend' failed"), ["scene.tiles.blend"]);
 });
 
 test("script reproduces the graph with inputs before the nodes that use them", () => {

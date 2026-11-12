@@ -55,7 +55,6 @@ typedef struct box_render_previews_t {
     ecs_vec_t delivered;        /**< box_render_texture_read_t, readbacks of the previews that
                                  *   box_render_texture_graph_reads took */
     uint32_t next_ticket;       /**< Number of the next ticket, without the preview bit */
-    ecs_query_t *query;         /**< Entities with a TextureNodePreview */
     TextureGraphStats stats;    /**< Statistics written last */
     bool stats_written;         /**< stats was written */
 } box_render_previews_t;
@@ -541,6 +540,28 @@ static box_render_preview_t* box_render_preview_of_ticket(
     return result;
 }
 
+/** Get the node entity a readback holds the value of: its node, or the output node of its
+ * graph for a readback of the image.
+ *
+ * @param t The registry
+ * @param r The readback
+ * @return The node entity, 0 when the graph is gone
+ */
+static ecs_entity_t box_render_preview_node_of(
+    box_textures_t *t,
+    const box_render_texture_read_t *r)
+{
+    const box_texture_t *tex = r->texture
+        ? ecs_map_get_deref(&t->textures, box_texture_t, r->texture)
+        : NULL;
+    ecs_entity_t result = r->node;
+    if (!result && r->index < 0 && tex && tex->graph && tex->graph->node_count) {
+        result = tex->graph->nodes[tex->graph->node_count - 1].entity;
+    }
+
+    return result;
+}
+
 /** Take the delivered readbacks: the ones of the previews are encoded, the others are kept for
  * box_render_texture_graph_reads.
  *
@@ -576,7 +597,7 @@ static void box_render_previews_deliver(
         preview = box_render_preview_of_ticket(p, r->ticket);
         if (preview) {
             preview->ticket = 0;
-            if (r->texels && r->node == preview->node && preview->seen) {
+            if (r->texels && box_render_preview_node_of(t, r) == preview->node) {
                 box_render_preview_encode(stage, t, preview, r);
             }
         }
@@ -714,6 +735,9 @@ done:
 /** Deliver the readbacks of the previews, request the next ones, forget removed previews and
  * write the statistics of the texture graphs.
  *
+ * The nodes are found with ecs_each_id rather than a query made at import, because box.surface
+ * imports box.render before box.texture registers TextureNodePreview.
+ *
  * @param it The iterator of the system
  */
 static void BoxRenderTexturePreviews(
@@ -725,7 +749,7 @@ static void BoxRenderTexturePreviews(
     double now = (double)ecs_get_world_info(world)->world_time_total;
     bool inflight = false;
     int32_t i, count = 0;
-    if (!p || !t) {
+    if (!p || !t || !ecs_id(TextureNodePreview)) {
         goto done;
     }
 
@@ -738,8 +762,8 @@ static void BoxRenderTexturePreviews(
         box_render_previews_deliver(world, it->stage, t, p);
     }
 
-    ecs_iter_t qit = ecs_query_iter(world, p->query);
-    while (ecs_query_next(&qit)) {
+    ecs_iter_t qit = ecs_each_id(world, ecs_id(TextureNodePreview));
+    while (ecs_each_next(&qit)) {
         const TextureNodePreview *desc = ecs_field(&qit, TextureNodePreview, 0);
         for (i = 0; i < qit.count; i ++) {
             ecs_entity_t node = qit.entities[i];
@@ -776,14 +800,9 @@ void box_render_texture_previews_init(
     ecs_vec_init_t(NULL, &p->kept, box_render_texture_read_t, 0);
     ecs_vec_init_t(NULL, &p->delivered, box_render_texture_read_t, 0);
     p->next_ticket = 1;
-    p->query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderTexturePreviewNodes" }),
-        .terms = {{ .id = ecs_id(TextureNodePreview), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
-    });
     ecs_singleton_set(world, RenderTexturePreviews, { .previews = p });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderTexturePreviews" }),
+        .entity = ecs_entity(world, { .name = "RenderExtractTexturePreviews" }),
         .phase = RenderExtract,
         .run = BoxRenderTexturePreviews
     });

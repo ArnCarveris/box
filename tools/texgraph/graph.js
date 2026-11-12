@@ -460,14 +460,32 @@ G.addNode = async (comp, ev) => {
     x = (ev.clientX - r.left) / G.zoom;
     y = (ev.clientY - r.top) / G.zoom;
   } else if (scroller) {
-    x = scroller.scrollLeft / G.zoom + 40;
-    y = scroller.scrollTop / G.zoom + 40;
+    const kind = TG.kinds[comp];
+    const h = GHEAD + G.thumbH(TG.textures[TG.tex]) + (kind ? kind.inputs.length : 0) * GROW + 6;
+    [x, y] = G.freeSpot(scroller.scrollLeft / G.zoom + GPAD, scroller.scrollTop / G.zoom + GPAD,
+      scroller.clientWidth / G.zoom, h);
   }
   const pos = G.loadPos();
   pos[path] = [Math.round(Math.max(0, x)), Math.round(Math.max(0, y))];
   G.savePos(pos);
   TG.select(path);
   G.renderAll();
+};
+
+// The first place for a node of height h, in columns from x0, y0 across a width, where it
+// does not overlap the nodes of the graph.
+G.freeSpot = (x0, y0, width, h) => {
+  const list = G.cur ? [...G.cur.nodes.values()] : [];
+  const free = (x, y) => !list.some((n) => n.x < x + GNODEW + GGAP && n.x + GNODEW + GGAP > x &&
+    n.y < y + h + GGAP && n.y + n.h + GGAP > y);
+  const cols = Math.max(1, Math.floor((width - GPAD) / GCOLW));
+  for (let row = 0; row < 40; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = x0 + col * GCOLW, y = y0 + row * 40;
+      if (free(x, y)) return [x, y];
+    }
+  }
+  return [x0, y0];
 };
 
 G.nodeMenu = (ev, n) => {
@@ -515,7 +533,8 @@ G.updatePreviews = () => {
       if (n.x < x1 && n.x + GNODEW > x0 && n.y < y1 && n.y + n.h > y0) wanted.set(n.path, 128);
     }
   }
-  if (TG.sel && TG.nodes[TG.sel] && TG.kindOfNode(TG.sel)) wanted.set(TG.sel, 512);
+  const big = TG.sel || (G.cur ? G.cur.g.output : null);
+  if (big && TG.nodes[big] && TG.kindOfNode(big)) wanted.set(big, 512);
   TG.syncPreviews(wanted);
 };
 
@@ -524,19 +543,22 @@ G.schedulePreviews = () => {
 };
 
 G.showPreviews = (paths) => {
+  const output = G.cur ? G.cur.g.output : null;
   for (const path of paths) {
     const p = TG.previews[path];
-    document.querySelectorAll(`img[data-preview="${CSS.escape(path)}"]`).forEach((img) => {
-      if (p && p.src) {
-        img.src = p.src;
-        img.classList.remove("empty");
-      } else {
-        img.removeAttribute("src");
-        img.classList.add("empty");
-      }
-    });
+    const ids = path === output ? [path, SINK] : [path];
+    for (const id of ids) {
+      document.querySelectorAll(`img[data-preview="${CSS.escape(id)}"]`).forEach((img) => {
+        if (p && p.src) {
+          img.src = p.src;
+          img.classList.remove("empty");
+        } else {
+          img.removeAttribute("src");
+          img.classList.add("empty");
+        }
+      });
+    }
   }
-  if (G.cur && G.cur.g.output && paths.includes(G.cur.g.output)) G.showPreviews([SINK]);
 };
 
 G.previewImg = (path) => {
@@ -623,7 +645,7 @@ G.render = (root) => {
   G.edgeEls = [];
   const tex = m.g.tex;
   const status = tex ? tex.status : null;
-  const errors = status && status.error ? TGM.errorNodes(status.error) : [];
+  const errors = status && status.error ? TGM.errorTargets(m.g, status.error) : [];
   const banner = status && status.error
     ? G.el("div", { class: "gerror", title: status.error }, "⚠ " + status.error)
     : null;

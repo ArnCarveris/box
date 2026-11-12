@@ -116,6 +116,11 @@
     return false;
   };
 
+  // Whether the output of a texture graph reaches a node through the inputs: only such a node
+  // has a value the engine can read back for its preview.
+  M.isReached = (state, path) => Object.values(state.textures).some((t) =>
+    t.graph && !M.isNone(t.graph.output) && M.reaches(state, path, t.graph.output));
+
   // Why the output of node "from" cannot go into input "port" of node "to", null when it can.
   // The pseudo node "@output" is the output of the graph, which takes a vector.
   M.connectError = (state, from, to, port) => {
@@ -150,6 +155,17 @@
     const re = /node '([^']+)'/g;
     let m;
     while ((m = re.exec(error))) if (out.indexOf(m[1]) < 0) out.push(m[1]);
+    return out;
+  };
+
+  // The nodes of a graph an error is about: the ones it names and the ones with an input that
+  // refers to an entity it names, such as an entity without a node component.
+  M.errorTargets = (g, error) => {
+    const named = M.errorNodes(error);
+    const out = named.filter((p) => g.nodes.has(p));
+    for (const e of g.edges.concat(g.dangling.map((d) => ({ from: d.ref, to: d.to })))) {
+      if (named.includes(e.from) && !g.nodes.has(e.from) && !out.includes(e.to)) out.push(e.to);
+    }
     return out;
   };
 

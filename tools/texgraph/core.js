@@ -26,7 +26,8 @@ const TG = window.TG = {
   listeners: [],
   dragging: 0,
   sig: "",
-  names: new Set()
+  names: new Set(),
+  deleting: new Set()
 };
 
 TG.on = (fn) => TG.listeners.push(fn);
@@ -282,7 +283,7 @@ async function pollPreviews(epoch) {
 TG.syncPreviews = (wanted) => {
   if (!TG.conn || !TG.connected) return;
   for (const [path, size] of wanted) {
-    if (TG.previewSet.get(path) === size) continue;
+    if (TG.previewSet.get(path) === size || !TG.nodes[path] || TG.deleting.has(path)) continue;
     TG.previewSet.set(path, size);
     TG.add(path, TEX + "TextureNodePreview", { size, rate: 4 }).catch((e) => {
       TG.previewSet.delete(path);
@@ -388,9 +389,16 @@ TG.createNode = async (comp) => {
 };
 
 // Delete nodes, first disconnecting the inputs and the graph output that refer to them, so the
-// graphs do not keep references to deleted entities.
+// graphs do not keep references to deleted entities. The disconnects are written and answered
+// before the delete, so no graph sees a missing node in between.
 TG.deleteNodes = async (paths) => {
   const gone = new Set(paths);
+  const clears = [];
+  for (const path of paths) TG.deleting.add(path);
+  const clear = (path, comp, partial) => {
+    applyLocal(path, comp, partial);
+    clears.push(TG.add(path, comp, partial).catch((e) => TG.toast(`disconnect ${path} failed:\n${e}`, true)));
+  };
   for (const n of Object.values(TG.nodes)) {
     if (gone.has(n.path)) continue;
     const kind = TGM.nodeKind(TG, n);
@@ -398,11 +406,12 @@ TG.deleteNodes = async (paths) => {
     if (!kind) continue;
     const partial = {};
     for (const p of kind.inputs) if (gone.has(v[p.name])) partial[p.name] = "#0";
-    if (Object.keys(partial).length) TG.write(n.path, n.kinds[0], partial);
+    if (Object.keys(partial).length) clear(n.path, n.kinds[0], partial);
   }
   for (const t of Object.values(TG.textures)) {
-    if (t.graph && gone.has(t.graph.output)) TG.write(t.path, TEX + "TextureGraph", { output: "#0" });
+    if (t.graph && gone.has(t.graph.output)) clear(t.path, TEX + "TextureGraph", { output: "#0" });
   }
+  await Promise.all(clears);
   for (const path of paths) {
     TG.previewSet.delete(path);
     delete TG.previews[path];
@@ -413,6 +422,7 @@ TG.deleteNodes = async (paths) => {
       TG.toast(`delete ${path} failed:\n${e}`, true);
     }
   }
+  for (const path of paths) TG.deleting.delete(path);
   if (gone.has(TG.sel)) TG.sel = null;
   TG.emit("structure");
 };

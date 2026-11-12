@@ -289,13 +289,11 @@ P.previewBlock = (path) => {
   const sphere = tex && tex.graph && tex.graph.domain === "DomainSphere";
   const img = G.previewImg(path);
   img.classList.add("big");
-  const cap = el("div", { class: "pcap" },
-    p ? `${p.width} × ${p.height}, revision ${p.revision}` : "waiting for the preview",
-    sphere ? ", equirectangular" : "");
-  P.refreshers.push(() => {
-    const q = TG.previews[path];
-    cap.firstChild.textContent = q ? `${q.width} × ${q.height}, revision ${q.revision}` : "waiting for the preview";
-  });
+  const caption = (q) => q ? `${q.width} × ${q.height}, revision ${q.revision}`
+    : TGM.isReached(TG, path) ? "waiting for the preview"
+      : "no preview: the output of no graph reaches this node";
+  const cap = el("div", { class: "pcap" }, caption(p), sphere ? ", equirectangular" : "");
+  P.refreshers.push(() => { cap.firstChild.textContent = caption(TG.previews[path]); });
   return el("div", { class: "pbig" + (sphere ? " sphere" : "") }, img, cap);
 };
 
@@ -306,7 +304,8 @@ P.renderNode = (root, n) => {
   const v = TGM.nodeValue(n) || {};
   const tex = TG.textures[TG.tex];
   const isOutput = tex && tex.graph && tex.graph.output === n.path;
-  const errors = tex && tex.status && tex.status.error && TGM.errorNodes(tex.status.error).includes(n.path) ? tex.status.error : null;
+  const errors = tex && tex.status && tex.status.error &&
+    TGM.errorTargets(TG.graph(), tex.status.error).includes(n.path) ? tex.status.error : null;
   root.appendChild(el("div", { class: "phead" },
     el("span", { class: "swatch", style: { background: G.color(n.kinds.map(TGM.short).join(" + ") + (kind && kind.output === "TexScalar" ? " · scalar" : "")) } }),
     el("div", {},
