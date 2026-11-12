@@ -39,26 +39,7 @@ state {
   export const K_AUTO: i32 = 17
   export const T_REMOVE: i32 = 18
 
-  export const K_BRIDGE: i32 = 20
-  export const K_SENSOR: i32 = 21
-  export const K_RESIDENCE: i32 = 22
-  export const K_RING: i32 = 23
-  export const K_ARBOR: i32 = 24
-  export const K_CORE: i32 = 25
-  export const K_WING: i32 = 26
-  export const K_DRIVE: i32 = 27
-  export const K_JUMP: i32 = 28
-  export const K_TANKS: i32 = 29
-  export const K_FREIGHT: i32 = 30
-  export const K_HANGAR: i32 = 31
-  export const K_SLIP: i32 = 32
-  export const K_REFINERY: i32 = 33
-  export const K_ARMOR: i32 = 34
-  export const K_BATTERY: i32 = 35
-  export const KINDS: i32 = 36
-
-  export const RAD_F: f32 = 0.12
-  export const SKIN_F: f32 = 0.05
+  export const KINDS: i32 = 18
 
   export const H_WEDGE: i32 = 1
   export const H_SLOPE: i32 = 2
@@ -74,9 +55,9 @@ state {
   export const OP_SCOUT: i32 = 131
   export const OP_CLEAR: i32 = 132
   export const OP_MINER: i32 = 133
-  export const OP_CRAFT: i32 = 140
-  export const OP_CAPITAL: i32 = 141
-  export const OP_LINER: i32 = 150
+  export const OP_RIGS: i32 = 140
+  export const OP_LINERS: i32 = 141
+  export const OP_PASSENGER: i32 = 150
   export const OP_FREIGHTER: i32 = 151
   export const OP_TENDER: i32 = 152
   export const OP_BATTLESHIP: i32 = 153
@@ -175,96 +156,9 @@ state {
     0, 0, 0, 0, 0
   ]
 
-  export const PLAN_BOXES: i32 = 83
-  export const capital_plan: i32[664] = [
-    OP_LINER, 3, 5, 0, 0, 2, 2, K_DRIVE,
-    OP_LINER, 3, 5, 0, 0, 3, 3, K_TANKS,
-    OP_LINER, 4, 4, 0, 0, 4, 4, K_CORE,
-    OP_LINER, 3, 3, 0, 0, 4, 5, K_WING,
-    OP_LINER, 5, 5, 0, 0, 4, 5, K_WING,
-    OP_LINER, 4, 4, 0, 0, 5, 5, K_JUMP,
-    OP_LINER, 4, 4, 0, 0, 6, 7, K_RING,
-    OP_LINER, 3, 5, 0, 0, 8, 15, K_RESIDENCE,
-    OP_LINER, 3, 3, 0, 0, 9, 10, K_HANGAR,
-    OP_LINER, 5, 5, 0, 0, 9, 10, K_HANGAR,
-    OP_LINER, 3, 5, 1, 1, 9, 15, K_RESIDENCE,
-    OP_LINER, 4, 4, 2, 2, 9, 9, K_SENSOR,
-    OP_LINER, 4, 4, 2, 2, 10, 14, K_ARBOR,
-    OP_LINER, 3, 3, 2, 2, 11, 14, K_RESIDENCE,
-    OP_LINER, 5, 5, 2, 2, 11, 14, K_RESIDENCE,
-    OP_LINER, 4, 4, 2, 2, 15, 15, K_BRIDGE,
-    OP_LINER, 3, 5, 0, 1, 16, 16, K_ARMOR,
-    OP_FREIGHTER, 3, 5, 0, 0, 1, 1, K_DRIVE,
-    OP_FREIGHTER, 3, 5, 0, 0, 2, 2, K_TANKS,
-    OP_FREIGHTER, 4, 4, 0, 0, 3, 3, K_CORE,
-    OP_FREIGHTER, 3, 3, 0, 0, 3, 4, K_WING,
-    OP_FREIGHTER, 5, 5, 0, 0, 3, 4, K_WING,
-    OP_FREIGHTER, 4, 4, 0, 0, 4, 4, K_JUMP,
-    OP_FREIGHTER, 4, 4, 0, 0, 5, 5, K_RING,
-    OP_FREIGHTER, 3, 5, 0, 0, 6, 14, K_FREIGHT,
-    OP_FREIGHTER, 3, 5, 1, 1, 7, 13, K_FREIGHT,
-    OP_FREIGHTER, 4, 4, 0, 0, 15, 15, K_RESIDENCE,
-    OP_FREIGHTER, 4, 4, 1, 1, 14, 14, K_SENSOR,
-    OP_FREIGHTER, 4, 4, 1, 1, 15, 15, K_BRIDGE,
-    OP_FREIGHTER, 4, 4, 2, 2, 15, 15, K_ARBOR,
-    OP_FREIGHTER, 3, 3, 0, 0, 15, 15, K_ARMOR,
-    OP_FREIGHTER, 5, 5, 0, 0, 15, 15, K_ARMOR,
-    OP_TENDER, 3, 5, 0, 0, 1, 1, K_DRIVE,
-    OP_TENDER, 3, 5, 0, 0, 2, 2, K_TANKS,
-    OP_TENDER, 4, 4, 0, 0, 3, 4, K_CORE,
-    OP_TENDER, 3, 3, 0, 0, 3, 4, K_WING,
-    OP_TENDER, 5, 5, 0, 0, 3, 4, K_WING,
-    OP_TENDER, 4, 4, 1, 1, 4, 4, K_JUMP,
-    OP_TENDER, 3, 3, 1, 1, 4, 4, K_WING,
-    OP_TENDER, 5, 5, 1, 1, 4, 4, K_WING,
-    OP_TENDER, 3, 5, 0, 0, 5, 6, K_REFINERY,
-    OP_TENDER, 4, 4, 0, 0, 7, 12, K_FREIGHT,
-    OP_TENDER, 3, 3, 0, 0, 7, 12, K_HANGAR,
-    OP_TENDER, 5, 5, 0, 0, 7, 12, K_HANGAR,
-    OP_TENDER, 3, 5, 1, 1, 8, 12, K_SLIP,
-    OP_TENDER, 4, 4, 0, 0, 13, 13, K_RING,
-    OP_TENDER, 3, 3, 0, 0, 13, 14, K_RESIDENCE,
-    OP_TENDER, 5, 5, 0, 0, 13, 14, K_RESIDENCE,
-    OP_TENDER, 4, 4, 0, 0, 14, 14, K_RESIDENCE,
-    OP_TENDER, 3, 3, 1, 1, 13, 14, K_ARBOR,
-    OP_TENDER, 5, 5, 1, 1, 13, 14, K_ARBOR,
-    OP_TENDER, 4, 4, 1, 1, 14, 14, K_RESIDENCE,
-    OP_TENDER, 4, 4, 2, 2, 14, 14, K_SENSOR,
-    OP_TENDER, 4, 4, 1, 1, 15, 15, K_BRIDGE,
-    OP_TENDER, 3, 5, 0, 0, 15, 15, K_ARMOR,
-    OP_BATTLESHIP, 3, 5, 0, 0, 1, 1, K_DRIVE,
-    OP_BATTLESHIP, 3, 5, 0, 0, 2, 2, K_TANKS,
-    OP_BATTLESHIP, 4, 4, 0, 0, 3, 4, K_CORE,
-    OP_BATTLESHIP, 3, 3, 0, 0, 3, 5, K_WING,
-    OP_BATTLESHIP, 5, 5, 0, 0, 3, 5, K_WING,
-    OP_BATTLESHIP, 4, 4, 0, 0, 5, 5, K_JUMP,
-    OP_BATTLESHIP, 4, 4, 0, 0, 6, 6, K_RING,
-    OP_BATTLESHIP, 4, 4, 0, 0, 7, 15, K_RESIDENCE,
-    OP_BATTLESHIP, 3, 3, 0, 0, 7, 15, K_ARMOR,
-    OP_BATTLESHIP, 5, 5, 0, 0, 7, 15, K_ARMOR,
-    OP_BATTLESHIP, 4, 4, 1, 1, 7, 14, K_RESIDENCE,
-    OP_BATTLESHIP, 2, 2, 0, 0, 7, 15, K_ARMOR,
-    OP_BATTLESHIP, 6, 6, 0, 0, 7, 15, K_ARMOR,
-    OP_BATTLESHIP, 2, 2, 0, 0, 10, 11, K_HANGAR,
-    OP_BATTLESHIP, 6, 6, 0, 0, 10, 11, K_HANGAR,
-    OP_BATTLESHIP, 3, 3, 1, 1, 7, 14, K_ARMOR,
-    OP_BATTLESHIP, 5, 5, 1, 1, 7, 14, K_ARMOR,
-    OP_BATTLESHIP, 3, 5, 0, 0, 16, 16, K_ARMOR,
-    OP_BATTLESHIP, 4, 4, 1, 1, 15, 15, K_ARMOR,
-    OP_BATTLESHIP, 4, 4, 2, 2, 7, 8, K_ARBOR,
-    OP_BATTLESHIP, 4, 4, 2, 2, 9, 9, K_SENSOR,
-    OP_BATTLESHIP, 4, 4, 2, 2, 10, 10, K_BRIDGE,
-    OP_BATTLESHIP, 3, 3, 2, 2, 8, 8, K_BATTERY,
-    OP_BATTLESHIP, 5, 5, 2, 2, 8, 8, K_BATTERY,
-    OP_BATTLESHIP, 3, 3, 2, 2, 11, 11, K_BATTERY,
-    OP_BATTLESHIP, 5, 5, 2, 2, 11, 11, K_BATTERY,
-    OP_BATTLESHIP, 3, 3, 2, 2, 13, 13, K_BATTERY,
-    OP_BATTLESHIP, 5, 5, 2, 2, 13, 13, K_BATTERY
-  ]
-
   export mut grid: i32[1080] = {}
   export mut status: i32[1080] = {}
-  export mut counts: i32[36] = {}
+  export mut counts: i32[18] = {}
   export mut modules: i32 = 0
   export mut problems: i32 = 0
   export mut air: bool[1080] = {}
@@ -275,10 +169,7 @@ state {
   export mut fsy: i32[1080] = {}
   export mut fsz: i32[1080] = {}
 
-  export mut capital: bool = false
-  export mut stash: i32[1080] = {}
-  export mut stash_placed: i32[1080] = {}
-  export mut stashed: bool = false
+  export mut liner: bool = false
   export mut span: i32 = 0
 
   export mut tool: i32 = 0
@@ -303,41 +194,29 @@ state {
     kind_at(x, y, z) != 0 && y <= deck
   }
 
-  fn grand(k: i32) -> bool {
-    k >= K_BRIDGE
-  }
-
   fn boxy(k: i32) -> bool {
-    k == K_HAB || k == K_LIFE || k == K_POWER || k == K_CARGO || k == K_DATA ||
-    k == K_RESIDENCE || k == K_HANGAR || k == K_SENSOR || k == K_REFINERY || k == K_ARMOR
+    k == K_HAB || k == K_LIFE || k == K_POWER || k == K_CARGO || k == K_DATA
   }
 
   fn crewed(k: i32) -> bool {
-    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_BIOME ||
-    k == K_BRIDGE || k == K_RESIDENCE || k == K_RING || k == K_ARBOR || k == K_HANGAR
+    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_BIOME
   }
 
   fn hulled(k: i32) -> bool {
-    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_AUTO ||
-    k == K_BRIDGE || k == K_SENSOR || k == K_RESIDENCE || k == K_HANGAR
+    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_AUTO
   }
 
   fn piloted(k: i32) -> bool {
-    k == K_COCKPIT || k == K_AUTO || k == K_BRIDGE
+    k == K_COCKPIT || k == K_AUTO
   }
 
   fn shaped(k: i32) -> bool {
-    k == K_HULL || k == K_ARMOR
-  }
-
-  fn framed(k: i32) -> bool {
-    k == K_CORE || k == K_JUMP || k == K_TANKS || k == K_FREIGHT || k == K_SLIP || k == K_REFINERY
+    k == K_HULL
   }
 
   fn fairable(k: i32) -> bool {
     k != K_EMPTY && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL && k != K_RADIATOR &&
-    k != K_DRILL && k != K_BUILDER &&
-    k != K_RING && k != K_WING && k != K_DRIVE && k != K_BATTERY && k != K_ARMOR
+    k != K_DRILL && k != K_BUILDER
   }
 
   fn slot(x: i32, y: i32, z: i32) -> i32 {
@@ -348,24 +227,17 @@ state {
     fairable(kind_at(x, y, z)) || (shaped(kind_at(x, y, z)) && fshape[slot(x, y, z)] == H_BLOCK)
   }
 
-  fn braced(x: i32, y: i32, z: i32, a: bool) -> bool {
-    propped(x, y, z) || (a && kind_at(x, y, z) == K_ARMOR)
-  }
-
   fn fair_sx(x: i32, y: i32, z: i32) -> i32 {
-    const a = kind_at(x, y, z) == K_ARMOR
-    braced(x + 1, y, z, a) ? 1 : braced(x - 1, y, z, a) ? -1 : 0
+    propped(x + 1, y, z) ? 1 : propped(x - 1, y, z) ? -1 : 0
   }
 
   fn fair_sz(x: i32, y: i32, z: i32) -> i32 {
-    const a = kind_at(x, y, z) == K_ARMOR
-    braced(x, y, z + 1, a) ? 1 : braced(x, y, z - 1, a) ? -1 : 0
+    propped(x, y, z + 1) ? 1 : propped(x, y, z - 1) ? -1 : 0
   }
 
   fn fair_n(x: i32, y: i32, z: i32) -> i32 {
-    const a = kind_at(x, y, z) == K_ARMOR
-    (braced(x + 1, y, z, a) ? 1 : 0) + (braced(x - 1, y, z, a) ? 1 : 0) +
-    (braced(x, y, z + 1, a) ? 1 : 0) + (braced(x, y, z - 1, a) ? 1 : 0)
+    (propped(x + 1, y, z) ? 1 : 0) + (propped(x - 1, y, z) ? 1 : 0) +
+    (propped(x, y, z + 1) ? 1 : 0) + (propped(x, y, z - 1) ? 1 : 0)
   }
 
   fn fair_sy(x: i32, y: i32, z: i32) -> i32 {
@@ -373,15 +245,13 @@ state {
   }
 
   fn fair_dx(x: i32, y: i32, z: i32) -> i32 {
-    const a = kind_at(x, y, z) == K_ARMOR
-    braced(x + 1, y, z + 1, a) || braced(x + 1, y, z - 1, a) ? 1 :
-    braced(x - 1, y, z + 1, a) || braced(x - 1, y, z - 1, a) ? -1 : 0
+    propped(x + 1, y, z + 1) || propped(x + 1, y, z - 1) ? 1 :
+    propped(x - 1, y, z + 1) || propped(x - 1, y, z - 1) ? -1 : 0
   }
 
   fn fair_dz(x: i32, y: i32, z: i32) -> i32 {
-    const a = kind_at(x, y, z) == K_ARMOR
     const dx = fair_dx(x, y, z)
-    dx == 0 ? 0 : braced(x + dx, y, z + 1, a) ? 1 : -1
+    dx == 0 ? 0 : propped(x + dx, y, z + 1) ? 1 : -1
   }
 
   fn fair_shape(x: i32, y: i32, z: i32) -> i32 {
@@ -473,11 +343,11 @@ state {
   }
 
   fn hot(k: i32) -> bool {
-    k == K_POWER || k == K_DATA || k == K_CORE || k == K_JUMP
+    k == K_POWER || k == K_DATA
   }
 
   fn cooled(k: i32) -> bool {
-    hot(k) || k == K_RADIATOR || k == K_WING
+    hot(k) || k == K_RADIATOR
   }
 
   fn bay_at(x: i32, y: i32, z: i32) -> i32 {
@@ -548,22 +418,16 @@ state {
     !touches_any(x, y, z) ? 0 :
     piloted(k) && kind_at(x, y, z - 1) == 0 ? 3 :
     piloted(k) && !clear_ahead(x, y, z) ? 4 :
-    (k == K_ENGINE || k == K_DRIVE) && kind_at(x, y, z + 1) == 0 ? 5 :
-    (k == K_ENGINE || k == K_DRIVE) && !clear_behind(x, y, z) ? 6 :
-    (k == K_WEAPON || k == K_BATTERY) && mount_at(x, y, z) == 0 ? 7 :
+    k == K_ENGINE && kind_at(x, y, z + 1) == 0 ? 5 :
+    k == K_ENGINE && !clear_behind(x, y, z) ? 6 :
+    k == K_WEAPON && mount_at(x, y, z) == 0 ? 7 :
     k == K_FUEL && !touches(x, y, z, K_ENGINE) && !touches(x, y, z, K_FUEL) ? 9 :
-    k == K_TANKS && !touches(x, y, z, K_DRIVE) && !touches(x, y, z, K_TANKS) ? 9 :
     k == K_POWER && (touches(x, y, z, K_HAB) || touches(x, y, z, K_COCKPIT)) ? 10 :
-    k == K_CORE && (touches(x, y, z, K_RESIDENCE) || touches(x, y, z, K_BRIDGE)) ? 10 :
-    (k == K_BIOME || k == K_ARBOR || k == K_SENSOR) && kind_at(x, y + 1, z) != 0 ? 18 :
-    (k == K_OBS || k == K_HANGAR) && !open_side(x, y, z) ? 20 :
+    k == K_BIOME && kind_at(x, y + 1, z) != 0 ? 18 :
+    k == K_OBS && !open_side(x, y, z) ? 20 :
     k == K_DOCK && dock_at(x, y, z) == 0 ? 21 :
     shaped(k) && fshape[cell_at(x, y, z)] == 0 ? 22 :
-    (k == K_RADIATOR || k == K_WING) && cool_at(x, y, z) == 0 ? 23 :
-    k == K_RING && (kind_at(x, y + 1, z) != 0 || kind_at(x, y - 1, z) != 0) ? 31 :
-    k == K_RING && kind_at(x, y, z - 1) == 0 && kind_at(x, y, z + 1) == 0 ? 32 :
-    k == K_JUMP && !touches(x, y, z, K_CORE) ? 33 :
-    k == K_SLIP && !open_side(x, y, z) && kind_at(x, y + 1, z) != 0 ? 34 :
+    k == K_RADIATOR && cool_at(x, y, z) == 0 ? 23 :
     k == K_DRILL && drill_at(x, y, z) == 0 ? 24 :
     k == K_BUILDER && mount_at(x, y, z) == 0 ? 25 :
     k == K_DATA && !touches(x, y, z, K_RADIATOR) ? 26 :
@@ -573,7 +437,6 @@ state {
   fn kind_mass(k: i32) -> f32 {
     match k {
       1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; 9: 11; 10: 9; 11: 4; 12: 3; 13: 5; 14: 12; 15: 8; 16: 14; 17: 10
-      20: 18; 21: 9; 22: 14; 23: 16; 24: 12; 25: 30; 26: 6; 27: 26; 28: 34; 29: 20; 30: 12; 31: 11; 32: 14; 33: 22; 34: 4; 35: 17
       _: 0
     }
   }
@@ -586,7 +449,7 @@ state {
     mut st: i32[1080] = {}
     mut aired: bool[1080] = {}
     mut queue: i32[1080] = {}
-    mut tally: i32[36] = {}
+    mut tally: i32[18] = {}
     mut front: i32 = GZ
     mut back: i32 = -1
     mut total: i32 = 0
@@ -604,7 +467,7 @@ state {
     mut head: i32 = 0
     mut tail: i32 = 0
     for i in 0..CELLS {
-      if grid[i] == K_LIFE || grid[i] == K_OBS || grid[i] == K_ARBOR {
+      if grid[i] == K_LIFE || grid[i] == K_OBS {
         aired[i] = true
         queue[tail] = i
         tail += 1
@@ -696,7 +559,7 @@ state {
         const own = rule_code(cell_x(i), cell_y(i), cell_z(i), k)
         if own != 0 {
           st[i] = own
-        } else if (k == K_HAB || k == K_RESIDENCE) && !aired[i] && touches_any(cell_x(i), cell_y(i), cell_z(i)) {
+        } else if k == K_HAB && !aired[i] && touches_any(cell_x(i), cell_y(i), cell_z(i)) {
           st[i] = 17
         }
         if st[i] != 0 {

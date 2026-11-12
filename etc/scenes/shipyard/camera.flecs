@@ -29,6 +29,7 @@ state {
   export const VIEW_YAW: f32 = 1.02
   export const VIEW_PITCH: f32 = 0.42
   export const VIEW_DIST: f32 = 78
+  export const LINER_DIST: f32 = 112
 
   export mut view_yaw: f32 = VIEW_YAW
   export mut view_pitch: f32 = VIEW_PITCH
@@ -53,7 +54,7 @@ async {
     await on.pressed(view_actions.Home)
     view_yaw = VIEW_YAW
     view_pitch = VIEW_PITCH
-    view_dist = VIEW_DIST
+    view_dist = liner ? LINER_DIST : VIEW_DIST
     view_x = 0
     view_z = 0
     view_y = 0
@@ -62,12 +63,18 @@ async {
 
 async {
   mut last: f64 = AppStatus[AppStatus].elapsed
+  mut was_liner = false
   while true {
     await next_frame()
     const now = AppStatus[AppStatus].elapsed
     const fixed = App[App].delta_time
     const dt = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
     last = now
+
+    if liner != was_liner {
+      was_liner = liner
+      view_dist = liner ? LINER_DIST : VIEW_DIST
+    }
 
     const turn = held(view_actions.TurnLeft[ActionState].down) - held(view_actions.TurnRight[ActionState].down)
     const tilt = held(view_actions.TiltUp[ActionState].down) - held(view_actions.TiltDown[ActionState].down)
@@ -103,7 +110,7 @@ async {
     }
 
     const ease = min(1, dt * 10)
-    const target_y = deck * CH * 0.5 + 2.5 + view_y
+    const target_y = (liner ? AXIS_Y : deck * CH * 0.5 + 2.5) + view_y
     if abs(cam_yaw - view_yaw) > 0.0001 || abs(cam_pitch - view_pitch) > 0.0001 {
       cam_yaw += (view_yaw - cam_yaw) * ease
       cam_pitch += (view_pitch - cam_pitch) * ease

@@ -5,16 +5,16 @@ using state
 
 state {
   actions {
-    Deck1 { Action: {description: "Work on deck 1"}; Binding: {key: Num1} }
-    Deck2 { Action: {description: "Work on deck 2"}; Binding: {key: Num2} }
-    Deck3 { Action: {description: "Work on deck 3"}; Binding: {key: Num3} }
-    Deck4 { Action: {description: "Work on deck 4"}; Binding: {key: Num4} }
-    Deck5 { Action: {description: "Work on deck 5"}; Binding: {key: Num5} }
+    Deck1 { Action: {description: "Work on deck 1, or on the core spine of a liner"}; Binding: {key: Num1} }
+    Deck2 { Action: {description: "Work on deck 2, or on the port spine of a liner"}; Binding: {key: Num2} }
+    Deck3 { Action: {description: "Work on deck 3, or on the starboard spine of a liner"}; Binding: {key: Num3} }
+    Deck4 { Action: {description: "Work on deck 4, or on the dorsal spine of a liner"}; Binding: {key: Num4} }
+    Deck5 { Action: {description: "Work on deck 5, or on the ventral spine of a liner"}; Binding: {key: Num5} }
     Deck6 { Action: {description: "Work on deck 6"}; Binding: {key: Num6} }
     Remove { Action: {description: "Pick the remove tool"}; Binding: {key: X} }
     Cancel { Action: {description: "Put the tool away"}; Binding: {key: Escape} }
-    DeckUp { Action: {description: "Work on the deck above"}; Binding: {key: PageUp} }
-    DeckDown { Action: {description: "Work on the deck below"}; Binding: {key: PageDown} }
+    DeckUp { Action: {description: "Work on the deck above, or on the next spine of a liner"}; Binding: {key: PageUp} }
+    DeckDown { Action: {description: "Work on the deck below, or on the previous spine of a liner"}; Binding: {key: PageDown} }
   }
 
   fn load(design: i32) {
@@ -29,53 +29,22 @@ state {
         top = max(top, py)
       }
     }
-    for b in 0..PLAN_BOXES {
-      const o = b * 8
-      if capital_plan[o] == design {
-        for y in capital_plan[o + 3]..capital_plan[o + 4] + 1 {
-          for z in capital_plan[o + 5]..capital_plan[o + 6] + 1 {
-            for x in capital_plan[o + 1]..capital_plan[o + 2] + 1 {
-              g[cell_at(x, y, z)] = capital_plan[o + 7]
-              order[cell_at(x, y, z)] = b + 1
-            }
-          }
-          top = max(top, y)
-        }
-      }
-    }
     grid = g
     placed = order
-    stamp = PLAN_BOXES
+    stamp = 0
     deck = top
     validate()
   }
 
   fn switch_class(big: bool) {
-    if big != capital {
-      const keep = grid
-      const keep_placed = placed
-      const other = stash
-      const other_placed = stash_placed
-      const had = stashed
-      stash = keep
-      stash_placed = keep_placed
-      stashed = true
-      capital = big
+    if big != liner {
+      liner = big
       tool = 0
       hover = -1
-      if had {
-        grid = other
-        placed = other_placed
-        mut top: i32 = 0
-        for i in 0..CELLS {
-          if other[i] != 0 {
-            top = max(top, cell_y(i))
-          }
-        }
-        deck = top
-        validate()
-      } else {
-        load(big ? OP_LINER : OP_FRIGATE)
+      lhover = -1
+      if big && !lloaded {
+        lloaded = true
+        load_liner(OP_PASSENGER)
       }
     }
   }
@@ -138,26 +107,56 @@ async {
 
 async {
   while true {
+    const e = await SlotClick
+    const i = e.slot
+    const k = lgrid[i]
+    if tool > 0 && tool != T_REMOVE {
+      if k != tool {
+        const built = tool
+        emit Built(cell: i)
+        await next_frame()
+        lgrid[i] = built
+        lvalidate()
+      }
+    } else if tool == T_REMOVE && k != 0 {
+      lgrid[i] = 0
+      lvalidate()
+    }
+  }
+}
+
+async {
+  while true {
     const e = await Request
     const op = e.op
-    if (op > 0 && op <= T_REMOVE) || (op >= K_BRIDGE && op < KINDS) {
+    if (op > 0 && op <= T_REMOVE) || (op >= L_BASE && op < L_END) {
       tool = tool == op ? 0 : op
     } else if op == OP_CANCEL {
       tool = 0
-    } else if op >= OP_DECK && op < OP_DECK + GY {
+    } else if liner && op >= OP_DECK && op < OP_DECK + LANES {
+      lhover = -1
+      lane = op - OP_DECK
+    } else if liner && op == OP_DECK_UP {
+      lhover = -1
+      lane = (lane + 1) % LANES
+    } else if liner && op == OP_DECK_DOWN {
+      lhover = -1
+      lane = (lane + LANES - 1) % LANES
+    } else if !liner && op >= OP_DECK && op < OP_DECK + GY {
       hover = -1
       deck = op - OP_DECK
-    } else if op == OP_DECK_UP {
+    } else if !liner && op == OP_DECK_UP {
       hover = -1
       deck = min(deck + 1, GY - 1)
-    } else if op == OP_DECK_DOWN {
+    } else if !liner && op == OP_DECK_DOWN {
       hover = -1
       deck = max(deck - 1, 0)
-    } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_MINER || op == OP_CLEAR ||
-              op == OP_LINER || op == OP_FREIGHTER || op == OP_TENDER || op == OP_BATTLESHIP {
+    } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_MINER || (op == OP_CLEAR && !liner) {
       load(op)
-    } else if op == OP_CRAFT || op == OP_CAPITAL {
-      switch_class(op == OP_CAPITAL)
+    } else if op == OP_PASSENGER || op == OP_FREIGHTER || op == OP_TENDER || op == OP_BATTLESHIP || (op == OP_CLEAR && liner) {
+      load_liner(op)
+    } else if op == OP_RIGS || op == OP_LINERS {
+      switch_class(op == OP_LINERS)
     }
   }
 }
