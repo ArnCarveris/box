@@ -45,6 +45,7 @@
                     "defaults",
                     "headless",
                     "no_audio",
+                    "unguarded",
                     "frames",
                     "timeout_seconds",
                     "timeout_infinite",
