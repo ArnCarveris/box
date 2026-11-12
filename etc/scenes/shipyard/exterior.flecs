@@ -1451,38 +1451,27 @@ assets {
 
     cabinet : ShipHullDark { Position: {0, 1.32, 0}; RoundedBox: {1.06, 2.2, 0.9, 0.04, segments: 2} }
     cap : ShipStripe { Position: {0, 2.44, 0}; Box: {1.08, 0.04, 0.92} }
-    door : ShipTrim { Position: {0, 1.32, 0.455}; Box: {0.96, 2.04, 0.02} }
-    glass : ShipRecess { Position: {0, 1.32, 0.467}; Box: {0.9, 1.98, 0.01} }
-    for i in 0..8 {
-      const r = (i * 7 + seed) % 5
-      const by = 0.5 + i * 0.235
-      "blade_{i}" : ShipTrim { Position: {0, by, 0.475}; Box: {0.84, 0.17, 0.01} }
-      if r == 0 {
-        "status_{i}" : ShipDataAmber { Position: {-0.33, by, 0.482}; Box: {0.06, 0.04, 0.01}; Animator: {clip: yard_data_blink, time: i * 0.37 + seed * 0.29, speed: 0.4} }
-      } else {
-        "status_{i}" : ShipGreenLight { Position: {-0.33, by, 0.482}; Box: {0.06, 0.04, 0.01} }
-      }
-      "activity_{i}" : ShipDataCyan { Position: {0.08 - r * 0.03, by, 0.482}; Box: {0.3 + r * 0.06, 0.03, 0.01}; Animator: {clip: yard_data_blink, time: i * 0.53 + seed * 0.17, speed: 0.6 + r * 0.3} }
-    }
-    for f in 0..2 {
-      "fan_{f}" {
-        Position: {0, 0.85 + f * 0.95, -0.46}
-        housing : ShipRecess { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.32, length: 0.02, segments: 12, smooth: true} }
-        ring : ShipTrim { Position: {0, 0, -0.01}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.32, tube: 0.03, segments: 12, rings: 3, smooth: true} }
-        rotor {
-          Position: {0, 0, -0.02}
-          AngularVelocity: {0, 0, 9 + f * 2}
-          hub : ShipChrome { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 0.03, segments: 6, smooth: true} }
-          for b in 0..3 {
-            "blade_{b}" : ShipSteel { Position: {0, 0, 0}; Rotation: {0, 0, b * 1.0472}; Box: {0.07, 0.56, 0.01} }
+    for s in 0..2 {
+      "face_{s}" {
+        Position: {0, 0, 0}
+        Rotation: {0, s * HALF_PI * 2, 0}
+        door : ShipTrim { Position: {0, 1.32, 0.455}; Box: {0.96, 2.04, 0.02} }
+        glass : ShipRecess { Position: {0, 1.32, 0.467}; Box: {0.9, 1.98, 0.01} }
+        for i in 0..8 {
+          const r = (i * 7 + seed + s * 3) % 5
+          const by = 0.5 + i * 0.235
+          "blade_{i}" : ShipTrim { Position: {0, by, 0.475}; Box: {0.84, 0.17, 0.01} }
+          if r == 0 {
+            "status_{i}" : ShipDataAmber { Position: {-0.33, by, 0.482}; Box: {0.06, 0.04, 0.01}; Animator: {clip: yard_data_blink, time: i * 0.37 + seed * 0.29 + s * 0.61, speed: 0.4} }
+          } else {
+            "status_{i}" : ShipGreenLight { Position: {-0.33, by, 0.482}; Box: {0.06, 0.04, 0.01} }
           }
+          "activity_{i}" : ShipDataCyan { Position: {0.08 - r * 0.03, by, 0.482}; Box: {0.3 + r * 0.06, 0.03, 0.01}; Animator: {clip: yard_data_blink, time: i * 0.53 + seed * 0.17 + s * 0.41, speed: 0.6 + r * 0.3} }
         }
-        guard_a : ShipTrim { Position: {0, 0, -0.035}; Box: {0.64, 0.025, 0.01} }
-        guard_b : ShipTrim { Position: {0, 0, -0.035}; Box: {0.025, 0.64, 0.01} }
       }
     }
-    supply : ShipCopper { Position: {0.3, 2.53, -0.2}; Cylinder: {radius: 0.04, length: 0.14, segments: 4, smooth: true} }
-    return : ShipTeal { Position: {-0.3, 2.53, -0.2}; Cylinder: {radius: 0.04, length: 0.14, segments: 4, smooth: true} }
+    supply : ShipCopper { Position: {0, 2.53, 0.2}; Cylinder: {radius: 0.04, length: 0.14, segments: 4, smooth: true} }
+    return : ShipTeal { Position: {0, 2.53, -0.2}; Cylinder: {radius: 0.04, length: 0.14, segments: 4, smooth: true} }
   }
 
   template Datacenter {
@@ -1493,35 +1482,35 @@ assets {
 
     RackFrame frame(pz: pz, nz: nz)
     deck : ShipHullDark { Position: {0, 0.19, 0}; Box: {3.56, 0.06, 3.56} }
-    aisle : ShipRecess { Position: {0, 0.224, 0}; Box: {0.9, 0.01, 4} }
-    for s in 0..2 {
-      "aisle_edge_{s}" : ShipCyanLight { Position: {s == 0 ? -0.43 : 0.43, 0.23, 0}; Box: {0.03, 0.01, 4} }
-    }
-    for i in 0..10 {
-      "grate_{i}" : ShipTrim { Position: {0, 0.232, -1.8 + i * 0.4}; Box: {0.84, 0.008, 0.05} }
+    for a in 0..2 {
+      const ax = a == 0 ? -1.14 : 1.14
+      "aisle_{a}" : ShipRecess { Position: {ax, 0.224, 0}; Box: {0.9, 0.01, 4} }
+      for s in 0..2 {
+        "aisle_edge_{a}_{s}" : ShipCyanLight { Position: {ax + (s == 0 ? -0.43 : 0.43), 0.23, 0}; Box: {0.03, 0.01, 4} }
+      }
+      for i in 0..10 {
+        "grate_{a}_{i}" : ShipTrim { Position: {ax, 0.232, -1.8 + i * 0.4}; Box: {0.84, 0.008, 0.05} }
+      }
     }
     if roof {
       lid : ShipHullDark { Position: {0, CH - 0.05, 0}; Box: {3.56, 0.08, 3.56} }
     }
 
-    for row in 0..2 {
-      const sx = row == 0 ? -1 : 1
-      for c in 0..3 {
-        "rack_{row}_{c}" {
-          Position: {sx * 0.95, 0, -1.14 + c * 1.14}
-          Rotation: {0, sx * (0 - HALF_PI), 0}
-          DataRack r(seed: seed + row * 5 + c * 3)
-        }
+    for c in 0..3 {
+      "rack_{c}" {
+        Position: {0, 0, -1.14 + c * 1.14}
+        Rotation: {0, HALF_PI, 0}
+        DataRack r(seed: seed + c * 3)
       }
-      "supply_{row}" : ShipCopper { Position: {sx * 0.75, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
-      "return_{row}" : ShipTeal { Position: {sx * 1.15, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
-      "frost_{row}" : ShipWhite { Position: {sx * 0.75, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.074, length: 0.3, segments: 6, smooth: true} }
     }
+    supply : ShipCopper { Position: {0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
+    return : ShipTeal { Position: {-0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
+    frost : ShipWhite { Position: {0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.074, length: 0.3, segments: 6, smooth: true} }
 
-    tray : ShipHullDark { Position: {0, 2.72, 0}; Box: {0.4, 0.03, 4} }
-    cable_a : ShipRed { Position: {-0.1, 2.76, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
-    cable_b : ShipYellow { Position: {0, 2.76, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
-    cable_c : ShipStripe { Position: {0.1, 2.76, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
+    tray : ShipHullDark { Position: {0, 2.76, 0}; Box: {0.4, 0.03, 4} }
+    cable_a : ShipRed { Position: {-0.1, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
+    cable_b : ShipYellow { Position: {0, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
+    cable_c : ShipStripe { Position: {0.1, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
 
     glow { Position: {0, 1.4, 0}; PointLight: {intensity: 3, range: 4}; Rgb: {90, 200, 255} }
   }
