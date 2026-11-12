@@ -84,11 +84,6 @@ assets {
     strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 16}, {0.09, 20}, {0.17, 14}, {0.3, 19}, {0.41, 14.5}, {0.52, 18}, {0.6, 16}]}} }
   }
   prefab ShipPlumeCore { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Opacity: {0.2}; BlendMode: Additive; Emissive: {strength: 16, color: {255, 255, 255}}; PbrTextures: {emissive: yard_tex_plume_core}; Animator: {clip: yard_drive_flicker} }
-  prefab yard_liner_flicker {
-    AnimationClip: {duration: 2.4}
-    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 16}, {0.5, 18}, {0.9, 15}, {1.4, 17.5}, {1.9, 15.5}, {2.4, 16}]}} }
-  }
-  prefab ShipLinerPlume { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Opacity: {0.15}; BlendMode: Additive; Emissive: {strength: 16, color: {255, 255, 255}}; PbrTextures: {emissive: yard_tex_plume_core}; Animator: {clip: yard_liner_flicker} }
 
   prefab yard_weld_flicker {
     AnimationClip: {duration: 0.5}
