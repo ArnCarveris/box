@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include "render.h"
+#include "../../../../src/posix.h"
 
 void Args_defaults(void) {
     // engine_core/app
@@ -559,7 +560,7 @@ void Args_out_capture(void) {
         ecs_iter_t it = ecs_each(world, Surface);
         test_assert(ecs_each_next(&it));
         const Surface *surface = ecs_field(&it, Surface, 0);
-        test_assert(surface->write_to_file[0] == '/');
+        test_assert(BOX_POSIX_ABSOLUTE(surface->write_to_file));
         if (i == 2) {
             test_str(surface->write_to_file, "/tmp/box-out-test.png");
         } else {

@@ -9,6 +9,7 @@
 #define BOX_SURFACE_IMPL
 #include "surface.h"
 #include "../render/render.h"
+#include "../posix.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -336,7 +337,7 @@ static const char* box_surface_capture(
     ecs_os_free(impl->capture);
     impl->write_to_file = ecs_os_strdup(file);
     status = ecs_singleton_get(world, AppStatus);
-    if (file[0] != '/' && status && status->tmp_dir) {
+    if (!BOX_POSIX_ABSOLUTE(file) && status && status->tmp_dir) {
         impl->capture = flecs_asprintf("%s/%s", status->tmp_dir, file);
     } else {
         impl->capture = ecs_os_strdup(file);

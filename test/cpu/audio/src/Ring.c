@@ -7,8 +7,11 @@
 #include "util.h"
 #include <flecs.h>
 #include <ring.h>
-#include <pthread.h>
+#include "../../../../src/posix.h"
+
+#ifndef _WIN32
 #include <sched.h>
+#endif
 
 /* The cases without a world call no flecs function that would set up the OS API they allocate
  * and log with. */
@@ -213,13 +216,15 @@ static void* ring_consumer(
 void Ring_stress(void) {
     // audio/native
     static ring_stress_t s;
-    pthread_t producer, consumer;
+    ecs_os_thread_t producer, consumer;
     memset(&s, 0, sizeof(s));
     test_int(box_audio_ring_init(&s.ring, 256), 0);
-    test_int(pthread_create(&consumer, NULL, ring_consumer, &s), 0);
-    test_int(pthread_create(&producer, NULL, ring_producer, &s), 0);
-    pthread_join(producer, NULL);
-    pthread_join(consumer, NULL);
+    consumer = ecs_os_thread_new(ring_consumer, &s);
+    test_assert(consumer != 0);
+    producer = ecs_os_thread_new(ring_producer, &s);
+    test_assert(producer != 0);
+    ecs_os_thread_join(producer);
+    ecs_os_thread_join(consumer);
 
     test_int(s.errors, 0);
     test_int(s.count, RING_STRESS_RECORDS);

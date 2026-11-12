@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include "../posix.h"
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -374,7 +374,7 @@ char* box_shader_locate_cwd(
         goto done;
     }
 
-    if (path[0] == '/' || box_shader_readable(path)) {
+    if (BOX_POSIX_ABSOLUTE(path) || box_shader_readable(path)) {
         result = box_shader_readable(path) ? ecs_os_strdup(path) : NULL;
         goto done;
     }
@@ -392,7 +392,9 @@ char* box_shader_locate(
 {
     char *result = box_shader_locate_cwd(path);
     char dir[BOX_SHADER_PATH_MAX];
-    if (!result && path && path[0] && path[0] != '/' && box_shader_exe_dir(dir, sizeof(dir))) {
+    if (!result && path && path[0] && !BOX_POSIX_ABSOLUTE(path) &&
+        box_shader_exe_dir(dir, sizeof(dir)))
+    {
         result = box_shader_search(dir, path);
     }
 
@@ -491,7 +493,7 @@ static char* box_shader_load(
     char *result = NULL;
     char *first = NULL;
     char *candidate = NULL;
-    const char *slash = from && path[0] != '/' ? strrchr(from, '/') : NULL;
+    const char *slash = from && !BOX_POSIX_ABSOLUTE(path) ? strrchr(from, '/') : NULL;
     if (slash) {
         first = flecs_asprintf("%.*s%s", (int)(slash - from + 1), from, path);
         result = box_shader_try(pp, first);

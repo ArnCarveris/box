@@ -78,7 +78,7 @@ void box_window_resize(
 /** Get the layer webgpu presents a window with.
  *
  * @param window The window
- * @return The CAMetalLayer of the window
+ * @return The CAMetalLayer of the window, on Windows its HWND
  */
 void* box_window_layer(
     box_window_t *window);

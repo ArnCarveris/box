@@ -5,13 +5,14 @@
 
 #include "gpu.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 #ifdef BOX_RENDER_WGPU
 
 #include <stdio.h>
 #include <string.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
+#include "../posix.h"
 
 /** A capture on its way from the GPU to its PNG file */
 struct box_gpu_capture_t {

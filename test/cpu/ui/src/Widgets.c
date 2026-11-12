@@ -10,7 +10,7 @@
 #include "picking.h"
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 
 /** Templates of the widget library */
 static const char *widgets_templates[] = {
