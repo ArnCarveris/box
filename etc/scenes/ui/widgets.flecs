@@ -52,6 +52,9 @@
 // clipped away, so it is not drawn, picked or reached with Tab. Content a ScrollView only
 // scrolled out of view is reached with Tab, which scrolls it into view. Popups such as the list of a
 // Dropdown float (LayoutFloat) above the other widgets and outside every clip.
+//
+// A Tooltip, a child of the widget it explains, floats a text box below it after the pointer
+// has rested on it for a moment, and never takes the pointer itself.
 
 module box.widgets
 
@@ -65,6 +68,7 @@ include progress
 include stepper
 include text_input
 include dropdown
+include tooltip
 include scroll
 include tabs
 include collapsible
