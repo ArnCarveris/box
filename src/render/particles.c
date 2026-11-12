@@ -899,6 +899,28 @@ static void box_particles_block_forces(
     }
 }
 
+/** Get the uniform scale of the world transform of an emitter, the cube root of the absolute
+ * determinant of its upper 3x3: the geometric mean of the axis lengths without shear. A scale
+ * within float rounding of 1, as of a rotation, is 1, so an unscaled emitter is unchanged.
+ *
+ * @param transform World transform of the emitter
+ * @return The scale, 0 for a flat transform
+ */
+static float box_particles_world_scale(
+    const WorldTransform *transform)
+{
+    mat3 m;
+    glm_mat4_pick3(ECS_CONST_CAST(vec4*, transform->m), m);
+    float result = cbrtf(fabsf(glm_mat3_det(m)));
+    if (!isfinite(result)) {
+        result = 1.0f;
+    } else if (fabsf(result - 1.0f) < 1e-5f) {
+        result = 1.0f;
+    }
+
+    return result;
+}
+
 /** Write the parameters of an emitter for this frame but its forces.
  *
  * @param emitter The emitter values
@@ -906,8 +928,8 @@ static void box_particles_block_forces(
  * @param collision Its ground collision, NULL for none
  * @param inherit World velocity its spawns get
  * @param delta Seconds of the frame
- * @param scale Multiplier of the speeds, radial speeds and sizes, the scale of the effect it
- *              plays in
+ * @param scale Multiplier of the speeds, radial speeds and sizes, the uniform scale of the
+ *              transform, which holds the scale of the effect it plays in
  * @param out Receives the block, every padding member zero
  */
 static void box_particles_block(
@@ -1040,11 +1062,14 @@ static void box_particles_block_still(
  *
  * @param look The ParticleAppearance of the emitter, NULL for none
  * @param pool The pool, with the rows of its curves and of its ParticleMotion
+ * @param scale Multiplier of the softness and divisor of the stretch per unit of speed, the
+ *              uniform scale of the emitter, so a scaled emitter draws a scaled copy
  * @param out The block, its other members written, its color variance among them
  */
 static void box_particles_block_look(
     const ParticleAppearance *look,
     const box_particle_pool_t *pool,
+    float scale,
     box_render_particle_block_t *out)
 {
     const box_particle_motion_rows_t *motion = &pool->motion.rows;
@@ -1083,8 +1108,8 @@ static void box_particles_block_look(
         out->columns = look->columns > 1 ? (uint32_t)look->columns : 1;
         out->rows = look->rows > 1 ? (uint32_t)look->rows : 1;
         out->fps = look->fps > 0 ? look->fps : 0.0f;
-        out->softness = look->softness > 0 ? look->softness : 0.0f;
-        out->stretch = look->stretch > 0 ? look->stretch : 0.0f;
+        out->softness = look->softness > 0 ? look->softness * scale : 0.0f;
+        out->stretch = look->stretch > 0 && scale > 0 ? look->stretch / scale : 0.0f;
         out->lit = glm_clamp(look->lit, 0.0f, 1.0f);
         if (look->shape != ParticleSprite) {
             out->look = ParticleCircle;
@@ -1221,7 +1246,6 @@ static void box_particles_light_write(
  * @param timeline Its ParticleTimeline, NULL for none
  * @param motion Its ParticleMotion, NULL for none
  * @param look Its ParticleAppearance, NULL for none
- * @param effect The ParticleEffect of the instance it plays in, NULL for none
  * @param lights The lights its ParticleLight drives
  * @param stats Receives its counts
  */
@@ -1238,7 +1262,6 @@ static void box_particles_emitter(
     const ParticleTimeline *timeline,
     const ParticleMotion *motion,
     const ParticleAppearance *look,
-    const ParticleEffect *effect,
     const box_particles_light_t *lights,
     ParticleStats *stats)
 {
@@ -1353,23 +1376,25 @@ static void box_particles_emitter(
     ParticleForces forces;
     box_particles_forces(world, e, emitter->forces, own, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
+    float scale = box_particles_world_scale(transform);
+    vec3 acceleration;
+    glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
     box_particles_block(emitter, transform, ecs_get(world, e, ParticleCollision), velocity,
-        age_us ? p->delta : 0.0f, effect && effect->scale > 0 ? effect->scale : 1.0f,
-        &entry->block);
+        age_us ? p->delta : 0.0f, scale, &entry->block);
     if (timeline) {
         float speed = box_particle_timeline_speed(timeline, pool->time);
         entry->block.speed[0] *= speed;
         entry->block.speed[1] *= speed;
     }
 
-    box_particles_block_forces(pool, emitter->acceleration, &forces, moves, &entry->block);
+    box_particles_block_forces(pool, acceleration, &forces, moves, &entry->block);
     if (curves || motion || pool->curved) {
         box_particle_rows_update(&s->curves, &pool->curves, curves);
         box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
         pool->curved = curves || motion;
     }
 
-    box_particles_block_look(look, pool, &entry->block);
+    box_particles_block_look(look, pool, scale, &entry->block);
     entry->curves = pool->curved && (box_particle_rows_used(&pool->curves) ||
         box_particle_rows_motion_used(&pool->motion))
         ? BOX_RENDER_BUFFER_PARTICLE_CURVES
@@ -1387,7 +1412,7 @@ static void box_particles_emitter(
     pool->fresh = false;
     if (emitter->linger) {
         pool->entry = *entry;
-        glm_vec3_copy(ECS_CONST_CAST(float*, emitter->acceleration), pool->acceleration);
+        glm_vec3_copy(acceleration, pool->acceleration);
         pool->forces = emitter->forces;
         pool->has_own = own != NULL;
         if (own) {
@@ -1453,41 +1478,6 @@ static bool box_particles_linger(
     stats->lingering ++;
     result = true;
 done:
-    return result;
-}
-
-/** Find the ParticleEffect of the instance the emitters of a table play in, on the emitters
- * themselves or on the nearest ancestor that has one.
- *
- * Searched per table instead of matched by the query, whose up traversal allocates. The rows of
- * a table with a Parent component have parents of their own, so their ancestor is searched per
- * emitter.
- *
- * @param world The world
- * @param table The table of the emitters
- * @param e The emitter whose ancestor is searched, 0 to search the ancestor of the table
- * @param src Receives the ancestor that has it, 0 when the emitters have it or none does
- * @return Whether the emitters have it themselves
- */
-static bool box_particles_effect_of(
-    const ecs_world_t *world,
-    ecs_table_t *table,
-    ecs_entity_t e,
-    ecs_entity_t *src)
-{
-    bool result = false;
-    *src = 0;
-    if (ecs_table_has_id(world, table, ecs_id(ParticleEffect))) {
-        result = true;
-    } else if (e) {
-        *src = ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(ParticleEffect));
-    } else if (!ecs_table_has_id(world, table, ecs_id(EcsParent)) &&
-        ecs_search_relation(world, table, 0, ecs_id(ParticleEffect), EcsChildOf, EcsUp, src,
-            NULL, NULL) == -1)
-    {
-        *src = 0;
-    }
-
     return result;
 }
 
@@ -1564,23 +1554,7 @@ static void BoxRenderExtractParticles(
         bool looks_shared = looks && !ecs_field_is_self(&qit, 5);
         bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
         bool motions_shared = motions && !ecs_field_is_self(&qit, 10);
-        ecs_entity_t effect_src = 0;
-        bool effect_self = box_particles_effect_of(world, qit.table, 0, &effect_src);
-        bool effect_rows = !effect_self && ecs_table_has_id(world, qit.table, ecs_id(EcsParent));
-        const ParticleEffect *shared_effect = effect_src
-            ? ecs_get(world, effect_src, ParticleEffect)
-            : NULL;
-        ecs_entity_t effect_parent = 0;
         for (i = 0; i < qit.count; i ++) {
-            if (effect_rows) {
-                ecs_entity_t parent = ecs_get_parent(world, qit.entities[i]);
-                if (!parent || parent != effect_parent) {
-                    box_particles_effect_of(world, qit.table, qit.entities[i], &effect_src);
-                    shared_effect = effect_src ? ecs_get(world, effect_src, ParticleEffect) : NULL;
-                    effect_parent = parent;
-                }
-            }
-
             const WorldTransform *t = &transforms[shared ? 0 : i];
             box_particles_light_t light = {
                 .light = lights ? &lights[lights_shared ? 0 : i] : NULL,
@@ -1594,7 +1568,6 @@ static void BoxRenderExtractParticles(
                 timelines ? &timelines[timelines_shared ? 0 : i] : NULL,
                 motions ? &motions[motions_shared ? 0 : i] : NULL,
                 looks ? &looks[looks_shared ? 0 : i] : NULL,
-                effect_self ? ecs_get(world, qit.entities[i], ParticleEffect) : shared_effect,
                 &light, &stats);
         }
     }

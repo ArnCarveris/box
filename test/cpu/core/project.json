@@ -71,6 +71,8 @@
                     "surface_not_created_when_present",
                     "surface_created_next_to_texture_surface",
                     "surface_first_frame",
+                    "surface_overrides_scene_window",
+                    "surface_scene_window_without_option",
                     "out",
                     "invalid_out",
                     "out_capture"

@@ -59,7 +59,7 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 
 | Command | What it does |
 |---------|--------------|
-| `capture [camera]` | Write a PNG of the active camera or a camera, as its view shows it |
+| `capture [camera\|surface]` | Write a PNG of the active camera or a camera, as its view shows it, or of a surface with all its views |
 | `render <subject>` | Write a PNG of an entity, prefab or template on its own |
 | `fit [camera]` | Move the active camera or a camera so that it sees the whole scene |
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
