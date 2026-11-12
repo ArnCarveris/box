@@ -336,11 +336,15 @@ template Gallery {
             buttons {
               Layout: {direction: Row, spacing: 8, v: Middle}
               Button save(label: "Save")
-              Button cancel(label: "Cancel", variant: "secondary")
+              Button cancel(label: "Cancel", variant: "secondary") {
+                Tooltip tip(text: "Discards the changes since the last save")
+              }
               Button more(label: "More", variant: "ghost")
               Button remove(label: "Delete", variant: "danger")
               Button ping(label: "Ping", variant: "secondary", action: actions.ping)
-              Button off(label: "Disabled", disabled: true)
+              Button off(label: "Disabled", disabled: true) {
+                Tooltip tip(text: "Not available")
+              }
             }
 
             toggles {
@@ -457,7 +461,9 @@ template Gallery {
 
               Label usage(width: 540, text: "Tab moves the focus into the view and through the widgets in it. A widget scrolled out of the view is clipped: it is not drawn and the pointer passes through it to whatever lies under it.")
 
-              Button share(label: "Share", variant: "secondary")
+              Button share(label: "Share", variant: "secondary") {
+                Tooltip tip(text: "Shares the notes")
+              }
 
               Label outro(width: 540, variant: "muted", text: "The end of the scroll view.")
             }
