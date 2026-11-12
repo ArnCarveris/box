@@ -78,7 +78,8 @@ void box_gpu_cull_begin(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Add the frustums of a view: the view itself and every cascade of its shadows.
+/** Add the frustums of a view: the view itself and every cascade of its shadows that renders in
+ * the packet (box_gpu_shadow_renders), a kept cascade culls nothing.
  *
  * @param gpu The backend
  * @param t The target
@@ -252,7 +253,8 @@ bool box_gpu_cull_occludes(
     int32_t slot);
 
 /** Record the late phase of a view: its pyramid built from the depth of the early draw, then
- * the dispatches that test what the early draw left out against it.
+ * the dispatches that test what the early draw left out against it, which a mesh draw with a
+ * history gets in its late arguments and appended to its early ones.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame

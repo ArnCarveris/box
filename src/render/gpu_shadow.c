@@ -83,6 +83,8 @@ void box_gpu_shadow_init(
         .size = BOX_GPU_ATLAS_TILES_SIZE
     });
     ecs_vec_init_t(NULL, &gpu->shadow_data, uint8_t, 0);
+    ecs_vec_init_t(NULL, &gpu->cascade_stores, box_gpu_cascade_store_t, 0);
+    ecs_vec_init_t(NULL, &gpu->cascade_slots, box_gpu_cascade_slot_t, 0);
     ecs_vec_init_t(NULL, &gpu->atlas_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &gpu->atlas_blocks, int32_t, 0);
     ecs_vec_init_t(NULL, &gpu->atlas_renders, bool, 0);
@@ -135,6 +137,36 @@ static void box_gpu_shadow_map_free(
 
     gpu->shadow_resolution = 0;
     gpu->shadow_cascades = 0;
+}
+
+/** Release the shadow map of a cascade store and the views of its cascades.
+ *
+ * @param store The store
+ */
+static void box_gpu_cascade_store_free(
+    box_gpu_cascade_store_t *store)
+{
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_SHADOW_CASCADES; i ++) {
+        if (store->layers[i]) {
+            wgpuTextureViewRelease(store->layers[i]);
+            store->layers[i] = NULL;
+        }
+    }
+
+    if (store->array) {
+        wgpuTextureViewRelease(store->array);
+        store->array = NULL;
+    }
+
+    if (store->texture) {
+        wgpuTextureRelease(store->texture);
+        store->texture = NULL;
+    }
+
+    store->resolution = 0;
+    store->cascades = 0;
+    store->valid = 0;
 }
 
 /** Release the shadow map of the probe captures and its uniform buffer.
@@ -191,6 +223,7 @@ static void box_gpu_shadow_variants_release(
 void box_gpu_shadow_fini(
     box_gpu_t *gpu)
 {
+    int32_t i;
     ecs_map_iter_t it = ecs_map_iter(&gpu->atlases);
     while (ecs_map_next(&it)) {
         box_gpu_atlas_free(ecs_map_ptr(&it));
@@ -198,6 +231,13 @@ void box_gpu_shadow_fini(
 
     ecs_map_fini(&gpu->atlases);
     box_gpu_shadow_map_free(gpu);
+    for (i = 0; i < ecs_vec_count(&gpu->cascade_stores); i ++) {
+        box_gpu_cascade_store_free(ecs_vec_get_t(
+            &gpu->cascade_stores, box_gpu_cascade_store_t, i));
+    }
+
+    ecs_vec_fini_t(NULL, &gpu->cascade_stores, box_gpu_cascade_store_t);
+    ecs_vec_fini_t(NULL, &gpu->cascade_slots, box_gpu_cascade_slot_t);
     box_gpu_shadow_capture_free(gpu);
     ecs_vec_fini_t(NULL, &gpu->shadow_data, uint8_t);
     ecs_vec_fini_t(NULL, &gpu->atlas_data, uint8_t);
@@ -340,16 +380,161 @@ void box_gpu_shadow_filter_uniforms(
     u->shadow_config[1] = (uint32_t)filter_size;
 }
 
+/** Create a shadow map with a layer per cascade, its array view and the view of each layer.
+ *
+ * @param gpu The backend
+ * @param resolution Edge of a layer in texels
+ * @param cascades Layers
+ * @param texture Receives the texture
+ * @param array Receives the array view
+ * @param layers Receives the view of each layer
+ */
+static void box_gpu_shadow_layers_create(
+    box_gpu_t *gpu,
+    int32_t resolution,
+    int32_t cascades,
+    WGPUTexture *texture,
+    WGPUTextureView *array,
+    WGPUTextureView *layers)
+{
+    int32_t i;
+    WGPUTextureDescriptor desc = {
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { (uint32_t)resolution, (uint32_t)resolution, (uint32_t)cascades },
+        .format = BOX_GPU_SHADOW_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    };
+    *texture = wgpuDeviceCreateTexture(gpu->device, &desc);
+    *array = wgpuTextureCreateView(*texture, &(WGPUTextureViewDescriptor){
+        .format = BOX_GPU_SHADOW_FORMAT,
+        .dimension = WGPUTextureViewDimension_2DArray,
+        .mipLevelCount = 1,
+        .arrayLayerCount = (uint32_t)cascades,
+        .aspect = WGPUTextureAspect_DepthOnly
+    });
+    for (i = 0; i < cascades; i ++) {
+        layers[i] = wgpuTextureCreateView(*texture,
+            &(WGPUTextureViewDescriptor){
+                .format = BOX_GPU_SHADOW_FORMAT,
+                .dimension = WGPUTextureViewDimension_2D,
+                .mipLevelCount = 1,
+                .baseArrayLayer = (uint32_t)i,
+                .arrayLayerCount = 1,
+                .aspect = WGPUTextureAspect_DepthOnly
+            });
+    }
+}
+
+/** Get the cascade store of a view, created on first use, with a shadow map at the resolution
+ * and cascades of the view: a store recreates its map when they change, which drops its layers.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param frame Frame of the packet
+ * @return Index of the store in gpu->cascade_stores
+ */
+static int32_t box_gpu_cascade_store(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    int64_t frame)
+{
+    const box_render_view_shadows_t *s = &v->shadows;
+    box_gpu_cascade_store_t *store = NULL;
+    int32_t i, count = ecs_vec_count(&gpu->cascade_stores), result = count;
+    for (i = 0; i < count; i ++) {
+        store = ecs_vec_get_t(&gpu->cascade_stores, box_gpu_cascade_store_t, i);
+        if (store->view == v->view) {
+            result = i;
+            break;
+        }
+    }
+
+    if (result == count) {
+        store = ecs_vec_append_t(NULL, &gpu->cascade_stores, box_gpu_cascade_store_t);
+        ecs_os_memset_t(store, 0, box_gpu_cascade_store_t);
+        store->view = v->view;
+    }
+
+    if (!store->texture || store->resolution != s->resolution ||
+        store->cascades != s->cascades)
+    {
+        box_gpu_cascade_store_free(store);
+        box_gpu_shadow_layers_create(gpu, s->resolution, s->cascades, &store->texture,
+            &store->array, store->layers);
+        store->resolution = s->resolution;
+        store->cascades = s->cascades;
+    }
+
+    store->frame = frame;
+
+    return result;
+}
+
+void box_gpu_shadow_begin(
+    box_gpu_t *gpu,
+    int64_t frame)
+{
+    int32_t i;
+    ecs_vec_clear(&gpu->cascade_slots);
+    for (i = ecs_vec_count(&gpu->cascade_stores) - 1; i >= 0; i --) {
+        box_gpu_cascade_store_t *store = ecs_vec_get_t(
+            &gpu->cascade_stores, box_gpu_cascade_store_t, i);
+        if (frame - store->frame > BOX_GPU_CASCADE_STORE_FRAMES ||
+            frame < store->frame)
+        {
+            box_gpu_cascade_store_free(store);
+            ecs_vec_remove_t(&gpu->cascade_stores, box_gpu_cascade_store_t, i);
+        }
+    }
+}
+
+/** Get the cascades of a view slot of the target being drawn.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @return The cascades, NULL for a slot box_gpu_shadow_uniforms did not write
+ */
+static const box_gpu_cascade_slot_t* box_gpu_cascade_slot(
+    box_gpu_t *gpu,
+    int32_t slot)
+{
+    return slot >= 0 && slot < ecs_vec_count(&gpu->cascade_slots)
+        ? ecs_vec_get_t(&gpu->cascade_slots, box_gpu_cascade_slot_t, slot)
+        : NULL;
+}
+
+uint32_t box_gpu_shadow_renders(
+    box_gpu_t *gpu,
+    int32_t slot)
+{
+    const box_gpu_cascade_slot_t *cs = box_gpu_cascade_slot(gpu, slot);
+
+    return cs ? cs->renders : ~0u;
+}
+
 void box_gpu_shadow_uniforms(
     box_gpu_t *gpu,
     const box_render_view_t *v,
     mat4 proj,
     int32_t slot,
+    int64_t frame,
     box_gpu_view_uniforms_t *u)
 {
     const box_render_view_shadows_t *s = &v->shadows;
+    box_gpu_cascade_store_t *store = NULL;
     box_render_cascade_t cascade;
     int32_t i, n = s->cascades;
+    ecs_os_memset_t(&cascade, 0, box_render_cascade_t);
+    if (ecs_vec_count(&gpu->cascade_slots) <= slot) {
+        ecs_vec_set_count_t(NULL, &gpu->cascade_slots, box_gpu_cascade_slot_t, slot + 1);
+    }
+
+    box_gpu_cascade_slot_t *cs = ecs_vec_get_t(
+        &gpu->cascade_slots, box_gpu_cascade_slot_t, slot);
+    cs->store = -1;
+    cs->renders = 0;
     if (!s->enabled || n < 1 || n > BOX_RENDER_SHADOW_CASCADES) {
         goto done;
     }
@@ -359,12 +544,36 @@ void box_gpu_shadow_uniforms(
         ecs_vec_set_count_t(NULL, &gpu->shadow_data, uint8_t, size);
     }
 
+    cs->renders = (1u << n) - 1u;
+    if (s->reuse && v->view) {
+        cs->store = box_gpu_cascade_store(gpu, v, frame);
+        store = ecs_vec_get_t(&gpu->cascade_stores, box_gpu_cascade_store_t, cs->store);
+        if (store->revision != gpu->shadow_revision ||
+            ecs_os_memcmp(store->proj, proj, sizeof(mat4)))
+        {
+            store->valid = 0;
+        }
+
+        glm_mat4_copy(proj, store->proj);
+        cs->renders &= s->render | ~store->valid;
+    }
+
     float distance = s->splits[n - 1];
     float last = n > 1 ? s->splits[n - 2] : s->near_;
     for (i = 0; i < n; i ++) {
-        box_render_shadow_cascade(ECS_CONST_CAST(vec4*, v->camera_transform), proj,
-            i ? s->splits[i - 1] : s->near_, s->splits[i], s->direction, s->resolution,
-            distance, &cascade);
+        if (cs->renders & (1u << i)) {
+            box_render_shadow_cascade(ECS_CONST_CAST(vec4*, v->camera_transform), proj,
+                i ? s->splits[i - 1] : s->near_, s->splits[i], s->direction, s->resolution,
+                distance, &cascade);
+        }
+
+        if (store && (cs->renders & (1u << i))) {
+            store->fits[i] = cascade;
+            store->valid &= ~(1u << i);
+        } else if (store) {
+            cascade = store->fits[i];
+        }
+
         ecs_os_memcpy(ecs_vec_get_t(&gpu->shadow_data, uint8_t,
             (slot * BOX_RENDER_SHADOW_CASCADES + i) * BOX_GPU_CASCADE_STRIDE),
             cascade.matrix, sizeof(mat4));
@@ -655,7 +864,6 @@ static void box_gpu_shadow_map_ensure(
     box_gpu_t *gpu,
     const box_render_view_shadows_t *s)
 {
-    int32_t i;
     if (gpu->shadow_map && gpu->shadow_resolution == s->resolution &&
         gpu->shadow_cascades == s->cascades)
     {
@@ -663,34 +871,8 @@ static void box_gpu_shadow_map_ensure(
     }
 
     box_gpu_shadow_map_free(gpu);
-    WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { (uint32_t)s->resolution, (uint32_t)s->resolution, (uint32_t)s->cascades },
-        .format = BOX_GPU_SHADOW_FORMAT,
-        .mipLevelCount = 1,
-        .sampleCount = 1
-    };
-    gpu->shadow_map = wgpuDeviceCreateTexture(gpu->device, &desc);
-    gpu->shadow_map_view = wgpuTextureCreateView(gpu->shadow_map, &(WGPUTextureViewDescriptor){
-        .format = BOX_GPU_SHADOW_FORMAT,
-        .dimension = WGPUTextureViewDimension_2DArray,
-        .mipLevelCount = 1,
-        .arrayLayerCount = (uint32_t)s->cascades,
-        .aspect = WGPUTextureAspect_DepthOnly
-    });
-    for (i = 0; i < s->cascades; i ++) {
-        gpu->shadow_layers[i] = wgpuTextureCreateView(gpu->shadow_map,
-            &(WGPUTextureViewDescriptor){
-                .format = BOX_GPU_SHADOW_FORMAT,
-                .dimension = WGPUTextureViewDimension_2D,
-                .mipLevelCount = 1,
-                .baseArrayLayer = (uint32_t)i,
-                .arrayLayerCount = 1,
-                .aspect = WGPUTextureAspect_DepthOnly
-            });
-    }
-
+    box_gpu_shadow_layers_create(gpu, s->resolution, s->cascades, &gpu->shadow_map,
+        &gpu->shadow_map_view, gpu->shadow_layers);
     gpu->shadow_resolution = s->resolution;
     gpu->shadow_cascades = s->cascades;
 done:
@@ -841,15 +1023,29 @@ void box_gpu_shadow_render(
     int32_t slot)
 {
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
+    const box_gpu_cascade_slot_t *cs = box_gpu_cascade_slot(gpu, slot);
+    box_gpu_cascade_store_t *store = cs && cs->store >= 0
+        ? ecs_vec_get_t(&gpu->cascade_stores, box_gpu_cascade_store_t, cs->store)
+        : NULL;
+    WGPUTextureView *layers = store ? store->layers : gpu->shadow_layers;
     WGPURenderPipeline pipeline = NULL;
     int32_t i;
-    if (!v->shadows.enabled || box_gpu_shadow_binding(gpu, v) != gpu->shadow_map_view) {
+    if (!v->shadows.enabled || !cs) {
+        goto done;
+    }
+
+    if (!store && box_gpu_shadow_binding(gpu, v) != gpu->shadow_map_view) {
         goto done;
     }
 
     pipeline = box_gpu_shadow_pipeline(gpu);
     if (!pipeline || !gpu->shadow_buffer) {
         goto done;
+    }
+
+    if (store && store->revision != gpu->shadow_revision) {
+        store->valid = 0;
+        store->revision = gpu->shadow_revision;
     }
 
     WGPUBindGroupEntry entry = {
@@ -861,11 +1057,17 @@ void box_gpu_shadow_render(
         .entries = &entry
     });
     for (i = 0; i < v->shadows.cascades; i ++) {
+        if (!(cs->renders & (1u << i))) {
+            box_gpu_count(gpu, BOX_GPU_STAT_CASCADE_KEPT);
+            continue;
+        }
+
         const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, i);
         uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
             BOX_GPU_CASCADE_STRIDE);
+        bool complete = false;
         WGPURenderPassDepthStencilAttachment depth = {
-            .view = gpu->shadow_layers[i],
+            .view = layers[i],
             .depthLoadOp = WGPULoadOp_Clear,
             .depthStoreOp = WGPUStoreOp_Store,
             .depthClearValue = 0.0f
@@ -874,12 +1076,16 @@ void box_gpu_shadow_render(
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         if (cv) {
-            box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow, gpu->shadow_cutout, false,
-                true);
+            complete = box_gpu_shadow_draw(gpu, pass, packet, cv, gpu->shadow,
+                gpu->shadow_cutout, false, true);
         }
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
+        box_gpu_count(gpu, BOX_GPU_STAT_CASCADE);
+        if (store && complete) {
+            store->valid |= 1u << i;
+        }
     }
 
     wgpuBindGroupRelease(group);
@@ -1033,10 +1239,22 @@ WGPUTextureView box_gpu_shadow_binding(
     const box_render_view_t *v)
 {
     WGPUTextureView result = gpu->shadow_empty_view;
+    int32_t i;
     if (!v->shadows.enabled || v->shadows.cascades < 1 ||
         v->shadows.cascades > BOX_RENDER_SHADOW_CASCADES)
     {
         goto done;
+    }
+
+    if (v->shadows.reuse) {
+        for (i = 0; i < ecs_vec_count(&gpu->cascade_stores); i ++) {
+            const box_gpu_cascade_store_t *store = ecs_vec_get_t(
+                &gpu->cascade_stores, box_gpu_cascade_store_t, i);
+            if (store->view == v->view && store->array) {
+                result = store->array;
+                goto done;
+            }
+        }
     }
 
     box_gpu_shadow_map_ensure(gpu, &v->shadows);

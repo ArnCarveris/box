@@ -998,6 +998,7 @@ static int32_t box_gpu_view_write(
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
     box_gpu_cull_begin(gpu, packet);
     box_gpu_planar_begin(gpu);
+    box_gpu_shadow_begin(gpu, packet->frame);
     for (i = 0; i < count; i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
         if (!box_gpu_target_has_view(frame, v)) {
@@ -1019,7 +1020,7 @@ static int32_t box_gpu_view_write(
         u->viewport[2] = 1.0f / (float)(t->desc.render_width > 0 ? t->desc.render_width : 1);
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_light_uniforms(gpu, v, proj, u);
-        box_gpu_shadow_uniforms(gpu, v, proj, result, u);
+        box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame, u);
         box_gpu_atlas_uniforms(gpu, v, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);
@@ -1383,8 +1384,8 @@ static void box_gpu_draw_snapshot(
  * volumes, then the particles of its scene, draw after the 3D meshes shared by every view and
  * before the 2D shapes and the blended draws, in the phases that draw those.
  *
- * After a depth prepass the opaque meshes draw with the Equal pipelines, both the early and the
- * late arguments of a view that culls by occlusion, so they draw what the prepasses drew. A
+ * After a depth prepass the opaque meshes draw once with the Equal pipelines and the early
+ * arguments, which the late phase of occlusion appends to: what both prepasses drew. A
  * view with WireframeOnly draws none of its mesh batches: its debug pass wires them instead.
  *
  * @param gpu The backend
@@ -1421,7 +1422,6 @@ static void box_gpu_draw_batches(
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
     bool particles = phase == 1;
-    bool late = phase == 3 && box_gpu_cull_occludes(gpu, slot);
     bool wired = v->debug.wireframe == WireframeOnly;
     int32_t i;
     vp->front = -1;
@@ -1499,13 +1499,6 @@ static void box_gpu_draw_batches(
         }
 
         if (box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, phase == 2 && mesh, true,
-            &instances))
-        {
-            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
-            vp->drawn |= !b->transmissive;
-        }
-
-        if (late && mesh && box_gpu_cull_draw(gpu, vp->pass, packet, d, 2, true, true,
             &instances))
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
@@ -1805,11 +1798,6 @@ bool box_gpu_draw_overdraw(
     wgpuRenderPassEncoderSetViewport(pass, 0, 0, (float)width, (float)height, 0, 1);
     box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, false, format,
         BOX_GPU_STAT_DRAW);
-    if (box_gpu_cull_occludes(gpu, slot)) {
-        box_gpu_draw_prepass_draws(gpu, pass, packet, v, group, slot, true, format,
-            BOX_GPU_STAT_DRAW);
-    }
-
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 done:

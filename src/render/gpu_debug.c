@@ -1429,7 +1429,8 @@ static bool box_gpu_debug_view_sequence(
 }
 
 /** Record the wire draws of a view in its debug pass: every mesh batch of its cull view with
- * the early and the late arguments the cull pass wrote, as box_gpu_draw_batches draws them.
+ * the early arguments the cull pass wrote, which hold what the late phase kept too, as
+ * box_gpu_draw_batches draws them.
  *
  * @param gpu The backend
  * @param pass The debug pass, with the view group bound
@@ -1477,12 +1478,6 @@ static void box_gpu_debug_wire_draws(
         }
 
         if (box_gpu_cull_draw_wire(gpu, pass, packet, d, 2, false, gpu->debug->sequence,
-            &instances))
-        {
-            box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
-        }
-
-        if (box_gpu_cull_draw_wire(gpu, pass, packet, d, 2, true, gpu->debug->sequence,
             &instances))
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);

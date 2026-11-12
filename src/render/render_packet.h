@@ -327,8 +327,12 @@ typedef enum box_render_resource_kind_t {
                                   *   cubemap of its handle */
     BOX_RENDER_ATMOSPHERE_ENVIRONMENT, /**< Sky an Atmosphere renders into the cubemap of its
                                        *   handle */
-    BOX_RENDER_SHADOW_ATLAS /**< Depth32Float shadow atlas of the spot and point light tiles of
-                             *   a scene */
+    BOX_RENDER_SHADOW_ATLAS, /**< Depth32Float shadow atlas of the spot and point light tiles
+                             *   of a scene */
+    BOX_RENDER_TEXTURE_GRAPH, /**< Compiled TextureGraph the backend evaluates into the image
+                             *   of the texture of its handle, box_render_texture_graph_t */
+    BOX_RENDER_TEXTURE_NODE_KIND /**< Node kind of the texture graphs whose id is its handle,
+                             *   box_render_texture_node_kind_t */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -493,6 +497,12 @@ typedef struct box_render_view_shadows_t {
     float near_;            /**< View depth the first cascade starts at */
     float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
     float direction[3];     /**< Direction toward the light that casts the shadows */
+    uint32_t render;        /**< Mask of the cascades that render in this frame; the others keep
+                             *   their depth and the matrix of the frame they rendered in, which
+                             *   the renderer also renders when it does not hold them */
+    bool reuse;             /**< A cascade has a ShadowSettings.interval above 1: the cascades
+                             *   live in a shadow map of the view, which no other view renders
+                             *   into, else in the one the views share */
     bool spots;             /**< The view samples the spot and point light tiles of the atlas
                              *   of its scene: it renders shadows and is lit; filter_size,
                              *   depth_bias and normal_offset apply, in texels of a tile */
@@ -1758,6 +1768,13 @@ typedef struct box_render_null_t {
     int64_t bytes;              /**< Upload bytes received in total */
     int64_t targets;            /**< Targets received in total */
     int64_t transitions;        /**< Transition records received in total */
+    int64_t texture_graphs;     /**< Texture graph creates received in total */
+    int64_t texture_graph_destroys; /**< Texture graph destroys received in total */
+    int64_t texture_node_kinds; /**< Texture node kind creates received in total */
+    ecs_map_t graphs;           /**< Texture handle to a copy of the description of the last
+                                 *   graph created for it and not destroyed, see
+                                 *   box_render_null_texture_graph */
+    ecs_map_t node_kinds;       /**< Node kind id to a copy of its last description */
     box_render_packet_t last;   /**< Copy of the last packet */
 } box_render_null_t;
 

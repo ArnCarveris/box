@@ -6,9 +6,42 @@
 #include <boxrun.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
 #include <time.h>
+#ifdef _WIN32
+#include <io.h>
+
+#define STDERR_FILENO (2)
+#define isatty _isatty
+#define localtime_r(sec, tm) localtime_s(tm, sec)
+
+/** Seconds and microseconds of the time of day */
+struct timeval {
+    time_t tv_sec;  /**< Seconds since the epoch */
+    long tv_usec;   /**< Microseconds */
+};
+
+/** Get the time of day.
+ *
+ * @param tv Receives the time
+ * @param tz Unused
+ * @return 0
+ */
+static int gettimeofday(
+    struct timeval *tv,
+    void *tz)
+{
+    struct timespec ts;
+    (void)tz;
+    timespec_get(&ts, TIME_UTC);
+    tv->tv_sec = ts.tv_sec;
+    tv->tv_usec = (long)(ts.tv_nsec / 1000);
+
+    return 0;
+}
+#else
+#include <sys/time.h>
 #include <unistd.h>
+#endif
 
 /** Print a log message to stderr with the local time of day.
  *

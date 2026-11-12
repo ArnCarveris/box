@@ -137,7 +137,9 @@ static int box_app_option(
 {
     double v = 0;
     int result = -1;
-    if (!strcmp(flag, "camera") || !strcmp(flag, "out")) {
+    if (!strcmp(flag, "gpu")) {
+        result = value ? 0 : -1;
+    } else if (!strcmp(flag, "camera") || !strcmp(flag, "out")) {
         if (value && value[0] && value[0] != '-') {
             char **target = !strcmp(flag, "out") ? &app->out : &app->camera;
             ecs_os_free(*target);
@@ -199,7 +201,7 @@ static bool box_app_has_value(
     return !strcmp(flag, "frames") || !strcmp(flag, "timeout") ||
         !strcmp(flag, "cpu-budget") || !strcmp(flag, "fps") || !strcmp(flag, "delta-time") ||
         !strcmp(flag, "port") || !strcmp(flag, "surface") || !strcmp(flag, "camera") ||
-        !strcmp(flag, "out");
+        !strcmp(flag, "out") || !strcmp(flag, "gpu");
 }
 
 int box_app_parse(

@@ -10,6 +10,13 @@
 
 #ifdef BOX_RENDER_WGPU
 
+#ifdef _WIN32
+/* wingdi.h declares an AlphaBlend function, which is an enumerator of box/material.h */
+#define NOGDI
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 WGPURenderPipeline box_gpu_blit_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format)
@@ -410,10 +417,18 @@ static void box_gpu_target_surface(
     box_gpu_t *gpu,
     box_gpu_target_t *t)
 {
+#ifdef _WIN32
+    WGPUSurfaceSourceWindowsHWND source = {
+        .chain = { .sType = WGPUSType_SurfaceSourceWindowsHWND },
+        .hinstance = GetModuleHandleW(NULL),
+        .hwnd = t->desc.layer
+    };
+#else
     WGPUSurfaceSourceMetalLayer source = {
         .chain = { .sType = WGPUSType_SurfaceSourceMetalLayer },
         .layer = t->desc.layer
     };
+#endif
     WGPUSurfaceDescriptor desc = { .nextInChain = &source.chain };
     WGPUSurfaceCapabilities caps = {0};
     size_t i;

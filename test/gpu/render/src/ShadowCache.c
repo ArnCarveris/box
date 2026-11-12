@@ -19,6 +19,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "../../../../src/posix.h"
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION

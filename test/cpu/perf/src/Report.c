@@ -8,7 +8,7 @@
 #include "fake.h"
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 
 void Report_writes_json(void) {
     // testing/perf_flake

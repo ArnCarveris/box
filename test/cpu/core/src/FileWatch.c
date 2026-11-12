@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 

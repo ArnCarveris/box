@@ -14,6 +14,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "../../../../src/posix.h"
 
 /** a, e acute of 2 bytes, euro sign of 3 bytes and b: glyphs at offsets 0, 1, 3 and 6 */
 #define SPANS_MULTI_BYTE "a\xC3\xA9\xE2\x82\xAC" "b"

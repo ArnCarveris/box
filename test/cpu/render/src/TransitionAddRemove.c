@@ -31,7 +31,7 @@
 static const Tint tr_tint = {0, 0, 255, 200};
 
 /** Error messages logged since the collector was installed */
-static ecs_strbuf_t tr_errors = ECS_STRBUF_INIT;
+static ecs_strbuf_t tr_errors = {0};
 
 /** Log function the collector passes messages on to */
 static ecs_os_api_log_t tr_log = NULL;

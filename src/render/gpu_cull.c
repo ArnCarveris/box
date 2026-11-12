@@ -32,7 +32,8 @@
 #define BOX_GPU_CULL_PURGE (64)
 
 /** Words of an entry of a cull table: job, first scan word, workgroups, draw arguments, first
- * visible entry, counters and two unused, as ENTRY_WORDS of cull.wgsl */
+ * visible entry, counters, and for a late entry with a history its early draw arguments plus
+ * one and first early visible entry, else two zeros, as ENTRY_WORDS of cull.wgsl */
 #define BOX_GPU_CULL_ENTRY_WORDS (8)
 
 /** Words of a workgroup of the cull_instances list: job, first scan word, first table entry of
@@ -689,6 +690,8 @@ static void box_gpu_cull_table(
                 const box_gpu_cull_draw_t *draw = ecs_vec_get_t(&c->draws, box_gpu_cull_draw_t,
                     *ecs_vec_get_t(&c->entries, int32_t, dp->first_entry + k));
                 bool second = late && draw->late != UINT32_MAX;
+                bool merged = second && ecs_vec_get_t(&c->job_data, box_gpu_cull_job_t,
+                    (int32_t)dp->first)->history != UINT32_MAX;
                 uint32_t *e = ecs_vec_grow_t(NULL, &pg->table_data, uint32_t,
                     BOX_GPU_CULL_ENTRY_WORDS);
                 e[0] = dp->first;
@@ -697,8 +700,8 @@ static void box_gpu_cull_table(
                 e[3] = second ? draw->late : draw->args;
                 e[4] = second ? draw->base + draw->count : draw->base;
                 e[5] = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, grp->first_view + f)->counter;
-                e[6] = 0;
-                e[7] = 0;
+                e[6] = merged ? draw->args + 1 : 0;
+                e[7] = merged ? draw->base : 0;
                 table.entries += pass ? 0 : 1;
                 k ++;
             }
@@ -1469,10 +1472,6 @@ static bool box_gpu_cull_stats_read(
             }
 
             int32_t kept = (int32_t)counts[draw->args * BOX_GPU_CULL_ARGS + 1];
-            if (draw->late != UINT32_MAX) {
-                kept += (int32_t)counts[draw->late * BOX_GPU_CULL_ARGS + 1];
-            }
-
             if (cv->cascade < 0 || !all) {
                 out->tested += (int32_t)draw->count;
                 out->visible += kept;

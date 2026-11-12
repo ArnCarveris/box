@@ -65,6 +65,9 @@ void box_render_shadow_settings(
     out->depth_bias = glm_max(settings->depth_bias, 0.0f);
     out->normal_offset = glm_max(settings->normal_offset, 0.0f);
     out->min_caster_texels = glm_max(settings->min_caster_texels, 0.0f);
+    for (int32_t i = 0; i < BOX_RENDER_SHADOW_CASCADES; i ++) {
+        out->interval[i] = settings->interval[i] > 1 ? settings->interval[i] : 1;
+    }
 }
 
 void box_render_shadow_splits(
@@ -209,13 +212,138 @@ void box_render_shadow_cascade(
     out->depth_range = range;
 }
 
+/** What the cascades of a view were fitted to: a change renders every cascade at once */
+typedef struct box_shadows_key_t {
+    int32_t cascades;       /**< Cascades */
+    int32_t resolution;     /**< Edge of a cascade in texels */
+    float max_distance;     /**< ShadowSettings.max_distance */
+    float split_lambda;     /**< ShadowSettings.split_lambda */
+    float min_texels;       /**< ShadowSettings.min_caster_texels */
+    float near_;            /**< View depth the first cascade starts at */
+    float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
+    float direction[3];     /**< Direction toward the light */
+    Camera camera;          /**< Settings of the camera, its projection */
+} box_shadows_key_t;
+
+/** The cascades of a view in the earlier extracts */
+typedef struct box_shadows_history_t {
+    box_shadows_key_t key;  /**< What the cascades were fitted to in the last extract */
+    int64_t count;          /**< Extracts since every cascade last rendered */
+    int64_t seen;           /**< Extract that last resolved the cascades of the view */
+    uint32_t rendered;      /**< Cascades the last extract scheduled */
+} box_shadows_history_t;
+
+/** State of the shadow extract */
+typedef struct box_shadows_t {
+    ecs_map_t views;        /**< View entity to box_shadows_history_t */
+    int64_t extract;        /**< Extracts run */
+    int32_t rendered;       /**< Cascades the extract scheduled */
+    int32_t kept;           /**< Cascades the extract kept from an earlier frame */
+} box_shadows_t;
+
+/** Check whether two cascade keys are the same.
+ *
+ * @param a The first key
+ * @param b The second key
+ * @return Whether every member is equal
+ */
+static bool box_shadows_key_equal(
+    const box_shadows_key_t *a,
+    const box_shadows_key_t *b)
+{
+    int32_t i;
+    bool result = a->cascades == b->cascades && a->resolution == b->resolution &&
+        a->max_distance == b->max_distance && a->split_lambda == b->split_lambda &&
+        a->min_texels == b->min_texels && a->near_ == b->near_ &&
+        a->camera.fov == b->camera.fov && a->camera.near_ == b->camera.near_ &&
+        a->camera.far_ == b->camera.far_ && a->camera.aspect_ratio == b->camera.aspect_ratio &&
+        a->camera.ortho == b->camera.ortho && a->camera.ortho_height == b->camera.ortho_height &&
+        a->camera.ortho_scale == b->camera.ortho_scale;
+    for (i = 0; i < BOX_RENDER_SHADOW_CASCADES; i ++) {
+        result = result && a->splits[i] == b->splits[i];
+    }
+
+    for (i = 0; i < 3; i ++) {
+        result = result && a->direction[i] == b->direction[i];
+    }
+
+    return result;
+}
+
+/** Decide which cascades of a view render in this frame.
+ *
+ * Each cascade renders when the extracts since every cascade last rendered, plus its index,
+ * are a multiple of its interval; every cascade renders when the view is new to the extract or
+ * what its cascades are fitted to changed.
+ *
+ * @param state The state of the extract
+ * @param v The view, with its shadows resolved
+ * @param s The resolved settings of the view
+ */
+static void box_shadows_schedule(
+    box_shadows_t *state,
+    box_render_view_t *v,
+    const ShadowSettings *s)
+{
+    box_render_view_shadows_t *out = &v->shadows;
+    box_shadows_history_t *h = ecs_map_get_deref(
+        &state->views, box_shadows_history_t, v->view);
+    box_shadows_key_t key;
+    uint32_t all = (1u << out->cascades) - 1u;
+    int32_t i;
+    ecs_os_memset_t(&key, 0, box_shadows_key_t);
+    key.cascades = out->cascades;
+    key.resolution = out->resolution;
+    key.max_distance = s->max_distance;
+    key.split_lambda = s->split_lambda;
+    key.min_texels = out->min_texels;
+    key.near_ = out->near_;
+    for (i = 0; i < out->cascades; i ++) {
+        key.splits[i] = out->splits[i];
+        out->reuse = out->reuse || s->interval[i] > 1;
+    }
+
+    glm_vec3_copy(out->direction, key.direction);
+    key.camera = v->camera_data;
+    if (!h) {
+        h = ecs_os_calloc_t(box_shadows_history_t);
+        ecs_map_insert_ptr(&state->views, v->view, h);
+        h->count = -1;
+    }
+
+    if (h->count < 0 || !box_shadows_key_equal(&h->key, &key)) {
+        h->key = key;
+        h->count = 0;
+        out->render = all;
+    } else {
+        h->count ++;
+        for (i = 0; i < out->cascades; i ++) {
+            if ((h->count + i) % s->interval[i] == 0) {
+                out->render |= 1u << i;
+            }
+        }
+    }
+
+    h->seen = state->extract;
+    h->rendered = out->render;
+    for (i = 0; i < out->cascades; i ++) {
+        if (out->render & (1u << i)) {
+            state->rendered ++;
+        } else {
+            state->kept ++;
+        }
+    }
+}
+
 /** Resolve the shadows of a view of the packet.
  *
  * @param world The world
+ * @param state The state of the extract
  * @param v The view
  */
 static void box_shadows_view(
     ecs_world_t *world,
+    box_shadows_t *state,
     box_render_view_t *v)
 {
     box_render_view_shadows_t *out = &v->shadows;
@@ -258,30 +386,87 @@ static void box_shadows_view(
     out->near_ = near_;
     box_render_shadow_splits(near_, distance, s.split_lambda, s.cascades, out->splits);
     glm_vec3_normalize_to(v->lights.sun, out->direction);
+    box_shadows_schedule(state, v, &s);
 done:
     return;
 }
 
-/** Resolve the shadows of every view of the packet.
+/** Resolve the shadows of every view of the packet, then forget the views it did not resolve
+ * cascades for and write the cascade counts of RenderStatus.
  *
- * @param it The iterator of the system
+ * @param it The iterator of the system, its ctx the state of the extract
  */
 static void BoxRenderExtractShadows(
     ecs_iter_t *it)
 {
+    box_shadows_t *state = it->ctx;
     box_render_packet_t *p = box_render_packet(it->world);
     int32_t i, count = ecs_vec_count(&p->views);
+    state->extract ++;
+    state->rendered = 0;
+    state->kept = 0;
     for (i = 0; i < count; i ++) {
-        box_shadows_view(it->world, ecs_vec_get_t(&p->views, box_render_view_t, i));
+        box_shadows_view(it->world, state, ecs_vec_get_t(&p->views, box_render_view_t, i));
     }
+
+    ecs_map_iter_t mit = ecs_map_iter(&state->views);
+    while (ecs_map_next(&mit)) {
+        box_shadows_history_t *h = ecs_map_ptr(&mit);
+        if (h->seen != state->extract) {
+            ecs_map_remove(&state->views, ecs_map_key(&mit));
+            ecs_os_free(h);
+            mit = ecs_map_iter(&state->views);
+        }
+    }
+
+    RenderStatus *status = ecs_singleton_get_mut(it->world, RenderStatus);
+    if (status) {
+        status->shadow_cascades = state->rendered;
+        status->shadow_cascades_kept = state->kept;
+    }
+}
+
+/** Free the state of the shadow extract.
+ *
+ * @param ctx The state
+ */
+static void box_shadows_free(
+    void *ctx)
+{
+    box_shadows_t *state = ctx;
+    ecs_map_iter_t it = ecs_map_iter(&state->views);
+    while (ecs_map_next(&it)) {
+        ecs_os_free(ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&state->views);
+    ecs_os_free(state);
+}
+
+uint32_t box_render_shadow_rendered(
+    const ecs_world_t *world,
+    ecs_entity_t view)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractShadows");
+    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const box_shadows_t *state = sys ? sys->ctx : NULL;
+    const box_shadows_history_t *h = state
+        ? ecs_map_get_deref(&state->views, box_shadows_history_t, view)
+        : NULL;
+
+    return h && h->seen == state->extract ? h->rendered : 0;
 }
 
 void box_render_shadows_init(
     ecs_world_t *world)
 {
+    box_shadows_t *state = ecs_os_calloc_t(box_shadows_t);
+    ecs_map_init(&state->views, NULL);
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractShadows" }),
         .phase = RenderExtract,
-        .run = BoxRenderExtractShadows
+        .run = BoxRenderExtractShadows,
+        .ctx = state,
+        .ctx_free = box_shadows_free
     });
 }

@@ -6,7 +6,8 @@
  * engine then writes Texture and TextureStatus, and PbrTextures (box/material.h) samples it.
  *
  * A TextureGen generates a seamless height, albedo or normal map from noise, blocks and cells
- * instead, on the job system as well.
+ * instead, on the job system as well. A TextureGraph computes its image from a graph of node
+ * entities on the render backend.
  */
 
 #ifndef BOX_TEXTURE_H
@@ -240,15 +241,195 @@ ECS_STRUCT(TextureGen, {
                                      *   texture, whatever its size */
 });
 
-/** Progress of the load of a TexturePath or a TextureGen */
+/** Coordinates a TextureGraph is evaluated over, which TexCoords outputs */
+ECS_ENUM(TextureGraphDomain, {
+    DomainPlane = 0,  /**< The image plane: (u, v, 0, 1) with u and v in 0..1, v 0 at the top,
+                       *   the default */
+    DomainSphere = 1  /**< The unit sphere of an equirectangular image: (x, y, z, 1), the
+                       *   direction of the texel, y up */
+});
+
+/** What the image of a TextureGraph stores */
+ECS_ENUM(TextureGraphFormat, {
+    GraphColor = 0,  /**< RGBA8 display encoded from the linear output, the default */
+    GraphLinear = 1, /**< RGBA8 stored as the output is, for normal and ORM maps */
+    GraphSingle = 2, /**< R8 of the first channel of the output, as a GenHeight TextureGen */
+    GraphHdr = 3     /**< RGBA16Float of the linear output, for emissive maps */
+});
+
+/** Type of a value that flows between the nodes of a TextureGraph */
+ECS_ENUM(TextureValueType, {
+    TexScalar = 0, /**< One float */
+    TexVector = 1  /**< Four floats */
+});
+
+/** Texture whose image a graph of node entities computes per texel on the render backend.
+ *
+ * Each node entity has one node component such as TexMath, whose entity members are its
+ * inputs; the graph is the output node and every node it reaches. A change of either builds it
+ * again. It writes Texture and TextureStatus as a TexturePath does, capped by texture_quality.
+ *
+ * A cycle, a deleted node, an entity without a node component by the next frame or an input of
+ * the wrong type fails it, and so does a TexturePath or a TextureGen on the same entity.
+ *
+ * @code
+ * plating {
+ *   uv     { TexCoords: {} }
+ *   bright { TexMath: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
+ *   tinted { TexMath: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
+ *   TextureGraph: {output: tinted, width: 1024}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TextureGraph, {
+    ecs_entity_t output;       /**< Node whose value becomes the image */
+    int32_t width;             /**< Width in pixels, 0 for 512 */
+    int32_t height;            /**< Height in pixels, 0 for the width */
+    TextureGraphDomain domain; /**< Coordinates of the texels, default DomainPlane */
+    TextureGraphFormat format; /**< What the image stores, default GraphColor */
+});
+
+/** Node of a TextureGraph with a constant value */
+ECS_STRUCT(TexConstant, {
+    vec4 value; /**< The value */
+});
+
+/** Node of a TextureGraph whose value is the coordinates of the texel in the domain of the
+ * graph, see TextureGraphDomain */
+ECS_STRUCT(TexCoords, {
+    float scale; /**< Factor of the coordinates, 0 for 1 */
+});
+
+/** Operation of a TexMath node */
+ECS_ENUM(TextureMathOp, {
+    MathAdd = 0,      /**< a + b, the default */
+    MathSubtract = 1, /**< a - b */
+    MathMultiply = 2, /**< a * b */
+    MathMin = 3,      /**< min(a, b) */
+    MathMax = 4,      /**< max(a, b) */
+    MathMix = 5,      /**< mix(a, b, c): a where c is 0, b where c is 1 */
+    MathClamp = 6     /**< clamp(a, b, c): a limited to b..c */
+});
+
+/** Node of a TextureGraph that combines two or three vectors per channel. An input without a
+ * node takes its value member instead. */
+ECS_STRUCT(TexMath, {
+    TextureMathOp op;   /**< Operation, default MathAdd */
+    ecs_entity_t a;     /**< First input node, 0 for a_value */
+    ecs_entity_t b;     /**< Second input node, 0 for b_value */
+    ecs_entity_t c;     /**< Third input node of MathMix and MathClamp, 0 for c_value */
+    vec4 a_value;       /**< Value of a without a node */
+    vec4 b_value;       /**< Value of b without a node */
+    vec4 c_value;       /**< Value of c without a node */
+});
+
+/** Most inputs of a node kind */
+#define BOX_TEXTURE_NODE_INPUTS (4)
+
+/** Most parameters of a node kind */
+#define BOX_TEXTURE_NODE_PARAMS (8)
+
+/** Most bytes of the parameters of a node kind in the parameter buffer */
+#define BOX_TEXTURE_NODE_PARAM_BYTES (64)
+
+/** Flag of a node kind that reads its inputs at other texels, so they are materialized */
+#define BOX_TEXTURE_NODE_NEIGHBOURHOOD (1u << 0)
+
+/** Flag of a node kind whose value depends on time */
+#define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
+
+/** An input port of a node kind, as TextureNodeKind lists it */
+ECS_STRUCT(TextureNodePort, {
+    const char *name;      /**< Member of the ecs_entity_t of the input node */
+    TextureValueType type; /**< Type the input node must output */
+    bool fallback;         /**< The input has a constant member used without a node */
+});
+
+/** A parameter of a node kind, as TextureNodeKind lists it */
+ECS_STRUCT(TextureNodeParam, {
+    const char *name;   /**< Member copied into the parameter buffer */
+    int32_t offset;     /**< Byte offset in the parameters of a node */
+    int32_t size;       /**< Bytes, 4 to 16 */
+});
+
+/** Description of a node kind, set by the engine on the component entity of each registered
+ * kind so tools can list kinds and check connections from the world */
+ECS_STRUCT(TextureNodeKind, {
+    int32_t id;              /**< Id of the kind in the compiled graphs, from 1 */
+    TextureValueType output; /**< Type of the value of the node */
+    int32_t input_count;     /**< Inputs in inputs */
+    TextureNodePort inputs[4]; /**< The BOX_TEXTURE_NODE_INPUTS inputs, in order */
+    int32_t param_count;     /**< Parameters in params */
+    TextureNodeParam params[8]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
+    int32_t param_size;      /**< Bytes of the parameters of a node, a multiple of 16 */
+    const char *function;    /**< Name of the WGSL function of the node */
+    bool neighbourhood;      /**< The node reads its inputs at other texels */
+    bool animated;           /**< The node depends on time */
+});
+
+/** Kind of the scalar elements of a parameter of a node kind */
+typedef enum box_texture_param_kind_t {
+    BOX_TEXTURE_PARAM_F32 = 0, /**< float elements, f32 in WGSL */
+    BOX_TEXTURE_PARAM_I32 = 1, /**< int32_t elements, such as an enum, i32 in WGSL */
+    BOX_TEXTURE_PARAM_U32 = 2  /**< uint32_t elements, u32 in WGSL */
+} box_texture_param_kind_t;
+
+/** An input of a node kind: an ecs_entity_t member of its component */
+typedef struct box_texture_node_input_t {
+    const char *name;           /**< Name of the member, NULL ends the list */
+    ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
+    TextureValueType type;      /**< Type the input node must output */
+    const char *value;          /**< Name of the constant member used without a node, a float
+                                 *   for TexScalar or a vec4 for TexVector, NULL for none */
+    ecs_size_t value_offset;    /**< Offset of that member */
+} box_texture_node_input_t;
+
+/** A parameter of a node kind: a member copied into the parameter buffer */
+typedef struct box_texture_node_param_t {
+    const char *name;           /**< Name of the member, NULL ends the list */
+    ecs_size_t offset;          /**< Offset of the member */
+    ecs_size_t size;            /**< Bytes of the member: 4, 8, 12 or 16 */
+    box_texture_param_kind_t kind; /**< Kind of its elements */
+} box_texture_node_param_t;
+
+/** Description of a node kind for box_texture_node_register.
+ *
+ * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
+ * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
+ * order, a scalar in x and the constant of an input without a node, and the coordinates.
+ *
+ * It returns the value of the node, a scalar in x.
+ */
+typedef struct box_texture_node_desc_t {
+    ecs_entity_t component;     /**< Component of the nodes of the kind */
+    TextureValueType output;    /**< Type of the value of the node */
+    box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs in order */
+    box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters in order */
+    const char *function;       /**< Name of the WGSL function */
+    const char *source;         /**< WGSL source that defines the function */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+} box_texture_node_desc_t;
+
+/** Register a node kind, or replace the kind of a component registered before; the graphs
+ * that use it build again. box.texture registers the built in kinds this way.
+ *
+ * @param world The world, with box.texture imported
+ * @param desc The kind
+ * @return The id of the kind, 0 when the description is invalid
+ */
+int32_t box_texture_node_register(
+    ecs_world_t *world,
+    const box_texture_node_desc_t *desc);
+
+/** Progress of the load of a TexturePath, a TextureGen or a TextureGraph */
 ECS_ENUM(TextureState, {
     TextureLoading = 0, /**< A load is in flight */
     TextureReady = 1,   /**< The last load succeeded and Texture holds its size */
     TextureFailed = 2   /**< The last load failed, error says why */
 });
 
-/** Outcome of the loads of a TexturePath or a TextureGen, written by the engine and read only
- * for applications */
+/** Outcome of the loads of a TexturePath, a TextureGen or a TextureGraph, written by the
+ * engine and read only for applications */
 ECS_STRUCT(TextureStatus, {
     TextureState state; /**< Progress of the last requested load */
     int32_t revision;   /**< Loads that succeeded, the image changed when it increments */

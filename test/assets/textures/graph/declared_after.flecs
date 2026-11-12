@@ -1,0 +1,10 @@
+// A graph whose output node is declared before the graph and gets its node component after it.
+
+using box.texture
+
+panel {
+  tinted {}
+  TextureGraph: {output: tinted, width: 64, height: 32, format: GraphLinear}
+  uv { TexCoords: {scale: 2} }
+  tinted { TexMath: {op: MathMix, a: uv, b_value: {1, 0, 0, 1}, c_value: {0.5, 0.5, 0.5, 0.5}} }
+}

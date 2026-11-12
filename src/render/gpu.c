@@ -755,6 +755,12 @@ void box_gpu_count(
     case BOX_GPU_STAT_SHADOW_DRAW:
         gpu->pending.shadow_draws ++;
         break;
+    case BOX_GPU_STAT_CASCADE:
+        gpu->pending.shadow_cascades ++;
+        break;
+    case BOX_GPU_STAT_CASCADE_KEPT:
+        gpu->pending.shadow_cascades_kept ++;
+        break;
     case BOX_GPU_STAT_COPY_DIRECT:
         gpu->pending.copies_direct ++;
         break;
@@ -816,6 +822,8 @@ void box_gpu_stats_publish(
     s->shadow_reused += p->shadow_reused;
     s->shadow_passes += p->shadow_passes;
     s->shadow_draws += p->shadow_draws;
+    s->shadow_cascades += p->shadow_cascades;
+    s->shadow_cascades_kept += p->shadow_cascades_kept;
     s->copies_direct += p->copies_direct;
     s->copies_staged += p->copies_staged;
     s->copy_staging = (int64_t)gpu->copy_staging_size;
