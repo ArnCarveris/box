@@ -80,6 +80,26 @@ assets {
   }
   prefab ShipPlumeCore { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Opacity: {0.2}; BlendMode: Additive; Emissive: {strength: 16, color: {255, 255, 255}}; PbrTextures: {emissive: yard_tex_plume_core}; Animator: {clip: yard_drive_flicker} }
 
+  prefab yard_weld_flicker {
+    AnimationClip: {duration: 0.5}
+    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 12}, {0.06, 30}, {0.1, 4}, {0.18, 26}, {0.27, 8}, {0.33, 34}, {0.42, 6}, {0.5, 12}]}} }
+  }
+  prefab ShipWeld { Rgb: {220, 240, 255}; Emissive: {strength: 12, color: {170, 220, 255}}; Animator: {clip: yard_weld_flicker} }
+
+  prefab ShipVisor { Rgb: {12, 14, 20}; PbrMaterial: {metallic: 0.3, roughness: 0.06}; ClearCoat: {strength: 1, roughness: 0.02} }
+  prefab ShipScanner { Rgb: {255, 70, 50}; Emissive: {strength: 8, color: {255, 40, 24}} }
+  prefab yard_scan {
+    AnimationClip: {duration: 1.2}
+    x { AnimationTrack: {component: box.transform.Position, member: "x", curve: {keys: [{0, -0.95}, {1.2, 0.95}]}} }
+  }
+
+  prefab yard_data_blink {
+    AnimationClip: {duration: 1}
+    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 5}, {0.18, 5}, {0.2, 0.4}, {0.45, 0.4}, {0.47, 5}, {0.62, 5}, {0.64, 0.4}, {0.7, 0.4}, {0.72, 5}, {1, 5}]}} }
+  }
+  prefab ShipDataCyan { Rgb: {96, 220, 240}; Emissive: {strength: 5, color: {80, 214, 255}} }
+  prefab ShipDataAmber { Rgb: {255, 180, 70}; Emissive: {strength: 5, color: {255, 160, 50}} }
+
   prefab ShipWarning { Rgb: {255, 70, 50}; Emissive: {strength: 3, color: {255, 50, 30}}; Animator: {clip: yard_pulse} }
 
   prefab YardDeck { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; TextureMapping: {MappingWorld, size: 4} }
