@@ -138,6 +138,7 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->groups, box_gpu_cull_group_t, 0);
     ecs_vec_init_t(NULL, &c->entries, int32_t, 0);
     ecs_vec_init_t(NULL, &c->masks, uint32_t, 0);
+    ecs_vec_init_t(NULL, &c->skips, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->sort, box_gpu_cull_sort_t, 0);
     ecs_vec_init_t(NULL, &c->frustums, box_gpu_cull_desc_t, 0);
     if (gpu->timestamps) {
@@ -249,6 +250,7 @@ void box_gpu_cull_fini(
     ecs_vec_fini_t(NULL, &c->groups, box_gpu_cull_group_t);
     ecs_vec_fini_t(NULL, &c->entries, int32_t);
     ecs_vec_fini_t(NULL, &c->masks, uint32_t);
+    ecs_vec_fini_t(NULL, &c->skips, uint32_t);
     ecs_vec_fini_t(NULL, &c->sort, box_gpu_cull_sort_t);
     ecs_vec_fini_t(NULL, &c->frustums, box_gpu_cull_desc_t);
     if (c->stamps) {
@@ -397,14 +399,17 @@ static void box_gpu_cull_publish(
             continue;
         }
 
-        int32_t visible = (int32_t)words[0], frustum = (int32_t)words[1];
+        int32_t visible = (int32_t)words[0];
+        int32_t frustum = (int32_t)words[1] + rec->untested;
         int32_t hidden = rec->tested - visible - frustum;
         st->status = (CullStatus){
             .frame = r->frame,
             .instances = rec->tested,
             .visible = visible,
             .frustum_culled = frustum,
-            .occlusion_culled = hidden > 0 ? hidden : 0
+            .occlusion_culled = hidden > 0 ? hidden : 0,
+            .batches_skipped = rec->skipped,
+            .casters_skipped = rec->casters_skipped
         };
     }
 
@@ -1253,9 +1258,22 @@ void box_gpu_cull_finish(
             NULL, &r->records, box_gpu_cull_record_t);
         rec->view = cv->view;
         rec->counter = cv->counter;
-        rec->tested = 0;
+        rec->tested = cv->skipped_untested;
+        rec->untested = cv->skipped_untested;
+        rec->skipped = cv->skipped;
+        rec->casters_skipped = 0;
         for (d = cv->first_draw; d < cv->first_draw + cv->draw_count; d ++) {
             rec->tested += (int32_t)ecs_vec_get_t(&c->draws, box_gpu_cull_draw_t, d)->count;
+        }
+
+        for (d = 0; d < count; d ++) {
+            const box_gpu_cull_view_t *cascade = ecs_vec_get_t(
+                &c->views, box_gpu_cull_view_t, d);
+            if (cascade->view == cv->view && cascade->slot == cv->slot &&
+                cascade->cascade >= 0)
+            {
+                rec->casters_skipped += cascade->skipped;
+            }
         }
     }
 
@@ -1438,9 +1456,21 @@ static bool box_gpu_cull_stats_read(
         }
 
         result = true;
+        if (cv->cascade < 0 || !all) {
+            out->tested += cv->skipped_untested;
+            out->skipped += cv->skipped;
+        } else {
+            out->casters_tested += cv->skipped_untested;
+            out->casters_skipped += cv->skipped;
+        }
+
         for (d = cv->first_draw; d < cv->first_draw + cv->draw_count; d ++) {
             const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
                 &c->draws, box_gpu_cull_draw_t, d);
+            if (draw->args == UINT32_MAX) {
+                continue;
+            }
+
             int32_t kept = (int32_t)counts[draw->args * BOX_GPU_CULL_ARGS + 1];
             if (cv->cascade < 0 || !all) {
                 out->tested += (int32_t)draw->count;

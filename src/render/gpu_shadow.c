@@ -991,7 +991,7 @@ static bool box_gpu_shadow_draw(
             pipeline = plain;
         }
 
-        if (!pipeline) {
+        if (!pipeline || d->skip) {
             continue;
         }
 
@@ -1622,6 +1622,10 @@ static void box_gpu_atlas_counts(
                 for (d = 0; cv && d < cv->draw_count; d ++) {
                     const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
                         &c->draws, box_gpu_cull_draw_t, cv->first_draw + d);
+                    if (draw->skip) {
+                        continue;
+                    }
+
                     *ecs_vec_append_t(NULL, &gpu->atlas_reads, box_gpu_atlas_read_t) =
                         (box_gpu_atlas_read_t){ a->first + j, draw->args, draw->count };
                 }

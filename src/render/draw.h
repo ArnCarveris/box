@@ -410,6 +410,15 @@ typedef struct box_draw_batch_t {
     bool bounded;           /**< A slot holds a parametric surface, see center and extent */
     float center[3];        /**< Center of the local bounds of every slot, when bounded */
     float extent[3];        /**< Half size of the local bounds of every slot, when bounded */
+    bool world_dirty;       /**< A slot, its transform or its surface changed since the world
+                             *   bounds were computed */
+    bool world_valid;       /**< world_min, world_max and world_radius hold the world bounds */
+    float world_local[6];   /**< Local center and extent the world bounds were computed with */
+    float world_min[3];     /**< Minimum corner of the world bounds of its slots, padded */
+    float world_max[3];     /**< Maximum corner of the world bounds of its slots, padded */
+    float world_radius;     /**< Largest radius of the world box of a slot, padded */
+    int64_t record_frame;   /**< Frame of the packet its batch record was last sent in */
+    int32_t record;         /**< Index of that record in the batches of the packet */
     int64_t transform_frame; /**< Frame of the packet the transform stream of its run was last
                              *   uploaded in */
     uint32_t transform_data; /**< Offset of that upload in the packet data, where the transform
@@ -1809,6 +1818,34 @@ void box_draws_order_position(
 void box_draws_send_ordered(
     box_render_packet_t *p,
     box_render_draws_t *d);
+
+/** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the
+ * bounds of each surface, and of the mesh for a slot without one. A plain mesh batch keeps no
+ * surfaces, so it is not bounded and draws with the bounds of its mesh.
+ *
+ * @param b The batch
+ * @param cache The mesh cache
+ */
+void box_draws_bounds(
+    box_draw_batch_t *b,
+    box_mesh_cache_t *cache);
+
+/** Compute the world bounds of a batch: the box around the world box the cull pass computes for
+ * each slot (bounds of cull.wgsl) from the local bounds it tests, and the largest radius of such
+ * a box. Both are padded, so rounding never makes them smaller than what the GPU computes.
+ *
+ * A batch without DynamicTransform computes them again only when a slot, its transform or its
+ * surface changed, or its local bounds did. A dynamic batch computes them every frame from the
+ * transforms box_draws_dynamic just wrote, one pass over its slots.
+ *
+ * @param b The batch, ready
+ * @param cache The mesh cache
+ * @param wanted Whether a view of the packet culls batches by their bounds
+ */
+void box_draws_world_bounds(
+    box_draw_batch_t *b,
+    box_mesh_cache_t *cache,
+    bool wanted);
 
 /** Write the texture handles and the sampler wrap of a batch into its draw.
  *

@@ -81,6 +81,11 @@ ECS_STRUCT(CullStatus, {
     int32_t visible;        /**< Instances the view drew */
     int32_t frustum_culled; /**< Instances outside the frustum or below the smallest size */
     int32_t occlusion_culled; /**< Instances in the frustum hidden behind closer geometry */
+    int32_t batches_skipped; /**< Batches whose draws the view skipped by their bounds
+                             *   (CullSettings.bounds), 0 without; their instances count as
+                             *   frustum culled */
+    int32_t casters_skipped; /**< Batches whose draws the shadow cascades of the view skipped by
+                             *   their bounds, summed over the cascades */
 });
 
 /** Register the box.render module.

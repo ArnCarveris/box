@@ -1468,7 +1468,7 @@ static void box_gpu_debug_wire_draws(
 
         box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
         WGPUBindGroup group = m ? box_gpu_debug_mesh_group(gpu, m) : NULL;
-        if (!group) {
+        if (!group || d->skip) {
             continue;
         }
 

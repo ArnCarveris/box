@@ -308,6 +308,7 @@ static void box_render_extract_view(
     v->cull.occlusion = view->culling.enabled && view->culling.occlusion &&
         view->debug.wireframe != WireframeOnly;
     v->cull.min_dimension = view->culling.min_dimension_px;
+    v->cull.bounds = view->culling.enabled && view->culling.bounds;
     v->features = box_render_view_features(world, v->scene, &view->lighting);
     v->scene_features = box_render_scene_features(world, v->scene);
     if (transform) {

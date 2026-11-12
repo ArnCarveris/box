@@ -1121,7 +1121,8 @@ static void box_transition_send_pose(
 }
 
 /** Send the slot record of a transform a node moves, when its batch uploaded its run into this
- * packet; a moving shadow caster records the bounds of the poses it can render at.
+ * packet; a moving shadow caster records the bounds of the poses it can render at. The batch
+ * record loses its world bounds: they hold the target, and the resolver renders another pose.
  *
  * @param world The world
  * @param s The state of the extract
@@ -1157,6 +1158,10 @@ static void box_transition_send_slot(
         p, BOX_RENDER_TRANSITION_SLOT, node);
     r->data = box_transition_matrix(p, rel);
     r->offset = b->transform_data + (uint32_t)slot * (uint32_t)sizeof(box_render_transform_t);
+    if (b->record_frame == p->frame) {
+        ecs_vec_get_t(&p->batches, box_render_batch_t, b->record)->bounds = false;
+    }
+
     if (range && d->shadow_record && box_draws_caster(b)) {
         box_draws_range_region(world, b, slot, range, rel, ecs_vec_append_t(
             NULL, &s->shadow_regions, box_render_shadow_region_t));

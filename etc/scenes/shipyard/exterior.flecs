@@ -1483,29 +1483,32 @@ assets {
     RackFrame frame(pz: pz, nz: nz)
     deck : ShipHullDark { Position: {0, 0.19, 0}; Box: {3.56, 0.06, 3.56} }
     for a in 0..2 {
-      const ax = a == 0 ? -1.14 : 1.14
-      "aisle_{a}" : ShipRecess { Position: {ax, 0.224, 0}; Box: {0.9, 0.01, 4} }
+      const ax = a == 0 ? -0.65 : 0.65
+      "aisle_{a}" : ShipRecess { Position: {ax, 0.224, 0}; Box: {0.4, 0.01, 4} }
       for s in 0..2 {
-        "aisle_edge_{a}_{s}" : ShipCyanLight { Position: {ax + (s == 0 ? -0.43 : 0.43), 0.23, 0}; Box: {0.03, 0.01, 4} }
+        "aisle_edge_{a}_{s}" : ShipCyanLight { Position: {ax + (s == 0 ? -0.18 : 0.18), 0.23, 0}; Box: {0.03, 0.01, 4} }
       }
       for i in 0..10 {
-        "grate_{a}_{i}" : ShipTrim { Position: {ax, 0.232, -1.8 + i * 0.4}; Box: {0.84, 0.008, 0.05} }
+        "grate_{a}_{i}" : ShipTrim { Position: {ax, 0.232, -1.8 + i * 0.4}; Box: {0.34, 0.008, 0.05} }
       }
     }
     if roof {
       lid : ShipHullDark { Position: {0, CH - 0.05, 0}; Box: {3.56, 0.08, 3.56} }
     }
 
-    for c in 0..3 {
-      "rack_{c}" {
-        Position: {0, 0, -1.14 + c * 1.14}
-        Rotation: {0, HALF_PI, 0}
-        DataRack r(seed: seed + c * 3)
+    for w in 0..3 {
+      const wx = (w - 1) * 1.3
+      for c in 0..3 {
+        "rack_{w}_{c}" {
+          Position: {wx, 0, -1.14 + c * 1.14}
+          Rotation: {0, HALF_PI, 0}
+          DataRack r(seed: seed + w * 9 + c * 3)
+        }
       }
+      "supply_{w}" : ShipCopper { Position: {wx + 0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
+      "return_{w}" : ShipTeal { Position: {wx - 0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
+      "frost_{w}" : ShipWhite { Position: {wx + 0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.074, length: 0.3, segments: 6, smooth: true} }
     }
-    supply : ShipCopper { Position: {0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
-    return : ShipTeal { Position: {-0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
-    frost : ShipWhite { Position: {0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.074, length: 0.3, segments: 6, smooth: true} }
 
     tray : ShipHullDark { Position: {0, 2.76, 0}; Box: {0.4, 0.03, 4} }
     cable_a : ShipRed { Position: {-0.1, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }

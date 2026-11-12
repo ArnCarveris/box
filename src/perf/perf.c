@@ -457,20 +457,22 @@ static void box_perf_range(
  *
  * @param perf The state of the module
  * @param status The status whose ranges are updated
- * @param counts The visible, frustum culled and occlusion culled instances
+ * @param counts The visible, frustum culled and occlusion culled instances, the batches skipped
+ *   by the views and by their cascades
  */
 static void box_perf_cull_count(
     box_perf_t *perf,
     PerfStatus *status,
-    const int32_t counts[3])
+    const int32_t counts[5])
 {
-    PerfRange *ranges[3] = {
-        &status->visible, &status->frustum_culled, &status->occlusion_culled
+    PerfRange *ranges[5] = {
+        &status->visible, &status->frustum_culled, &status->occlusion_culled,
+        &status->batches_skipped, &status->casters_skipped
     };
     bool changed = false;
     int32_t i;
     status->cull_samples ++;
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 5; i ++) {
         changed |= status->cull_samples > 1 && counts[i] != perf->cull_last[i];
         perf->cull_last[i] = counts[i];
         perf->cull_sum[i] += counts[i];
@@ -494,7 +496,7 @@ static void box_perf_sample_cull(
     PerfStatus *status,
     ecs_entity_t camera)
 {
-    int32_t counts[3] = {0, 0, 0};
+    int32_t counts[5] = {0, 0, 0, 0, 0};
     int64_t frame = -1;
     int32_t views = 0;
     ecs_iter_t it = ecs_each(world, View);
@@ -513,6 +515,8 @@ static void box_perf_sample_cull(
                 counts[0] += cull->visible;
                 counts[1] += cull->frustum_culled;
                 counts[2] += cull->occlusion_culled;
+                counts[3] += cull->batches_skipped;
+                counts[4] += cull->casters_skipped;
                 frame = cull->frame > frame ? cull->frame : frame;
             }
         }

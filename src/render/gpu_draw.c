@@ -1210,7 +1210,7 @@ static void box_gpu_draw_glass(
 
         WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b,
             WGPUTextureFormat_Undefined);
-        if (!pipeline) {
+        if (!pipeline || d->skip) {
             continue;
         }
 
@@ -1480,6 +1480,11 @@ static void box_gpu_draw_batches(
             continue;
         }
 
+        if (d->skip) {
+            vp->drawn |= !b->transmissive;
+            continue;
+        }
+
         if (pipeline != bound) {
             wgpuRenderPassEncoderSetPipeline(vp->pass, pipeline);
             bound = pipeline;
@@ -1612,7 +1617,7 @@ static void box_gpu_draw_pass(
 
 /** Check whether a view draws a depth prepass: it is lit with LightSettings.depth_prepass, not
  * WireframeOnly, its camera has a depth range and it draws an opaque or alpha tested mesh with a
- * mesh shader.
+ * mesh shader. A batch it skips by its bounds counts, so the bounds never change its passes.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -1693,7 +1698,7 @@ static void box_gpu_draw_prepass_draws(
         }
 
         WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b, count);
-        if (!pipeline) {
+        if (!pipeline || d->skip) {
             continue;
         }
 

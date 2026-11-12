@@ -363,6 +363,10 @@ typedef struct box_gpu_cull_history_t {
  * are not transmissive, without occlusion */
 #define BOX_GPU_CULL_REFLECT (1u << 5)
 
+/** Flag of a frustum that skips the batches whose world bounds (box_render_batch_t.bounds) are
+ * outside it or too small in it, CullSettings.bounds */
+#define BOX_GPU_CULL_BOUNDS (1u << 6)
+
 /** Bytes between the uniforms of two dispatches, the dynamic offset alignment of webgpu */
 #define BOX_GPU_CULL_STRIDE (256)
 
@@ -402,6 +406,10 @@ typedef struct box_gpu_cull_view_t {
     box_gpu_hiz_t *hiz;             /**< Pyramid of a view that culls by occlusion, else NULL */
     WGPUBindGroup group;            /**< History and pyramid, or the empty ones */
     bool report;                    /**< Its counts become the CullStatus, false for captures */
+    int32_t skipped;                /**< Batches it does not draw by their bounds */
+    int32_t skipped_untested;       /**< Instances of those without a job, which count as tested
+                                     *   and frustum culled; the job of the frustum with a
+                                     *   history still runs, so the GPU counts those */
 } box_gpu_cull_view_t;
 
 /** A batch a cull view draws: where its visible instances and its draw arguments are */
@@ -412,6 +420,10 @@ typedef struct box_gpu_cull_draw_t {
     uint32_t page;                  /**< Page that holds its visible slots */
     uint32_t base;                  /**< First of its entries in the visible slots of the page */
     uint32_t count;                 /**< Instances it tests */
+    bool skip;                      /**< Its cull view skips the batch by its bounds: a pass
+                                     *   records no draw but requests its pipelines, as when it
+                                     *   draws no instance. Only the frustum with a history has
+                                     *   arguments for it, else args and late are UINT32_MAX */
 } box_gpu_cull_draw_t;
 
 /** A dispatch of the cull pass: the parallel job of a batch of a group and phase, with the
@@ -526,6 +538,10 @@ typedef struct box_gpu_cull_group_t {
 typedef struct box_gpu_cull_record_t {
     ecs_entity_t view;              /**< Entity of the view */
     int32_t tested;                 /**< Instances it tested */
+    int32_t untested;               /**< Instances of the batches it skipped by their bounds
+                                     *   without testing them, frustum culled */
+    int32_t skipped;                /**< Batches it skipped by their bounds */
+    int32_t casters_skipped;        /**< Batches its cascades skipped by their bounds */
     uint32_t counter;               /**< Index of its counters */
 } box_gpu_cull_record_t;
 
@@ -644,6 +660,8 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t entries;              /**< int32_t, the draw of each frustum of a parallel job */
     ecs_vec_t masks;                /**< uint32_t, the frustums of the group being added that
                                      *   draw each batch of the packet */
+    ecs_vec_t skips;                /**< uint32_t, the frustums of the group being added that
+                                     *   skip each batch of the packet by its bounds */
     ecs_vec_t sort;                 /**< box_gpu_cull_sort_t, the batches of the group being
                                      *   added in the order of their draws */
     ecs_vec_t frustums;             /**< Frustums of the view being added */

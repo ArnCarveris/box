@@ -123,6 +123,79 @@ done:
     return result;
 }
 
+/** Check whether the cull pass keeps no instance of a batch in a frustum that culls batches by
+ * their bounds (BOX_GPU_CULL_BOUNDS), so the frustum can skip the draws of the batch. Batches of
+ * one view are always drawn, as their dispatches keep the order of their slots.
+ *
+ * The world box of the batch holds the world box the cull pass computes for each instance, so
+ * when it is outside a plane of the frustum every instance is (visible of cull.wgsl).
+ *
+ * With a smallest size, no instance passes it when the nearest w of the box is in front of the
+ * largest radius of an instance and that radius is below the size at that w. Padding and a
+ * margin make rounding keep batches, never skip them.
+ *
+ * @param b The batch
+ * @param f The frustum
+ * @return Whether the frustum keeps no instance of the batch, false for a batch without bounds
+ */
+static bool box_gpu_cull_outside(
+    const box_render_batch_t *b,
+    const box_gpu_cull_desc_t *f)
+{
+    bool result = false;
+    vec3 center, extent;
+    int32_t i;
+    if (!(f->flags & BOX_GPU_CULL_BOUNDS) || !b->bounds || b->view != -1) {
+        goto done;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        center[i] = (b->min[i] + b->max[i]) * 0.5f;
+        extent[i] = (b->max[i] - b->min[i]) * 0.5f;
+    }
+
+    for (i = 0; i < 6 && !result; i ++) {
+        const float *p = f->frustum.planes[i];
+        float d = p[0] * center[0] + p[1] * center[1] + p[2] * center[2] + p[3] +
+            fabsf(p[0]) * extent[0] + fabsf(p[1]) * extent[1] + fabsf(p[2]) * extent[2];
+        result = d < 0.0f;
+    }
+
+    const float *size = f->frustum.size;
+    if (!result && size[1] > 0.0f && size[0] > 0.0f) {
+        const float *cw = f->frustum.clip_w;
+        float w = cw[0] * center[0] + cw[1] * center[1] + cw[2] * center[2] + cw[3] -
+            fabsf(cw[0]) * extent[0] - fabsf(cw[1]) * extent[1] - fabsf(cw[2]) * extent[2];
+        float front = w * 0.999f;
+        result = w > 0.0f && front > b->radius * size[2] &&
+            2.0f * b->radius * size[0] < size[1] * front;
+    }
+
+done:
+    return result;
+}
+
+/** Check whether a view of a packet in a scene culls batches by their bounds, for the frustums
+ * of the scene that belong to no view: the tiles of its shadow atlas and its captures.
+ *
+ * @param packet The packet
+ * @param scene The scene
+ * @return Whether one does
+ */
+static bool box_gpu_cull_scene_bounds(
+    const box_render_packet_t *packet,
+    ecs_entity_t scene)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&packet->views) && !result; i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
+        result = v->scene == scene && v->cull.bounds;
+    }
+
+    return result;
+}
+
 /** Check whether the backend has what the cull pass of a batch needs.
  *
  * @param gpu The backend
@@ -397,6 +470,8 @@ done:
  * tests it again alone in a late job, the only job of its opaque 2D shapes.
  *
  * Blended and per view draws get their ordered dispatches once the group has all its draws.
+ * The frustum with a history keeps its job for a batch it skips by its bounds
+ * (box_gpu_cull_group_add), with a draw that skips.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -423,6 +498,7 @@ static void box_gpu_cull_batch_part(
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
     bool view = hist >= 0 && ((mask >> hist) & 1u);
     bool late = view && b->view == -1 && box_render_is_mesh(b->pipeline);
+    uint32_t skips = *ecs_vec_get_t(&c->skips, uint32_t, batch);
     int32_t draws[BOX_GPU_CULL_GROUP_VIEWS], first[BOX_GPU_CULL_GROUP_VIEWS];
     int32_t f, i, k = 0, n = 0;
     uint64_t slots = 0;
@@ -450,9 +526,10 @@ static void box_gpu_cull_batch_part(
             &c->views, box_gpu_cull_view_t, g->first_view + f);
         bool twice = late && f == hist;
         int32_t index = cv->first_draw + filled[f];
-        box_gpu_cull_draw_t *d = ecs_vec_get_t(&c->draws, box_gpu_cull_draw_t, index);
         filled[f] ++;
+        box_gpu_cull_draw_t *d = ecs_vec_get_t(&c->draws, box_gpu_cull_draw_t, index);
         d->batch = batch;
+        d->skip = (skips >> f) & 1u;
         d->args = (uint32_t)(ecs_vec_count(&c->arg_data) / BOX_GPU_CULL_ARGS);
         d->late = twice ? d->args + 1 : UINT32_MAX;
         d->page = (uint32_t)c->page_count - 1;
@@ -506,6 +583,44 @@ static void box_gpu_cull_batch_part(
 
 done:
     return;
+}
+
+/** Add the draws of a batch to frustums of the group being added that skip it by its bounds
+ * without a job: draws that skip, without arguments, so passes still request its pipelines.
+ *
+ * @param gpu The backend
+ * @param group Index of the cull group
+ * @param batch Index of the batch in the packet
+ * @param mask Frustums of the group that skip it without a job
+ * @param filled Draws added to each frustum, updated
+ */
+static void box_gpu_cull_batch_skip(
+    box_gpu_t *gpu,
+    int32_t group,
+    int32_t batch,
+    uint32_t mask,
+    int32_t *filled)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const box_gpu_cull_group_t *g = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, group);
+    int32_t f;
+    for (f = 0; f < g->view_count; f ++) {
+        if (!((mask >> f) & 1u)) {
+            continue;
+        }
+
+        const box_gpu_cull_view_t *cv = ecs_vec_get_t(
+            &c->views, box_gpu_cull_view_t, g->first_view + f);
+        box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &c->draws, box_gpu_cull_draw_t, cv->first_draw + filled[f]);
+        filled[f] ++;
+        *d = (box_gpu_cull_draw_t){
+            .batch = batch,
+            .args = UINT32_MAX,
+            .late = UINT32_MAX,
+            .skip = true
+        };
+    }
 }
 
 /** Add the draws of a batch to the frustums of the group being added that draw it, with its
@@ -660,7 +775,9 @@ done:
  * follow the plain ones. The opaque meshes are grouped by pipeline state and material group
  * within their phase (box_gpu_cull_sort_cmp), the rest keep packet order.
  *
- * A batch several frustums draw is one job with their mask. At most one frustum has a history.
+ * A batch is one job with the mask of the frustums that draw it, less those that skip it by
+ * its bounds (box_gpu_cull_outside) but for the one with a history, so the history is written
+ * as without the bounds. Each keeps a draw that skips, so its passes still request the batch.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -727,23 +844,44 @@ static void box_gpu_cull_group_add(
 
     g->frustums = box_gpu_cull_uniform(c, block, (uint32_t)sizeof(block));
     ecs_vec_set_count_t(NULL, &c->masks, uint32_t, batches);
+    ecs_vec_set_count_t(NULL, &c->skips, uint32_t, batches);
     uint32_t *masks = ecs_vec_first(&c->masks);
+    uint32_t *skips = ecs_vec_first(&c->skips);
     for (i = 0; i < batches; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        uint32_t mask = 0;
+        uint32_t mask = 0, skip = 0;
         for (f = 0; f < count; f ++) {
             if (box_gpu_cull_wants(gpu, b, scene, &frustums[f])) {
                 mask |= 1u << f;
+                if (box_gpu_cull_outside(b, &frustums[f])) {
+                    skip |= 1u << f;
+                }
             }
         }
 
         if (mask && !box_gpu_cull_ready(gpu, b)) {
             mask = 0;
+            skip = 0;
+        }
+
+        for (f = 0; skip && f < count; f ++) {
+            if (!((skip >> f) & 1u)) {
+                continue;
+            }
+
+            box_gpu_cull_view_t *cv = ecs_vec_get_t(
+                &c->views, box_gpu_cull_view_t, g->first_view + f);
+            cv->skipped ++;
+            if (f != hist) {
+                mask &= ~(1u << f);
+                cv->skipped_untested += (int32_t)b->instance_count;
+            }
         }
 
         masks[i] = mask;
+        skips[i] = skip;
         for (f = 0; f < count; f ++) {
-            counts[f] += (int32_t)((mask >> f) & 1u);
+            counts[f] += (int32_t)(((mask | skip) >> f) & 1u);
         }
     }
 
@@ -761,7 +899,7 @@ static void box_gpu_cull_group_add(
 
     ecs_vec_clear(&c->sort);
     for (i = 0; i < batches; i ++) {
-        if (masks[i]) {
+        if (masks[i] | skips[i]) {
             box_gpu_cull_sort_key(ecs_vec_get_t(&packet->batches, box_render_batch_t, i), i,
                 ecs_vec_append_t(NULL, &c->sort, box_gpu_cull_sort_t));
         }
@@ -774,8 +912,12 @@ static void box_gpu_cull_group_add(
     }
 
     for (i = 0; i < sorted; i ++) {
-        box_gpu_cull_batch_add(gpu, packet, group, order[i].batch, masks[order[i].batch],
-            filled, history, hist);
+        int32_t batch = order[i].batch;
+        box_gpu_cull_batch_skip(gpu, group, batch, skips[batch] & ~masks[batch], filled);
+        if (masks[batch]) {
+            box_gpu_cull_batch_add(gpu, packet, group, batch, masks[batch], filled, history,
+                hist);
+        }
     }
 
     for (f = 0; f < count; f ++) {
@@ -870,6 +1012,7 @@ void box_gpu_cull_add(
         view.frustum.size[1] = v->cull.min_dimension > 0 ? v->cull.min_dimension : 0.0f;
         view.frustum.size[2] = v->camera_data.ortho ? 0.0f : 1.0f;
         view.flags |= view.frustum.size[1] > 0 ? BOX_GPU_CULL_SIZE : 0;
+        view.flags |= v->cull.bounds && draws ? BOX_GPU_CULL_BOUNDS : 0;
     }
 
     if (v->cull.enabled && v->cull.occlusion) {
@@ -899,6 +1042,7 @@ void box_gpu_cull_add(
         cascade->flags = BOX_GPU_CULL_CASTERS;
         box_gpu_cull_frustum_all(&cascade->frustum);
         if (v->cull.enabled) {
+            cascade->flags |= v->cull.bounds ? BOX_GPU_CULL_BOUNDS : 0;
             vec4 *m = ECS_CONST_CAST(vec4*, u->shadow_matrix[i < cascades ? i : 0]);
             box_gpu_cull_planes(m, cascade->frustum.planes);
             if (v->shadows.min_texels > 0) {
@@ -948,6 +1092,7 @@ void box_gpu_cull_reflect_add(
         f.frustum.size[1] = v->cull.min_dimension > 0 ? v->cull.min_dimension : 0.0f;
         f.frustum.size[2] = 1.0f;
         f.flags |= f.frustum.size[1] > 0 ? BOX_GPU_CULL_SIZE : 0;
+        f.flags |= v->cull.bounds ? BOX_GPU_CULL_BOUNDS : 0;
     }
 
     c->exclude_page = exclude_page;
@@ -968,6 +1113,7 @@ void box_gpu_cull_casters_add(
 {
     box_gpu_cull_t *c = &gpu->cull;
     box_gpu_cull_uniforms_t base;
+    uint32_t bounds = box_gpu_cull_scene_bounds(packet, scene) ? BOX_GPU_CULL_BOUNDS : 0;
     int32_t i, o;
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
     ecs_vec_clear(&c->frustums);
@@ -983,7 +1129,7 @@ void box_gpu_cull_casters_add(
             f->slot = slot;
             f->cascade = BOX_GPU_ATLAS_FRUSTUM(i, o);
             f->index = -1;
-            f->flags = BOX_GPU_CULL_CASTERS;
+            f->flags = BOX_GPU_CULL_CASTERS | bounds;
             box_gpu_cull_frustum_all(&f->frustum);
             if (octahedral) {
                 box_render_shadow_octant_planes(&tiles[i], o, f->frustum.planes);
@@ -1053,7 +1199,8 @@ void box_gpu_cull_capture_add(
     f.cascade = cascade;
     f.index = -1;
     f.flags = BOX_GPU_CULL_BAKE | (cascade >= 0 ? BOX_GPU_CULL_CASTERS : 0) |
-        (pixels > 0 ? BOX_GPU_CULL_SIZE : 0);
+        (pixels > 0 ? BOX_GPU_CULL_SIZE : 0) |
+        (box_gpu_cull_scene_bounds(packet, scene) ? BOX_GPU_CULL_BOUNDS : 0);
     box_gpu_cull_planes(view_proj, f.frustum.planes);
     for (i = 0; i < 4; i ++) {
         f.frustum.clip_w[i] = view_proj[i][3];

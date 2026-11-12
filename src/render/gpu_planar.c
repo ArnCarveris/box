@@ -842,7 +842,7 @@ static void box_gpu_planar_draws(
 
         WGPURenderPipeline pipeline = box_gpu_forward_pipeline_mirrored(
             gpu, BOX_GPU_HDR_FORMAT, b, false, true);
-        if (!pipeline) {
+        if (!pipeline || d->skip) {
             continue;
         }
 

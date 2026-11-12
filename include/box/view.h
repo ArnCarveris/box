@@ -106,6 +106,10 @@ ECS_STRUCT(CullSettings, {
     bool enabled;           /**< Cull by frustum and size, false draws every instance */
     bool occlusion;         /**< Also cull instances hidden behind what the view drew */
     float min_dimension_px; /**< Projected size in pixels below which an instance is culled */
+    bool bounds;            /**< Also skip the draws of a whole batch in a frustum (the view, a
+                             *   cascade) when the world box around its instances is outside it
+                             *   or too small there, before the GPU tests its instances; needs
+                             *   enabled, renders the same image, default false */
 });
 
 /** Settings of the infinite grid a view draws in its debug pass: the plane y = height, with

@@ -489,6 +489,17 @@
                 ]
             },
             {
+                "id": "BatchBounds",
+                "testcases": [
+                    "none_without_view_bounds",
+                    "cover_instances",
+                    "follow_scale_and_rotation",
+                    "static_follow_change",
+                    "dynamic_every_frame",
+                    "view_turns_bounds_on"
+                ]
+            },
+            {
                 "id": "ShadowAtlas",
                 "setup": true,
                 "testcases": [
