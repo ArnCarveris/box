@@ -399,7 +399,11 @@
                     "null_backend_remove",
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
-                    "custom_kind_sent"
+                    "custom_kind_sent",
+                    "builtin_time_splat",
+                    "time_into_vector_fails",
+                    "null_backend_rate",
+                    "cache_budget_packet"
                 ]
             },
             {

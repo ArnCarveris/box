@@ -944,6 +944,7 @@ WGPUTextureView box_gpu_texture_color(
 {
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS] = {0};
     textures[0] = handle & BOX_RENDER_TEXTURE_TARGET ? 0 : handle;
+    box_gpu_texture_graph_sampled(gpu, textures[0]);
     box_gpu_material_mips(gpu, textures);
 
     return box_gpu_material_view(gpu, textures[0], 0);
@@ -956,6 +957,7 @@ WGPUTextureView box_gpu_texture_cookie(
     box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
         ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
         : NULL;
+    box_gpu_texture_graph_sampled(gpu, handle);
 
     return tex ? tex->linear : NULL;
 }
@@ -973,6 +975,14 @@ WGPUBindGroup box_gpu_material_group(
     uint64_t hash;
     ecs_map_val_t *head;
     int32_t i;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        box_gpu_texture_graph_sampled(gpu, b->textures[i]);
+    }
+
+    if (b->water) {
+        box_gpu_texture_graph_sampled(gpu, b->foam);
+    }
+
     if (box_gpu_texture_blends(b)) {
         result = box_gpu_blend_group(gpu, packet, b);
         goto done;

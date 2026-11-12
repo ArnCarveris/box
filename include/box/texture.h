@@ -287,6 +287,23 @@ ECS_STRUCT(TextureGraph, {
     int32_t height;            /**< Height in pixels, 0 for the width */
     TextureGraphDomain domain; /**< Coordinates of the texels, default DomainPlane */
     TextureGraphFormat format; /**< What the image stores, default GraphColor */
+    float rate;                /**< Updates per second of an animated graph, 0 for every frame.
+                                *   An animated graph whose image no draw sampled in the
+                                *   previous frame skips its updates until one samples it */
+});
+
+/** Settings of the cache of the values the texture graphs materialize, a singleton.
+ *
+ * Values are cached by the content hash of their node (its kind, parameters, inputs, the size and
+ * domain of the graph) for every graph, so an edit evaluates only the stages after the edited
+ * node, graphs with an identical subgraph share it and an edit undone finds the earlier value.
+ *
+ * Values no graph uses stay while the cache fits the budget, the least recently used evicted
+ * first; values in use are never evicted, even over the budget.
+ */
+ECS_STRUCT(TextureGraphCache, {
+    int64_t budget; /**< Bytes the cache holds at most, 0 for 256 MB: values no graph uses are
+                     *   evicted while it holds more */
 });
 
 /** Node of a TextureGraph with a constant value */
@@ -298,6 +315,21 @@ ECS_STRUCT(TexConstant, {
  * graph, see TextureGraphDomain */
 ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 0 for 1 */
+});
+
+/** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
+ * times scale plus offset, so a paused world shows the same image. It makes the nodes after it
+ * and their graph animated, see TextureGraph.rate */
+ECS_STRUCT(TexTime, {
+    float scale;  /**< Factor of the seconds, 0 for 1 */
+    float offset; /**< Added after the factor */
+});
+
+/** Node of a TextureGraph that spreads a scalar over the four channels of a vector, such as a
+ * TexTime into a TexMath */
+ECS_STRUCT(TexSplat, {
+    ecs_entity_t in; /**< Scalar input node, 0 for in_value */
+    float in_value;  /**< Value of in without a node */
 });
 
 /** Operation of a TexMath node */

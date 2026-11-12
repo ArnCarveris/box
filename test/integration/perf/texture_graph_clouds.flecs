@@ -1,0 +1,53 @@
+// Animated texture graphs: eight panels whose emission samples a drifting cloud layer of
+// test/assets/textures/graph/clouds, each at its own speed and 30 updates per second, and 24
+// animated layers no draw samples, which skip their updates. Every layer mixes the same static sky
+// gradient, a stage the cache shares.
+
+include test/assets/textures/graph/clouds
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.perf
+
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {12, 0.2, 6}
+  Rgb: {90, 96, 104}
+}
+
+for row in 0..2 {
+  for col in 0..4 {
+    {
+      Position: {col * 2.6 - 3.9, 1.2 + row * 2.4, 0}
+      Box: {2.2, 2.2, 0.2}
+      Rgb: {0, 0, 0}
+      PbrMaterial: {metallic: 1, roughness: 1}
+      Emissive: {strength: 1, color: {255, 255, 255}}
+      clouds.CloudLayer layer(speed: 0.02 + (row * 4 + col) * 0.01, rate: 30, size: 512)
+      PbrTextures: {emissive: layer}
+    }
+  }
+}
+
+offscreen {
+  for i in 0..24 {
+    {
+      clouds.CloudLayer layer(speed: 0.03 + i * 0.005, rate: 0, size: 512)
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 60, frames: 600, warmup: 60, period: 10, elevation: 20, camera: camera}
+}

@@ -1036,7 +1036,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 5);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1073,7 +1073,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 5);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1165,7 +1165,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 3);
+    test_int(second->texture_node_kinds, 5);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1192,7 +1192,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 4);
+    test_int(null->texture_node_kinds, 6);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1201,6 +1201,130 @@ void TextureGraph_custom_kind_sent(void) {
     test_int(k->flags, BOX_TEXTURE_NODE_ANIMATED);
     test_str(box_render_texture_node_kind_function(k), "test_scalar");
     test_str(box_render_texture_node_kind_source(k), test_scalar_wgsl);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void TextureGraph_builtin_time_splat(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexTime), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 0);
+    test_int(kind->param_count, 2);
+    test_str(kind->params[0].name, "scale");
+    test_int(kind->params[0].offset, 0);
+    test_str(kind->params[1].name, "offset");
+    test_int(kind->params[1].offset, 4);
+    test_int(kind->param_size, 16);
+    test_str(kind->function, "box_tex_time");
+    test_bool(kind->animated, true);
+    test_bool(kind->neighbourhood, false);
+
+    kind = ecs_get(world, ecs_id(TexSplat), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "in");
+    test_int(kind->inputs[0].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, true);
+    test_str(kind->function, "box_tex_splat");
+    test_bool(kind->animated, false);
+
+    ecs_entity_t time = ecs_entity(world, { .name = "time" });
+    ecs_entity_t splat = ecs_entity(world, { .name = "splat" });
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_set(world, time, TexTime, { .scale = 2, .offset = 0.5f });
+    ecs_set(world, splat, TexSplat, { .in = time });
+    ecs_set(world, tex, TextureGraph, { .output = splat, .width = 8 });
+    ecs_progress(world, 0);
+    const TextureStatus *status = ecs_get(world, tex, TextureStatus);
+    test_assert(status != NULL);
+    test_int(status->state, TextureReady);
+
+    const box_texture_t *entry = entry_of(world, tex);
+    test_int(entry->graph->node_count, 2);
+    test_int(entry->graph->nodes[0].kind, kind_id(world, ecs_id(TexTime)));
+    test_int(entry->graph->nodes[1].inputs[0], 0);
+    float params[2];
+    ecs_os_memcpy(params, entry->graph->params + entry->graph->nodes[0].params, 8);
+    test_flt(params[0], 2);
+    test_flt(params[1], 0.5f);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_time_into_vector_fails(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t time = ecs_entity(world, { .name = "time" });
+    ecs_entity_t math = ecs_entity(world, { .name = "math" });
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_set(world, time, TexTime, { .scale = 1 });
+    ecs_set(world, math, TexMath, { .op = MathAdd, .a = time });
+    ecs_set(world, tex, TextureGraph, { .output = math, .width = 8 });
+    ecs_log_set_level(-4);
+    frame_status(world, tex);
+    ecs_log_set_level(-1);
+    test_failed(world, tex, "node 'time' outputs Scalar", "input 'a' of node 'math'");
+
+    ecs_fini(world);
+}
+
+void TextureGraph_null_backend_rate(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    uint32_t handle = entry_of(world, tex)->handle;
+    const box_render_texture_graph_t *g = box_render_null_texture_graph(null, handle);
+    test_assert(g != NULL);
+    test_flt(g->rate, 0);
+    test_int(null->texture_graphs, 1);
+    uint64_t structure = g->structure_hash, params = g->param_hash;
+
+    TextureGraph *graph = ecs_get_mut(world, tex, TextureGraph);
+    graph->rate = 12;
+    ecs_modified(world, tex, TextureGraph);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(null->texture_graphs, 2);
+    g = box_render_null_texture_graph(null, handle);
+    test_flt(g->rate, 12);
+    test_assert(g->structure_hash == structure);
+    test_assert(g->param_hash == params);
+
+    graph = ecs_get_mut(world, tex, TextureGraph);
+    graph->rate = -1;
+    ecs_modified(world, tex, TextureGraph);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(null->texture_graphs, 3);
+    test_flt(box_render_null_texture_graph(null, handle)->rate, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void TextureGraph_cache_budget_packet(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_assert(null->last.texture_graph_budget == 0);
+
+    ecs_singleton_set(world, TextureGraphCache, { .budget = 4096 });
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_assert(null->last.texture_graph_budget == 4096);
 
     ecs_fini(world);
     box_render_null_free(null);

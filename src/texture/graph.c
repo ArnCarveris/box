@@ -50,6 +50,21 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexTime node: the seconds of the world clock times its scale plus its offset */
+static const char *box_texture_time_wgsl =
+    "fn box_tex_time(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let scale = bitcast<f32>(p[0].x);\n"
+    "    let offset = bitcast<f32>(p[0].y);\n"
+    "    return vec4f(box_texgraph_stage.time * select(scale, 1.0, scale == 0.0) + offset, 0.0,\n"
+    "        0.0, 0.0);\n"
+    "}\n";
+
+/** WGSL of the TexSplat node: its scalar input in every channel */
+static const char *box_texture_splat_wgsl =
+    "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    return vec4f(i[0].x);\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -633,6 +648,7 @@ static box_texture_graph_t* box_texture_graph_compile(
         &result->height);
     result->domain = graph->domain;
     result->format = graph->format;
+    result->rate = graph->rate > 0 ? graph->rate : 0;
     result->node_count = ecs_vec_count(&b->nodes);
     result->nodes = ecs_os_memdup(ecs_vec_first(&b->nodes),
         result->node_count * ECS_SIZEOF(box_texture_graph_node_t));
@@ -660,14 +676,14 @@ static box_texture_graph_t* box_texture_graph_compile(
  *
  * @param a The first graph
  * @param b The second graph
- * @return Whether their size, domain, format, structure and parameters are the same
+ * @return Whether their size, domain, format, rate, structure and parameters are the same
  */
 static bool box_texture_graph_same(
     const box_texture_graph_t *a,
     const box_texture_graph_t *b)
 {
     return a->width == b->width && a->height == b->height && a->domain == b->domain &&
-        a->format == b->format && a->structure_hash == b->structure_hash &&
+        a->format == b->format && a->rate == b->rate && a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&
         a->param_size == b->param_size &&
         (!a->param_size || !ecs_os_memcmp(a->params, b->params, a->param_size));
@@ -862,7 +878,7 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexTime and TexSplat.
  *
  * @param world The world
  */
@@ -896,6 +912,28 @@ static void box_texture_nodes_register(
         .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexTime),
+        .output = TexScalar,
+        .params = {
+            { "scale", offsetof(TexTime, scale), 4, BOX_TEXTURE_PARAM_F32 },
+            { "offset", offsetof(TexTime, offset), 4, BOX_TEXTURE_PARAM_F32 }
+        },
+        .function = "box_tex_time",
+        .source = box_texture_time_wgsl,
+        .flags = BOX_TEXTURE_NODE_ANIMATED
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexSplat),
+        .output = TexVector,
+        .inputs = {
+            { "in", offsetof(TexSplat, in), TexScalar, "in_value", offsetof(TexSplat, in_value) }
+        },
+        .function = "box_tex_splat",
+        .source = box_texture_splat_wgsl
     });
 }
 

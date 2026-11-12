@@ -246,7 +246,7 @@ static void box_render_texture_graph_send(
     desc->structure_hash = graph->structure_hash;
     desc->param_hash = graph->param_hash;
     desc->serial = tex->graph_serial;
-    desc->pad = 0;
+    desc->rate = graph->rate;
     box_render_texture_graph_node_t *out = (box_render_texture_graph_node_t*)(desc + 1);
     for (i = 0; i < graph->node_count; i ++) {
         const box_texture_graph_node_t *node = &graph->nodes[i];
@@ -628,6 +628,8 @@ static void BoxRenderExtractTextures(
     ecs_vec_clear(&t->released);
     box_render_textures_send(p, t, restart);
     box_render_texture_graphs_send(p, t);
+    const TextureGraphCache *cache = ecs_singleton_get(world, TextureGraphCache);
+    p->texture_graph_budget = cache ? cache->budget : 0;
     p->anisotropy = box_render_anisotropy(world, t);
 done:
     return;
