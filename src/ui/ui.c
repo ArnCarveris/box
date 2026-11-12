@@ -37,7 +37,12 @@ static void box_ui_state_dtor(
             ecs_script_future_release(ecs_vec_get_t(&st->waiters, box_ui_waiter_t, w)->future);
         }
 
+        for (w = 0; w < ecs_vec_count(&st->timers); w ++) {
+            ecs_script_future_release(ecs_vec_get_t(&st->timers, box_ui_timer_t, w)->future);
+        }
+
         ecs_vec_fini_t(NULL, &st->waiters, box_ui_waiter_t);
+        ecs_vec_fini_t(NULL, &st->timers, box_ui_timer_t);
         ecs_vec_fini_t(NULL, &st->order, ecs_entity_t);
         ecs_vec_fini_t(NULL, &st->text, char);
         ecs_vec_fini_t(NULL, &st->paste, char);
@@ -116,6 +121,7 @@ void BoxUiImport(
     box_ui_state_t *st = ecs_os_calloc_t(box_ui_state_t);
     int32_t i;
     ecs_vec_init_t(NULL, &st->waiters, box_ui_waiter_t, 0);
+    ecs_vec_init_t(NULL, &st->timers, box_ui_timer_t, 0);
     ecs_vec_init_t(NULL, &st->order, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &st->text, char, 0);
     ecs_vec_init_t(NULL, &st->paste, char, 0);
