@@ -287,6 +287,23 @@ ECS_STRUCT(TextureGraph, {
     int32_t height;            /**< Height in pixels, 0 for the width */
     TextureGraphDomain domain; /**< Coordinates of the texels, default DomainPlane */
     TextureGraphFormat format; /**< What the image stores, default GraphColor */
+    float rate;                /**< Updates per second of an animated graph, 0 for every frame.
+                                *   An animated graph whose image no draw sampled in the
+                                *   previous frame skips its updates until one samples it */
+});
+
+/** Settings of the cache of the values the texture graphs materialize, a singleton.
+ *
+ * Values are cached by the content hash of their node (its kind, parameters, inputs, the size and
+ * domain of the graph) for every graph, so an edit evaluates only the stages after the edited
+ * node, graphs with an identical subgraph share it and an edit undone finds the earlier value.
+ *
+ * Values no graph uses stay while the cache fits the budget, the least recently used evicted
+ * first; values in use are never evicted, even over the budget.
+ */
+ECS_STRUCT(TextureGraphCache, {
+    int64_t budget; /**< Bytes the cache holds at most, 0 for 256 MB: values no graph uses are
+                     *   evicted while it holds more */
 });
 
 /** Node of a TextureGraph with a constant value */
@@ -298,6 +315,21 @@ ECS_STRUCT(TexConstant, {
  * graph, see TextureGraphDomain */
 ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 0 for 1 */
+});
+
+/** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
+ * times scale plus offset, so a paused world shows the same image. It makes the nodes after it
+ * and their graph animated, see TextureGraph.rate */
+ECS_STRUCT(TexTime, {
+    float scale;  /**< Factor of the seconds, 0 for 1 */
+    float offset; /**< Added after the factor */
+});
+
+/** Node of a TextureGraph that spreads a scalar over the four channels of a vector, such as a
+ * TexTime into a TexMath */
+ECS_STRUCT(TexSplat, {
+    ecs_entity_t in; /**< Scalar input node, 0 for in_value */
+    float in_value;  /**< Value of in without a node */
 });
 
 /** Operation of a TexMath node */
@@ -403,6 +435,7 @@ ECS_STRUCT(TextureNodePort, {
     const char *name;      /**< Member of the ecs_entity_t of the input node */
     TextureValueType type; /**< Type the input node must output */
     bool fallback;         /**< The input has a constant member used without a node */
+    const char *value;     /**< Name of that constant member, NULL without one */
 });
 
 /** A parameter of a node kind, as TextureNodeKind lists it */
@@ -496,6 +529,44 @@ ECS_STRUCT(TextureStatus, {
     TextureState state; /**< Progress of the last requested load */
     int32_t revision;   /**< Loads that succeeded, the image changed when it increments */
     char *error;        /**< Why the last load failed, NULL unless state is TextureFailed */
+});
+
+/** Preview of the value of a node of a TextureGraph, which a tool such as tools/texgraph sets
+ * on a node entity to see it. With the GPU backend the engine reads the value of the node back
+ * at most rate times per second, scales it down to size and writes TextureNodePreviewStatus.
+ *
+ * Removing it stops the readbacks and removes the status. A node that no graph reaches has no
+ * value to read, so it gets no status.
+ */
+ECS_STRUCT(TextureNodePreview, {
+    int32_t size; /**< Largest dimension of the preview in pixels, 0 for 128 */
+    float rate;   /**< Most readbacks per second, 0 for 4 */
+});
+
+/** Preview of a node written by the engine for its TextureNodePreview, read only for
+ * applications: an opaque RGBA8 PNG of its value as the image of its graph would store it, a
+ * scalar in gray. It is encoded again only when the value changed. */
+ECS_STRUCT(TextureNodePreviewStatus, {
+    int32_t width;    /**< Width of the preview in pixels */
+    int32_t height;   /**< Height of the preview in pixels */
+    int32_t revision; /**< Previews encoded, it increments when the value changed */
+    char *png;        /**< The PNG file in base64 */
+});
+
+/** Statistics of the evaluation of the texture graphs on the GPU backend, a singleton the
+ * engine writes when they change, read only for applications */
+ECS_STRUCT(TextureGraphStats, {
+    int32_t graphs;      /**< Texture graphs alive on the backend */
+    int32_t programs;    /**< Generated stage programs alive, shared by graphs of one structure */
+    int32_t evaluations; /**< Evaluations of texture graphs recorded */
+    int32_t dispatches;  /**< Stage dispatches recorded */
+    int64_t texels;      /**< Texels the stage dispatches computed */
+    double gpu_ms;       /**< GPU time of the evaluations measured, 0 without timestamp
+                          *   queries */
+    int32_t timed;       /**< Packets of evaluations whose GPU time gpu_ms holds */
+    int64_t pool_bytes;  /**< Bytes of the pooled intermediate textures now */
+    int32_t reads;       /**< Readbacks delivered, previews included */
+    int32_t previews;    /**< Nodes with a TextureNodePreview */
 });
 
 /** Register the box.texture module.

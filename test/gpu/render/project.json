@@ -1475,6 +1475,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "TextureCoordNodes",
                 "testcases": [
                     "identity_plane",
@@ -1485,6 +1486,31 @@
                     "rotate_sphere",
                     "sphere_seam",
                     "script"
+=======
+                "id": "TexturePreview",
+                "testcases": [
+                    "size_and_pixels",
+                    "default_size",
+                    "same_value_not_encoded",
+                    "rate_limits_readbacks",
+                    "remove_stops_readbacks",
+                    "node_outside_graph",
+                    "other_readbacks_kept",
+                    "stats"
+                ]
+            },
+            {
+                "id": "TextureGraphCache",
+                "testcases": [
+                    "animated_changes",
+                    "rate_limits_updates",
+                    "undrawn_skips_update",
+                    "downstream_edit_keeps_upstream",
+                    "shared_subgraph",
+                    "toggle_back_reuses",
+                    "eviction_under_budget",
+                    "animated_static_part"
+>>>>>>> f8057f76d34068a3d56daf6fb1e220d24e3796d7
                 ]
             }
         ]
