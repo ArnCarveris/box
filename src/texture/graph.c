@@ -778,7 +778,7 @@ done:
 static void BoxTextureGraphBuild(
     ecs_iter_t *it)
 {
-    ecs_world_t *world = it->world;
+    ecs_world_t *world = it->stage;
     box_textures_t *t = box_textures_get(world);
     ecs_vec_t build;
     int32_t i, count;

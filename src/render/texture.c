@@ -281,7 +281,8 @@ static void box_render_texture_graphs_release(
     ecs_vec_clear(&t->graph_released);
 }
 
-/** Send the node kinds the backend does not have and the queued graphs.
+/** Send the queued graphs, after the node kinds the backend does not have. Without a graph
+ * to send no kind is sent, so a world without graphs sends nothing.
  *
  * @param p The packet
  * @param t The registry
@@ -292,7 +293,10 @@ static void box_render_texture_graphs_send(
 {
     int32_t i, count = ecs_vec_count(&t->graph_queued);
     ecs_entity_t *queued = ecs_vec_first(&t->graph_queued);
-    box_render_texture_kinds_send(p, t);
+    if (count) {
+        box_render_texture_kinds_send(p, t);
+    }
+
     for (i = 0; i < count; i ++) {
         box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, queued[i]);
         if (tex && tex->graph_queued && tex->graph) {

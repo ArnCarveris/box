@@ -1175,9 +1175,15 @@ void TextureGraph_custom_kind_sent(void) {
     ecs_world_t *world = world_null(&null);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 0);
 
     int32_t id = register_scalar(world);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(null->texture_node_kinds, 0);
+
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_node_kinds, 4);
