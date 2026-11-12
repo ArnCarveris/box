@@ -307,6 +307,8 @@ int32_t box_draws_batch_ensure(
     b->from_count = 0;
     b->bounds_dirty = false;
     b->bounded = false;
+    b->world_dirty = true;
+    b->world_valid = false;
     b->was_ready = false;
     b->transform_frame = -1;
     b->shading_frame = -1;
@@ -373,6 +375,10 @@ void box_draws_slot_changed(
 {
     int32_t s;
     kinds &= box_draws_batch_kinds(b);
+    if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_SURFACE)) {
+        b->world_dirty = true;
+    }
+
     if ((kinds & BOX_DRAW_SURFACE) &&
         (b->bounded || box_draws_slot_surface(b, slot)->p[0][0] != 0.0f))
     {
@@ -420,6 +426,7 @@ int32_t box_draws_slot_add(
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->transforms, box_render_transform_t), 0,
         box_render_transform_t);
+    b->world_dirty = true;
 
     return result;
 }
@@ -678,6 +685,7 @@ void box_draws_slot_remove(
         b->bounds_dirty = true;
     }
 
+    b->world_dirty = true;
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->transforms);
     ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
@@ -1145,56 +1153,6 @@ done:
     return;
 }
 
-/** Compute the local bounds of the slots of a batch with parametric surfaces: the union of the
- * bounds of each surface, and of the mesh for a slot without one. A plain mesh batch keeps no
- * surfaces, so it is not bounded and draws with the bounds of its mesh.
- *
- * @param b The batch
- * @param cache The mesh cache
- */
-static void box_draws_bounds(
-    box_draw_batch_t *b,
-    box_mesh_cache_t *cache)
-{
-    const box_render_surface_t *surfaces = ecs_vec_first(&b->surfaces);
-    const box_mesh_t *mesh = NULL;
-    int32_t i, count = ecs_vec_count(&b->surfaces);
-    vec3 lo = { FLT_MAX, FLT_MAX, FLT_MAX }, hi = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-    bool plain = false;
-    b->bounds_dirty = false;
-    b->bounded = false;
-    for (i = 0; i < count; i ++) {
-        const float *p = surfaces[i].p[0];
-        if (p[0] == 0.0f) {
-            plain = true;
-            continue;
-        }
-
-        vec3 c = { surfaces[i].p[22][0], surfaces[i].p[22][1], surfaces[i].p[22][2] };
-        vec3 e = { surfaces[i].p[23][0], surfaces[i].p[23][1], surfaces[i].p[23][2] };
-        vec3 a, z;
-        glm_vec3_sub(c, e, a);
-        glm_vec3_add(c, e, z);
-        glm_vec3_minv(lo, a, lo);
-        glm_vec3_maxv(hi, z, hi);
-        b->bounded = true;
-    }
-
-    if (b->bounded && plain) {
-        mesh = box_mesh_cache_get(cache, b->key.mesh);
-    }
-
-    if (mesh) {
-        glm_vec3_minv(lo, ECS_CONST_CAST(float*, mesh->min), lo);
-        glm_vec3_maxv(hi, ECS_CONST_CAST(float*, mesh->max), hi);
-    }
-
-    if (b->bounded) {
-        glm_vec3_center(lo, hi, b->center);
-        glm_vec3_sub(hi, b->center, b->extent);
-    }
-}
-
 /** Write the instance page, the run and the bounds of a batch into its draw.
  *
  * @param d The state
@@ -1213,6 +1171,13 @@ static void box_draws_batch_page(
     if (b->bounded) {
         glm_vec3_copy(ECS_CONST_CAST(float*, b->center), out->center);
         glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), out->extent);
+    }
+
+    out->bounds = b->world_valid && !b->world_dirty;
+    if (out->bounds) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->world_min), out->min);
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->world_max), out->max);
+        out->radius = b->world_radius;
     }
 }
 
@@ -1823,7 +1788,7 @@ void box_draws_send(
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t i, count = ecs_vec_count(&d->batches);
     uint64_t changes = 0, copies = 0;
-    bool views = ecs_vec_count(&p->views) != 0;
+    bool views = ecs_vec_count(&p->views) != 0, bounds = false;
     d->textures = box_textures_get(world);
     d->world = world;
     d->stats.batches = 0;
@@ -1854,6 +1819,10 @@ void box_draws_send(
         goto done;
     }
 
+    for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+        bounds |= ecs_vec_get_t(&p->views, box_render_view_t, i)->cull.bounds;
+    }
+
     box_draws_dynamic(world, d);
     box_draws_materials_send(world, d, p);
     box_draws_shadow_materials(world, d);
@@ -1882,6 +1851,7 @@ void box_draws_send(
         }
 
         if (b->ready) {
+            box_draws_world_bounds(b, cache, bounds);
             box_draws_send_batch(p, d, b, &changes, &copies);
         }
 

@@ -1619,7 +1619,7 @@ static void box_gpu_draw_pass(
 
 /** Check whether a view draws a depth prepass: it is lit with LightSettings.depth_prepass, not
  * WireframeOnly, its camera has a depth range and it draws an opaque or alpha tested mesh with a
- * mesh shader.
+ * mesh shader. A batch it skips by its bounds counts, so the bounds never change its passes.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -1643,6 +1643,7 @@ static bool box_gpu_draw_prepasses(
     }
 
     cv = box_gpu_cull_view(gpu, slot, -1);
+    result = cv && cv->skipped > 0;
     for (i = 0; cv && i < cv->draw_count && !result; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);

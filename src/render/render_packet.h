@@ -621,6 +621,8 @@ typedef struct box_render_view_cull_t {
     bool occlusion;         /**< Instances hidden behind what the view drew are not drawn,
                              *   false for a view with WireframeOnly, which writes no depth */
     float min_dimension;    /**< Projected size in pixels below which an instance is culled */
+    bool bounds;            /**< Batches outside a frustum of the view, by their world bounds,
+                             *   are not drawn in it; only with enabled */
 } box_render_view_cull_t;
 
 /** The ambient occlusion of a view, resolved from the first enabled Gtao of its effects */
@@ -1535,6 +1537,14 @@ typedef struct box_render_batch_t {
     bool listed;                /**< The instances are the slots at slots, not a range */
     uint32_t slots;             /**< Data offset of instance_count uint32_t page slots in draw
                                  *   order */
+    bool bounds;                /**< min, max and radius hold the world bounds of the instances,
+                                 *   only for opaque mesh batches when a view of the packet culls
+                                 *   by them (box_render_view_cull_t.bounds) */
+    float min[3];               /**< Minimum corner of the world box around the world box the
+                                 *   cull pass computes for each instance, padded for rounding */
+    float max[3];               /**< Maximum corner of that box */
+    float radius;               /**< Largest radius of the world box of an instance, the size
+                                 *   the cull pass tests, padded for rounding */
 } box_render_batch_t;
 
 /** Components whose rendered value can transition, the index of their entry in the layout table

@@ -716,6 +716,25 @@
                 ]
             },
             {
+                "id": "BoundsCull",
+                "testcases": [
+                    "outside_batch_skipped",
+                    "outside_batch_skipped_with_occlusion",
+                    "partly_inside_drawn",
+                    "edge_batch_drawn",
+                    "disabled_skips_nothing",
+                    "needs_enabled",
+                    "status_counts_skipped",
+                    "status_counts_skipped_with_occlusion",
+                    "min_dimension",
+                    "static_moves_in",
+                    "camera_moves_to_skipped",
+                    "dynamic_follows",
+                    "cascades_skip_outside",
+                    "same_image"
+                ]
+            },
+            {
                 "id": "MultiViewCull",
                 "testcases": [
                     "one_pass_without_occlusion",

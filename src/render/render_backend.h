@@ -276,6 +276,9 @@ typedef struct box_render_cull_stats_t {
     int32_t visible;            /**< Instances the view draws */
     int32_t casters_tested;     /**< Shadow casters tested, summed over the cascades */
     int32_t casters_visible;    /**< Shadow casters drawn, summed over the cascades */
+    int32_t skipped;            /**< Batches the view did not draw by their bounds
+                                 *   (CullSettings.bounds), whose instances count as tested */
+    int32_t casters_skipped;    /**< Batches the cascades did not draw by their bounds, summed */
 } box_render_cull_stats_t;
 
 /** The culling of a view the GPU backend read back, for its CullStatus */
