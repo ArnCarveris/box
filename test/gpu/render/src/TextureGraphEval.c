@@ -1243,6 +1243,9 @@ void TextureGraphEval_keys_edit_no_recompile(void) {
         .format = GraphHdr});
     test_int(tg_wait(world, ramp_tex, 1)->state, TextureReady);
     test_int(tg_wait(world, curve_tex, 1)->state, TextureReady);
+
+    /* Reading the curve node materializes it once, which compiles the stages of the new cut */
+    tg_curve_expect(world, curve_tex, curve, &ecs_get(world, curve, TexCurve)->curve, w, 1);
     test_bool(box_render_gpu_stats(world, &before), true);
 
     const TextureGenKey keys[] = { TG_RAMP_KEYS };
