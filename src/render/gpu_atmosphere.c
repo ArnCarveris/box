@@ -593,8 +593,8 @@ void box_gpu_atmosphere_apply(
         l->uniforms = box_gpu_atmos_uniform_buffer(gpu);
         l->transmittance = box_gpu_atmos_texture(gpu, BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH,
             BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, 1, &l->transmittance_view);
-        l->multi = box_gpu_atmos_texture(gpu, BOX_RENDER_ATMOS_MULTI_SIZE,
-            BOX_RENDER_ATMOS_MULTI_SIZE, 1, &l->multi_view);
+        l->multi = box_gpu_atmos_texture(gpu, BOX_RENDER_ATMOS_MULTI_WIDTH,
+            BOX_RENDER_ATMOS_MULTI_HEIGHT, 1, &l->multi_view);
         ecs_map_insert_ptr(&a->luts, handle, l);
         gpu->pending.atmosphere_luts ++;
     }
@@ -897,7 +897,7 @@ static void box_gpu_atmos_build(
     box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_TRANSMITTANCE, transmittance, 2,
         BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH, BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, 1);
     box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_MULTI, multi, 4,
-        BOX_RENDER_ATMOS_MULTI_SIZE, BOX_RENDER_ATMOS_MULTI_SIZE, 1);
+        BOX_RENDER_ATMOS_MULTI_WIDTH, BOX_RENDER_ATMOS_MULTI_HEIGHT, 1);
     l->dirty = false;
     l->revision = a->revision;
     l->builds ++;
@@ -1688,10 +1688,10 @@ bool box_render_gpu_read_atmosphere(
     bool transmittance = lut == BOX_RENDER_ATMOS_TRANSMITTANCE;
     uint32_t width = transmittance
         ? BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH
-        : BOX_RENDER_ATMOS_MULTI_SIZE;
+        : BOX_RENDER_ATMOS_MULTI_WIDTH;
     uint32_t height = transmittance
         ? BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT
-        : BOX_RENDER_ATMOS_MULTI_SIZE;
+        : BOX_RENDER_ATMOS_MULTI_HEIGHT;
     if (!l || !l->revision || (int64_t)width * height * 4 > count) {
         goto done;
     }

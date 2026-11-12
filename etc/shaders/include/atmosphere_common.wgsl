@@ -107,10 +107,21 @@ fn sample_transmittance(r: f32, mu: f32) -> vec3f {
     return textureSampleLevel(transmittance_lut, lut_sampler, transmittance_to_uv(r, mu), 0.0).rgb;
 }
 
-fn earth_shadow(r: f32, mu_sun: f32) -> f32 {
+// Cosine of the sun at which it sets below the ground horizon of a radius.
+fn shadow_horizon(r: f32) -> f32 {
     let rb = bottom_radius();
-    let horizon = -sqrt(max(0.0, 1.0 - (rb * rb) / max(r * r, 1e-6)));
-    return smoothstep(horizon - 0.02, horizon + 0.02, mu_sun);
+    return -sqrt(max(0.0, 1.0 - (rb * rb) / max(r * r, 1e-6)));
+}
+
+// Sunlight that clears the ground at a radius, a smoothstep of half width in cosine around the
+// horizon of the radius.
+fn earth_shadow_soft(r: f32, mu_sun: f32, width: f32) -> f32 {
+    let horizon = shadow_horizon(r);
+    return smoothstep(horizon - width, horizon + width, mu_sun);
+}
+
+fn earth_shadow(r: f32, mu_sun: f32) -> f32 {
+    return earth_shadow_soft(r, mu_sun, 0.02);
 }
 
 fn multi_to_uv(cos_sun: f32, r: f32) -> vec2f {
@@ -138,17 +149,87 @@ fn scatter_ray(ro: vec3f, rd: vec3f, max_t: f32, steps: i32, k: f32, ground: boo
     let mie = mie_phase(cos_view, g);
     for (var i = 0; i < steps; i = i + 1) {
         let pos = ro + rd * (seg.x + (f32(i) + 0.5) * dt);
-        let r = length(pos);
-        let m = sample_medium(max(r - bottom_radius(), 0.0), k);
-        let step_t = exp(-m.extinction * dt);
-        let mu_sun = clamp(dot(pos / max(r, 1e-4), sun), -1.0, 1.0);
-        let sun_t = sample_transmittance(r, mu_sun) * earth_shadow(r, mu_sun);
-        let single = (m.scattering_rayleigh * rayleigh + m.scattering_mie * mie) * sun_t;
-        let psi = textureSampleLevel(multi_lut, lut_sampler, multi_to_uv(mu_sun, r), 0.0).rgb;
-        let scattered = (single + psi * m.scattering) * sun_color;
-        let integral = (scattered - scattered * step_t) / max(m.extinction, vec3f(1e-6));
-        s.light = s.light + s.throughput * integral;
-        s.throughput = s.throughput * step_t;
+        let st = scatter_step(pos, dt, k, rayleigh, mie, sun, sun_color, 0.02);
+        s.light = s.light + s.throughput * st.light;
+        s.throughput = s.throughput * st.throughput;
+    }
+
+    return s;
+}
+
+// One step of scatter_ray at a sample position: light is the in scattered light of the step
+// as seen from its start, throughput its transmittance. shadow is the half width of the earth
+// shadow transition in cosine.
+fn scatter_step(pos: vec3f, dt: f32, k: f32, rayleigh: f32, mie: f32, sun: vec3f,
+    sun_color: vec3f, shadow: f32) -> Scatter {
+    let r = length(pos);
+    let m = sample_medium(max(r - bottom_radius(), 0.0), k);
+    let step_t = exp(-m.extinction * dt);
+    let mu_sun = clamp(dot(pos / max(r, 1e-4), sun), -1.0, 1.0);
+    let sun_t = sample_transmittance(r, mu_sun) * earth_shadow_soft(r, mu_sun, shadow);
+    let single = (m.scattering_rayleigh * rayleigh + m.scattering_mie * mie) * sun_t;
+    let psi = textureSampleLevel(multi_lut, lut_sampler, multi_to_uv(mu_sun, r), 0.0).rgb;
+    let scattered = (single + psi * m.scattering) * sun_color;
+    var s: Scatter;
+    s.light = (scattered - scattered * step_t) / max(m.extinction, vec3f(1e-6));
+    s.throughput = step_t;
+    return s;
+}
+
+// Fraction of a march of the shell at a fraction x of its steps: the steps are spread by
+// spread (0 even, 1 quadratic) so they are dense around the fraction low, the lowest point of
+// the ray, where the medium is densest.
+fn shell_spread(x: f32, low: f32, spread: f32) -> f32 {
+    var q = x;
+    if (x < low) {
+        let a = 1.0 - x / low;
+        q = low * (1.0 - a * a);
+    } else if (low < 1.0) {
+        let b = (x - low) / (1.0 - low);
+        q = low + (1.0 - low) * b * b;
+    }
+
+    return mix(x, q, spread);
+}
+
+// scatter_ray for the shells of planets, which are seen from far away: the march of a ray that
+// may end on the ground takes a fractional number of steps, so it does not jump between
+// neighboring pixels, spread by spread around the lowest point of the ray, each sampled at a
+// fraction jitter of the step instead of its middle. The earth shadow of a step is widened by
+// the range of the horizons over the radii of the step, so its samples do not turn on one by
+// one across the terminator.
+fn scatter_shell(ro: vec3f, rd: vec3f, max_t: f32, steps: f32, spread: f32, jitter: f32,
+    sun: vec3f, sun_color: vec3f, g: f32) -> Scatter {
+    var s: Scatter;
+    s.light = vec3f(0.0);
+    s.throughput = vec3f(1.0);
+    let seg = ray_segment(ro, rd, max_t, true);
+    if (seg.y <= seg.x) {
+        return s;
+    }
+
+    let len = seg.y - seg.x;
+    let low = clamp((-dot(ro, rd) - seg.x) / len, 0.0, 1.0);
+    let n = max(steps, 1.0);
+    let count = i32(ceil(n));
+    let cos_view = clamp(dot(rd, sun), -1.0, 1.0);
+    let rayleigh = rayleigh_phase(cos_view);
+    let mie = mie_phase(cos_view, g);
+    var t0 = seg.x;
+    var h0 = shadow_horizon(length(ro + rd * t0));
+    for (var i = 0; i < count; i = i + 1) {
+        let x0 = f32(i) / n;
+        let x1 = min(f32(i + 1) / n, 1.0);
+        let t1 = seg.x + len * shell_spread(x1, low, spread);
+        let dt = t1 - t0;
+        let h1 = shadow_horizon(length(ro + rd * t1));
+        let pos = ro + rd * (seg.x + len * shell_spread(mix(x0, x1, jitter), low, spread));
+        let shadow = max(0.02, 0.5 * abs(h1 - h0));
+        let st = scatter_step(pos, dt, 1.0, rayleigh, mie, sun, sun_color, shadow);
+        s.light = s.light + s.throughput * st.light;
+        s.throughput = s.throughput * st.throughput;
+        t0 = t1;
+        h0 = h1;
     }
 
     return s;
