@@ -1118,6 +1118,7 @@ void BoxTextureImport(
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
+    ECS_IMPORT(world, BoxCurve);
 
     ECS_META_COMPONENT(world, Texture);
     ECS_META_COMPONENT(world, TexturePath);
@@ -1137,6 +1138,8 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
+    ECS_META_COMPONENT(world, TexRamp);
+    ECS_META_COMPONENT(world, TexCurve);
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
@@ -1146,6 +1149,8 @@ void BoxTextureImport(
     box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
         BOX_OWNED_VEC(TextureGen, palette, rgb));
+    box_owned_hooks(world, TexRamp, BOX_OWNED_VEC(TexRamp, keys, TextureGenKey));
+    box_owned_hooks(world, TexCurve, BOX_OWNED_CURVE(TexCurve, curve));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);

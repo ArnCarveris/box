@@ -1201,3 +1201,258 @@ void TextureGraph_custom_kind_sent(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Get the parameter bytes of the node of an entity in the compiled graph of a texture.
+ *
+ * @param world The world
+ * @param tex The texture entity
+ * @param e The node entity
+ * @param size Receives the bytes of the node
+ * @return Its bytes
+ */
+static const uint8_t* node_params(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    ecs_entity_t e,
+    int32_t *size)
+{
+    const box_texture_graph_t *g = graph_of(world, tex);
+    const uint8_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < g->node_count; i ++) {
+        if (g->nodes[i].entity == e) {
+            result = g->params + g->nodes[i].params;
+            *size = g->nodes[i].param_size;
+        }
+    }
+
+    test_assert(result != NULL);
+
+    return result;
+}
+
+void TextureGraph_ramp_curve_kinds(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexRamp), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "input");
+    test_int(kind->inputs[0].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, true);
+    test_int(kind->param_count, 0);
+    test_str(kind->array, "keys");
+    test_int(kind->array_max, BOX_TEXTURE_RAMP_KEYS);
+    test_int(kind->array_header, 0);
+    test_int(kind->param_size, 16);
+    test_str(kind->function, "box_tex_ramp");
+
+    kind = ecs_get(world, ecs_id(TexCurve), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->inputs[0].type, TexScalar);
+    test_str(kind->array, "curve.keys");
+    test_int(kind->array_max, BOX_TEXTURE_CURVE_KEYS);
+    test_str(kind->function, "box_tex_curve");
+
+    kind = ecs_get(world, ecs_id(TexMath), TextureNodeKind);
+    test_assert(kind->array == NULL);
+    test_int(kind->array_max, 0);
+    test_int(kind->array_header, -1);
+
+    box_textures_t *t = box_textures_get(world);
+    const box_texture_node_kind_t *k = box_texture_node_kind(t,
+        kind_id(world, ecs_id(TexRamp)));
+    test_int(k->node_size, 16 + 16 + BOX_TEXTURE_RAMP_KEYS * 16);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_ramp_keys_layout(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t uv = ecs_entity(world, { .name = "uv" });
+    ecs_entity_t ramp = ecs_entity(world, { .name = "ramp" });
+    ecs_entity_t math = ecs_entity(world, { .name = "math" });
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    ecs_set(world, ramp, TexRamp, { .input_value = 0.25f,
+        .keys = BOX_VEC_VIEW(TextureGenKey, {0.2f, {255, 0, 51}}) });
+    ecs_set(world, math, TexMath, { .op = MathMultiply, .a = uv, .b = ramp });
+    ecs_set(world, tex, TextureGraph, { .output = math, .width = 8 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    uint64_t structure = graph_of(world, tex)->structure_hash;
+    uint64_t params = graph_of(world, tex)->param_hash;
+    int32_t total = graph_of(world, tex)->param_size, size = 0;
+    const uint8_t *bytes = node_params(world, tex, ramp, &size);
+    const box_texture_graph_t *g = graph_of(world, tex);
+    int32_t offset = (int32_t)(bytes - g->params);
+    const uint32_t *header = (const uint32_t*)bytes;
+    const float *input = (const float*)(bytes + 16);
+    const float *keys = (const float*)(bytes + 32);
+    test_int(size, 32 + BOX_TEXTURE_RAMP_KEYS * 16);
+    test_int(header[0], (offset + 32) / 16);
+    test_int(header[1], 1);
+    test_flt(input[0], 0.25f);
+    test_flt(keys[0], 0.2f);
+    test_flt(keys[1], 1.0f);
+    test_flt(keys[2], 0.0f);
+    test_flt(keys[3], 0.2f);
+    test_flt(keys[4], 0.0f);
+
+    ecs_set(world, ramp, TexRamp, { .input_value = 0.25f,
+        .keys = BOX_VEC_VIEW(TextureGenKey, {0.2f, {255, 0, 51}}, {0.8f, {0, 255, 0}}) });
+    test_int(frame_status(world, tex)->revision, 2);
+    test_assert(graph_of(world, tex)->structure_hash == structure);
+    test_assert(graph_of(world, tex)->param_hash != params);
+    test_int(graph_of(world, tex)->param_size, total);
+    bytes = node_params(world, tex, ramp, &size);
+    header = (const uint32_t*)bytes;
+    keys = (const float*)(bytes + 32);
+    test_int(header[1], 2);
+    test_flt(keys[4], 0.8f);
+    test_flt(keys[6], 1.0f);
+    params = graph_of(world, tex)->param_hash;
+
+    ecs_set(world, ramp, TexRamp, { .input_value = 0.25f });
+    test_int(frame_status(world, tex)->revision, 3);
+    test_assert(graph_of(world, tex)->structure_hash == structure);
+    test_assert(graph_of(world, tex)->param_hash != params);
+    bytes = node_params(world, tex, ramp, &size);
+    test_int(((const uint32_t*)bytes)[1], 0);
+    test_flt(((const float*)(bytes + 32))[0], 0.0f);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_ramp_too_many_keys(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t ramp = ecs_entity(world, { .name = "ramp" });
+    TexRamp *value = ecs_ensure(world, ramp, TexRamp);
+    int32_t i;
+    ecs_vec_init_if_t(&value->keys, TextureGenKey);
+    for (i = 0; i <= BOX_TEXTURE_RAMP_KEYS; i ++) {
+        *ecs_vec_append_t(NULL, &value->keys, TextureGenKey) = (TextureGenKey){
+            (float)i / BOX_TEXTURE_RAMP_KEYS, {0, 0, 0}};
+    }
+
+    ecs_modified(world, ramp, TexRamp);
+    ecs_set(world, tex, TextureGraph, { .output = ramp });
+    frame_status(world, tex);
+    test_failed(world, tex, "ramp", "33 elements in keys, more than 32");
+
+    value = ecs_get_mut(world, ramp, TexRamp);
+    ecs_vec_remove_last(&value->keys);
+    ecs_modified(world, ramp, TexRamp);
+    test_int(frame_status(world, tex)->state, TextureReady);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_curve_keys_layout(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t curve = ecs_entity(world, { .name = "curve" });
+    ecs_entity_t ramp = ecs_entity(world, { .name = "ramp" });
+    ecs_set(world, curve, TexCurve, { .input_value = 0.5f, .curve = { .kind = CurveCatmullRom,
+        .keys = BOX_CURVE_KEYS({0, 0.2f}, {0.4f, 1}, {1, 0.5f}) } });
+    ecs_set(world, ramp, TexRamp, { .input = curve });
+    ecs_set(world, tex, TextureGraph, { .output = ramp });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    uint64_t structure = graph_of(world, tex)->structure_hash;
+    uint64_t params = graph_of(world, tex)->param_hash;
+    int32_t size = 0, i;
+    const uint8_t *bytes = node_params(world, tex, curve, &size);
+    const Curve *c = &ecs_get(world, curve, TexCurve)->curve;
+    const float *keys = (const float*)(bytes + 32);
+    test_int(size, 32 + BOX_TEXTURE_CURVE_KEYS * 16);
+    test_int(((const uint32_t*)bytes)[1], 3);
+    for (i = 0; i < 2; i ++) {
+        float c1, c2;
+        box_curve_span_controls(c, i, &c1, &c2);
+        test_flt(keys[i * 4], ecs_vec_get_t(&c->keys, CurveKey, i)->time);
+        test_flt(keys[i * 4 + 1], ecs_vec_get_t(&c->keys, CurveKey, i)->value);
+        test_flt(keys[i * 4 + 2], c1);
+        test_flt(keys[i * 4 + 3], c2);
+    }
+
+    test_flt(keys[8], 1.0f);
+    test_flt(keys[9], 0.5f);
+
+    ecs_set(world, curve, TexCurve, { .input_value = 0.5f, .curve = { .kind = CurveBezier,
+        .keys = BOX_CURVE_KEYS({0, 0.2f, 0, 1}, {0.4f, 1, -1, 0}, {0.7f, 0.1f}, {1, 0.5f}) } });
+    test_int(frame_status(world, tex)->revision, 2);
+    test_assert(graph_of(world, tex)->structure_hash == structure);
+    test_assert(graph_of(world, tex)->param_hash != params);
+    bytes = node_params(world, tex, curve, &size);
+    test_int(((const uint32_t*)bytes)[1], 4);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_curve_invalid(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t curve = ecs_entity(world, { .name = "curve" });
+    ecs_entity_t ramp = ecs_entity(world, { .name = "ramp" });
+    ecs_set(world, curve, TexCurve, { .curve = {
+        .keys = BOX_CURVE_KEYS({0.5f, 0}, {0.5f, 1}) } });
+    ecs_set(world, ramp, TexRamp, { .input = curve });
+    ecs_set(world, tex, TextureGraph, { .output = ramp });
+    frame_status(world, tex);
+    test_failed(world, tex, "'curve'", "key 1");
+
+    ecs_fini(world);
+}
+
+void TextureGraph_array_register_invalid(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t c = ecs_component(world, {
+        .entity = ecs_entity(world, { .name = "TestArray" }),
+        .type.size = ECS_SIZEOF(TexRamp),
+        .type.alignment = ECS_ALIGNOF(TexRamp)
+    });
+    ecs_log_set_level(-4);
+    test_int(box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = c,
+        .array = { "keys", offsetof(TexRamp, keys), 8, 0 },
+        .function = "f",
+        .source = "fn f() {}"
+    }), 0);
+    test_int(box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = c,
+        .array = { "keys", offsetof(TexRamp, keys), 20, 4 },
+        .function = "f",
+        .source = "fn f() {}"
+    }), 0);
+    test_int(box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = c,
+        .params = {
+            { "a", 0, 16, BOX_TEXTURE_PARAM_F32 }, { "b", 0, 16, BOX_TEXTURE_PARAM_F32 },
+            { "c", 0, 16, BOX_TEXTURE_PARAM_F32 }, { "d", 0, 16, BOX_TEXTURE_PARAM_F32 }
+        },
+        .array = { "keys", offsetof(TexRamp, keys), 8, 4 },
+        .function = "f",
+        .source = "fn f() {}"
+    }), 0);
+    ecs_log_set_level(-1);
+    test_assert(box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = c,
+        .params = {{ "a", 0, 4, BOX_TEXTURE_PARAM_F32 }},
+        .array = { "keys", offsetof(TexRamp, keys), 8, 4 },
+        .function = "f",
+        .source = "fn f() {}"
+    }) > 0);
+    const TextureNodeKind *kind = ecs_get(world, c, TextureNodeKind);
+    test_int(kind->array_header, 16);
+    test_int(kind->param_size, 32);
+    test_int(kind->array_max, 4);
+
+    ecs_fini(world);
+}

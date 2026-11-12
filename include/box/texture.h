@@ -14,6 +14,7 @@
 #define BOX_TEXTURE_H
 
 #include "types.h"
+#include "curve.h"
 
 #ifdef BOX_TEXTURE_IMPL
 #define ECS_META_IMPL IMPL
@@ -251,7 +252,8 @@ ECS_ENUM(TextureGraphDomain, {
 
 /** What the image of a TextureGraph stores */
 ECS_ENUM(TextureGraphFormat, {
-    GraphColor = 0,  /**< RGBA8 display encoded from the linear output, the default */
+    GraphColor = 0,  /**< RGBA8 display encoded from the linear output, the default; the
+                      *   format of colors such as a TexRamp outputs */
     GraphLinear = 1, /**< RGBA8 stored as the output is, for normal and ORM maps */
     GraphSingle = 2, /**< R8 of the first channel of the output, as a GenHeight TextureGen */
     GraphHdr = 3     /**< RGBA16Float of the linear output, for emissive maps */
@@ -323,6 +325,52 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** Most keys of a TexRamp */
+#define BOX_TEXTURE_RAMP_KEYS (32)
+
+/** Most keys of the curve of a TexCurve */
+#define BOX_TEXTURE_CURVE_KEYS (32)
+
+/** Node of a TextureGraph that maps a scalar through a color ramp to a vector, with the keys
+ * and the interpolation of TextureGen.colors: below the first key the color of the first,
+ * above the last the color of the last, between two keys the display encoded colors mixed
+ * linearly. Its value is the linear color of the result with alpha 1, so a GraphColor image
+ * stores the display encoded colors of the ramp as a GenAlbedo TextureGen does; without keys
+ * the input is a display encoded gray.
+ *
+ * Editing, adding or removing keys up to BOX_TEXTURE_RAMP_KEYS changes the parameters of the
+ * graph and not its structure, more keys fail the graph.
+ *
+ * @code
+ * // height is a node whose value is a Scalar
+ * albedo { TexRamp: {input: height, keys: [{0, {20, 40, 90}}, {0.5, {200, 180, 120}}]} }
+ * @endcode
+ */
+ECS_STRUCT(TexRamp, {
+    ecs_entity_t input;          /**< Scalar input node, 0 for input_value */
+    float input_value;           /**< Value of input without a node */
+    ecs_vec(TextureGenKey) keys; /**< Keys in order of position, display encoded colors */
+});
+
+/** Node of a TextureGraph that maps a scalar through a curve of box/curve.h, the input being
+ * the time: the value of box_curve_value of the curve at the input, the input itself without
+ * keys. The controls of the spans are computed as the engine computes them on the CPU and the
+ * cubics evaluated per texel.
+ *
+ * Editing, adding or removing keys up to BOX_TEXTURE_CURVE_KEYS changes the parameters of the
+ * graph and not its structure, more keys or an invalid curve (box_curve_validate) fail the
+ * graph.
+ *
+ * @code
+ * bumps { TexCurve: {input: height, curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1, 0.6}]}} }
+ * @endcode
+ */
+ECS_STRUCT(TexCurve, {
+    ecs_entity_t input;          /**< Scalar input node, 0 for input_value */
+    float input_value;           /**< Value of input without a node */
+    Curve curve;                 /**< The curve */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
@@ -331,6 +379,9 @@ ECS_STRUCT(TexMath, {
 
 /** Most bytes of the parameters of a node kind in the parameter buffer */
 #define BOX_TEXTURE_NODE_PARAM_BYTES (64)
+
+/** Most elements of the array parameter of a node kind */
+#define BOX_TEXTURE_NODE_ARRAY_MAX (256)
 
 /** Flag of a node kind that reads its inputs at other texels, so they are materialized */
 #define BOX_TEXTURE_NODE_NEIGHBOURHOOD (1u << 0)
@@ -362,6 +413,11 @@ ECS_STRUCT(TextureNodeKind, {
     int32_t param_count;     /**< Parameters in params */
     TextureNodeParam params[8]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
     int32_t param_size;      /**< Bytes of the parameters of a node, a multiple of 16 */
+    const char *array;       /**< Member of the array parameter, NULL for none */
+    int32_t array_max;       /**< Most elements of the array parameter */
+    int32_t array_header;    /**< Byte offset in the parameters of the vec4u of the array:
+                              *   (vec4 index of its first element in the parameter buffer,
+                              *   element count, 0, 0) */
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
@@ -392,19 +448,50 @@ typedef struct box_texture_node_param_t {
     box_texture_param_kind_t kind; /**< Kind of its elements */
 } box_texture_node_param_t;
 
+/** Pack the elements of the array parameter of a node into the parameter buffer.
+ *
+ * @param node The node component
+ * @param count Number of elements, at most the max of the array
+ * @param out Receives a vec4 of 32 bit words per element, zeroed before the call
+ * @return Why the elements are invalid, freed with ecs_os_free, NULL when they are valid
+ */
+typedef char* (*box_texture_node_pack_t)(
+    const void *node,
+    int32_t count,
+    uint32_t *out);
+
+/** The array parameter of a node kind: the elements of an ecs_vec_t member, a variable number
+ * of values such as the keys of a ramp.
+ *
+ * A node reserves max vec4 elements after the constants of its inputs, so the number of
+ * elements changes the parameter bytes and never the structure of the graph; more than max
+ * elements fail the graph. A vec4u after the parameters, at TextureNodeKind.array_header, holds
+ * the index of the first element in box_texgraph_params and the element count.
+ */
+typedef struct box_texture_node_array_t {
+    const char *name;           /**< Name of the ecs_vec_t member, NULL for none */
+    ecs_size_t offset;          /**< Offset of the ecs_vec_t member */
+    ecs_size_t size;            /**< Bytes of an element, copied into its vec4 without pack, 4
+                                 *   to 16 */
+    int32_t max;                /**< Most elements, 1 to BOX_TEXTURE_NODE_ARRAY_MAX */
+    box_texture_node_pack_t pack; /**< Writes the elements, NULL to copy them */
+} box_texture_node_array_t;
+
 /** Description of a node kind for box_texture_node_register.
  *
  * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
  * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
  * order, a scalar in x and the constant of an input without a node, and the coordinates.
  *
- * It returns the value of the node, a scalar in x.
+ * It returns the value of the node, a scalar in x. A kind with an array parameter reads its
+ * elements from box_texgraph_params at the index in its header, see box_texture_node_array_t.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
     TextureValueType output;    /**< Type of the value of the node */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs in order */
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters in order */
+    box_texture_node_array_t array; /**< Array parameter, name NULL for none */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */

@@ -50,6 +50,81 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexRamp node: the display encoded colors of the keys around the input mixed as
+ * box_gen_ramp does, decoded to linear; the elements are (position, r, g, b) in 0..1 */
+static const char *box_texture_ramp_wgsl =
+    "fn box_tex_ramp_key(at: u32) -> vec4f {\n"
+    "    return bitcast<vec4f>(box_texgraph_params[at]);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_ramp(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let base = p[0].x;\n"
+    "    let count = p[0].y;\n"
+    "    let h = i[0].x;\n"
+    "    if (count == 0u) {\n"
+    "        return vec4f(box_texgraph_linear(vec3f(h)), 1.0);\n"
+    "    }\n"
+    "    var a = box_tex_ramp_key(base);\n"
+    "    var b = a;\n"
+    "    var t = 0.0;\n"
+    "    let last = box_tex_ramp_key(base + count - 1u);\n"
+    "    if (h >= last.x) {\n"
+    "        a = last;\n"
+    "        b = last;\n"
+    "    } else if (h > a.x) {\n"
+    "        var k = 0u;\n"
+    "        while (k + 1u < count && box_tex_ramp_key(base + k + 1u).x <= h) {\n"
+    "            k += 1u;\n"
+    "        }\n"
+    "        a = box_tex_ramp_key(base + k);\n"
+    "        b = box_tex_ramp_key(base + k + 1u);\n"
+    "        t = select(1.0, (h - a.x) / (b.x - a.x), b.x > a.x);\n"
+    "    }\n"
+    "    return vec4f(box_texgraph_linear(a.yzw + (b.yzw - a.yzw) * t), 1.0);\n"
+    "}\n";
+
+/** WGSL of the TexCurve node: box_curve_value of the curve at the input, the input without
+ * keys; the elements are (time, value, control1, control2) of the span from each key, the
+ * cubic the twin of curve_cubic in etc/shaders/include/curve.wgsl */
+static const char *box_texture_curve_wgsl =
+    "fn box_tex_curve_mix(a: f32, b: f32, t: f32) -> f32 {\n"
+    "    return a * (1.0 - t) + b * t;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_curve_key(at: u32) -> vec4f {\n"
+    "    return bitcast<vec4f>(box_texgraph_params[at]);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_curve(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let base = p[0].x;\n"
+    "    let count = p[0].y;\n"
+    "    let x = i[0].x;\n"
+    "    if (count == 0u) {\n"
+    "        return vec4f(x, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "    let first = box_tex_curve_key(base);\n"
+    "    if (count == 1u || !(x > first.x)) {\n"
+    "        return vec4f(first.y, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "    let last = box_tex_curve_key(base + count - 1u);\n"
+    "    if (x >= last.x) {\n"
+    "        return vec4f(last.y, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "    var k = 0u;\n"
+    "    while (k + 2u < count && box_tex_curve_key(base + k + 1u).x <= x) {\n"
+    "        k += 1u;\n"
+    "    }\n"
+    "    let a = box_tex_curve_key(base + k);\n"
+    "    let b = box_tex_curve_key(base + k + 1u);\n"
+    "    let t = (x - a.x) / (b.x - a.x);\n"
+    "    let m0 = box_tex_curve_mix(a.y, a.z, t);\n"
+    "    let m1 = box_tex_curve_mix(a.z, a.w, t);\n"
+    "    let m2 = box_tex_curve_mix(a.w, b.y, t);\n"
+    "    let n0 = box_tex_curve_mix(m0, m1, t);\n"
+    "    let n1 = box_tex_curve_mix(m1, m2, t);\n"
+    "    return vec4f(box_tex_curve_mix(n0, n1, t), 0.0, 0.0, 0.0);\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -115,6 +190,8 @@ static void box_texture_node_kind_strings_free(
     for (i = 0; i < kind->param_count; i ++) {
         ecs_os_free(ECS_CONST_CAST(char*, kind->params[i].name));
     }
+
+    ecs_os_free(ECS_CONST_CAST(char*, kind->array.name));
 
     ecs_os_free(kind->function);
     ecs_os_free(kind->source);
@@ -257,7 +334,21 @@ static int box_texture_node_kind_fill(
     }
 
     kind->param_size = (offset + 15) / 16 * 16;
-    kind->node_size = kind->param_size + kind->input_count * 16;
+    kind->array_header = -1;
+    if (desc->array.name) {
+        kind->array = desc->array;
+        kind->array.name = ecs_os_strdup(desc->array.name);
+        kind->array_header = kind->param_size;
+        kind->param_size += 16;
+        if (desc->array.max < 1 || desc->array.max > BOX_TEXTURE_NODE_ARRAY_MAX ||
+            (!desc->array.pack && (desc->array.size < 4 || desc->array.size > 16)))
+        {
+            result = -1;
+        }
+    }
+
+    kind->node_size = kind->param_size + kind->input_count * 16 +
+        (kind->array.name ? kind->array.max * 16 : 0);
     if (kind->param_size > BOX_TEXTURE_NODE_PARAM_BYTES) {
         result = -1;
     }
@@ -280,6 +371,9 @@ static void box_texture_node_kind_reflect(
         .input_count = kind->input_count,
         .param_count = kind->param_count,
         .param_size = kind->param_size,
+        .array = kind->array.name,
+        .array_max = kind->array.name ? kind->array.max : 0,
+        .array_header = kind->array_header,
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
         .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
@@ -324,7 +418,8 @@ int32_t box_texture_node_register(
     if (box_texture_node_kind_fill(kind, desc)) {
         char *name = ecs_get_path(world, desc->component);
         ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size "
-            "or more than %d parameter bytes", name, BOX_TEXTURE_NODE_PARAM_BYTES);
+            "or more than %d parameter bytes, or an invalid array", name,
+            BOX_TEXTURE_NODE_PARAM_BYTES);
         ecs_os_free(name);
         box_texture_node_kind_strings_free(kind);
         ecs_os_free(kind);
@@ -445,6 +540,60 @@ static void box_texture_graph_reach(
     }
 }
 
+/** Write the array parameter of a node: its header and its elements after the constants of
+ * its inputs, failing the build with more elements than the kind takes or invalid ones.
+ *
+ * @param b The build
+ * @param e The node entity
+ * @param kind Its kind, with an array parameter
+ * @param ptr Its node component
+ * @param params Its parameter bytes, zeroed
+ * @param offset Offset of its parameter bytes in the graph parameters
+ */
+static void box_texture_graph_array(
+    box_texture_graph_build_t *b,
+    ecs_entity_t e,
+    const box_texture_node_kind_t *kind,
+    const uint8_t *ptr,
+    uint8_t *params,
+    int32_t offset)
+{
+    const ecs_vec_t *vec = (const ecs_vec_t*)(ptr + kind->array.offset);
+    int32_t i, count = ecs_vec_count(vec);
+    int32_t first = kind->param_size + kind->input_count * 16;
+    uint32_t *header = (uint32_t*)(params + kind->array_header);
+    uint32_t *elements = (uint32_t*)(params + first);
+    char *problem = NULL;
+    if (count > kind->array.max) {
+        char *name = box_texture_graph_name(b->world, e);
+        box_texture_graph_error(b, "node '%s' has %d elements in %s, more than %d", name,
+            count, kind->array.name, kind->array.max);
+        ecs_os_free(name);
+        goto done;
+    }
+
+    header[0] = (uint32_t)((offset + first) / 16);
+    header[1] = (uint32_t)count;
+    if (kind->array.pack) {
+        problem = kind->array.pack(ptr, count, elements);
+    } else {
+        const uint8_t *data = ecs_vec_first(vec);
+        for (i = 0; i < count; i ++) {
+            ecs_os_memcpy(&elements[i * 4], data + i * kind->array.size, kind->array.size);
+        }
+    }
+
+    if (problem) {
+        char *name = box_texture_graph_name(b->world, e);
+        box_texture_graph_error(b, "node '%s': %s", name, problem);
+        ecs_os_free(name);
+        ecs_os_free(problem);
+    }
+
+done:
+    return;
+}
+
 /** Append the compiled node of an entity whose inputs are compiled, with its parameters and
  * the constants of its inputs without a node.
  *
@@ -476,6 +625,10 @@ static int32_t box_texture_graph_append(
             ecs_os_memcpy(params + kind->param_size + i * 16, ptr + in->value_offset,
                 in->type == TexScalar ? ECS_SIZEOF(float) : 4 * ECS_SIZEOF(float));
         }
+    }
+
+    if (kind->array.name) {
+        box_texture_graph_array(b, e, kind, ptr, params, offset);
     }
 
     box_texture_graph_node_t *node = ecs_vec_append_t(NULL, &b->nodes,
@@ -861,7 +1014,70 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
+ *
+ * @param node The TexRamp
+ * @param count Number of keys
+ * @param out Receives a vec4 per key
+ * @return NULL, every ramp is valid
+ */
+static char* box_texture_ramp_pack(
+    const void *node,
+    int32_t count,
+    uint32_t *out)
+{
+    const TexRamp *ramp = node;
+    const TextureGenKey *keys = ecs_vec_first_t(&ramp->keys, TextureGenKey);
+    float *f = (float*)out;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        f[i * 4] = keys[i].position;
+        f[i * 4 + 1] = keys[i].color.r / 255.0f;
+        f[i * 4 + 2] = keys[i].color.g / 255.0f;
+        f[i * 4 + 3] = keys[i].color.b / 255.0f;
+    }
+
+    return NULL;
+}
+
+/** Pack the keys of the curve of a TexCurve: (time, value, control1, control2) with the
+ * controls of the span from the key to the next, box_curve_span_controls, zero for the last.
+ *
+ * @param node The TexCurve
+ * @param count Number of keys
+ * @param out Receives a vec4 per key
+ * @return Why the curve is invalid, NULL when it is valid
+ */
+static char* box_texture_curve_pack(
+    const void *node,
+    int32_t count,
+    uint32_t *out)
+{
+    const TexCurve *curve = node;
+    const CurveKey *keys = ecs_vec_first_t(&curve->curve.keys, CurveKey);
+    float *f = (float*)out;
+    char *problem = box_curve_validate(&curve->curve);
+    char *result = NULL;
+    int32_t i;
+    if (problem) {
+        result = flecs_asprintf("curve %s", problem);
+        ecs_os_free(problem);
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        f[i * 4] = keys[i].time;
+        f[i * 4 + 1] = keys[i].value;
+        if (i + 1 < count) {
+            box_curve_span_controls(&curve->curve, i, &f[i * 4 + 2], &f[i * 4 + 3]);
+        }
+    }
+
+done:
+    return result;
+}
+
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexRamp and TexCurve.
  *
  * @param world The world
  */
@@ -895,6 +1111,32 @@ static void box_texture_nodes_register(
         .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexRamp),
+        .output = TexVector,
+        .inputs = {
+            { "input", offsetof(TexRamp, input), TexScalar, "input_value",
+                offsetof(TexRamp, input_value) }
+        },
+        .array = { "keys", offsetof(TexRamp, keys), ECS_SIZEOF(TextureGenKey),
+            BOX_TEXTURE_RAMP_KEYS, box_texture_ramp_pack },
+        .function = "box_tex_ramp",
+        .source = box_texture_ramp_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCurve),
+        .output = TexScalar,
+        .inputs = {
+            { "input", offsetof(TexCurve, input), TexScalar, "input_value",
+                offsetof(TexCurve, input_value) }
+        },
+        .array = { "curve.keys", offsetof(TexCurve, curve.keys), ECS_SIZEOF(CurveKey),
+            BOX_TEXTURE_CURVE_KEYS, box_texture_curve_pack },
+        .function = "box_tex_curve",
+        .source = box_texture_curve_wgsl
     });
 }
 

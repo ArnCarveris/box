@@ -100,6 +100,12 @@ fn box_texgraph_srgb(c: vec3f) -> vec3f {
     return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3f(0.0031308));
 }
 
+// Linear light of a display encoded color, the inverse of box_texgraph_srgb, clamped to 0..1
+fn box_texgraph_linear(c: vec3f) -> vec3f {
+    let x = clamp(c, vec3f(0.0), vec3f(1.0));
+    return select(pow((x + 0.055) / 1.055, vec3f(2.4)), x / 12.92, x <= vec3f(0.04045));
+}
+
 // Value the output stage stores, as box_texgraph_stage.encode asks
 fn box_texgraph_encode(v: vec4f) -> vec4f {
     switch box_texgraph_stage.encode {

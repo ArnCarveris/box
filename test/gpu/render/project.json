@@ -10,6 +10,7 @@
     "lang.c": {
         "include": [
             "../../../src/render",
+            "../../../src/texture",
             "../../../src/geometry",
             "../../../src/spatial"
         ]
@@ -1471,7 +1472,13 @@
                     "shared_structure",
                     "compile_failure_reports_node",
                     "status_transitions",
-                    "material_samples_graph"
+                    "material_samples_graph",
+                    "ramp_plane",
+                    "ramp_sphere",
+                    "ramp_linear_value",
+                    "curve_values",
+                    "keys_edit_no_recompile",
+                    "ramp_too_many_keys"
                 ]
             }
         ]
