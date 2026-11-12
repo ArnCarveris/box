@@ -401,7 +401,9 @@ static void box_pick_send(
     box_pick_publish(world, st, pick, st->cursor, press);
 }
 
-/** Resolve the on.scroll waiters along the path of the pick of a wheel movement.
+/** Resolve the on.scroll waiters of the innermost entity on the path of the pick of a wheel
+ * movement that waits for one. The path goes past the handler of the pick, so an Interactive
+ * element inside a scroll view, such as a button, does not keep the wheel from the view.
  *
  * @param world The world
  * @param st The module state
@@ -414,15 +416,17 @@ static void box_pick_scroll(
     const EcsScriptMouseEvent *src,
     const box_pick_t *pick)
 {
-    ecs_entity_t chain[BOX_PICK_CHAIN_MAX];
-    int32_t i, w, resolved = 0, count = box_pick_chain(world, st, pick, chain);
-    for (i = 0; i < count && ecs_is_alive(world, chain[i]); i ++) {
+    ecs_entity_t e = pick->target ? pick->target : st->screen;
+    int32_t w, resolved = 0;
+    for (; e && !resolved && ecs_is_alive(world, e);
+        e = pick->target ? ecs_get_parent(world, e) : 0)
+    {
         EcsScriptMouseEvent evt = *src;
-        evt.target = chain[i];
-        box_pick_local(world, chain[i], pick, &evt);
+        evt.target = e;
+        box_pick_local(world, e, pick, &evt);
         for (w = 0; w < ecs_vec_count(&st->waiters); ) {
             box_pick_waiter_t waiter = *ecs_vec_get_t(&st->waiters, box_pick_waiter_t, w);
-            if (waiter.target != chain[i]) {
+            if (waiter.target != e) {
                 w ++;
                 continue;
             }
