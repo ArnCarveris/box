@@ -399,7 +399,9 @@
                     "null_backend_remove",
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
-                    "custom_kind_sent"
+                    "custom_kind_sent",
+                    "coord_kinds",
+                    "coord_nodes_script"
                 ]
             },
             {

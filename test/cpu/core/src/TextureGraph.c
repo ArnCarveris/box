@@ -13,6 +13,9 @@
 /** The authoring example of TextureGraph */
 #define GRAPH_PLATING "test/assets/textures/graph/plating.flecs"
 
+/** Coordinates turned, scaled and warped by TexTransform and TexWarp */
+#define GRAPH_COORDS "test/assets/textures/graph/coords.flecs"
+
 /** A graph whose output node gets its node component after the graph */
 #define GRAPH_DECLARED_AFTER "test/assets/textures/graph/declared_after.flecs"
 
@@ -1200,4 +1203,99 @@ void TextureGraph_custom_kind_sent(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+void TextureGraph_coord_kinds(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexWarp), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 3);
+    test_str(kind->inputs[0].name, "coords");
+    test_str(kind->inputs[1].name, "offset");
+    test_str(kind->inputs[2].name, "amount");
+    test_int(kind->inputs[0].type, TexVector);
+    test_int(kind->inputs[1].type, TexVector);
+    test_int(kind->inputs[2].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, false);
+    test_bool(kind->inputs[1].fallback, true);
+    test_bool(kind->inputs[2].fallback, true);
+    test_int(kind->param_size, 16);
+    test_str(kind->function, "box_tex_warp");
+    test_bool(kind->neighbourhood, false);
+    test_bool(kind->animated, false);
+
+    kind = ecs_get(world, ecs_id(TexTransform), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 2);
+    test_str(kind->inputs[0].name, "coords");
+    test_str(kind->inputs[1].name, "angle");
+    test_int(kind->inputs[1].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, false);
+    test_bool(kind->inputs[1].fallback, true);
+    test_int(kind->param_count, 4);
+    test_int(kind->params[1].offset, 16);
+    test_int(kind->params[2].offset, 32);
+    test_int(kind->params[3].offset, 48);
+    test_int(kind->param_size, 64);
+    test_str(kind->function, "box_tex_transform");
+    test_bool(kind->neighbourhood, false);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_coord_nodes_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    run_file(world, GRAPH_COORDS);
+    ecs_entity_t tex = ecs_lookup(world, "graph_coords");
+    ecs_entity_t uv = ecs_lookup(world, "graph_coords.uv");
+    ecs_entity_t turned = ecs_lookup(world, "graph_coords.turned");
+    ecs_entity_t warped = ecs_lookup(world, "graph_coords.warped");
+    test_assert(tex && uv && turned && warped);
+    test_assert(ecs_get(world, turned, TexTransform)->coords == uv);
+    test_assert(ecs_get(world, warped, TexWarp)->coords == turned);
+
+    const TextureStatus *status = frame_status(world, tex);
+    test_int(status->state, TextureReady);
+    test_assert(status->error == NULL);
+
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 3);
+    test_assert(graph->nodes[0].entity == uv);
+    test_assert(graph->nodes[1].entity == turned);
+    test_assert(graph->nodes[2].entity == warped);
+    test_int(graph->nodes[1].kind, kind_id(world, ecs_id(TexTransform)));
+    test_int(graph->nodes[2].kind, kind_id(world, ecs_id(TexWarp)));
+    test_int(graph->nodes[1].inputs[0], 0);
+    test_int(graph->nodes[1].inputs[1], -1);
+    test_int(graph->nodes[2].inputs[0], 1);
+    test_int(graph->nodes[2].inputs[1], -1);
+    test_int(graph->nodes[2].inputs[2], -1);
+
+    /* The transform: the entity of its coords, its scale and the angle without a node */
+    const uint8_t *p = graph->params + graph->nodes[1].params;
+    ecs_entity_t coords;
+    float value;
+    test_int(graph->nodes[1].param_size, 64 + 2 * 16);
+    ecs_os_memcpy(&coords, p, ECS_SIZEOF(ecs_entity_t));
+    test_assert(coords == uv);
+    ecs_os_memcpy(&value, p + 48, ECS_SIZEOF(float));
+    test_flt(value, 2);
+    ecs_os_memcpy(&value, p + 64 + 16, ECS_SIZEOF(float));
+    test_flt(value, 90);
+
+    /* The warp: the entity of its coords, then the offset and the amount without a node */
+    p = graph->params + graph->nodes[2].params;
+    test_int(graph->nodes[2].param_size, 16 + 3 * 16);
+    ecs_os_memcpy(&coords, p, ECS_SIZEOF(ecs_entity_t));
+    test_assert(coords == turned);
+    ecs_os_memcpy(&value, p + 16 + 16, ECS_SIZEOF(float));
+    test_flt(value, 0.7f);
+    ecs_os_memcpy(&value, p + 16 + 32, ECS_SIZEOF(float));
+    test_flt(value, 0.5f);
+
+    ecs_fini(world);
 }

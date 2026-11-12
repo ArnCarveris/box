@@ -323,6 +323,66 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** Node of a TextureGraph that displaces coordinates: coords + (offset - 0.5) * amount.
+ *
+ * The offset is centred at 0.5, so a noise in 0..1 moves the coordinates by -0.5..0.5 times
+ * amount; x, y and z move, w is kept. On DomainPlane the result keeps tiling where the offset
+ * tiles. On DomainSphere the result is normalized back onto the unit sphere, so generators
+ * reading it stay seamless; where the displaced point is at the origin it keeps coords.
+ *
+ * @code
+ * warped {
+ *   bumps { TexMath: {op: MathMultiply, a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
+ *   TexWarp: {offset: bumps, amount_value: 0.2}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexWarp, {
+    ecs_entity_t coords;  /**< Vector input of the coordinates to displace, 0 for the coordinates
+                           *   of the texel in the domain of the graph */
+    ecs_entity_t offset;  /**< Vector input of the displacement centred at 0.5, 0 for
+                           *   offset_value */
+    ecs_entity_t amount;  /**< Scalar input of the factor of the displacement, 0 for
+                           *   amount_value */
+    vec4 offset_value;    /**< Value of offset without a node; the default 0 moves by -0.5 *
+                           *   amount, set {0.5, 0.5, 0.5} for no displacement */
+    float amount_value;   /**< Value of amount without a node, default 0: no displacement */
+});
+
+/** Node of a TextureGraph that scales, rotates and translates coordinates, in that order:
+ * rotate((coords - centre) * scale) + centre + translate, w kept.
+ *
+ * On DomainPlane the centre is the image centre (0.5, 0.5, 0) and the rotation turns (u, v)
+ * about it from +u towards +v (clockwise in the image, whose v goes down), ignoring axis. The
+ * result tiles for any translate, for whole number scales, and only for rotations by a
+ * multiple of 90 degrees, which are exact; other angles leave seams at the image border.
+ *
+ * On DomainSphere the centre is the origin and the rotation is right handed about axis, so a
+ * field computed from the result turns the other way over the sphere. A scale changes the
+ * distance of the points from the origin, so 3D generators reading them see features scale
+ * times smaller; a translate moves the points off the unit sphere through the 3D field of the
+ * generators, which changes the pattern but keeps it seamless. Neither keeps unit length.
+ *
+ * The angle may come from a Scalar node, so a field spins when an animated value drives it.
+ *
+ * @code
+ * turned {
+ *   TexTransform: {angle_value: 90, scale: {2, 2, 1}}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexTransform, {
+    ecs_entity_t coords;  /**< Vector input of the coordinates to transform, 0 for the
+                           *   coordinates of the texel in the domain of the graph */
+    ecs_entity_t angle;   /**< Scalar input of the rotation in degrees, 0 for angle_value */
+    float angle_value;    /**< Value of angle without a node, in degrees, default 0 */
+    vec3 axis;            /**< DomainSphere: axis of the rotation, normalized; 0 for +y, the
+                           *   poles. Ignored on DomainPlane */
+    vec3 translate;       /**< Added to the coordinates after scale and rotation */
+    vec3 scale;           /**< Factor of the coordinates about the centre, a 0 component for 1;
+                           *   whole numbers keep the plane tiling */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
