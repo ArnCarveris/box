@@ -213,6 +213,21 @@ bool box_ui_focus_step(
     box_pick_state_t *pst,
     bool back);
 
+/** Find the first Focusable entity below a scope in 2D draw order that Tab can reach, the one
+ * Tab moves to from outside the scope, leaving out an entity and the entities below it.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param scope The scope
+ * @param skip Entity left out with the entities below it, 0 for none
+ * @return The entity, 0 when there is none
+ */
+ecs_entity_t box_ui_first_focusable(
+    ecs_world_t *world,
+    box_ui_state_t *st,
+    ecs_entity_t scope,
+    ecs_entity_t skip);
+
 /** Register Focusable, the observers that clear the focus and the FocusStatus singleton.
  *
  * @param world The world
@@ -357,7 +372,8 @@ void box_ui_text_edit_pointer(
     uint32_t pressed,
     uint32_t released);
 
-/** Register UiTheme, the box.ui.theme entity and ui.sibling, and load the widget library.
+/** Register UiTheme, the box.ui.theme entity, ui.sibling, ui.root, ui.focused and
+ * ui.first_focusable, and load the widget library.
  *
  * A script owns the entities it declares that no other script owns and deletes them when it is
  * updated or deleted. The theme entity is owned by the module, so it survives the scenes that

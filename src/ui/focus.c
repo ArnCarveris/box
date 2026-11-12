@@ -329,6 +329,25 @@ bool box_ui_focus_step(
     return result;
 }
 
+ecs_entity_t box_ui_first_focusable(
+    ecs_world_t *world,
+    box_ui_state_t *st,
+    ecs_entity_t scope,
+    ecs_entity_t skip)
+{
+    int32_t i, count = scope && ecs_is_alive(world, scope) ? box_ui_collect(
+        world, st->focusables, scope, 0, true, st->focused, &st->order) : 0;
+    const ecs_entity_t *items = ecs_vec_first_t(&st->order, ecs_entity_t);
+    ecs_entity_t result = 0;
+    for (i = 0; i < count && !result; i ++) {
+        ecs_entity_t e = items[i];
+        bool skipped = skip && (e == skip || box_ui_below(world, e, skip));
+        result = !skipped && box_ui_can_focus(world, e) ? e : 0;
+    }
+
+    return result;
+}
+
 /** Clear the focus after the remove or delete that took Focusable from the focused entity, when
  * its tables are no longer locked and the scripts of on.blur can change the world.
  *

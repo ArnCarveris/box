@@ -120,6 +120,9 @@ template Gallery {
   mut draft: PreviewValues = preview_defaults
   mut applied: PreviewValues = preview_defaults
 
+  // Whether the dialog of the Basics section is open
+  mut dialog_open = false
+
   // The background view is created before the UI view, so the UI draws over it
   backdrop_view {
     BackdropView: {camera: backdrop.camera}
@@ -270,6 +273,34 @@ template Gallery {
                 Button more(label: "More", variant: "ghost")
                 Button remove(label: "Delete", variant: "danger")
                 Button off(label: "Disabled", disabled: true)
+                Button open_dialog(label: "Dialog", variant: "secondary")
+
+                // Dialog opens a modal dialog, which floats over the whole window although
+                // it is declared here. Its close button, Escape and the backdrop close it
+                // with a change, the buttons in it by clearing dialog_open.
+                Modal dialog(title: "Discard changes?", open: dialog_open, width: 360) {
+                  Label message(width: 312, text: "The changes since the last save are lost when you discard them.")
+
+                  dialog_actions {
+                    Layout: {direction: Row, spacing: 8, v: Middle}
+                    Button discard(label: "Discard", variant: "danger")
+                    Button keep(label: "Keep editing", variant: "secondary")
+                  }
+                }
+
+                async {
+                  while true {
+                    const e = await on.change(this)
+                    const w = e.widget
+                    if w.has(Modal) {
+                      dialog_open = w[Modal.mut].current
+                    } else if w.has(Button) && w.name() == "open_dialog" {
+                      dialog_open = true
+                    } else if w.has(Button) && w.parent().name() == "dialog_actions" {
+                      dialog_open = false
+                    }
+                  }
+                }
               }
 
               toggles {
