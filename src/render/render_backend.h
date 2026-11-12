@@ -101,6 +101,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t shadow_draws;       /**< Draw calls recorded in the shadow passes of the cascades
                                  *   and the atlas tiles, not those of the probe captures; a
                                  *   point light tile draws each caster draw once per octant */
+    int32_t shadow_cascades;    /**< Cascades of views rendered */
+    int32_t shadow_cascades_kept; /**< Cascades of views kept from an earlier frame instead of
+                                 *   rendered, sampled with the matrix they rendered with */
     int32_t copies_direct;      /**< Copies between buffers (box_render_copy_t) that went from
                                  *   their source buffer straight into their destination */
     int32_t copies_staged;      /**< Copies between buffers that went through the staging

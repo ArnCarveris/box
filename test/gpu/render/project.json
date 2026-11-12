@@ -649,6 +649,21 @@
                 ]
             },
             {
+                "id": "CascadeReuse",
+                "testcases": [
+                    "default_renders_every_cascade",
+                    "zero_interval_renders_every_frame",
+                    "interval_renders_every_n_frames",
+                    "equal_intervals_staggered",
+                    "light_direction_renders_all",
+                    "settings_change_renders_all",
+                    "projection_change_renders_all",
+                    "camera_move_keeps_cascades",
+                    "kept_cascade_sampled_with_its_matrix",
+                    "enabled_interval_renders_all_first"
+                ]
+            },
+            {
                 "id": "LightCookie",
                 "testcases": [
                     "default_settings",
