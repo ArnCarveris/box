@@ -6,13 +6,14 @@
  * The renderer replaces its file with the image in one rename once the GPU finished the frame
  * that holds it, at the latest on box_render_sync, so a client reads an empty or whole image.
  *
- * A capture shows a camera as its view renders it, effects included. A render shows its
- * subject alone in a private scene, plain lit without shadows or effects, so the image does
- * not depend on the views of the world.
+ * A capture shows a camera as its view renders it, effects included, or a surface as presented
+ * with all its views. A render shows its subject alone in a private scene, plain lit without
+ * shadows or effects, so the image does not depend on the views of the world.
  */
 
 #include "command.h"
 #include "../render/render.h"
+#include "../surface/surface.h"
 #include <float.h>
 #include <math.h>
 #include <string.h>
@@ -390,11 +391,12 @@ static void box_cmd_render_capture_size(
     }
 }
 
-/** The capture command: write a PNG of the active camera or of a camera.
+/** The capture command: write a PNG of the active camera, of a camera, or of a surface with
+ * all its views as it is presented, written by the Surface.write_to_file readback.
  *
  * @param ctx The call context
  * @param argc Number of arguments
- * @param argv The camera, omitted for the active camera
+ * @param argv The camera or surface, omitted for the active camera
  * @param result Receives the PNG resource
  */
 static void box_cmd_capture(
@@ -404,9 +406,22 @@ static void box_cmd_capture(
     ecs_value_t *result)
 {
     ecs_world_t *world = ctx->world;
-    ecs_entity_t camera = box_cmd_render_camera(world, argc, argv);
+    ecs_entity_t arg = argc > 0 ? *(ecs_entity_t*)argv[0].ptr : 0;
+    ecs_entity_t camera = 0;
     box_render_capture_desc_t desc = {0};
     char *path = NULL;
+    if (arg && ecs_is_alive(world, arg) && !ecs_has(world, arg, Camera) &&
+        ecs_has(world, arg, Surface))
+    {
+        path = box_cmd_render_file(ctx, result->ptr);
+        if (path) {
+            box_surface_capture_frame(world, arg, path);
+        }
+
+        goto done;
+    }
+
+    camera = box_cmd_render_camera(world, argc, argv);
     if (!camera) {
         goto done;
     }
@@ -804,13 +819,14 @@ void box_cmd_render_init(
     });
 
     box_command_register(world,
-        "Write a PNG of the active camera or of a camera to a resource next frame",
+        "Write a PNG of the active camera, of a camera or of a surface with all its views to "
+        "a resource next frame",
         (ecs_function_desc_t){
             .name = "capture",
             .return_type = ecs_id(ecs_shell_resource_t),
             .params = {
                 { .name = "camera", .type = ecs_id(ecs_entity_t), .optional = true,
-                  .brief = "Camera to capture (default: the active camera)" }
+                  .brief = "Camera or surface to capture (default: the active camera)" }
             },
             .callback = box_cmd_capture,
             .ctx = state
