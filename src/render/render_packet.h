@@ -102,6 +102,10 @@
 /** Shader handle of the engine shader of the depth of field passes */
 #define BOX_RENDER_SHADER_DEPTH_OF_FIELD (59)
 
+/** Shader handle of the shared code of the texture graph stages, which the GPU backend puts in
+ * front of the stages it generates instead of compiling it alone */
+#define BOX_RENDER_SHADER_TEXTURE_GRAPH (62)
+
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most; the bake
  * warns once about a volume with more for the first view that shows it */
 #define BOX_RENDER_DEBUG_PROBES_MAX (65536)

@@ -34,6 +34,10 @@
 /** Format of single channel sampled textures, which every layer reads as stored */
 #define BOX_GPU_TEXTURE_SINGLE (WGPUTextureFormat_R8Unorm)
 
+/** First shader handle of the stages the backend generates for the texture graphs, above the
+ * handles the main thread gives */
+#define BOX_GPU_TEXTURE_GRAPH_SHADER_FIRST (0x70000000u)
+
 /** TextureWrap modes the samplers are created for */
 #define BOX_GPU_WRAPS (3)
 
@@ -1052,6 +1056,17 @@ typedef struct box_gpu_t {
                                      *   background, created by the first request */
     bool pipeline_wait;             /**< Requests of this packet wait for their pipeline:
                                      *   natively, a headless run or a packet that captures */
+    struct box_gpu_texgraphs_t *texture_graphs; /**< Texture graphs, their programs and
+                                     *   intermediates, created by the first graph or kind */
+    ecs_vec_t graph_results;        /**< box_render_texture_graph_result_t not yet taken, under
+                                     *   the lock */
+    ecs_vec_t graph_requests;       /**< box_render_texture_read_t, readbacks the main thread
+                                     *   requested, under the lock */
+    ecs_vec_t graph_reads;          /**< box_render_texture_read_t, delivered readbacks not yet
+                                     *   taken, under the lock */
+    int32_t texture_graph_count;    /**< Texture graphs alive */
+    int32_t texture_graph_programs; /**< Texture graph programs alive */
+    uint64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediates */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;

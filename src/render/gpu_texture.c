@@ -78,6 +78,8 @@ typedef struct box_gpu_texture_entry_t {
     bool single;                /**< BOX_GPU_TEXTURE_SINGLE, whose levels average stored values */
     uint32_t serial;            /**< Serial of the image it holds, unique across textures, which
                                  *   the blend arrays and groups compare */
+    WGPUTextureFormat format;   /**< Format of the texture of a texture graph, undefined for
+                                 *   an uploaded image */
 } box_gpu_texture_entry_t;
 
 /** Count the mip levels of a full chain.
@@ -523,6 +525,113 @@ done:
     return;
 }
 
+box_gpu_texture_t* box_gpu_texture_output(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    uint32_t width,
+    uint32_t height,
+    WGPUTextureFormat format,
+    bool color)
+{
+    box_gpu_texture_t *result = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
+    box_gpu_texture_entry_t *entry = (box_gpu_texture_entry_t*)result;
+    box_gpu_mip_space_t space = BOX_GPU_MIP_UNKNOWN;
+    bool rgba8 = format == BOX_GPU_TEXTURE_FORMAT;
+    WGPUTextureFormat srgb = rgba8 ? BOX_GPU_TEXTURE_SRGB : format;
+    if (result && entry->format == format && wgpuTextureGetWidth(result->texture) == width &&
+        wgpuTextureGetHeight(result->texture) == height)
+    {
+        goto done;
+    }
+
+    box_gpu_materials_clear(gpu);
+    if (result) {
+        space = entry->space;
+        ecs_map_remove(&gpu->textures, handle);
+        box_gpu_texture_free(result);
+    }
+
+    entry = ecs_os_calloc_t(box_gpu_texture_entry_t);
+    result = &entry->base;
+    result->mips = box_gpu_mip_count(width, height);
+    WGPUTextureDescriptor desc = {
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
+            WGPUTextureUsage_CopySrc | WGPUTextureUsage_RenderAttachment |
+            (format != BOX_GPU_TEXTURE_SINGLE ? WGPUTextureUsage_StorageBinding : 0),
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width, height, 1 },
+        .format = format,
+        .mipLevelCount = result->mips,
+        .sampleCount = 1,
+        .viewFormatCount = rgba8 ? 1 : 0,
+        .viewFormats = rgba8 ? &srgb : NULL
+    };
+    entry->format = format;
+    entry->single = format == BOX_GPU_TEXTURE_SINGLE;
+    entry->serial = ++ gpu->texture_serial;
+    entry->space = entry->single || !rgba8 ? BOX_GPU_MIP_LINEAR
+        : color ? BOX_GPU_MIP_SRGB : space;
+    result->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
+    result->linear = box_gpu_texture_view(result->texture, format, 0, result->mips);
+    result->srgb = box_gpu_texture_view(result->texture, srgb, 0, result->mips);
+    result->mipped = true;
+    ecs_map_insert_ptr(&gpu->textures, handle, result);
+done:
+    return result;
+}
+
+void box_gpu_texture_output_written(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
+    int32_t i;
+    if (!tex) {
+        goto done;
+    }
+
+    ((box_gpu_texture_entry_t*)tex)->serial = ++ gpu->texture_serial;
+    if (tex->mips == 1 || !tex->mipped) {
+        goto done;
+    }
+
+    tex->mipped = false;
+    for (i = 0; i < ecs_vec_count(&gpu->mips); i ++) {
+        if (*ecs_vec_get_t(&gpu->mips, uint32_t, i) == handle) {
+            goto done;
+        }
+    }
+
+    *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = handle;
+done:
+    return;
+}
+
+static void box_gpu_texture_blit(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    WGPURenderPipeline pipeline,
+    WGPUTextureView src,
+    WGPUTextureView dst);
+
+bool box_gpu_texture_output_blit(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    uint32_t handle,
+    WGPUTextureView src)
+{
+    box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
+    box_gpu_texture_entry_t *entry = (box_gpu_texture_entry_t*)tex;
+    WGPURenderPipeline pipeline = tex ? box_gpu_blit_pipeline(gpu, entry->format) : NULL;
+    if (pipeline) {
+        WGPUTextureView dst = box_gpu_texture_view(tex->texture, entry->format, 0, 1);
+        box_gpu_texture_blit(gpu, encoder, pipeline, src, dst);
+        wgpuTextureViewRelease(dst);
+    }
+
+    return pipeline != NULL;
+}
+
 /** Record a pass that renders a view into another through the blit pipeline: a full screen
  * triangle that samples the source with the linear sampler of the blit.
  *
@@ -589,8 +698,10 @@ static void box_gpu_texture_mip_chain(
         space = BOX_GPU_MIP_LINEAR;
     }
 
+    WGPUTextureFormat stored = ((box_gpu_texture_entry_t*)tex)->format;
     WGPUTextureFormat format = ((box_gpu_texture_entry_t*)tex)->single
         ? BOX_GPU_TEXTURE_SINGLE
+        : stored && stored != BOX_GPU_TEXTURE_FORMAT ? stored
         : space == BOX_GPU_MIP_SRGB ? BOX_GPU_TEXTURE_SRGB : BOX_GPU_TEXTURE_FORMAT;
     WGPURenderPipeline pipeline = box_gpu_blit_pipeline(gpu, format);
     uint32_t level;

@@ -328,6 +328,128 @@ void box_gpu_texture_mips(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Get the texture of a handle that a texture graph writes, creating it with storage binding
+ * (unless R8Unorm) and a full mip chain when the handle has none of the size and format; a
+ * replaced image of the handle is released.
+ *
+ * An RGBA8Unorm texture has an sRGB view, which the color layers sample. Its levels below the
+ * first are generated once box_gpu_texture_output_written queued them.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the texture
+ * @param width Width of the first level
+ * @param height Height of the first level
+ * @param format RGBA8Unorm, RGBA16Float or R8Unorm
+ * @param color The texture holds display encoded color, whose levels average linear light
+ * @return The texture
+ */
+box_gpu_texture_t* box_gpu_texture_output(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    uint32_t width,
+    uint32_t height,
+    WGPUTextureFormat format,
+    bool color);
+
+/** Record a render pass that writes the first level of the texture of a handle from a view of
+ * the same size through the blit pipeline, for a format that cannot be a storage texture.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder
+ * @param handle Handle of the texture, made by box_gpu_texture_output
+ * @param src The view sampled, filterable
+ * @return Whether the pass was recorded, false while the blit pipeline does not exist
+ */
+bool box_gpu_texture_output_blit(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    uint32_t handle,
+    WGPUTextureView src);
+
+/** Queue the levels below the first of the texture of a handle whose first level was written,
+ * so box_gpu_texture_mips generates them before the passes of the packet sample it.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the texture
+ */
+void box_gpu_texture_output_written(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
+/** Create, replace or release a node kind of the texture graphs from a
+ * BOX_RENDER_TEXTURE_NODE_KIND resource.
+ *
+ * @param gpu The backend
+ * @param op What happens to the kind
+ * @param handle Id of the kind
+ * @param desc The kind followed by its function name and source, NULL for a release
+ * @param size Bytes of desc
+ */
+void box_gpu_texture_node_kind_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_texture_node_kind_t *desc,
+    uint32_t size);
+
+/** Create, replace or release a texture graph from a BOX_RENDER_TEXTURE_GRAPH resource. A
+ * graph of a new structure compiles its stages; until they exist its texture keeps the image
+ * it has.
+ *
+ * @param gpu The backend
+ * @param op What happens to the graph
+ * @param handle Texture handle of the graph
+ * @param desc The graph followed by its nodes and parameters, NULL for a release
+ * @param size Bytes of desc
+ */
+void box_gpu_texture_graph_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_texture_graph_t *desc,
+    uint32_t size);
+
+/** Take the shared code of the texture graph stages (BOX_RENDER_SHADER_TEXTURE_GRAPH), which is
+ * not compiled alone; the stages are generated again with new code.
+ *
+ * @param gpu The backend
+ * @param op What happens to the code
+ * @param desc The code, NULL for a release
+ */
+void box_gpu_texture_graph_prelude(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    const box_render_shader_desc_t *desc);
+
+/** Learn the outcome of the compile or of the pipeline of a generated texture graph stage.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the stage, from BOX_GPU_TEXTURE_GRAPH_SHADER_FIRST
+ * @param message Error text, NULL when it compiled
+ */
+void box_gpu_texture_graph_compiled(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    const char *message);
+
+/** Evaluate the texture graphs whose stages exist and whose image is out of date, deliver
+ * their outcomes and readbacks, after the resources of a packet applied and before the mip
+ * levels are generated, so the passes of the packet sample the new images.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_texture_graphs_evaluate(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Release the texture graphs, their programs and intermediates.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_texture_graphs_fini(
+    box_gpu_t *gpu);
+
 /** Release every cached bind group of the texture layers, after a texture they bind changed.
  *
  * @param gpu The backend

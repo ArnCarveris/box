@@ -8,6 +8,7 @@
  */
 
 #include "texture.h"
+#include "../render/render.h"
 #include <stdarg.h>
 
 /** Most nodes of a graph */
@@ -133,6 +134,7 @@ void box_texture_graph_clear(
     tex->graph_dirty = false;
     tex->graph_waiting = false;
     tex->graph_sent = false;
+    tex->graph_pending = false;
 }
 
 void box_texture_graphs_fini(
@@ -670,8 +672,25 @@ static bool box_texture_graph_same(
         (!a->param_size || !ecs_os_memcmp(a->params, b->params, a->param_size));
 }
 
+/** Check whether the backend of a world evaluates the graphs and reports their outcome, so
+ * a graph is ready once its image was written: the GPU backend, unless its device failed.
+ *
+ * @param world The world or a stage
+ * @return Whether Texture and TextureStatus wait for the outcome of the backend
+ */
+static bool box_texture_graph_deferred(
+    ecs_world_t *world)
+{
+    box_render_gpu_stats_t stats;
+
+    return box_render_gpu_stats(world, &stats) && !stats.failed;
+}
+
 /** Take a compiled graph into the entry of its texture and queue it for the backend, unless
  * it makes the image the backend already has.
+ *
+ * With a backend that evaluates the graphs the texture stays loading until the outcome of its
+ * evaluation arrives from the render extract, else it is ready at once.
  *
  * @param world The world or a stage
  * @param t The registry
@@ -686,11 +705,13 @@ static void box_texture_graph_accept(
 {
     box_texture_t *tex = box_texture_entry(t, e);
     int32_t revision = box_texture_revision(world, e);
+    bool deferred = box_texture_graph_deferred(world);
     if (tex->graph && box_texture_graph_same(tex->graph, graph)) {
         ecs_os_free(graph->nodes);
         ecs_os_free(graph->params);
         ecs_os_free(graph);
-        box_texture_status(world, e, TextureReady, revision, NULL);
+        box_texture_status(world, e, tex->graph_pending ? TextureLoading : TextureReady,
+            revision, NULL);
         goto done;
     }
 
@@ -705,9 +726,16 @@ static void box_texture_graph_accept(
     tex->width = graph->width;
     tex->height = graph->height;
     tex->single_channel = graph->format == GraphSingle;
+    tex->graph_serial ++;
+    tex->graph_pending = deferred;
     if (!tex->graph_queued) {
         tex->graph_queued = true;
         *ecs_vec_append_t(NULL, &t->graph_queued, ecs_entity_t) = e;
+    }
+
+    if (deferred) {
+        box_texture_status(world, e, TextureLoading, revision, NULL);
+        goto done;
     }
 
     ecs_set(world, e, Texture, { .width = graph->width, .height = graph->height });

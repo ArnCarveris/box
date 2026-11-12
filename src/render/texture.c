@@ -7,6 +7,8 @@
  * A texture entity a surface renders into resolves to the image of the target of the surface.
  *
  * The compiled graph of a TextureGraph goes to the handle of its texture, after its node kinds.
+ * The GPU backend evaluates it into the image of the handle and reports the outcome, which
+ * writes Texture and TextureStatus.
  */
 
 #include "render.h"
@@ -243,6 +245,8 @@ static void box_render_texture_graph_send(
     desc->param_size = (uint32_t)graph->param_size;
     desc->structure_hash = graph->structure_hash;
     desc->param_hash = graph->param_hash;
+    desc->serial = tex->graph_serial;
+    desc->pad = 0;
     box_render_texture_graph_node_t *out = (box_render_texture_graph_node_t*)(desc + 1);
     for (i = 0; i < graph->node_count; i ++) {
         const box_texture_graph_node_t *node = &graph->nodes[i];
@@ -309,6 +313,147 @@ static void box_render_texture_graphs_send(
     }
 
     ecs_vec_clear(&t->graph_queued);
+}
+
+/** Find the texture whose graph went to the backend under a handle.
+ *
+ * @param t The registry
+ * @param handle The texture handle
+ * @return The texture, NULL when no texture with a graph has the handle
+ */
+static box_texture_t* box_render_texture_graph_of(
+    box_textures_t *t,
+    uint32_t handle)
+{
+    box_texture_t *result = NULL;
+    ecs_map_iter_t it = ecs_map_iter(&t->textures);
+    while (handle && !result && ecs_map_next(&it)) {
+        box_texture_t *tex = ecs_map_ptr(&it);
+        if (tex->handle == handle && tex->graph) {
+            result = tex;
+        }
+    }
+
+    return result;
+}
+
+/** Apply an outcome of the GPU backend to the texture of its graph, unless a newer graph was
+ * taken since: the first evaluation writes Texture and makes the texture ready with the next
+ * revision, a failure fails it with the error and the node it came from.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ * @param r The outcome
+ */
+static void box_render_texture_graph_outcome(
+    ecs_world_t *world,
+    box_textures_t *t,
+    const box_render_texture_graph_result_t *r)
+{
+    box_texture_t *tex = box_render_texture_graph_of(t, r->handle);
+    int32_t revision;
+    if (!tex || tex->graph_serial != r->serial || !ecs_is_alive(world, tex->entity)) {
+        goto done;
+    }
+
+    tex->graph_pending = false;
+    revision = box_texture_revision(world, tex->entity);
+    if (r->error) {
+        char *name = ecs_get_path(world, tex->entity);
+        const box_texture_graph_t *graph = tex->graph;
+        ecs_entity_t node = r->node >= 0 && r->node < graph->node_count
+            ? graph->nodes[r->node].entity : 0;
+        char *node_name = node && ecs_is_alive(world, node) ? ecs_get_path(world, node) : NULL;
+        char *error = node_name
+            ? flecs_asprintf("texture graph '%s': node '%s': %s", name, node_name, r->error)
+            : flecs_asprintf("texture graph '%s': %s", name, r->error);
+        ecs_err("%s", error);
+        box_texture_status(world, tex->entity, TextureFailed, revision, error);
+        ecs_os_free(error);
+        ecs_os_free(node_name);
+        ecs_os_free(name);
+        goto done;
+    }
+
+    tex->sent = true;
+    tex->revision ++;
+    ecs_set(world, tex->entity, Texture, {
+        .width = tex->graph->width, .height = tex->graph->height });
+    box_texture_status(world, tex->entity, TextureReady, revision + 1, NULL);
+done:
+    return;
+}
+
+/** Apply the outcomes of the graphs the GPU backend evaluated or failed.
+ *
+ * @param world The world or a stage
+ * @param t The registry
+ */
+static void box_render_texture_graph_outcomes(
+    ecs_world_t *world,
+    box_textures_t *t)
+{
+    ecs_vec_t results;
+    int32_t i;
+    ecs_vec_init_t(NULL, &results, box_render_texture_graph_result_t, 0);
+    box_render_gpu_texture_graph_results(world, &results);
+    for (i = 0; i < ecs_vec_count(&results); i ++) {
+        box_render_texture_graph_result_t *r = ecs_vec_get_t(
+            &results, box_render_texture_graph_result_t, i);
+        box_render_texture_graph_outcome(world, t, r);
+        ecs_os_free(r->error);
+    }
+
+    ecs_vec_fini_t(NULL, &results, box_render_texture_graph_result_t);
+}
+
+bool box_render_texture_graph_read(
+    ecs_world_t *world,
+    ecs_entity_t texture,
+    ecs_entity_t node,
+    uint32_t ticket)
+{
+    box_textures_t *t = box_textures_get(world);
+    const box_texture_t *tex = t && texture
+        ? ecs_map_get_deref(&t->textures, box_texture_t, texture)
+        : NULL;
+    int32_t i, index = -1;
+    bool result = false;
+    if (!tex || !tex->graph || !tex->handle || !tex->graph_sent) {
+        goto done;
+    }
+
+    for (i = 0; node && i < tex->graph->node_count && index < 0; i ++) {
+        if (tex->graph->nodes[i].entity == node) {
+            index = i;
+        }
+    }
+
+    if (node && index < 0) {
+        goto done;
+    }
+
+    result = box_render_gpu_texture_graph_read(world, tex->handle, index, ticket);
+done:
+    return result;
+}
+
+bool box_render_texture_graph_reads(
+    ecs_world_t *world,
+    ecs_vec_t *out)
+{
+    box_textures_t *t = box_textures_get(world);
+    int32_t i, first = ecs_vec_count(out);
+    bool result = box_render_gpu_texture_graph_reads(world, out);
+    for (i = first; t && i < ecs_vec_count(out); i ++) {
+        box_render_texture_read_t *r = ecs_vec_get_t(out, box_render_texture_read_t, i);
+        const box_texture_t *tex = box_render_texture_graph_of(t, r->handle);
+        r->texture = tex ? tex->entity : 0;
+        r->node = tex && r->index >= 0 && r->index < tex->graph->node_count
+            ? tex->graph->nodes[r->index].entity : 0;
+    }
+
+    return result;
 }
 
 /** Queue every graph and node kind for a restarted backend.
@@ -459,6 +604,7 @@ static void BoxRenderExtractTextures(
         state->generation = backend->generation;
     }
 
+    box_render_texture_graph_outcomes(it->stage, t);
     box_render_texture_graphs_release(p, t);
     for (i = 0; i < ecs_vec_count(&t->released); i ++) {
         uint32_t handle = *ecs_vec_get_t(&t->released, uint32_t, i);

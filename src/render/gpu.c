@@ -510,6 +510,12 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_SHADOW_ATLAS) {
             box_gpu_atlas_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_shadow_atlas_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_TEXTURE_NODE_KIND) {
+            box_gpu_texture_node_kind_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_texture_node_kind_t) ? data : NULL, r->size);
+        } else if (r->kind == BOX_RENDER_TEXTURE_GRAPH) {
+            box_gpu_texture_graph_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_texture_graph_t) ? data : NULL, r->size);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {
@@ -525,6 +531,7 @@ static void box_gpu_render(
         }
     }
 
+    box_gpu_texture_graphs_evaluate(gpu, packet);
     box_gpu_texture_mips(gpu, packet);
     box_gpu_copy(gpu, packet);
     box_gpu_upload(gpu, packet);
@@ -598,6 +605,7 @@ static void box_gpu_fini(
     box_gpu_t *gpu = ctx;
     box_gpu_pipelines_fini(gpu);
     if (gpu->device) {
+        box_gpu_texture_graphs_fini(gpu);
         box_gpu_target_fini(gpu);
         ecs_map_fini(&gpu->targets);
         box_gpu_shader_fini(gpu);
@@ -640,6 +648,18 @@ static void box_gpu_free(
     }
 
     ecs_vec_fini_t(NULL, &gpu->results, box_render_shader_result_t);
+    for (i = 0; i < ecs_vec_count(&gpu->graph_results); i ++) {
+        ecs_os_free(ecs_vec_get_t(&gpu->graph_results,
+            box_render_texture_graph_result_t, i)->error);
+    }
+
+    for (i = 0; i < ecs_vec_count(&gpu->graph_reads); i ++) {
+        ecs_os_free(ecs_vec_get_t(&gpu->graph_reads, box_render_texture_read_t, i)->texels);
+    }
+
+    ecs_vec_fini_t(NULL, &gpu->graph_results, box_render_texture_graph_result_t);
+    ecs_vec_fini_t(NULL, &gpu->graph_requests, box_render_texture_read_t);
+    ecs_vec_fini_t(NULL, &gpu->graph_reads, box_render_texture_read_t);
     ecs_os_mutex_free(gpu->lock);
     ecs_os_free(gpu);
 }
@@ -832,6 +852,15 @@ void box_gpu_stats_publish(
     s->blend_builds += p->blend_builds;
     s->cluster_resizes += p->cluster_resizes;
     s->cluster_entries = (int64_t)gpu->cluster_entries;
+    s->texture_graphs = gpu->texture_graph_count;
+    s->texture_graph_programs = gpu->texture_graph_programs;
+    s->texture_graph_evaluations += p->texture_graph_evaluations;
+    s->texture_graph_dispatches += p->texture_graph_dispatches;
+    s->texture_graph_texels += p->texture_graph_texels;
+    s->texture_graph_ns += p->texture_graph_ns;
+    s->texture_graph_timed += p->texture_graph_timed;
+    s->texture_graph_pool_bytes = (int64_t)gpu->texture_graph_pool_bytes;
+    s->texture_graph_reads += p->texture_graph_reads;
     if (s->copy_staging > s->copy_staging_peak) {
         s->copy_staging_peak = s->copy_staging;
     }
@@ -851,6 +880,9 @@ box_render_backend_t box_render_gpu_backend(void)
     gpu->lock = ecs_os_mutex_new();
     gpu->cull_window = BOX_GPU_CULL_WINDOW;
     ecs_vec_init_t(NULL, &gpu->results, box_render_shader_result_t, 0);
+    ecs_vec_init_t(NULL, &gpu->graph_results, box_render_texture_graph_result_t, 0);
+    ecs_vec_init_t(NULL, &gpu->graph_requests, box_render_texture_read_t, 0);
+    ecs_vec_init_t(NULL, &gpu->graph_reads, box_render_texture_read_t, 0);
     box_render_backend_t result = {
         .ctx = gpu,
         .init = box_gpu_init,

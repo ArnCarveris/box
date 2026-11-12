@@ -54,6 +54,10 @@ typedef struct box_texture_t {
                              *   the next build fails it unless the node got one */
     bool graph_queued;      /**< The entity is in the list of graphs to send */
     bool graph_sent;        /**< The current backend has the graph under handle */
+    uint32_t graph_serial;  /**< Graphs taken for the backend, the serial of the last one */
+    bool graph_pending;     /**< The backend evaluates the graphs, and the outcome of the graph
+                             *   of graph_serial did not arrive: Texture and TextureStatus wait
+                             *   for it */
 } box_texture_t;
 
 /** A node kind of the registry, see box_texture_node_register */

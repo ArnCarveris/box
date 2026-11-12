@@ -122,6 +122,18 @@ typedef struct box_render_gpu_stats_t {
                                  *   another size, its first creation included */
     int64_t cluster_entries;    /**< Light and probe index entries the cluster buffers of the
                                  *   views hold together now */
+    int32_t texture_graphs;     /**< Texture graphs alive */
+    int32_t texture_graph_programs; /**< Generated stage programs alive, shared by the graphs
+                                 *   of one structure */
+    int32_t texture_graph_evaluations; /**< Evaluations of texture graphs recorded */
+    int32_t texture_graph_dispatches; /**< Stage dispatches of texture graphs recorded */
+    int64_t texture_graph_texels; /**< Texels the stage dispatches computed */
+    int64_t texture_graph_ns;   /**< GPU time of the texture graph evaluations read back, 0
+                                 *   without timestamp queries */
+    int32_t texture_graph_timed; /**< Packets of evaluations whose GPU time texture_graph_ns
+                                 *   holds */
+    int64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediate textures now */
+    int32_t texture_graph_reads; /**< Texture graph readbacks delivered */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -332,6 +344,9 @@ typedef struct box_render_texture_graph_t {
     uint32_t param_size;        /**< Parameter bytes after the nodes */
     uint64_t structure_hash;    /**< Hash of the kinds and edges of the nodes */
     uint64_t param_hash;        /**< Hash of the parameter bytes */
+    uint32_t serial;            /**< Graphs sent for the texture, which the outcome of the
+                                 *   evaluation names (box_render_texture_graph_result_t) */
+    uint32_t pad;               /**< Unused, zero */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.
@@ -387,6 +402,98 @@ const box_render_texture_graph_t* box_render_null_texture_graph(
 const box_render_texture_node_kind_t* box_render_null_texture_node_kind(
     const box_render_null_t *null,
     uint32_t id);
+
+/** Outcome of the first evaluation of a graph the GPU backend received, or why it failed */
+typedef struct box_render_texture_graph_result_t {
+    uint32_t handle;            /**< Texture handle of the graph */
+    uint32_t serial;            /**< Serial of the graph (box_render_texture_graph_t) */
+    int32_t node;               /**< Index of the node an error came from, -1 for none */
+    char *error;                /**< Why the graph failed, NULL when its image was written,
+                                 *   freed by the caller */
+} box_render_texture_graph_result_t;
+
+/** Take the outcomes of the texture graphs the GPU backend of a world evaluated or failed since
+ * the last call, oldest first.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_graph_result_t
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_texture_graph_results(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** A readback of a texture graph that the GPU backend delivered */
+typedef struct box_render_texture_read_t {
+    ecs_entity_t texture;       /**< Texture entity, set by box_render_texture_graph_reads */
+    ecs_entity_t node;          /**< Node entity read, 0 for the image; set by
+                                 *   box_render_texture_graph_reads */
+    uint32_t handle;            /**< Texture handle of the graph */
+    int32_t index;              /**< Index of the node read in the compiled graph, -1 for the
+                                 *   image */
+    uint32_t ticket;            /**< Ticket of the request */
+    int32_t width;              /**< Width of the texels */
+    int32_t height;             /**< Height of the texels */
+    float *texels;              /**< Four floats per texel from the top row, NULL when failed,
+                                 *   freed by the caller: the image as stored (R8 as (r, 0, 0,
+                                 *   1)), a scalar node as (x, 0, 0, 1), a vector one in halves */
+} box_render_texture_read_t;
+
+/** Request a readback of the image of a texture graph of the GPU backend of a world, or of the
+ * value of one of its nodes, which the graph then keeps materialized in a texture.
+ *
+ * The backend copies it after the next evaluation that has it, or at once from the image of a
+ * graph that is evaluated, and delivers it once the copy mapped, unless
+ * box_render_gpu_readback_delivery holds. The output node reads as the image.
+ *
+ * @param world The world
+ * @param handle Texture handle of the graph
+ * @param node Index of the node in the compiled graph, -1 for the image
+ * @param ticket Number the delivered readback carries
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_texture_graph_read(
+    ecs_world_t *world,
+    uint32_t handle,
+    int32_t node,
+    uint32_t ticket);
+
+/** Take the texture graph readbacks the GPU backend of a world delivered since the last call.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_read_t, without texture and node entities
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_texture_graph_reads(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** Request a readback of the image of the TextureGraph of a texture entity, or of the value of
+ * one of its nodes, see box_render_gpu_texture_graph_read.
+ *
+ * @param world The world
+ * @param texture The texture entity
+ * @param node The node entity, 0 for the image
+ * @param ticket Number the delivered readback carries
+ * @return Whether the request was made: the world renders with the GPU backend, the graph of
+ * the texture was sent to it and the node is part of it
+ */
+bool box_render_texture_graph_read(
+    ecs_world_t *world,
+    ecs_entity_t texture,
+    ecs_entity_t node,
+    uint32_t ticket);
+
+/** Take the texture graph readbacks delivered since the last call, with their texture and node
+ * entities.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_read_t
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_texture_graph_reads(
+    ecs_world_t *world,
+    ecs_vec_t *out);
 
 /** Create a null backend.
  *

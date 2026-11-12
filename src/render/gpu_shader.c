@@ -179,20 +179,33 @@ static void box_gpu_compile_finish(
         compile->slot = NULL;
     }
 
+    bool graph = compile->handle >= BOX_GPU_TEXTURE_GRAPH_SHADER_FIRST;
     if (compile->failed || !compile->module) {
         const char *message = compile->message
             ? compile->message : "shader module creation failed";
         ecs_err("shader '%s' failed to compile: %s", compile->label, message);
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
-        box_gpu_shader_report(gpu, compile->handle, compile->revision, message,
-            compile->label);
+        if (graph) {
+            box_gpu_texture_graph_compiled(gpu, compile->handle, message);
+        } else {
+            box_gpu_shader_report(gpu, compile->handle, compile->revision, message,
+                compile->label);
+        }
     } else {
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
-        box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
+        if (!graph) {
+            box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL,
+                compile->label);
+        }
+
         if (compile->revision == slot->requested) {
             box_gpu_shader_install(gpu, compile->handle, compile->module, compile->revision,
                 compile->label);
             compile->module = NULL;
+        }
+
+        if (graph) {
+            box_gpu_texture_graph_compiled(gpu, compile->handle, NULL);
         }
     }
 
@@ -485,6 +498,11 @@ void box_gpu_shader_apply(
     uint32_t handle,
     const box_render_shader_desc_t *desc)
 {
+    if (op == BOX_RENDER_DESTROY && handle == BOX_RENDER_SHADER_TEXTURE_GRAPH) {
+        box_gpu_texture_graph_prelude(gpu, op, NULL);
+        goto done;
+    }
+
     if (op == BOX_RENDER_DESTROY) {
         box_gpu_shader_release(gpu, handle);
         goto done;
@@ -495,6 +513,11 @@ void box_gpu_shader_apply(
     }
 
     if (handle == BOX_RENDER_SHADER_SHADOW_CLIP && !gpu->clip_distances) {
+        goto done;
+    }
+
+    if (handle == BOX_RENDER_SHADER_TEXTURE_GRAPH) {
+        box_gpu_texture_graph_prelude(gpu, op, desc);
         goto done;
     }
 
@@ -540,7 +563,9 @@ void box_gpu_shader_pipeline_failed(
     while (module && !found && ecs_map_next(&it)) {
         box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
         found = slot->shader.module == module;
-        if (found) {
+        if (found && ecs_map_key(&it) >= BOX_GPU_TEXTURE_GRAPH_SHADER_FIRST) {
+            box_gpu_texture_graph_compiled(gpu, (uint32_t)ecs_map_key(&it), message);
+        } else if (found) {
             box_gpu_shader_report(gpu, (uint32_t)ecs_map_key(&it), slot->installed, message,
                 slot->label);
         }

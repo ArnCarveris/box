@@ -1,0 +1,14 @@
+// Coordinates scaled and offset per channel, with a mix towards a constant: the image of each
+// texel is mix(uv * (0.5, 0.25, 0.5, 1) + (0.2, 0.1, 0.05, 0), (1, 1, 1, 1), 0.25), stored as
+// HDR so it reads back at half precision.
+
+using box.texture
+
+graph_math {
+  uv     { TexCoords: {} }
+  scaled { TexMath: {op: MathMultiply, a: uv, b_value: {0.5, 0.25, 0.5, 1}} }
+  offset { TexMath: {op: MathAdd, a: scaled, b_value: {0.2, 0.1, 0.05, 0}} }
+  white  { TexConstant: {value: {1, 1, 1, 1}} }
+  mixed  { TexMath: {op: MathMix, a: offset, b: white, c_value: {0.25, 0.25, 0.25, 0.25}} }
+  TextureGraph: {output: mixed, width: 16, height: 8, format: GraphHdr}
+}

@@ -1,0 +1,97 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Texture graphs evaluated on the GPU and sampled by materials, lit by a sun from the upper
+// right. On the left the plating example: the coordinates halved and tinted, a gradient from a
+// dark brown at the top left to a light tan at the bottom right. In the middle a per channel mix
+// of a red and a blue constant by the coordinates (u, v, 0, 1), clamped, as linear albedo: red
+// flat at 0.5 over the left half and falling to 0.1 at the right, green rising slightly down,
+// blue at 0.1. On the right a sphere whose albedo is the sphere domain direction mapped from
+// -1..1 to 0..1: red towards +x, green up, blue towards +z. Below, a panel whose emission is an
+// HDR graph of green 4 v, black at its top and brightest at its bottom.
+// frames: 30
+
+graphs {
+  AmbientLight: {sky: {120, 140, 170}, ground: {40, 40, 40}, intensity: 0.8}
+
+  sun {
+    Rotation: {-0.6, 0.8, 0}
+    DirectionalLight: {intensity: 3}
+  }
+
+  camera {
+    Position: {0, 0, 8}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+  }
+
+  plating {
+    uv     { TexCoords: {} }
+    bright { TexMath: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
+    tinted { TexMath: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
+    TextureGraph: {output: tinted, width: 256}
+  }
+
+  bands {
+    uv    { TexCoords: {} }
+    red   { TexConstant: {value: {0.9, 0.1, 0.1, 1}} }
+    blue  { TexConstant: {value: {0.1, 0.2, 0.9, 1}} }
+    mixed { TexMath: {op: MathMix, a: red, b: blue, c: uv} }
+    edge  { TexMath: {op: MathClamp, a: mixed, b_value: {0, 0, 0, 1}, c_value: {0.5, 1, 1, 1}} }
+    TextureGraph: {output: edge, width: 128, format: GraphLinear}
+  }
+
+  globe {
+    dir    { TexCoords: {} }
+    half   { TexMath: {op: MathMultiply, a: dir, b_value: {0.5, 0.5, 0.5, 1}} }
+    shift  { TexMath: {op: MathAdd, a: half, b_value: {0.5, 0.5, 0.5, 0}} }
+    TextureGraph: {output: shift, width: 256, height: 128, domain: DomainSphere}
+  }
+
+  glow {
+    uv     { TexCoords: {} }
+    bright { TexMath: {op: MathMultiply, a: uv, b_value: {0, 4, 2, 1}} }
+    TextureGraph: {output: bright, width: 64, format: GraphHdr}
+  }
+
+  plating_quad {
+    Position: {-3, 0.8, 0}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: plating}
+  }
+
+  bands_quad {
+    Position: {0, 0.8, 0}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: bands}
+  }
+
+  globe_sphere {
+    Position: {3, 0.8, 0}
+    Sphere: {segments: 48, smooth: true, radius: 1.2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.6}
+    PbrTextures: {albedo: globe}
+  }
+
+  glow_panel {
+    Position: {0, -2, 0}
+    Quad: {6, 1.2}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 1, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {emissive: glow}
+  }
+}
