@@ -1,0 +1,731 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.audio
+using box.camera
+using box.view
+using box.surface
+using box.geometry
+using box.input
+using box.layout
+using box.material
+using box.picking
+using box.text
+using box.texture
+using box.transform
+using box.transition
+using state
+
+window {}
+
+assets {
+  export const HOP_CLOCK: i32 = 1
+  export const HOP_SEASON: i32 = 2
+  export const HOP_WHISTLE: i32 = 6
+  export const HOP_BELL: i32 = 7
+  export const HOP_FIREWORKS: i32 = 8
+  export const HOP_CAM: i32 = 9
+  export const HOP_CAM_NEXT: i32 = 12
+  export const HOP_TOUR: i32 = 13
+  export const HOP_PANEL: i32 = 14
+  export const HOP_VILLAGE_LESS: i32 = 15
+  export const HOP_VILLAGE_MORE: i32 = 16
+  export const HOP_BALLOONS_LESS: i32 = 17
+  export const HOP_BALLOONS_MORE: i32 = 18
+  export const HOP_SOUND: i32 = 19
+
+  export const HV_HOUR: i32 = 0
+  export const HV_RATE: i32 = 1
+  export const HV_WIND: i32 = 2
+  export const HV_TRAIN: i32 = 3
+
+  export const HC_INK: Rgb = {13, 40, 46}
+  export const HC_INSET: Rgb = {7, 25, 30}
+  export const HC_RAISED: Rgb = {22, 58, 64}
+  export const HC_LIFT: Rgb = {32, 78, 84}
+  export const HC_EDGE: Rgb = {42, 88, 92}
+  export const HC_BRASS: Rgb = {216, 174, 98}
+  export const HC_BRASS_HI: Rgb = {244, 210, 140}
+  export const HC_BRASS_LO: Rgb = {148, 122, 74}
+  export const HC_CREAM: Rgb = {242, 233, 210}
+  export const HC_MIST: Rgb = {146, 172, 166}
+  export const HC_DARK: Rgb = {24, 30, 24}
+
+  export mut hud_panel_on = true
+  export mut hud_muted = false
+
+  hud_actions {
+    KeyPanel { Action: {description: "Show or hide the panel"}; Binding: {key: H} }
+    KeyClock { Action: {description: "Run or pause the clock"}; Binding: {key: Space} }
+    KeySpring { Action: {description: "Make it spring"}; Binding: {key: Num1} }
+    KeySummer { Action: {description: "Make it summer"}; Binding: {key: Num2} }
+    KeyAutumn { Action: {description: "Make it autumn"}; Binding: {key: Num3} }
+    KeyWinter { Action: {description: "Make it winter"}; Binding: {key: Num4} }
+    KeyFireworks { Action: {description: "Launch fireworks"}; Binding: {key: F} }
+    KeyWhistle { Action: {description: "Blow the train whistle"}; Binding: {key: T} }
+    KeyBell { Action: {description: "Ring the tower bell"}; Binding: {key: B} }
+    KeyCamera { Action: {description: "Switch to the next camera"}; Binding: {key: C} }
+  }
+
+  fn hud_ratio(x: f32, w: f32, thumb: f32) -> f32 {
+    clamp((x + w / 2 - thumb / 2) / (w - thumb + 0.001), 0, 1)
+  }
+
+  fn hud_snap(v: f32, step: f32) -> f32 {
+    round(v / step) * step
+  }
+
+  fn hud_put(id: i32, ratio: f32) {
+    if id == HV_HOUR {
+      hour = clamp(ratio * 24, 0, 23.98)
+    } else if id == HV_RATE {
+      clock_rate = clamp(hud_snap(0.05 + ratio * 1.95, 0.05), 0.05, 2)
+    } else if id == HV_WIND {
+      wind = clamp(hud_snap(ratio, 0.01), 0, 1)
+    } else if id == HV_TRAIN {
+      train_speed = clamp(hud_snap(ratio, 0.01), 0, 1)
+    }
+  }
+
+  fn hud_run(op: i32) {
+    if op == HOP_CLOCK {
+      clock_on = !clock_on
+    } else if op >= HOP_SEASON && op < HOP_SEASON + 4 {
+      season = op - HOP_SEASON
+    } else if op == HOP_WHISTLE {
+      emit Whistle()
+    } else if op == HOP_BELL {
+      emit Bell()
+    } else if op == HOP_FIREWORKS {
+      emit Fireworks()
+    } else if op >= HOP_CAM && op < HOP_CAM + 3 {
+      cam_mode = op - HOP_CAM
+    } else if op == HOP_CAM_NEXT {
+      cam_mode = (cam_mode + 1) % 3
+    } else if op == HOP_TOUR {
+      tour = !tour
+    } else if op == HOP_PANEL {
+      hud_panel_on = !hud_panel_on
+    } else if op == HOP_VILLAGE_LESS {
+      village = max(village - 1, 0)
+    } else if op == HOP_VILLAGE_MORE {
+      village = min(village + 1, 14)
+    } else if op == HOP_BALLOONS_LESS {
+      balloons = max(balloons - 1, 0)
+    } else if op == HOP_BALLOONS_MORE {
+      balloons = min(balloons + 1, 8)
+    } else if op == HOP_SOUND {
+      hud_muted = !hud_muted
+    }
+  }
+}
+
+assets {
+  isle_font_title { Font: {path: "etc/scenes/fable_isle/assets/fonts/Cinzel.ttf"} }
+  isle_font_body { Font: {path: "etc/scenes/fable_isle/assets/fonts/Spectral-Regular.ttf"} }
+  isle_font_note { Font: {path: "etc/scenes/fable_isle/assets/fonts/Spectral-Italic.ttf"} }
+  isle_icon_sun { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/sun.svg", width: 96} }
+  isle_icon_moon { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/moon.svg", width: 96} }
+  isle_icon_play { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/play.svg", width: 96} }
+  isle_icon_pause { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/pause.svg", width: 96} }
+  isle_icon_minus { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/minus.svg", width: 96} }
+  isle_icon_plus { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/plus.svg", width: 96} }
+  isle_icon_bell { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/bell.svg", width: 96} }
+  isle_icon_whistle { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/whistle.svg", width: 96} }
+  isle_icon_spark { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/spark.svg", width: 96} }
+  isle_icon_sound { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/sound.svg", width: 96} }
+  isle_icon_mute { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/mute.svg", width: 96} }
+
+  template IsleHotKey {
+    prop action: entity = 0
+    prop op: i32 = 0
+
+    async {
+      while true {
+        await on.pressed(action)
+        hud_run(op)
+      }
+    }
+  }
+
+  template IsleIcon {
+    prop icon: entity = 0
+    prop size: f32 = 16
+    prop color: Rgb = {242, 233, 210}
+
+    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Rect: {1, 1}
+    Image: {texture: icon}
+    Rgb: color
+  }
+
+  template IsleAction {
+    prop op: i32 = 0
+
+    mut hover = false
+    mut down = false
+
+    Interactive
+    Cursor: {CursorPointer}
+
+    async {
+      while true {
+        await on.enter(this)
+        hover = true
+        await on.leave(this)
+        hover = false
+      }
+    }
+
+    async {
+      while true {
+        await on.press(this)
+        down = true
+        await on.release(this)
+        down = false
+      }
+    }
+
+    async {
+      while true {
+        await on.click(this)
+        hud_run(op)
+      }
+    }
+  }
+
+  template IsleButtonFace {
+    prop label: string = ""
+    prop icon: entity = 0
+    prop hover: bool = false
+    prop down: bool = false
+
+    Layout: {direction: Row, padding: {0, 0, 8, 10}, spacing: 6, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: down ? HC_INSET : hover ? HC_LIFT : HC_RAISED
+    Border: {width: 1, radius: 7, color: hover ? {216, 174, 98, 255} : {110, 108, 76, 255}}
+    Transition: [Rgb: {duration: 0.1}]
+
+    if icon != 0 {
+      IsleIcon glyph(icon: icon, size: 14, color: hover ? HC_BRASS_HI : HC_BRASS)
+    }
+    name {
+      Text: {value: label, size: 13, font: isle_font_body}
+      Rgb: HC_CREAM
+    }
+  }
+
+  template IsleButton : IsleAction {
+    prop label: string = ""
+    prop icon: entity = 0
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 28}}
+    Layout: {}
+
+    IsleButtonFace face(label: label, icon: icon, hover: hover, down: down)
+  }
+
+  template IsleRoundFace {
+    prop op: i32 = 0
+    prop icon: entity = 0
+    prop size: f32 = 24
+    prop hover: bool = false
+    prop down: bool = false
+
+    const dim = op == HOP_VILLAGE_LESS ? village <= 0 : op == HOP_VILLAGE_MORE ? village >= 14 : op == HOP_BALLOONS_LESS ? balloons <= 0 : op == HOP_BALLOONS_MORE ? balloons >= 8 : false
+    const glyph_icon = op == HOP_CLOCK ? (clock_on ? isle_icon_pause : isle_icon_play) : icon
+
+    Layout: {direction: Row, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: dim ? HC_INK : down ? HC_INSET : hover ? HC_LIFT : HC_RAISED
+    Border: {width: 1, radius: size / 2, color: dim ? {42, 88, 92, 255} : hover ? {216, 174, 98, 255} : {110, 108, 76, 255}}
+    Transition: [Rgb: {duration: 0.1}]
+
+    IsleIcon glyph(icon: glyph_icon, size: size * 0.42, color: dim ? {64, 102, 104} : hover ? HC_BRASS_HI : HC_BRASS)
+  }
+
+  template IsleStep : IsleAction {
+    prop icon: entity = 0
+
+    LayoutItem: {width: {mode: Fixed, value: 24}, height: {mode: Fixed, value: 24}}
+    Layout: {}
+
+    IsleRoundFace face(op: op, icon: icon, size: 24, hover: hover, down: down)
+  }
+
+  template IslePlay : IsleAction {
+    LayoutItem: {width: {mode: Fixed, value: 30}, height: {mode: Fixed, value: 30}}
+    Layout: {}
+
+    IsleRoundFace face(op: op, size: 30, hover: hover, down: down)
+  }
+
+  template IsleSegmentFace {
+    prop op: i32 = 0
+    prop label: string = ""
+    prop hover: bool = false
+    prop down: bool = false
+
+    const selected = (op >= HOP_SEASON && op < HOP_SEASON + 4 && season == op - HOP_SEASON) || (op >= HOP_CAM && op < HOP_CAM + 3 && cam_mode == op - HOP_CAM)
+
+    Layout: {direction: Row, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: selected ? (hover ? HC_BRASS_HI : HC_BRASS) : down ? HC_INK : hover ? HC_RAISED : HC_INSET
+    Border: {radius: 6}
+    Transition: [Rgb: {duration: 0.12}]
+
+    name {
+      Text: {value: label, size: 13, font: isle_font_body}
+      Rgb: selected ? HC_DARK : hover ? HC_CREAM : HC_MIST
+    }
+  }
+
+  template IsleSegment : IsleAction {
+    prop label: string = ""
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Layout: {}
+
+    IsleSegmentFace face(op: op, label: label, hover: hover, down: down)
+  }
+
+  template IsleSegments {
+    Layout: {direction: Row, padding: {3, 3, 3, 3}, spacing: 2}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
+    Rect: {1, 1}
+    Rgb: HC_INSET
+    Border: {width: 1, radius: 9, color: {42, 88, 92, 255}}
+  }
+
+  template IsleSwitchFace {
+    prop op: i32 = 0
+    prop label: string = ""
+    prop hover: bool = false
+
+    const on = op == HOP_TOUR ? tour : op == HOP_SOUND ? !hud_muted : clock_on
+
+    Layout: {direction: Row, spacing: 8, v: Middle}
+    LayoutItem: {height: {mode: Grow}}
+
+    track {
+      Layout: {}
+      LayoutItem: {width: {mode: Fixed, value: 32}, height: {mode: Fixed, value: 18}}
+      Rect: {1, 1}
+      Rgb: on ? (hover ? HC_BRASS_HI : HC_BRASS) : hover ? HC_RAISED : HC_INSET
+      Border: {width: 1, radius: 9, color: on ? {216, 174, 98, 255} : {70, 104, 104, 255}}
+      Transition: [Rgb: {duration: 0.12}]
+
+      knob {
+        LayoutItem: {h: Left, v: Middle, x: on ? 17 : 3, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
+        Rect: {1, 1}
+        Rgb: on ? HC_DARK : HC_MIST
+        Border: {radius: 6}
+        Transition: [Position: {duration: 0.14, timing_function: EaseInOut}, Rgb: {duration: 0.12}]
+      }
+    }
+    name {
+      Text: {value: label, size: 13, font: isle_font_body}
+      Rgb: HC_CREAM
+    }
+  }
+
+  template IsleSwitch : IsleAction {
+    prop label: string = ""
+
+    LayoutItem: {height: {mode: Fixed, value: 24}}
+    Layout: {}
+
+    IsleSwitchFace face(op: op, label: label, hover: hover)
+  }
+
+  template IsleSliderInput {
+    prop bind: i32 = 0
+    prop thumb: f32 = 14
+
+    mut hover = false
+    mut down = false
+
+    Interactive
+    Cursor: {CursorPointer}
+
+    async {
+      while true {
+        await on.enter(this)
+        hover = true
+        await on.leave(this)
+        hover = false
+      }
+    }
+
+    async {
+      while true {
+        const e = await on.press(this)
+        down = true
+        hud_put(bind, hud_ratio(e.local_x, this[LayoutBounds].width, thumb))
+      }
+    }
+
+    async {
+      while true {
+        const e = await on.drag(this)
+        hud_put(bind, hud_ratio(e.local_x, this[LayoutBounds].width, thumb))
+      }
+    }
+
+    async {
+      while true {
+        await on.release(this)
+        down = false
+      }
+    }
+  }
+
+  template IsleSliderFace {
+    prop ratio: f32 = 0
+    prop w: f32 = 100
+    prop thumb: f32 = 14
+    prop hover: bool = false
+    prop down: bool = false
+
+    const r = clamp(ratio, 0, 1)
+
+    Layout: {}
+    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Grow}}
+
+    groove {
+      LayoutItem: {h: Left, v: Middle, x: thumb / 2 - 2, width: {mode: Fixed, value: w - thumb + 4}, height: {mode: Fixed, value: 4}}
+      Rect: {1, 1}
+      Rgb: HC_INSET
+      Border: {width: 1, radius: 2, color: {42, 88, 92, 255}}
+    }
+    fill {
+      LayoutItem: {h: Left, v: Middle, x: thumb / 2 - 2, width: {mode: Fixed, value: r * (w - thumb) + 2.01}, height: {mode: Fixed, value: 4}}
+      Rect: {1, 1}
+      Rgb: HC_BRASS
+      Border: {radius: 2}
+    }
+    knob {
+      LayoutItem: {h: Left, v: Middle, x: r * (w - thumb), width: {mode: Fixed, value: thumb}, height: {mode: Fixed, value: thumb}}
+      Rect: {1, 1}
+      Rgb: down ? HC_BRASS_HI : HC_CREAM
+      Border: {width: hover || down ? 3 : 2, radius: thumb / 2, color: {216, 174, 98, 255}}
+      BoxShadow: {offset_y: -1, blur: 4, color: {0, 0, 0, 120}}
+    }
+  }
+
+  template IsleSlider : IsleSliderInput {
+    prop w: f32 = 100
+
+    const ratio = bind == HV_RATE ? (clock_rate - 0.05) / 1.95 : bind == HV_WIND ? wind : train_speed
+
+    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 22}}
+    Layout: {}
+
+    IsleSliderFace face(ratio: ratio, w: w, thumb: thumb, hover: hover, down: down)
+  }
+
+  template IsleHourSlider : IsleSliderInput {
+    prop w: f32 = 100
+
+    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 22}}
+    Layout: {}
+
+    IsleSliderFace face(ratio: hour / 24, w: w, thumb: thumb, hover: hover, down: down)
+  }
+
+  template IsleClock {
+    const h = floor(hour)
+    const m = floor((hour - h) * 60)
+    const part = hour < 5 ? "night" : hour < 8 ? "dawn" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 20 ? "dusk" : "night"
+
+    Layout: {direction: Row, spacing: 8, v: Bottom}
+
+    digits {
+      LayoutItem: {width: {mode: Fixed, value: 62}}
+      Text: {value: "{h:02.0}:{m:02.0}", size: 24, font: isle_font_body}
+      Rgb: HC_CREAM
+    }
+    word {
+      Layout: {padding: {0, 8, 0, 0}}
+      label {
+        Text: {value: part, size: 13, font: isle_font_note}
+        Rgb: HC_MIST
+      }
+    }
+  }
+
+  template IsleSection {
+    prop title: string = ""
+
+    Layout: {direction: Column, spacing: 7}
+    LayoutItem: {width: {mode: Grow}}
+
+    heading {
+      Layout: {direction: Row, spacing: 8, v: Middle}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 14}}
+      name {
+        Text: {value: title, size: 10.5, font: isle_font_title}
+        Rgb: HC_BRASS
+      }
+      rule {
+        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+        Rect: {1, 1}
+        Rgb: HC_EDGE
+      }
+    }
+  }
+
+  template IsleRow {
+    prop label: string = ""
+
+    Layout: {direction: Row, spacing: 8, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 26}}
+
+    caption {
+      Layout: {direction: Row, v: Middle}
+      LayoutItem: {width: {mode: Fixed, value: 60}}
+      name {
+        Text: {value: label, size: 13, font: isle_font_body}
+        Rgb: HC_CREAM
+      }
+    }
+  }
+
+  template IsleAmount {
+    prop text: string = ""
+    prop w: f32 = 50
+
+    Layout: {direction: Row, h: Right, v: Middle}
+    LayoutItem: {width: {mode: Fixed, value: w}}
+    name {
+      Text: {value: text, size: 13, font: isle_font_body}
+      Rgb: HC_MIST
+    }
+  }
+
+  template IsleCount {
+    prop text: string = ""
+
+    Layout: {direction: Row, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+    name {
+      Text: {value: text, size: 13, font: isle_font_body}
+      Rgb: HC_CREAM
+    }
+  }
+
+  template IsleFiller {
+    LayoutItem: {width: {mode: Grow}}
+  }
+
+  template IsleTick {
+    prop text: string = ""
+
+    Layout: {direction: Row, h: Center}
+    LayoutItem: {width: {mode: Fixed, value: 14}}
+    name {
+      Text: {value: text, size: 10.5, font: isle_font_body}
+      Rgb: HC_MIST
+    }
+  }
+
+  template IslePanel {
+    const inner: f32 = 272
+
+    Layout: {direction: Column, padding: {18, 18, 20, 20}, spacing: 14}
+    LayoutItem: {width: {min: inner + 40, max: inner + 40}}
+    Rect: {1, 1}
+    Rgb: HC_INK
+    Border: {width: 1.5, radius: 16, color: {176, 142, 80, 255}}
+    BoxShadow: {offset_y: -6, blur: 28, spread: 2, color: {0, 0, 0, 150}}
+    InputBlocker
+
+    masthead {
+      Layout: {direction: Column, spacing: 1, h: Center}
+      LayoutItem: {width: {mode: Grow}}
+      name {
+        Text: {value: "Fable Isle", size: 27, font: isle_font_title}
+        Rgb: HC_BRASS_HI
+      }
+      motto {
+        Text: {value: "a floating world written in flecs script", size: 13, font: isle_font_note}
+        Rgb: HC_MIST
+      }
+      flourish {
+        Layout: {direction: Row, spacing: 8, v: Middle, padding: {8, 0, 0, 0}}
+        LayoutItem: {width: {mode: Grow}}
+        left {
+          LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+          Rect: {1, 1}
+          Rgb: HC_BRASS_LO
+        }
+        gem {
+          LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 6}}
+          Rect: {1, 1}
+          Rgb: HC_BRASS
+          Border: {radius: 3}
+        }
+        right {
+          LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+          Rect: {1, 1}
+          Rgb: HC_BRASS_LO
+        }
+      }
+    }
+
+    IsleSection time(title: "TIME OF DAY") {
+      now {
+        Layout: {direction: Row, spacing: 10, v: Middle}
+        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 32}}
+        IsleIcon orb(icon: night ? isle_icon_moon : isle_icon_sun, size: 22, color: night ? {178, 204, 236} : {250, 206, 108})
+        IsleClock clock()
+        IsleFiller filler()
+        IslePlay toggle(op: HOP_CLOCK)
+      }
+      dial {
+        Layout: {direction: Column}
+        LayoutItem: {width: {mode: Grow}}
+        IsleHourSlider slider(bind: HV_HOUR, w: inner)
+        ticks {
+          Layout: {direction: Row}
+          LayoutItem: {width: {mode: Grow}}
+          IsleTick t0(text: "0")
+          IsleFiller f0()
+          IsleTick t6(text: "6")
+          IsleFiller f1()
+          IsleTick t12(text: "12")
+          IsleFiller f2()
+          IsleTick t18(text: "18")
+          IsleFiller f3()
+          IsleTick t24(text: "24")
+        }
+      }
+      IsleRow pace(label: "Pace") {
+        IsleSlider slider(bind: HV_RATE, w: inner - 60 - 54 - 16)
+        IsleAmount amount(text: "{clock_rate:.2} h/s", w: 54)
+      }
+    }
+
+    IsleSection sky(title: "SEASON & SKY") {
+      IsleSegments seasons {
+        IsleSegment spring(label: "Spring", op: HOP_SEASON)
+        IsleSegment summer(label: "Summer", op: HOP_SEASON + 1)
+        IsleSegment autumn(label: "Autumn", op: HOP_SEASON + 2)
+        IsleSegment winter(label: "Winter", op: HOP_SEASON + 3)
+      }
+      IsleRow breeze(label: "Wind") {
+        IsleSlider slider(bind: HV_WIND, w: inner - 60 - 54 - 16)
+        IsleAmount amount(text: "{wind * 100:.0} %", w: 54)
+      }
+      IsleRow fleet(label: "Balloons") {
+        IsleStep less(icon: isle_icon_minus, op: HOP_BALLOONS_LESS)
+        IsleCount count(text: balloons == 1 ? "1 aloft" : "{balloons} aloft")
+        IsleStep more(icon: isle_icon_plus, op: HOP_BALLOONS_MORE)
+      }
+    }
+
+    IsleSection town(title: "VILLAGE") {
+      IsleRow houses(label: "Houses") {
+        IsleStep less(icon: isle_icon_minus, op: HOP_VILLAGE_LESS)
+        IsleCount count(text: village == 1 ? "1 house" : "{village} houses")
+        IsleStep more(icon: isle_icon_plus, op: HOP_VILLAGE_MORE)
+      }
+      deeds {
+        Layout: {direction: Row, spacing: 8}
+        LayoutItem: {width: {mode: Grow}}
+        IsleButton bell(label: "Ring bell", icon: isle_icon_bell, op: HOP_BELL)
+        IsleButton fireworks(label: "Fireworks", icon: isle_icon_spark, op: HOP_FIREWORKS)
+      }
+    }
+
+    IsleSection rail(title: "TRAIN") {
+      IsleRow speed(label: "Speed") {
+        IsleSlider slider(bind: HV_TRAIN, w: inner - 60 - 54 - 16)
+        IsleAmount amount(text: "{train_speed * 100:.0} %", w: 54)
+      }
+      IsleButton whistle(label: "Whistle", icon: isle_icon_whistle, op: HOP_WHISTLE)
+    }
+
+    IsleSection lens(title: "CAMERA") {
+      IsleSegments modes {
+        IsleSegment orbit(label: "Orbit", op: HOP_CAM)
+        IsleSegment train(label: "Train", op: HOP_CAM + 1)
+        IsleSegment balloon(label: "Balloon", op: HOP_CAM + 2)
+      }
+      extras {
+        Layout: {direction: Row, v: Middle}
+        LayoutItem: {width: {mode: Grow}}
+        IsleSwitch tour(label: "Tour", op: HOP_TOUR)
+        IsleFiller filler()
+        IsleSwitch sound(label: "Sound", op: HOP_SOUND)
+      }
+    }
+  }
+
+  template IsleHint {
+    const verb = hud_panel_on ? "hide" : "show"
+
+    Layout: {direction: Row, padding: {5, 6, 16, 16}, v: Middle}
+    Rect: {1, 1}
+    Rgb: HC_INSET
+    Border: {radius: 13}
+    Opacity: {0.78}
+
+    line {
+      Text: {value: "Right drag: orbit     Wheel: zoom     Click the train, the bell tower or the balloons     H: {verb} panel", size: 12.5, font: isle_font_body}
+      Rgb: {214, 222, 208}
+    }
+  }
+
+  template IsleHud {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    screen {
+      LayoutFill: {surface: window}
+      Layout: {direction: Column, padding: {16, 14, 16, 16}}
+
+      main {
+        Layout: {direction: Row}
+        LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+        if hud_panel_on {
+          IslePanel panel()
+        }
+      }
+
+      foot {
+        Layout: {direction: Row, h: Center}
+        LayoutItem: {width: {mode: Grow}}
+        IsleHint hint()
+      }
+    }
+
+    view {
+      View: {camera: camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}}
+    }
+  }
+}
+
+isle_hotkeys {
+  assets.IsleHotKey panel(action: assets.hud_actions.KeyPanel, op: assets.HOP_PANEL)
+  assets.IsleHotKey clock(action: assets.hud_actions.KeyClock, op: assets.HOP_CLOCK)
+  assets.IsleHotKey spring(action: assets.hud_actions.KeySpring, op: assets.HOP_SEASON)
+  assets.IsleHotKey summer(action: assets.hud_actions.KeySummer, op: assets.HOP_SEASON + 1)
+  assets.IsleHotKey autumn(action: assets.hud_actions.KeyAutumn, op: assets.HOP_SEASON + 2)
+  assets.IsleHotKey winter(action: assets.hud_actions.KeyWinter, op: assets.HOP_SEASON + 3)
+  assets.IsleHotKey fireworks(action: assets.hud_actions.KeyFireworks, op: assets.HOP_FIREWORKS)
+  assets.IsleHotKey whistle(action: assets.hud_actions.KeyWhistle, op: assets.HOP_WHISTLE)
+  assets.IsleHotKey bell(action: assets.hud_actions.KeyBell, op: assets.HOP_BELL)
+  assets.IsleHotKey camera(action: assets.hud_actions.KeyCamera, op: assets.HOP_CAM_NEXT)
+}
+
+$ {
+  AudioSettings: {master_volume: 1, mute: assets.hud_muted}
+}

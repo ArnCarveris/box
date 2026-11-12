@@ -1,0 +1,54 @@
+using flecs.script
+using flecs.script.math
+
+state {
+  export const TAU: f32 = 6.2831853
+  export const HALF_PI: f32 = 1.5707963
+  export const GOLDEN: f32 = 2.3999632
+
+  export const ISLE_R: f32 = 30
+  export const LAKE_R: f32 = 8
+  export const RAIL_R: f32 = 22
+  export const HILL_A: f32 = -1.5707963
+  export const HILL_R: f32 = 8
+  export const HILL_H: f32 = 7
+  export const BROOK_A: f32 = 0.6
+  export const STATION_A: f32 = 2.0
+  export const MILL_A: f32 = 3.3
+
+  export const SPRING: i32 = 0
+  export const SUMMER: i32 = 1
+  export const AUTUMN: i32 = 2
+  export const WINTER: i32 = 3
+
+  export const CAM_ORBIT: i32 = 0
+  export const CAM_TRAIN: i32 = 1
+  export const CAM_BALLOON: i32 = 2
+
+  export mut hour: f32 = 12.6
+  export mut clock_on = true
+  export mut clock_rate: f32 = 0.25
+  export mut night = false
+  export mut season: i32 = 1
+  export mut wind: f32 = 0.45
+  export mut village: i32 = 10
+  export mut train_speed: f32 = 0.5
+  export mut balloons: i32 = 5
+  export mut cam_mode: i32 = 0
+  export mut tour = true
+
+  event Whistle()
+  event Fireworks()
+  event Bell()
+
+  fn px(r: f32, a: f32) -> f32 { r * cos(a) }
+  fn pz(r: f32, a: f32) -> f32 { r * sin(a) }
+  fn frac(v: f32) -> f32 { v - floor(v) }
+  fn rnd(i: f32, seed: f32) -> f32 { frac(sin(i * 12.9898 + seed * 78.233) * 43758.5453) }
+  fn hill_y(x: f32, z: f32) -> f32 {
+    const hx = px(RAIL_R, HILL_A)
+    const hz = pz(RAIL_R, HILL_A)
+    const d = sqrt((x - hx) * (x - hx) + (z - hz) * (z - hz)) / HILL_R
+    d >= 1 ? 0 : HILL_H * (1 - d * d * d * d * d * d)
+  }
+}
