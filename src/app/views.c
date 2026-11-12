@@ -73,7 +73,8 @@ static ecs_entity_t box_app_child(
     });
 }
 
-/** Find the first surface that is not a texture, or create one with the app dimensions.
+/** Find the first surface that is not a texture, or create one, with the app dimensions when the
+ * command line sets them.
  *
  * @param world The world.
  * @return The surface entity.
@@ -82,6 +83,9 @@ static ecs_entity_t box_app_surface(
     ecs_world_t *world)
 {
     ecs_entity_t result = 0;
+    const App *app = ecs_singleton_get(world, App);
+    int32_t width = app->surface_width;
+    int32_t height = app->surface_height;
     ecs_iter_t it = ecs_each(world, Surface);
     while (ecs_each_next(&it)) {
         const Surface *s = ecs_field(&it, Surface, 0);
@@ -89,14 +93,11 @@ static ecs_entity_t box_app_surface(
             if (!s[i].texture) {
                 result = it.entities[i];
                 ecs_iter_fini(&it);
-                goto done;
+                goto found;
             }
         }
     }
 
-    const App *app = ecs_singleton_get(world, App);
-    int32_t width = app->surface_width;
-    int32_t height = app->surface_height;
     result = ecs_new(world);
     Surface *s = ecs_ensure(world, result, Surface);
     if (width > 0 && height > 0) {
@@ -106,6 +107,17 @@ static ecs_entity_t box_app_surface(
 
     s->vsync = true;
     ecs_modified(world, result, Surface);
+    goto done;
+found:
+    if (width > 0 && height > 0) {
+        const Surface *cur = ecs_get(world, result, Surface);
+        if (cur->width != width || cur->height != height) {
+            Surface *size = ecs_ensure(world, result, Surface);
+            size->width = width;
+            size->height = height;
+            ecs_modified(world, result, Surface);
+        }
+    }
 done:
     return result;
 }

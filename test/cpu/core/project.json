@@ -45,6 +45,8 @@
                     "defaults",
                     "headless",
                     "no_audio",
+                    "unguarded",
+                    "fail_on_error",
                     "frames",
                     "timeout_seconds",
                     "timeout_infinite",
@@ -69,6 +71,8 @@
                     "surface_not_created_when_present",
                     "surface_created_next_to_texture_surface",
                     "surface_first_frame",
+                    "surface_overrides_scene_window",
+                    "surface_scene_window_without_option",
                     "out",
                     "invalid_out",
                     "out_capture"
@@ -84,7 +88,14 @@
                     "run_headless_requires_limit",
                     "run_headless_timeout_infinite",
                     "run_headless_fixed_delta",
-                    "run_loads_scene"
+                    "run_loads_scene",
+                    "run_scene_syntax_error",
+                    "run_scene_missing",
+                    "run_scene_valid",
+                    "run_async_error",
+                    "run_async_error_fail_on_error",
+                    "run_errors_counted_from_start",
+                    "run_scene_loaded_later"
                 ]
             },
             {

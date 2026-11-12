@@ -100,4 +100,19 @@ float box_window_refresh(
 bool box_window_closed(
     box_window_t *window);
 
+/** Write the next frame a surface renders, as presented with all its views, to a PNG file.
+ *
+ * The frame goes through the Surface.write_to_file readback and replaces its file for that
+ * frame; requests of the same surface are written in the frames after each other.
+ *
+ * @param world The world
+ * @param surface The surface entity, which a Surface was set on
+ * @param path PNG file, copied
+ * @return 0 when the frame was queued, -1 when the entity has no surface
+ */
+int box_surface_capture_frame(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    const char *path);
+
 #endif

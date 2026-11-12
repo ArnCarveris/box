@@ -545,8 +545,13 @@ typedef struct box_gpu_cluster_t {
     int32_t state;                  /**< Free, copied, mapping, mapped or failed */
     int64_t frame;                  /**< Frame of the packet the copy was recorded in */
     int64_t stamp;                  /**< Cull pass the view last bound the buffer in */
-    bool cut;                       /**< The last read back pass listed fewer lights or probes
-                                     *   than reach */
+    uint64_t copied;                /**< Entries the list held in the pass of the read back in
+                                     *   flight */
+    int64_t oversized;              /**< Cull pass from which every read back fit in a quarter
+                                     *   of the list, -1 while one did not */
+    uint64_t peak;                  /**< Most entries a pass allocated since oversized */
+    bool cut;                       /**< The list is at its largest and a read back pass listed
+                                     *   fewer lights or probes than reach, warned once */
 } box_gpu_cluster_t;
 
 /** Visible slots and slot lists of a group of draws, each bound whole as storage */
@@ -876,6 +881,7 @@ typedef struct box_gpu_t {
     WGPUComputePipeline cluster;    /**< Cluster pipeline, NULL until the shader exists */
     int32_t cluster_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t clusters;             /**< View and target key to box_gpu_cluster_t */
+    uint64_t cluster_entries;       /**< Index entries of the cluster buffers alive */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     WGPUBuffer no_probes;           /**< Reflection probe buffer of a cluster pass without probes */
     WGPUBuffer no_clips;            /**< Clip buffer of the views while no element clips */

@@ -19,20 +19,65 @@ state {
 
   fn load(design: i32) {
     mut g: i32[1080] = {}
+    mut order: i32[1080] = {}
     mut top: i32 = 0
     for i in 0..PLAN_CELLS {
-      const k = design == OP_FRIGATE ? frigate_plan[i] : design == OP_SCOUT ? scout_plan[i] : 0
+      const k = design == OP_FRIGATE ? frigate_plan[i] : design == OP_SCOUT ? scout_plan[i] : design == OP_MINER ? miner_plan[i] : 0
       if k != 0 {
         const py = (i - i % PLAN_LAYER) / PLAN_LAYER
         g[cell_at(i % PLAN_X + PLAN_OX, py, ((i - i % PLAN_X) / PLAN_X) % PLAN_Z + PLAN_OZ)] = k
         top = max(top, py)
       }
     }
-    mut fresh: i32[1080] = {}
+    for b in 0..PLAN_BOXES {
+      const o = b * 8
+      if capital_plan[o] == design {
+        for y in capital_plan[o + 3]..capital_plan[o + 4] + 1 {
+          for z in capital_plan[o + 5]..capital_plan[o + 6] + 1 {
+            for x in capital_plan[o + 1]..capital_plan[o + 2] + 1 {
+              g[cell_at(x, y, z)] = capital_plan[o + 7]
+              order[cell_at(x, y, z)] = b + 1
+            }
+          }
+          top = max(top, y)
+        }
+      }
+    }
     grid = g
-    placed = fresh
+    placed = order
+    stamp = PLAN_BOXES
     deck = top
     validate()
+  }
+
+  fn switch_class(big: bool) {
+    if big != capital {
+      const keep = grid
+      const keep_placed = placed
+      const other = stash
+      const other_placed = stash_placed
+      const had = stashed
+      stash = keep
+      stash_placed = keep_placed
+      stashed = true
+      capital = big
+      tool = 0
+      hover = -1
+      if had {
+        grid = other
+        placed = other_placed
+        mut top: i32 = 0
+        for i in 0..CELLS {
+          if other[i] != 0 {
+            top = max(top, cell_y(i))
+          }
+        }
+        deck = top
+        validate()
+      } else {
+        load(big ? OP_LINER : OP_FRIGATE)
+      }
+    }
   }
 }
 
@@ -95,7 +140,7 @@ async {
   while true {
     const e = await Request
     const op = e.op
-    if op > 0 && op <= T_REMOVE {
+    if (op > 0 && op <= T_REMOVE) || (op >= K_BRIDGE && op < KINDS) {
       tool = tool == op ? 0 : op
     } else if op == OP_CANCEL {
       tool = 0
@@ -108,8 +153,11 @@ async {
     } else if op == OP_DECK_DOWN {
       hover = -1
       deck = max(deck - 1, 0)
-    } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_CLEAR {
+    } else if op == OP_FRIGATE || op == OP_SCOUT || op == OP_MINER || op == OP_CLEAR ||
+              op == OP_LINER || op == OP_FREIGHTER || op == OP_TENDER || op == OP_BATTLESHIP {
       load(op)
+    } else if op == OP_CRAFT || op == OP_CAPITAL {
+      switch_class(op == OP_CAPITAL)
     }
   }
 }

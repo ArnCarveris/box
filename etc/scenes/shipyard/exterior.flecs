@@ -7,6 +7,7 @@ using box.light
 using box.movement
 using box.particle
 using box.spatial
+using box.animation
 using state
 
 // Exterior detail of the modules. A side feature is drawn in the frame of a face: x runs along
@@ -1076,6 +1077,110 @@ assets {
     beacon : ShipBeaconGreen { Position: {-1.6, 0.06, 1.6}; Sphere: {radius: 0.06, segments: 3, smooth: true} }
   }
 
+  template AutopilotNose {
+    prop px: bool = true
+    prop nx: bool = true
+
+    const T = 0.7
+    const fz = nose_z(T)
+    const fy = nose_y(T)
+    const hw = 2 * nose_w(T)
+    const hh = 1.5 * nose_h(T)
+
+    shell : ShipHull {
+      Position: {0, 0, 0}; Loft: {
+        sections: [nose_sec(0, 1), nose_sec(0.12, 1), nose_sec(0.25, 1), nose_sec(0.38, 1), nose_sec(0.5, 1), nose_sec(0.6, 1), nose_sec(0.66, 1), nose_sec(T, 1)],
+        cap_start: false, cap_end: true, segments: 2, rings: 4
+      }
+    }
+    ridge : ShipTrim {
+      Position: {0, 0, 0}; Loft: {sections: [band_sec(yard_spine_profile, 0), band_sec(yard_spine_profile, 0.2), band_sec(yard_spine_profile, 0.45), band_sec(yard_spine_profile, 0.68)], cap_start: true, cap_end: true, segments: 2, rings: 3}
+    }
+    if px {
+      stripe_p : ShipStripe {
+        Position: {0, 0, 0}; Loft: {sections: [band_sec(yard_stripe_n_profile, 0), band_sec(yard_stripe_n_profile, 0.25), band_sec(yard_stripe_n_profile, 0.5), band_sec(yard_stripe_n_profile, 0.68)], cap_start: true, cap_end: true, segments: 2, rings: 3}
+      }
+    }
+    if nx {
+      stripe_n : ShipStripe {
+        Position: {0, 0, 0}; Loft: {sections: [band_sec(yard_stripe_profile, 0), band_sec(yard_stripe_profile, 0.25), band_sec(yard_stripe_profile, 0.5), band_sec(yard_stripe_profile, 0.68)], cap_start: true, cap_end: true, segments: 2, rings: 3}
+      }
+    }
+
+    face : ShipHullDark { Position: {0, fy, fz + 0.03}; RoundedBox: {hw * 2 - 0.26, hh * 2 - 0.22, 0.06, 0.3, segments: 3} }
+    visor : ShipVisor { Position: {0, fy + 0.3, fz + 0.075}; RoundedBox: {hw * 2 - 0.6, 0.42, 0.05, 0.14, segments: 3} }
+    scan {
+      Position: {0, fy + 0.3, fz + 0.105}
+      Animator: {clip: yard_scan, mode: AnimationPingPong}
+      bar : ShipScanner { Position: {0, 0, 0}; Box: {0.34, 0.1, 0.02} }
+      light { Position: {0, 0, 0.35}; PointLight: {intensity: 1.5, range: 2.5}; Rgb: {255, 60, 40} }
+    }
+
+    eye {
+      Position: {0, fy - 0.33, fz + 0.06}
+      bezel : ShipTrim { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.3, length: 0.12, segments: 12, smooth: true} }
+      lens : ShipVisor { Position: {0, 0, 0.02}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.24, length: 0.12, segments: 12, smooth: true} }
+      iris : ShipCyanLight { Position: {0, 0, 0.085}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.14, tube: 0.018, segments: 12, rings: 3, smooth: true} }
+      pupil : ShipRedLight { Position: {0, 0, 0.08}; Sphere: {radius: 0.05, segments: 3, smooth: true} }
+    }
+    for s in 0..2 {
+      const sx = s == 0 ? -1 : 1
+      "cam_{s}" {
+        Position: {sx * 0.82, fy - 0.36, fz + 0.06}
+        bezel : ShipTrim { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.15, length: 0.1, segments: 8, smooth: true} }
+        lens : ShipVisor { Position: {0, 0, 0.02}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.11, length: 0.1, segments: 8, smooth: true} }
+        pupil : ShipRedLight { Position: {0, 0, 0.07}; Sphere: {radius: 0.03, segments: 3, smooth: true} }
+      }
+      for i in 0..3 {
+        "vent_{s}_{i}" : ShipRecess { Position: {sx * (0.36 + i * 0.07), fy - 0.33, fz + 0.065}; Box: {0.035, 0.34, 0.01} }
+      }
+      "side_eye_{s}" {
+        Position: {sx * (2 * nose_w(0.42) + 0.01), nose_y(0.42) + 0.15, nose_z(0.42)}
+        bezel : ShipTrim { Position: {0, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.13, length: 0.05, segments: 8, smooth: true} }
+        lens : ShipCyanLight { Position: {sx * 0.02, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.07, length: 0.03, segments: 8, smooth: true} }
+      }
+    }
+    chin : ShipHazard { Position: {0, fy - hh + 0.22, fz + 0.065}; Box: {1.5, 0.08, 0.01} }
+
+    lidar {
+      Position: {0, nose_y(0.3) + 1.5 * nose_h(0.3), nose_z(0.3)}
+      post : ShipSteel { Position: {0, 0.12, 0}; Cylinder: {radius: 0.06, length: 0.24, segments: 4, smooth: true} }
+      head {
+        Position: {0, 0.32, 0}
+        AngularVelocity: {0, 5, 0}
+        drum : ShipHullDark { Position: {0, 0, 0}; Cylinder: {radius: 0.17, length: 0.2, segments: 8, smooth: true} }
+        lid : ShipTrim { Position: {0, 0.11, 0}; Cylinder: {radius: 0.18, length: 0.02, segments: 8, smooth: true} }
+        lens : ShipScanner { Position: {0, 0, 0.17}; Box: {0.12, 0.08, 0.02} }
+      }
+    }
+  }
+
+  template AutopilotFlank {
+    prop sx: f32 = 1
+
+    frame : ShipTrim { Position: {sx * 2.004, 2.36, 0.88}; Box: {0.02, 0.56, 2.32} }
+    strip : ShipVisor { Position: {sx * 2.012, 2.36, 0.9}; Box: {0.02, 0.3, 2.2} }
+    for i in 0..5 {
+      "eye_{i}" : ShipDataCyan { Position: {sx * 2.024, 2.36, -0.1 + i * 0.5}; Box: {0.01, 0.07, 0.18}; Animator: {clip: yard_data_blink, time: i * 0.23, speed: 0.35} }
+    }
+  }
+
+  template AutopilotTop {
+    plate : ShipHullDark { Position: {0, 0.05, -0.5}; RoundedBox: {2.3, 0.1, 2.0, 0.04, segments: 2} }
+    for i in 0..4 {
+      for j in 0..3 {
+        "tile_{i}_{j}" : ShipStripe { Position: {-0.84 + i * 0.56, 0.105, -1.12 + j * 0.62}; Box: {0.5, 0.01, 0.56} }
+      }
+    }
+    dome {
+      Position: {1.3, 0, 1.1}
+      ring : ShipTrim { Position: {0, 0.06, 0}; Cylinder: {radius: 0.3, length: 0.12, segments: 8, smooth: true} }
+      cap : ShipCanopy { Position: {0, 0.12, 0}; HemiSphere: {radius: 0.26, segments: 4, smooth: true} }
+    }
+    mast : ShipSteel { Position: {-1.4, 0.5, 1.2}; Cylinder: {radius: 0.03, length: 1.0, segments: 4, smooth: true} }
+    tip : ShipBeaconWhite { Position: {-1.4, 1.02, 1.2}; Sphere: {radius: 0.06, segments: 3, smooth: true} }
+  }
+
   template ModuleExterior {
     prop k: i32 = 0
     prop px: bool = false
@@ -1102,6 +1207,21 @@ assets {
       }
       if py {
         CockpitTop top() { Position: {0, CH, 0} }
+      }
+    } else if k == K_AUTO {
+      if pz {
+        AutopilotNose nose(px: px || fpx, nx: nx || fnx)
+      }
+      if px {
+        AutopilotFlank flank_px(sx: 1)
+        port : ShipBeaconRed { Position: {2.02, 1.4, -1.6}; Sphere: {radius: 0.08, segments: 3, smooth: true} }
+      }
+      if nx {
+        AutopilotFlank flank_nx(sx: -1)
+        starboard : ShipBeaconGreen { Position: {-2.02, 1.4, -1.6}; Sphere: {radius: 0.08, segments: 3, smooth: true} }
+      }
+      if py {
+        AutopilotTop top() { Position: {0, CH, 0} }
       }
     } else {
       Sides sides(k: k, px: px, nx: nx, pz: pz, nz: nz)
@@ -1170,5 +1290,228 @@ assets {
     } else {
       DockPort port()
     }
+  }
+
+  template DrillHead {
+    plate : ShipHullDark { Position: {0, 0.06, 0}; RoundedBox: {2.6, 0.12, 2.6, 0.05, segments: 2} }
+    for i in 0..4 {
+      const a = i * HALF_PI + 0.785
+      "bolt_{i}" : ShipChrome { Position: {cos(a) * 1.6, 0.14, sin(a) * 1.6}; Cylinder: {radius: 0.07, length: 0.05, segments: 4, smooth: true} }
+    }
+    band : ShipHazard { Position: {0, 0.26, 0}; Box: {1.74, 0.16, 1.74} }
+    housing : ShipHullDark { Position: {0, 0.62, 0}; RoundedBox: {1.7, 0.92, 1.7, 0.18, segments: 3} }
+    for i in 0..4 {
+      const a = i * HALF_PI
+      for j in 0..3 {
+        const t = -0.42 + j * 0.42
+        "fin_{i}_{j}" : ShipTrim { Position: {cos(a) * 0.9 - sin(a) * t, 0.66, sin(a) * 0.9 + cos(a) * t}; Rotation: {0, 0 - a, 0}; Box: {0.14, 0.66, 0.06} }
+      }
+    }
+    lamp : ShipAmberLight { Position: {0.62, 1.1, 0.62}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+    collar : ShipTrim { Position: {0, 1.18, 0}; Cylinder: {radius: 0.62, length: 0.24, segments: 8, smooth: true} }
+    bearing : ShipCopper { Position: {0, 1.31, 0}; Torus: {radius: 0.48, tube: 0.05, segments: 8, rings: 3, smooth: true} }
+    bit {
+      Position: {0, 1.3, 0}
+      AngularVelocity: {0, 4, 0}
+      shank : ShipSteel { Position: {0, 0.18, 0}; Cylinder: {radius: 0.34, length: 0.36, segments: 8, smooth: true} }
+      cone : ShipSteel { Position: {0, 1.3, 0}; Frustum: {radius_bottom: 0.62, radius_top: 0.05, length: 1.9, segments: 8, smooth: true} }
+      for f in 0..2 {
+        for i in 0..14 {
+          const a = i * 0.75 + f * PI
+          const h = 0.1 + i * 0.125
+          const r = 0.64 - 0.3 * h
+          "flute_{f}_{i}" : ShipTrim { Position: {cos(a) * r, 0.35 + h, sin(a) * r}; Rotation: {0, 0 - a, 0}; Box: {0.1, 0.08, 0.3} }
+        }
+      }
+      for i in 0..6 {
+        const a = i * PI / 3
+        "tooth_{i}" : ShipGold { Position: {cos(a) * 0.62, 0.42, sin(a) * 0.62}; Rotation: {0, 0 - a, 0.5}; Box: {0.16, 0.12, 0.18} }
+      }
+      tip : ShipHeat { Position: {0, 2.26, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+    }
+    heat { Position: {0, 3.7, 0}; PointLight: {intensity: 2, range: 3}; Rgb: {255, 140, 60} }
+  }
+
+  template DrillMount {
+    prop side: i32 = 5
+
+    if side == 2 {
+      mount { Position: {-2, CH / 2, 0}; Rotation: {0, 0, 0 - HALF_PI}; DrillHead drill() }
+    } else if side == 3 {
+      mount { Position: {2, CH / 2, 0}; Rotation: {0, 0, HALF_PI}; DrillHead drill() }
+    } else if side == 5 {
+      mount { Position: {0, CH / 2, -2}; Rotation: {HALF_PI, 0, 0}; DrillHead drill() }
+    } else if side == 6 {
+      mount { Position: {0, CH, 0}; Rotation: {PI, 0, 0}; Scale: {0.8, 0.8, 0.8}; DrillHead drill() }
+    } else {
+      mount { Scale: {0.8, 0.8, 0.8}; DrillHead drill() }
+    }
+  }
+
+  template BuilderRig {
+    prop seed: i32 = 0
+
+    pad : ShipHullDark { Position: {0, 0.04, 0}; RoundedBox: {2.8, 0.08, 2.8, 0.04, segments: 2} }
+    for i in 0..4 {
+      "hazard_{i}" : ShipHazard { Position: {cos(i * HALF_PI) * 1.3, 0.085, sin(i * HALF_PI) * 1.3}; Rotation: {0, 0 - i * HALF_PI + HALF_PI, 0}; Box: {2.4, 0.01, 0.12} }
+    }
+
+    for i in 0..2 {
+      const jx = i == 0 ? -1.0 : 0.6
+      "jig_{i}" : ShipTrim { Position: {jx, 0.32, 0.76}; Box: {0.12, 0.48, 0.44} }
+    }
+    for i in 0..4 {
+      const ly = i % 2 == 0 ? 0.58 : 0.88
+      const lz = i < 2 ? 0.61 : 0.91
+      "chord_{i}" : ShipSteel { Position: {-0.2, ly, lz}; Box: {2.0, 0.05, 0.05} }
+    }
+    for i in 0..6 {
+      const bx = -1.2 + i * 0.4
+      "post_a_{i}" : ShipSteel { Position: {bx, 0.73, 0.61}; Box: {0.04, 0.3, 0.04} }
+      "post_b_{i}" : ShipSteel { Position: {bx, 0.73, 0.91}; Box: {0.04, 0.3, 0.04} }
+      "tie_{i}" : ShipSteel { Position: {bx, 0.88, 0.76}; Box: {0.04, 0.04, 0.3} }
+    }
+    for i in 0..5 {
+      const bx = -1.0 + i * 0.4
+      const tilt = i % 2 == 0 ? 0.6435 : -0.6435
+      "brace_a_{i}" : ShipOrange { Position: {bx, 0.73, 0.61}; Rotation: {0, 0, tilt}; Box: {0.5, 0.03, 0.03} }
+      "brace_b_{i}" : ShipOrange { Position: {bx, 0.73, 0.91}; Rotation: {0, 0, tilt}; Box: {0.5, 0.03, 0.03} }
+    }
+
+    stock_a : ShipOrange { Position: {1.0, 0.19, -0.4}; Box: {0.22, 0.22, 1.6} }
+    stock_b : ShipOrange { Position: {1.26, 0.19, -0.4}; Box: {0.22, 0.22, 1.6} }
+    stock_c : ShipOrange { Position: {1.13, 0.41, -0.4}; Box: {0.22, 0.22, 1.6} }
+    for i in 0..2 {
+      "strap_{i}" : ShipRubber { Position: {1.13, 0.3, -0.9 + i * 1.0}; Box: {0.54, 0.46, 0.06} }
+    }
+
+    arm {
+      Position: {0, 0, -0.5}
+      turntable : ShipTrim { Position: {0, 0.17, 0}; Cylinder: {radius: 0.72, length: 0.18, segments: 8, smooth: true} }
+      ring : ShipYellow { Position: {0, 0.28, 0}; Cylinder: {radius: 0.62, length: 0.06, segments: 8, smooth: true} }
+      body : ShipYellow { Position: {0, 0.55, 0}; RoundedBox: {0.7, 0.5, 0.7, 0.1, segments: 2} }
+      beacon : ShipAmberLight { Position: {0.26, 0.84, -0.26}; Sphere: {radius: 0.06, segments: 3, smooth: true} }
+      shoulder {
+        Position: {0, 0.85, 0}
+        Rotation: {0.25, 0, 0}
+        hub : ShipTrim { Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.26, length: 0.86, segments: 8, smooth: true} }
+        upper : ShipYellow { Position: {0, 0.65, 0}; RoundedBox: {0.34, 1.3, 0.4, 0.08, segments: 2} }
+        groove : ShipRecess { Position: {0.175, 0.65, 0}; Box: {0.01, 0.9, 0.08} }
+        piston : ShipChrome { Position: {0, 0.6, -0.27}; Cylinder: {radius: 0.05, length: 0.9, segments: 4, smooth: true} }
+        elbow {
+          Position: {0, 1.3, 0}
+          Rotation: {2.0, 0, 0}
+          hub : ShipTrim { Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.2, length: 0.6, segments: 8, smooth: true} }
+          fore : ShipYellow { Position: {0, 0.5, 0}; RoundedBox: {0.26, 1.0, 0.3, 0.07, segments: 2} }
+          wrist {
+            Position: {0, 1.0, 0}
+            Rotation: {0.6, 0, 0}
+            joint : ShipTrim { Position: {0, 0, 0}; Sphere: {radius: 0.15, segments: 3, smooth: true} }
+            torch : ShipSteel { Position: {0, 0.24, 0}; Cylinder: {radius: 0.07, length: 0.32, segments: 6, smooth: true} }
+            nozzle : ShipCopper { Position: {0, 0.46, 0}; Frustum: {radius_bottom: 0.07, radius_top: 0.035, length: 0.12, segments: 6, smooth: true} }
+            arc : ShipWeld { Position: {0, 0.55, 0}; Sphere: {radius: 0.06, segments: 3, smooth: true}; NoShadow }
+            light { Position: {0, 0.5, 0}; PointLight: {intensity: 4, range: 3}; Rgb: {170, 210, 255} }
+          }
+        }
+      }
+    }
+
+    sparks {
+      Position: {0, 0.93, 0.76}
+      ParticleEmitter: {
+        max: 90, rate: 120, shape: EmitterDisc, radius: 0.03,
+        direction: {0, 1, 0}, spread: 75, speed: {1, 3.5},
+        lifetime: {0.2, 0.55}, size: {0.015, 0.04}, opacity: {0.7, 1},
+        color: {255, 190, 110}, seed: 400 + seed
+      }
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.05}
+      ParticleCurves: {
+        opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
+        color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
+      }
+      SpatialIgnore
+    }
+  }
+
+  template BuilderMount {
+    prop side: i32 = 1
+    prop seed: i32 = 0
+
+    if side == 2 {
+      mount { Position: {-2, CH / 2, 0}; Rotation: {0, 0, 0 - HALF_PI}; BuilderRig rig(seed: seed) }
+    } else if side == 3 {
+      mount { Position: {2, CH / 2, 0}; Rotation: {0, 0, HALF_PI}; BuilderRig rig(seed: seed) }
+    } else {
+      BuilderRig rig(seed: seed)
+    }
+  }
+
+  template DataRack {
+    prop seed: i32 = 0
+
+    cabinet : ShipHullDark { Position: {0, 1.32, 0}; RoundedBox: {1.06, 2.2, 0.9, 0.04, segments: 2} }
+    cap : ShipStripe { Position: {0, 2.44, 0}; Box: {1.08, 0.04, 0.92} }
+    for s in 0..2 {
+      "face_{s}" {
+        Position: {0, 0, 0}
+        Rotation: {0, s * HALF_PI * 2, 0}
+        door : ShipTrim { Position: {0, 1.32, 0.455}; Box: {0.96, 2.04, 0.02} }
+        glass : ShipRecess { Position: {0, 1.32, 0.467}; Box: {0.9, 1.98, 0.01} }
+        for i in 0..8 {
+          const r = (i * 7 + seed + s * 3) % 5
+          const by = 0.5 + i * 0.235
+          "blade_{i}" : ShipTrim { Position: {0, by, 0.475}; Box: {0.84, 0.17, 0.01} }
+          if r == 0 {
+            "status_{i}" : ShipDataAmber { Position: {-0.33, by, 0.482}; Box: {0.06, 0.04, 0.01}; Animator: {clip: yard_data_blink, time: i * 0.37 + seed * 0.29 + s * 0.61, speed: 0.4} }
+          } else {
+            "status_{i}" : ShipGreenLight { Position: {-0.33, by, 0.482}; Box: {0.06, 0.04, 0.01} }
+          }
+          "activity_{i}" : ShipDataCyan { Position: {0.08 - r * 0.03, by, 0.482}; Box: {0.3 + r * 0.06, 0.03, 0.01}; Animator: {clip: yard_data_blink, time: i * 0.53 + seed * 0.17 + s * 0.41, speed: 0.6 + r * 0.3} }
+        }
+      }
+    }
+    supply : ShipCopper { Position: {0, 2.53, 0.2}; Cylinder: {radius: 0.04, length: 0.14, segments: 4, smooth: true} }
+    return : ShipTeal { Position: {0, 2.53, -0.2}; Cylinder: {radius: 0.04, length: 0.14, segments: 4, smooth: true} }
+  }
+
+  template Datacenter {
+    prop pz: bool = true
+    prop nz: bool = true
+    prop roof: bool = false
+    prop seed: i32 = 0
+
+    RackFrame frame(pz: pz, nz: nz)
+    deck : ShipHullDark { Position: {0, 0.19, 0}; Box: {3.56, 0.06, 3.56} }
+    for a in 0..2 {
+      const ax = a == 0 ? -1.14 : 1.14
+      "aisle_{a}" : ShipRecess { Position: {ax, 0.224, 0}; Box: {0.9, 0.01, 4} }
+      for s in 0..2 {
+        "aisle_edge_{a}_{s}" : ShipCyanLight { Position: {ax + (s == 0 ? -0.43 : 0.43), 0.23, 0}; Box: {0.03, 0.01, 4} }
+      }
+      for i in 0..10 {
+        "grate_{a}_{i}" : ShipTrim { Position: {ax, 0.232, -1.8 + i * 0.4}; Box: {0.84, 0.008, 0.05} }
+      }
+    }
+    if roof {
+      lid : ShipHullDark { Position: {0, CH - 0.05, 0}; Box: {3.56, 0.08, 3.56} }
+    }
+
+    for c in 0..3 {
+      "rack_{c}" {
+        Position: {0, 0, -1.14 + c * 1.14}
+        Rotation: {0, HALF_PI, 0}
+        DataRack r(seed: seed + c * 3)
+      }
+    }
+    supply : ShipCopper { Position: {0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
+    return : ShipTeal { Position: {-0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 4, segments: 6, smooth: true} }
+    frost : ShipWhite { Position: {0.2, 2.62, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.074, length: 0.3, segments: 6, smooth: true} }
+
+    tray : ShipHullDark { Position: {0, 2.76, 0}; Box: {0.4, 0.03, 4} }
+    cable_a : ShipRed { Position: {-0.1, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
+    cable_b : ShipYellow { Position: {0, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
+    cable_c : ShipStripe { Position: {0.1, 2.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 4, segments: 4, smooth: true} }
+
+    glow { Position: {0, 1.4, 0}; PointLight: {intensity: 3, range: 4}; Rgb: {90, 200, 255} }
   }
 }

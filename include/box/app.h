@@ -57,15 +57,16 @@ ECS_STRUCT(App, {
     float fps;          /**< Target fps flecs caps the frames at, default 0: FpsTarget */
     float delta_time;   /**< Seconds every frame advances, default 0: flecs measures the delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
-    int32_t surface_width;  /**< Width of the Surface created when there is no window, 0 none */
-    int32_t surface_height; /**< Height of the Surface a run creates when it has none */
-    bool unguarded;     /**< A headless run starts on an oversubscribed machine */
+    int32_t surface_width;  /**< Width of the window Surface, set or created by the run, 0 none */
+    int32_t surface_height; /**< Height of the window Surface, set or created by the run */
+    bool unguarded;     /**< A headless run starts on an oversubscribed machine, by --unguarded */
     bool unpaced;       /**< A headless run ignores its CPU budget */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
     bool design;        /**< Render the gallery of design cameras, set by --design */
     char *camera;       /**< Name of the Camera the surface shows, set by --camera, NULL for none */
     char *out;          /**< Image file the surface is written to, set by --out, NULL for none */
     bool no_audio;      /**< Open no audio output, set by --no-audio */
+    bool fail_on_error; /**< A run during which an error was logged fails, by --fail-on-error */
 });
 
 /** Frame rate cap of a scene, a singleton a scene script sets, such as
@@ -85,6 +86,7 @@ ECS_STRUCT(AppStatus, {
     double slept;       /**< Wall seconds the CPU budget has slept in total */
     char *tmp_dir;      /**< Folder for temporary files of a headless process, else NULL */
     bool running;       /**< box_app_run is stepping the world */
+    int32_t errors;     /**< Messages of error level logged since the world was created */
 });
 
 /** Range of a frame time over the recent frames, in milliseconds */
@@ -182,9 +184,11 @@ ECS_STRUCT(SetAt, {
 void BoxAppImport(
     ecs_world_t *world);
 
-/** Write command line arguments into the App singleton: --headless, --frames <n>,
+/** Write command line arguments into the App singleton: --headless, --unguarded, --frames <n>,
  * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --delta-time <s>, --port <n>,
- * --surface <w>x<h>, a scene.
+ * --surface <w>x<h>, --fail-on-error, a scene.
+ *
+ * --fail-on-error makes box_app_run fail when an error was logged during the run.
  *
  * --fps <n> sets the target fps of flecs in every mode, 0 or none for no cap. --delta-time <s>
  * makes every frame advance s seconds, 0 or none to measure the delta, headless too.
@@ -249,8 +253,12 @@ double box_wait_until(
 /** Run the world with the settings of the App singleton until a stop condition is met: every
  * frame is ecs_progress(world, App.delta_time), and nothing else runs in the loop.
  *
+ * The run fails when App.scene is set and the scene is still not loaded when the run ends, and
+ * with App.fail_on_error when an error was logged since the world was created.
+ *
  * @param world The world
- * @return 0 when the run completed, nonzero when it was refused or failed to start
+ * @return 0 when the run completed, nonzero when it was refused, failed to start, ended with
+ *         its scene not loaded or, with App.fail_on_error, logged an error
  */
 int box_app_run(
     ecs_world_t *world);

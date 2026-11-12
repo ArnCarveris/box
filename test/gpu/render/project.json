@@ -456,7 +456,10 @@
                     "point_light_inverse_square",
                     "directional_light_irradiance_unit",
                     "point_light_fades_smoothly_to_range",
-                    "cluster_list_kept_per_target"
+                    "cluster_list_kept_per_target",
+                    "cluster_large_range_no_warning",
+                    "cluster_flash_no_repeated_resize",
+                    "cluster_list_grows_quietly"
                 ]
             },
             {

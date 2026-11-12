@@ -1,0 +1,4 @@
+// A scene that loads
+valid_root {
+  box.transform.Position: {1, 2, 3}
+}

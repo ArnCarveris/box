@@ -115,6 +115,10 @@ typedef struct box_render_gpu_stats_t {
                                  *   with their mip levels */
     int32_t blend_arrays;       /**< Texture arrays of the TextureBlend layers alive */
     int32_t blend_builds;       /**< Times such an array was built */
+    int32_t cluster_resizes;    /**< Times the cluster buffer of a view was created again with
+                                 *   another size, its first creation included */
+    int64_t cluster_entries;    /**< Light and probe index entries the cluster buffers of the
+                                 *   views hold together now */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
