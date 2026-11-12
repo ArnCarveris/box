@@ -327,17 +327,6 @@ state {
     lvalidate()
   }
 
-  fn liner_class() -> string {
-    lmodules == 0 ? "NO HULL" :
-    lc(L_TURRET) >= 4 ? "BATTLESHIP" :
-    lc(L_FAB) > 0 ? "TENDER" :
-    lc(L_REFINERY) > 0 ? "ORE CARRIER" :
-    lc(L_CARGO) >= 8 ? "FREIGHTER" :
-    lc(L_HABRING) + lc(L_PARKRING) >= 2 ? "PASSENGER LINER" :
-    lc(L_HANGAR) >= 4 ? "CARRIER" :
-    "LINER"
-  }
-
   fn lkind_mass(k: i32) -> f32 {
     match k {
       40: 18; 41: 8; 42: 10; 43: 30; 44: 34; 45: 26; 46: 6; 47: 34; 48: 24

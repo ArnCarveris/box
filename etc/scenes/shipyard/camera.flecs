@@ -29,7 +29,7 @@ state {
   export const VIEW_YAW: f32 = 1.02
   export const VIEW_PITCH: f32 = 0.42
   export const VIEW_DIST: f32 = 78
-  export const LINER_DIST: f32 = 112
+  export const LINER_DIST: f32 = 140
 
   export mut view_yaw: f32 = VIEW_YAW
   export mut view_pitch: f32 = VIEW_PITCH

@@ -103,77 +103,208 @@ assets {
     }
   }
 
-  template YardClamp {
-    housing : ShipHullDarkFine { Position: {1.4, 0, 0}; Box: {2.8, 3.4, 4.2} }
-    collar : ShipTrim { Position: {-0.05, 0, 0}; Box: {0.3, 3.8, 4.6} }
-    for p in 0..2 {
-      "rod_{p}" : ShipChrome { Position: {-0.35, (p - 0.5) * 2.2, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.22, length: 0.5, segments: 8, smooth: true} }
-    }
-    shoe : ShipYellow { Position: {-0.85, 0, 0}; Box: {0.6, 3.2, 3.6} }
-    pad : ShipRecess { Position: {-1.18, 0, 0}; Box: {0.08, 2.4, 2.8} }
-    for j in 0..2 {
-      "jaw_{j}" : ShipSteel { Position: {-0.95, (j - 0.5) * 3.6, 0}; Box: {1.0, 0.4, 3.9} }
-    }
-    for t in 0..4 {
-      "tooth_{t}" : ShipTrim { Position: {-1.24, -1.05 + t * 0.7, 0}; Box: {0.1, 0.3, 2.4} }
-    }
-    stripe : ShipHazard { Position: {-0.85, 1.62, 0}; Box: {0.62, 0.04, 3.6} }
-    lamp : ShipGreenLight { Position: {1.4, 1.75, 1.6}; Box: {0.5, 0.12, 0.5} }
-  }
+  template YardTruss {
+    prop len: f32 = 88
+    prop w: f32 = 5
+    prop h: f32 = 7
+    prop bays: i32 = 11
 
-  template YardWing {
-    prop len: f32 = 80
-
-    const bays = 3
     const bl = len / bays
-    const dz = bl / 2 - 1
-    const tilt = atan(6 / dz)
-    const strut = sqrt(dz * dz + 36)
-    for c in 0..2 {
-      const cx = c == 0 ? 0.6 : 9.4
-      "top_{c}" : YardGirder { Position: {cx, 3, 0}; Box: {1.2, 1, len} }
-      "cap_{c}" : ShipYellow { Position: {cx, 3.58, 0}; Box: {1.3, 0.16, len} }
-      "bottom_{c}" : YardGirder { Position: {cx, -4, 0}; Box: {1.2, 1, len} }
-      "rail_{c}" : ShipSteel { Position: {c == 0 ? 0.3 : 9.7, 4.4, 0}; Box: {0.08, 0.08, len} }
-      for b in 0..bays {
-        const bz = (b - bays / 2.0 + 0.5) * bl
-        "rise_{c}_{b}" : ShipYellow { Position: {cx, -0.5, bz - dz / 2}; Rotation: {0 - tilt, 0, 0}; Box: {0.4, 0.4, strut} }
-        "fall_{c}_{b}" : ShipYellow { Position: {cx, -0.5, bz + dz / 2}; Rotation: {tilt, 0, 0}; Box: {0.4, 0.4, strut} }
-      }
-      for e in 0..2 {
-        "beacon_{c}_{e}" : ShipBeaconRed { Position: {cx, 3.9, (e - 0.5) * len}; Sphere: {radius: 0.2, segments: 3, smooth: true} }
-      }
+    const tilt = atan2(h, bl)
+    const diag = sqrt(h * h + bl * bl)
+    const sweep = atan2(w, bl)
+    const span = sqrt(w * w + bl * bl)
+    for c in 0..4 {
+      "chord_{c}" : YardGirder { Position: {c % 2 == 0 ? 0 : w, c < 2 ? 0 - h / 2 : h / 2, 0}; Box: {0.8, 0.8, len} }
     }
-    for i in 0..21 {
-      const pz = (i - 10) * (len - 2) / 20
-      "post_{i}" : ShipSteel { Position: {0.3, 4.0, pz}; Box: {0.06, 0.8, 0.06} }
-    }
-    lights : ShipRunLights { Position: {-0.02, 3, 0}; Box: {0.04, 0.3, len - 2} }
-    pipe : ShipTeal { Position: {1.8, -2.7, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.35, length: len, segments: 8, smooth: true} }
     for f in 0..bays + 1 {
       const fz = (f - bays / 2.0) * bl
-      "frame_{f}" : YardGirder { Position: {5, -0.5, fz}; Box: {10.4, 8, 1} }
-      "band_{f}" : ShipYellow { Position: {5, 2.6, fz}; Box: {10.6, 1, 1.1} }
+      for s in 0..2 {
+        "post_{f}_{s}" : YardGirder { Position: {s * w, 0, fz}; Box: {0.5, h, 0.5} }
+      }
+      "tie_top_{f}" : YardGirder { Position: {w / 2, h / 2, fz}; Box: {w, 0.5, 0.5} }
+      "tie_bot_{f}" : YardGirder { Position: {w / 2, 0 - h / 2, fz}; Box: {w, 0.5, 0.5} }
     }
     for b in 0..bays {
       const bz = (b - bays / 2.0 + 0.5) * bl
-      "core_{b}" : ShipRecess { Position: {5.5, -0.6, bz}; Box: {6, 5.4, bl - 3} }
-      "deck_{b}" : ShipHullDarkFine { Position: {5, 3.45, bz}; Box: {8.4, 0.2, bl - 1} }
-      "lane_{b}" : ShipHazard { Position: {1.6, 3.56, bz}; Box: {0.3, 0.02, bl - 2} }
-      YardClamp "clamp_{b}"() { Position: {0, 0.4, bz} }
-    }
-    for t in 0..3 {
-      "tank_{t}" : ShipWhite { Position: {6.8, 4.5, -bl + (t - 1) * 2.4}; Cylinder: {radius: 0.9, length: 1.9, segments: 12, smooth: true} }
-      "tank_band_{t}" : ShipTeal { Position: {6.8, 4.8, -bl + (t - 1) * 2.4}; Cylinder: {radius: 0.92, length: 0.2, segments: 12, smooth: true} }
-    }
-    for q in 0..4 {
-      "stack_{q}" : ShipContainers { Position: {q % 2 == 0 ? 4.6 : 7.2, 3.55 + (q < 2 ? 0.6 : 0.45), (q < 2 ? -2 : 3)}; Box: {2.2, q < 2 ? 1.2 : 0.9, 3.8} }
-    }
-    for r in 0..5 {
-      "fin_{r}" : ShipHeatFin { Position: {6.5, 4.35, bl - 4 + r * 1.6}; Box: {4.2, 1.4, 0.06} }
+      for s in 0..2 {
+        "web_{b}_{s}" : YardGirder { Position: {s * w, 0, bz}; Rotation: {b % 2 == 0 ? 0 - tilt : tilt, 0, 0}; Box: {0.3, 0.3, diag - 0.5} }
+      }
+      "brace_{b}" : YardGirder { Position: {w / 2, 0 - h / 2, bz}; Rotation: {0, b % 2 == 0 ? sweep : 0 - sweep, 0}; Box: {0.25, 0.25, span - 0.5} }
     }
   }
 
+  template YardSpan {
+    prop len: f32 = 36
+    prop d: f32 = 2.4
+    prop n: i32 = 9
+
+    const pl = len / n
+    const da = atan2(d, pl)
+    const dl = sqrt(d * d + pl * pl)
+    for c in 0..2 {
+      "chord_{c}" : YardGirder { Position: {0, (c - 0.5) * d, 0}; Box: {len, 0.6, 1.0} }
+    }
+    for i in 0..n + 1 {
+      "post_{i}" : YardGirder { Position: {(i - n / 2.0) * pl, 0, 0}; Box: {0.4, d, 0.7} }
+    }
+    for i in 0..n {
+      "web_{i}" : YardGirder { Position: {(i - n / 2.0 + 0.5) * pl, 0, 0}; Rotation: {0, 0, i % 2 == 0 ? da : 0 - da}; Box: {dl - 0.4, 0.25, 0.4} }
+    }
+  }
+
+  template YardCrane {
+    prop w: f32 = 5
+    prop boom: f32 = 20
+    prop luff: f32 = 1.12
+
+    const px = w / 2
+    const py = 7.6
+    const tx = px - cos(luff) * boom
+    const ty = py + sin(luff) * boom
+    const mx = px + 0.6
+    const my = py + 4.5
+    const pd = sqrt((tx - mx) * (tx - mx) + (ty - my) * (ty - my))
+
+    for s in 0..2 {
+      const sx = s == 0 ? 0.8 : w - 0.8
+      "bogie_{s}" : ShipTrim { Position: {sx, 0.55, 0}; Box: {1, 0.7, 3.6} }
+      for e in 0..2 {
+        "wheel_{s}_{e}" : ShipRubber { Position: {sx, 0.3, (e - 0.5) * 2.4}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.35, length: 0.6, segments: 10, smooth: true} }
+        "leg_{s}_{e}" : YardGirder { Position: {sx, 3.4, (e - 0.5) * 2.4}; Box: {0.5, 5.4, 0.5} }
+      }
+      "cross_{s}" : ShipYellow { Position: {sx, 3.4, 0}; Rotation: {atan2(5.4, 2.4), 0, 0}; Box: {0.25, 0.25, 5.6} }
+    }
+    deck : ShipYellow { Position: {px, 6.4, 0}; Box: {w + 0.4, 0.8, 3.4} }
+    edge : ShipHazard { Position: {px, 6.82, 0}; Box: {w + 0.4, 0.04, 3.4} }
+    turntable : ShipTrim { Position: {px, 7, 0}; Cylinder: {radius: 1.7, length: 0.5, segments: 16, smooth: true} }
+    house : ShipHullFine { Position: {px + 1.2, 8.1, 0}; Box: {3.4, 1.8, 2.6} }
+    cab : ShipWhite { Position: {px - 1.2, 8.1, 1.4}; Box: {1.6, 1.8, 1.4} }
+    cab_glass : ShipCanopy { Position: {px - 2.02, 8.3, 1.4}; Box: {0.06, 1, 1.2} }
+    for s in 0..2 {
+      "mast_{s}" : ShipTrim { Position: {mx, py + 2.25, (s - 0.5) * 1.6}; Rotation: {(0.5 - s) * 0.3, 0, 0}; Box: {0.35, 4.6, 0.35} }
+    }
+    mast_cap : ShipBeaconRed { Position: {mx, my + 0.2, 0}; Sphere: {radius: 0.22, segments: 3, smooth: true} }
+    counter_jib : YardGirder { Position: {px + 3.4, py + 0.2, 0}; Box: {5.6, 0.6, 1.2} }
+    counterweight : ShipHullDark { Position: {px + 5.2, py - 0.6, 0}; Box: {2, 2, 2.6} }
+    weight_band : ShipHazard { Position: {px + 5.2, py + 0.42, 0}; Box: {2.02, 0.04, 2.62} }
+    pendant : ShipSteel { Position: {(tx + mx) / 2, (ty + my) / 2, 0}; Rotation: {0, 0, atan2(ty - my, tx - mx)}; Box: {pd, 0.08, 0.08} }
+    back_stay : ShipSteel { Position: {(px + 5.2 + mx) / 2, (py + 0.4 + my) / 2, 0}; Rotation: {0, 0, atan2(py + 0.4 - my, px + 5.2 - mx)}; Box: {sqrt((px + 4.6 - mx) * (px + 4.6 - mx) + (my - py) * (my - py)), 0.08, 0.08} }
+    jib {
+      Position: {px, py, 0}
+      Rotation: {0, 0, PI - luff}
+      for s in 0..2 {
+        "chord_{s}" : ShipYellow { Position: {boom / 2, 0, (s - 0.5) * 1.1}; Box: {boom, 0.3, 0.3} }
+      }
+      spine : ShipYellow { Position: {boom / 2, 0.85, 0}; Box: {boom, 0.3, 0.3} }
+      for i in 0..8 {
+        "lace_{i}" : ShipYellow { Position: {(i + 0.5) * boom / 8, 0.4, 0}; Box: {0.15, 0.9, 1.2} }
+      }
+      foot : ShipTrim { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.45, length: 1.6, segments: 10, smooth: true} }
+      sheave : ShipTrim { Position: {boom, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.5, length: 0.8, segments: 10, smooth: true} }
+      tip : ShipBeaconRed { Position: {boom, 0.7, 0}; Sphere: {radius: 0.22, segments: 3, smooth: true} }
+    }
+    cable : ShipSteel { Position: {tx, ty - 4.5, 0}; Box: {0.06, 9, 0.06} }
+    block : ShipYellow { Position: {tx, ty - 9.4, 0}; Box: {0.7, 0.9, 0.7} }
+    hook : ShipTrim { Position: {tx, ty - 10.1, 0}; Box: {0.25, 0.6, 0.25} }
+  }
+
+  template YardControl {
+    prop w: f32 = 5
+
+    hall : ShipHullFine { Position: {w / 2, 2.2, 0}; Box: {w + 1, 4, 7} }
+    trim : ShipTrim { Position: {w / 2, 4.3, 0}; Box: {w + 1.2, 0.2, 7.2} }
+    windows : ShipWindow { Position: {-0.52, 2.8, 0}; Box: {0.04, 0.6, 6} }
+    windows_end : ShipWindow { Position: {w / 2, 2.8, -3.52}; Box: {w - 0.4, 0.6, 0.04} }
+    lounge : ShipHullFine { Position: {w / 2 - 0.4, 5.4, 1.2}; Box: {w - 0.6, 2, 3.6} }
+    lounge_glass : ShipCanopy { Position: {-0.12, 5.5, 1.2}; Box: {0.06, 1.2, 3.2} }
+    vent_a : ShipHeatFin { Position: {w / 2 + 0.6, 4.9, -2}; Box: {2.4, 1, 0.06} }
+    vent_b : ShipHeatFin { Position: {w / 2 + 0.6, 4.9, -2.6}; Box: {2.4, 1, 0.06} }
+    mast : ShipSteel { Position: {w - 0.6, 8, -2.2}; Cylinder: {radius: 0.12, length: 7.6, segments: 6, smooth: true} }
+    mast_top : ShipBeaconWhite { Position: {w - 0.6, 11.9, -2.2}; Sphere: {radius: 0.2, segments: 3, smooth: true} }
+    dish {
+      Position: {w / 2 - 0.2, 7.2, 1.4}
+      Rotation: {-0.5, -0.9, 0}
+      bowl : ShipWhite { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cone: {radius: 1.3, length: 0.6, segments: 16, smooth: true} }
+      feed : ShipSteel { Position: {0, 0, 0.7}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.05, length: 1.4, segments: 6} }
+    }
+    dish_post : ShipTrim { Position: {w / 2 - 0.2, 6.7, 1.4}; Cylinder: {radius: 0.15, length: 1, segments: 8} }
+  }
+
+  template YardGantry {
+    prop len: f32 = 88
+
+    const w = 5
+    const h = 7
+    const top = h / 2 + 0.6
+    const bays = 11
+    const bl = len / bays
+
+    YardTruss truss(len: len, w: w, h: h, bays: bays)
+    deck : YardDeckFine { Position: {w / 2, top, 0}; Box: {w + 1.4, 0.25, len} }
+    edge : ShipHazard { Position: {-0.35, top + 0.14, 0}; Box: {0.7, 0.04, len} }
+    rail : ShipSteel { Position: {-0.6, top + 1.1, 0}; Box: {0.08, 0.08, len} }
+    for t in 0..2 {
+      "track_{t}" : ShipTrim { Position: {t == 0 ? 0.8 : w - 0.8, top + 0.17, 0}; Box: {0.3, 0.1, len} }
+    }
+    lights_top : ShipRunLights { Position: {-0.44, h / 2, 0}; Box: {0.04, 0.3, len - 2} }
+    lights_low : ShipRunLightsCyan { Position: {-0.44, 0 - h / 2, 0}; Box: {0.04, 0.3, len - 2} }
+    for f in 0..bays + 1 {
+      const fz = (f - bays / 2.0) * bl
+      "stanchion_{f}" : ShipSteel { Position: {-0.6, top + 0.6, fz}; Box: {0.08, 1, 0.08} }
+      if f % 4 == 1 {
+        "flood_{f}" {
+          Position: {-0.7, top - 0.9, fz}
+          Rotation: {0, 0, -0.55}
+          housing : ShipTrim { Position: {0.2, 0, 0}; Box: {0.7, 0.8, 1.6} }
+          lens : ShipWhiteLight { Position: {-0.17, 0, 0}; Box: {0.04, 0.6, 1.4} }
+        }
+      }
+    }
+    for e in 0..2 {
+      const ez = (e - 0.5) * len
+      "cap_{e}" : ShipHullDarkFine { Position: {w / 2, 0, ez}; Box: {w + 1, h + 0.6, 1.2} }
+      "cap_band_{e}" : ShipHazard { Position: {w / 2, h / 2 - 0.4, ez + (e - 0.5) * 1.22}; Box: {w + 1, 0.8, 0.04} }
+      "beacon_{e}" : ShipBeaconRed { Position: {-0.4, top + 0.4, ez + (0.5 - e) * 1}; Sphere: {radius: 0.25, segments: 3, smooth: true} }
+    }
+    YardCrane crane(w: w) { Position: {0, top, 0 - 2.5 * bl} }
+    YardControl control(w: w) { Position: {0, top, len / 2 - 4.5} }
+    for t in 0..3 {
+      "tank_{t}" : ShipWhite { Position: {w / 2 + 0.3, top + 1.2, 1.6 * bl + (t - 1) * 2.6}; Cylinder: {radius: 1, length: 2.1, segments: 14, smooth: true} }
+      "tank_band_{t}" : ShipTeal { Position: {w / 2 + 0.3, top + 1.5, 1.6 * bl + (t - 1) * 2.6}; Cylinder: {radius: 1.02, length: 0.22, segments: 14, smooth: true} }
+    }
+    for q in 0..4 {
+      "stack_{q}" : ShipContainers { Position: {q % 2 == 0 ? 1.5 : 3.8, top + (q < 2 ? 0.7 : 0.55), 0.3 * bl + (q < 2 ? -2 : 2.2)}; Box: {2.1, q < 2 ? 1.2 : 0.9, 3.8} }
+    }
+    pipe : ShipTeal { Position: {w * 0.75, 0 - h / 2 + 0.9, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.4, length: len, segments: 10, smooth: true} }
+    pipe_b : ShipCopper { Position: {w * 0.75 + 1, 0 - h / 2 + 0.8, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.22, length: len, segments: 8, smooth: true} }
+  }
+
+  template YardMast {
+    prop high: f32 = 28
+
+    const levels = 7
+    const lv = high / levels
+    for p in 0..4 {
+      "post_{p}" : YardGirder { Position: {p % 2 == 0 ? -0.8 : 0.8, high / 2, p < 2 ? -0.8 : 0.8}; Box: {0.3, high, 0.3} }
+    }
+    for i in 1..levels + 1 {
+      for s in 0..2 {
+        "tie_x_{i}_{s}" : ShipYellow { Position: {0, i * lv, s == 0 ? -0.8 : 0.8}; Box: {1.6, 0.2, 0.2} }
+        "tie_z_{i}_{s}" : ShipYellow { Position: {s == 0 ? -0.8 : 0.8, i * lv, 0}; Box: {0.2, 0.2, 1.6} }
+      }
+    }
+    platform : ShipHullDarkFine { Position: {0, high + 0.2, 0}; Box: {2.6, 0.4, 2.6} }
+    head {
+      Position: {0, high + 1.1, 0}
+      Rotation: {-0.35, 0, 0}
+      frame : ShipTrim { Position: {0, 0, 0}; Box: {2.4, 1.4, 0.5} }
+      for i in 0..3 {
+        "lamp_{i}" : ShipWhiteLight { Position: {(i - 1) * 0.75, 0, -0.27}; Box: {0.6, 1.0, 0.04} }
+      }
+    }
+    beacon : ShipBeaconRed { Position: {0, high + 2.3, 0.6}; Sphere: {radius: 0.25, segments: 3, smooth: true} }
+  }
   template MiniTug {
     prop seed: i32 = 0
 
@@ -184,14 +315,37 @@ assets {
   }
 
   template Drydock {
-    const l = GZ * CW + 8
-    const gap = GX * CW / 2 + 4
+    const len = SLOTS * SEG + 16
+    const gap = RING_R + 18
+    const ty = -2
+    const tb = ty - 3.5
+    const ky = -20
+    const kx = 18
+    const la = atan2(tb - ky, gap - kx)
+    const ll = sqrt((tb - ky) * (tb - ky) + (gap - kx) * (gap - kx))
 
     for s in 0..2 {
-      YardWing "wing_{s}"(len: l) { Position: {s == 0 ? 0 - gap : gap, 0, 0}; Rotation: {0, s == 0 ? PI : 0, 0} }
+      YardGantry "gantry_{s}"(len: len) { Position: {s == 0 ? 0 - gap : gap, ty, 0}; Rotation: {0, s == 0 ? PI : 0, 0} }
+      for e in 0..2 {
+        YardMast "mast_{s}_{e}"(high: 30) { Position: {(s == 0 ? -1 : 1) * (gap + 2.5), tb, (e == 0 ? -1 : 1) * (len / 2 + 2.6)}; Rotation: {0, e == 0 ? PI : 0, 0} }
+      }
     }
-    MiniTug tug_a(seed: 0) { Position: {gap + 14, 5, 8}; Rotation: {0, -0.3, 0} }
-    MiniTug tug_b(seed: 1) { Position: {0 - gap - 12, 2, -14}; Rotation: {0, 2.6, 0} }
+    for r in 0..2 {
+      "rib_{r}" {
+        Position: {0, 0, (r == 0 ? -1 : 1) * (len / 2 - 1)}
+        YardSpan floor(len: kx * 2, d: 2.4, n: 9) { Position: {0, ky, 0} }
+        for s in 0..2 {
+          const sx = s == 0 ? -1 : 1
+          YardSpan "leg_{s}"(len: ll, d: 2, n: 5) { Position: {sx * (kx + gap) / 2, (ky + tb) / 2, 0}; Rotation: {0, 0, sx * la} }
+          "knee_{s}" : ShipHullDarkFine { Position: {sx * kx, ky, 0}; Box: {2.6, 3, 1.6} }
+          "shoulder_{s}" : ShipHullDarkFine { Position: {sx * gap, tb, 0}; Box: {2, 2.4, 1.6} }
+          "knee_lamp_{s}" : ShipAmberLight { Position: {sx * kx, ky + 1.52, 0}; Box: {0.8, 0.06, 0.8} }
+        }
+      }
+    }
+
+    MiniTug tug_a(seed: 0) { Position: {gap - 6, 18, 30}; Rotation: {0, -0.4, 0} }
+    MiniTug tug_b(seed: 1) { Position: {0 - gap - 6, 9, -22}; Rotation: {0, 2.6, 0} }
   }
 
   template YardPlanet {

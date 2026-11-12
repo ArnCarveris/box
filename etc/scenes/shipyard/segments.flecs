@@ -30,6 +30,7 @@ state {
 assets {
   liner_bell_outer { Path2D: {start: {0.34, 0}, segments: [{kind: CubicBezier, end: {1.0, 2.6}, control1: {0.4, 1.3}, control2: {0.78, 2.2}}]} }
   liner_bell_inner { Path2D: {start: {0.29, 0}, segments: [{kind: CubicBezier, end: {0.95, 2.6}, control1: {0.35, 1.3}, control2: {0.73, 2.2}}]} }
+  liner_plume_shape { Path2D: {start: {0.56, 0}, segments: [{kind: CubicBezier, end: {0.04, 1}, control1: {0.5, 0.3}, control2: {0.32, 0.75}}]} }
 
   template MiniShuttle {
     prop paint: i32 = 0
@@ -140,10 +141,10 @@ assets {
     prop r1: f32 = 10
 
     const len = r1 - r0
-    shaft : ShipHullFine { Position: {0, (r0 + r1) / 2, 0}; Cylinder: {radius: 0.3, length: len, segments: 12, smooth: true} }
+    shaft : ShipHullSpin { Position: {0, (r0 + r1) / 2, 0}; Cylinder: {radius: 0.3, length: len, segments: 12, smooth: true} }
     lift : ShipRunLightsCyan { Position: {0, (r0 + r1) / 2, 0.29}; Box: {0.08, len - 0.4, 0.04} }
     for s in 0..2 {
-      "foot_{s}" : ShipHullDarkFine { Position: {0, s == 0 ? r0 + 0.3 : r1 - 0.3, 0}; Cylinder: {radius: 0.46, length: 0.6, segments: 12, smooth: true} }
+      "foot_{s}" : ShipHullDarkSpin { Position: {0, s == 0 ? r0 + 0.3 : r1 - 0.3, 0}; Cylinder: {radius: 0.46, length: 0.6, segments: 12, smooth: true} }
     }
   }
 
@@ -159,17 +160,17 @@ assets {
     RingHub hub(r: r)
     rotor {
       AngularVelocity: {0, 0, dir * 0.12}
-      collar : ShipHullFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.28, length: 1.6, segments: 32, smooth: true} }
+      collar : ShipHullSpin { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.28, length: 1.6, segments: 32, smooth: true} }
       for i in 0..4 {
         RingSpoke "spoke_{i}"(r0: r * 1.28, r1: RING_R - 2.2) { Rotation: {0, 0, i * HALF_PI + PI / 4} }
       }
-      corridor : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Tube: {radius: RING_R - 1.7, thickness: 0.5, length: 1.4, segments: 96, smooth: true} }
+      corridor : ShipHullDarkSpin { Rotation: {HALF_PI, 0, 0}; Tube: {radius: RING_R - 1.7, thickness: 0.5, length: 1.4, segments: 96, smooth: true} }
       for i in 0..n {
         "pod_{i}" {
           Rotation: {0, 0, i * 2 * PI / n}
           cabin : ShipCabins { Position: {0, pod_r, 0}; Box: {pod_w, 2.0, 3.1} }
-          keel : ShipHullFine { Position: {0, RING_R - 0.08, 0}; Box: {pod_w + 0.2, 0.16, 3.3} }
-          roof : ShipHullDarkFine { Position: {0, pod_r - 1.06, 0}; Box: {pod_w + 0.1, 0.12, 3.2} }
+          keel : ShipHullSpin { Position: {0, RING_R - 0.08, 0}; Box: {pod_w + 0.2, 0.16, 3.3} }
+          roof : ShipHullDarkSpin { Position: {0, pod_r - 1.06, 0}; Box: {pod_w + 0.1, 0.12, 3.2} }
         }
       }
       for s in 0..2 {
@@ -189,17 +190,17 @@ assets {
     RingHub hub(r: r)
     rotor {
       AngularVelocity: {0, 0, dir * 0.12}
-      collar : ShipHullFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.28, length: 1.6, segments: 32, smooth: true} }
+      collar : ShipHullSpin { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.28, length: 1.6, segments: 32, smooth: true} }
       for i in 0..3 {
         RingSpoke "spoke_{i}"(r0: r * 1.28, r1: sky) { Rotation: {0, 0, i * 2.0944 + 0.5236} }
       }
-      shell : ShipHullFine { Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro, thickness: 0.4, length: 3.7, segments: 120, smooth: true} }
+      shell : ShipHullSpin { Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro, thickness: 0.4, length: 3.7, segments: 120, smooth: true} }
       lawn : ShipMoss { Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro - 0.4, thickness: 0.22, length: 3.5, segments: 120, smooth: true} }
       creek : ShipWater { Position: {0, 0, 1.0}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro - 0.6, thickness: 0.04, length: 0.55, segments: 120, smooth: true} }
       glass : ShipGlass { Rotation: {HALF_PI, 0, 0}; Tube: {radius: sky, thickness: 0.05, length: 3.7, segments: 120, smooth: true} }
       for s in 0..2 {
         "wall_{s}" : ShipGlass { Position: {0, 0, (s - 0.5) * 3.66}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro - 0.3, thickness: 2.3, length: 0.04, segments: 120, smooth: true} }
-        "rail_{s}" : ShipHullFine { Position: {0, 0, (s - 0.5) * 3.6}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky, tube: 0.14, segments: 120, rings: 6, smooth: true} }
+        "rail_{s}" : ShipHullSpin { Position: {0, 0, (s - 0.5) * 3.6}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky, tube: 0.14, segments: 120, rings: 6, smooth: true} }
       }
       sun : ShipWhiteLight { Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.02, tube: 0.05, segments: 120, rings: 3, smooth: true} }
       for i in 0..30 {
@@ -335,8 +336,62 @@ assets {
     }
     throat : ShipPlasma { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.3, length: 0.04, segments: 16, smooth: true} }
     lip : ShipRadiant { Position: {0, 0, -2.81}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: r * 1.02, tube: 0.03, segments: 40, rings: 3, smooth: true} }
-    plume : ShipPlumeCore { Position: {0, 0, -7.4}; Rotation: {0 - HALF_PI, 0, 0}; Cone: {radius: r * 0.9, length: 9, segments: 24, smooth: true}; NoShadow; SpatialIgnore }
-    glow { Position: {0, 0, -4}; PointLight: {intensity: 5, range: r * 6}; Rgb: {120, 180, 255} }
+    glow {
+      Position: {0, 0, -1.42}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Frustum: {radius_bottom: r * 0.32, radius_top: r * 0.95, length: 2.75, segments: 24, smooth: true}
+      Rgb: {120, 190, 255}
+      Emissive: {strength: 2.5, color: {90, 170, 255}}
+      Opacity: {0.16}
+      BlendMode: Additive
+      NoShadow
+      SpatialIgnore
+    }
+    plume : ShipLinerPlume {
+      Position: {0, 0, -1.75}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Scale: {r, r * 7, r}
+      Lathe: {profile: liner_plume_shape, segments: 24, rings: 16}
+      NoShadow
+      SpatialIgnore
+    }
+    haze {
+      Position: {0, 0, -2.6}
+      Rotation: {0 - HALF_PI, 0, 0}
+      ParticleEmitter: {
+        max: 380, rate: 130, shape: EmitterDisc, radius: r * 0.45,
+        direction: {0, 1, 0}, spread: 5, speed: {r * 2.2, r * 3},
+        lifetime: {1.8, 2.5}, size: {r * 0.7, r * 1.0}, opacity: {0.035, 0.06},
+        color: {110, 150, 255}, seed: 170 + fe
+      }
+      ParticleForces: {gravity: {0, 0, 0}, turbulence: 1.2, turbulence_scale: 0.15}
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.04}
+      ParticleCurves: {
+        size: {keys: [{0, 0.6}, {1, 1.7}]},
+        opacity: {keys: [{0, 0}, {0.12, 1}, {0.5, 0.45}, {1, 0}]},
+        color: {keys: [{0, {200, 230, 255}}, {0.4, {255, 255, 255}}, {1, {170, 110, 255}}]}
+      }
+      SpatialIgnore
+    }
+    exhaust {
+      Position: {0, 0, -2.9}
+      Rotation: {0 - HALF_PI, 0, 0}
+      ParticleEmitter: {
+        max: 720, rate: 330, shape: EmitterDisc, radius: r * 0.5,
+        direction: {0, 1, 0}, spread: 2.5, speed: {r * 3.4, r * 4.6},
+        lifetime: {1.3, 2.0}, size: {r * 0.1, r * 0.2}, opacity: {0.35, 0.6},
+        color: {170, 215, 255}, seed: 70 + fe
+      }
+      ParticleForces: {gravity: {0, 0, 0}, turbulence: 2.5, turbulence_scale: 0.2}
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.18}
+      ParticleCurves: {
+        size: {keys: [{0, 0.8}, {1, 1.6}]},
+        opacity: {keys: [{0, 0}, {0.06, 1}, {0.45, 0.45}, {1, 0}]},
+        color: {keys: [{0, {255, 255, 255}}, {0.3, {130, 190, 255}}, {1, {90, 60, 255}}]}
+      }
+      SpatialIgnore
+    }
+    light { Position: {0, 0, -5}; PointLight: {intensity: 40, range: r * 9}; Rgb: {120, 180, 255} }
     SpineEnds ends(r: r, fe: fe, be: 0)
   }
 

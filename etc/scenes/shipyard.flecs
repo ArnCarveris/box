@@ -83,7 +83,9 @@ yard {
   } else {
     Slipway slipway()
   }
-  BuildFrame frame()
+  if !liner {
+    BuildFrame frame()
+  }
   if tool > 0 && liner {
     SpineGuide spine_guide(l: lane)
   } else if tool > 0 {
