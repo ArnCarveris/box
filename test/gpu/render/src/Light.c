@@ -10,6 +10,7 @@
 #include <bake_test.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -1148,5 +1149,103 @@ void Light_cluster_list_kept_per_target(void) {
 
     stbi_image_free(px);
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+static int32_t cluster_warnings;
+
+static void cluster_count_warnings(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    if (level == -2 && strstr(msg, "light and probe index entries")) {
+        cluster_warnings ++;
+    }
+}
+
+static ecs_world_t* cluster_flash_world(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .resolution_scale = 1});
+
+    return world;
+}
+
+void Light_cluster_large_range_no_warning(void) {
+    // lighting_fixes/cluster_overflow
+    ecs_world_t *world = cluster_flash_world();
+    ecs_entity_t flash = ecs_new(world);
+    ecs_set(world, flash, Position, {0, 0, 2});
+    ecs_set(world, flash, PointLight, {.intensity = 200000, .range = 4000});
+
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    cluster_warnings = 0;
+    ecs_os_api.log_ = cluster_count_warnings;
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    ecs_os_api.log_ = log;
+    test_int(cluster_warnings, 0);
+
+    ecs_fini(world);
+}
+
+void Light_cluster_flash_no_repeated_resize(void) {
+    // lighting_fixes/cluster_overflow
+    ecs_world_t *world = cluster_flash_world();
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_entity_t light = ecs_new(world);
+        ecs_set(world, light, Position, {i ? 3.0f : -3.0f, 0, 0});
+        ecs_set(world, light, PointLight, {.intensity = 0.4f * GLM_PIf, .range = 4000});
+    }
+
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    cluster_warnings = 0;
+    ecs_os_api.log_ = cluster_count_warnings;
+    ecs_entity_t flash = 0;
+    for (i = 0; i < 60; i ++) {
+        if (!(i % 5)) {
+            if (flash) {
+                ecs_delete(world, flash);
+                flash = 0;
+            } else {
+                flash = ecs_new(world);
+                ecs_set(world, flash, Position, {0, 0, 2});
+                ecs_set(world, flash, PointLight, {.intensity = 200000, .range = 4000});
+            }
+        }
+
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    ecs_os_api.log_ = log;
+    test_int(cluster_warnings, 0);
+
     ecs_fini(world);
 }
