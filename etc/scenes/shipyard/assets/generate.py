@@ -240,14 +240,20 @@ ICONS = {
     "ok": f'<g {S}><circle cx="32" cy="32" r="26"/><path d="M20 33l8 8 16-17"/></g>',
     "warn": f'<g {S}><path d="M32 6l28 50H4z"/><path d="M32 24v14M32 46v1"/></g>',
     "ship": f'<g {S}><path d="M60 32L40 20H22L6 12l4 20-4 20 16-8h18z"/><path d="M22 20v24M40 20v24"/></g>',
-    "capital": f'<g {S}><path d="M62 34L50 26H8l-4 4v12l4 4h42z"/><path d="M14 26v-6h10l4 6M8 36h40"/>'
-               '<path d="M34 26v20M44 26v20"/></g>',
+    "liner": f'<g {S}><path d="M4 32h48"/><path d="M4 27v10"/><path d="M52 27h3l6 5-6 5h-3z"/>'
+             '<ellipse cx="22" cy="32" rx="4" ry="24"/><ellipse cx="36" cy="32" rx="4" ry="17"/></g>',
     "bridge": f'<g {S}><path d="M4 54h56"/><path d="M8 54V38h48v16"/><path d="M14 38V26h36v12"/>'
               '<path d="M20 26l4-8h16l4 8"/><path d="M32 18V8"/><path d="M18 32h28"/></g>',
     "sensor": f'<g {S}><path d="M12 14a28 28 0 0 0 38 38z"/><path d="M31 33l14-14"/><circle cx="47" cy="17" r="3"/>'
               '<path d="M26 52l-8 8h28"/></g>',
-    "residence": f'<g {S}><rect x="6" y="10" width="52" height="44" rx="3"/><path d="M6 24h52M6 38h52"/>'
-                 '<path d="M14 17h4M24 17h4M34 17h4M44 17h4M14 31h4M24 31h4M34 31h4M44 31h4M14 45h4M24 45h4M34 45h4M44 45h4"/></g>',
+    "quarters": f'<g {S}><rect x="6" y="16" width="52" height="32" rx="12"/>'
+                '<path d="M17 27h4M27 27h4M37 27h4M47 27h.01M17 37h4M27 37h4M37 37h4M47 37h.01"/></g>',
+    "truss": f'<g {S}><path d="M4 18h56M4 46h56M4 18v28M60 18v28M18 18v28M32 18v28M46 18v28"/>'
+             '<path d="M4 46l14-28M18 46l14-28M32 46l14-28M46 46l14-28"/></g>',
+    "yoke": f'<g {S}><circle cx="32" cy="32" r="10"/><circle cx="8" cy="32" r="5"/><circle cx="56" cy="32" r="5"/>'
+            '<circle cx="32" cy="56" r="5"/><path d="M13 30h9M13 34h9M42 30h9M42 34h9M30 42v9M34 42v9"/></g>',
+    "spine": f'<g {S}><circle cx="32" cy="32" r="9"/><circle cx="32" cy="9" r="5"/><circle cx="32" cy="55" r="5"/>'
+             '<circle cx="9" cy="32" r="5"/><circle cx="55" cy="32" r="5"/></g>',
     "ring": f'<g {S}><path d="M4 32h56"/><ellipse cx="32" cy="32" rx="12" ry="26"/><ellipse cx="32" cy="32" rx="4" ry="9"/>'
             '<path d="M32 6v17M32 41v17"/></g>',
     "arbor": f'<g {S}><path d="M6 50a26 26 0 0 1 52 0"/><path d="M2 50h60"/><path d="M24 50V38"/><circle cx="24" cy="32" r="7"/>'

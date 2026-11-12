@@ -44,6 +44,23 @@ assets {
     }
   }
 
+  template SpineGuide {
+    prop l: i32 = 0
+
+    const r = lane_r(l)
+    Position: {lane_x(l), AXIS_Y + lane_y(l), 0}
+    HoloLine axis(len: SLOTS * SEG + 6, glow: 1.6) { Rotation: {0, HALF_PI, 0} }
+    for i in 0..SLOTS + 1 {
+      "tick_{i}" : YardHolo {
+        Position: {0, 0, (i - SLOTS / 2.0) * SEG}
+        Rotation: {HALF_PI, 0, 0}
+        Torus: {radius: r * 1.5, tube: 0.03, segments: 32, rings: 3}
+        NoShadow
+        SpatialIgnore
+      }
+    }
+  }
+
   template BuildFrame {
     const hx = GX * CW / 2 + 0.6
     const hz = GZ * CW / 2 + 0.6

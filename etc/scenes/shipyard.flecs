@@ -2,7 +2,8 @@ include shipyard/state
 include shipyard/materials
 include shipyard/hull
 include shipyard/exterior
-include shipyard/capital
+include shipyard/liner
+include shipyard/segments
 include shipyard/cell
 include shipyard/stage
 include shipyard/logic
@@ -77,21 +78,29 @@ view {
 }
 
 yard {
-  if capital {
+  if liner {
     Drydock dock()
   } else {
     Slipway slipway()
   }
   BuildFrame frame()
-  if tool > 0 {
+  if tool > 0 && liner {
+    SpineGuide spine_guide(l: lane)
+  } else if tool > 0 {
     DeckGrid deck_grid(level: deck)
   }
   YardPlanet planet() { Position: {-1100, -760, -1500} }
 }
 
 ship {
-  for i in 0..CELLS {
-    ShipCell "cell_{i}"(idx: i)
+  if liner {
+    for i in 0..LCELLS {
+      LinerSlot "slot_{i}"(idx: i)
+    }
+  } else {
+    for i in 0..CELLS {
+      ShipCell "cell_{i}"(idx: i)
+    }
   }
 }
 
