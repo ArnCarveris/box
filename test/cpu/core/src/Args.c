@@ -571,3 +571,47 @@ void Args_out_capture(void) {
         box_render_null_free(null);
     }
 }
+
+static void surface_scene_run(
+    const char *size,
+    int32_t width,
+    int32_t height)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "1",
+        "test/assets/app/surface_window.flecs", "--surface", ECS_CONST_CAST(char*, size)};
+    int argc = size ? 7 : 5;
+
+    test_int(box_app_parse(world, argc, argv), 0);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->unguarded = true;
+    app->unpaced = true;
+    test_int(box_app_run(world), 0);
+
+    ecs_entity_t window = ecs_lookup(world, "window");
+    test_assert(window != 0);
+    test_int(ecs_count(world, Surface), 1);
+    const Surface *s = ecs_get(world, window, Surface);
+    test_assert(s != NULL);
+    test_int(s->width, width);
+    test_int(s->height, height);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Args_surface_overrides_scene_window(void) {
+    // test_fixes/surface_arg_override
+    surface_scene_run("1280x720", 1280, 720);
+}
+
+void Args_surface_scene_window_without_option(void) {
+    // test_fixes/surface_arg_override
+    surface_scene_run(NULL, 640, 360);
+}
