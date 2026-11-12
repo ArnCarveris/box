@@ -1062,7 +1062,8 @@ static void box_particles_block_still(
  *
  * @param look The ParticleAppearance of the emitter, NULL for none
  * @param pool The pool, with the rows of its curves and of its ParticleMotion
- * @param scale Multiplier of the softness, the uniform scale of the emitter
+ * @param scale Multiplier of the softness and divisor of the stretch per unit of speed, the
+ *              uniform scale of the emitter, so a scaled emitter draws a scaled copy
  * @param out The block, its other members written, its color variance among them
  */
 static void box_particles_block_look(
@@ -1108,7 +1109,7 @@ static void box_particles_block_look(
         out->rows = look->rows > 1 ? (uint32_t)look->rows : 1;
         out->fps = look->fps > 0 ? look->fps : 0.0f;
         out->softness = look->softness > 0 ? look->softness * scale : 0.0f;
-        out->stretch = look->stretch > 0 ? look->stretch : 0.0f;
+        out->stretch = look->stretch > 0 && scale > 0 ? look->stretch / scale : 0.0f;
         out->lit = glm_clamp(look->lit, 0.0f, 1.0f);
         if (look->shape != ParticleSprite) {
             out->look = ParticleCircle;
