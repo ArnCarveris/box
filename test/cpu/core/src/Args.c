@@ -76,6 +76,22 @@ void Args_unguarded(void) {
     ecs_fini(world);
 }
 
+void Args_async_loads(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->async_loads, false);
+    char *argv[] = {"boxrun", "--headless", "--async-loads"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->async_loads, true);
+    test_bool(app->headless, true);
+
+    ecs_fini(world);
+}
+
 void Args_fail_on_error(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();
