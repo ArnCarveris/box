@@ -37,6 +37,19 @@
                 "BOX_RENDER_WGPU",
                 "_GNU_SOURCE"
             ]
+        },
+        "${os Windows}": {
+            "defines": [
+                "BOX_PLATFORM_GLFW",
+                "BOX_RENDER_WGPU",
+                "flecs_STATIC",
+                "box_STATIC",
+                "_CRT_SECURE_NO_WARNINGS"
+            ],
+            "cflags": [
+                "/std:c11",
+                "/experimental:c11atomics"
+            ]
         }
     },
     "dependee": {
@@ -45,6 +58,23 @@
                 "FLECS_SCRIPT_MATH",
                 "FLECS_CREATE_MEMBER_ENTITIES"
             ],
+            "${os Windows}": {
+                "defines": [
+                    "flecs_STATIC",
+                    "box_STATIC"
+                ],
+                "lib": [
+                    "ntdll",
+                    "userenv",
+                    "user32",
+                    "gdi32",
+                    "shell32"
+                ],
+                "cflags": [
+                    "/std:c11",
+                    "/experimental:c11atomics"
+                ]
+            },
             "${os Darwin}": {
                 "lib": [
                     "m"
@@ -175,6 +205,50 @@
                 "repository": "https://github.com/mackron/miniaudio.git",
                 "tag": "0.11.26",
                 "header-only": true
+            },
+            "wgpu_native": {
+                "repository": "https://github.com/gfx-rs/wgpu-native.git",
+                "tag": "v29.0.1.1",
+                "build-system": "cargo",
+                "library": "wgpu_native",
+                "include": [
+                    "ffi",
+                    "ffi/webgpu-headers"
+                ]
+            },
+            "resvg": {
+                "repository": "https://github.com/linebender/resvg.git",
+                "tag": "v0.47.0",
+                "subdir": "crates/c-api",
+                "build-system": "cargo",
+                "library": "resvg",
+                "cargo-args": [
+                    "--no-default-features",
+                    "--features=text,system-fonts,memmap-fonts"
+                ],
+                "include": [
+                    "."
+                ]
+            }
+        }
+        },
+    "${os Windows}": {
+        "bundle": {
+            "miniaudio": {
+                "repository": "https://github.com/mackron/miniaudio.git",
+                "tag": "0.11.26",
+                "header-only": true
+            },
+            "glfw": {
+                "repository": "https://github.com/glfw/glfw.git",
+                "tag": "3.4",
+                "library": "glfw3",
+                "cmake-args": [
+                    "-DGLFW_BUILD_EXAMPLES=OFF",
+                    "-DGLFW_BUILD_TESTS=OFF",
+                    "-DGLFW_BUILD_DOCS=OFF",
+                    "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"
+                ]
             },
             "wgpu_native": {
                 "repository": "https://github.com/gfx-rs/wgpu-native.git",

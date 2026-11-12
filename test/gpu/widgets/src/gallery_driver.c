@@ -10,7 +10,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 
 /** Path of the gallery scene in the repository */
 #define GALLERY_SCENE "test/assets/ui/gallery.flecs"

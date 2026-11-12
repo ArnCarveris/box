@@ -4,7 +4,7 @@
  */
 
 #include "jobs.h"
-#include <unistd.h>
+#include "../posix.h"
 
 /** A job from submission until its completion ran */
 typedef struct box_job_t {

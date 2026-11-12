@@ -94,6 +94,8 @@ void box_file_stamp(
 #ifdef __APPLE__
     stamp->sec = (int64_t)st.st_mtimespec.tv_sec;
     stamp->nsec = (int64_t)st.st_mtimespec.tv_nsec;
+#elif defined(_WIN32)
+    stamp->sec = (int64_t)st.st_mtime;
 #else
     stamp->sec = (int64_t)st.st_mtim.tv_sec;
     stamp->nsec = (int64_t)st.st_mtim.tv_nsec;

@@ -9,7 +9,7 @@
 #include <string.h>
 
 /** Error messages logged since the collector was installed */
-static ecs_strbuf_t transition_errors = ECS_STRBUF_INIT;
+static ecs_strbuf_t transition_errors = {0};
 
 /** Log function the collector passes messages on to */
 static ecs_os_api_log_t transition_log = NULL;

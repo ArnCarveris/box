@@ -3,6 +3,8 @@
  * @brief The private temporary folder of a process under /tmp/box/<pid>.
  */
 
+#ifndef _WIN32
+
 #include "app.h"
 #include <dirent.h>
 #include <errno.h>
@@ -312,3 +314,5 @@ char* box_app_tmp_create(
 
     return result;
 }
+
+#endif

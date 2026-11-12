@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 
 /** Path of the showcase scene in the repository */
 #define SHOWCASE_SCENE "test/assets/scenes/ui_showcase.flecs"
