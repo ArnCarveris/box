@@ -7,11 +7,7 @@
 #include <bake_test.h>
 #include <stdio.h>
 #include <string.h>
-<<<<<<< HEAD
-#include <unistd.h>
-=======
 #include "../../../../src/posix.h"
->>>>>>> 54068c8d984217a08da76fddea52ffe4adbdd258
 
 static int32_t quit_after = 0;
 static float last_delta = 0;
