@@ -14,6 +14,11 @@ assets {
   yard_tex_screen { TexturePath: {path: "etc/scenes/shipyard/assets/screen.svg", width: 512} }
   yard_tex_hazard { TexturePath: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
   yard_tex_plume_core { TexturePath: {path: "etc/scenes/shipyard/assets/plume_core.png"} }
+  yard_tex_windows { TexturePath: {path: "etc/scenes/shipyard/assets/windows.png"} }
+  yard_tex_windows_albedo { TexturePath: {path: "etc/scenes/shipyard/assets/windows_albedo.png"} }
+  yard_tex_containers { TexturePath: {path: "etc/scenes/shipyard/assets/containers.jpg"} }
+  yard_tex_heat_fins { TexturePath: {path: "etc/scenes/shipyard/assets/heat_fins.png"} }
+  yard_tex_dots { TexturePath: {path: "etc/scenes/shipyard/assets/dots.png"} }
 
   prefab ShipHull { Rgb: {222, 226, 232}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingWorld, size: 7, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
   prefab ShipHullDark { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingWorld, size: 5, blend: 0.3} }
@@ -102,7 +107,31 @@ assets {
 
   prefab ShipWarning { Rgb: {255, 70, 50}; Emissive: {strength: 3, color: {255, 50, 30}}; Animator: {clip: yard_pulse} }
 
+  prefab ShipHullFine { Rgb: {236, 240, 246}; PbrMaterial: {metallic: 0.45, roughness: 0.45}; PbrTextures: {normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingWorld, size: 1.6, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
+  prefab ShipHullDarkFine { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingWorld, size: 0.8, blend: 0.3} }
+  prefab ShipCabins { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.5, roughness: 0.1}; Emissive: {strength: 3.5, color: {255, 255, 255}}; PbrTextures: {albedo: yard_tex_windows_albedo, emissive: yard_tex_windows}; TextureMapping: {MappingObject, size: 1} }
+  prefab ShipContainers { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.45, roughness: 0.6}; PbrTextures: {albedo: yard_tex_containers}; TextureMapping: {MappingObject, size: 1.1} }
+  prefab ShipHeatFin { Rgb: {58, 62, 70}; PbrMaterial: {metallic: 0.8, roughness: 0.35}; Emissive: {strength: 2.2, color: {255, 255, 255}}; PbrTextures: {emissive: yard_tex_heat_fins}; TextureMapping: {MappingObject, size: 1} }
+  prefab ShipRunLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {255, 196, 120}}; PbrTextures: {emissive: yard_tex_dots}; TextureMapping: {MappingObject, size: 0.5} }
+  prefab ShipRunLightsCyan { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {90, 214, 255}}; PbrTextures: {emissive: yard_tex_dots}; TextureMapping: {MappingObject, size: 0.5} }
+  prefab ShipTeak { Rgb: {150, 106, 70}; PbrMaterial: {roughness: 0.7} }
+  prefab ShipCourt { Rgb: {52, 120, 96}; PbrMaterial: {roughness: 0.8} }
+  prefab ShipField { Rgb: {90, 200, 255}; Emissive: {strength: 0.6, color: {80, 190, 255}}; Opacity: {0.05}; BlendMode: Additive; NoShadow }
+
+  prefab yard_jump_pulse {
+    AnimationClip: {duration: 2.2}
+    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 3}, {0.4, 12}, {0.8, 4}, {2.2, 3}]}} }
+  }
+  prefab ShipJump { Rgb: {170, 250, 255}; Emissive: {strength: 6, color: {110, 236, 255}}; Animator: {clip: yard_jump_pulse} }
+  prefab ShipJumpField { Rgb: {90, 220, 255}; Emissive: {strength: 1.6, color: {90, 220, 255}}; Opacity: {0.1}; BlendMode: Additive; NoShadow; Animator: {clip: yard_jump_pulse} }
+
+  prefab yard_gantry_travel {
+    AnimationClip: {duration: 9}
+    z { AnimationTrack: {component: box.transform.Position, member: "z", curve: {keys: [{0, -1.4}, {9, 1.4}]}} }
+  }
+
   prefab YardDeck { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; TextureMapping: {MappingWorld, size: 4} }
+  prefab YardDeckFine { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; TextureMapping: {MappingWorld, size: 0.6} }
   prefab YardGirder { Rgb: {64, 70, 80}; PbrMaterial: {metallic: 0.85, roughness: 0.45} }
   prefab YardHolo { Rgb: {70, 200, 255}; Emissive: {strength: 1.6, color: {60, 190, 255}} }
 }
