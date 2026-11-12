@@ -1046,8 +1046,12 @@ typedef struct box_render_reflect_batch_t {
 /** Height of the transmittance LUT of an atmosphere in texels */
 #define BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT (64)
 
-/** Edge of the multi scattering LUT of an atmosphere in texels */
-#define BOX_RENDER_ATMOS_MULTI_SIZE (32)
+/** Width of the multi scattering LUT of an atmosphere in texels, over the cosine of the sun.
+ * Finer than its height so the bilinear kinks do not band the twilight of planet shells */
+#define BOX_RENDER_ATMOS_MULTI_WIDTH (128)
+
+/** Height of the multi scattering LUT of an atmosphere in texels, over the altitude */
+#define BOX_RENDER_ATMOS_MULTI_HEIGHT (32)
 
 /** Width of the sky view LUT of a view in texels */
 #define BOX_RENDER_ATMOS_SKY_WIDTH (192)

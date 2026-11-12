@@ -1319,6 +1319,7 @@
                     "two_planets_independent",
                     "camera_inside",
                     "backlit_ring",
+                    "terminator_smooth",
                     "draws_per_planet"
                 ]
             },

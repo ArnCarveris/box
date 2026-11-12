@@ -4,7 +4,8 @@
 // it, before its fog volumes, particles and blended draws.
 //
 // A pixel marches from where its ray enters the top sphere, or from the camera inside it, to
-// where it leaves it, hits the ground sphere or the scene depth, whichever is first, with the
+// where it leaves it, hits the ground sphere or the scene depth, whichever is first, with steps
+// packed around the lowest point of the ray and jittered per pixel against banding, and the
 // transmittance and multi scattering LUTs of the planet (atmosphere.wgsl). The target is
 // multiplied by the mean transmittance and gets the in scattered light added.
 //
@@ -12,11 +13,15 @@
 #include "include/atmosphere_common.wgsl"
 
 // Steps of a march along the longest chord of the shell, the one that grazes the ground
-const SHELL_STEPS: i32 = 32;
+const SHELL_STEPS: f32 = 32.0;
 
 // Fewest steps of a march; shorter rays, such as those that look down on the ground, take
-// fewer steps in proportion to their length
-const SHELL_MIN_STEPS: i32 = 8;
+// fewer steps in proportion to their length, a fractional count so it changes smoothly
+const SHELL_MIN_STEPS: f32 = 12.0;
+
+// How much the steps of a march are packed around the lowest point of the ray (0 even, 1
+// quadratic), where the medium is densest
+const SHELL_SPREAD: f32 = 0.75;
 
 struct Planet {
     // bottom radius, top radius, Rayleigh scale height, Mie scale height in km
@@ -79,6 +84,13 @@ fn vs(@builtin(vertex_index) vertex: u32) -> @builtin(position) vec4f {
     return clip;
 }
 
+// Noise in [0, 1) that differs between neighboring pixels (Jimenez 2014), offset from the
+// dither of the tonemapper so the two do not line up.
+fn interleaved_gradient_noise(p: vec2f) -> f32 {
+    let q = p + vec2f(5.588238);
+    return fract(52.9829189 * fract(0.06711056 * q.x + 0.00583715 * q.y));
+}
+
 // World position of a uv of the image at a clip depth.
 fn world_at(uv: vec2f, depth: f32) -> vec3f {
     let h = u.inv_view_proj * vec4f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
@@ -121,9 +133,10 @@ fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     let rt = top_radius();
     let rb = bottom_radius();
     let chord = 2.0 * sqrt(max(rt * rt - rb * rb, 1e-6));
-    let steps = clamp(i32(ceil(f32(SHELL_STEPS) * (seg.y - seg.x) / chord)), SHELL_MIN_STEPS,
-        SHELL_STEPS);
-    let s = scatter_ray(ro, rd, max_t, steps, 1.0, true, u.sun.xyz, u.sun_color.rgb, u.sun.w);
+    let steps = clamp(SHELL_STEPS * (seg.y - seg.x) / chord, SHELL_MIN_STEPS, SHELL_STEPS);
+    let jitter = interleaved_gradient_noise(floor(pos.xy));
+    let s = scatter_shell(ro, rd, max_t, steps, SHELL_SPREAD, jitter, u.sun.xyz,
+        u.sun_color.rgb, u.sun.w);
     let light = s.light * u.sun_color.w;
     let t = clamp((s.throughput.x + s.throughput.y + s.throughput.z) / 3.0, 0.0, 1.0);
     if (any(light != light) || t != t) {

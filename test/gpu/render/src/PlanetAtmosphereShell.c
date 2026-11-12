@@ -2,8 +2,8 @@
  * @file PlanetAtmosphereShell.c
  * @brief Tests for the atmosphere shells of PlanetAtmosphere: the limb glow of the day side, the
  * dark night side, the haze over the surface, nothing outside the top sphere or without
- * scattering, geometry in front of a planet, two planets with different media and a camera
- * inside the atmosphere; checked on PNG captures.
+ * scattering, geometry in front of a planet, two planets with different media, a camera
+ * inside the atmosphere and a smooth twilight past the terminator; checked on PNG captures.
  *
  * The planets have a ground radius of 1 world unit, 300 km, and a 60 km atmosphere, so the top
  * sphere is 1.2 units; the camera looks down -Z with a 60 degree field of view over a black
@@ -588,6 +588,40 @@ void PlanetAtmosphereShell_backlit_ring(void) {
     test_assert(r[0] + r[1] + r[2] > 30);
     test_assert(t[0] + t[1] + t[2] > 30);
     test_assert(c[0] + c[1] + c[2] < r[0] + r[1] + r[2]);
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+/** A planet lit from the side fades smoothly from the terminator into the night: along the
+ * row through its center the night side of the disk does not brighten again toward the limb,
+ * as it does with stripes of the twilight glow parallel to the terminator. */
+void PlanetAtmosphereShell_terminator_smooth(void) {
+    // planet_atmosphere/shell
+    int32_t edge[2], x, center = PA_SIZE / 2, bumps = 0;
+    ecs_world_t *world = pa_world(0, -90);
+    pa_view(world, 3, 0);
+    pa_atmosphere(world, pa_planet(world, 0, 0));
+    unsigned char *px = pa_render(world, "planet_terminator.png");
+    pa_limb(3, 0, 0, -1, 0, 1.0f, edge);
+    int32_t last = center - (center - edge[0]) * 7 / 10;
+    const unsigned char *lit = pa_px(px, center + (center - edge[0]) / 2, center);
+    const unsigned char *night = pa_px(px, last, center);
+    pa_print("day", lit);
+    pa_print("night", night);
+    test_assert(lit[0] + lit[1] + lit[2] > night[0] + night[1] + night[2]);
+    int32_t low = 0;
+    for (x = center; x >= last; x --) {
+        const unsigned char *p = pa_px(px, x, center);
+        int32_t sum = p[0] + p[1] + p[2];
+        if (x != center && sum > low + 6) {
+            printf("bump at %d: %d after %d\n", x, sum, low);
+            bumps ++;
+        }
+
+        low = x == center || sum < low ? sum : low;
+    }
+
+    test_int(bumps, 0);
     stbi_image_free(px);
     ecs_fini(world);
 }
