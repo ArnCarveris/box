@@ -1,25 +1,292 @@
-// The editor of box, the script module box.editor. box.editor loads it when the editor first
-// opens and loads it again when the file changes on disk.
-//
-// C creates the scene of the editor (editor.ui), its camera and view, and the panel
-// (editor.ui.screen.panel), which it docks to Editor.side at Editor.width of the surface and
-// makes an instance of EditorPanel. Everything the panel shows is defined here, from the
-// widgets and theme of box.widgets.
-//
-// The panel is a title bar over a body that the editor widgets fill; the body clips what does
-// not fit. The panel is an InputBlocker, so the pointer over it never reaches the game.
-
 module box.editor
 
 using flecs.script
 using box.ui
+using box.input
+using box.picking
 using box.layout
 using box.geometry
 using box.material
 using box.text
+using box.transform
+using box.transition
 using box.widgets
 
-// The editor panel: a title bar and an empty body, in the colors of the theme
+template TreeIconButton : HeadlessButton {
+  prop icon: string = "add"
+  prop size: f32 = 20
+
+  const t = box.ui.theme[UiTheme]
+  const ring = focused && FocusStatus[FocusStatus].visible
+  const s = size * 0.7
+  const ink = hover || down ? (icon == "delete" ? t.danger : t.text) : t.text_muted
+
+  Layout: {}
+  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  if hover || down || ring {
+    Rect: {1, 1}
+    Rgb: down ? t.pressed : t.surface
+  }
+  Border: {
+    width: ring ? t.focus_width : 0,
+    radius: t.radius,
+    color: {t.focus.r, t.focus.g, t.focus.b, 255}
+  }
+
+  if icon == "delete" {
+    lid {
+      Position: {0, 0, 0}
+      Line: {-s * 0.45, s * 0.3, s * 0.45, s * 0.3, 1.25}
+      Rgb: ink
+    }
+    handle {
+      Position: {0, 0, 0}
+      Line: {-s * 0.15, s * 0.45, s * 0.15, s * 0.45, 1.25}
+      Rgb: ink
+    }
+    left {
+      Position: {0, 0, 0}
+      Line: {-s * 0.32, s * 0.3, -s * 0.26, -s * 0.45, 1.25}
+      Rgb: ink
+    }
+    right {
+      Position: {0, 0, 0}
+      Line: {s * 0.32, s * 0.3, s * 0.26, -s * 0.45, 1.25}
+      Rgb: ink
+    }
+    bottom {
+      Position: {0, 0, 0}
+      Line: {-s * 0.26, -s * 0.45, s * 0.26, -s * 0.45, 1.25}
+      Rgb: ink
+    }
+    stripe_left {
+      Position: {0, 0, 0}
+      Line: {-s * 0.09, s * 0.15, -s * 0.09, -s * 0.3, 1}
+      Rgb: ink
+    }
+    stripe_right {
+      Position: {0, 0, 0}
+      Line: {s * 0.09, s * 0.15, s * 0.09, -s * 0.3, 1}
+      Rgb: ink
+    }
+  } else {
+    horizontal {
+      Position: {0, 0, 0}
+      Line: {-s * 0.4, 0, s * 0.4, 0, 1.25}
+      Rgb: ink
+    }
+    vertical {
+      Position: {0, 0, 0}
+      Line: {0, -s * 0.4, 0, s * 0.4, 1.25}
+      Rgb: ink
+    }
+  }
+}
+
+template TreeAddButton : HeadlessButton {
+  prop label: string = "New entity"
+
+  const t = box.ui.theme[UiTheme]
+  const ring = focused && FocusStatus[FocusStatus].visible
+  const ink = hover || down ? t.text : t.text_muted
+  const arm = t.font_size * 0.4
+
+  Layout: {direction: Row, spacing: t.spacing, padding: {0, 0, t.padding, t.padding}, v: Middle}
+  LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height}}
+  if hover || down || ring {
+    Rect: {1, 1}
+    Rgb: down ? t.pressed : t.hover
+  }
+  Border: {
+    width: ring ? t.focus_width : 0,
+    radius: t.radius,
+    color: {t.focus.r, t.focus.g, t.focus.b, 255}
+  }
+
+  plus {
+    Layout: {}
+    LayoutItem: {width: {mode: Fixed, value: arm * 2}, height: {mode: Fixed, value: arm * 2}}
+
+    horizontal {
+      Position: {0, 0, 0}
+      Line: {-arm, 0, arm, 0, 1.25}
+      Rgb: ink
+    }
+    vertical {
+      Position: {0, 0, 0}
+      Line: {0, -arm, 0, arm, 1.25}
+      Rgb: ink
+    }
+  }
+
+  caption {
+    Text: {value: label, size: t.font_size}
+    Rgb: ink
+  }
+}
+
+template EntityTreeNode {
+  prop entity: entity = 0
+  prop label: string = ""
+  prop depth: i32 = 0
+  prop indent: f32 = 16
+
+  mut open = false
+  mut hover = false
+
+  const t = box.ui.theme[UiTheme]
+  const chevron = 10
+  const inset = t.padding / 2 + depth * indent
+
+  query kids {
+    (flecs.core.ChildOf, $entity), ?flecs.core.Prefab, ?(flecs.core.Identifier, flecs.core.Name)
+  }
+
+  Layout: {direction: Column}
+  LayoutItem: {width: {mode: Grow}}
+
+  head {
+    Interactive
+    Cursor: {CursorPointer}
+    Layout: {direction: Row, spacing: t.spacing / 2, padding: {0, 0, inset, t.padding / 2}, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height}}
+    if hover {
+      Rect: {1, 1}
+      Rgb: t.hover
+      Border: {width: 0, radius: t.radius}
+    }
+
+    if kids {
+      Chevron toggle(direction: open ? "down" : "right", size: chevron, color: t.text_muted)
+    } else {
+      leaf {
+        LayoutItem: {width: {mode: Fixed, value: chevron}, height: {mode: Fixed, value: chevron}}
+      }
+    }
+
+    caption {
+      Text: {value: label, size: t.font_size}
+      Rgb: t.text
+    }
+
+    gap {
+      LayoutItem: {width: {mode: Grow}}
+    }
+
+    if hover {
+      TreeIconButton add(icon: "add", label: "Add child")
+      TreeIconButton remove(icon: "delete", label: "Delete")
+    }
+  }
+
+  if open && kids {
+    children {
+      Layout: {}
+      LayoutItem: {width: {mode: Grow}}
+
+      guide {
+        LayoutItem: {
+          h: Left, v: Top, x: inset + chevron / 2,
+          width: {mode: Fixed, value: 1}, height: {mode: Grow}
+        }
+        Rect: {1, 1}
+        Rgb: t.border
+      }
+
+      list {
+        Layout: {direction: Column}
+        LayoutItem: {h: Left, v: Top, width: {mode: Grow}}
+
+        for (e, n) in kids {
+          const name = e.name()
+          if name != "" {
+            "n_{name}" {
+              EntityTreeNode: {entity: e, label: name, depth: depth + 1, indent: indent}
+            }
+          } else {
+            "a_{e}" {
+              EntityTreeNode: {entity: e, label: "{e}", depth: depth + 1, indent: indent}
+            }
+          }
+        }
+      }
+    }
+  }
+
+  async {
+    while true {
+      await on.enter(head)
+      hover = true
+      await on.leave(head)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.activate(head)
+      if ui.activation(e) == head {
+        open = !open
+      }
+    }
+  }
+
+  async {
+    while true {
+      const e = await on.change(head)
+      const w = e.widget.name()
+      if w == "remove" {
+        flecs.script.shell.commands.core.rm(entity)
+      } else if w == "add" {
+        const child = new {}
+        flecs.script.shell.commands.core.add(
+          child, flecs.script.core.pair(flecs.core.ChildOf, entity))
+        open = true
+      }
+    }
+  }
+}
+
+template EntityTree {
+  prop indent: f32 = 16
+
+  const t = box.ui.theme[UiTheme]
+
+  query roots {
+    !(flecs.core.ChildOf, *), ?flecs.core.Prefab, ?(flecs.core.Identifier, flecs.core.Name)
+  }
+
+  Layout: {direction: Column}
+  LayoutItem: {width: {mode: Grow}}
+
+  nodes {
+    Layout: {direction: Column}
+    LayoutItem: {width: {mode: Grow}}
+
+    for (e, n) in roots {
+      const name = e.name()
+      if name != "" {
+        "n_{name}" {
+          EntityTreeNode: {entity: e, label: name, indent: indent}
+        }
+      } else {
+        "a_{e}" {
+          EntityTreeNode: {entity: e, label: "{e}", indent: indent}
+        }
+      }
+    }
+  }
+
+  TreeAddButton new_entity(label: "New entity")
+
+  async {
+    while true {
+      await on.change(new_entity)
+      const e = new {}
+    }
+  }
+}
+
 template EditorPanel {
   prop title: string = "Entities"
 
@@ -46,10 +313,7 @@ template EditorPanel {
     Separator: {}
   }
 
-  // Filled by the editor widgets
-  body {
-    Layout: {direction: Column, padding: {t.padding, t.padding, t.padding, t.padding}, spacing: t.spacing}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-    ClipChildren
+  ScrollView body {
+    EntityTree tree
   }
 }
