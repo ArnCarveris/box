@@ -1,0 +1,348 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.particle
+using box.light
+using box.camera
+using box.picking
+using box.input
+using box.transition
+using box.animation
+using box.curve
+using state
+using assets
+
+assets {
+  prefab IsleSkyCloud { Rgb: {250, 251, 255}; PbrMaterial: {roughness: 1} }
+  prefab IsleSkyWicker { Rgb: {170, 122, 70}; PbrMaterial: {roughness: 0.95} }
+  prefab IsleSkyWickerDark { Rgb: {116, 78, 44}; PbrMaterial: {roughness: 0.95} }
+  prefab IsleSkyBird { Rgb: {250, 250, 246}; PbrMaterial: {roughness: 0.8} }
+  prefab IsleSkyBirdDark { Rgb: {52, 56, 70}; PbrMaterial: {roughness: 0.8} }
+  const sky_grass_tex = match season { 0: isle_grass_spring; 1: isle_grass_summer; 2: isle_grass_autumn; _: isle_grass_winter }
+  prefab IsleSkyGrass { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: sky_grass_tex, normal: isle_grass_n}; TextureMapping: {mode: MappingObject, size: 9} }
+  prefab IsleSkyRock { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; TextureMapping: {mode: MappingObject, size: 7, blend: 0.3} }
+
+  isle_sky_bob {
+    AnimationClip: {duration: 7}
+    y { AnimationTrack: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.75, 0.45}, {3.5, 0}, {5.25, -0.45}, {7, 0}]}} }
+  }
+  isle_sky_flap_l {
+    AnimationClip: {duration: 0.42}
+    z { AnimationTrack: {component: Rotation, member: "z", curve: {keys: [{0, 0.55}, {0.42, -0.5}]}} }
+  }
+  isle_sky_flap_r {
+    AnimationClip: {duration: 0.42}
+    z { AnimationTrack: {component: Rotation, member: "z", curve: {keys: [{0, -0.55}, {0.42, 0.5}]}} }
+  }
+
+  template IsleBalloon {
+    prop idx: i32 = 0
+    prop lit = false
+    prop cam = false
+    prop orbit_r: f32 = 40
+    prop orbit_h: f32 = 12
+    mut firing = false
+    mut up = false
+    const k = idx % 4
+    const col_a: Rgb = match k { 0: {214, 70, 58}; 1: {66, 120, 200}; 2: {244, 200, 80}; _: {44, 140, 140} }
+    const col_b: Rgb = match k { 0: {244, 240, 230}; 1: {244, 200, 80}; 2: {214, 70, 58}; _: {244, 240, 230} }
+    const gores = 10
+    const cy = 5.3
+    const glow_s = firing ? (night ? 0.55 : 1.0) : lit && night ? 0.2 : 0.0
+
+    Interactive
+    Cursor: {CursorPointer}
+
+    craft {
+      Position: {0, up ? 2.2 : 0, 0}
+      Transition: [Position: {duration: 3, timing_function: EaseInOut}]
+      envelope {
+        Position: {0, cy, 0}
+        for i in 0..gores {
+          if i % 2 == 0 {
+            "gore_{i}" { Position: {0, 0, 0}; Rgb: col_a; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 230, 210}, roughness: 0.5}; Emissive: {strength: glow_s, color: col_a}; Transition: [Emissive: {duration: 0.3}]; EllipsoidShell: {radius: {2.3, 2.7, 2.3}, longitude_start: i * TAU / gores, longitude_end: (i + 1) * TAU / gores, latitude_start: 0 - 1.05, latitude_end: HALF_PI, segments: 5, rings: 14} }
+          } else {
+            "gore_{i}" { Position: {0, 0, 0}; Rgb: col_b; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 255, 255}, roughness: 0.5}; Emissive: {strength: glow_s, color: col_b}; Transition: [Emissive: {duration: 0.3}]; EllipsoidShell: {radius: {2.3, 2.7, 2.3}, longitude_start: i * TAU / gores, longitude_end: (i + 1) * TAU / gores, latitude_start: 0 - 1.05, latitude_end: HALF_PI, segments: 5, rings: 14} }
+          }
+        }
+        skirt { Rgb: col_a; PbrMaterial: {roughness: 0.9}; Emissive: {strength: glow_s, color: col_a}; Position: {0, -2.9, 0}; Frustum: {radius_bottom: 0.5, radius_top: 1.16, length: 1.14, segments: 20, smooth: true} }
+        band { Rgb: col_b; PbrMaterial: {roughness: 0.9}; Position: {0, -3.47, 0}; Cylinder: {radius: 0.53, length: 0.12, segments: 20, smooth: true} }
+        cap { Rgb: col_b; PbrMaterial: {roughness: 0.9}; Position: {0, 2.62, 0}; Scale: {1, 0.3, 1}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      }
+      basket : IsleSkyWicker { Position: {0, 0.36, 0}; Box: {0.95, 0.72, 0.95} }
+      rim : IsleSkyWickerDark { Position: {0, 0.74, 0}; Box: {1.05, 0.09, 1.05} }
+      foot : IsleSkyWickerDark { Position: {0, 0.03, 0}; Box: {1.02, 0.07, 1.02} }
+      for i in 0..4 {
+        const sx = i % 2 == 0 ? 0.44 : -0.44
+        const sz = i < 2 ? 0.44 : -0.44
+        "rope_{i}" : IsleRope { NoShadow; SpatialIgnore; Position: {sx, 1.3, sz}; Cylinder: {radius: 0.018, length: 1.1, segments: 5} }
+      }
+      burner : IsleSteel { Position: {0, 1.12, 0}; Cylinder: {radius: 0.14, length: 0.16, segments: 10} }
+      flame : IsleFire { NoShadow; Position: {0, 1.4, 0}; Cone: {radius: 0.11, length: 0.4, segments: 8} }
+      jet {
+        Position: {0, 1.26, 0}
+        ParticleEmitter: {max: 200, rate: firing ? 120 : 0, shape: EmitterDisc, radius: 0.07, direction: {0, 1, 0}, spread: 5, speed: {3.6, 5.2}, lifetime: {0.28, 0.44}, size: {0.4, 0.6}, opacity: {0.8, 1}, inherit_velocity: 1, color: {255, 180, 80}, color_variance: {0, 30, 20}, seed: 21 + idx}
+        ParticleAppearance: {blend: ParticleAdditive, stretch: 0.03}
+        ParticleCurves: {size: {keys: [{0, 0.6}, {0.4, 1.25}, {1, 0.4}]}, opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}, color: {keys: [{0, {255, 255, 255}}, {0.3, {255, 226, 160}}, {1, {255, 120, 50}}]}}
+        ParticleForces: {gravity: {0, 0, 0}}
+      }
+      if firing {
+        blast : IsleFire { NoShadow; SpatialIgnore; Position: {0, 2.0, 0}; Cone: {radius: 0.24, length: 1.6, segments: 8} }
+        blast_light { Position: {0, 2.6, 0}; PointLight: {intensity: night ? 9 : 40, range: 10}; Rgb: {255, 160, 80} }
+      } else if lit && night {
+        glow { Position: {0, 2.4, 0}; PointLight: {intensity: 5, range: 8}; Rgb: {255, 170, 90} }
+      }
+    }
+    if cam {
+      cam { Position: {-0.75, 1.1, 0}; Rotation: {-atan2(orbit_h - 2, orbit_r), HALF_PI, 0}; Camera: {fov: 55, near_: 0.1, far_: 800} }
+    }
+
+    async {
+      while true {
+        await on.click(this)
+        firing = true
+        await delay(1.2)
+        up = true
+        await delay(0.4)
+        firing = false
+        await delay(3.4)
+        up = false
+      }
+    }
+  }
+
+  template IsleBird {
+    SpatialIgnore
+    body : IsleSkyBird { Position: {0, 0, 0}; Scale: {0.6, 0.6, 1.5}; IcoSphere: {radius: 0.16, segments: 1, smooth: true} }
+    beak : IsleBrass { Position: {0, 0, -0.28}; Rotation: {-1.5708, 0, 0}; Cone: {radius: 0.04, length: 0.12, segments: 5} }
+    tail : IsleSkyBirdDark { Position: {0, 0.01, 0.28}; Box: {0.14, 0.02, 0.2} }
+    wl {
+      Position: {0.06, 0.03, 0}
+      Animator: {clip: isle_sky_flap_l, mode: AnimationPingPong}
+      { (IsA, IsleSkyBird); Position: {0.3, 0, 0.02}; Box: {0.6, 0.025, 0.26} }
+      { (IsA, IsleSkyBirdDark); Position: {0.7, 0, 0.06}; Rotation: {0, -0.35, 0}; Box: {0.3, 0.025, 0.18} }
+    }
+    wr {
+      Position: {-0.06, 0.03, 0}
+      Animator: {clip: isle_sky_flap_r, mode: AnimationPingPong}
+      { (IsA, IsleSkyBird); Position: {-0.3, 0, 0.02}; Box: {0.6, 0.025, 0.26} }
+      { (IsA, IsleSkyBirdDark); Position: {-0.7, 0, 0.06}; Rotation: {0, 0.35, 0}; Box: {0.3, 0.025, 0.18} }
+    }
+  }
+
+  template IsleFlock {
+    prop count: i32 = 5
+    prop radius: f32 = 34
+    prop speed: f32 = 0.22
+    orbit {
+      AngularVelocity: {0, speed, 0}
+      for i in 0..count {
+        const row = (i + 1) / 2
+        const side = i % 2 == 0 ? 1.0 : -1.0
+        IsleBird() { Position: {radius + row * side * 1.3, sin(i * 2.1) * 0.4, speed < 0 ? row * -1.5 : row * 1.5}; Rotation: {0, speed < 0 ? 3.1416 : 0.0, 0}; Scale: {1.5, 1.5, 1.5} }
+      }
+    }
+  }
+
+  template IsleIslet {
+    prop size: f32 = 3
+    prop seed: f32 = 0
+    prop kind: i32 = 0
+    const s = size
+    top : IsleSkyGrass { Position: {0, -0.12, 0}; Cylinder: {radius: s, length: 0.24, segments: 9} }
+    mound : IsleSkyGrass { Position: {0, 0, 0}; Scale: {1, 0.16, 1}; IcoSphere: {radius: s * 0.86, segments: 2, smooth: true} }
+    rock : IsleSkyRock { Position: {0, -0.24 - s * 0.75, 0}; Rotation: {3.1416, seed, 0}; Cone: {radius: s * 0.98, length: s * 1.5, segments: 9} }
+    for i in 0..4 {
+      const a = i * GOLDEN + seed
+      { (IsA, IsleSkyRock); Position: {sin(a) * s * 0.5, -0.5 - s * (0.3 + i * 0.12), cos(a) * s * 0.5}; Rotation: {rnd(i, seed), a, rnd(i, seed + 1)}; Scale: {1, 1.5, 1}; IcoSphere: {radius: s * (0.34 - i * 0.04), segments: 1} }
+    }
+    if kind == 0 {
+      trunk : IsleBark { Position: {s * 0.15, s * 0.42, 0}; Frustum: {radius_bottom: s * 0.07, radius_top: s * 0.04, length: s * 0.8, segments: 7} }
+      leaf0 : IsleLeaf { Position: {s * 0.15, s * 1.05, 0}; Scale: {1, 0.85, 1}; IcoSphere: {radius: s * 0.5, segments: 2, smooth: true} }
+      leaf1 : IsleLeafAlt { Position: {s * 0.52, s * 0.8, s * 0.2}; IcoSphere: {radius: s * 0.38, segments: 2, smooth: true} }
+      leaf2 : IsleLeafAlt { Position: {-s * 0.2, s * 0.78, -s * 0.24}; IcoSphere: {radius: s * 0.38, segments: 2, smooth: true} }
+      leaf3 : IsleLeaf { Position: {-s * 0.05, s * 0.74, s * 0.34}; IcoSphere: {radius: s * 0.34, segments: 2, smooth: true} }
+      bush : IsleLeafDark { Position: {-s * 0.5, s * 0.12, s * 0.3}; Scale: {1, 0.75, 1}; IcoSphere: {radius: s * 0.2, segments: 2, smooth: true} }
+    } else if kind == 1 {
+      for i in 0..4 {
+        const a = i * GOLDEN + seed
+        const lean = i == 0 ? 0.0 : 0.5
+        { (IsA, IsleNatureCrystalA); NoShadow; Position: {sin(a) * s * 0.2 * i * 0.6, s * 0.3, cos(a) * s * 0.2 * i * 0.6}; Rotation: {cos(a) * lean, 0, -sin(a) * lean}; Cone: {radius: s * (i == 0 ? 0.16 : 0.1), length: s * (i == 0 ? 0.9 : 0.55), segments: 5} }
+      }
+      stone : IsleSkyRock { Position: {-s * 0.45, s * 0.1, -s * 0.2}; Scale: {1, 0.7, 1.2}; IcoSphere: {radius: s * 0.2, segments: 1} }
+    } else {
+      for k in 0..3 {
+        { (IsA, IsleLeafDark); Position: {0, s * (0.5 + k * 0.32), 0}; Cone: {radius: s * (0.42 - k * 0.09), length: s * 0.62, segments: 8} }
+      }
+      trunk : IsleBark { Position: {0, s * 0.15, 0}; Cylinder: {radius: s * 0.06, length: s * 0.3, segments: 7} }
+      pink : IsleNatureCrystalPinkA { NoShadow; Position: {s * 0.5, s * 0.2, s * 0.2}; Rotation: {0.2, 0, -0.4}; Cone: {radius: s * 0.1, length: s * 0.6, segments: 5} }
+    }
+  }
+
+  template IsleCloud {
+    prop size: f32 = 4
+    prop seed: f32 = 0
+    SpatialIgnore
+    for i in 0..5 {
+      const a = i * GOLDEN + seed
+      const r = i == 0 ? 0.0 : size * (0.55 + rnd(i, seed) * 0.35)
+      const s = size * (i == 0 ? 0.62 : 0.34 + rnd(i, seed + 1) * 0.2)
+      { (IsA, IsleSkyCloud); NoShadow; Position: {sin(a) * r * 1.3, s * 0.3 - size * 0.1, cos(a) * r * 0.7}; Scale: {1.15, 0.72, 1}; IcoSphere: {radius: s, segments: 2, smooth: true} }
+    }
+  }
+
+  template IsleSkyClouds {
+    inner {
+      AngularVelocity: {0, 0.004 + wind * 0.03, 0}
+      for i in 0..7 {
+        const a = i * TAU / 7 + rnd(i, 71) * 0.5
+        const r = 42 + rnd(i, 72) * 14
+        IsleCloud(size: 3 + rnd(i, 73) * 2.5, seed: i) { Position: {px(r, a), -20 + rnd(i, 74) * 24, pz(r, a)}; Rotation: {0, -a + HALF_PI, 0} }
+      }
+    }
+    outer {
+      AngularVelocity: {0, -0.003 - wind * 0.02, 0}
+      for i in 0..6 {
+        const a = i * TAU / 6 + rnd(i, 75) * 0.6
+        const r = 60 + rnd(i, 76) * 12
+        IsleCloud(size: 4.5 + rnd(i, 77) * 3.5, seed: i + 20) { Position: {px(r, a), -16 + rnd(i, 78) * 26, pz(r, a)}; Rotation: {0, -a + HALF_PI, 0} }
+      }
+    }
+  }
+
+  prefab IsleSkyBurstGold {
+    sparks {
+      ParticleEmitter: {max: 500, rate: 0, shape: EmitterPoint, spread: 180, speed: {6, 10}, lifetime: {1.6, 2.4}, size: {0.3, 0.55}, opacity: {1, 1}, color: {255, 200, 90}, color_variance: {0, 40, 40}, seed: 1}
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.04}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.6, 0.9}, {1, 0}]}, size: {keys: [{0, 1}, {1, 0.3}]}}
+      ParticleForces: {gravity: {0, -2.2, 0}, drag: 1.3}
+      ParticleBurst: {count: 320}
+    }
+    core {
+      ParticleEmitter: {max: 120, rate: 0, shape: EmitterSphere, radius: 0.3, spread: 180, speed: {1, 3}, lifetime: {0.4, 0.8}, size: {0.8, 1.6}, opacity: {0.8, 1}, color: {255, 250, 230}, seed: 2}
+      ParticleAppearance: {blend: ParticleAdditive}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {1, 0}]}}
+      ParticleBurst: {count: 60}
+    }
+    light { PointLight: {intensity: 30, range: 70}; Rgb: {255, 200, 120}; EffectFlash: {intensity: 260, seconds: 0.7} }
+  }
+  prefab IsleSkyBurstPink {
+    sparks {
+      ParticleEmitter: {max: 500, rate: 0, shape: EmitterPoint, spread: 180, speed: {7, 9}, lifetime: {1.6, 2.4}, size: {0.3, 0.55}, opacity: {1, 1}, color: {255, 90, 190}, color_variance: {0, 50, 50}, seed: 3}
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.04}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.6, 0.9}, {1, 0}]}, size: {keys: [{0, 1}, {1, 0.3}]}}
+      ParticleForces: {gravity: {0, -2.2, 0}, drag: 1.3}
+      ParticleBurst: {count: 320}
+    }
+    glitter {
+      ParticleEmitter: {max: 300, rate: 0, shape: EmitterSphere, radius: 3.5, spread: 180, speed: {0.3, 1}, lifetime: {0.8, 1.6}, size: {0.16, 0.3}, opacity: {1, 1}, color: {255, 240, 250}, seed: 4}
+      ParticleAppearance: {blend: ParticleAdditive}
+      ParticleCurves: {opacity: {keys: [{0, 0}, {0.2, 1}, {0.5, 0.2}, {0.7, 1}, {1, 0}]}}
+      ParticleForces: {gravity: {0, -1.5, 0}, drag: 1}
+      ParticleBurst: {count: 200, at: 0.5}
+    }
+    light { PointLight: {intensity: 30, range: 70}; Rgb: {255, 120, 200}; EffectFlash: {intensity: 260, seconds: 0.7} }
+  }
+  prefab IsleSkyBurstCyan {
+    sparks {
+      ParticleEmitter: {max: 500, rate: 0, shape: EmitterSphere, radius: 0.2, spread: 180, speed: {8, 8.6}, lifetime: {1.5, 2.2}, size: {0.3, 0.5}, opacity: {1, 1}, color: {80, 220, 255}, color_variance: {40, 30, 0}, seed: 5}
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.04}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.6, 0.9}, {1, 0}]}, size: {keys: [{0, 1}, {1, 0.3}]}}
+      ParticleForces: {gravity: {0, -2.2, 0}, drag: 1.3}
+      ParticleBurst: {count: 300}
+    }
+    inner {
+      ParticleEmitter: {max: 300, rate: 0, shape: EmitterPoint, spread: 180, speed: {3, 4.4}, lifetime: {1.2, 1.8}, size: {0.25, 0.4}, opacity: {1, 1}, color: {255, 255, 255}, seed: 6}
+      ParticleAppearance: {blend: ParticleAdditive}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.6, 0.9}, {1, 0}]}}
+      ParticleForces: {gravity: {0, -2.2, 0}, drag: 1.3}
+      ParticleBurst: {count: 160}
+    }
+    light { PointLight: {intensity: 30, range: 70}; Rgb: {120, 220, 255}; EffectFlash: {intensity: 260, seconds: 0.7} }
+  }
+  prefab IsleSkyBurstGreen {
+    sparks {
+      ParticleEmitter: {max: 500, rate: 0, shape: EmitterPoint, spread: 180, speed: {5, 11}, lifetime: {1.8, 2.6}, size: {0.3, 0.5}, opacity: {1, 1}, color: {120, 255, 110}, color_variance: {60, 0, 60}, seed: 7}
+      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.05}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.6, 0.9}, {1, 0}]}, size: {keys: [{0, 1}, {1, 0.3}]}, color: {keys: [{0, {255, 255, 255}}, {0.5, {255, 255, 255}}, {1, {255, 160, 80}}]}}
+      ParticleForces: {gravity: {0, -3, 0}, drag: 1.1}
+      ParticleBurst: {count: 320}
+    }
+    light { PointLight: {intensity: 30, range: 70}; Rgb: {150, 255, 140}; EffectFlash: {intensity: 260, seconds: 0.7} }
+  }
+
+  template IsleSkyFireworks {
+    mut shows = 0
+    async {
+      while true {
+        await Fireworks
+        shows = shows + 1
+        for k in 0..8 {
+          const a = rnd(k, shows) * TAU
+          const r = rnd(k, shows + 3) * 15
+          const y = 25 + rnd(k, shows + 5) * 15
+          const kind = (k + shows) % 4
+          if kind == 0 {
+            const b = box.particle.burst_at(IsleSkyBurstGold, {px(r, a), y, pz(r, a)}, 1)
+          } else if kind == 1 {
+            const b = box.particle.burst_at(IsleSkyBurstPink, {px(r, a), y, pz(r, a)}, 1)
+          } else if kind == 2 {
+            const b = box.particle.burst_at(IsleSkyBurstCyan, {px(r, a), y, pz(r, a)}, 1)
+          } else {
+            const b = box.particle.burst_at(IsleSkyBurstGreen, {px(r, a), y, pz(r, a)}, 1)
+          }
+          await delay(0.28 + rnd(k, shows + 9) * 0.24)
+        }
+      }
+    }
+  }
+
+  template IsleSkyBirds {
+    if !night {
+      flock_0 { Position: {0, 15, 0}; Rotation: {0.14, 0, 0.08}; IsleFlock birds(count: 5, radius: 33, speed: 0.2) }
+      flock_1 { Position: {4, 21, -6}; Rotation: {-0.1, 2, 0.12}; IsleFlock birds(count: 7, radius: 22, speed: -0.26) }
+    }
+  }
+
+  template IsleSkyLife {
+    for i in 0..balloons {
+      const r = match i { 0: 44.0; 1: 52.0; 2: 38.0; 3: 57.0; 4: 49.0; 5: 62.0; 6: 67.0; _: 36.0 }
+      const h = match i { 0: 22.0; 1: 15.0; 2: 11.0; 3: 24.0; 4: 27.0; 5: 17.0; 6: 26.0; _: 30.0 }
+      const a = match i { 0: 2.75; 1: 5.6; 2: 4.4; 3: 0.3; 4: 2.4; 5: 3.0; 6: 5.1; _: 0.9 }
+      const w = (0.022 + frac(i * 0.27) * 0.03) * (i % 2 == 0 ? 1.0 : -1.0)
+      "balloon_{i}" {
+        Position: {0, h, 0}
+        AngularVelocity: {0, w, 0}
+        IsleBalloon rig(idx: i, lit: i < 3, cam: i == 0, orbit_r: r, orbit_h: h) { Position: {px(r, a), 0, pz(r, a)}; Rotation: {0, -a, 0}; Animator: {clip: isle_sky_bob, time: i * 1.7} }
+      }
+    }
+    IsleSkyBirds birds()
+    islets {
+      islet_0 { Position: {px(36.6, 1.25), -0.9, pz(36.6, 1.25)}; IsleIslet body(size: 3.2, seed: 1, kind: 0) }
+      islet_1 { Position: {px(46, 0.15), 8, pz(46, 0.15)}; IsleIslet body(size: 2.6, seed: 2, kind: 1) { Animator: {clip: isle_sky_bob, speed: 0.5} } }
+      islet_2 { Position: {px(50, 4.1), -5, pz(50, 4.1)}; IsleIslet body(size: 3.6, seed: 3, kind: 2) { Animator: {clip: isle_sky_bob, speed: 0.4, time: 2} } }
+      islet_3 { Position: {px(42, 5.5), 6, pz(42, 5.5)}; IsleIslet body(size: 2.2, seed: 4, kind: 0) { Animator: {clip: isle_sky_bob, speed: 0.6, time: 4} } }
+      islet_4 { Position: {px(41, 2.75), 3, pz(41, 2.75)}; IsleIslet body(size: 2.4, seed: 5, kind: 1) { Animator: {clip: isle_sky_bob, speed: 0.45, time: 5} } }
+      bridge {
+        Position: {px(31.8, 1.25), -0.55, pz(31.8, 1.25)}
+        Rotation: {0, -1.25, 0}
+        for i in 0..8 {
+          const t = (i - 3.5) / 3.5
+          { (IsA, IsleWood); Position: {(i - 3.5) * 0.46, -0.3 + t * t * 0.3 - t * 0.12, 0}; Rotation: {0, 0, t * 0.17 - 0.05}; Box: {0.36, 0.05, 0.9} }
+        }
+        for i in 0..2 {
+          const z = i == 0 ? 0.42 : -0.42
+          { (IsA, IsleRope); NoShadow; Position: {0, 0.42, z}; Rotation: {0, 0, 1.5708 - 0.07}; Cylinder: {radius: 0.02, length: 3.9, segments: 5} }
+          { (IsA, IsleWoodDark); Position: {-1.85, 0.2, z}; Cylinder: {radius: 0.05, length: 0.75, segments: 6} }
+          { (IsA, IsleWoodDark); Position: {1.85, -0.05, z}; Cylinder: {radius: 0.05, length: 0.75, segments: 6} }
+        }
+      }
+    }
+    IsleSkyClouds clouds()
+    IsleSkyFireworks fireworks()
+  }
+}

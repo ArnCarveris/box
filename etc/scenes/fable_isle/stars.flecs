@@ -1,0 +1,94 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.animation
+using box.curve
+using box.transition
+using state
+using assets
+
+assets {
+  prefab IsleStarWhite { Rgb: {255, 255, 255}; Emissive: {strength: 9, color: {235, 240, 255}}; NoShadow; SpatialIgnore }
+  prefab IsleStarWarm { Rgb: {255, 240, 210}; Emissive: {strength: 8, color: {255, 226, 180}}; NoShadow; SpatialIgnore }
+  prefab IsleStarBlue { Rgb: {200, 220, 255}; Emissive: {strength: 11, color: {170, 200, 255}}; NoShadow; SpatialIgnore }
+
+  prefab isle_twinkle {
+    AnimationClip: {duration: 3}
+    glow { AnimationTrack: {component: Scale, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
+    glow_y { AnimationTrack: {component: Scale, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
+    glow_z { AnimationTrack: {component: Scale, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
+  }
+
+  template IsleShootingStar {
+    prop seed: f32 = 1
+    prop pause: f32 = 6
+    mut phase: i32 = 0
+    mut n: i32 = 0
+
+    const az = rnd(n, seed) * TAU
+    const h = 330 + rnd(n, seed + 1) * 260
+    const r = 760
+    const run = 240 + rnd(n, seed + 2) * 160
+    const drop = 90 + rnd(n, seed + 3) * 70
+    const tx = 0 - sin(az)
+    const tz = cos(az)
+
+    if phase > 0 {
+      streak {
+        Position: {cos(az) * r + (phase == 2 ? tx * run : 0), h - (phase == 2 ? drop : 0), sin(az) * r + (phase == 2 ? tz * run : 0)}
+        Rotation: {0, 0 - az - HALF_PI, 0 - atan2(drop, run)}
+        Transition: [Position: {duration: 0.8, timing_function: EaseIn}]
+        head : IsleStarBlue { Position: {0, 0, 0}; IcoSphere: {radius: 2.2, segments: 1} }
+        tail : IsleStarWhite { Position: {-22, 0, 0}; Box: {44, 0.9, 0.9} }
+        wisp : IsleStarWhite { Position: {-58, 0, 0}; Box: {30, 0.4, 0.4} }
+      }
+    }
+
+    async {
+      while true {
+        await delay(pause * (0.5 + rnd(n, seed + 5)))
+        if night {
+          n += 1
+          phase = 1
+          await delay(0.05)
+          phase = 2
+          await delay(0.85)
+          phase = 0
+        }
+      }
+    }
+  }
+
+  template IsleStars {
+    prop count: i32 = 520
+    prop dist: f32 = 1500
+
+    IsleShootingStar meteor_a(seed: 1, pause: 7)
+    IsleShootingStar meteor_b(seed: 5, pause: 11)
+
+    if night {
+      dome {
+        Position: {0, 0, 0}
+        AngularVelocity: {0, 0.004, 0.001}
+        for i in 0..count {
+          const up = 0.985 - 1.12 * rnd(i, 3)
+          const flat = sqrt(1 - up * up)
+          const az = i * GOLDEN
+          const s = 1.5 + rnd(i, 7) * rnd(i, 9) * 3.2
+          const kind = i % 7
+          if kind == 0 {
+            "star_{i}" : IsleStarBlue { Position: {cos(az) * flat * dist, up * dist, sin(az) * flat * dist}; Scale: {1, 1, 1}; IcoSphere: {radius: s, segments: 1}; Animator: {clip: isle_twinkle, time: rnd(i, 5) * 3, speed: 0.6 + rnd(i, 11)} }
+          } else if kind == 3 {
+            "star_{i}" : IsleStarWarm { Position: {cos(az) * flat * dist, up * dist, sin(az) * flat * dist}; IcoSphere: {radius: s, segments: 1} }
+          } else {
+            "star_{i}" : IsleStarWhite { Position: {cos(az) * flat * dist, up * dist, sin(az) * flat * dist}; IcoSphere: {radius: s * 0.8, segments: 1} }
+          }
+        }
+      }
+    }
+  }
+}

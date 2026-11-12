@@ -1,0 +1,575 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.movement
+using box.particle
+using box.picking
+using box.input
+using box.text
+using box.spatial
+using state
+using assets
+
+assets {
+  const RAIL_V: f32 = 8.8
+  const RAIL_W: f32 = 0.4
+  const RAIL_PI: f32 = 3.14159265
+
+  prefab IsleRailBallast { Rgb: {146, 136, 124}; PbrMaterial: {roughness: 1} }
+  prefab IsleRailBallastLow { Rgb: {122, 112, 100}; PbrMaterial: {roughness: 1} }
+  prefab IsleRailSleeper { Rgb: {84, 60, 44}; PbrMaterial: {roughness: 0.9} }
+  prefab IsleRailCoal { Rgb: {16, 16, 19}; PbrMaterial: {roughness: 0.3} }
+  prefab IsleRailDark { Rgb: {3, 3, 5}; PbrMaterial: {roughness: 1} }
+  prefab IsleRailRoof { Rgb: {74, 78, 88}; PbrMaterial: {roughness: 0.55} }
+  prefab IsleRailGirder { Rgb: {150, 56, 42}; PbrMaterial: {metallic: 0.3, roughness: 0.5} }
+  prefab IsleRailPlank { Rgb: {150, 108, 70}; PbrMaterial: {roughness: 0.85} }
+  prefab IsleRailLens { Rgb: {30, 30, 34}; PbrMaterial: {roughness: 0.2} }
+  prefab IsleRailBright { Rgb: {206, 210, 218}; PbrMaterial: {metallic: 0.45, roughness: 0.32} }
+  prefab IsleRailFire { Rgb: {255, 150, 60}; Emissive: {strength: night ? 9 : 2.5, color: {255, 120, 40}} }
+
+  template IsleRailWheel {
+    prop r: f32 = 0.26
+    prop n: i32 = 2
+    prop side: f32 = 1
+
+    AngularVelocity: {train_speed * RAIL_V / r, 0, 0}
+    tyre : IsleSteel { Rotation: {0, 0, HALF_PI}; Tube: {radius: r, thickness: r * 0.2, length: 0.12, segments: 24, smooth: true} }
+    flange : IsleSteel { Position: {-side * 0.07, 0, 0}; Rotation: {0, 0, HALF_PI}; Tube: {radius: r + 0.04, thickness: r * 0.2, length: 0.03, segments: 24, smooth: true} }
+    hub : IslePaintRed { Position: {side * 0.01, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: r * 0.3, length: 0.14, segments: 12, smooth: true} }
+    for i in 0..n {
+      "spoke_{i}" : IslePaintRed { Rotation: {i * RAIL_PI / n, 0, 0}; Box: {0.07, r * 1.75, r * 0.2}; SpatialIgnore }
+    }
+  }
+
+  template IsleRailAxle {
+    prop r: f32 = 0.26
+    prop n: i32 = 2
+
+    IsleRailWheel left(r: r, n: n, side: 1) { Position: {0.6, 0, 0} }
+    IsleRailWheel right(r: r, n: n, side: -1) { Position: {-0.6, 0, 0} }
+    axle : IsleIron { Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.05, length: 1.2, segments: 8}; SpatialIgnore; NoShadow }
+  }
+
+  template IsleRailRod {
+    prop r: f32 = 0.44
+    prop len: f32 = 1
+
+    AngularVelocity: {train_speed * RAIL_V / r, 0, 0}
+    arm {
+      Position: {0, r * 0.45, 0}
+      AngularVelocity: {-train_speed * RAIL_V / r, 0, 0}
+      rod : IsleRailBright { Box: {0.05, 0.1, len + 0.24} }
+      pin_a : IsleBrass { Position: {0, 0, len / 2}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.06, length: 0.09, segments: 10} }
+      pin_b : IsleBrass { Position: {0, 0, -len / 2}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.06, length: 0.09, segments: 10} }
+    }
+  }
+
+  template IsleRailLoco {
+    mut blowing = false
+
+    Interactive
+    Cursor: {CursorPointer}
+
+    frame : IsleIron { Position: {0, 0.86, 0.1}; Box: {1.0, 0.24, 3.7} }
+    board : IsleIron { Position: {0, 1.0, 0.1}; Box: {1.6, 0.07, 3.75} }
+    valance_l : IslePaintRed { Position: {0.8, 0.94, 0.1}; Box: {0.04, 0.16, 3.75} }
+    valance_r : IslePaintRed { Position: {-0.8, 0.94, 0.1}; Box: {0.04, 0.16, 3.75} }
+    beam : IslePaintRed { Position: {0, 0.86, 1.99}; Box: {1.64, 0.34, 0.1} }
+    catcher : IslePaintRed { Position: {0, 0.6, 2.27}; Rotation: {0, -HALF_PI, 0}; RightTrianglePrism: {0.5, 0.5, 1.5} }
+    for i in 0..5 {
+      "slat_{i}" : IsleIron { Position: {-0.56 + i * 0.28, 0.61, 2.285}; Rotation: {-0.785, 0, 0}; Box: {0.06, 0.66, 0.03}; SpatialIgnore; NoShadow }
+    }
+    coupler : IsleIron { Position: {0, 0.8, -1.9}; Box: {0.12, 0.1, 0.4} }
+
+    boiler : IslePaintGreen { Position: {0, 1.6, 0.45}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.5, length: 2.0, segments: 32, smooth: true} }
+    saddle : IsleIron { Position: {0, 1.2, 1.72}; Box: {0.74, 0.5, 0.5} }
+    smokebox : IsleIron { Position: {0, 1.6, 1.72}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.53, length: 0.56, segments: 32, smooth: true} }
+    door : IsleIron { Position: {0, 1.6, 2.0}; Scale: {1, 1, 0.3}; Sphere: {radius: 0.44, segments: 24, smooth: true} }
+    door_ring : IsleBrass { Position: {0, 1.6, 2.01}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.46, tube: 0.025, segments: 32, rings: 6, smooth: true} }
+    door_wheel : IsleBrass { Position: {0, 1.6, 2.15}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.1, tube: 0.02, segments: 16, rings: 6, smooth: true} }
+    door_hub : IsleBrass { Position: {0, 1.6, 2.13}; Sphere: {radius: 0.04, segments: 10, smooth: true} }
+    for i in 0..3 {
+      "band_{i}" : IsleBrass { Position: {0, 1.6, -0.3 + i * 0.75}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.503, tube: 0.022, segments: 32, rings: 6, smooth: true}; SpatialIgnore }
+    }
+    rail_l : IsleBrass { Position: {0.53, 1.78, 0.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.018, length: 2.0, segments: 6}; SpatialIgnore }
+    rail_r : IsleBrass { Position: {-0.53, 1.78, 0.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.018, length: 2.0, segments: 6}; SpatialIgnore }
+
+    funnel_base : IsleIron { Position: {0, 2.14, 1.72}; Cylinder: {radius: 0.22, length: 0.1, segments: 20, smooth: true} }
+    funnel : IsleIron { Position: {0, 2.45, 1.72}; Frustum: {radius_bottom: 0.13, radius_top: 0.2, length: 0.62, segments: 20, smooth: true} }
+    funnel_cap : IsleBrass { Position: {0, 2.76, 1.72}; Torus: {radius: 0.2, tube: 0.035, segments: 20, rings: 8, smooth: true} }
+    dome_base : IsleBrass { Position: {0, 2.12, 0.8}; Cylinder: {radius: 0.24, length: 0.3, segments: 20, smooth: true} }
+    dome : IsleBrass { Position: {0, 2.27, 0.8}; Sphere: {radius: 0.24, segments: 20, smooth: true} }
+    sand_base : IslePaintGreen { Position: {0, 2.1, 0.1}; Cylinder: {radius: 0.18, length: 0.24, segments: 16, smooth: true} }
+    sand : IslePaintGreen { Position: {0, 2.22, 0.1}; Sphere: {radius: 0.18, segments: 16, smooth: true} }
+    sand_ring : IsleBrass { Position: {0, 2.22, 0.1}; Torus: {radius: 0.18, tube: 0.018, segments: 16, rings: 6, smooth: true} }
+    whistle : IsleBrass { Position: {0.2, 2.2, -0.3}; Cylinder: {radius: 0.035, length: 0.36, segments: 8, smooth: true} }
+    whistle_top : IsleBrass { Position: {0.2, 2.4, -0.3}; Sphere: {radius: 0.05, segments: 8, smooth: true} }
+    valve : IsleBrass { Position: {-0.2, 2.16, -0.3}; Cylinder: {radius: 0.05, length: 0.26, segments: 8, smooth: true} }
+
+    cab : IslePaintGreen { Position: {0, 1.7, -1.15}; Box: {1.5, 1.34, 1.2} }
+    cab_roof : IsleIron { Position: {0, 2.36, -1.15}; Rotation: {HALF_PI, 0, 0}; Scale: {1, 1, 0.24}; Cylinder: {radius: 0.9, length: 1.56, segments: 28, smooth: true} }
+    cab_line_l : IslePaintYellow { Position: {0.752, 1.24, -1.15}; Box: {0.012, 0.05, 1.2} }
+    cab_line_r : IslePaintYellow { Position: {-0.752, 1.24, -1.15}; Box: {0.012, 0.05, 1.2} }
+    win_frame : IsleBrass { Position: {0, 1.98, -1.15}; Box: {1.52, 0.6, 0.66} }
+    win : IsleWindow { Position: {0, 1.98, -1.15}; Box: {1.54, 0.5, 0.56} }
+    plate : IsleBrass { Position: {0, 1.46, -1.15}; Box: {1.52, 0.18, 0.44} }
+    spec_l : IsleWindow { Position: {0.5, 2.08, -0.545}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.15, length: 0.04, segments: 16} }
+    spec_r : IsleWindow { Position: {-0.5, 2.08, -0.545}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.15, length: 0.04, segments: 16} }
+    spec_ring_l : IsleBrass { Position: {0.5, 2.08, -0.54}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.15, tube: 0.02, segments: 16, rings: 6} }
+    spec_ring_r : IsleBrass { Position: {-0.5, 2.08, -0.54}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.15, tube: 0.02, segments: 16, rings: 6} }
+    cab_back : IsleRailDark { Position: {0, 1.78, -1.752}; Box: {1.1, 0.95, 0.02} }
+    firebox : IsleRailFire { Position: {0, 1.5, -1.76}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.2, length: 0.03, segments: 16} }
+    firebox_ring : IsleBrass { Position: {0, 1.5, -1.765}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.2, tube: 0.025, segments: 16, rings: 6} }
+
+    splash_fl : IslePaintGreen { Position: {0.6, 1.12, 0.5}; Box: {0.2, 0.2, 0.74} }
+    splash_fr : IslePaintGreen { Position: {-0.6, 1.12, 0.5}; Box: {0.2, 0.2, 0.74} }
+    splash_bl : IslePaintGreen { Position: {0.6, 1.12, -0.5}; Box: {0.2, 0.2, 0.74} }
+    splash_br : IslePaintGreen { Position: {-0.6, 1.12, -0.5}; Box: {0.2, 0.2, 0.74} }
+    cyl_l : IslePaintGreen { Position: {0.8, 0.74, 1.25}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.17, length: 0.6, segments: 16, smooth: true} }
+    cyl_r : IslePaintGreen { Position: {-0.8, 0.74, 1.25}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.17, length: 0.6, segments: 16, smooth: true} }
+    cyl_cap_l : IsleBrass { Position: {0.8, 0.74, 1.56}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.13, length: 0.04, segments: 16} }
+    cyl_cap_r : IsleBrass { Position: {-0.8, 0.74, 1.56}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.13, length: 0.04, segments: 16} }
+    piston_l : IsleRailBright { Position: {0.8, 0.74, 0.7}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 0.6, segments: 6} }
+    piston_r : IsleRailBright { Position: {-0.8, 0.74, 0.7}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 0.6, segments: 6} }
+
+    IsleRailAxle drive_a(r: 0.44, n: 3) { Position: {0, 0.76, 0.5} }
+    IsleRailAxle drive_b(r: 0.44, n: 3) { Position: {0, 0.76, -0.5} }
+    IsleRailAxle lead(r: 0.25) { Position: {0, 0.57, 1.5} }
+    IsleRailAxle trail(r: 0.25) { Position: {0, 0.57, -1.4} }
+    IsleRailRod rod_l(r: 0.44, len: 1) { Position: {0.7, 0.76, 0} }
+    IsleRailRod rod_r(r: 0.44, len: 1) { Position: {-0.7, 0.76, 0} }
+
+    lamp : IsleBrass { Position: {0, 2.28, 2.04}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.14, length: 0.22, segments: 16, smooth: true} }
+    lamp_lens : IsleLampGlow { Position: {0, 2.28, 2.155}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.11, length: 0.02, segments: 16} }
+
+    if night {
+      headlight { Position: {0, 2.28, 2.2}; Rotation: {0.14, 0, 0}; SpotLight: {intensity: 260, range: 30, inner_angle: 14, outer_angle: 30}; Rgb: {255, 226, 170} }
+      fireglow { Position: {0, 1.5, -2.0}; PointLight: {intensity: 4, range: 3.5}; Rgb: {255, 130, 50} }
+    }
+
+    smoke {
+      Position: {0, 2.8, 1.72}
+      ParticleEmitter: {
+        max: 400, rate: train_speed > 0.01 ? 10 + 34 * train_speed : 3, shape: EmitterDisc, radius: 0.12, spread: 12,
+        speed: {3.2, 4.2}, lifetime: {2.2, 3.6}, size: {0.4, 0.65}, rotation: {0, 360},
+        opacity: {0.4, 0.7}, acceleration: {0, 0.6, 0}, inherit_velocity: 0.4, color: {244, 244, 240}, seed: 7
+      }
+      ParticleForces: {gravity: {0, 0, 0}, drag: 0.5, turbulence: 0.7}
+      ParticleCurves: {
+        size: {keys: [{0, 0.4}, {0.3, 1.2}, {1, 3.4}]},
+        opacity: {keys: [{0, 0}, {0.08, 1}, {0.5, 0.55}, {1, 0}]},
+        color: {keys: [{0, {255, 255, 255}}, {0.4, {236, 236, 236}}, {1, {200, 204, 212}}]}
+      }
+      ParticleAppearance: {softness: 0.5, lit: 0.6}
+    }
+
+    whistle_jet {
+      Position: {0.2, 2.46, -0.3}
+      ParticleEmitter: {
+        max: 500, rate: blowing ? 260 : 0, spread: 9,
+        speed: {4.5, 7}, lifetime: {0.5, 1.1}, size: {0.14, 0.26}, rotation: {0, 360},
+        opacity: {0.6, 0.95}, color: {255, 255, 255}, seed: 11
+      }
+      ParticleForces: {gravity: {0, 0, 0}, drag: 2.2, turbulence: 1.2}
+      ParticleCurves: {
+        size: {keys: [{0, 0.6}, {0.4, 2.2}, {1, 4}]},
+        opacity: {keys: [{0, 1}, {0.5, 0.6}, {1, 0}]}
+      }
+      ParticleAppearance: {softness: 0.3, lit: 0.4}
+    }
+
+    cock_l {
+      Position: {0.98, 0.6, 1.5}
+      ParticleEmitter: {
+        max: 300, rate: blowing ? 120 : 0, direction: {1, 0.15, 0.4}, spread: 16,
+        speed: {2, 4}, lifetime: {0.5, 1.0}, size: {0.16, 0.3}, rotation: {0, 360},
+        opacity: {0.5, 0.85}, color: {255, 255, 255}, seed: 13
+      }
+      ParticleForces: {gravity: {0, 0, 0}, drag: 2.5, turbulence: 1}
+      ParticleCurves: {size: {keys: [{0, 0.6}, {1, 3.6}]}, opacity: {keys: [{0, 1}, {0.5, 0.5}, {1, 0}]}}
+      ParticleAppearance: {softness: 0.3, lit: 0.4}
+    }
+
+    cock_r {
+      Position: {-0.98, 0.6, 1.5}
+      ParticleEmitter: {
+        max: 300, rate: blowing ? 120 : 0, direction: {-1, 0.15, 0.4}, spread: 16,
+        speed: {2, 4}, lifetime: {0.5, 1.0}, size: {0.16, 0.3}, rotation: {0, 360},
+        opacity: {0.5, 0.85}, color: {255, 255, 255}, seed: 14
+      }
+      ParticleForces: {gravity: {0, 0, 0}, drag: 2.5, turbulence: 1}
+      ParticleCurves: {size: {keys: [{0, 0.6}, {1, 3.6}]}, opacity: {keys: [{0, 1}, {0.5, 0.5}, {1, 0}]}}
+      ParticleAppearance: {softness: 0.3, lit: 0.4}
+    }
+
+    cam { Position: {0, 3.7, -1.7}; Rotation: {-0.2, RAIL_PI - 0.14, 0}; Camera: {fov: 60, near_: 0.1, far_: 800} }
+
+    async {
+      while true {
+        await on.click(this)
+        emit Whistle()
+      }
+    }
+
+    async {
+      while true {
+        await Whistle
+        blowing = true
+        await delay(1.1)
+        blowing = false
+      }
+    }
+  }
+
+  template IsleRailTender {
+    frame : IsleIron { Position: {0, 0.82, 0}; Box: {1.1, 0.2, 2.2} }
+    body : IslePaintGreen { Position: {0, 1.34, 0}; Box: {1.46, 0.84, 2.1} }
+    rim : IslePaintGreen { Position: {0, 1.79, 0}; Box: {1.54, 0.07, 2.18} }
+    line_a : IslePaintYellow { Position: {0, 1.14, 0}; Box: {1.475, 0.04, 2.115} }
+    line_b : IslePaintYellow { Position: {0, 1.62, 0}; Box: {1.475, 0.04, 2.115} }
+    coal : IsleRailCoal { Position: {0, 1.76, 0.1}; Scale: {0.62, 0.3, 0.86}; Sphere: {radius: 1, segments: 16, smooth: true} }
+    for i in 0..9 {
+      "lump_{i}" : IsleRailCoal {
+        Position: {-0.4 + rnd(i, 1) * 0.8, 1.86 + rnd(i, 2) * 0.16, -0.5 + rnd(i, 3) * 1.2}
+        Rotation: {rnd(i, 4) * 3, rnd(i, 5) * 3, 0}
+        IcoSphere: {radius: 0.12 + rnd(i, 6) * 0.08, segments: 0}
+        SpatialIgnore
+      }
+    }
+    hatch : IsleBrass { Position: {0, 1.84, -0.82}; Cylinder: {radius: 0.16, length: 0.06, segments: 14, smooth: true} }
+    coupler_f : IsleIron { Position: {0, 0.8, 1.2}; Box: {0.12, 0.1, 0.3} }
+    coupler_b : IsleIron { Position: {0, 0.8, -1.2}; Box: {0.12, 0.1, 0.3} }
+    IsleRailAxle axle_a(r: 0.3) { Position: {0, 0.62, 0.7} }
+    IsleRailAxle axle_b(r: 0.3) { Position: {0, 0.62, 0} }
+    IsleRailAxle axle_c(r: 0.3) { Position: {0, 0.62, -0.7} }
+  }
+
+  template IsleRailCoach {
+    prop paint: entity = 0
+    prop trim: entity = 0
+
+    frame : IsleIron { Position: {0, 0.8, 0}; Box: {1.2, 0.16, 3.6} }
+    deck : IsleIron { Position: {0, 0.9, 0}; Box: {1.46, 0.06, 3.8} }
+    lower { (IsA, paint); Position: {0, 1.23, 0}; Box: {1.5, 0.6, 3.3} }
+    band { (IsA, trim); Position: {0, 1.84, 0}; Box: {1.46, 0.64, 3.26} }
+    cornice { (IsA, paint); Position: {0, 2.2, 0}; Box: {1.5, 0.1, 3.3} }
+    stripe : IslePaintYellow { Position: {0, 1.53, 0}; Box: {1.515, 0.04, 3.31} }
+    roof : IsleRailRoof { Position: {0, 2.23, 0}; Rotation: {HALF_PI, 0, 0}; Scale: {1, 1, 0.26}; Cylinder: {radius: 0.88, length: 3.6, segments: 28, smooth: true} }
+    lantern : IsleRailRoof { Position: {0, 2.47, 0}; Box: {0.5, 0.12, 2.6} }
+    for i in 0..5 {
+      "win_{i}" : IsleWindow { Position: {0, 1.86, -1.2 + i * 0.6}; Box: {1.48, 0.46, 0.42} }
+    }
+    for i in 0..3 {
+      "vent_{i}" : IsleBrass { Position: {0, 2.56, -0.9 + i * 0.9}; Cylinder: {radius: 0.07, length: 0.1, segments: 8}; SpatialIgnore }
+    }
+    doors : IsleWoodDark { Position: {0, 1.55, 0}; Box: {0.52, 1.16, 3.32}; TextureMapping: {mode: MappingObject, size: 1.6} }
+    door_win : IsleWindow { Position: {0, 1.86, 0}; Box: {0.3, 0.4, 3.34} }
+    for s in 0..2 {
+      const z = s * 3.72 - 1.86
+      "rail_{s}" : IsleBrass { Position: {0, 1.5, z}; Box: {1.3, 0.03, 0.03}; SpatialIgnore }
+      "post_l_{s}" : IsleBrass { Position: {0.63, 1.2, z}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
+      "post_r_{s}" : IsleBrass { Position: {-0.63, 1.2, z}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
+      "coupler_{s}" : IsleIron { Position: {0, 0.8, s * 4.0 - 2.0}; Box: {0.12, 0.1, 0.3} }
+      "bogie_{s}" : IsleIron { Position: {0, 0.62, s * 2.3 - 1.15}; Box: {1.34, 0.14, 1.0} }
+      IsleRailAxle "axle_a_{s}"(r: 0.26) { Position: {0, 0.58, s * 2.3 - 1.15 + 0.32} }
+      IsleRailAxle "axle_b_{s}"(r: 0.26) { Position: {0, 0.58, s * 2.3 - 1.15 - 0.32} }
+    }
+  }
+
+  template IsleRailCaboose {
+    frame : IsleIron { Position: {0, 0.8, 0}; Box: {1.2, 0.16, 2.6} }
+    deck : IsleIron { Position: {0, 0.9, 0}; Box: {1.46, 0.06, 2.7} }
+    body : IslePaintTeal { Position: {0, 1.55, 0.2}; Box: {1.5, 1.24, 2.0} }
+    stripe : IslePaintCream { Position: {0, 1.4, 0.2}; Box: {1.515, 0.08, 2.01} }
+    roof : IsleRailRoof { Position: {0, 2.15, 0.1}; Rotation: {HALF_PI, 0, 0}; Scale: {1, 1, 0.24}; Cylinder: {radius: 0.88, length: 2.6, segments: 28, smooth: true} }
+    cupola : IslePaintTeal { Position: {0, 2.5, 0.3}; Box: {0.9, 0.42, 0.8} }
+    cupola_win : IsleWindow { Position: {0, 2.52, 0.3}; Box: {0.92, 0.24, 0.6} }
+    cupola_win_b : IsleWindow { Position: {0, 2.52, 0.3}; Box: {0.6, 0.24, 0.82} }
+    cupola_roof : IsleRailRoof { Position: {0, 2.74, 0.3}; Box: {1.04, 0.07, 0.94} }
+    win_a : IsleWindow { Position: {0, 1.8, 0.7}; Box: {1.52, 0.42, 0.42} }
+    win_b : IsleWindow { Position: {0, 1.8, -0.3}; Box: {1.52, 0.42, 0.42} }
+    door : IsleWoodDark { Position: {0, 1.5, 0.2}; Box: {0.52, 1.1, 2.02}; TextureMapping: {mode: MappingObject, size: 1.6} }
+    chimney : IsleIron { Position: {0.45, 2.5, -0.5}; Cylinder: {radius: 0.06, length: 0.5, segments: 8} }
+    rail : IsleBrass { Position: {0, 1.5, -1.3}; Box: {1.3, 0.03, 0.03}; SpatialIgnore }
+    post_l : IsleBrass { Position: {0.63, 1.2, -1.3}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
+    post_r : IsleBrass { Position: {-0.63, 1.2, -1.3}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
+    tail : IsleSignalRed { Position: {0, 1.3, -1.36}; Sphere: {radius: 0.07, segments: 10}; NoShadow }
+    coupler : IsleIron { Position: {0, 0.8, 1.4}; Box: {0.12, 0.1, 0.3} }
+    IsleRailAxle axle_a(r: 0.28) { Position: {0, 0.6, 0.75} }
+    IsleRailAxle axle_b(r: 0.28) { Position: {0, 0.6, -0.75} }
+  }
+
+  template IsleRailPortal {
+    wall_l : IsleStone { Position: {1.55, 0.85, 0}; Box: {0.5, 1.7, 4} }
+    wall_r : IsleStone { Position: {-1.55, 0.85, 0}; Box: {0.5, 1.7, 4} }
+    vault : IsleStone { Position: {0, 1.7, 0}; Rotation: {-HALF_PI, 0, 0}; Tube: {radius: 1.8, thickness: 0.5, length: 4, arc: RAIL_PI, segments: 24, smooth: true} }
+    ring : IsleStone { Position: {0, 1.7, 1.85}; Rotation: {-HALF_PI, 0, 0}; Tube: {radius: 2.05, thickness: 0.8, length: 0.5, arc: RAIL_PI, segments: 24} }
+    pier_l : IsleStone { Position: {1.65, 0.85, 1.85}; Box: {0.8, 1.7, 0.5} }
+    pier_r : IsleStone { Position: {-1.65, 0.85, 1.85}; Box: {0.8, 1.7, 0.5} }
+    key : IsleRock { Position: {0, 3.42, 1.9}; Box: {0.42, 0.7, 0.62} }
+    butt_l : IsleStone { Position: {2.35, 1.2, 1.75}; Box: {0.6, 2.4, 0.8} }
+    butt_r : IsleStone { Position: {-2.35, 1.2, 1.75}; Box: {0.6, 2.4, 0.8} }
+    cap_l : IsleRock { Position: {2.35, 2.47, 1.75}; Box: {0.74, 0.14, 0.94} }
+    cap_r : IsleRock { Position: {-2.35, 2.47, 1.75}; Box: {0.74, 0.14, 0.94} }
+    wing_l : IsleStone { Position: {3.2, 0.65, 1.5}; Box: {1.2, 1.3, 0.45} }
+    wing_r : IsleStone { Position: {-3.2, 0.65, 1.5}; Box: {1.2, 1.3, 0.45} }
+    wing_l2 : IsleStone { Position: {4.2, 0.35, 1.3}; Box: {1.0, 0.7, 0.45} }
+    wing_r2 : IsleStone { Position: {-4.2, 0.35, 1.3}; Box: {1.0, 0.7, 0.45} }
+    dark : IsleRailDark { Position: {0, 0.85, 1.25}; Box: {2.6, 1.7, 0.1}; NoShadow }
+    dark_top : IsleRailDark { Position: {0, 1.7, 1.25}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 1.3, length: 0.1, segments: 24}; NoShadow }
+    lamp_arm : IsleIron { Position: {0, 3.86, 2.05}; Box: {0.05, 0.2, 0.3} }
+    lamp : IsleLampGlow { Position: {0, 3.72, 2.2}; Sphere: {radius: 0.13, segments: 12, smooth: true}; NoShadow }
+  }
+
+  template IsleRailBridge {
+    deck : IsleWoodDark { Position: {0, 0.165, 0}; Box: {2.5, 0.06, 4.8} }
+    for s in 0..2 {
+      const x = s * 2.7 - 1.35
+      "base_{s}" : IsleStone { Position: {x, 0.2, 0}; Box: {0.4, 0.4, 5.2} }
+      "arch_{s}" : IsleRailDark { Position: {x, 0.13, 0}; Box: {0.42, 0.26, 1.4}; NoShadow }
+      "chord_{s}" : IsleRailGirder { Position: {x, 0.48, 0}; Box: {0.16, 0.18, 5.0} }
+      "top_{s}" : IsleRailGirder { Position: {x, 1.7, 0}; Box: {0.16, 0.14, 3.7} }
+      "end_a_{s}" : IsleRailGirder { Position: {x, 1.08, 2.15}; Rotation: {-0.53, 0, 0}; Box: {0.13, 1.5, 0.13} }
+      "end_b_{s}" : IsleRailGirder { Position: {x, 1.08, -2.15}; Rotation: {0.53, 0, 0}; Box: {0.13, 1.5, 0.13} }
+      for i in 0..4 {
+        "post_{s}_{i}" : IsleRailGirder { Position: {x, 1.08, -1.8 + i * 1.2}; Box: {0.1, 1.2, 0.1} }
+      }
+      for i in 0..3 {
+        "diag_{s}_{i}" : IsleRailGirder { Position: {x, 1.08, -1.2 + i * 1.2}; Rotation: {i == 1 ? -0.785 : 0.785, 0, 0}; Box: {0.07, 1.66, 0.07}; SpatialIgnore }
+      }
+      "pier_a_{s}" : IsleStone { Position: {x, 0.5, 2.95}; Box: {0.75, 1.0, 0.85} }
+      "pier_b_{s}" : IsleStone { Position: {x, 0.5, -2.95}; Box: {0.75, 1.0, 0.85} }
+      "cap_a_{s}" : IsleRock { Position: {x, 1.06, 2.95}; Box: {0.88, 0.12, 0.98} }
+      "cap_b_{s}" : IsleRock { Position: {x, 1.06, -2.95}; Box: {0.88, 0.12, 0.98} }
+    }
+  }
+
+  template IsleRailSignal {
+    prop semaphore: bool = false
+    const go = train_speed > 0.01
+
+    base : IsleIron { Position: {0, 0.15, 0}; Cylinder: {radius: 0.14, length: 0.3, segments: 10} }
+    if semaphore {
+      post : IsleWhite { Position: {0, 1.7, 0}; Cylinder: {radius: 0.06, length: 3.2, segments: 8} }
+      finial : IslePaintRed { Position: {0, 3.38, 0}; Cone: {radius: 0.09, length: 0.22, segments: 8} }
+      arm {
+        Position: {0, 3.0, -0.08}
+        Rotation: {0, 0, go ? 0.75 : 0}
+        blade : IslePaintRed { Position: {0.5, 0, 0}; Box: {1.0, 0.2, 0.04} }
+        band : IsleWhite { Position: {0.78, 0, 0}; Box: {0.12, 0.205, 0.05} }
+        lens : IsleRailLens { Position: {-0.14, 0, 0}; Box: {0.24, 0.24, 0.05} }
+      }
+      if go {
+        lamp_go : IsleSignalGreen { Position: {-0.16, 2.74, -0.1}; Sphere: {radius: 0.08, segments: 10}; NoShadow }
+      } else {
+        lamp_stop : IsleSignalRed { Position: {-0.16, 2.74, -0.1}; Sphere: {radius: 0.08, segments: 10}; NoShadow }
+      }
+    } else {
+      post : IsleIron { Position: {0, 1.3, 0}; Cylinder: {radius: 0.05, length: 2.4, segments: 8} }
+      head : IsleBlack { Position: {0, 2.7, 0}; Box: {0.34, 0.8, 0.2} }
+      hood : IsleBlack { Position: {0, 3.12, 0}; Box: {0.42, 0.05, 0.42} }
+      if go {
+        lamp_red : IsleRailLens { Position: {0, 2.9, 0}; Sphere: {radius: 0.12, segments: 10}; NoShadow }
+        lamp_green : IsleSignalGreen { Position: {0, 2.52, 0}; Sphere: {radius: 0.12, segments: 10}; NoShadow }
+      } else {
+        lamp_red : IsleSignalRed { Position: {0, 2.9, 0}; Sphere: {radius: 0.12, segments: 10}; NoShadow }
+        lamp_green : IsleRailLens { Position: {0, 2.52, 0}; Sphere: {radius: 0.12, segments: 10}; NoShadow }
+      }
+    }
+  }
+
+  template IsleRailBench {
+    seat : IsleWood { Position: {0, 0.42, 0}; Box: {0.42, 0.05, 1.3} }
+    back : IsleWood { Position: {0.2, 0.7, 0}; Rotation: {0, 0, -0.12}; Box: {0.05, 0.36, 1.3} }
+    leg_a : IsleIron { Position: {0.02, 0.21, 0.52}; Box: {0.4, 0.42, 0.05} }
+    leg_b : IsleIron { Position: {0.02, 0.21, -0.52}; Box: {0.4, 0.42, 0.05} }
+  }
+
+  template IsleRailLamp {
+    prop lit: bool = false
+
+    base : IsleIron { Position: {0, 0.12, 0}; Cylinder: {radius: 0.11, length: 0.24, segments: 10} }
+    post : IsleIron { Position: {0, 1.4, 0}; Cylinder: {radius: 0.045, length: 2.6, segments: 8} }
+    collar : IsleBrass { Position: {0, 2.68, 0}; Cylinder: {radius: 0.08, length: 0.06, segments: 10} }
+    glow : IsleLampGlow { Position: {0, 2.9, 0}; Frustum: {radius_bottom: 0.1, radius_top: 0.17, length: 0.36, segments: 6}; NoShadow }
+    cap : IsleIron { Position: {0, 3.16, 0}; Cone: {radius: 0.24, length: 0.18, segments: 6} }
+    knob : IsleBrass { Position: {0, 3.28, 0}; Sphere: {radius: 0.04, segments: 8} }
+    if lit && night {
+      light { Position: {0, 2.9, 0}; PointLight: {intensity: 7, range: 9}; Rgb: {255, 196, 120} }
+    }
+  }
+
+  template IsleRailWaterTower {
+    for i in 0..4 {
+      "leg_{i}" : IsleWoodDark { Position: {(i % 2) * 1.2 - 0.6, 1.25, floor(i / 2) * 1.2 - 0.6}; Box: {0.15, 2.5, 0.15} }
+    }
+    brace_a : IsleWoodDark { Position: {0, 1.2, 0.6}; Rotation: {0, 0, 0.9}; Box: {0.08, 1.9, 0.08} }
+    brace_b : IsleWoodDark { Position: {0, 1.2, -0.6}; Rotation: {0, 0, -0.9}; Box: {0.08, 1.9, 0.08} }
+    brace_c : IsleWoodDark { Position: {0.6, 1.2, 0}; Rotation: {0.9, 0, 0}; Box: {0.08, 1.9, 0.08} }
+    brace_d : IsleWoodDark { Position: {-0.6, 1.2, 0}; Rotation: {-0.9, 0, 0}; Box: {0.08, 1.9, 0.08} }
+    floor : IsleWoodDark { Position: {0, 2.55, 0}; Box: {1.7, 0.1, 1.7} }
+    tank : IsleWood { Position: {0, 3.35, 0}; Cylinder: {radius: 0.9, length: 1.5, segments: 24, smooth: true} }
+    for i in 0..3 {
+      "hoop_{i}" : IsleIron { Position: {0, 2.85 + i * 0.5, 0}; Torus: {radius: 0.905, tube: 0.025, segments: 24, rings: 6}; SpatialIgnore }
+    }
+    roof : IsleRoofSlate { Position: {0, 4.45, 0}; Cone: {radius: 1.08, length: 0.7, segments: 16} }
+    knob : IsleBrass { Position: {0, 4.84, 0}; Sphere: {radius: 0.07, segments: 8} }
+    spout : IsleIron { Position: {-1.25, 2.78, 0}; Rotation: {0, 0, 1.25}; Cylinder: {radius: 0.07, length: 1.0, segments: 8} }
+    spout_end : IsleRope { Position: {-1.74, 2.46, 0}; Cylinder: {radius: 0.08, length: 0.4, segments: 8} }
+  }
+
+  template IsleRailStation {
+    const arc: f32 = 0.44
+    const top: f32 = 0.5
+
+    platform : IsleCobble { Position: {0, top / 2, 0}; Rotation: {0, arc / 2, 0}; Tube: {radius: 27.3, thickness: 3.8, length: top, arc: arc, segments: 16} }
+    edge : IsleStone { Position: {0, top / 2 + 0.01, 0}; Rotation: {0, arc / 2, 0}; Tube: {radius: 23.56, thickness: 0.28, length: top, arc: arc, segments: 16} }
+    line : IsleWhite { Position: {0, top / 2 + 0.014, 0}; Rotation: {0, arc / 2, 0}; Tube: {radius: 23.82, thickness: 0.08, length: top, arc: arc, segments: 16}; NoShadow }
+    ramp_a { Rotation: {0, -arc / 2, 0}; plank : IsleRailPlank { Position: {25.4, 0.24, 0.78}; Rotation: {0.31, 0, 0}; Box: {3.7, 0.07, 1.66} } }
+    ramp_b { Rotation: {0, arc / 2, 0}; plank : IsleRailPlank { Position: {25.4, 0.24, -0.78}; Rotation: {-0.31, 0, 0}; Box: {3.7, 0.07, 1.66} } }
+
+    plinth : IsleStone { Position: {26.0, top + 0.2, 0}; Box: {2.5, 0.4, 5.3} }
+    walls : IslePlasterWarm { Position: {26.0, top + 1.25, 0}; Box: {2.4, 2.5, 5.2} }
+    beam : IsleWoodDark { Position: {26.0, top + 2.42, 0}; Box: {2.46, 0.16, 5.26} }
+    for i in 0..4 {
+      "corner_{i}" : IsleWoodDark { Position: {26.0 + (i % 2) * 2.4 - 1.2, top + 1.25, floor(i / 2) * 5.2 - 2.6}; Box: {0.16, 2.5, 0.16} }
+    }
+    roof : IsleRoofRed { Position: {26.0, top + 3.1, 0}; TrianglePrism: {3.3, 1.25, 5.9} }
+    chimney : IsleStone { Position: {26.5, top + 3.5, 1.7}; Box: {0.45, 1.3, 0.45} }
+    chimney_cap : IsleRock { Position: {26.5, top + 4.2, 1.7}; Box: {0.58, 0.12, 0.58} }
+
+    tower : IslePlaster { Position: {25.3, top + 2.3, 0}; Box: {1.3, 4.6, 1.3} }
+    tower_base : IsleStone { Position: {25.3, top + 0.2, 0}; Box: {1.4, 0.4, 1.4} }
+    tower_band : IsleWoodDark { Position: {25.3, top + 3.3, 0}; Box: {1.36, 0.12, 1.36} }
+    tower_eave : IsleWoodDark { Position: {25.3, top + 4.62, 0}; Box: {1.5, 0.1, 1.5} }
+    tower_roof : IsleRoofRed { Position: {25.3, top + 5.3, 0}; Rotation: {0, 0.7854, 0}; Cone: {radius: 1.12, length: 1.3, segments: 4} }
+    tower_knob : IsleBrass { Position: {25.3, top + 6.0, 0}; Sphere: {radius: 0.09, segments: 10, smooth: true} }
+    clock_a : IsleLampGlow { Position: {24.64, top + 3.95, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.44, length: 0.04, segments: 24}; NoShadow }
+    clock_a_rim : IsleBrass { Position: {24.63, top + 3.95, 0}; Rotation: {0, 0, HALF_PI}; Torus: {radius: 0.44, tube: 0.045, segments: 24, rings: 6} }
+    clock_a_h : IsleBlack { Position: {24.61, top + 4.03, 0.05}; Rotation: {0.55, 0, 0}; Box: {0.02, 0.24, 0.05}; NoShadow }
+    clock_a_m : IsleBlack { Position: {24.61, top + 4.07, -0.09}; Rotation: {-0.62, 0, 0}; Box: {0.02, 0.36, 0.035}; NoShadow }
+    clock_b : IsleLampGlow { Position: {25.96, top + 3.95, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.44, length: 0.04, segments: 24}; NoShadow }
+    clock_b_rim : IsleBrass { Position: {25.97, top + 3.95, 0}; Rotation: {0, 0, HALF_PI}; Torus: {radius: 0.44, tube: 0.045, segments: 24, rings: 6} }
+    clock_b_h : IsleBlack { Position: {25.99, top + 4.03, -0.05}; Rotation: {-0.55, 0, 0}; Box: {0.02, 0.24, 0.05}; NoShadow }
+    clock_b_m : IsleBlack { Position: {25.99, top + 4.07, 0.09}; Rotation: {0.62, 0, 0}; Box: {0.02, 0.36, 0.035}; NoShadow }
+    door : IslePaintGreen { Position: {24.64, top + 0.85, 0}; Box: {0.06, 1.5, 0.8} }
+    door_light : IsleWindow { Position: {24.635, top + 1.3, 0}; Box: {0.06, 0.4, 0.56} }
+    door_knob : IsleBrass { Position: {24.6, top + 0.8, 0.28}; Sphere: {radius: 0.04, segments: 8} }
+
+    for i in 0..2 {
+      const z = i * 3.5 - 1.75
+      "win_f_frame_{i}" : IsleWhite { Position: {24.8, top + 1.45, z}; Box: {0.05, 1.0, 0.9} }
+      "win_f_{i}" : IsleWindow { Position: {24.78, top + 1.45, z}; Box: {0.05, 0.84, 0.74} }
+      "win_b_frame_{i}" : IsleWhite { Position: {27.2, top + 1.45, z}; Box: {0.05, 1.0, 0.9} }
+      "win_b_{i}" : IsleWindow { Position: {27.22, top + 1.45, z}; Box: {0.05, 0.84, 0.74} }
+      "box_b_{i}" : IsleWood { Position: {27.3, top + 0.88, z}; Box: {0.2, 0.16, 0.9} }
+      "flowers_a_{i}" : IsleClothRed { Position: {27.3, top + 1.0, z - 0.22}; Sphere: {radius: 0.13, segments: 8} }
+      "flowers_b_{i}" : IsleClothYellow { Position: {27.3, top + 1.0, z + 0.05}; Sphere: {radius: 0.12, segments: 8} }
+      "flowers_c_{i}" : IsleClothRed { Position: {27.3, top + 1.0, z + 0.3}; Sphere: {radius: 0.12, segments: 8} }
+      "win_s_frame_{i}" : IsleWhite { Position: {26.0, top + 1.45, i * 5.2 - 2.6}; Box: {0.9, 1.0, 0.05} }
+      "win_s_{i}" : IsleWindow { Position: {26.0, top + 1.45, i * 5.24 - 2.62}; Box: {0.74, 0.84, 0.05} }
+      IsleRailBench "bench_{i}"() { Position: {24.5, top, z} }
+      IsleRailLamp "lamp_{i}"(lit: true) { Position: {24.3, top, i * 8.2 - 4.1} }
+      "hang_{i}" : IsleLampGlow { Position: {24.1, top + 1.98, i * 3.6 - 1.8}; Sphere: {radius: 0.1, segments: 10}; NoShadow }
+      "hang_rod_{i}" : IsleIron { Position: {24.1, top + 2.14, i * 3.6 - 1.8}; Box: {0.02, 0.2, 0.02}; NoShadow; SpatialIgnore }
+    }
+    back_door : IsleWoodDark { Position: {27.21, top + 0.8, 0}; Box: {0.05, 1.5, 0.8} }
+    back_sign : IsleWhite { Position: {27.22, top + 2.0, 0}; Box: {0.05, 0.4, 2.3} }
+    back_text { Position: {27.26, top + 1.95, 0}; Rotation: {0, HALF_PI, 0}; Scale: {0.01, 0.01, 1}; Text: {value: "FABLE ISLE", size: 30, align: Center}; Rgb: {40, 44, 60} }
+
+    canopy : IsleRoofSlate { Position: {24.1, top + 2.3, 0}; Rotation: {0, 0, 0.14}; Box: {1.6, 0.07, 5.9} }
+    valance : IslePaintCream { Position: {23.32, top + 2.1, 0}; Box: {0.05, 0.2, 5.9} }
+    for i in 0..4 {
+      "post_{i}" : IslePaintGreen { Position: {23.5, top + 1.07, -2.7 + i * 1.8}; Cylinder: {radius: 0.05, length: 2.14, segments: 8} }
+    }
+
+    name_board : IsleWhite { Position: {26.4, top + 1.75, -4.25}; Box: {0.08, 0.5, 2.3} }
+    name_frame : IslePaintGreen { Position: {26.4, top + 1.75, -4.25}; Box: {0.06, 0.6, 2.4} }
+    name_post_a : IslePaintGreen { Position: {26.4, top + 0.75, -3.25}; Box: {0.09, 1.5, 0.09} }
+    name_post_b : IslePaintGreen { Position: {26.4, top + 0.75, -5.25}; Box: {0.09, 1.5, 0.09} }
+    name_text_a { Position: {26.35, top + 1.7, -4.25}; Rotation: {0, -HALF_PI, 0}; Scale: {0.01, 0.01, 1}; Text: {value: "FABLE ISLE", size: 30, align: Center}; Rgb: {40, 44, 60} }
+    name_text_b { Position: {26.45, top + 1.7, -4.25}; Rotation: {0, HALF_PI, 0}; Scale: {0.01, 0.01, 1}; Text: {value: "FABLE ISLE", size: 30, align: Center}; Rgb: {40, 44, 60} }
+
+    trolley : IsleWood { Position: {24.9, top + 0.3, 3.9}; Box: {0.7, 0.08, 1.2} }
+    trolley_wheel_a : IsleIron { Position: {24.9, top + 0.14, 4.25}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.14, length: 0.76, segments: 10} }
+    trolley_wheel_b : IsleIron { Position: {24.9, top + 0.14, 3.55}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.14, length: 0.76, segments: 10} }
+    case_a : IsleClothRed { Position: {24.85, top + 0.52, 4.15}; Box: {0.5, 0.36, 0.5} }
+    case_b : IsleWoodDark { Position: {24.95, top + 0.46, 3.6}; Box: {0.55, 0.24, 0.4} }
+    case_c : IsleClothBlue { Position: {24.92, top + 0.68, 3.62}; Rotation: {0, 0.3, 0}; Box: {0.4, 0.2, 0.3} }
+    for i in 0..3 {
+      "churn_{i}" : IsleSteel { Position: {25.9 + (i % 2) * 0.34, top + 0.26, 3.2 + i * 0.3}; Cylinder: {radius: 0.15, length: 0.52, segments: 12, smooth: true} }
+      "churn_neck_{i}" : IsleSteel { Position: {25.9 + (i % 2) * 0.34, top + 0.58, 3.2 + i * 0.3}; Frustum: {radius_bottom: 0.15, radius_top: 0.09, length: 0.14, segments: 12, smooth: true}; SpatialIgnore }
+    }
+
+    for s in 0..2 {
+      const a0 = s == 0 ? 0.105 : -arc / 2
+      "fence_top_{s}" : IsleWhite { Position: {0, top + 0.72, 0}; Rotation: {0, -a0, 0}; Tube: {radius: 27.22, thickness: 0.05, length: 0.06, arc: arc / 2 - 0.105, segments: 6} }
+      "fence_low_{s}" : IsleWhite { Position: {0, top + 0.36, 0}; Rotation: {0, -a0, 0}; Tube: {radius: 27.22, thickness: 0.05, length: 0.06, arc: arc / 2 - 0.105, segments: 6} }
+      for i in 0..7 {
+        const a = a0 + i * (arc / 2 - 0.105) / 6
+        "picket_{s}_{i}" : IsleWhite { Position: {px(27.2, a), top + 0.45, pz(27.2, a)}; Rotation: {0, -a, 0}; Box: {0.08, 0.9, 0.08}; SpatialIgnore }
+      }
+    }
+
+    IsleRailWaterTower water() { Position: {25.0, 0, -7.4} }
+  }
+
+  template IsleRailCrossing {
+    mid : IsleRailPlank { Position: {0, 0.285, 0}; Box: {1.04, 0.07, 1.8} }
+    outer : IsleRailPlank { Position: {1.2, 0.25, 0}; Rotation: {0, 0, -0.07}; Box: {1.1, 0.07, 1.8} }
+    inner : IsleRailPlank { Position: {-1.2, 0.25, 0}; Rotation: {0, 0, 0.07}; Box: {1.1, 0.07, 1.8} }
+    for s in 0..2 {
+      const x = s * 3.9 - 1.95
+      const z = s * 2.6 - 1.3
+      "post_{s}" : IsleWhite { Position: {x, 1.0, z}; Cylinder: {radius: 0.05, length: 2.0, segments: 8} }
+      "x_a_{s}" : IsleWhite { Position: {x, 1.85, z}; Rotation: {0.7, 0, 0}; Box: {0.04, 0.14, 1.0} }
+      "x_b_{s}" : IsleWhite { Position: {x, 1.85, z}; Rotation: {-0.7, 0, 0}; Box: {0.04, 0.14, 1.0} }
+      "x_hub_{s}" : IslePaintRed { Position: {x, 1.85, z}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.1, length: 0.06, segments: 10} }
+    }
+  }
+
+  template IsleRailway {
+    prop start: f32 = 1.25
+
+    const R = RAIL_R
+    const n = 104
+
+    track {
+      bed : IsleRailBallastLow { Position: {0, 0.05, 0}; Tube: {radius: R + 1.25, thickness: 2.5, length: 0.1, segments: 128} }
+      ballast : IsleRailBallast { Position: {0, 0.13, 0}; Tube: {radius: R + 1.02, thickness: 2.04, length: 0.1, segments: 128} }
+      rail_out : IsleRailBright { Position: {0, 0.275, 0}; Tube: {radius: R + 0.635, thickness: 0.07, length: 0.09, segments: 160, smooth: true} }
+      rail_in : IsleRailBright { Position: {0, 0.275, 0}; Tube: {radius: R - 0.565, thickness: 0.07, length: 0.09, segments: 160, smooth: true} }
+      for i in 0..n {
+        const a = i * TAU / n
+        if abs(a - 4.712389) > 0.37 {
+          "sleeper_{i}" : IsleRailSleeper { Position: {px(R, a), 0.2, pz(R, a)}; Rotation: {0, -a, 0}; Box: {1.9, 0.08, 0.3}; SpatialIgnore; NoShadow }
+        }
+      }
+    }
+
+    pivot {
+      AngularVelocity: {0, -RAIL_W * train_speed, 0}
+      IsleRailLoco loco() { Position: {px(R, start), 0, pz(R, start)}; Rotation: {0, -start, 0} }
+      IsleRailTender tender() { Position: {px(R, start - 3.15 / R), 0, pz(R, start - 3.15 / R)}; Rotation: {0, -(start - 3.15 / R), 0} }
+      IsleRailCoach coach_a(paint: IslePaintRed, trim: IslePaintCream) { Position: {px(R, start - 6.45 / R), 0, pz(R, start - 6.45 / R)}; Rotation: {0, -(start - 6.45 / R), 0} }
+      IsleRailCoach coach_b(paint: IslePaintBlue, trim: IslePaintCream) { Position: {px(R, start - 10.55 / R), 0, pz(R, start - 10.55 / R)}; Rotation: {0, -(start - 10.55 / R), 0} }
+      IsleRailCoach coach_c(paint: IslePaintYellow, trim: IslePaintCream) { Position: {px(R, start - 14.65 / R), 0, pz(R, start - 14.65 / R)}; Rotation: {0, -(start - 14.65 / R), 0} }
+      IsleRailCaboose caboose() { Position: {px(R, start - 18.25 / R), 0, pz(R, start - 18.25 / R)}; Rotation: {0, -(start - 18.25 / R), 0} }
+    }
+
+    IsleRailPortal portal_a() { Position: {px(R, HILL_A + 0.32), 0, pz(R, HILL_A + 0.32)}; Rotation: {0, -(HILL_A + 0.32), 0} }
+    IsleRailPortal portal_b() { Position: {px(R, HILL_A - 0.32), 0, pz(R, HILL_A - 0.32)}; Rotation: {0, RAIL_PI - (HILL_A - 0.32), 0} }
+    IsleRailBridge bridge() { Position: {px(R, BROOK_A), 0, pz(R, BROOK_A)}; Rotation: {0, -BROOK_A, 0} }
+    IsleRailStation station() { Rotation: {0, -STATION_A, 0} }
+    IsleRailCrossing crossing() { Position: {px(R, STATION_A + 0.3), 0, pz(R, STATION_A + 0.3)}; Rotation: {0, -(STATION_A + 0.3), 0} }
+
+    IsleRailSignal signal_station(semaphore: true) { Position: {px(R + 1.3, STATION_A - 0.3), 0, pz(R + 1.3, STATION_A - 0.3)}; Rotation: {0, -(STATION_A - 0.3), 0} }
+    IsleRailSignal signal_hill_a() { Position: {px(R - 1.35, HILL_A - 0.52), 0, pz(R - 1.35, HILL_A - 0.52)}; Rotation: {0, -(HILL_A - 0.52), 0} }
+    IsleRailSignal signal_hill_b() { Position: {px(R - 1.35, HILL_A + 0.52), 0, pz(R - 1.35, HILL_A + 0.52)}; Rotation: {0, -(HILL_A + 0.52), 0} }
+    IsleRailSignal signal_brook(semaphore: true) { Position: {px(R + 1.3, BROOK_A - 0.22), 0, pz(R + 1.3, BROOK_A - 0.22)}; Rotation: {0, -(BROOK_A - 0.22), 0} }
+  }
+}

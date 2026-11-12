@@ -1,0 +1,814 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.light
+using box.particle
+using box.picking
+using box.input
+using box.spatial
+using box.transition
+using box.movement
+using state
+
+assets {
+  prefab IsleVillageSkin { Rgb: {240, 202, 168}; PbrMaterial: {roughness: 0.8} }
+  prefab IsleVillageTimber { Rgb: {92, 64, 46}; PbrMaterial: {roughness: 0.85} }
+  prefab IsleVillageBarn { Rgb: {164, 58, 46}; PbrMaterial: {roughness: 0.9} }
+  prefab IsleVillageWool { Rgb: {248, 244, 234}; PbrMaterial: {roughness: 1}; Sheen: {color: {255, 255, 255}, roughness: 0.5} }
+  prefab IsleVillageWater { Rgb: {92, 170, 214}; PbrMaterial: {metallic: 0.2, roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.05} }
+  prefab IsleVillageSail { Rgb: {242, 234, 216}; PbrMaterial: {roughness: 0.95} }
+  prefab IsleVillagePumpkin { Rgb: {234, 126, 38}; PbrMaterial: {roughness: 0.6} }
+  prefab IsleVillageFur { Rgb: {226, 138, 60}; PbrMaterial: {roughness: 0.9} }
+  prefab IsleVillageTerracotta { Rgb: {196, 110, 76}; PbrMaterial: {roughness: 0.8} }
+
+  template IsleGableRoof {
+    prop span: f32 = 3
+    prop rise: f32 = 1.5
+    prop len: f32 = 3
+    prop ri: i32 = 1
+    prop wi: i32 = 0
+    prop ov: f32 = 0.3
+    prop timber = false
+    prop attic = false
+
+    const roof = match ri { 0: IsleRoofThatch; 1: IsleRoofRed; 2: IsleRoofBlue; _: IsleRoofSlate }
+    const wall = match wi { 0: IslePlaster; 1: IslePlasterWarm; 2: IsleStone; 3: IsleVillageBarn; _: IsleWood }
+    const ang: f32 = atan2(rise, span / 2)
+    const sl: f32 = sqrt(span * span / 4 + rise * rise) + ov
+    const th: f32 = ri == 0 ? 0.26 : 0.13
+    const cx: f32 = sl / 2 * cos(ang) + th / 2 * sin(ang)
+    const cy: f32 = rise - sl / 2 * sin(ang) + th / 2 * cos(ang)
+    const sn: f32 = th / 2 + 0.03
+
+    gable { (IsA, $wall); Position: {0, rise / 2, 0}; TrianglePrism: {span, rise, len} }
+    slab_l { (IsA, $roof); Position: {-cx, cy, 0}; Rotation: {0, 0, ang}; Box: {sl, th, len + 0.5} }
+    slab_r { (IsA, $roof); Position: {cx, cy, 0}; Rotation: {0, 0, -ang}; Box: {sl, th, len + 0.5} }
+    ridge { (IsA, $roof); Position: {0, rise + th / cos(ang) - 0.07, 0}; Rotation: {0, 0, 0.7854}; Box: {0.2, 0.2, len + 0.56} }
+    if timber {
+      king_a : IsleWoodDark { Position: {0, rise * 0.45, len / 2 + 0.01}; Box: {0.1, rise * 0.9, 0.05} }
+      king_b : IsleWoodDark { Position: {0, rise * 0.45, -len / 2 - 0.01}; Box: {0.1, rise * 0.9, 0.05} }
+      tie_a : IsleWoodDark { Position: {0, 0.05, len / 2 + 0.01}; Box: {span, 0.12, 0.06} }
+      tie_b : IsleWoodDark { Position: {0, 0.05, -len / 2 - 0.01}; Box: {span, 0.12, 0.06} }
+    }
+    if attic {
+      attic_frame : IsleWhite { Position: {0, rise * 0.4, len / 2 + 0.02}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.27, length: 0.06, segments: 16} }
+      attic_pane : IsleWindow { Position: {0, rise * 0.4, len / 2 + 0.035}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.2, length: 0.06, segments: 16} }
+    }
+    if season == WINTER {
+      snow_l : IsleSnow { Position: {-cx - sn * sin(ang) + sl * 0.06 * cos(ang), cy + sn * cos(ang) + sl * 0.06 * sin(ang), 0}; Rotation: {0, 0, ang}; Box: {sl * 0.86, 0.1, len + 0.4} }
+      snow_r : IsleSnow { Position: {cx + sn * sin(ang) - sl * 0.06 * cos(ang), cy + sn * cos(ang) + sl * 0.06 * sin(ang), 0}; Rotation: {0, 0, -ang}; Box: {sl * 0.86, 0.1, len + 0.4} }
+    }
+  }
+
+  template IsleHouseWindow {
+    prop w: f32 = 0.5
+    prop h: f32 = 0.6
+    prop fancy = false
+    prop tint: i32 = 0
+
+    frame : IsleWhite { Position: {0, 0, 0.02}; Box: {w + 0.14, h + 0.14, 0.07} }
+    pane : IsleWindow { Position: {0, 0, 0.045}; Box: {w, h, 0.04} }
+    bar_v : IsleWhite { Position: {0, 0, 0.065}; Box: {0.04, h, 0.02}; SpatialIgnore }
+    bar_h : IsleWhite { Position: {0, h * 0.12, 0.065}; Box: {w, 0.04, 0.02}; SpatialIgnore }
+    if fancy {
+      const paint = match tint { 0: IslePaintGreen; 1: IslePaintBlue; 2: IslePaintRed; _: IslePaintTeal }
+      shut_l { (IsA, $paint); Position: {-w * 0.5 - 0.2, 0, 0.03}; Box: {0.24, h + 0.12, 0.05} }
+      shut_r { (IsA, $paint); Position: {w * 0.5 + 0.2, 0, 0.03}; Box: {0.24, h + 0.12, 0.05} }
+      planter : IsleVillageTerracotta { Position: {0, -h / 2 - 0.17, 0.13}; Box: {w + 0.24, 0.15, 0.2} }
+      greens : IsleLeafDark { Position: {0, -h / 2 - 0.07, 0.13}; Box: {w + 0.18, 0.09, 0.16}; SpatialIgnore }
+      for i in 0..4 {
+        const fx = -w / 2 + (i + 0.5) * w / 4
+        if i % 2 == 0 {
+          { (IsA, IsleClothRed); Position: {fx, -h / 2 + 0.01, 0.15}; IcoSphere: {radius: 0.06, segments: 1}; SpatialIgnore; NoShadow }
+        } else {
+          { (IsA, IsleClothYellow); Position: {fx, -h / 2 - 0.01, 0.19}; IcoSphere: {radius: 0.055, segments: 1}; SpatialIgnore; NoShadow }
+        }
+      }
+    }
+  }
+
+  template IsleChimneySmoke {
+    prop seed: i32 = 0
+    const cold = season == WINTER
+    SpatialIgnore
+    ParticleEmitter: {
+      max: 160, rate: cold ? 16 : 7, shape: EmitterDisc, radius: 0.07, spread: 10,
+      speed: {0.35, 0.7}, lifetime: {3, 5}, size: {0.16, 0.5},
+      opacity: {0.06, cold ? 0.24 : 0.14}, color: {168, 168, 174}, seed: seed
+    }
+    ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.6}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
+    ParticleForces: {gravity: {0, 0.15, 0}, wind: {wind * 1.6, 0, wind * 0.6}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
+  }
+
+  template IsleBarrel {
+    body : IsleWood { Position: {0, 0.3, 0}; Cylinder: {radius: 0.23, length: 0.6, segments: 14, smooth: true} }
+    hoop_a : IsleIron { Position: {0, 0.14, 0}; Cylinder: {radius: 0.24, length: 0.05, segments: 14, smooth: true}; SpatialIgnore }
+    hoop_b : IsleIron { Position: {0, 0.46, 0}; Cylinder: {radius: 0.24, length: 0.05, segments: 14, smooth: true}; SpatialIgnore }
+    lid : IsleWoodDark { Position: {0, 0.6, 0}; Cylinder: {radius: 0.2, length: 0.02, segments: 14}; SpatialIgnore }
+  }
+
+  template IsleFence {
+    prop n: i32 = 3
+    prop span: f32 = 0.9
+    const posts = n + 1
+    const len: f32 = n * span
+    for i in 0..posts {
+      { (IsA, IsleWood); Position: {-len / 2 + i * span, 0.33, 0}; Box: {0.09, 0.66, 0.09}; SpatialIgnore }
+    }
+    rail_a : IsleWood { Position: {0, 0.5, 0}; Box: {len, 0.07, 0.04}; SpatialIgnore }
+    rail_b : IsleWood { Position: {0, 0.26, 0}; Box: {len, 0.07, 0.04}; SpatialIgnore }
+  }
+
+  template IsleHouse {
+    prop seed: f32 = 0
+    prop style: i32 = 0
+    prop look: i32 = 0
+    prop smoke = false
+
+    const w: f32 = match style { 0: 3.4; 1: 2.7; 2: 3.6; _: 3.8 }
+    const d: f32 = match style { 0: 2.7; 1: 2.7; 2: 2.8; _: 3.2 }
+    const wh: f32 = match style { 0: 1.8; 1: 3.4; 2: 2.1; _: 2.2 }
+    const rise: f32 = match style { 0: 1.7; 1: 1.8; 2: 1.4; _: 1.8 }
+    const fh: f32 = 0.22
+    const top: f32 = fh + wh
+    const wi = style == 3 ? 2 : look % 3
+    const ri = match style * 2 + (look % 2) { 0: 0; 1: 1; 2: 2; 3: 3; 4: 1; 5: 2; _: 3 }
+    const wall = match wi { 0: IslePlaster; 1: IslePlasterWarm; _: IsleStone }
+    const trim = match look { 0: IslePaintGreen; 1: IslePaintBlue; 2: IslePaintRed; _: IslePaintTeal }
+    const timber = wi != 2
+    const jet: f32 = style == 1 ? 0.26 : 0
+    const front = style == 1 || style == 3
+    const span: f32 = front ? w + jet : d
+    const len: f32 = front ? d + jet : w
+    const door_x: f32 = match style { 0: 0; 1: -0.62; 2: -1.15; _: 0 }
+    const side: f32 = rnd(seed, 3) > 0.5 ? 1 : -1
+    const chx: f32 = front ? side * span * 0.24 : side * w * 0.3
+    const chz: f32 = front ? -d * 0.2 : -d * 0.16
+    const wy: f32 = fh + wh * 0.56
+    const fz: f32 = d / 2
+    const uz: f32 = (d + jet) / 2
+    const ux: f32 = (w + jet) / 2
+
+    base : IsleStone { Position: {0, fh / 2, 0}; Box: {w + 0.16, fh, d + 0.16} }
+    walls { (IsA, $wall); Position: {0, fh + wh / 2, 0}; Box: {w, wh, d} }
+    if style == 1 {
+      upper { (IsA, $wall); Position: {0, fh + wh * 0.76, 0}; Box: {w + jet, wh * 0.48, d + jet} }
+      band : IsleWoodDark { Position: {0, fh + wh * 0.5, 0}; Box: {w + jet + 0.08, 0.16, d + jet + 0.08} }
+    }
+    if timber {
+      for i in 0..4 {
+        const sx = i % 2 == 0 ? -1 : 1
+        const sz = i < 2 ? -1 : 1
+        { (IsA, IsleWoodDark); Position: {sx * ux, fh + wh / 2, sz * uz}; Box: {0.16, wh, 0.16} }
+      }
+      plate : IsleWoodDark { Position: {0, top - 0.07, 0}; Box: {w + jet + 0.08, 0.14, d + jet + 0.08} }
+      if style != 1 {
+        rail : IsleWoodDark { Position: {0, fh + wh * 0.3, 0}; Box: {w + 0.06, 0.1, d + 0.06} }
+      }
+    }
+
+    IsleGableRoof roof(span: span, rise: rise, len: len, ri: ri, wi: wi, timber: timber, attic: front) {
+      Position: {0, top, 0}
+      Rotation: {0, front ? 0 : HALF_PI, 0}
+    }
+
+    if style != 3 {
+      chimney : IsleStone { Position: {chx, top + (rise + 0.4) / 2, chz}; Box: {0.44, rise + 0.4, 0.44} }
+      chimney_cap : IsleStone { Position: {chx, top + rise + 0.44, chz}; Box: {0.56, 0.1, 0.56} }
+      chimney_pot : IsleVillageTerracotta { Position: {chx, top + rise + 0.62, chz}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.28, segments: 10, smooth: true} }
+      if smoke {
+        IsleChimneySmoke puff(seed: seed) { Position: {chx, top + rise + 0.8, chz} }
+      }
+
+      door_frame : IsleWoodDark { Position: {door_x, fh + 0.7, fz + 0.02}; Box: {0.88, 1.44, 0.08} }
+      door { (IsA, $trim); Position: {door_x, fh + 0.66, fz + 0.05}; Box: {0.7, 1.32, 0.06} }
+      door_knob : IsleBrass { Position: {door_x + 0.24, fh + 0.66, fz + 0.09}; Sphere: {radius: 0.045, segments: 10, smooth: true}; SpatialIgnore }
+      door_lamp : IsleLampGlow { Position: {door_x, fh + 1.54, fz + 0.1}; Box: {0.14, 0.16, 0.12}; SpatialIgnore }
+      step : IsleStone { Position: {door_x, 0.07, fz + 0.34}; Box: {1.1, 0.14, 0.52} }
+    }
+
+    if style == 0 {
+      IsleHouseWindow win_a(fancy: true, tint: look) { Position: {-1.04, wy, fz} }
+      IsleHouseWindow win_b(fancy: true, tint: look) { Position: {1.04, wy, fz} }
+      IsleHouseWindow win_c() { Position: {-0.9, wy, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_d() { Position: {0.9, wy, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_e() { Position: {w / 2, wy, 0}; Rotation: {0, HALF_PI, 0} }
+      IsleHouseWindow win_f() { Position: {-w / 2, wy, 0}; Rotation: {0, -HALF_PI, 0} }
+      bench : IsleWood { Position: {-1.04, 0.3, fz + 0.3}; Box: {0.9, 0.07, 0.3} }
+      bench_leg_a : IsleWoodDark { Position: {-1.4, 0.14, fz + 0.3}; Box: {0.07, 0.28, 0.26} }
+      bench_leg_b : IsleWoodDark { Position: {-0.68, 0.14, fz + 0.3}; Box: {0.07, 0.28, 0.26} }
+    } else if style == 1 {
+      IsleHouseWindow win_g(w: 0.6, h: 0.7) { Position: {0.62, fh + 0.95, fz} }
+      IsleHouseWindow win_a(fancy: true, tint: look) { Position: {-0.7, fh + wh * 0.76, uz} }
+      IsleHouseWindow win_b(fancy: true, tint: look) { Position: {0.7, fh + wh * 0.76, uz} }
+      IsleHouseWindow win_c() { Position: {-0.6, fh + wh * 0.76, -uz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_d() { Position: {0.6, fh + wh * 0.3, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_e() { Position: {ux, fh + wh * 0.76, 0}; Rotation: {0, HALF_PI, 0} }
+      IsleHouseWindow win_f() { Position: {-ux, fh + wh * 0.76, 0}; Rotation: {0, -HALF_PI, 0} }
+      IsleBarrel barrel() { Position: {1.2, 0, fz + 0.4} }
+    } else if style == 2 {
+      IsleHouseWindow win_a(w: 1.5, h: 0.85) { Position: {0.62, fh + 1.0, fz} }
+      IsleHouseWindow win_c() { Position: {-0.9, wy, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_d() { Position: {0.9, wy, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_e() { Position: {w / 2, wy, 0}; Rotation: {0, HALF_PI, 0} }
+      IsleHouseWindow win_f() { Position: {-w / 2, wy, 0}; Rotation: {0, -HALF_PI, 0} }
+      awning {
+        Position: {0.62, fh + 1.72, fz + 0.46}
+        Rotation: {0.42, 0, 0}
+        base : IsleClothWhite { Position: {0, 0, 0}; Box: {1.96, 0.04, 1.0} }
+        for i in 0..4 {
+          { (IsA, $trim); Position: {-0.735 + i * 0.49, 0.006, 0}; Box: {0.245, 0.04, 1.01}; SpatialIgnore }
+        }
+      }
+      sign_arm : IsleIron { Position: {door_x, fh + 1.88, fz + 0.32}; Box: {0.04, 0.04, 0.64}; SpatialIgnore }
+      sign { (IsA, $trim); Position: {door_x, fh + 1.66, fz + 0.42}; Box: {0.06, 0.34, 0.46} }
+      sign_dot_a : IsleBrass { Position: {door_x + 0.035, fh + 1.66, fz + 0.42}; Sphere: {radius: 0.09, segments: 10, smooth: true}; SpatialIgnore }
+      sign_dot_b : IsleBrass { Position: {door_x - 0.035, fh + 1.66, fz + 0.42}; Sphere: {radius: 0.09, segments: 10, smooth: true}; SpatialIgnore }
+      crate_a : IsleWood { Position: {0.3, 0.2, fz + 0.36}; Rotation: {0, 0.2, 0}; Box: {0.5, 0.4, 0.4} }
+      crate_b : IsleWoodDark { Position: {0.95, 0.16, fz + 0.4}; Rotation: {0, -0.25, 0}; Box: {0.42, 0.32, 0.38} }
+      for i in 0..3 {
+        { (IsA, IslePaintRed); Position: {0.18 + i * 0.13, 0.44, fz + 0.36}; IcoSphere: {radius: 0.07, segments: 1}; SpatialIgnore; NoShadow }
+        { (IsA, IslePaintYellow); Position: {0.84 + i * 0.12, 0.36, fz + 0.4}; IcoSphere: {radius: 0.06, segments: 1}; SpatialIgnore; NoShadow }
+      }
+    } else {
+      gate_frame : IsleWoodDark { Position: {0, fh + 0.86, fz + 0.02}; Box: {1.96, 1.76, 0.08} }
+      door_l : IsleWood { Position: {-0.45, fh + 0.82, fz + 0.05}; Box: {0.86, 1.62, 0.06} }
+      door_r : IsleWood { Position: {0.45, fh + 0.82, fz + 0.05}; Box: {0.86, 1.62, 0.06} }
+      for i in 0..4 {
+        const sx = i % 2 == 0 ? -1 : 1
+        const sy = i < 2 ? 0.36 : 1.3
+        { (IsA, IsleIron); Position: {sx * 0.45, fh + sy, fz + 0.085}; Box: {0.78, 0.07, 0.02}; SpatialIgnore }
+      }
+      gate_step : IsleStone { Position: {0, 0.05, fz + 0.36}; Box: {2.2, 0.1, 0.56} }
+      IsleHouseWindow win_c() { Position: {-0.9, wy, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_d() { Position: {0.9, wy, -fz}; Rotation: {0, PI, 0} }
+      IsleHouseWindow win_f() { Position: {-w / 2, wy, 0}; Rotation: {0, -HALF_PI, 0} }
+      IsleHouseWindow win_h(w: 0.4, h: 0.5) { Position: {-1.42, wy, fz} }
+      hearth : IsleStone { Position: {w / 2 + 0.42, 0.6, 0.3}; Box: {0.9, 1.2, 1.1} }
+      hearth_mouth : IsleBlack { Position: {w / 2 + 0.42, 0.62, 0.86}; Box: {0.6, 0.5, 0.02} }
+      fire : IsleFire { Position: {w / 2 + 0.42, 0.5, 0.87}; Box: {0.46, 0.22, 0.03}; NoShadow }
+      stack : IsleStone { Position: {w / 2 + 0.42, (top + rise + 0.5) / 2, 0.05}; Box: {0.6, top + rise + 0.5, 0.6} }
+      stack_cap : IsleStone { Position: {w / 2 + 0.42, top + rise + 0.54, 0.05}; Box: {0.74, 0.1, 0.74} }
+      stump : IsleBark { Position: {w / 2 + 0.3, 0.2, 1.5}; Cylinder: {radius: 0.2, length: 0.4, segments: 10} }
+      anvil : IsleIron { Position: {w / 2 + 0.3, 0.5, 1.5}; Box: {0.5, 0.14, 0.2} }
+      anvil_foot : IsleIron { Position: {w / 2 + 0.3, 0.42, 1.5}; Box: {0.22, 0.1, 0.16} }
+      anvil_horn : IsleIron { Position: {w / 2 + 0.62, 0.5, 1.5}; Rotation: {0, 0, -HALF_PI}; Cone: {radius: 0.07, length: 0.2, segments: 8} }
+      IsleBarrel barrel() { Position: {-1.5, 0, fz + 0.36} }
+      wheel : IsleWoodDark { Position: {1.42, 0.45, fz + 0.1}; Rotation: {HALF_PI - 0.2, 0, 0}; Torus: {radius: 0.36, tube: 0.045, segments: 18, rings: 6} }
+      if smoke {
+        IsleChimneySmoke forge_puff(seed: seed) { Position: {w / 2 + 0.42, top + rise + 0.7, 0.05} }
+      }
+    }
+  }
+
+  template IsleHouseSlot {
+    prop idx: i32 = 0
+    mut shown = false
+
+    const a: f32 = match idx { 0: 1.8; 1: 2.64; 2: 2.62; 3: 1.72; 4: 3.0; 5: 2.92; 6: 1.42; 7: 1.46; 8: 3.2; 9: 3.38; 10: 1.2; 11: 3.48; 12: 3.76; _: 3.76 }
+    const inner = match idx { 0, 2, 4, 6, 9, 12: true; _: false }
+    const style = match idx { 0: 2; 1: 1; 2: 0; 3: 0; 4: 1; 5: 3; 6: 0; 7: 1; 8: 0; 9: 2; 10: 0; 11: 1; 12: 0; _: 3 }
+    const look = match idx { 0: 0; 1: 0; 2: 1; 3: 0; 4: 1; 5: 2; 6: 2; 7: 3; 8: 3; 9: 1; 10: 1; 11: 2; 12: 0; _: 3 }
+    const r: f32 = (inner ? 12.0 : 17.8) + (rnd(idx, 1) - 0.5) * 0.4
+    const yaw: f32 = (inner ? HALF_PI : -HALF_PI) - a + (rnd(idx, 2) - 0.5) * 0.2
+    const s: f32 = shown ? 1 : 0.05
+
+    Position: {px(r, a), 0, pz(r, a)}
+    Rotation: {0, yaw, 0}
+    Scale: {s, s, s}
+    Transition: [Scale: {duration: 0.55, timing_function: CubicBezier, bezier: {0.34, 1.56, 0.64, 1}}]
+
+    IsleHouse body(seed: idx, style: style, look: look, smoke: idx % 3 == 0 || style == 3)
+
+    async {
+      await delay(0.05)
+      shown = true
+    }
+  }
+
+  template IsleStreetLamp {
+    prop lit = false
+    foot : IsleStone { Position: {0, 0.08, 0}; Cylinder: {radius: 0.16, length: 0.16, segments: 10} }
+    post : IsleIron { Position: {0, 0.98, 0}; Frustum: {radius_bottom: 0.06, radius_top: 0.035, length: 1.7, segments: 8, smooth: true} }
+    collar : IsleIron { Position: {0, 1.8, 0}; Frustum: {radius_bottom: 0.05, radius_top: 0.13, length: 0.08, segments: 4}; Rotation: {0, 0.7854, 0}; SpatialIgnore }
+    lantern : IsleLampGlow { Position: {0, 1.97, 0}; Box: {0.17, 0.26, 0.17}; NoShadow }
+    cap : IsleIron { Position: {0, 2.17, 0}; Rotation: {0, 0.7854, 0}; Cone: {radius: 0.2, length: 0.16, segments: 4}; SpatialIgnore }
+    if lit && night {
+      glow { Position: {0, 1.97, 0}; Rgb: {255, 196, 120}; PointLight: {intensity: 7, range: 9} }
+    }
+  }
+
+  template IsleVillager {
+    prop look: i32 = 0
+    const cloth = match look % 4 { 0: IsleClothRed; 1: IsleClothBlue; 2: IsleClothYellow; _: IsleClothWhite }
+    body { (IsA, $cloth); Position: {0, 0.31, 0}; Frustum: {radius_bottom: 0.2, radius_top: 0.11, length: 0.62, segments: 14, smooth: true} }
+    arm_l { (IsA, $cloth); Position: {-0.17, 0.42, 0}; Rotation: {0, 0, -0.3}; Capsule: {radius: 0.045, length: 0.2, segments: 8, smooth: true}; SpatialIgnore }
+    arm_r { (IsA, $cloth); Position: {0.17, 0.42, 0}; Rotation: {0, 0, 0.3}; Capsule: {radius: 0.045, length: 0.2, segments: 8, smooth: true}; SpatialIgnore }
+    head : IsleVillageSkin { Position: {0, 0.75, 0}; Sphere: {radius: 0.15, segments: 14, smooth: true} }
+    if look % 3 == 0 {
+      brim : IsleRoofThatch { Position: {0, 0.84, 0}; Cylinder: {radius: 0.26, length: 0.03, segments: 14}; SpatialIgnore }
+      crown : IsleRoofThatch { Position: {0, 0.9, 0}; Cylinder: {radius: 0.13, length: 0.12, segments: 12}; SpatialIgnore }
+    } else if look % 3 == 1 {
+      hat : IslePaintGreen { Position: {0, 0.96, 0}; Cone: {radius: 0.17, length: 0.3, segments: 12, smooth: true}; SpatialIgnore }
+    } else {
+      cap : IsleVillageTimber { Position: {0, 0.8, -0.02}; HemiSphere: {radius: 0.16, segments: 12, smooth: true}; SpatialIgnore }
+    }
+  }
+
+  template IsleVillageCat {
+    prop look: i32 = 0
+    const fur = match look { 0: IsleVillageFur; 1: IsleBlack; _: IsleWhite }
+    body { (IsA, $fur); Position: {0, 0.13, 0}; Rotation: {HALF_PI, 0, 0}; Capsule: {radius: 0.085, length: 0.2, segments: 10, smooth: true} }
+    head { (IsA, $fur); Position: {0, 0.24, 0.17}; Sphere: {radius: 0.085, segments: 10, smooth: true} }
+    ear_l { (IsA, $fur); Position: {-0.05, 0.33, 0.17}; Cone: {radius: 0.03, length: 0.07, segments: 6}; SpatialIgnore }
+    ear_r { (IsA, $fur); Position: {0.05, 0.33, 0.17}; Cone: {radius: 0.03, length: 0.07, segments: 6}; SpatialIgnore }
+    tail { (IsA, $fur); Position: {0, 0.26, -0.2}; Rotation: {-0.4, 0, 0}; Capsule: {radius: 0.022, length: 0.2, segments: 6}; SpatialIgnore }
+  }
+
+  template IsleFountain {
+    basin : IsleStone { Position: {0, 0.24, 0}; Tube: {radius: 1.05, thickness: 0.2, length: 0.48, segments: 28, smooth: true} }
+    floor : IsleStone { Position: {0, 0.1, 0}; Cylinder: {radius: 0.9, length: 0.2, segments: 28} }
+    water : IsleVillageWater { Position: {0, 0.38, 0}; Cylinder: {radius: 0.87, length: 0.04, segments: 28}; NoShadow }
+    pillar : IsleStone { Position: {0, 0.75, 0}; Frustum: {radius_bottom: 0.2, radius_top: 0.12, length: 0.9, segments: 14, smooth: true} }
+    bowl : IsleStone { Position: {0, 1.24, 0}; Frustum: {radius_bottom: 0.14, radius_top: 0.52, length: 0.2, segments: 20, smooth: true} }
+    bowl_water : IsleVillageWater { Position: {0, 1.335, 0}; Cylinder: {radius: 0.46, length: 0.02, segments: 20}; NoShadow }
+    spout : IsleBrass { Position: {0, 1.44, 0}; Frustum: {radius_bottom: 0.07, radius_top: 0.03, length: 0.22, segments: 10, smooth: true} }
+    spray {
+      Position: {0, 1.56, 0}
+      SpatialIgnore
+      ParticleEmitter: {
+        max: 160, rate: 90, spread: 24, speed: {1.6, 2.2}, lifetime: {0.7, 0.95}, size: {0.035, 0.07},
+        opacity: {0.5, 0.9}, color: {214, 236, 255}, seed: 5
+      }
+      ParticleForces: {gravity: {0, -7, 0}}
+      ParticleCurves: {opacity: {keys: [{0, 1}, {0.8, 0.8}, {1, 0}]}}
+    }
+  }
+
+  template IsleMarketStall {
+    prop look: i32 = 0
+    const cloth = match look { 0: IsleClothRed; 1: IsleClothBlue; _: IsleClothYellow }
+    table : IsleWood { Position: {0, 0.6, 0}; Box: {1.9, 0.08, 0.85} }
+    skirt { (IsA, $cloth); Position: {0, 0.36, 0.41}; Box: {1.86, 0.44, 0.03} }
+    for i in 0..4 {
+      const sx = i % 2 == 0 ? -1 : 1
+      const sz = i < 2 ? -1 : 1
+      { (IsA, IsleWoodDark); Position: {sx * 0.9, sz < 0 ? 0.95 : 0.8, sz * 0.38}; Box: {0.08, sz < 0 ? 1.9 : 1.6, 0.08} }
+    }
+    canopy {
+      Position: {0, 1.78, 0.02}
+      Rotation: {0.33, 0, 0}
+      sheet : IsleClothWhite { Position: {0, 0, 0}; Box: {2.2, 0.04, 1.3} }
+      for i in 0..4 {
+        { (IsA, $cloth); Position: {-0.825 + i * 0.55, 0.006, 0}; Box: {0.275, 0.04, 1.31}; SpatialIgnore }
+      }
+    }
+    crate : IsleWoodDark { Position: {-0.55, 0.72, 0}; Box: {0.6, 0.16, 0.5} }
+    for i in 0..6 {
+      { (IsA, IslePaintRed); Position: {-0.75 + (i % 3) * 0.2, 0.83, -0.1 + (i / 3) * 0.2}; IcoSphere: {radius: 0.085, segments: 1}; SpatialIgnore; NoShadow }
+    }
+    cheese_a : IslePaintYellow { Position: {0.2, 0.71, 0.05}; Cylinder: {radius: 0.2, length: 0.14, segments: 14, smooth: true} }
+    cheese_b : IslePaintYellow { Position: {0.24, 0.84, 0.02}; Cylinder: {radius: 0.16, length: 0.12, segments: 14, smooth: true} }
+    loaf_a : IsleRoofThatch { Position: {0.68, 0.7, 0.1}; Rotation: {HALF_PI, 0.5, 0}; Capsule: {radius: 0.07, length: 0.2, segments: 8, smooth: true}; SpatialIgnore }
+    loaf_b : IsleRoofThatch { Position: {0.66, 0.7, -0.14}; Rotation: {HALF_PI, -0.3, 0}; Capsule: {radius: 0.07, length: 0.2, segments: 8, smooth: true}; SpatialIgnore }
+    jug : IsleVillageTerracotta { Position: {0.72, 0.76, -0.3}; Frustum: {radius_bottom: 0.09, radius_top: 0.05, length: 0.24, segments: 10, smooth: true}; SpatialIgnore }
+  }
+
+  template IsleNoticeBoard {
+    post_l : IsleWoodDark { Position: {-0.55, 0.7, 0}; Box: {0.09, 1.4, 0.09} }
+    post_r : IsleWoodDark { Position: {0.55, 0.7, 0}; Box: {0.09, 1.4, 0.09} }
+    panel : IsleWood { Position: {0, 0.95, 0}; Box: {1.1, 0.7, 0.05} }
+    hood : IsleRoofRed { Position: {0, 1.46, 0}; TrianglePrism: {1.5, 0.22, 0.34} }
+    note_a : IsleWhite { Position: {-0.3, 1.02, 0.03}; Rotation: {0, 0, 0.08}; Box: {0.26, 0.34, 0.01}; SpatialIgnore; NoShadow }
+    note_b : IslePaintCream { Position: {0.06, 0.92, 0.03}; Rotation: {0, 0, -0.1}; Box: {0.3, 0.22, 0.01}; SpatialIgnore; NoShadow }
+    note_c : IslePaintYellow { Position: {0.36, 1.06, 0.03}; Rotation: {0, 0, 0.14}; Box: {0.2, 0.24, 0.01}; SpatialIgnore; NoShadow }
+  }
+
+  template IsleBellTower {
+    mut swing: i32 = 0
+
+    Interactive
+    Cursor: {CursorPointer}
+
+    plinth : IsleStone { Position: {0, 0.15, 0}; Box: {2.1, 0.3, 2.1} }
+    lower : IsleStone { Position: {0, 1.3, 0}; Box: {1.75, 2.0, 1.75} }
+    course : IsleWoodDark { Position: {0, 2.35, 0}; Box: {1.85, 0.12, 1.85} }
+    shaft : IslePlaster { Position: {0, 3.55, 0}; Box: {1.55, 2.3, 1.55} }
+    cornice : IsleWoodDark { Position: {0, 4.76, 0}; Box: {1.85, 0.14, 1.85} }
+    for i in 0..4 {
+      const sx = i % 2 == 0 ? -1 : 1
+      const sz = i < 2 ? -1 : 1
+      { (IsA, IsleWoodDark); Position: {sx * 0.68, 5.38, sz * 0.68}; Box: {0.16, 1.1, 0.16} }
+      { (IsA, IsleWoodDark); Position: {sx * 0.775, 3.55, sz * 0.775}; Box: {0.12, 2.3, 0.12} }
+    }
+    belfry_rail : IsleWoodDark { Position: {0, 5.0, 0}; Box: {1.5, 0.34, 1.5} }
+    belfry_top : IsleWoodDark { Position: {0, 5.98, 0}; Box: {1.7, 0.12, 1.7} }
+    spire : IsleRoofBlue { Position: {0, 6.94, 0}; Rotation: {0, 0.7854, 0}; Cone: {radius: 1.4, length: 1.8, segments: 4} }
+    if season == WINTER {
+      spire_snow : IsleSnow { Position: {0, 7.2, 0}; Rotation: {0, 0.7854, 0}; Cone: {radius: 1.04, length: 1.34, segments: 4} }
+    }
+    finial : IsleBrass { Position: {0, 7.9, 0}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
+    vane_rod : IsleIron { Position: {0, 8.15, 0}; Cylinder: {radius: 0.015, length: 0.5, segments: 6} }
+    vane : IsleBrass { Position: {0.1, 8.3, 0}; Box: {0.4, 0.12, 0.015} }
+
+    yoke {
+      Position: {0, 5.82, 0}
+      Rotation: {0, 0, swing * 0.55}
+      Transition: [Rotation: {duration: 0.38, timing_function: EaseInOut}]
+      beam : IsleVillageTimber { Position: {0, 0, 0}; Box: {1.3, 0.1, 0.1} }
+      bell : IsleBrass { Position: {0, -0.33, 0}; Frustum: {radius_bottom: 0.36, radius_top: 0.17, length: 0.46, segments: 18, smooth: true} }
+      crown : IsleBrass { Position: {0, -0.1, 0}; Sphere: {radius: 0.17, segments: 12, smooth: true} }
+      lip : IsleBrass { Position: {0, -0.55, 0}; Torus: {radius: 0.36, tube: 0.03, segments: 18, rings: 6} }
+      clapper : IsleIron { Position: {0, -0.62, 0}; Sphere: {radius: 0.07, segments: 8, smooth: true} }
+    }
+
+    door_arch : IsleStone { Position: {0, 1.05, 0.9}; Box: {1.0, 1.6, 0.1} }
+    door : IsleWoodDark { Position: {0, 0.98, 0.93}; Box: {0.74, 1.36, 0.08} }
+    door_ring : IsleBrass { Position: {0.2, 1.0, 0.98}; Torus: {radius: 0.06, tube: 0.014, segments: 10, rings: 5}; Rotation: {HALF_PI, 0, 0}; SpatialIgnore }
+    step : IsleStone { Position: {0, 0.07, 1.25}; Box: {1.2, 0.14, 0.5} }
+    clock_rim : IsleBrass { Position: {0, 3.75, 0.78}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.52, length: 0.06, segments: 24} }
+    clock : IsleWhite { Position: {0, 3.75, 0.8}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.45, length: 0.06, segments: 24} }
+    hand_h : IsleBlack { Position: {0.08, 3.84, 0.84}; Rotation: {0, 0, -0.7}; Box: {0.04, 0.26, 0.01}; SpatialIgnore }
+    hand_m : IsleBlack { Position: {-0.12, 3.86, 0.84}; Rotation: {0, 0, 0.85}; Box: {0.03, 0.36, 0.01}; SpatialIgnore }
+    slit_l : IsleWindow { Position: {-0.79, 3.4, 0}; Box: {0.04, 0.7, 0.3} }
+    slit_r : IsleWindow { Position: {0.79, 3.4, 0}; Box: {0.04, 0.7, 0.3} }
+    slit_b : IsleWindow { Position: {0, 3.4, -0.79}; Box: {0.3, 0.7, 0.04} }
+
+    async {
+      while true {
+        await on.click(this)
+        emit Bell()
+      }
+    }
+
+    async {
+      while true {
+        await Bell
+        for k in 0..4 {
+          swing = 1
+          await delay(0.4)
+          swing = -1
+          await delay(0.4)
+        }
+        swing = 0
+      }
+    }
+  }
+
+  template IsleVillage {
+    const sq_r: f32 = 14.0
+    const sq_a: f32 = 2.2
+
+    for i in 0..village {
+      IsleHouseSlot "house_{i}"(idx: i)
+    }
+
+    for i in 0..30 {
+      const a = 1.12 + i * 0.094
+      { (IsA, IsleCobble); Position: {px(14.9, a), 0.03, pz(14.9, a)}; Rotation: {0, -a, 0}; Box: {1.3, 0.06, 1.5}; NoShadow; SpatialIgnore }
+    }
+    station_path : IsleCobble { Position: {px(18.3, 2.0), 0.03, pz(18.3, 2.0)}; Rotation: {0, -2.0, 0}; Box: {5.0, 0.06, 1.2}; NoShadow; SpatialIgnore }
+    lake_path : IsleCobble { Position: {px(10.6, 2.2), 0.03, pz(10.6, 2.2)}; Rotation: {0, -2.2, 0}; Box: {2.6, 0.06, 1.1}; NoShadow; SpatialIgnore }
+
+    for i in 0..8 {
+      const a = 1.25 + i * 0.34 + (i > 2 ? 0.2 : 0)
+      IsleStreetLamp "lamp_{i}"(lit: i == 1 || i == 2 || i == 3 || i == 5 || i == 7) { Position: {px(14.0, a), 0, pz(14.0, a)} }
+    }
+
+    for i in 0..11 {
+      const a = 1.16 + i * 0.26 + (i > 2 ? 0.2 : 0)
+      if i != 3 && i != 7 {
+        IsleFence "fence_{i}"(n: 4) { Position: {px(19.75, a), 0, pz(19.75, a)}; Rotation: {0, HALF_PI - a, 0} }
+      }
+    }
+
+    square {
+      Position: {px(sq_r, sq_a), 0, pz(sq_r, sq_a)}
+      Rotation: {0, -sq_a - HALF_PI, 0}
+
+      plaza : IsleCobble { Position: {0, 0.04, 0}; Cylinder: {radius: 2.9, length: 0.08, segments: 40}; NoShadow }
+      kerb : IsleStone { Position: {0, 0.05, 0}; Tube: {radius: 3.05, thickness: 0.18, length: 0.12, segments: 40} }
+      IsleFountain fountain() { Position: {0, 0.06, 0} }
+      IsleMarketStall stall_a(look: 0) { Position: {-1.9, 0.08, 0.5}; Rotation: {0, 1.2, 0} }
+      IsleMarketStall stall_b(look: 1) { Position: {1.9, 0.08, 0.5}; Rotation: {0, -1.2, 0} }
+      IsleNoticeBoard board() { Position: {1.6, 0.08, -2.0}; Rotation: {0, -0.5, 0} }
+      IsleBarrel barrel_a() { Position: {-1.5, 0.08, -2.0} }
+      IsleBarrel barrel_b() { Position: {-2.0, 0.08, -1.7} }
+      crate_a : IsleWood { Position: {-1.0, 0.3, -2.3}; Rotation: {0, 0.3, 0}; Box: {0.5, 0.44, 0.5} }
+      crate_b : IsleWoodDark { Position: {-1.05, 0.68, -2.28}; Rotation: {0, -0.2, 0}; Box: {0.36, 0.32, 0.36} }
+      IsleBellTower tower() { Position: {0, 0, -3.9} }
+
+      IsleVillager folk_a(look: 0) { Position: {-1.2, 0.08, 1.3}; Rotation: {0, -1.9, 0} }
+      IsleVillager folk_b(look: 1) { Position: {1.25, 0.08, 1.2}; Rotation: {0, 1.9, 0} }
+      IsleVillager folk_c(look: 2) { Position: {0.5, 0.08, 1.9}; Rotation: {0, 2.8, 0} }
+      IsleVillager folk_d(look: 3) { Position: {-0.2, 0.08, 2.1}; Rotation: {0, -2.6, 0} }
+      IsleVillager folk_e(look: 4) { Position: {1.3, 0.08, -1.3}; Rotation: {0, 2.4, 0} }
+      IsleVillager folk_f(look: 5) { Position: {-0.4, 0.08, -2.2}; Rotation: {0, 3.1, 0} }
+      IsleVillager folk_g(look: 6) { Position: {-2.4, 0.08, 1.3}; Rotation: {0, 1.2, 0}; Scale: {0.7, 0.7, 0.7} }
+      IsleVillageCat cat(look: 0) { Position: {0.9, 0.54, -0.6}; Rotation: {0, 2.0, 0} }
+      IsleVillageCat dog(look: 2) { Position: {-0.9, 0.08, 2.2}; Rotation: {0, 0.6, 0}; Scale: {1.5, 1.5, 1.5} }
+    }
+  }
+
+  template IsleWindmillSail {
+    stock : IsleVillageTimber { Position: {0, 2.35, 0}; Box: {0.13, 4.7, 0.1} }
+    cloth : IsleVillageSail { Position: {0.5, 2.8, -0.02}; Box: {0.84, 3.5, 0.03} }
+    edge : IsleVillageTimber { Position: {0.92, 2.8, 0}; Box: {0.05, 3.56, 0.05}; SpatialIgnore }
+    for i in 0..7 {
+      { (IsA, IsleVillageTimber); Position: {0.46, 1.06 + i * 0.58, 0.012}; Box: {0.94, 0.045, 0.045}; SpatialIgnore }
+    }
+  }
+
+  template IsleWindmillRotor {
+    AngularVelocity: {0, 0, wind * 1.5}
+    DynamicTransform
+    hub : IsleIron { Position: {0, 0, 0.05}; Rotation: {HALF_PI, 0, 0}; Cone: {radius: 0.24, length: 0.4, segments: 12, smooth: true} }
+    for i in 0..4 {
+      IsleWindmillSail "sail_{i}"() { Rotation: {0, 0, i * HALF_PI} }
+    }
+  }
+
+  template IsleWindmill {
+    Position: {px(26.5, MILL_A), 0, pz(26.5, MILL_A)}
+    Rotation: {0, 0.85, 0}
+
+    plinth : IsleStone { Position: {0, 0.2, 0}; Cylinder: {radius: 2.35, length: 0.5, segments: 32, smooth: true} }
+    base : IsleStone { Position: {0, 1.55, 0}; Frustum: {radius_bottom: 2.05, radius_top: 1.8, length: 2.3, segments: 32, smooth: true} }
+    tower : IslePlaster { Position: {0, 5.1, 0}; Frustum: {radius_bottom: 1.8, radius_top: 1.25, length: 4.8, segments: 32, smooth: true} }
+    band : IsleWoodDark { Position: {0, 7.5, 0}; Cylinder: {radius: 1.36, length: 0.24, segments: 32, smooth: true} }
+    cap : IsleRoofBlue { Position: {0, 7.6, 0.1}; Scale: {1, 0.95, 1.2}; HemiSphere: {radius: 1.4, segments: 24, smooth: true} }
+    finial : IsleBrass { Position: {0, 9.0, 0.1}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+    tail : IsleVillageTimber { Position: {0, 7.9, -1.9}; Rotation: {0.5, 0, 0}; Box: {0.12, 0.12, 2.0} }
+    if season == WINTER {
+      cap_snow : IsleSnow { Position: {0, 7.86, 0.1}; Scale: {1, 0.9, 1.2}; HemiSphere: {radius: 1.24, segments: 20, smooth: true} }
+    }
+
+    deck : IsleWood { Position: {0, 2.76, 0}; Cylinder: {radius: 2.75, length: 0.12, segments: 32} }
+    rail_top : IsleWoodDark { Position: {0, 3.34, 0}; Torus: {radius: 2.66, tube: 0.04, segments: 36, rings: 6} }
+    rail_mid : IsleWoodDark { Position: {0, 3.08, 0}; Torus: {radius: 2.66, tube: 0.025, segments: 36, rings: 6} }
+    for i in 0..12 {
+      const a = i * TAU / 12 + 0.26
+      { (IsA, IsleWoodDark); Position: {cos(a) * 2.66, 3.08, sin(a) * 2.66}; Box: {0.08, 0.56, 0.08}; SpatialIgnore }
+      {
+        Position: {cos(a) * 2.25, 2.25, sin(a) * 2.25}
+        Rotation: {0, -a, 0}
+        { (IsA, IsleWoodDark); Position: {0, 0, 0}; Rotation: {0, 0, -0.75}; Box: {0.09, 1.25, 0.09}; SpatialIgnore }
+      }
+    }
+
+    door_frame : IsleStone { Position: {0, 1.2, 1.9}; Box: {1.1, 1.6, 0.4} }
+    door : IslePaintGreen { Position: {0, 1.12, 2.08}; Box: {0.78, 1.36, 0.08} }
+    door_knob : IsleBrass { Position: {0.24, 1.1, 2.13}; Sphere: {radius: 0.05, segments: 10, smooth: true}; SpatialIgnore }
+    step : IsleStone { Position: {0, 0.22, 2.5}; Box: {1.3, 0.44, 0.6} }
+    for i in 0..4 {
+      const y = 3.9 + i * 0.85
+      const wr = 1.8 - (y - 2.7) * 0.1146
+      {
+        Rotation: {0, 0.5 + i * 1.9, 0}
+        IsleHouseWindow win(w: 0.38, h: 0.52) { Position: {0, y, wr - 0.03}; Rotation: {-0.114, 0, 0} }
+      }
+    }
+
+    shaft : IsleVillageTimber { Position: {0, 8.0, 1.5}; Rotation: {HALF_PI - 0.12, 0, 0}; Cylinder: {radius: 0.15, length: 1.3, segments: 12, smooth: true} }
+    axle {
+      Position: {0, 8.08, 2.12}
+      Rotation: {-0.12, 0, 0}
+      IsleWindmillRotor rotor()
+    }
+  }
+
+  template IsleLighthouse {
+    Position: {0, 7, -22}
+
+    footing : IsleStone { Position: {0, -0.7, 0}; Cylinder: {radius: 2.2, length: 2.0, segments: 28, smooth: true} }
+    for i in 0..4 {
+      const rb = 1.6 - i * 0.14
+      if i % 2 == 0 {
+        { (IsA, IslePaintRed); Position: {0, 1.1 + i * 1.6, 0}; Frustum: {radius_bottom: rb, radius_top: rb - 0.14, length: 1.6, segments: 28, smooth: true} }
+      } else {
+        { (IsA, IsleWhite); Position: {0, 1.1 + i * 1.6, 0}; Frustum: {radius_bottom: rb, radius_top: rb - 0.14, length: 1.6, segments: 28, smooth: true} }
+      }
+    }
+    corbel : IsleWhite { Position: {0, 6.55, 0}; Frustum: {radius_bottom: 1.04, radius_top: 1.6, length: 0.3, segments: 28, smooth: true} }
+    deck : IsleIron { Position: {0, 6.76, 0}; Cylinder: {radius: 1.72, length: 0.12, segments: 28} }
+    rail_top : IsleIron { Position: {0, 7.36, 0}; Torus: {radius: 1.66, tube: 0.03, segments: 28, rings: 6} }
+    rail_mid : IsleIron { Position: {0, 7.1, 0}; Torus: {radius: 1.66, tube: 0.018, segments: 28, rings: 5} }
+    for i in 0..10 {
+      const a = i * TAU / 10
+      { (IsA, IsleIron); Position: {cos(a) * 1.66, 7.09, sin(a) * 1.66}; Cylinder: {radius: 0.025, length: 0.56, segments: 6}; SpatialIgnore }
+    }
+
+    lantern_base : IsleWhite { Position: {0, 6.98, 0}; Cylinder: {radius: 0.95, length: 0.32, segments: 20, smooth: true} }
+    lantern_glass : IsleGlass { Position: {0, 7.7, 0}; Cylinder: {radius: 0.86, length: 1.12, segments: 20, smooth: true}; NoShadow }
+    for i in 0..8 {
+      const a = i * TAU / 8
+      { (IsA, IsleIron); Position: {cos(a) * 0.88, 7.7, sin(a) * 0.88}; Box: {0.05, 1.12, 0.05}; SpatialIgnore }
+    }
+    lamp_stand : IsleBrass { Position: {0, 7.36, 0}; Cylinder: {radius: 0.14, length: 0.44, segments: 12, smooth: true} }
+    lamp : IsleLampGlow { Position: {0, 7.76, 0}; Sphere: {radius: 0.3, segments: 16, smooth: true}; NoShadow }
+    lantern_top : IsleIron { Position: {0, 8.3, 0}; Cylinder: {radius: 1.0, length: 0.1, segments: 20} }
+    dome : IslePaintRed { Position: {0, 8.34, 0}; Scale: {1, 0.8, 1}; HemiSphere: {radius: 0.98, segments: 20, smooth: true} }
+    dome_ball : IsleBrass { Position: {0, 9.2, 0}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    rod : IsleIron { Position: {0, 9.6, 0}; Cylinder: {radius: 0.015, length: 0.7, segments: 6} }
+    if season == WINTER {
+      dome_snow : IsleSnow { Position: {0, 8.56, 0}; Scale: {1, 0.7, 1}; HemiSphere: {radius: 0.84, segments: 16, smooth: true} }
+    }
+
+    door_frame : IsleStone { Position: {0, 1.1, 1.5}; Box: {1.1, 1.7, 0.4} }
+    door : IslePaintGreen { Position: {0, 1.02, 1.68}; Box: {0.76, 1.4, 0.08} }
+    door_knob : IsleBrass { Position: {0.22, 1.0, 1.73}; Sphere: {radius: 0.05, segments: 10, smooth: true}; SpatialIgnore }
+    step : IsleStone { Position: {0, 0.1, 2.05}; Box: {1.4, 0.4, 0.7} }
+    for i in 0..3 {
+      const y = 2.9 + i * 1.5
+      const wr = 1.6 - (y - 0.3) * 0.0875
+      {
+        Rotation: {0, 0.5 - i * 0.9, 0}
+        IsleHouseWindow win(w: 0.34, h: 0.5) { Position: {0, y, wr - 0.03}; Rotation: {-0.087, 0, 0} }
+      }
+    }
+
+    hut {
+      Position: {2.7, -1.0, 0.9}
+      Rotation: {0, 0.5, 0}
+      terrace : IsleStone { Position: {0, -1.0, 0}; Box: {2.7, 2.4, 2.3} }
+      walls : IslePlaster { Position: {0, 0.85, 0}; Box: {2.1, 1.3, 1.7} }
+      IsleGableRoof roof(span: 1.7, rise: 0.9, len: 2.1, ri: 1, wi: 0, ov: 0.22) { Position: {0, 1.5, 0}; Rotation: {0, HALF_PI, 0} }
+      door : IslePaintBlue { Position: {-0.5, 0.75, 0.86}; Box: {0.56, 1.1, 0.06} }
+      IsleHouseWindow win(w: 0.44, h: 0.5, fancy: true, tint: 1) { Position: {0.42, 0.95, 0.85} }
+      chimney : IsleStone { Position: {0.6, 2.2, -0.3}; Box: {0.34, 1.0, 0.34} }
+      IsleChimneySmoke puff(seed: 31) { Position: {0.6, 2.8, -0.3} }
+    }
+
+    if night {
+      sweep {
+        Position: {0, 7.76, 0}
+        AngularVelocity: {0, 0.8, 0}
+        spot_a { Rotation: {0.4, 0, 0}; Rgb: {255, 232, 180}; SpotLight: {intensity: 700, range: 70, inner_angle: 7, outer_angle: 13} }
+        spot_b { Rotation: {0.4, PI, 0}; Rgb: {255, 232, 180}; SpotLight: {intensity: 700, range: 70, inner_angle: 7, outer_angle: 13} }
+        beam_a { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Emissive: {strength: 0.035, color: {255, 228, 160}}; BlendMode: Additive; Opacity: {0.4}; Position: {0, 0, 14.5}; Rotation: {HALF_PI, 0, 0}; Frustum: {radius_bottom: 0.2, radius_top: 2.2, length: 27, segments: 24, smooth: true}; NoShadow; SpatialIgnore }
+        beam_b { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Emissive: {strength: 0.035, color: {255, 228, 160}}; BlendMode: Additive; Opacity: {0.4}; Position: {0, 0, -14.5}; Rotation: {-HALF_PI, 0, 0}; Frustum: {radius_bottom: 0.2, radius_top: 2.2, length: 27, segments: 24, smooth: true}; NoShadow; SpatialIgnore }
+        core_a { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Emissive: {strength: 0.035, color: {255, 240, 200}}; BlendMode: Additive; Opacity: {0.5}; Position: {0, 0, 9.5}; Rotation: {HALF_PI, 0, 0}; Frustum: {radius_bottom: 0.14, radius_top: 0.8, length: 17, segments: 24, smooth: true}; NoShadow; SpatialIgnore }
+        core_b { Rgb: {0, 0, 0}; PbrMaterial: {metallic: 1, roughness: 1}; Emissive: {strength: 0.035, color: {255, 240, 200}}; BlendMode: Additive; Opacity: {0.5}; Position: {0, 0, -9.5}; Rotation: {-HALF_PI, 0, 0}; Frustum: {radius_bottom: 0.14, radius_top: 0.8, length: 17, segments: 24, smooth: true}; NoShadow; SpatialIgnore }
+      }
+    }
+  }
+
+  template IsleField {
+    prop wid: f32 = 4
+    prop len: f32 = 6
+    prop rows: i32 = 7
+    prop tall: f32 = 0.4
+    const pitch: f32 = wid / rows
+    soil : IsleDirt { Position: {0, 0.03, 0}; Box: {wid, 0.08, len}; NoShadow }
+    for i in 0..rows {
+      { (IsA, IsleCrop); Position: {-wid / 2 + (i + 0.5) * pitch, 0.07 + tall * 0.4, 0}; Rotation: {HALF_PI, 0, 0}; Scale: {1, 1, tall / (pitch * 0.3)}; Capsule: {radius: pitch * 0.3, length: len - 0.5 - pitch * 0.6, segments: 8, smooth: true} }
+    }
+  }
+
+  template IsleSheep {
+    body : IsleVillageWool { Position: {0, 0.36, 0}; Rotation: {HALF_PI, 0, 0}; Capsule: {radius: 0.22, length: 0.3, segments: 12, smooth: true} }
+    head : IsleBlack { Position: {0, 0.44, 0.4}; Rotation: {0.5, 0, 0}; Capsule: {radius: 0.09, length: 0.1, segments: 8, smooth: true} }
+    tuft : IsleVillageWool { Position: {0, 0.55, 0.32}; Sphere: {radius: 0.1, segments: 8, smooth: true}; SpatialIgnore }
+    for i in 0..4 {
+      const sx = i % 2 == 0 ? -1 : 1
+      const sz = i < 2 ? -1 : 1
+      { (IsA, IsleBlack); Position: {sx * 0.11, 0.1, sz * 0.17}; Box: {0.06, 0.2, 0.06}; SpatialIgnore }
+    }
+  }
+
+  template IsleScarecrow {
+    pole : IsleWoodDark { Position: {0, 0.7, 0}; Box: {0.08, 1.4, 0.08} }
+    arms : IsleWoodDark { Position: {0, 1.05, 0}; Box: {1.2, 0.07, 0.07} }
+    shirt : IsleClothRed { Position: {0, 0.9, 0}; Frustum: {radius_bottom: 0.22, radius_top: 0.14, length: 0.5, segments: 10, smooth: true} }
+    sleeve_l : IsleClothRed { Position: {-0.36, 1.05, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.08, length: 0.44, segments: 8} }
+    sleeve_r : IsleClothRed { Position: {0.36, 1.05, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.08, length: 0.44, segments: 8} }
+    hand_l : IsleRoofThatch { Position: {-0.64, 1.05, 0}; IcoSphere: {radius: 0.09, segments: 1}; SpatialIgnore }
+    hand_r : IsleRoofThatch { Position: {0.64, 1.05, 0}; IcoSphere: {radius: 0.09, segments: 1}; SpatialIgnore }
+    head : IsleClothWhite { Position: {0, 1.32, 0}; Sphere: {radius: 0.17, segments: 12, smooth: true} }
+    brim : IsleRoofThatch { Position: {0, 1.43, 0}; Cylinder: {radius: 0.3, length: 0.03, segments: 14} }
+    hat : IsleRoofThatch { Position: {0, 1.56, 0}; Cone: {radius: 0.17, length: 0.26, segments: 12, smooth: true} }
+  }
+
+  template IsleWell {
+    wall : IsleStone { Position: {0, 0.3, 0}; Tube: {radius: 0.6, thickness: 0.16, length: 0.6, segments: 18, smooth: true} }
+    water : IsleVillageWater { Position: {0, 0.3, 0}; Cylinder: {radius: 0.46, length: 0.02, segments: 18}; NoShadow }
+    post_l : IsleWoodDark { Position: {-0.56, 0.9, 0}; Box: {0.1, 1.8, 0.1} }
+    post_r : IsleWoodDark { Position: {0.56, 0.9, 0}; Box: {0.1, 1.8, 0.1} }
+    axle : IsleWoodDark { Position: {0, 1.4, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.05, length: 1.2, segments: 8} }
+    IsleGableRoof roof(span: 1.2, rise: 0.5, len: 1.3, ri: 1, wi: 4, ov: 0.18) { Position: {0, 1.75, 0}; Rotation: {0, HALF_PI, 0} }
+    rope : IsleRope { Position: {0, 1.05, 0}; Cylinder: {radius: 0.012, length: 0.7, segments: 5}; SpatialIgnore }
+    bucket : IsleWood { Position: {0, 0.72, 0}; Frustum: {radius_bottom: 0.1, radius_top: 0.13, length: 0.2, segments: 10, smooth: true} }
+  }
+
+  template IsleFarmBarn {
+    base : IsleStone { Position: {0, 0.15, 0}; Box: {4.0, 0.3, 4.8} }
+    walls : IsleVillageBarn { Position: {0, 1.5, 0}; Box: {3.8, 2.4, 4.6} }
+    for i in 0..4 {
+      const sx = i % 2 == 0 ? -1 : 1
+      const sz = i < 2 ? -1 : 1
+      { (IsA, IsleWhite); Position: {sx * 1.9, 1.5, sz * 2.3}; Box: {0.14, 2.4, 0.14} }
+    }
+    IsleGableRoof roof(span: 3.8, rise: 1.9, len: 4.6, ri: 3, wi: 3, ov: 0.34) { Position: {0, 2.7, 0} }
+    trim : IsleWhite { Position: {0, 2.7, 2.31}; Box: {3.8, 0.12, 0.05} }
+    door_frame : IsleWhite { Position: {0, 1.25, 2.31}; Box: {2.1, 1.96, 0.06} }
+    door_l : IsleVillageBarn { Position: {-0.48, 1.22, 2.33}; Box: {0.92, 1.8, 0.06} }
+    door_r : IsleVillageBarn { Position: {0.48, 1.22, 2.33}; Box: {0.92, 1.8, 0.06} }
+    for i in 0..4 {
+      const sx = i < 2 ? -1 : 1
+      const tilt = i % 2 == 0 ? 1 : -1
+      { (IsA, IsleWhite); Position: {sx * 0.48, 1.22, 2.365}; Rotation: {0, 0, tilt * 0.47}; Box: {0.07, 1.96, 0.02}; SpatialIgnore }
+    }
+    loft_frame : IsleWhite { Position: {0, 3.4, 2.31}; Box: {0.84, 0.84, 0.06} }
+    loft : IsleWoodDark { Position: {0, 3.4, 2.33}; Box: {0.7, 0.7, 0.06} }
+    IsleHouseWindow win_l(w: 0.5, h: 0.5) { Position: {-1.9, 1.7, 0.9}; Rotation: {0, -HALF_PI, 0} }
+    IsleHouseWindow win_r(w: 0.5, h: 0.5) { Position: {1.9, 1.7, 0.9}; Rotation: {0, HALF_PI, 0} }
+    IsleHouseWindow win_l2(w: 0.5, h: 0.5) { Position: {-1.9, 1.7, -0.9}; Rotation: {0, -HALF_PI, 0} }
+    IsleHouseWindow win_r2(w: 0.5, h: 0.5) { Position: {1.9, 1.7, -0.9}; Rotation: {0, HALF_PI, 0} }
+    lamp : IsleLampGlow { Position: {0, 2.42, 2.4}; Box: {0.16, 0.18, 0.14}; SpatialIgnore }
+  }
+
+  template IsleHayBale {
+    roll : IsleRoofThatch { Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.42, length: 0.62, segments: 14, smooth: true} }
+    strap_a : IsleRope { Position: {-0.15, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.43, length: 0.03, segments: 14, smooth: true}; SpatialIgnore }
+    strap_b : IsleRope { Position: {0.15, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.43, length: 0.03, segments: 14, smooth: true}; SpatialIgnore }
+  }
+
+  template IsleFarm {
+    const barn_a: f32 = -0.84
+    barn {
+      Position: {px(16.4, barn_a), 0, pz(16.4, barn_a)}
+      Rotation: {0, -barn_a - HALF_PI + 0.3, 0}
+      IsleFarmBarn body()
+      IsleHayBale bale_a() { Position: {2.7, 0.42, 1.4} }
+      IsleHayBale bale_b() { Position: {2.7, 0.42, 0.7} }
+      IsleHayBale bale_c() { Position: {2.7, 1.14, 1.05} }
+      IsleBarrel barrel() { Position: {-1.5, 0, 2.7} }
+      cart : IsleWood { Position: {-2.8, 0.5, 1.2}; Rotation: {0.12, 0.3, 0}; Box: {0.9, 0.3, 1.5} }
+      cart_wheel_l : IsleWoodDark { Position: {-3.3, 0.36, 1.0}; Rotation: {0, 0.3, HALF_PI}; Cylinder: {radius: 0.36, length: 0.07, segments: 14} }
+      cart_wheel_r : IsleWoodDark { Position: {-2.3, 0.36, 1.3}; Rotation: {0, 0.3, HALF_PI}; Cylinder: {radius: 0.36, length: 0.07, segments: 14} }
+    }
+
+    pen {
+      Position: {px(12.4, -0.78), 0, pz(12.4, -0.78)}
+      Rotation: {0, HALF_PI + 0.78, 0}
+      IsleFence side_n(n: 5) { Position: {0, 0, -1.8} }
+      IsleFence side_s(n: 5) { Position: {0, 0, 1.8} }
+      IsleFence side_w(n: 4) { Position: {-2.25, 0, 0}; Rotation: {0, HALF_PI, 0} }
+      IsleFence side_e(n: 4) { Position: {2.25, 0, 0}; Rotation: {0, HALF_PI, 0} }
+      IsleSheep sheep_a() { Position: {-1.0, 0, 0.4}; Rotation: {0, 0.6, 0} }
+      IsleSheep sheep_b() { Position: {0.5, 0, -0.7}; Rotation: {0, -1.2, 0} }
+      IsleSheep sheep_c() { Position: {1.2, 0, 0.8}; Rotation: {0, 2.6, 0} }
+      IsleSheep sheep_d() { Position: {-0.3, 0, 1.0}; Rotation: {0, 1.9, 0}; Scale: {0.7, 0.7, 0.7} }
+      trough : IsleWoodDark { Position: {-1.4, 0.14, -1.2}; Box: {0.9, 0.24, 0.34} }
+      trough_water : IsleVillageWater { Position: {-1.4, 0.25, -1.2}; Box: {0.8, 0.04, 0.24}; NoShadow }
+    }
+
+    field_a {
+      Position: {px(14.7, -0.44), 0, pz(14.7, -0.44)}
+      Rotation: {0, HALF_PI + 0.44, 0}
+      IsleField crop(wid: 4.2, len: 7.4, rows: 12, tall: 0.5)
+      IsleScarecrow scarecrow() { Position: {0.4, 0, 0.6}; Rotation: {0, 2.0, 0} }
+      IsleFence edge(n: 8) { Position: {-2.4, 0, 0}; Rotation: {0, HALF_PI, 0} }
+    }
+
+    field_b {
+      Position: {px(14.7, -0.12), 0, pz(14.7, -0.12)}
+      Rotation: {0, HALF_PI + 0.12, 0}
+      IsleField crop(wid: 4.0, len: 7.4, rows: 9, tall: 0.24)
+      IsleFence edge(n: 8) { Position: {-2.35, 0, 0}; Rotation: {0, HALF_PI, 0} }
+    }
+
+    patch {
+      Position: {px(12.6, 0.2), 0, pz(12.6, 0.2)}
+      Rotation: {0, HALF_PI - 0.2, 0}
+      soil : IsleDirt { Position: {0, 0.03, 0}; Box: {3.6, 0.08, 3.4}; NoShadow }
+      for i in 0..5 {
+        { (IsA, IsleLeaf); Position: {-1.3, 0.2, -1.2 + i * 0.6}; Scale: {1, 0.75, 1}; IcoSphere: {radius: 0.2, segments: 1}; SpatialIgnore }
+        { (IsA, IsleLeafDark); Position: {-0.5, 0.16, -1.25 + i * 0.6}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 0.17, segments: 1}; SpatialIgnore }
+        { (IsA, IsleLeafDark); Position: {1.2, 0.2, -1.2 + i * 0.6}; Cone: {radius: 0.1, length: 0.3, segments: 6}; SpatialIgnore }
+      }
+      for i in 0..4 {
+        { (IsA, IsleVillagePumpkin); Position: {0.35 + rnd(i, 7) * 0.2, 0.2, -1.1 + i * 0.75}; Scale: {1, 0.75, 1}; Sphere: {radius: 0.2 + rnd(i, 4) * 0.08, segments: 10, smooth: true}; SpatialIgnore }
+        { (IsA, IsleLeafDark); Position: {0.35 + rnd(i, 7) * 0.2, 0.38, -1.1 + i * 0.75}; Cylinder: {radius: 0.025, length: 0.1, segments: 5}; SpatialIgnore; NoShadow }
+      }
+      IsleFence side_a(n: 4) { Position: {0, 0, -1.85} }
+      IsleFence side_b(n: 4) { Position: {0, 0, 1.85} }
+      IsleFence side_c(n: 4) { Position: {1.9, 0, 0}; Rotation: {0, HALF_PI, 0} }
+    }
+
+    meadow {
+      Position: {px(16.9, 0.2), 0, pz(16.9, 0.2)}
+      Rotation: {0, HALF_PI - 0.2, 0}
+      stubble : IsleRoofThatch { Position: {0, 0.02, 0}; Box: {3.8, 0.05, 3.6}; NoShadow }
+      IsleHayBale bale_a() { Position: {-1.1, 0.44, -0.9}; Rotation: {0, 0.4, 0} }
+      IsleHayBale bale_b() { Position: {0.9, 0.44, -0.3}; Rotation: {0, -0.7, 0} }
+      IsleHayBale bale_c() { Position: {-0.3, 0.44, 1.0}; Rotation: {0, 1.3, 0} }
+      IsleHayBale bale_d() { Position: {1.2, 0.44, 1.2}; Rotation: {0, 0.1, 0} }
+      fork : IsleWoodDark { Position: {-1.2, 0.6, 0.3}; Rotation: {0.3, 0, 0.2}; Cylinder: {radius: 0.02, length: 1.2, segments: 5}; SpatialIgnore }
+    }
+
+    IsleWell well() { Position: {px(12.6, -0.3), 0, pz(12.6, -0.3)}; Rotation: {0, 0.4, 0} }
+  }
+}
