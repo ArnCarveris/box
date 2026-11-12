@@ -1515,7 +1515,7 @@ ecs_entity_t ore_explosion(
 /** Play the combust of a critter that died, the oreCombust of the original.
  *
  * The effect (CombustBurst, authored for radius 1) plays cfg.combustLift * r above the position,
- * its sizes and speeds at sqrt(r) and its spawn volumes and offsets, the scale of the root, at r.
+ * scaled by r: its sizes, speeds, spawn volumes and offsets follow the scale of the root.
  * The radius is clamped to cfg.combustRadiusMin and cfg.combustRadiusMax.
  *
  * Its flash light peaks at cfg.combustPeak * sqrt(r) and reaches cfg.combustRange +

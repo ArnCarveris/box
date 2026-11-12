@@ -202,9 +202,9 @@ cfg {
 
   // The combust of a critter of body radius r (ore_combust, CombustBurst), r clamped to
   // [combustRadiusMin, combustRadiusMax]: it plays combustLift * r above the critter's position,
-  // its sizes and speeds at sqrt(r) and its spawn volumes and offsets at r. Its flash light peaks
-  // at combustPeak * sqrt(r) and reaches combustRange + combustRangeRadius * r; it fades to 0
-  // over 1 / 7 s, the EffectFlash of CombustBurst
+  // scaled by r, its sizes, speeds, spawn volumes and offsets. Its flash light peaks at
+  // combustPeak * sqrt(r) and reaches combustRange + combustRangeRadius * r; it fades to 0 over
+  // 1 / 7 s, the EffectFlash of CombustBurst
   export const combustRadiusMin: f32 = 0.1
   export const combustRadiusMax: f32 = 4
   export const combustLift: f32 = 0.9

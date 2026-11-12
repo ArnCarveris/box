@@ -937,6 +937,142 @@ void Render_gpu_capture_effects(void) {
     ecs_fini(world);
 }
 
+/** Create a 3D view of a red box and, over it, a view of a HUD scene with a blue Rect at the
+ * top right, both shown on a 64x48 surface named "screen".
+ *
+ * @param world The world
+ * @param write_to_file Surface.write_to_file of the surface, NULL for none
+ * @return The surface
+ */
+static ecs_entity_t capture_surface_scene(
+    ecs_world_t *world,
+    const char *write_to_file)
+{
+    ecs_entity_t camera = ecs_entity(world, { .name = "cam" });
+    ecs_set(world, camera, Position, {0, 0, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Position, {0, 0, 0});
+    ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Rgb, {0, 0, 0});
+    ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, box, Emissive, {.strength = 1, .color = {255, 0, 0}});
+
+    ecs_entity_t hud = ecs_new(world);
+    ecs_set(world, hud, Scene, {0});
+    ecs_entity_t hud_camera = ecs_new_w_pair(world, EcsChildOf, hud);
+    ecs_set(world, hud_camera, Position, {0, 0, 100});
+    ecs_set(world, hud_camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t hud_view = ecs_new(world);
+    ecs_set(world, hud_view, View, {.camera = hud_camera, .order = 1});
+    ecs_entity_t rect = ecs_new_w_pair(world, EcsChildOf, hud);
+    ecs_set(world, rect, Position, {20, 12, 0});
+    ecs_set(world, rect, Rect, {10, 10});
+    ecs_set(world, rect, Rgb, {0, 0, 255});
+
+    ecs_entity_t surface = ecs_entity(world, { .name = "screen" });
+    ecs_set(world, surface, Surface, {.width = 64, .height = 48, .resolution_scale = 1,
+        .write_to_file = ECS_CONST_CAST(char*, write_to_file)});
+
+    return surface;
+}
+
+void Render_gpu_capture_surface(void) {
+    // command/capture_surface
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    capture_surface_scene(world, NULL);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0);
+
+    bool error = true;
+    char *out = box_command_run(world, s, "capture screen", &error);
+    test_bool(error, false);
+    test_str(out, "{\"name\":\"1\", \"content_type\":\"image/png\"}");
+    ecs_os_free(out);
+    ecs_os_free(box_command_run(world, s, "capture cam", NULL));
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    /* The Rect is at x 32 + 20, y 24 - 12 in pixels of the 64x48 surface */
+    int32_t rect = (12 * 64 + 52) * 4, center = (24 * 64 + 32) * 4;
+    char *path = box_command_resource_file(world, s, "1");
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 48);
+    test_assert(px[rect] < 10);
+    test_assert(px[rect + 1] < 10);
+    test_assert(px[rect + 2] > 245);
+    test_assert(px[center] > 200);
+    test_assert(px[center + 2] < 40);
+    stbi_image_free(px);
+    ecs_os_free(path);
+
+    path = box_command_resource_file(world, s, "2");
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 48);
+    test_assert(px[rect + 2] < 10);
+    test_assert(px[center] > 200);
+    test_assert(px[center + 2] < 40);
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Render_gpu_capture_surface_write_to_file(void) {
+    // command/capture_surface
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    capture_surface_scene(world, "capture_surface.png");
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *frame = flecs_asprintf("%s/capture_surface.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    test_int(remove(frame), 0);
+    ecs_os_free(box_command_run(world, s, "capture screen", NULL));
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = box_command_resource_file(world, s, "1");
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 48);
+    test_assert(px[(12 * 64 + 52) * 4 + 2] > 245);
+    test_assert(access(frame, F_OK) != 0);
+    stbi_image_free(px);
+    ecs_os_free(path);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    px = stbi_load(frame, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 48);
+    stbi_image_free(px);
+    ecs_os_free(frame);
+    ecs_fini(world);
+}
+
 void Render_gpu_render_isolated(void) {
     // command/render
     ecs_world_t *world = ecs_init();

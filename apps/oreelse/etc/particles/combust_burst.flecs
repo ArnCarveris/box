@@ -1,9 +1,9 @@
 // A critter's death, the CombustBurst of the original: layered bursts of an organic
 // combustion authored for a body of radius 1. ore_combust (src/particles.c) plays it at the
-// center of the body (0.9 r above its feet) with the sizes and speeds at sqrt(r) and the
-// spawn volumes and offsets at r, with the flash light of the original's oreCombust. A pale
-// green flash and licks of the fire pool, ichor of the fx pool, chunks of the debris pool, a
-// ring of spores of the glow pool, cinders of the ember pool and soot.
+// center of the body (0.9 r above its feet) scaled by r, its sizes, speeds, spawn volumes and
+// offsets, with the flash light of the original's oreCombust. A pale green flash and licks of
+// the fire pool, ichor of the fx pool, chunks of the debris pool, a ring of spores of the glow
+// pool, cinders of the ember pool and soot.
 //
 // The spores' squash (stretch 0.45) has no equivalent and is left out, and so is the mass of
 // the chunks. The original also scales the count of every layer with sqrt(r); box plays the
