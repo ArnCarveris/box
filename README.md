@@ -22,6 +22,7 @@ bake3 run apps/boxrun --local-env -- etc/scenes/town.flecs                      
 bake3 run apps/boxrun --local-env -- --headless --frames 10 etc/scenes/town.flecs  # run 10 frames without a window and exit
 bake3 run apps/boxrun --local-env -- --headless --frames 3 --delta-time 1/60 --out /tmp/town.png etc/scenes/town.flecs  # render a frame to a PNG
 bake3 run apps/boxrun --local-env -- --headless --timeout 60 --port 27760 etc/scenes/town.flecs  # take shell commands on a REST port
+bake3 run apps/boxrun --local-env -- --headless --unguarded --frames 10 etc/scenes/town.flecs  # start even when the machine is oversubscribed
 bake3 run apps/boxrun --local-env=agent_a -- etc/scenes/town.flecs              # a separate build environment per agent
 bake3 --target em --local-env apps/boxrun                                       # build for the browser
 ```
@@ -57,7 +58,7 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 
 | Command | What it does |
 |---------|--------------|
-| `capture [camera]` | Write a PNG of the active camera or a camera, as its view shows it |
+| `capture [camera\|surface]` | Write a PNG of the active camera or a camera, as its view shows it, or of a surface with all its views |
 | `render <subject>` | Write a PNG of an entity, prefab or template on its own |
 | `fit [camera]` | Move the active camera or a camera so that it sees the whole scene |
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |

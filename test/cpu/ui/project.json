@@ -222,6 +222,15 @@
                 ]
             },
             {
+                "id": "PickBare",
+                "testcases": [
+                    "bare_root_passes_to_lower_root",
+                    "rect_root_blocks",
+                    "input_blocker_root_blocks",
+                    "bare_child_delivers_to_parent"
+                ]
+            },
+            {
                 "id": "TextSpans",
                 "testcases": [
                     "glyph_to_color",
