@@ -47,6 +47,7 @@
                     "no_audio",
                     "unguarded",
                     "fail_on_error",
+                    "async_loads",
                     "frames",
                     "timeout_seconds",
                     "timeout_infinite",
@@ -218,7 +219,10 @@
                     "text_wait_timeout_warns",
                     "ready_frame_does_not_warn",
                     "many_stuck_textures_counted",
-                    "decoded_texture_not_named"
+                    "decoded_texture_not_named",
+                    "async_loads_texture_frame_does_not_wait",
+                    "async_loads_text_frame_does_not_wait",
+                    "texture_frame_waits_without_async_loads"
                 ]
             },
             {

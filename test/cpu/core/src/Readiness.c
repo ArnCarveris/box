@@ -24,6 +24,43 @@ static void WorkHold(
     }
 }
 
+static void WorkSleep(
+    void *ctx)
+{
+    ecs_sleepf(0.05);
+}
+
+/** Wait until the held job runs on the worker.
+ */
+static void wait_hold_started(void)
+{
+    int32_t i;
+    for (i = 0; i < 5000 && !*(volatile int32_t*)&hold_started; i ++) {
+        ecs_sleepf(0.001);
+    }
+
+    test_int(hold_started, 1);
+}
+
+/** Add a TextureGen of noise to a new entity.
+ *
+ * @param world The world
+ * @return The texture entity
+ */
+static ecs_entity_t gen_texture(
+    ecs_world_t *world)
+{
+    ecs_entity_t tex = ecs_entity(world, { .name = "gen_texture" });
+    TextureGen gen = { .width = 64, .height = 64, .seed = 3 };
+    ecs_vec_init_t(NULL, &gen.layers, TextureGenLayer, 1);
+    *ecs_vec_append_t(NULL, &gen.layers, TextureGenLayer) = (TextureGenLayer){
+        .kind = GenNoise, .frequency = 4, .octaves = 3, .amount = 1 };
+    ecs_set_ptr(world, tex, TextureGen, &gen);
+    ecs_vec_fini_t(NULL, &gen.layers, TextureGenLayer);
+
+    return tex;
+}
+
 static void FakeTime(
     ecs_time_t *time)
 {
@@ -270,6 +307,130 @@ void Readiness_decoded_texture_not_named(void)
     }
 
     ecs_progress(world, 0);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+
+    ecs_fini(world);
+}
+
+void Readiness_async_loads_texture_frame_does_not_wait(void)
+{
+    // test_fixes/headless_async_loads
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_jobs_set_workers(world, 1);
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 100, .unguarded = true, .unpaced = true,
+        .async_loads = true });
+
+    test_int(box_job_submit(world, &(box_job_desc_t){ .work = WorkHold }), 0);
+    wait_hold_started();
+    ecs_entity_t tex = gen_texture(world);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureLoading);
+
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    real_get_time = ecs_os_api.get_time_;
+    real_log = ecs_os_api.log_;
+    ecs_os_api.get_time_ = FakeTime;
+    ecs_os_api.log_ = CaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.get_time_ = real_get_time;
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_assert(strstr(warnings, "wait timed out") == NULL);
+    test_int(box_jobs_running(world), 1);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureLoading);
+
+    ecs_os_ainc(&hold_release);
+    int32_t i;
+    for (i = 0; i < 5000; i ++) {
+        ecs_progress(world, 0);
+        if (ecs_get(world, tex, TextureStatus)->state != TextureLoading) {
+            break;
+        }
+
+        ecs_sleepf(0.001);
+    }
+
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+    test_int(box_jobs_running(world), 0);
+
+    ecs_fini(world);
+}
+
+void Readiness_async_loads_text_frame_does_not_wait(void)
+{
+    // test_fixes/headless_async_loads
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_jobs_set_workers(world, 1);
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 100, .unguarded = true, .unpaced = true,
+        .async_loads = true });
+
+    test_int(box_job_submit(world, &(box_job_desc_t){ .work = WorkHold }), 0);
+    wait_hold_started();
+    ecs_entity_t font = ecs_entity(world, { .name = "async_font" });
+    ecs_set(world, font, Font, { .path = "test/assets/fonts/B612-Regular.ttf" });
+    ecs_entity_t label = ecs_new(world);
+    ecs_set(world, label, Text, { .value = "later", .size = 16, .font = font });
+    test_int(ecs_get(world, font, FontStatus)->state, FontLoading);
+
+    int32_t level = ecs_log_set_level(-1);
+    bool colors = ecs_log_enable_colors(false);
+    real_get_time = ecs_os_api.get_time_;
+    real_log = ecs_os_api.log_;
+    ecs_os_api.get_time_ = FakeTime;
+    ecs_os_api.log_ = CaptureLog;
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_api.get_time_ = real_get_time;
+    ecs_os_api.log_ = real_log;
+    ecs_log_set_level(level);
+    ecs_log_enable_colors(colors);
+
+    test_assert(strstr(warnings, "wait timed out") == NULL);
+    test_int(box_jobs_running(world), 1);
+    test_int(ecs_get(world, font, FontStatus)->state, FontLoading);
+
+    ecs_os_ainc(&hold_release);
+    int32_t i;
+    for (i = 0; i < 5000; i ++) {
+        ecs_progress(world, 0);
+        if (ecs_get(world, font, FontStatus)->state != FontLoading) {
+            break;
+        }
+
+        ecs_sleepf(0.001);
+    }
+
+    test_int(ecs_get(world, font, FontStatus)->state, FontReady);
+
+    ecs_fini(world);
+}
+
+void Readiness_texture_frame_waits_without_async_loads(void)
+{
+    // test_fixes/headless_async_loads
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_jobs_set_workers(world, 1);
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 100, .unguarded = true, .unpaced = true });
+
+    test_int(box_job_submit(world, &(box_job_desc_t){ .work = WorkSleep }), 0);
+    ecs_entity_t tex = gen_texture(world);
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureLoading);
+
+    ecs_progress(world, 0);
+    test_int(box_jobs_running(world), 0);
+    if (ecs_get(world, tex, TextureStatus)->state == TextureLoading) {
+        ecs_progress(world, 0);
+    }
+
     test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
 
     ecs_fini(world);

@@ -61,6 +61,8 @@ ECS_STRUCT(App, {
     int32_t surface_height; /**< Height of the window Surface, set or created by the run */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine, by --unguarded */
     bool unpaced;       /**< A headless run ignores its CPU budget */
+    bool async_loads;   /**< A headless frame doesn't wait for the texture, text and other jobs
+                         *   in flight, like a windowed frame, by --async-loads */
     char *scene;        /**< Script file loaded before the first frame, NULL for none */
     bool design;        /**< Render the gallery of design cameras, set by --design */
     char *camera;       /**< Name of the Camera the surface shows, set by --camera, NULL for none */
@@ -186,7 +188,11 @@ void BoxAppImport(
 
 /** Write command line arguments into the App singleton: --headless, --unguarded, --frames <n>,
  * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --delta-time <s>, --port <n>,
- * --surface <w>x<h>, --fail-on-error, a scene.
+ * --surface <w>x<h>, --fail-on-error, --async-loads, a scene.
+ *
+ * --async-loads lets headless frames run on while texture, TextureGen, glyph and other jobs are
+ * in flight, so their results appear in a later frame as in a windowed run. Without it a
+ * headless frame waits for them, so captures are deterministic.
  *
  * --fail-on-error makes box_app_run fail when an error was logged during the run.
  *
