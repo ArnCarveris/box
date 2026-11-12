@@ -1209,7 +1209,7 @@ static void box_gpu_draw_glass(
 
         WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b,
             WGPUTextureFormat_Undefined);
-        if (!pipeline) {
+        if (!pipeline || d->skip) {
             continue;
         }
 
@@ -1480,6 +1480,11 @@ static void box_gpu_draw_batches(
             continue;
         }
 
+        if (d->skip) {
+            vp->drawn |= !b->transmissive;
+            continue;
+        }
+
         if (pipeline != bound) {
             wgpuRenderPassEncoderSetPipeline(vp->pass, pipeline);
             bound = pipeline;
@@ -1643,7 +1648,6 @@ static bool box_gpu_draw_prepasses(
     }
 
     cv = box_gpu_cull_view(gpu, slot, -1);
-    result = cv && cv->skipped > 0;
     for (i = 0; cv && i < cv->draw_count && !result; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
@@ -1701,7 +1705,7 @@ static void box_gpu_draw_prepass_draws(
         }
 
         WGPURenderPipeline pipeline = box_gpu_prepass_pipeline(gpu, b, count);
-        if (!pipeline) {
+        if (!pipeline || d->skip) {
             continue;
         }
 

@@ -729,6 +729,7 @@
                     "min_dimension",
                     "static_moves_in",
                     "camera_moves_to_skipped",
+                    "skipped_keeps_pipelines",
                     "dynamic_follows",
                     "cascades_skip_outside",
                     "same_image"

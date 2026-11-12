@@ -106,6 +106,10 @@ static void box_perf_report_orbit(
     box_perf_report_range(buf, "frustum_culled", &status->frustum_culled);
     ecs_strbuf_appendstr(buf, ",\n");
     box_perf_report_range(buf, "occlusion_culled", &status->occlusion_culled);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "batches_skipped", &status->batches_skipped);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "casters_skipped", &status->casters_skipped);
     ecs_strbuf_appendstr(buf, "\n  },\n");
 }
 

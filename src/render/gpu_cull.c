@@ -137,7 +137,7 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->groups, box_gpu_cull_group_t, 0);
     ecs_vec_init_t(NULL, &c->entries, int32_t, 0);
     ecs_vec_init_t(NULL, &c->masks, uint32_t, 0);
-    ecs_vec_init_t(NULL, &c->hidden, uint32_t, 0);
+    ecs_vec_init_t(NULL, &c->skips, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->sort, box_gpu_cull_sort_t, 0);
     ecs_vec_init_t(NULL, &c->frustums, box_gpu_cull_desc_t, 0);
     if (gpu->timestamps) {
@@ -249,7 +249,7 @@ void box_gpu_cull_fini(
     ecs_vec_fini_t(NULL, &c->groups, box_gpu_cull_group_t);
     ecs_vec_fini_t(NULL, &c->entries, int32_t);
     ecs_vec_fini_t(NULL, &c->masks, uint32_t);
-    ecs_vec_fini_t(NULL, &c->hidden, uint32_t);
+    ecs_vec_fini_t(NULL, &c->skips, uint32_t);
     ecs_vec_fini_t(NULL, &c->sort, box_gpu_cull_sort_t);
     ecs_vec_fini_t(NULL, &c->frustums, box_gpu_cull_desc_t);
     if (c->stamps) {
@@ -1255,7 +1255,7 @@ void box_gpu_cull_finish(
             NULL, &r->records, box_gpu_cull_record_t);
         rec->view = cv->view;
         rec->counter = cv->counter;
-        rec->tested = cv->skipped_tested + cv->skipped_untested;
+        rec->tested = cv->skipped_untested;
         rec->untested = cv->skipped_untested;
         rec->skipped = cv->skipped;
         rec->casters_skipped = 0;
@@ -1454,16 +1454,20 @@ static bool box_gpu_cull_stats_read(
 
         result = true;
         if (cv->cascade < 0 || !all) {
-            out->tested += cv->skipped_tested + cv->skipped_untested;
+            out->tested += cv->skipped_untested;
             out->skipped += cv->skipped;
         } else {
-            out->casters_tested += cv->skipped_tested + cv->skipped_untested;
+            out->casters_tested += cv->skipped_untested;
             out->casters_skipped += cv->skipped;
         }
 
         for (d = cv->first_draw; d < cv->first_draw + cv->draw_count; d ++) {
             const box_gpu_cull_draw_t *draw = ecs_vec_get_t(
                 &c->draws, box_gpu_cull_draw_t, d);
+            if (draw->args == UINT32_MAX) {
+                continue;
+            }
+
             int32_t kept = (int32_t)counts[draw->args * BOX_GPU_CULL_ARGS + 1];
             if (draw->late != UINT32_MAX) {
                 kept += (int32_t)counts[draw->late * BOX_GPU_CULL_ARGS + 1];

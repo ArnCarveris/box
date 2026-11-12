@@ -308,7 +308,9 @@ void Orbit_cull_ranges(void) {
             .instances = 20,
             .visible = visible[i],
             .frustum_culled = 20 - visible[i] - 2,
-            .occlusion_culled = 2 });
+            .occlusion_culled = 2,
+            .batches_skipped = 4,
+            .casters_skipped = 9 });
         ecs_progress(world, 0);
     }
 
@@ -324,6 +326,10 @@ void Orbit_cull_ranges(void) {
     test_int(status->frustum_culled.max, 11);
     test_int(status->occlusion_culled.min, 2);
     test_int(status->occlusion_culled.max, 2);
+    test_int(status->batches_skipped.min, 4);
+    test_int(status->batches_skipped.max, 4);
+    test_int(status->casters_skipped.min, 9);
+    test_int(status->casters_skipped.max, 9);
 
     ecs_fini(world);
     box_perf_clock = NULL;

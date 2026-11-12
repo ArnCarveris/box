@@ -208,6 +208,8 @@ void Report_orbit_json(void) {
     test_assert(strstr(json, "\"visible\": {\"min\": 43, \"max\": 46") != NULL);
     test_assert(strstr(json, "\"frustum_culled\": {\"min\": 4, \"max\": 7") != NULL);
     test_assert(strstr(json, "\"occlusion_culled\": {\"min\": 0, \"max\": 0") != NULL);
+    test_assert(strstr(json, "\"batches_skipped\": {\"min\": 0, \"max\": 0") != NULL);
+    test_assert(strstr(json, "\"casters_skipped\": {\"min\": 0, \"max\": 0") != NULL);
     remove(path);
 
     ecs_fini(world);

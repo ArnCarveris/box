@@ -403,10 +403,9 @@ typedef struct box_gpu_cull_view_t {
     WGPUBindGroup group;            /**< History and pyramid, or the empty ones */
     bool report;                    /**< Its counts become the CullStatus, false for captures */
     int32_t skipped;                /**< Batches it does not draw by their bounds */
-    int32_t skipped_tested;         /**< Instances of those whose job still runs, to keep the
-                                     *   occlusion history of the view; the GPU counts them */
     int32_t skipped_untested;       /**< Instances of those without a job, which count as tested
-                                     *   and frustum culled */
+                                     *   and frustum culled; the job of the frustum with a
+                                     *   history still runs, so the GPU counts those */
 } box_gpu_cull_view_t;
 
 /** A batch a cull view draws: where its visible instances and its draw arguments are */
@@ -417,6 +416,10 @@ typedef struct box_gpu_cull_draw_t {
     uint32_t page;                  /**< Page that holds its visible slots */
     uint32_t base;                  /**< First of its entries in the visible slots of the page */
     uint32_t count;                 /**< Instances it tests */
+    bool skip;                      /**< Its cull view skips the batch by its bounds: a pass
+                                     *   records no draw but requests its pipelines, as when it
+                                     *   draws no instance. Only the frustum with a history has
+                                     *   arguments for it, else args and late are UINT32_MAX */
 } box_gpu_cull_draw_t;
 
 /** A dispatch of the cull pass: the parallel job of a batch of a group and phase, with the
@@ -653,12 +656,8 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t entries;              /**< int32_t, the draw of each frustum of a parallel job */
     ecs_vec_t masks;                /**< uint32_t, the frustums of the group being added that
                                      *   draw each batch of the packet */
-    ecs_vec_t hidden;               /**< uint32_t, the frustums of the group being added that
-                                     *   test each batch of the packet but skip its draws by its
-                                     *   bounds: the frustum with a history, whose late job keeps
-                                     *   writing the history of the instances */
-    int32_t hidden_draw;            /**< Next draw of the group being added for a hidden batch,
-                                     *   past the draws of its cull views */
+    ecs_vec_t skips;                /**< uint32_t, the frustums of the group being added that
+                                     *   skip each batch of the packet by its bounds */
     ecs_vec_t sort;                 /**< box_gpu_cull_sort_t, the batches of the group being
                                      *   added in the order of their draws */
     ecs_vec_t frustums;             /**< Frustums of the view being added */

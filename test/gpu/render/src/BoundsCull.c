@@ -405,6 +405,42 @@ void BoundsCull_camera_moves_to_skipped(void) {
     ecs_fini(world);
 }
 
+/** The sphere has a pipeline of its own (BackFacePlain). Its draws are skipped while it is out
+ * of the view, yet the view keeps requesting its pipeline, so with the outcomes held as the
+ * browser holds them it still draws in the frame it enters the view. */
+void BoundsCull_skipped_keeps_pipelines(void) {
+    // culling/bounds
+    ecs_world_t *world = bounds_world();
+    ecs_entity_t camera = 0;
+    ecs_entity_t view = bounds_ortho_view(world, &camera, true, false);
+    bounds_box(world, 0, 0, 0);
+    ecs_entity_t sphere = bounds_sphere(world, 30, 0, 0);
+    ecs_set(world, sphere, BackFaceMode, {BackFacePlain});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "pipelines.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.skipped, 1);
+
+    test_bool(box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_HOLD), true);
+    ecs_set(world, camera, Position, {30, 0, 10});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.skipped, 1);
+    test_int(stats.visible, 1);
+
+    unsigned char *px = bounds_load(world, "pipelines.png");
+    test_assert(px[(32 * 64 + 32) * 4] > 200);
+    stbi_image_free(px);
+    box_render_gpu_compile_delivery(world, BOX_RENDER_COMPILE_AT_ONCE);
+    ecs_fini(world);
+}
+
 void BoundsCull_dynamic_follows(void) {
     // culling/bounds
     ecs_world_t *world = bounds_world();
