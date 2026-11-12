@@ -50,6 +50,58 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
+ * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
+ * them further apart, between texels. */
+static const char *box_texture_blur_wgsl =
+    "const BOX_TEX_BLUR_TAPS: i32 = 64;\n"
+    "\n"
+    "fn box_tex_blur_tap(t: texture_2d<f32>, texel: vec2i, axis: u32, offset: f32) -> vec4f {\n"
+    "    let o = floor(offset);\n"
+    "    let f = offset - o;\n"
+    "    let dir = select(vec2i(0, 1), vec2i(1, 0), axis == 0u);\n"
+    "    let a = texel + dir * i32(o);\n"
+    "    return mix(box_texgraph_load_poles(t, a), box_texgraph_load_poles(t, a + dir), f);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blur_axis(t: texture_2d<f32>, texel: vec2i, axis: u32, radius: f32) -> vec4f {\n"
+    "    if (radius <= 0.0) {\n"
+    "        return box_texgraph_load_poles(t, texel);\n"
+    "    }\n"
+    "    let taps = clamp(i32(ceil(radius)), 1, BOX_TEX_BLUR_TAPS);\n"
+    "    let spacing = radius / f32(taps);\n"
+    "    let sigma = radius / 3.0;\n"
+    "    var sum = vec4f(0.0);\n"
+    "    var total = 0.0;\n"
+    "    for (var k = -taps; k <= taps; k ++) {\n"
+    "        let o = f32(k) * spacing;\n"
+    "        let w = exp(-0.5 * o * o / (sigma * sigma));\n"
+    "        sum += w * box_tex_blur_tap(t, texel, axis, o);\n"
+    "        total += w;\n"
+    "    }\n"
+    "    return sum / total;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blur(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    pass_index: u32, prev: texture_2d<f32>, t0: texture_2d<f32>) -> vec4f {\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let radius = max(bitcast<f32>(p[0].x), 0.0) * size.x / 512.0;\n"
+    "    let sphere = box_texgraph_stage.domain == 1u;\n"
+    "    if (pass_index == 0u) {\n"
+    "        if (any(textureDimensions(t0) != box_texgraph_stage.size)) {\n"
+    "            return i[0];\n"
+    "        }\n"
+    "        var r = radius;\n"
+    "        if (sphere) {\n"
+    "            let s = sin((f32(texel.y) + 0.5) / size.y * BOX_TEXGRAPH_PI);\n"
+    "            r = min(radius / max(s, 1e-6), size.x * 0.5);\n"
+    "        }\n"
+    "        return box_tex_blur_axis(t0, texel, 0u, r);\n"
+    "    }\n"
+    "    return box_tex_blur_axis(prev, texel, 1u,\n"
+    "        select(radius, radius * 2.0 * size.y / size.x, sphere));\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -230,6 +282,15 @@ static int box_texture_node_kind_fill(
     kind->component = desc->component;
     kind->output = desc->output;
     kind->flags = desc->flags;
+    kind->passes = desc->passes > 1 ? desc->passes : 1;
+    if (kind->passes > 1) {
+        kind->flags |= BOX_TEXTURE_NODE_NEIGHBOURHOOD;
+    }
+
+    if (kind->passes > BOX_TEXTURE_NODE_PASSES) {
+        result = -1;
+    }
+
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS && desc->inputs[i].name; i ++) {
@@ -282,7 +343,9 @@ static void box_texture_node_kind_reflect(
         .param_size = kind->param_size,
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
-        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
+        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0,
+        .follows_input = (kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT) != 0,
+        .passes = kind->passes
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -323,8 +386,9 @@ int32_t box_texture_node_register(
     kind = ecs_os_calloc_t(box_texture_node_kind_t);
     if (box_texture_node_kind_fill(kind, desc)) {
         char *name = ecs_get_path(world, desc->component);
-        ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size "
-            "or more than %d parameter bytes", name, BOX_TEXTURE_NODE_PARAM_BYTES);
+        ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size, "
+            "more than %d parameter bytes or more than %d passes", name,
+            BOX_TEXTURE_NODE_PARAM_BYTES, BOX_TEXTURE_NODE_PASSES);
         ecs_os_free(name);
         box_texture_node_kind_strings_free(kind);
         ecs_os_free(kind);
@@ -452,13 +516,15 @@ static void box_texture_graph_reach(
  * @param e The node entity
  * @param kind Its kind
  * @param inputs Index of the node of each input, -1 for none
+ * @param output Type of the value of the node
  * @return Index of the node
  */
 static int32_t box_texture_graph_append(
     box_texture_graph_build_t *b,
     ecs_entity_t e,
     const box_texture_node_kind_t *kind,
-    const int32_t *inputs)
+    const int32_t *inputs,
+    TextureValueType output)
 {
     const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
     int32_t i, offset = ecs_vec_count(&b->params);
@@ -483,7 +549,7 @@ static int32_t box_texture_graph_append(
     ecs_os_memset_t(node, 0, box_texture_graph_node_t);
     node->entity = e;
     node->kind = kind->id;
-    node->output = kind->output;
+    node->output = output;
     node->params = offset;
     node->param_size = kind->node_size;
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
@@ -502,7 +568,7 @@ static int32_t box_texture_graph_append(
  * @param output Type of the node
  * @param from Node of the input, 0 for the output of the graph
  * @param input Name of the input
- * @param expected Type the input expects
+ * @param expected Type the input expects, -1 for either
  */
 static void box_texture_graph_check_type(
     box_texture_graph_build_t *b,
@@ -512,7 +578,7 @@ static void box_texture_graph_check_type(
     const char *input,
     TextureValueType expected)
 {
-    if (from && output != expected) {
+    if (from && (int32_t)expected >= 0 && output != expected) {
         char *name = box_texture_graph_name(b->world, e);
         char *from_name = box_texture_graph_name(b->world, from);
         box_texture_graph_error(b, "node '%s' outputs %s but input '%s' of node '%s' expects "
@@ -529,7 +595,7 @@ static void box_texture_graph_check_type(
  * @param e The node entity
  * @param from Node whose input it is, 0 for the output of the graph
  * @param input Name of that input
- * @param expected Type that input expects
+ * @param expected Type that input expects, -1 for either
  * @return Index of the node, -1 when the build failed or waits
  */
 static int32_t box_texture_graph_visit(
@@ -568,7 +634,9 @@ static int32_t box_texture_graph_visit(
     kind = box_texture_graph_kind_of(b, e, &kinds);
     if (visited) {
         result = (int32_t)*visited - 1;
-        box_texture_graph_check_type(b, e, kind->output, from, input, expected);
+        box_texture_graph_check_type(b, e,
+            ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, result)->output, from, input,
+            expected);
         goto done;
     }
 
@@ -587,7 +655,10 @@ static int32_t box_texture_graph_visit(
         goto done;
     }
 
-    box_texture_graph_check_type(b, e, kind->output, from, input, expected);
+    if (!(kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT)) {
+        box_texture_graph_check_type(b, e, kind->output, from, input, expected);
+    }
+
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
         box_texture_graph_error(b, "more than %d nodes", BOX_TEXTURE_GRAPH_NODES);
     }
@@ -600,14 +671,26 @@ static int32_t box_texture_graph_visit(
     for (i = 0; i < kind->input_count && !b->error && !b->waiting; i ++) {
         const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
         ecs_entity_t in = *(const ecs_entity_t*)(ptr + kind->inputs[i].offset);
+        bool follows = i == 0 && (kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT);
         if (in) {
             inputs[i] = box_texture_graph_visit(b, in, e, kind->inputs[i].name,
-                kind->inputs[i].type);
+                follows ? (TextureValueType)-1 : kind->inputs[i].type);
         }
     }
 
     if (!b->error && !b->waiting) {
-        result = box_texture_graph_append(b, e, kind, inputs);
+        TextureValueType output = kind->output;
+        if ((kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT) && inputs[0] >= 0) {
+            output = ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, inputs[0])->output;
+        }
+
+        if (kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT) {
+            box_texture_graph_check_type(b, e, output, from, input, expected);
+        }
+
+        if (!b->error) {
+            result = box_texture_graph_append(b, e, kind, inputs, output);
+        }
     }
 
 done:
@@ -861,7 +944,7 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexBlur.
  *
  * @param world The world
  */
@@ -895,6 +978,20 @@ static void box_texture_nodes_register(
         .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexBlur),
+        .output = TexVector,
+        .inputs = {
+            { "input", offsetof(TexBlur, input), TexVector, "input_value",
+                offsetof(TexBlur, input_value) }
+        },
+        .params = {{ "radius", offsetof(TexBlur, radius), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_blur",
+        .source = box_texture_blur_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD | BOX_TEXTURE_NODE_FOLLOWS_INPUT,
+        .passes = 2
     });
 }
 

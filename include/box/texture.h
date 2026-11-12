@@ -323,6 +323,29 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** Node of a TextureGraph that blurs its input with a separable gaussian, in two passes.
+ *
+ * The input is a Scalar or a Vector node and the value has its type; without a node it is
+ * input_value, a Vector. On DomainPlane the blur wraps around the edges so a tiling input still
+ * tiles. On DomainSphere it follows the equirectangular layout: it wraps in longitude, the
+ * horizontal radius grows with 1/cos(latitude), capped at half the width near the poles, and
+ * the vertical taps across a pole continue on the opposite meridian.
+ *
+ * Editing radius writes the parameter buffer only: the shader loops to a fixed number of taps,
+ * spacing them further apart beyond that many texels.
+ *
+ * @code
+ * soft { TexBlur: {input: noise, radius: 8} }
+ * @endcode
+ */
+ECS_STRUCT(TexBlur, {
+    ecs_entity_t input; /**< Node to blur, a Scalar or a Vector, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+    float radius;       /**< Reach of the gaussian in texels of a 512 pixel wide image, scaled
+                         *   with the width so the look does not change with the resolution:
+                         *   three standard deviations, 0 for no blur */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
@@ -337,6 +360,13 @@ ECS_STRUCT(TexMath, {
 
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
+
+/** Flag of a node kind whose first input takes a Scalar or a Vector node and whose value has
+ * the type of that node; without a node the input and the value have the declared types */
+#define BOX_TEXTURE_NODE_FOLLOWS_INPUT (1u << 2)
+
+/** Most passes of a node kind */
+#define BOX_TEXTURE_NODE_PASSES (4)
 
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
@@ -365,6 +395,8 @@ ECS_STRUCT(TextureNodeKind, {
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
+    bool follows_input;      /**< The value has the type of the node of the first input */
+    int32_t passes;          /**< Passes that compute the value, 1 for most kinds */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -399,6 +431,13 @@ typedef struct box_texture_node_param_t {
  * order, a scalar in x and the constant of an input without a node, and the coordinates.
  *
  * It returns the value of the node, a scalar in x.
+ *
+ * A neighbourhood kind's function also gets the texel, then the texture of each input in order:
+ * fn name(p, i, coords, texel: vec2i, t0: texture_2d<f32>, ...) -> vec4f. A kind of more than
+ * one pass is a neighbourhood kind whose function also gets the pass and the value of the pass
+ * before it: fn name(p, i, coords, texel: vec2i, pass_index: u32, prev: texture_2d<f32>, t0, ...).
+ * Every pass but the last is materialized like any other node, prev is a 1x1 zero texture in
+ * the first pass and the value of the last pass is the value of the node.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -407,7 +446,11 @@ typedef struct box_texture_node_desc_t {
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters in order */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_FOLLOWS_INPUT */
+    int32_t passes;             /**< Passes of the function, 0 for 1, at most
+                                 *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
+                                 *   neighbourhood kind */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs
