@@ -96,6 +96,12 @@ ECS_STRUCT(ParticleCollision, {
  * of a ParticleCollision of the emitter entity and die once their age reaches their lifetime.
  * ParticlePlayback pauses, stops and resets the emitter; ParticleBurst spawns on top of the rate.
  *
+ * Sizes and speeds follow the world scale: the size, speed, radial speed and acceleration, and
+ * the softness of its ParticleAppearance, are multiplied by the uniform scale of the
+ * WorldTransform, the cube root of the determinant of its 3x3, so a plume under a Scale 40 hull
+ * is 40 times larger. A non-uniform scale stretches the spawn volume per axis. ParticleForces and
+ * ParticleMotion are in world units and do not scale.
+ *
  * Each is a camera facing soft circle of its size, color times opacity, over the opaque image,
  * unless ParticleCurves and ParticleAppearance on the emitter change that. Every drawn property
  * has its own random stream, so changing one range does not change the other draws.

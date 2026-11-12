@@ -2,6 +2,7 @@ include shipyard/state
 include shipyard/materials
 include shipyard/hull
 include shipyard/exterior
+include shipyard/capital
 include shipyard/cell
 include shipyard/stage
 include shipyard/logic
@@ -76,7 +77,11 @@ view {
 }
 
 yard {
-  Slipway slipway()
+  if capital {
+    Drydock dock()
+  } else {
+    Slipway slipway()
+  }
   BuildFrame frame()
   if tool > 0 {
     DeckGrid deck_grid(level: deck)
