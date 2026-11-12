@@ -86,6 +86,101 @@ assets {
     }
   }
 
+  template GantryCrane {
+    prop span: f32 = 40
+    prop h: f32 = 21
+    prop trolley: f32 = 0
+
+    for s in 0..2 {
+      const sx = s == 0 ? -0.5 : 0.5
+      for e in 0..2 {
+        const ez = e == 0 ? -1.3 : 1.3
+        "leg_{s}_{e}" : ShipYellow { Position: {sx * span, (h - 2.6) / 2, ez}; Box: {0.3, h + 2.6, 0.3} }
+      }
+      for i in 0..6 {
+        const by = -2.6 + (i + 0.5) * (h + 2.6) / 6
+        "brace_{s}_{i}" : ShipYellow { Position: {sx * span, by, 0}; Rotation: {i % 2 == 0 ? 1.0 : -1.0, 0, 0}; Box: {0.1, 0.1, 4.2} }
+        "tie_{s}_{i}" : ShipYellow { Position: {sx * span, by + (h + 2.6) / 12, 0}; Box: {0.12, 0.12, 2.6} }
+      }
+      "bogie_{s}" : ShipTrim { Position: {sx * span, -2.45, 0}; Box: {0.7, 0.5, 3.6} }
+      "lamp_{s}" : ShipBeaconRed { Position: {sx * span, h + 0.7, 0}; Sphere: {radius: 0.14, segments: 3, smooth: true} }
+      "cab_{s}" : ShipWhite { Position: {sx * span + (s == 0 ? 0.8 : -0.8), h - 1.2, 1.5}; Box: {1.2, 0.9, 0.9} }
+      "cab_glass_{s}" : ShipWindow { Position: {sx * span + (s == 0 ? 0.8 : -0.8), h - 1.15, 1.96}; Box: {1.0, 0.4, 0.02} }
+    }
+    for g in 0..2 {
+      const gz = g == 0 ? -1.1 : 1.1
+      "girder_{g}" : ShipYellow { Position: {0, h, gz}; Box: {span + 0.6, 0.6, 0.3} }
+      "lights_{g}" : ShipRunLights { Position: {0, h - 0.31, gz}; Box: {span, 0.02, 0.1} }
+    }
+    for i in 0..16 {
+      const tx = (i - 7.5) * span / 16
+      "lace_{i}" : ShipYellow { Position: {tx, h + 0.15, 0}; Rotation: {0, i % 2 == 0 ? 0.6 : -0.6, 0}; Box: {0.08, 0.08, 2.6} }
+    }
+    carriage {
+      Position: {trolley, h + 0.55, 0}
+      body : ShipTrim { Position: {0, 0, 0}; Box: {2.4, 0.7, 2.8} }
+      drum : ShipSteel { Position: {0, 0.45, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.3, length: 1.8, segments: 8, smooth: true} }
+      for c in 0..2 {
+        "cable_{c}" : ShipSteel { Position: {c == 0 ? -0.4 : 0.4, -6, 0}; Cylinder: {radius: 0.03, length: 11.4, segments: 4} }
+      }
+      block : ShipYellow { Position: {0, -11.9, 0}; Box: {1.2, 0.5, 0.6} }
+      hook : ShipTrim { Position: {0, -12.4, 0}; Box: {0.25, 0.6, 0.25} }
+      flood : ShipWhiteLight { Position: {0, -0.37, 0}; Box: {1.4, 0.03, 0.4} }
+    }
+  }
+
+  template MiniTug {
+    prop seed: i32 = 0
+
+    hull { Scale: {0.1, 0.1, 0.1}; MiniShuttle body(paint: seed % 2) }
+    plume : ShipPlasma { Position: {0, 0.15, -0.34}; Sphere: {radius: 0.07, segments: 3, smooth: true}; NoShadow }
+    beacon : ShipBeaconRed { Position: {0, 0.33, -0.1}; Sphere: {radius: 0.03, segments: 3, smooth: true} }
+    glow { Position: {0, 0.15, -0.6}; PointLight: {intensity: 1.5, range: 2}; Rgb: {120, 180, 255} }
+  }
+
+  template LightTower {
+    prop h: f32 = 24
+
+    mast : ShipSteel { Position: {0, h / 2 - 2.9, 0}; Cylinder: {radius: 0.12, length: h, segments: 6, smooth: true} }
+    for i in 0..4 {
+      "rung_{i}" : ShipTrim { Position: {0, 2 + i * (h - 6) / 3, 0}; Box: {0.6, 0.06, 0.6} }
+    }
+    head : ShipTrim { Position: {0, h - 2.9, 0}; Box: {1.4, 0.5, 0.3} }
+    lamps : ShipWhiteLight { Position: {0, h - 2.9, 0.16}; Box: {1.2, 0.3, 0.02} }
+    tip : ShipBeaconRed { Position: {0, h - 2.4, 0}; Sphere: {radius: 0.12, segments: 3, smooth: true} }
+  }
+
+  template Drydock {
+    const w = GX * CW + 8
+    const l = GZ * CW + 8
+    const span = w - 3
+
+    slab : YardDeckFine { Position: {0, -3.2, 0}; Box: {w, 0.6, l} }
+    for s in 0..2 {
+      const sx = s == 0 ? -1 : 1
+      "rim_{s}" : YardGirder { Position: {sx * w / 2, -2.86, 0}; Box: {0.3, 0.12, l + 0.3} }
+      "edge_{s}" : ShipRunLights { Position: {sx * (w / 2 + 0.16), -2.9, 0}; Box: {0.02, 0.05, l} }
+      "rail_{s}" : YardGirder { Position: {sx * span / 2, -2.78, 0}; Box: {0.4, 0.24, l - 0.4} }
+      "rail_top_{s}" : ShipSteel { Position: {sx * span / 2, -2.65, 0}; Box: {0.14, 0.04, l - 0.4} }
+      "end_{s}" : YardGirder { Position: {0, -2.86, sx * l / 2}; Box: {w + 0.3, 0.12, 0.3} }
+      "end_lights_{s}" : ShipRunLights { Position: {0, -2.9, sx * (l / 2 + 0.16)}; Box: {w, 0.05, 0.02} }
+      for t in 0..3 {
+        LightTower "tower_{s}_{t}"(h: 22 + t * 2) { Position: {sx * (w / 2 - 0.8), 0, -l / 2 + 6 + t * (l - 12) / 2} }
+      }
+    }
+    keel : ShipRunLightsCyan { Position: {0, -2.89, 0}; Box: {0.08, 0.02, l - 4} }
+    for i in 0..38 {
+      const cz = (i - 18.5) * 2
+      "cradle_{i}" : YardGirder { Position: {0, -2.84, cz}; Box: {GX * CW - 12, 0.12, 0.16} }
+      "block_{i}" : ShipHazard { Position: {i % 2 == 0 ? -5 : 5, -2.76, cz}; Box: {0.5, 0.06, 0.22} }
+    }
+    GantryCrane crane_a(span: span, trolley: -6) { Position: {0, 0, -27} }
+    GantryCrane crane_b(span: span, trolley: 9) { Position: {0, 0, 25} }
+    MiniTug tug_a(seed: 0) { Position: {w / 2 + 5, 4, 8}; Rotation: {0, -0.3, 0} }
+    MiniTug tug_b(seed: 1) { Position: {0 - w / 2 - 4, 9, -14}; Rotation: {0, 2.6, 0} }
+    MiniTug tug_c(seed: 2) { Position: {6, 24, 30}; Rotation: {0, 1.2, 0} }
+  }
+
   template YardPlanet {
     surface {
       Position: {0, 0, 0}
