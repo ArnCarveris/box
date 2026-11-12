@@ -38,6 +38,17 @@
  * the ground */
 #define PA_LIMB (1.02f)
 
+/** Rows on each side of the center row that PlanetAtmosphereShell_terminator_smooth averages,
+ * which evens out the per pixel jitter of the samples but keeps stripes parallel to the
+ * terminator */
+#define PA_TWILIGHT_ROWS (8)
+
+/** Brightness, the sum of the color channels, below which the twilight is too faint to check */
+#define PA_TWILIGHT_FAINT (30.0f)
+
+/** Largest change of the fall of the twilight brightness between neighboring columns */
+#define PA_TWILIGHT_STEP (5.0f)
+
 /** Create a headless world that renders on the main thread, without ambient light, with a white
  * sun turned by a pitch and a yaw.
  *
@@ -592,36 +603,64 @@ void PlanetAtmosphereShell_backlit_ring(void) {
     ecs_fini(world);
 }
 
+/** Get the brightness of a column of a capture, the sum of the color channels averaged over the
+ * PA_TWILIGHT_ROWS rows on each side of the center row and that row.
+ *
+ * @param px The pixels
+ * @param x Column
+ * @return The brightness
+ */
+static float pa_column(
+    const unsigned char *px,
+    int32_t x)
+{
+    int32_t y, sum = 0;
+    for (y = PA_SIZE / 2 - PA_TWILIGHT_ROWS; y <= PA_SIZE / 2 + PA_TWILIGHT_ROWS; y ++) {
+        const unsigned char *p = pa_px(px, x, y);
+        sum += p[0] + p[1] + p[2];
+    }
+
+    return (float)sum / (2 * PA_TWILIGHT_ROWS + 1);
+}
+
 /** A planet lit from the side fades smoothly from the terminator into the night: along the
- * row through its center the night side of the disk does not brighten again toward the limb,
- * as it does with stripes of the twilight glow parallel to the terminator. */
+ * rows around its center the brightness of the night side falls by about the same amount from
+ * column to column, while stripes of the twilight glow parallel to the terminator fall in
+ * steps. */
 void PlanetAtmosphereShell_terminator_smooth(void) {
     // planet_atmosphere/shell
-    int32_t edge[2], x, center = PA_SIZE / 2, bumps = 0;
+    int32_t edge[2], x, center = PA_SIZE / 2, columns = 0;
     ecs_world_t *world = pa_world(0, -90);
     pa_view(world, 3, 0);
     pa_atmosphere(world, pa_planet(world, 0, 0));
     unsigned char *px = pa_render(world, "planet_terminator.png");
     pa_limb(3, 0, 0, -1, 0, 1.0f, edge);
-    int32_t last = center - (center - edge[0]) * 7 / 10;
     const unsigned char *lit = pa_px(px, center + (center - edge[0]) / 2, center);
-    const unsigned char *night = pa_px(px, last, center);
+    const unsigned char *night = pa_px(px, center - (center - edge[0]) * 7 / 10, center);
     pa_print("day", lit);
     pa_print("night", night);
     test_assert(lit[0] + lit[1] + lit[2] > night[0] + night[1] + night[2]);
-    int32_t low = 0;
-    for (x = center; x >= last; x --) {
-        const unsigned char *p = pa_px(px, x, center);
-        int32_t sum = p[0] + p[1] + p[2];
-        if (x != center && sum > low + 6) {
-            printf("bump at %d: %d after %d\n", x, sum, low);
-            bumps ++;
+
+    // From just past the terminator of the ground into the night, until the glow is faint
+    float prev = pa_column(px, center - 2), drop = -1, worst = 0;
+    for (x = center - 3; x > edge[0]; x --) {
+        float value = pa_column(px, x);
+        if (value < PA_TWILIGHT_FAINT) {
+            break;
         }
 
-        low = x == center || sum < low ? sum : low;
+        if (drop >= 0 && fabsf(prev - value - drop) > worst) {
+            worst = fabsf(prev - value - drop);
+        }
+
+        drop = prev - value;
+        prev = value;
+        columns ++;
     }
 
-    test_int(bumps, 0);
+    printf("twilight columns: %d, largest change of the falloff: %.1f\n", columns, worst);
+    test_assert(columns >= 8);
+    test_assert(worst < PA_TWILIGHT_STEP);
     stbi_image_free(px);
     ecs_fini(world);
 }
