@@ -1039,7 +1039,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 5);
+    test_int(null->texture_node_kinds, 7);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1076,7 +1076,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 5);
+    test_int(null->texture_node_kinds, 7);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1168,7 +1168,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 5);
+    test_int(second->texture_node_kinds, 7);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1195,7 +1195,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 6);
+    test_int(null->texture_node_kinds, 8);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1209,7 +1209,6 @@ void TextureGraph_custom_kind_sent(void) {
     box_render_null_free(null);
 }
 
-<<<<<<< HEAD
 void TextureGraph_coord_kinds(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1249,7 +1248,10 @@ void TextureGraph_coord_kinds(void) {
     test_int(kind->param_size, 48);
     test_str(kind->function, "box_tex_transform");
     test_bool(kind->neighbourhood, false);
-=======
+
+    ecs_fini(world);
+}
+
 void TextureGraph_builtin_time_splat(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1296,12 +1298,10 @@ void TextureGraph_builtin_time_splat(void) {
     ecs_os_memcpy(params, entry->graph->params + entry->graph->nodes[0].params, 8);
     test_flt(params[0], 2);
     test_flt(params[1], 0.5f);
->>>>>>> f8057f76d34068a3d56daf6fb1e220d24e3796d7
 
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 void TextureGraph_coord_kinds_sent(void) {
     // materials/textures
     box_render_null_t *null = NULL;
@@ -1321,7 +1321,11 @@ void TextureGraph_coord_kinds_sent(void) {
     k = box_render_null_texture_node_kind(null, (uint32_t)kind_id(world, ecs_id(TexMath)));
     test_assert(k != NULL);
     test_int(k->coords_inputs, 0);
-=======
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void TextureGraph_time_into_vector_fails(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1372,13 +1376,11 @@ void TextureGraph_null_backend_rate(void) {
     box_render_sync(world);
     test_int(null->texture_graphs, 3);
     test_flt(box_render_null_texture_graph(null, handle)->rate, 0);
->>>>>>> f8057f76d34068a3d56daf6fb1e220d24e3796d7
 
     ecs_fini(world);
     box_render_null_free(null);
 }
 
-<<<<<<< HEAD
 void TextureGraph_coord_nodes_script(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1426,7 +1428,8 @@ void TextureGraph_coord_nodes_script(void) {
     test_flt(value, 0.5f);
 
     ecs_fini(world);
-=======
+}
+
 void TextureGraph_cache_budget_packet(void) {
     // materials/textures
     box_render_null_t *null = NULL;
@@ -1444,5 +1447,4 @@ void TextureGraph_cache_budget_packet(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
->>>>>>> f8057f76d34068a3d56daf6fb1e220d24e3796d7
 }

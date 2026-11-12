@@ -1475,7 +1475,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "TextureCoordNodes",
                 "testcases": [
                     "identity_plane",
@@ -1486,7 +1485,9 @@
                     "rotate_sphere",
                     "sphere_seam",
                     "script"
-=======
+                ]
+            },
+            {
                 "id": "TexturePreview",
                 "testcases": [
                     "size_and_pixels",
@@ -1510,7 +1511,6 @@
                     "toggle_back_reuses",
                     "eviction_under_budget",
                     "animated_static_part"
->>>>>>> f8057f76d34068a3d56daf6fb1e220d24e3796d7
                 ]
             }
         ]
