@@ -602,6 +602,13 @@ static void surface_scene_run(
     test_int(s->width, width);
     test_int(s->height, height);
 
+    /* A later write of the Surface, as a reload does, keeps the size of the command line */
+    ecs_set(world, window, Surface, {.width = 800, .height = 600});
+    ecs_progress(world, 0);
+    s = ecs_get(world, window, Surface);
+    test_int(s->width, size ? width : 800);
+    test_int(s->height, size ? height : 600);
+
     ecs_fini(world);
     box_render_null_free(null);
 }
