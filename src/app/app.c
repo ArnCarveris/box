@@ -272,6 +272,7 @@ static void BoxAppFrame(
 
     status->frame ++;
     status->elapsed = wall - clock->start;
+    status->delta_time = ecs_get_world_info(it->world)->delta_time;
     status->errors = box_app_errors(clock);
     if (app->frames > 0 && status->frame >= app->frames) {
         ecs_quit(it->world);
