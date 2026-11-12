@@ -223,8 +223,7 @@ typedef struct box_gpu_texgraphs_t {
     ecs_map_t cache;            /**< Content hash to box_gpu_tg_entry_t* */
     box_gpu_tg_entry_t *lru_first; /**< Least recently used entry no graph holds */
     box_gpu_tg_entry_t *lru_last; /**< Most recently used entry no graph holds */
-    uint64_t lru_bytes;         /**< Bytes of the entries in the LRU list */
-    uint64_t budget;            /**< Bytes the LRU list keeps at most */
+    uint64_t budget;            /**< Bytes the cache holds at most, evicting from the LRU list */
     double time;                /**< World time of the packet being evaluated */
 } box_gpu_texgraphs_t;
 

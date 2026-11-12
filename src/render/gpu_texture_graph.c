@@ -308,7 +308,6 @@ static void box_gpu_tg_lru_remove(
     e->prev = NULL;
     e->next = NULL;
     e->listed = false;
-    tg->lru_bytes -= e->bytes;
 }
 
 /** Take a reference to the cached value of a node of a graph: the entry the graph held for the
@@ -398,7 +397,6 @@ static void box_gpu_tg_cache_release(
 
     tg->lru_last = e;
     e->listed = true;
-    tg->lru_bytes += e->bytes;
 done:
     return;
 }
