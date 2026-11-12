@@ -844,8 +844,8 @@ void box_gpu_upload(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Record the overdraw count of a view: its depth prepass again, early then late arguments, into
- * a depth buffer of its own cleared to 0 with compare Greater.
+/** Record the overdraw count of a view: its depth prepass again with the early arguments, which
+ * hold the late ones too, into a depth buffer of its own cleared to 0 with compare Greater.
  *
  * A fragment that passes the depth and alpha tests adds one to red (plain) or green (cutout).
  *

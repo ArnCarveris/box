@@ -67,7 +67,8 @@ const GROUP_VIEWS: u32 = 32u;
 const FRUSTUM_HISTORY: u32 = 4u;
 
 // Words of a table entry: job, first scan word, workgroups, draw arguments, first visible entry,
-// counters, two unused.
+// counters, then for a late entry with a history its early draw arguments plus one and first
+// early visible entry, which it appends what it keeps to, else two zeros.
 const ENTRY_WORDS: u32 = 8u;
 
 // Words of a workgroup of the cull_instances list: job, first scan word of the job, first table
@@ -306,10 +307,17 @@ fn cull_instances(
             let mask = select(atomicLoad(&group_masks[f * 2u + 1u]), low, local < 32u);
             let below = countOneBits(mask & ((1u << bit) - 1u)) +
                 select(countOneBits(low), 0u, local < 32u);
-            visible_slots[scan_words[entry + k * ENTRY_WORDS + 4u] + below] = job.first + index;
+            let e = entry + k * ENTRY_WORDS;
+            visible_slots[scan_words[e + 4u] + below] = job.first + index;
+            let early = scan_words[e + 6u];
+            if (early != 0u) {
+                let kept = atomicLoad(&args[(early - 1u) * ARGS + 1u]);
+                visible_slots[scan_words[e + 7u] + kept + below] = job.first + index;
+            }
         }
     }
 
+    storageBarrier();
     if (local < GROUP_VIEWS && ((job.mask >> local) & 1u) != 0u) {
         let k = countOneBits(job.mask & ((1u << local) - 1u));
         let low = atomicLoad(&group_masks[local * 2u]);
@@ -320,6 +328,11 @@ fn cull_instances(
             atomicStore(&args[scan_words[e + 3u] * ARGS + 1u], total);
             if (total > 0u) {
                 atomicAdd(&counters[scan_words[e + 5u] * COUNTERS], total);
+            }
+
+            let early = scan_words[e + 6u];
+            if (early != 0u && total > 0u) {
+                atomicAdd(&args[(early - 1u) * ARGS + 1u], total);
             }
         } else {
             let words = scan + (k * job_groups + part) * SCAN_WORDS;
@@ -386,6 +399,10 @@ fn cull_scan(
         let total = scan_sums[255];
         atomicStore(&args[scan_words[entry + 3u] * ARGS + 1u], total);
         atomicAdd(&counters[scan_words[entry + 5u] * COUNTERS], total);
+        let early = scan_words[entry + 6u];
+        if (early != 0u && total > 0u) {
+            atomicAdd(&args[(early - 1u) * ARGS + 1u], total);
+        }
     }
 }
 
@@ -423,8 +440,15 @@ fn cull_write(
         if (((mask >> bit) & 1u) != 0u) {
             let below = countOneBits(mask & ((1u << bit) - 1u)) +
                 select(countOneBits(low), 0u, local < 32u);
-            visible_slots[scan_words[entry + k * ENTRY_WORDS + 4u] + scan_words[words + 2u] +
-                below] = job.first + index;
+            let e = entry + k * ENTRY_WORDS;
+            let offset = scan_words[words + 2u] + below;
+            visible_slots[scan_words[e + 4u] + offset] = job.first + index;
+            let early = scan_words[e + 6u];
+            if (early != 0u) {
+                let kept = atomicLoad(&args[(early - 1u) * ARGS + 1u]) -
+                    atomicLoad(&args[scan_words[e + 3u] * ARGS + 1u]);
+                visible_slots[scan_words[e + 7u] + kept + offset] = job.first + index;
+            }
         }
     }
 }
