@@ -134,6 +134,17 @@ typedef struct box_render_gpu_stats_t {
                                  *   holds */
     int64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediate textures now */
     int32_t texture_graph_reads; /**< Texture graph readbacks delivered */
+    int32_t texture_graph_hits; /**< Stages of texture graphs whose value the cache had, so
+                                 *   they were not dispatched; not the stages of an animated
+                                 *   update that kept the values the graph held */
+    int32_t texture_graph_misses; /**< Stages of texture graphs whose value the cache did not
+                                 *   have, dispatched into a new entry */
+    int32_t texture_graph_evictions; /**< Cached values evicted to keep the budget */
+    int32_t texture_graph_updates; /**< Evaluations of animated texture graphs that only
+                                 *   updated them over time, also counted in
+                                 *   texture_graph_evaluations */
+    int64_t texture_graph_cached_bytes; /**< Bytes of the cached values now, in use or not */
+    int32_t texture_graph_cached; /**< Cached values now */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -349,7 +360,8 @@ typedef struct box_render_texture_graph_t {
     uint64_t param_hash;        /**< Hash of the parameter bytes */
     uint32_t serial;            /**< Graphs sent for the texture, which the outcome of the
                                  *   evaluation names (box_render_texture_graph_result_t) */
-    uint32_t pad;               /**< Unused, zero */
+    float rate;                 /**< Updates per second of an animated graph, 0 for every
+                                 *   frame (TextureGraph.rate) */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.

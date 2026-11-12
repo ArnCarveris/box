@@ -1,0 +1,68 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.perf
+
+// Animated texture graphs: eight panels whose emission samples a drifting cloud layer, each at
+// its own speed and 30 updates per second, and 24 animated layers no draw samples, which skip
+// their updates. Every layer mixes the same static sky gradient, a stage the cache shares.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {12, 0.2, 6}
+  Rgb: {90, 96, 104}
+}
+
+for row in 0..2 {
+  for col in 0..4 {
+    {
+      Position: {col * 2.6 - 3.9, 1.2 + row * 2.4, 0}
+      Box: {2.2, 2.2, 0.2}
+      Rgb: {0, 0, 0}
+      PbrMaterial: {metallic: 1, roughness: 1}
+      Emissive: {strength: 1, color: {255, 255, 255}}
+
+      clouds {
+        uv { TexCoords: {scale: 1} }
+        sky { TexMath: {op: MathMix, a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, c: uv} }
+        time { TexTime: {scale: 0.02 + (row * 4 + col) * 0.01, offset: 0} }
+        drift { TexSplat: {in: time} }
+        moved { TexMath: {op: MathAdd, a: uv, b: drift} }
+        puffs { TexMath: {op: MathMultiply, a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
+        out { TexMath: {op: MathMax, a: sky, b: puffs} }
+        TextureGraph: {output: out, width: 512, height: 512, domain: DomainPlane, format: GraphColor, rate: 30}
+      }
+
+      PbrTextures: {emissive: clouds}
+    }
+  }
+}
+
+offscreen {
+  for i in 0..24 {
+    {
+      uv { TexCoords: {scale: 1} }
+      sky { TexMath: {op: MathMix, a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, c: uv} }
+      time { TexTime: {scale: 0.03 + i * 0.005, offset: 0} }
+      drift { TexSplat: {in: time} }
+      moved { TexMath: {op: MathAdd, a: uv, b: drift} }
+      puffs { TexMath: {op: MathMultiply, a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
+      out { TexMath: {op: MathMax, a: sky, b: puffs} }
+      TextureGraph: {output: out, width: 512, height: 512, domain: DomainPlane, format: GraphColor, rate: 0}
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 60, frames: 600, warmup: 60, period: 10, elevation: 20, camera: camera}
+}
