@@ -1137,19 +1137,31 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
+<<<<<<< HEAD
     ECS_META_COMPONENT(world, TextureChannel);
     ECS_META_COMPONENT(world, TexSplit);
     ECS_META_COMPONENT(world, TexCombine);
+=======
+    ECS_META_COMPONENT(world, TexWarp);
+    ECS_META_COMPONENT(world, TexTransform);
+    ECS_META_COMPONENT(world, TexTime);
+    ECS_META_COMPONENT(world, TexSplat);
+    ECS_META_COMPONENT(world, TextureGraphCache);
+>>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
+    ECS_META_COMPONENT(world, TextureNodePreview);
+    ECS_META_COMPONENT(world, TextureNodePreviewStatus);
+    ECS_META_COMPONENT(world, TextureGraphStats);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
     box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
         BOX_OWNED_VEC(TextureGen, palette, rgb));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+<<<<<<< HEAD
     box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name));
     box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));
     box_owned_hooks(world, TextureNodeKind, BOX_OWNED_STR(TextureNodeKind, function),
@@ -1165,6 +1177,10 @@ void BoxTextureImport(
         BOX_OWNED_STR(TextureNodeKind, params[5].name),
         BOX_OWNED_STR(TextureNodeKind, params[6].name),
         BOX_OWNED_STR(TextureNodeKind, params[7].name));
+=======
+    box_owned_hooks(world, TextureNodePreviewStatus,
+        BOX_OWNED_STR(TextureNodePreviewStatus, png));
+>>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);

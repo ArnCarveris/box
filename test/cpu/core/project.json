@@ -400,11 +400,21 @@
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
                     "custom_kind_sent",
+<<<<<<< HEAD
                     "math_types",
                     "math_remap_params",
                     "math_op_output_changes_structure",
                     "split_combine_kinds",
                     "combine_rejects_vector"
+=======
+                    "coord_kinds",
+                    "coord_kinds_sent",
+                    "coord_nodes_script",
+                    "builtin_time_splat",
+                    "time_into_vector_fails",
+                    "null_backend_rate",
+                    "cache_budget_packet"
+>>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
                 ]
             },
             {

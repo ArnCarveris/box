@@ -91,6 +91,30 @@
                 ]
             },
             {
+                "id": "GeometryCheck",
+                "testcases": [
+                    "coplanar_faces",
+                    "single_face",
+                    "opposite_faces",
+                    "tolerance",
+                    "area",
+                    "max",
+                    "root",
+                    "mirrored",
+                    "rotated",
+                    "tilted",
+                    "cylinder_caps",
+                    "skips_2d",
+                    "skips_prefabs",
+                    "errors",
+                    "status",
+                    "unplaced",
+                    "hidden",
+                    "partly_hidden",
+                    "alike"
+                ]
+            },
+            {
                 "id": "Logs",
                 "testcases": [
                     "captures_error",

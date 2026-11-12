@@ -289,6 +289,23 @@ ECS_STRUCT(TextureGraph, {
     int32_t height;            /**< Height in pixels, 0 for the width */
     TextureGraphDomain domain; /**< Coordinates of the texels, default DomainPlane */
     TextureGraphFormat format; /**< What the image stores, default GraphColor */
+    float rate;                /**< Updates per second of an animated graph, 0 for every frame.
+                                *   An animated graph whose image no draw sampled in the
+                                *   previous frame skips its updates until one samples it */
+});
+
+/** Settings of the cache of the values the texture graphs materialize, a singleton.
+ *
+ * Values are cached by the content hash of their node (its kind, parameters, inputs, the size and
+ * domain of the graph) for every graph, so an edit evaluates only the stages after the edited
+ * node, graphs with an identical subgraph share it and an edit undone finds the earlier value.
+ *
+ * Values no graph uses stay while the cache fits the budget, the least recently used evicted
+ * first; values in use are never evicted, even over the budget.
+ */
+ECS_STRUCT(TextureGraphCache, {
+    int64_t budget; /**< Bytes the cache holds at most, 0 for 256 MB: values no graph uses are
+                     *   evicted while it holds more */
 });
 
 /** Node of a TextureGraph with a constant value */
@@ -302,7 +319,26 @@ ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 0 for 1 */
 });
 
+<<<<<<< HEAD
 /** Operation of a TexMath node. Each one works per channel unless it says otherwise. */
+=======
+/** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
+ * times scale plus offset, so a paused world shows the same image. It makes the nodes after it
+ * and their graph animated, see TextureGraph.rate */
+ECS_STRUCT(TexTime, {
+    float scale;  /**< Factor of the seconds, 0 for 1 */
+    float offset; /**< Added after the factor */
+});
+
+/** Node of a TextureGraph that spreads a scalar over the four channels of a vector, such as a
+ * TexTime into a TexMath */
+ECS_STRUCT(TexSplat, {
+    ecs_entity_t in; /**< Scalar input node, 0 for in_value */
+    float in_value;  /**< Value of in without a node */
+});
+
+/** Operation of a TexMath node */
+>>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
 ECS_ENUM(TextureMathOp, {
     MathAdd = 0,         /**< a + b, the default */
     MathSubtract = 1,    /**< a - b */
@@ -421,6 +457,66 @@ ECS_STRUCT(TexCombine, {
     float a_value;      /**< Value of a without a node */
 });
 
+/** Node of a TextureGraph that displaces coordinates: coords + (offset - 0.5) * amount.
+ *
+ * The offset is centred at 0.5, so a noise in 0..1 moves the coordinates by -0.5..0.5 times
+ * amount; x, y and z move, w is kept. On DomainPlane the result keeps tiling where the offset
+ * tiles. On DomainSphere the result is normalized back onto the unit sphere, so generators
+ * reading it stay seamless; where the displaced point is at the origin it keeps coords.
+ *
+ * @code
+ * warped {
+ *   bumps { TexMath: {op: MathMultiply, a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
+ *   TexWarp: {offset: bumps, amount_value: 0.2}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexWarp, {
+    ecs_entity_t coords;  /**< Vector input of the coordinates to displace, 0 for the coordinates
+                           *   of the texel in the domain of the graph */
+    ecs_entity_t offset;  /**< Vector input of the displacement centred at 0.5, 0 for
+                           *   offset_value */
+    ecs_entity_t amount;  /**< Scalar input of the factor of the displacement, 0 for
+                           *   amount_value */
+    vec4 offset_value;    /**< Value of offset without a node; the default 0 moves by -0.5 *
+                           *   amount, set {0.5, 0.5, 0.5} for no displacement */
+    float amount_value;   /**< Value of amount without a node, default 0: no displacement */
+});
+
+/** Node of a TextureGraph that scales, rotates and translates coordinates, in that order:
+ * rotate((coords - centre) * scale) + centre + translate, w kept.
+ *
+ * On DomainPlane the centre is the image centre (0.5, 0.5, 0) and the rotation turns (u, v)
+ * about it from +u towards +v (clockwise in the image, whose v goes down), ignoring axis. The
+ * result tiles for any translate, for whole number scales, and only for rotations by a
+ * multiple of 90 degrees, which are exact; other angles leave seams at the image border.
+ *
+ * On DomainSphere the centre is the origin and the rotation is right handed about axis, so a
+ * field computed from the result turns the other way over the sphere. A scale changes the
+ * distance of the points from the origin, so 3D generators reading them see features scale
+ * times smaller; a translate moves the points off the unit sphere through the 3D field of the
+ * generators, which changes the pattern but keeps it seamless. Neither keeps unit length.
+ *
+ * The angle may come from a Scalar node, so a field spins when an animated value drives it.
+ *
+ * @code
+ * turned {
+ *   TexTransform: {angle_value: 90, scale: {2, 2, 1}}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexTransform, {
+    ecs_entity_t coords;  /**< Vector input of the coordinates to transform, 0 for the
+                           *   coordinates of the texel in the domain of the graph */
+    ecs_entity_t angle;   /**< Scalar input of the rotation in degrees, 0 for angle_value */
+    float angle_value;    /**< Value of angle without a node, in degrees, default 0 */
+    vec3 axis;            /**< DomainSphere: axis of the rotation, normalized; 0 for +y, the
+                           *   poles. Ignored on DomainPlane */
+    vec3 translate;       /**< Added to the coordinates after scale and rotation */
+    vec3 scale;           /**< Factor of the coordinates about the centre, a 0 component for 1;
+                           *   whole numbers keep the plane tiling */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
@@ -441,6 +537,7 @@ ECS_STRUCT(TextureNodePort, {
     const char *name;      /**< Member of the ecs_entity_t of the input node */
     TextureValueType type; /**< Type the input node must output */
     bool fallback;         /**< The input has a constant member used without a node */
+    const char *value;     /**< Name of that constant member, NULL without one */
 });
 
 /** A parameter of a node kind, as TextureNodeKind lists it */
@@ -483,6 +580,8 @@ typedef struct box_texture_node_input_t {
                                  *   for TexScalar or a vec4 for TexVector and TexAny, NULL for
                                  *   none */
     ecs_size_t value_offset;    /**< Offset of that member */
+    bool coords;                /**< A TexVector input without value: without a node it is the
+                                 *   coordinates of the texel in the domain of the graph */
 } box_texture_node_input_t;
 
 /** A parameter of a node kind: a member copied into the parameter buffer */
@@ -553,6 +652,44 @@ ECS_STRUCT(TextureStatus, {
     TextureState state; /**< Progress of the last requested load */
     int32_t revision;   /**< Loads that succeeded, the image changed when it increments */
     char *error;        /**< Why the last load failed, NULL unless state is TextureFailed */
+});
+
+/** Preview of the value of a node of a TextureGraph, which a tool such as tools/texgraph sets
+ * on a node entity to see it. With the GPU backend the engine reads the value of the node back
+ * at most rate times per second, scales it down to size and writes TextureNodePreviewStatus.
+ *
+ * Removing it stops the readbacks and removes the status. A node that no graph reaches has no
+ * value to read, so it gets no status.
+ */
+ECS_STRUCT(TextureNodePreview, {
+    int32_t size; /**< Largest dimension of the preview in pixels, 0 for 128 */
+    float rate;   /**< Most readbacks per second, 0 for 4 */
+});
+
+/** Preview of a node written by the engine for its TextureNodePreview, read only for
+ * applications: an opaque RGBA8 PNG of its value as the image of its graph would store it, a
+ * scalar in gray. It is encoded again only when the value changed. */
+ECS_STRUCT(TextureNodePreviewStatus, {
+    int32_t width;    /**< Width of the preview in pixels */
+    int32_t height;   /**< Height of the preview in pixels */
+    int32_t revision; /**< Previews encoded, it increments when the value changed */
+    char *png;        /**< The PNG file in base64 */
+});
+
+/** Statistics of the evaluation of the texture graphs on the GPU backend, a singleton the
+ * engine writes when they change, read only for applications */
+ECS_STRUCT(TextureGraphStats, {
+    int32_t graphs;      /**< Texture graphs alive on the backend */
+    int32_t programs;    /**< Generated stage programs alive, shared by graphs of one structure */
+    int32_t evaluations; /**< Evaluations of texture graphs recorded */
+    int32_t dispatches;  /**< Stage dispatches recorded */
+    int64_t texels;      /**< Texels the stage dispatches computed */
+    double gpu_ms;       /**< GPU time of the evaluations measured, 0 without timestamp
+                          *   queries */
+    int32_t timed;       /**< Packets of evaluations whose GPU time gpu_ms holds */
+    int64_t pool_bytes;  /**< Bytes of the pooled intermediate textures now */
+    int32_t reads;       /**< Readbacks delivered, previews included */
+    int32_t previews;    /**< Nodes with a TextureNodePreview */
 });
 
 /** Register the box.texture module.

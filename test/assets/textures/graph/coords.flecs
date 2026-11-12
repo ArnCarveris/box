@@ -1,0 +1,10 @@
+// Coordinates turned a quarter, scaled twice and warped by a constant offset.
+
+using box.texture
+
+graph_coords {
+  uv     { TexCoords: {} }
+  turned { TexTransform: {coords: uv, angle_value: 90, scale: {2, 2, 1}} }
+  warped { TexWarp: {coords: turned, offset_value: {0.7, 0.5, 0.5, 0}, amount_value: 0.5} }
+  TextureGraph: {output: warped, width: 64, format: GraphHdr}
+}

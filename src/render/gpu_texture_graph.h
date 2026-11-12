@@ -27,7 +27,10 @@
 #define BOX_GPU_TG_PARAM_PAD (64)
 
 /** Bytes of BoxTexGraphStage */
-#define BOX_GPU_TG_UNIFORM_SIZE (16)
+#define BOX_GPU_TG_UNIFORM_SIZE (32)
+
+/** Bytes of the cached values no graph uses kept by default (TextureGraphCache.budget) */
+#define BOX_GPU_TG_CACHE_BUDGET (256ll * 1024 * 1024)
 
 /** Packets a pooled intermediate that no graph used stays in the pool */
 #define BOX_GPU_TG_POOL_KEEP (120)
@@ -52,6 +55,7 @@ typedef struct box_gpu_tg_kind_t {
     uint32_t output;            /**< TextureValueType of its value */
     uint32_t input_count;       /**< Inputs of a node */
     uint32_t param_size;        /**< Bytes of the parameters before the input constants */
+    uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
@@ -115,6 +119,15 @@ typedef struct box_gpu_tg_graph_t {
     bool dirty;                 /**< The image is older than the description */
     bool written;               /**< The image of the handle was written by the graph */
     uint32_t reported;          /**< Serial whose outcome was reported, 0 for none */
+    uint64_t *hashes;           /**< Content hash of each node, computed with the key */
+    bool *animated;             /**< Whether each node depends on time, computed with the key */
+    bool is_animated;           /**< The output depends on time */
+    struct box_gpu_tg_entry_t **entries; /**< Cache entry each node of the last evaluation
+                                 *   held, by node of the current program, NULL for none */
+    int32_t entry_count;        /**< Nodes in entries */
+    int64_t sampled;            /**< Packet of the graph state whose draws last sampled the
+                                 *   image, -1 for none */
+    double time;                /**< World time of the last evaluation */
 } box_gpu_tg_graph_t;
 
 /** A pooled intermediate */
@@ -127,6 +140,21 @@ typedef struct box_gpu_tg_pooled_t {
     bool used;                  /**< An evaluation of this packet holds it */
     int64_t last;               /**< Packet it was last used in */
 } box_gpu_tg_pooled_t;
+
+/** A materialized value of the cache, shared by the graphs whose node has its content hash.
+ *
+ * An entry the graphs use has references; one without is in the LRU list of the cache, most
+ * recently used last, until it is evicted or used again.
+ */
+typedef struct box_gpu_tg_entry_t {
+    uint64_t hash;              /**< Content hash of the node */
+    box_gpu_tg_pooled_t value;  /**< Texture of the value, never in the pool */
+    uint64_t bytes;             /**< Bytes of the texture */
+    int32_t refs;               /**< Graphs that hold it */
+    struct box_gpu_tg_entry_t *prev; /**< Previous entry of the LRU list */
+    struct box_gpu_tg_entry_t *next; /**< Next entry of the LRU list */
+    bool listed;                /**< It is in the LRU list */
+} box_gpu_tg_entry_t;
 
 /** Where a readback is */
 typedef enum box_gpu_tg_read_state_t {
@@ -167,8 +195,11 @@ typedef struct box_gpu_tg_eval_t {
     box_gpu_tg_graph_t *graph;  /**< The graph */
     box_gpu_tg_pooled_t **textures; /**< Intermediate of each materialized node, by node */
     box_gpu_tg_pooled_t *temp;  /**< Texture the output stage writes before a blit, or NULL */
+    box_gpu_tg_entry_t **entries; /**< Cache entry of each node it reads or writes, by node,
+                                 *   which the graph holds after the evaluation */
     bool held;                  /**< The intermediates stay until the end of the packet */
     bool stored;                /**< The image of the handle was written */
+    bool update;                /**< Only an animated update: the graph did not change */
 } box_gpu_tg_eval_t;
 
 /** Texture graphs of the backend */
@@ -190,7 +221,24 @@ typedef struct box_gpu_texgraphs_t {
     WGPUQuerySet queries;       /**< Two timestamps per readback, NULL without the feature */
     WGPUBuffer resolve;         /**< Resolved timestamps */
     box_gpu_tg_stamp_t stamps[BOX_GPU_TG_STAMPS]; /**< Timestamp readbacks */
+    ecs_map_t cache;            /**< Content hash to box_gpu_tg_entry_t* */
+    box_gpu_tg_entry_t *lru_first; /**< Least recently used entry no graph holds */
+    box_gpu_tg_entry_t *lru_last; /**< Most recently used entry no graph holds */
+    uint64_t budget;            /**< Bytes the cache holds at most, evicting from the LRU list */
+    double time;                /**< World time of the packet being evaluated */
 } box_gpu_texgraphs_t;
+
+/** Get the bytes of a texel of a format of an intermediate, a cached value or a readback.
+ *
+ * @param format The format
+ * @return The bytes
+ */
+static inline uint32_t box_gpu_tg_texel_size(
+    WGPUTextureFormat format)
+{
+    return format == WGPUTextureFormat_RGBA16Float ? 8
+        : format == BOX_GPU_TEXTURE_SINGLE ? 1 : 4;
+}
 
 /** Get the format of the texture of the image of a graph.
  *

@@ -1475,6 +1475,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "TextureNodesMath",
                 "testcases": [
                     "vector_plane",
@@ -1493,6 +1494,45 @@
                     "combine_round_trip_sphere",
                     "script"
                 ]
+=======
+                "id": "TextureCoordNodes",
+                "testcases": [
+                    "identity_plane",
+                    "identity_sphere",
+                    "warp_constant_plane",
+                    "warp_sphere_unit",
+                    "rotate_plane",
+                    "rotate_sphere",
+                    "sphere_seam",
+                    "script"
+                ]
+            },
+            {
+                "id": "TexturePreview",
+                "testcases": [
+                    "size_and_pixels",
+                    "default_size",
+                    "same_value_not_encoded",
+                    "rate_limits_readbacks",
+                    "remove_stops_readbacks",
+                    "node_outside_graph",
+                    "other_readbacks_kept",
+                    "stats"
+                ]
+            },
+            {
+                "id": "TextureGraphCache",
+                "testcases": [
+                    "animated_changes",
+                    "rate_limits_updates",
+                    "undrawn_skips_update",
+                    "downstream_edit_keeps_upstream",
+                    "shared_subgraph",
+                    "toggle_back_reuses",
+                    "eviction_under_budget",
+                    "animated_static_part"
+                ]
+>>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
             }
         ]
     }
