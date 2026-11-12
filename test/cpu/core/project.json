@@ -399,7 +399,12 @@
                     "null_backend_remove",
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
-                    "custom_kind_sent"
+                    "custom_kind_sent",
+                    "math_types",
+                    "math_remap_params",
+                    "math_op_output_changes_structure",
+                    "split_combine_kinds",
+                    "combine_rejects_vector"
                 ]
             },
             {

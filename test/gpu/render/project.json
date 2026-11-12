@@ -1473,6 +1473,26 @@
                     "status_transitions",
                     "material_samples_graph"
                 ]
+            },
+            {
+                "id": "TextureNodesMath",
+                "testcases": [
+                    "vector_plane",
+                    "vector_sphere",
+                    "scalar_plane",
+                    "scalar_sphere",
+                    "broadcast_plane",
+                    "broadcast_sphere",
+                    "scalar_constants_plane",
+                    "scalar_constants_sphere",
+                    "edge_cases_plane",
+                    "edge_cases_sphere",
+                    "split_round_trip_plane",
+                    "split_round_trip_sphere",
+                    "combine_round_trip_plane",
+                    "combine_round_trip_sphere",
+                    "script"
+                ]
             }
         ]
     }

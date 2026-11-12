@@ -33,21 +33,122 @@ static const char *box_texture_coords_wgsl =
     "    return vec4f(coords.xyz * select(scale, 1.0, scale == 0.0), coords.w);\n"
     "}\n";
 
-/** WGSL of the TexMath node: the operation of its op on a, b and c */
+/** WGSL of the TexMath node: the operation of its op on a, b and c.
+ *
+ * Its parameters are op, the remap range and the types word, so p[0] is (op, from_min,
+ * from_max, to_min) and p[1] is (to_max, types). A Scalar input node is broadcast; the
+ * operations that differ on Scalars check whether the inputs they read are Scalars.
+ */
 static const char *box_texture_math_wgsl =
+    "fn box_tex_math_in(v: vec4f, types: u32, j: u32) -> vec4f {\n"
+    "    return select(v, v.xxxx, (types & (1u << j)) != 0u);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_math_scalar(types: u32, used: u32) -> bool {\n"
+    "    return (types & (used << 4u)) == 0u && (types & used) != 0u;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_math_div(a: vec4f, b: vec4f) -> vec4f {\n"
+    "    let zero = b == vec4f(0.0);\n"
+    "    return select(a / select(b, vec4f(1.0), zero), vec4f(0.0), zero);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_math_pow(a: vec4f, b: vec4f) -> vec4f {\n"
+    "    let r = pow(max(abs(a), vec4f(1e-30)), b);\n"
+    "    let whole = fract(b) == vec4f(0.0);\n"
+    "    let odd = whole & (fract(b * 0.5) != vec4f(0.0));\n"
+    "    let negative = a < vec4f(0.0);\n"
+    "    var v = select(r, -r, negative & odd);\n"
+    "    v = select(v, vec4f(0.0), (negative & !whole) | (a == vec4f(0.0)));\n"
+    "    return select(v, vec4f(1.0), b == vec4f(0.0));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_math_smoothstep(e0: vec4f, e1: vec4f, x: vec4f) -> vec4f {\n"
+    "    let d = e1 - e0;\n"
+    "    let same = d == vec4f(0.0);\n"
+    "    let t = clamp((x - e0) / select(d, vec4f(1.0), same), vec4f(0.0), vec4f(1.0));\n"
+    "    let s = t * t * (3.0 - 2.0 * t);\n"
+    "    return select(s, select(vec4f(0.0), vec4f(1.0), x >= e0), same);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_math_remap(a: vec4f, range: vec4f, clamped: bool) -> vec4f {\n"
+    "    let d = range.y - range.x;\n"
+    "    var t = select((a - range.x) / d, vec4f(0.0), d == 0.0);\n"
+    "    if (clamped) {\n"
+    "        t = clamp(t, vec4f(0.0), vec4f(1.0));\n"
+    "    }\n"
+    "\n"
+    "    return range.z + t * (range.w - range.z);\n"
+    "}\n"
+    "\n"
     "fn box_tex_math(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let a = i[0];\n"
-    "    let b = i[1];\n"
-    "    let c = i[2];\n"
+    "    let types = p[1].y;\n"
+    "    let a = box_tex_math_in(i[0], types, 0u);\n"
+    "    let b = box_tex_math_in(i[1], types, 1u);\n"
+    "    let c = box_tex_math_in(i[2], types, 2u);\n"
+    "    let range = vec4f(bitcast<vec3f>(p[0].yzw), bitcast<f32>(p[1].x));\n"
     "    switch bitcast<i32>(p[0].x) {\n"
     "        case 1: { return a - b; }\n"
     "        case 2: { return a * b; }\n"
     "        case 3: { return min(a, b); }\n"
     "        case 4: { return max(a, b); }\n"
     "        case 5: { return mix(a, b, c); }\n"
-    "        case 6: { return clamp(a, b, c); }\n"
+    "        case 6: { return min(max(a, b), c); }\n"
+    "        case 7: { return box_tex_math_div(a, b); }\n"
+    "        case 8: { return box_tex_math_pow(a, b); }\n"
+    "        case 9: { return abs(a); }\n"
+    "        case 10: { return -a; }\n"
+    "        case 11: { return floor(a); }\n"
+    "        case 12: { return a - floor(a); }\n"
+    "        case 13: { return sin(a); }\n"
+    "        case 14: { return cos(a); }\n"
+    "        case 15: { return select(vec4f(0.0), vec4f(1.0), a >= b); }\n"
+    "        case 16: { return box_tex_math_smoothstep(b, c, a); }\n"
+    "        case 17: { return box_tex_math_remap(a, range, false); }\n"
+    "        case 18: { return box_tex_math_remap(a, range, true); }\n"
+    "        case 19: {\n"
+    "            if (box_tex_math_scalar(types, 3u)) {\n"
+    "                return vec4f(a.x * b.x, 0.0, 0.0, 0.0);\n"
+    "            }\n"
+    "\n"
+    "            return vec4f(dot(a.xyz, b.xyz), 0.0, 0.0, 0.0);\n"
+    "        }\n"
+    "        case 20: {\n"
+    "            if (box_tex_math_scalar(types, 1u)) {\n"
+    "                return vec4f(abs(a.x), 0.0, 0.0, 0.0);\n"
+    "            }\n"
+    "\n"
+    "            return vec4f(length(a.xyz), 0.0, 0.0, 0.0);\n"
+    "        }\n"
+    "        case 21: {\n"
+    "            if (box_tex_math_scalar(types, 1u)) {\n"
+    "                return sign(a);\n"
+    "            }\n"
+    "\n"
+    "            let l = length(a.xyz);\n"
+    "            return vec4f(select(a.xyz / l, vec3f(0.0), l == 0.0), a.w);\n"
+    "        }\n"
+    "        case 22: { return vec4f(cross(a.xyz, b.xyz), 0.0); }\n"
     "        default: { return a + b; }\n"
     "    }\n"
+    "}\n";
+
+/** WGSL of the TexSplit node: one channel of its input */
+static const char *box_texture_split_wgsl =
+    "fn box_tex_split(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let v = i[0];\n"
+    "    switch bitcast<i32>(p[0].x) {\n"
+    "        case 1: { return vec4f(v.y, 0.0, 0.0, 0.0); }\n"
+    "        case 2: { return vec4f(v.z, 0.0, 0.0, 0.0); }\n"
+    "        case 3: { return vec4f(v.w, 0.0, 0.0, 0.0); }\n"
+    "        default: { return vec4f(v.x, 0.0, 0.0, 0.0); }\n"
+    "    }\n"
+    "}\n";
+
+/** WGSL of the TexCombine node: its four scalars as the channels of a vector */
+static const char *box_texture_combine_wgsl =
+    "fn box_tex_combine(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    return vec4f(i[0].x, i[1].x, i[2].x, i[3].x);\n"
     "}\n";
 
 /** State of the build of one graph */
@@ -227,8 +328,10 @@ static int box_texture_node_kind_fill(
     const box_texture_node_desc_t *desc)
 {
     int32_t i, offset = 0, result = 0;
+    bool any = false;
     kind->component = desc->component;
     kind->output = desc->output;
+    kind->output_type = desc->output_type;
     kind->flags = desc->flags;
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
@@ -239,6 +342,7 @@ static int box_texture_node_kind_fill(
             ? ecs_os_strdup(desc->inputs[i].value)
             : NULL;
         kind->input_count ++;
+        any = any || desc->inputs[i].type == TexAny;
     }
 
     for (i = 0; i < BOX_TEXTURE_NODE_PARAMS && desc->params[i].name; i ++) {
@@ -254,6 +358,12 @@ static int box_texture_node_kind_fill(
         offset = (offset + align - 1) / align * align;
         kind->param_offsets[i] = offset;
         offset += size;
+    }
+
+    kind->types_offset = -1;
+    if (any) {
+        kind->types_offset = (offset + 3) / 4 * 4;
+        offset = kind->types_offset + ECS_SIZEOF(uint32_t);
     }
 
     kind->param_size = (offset + 15) / 16 * 16;
@@ -280,6 +390,7 @@ static void box_texture_node_kind_reflect(
         .input_count = kind->input_count,
         .param_count = kind->param_count,
         .param_size = kind->param_size,
+        .types_offset = kind->types_offset,
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
         .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
@@ -445,6 +556,106 @@ static void box_texture_graph_reach(
     }
 }
 
+/** Get the type that follows the inputs a node reads: a Vector when one of them has a Vector
+ * node, else a Scalar when one has a Scalar node, else a Vector.
+ *
+ * @param inputs Type of the node of each input, TexAny for none
+ * @param used Bit j set when input j is read
+ * @return The type
+ */
+static TextureValueType box_texture_graph_follow(
+    const TextureValueType *inputs,
+    uint32_t used)
+{
+    TextureValueType result = TexVector;
+    bool scalar = false, vector = false;
+    int32_t i;
+    for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
+        if (used & (1u << i)) {
+            scalar = scalar || inputs[i] == TexScalar;
+            vector = vector || inputs[i] == TexVector;
+        }
+    }
+
+    if (scalar && !vector) {
+        result = TexScalar;
+    }
+
+    return result;
+}
+
+/** Get the type of the value of a node.
+ *
+ * @param kind Its kind
+ * @param ptr Its component
+ * @param inputs Type of the node of each input, TexAny for none
+ * @return The type, TexScalar or TexVector
+ */
+static TextureValueType box_texture_graph_output_type(
+    const box_texture_node_kind_t *kind,
+    const void *ptr,
+    const TextureValueType *inputs)
+{
+    TextureValueType result = kind->output;
+    if (result == TexAny && kind->output_type) {
+        result = kind->output_type(ptr, inputs);
+    }
+
+    if (result == TexAny) {
+        result = box_texture_graph_follow(inputs, (1u << kind->input_count) - 1);
+    }
+
+    return result;
+}
+
+/** Get the type of the value of a TexMath node: a Scalar for MathDot and MathLength, a Vector
+ * for MathCross, else the type that follows the inputs its operation reads.
+ *
+ * @param node The TexMath
+ * @param inputs Type of the node of each input, TexAny for none
+ * @return The type
+ */
+static TextureValueType box_texture_math_type(
+    const void *node,
+    const TextureValueType *inputs)
+{
+    const TexMath *math = node;
+    TextureValueType result;
+    uint32_t used = 3;
+    switch (math->op) {
+    case MathDot:
+    case MathLength:
+        result = TexScalar;
+        break;
+    case MathCross:
+        result = TexVector;
+        break;
+    case MathAbs:
+    case MathNegate:
+    case MathFloor:
+    case MathFract:
+    case MathSin:
+    case MathCos:
+    case MathRemap:
+    case MathRemapClamped:
+    case MathNormalize:
+        used = 1;
+        result = box_texture_graph_follow(inputs, used);
+        break;
+    case MathMix:
+    case MathClamp:
+    case MathSmoothstep:
+        used = 7;
+        result = box_texture_graph_follow(inputs, used);
+        break;
+    default:
+        result = box_texture_graph_follow(inputs, used);
+        break;
+    }
+
+    return result;
+}
+
 /** Append the compiled node of an entity whose inputs are compiled, with its parameters and
  * the constants of its inputs without a node.
  *
@@ -463,6 +674,15 @@ static int32_t box_texture_graph_append(
     const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
     int32_t i, offset = ecs_vec_count(&b->params);
     int32_t result = ecs_vec_count(&b->nodes);
+    TextureValueType types[BOX_TEXTURE_NODE_INPUTS] = { TexAny, TexAny, TexAny, TexAny };
+    uint32_t word = 0;
+    for (i = 0; i < kind->input_count; i ++) {
+        if (inputs[i] >= 0) {
+            types[i] = ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, inputs[i])->output;
+            word |= types[i] == TexScalar ? (1u << i) : (1u << (4 + i));
+        }
+    }
+
     uint8_t *params = ecs_vec_grow_t(NULL, &b->params, uint8_t, kind->node_size);
     ecs_os_memset(params, 0, kind->node_size);
     for (i = 0; i < kind->param_count; i ++) {
@@ -478,12 +698,16 @@ static int32_t box_texture_graph_append(
         }
     }
 
+    if (kind->types_offset >= 0) {
+        ecs_os_memcpy(params + kind->types_offset, &word, ECS_SIZEOF(uint32_t));
+    }
+
     box_texture_graph_node_t *node = ecs_vec_append_t(NULL, &b->nodes,
         box_texture_graph_node_t);
     ecs_os_memset_t(node, 0, box_texture_graph_node_t);
     node->entity = e;
     node->kind = kind->id;
-    node->output = kind->output;
+    node->output = box_texture_graph_output_type(kind, ptr, types);
     node->params = offset;
     node->param_size = kind->node_size;
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
@@ -512,7 +736,7 @@ static void box_texture_graph_check_type(
     const char *input,
     TextureValueType expected)
 {
-    if (from && output != expected) {
+    if (from && expected != TexAny && output != expected) {
         char *name = box_texture_graph_name(b->world, e);
         char *from_name = box_texture_graph_name(b->world, from);
         box_texture_graph_error(b, "node '%s' outputs %s but input '%s' of node '%s' expects "
@@ -568,7 +792,9 @@ static int32_t box_texture_graph_visit(
     kind = box_texture_graph_kind_of(b, e, &kinds);
     if (visited) {
         result = (int32_t)*visited - 1;
-        box_texture_graph_check_type(b, e, kind->output, from, input, expected);
+        box_texture_graph_check_type(b, e,
+            ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, result)->output, from, input,
+            expected);
         goto done;
     }
 
@@ -587,7 +813,6 @@ static int32_t box_texture_graph_visit(
         goto done;
     }
 
-    box_texture_graph_check_type(b, e, kind->output, from, input, expected);
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
         box_texture_graph_error(b, "more than %d nodes", BOX_TEXTURE_GRAPH_NODES);
     }
@@ -608,6 +833,9 @@ static int32_t box_texture_graph_visit(
 
     if (!b->error && !b->waiting) {
         result = box_texture_graph_append(b, e, kind, inputs);
+        box_texture_graph_check_type(b, e,
+            ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, result)->output, from, input,
+            expected);
     }
 
 done:
@@ -647,6 +875,8 @@ static box_texture_graph_t* box_texture_graph_compile(
             ECS_SIZEOF(int32_t));
         result->structure_hash = box_texture_graph_hash(result->structure_hash, node->inputs,
             ECS_SIZEOF(node->inputs));
+        result->structure_hash = box_texture_graph_hash(result->structure_hash, &node->output,
+            ECS_SIZEOF(TextureValueType));
     }
 
     result->param_hash = box_texture_graph_hash(BOX_TEXTURE_GRAPH_FNV_BASIS, result->params,
@@ -861,7 +1091,8 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit and
+ * TexCombine.
  *
  * @param world The world
  */
@@ -886,15 +1117,46 @@ static void box_texture_nodes_register(
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
         .component = ecs_id(TexMath),
-        .output = TexVector,
+        .output = TexAny,
+        .output_type = box_texture_math_type,
         .inputs = {
-            { "a", offsetof(TexMath, a), TexVector, "a_value", offsetof(TexMath, a_value) },
-            { "b", offsetof(TexMath, b), TexVector, "b_value", offsetof(TexMath, b_value) },
-            { "c", offsetof(TexMath, c), TexVector, "c_value", offsetof(TexMath, c_value) }
+            { "a", offsetof(TexMath, a), TexAny, "a_value", offsetof(TexMath, a_value) },
+            { "b", offsetof(TexMath, b), TexAny, "b_value", offsetof(TexMath, b_value) },
+            { "c", offsetof(TexMath, c), TexAny, "c_value", offsetof(TexMath, c_value) }
         },
-        .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
+        .params = {
+            { "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 },
+            { "from_min", offsetof(TexMath, from_min), 4, BOX_TEXTURE_PARAM_F32 },
+            { "from_max", offsetof(TexMath, from_max), 4, BOX_TEXTURE_PARAM_F32 },
+            { "to_min", offsetof(TexMath, to_min), 4, BOX_TEXTURE_PARAM_F32 },
+            { "to_max", offsetof(TexMath, to_max), 4, BOX_TEXTURE_PARAM_F32 }
+        },
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexSplit),
+        .output = TexScalar,
+        .inputs = {
+            { "input", offsetof(TexSplit, input), TexVector, "value", offsetof(TexSplit, value) }
+        },
+        .params = {{ "channel", offsetof(TexSplit, channel), 4, BOX_TEXTURE_PARAM_I32 }},
+        .function = "box_tex_split",
+        .source = box_texture_split_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCombine),
+        .output = TexVector,
+        .inputs = {
+            { "r", offsetof(TexCombine, r), TexScalar, "r_value", offsetof(TexCombine, r_value) },
+            { "g", offsetof(TexCombine, g), TexScalar, "g_value", offsetof(TexCombine, g_value) },
+            { "b", offsetof(TexCombine, b), TexScalar, "b_value", offsetof(TexCombine, b_value) },
+            { "a", offsetof(TexCombine, a), TexScalar, "a_value", offsetof(TexCombine, a_value) }
+        },
+        .function = "box_tex_combine",
+        .source = box_texture_combine_wgsl
     });
 }
 

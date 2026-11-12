@@ -1137,6 +1137,9 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
+    ECS_META_COMPONENT(world, TextureChannel);
+    ECS_META_COMPONENT(world, TexSplit);
+    ECS_META_COMPONENT(world, TexCombine);
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
