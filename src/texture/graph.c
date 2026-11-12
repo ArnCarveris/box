@@ -51,10 +51,10 @@ static const char *box_texture_math_wgsl =
     "}\n";
 
 /** WGSL of the TexWarp node: its coordinates moved by (offset - 0.5) * amount, normalized on the
- * sphere. The entity of its coords input in p[0].xy tells whether it has a coords node */
+ * sphere */
 static const char *box_texture_warp_wgsl =
     "fn box_tex_warp(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let c = select(coords, i[0], (p[0].x | p[0].y) != 0u);\n"
+    "    let c = i[0];\n"
     "    let moved = c.xyz + (i[1].xyz - vec3f(0.5)) * i[2].x;\n"
     "    if (box_texgraph_stage.domain == 1u) {\n"
     "        let len = length(moved);\n"
@@ -70,10 +70,10 @@ static const char *box_texture_warp_wgsl =
  * domain, then translated. A rotation by a multiple of 90 degrees is exact, so the plane tiles */
 static const char *box_texture_transform_wgsl =
     "fn box_tex_transform(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let c = select(coords, i[0], (p[0].x | p[0].y) != 0u);\n"
-    "    let axis = bitcast<vec3f>(p[1].xyz);\n"
-    "    let translate = bitcast<vec3f>(p[2].xyz);\n"
-    "    let factor = bitcast<vec3f>(p[3].xyz);\n"
+    "    let c = i[0];\n"
+    "    let axis = bitcast<vec3f>(p[0].xyz);\n"
+    "    let translate = bitcast<vec3f>(p[1].xyz);\n"
+    "    let factor = bitcast<vec3f>(p[2].xyz);\n"
     "    let scale = select(factor, vec3f(1.0), factor == vec3f(0.0));\n"
     "    let deg = i[1].x;\n"
     "    let quarter = round(deg / 90.0);\n"
@@ -947,13 +947,12 @@ static void box_texture_nodes_register(
         .component = ecs_id(TexWarp),
         .output = TexVector,
         .inputs = {
-            { "coords", offsetof(TexWarp, coords), TexVector, NULL, 0 },
+            { "coords", offsetof(TexWarp, coords), TexVector, NULL, 0, true },
             { "offset", offsetof(TexWarp, offset), TexVector, "offset_value",
                 offsetof(TexWarp, offset_value) },
             { "amount", offsetof(TexWarp, amount), TexScalar, "amount_value",
                 offsetof(TexWarp, amount_value) }
         },
-        .params = {{ "coords", offsetof(TexWarp, coords), 8, BOX_TEXTURE_PARAM_U32 }},
         .function = "box_tex_warp",
         .source = box_texture_warp_wgsl
     });
@@ -962,12 +961,11 @@ static void box_texture_nodes_register(
         .component = ecs_id(TexTransform),
         .output = TexVector,
         .inputs = {
-            { "coords", offsetof(TexTransform, coords), TexVector, NULL, 0 },
+            { "coords", offsetof(TexTransform, coords), TexVector, NULL, 0, true },
             { "angle", offsetof(TexTransform, angle), TexScalar, "angle_value",
                 offsetof(TexTransform, angle_value) }
         },
         .params = {
-            { "coords", offsetof(TexTransform, coords), 8, BOX_TEXTURE_PARAM_U32 },
             { "axis", offsetof(TexTransform, axis), 12, BOX_TEXTURE_PARAM_F32 },
             { "translate", offsetof(TexTransform, translate), 12, BOX_TEXTURE_PARAM_F32 },
             { "scale", offsetof(TexTransform, scale), 12, BOX_TEXTURE_PARAM_F32 }

@@ -442,6 +442,8 @@ typedef struct box_texture_node_input_t {
     const char *value;          /**< Name of the constant member used without a node, a float
                                  *   for TexScalar or a vec4 for TexVector, NULL for none */
     ecs_size_t value_offset;    /**< Offset of that member */
+    bool coords;                /**< A TexVector input without value: without a node it is the
+                                 *   coordinates of the texel in the domain of the graph */
 } box_texture_node_input_t;
 
 /** A parameter of a node kind: a member copied into the parameter buffer */

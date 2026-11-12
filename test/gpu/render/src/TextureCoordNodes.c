@@ -16,8 +16,9 @@
 /** Frames a test waits at most for an outcome */
 #define TC_FRAMES (40)
 
-/** Difference a float channel of a node read back may have from its value */
-#define TC_TOLERANCE (1e-4f)
+/** Difference a float channel of a node read back may have from its value: vector nodes are
+ * materialized as RGBA16Float */
+#define TC_TOLERANCE (2e-3f)
 
 /** Pi */
 #define TC_PI (3.14159265358979f)

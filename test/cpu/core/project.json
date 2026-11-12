@@ -401,6 +401,7 @@
                     "null_backend_restart",
                     "custom_kind_sent",
                     "coord_kinds",
+                    "coord_kinds_sent",
                     "coord_nodes_script"
                 ]
             },

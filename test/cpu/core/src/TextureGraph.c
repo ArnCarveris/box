@@ -1035,7 +1035,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 5);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1072,7 +1072,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 5);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1164,7 +1164,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 3);
+    test_int(second->texture_node_kinds, 5);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1191,7 +1191,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 4);
+    test_int(null->texture_node_kinds, 6);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1221,7 +1221,8 @@ void TextureGraph_coord_kinds(void) {
     test_bool(kind->inputs[0].fallback, false);
     test_bool(kind->inputs[1].fallback, true);
     test_bool(kind->inputs[2].fallback, true);
-    test_int(kind->param_size, 16);
+    test_int(kind->param_count, 0);
+    test_int(kind->param_size, 0);
     test_str(kind->function, "box_tex_warp");
     test_bool(kind->neighbourhood, false);
     test_bool(kind->animated, false);
@@ -1235,15 +1236,40 @@ void TextureGraph_coord_kinds(void) {
     test_int(kind->inputs[1].type, TexScalar);
     test_bool(kind->inputs[0].fallback, false);
     test_bool(kind->inputs[1].fallback, true);
-    test_int(kind->param_count, 4);
+    test_int(kind->param_count, 3);
+    test_str(kind->params[0].name, "axis");
+    test_int(kind->params[0].offset, 0);
     test_int(kind->params[1].offset, 16);
     test_int(kind->params[2].offset, 32);
-    test_int(kind->params[3].offset, 48);
-    test_int(kind->param_size, 64);
+    test_int(kind->param_size, 48);
     test_str(kind->function, "box_tex_transform");
     test_bool(kind->neighbourhood, false);
 
     ecs_fini(world);
+}
+
+void TextureGraph_coord_kinds_sent(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    run_file(world, GRAPH_COORDS);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    /* A coords input without a node is the domain coordinates, the others their constants */
+    const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
+        (uint32_t)kind_id(world, ecs_id(TexWarp)));
+    test_assert(k != NULL);
+    test_int(k->coords_inputs, 1);
+    k = box_render_null_texture_node_kind(null, (uint32_t)kind_id(world, ecs_id(TexTransform)));
+    test_assert(k != NULL);
+    test_int(k->coords_inputs, 1);
+    k = box_render_null_texture_node_kind(null, (uint32_t)kind_id(world, ecs_id(TexMath)));
+    test_assert(k != NULL);
+    test_int(k->coords_inputs, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }
 
 void TextureGraph_coord_nodes_script(void) {
@@ -1275,26 +1301,21 @@ void TextureGraph_coord_nodes_script(void) {
     test_int(graph->nodes[2].inputs[1], -1);
     test_int(graph->nodes[2].inputs[2], -1);
 
-    /* The transform: the entity of its coords, its scale and the angle without a node */
+    /* The transform: its scale, then the angle without a node */
     const uint8_t *p = graph->params + graph->nodes[1].params;
-    ecs_entity_t coords;
     float value;
-    test_int(graph->nodes[1].param_size, 64 + 2 * 16);
-    ecs_os_memcpy(&coords, p, ECS_SIZEOF(ecs_entity_t));
-    test_assert(coords == uv);
-    ecs_os_memcpy(&value, p + 48, ECS_SIZEOF(float));
+    test_int(graph->nodes[1].param_size, 48 + 2 * 16);
+    ecs_os_memcpy(&value, p + 32, ECS_SIZEOF(float));
     test_flt(value, 2);
-    ecs_os_memcpy(&value, p + 64 + 16, ECS_SIZEOF(float));
+    ecs_os_memcpy(&value, p + 48 + 16, ECS_SIZEOF(float));
     test_flt(value, 90);
 
-    /* The warp: the entity of its coords, then the offset and the amount without a node */
+    /* The warp: no parameters, then the offset and the amount without a node */
     p = graph->params + graph->nodes[2].params;
-    test_int(graph->nodes[2].param_size, 16 + 3 * 16);
-    ecs_os_memcpy(&coords, p, ECS_SIZEOF(ecs_entity_t));
-    test_assert(coords == turned);
-    ecs_os_memcpy(&value, p + 16 + 16, ECS_SIZEOF(float));
+    test_int(graph->nodes[2].param_size, 3 * 16);
+    ecs_os_memcpy(&value, p + 16, ECS_SIZEOF(float));
     test_flt(value, 0.7f);
-    ecs_os_memcpy(&value, p + 16 + 32, ECS_SIZEOF(float));
+    ecs_os_memcpy(&value, p + 32, ECS_SIZEOF(float));
     test_flt(value, 0.5f);
 
     ecs_fini(world);
