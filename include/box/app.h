@@ -85,6 +85,7 @@ ECS_STRUCT(FpsTarget, {
 ECS_STRUCT(AppStatus, {
     int32_t frame;      /**< Frames completed since the world was created */
     double elapsed;     /**< Wall seconds since the world was created */
+    double delta_time;  /**< Seconds the last frame advanced the world, the fixed App.delta_time when set */
     double slept;       /**< Wall seconds the CPU budget has slept in total */
     char *tmp_dir;      /**< Folder for temporary files of a headless process, else NULL */
     bool running;       /**< box_app_run is stepping the world */

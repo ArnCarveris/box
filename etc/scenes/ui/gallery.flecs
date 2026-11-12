@@ -263,7 +263,9 @@ template Gallery {
             Panel basics(title: "Basics", width: 616) {
               buttons {
                 Layout: {direction: Row, spacing: 8, v: Middle}
-                Button save(label: "Save")
+                Button save(label: "Save") {
+                  Tooltip tip(text: "Saves the settings")
+                }
                 Button cancel(label: "Cancel", variant: "secondary")
                 Button more(label: "More", variant: "ghost")
                 Button remove(label: "Delete", variant: "danger")

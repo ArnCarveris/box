@@ -113,6 +113,19 @@
                 ]
             },
             {
+                "id": "Tooltip",
+                "testcases": [
+                    "hidden_by_default",
+                    "shows_after_delay",
+                    "hides_on_leave",
+                    "hides_on_press",
+                    "disabled_parent",
+                    "deleted_parent",
+                    "click_passes_through",
+                    "not_clipped_in_scroll"
+                ]
+            },
+            {
                 "id": "Gallery",
                 "testcases": [
                     "scene_loads",

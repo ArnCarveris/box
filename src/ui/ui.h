@@ -39,6 +39,13 @@ typedef struct box_ui_waiter_t {
     ecs_script_future_t *future; /**< Future the event resolves */
 } box_ui_waiter_t;
 
+/** A script task waiting in ui.delay */
+typedef struct box_ui_timer_t {
+    ecs_script_future_t *future; /**< Future the wait resolves */
+    float seconds;               /**< Seconds the task waits for */
+    float left;                  /**< Seconds of world time left */
+} box_ui_timer_t;
+
 /** A key event as the focus model and the text field follow it */
 typedef struct box_ui_key_t {
     Key key;     /**< The key */
@@ -76,6 +83,7 @@ struct box_ui_state_t {
     ecs_query_t *focusables;     /**< Entities with Focusable */
     ecs_query_t *scopes;         /**< Entities with FocusScope */
     ecs_vec_t waiters;           /**< box_ui_waiter_t of the on.* functions */
+    ecs_vec_t timers;            /**< box_ui_timer_t of ui.delay */
     ecs_vec_t order;             /**< ecs_entity_t scratch of a Tab walk */
     ecs_vec_t text;              /**< char of the text KeyCapture took this frame, terminated */
     ecs_vec_t paste;             /**< char of the paste KeyCapture took this frame, terminated */
@@ -279,7 +287,7 @@ void box_ui_wait_function(
     box_ui_wait_kind_t kind,
     ecs_entity_t type);
 
-/** Register on.change, on.submit, ui.changed and ui.submit.
+/** Register on.change, on.submit, ui.changed, ui.submit and ui.delay.
  *
  * @param world The world
  * @param st The module state

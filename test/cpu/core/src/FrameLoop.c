@@ -17,6 +17,7 @@ static float loop_change_delta = 0;
 static float loop_change_fps = -1;
 static ecs_os_api_now_t loop_saved_now = NULL;
 static ecs_os_api_sleep_t loop_saved_sleep = NULL;
+static ecs_script_future_t *loop_tick = NULL;
 
 static uint64_t LoopNow(void) {
     return (uint64_t)(loop_clock * 1e9);
@@ -26,10 +27,21 @@ static void LoopSleep(int32_t sec, int32_t nanosec) {
     loop_clock += (double)sec + (double)nanosec * 1e-9;
 }
 
-/** Record the delta of the frame, spend loop_work fake seconds and change App when asked */
+/** Record the delta of the frame, resolve the pending tick, spend loop_work fake seconds and
+ * change App when asked
+ */
 static void LoopFrame(ecs_iter_t *it) {
     if (loop_frames < 64) {
         loop_deltas[loop_frames] = ecs_get_world_info(it->world)->delta_time_raw;
+    }
+
+    if (loop_tick) {
+        ecs_script_future_t *tick = loop_tick;
+        bool value = true;
+        loop_tick = NULL;
+        ecs_script_future_resolve(tick, &(ecs_value_t){
+            .type = ecs_id(ecs_bool_t), .ptr = &value });
+        ecs_script_future_release(tick);
     }
 
     loop_clock += loop_work;
@@ -141,6 +153,82 @@ void FrameLoop_delta_time_change_applies_next_frame(void) {
     test_assert(fabsf(loop_deltas[2] - 0.010f) < 1e-5f);
     test_flt(loop_deltas[3], 0.05f);
     test_flt(loop_deltas[5], 0.05f);
+
+    loop_fini(world);
+}
+
+/** Async function that resolves in the LoopFrame of the next frame, so the awaiting block
+ * resumes a frame later.
+ */
+static void LoopTick(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_script_future_t *future)
+{
+    (void)ctx;
+    (void)argc;
+    (void)argv;
+    loop_tick = future;
+}
+
+/** Release a tick the world cancels before LoopFrame resolved it */
+static void LoopTickCancel(
+    const ecs_function_ctx_t *ctx,
+    ecs_script_future_t *future)
+{
+    (void)ctx;
+    if (loop_tick == future) {
+        loop_tick = NULL;
+    }
+
+    ecs_script_future_release(future);
+}
+
+void FrameLoop_status_delta_time(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = loop_world(0.003);
+    ecs_singleton_set(world, App, { .frames = 4, .delta_time = 0.025f, .no_audio = true });
+
+    test_int(box_app_run(world), 0);
+    test_int(loop_frames, 4);
+    test_flt(ecs_singleton_get(world, AppStatus)->delta_time, 0.025f);
+
+    loop_fini(world);
+}
+
+void FrameLoop_status_delta_time_measured(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = loop_world(0.010);
+    ecs_singleton_set(world, App, { .frames = 6, .no_audio = true });
+
+    test_int(box_app_run(world), 0);
+    test_int(loop_frames, 6);
+    test_assert(fabs(ecs_singleton_get(world, AppStatus)->delta_time - 0.010) < 1e-5);
+
+    loop_fini(world);
+}
+
+void FrameLoop_status_delta_time_script(void) {
+    // engine/builtin_frame_pacing
+    ecs_world_t *world = loop_world(0.003);
+    ecs_async_function(world, {
+        .name = "core_tick",
+        .return_type = ecs_id(ecs_bool_t),
+        .callback = LoopTick,
+        .cancel = LoopTickCancel
+    });
+
+    ecs_singleton_set(world, App, {
+        .frames = 4, .delta_time = 0.025f, .no_audio = true,
+        .scene = "test/assets/app/status_delta_time.flecs" });
+
+    test_int(box_app_run(world), 0);
+    ecs_entity_t seen = ecs_lookup(world, "delta_seen");
+    test_assert(seen != 0);
+    ecs_value_t value = ecs_mut_var_get(world, seen);
+    test_uint(value.type, ecs_id(ecs_f64_t));
+    test_flt(*(const double*)value.ptr, 0.025f);
 
     loop_fini(world);
 }
