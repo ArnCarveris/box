@@ -57,7 +57,7 @@ static const char *box_texture_math_wgsl =
  * keeps them; its id comes from its rank among the cuts and its tone from its index.
  *
  * Before the first cut the block is the last one with its end one past the first cut, as gen.c
- * has it. Lengths are in widths of the image. The coords parameter is nonzero with a node. */
+ * has it. Lengths are in widths of the image. */
 static const char *box_texture_blocks_wgsl =
     "fn box_tex_blocks_mix(v: u32) -> u32 {\n"
     "    var x = v;\n"
@@ -93,7 +93,7 @@ static const char *box_texture_blocks_wgsl =
     "    let gap = shape.x;\n"
     "    let jitter = shape.y;\n"
     "    let softness = shape.w;\n"
-    "    let at = select(coords, i[0], any(p[2].zw != vec2u(0u)));\n"
+    "    let at = i[0];\n"
     "    var seed = box_tex_blocks_hash(0x5bd1e995u, p[2].x);\n"
     "    seed = box_tex_blocks_hash(seed, p[2].y);\n"
     "    seed = box_tex_blocks_hash(seed, 1u);\n"
@@ -1040,8 +1040,7 @@ static void box_texture_nodes_register(
             { "stagger", offsetof(TexBlocks, stagger), 4, BOX_TEXTURE_PARAM_F32 },
             { "softness", offsetof(TexBlocks, softness), 4, BOX_TEXTURE_PARAM_F32 },
             { "seed", offsetof(TexBlocks, seed), 4, BOX_TEXTURE_PARAM_I32 },
-            { "layer_seed", offsetof(TexBlocks, layer_seed), 4, BOX_TEXTURE_PARAM_I32 },
-            { "coords", offsetof(TexBlocks, coords), 8, BOX_TEXTURE_PARAM_U32 }
+            { "layer_seed", offsetof(TexBlocks, layer_seed), 4, BOX_TEXTURE_PARAM_I32 }
         },
         .function = "box_tex_blocks",
         .source = box_texture_blocks_wgsl,

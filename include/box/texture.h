@@ -419,7 +419,8 @@ typedef struct box_texture_node_input_t {
     ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
     TextureValueType type;      /**< Type the input node must output */
     const char *value;          /**< Name of the constant member used without a node, a float
-                                 *   for TexScalar or a vec4 for TexVector, NULL for none */
+                                 *   for TexScalar or a vec4 for TexVector, NULL for none:
+                                 *   without a node the input is the coordinates */
     ecs_size_t value_offset;    /**< Offset of that member */
 } box_texture_node_input_t;
 

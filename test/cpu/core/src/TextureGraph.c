@@ -1212,12 +1212,11 @@ void TextureGraph_blocks_kind(void) {
     test_str(kind->inputs[0].name, "coords");
     test_int(kind->inputs[0].type, TexVector);
     test_bool(kind->inputs[0].fallback, false);
-    test_int(kind->param_count, 11);
+    test_int(kind->param_count, 10);
     test_str(kind->params[0].name, "courses");
     test_str(kind->params[9].name, "layer_seed");
-    test_str(kind->params[10].name, "coords");
-    test_int(kind->params[10].offset, 40);
-    test_int(kind->params[10].size, 8);
+    test_int(kind->params[9].offset, 36);
+    test_int(kind->params[9].size, 4);
     test_int(kind->param_size, 48);
     test_str(kind->function, "box_tex_blocks");
     test_bool(kind->plane, true);
