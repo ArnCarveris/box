@@ -155,6 +155,15 @@ ICONS = {
               '<path d="M32 2v14M32 48v14M2 32h14M48 32h14"/></g>',
     "engine": f'<g {S}><path d="M6 20h20l10 6v12l-10 6H6z"/><path d="M36 26l12-8v28l-12-8"/>'
               '<path d="M52 24h8M52 32h10M52 40h8"/></g>',
+    "drill": f'<g {S}><path d="M6 20h14v24H6z"/><path d="M20 24h6v16h-6"/><path d="M26 20l32 12-32 12z"/>'
+             '<path d="M34 23l5 18M44 27l3 10"/></g>',
+    "builder": f'<g {S}><path d="M8 56h24M20 56v-8"/><circle cx="20" cy="43" r="5"/><path d="M23 39l11-17"/>'
+               '<circle cx="36" cy="19" r="4"/><path d="M40 21l12 9"/><path d="M52 30l6-3M52 30l3 6"/>'
+               '<path d="M38 50h20M38 58h20M42 50l6 8 6-8"/></g>',
+    "datacenter": f'<g {S}><rect x="10" y="7" width="44" height="14" rx="2"/><rect x="10" y="25" width="44" height="14" rx="2"/>'
+                  '<rect x="10" y="43" width="44" height="14" rx="2"/><path d="M17 14h.01M17 32h.01M17 50h.01M34 14h12M34 32h12M34 50h12"/></g>',
+    "autopilot": f'<g {S}><path d="M10 52V34a22 22 0 0 1 44 0v18z"/><rect x="17" y="30" width="30" height="9" rx="4.5"/>'
+                 '<path d="M32 12V5M6 52h52M22 46h20"/></g>',
     "remove": f'<g {S}><path d="M10 16h44M24 16V8h16v8M15 16l3 40h28l3-40"/><path d="M27 27v18M37 27v18"/></g>',
     "deck": f'<g {S}><path d="M32 8l26 10-26 10L6 18z"/><path d="M6 30l26 10 26-10"/><path d="M6 42l26 10 26-10"/></g>',
     "power": f'<path {F} d="M37 3L11 37h17l-3 24 28-36H35z"/>',

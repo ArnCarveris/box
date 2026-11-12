@@ -67,6 +67,10 @@ assets {
   yard_icon_dock { TexturePath: {path: "etc/scenes/shipyard/assets/icons/dock.svg", width: 96} }
   yard_icon_obs { TexturePath: {path: "etc/scenes/shipyard/assets/icons/obs.svg", width: 96} }
   yard_icon_hull { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hull.svg", width: 96} }
+  yard_icon_drill { TexturePath: {path: "etc/scenes/shipyard/assets/icons/drill.svg", width: 96} }
+  yard_icon_builder { TexturePath: {path: "etc/scenes/shipyard/assets/icons/builder.svg", width: 96} }
+  yard_icon_datacenter { TexturePath: {path: "etc/scenes/shipyard/assets/icons/datacenter.svg", width: 96} }
+  yard_icon_autopilot { TexturePath: {path: "etc/scenes/shipyard/assets/icons/autopilot.svg", width: 96} }
   yard_icon_remove { TexturePath: {path: "etc/scenes/shipyard/assets/icons/remove.svg", width: 96} }
   yard_icon_deck { TexturePath: {path: "etc/scenes/shipyard/assets/icons/deck.svg", width: 96} }
   yard_icon_power { TexturePath: {path: "etc/scenes/shipyard/assets/icons/power.svg", width: 96} }
@@ -105,6 +109,10 @@ state {
       11: assets.yard_icon_dock
       12: assets.yard_icon_hull
       13: assets.yard_icon_radiator
+      14: assets.yard_icon_drill
+      15: assets.yard_icon_builder
+      16: assets.yard_icon_datacenter
+      17: assets.yard_icon_autopilot
       _: assets.yard_icon_remove
     }
   }
@@ -312,7 +320,7 @@ assets {
     Border: {radius: 5}
 
     plate {
-      Layout: {direction: Row, padding: {6, 6, 8, 8}, spacing: 8, v: Middle}
+      Layout: {direction: Row, padding: {6, 6, 7, 7}, spacing: 7, v: Middle}
       LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       if selected {
@@ -330,7 +338,7 @@ assets {
       }
       Transition: [Rgb: {duration: 0.1}]
 
-      YardIcon glyph(icon: kind_icon(op), size: 24, state: selected ? UI_GOOD : UI_OK)
+      YardIcon glyph(icon: kind_icon(op), size: 20, state: selected ? UI_GOOD : UI_OK)
       words {
         Layout: {direction: Column, spacing: 2}
         LayoutItem: {width: {mode: Grow}}
@@ -365,6 +373,40 @@ assets {
     Layout: {direction: Column}
 
     YardTileFace face(op: op, label: label, key_hint: key_hint, hover: hover, down: down)
+  }
+
+  template YardGroup {
+    prop title: string = ""
+    prop fitted: i32 = 0
+
+    Layout: {direction: Column, spacing: 5}
+    LayoutItem: {width: {mode: Grow}}
+    heading {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      name {
+        Text: {value: title, size: 10}
+        Rgb: {128, 160, 182}
+      }
+      rule {
+        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+        Rect: {1, 1}
+        Rgb: {30, 70, 92}
+      }
+      amount {
+        Text: {value: "{fitted}", size: 10}
+        if fitted > 0 {
+          Rgb: {92, 222, 255}
+        } else {
+          Rgb: {70, 100, 120}
+        }
+      }
+    }
+  }
+
+  template YardTileRow {
+    Layout: {direction: Row, spacing: 6}
+    LayoutItem: {width: {mode: Grow}}
   }
 
   template YardStat {
@@ -424,21 +466,30 @@ assets {
     const c9 = counts[9]
     const c10 = counts[10]
     const c13 = counts[13]
+    const c14 = counts[14]
+    const c15 = counts[15]
+    const c16 = counts[16]
+    const c17 = counts[17]
     const crew = c1 * 2 + c2 * 3
     const air = c3 * 10 + c9 * 5
     const gen: f32 = c4 * 30
-    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3 + c9 + c10
-    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10) + c13 * kind_mass(13)
+    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3 + c9 + c10 + c14 * 4 + c15 * 2 + c16 * 12 + c17 * 2
+    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10) + c13 * kind_mass(13) + c14 * kind_mass(14) + c15 * kind_mass(15) + c16 * kind_mass(16) + c17 * kind_mass(17)
     const accel: f32 = c8 * 260.0 / max(mass, 1)
     const reach: f32 = c6 * 900.0 / max(mass, 1)
-    const has_helm = c1 > 0
+    const cgen: f32 = c16 * 60
+    const cuse: f32 = c17 * 30 + c15 * 10
+    const has_helm = c1 > 0 || c17 > 0
+    const crewless = crew == 0 && c17 > 0
+    const compute_ok = cgen >= cuse
     const has_drive = c8 > 0
     const power_ok = gen >= use && use > 0
-    const air_ok = crew > 0 && air >= crew
+    const air_ok = crewless || (crew > 0 && air >= crew)
+    const hold_ok = c14 == 0 || c5 > 0
     const fuel_ok = c6 > 0
-    const cool_ok = c13 >= c4
+    const cool_ok = c13 >= c4 + c16
     const sound = problems == 0 && modules > 0
-    const ready = has_helm && has_drive && power_ok && cool_ok && air_ok && fuel_ok && sound
+    const ready = has_helm && has_drive && power_ok && cool_ok && compute_ok && air_ok && hold_ok && fuel_ok && sound
 
     Scene: {}
 
@@ -458,7 +509,7 @@ assets {
 
         YardHalo title_a(strength: 10) {
           YardHalo title_b(strength: 24, pad: 1) {
-            YardCard title(spacing: 4, width: 292) {
+            YardCard title(spacing: 4, width: 320) {
               row {
                 Layout: {direction: Row, spacing: 10, v: Middle}
                 LayoutItem: {width: {mode: Grow}}
@@ -504,6 +555,7 @@ assets {
                 }
                 YardButton b_frigate(label: "Frigate", op: OP_FRIGATE, size: 74)
                 YardButton b_scout(label: "Scout", op: OP_SCOUT, size: 64)
+                YardButton b_miner(label: "Miner", op: OP_MINER, size: 64)
                 YardButton b_clear(label: "Clear", icon: yard_icon_remove, op: OP_CLEAR, size: 76)
               }
             }
@@ -524,22 +576,58 @@ assets {
 
         YardHalo ops_a(strength: 10) {
           YardHalo ops_b(strength: 24, pad: 1) {
-            YardCard ops(title: "MODULES", width: 292, spacing: 6) {
-              YardTile t1(label: "Cockpit", op: K_COCKPIT)
-              YardTile t2(label: "Habitat", op: K_HAB)
-              YardTile t3(label: "Life Support", op: K_LIFE)
-              YardTile t4(label: "Power", op: K_POWER)
-              YardTile tr(label: "Radiator", op: K_RADIATOR)
-              YardTile t5(label: "Cargo Bay", op: K_CARGO)
-              YardTile t6(label: "Fuel Tank", op: K_FUEL)
-              YardTile t7(label: "Weapons", op: K_WEAPON)
-              YardTile t8(label: "Engine", op: K_ENGINE)
-              YardTile t9(label: "Biome", op: K_BIOME)
-              YardTile t0(label: "Observation Deck", op: K_OBS)
-              YardTile tp(label: "Docking Port", op: K_DOCK)
-              YardTile th(label: "Hull Fairing", op: K_HULL)
-              YardTile tx(label: "Remove", op: T_REMOVE, key_hint: "X")
-
+            YardCard ops(title: "MODULES", width: 320, spacing: 11) {
+              YardGroup command(title: "COMMAND", fitted: c1 + c17) {
+                YardTileRow row_a {
+                  YardTile cockpit(label: "Cockpit", op: K_COCKPIT)
+                  YardTile autopilot(label: "Autopilot", op: K_AUTO)
+                }
+              }
+              YardGroup crew_group(title: "CREW", fitted: c2 + c3 + c9 + c10) {
+                YardTileRow row_a {
+                  YardTile hab(label: "Habitat", op: K_HAB)
+                  YardTile life(label: "Life Support", op: K_LIFE)
+                }
+                YardTileRow row_b {
+                  YardTile biome(label: "Biome", op: K_BIOME)
+                  YardTile obs(label: "Observation", op: K_OBS)
+                }
+              }
+              YardGroup systems(title: "POWER & COMPUTE", fitted: c4 + c13 + c16) {
+                YardTileRow row_a {
+                  YardTile power(label: "Power Plant", op: K_POWER)
+                  YardTile radiator(label: "Radiator", op: K_RADIATOR)
+                }
+                YardTileRow row_b {
+                  YardTile datacenter(label: "Datacenter", op: K_DATA)
+                  filler {
+                    LayoutItem: {width: {mode: Grow}}
+                  }
+                }
+              }
+              YardGroup drive(title: "PROPULSION", fitted: c8 + c6) {
+                YardTileRow row_a {
+                  YardTile engine(label: "Engine", op: K_ENGINE)
+                  YardTile fuel(label: "Fuel Tank", op: K_FUEL)
+                }
+              }
+              YardGroup industry(title: "INDUSTRY & LOGISTICS", fitted: c5 + c14 + c15 + counts[K_DOCK]) {
+                YardTileRow row_a {
+                  YardTile cargo(label: "Cargo Bay", op: K_CARGO)
+                  YardTile dock(label: "Docking Port", op: K_DOCK)
+                }
+                YardTileRow row_b {
+                  YardTile drill(label: "Mining Drill", op: K_DRILL)
+                  YardTile builder(label: "Constructor", op: K_BUILDER)
+                }
+              }
+              YardGroup hull(title: "HULL & DEFENSE", fitted: c7 + counts[K_HULL]) {
+                YardTileRow row_a {
+                  YardTile fairing(label: "Hull Fairing", op: K_HULL)
+                  YardTile weapon(label: "Weapons", op: K_WEAPON)
+                }
+              }
+              YardTile remove(label: "Remove", op: T_REMOVE, key_hint: "X")
             }
           }
         }
@@ -552,19 +640,28 @@ assets {
           YardHalo stats_b(strength: 24, pad: 1) {
             YardCard stats(title: "SHIP SYSTEMS", width: 280, spacing: 9) {
               YardStat power(icon: yard_icon_power, label: "POWER", value: "{use:.1} / {gen:.0} MW", ratio: use / max(gen, 1), state: gen == 0 && use == 0 ? UI_MUTED : gen >= use ? UI_OK : UI_BAD)
+              YardStat compute(icon: yard_icon_datacenter, label: "COMPUTE", value: "{cuse:.0} / {cgen:.0} PF", ratio: cuse / max(cgen, 1), state: cgen == 0 && cuse == 0 ? UI_MUTED : compute_ok ? UI_OK : UI_BAD)
               YardStat crew_stat(icon: yard_icon_crew, label: "CREW / AIR", value: "{crew} / {air}", ratio: crew / max(air, 1.0), state: crew == 0 ? UI_MUTED : air >= crew ? UI_OK : UI_BAD)
               YardStat thrust(icon: yard_icon_thrust, label: "ACCELERATION", value: "{accel:.1} g", ratio: accel / 4, state: c8 == 0 ? UI_MUTED : accel >= 1 ? UI_GOOD : UI_WARN)
               YardStat range(icon: yard_icon_range, label: "RANGE", value: "{reach:.1} ly", ratio: reach / 25, state: c6 == 0 ? UI_MUTED : UI_OK)
               YardStat hold(icon: yard_icon_cargo, label: "CARGO", value: "{c5 * 120} t", ratio: c5 / 12.0, state: c5 == 0 ? UI_MUTED : UI_OK)
+              YardStat mining(icon: yard_icon_drill, label: "MINING", value: "{c14 * 40} t/h", ratio: c14 / 6.0, state: c14 == 0 ? UI_MUTED : hold_ok ? UI_OK : UI_WARN)
+              YardStat assembly(icon: yard_icon_builder, label: "ASSEMBLY", value: "{c15 * 15} m/h", ratio: c15 / 6.0, state: c15 == 0 ? UI_MUTED : UI_OK)
               YardStat guns(icon: yard_icon_weapon, label: "FIREPOWER", value: "{c7 * 25}", ratio: c7 / 8.0, state: c7 == 0 ? UI_MUTED : UI_WARN)
 
               YardSectionTitle checks_title(title: ready ? "SPACEWORTHY" : "NOT READY", state: ready ? UI_GOOD : UI_WARN)
-              YardCheck chk_helm(label: "A cockpit to fly her", ok: has_helm)
+              YardCheck chk_helm(label: c1 == 0 && c17 > 0 ? "An autopilot flies her" : "A cockpit or autopilot to fly her", ok: has_helm)
               YardCheck chk_drive(label: "Engines to push her", ok: has_drive)
               YardCheck chk_fuel(label: "Fuel for the engines", ok: fuel_ok)
               YardCheck chk_power(label: "Enough power", ok: power_ok)
-              YardCheck chk_cool(label: "A radiator for every power plant", ok: cool_ok)
-              YardCheck chk_air(label: "Air for every crew member", ok: air_ok)
+              YardCheck chk_cool(label: c16 > 0 ? "A radiator per power plant and datacenter" : "A radiator for every power plant", ok: cool_ok)
+              if cuse > 0 {
+                YardCheck chk_compute(label: "Compute for the autopilot and robots", ok: compute_ok)
+              }
+              YardCheck chk_air(label: crewless ? "No crew, no air needed" : "Air for every crew member", ok: air_ok)
+              if c14 > 0 {
+                YardCheck chk_hold(label: "A cargo bay for the ore", ok: hold_ok)
+              }
               YardCheck chk_rules(label: problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: sound)
             }
           }

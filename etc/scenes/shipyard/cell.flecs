@@ -70,6 +70,12 @@ assets {
       EngineMount mount(seed: seed, mounted: kind_at(x, y, z + 1) != 0)
     } else if k == K_RADIATOR {
       RadiatorMount mount(side: cool_at(x, y, z))
+    } else if k == K_DATA {
+      Datacenter racks(pz: kind_at(x, y, z + 1) != K_DATA, nz: kind_at(x, y, z - 1) != K_DATA, roof: shown_at(x, y + 1, z), seed: seed)
+    } else if k == K_DRILL {
+      DrillMount mount(side: drill_at(x, y, z))
+    } else if k == K_BUILDER {
+      BuilderMount mount(side: mount_at(x, y, z), seed: seed)
     } else if k == K_HULL && hull_drawn(x, y, z) != 0 {
       HullFairing fairing(shape: hull_drawn(x, y, z), sx: hull_sx(x, y, z), sy: hull_sy(x, y, z), sz: hull_sz(x, y, z))
     } else if k == K_CARGO {
@@ -91,7 +97,7 @@ assets {
     } else {
       HullShell skin(
         px: !skin_at(x + 1, y, z, -1, 0), nx: !skin_at(x - 1, y, z, 1, 0), py: !skin_y(x, y + 1, z, -1),
-        ny: !skin_y(x, y - 1, z, 1), pz: !skin_at(x, y, z + 1, 0, -1) && k != K_COCKPIT, nz: !skin_at(x, y, z - 1, 0, 1),
+        ny: !skin_y(x, y - 1, z, 1), pz: !skin_at(x, y, z + 1, 0, -1) && !piloted(k), nz: !skin_at(x, y, z - 1, 0, 1),
         xy_pp: solid_at(x + 1, y + 1, z), xy_pn: solid_at(x + 1, y - 1, z),
         xy_np: solid_at(x - 1, y + 1, z), xy_nn: solid_at(x - 1, y - 1, z),
         xz_pp: solid_at(x + 1, y, z + 1), xz_pn: solid_at(x + 1, y, z - 1),
