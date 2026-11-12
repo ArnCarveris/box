@@ -140,7 +140,8 @@
         return "the connection would make a cycle";
       }
     }
-    if (srcKind.output !== expect) {
+    // A TexAny port takes or gives either type; the engine checks the types it resolves to.
+    if (srcKind.output !== expect && srcKind.output !== "TexAny" && expect !== "TexAny") {
       return `${M.leaf(from)} outputs ${M.typeLabel(srcKind.output)}, ${port} takes ${M.typeLabel(expect)}`;
     }
     return null;

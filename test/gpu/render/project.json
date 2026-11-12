@@ -1475,7 +1475,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "TextureNodesMath",
                 "testcases": [
                     "vector_plane",
@@ -1494,7 +1493,8 @@
                     "combine_round_trip_sphere",
                     "script"
                 ]
-=======
+            },
+            {
                 "id": "TextureCoordNodes",
                 "testcases": [
                     "identity_plane",
@@ -1532,7 +1532,6 @@
                     "eviction_under_budget",
                     "animated_static_part"
                 ]
->>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
             }
         ]
     }

@@ -133,7 +133,6 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
-<<<<<<< HEAD
 /** WGSL of the TexSplit node: one channel of its input */
 static const char *box_texture_split_wgsl =
     "fn box_tex_split(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
@@ -150,7 +149,8 @@ static const char *box_texture_split_wgsl =
 static const char *box_texture_combine_wgsl =
     "fn box_tex_combine(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x, i[1].x, i[2].x, i[3].x);\n"
-=======
+    "}\n";
+
 /** WGSL of the TexWarp node: its coordinates moved by (offset - 0.5) * amount, normalized on the
  * sphere */
 static const char *box_texture_warp_wgsl =
@@ -209,7 +209,6 @@ static const char *box_texture_time_wgsl =
 static const char *box_texture_splat_wgsl =
     "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x);\n"
->>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
     "}\n";
 
 /** State of the build of one graph */
@@ -1154,13 +1153,8 @@ done:
     return;
 }
 
-<<<<<<< HEAD
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit and
- * TexCombine.
-=======
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexWarp, TexTransform,
- * TexTime and TexSplat.
->>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
+ * TexWarp, TexTransform, TexTime and TexSplat.
  *
  * @param world The world
  */
@@ -1204,7 +1198,6 @@ static void box_texture_nodes_register(
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
-<<<<<<< HEAD
         .component = ecs_id(TexSplit),
         .output = TexScalar,
         .inputs = {
@@ -1226,7 +1219,9 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_combine",
         .source = box_texture_combine_wgsl
-=======
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
         .component = ecs_id(TexWarp),
         .output = TexVector,
         .inputs = {
@@ -1277,7 +1272,6 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_splat",
         .source = box_texture_splat_wgsl
->>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
     });
 }
 

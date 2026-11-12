@@ -315,7 +315,7 @@ P.renderNode = (root, n) => {
   if (n.kinds.length > 1) root.appendChild(el("div", { class: "perror" }, `more than one node component: ${n.kinds.map(TGM.short).join(", ")}`));
   root.appendChild(P.previewBlock(n.path));
   root.appendChild(el("div", { class: "pbuttons" },
-    el("button", { text: isOutput ? "is the graph output" : "set as graph output", disabled: isOutput || !kind || kind.output !== "TexVector", onclick: () => TG.connectPorts(n.path, "@output", "output") }),
+    el("button", { text: isOutput ? "is the graph output" : "set as graph output", disabled: isOutput || !kind || kind.output === "TexScalar", onclick: () => TG.connectPorts(n.path, "@output", "output") }),
     el("button", { text: "delete", class: "danger", onclick: () => G.deleteNodes([n.path]) })));
   if (!kind) return;
   root.appendChild(el("div", { class: "pinfo" },

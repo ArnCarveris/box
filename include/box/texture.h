@@ -319,9 +319,6 @@ ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 0 for 1 */
 });
 
-<<<<<<< HEAD
-/** Operation of a TexMath node. Each one works per channel unless it says otherwise. */
-=======
 /** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
  * times scale plus offset, so a paused world shows the same image. It makes the nodes after it
  * and their graph animated, see TextureGraph.rate */
@@ -337,8 +334,7 @@ ECS_STRUCT(TexSplat, {
     float in_value;  /**< Value of in without a node */
 });
 
-/** Operation of a TexMath node */
->>>>>>> 5dd30e3cbf83cbcb8782925fc6a07812e0794a90
+/** Operation of a TexMath node. Each one works per channel unless it says otherwise. */
 ECS_ENUM(TextureMathOp, {
     MathAdd = 0,         /**< a + b, the default */
     MathSubtract = 1,    /**< a - b */
