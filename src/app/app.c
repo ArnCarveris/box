@@ -12,7 +12,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "../posix.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -1017,7 +1017,7 @@ char* box_app_locate(
 {
     char dir[4096];
     char *result = NULL;
-    if (path[0] == '/' || !access(path, R_OK) || !getcwd(dir, sizeof(dir))) {
+    if (BOX_POSIX_ABSOLUTE(path) || !access(path, R_OK) || !getcwd(dir, sizeof(dir))) {
         goto done;
     }
 

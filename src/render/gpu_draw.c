@@ -998,6 +998,7 @@ static int32_t box_gpu_view_write(
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
     box_gpu_cull_begin(gpu, packet);
     box_gpu_planar_begin(gpu);
+    box_gpu_shadow_begin(gpu, packet->frame);
     for (i = 0; i < count; i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
         if (!box_gpu_target_has_view(frame, v)) {
@@ -1019,7 +1020,7 @@ static int32_t box_gpu_view_write(
         u->viewport[2] = 1.0f / (float)(t->desc.render_width > 0 ? t->desc.render_width : 1);
         u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_light_uniforms(gpu, v, proj, u);
-        box_gpu_shadow_uniforms(gpu, v, proj, result, u);
+        box_gpu_shadow_uniforms(gpu, v, proj, result, packet->frame, u);
         box_gpu_atlas_uniforms(gpu, v, u);
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);

@@ -58,6 +58,7 @@ double box_app_pace(
     double wall_used,
     double budget);
 
+#ifndef _WIN32
 /** Decide whether the root of the temporary folders keeps the folder of a process safe from
  * other users: it must be a real folder, owned by the user or by root, and sticky when others
  * can write it.
@@ -71,6 +72,7 @@ const char* box_app_tmp_root_problem(
     mode_t mode,
     uid_t owner,
     uid_t user);
+#endif
 
 /** Create the private temporary folder of the process, or share the one it created, and
  * remove it when the last world that uses it is deleted.

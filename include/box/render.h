@@ -60,6 +60,10 @@ ECS_STRUCT(RenderStatus, {
                              *   ShadowAtlas */
     int32_t shadow_dropped; /**< Shadow casting lights that needed a tile in the last extract
                              *   and got none, so they light unshadowed */
+    int32_t shadow_cascades; /**< Cascades the last extract scheduled to render, over every
+                             *   view with shadows (ShadowSettings.interval) */
+    int32_t shadow_cascades_kept; /**< Cascades of those views the last extract kept from an
+                             *   earlier frame instead */
 });
 
 /** How a view culled its instances in the last frame the GPU finished, set on the View entity.

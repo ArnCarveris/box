@@ -13,11 +13,17 @@
 #ifdef BOX_PLATFORM_GLFW
 
 #define GLFW_INCLUDE_NONE
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#else
 #define GLFW_EXPOSE_NATIVE_COCOA
+#endif
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
+#ifndef _WIN32
 #include <objc/message.h>
 #include <objc/runtime.h>
+#endif
 
 /** Seconds after which the refresh rate of a window is read again without a move or a change
  * of the monitors, so a changed display mode is noticed */
@@ -26,7 +32,8 @@
 /** A glfw window and its layer */
 struct box_window_t {
     GLFWwindow *window;               /**< The glfw window */
-    void *layer;                      /**< CAMetalLayer of the content view */
+    void *layer;                      /**< CAMetalLayer of the content view, on Windows the
+                                       *   HWND of the window */
     box_input_glfw_target_t input;    /**< World and surface the input events go to */
     float refresh;                    /**< Refresh rate of the display when last read */
     int32_t refresh_moves;            /**< box_window_moves at the last read, -1 never */
@@ -83,6 +90,18 @@ static void box_window_error(
     ecs_err("glfw error %d: %s", code, message);
 }
 
+#ifdef _WIN32
+/** Get what webgpu presents a window with on Windows.
+ *
+ * @param window The glfw window
+ * @return The HWND of the window
+ */
+static void* box_window_metal_layer(
+    GLFWwindow *window)
+{
+    return (void*)glfwGetWin32Window(window);
+}
+#else
 /** Give the content view of a window a CAMetalLayer.
  *
  * @param window The glfw window
@@ -104,6 +123,7 @@ static void* box_window_metal_layer(
 
     return (void*)layer;
 }
+#endif
 
 box_window_t* box_window_new(
     ecs_world_t *world,

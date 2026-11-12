@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 
 /** Path of the title label the script template creates in the panel */
 #define EDITOR_TITLE BOX_EDITOR_PANEL ".title_bar.label"

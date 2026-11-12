@@ -47,7 +47,8 @@ static void box_view_ctor(
             .normal_offset = 2.0f,
             .filter_size = 3,
             .fade = 0.2f,
-            .blend = 0.1f
+            .blend = 0.1f,
+            .interval = {1, 1, 1, 1}
         };
         values[i].culling = (CullSettings){
             .enabled = true,

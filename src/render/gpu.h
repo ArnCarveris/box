@@ -1054,12 +1054,29 @@ void box_gpu_shadow_init(
 void box_gpu_shadow_fini(
     box_gpu_t *gpu);
 
+/** Start the cascades of the views of a target: forget the cascades of the views of the last
+ * target and release the cascade stores of the views no packet rendered for
+ * BOX_GPU_CASCADE_STORE_FRAMES frames.
+ *
+ * @param gpu The backend
+ * @param frame Frame of the packet
+ */
+void box_gpu_shadow_begin(
+    box_gpu_t *gpu,
+    int64_t frame);
+
 /** Fit the cascades of a view to its projection and write the shadow members of its uniforms.
+ *
+ * A view that keeps cascades between frames (box_render_view_shadows_t.reuse) fits only the
+ * cascades that render in the packet: those of its render mask and those its cascade store does
+ * not hold, every one when the store was (re)created, the projection changed or the shadow
+ * shader did. The others keep the cascade they rendered with, so they are sampled with it.
  *
  * @param gpu The backend
  * @param v The view
  * @param proj Projection of the view for its target
  * @param slot Slot of the view in the view buffer
+ * @param frame Frame of the packet
  * @param u The uniforms
  */
 void box_gpu_shadow_uniforms(
@@ -1067,7 +1084,18 @@ void box_gpu_shadow_uniforms(
     const box_render_view_t *v,
     mat4 proj,
     int32_t slot,
+    int64_t frame,
     box_gpu_view_uniforms_t *u);
+
+/** Get the cascades of a view that render in the packet, after box_gpu_shadow_uniforms.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @return Mask of the cascades, bit i for cascade i, every bit for a slot it did not write
+ */
+uint32_t box_gpu_shadow_renders(
+    box_gpu_t *gpu,
+    int32_t slot);
 
 /** Write the cascade matrices of the views of a target into the cascade buffer.
  *
@@ -1078,7 +1106,8 @@ void box_gpu_shadow_upload(
     box_gpu_t *gpu,
     int32_t count);
 
-/** Record the shadow passes of a view: its casters drawn into every cascade.
+/** Record the shadow passes of a view: its casters drawn into every cascade that renders in
+ * the packet, the others keep their depth.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -1182,7 +1211,8 @@ void box_gpu_shadow_request(
  *
  * @param gpu The backend
  * @param v The view
- * @return The array view of the shadow map, the empty one for a view without shadows
+ * @return The array view of the shadow map: of its cascade store for a view that keeps
+ * cascades, else the shared one, the empty one for a view without shadows
  */
 WGPUTextureView box_gpu_shadow_binding(
     box_gpu_t *gpu,

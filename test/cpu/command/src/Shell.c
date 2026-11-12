@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 #include <math.h>
 #include <output.h>
 #include "command.h"
@@ -429,7 +429,7 @@ void Shell_rest_endpoint(void) {
     ecs_os_free(body);
 
     char *path = flecs_asprintf("/shell/session/%llu", session);
-    reply = (ecs_http_reply_t)ECS_HTTP_REPLY_INIT;
+    reply = ECS_HTTP_REPLY_INIT;
     test_int(ecs_http_server_request(srv, "PUT", path, "key_press W 2", &reply), 0);
     test_int(reply.code, 200);
     body = ecs_strbuf_get(&reply.body);
@@ -437,7 +437,7 @@ void Shell_rest_endpoint(void) {
         "\"errors\":[]}");
     ecs_os_free(body);
 
-    reply = (ecs_http_reply_t)ECS_HTTP_REPLY_INIT;
+    reply = ECS_HTTP_REPLY_INIT;
     test_int(ecs_http_server_request(srv, "PUT", path, "key_press Nope", &reply), 0);
     test_int(reply.code, 200);
     body = ecs_strbuf_get(&reply.body);

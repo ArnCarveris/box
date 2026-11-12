@@ -733,6 +733,32 @@ typedef struct box_gpu_atlas_t {
     int32_t point_revision;         /**< Revision of that variant */
 } box_gpu_atlas_t;
 
+/** Packets a cascade store outlives the last packet that rendered its view */
+#define BOX_GPU_CASCADE_STORE_FRAMES (16)
+
+/** The shadow map of a view that keeps cascades between frames (box_render_view_shadows_t.reuse):
+ * its own, so no other view renders into it, with the cascade each layer was rendered with */
+typedef struct box_gpu_cascade_store_t {
+    ecs_entity_t view;              /**< The view entity */
+    WGPUTexture texture;            /**< BOX_GPU_SHADOW_FORMAT, a layer per cascade */
+    WGPUTextureView array;          /**< Array view, sampled by the forward pass */
+    WGPUTextureView layers[BOX_RENDER_SHADOW_CASCADES]; /**< View of each cascade */
+    int32_t resolution;             /**< Edge of a layer in texels */
+    int32_t cascades;               /**< Layers */
+    box_render_cascade_t fits[BOX_RENDER_SHADOW_CASCADES]; /**< Cascade each layer rendered
+                                     *   with, or renders with in the packet */
+    uint32_t valid;                 /**< Mask of the layers that hold the render of their fit */
+    mat4 proj;                      /**< Projection of the view the fits were made with */
+    int32_t revision;               /**< Revision of the shadow shader the layers rendered with */
+    int64_t frame;                  /**< Frame of the last packet that rendered the view */
+} box_gpu_cascade_store_t;
+
+/** The cascades of a view of the target being drawn */
+typedef struct box_gpu_cascade_slot_t {
+    int32_t store;                  /**< Index of its cascade store, -1 for the shared map */
+    uint32_t renders;               /**< Mask of the cascades that render in the packet */
+} box_gpu_cascade_slot_t;
+
 #define BOX_GPU_ATLAS_FRUSTUM(tile, octant) ((tile) * BOX_RENDER_SHADOW_OCTANTS + (octant))
 
 /** A draw of the casters of a tile of the last packet, read by box_render_gpu_cull_tile */
@@ -913,6 +939,9 @@ typedef struct box_gpu_t {
     WGPUTextureView shadow_layers[BOX_RENDER_SHADOW_CASCADES]; /**< View of each cascade */
     int32_t shadow_resolution;      /**< Edge of the shadow map, 0 before it exists */
     int32_t shadow_cascades;        /**< Layers of the shadow map */
+    ecs_vec_t cascade_stores;       /**< box_gpu_cascade_store_t, the shadow maps of the views
+                                     *   that keep cascades between frames */
+    ecs_vec_t cascade_slots;        /**< box_gpu_cascade_slot_t of each view slot of a target */
     WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
@@ -1069,6 +1098,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_SHADOW_REUSED,     /**< A shadow atlas tile was kept from an earlier frame */
     BOX_GPU_STAT_SHADOW_PASS,       /**< A shadow atlas render pass was recorded */
     BOX_GPU_STAT_SHADOW_DRAW,       /**< A draw call was recorded in a cascade or a tile */
+    BOX_GPU_STAT_CASCADE,           /**< A cascade of a view was rendered */
+    BOX_GPU_STAT_CASCADE_KEPT,      /**< A cascade of a view was kept from an earlier frame */
     BOX_GPU_STAT_COPY_DIRECT,       /**< A copy went from its source to its destination */
     BOX_GPU_STAT_COPY_STAGED,       /**< A copy went through the staging buffer */
     BOX_GPU_STAT_FOG_VOLUME,        /**< A fog volume was drawn */

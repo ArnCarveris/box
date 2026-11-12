@@ -743,6 +743,16 @@ ecs_entity_t box_render_scene_field(
 void box_render_shadows_init(
     ecs_world_t *world);
 
+/** Get the cascades of a view the last shadow extract scheduled to render.
+ *
+ * @param world The world
+ * @param view The view entity
+ * @return Mask of the cascades, bit i for cascade i, 0 for a view without cascades
+ */
+uint32_t box_render_shadow_rendered(
+    const ecs_world_t *world,
+    ecs_entity_t view);
+
 /** Resolve shadow settings: every field is clamped to its valid range and an even
  * filter_size rounds up to the next odd one, other values apply as set.
  *

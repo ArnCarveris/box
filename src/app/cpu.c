@@ -5,8 +5,10 @@
 
 #include "app.h"
 #include <stdlib.h>
-#include <unistd.h>
+#include "../posix.h"
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 
 /** Seconds left below which a wait sleeps the rest in one go */
 #define BOX_WAIT_STEP (0.0001)
@@ -77,7 +79,11 @@ int box_app_guard(
         cores = 1;
     }
 
-    if (getloadavg(&load, 1) == 1 && box_app_oversubscribed(load, (int32_t)cores, budget)) {
+    if (getloadavg(&load, 1) != 1) {
+        load = 0;
+    }
+
+    if (box_app_oversubscribed(load, (int32_t)cores, budget)) {
         ecs_err("cpu oversubscribed: load %.1f plus a claim of %.2f cores on %d cores", load,
             budget > 0 ? (double)budget / 100.0 : 1.0, (int)cores);
         result = -1;

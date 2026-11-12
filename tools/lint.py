@@ -45,7 +45,8 @@ class Lint:
             if not match:
                 continue
             name = match.group(1)
-            if self.path != name and not self.path.endswith("/" + name):
+            path = self.path.replace(os.sep, "/")
+            if path != name and not path.endswith("/" + name):
                 self.report(i, f"@file {name} does not match file name")
             break
         if len(self.lines) > MAX_FILE_LINES:

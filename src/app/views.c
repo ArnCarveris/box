@@ -14,7 +14,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include "../posix.h"
 
 enum {
     BOX_DESIGN_ORTHO_COUNT = 6,
@@ -531,13 +531,13 @@ int box_app_views(
     ecs_entity_t surface = box_app_surface(world);
     if (app->out) {
         char cwd[4096];
-        if (app->out[0] != '/' && !getcwd(cwd, sizeof(cwd))) {
+        if (!BOX_POSIX_ABSOLUTE(app->out) && !getcwd(cwd, sizeof(cwd))) {
             ecs_err("cannot resolve output path '%s'", app->out);
             result = -1;
             goto done;
         }
 
-        char *path = app->out[0] == '/' ? ecs_os_strdup(app->out)
+        char *path = BOX_POSIX_ABSOLUTE(app->out) ? ecs_os_strdup(app->out)
             : flecs_asprintf("%s/%s", cwd, app->out);
         const char *dot = strrchr(path, '.');
         const char *slash = strrchr(path, '/');

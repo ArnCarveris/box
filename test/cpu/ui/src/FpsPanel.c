@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 
 /** Path of the Text of the mean and worst frame time in the summary */
 #define FPS_TIMES BOX_FPS_SUMMARY ".times"

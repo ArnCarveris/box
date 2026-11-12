@@ -60,7 +60,13 @@
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #endif
+#ifdef _WIN32
+#define AlphaBlend box_win32_AlphaBlend
+#endif
 #include <miniaudio.h>
+#ifdef _WIN32
+#undef AlphaBlend
+#endif
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #elif defined(__GNUC__)

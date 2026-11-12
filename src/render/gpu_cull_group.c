@@ -850,6 +850,7 @@ void box_gpu_cull_add(
     bool draws = box_camera_has_depth(&v->camera_data);
     int32_t i, j, cascades = draws ? (int32_t)u->shadow_config[0] : 0;
     int32_t count = cascades ? cascades + c->copies : 0;
+    uint32_t renders = box_gpu_shadow_renders(gpu, slot);
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
     ecs_os_memset_t(&view, 0, box_gpu_cull_desc_t);
     view.view = v->view;
@@ -885,6 +886,10 @@ void box_gpu_cull_add(
     ecs_vec_clear(&c->frustums);
     *ecs_vec_append_t(NULL, &c->frustums, box_gpu_cull_desc_t) = view;
     for (i = 0; i < count; i ++) {
+        if (i < cascades && !(renders & (1u << i))) {
+            continue;
+        }
+
         box_gpu_cull_desc_t *cascade = ecs_vec_append_t(NULL, &c->frustums, box_gpu_cull_desc_t);
         ecs_os_memset_t(cascade, 0, box_gpu_cull_desc_t);
         cascade->view = v->view;

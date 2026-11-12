@@ -10,6 +10,7 @@
 #include "../jobs/jobs.h"
 #include <stdio.h>
 #include <math.h>
+#include "../posix.h"
 
 /** Singleton through which the functions of the module find its state in a world */
 typedef struct AudioModuleState {

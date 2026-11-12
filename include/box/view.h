@@ -86,6 +86,15 @@ ECS_STRUCT(ShadowSettings, {
     float min_caster_texels; /**< Projected size in texels of a cascade below which a caster is
                           *   not drawn into that cascade; needs CullSettings.enabled, default 0
                           *   for none */
+    int32_t interval[4]; /**< Frames each cascade uses one render for: 1 (or 0) renders it
+                          *   every frame, 2 every other frame, and so on, each cascade offset
+                          *   by its index so equal intervals render on different frames; a
+                          *   kept cascade is sampled with the matrix it was rendered with.
+                          *   Every cascade renders at once on the first frame and when the
+                          *   light direction, the projection of the camera, the resolution,
+                          *   cascades, max_distance, split_lambda or min_caster_texels change;
+                          *   moved, added or removed casters show up to interval - 1 frames
+                          *   late. Default 1 */
 });
 
 /** Culling settings of a view, applied as specified: all zero draws every instance.

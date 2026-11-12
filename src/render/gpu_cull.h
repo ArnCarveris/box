@@ -78,7 +78,8 @@ void box_gpu_cull_begin(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Add the frustums of a view: the view itself and every cascade of its shadows.
+/** Add the frustums of a view: the view itself and every cascade of its shadows that renders in
+ * the packet (box_gpu_shadow_renders), a kept cascade culls nothing.
  *
  * @param gpu The backend
  * @param t The target

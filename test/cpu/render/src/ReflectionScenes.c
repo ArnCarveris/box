@@ -17,8 +17,9 @@
 /** Path of the garden scene in the repository */
 #define GARDEN_PATH "test/assets/scenes/japanese_garden.flecs"
 
-/** Path of this file in the repository, which locates the repository root */
-#define GARDEN_SOURCE "test/cpu/render/src/"
+/** Path of this project in the repository, which locates the repository root (MSVC names this
+ * file with a backslash before src) */
+#define GARDEN_SOURCE "test/cpu/render"
 
 /** Hand placed probes of the garden */
 #define GARDEN_PROBES (14)
@@ -38,9 +39,10 @@ static char* file_read(
     const char *file)
 {
     char *result = NULL;
-    const char *source = strstr(__FILE__, GARDEN_SOURCE);
-    int32_t root = source ? (int32_t)(source - __FILE__) : 0;
-    char *path = flecs_asprintf("%.*s%s", root, __FILE__, file);
+    const char *self = __FILE__;
+    const char *source = strstr(self, GARDEN_SOURCE);
+    int32_t root = source ? (int32_t)(source - self) : 0;
+    char *path = flecs_asprintf("%.*s%s", root, self, file);
     FILE *f = fopen(path, "rb");
     ecs_os_free(path);
     if (!f) {
