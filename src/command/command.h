@@ -433,4 +433,26 @@ void box_cmd_frames_init(
 void box_cmd_edit_init(
     ecs_world_t *world);
 
+/** Register the geometry command that counts the shapes and geometry.check that lists the
+ * pairs of 3D shapes with faces that z-fight.
+ *
+ * @param world The world
+ */
+void box_cmd_geometry_init(
+    ecs_world_t *world);
+
+/** List the pairs of 3D shapes with faces that lie in the same plane, face the same way and
+ * overlap: geometry.check [root] [tolerance=units] [area=units^2] [max=n]. One line per pair,
+ * the largest area first, and a summary line.
+ *
+ * @param world The world
+ * @param argc Number of arguments
+ * @param argv The root and the options in any order
+ * @return The text, which the caller frees, NULL with an error logged
+ */
+char* box_cmd_geometry_check(
+    ecs_world_t *world,
+    int32_t argc,
+    const char **argv);
+
 #endif
