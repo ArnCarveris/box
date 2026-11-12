@@ -220,6 +220,48 @@ uint32_t box_render_texture_target_handle(
 void box_render_textures_init(
     ecs_world_t *world);
 
+/** Take the texture graph readbacks the GPU backend delivered since the last call, with their
+ * texture and node entities, without the ones the previews kept for
+ * box_render_texture_graph_reads.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_read_t
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_texture_graph_reads_take(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** Move the readbacks of other callers that the previews took along with theirs to the end of
+ * a vector.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_read_t
+ */
+void box_render_texture_previews_kept(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** Move the readbacks of the previews among the ones a caller of
+ * box_render_texture_graph_reads took to the previews, which encode them in their next frame.
+ *
+ * @param world The world
+ * @param out The readbacks, compacted
+ * @param first Index of the first readback the caller took
+ */
+void box_render_texture_previews_filter(
+    ecs_world_t *world,
+    ecs_vec_t *out,
+    int32_t first);
+
+/** Register the system that reads back the nodes with a TextureNodePreview and writes their
+ * TextureNodePreviewStatus, and TextureGraphStats. It runs after the texture extract.
+ *
+ * @param world The world
+ */
+void box_render_texture_previews_init(
+    ecs_world_t *world);
+
 /** Counters of the light extract of a world */
 typedef struct box_render_lights_stats_t {
     int32_t scenes;             /**< Scenes that have lights */

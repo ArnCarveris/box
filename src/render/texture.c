@@ -442,6 +442,19 @@ bool box_render_texture_graph_reads(
     ecs_world_t *world,
     ecs_vec_t *out)
 {
+    int32_t first = ecs_vec_count(out);
+    bool result;
+    box_render_texture_previews_kept(world, out);
+    result = box_render_texture_graph_reads_take(world, out);
+    box_render_texture_previews_filter(world, out, first);
+
+    return result;
+}
+
+bool box_render_texture_graph_reads_take(
+    ecs_world_t *world,
+    ecs_vec_t *out)
+{
     box_textures_t *t = box_textures_get(world);
     int32_t i, first = ecs_vec_count(out);
     bool result = box_render_gpu_texture_graph_reads(world, out);

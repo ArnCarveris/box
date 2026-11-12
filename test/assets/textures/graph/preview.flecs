@@ -1,0 +1,12 @@
+// A graph for the node previews: coordinates scaled per channel and offset over a 256 x 128
+// image stored as computed, and a constant that the graph does not reach.
+
+using box.texture
+
+graph_preview {
+  uv     { TexCoords: {} }
+  scaled { TexMath: {op: MathMultiply, a: uv, b_value: {1, 0.5, 0, 1}} }
+  offset { TexMath: {op: MathAdd, a: scaled, b_value: {0, 0, 0.25, 0}} }
+  loose  { TexConstant: {value: {1, 0, 1, 1}} }
+  TextureGraph: {output: offset, width: 256, height: 128, format: GraphLinear}
+}

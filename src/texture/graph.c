@@ -289,6 +289,7 @@ static void box_texture_node_kind_reflect(
         value.inputs[i].name = kind->inputs[i].name;
         value.inputs[i].type = kind->inputs[i].type;
         value.inputs[i].fallback = kind->inputs[i].value != NULL;
+        value.inputs[i].value = kind->inputs[i].value;
     }
 
     for (i = 0; i < kind->param_count; i ++) {

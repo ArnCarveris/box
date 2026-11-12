@@ -1142,11 +1142,16 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TextureNodeKind);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
+    ECS_META_COMPONENT(world, TextureNodePreview);
+    ECS_META_COMPONENT(world, TextureNodePreviewStatus);
+    ECS_META_COMPONENT(world, TextureGraphStats);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
     box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
         BOX_OWNED_VEC(TextureGen, palette, rgb));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+    box_owned_hooks(world, TextureNodePreviewStatus,
+        BOX_OWNED_STR(TextureNodePreviewStatus, png));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);

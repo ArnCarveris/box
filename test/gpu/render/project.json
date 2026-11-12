@@ -1473,6 +1473,19 @@
                     "status_transitions",
                     "material_samples_graph"
                 ]
+            },
+            {
+                "id": "TexturePreview",
+                "testcases": [
+                    "size_and_pixels",
+                    "default_size",
+                    "same_value_not_encoded",
+                    "rate_limits_readbacks",
+                    "remove_stops_readbacks",
+                    "node_outside_graph",
+                    "other_readbacks_kept",
+                    "stats"
+                ]
             }
         ]
     }

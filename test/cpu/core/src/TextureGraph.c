@@ -255,6 +255,8 @@ void TextureGraph_builtin_kinds(void) {
     test_str(kind->inputs[2].name, "c");
     test_int(kind->inputs[0].type, TexVector);
     test_bool(kind->inputs[0].fallback, true);
+    test_str(kind->inputs[0].value, "a_value");
+    test_str(kind->inputs[2].value, "c_value");
     test_int(kind->param_count, 1);
     test_str(kind->params[0].name, "op");
     test_int(kind->params[0].offset, 0);
@@ -266,6 +268,7 @@ void TextureGraph_builtin_kinds(void) {
 
     kind = ecs_get(world, ecs_id(TexConstant), TextureNodeKind);
     test_int(kind->input_count, 0);
+    test_str(kind->inputs[0].value, NULL);
     test_int(kind->params[0].size, 16);
     test_str(kind->function, "box_tex_constant");
 
