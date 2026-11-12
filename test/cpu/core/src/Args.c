@@ -18,6 +18,7 @@ void Args_defaults(void) {
     const App *app = ecs_singleton_get(world, App);
     test_assert(app != NULL);
     test_bool(app->headless, false);
+    test_bool(app->unguarded, false);
     test_int(app->frames, 0);
     test_flt(app->timeout, 0);
     test_flt(app->cpu_budget, 100);
@@ -55,6 +56,22 @@ void Args_no_audio(void) {
     const App *app = ecs_singleton_get(world, App);
     test_bool(app->no_audio, true);
     test_bool(app->headless, false);
+
+    ecs_fini(world);
+}
+
+void Args_unguarded(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->unguarded, false);
+    char *argv[] = {"boxrun", "--headless", "--unguarded"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->unguarded, true);
+    test_bool(app->headless, true);
 
     ecs_fini(world);
 }
