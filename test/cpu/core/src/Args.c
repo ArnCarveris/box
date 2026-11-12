@@ -18,6 +18,7 @@ void Args_defaults(void) {
     const App *app = ecs_singleton_get(world, App);
     test_assert(app != NULL);
     test_bool(app->headless, false);
+    test_bool(app->unguarded, false);
     test_int(app->frames, 0);
     test_flt(app->timeout, 0);
     test_flt(app->cpu_budget, 100);
@@ -55,6 +56,38 @@ void Args_no_audio(void) {
     const App *app = ecs_singleton_get(world, App);
     test_bool(app->no_audio, true);
     test_bool(app->headless, false);
+
+    ecs_fini(world);
+}
+
+void Args_unguarded(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->unguarded, false);
+    char *argv[] = {"boxrun", "--headless", "--unguarded"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->unguarded, true);
+    test_bool(app->headless, true);
+
+    ecs_fini(world);
+}
+
+void Args_fail_on_error(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_bool(ecs_singleton_get(world, App)->fail_on_error, false);
+    char *argv[] = {"boxrun", "--headless", "--fail-on-error"};
+    test_int(box_app_parse(world, 3, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->fail_on_error, true);
+    test_bool(app->headless, true);
 
     ecs_fini(world);
 }
@@ -420,8 +453,8 @@ void Args_surface_not_created_when_present(void) {
 
     test_int(ecs_count(world, Surface), 1);
     const Surface *s = ecs_get(world, own, Surface);
-    test_int(s->width, 64);
-    test_int(s->height, 48);
+    test_int(s->width, 320);
+    test_int(s->height, 200);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -570,4 +603,55 @@ void Args_out_capture(void) {
         ecs_fini(world);
         box_render_null_free(null);
     }
+}
+
+static void surface_scene_run(
+    const char *size,
+    int32_t width,
+    int32_t height)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "1",
+        "test/assets/app/surface_window.flecs", "--surface", ECS_CONST_CAST(char*, size)};
+    int argc = size ? 7 : 5;
+
+    test_int(box_app_parse(world, argc, argv), 0);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->unguarded = true;
+    app->unpaced = true;
+    test_int(box_app_run(world), 0);
+
+    ecs_entity_t window = ecs_lookup(world, "window");
+    test_assert(window != 0);
+    test_int(ecs_count(world, Surface), 1);
+    const Surface *s = ecs_get(world, window, Surface);
+    test_assert(s != NULL);
+    test_int(s->width, width);
+    test_int(s->height, height);
+
+    /* A later write of the Surface, as a reload does, keeps the size of the command line */
+    ecs_set(world, window, Surface, {.width = 800, .height = 600});
+    ecs_progress(world, 0);
+    s = ecs_get(world, window, Surface);
+    test_int(s->width, size ? width : 800);
+    test_int(s->height, size ? height : 600);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Args_surface_overrides_scene_window(void) {
+    // test_fixes/surface_arg_override
+    surface_scene_run("1280x720", 1280, 720);
+}
+
+void Args_surface_scene_window_without_option(void) {
+    // test_fixes/surface_arg_override
+    surface_scene_run(NULL, 640, 360);
 }

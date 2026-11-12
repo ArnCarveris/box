@@ -106,6 +106,71 @@ def plume(width=64, height=256):
     save_emissive("plume_core.png", core)
 
 
+def windows(size=512, cols=6, rows=4):
+    rng = np.random.default_rng(23)
+    albedo = np.zeros((size, size, 3))
+    glow = np.zeros((size, size, 3))
+    albedo[:] = (28, 34, 44)
+    cw, rh = size // cols, size // rows
+    for r in range(rows):
+        y0 = r * rh
+        albedo[y0 + rh - 6:y0 + rh, :] = (206, 212, 220)
+        albedo[y0 + rh - 9:y0 + rh - 6, :] = (90, 96, 108)
+        for c in range(cols):
+            x0 = c * cw
+            wx0, wx1 = x0 + 14, x0 + cw - 14
+            wy0, wy1 = y0 + 34, y0 + rh - 30
+            albedo[wy0:wy1, wx0:wx1] = (44, 56, 72)
+            if rng.uniform() < 0.5:
+                pick = rng.uniform()
+                tone = (1.0, 0.72, 0.42) if pick < 0.65 else (1.0, 0.86, 0.62) if pick < 0.88 else (0.6, 0.8, 1.0)
+                level = rng.uniform(0.35, 1.0)
+                glow[wy0:wy1, wx0:wx1] = np.array(tone) * level
+    save_rgb("windows_albedo.png", albedo)
+    save_emissive("windows.png", glow)
+
+
+def containers(size=512, tiers=4):
+    rng = np.random.default_rng(31)
+    paint = [(164, 70, 44), (38, 76, 132), (52, 106, 72), (206, 154, 38), (124, 130, 138),
+             (30, 112, 120), (226, 228, 230), (214, 104, 40), (120, 40, 44)]
+    img = np.zeros((size, size, 3))
+    th = size // tiers
+    for t in range(tiers):
+        y0 = t * th
+        spans = [(0, size)] if rng.uniform() < 0.5 else [(0, size // 2), (size // 2, size)]
+        for x0, x1 in spans:
+            base = np.array(paint[rng.integers(len(paint))], float) * rng.uniform(0.82, 1.05)
+            block = np.ones((th, x1 - x0, 3)) * base
+            ribs = (np.arange(x1 - x0) // 6) % 2 == 0
+            block[:, ribs] *= 0.86
+            block[:5] *= 0.45
+            block[-5:] *= 0.45
+            block[:, :5] *= 0.4
+            block[:, -5:] *= 0.4
+            block[th // 2 - 1:th // 2 + 1] *= 0.92
+            img[y0:y0 + th, x0:x1] = block
+    grime = noise(size, 1.3, 33)[:, :, None]
+    save_rgb("containers.jpg", img * (0.82 + 0.3 * grime))
+
+
+def heat_fins(size=256, lines=10):
+    v = (np.arange(size)[:, None] + 0.5) / size
+    phase = (v * lines) % 1.0
+    line = np.exp(-((phase - 0.5) / 0.045) ** 2)
+    streak = 0.75 + 0.25 * periodic_streaks(size, size, 17, 2, 9, 0.2).T
+    lin = (line * streak)[:, :, None] * np.array([1.0, 0.42, 0.14])
+    save_emissive("heat_fins.png", lin)
+
+
+def dots(size=128, count=2):
+    u = (np.arange(size) + 0.5) / size
+    pu = (u[None, :] * count) % 1.0 - 0.5
+    pv = (u[:, None] * count) % 1.0 - 0.5
+    d = np.exp(-(pu * pu + pv * pv) / (2 * 0.05 ** 2))
+    save_emissive("dots.png", np.dstack([d, d, d]))
+
+
 SCREEN = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 160" width="512" height="320">
 <rect width="256" height="160" fill="#05101a"/>
 <g fill="none" stroke="#5fd8ff" stroke-width="2">
@@ -155,6 +220,15 @@ ICONS = {
               '<path d="M32 2v14M32 48v14M2 32h14M48 32h14"/></g>',
     "engine": f'<g {S}><path d="M6 20h20l10 6v12l-10 6H6z"/><path d="M36 26l12-8v28l-12-8"/>'
               '<path d="M52 24h8M52 32h10M52 40h8"/></g>',
+    "drill": f'<g {S}><path d="M6 20h14v24H6z"/><path d="M20 24h6v16h-6"/><path d="M26 20l32 12-32 12z"/>'
+             '<path d="M34 23l5 18M44 27l3 10"/></g>',
+    "builder": f'<g {S}><path d="M8 56h24M20 56v-8"/><circle cx="20" cy="43" r="5"/><path d="M23 39l11-17"/>'
+               '<circle cx="36" cy="19" r="4"/><path d="M40 21l12 9"/><path d="M52 30l6-3M52 30l3 6"/>'
+               '<path d="M38 50h20M38 58h20M42 50l6 8 6-8"/></g>',
+    "datacenter": f'<g {S}><rect x="10" y="7" width="44" height="14" rx="2"/><rect x="10" y="25" width="44" height="14" rx="2"/>'
+                  '<rect x="10" y="43" width="44" height="14" rx="2"/><path d="M17 14h.01M17 32h.01M17 50h.01M34 14h12M34 32h12M34 50h12"/></g>',
+    "autopilot": f'<g {S}><path d="M10 52V34a22 22 0 0 1 44 0v18z"/><rect x="17" y="30" width="30" height="9" rx="4.5"/>'
+                 '<path d="M32 12V5M6 52h52M22 46h20"/></g>',
     "remove": f'<g {S}><path d="M10 16h44M24 16V8h16v8M15 16l3 40h28l3-40"/><path d="M27 27v18M37 27v18"/></g>',
     "deck": f'<g {S}><path d="M32 8l26 10-26 10L6 18z"/><path d="M6 30l26 10 26-10"/><path d="M6 42l26 10 26-10"/></g>',
     "power": f'<path {F} d="M37 3L11 37h17l-3 24 28-36H35z"/>',
@@ -166,6 +240,37 @@ ICONS = {
     "ok": f'<g {S}><circle cx="32" cy="32" r="26"/><path d="M20 33l8 8 16-17"/></g>',
     "warn": f'<g {S}><path d="M32 6l28 50H4z"/><path d="M32 24v14M32 46v1"/></g>',
     "ship": f'<g {S}><path d="M60 32L40 20H22L6 12l4 20-4 20 16-8h18z"/><path d="M22 20v24M40 20v24"/></g>',
+    "capital": f'<g {S}><path d="M62 34L50 26H8l-4 4v12l4 4h42z"/><path d="M14 26v-6h10l4 6M8 36h40"/>'
+               '<path d="M34 26v20M44 26v20"/></g>',
+    "bridge": f'<g {S}><path d="M4 54h56"/><path d="M8 54V38h48v16"/><path d="M14 38V26h36v12"/>'
+              '<path d="M20 26l4-8h16l4 8"/><path d="M32 18V8"/><path d="M18 32h28"/></g>',
+    "sensor": f'<g {S}><path d="M12 14a28 28 0 0 0 38 38z"/><path d="M31 33l14-14"/><circle cx="47" cy="17" r="3"/>'
+              '<path d="M26 52l-8 8h28"/></g>',
+    "residence": f'<g {S}><rect x="6" y="10" width="52" height="44" rx="3"/><path d="M6 24h52M6 38h52"/>'
+                 '<path d="M14 17h4M24 17h4M34 17h4M44 17h4M14 31h4M24 31h4M34 31h4M44 31h4M14 45h4M24 45h4M34 45h4M44 45h4"/></g>',
+    "ring": f'<g {S}><path d="M4 32h56"/><ellipse cx="32" cy="32" rx="12" ry="26"/><ellipse cx="32" cy="32" rx="4" ry="9"/>'
+            '<path d="M32 6v17M32 41v17"/></g>',
+    "arbor": f'<g {S}><path d="M6 50a26 26 0 0 1 52 0"/><path d="M2 50h60"/><path d="M24 50V38"/><circle cx="24" cy="32" r="7"/>'
+             '<path d="M42 50v-8"/><circle cx="42" cy="38" r="5"/></g>',
+    "core": f'<g {S}><circle cx="32" cy="32" r="13"/><ellipse cx="32" cy="32" rx="28" ry="9"/><path d="M32 4v10M32 50v10"/></g>',
+    "wing": f'<g {S}><path d="M8 8v48"/><path d="M8 12l48 6v28L8 52"/><path d="M8 24l48 3M8 32h48M8 40l48-3"/></g>',
+    "drive": f'<g {S}><path d="M4 16h16v32H4z"/><path d="M20 18l20-8v20l-20 2zM20 46l20 8V34l-20-2z"/>'
+             '<path d="M46 20h14M46 44h14M48 32h10"/></g>',
+    "jump": f'<g {S}><path d="M2 32h60"/><ellipse cx="16" cy="32" rx="5" ry="20"/><ellipse cx="32" cy="32" rx="5" ry="24"/>'
+            '<ellipse cx="48" cy="32" rx="5" ry="20"/></g>',
+    "tanks": f'<g {S}><circle cx="19" cy="19" r="12"/><circle cx="45" cy="19" r="12"/><circle cx="19" cy="45" r="12"/>'
+             '<circle cx="45" cy="45" r="12"/></g>',
+    "freight": f'<g {S}><rect x="4" y="38" width="26" height="16"/><rect x="34" y="38" width="26" height="16"/>'
+               '<rect x="19" y="18" width="26" height="16"/><path d="M11 42v8M17 42v8M23 42v8M41 42v8M47 42v8M53 42v8M26 22v8M32 22v8M38 22v8"/>'
+               '<path d="M32 18V8"/></g>',
+    "hangar": f'<g {S}><path d="M4 56V24l28-14 28 14v32"/><path d="M14 56V32h36v24"/><path d="M22 50l10-8 10 8z"/></g>',
+    "slip": f'<g {S}><path d="M8 58V8h48v50"/><path d="M8 16h48"/><path d="M36 16v10"/><path d="M14 48c6-12 30-12 36 0z"/>'
+            '<path d="M22 48v-6M32 48v-9M42 48v-6"/></g>',
+    "refinery": f'<g {S}><path d="M6 56V22h12v34M22 56V12h12v44"/><path d="M38 56V38l9-7 9 7v18"/><path d="M2 56h60"/>'
+                '<path d="M44 46h6"/></g>',
+    "armor": f'<g {S}><path d="M6 56V26L30 8h28v48z"/><path d="M16 56V30l16-12h18"/><path d="M26 56V36l8-6h16"/></g>',
+    "battery": f'<g {S}><path d="M4 52h56"/><path d="M10 52v-8a12 12 0 0 1 12-12h12a12 12 0 0 1 12 12v8"/>'
+               '<path d="M34 36l26-14M34 31l22-20M37 41l25-9"/></g>',
 }
 
 
@@ -185,3 +290,7 @@ if __name__ == "__main__":
         f.write(HAZARD)
     icons()
     plume()
+    windows()
+    containers()
+    heat_fins()
+    dots()

@@ -1,0 +1,4 @@
+// A scene that does not parse: the run ends with it not loaded
+syntax_error_root {
+  box.transform.Position: {1, 2, 3
+}

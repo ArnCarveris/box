@@ -42,7 +42,18 @@ typedef struct box_app_clock_t {
     box_app_series_t present;   /**< Present intervals of the recent frames */
     box_app_series_t late;      /**< 1 for a recent frame with a late delta, else 0 */
     box_app_series_t dropped;   /**< 1 for a recent dropped frame, else 0 */
+    int32_t errors;             /**< Errors the process had logged when the module was imported */
+    ecs_entity_t scene;         /**< Script entity of App.scene, 0 when none was loaded */
 } box_app_clock_t;
+
+/** Messages of error level the process has logged while the log hook was installed */
+static int32_t box_app_log_errors;
+
+/** Worlds that import box.app, which share the log hook */
+static int32_t box_app_log_users;
+
+/** Log callback the hook passes messages on to */
+static ecs_os_api_log_t box_app_log_prev;
 
 _Static_assert(sizeof(((FrameSamples*)0)->interval) == BOX_FRAME_WINDOW * sizeof(double),
     "FrameSamples.interval holds BOX_FRAME_WINDOW samples");
@@ -58,6 +69,7 @@ static box_app_clock_t* box_app_clock_new(void)
 {
     box_app_clock_t *result = ecs_os_calloc_t(box_app_clock_t);
     result->start = box_app_wall_time();
+    result->errors = box_app_log_errors;
 
     return result;
 }
@@ -70,6 +82,74 @@ static void box_app_clock_free(
     void *ctx)
 {
     ecs_os_free(ctx);
+}
+
+/** Log hook: count the messages of error level and pass them on to the previous hook.
+ *
+ * @param level The flecs log level
+ * @param file The file that logged
+ * @param line The line that logged
+ * @param msg The message
+ */
+static void box_app_log_hook(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    if (level <= -3) {
+        ecs_os_ainc(&box_app_log_errors);
+    }
+
+    if (box_app_log_prev) {
+        box_app_log_prev(level, file, line, msg);
+    }
+}
+
+/** Remove the log hook when the last world that uses it is deleted and nothing hooked the log
+ * after it; else the hook stays and passes messages on.
+ *
+ * @param world The world
+ * @param ctx Unused
+ */
+static void box_app_log_fini(
+    ecs_world_t *world,
+    void *ctx)
+{
+    (void)world;
+    (void)ctx;
+    box_app_log_users --;
+    if (!box_app_log_users && ecs_os_api.log_ == box_app_log_hook) {
+        ecs_os_api.log_ = box_app_log_prev;
+        box_app_log_prev = NULL;
+    }
+}
+
+/** Install the log hook that counts errors for the world.
+ *
+ * @param world The world
+ */
+static void box_app_log_init(
+    ecs_world_t *world)
+{
+    if (!box_app_log_users && ecs_os_api.log_ != box_app_log_hook) {
+        box_app_log_prev = ecs_os_api.log_;
+        ecs_os_api.log_ = box_app_log_hook;
+    }
+
+    box_app_log_users ++;
+    ecs_atfini(world, box_app_log_fini, NULL);
+}
+
+/** Errors logged since the world imported box.app.
+ *
+ * @param clock The clock of the frame loop
+ * @return The count
+ */
+static int32_t box_app_errors(
+    const box_app_clock_t *clock)
+{
+    return box_app_log_errors - clock->errors;
 }
 
 float box_app_fps(
@@ -192,6 +272,7 @@ static void BoxAppFrame(
 
     status->frame ++;
     status->elapsed = wall - clock->start;
+    status->errors = box_app_errors(clock);
     if (app->frames > 0 && status->frame >= app->frames) {
         ecs_quit(it->world);
     }
@@ -1002,6 +1083,7 @@ static int box_app_start(
             .filename = scene
         });
         const EcsScript *loaded = script ? ecs_get(world, script, EcsScript) : NULL;
+        box_app_clock(world)->scene = script;
         ecs_os_free(scene);
         if (!loaded || !loaded->script || loaded->error) {
             ecs_err("failed to load scene '%s'", app->scene);
@@ -1075,6 +1157,42 @@ done:
 }
 #endif
 
+/** Check how a run ended: with App.scene set the scene must be loaded, and with
+ * App.fail_on_error no error may have been logged since the world was created.
+ *
+ * A scene that failed to load and loaded later, once what it waited for appeared, passes.
+ *
+ * @param world The world
+ * @param clock The clock of the frame loop
+ * @return 0 when the run passes, nonzero when it fails
+ */
+static int box_app_end(
+    ecs_world_t *world,
+    box_app_clock_t *clock)
+{
+    const App *app = ecs_singleton_get(world, App);
+    AppStatus *status = ecs_singleton_get_mut(world, AppStatus);
+    int result = 0;
+    if (app->scene && app->scene[0]) {
+        ecs_entity_t script = clock->scene;
+        const EcsScript *loaded = script && ecs_is_alive(world, script)
+            ? ecs_get(world, script, EcsScript) : NULL;
+        if (!loaded || !loaded->script || loaded->error) {
+            ecs_err("run ended with scene '%s' not loaded", app->scene);
+            result = -1;
+        }
+    }
+
+    status->errors = box_app_errors(clock);
+    if (app->fail_on_error && status->errors > 0) {
+        ecs_err("run ended with %d error%s logged (--fail-on-error)",
+            status->errors, status->errors == 1 ? "" : "s");
+        result = -1;
+    }
+
+    return result;
+}
+
 int box_app_run(
     ecs_world_t *world)
 {
@@ -1098,6 +1216,7 @@ int box_app_run(
 
     status = ecs_singleton_get_mut(world, AppStatus);
     status->running = false;
+    result = box_app_end(world, clock);
 done:
     return result;
 }
@@ -1132,6 +1251,7 @@ void BoxAppImport(
     ecs_add_pair(world, ecs_id(SetAt), EcsWith, ecs_id(SetAtWritten));
 
     box_audio_output_init(world);
+    box_app_log_init(world);
 
     ecs_singleton_set(world, AppStatus, {0});
     ecs_singleton_set(world, FrameTiming, {0});

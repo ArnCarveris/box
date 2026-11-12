@@ -67,6 +67,10 @@ assets {
   yard_icon_dock { TexturePath: {path: "etc/scenes/shipyard/assets/icons/dock.svg", width: 96} }
   yard_icon_obs { TexturePath: {path: "etc/scenes/shipyard/assets/icons/obs.svg", width: 96} }
   yard_icon_hull { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hull.svg", width: 96} }
+  yard_icon_drill { TexturePath: {path: "etc/scenes/shipyard/assets/icons/drill.svg", width: 96} }
+  yard_icon_builder { TexturePath: {path: "etc/scenes/shipyard/assets/icons/builder.svg", width: 96} }
+  yard_icon_datacenter { TexturePath: {path: "etc/scenes/shipyard/assets/icons/datacenter.svg", width: 96} }
+  yard_icon_autopilot { TexturePath: {path: "etc/scenes/shipyard/assets/icons/autopilot.svg", width: 96} }
   yard_icon_remove { TexturePath: {path: "etc/scenes/shipyard/assets/icons/remove.svg", width: 96} }
   yard_icon_deck { TexturePath: {path: "etc/scenes/shipyard/assets/icons/deck.svg", width: 96} }
   yard_icon_power { TexturePath: {path: "etc/scenes/shipyard/assets/icons/power.svg", width: 96} }
@@ -76,6 +80,23 @@ assets {
   yard_icon_ok { TexturePath: {path: "etc/scenes/shipyard/assets/icons/ok.svg", width: 96} }
   yard_icon_warn { TexturePath: {path: "etc/scenes/shipyard/assets/icons/warn.svg", width: 96} }
   yard_icon_ship { TexturePath: {path: "etc/scenes/shipyard/assets/icons/ship.svg", width: 96} }
+  yard_icon_capital { TexturePath: {path: "etc/scenes/shipyard/assets/icons/capital.svg", width: 96} }
+  yard_icon_bridge { TexturePath: {path: "etc/scenes/shipyard/assets/icons/bridge.svg", width: 96} }
+  yard_icon_sensor { TexturePath: {path: "etc/scenes/shipyard/assets/icons/sensor.svg", width: 96} }
+  yard_icon_residence { TexturePath: {path: "etc/scenes/shipyard/assets/icons/residence.svg", width: 96} }
+  yard_icon_ring { TexturePath: {path: "etc/scenes/shipyard/assets/icons/ring.svg", width: 96} }
+  yard_icon_arbor { TexturePath: {path: "etc/scenes/shipyard/assets/icons/arbor.svg", width: 96} }
+  yard_icon_core { TexturePath: {path: "etc/scenes/shipyard/assets/icons/core.svg", width: 96} }
+  yard_icon_wing { TexturePath: {path: "etc/scenes/shipyard/assets/icons/wing.svg", width: 96} }
+  yard_icon_drive { TexturePath: {path: "etc/scenes/shipyard/assets/icons/drive.svg", width: 96} }
+  yard_icon_jump { TexturePath: {path: "etc/scenes/shipyard/assets/icons/jump.svg", width: 96} }
+  yard_icon_tanks { TexturePath: {path: "etc/scenes/shipyard/assets/icons/tanks.svg", width: 96} }
+  yard_icon_freight { TexturePath: {path: "etc/scenes/shipyard/assets/icons/freight.svg", width: 96} }
+  yard_icon_hangar { TexturePath: {path: "etc/scenes/shipyard/assets/icons/hangar.svg", width: 96} }
+  yard_icon_slip { TexturePath: {path: "etc/scenes/shipyard/assets/icons/slip.svg", width: 96} }
+  yard_icon_refinery { TexturePath: {path: "etc/scenes/shipyard/assets/icons/refinery.svg", width: 96} }
+  yard_icon_armor { TexturePath: {path: "etc/scenes/shipyard/assets/icons/armor.svg", width: 96} }
+  yard_icon_battery { TexturePath: {path: "etc/scenes/shipyard/assets/icons/battery.svg", width: 96} }
 }
 
 state {
@@ -105,6 +126,26 @@ state {
       11: assets.yard_icon_dock
       12: assets.yard_icon_hull
       13: assets.yard_icon_radiator
+      14: assets.yard_icon_drill
+      15: assets.yard_icon_builder
+      16: assets.yard_icon_datacenter
+      17: assets.yard_icon_autopilot
+      20: assets.yard_icon_bridge
+      21: assets.yard_icon_sensor
+      22: assets.yard_icon_residence
+      23: assets.yard_icon_ring
+      24: assets.yard_icon_arbor
+      25: assets.yard_icon_core
+      26: assets.yard_icon_wing
+      27: assets.yard_icon_drive
+      28: assets.yard_icon_jump
+      29: assets.yard_icon_tanks
+      30: assets.yard_icon_freight
+      31: assets.yard_icon_hangar
+      32: assets.yard_icon_slip
+      33: assets.yard_icon_refinery
+      34: assets.yard_icon_armor
+      35: assets.yard_icon_battery
       _: assets.yard_icon_remove
     }
   }
@@ -113,8 +154,19 @@ state {
     n == 0 ? "NO HULL" : n < 6 ? "SHUTTLE" : n < 14 ? "SCOUT" : n < 24 ? "CORVETTE" : n < 36 ? "FRIGATE" : n < 52 ? "DESTROYER" : "CRUISER"
   }
 
+  fn grand_class() -> string {
+    modules == 0 ? "NO HULL" :
+    counts[K_BATTERY] >= 4 ? "BATTLESHIP" :
+    counts[K_SLIP] > 0 ? "TENDER" :
+    counts[K_REFINERY] > 0 ? "ORE CARRIER" :
+    counts[K_FREIGHT] >= 8 ? "FREIGHTER" :
+    counts[K_RESIDENCE] >= 12 ? "STAR LINER" :
+    counts[K_HANGAR] >= 4 ? "CARRIER" :
+    "CAPITAL HULL"
+  }
+
   fn op_selected(op: i32, t: i32, d: i32) -> bool {
-    op == t || op == OP_DECK + d
+    op == t || op == OP_DECK + d || (op == OP_CAPITAL && capital) || (op == OP_CRAFT && !capital)
   }
 }
 
@@ -312,7 +364,7 @@ assets {
     Border: {radius: 5}
 
     plate {
-      Layout: {direction: Row, padding: {6, 6, 8, 8}, spacing: 8, v: Middle}
+      Layout: {direction: Row, padding: {6, 6, 7, 7}, spacing: 7, v: Middle}
       LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       if selected {
@@ -330,7 +382,7 @@ assets {
       }
       Transition: [Rgb: {duration: 0.1}]
 
-      YardIcon glyph(icon: kind_icon(op), size: 24, state: selected ? UI_GOOD : UI_OK)
+      YardIcon glyph(icon: kind_icon(op), size: 20, state: selected ? UI_GOOD : UI_OK)
       words {
         Layout: {direction: Column, spacing: 2}
         LayoutItem: {width: {mode: Grow}}
@@ -365,6 +417,40 @@ assets {
     Layout: {direction: Column}
 
     YardTileFace face(op: op, label: label, key_hint: key_hint, hover: hover, down: down)
+  }
+
+  template YardGroup {
+    prop title: string = ""
+    prop fitted: i32 = 0
+
+    Layout: {direction: Column, spacing: 5}
+    LayoutItem: {width: {mode: Grow}}
+    heading {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      name {
+        Text: {value: title, size: 10}
+        Rgb: {128, 160, 182}
+      }
+      rule {
+        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+        Rect: {1, 1}
+        Rgb: {30, 70, 92}
+      }
+      amount {
+        Text: {value: "{fitted}", size: 10}
+        if fitted > 0 {
+          Rgb: {92, 222, 255}
+        } else {
+          Rgb: {70, 100, 120}
+        }
+      }
+    }
+  }
+
+  template YardTileRow {
+    Layout: {direction: Row, spacing: 6}
+    LayoutItem: {width: {mode: Grow}}
   }
 
   template YardStat {
@@ -424,21 +510,62 @@ assets {
     const c9 = counts[9]
     const c10 = counts[10]
     const c13 = counts[13]
+    const c14 = counts[14]
+    const c15 = counts[15]
+    const c16 = counts[16]
+    const c17 = counts[17]
     const crew = c1 * 2 + c2 * 3
     const air = c3 * 10 + c9 * 5
     const gen: f32 = c4 * 30
-    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3 + c9 + c10
-    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10) + c13 * kind_mass(13)
+    const use: f32 = c1 * 2 + c2 + c3 * 2 + c5 * 0.5 + c7 * 3 + c8 * 3 + c9 + c10 + c14 * 4 + c15 * 2 + c16 * 12 + c17 * 2
+    const mass: f32 = c1 * kind_mass(1) + c2 * kind_mass(2) + c3 * kind_mass(3) + c4 * kind_mass(4) + c5 * kind_mass(5) + c6 * kind_mass(6) + c7 * kind_mass(7) + c8 * kind_mass(8) + c9 * kind_mass(9) + c10 * kind_mass(10) + c13 * kind_mass(13) + c14 * kind_mass(14) + c15 * kind_mass(15) + c16 * kind_mass(16) + c17 * kind_mass(17)
     const accel: f32 = c8 * 260.0 / max(mass, 1)
     const reach: f32 = c6 * 900.0 / max(mass, 1)
-    const has_helm = c1 > 0
+    const cgen: f32 = c16 * 60
+    const cuse: f32 = c17 * 30 + c15 * 10
+    const has_helm = c1 > 0 || c17 > 0
+    const crewless = crew == 0 && c17 > 0
+    const compute_ok = cgen >= cuse
     const has_drive = c8 > 0
     const power_ok = gen >= use && use > 0
-    const air_ok = crew > 0 && air >= crew
+    const air_ok = crewless || (crew > 0 && air >= crew)
+    const hold_ok = c14 == 0 || c5 > 0
     const fuel_ok = c6 > 0
-    const cool_ok = c13 >= c4
+    const cool_ok = c13 >= c4 + c16
     const sound = problems == 0 && modules > 0
-    const ready = has_helm && has_drive && power_ok && cool_ok && air_ok && fuel_ok && sound
+    const ready = has_helm && has_drive && power_ok && cool_ok && compute_ok && air_ok && hold_ok && fuel_ok && sound
+
+    const g_bridge = counts[K_BRIDGE]
+    const g_sensor = counts[K_SENSOR]
+    const g_res = counts[K_RESIDENCE]
+    const g_ring = counts[K_RING]
+    const g_arbor = counts[K_ARBOR]
+    const g_core = counts[K_CORE]
+    const g_wing = counts[K_WING]
+    const g_drive = counts[K_DRIVE]
+    const g_jump = counts[K_JUMP]
+    const g_tanks = counts[K_TANKS]
+    const g_freight = counts[K_FREIGHT]
+    const g_hangar = counts[K_HANGAR]
+    const g_slip = counts[K_SLIP]
+    const g_refinery = counts[K_REFINERY]
+    const g_armor = counts[K_ARMOR]
+    const g_battery = counts[K_BATTERY]
+    const souls = g_res * 200 + g_bridge * 60 + g_hangar * 40 + g_slip * 30 + g_refinery * 40 + g_battery * 20
+    const breath = g_arbor * 3000
+    const spin = g_ring * 8000
+    const ggen: f32 = g_core * 120
+    const guse: f32 = g_bridge * 2 + g_sensor * 4 + g_res * 0.8 + g_ring * 2 + g_arbor + g_drive * 8 + g_jump * 20 + g_tanks * 0.2 + g_freight * 0.2 + g_hangar * 2 + g_slip * 4 + g_refinery * 6 + g_battery * 6
+    const kmass: f32 = g_bridge * kind_mass(K_BRIDGE) + g_sensor * kind_mass(K_SENSOR) + g_res * kind_mass(K_RESIDENCE) + g_ring * kind_mass(K_RING) + g_arbor * kind_mass(K_ARBOR) + g_core * kind_mass(K_CORE) + g_wing * kind_mass(K_WING) + g_drive * kind_mass(K_DRIVE) + g_jump * kind_mass(K_JUMP) + g_tanks * kind_mass(K_TANKS) + g_freight * kind_mass(K_FREIGHT) + g_hangar * kind_mass(K_HANGAR) + g_slip * kind_mass(K_SLIP) + g_refinery * kind_mass(K_REFINERY) + g_armor * kind_mass(K_ARMOR) + g_battery * kind_mass(K_BATTERY)
+    const gaccel: f32 = g_drive * 180.0 / max(kmass, 1)
+    const jrange: f32 = g_jump * (8000.0 + g_tanks * 2500) / max(kmass, 1)
+    const g_power_ok = ggen >= guse && guse > 0
+    const g_cool_ok = g_wing >= g_core + g_jump
+    const g_air_ok = souls > 0 && breath >= souls
+    const g_spin_ok = souls > 0 && spin >= souls
+    const g_mine_ok = g_refinery == 0 || g_hangar > 0
+    const g_stock_ok = g_slip == 0 || g_refinery + g_freight > 0
+    const grand_ready = g_bridge > 0 && g_drive > 0 && g_jump > 0 && g_tanks > 0 && g_power_ok && g_cool_ok && g_air_ok && g_spin_ok && g_mine_ok && g_stock_ok && sound
 
     Scene: {}
 
@@ -458,11 +585,11 @@ assets {
 
         YardHalo title_a(strength: 10) {
           YardHalo title_b(strength: 24, pad: 1) {
-            YardCard title(spacing: 4, width: 292) {
+            YardCard title(spacing: 4, width: 380) {
               row {
                 Layout: {direction: Row, spacing: 10, v: Middle}
                 LayoutItem: {width: {mode: Grow}}
-                YardIcon emblem(icon: yard_icon_ship, size: 34, state: ready ? UI_GOOD : UI_OK)
+                YardIcon emblem(icon: capital ? yard_icon_capital : yard_icon_ship, size: 34, state: (capital ? grand_ready : ready) ? UI_GOOD : UI_OK)
                 words {
                   Layout: {direction: Column, spacing: 3}
                   LayoutItem: {width: {mode: Grow}}
@@ -471,7 +598,11 @@ assets {
                     Rgb: {150, 236, 255}
                   }
                   sub {
-                    Text: {value: "{ship_class(modules)}  ·  {modules} modules  ·  {mass:.0} t", size: 11}
+                    if capital {
+                      Text: {value: "{grand_class()}  ·  {modules} modules  ·  {span * 40} m  ·  {kmass:.0} kt", size: 11}
+                    } else {
+                      Text: {value: "{ship_class(modules)}  ·  {modules} modules  ·  {span * 4} m  ·  {mass:.0} t", size: 11}
+                    }
                     Rgb: {146, 176, 196}
                   }
                 }
@@ -502,9 +633,22 @@ assets {
                   Rect: {1, 1}
                   Rgb: {40, 96, 124}
                 }
-                YardButton b_frigate(label: "Frigate", op: OP_FRIGATE, size: 74)
-                YardButton b_scout(label: "Scout", op: OP_SCOUT, size: 64)
-                YardButton b_clear(label: "Clear", icon: yard_icon_remove, op: OP_CLEAR, size: 76)
+                YardButton b_craft(label: "Craft", icon: yard_icon_ship, op: OP_CRAFT, size: 78)
+                YardButton b_capital(label: "Capital", icon: yard_icon_capital, op: OP_CAPITAL, size: 90)
+                sep_c {
+                  LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 22}}
+                  Rect: {1, 1}
+                  Rgb: {40, 96, 124}
+                }
+                YardButton b_frigate(label: capital ? "Liner" : "Frigate", op: capital ? OP_LINER : OP_FRIGATE, size: capital ? 60 : 74)
+                YardButton b_scout(label: capital ? "Freighter" : "Scout", op: capital ? OP_FREIGHTER : OP_SCOUT, size: capital ? 82 : 64)
+                YardButton b_miner(label: capital ? "Tender" : "Miner", op: capital ? OP_TENDER : OP_MINER, size: capital ? 66 : 64)
+                if capital {
+                  YardButton b_battleship(label: "Battleship", op: OP_BATTLESHIP, size: 88)
+                  YardButton b_clear_g(label: "Clear", icon: yard_icon_remove, op: OP_CLEAR, size: 76)
+                } else {
+                  YardButton b_clear(label: "Clear", icon: yard_icon_remove, op: OP_CLEAR, size: 76)
+                }
               }
             }
           }
@@ -514,7 +658,7 @@ assets {
           LayoutItem: {width: {mode: Grow}}
         }
         gap_right {
-          LayoutItem: {width: {mode: Fixed, value: 280}}
+          LayoutItem: {width: {mode: Fixed, value: 200}}
         }
       }
 
@@ -524,22 +668,64 @@ assets {
 
         YardHalo ops_a(strength: 10) {
           YardHalo ops_b(strength: 24, pad: 1) {
-            YardCard ops(title: "MODULES", width: 292, spacing: 6) {
-              YardTile t1(label: "Cockpit", op: K_COCKPIT)
-              YardTile t2(label: "Habitat", op: K_HAB)
-              YardTile t3(label: "Life Support", op: K_LIFE)
-              YardTile t4(label: "Power", op: K_POWER)
-              YardTile tr(label: "Radiator", op: K_RADIATOR)
-              YardTile t5(label: "Cargo Bay", op: K_CARGO)
-              YardTile t6(label: "Fuel Tank", op: K_FUEL)
-              YardTile t7(label: "Weapons", op: K_WEAPON)
-              YardTile t8(label: "Engine", op: K_ENGINE)
-              YardTile t9(label: "Biome", op: K_BIOME)
-              YardTile t0(label: "Observation Deck", op: K_OBS)
-              YardTile tp(label: "Docking Port", op: K_DOCK)
-              YardTile th(label: "Hull Fairing", op: K_HULL)
-              YardTile tx(label: "Remove", op: T_REMOVE, key_hint: "X")
-
+            YardCard ops(title: "MODULES", width: 320, spacing: 11) {
+              YardGroup command(title: "COMMAND", fitted: capital ? g_bridge + g_sensor : c1 + c17) {
+                YardTileRow row_a {
+                  YardTile cockpit(label: capital ? "Bridge" : "Cockpit", op: capital ? K_BRIDGE : K_COCKPIT)
+                  YardTile autopilot(label: capital ? "Sensor Array" : "Autopilot", op: capital ? K_SENSOR : K_AUTO)
+                }
+              }
+              YardGroup crew_group(title: capital ? "HABITATION" : "CREW", fitted: capital ? g_res + g_ring + g_arbor : c2 + c3 + c9 + c10) {
+                YardTileRow row_a {
+                  YardTile hab(label: capital ? "Residence" : "Habitat", op: capital ? K_RESIDENCE : K_HAB)
+                  YardTile life(label: capital ? "Spin Ring" : "Life Support", op: capital ? K_RING : K_LIFE)
+                }
+                YardTileRow row_b {
+                  YardTile biome(label: capital ? "Arboretum" : "Biome", op: capital ? K_ARBOR : K_BIOME)
+                  if capital {
+                    filler {
+                      LayoutItem: {width: {mode: Grow}}
+                    }
+                  } else {
+                    YardTile obs(label: "Observation", op: K_OBS)
+                  }
+                }
+              }
+              YardGroup systems(title: capital ? "POWER & JUMP" : "POWER & COMPUTE", fitted: capital ? g_core + g_wing + g_jump : c4 + c13 + c16) {
+                YardTileRow row_a {
+                  YardTile power(label: capital ? "Fusion Core" : "Power Plant", op: capital ? K_CORE : K_POWER)
+                  YardTile radiator(label: capital ? "Radiator Wing" : "Radiator", op: capital ? K_WING : K_RADIATOR)
+                }
+                YardTileRow row_b {
+                  YardTile datacenter(label: capital ? "Jump Drive" : "Datacenter", op: capital ? K_JUMP : K_DATA)
+                  filler {
+                    LayoutItem: {width: {mode: Grow}}
+                  }
+                }
+              }
+              YardGroup drive(title: "PROPULSION", fitted: capital ? g_drive + g_tanks : c8 + c6) {
+                YardTileRow row_a {
+                  YardTile engine(label: capital ? "Main Drive" : "Engine", op: capital ? K_DRIVE : K_ENGINE)
+                  YardTile fuel(label: capital ? "Tank Farm" : "Fuel Tank", op: capital ? K_TANKS : K_FUEL)
+                }
+              }
+              YardGroup industry(title: "INDUSTRY & LOGISTICS", fitted: capital ? g_freight + g_hangar + g_slip + g_refinery : c5 + c14 + c15 + counts[K_DOCK]) {
+                YardTileRow row_a {
+                  YardTile cargo(label: capital ? "Container Spine" : "Cargo Bay", op: capital ? K_FREIGHT : K_CARGO)
+                  YardTile dock(label: capital ? "Hangar Bay" : "Docking Port", op: capital ? K_HANGAR : K_DOCK)
+                }
+                YardTileRow row_b {
+                  YardTile drill(label: capital ? "Ore Refinery" : "Mining Drill", op: capital ? K_REFINERY : K_DRILL)
+                  YardTile builder(label: capital ? "Fab Slip" : "Constructor", op: capital ? K_SLIP : K_BUILDER)
+                }
+              }
+              YardGroup hull(title: "HULL & DEFENSE", fitted: capital ? g_armor + g_battery : c7 + counts[K_HULL]) {
+                YardTileRow row_a {
+                  YardTile fairing(label: capital ? "Armor Fairing" : "Hull Fairing", op: capital ? K_ARMOR : K_HULL)
+                  YardTile weapon(label: capital ? "Gun Battery" : "Weapons", op: capital ? K_BATTERY : K_WEAPON)
+                }
+              }
+              YardTile remove(label: "Remove", op: T_REMOVE, key_hint: "X")
             }
           }
         }
@@ -551,21 +737,68 @@ assets {
         YardHalo stats_a(strength: 10) {
           YardHalo stats_b(strength: 24, pad: 1) {
             YardCard stats(title: "SHIP SYSTEMS", width: 280, spacing: 9) {
-              YardStat power(icon: yard_icon_power, label: "POWER", value: "{use:.1} / {gen:.0} MW", ratio: use / max(gen, 1), state: gen == 0 && use == 0 ? UI_MUTED : gen >= use ? UI_OK : UI_BAD)
-              YardStat crew_stat(icon: yard_icon_crew, label: "CREW / AIR", value: "{crew} / {air}", ratio: crew / max(air, 1.0), state: crew == 0 ? UI_MUTED : air >= crew ? UI_OK : UI_BAD)
-              YardStat thrust(icon: yard_icon_thrust, label: "ACCELERATION", value: "{accel:.1} g", ratio: accel / 4, state: c8 == 0 ? UI_MUTED : accel >= 1 ? UI_GOOD : UI_WARN)
-              YardStat range(icon: yard_icon_range, label: "RANGE", value: "{reach:.1} ly", ratio: reach / 25, state: c6 == 0 ? UI_MUTED : UI_OK)
-              YardStat hold(icon: yard_icon_cargo, label: "CARGO", value: "{c5 * 120} t", ratio: c5 / 12.0, state: c5 == 0 ? UI_MUTED : UI_OK)
-              YardStat guns(icon: yard_icon_weapon, label: "FIREPOWER", value: "{c7 * 25}", ratio: c7 / 8.0, state: c7 == 0 ? UI_MUTED : UI_WARN)
+              YardStat power(icon: yard_icon_power, label: "POWER",
+                value: capital ? "{guse:.0} / {ggen:.0} GW" : "{use:.1} / {gen:.0} MW",
+                ratio: capital ? guse / max(ggen, 1) : use / max(gen, 1),
+                state: capital ? (ggen == 0 && guse == 0 ? UI_MUTED : ggen >= guse ? UI_OK : UI_BAD) : (gen == 0 && use == 0 ? UI_MUTED : gen >= use ? UI_OK : UI_BAD))
+              YardStat compute(icon: capital ? yard_icon_crew : yard_icon_datacenter, label: capital ? "SOULS / AIR" : "COMPUTE",
+                value: capital ? "{souls} / {breath}" : "{cuse:.0} / {cgen:.0} PF",
+                ratio: capital ? souls / max(breath, 1.0) : cuse / max(cgen, 1),
+                state: capital ? (souls == 0 ? UI_MUTED : breath >= souls ? UI_OK : UI_BAD) : (cgen == 0 && cuse == 0 ? UI_MUTED : compute_ok ? UI_OK : UI_BAD))
+              YardStat crew_stat(icon: capital ? yard_icon_ring : yard_icon_crew, label: capital ? "SPIN GRAVITY" : "CREW / AIR",
+                value: capital ? "{souls} / {spin}" : "{crew} / {air}",
+                ratio: capital ? souls / max(spin, 1.0) : crew / max(air, 1.0),
+                state: capital ? (souls == 0 ? UI_MUTED : spin >= souls ? UI_OK : UI_BAD) : (crew == 0 ? UI_MUTED : air >= crew ? UI_OK : UI_BAD))
+              YardStat thrust(icon: yard_icon_thrust, label: "ACCELERATION",
+                value: capital ? "{gaccel:.2} g" : "{accel:.1} g",
+                ratio: capital ? gaccel : accel / 4,
+                state: capital ? (g_drive == 0 ? UI_MUTED : gaccel >= 0.25 ? UI_GOOD : UI_WARN) : (c8 == 0 ? UI_MUTED : accel >= 1 ? UI_GOOD : UI_WARN))
+              YardStat range(icon: capital ? yard_icon_jump : yard_icon_range, label: capital ? "JUMP RANGE" : "RANGE",
+                value: capital ? "{jrange:.1} ly" : "{reach:.1} ly",
+                ratio: capital ? jrange / 30 : reach / 25,
+                state: (capital ? g_jump : c6) == 0 ? UI_MUTED : UI_OK)
+              YardStat hold(icon: capital ? yard_icon_freight : yard_icon_cargo, label: "CARGO",
+                value: capital ? "{g_freight * 60} kt" : "{c5 * 120} t",
+                ratio: capital ? g_freight / 50.0 : c5 / 12.0,
+                state: (capital ? g_freight : c5) == 0 ? UI_MUTED : UI_OK)
+              YardStat mining(icon: capital ? yard_icon_hangar : yard_icon_drill, label: capital ? "HANGAR" : "MINING",
+                value: capital ? "{g_hangar * 6} craft" : "{c14 * 40} t/h",
+                ratio: capital ? g_hangar / 12.0 : c14 / 6.0,
+                state: capital ? (g_hangar == 0 ? UI_MUTED : UI_OK) : (c14 == 0 ? UI_MUTED : hold_ok ? UI_OK : UI_WARN))
+              YardStat assembly(icon: capital ? yard_icon_slip : yard_icon_builder, label: capital ? "FABRICATION" : "ASSEMBLY",
+                value: capital ? "{g_slip * 2} hulls/yr  ·  {g_refinery * 3} kt/d" : "{c15 * 15} m/h",
+                ratio: capital ? (g_slip + g_refinery) / 20.0 : c15 / 6.0,
+                state: capital ? (g_slip + g_refinery == 0 ? UI_MUTED : g_mine_ok && g_stock_ok ? UI_OK : UI_WARN) : (c15 == 0 ? UI_MUTED : UI_OK))
+              YardStat guns(icon: capital ? yard_icon_battery : yard_icon_weapon, label: "FIREPOWER",
+                value: capital ? "{g_battery * 400}" : "{c7 * 25}",
+                ratio: capital ? g_battery / 12.0 : c7 / 8.0,
+                state: (capital ? g_battery : c7) == 0 ? UI_MUTED : UI_WARN)
 
-              YardSectionTitle checks_title(title: ready ? "SPACEWORTHY" : "NOT READY", state: ready ? UI_GOOD : UI_WARN)
-              YardCheck chk_helm(label: "A cockpit to fly her", ok: has_helm)
-              YardCheck chk_drive(label: "Engines to push her", ok: has_drive)
-              YardCheck chk_fuel(label: "Fuel for the engines", ok: fuel_ok)
-              YardCheck chk_power(label: "Enough power", ok: power_ok)
-              YardCheck chk_cool(label: "A radiator for every power plant", ok: cool_ok)
-              YardCheck chk_air(label: "Air for every crew member", ok: air_ok)
-              YardCheck chk_rules(label: problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: sound)
+              YardSectionTitle checks_title(title: capital ? (grand_ready ? "STARWORTHY" : "NOT READY") : (ready ? "SPACEWORTHY" : "NOT READY"), state: (capital ? grand_ready : ready) ? UI_GOOD : UI_WARN)
+              YardCheck chk_helm(label: capital ? "A bridge to command her" : c1 == 0 && c17 > 0 ? "An autopilot flies her" : "A cockpit or autopilot to fly her", ok: capital ? g_bridge > 0 : has_helm)
+              YardCheck chk_drive(label: capital ? "Main drives to push her" : "Engines to push her", ok: capital ? g_drive > 0 : has_drive)
+              YardCheck chk_fuel(label: capital ? "A jump drive to cross between stars" : "Fuel for the engines", ok: capital ? g_jump > 0 : fuel_ok)
+              YardCheck chk_power(label: capital ? "Propellant for the drives" : "Enough power", ok: capital ? g_tanks > 0 : power_ok)
+              YardCheck chk_cool(label: capital ? "Enough power" : c16 > 0 ? "A radiator per power plant and datacenter" : "A radiator for every power plant", ok: capital ? g_power_ok : cool_ok)
+              YardCheck chk_air(label: capital ? "A radiator wing per core and jump drive" : crewless ? "No crew, no air needed" : "Air for every crew member", ok: capital ? g_cool_ok : air_ok)
+              YardCheck chk_rules(label: capital ? "Arboretum air for every soul aboard" : problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: capital ? g_air_ok : sound)
+              if capital {
+                YardCheck chk_spin(label: "Spin gravity for the long haul", ok: g_spin_ok)
+                YardCheck chk_sound(label: problems == 0 ? "Every module fits" : problems == 1 ? "One module breaks a rule" : "{problems} modules break a rule", ok: sound)
+                if g_refinery > 0 {
+                  YardCheck chk_mine(label: "A hangar of mining craft for the refinery", ok: g_mine_ok)
+                }
+                if g_slip > 0 {
+                  YardCheck chk_stock(label: "Stock for the fabrication slips", ok: g_stock_ok)
+                }
+              } else {
+                if cuse > 0 {
+                  YardCheck chk_compute(label: "Compute for the autopilot and robots", ok: compute_ok)
+                }
+                if c14 > 0 {
+                  YardCheck chk_hold(label: "A cargo bay for the ore", ok: hold_ok)
+                }
+              }
             }
           }
         }
