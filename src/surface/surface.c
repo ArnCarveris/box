@@ -40,6 +40,8 @@ typedef struct SurfaceImpl {
     int32_t generation;             /**< Generation of the backend that received it */
     char *write_to_file;            /**< Surface.write_to_file the capture path was made from */
     char *capture;                  /**< Path the frames are written to */
+    ecs_vec_t captures;             /**< char*, files of one frame each that are written next,
+                                     *   in place of the write_to_file path */
 } SurfaceImpl;
 
 ECS_COMPONENT_DECLARE(SurfaceImpl);
@@ -53,6 +55,7 @@ static void box_surface_retire(
     box_surface_state_t *state,
     SurfaceImpl *impl)
 {
+    int32_t i;
     if (impl->handle) {
         box_surface_retired_t *r = ecs_vec_append_t(
             NULL, &state->retired, box_surface_retired_t);
@@ -61,6 +64,11 @@ static void box_surface_retire(
         r->packet = 0;
     }
 
+    for (i = 0; i < ecs_vec_count(&impl->captures); i ++) {
+        ecs_os_free(ecs_vec_get_t(&impl->captures, char*, i)[0]);
+    }
+
+    ecs_vec_fini_t(NULL, &impl->captures, char*);
     ecs_os_free(impl->write_to_file);
     ecs_os_free(impl->capture);
     ecs_os_memset_t(impl, 0, SurfaceImpl);
@@ -452,8 +460,15 @@ static void box_surface_frame(
     }
 
     box_surface_clear(world, s, p, clear);
+    char *once = NULL;
+    if (ecs_vec_count(&impl->captures)) {
+        once = ecs_vec_first_t(&impl->captures, char*)[0];
+        ecs_vec_remove_ordered_t(&impl->captures, char*, 0);
+    }
+
     box_render_target_t *target = box_render_packet_target(
-        p, impl->handle, box_surface_capture(world, s, impl));
+        p, impl->handle, once ? once : box_surface_capture(world, s, impl));
+    ecs_os_free(once);
     ecs_os_memcpy_n(target->clear, clear, float, 4);
     target->view_root = s->view_root;
     if (s->texture) {
@@ -747,6 +762,19 @@ bool box_surface_view_size(
     }
 
     return surface != 0;
+}
+
+int box_surface_capture_frame(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    const char *path)
+{
+    SurfaceImpl *impl = surface && path ? ecs_get_mut(world, surface, SurfaceImpl) : NULL;
+    if (impl) {
+        *ecs_vec_append_t(NULL, &impl->captures, char*) = ecs_os_strdup(path);
+    }
+
+    return impl ? 0 : -1;
 }
 
 void BoxSurfaceImport(

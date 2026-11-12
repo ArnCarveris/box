@@ -162,7 +162,7 @@ The framework shall expose a command interface that:
     - Help: man [path] (shows content of flecs.doc components for entity)
     - Render operations:
         - capture: captures currently active camera
-        - capture [camera]: captures camera
+        - capture [camera|surface]: captures camera, or surface with all its views composited
         - capture [camera_0, camera_1, ... ,camera_n]: batch-capture multiple cameras
         - render [entity|prefab|template]: return render of specified entity, prefab or template
         - render functions shall save an image to the /tmp/box/<pid>/session/resources folder, and return the relative file path
