@@ -11,6 +11,7 @@ using box.layout
 using box.geometry
 using box.material
 using box.text
+using box.transform
 
 // A small square ghost button with an x, such as the close button of a Modal or of the title of
 // a Panel. It is a HeadlessButton, so a click, Enter or Space activates it (on.activate) and
@@ -26,12 +27,22 @@ template CloseButton : HeadlessButton {
   Layout: {}
   LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
   Rect: {1, 1}
-  Rgb: down ? t.pressed : hover ? t.hover : t.surface
 
-  Border: {
-    width: ring ? t.focus_width : 0,
-    radius: t.radius,
-    color: {t.focus.r, t.focus.g, t.focus.b, 255}
+  if down {
+    Rgb: t.pressed
+  } else if hover {
+    Rgb: t.hover
+  } else {
+    Rgb: t.surface
+  }
+
+  if ring {
+    Border: {
+      width: t.focus_width, radius: t.radius,
+      color: {t.focus.r, t.focus.g, t.focus.b, 255}
+    }
+  } else {
+    Border: {width: 0, radius: t.radius}
   }
 
   if disabled {
@@ -41,24 +52,32 @@ template CloseButton : HeadlessButton {
   first {
     Position: {0, 0, 0}
     Line: {-arm, -arm, arm, arm, 1.5}
-    Rgb: hover || down ? t.text : t.text_muted
+    if hover || down {
+      Rgb: t.text
+    } else {
+      Rgb: t.text_muted
+    }
   }
 
   second {
     Position: {0, 0, 0}
     Line: {-arm, arm, arm, -arm, 1.5}
-    Rgb: hover || down ? t.text : t.text_muted
+    if hover || down {
+      Rgb: t.text
+    } else {
+      Rgb: t.text_muted
+    }
   }
 }
 
 // Behavior of a modal dialog: current is whether it is open, open its initial value. While open
 // it floats (LayoutFloat) centered on the root of its layout tree, over every widget wherever it
-// is declared, above its child backdrop, a float as large as that root. Both are InputBlockers,
-// so no click, scroll or hover reaches the widgets or the 3D scene under them. The dialog is a
-// FocusScope: the focus moves to its first focusable child, else to its close button, Tab stays
-// inside it, and it goes back to the widget that had it when the dialog closes (or is cleared
-// when none had it). A press that clears the focus while it is open, such as one on the
-// backdrop, moves it back in.
+// is declared, above its child backdrop, a float as large as that root. Both are Interactive
+// InputBlockers, so they handle the pointer themselves and no click, scroll or hover reaches the
+// widgets or the 3D scene under them. The dialog is a FocusScope: the focus moves to its first
+// focusable child, else to its close button, Tab stays inside it, and it goes back to the widget
+// that had it when the dialog closes (or is cleared when none had it). A press that clears the
+// focus while it is open, such as one on the backdrop, moves it back in.
 //
 // The close button (heading.close, a CloseButton of the styled template), Escape and, with
 // dismiss, a press on the backdrop close it: they set current to false and report a change.
@@ -78,12 +97,18 @@ template HeadlessModal {
   mut returns: entity = 0
   mut inside: entity = 0
 
+  const none: entity = 0
+
   const root = ui.root(this)
 
+  // In front of the parts a text field lifts (Position z), so they neither draw over the
+  // dialog nor take the pointer from it; the layout places x and y
+  Position: {0, 0, 10}
   LayoutFloat: {anchor: root, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
 
   if current {
     FocusScope
+    Interactive
     InputBlocker
   } else {
     ClipChildren
@@ -96,6 +121,7 @@ template HeadlessModal {
     LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
 
     if current {
+      Interactive
       InputBlocker
     }
   }
@@ -116,30 +142,30 @@ template HeadlessModal {
         active = current
         if current {
           returns = ui.focused()
-          inside = 0
+          inside = none
           settle = 2
         } else {
           settle = 0
           const back = returns
-          returns = 0
-          if back != 0 {
+          returns = none
+          if back != none {
             await focus(back)
           } else if ui.focused() == inside {
-            await focus(0)
+            await focus(none)
           }
         }
       } else if current && settle > 0 {
         settle = settle - 1
         if settle == 0 {
           const first = ui.first_focusable(this, this.lookup("heading"))
-          if first != 0 {
+          if first != none {
             await focus(first)
           } else {
             await focus(this.lookup("heading").lookup("close"))
           }
         }
-      } else if current && ui.focused() == 0 {
-        if inside != 0 {
+      } else if current && ui.focused() == none {
+        if inside != none {
           await focus(inside)
         } else {
           await focus(this.lookup("heading").lookup("close"))
@@ -196,8 +222,8 @@ template HeadlessModal {
 // A modal dialog: the backdrop dims the window with the backdrop color of the theme, the dialog
 // is a panel with the title and a CloseButton at the right of it above the children of the
 // instance, laid out in a column. A width fixes the dialog, 0 fits it to the children. Its
-// surface is backdrop.surface, a float as large as the dialog drawn over the backdrop and under
-// the title and the children, with InputBlocker, so a press on it does not dismiss the dialog.
+// surface is the child surface, a float as large as the dialog drawn over the backdrop and under
+// the title and the children; a press on it goes to the dialog and does not dismiss it.
 template Modal : HeadlessModal {
   const t = box.ui.theme[UiTheme]
   const pad = t.padding * 2
@@ -210,28 +236,28 @@ template Modal : HeadlessModal {
     LayoutItem: {width: {min: width, max: width}}
   }
 
-  // The backdrop is the first child here too, so it is created, and drawn, before the title
-  // and the children of the instance whichever template body runs first
+  // The backdrop and the surface come first here too, so they are created, and drawn, before
+  // the title and the children of the instance whichever template body runs first. The surface
+  // is no child of the backdrop, whose Opacity would composite it
   backdrop {
     if current {
       Rect: {1, 1}
       Rgb: t.backdrop
       Opacity: {t.backdrop_opacity}
     }
+  }
 
-    surface {
-      LayoutFloat: {anchor: dialog, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  surface {
+    LayoutFloat: {anchor: dialog, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
 
-      if current {
-        InputBlocker
-        Rect: {1, 1}
-        Rgb: t.surface
-        Border: {
-          width: 1, radius: t.radius * 1.5, color: {t.border.r, t.border.g, t.border.b, 255}
-        }
-        BoxShadow: {offset_y: -6, blur: 24, color: {0, 0, 0, 160}}
+    if current {
+      Rect: {1, 1}
+      Rgb: t.surface
+      Border: {
+        width: 1, radius: t.radius * 1.5, color: {t.border.r, t.border.g, t.border.b, 255}
       }
+      BoxShadow: {offset_y: -6, blur: 24, color: {0, 0, 0, 160}}
     }
   }
 

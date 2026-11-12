@@ -745,15 +745,16 @@ void Basics_tab_order(void) {
     ecs_world_t *world = gallery_load(&s);
     const char *order[] = {
         HEADER ".theme", BASICS ".buttons.save", BASICS ".buttons.cancel", BASICS ".buttons.more",
-        BASICS ".buttons.remove", BASICS ".buttons.ping", BASICS ".toggles.sound",
-        BASICS ".toggles.music", BASICS ".toggles.wifi", BASICS ".radios.size.medium",
+        BASICS ".buttons.remove", BASICS ".buttons.ping", BASICS ".buttons.open_dialog",
+        BASICS ".toggles.sound", BASICS ".toggles.music", BASICS ".toggles.wifi",
+        BASICS ".radios.size.medium",
         BASICS ".sliders.volume", BASICS ".sliders.gain", BASICS ".steppers.count",
         TEXT ".name.field", TEXT ".secret.field", TEXT ".fixed.field",
         TEXT ".submit.message.field", CONTAINERS ".tabs.bar.tab_0"
     };
     int32_t i;
 
-    for (i = 0; i < 18; i ++) {
+    for (i = 0; i < 19; i ++) {
         gallery_key(world, s, "Tab");
         basics_expect_focus(world, s, order[i]);
     }

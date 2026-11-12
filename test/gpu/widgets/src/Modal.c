@@ -14,7 +14,7 @@
 #define OPEN BASICS ".buttons.open_dialog"
 #define DIALOG BASICS ".buttons.dialog"
 #define BACKDROP DIALOG ".backdrop"
-#define SURFACE BACKDROP ".surface"
+#define SURFACE DIALOG ".surface"
 #define CLOSE DIALOG ".heading.close"
 #define DISCARD DIALOG ".dialog_actions.discard"
 #define KEEP DIALOG ".dialog_actions.keep"
@@ -130,13 +130,16 @@ void Modal_open_covers_window(void) {
     // widgets/modal
     ecs_entity_t s = 0;
     ecs_world_t *world = gallery_load(&s);
-    float root[4], backdrop[4], dialog[4], surface[4];
+    float backdrop[4], dialog[4], surface[4];
 
     modal_open(world, s);
     gallery_expect(world, s, "logs warning 100", "");
 
-    /* The backdrop covers the window, the dialog is centered in it on its surface */
-    gallery_rect(world, "gallery.hud.root", root);
+    /* The backdrop covers the window, which the root fills, the dialog is centered in it on its
+     * surface */
+    const SurfaceStatus *ss = ecs_get(world, ecs_lookup(world, "window"), SurfaceStatus);
+    test_assert(ss != NULL);
+    float root[4] = { 0, 0, (float)ss->point_width, (float)ss->point_height };
     gallery_rect(world, BACKDROP, backdrop);
     gallery_rect(world, DIALOG, dialog);
     gallery_rect(world, SURFACE, surface);
