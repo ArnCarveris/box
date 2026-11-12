@@ -389,3 +389,40 @@ void CascadeReuse_enabled_interval_renders_all_first(void) {
 
     ecs_fini(s.world);
 }
+
+void CascadeReuse_kept_cascade_not_overwritten_by_other_view(void) {
+    // lighting/shadows
+    reuse_scene_t s;
+    unsigned char *px = NULL;
+    int32_t i;
+    reuse_scene(&(ShadowSettings){.enabled = true, .cascades = 1, .resolution = 1024,
+        .max_distance = 30, .split_lambda = 0.7f, .depth_bias = 2, .normal_offset = 1.5f,
+        .filter_size = 3, .interval = {4}}, &s);
+    View *v = ecs_get_mut(s.world, s.view, View);
+    v->order = 1;
+    ecs_modified(s.world, s.view, View);
+
+    // a view with shadows renders before it every frame, far from every caster, so the cascades
+    // it renders hold no caster
+    ecs_entity_t camera = ecs_new(s.world);
+    ecs_set(s.world, camera, Position, {200, 10, 0});
+    ecs_set(s.world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(s.world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t other = ecs_new(s.world);
+    ecs_add(s.world, other, View);
+    v = ecs_get_mut(s.world, other, View);
+    v->camera = camera;
+    v->shadows.enabled = true;
+    ecs_modified(s.world, other, View);
+
+    // the kept cascade of the view still holds the slab
+    for (i = 0; i < 4; i ++) {
+        reuse_frame_t f = reuse_frame_to(&s, "reuse_other.png", &px);
+        test_uint(f.mask, i ? 0x0u : 0x1u);
+        test_assert(px[(32 * REUSE_SIZE + 48) * 4] > 200);
+        test_assert(px[(32 * REUSE_SIZE + 15) * 4] < 30);
+        stbi_image_free(px);
+    }
+
+    ecs_fini(s.world);
+}

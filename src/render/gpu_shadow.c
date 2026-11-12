@@ -555,7 +555,6 @@ void box_gpu_shadow_uniforms(
         }
 
         glm_mat4_copy(proj, store->proj);
-        store->revision = gpu->shadow_revision;
         cs->renders &= s->render | ~store->valid;
     }
 
@@ -1042,6 +1041,11 @@ void box_gpu_shadow_render(
     pipeline = box_gpu_shadow_pipeline(gpu);
     if (!pipeline || !gpu->shadow_buffer) {
         goto done;
+    }
+
+    if (store && store->revision != gpu->shadow_revision) {
+        store->valid = 0;
+        store->revision = gpu->shadow_revision;
     }
 
     WGPUBindGroupEntry entry = {
