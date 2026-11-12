@@ -1228,6 +1228,9 @@ void Light_cluster_flash_no_repeated_resize(void) {
     cluster_warnings = 0;
     ecs_os_api.log_ = cluster_count_warnings;
     ecs_entity_t flash = 0;
+    box_render_gpu_stats_t stats;
+    int32_t resizes = 0;
+    int64_t entries = 0;
     for (i = 0; i < 60; i ++) {
         if (!(i % 5)) {
             if (flash) {
@@ -1242,10 +1245,50 @@ void Light_cluster_flash_no_repeated_resize(void) {
 
         ecs_progress(world, 0);
         box_render_sync(world);
+        if (i == 9) {
+            /* The first flash came and went: the list grew once for it */
+            test_bool(box_render_gpu_stats(world, &stats), true);
+            resizes = stats.cluster_resizes;
+            entries = stats.cluster_entries;
+            test_assert(resizes >= 1);
+        }
     }
 
     ecs_os_api.log_ = log;
     test_int(cluster_warnings, 0);
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_int(stats.cluster_resizes, resizes);
+    test_int(stats.cluster_entries, entries);
+
+    ecs_fini(world);
+}
+
+void Light_cluster_list_grows_quietly(void) {
+    // lighting_fixes/cluster_overflow
+    ecs_world_t *world = cluster_flash_world();
+    int32_t i;
+    for (i = 0; i < 100; i ++) {
+        ecs_entity_t light = ecs_new(world);
+        ecs_set(world, light, Position, {(float)(i % 10) - 4.5f, (float)(i / 10) - 4.5f, 0});
+        ecs_set(world, light, PointLight, {.intensity = 0.004f * GLM_PIf, .range = 1000});
+    }
+
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    cluster_warnings = 0;
+    ecs_os_api.log_ = cluster_count_warnings;
+    for (i = 0; i < 12; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    ecs_os_api.log_ = log;
+    test_int(cluster_warnings, 0);
+
+    /* The list starts from the budget of 32 lights and grows to hold all 100 */
+    box_render_gpu_stats_t stats;
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.cluster_resizes >= 2);
+    test_assert(stats.cluster_entries > 16 * 9 * 24 * 32);
 
     ecs_fini(world);
 }

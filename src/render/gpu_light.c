@@ -50,6 +50,10 @@
 /** Cull passes after which the cluster buffer of a view that no target rendered is released */
 #define BOX_GPU_CLUSTER_IDLE (240)
 
+/** Frames the index list of a view must be four times larger than its passes allocate before it
+ * shrinks, so a light that comes and goes, such as a flash, doesn't shrink and regrow it */
+#define BOX_GPU_CLUSTER_SHRINK_FRAMES (300)
+
 /** Entries the index list holds at most within BOX_GPU_CLUSTER_BYTES_MAX */
 #define BOX_GPU_CLUSTER_ENTRIES_MAX (BOX_GPU_CLUSTER_BYTES_MAX / sizeof(uint32_t) - \
     BOX_GPU_CLUSTER_HEADER)
@@ -153,13 +157,16 @@ static WGPUBuffer box_gpu_cluster_buffer_new(
 
 /** Release the buffers of the cluster state of a view and the state.
  *
+ * @param gpu The backend
  * @param c The state
  */
 static void box_gpu_cluster_free(
+    box_gpu_t *gpu,
     box_gpu_cluster_t *c)
 {
     if (c->buffer) {
         wgpuBufferRelease(c->buffer);
+        gpu->cluster_entries -= c->entries;
     }
 
     if (c->readback) {
@@ -227,7 +234,7 @@ void box_gpu_light_fini(
 {
     ecs_map_iter_t it = ecs_map_iter(&gpu->clusters);
     while (ecs_map_next(&it)) {
-        box_gpu_cluster_free(ecs_map_ptr(&it));
+        box_gpu_cluster_free(gpu, ecs_map_ptr(&it));
     }
 
     ecs_map_fini(&gpu->clusters);
@@ -393,6 +400,7 @@ static box_gpu_cluster_t* box_gpu_cluster_get(
     box_gpu_cluster_t *result = ecs_map_get_deref(&gpu->clusters, box_gpu_cluster_t, key);
     if (!result) {
         result = ecs_os_calloc_t(box_gpu_cluster_t);
+        result->oversized = -1;
         ecs_map_insert_ptr(&gpu->clusters, key, result);
     }
 
@@ -414,10 +422,14 @@ static void box_gpu_cluster_resize(
 {
     if (c->buffer) {
         wgpuBufferRelease(c->buffer);
+        gpu->cluster_entries -= c->entries;
     }
 
     c->buffer = box_gpu_cluster_buffer_new(gpu, box_gpu_cluster_bytes(entries));
     c->entries = entries;
+    c->oversized = -1;
+    gpu->cluster_entries += entries;
+    gpu->pending.cluster_resizes ++;
 }
 
 /** Receive the map of the read back of a cluster pass.
@@ -443,9 +455,12 @@ static void box_gpu_cluster_on_map(
 
 /** Resize the index list of a slot to the entries its last read back pass allocated.
  *
- * A list that was too small grows to the next power of two and reports the cut, since the
- * clusters past its end missed lights or probes until then; a list four times too large
- * shrinks.
+ * A list that was too small grows quietly to the next power of two. Only a list at its largest
+ * that still cut a pass is reported, once until a pass fits again; the entries the list held in
+ * that pass decide, since the read back can be from a pass with more lights than now.
+ *
+ * A list four times too large for BOX_GPU_CLUSTER_SHRINK_FRAMES shrinks to twice the most a pass
+ * allocated in that time, so a light that comes and goes doesn't shrink and regrow it.
  *
  * @param gpu The backend
  * @param c The cluster state of the slot
@@ -462,26 +477,54 @@ static void box_gpu_cluster_fit(
 {
     uint64_t limit = box_gpu_cluster_limit(lights, probes);
     uint64_t budget = box_gpu_cluster_budget(lights, probes);
-    bool cut = allocated > c->entries;
-    if (cut) {
+    uint64_t held = c->copied ? c->copied : c->entries;
+    bool cut = false;
+    if (allocated > c->entries) {
         uint64_t grown = box_gpu_cluster_round(allocated, limit);
+        if (grown > c->entries) {
+            ecs_dbg("the clusters of a view needed %u light and probe index entries but held "
+                "%u; the list grows to %u entries", (uint32_t)allocated,
+                (uint32_t)c->entries, (uint32_t)grown);
+            box_gpu_cluster_resize(gpu, c, grown);
+        } else {
+            cut = c->entries >= BOX_GPU_CLUSTER_ENTRIES_MAX && allocated > held;
+        }
+    }
+
+    if (cut) {
         if (!c->cut) {
             ecs_warn("the clusters of a view needed %u light and probe index entries but held "
-                "%u, so some clusters missed lights or reflection probes; the list %s %u "
-                "entries", (uint32_t)allocated,
-                (uint32_t)c->entries, grown > c->entries ? "grows to" : "stays at its largest,",
-                (uint32_t)(grown > c->entries ? grown : c->entries));
+                "%u, so some clusters missed lights or reflection probes; the list stays at its "
+                "largest, %u entries", (uint32_t)allocated, (uint32_t)held,
+                (uint32_t)c->entries);
         }
 
-        if (grown > c->entries) {
-            box_gpu_cluster_resize(gpu, c, grown);
-        }
+        c->oversized = -1;
     } else if (allocated * 4 < c->entries) {
-        uint64_t shrunk = box_gpu_cluster_round(allocated * 2, limit);
-        shrunk = shrunk > budget ? shrunk : budget;
-        if (shrunk < c->entries) {
-            box_gpu_cluster_resize(gpu, c, shrunk);
+        if (c->oversized < 0) {
+            c->oversized = gpu->cull.frame;
+            c->peak = 0;
         }
+
+        if (allocated > c->peak) {
+            c->peak = allocated;
+        }
+
+        if (gpu->cull.frame - c->oversized >= BOX_GPU_CLUSTER_SHRINK_FRAMES) {
+            uint64_t shrunk = box_gpu_cluster_round(c->peak * 2, limit);
+            shrunk = shrunk > budget ? shrunk : budget;
+            if (shrunk < c->entries) {
+                ecs_dbg("the clusters of a view needed at most %u light and probe index "
+                    "entries for %u frames; the list shrinks from %u to %u entries",
+                    (uint32_t)c->peak, BOX_GPU_CLUSTER_SHRINK_FRAMES, (uint32_t)c->entries,
+                    (uint32_t)shrunk);
+                box_gpu_cluster_resize(gpu, c, shrunk);
+            }
+
+            c->oversized = -1;
+        }
+    } else {
+        c->oversized = -1;
     }
 
     c->cut = cut;
@@ -529,6 +572,9 @@ static void box_gpu_cluster_poll(
 /** Get the cluster buffer of a view in a target, holding at least the budget of the view's
  * lights and probes.
  *
+ * A list larger than the view's lights need is kept: it shrinks only in box_gpu_cluster_fit,
+ * after it stayed too large for a while, so a light that comes and goes doesn't recreate it.
+ *
  * @param gpu The backend
  * @param t The target that renders the view
  * @param v The view
@@ -543,11 +589,8 @@ static WGPUBuffer box_gpu_cluster_buffer(
     uint64_t lights = box_gpu_cluster_lights(gpu, v);
     uint64_t probes = box_gpu_cluster_probe_count(gpu, v);
     uint64_t budget = box_gpu_cluster_budget(lights, probes);
-    uint64_t limit = box_gpu_cluster_limit(lights, probes);
     if (!c->buffer || c->entries < budget) {
         box_gpu_cluster_resize(gpu, c, budget);
-    } else if (c->entries > limit) {
-        box_gpu_cluster_resize(gpu, c, limit);
     }
 
     return c->buffer;
@@ -733,6 +776,7 @@ void box_gpu_light_cluster(
         sizeof(uint32_t));
     c->state = BOX_GPU_CLUSTER_COPIED;
     c->frame = gpu->cull.frame;
+    c->copied = c->entries;
 done:
     return;
 }
@@ -837,7 +881,7 @@ void box_gpu_light_purge(
         if (c->state != BOX_GPU_CLUSTER_MAPPING &&
             gpu->cull.stamp - c->stamp > BOX_GPU_CLUSTER_IDLE)
         {
-            box_gpu_cluster_free(c);
+            box_gpu_cluster_free(gpu, c);
             ecs_map_remove(&gpu->clusters, ecs_map_key(&it));
             it = ecs_map_iter(&gpu->clusters);
         }
