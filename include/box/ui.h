@@ -98,7 +98,9 @@ ECS_STRUCT(UiTheme, {
     Rgb danger;             /**< Destructive buttons and errors */
     Rgb selection;          /**< Behind selected text */
     Rgb caret;              /**< The text caret */
+    Rgb backdrop;           /**< Dims what lies under a modal dialog */
     float disabled_opacity; /**< Opacity of a disabled widget */
+    float backdrop_opacity; /**< Opacity of the backdrop of a modal dialog */
     float font_size;        /**< Body text */
     float small_font_size;  /**< Captions */
     float heading_font_size; /**< Headings and panel titles */

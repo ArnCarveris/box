@@ -126,6 +126,21 @@
                 ]
             },
             {
+                "id": "Modal",
+                "testcases": [
+                    "closed_by_default",
+                    "open_covers_window",
+                    "blocks_input",
+                    "close_button",
+                    "escape",
+                    "backdrop_dismiss",
+                    "backdrop_no_dismiss",
+                    "tab_cycles",
+                    "focus_returns",
+                    "set_mut_no_change"
+                ]
+            },
+            {
                 "id": "Gallery",
                 "testcases": [
                     "scene_loads",

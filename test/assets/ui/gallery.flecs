@@ -125,6 +125,7 @@ template Gallery {
   mut changes: i32 = 0
   mut pings: i32 = 0
   mut submitted: string = ""
+  mut dialog_open = false
 
   // The form owns two sets of values: draft, what its widgets show, and applied, what the
   // preview shows. A change of a widget reads the values of every widget into draft, Apply (or
@@ -291,6 +292,8 @@ template Gallery {
               last = "{w.name()}: {w[ListView.mut].current}"
             } else if w.has(Collapsible) {
               last = "{w.name()}: {w[Collapsible.mut].current}"
+            } else if w.has(Modal) {
+              last = "{w.name()}: {w[Modal.mut].current}"
             } else {
               last = "{w.name()}"
             }
@@ -344,6 +347,34 @@ template Gallery {
               Button ping(label: "Ping", variant: "secondary", action: actions.ping)
               Button off(label: "Disabled", disabled: true) {
                 Tooltip tip(text: "Not available")
+              }
+              Button open_dialog(label: "Dialog", variant: "secondary")
+
+              // Dialog opens a modal dialog, which floats over the whole window although
+              // it is declared here. Its close button, Escape and the backdrop close it
+              // with a change, the buttons in it by clearing dialog_open.
+              Modal dialog(title: "Discard changes?", open: dialog_open, width: 360) {
+                Label message(width: 312, text: "The changes since the last save are lost when you discard them.")
+
+                dialog_actions {
+                  Layout: {direction: Row, spacing: 8, v: Middle}
+                  Button discard(label: "Discard", variant: "danger")
+                  Button keep(label: "Keep editing", variant: "secondary")
+                }
+              }
+
+              async {
+                while true {
+                  const e = await on.change(this)
+                  const w = e.widget
+                  if w.has(Modal) {
+                    dialog_open = w[Modal.mut].current
+                  } else if w.has(Button) && w.name() == "open_dialog" {
+                    dialog_open = true
+                  } else if w.has(Button) && w.parent().name() == "dialog_actions" {
+                    dialog_open = false
+                  }
+                }
               }
             }
 

@@ -55,6 +55,11 @@
 //
 // A Tooltip, a child of the widget it explains, floats a text box below it after the pointer
 // has rested on it for a moment, and never takes the pointer itself.
+//
+// A Modal is a dialog centered over a dimmed backdrop that blocks the input to everything under
+// it; while open (mut current) it keeps the focus and Tab inside, and its CloseButton, Escape or
+// a click on the backdrop close it with a change. A CloseButton is a small button with an x that
+// works on its own too, such as in the title of a Panel.
 
 module box.widgets
 
@@ -69,6 +74,7 @@ include stepper
 include text_input
 include dropdown
 include tooltip
+include modal
 include scroll
 include tabs
 include collapsible

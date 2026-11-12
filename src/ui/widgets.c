@@ -1,7 +1,7 @@
 /**
  * @file ui/widgets.c
- * @brief The UiTheme component and the box.ui.theme entity, and ui.sibling, which the widget
- * library etc/scenes/ui/widgets.flecs uses.
+ * @brief The UiTheme component and the box.ui.theme entity, and ui.sibling, ui.root, ui.focused
+ * and ui.first_focusable, which the widget library etc/scenes/ui/widgets.flecs uses.
  */
 
 #include "ui.h"
@@ -22,7 +22,9 @@ static const UiTheme box_ui_dark_theme = {
     .danger = { 210, 104, 91 },
     .selection = { 60, 104, 84 },
     .caret = { 214, 218, 224 },
+    .backdrop = { 10, 12, 16 },
     .disabled_opacity = 0.45f,
+    .backdrop_opacity = 0.6f,
     .font_size = 14,
     .small_font_size = 12,
     .heading_font_size = 18,
@@ -108,6 +110,75 @@ static void box_ui_sibling(
     *(ecs_entity_t*)result->ptr = found;
 }
 
+/** Find the root of the layout tree of an entity, the highest ancestor reached through parents
+ * with a Layout, which a Modal covers: ui.root(entity).
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The entity
+ * @param result Receives the root, the entity itself when its parent has no Layout
+ */
+static void box_ui_root(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    const ecs_world_t *world = ctx->world;
+    ecs_entity_t e = *(ecs_entity_t*)argv[0].ptr;
+    ecs_entity_t parent = e && ecs_is_alive(world, e) ? ecs_get_parent(world, e) : 0;
+    int32_t depth = 0;
+    (void)argc;
+    while (parent && depth < BOX_UI_DEPTH_MAX && ecs_has(world, parent, Layout)) {
+        e = parent;
+        parent = ecs_get_parent(world, e);
+        depth ++;
+    }
+
+    *(ecs_entity_t*)result->ptr = e;
+}
+
+/** Get the entity with the keyboard focus: ui.focused().
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv No arguments
+ * @param result Receives the entity, 0 when nothing has the focus
+ */
+static void box_ui_focused(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    const box_ui_state_t *st = box_ui_state(ctx->world);
+    (void)argc;
+    (void)argv;
+    *(ecs_entity_t*)result->ptr = st ? st->focused : 0;
+}
+
+/** Find the first Focusable entity below a scope that Tab reaches, leaving out an entity and
+ * what is below it: ui.first_focusable(scope, skip).
+ *
+ * @param ctx Call context
+ * @param argc Number of arguments
+ * @param argv The scope and the entity left out, 0 for none
+ * @param result Receives the entity, 0 when there is none
+ */
+static void box_ui_first(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ctx->world);
+    box_ui_state_t *st = box_ui_state(world);
+    ecs_entity_t scope = *(ecs_entity_t*)argv[0].ptr;
+    ecs_entity_t skip = *(ecs_entity_t*)argv[1].ptr;
+    (void)argc;
+    *(ecs_entity_t*)result->ptr = st ? box_ui_first_focusable(world, st, scope, skip) : 0;
+}
+
 void box_ui_widgets_import(
     ecs_world_t *world,
     ecs_entity_t ui)
@@ -126,5 +197,28 @@ void box_ui_widgets_import(
             { "with", ecs_id(ecs_id_t) }
         },
         .callback = box_ui_sibling
+    });
+    ecs_function(world, {
+        .name = "root",
+        .parent = ui,
+        .return_type = ecs_id(ecs_entity_t),
+        .params = {{ "entity", ecs_id(ecs_entity_t) }},
+        .callback = box_ui_root
+    });
+    ecs_function(world, {
+        .name = "focused",
+        .parent = ui,
+        .return_type = ecs_id(ecs_entity_t),
+        .callback = box_ui_focused
+    });
+    ecs_function(world, {
+        .name = "first_focusable",
+        .parent = ui,
+        .return_type = ecs_id(ecs_entity_t),
+        .params = {
+            { "scope", ecs_id(ecs_entity_t) },
+            { "skip", ecs_id(ecs_entity_t) }
+        },
+        .callback = box_ui_first
     });
 }
