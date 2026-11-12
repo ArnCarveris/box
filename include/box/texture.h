@@ -325,14 +325,9 @@ ECS_STRUCT(TexMath, {
 
 /** Node of a TextureGraph that blurs its input with a separable gaussian, in two passes.
  *
- * The input is a Scalar or a Vector node and the value has its type; without a node it is
- * input_value, a Vector. On DomainPlane the blur wraps around the edges so a tiling input still
- * tiles. On DomainSphere it follows the equirectangular layout: it wraps in longitude, the
- * horizontal radius grows with 1/cos(latitude), capped at half the width near the poles, and
- * the vertical taps across a pole continue on the opposite meridian.
- *
- * Editing radius writes the parameter buffer only: the shader loops to a fixed number of taps,
- * spacing them further apart beyond that many texels.
+ * The input is a Scalar or a Vector node and the value has its type, input_value without one.
+ * DomainPlane wraps, so a tiling input still tiles. DomainSphere wraps in longitude, scales the
+ * horizontal radius by 1/cos(latitude) and continues vertical taps across a pole.
  *
  * @code
  * soft { TexBlur: {input: noise, radius: 8} }
@@ -426,18 +421,13 @@ typedef struct box_texture_node_param_t {
 
 /** Description of a node kind for box_texture_node_register.
  *
- * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
- * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
- * order, a scalar in x and the constant of an input without a node, and the coordinates.
+ * The WGSL function fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
+ * gets the parameter bytes at the offsets of TextureNodeKind.params, the input values (a scalar
+ * in x, the constant without a node) and the coordinates, and returns the value, a scalar in x.
  *
- * It returns the value of the node, a scalar in x.
- *
- * A neighbourhood kind's function also gets the texel, then the texture of each input in order:
- * fn name(p, i, coords, texel: vec2i, t0: texture_2d<f32>, ...) -> vec4f. A kind of more than
- * one pass is a neighbourhood kind whose function also gets the pass and the value of the pass
- * before it: fn name(p, i, coords, texel: vec2i, pass_index: u32, prev: texture_2d<f32>, t0, ...).
- * Every pass but the last is materialized like any other node, prev is a 1x1 zero texture in
- * the first pass and the value of the last pass is the value of the node.
+ * A neighbourhood kind also gets texel: vec2i, then t0: texture_2d<f32>, ... per input. A kind of
+ * more passes gets pass_index: u32 and prev: texture_2d<f32> (the pass before, 1x1 zero in pass
+ * 0) between texel and t0; its last pass is the value of the node.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */

@@ -576,7 +576,6 @@ static void tb_impulse_in(
         }
     }
 
-    // normalized, and as wide as the truncated gaussian of the scaled radius
     test_assert(fabs(sum - 1.0) < 1e-4);
     double variance = 0;
     for (k = -taps; k <= taps; k ++) {
