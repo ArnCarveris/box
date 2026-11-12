@@ -134,7 +134,8 @@ static void tm_wait(
     test_int(status->state, TextureReady);
 }
 
-/** Read back the image of a texture graph or the value of one of its nodes.
+/** Read back the image of a texture graph or the value of one of its nodes. The value of the
+ * output node is the image.
  *
  * @param world The world
  * @param tex The texture entity
@@ -154,6 +155,11 @@ static float* tm_read(
     float *result = NULL;
     int32_t i, j;
     ecs_vec_t reads;
+    const TextureGraph *graph = ecs_get(world, tex, TextureGraph);
+    if (graph && graph->output == node) {
+        node = 0;
+    }
+
     ecs_vec_init_t(NULL, &reads, box_render_texture_read_t, 0);
     test_bool(box_render_texture_graph_read(world, tex, node, ticket), true);
     for (i = 0; i < TM_FRAMES && !result; i ++) {
@@ -934,8 +940,8 @@ void TextureNodesMath_split_round_trip_sphere(void) {
     tm_split_round_trip(DomainSphere);
 }
 
-/** Combine two Scalar nodes and two constants into a vector and split each channel out again:
- * each split reads back as its Scalar.
+/** Combine two Scalar nodes and two constants into a vector and split each channel out again,
+ * combined once more as the output: each split reads back as its Scalar.
  *
  * @param domain The domain
  */
@@ -947,6 +953,7 @@ static void tm_combine_round_trip(
     ecs_entity_t tex = ecs_new(world);
     ecs_entity_t wave = ecs_new(world);
     ecs_entity_t combine = ecs_new(world);
+    ecs_entity_t output = ecs_new(world);
     ecs_entity_t split[4];
     int32_t k, x, y, c;
     ecs_set(world, uv, TexCoords, {0});
@@ -960,11 +967,14 @@ static void tm_combine_round_trip(
         split[k] = tm_split(world, combine, (TextureChannel)k);
     }
 
-    ecs_set(world, tex, TextureGraph, {.output = combine, .width = TM_W, .height = TM_H,
+    ecs_set(world, output, TexCombine, {.r = split[0], .g = split[1], .b = split[2],
+        .a = split[3]});
+    ecs_set(world, tex, TextureGraph, {.output = output, .width = TM_W, .height = TM_H,
         .domain = domain, .format = GraphHdr});
     tm_wait(world, tex);
 
     float *image = tm_read(world, tex, 0, TM_W, TM_H);
+    float *combined = tm_read(world, tex, combine, TM_W, TM_H);
     float *channels[4];
     for (k = 0; k < 4; k ++) {
         channels[k] = tm_read(world, tex, split[k], TM_W, TM_H);
@@ -977,7 +987,8 @@ static void tm_combine_round_trip(
             tm_input(domain, x, y, 1, v);
             const float scalars[4] = {v[1], sinf(v[2]), 0.25f, 0.75f};
             for (c = 0; c < 4; c ++) {
-                tm_expect("combined", x, y, c, image[at + c], scalars[c]);
+                tm_expect("combined", x, y, c, combined[at + c], scalars[c]);
+                tm_expect("recombined", x, y, c, image[at + c], scalars[c]);
             }
 
             for (k = 0; k < 4; k ++) {
@@ -993,6 +1004,7 @@ static void tm_combine_round_trip(
         ecs_os_free(channels[k]);
     }
 
+    ecs_os_free(combined);
     ecs_os_free(image);
     ecs_fini(world);
 }

@@ -1035,7 +1035,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 5);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1049,6 +1049,7 @@ void TextureGraph_null_backend_records(void) {
     test_int(g->param_size, entry->graph->param_size);
 
     const box_render_texture_graph_node_t *nodes = box_render_texture_graph_nodes(g);
+    test_int(nodes[2].output, TexVector);
     test_int(nodes[2].kind, kind_id(world, ecs_id(TexMath)));
     test_int(nodes[2].inputs[0], 0);
     test_int(nodes[2].inputs[1], 1);
@@ -1063,16 +1064,16 @@ void TextureGraph_null_backend_records(void) {
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)kind_id(world, ecs_id(TexMath)));
     test_assert(k != NULL);
-    test_int(k->output, TexVector);
+    test_int(k->output, TexAny);
     test_int(k->input_count, 3);
-    test_int(k->param_size, 16);
+    test_int(k->param_size, 32);
     test_str(box_render_texture_node_kind_function(k), "box_tex_math");
     test_assert(strstr(box_render_texture_node_kind_source(k), "fn box_tex_math(") != NULL);
 
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 5);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1164,7 +1165,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 3);
+    test_int(second->texture_node_kinds, 5);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1191,7 +1192,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 4);
+    test_int(null->texture_node_kinds, 6);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);

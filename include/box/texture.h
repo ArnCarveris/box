@@ -339,14 +339,13 @@ ECS_ENUM(TextureMathOp, {
 
 /** Node of a TextureGraph that computes an operation on one, two or three values.
  *
- * Its inputs take Scalar and Vector nodes. An input without a node takes its value member
- * instead, whose first channel is the value on Scalars. The node outputs a Scalar when every
- * input node its operation reads is a Scalar, else a Vector, with a Scalar input broadcast to
- * the four channels; MathDot and MathLength always output a Scalar and MathCross a Vector.
+ * Its inputs take Scalar and Vector nodes, or their value member without a node. It outputs a
+ * Scalar when every input node its operation reads is a Scalar, else a Vector with a Scalar
+ * broadcast; MathDot and MathLength always output a Scalar, MathCross a Vector.
  *
  * Unary operations read a, binary ones a and b, MathMix, MathClamp and MathSmoothstep a, b and
- * c. The range members are parameters of MathRemap and MathRemapClamped, the same for every
- * channel.
+ * c. On Scalars a value member gives its first channel. The range members are the parameters
+ * of MathRemap and MathRemapClamped.
  *
  * @code
  * glow {
@@ -393,8 +392,8 @@ ECS_ENUM(TextureChannel, {
  * @endcode
  */
 ECS_STRUCT(TexSplit, {
-    ecs_entity_t input; /**< Vector input node, 0 for value */
-    vec4 value;         /**< Value of input without a node */
+    ecs_entity_t input;     /**< Vector input node, 0 for value */
+    vec4 value;             /**< Value of input without a node */
     TextureChannel channel; /**< Channel of the value, default ChannelR */
 });
 
@@ -494,29 +493,35 @@ typedef struct box_texture_node_param_t {
     box_texture_param_kind_t kind; /**< Kind of its elements */
 } box_texture_node_param_t;
 
+/** Type of the value of a node of a kind whose output is TexAny.
+ *
+ * The default, without a function or when it returns TexAny, is a Vector when an input node
+ * is a Vector, else a Scalar when one is a Scalar, else a Vector.
+ *
+ * @param node The node component
+ * @param inputs Type of the node of each input in order, TexAny for an input without a node
+ * @return The type, or TexAny for the default
+ */
+typedef TextureValueType (*box_texture_node_type_t)(
+    const void *node,
+    const TextureValueType *inputs);
+
 /** Description of a node kind for box_texture_node_register.
  *
- * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
- * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
- * order, a scalar in x and the constant of an input without a node, and the coordinates.
+ * The WGSL function fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
+ * of the parameter bytes p, the input values i (a scalar in x, the constant without a node)
+ * and the coordinates returns the value of the node, a scalar in x.
  *
- * It returns the value of the node, a scalar in x.
- *
- * A kind with a TexAny input gets the types of the input nodes of each node in a u32 after its
- * last parameter, at the next multiple of 4 bytes: bit j set when input j has a Scalar node,
- * bit 4 + j when it has a Vector node. Its function broadcasts a Scalar input itself.
- *
- * A kind whose output is TexAny gets the type of each node from output_type, or without one a
- * Vector when an input node is a Vector, else a Scalar when one is a Scalar, else a Vector.
+ * A kind with a TexAny input gets a u32 after its last parameter, 4 byte aligned, with bit j
+ * set when input j has a Scalar node and bit 4 + j when it has a Vector node; its function
+ * broadcasts a Scalar input itself.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
     TextureValueType output;    /**< Type of the value of the node, TexAny when it follows the
                                  *   inputs */
-    /** Type of the value of a node of a kind whose output is TexAny, from its component and
-     * the types of its input nodes in order, TexAny for an input without a node; TexAny for
-     * the default. NULL for the default. */
-    TextureValueType (*output_type)(const void *node, const TextureValueType *inputs);
+    box_texture_node_type_t output_type; /**< Type of a node of a kind whose output is TexAny,
+                                          *   NULL for the default */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs in order */
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters in order */
     const char *function;       /**< Name of the WGSL function */

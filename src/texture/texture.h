@@ -65,9 +65,8 @@ typedef struct box_texture_node_kind_t {
     int32_t id;                 /**< Id of the kind, from 1 */
     ecs_entity_t component;     /**< Component of its nodes */
     TextureValueType output;    /**< Type of its value, TexAny when it follows the inputs */
-    TextureValueType (*output_type)(const void *node, const TextureValueType *inputs);
-                                /**< Type of the value of a node when output is TexAny, NULL
-                                 *   for the default */
+    box_texture_node_type_t output_type; /**< Type of a node when output is TexAny, NULL for
+                                          *   the default */
     int32_t input_count;        /**< Inputs in inputs */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs, names owned */
     int32_t param_count;        /**< Parameters in params */
