@@ -1,0 +1,11 @@
+// A scene whose async block copies AppStatus.delta_time to delta_seen. core_tick is an async
+// function of the test that resolves in the next frame; the engine writes AppStatus at the end of
+// a frame, so the block reads it in the second frame.
+using box.app
+
+export mut delta_seen: f64 = 0
+
+async {
+  await core_tick()
+  delta_seen = AppStatus[AppStatus].delta_time
+}
