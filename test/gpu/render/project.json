@@ -1475,7 +1475,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "TexturePreview",
                 "testcases": [
                     "size_and_pixels",
@@ -1486,7 +1485,9 @@
                     "node_outside_graph",
                     "other_readbacks_kept",
                     "stats"
-=======
+                ]
+            },
+            {
                 "id": "TextureGraphCache",
                 "testcases": [
                     "animated_changes",
@@ -1497,7 +1498,6 @@
                     "toggle_back_reuses",
                     "eviction_under_budget",
                     "animated_static_part"
->>>>>>> 1436e8b1e18e205e4c50f73fb810fd5e2cffce57
                 ]
             }
         ]
