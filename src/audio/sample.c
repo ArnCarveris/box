@@ -409,7 +409,7 @@ static void BoxAudioSampleFrame(
     ecs_time_t start = {0};
     box_task_remaining(it->world, &state->sample_task, BOX_TASK_SOUNDS, false,
         box_audio_sample_working(state->sample_sync));
-    if (!app || !app->headless) {
+    if (!app || !app->headless || app->async_loads) {
         goto done;
     }
 

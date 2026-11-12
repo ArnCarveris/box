@@ -672,7 +672,7 @@ static void BoxFileWatchPoll(
     bool threaded = interval > 0 && !w->no_thread && ecs_os_has_threading();
 #endif
     const App *app = ecs_singleton_get(world, App);
-    bool wait = !threaded || (app && app->headless);
+    bool wait = !threaded || (app && app->headless && !app->async_loads);
     box_watch_pass_state_t state = box_watch_pass_get(&w->pass, wait);
     if (state == BoxWatchDone) {
         box_watch_pass_apply(w, &found);
