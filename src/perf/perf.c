@@ -9,7 +9,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../posix.h"
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 
 /** Warmup frames a light bake may go without progress before a run measures without it */
 #define BOX_PERF_BAKE_STALL (300)

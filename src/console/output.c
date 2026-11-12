@@ -61,7 +61,7 @@ typedef struct box_console_fmt_t {
 void box_console_out_init(
     box_console_out_t *out)
 {
-    out->buf = (ecs_strbuf_t)ECS_STRBUF_INIT;
+    out->buf = ECS_STRBUF_INIT;
     ecs_vec_init_t(NULL, &out->spans, box_console_span_t, 0);
 }
 

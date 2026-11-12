@@ -7,8 +7,11 @@
 #include <app.h>
 #include <bake_test.h>
 #include <stdio.h>
-#include <unistd.h>
+#include "../../../../src/posix.h"
 #include <sys/stat.h>
+
+/** Why a case is skipped on Windows: its folder has no POSIX modes, owners or root checks */
+#define BOX_TEST_POSIX_ONLY ("11 Nov 2026, POSIX modes and owners only")
 
 void TmpDir_headless_creates_folder(void) {
     // engine_core/app
@@ -76,6 +79,9 @@ void TmpDir_removed_at_fini(void) {
 
 void TmpDir_folder_private(void) {
     // hardening/tmp_dir
+#ifdef _WIN32
+    test_quarantine(BOX_TEST_POSIX_ONLY);
+#else
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
@@ -91,6 +97,7 @@ void TmpDir_folder_private(void) {
     test_int(st.st_uid, geteuid());
 
     ecs_fini(world);
+#endif
 }
 
 void TmpDir_symlink_inside_not_followed(void) {
@@ -200,30 +207,50 @@ void TmpDir_worlds_share_folder(void) {
 
 void TmpDir_root_of_user_accepted(void) {
     // hardening/tmp_dir
+#ifdef _WIN32
+    test_quarantine(BOX_TEST_POSIX_ONLY);
+#else
     test_assert(box_app_tmp_root_problem(S_IFDIR | 0700, 501, 501) == NULL);
     test_assert(box_app_tmp_root_problem(S_IFDIR | 01777, 501, 501) == NULL);
+#endif
 }
 
 void TmpDir_root_of_root_accepted(void) {
     // hardening/tmp_dir
+#ifdef _WIN32
+    test_quarantine(BOX_TEST_POSIX_ONLY);
+#else
     test_assert(box_app_tmp_root_problem(S_IFDIR | 01777, 0, 501) == NULL);
     test_assert(box_app_tmp_root_problem(S_IFDIR | 0755, 0, 501) == NULL);
+#endif
 }
 
 void TmpDir_root_of_other_user_refused(void) {
     // hardening/tmp_dir
+#ifdef _WIN32
+    test_quarantine(BOX_TEST_POSIX_ONLY);
+#else
     test_assert(box_app_tmp_root_problem(S_IFDIR | 01777, 502, 501) != NULL);
     test_assert(box_app_tmp_root_problem(S_IFDIR | 0700, 502, 501) != NULL);
+#endif
 }
 
 void TmpDir_root_writable_without_sticky_refused(void) {
     // hardening/tmp_dir
+#ifdef _WIN32
+    test_quarantine(BOX_TEST_POSIX_ONLY);
+#else
     test_assert(box_app_tmp_root_problem(S_IFDIR | 0777, 0, 501) != NULL);
     test_assert(box_app_tmp_root_problem(S_IFDIR | 0770, 501, 501) != NULL);
+#endif
 }
 
 void TmpDir_root_not_a_folder_refused(void) {
     // hardening/tmp_dir
+#ifdef _WIN32
+    test_quarantine(BOX_TEST_POSIX_ONLY);
+#else
     test_assert(box_app_tmp_root_problem(S_IFLNK | 0777, 501, 501) != NULL);
     test_assert(box_app_tmp_root_problem(S_IFREG | 0600, 501, 501) != NULL);
+#endif
 }
