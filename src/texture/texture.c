@@ -1021,7 +1021,7 @@ static void BoxTextureFrame(
         box_textures_reload(it->world, t, false);
     }
 
-    if (!app || !app->headless) {
+    if (!app || !app->headless || app->async_loads) {
         goto done;
     }
 

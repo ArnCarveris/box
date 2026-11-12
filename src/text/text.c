@@ -352,7 +352,7 @@ static void BoxTextFrame(
             box_text_working(s->sync));
     }
 
-    if (!s || !app || !app->headless) {
+    if (!s || !app || !app->headless || app->async_loads) {
         goto done;
     }
 

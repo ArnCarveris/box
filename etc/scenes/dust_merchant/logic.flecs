@@ -25,7 +25,6 @@ const STATION_YAW: f32[6] = [-0.06, 0, -0.34, -0.7, 0.72, 0.02]
 const TURN: f32 = 2 * PI
 
 async {
-  mut last: f64 = AppStatus[AppStatus].elapsed
   mut cam_x: f32 = STATION_X[0]
   mut cam_y: f32 = STATION_Y[0]
   mut cam_z: f32 = STATION_Z[0]
@@ -35,10 +34,7 @@ async {
   mut pan_y: f32 = 0
   while true {
     await next_frame()
-    const now = AppStatus[AppStatus].elapsed
-    const fixed_step = App[App].delta_time
-    const step = fixed_step > 0 ? fixed_step : clamp(now - last, 0.001, 0.1)
-    last = now
+    const step = clamp(AppStatus[AppStatus].delta_time, 0.001, 0.1)
     clock += step
     dt = step
     if fract(clock * 2.6) < 0.5 != blink {
