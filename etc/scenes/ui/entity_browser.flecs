@@ -1,0 +1,62 @@
+include widgets
+
+using flecs.script
+using box.transform
+using box.camera
+using box.view
+using box.surface
+using box.layout
+using box.geometry
+using box.material
+using box.ui
+using box.widgets
+
+window {
+  Surface: {width: 1280, height: 800}
+}
+
+backdrop {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+}
+
+browser {
+  backdrop_view {
+    const t = box.ui.theme[UiTheme]
+    View: {
+      camera: backdrop.camera,
+      clear: {enabled: true, color: {t.background.r, t.background.g, t.background.b, 255}},
+      lighting: {enabled: false},
+      culling: {enabled: false}
+    }
+  }
+
+  hud {
+    Scene: {}
+
+    camera {
+      Position: {0, 0, 100}
+      Camera: {ortho: true, ortho_scale: 1}
+    }
+
+    root {
+      LayoutFill: {surface: window}
+      Layout: {direction: Row, padding: {16, 16, 16, 16}}
+      FocusScope
+
+      Panel entities(title: "Entities", width: 360, grow: true) {
+        ScrollView list(frame: false) {
+          EntityTree tree
+        }
+      }
+    }
+  }
+
+  hud_view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
