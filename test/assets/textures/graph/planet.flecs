@@ -1,11 +1,13 @@
 // Planets of texture graphs on the sphere domain, as templates. World is a rocky planet with seas:
-// one height of warped fbm continents and ridged mountain ranges masked to some regions feeds its
-// albedo and its normal map. Its temperature falls with the latitude and the altitude, its
-// moisture follows the distance to the sea (the land mask blurred) and the latitude bands, and a
-// biome table (a small plane graph) looked up by both colors the vegetation; rock covers steep
-// ground, snow the cold one and ice the cold seas. Its clouds are an animated graph of the seed,
-// swirled by evolving warps and banded by latitude. Giant is a gas giant whose bands drift at the
-// speed of their latitude, with warped turbulence and storm ovals, animated.
+// one height of warped fbm continents with unwarped detail and ridged mountain ranges masked to
+// some regions feeds its albedo and its normal map. Its temperature falls with the latitude and
+// the altitude, its moisture follows the distance to the sea (the land mask blurred) and the
+// latitude bands, and a biome table (a small plane graph) looked up by both colors the
+// vegetation; rock covers steep ground, snow the cold one and ice the cold seas. Its clouds are an
+// animated graph of the seed: a coverage noise that evolves at warped coordinates, banded by
+// latitude, with billows that do not depend on the time. Giant is a gas giant: zones and belts
+// with warped turbulence and storm ovals computed once (bands), turned about the pole at the
+// speed of the jet of their latitude by the animated albedo.
 //
 // water is the fraction of the surface under the sea, temp and bio 0..1, size the width of the
 // maps.
@@ -30,79 +32,83 @@ planet_graph {
     prop bio: f32 = 0.8
     prop size: i32 = 512
 
-    const sea_h: f32 = 0.5 + 0.125 * probit(water)
-    const top_h: f32 = max(1 - sea_h, 0.3)
+    // Height about 0.5 with a standard deviation of 1/6, the sea level its quantile of water
+    const sea_h: f32 = 0.5 + probit(water) / 6
+    const top_h: f32 = 1.04
     const t_eq: f32 = 0.25 + 0.9 * temp
+    const sky: f32 = 0.45
+    const thr: f32 = 1.28 * probit(1 - sky)
 
     // Height
-    dir { TexCoords: {} }
-    lat { TexSplit: {input: dir, channel: ChannelG} }
-    abs_lat { TexMath: {op: MathAbs, a: lat} }
-    warp_noise { TexNoise: {channels: 3, frequency: 1.2, octaves: 3, seed: seed * 8 + 2} }
-    warped { TexWarp: {offset: warp_noise, amount_value: 2} }
-    continents {
-      TexNoise: {coords: warped, frequency: 1.2, octaves: 5, gain: 0.55, seed: seed * 8 + 1}
+    warp_noise { TexNoise: {channels: 3, frequency: 1.3, octaves: 3, seed: seed * 16 + 2} }
+    warped { TexWarp: {offset: warp_noise, amount_value: 1} }
+    continents { TexNoise: {coords: warped, frequency: 1.25, octaves: 5, seed: seed * 16 + 1} }
+    detail_noise { TexNoise: {frequency: 12, octaves: 3, seed: seed * 16 + 9} }
+    detail {
+      TexMath: {
+        op: MathRemap, a: detail_noise, from_min: 0, from_max: 1, to_min: -0.07, to_max: 0.07
+      }
     }
+    rough { TexMath: {op: MathAdd, a: continents, b: detail} }
     spread {
-      TexMath: {op: MathRemap, a: continents, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
+      TexMath: {op: MathRemap, a: rough, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
     }
     ridges {
       TexNoise: {
-        coords: warped, frequency: 2.6, octaves: 5, gain: 0.5, fractal: NoiseRidged,
-        seed: seed * 8 + 3
+        coords: warped, frequency: 2.4, octaves: 5, fractal: NoiseRidged, seed: seed * 16 + 3
       }
     }
     crest {
-      TexMath: {op: MathSmoothstep, a: ridges, b_value: {0.4, 0, 0, 0}, c_value: {1, 0, 0, 0}}
+      TexMath: {op: MathSmoothstep, a: ridges, b_value: {0.45, 0, 0, 0}, c_value: {1, 0, 0, 0}}
     }
-    ranges_noise { TexNoise: {frequency: 1.1, octaves: 2, seed: seed * 8 + 4} }
+    ranges_noise { TexNoise: {frequency: 0.9, octaves: 2, seed: seed * 16 + 4} }
     ranges {
       TexMath: {
-        op: MathSmoothstep, a: ranges_noise, b_value: {0.47, 0, 0, 0}, c_value: {0.57, 0, 0, 0}
+        op: MathSmoothstep, a: ranges_noise, b_value: {0.5, 0, 0, 0}, c_value: {0.6, 0, 0, 0}
       }
     }
     inland {
       TexMath: {
-        op: MathSmoothstep, a: spread, b_value: {sea_h - 0.02, 0, 0, 0},
-        c_value: {sea_h + 0.1, 0, 0, 0}
+        op: MathSmoothstep, a: spread, b_value: {sea_h, 0, 0, 0}, c_value: {sea_h + 0.08, 0, 0, 0}
       }
     }
     peaks0 { TexMath: {op: MathMultiply, a: crest, b: ranges} }
     peaks1 { TexMath: {op: MathMultiply, a: peaks0, b: inland} }
-    peaks { TexMath: {op: MathMultiply, a: peaks1, b_value: {0.24, 0, 0, 0}} }
+    peaks { TexMath: {op: MathMultiply, a: peaks1, b_value: {0.2, 0, 0, 0}} }
     height { TexMath: {op: MathAdd, a: spread, b: peaks} }
     relief { TexMath: {op: MathMax, a: height, b_value: {sea_h, 0, 0, 0}} }
-    slope { TexSlope: {height: relief, strength: 2.4} }
+    slope { TexSlope: {height: relief, strength: 3.5} }
     altitude {
       TexMath: {
-        op: MathRemapClamped, a: height, from_min: sea_h, from_max: sea_h + top_h, to_min: 0,
-        to_max: 1
+        op: MathRemapClamped, a: height, from_min: sea_h, from_max: top_h, to_min: 0, to_max: 1
       }
     }
     land {
       TexMath: {
-        op: MathSmoothstep, a: height, b_value: {sea_h - 0.003, 0, 0, 0},
-        c_value: {sea_h + 0.003, 0, 0, 0}
+        op: MathSmoothstep, a: height, b_value: {sea_h - 0.002, 0, 0, 0},
+        c_value: {sea_h + 0.002, 0, 0, 0}
       }
     }
 
-    // Temperature
+    // Temperature, from the warped latitude so the climate zones meander
+    lat { TexSplit: {input: warped, channel: ChannelG} }
+    abs_lat { TexMath: {op: MathAbs, a: lat} }
     lat2 { TexMath: {op: MathMultiply, a: lat, b: lat} }
     sea_temp {
       TexMath: {op: MathRemap, a: lat2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_eq - 0.75}
     }
-    lapse { TexMath: {op: MathMultiply, a: altitude, b_value: {0.5, 0, 0, 0}} }
+    lapse { TexMath: {op: MathMultiply, a: altitude, b_value: {0.45, 0, 0, 0}} }
     temperature { TexMath: {op: MathSubtract, a: sea_temp, b: lapse} }
 
     // Moisture
-    near { TexBlur: {input: land, radius: 18} }
+    near { TexBlur: {input: land, radius: 24} }
     bands {
       TexCurve: {input: abs_lat, curve: {kind: CurveCatmullRom, keys: [
-        {0, 1}, {0.2, 0.8}, {0.45, 0.3}, {0.55, 0.32}, {0.75, 0.75}, {0.88, 0.7}, {1, 0.35}
+        {0, 1}, {0.2, 0.85}, {0.42, 0.35}, {0.55, 0.35}, {0.78, 0.8}, {0.9, 0.7}, {1, 0.4}
       ]}}
     }
     coastal {
-      TexMath: {op: MathRemapClamped, a: near, from_min: 0.2, from_max: 1, to_min: 1, to_max: 0.3}
+      TexMath: {op: MathRemapClamped, a: near, from_min: 0.35, from_max: 1, to_min: 1, to_max: 0.3}
     }
     moisture { TexMath: {op: MathMultiply, a: coastal, b: bands} }
 
@@ -111,25 +117,27 @@ planet_graph {
       uv { TexCoords: {} }
       t { TexSplit: {input: uv, channel: ChannelR} }
       m { TexSplit: {input: uv, channel: ChannelG} }
-      grass {
+      dry {
         TexRamp: {input: t, keys: [
-          {0.1, {116, 118, 84}}, {0.3, {112, 138, 64}}, {0.55, {70, 130, 60}},
-          {0.8, {158, 146, 78}}, {1, {176, 150, 86}}
+          {0.1, {128, 122, 96}}, {0.3, {118, 126, 78}}, {0.55, {110, 138, 70}},
+          {0.78, {160, 150, 82}}, {1, {176, 152, 92}}
         ]}
       }
-      forest {
+      wet {
         TexRamp: {input: t, keys: [
-          {0.1, {74, 86, 64}}, {0.3, {34, 66, 44}}, {0.55, {28, 82, 44}}, {0.8, {26, 92, 34}},
-          {1, {44, 88, 30}}
+          {0.1, {88, 96, 74}}, {0.25, {40, 64, 48}}, {0.5, {34, 80, 40}}, {0.75, {30, 86, 34}},
+          {1, {24, 74, 30}}
         ]}
       }
-      lush { TexMath: {op: MathSmoothstep, a: m, b_value: {0.3, 0, 0, 0}, c_value: {0.75, 0, 0, 0}}}
-      veg { TexMath: {op: MathMix, a: grass, b: forest, c: lush} }
+      lush { TexMath: {op: MathSmoothstep, a: m, b_value: {0.3, 0, 0, 0}, c_value: {0.7, 0, 0, 0}}}
+      veg { TexMath: {op: MathMix, a: dry, b: wet, c: lush} }
       habitable {
-        TexCurve: {input: t, curve: {keys: [{0, 0}, {0.12, 0}, {0.3, 1}, {0.8, 1}, {1, 0.3}]}}
+        TexCurve: {
+          input: t, curve: {keys: [{0, 0}, {0.1, 0}, {0.22, 0.6}, {0.3, 1}, {0.85, 1}, {1, 0.6}]}
+        }
       }
       watered {
-        TexMath: {op: MathSmoothstep, a: m, b_value: {0.04, 0, 0, 0}, c_value: {0.4, 0, 0, 0}}
+        TexMath: {op: MathSmoothstep, a: m, b_value: {0.06, 0, 0, 0}, c_value: {0.35, 0, 0, 0}}
       }
       cover0 { TexMath: {op: MathMultiply, a: habitable, b: watered} }
       cover { TexMath: {op: MathMultiply, a: cover0, b_value: {bio, 0, 0, 0}} }
@@ -145,33 +153,38 @@ planet_graph {
       cover { TexSplit: {input: biome, channel: ChannelA} }
       ground {
         TexRamp: {input: altitude, keys: [
-          {0, {170, 120, 86}}, {0.22, {150, 104, 76}}, {0.55, {120, 100, 92}},
-          {0.95, {156, 150, 150}}
+          {0, {170, 140, 100}}, {0.22, {150, 120, 86}}, {0.55, {124, 108, 96}},
+          {0.95, {156, 150, 148}}
         ]}
       }
       grown { TexMath: {op: MathMix, a: ground, b: biome, c: cover} }
       steep {
-        TexMath: {op: MathSmoothstep, a: slope, b_value: {0.08, 0, 0, 0}, c_value: {0.2, 0, 0, 0}}
+        TexMath: {op: MathSmoothstep, a: slope, b_value: {0.25, 0, 0, 0}, c_value: {0.5, 0, 0, 0}}
       }
       rock { TexRamp: {input: altitude, keys: [{0, {118, 106, 96}}, {1, {124, 116, 112}}]} }
       rocky { TexMath: {op: MathMix, a: grown, b: rock, c: steep} }
       cold {
         TexMath: {
-          op: MathSmoothstep, a: temperature, b_value: {0.14, 0, 0, 0}, c_value: {0.04, 0, 0, 0}
+          op: MathSmoothstep, a: temperature, b_value: {0.13, 0, 0, 0}, c_value: {0.06, 0, 0, 0}
         }
       }
       snow { TexRamp: {keys: [{0, {236, 242, 250}}]} }
       ground_color { TexMath: {op: MathMix, a: rocky, b: snow, c: cold} }
-      depth {
+      shelf {
         TexMath: {
-          op: MathRemapClamped, a: height, from_min: sea_h, from_max: sea_h - 0.45, to_min: 0,
+          op: MathRemapClamped, a: height, from_min: sea_h, from_max: sea_h - 0.12, to_min: 0,
           to_max: 1
         }
       }
+      open {
+        TexMath: {
+          op: MathRemapClamped, a: near, from_min: 0.35, from_max: 0, to_min: 0.3, to_max: 1
+        }
+      }
+      depth { TexMath: {op: MathMultiply, a: shelf, b: open} }
       water_color {
         TexRamp: {input: depth, keys: [
-          {0.011, {30, 108, 138}}, {0.078, {13, 72, 115}}, {0.356, {8, 47, 92}},
-          {1, {4, 20, 52}}
+          {0.02, {30, 108, 138}}, {0.12, {13, 72, 115}}, {0.4, {8, 47, 92}}, {0.9, {4, 20, 52}}
         ]}
       }
       frozen {
@@ -179,54 +192,60 @@ planet_graph {
           op: MathSmoothstep, a: sea_temp, b_value: {0.13, 0, 0, 0}, c_value: {0.07, 0, 0, 0}
         }
       }
-      ice { TexRamp: {input: depth, keys: [{0, {222, 236, 246}}, {1, {150, 186, 216}}]} }
+      ice { TexRamp: {input: depth, keys: [{0, {226, 238, 248}}, {1, {170, 198, 222}}]} }
       sea_color { TexMath: {op: MathMix, a: water_color, b: ice, c: frozen} }
       out { TexMath: {op: MathMix, a: sea_color, b: ground_color, c: land} }
       TextureGraph: {output: out, width: size, height: size / 2, domain: DomainSphere}
     }
 
     normals {
-      normal { TexNormal: {height: relief, strength: 2.4} }
+      normal { TexNormal: {height: relief, strength: 3.5} }
       TextureGraph: {
         output: normal, width: size, height: size / 2, domain: DomainSphere, format: GraphLinear
       }
     }
 
     clouds {
-      time { TexTime: {scale: 0.012, offset: 3} }
-      swirl {
-        TexNoise: {channels: 3, frequency: 1.4, octaves: 2, evolve: time, seed: seed * 8 + 10}
-      }
-      swirled { TexWarp: {offset: swirl, amount_value: 2.4} }
-      eddies {
+      time { TexTime: {scale: 0.01, offset: 3} }
+      swirl { TexNoise: {channels: 3, frequency: 1.2, octaves: 2, seed: seed * 16 + 12} }
+      swirled { TexWarp: {offset: swirl, amount_value: 0.7} }
+      stretched { TexTransform: {coords: swirled, scale: {1, 1.6, 1}} }
+      systems {
         TexNoise: {
-          coords: swirled, channels: 3, frequency: 3, octaves: 2, evolve: time, seed: seed * 8 + 11
+          coords: stretched, frequency: 1.8, octaves: 3, evolve: time, seed: seed * 16 + 13
         }
       }
-      eddied { TexWarp: {coords: swirled, offset: eddies, amount_value: 1.2} }
-      stretched { TexTransform: {coords: eddied, scale: {1, 2, 1}} }
-      noise {
+      coverage {
+        TexMath: {op: MathRemap, a: systems, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
+      }
+      billows {
         TexNoise: {
-          coords: stretched, frequency: 2.2, octaves: 5, gain: 0.55, evolve: time,
-          seed: seed * 8 + 12
+          coords: stretched, frequency: 6, octaves: 4, gain: 0.6, fractal: NoiseBillow,
+          seed: seed * 16 + 15
         }
       }
-      spread {
-        TexMath: {op: MathRemap, a: noise, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
+      puffs {
+        TexMath: {op: MathRemap, a: billows, from_min: 0.23, from_max: 0.32, to_min: 0, to_max: 0.8}
       }
-      bands {
-        TexCurve: {input: abs_lat, curve: {kind: CurveCatmullRom, keys: [
-          {0, 0.1}, {0.2, 0.02}, {0.5, -0.12}, {0.72, 0.08}, {0.88, 0.06}, {1, -0.04}
+      cloud_lat { TexSplit: {input: swirled, channel: ChannelG} }
+      cloud_abs_lat { TexMath: {op: MathAbs, a: cloud_lat} }
+      belts {
+        TexCurve: {input: cloud_abs_lat, curve: {kind: CurveCatmullRom, keys: [
+          {0, 0.7}, {0.15, 0.3}, {0.42, -0.9}, {0.58, -0.3}, {0.8, 0.7}, {0.92, 0.4}, {1, -0.4}
         ]}}
       }
-      banded { TexMath: {op: MathAdd, a: spread, b: bands} }
+      banded { TexMath: {op: MathAdd, a: coverage, b: belts} }
+      sum { TexMath: {op: MathAdd, a: banded, b: puffs} }
       density {
-        TexMath: {op: MathSmoothstep, a: banded, b_value: {0.45, 0, 0, 0}, c_value: {0.63, 0, 0, 0}}
+        TexMath: {
+          op: MathSmoothstep, a: sum, b_value: {thr, 0, 0, 0}, c_value: {thr + 1.8, 0, 0, 0}
+        }
       }
       density4 { TexSplat: {in: density} }
-      shade { TexMath: {op: MathMultiply, a: density4, b_value: {0.22, 0.22, 0.22, 1}} }
-      out { TexMath: {op: MathAdd, a: shade, b_value: {0.78, 0.78, 0.78, 0}} }
-      TextureGraph: {output: out, width: size, height: size / 2, domain: DomainSphere, rate: 12}
+      out {
+        TexMath: {op: MathMix, a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, c: density4}
+      }
+      TextureGraph: {output: out, width: size, height: size / 2, domain: DomainSphere, rate: 3}
     }
 
     body {
@@ -251,72 +270,92 @@ planet_graph {
     prop seed: i32 = 5
     prop size: i32 = 512
 
-    albedo {
-      dir { TexCoords: {} }
-      lat { TexSplit: {input: dir, channel: ChannelG} }
-      time { TexTime: {scale: 1, offset: 20} }
-      line { TexCombine: {r_value: 3, g: lat, b_value: 5, a_value: 1} }
-      jet_noise { TexNoise: {coords: line, frequency: 2.5, octaves: 2, seed: seed * 8 + 3} }
-      jet {
-        TexMath: {
-          op: MathRemap, a: jet_noise, from_min: 0.35, from_max: 0.65, to_min: -2, to_max: 2
-        }
-      }
-      angle { TexMath: {op: MathMultiply, a: time, b: jet} }
-      turned { TexTransform: {coords: dir, angle: angle} }
-      evolve { TexTime: {scale: 0.02, offset: 1} }
-      swirl {
-        TexNoise: {
-          coords: turned, channels: 3, frequency: 2.2, octaves: 3, evolve: evolve,
-          seed: seed * 8 + 5
-        }
-      }
-      swirled { TexWarp: {coords: turned, offset: swirl, amount_value: 1.1} }
-      stretched { TexTransform: {coords: swirled, scale: {1, 5, 1}} }
+    // Zones and belts from the sine of the latitude, made irregular by a noise of the latitude
+    dir { TexCoords: {} }
+    lat { TexSplit: {input: dir, channel: ChannelG} }
+    line { TexCombine: {r_value: 3, g: lat, b_value: 5, a_value: 1} }
+    line_noise { TexNoise: {coords: line, frequency: 2, octaves: 2, seed: seed * 16 + 3} }
+    lat_offset {
+      TexMath: {op: MathRemap, a: line_noise, from_min: 0.5, from_max: 1, to_min: 0, to_max: 0.6}
+    }
+    band_lat { TexMath: {op: MathAdd, a: lat, b: lat_offset} }
+    phase { TexMath: {op: MathMultiply, a: band_lat, b_value: {16, 0, 0, 0}} }
+    wave { TexMath: {op: MathSin, a: phase} }
+
+    // The bands in their own frame, computed once
+    bands {
+      swirl { TexNoise: {channels: 3, frequency: 2.5, octaves: 2, seed: seed * 16 + 5} }
+      swirled { TexWarp: {offset: swirl, amount_value: 0.3} }
+      stretched { TexTransform: {coords: swirled, scale: {1, 4, 1}} }
       turbulence {
-        TexNoise: {
-          coords: stretched, frequency: 2.5, octaves: 5, gain: 0.55, evolve: evolve,
-          seed: seed * 8 + 6
-        }
+        TexNoise: {coords: stretched, frequency: 3, octaves: 5, gain: 0.55, seed: seed * 16 + 6}
       }
       wavy { TexSplit: {input: swirled, channel: ChannelG} }
-      band_line { TexCombine: {r_value: 3, g: wavy, b_value: 8, a_value: 1} }
-      band_noise {
-        TexNoise: {coords: band_line, frequency: 4.5, octaves: 3, gain: 0.6, seed: seed * 8 + 1}
+      wavy_lat { TexMath: {op: MathAdd, a: wavy, b: lat_offset} }
+      wavy_phase { TexMath: {op: MathMultiply, a: wavy_lat, b_value: {16, 0, 0, 0}} }
+      wavy_wave { TexMath: {op: MathSin, a: wavy_phase} }
+      sub_line { TexCombine: {r_value: 6, g: wavy, b_value: 8, a_value: 1} }
+      sub_noise {
+        TexNoise: {coords: sub_line, frequency: 9, octaves: 3, gain: 0.6, seed: seed * 16 + 1}
       }
       band {
-        TexMath: {op: MathRemap, a: band_noise, from_min: 0.3, from_max: 0.7, to_min: 0, to_max: 1}
+        TexMath: {op: MathRemap, a: wavy_wave, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8}
       }
-      detail {
+      sub {
         TexMath: {
-          op: MathRemap, a: turbulence, from_min: 0.3, from_max: 0.7, to_min: -0.1, to_max: 0.1
+          op: MathRemap, a: sub_noise, from_min: 0.4, from_max: 0.6, to_min: -0.2, to_max: 0.2
         }
       }
-      mixed { TexMath: {op: MathAdd, a: band, b: detail} }
+      eddies {
+        TexMath: {
+          op: MathRemap, a: turbulence, from_min: 0.4, from_max: 0.6, to_min: -0.07, to_max: 0.07
+        }
+      }
+      mixed0 { TexMath: {op: MathAdd, a: band, b: sub} }
+      mixed { TexMath: {op: MathAdd, a: mixed0, b: eddies} }
       color {
         TexRamp: {input: mixed, keys: [
-          {0.12, {142, 92, 66}}, {0.26, {214, 186, 148}}, {0.33, {168, 118, 82}},
-          {0.4, {236, 220, 190}}, {0.46, {198, 152, 110}}, {0.52, {168, 118, 82}},
-          {0.58, {236, 220, 190}}, {0.65, {214, 186, 148}}, {0.74, {142, 92, 66}},
-          {0.88, {168, 118, 82}}
+          {0.15, {142, 92, 66}}, {0.35, {168, 118, 82}}, {0.5, {198, 152, 110}},
+          {0.65, {214, 186, 148}}, {0.85, {236, 220, 190}}
         ]}
       }
-      storm_coords { TexTransform: {coords: turned, scale: {1, 2.2, 1}} }
-      cells { TexCells: {coords: storm_coords, count: 26, jitter: 0.8, seed: seed * 8 + 4} }
+      storm_coords { TexTransform: {scale: {1, 2.2, 1}} }
+      cells { TexCells: {coords: storm_coords, count: 48, jitter: 0.8, seed: seed * 16 + 4} }
       cell_distance { TexSplit: {input: cells, channel: ChannelR} }
       cell_pick { TexSplit: {input: cells, channel: ChannelB} }
       cell_tone { TexSplit: {input: cells, channel: ChannelA} }
       core {
         TexMath: {
-          op: MathSmoothstep, a: cell_distance, b_value: {0.3, 0, 0, 0}, c_value: {0.08, 0, 0, 0}
+          op: MathSmoothstep, a: cell_distance, b_value: {0.42, 0, 0, 0}, c_value: {0.34, 0, 0, 0}
         }
       }
-      picked { TexMath: {op: MathStep, a_value: {0.2, 0, 0, 0}, b: cell_pick} }
-      storm { TexMath: {op: MathMultiply, a: core, b: picked} }
-      storm_mix { TexMath: {op: MathMultiply, a: storm, b_value: {0.85, 0, 0, 0}} }
-      storm_color { TexRamp: {input: cell_tone, keys: [{0, {171, 91, 63}}, {1, {244, 236, 216}}]} }
-      out { TexMath: {op: MathMix, a: color, b: storm_color, c: storm_mix} }
-      TextureGraph: {output: out, width: size, height: size / 2, domain: DomainSphere, rate: 12}
+      picked { TexMath: {op: MathStep, a_value: {0.3, 0, 0, 0}, b: cell_pick} }
+      wave_abs { TexMath: {op: MathAbs, a: wave} }
+      between_jets {
+        TexMath: {
+          op: MathSmoothstep, a: wave_abs, b_value: {0.35, 0, 0, 0}, c_value: {0.9, 0, 0, 0}
+        }
+      }
+      storm0 { TexMath: {op: MathMultiply, a: core, b: picked} }
+      storm { TexMath: {op: MathMultiply, a: storm0, b: between_jets} }
+      storm_color { TexRamp: {input: cell_tone, keys: [{0, {184, 86, 60}}, {1, {244, 236, 216}}]} }
+      out { TexMath: {op: MathMix, a: color, b: storm_color, c: storm} }
+      TextureGraph: {output: out, width: size, height: size / 2, domain: DomainSphere}
+    }
+
+    // Each band turns about the pole at the speed of the jet of its latitude, swinging back and
+    // forth with a period of 20 minutes
+    albedo {
+      jet {
+        TexMath: {op: MathSmoothstep, a: wave, b_value: {-0.8, 0, 0, 0}, c_value: {0.8, 0, 0, 0}}
+      }
+      reach { TexMath: {op: MathRemap, a: jet, from_min: 0, from_max: 1, to_min: -45, to_max: 45} }
+      time { TexTime: {scale: 0.00524, offset: -0.5} }
+      swing { TexMath: {op: MathSin, a: time} }
+      angle { TexMath: {op: MathMultiply, a: reach, b: swing} }
+      turned { TexTransform: {coords: dir, angle: angle} }
+      sampled { TexImage: {texture: bands, coords: turned} }
+      TextureGraph: {output: sampled, width: size, height: size / 2, domain: DomainSphere, rate: 12}
     }
 
     body {

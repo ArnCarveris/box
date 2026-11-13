@@ -2321,14 +2321,14 @@ static int32_t planet_node(
     const box_texture_graph_t *graph,
     ecs_entity_t component)
 {
-    int32_t i, id = kind_id(world, component);
-    for (i = 0; i < graph->node_count; i ++) {
+    int32_t i, result = -1, id = kind_id(world, component);
+    for (i = graph->node_count - 1; i >= 0; i --) {
         if (graph->nodes[i].kind == id) {
-            return i;
+            result = i;
         }
     }
 
-    return -1;
+    return result;
 }
 
 /** Get the index of the node of an entity in a compiled graph.
@@ -2341,14 +2341,14 @@ static int32_t planet_entity(
     const box_texture_graph_t *graph,
     ecs_entity_t node)
 {
-    int32_t i;
-    for (i = 0; i < graph->node_count; i ++) {
+    int32_t i, result = -1;
+    for (i = 0; i < graph->node_count && result < 0; i ++) {
         if (graph->nodes[i].entity == node) {
-            return i;
+            result = i;
         }
     }
 
-    return -1;
+    return result;
 }
 
 void TextureGraph_planet_script(void) {
@@ -2360,6 +2360,7 @@ void TextureGraph_planet_script(void) {
     ecs_entity_t normals = planet_map(world, "earth.normals");
     ecs_entity_t clouds = planet_map(world, "earth.clouds");
     ecs_entity_t giant = planet_map(world, "giant.albedo");
+    ecs_entity_t bands = planet_map(world, "giant.bands");
     ecs_entity_t relief = ecs_lookup(world, "earth.relief");
     test_assert(relief != 0);
 
@@ -2393,21 +2394,35 @@ void TextureGraph_planet_script(void) {
 
     g = graph_of(world, clouds);
     test_int(g->domain, DomainSphere);
-    test_flt(g->rate, 12);
+    test_flt(g->rate, 3);
     int32_t time = planet_node(world, g, ecs_id(TexTime));
     test_assert(time >= 0);
-    int32_t noise = planet_node(world, g, ecs_id(TexNoise));
-    test_assert(noise >= 0);
-    test_assert(g->nodes[noise].inputs[1] == time);
+    int32_t i, evolving = 0, noise_id = kind_id(world, ecs_id(TexNoise));
+    for (i = 0; i < g->node_count; i ++) {
+        if (g->nodes[i].kind == noise_id && g->nodes[i].inputs[1] == time) {
+            evolving ++;
+        }
+    }
+
+    test_int(evolving, 1);
     test_assert(planet_node(world, g, ecs_id(TexCurve)) >= 0);
+
+    g = graph_of(world, bands);
+    test_int(g->domain, DomainSphere);
+    test_assert(g->rate == 0);
+    test_assert(planet_node(world, g, ecs_id(TexTime)) < 0);
+    test_assert(planet_node(world, g, ecs_id(TexCells)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexRamp)) >= 0);
 
     g = graph_of(world, giant);
     test_int(g->domain, DomainSphere);
     test_flt(g->rate, 12);
     test_assert(planet_node(world, g, ecs_id(TexTime)) >= 0);
     test_assert(planet_node(world, g, ecs_id(TexTransform)) >= 0);
-    test_assert(planet_node(world, g, ecs_id(TexCells)) >= 0);
-    test_assert(planet_node(world, g, ecs_id(TexRamp)) >= 0);
+    int32_t image = planet_node(world, g, ecs_id(TexImage));
+    test_assert(image >= 0);
+    test_assert(g->nodes[image].texture >= 0);
+    test_assert(g->textures[g->nodes[image].texture].entity == bands);
 
     ecs_fini(world);
 }
@@ -2427,9 +2442,12 @@ void TextureGraph_planet_props_keep_structure(void) {
 
     ecs_entity_t earth = ecs_lookup(world, "earth");
     ecs_entity_t tmpl = ecs_lookup(world, "planet_graph.World");
-    test_assert(earth != 0 && tmpl != 0);
-    void *ptr = ecs_get_mut_id(world, earth, tmpl);
-    test_assert(ptr != NULL);
+    ecs_entity_t relief = ecs_lookup(world, "earth.relief");
+    test_assert(earth != 0 && tmpl != 0 && relief != 0);
+    const ecs_type_info_t *ti = ecs_get_type_info(world, tmpl);
+    test_assert(ti != NULL);
+    void *ptr = ecs_os_malloc(ti->size);
+    ecs_os_memcpy(ptr, ecs_get_id(world, earth, tmpl), ti->size);
     ecs_meta_cursor_t cur = ecs_meta_cursor(world, tmpl, ptr);
     test_int(ecs_meta_push(&cur), 0);
     test_int(ecs_meta_member(&cur, "seed"), 0);
@@ -2440,7 +2458,8 @@ void TextureGraph_planet_props_keep_structure(void) {
     test_int(ecs_meta_set_float(&cur, 0.7), 0);
     test_int(ecs_meta_member(&cur, "bio"), 0);
     test_int(ecs_meta_set_float(&cur, 0.4), 0);
-    ecs_modified_id(world, earth, tmpl);
+    ecs_set_id(world, earth, tmpl, ti->size, ptr);
+    ecs_os_free(ptr);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -2450,6 +2469,9 @@ void TextureGraph_planet_props_keep_structure(void) {
         test_assert(g->structure_hash == structure[i]);
         test_assert(g->param_hash != params[i]);
     }
+
+    test_assert(ecs_is_alive(world, relief));
+    test_assert(ecs_lookup(world, "earth.relief") == relief);
 
     ecs_fini(world);
 }
