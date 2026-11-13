@@ -1042,11 +1042,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-<<<<<<< HEAD
-    test_int(null->texture_node_kinds, 4);
-=======
-    test_int(null->texture_node_kinds, 11);
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+    test_int(null->texture_node_kinds, 12);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1084,11 +1080,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-<<<<<<< HEAD
-    test_int(null->texture_node_kinds, 4);
-=======
-    test_int(null->texture_node_kinds, 11);
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+    test_int(null->texture_node_kinds, 12);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1180,11 +1172,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-<<<<<<< HEAD
-    test_int(second->texture_node_kinds, 4);
-=======
-    test_int(second->texture_node_kinds, 11);
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+    test_int(second->texture_node_kinds, 12);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1211,11 +1199,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-<<<<<<< HEAD
-    test_int(null->texture_node_kinds, 5);
-=======
-    test_int(null->texture_node_kinds, 12);
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+    test_int(null->texture_node_kinds, 13);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1229,26 +1213,6 @@ void TextureGraph_custom_kind_sent(void) {
     box_render_null_free(null);
 }
 
-<<<<<<< HEAD
-void TextureGraph_blocks_kind(void) {
-    // materials/textures
-    ecs_world_t *world = world_new();
-    test_assert(kind_id(world, ecs_id(TexBlocks)) > 0);
-    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexBlocks), TextureNodeKind);
-    test_int(kind->output, TexVector);
-    test_int(kind->input_count, 1);
-    test_str(kind->inputs[0].name, "coords");
-    test_int(kind->inputs[0].type, TexVector);
-    test_bool(kind->inputs[0].fallback, false);
-    test_int(kind->param_count, 10);
-    test_str(kind->params[0].name, "courses");
-    test_str(kind->params[9].name, "layer_seed");
-    test_int(kind->params[9].offset, 36);
-    test_int(kind->params[9].size, 4);
-    test_int(kind->param_size, 48);
-    test_str(kind->function, "box_tex_blocks");
-    test_bool(kind->plane, true);
-=======
 /** Build a graph whose output is a TexMath and get the compiled node of the TexMath.
  *
  * @param world The world
@@ -1484,24 +1448,11 @@ void TextureGraph_coord_kinds(void) {
     test_int(kind->params[2].offset, 32);
     test_int(kind->param_size, 48);
     test_str(kind->function, "box_tex_transform");
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
     test_bool(kind->neighbourhood, false);
 
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
-void TextureGraph_blocks_plane(void) {
-    // materials/textures
-    ecs_world_t *world = world_new();
-    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
-    ecs_entity_t blocks = ecs_entity(world, { .name = "blocks" });
-    ecs_set(world, blocks, TexBlocks, { .courses = 4, .per_course = 3, .gap = 0.02f });
-    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 32 });
-    const TextureStatus *status = frame_status(world, tex);
-    test_int(status->state, TextureReady);
-    test_assert(graph_of(world, tex)->node_count == 1);
-=======
 void TextureGraph_combine_rejects_vector(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1521,28 +1472,10 @@ void TextureGraph_combine_rejects_vector(void) {
     ecs_log_set_level(-4);
     frame_status(world, tex);
     test_failed(world, tex, "node 'math' outputs Vector", "input 'r' of node 'combine'");
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
 
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
-void TextureGraph_blocks_sphere_error(void) {
-    // materials/textures
-    ecs_world_t *world = world_new();
-    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
-    ecs_entity_t blocks = ecs_entity(world, { .name = "blocks" });
-    ecs_set(world, blocks, TexBlocks, { .courses = 4, .per_course = 3, .gap = 0.02f });
-    ecs_log_set_level(-4);
-    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
-        .domain = DomainSphere });
-    frame_status(world, tex);
-    test_failed(world, tex, "'blocks'", "DomainPlane");
-    test_failed(world, tex, "TexBlocks", "'graph'");
-
-    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
-        .domain = DomainPlane });
-=======
 void TextureGraph_builtin_time_splat(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1885,13 +1818,10 @@ void TextureGraph_ramp_too_many_keys(void) {
     value = ecs_get_mut(world, ramp, TexRamp);
     ecs_vec_remove_last(&value->keys);
     ecs_modified(world, ramp, TexRamp);
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
     test_int(frame_status(world, tex)->state, TextureReady);
 
     ecs_fini(world);
 }
-<<<<<<< HEAD
-=======
 
 void TextureGraph_curve_keys_layout(void) {
     // materials/textures
@@ -1997,4 +1927,60 @@ void TextureGraph_array_register_invalid(void) {
 
     ecs_fini(world);
 }
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+
+void TextureGraph_blocks_kind(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    test_assert(kind_id(world, ecs_id(TexBlocks)) > 0);
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexBlocks), TextureNodeKind);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "coords");
+    test_int(kind->inputs[0].type, TexVector);
+    test_bool(kind->inputs[0].fallback, false);
+    test_int(kind->param_count, 10);
+    test_str(kind->params[0].name, "courses");
+    test_str(kind->params[9].name, "layer_seed");
+    test_int(kind->params[9].offset, 36);
+    test_int(kind->params[9].size, 4);
+    test_int(kind->param_size, 48);
+    test_str(kind->function, "box_tex_blocks");
+    test_bool(kind->plane, true);
+    test_bool(kind->neighbourhood, false);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_blocks_plane(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t blocks = ecs_entity(world, { .name = "blocks" });
+    ecs_set(world, blocks, TexBlocks, { .courses = 4, .per_course = 3, .gap = 0.02f });
+    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 32 });
+    const TextureStatus *status = frame_status(world, tex);
+    test_int(status->state, TextureReady);
+    test_assert(graph_of(world, tex)->node_count == 1);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_blocks_sphere_error(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t blocks = ecs_entity(world, { .name = "blocks" });
+    ecs_set(world, blocks, TexBlocks, { .courses = 4, .per_course = 3, .gap = 0.02f });
+    ecs_log_set_level(-4);
+    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
+        .domain = DomainSphere });
+    frame_status(world, tex);
+    test_failed(world, tex, "'blocks'", "DomainPlane");
+    test_failed(world, tex, "TexBlocks", "'graph'");
+
+    ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
+        .domain = DomainPlane });
+    test_int(frame_status(world, tex)->state, TextureReady);
+
+    ecs_fini(world);
+}

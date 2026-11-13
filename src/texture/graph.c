@@ -133,7 +133,6 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
-<<<<<<< HEAD
 /** WGSL of the TexBlocks node: the courses of blocks of box_gen_blocks of texture/gen.c.
  *
  * The cuts of the course of the texel are made again rather than sorted: the block starts at
@@ -252,7 +251,8 @@ static const char *box_texture_blocks_wgsl =
     "    }\n"
     "    let level = select(0.0, f32(tone) / f32(max(tones - 1, 1)), tones > 1);\n"
     "    return vec4f(mask, id, level, random);\n"
-=======
+    "}\n";
+
 /** WGSL of the TexRamp node: the display encoded colors of the keys around the input mixed as
  * box_gen_ramp does, decoded to linear; the elements are (position, r, g, b) in 0..1 */
 static const char *box_texture_ramp_wgsl =
@@ -404,7 +404,6 @@ static const char *box_texture_time_wgsl =
 static const char *box_texture_splat_wgsl =
     "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x);\n"
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
     "}\n";
 
 /** State of the build of one graph */
@@ -1150,8 +1149,6 @@ static int32_t box_texture_graph_visit(
         goto done;
     }
 
-<<<<<<< HEAD
-    box_texture_graph_check_type(b, e, kind->output, from, input, expected);
     if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain == DomainSphere) {
         char *component = ecs_get_path(b->world, kind->component);
         box_texture_graph_error(b, "node '%s' (%s) works on DomainPlane only, the graph is on "
@@ -1159,8 +1156,6 @@ static int32_t box_texture_graph_visit(
         ecs_os_free(component);
     }
 
-=======
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
         box_texture_graph_error(b, "more than %d nodes", BOX_TEXTURE_GRAPH_NODES);
     }
@@ -1441,9 +1436,6 @@ done:
     return;
 }
 
-<<<<<<< HEAD
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexBlocks.
-=======
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -1508,8 +1500,7 @@ done:
 }
 
 /** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
- * TexWarp, TexTransform, TexTime, TexSplat, TexRamp and TexCurve.
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+ * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve and TexBlocks.
  *
  * @param world The world
  */
@@ -1553,26 +1544,6 @@ static void box_texture_nodes_register(
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
-<<<<<<< HEAD
-        .component = ecs_id(TexBlocks),
-        .output = TexVector,
-        .inputs = {{ "coords", offsetof(TexBlocks, coords), TexVector, NULL, 0 }},
-        .params = {
-            { "courses", offsetof(TexBlocks, courses), 4, BOX_TEXTURE_PARAM_I32 },
-            { "per_course", offsetof(TexBlocks, per_course), 4, BOX_TEXTURE_PARAM_I32 },
-            { "tones", offsetof(TexBlocks, tones), 4, BOX_TEXTURE_PARAM_I32 },
-            { "tone_order", offsetof(TexBlocks, tone_order), 4, BOX_TEXTURE_PARAM_I32 },
-            { "gap", offsetof(TexBlocks, gap), 4, BOX_TEXTURE_PARAM_F32 },
-            { "jitter", offsetof(TexBlocks, jitter), 4, BOX_TEXTURE_PARAM_F32 },
-            { "stagger", offsetof(TexBlocks, stagger), 4, BOX_TEXTURE_PARAM_F32 },
-            { "softness", offsetof(TexBlocks, softness), 4, BOX_TEXTURE_PARAM_F32 },
-            { "seed", offsetof(TexBlocks, seed), 4, BOX_TEXTURE_PARAM_I32 },
-            { "layer_seed", offsetof(TexBlocks, layer_seed), 4, BOX_TEXTURE_PARAM_I32 }
-        },
-        .function = "box_tex_blocks",
-        .source = box_texture_blocks_wgsl,
-        .flags = BOX_TEXTURE_NODE_PLANE
-=======
         .component = ecs_id(TexSplit),
         .output = TexScalar,
         .inputs = {
@@ -1673,7 +1644,27 @@ static void box_texture_nodes_register(
             BOX_TEXTURE_CURVE_KEYS, box_texture_curve_pack },
         .function = "box_tex_curve",
         .source = box_texture_curve_wgsl
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexBlocks),
+        .output = TexVector,
+        .inputs = {{ "coords", offsetof(TexBlocks, coords), TexVector, NULL, 0, true }},
+        .params = {
+            { "courses", offsetof(TexBlocks, courses), 4, BOX_TEXTURE_PARAM_I32 },
+            { "per_course", offsetof(TexBlocks, per_course), 4, BOX_TEXTURE_PARAM_I32 },
+            { "tones", offsetof(TexBlocks, tones), 4, BOX_TEXTURE_PARAM_I32 },
+            { "tone_order", offsetof(TexBlocks, tone_order), 4, BOX_TEXTURE_PARAM_I32 },
+            { "gap", offsetof(TexBlocks, gap), 4, BOX_TEXTURE_PARAM_F32 },
+            { "jitter", offsetof(TexBlocks, jitter), 4, BOX_TEXTURE_PARAM_F32 },
+            { "stagger", offsetof(TexBlocks, stagger), 4, BOX_TEXTURE_PARAM_F32 },
+            { "softness", offsetof(TexBlocks, softness), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexBlocks, seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "layer_seed", offsetof(TexBlocks, layer_seed), 4, BOX_TEXTURE_PARAM_I32 }
+        },
+        .function = "box_tex_blocks",
+        .source = box_texture_blocks_wgsl,
+        .flags = BOX_TEXTURE_NODE_PLANE
     });
 }
 

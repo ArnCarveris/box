@@ -3,11 +3,8 @@
  * @brief Tests for the evaluation of TextureGraph on the GPU backend: the images of constant,
  * coordinate and math graphs in both domains read back, nodes read back, compiles shared by
  * structure and kept by parameter edits, failures, status and a material that samples a graph,
-<<<<<<< HEAD
- * and the TexBlocks node against the GenBlocks layers of TextureGen.
-=======
- * and the TexRamp and TexCurve nodes against their CPU twins.
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
+ * the TexBlocks node against the GenBlocks layers of TextureGen and the TexRamp and TexCurve
+ * nodes against their CPU twins.
  */
 
 #include <box.h>
@@ -15,11 +12,7 @@
 #include <math.h>
 #include <string.h>
 #include "render.h"
-<<<<<<< HEAD
-#include "../../../../src/texture/texture.h"
-=======
 #include "texture.h"
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -944,7 +937,6 @@ void TextureGraphEval_material_samples_graph(void) {
     ecs_fini(world);
 }
 
-<<<<<<< HEAD
 /** Texels whose block or mask may differ from GenBlocks, of every 1000: those whose center
  * falls within float rounding of a cut or a course */
 #define TG_BLOCKS_OUTLIERS (5)
@@ -1175,7 +1167,9 @@ void TextureGraphEval_blocks_sphere_error(void) {
     test_assert(strstr(status->error, "DomainPlane") != NULL);
     test_assert(strstr(status->error, "blocks_graph") != NULL);
 
-=======
+    ecs_fini(world);
+}
+
 /** Keys of the ramps of the tests: the outer keys at texel centers of a 32 wide plane, so the
  * texels 6, 15 and 25 are at a key */
 #define TG_RAMP_KEYS \
@@ -1533,6 +1527,5 @@ void TextureGraphEval_ramp_too_many_keys(void) {
     test_int(status->state, TextureFailed);
     test_assert(status->error != NULL);
     test_assert(strstr(status->error, "more than 32") != NULL);
->>>>>>> e5e6a8842deb871d0e595c491a6bb18bdb8c07cf
     ecs_fini(world);
 }
