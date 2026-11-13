@@ -262,7 +262,6 @@ assets {
     const used = used_bars()
     const free = supply - used
     const pips = min(supply, 40)
-    const short = (need[0] - alloc[0]) + (need[1] - alloc[1]) + (need[2] - alloc[2]) + (need[3] - alloc[3]) + (need[4] - alloc[4]) + (need[5] - alloc[5]) + (need[6] - alloc[6]) + (need[7] - alloc[7]) + (need[8] - alloc[8])
 
     pool {
       Layout: {direction: Row, spacing: 6, v: Middle}
@@ -275,9 +274,6 @@ assets {
     pips {
       Layout: {direction: Row, spacing: 2}
       LayoutItem: {width: {mode: Grow}}
-      if supply == 0 {
-        OpsCaption none(text: "All reactors are offline", size: 11, tone: UI_BAD)
-      }
       for i in 0..pips {
         PowerPip "pip_{i}"(tone: i < used ? UI_OK : UI_WARN)
       }
@@ -288,13 +284,6 @@ assets {
       for c in 0..CHANNELS {
         PowerColumn "chan_{c}"(c: c)
       }
-    }
-    YardRule rule()
-    footer {
-      Layout: {direction: Row, spacing: 6, v: Middle}
-      LayoutItem: {width: {mode: Grow}}
-      YardIcon glyph(icon: short == 0 ? yard_icon_ok : yard_icon_warn, size: 13, state: short == 0 ? UI_GOOD : UI_WARN)
-      OpsCaption status(text: short == 0 ? "Every system has the power it needs" : short == 1 ? "1 bar short of full power" : "{short} bars short of full power", size: 11, tone: short == 0 ? UI_SOFT : UI_WARN)
     }
   }
 
@@ -362,8 +351,6 @@ assets {
       YardFiller gap()
       if drives == 0 {
         OpsCaption note(text: liner ? "No main drives" : "No engines", size: 11, tone: UI_BAD)
-      } else if drive_on && pf[C_DRIVE] == 0 {
-        OpsCaption note(text: "Drives have no power", size: 11, tone: UI_WARN)
       } else if burning {
         OpsCaption note(text: "BURN {clock(fuel / max(rate, 0.0001))} LEFT", size: 11, tone: UI_WARN, mono: true)
       } else {
