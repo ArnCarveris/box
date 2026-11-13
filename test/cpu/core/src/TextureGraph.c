@@ -22,6 +22,9 @@
 /** Billow noise at coordinates warped by a vector of noise */
 #define GRAPH_NOISE "test/assets/textures/graph/noise.flecs"
 
+/** A rocky world and a gas giant whose maps are graphs on the sphere domain, as templates */
+#define GRAPH_PLANET "test/assets/textures/graph/planet.flecs"
+
 /** Node of a scalar kind registered by the tests, as an application registers its own */
 typedef struct TestScalar {
     float value;        /**< Parameter */
@@ -2262,6 +2265,191 @@ void TextureGraph_noise_script(void) {
     test_int(octaves, 5);
     test_int(fractal, NoiseBillow);
     test_int(graph->nodes[3].param_size, 32 + 2 * 16);
+
+    ecs_fini(world);
+}
+
+/** Load the planet templates, declare a World and a Giant and run frames until the graphs that
+ * sample the biome table are built.
+ *
+ * @param world The world
+ */
+static void planet_load(
+    ecs_world_t *world)
+{
+    run_file(world, GRAPH_PLANET);
+    test_int(ecs_script_run(world, "planets",
+        "planet_graph.World earth(seed: 7, water: 0.6, temp: 0.5, bio: 0.8, size: 64)\n"
+        "planet_graph.Giant giant(seed: 5, size: 64)\n", NULL), 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+}
+
+/** Get the ready texture of an entity of the planets by path.
+ *
+ * @param world The world
+ * @param path The path of the texture entity
+ * @return The texture entity
+ */
+static ecs_entity_t planet_map(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t e = ecs_lookup(world, path);
+    test_assert(e != 0);
+    const TextureStatus *status = ecs_get(world, e, TextureStatus);
+    test_assert(status != NULL);
+    if (status->state != TextureReady) {
+        printf("%s: %s\n", path, status->error ? status->error : "not ready");
+    }
+
+    test_int(status->state, TextureReady);
+
+    return e;
+}
+
+/** Get the index of the first node of a kind in a compiled graph.
+ *
+ * @param world The world
+ * @param graph The graph
+ * @param component The node component of the kind
+ * @return The index, -1 when no node has the kind
+ */
+static int32_t planet_node(
+    ecs_world_t *world,
+    const box_texture_graph_t *graph,
+    ecs_entity_t component)
+{
+    int32_t i, id = kind_id(world, component);
+    for (i = 0; i < graph->node_count; i ++) {
+        if (graph->nodes[i].kind == id) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+/** Get the index of the node of an entity in a compiled graph.
+ *
+ * @param graph The graph
+ * @param node The node entity
+ * @return The index, -1 when the graph does not reach it
+ */
+static int32_t planet_entity(
+    const box_texture_graph_t *graph,
+    ecs_entity_t node)
+{
+    int32_t i;
+    for (i = 0; i < graph->node_count; i ++) {
+        if (graph->nodes[i].entity == node) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void TextureGraph_planet_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    planet_load(world);
+    ecs_entity_t table = planet_map(world, "earth.table");
+    ecs_entity_t albedo = planet_map(world, "earth.albedo");
+    ecs_entity_t normals = planet_map(world, "earth.normals");
+    ecs_entity_t clouds = planet_map(world, "earth.clouds");
+    ecs_entity_t giant = planet_map(world, "giant.albedo");
+    ecs_entity_t relief = ecs_lookup(world, "earth.relief");
+    test_assert(relief != 0);
+
+    const box_texture_graph_t *g = graph_of(world, table);
+    test_int(g->domain, DomainPlane);
+    test_int(g->width, 32);
+    test_int(g->height, 32);
+    test_assert(planet_node(world, g, ecs_id(TexCurve)) >= 0);
+
+    g = graph_of(world, albedo);
+    test_int(g->domain, DomainSphere);
+    test_int(g->width, 64);
+    test_int(g->height, 32);
+    test_int(g->format, GraphColor);
+    test_assert(g->rate == 0);
+    int32_t lut = planet_node(world, g, ecs_id(TexLut));
+    test_assert(lut >= 0);
+    test_assert(g->nodes[lut].texture >= 0);
+    test_assert(g->textures[g->nodes[lut].texture].entity == table);
+    test_assert(planet_node(world, g, ecs_id(TexSlope)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexBlur)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexWarp)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexTime)) < 0);
+    test_assert(planet_entity(g, relief) >= 0);
+
+    g = graph_of(world, normals);
+    test_int(g->domain, DomainSphere);
+    test_int(g->format, GraphLinear);
+    test_int(g->nodes[g->node_count - 1].kind, kind_id(world, ecs_id(TexNormal)));
+    test_assert(planet_entity(g, relief) >= 0);
+
+    g = graph_of(world, clouds);
+    test_int(g->domain, DomainSphere);
+    test_flt(g->rate, 12);
+    int32_t time = planet_node(world, g, ecs_id(TexTime));
+    test_assert(time >= 0);
+    int32_t noise = planet_node(world, g, ecs_id(TexNoise));
+    test_assert(noise >= 0);
+    test_assert(g->nodes[noise].inputs[1] == time);
+    test_assert(planet_node(world, g, ecs_id(TexCurve)) >= 0);
+
+    g = graph_of(world, giant);
+    test_int(g->domain, DomainSphere);
+    test_flt(g->rate, 12);
+    test_assert(planet_node(world, g, ecs_id(TexTime)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexTransform)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexCells)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexRamp)) >= 0);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_planet_props_keep_structure(void) {
+    // materials/textures
+    const char *paths[] = {"earth.table", "earth.albedo", "earth.normals", "earth.clouds"};
+    uint64_t structure[4], params[4];
+    int32_t i;
+    ecs_world_t *world = world_new();
+    planet_load(world);
+    for (i = 0; i < 4; i ++) {
+        const box_texture_graph_t *g = graph_of(world, planet_map(world, paths[i]));
+        structure[i] = g->structure_hash;
+        params[i] = g->param_hash;
+    }
+
+    ecs_entity_t earth = ecs_lookup(world, "earth");
+    ecs_entity_t tmpl = ecs_lookup(world, "planet_graph.World");
+    test_assert(earth != 0 && tmpl != 0);
+    void *ptr = ecs_get_mut_id(world, earth, tmpl);
+    test_assert(ptr != NULL);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, tmpl, ptr);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "seed"), 0);
+    test_int(ecs_meta_set_int(&cur, 12), 0);
+    test_int(ecs_meta_member(&cur, "water"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.3), 0);
+    test_int(ecs_meta_member(&cur, "temp"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.7), 0);
+    test_int(ecs_meta_member(&cur, "bio"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.4), 0);
+    ecs_modified_id(world, earth, tmpl);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    for (i = 0; i < 4; i ++) {
+        const box_texture_graph_t *g = graph_of(world, planet_map(world, paths[i]));
+        test_assert(g->structure_hash == structure[i]);
+        test_assert(g->param_hash != params[i]);
+    }
 
     ecs_fini(world);
 }

@@ -426,7 +426,9 @@
                     "array_register_invalid",
                     "blocks_kind",
                     "blocks_plane",
-                    "blocks_sphere_error"
+                    "blocks_sphere_error",
+                    "planet_script",
+                    "planet_props_keep_structure"
                 ]
             },
             {

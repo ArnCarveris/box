@@ -1,0 +1,46 @@
+// Planets whose maps are the texture graphs of test/assets/textures/graph/planet, lit by a sun
+// from the front left. On the left a rocky world tilted with its north pole toward the camera:
+// green and brown continents with ragged warped coasts in a blue sea, lighter near the shores and
+// dark in the deep, mountain ranges in gray rock with a lit and a shaded flank, white snow on the
+// highest peaks and a white ice cap around the pole that is round, without a pinch, a seam or a
+// raised rim; dry tan land around 30 degrees and lush green near the equator. Over it white clouds
+// with swirls, thicker in bands at the equator and at mid latitudes, through which the surface
+// shows. On the right a gas giant of cream, tan and brown bands with wavy edges and streaky
+// turbulence along them, a few pale or reddish storm ovals, and no seam where the longitude wraps.
+// frames: 30
+
+include test/assets/textures/graph/planet
+
+using box.transform
+using box.camera
+using box.view
+using box.light
+
+$ {
+  AmbientLight: {sky: {60, 70, 90}, ground: {20, 20, 24}, intensity: 0.4}
+}
+
+camera {
+  Position: {0, 0, 5.4}
+  Camera: {fov: 45}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {4, 6, 10, 255}}}
+}
+
+sun {
+  Rotation: {-0.35, -0.6, 0}
+  DirectionalLight: {intensity: 4}
+  Rgb: {255, 248, 236}
+}
+
+planet_graph.World earth(seed: 7, water: 0.62, temp: 0.5, bio: 0.85, size: 512) {
+  Position: {-1.25, 0, 0}
+  Rotation: {0.55, 0.4, 0}
+}
+
+planet_graph.Giant giant(seed: 5, size: 512) {
+  Position: {1.25, 0, 0}
+  Rotation: {0.15, 0, 0.1}
+}
