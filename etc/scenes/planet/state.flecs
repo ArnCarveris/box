@@ -21,19 +21,23 @@ state {
 
   export const SUN_DAY: f32 = 123
 
+  // The planet the scene starts with and resets to
+  export const START_KIND: i32 = KIND_GARDEN
+  export const START_SEED: i32 = 23
+
   // The planet the panel edits: its kind, seed, detail and parameters
-  export mut kind: i32 = KIND_GARDEN
-  export mut seed: i32 = 23
+  export mut kind: i32 = START_KIND
+  export mut seed: i32 = START_SEED
   export mut detail: i32 = 2
-  export mut body: PlanetBody = body_preset(23)
-  export mut surface: PlanetSurface = surface_preset(KIND_GARDEN, 23)
-  export mut climate: PlanetClimate = climate_preset(KIND_GARDEN)
-  export mut air: PlanetAir = air_preset(KIND_GARDEN, 23)
-  export mut clouds: PlanetClouds = clouds_preset(KIND_GARDEN)
-  export mut night: PlanetNight = night_preset(KIND_GARDEN)
-  export mut lava: PlanetLava = lava_preset(KIND_GARDEN)
-  export mut gas: PlanetGas = gas_preset(23)
-  export mut rings: PlanetRings = rings_preset(KIND_GARDEN, 23)
+  export mut body: PlanetBody = body_preset(START_SEED)
+  export mut surface: PlanetSurface = surface_preset(START_KIND, START_SEED)
+  export mut climate: PlanetClimate = climate_preset(START_KIND)
+  export mut air: PlanetAir = air_preset(START_KIND, START_SEED)
+  export mut clouds: PlanetClouds = clouds_preset(START_KIND)
+  export mut night: PlanetNight = night_preset(START_KIND)
+  export mut lava: PlanetLava = lava_preset(START_KIND)
+  export mut gas: PlanetGas = gas_preset(START_SEED)
+  export mut rings: PlanetRings = rings_preset(START_KIND, START_SEED)
   export mut sun_angle: f32 = SUN_DAY
   export mut orbit_yaw: f32 = 0
   export mut orbit_pitch: f32 = 0
@@ -43,13 +47,13 @@ state {
   // evaluation per step. edits counts the changes, shown_edits the last one shown
   export mut edits: i32 = 0
   export mut shown_edits: i32 = 0
-  export mut shown_kind: i32 = KIND_GARDEN
-  export mut shown_seed: i32 = 23
+  export mut shown_kind: i32 = START_KIND
+  export mut shown_seed: i32 = START_SEED
   export mut shown_detail: i32 = 2
-  export mut shown_surface: PlanetSurface = surface_preset(KIND_GARDEN, 23)
-  export mut shown_climate: PlanetClimate = climate_preset(KIND_GARDEN)
-  export mut shown_clouds: PlanetClouds = clouds_preset(KIND_GARDEN)
-  export mut shown_night: PlanetNight = night_preset(KIND_GARDEN)
-  export mut shown_lava: PlanetLava = lava_preset(KIND_GARDEN)
-  export mut shown_gas: PlanetGas = gas_preset(23)
+  export mut shown_surface: PlanetSurface = surface_preset(START_KIND, START_SEED)
+  export mut shown_climate: PlanetClimate = climate_preset(START_KIND)
+  export mut shown_clouds: PlanetClouds = clouds_preset(START_KIND)
+  export mut shown_night: PlanetNight = night_preset(START_KIND)
+  export mut shown_lava: PlanetLava = lava_preset(START_KIND)
+  export mut shown_gas: PlanetGas = gas_preset(START_SEED)
 }

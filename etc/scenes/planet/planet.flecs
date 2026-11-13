@@ -103,12 +103,8 @@ planets {
     }
   }
 
-  // Tint of the bands of a gas giant, warmer the hotter and bluer the colder its equator
-  fn gas_tint(equator: f32) -> Col {
-    const t: f32 = (equator - 0.25) / 0.9
-    const warm: Col = mixc({255, 255, 255}, {255, 196, 150}, sat((t - 0.62) / 0.38) * 0.5)
-    mixc(warm, {170, 200, 255}, sat((0.42 - t) / 0.42) * 0.5)
-  }
+  // Tint of the bands of a gas giant of the presets, a giant of a temperate equator
+  fn gas_white() -> Col { {252.98, 253.69, 255} }
 
   // Color i of the bands of a gas giant of a seed: a palette of the seed, nudged toward the next
   fn gas_tone(sd: i32, i: i32, tint: Col) -> Col {
@@ -163,8 +159,9 @@ planets {
   struct PlanetLava(level: f32, cracks: f32, emission: f32)
 
   // A gas giant: the frequency of the bands over the sine of the latitude, the turbulence of
-  // their edges, how far in degrees the jets drift them and the fraction of cells with a storm
-  struct PlanetGas(bands: f32, turbulence: f32, drift: f32, storms: f32)
+  // their edges, how far in degrees the jets drift them, the fraction of cells with a storm and
+  // the tint of the colors of the bands, warm for a hot giant and blue for a cold one
+  struct PlanetGas(bands: f32, turbulence: f32, drift: f32, storms: f32, tint: Col)
 
   // Rings: their outer radius in planet radii, opacity and color
   struct PlanetRings(enabled: bool, size: f32, opacity: f32, color: Col)
@@ -220,8 +217,7 @@ planets {
 
   fn air_preset(kind: i32, seed: i32) -> PlanetAir {
     const sd: i32 = seed_of(seed)
-    const tint_gas: Col = gas_tint(0.61)
-    const g: Col = mixc(gas_tone(sd, 2, tint_gas), gas_tone(sd, 1, tint_gas), 0.4)
+    const g: Col = mixc(gas_tone(sd, 2, gas_white()), gas_tone(sd, 1, gas_white()), 0.4)
     const g_max: f32 = max(max(g.r, g.g), max(g.b, 1))
     const tint: Col = match kind {
       0: {255, 225, 195}; 1: {255, 175.9, 105.5}; 2: {180.6, 227.4, 255}; 3: {255, 104, 48}
@@ -273,15 +269,14 @@ planets {
     const sd: i32 = seed_of(seed)
     {
       bands: 13 + h01(sd, 1) * 6, turbulence: 0.07, drift: 35 + h01(sd, 2) * 20,
-      storms: 0.12 + h01(sd, 4) * 0.12
+      storms: 0.12 + h01(sd, 4) * 0.12, tint: gas_white()
     }
   }
 
   fn rings_preset(kind: i32, seed: i32) -> PlanetRings {
     const sd: i32 = seed_of(seed)
-    const tint_gas: Col = gas_tint(0.61)
     const dust: Col = mixc({214, 204, 184}, {196, 170, 140}, h01(sd, 1))
-    const ice: Col = mixc(gas_tone(sd, 2, tint_gas), {255, 255, 255}, 0.4)
+    const ice: Col = mixc(gas_tone(sd, 2, gas_white()), {255, 255, 255}, 0.4)
     {enabled: kind == 4, size: 2.3, opacity: 1, color: mixc(dust, ice, kind == 4 ? 0.35 : 0)}
   }
 
@@ -345,12 +340,11 @@ planets {
     const s2: Col = sea_col(2, v3, 0, hot)
     const s3: Col = sea_col(3, v3, 0, hot)
 
-    const gtint: Col = gas_tint(climate.equator)
-    const g0: Col = gas_tone(sd, 0, gtint)
-    const g1: Col = gas_tone(sd, 1, gtint)
-    const g2: Col = gas_tone(sd, 2, gtint)
-    const g3: Col = gas_tone(sd, 3, gtint)
-    const g4: Col = gas_tone(sd, 4, gtint)
+    const g0: Col = gas_tone(sd, 0, gas.tint)
+    const g1: Col = gas_tone(sd, 1, gas.tint)
+    const g2: Col = gas_tone(sd, 2, gas.tint)
+    const g3: Col = gas_tone(sd, 3, gas.tint)
+    const g4: Col = gas_tone(sd, 4, gas.tint)
 
     const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
     const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
@@ -447,7 +441,6 @@ planets {
 
     if air_on {
       PlanetAtmosphere: {
-        sun: sun
         radius: radius
         thickness: max(air.rayleigh_height, air.mie_height) * 6
         rayleigh: {

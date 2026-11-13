@@ -24,9 +24,9 @@ state {
   }
 
   fn reset() {
-    state.seed = 23
+    state.seed = START_SEED
     state.detail = 2
-    preset(KIND_GARDEN)
+    preset(START_KIND)
     state.sun_angle = SUN_DAY
     state.orbit_yaw = 0
     state.orbit_pitch = 0
@@ -44,129 +44,129 @@ state {
     state.shown_gas = state.gas
     state.shown_edits = state.edits
   }
+
+  // A color with one channel, r, g or b, set to v
+  fn with_channel(c: Col, channel: string, v: f32) -> Col {
+    {channel == "r" ? v : c.r, channel == "g" ? v : c.g, channel == "b" ? v : c.b}
+  }
+
+  // Set the parameter of the slider n in the group of the panel g to v
+  fn edit(g: string, n: string, v: f32) {
+    if g == "panel" {
+      if n == "sun" { state.sun_angle = v }
+    } else if g == "body" {
+      if n == "radius" { state.body.radius = v }
+      else if n == "tilt" { state.body.tilt = v }
+      else if n == "lean" { state.body.lean = v }
+      else if n == "spin" { state.body.spin = v }
+    } else if g == "surface" {
+      if n == "ocean" { state.surface.ocean = v }
+      else if n == "continents" { state.surface.continents = v }
+      else if n == "warp" { state.surface.warp = v }
+      else if n == "mountains" { state.surface.mountains = v }
+      else if n == "mountain_cover" { state.surface.mountain_cover = v }
+      else if n == "craters" { state.surface.craters = v }
+      else if n == "cracks" { state.surface.cracks = v }
+      else if n == "plates" { state.surface.plates = v }
+      else if n == "crack_shade" { state.surface.crack_shade = v }
+      else if n == "normal" { state.surface.normal = v }
+      else if n == "variation" { state.surface.variation = v }
+      else if n == "beach" { state.surface.beach = v }
+    } else if g == "climate" {
+      if n == "equator" { state.climate.equator = v }
+      else if n == "poles" { state.climate.poles = v }
+      else if n == "lapse" { state.climate.lapse = v }
+      else if n == "ice" { state.climate.ice = v }
+      else if n == "snow_line" { state.climate.snow_line = v }
+      else if n == "snow" { state.climate.snow = v }
+      else if n == "moisture" { state.climate.moisture = v }
+      else if n == "vegetation" { state.climate.vegetation = v }
+      else if n == "treeline" { state.climate.treeline = v }
+    } else if g == "air" {
+      if n == "density" { state.air.density = v }
+      else if n == "rayleigh_height" { state.air.rayleigh_height = v }
+      else if n == "rayleigh" { state.air.rayleigh = v }
+      else if n == "mie_height" { state.air.mie_height = v }
+      else if n == "mie" { state.air.mie = v }
+      else if n == "anisotropy" { state.air.anisotropy = v }
+    } else if g == "clouds" {
+      if n == "cover" { state.clouds.cover = v }
+      else if n == "opacity" { state.clouds.opacity = v }
+      else if n == "frequency" { state.clouds.frequency = v }
+      else if n == "speed" { state.clouds.speed = v }
+      else if n == "evolve" { state.clouds.evolve = v }
+    } else if g == "night" {
+      if n == "density" { state.night.density = v }
+      else if n == "brightness" { state.night.brightness = v }
+    } else if g == "lava" {
+      if n == "level" { state.lava.level = v }
+      else if n == "cracks" { state.lava.cracks = v }
+      else if n == "emission" { state.lava.emission = v }
+    } else if g == "gas" {
+      if n == "bands" { state.gas.bands = v }
+      else if n == "turbulence" { state.gas.turbulence = v }
+      else if n == "drift" { state.gas.drift = v }
+      else if n == "storms" { state.gas.storms = v }
+    } else if g == "rings" {
+      if n == "size" { state.rings.size = v }
+      else if n == "opacity" { state.rings.opacity = v }
+    }
+  }
+
+  // Set channel c of the color n in the group of the panel g to v
+  fn edit_color(g: string, n: string, c: string, v: f32) {
+    if g == "air" {
+      state.air.tint = with_channel(state.air.tint, c, v)
+    } else if g == "clouds" {
+      state.clouds.color = with_channel(state.clouds.color, c, v)
+    } else if g == "gas" {
+      state.gas.tint = with_channel(state.gas.tint, c, v)
+    } else if g == "rings" {
+      state.rings.color = with_channel(state.rings.color, c, v)
+    }
+  }
+
+  // Set the switch n in the group of the panel g to on
+  fn edit_switch(g: string, n: string, on: bool) {
+    if g == "night" {
+      state.night.lights = on
+    } else if g == "rings" {
+      state.rings.enabled = on
+    }
+  }
 }
 
-// A change of a widget of the panel reads the values of the widgets: a new type loads its
-// preset, else the parameters of the groups the type shows take the values of their sliders
+// A change of a widget of the panel sets the value it stands for: a new type loads its preset,
+// the other widgets set their parameter, found by the names of the widget and of its group. Only
+// the widget that changed is read, so the other parameters keep their exact values
 async {
   while true {
     const e = await on.change(hud.screen.side.panel)
-    const picked: i32 = hud.screen.side.panel.type.kind[Dropdown.mut].current
-    if e.widget.has(Button) {
-      // The Random and Reset buttons act through their actions
-    } else if picked != state.kind {
-      preset(picked)
-    } else {
-      const g = hud.screen.side.panel.lookup("groups")
-      state.seed = hud.screen.side.panel.variant.seed[Stepper.mut].current
-      state.detail = hud.screen.side.panel.level.detail[Stepper.mut].current
-      state.sun_angle = hud.screen.side.panel.sun[Slider.mut].current
-
-      const b = g.lookup("body")
-      state.body = {
-        radius: b.lookup("radius")[Slider.mut].current,
-        tilt: b.lookup("tilt")[Slider.mut].current,
-        lean: b.lookup("lean")[Slider.mut].current,
-        spin: b.lookup("spin")[Slider.mut].current
+    const w = e.widget
+    if w.has(Dropdown) {
+      const picked: i32 = w[Dropdown.mut].current
+      if picked != state.kind {
+        preset(picked)
       }
-
-      const a = g.lookup("air")
-      const at = a.lookup("tint").lookup("channels")
-      state.air = {
-        density: a.lookup("density")[Slider.mut].current,
-        rayleigh_height: a.lookup("rayleigh_height")[Slider.mut].current,
-        rayleigh: a.lookup("rayleigh")[Slider.mut].current,
-        mie_height: a.lookup("mie_height")[Slider.mut].current,
-        mie: a.lookup("mie")[Slider.mut].current,
-        anisotropy: a.lookup("anisotropy")[Slider.mut].current,
-        tint: {
-          at.lookup("r")[Slider.mut].current,
-          at.lookup("g")[Slider.mut].current,
-          at.lookup("b")[Slider.mut].current
-        }
-      }
-
-      const r = g.lookup("rings")
-      const rc = r.lookup("color").lookup("channels")
-      state.rings = {
-        enabled: r.lookup("enabled")[Checkbox.mut].current,
-        size: r.lookup("size")[Slider.mut].current,
-        opacity: r.lookup("opacity")[Slider.mut].current,
-        color: {
-          rc.lookup("r")[Slider.mut].current,
-          rc.lookup("g")[Slider.mut].current,
-          rc.lookup("b")[Slider.mut].current
-        }
-      }
-
-      if state.kind == state.KIND_GAS {
-        const gg = g.lookup("gas")
-        state.gas = {
-          bands: gg.lookup("bands")[Slider.mut].current,
-          turbulence: gg.lookup("turbulence")[Slider.mut].current,
-          drift: gg.lookup("drift")[Slider.mut].current,
-          storms: gg.lookup("storms")[Slider.mut].current
-        }
+    } else if w.has(Stepper) {
+      if w.name() == "seed" {
+        state.seed = w[Stepper.mut].current
       } else {
-        const s = g.lookup("surface")
-        state.surface = {
-          ocean: s.lookup("ocean")[Slider.mut].current,
-          continents: s.lookup("continents")[Slider.mut].current,
-          warp: s.lookup("warp")[Slider.mut].current,
-          mountains: s.lookup("mountains")[Slider.mut].current,
-          mountain_cover: s.lookup("mountain_cover")[Slider.mut].current,
-          craters: s.lookup("craters")[Slider.mut].current,
-          cracks: s.lookup("cracks")[Slider.mut].current,
-          plates: s.lookup("plates")[Slider.mut].current,
-          crack_shade: s.lookup("crack_shade")[Slider.mut].current,
-          normal: s.lookup("normal")[Slider.mut].current,
-          variation: s.lookup("variation")[Slider.mut].current,
-          beach: s.lookup("beach")[Slider.mut].current
-        }
-
-        const c = g.lookup("climate")
-        state.climate = {
-          equator: c.lookup("equator")[Slider.mut].current,
-          poles: c.lookup("poles")[Slider.mut].current,
-          lapse: c.lookup("lapse")[Slider.mut].current,
-          ice: c.lookup("ice")[Slider.mut].current,
-          snow_line: c.lookup("snow_line")[Slider.mut].current,
-          snow: c.lookup("snow")[Slider.mut].current,
-          moisture: c.lookup("moisture")[Slider.mut].current,
-          vegetation: c.lookup("vegetation")[Slider.mut].current,
-          treeline: c.lookup("treeline")[Slider.mut].current
-        }
-
-        const k = g.lookup("clouds")
-        const kc = k.lookup("color").lookup("channels")
-        state.clouds = {
-          cover: k.lookup("cover")[Slider.mut].current,
-          opacity: k.lookup("opacity")[Slider.mut].current,
-          frequency: k.lookup("frequency")[Slider.mut].current,
-          speed: k.lookup("speed")[Slider.mut].current,
-          evolve: k.lookup("evolve")[Slider.mut].current,
-          color: {
-            kc.lookup("r")[Slider.mut].current,
-            kc.lookup("g")[Slider.mut].current,
-            kc.lookup("b")[Slider.mut].current
-          }
-        }
-
-        const n = g.lookup("night")
-        state.night = {
-          lights: n.lookup("lights")[Checkbox.mut].current,
-          density: n.lookup("density")[Slider.mut].current,
-          brightness: n.lookup("brightness")[Slider.mut].current
-        }
-
-        const l = g.lookup("lava")
-        state.lava = {
-          level: l.lookup("level")[Slider.mut].current,
-          cracks: l.lookup("cracks")[Slider.mut].current,
-          emission: l.lookup("emission")[Slider.mut].current
-        }
+        state.detail = w[Stepper.mut].current
       }
-
+      state.edits += 1
+    } else if w.has(Checkbox) {
+      edit_switch(w.parent().name(), w.name(), w[Checkbox.mut].current)
+      state.edits += 1
+    } else if w.has(Slider) {
+      const v: f32 = w[Slider.mut].current
+      const p = w.parent()
+      if p.name() == "channels" {
+        const field = p.parent()
+        edit_color(field.parent().name(), field.name(), w.name(), v)
+      } else {
+        edit(p.name(), w.name(), v)
+      }
       state.edits += 1
     }
   }
