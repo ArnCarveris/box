@@ -113,6 +113,10 @@ void box_gpu_cull_init(
         .usage = WGPUBufferUsage_Storage,
         .size = sizeof(box_render_surface_t)
     });
+    gpu->no_frames = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Storage,
+        .size = sizeof(box_render_transform_t)
+    });
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 8, .entries = entries });
     box_gpu_hiz_init(gpu);
@@ -286,6 +290,7 @@ void box_gpu_cull_fini(
 
     box_gpu_cull_release(&gpu->no_assets);
     box_gpu_cull_release(&gpu->no_surfaces);
+    box_gpu_cull_release(&gpu->no_frames);
 }
 
 /** Get the cull pipelines, created again with the pyramid pipelines when the cull shader was

@@ -21,12 +21,14 @@ struct Placed {
     normal: vec3f,
     world: vec4f,
     pos: vec4f,
+    // The object position, the evaluated position of a parametric surface
+    local: vec3f,
 };
 
 fn place_at(v: VertexIn, position: vec3f, normal: vec3f) -> Placed {
     let model = instance_model(transforms[v.slot]);
     let world = model * vec4f(position, 1.0);
-    return Placed(model, normal, world, view.view_proj * world);
+    return Placed(model, normal, world, view.view_proj * world, position);
 }
 
 fn place_mesh(v: VertexIn) -> Placed {

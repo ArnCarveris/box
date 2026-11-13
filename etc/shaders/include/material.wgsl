@@ -107,6 +107,12 @@ fn material_world(m: Material) -> bool {
     return (m.mapping & 0xffffu) == 2u;
 }
 
+// The material projects its texture coordinates from the position in the space of the texture
+// frame of its instance (MappingFrame).
+fn material_frame(m: Material) -> bool {
+    return (m.mapping & 0xffffu) == 3u;
+}
+
 // TextureMapping.blend of the material, 0..1, 0 for the hard projection.
 fn material_blend(m: Material) -> f32 {
     return unpack2x16unorm(m.mapping).y;
@@ -120,6 +126,40 @@ fn material_blend(m: Material) -> f32 {
 fn mapping_object(m: Material, position: vec3f, scale: vec3f) -> vec4f {
     let p = position * scale / m.mapping_size;
     return vec4f(p.x * m.uv.x, p.y * m.uv.y, p.z * m.uv.x, p.x * m.uv.y);
+}
+
+// What a vertex of a MappingFrame material passes on: its object position moved by relative,
+// the transform of its instance relative to its texture frame, over the mapping size as
+// mapping_object makes it (with a scale of 1, so world units), and its object normal in the
+// space of the frame. Both are linear in the position, so they interpolate exactly.
+struct FrameMapping {
+    object: vec4f,
+    normal: vec3f,
+};
+
+fn mapping_frame(m: Material, relative: mat4x4f, position: vec3f, normal: vec3f)
+    -> FrameMapping
+{
+    let c0 = relative[0].xyz;
+    let c1 = relative[1].xyz;
+    let c2 = relative[2].xyz;
+    let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
+    let n = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) * normal * flip;
+    return FrameMapping(mapping_object(m, (relative * vec4f(position, 1.0)).xyz, vec3f(1.0)), n);
+}
+
+// Rotation of the texture frame of an instance in the world as a quaternion, which turns the
+// axes of a MappingFrame projection to the world: the model matrix times the inverse of the
+// transform relative to the frame (the adjugate, by the sign of the determinant), whose columns
+// mapping_rotation normalizes.
+fn mapping_frame_rotation(model: mat4x4f, relative: mat4x4f) -> vec4f {
+    let c0 = relative[0].xyz;
+    let c1 = relative[1].xyz;
+    let c2 = relative[2].xyz;
+    let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
+    let adjugate = transpose(mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)));
+    let w = mat3x3f(model[0].xyz, model[1].xyz, model[2].xyz) * adjugate * flip;
+    return mapping_rotation(w[0], w[1], w[2]);
 }
 
 // Rotation of normalized model matrix columns as a quaternion (xyz the axis times the sine of
@@ -179,11 +219,11 @@ fn surface_sweep_lengths(uv: vec2f, position: vec3f, vertex: u32) -> vec2f {
     return result;
 }
 
-// Texture coordinates of a fragment of a MappingObject or MappingWorld material, projected onto
-// the plane of the dominant axis of its object (or world) normal, oriented as the faces of a
-// Box: on the side faces u runs along the horizontal tangent seen from outside (up x normal) and
-// v toward -y; the top has u along +z and the bottom along -z, both v along -x. object comes
-// from mapping_object, offset from mapping_offset. It does not branch, so a texture sample after
+// Texture coordinates of a fragment of a MappingObject, MappingWorld or MappingFrame material,
+// projected onto the plane of the dominant axis of its object (world, frame) normal, oriented
+// as the faces of a Box: on the side faces u runs along the horizontal tangent seen from
+// outside (up x normal) and v toward -y; the top has u along +z and the bottom along -z, both v
+// along -x. object comes from mapping_object, offset from mapping_offset. It does not branch, so a texture sample after
 // it stays in uniform control flow.
 fn mapping_uv(object: vec4f, normal: vec3f, offset: vec2f) -> vec2f {
     let a = abs(normal);

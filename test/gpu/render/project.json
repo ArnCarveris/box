@@ -10,6 +10,7 @@
     "lang.c": {
         "include": [
             "../../../src/render",
+            "../../../src/texture",
             "../../../src/geometry",
             "../../../src/spatial"
         ]
@@ -394,6 +395,15 @@
                 "id": "TextureMappingWorld",
                 "testcases": [
                     "grid_matches_single_box"
+                ]
+            },
+            {
+                "id": "TextureMappingFrame",
+                "testcases": [
+                    "touching_boxes_continuous",
+                    "moved_frame_matches",
+                    "surface_moved_frame_matches",
+                    "cutout_shadow_follows_frame"
                 ]
             },
             {
@@ -1471,7 +1481,66 @@
                     "shared_structure",
                     "compile_failure_reports_node",
                     "status_transitions",
-                    "material_samples_graph"
+                    "material_samples_graph",
+                    "blocks_match_gen",
+                    "blocks_match_gen_aspect",
+                    "blocks_match_gen_tones",
+                    "blocks_match_gen_hard",
+                    "blocks_match_gen_wrap",
+                    "blocks_tiling",
+                    "blocks_sphere_error",
+                    "ramp_plane",
+                    "ramp_sphere",
+                    "ramp_linear_value",
+                    "curve_values",
+                    "keys_edit_no_recompile",
+                    "ramp_too_many_keys"
+                ]
+            },
+            {
+                "id": "TextureNodesMath",
+                "testcases": [
+                    "vector_plane",
+                    "vector_sphere",
+                    "scalar_plane",
+                    "scalar_sphere",
+                    "broadcast_plane",
+                    "broadcast_sphere",
+                    "scalar_constants_plane",
+                    "scalar_constants_sphere",
+                    "edge_cases_plane",
+                    "edge_cases_sphere",
+                    "split_round_trip_plane",
+                    "split_round_trip_sphere",
+                    "combine_round_trip_plane",
+                    "combine_round_trip_sphere",
+                    "script"
+                ]
+            },
+            {
+                "id": "TextureCoordNodes",
+                "testcases": [
+                    "identity_plane",
+                    "identity_sphere",
+                    "warp_constant_plane",
+                    "warp_sphere_unit",
+                    "rotate_plane",
+                    "rotate_sphere",
+                    "sphere_seam",
+                    "script"
+                ]
+            },
+            {
+                "id": "TexturePreview",
+                "testcases": [
+                    "size_and_pixels",
+                    "default_size",
+                    "same_value_not_encoded",
+                    "rate_limits_readbacks",
+                    "remove_stops_readbacks",
+                    "node_outside_graph",
+                    "other_readbacks_kept",
+                    "stats"
                 ]
             },
             {
@@ -1488,6 +1557,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "TextureNodesImage",
                 "testcases": [
                     "sample_plane",
@@ -1504,6 +1574,37 @@
                     "cycle_fails",
                     "loading_holds",
                     "failure_names_texture"
+=======
+                "id": "TextureCells",
+                "testcases": [
+                    "plane_distances",
+                    "sphere_distances",
+                    "ids_per_cell",
+                    "seed_changes_ids",
+                    "plane_tiles",
+                    "sphere_continuous",
+                    "plane_cell_count",
+                    "sphere_cell_count",
+                    "evolve_plane",
+                    "evolve_sphere",
+                    "coords_input",
+                    "script_defaults"
+                ]
+            },
+            {
+                "id": "TextureBlur",
+                "testcases": [
+                    "constant_plane",
+                    "constant_sphere",
+                    "impulse_plane",
+                    "impulse_scales_with_size",
+                    "vector_input",
+                    "tiling_plane",
+                    "sphere_seam",
+                    "sphere_poles",
+                    "radius_edit_no_recompile",
+                    "follows_input_type"
+>>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
                 ]
             }
         ]

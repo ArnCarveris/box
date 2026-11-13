@@ -177,7 +177,7 @@ state {
 
   fn liner_ready() -> bool {
     const souls = lc(L_QUARTERS) * 60 + lc(L_HABRING) * 900 + lc(L_BRIDGE) * 40 + lc(L_HANGAR) * 30 + lc(L_REFINERY) * 30 + lc(L_FAB) * 30 + lc(L_TURRET) * 15
-    const breath = lc(L_QUARTERS) * 200 + lc(L_HABRING) * 300 + lc(L_PARKRING) * 2400
+    const breath = lc(L_QUARTERS) * 200 + lc(L_HABRING) * 300 + lc(L_ESTATE) * 2400
     const use = liner_power()
     lc(L_BRIDGE) > 0 && lc(L_DRIVE) > 0 && lc(L_JUMP) > 0 && lc(L_TANKS) > 0 &&
     lc(L_REACTOR) * 120 >= use && use > 0 && lc(L_RADIATOR) >= lc(L_REACTOR) + lc(L_JUMP) &&
@@ -595,7 +595,7 @@ assets {
         YardTile life(label: liner ? "Hab Ring" : "Life Support", op: liner ? L_HABRING : K_LIFE)
       }
       YardTileRow row_b {
-        YardTile biome(label: liner ? "Park Ring" : "Biome", op: liner ? L_PARKRING : K_BIOME)
+        YardTile biome(label: liner ? "Estate Ring" : "Biome", op: liner ? L_ESTATE : K_BIOME)
         if liner {
           YardFiller filler()
         } else {
@@ -685,7 +685,7 @@ assets {
     const l_bridge = lc(L_BRIDGE)
     const l_quarters = lc(L_QUARTERS)
     const l_habring = lc(L_HABRING)
-    const l_parkring = lc(L_PARKRING)
+    const l_estate = lc(L_ESTATE)
     const l_reactor = lc(L_REACTOR)
     const l_radiator = lc(L_RADIATOR)
     const l_jump = lc(L_JUMP)
@@ -697,7 +697,7 @@ assets {
     const l_fab = lc(L_FAB)
     const l_turret = lc(L_TURRET)
     const souls = l_quarters * 60 + l_habring * 900 + l_bridge * 40 + l_hangar * 30 + l_refinery * 30 + l_fab * 30 + l_turret * 15
-    const breath = l_quarters * 200 + l_habring * 300 + l_parkring * 2400
+    const breath = l_quarters * 200 + l_habring * 300 + l_estate * 2400
     const l_gen: f32 = l_reactor * 120
     const l_use: f32 = liner_power()
     const l_heat = l_reactor + l_jump
