@@ -636,8 +636,9 @@ void TextureGraphEval_scalar_node_readback(void) {
     ecs_fini(world);
 }
 
-/** The input of a neighbourhood node is materialized in its own stage, which the node reads at
- * another texel: two dispatches, and the coordinates of the texel to the right, wrapped. */
+/** The input of a neighbourhood node is materialized in its own stage, a cached value, which the
+ * node reads at another texel: two dispatches, and the coordinates of the texel to the right,
+ * wrapped. */
 void TextureGraphEval_neighbourhood_materialized(void) {
     // textures/graph
     ecs_world_t *world = tg_world();
@@ -668,7 +669,7 @@ void TextureGraphEval_neighbourhood_materialized(void) {
     test_int(after.texture_graph_evaluations - before.texture_graph_evaluations, 1);
     test_int(after.texture_graph_dispatches - before.texture_graph_dispatches, 2);
     test_int(after.texture_graph_texels - before.texture_graph_texels, 2 * w * h);
-    test_assert(after.texture_graph_pool_bytes >= (int64_t)w * h * 8);
+    test_assert(after.texture_graph_cached_bytes >= (int64_t)w * h * 8);
     test_int(after.texture_graphs, 1);
     test_int(after.texture_graph_programs, 1);
 

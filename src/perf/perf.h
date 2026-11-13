@@ -43,6 +43,10 @@ typedef struct box_perf_t {
     bool has_last;        /**< last holds a position */
     int32_t bake_left;    /**< Probes the bakes had left when they last progressed */
     int32_t bake_stalled; /**< Warmup frames since the bakes last progressed */
+    bool graph_sampled;   /**< graph_last holds the counts of a measured frame */
+    int64_t graph_last[4]; /**< Texture graph hits, misses, evictions and updates the backend
+                           *   statistics counted until the last measured frame */
+    double graph_sum[5];  /**< Sums of the samples of those per frame and the cached kilobytes */
 } box_perf_t;
 
 /** Distribution of a series of durations */

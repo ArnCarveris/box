@@ -400,12 +400,27 @@
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
                     "custom_kind_sent",
+<<<<<<< HEAD
                     "ramp_curve_kinds",
                     "ramp_keys_layout",
                     "ramp_too_many_keys",
                     "curve_keys_layout",
                     "curve_invalid",
                     "array_register_invalid"
+=======
+                    "math_types",
+                    "math_remap_params",
+                    "math_op_output_changes_structure",
+                    "split_combine_kinds",
+                    "combine_rejects_vector",
+                    "coord_kinds",
+                    "coord_kinds_sent",
+                    "coord_nodes_script",
+                    "builtin_time_splat",
+                    "time_into_vector_fails",
+                    "null_backend_rate",
+                    "cache_budget_packet"
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
                 ]
             },
             {

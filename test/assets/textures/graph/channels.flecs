@@ -1,0 +1,13 @@
+// The coordinates split into channels and combined swizzled, with a clamped remap of u: the
+// image of each texel is (v, u, min(2 * u, 1), 1), stored as HDR.
+
+using box.texture
+
+graph_channels {
+  uv   { TexCoords: {} }
+  u    { TexSplit: {input: uv, channel: ChannelR} }
+  v    { TexSplit: {input: uv, channel: ChannelG} }
+  ramp { TexMath: {op: MathRemapClamped, a: u, from_min: 0, from_max: 0.5, to_min: 0, to_max: 1} }
+  vu   { TexCombine: {r: v, g: u, b: ramp, a_value: 1} }
+  TextureGraph: {output: vu, width: 16, height: 8, format: GraphHdr}
+}

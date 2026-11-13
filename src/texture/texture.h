@@ -64,17 +64,25 @@ typedef struct box_texture_t {
 typedef struct box_texture_node_kind_t {
     int32_t id;                 /**< Id of the kind, from 1 */
     ecs_entity_t component;     /**< Component of its nodes */
-    TextureValueType output;    /**< Type of its value */
+    TextureValueType output;    /**< Type of its value, TexAny when it follows the inputs */
+    box_texture_node_type_t output_type; /**< Type of a node when output is TexAny, NULL for
+                                          *   the default */
     int32_t input_count;        /**< Inputs in inputs */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs, names owned */
     int32_t param_count;        /**< Parameters in params */
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters, names owned */
     int32_t param_offsets[BOX_TEXTURE_NODE_PARAMS]; /**< Offset of each parameter in the
                                  *   parameter bytes of a node */
+<<<<<<< HEAD
     box_texture_node_array_t array; /**< Array parameter, name owned, NULL for none */
     int32_t array_header;       /**< Offset of the header of the array in the parameters */
     int32_t param_size;         /**< Bytes of the parameters with the header of the array, a
                                  *   multiple of 16 */
+=======
+    int32_t param_size;         /**< Bytes of the parameters, a multiple of 16 */
+    int32_t types_offset;       /**< Offset of the types word of the inputs in the parameter
+                                 *   bytes of a node, -1 without a TexAny input */
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
     int32_t node_size;          /**< Parameter bytes of a node: the parameters, then a vec4 per
                                  *   input with the constant of an input without a node, then
                                  *   the max elements of the array */
@@ -101,6 +109,7 @@ typedef struct box_texture_graph_t {
     int32_t height;             /**< Height of the image, capped */
     TextureGraphDomain domain;  /**< Coordinates of the texels */
     TextureGraphFormat format;  /**< What the image stores */
+    float rate;                 /**< Updates per second of an animated graph, 0 every frame */
     int32_t node_count;         /**< Nodes in nodes */
     box_texture_graph_node_t *nodes; /**< The nodes, inputs first */
     int32_t param_size;         /**< Bytes in params */

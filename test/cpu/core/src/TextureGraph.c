@@ -13,6 +13,9 @@
 /** The authoring example of TextureGraph */
 #define GRAPH_PLATING "test/assets/textures/graph/plating.flecs"
 
+/** Coordinates turned, scaled and warped by TexTransform and TexWarp */
+#define GRAPH_COORDS "test/assets/textures/graph/coords.flecs"
+
 /** A graph whose output node gets its node component after the graph */
 #define GRAPH_DECLARED_AFTER "test/assets/textures/graph/declared_after.flecs"
 
@@ -248,24 +251,30 @@ void TextureGraph_builtin_kinds(void) {
     test_assert(constant != coords && coords != math && constant != math);
 
     const TextureNodeKind *kind = ecs_get(world, ecs_id(TexMath), TextureNodeKind);
-    test_int(kind->output, TexVector);
+    test_int(kind->output, TexAny);
     test_int(kind->input_count, 3);
     test_str(kind->inputs[0].name, "a");
     test_str(kind->inputs[1].name, "b");
     test_str(kind->inputs[2].name, "c");
-    test_int(kind->inputs[0].type, TexVector);
+    test_int(kind->inputs[0].type, TexAny);
     test_bool(kind->inputs[0].fallback, true);
-    test_int(kind->param_count, 1);
+    test_str(kind->inputs[0].value, "a_value");
+    test_str(kind->inputs[2].value, "c_value");
+    test_int(kind->param_count, 5);
     test_str(kind->params[0].name, "op");
     test_int(kind->params[0].offset, 0);
     test_int(kind->params[0].size, 4);
-    test_int(kind->param_size, 16);
+    test_str(kind->params[4].name, "to_max");
+    test_int(kind->params[4].offset, 16);
+    test_int(kind->types_offset, 20);
+    test_int(kind->param_size, 32);
     test_str(kind->function, "box_tex_math");
     test_bool(kind->neighbourhood, false);
     test_bool(kind->animated, false);
 
     kind = ecs_get(world, ecs_id(TexConstant), TextureNodeKind);
     test_int(kind->input_count, 0);
+    test_str(kind->inputs[0].value, NULL);
     test_int(kind->params[0].size, 16);
     test_str(kind->function, "box_tex_constant");
 
@@ -273,7 +282,7 @@ void TextureGraph_builtin_kinds(void) {
     const box_texture_node_kind_t *k = box_texture_node_kind(t, math);
     test_assert(k != NULL);
     test_assert(k->component == ecs_id(TexMath));
-    test_int(k->node_size, 16 + 3 * 16);
+    test_int(k->node_size, 32 + 3 * 16);
     test_assert(strstr(k->source, "fn box_tex_math(") != NULL);
     test_assert(box_texture_node_kind(t, 0) == NULL);
     test_assert(box_texture_node_kind(t, 1000) == NULL);
@@ -288,8 +297,9 @@ void TextureGraph_kind_reflected_json(void) {
     char *json = ecs_ptr_to_json(world, ecs_id(TextureNodeKind), kind);
     test_assert(json != NULL);
     test_assert(strstr(json, "\"box_tex_math\"") != NULL);
-    test_assert(strstr(json, "\"a_value\"") == NULL);
-    test_assert(strstr(json, "\"TexVector\"") != NULL);
+    test_assert(strstr(json, "\"name\":\"a_value\"") == NULL);
+    test_assert(strstr(json, "\"value\":\"a_value\"") != NULL);
+    test_assert(strstr(json, "\"TexAny\"") != NULL);
     test_assert(strstr(json, "\"b\"") != NULL);
     ecs_os_free(json);
 
@@ -332,12 +342,12 @@ void TextureGraph_script(void) {
     test_int(graph->nodes[2].inputs[1], -1);
 
     const box_texture_graph_node_t *node = &graph->nodes[2];
-    test_int(node->param_size, 64);
-    test_int(graph->param_size, 16 + 64 + 64);
+    test_int(node->param_size, 80);
+    test_int(graph->param_size, 16 + 80 + 80);
     int32_t op;
     float b[4];
     ecs_os_memcpy(&op, graph->params + node->params, 4);
-    ecs_os_memcpy(b, graph->params + node->params + 16 + 16, 16);
+    ecs_os_memcpy(b, graph->params + node->params + 32 + 16, 16);
     test_int(op, MathAdd);
     test_flt(b[0], 0.2f);
     test_flt(b[1], 0.1f);
@@ -365,7 +375,7 @@ void TextureGraph_script_declared_after(void) {
     test_bool(entry_of(world, tex)->single_channel, false);
 
     float c[4];
-    ecs_os_memcpy(c, graph->params + graph->nodes[1].params + 16 + 2 * 16, 16);
+    ecs_os_memcpy(c, graph->params + graph->nodes[1].params + 32 + 2 * 16, 16);
     test_flt(c[0], 0.5f);
     test_flt(c[3], 0.5f);
     float scale;
@@ -782,15 +792,15 @@ void TextureGraph_error_type_mismatch(void) {
     ecs_world_t *world = world_new();
     test_assert(register_scalar(world) > 0);
     ecs_entity_t scalar = ecs_entity(world, { .name = "scalar" });
-    ecs_entity_t math = ecs_entity(world, { .name = "math" });
+    ecs_entity_t split = ecs_entity(world, { .name = "split" });
     ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
     set_scalar(world, scalar, 2, 0);
-    ecs_set(world, math, TexMath, { .op = MathAdd, .a = scalar });
-    ecs_set(world, tex, TextureGraph, { .output = math, .width = 8 });
+    ecs_set(world, split, TexSplit, { .input = scalar });
+    ecs_set(world, tex, TextureGraph, { .output = split, .width = 8 });
     ecs_log_set_level(-4);
     frame_status(world, tex);
     test_failed(world, tex, "'graph'", "node 'scalar' outputs Scalar");
-    test_failed(world, tex, "input 'a' of node 'math'", "expects Vector");
+    test_failed(world, tex, "input 'input' of node 'split'", "expects Vector");
 
     ecs_entity_t uv = ecs_entity(world, { .name = "uv" });
     ecs_set(world, uv, TexCoords, { .scale = 1 });
@@ -1032,7 +1042,11 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
+<<<<<<< HEAD
     test_int(null->texture_node_kinds, 5);
+=======
+    test_int(null->texture_node_kinds, 9);
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1046,6 +1060,7 @@ void TextureGraph_null_backend_records(void) {
     test_int(g->param_size, entry->graph->param_size);
 
     const box_render_texture_graph_node_t *nodes = box_render_texture_graph_nodes(g);
+    test_int(nodes[2].output, TexVector);
     test_int(nodes[2].kind, kind_id(world, ecs_id(TexMath)));
     test_int(nodes[2].inputs[0], 0);
     test_int(nodes[2].inputs[1], 1);
@@ -1060,16 +1075,20 @@ void TextureGraph_null_backend_records(void) {
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)kind_id(world, ecs_id(TexMath)));
     test_assert(k != NULL);
-    test_int(k->output, TexVector);
+    test_int(k->output, TexAny);
     test_int(k->input_count, 3);
-    test_int(k->param_size, 16);
+    test_int(k->param_size, 32);
     test_str(box_render_texture_node_kind_function(k), "box_tex_math");
     test_assert(strstr(box_render_texture_node_kind_source(k), "fn box_tex_math(") != NULL);
 
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
+<<<<<<< HEAD
     test_int(null->texture_node_kinds, 5);
+=======
+    test_int(null->texture_node_kinds, 9);
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1161,7 +1180,11 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
+<<<<<<< HEAD
     test_int(second->texture_node_kinds, 5);
+=======
+    test_int(second->texture_node_kinds, 9);
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1188,7 +1211,11 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
+<<<<<<< HEAD
     test_int(null->texture_node_kinds, 6);
+=======
+    test_int(null->texture_node_kinds, 10);
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1202,6 +1229,7 @@ void TextureGraph_custom_kind_sent(void) {
     box_render_null_free(null);
 }
 
+<<<<<<< HEAD
 /** Get the parameter bytes of the node of an entity in the compiled graph of a texture.
  *
  * @param world The world
@@ -1227,10 +1255,49 @@ static const uint8_t* node_params(
     }
 
     test_assert(result != NULL);
+=======
+/** Build a graph whose output is a TexMath and get the compiled node of the TexMath.
+ *
+ * @param world The world
+ * @param tex The texture entity
+ * @param node The TexMath node, the output
+ * @param math The TexMath
+ * @return The compiled node, the last
+ */
+static const box_texture_graph_node_t* math_node(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    ecs_entity_t node,
+    const TexMath *math)
+{
+    ecs_set_ptr(world, node, TexMath, math);
+    ecs_set(world, tex, TextureGraph, { .output = node, .width = 8 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    const box_texture_graph_t *graph = graph_of(world, tex);
+
+    return &graph->nodes[graph->node_count - 1];
+}
+
+/** Read the types word of a compiled TexMath node.
+ *
+ * @param world The world
+ * @param tex The texture entity
+ * @param node The compiled node
+ * @return The word
+ */
+static uint32_t math_types(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    const box_texture_graph_node_t *node)
+{
+    uint32_t result;
+    ecs_os_memcpy(&result, graph_of(world, tex)->params + node->params + 20, 4);
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
 
     return result;
 }
 
+<<<<<<< HEAD
 void TextureGraph_ramp_curve_kinds(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1270,10 +1337,14 @@ void TextureGraph_ramp_curve_kinds(void) {
 }
 
 void TextureGraph_ramp_keys_layout(void) {
+=======
+void TextureGraph_math_types(void) {
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
     // materials/textures
     ecs_world_t *world = world_new();
     ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
     ecs_entity_t uv = ecs_entity(world, { .name = "uv" });
+<<<<<<< HEAD
     ecs_entity_t ramp = ecs_entity(world, { .name = "ramp" });
     ecs_entity_t math = ecs_entity(world, { .name = "math" });
     ecs_set(world, uv, TexCoords, { .scale = 0 });
@@ -1322,10 +1393,100 @@ void TextureGraph_ramp_keys_layout(void) {
     bytes = node_params(world, tex, ramp, &size);
     test_int(((const uint32_t*)bytes)[1], 0);
     test_flt(((const float*)(bytes + 32))[0], 0.0f);
+=======
+    ecs_entity_t split = ecs_entity(world, { .name = "split" });
+    ecs_entity_t math = ecs_entity(world, { .name = "math" });
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    ecs_set(world, split, TexSplit, { .input = uv, .channel = ChannelG });
+    const box_texture_graph_node_t *node;
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathAdd, .a = uv, .b = uv });
+    test_int(node->output, TexVector);
+    test_uint(math_types(world, tex, node), (1u << 4) | (1u << 5));
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathAdd, .a = split,
+        .b_value = { 1, 2, 3, 4 } });
+    test_int(node->output, TexScalar);
+    test_uint(math_types(world, tex, node), 1u);
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathMultiply, .a = split, .b = uv });
+    test_int(node->output, TexVector);
+    test_uint(math_types(world, tex, node), 1u | (1u << 5));
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathMix, .a = split, .b = split,
+        .c = uv });
+    test_int(node->output, TexVector);
+    test_uint(math_types(world, tex, node), 3u | (1u << 6));
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathAbs, .a = split, .b = uv });
+    test_int(node->output, TexScalar);
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathSubtract,
+        .a_value = { 1, 1, 1, 1 } });
+    test_int(node->output, TexVector);
+    test_uint(math_types(world, tex, node), 0);
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathDot, .a = uv, .b = uv });
+    test_int(node->output, TexScalar);
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathLength, .a = uv });
+    test_int(node->output, TexScalar);
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathNormalize, .a = split });
+    test_int(node->output, TexScalar);
+
+    node = math_node(world, tex, math, &(TexMath){ .op = MathCross, .a = split, .b = split });
+    test_int(node->output, TexVector);
 
     ecs_fini(world);
 }
 
+void TextureGraph_math_remap_params(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t math = ecs_new(world);
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    const box_texture_graph_node_t *node = math_node(world, tex, math, &(TexMath){
+        .op = MathRemapClamped, .a = uv, .from_min = -1, .from_max = 1, .to_min = 2,
+        .to_max = 4 });
+    float range[4];
+    int32_t op;
+    test_int(node->param_size, 80);
+    ecs_os_memcpy(&op, graph_of(world, tex)->params + node->params, 4);
+    ecs_os_memcpy(range, graph_of(world, tex)->params + node->params + 4, 16);
+    test_int(op, MathRemapClamped);
+    test_flt(range[0], -1);
+    test_flt(range[1], 1);
+    test_flt(range[2], 2);
+    test_flt(range[3], 4);
+    test_uint(math_types(world, tex, node), 1u << 4);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_math_op_output_changes_structure(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t math = ecs_new(world);
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    math_node(world, tex, math, &(TexMath){ .op = MathAdd, .a = uv, .b = uv });
+    uint64_t structure = graph_of(world, tex)->structure_hash;
+
+    math_node(world, tex, math, &(TexMath){ .op = MathMultiply, .a = uv, .b = uv });
+    test_assert(graph_of(world, tex)->structure_hash == structure);
+
+    math_node(world, tex, math, &(TexMath){ .op = MathDot, .a = uv, .b = uv });
+    test_assert(graph_of(world, tex)->structure_hash != structure);
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
+
+    ecs_fini(world);
+}
+
+<<<<<<< HEAD
 void TextureGraph_ramp_too_many_keys(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -1456,3 +1617,328 @@ void TextureGraph_array_register_invalid(void) {
 
     ecs_fini(world);
 }
+=======
+void TextureGraph_split_combine_kinds(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexSplit), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "input");
+    test_int(kind->inputs[0].type, TexVector);
+    test_bool(kind->inputs[0].fallback, true);
+    test_int(kind->param_count, 1);
+    test_str(kind->params[0].name, "channel");
+    test_int(kind->types_offset, -1);
+    test_str(kind->function, "box_tex_split");
+
+    kind = ecs_get(world, ecs_id(TexCombine), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 4);
+    test_str(kind->inputs[0].name, "r");
+    test_str(kind->inputs[3].name, "a");
+    test_int(kind->inputs[2].type, TexScalar);
+    test_bool(kind->inputs[3].fallback, true);
+    test_int(kind->param_count, 0);
+    test_int(kind->param_size, 0);
+    test_str(kind->function, "box_tex_combine");
+
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t split = ecs_new(world);
+    ecs_entity_t combine = ecs_new(world);
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    ecs_set(world, split, TexSplit, { .input = uv, .channel = ChannelB });
+    ecs_set(world, combine, TexCombine, { .g = split, .r_value = 0.25f, .b_value = 0.5f,
+        .a_value = 1 });
+    ecs_set(world, tex, TextureGraph, { .output = combine, .width = 8 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 3);
+    test_int(graph->nodes[1].output, TexScalar);
+    test_int(graph->nodes[1].param_size, 32);
+    test_int(graph->nodes[2].output, TexVector);
+    test_int(graph->nodes[2].param_size, 64);
+    test_int(graph->nodes[2].inputs[0], -1);
+    test_int(graph->nodes[2].inputs[1], 1);
+
+    int32_t channel;
+    float v[4];
+    ecs_os_memcpy(&channel, graph->params + graph->nodes[1].params, 4);
+    test_int(channel, ChannelB);
+    ecs_os_memcpy(v, graph->params + graph->nodes[2].params, 16);
+    test_flt(v[0], 0.25f);
+    test_flt(v[1], 0);
+    ecs_os_memcpy(v, graph->params + graph->nodes[2].params + 2 * 16, 16);
+    test_flt(v[0], 0.5f);
+    ecs_os_memcpy(v, graph->params + graph->nodes[2].params + 3 * 16, 16);
+    test_flt(v[0], 1);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_coord_kinds(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexWarp), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 3);
+    test_str(kind->inputs[0].name, "coords");
+    test_str(kind->inputs[1].name, "offset");
+    test_str(kind->inputs[2].name, "amount");
+    test_int(kind->inputs[0].type, TexVector);
+    test_int(kind->inputs[1].type, TexVector);
+    test_int(kind->inputs[2].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, false);
+    test_bool(kind->inputs[1].fallback, true);
+    test_bool(kind->inputs[2].fallback, true);
+    test_int(kind->param_count, 0);
+    test_int(kind->param_size, 0);
+    test_str(kind->function, "box_tex_warp");
+    test_bool(kind->neighbourhood, false);
+    test_bool(kind->animated, false);
+
+    kind = ecs_get(world, ecs_id(TexTransform), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 2);
+    test_str(kind->inputs[0].name, "coords");
+    test_str(kind->inputs[1].name, "angle");
+    test_int(kind->inputs[1].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, false);
+    test_bool(kind->inputs[1].fallback, true);
+    test_int(kind->param_count, 3);
+    test_str(kind->params[0].name, "axis");
+    test_int(kind->params[0].offset, 0);
+    test_int(kind->params[1].offset, 16);
+    test_int(kind->params[2].offset, 32);
+    test_int(kind->param_size, 48);
+    test_str(kind->function, "box_tex_transform");
+    test_bool(kind->neighbourhood, false);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_combine_rejects_vector(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t uv = ecs_entity(world, { .name = "uv" });
+    ecs_entity_t split = ecs_entity(world, { .name = "split" });
+    ecs_entity_t math = ecs_entity(world, { .name = "math" });
+    ecs_entity_t combine = ecs_entity(world, { .name = "combine" });
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    ecs_set(world, split, TexSplit, { .input = uv });
+    ecs_set(world, math, TexMath, { .op = MathSin, .a = split });
+    ecs_set(world, combine, TexCombine, { .r = math, .g = split });
+    ecs_set(world, tex, TextureGraph, { .output = combine, .width = 8 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+
+    ecs_set(world, math, TexMath, { .op = MathSin, .a = uv });
+    ecs_log_set_level(-4);
+    frame_status(world, tex);
+    test_failed(world, tex, "node 'math' outputs Vector", "input 'r' of node 'combine'");
+
+    ecs_fini(world);
+}
+
+void TextureGraph_builtin_time_splat(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexTime), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 0);
+    test_int(kind->param_count, 2);
+    test_str(kind->params[0].name, "scale");
+    test_int(kind->params[0].offset, 0);
+    test_str(kind->params[1].name, "offset");
+    test_int(kind->params[1].offset, 4);
+    test_int(kind->param_size, 16);
+    test_str(kind->function, "box_tex_time");
+    test_bool(kind->animated, true);
+    test_bool(kind->neighbourhood, false);
+
+    kind = ecs_get(world, ecs_id(TexSplat), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "in");
+    test_int(kind->inputs[0].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, true);
+    test_str(kind->function, "box_tex_splat");
+    test_bool(kind->animated, false);
+
+    ecs_entity_t time = ecs_entity(world, { .name = "time" });
+    ecs_entity_t splat = ecs_entity(world, { .name = "splat" });
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_set(world, time, TexTime, { .scale = 2, .offset = 0.5f });
+    ecs_set(world, splat, TexSplat, { .in = time });
+    ecs_set(world, tex, TextureGraph, { .output = splat, .width = 8 });
+    ecs_progress(world, 0);
+    const TextureStatus *status = ecs_get(world, tex, TextureStatus);
+    test_assert(status != NULL);
+    test_int(status->state, TextureReady);
+
+    const box_texture_t *entry = entry_of(world, tex);
+    test_int(entry->graph->node_count, 2);
+    test_int(entry->graph->nodes[0].kind, kind_id(world, ecs_id(TexTime)));
+    test_int(entry->graph->nodes[1].inputs[0], 0);
+    float params[2];
+    ecs_os_memcpy(params, entry->graph->params + entry->graph->nodes[0].params, 8);
+    test_flt(params[0], 2);
+    test_flt(params[1], 0.5f);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_coord_kinds_sent(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    run_file(world, GRAPH_COORDS);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    /* A coords input without a node is the domain coordinates, the others their constants */
+    const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
+        (uint32_t)kind_id(world, ecs_id(TexWarp)));
+    test_assert(k != NULL);
+    test_int(k->coords_inputs, 1);
+    k = box_render_null_texture_node_kind(null, (uint32_t)kind_id(world, ecs_id(TexTransform)));
+    test_assert(k != NULL);
+    test_int(k->coords_inputs, 1);
+    k = box_render_null_texture_node_kind(null, (uint32_t)kind_id(world, ecs_id(TexMath)));
+    test_assert(k != NULL);
+    test_int(k->coords_inputs, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void TextureGraph_time_into_vector_fails(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t time = ecs_entity(world, { .name = "time" });
+    ecs_entity_t split = ecs_entity(world, { .name = "split" });
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_set(world, time, TexTime, { .scale = 1 });
+    ecs_set(world, split, TexSplit, { .input = time });
+    ecs_set(world, tex, TextureGraph, { .output = split, .width = 8 });
+    ecs_log_set_level(-4);
+    frame_status(world, tex);
+    ecs_log_set_level(-1);
+    test_failed(world, tex, "node 'time' outputs Scalar", "input 'input' of node 'split'");
+
+    ecs_fini(world);
+}
+
+void TextureGraph_null_backend_rate(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    uint32_t handle = entry_of(world, tex)->handle;
+    const box_render_texture_graph_t *g = box_render_null_texture_graph(null, handle);
+    test_assert(g != NULL);
+    test_flt(g->rate, 0);
+    test_int(null->texture_graphs, 1);
+    uint64_t structure = g->structure_hash, params = g->param_hash;
+
+    TextureGraph *graph = ecs_get_mut(world, tex, TextureGraph);
+    graph->rate = 12;
+    ecs_modified(world, tex, TextureGraph);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(null->texture_graphs, 2);
+    g = box_render_null_texture_graph(null, handle);
+    test_flt(g->rate, 12);
+    test_assert(g->structure_hash == structure);
+    test_assert(g->param_hash == params);
+
+    graph = ecs_get_mut(world, tex, TextureGraph);
+    graph->rate = -1;
+    ecs_modified(world, tex, TextureGraph);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(null->texture_graphs, 3);
+    test_flt(box_render_null_texture_graph(null, handle)->rate, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void TextureGraph_coord_nodes_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    run_file(world, GRAPH_COORDS);
+    ecs_entity_t tex = ecs_lookup(world, "graph_coords");
+    ecs_entity_t uv = ecs_lookup(world, "graph_coords.uv");
+    ecs_entity_t turned = ecs_lookup(world, "graph_coords.turned");
+    ecs_entity_t warped = ecs_lookup(world, "graph_coords.warped");
+    test_assert(tex && uv && turned && warped);
+    test_assert(ecs_get(world, turned, TexTransform)->coords == uv);
+    test_assert(ecs_get(world, warped, TexWarp)->coords == turned);
+
+    const TextureStatus *status = frame_status(world, tex);
+    test_int(status->state, TextureReady);
+    test_assert(status->error == NULL);
+
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 3);
+    test_assert(graph->nodes[0].entity == uv);
+    test_assert(graph->nodes[1].entity == turned);
+    test_assert(graph->nodes[2].entity == warped);
+    test_int(graph->nodes[1].kind, kind_id(world, ecs_id(TexTransform)));
+    test_int(graph->nodes[2].kind, kind_id(world, ecs_id(TexWarp)));
+    test_int(graph->nodes[1].inputs[0], 0);
+    test_int(graph->nodes[1].inputs[1], -1);
+    test_int(graph->nodes[2].inputs[0], 1);
+    test_int(graph->nodes[2].inputs[1], -1);
+    test_int(graph->nodes[2].inputs[2], -1);
+
+    /* The transform: its scale, then the angle without a node */
+    const uint8_t *p = graph->params + graph->nodes[1].params;
+    float value;
+    test_int(graph->nodes[1].param_size, 48 + 2 * 16);
+    ecs_os_memcpy(&value, p + 32, ECS_SIZEOF(float));
+    test_flt(value, 2);
+    ecs_os_memcpy(&value, p + 48 + 16, ECS_SIZEOF(float));
+    test_flt(value, 90);
+
+    /* The warp: no parameters, then the offset and the amount without a node */
+    p = graph->params + graph->nodes[2].params;
+    test_int(graph->nodes[2].param_size, 3 * 16);
+    ecs_os_memcpy(&value, p + 16, ECS_SIZEOF(float));
+    test_flt(value, 0.7f);
+    ecs_os_memcpy(&value, p + 32, ECS_SIZEOF(float));
+    test_flt(value, 0.5f);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_cache_budget_packet(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_assert(null->last.texture_graph_budget == 0);
+
+    ecs_singleton_set(world, TextureGraphCache, { .budget = 4096 });
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_assert(null->last.texture_graph_budget == 4096);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+>>>>>>> 7702aad1d2b020e94876d469555ac283e246846d

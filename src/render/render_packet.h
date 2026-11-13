@@ -1697,6 +1697,8 @@ typedef struct box_render_packet_t {
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     float transmission_roughness; /**< Largest roughness of the transmissive materials, which
                              *   bounds the mips of the opaque snapshot that render */
+    int64_t texture_graph_budget; /**< Bytes the cache of the texture graph values holds at
+                             *   most (TextureGraphCache.budget), 0 for the default */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */

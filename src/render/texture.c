@@ -205,6 +205,9 @@ static void box_render_texture_kinds_send(
         desc->input_count = (uint32_t)kind->input_count;
         for (i = 0; i < kind->input_count; i ++) {
             desc->input_types[i] = (uint32_t)kind->inputs[i].type;
+            if (kind->inputs[i].coords && !kind->inputs[i].value) {
+                desc->coords_inputs |= 1u << i;
+            }
         }
 
         desc->param_size = (uint32_t)kind->param_size;
@@ -246,7 +249,7 @@ static void box_render_texture_graph_send(
     desc->structure_hash = graph->structure_hash;
     desc->param_hash = graph->param_hash;
     desc->serial = tex->graph_serial;
-    desc->pad = 0;
+    desc->rate = graph->rate;
     box_render_texture_graph_node_t *out = (box_render_texture_graph_node_t*)(desc + 1);
     for (i = 0; i < graph->node_count; i ++) {
         const box_texture_graph_node_t *node = &graph->nodes[i];
@@ -442,6 +445,19 @@ bool box_render_texture_graph_reads(
     ecs_world_t *world,
     ecs_vec_t *out)
 {
+    int32_t first = ecs_vec_count(out);
+    bool result;
+    box_render_texture_previews_kept(world, out);
+    result = box_render_texture_graph_reads_take(world, out);
+    box_render_texture_previews_filter(world, out, first);
+
+    return result;
+}
+
+bool box_render_texture_graph_reads_take(
+    ecs_world_t *world,
+    ecs_vec_t *out)
+{
     box_textures_t *t = box_textures_get(world);
     int32_t i, first = ecs_vec_count(out);
     bool result = box_render_gpu_texture_graph_reads(world, out);
@@ -615,6 +631,8 @@ static void BoxRenderExtractTextures(
     ecs_vec_clear(&t->released);
     box_render_textures_send(p, t, restart);
     box_render_texture_graphs_send(p, t);
+    const TextureGraphCache *cache = ecs_singleton_get(world, TextureGraphCache);
+    p->texture_graph_budget = cache ? cache->budget : 0;
     p->anisotropy = box_render_anisotropy(world, t);
 done:
     return;

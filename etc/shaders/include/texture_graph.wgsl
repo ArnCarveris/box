@@ -14,6 +14,11 @@ struct BoxTexGraphStage {
     // How the output stage stores its value: 0 as computed, 1 display encoded with alpha kept,
     // 2 the first channel as (x, 0, 0, 1)
     encode: u32,
+    // Seconds of the world clock at the evaluation, which TexTime reads
+    time: f32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // Parameter bytes of every node of the graph, at the offsets of the compiled graph
