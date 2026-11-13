@@ -109,8 +109,75 @@ static void box_transition_change(
     box_transition_send(p, node, component, slot, spec);
 }
 
+/** Check whether a component is a material lobe that keeps a shape on the extended mesh
+ * shader while it leaves (box_render_transitions_leaving).
+ *
+ * @param component The component
+ * @return Whether it is Sheen, ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel
+ */
+static bool box_transition_lobe(
+    box_render_transition_component_t component)
+{
+    return component == BOX_RENDER_TRANSITION_SHEEN ||
+        component == BOX_RENDER_TRANSITION_CLEAR_COAT ||
+        component == BOX_RENDER_TRANSITION_ANISOTROPY ||
+        component == BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION ||
+        component == BOX_RENDER_TRANSITION_FRESNEL;
+}
+
+/** Mark the shapes that read the material lobes of an entity as changed: the entity and its
+ * IsA instances, down every level.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity of a node
+ */
+static void box_transition_lobe_left(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    ecs_entity_t e)
+{
+    int32_t i;
+    if (!s->draws || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    ecs_vec_clear(&s->instances);
+    *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = e;
+    while (ecs_vec_count(&s->instances)) {
+        ecs_entity_t cur = *ecs_vec_last_t(&s->instances, ecs_entity_t);
+        ecs_vec_remove_last(&s->instances);
+        box_draws_mark(world, s->draws, cur, BOX_DRAW_ALL);
+        ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, cur));
+        while (ecs_each_next(&it)) {
+            for (i = 0; i < it.count; i ++) {
+                *ecs_vec_append_t(NULL, &s->instances, ecs_entity_t) = it.entities[i];
+            }
+        }
+    }
+done:
+    return;
+}
+
+void box_transitions_lobes_left(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    const box_transition_node_t *node)
+{
+    bool leaving = false;
+    int32_t c;
+    for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS && !leaving; c ++) {
+        leaving = node->slots[c].leaving &&
+            box_transition_lobe((box_render_transition_component_t)c);
+    }
+
+    if (leaving) {
+        box_transition_lobe_left(world, s, node->entity);
+    }
+}
+
 void box_transitions_compare(
-    const ecs_world_t *world,
+    ecs_world_t *world,
     box_render_transitions_t *s,
     box_render_packet_t *p,
     ecs_entity_t e,
@@ -121,7 +188,7 @@ void box_transitions_compare(
     const void *value)
 {
     uint8_t packed[BOX_RENDER_TRANSITION_VALUE];
-    bool added = slot->absent;
+    bool added = slot->absent, leaving = slot->leaving;
     slot->absent = false;
     if (value) {
         box_render_transition_pack(component, value, packed);
@@ -175,5 +242,7 @@ void box_transitions_compare(
 
     if (slot->leaving) {
         s->leaving ++;
+    } else if (leaving && box_transition_lobe(component)) {
+        box_transition_lobe_left(world, s, e);
     }
 }

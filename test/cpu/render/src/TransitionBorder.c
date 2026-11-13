@@ -747,6 +747,8 @@ void TransitionBorder_present_bits(void) {
     const SpecularAnisotropy aniso = {0.5f, 1.0f};
     const Sheen sheen = { .color = {10, 20, 30}, .roughness = 0.5f };
     const DiffuseTransmission diffuse = { .factor = 0.5f, .color = {10, 20, 30} };
+    const Fresnel fresnel = {
+        .color = {10, 20, 30}, .strength = 2, .power = 3, .bias = 0.25f, .opacity = 0.5f };
     const Tint tint = {40, 80, 120, 100};
     const Border border = { .width = 2, .radius = 0, .color = {40, 110, 240, 200} };
     const Border other = { .width = 3, .radius = 6, .color = {240, 110, 40, 100} };
@@ -761,18 +763,19 @@ void TransitionBorder_present_bits(void) {
         .color = &color, .opacity = &opacity, .cutoff = &cutoff, .pbr = &pbr,
         .emissive = &emissive, .uv = &uv, .transmission = &transmission, .clear_coat = &coat,
         .anisotropy = &aniso, .sheen = &sheen, .diffuse_transmission = &diffuse,
-        .tint = &tint, .inherited = &inherited, .shape2d = &shape, .border = &border,
-        .border_radius = true, .fade = 0.75f, .rank = 3
+        .fresnel = &fresnel, .tint = &tint, .inherited = &inherited, .shape2d = &shape,
+        .border = &border, .border_radius = true, .fade = 0.75f, .rank = 3
     };
     uint32_t all = (uint32_t)((1ull << BOX_RENDER_TRANSITION_COMPONENTS) - 1);
 
-    test_int(BOX_RENDER_TRANSITION_COMPONENTS, 17);
+    test_int(BOX_RENDER_TRANSITION_COMPONENTS, 18);
     test_assert(ECS_SIZEOF(target.present) * 8 >= BOX_RENDER_TRANSITION_COMPONENTS);
 
     box_draws_transition_target(&target, &m, BOX_DRAW_TRANSITION_SHAPE);
     test_assert(target.present & (1u << BOX_RENDER_TRANSITION_BORDER));
     test_assert(target.present & (1u << BOX_RENDER_TRANSITION_TINT));
     test_assert(target.present & (1u << BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION));
+    test_assert(target.present & (1u << BOX_RENDER_TRANSITION_FRESNEL));
     target.present = all;
     box_draws_material(&expected, &m);
     rendered = expected;

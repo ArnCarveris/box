@@ -679,12 +679,49 @@ done:
     return result;
 }
 
+/** Check whether a 3D shape fades out a removed material lobe its scene enables: Sheen,
+ * ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel with on_remove.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param features The scene features of its key
+ * @return Whether one of those leaves
+ */
+static bool box_draws_lobe_leaving(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t features)
+{
+    static const struct {
+        uint32_t feature;
+        box_render_transition_component_t component;
+    } lobes[] = {
+        { BOX_RENDER_FEATURE_SHEEN, BOX_RENDER_TRANSITION_SHEEN },
+        { BOX_RENDER_FEATURE_CLEAR_COAT, BOX_RENDER_TRANSITION_CLEAR_COAT },
+        { BOX_RENDER_FEATURE_ANISOTROPY, BOX_RENDER_TRANSITION_ANISOTROPY },
+        { BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION, BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION },
+        { BOX_RENDER_FEATURE_FRESNEL, BOX_RENDER_TRANSITION_FRESNEL }
+    };
+    const box_render_transitions_t *s = box_render_transitions_get(world);
+    bool result = false;
+    int32_t i;
+    for (i = 0; s && !result && i < (int32_t)(sizeof(lobes) / sizeof(lobes[0])); i ++) {
+        result = (features & lobes[i].feature) &&
+            box_render_transitions_leaving(world, s, e, lobes[i].component);
+    }
+
+    return result;
+}
+
 /** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or
  * water, it has a PlanarReflection with Scene.planar_reflections or a material feature its scene
  * enables. Alpha tested, blended and TextureBlend shapes without those use the mesh shader.
  *
  * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy,
  * DiffuseTransmission or Fresnel; only a scene with some of those off checks which.
+ *
+ * A shape that fades out a removed one of those its scene enables, with on_remove, keeps the
+ * extended mesh shader until the fade ends, so the fade renders in the same batch.
  *
  * @param world The world
  * @param d The state
@@ -713,19 +750,24 @@ static bool box_draws_extended(
         result = true;
     }
 
-    if (result || !(f & lobes) ||
-        !ecs_query_has_table(d->extended, ecs_get_table(world, e), &it))
-    {
+    if (result || !(f & lobes)) {
         goto done;
     }
 
-    ecs_iter_fini(&it);
-    result = (f & lobes) == lobes ||
-        ((f & BOX_RENDER_FEATURE_SHEEN) && ecs_get(world, e, Sheen)) ||
-        ((f & BOX_RENDER_FEATURE_CLEAR_COAT) && ecs_get(world, e, ClearCoat)) ||
-        ((f & BOX_RENDER_FEATURE_ANISOTROPY) && ecs_get(world, e, SpecularAnisotropy)) ||
-        ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) && ecs_get(world, e, DiffuseTransmission)) ||
-        ((f & BOX_RENDER_FEATURE_FRESNEL) && ecs_get(world, e, Fresnel));
+    if (ecs_query_has_table(d->extended, ecs_get_table(world, e), &it)) {
+        ecs_iter_fini(&it);
+        result = (f & lobes) == lobes ||
+            ((f & BOX_RENDER_FEATURE_SHEEN) && ecs_get(world, e, Sheen)) ||
+            ((f & BOX_RENDER_FEATURE_CLEAR_COAT) && ecs_get(world, e, ClearCoat)) ||
+            ((f & BOX_RENDER_FEATURE_ANISOTROPY) && ecs_get(world, e, SpecularAnisotropy)) ||
+            ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) &&
+                ecs_get(world, e, DiffuseTransmission)) ||
+            ((f & BOX_RENDER_FEATURE_FRESNEL) && ecs_get(world, e, Fresnel));
+    }
+
+    if (!result) {
+        result = box_draws_lobe_leaving(world, e, f);
+    }
 done:
     return result;
 }

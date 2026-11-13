@@ -1448,6 +1448,7 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(SpecularAnisotropy)));
     test_assert(box_transition_supported(world, ecs_id(Sheen)));
     test_assert(box_transition_supported(world, ecs_id(DiffuseTransmission)));
+    test_assert(box_transition_supported(world, ecs_id(Fresnel)));
     test_assert(box_transition_supported(world, ecs_id(BoxShadow)));
     test_assert(box_transition_supported(world, ecs_id(Border)));
 
@@ -1800,7 +1801,8 @@ void Transition_neutral_supported(void) {
     ecs_entity_t both[] = {
         ecs_id(Rotation), ecs_id(Scale), ecs_id(Opacity), ecs_id(Tint), ecs_id(PbrMaterial),
         ecs_id(Emissive), ecs_id(TextureTransform), ecs_id(ClearCoat),
-        ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission)
+        ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission),
+        ecs_id(Fresnel)
     };
     ecs_entity_t none[] = {
         ecs_id(Position), ecs_id(Rgb), ecs_id(AlphaCutoff), ecs_id(Transmission),

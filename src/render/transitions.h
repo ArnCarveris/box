@@ -169,6 +169,9 @@ bool box_transitions_opts(
  * A transform component and a BoxShadow keep the range of their targets since they were last
  * idle, widened by what the curve overshoots, as the resolver starts from the value it renders.
  *
+ * A removed material lobe keeps its shapes on the extended mesh shader while it leaves, so they
+ * are marked as changed when it stops leaving (box_transitions_lobes_left).
+ *
  * @param world The world
  * @param s The state of the extract
  * @param p The packet
@@ -180,7 +183,7 @@ bool box_transitions_opts(
  * @param value The value the entity owns, NULL when it owns none
  */
 void box_transitions_compare(
-    const ecs_world_t *world,
+    ecs_world_t *world,
     box_render_transitions_t *s,
     box_render_packet_t *p,
     ecs_entity_t e,
@@ -189,6 +192,20 @@ void box_transitions_compare(
     box_transition_slot_t *slot,
     const TransitionSpec *spec,
     const void *value);
+
+/** Mark the shapes that read the material lobes of a node as changed when one of them leaves:
+ * Sheen, ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel with on_remove keeps
+ * them on the extended mesh shader (box_render_transitions_leaving), so their batch key changes
+ * when the node is destroyed. Marks the entity of the node and its IsA instances.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param node The node
+ */
+void box_transitions_lobes_left(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    const box_transition_node_t *node);
 
 /** Get the private state of a node.
  *

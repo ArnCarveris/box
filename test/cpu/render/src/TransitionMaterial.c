@@ -44,6 +44,7 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_ANISOTROPY: m->anisotropy = value; break;
     case BOX_RENDER_TRANSITION_SHEEN: m->sheen = value; break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: m->diffuse_transmission = value; break;
+    case BOX_RENDER_TRANSITION_FRESNEL: m->fresnel = value; break;
     default: test_assert(false); break;
     }
 }
@@ -200,6 +201,15 @@ static const DiffuseTransmission tr_diffuse_to = {
     .factor = 1, .color = {200, 100, 40}, .thickness = 2, .blur = 0.5f
 };
 
+/** The Fresnel case: every color channel steps by an integer and every float by an exact amount
+ * each quarter */
+static const Fresnel tr_fresnel_from = {
+    .color = {40, 20, 8}, .strength = 0, .power = 1, .bias = 0, .opacity = 0
+};
+static const Fresnel tr_fresnel_to = {
+    .color = {200, 100, 40}, .strength = 4, .power = 5, .bias = 0.5f, .opacity = 1
+};
+
 /** Get the case of a component, once the world registered the components.
  *
  * @param c The component
@@ -269,6 +279,12 @@ static tr_material_case_t tr_case(
         result.size = ECS_SIZEOF(DiffuseTransmission);
         result.from = &tr_diffuse_from;
         result.to = &tr_diffuse_to;
+        break;
+    case BOX_RENDER_TRANSITION_FRESNEL:
+        result.component = ecs_id(Fresnel);
+        result.size = ECS_SIZEOF(Fresnel);
+        result.from = &tr_fresnel_from;
+        result.to = &tr_fresnel_to;
         break;
     default:
         test_assert(false);
@@ -1745,4 +1761,198 @@ void TransitionMaterial_diffuse_transmission_idle(void) {
 void TransitionMaterial_diffuse_transmission_2d(void) {
     // engine_core/transition
     tr_test_shape_material(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, false);
+}
+
+/** Check the fresnel words of a record of the material table against the ones a Fresnel packs.
+ *
+ * @param r The record
+ * @param fresnel The Fresnel
+ */
+static void tr_fresnel_check(
+    const box_render_material_t *r,
+    const Fresnel *fresnel)
+{
+    box_render_material_t expected;
+    box_draw_material_t m = { .fresnel = fresnel };
+    box_draws_material_pack(&expected, &m);
+    test_uint(r->fresnel_color[0], expected.fresnel_color[0]);
+    test_uint(r->fresnel_color[1], expected.fresnel_color[1]);
+    test_flt(r->fresnel_strength, fresnel->strength);
+    test_flt(r->fresnel_power, fresnel->power);
+    test_flt(r->fresnel_bias, fresnel->bias);
+    test_flt(r->fresnel_opacity, fresnel->opacity);
+}
+
+/** Get the Fresnel of the Fresnel case at a progress of k quarters.
+ *
+ * @param k Quarters, 0 to 4
+ * @return The value
+ */
+static Fresnel tr_fresnel_at(
+    uint32_t k)
+{
+    float t = (float)k / 4.0f;
+    return (Fresnel){
+        .color = {(uint8_t)(40 + 40 * k), (uint8_t)(20 + 20 * k), (uint8_t)(8 + 8 * k)},
+        .strength = 4.0f * t,
+        .power = 1.0f + 4.0f * t,
+        .bias = 0.5f * t,
+        .opacity = t
+    };
+}
+
+void TransitionMaterial_fresnel_mesh(void) {
+    // engine_core/transition
+    tr_test_mesh_material(BOX_RENDER_TRANSITION_FRESNEL);
+
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_from);
+    box_transition_set(world, e, ecs_id(Fresnel), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_to);
+    for (i = 0; i < 4; i ++) {
+        Fresnel expected = tr_fresnel_at((uint32_t)i);
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        tr_fresnel_check(&rendered, &expected);
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    tr_fresnel_check(&rendered, &tr_fresnel_to);
+    tr_fini(world, null);
+}
+
+void TransitionMaterial_fresnel_prefab(void) {
+    // engine_core/transition
+    tr_test_prefab_material(BOX_RENDER_TRANSITION_FRESNEL,
+        &(Fresnel){ .color = {10, 200, 30}, .strength = 2, .power = 3, .bias = 0.25f,
+            .opacity = 0.5f });
+}
+
+void TransitionMaterial_fresnel_final(void) {
+    // engine_core/transition
+    tr_test_material_final(BOX_RENDER_TRANSITION_FRESNEL);
+}
+
+void TransitionMaterial_fresnel_idle(void) {
+    // engine_core/transition
+    tr_test_material_idle(BOX_RENDER_TRANSITION_FRESNEL);
+}
+
+void TransitionMaterial_fresnel_2d(void) {
+    // engine_core/transition
+    tr_test_shape_material(BOX_RENDER_TRANSITION_FRESNEL, false);
+}
+
+void TransitionMaterial_fresnel_keeps_batch(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered;
+    int32_t i;
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_from);
+    box_transition_set(world, e, ecs_id(Fresnel), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    int32_t at = ecs_get(world, e, DrawSlot)->slot;
+    box_draw_key_t key = tr_batch(world, e)->key;
+    test_int(key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_to);
+    for (i = 0; i < 4; i ++) {
+        Fresnel expected = tr_fresnel_at((uint32_t)i);
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(ecs_get(world, e, DrawSlot)->slot, at);
+        test_int(tr_batch(world, e)->key.pipeline, key.pipeline);
+        test_uint(tr_batch(world, e)->key.features, key.features);
+        test_assert(!ecs_has_id(world, e, TransitionMaterial));
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        tr_fresnel_check(&rendered, &expected);
+    }
+
+    tr_frame(world);
+    test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+    test_int(tr_batch(world, e)->key.pipeline, key.pipeline);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    tr_fresnel_check(&rendered, &tr_fresnel_to);
+
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_from);
+    for (i = 0; i < 5; i ++) {
+        Fresnel expected = tr_fresnel_at((uint32_t)(4 - i));
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(ecs_get(world, e, DrawSlot)->slot, at);
+        test_int(tr_batch(world, e)->key.pipeline, key.pipeline);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        tr_fresnel_check(&rendered, &expected);
+    }
+
+    tr_fini(world, null);
+}
+
+/* A change back to the first value three frames into a transition starts from what the
+ * transition renders at that time, 3/4 of the way, so no frame jumps. */
+void TransitionMaterial_fresnel_interrupt(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    tr_material_case_t case_ = tr_case(BOX_RENDER_TRANSITION_FRESNEL), *mc = &case_;
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered, expected;
+    box_draw_material_t m;
+    float start[BOX_RENDER_TRANSITION_VALUE / 4], from[BOX_RENDER_TRANSITION_VALUE / 4];
+    float mid[BOX_RENDER_TRANSITION_VALUE / 4];
+    int32_t i;
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_from);
+    box_transition_set(world, e, ecs_id(Fresnel), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_to);
+    for (i = 0; i < 3; i ++) {
+        Fresnel at = tr_fresnel_at((uint32_t)i);
+        tr_frame(world);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        tr_fresnel_check(&rendered, &at);
+    }
+
+    tr_material_mix(mc, 0.75f, start);
+    box_render_transition_pack(BOX_RENDER_TRANSITION_FRESNEL, &tr_fresnel_from, from);
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel_from);
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        box_render_transition_mix(BOX_RENDER_TRANSITION_FRESNEL, start, from,
+            (float)i / 4.0f, mid);
+        box_draws_material_of(world, e, 0, &m);
+        tr_material_set(&m, mc->c, mid);
+        box_draws_material_pack(&expected, &m);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    tr_fresnel_check(&rendered, &tr_fresnel_from);
+    tr_fini(world, null);
 }

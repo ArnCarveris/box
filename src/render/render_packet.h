@@ -1608,12 +1608,13 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_ANISOTROPY,       /**< SpecularAnisotropy */
     BOX_RENDER_TRANSITION_SHEEN,            /**< Sheen */
     BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, /**< DiffuseTransmission */
+    BOX_RENDER_TRANSITION_FRESNEL,          /**< Fresnel */
     BOX_RENDER_TRANSITION_BOX_SHADOW,       /**< BoxShadow */
     BOX_RENDER_TRANSITION_BORDER,           /**< Border */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 
-/** Bytes of the largest transitionable components (Transmission, BoxShadow), the size of a
+/** Bytes of the largest transitionable components (Transmission, Fresnel, BoxShadow), the size of a
  * value in a record, a multiple of 4 so a value holds floats */
 #define BOX_RENDER_TRANSITION_VALUE (20)
 

@@ -2283,6 +2283,22 @@ uint32_t box_render_transitions_node(
     const box_render_transitions_t *s,
     ecs_entity_t entity);
 
+/** Check whether an entity renders a component it no longer has, owned or inherited, on its
+ * way to the neutral value of an on_remove (box_transition_slot_t leaving), as the last extract
+ * saw it.
+ *
+ * @param world The world
+ * @param s The state of the transition extract, NULL for none
+ * @param entity The entity
+ * @param component The component
+ * @return Whether the component of the entity leaves
+ */
+bool box_render_transitions_leaving(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    ecs_entity_t entity,
+    box_render_transition_component_t component);
+
 /** Check whether the transition of a component of a node runs at a time, as the resolver
  * decides it: from the same start time, delay and duration, with box_render_transition_running.
  *

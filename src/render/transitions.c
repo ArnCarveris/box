@@ -32,7 +32,8 @@ static const box_render_transition_component_t box_transition_material_component
     BOX_RENDER_TRANSITION_CLEAR_COAT,
     BOX_RENDER_TRANSITION_ANISOTROPY,
     BOX_RENDER_TRANSITION_SHEEN,
-    BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION
+    BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION,
+    BOX_RENDER_TRANSITION_FRESNEL
 };
 
 /** Number of material components */
@@ -47,11 +48,12 @@ static const box_render_transition_component_t box_transition_material_component
      (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM) | \
      (1u << BOX_RENDER_TRANSITION_TRANSMISSION) | (1u << BOX_RENDER_TRANSITION_CLEAR_COAT) | \
      (1u << BOX_RENDER_TRANSITION_ANISOTROPY) | (1u << BOX_RENDER_TRANSITION_SHEEN) | \
-     (1u << BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION))
+     (1u << BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION) | \
+     (1u << BOX_RENDER_TRANSITION_FRESNEL))
 
 /** Components the shading of a 2D shape reads: a 2D shape has no alpha test, transmission,
- * coat, anisotropy, sheen nor diffuse transmission and its material words hold its shape and
- * its Border, which a Line does not draw */
+ * coat, anisotropy, sheen, diffuse transmission nor fresnel and its material words hold its
+ * shape and its Border, which a Line does not draw */
 #define BOX_TRANSITION_MASK_SHAPE \
     ((1u << BOX_RENDER_TRANSITION_RGB) | (1u << BOX_RENDER_TRANSITION_EMISSIVE) | \
      (1u << BOX_RENDER_TRANSITION_TEXTURE_TRANSFORM) | (1u << BOX_RENDER_TRANSITION_BORDER))
@@ -86,6 +88,7 @@ ecs_entity_t box_transitions_id(
     case BOX_RENDER_TRANSITION_ANISOTROPY: result = ecs_id(SpecularAnisotropy); break;
     case BOX_RENDER_TRANSITION_SHEEN: result = ecs_id(Sheen); break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: result = ecs_id(DiffuseTransmission); break;
+    case BOX_RENDER_TRANSITION_FRESNEL: result = ecs_id(Fresnel); break;
     case BOX_RENDER_TRANSITION_BOX_SHADOW: result = ecs_id(BoxShadow); break;
     case BOX_RENDER_TRANSITION_BORDER: result = ecs_id(Border); break;
     case BOX_RENDER_TRANSITION_COMPONENTS: break;
@@ -1026,6 +1029,7 @@ static void BoxRenderExtractTransitions(
         }
 
         box_render_packet_transition(p, BOX_RENDER_TRANSITION_DESTROY, (uint32_t)i);
+        box_transitions_lobes_left(world, s, node);
         ecs_map_remove(&s->by_entity, node->entity);
         node->entity = 0;
         *ecs_vec_append_t(NULL, &s->free, uint32_t) = (uint32_t)i;
@@ -1859,6 +1863,15 @@ uint32_t box_render_transitions_node(
     const ecs_map_val_t *found = s ? ecs_map_get(&s->by_entity, entity) : NULL;
 
     return found ? (uint32_t)*found : 0;
+}
+
+bool box_render_transitions_leaving(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    ecs_entity_t entity,
+    box_render_transition_component_t component)
+{
+    return s && s->leaving && box_transition_leaving_node(world, s, entity, component, 0) != 0;
 }
 
 bool box_render_transitions_active(

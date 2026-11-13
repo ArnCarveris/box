@@ -81,6 +81,7 @@ or removing it while it animates in, starts from the rendered value without a ju
 | `SpecularAnisotropy` | Strength 0, the target rotation |
 | `Sheen` | Black, the target roughness |
 | `DiffuseTransmission` | Factor, thickness and blur 0, the target color |
+| `Fresnel` | Strength and opacity 0, the target color, power and bias |
 | `BoxShadow` (add only) | The target offsets, blur and spread, color alpha 0 |
 
 `Position`, `Rgb`, `AlphaCutoff` and `Transmission` have no neutral value: an entity
@@ -184,7 +185,7 @@ error naming the entity/component and ignore that entry. Other entries still wor
 | --- | --- | --- |
 | Transform | `Position`, `Rotation`, `Scale` | Shape, text and shadow slots on the entity and descendants |
 | Material | `Rgb`, `Emissive`, `TextureTransform` | Meshes, 2D shapes and text where the field is rendered |
-| Mesh material | `AlphaCutoff`, `PbrMaterial`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission` | Mesh material table |
+| Mesh material | `AlphaCutoff`, `PbrMaterial`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission`, `Fresnel` | Mesh material table |
 | Hierarchy | `Tint`, `Opacity` | Composed down `ChildOf` and `Parent` |
 | 2D shadow | `BoxShadow` | Shadow offset, blur, spread and color |
 | 2D shape | `Border` | Border width, radius and color of a `Rect`, `Circle` or `Polygon2D` |

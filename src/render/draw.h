@@ -311,8 +311,7 @@ typedef struct box_draw_transition_material_t {
     SpecularAnisotropy anisotropy; /**< SpecularAnisotropy */
     Sheen sheen;            /**< Sheen */
     DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission */
-    Fresnel fresnel;        /**< Fresnel, which has no transition: the record keeps it */
-    bool rimmed;            /**< The material has a Fresnel */
+    Fresnel fresnel;        /**< Fresnel */
     Water water;            /**< Water, which has no transition: the record keeps it */
     bool watered;           /**< The material has a Water */
     Opacity opacity;        /**< Opacity of the shape itself */

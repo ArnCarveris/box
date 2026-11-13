@@ -107,6 +107,7 @@ static ecs_entity_t tr_id(
     case BOX_RENDER_TRANSITION_ANISOTROPY: result = ecs_id(SpecularAnisotropy); break;
     case BOX_RENDER_TRANSITION_SHEEN: result = ecs_id(Sheen); break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: result = ecs_id(DiffuseTransmission); break;
+    case BOX_RENDER_TRANSITION_FRESNEL: result = ecs_id(Fresnel); break;
     default: test_assert(false); break;
     }
 
@@ -174,6 +175,7 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_ANISOTROPY: m->anisotropy = value; break;
     case BOX_RENDER_TRANSITION_SHEEN: m->sheen = value; break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: m->diffuse_transmission = value; break;
+    case BOX_RENDER_TRANSITION_FRESNEL: m->fresnel = value; break;
     default: test_assert(false); break;
     }
 }
@@ -407,6 +409,7 @@ static void tr_test_mesh(
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t id = tr_id(c);
     ecs_size_t size = box_render_transition_layout(c)->size;
+    ecs_singleton_set(world, Scene, {.fresnel = true});
     ecs_entity_t e = ecs_new(world);
     float target[BOX_RENDER_TRANSITION_VALUE / 4], neutral[BOX_RENDER_TRANSITION_VALUE / 4];
     float mid[BOX_RENDER_TRANSITION_VALUE / 4];
@@ -785,6 +788,101 @@ void TransitionAddRemove_diffuse_transmission_remove(void) {
     const DiffuseTransmission value = {
         .factor = 1, .color = {200, 100, 40}, .thickness = 2, .blur = 0.5f };
     tr_test_mesh(BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, &value, true, false);
+}
+
+/** The Fresnel the cases add and remove */
+static const Fresnel tr_fresnel = {
+    .color = {200, 100, 40}, .strength = 4, .power = 3, .bias = 0.25f, .opacity = 0.8f };
+
+void TransitionAddRemove_fresnel_add(void) {
+    // engine_core/transition
+    tr_test_mesh(BOX_RENDER_TRANSITION_FRESNEL, &tr_fresnel, false, false);
+}
+
+void TransitionAddRemove_fresnel_add_new_material(void) {
+    // engine_core/transition
+    tr_test_mesh(BOX_RENDER_TRANSITION_FRESNEL, &tr_fresnel, false, true);
+}
+
+void TransitionAddRemove_fresnel_remove(void) {
+    // engine_core/transition
+    tr_test_mesh(BOX_RENDER_TRANSITION_FRESNEL, &tr_fresnel, true, false);
+}
+
+/** A remove of a Fresnel three frames into its add starts from what the add renders at that
+ * time, 3/4 of the way, and fades to strength and opacity 0 without changing batch: with
+ * Scene.fresnel the shape stays on the extended mesh shader until the fade ends. */
+void TransitionAddRemove_fresnel_remove_during_add(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_entity_t e = ecs_new(world);
+    float target[BOX_RENDER_TRANSITION_VALUE / 4], neutral[BOX_RENDER_TRANSITION_VALUE / 4];
+    float from[BOX_RENDER_TRANSITION_VALUE / 4], mid[BOX_RENDER_TRANSITION_VALUE / 4];
+    int32_t i;
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 2, 3});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+    box_transition_set(world, e, ecs_id(Fresnel), &tr_both);
+    tr_frames(world, 2);
+    box_render_transition_pack(BOX_RENDER_TRANSITION_FRESNEL, &tr_fresnel, target);
+    test_assert(box_render_transition_neutral(BOX_RENDER_TRANSITION_FRESNEL, target, neutral));
+
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel);
+    for (i = 0; i < 3; i ++) {
+        tr_frame(world);
+        tr_at(BOX_RENDER_TRANSITION_FRESNEL, neutral, target, i, mid);
+        tr_check_record(world, null, e, BOX_RENDER_TRANSITION_FRESNEL, mid);
+    }
+
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    tr_at(BOX_RENDER_TRANSITION_FRESNEL, neutral, target, 3, from);
+    ecs_remove(world, e, Fresnel);
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_assert(!ecs_has(world, e, Fresnel));
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        tr_at(BOX_RENDER_TRANSITION_FRESNEL, from, neutral, i, mid);
+        tr_check_record(world, null, e, BOX_RENDER_TRANSITION_FRESNEL, mid);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    }
+
+    tr_frame(world);
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    tr_check_record_target(world, null, e);
+    tr_fini(world, null);
+}
+
+/** A shape whose Fresnel fades out keeps the extended mesh shader until its Transition goes
+ * away, then moves to the mesh shader and renders the target. */
+void TransitionAddRemove_fresnel_remove_transition(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 2, 3});
+    ecs_set_ptr(world, e, Fresnel, &tr_fresnel);
+    box_transition_set(world, e, ecs_id(Fresnel), &tr_remove);
+    tr_frames(world, 2);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_remove(world, e, Fresnel);
+    tr_frames(world, 2);
+    test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_remove(world, e, Transition);
+    tr_frame(world);
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH);
+    tr_check_record_target(world, null, e);
+    tr_fini(world, null);
 }
 
 void TransitionAddRemove_pbr_add(void) {
@@ -1266,6 +1364,18 @@ void TransitionAddRemove_neutral_values(void) {
     test_int(sheen_n.color.g, 0);
     test_int(sheen_n.color.b, 0);
     test_flt(sheen_n.roughness, 0.75f);
+
+    Fresnel fresnel = {{1, 2, 3}, 4, 5, 0.25f, 0.5f}, fresnel_n;
+    box_render_transition_pack(BOX_RENDER_TRANSITION_FRESNEL, &fresnel, value);
+    test_assert(box_render_transition_neutral(BOX_RENDER_TRANSITION_FRESNEL, value, out));
+    ecs_os_memcpy(&fresnel_n, out, ECS_SIZEOF(Fresnel));
+    test_int(fresnel_n.color.r, 1);
+    test_int(fresnel_n.color.g, 2);
+    test_int(fresnel_n.color.b, 3);
+    test_flt(fresnel_n.strength, 0);
+    test_flt(fresnel_n.power, 5);
+    test_flt(fresnel_n.bias, 0.25f);
+    test_flt(fresnel_n.opacity, 0);
 
     BoxShadow shadow = {1, 2, 3, 4, {5, 6, 7, 8}}, shadow_n;
     box_render_transition_pack(BOX_RENDER_TRANSITION_BOX_SHADOW, &shadow, value);
