@@ -86,12 +86,12 @@ view {
 }
 
 yard {
-  if liner {
-    if show_gantry {
+  if show_gantry {
+    if liner {
       Drydock dock()
+    } else {
+      Slipway slipway()
     }
-  } else {
-    Slipway slipway()
   }
   if !liner {
     BuildFrame frame()

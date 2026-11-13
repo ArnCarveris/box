@@ -129,9 +129,7 @@ assets {
         LayoutItem: {width: {min: 320, max: 320}}
         YardStripLabel caption(text: "SHOW")
         YardSegment b_ui(label: "Interface", op: OP_SHOW_UI, grow: true)
-        if liner {
-          YardSegment b_gantry(label: "Gantry", op: OP_SHOW_GANTRY, grow: true)
-        }
+        YardSegment b_gantry(label: "Gantry", op: OP_SHOW_GANTRY, grow: true)
       }
     }
 
