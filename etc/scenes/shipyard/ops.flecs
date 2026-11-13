@@ -1,0 +1,418 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using state
+
+state {
+  export const UNITS: i32 = 12
+  export const CHANNELS: i32 = 9
+  export const MAX_BARS: i32 = 8
+  export const REACTOR_BARS: i32 = 12
+  export const U_REACTOR: i32 = 0
+  export const U_JUMP: i32 = 1
+
+  export const C_LIFE: i32 = 0
+  export const C_HAB: i32 = 1
+  export const C_JUMP: i32 = 2
+  export const C_WEAPONS: i32 = 3
+  export const C_DRIVE: i32 = 4
+  export const C_FAB: i32 = 5
+  export const C_MINING: i32 = 6
+  export const C_DATA: i32 = 7
+  export const C_SHIELDS: i32 = 8
+
+  export const OP_DRIVE: i32 = 170
+  export const OP_REFUEL: i32 = 171
+  export const OP_UNIT: i32 = 200
+  export const OP_POWER: i32 = 300
+
+  export const TICK: f32 = 0.1
+  export const COOLING: f32 = 1.6
+  export const PASSIVE: f32 = 0.15
+  export const BURN_TIME: f32 = 90
+
+  export mut units: i32[12] = {}
+  export mut unit_kind: i32[12] = {}
+  export mut unit_on: bool[12] = {}
+  export mut unit_trip: bool[12] = {}
+  export mut unit_heat: f32[12] = {}
+  export mut unit_charge: f32[12] = {}
+  export mut unit_n: i32 = 0
+  export mut slot_on: bool[90] = {}
+
+  export mut need: i32[9] = {}
+  export mut want: i32[9] = {}
+  export mut alloc: i32[9] = {}
+  export mut pf: f32[9] = {}
+  export mut supply: i32 = 0
+  export mut radiators: i32 = 0
+  export mut drives: i32 = 0
+  export mut tanks: i32 = 0
+
+  export mut drive_on: bool = false
+  export mut burning: bool = false
+  export mut fuel: f32 = 1
+  export mut ship_z0: f32 = 0
+  export mut ship_z1: f32 = 0
+
+  fn chan_name(c: i32) -> string {
+    match c { 0: "LIFE"; 1: "HAB"; 2: "JUMP"; 3: "WPN"; 4: "DRV"; 5: "FAB"; 6: "MINE"; 7: "DATA"; _: "SHLD" }
+  }
+
+  fn chan_title(c: i32) -> string {
+    match c {
+      0: "Life support"; 1: "Habitats"; 2: "Jump drive"; 3: "Weapons"; 4: "Main drive"
+      5: "Manufacturing"; 6: "Mining"; 7: "Datacenter"; _: "Shields"
+    }
+  }
+
+  fn chan_rank(c: i32) -> i32 {
+    match c { 0: 0; 1: 1; 7: 2; 4: 3; 8: 4; 2: 5; 3: 6; 5: 7; _: 8 }
+  }
+
+  fn chan_at_rank(r: i32) -> i32 {
+    match r { 0: 0; 1: 1; 2: 7; 3: 4; 4: 8; 5: 2; 6: 3; 7: 5; _: 6 }
+  }
+
+  fn liner_chan(k: i32) -> i32 {
+    match k {
+      58: C_LIFE; 42: C_HAB; 43: C_HAB; 44: C_HAB; 47: C_JUMP; 57: C_WEAPONS; 60: C_WEAPONS
+      48: C_DRIVE; 52: C_FAB; 53: C_FAB; 51: C_MINING; 40: C_DATA; 41: C_DATA; 59: C_SHIELDS
+      _: -1
+    }
+  }
+
+  fn rig_chan(k: i32) -> i32 {
+    match k {
+      3: C_LIFE; 9: C_LIFE; 1: C_HAB; 2: C_HAB; 10: C_HAB; 7: C_WEAPONS; 8: C_DRIVE
+      15: C_FAB; 14: C_MINING; 16: C_DATA; 17: C_DATA
+      _: -1
+    }
+  }
+
+  fn liner_souls() -> i32 {
+    lc(L_QUARTERS) * 60 + lc(L_HABRING) * 900 + lc(L_BRIDGE) * 40 + lc(L_HANGAR) * 30 +
+    lc(L_ASSEMBLER) * 30 + lc(L_FAB) * 30 + lc(L_TURRET) * 15 + lc(L_RAILGUN) * 20
+  }
+
+  fn bar_size() -> f32 { liner ? 10 : 2.5 }
+
+  fn power_unit() -> string { liner ? "GW" : "MW" }
+
+  fn chan_demand(c: i32) -> f32 {
+    mut d: f32 = 0
+    if liner {
+      for k in L_BASE..L_END {
+        if liner_chan(k) == c {
+          d += lc(k) * lkind_power(k)
+        }
+      }
+      if c == C_LIFE {
+        d += liner_souls() * 0.01
+      }
+    } else {
+      for k in 1..KINDS {
+        if rig_chan(k) == c {
+          d += counts[k] * kind_power(k)
+        }
+      }
+    }
+    d
+  }
+
+  fn bars_for(d: f32) -> i32 {
+    mut n: i32 = 0
+    while n < MAX_BARS && n * bar_size() < d - 0.001 {
+      n += 1
+    }
+    n
+  }
+
+  fn used_bars() -> i32 {
+    mut n: i32 = 0
+    for c in 0..CHANNELS {
+      n += alloc[c]
+    }
+    n
+  }
+
+  fn free_bars() -> i32 { supply - used_bars() }
+
+  fn online() -> i32 {
+    mut n: i32 = 0
+    for u in 0..unit_n {
+      if unit_kind[u] == U_REACTOR && unit_on[u] {
+        n += 1
+      }
+    }
+    n
+  }
+
+  fn unit_count(kind: i32) -> i32 {
+    mut n: i32 = 0
+    for u in 0..unit_n {
+      if unit_kind[u] == kind {
+        n += 1
+      }
+    }
+    n
+  }
+
+  fn unit_ordinal(u: i32) -> i32 {
+    mut n: i32 = 1
+    for v in 0..u {
+      if unit_kind[v] == unit_kind[u] {
+        n += 1
+      }
+    }
+    n
+  }
+
+  fn unit_place(u: i32) -> string {
+    const i = units[u]
+    liner ? "{lane_name(lane_of(i))} {slot_of(i) + 1}" : "Deck {cell_y(i) + 1}"
+  }
+
+  fn heat_kelvin(h: f32) -> i32 { 290 + h * 1910 }
+
+  fn ship_mass() -> f32 {
+    mut m: f32 = 0
+    if liner {
+      m = liner_mass()
+    } else {
+      for k in 1..KINDS {
+        m += counts[k] * kind_mass(k)
+      }
+    }
+    m
+  }
+
+  fn full_thrust() -> f32 {
+    liner ? drives * 60.0 / max(ship_mass(), 1) : drives * 260.0 / max(ship_mass(), 1)
+  }
+
+  fn burn_rate() -> f32 {
+    tanks == 0 ? 0 : drives * pf[C_DRIVE] / (BURN_TIME * tanks)
+  }
+
+  fn ops_live(idx: i32, k: i32) -> f32 {
+    match k {
+      45: slot_on[idx] ? 1 : 0
+      47: slot_on[idx] ? 0.25 + 0.75 * pf[C_JUMP] : 0
+      48: burning ? pf[C_DRIVE] : 0
+      52: pf[C_FAB]
+      53: pf[C_FAB]
+      57: pf[C_WEAPONS]
+      60: pf[C_WEAPONS]
+      59: pf[C_SHIELDS]
+      _: 1
+    }
+  }
+
+  fn route() {
+    mut left: i32 = supply
+    mut a: i32[9] = {}
+    for r in 0..CHANNELS {
+      const c = chan_at_rank(r)
+      const n = min(want[c], left)
+      a[c] = n
+      left -= n
+    }
+    alloc = a
+    mut f: f32[9] = {}
+    mut same = true
+    for c in 0..CHANNELS {
+      f[c] = need[c] > 0 ? a[c] * 1.0 / need[c] : 0
+      if f[c] != pf[c] {
+        same = false
+      }
+    }
+    if !same {
+      pf = f
+    }
+  }
+
+  fn resupply() {
+    const s = online() * REACTOR_BARS
+    if s != supply {
+      supply = s
+    }
+    route()
+  }
+
+  fn mark_slots() {
+    mut so: bool[90] = {}
+    if liner {
+      for u in 0..unit_n {
+        so[units[u]] = unit_on[u]
+      }
+    }
+    slot_on = so
+  }
+
+  fn ops_sync() {
+    mut nu: i32[12] = {}
+    mut nk: i32[12] = {}
+    mut non: bool[12] = {}
+    mut ntrip: bool[12] = {}
+    mut nheat: f32[12] = {}
+    mut ncharge: f32[12] = {}
+    mut n: i32 = 0
+    const total = liner ? LCELLS : CELLS
+    for i in 0..total {
+      const k = liner ? lgrid[i] : grid[i]
+      const kind = liner ? (k == L_REACTOR ? U_REACTOR : k == L_JUMP ? U_JUMP : -1) : (k == K_POWER ? U_REACTOR : -1)
+      if kind >= 0 && n < UNITS {
+        nu[n] = i
+        nk[n] = kind
+        non[n] = kind == U_REACTOR
+        for u in 0..unit_n {
+          if units[u] == i && unit_kind[u] == kind {
+            non[n] = unit_on[u]
+            ntrip[n] = unit_trip[u]
+            nheat[n] = unit_heat[u]
+            ncharge[n] = unit_charge[u]
+          }
+        }
+        n += 1
+      }
+    }
+    units = nu
+    unit_kind = nk
+    unit_on = non
+    unit_trip = ntrip
+    unit_heat = nheat
+    unit_charge = ncharge
+    unit_n = n
+    mark_slots()
+
+    radiators = liner ? lc(L_RADIATOR) : counts[K_RADIATOR]
+    drives = liner ? lc(L_DRIVE) : counts[K_ENGINE]
+    const t = liner ? lc(L_TANKS) : counts[K_FUEL]
+    if t > tanks && tanks == 0 {
+      fuel = 1
+    }
+    tanks = t
+    if tanks == 0 {
+      fuel = 0
+    }
+
+    mut nn: i32[9] = {}
+    mut nw: i32[9] = {}
+    for c in 0..CHANNELS {
+      nn[c] = bars_for(chan_demand(c))
+      nw[c] = want[c] >= need[c] ? nn[c] : min(want[c], nn[c])
+    }
+    need = nn
+    want = nw
+
+    mut z0: i32 = SLOTS
+    mut z1: i32 = -1
+    for i in 0..LCELLS {
+      if lgrid[i] != 0 {
+        z0 = min(z0, slot_of(i))
+        z1 = max(z1, slot_of(i))
+      }
+    }
+    ship_z0 = slot_z(z0) - SEG / 2
+    ship_z1 = slot_z(z1) + SEG / 2
+
+    resupply()
+  }
+
+  fn toggle_unit(u: i32) {
+    if u >= 0 && u < unit_n {
+      unit_on[u] = !unit_on[u]
+      if unit_on[u] {
+        unit_trip[u] = false
+      }
+      mark_slots()
+      resupply()
+    }
+  }
+
+  fn set_power(c: i32, level: i32) {
+    if c >= 0 && c < CHANNELS {
+      want[c] = clamp(want[c] == level ? level - 1 : level, 0, need[c])
+      route()
+    }
+  }
+
+  fn ops_step(dt: f32) {
+    const load: f32 = supply > 0 ? used_bars() * 1.0 / supply : 0
+    mut active: i32 = 0
+    for u in 0..unit_n {
+      if unit_on[u] || unit_heat[u] > 0.02 {
+        active += 1
+      }
+    }
+    const share: f32 = radiators * COOLING / max(active, 1) + PASSIVE
+    mut h: f32[12] = unit_heat
+    mut ch: f32[12] = unit_charge
+    mut tripped = false
+    for u in 0..unit_n {
+      mut gain: f32 = 0
+      if unit_on[u] && unit_kind[u] == U_REACTOR {
+        gain = 0.25 + 0.75 * load
+      } else if unit_on[u] {
+        gain = ch[u] < 1 ? 1.1 * pf[C_JUMP] : 0.3
+        ch[u] = min(ch[u] + dt * 0.08 * pf[C_JUMP], 1)
+      } else {
+        ch[u] = max(ch[u] - dt * 0.02, 0)
+      }
+      h[u] = max(h[u] + (gain - share * h[u]) * 0.25 * dt, 0)
+      if h[u] > 1 && unit_on[u] {
+        unit_on[u] = false
+        unit_trip[u] = true
+        tripped = true
+      }
+    }
+    unit_heat = h
+    unit_charge = ch
+    if tripped {
+      mark_slots()
+      resupply()
+    }
+
+    if drive_on && (fuel <= 0 || drives == 0) {
+      drive_on = false
+    }
+    if drive_on {
+      fuel = max(fuel - dt * burn_rate(), 0)
+    }
+    const burn = drive_on && fuel > 0 && pf[C_DRIVE] > 0
+    if burn != burning {
+      burning = burn
+    }
+  }
+}
+
+async {
+  mut seen: i32 = -1
+  mut was_liner = false
+  while true {
+    if layout_rev != seen || liner != was_liner {
+      seen = layout_rev
+      was_liner = liner
+      ops_sync()
+    }
+    ops_step(TICK)
+    await delay(TICK)
+  }
+}
+
+async {
+  while true {
+    const e = await Request
+    const op = e.op
+    if op == OP_DRIVE {
+      drive_on = !drive_on && fuel > 0 && drives > 0
+    } else if op == OP_REFUEL {
+      fuel = tanks > 0 ? 1 : 0
+    } else if op >= OP_UNIT && op < OP_UNIT + UNITS {
+      toggle_unit(op - OP_UNIT)
+    } else if op >= OP_POWER && op < OP_POWER + CHANNELS * 10 {
+      set_power((op - OP_POWER - (op - OP_POWER) % 10) / 10, (op - OP_POWER) % 10)
+    }
+  }
+}

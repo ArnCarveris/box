@@ -41,13 +41,13 @@ assets {
     } else if k == L_FARM {
       AgriRing part(r: r, seed: z)
     } else if k == L_REACTOR {
-      Reactor part(r: r, fe: fe, be: be)
+      Reactor part(r: r, fe: fe, be: be, power: live)
     } else if k == L_RADIATOR {
       Radiator part(r: r, core: core)
     } else if k == L_JUMP {
-      JumpDrive part(r: r, fe: fe, be: be)
+      JumpDrive part(r: r, fe: fe, be: be, power: live)
     } else if k == L_DRIVE {
-      DriveSection part(r: r, fe: fe)
+      DriveSection part(r: r, fe: fe, power: live)
     } else if k == L_TANKS {
       TankCluster part(r: r)
     } else if k == L_CARGO {
@@ -125,7 +125,7 @@ assets {
         } else if hovered && swap {
           Tint: {90, 255, 160, 120}
         }
-        LinerSegment part(k: k, l: l, z: z, seed: idx)
+        LinerSegment part(k: k, l: l, z: z, seed: idx, live: ops_live(idx, k))
       }
 
       if fault != 0 {

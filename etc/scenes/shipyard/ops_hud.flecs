@@ -1,0 +1,374 @@
+using flecs.script
+using flecs.script.math
+using box.geometry
+using box.input
+using box.layout
+using box.material
+using box.picking
+using box.text
+using box.texture
+using box.transition
+using box.ui
+using box.widgets
+using state
+
+state {
+  fn chan_icon(c: i32) -> entity {
+    match c {
+      0: assets.yard_icon_life
+      1: assets.yard_icon_hab
+      2: assets.yard_icon_jump
+      3: assets.yard_icon_weapon
+      4: assets.yard_icon_drive
+      5: assets.yard_icon_builder
+      6: assets.yard_icon_drill
+      7: assets.yard_icon_datacenter
+      _: assets.yard_icon_shield
+    }
+  }
+
+  fn heat_tone(i: i32, n: i32) -> i32 {
+    i * 10 < n * 6 ? UI_GOOD : i * 10 < n * 8 ? UI_WARN : UI_BAD
+  }
+
+  fn clock(secs: f32) -> string {
+    const m = floor(secs / 60)
+    const s = floor(secs - m * 60)
+    s < 10 ? "{m:.0}:0{s:.0}" : "{m:.0}:{s:.0}"
+  }
+}
+
+assets {
+  template OpsToggleFace {
+    prop label: string = ""
+    prop tone: i32 = 0
+    prop lit: bool = false
+    prop hover: bool = false
+    prop down: bool = false
+
+    Layout: {direction: Row, padding: {0, 0, 8, 8}, spacing: 6, h: Center, v: Middle}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    if lit {
+      Rgb: {ui_r(tone), ui_g(tone), ui_b(tone)}
+      Border: {width: 1, radius: 1, color: {ui_r(tone), ui_g(tone), ui_b(tone), 255}}
+    } else if down {
+      Rgb: {3, 10, 17}
+      Border: {width: 1, radius: 1, color: {ui_r(tone), ui_g(tone), ui_b(tone), 255}}
+    } else if hover {
+      Rgb: {14, 40, 58}
+      Border: {width: 1, radius: 1, color: {ui_r(tone), ui_g(tone), ui_b(tone), 255}}
+    } else {
+      Rgb: {9, 27, 41}
+      Border: {width: 1, radius: 1, color: {34, 86, 110, 255}}
+    }
+    Transition: [Rgb: {duration: 0.08}]
+
+    name {
+      Text: {value: label, size: 11, font: yard_font_title}
+      if lit {
+        Rgb: {5, 16, 26}
+      } else {
+        Rgb: {ui_r(tone), ui_g(tone), ui_b(tone)}
+      }
+    }
+  }
+
+  template OpsToggle : YardAction {
+    prop tone: i32 = 0
+    prop lit: bool = false
+    prop w: f32 = 52
+    prop h: f32 = 22
+
+    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Layout: {}
+
+    OpsToggleFace face(label: label, tone: tone, lit: lit, hover: hover, down: down)
+  }
+
+  template OpsCaption {
+    prop text: string = ""
+    prop size: f32 = 10
+    prop tone: i32 = UI_SOFT
+    prop mono: bool = false
+
+    Text: {value: text, size: size, font: mono ? yard_font_mono : yard_font_body}
+    Rgb: {ui_r(tone), ui_g(tone), ui_b(tone)}
+  }
+
+  template HeatCell {
+    prop i: i32 = 0
+    prop n: i32 = 12
+    prop lit: bool = false
+
+    const tone = heat_tone(i, n)
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 9}}
+    Rect: {1, 1}
+    if lit {
+      Rgb: {ui_r(tone), ui_g(tone), ui_b(tone)}
+    } else {
+      Rgb: {14, 36, 52}
+    }
+    Border: {radius: 1}
+  }
+
+  template ReactorRow {
+    prop u: i32 = 0
+
+    const kind = unit_kind[u]
+    const on = unit_on[u]
+    const trip = unit_trip[u]
+    const heat = unit_heat[u]
+    const charge = unit_charge[u]
+    const jump = kind == U_JUMP
+    const level: i32 = floor(heat * 12 + 0.5)
+    const state = trip ? UI_BAD : on ? UI_OK : UI_MUTED
+
+    Layout: {direction: Row, spacing: 8, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+
+    YardIcon glyph(icon: jump ? yard_icon_jump : yard_icon_reactor, size: 16, state: state)
+    words {
+      Layout: {direction: Column, spacing: 1}
+      LayoutItem: {width: {min: 92, max: 92}}
+      OpsCaption name(text: jump ? "Jump Drive {unit_ordinal(u)}" : liner ? "Reactor {unit_ordinal(u)}" : "Power Plant {unit_ordinal(u)}", size: 12, tone: on ? UI_TEXT : UI_SOFT)
+      OpsCaption place(text: unit_place(u), size: 10, tone: UI_MUTED, mono: true)
+    }
+    gauge {
+      Layout: {direction: Column, spacing: 3}
+      LayoutItem: {width: {mode: Grow}}
+      cells {
+        Layout: {direction: Row, spacing: 2}
+        LayoutItem: {width: {mode: Grow}}
+        for i in 0..12 {
+          HeatCell "c_{i}"(i: i, n: 12, lit: i < level)
+        }
+      }
+      readout {
+        Layout: {direction: Row, spacing: 6}
+        LayoutItem: {width: {mode: Grow}}
+        OpsCaption temp(text: "{heat_kelvin(heat)} K", size: 10, tone: heat > 0.8 ? UI_BAD : heat > 0.6 ? UI_WARN : UI_SOFT, mono: true)
+        YardFiller gap()
+        if jump {
+          OpsCaption charge_text(text: charge >= 1 ? "CHARGED" : "CHG {charge * 100:.0}%", size: 10, tone: charge >= 1 ? UI_GOOD : on ? UI_OK : UI_MUTED, mono: true)
+        } else {
+          OpsCaption out_text(text: on ? "{REACTOR_BARS * bar_size():.0} {power_unit()}" : "0 {power_unit()}", size: 10, tone: on ? UI_OK : UI_MUTED, mono: true)
+        }
+      }
+    }
+    OpsToggle toggle(label: trip ? "TRIP" : on ? "ON" : "OFF", op: OP_UNIT + u, tone: trip ? UI_BAD : on ? UI_GOOD : UI_SOFT, lit: on)
+  }
+
+  template ReactorPanel : YardPanel {
+    const reactors = unit_count(U_REACTOR)
+    const jumps = unit_count(U_JUMP)
+    const up = online()
+
+    if unit_n == 0 {
+      OpsCaption empty(text: liner ? "No reactors or jump drives aboard" : "No power plants aboard", size: 11, tone: UI_MUTED)
+    }
+    rows {
+      Layout: {direction: Column, spacing: 7}
+      LayoutItem: {width: {mode: Grow}}
+      for u in 0..unit_n {
+        ReactorRow "row_{u}"(u: u)
+      }
+    }
+    YardRule rule()
+    footer {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      YardIcon glyph(icon: yard_icon_radiator, size: 13, state: radiators > 0 ? UI_SOFT : UI_BAD)
+      OpsCaption cooling(text: radiators == 1 ? "1 radiator" : "{radiators} radiators", size: 11, tone: radiators > 0 ? UI_SOFT : UI_BAD)
+      YardFiller gap()
+      OpsCaption status(text: "{up} / {reactors} online", size: 11, tone: up > 0 ? UI_OK : UI_BAD, mono: true)
+    }
+  }
+
+  template PowerBarFace {
+    prop c: i32 = 0
+    prop v: i32 = 1
+    prop hover: bool = false
+
+    const lit = v <= alloc[c]
+    const asked = v <= want[c]
+    const shown = v <= need[c]
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    if !shown {
+      Rgb: {5, 16, 26}
+      Border: {width: 0, radius: 1, color: {5, 16, 26, 255}}
+    } else if lit && hover {
+      Rgb: {170, 238, 255}
+      Border: {width: 1, radius: 1, color: {214, 246, 255, 255}}
+    } else if lit {
+      Rgb: {95, 216, 255}
+      Border: {width: 1, radius: 1, color: {150, 232, 255, 255}}
+    } else if asked {
+      Rgb: {40, 30, 12}
+      Border: {width: 1, radius: 1, color: {255, 179, 71, 255}}
+    } else if hover {
+      Rgb: {24, 62, 84}
+      Border: {width: 1, radius: 1, color: {95, 216, 255, 255}}
+    } else {
+      Rgb: {12, 34, 50}
+      Border: {width: 1, radius: 1, color: {34, 86, 110, 255}}
+    }
+    Transition: [Rgb: {duration: 0.1}]
+  }
+
+  template PowerBar : YardAction {
+    prop c: i32 = 0
+    prop v: i32 = 1
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 9}}
+    Layout: {}
+
+    PowerBarFace face(c: c, v: v, hover: hover && v <= need[c])
+  }
+
+  template PowerColumn {
+    prop c: i32 = 0
+
+    const n = need[c]
+    const a = alloc[c]
+    const state = n == 0 ? UI_DIM : a >= n ? UI_OK : a > 0 ? UI_WARN : UI_BAD
+
+    Layout: {direction: Column, spacing: 3, h: Center}
+    LayoutItem: {width: {mode: Grow}}
+
+    for i in 0..MAX_BARS {
+      PowerBar "bar_{i}"(label: chan_title(c), c: c, v: MAX_BARS - i, op: OP_POWER + c * 10 + MAX_BARS - i)
+    }
+    gap {
+      LayoutItem: {height: {mode: Fixed, value: 3}}
+    }
+    YardIcon glyph(icon: chan_icon(c), size: 16, state: state)
+    OpsCaption caption(text: chan_name(c), size: 9, tone: n == 0 ? UI_MUTED : a >= n ? UI_SOFT : UI_WARN)
+  }
+
+  template PowerPip {
+    prop tone: i32 = 0
+
+    LayoutItem: {width: {mode: Fixed, value: 5}, height: {mode: Fixed, value: 10}}
+    Rect: {1, 1}
+    Rgb: {ui_r(tone), ui_g(tone), ui_b(tone)}
+    Border: {radius: 1}
+  }
+
+  template PowerPanel : YardPanel {
+    const used = used_bars()
+    const free = supply - used
+    const pips = min(supply, 40)
+    const short = (need[0] - alloc[0]) + (need[1] - alloc[1]) + (need[2] - alloc[2]) + (need[3] - alloc[3]) + (need[4] - alloc[4]) + (need[5] - alloc[5]) + (need[6] - alloc[6]) + (need[7] - alloc[7]) + (need[8] - alloc[8])
+
+    pool {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      YardIcon glyph(icon: yard_icon_power, size: 14, state: supply > 0 ? UI_WARN : UI_BAD)
+      OpsCaption output(text: "{used * bar_size():.0} / {supply * bar_size():.0} {power_unit()}", size: 12, tone: UI_TEXT, mono: true)
+      YardFiller gap()
+      OpsCaption free_text(text: "FREE {free}", size: 12, tone: free > 0 ? UI_WARN : UI_MUTED, mono: true)
+    }
+    pips {
+      Layout: {direction: Row, spacing: 2}
+      LayoutItem: {width: {mode: Grow}}
+      if supply == 0 {
+        OpsCaption none(text: "All reactors are offline", size: 11, tone: UI_BAD)
+      }
+      for i in 0..pips {
+        PowerPip "pip_{i}"(tone: i < used ? UI_OK : UI_WARN)
+      }
+    }
+    columns {
+      Layout: {direction: Row, spacing: 5, padding: {4, 0, 0, 0}}
+      LayoutItem: {width: {mode: Grow}}
+      for c in 0..CHANNELS {
+        PowerColumn "chan_{c}"(c: c)
+      }
+    }
+    YardRule rule()
+    footer {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      YardIcon glyph(icon: short == 0 ? yard_icon_ok : yard_icon_warn, size: 13, state: short == 0 ? UI_GOOD : UI_WARN)
+      OpsCaption status(text: short == 0 ? "Every system has the power it needs" : short == 1 ? "1 bar short of full power" : "{short} bars short of full power", size: 11, tone: short == 0 ? UI_SOFT : UI_WARN)
+    }
+  }
+
+  template FuelCell {
+    prop lit: bool = false
+    prop tone: i32 = 0
+
+    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Rect: {1, 1}
+    if lit {
+      Rgb: {ui_r(tone), ui_g(tone), ui_b(tone)}
+    } else {
+      Rgb: {14, 36, 52}
+    }
+    Border: {radius: 1}
+  }
+
+  template DrivePanel : YardPanel {
+    const level: i32 = floor(fuel * 24 + 0.999)
+    const tone = fuel > 0.5 ? UI_GOOD : fuel > 0.2 ? UI_WARN : UI_BAD
+    const rate = burn_rate()
+    const thrust: f32 = burning ? full_thrust() * pf[C_DRIVE] : 0
+    const ready = drives > 0 && tanks > 0 && fuel > 0
+
+    controls {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      OpsToggle engage(label: drive_on ? "CUT DRIVES" : "ENGAGE DRIVES", op: OP_DRIVE, tone: drive_on ? UI_WARN : ready ? UI_OK : UI_MUTED, lit: drive_on, w: 180, h: 28)
+      YardFiller gap()
+      OpsToggle refuel(label: "REFUEL", op: OP_REFUEL, tone: tanks > 0 && fuel < 1 ? UI_OK : UI_MUTED, w: 80, h: 28)
+    }
+    fuel_head {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      YardIcon glyph(icon: yard_icon_fuel, size: 14, state: tanks == 0 ? UI_MUTED : tone)
+      OpsCaption label_text(text: "PROPELLANT", size: 11, tone: UI_SOFT)
+      YardFiller gap()
+      OpsCaption amount(text: tanks == 0 ? "NO TANKS" : "{fuel * 100:.1}%", size: 13, tone: tanks == 0 ? UI_MUTED : tone, mono: true)
+    }
+    gauge {
+      Layout: {direction: Row, spacing: 2, padding: {3, 3, 3, 3}}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 22}}
+      Rect: {1, 1}
+      Rgb: {3, 10, 17}
+      Border: {width: 1, radius: 2, color: {34, 86, 110, 255}}
+      for i in 0..24 {
+        FuelCell "cell_{i}"(lit: i < level, tone: tone)
+      }
+    }
+    scale {
+      Layout: {direction: Row}
+      LayoutItem: {width: {mode: Grow}}
+      OpsCaption empty(text: "E", size: 9, tone: UI_MUTED, mono: true)
+      YardFiller gap_a()
+      OpsCaption half(text: "1/2", size: 9, tone: UI_MUTED, mono: true)
+      YardFiller gap_b()
+      OpsCaption full(text: "F", size: 9, tone: UI_MUTED, mono: true)
+    }
+    YardRule rule()
+    stats {
+      Layout: {direction: Row, spacing: 6, v: Middle}
+      LayoutItem: {width: {mode: Grow}}
+      YardIcon thrust_icon(icon: yard_icon_thrust, size: 13, state: burning ? UI_GOOD : UI_MUTED)
+      OpsCaption thrust_text(text: "{thrust:.2} g", size: 12, tone: burning ? UI_GOOD : UI_SOFT, mono: true)
+      YardFiller gap()
+      if drives == 0 {
+        OpsCaption note(text: liner ? "No main drives" : "No engines", size: 11, tone: UI_BAD)
+      } else if drive_on && pf[C_DRIVE] == 0 {
+        OpsCaption note(text: "Drives have no power", size: 11, tone: UI_WARN)
+      } else if burning {
+        OpsCaption note(text: "BURN {clock(fuel / max(rate, 0.0001))} LEFT", size: 11, tone: UI_WARN, mono: true)
+      } else {
+        OpsCaption note(text: liner ? "{drives} drives  ·  {tanks} tank clusters" : "{drives} engines  ·  {tanks} tanks", size: 11, tone: UI_SOFT)
+      }
+    }
+  }
+}
