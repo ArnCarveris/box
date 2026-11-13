@@ -3,6 +3,7 @@ include shipyard/materials
 include shipyard/hull
 include shipyard/exterior
 include shipyard/liner
+include shipyard/ops
 include shipyard/segments
 include shipyard/fab
 include shipyard/assembler
@@ -15,6 +16,8 @@ include shipyard/logic
 include shipyard/camera
 include ui/widgets
 include shipyard/hud
+include shipyard/ops_hud
+include shipyard/screen
 
 using flecs.script
 using flecs.script.math
@@ -26,6 +29,7 @@ using box.view
 using box.light
 using box.effects
 using box.surface
+using box.spatial
 using box.texture
 using state
 using assets
@@ -36,7 +40,7 @@ assets {
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, blend_modes: true, transmission: true}
+  Scene: {environment: true, blend_modes: true, transmission: true, fresnel: true}
   AmbientLight: {sky: {120, 140, 180}, ground: {50, 60, 84}, intensity: 0.4}
 }
 
@@ -105,6 +109,20 @@ ship {
   if liner {
     for i in 0..LCELLS {
       LinerSlot "slot_{i}"(idx: i)
+    }
+    if pf[C_SHIELDS] > 0 && ship_z1 > ship_z0 {
+      shield_bubble {
+        Position: {0, AXIS_Y, (ship_z0 + ship_z1) / 2}
+        Scale: {RING_R + 6, RING_R + 6, (ship_z1 - ship_z0) / 2 + 9}
+        Sphere: {radius: 1, segments: 48, smooth: true}
+        Rgb: {110, 170, 255}
+        Emissive: {strength: 0.05 * pf[C_SHIELDS], color: {110, 170, 255}}
+        Fresnel: {color: {120, 190, 255}, strength: 1.4 * pf[C_SHIELDS], power: 4, bias: 0, opacity: 0.2 * pf[C_SHIELDS]}
+        Opacity: {0.01}
+        BlendMode: Additive
+        NoShadow
+        SpatialIgnore
+      }
     }
   } else {
     for i in 0..CELLS {
