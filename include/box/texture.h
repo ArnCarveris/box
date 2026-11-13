@@ -658,7 +658,6 @@ ECS_STRUCT(TexBlur, {
                          *   three standard deviations, 0 for no blur */
 });
 
-<<<<<<< HEAD
 /** Fractal sum of the octaves of a TexNoise node */
 ECS_ENUM(TextureNoiseFractal, {
     NoiseFbm = 0,    /**< Fractal brownian motion: the octaves added, the default */
@@ -700,7 +699,8 @@ ECS_STRUCT(TexNoise, {
     float offset;               /**< NoiseRidged: value the ridge reaches, 0 for 1; a lower
                                  *   offset makes the ridges sharper and the valleys wider */
     int32_t channels;           /**< 1 for a Scalar, the default, 3 or 4 for a Vector */
-=======
+});
+
 /** Addressing of the texels outside a texture a TexImage samples */
 ECS_ENUM(TextureAddress, {
     AddressWrap = 0, /**< The texture repeats, the default. On DomainSphere only the longitude
@@ -751,7 +751,6 @@ ECS_STRUCT(TexLut, {
     float u_value;          /**< Value of u without a node */
     float v_value;          /**< Value of v without a node */
     bool linear;            /**< Read the color channels as stored, see TexImage.linear */
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
 });
 
 /** Most inputs of a node kind */

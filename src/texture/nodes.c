@@ -679,7 +679,8 @@ done:
 }
 
 /** Register the built in node kinds of values and their math: TexConstant, TexCoords,
- * TexMath, TexBlur, TexSplit, TexCombine, TexWarp, TexTransform, TexTime and TexSplat.
+ * TexMath, TexNoise, TexBlur, TexSplit, TexCombine, TexWarp, TexTransform, TexTime and
+ * TexSplat.
  *
  * @param world The world
  */
@@ -721,6 +722,8 @@ static void box_texture_nodes_register_math(
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
     });
+
+    box_texture_noise_register(world);
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
         .component = ecs_id(TexBlur),

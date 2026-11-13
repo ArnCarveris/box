@@ -1116,11 +1116,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-<<<<<<< HEAD
-    test_int(null->texture_node_kinds, 15);
-=======
-    test_int(null->texture_node_kinds, 16);
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
+    test_int(null->texture_node_kinds, 17);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1164,11 +1160,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-<<<<<<< HEAD
-    test_int(null->texture_node_kinds, 15);
-=======
-    test_int(null->texture_node_kinds, 16);
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
+    test_int(null->texture_node_kinds, 17);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1260,11 +1252,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-<<<<<<< HEAD
-    test_int(second->texture_node_kinds, 15);
-=======
-    test_int(second->texture_node_kinds, 16);
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
+    test_int(second->texture_node_kinds, 17);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1291,11 +1279,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-<<<<<<< HEAD
-    test_int(null->texture_node_kinds, 16);
-=======
-    test_int(null->texture_node_kinds, 17);
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
+    test_int(null->texture_node_kinds, 18);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);

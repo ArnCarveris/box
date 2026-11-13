@@ -1589,7 +1589,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
                 "id": "TextureNodesNoise",
                 "testcases": [
                     "range_mean_plane",
@@ -1604,7 +1603,9 @@
                     "evolve_sphere",
                     "ridged_billow",
                     "octaves_no_recompile"
-=======
+                ]
+            },
+            {
                 "id": "TextureNodesImage",
                 "testcases": [
                     "sample_plane",
@@ -1621,7 +1622,6 @@
                     "cycle_fails",
                     "loading_holds",
                     "failure_names_texture"
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
                 ]
             }
         ]

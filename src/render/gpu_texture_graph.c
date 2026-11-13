@@ -213,11 +213,8 @@ static uint64_t box_gpu_tg_key(
         result = box_gpu_tg_hash(result, graph->nodes[i].inputs,
             sizeof(graph->nodes[i].inputs));
         result = box_gpu_tg_hash(result, &graph->nodes[i].params, sizeof(uint32_t));
-<<<<<<< HEAD
         result = box_gpu_tg_hash(result, &graph->nodes[i].output, sizeof(uint32_t));
-=======
         result = box_gpu_tg_hash(result, &graph->nodes[i].texture, sizeof(int32_t));
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
     }
 
     result = box_gpu_tg_hash(result, ecs_vec_first(&graph->forced),

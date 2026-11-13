@@ -449,7 +449,6 @@ void box_texture_graphs_init(
     ecs_world_t *world,
     box_textures_t *t);
 
-<<<<<<< HEAD
 /** Register the TexNoise node kind.
  *
  * @param world The world
@@ -457,7 +456,6 @@ void box_texture_graphs_init(
 void box_texture_noise_register(
     ecs_world_t *world);
 
-=======
 /** Register the built in node kinds.
  *
  * @param world The world
@@ -476,7 +474,6 @@ TextureValueType box_texture_graph_follow(
     const TextureValueType *inputs,
     uint32_t used);
 
->>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
 /** Free the node kinds and the graph lists of a registry.
  *
  * @param t The registry
