@@ -134,6 +134,17 @@ typedef struct box_render_gpu_stats_t {
                                  *   holds */
     int64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediate textures now */
     int32_t texture_graph_reads; /**< Texture graph readbacks delivered */
+    int32_t texture_graph_hits; /**< Stages of texture graphs whose value the cache had, so
+                                 *   they were not dispatched; not the stages of an animated
+                                 *   update that kept the values the graph held */
+    int32_t texture_graph_misses; /**< Stages of texture graphs whose value the cache did not
+                                 *   have, dispatched into a new entry */
+    int32_t texture_graph_evictions; /**< Cached values evicted to keep the budget */
+    int32_t texture_graph_updates; /**< Evaluations of animated texture graphs that only
+                                 *   updated them over time, also counted in
+                                 *   texture_graph_evaluations */
+    int64_t texture_graph_cached_bytes; /**< Bytes of the cached values now, in use or not */
+    int32_t texture_graph_cached; /**< Cached values now */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
@@ -314,9 +325,14 @@ typedef struct box_render_texture_node_kind_t {
     uint32_t output;            /**< TextureValueType of the value of a node */
     uint32_t input_count;       /**< Inputs of a node */
     uint32_t input_types[BOX_TEXTURE_NODE_INPUTS]; /**< TextureValueType of each input */
+    uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
     uint32_t param_size;        /**< Bytes of the parameters of a node, a multiple of 16 */
+<<<<<<< HEAD
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
     uint32_t input_coords;      /**< Bit per input that is the coordinates without a node */
+=======
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE */
+>>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
     uint32_t function_size;     /**< Bytes of the function name, its terminator included */
     uint32_t source_size;       /**< Bytes of the source, its terminator included */
 } box_render_texture_node_kind_t;
@@ -350,7 +366,8 @@ typedef struct box_render_texture_graph_t {
     uint64_t param_hash;        /**< Hash of the parameter bytes */
     uint32_t serial;            /**< Graphs sent for the texture, which the outcome of the
                                  *   evaluation names (box_render_texture_graph_result_t) */
-    uint32_t pad;               /**< Unused, zero */
+    float rate;                 /**< Updates per second of an animated graph, 0 for every
+                                 *   frame (TextureGraph.rate) */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.

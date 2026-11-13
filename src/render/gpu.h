@@ -432,9 +432,12 @@ void box_gpu_texture_graph_compiled(
     uint32_t handle,
     const char *message);
 
-/** Evaluate the texture graphs whose stages exist and whose image is out of date, deliver
- * their outcomes and readbacks, after the resources of a packet applied and before the mip
- * levels are generated, so the passes of the packet sample the new images.
+/** Evaluate the texture graphs whose stages exist and whose image is out of date or, animated,
+ * due an update at the time of the packet, deliver their outcomes and readbacks and evict cached
+ * values over the budget.
+ *
+ * It runs after the resources of a packet applied and before the mip levels are generated, so
+ * the passes of the packet sample the new images.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -443,7 +446,17 @@ void box_gpu_texture_graphs_evaluate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Release the texture graphs, their programs and intermediates.
+/** Note that a draw of the current packet samples a texture, so its texture graph, when it is
+ * animated, updates in the next packet.
+ *
+ * @param gpu The backend
+ * @param handle Texture handle, 0 or a target handle for none
+ */
+void box_gpu_texture_graph_sampled(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
+/** Release the texture graphs, their programs, intermediates and cached values.
  *
  * @param gpu The backend
  */

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>box texgraph</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="texgraph.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">box<span>texgraph</span></div>
+  <div class="group" id="app-group">
+    <span class="dot" id="conn-dot"></span>
+    <select id="app-select" title="Flecs apps found on localhost"></select>
+    <input id="app-host" placeholder="host:port" title="Connect to a host that discovery does not find">
+  </div>
+  <div class="group" id="tex-group">
+    <select id="tex-select" title="Texture entities with a TextureGraph"></select>
+    <span id="tex-state" class="state"></span>
+  </div>
+  <div class="group grow"></div>
+  <div class="group">
+    <span class="warn-inline" title="The editor changes the components of the running app. Use copy as script to keep the graph.">edits are lost when the app reloads its scene script</span>
+    <button id="copy-script" title="The graph as flecs script that reproduces it, to paste into the scene file">copy as script</button>
+  </div>
+</header>
+<main id="layout">
+  <section id="center">
+    <div id="view"></div>
+  </section>
+  <div id="side-grip"></div>
+  <aside id="detail"></aside>
+</main>
+<footer id="stats"></footer>
+<div id="toast"></div>
+<script src="../daw/flecs.js"></script>
+<script src="model.js"></script>
+<script src="core.js"></script>
+<script src="graph.js"></script>
+<script src="panel.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

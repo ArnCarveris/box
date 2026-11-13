@@ -861,6 +861,12 @@ void box_gpu_stats_publish(
     s->texture_graph_timed += p->texture_graph_timed;
     s->texture_graph_pool_bytes = (int64_t)gpu->texture_graph_pool_bytes;
     s->texture_graph_reads += p->texture_graph_reads;
+    s->texture_graph_hits += p->texture_graph_hits;
+    s->texture_graph_misses += p->texture_graph_misses;
+    s->texture_graph_evictions += p->texture_graph_evictions;
+    s->texture_graph_updates += p->texture_graph_updates;
+    s->texture_graph_cached_bytes = (int64_t)gpu->texture_graph_cached_bytes;
+    s->texture_graph_cached = gpu->texture_graph_cached;
     if (s->copy_staging > s->copy_staging_peak) {
         s->copy_staging_peak = s->copy_staging;
     }

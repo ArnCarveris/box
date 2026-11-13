@@ -2,7 +2,9 @@
  * @file TextureGraphEval.c
  * @brief Tests for the evaluation of TextureGraph on the GPU backend: the images of constant,
  * coordinate and math graphs in both domains read back, nodes read back, compiles shared by
- * structure and kept by parameter edits, failures, status and a material that samples a graph.
+ * structure and kept by parameter edits, failures, status and a material that samples a graph,
+ * the TexBlocks node against the GenBlocks layers of TextureGen and the TexRamp and TexCurve
+ * nodes against their CPU twins.
  */
 
 #include <box.h>
@@ -10,6 +12,7 @@
 #include <math.h>
 #include <string.h>
 #include "render.h"
+#include "texture.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -634,8 +637,9 @@ void TextureGraphEval_scalar_node_readback(void) {
     ecs_fini(world);
 }
 
-/** The input of a neighbourhood node is materialized in its own stage, which the node reads at
- * another texel: two dispatches, and the coordinates of the texel to the right, wrapped. */
+/** The input of a neighbourhood node is materialized in its own stage, a cached value, which the
+ * node reads at another texel: two dispatches, and the coordinates of the texel to the right,
+ * wrapped. */
 void TextureGraphEval_neighbourhood_materialized(void) {
     // textures/graph
     ecs_world_t *world = tg_world();
@@ -666,7 +670,7 @@ void TextureGraphEval_neighbourhood_materialized(void) {
     test_int(after.texture_graph_evaluations - before.texture_graph_evaluations, 1);
     test_int(after.texture_graph_dispatches - before.texture_graph_dispatches, 2);
     test_int(after.texture_graph_texels - before.texture_graph_texels, 2 * w * h);
-    test_assert(after.texture_graph_pool_bytes >= (int64_t)w * h * 8);
+    test_assert(after.texture_graph_cached_bytes >= (int64_t)w * h * 8);
     test_int(after.texture_graphs, 1);
     test_int(after.texture_graph_programs, 1);
 
@@ -930,5 +934,598 @@ void TextureGraphEval_material_samples_graph(void) {
     test_assert(center[2] <= 30);
     stbi_image_free(img);
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+/** Texels whose block or mask may differ from GenBlocks, of every 1000: those whose center
+ * falls within float rounding of a cut or a course */
+#define TG_BLOCKS_OUTLIERS (5)
+
+/** Create a graph of one TexBlocks node, stored as HDR.
+ *
+ * @param world The world
+ * @param blocks The node
+ * @param coords The node of its coordinates, 0 for the domain
+ * @param width Width
+ * @param height Height
+ * @param domain Domain
+ * @return The texture entity
+ */
+static ecs_entity_t tg_blocks(
+    ecs_world_t *world,
+    const TexBlocks *blocks,
+    ecs_entity_t coords,
+    int32_t width,
+    int32_t height,
+    TextureGraphDomain domain)
+{
+    ecs_entity_t tex = ecs_entity(world, { .name = "blocks_graph" });
+    ecs_entity_t node = ecs_entity(world, { .name = "blocks_node" });
+    TexBlocks value = *blocks;
+    value.coords = coords;
+    ecs_set_ptr(world, node, TexBlocks, &value);
+    ecs_set(world, tex, TextureGraph, {.output = node, .width = width, .height = height,
+        .domain = domain, .format = GraphHdr});
+
+    return tex;
+}
+
+/** Check the image of a TexBlocks node against the face mask, ids and tones of the GenBlocks
+ * layer of the same parameters that TextureGen generates on the CPU.
+ *
+ * @param blocks The node; its seed is the seed of the generator, layer_seed that of the layer
+ * @param width Width
+ * @param height Height
+ */
+static void tg_blocks_match(
+    const TexBlocks *blocks,
+    int32_t width,
+    int32_t height)
+{
+    ecs_world_t *world = tg_world();
+    ecs_entity_t tex = tg_blocks(world, blocks, 0, width, height, DomainPlane);
+    int32_t count = width * height, i, outliers = 0;
+    int32_t tones = blocks->tones;
+    test_int(tg_wait(world, tex, 1)->state, TextureReady);
+
+    TextureGenLayer layer = {
+        .kind = GenBlocks, .seed = blocks->layer_seed, .tones = blocks->tones,
+        .tone_order = blocks->tone_order, .courses = blocks->courses,
+        .per_course = blocks->per_course, .gap = blocks->gap, .jitter = blocks->jitter,
+        .stagger = blocks->stagger, .softness = blocks->softness
+    };
+    float *value = ecs_os_malloc_n(float, count);
+    float *id = ecs_os_malloc_n(float, count);
+    int32_t *tone = ecs_os_malloc_n(int32_t, count);
+    box_texture_gen_pattern(&layer, blocks->seed, width, height, value, id, tone);
+
+    float *texels = tg_read(world, tex, 0, width, height);
+    for (i = 0; i < count; i ++) {
+        const float *t = &texels[i * 4];
+        float level = tones > 1 ? (float)tone[i] / (float)(tones - 1) : 0.0f;
+        bool ok = fabsf(t[0] - value[i]) <= 5e-3f && fabsf(t[1] - id[i]) <= TG_TOLERANCE_16 &&
+            fabsf(t[2] - level) <= TG_TOLERANCE_16 && t[3] >= 0.0f && t[3] <= 1.0f;
+        if (!ok) {
+            if (outliers < 8) {
+                printf("texel %d, %d: (%f, %f, %f, %f), GenBlocks (%f, %f, %f)\n",
+                    i % width, i / width, t[0], t[1], t[2], t[3], value[i], id[i], level);
+            }
+
+            outliers ++;
+        }
+    }
+
+    test_assert(outliers * 1000 <= count * TG_BLOCKS_OUTLIERS);
+
+    ecs_os_free(texels);
+    ecs_os_free(value);
+    ecs_os_free(id);
+    ecs_os_free(tone);
+    ecs_fini(world);
+}
+
+void TextureGraphEval_blocks_match_gen(void) {
+    // textures/graph
+    tg_blocks_match(&(TexBlocks){
+        .courses = 8, .per_course = 4, .gap = 0.006f, .jitter = 0.22f, .stagger = 0.5f,
+        .seed = 11
+    }, 128, 128);
+}
+
+void TextureGraphEval_blocks_match_gen_aspect(void) {
+    // textures/graph
+    tg_blocks_match(&(TexBlocks){
+        .courses = 6, .per_course = 5, .gap = 0.02f, .softness = 0.03f, .jitter = 0.4f,
+        .stagger = 0.3f, .seed = 3, .layer_seed = 52
+    }, 128, 64);
+}
+
+void TextureGraphEval_blocks_match_gen_tones(void) {
+    // textures/graph
+    TextureGenToneOrder orders[] = {
+        GenToneRandom, GenToneChecker, GenToneCourses, GenToneColumns
+    };
+    int32_t o;
+    for (o = 0; o < 4; o ++) {
+        tg_blocks_match(&(TexBlocks){
+            .courses = 4, .per_course = 4, .gap = 0.04f, .jitter = 0.2f, .stagger = 0.5f,
+            .tones = 3, .tone_order = orders[o], .seed = 5, .layer_seed = o
+        }, 64, 64);
+    }
+}
+
+void TextureGraphEval_blocks_match_gen_hard(void) {
+    // textures/graph
+    tg_blocks_match(&(TexBlocks){
+        .courses = 3, .per_course = 2, .jitter = 0.6f, .stagger = 0.25f, .tones = 2,
+        .seed = 9
+    }, 64, 64);
+}
+
+void TextureGraphEval_blocks_match_gen_wrap(void) {
+    // textures/graph
+    /* Courses whose cuts are all below 0.5, so the last block wraps around to u = 0 */
+    int32_t seeds[] = {4, 6, 7};
+    int32_t s;
+    for (s = 0; s < 3; s ++) {
+        tg_blocks_match(&(TexBlocks){
+            .courses = 8, .per_course = 2, .gap = 0.01f, .jitter = 0.5f, .seed = seeds[s]
+        }, 128, 128);
+    }
+
+    for (s = 0; s < 4; s ++) {
+        tg_blocks_match(&(TexBlocks){
+            .courses = 1, .per_course = 1, .gap = 0.01f, .jitter = 0.5f, .seed = s
+        }, 64, 64);
+    }
+}
+
+void TextureGraphEval_blocks_tiling(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    const TexBlocks blocks = {
+        .courses = 4, .per_course = 3, .gap = 0.02f, .jitter = 0.3f, .stagger = 0.5f,
+        .tones = 2, .seed = 7
+    };
+    int32_t w = 64, h = 64, x, y, outliers = 0;
+    ecs_entity_t plain = tg_blocks(world, &blocks, 0, w, h, DomainPlane);
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t twice = ecs_new(world);
+    ecs_entity_t shift = ecs_new(world);
+    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, twice, TexMath, {.op = MathMultiply, .a = uv,
+        .b_value = {2.0f, 2.0f, 1.0f, 1.0f}});
+    ecs_set(world, shift, TexMath, {.op = MathAdd, .a = uv,
+        .b_value = {1.0f, -2.0f, 0.0f, 0.0f}});
+    ecs_entity_t repeated = ecs_new(world);
+    ecs_entity_t repeated_node = ecs_new(world);
+    TexBlocks value = blocks;
+    value.coords = twice;
+    ecs_set_ptr(world, repeated_node, TexBlocks, &value);
+    ecs_set(world, repeated, TextureGraph, {.output = repeated_node, .width = w, .height = h,
+        .format = GraphHdr});
+    ecs_entity_t shifted = ecs_new(world);
+    ecs_entity_t shifted_node = ecs_new(world);
+    value.coords = shift;
+    ecs_set_ptr(world, shifted_node, TexBlocks, &value);
+    ecs_set(world, shifted, TextureGraph, {.output = shifted_node, .width = w, .height = h,
+        .format = GraphHdr});
+    test_int(tg_wait(world, plain, 1)->state, TextureReady);
+    test_int(tg_wait(world, repeated, 1)->state, TextureReady);
+    test_int(tg_wait(world, shifted, 1)->state, TextureReady);
+
+    float *a = tg_read(world, plain, 0, w, h);
+    float *b = tg_read(world, repeated, 0, w, h);
+    float *c = tg_read(world, shifted, 0, w, h);
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            const float *pa = &a[(y * w + x) * 4];
+            const float *pc = &c[(y * w + x) * 4];
+            const float *pb = &b[(y * w + x) * 4];
+            const float *pq = &b[(((y + h / 2) % h) * w + (x + w / 2) % w) * 4];
+            int32_t k;
+            bool ok = true;
+            for (k = 0; k < 4; k ++) {
+                ok = ok && fabsf(pa[k] - pc[k]) <= 5e-3f && fabsf(pb[k] - pq[k]) <= 5e-3f;
+            }
+
+            if (!ok) {
+                outliers ++;
+            }
+        }
+    }
+
+    test_assert(outliers * 1000 <= w * h * TG_BLOCKS_OUTLIERS);
+
+    /* Across the wrap of the plane the edge columns are in one block or in a joint */
+    for (y = 0; y < h; y ++) {
+        const float *left = &a[(y * w) * 4];
+        const float *right = &a[(y * w + w - 1) * 4];
+        test_assert(left[1] == right[1] || left[0] < 1.0f || right[0] < 1.0f);
+    }
+
+    ecs_os_free(a);
+    ecs_os_free(b);
+    ecs_os_free(c);
+    ecs_fini(world);
+}
+
+void TextureGraphEval_blocks_sphere_error(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    const TexBlocks blocks = {.courses = 4, .per_course = 3, .gap = 0.02f};
+    ecs_log_set_level(-4);
+    ecs_entity_t tex = tg_blocks(world, &blocks, 0, 32, 16, DomainSphere);
+    const TextureStatus *status = tg_wait(world, tex, 1);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    if (!strstr(status->error, "blocks_node") || !strstr(status->error, "DomainPlane")) {
+        printf("error: %s\n", status->error);
+    }
+
+    test_assert(strstr(status->error, "blocks_node") != NULL);
+    test_assert(strstr(status->error, "DomainPlane") != NULL);
+    test_assert(strstr(status->error, "blocks_graph") != NULL);
+
+    ecs_fini(world);
+}
+
+/** Keys of the ramps of the tests: the outer keys at texel centers of a 32 wide plane, so the
+ * texels 6, 15 and 25 are at a key */
+#define TG_RAMP_KEYS \
+    {6.5f / 32.0f, {255, 0, 0}}, {15.5f / 32.0f, {0, 128, 255}}, {25.5f / 32.0f, {20, 200, 40}}
+
+/** Difference a ramp color stored as RGBA8 may have from the color of box_gen_ramp, which
+ * rounds once where the GPU decodes to linear and encodes again */
+#define TG_TOLERANCE_RAMP (2.0f / 255.0f + 1e-4f)
+
+/** Difference a curve value of an R32Float node may have from box_curve_value */
+#define TG_TOLERANCE_CURVE (1e-4f)
+
+/** Register TgScalar, its value times the x of its vector input.
+ *
+ * @param world The world
+ * @return The component
+ */
+static ecs_entity_t tg_register_scalar(
+    ecs_world_t *world)
+{
+    return tg_register(world, "TgScalar", ECS_SIZEOF(TgScalar), &(box_texture_node_desc_t){
+        .output = TexScalar,
+        .inputs = {{ "in", offsetof(TgScalar, in), TexVector, "in_value",
+            offsetof(TgScalar, in_value) }},
+        .params = {{ "value", offsetof(TgScalar, value), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "tg_scalar",
+        .source = tg_scalar_wgsl
+    });
+}
+
+/** Register TgSplat, which splats a scalar input into (x, x, x, 1).
+ *
+ * @param world The world
+ * @return The component
+ */
+static ecs_entity_t tg_register_splat(
+    ecs_world_t *world)
+{
+    return tg_register(world, "TgSplat", ECS_SIZEOF(TgSplat), &(box_texture_node_desc_t){
+        .output = TexVector,
+        .inputs = {{ "in", offsetof(TgSplat, in), TexScalar, "in_value",
+            offsetof(TgSplat, in_value) }},
+        .function = "tg_splat",
+        .source = tg_splat_wgsl
+    });
+}
+
+/** Create the scalar node of the tests of TexRamp and TexCurve: x of the coordinates times a
+ * factor.
+ *
+ * @param world The world
+ * @param factor The factor
+ * @return The node
+ */
+static ecs_entity_t tg_coords_x(
+    ecs_world_t *world,
+    float factor)
+{
+    ecs_entity_t scalar_c = tg_register_scalar(world);
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t scalar = ecs_new(world);
+    TgScalar s = {.value = factor, .in = uv};
+    ecs_set(world, uv, TexCoords, {0});
+    ecs_set_id(world, scalar, scalar_c, ECS_SIZEOF(TgScalar), &s);
+
+    return scalar;
+}
+
+/** Get the input of the tests of TexRamp and TexCurve at a texel: x of its coordinates times
+ * a factor.
+ *
+ * @param domain The domain
+ * @param x Column
+ * @param y Row
+ * @param width Width
+ * @param height Height
+ * @param factor The factor
+ * @return The input
+ */
+static float tg_input(
+    TextureGraphDomain domain,
+    int32_t x,
+    int32_t y,
+    int32_t width,
+    int32_t height,
+    float factor)
+{
+    float coords[4];
+    if (domain == DomainSphere) {
+        tg_sphere(x, y, width, height, coords);
+    } else {
+        tg_plane(x, y, width, height, coords);
+    }
+
+    return coords[0] * factor;
+}
+
+/** Check the image of a ramp graph against box_gen_ramp, through box_texture_gen_albedo.
+ *
+ * @param world The world
+ * @param tex The texture entity, a GraphColor ramp of the x of the coordinates times factor
+ * @param domain The domain
+ * @param width Width
+ * @param height Height
+ * @param factor The factor
+ * @param keys The keys of the ramp
+ * @param key_count Number of keys
+ */
+static void tg_ramp_expect(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    TextureGraphDomain domain,
+    int32_t width,
+    int32_t height,
+    float factor,
+    const TextureGenKey *keys,
+    int32_t key_count)
+{
+    float *texels = tg_read(world, tex, 0, width, height);
+    int32_t x, y, c;
+    for (y = 0; y < height; y ++) {
+        for (x = 0; x < width; x ++) {
+            float h = tg_input(domain, x, y, width, height, factor);
+            uint8_t rgba[4];
+            float expect[4];
+            box_texture_gen_albedo(&h, 1, keys, key_count, NULL, NULL, 0, rgba);
+            for (c = 0; c < 4; c ++) {
+                expect[c] = (float)rgba[c] / 255.0f;
+            }
+
+            tg_expect(texels, width, x, y, expect, TG_TOLERANCE_RAMP);
+        }
+    }
+
+    ecs_os_free(texels);
+}
+
+/** Check a ramp of the x of the coordinates in a domain: the first color below the first key,
+ * the last above the last, the key colors at the keys and mixed between.
+ *
+ * @param domain The domain
+ */
+static void tg_ramp_in(
+    TextureGraphDomain domain)
+{
+    ecs_world_t *world = tg_world();
+    const TextureGenKey keys[] = { TG_RAMP_KEYS };
+    int32_t w = 32, h = domain == DomainSphere ? 16 : 1;
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t ramp = ecs_new(world);
+    ecs_entity_t scalar = tg_coords_x(world, 1);
+    ecs_set(world, ramp, TexRamp, {.input = scalar, .keys = BOX_VEC_VIEW(TextureGenKey,
+        TG_RAMP_KEYS)});
+    ecs_set(world, tex, TextureGraph, {.output = ramp, .width = w, .height = h,
+        .domain = domain, .format = GraphColor});
+    test_int(tg_wait(world, tex, 1)->state, TextureReady);
+    tg_ramp_expect(world, tex, domain, w, h, 1, keys, 3);
+    ecs_fini(world);
+}
+
+void TextureGraphEval_ramp_plane(void) {
+    // textures/graph
+    tg_ramp_in(DomainPlane);
+}
+
+void TextureGraphEval_ramp_sphere(void) {
+    // textures/graph
+    tg_ramp_in(DomainSphere);
+}
+
+/** The value of a ramp node is the linear color of the mixed display encoded keys, with alpha
+ * 1; without keys the input is a display encoded gray, without an input node its value. */
+void TextureGraphEval_ramp_linear_value(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    const TextureGenKey keys[] = { TG_RAMP_KEYS };
+    int32_t x, w = 32, c;
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t ramp = ecs_new(world);
+    ecs_entity_t scalar = tg_coords_x(world, 1);
+    ecs_set(world, ramp, TexRamp, {.input = scalar, .keys = BOX_VEC_VIEW(TextureGenKey,
+        TG_RAMP_KEYS)});
+    ecs_set(world, tex, TextureGraph, {.output = ramp, .width = w, .height = 1,
+        .format = GraphHdr});
+    test_int(tg_wait(world, tex, 1)->state, TextureReady);
+
+    float *texels = tg_read(world, tex, 0, w, 1);
+    for (x = 0; x < w; x ++) {
+        float in = tg_input(DomainPlane, x, 0, w, 1, 1), expect[4];
+        uint8_t rgba[4];
+        box_texture_gen_albedo(&in, 1, keys, 3, NULL, NULL, 0, rgba);
+        for (c = 0; c < 3; c ++) {
+            float d = (float)rgba[c] / 255.0f;
+            expect[c] = d <= 0.04045f ? d / 12.92f : powf((d + 0.055f) / 1.055f, 2.4f);
+        }
+
+        expect[3] = 1;
+        tg_expect(texels, w, x, 0, expect, TG_TOLERANCE_RAMP);
+    }
+
+    ecs_os_free(texels);
+
+    ecs_set(world, ramp, TexRamp, {.input_value = 0.5f});
+    test_int(tg_wait(world, tex, 2)->state, TextureReady);
+    texels = tg_read(world, tex, 0, w, 1);
+    float gray = powf((0.5f + 0.055f) / 1.055f, 2.4f);
+    const float expect[4] = {gray, gray, gray, 1};
+    tg_expect(texels, w, 7, 0, expect, TG_TOLERANCE_16);
+    ecs_os_free(texels);
+    ecs_fini(world);
+}
+
+/** Check the value of a curve node against box_curve_value at the input of each texel.
+ *
+ * @param world The world
+ * @param tex The texture entity
+ * @param node The TexCurve node
+ * @param curve The curve
+ * @param width Width
+ * @param factor Factor of the x of the coordinates of the input
+ */
+static void tg_curve_expect(
+    ecs_world_t *world,
+    ecs_entity_t tex,
+    ecs_entity_t node,
+    const Curve *curve,
+    int32_t width,
+    float factor)
+{
+    float *values = tg_read(world, tex, node, width, 1);
+    int32_t x;
+    for (x = 0; x < width; x ++) {
+        float in = tg_input(DomainPlane, x, 0, width, 1, factor);
+        float expect = box_curve_value(curve, in, in);
+        float value = values[x * 4];
+        if (fabsf(value - expect) > TG_TOLERANCE_CURVE) {
+            printf("texel %d at %f: %f, expected %f\n", x, in, value, expect);
+        }
+
+        test_assert(fabsf(value - expect) <= TG_TOLERANCE_CURVE);
+    }
+
+    ecs_os_free(values);
+}
+
+/** A curve node maps its input through each kind of curve as box_curve_value does, before,
+ * between and after its keys; switching the kind only changes the parameters. */
+void TextureGraphEval_curve_values(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    ecs_entity_t splat_c = tg_register_splat(world);
+    const CurveKind kinds[] = {CurveLinear, CurveCatmullRom, CurveBezier};
+    box_render_gpu_stats_t before, after;
+    int32_t w = 64, i;
+    float factor = 1.4f;
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t node = ecs_new(world);
+    ecs_entity_t splat = ecs_new(world);
+    ecs_entity_t scalar = tg_coords_x(world, factor);
+    TgSplat p = {.in = node};
+    ecs_set_id(world, splat, splat_c, ECS_SIZEOF(TgSplat), &p);
+    for (i = 0; i < 3; i ++) {
+        Curve curve = {.kind = kinds[i], .keys = BOX_CURVE_KEYS({0.1f, 0.2f, 0, 1.5f},
+            {0.35f, 0.9f, -0.5f, 0.25f}, {0.7f, 0.1f, 2, -1}, {1.2f, 0.6f, 0.5f, 0})};
+        ecs_set(world, node, TexCurve, {.input = scalar, .curve = curve});
+        if (!i) {
+            ecs_set(world, tex, TextureGraph, {.output = splat, .width = w, .height = 1,
+                .format = GraphHdr});
+        }
+
+        test_int(tg_wait(world, tex, i + 1)->state, TextureReady);
+        if (!i) {
+            test_bool(box_render_gpu_stats(world, &before), true);
+        }
+
+        tg_curve_expect(world, tex, node, &curve, w, factor);
+    }
+
+    test_bool(box_render_gpu_stats(world, &after), true);
+    test_int(after.texture_graph_programs, 1);
+    ecs_fini(world);
+}
+
+/** Adding, editing and removing the keys of a ramp and of a curve changes the parameters of
+ * the graph and never its structure: nothing compiles again, and the images follow the keys. */
+void TextureGraphEval_keys_edit_no_recompile(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    ecs_entity_t splat_c = tg_register_splat(world);
+    box_render_gpu_stats_t before, after;
+    int32_t w = 32;
+    ecs_entity_t ramp_tex = ecs_new(world);
+    ecs_entity_t curve_tex = ecs_new(world);
+    ecs_entity_t ramp = ecs_new(world);
+    ecs_entity_t curve = ecs_new(world);
+    ecs_entity_t splat = ecs_new(world);
+    ecs_entity_t scalar = tg_coords_x(world, 1);
+    TgSplat p = {.in = curve};
+    ecs_set_id(world, splat, splat_c, ECS_SIZEOF(TgSplat), &p);
+    ecs_set(world, ramp, TexRamp, {.input = scalar, .keys = BOX_VEC_VIEW(TextureGenKey,
+        {0.25f, {0, 0, 0}})});
+    ecs_set(world, curve, TexCurve, {.input = scalar, .curve = {
+        .keys = BOX_CURVE_KEYS({0, 0}, {1, 1})}});
+    ecs_set(world, ramp_tex, TextureGraph, {.output = ramp, .width = w, .height = 1});
+    ecs_set(world, curve_tex, TextureGraph, {.output = splat, .width = w, .height = 1,
+        .format = GraphHdr});
+    test_int(tg_wait(world, ramp_tex, 1)->state, TextureReady);
+    test_int(tg_wait(world, curve_tex, 1)->state, TextureReady);
+
+    /* Reading the curve node materializes it once, which compiles the stages of the new cut */
+    tg_curve_expect(world, curve_tex, curve, &ecs_get(world, curve, TexCurve)->curve, w, 1);
+    test_bool(box_render_gpu_stats(world, &before), true);
+
+    const TextureGenKey keys[] = { TG_RAMP_KEYS };
+    ecs_set(world, ramp, TexRamp, {.input = scalar, .keys = BOX_VEC_VIEW(TextureGenKey,
+        TG_RAMP_KEYS)});
+    test_int(tg_wait(world, ramp_tex, 2)->state, TextureReady);
+    tg_ramp_expect(world, ramp_tex, DomainPlane, w, 1, 1, keys, 3);
+
+    const TextureGenKey edited[] = {{0.1f, {10, 20, 30}}, {0.9f, {250, 240, 230}}};
+    ecs_set(world, ramp, TexRamp, {.input = scalar, .keys = BOX_VEC_VIEW(TextureGenKey,
+        {0.1f, {10, 20, 30}}, {0.9f, {250, 240, 230}})});
+    test_int(tg_wait(world, ramp_tex, 3)->state, TextureReady);
+    tg_ramp_expect(world, ramp_tex, DomainPlane, w, 1, 1, edited, 2);
+
+    ecs_set(world, curve, TexCurve, {.input = scalar, .curve = {.kind = CurveCatmullRom,
+        .keys = BOX_CURVE_KEYS({0.1f, 0.5f}, {0.4f, 0.2f}, {0.6f, 0.8f}, {0.9f, 0.3f})}});
+    test_int(tg_wait(world, curve_tex, 2)->state, TextureReady);
+    tg_curve_expect(world, curve_tex, curve, &ecs_get(world, curve, TexCurve)->curve, w, 1);
+
+    test_bool(box_render_gpu_stats(world, &after), true);
+    test_int(after.compiles, before.compiles);
+    test_int(after.texture_graph_programs, before.texture_graph_programs);
+    ecs_fini(world);
+}
+
+/** A ramp with more keys than BOX_TEXTURE_RAMP_KEYS fails its graph with an error. */
+void TextureGraphEval_ramp_too_many_keys(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    ecs_entity_t tex = ecs_new(world);
+    ecs_entity_t ramp = ecs_new(world);
+    TexRamp *value = ecs_ensure(world, ramp, TexRamp);
+    int32_t i;
+    value->input_value = 0.5f;
+    ecs_vec_init_if_t(&value->keys, TextureGenKey);
+    for (i = 0; i <= BOX_TEXTURE_RAMP_KEYS; i ++) {
+        *ecs_vec_append_t(NULL, &value->keys, TextureGenKey) = (TextureGenKey){
+            (float)i / BOX_TEXTURE_RAMP_KEYS, {(uint8_t)(i * 7), 0, 0}};
+    }
+
+    ecs_modified(world, ramp, TexRamp);
+    ecs_set(world, tex, TextureGraph, {.output = ramp, .width = 8, .height = 1});
+    const TextureStatus *status = tg_wait(world, tex, 1);
+    test_int(status->state, TextureFailed);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "more than 32") != NULL);
     ecs_fini(world);
 }

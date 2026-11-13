@@ -199,16 +199,20 @@ static inline bool box_render_is_mesh(
  *
  * Every batch draws a run of slots of one instance page: a storage buffer per stream of at most
  * the chunk of its store (box_draws_layout_chunk). Plain mesh and 2D pages have no surface
- * stream (BOX_RENDER_INSTANCE_STREAMS_PLAIN), for which the backend binds a zero record.
+ * stream (BOX_RENDER_INSTANCE_STREAMS_PLAIN), for which the backend binds a zero record; only
+ * frame pages have the frame stream, for which the other pages bind a zero record too.
  *
  * box_render_batch_t.instances is the transform stream of the page, first_instance its slot.
  * Page p has the handle BOX_RENDER_BUFFER_FIRST + p * BOX_RENDER_INSTANCE_STREAMS + s for stream
  * s; a released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
-/** Buffers of a mesh instance page with parametric surfaces, one per stream, at consecutive
- * handles; the handles of every page, plain and 2D pages included, leave room for this many */
-#define BOX_RENDER_INSTANCE_STREAMS (3)
+/** Buffers of a mesh instance page of the MappingFrame materials, one per stream, at
+ * consecutive handles; the handles of every page leave room for this many */
+#define BOX_RENDER_INSTANCE_STREAMS (4)
+
+/** Buffers of a mesh instance page with parametric surfaces: transform, shading and surface */
+#define BOX_RENDER_INSTANCE_STREAMS_SURFACE (3)
 
 /** Buffers of a plain mesh or a 2D instance page: the transform and the shading stream */
 #define BOX_RENDER_INSTANCE_STREAMS_PLAIN (2)
@@ -222,10 +226,22 @@ static inline bool box_render_is_mesh(
 #define BOX_RENDER_BUFFER_FIRST_SURFACE \
     (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x02000000u)
 
+/** Buffer handle of the first instance page of the plain meshes whose material uses
+ * MappingFrame, which have the frame stream but no surface stream. Page p of these pages has the
+ * handle BOX_RENDER_BUFFER_FIRST_FRAME + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+#define BOX_RENDER_BUFFER_FIRST_FRAME \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x03000000u)
+
+/** Buffer handle of the first instance page of the meshes with a parametric surface whose
+ * material uses MappingFrame, which have every stream. Page p of these pages has the handle
+ * BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+#define BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
+
 /** Buffer handle of the first instance page of the 2D shapes and glyphs. Page p of the 2D pages
  * has the handle BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_2D \
-    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x05000000u)
 
 /** Stream of the transforms of an instance page, box_render_transform_t per slot */
 #define BOX_RENDER_STREAM_TRANSFORM (0)
@@ -237,6 +253,12 @@ static inline bool box_render_is_mesh(
 /** Stream of the surface parameters of a mesh instance page with parametric surfaces,
  * box_render_surface_t per slot; plain mesh pages and 2D pages have none */
 #define BOX_RENDER_STREAM_SURFACE (2)
+
+/** Stream of the transforms relative to the texture frame of a frame page, the pages of the
+ * MappingFrame materials: box_render_transform_t per slot, the inverse of the world transform of
+ * the nearest TextureFrame without its scale times the model matrix (the model matrix without a
+ * frame); every other page has none */
+#define BOX_RENDER_STREAM_FRAME (3)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
 #define BOX_RENDER_SCATTER_ALIGN (256)
@@ -1329,7 +1351,7 @@ typedef struct box_render_material_t {
     uint32_t mapping;       /**< TextureMapping.mode | blend << 16, the blend a unorm16
                              *   clamped to 0..1 (0 when not finite); MappingUv (0) without one
                              *   or for MappingUv, whose blend is dropped */
-    float mapping_size;     /**< TextureMapping.size of MappingObject and MappingWorld, 1 when
+    float mapping_size;     /**< TextureMapping.size of a projected mapping, 1 when
                              *   it is not positive and finite; 0 for MappingUv, so it matches
                              *   the record without one */
     float normal_offset[2]; /**< Wrapped TextureScroll.normal_velocity offset the normal map
@@ -1697,6 +1719,8 @@ typedef struct box_render_packet_t {
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     float transmission_roughness; /**< Largest roughness of the transmissive materials, which
                              *   bounds the mips of the opaque snapshot that render */
+    int64_t texture_graph_budget; /**< Bytes the cache of the texture graph values holds at
+                             *   most (TextureGraphCache.budget), 0 for the default */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */

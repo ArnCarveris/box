@@ -11,18 +11,6 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Get the bytes of a texel of a format a readback copies.
- *
- * @param format The format
- * @return The bytes
- */
-static uint32_t box_gpu_tg_texel_size(
-    WGPUTextureFormat format)
-{
-    return format == WGPUTextureFormat_RGBA16Float ? 8
-        : format == BOX_GPU_TEXTURE_SINGLE ? 1 : 4;
-}
-
 /** Deliver a readback to the main thread, with its texels or failed.
  *
  * @param gpu The backend

@@ -14,6 +14,7 @@
 #define BOX_TEXTURE_H
 
 #include "types.h"
+#include "curve.h"
 
 #ifdef BOX_TEXTURE_IMPL
 #define ECS_META_IMPL IMPL
@@ -251,7 +252,8 @@ ECS_ENUM(TextureGraphDomain, {
 
 /** What the image of a TextureGraph stores */
 ECS_ENUM(TextureGraphFormat, {
-    GraphColor = 0,  /**< RGBA8 display encoded from the linear output, the default */
+    GraphColor = 0,  /**< RGBA8 display encoded from the linear output, the default; the
+                      *   format of colors such as a TexRamp outputs */
     GraphLinear = 1, /**< RGBA8 stored as the output is, for normal and ORM maps */
     GraphSingle = 2, /**< R8 of the first channel of the output, as a GenHeight TextureGen */
     GraphHdr = 3     /**< RGBA16Float of the linear output, for emissive maps */
@@ -260,7 +262,9 @@ ECS_ENUM(TextureGraphFormat, {
 /** Type of a value that flows between the nodes of a TextureGraph */
 ECS_ENUM(TextureValueType, {
     TexScalar = 0, /**< One float */
-    TexVector = 1  /**< Four floats */
+    TexVector = 1, /**< Four floats */
+    TexAny = 2     /**< Either: an input that takes both, a Scalar broadcast to the four
+                    *   channels, or the output of a kind whose type follows its inputs */
 });
 
 /** Texture whose image a graph of node entities computes per texel on the render backend.
@@ -287,6 +291,23 @@ ECS_STRUCT(TextureGraph, {
     int32_t height;            /**< Height in pixels, 0 for the width */
     TextureGraphDomain domain; /**< Coordinates of the texels, default DomainPlane */
     TextureGraphFormat format; /**< What the image stores, default GraphColor */
+    float rate;                /**< Updates per second of an animated graph, 0 for every frame.
+                                *   An animated graph whose image no draw sampled in the
+                                *   previous frame skips its updates until one samples it */
+});
+
+/** Settings of the cache of the values the texture graphs materialize, a singleton.
+ *
+ * Values are cached by the content hash of their node (its kind, parameters, inputs, the size and
+ * domain of the graph) for every graph, so an edit evaluates only the stages after the edited
+ * node, graphs with an identical subgraph share it and an edit undone finds the earlier value.
+ *
+ * Values no graph uses stay while the cache fits the budget, the least recently used evicted
+ * first; values in use are never evicted, even over the budget.
+ */
+ECS_STRUCT(TextureGraphCache, {
+    int64_t budget; /**< Bytes the cache holds at most, 0 for 256 MB: values no graph uses are
+                     *   evicted while it holds more */
 });
 
 /** Node of a TextureGraph with a constant value */
@@ -300,27 +321,279 @@ ECS_STRUCT(TexCoords, {
     float scale; /**< Factor of the coordinates, 0 for 1 */
 });
 
-/** Operation of a TexMath node */
-ECS_ENUM(TextureMathOp, {
-    MathAdd = 0,      /**< a + b, the default */
-    MathSubtract = 1, /**< a - b */
-    MathMultiply = 2, /**< a * b */
-    MathMin = 3,      /**< min(a, b) */
-    MathMax = 4,      /**< max(a, b) */
-    MathMix = 5,      /**< mix(a, b, c): a where c is 0, b where c is 1 */
-    MathClamp = 6     /**< clamp(a, b, c): a limited to b..c */
+/** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
+ * times scale plus offset, so a paused world shows the same image. It makes the nodes after it
+ * and their graph animated, see TextureGraph.rate */
+ECS_STRUCT(TexTime, {
+    float scale;  /**< Factor of the seconds, 0 for 1 */
+    float offset; /**< Added after the factor */
 });
 
-/** Node of a TextureGraph that combines two or three vectors per channel. An input without a
- * node takes its value member instead. */
+/** Node of a TextureGraph that spreads a scalar over the four channels of a vector, such as a
+ * TexTime into a TexMath */
+ECS_STRUCT(TexSplat, {
+    ecs_entity_t in; /**< Scalar input node, 0 for in_value */
+    float in_value;  /**< Value of in without a node */
+});
+
+/** Operation of a TexMath node. Each one works per channel unless it says otherwise. */
+ECS_ENUM(TextureMathOp, {
+    MathAdd = 0,         /**< a + b, the default */
+    MathSubtract = 1,    /**< a - b */
+    MathMultiply = 2,    /**< a * b */
+    MathMin = 3,         /**< min(a, b) */
+    MathMax = 4,         /**< max(a, b) */
+    MathMix = 5,         /**< mix(a, b, c): a where c is 0, b where c is 1 */
+    MathClamp = 6,       /**< clamp(a, b, c): a limited to b..c */
+    MathDivide = 7,      /**< a / b, 0 where b is 0 */
+    MathPower = 8,       /**< a to the power b: 1 where b is 0, else 0 where a is 0 and where a
+                          *   is negative and b is not a whole number; a negative a with a whole
+                          *   b keeps the sign of an odd power */
+    MathAbs = 9,         /**< abs(a) */
+    MathNegate = 10,     /**< -a */
+    MathFloor = 11,      /**< floor(a) */
+    MathFract = 12,      /**< a - floor(a) */
+    MathSin = 13,        /**< sin(a), a in radians */
+    MathCos = 14,        /**< cos(a), a in radians */
+    MathStep = 15,       /**< 1 where a is at least the edge b, else 0 */
+    MathSmoothstep = 16, /**< smoothstep from the edge b to the edge c at a, 0 at b, 1 at c;
+                          *   a step at b where b and c are equal */
+    MathRemap = 17,      /**< a mapped from from_min..from_max to to_min..to_max, to_min where
+                          *   the from range is empty */
+    MathRemapClamped = 18, /**< MathRemap limited to the to range */
+    MathDot = 19,        /**< Scalar: dot product of the first three channels of a and b, a * b
+                          *   on Scalars */
+    MathLength = 20,     /**< Scalar: length of the first three channels of a, abs(a) on a
+                          *   Scalar */
+    MathNormalize = 21,  /**< The first three channels of a scaled to length 1 with its fourth
+                          *   kept, the sign of a on a Scalar; 0 stays 0 */
+    MathCross = 22       /**< Vector: cross product of the first three channels of a and b, with
+                          *   0 as the fourth */
+});
+
+/** Node of a TextureGraph that computes an operation on one, two or three values.
+ *
+ * Its inputs take Scalar and Vector nodes, or their value member without a node. It outputs a
+ * Scalar when every input node its operation reads is a Scalar, else a Vector with a Scalar
+ * broadcast; MathDot and MathLength always output a Scalar, MathCross a Vector.
+ *
+ * Unary operations read a, binary ones a and b, MathMix, MathClamp and MathSmoothstep a, b and
+ * c. On Scalars a value member gives its first channel. The range members are the parameters
+ * of MathRemap and MathRemapClamped.
+ *
+ * @code
+ * glow {
+ *   uv     { TexCoords: {} }
+ *   red    { TexSplit: {input: uv, channel: ChannelR} }
+ *   wave   { TexMath: {op: MathSin, a: red} }
+ *   level  { TexMath: {op: MathRemapClamped, a: wave, from_min: -1, from_max: 1,
+ *                      to_min: 0.2, to_max: 0.8} }
+ *   tinted { TexMath: {op: MathMultiply, a: level, b_value: {1, 0.5, 0.25, 1}} }
+ *   TextureGraph: {output: tinted}
+ * }
+ * @endcode
+ */
 ECS_STRUCT(TexMath, {
     TextureMathOp op;   /**< Operation, default MathAdd */
     ecs_entity_t a;     /**< First input node, 0 for a_value */
     ecs_entity_t b;     /**< Second input node, 0 for b_value */
-    ecs_entity_t c;     /**< Third input node of MathMix and MathClamp, 0 for c_value */
+    ecs_entity_t c;     /**< Third input node, 0 for c_value */
     vec4 a_value;       /**< Value of a without a node */
     vec4 b_value;       /**< Value of b without a node */
     vec4 c_value;       /**< Value of c without a node */
+    float from_min;     /**< MathRemap: start of the range a is mapped from */
+    float from_max;     /**< MathRemap: end of the range a is mapped from */
+    float to_min;       /**< MathRemap: value at from_min */
+    float to_max;       /**< MathRemap: value at from_max */
+});
+
+/** Channel of a Vector */
+ECS_ENUM(TextureChannel, {
+    ChannelR = 0, /**< The first channel, x, the default */
+    ChannelG = 1, /**< The second channel, y */
+    ChannelB = 2, /**< The third channel, z */
+    ChannelA = 3  /**< The fourth channel, w */
+});
+
+/** Node of a TextureGraph whose Scalar value is one channel of a Vector.
+ *
+ * @code
+ * height {
+ *   uv { TexCoords: {} }
+ *   v  { TexSplit: {input: uv, channel: ChannelG} }
+ *   TextureGraph: {output: v, format: GraphSingle}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexSplit, {
+    ecs_entity_t input;     /**< Vector input node, 0 for value */
+    vec4 value;             /**< Value of input without a node */
+    TextureChannel channel; /**< Channel of the value, default ChannelR */
+});
+
+/** Node of a TextureGraph whose Vector value has four Scalar channels. An input without a node
+ * takes its value member instead.
+ *
+ * @code
+ * swapped {
+ *   uv { TexCoords: {} }
+ *   u  { TexSplit: {input: uv, channel: ChannelR} }
+ *   v  { TexSplit: {input: uv, channel: ChannelG} }
+ *   vu { TexCombine: {r: v, g: u, b_value: 0, a_value: 1} }
+ *   TextureGraph: {output: vu}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexCombine, {
+    ecs_entity_t r;     /**< Scalar node of the first channel, 0 for r_value */
+    ecs_entity_t g;     /**< Scalar node of the second channel, 0 for g_value */
+    ecs_entity_t b;     /**< Scalar node of the third channel, 0 for b_value */
+    ecs_entity_t a;     /**< Scalar node of the fourth channel, 0 for a_value */
+    float r_value;      /**< Value of r without a node */
+    float g_value;      /**< Value of g without a node */
+    float b_value;      /**< Value of b without a node */
+    float a_value;      /**< Value of a without a node */
+});
+
+/** Node of a TextureGraph that displaces coordinates: coords + (offset - 0.5) * amount.
+ *
+ * The offset is centred at 0.5, so a noise in 0..1 moves the coordinates by -0.5..0.5 times
+ * amount; x, y and z move, w is kept. On DomainPlane the result keeps tiling where the offset
+ * tiles. On DomainSphere the result is normalized back onto the unit sphere, so generators
+ * reading it stay seamless; where the displaced point is at the origin it keeps coords.
+ *
+ * @code
+ * warped {
+ *   bumps { TexMath: {op: MathMultiply, a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
+ *   TexWarp: {offset: bumps, amount_value: 0.2}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexWarp, {
+    ecs_entity_t coords;  /**< Vector input of the coordinates to displace, 0 for the coordinates
+                           *   of the texel in the domain of the graph */
+    ecs_entity_t offset;  /**< Vector input of the displacement centred at 0.5, 0 for
+                           *   offset_value */
+    ecs_entity_t amount;  /**< Scalar input of the factor of the displacement, 0 for
+                           *   amount_value */
+    vec4 offset_value;    /**< Value of offset without a node; the default 0 moves by -0.5 *
+                           *   amount, set {0.5, 0.5, 0.5} for no displacement */
+    float amount_value;   /**< Value of amount without a node, default 0: no displacement */
+});
+
+/** Node of a TextureGraph that scales, rotates and translates coordinates, in that order:
+ * rotate((coords - centre) * scale) + centre + translate, w kept.
+ *
+ * On DomainPlane the centre is the image centre (0.5, 0.5, 0) and the rotation turns (u, v)
+ * about it from +u towards +v (clockwise in the image, whose v goes down), ignoring axis. The
+ * result tiles for any translate, for whole number scales, and only for rotations by a
+ * multiple of 90 degrees, which are exact; other angles leave seams at the image border.
+ *
+ * On DomainSphere the centre is the origin and the rotation is right handed about axis, so a
+ * field computed from the result turns the other way over the sphere. A scale changes the
+ * distance of the points from the origin, so 3D generators reading them see features scale
+ * times smaller; a translate moves the points off the unit sphere through the 3D field of the
+ * generators, which changes the pattern but keeps it seamless. Neither keeps unit length.
+ *
+ * The angle may come from a Scalar node, so a field spins when an animated value drives it.
+ *
+ * @code
+ * turned {
+ *   TexTransform: {angle_value: 90, scale: {2, 2, 1}}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexTransform, {
+    ecs_entity_t coords;  /**< Vector input of the coordinates to transform, 0 for the
+                           *   coordinates of the texel in the domain of the graph */
+    ecs_entity_t angle;   /**< Scalar input of the rotation in degrees, 0 for angle_value */
+    float angle_value;    /**< Value of angle without a node, in degrees, default 0 */
+    vec3 axis;            /**< DomainSphere: axis of the rotation, normalized; 0 for +y, the
+                           *   poles. Ignored on DomainPlane */
+    vec3 translate;       /**< Added to the coordinates after scale and rotation */
+    vec3 scale;           /**< Factor of the coordinates about the centre, a 0 component for 1;
+                           *   whole numbers keep the plane tiling */
+});
+
+/** Most keys of a TexRamp */
+#define BOX_TEXTURE_RAMP_KEYS (32)
+
+/** Most keys of the curve of a TexCurve */
+#define BOX_TEXTURE_CURVE_KEYS (32)
+
+/** Node of a TextureGraph that maps a scalar through a color ramp to a vector, with the keys
+ * and the interpolation of TextureGen.colors: below the first key the color of the first,
+ * above the last the color of the last, between two keys the display encoded colors mixed
+ * linearly. Its value is the linear color of the result with alpha 1, so a GraphColor image
+ * stores the display encoded colors of the ramp as a GenAlbedo TextureGen does; without keys
+ * the input is a display encoded gray.
+ *
+ * Editing, adding or removing keys up to BOX_TEXTURE_RAMP_KEYS changes the parameters of the
+ * graph and not its structure, more keys fail the graph.
+ *
+ * @code
+ * // height is a node whose value is a Scalar
+ * albedo { TexRamp: {input: height, keys: [{0, {20, 40, 90}}, {0.5, {200, 180, 120}}]} }
+ * @endcode
+ */
+ECS_STRUCT(TexRamp, {
+    ecs_entity_t input;          /**< Scalar input node, 0 for input_value */
+    float input_value;           /**< Value of input without a node */
+    ecs_vec(TextureGenKey) keys; /**< Keys in order of position, display encoded colors */
+});
+
+/** Node of a TextureGraph that maps a scalar through a curve of box/curve.h, the input being
+ * the time: the value of box_curve_value of the curve at the input, the input itself without
+ * keys. The controls of the spans are computed as the engine computes them on the CPU and the
+ * cubics evaluated per texel.
+ *
+ * Editing, adding or removing keys up to BOX_TEXTURE_CURVE_KEYS changes the parameters of the
+ * graph and not its structure, more keys or an invalid curve (box_curve_validate) fail the
+ * graph.
+ *
+ * @code
+ * bumps { TexCurve: {input: height, curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1, 0.6}]}} }
+ * @endcode
+ */
+ECS_STRUCT(TexCurve, {
+    ecs_entity_t input;          /**< Scalar input node, 0 for input_value */
+    float input_value;           /**< Value of input without a node */
+    Curve curve;                 /**< The curve */
+});
+
+/** Node of a TextureGraph of courses of blocks or planks, as a GenBlocks layer of TextureGen
+ * makes them: the same parameters and seeds give the same blocks, ids and tones.
+ *
+ * Its value is (mask, id, tone, random): mask 1 on a face and 0 in the joints, beveled; id the
+ * random id of the block in 0..1 as GenBlocks gives it; tone the tone level of the block,
+ * tone / (tones - 1), 0 with fewer than two tones; random a second random number of the block
+ * in 0..1, independent of id. Lengths are fractions of the width of the image, the courses
+ * repeat down v and the cuts wrap along u, so it tiles over 0..1.
+ *
+ * DomainPlane only: on DomainSphere it fails the graph.
+ *
+ * @code
+ * ashlar {
+ *   blocks { TexBlocks: {courses: 8, per_course: 4, gap: 0.006, jitter: 0.22, stagger: 0.5,
+ *                        seed: 11} }
+ *   TextureGraph: {output: blocks, format: GraphLinear}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexBlocks, {
+    ecs_entity_t coords;    /**< Vector input node of the (u, v) the blocks are evaluated at, 0
+                             *   for the coordinates of the domain */
+    int32_t courses;        /**< Courses down the texture, default 8 */
+    int32_t per_course;     /**< Blocks along a course, default 4 */
+    float gap;              /**< Width of the joints as a fraction of the width */
+    float jitter;           /**< Random shift of each cut, up to +-jitter blocks */
+    float stagger;          /**< Shift of every second course in blocks */
+    float softness;         /**< Width of the bevel from a joint to the face as a fraction of the
+                             *   width, default 1.3 times gap; with neither a hard edge */
+    int32_t tones;          /**< Number of tones a block takes, 0 for none */
+    TextureGenToneOrder tone_order; /**< Order of the tones, default GenToneRandom */
+    int32_t seed;           /**< Seed, as TextureGen.seed */
+    int32_t layer_seed;     /**< Seed mixed with seed, as TextureGenLayer.seed */
 });
 
 /** What the x of a TexCells node measures */
@@ -371,10 +644,13 @@ ECS_STRUCT(TexCells, {
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
 /** Most parameters of a node kind */
-#define BOX_TEXTURE_NODE_PARAMS (8)
+#define BOX_TEXTURE_NODE_PARAMS (16)
 
 /** Most bytes of the parameters of a node kind in the parameter buffer */
 #define BOX_TEXTURE_NODE_PARAM_BYTES (64)
+
+/** Most elements of the array parameter of a node kind */
+#define BOX_TEXTURE_NODE_ARRAY_MAX (256)
 
 /** Flag of a node kind that reads its inputs at other texels, so they are materialized */
 #define BOX_TEXTURE_NODE_NEIGHBOURHOOD (1u << 0)
@@ -382,12 +658,19 @@ ECS_STRUCT(TexCells, {
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
 
+/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
+#define BOX_TEXTURE_NODE_PLANE (1u << 2)
+
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
     const char *name;      /**< Member of the ecs_entity_t of the input node */
     TextureValueType type; /**< Type the input node must output */
     bool fallback;         /**< The input has a constant member used without a node */
+<<<<<<< HEAD
     bool coords;           /**< Without a node the input is the coordinates of the texel */
+=======
+    const char *value;     /**< Name of that constant member, NULL without one */
+>>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
 });
 
 /** A parameter of a node kind, as TextureNodeKind lists it */
@@ -405,11 +688,19 @@ ECS_STRUCT(TextureNodeKind, {
     int32_t input_count;     /**< Inputs in inputs */
     TextureNodePort inputs[4]; /**< The BOX_TEXTURE_NODE_INPUTS inputs, in order */
     int32_t param_count;     /**< Parameters in params */
-    TextureNodeParam params[8]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
+    TextureNodeParam params[16]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
     int32_t param_size;      /**< Bytes of the parameters of a node, a multiple of 16 */
+    const char *array;       /**< Member of the array parameter, NULL for none */
+    int32_t array_max;       /**< Most elements of the array parameter */
+    int32_t array_header;    /**< Byte offset in the parameters of the vec4u of the array:
+                              *   (vec4 index of its first element in the parameter buffer,
+                              *   element count, 0, 0) */
+    int32_t types_offset;    /**< Byte offset of the types word of a kind with a TexAny input,
+                              *   see box_texture_node_desc_t, -1 without */
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
+    bool plane;              /**< The node works on DomainPlane only */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -425,11 +716,17 @@ typedef struct box_texture_node_input_t {
     ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
     TextureValueType type;      /**< Type the input node must output */
     const char *value;          /**< Name of the constant member used without a node, a float
-                                 *   for TexScalar or a vec4 for TexVector, NULL for none */
+                                 *   for TexScalar or a vec4 for TexVector and TexAny, NULL for
+                                 *   none */
     ecs_size_t value_offset;    /**< Offset of that member */
+<<<<<<< HEAD
     bool coords;                /**< Without a node the input is the coordinates of the texel
                                  *   in the domain, as the coords of a generator; value is
                                  *   NULL then */
+=======
+    bool coords;                /**< A TexVector input without value: without a node it is the
+                                 *   coordinates of the texel in the domain of the graph */
+>>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
 } box_texture_node_input_t;
 
 /** A parameter of a node kind: a member copied into the parameter buffer */
@@ -440,23 +737,81 @@ typedef struct box_texture_node_param_t {
     box_texture_param_kind_t kind; /**< Kind of its elements */
 } box_texture_node_param_t;
 
+/** Pack the elements of the array parameter of a node into the parameter buffer.
+ *
+ * @param node The node component
+ * @param count Number of elements, at most the max of the array
+ * @param out Receives a vec4 of 32 bit words per element, zeroed before the call
+ * @return Why the elements are invalid, freed with ecs_os_free, NULL when they are valid
+ */
+typedef char* (*box_texture_node_pack_t)(
+    const void *node,
+    int32_t count,
+    uint32_t *out);
+
+/** The array parameter of a node kind: the elements of an ecs_vec_t member, a variable number
+ * of values such as the keys of a ramp.
+ *
+ * A node reserves max vec4 elements after the constants of its inputs, so the number of
+ * elements changes the parameter bytes and never the structure of the graph; more than max
+ * elements fail the graph. A vec4u after the parameters, at TextureNodeKind.array_header, holds
+ * the index of the first element in box_texgraph_params and the element count.
+ */
+typedef struct box_texture_node_array_t {
+    const char *name;           /**< Name of the ecs_vec_t member, NULL for none */
+    ecs_size_t offset;          /**< Offset of the ecs_vec_t member */
+    ecs_size_t size;            /**< Bytes of an element, copied into its vec4 without pack, 4
+                                 *   to 16 */
+    int32_t max;                /**< Most elements, 1 to BOX_TEXTURE_NODE_ARRAY_MAX */
+    box_texture_node_pack_t pack; /**< Writes the elements, NULL to copy them */
+} box_texture_node_array_t;
+
+/** Type of the value of a node of a kind whose output is TexAny.
+ *
+ * The default, without a function or when it returns TexAny, is a Vector when an input node
+ * is a Vector, else a Scalar when one is a Scalar, else a Vector.
+ *
+ * @param node The node component
+ * @param inputs Type of the node of each input in order, TexAny for an input without a node
+ * @return The type, or TexAny for the default
+ */
+typedef TextureValueType (*box_texture_node_type_t)(
+    const void *node,
+    const TextureValueType *inputs);
+
 /** Description of a node kind for box_texture_node_register.
  *
+<<<<<<< HEAD
  * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
  * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
  * order, a scalar in x and the constant of an input without a node (the coordinates for an
  * input with coords), and the coordinates.
+=======
+ * The WGSL function fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
+ * of the parameter bytes p, the input values i (a scalar in x, the constant without a node)
+ * and the coordinates returns the value of the node, a scalar in x.
+>>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
  *
- * It returns the value of the node, a scalar in x.
+ * A kind with an array parameter reads its elements from box_texgraph_params at the index in
+ * its header, see box_texture_node_array_t.
+ *
+ * A kind with a TexAny input gets a u32 after its last parameter, 4 byte aligned, with bit j
+ * set when input j has a Scalar node and bit 4 + j when it has a Vector node; its function
+ * broadcasts a Scalar input itself.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
-    TextureValueType output;    /**< Type of the value of the node */
+    TextureValueType output;    /**< Type of the value of the node, TexAny when it follows the
+                                 *   inputs */
+    box_texture_node_type_t output_type; /**< Type of a node of a kind whose output is TexAny,
+                                          *   NULL for the default */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs in order */
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters in order */
+    box_texture_node_array_t array; /**< Array parameter, name NULL for none */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_PLANE */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs
@@ -483,6 +838,44 @@ ECS_STRUCT(TextureStatus, {
     TextureState state; /**< Progress of the last requested load */
     int32_t revision;   /**< Loads that succeeded, the image changed when it increments */
     char *error;        /**< Why the last load failed, NULL unless state is TextureFailed */
+});
+
+/** Preview of the value of a node of a TextureGraph, which a tool such as tools/texgraph sets
+ * on a node entity to see it. With the GPU backend the engine reads the value of the node back
+ * at most rate times per second, scales it down to size and writes TextureNodePreviewStatus.
+ *
+ * Removing it stops the readbacks and removes the status. A node that no graph reaches has no
+ * value to read, so it gets no status.
+ */
+ECS_STRUCT(TextureNodePreview, {
+    int32_t size; /**< Largest dimension of the preview in pixels, 0 for 128 */
+    float rate;   /**< Most readbacks per second, 0 for 4 */
+});
+
+/** Preview of a node written by the engine for its TextureNodePreview, read only for
+ * applications: an opaque RGBA8 PNG of its value as the image of its graph would store it, a
+ * scalar in gray. It is encoded again only when the value changed. */
+ECS_STRUCT(TextureNodePreviewStatus, {
+    int32_t width;    /**< Width of the preview in pixels */
+    int32_t height;   /**< Height of the preview in pixels */
+    int32_t revision; /**< Previews encoded, it increments when the value changed */
+    char *png;        /**< The PNG file in base64 */
+});
+
+/** Statistics of the evaluation of the texture graphs on the GPU backend, a singleton the
+ * engine writes when they change, read only for applications */
+ECS_STRUCT(TextureGraphStats, {
+    int32_t graphs;      /**< Texture graphs alive on the backend */
+    int32_t programs;    /**< Generated stage programs alive, shared by graphs of one structure */
+    int32_t evaluations; /**< Evaluations of texture graphs recorded */
+    int32_t dispatches;  /**< Stage dispatches recorded */
+    int64_t texels;      /**< Texels the stage dispatches computed */
+    double gpu_ms;       /**< GPU time of the evaluations measured, 0 without timestamp
+                          *   queries */
+    int32_t timed;       /**< Packets of evaluations whose GPU time gpu_ms holds */
+    int64_t pool_bytes;  /**< Bytes of the pooled intermediate textures now */
+    int32_t reads;       /**< Readbacks delivered, previews included */
+    int32_t previews;    /**< Nodes with a TextureNodePreview */
 });
 
 /** Register the box.texture module.

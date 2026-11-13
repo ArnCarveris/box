@@ -7,6 +7,7 @@
 #include <box.h>
 
 ECS_TAG_DECLARE(DynamicMaterial);
+ECS_TAG_DECLARE(TextureFrame);
 ECS_TAG_DECLARE(NoShadow);
 ECS_TAG_DECLARE(LightFixture);
 
@@ -376,6 +377,7 @@ void BoxMaterialImport(
     }
 
     ECS_TAG_DEFINE(world, DynamicMaterial);
+    ECS_TAG_DEFINE(world, TextureFrame);
     ECS_TAG_DEFINE(world, NoShadow);
     ECS_TAG_DEFINE(world, LightFixture);
 }

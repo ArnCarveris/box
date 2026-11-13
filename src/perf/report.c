@@ -113,6 +113,29 @@ static void box_perf_report_orbit(
     ecs_strbuf_appendstr(buf, "\n  },\n");
 }
 
+/** Append the texture graph cache counts per frame as JSON members.
+ *
+ * @param buf The buffer
+ * @param status The completed status
+ */
+static void box_perf_report_graphs(
+    ecs_strbuf_t *buf,
+    const PerfStatus *status)
+{
+    const PerfTextureGraphs *g = &status->texture_graphs;
+    ecs_strbuf_append(buf, "  \"texture_graphs\": {\n    \"samples\": %d,\n", g->samples);
+    box_perf_report_range(buf, "hits", &g->hits);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "misses", &g->misses);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "evictions", &g->evictions);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "updates", &g->updates);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "cached_kb", &g->cached_kb);
+    ecs_strbuf_appendstr(buf, "\n  },\n");
+}
+
 /** Append the statistics of a status as JSON members.
  *
  * @param buf The buffer
@@ -169,6 +192,7 @@ int box_perf_report(
     ecs_strbuf_append(&buf, "  \"stall_ms\": %.3f,\n", (double)run->stall);
     box_perf_report_stats(&buf, status);
     box_perf_report_orbit(&buf, status);
+    box_perf_report_graphs(&buf, status);
     ecs_strbuf_appendstr(&buf, "  \"intervals_ms\": [");
     for (i = 0; i < count; i ++) {
         ecs_strbuf_append(&buf, i ? ", %.4f" : "%.4f", values[i]);
