@@ -175,6 +175,7 @@ state {
   export mut show_ui: bool = true
   export mut show_gantry: bool = true
   export mut span: i32 = 0
+  export mut layout_rev: i32 = 0
 
   export mut tool: i32 = 0
   export mut deck: i32 = 2
@@ -578,5 +579,6 @@ state {
     modules = total
     problems = bad
     span = max(back - front + 1, 0)
+    layout_rev += 1
   }
 }

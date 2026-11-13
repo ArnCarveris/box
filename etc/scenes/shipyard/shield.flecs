@@ -1,0 +1,94 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.particle
+using box.light
+using box.animation
+using state
+
+assets {
+  prefab ShieldGlow { Rgb: {176, 208, 255}; Emissive: {strength: 6, color: {96, 150, 255}} }
+  prefab ShieldCell { Rgb: {26, 44, 84}; PbrMaterial: {metallic: 0.2, roughness: 0.12}; ClearCoat: {strength: 1, roughness: 0.04}; Emissive: {strength: 2, color: {80, 140, 255}} }
+  prefab ShieldField { Rgb: {110, 160, 255}; Emissive: {strength: 1.4, color: {100, 156, 255}}; Opacity: {0.08}; BlendMode: Additive; NoShadow; SpatialIgnore }
+  prefab ShieldPaint { Rgb: {36, 70, 140}; PbrMaterial: {metallic: 0.35, roughness: 0.38}; ClearCoat: {strength: 0.6, roughness: 0.15} }
+
+  template ShieldGenerator {
+    prop r: f32 = 1
+    prop core: bool = true
+    prop fe: i32 = 0
+    prop be: i32 = 0
+    prop power: f32 = 1
+
+    const p = clamp(power, 0, 1)
+    const on = p > 0.01
+    const glow = 6 * p
+    const lr = 44 + 132 * p
+    const lg = 58 + 150 * p
+    const lb = 82 + 173 * p
+    const n = core ? 4 : 3
+    const m = core ? 16 : 12
+    const step = 2 * PI / n
+    const a0 = core ? PI / 4 : 0
+    const skip = core ? 2 : 0
+    const hr = r * 1.08
+    const pa = 2 * PI * hr / m
+    const hc = pa * 0.9 / sqrt(3)
+    const dz = pa * 0.866
+    const x0 = hr + 0.14
+    const xt = r * 1.57
+    const ml = xt - x0
+
+    drum : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.7, length: SEG, segments: 32, smooth: true} }
+    housing : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr, length: 3.1, segments: 48, smooth: true} }
+    for s in 0..2 {
+      const sz = (s - 0.5) * 2
+      "collar_{s}" : ShipHullDarkFine { Position: {0, 0, sz * 1.6}; Rotation: {sz * HALF_PI, 0, 0}; Frustum: {radius_bottom: hr + 0.08, radius_top: r * 0.9, length: 0.32, segments: 48, smooth: true} }
+      "lip_{s}" : ShipTrim { Position: {0, 0, sz * 1.44}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr + 0.1, length: 0.06, segments: 48, smooth: true} }
+      "paint_{s}" : ShieldPaint { Position: {0, 0, sz * 1.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr + 0.075, length: 0.06, segments: 48, smooth: true} }
+    }
+
+    for row in 0..3 {
+      for j in 0..m {
+        const a = (j + (row == 1 ? 0 : 0.5)) * 2 * PI / m
+        const cz = (row - 1) * dz
+        if row != 1 || j % 4 != skip {
+          "frame_{row}_{j}" : ShipTrim { Position: {cos(a) * hr, sin(a) * hr, cz}; Rotation: {a - HALF_PI, 0 - HALF_PI, 0}; Cylinder: {radius: hc * 0.97, length: 0.12, segments: 6} }
+          "pane_{row}_{j}" : ShieldCell { Position: {cos(a) * (hr + 0.035), sin(a) * (hr + 0.035), cz}; Rotation: {a - HALF_PI, 0 - HALF_PI, 0}; Cylinder: {radius: hc * 0.8, length: 0.08, segments: 6}; Emissive: {strength: (0.3 + seg_hash(row + 3, j, 5) * 0.3) * p, color: {80, 140, 255}} }
+          "node_{row}_{j}" : ShieldGlow { Position: {cos(a) * (hr + 0.08), sin(a) * (hr + 0.08), cz}; Rotation: {a - HALF_PI, 0 - HALF_PI, 0}; Cylinder: {radius: hc * 0.16, length: 0.03, segments: 6}; Rgb: {lr, lg, lb}; Emissive: {strength: glow * 0.7, color: {110, 165, 255}} }
+        }
+      }
+    }
+
+    for i in 0..n {
+      "spire_{i}" {
+        Rotation: {0, 0, a0 + i * step}
+        socket : ShipHullDark { Position: {hr + 0.08, 0, 0}; Rotation: {0, 0, 0 - HALF_PI}; Cylinder: {radius: r * 0.17, length: 0.2, segments: 20, smooth: true} }
+        band : ShieldPaint { Position: {hr + 0.1, 0, 0}; Rotation: {0, 0, 0 - HALF_PI}; Cylinder: {radius: r * 0.172, length: 0.06, segments: 20, smooth: true} }
+        for s in 0..2 {
+          const sz = (s - 0.5) * 2
+          "feed_{s}" : ShipCopper { Position: {hr + 0.03, 0, sz * (r * 0.17 + 1.42) / 2}; Box: {0.08, 0.07, 1.42 - r * 0.17} }
+          "clamp_{s}" : ShipTrim { Position: {hr + 0.05, 0, sz * (r * 0.17 + 1.42) / 2}; Box: {0.08, 0.12, 0.1} }
+        }
+        mast : ShipSteel { Position: {x0 + ml / 2, 0, 0}; Rotation: {0, 0, 0 - HALF_PI}; Frustum: {radius_bottom: r * 0.08, radius_top: r * 0.03, length: ml, segments: 16, smooth: true} }
+        for k in 0..4 {
+          "grade_{k}" : ShipChrome { Position: {x0 + ml * (0.16 + k * 0.2), 0, 0}; Rotation: {0, 0, 0 - HALF_PI}; Torus: {radius: r * (0.15 - k * 0.022), tube: r * 0.017, segments: 24, rings: 6, smooth: true} }
+        }
+        corona : ShieldGlow { Position: {xt, 0, 0}; Rotation: {0, 0, 0 - HALF_PI}; Torus: {radius: r * 0.075, tube: r * 0.014, segments: 24, rings: 6, smooth: true}; Rgb: {lr, lg, lb}; Emissive: {strength: glow, color: {96, 150, 255}} }
+        orb : ShieldGlow { Position: {xt + r * 0.03, 0, 0}; Sphere: {radius: r * 0.065, segments: 12, smooth: true}; Rgb: {lr, lg, lb}; Emissive: {strength: glow * 1.6, color: {130, 180, 255}} }
+        if on {
+          halo : ShieldField { Position: {xt + r * 0.03, 0, 0}; Sphere: {radius: r * 0.12, segments: 16, smooth: true}; Opacity: {0.08 * p}; Emissive: {strength: 1.4 * p, color: {100, 156, 255}} }
+        }
+      }
+    }
+
+    if on {
+      sheath : ShieldField { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr + 0.16, length: 2.84, segments: 48, smooth: true}; Opacity: {0.035 * p}; Emissive: {strength: 1.2 * p, color: {100, 156, 255}} }
+      light { Position: {0, 0, 0}; PointLight: {intensity: 4 * p, range: r * 4}; Rgb: {110, 160, 255} }
+    }
+    SpineEnds ends(r: r, fe: fe, be: be)
+  }
+}
