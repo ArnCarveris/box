@@ -132,8 +132,8 @@ static void range_init(
         "using box.transform\n"
         "jet {\n"
         "  Position: {0, 0, 0}\n"
-        "  ParticleEmitter: {rate: 20, lifetime: {1, 1}, seed: %u}\n"
-        "  ParticleCurves: {%s}\n"
+        "  Emitter: {rate: 20, lifetime: {1, 1}, seed: %u}\n"
+        "  Curves: {%s}\n"
         "}\n", SEED, curves);
     test_int(ecs_script_run(r->world, "range", code, NULL), 0);
     r->e = ecs_lookup(r->world, "jet");
@@ -506,7 +506,7 @@ void CurveRange_copy_owns_max_keys(void) {
         "using box.curve\n"
         "using box.particle\n"
         "prefab p {\n"
-        "  ParticleCurves: {\n"
+        "  Curves: {\n"
         "    size: {keys: [{0, 1}, {1, 0}], max_keys: [{0, 2}, {1, 0.5}]}\n"
         "    spin: {max_keys: [{0, 2}, {1, 1}]}\n"
         "    color: {keys: [{0, {255, 0, 0}}], max_keys: [{0, {0, 0, 255}}, {1, {0, 0, 0}}]}\n"

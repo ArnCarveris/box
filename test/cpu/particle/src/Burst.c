@@ -145,7 +145,7 @@ void Burst_defaults(void) {
 
     test_assert(ecs_script_run(world, "burst",
         "using box.particle\n"
-        "b { ParticleBurst: {count: 40, at: 0.5, repeat: -1} }\n", NULL) == 0);
+        "b { Burst: {count: 40, at: 0.5, repeat: -1} }\n", NULL) == 0);
     b = ecs_get(world, ecs_lookup(world, "b"), ParticleBurst);
     test_assert(b != NULL);
     test_int(b->count, 40);

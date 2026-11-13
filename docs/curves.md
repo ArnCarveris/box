@@ -17,8 +17,8 @@ using box.transform
 
 smoke {
   Position: {0, 0, 0}
-  ParticleEmitter: {rate: 20, lifetime: {2, 3}, size: {0.5, 0.5}, seed: 1}
-  ParticleCurves: {
+  Emitter: {rate: 20, lifetime: {2, 3}, size: {0.5, 0.5}, seed: 1}
+  Curves: {
     opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}
     size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}
     spin: {kind: CurveBezier, keys: [{time: 0, value: 1, out: -2}, {time: 1, value: 0, in: 0}]}
@@ -47,7 +47,7 @@ A `CurveKey` is `{time, value, in, out}`, positionally `{0.5, 2}` or by name
   not per key. Write the full names: `Linear` is a `TimingFunction` constant and `CatmullRom` a
   `PathSegmentKind` constant, and either in a curve is a script error, `unresolved reference
   'Linear'`, that stops the script.
-- No keys means the default of the field that holds the curve, so `ParticleCurves: {}` changes
+- No keys means the default of the field that holds the curve, so `Curves: {}` changes
   nothing. One key is a constant. Before the first key and after the last the curve holds the
   value of that key.
 - Times and values are finite and times increase strictly. Each field defines the range of its
@@ -174,13 +174,13 @@ using box.transform
 
 puff {
   Position: {0, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 200, rate: 25, shape: EmitterSphere, radius: 0.1, spread: 25,
     speed: {0.4, 0.8}, lifetime: {1.5, 2.5}, size: {0.4, 0.6},
     opacity: {0.6, 0.8}, color: {200, 200, 205}, seed: 2
   }
-  ParticleForces: {gravity: {0, 0.3, 0}, drag: 0.8}
-  ParticleCurves: {
+  Forces: {gravity: {0, 0.3, 0}, drag: 0.8}
+  Curves: {
     size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.3, 1.8}, {1, 2.4}]}
     opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}
   }
@@ -201,13 +201,13 @@ using box.transform
 
 spark {
   Position: {0, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 400, rate: 120, spread: 35, speed: {4, 7}, lifetime: {0.4, 0.8},
     size: {0.06, 0.1}, color: {255, 200, 120}, seed: 3
   }
-  ParticleForces: {drag: 1.5}
-  ParticleAppearance: {blend: ParticleAdditive, stretch: 0.03}
-  ParticleCurves: {
+  Forces: {drag: 1.5}
+  Appearance: {blend: Additive, stretch: 0.03}
+  Curves: {
     size: {kind: CurveBezier, keys: [{time: 0, value: 1, out: -3}, {time: 1, value: 0, in: 0}]}
     opacity: {keys: [{0, 1}, {0.7, 1}, {1, 0}]}
   }
@@ -232,12 +232,12 @@ campfire {
   Position: {0, 0, 0}
   Rgb: {255, 150, 60}
   PointLight: {intensity: 3, range: 6}
-  ParticleEmitter: {
+  Emitter: {
     rate: 60, shape: EmitterDisc, radius: 0.2, speed: {0.5, 1}, lifetime: {0.6, 0.9},
     size: {0.15, 0.25}, color: {255, 160, 60}, seed: 7
   }
-  ParticleAppearance: {blend: ParticleAdditive}
-  ParticleLight: {
+  Appearance: {blend: Additive}
+  box.particle.Light: {
     intensity: 3, period: 0.7, loop: true, fade: 0.3
     curve: {kind: CurveCatmullRom, keys: [
       {0, 1}, {0.12, 0.75}, {0.25, 1.1}, {0.4, 0.85}, {0.55, 1.2}, {0.7, 0.7}, {0.85, 1.05}, {1, 1}
@@ -281,11 +281,11 @@ using box.transform
 
 bubbles {
   Position: {0, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     rate: 40, spread: 30, speed: {0.5, 1}, lifetime: {2, 2}, size: {0.2, 0.2}, seed: 8
   }
-  ParticleForces: {gravity: {0, 0.2, 0}}
-  ParticleCurves: {
+  Forces: {gravity: {0, 0.2, 0}}
+  Curves: {
     size: {
       kind: CurveCatmullRom
       keys: [{0, 1}, {1, 0.4}]
@@ -333,7 +333,7 @@ root entity, and shown together by `test/integration/visual/curves_showcase.flec
 Common authoring traps:
 
 - Spin is invisible on the default circle. Use a sprite or billboard mesh.
-- Without `ParticleForces`, particles feel no gravity. `ParticleForces: {}`
+- Without `ParticleForces`, particles feel no gravity. `Forces: {}`
   supplies the default -9.81 gravity.
 - Velocity-curve times use normalized life, but values are units per second.
   Use a fixed lifetime to make every particle trace the same shape.

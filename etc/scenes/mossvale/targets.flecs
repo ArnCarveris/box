@@ -35,9 +35,9 @@ assets {
     if glint {
       sparkle {
         Position: {0, gy, 0}
-        ParticleEmitter: {max: 24, rate: 7, shape: EmitterSphere, radius: 0.9, direction: {0, 1, 0}, spread: 40, speed: {0.2, 0.6}, lifetime: {0.8, 1.6}, size: {0.08, 0.16}, opacity: {0.8, 1}, color: {spell_r(sp), spell_g(sp), spell_b(sp)}, color_variance: {20, 20, 20}, seed: id}
-        ParticleAppearance: {blend: ParticleAdditive}
-        ParticleCurves: {opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
+        Emitter: {max: 24, rate: 7, shape: EmitterSphere, radius: 0.9, direction: {0, 1, 0}, spread: 40, speed: {0.2, 0.6}, lifetime: {0.8, 1.6}, size: {0.08, 0.16}, opacity: {0.8, 1}, color: {spell_r(sp), spell_g(sp), spell_b(sp)}, color_variance: {20, 20, 20}, seed: id}
+        Appearance: {blend: Additive}
+        Curves: {opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
       }
     }
 
@@ -89,8 +89,8 @@ assets {
       glow { Position: {0, 1.0, 1.0}; PointLight: {intensity: 4, range: 8}; Rgb: {255, 170, 90} }
       steam {
         Position: {0.3, 1.5, 0}
-        ParticleEmitter: {max: 20, rate: 4, shape: EmitterSphere, radius: 0.1, direction: {0, 1, 0}, spread: 10, speed: {0.5, 0.9}, lifetime: {1.5, 2.5}, size: {0.25, 0.4}, opacity: {0.2, 0.35}, color: {240, 240, 240}, seed: 3}
-        ParticleCurves: {size: {keys: [{0, 0.6}, {1, 2.5}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
+        Emitter: {max: 20, rate: 4, shape: EmitterSphere, radius: 0.1, direction: {0, 1, 0}, spread: 10, speed: {0.5, 0.9}, lifetime: {1.5, 2.5}, size: {0.25, 0.4}, opacity: {0.2, 0.35}, color: {240, 240, 240}, seed: 3}
+        Curves: {size: {keys: [{0, 0.6}, {1, 2.5}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
       }
     }
     async { block_rect(x - 1, z - 0.8, x + 1, z + 0.8) }
@@ -143,8 +143,8 @@ assets {
       glow { Position: {0, 1.2, 2.0}; PointLight: {intensity: 4, range: 8}; Rgb: {255, 150, 70} }
       smoke {
         Position: {0, 2.4, -0.4}
-        ParticleEmitter: {max: 24, rate: 4, shape: EmitterSphere, radius: 0.1, direction: {0, 1, 0}, spread: 10, speed: {0.6, 1.0}, lifetime: {2, 3.5}, size: {0.4, 0.6}, opacity: {0.25, 0.4}, color: {200, 196, 190}, seed: 9}
-        ParticleCurves: {size: {keys: [{0, 0.6}, {1, 3}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
+        Emitter: {max: 24, rate: 4, shape: EmitterSphere, radius: 0.1, direction: {0, 1, 0}, spread: 10, speed: {0.6, 1.0}, lifetime: {2, 3.5}, size: {0.4, 0.6}, opacity: {0.25, 0.4}, color: {200, 196, 190}, seed: 9}
+        Curves: {size: {keys: [{0, 0.6}, {1, 3}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
       }
       loaves {
         for i in 0..3 {
@@ -215,8 +215,8 @@ assets {
       hay : MvBurnt { Position: {0, 0.6, 0}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 1.0, segments: 1} }
       steam {
         Position: {0, 1.0, 0}
-        ParticleEmitter: {max: 16, rate: 2, shape: EmitterSphere, radius: 0.4, direction: {0, 1, 0}, spread: 20, speed: {0.4, 0.8}, lifetime: {1.5, 2.5}, size: {0.4, 0.7}, opacity: {0.15, 0.3}, color: {230, 230, 230}, seed: id}
-        ParticleCurves: {size: {keys: [{0, 0.6}, {1, 2.5}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
+        Emitter: {max: 16, rate: 2, shape: EmitterSphere, radius: 0.4, direction: {0, 1, 0}, spread: 20, speed: {0.4, 0.8}, lifetime: {1.5, 2.5}, size: {0.4, 0.7}, opacity: {0.15, 0.3}, color: {230, 230, 230}, seed: id}
+        Curves: {size: {keys: [{0, 0.6}, {1, 2.5}]}, opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}}
       }
     } else {
       hay : MvHay { Position: {0, 0.8, 0}; Scale: {1, 0.85, 1}; IcoSphere: {radius: 1.1, segments: 1} }
@@ -227,13 +227,13 @@ assets {
         light { Position: {0, 2.4, 0}; PointLight: {intensity: 10, range: 12}; Rgb: {255, 140, 60} }
         smoke {
           Position: {0, 2.5, 0}
-          ParticleEmitter: {max: 60, rate: 14, shape: EmitterSphere, radius: 0.5, direction: {0, 1, 0}, spread: 15, speed: {1.5, 2.5}, lifetime: {2, 3.5}, size: {0.8, 1.2}, opacity: {0.3, 0.5}, color: {70, 66, 64}, seed: id}
-          ParticleCurves: {size: {keys: [{0, 0.6}, {1, 3}]}, opacity: {keys: [{0, 0}, {0.2, 1}, {1, 0}]}}
+          Emitter: {max: 60, rate: 14, shape: EmitterSphere, radius: 0.5, direction: {0, 1, 0}, spread: 15, speed: {1.5, 2.5}, lifetime: {2, 3.5}, size: {0.8, 1.2}, opacity: {0.3, 0.5}, color: {70, 66, 64}, seed: id}
+          Curves: {size: {keys: [{0, 0.6}, {1, 3}]}, opacity: {keys: [{0, 0}, {0.2, 1}, {1, 0}]}}
         }
         embers {
           Position: {0, 1.4, 0}
-          ParticleEmitter: {max: 60, rate: 24, shape: EmitterSphere, radius: 0.6, direction: {0, 1, 0}, spread: 25, speed: {1.5, 3}, lifetime: {0.6, 1.2}, size: {0.08, 0.16}, opacity: {0.8, 1}, color: {255, 160, 60}, color_variance: {0, 40, 20}, seed: id + 7}
-          ParticleAppearance: {blend: ParticleAdditive}
+          Emitter: {max: 60, rate: 24, shape: EmitterSphere, radius: 0.6, direction: {0, 1, 0}, spread: 25, speed: {1.5, 3}, lifetime: {0.6, 1.2}, size: {0.08, 0.16}, opacity: {0.8, 1}, color: {255, 160, 60}, color_variance: {0, 40, 20}, seed: id + 7}
+          Appearance: {blend: Additive}
         }
       }
     }
@@ -336,7 +336,7 @@ assets {
         "cloth_{i}" { Position: {cx, 1.5, 0}; Box: {0.9, 1.2, 0.06}; Rgb: {120, 116, 120}; PbrMaterial: {roughness: 0.4} }
         "drip_{i}" {
           Position: {cx, 0.9, 0}
-          ParticleEmitter: {max: 8, rate: 3, shape: EmitterBox, extents: {0.4, 0, 0}, direction: {0, -1, 0}, speed: {0.5, 1}, lifetime: {0.5, 0.8}, size: {0.05, 0.08}, opacity: {0.6, 0.9}, acceleration: {0, -9, 0}, color: {150, 190, 230}, seed: id * 3 + i}
+          Emitter: {max: 8, rate: 3, shape: EmitterBox, extents: {0.4, 0, 0}, direction: {0, -1, 0}, speed: {0.5, 1}, lifetime: {0.5, 0.8}, size: {0.05, 0.08}, opacity: {0.6, 0.9}, acceleration: {0, -9, 0}, color: {150, 190, 230}, seed: id * 3 + i}
         }
       }
     }
@@ -360,9 +360,9 @@ assets {
       }
       mist {
         Position: {0, 0.8, 0}
-        ParticleEmitter: {max: 60, rate: 10, shape: EmitterBox, extents: {w / 2, 0.6, 1}, direction: {1, 0, 0}, spread: 180, speed: {0.1, 0.3}, lifetime: {3, 5}, size: {1.8, 2.6}, opacity: {0.2, 0.35}, color: {230, 236, 240}, seed: id}
-        ParticleCurves: {opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}, size: {keys: [{0, 0.8}, {1, 1.4}]}}
-        ParticleAppearance: {softness: 0.8}
+        Emitter: {max: 60, rate: 10, shape: EmitterBox, extents: {w / 2, 0.6, 1}, direction: {1, 0, 0}, spread: 180, speed: {0.1, 0.3}, lifetime: {3, 5}, size: {1.8, 2.6}, opacity: {0.2, 0.35}, color: {230, 236, 240}, seed: id}
+        Curves: {opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}, size: {keys: [{0, 0.8}, {1, 1.4}]}}
+        Appearance: {softness: 0.8}
       }
     }
     async {
@@ -413,8 +413,8 @@ assets {
       light { Position: {0, 2.2, 0}; PointLight: {intensity: 6, range: 10}; Rgb: {120, 190, 255} }
       wisps {
         Position: {0, 1.7, 0}
-        ParticleEmitter: {max: 30, rate: 10, shape: EmitterSphere, radius: 0.3, direction: {0, 1, 0}, spread: 20, speed: {0.6, 1.2}, lifetime: {0.8, 1.4}, size: {0.08, 0.16}, opacity: {0.8, 1}, color: {150, 210, 255}, seed: id}
-        ParticleAppearance: {blend: ParticleAdditive}
+        Emitter: {max: 30, rate: 10, shape: EmitterSphere, radius: 0.3, direction: {0, 1, 0}, spread: 20, speed: {0.6, 1.2}, lifetime: {0.8, 1.4}, size: {0.08, 0.16}, opacity: {0.8, 1}, color: {150, 210, 255}, seed: id}
+        Appearance: {blend: Additive}
       }
     }
     async { block_disc(x, z, 0.6) }
@@ -547,8 +547,8 @@ assets {
       light { Position: {0, 3, 0}; PointLight: {intensity: 14, range: 22}; Rgb: {255, 190, 110} }
       sparks {
         Position: {0, 1.8, 0}
-        ParticleEmitter: {max: 60, rate: 20, shape: EmitterSphere, radius: 0.5, direction: {0, 1, 0}, spread: 18, speed: {1.5, 3}, lifetime: {0.6, 1.3}, size: {0.08, 0.18}, opacity: {0.8, 1}, color: {255, 190, 90}, color_variance: {0, 40, 30}, seed: 31}
-        ParticleAppearance: {blend: ParticleAdditive}
+        Emitter: {max: 60, rate: 20, shape: EmitterSphere, radius: 0.5, direction: {0, 1, 0}, spread: 18, speed: {1.5, 3}, lifetime: {0.6, 1.3}, size: {0.08, 0.18}, opacity: {0.8, 1}, color: {255, 190, 90}, color_variance: {0, 40, 30}, seed: 31}
+        Appearance: {blend: Additive}
       }
     }
     async { block_disc(x, z, 1.1) }
@@ -567,7 +567,7 @@ assets {
     } else {
       flies {
         Position: {0, 1.2, 0}
-        ParticleEmitter: {max: 6, rate: 2, shape: EmitterSphere, radius: 0.4, direction: {0, 0, 0}, speed: {0, 0}, lifetime: {1, 2}, size: {0.05, 0.06}, opacity: {1, 1}, color: {30, 30, 30}, seed: id}
+        Emitter: {max: 6, rate: 2, shape: EmitterSphere, radius: 0.4, direction: {0, 0, 0}, speed: {0, 0}, lifetime: {1, 2}, size: {0.05, 0.06}, opacity: {1, 1}, color: {30, 30, 30}, seed: id}
       }
     }
     async { block_disc(x, z, 0.5) }
@@ -758,12 +758,12 @@ assets {
         const a = k * HALF_PI + 0.785
         "stream_{k}" {
           Position: {cos(a) * 0.86, 0.75, sin(a) * 0.86}
-          ParticleEmitter: {max: 40, rate: 30, shape: EmitterSphere, radius: 0.03, direction: {cos(a), 0.3, sin(a)}, spread: 6, speed: {1.2, 1.5}, lifetime: {0.3, 0.45}, size: {0.06, 0.1}, opacity: {0.5, 0.8}, acceleration: {0, -9, 0}, color: {210, 235, 255}, seed: 80 + k}
+          Emitter: {max: 40, rate: 30, shape: EmitterSphere, radius: 0.03, direction: {cos(a), 0.3, sin(a)}, spread: 6, speed: {1.2, 1.5}, lifetime: {0.3, 0.45}, size: {0.06, 0.1}, opacity: {0.5, 0.8}, acceleration: {0, -9, 0}, color: {210, 235, 255}, seed: 80 + k}
         }
       }
       jet {
         Position: {0, 2.9, 0}
-        ParticleEmitter: {max: 160, rate: 70, shape: EmitterSphere, radius: 0.1, direction: {0, 1, 0}, spread: 22, speed: {2.5, 3.5}, lifetime: {0.8, 1.2}, size: {0.08, 0.14}, opacity: {0.6, 0.9}, acceleration: {0, -9, 0}, color: {200, 230, 255}, seed: 77}
+        Emitter: {max: 160, rate: 70, shape: EmitterSphere, radius: 0.1, direction: {0, 1, 0}, spread: 22, speed: {2.5, 3.5}, lifetime: {0.8, 1.2}, size: {0.08, 0.14}, opacity: {0.6, 0.9}, acceleration: {0, -9, 0}, color: {200, 230, 255}, seed: 77}
       }
     }
     async { block_disc(x, z, 3.2) }
@@ -861,8 +861,8 @@ assets {
       light { Position: {0, 0, 0}; PointLight: {intensity: 2, range: 5}; Rgb: {160, 220, 255} }
       glitter {
         Position: {0, 0, 0}
-        ParticleEmitter: {max: 24, rate: 8, shape: EmitterSphere, radius: 0.35, direction: {0, 1, 0}, spread: 60, speed: {0.2, 0.5}, lifetime: {0.8, 1.5}, size: {0.05, 0.1}, opacity: {0.8, 1}, color: {180, 230, 255}, seed: i}
-        ParticleAppearance: {blend: ParticleAdditive}
+        Emitter: {max: 24, rate: 8, shape: EmitterSphere, radius: 0.35, direction: {0, 1, 0}, spread: 60, speed: {0.2, 0.5}, lifetime: {0.8, 1.5}, size: {0.05, 0.1}, opacity: {0.8, 1}, color: {180, 230, 255}, seed: i}
+        Appearance: {blend: Additive}
       }
     }
     async {

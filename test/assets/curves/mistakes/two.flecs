@@ -3,9 +3,9 @@ using box.curve
 using box.particle
 
 first {
-  ParticleCurves: {size: {keys: [{0, 1}, {1, 2}, {1.5, 0}]}}
+  Curves: {size: {keys: [{0, 1}, {1, 2}, {1.5, 0}]}}
 }
 
 second {
-  ParticleCurves: {opacity: {keys: [{0, 0}, {0.6, 1}, {0.5, 1}, {1, 0}]}}
+  Curves: {opacity: {keys: [{0, 0}, {0.6, 1}, {0.5, 1}, {1, 0}]}}
 }

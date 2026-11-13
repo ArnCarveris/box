@@ -1,6 +1,6 @@
 // Sparks where a laser beam lands, the BeamSparks of the original, with a light of the
 // beam's color. The turret plays it at the end of the beam while the beam is on; the
-// ParticleLight of the emitter lights the light at peak while it plays and turns it off at
+// box.particle.Light of the emitter lights the light at peak while it plays and turns it off at
 // once when it stops. The sparks start white and take the beam's color by 0.3 of their life,
 // a ramp computed for the default color.
 
@@ -17,12 +17,12 @@ template BeamSparks {
 
   Rgb: {color.r, color.g, color.b}
   PointLight: {intensity: 0, range: radius}
-  ParticleLight: {intensity: peak}
+  box.particle.Light: {intensity: peak}
 
   // The stream: 180 a second into the glow pool, from a sphere of 0.07, at {0, 1.2, 0} +-
   // {2.4, 2.4, 2.4}, radial 3.2, living 0.34 +- 0.1 s, sized 0.12 +- 0.05 growing -0.22 a
   // second, colored {255, 250, 252} through {240, 96, 172} at 0.3 to {120, 30, 80, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 119,
     rate: rate,
     shape: EmitterSphere,
@@ -36,16 +36,16 @@ template BeamSparks {
     color: {255, 253, 254},
     seed: 231
   }
-  ParticlePlayback: {state: ParticleStopped}
-  ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
-  ParticleAppearance: {
-    shape: ParticleSprite,
-    blend: ParticleAdditive,
+  Playback: {state: Stopped}
+  Forces: {gravity: {0, -4, 0}, drag: 1.5}
+  Appearance: {
+    shape: Sprite,
+    blend: Additive,
     texture: sprSpark,
     softness: 0.25,
     lit: 0
   }
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 1.25}, {0.33333334, 0.71}, {0.6666667, 0.28}, {1, 0.02}]},
     opacity: {keys: [{0, 1}, {0.33333334, 0.95}, {0.6666667, 0.44}, {1, 0}]},
     color: {keys: [

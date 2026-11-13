@@ -115,6 +115,8 @@ void BoxParticleImport(
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxRender);
 
+    ecs_set_name_prefix(world, "Particle");
+
     ECS_META_COMPONENT(world, EmitterShape);
     ECS_META_COMPONENT(world, ParticleRange);
     ECS_META_COMPONENT(world, ParticleForces);
@@ -188,4 +190,6 @@ void BoxParticleImport(
 
     box_render_particles_import(world);
     box_particle_effects_import(world);
+
+    ecs_set_name_prefix(world, NULL);
 }

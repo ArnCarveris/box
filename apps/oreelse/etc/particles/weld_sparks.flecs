@@ -1,5 +1,5 @@
 // Sparks falling from a drone's welding arm while it builds, the WeldSparks of the original,
-// with a light of the arc's color. The drone plays it while it welds; the ParticleLight of
+// with a light of the arc's color. The drone plays it while it welds; the box.particle.Light of
 // the emitter lights the light at peak while it plays and turns it off at once when it
 // stops. The sparks start white and take the arc's color by 0.28 of their life, a ramp
 // computed for the default color.
@@ -17,12 +17,12 @@ template WeldSparks {
 
   Rgb: {color.r, color.g, color.b}
   PointLight: {intensity: 0, range: radius}
-  ParticleLight: {intensity: peak}
+  box.particle.Light: {intensity: peak}
 
   // The stream: 120 a second into the glow pool, from a sphere of 0.05, at {0, -5.5, 0} +-
   // {0.8, 1.4, 0.8}, radial 0.6, living 0.42 +- 0.12 s, sized 0.09 +- 0.04 growing -0.16 a
   // second, colored {245, 252, 255} through {120, 216, 255} at 0.28 to {40, 110, 190, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 98,
     rate: rate,
     shape: EmitterSphere,
@@ -36,16 +36,16 @@ template WeldSparks {
     color: {251, 254, 255},
     seed: 232
   }
-  ParticlePlayback: {state: ParticleStopped}
-  ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
-  ParticleAppearance: {
-    shape: ParticleSprite,
-    blend: ParticleAdditive,
+  Playback: {state: Stopped}
+  Forces: {gravity: {0, -4, 0}, drag: 1.5}
+  Appearance: {
+    shape: Sprite,
+    blend: Additive,
     texture: sprSpark,
     softness: 0.25,
     lit: 0
   }
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 1.25}, {0.33333334, 0.68}, {0.6666667, 0.24}, {1, 0.01}]},
     opacity: {keys: [{0, 1}, {0.33333334, 0.93}, {0.6666667, 0.43}, {1, 0}]},
     color: {keys: [

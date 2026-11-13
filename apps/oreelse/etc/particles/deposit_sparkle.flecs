@@ -16,7 +16,7 @@ template DepositSparkle {
   // {186, 240, 255, 235} through {130, 210, 255, 200} at 0.5 to {70, 150, 220, 0}
   sparkle {
     Position: {0, 0.18, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 7,
       rate: rate,
       shape: EmitterDisc,
@@ -29,15 +29,15 @@ template DepositSparkle {
       color: color,
       seed: 236
     }
-    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Forces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprSpark,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 0.9}, {0.6666667, 0.47}, {1, 0.05}]},
       opacity: {keys: [{0, 0.14}, {0.33333334, 0.64}, {0.6666667, 0.31}, {1, 0}]},
       color: {keys: [
@@ -54,7 +54,7 @@ template DepositSparkle {
   // box draws a particle, and it looks flat without it
   sparkle_halo {
     Position: {0, 0.18, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 7,
       rate: rate,
       shape: EmitterDisc,
@@ -68,15 +68,15 @@ template DepositSparkle {
       color: color,
       seed: 236
     }
-    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Forces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 0.9}, {0.6666667, 0.47}, {1, 0.05}]},
       opacity: {keys: [{0, 0.14}, {0.33333334, 0.64}, {0.6666667, 0.31}, {1, 0}]},
       color: {keys: [

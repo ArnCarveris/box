@@ -12,7 +12,7 @@ prefab MissileLaunch {
   // {255, 246, 224} through {255, 208, 132} at 0.45 to {255, 138, 62, 190}
   flash {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 4,
       rate: 0,
       shape: EmitterSphere,
@@ -27,16 +27,16 @@ prefab MissileLaunch {
       color: {255, 251, 241},
       seed: 215
     }
-    ParticleBurst: {count: 4}
-    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 4}
+    Forces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.6,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.3}, {0.33333334, 1.55}, {0.6666667, 1.58}, {1, 1.28}]},
       opacity: {keys: [{0, 0.9}, {0.33333334, 0.56}, {0.6666667, 0.17}, {1, 0}]},
       color: {keys: [
@@ -53,7 +53,7 @@ prefab MissileLaunch {
   // colored {255, 226, 176} through {255, 152, 66, 235} at 0.38 to {148, 70, 40, 120}
   exhaust {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 10,
       rate: 0,
       shape: EmitterSphere,
@@ -69,16 +69,16 @@ prefab MissileLaunch {
       color: {255, 242, 216},
       seed: 216
     }
-    ParticleBurst: {count: 10}
-    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 10}
+    Forces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.6,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.3}, {0.33333334, 1.7}, {0.6666667, 1.86}, {1, 1.6}]},
       opacity: {keys: [{0, 0.9}, {0.33333334, 0.52}, {0.6666667, 0.13}, {1, 0}]},
       color: {keys: [
@@ -96,7 +96,7 @@ prefab MissileLaunch {
   // {80, 76, 72, 0}
   smoke {
     Position: {0, 0, -0.12}
-    ParticleEmitter: {
+    Emitter: {
       max: 13,
       rate: 0,
       shape: EmitterSphere,
@@ -112,15 +112,15 @@ prefab MissileLaunch {
       color: {202, 194, 188},
       seed: 217
     }
-    ParticleBurst: {count: 13}
-    ParticleForces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 13}
+    Forces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.5,
       lit: 0.85
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.35}, {0.33333334, 2.24}, {0.6666667, 4.55}, {1, 7.09}]},
       opacity: {keys: [{0, 0}, {0.33333334, 0.56}, {0.6666667, 0.21}, {1, 0}]},
       color: {keys: [

@@ -40,13 +40,13 @@ wall {
 prefab Blast {
   sparks {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 200, rate: 0, shape: EmitterSphere, radius: 0.1, spread: 180,
       speed: {2, 4}, lifetime: {1, 1}, size: {0.05, 0.1}, opacity: {1, 1},
       color: {255, 170, 60}, seed: 4
     }
-    ParticleAppearance: {blend: ParticleAdditive}
-    ParticleBurst: {count: 150}
+    Appearance: {blend: Additive}
+    Burst: {count: 150}
   }
 
   light {

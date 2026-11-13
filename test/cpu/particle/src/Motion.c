@@ -337,7 +337,7 @@ static void scene_init(
         "using box.transform\n"
         "jet {\n"
         "  Position: {0, 0, 0}\n"
-        "  ParticleEmitter: {rate: 20, lifetime: {1, 1}, seed: %u}\n"
+        "  Emitter: {rate: 20, lifetime: {1, 1}, seed: %u}\n"
         "  %s\n"
         "}\n", SEED, components);
     test_int(ecs_script_run(s->world, "motion", code, NULL), 0);
@@ -487,8 +487,8 @@ void Motion_script_values(void) {
     test_int(ecs_script_run(world, "motion",
         "using box.curve\n"
         "using box.particle\n"
-        "plain { ParticleMotion: {} }\n"
-        "custom { ParticleMotion: {\n"
+        "plain { Motion: {} }\n"
+        "custom { Motion: {\n"
         "  velocity_y: {kind: CurveCatmullRom, keys: [{0, 0}, {0.5, 0}, {1, 2}]}\n"
         "  force_x: {keys: [{0, 1}], max_keys: [{0, 3}]}\n"
         "  drag: {keys: [{0, 0}, {0.2, 4}]}\n"
@@ -555,12 +555,12 @@ void Motion_no_component_unchanged(void) {
     }
 
     scene_t s;
-    scene_init(&s, "ParticleCurves: {size: {keys: [{0, 1}, {1, 0}]}}");
+    scene_init(&s, "Curves: {size: {keys: [{0, 1}, {1, 0}]}}");
     scene_no_motion(&s);
     test_int(s.rows, 1);
     scene_fini(&s);
 
-    scene_init(&s, "ParticleMotion: {}");
+    scene_init(&s, "Motion: {}");
     scene_no_motion(&s);
     test_int(s.rows, 0);
     test_uint(s.pool->curves, 0);
@@ -586,7 +586,7 @@ void Motion_defaults_change_nothing(void) {
     }
 
     scene_t s;
-    scene_init(&s, "ParticleMotion: {speed: {keys: [{0, 1}]}, drag: {keys: [{0, 1}, {1, 1}]}, "
+    scene_init(&s, "Motion: {speed: {keys: [{0, 1}]}, drag: {keys: [{0, 1}, {1, 1}]}, "
         "velocity_x: {keys: [{0, 0}]}}");
     scene_no_motion(&s);
     test_int(s.rows, 0);
@@ -780,7 +780,7 @@ void Motion_block_reads_rows(void) {
     // particle/motion
     scene_t s;
     box_particle_motion_rows_t rows;
-    scene_init(&s, "ParticleMotion: {velocity_y: {keys: [{0, 0}, {0.5, 0}, {1, 2}]}, "
+    scene_init(&s, "Motion: {velocity_y: {keys: [{0, 0}, {0.5, 0}, {1, 2}]}, "
         "drag: {keys: [{0, 3}]}, speed: {kind: CurveCatmullRom, keys: [{0, 1}, {1, 0.2}]}}");
     const box_render_particle_block_t *b = &s.pool->block;
     scene_rows(&s, &rows);
@@ -822,7 +822,7 @@ void Motion_constants_take_no_row(void) {
     // particle/motion
     scene_t s;
     box_particle_motion_rows_t rows;
-    scene_init(&s, "ParticleMotion: {velocity_y: {keys: [{0, 2}]}, "
+    scene_init(&s, "Motion: {velocity_y: {keys: [{0, 2}]}, "
         "force_x: {keys: [{0, -1}, {1, -1}]}, drag: {keys: [{0, 0.5}], max_keys: [{0, 0.5}]}}");
     scene_rows(&s, &rows);
     test_uint(s.pool->block.motion, 1);
@@ -839,7 +839,7 @@ void Motion_constants_take_no_row(void) {
     test_flt(rows.force[3], 0.5f);
     scene_fini(&s);
 
-    scene_init(&s, "ParticleMotion: {force_z: {keys: [{0, 1}], max_keys: [{0, 3}]}}");
+    scene_init(&s, "Motion: {force_z: {keys: [{0, 1}], max_keys: [{0, 3}]}}");
     scene_rows(&s, &rows);
     test_uint(s.pool->block.motion, 1);
     test_uint(rows.velocity_row, BOX_PARTICLE_CURVE_CONSTANT);
@@ -885,8 +885,8 @@ void Motion_stretch_sees_velocity(void) {
     }
 
     scene_t s;
-    scene_init(&s, "ParticleAppearance: {stretch: 0.5}\n"
-        "  ParticleMotion: {velocity_x: {keys: [{0, 4}, {1, 0}]}}");
+    scene_init(&s, "Appearance: {stretch: 0.5}\n"
+        "  Motion: {velocity_x: {keys: [{0, 4}, {1, 0}]}}");
     test_uint(s.pool->block.motion, 1);
     test_flt(s.pool->block.stretch, 0.5f);
     scene_rows(&s, &rows);
@@ -950,7 +950,7 @@ void Motion_random_between_two(void) {
     // particle/motion
     scene_t s;
     box_particle_motion_rows_t rows;
-    scene_init(&s, "ParticleMotion: {\n"
+    scene_init(&s, "Motion: {\n"
         "    velocity_x: {keys: [{0, 0}, {1, 2}], max_keys: [{0, 0}, {1, 4}]}\n"
         "    velocity_y: {keys: [{0, 1}], max_keys: [{0, 3}]}\n"
         "    speed: {keys: [{0, 1}], max_keys: [{0, 0}]}\n"

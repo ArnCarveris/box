@@ -549,14 +549,14 @@ assets {
       }
       haze {
         Position: {0, cy, -1.6}
-        ParticleEmitter: {
+        Emitter: {
           max: 56, rate: 80, shape: EmitterDisc, radius: 0.5,
           direction: {0, 0, -1}, spread: 6, speed: {11, 15},
           lifetime: {0.45, 0.7}, size: {1.5, 2.1}, opacity: {0.07, 0.11},
           color: {110, 150, 255}, seed: 170 + seed
         }
-        ParticleAppearance: {blend: ParticleAdditive, stretch: 0.05}
-        ParticleCurves: {
+        Appearance: {blend: Additive, stretch: 0.05}
+        Curves: {
           size: {keys: [{0, 0.7}, {1, 1.5}]},
           opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.6}, {1, 0}]},
           color: {keys: [{0, {200, 230, 255}}, {0.4, {255, 255, 255}}, {1, {170, 110, 255}}]}
@@ -565,15 +565,15 @@ assets {
       }
       exhaust {
         Position: {0, cy, -1.9}
-        ParticleEmitter: {
+        Emitter: {
           max: 160, rate: 260, shape: EmitterDisc, radius: 0.6,
           direction: {0, 0, -1}, spread: 3, speed: {18, 26},
           lifetime: {0.22, 0.42}, size: {0.22, 0.4}, opacity: {0.3, 0.55},
           color: {170, 215, 255}, seed: 70 + seed
         }
-        ParticleForces: {gravity: {0, 0, 0}, turbulence: 14, turbulence_scale: 0.8}
-        ParticleAppearance: {blend: ParticleAdditive, stretch: 0.06}
-        ParticleCurves: {
+        Forces: {gravity: {0, 0, 0}, turbulence: 14, turbulence_scale: 0.8}
+        Appearance: {blend: Additive, stretch: 0.06}
+        Curves: {
           size: {keys: [{0, 0.8}, {1, 1.3}]},
           opacity: {keys: [{0, 0}, {0.08, 1}, {0.4, 0.45}, {1, 0}]},
           color: {keys: [{0, {255, 255, 255}}, {0.3, {130, 190, 255}}, {1, {90, 60, 255}}]}
@@ -1423,14 +1423,14 @@ assets {
 
     sparks {
       Position: {0, 0.93, 0.76}
-      ParticleEmitter: {
+      Emitter: {
         max: 90, rate: 120, shape: EmitterDisc, radius: 0.03,
         direction: {0, 1, 0}, spread: 75, speed: {1, 3.5},
         lifetime: {0.2, 0.55}, size: {0.015, 0.04}, opacity: {0.7, 1},
         color: {255, 190, 110}, seed: 400 + seed
       }
-      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.05}
-      ParticleCurves: {
+      Appearance: {blend: Additive, stretch: 0.05}
+      Curves: {
         opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
         color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
       }

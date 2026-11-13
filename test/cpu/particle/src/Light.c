@@ -182,7 +182,7 @@ void Light_script_values(void) {
         "using box.curve\n"
         "using box.particle\n"
         "e {\n"
-        "  ParticleLight: {intensity: 5, curve: {kind: CurveCatmullRom, keys: [{0, 0}, "
+        "  Light: {intensity: 5, curve: {kind: CurveCatmullRom, keys: [{0, 0}, "
         "{0.33333334, 1}, {0.6666667, 0.5}, {1, 0}]}, period: 2, loop: true, fade: 0.5}\n"
         "}\n", NULL) == 0);
     ecs_entity_t e = ecs_lookup(world, "e");
@@ -464,15 +464,15 @@ void Light_effect_layers_own_lights(void) {
         "using box.light\n"
         "@tree ChildOf\n"
         "prefab Lamp {\n"
-        "  ParticleEmitter: {lifetime: {0.3, 0.3}}\n"
-        "  ParticleBurst: {count: 2}\n"
+        "  Emitter: {lifetime: {0.3, 0.3}}\n"
+        "  Burst: {count: 2}\n"
         "  PointLight: {intensity: 1, range: 5}\n"
-        "  ParticleLight: {intensity: 2, fade: 0.2}\n"
+        "  box.particle.Light: {intensity: 2, fade: 0.2}\n"
         "  glow {\n"
-        "    ParticleEmitter: {lifetime: {0.5, 0.5}}\n"
-        "    ParticleBurst: {count: 2}\n"
+        "    Emitter: {lifetime: {0.5, 0.5}}\n"
+        "    Burst: {count: 2}\n"
         "    PointLight: {intensity: 1, range: 5}\n"
-        "    ParticleLight: {intensity: 5}\n"
+        "    box.particle.Light: {intensity: 5}\n"
         "  }\n"
         "}\n", NULL) == 0);
     ecs_entity_t lamp = ecs_lookup(world, "Lamp");

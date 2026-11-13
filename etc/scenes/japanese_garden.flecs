@@ -552,27 +552,27 @@ japanese_garden {
 
   fireflies {
     Position: {2.7, 0.75, 2.2}
-    ParticleEmitter: {
+    Emitter: {
       max: 40, rate: 6, shape: EmitterBox, extents: {3.2, 0.35, 2.2}, direction: {0, 0, 0},
       speed: {0, 0}, lifetime: {3, 6}, size: {0.035, 0.06}, opacity: {0.7, 1},
       color: {222, 245, 160}, seed: 31
     }
-    ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.35, turbulence_scale: 1.5, drag: 0.8}
-    ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive}
-    ParticleCurves: {opacity: {keys: [{0, 0}, {0.2, 1}, {0.45, 0.3}, {0.7, 1}, {1, 0}]}}
+    Forces: {gravity: {0, 0, 0}, turbulence: 0.35, turbulence_scale: 1.5, drag: 0.8}
+    Appearance: {shape: Circle, blend: Additive}
+    Curves: {opacity: {keys: [{0, 0}, {0.2, 1}, {0.45, 0.3}, {0.7, 1}, {1, 0}]}}
   }
 
   petals {
     Position: {0, 3.4, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 260, rate: 22, shape: EmitterBox, extents: {13, 0.6, 11}, direction: {0, -1, 0},
       spread: 30, speed: {0.05, 0.2}, lifetime: {8, 12}, size: {0.04, 0.07}, opacity: {0.8, 1},
       rotation: {0, 360}, spin: {-90, 90}, color: {247, 190, 210}, color_variance: {8, 20, 16}, seed: 47
     }
-    ParticleForces: {gravity: {0, -0.35, 0}, wind: {0.25, 0, 0.1}, drag: 1.2, turbulence: 0.6, turbulence_scale: 0.7}
-    ParticleCollision: {height: 0.12, bounce: 0, friction: 1}
-    ParticleAppearance: {shape: ParticleCircle, blend: ParticleAlpha, lit: 1}
-    ParticleCurves: {opacity: {keys: [{0, 0}, {0.08, 1}, {0.85, 1}, {1, 0}]}}
+    Forces: {gravity: {0, -0.35, 0}, wind: {0.25, 0, 0.1}, drag: 1.2, turbulence: 0.6, turbulence_scale: 0.7}
+    Collision: {height: 0.12, bounce: 0, friction: 1}
+    Appearance: {shape: Circle, blend: Alpha, lit: 1}
+    Curves: {opacity: {keys: [{0, 0}, {0.08, 1}, {0.85, 1}, {1, 0}]}}
   }
 }
 

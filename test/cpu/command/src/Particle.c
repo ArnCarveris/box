@@ -61,41 +61,41 @@ void Particle_playback_states(void) {
         "using box.transform\n"
         "fx {\n"
         "  Position: {0, 0, 0}\n"
-        "  ParticleEmitter: {rate: 8, lifetime: {0.75, 0.75}}\n"
-        "  ParticlePlayback: {}\n"
+        "  Emitter: {rate: 8, lifetime: {0.75, 0.75}}\n"
+        "  Playback: {}\n"
         "}\n", NULL) == 0);
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
-    const char *playback = "get fx box.particle.ParticlePlayback";
-    const char *live = "get $ box.particle.ParticleStats";
+    const char *playback = "get fx box.particle.Playback";
+    const char *live = "get $ box.particle.Stats";
 
     frames(world, 2);
     run(world, s, playback, "\"time\":0.5");
     run(world, s, live, "\"particles\":4");
 
-    run(world, s, "set fx box.particle.ParticlePlayback {state: ParticlePaused}", "");
+    run(world, s, "set fx box.particle.Playback {state: Paused}", "");
     frames(world, 3);
     run(world, s, playback, "\"time\":0.5");
     run(world, s, live, "\"particles\":4");
-    run(world, s, playback, "\"state\":\"ParticlePaused\"");
+    run(world, s, playback, "\"state\":\"Paused\"");
 
-    run(world, s, "set fx box.particle.ParticlePlayback {state: ParticlePlaying}", "");
+    run(world, s, "set fx box.particle.Playback {state: Playing}", "");
     frames(world, 1);
     run(world, s, playback, "\"time\":0.75");
     run(world, s, live, "\"particles\":6");
 
-    run(world, s, "set fx box.particle.ParticlePlayback {state: ParticleStopped}", "");
+    run(world, s, "set fx box.particle.Playback {state: Stopped}", "");
     frames(world, 1);
     run(world, s, playback, "\"time\":0.75");
     run(world, s, live, "\"particles\":4");
     frames(world, 2);
     run(world, s, live, "\"particles\":0");
 
-    run(world, s, "set fx box.particle.ParticlePlayback {state: ParticlePlaying}", "");
+    run(world, s, "set fx box.particle.Playback {state: Playing}", "");
     frames(world, 1);
     run(world, s, playback, "\"time\":0.25");
     run(world, s, live, "\"particles\":2");
 
-    run(world, s, "set fx box.particle.ParticlePlayback {reset: true}", "");
+    run(world, s, "set fx box.particle.Playback {reset: true}", "");
     frames(world, 1);
     run(world, s, playback, "\"time\":0");
     run(world, s, live, "\"particles\":0");

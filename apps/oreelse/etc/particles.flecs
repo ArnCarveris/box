@@ -4,7 +4,7 @@
 //
 // One shot effects are prefabs played with box_particle_burst_at, or the helpers of
 // src/particles.c (ore_burst, ore_burst_aimed, ore_explosion, ore_combust); emitter templates
-// play and stop with their ParticlePlayback.
+// play and stop with their Playback.
 
 include particles/pools
 

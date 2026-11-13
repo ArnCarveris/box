@@ -1,6 +1,6 @@
 // The glow at the lens of a laser turret while it fires, the BeamGlow of the original: a
 // stream of glow sparks and a light of the beam's color. The turret plays it while its beam
-// is on and stops it when it goes off; the ParticleLight of the emitter lights the light at
+// is on and stops it when it goes off; the box.particle.Light of the emitter lights the light at
 // peak while it plays and turns it off at once when it stops, the FlashLight with fade 0 of
 // the original.
 
@@ -17,12 +17,12 @@ template BeamGlow {
 
   Rgb: {color.r, color.g, color.b}
   PointLight: {intensity: 0, range: radius}
-  ParticleLight: {intensity: peak}
+  box.particle.Light: {intensity: peak}
 
   // The stream: 55 a second into the glow pool, from a sphere of 0.05, at {0, 0.4, 0} +-
   // {0.9, 0.9, 0.9}, radial 1.2, living 0.22 +- 0.08 s, sized 0.075 +- 0.035 growing -0.1 a
   // second, colored {240, 96, 172}
-  ParticleEmitter: {
+  Emitter: {
     max: 25,
     rate: rate,
     shape: EmitterSphere,
@@ -36,16 +36,16 @@ template BeamGlow {
     color: color,
     seed: 230
   }
-  ParticlePlayback: {state: ParticleStopped}
-  ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
-  ParticleAppearance: {
-    shape: ParticleSprite,
-    blend: ParticleAdditive,
+  Playback: {state: Stopped}
+  Forces: {gravity: {0, -4, 0}, drag: 1.5}
+  Appearance: {
+    shape: Sprite,
+    blend: Additive,
     texture: sprSpark,
     softness: 0.25,
     lit: 0
   }
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 1.25}, {0.33333334, 0.81}, {0.6666667, 0.38}, {1, 0.04}]},
     opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.93}, {1, 0}]}
   }

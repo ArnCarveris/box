@@ -21,7 +21,7 @@ prefab SmokeBurst {
   // {104, 98, 94, 110}
   particles {
     Position: {0, 0.05, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 20,
       rate: 0,
       shape: EmitterMesh,
@@ -37,15 +37,15 @@ prefab SmokeBurst {
       color: {232, 228, 224},
       seed: 219
     }
-    ParticleBurst: {count: 20}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 20}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.35,
       lit: 0.8
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.45}, {0.33333334, 1.93}, {0.6666667, 3.22}, {1, 4.43}]},
       opacity: {keys: [{0, 0.92}, {0.33333334, 0.77}, {0.6666667, 0.54}, {1, 0}]},
       color: {keys: [

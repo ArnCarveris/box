@@ -173,14 +173,14 @@ assets {
     if sparking {
       sparks {
         Position: {0, 0, 0}
-        ParticleEmitter: {
+        Emitter: {
           max: 240, rate: 260, shape: EmitterBox, extents: {r, r, 1.9},
           direction: {0, 1, 0}, spread: 70, speed: {1.5, 5},
           lifetime: {0.25, 0.7}, size: {0.03, 0.08}, opacity: {0.6, 1},
           acceleration: {0, -4, 0}, color: {140, 220, 255}, seed: 30 + idx
         }
-        ParticleAppearance: {blend: ParticleAdditive, stretch: 0.06}
-        ParticleCurves: {opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}}
+        Appearance: {blend: Additive, stretch: 0.06}
+        Curves: {opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}}
       }
     }
 

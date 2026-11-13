@@ -27,32 +27,32 @@ torus {
 
 shock {
   Position: {-5, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 1500, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0},
     speed: {0, 0}, radial: {55, 60}, lifetime: {2, 2}, size: {0.08, 0.14},
     opacity: {0.6, 1}, color: {255, 140, 50}, seed: 1
   }
-  ParticleBurst: {count: 1500}
+  Burst: {count: 1500}
 }
 
 halo {
   Position: {0, 2, 0}
   Rotation: {1.5707964, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 1500, rate: 0, shape: EmitterMesh, source: torus, direction: {0, 0, 0},
     speed: {0, 0}, radial: {50, 50}, lifetime: {2, 2}, size: {0.08, 0.14},
     opacity: {0.6, 1}, color: {80, 220, 255}, seed: 2
   }
-  ParticleBurst: {count: 1500}
+  Burst: {count: 1500}
 }
 
 tilted {
   Position: {5, 1, 0}
   Rotation: {0.5, 0, 0.6}
-  ParticleEmitter: {
+  Emitter: {
     max: 1500, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 1, 0},
     speed: {10, 10}, radial: {45, 50}, lifetime: {2, 2}, size: {0.08, 0.14},
     opacity: {0.6, 1}, color: {120, 255, 110}, seed: 3
   }
-  ParticleBurst: {count: 1500}
+  Burst: {count: 1500}
 }

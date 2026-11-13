@@ -93,7 +93,7 @@ assets {
 
     flow {
       Position: {-1.04, 0.2, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 1800,
         rate: lock_mill_on ? 700 : 0,
         shape: EmitterBox, extents: {0.02, 0.02, 0.42},
@@ -101,11 +101,11 @@ assets {
         lifetime: {0.55, 0.95}, size: {0.025, 0.08}, opacity: {0.3, 0.75},
         acceleration: {0, -7, 0}, color: {224, 240, 244}, seed: 11
       }
-      ParticleCollision: {height: -1.1, die: true}
+      Collision: {height: -1.1, die: true}
     }
     tail_foam {
       Position: {-1.8, -1.08, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 800,
         rate: lock_mill_on ? 320 : 0,
         shape: EmitterBox, extents: {0.5, 0.01, 0.42},

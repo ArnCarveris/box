@@ -10,7 +10,7 @@ prefab SparkBurst {
   // colored {255, 250, 232} through {255, 236, 176} at 0.3 to {255, 116, 26, 210}
   particles {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 10,
       rate: 0,
       shape: EmitterSphere,
@@ -24,17 +24,17 @@ prefab SparkBurst {
       color: {255, 253, 245},
       seed: 226
     }
-    ParticleBurst: {count: 10}
-    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 10}
+    Forces: {gravity: {0, -4, 0}, drag: 1.5}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprSpark,
       softness: 0.25,
       stretch: 0.52,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 0.9}, {0.6666667, 0.47}, {1, 0.05}]},
       opacity: {keys: [{0, 1}, {0.33333334, 0.99}, {0.6666667, 0.85}, {1, 0}]},
       color: {keys: [

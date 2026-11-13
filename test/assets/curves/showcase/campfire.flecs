@@ -30,21 +30,21 @@ campfire {
     Position: {0, 0.15, 0}
     Rgb: {255, 140, 50}
     PointLight: {intensity: 4, range: 6}
-    ParticleLight: {
+    box.particle.Light: {
       intensity: 4, period: 0.9, loop: true
       curve: {kind: CurveCatmullRom, keys: [
         {0, 1}, {0.1, 0.8}, {0.22, 1.15}, {0.37, 0.9}, {0.5, 1.2}, {0.63, 0.75},
         {0.8, 1.1}, {0.9, 0.85}, {1, 1}
       ]}
     }
-    ParticleEmitter: {
+    Emitter: {
       max: 400, rate: 90, shape: EmitterDisc, radius: 0.25, spread: 8,
       speed: {0.6, 1}, radial: {-0.35, -0.2}, lifetime: {0.6, 1}, size: {0.35, 0.5},
       opacity: {0.7, 0.9}, seed: 11
     }
-    ParticleForces: {gravity: {0, 1.2, 0}, turbulence: 1.2, turbulence_scale: 2}
-    ParticleAppearance: {blend: ParticleAdditive}
-    ParticleCurves: {
+    Forces: {gravity: {0, 1.2, 0}, turbulence: 1.2, turbulence_scale: 2}
+    Appearance: {blend: Additive}
+    Curves: {
       color: {keys: [
         {0, {255, 240, 200}}, {0.25, {255, 170, 60}}, {0.6, {230, 70, 20}}, {1, {80, 15, 5}}
       ]}
@@ -56,13 +56,13 @@ campfire {
   // Thin smoke above the flame that grows, drifts with the wind and thins out.
   smoke {
     Position: {0, 0.9, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 100, rate: 8, shape: EmitterDisc, radius: 0.15, spread: 10,
       speed: {0.4, 0.6}, lifetime: {2.5, 3.5}, size: {0.4, 0.6},
       opacity: {0.25, 0.35}, color: {70, 66, 64}, seed: 12
     }
-    ParticleForces: {gravity: {0, 0.2, 0}, wind: {0.4, 0, 0}, drag: 0.5, turbulence: 0.4}
-    ParticleCurves: {
+    Forces: {gravity: {0, 0.2, 0}, wind: {0.4, 0, 0}, drag: 0.5, turbulence: 0.4}
+    Curves: {
       size: {kind: CurveCatmullRom, keys: [{0, 0.6}, {0.3, 1.4}, {1, 2.6}]}
       opacity: {keys: [{0, 0}, {0.2, 1}, {1, 0}]}
     }
@@ -74,13 +74,13 @@ campfire {
   // on its own blend of two out of phase opacity curves and cools from yellow to dark red.
   embers {
     Position: {0, 0.2, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 200, rate: 18, shape: EmitterDisc, radius: 0.2, spread: 25,
       speed: {1.5, 2.5}, lifetime: {1.5, 2.5}, size: {0.035, 0.055}, seed: 13
     }
-    ParticleForces: {gravity: {0, 0, 0}, turbulence: 1.5, turbulence_scale: 3}
-    ParticleAppearance: {blend: ParticleAdditive, stretch: 0.02}
-    ParticleMotion: {
+    Forces: {gravity: {0, 0, 0}, turbulence: 1.5, turbulence_scale: 3}
+    Appearance: {blend: Additive, stretch: 0.02}
+    Motion: {
       speed: {kind: CurveBezier, keys: [
         {time: 0, value: 1, out: -3}, {time: 1, value: 0.1, in: 0}
       ]}
@@ -96,7 +96,7 @@ campfire {
         max_keys: [{0, 0}, {0.3, 0.3}, {0.6, -0.3}, {1, 0}]
       }
     }
-    ParticleCurves: {
+    Curves: {
       color: {keys: [{0, {255, 230, 150}}, {0.3, {255, 150, 40}}, {1, {180, 30, 0}}]}
       opacity: {
         kind: CurveCatmullRom

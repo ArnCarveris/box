@@ -15,7 +15,7 @@ prefab FlameBurst {
   // {132, 74, 52, 120}
   particles {
     Position: {0, 0.1, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 16,
       rate: 0,
       shape: EmitterDisc,
@@ -30,16 +30,16 @@ prefab FlameBurst {
       color: {255, 245, 219},
       seed: 218
     }
-    ParticleBurst: {count: 16}
-    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 16}
+    Forces: {gravity: {0, -4, 0}, drag: 1.5}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprSpark,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 1.07}, {0.6666667, 0.65}, {1, 0.08}]},
       opacity: {keys: [{0, 1}, {0.33333334, 0.96}, {0.6666667, 0.7}, {1, 0}]},
       color: {keys: [

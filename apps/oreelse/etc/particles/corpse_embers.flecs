@@ -19,7 +19,7 @@ template CorpseEmbers {
   // colored {255, 138, 52} through {236, 92, 34} at 0.45 to {58, 26, 16, 140}
   embers {
     Position: {0, 0.05, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 21,
       rate: 8,
       shape: EmitterDisc,
@@ -33,15 +33,15 @@ template CorpseEmbers {
       color: {255, 194, 125},
       seed: 237
     }
-    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Forces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprSpark,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 0.9}, {0.6666667, 0.47}, {1, 0.05}]},
       opacity: {keys: [{0, 0.15}, {0.33333334, 0.77}, {0.6666667, 0.49}, {1, 0}]},
       color: {keys: [
@@ -58,7 +58,7 @@ template CorpseEmbers {
   // box draws a particle, and it looks flat without it
   embers_halo {
     Position: {0, 0.05, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 21,
       rate: 8,
       shape: EmitterDisc,
@@ -73,15 +73,15 @@ template CorpseEmbers {
       color: {255, 194, 125},
       seed: 237
     }
-    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Forces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 0.9}, {0.6666667, 0.47}, {1, 0.05}]},
       opacity: {keys: [{0, 0.15}, {0.33333334, 0.77}, {0.6666667, 0.49}, {1, 0}]},
       color: {keys: [

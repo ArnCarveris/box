@@ -72,7 +72,7 @@ assets {
       }
       exhaust {
         Position: {0, 0.2, 0}
-        ParticleEmitter: {
+        Emitter: {
           max: 220,
           rate: burning ? 110 : 0,
           shape: EmitterDisc, radius: 0.5,
@@ -80,8 +80,8 @@ assets {
           lifetime: {0.15, 0.45}, size: {0.06, 0.2}, opacity: {0.3, 0.8},
           color: {150, 205, 255}, seed: 70 + idx
         }
-        ParticleAppearance: {blend: ParticleAdditive, stretch: 0.03}
-        ParticleCurves: {
+        Appearance: {blend: Additive, stretch: 0.03}
+        Curves: {
           size: {keys: [{0, 1}, {1, 2.2}]},
           opacity: {keys: [{0, 1}, {1, 0}]},
           color: {keys: [{0, {235, 248, 255}}, {0.4, {150, 205, 255}}, {1, {70, 110, 255}}]}
@@ -89,7 +89,7 @@ assets {
         if burning {
           Rgb: {140, 200, 255}
           PointLight: {intensity: 5, range: 6}
-          ParticleLight: {intensity: 5, curve: {keys: [{0, 1}, {0.5, 0.8}, {1, 1}]}, period: 0.12, loop: true}
+          box.particle.Light: {intensity: 5, curve: {keys: [{0, 1}, {0.5, 0.8}, {1, 1}]}, period: 0.12, loop: true}
         }
       }
     }

@@ -36,26 +36,26 @@ letter_tex {
 
 debris {
   Position: {-2, 1, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 400, rate: 6000, shape: EmitterSphere, radius: 0.3, spread: 180,
     speed: {20, 50}, lifetime: {0.045, 0.05}, size: {0.3, 0.5}, rotation: {0, 360},
     spin: {2000, 4000}, opacity: {1, 1}, color: {200, 150, 110}, seed: 13
   }
-  ParticleCurves: {
+  Curves: {
     spin: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 2}, {1, 4}]}
   }
-  ParticleAppearance: {shape: ParticleSprite, texture: letter_tex, lit: 1}
+  Appearance: {shape: Sprite, texture: letter_tex, lit: 1}
 }
 
 letters {
   Position: {2, 1, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 400, rate: 6000, shape: EmitterSphere, radius: 0.3, spread: 180,
     speed: {20, 40}, lifetime: {0.045, 0.05}, size: {0.6, 0.6}, opacity: {0.9, 1},
     color: {255, 255, 255}, seed: 17
   }
-  ParticleCurves: {
+  Curves: {
     rotation: {keys: [{0, 0}, {0.33333334, 0.25}, {0.6666667, 0.5}, {1, 1}]}
   }
-  ParticleAppearance: {shape: ParticleSprite, texture: letter_tex}
+  Appearance: {shape: Sprite, texture: letter_tex}
 }

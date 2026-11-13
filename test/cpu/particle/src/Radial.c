@@ -31,9 +31,9 @@
     "prefab Ring {\n" \
     "  ring {\n" \
     "    Rotation: {1.5707964, 0, 0}\n" \
-    "    ParticleEmitter: {max: 64, shape: EmitterDisc, radius: 0.5, speed: {0, 0}, " \
+    "    Emitter: {max: 64, shape: EmitterDisc, radius: 0.5, speed: {0, 0}, " \
     "radial: {1, 1}, lifetime: {5, 5}, seed: 4}\n" \
-    "    ParticleBurst: {count: 64}\n" \
+    "    Burst: {count: 64}\n" \
     "  }\n" \
     "}\n"
 
@@ -337,7 +337,7 @@ void Radial_c_default(void) {
 
     test_assert(ecs_script_run(world, "radial",
         "using box.particle\n"
-        "ring { ParticleEmitter: {radial: {2, 3}} }\n", NULL) == 0);
+        "ring { Emitter: {radial: {2, 3}} }\n", NULL) == 0);
     p = ecs_get(world, ecs_lookup(world, "ring"), ParticleEmitter);
     test_flt(p->radial.min, 2);
     test_flt(p->radial.max, 3);

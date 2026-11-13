@@ -402,9 +402,9 @@ static ecs_entity_t dot_template_new(
     test_assert(ecs_script_run(world, "dot",
         "using box.particle\n"
         "prefab Dot {\n"
-        "  ParticleEmitter: {max: 1, direction: {0, 0, 0}, lifetime: {100, 100}, "
+        "  Emitter: {max: 1, direction: {0, 0, 0}, lifetime: {100, 100}, "
         "size: {1, 1}}\n"
-        "  ParticleBurst: {count: 1}\n"
+        "  Burst: {count: 1}\n"
         "}\n", NULL) == 0);
     ecs_entity_t result = ecs_lookup(world, "Dot");
     test_assert(result != 0);
@@ -486,9 +486,9 @@ void Particle_flash_lights_wall(void) {
         "using box.particle\n"
         "using box.light\n"
         "prefab Flash {\n"
-        "  ParticleEmitter: {max: 1, direction: {0, 0, 0}, lifetime: {1, 1}, "
+        "  Emitter: {max: 1, direction: {0, 0, 0}, lifetime: {1, 1}, "
         "size: {1, 1}}\n"
-        "  ParticleBurst: {count: 1}\n"
+        "  Burst: {count: 1}\n"
         "  light {\n"
         "    PointLight: {intensity: flecs.script.math.PI, range: 4}\n"
         "    EffectFlash: {intensity: 4 * flecs.script.math.PI, seconds: 0.05}\n"
@@ -573,10 +573,10 @@ static ecs_entity_t ring_template_new(
     test_assert(ecs_script_run(world, "ring",
         "using box.particle\n"
         "prefab Ring {\n"
-        "  ParticleEmitter: {max: 400, shape: EmitterDisc, radius: 0.25, "
+        "  Emitter: {max: 400, shape: EmitterDisc, radius: 0.25, "
         "direction: {0, 0, 0}, speed: {0, 0}, radial: {2, 2}, lifetime: {100, 100}, "
         "size: {0.25, 0.25}, seed: 5}\n"
-        "  ParticleBurst: {count: 400}\n"
+        "  Burst: {count: 400}\n"
         "}\n", NULL) == 0);
     ecs_entity_t result = ecs_lookup(world, "Ring");
     test_assert(result != 0);

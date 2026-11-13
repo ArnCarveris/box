@@ -19,31 +19,31 @@
     "using box.transform\n" \
     "@tree ChildOf\n" \
     "prefab Spark {\n" \
-    "  ParticleEmitter: {max: 100, lifetime: {0.3, 0.3}, speed: {2, 2}, size: {0.5, 0.5}, " \
+    "  Emitter: {max: 100, lifetime: {0.3, 0.3}, speed: {2, 2}, size: {0.5, 0.5}, " \
     "shape: EmitterSphere, radius: 1}\n" \
-    "  ParticleBurst: {count: 5}\n" \
+    "  Burst: {count: 5}\n" \
     "}\n" \
     "@tree ChildOf\n" \
     "prefab Layered {\n" \
     "  flash {\n" \
     "    Position: {1, 0, 0}\n" \
-    "    ParticleEmitter: {lifetime: {0.2, 0.2}}\n" \
-    "    ParticleBurst: {count: 4}\n" \
+    "    Emitter: {lifetime: {0.2, 0.2}}\n" \
+    "    Burst: {count: 4}\n" \
     "  }\n" \
     "  smoke {\n" \
     "    Position: {0, 2, 0}\n" \
-    "    ParticleEmitter: {rate: 50, lifetime: {0.5, 0.5}}\n" \
-    "    ParticleBurst: {count: 2, at: 0.2}\n" \
+    "    Emitter: {rate: 50, lifetime: {0.5, 0.5}}\n" \
+    "    Burst: {count: 2, at: 0.2}\n" \
     "  }\n" \
     "  debris {\n" \
-    "    ParticleEmitter: {lifetime: {0.3, 0.3}}\n" \
-    "    ParticleBurst: {count: 3, at: 0.1, repeat: 1}\n" \
+    "    Emitter: {lifetime: {0.3, 0.3}}\n" \
+    "    Burst: {count: 3, at: 0.1, repeat: 1}\n" \
     "  }\n" \
     "}\n" \
     "@tree ChildOf\n" \
     "prefab Glow {\n" \
-    "  ParticleEmitter: {lifetime: {0.3, 0.3}}\n" \
-    "  ParticleBurst: {count: 2}\n" \
+    "  Emitter: {lifetime: {0.3, 0.3}}\n" \
+    "  Burst: {count: 2}\n" \
     "}\n" \
     "@tree ChildOf\n" \
     "prefab Empty {\n" \
@@ -486,11 +486,11 @@ void Effect_script_template(void) {
     test_assert(ecs_script_run(world, "puff",
         "using box.particle\n"
         "template Puff {\n"
-        "  ParticleEmitter: {lifetime: {0.2, 0.2}}\n"
-        "  ParticleBurst: {count: 3}\n"
+        "  Emitter: {lifetime: {0.2, 0.2}}\n"
+        "  Burst: {count: 3}\n"
         "  ring {\n"
-        "    ParticleEmitter: {lifetime: {0.4, 0.4}}\n"
-        "    ParticleBurst: {count: 2}\n"
+        "    Emitter: {lifetime: {0.4, 0.4}}\n"
+        "    Burst: {count: 2}\n"
         "  }\n"
         "}\n", NULL) == 0);
 

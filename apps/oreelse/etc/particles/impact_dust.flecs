@@ -9,7 +9,7 @@ prefab ImpactDust {
   // growing 0.7 a second, colored {198, 176, 148, 215} to {162, 148, 130, 80}
   particles {
     Position: {0, 0.05, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 12,
       rate: 0,
       shape: EmitterDisc,
@@ -25,15 +25,15 @@ prefab ImpactDust {
       color: {228, 216, 200},
       seed: 222
     }
-    ParticleBurst: {count: 12}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 12}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.35,
       lit: 0.8
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.45}, {0.33333334, 2.06}, {0.6666667, 3.53}, {1, 4.93}]},
       opacity: {keys: [{0, 0.84}, {0.33333334, 0.67}, {0.6666667, 0.44}, {1, 0}]},
       color: {keys: [

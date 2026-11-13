@@ -175,14 +175,14 @@ assets {
                 sparks {
                   Position: {0, tl - 0.47, 0}
                   Rotation: {PI, 0, 0}
-                  ParticleEmitter: {
+                  Emitter: {
                     max: 120, rate: 150, shape: EmitterDisc, radius: 0.03,
                     direction: {0, 1, 0}, spread: 70, speed: {1, 3.5},
                     lifetime: {0.2, 0.6}, size: {0.02, 0.05}, opacity: {0.7, 1},
                     color: {255, 190, 110}, seed: 510
                   }
-                  ParticleAppearance: {blend: ParticleAdditive, stretch: 0.05}
-                  ParticleCurves: {
+                  Appearance: {blend: Additive, stretch: 0.05}
+                  Curves: {
                     opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
                     color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
                   }

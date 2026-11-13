@@ -26,7 +26,7 @@ FPS = round(1 / float(DELTA_TIME))
 GAME = "get bunnyhopper.BunnyGame bunnyhopper.BunnyGame."
 STATE = ("eval bunnyhopper.BunnyGameState.has(flecs.script.core.pair("
          "bunnyhopper.BunnyGameState,bunnyhopper.BunnyGameState.%s))")
-PARTICLES = "get box.particle.ParticleStats box.particle.ParticleStats.particles"
+PARTICLES = "get box.particle.Stats box.particle.Stats.particles"
 SCREEN = "hud.ui.screen"
 SCORE = "get %s.score box.text.Text.value" % SCREEN
 TITLE = "get %s.game_over.title box.text.Text.value" % SCREEN

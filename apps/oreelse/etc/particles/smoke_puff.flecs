@@ -10,7 +10,7 @@ prefab SmokePuff {
   // +- 0.1 growing 1.1 a second, colored {148, 144, 140, 200} to {104, 98, 94, 120}
   particles {
     Position: {0, 0.06, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 5,
       rate: 0,
       shape: EmitterBox,
@@ -24,15 +24,15 @@ prefab SmokePuff {
       color: {200, 198, 196},
       seed: 225
     }
-    ParticleBurst: {count: 5}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 5}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.35,
       lit: 0.8
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.45}, {0.33333334, 2.78}, {0.6666667, 5.25}, {1, 7.69}]},
       opacity: {keys: [{0, 0.78}, {0.33333334, 0.68}, {0.6666667, 0.51}, {1, 0}]},
       color: {keys: [

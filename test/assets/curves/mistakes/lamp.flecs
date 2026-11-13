@@ -7,6 +7,6 @@ using box.transform
 lamp {
   Position: {0, 0, 0}
   PointLight: {}
-  ParticleEmitter: {rate: 10}
-  ParticleLight: {period: 1, curve: {keys: [{0, 1}, {1, 0}], max_keys: [{0, 2}, {1, 0}]}}
+  Emitter: {rate: 10}
+  box.particle.Light: {period: 1, curve: {keys: [{0, 1}, {1, 0}], max_keys: [{0, 2}, {1, 0}]}}
 }

@@ -31,7 +31,7 @@ prefab CombustBurst {
   // through {214, 255, 148} at 0.32 to {124, 226, 56, 200}
   flash {
     Position: {0, 0.45, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 6,
       rate: 0,
       shape: EmitterSphere,
@@ -46,16 +46,16 @@ prefab CombustBurst {
       color: {255, 255, 247},
       seed: 208
     }
-    ParticleBurst: {count: 6}
-    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 6}
+    Forces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.6,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.3}, {0.33333334, 1.51}, {0.6666667, 1.51}, {1, 1.21}]},
       opacity: {keys: [{0, 0.9}, {0.33333334, 0.56}, {0.6666667, 0.17}, {1, 0}]},
       color: {keys: [
@@ -72,7 +72,7 @@ prefab CombustBurst {
   // box draws a particle, and it looks flat without it
   flash_halo {
     Position: {0, 0.45, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 6,
       rate: 0,
       shape: EmitterSphere,
@@ -88,16 +88,16 @@ prefab CombustBurst {
       color: {255, 255, 247},
       seed: 208
     }
-    ParticleBurst: {count: 6}
-    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 6}
+    Forces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.6,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.3}, {0.33333334, 1.51}, {0.6666667, 1.51}, {1, 1.21}]},
       opacity: {keys: [{0, 0.9}, {0.33333334, 0.56}, {0.6666667, 0.17}, {1, 0}]},
       color: {keys: [
@@ -114,7 +114,7 @@ prefab CombustBurst {
   // {138, 226, 118} through {104, 190, 88, 240} at 0.45 to {62, 122, 54, 130}
   ichor {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 16,
       rate: 0,
       shape: EmitterSphere,
@@ -130,16 +130,16 @@ prefab CombustBurst {
       color: {194, 242, 181},
       seed: 209
     }
-    ParticleBurst: {count: 16}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 16}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.35,
       stretch: 0.2,
       lit: 0.8
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.45}, {0.33333334, 1.17}, {0.6666667, 1.4}, {1, 1.5}]},
       opacity: {keys: [{0, 1}, {0.33333334, 0.96}, {0.6666667, 0.69}, {1, 0}]},
       color: {keys: [
@@ -157,7 +157,7 @@ prefab CombustBurst {
   // {50, 60, 26, 150}
   licks {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 18,
       rate: 0,
       shape: EmitterSphere,
@@ -173,17 +173,17 @@ prefab CombustBurst {
       color: {222, 255, 175},
       seed: 210
     }
-    ParticleBurst: {count: 18}
-    ParticleForces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 18}
+    Forces: {gravity: {0, 1.6, 0}, drag: 3, turbulence: 2.2, turbulence_scale: 1.4}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprFlare,
       softness: 0.6,
       stretch: 0.12,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.3}, {0.33333334, 1.64}, {0.6666667, 1.76}, {1, 1.48}]},
       opacity: {keys: [{0, 0.9}, {0.33333334, 0.53}, {0.6666667, 0.14}, {1, 0}]},
       color: {keys: [
@@ -200,7 +200,7 @@ prefab CombustBurst {
   // through {58, 68, 36} at 0.5 to {40, 44, 28}
   chunks {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 10,
       rate: 0,
       shape: EmitterSphere,
@@ -216,14 +216,14 @@ prefab CombustBurst {
       color: {150, 163, 118},
       seed: 211
     }
-    ParticleBurst: {count: 10}
-    ParticleForces: {gravity: {0, -17, 0}, drag: 0.3}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 10}
+    Forces: {gravity: {0, -17, 0}, drag: 0.3}
+    Appearance: {
+      shape: Sprite,
       texture: sprChunk,
       lit: 1
     }
-    ParticleCurves: {
+    Curves: {
       opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 1}, {1, 0}]},
       color: {keys: [
         {0, {255, 255, 255}},
@@ -239,7 +239,7 @@ prefab CombustBurst {
   // stretched 0.45, colored {214, 255, 158, 240} to {92, 186, 66, 0}
   spores {
     Position: {0, -0.85, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 24,
       rate: 0,
       shape: EmitterMesh,
@@ -252,16 +252,16 @@ prefab CombustBurst {
       color: {236, 255, 206},
       seed: 212
     }
-    ParticleBurst: {count: 24}
-    ParticleForces: {gravity: {0, -4, 0}, drag: 1.5}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 24}
+    Forces: {gravity: {0, -4, 0}, drag: 1.5}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprSpark,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 1.17}, {0.6666667, 0.76}, {1, 0.1}]},
       opacity: {keys: [{0, 0.94}, {0.33333334, 0.63}, {0.6666667, 0.29}, {1, 0}]},
       color: {keys: [
@@ -278,7 +278,7 @@ prefab CombustBurst {
   // {255, 138, 52} through {236, 92, 34} at 0.45 to {58, 26, 16, 140}
   cinders {
     Position: {0, -0.35, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 9,
       rate: 0,
       shape: EmitterSphere,
@@ -292,16 +292,16 @@ prefab CombustBurst {
       color: {255, 194, 125},
       seed: 213
     }
-    ParticleBurst: {count: 9}
-    ParticleForces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
-    ParticleAppearance: {
-      shape: ParticleSprite,
-      blend: ParticleAdditive,
+    Burst: {count: 9}
+    Forces: {gravity: {0, 0.8, 0}, drag: 1.1, turbulence: 1.8, turbulence_scale: 1.1}
+    Appearance: {
+      shape: Sprite,
+      blend: Additive,
       texture: sprSpark,
       softness: 0.25,
       lit: 0
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 1.25}, {0.33333334, 0.9}, {0.6666667, 0.47}, {1, 0.05}]},
       opacity: {keys: [{0, 0.15}, {0.33333334, 0.77}, {0.6666667, 0.49}, {1, 0}]},
       color: {keys: [
@@ -319,7 +319,7 @@ prefab CombustBurst {
   // {32, 32, 28, 60}
   soot {
     Position: {0, 0.1, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 12,
       rate: 0,
       shape: EmitterMesh,
@@ -335,15 +335,15 @@ prefab CombustBurst {
       color: {147, 150, 127},
       seed: 214
     }
-    ParticleBurst: {count: 12}
-    ParticleForces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 12}
+    Forces: {gravity: {0, -0.6, 0}, drag: 0.9, turbulence: 1.5, turbulence_scale: 0.55}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.5,
       lit: 0.85
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.35}, {0.33333334, 2.27}, {0.6666667, 4.65}, {1, 7.25}]},
       opacity: {keys: [{0, 0}, {0.33333334, 0.6}, {0.6666667, 0.3}, {1, 0}]},
       color: {keys: [

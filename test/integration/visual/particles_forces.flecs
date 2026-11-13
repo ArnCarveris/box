@@ -34,26 +34,26 @@ chimney {
 
 // Wind of 120 units per second to the right that the smoke follows with drag 40
 breeze {
-  ParticleForces: {gravity: {0, 0, 0}, wind: {120, 0, 0}, drag: 40}
+  Forces: {gravity: {0, 0, 0}, wind: {120, 0, 0}, drag: 40}
 }
 
 smoke {
   Position: {-4, 1.1, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 4000, rate: 30000, shape: EmitterSphere, radius: 0.45, spread: 10,
     speed: {20, 60}, lifetime: {2, 2}, size: {0.35, 0.7}, opacity: {0.08, 0.25},
     color: {170, 170, 175}, color_variance: {30, 30, 30}, forces: breeze, seed: 3
   }
-  ParticleForces: {gravity: {0, 0, 0}, turbulence: 400, turbulence_scale: 2}
+  Forces: {gravity: {0, 0, 0}, turbulence: 400, turbulence_scale: 2}
 }
 
 sparks {
   Position: {2, 0.6, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 4000, rate: 30000, shape: EmitterSphere, radius: 0.1, spread: 70,
     speed: {20, 140}, lifetime: {2, 2}, size: {0.05, 0.1}, opacity: {0.7, 1},
     color: {255, 170, 60}, color_variance: {0, 60, 50}, seed: 4
   }
-  ParticleForces: {gravity: {0, -3000, 0}}
-  ParticleCollision: {height: 0, bounce: 0.3, friction: 0.3}
+  Forces: {gravity: {0, -3000, 0}}
+  Collision: {height: 0, bounce: 0.3, friction: 0.3}
 }

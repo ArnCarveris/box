@@ -187,7 +187,7 @@ void Appearance_script_values(void) {
     test_assert(ecs_script_run(world, "appearance",
         "using box.particle\n"
         "smoke_tex {}\n"
-        "sprite { ParticleAppearance: {shape: ParticleSprite, blend: ParticleAdditive, "
+        "sprite { Appearance: {shape: Sprite, blend: Additive, "
         "texture: smoke_tex, columns: 4, rows: 2, fps: 12, softness: 0.5, stretch: 0.1, "
         "lit: 0.75} }\n", NULL) == 0);
 

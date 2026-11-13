@@ -22,7 +22,7 @@ assets {
     prop life: f32 = 1
     prop lift: f32 = 60
 
-    ParticleEmitter: {
+    Emitter: {
       max: count + 10,
       rate: 0,
       shape: EmitterSphere,
@@ -38,13 +38,13 @@ assets {
       seed: count,
       linger: true
     }
-    ParticleForces: {gravity: {0, lift, 0}, drag: 2.2, turbulence: 90, turbulence_scale: 0.03}
-    ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.006}
-    ParticleCurves: {
+    Forces: {gravity: {0, lift, 0}, drag: 2.2, turbulence: 90, turbulence_scale: 0.03}
+    Appearance: {shape: Circle, blend: Additive, stretch: 0.006}
+    Curves: {
       opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.5}, {1, 0}]}
       size: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0.1}]}
     }
-    ParticleBurst: {count: count, at: 0}
+    box.particle.Burst: {count: count, at: 0}
   }
 
   template CastFx : OneShot {
@@ -62,7 +62,7 @@ assets {
 
   template FallingStar {
     Position: {260, 500, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 150,
       rate: 0,
       shape: EmitterBox,
@@ -78,13 +78,13 @@ assets {
       seed: 3,
       linger: true
     }
-    ParticleForces: {gravity: {0, 0, 0}}
-    ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.042}
-    ParticleCurves: {
+    Forces: {gravity: {0, 0, 0}}
+    Appearance: {shape: Circle, blend: Additive, stretch: 0.042}
+    Curves: {
       opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.9}, {1, 0}]}
       size: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0.3}]}
     }
-    ParticleBurst: {count: 16, at: 0.08, repeat: 7}
+    box.particle.Burst: {count: 16, at: 0.08, repeat: 7}
   }
 
   template ScreenFlash : OneShot {

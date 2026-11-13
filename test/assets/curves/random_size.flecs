@@ -6,11 +6,11 @@ using box.transform
 
 bubbles {
   Position: {0, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     rate: 40, spread: 30, speed: {0.5, 1}, lifetime: {2, 2}, size: {0.2, 0.2}, seed: 8
   }
-  ParticleForces: {gravity: {0, 0.2, 0}}
-  ParticleCurves: {
+  Forces: {gravity: {0, 0.2, 0}}
+  Curves: {
     size: {
       kind: CurveCatmullRom
       keys: [{0, 1}, {1, 0.4}]

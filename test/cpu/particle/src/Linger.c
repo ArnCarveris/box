@@ -156,7 +156,7 @@ void Linger_c_default(void) {
 
     test_assert(ecs_script_run(world, "linger",
         "using box.particle\n"
-        "e { ParticleEmitter: {linger: true} }\n", NULL) == 0);
+        "e { Emitter: {linger: true} }\n", NULL) == 0);
     const ParticleEmitter *p = ecs_get(world, ecs_lookup(world, "e"), ParticleEmitter);
     test_assert(p != NULL);
     test_bool(p->linger, true);

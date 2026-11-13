@@ -172,13 +172,13 @@ assets {
     pot_b : CanalBrick { Position: {2.34, 5.86, -0.7}; Frustum: {radius_bottom: 0.11, radius_top: 0.08, length: 0.34, segments: 12, smooth: true} }
     smoke {
       Position: {2.06, 6.1, -0.7}
-      ParticleEmitter: {
+      Emitter: {
         max: 180, rate: 14, shape: EmitterDisc, radius: 0.07, spread: 10,
         speed: {0.4, 0.75}, lifetime: {3, 5}, size: {0.14, 0.5},
         opacity: {0.05, 0.14}, color: {128, 128, 132}, seed: 7
       }
-      ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
-      ParticleForces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
+      Curves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
+      Forces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
     }
 
     doorway { Position: {-0.9, 1.29, 2.015}; Box: {0.92, 1.92, 0.015}; Rgb: {26, 20, 16} }

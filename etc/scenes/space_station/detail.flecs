@@ -84,7 +84,7 @@ assets {
     prop rate: f32 = 18
     prop seed: i32 = 1
 
-    ParticleEmitter: {
+    Emitter: {
       max: 120,
       rate: rate,
       shape: EmitterDisc, radius: 0.08,
@@ -92,8 +92,8 @@ assets {
       lifetime: {0.8, 1.8}, size: {0.05, 0.2}, opacity: {0.04, 0.16},
       color: {214, 228, 240}, seed: seed
     }
-    ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.6}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {1, 0}]}}
-    ParticleForces: {gravity: {0, 0, 0}, drag: 0.8, turbulence: 0.6, turbulence_scale: 2}
+    Curves: {size: {kind: CurveCatmullRom, keys: [{0, 0.6}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {1, 0}]}}
+    Forces: {gravity: {0, 0, 0}, drag: 0.8, turbulence: 0.6, turbulence_scale: 2}
   }
 
   template StationJunction {

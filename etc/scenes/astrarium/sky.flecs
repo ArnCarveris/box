@@ -113,7 +113,7 @@ assets {
 
       motes {
         Position: {0, 0, 0}
-        ParticleEmitter: {
+        Emitter: {
           max: 900,
           rate: rite_drift ? 42 * rite_dust : 0,
           shape: EmitterBox,
@@ -128,9 +128,9 @@ assets {
           opacity: {0.25, 0.9},
           seed: 16
         }
-        ParticleForces: {gravity: {0, 0, 0}, turbulence: 3, turbulence_scale: 0.01}
-        ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive}
-        ParticleCurves: {
+        Forces: {gravity: {0, 0, 0}, turbulence: 3, turbulence_scale: 0.01}
+        Appearance: {shape: Circle, blend: Additive}
+        Curves: {
           opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0}]}
           size: {keys: [{0, 0.6}, {0.33333334, 1}, {0.6666667, 1}, {1, 0.8}]}
         }

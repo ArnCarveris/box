@@ -11,7 +11,7 @@ prefab SplatBurst {
   // {62, 122, 54, 130}
   particles {
     Position: {0, 0.1, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 22,
       rate: 0,
       shape: EmitterSphere,
@@ -27,16 +27,16 @@ prefab SplatBurst {
       color: {194, 242, 181},
       seed: 227
     }
-    ParticleBurst: {count: 22}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
-    ParticleAppearance: {
-      shape: ParticleSprite,
+    Burst: {count: 22}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5, turbulence: 0.7, turbulence_scale: 1.2}
+    Appearance: {
+      shape: Sprite,
       texture: sprPuff,
       softness: 0.35,
       stretch: 0.17,
       lit: 0.8
     }
-    ParticleCurves: {
+    Curves: {
       size: {keys: [{0, 0.45}, {0.33333334, 1.17}, {0.6666667, 1.4}, {1, 1.5}]},
       opacity: {keys: [{0, 1}, {0.33333334, 0.96}, {0.6666667, 0.69}, {1, 0}]},
       color: {keys: [

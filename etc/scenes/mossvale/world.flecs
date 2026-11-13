@@ -18,17 +18,17 @@ mossvale {
     lake_deep : MvDeepWater { Position: {LAKE_X, 0.052, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R - 5, segments: 40}; TextureTransform: {(LAKE_R - 5) * 2 / 5, (LAKE_R - 5) * 2 / 5, 0, 0} }
     lake_glints {
       Position: {LAKE_X, 0.2, LAKE_Z}
-      ParticleEmitter: {max: 60, rate: 14, shape: EmitterDisc, radius: LAKE_R - 1, direction: {0, 1, 0}, speed: {0, 0.05}, lifetime: {0.6, 1.4}, size: {0.15, 0.3}, opacity: {0.6, 1}, color: {255, 250, 230}, seed: 61}
-      ParticleAppearance: {blend: ParticleAdditive}
-      ParticleCurves: {opacity: {keys: [{0, 0}, {0.5, 1}, {1, 0}]}}
+      Emitter: {max: 60, rate: 14, shape: EmitterDisc, radius: LAKE_R - 1, direction: {0, 1, 0}, speed: {0, 0.05}, lifetime: {0.6, 1.4}, size: {0.15, 0.3}, opacity: {0.6, 1}, color: {255, 250, 230}, seed: 61}
+      Appearance: {blend: Additive}
+      Curves: {opacity: {keys: [{0, 0}, {0.5, 1}, {1, 0}]}}
     }
     for i in 0..12 {
       const zz = -90 + i * 16
       "river_glint_{i}" {
         Position: {river_x(zz), 0.2, zz}
-        ParticleEmitter: {max: 16, rate: 4, shape: EmitterBox, extents: {2.4, 0, 7}, direction: {0, 0, 1}, speed: {0.6, 1.2}, lifetime: {0.6, 1.4}, size: {0.12, 0.25}, opacity: {0.6, 1}, color: {255, 250, 230}, seed: 70 + i}
-        ParticleAppearance: {blend: ParticleAdditive}
-        ParticleCurves: {opacity: {keys: [{0, 0}, {0.5, 1}, {1, 0}]}}
+        Emitter: {max: 16, rate: 4, shape: EmitterBox, extents: {2.4, 0, 7}, direction: {0, 0, 1}, speed: {0.6, 1.2}, lifetime: {0.6, 1.4}, size: {0.12, 0.25}, opacity: {0.6, 1}, color: {255, 250, 230}, seed: 70 + i}
+        Appearance: {blend: Additive}
+        Curves: {opacity: {keys: [{0, 0}, {0.5, 1}, {1, 0}]}}
       }
       "river_rock_{i}" : MvRock { Position: {river_x(zz) + match i % 2 { 0: 3.6; _: -3.6 }, 0.15, zz + 3}; Rotation: {i, i, 0}; Scale: {0.7, 0.4, 0.6}; IcoSphere: {radius: 1, segments: 0} }
     }

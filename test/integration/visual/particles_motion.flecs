@@ -1,9 +1,9 @@
 // Motion over life: a burst that flies out, stops and then rises, which constant forces cannot
-// do, on the left, next to the same burst without ParticleMotion on the right. Both spray
+// do, on the left, next to the same burst without Motion on the right. Both spray
 // particles in every direction at 90 units per second every frame, with a lifetime of 2.2
 // frames, so the three frames of a visual run show three shells at the normalized ages 0, 0.45
 // and 0.91. On the right the shells are spheres of 1.5 and 3 around the emitter. On the left the
-// ParticleMotion drag curve is 0 until 0.5 and the velocity_y curve 0 until 0.6: the middle shell
+// Motion drag curve is 0 until 0.5 and the velocity_y curve 0 until 0.6: the middle shell
 // is the same sphere of 1.5, and the oldest shell is a sphere of the same size, stopped by the
 // drag of 300 that came on late, lifted 2 units by the velocity curve. The sprites stretch along
 // the velocity they move with: outward on the right and in the middle shell on the left, upward
@@ -28,18 +28,18 @@ main_view {
 const dt = 1.0 / 60.0
 
 prefab Burst {
-  ParticleEmitter: {
+  Emitter: {
     max: 4000, rate: 30000, shape: EmitterSphere, radius: 0.05, spread: 180,
     speed: {90, 90}, lifetime: {2.2 * dt, 2.2 * dt}, size: {0.08, 0.12},
     opacity: {0.8, 1}, color: {255, 190, 90}, seed: 5
   }
-  ParticleAppearance: {blend: ParticleAdditive, stretch: 0.01}
+  Appearance: {blend: Additive, stretch: 0.01}
 }
 
 curved : Burst {
   Position: {-3.5, -1.5, 0}
-  ParticleForces: {gravity: {0, 0, 0}, drag: 300}
-  ParticleMotion: {
+  Forces: {gravity: {0, 0, 0}, drag: 300}
+  Motion: {
     drag: {keys: [{0, 0}, {0.5, 0}, {0.6, 1}]}
     velocity_y: {keys: [{0, 0}, {0.6, 0}, {0.8, 120}]}
   }
@@ -47,5 +47,5 @@ curved : Burst {
 
 constant : Burst {
   Position: {3.5, -0.5, 0}
-  ParticleForces: {gravity: {0, 0, 0}}
+  Forces: {gravity: {0, 0, 0}}
 }

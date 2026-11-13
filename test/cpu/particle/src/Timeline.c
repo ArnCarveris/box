@@ -250,8 +250,8 @@ void Timeline_script_values(void) {
         "using box.curve\n"
         "using box.particle\n"
         "pulse {\n"
-        "  ParticleEmitter: {rate: 50}\n"
-        "  ParticleTimeline: {period: 2, loop: true, "
+        "  Emitter: {rate: 50}\n"
+        "  Timeline: {period: 2, loop: true, "
         "rate: {keys: [{0, 0}, {0.5, 1}, {1, 0}]}, "
         "speed: {kind: CurveCatmullRom, keys: [{0, 1}, {1, 2}]}}\n"
         "}\n", NULL);

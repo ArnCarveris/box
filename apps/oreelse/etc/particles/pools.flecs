@@ -15,14 +15,14 @@
 // | debris | sprChunk  | alpha    | 17 down | 0.3  |            |      | 1    | ease in alpha          |
 // | ember  | sprSpark  | additive | 0.8 up  | 1.1  | 1.8 at 1.1 | 0.25 | 0    | taper, ember fade      |
 //
-// A layer's ParticleCurves sample at the keys 0, 1/3, 2/3 and 1 of the life what the original
+// A layer's Curves sample at the keys 0, 1/3, 2/3 and 1 of the life what the original
 // computes per particle: the size curve of the pool times the growth of the burst (size + grow *
 // age over its mean life), the alpha of the color ramp times the alpha curve and envelope of the
 // pool (the start key skips a fade in of a few hundredths of the life), and the colors of the
 // ramp as multipliers of the layer's color in linear light. The original's emissive strengths
 // (glow 1.6, fire 2.6, ember 2.2), its brightness variance, the squash of a stretch below 1, the
 // mass of debris and turbulence_speed have no equivalent and are left out; a stretch above 1
-// becomes ParticleAppearance.stretch at the layer's typical speed, half its initial one. The
+// becomes Appearance.stretch at the layer's typical speed, half its initial one. The
 // layers that look clearly weaker without the emission have an additive halo layer.
 
 using box.texture
@@ -64,7 +64,7 @@ sprChunk {
 // budget a burst that no view sees, or that lies more than 80 units from the camera, is
 // dropped, and one in view replays the play of its template that has played longest.
 $ {
-  ParticleSettings: {
+  box.particle.Settings: {
     effect_max: 64,
     effect_total: 640,
     effect_overflow: EffectSkip,

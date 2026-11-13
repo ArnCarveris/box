@@ -109,13 +109,13 @@ assets {
     chimney_band_b : CanalBrass { Position: {0.9, 1.68, 0.3}; Cylinder: {radius: 0.085, length: 0.04, segments: 14, smooth: true} }
     smoke {
       Position: {0.9, 2.12, 0.3}
-      ParticleEmitter: {
+      Emitter: {
         max: 160, rate: 12, shape: EmitterPoint, spread: 12,
         speed: {0.35, 0.6}, lifetime: {2, 3.5}, size: {0.08, 0.3},
         opacity: {0.05, 0.14}, color: {128, 128, 132}, seed: 3
       }
-      ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
-      ParticleForces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
+      Curves: {size: {kind: CurveCatmullRom, keys: [{0, 0.5}, {1, 2.4}]}, opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.7}, {1, 0}]}}
+      Forces: {gravity: {0, 0.15, 0}, wind: {0.5, 0, 0.2}, drag: 0.4, turbulence: 0.25, turbulence_scale: 1.5}
     }
 
     can : CanalGreen { Position: {0.1, 1.36, -0.32}; Lathe: {profile: LockCanShape, cap_start: true, cap_end: true, segments: 18, rings: 14} }

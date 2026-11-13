@@ -81,16 +81,16 @@ assets {
       }
       {
         Position: {math.sin(a) * 1.02, 0.53, math.cos(a) * 1.02}
-        ParticleEmitter: {
+        Emitter: {
           max: 120, rate: 60, shape: EmitterDisc, radius: 0.04,
           direction: {0, 1, 0}, spread: 35, speed: {0.4, 0.9},
           lifetime: {0.3, 0.6}, size: {0.012, 0.03}, opacity: {0.4, 0.8},
           color: {226, 242, 238}, seed: i + 7
         }
-        ParticleForces: {}
-        ParticleCollision: {height: 0.77, die: true}
-        ParticleAppearance: {lit: 0.8}
-        ParticleCurves: {opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}}
+        Forces: {}
+        Collision: {height: 0.77, die: true}
+        Appearance: {lit: 0.8}
+        Curves: {opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}}
       }
       for ripple in 0..3 {
         {

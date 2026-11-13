@@ -50,12 +50,12 @@ log_b {
 
 fire {
   Position: {0, 0.3, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 8000, rate: 120000, shape: EmitterDisc, radius: 0.5, spread: 12,
     speed: {5, 100}, lifetime: {0.02, 0.05}, size: {0.3, 0.6}, opacity: {0.2, 0.5},
     acceleration: {0, 400, 0}, color: {255, 200, 140}, seed: 11
   }
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 1}, {0.33333334, 1.2}, {0.6666667, 0.8}, {1, 0.2}]},
     opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0}]},
     color: {keys: [
@@ -65,5 +65,5 @@ fire {
       {1, {90, 20, 10}}
     ]}
   }
-  ParticleAppearance: {blend: ParticleAdditive, softness: 0.3}
+  Appearance: {blend: Additive, softness: 0.3}
 }

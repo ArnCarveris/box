@@ -15,20 +15,20 @@ using box.material
 // The frame of the track: the systems keep its drift at (-BunnyGame.speed, 0, 0) while playing
 // and at 0 once the game is over. It adds no forces of its own.
 effect_drift {
-  ParticleForces: {gravity: {0, 0, 0}}
+  Forces: {gravity: {0, 0, 0}}
 }
 
 // Budgets of the effects: a few plays of a template at once are plenty, as the bunny lands at
 // most once per jump. A full budget recycles the oldest play, so a landing never drops its dust.
 $ {
-  ParticleSettings: {effect_max: 8, effect_total: 32, effect_overflow: EffectRecycle}
+  box.particle.Settings: {effect_max: 8, effect_total: 32, effect_overflow: EffectRecycle}
 }
 
 // Dust of a landing after a jump, played at the bunny's feet
 prefab LandingDust {
   particles {
     Position: {0, 0.08, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 16,
       rate: 0,
       shape: EmitterBox,
@@ -42,10 +42,10 @@ prefab LandingDust {
       forces: effect_drift,
       seed: 101
     }
-    ParticleBurst: {count: 11}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5}
-    ParticleCollision: {height: 0, bounce: 0.15, friction: 0.6}
-    ParticleCurves: {
+    Burst: {count: 11}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5}
+    Collision: {height: 0, bounce: 0.15, friction: 0.6}
+    Curves: {
       size: {keys: [{0, 1}, {0.33333334, 1.33}, {0.6666667, 1.65}, {1, 1.98}]},
       opacity: {keys: [{0, 0.7}, {0.33333334, 1.12}, {0.6666667, 0.7}, {1, 0}]}
     }
@@ -56,7 +56,7 @@ prefab LandingDust {
 prefab HardLandingDust {
   particles {
     Position: {0, 0.08, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 32,
       rate: 0,
       shape: EmitterBox,
@@ -70,10 +70,10 @@ prefab HardLandingDust {
       forces: effect_drift,
       seed: 102
     }
-    ParticleBurst: {count: 23}
-    ParticleForces: {gravity: {0, -5, 0}, drag: 2.5}
-    ParticleCollision: {height: 0, bounce: 0.15, friction: 0.6}
-    ParticleCurves: {
+    Burst: {count: 23}
+    Forces: {gravity: {0, -5, 0}, drag: 2.5}
+    Collision: {height: 0, bounce: 0.15, friction: 0.6}
+    Curves: {
       size: {keys: [{0, 1}, {0.33333334, 1.72}, {0.6666667, 2.44}, {1, 3.16}]},
       opacity: {keys: [{0, 0.7}, {0.33333334, 1.12}, {0.6666667, 0.7}, {1, 0}]}
     }
@@ -84,7 +84,7 @@ prefab HardLandingDust {
 prefab HitBurst {
   particles {
     Position: {0, 0.7, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 32,
       rate: 0,
       shape: EmitterBox,
@@ -98,10 +98,10 @@ prefab HitBurst {
       forces: effect_drift,
       seed: 103
     }
-    ParticleBurst: {count: 28}
-    ParticleForces: {gravity: {0, -9, 0}, drag: 2}
-    ParticleCollision: {height: 0, bounce: 0.15, friction: 0.6}
-    ParticleCurves: {
+    Burst: {count: 28}
+    Forces: {gravity: {0, -9, 0}, drag: 2}
+    Collision: {height: 0, bounce: 0.15, friction: 0.6}
+    Curves: {
       size: {keys: [{0, 1}, {0.33333334, 1.1}, {0.6666667, 1.21}, {1, 1.31}]},
       opacity: {keys: [{0, 0.7}, {0.33333334, 1.1}, {0.6666667, 0.56}, {1, 0}]}
     }
@@ -114,7 +114,7 @@ prefab HitBurst {
 prefab CarrotSparkle {
   particles {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 32,
       rate: 0,
       shape: EmitterBox,
@@ -128,15 +128,15 @@ prefab CarrotSparkle {
       forces: effect_drift,
       seed: 104
     }
-    ParticleBurst: {count: 18}
-    ParticleForces: {gravity: {0, 0, 0}}
-    ParticleAppearance: {blend: ParticleAdditive, stretch: 0.02}
-    ParticleCurves: {
+    Burst: {count: 18}
+    Forces: {gravity: {0, 0, 0}}
+    Appearance: {blend: Additive, stretch: 0.02}
+    Curves: {
       opacity: {keys: [{0, 1.4}, {0.33333334, 2.2}, {0.6666667, 1.7}, {1, 0}]}
     }
     PointLight: {intensity: 3, range: 4}
     Rgb: {255, 210, 90}
-    ParticleLight: {
+    box.particle.Light: {
       intensity: 3,
       curve: {keys: [{0, 1}, {0.5, 0.5}, {1, 0}]},
       period: 0.5

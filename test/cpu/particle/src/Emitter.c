@@ -170,9 +170,9 @@ void Emitter_script_defaults(void) {
 
     test_assert(ecs_script_run(world, "defaults",
         "using box.particle\n"
-        "plain { ParticleEmitter: {} }\n"
-        "stream { ParticleEmitter: {rate: 400} }\n"
-        "custom { ParticleEmitter: {max: 20, rate: 5, shape: EmitterBox, radius: 2, "
+        "plain { Emitter: {} }\n"
+        "stream { Emitter: {rate: 400} }\n"
+        "custom { Emitter: {max: 20, rate: 5, shape: EmitterBox, radius: 2, "
         "extents: {1, 2, 3}, direction: {1, 0, 0}, spread: 30, speed: {2, 4}, radial: {1, 3}, "
         "lifetime: {3, 5}, size: {0.5, 1}, rotation: {10, 20}, spin: {-90, 90}, "
         "opacity: {0.25, 0.75}, acceleration: {0, -9.8, 0}, color: {10, 20, 30}, "
@@ -222,7 +222,7 @@ void Emitter_zero_is_literal(void) {
 
     test_assert(ecs_script_run(world, "zero",
         "using box.particle\n"
-        "e { ParticleEmitter: {max: 0, direction: {0, 0, 0}, speed: {0, 0}, "
+        "e { Emitter: {max: 0, direction: {0, 0, 0}, speed: {0, 0}, "
         "lifetime: {0, 0}, size: {0, 0}, opacity: {0, 0}, color: {0, 0, 0}} }\n",
         NULL) == 0);
 
@@ -497,13 +497,13 @@ void Emitter_forces_script(void) {
     test_assert(ecs_script_run(world, "forces",
         "using box.particle\n"
         "using box.transform\n"
-        "zone { ParticleForces: {wind: {5, 0, 0}, drag: 1, turbulence: 2, "
+        "zone { Forces: {wind: {5, 0, 0}, drag: 1, turbulence: 2, "
         "turbulence_scale: 3} }\n"
-        "plain { ParticleForces: {} }\n"
+        "plain { Forces: {} }\n"
         "e { Position: {0, 0, 0}\n"
-        "    ParticleEmitter: {rate: 60, forces: zone, inherit_velocity: 0.5, "
+        "    Emitter: {rate: 60, forces: zone, inherit_velocity: 0.5, "
         "color_variance: {10, 20, 30}}\n"
-        "    ParticleCollision: {height: 1, die: true} }\n", NULL) == 0);
+        "    Collision: {height: 1, die: true} }\n", NULL) == 0);
 
     ecs_entity_t zone = ecs_lookup(world, "zone"), e = ecs_lookup(world, "e");
     const ParticleForces *f = ecs_get(world, zone, ParticleForces);
@@ -779,20 +779,20 @@ void Emitter_collision_in_block(void) {
     "  Scale: {40, 40, 40}\n" \
     "  engine {\n" \
     "    Position: {0, 0, -4.2}\n" \
-    "    ParticleEmitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
+    "    Emitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
     "acceleration: {0, 1, 0}, shape: EmitterSphere, radius: 0.5}\n" \
-    "    ParticleAppearance: {softness: 0.25, stretch: 0.2}\n" \
-    "    ParticleForces: {gravity: {0, -2, 0}}\n" \
+    "    Appearance: {softness: 0.25, stretch: 0.2}\n" \
+    "    Forces: {gravity: {0, -2, 0}}\n" \
     "  }\n" \
     "}\n" \
     "boat {\n" \
     "  Scale: {1, 1, 1}\n" \
     "  engine {\n" \
     "    Position: {0, 0, -4.2}\n" \
-    "    ParticleEmitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
+    "    Emitter: {rate: 60, speed: {2, 3}, radial: {0.5, 1}, size: {0.1, 0.2}, " \
     "acceleration: {0, 1, 0}, shape: EmitterSphere, radius: 0.5}\n" \
-    "    ParticleAppearance: {softness: 0.25, stretch: 0.2}\n" \
-    "    ParticleForces: {gravity: {0, -2, 0}}\n" \
+    "    Appearance: {softness: 0.25, stretch: 0.2}\n" \
+    "    Forces: {gravity: {0, -2, 0}}\n" \
     "  }\n" \
     "}\n"
 

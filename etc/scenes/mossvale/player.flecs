@@ -119,8 +119,8 @@ assets {
     if moving && sprinting {
       dust {
         Position: {0, 0.15, -0.3}
-        ParticleEmitter: {max: 40, rate: 18, shape: EmitterSphere, radius: 0.2, direction: {0, 1, -1}, spread: 50, speed: {0.4, 1.0}, lifetime: {0.5, 0.9}, size: {0.25, 0.45}, opacity: {0.3, 0.5}, color: {200, 180, 140}, color_variance: {10, 10, 10}, seed: 17}
-        ParticleCurves: {size: {keys: [{0, 0.6}, {1, 1.8}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
+        Emitter: {max: 40, rate: 18, shape: EmitterSphere, radius: 0.2, direction: {0, 1, -1}, spread: 50, speed: {0.4, 1.0}, lifetime: {0.5, 0.9}, size: {0.25, 0.45}, opacity: {0.3, 0.5}, color: {200, 180, 140}, color_variance: {10, 10, 10}, seed: 17}
+        Curves: {size: {keys: [{0, 0.6}, {1, 1.8}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
       }
     }
     leg_a {
@@ -238,9 +238,9 @@ mossvale {
       light { Position: {0, 0, 0}; PointLight: {intensity: 4, range: 7}; Rgb: {spell_r(orb_spell), spell_g(orb_spell), spell_b(orb_spell)} }
       trail {
         Position: {0, 0, 0}
-        ParticleEmitter: {max: 60, rate: 120, shape: EmitterSphere, radius: 0.12, direction: {0, 0, 0}, speed: {0, 0.2}, lifetime: {0.2, 0.4}, size: {0.12, 0.22}, opacity: {0.7, 1}, color: {spell_r(orb_spell), spell_g(orb_spell), spell_b(orb_spell)}, seed: 3}
-        ParticleAppearance: {blend: ParticleAdditive}
-        ParticleCurves: {size: {keys: [{0, 1}, {1, 0.2}]}}
+        Emitter: {max: 60, rate: 120, shape: EmitterSphere, radius: 0.12, direction: {0, 0, 0}, speed: {0, 0.2}, lifetime: {0.2, 0.4}, size: {0.12, 0.22}, opacity: {0.7, 1}, color: {spell_r(orb_spell), spell_g(orb_spell), spell_b(orb_spell)}, seed: 3}
+        Appearance: {blend: Additive}
+        Curves: {size: {keys: [{0, 1}, {1, 0.2}]}}
       }
     }
   }
@@ -254,26 +254,26 @@ mossvale {
       if night {
         fireflies {
           Position: {0, 1.2, -2}
-          ParticleEmitter: {max: 60, rate: 5, shape: EmitterBox, extents: {16, 1, 11}, direction: {1, 0, 0}, spread: 180, speed: {0.2, 0.5}, lifetime: {3, 5}, size: {0.1, 0.16}, opacity: {1, 1}, color: {210, 255, 120}, color_variance: {20, 0, 30}, seed: 5}
-          ParticleAppearance: {blend: ParticleAdditive}
-          ParticleCurves: {opacity: {keys: [{0, 0}, {0.2, 1}, {0.35, 0.2}, {0.5, 1}, {0.7, 0.3}, {0.85, 1}, {1, 0}]}}
-          ParticleMotion: {velocity_y: {keys: [{0, 0.2}, {0.25, -0.2}, {0.5, 0.25}, {0.75, -0.15}, {1, 0.1}]}}
+          Emitter: {max: 60, rate: 5, shape: EmitterBox, extents: {16, 1, 11}, direction: {1, 0, 0}, spread: 180, speed: {0.2, 0.5}, lifetime: {3, 5}, size: {0.1, 0.16}, opacity: {1, 1}, color: {210, 255, 120}, color_variance: {20, 0, 30}, seed: 5}
+          Appearance: {blend: Additive}
+          Curves: {opacity: {keys: [{0, 0}, {0.2, 1}, {0.35, 0.2}, {0.5, 1}, {0.7, 0.3}, {0.85, 1}, {1, 0}]}}
+          Motion: {velocity_y: {keys: [{0, 0.2}, {0.25, -0.2}, {0.5, 0.25}, {0.75, -0.15}, {1, 0.1}]}}
         }
       } else if forest {
         leaves {
           Position: {0, 8, -2}
-          ParticleEmitter: {max: 70, rate: 7, shape: EmitterBox, extents: {16, 1, 11}, direction: {0, -1, 0}, spread: 20, speed: {0.6, 1.0}, lifetime: {6, 9}, size: {0.14, 0.22}, opacity: {1, 1}, color: {200, 140, 60}, color_variance: {50, 50, 20}, seed: 7}
-          ParticleAppearance: {lit: 0.7}
-          ParticleMotion: {velocity_x: {keys: [{0, 0.6}, {0.25, -0.6}, {0.5, 0.6}, {0.75, -0.6}, {1, 0.6}]}}
-          ParticleCurves: {opacity: {keys: [{0, 0}, {0.1, 1}, {0.9, 1}, {1, 0}]}}
+          Emitter: {max: 70, rate: 7, shape: EmitterBox, extents: {16, 1, 11}, direction: {0, -1, 0}, spread: 20, speed: {0.6, 1.0}, lifetime: {6, 9}, size: {0.14, 0.22}, opacity: {1, 1}, color: {200, 140, 60}, color_variance: {50, 50, 20}, seed: 7}
+          Appearance: {lit: 0.7}
+          Motion: {velocity_x: {keys: [{0, 0.6}, {0.25, -0.6}, {0.5, 0.6}, {0.75, -0.6}, {1, 0.6}]}}
+          Curves: {opacity: {keys: [{0, 0}, {0.1, 1}, {0.9, 1}, {1, 0}]}}
         }
       } else if !hills {
         butterflies {
           Position: {0, 0.9, -2}
-          ParticleEmitter: {max: 24, rate: 1.4, shape: EmitterBox, extents: {16, 0.4, 11}, direction: {1, 0, 0}, spread: 180, speed: {0.5, 1.0}, lifetime: {5, 8}, size: {0.18, 0.24}, opacity: {1, 1}, color: {240, 200, 120}, color_variance: {20, 60, 120}, seed: 9}
-          ParticleAppearance: {lit: 0.6}
-          ParticleMotion: {velocity_y: {keys: [{0, 0.5}, {0.08, -0.4}, {0.16, 0.5}, {0.24, -0.4}, {0.32, 0.5}, {0.4, -0.4}, {0.48, 0.5}, {0.56, -0.4}, {0.64, 0.5}, {0.72, -0.4}, {0.8, 0.5}, {0.9, -0.4}, {1, 0.3}]}}
-          ParticleCurves: {opacity: {keys: [{0, 0}, {0.1, 1}, {0.9, 1}, {1, 0}]}}
+          Emitter: {max: 24, rate: 1.4, shape: EmitterBox, extents: {16, 0.4, 11}, direction: {1, 0, 0}, spread: 180, speed: {0.5, 1.0}, lifetime: {5, 8}, size: {0.18, 0.24}, opacity: {1, 1}, color: {240, 200, 120}, color_variance: {20, 60, 120}, seed: 9}
+          Appearance: {lit: 0.6}
+          Motion: {velocity_y: {keys: [{0, 0.5}, {0.08, -0.4}, {0.16, 0.5}, {0.24, -0.4}, {0.32, 0.5}, {0.4, -0.4}, {0.48, 0.5}, {0.56, -0.4}, {0.64, 0.5}, {0.72, -0.4}, {0.8, 0.5}, {0.9, -0.4}, {1, 0.3}]}}
+          Curves: {opacity: {keys: [{0, 0}, {0.1, 1}, {0.9, 1}, {1, 0}]}}
         }
       }
     }

@@ -24,7 +24,7 @@ etc/config.flecs, which stay as they are. What counts as a color literal: three 
 four with an alpha (rgba) or strength (Tint) that stays as it is, in braces, positional or
 named r, g, b, a, that are
   - the value of a color component or member: Rgb, Tint, color, and the color of each
-    {time, {r, g, b}} key of a ParticleGradient (inside color: {keys: [...]}, before the
+    {time, {r, g, b}} key of a Gradient (inside color: {keys: [...]}, before the
     keyed curves the keys start, early, late and end), the live, dead, warn and ok of
     OreStatusLamp, and the props of the templates declared with a color type (the Light's
     dead, warn and ok, the tints of the deposits and the flora, the astronaut's suit);
@@ -56,7 +56,7 @@ COLOR_KEYS = {
     "fill", "rootTint", "stalkTint", "nubTint", "bulbTint", "podTint", "quillTint"
 }
 
-# Keys of a ParticleGradient, colors only inside a color member
+# Keys of a Gradient, colors only inside a color member
 GRADIENT_KEYS = {"start", "early", "late", "end"}
 
 # Types a constant or prop is declared with that hold a color

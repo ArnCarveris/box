@@ -1,7 +1,7 @@
 // The scene of the browser check of particle curves (particles.mjs), which renders on the main
 // thread. The page opens a window only for a scene with a Surface; its 640x480 points fill the
 // viewport of the check. Three jets rise from the bottom: on the left one that cools from white
-// over yellow and orange to a dim red, in the middle one without ParticleCurves that stays white,
+// over yellow and orange to a dim red, in the middle one without Curves that stays white,
 // and on the right two with equal curves that share their rows of the curve table, from magenta
 // to cyan. At frame 180 SetAt changes the gradient of the left jet to green and blue, which bakes
 // new rows, and gives six emitters out of view gradients of their own, so the table outgrows its
@@ -29,24 +29,24 @@ main_view {
 template Jet {
   prop seed = 1
 
-  ParticleEmitter: {
+  Emitter: {
     max: 2000, rate: 1500, shape: EmitterDisc, radius: 0.1, spread: 4,
     speed: {3, 3.5}, lifetime: {1, 1.1}, size: {0.25, 0.3}, opacity: {1, 1},
     color: {255, 255, 255}, seed: seed
   }
-  ParticleAppearance: {}
+  Appearance: {}
 }
 
 // Holds a pool and rows but no particle, out of view
 template Filler {
   Position: {0, -1000, 0}
-  ParticleEmitter: {max: 1, rate: 0}
+  Emitter: {max: 1, rate: 0}
 }
 
 jet {
   Position: {-2.5, -1.5, 0}
   Jet: {seed: 3}
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 0.5}, {0.33333334, 1.4}, {0.6666667, 1.4}, {1, 0.4}]},
     color: {keys: [
       {0, {255, 255, 255}},
@@ -65,7 +65,7 @@ plain {
 twin_a {
   Position: {2.5, -1.5, 0}
   Jet: {seed: 7}
-  ParticleCurves: {
+  Curves: {
     opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0.2}]},
     color: {keys: [
       {0, {255, 40, 220}},
@@ -79,7 +79,7 @@ twin_a {
 twin_b {
   Position: {3.5, -1.5, 0}
   Jet: {seed: 9}
-  ParticleCurves: {
+  Curves: {
     opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0.2}]},
     color: {keys: [
       {0, {255, 40, 220}},
@@ -99,7 +99,7 @@ filler_6 { Filler: {} }
 
 change_jet {
   SetAt: {frame: 180, entity: jet}
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 0.5}, {0.33333334, 1.4}, {0.6666667, 1.4}, {1, 0.4}]},
     color: {keys: [
       {0, {200, 255, 200}},
@@ -112,7 +112,7 @@ change_jet {
 
 change_1 {
   SetAt: {frame: 180, entity: filler_1}
-  ParticleCurves: {
+  Curves: {
     color: {keys: [
       {0, {255, 0, 0}},
       {0.33333334, {255, 255, 255}},
@@ -124,7 +124,7 @@ change_1 {
 
 change_2 {
   SetAt: {frame: 180, entity: filler_2}
-  ParticleCurves: {
+  Curves: {
     color: {keys: [
       {0, {0, 255, 0}},
       {0.33333334, {255, 255, 255}},
@@ -136,7 +136,7 @@ change_2 {
 
 change_3 {
   SetAt: {frame: 180, entity: filler_3}
-  ParticleCurves: {
+  Curves: {
     color: {keys: [
       {0, {0, 0, 255}},
       {0.33333334, {255, 255, 255}},
@@ -148,7 +148,7 @@ change_3 {
 
 change_4 {
   SetAt: {frame: 180, entity: filler_4}
-  ParticleCurves: {
+  Curves: {
     color: {keys: [
       {0, {255, 255, 0}},
       {0.33333334, {255, 255, 255}},
@@ -160,7 +160,7 @@ change_4 {
 
 change_5 {
   SetAt: {frame: 180, entity: filler_5}
-  ParticleCurves: {
+  Curves: {
     color: {keys: [
       {0, {0, 255, 255}},
       {0.33333334, {255, 255, 255}},
@@ -172,7 +172,7 @@ change_5 {
 
 change_6 {
   SetAt: {frame: 180, entity: filler_6}
-  ParticleCurves: {
+  Curves: {
     color: {keys: [
       {0, {255, 0, 255}},
       {0.33333334, {255, 255, 255}},

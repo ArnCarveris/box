@@ -4,17 +4,17 @@ using box.light
 using box.material
 
 effect_drift {
-  ParticleForces: {gravity: {0, 0, 0}}
+  Forces: {gravity: {0, 0, 0}}
 }
 
 $ {
-  ParticleSettings: {effect_max: 8, effect_total: 32, effect_overflow: EffectRecycle}
+  box.particle.Settings: {effect_max: 8, effect_total: 32, effect_overflow: EffectRecycle}
 }
 
 prefab LanternSparkle {
   particles {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 40,
       rate: 0,
       shape: EmitterBox,
@@ -28,15 +28,15 @@ prefab LanternSparkle {
       forces: effect_drift,
       seed: 201
     }
-    ParticleBurst: {count: 30}
-    ParticleForces: {gravity: {0, -1, 0}, drag: 1.5}
-    ParticleAppearance: {blend: ParticleAdditive}
-    ParticleCurves: {
+    Burst: {count: 30}
+    Forces: {gravity: {0, -1, 0}, drag: 1.5}
+    Appearance: {blend: Additive}
+    Curves: {
       opacity: {keys: [{0, 1.4}, {0.33333334, 2}, {0.6666667, 1.4}, {1, 0}]}
     }
     PointLight: {intensity: 4, range: 5}
     Rgb: {255, 170, 80}
-    ParticleLight: {
+    box.particle.Light: {
       intensity: 4,
       curve: {keys: [{0, 1}, {0.4, 0.5}, {1, 0}]},
       period: 0.9
@@ -47,7 +47,7 @@ prefab LanternSparkle {
 prefab StringCut {
   paper {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 40,
       rate: 0,
       shape: EmitterBox,
@@ -60,10 +60,10 @@ prefab StringCut {
       color: {246, 240, 225},
       seed: 202
     }
-    ParticleAppearance: {lit: 1}
-    ParticleBurst: {count: 32}
-    ParticleForces: {gravity: {0, -6, 0}, drag: 2}
-    ParticleCurves: {
+    Appearance: {lit: 1}
+    Burst: {count: 32}
+    Forces: {gravity: {0, -6, 0}, drag: 2}
+    Curves: {
       size: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.9}, {1, 0.7}]},
       opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0}]}
     }
@@ -71,7 +71,7 @@ prefab StringCut {
 
   sparks {
     Position: {0, 0, 0}
-    ParticleEmitter: {
+    Emitter: {
       max: 24,
       rate: 0,
       shape: EmitterBox,
@@ -84,10 +84,10 @@ prefab StringCut {
       color: {255, 60, 40},
       seed: 203
     }
-    ParticleBurst: {count: 20}
-    ParticleForces: {gravity: {0, -4, 0}, drag: 2}
-    ParticleAppearance: {blend: ParticleAdditive}
-    ParticleCurves: {
+    Burst: {count: 20}
+    Forces: {gravity: {0, -4, 0}, drag: 2}
+    Appearance: {blend: Additive}
+    Curves: {
       opacity: {keys: [{0, 1}, {0.33333334, 1}, {0.6666667, 0.6}, {1, 0}]}
     }
   }

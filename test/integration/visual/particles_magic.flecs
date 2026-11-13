@@ -45,12 +45,12 @@ floor {
 
 rings {
   Position: {-2, 0.1, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 600, rate: 5000, shape: EmitterDisc, radius: 1, spread: 5,
     speed: {10, 80}, lifetime: {0.04, 0.05}, size: {0.3, 0.6}, opacity: {0.4, 0.8},
     color: {255, 255, 255}, seed: 7
   }
-  ParticleCurves: {
+  Curves: {
     size: {keys: [{0, 0.5}, {0.33333334, 1}, {0.6666667, 1.2}, {1, 1.4}]},
     opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 1}, {1, 0}]},
     rotation: {keys: [{0, 0}, {0.33333334, 0.1}, {0.6666667, 0.2}, {1, 0.25}]},
@@ -61,15 +61,15 @@ rings {
       {1, {60, 255, 230}}
     ]}
   }
-  ParticleAppearance: {shape: ParticleSprite, blend: ParticleAdditive, texture: ring_tex}
+  Appearance: {shape: Sprite, blend: Additive, texture: ring_tex}
 }
 
 sheet {
   Position: {2.2, 0.1, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 600, rate: 8000, shape: EmitterDisc, radius: 0.8, spread: 10,
     speed: {30, 60}, lifetime: {0.04, 0.05}, size: {0.5, 0.5}, opacity: {1, 1},
     color: {255, 255, 255}, seed: 9
   }
-  ParticleAppearance: {shape: ParticleSprite, texture: checker_tex, columns: 4, rows: 4}
+  Appearance: {shape: Sprite, texture: checker_tex, columns: 4, rows: 4}
 }

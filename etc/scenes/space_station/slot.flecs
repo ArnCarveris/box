@@ -111,7 +111,7 @@ assets {
 
     welder {
       Position: {0, 0.3, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 240,
         rate: sparks ? 160 : 0,
         shape: EmitterBox, extents: {2.5, 0.05, 2.5},
@@ -119,16 +119,16 @@ assets {
         lifetime: {0.25, 0.7}, size: {0.03, 0.09}, opacity: {0.6, 1},
         acceleration: {0, -3, 0}, color: {255, 214, 140}, seed: 40 + idx
       }
-      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.06}
-      ParticleCurves: {
+      Appearance: {blend: Additive, stretch: 0.06}
+      Curves: {
         opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]},
         color: {keys: [{0, {255, 255, 235}}, {0.35, {255, 200, 110}}, {1, {255, 90, 40}}]}
       }
-      ParticleCollision: {height: 0.07, bounce: 0.35, friction: 0.4}
+      Collision: {height: 0.07, bounce: 0.35, friction: 0.4}
       if sparks {
         Rgb: {255, 196, 130}
         PointLight: {intensity: 6, range: 5}
-        ParticleLight: {intensity: 6, curve: {keys: [{0, 1}, {0.25, 0.35}, {0.5, 1.3}, {0.75, 0.6}, {1, 1}]}, period: 0.18, loop: true}
+        box.particle.Light: {intensity: 6, curve: {keys: [{0, 1}, {0.25, 0.35}, {0.5, 1.3}, {0.75, 0.6}, {1, 1}]}, period: 0.18, loop: true}
       }
     }
   }

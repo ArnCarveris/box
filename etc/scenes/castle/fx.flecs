@@ -9,7 +9,7 @@ using state
 using assets
 
 $ {
-  ParticleSettings: {effect_max: 16, effect_total: 64, effect_overflow: EffectRecycle}
+  box.particle.Settings: {effect_max: 16, effect_total: 64, effect_overflow: EffectRecycle}
 }
 
 assets {
@@ -132,7 +132,7 @@ assets {
   prefab DustBurst {
     particles {
       Position: {0, 0, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 48, rate: 0,
         shape: EmitterBox, extents: {0.9, 0.05, 0.9},
         direction: {0, 1, 0}, spread: 70, speed: {0.8, 2.6},
@@ -140,9 +140,9 @@ assets {
         color: {214, 200, 172}, color_variance: {16, 14, 10},
         seed: 7
       }
-      ParticleBurst: {count: 40}
-      ParticleForces: {gravity: {0, -2.5, 0}, drag: 2.2}
-      ParticleCurves: {size: {keys: [{0, 0.6}, {0.333, 1.4}, {0.667, 2}, {1, 2.4}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
+      Burst: {count: 40}
+      Forces: {gravity: {0, -2.5, 0}, drag: 2.2}
+      Curves: {size: {keys: [{0, 0.6}, {0.333, 1.4}, {0.667, 2}, {1, 2.4}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
     }
   }
 
@@ -150,7 +150,7 @@ assets {
   prefab RubbleBurst {
     dust {
       Position: {0, 0, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 64, rate: 0,
         shape: EmitterBox, extents: {0.8, 0.6, 0.8},
         direction: {0, 1, 0}, spread: 80, speed: {0.6, 2.2},
@@ -158,13 +158,13 @@ assets {
         color: {170, 160, 146}, color_variance: {14, 14, 14},
         seed: 13
       }
-      ParticleBurst: {count: 56}
-      ParticleForces: {gravity: {0, -1.5, 0}, drag: 1.8}
-      ParticleCurves: {size: {keys: [{0, 0.6}, {0.333, 1.5}, {0.667, 2.1}, {1, 2.6}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
+      Burst: {count: 56}
+      Forces: {gravity: {0, -1.5, 0}, drag: 1.8}
+      Curves: {size: {keys: [{0, 0.6}, {0.333, 1.5}, {0.667, 2.1}, {1, 2.6}]}, opacity: {keys: [{0, 1}, {0.333, 0.8}, {0.667, 0.4}, {1, 0}]}}
     }
     stones {
       Position: {0, 0, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 40, rate: 0,
         shape: EmitterBox, extents: {0.6, 0.8, 0.6},
         direction: {0, 1, 0}, spread: 60, speed: {2, 5},
@@ -172,9 +172,9 @@ assets {
         color: {120, 112, 100}, color_variance: {20, 20, 20},
         seed: 14
       }
-      ParticleBurst: {count: 30}
-      ParticleForces: {gravity: {0, -14, 0}}
-      ParticleCollision: {height: 0.03, bounce: 0.3, friction: 0.6}
+      Burst: {count: 30}
+      Forces: {gravity: {0, -14, 0}}
+      Collision: {height: 0.03, bounce: 0.3, friction: 0.6}
     }
   }
 
@@ -182,7 +182,7 @@ assets {
   prefab SplashBurst {
     particles {
       Position: {0, 0, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 48, rate: 0,
         shape: EmitterBox, extents: {0.8, 0.02, 0.8},
         direction: {0, 1, 0}, spread: 30, speed: {1.5, 3.5},
@@ -190,9 +190,9 @@ assets {
         color: {200, 230, 245}, color_variance: {10, 10, 10},
         seed: 17
       }
-      ParticleBurst: {count: 40}
-      ParticleForces: {gravity: {0, -12, 0}}
-      ParticleCollision: {height: -0.31, die: true}
+      Burst: {count: 40}
+      Forces: {gravity: {0, -12, 0}}
+      Collision: {height: -0.31, die: true}
     }
   }
 
@@ -200,7 +200,7 @@ assets {
   prefab Firework {
     sparks {
       Position: {0, 0, 0}
-      ParticleEmitter: {
+      Emitter: {
         max: 160, rate: 0,
         shape: EmitterSphere, radius: 0.1,
         direction: {0, 0, 0}, radial: {5, 8},
@@ -208,10 +208,10 @@ assets {
         color: {255, 200, 90}, color_variance: {0, 60, 90},
         seed: 23
       }
-      ParticleAppearance: {blend: ParticleAdditive, stretch: 0.05}
-      ParticleBurst: {count: 140}
-      ParticleForces: {gravity: {0, -3, 0}, drag: 1.2}
-      ParticleCurves: {
+      Appearance: {blend: Additive, stretch: 0.05}
+      Burst: {count: 140}
+      Forces: {gravity: {0, -3, 0}, drag: 1.2}
+      Curves: {
         size: {keys: [{0, 1}, {0.333, 1}, {0.667, 0.8}, {1, 0.4}]},
         opacity: {keys: [{0, 1}, {0.333, 1}, {0.667, 0.7}, {1, 0}]},
         color: {keys: [{0, {255, 255, 255}}, {0.333, {255, 220, 160}}, {0.667, {255, 120, 140}}, {1, {120, 80, 255}}]}

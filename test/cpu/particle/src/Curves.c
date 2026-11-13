@@ -435,8 +435,8 @@ void Curves_script_defaults(void) {
 
     test_assert(ecs_script_run(world, "curves",
         "using box.particle\n"
-        "plain { ParticleCurves: {} }\n"
-        "custom { ParticleCurves: {\n"
+        "plain { Curves: {} }\n"
+        "custom { Curves: {\n"
         "  size: {keys: [{0, 1}, {0.33333334, 2}, {0.6666667, 3}, {1, 4}]}\n"
         "  rotation: {keys: [{0, 0}, {0.33333334, 0.5}, {0.6666667, 1}, {1, 2}]}\n"
         "  color: {keys: [{0, {255, 0, 0}}, {0.33333334, {255, 255, 255}}, "

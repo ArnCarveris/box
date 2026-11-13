@@ -29,13 +29,13 @@ template Dot {
   prop kind: CurveKind = CurveLinear
   prop t = 0.5
 
-  ParticleEmitter: {
+  Emitter: {
     max: 1, rate: 0, speed: {0, 0}, lifetime: {age / t, age / t}, size: {0.3, 0.3},
     opacity: {1, 1}, color: {255, 255, 255}
   }
-  ParticleBurst: {count: 1}
-  ParticleAppearance: {}
-  ParticleCurves: {
+  Burst: {count: 1}
+  Appearance: {}
+  Curves: {
     size: {kind: kind, keys: [
       {time: 0, value: 0.3, out: 20},
       {time: 0.2, value: 2.2},

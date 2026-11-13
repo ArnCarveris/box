@@ -56,14 +56,14 @@ assets {
       if spark > 0 {
         sparks {
           Position: {tx, ty, 0}
-          ParticleEmitter: {
+          Emitter: {
             max: 160, rate: 220, shape: EmitterSphere, radius: 0.02,
             direction: {-1, 0.3, 0}, spread: 75, speed: {0.6, 2.2},
             lifetime: {0.25, 0.6}, size: {0.03, 0.07}, opacity: {0.8, 1},
             acceleration: {0, -1.5, 0}, color: {255, 210, 140}, seed: spark
           }
-          ParticleAppearance: {blend: ParticleAdditive, stretch: 0.08}
-          ParticleCurves: {opacity: {keys: [{0, 1}, {0.6, 0.8}, {1, 0}]}, color: {keys: [{0, {255, 255, 255}}, {0.3, {255, 200, 120}}, {1, {255, 110, 40}}]}}
+          Appearance: {blend: Additive, stretch: 0.08}
+          Curves: {opacity: {keys: [{0, 1}, {0.6, 0.8}, {1, 0}]}, color: {keys: [{0, {255, 255, 255}}, {0.3, {255, 200, 120}}, {1, {255, 110, 40}}]}}
           SpatialIgnore
         }
       }

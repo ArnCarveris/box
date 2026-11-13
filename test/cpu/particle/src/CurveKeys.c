@@ -574,7 +574,7 @@ void CurveKeys_error_script(void) {
         "using box.particle\n"
         "fx {\n"
         "  smoke {\n"
-        "    ParticleCurves: {size: {kind: CurveCatmullRom, keys: [{0, 1}, {1.2, 2}]}}\n"
+        "    Curves: {size: {kind: CurveCatmullRom, keys: [{0, 1}, {1.2, 2}]}}\n"
         "  }\n"
         "}\n", NULL);
     errors_end();
@@ -642,8 +642,8 @@ static const box_render_particle_pool_t* pool_of(
     "using box.particle\n" \
     "using box.transform\n" \
     "prefab smoke {\n" \
-    "  ParticleEmitter: {rate: 20, lifetime: {1, 1}}\n" \
-    "  ParticleCurves: {\n" \
+    "  Emitter: {rate: 20, lifetime: {1, 1}}\n" \
+    "  Curves: {\n" \
     "    size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}\n" \
     "    color: {kind: CurveBezier, keys: [{0, {255, 220, 60}}, {1, {120, 20, 10}}]}\n" \
     "  }\n" \
@@ -656,7 +656,7 @@ static const box_render_particle_pool_t* pool_of(
     "}\n" \
     "c : smoke {\n" \
     "  Position: {0, 0, 0}\n" \
-    "  ParticleCurves: {\n" \
+    "  Curves: {\n" \
     "    size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.4, 1.8}, {1, 2.2}]}\n" \
     "    opacity: {keys: [{0, 1}, {1, 0}]}\n" \
     "  }\n" \
@@ -776,12 +776,12 @@ void CurveKeys_copy_delete_no_leak(void) {
         "using box.curve\n"
         "using box.particle\n"
         "prefab p {\n"
-        "  ParticleCurves: {\n"
+        "  Curves: {\n"
         "    size: {kind: CurveCatmullRom, keys: [{0, 0}, {0.5, 1}, {1, 0}]}\n"
         "    spin: {kind: CurveBezier, keys: [{0, 1, 0, -2}, {1, 0}]}\n"
         "    color: {keys: [{0, {255, 0, 0}}, {1, {0, 0, 255}}]}\n"
         "  }\n"
-        "  ParticleLight: {curve: {keys: [{0, 1}, {1, 0}]}, period: 1}\n"
+        "  Light: {curve: {keys: [{0, 1}, {1, 0}]}, period: 1}\n"
         "}\n", NULL), 0);
     ecs_entity_t prefab = ecs_lookup(world, "p");
     test_assert(prefab != 0);
@@ -808,9 +808,9 @@ void CurveKeys_effect_instance(void) {
         "using box.particle\n"
         "@tree ChildOf\n"
         "prefab Puff {\n"
-        "  ParticleEmitter: {max: 50, lifetime: {0.5, 0.5}}\n"
-        "  ParticleBurst: {count: 5}\n"
-        "  ParticleCurves: {opacity: {kind: CurveCatmullRom, keys: [{0, 0}, {0.2, 1}, {1, 0}]}}\n"
+        "  Emitter: {max: 50, lifetime: {0.5, 0.5}}\n"
+        "  Burst: {count: 5}\n"
+        "  Curves: {opacity: {kind: CurveCatmullRom, keys: [{0, 0}, {0.2, 1}, {1, 0}]}}\n"
         "}\n", NULL), 0);
     ecs_entity_t effect = ecs_lookup(world, "Puff");
     test_assert(effect != 0);
@@ -848,8 +848,8 @@ void CurveKeys_script_reload(void) {
             "using box.transform\n"
             "jet {\n"
             "  Position: {0, 0, 0}\n"
-            "  ParticleEmitter: {rate: 20, lifetime: {1, 1}}\n"
-            "  ParticleCurves: {size: {keys: [{0, 1}, {1, 2}]}}\n"
+            "  Emitter: {rate: 20, lifetime: {1, 1}}\n"
+            "  Curves: {size: {keys: [{0, 1}, {1, 2}]}}\n"
             "}\n"
     });
     test_assert(script != 0);
@@ -867,8 +867,8 @@ void CurveKeys_script_reload(void) {
         "using box.transform\n"
         "jet {\n"
         "  Position: {0, 0, 0}\n"
-        "  ParticleEmitter: {rate: 20, lifetime: {1, 1}}\n"
-        "  ParticleCurves: {size: {kind: CurveBezier, keys: [{0, 1}, {0.5, 3}, {1, 4}]}}\n"
+        "  Emitter: {rate: 20, lifetime: {1, 1}}\n"
+        "  Curves: {size: {kind: CurveBezier, keys: [{0, 1}, {0.5, 3}, {1, 4}]}}\n"
         "}\n"), 0);
     jet = ecs_lookup(world, "jet");
     test_assert(jet != 0);

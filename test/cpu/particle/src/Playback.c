@@ -524,8 +524,8 @@ void Playback_script_control(void) {
         "using box.transform\n"
         "e {\n"
         "  Position: {0, 0, 0}\n"
-        "  ParticleEmitter: {rate: 20, lifetime: {100, 100}}\n"
-        "  ParticlePlayback: {state: ParticlePaused}\n"
+        "  Emitter: {rate: 20, lifetime: {100, 100}}\n"
+        "  Playback: {state: Paused}\n"
         "}\n", NULL) == 0);
     ecs_entity_t e = ecs_lookup(world, "e");
     test_assert(e != 0);
@@ -535,7 +535,7 @@ void Playback_script_control(void) {
 
     test_assert(ecs_script_run(world, "play",
         "using box.particle\n"
-        "e { ParticlePlayback: {state: ParticlePlaying} }\n", NULL) == 0);
+        "e { Playback: {state: Playing} }\n", NULL) == 0);
     stats = frames(world, 2);
     test_int(stats.spawned, 2);
     test_int(stats.particles, 4);
@@ -543,7 +543,7 @@ void Playback_script_control(void) {
 
     test_assert(ecs_script_run(world, "reset",
         "using box.particle\n"
-        "e { ParticlePlayback: {state: ParticleStopped, reset: true} }\n", NULL) == 0);
+        "e { Playback: {state: Stopped, reset: true} }\n", NULL) == 0);
     stats = frame(world);
     test_int(stats.particles, 0);
     test_flt(time_of(world, e), 0);

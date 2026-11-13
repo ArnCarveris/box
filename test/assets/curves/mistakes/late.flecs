@@ -5,6 +5,6 @@ using box.transform
 
 late {
   Position: {0, 0, 0}
-  ParticleEmitter: {rate: 10}
-  ParticleCurves: {size: {keys: [{0, 1}, {1, 2}, {1.5, 0}]}}
+  Emitter: {rate: 10}
+  Curves: {size: {keys: [{0, 1}, {1, 2}, {1.5, 0}]}}
 }

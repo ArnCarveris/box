@@ -135,7 +135,7 @@ static void recipe_fini(
  *
  * @param name File name of the recipe
  * @param entity Path of the entity of the recipe
- * @param component Path of the component, such as "box.particle.ParticleCurves"
+ * @param component Path of the component, such as "box.particle.Curves"
  * @param particles Whether the recipe has particles alive after its frames
  */
 static void recipe_check(
@@ -165,47 +165,47 @@ static void recipe_check(
 
 void CurveRecipes_format(void) {
     // particle/curve_docs
-    recipe_check("format.flecs", "smoke", "box.particle.ParticleCurves", true);
+    recipe_check("format.flecs", "smoke", "box.particle.Curves", true);
 }
 
 void CurveRecipes_fade(void) {
     // particle/curve_docs
-    recipe_check("fade.flecs", "fade", "box.particle.ParticleCurves", true);
+    recipe_check("fade.flecs", "fade", "box.particle.Curves", true);
 }
 
 void CurveRecipes_puff(void) {
     // particle/curve_docs
-    recipe_check("puff.flecs", "puff", "box.particle.ParticleCurves", true);
+    recipe_check("puff.flecs", "puff", "box.particle.Curves", true);
 }
 
 void CurveRecipes_spark(void) {
     // particle/curve_docs
-    recipe_check("spark.flecs", "spark", "box.particle.ParticleCurves", true);
+    recipe_check("spark.flecs", "spark", "box.particle.Curves", true);
 }
 
 void CurveRecipes_flame(void) {
     // particle/curve_docs
-    recipe_check("flame.flecs", "flame", "box.particle.ParticleCurves", true);
+    recipe_check("flame.flecs", "flame", "box.particle.Curves", true);
 }
 
 void CurveRecipes_burst(void) {
     // particle/curve_docs
-    recipe_check("burst.flecs", "burst", "box.particle.ParticleMotion", true);
+    recipe_check("burst.flecs", "burst", "box.particle.Motion", true);
 }
 
 void CurveRecipes_pulse(void) {
     // particle/curve_docs
-    recipe_check("pulse.flecs", "pulse", "box.particle.ParticleTimeline", true);
+    recipe_check("pulse.flecs", "pulse", "box.particle.Timeline", true);
 }
 
 void CurveRecipes_flicker(void) {
     // particle/curve_docs
-    recipe_check("flicker.flecs", "campfire", "box.particle.ParticleLight", true);
+    recipe_check("flicker.flecs", "campfire", "box.particle.Light", true);
 }
 
 void CurveRecipes_random_size(void) {
     // particle/curve_docs
-    recipe_check("random_size.flecs", "bubbles", "box.particle.ParticleCurves", true);
+    recipe_check("random_size.flecs", "bubbles", "box.particle.Curves", true);
 }
 
 void CurveRecipes_path(void) {
@@ -221,27 +221,27 @@ void CurveRecipes_ease(void) {
 
 void CurveRecipes_showcase_campfire(void) {
     // particle/curve_docs
-    recipe_check("showcase/campfire.flecs", "campfire.flame", "box.particle.ParticleLight", true);
-    recipe_check("showcase/campfire.flecs", "campfire.embers", "box.particle.ParticleMotion", true);
+    recipe_check("showcase/campfire.flecs", "campfire.flame", "box.particle.Light", true);
+    recipe_check("showcase/campfire.flecs", "campfire.embers", "box.particle.Motion", true);
 }
 
 void CurveRecipes_showcase_shockwave(void) {
     // particle/curve_docs
-    recipe_check("showcase/shockwave.flecs", "shockwave.core", "box.particle.ParticleLight", true);
-    recipe_check("showcase/shockwave.flecs", "shockwave.dust", "box.particle.ParticleMotion", true);
-    recipe_check("showcase/shockwave.flecs", "shockwave.debris", "box.particle.ParticleCollision",
+    recipe_check("showcase/shockwave.flecs", "shockwave.core", "box.particle.Light", true);
+    recipe_check("showcase/shockwave.flecs", "shockwave.dust", "box.particle.Motion", true);
+    recipe_check("showcase/shockwave.flecs", "shockwave.debris", "box.particle.Collision",
         true);
 }
 
 void CurveRecipes_showcase_orb(void) {
     // particle/curve_docs
-    recipe_check("showcase/orb.flecs", "orb.halo", "box.particle.ParticleTimeline", true);
-    recipe_check("showcase/orb.flecs", "orb.motes_front", "box.particle.ParticleMotion", true);
+    recipe_check("showcase/orb.flecs", "orb.halo", "box.particle.Timeline", true);
+    recipe_check("showcase/orb.flecs", "orb.motes_front", "box.particle.Motion", true);
 }
 
 void CurveRecipes_showcase_chimney(void) {
     // particle/curve_docs
-    recipe_check("showcase/chimney.flecs", "chimney.smoke", "box.particle.ParticleTimeline", true);
+    recipe_check("showcase/chimney.flecs", "chimney.smoke", "box.particle.Timeline", true);
 }
 
 /** Check that a mistake of test/assets/curves/mistakes loads and logs an error.

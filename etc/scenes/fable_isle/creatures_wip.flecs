@@ -418,14 +418,14 @@ assets {
     spout {
       Position: {0, 3.024, -6.6}
       NoShadow
-      ParticleEmitter: {
+      Emitter: {
         max: 500, rate: spouting ? 190 : 0, direction: {0, 1, 0.08}, spread: 8,
         speed: {8 * size, 12 * size}, lifetime: {0.9, 1.7}, size: {0.35 * size, 0.7 * size}, rotation: {0, 360},
         opacity: {0.55, 0.9}, color: {236, 248, 255}, seed: 31
       }
-      ParticleForces: {gravity: {0, -6 * size, 0}, drag: 1.1, turbulence: 1.2}
-      ParticleCurves: {size: {keys: [{0, 0.6}, {1, 3.6}]}, opacity: {keys: [{0, 1}, {0.5, 0.55}, {1, 0}]}}
-      ParticleAppearance: {softness: 0.3, lit: 0.5}
+      Forces: {gravity: {0, -6 * size, 0}, drag: 1.1, turbulence: 1.2}
+      Curves: {size: {keys: [{0, 0.6}, {1, 3.6}]}, opacity: {keys: [{0, 1}, {0.5, 0.55}, {1, 0}]}}
+      Appearance: {softness: 0.3, lit: 0.5}
     }
     tail {
       Position: {0, 0.225, 3.4}

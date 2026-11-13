@@ -115,14 +115,14 @@ assets {
 
       motes {
         Position: {0, 0.04, 0}
-        ParticleEmitter: {
+        Emitter: {
           max: 80, rate: 22, shape: EmitterDisc, radius: 0.05,
           direction: {0, 1, 0}, spread: 18, speed: {0.04, 0.12}, lifetime: {1.4, 3}, size: {0.0015, 0.004},
           color: {110, 214, 255}, opacity: {0.5, 1}, seed: 5
         }
-        ParticleForces: {gravity: {0, 0, 0}, turbulence: 0.02}
-        ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive}
-        ParticleCurves: {opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0}]}}
+        Forces: {gravity: {0, 0, 0}, turbulence: 0.02}
+        Appearance: {shape: Circle, blend: Additive}
+        Curves: {opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.8}, {1, 0}]}}
       }
 
       field {

@@ -28,15 +28,15 @@
     "using box.transform\n" \
     "@tree ChildOf\n" \
     "prefab Puff {\n" \
-    "  ParticleEmitter: {lifetime: {1, 1}}\n" \
-    "  ParticleBurst: {count: 3}\n" \
+    "  Emitter: {lifetime: {1, 1}}\n" \
+    "  Burst: {count: 3}\n" \
     "  ring {\n" \
-    "    ParticleEmitter: {rate: 60, lifetime: {0.5, 0.5}}\n" \
+    "    Emitter: {rate: 60, lifetime: {0.5, 0.5}}\n" \
     "  }\n" \
     "  spark {\n" \
     "    Position: {1, 0, 0}\n" \
-    "    ParticleEmitter: {lifetime: {0.5, 0.5}}\n" \
-    "    ParticleBurst: {count: 2}\n" \
+    "    Emitter: {lifetime: {0.5, 0.5}}\n" \
+    "    Burst: {count: 2}\n" \
     "  }\n" \
     "}\n"
 
@@ -362,7 +362,7 @@ void Drift_c_default(void) {
 
     test_assert(ecs_script_run(world, "forces",
         "using box.particle\n"
-        "zone { ParticleForces: {drift: {1, 2, 3}} }\n", NULL) == 0);
+        "zone { Forces: {drift: {1, 2, 3}} }\n", NULL) == 0);
     f = ecs_get(world, ecs_lookup(world, "zone"), ParticleForces);
     check_vec3(f->drift, 1, 2, 3);
     check_vec3(f->gravity, 0, -9.81f, 0);

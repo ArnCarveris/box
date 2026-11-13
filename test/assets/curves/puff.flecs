@@ -6,13 +6,13 @@ using box.transform
 
 puff {
   Position: {0, 0, 0}
-  ParticleEmitter: {
+  Emitter: {
     max: 200, rate: 25, shape: EmitterSphere, radius: 0.1, spread: 25,
     speed: {0.4, 0.8}, lifetime: {1.5, 2.5}, size: {0.4, 0.6},
     opacity: {0.6, 0.8}, color: {200, 200, 205}, seed: 2
   }
-  ParticleForces: {gravity: {0, 0.3, 0}, drag: 0.8}
-  ParticleCurves: {
+  Forces: {gravity: {0, 0.3, 0}, drag: 0.8}
+  Curves: {
     size: {kind: CurveCatmullRom, keys: [{0, 0.3}, {0.3, 1.8}, {1, 2.4}]}
     opacity: {keys: [{0, 0}, {0.1, 1}, {1, 0}]}
   }

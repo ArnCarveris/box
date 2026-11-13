@@ -49,7 +49,7 @@ ECS_STRUCT(ParticleRange, {
  * ParticleEmitter.forces names or on the emitter entity itself.
  *
  * An emitter adds up the forces of the three; with none, particles feel no force at all, so
- * ParticleForces: {} on the emitter is what makes them fall. A frame adds the accelerations to
+ * Forces: {} on the emitter is what makes them fall. A frame adds the accelerations to
  * the velocity, pulls it toward the wind by drag, then moves by velocity plus drift.
  *
  * The drift is the velocity of a frame of reference the particles move with, as a world that
@@ -291,7 +291,7 @@ ECS_STRUCT(ParticleGradient, {
  * {1, 2.2}]}}. It owns its keys, so copies, prefabs, IsA and effect instances have their own.
  *
  * Every curve multiplies the value a particle spawned with except rotation, which adds turns.
- * Without keys a curve is the default of its field, so `ParticleCurves: {}` changes nothing.
+ * Without keys a curve is the default of its field, so `Curves: {}` changes nothing.
  * Size, opacity and color clamp at 0 where a curve overshoots; rotation and spin may go negative.
  *
  * A curve with max_keys draws its blend from a stream of its own, so the other draws stay.
