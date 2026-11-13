@@ -1,0 +1,25 @@
+// A cloud layer as a template: a static sky gradient, and coordinates that drift with the world
+// clock at a speed of its own, the brighter of the two. The sky and the coordinates are static
+// stages, so every layer of one size shares their cached values, whatever its speed; only the
+// output stage runs at each update.
+
+using flecs.script
+using box.texture
+
+clouds {
+  @tree Parent
+  template CloudLayer {
+    prop speed: f32 = 0.02
+    prop rate: f32 = 30
+    prop size: i32 = 512
+
+    uv { TexCoords: {scale: 1} }
+    sky { TexMath: {op: MathMix, a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, c: uv} }
+    time { TexTime: {scale: speed, offset: 0} }
+    drift { TexSplat: {in: time} }
+    moved { TexMath: {op: MathAdd, a: uv, b: drift} }
+    puffs { TexMath: {op: MathMultiply, a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
+    out { TexMath: {op: MathMax, a: sky, b: puffs} }
+    TextureGraph: {output: out, width: size, height: size, domain: DomainPlane, format: GraphColor, rate: rate}
+  }
+}
