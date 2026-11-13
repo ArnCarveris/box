@@ -83,10 +83,13 @@ or removing it while it animates in, starts from the rendered value without a ju
 | `DiffuseTransmission` | Factor, thickness and blur 0, the target color |
 | `Fresnel` | Strength and opacity 0, the target color, power and bias |
 | `BoxShadow` (add only) | The target offsets, blur and spread, color alpha 0 |
+| `PointLight` | Intensity 0, the target range, bake mode and shadows |
+| `SpotLight` | Intensity 0, the target range, angles, bake mode and shadows |
 
 `Position`, `Rgb`, `AlphaCutoff` and `Transmission` have no neutral value: an entity
 without a `Position` is not placed by its parent, a shape without `Rgb` renders a
-default grey, and the other two change the batch of a shape. Removing `BoxShadow`
+default grey, and the other two change the batch of a shape. `DirectionalLight` is
+not transitionable and has none either; the `Rgb` of a light still transitions. Removing `BoxShadow`
 frees its shadow at once. `on_add` or `on_remove` on one of them logs an error and is
 ignored; the rest of the entry still works.
 
@@ -189,6 +192,8 @@ error naming the entity/component and ignore that entry. Other entries still wor
 | Hierarchy | `Tint`, `Opacity` | Composed down `ChildOf` and `Parent` |
 | 2D shadow | `BoxShadow` | Shadow offset, blur, spread and color |
 | 2D shape | `Border` | Border width, radius and color of a `Rect`, `Circle` or `Polygon2D` |
+| Light | `PointLight`, `SpotLight` | Intensity, range and cone angles; bake mode and shadows switch at once |
+| Light color | `Rgb` | Color of a `PointLight`, `SpotLight` or `DirectionalLight` on the entity |
 
 Material values transition on the entity that owns them. A prefab change therefore
 animates its material and the instances inheriting it; an overridden value has its

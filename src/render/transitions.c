@@ -91,6 +91,8 @@ ecs_entity_t box_transitions_id(
     case BOX_RENDER_TRANSITION_FRESNEL: result = ecs_id(Fresnel); break;
     case BOX_RENDER_TRANSITION_BOX_SHADOW: result = ecs_id(BoxShadow); break;
     case BOX_RENDER_TRANSITION_BORDER: result = ecs_id(Border); break;
+    case BOX_RENDER_TRANSITION_POINT_LIGHT: result = ecs_id(PointLight); break;
+    case BOX_RENDER_TRANSITION_SPOT_LIGHT: result = ecs_id(SpotLight); break;
     case BOX_RENDER_TRANSITION_COMPONENTS: break;
     }
 
@@ -459,16 +461,7 @@ done:
     return result;
 }
 
-/** Find the node of the value of a component an entity renders: the node of the entity or the
- * IsA base that owns the value, or while no entity owns one, the node that leaves it.
- *
- * @param world The world
- * @param s The state of the extract
- * @param e The entity
- * @param component The component
- * @return The node, 0 for none
- */
-static uint32_t box_transition_owner(
+uint32_t box_transitions_owner(
     const ecs_world_t *world,
     const box_render_transitions_t *s,
     ecs_entity_t e,
@@ -484,7 +477,7 @@ static uint32_t box_transition_owner(
 }
 
 /** Find the nodes whose running transitions a record reads: for each material component of
- * a mask, the node the value comes from (box_transition_owner) when its transition runs.
+ * a mask, the node the value comes from (box_transitions_owner) when its transition runs.
  *
  * @param world The world
  * @param s The state of the extract
@@ -511,7 +504,7 @@ static uint32_t box_transition_material_nodes(
             continue;
         }
 
-        uint32_t node = box_transition_owner(world, s, e, c);
+        uint32_t node = box_transitions_owner(world, s, e, c);
         if (node && box_render_transitions_active(s, node, c, time)) {
             out[c] = node;
             result |= 1u << c;
@@ -1038,6 +1031,7 @@ static void BoxRenderExtractTransitions(
     box_transition_affect(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
     box_transition_materials(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
     box_transitions_box_shadows(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
+    box_transitions_lights(world, s, ecs_map_count(&s->by_entity) ? p : NULL);
 }
 
 /** Copy a matrix into the packet data.
@@ -1827,6 +1821,8 @@ static void box_transitions_free(
     ecs_map_fini(&s->tagged_opacity);
     ecs_map_fini(&s->box_shadow_index);
     ecs_map_fini(&s->tagged_box_shadow);
+    ecs_map_fini(&s->light_index);
+    ecs_vec_fini_t(NULL, &s->lights, box_render_light_transition_t);
     ecs_vec_fini_t(NULL, &s->box_shadows, box_transition_box_shadow_t);
     ecs_vec_fini_t(NULL, &s->fade_items, box_transition_item_t);
     ecs_vec_fini_t(NULL, &s->fade_rels, box_transition_fade_rel_t);
@@ -1931,6 +1927,8 @@ void box_render_transitions_init(
     ecs_map_init(&s->tagged_opacity, NULL);
     ecs_map_init(&s->box_shadow_index, NULL);
     ecs_map_init(&s->tagged_box_shadow, NULL);
+    ecs_map_init(&s->light_index, NULL);
+    ecs_vec_init_t(NULL, &s->lights, box_render_light_transition_t, 0);
     ecs_vec_init_t(NULL, &s->box_shadows, box_transition_box_shadow_t, 0);
     ecs_vec_init_t(NULL, &s->fade_items, box_transition_item_t, 0);
     ecs_vec_init_t(NULL, &s->fade_rels, box_transition_fade_rel_t, 0);

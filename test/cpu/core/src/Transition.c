@@ -1451,6 +1451,9 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(Fresnel)));
     test_assert(box_transition_supported(world, ecs_id(BoxShadow)));
     test_assert(box_transition_supported(world, ecs_id(Border)));
+    test_assert(box_transition_supported(world, ecs_id(PointLight)));
+    test_assert(box_transition_supported(world, ecs_id(SpotLight)));
+    test_assert(!box_transition_supported(world, ecs_id(DirectionalLight)));
 
     test_assert(!box_transition_supported(world, ecs_id(PbrTextures)));
     test_assert(!box_transition_supported(world, ecs_id(WorldTransform)));
@@ -1802,11 +1805,12 @@ void Transition_neutral_supported(void) {
         ecs_id(Rotation), ecs_id(Scale), ecs_id(Opacity), ecs_id(Tint), ecs_id(PbrMaterial),
         ecs_id(Emissive), ecs_id(TextureTransform), ecs_id(ClearCoat),
         ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission),
-        ecs_id(Fresnel)
+        ecs_id(Fresnel), ecs_id(PointLight), ecs_id(SpotLight)
     };
     ecs_entity_t none[] = {
         ecs_id(Position), ecs_id(Rgb), ecs_id(AlphaCutoff), ecs_id(Transmission),
-        ecs_id(PbrTextures), ecs_id(WorldTransform), ecs_id(Transition), 0
+        ecs_id(PbrTextures), ecs_id(WorldTransform), ecs_id(Transition),
+        ecs_id(DirectionalLight), 0
     };
     int32_t i;
 

@@ -877,3 +877,65 @@ void Transition_mesh_color_shared_slot_transition_back(void) {
     trans_no_errors(world);
     ecs_fini(world);
 }
+
+/** A point light 2 units above the white floor, under the camera, fades from intensity 0.5 to 2
+ * in one second: half way the floor under it is brighter than at the start and darker than at
+ * the end, as the light buffer the GPU reads holds the rendered intensity. */
+void Transition_point_light_intensity_mid_transition(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {40, 0.2f, 40});
+    ecs_set(world, floor, Rgb, {255, 255, 255});
+    ecs_set(world, floor, PbrMaterial, {.roughness = 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 4, 0});
+    ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 90, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {0, 2, 0});
+    ecs_set(world, light, Rgb, {255, 255, 255});
+    ecs_set(world, light, PointLight, {.intensity = 0.5f, .range = 10, .shadow_resolution = 512});
+    box_transition_set(world, light, ecs_id(PointLight),
+        &(TransitionSpec){ .duration = 1.0f });
+    int32_t mid = TRANS_SIZE / 2, start, middle, end;
+
+    stbi_image_free(trans_capture(world, "transition_light_0.png"));
+    unsigned char *px = trans_capture(world, "transition_light_1.png");
+    start = trans_channel(px, mid, mid, 0);
+    stbi_image_free(px);
+
+    ecs_set(world, light, PointLight, {.intensity = 2, .range = 10, .shadow_resolution = 512});
+    stbi_image_free(trans_capture(world, "transition_light_2.png"));
+    stbi_image_free(trans_capture(world, "transition_light_3.png"));
+    px = trans_capture(world, "transition_light_4.png");
+    middle = trans_channel(px, mid, mid, 0);
+    test_flt(ecs_get(world, light, PointLight)->intensity, 2);
+    stbi_image_free(px);
+
+    stbi_image_free(trans_capture(world, "transition_light_5.png"));
+    stbi_image_free(trans_capture(world, "transition_light_6.png"));
+    px = trans_capture(world, "transition_light_7.png");
+    end = trans_channel(px, mid, mid, 0);
+    stbi_image_free(px);
+
+    test_assert(start > 10);
+    test_assert(end > start + 30);
+    test_assert(middle > start + 5);
+    test_assert(middle < end - 5);
+
+    trans_no_errors(world);
+    ecs_fini(world);
+}

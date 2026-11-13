@@ -10,7 +10,8 @@
 #include "draw.h"
 
 /** Fields of a component whose range of targets a slot keeps: the three of Position, Rotation
- * and Scale, offset_x, offset_y, blur and spread of BoxShadow */
+ * and Scale, offset_x, offset_y, blur and spread of BoxShadow, intensity and range of PointLight,
+ * intensity, range, inner and outer angle of SpotLight */
 #define BOX_TRANSITION_RANGE (4)
 
 /** A transitioned component of an entity, as the extract last sent it */
@@ -29,7 +30,8 @@ typedef struct box_transition_slot_t {
     uint8_t value[BOX_RENDER_TRANSITION_VALUE]; /**< The last target sent */
     float lo[BOX_TRANSITION_RANGE]; /**< Per field minimum of the targets sent since it was
                                      *   last idle, which bounds the value it renders: Position,
-                                     *   Rotation, Scale and the floats of BoxShadow only */
+                                     *   Rotation, Scale, the floats of BoxShadow and the lights
+                                     *   only */
     float hi[BOX_TRANSITION_RANGE]; /**< Per field maximum of those targets */
 } box_transition_slot_t;
 
@@ -123,6 +125,9 @@ struct box_render_transitions_t {
                                      *   last extract that kept it */
     int32_t leaving;                /**< Slots that are leaving in this frame, 0 skips the
                                      *   lookup of a leaving owner */
+    ecs_vec_t lights;               /**< box_render_light_transition_t, the lights whose light
+                                     *   or Rgb transitions in this frame */
+    ecs_map_t light_index;          /**< Entity to its entry of lights plus 1 */
 };
 
 /** A record an active material transition patches: a slot of the material table or a drawn
@@ -166,8 +171,10 @@ bool box_transitions_opts(
  * neutral value and starts from it in the same packet. With on_remove a removed value without an
  * inherited one starts to the neutral value and the slot leaves until it no longer runs.
  *
- * A transform component and a BoxShadow keep the range of their targets since they were last
- * idle, widened by what the curve overshoots, as the resolver starts from the value it renders.
+ * A transform component, a BoxShadow and a light keep the range of their targets since they
+ * were last idle, widened by what the curve overshoots, as the resolver starts from the value it
+ * renders. A light whose fields are unchanged still takes the members that switch at once, so a
+ * light that leaves keeps its bake mode and shadows.
  *
  * A removed material lobe keeps its shapes on the extended mesh shader while it leaves, so they
  * are marked as changed when it stops leaving (box_transitions_lobes_left).
@@ -324,5 +331,33 @@ void box_transitions_send_box_shadows(
     const box_render_transitions_t *s,
     box_render_draws_t *d,
     box_render_packet_t *p);
+
+/** Find the lights whose PointLight or SpotLight runs or leaves, or whose Rgb runs, in this
+ * frame: the entities of the nodes and their IsA instances, prefabs excluded. A frame without
+ * such a node visits no entity.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param p The packet, NULL when no entity has Transition
+ */
+void box_transitions_lights(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    const box_render_packet_t *p);
+
+/** Find the node of the value of a component an entity renders: the node of the entity or the
+ * IsA base that owns the value, or while no entity owns one, the node that leaves it.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param e The entity
+ * @param component The component
+ * @return The node, 0 for none
+ */
+uint32_t box_transitions_owner(
+    const ecs_world_t *world,
+    const box_render_transitions_t *s,
+    ecs_entity_t e,
+    box_render_transition_component_t component);
 
 #endif

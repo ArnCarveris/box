@@ -122,7 +122,7 @@ bool box_transition_bezier_valid(
  *
  * Position, Rotation, Scale, Rgb, Opacity, AlphaCutoff, Tint, PbrMaterial, Emissive,
  * TextureTransform, Transmission, ClearCoat, SpecularAnisotropy, Sheen, DiffuseTransmission,
- * Fresnel, BoxShadow and Border can. Every other id cannot.
+ * Fresnel, BoxShadow, Border, PointLight and SpotLight can. Every other id cannot.
  *
  * @param world The world
  * @param component The component id
@@ -136,8 +136,9 @@ bool box_transition_supported(
  * that renders like not having it.
  *
  * Rotation, Scale, Opacity, Tint, Emissive, PbrMaterial, TextureTransform, ClearCoat,
- * SpecularAnisotropy, Sheen, DiffuseTransmission and Fresnel can in both directions, BoxShadow
- * only when added: a removed BoxShadow frees its shadow at once.
+ * SpecularAnisotropy, Sheen, DiffuseTransmission, Fresnel, PointLight and SpotLight
+ * (intensity 0) can in both directions, BoxShadow only when added: a removed BoxShadow frees
+ * its shadow at once.
  *
  * Position, Rgb, AlphaCutoff, Transmission and the components that cannot transition have no
  * neutral value: on_add or on_remove on one of them logs an error and is ignored.

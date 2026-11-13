@@ -37,10 +37,10 @@ static void box_transition_send(
     ecs_os_memcpy(r->value, slot->value, BOX_RENDER_TRANSITION_VALUE);
 }
 
-/** Set or widen the per field range of the targets of a transform component or a BoxShadow.
+/** Set or widen the per field range of the targets of a transform component, a BoxShadow or
+ * a light.
  *
- * @param component The component, nothing for one other than Position, Rotation, Scale or
- * BoxShadow
+ * @param component The component, nothing for one box_render_transition_ranged rejects
  * @param slot The slot of the component
  * @param value A target, in the layout of the component
  * @param reset Whether the range becomes the target alone
@@ -53,9 +53,7 @@ static void box_transition_range_add(
 {
     const box_render_transition_layout_t *layout;
     int32_t i;
-    if (component > BOX_RENDER_TRANSITION_SCALE &&
-        component != BOX_RENDER_TRANSITION_BOX_SHADOW)
-    {
+    if (!box_render_transition_ranged(component)) {
         goto done;
     }
 
@@ -208,6 +206,10 @@ void box_transitions_compare(
             box_transition_send(p, node, component, slot, NULL);
         } else if (!box_render_transition_equal(component, slot->value, packed)) {
             box_transition_change(p, node, component, slot, spec, packed);
+        } else if (component == BOX_RENDER_TRANSITION_POINT_LIGHT ||
+            component == BOX_RENDER_TRANSITION_SPOT_LIGHT)
+        {
+            ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
         }
 
         slot->leaving = false;

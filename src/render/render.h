@@ -483,6 +483,22 @@ void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats);
 
+/** Write a light of a light buffer again from the values a transition renders, as the light
+ * extract writes it: its color from the Rgb and the intensity, times the scale of the record,
+ * and for a point or spot light its range, and for a spot light its cone. Its position,
+ * direction and shadow tile stay. Runs on the thread that resolves the transitions.
+ *
+ * @param target The target of the light record
+ * @param values The rendered intensity, range, inner and outer angle
+ * @param rgb The rendered Rgb, white when the target has none
+ * @param light The light, patched
+ */
+void box_render_lights_patch(
+    const box_render_transition_light_t *target,
+    const float *values,
+    const Rgb *rgb,
+    box_render_light_t *light);
+
 /** Get the state of the light extract of a world, valid as long as the world.
  *
  * @param world The world
@@ -2041,7 +2057,8 @@ const box_render_transition_layout_t* box_render_transition_layout(
     box_render_transition_component_t component);
 
 /** Copy the fields of a component value into a value of a record or the table, zeroing the
- * padding, so values compare and copy as bytes.
+ * padding, so values compare and copy as bytes. A light also keeps the members that switch at
+ * once (bake, shadows and shadow_resolution), which are neither compared nor mixed.
  *
  * @param component The component
  * @param src The component value
@@ -2100,15 +2117,25 @@ bool box_render_transition_neutral(
     const void *target,
     void *out);
 
-/** Widen the per field range of the targets of a transform component or a BoxShadow by what a
- * CubicBezier can overshoot: from + (to - from) * e, with e in the hull of 0, y1, y2 and 1, lies
- * at most max(y1, y2) - 1 or -min(y1, y2) range widths beyond it. The presets do not overshoot.
+/** Check whether the extract keeps the per field range of the targets of a component: a
+ * transform component, a BoxShadow, a PointLight or a SpotLight.
  *
- * @param component The component, nothing for one other than Position, Rotation, Scale or
- * BoxShadow
+ * @param component The component
+ * @return Whether it is one of them
+ */
+bool box_render_transition_ranged(
+    box_render_transition_component_t component);
+
+/** Widen the per field range of the targets of a transform component, a BoxShadow or a light
+ * by what a CubicBezier can overshoot: from + (to - from) * e, with e in the hull of 0, y1, y2
+ * and 1, lies at most max(y1, y2) - 1 or -min(y1, y2) range widths beyond it. The presets do not
+ * overshoot.
+ *
+ * @param component The component, nothing for one box_render_transition_ranged rejects
  * @param spec The transition of the start
  * @param lo The per field minimum, widened: three floats, four (offset_x, offset_y, blur and
- * spread) for a BoxShadow
+ * spread) for a BoxShadow, two (intensity and range) for a PointLight and four (intensity,
+ * range, inner and outer angle) for a SpotLight
  * @param hi The per field maximum, widened
  */
 void box_render_transition_widen(
@@ -2313,6 +2340,49 @@ bool box_render_transitions_active(
     uint32_t node,
     box_render_transition_component_t component,
     double time);
+
+/** A light the transition extract found in this frame whose PointLight or SpotLight runs or
+ * leaves, or whose Rgb runs: the light extract keeps it lit and sends a light record for it */
+typedef struct box_render_light_transition_t {
+    ecs_entity_t entity;    /**< The light entity */
+    int32_t kind;           /**< 0 for a directional, 1 for a point and 2 for a spot light */
+    bool leaving;           /**< The entity no longer has its light, which renders its way to
+                             *   the neutral value of on_remove */
+    uint32_t node;          /**< Node whose PointLight or SpotLight the light renders, 0 when
+                             *   it renders its target */
+    uint32_t rgb_node;      /**< Node whose Rgb the light renders, 0 for its target */
+    float range;            /**< Largest range the light can render in this frame: its target
+                             *   and the range of the targets since its node was last idle */
+    float outer;            /**< Largest outer angle of a spot light, the same way */
+    uint8_t value[BOX_RENDER_TRANSITION_VALUE]; /**< Target light, packed: the PointLight or
+                             *   SpotLight, of a leaving light the neutral value it renders its
+                             *   way to, the DirectionalLight intensity in the first float */
+    Rgb rgb;                /**< Target Rgb, white without one */
+    bool has_rgb;           /**< The light has an Rgb, owned or inherited */
+} box_render_light_transition_t;
+
+/** Get the transition of a light in this frame.
+ *
+ * Returns at once in a frame without a light transition, so lights of a world that does not
+ * transition them cost a compare.
+ *
+ * @param s The state of the transition extract, NULL for none
+ * @param entity The light entity
+ * @return The transition, NULL for none
+ */
+const box_render_light_transition_t* box_render_transitions_light(
+    const box_render_transitions_t *s,
+    ecs_entity_t entity);
+
+/** Get every light transition of this frame.
+ *
+ * @param s The state of the transition extract, NULL for none
+ * @param out Receives the transitions
+ * @return Their number
+ */
+int32_t box_render_transitions_lights(
+    const box_render_transitions_t *s,
+    const box_render_light_transition_t **out);
 
 /** Check whether any component of a node has a running transition at a time.
  *

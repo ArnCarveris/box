@@ -1611,12 +1611,14 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_FRESNEL,          /**< Fresnel */
     BOX_RENDER_TRANSITION_BOX_SHADOW,       /**< BoxShadow */
     BOX_RENDER_TRANSITION_BORDER,           /**< Border */
+    BOX_RENDER_TRANSITION_POINT_LIGHT,      /**< PointLight */
+    BOX_RENDER_TRANSITION_SPOT_LIGHT,       /**< SpotLight */
     BOX_RENDER_TRANSITION_COMPONENTS        /**< Number of transitionable components */
 } box_render_transition_component_t;
 
-/** Bytes of the largest transitionable components (Transmission, Fresnel, BoxShadow), the size of a
- * value in a record, a multiple of 4 so a value holds floats */
-#define BOX_RENDER_TRANSITION_VALUE (20)
+/** Bytes of the largest transitionable component (SpotLight), the size of a value in a record,
+ * a multiple of 4 so a value holds floats */
+#define BOX_RENDER_TRANSITION_VALUE (28)
 
 /** Fields of the transitionable component with the most fields: BoxShadow, four floats and
  * the four bytes of its color */
@@ -1641,10 +1643,28 @@ typedef enum box_render_transition_op_t {
     BOX_RENDER_TRANSITION_FADE,         /**< The rendered tints and opacity of a node with an
                                          *   active Tint or Opacity transition, for this packet,
                                          *   composed from its parent node */
-    BOX_RENDER_TRANSITION_SHADOW_BOX    /**< The transform and the box_render_shading_t of the
+    BOX_RENDER_TRANSITION_SHADOW_BOX,   /**< The transform and the box_render_shading_t of the
                                          *   shadow of a 2D shape, resolved again from the
                                          *   box_draw_transition_box_shadow_t and its node */
+    BOX_RENDER_TRANSITION_LIGHT         /**< A box_render_light_t of a light buffer upload in
+                                         *   the packet data, written again from the
+                                         *   box_render_transition_light_t and the rendered
+                                         *   light and Rgb of its nodes */
 } box_render_transition_op_t;
+
+/** What a light record points at in the packet data: the target of a light whose light
+ * component or Rgb transitions. The node of the record renders the PointLight or SpotLight,
+ * 0 when it is at its target. */
+typedef struct box_render_transition_light_t {
+    uint32_t kind;          /**< 0 for a directional, 1 for a point and 2 for a spot light */
+    uint32_t rgb_node;      /**< Node whose Rgb the light renders, 0 for the target Rgb */
+    float values[4];        /**< Target intensity, range, inner and outer angle */
+    float scale[3];         /**< Per channel factor the extract applied to the color of the
+                             *   light after its Rgb and intensity: the attenuation of a sun or
+                             *   moon, 1 for the others */
+    uint8_t rgb[3];         /**< Target Rgb, white without one */
+    uint8_t has_rgb;        /**< The light has an Rgb */
+} box_render_transition_light_t;
 
 /** What a fade record points at in the packet data: the composed Tint and Opacity of the
  * entities between a node and its parent node, and the target Tint and Opacity of the node.
@@ -1686,7 +1706,8 @@ typedef struct box_render_transition_pose_t {
  *
  * Pose and slot records come every frame a node moves, parent nodes first; fade records every
  * frame a Tint or Opacity runs, parent nodes first; material, shading and box shadow records
- * every frame they run, one per record, box shadows after the poses they read.
+ * every frame they run, one per record, box shadows after the poses they read; light records
+ * every frame a light transitions, one per light of an uploaded light buffer.
  */
 typedef struct box_render_transition_record_t {
     box_render_transition_op_t op;  /**< What the record does */
@@ -1695,10 +1716,12 @@ typedef struct box_render_transition_record_t {
                                      *   moves the shape of a box shadow, 0 for none */
     uint32_t data;                  /**< Packet data offset of the pose of a pose, the rel
                                      *   matrix of a slot, the box_render_transition_fade_t of a
-                                     *   fade, else the box_draw_transition_*_t of its op */
+                                     *   fade, the box_render_transition_light_t of a light,
+                                     *   else the box_draw_transition_*_t of its op */
     uint32_t offset;                /**< Packet data offset of the box_render_transform_t a
                                      *   slot patches, or of the record a material or shading
-                                     *   record patches, the shading of a box shadow */
+                                     *   record patches, the shading of a box shadow, the
+                                     *   box_render_light_t of a light */
     box_render_transition_component_t component; /**< Component of a start */
     TimingFunction timing_function; /**< Curve of a start */
     TransitionBezier bezier;        /**< Handles of a CubicBezier start, zero for the others */

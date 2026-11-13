@@ -1257,7 +1257,8 @@
                     "clear_coat_mid_transition",
                     "transmission_mid_transition",
                     "mesh_color_shared_slot_transition",
-                    "mesh_color_shared_slot_transition_back"
+                    "mesh_color_shared_slot_transition_back",
+                    "point_light_intensity_mid_transition"
                 ]
             },
             {

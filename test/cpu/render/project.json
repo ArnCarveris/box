@@ -899,6 +899,29 @@
                 ]
             },
             {
+                "id": "TransitionLight",
+                "testcases": [
+                    "point_intensity",
+                    "point_range",
+                    "range_to_zero",
+                    "spot_intensity_range_angles",
+                    "point_color",
+                    "spot_color",
+                    "directional_color",
+                    "point_add",
+                    "point_remove",
+                    "spot_add_remove",
+                    "remove_snaps",
+                    "fade_to_zero",
+                    "interrupted",
+                    "instance_of_prefab",
+                    "shadow_tile_intensity",
+                    "shadow_tile_range",
+                    "no_transition_no_records",
+                    "neutral_values"
+                ]
+            },
+            {
                 "id": "MeshShader",
                 "testcases": [
                     "plain_mesh_draws_with_mesh_shader",

@@ -20,6 +20,11 @@
 #define BOX_TRANSITION_U8(T, m) \
     { (uint16_t)offsetof(T, m), BOX_RENDER_TRANSITION_U8 }
 
+/** Copy a member of a component between unaligned values */
+#define BOX_TRANSITION_COPY(T, m, src, dst) \
+    ecs_os_memcpy(ECS_OFFSET(dst, offsetof(T, m)), ECS_OFFSET(src, offsetof(T, m)), \
+        ECS_SIZEOF(((T*)0)->m))
+
 /* A value of a record or the table holds every transitionable component */
 _Static_assert(sizeof(Position) <= BOX_RENDER_TRANSITION_VALUE, "Position fits a value");
 _Static_assert(sizeof(Rotation) <= BOX_RENDER_TRANSITION_VALUE, "Rotation fits a value");
@@ -42,6 +47,11 @@ _Static_assert(sizeof(DiffuseTransmission) <= BOX_RENDER_TRANSITION_VALUE,
 _Static_assert(sizeof(Fresnel) <= BOX_RENDER_TRANSITION_VALUE, "Fresnel fits a value");
 _Static_assert(sizeof(BoxShadow) <= BOX_RENDER_TRANSITION_VALUE, "BoxShadow fits a value");
 _Static_assert(sizeof(Border) <= BOX_RENDER_TRANSITION_VALUE, "Border fits a value");
+_Static_assert(sizeof(PointLight) <= BOX_RENDER_TRANSITION_VALUE, "PointLight fits a value");
+_Static_assert(sizeof(SpotLight) <= BOX_RENDER_TRANSITION_VALUE, "SpotLight fits a value");
+_Static_assert(offsetof(PointLight, intensity) == offsetof(SpotLight, intensity) &&
+    offsetof(PointLight, range) == offsetof(SpotLight, range),
+    "A light record reads the intensity and range of both lights alike");
 _Static_assert(BOX_RENDER_TRANSITION_VALUE % sizeof(float) == 0, "A value holds floats");
 _Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 32,
     "box_draw_transition_material_t.present holds a bit per component");
@@ -137,7 +147,15 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_U8(Border, color.r),
         BOX_TRANSITION_U8(Border, color.g),
         BOX_TRANSITION_U8(Border, color.b),
-        BOX_TRANSITION_U8(Border, color.a) } }
+        BOX_TRANSITION_U8(Border, color.a) } },
+    [BOX_RENDER_TRANSITION_POINT_LIGHT] = { ECS_SIZEOF(PointLight), 2, {
+        BOX_TRANSITION_FLOAT(PointLight, intensity),
+        BOX_TRANSITION_FLOAT(PointLight, range) } },
+    [BOX_RENDER_TRANSITION_SPOT_LIGHT] = { ECS_SIZEOF(SpotLight), 4, {
+        BOX_TRANSITION_FLOAT(SpotLight, intensity),
+        BOX_TRANSITION_FLOAT(SpotLight, range),
+        BOX_TRANSITION_FLOAT(SpotLight, inner_angle),
+        BOX_TRANSITION_FLOAT(SpotLight, outer_angle) } }
 };
 
 const box_render_transition_layout_t* box_render_transition_layout(
@@ -172,6 +190,16 @@ void box_render_transition_pack(
         const box_render_transition_field_t *field = &layout->fields[i];
         ecs_os_memcpy(ECS_OFFSET(dst, field->offset), ECS_OFFSET(src, field->offset),
             box_transition_field_size(field));
+    }
+
+    if (component == BOX_RENDER_TRANSITION_POINT_LIGHT) {
+        BOX_TRANSITION_COPY(PointLight, bake, src, dst);
+        BOX_TRANSITION_COPY(PointLight, shadows, src, dst);
+        BOX_TRANSITION_COPY(PointLight, shadow_resolution, src, dst);
+    } else if (component == BOX_RENDER_TRANSITION_SPOT_LIGHT) {
+        BOX_TRANSITION_COPY(SpotLight, bake, src, dst);
+        BOX_TRANSITION_COPY(SpotLight, shadows, src, dst);
+        BOX_TRANSITION_COPY(SpotLight, shadow_resolution, src, dst);
     }
 }
 
@@ -238,11 +266,9 @@ void box_render_transition_widen(
     float *hi)
 {
     float over;
-    int32_t i, count = component == BOX_RENDER_TRANSITION_BOX_SHADOW ? 4 : 3;
-    if ((component > BOX_RENDER_TRANSITION_SCALE &&
-        component != BOX_RENDER_TRANSITION_BOX_SHADOW) ||
-        spec->timing_function != CubicBezier)
-    {
+    int32_t i, count = box_render_transition_layout(component)->count;
+    count = count < 4 ? count : 4;
+    if (!box_render_transition_ranged(component) || spec->timing_function != CubicBezier) {
         goto done;
     }
 
@@ -259,6 +285,15 @@ void box_render_transition_widen(
     }
 done:
     return;
+}
+
+bool box_render_transition_ranged(
+    box_render_transition_component_t component)
+{
+    return component <= BOX_RENDER_TRANSITION_SCALE ||
+        component == BOX_RENDER_TRANSITION_BOX_SHADOW ||
+        component == BOX_RENDER_TRANSITION_POINT_LIGHT ||
+        component == BOX_RENDER_TRANSITION_SPOT_LIGHT;
 }
 
 bool box_render_transition_neutral(
@@ -316,10 +351,17 @@ bool box_render_transition_neutral(
     case BOX_RENDER_TRANSITION_BOX_SHADOW:
         ((BoxShadow*)value)->color.a = 0;
         break;
+    case BOX_RENDER_TRANSITION_POINT_LIGHT:
+        ((PointLight*)value)->intensity = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_SPOT_LIGHT:
+        ((SpotLight*)value)->intensity = 0.0f;
+        break;
     case BOX_RENDER_TRANSITION_POSITION:
     case BOX_RENDER_TRANSITION_RGB:
     case BOX_RENDER_TRANSITION_ALPHA_CUTOFF:
     case BOX_RENDER_TRANSITION_TRANSMISSION:
+    case BOX_RENDER_TRANSITION_BORDER:
     case BOX_RENDER_TRANSITION_COMPONENTS:
         result = false;
         break;
@@ -961,9 +1003,61 @@ done:
     return;
 }
 
-/** Apply the pose, slot, fade, material and box shadow records of a packet, in the order they
- * were made, which puts a parent node before its children and every pose and fade before the
- * records that read it.
+/** Patch a light of a light buffer upload with the light and the Rgb its nodes render, with
+ * the function of the game thread (box_render_lights_patch). A node that does not have the
+ * value leaves the target of the record.
+ *
+ * @param t The table
+ * @param p The packet
+ * @param r The record
+ */
+static void box_transition_light(
+    box_render_transition_table_t *t,
+    box_render_packet_t *p,
+    const box_render_transition_record_t *r)
+{
+    box_render_transition_light_t target;
+    const void *src = box_transition_data(p, r->data, ECS_SIZEOF(target));
+    void *dst = box_transition_data(p, r->offset, ECS_SIZEOF(box_render_light_t));
+    const box_render_transition_node_t *node = box_transition_node_get(t, r->node);
+    const box_render_transition_node_t *rgb_node;
+    box_render_light_t light;
+    float values[4];
+    Rgb rgb;
+    if (!src || !dst) {
+        goto done;
+    }
+
+    ecs_os_memcpy(&target, src, ECS_SIZEOF(target));
+    ecs_os_memcpy(&light, dst, ECS_SIZEOF(light));
+    ecs_os_memcpy(values, target.values, ECS_SIZEOF(values));
+    rgb = (Rgb){ target.rgb[0], target.rgb[1], target.rgb[2] };
+    if (node && node->alive && target.kind) {
+        box_render_transition_component_t component = target.kind == 1
+            ? BOX_RENDER_TRANSITION_POINT_LIGHT
+            : BOX_RENDER_TRANSITION_SPOT_LIGHT;
+        const box_render_transition_value_t *v = &node->values[component];
+        if (v->present) {
+            ecs_os_memcpy(values, v->current,
+                box_render_transition_layout(component)->count * ECS_SIZEOF(float));
+        }
+    }
+
+    rgb_node = target.rgb_node ? box_transition_node_get(t, target.rgb_node) : NULL;
+    if (rgb_node && rgb_node->alive && rgb_node->values[BOX_RENDER_TRANSITION_RGB].present) {
+        ecs_os_memcpy(&rgb, rgb_node->values[BOX_RENDER_TRANSITION_RGB].current,
+            ECS_SIZEOF(Rgb));
+    }
+
+    box_render_lights_patch(&target, values, &rgb, &light);
+    ecs_os_memcpy(dst, &light, ECS_SIZEOF(light));
+done:
+    return;
+}
+
+/** Apply the pose, slot, fade, material, box shadow and light records of a packet, in the
+ * order they were made, which puts a parent node before its children and every pose and fade
+ * before the records that read it.
  *
  * @param t The table
  * @param p The packet
@@ -988,6 +1082,8 @@ static void box_transition_patch(
             box_transition_fade(t, p, r);
         } else if (r->op == BOX_RENDER_TRANSITION_SHADOW_BOX) {
             box_transition_box_shadow(t, p, r);
+        } else if (r->op == BOX_RENDER_TRANSITION_LIGHT) {
+            box_transition_light(t, p, r);
         }
     }
 }
