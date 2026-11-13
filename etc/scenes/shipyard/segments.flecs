@@ -284,20 +284,92 @@ assets {
 
   template JumpDrive {
     prop r: f32 = 1
+    prop fe: i32 = 0
+    prop be: i32 = 0
 
+    const cr = r * 1.55
+    const hub = r * 0.78
+    const pr = r * 1.15
     shaft : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.6, length: SEG, segments: 24, smooth: true} }
+    for s in 0..2 {
+      "seam_{s}" : ShipRecess { Position: {0, 0, (s - 0.5) * 0.6}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.605, length: 0.03, segments: 24, smooth: true} }
+      "joint_{s}" : ShipRecess { Position: {0, 0, (s - 0.5) * 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.605, length: 0.03, segments: 24, smooth: true} }
+      "manifold_{s}" : ShipTrim { Position: {0, 0, (s - 0.5) * 3.3}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: 0.18, segments: 32, smooth: true} }
+    }
     for c in 0..3 {
-      const cz = (c - 1) * 1.25
-      "coil_{c}" : ShipJump { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: r * 1.55, tube: 0.13, segments: 48, rings: 8, smooth: true} }
+      const cz = (c - 1) * 1.3
+      "collar_{c}" : ShipHullDark { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hub, length: 0.44, segments: 32, smooth: true} }
+      "hazard_{c}" : ShipHazard { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.79, length: 0.12, segments: 32, smooth: true} }
+      for s in 0..2 {
+        "lip_{c}_{s}" : ShipSteel { Position: {0, 0, cz + (s - 0.5) * 0.4}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: 0.06, segments: 32, smooth: true} }
+      }
+      "coil_{c}" : ShipJump { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.12, segments: 48, rings: 8, smooth: true} }
+      for w in 0..4 {
+        const ws = (w % 2 - 0.5) * 2
+        "winding_{c}_{w}" : ShipCopper { Position: {0, 0, cz + ws * (0.2 + (w - w % 2) * 0.06)}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.05, segments: 48, rings: 6, smooth: true} }
+      }
+      for i in 0..12 {
+        const a = i * PI / 6
+        "clamp_{c}_{i}" : ShipTrim { Position: {cos(a) * cr, sin(a) * cr, cz}; Rotation: {0, 0, a}; Box: {0.38, 0.24, 0.82} }
+        "cap_{c}_{i}" : ShipSteel { Position: {cos(a) * (cr + 0.21), sin(a) * (cr + 0.21), cz}; Rotation: {0, 0, a}; Box: {0.05, 0.16, 0.6} }
+      }
       for s in 0..4 {
-        "strut_{c}_{s}" {
-          Rotation: {0, 0, PI / 4 + s * HALF_PI}
-          bar : ShipSteel { Position: {r * 1.07, 0, cz}; Box: {r * 0.95, 0.12, 0.12} }
+        const a = PI / 4 + s * HALF_PI
+        const sr = (hub - 0.05 + cr - 0.05) / 2
+        const sl = cr - hub
+        "spoke_{c}_{s}" : ShipTrim { Position: {cos(a) * sr, sin(a) * sr, cz}; Rotation: {0, 0, a}; Box: {sl, 0.14, 0.26} }
+        "feed_{c}_{s}" : ShipCopper { Position: {cos(a) * sr, sin(a) * sr, cz + 0.19}; Rotation: {0, 0, a - HALF_PI}; Cylinder: {radius: 0.04, length: sl, segments: 6} }
+      }
+    }
+    for i in 0..6 {
+      const a = PI / 6 + i * PI / 3
+      "stringer_{i}" : ShipSteel { Position: {cos(a) * (cr + 0.13), sin(a) * (cr + 0.13), 0}; Rotation: {0, 0, a}; Box: {0.1, 0.12, 3.3} }
+    }
+    for c in 0..2 {
+      const bz = (c - 0.5) * 2.6
+      "beacon_top_{c}" : ShipBeaconWhite { Position: {0, cr + 0.3, bz}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+      "beacon_port_{c}" : ShipBeaconRed { Position: {0 - cr - 0.3, 0, bz}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+      "beacon_stbd_{c}" : ShipBeaconGreen { Position: {cr + 0.3, 0, bz}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+    }
+    for i in 0..4 {
+      const a = PI / 4 + i * HALF_PI
+      "conduit_{i}" : ShipCopper { Position: {cos(a) * r * 0.68, sin(a) * r * 0.68, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.09, length: 3.3, segments: 8, smooth: true} }
+      "line_{i}" : ShipTeal { Position: {cos(a + 0.22) * r * 0.645, sin(a + 0.22) * r * 0.645, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.05, length: 3.3, segments: 6, smooth: true} }
+    }
+    for g in 0..2 {
+      for i in 0..3 {
+        const a = (i - 2) * HALF_PI
+        "cell_{g}_{i}" : ShipHullDark { Position: {cos(a) * r * 0.667, sin(a) * r * 0.667, (g - 0.5) * 1.3}; Rotation: {0, 0, a}; Box: {0.36, 0.7, 0.6} }
+        "charge_{g}_{i}" : ShipCyanLight { Position: {cos(a) * (r * 0.667 + 0.19), sin(a) * (r * 0.667 + 0.19), (g - 0.5) * 1.3}; Rotation: {0, 0, a}; Box: {0.03, 0.5, 0.06} }
+      }
+    }
+    catwalk {
+      Position: {0, r * 0.8 + 0.03, 0}
+      deck : YardDeckFine { Box: {0.5, 0.04, 3.3} }
+      for s in 0..2 {
+        const sx = (s - 0.5) * 0.46
+        "rail_{s}" : ShipSteel { Position: {sx, 0.14, 0}; Box: {0.025, 0.025, 3.3} }
+        "edge_{s}" : ShipRunLightsCyan { Position: {(s - 0.5) * 0.51, 0, 0}; Box: {0.02, 0.015, 3.3} }
+        for p in 0..7 {
+          "post_{s}_{p}" : ShipSteel { Position: {sx, 0.08, p * 0.55 - 1.65}; Box: {0.02, 0.12, 0.02} }
+        }
+      }
+    }
+    rotor {
+      AngularVelocity: {0, 0, 0.3}
+      for g in 0..2 {
+        const gz = (g - 0.5) * 1.3
+        "ring_{g}" : ShipChrome { Position: {0, 0, gz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: pr, tube: 0.05, segments: 40, rings: 4, smooth: true} }
+        for i in 0..6 {
+          const a = i * PI / 3 + g * PI / 6
+          "vane_{g}_{i}" : ShipTrim { Position: {cos(a) * pr, sin(a) * pr, gz}; Rotation: {0, 0, a}; Box: {0.5, 0.03, 0.36} }
+          "node_{g}_{i}" : ShipJump { Position: {cos(a) * (pr + 0.26), sin(a) * (pr + 0.26), gz}; Rotation: {0, 0, a}; Box: {0.06, 0.12, 0.12} }
         }
       }
     }
     field : ShipJumpField { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.45, length: SEG * 0.9, segments: 40, smooth: true} }
     glow { Position: {0, 0, 0}; PointLight: {intensity: 4, range: r * 5}; Rgb: {110, 236, 255} }
+    SpineEnds ends(r: r, fe: fe, be: be)
   }
 
   template DriveSection {
@@ -739,7 +811,7 @@ assets {
     } else if k == L_RADIATOR {
       Radiator part(r: r, core: core)
     } else if k == L_JUMP {
-      JumpDrive part(r: r)
+      JumpDrive part(r: r, fe: fe, be: be)
     } else if k == L_DRIVE {
       DriveSection part(r: r, fe: fe)
     } else if k == L_TANKS {
