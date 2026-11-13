@@ -317,7 +317,7 @@ typedef struct box_render_texture_node_kind_t {
     uint32_t coords_inputs;     /**< Bit per input without a constant, which takes the
                                  *   coordinates without a node */
     uint32_t param_size;        /**< Bytes of the parameters of a node, a multiple of 16 */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE */
     uint32_t function_size;     /**< Bytes of the function name, its terminator included */
     uint32_t source_size;       /**< Bytes of the source, its terminator included */
 } box_render_texture_node_kind_t;

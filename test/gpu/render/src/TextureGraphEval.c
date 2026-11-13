@@ -1060,6 +1060,24 @@ void TextureGraphEval_blocks_match_gen_hard(void) {
     }, 64, 64);
 }
 
+void TextureGraphEval_blocks_match_gen_wrap(void) {
+    // textures/graph
+    /* Courses whose cuts are all below 0.5, so the last block wraps around to u = 0 */
+    int32_t seeds[] = {4, 6, 7};
+    int32_t s;
+    for (s = 0; s < 3; s ++) {
+        tg_blocks_match(&(TexBlocks){
+            .courses = 8, .per_course = 2, .gap = 0.01f, .jitter = 0.5f, .seed = seeds[s]
+        }, 128, 128);
+    }
+
+    for (s = 0; s < 4; s ++) {
+        tg_blocks_match(&(TexBlocks){
+            .courses = 1, .per_course = 1, .gap = 0.01f, .jitter = 0.5f, .seed = s
+        }, 64, 64);
+    }
+}
+
 void TextureGraphEval_blocks_tiling(void) {
     // textures/graph
     ecs_world_t *world = tg_world();

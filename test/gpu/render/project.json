@@ -1476,6 +1476,7 @@
                     "blocks_match_gen_aspect",
                     "blocks_match_gen_tones",
                     "blocks_match_gen_hard",
+                    "blocks_match_gen_wrap",
                     "blocks_tiling",
                     "blocks_sphere_error"
                 ]
