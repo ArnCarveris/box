@@ -616,7 +616,7 @@ void TextureGraphNormal_slope_plane_sphere(void) {
     ecs_entity_t scaled = ecs_new(world);
     ecs_entity_t channel = ecs_new(world);
     ecs_set(world, coords, TexCoords, {0});
-    ecs_set(world, scaled, TexMath, {.op = MathMultiply, .a = coords,
+    ecs_set(world, scaled, TexMultiply, {.a = coords,
         .b_value = {0, 48, 0, 0}});
     ecs_set(world, channel, TexSplit, {.input = scaled, .channel = ChannelG});
     ecs_entity_t tex = tn_graph(world, channel, true, 3, w, h, DomainPlane, &node);

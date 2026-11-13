@@ -29,17 +29,18 @@ function world() {
   const kinds = {
     [N + "Constant"]: kind(1, "Vector", [], ["value"]),
     [N + "Coords"]: kind(2, "Vector", [], ["scale"]),
-    [N + "Math"]: kind(3, "Vector", [["a", "Vector", "a_value"], ["b", "Vector", "b_value"], ["c", "Vector", "c_value"]], ["op"]),
-    ["app.TgScalar"]: kind(4, "Scalar", [["in", "Vector", "in_value"]], ["value"])
+    [N + "Mix"]: kind(3, "Vector", [["a", "Vector", "a_value"], ["b", "Vector", "b_value"], ["factor", "Vector", "factor_value"]], []),
+    ["app.TgScalar"]: kind(4, "Scalar", [["in", "Vector", "in_value"]], ["value"]),
+    [N + "Multiply"]: kind(5, "Vector", [["a", "Vector", "a_value"], ["b", "Vector", "b_value"]], [])
   };
   for (const c in kinds) kinds[c].comp = c;
   const types = {
     [N + "Constant"]: { value: vec4 },
     [N + "Coords"]: { scale: ["float"] },
-    [N + "Math"]: {
-      op: ["enum", "MathAdd", "MathSubtract", "MathMultiply", "MathMin", "MathMax", "MathMix", "MathClamp"],
-      a: ["entity"], b: ["entity"], c: ["entity"], a_value: vec4, b_value: vec4, c_value: vec4
+    [N + "Mix"]: {
+      a: ["entity"], b: ["entity"], factor: ["entity"], a_value: vec4, b_value: vec4, factor_value: vec4
     },
+    [N + "Multiply"]: { a: ["entity"], b: ["entity"], a_value: vec4, b_value: vec4 },
     ["app.TgScalar"]: { value: ["float"], in: ["entity"], in_value: vec4 },
     [T + "Graph"]: {
       output: ["entity"], width: ["int"], height: ["int"],
@@ -55,8 +56,8 @@ function world() {
   for (const n of [
     node("scene.tiles.uv", N + "Coords", { scale: 2 }),
     node("scene.tiles.warm", N + "Constant", { value: { x: 0.9, y: 0.5, z: 0.2, w: 1 } }),
-    node("scene.tiles.blend", N + "Math", { op: "MathMix", a: "scene.tiles.warm", b: "#0", c: "scene.tiles.uv", a_value: zero, b_value: { x: 0.1, y: 0.3, z: 0.8, w: 1 }, c_value: zero }),
-    node("scene.tiles.dimmed", N + "Math", { op: "MathMultiply", a: "scene.tiles.blend", b: "#0", c: "#0", a_value: zero, b_value: { x: 0.8, y: 0.8, z: 0.8, w: 1 }, c_value: zero }),
+    node("scene.tiles.blend", N + "Mix", { a: "scene.tiles.warm", b: "#0", factor: "scene.tiles.uv", a_value: zero, b_value: { x: 0.1, y: 0.3, z: 0.8, w: 1 }, factor_value: zero }),
+    node("scene.tiles.dimmed", N + "Multiply", { a: "scene.tiles.blend", b: "#0", a_value: zero, b_value: { x: 0.8, y: 0.8, z: 0.8, w: 1 } }),
     node("scene.tiles.loose", "app.TgScalar", { value: 0.5, in: "#0", in_value: zero }),
     node("scene.shared", N + "Constant", { value: { x: 1, y: 1, z: 1, w: 1 } }),
     node("scene.other.n", N + "Coords", { scale: 0 })
@@ -78,15 +79,15 @@ test("graph of a texture has its descendants and the edges of their inputs", () 
     "scene.tiles.blend", "scene.tiles.dimmed", "scene.tiles.loose", "scene.tiles.uv", "scene.tiles.warm"
   ]);
   const edges = g.edges.map((e) => `${M.leaf(e.from)}>${M.leaf(e.to)}.${e.port}`).sort();
-  assert.deepEqual(edges, ["blend>dimmed.a", "uv>blend.c", "warm>blend.a"]);
+  assert.deepEqual(edges, ["blend>dimmed.a", "uv>blend.factor", "warm>blend.a"]);
   assert.equal(g.output, "scene.tiles.dimmed");
   assert.deepEqual(g.dangling, []);
 });
 
 test("graph reaches nodes outside the texture through inputs and lists missing ones", () => {
   const s = world();
-  s.nodes["scene.tiles.dimmed"].values[N + "Math"].b = "scene.shared";
-  s.nodes["scene.tiles.blend"].values[N + "Math"].b = "scene.gone";
+  s.nodes["scene.tiles.dimmed"].values[N + "Multiply"].b = "scene.shared";
+  s.nodes["scene.tiles.blend"].values[N + "Mix"].b = "scene.gone";
   const g = M.graphOf(s, "scene.tiles");
   assert.ok(g.nodes.has("scene.shared"));
   assert.ok(!g.nodes.has("scene.other.n"));
@@ -109,7 +110,7 @@ test("only nodes the output of a graph reaches have a value to preview", () => {
   assert.ok(M.isReached(s, "scene.tiles.dimmed"));
   assert.ok(M.isReached(s, "scene.tiles.warm"));
   assert.ok(!M.isReached(s, "scene.tiles.loose"));
-  s.nodes["scene.tiles.dimmed"].values[N + "Math"].b = "scene.shared";
+  s.nodes["scene.tiles.dimmed"].values[N + "Multiply"].b = "scene.shared";
   assert.ok(M.isReached(s, "scene.shared"));
   s.textures["scene.tiles"].graph.output = "#0";
   assert.ok(!M.isReached(s, "scene.tiles.warm"));
@@ -124,7 +125,7 @@ test("the nodes an error names are found", () => {
 
 test("an error marks the nodes it names and the inputs that refer to a named entity", () => {
   const s = world();
-  s.nodes["scene.tiles.dimmed"].values[N + "Math"].c = "scene.camera";
+  s.nodes["scene.tiles.dimmed"].values[N + "Multiply"].b = "scene.camera";
   const g = M.graphOf(s, "scene.tiles");
   assert.deepEqual(M.errorTargets(g, "texture graph 'scene.tiles': node 'scene.camera' has no node component"),
     ["scene.tiles.dimmed"]);
@@ -139,8 +140,8 @@ test("script reproduces the graph with inputs before the nodes that use them", (
   assert.ok(lines.includes("tiles {"));
   assert.ok(lines.includes("  uv { nodes.Coords: {scale: 2} }"));
   assert.ok(lines.includes("  warm { nodes.Constant: {value: {0.9, 0.5, 0.2, 1}} }"));
-  assert.ok(lines.includes("  blend { nodes.Math: {op: MathMix, a: warm, c: uv, b_value: {0.1, 0.3, 0.8, 1}} }"));
-  assert.ok(lines.includes("  dimmed { nodes.Math: {op: MathMultiply, a: blend, b_value: {0.8, 0.8, 0.8, 1}} }"));
+  assert.ok(lines.includes("  blend { nodes.Mix: {a: warm, factor: uv, b_value: {0.1, 0.3, 0.8, 1}} }"));
+  assert.ok(lines.includes("  dimmed { nodes.Multiply: {a: blend, b_value: {0.8, 0.8, 0.8, 1}} }"));
   assert.ok(lines.includes("  loose { app.TgScalar: {value: 0.5} }"));
   assert.ok(lines.includes("  Graph: {output: dimmed, width: 256}"));
   const at = (name) => lines.findIndex((l) => l.startsWith(`  ${name} `));
@@ -150,12 +151,12 @@ test("script reproduces the graph with inputs before the nodes that use them", (
 
 test("script refers to nodes outside the texture by path and keeps non default enums", () => {
   const s = world();
-  s.nodes["scene.tiles.dimmed"].values[N + "Math"].b = "scene.shared";
+  s.nodes["scene.tiles.dimmed"].values[N + "Multiply"].b = "scene.shared";
   s.textures["scene.tiles"].graph.domain = "DomainSphere";
   s.textures["scene.tiles"].graph.format = "GraphHdr";
   const text = M.toScript(s, "scene.tiles");
   assert.match(text, /\/\/ uses scene\.shared/);
-  assert.match(text, /dimmed \{ nodes\.Math: \{op: MathMultiply, a: blend, b: scene\.shared, /);
+  assert.match(text, /dimmed \{ nodes\.Multiply: \{a: blend, b: scene\.shared, /);
   assert.match(text, /Graph: \{output: dimmed, width: 256, domain: DomainSphere, format: GraphHdr\}/);
 });
 
@@ -173,8 +174,8 @@ test("values serialize to flecs script", () => {
 
 test("new nodes get a name no entity has", () => {
   const s = world();
-  s.nodes["scene.tiles.math_1"] = s.nodes["scene.tiles.blend"];
-  assert.equal(M.uniqueName(s, "scene.tiles", N + "Math"), "scene.tiles.math_2");
+  s.nodes["scene.tiles.mix_1"] = s.nodes["scene.tiles.blend"];
+  assert.equal(M.uniqueName(s, "scene.tiles", N + "Mix"), "scene.tiles.mix_2");
   assert.equal(M.uniqueName(s, "scene.tiles", N + "Constant"), "scene.tiles.constant_1");
   assert.equal(M.uniqueName(s, "scene.tiles", "app.TgScalar"), "scene.tiles.tgScalar_1");
 });

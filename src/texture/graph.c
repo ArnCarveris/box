@@ -248,12 +248,15 @@ static int box_texture_node_kind_fill(
     }
 
     for (i = 0; i < BOX_TEXTURE_NODE_PARAMS && desc->params[i].name; i ++) {
-        ecs_size_t size = desc->params[i].size;
+        bool flag = desc->params[i].kind == BOX_TEXTURE_PARAM_BOOL;
+        ecs_size_t size = flag ? ECS_SIZEOF(uint32_t) : desc->params[i].size;
         int32_t align = size <= 4 ? 4 : size <= 8 ? 8 : 16;
         kind->params[i] = desc->params[i];
         kind->params[i].name = ecs_os_strdup(desc->params[i].name);
         kind->param_count ++;
-        if (size < 4 || size > 16 || size % 4) {
+        if (flag ? desc->params[i].size != ECS_SIZEOF(bool)
+            : (size < 4 || size > 16 || size % 4))
+        {
             result = -1;
         }
 
@@ -329,7 +332,9 @@ static void box_texture_node_kind_reflect(
     for (i = 0; i < kind->param_count; i ++) {
         value.params[i].name = kind->params[i].name;
         value.params[i].offset = kind->param_offsets[i];
-        value.params[i].size = kind->params[i].size;
+        value.params[i].size = kind->params[i].kind == BOX_TEXTURE_PARAM_BOOL
+            ? ECS_SIZEOF(uint32_t)
+            : kind->params[i].size;
     }
 
     ecs_set_ptr(world, kind->component, TextureNodeKind, &value);
@@ -612,8 +617,13 @@ static int32_t box_texture_graph_append(
     uint8_t *params = ecs_vec_grow_t(NULL, &b->params, uint8_t, kind->node_size);
     ecs_os_memset(params, 0, kind->node_size);
     for (i = 0; i < kind->param_count; i ++) {
-        ecs_os_memcpy(params + kind->param_offsets[i], ptr + kind->params[i].offset,
-            kind->params[i].size);
+        if (kind->params[i].kind == BOX_TEXTURE_PARAM_BOOL) {
+            uint32_t flag = *(const bool*)(ptr + kind->params[i].offset) ? 1u : 0u;
+            ecs_os_memcpy(params + kind->param_offsets[i], &flag, ECS_SIZEOF(uint32_t));
+        } else {
+            ecs_os_memcpy(params + kind->param_offsets[i], ptr + kind->params[i].offset,
+                kind->params[i].size);
+        }
     }
 
     for (i = 0; i < kind->input_count; i ++) {

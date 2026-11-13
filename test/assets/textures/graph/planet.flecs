@@ -45,13 +45,13 @@ planet_graph {
     continents { nodes.Noise: {coords: warped, frequency: 1.25, octaves: 5, seed: seed * 16 + 1} }
     detail_noise { nodes.Noise: {frequency: 12, octaves: 3, seed: seed * 16 + 9} }
     detail {
-      nodes.Math: {
-        op: MathRemap, a: detail_noise, from_min: 0, from_max: 1, to_min: -0.07, to_max: 0.07
+      nodes.Remap: {
+        input: detail_noise, from_min: 0, from_max: 1, to_min: -0.07, to_max: 0.07
       }
     }
-    rough { nodes.Math: {op: MathAdd, a: continents, b: detail} }
+    rough { nodes.Add: {a: continents, b: detail} }
     spread {
-      nodes.Math: {op: MathRemap, a: rough, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
+      nodes.Remap: {input: rough, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
     }
     ridges {
       nodes.Noise: {
@@ -59,46 +59,46 @@ planet_graph {
       }
     }
     crest {
-      nodes.Math: {op: MathSmoothstep, a: ridges, b_value: {0.45, 0, 0, 0}, c_value: {1, 0, 0, 0}}
+      nodes.Smoothstep: {input: ridges, edge0_value: {0.45, 0, 0, 0}, edge1_value: {1, 0, 0, 0}}
     }
     ranges_noise { nodes.Noise: {frequency: 0.9, octaves: 2, seed: seed * 16 + 4} }
     ranges {
-      nodes.Math: {
-        op: MathSmoothstep, a: ranges_noise, b_value: {0.5, 0, 0, 0}, c_value: {0.6, 0, 0, 0}
+      nodes.Smoothstep: {
+        input: ranges_noise, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}
       }
     }
     inland {
-      nodes.Math: {
-        op: MathSmoothstep, a: spread, b_value: {sea_h, 0, 0, 0}, c_value: {sea_h + 0.08, 0, 0, 0}
+      nodes.Smoothstep: {
+        input: spread, edge0_value: {sea_h, 0, 0, 0}, edge1_value: {sea_h + 0.08, 0, 0, 0}
       }
     }
-    peaks0 { nodes.Math: {op: MathMultiply, a: crest, b: ranges} }
-    peaks1 { nodes.Math: {op: MathMultiply, a: peaks0, b: inland} }
-    peaks { nodes.Math: {op: MathMultiply, a: peaks1, b_value: {0.2, 0, 0, 0}} }
-    height { nodes.Math: {op: MathAdd, a: spread, b: peaks} }
-    relief { nodes.Math: {op: MathMax, a: height, b_value: {sea_h, 0, 0, 0}} }
+    peaks0 { nodes.Multiply: {a: crest, b: ranges} }
+    peaks1 { nodes.Multiply: {a: peaks0, b: inland} }
+    peaks { nodes.Multiply: {a: peaks1, b_value: {0.2, 0, 0, 0}} }
+    height { nodes.Add: {a: spread, b: peaks} }
+    relief { nodes.Max: {a: height, b_value: {sea_h, 0, 0, 0}} }
     slope { nodes.Slope: {height: relief, strength: 3.5} }
     altitude {
-      nodes.Math: {
-        op: MathRemapClamped, a: height, from_min: sea_h, from_max: top_h, to_min: 0, to_max: 1
+      nodes.Remap: {
+        input: height, from_min: sea_h, from_max: top_h, to_min: 0, to_max: 1, clamp: true
       }
     }
     land {
-      nodes.Math: {
-        op: MathSmoothstep, a: height, b_value: {sea_h - 0.002, 0, 0, 0},
-        c_value: {sea_h + 0.002, 0, 0, 0}
+      nodes.Smoothstep: {
+        input: height, edge0_value: {sea_h - 0.002, 0, 0, 0},
+        edge1_value: {sea_h + 0.002, 0, 0, 0}
       }
     }
 
     // Temperature, from the warped latitude so the climate zones meander
     lat { nodes.Split: {input: warped, channel: ChannelG} }
-    abs_lat { nodes.Math: {op: MathAbs, a: lat} }
-    lat2 { nodes.Math: {op: MathMultiply, a: lat, b: lat} }
+    abs_lat { nodes.Abs: {input: lat} }
+    lat2 { nodes.Multiply: {a: lat, b: lat} }
     sea_temp {
-      nodes.Math: {op: MathRemap, a: lat2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_eq - 0.75}
+      nodes.Remap: {input: lat2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_eq - 0.75}
     }
-    lapse { nodes.Math: {op: MathMultiply, a: altitude, b_value: {0.45, 0, 0, 0}} }
-    temperature { nodes.Math: {op: MathSubtract, a: sea_temp, b: lapse} }
+    lapse { nodes.Multiply: {a: altitude, b_value: {0.45, 0, 0, 0}} }
+    temperature { nodes.Subtract: {a: sea_temp, b: lapse} }
 
     // Moisture
     near { nodes.Blur: {input: land, radius: 24} }
@@ -108,9 +108,9 @@ planet_graph {
       ]}}
     }
     coastal {
-      nodes.Math: {op: MathRemapClamped, a: near, from_min: 0.35, from_max: 1, to_min: 1, to_max: 0.3}
+      nodes.Remap: {input: near, from_min: 0.35, from_max: 1, to_min: 1, to_max: 0.3, clamp: true}
     }
-    moisture { nodes.Math: {op: MathMultiply, a: coastal, b: bands} }
+    moisture { nodes.Multiply: {a: coastal, b: bands} }
 
     // Biome table: vegetation by temperature (u) and moisture (v), its cover in alpha
     table {
@@ -129,22 +129,22 @@ planet_graph {
           {1, {24, 74, 30}}
         ]}
       }
-      lush { nodes.Math: {op: MathSmoothstep, a: m, b_value: {0.3, 0, 0, 0}, c_value: {0.7, 0, 0, 0}}}
-      veg { nodes.Math: {op: MathMix, a: dry, b: wet, c: lush} }
+      lush { nodes.Smoothstep: {input: m, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}}}
+      veg { nodes.Mix: {a: dry, b: wet, factor: lush} }
       habitable {
         nodes.Curve: {
           input: t, curve: {keys: [{0, 0}, {0.1, 0}, {0.22, 0.6}, {0.3, 1}, {0.85, 1}, {1, 0.6}]}
         }
       }
       watered {
-        nodes.Math: {op: MathSmoothstep, a: m, b_value: {0.06, 0, 0, 0}, c_value: {0.35, 0, 0, 0}}
+        nodes.Smoothstep: {input: m, edge0_value: {0.06, 0, 0, 0}, edge1_value: {0.35, 0, 0, 0}}
       }
-      cover0 { nodes.Math: {op: MathMultiply, a: habitable, b: watered} }
-      cover { nodes.Math: {op: MathMultiply, a: cover0, b_value: {bio, 0, 0, 0}} }
+      cover0 { nodes.Multiply: {a: habitable, b: watered} }
+      cover { nodes.Multiply: {a: cover0, b_value: {bio, 0, 0, 0}} }
       cover4 { nodes.Splat: {in: cover} }
-      alpha { nodes.Math: {op: MathMultiply, a: cover4, b_value: {0, 0, 0, 1}} }
-      rgb { nodes.Math: {op: MathMultiply, a: veg, b_value: {1, 1, 1, 0}} }
-      out { nodes.Math: {op: MathAdd, a: rgb, b: alpha} }
+      alpha { nodes.Multiply: {a: cover4, b_value: {0, 0, 0, 1}} }
+      rgb { nodes.Multiply: {a: veg, b_value: {1, 1, 1, 0}} }
+      out { nodes.Add: {a: rgb, b: alpha} }
       Graph: {output: out, width: 32, height: 32}
     }
 
@@ -157,44 +157,44 @@ planet_graph {
           {0.95, {156, 150, 148}}
         ]}
       }
-      grown { nodes.Math: {op: MathMix, a: ground, b: biome, c: cover} }
+      grown { nodes.Mix: {a: ground, b: biome, factor: cover} }
       steep {
-        nodes.Math: {op: MathSmoothstep, a: slope, b_value: {0.25, 0, 0, 0}, c_value: {0.5, 0, 0, 0}}
+        nodes.Smoothstep: {input: slope, edge0_value: {0.25, 0, 0, 0}, edge1_value: {0.5, 0, 0, 0}}
       }
       rock { nodes.Ramp: {input: altitude, keys: [{0, {118, 106, 96}}, {1, {124, 116, 112}}]} }
-      rocky { nodes.Math: {op: MathMix, a: grown, b: rock, c: steep} }
+      rocky { nodes.Mix: {a: grown, b: rock, factor: steep} }
       cold {
-        nodes.Math: {
-          op: MathSmoothstep, a: temperature, b_value: {0.13, 0, 0, 0}, c_value: {0.06, 0, 0, 0}
+        nodes.Smoothstep: {
+          input: temperature, edge0_value: {0.13, 0, 0, 0}, edge1_value: {0.06, 0, 0, 0}
         }
       }
       snow { nodes.Ramp: {keys: [{0, {236, 242, 250}}]} }
-      ground_color { nodes.Math: {op: MathMix, a: rocky, b: snow, c: cold} }
+      ground_color { nodes.Mix: {a: rocky, b: snow, factor: cold} }
       shelf {
-        nodes.Math: {
-          op: MathRemapClamped, a: height, from_min: sea_h, from_max: sea_h - 0.12, to_min: 0,
-          to_max: 1
+        nodes.Remap: {
+          input: height, from_min: sea_h, from_max: sea_h - 0.12, to_min: 0,
+          to_max: 1, clamp: true
         }
       }
       open {
-        nodes.Math: {
-          op: MathRemapClamped, a: near, from_min: 0.35, from_max: 0, to_min: 0.3, to_max: 1
+        nodes.Remap: {
+          input: near, from_min: 0.35, from_max: 0, to_min: 0.3, to_max: 1, clamp: true
         }
       }
-      depth { nodes.Math: {op: MathMultiply, a: shelf, b: open} }
+      depth { nodes.Multiply: {a: shelf, b: open} }
       water_color {
         nodes.Ramp: {input: depth, keys: [
           {0.02, {30, 108, 138}}, {0.12, {13, 72, 115}}, {0.4, {8, 47, 92}}, {0.9, {4, 20, 52}}
         ]}
       }
       frozen {
-        nodes.Math: {
-          op: MathSmoothstep, a: sea_temp, b_value: {0.13, 0, 0, 0}, c_value: {0.07, 0, 0, 0}
+        nodes.Smoothstep: {
+          input: sea_temp, edge0_value: {0.13, 0, 0, 0}, edge1_value: {0.07, 0, 0, 0}
         }
       }
       ice { nodes.Ramp: {input: depth, keys: [{0, {226, 238, 248}}, {1, {170, 198, 222}}]} }
-      sea_color { nodes.Math: {op: MathMix, a: water_color, b: ice, c: frozen} }
-      out { nodes.Math: {op: MathMix, a: sea_color, b: ground_color, c: land} }
+      sea_color { nodes.Mix: {a: water_color, b: ice, factor: frozen} }
+      out { nodes.Mix: {a: sea_color, b: ground_color, factor: land} }
       Graph: {output: out, width: size, height: size / 2, domain: DomainSphere}
     }
 
@@ -216,7 +216,7 @@ planet_graph {
         }
       }
       coverage {
-        nodes.Math: {op: MathRemap, a: systems, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
+        nodes.Remap: {input: systems, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
       }
       billows {
         nodes.Noise: {
@@ -225,25 +225,25 @@ planet_graph {
         }
       }
       puffs {
-        nodes.Math: {op: MathRemap, a: billows, from_min: 0.23, from_max: 0.32, to_min: 0, to_max: 0.8}
+        nodes.Remap: {input: billows, from_min: 0.23, from_max: 0.32, to_min: 0, to_max: 0.8}
       }
       cloud_lat { nodes.Split: {input: swirled, channel: ChannelG} }
-      cloud_abs_lat { nodes.Math: {op: MathAbs, a: cloud_lat} }
+      cloud_abs_lat { nodes.Abs: {input: cloud_lat} }
       belts {
         nodes.Curve: {input: cloud_abs_lat, curve: {kind: CurveCatmullRom, keys: [
           {0, 0.7}, {0.15, 0.3}, {0.42, -0.9}, {0.58, -0.3}, {0.8, 0.7}, {0.92, 0.4}, {1, -0.4}
         ]}}
       }
-      banded { nodes.Math: {op: MathAdd, a: coverage, b: belts} }
-      sum { nodes.Math: {op: MathAdd, a: banded, b: puffs} }
+      banded { nodes.Add: {a: coverage, b: belts} }
+      sum { nodes.Add: {a: banded, b: puffs} }
       density {
-        nodes.Math: {
-          op: MathSmoothstep, a: sum, b_value: {thr, 0, 0, 0}, c_value: {thr + 1.8, 0, 0, 0}
+        nodes.Smoothstep: {
+          input: sum, edge0_value: {thr, 0, 0, 0}, edge1_value: {thr + 1.8, 0, 0, 0}
         }
       }
       density4 { nodes.Splat: {in: density} }
       out {
-        nodes.Math: {op: MathMix, a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, c: density4}
+        nodes.Mix: {a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, factor: density4}
       }
       Graph: {output: out, width: size, height: size / 2, domain: DomainSphere, rate: 3}
     }
@@ -276,11 +276,11 @@ planet_graph {
     line { nodes.Combine: {r_value: 3, g: lat, b_value: 5, a_value: 1} }
     line_noise { nodes.Noise: {coords: line, frequency: 2, octaves: 2, seed: seed * 16 + 3} }
     lat_offset {
-      nodes.Math: {op: MathRemap, a: line_noise, from_min: 0.5, from_max: 1, to_min: 0, to_max: 0.6}
+      nodes.Remap: {input: line_noise, from_min: 0.5, from_max: 1, to_min: 0, to_max: 0.6}
     }
-    band_lat { nodes.Math: {op: MathAdd, a: lat, b: lat_offset} }
-    phase { nodes.Math: {op: MathMultiply, a: band_lat, b_value: {16, 0, 0, 0}} }
-    wave { nodes.Math: {op: MathSin, a: phase} }
+    band_lat { nodes.Add: {a: lat, b: lat_offset} }
+    phase { nodes.Multiply: {a: band_lat, b_value: {16, 0, 0, 0}} }
+    wave { nodes.Sin: {input: phase} }
 
     // The bands in their own frame, computed once
     bands {
@@ -291,28 +291,28 @@ planet_graph {
         nodes.Noise: {coords: stretched, frequency: 3, octaves: 5, gain: 0.55, seed: seed * 16 + 6}
       }
       wavy { nodes.Split: {input: swirled, channel: ChannelG} }
-      wavy_lat { nodes.Math: {op: MathAdd, a: wavy, b: lat_offset} }
-      wavy_phase { nodes.Math: {op: MathMultiply, a: wavy_lat, b_value: {16, 0, 0, 0}} }
-      wavy_wave { nodes.Math: {op: MathSin, a: wavy_phase} }
+      wavy_lat { nodes.Add: {a: wavy, b: lat_offset} }
+      wavy_phase { nodes.Multiply: {a: wavy_lat, b_value: {16, 0, 0, 0}} }
+      wavy_wave { nodes.Sin: {input: wavy_phase} }
       sub_line { nodes.Combine: {r_value: 6, g: wavy, b_value: 8, a_value: 1} }
       sub_noise {
         nodes.Noise: {coords: sub_line, frequency: 9, octaves: 3, gain: 0.6, seed: seed * 16 + 1}
       }
       band {
-        nodes.Math: {op: MathRemap, a: wavy_wave, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8}
+        nodes.Remap: {input: wavy_wave, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8}
       }
       sub {
-        nodes.Math: {
-          op: MathRemap, a: sub_noise, from_min: 0.4, from_max: 0.6, to_min: -0.2, to_max: 0.2
+        nodes.Remap: {
+          input: sub_noise, from_min: 0.4, from_max: 0.6, to_min: -0.2, to_max: 0.2
         }
       }
       eddies {
-        nodes.Math: {
-          op: MathRemap, a: turbulence, from_min: 0.4, from_max: 0.6, to_min: -0.07, to_max: 0.07
+        nodes.Remap: {
+          input: turbulence, from_min: 0.4, from_max: 0.6, to_min: -0.07, to_max: 0.07
         }
       }
-      mixed0 { nodes.Math: {op: MathAdd, a: band, b: sub} }
-      mixed { nodes.Math: {op: MathAdd, a: mixed0, b: eddies} }
+      mixed0 { nodes.Add: {a: band, b: sub} }
+      mixed { nodes.Add: {a: mixed0, b: eddies} }
       color {
         nodes.Ramp: {input: mixed, keys: [
           {0.15, {142, 92, 66}}, {0.35, {168, 118, 82}}, {0.5, {198, 152, 110}},
@@ -325,21 +325,21 @@ planet_graph {
       cell_pick { nodes.Split: {input: cells, channel: ChannelB} }
       cell_tone { nodes.Split: {input: cells, channel: ChannelA} }
       core {
-        nodes.Math: {
-          op: MathSmoothstep, a: cell_distance, b_value: {0.42, 0, 0, 0}, c_value: {0.34, 0, 0, 0}
+        nodes.Smoothstep: {
+          input: cell_distance, edge0_value: {0.42, 0, 0, 0}, edge1_value: {0.34, 0, 0, 0}
         }
       }
-      picked { nodes.Math: {op: MathStep, a_value: {0.3, 0, 0, 0}, b: cell_pick} }
-      wave_abs { nodes.Math: {op: MathAbs, a: wave} }
+      picked { nodes.Step: {input_value: {0.3, 0, 0, 0}, edge: cell_pick} }
+      wave_abs { nodes.Abs: {input: wave} }
       between_jets {
-        nodes.Math: {
-          op: MathSmoothstep, a: wave_abs, b_value: {0.35, 0, 0, 0}, c_value: {0.9, 0, 0, 0}
+        nodes.Smoothstep: {
+          input: wave_abs, edge0_value: {0.35, 0, 0, 0}, edge1_value: {0.9, 0, 0, 0}
         }
       }
-      storm0 { nodes.Math: {op: MathMultiply, a: core, b: picked} }
-      storm { nodes.Math: {op: MathMultiply, a: storm0, b: between_jets} }
+      storm0 { nodes.Multiply: {a: core, b: picked} }
+      storm { nodes.Multiply: {a: storm0, b: between_jets} }
       storm_color { nodes.Ramp: {input: cell_tone, keys: [{0, {184, 86, 60}}, {1, {244, 236, 216}}]} }
-      out { nodes.Math: {op: MathMix, a: color, b: storm_color, c: storm} }
+      out { nodes.Mix: {a: color, b: storm_color, factor: storm} }
       Graph: {output: out, width: size, height: size / 2, domain: DomainSphere}
     }
 
@@ -347,12 +347,12 @@ planet_graph {
     // forth with a period of 20 minutes
     albedo {
       jet {
-        nodes.Math: {op: MathSmoothstep, a: wave, b_value: {-0.8, 0, 0, 0}, c_value: {0.8, 0, 0, 0}}
+        nodes.Smoothstep: {input: wave, edge0_value: {-0.8, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}}
       }
-      reach { nodes.Math: {op: MathRemap, a: jet, from_min: 0, from_max: 1, to_min: -45, to_max: 45} }
+      reach { nodes.Remap: {input: jet, from_min: 0, from_max: 1, to_min: -45, to_max: 45} }
       time { nodes.Time: {scale: 0.00524, offset: -0.5} }
-      swing { nodes.Math: {op: MathSin, a: time} }
-      angle { nodes.Math: {op: MathMultiply, a: reach, b: swing} }
+      swing { nodes.Sin: {input: time} }
+      angle { nodes.Multiply: {a: reach, b: swing} }
       turned { nodes.Transform: {coords: dir, angle: angle} }
       sampled { nodes.Image: {texture: bands, coords: turned} }
       Graph: {output: sampled, width: size, height: size / 2, domain: DomainSphere, rate: 12}

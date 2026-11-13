@@ -449,6 +449,13 @@ void box_texture_graphs_init(
     ecs_world_t *world,
     box_textures_t *t);
 
+/** Register the math node kinds, one per operation: TexAdd, TexMultiply, TexRemap, ...
+ *
+ * @param world The world
+ */
+void box_texture_math_register(
+    ecs_world_t *world);
+
 /** Register the TexNoise node kind.
  *
  * @param world The world

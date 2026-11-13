@@ -6,9 +6,9 @@ using box.texture
 
 graph_math {
   uv     { nodes.Coords: {} }
-  scaled { nodes.Math: {op: MathMultiply, a: uv, b_value: {0.5, 0.25, 0.5, 1}} }
-  offset { nodes.Math: {op: MathAdd, a: scaled, b_value: {0.2, 0.1, 0.05, 0}} }
+  scaled { nodes.Multiply: {a: uv, b_value: {0.5, 0.25, 0.5, 1}} }
+  offset { nodes.Add: {a: scaled, b_value: {0.2, 0.1, 0.05, 0}} }
   white  { nodes.Constant: {value: {1, 1, 1, 1}} }
-  mixed  { nodes.Math: {op: MathMix, a: offset, b: white, c_value: {0.25, 0.25, 0.25, 0.25}} }
+  mixed  { nodes.Mix: {a: offset, b: white, factor_value: {0.25, 0.25, 0.25, 0.25}} }
   Graph: {output: mixed, width: 16, height: 8, format: GraphHdr}
 }

@@ -1,8 +1,8 @@
 /**
  * @file TextureNodesMath.c
  * @brief Tests for the arithmetic and channel nodes of TextureGraph on the GPU backend: every
- * TexMath operation on Vector and Scalar inputs and broadcast between them against a reference
- * in both domains, their edge cases, and TexSplit and TexCombine round trips.
+ * math node kind on Vector and Scalar inputs and broadcast between them against a reference in
+ * both domains, their edge cases, and TexSplit and TexCombine round trips.
  */
 
 #include <box.h>
@@ -29,10 +29,42 @@
 /** Largest expected value a texel is checked against, beyond which half floats lose it */
 #define TM_LARGEST (1e4f)
 
-/** Last TexMath operation */
-#define TM_OPS (MathCross + 1)
+/** Operation of a math node of the tests, one per kind with TmRemapClamped for a TexRemap
+ * with clamp */
+typedef enum tm_op_t {
+    TmAdd = 0,          /**< TexAdd */
+    TmSubtract,         /**< TexSubtract */
+    TmMultiply,         /**< TexMultiply */
+    TmMin,              /**< TexMin */
+    TmMax,              /**< TexMax */
+    TmMix,              /**< TexMix */
+    TmClamp,            /**< TexClamp */
+    TmDivide,           /**< TexDivide */
+    TmPower,            /**< TexPower */
+    TmAbs,              /**< TexAbs */
+    TmNegate,           /**< TexNegate */
+    TmFloor,            /**< TexFloor */
+    TmFract,            /**< TexFract */
+    TmSin,              /**< TexSin */
+    TmCos,              /**< TexCos */
+    TmStep,             /**< TexStep */
+    TmSmoothstep,       /**< TexSmoothstep */
+    TmRemap,            /**< TexRemap */
+    TmRemapClamped,     /**< TexRemap with clamp */
+    TmDot,              /**< TexDot */
+    TmLength,           /**< TexLength */
+    TmNormalize,        /**< TexNormalize */
+    TmCross,            /**< TexCross */
+    TmOps               /**< Number of operations */
+} tm_op_t;
 
-/** How the inputs of the TexMath of a sweep are connected */
+/** Number of operations of the sweeps */
+#define TM_OPS (TmOps)
+
+/** A vec4 initializer from an array of four floats */
+#define TM_V(v) {(v)[0], (v)[1], (v)[2], (v)[3]}
+
+/** How the inputs of the math node of a sweep are connected */
 typedef enum tm_mode_t {
     TmVector = 0,       /**< a, b and c are Vector nodes */
     TmScalar = 1,       /**< a, b and c are Scalar nodes */
@@ -281,10 +313,8 @@ static ecs_entity_t tm_vector(
     ecs_entity_t scaled = ecs_new(world);
     ecs_entity_t result = ecs_new(world);
     const float *s = tm_scale[k], *o = tm_offset[k];
-    ecs_set(world, scaled, TexMath, {.op = MathMultiply, .a = uv,
-        .b_value = {s[0], s[1], s[2], s[3]}});
-    ecs_set(world, result, TexMath, {.op = MathAdd, .a = scaled,
-        .b_value = {o[0], o[1], o[2], o[3]}});
+    ecs_set(world, scaled, TexMultiply, {.a = uv, .b_value = {s[0], s[1], s[2], s[3]}});
+    ecs_set(world, result, TexAdd, {.a = scaled, .b_value = {o[0], o[1], o[2], o[3]}});
 
     return result;
 }
@@ -307,29 +337,128 @@ static ecs_entity_t tm_split(
     return result;
 }
 
+/** Set the math node of an operation on a node entity. Inputs a, b and c are the inputs of the
+ * kind in order, such as input, edge0 and edge1 of TexSmoothstep.
+ *
+ * @param world The world
+ * @param node The node entity
+ * @param op The operation
+ * @param in The input nodes a, b and c, 0 for their value
+ * @param b Value of b without a node
+ * @param c Value of c without a node
+ * @param range Remap range: from_min, from_max, to_min, to_max
+ */
+static void tm_node(
+    ecs_world_t *world,
+    ecs_entity_t node,
+    tm_op_t op,
+    const ecs_entity_t in[3],
+    const float b[4],
+    const float c[4],
+    const float range[4])
+{
+    switch (op) {
+    case TmAdd:
+        ecs_set(world, node, TexAdd, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmSubtract:
+        ecs_set(world, node, TexSubtract, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmMultiply:
+        ecs_set(world, node, TexMultiply, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmMin:
+        ecs_set(world, node, TexMin, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmMax:
+        ecs_set(world, node, TexMax, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmMix:
+        ecs_set(world, node, TexMix, {.a = in[0], .b = in[1], .factor = in[2],
+            .b_value = TM_V(b), .factor_value = TM_V(c)});
+        break;
+    case TmClamp:
+        ecs_set(world, node, TexClamp, {.input = in[0], .min = in[1], .max = in[2],
+            .min_value = TM_V(b), .max_value = TM_V(c)});
+        break;
+    case TmDivide:
+        ecs_set(world, node, TexDivide, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmPower:
+        ecs_set(world, node, TexPower, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmAbs:
+        ecs_set(world, node, TexAbs, {.input = in[0]});
+        break;
+    case TmNegate:
+        ecs_set(world, node, TexNegate, {.input = in[0]});
+        break;
+    case TmFloor:
+        ecs_set(world, node, TexFloor, {.input = in[0]});
+        break;
+    case TmFract:
+        ecs_set(world, node, TexFract, {.input = in[0]});
+        break;
+    case TmSin:
+        ecs_set(world, node, TexSin, {.input = in[0]});
+        break;
+    case TmCos:
+        ecs_set(world, node, TexCos, {.input = in[0]});
+        break;
+    case TmStep:
+        ecs_set(world, node, TexStep, {.input = in[0], .edge = in[1], .edge_value = TM_V(b)});
+        break;
+    case TmSmoothstep:
+        ecs_set(world, node, TexSmoothstep, {.input = in[0], .edge0 = in[1], .edge1 = in[2],
+            .edge0_value = TM_V(b), .edge1_value = TM_V(c)});
+        break;
+    case TmRemap:
+    case TmRemapClamped:
+        ecs_set(world, node, TexRemap, {.input = in[0], .from_min = range[0],
+            .from_max = range[1], .to_min = range[2], .to_max = range[3],
+            .clamp = op == TmRemapClamped});
+        break;
+    case TmDot:
+        ecs_set(world, node, TexDot, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    case TmLength:
+        ecs_set(world, node, TexLength, {.input = in[0]});
+        break;
+    case TmNormalize:
+        ecs_set(world, node, TexNormalize, {.input = in[0]});
+        break;
+    case TmCross:
+        ecs_set(world, node, TexCross, {.a = in[0], .b = in[1], .b_value = TM_V(b)});
+        break;
+    default:
+        test_assert(false);
+        break;
+    }
+}
+
 /** Get the inputs an operation reads.
  *
  * @param op The operation
  * @return Bit j set when it reads input j
  */
 static uint32_t tm_used(
-    TextureMathOp op)
+    tm_op_t op)
 {
     switch (op) {
-    case MathAbs:
-    case MathNegate:
-    case MathFloor:
-    case MathFract:
-    case MathSin:
-    case MathCos:
-    case MathRemap:
-    case MathRemapClamped:
-    case MathLength:
-    case MathNormalize:
+    case TmAbs:
+    case TmNegate:
+    case TmFloor:
+    case TmFract:
+    case TmSin:
+    case TmCos:
+    case TmRemap:
+    case TmRemapClamped:
+    case TmLength:
+    case TmNormalize:
         return 1;
-    case MathMix:
-    case MathClamp:
-    case MathSmoothstep:
+    case TmMix:
+    case TmClamp:
+    case TmSmoothstep:
         return 7;
     default:
         return 3;
@@ -344,7 +473,7 @@ static uint32_t tm_used(
  * @return Whether it does
  */
 static bool tm_scalar_mode(
-    TextureMathOp op,
+    tm_op_t op,
     tm_mode_t mode)
 {
     switch (mode) {
@@ -357,20 +486,20 @@ static bool tm_scalar_mode(
     }
 }
 
-/** Check whether a TexMath node outputs a Scalar.
+/** Check whether the math node of an operation outputs a Scalar.
  *
  * @param op The operation
  * @param scalar Whether it computes on Scalars
  * @return Whether it does
  */
 static bool tm_scalar_output(
-    TextureMathOp op,
+    tm_op_t op,
     bool scalar)
 {
-    return op == MathDot || op == MathLength || (op != MathCross && scalar);
+    return op == TmDot || op == TmLength || (op != TmCross && scalar);
 }
 
-/** Power as TexMath defines it.
+/** Power as TexPower defines it.
  *
  * @param a The base
  * @param b The exponent
@@ -396,7 +525,7 @@ static float tm_pow(
     return result;
 }
 
-/** Smoothstep as TexMath defines it.
+/** Smoothstep as TexSmoothstep defines it.
  *
  * @param e0 The edge of 0
  * @param e1 The edge of 1
@@ -419,7 +548,7 @@ static float tm_smoothstep(
     return t * t * (3.0f - 2.0f * t);
 }
 
-/** Remap as TexMath defines it.
+/** Remap as TexRemap defines it.
  *
  * @param a The value
  * @param range from_min, from_max, to_min, to_max
@@ -440,7 +569,7 @@ static float tm_remap(
     return range[2] + t * (range[3] - range[2]);
 }
 
-/** Compute a TexMath operation on the CPU, the reference of the tests.
+/** Compute an operation on the CPU, the reference of the tests.
  *
  * @param op The operation
  * @param a Input a, broadcast
@@ -451,7 +580,7 @@ static float tm_remap(
  * @param out Receives the value, a Scalar in out[0]
  */
 static void tm_ref(
-    TextureMathOp op,
+    tm_op_t op,
     const float a[4],
     const float b[4],
     const float c[4],
@@ -462,15 +591,15 @@ static void tm_ref(
     int32_t i;
     float l;
     switch (op) {
-    case MathDot:
+    case TmDot:
         out[0] = scalar ? a[0] * b[0] : a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
         out[1] = out[2] = out[3] = 0;
         return;
-    case MathLength:
+    case TmLength:
         out[0] = scalar ? fabsf(a[0]) : sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
         out[1] = out[2] = out[3] = 0;
         return;
-    case MathNormalize:
+    case TmNormalize:
         if (scalar) {
             for (i = 0; i < 4; i ++) {
                 out[i] = a[i] > 0 ? 1.0f : a[i] < 0 ? -1.0f : 0.0f;
@@ -484,7 +613,7 @@ static void tm_ref(
             out[3] = a[3];
         }
         return;
-    case MathCross:
+    case TmCross:
         out[0] = a[1] * b[2] - a[2] * b[1];
         out[1] = a[2] * b[0] - a[0] * b[2];
         out[2] = a[0] * b[1] - a[1] * b[0];
@@ -497,24 +626,24 @@ static void tm_ref(
     for (i = 0; i < 4; i ++) {
         float x = a[i], y = b[i], z = c[i];
         switch (op) {
-        case MathSubtract: out[i] = x - y; break;
-        case MathMultiply: out[i] = x * y; break;
-        case MathMin: out[i] = fminf(x, y); break;
-        case MathMax: out[i] = fmaxf(x, y); break;
-        case MathMix: out[i] = x + (y - x) * z; break;
-        case MathClamp: out[i] = fminf(fmaxf(x, y), z); break;
-        case MathDivide: out[i] = y == 0 ? 0 : x / y; break;
-        case MathPower: out[i] = tm_pow(x, y); break;
-        case MathAbs: out[i] = fabsf(x); break;
-        case MathNegate: out[i] = -x; break;
-        case MathFloor: out[i] = floorf(x); break;
-        case MathFract: out[i] = x - floorf(x); break;
-        case MathSin: out[i] = sinf(x); break;
-        case MathCos: out[i] = cosf(x); break;
-        case MathStep: out[i] = x >= y ? 1.0f : 0.0f; break;
-        case MathSmoothstep: out[i] = tm_smoothstep(y, z, x); break;
-        case MathRemap: out[i] = tm_remap(x, range, false); break;
-        case MathRemapClamped: out[i] = tm_remap(x, range, true); break;
+        case TmSubtract: out[i] = x - y; break;
+        case TmMultiply: out[i] = x * y; break;
+        case TmMin: out[i] = fminf(x, y); break;
+        case TmMax: out[i] = fmaxf(x, y); break;
+        case TmMix: out[i] = x + (y - x) * z; break;
+        case TmClamp: out[i] = fminf(fmaxf(x, y), z); break;
+        case TmDivide: out[i] = y == 0 ? 0 : x / y; break;
+        case TmPower: out[i] = tm_pow(x, y); break;
+        case TmAbs: out[i] = fabsf(x); break;
+        case TmNegate: out[i] = -x; break;
+        case TmFloor: out[i] = floorf(x); break;
+        case TmFract: out[i] = x - floorf(x); break;
+        case TmSin: out[i] = sinf(x); break;
+        case TmCos: out[i] = cosf(x); break;
+        case TmStep: out[i] = x >= y ? 1.0f : 0.0f; break;
+        case TmSmoothstep: out[i] = tm_smoothstep(y, z, x); break;
+        case TmRemap: out[i] = tm_remap(x, range, false); break;
+        case TmRemapClamped: out[i] = tm_remap(x, range, true); break;
         default: out[i] = x + y; break;
         }
     }
@@ -532,7 +661,7 @@ static void tm_ref(
  * @return Whether it is
  */
 static bool tm_fragile(
-    TextureMathOp op,
+    tm_op_t op,
     const float a[4],
     const float b[4],
     const float c[4],
@@ -541,19 +670,19 @@ static bool tm_fragile(
 {
     float l;
     switch (op) {
-    case MathFloor:
-    case MathFract:
+    case TmFloor:
+    case TmFract:
         return fabsf(a[i] - roundf(a[i])) < 1e-3f;
-    case MathStep:
+    case TmStep:
         return fabsf(a[i] - b[i]) < 1e-3f;
-    case MathDivide:
+    case TmDivide:
         return b[i] != 0 && fabsf(b[i]) < 0.1f;
-    case MathPower:
+    case TmPower:
         return fabsf(a[i]) < 0.05f ||
             (b[i] != roundf(b[i]) && fabsf(b[i] - roundf(b[i])) < 1e-3f);
-    case MathSmoothstep:
+    case TmSmoothstep:
         return c[i] != b[i] && fabsf(c[i] - b[i]) < 0.05f;
-    case MathNormalize:
+    case TmNormalize:
         l = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
         return scalar ? fabsf(a[i]) < 1e-3f : l < 0.05f;
     default:
@@ -561,16 +690,16 @@ static bool tm_fragile(
     }
 }
 
-/** A TexMath of a sweep in its own graph */
+/** A math node of a sweep in its own graph */
 typedef struct tm_case_t {
     ecs_entity_t tex;   /**< The texture entity */
-    ecs_entity_t node;  /**< The TexMath node */
+    ecs_entity_t node;  /**< The math node */
     bool scalar;        /**< It computes on Scalars */
     bool output;        /**< It outputs a Scalar */
 } tm_case_t;
 
-/** Check every TexMath operation on the inputs of a sweep in a mode and a domain against the
- * reference, reading back the value of the TexMath node of each.
+/** Check every operation on the inputs of a sweep in a mode and a domain against the
+ * reference, reading back the value of the math node of each.
  *
  * @param mode How the inputs are connected
  * @param domain The domain
@@ -587,11 +716,6 @@ static void tm_sweep(
         tm_case_t *t = &cases[op];
         ecs_entity_t uv = ecs_new(world);
         ecs_entity_t in[3], output;
-        TexMath math = {
-            .op = (TextureMathOp)op,
-            .from_min = tm_range[0], .from_max = tm_range[1],
-            .to_min = tm_range[2], .to_max = tm_range[3]
-        };
         ecs_set(world, uv, TexCoords, {0});
         for (k = 0; k < 3; k ++) {
             bool scalar = mode == TmScalar || (k == 0 && mode != TmVector);
@@ -606,16 +730,11 @@ static void tm_sweep(
             }
         }
 
-        math.a = in[0];
-        math.b = in[1];
-        math.c = in[2];
-        ecs_os_memcpy(math.b_value, tm_const[1], ECS_SIZEOF(vec4));
-        ecs_os_memcpy(math.c_value, tm_const[2], ECS_SIZEOF(vec4));
-        t->scalar = tm_scalar_mode((TextureMathOp)op, mode);
-        t->output = tm_scalar_output((TextureMathOp)op, t->scalar);
+        t->scalar = tm_scalar_mode((tm_op_t)op, mode);
+        t->output = tm_scalar_output((tm_op_t)op, t->scalar);
         t->tex = ecs_new(world);
         t->node = ecs_new(world);
-        ecs_set_ptr(world, t->node, TexMath, &math);
+        tm_node(world, t->node, (tm_op_t)op, in, tm_const[1], tm_const[2], tm_range);
         output = t->node;
         if (t->output) {
             output = ecs_new(world);
@@ -648,7 +767,7 @@ static void tm_sweep(
                         : mode == TmScalarConst ? tm_const[2][c] : v[2][c];
                 }
 
-                tm_ref((TextureMathOp)op, a, b, cc, tm_range, t->scalar, expect);
+                tm_ref((tm_op_t)op, a, b, cc, tm_range, t->scalar, expect);
                 if (t->output) {
                     expect[1] = 0;
                     expect[2] = 0;
@@ -657,7 +776,7 @@ static void tm_sweep(
 
                 for (c = 0; c < 4; c ++) {
                     int32_t at = t->output ? 0 : c;
-                    if (tm_fragile((TextureMathOp)op, a, b, cc, t->scalar, at) ||
+                    if (tm_fragile((tm_op_t)op, a, b, cc, t->scalar, at) ||
                         !isfinite(expect[c]) || fabsf(expect[c]) > TM_LARGEST)
                     {
                         continue;
@@ -716,7 +835,7 @@ void TextureNodesMath_scalar_constants_sphere(void) {
 
 /** An edge case of an operation with constant inputs and its expected values */
 typedef struct tm_edge_t {
-    TextureMathOp op;   /**< The operation */
+    tm_op_t op;   /**< The operation */
     float a[4];         /**< Input a */
     float b[4];         /**< Input b */
     float c[4];         /**< Input c */
@@ -727,33 +846,33 @@ typedef struct tm_edge_t {
 
 /** The edge cases */
 static const tm_edge_t tm_edges[] = {
-    {MathDivide, {3, -2, 0, 5}, {0, 0, 0, 2}, {0}, {0}, {0, 0, 0, 2.5f}, {0, 0, 0, 2.5f}},
-    {MathPower, {0, -2, -2, 0}, {-1, 3, 0.5f, 0}, {0}, {0}, {0, -8, 0, 1}, {0, -8, 0, 1}},
-    {MathPower, {-2, 2, 4, -3}, {2, -1, 0.5f, 1}, {0}, {0}, {4, 0.5f, 2, -3},
+    {TmDivide, {3, -2, 0, 5}, {0, 0, 0, 2}, {0}, {0}, {0, 0, 0, 2.5f}, {0, 0, 0, 2.5f}},
+    {TmPower, {0, -2, -2, 0}, {-1, 3, 0.5f, 0}, {0}, {0}, {0, -8, 0, 1}, {0, -8, 0, 1}},
+    {TmPower, {-2, 2, 4, -3}, {2, -1, 0.5f, 1}, {0}, {0}, {4, 0.5f, 2, -3},
         {4, 0.5f, 2, -3}},
-    {MathNormalize, {0, 0, 0, 0.5f}, {0}, {0}, {0}, {0, 0, 0, 0.5f}, {0, 0, 0, 1}},
-    {MathNormalize, {3, 0, -4, 2}, {0}, {0}, {0}, {0.6f, 0, -0.8f, 2}, {1, 0, -1, 1}},
-    {MathSmoothstep, {0.5f, 0.2f, 0.7f, 0.4f}, {0.5f, 0.5f, 0.5f, 0.5f},
+    {TmNormalize, {0, 0, 0, 0.5f}, {0}, {0}, {0}, {0, 0, 0, 0.5f}, {0, 0, 0, 1}},
+    {TmNormalize, {3, 0, -4, 2}, {0}, {0}, {0}, {0.6f, 0, -0.8f, 2}, {1, 0, -1, 1}},
+    {TmSmoothstep, {0.5f, 0.2f, 0.7f, 0.4f}, {0.5f, 0.5f, 0.5f, 0.5f},
         {0.5f, 0.5f, 0.5f, 0.5f}, {0}, {1, 0, 1, 0}, {1, 0, 1, 0}},
-    {MathSmoothstep, {0.25f, 0, 1, 0.75f}, {0, 0, 0, 0}, {1, 1, 1, 1}, {0},
+    {TmSmoothstep, {0.25f, 0, 1, 0.75f}, {0, 0, 0, 0}, {1, 1, 1, 1}, {0},
         {0.15625f, 0, 1, 0.84375f}, {0.15625f, 0, 1, 0.84375f}},
-    {MathStep, {1, 0.5f, -1, 2}, {1, 1, -1, 3}, {0}, {0}, {1, 0, 1, 0}, {1, 0, 1, 0}},
-    {MathFloor, {-0.25f, 1.5f, 2, -3}, {0}, {0}, {0}, {-1, 1, 2, -3}, {-1, 1, 2, -3}},
-    {MathFract, {-0.25f, 1.5f, 2, -3}, {0}, {0}, {0}, {0.75f, 0.5f, 0, 0},
+    {TmStep, {1, 0.5f, -1, 2}, {1, 1, -1, 3}, {0}, {0}, {1, 0, 1, 0}, {1, 0, 1, 0}},
+    {TmFloor, {-0.25f, 1.5f, 2, -3}, {0}, {0}, {0}, {-1, 1, 2, -3}, {-1, 1, 2, -3}},
+    {TmFract, {-0.25f, 1.5f, 2, -3}, {0}, {0}, {0}, {0.75f, 0.5f, 0, 0},
         {0.75f, 0.5f, 0, 0}},
-    {MathAbs, {-1.5f, 0, 2, -3}, {0}, {0}, {0}, {1.5f, 0, 2, 3}, {1.5f, 0, 2, 3}},
-    {MathNegate, {1, -2, 0, 3}, {0}, {0}, {0}, {-1, 2, 0, -3}, {-1, 2, 0, -3}},
-    {MathSin, {0, TM_PI / 2, TM_PI, -TM_PI / 2}, {0}, {0}, {0}, {0, 1, 0, -1}, {0, 1, 0, -1}},
-    {MathCos, {0, TM_PI / 2, TM_PI, 2 * TM_PI}, {0}, {0}, {0}, {1, 0, -1, 1}, {1, 0, -1, 1}},
-    {MathDot, {1, 2, 3, 4}, {4, 5, 6, 7}, {0}, {0}, {32, 0, 0, 1}, {4, 10, 18, 28}},
-    {MathLength, {3, 4, 0, -9}, {0}, {0}, {0}, {5, 0, 0, 1}, {3, 4, 0, 9}},
-    {MathCross, {1, 0, 0, 5}, {0, 1, 0, 5}, {0}, {0}, {0, 0, 1, 0}, {0, 0, 0, 0}},
-    {MathRemap, {-5, 0.5f, 5, 0}, {0}, {0}, {0, 1, 10, 20}, {-40, 15, 60, 10},
+    {TmAbs, {-1.5f, 0, 2, -3}, {0}, {0}, {0}, {1.5f, 0, 2, 3}, {1.5f, 0, 2, 3}},
+    {TmNegate, {1, -2, 0, 3}, {0}, {0}, {0}, {-1, 2, 0, -3}, {-1, 2, 0, -3}},
+    {TmSin, {0, TM_PI / 2, TM_PI, -TM_PI / 2}, {0}, {0}, {0}, {0, 1, 0, -1}, {0, 1, 0, -1}},
+    {TmCos, {0, TM_PI / 2, TM_PI, 2 * TM_PI}, {0}, {0}, {0}, {1, 0, -1, 1}, {1, 0, -1, 1}},
+    {TmDot, {1, 2, 3, 4}, {4, 5, 6, 7}, {0}, {0}, {32, 0, 0, 1}, {4, 10, 18, 28}},
+    {TmLength, {3, 4, 0, -9}, {0}, {0}, {0}, {5, 0, 0, 1}, {3, 4, 0, 9}},
+    {TmCross, {1, 0, 0, 5}, {0, 1, 0, 5}, {0}, {0}, {0, 0, 1, 0}, {0, 0, 0, 0}},
+    {TmRemap, {-5, 0.5f, 5, 0}, {0}, {0}, {0, 1, 10, 20}, {-40, 15, 60, 10},
         {-40, 15, 60, 10}},
-    {MathRemapClamped, {-5, 0.5f, 5, 0}, {0}, {0}, {0, 1, 10, 20}, {10, 15, 20, 10},
+    {TmRemapClamped, {-5, 0.5f, 5, 0}, {0}, {0}, {0, 1, 10, 20}, {10, 15, 20, 10},
         {10, 15, 20, 10}},
-    {MathRemap, {0, 1, 2, 3}, {0}, {0}, {1, 1, 2, 3}, {2, 2, 2, 2}, {2, 2, 2, 2}},
-    {MathClamp, {-1, 0.5f, 2, 0.25f}, {0, 0, 0, 0.5f}, {1, 1, 1, 1}, {0}, {0, 0.5f, 1, 0.5f},
+    {TmRemap, {0, 1, 2, 3}, {0}, {0}, {1, 1, 2, 3}, {2, 2, 2, 2}, {2, 2, 2, 2}},
+    {TmClamp, {-1, 0.5f, 2, 0.25f}, {0, 0, 0, 0.5f}, {1, 1, 1, 1}, {0}, {0, 0.5f, 1, 0.5f},
         {0, 0.5f, 1, 0.5f}}
 };
 
@@ -764,7 +883,7 @@ static const tm_edge_t tm_edges[] = {
  * @param e The edge case
  * @param channel Channel of the Scalar inputs, -1 for Vector inputs
  * @param domain The domain
- * @param node Receives the TexMath node
+ * @param node Receives the math node
  * @return The texture entity
  */
 static ecs_entity_t tm_edge_graph(
@@ -789,9 +908,7 @@ static ecs_entity_t tm_edge_graph(
     }
 
     *node = ecs_new(world);
-    ecs_set(world, *node, TexMath, {.op = e->op, .a = in[0], .b = in[1], .c = in[2],
-        .from_min = e->range[0], .from_max = e->range[1], .to_min = e->range[2],
-        .to_max = e->range[3]});
+    tm_node(world, *node, e->op, in, tm_const[0], tm_const[0], e->range);
     output = *node;
     if (tm_scalar_output(e->op, channel >= 0)) {
         output = ecs_new(world);
@@ -960,7 +1077,7 @@ static void tm_combine_round_trip(
     ecs_entity_t vector = tm_vector(world, uv, 1);
     ecs_entity_t green = tm_split(world, vector, ChannelG);
     ecs_entity_t blue = tm_split(world, vector, ChannelB);
-    ecs_set(world, wave, TexMath, {.op = MathSin, .a = blue});
+    ecs_set(world, wave, TexSin, {.input = blue});
     ecs_set(world, combine, TexCombine, {.r = green, .g = wave, .b_value = 0.25f,
         .a_value = 0.75f});
     for (k = 0; k < 4; k ++) {

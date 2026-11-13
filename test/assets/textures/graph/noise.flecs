@@ -6,7 +6,7 @@ using box.texture
 clouds {
   uv     { nodes.Coords: {} }
   warp   { nodes.Noise: {frequency: 3, channels: 4, seed: 7} }
-  moved  { nodes.Math: {op: MathMix, a: uv, b: warp, c_value: {0.1, 0.1, 0.1, 0}} }
+  moved  { nodes.Mix: {a: uv, b: warp, factor_value: {0.1, 0.1, 0.1, 0}} }
   noise  {
     nodes.Noise: {coords: moved, frequency: 6, octaves: 5, lacunarity: 2.5, gain: 0.45, fractal: NoiseBillow, seed: 3}
   }

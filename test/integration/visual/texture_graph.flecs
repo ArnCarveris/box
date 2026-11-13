@@ -36,8 +36,8 @@ graphs {
 
   plating {
     uv     { nodes.Coords: {} }
-    bright { nodes.Math: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
-    tinted { nodes.Math: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
+    bright { nodes.Multiply: {a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
+    tinted { nodes.Add: {a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
     Graph: {output: tinted, width: 256}
   }
 
@@ -45,21 +45,21 @@ graphs {
     uv    { nodes.Coords: {} }
     red   { nodes.Constant: {value: {0.9, 0.1, 0.1, 1}} }
     blue  { nodes.Constant: {value: {0.1, 0.2, 0.9, 1}} }
-    mixed { nodes.Math: {op: MathMix, a: red, b: blue, c: uv} }
-    edge  { nodes.Math: {op: MathClamp, a: mixed, b_value: {0, 0, 0, 1}, c_value: {0.5, 1, 1, 1}} }
+    mixed { nodes.Mix: {a: red, b: blue, factor: uv} }
+    edge  { nodes.Clamp: {input: mixed, min_value: {0, 0, 0, 1}, max_value: {0.5, 1, 1, 1}} }
     Graph: {output: edge, width: 128, format: GraphLinear}
   }
 
   globe {
     dir    { nodes.Coords: {} }
-    half   { nodes.Math: {op: MathMultiply, a: dir, b_value: {0.5, 0.5, 0.5, 1}} }
-    shift  { nodes.Math: {op: MathAdd, a: half, b_value: {0.5, 0.5, 0.5, 0}} }
+    half   { nodes.Multiply: {a: dir, b_value: {0.5, 0.5, 0.5, 1}} }
+    shift  { nodes.Add: {a: half, b_value: {0.5, 0.5, 0.5, 0}} }
     Graph: {output: shift, width: 256, height: 128, domain: DomainSphere}
   }
 
   glow {
     uv     { nodes.Coords: {} }
-    bright { nodes.Math: {op: MathMultiply, a: uv, b_value: {0, 4, 2, 1}} }
+    bright { nodes.Multiply: {a: uv, b_value: {0, 4, 2, 1}} }
     Graph: {output: bright, width: 64, format: GraphHdr}
   }
 

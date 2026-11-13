@@ -39,10 +39,10 @@ graph_normals {
 
   meridian {
     dir    { nodes.Coords: {} }
-    neg    { nodes.Math: {op: MathMultiply, a: dir, b_value: {-1, -1, -1, 1}} }
-    mag    { nodes.Math: {op: MathMax, a: dir, b: neg} }
-    tent   { nodes.Math: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
-    ridge  { nodes.Math: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
+    neg    { nodes.Multiply: {a: dir, b_value: {-1, -1, -1, 1}} }
+    mag    { nodes.Max: {a: dir, b: neg} }
+    tent   { nodes.Subtract: {a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
+    ridge  { nodes.Max: {a: tent, b_value: {0, 0, 0, 0}} }
     height { nodes.Split: {input: ridge, channel: ChannelR} }
     normal { nodes.Normal: {height: height, strength: 20} }
     Graph: {output: normal, width: 512, height: 256, domain: DomainSphere,
@@ -51,10 +51,10 @@ graph_normals {
 
   belt {
     dir    { nodes.Coords: {} }
-    neg    { nodes.Math: {op: MathMultiply, a: dir, b_value: {-1, -1, -1, 1}} }
-    mag    { nodes.Math: {op: MathMax, a: dir, b: neg} }
-    tent   { nodes.Math: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
-    ridge  { nodes.Math: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
+    neg    { nodes.Multiply: {a: dir, b_value: {-1, -1, -1, 1}} }
+    mag    { nodes.Max: {a: dir, b: neg} }
+    tent   { nodes.Subtract: {a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
+    ridge  { nodes.Max: {a: tent, b_value: {0, 0, 0, 0}} }
     height { nodes.Split: {input: ridge, channel: ChannelG} }
     normal { nodes.Normal: {height: height, strength: 20} }
     Graph: {output: normal, width: 512, height: 256, domain: DomainSphere,
@@ -63,10 +63,10 @@ graph_normals {
 
   steep {
     dir    { nodes.Coords: {} }
-    neg    { nodes.Math: {op: MathMultiply, a: dir, b_value: {-1, -1, -1, 1}} }
-    mag    { nodes.Math: {op: MathMax, a: dir, b: neg} }
-    tent   { nodes.Math: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
-    ridge  { nodes.Math: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
+    neg    { nodes.Multiply: {a: dir, b_value: {-1, -1, -1, 1}} }
+    mag    { nodes.Max: {a: dir, b: neg} }
+    tent   { nodes.Subtract: {a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
+    ridge  { nodes.Max: {a: tent, b_value: {0, 0, 0, 0}} }
     height { nodes.Split: {input: ridge, channel: ChannelG} }
     slope  { nodes.Slope: {height: height, strength: 20} }
     Graph: {output: slope, width: 512, height: 256, domain: DomainSphere,

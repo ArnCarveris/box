@@ -274,7 +274,7 @@ static ecs_entity_t tg_shifted(
     s.in = *uv;
     ecs_set(world, *uv, TexCoords, {.scale = scale});
     ecs_set_id(world, shift, shift_c, ECS_SIZEOF(TgShift), &s);
-    ecs_set(world, *math, TexMath, {.op = MathMultiply, .a = shift,
+    ecs_set(world, *math, TexMultiply, {.a = shift,
         .b_value = {factor, factor, factor, factor}});
     ecs_set(world, tex, TextureGraph, {.output = *math, .width = 8, .height = 8,
         .format = GraphHdr});
@@ -461,9 +461,9 @@ void TextureGraphCache_downstream_edit_keeps_upstream(void) {
     tg_expect_shifted(world, tex, 1, 0.5f);
 
     before = tg_stats(world);
-    TexMath *m = ecs_get_mut(world, math, TexMath);
+    TexMultiply *m = ecs_get_mut(world, math, TexMultiply);
     m->b_value[0] = m->b_value[1] = m->b_value[2] = m->b_value[3] = 0.25f;
-    ecs_modified(world, math, TexMath);
+    ecs_modified(world, math, TexMultiply);
     tg_wait(world, tex, 2);
     after = tg_stats(world);
     test_int(after.texture_graph_dispatches - before.texture_graph_dispatches, 1);
@@ -618,7 +618,7 @@ void TextureGraphCache_animated_static_part(void) {
     ecs_set_id(world, shift, shift_c, ECS_SIZEOF(TgShift), &s);
     ecs_set(world, time, TexTime, {.scale = 1});
     ecs_set(world, splat, TexSplat, {.in = time});
-    ecs_set(world, math, TexMath, {.op = MathAdd, .a = shift, .b = splat});
+    ecs_set(world, math, TexAdd, {.a = shift, .b = splat});
     box_render_gpu_stats_t before = tg_stats(world);
     ecs_set(world, tex, TextureGraph, {.output = math, .width = 8, .height = 8,
         .format = GraphHdr});

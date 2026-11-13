@@ -14,12 +14,12 @@ clouds {
     prop size: i32 = 512
 
     uv { nodes.Coords: {scale: 1} }
-    sky { nodes.Math: {op: MathMix, a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, c: uv} }
+    sky { nodes.Mix: {a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, factor: uv} }
     time { nodes.Time: {scale: speed, offset: 0} }
     drift { nodes.Splat: {in: time} }
-    moved { nodes.Math: {op: MathAdd, a: uv, b: drift} }
-    puffs { nodes.Math: {op: MathMultiply, a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
-    out { nodes.Math: {op: MathMax, a: sky, b: puffs} }
+    moved { nodes.Add: {a: uv, b: drift} }
+    puffs { nodes.Multiply: {a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
+    out { nodes.Max: {a: sky, b: puffs} }
     Graph: {output: out, width: size, height: size, domain: DomainPlane, format: GraphColor, rate: rate}
   }
 }

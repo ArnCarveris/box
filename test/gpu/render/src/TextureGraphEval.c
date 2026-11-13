@@ -350,7 +350,7 @@ static ecs_entity_t tg_scaled(
     *math = ecs_new(world);
     ecs_set(world, uv, TexCoords, {0});
     ecs_set(world, *constant, TexConstant, {.value = {value[0], value[1], value[2], value[3]}});
-    ecs_set(world, *math, TexMath, {.op = MathMultiply, .a = uv, .b = *constant});
+    ecs_set(world, *math, TexMultiply, {.a = uv, .b = *constant});
     ecs_set(world, tex, TextureGraph, {.output = *math, .width = 8, .height = 8,
         .format = format});
 
@@ -745,13 +745,13 @@ void TextureGraphEval_structure_edit_recompiles(void) {
     test_int(tg_wait(world, tex, 1)->state, TextureReady);
     test_bool(box_render_gpu_stats(world, &before), true);
 
-    TexMath *m = ecs_get_mut(world, math, TexMath);
+    TexMultiply *m = ecs_get_mut(world, math, TexMultiply);
     m->b = 0;
     m->b_value[0] = 0.5f;
     m->b_value[1] = 0.5f;
     m->b_value[2] = 0.5f;
     m->b_value[3] = 0.5f;
-    ecs_modified(world, math, TexMath);
+    ecs_modified(world, math, TexMultiply);
     const TextureStatus *status = tg_wait(world, tex, 2);
     test_int(status->state, TextureReady);
     test_int(status->revision, 2);
@@ -1093,9 +1093,9 @@ void TextureGraphEval_blocks_tiling(void) {
     ecs_entity_t twice = ecs_new(world);
     ecs_entity_t shift = ecs_new(world);
     ecs_set(world, uv, TexCoords, {0});
-    ecs_set(world, twice, TexMath, {.op = MathMultiply, .a = uv,
+    ecs_set(world, twice, TexMultiply, {.a = uv,
         .b_value = {2.0f, 2.0f, 1.0f, 1.0f}});
-    ecs_set(world, shift, TexMath, {.op = MathAdd, .a = uv,
+    ecs_set(world, shift, TexAdd, {.a = uv,
         .b_value = {1.0f, -2.0f, 0.0f, 0.0f}});
     ecs_entity_t repeated = ecs_new(world);
     ecs_entity_t repeated_node = ecs_new(world);

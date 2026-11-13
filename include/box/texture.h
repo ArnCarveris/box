@@ -269,7 +269,7 @@ ECS_ENUM(TextureValueType, {
 
 /** Texture whose image a graph of node entities computes per texel on the render backend.
  *
- * Each node entity has one node component such as TexMath, whose entity members are its
+ * Each node entity has one node component such as TexMultiply, whose entity members are its
  * inputs; the graph is the output node and every node it reaches. A change of either builds it
  * again. It writes Texture and TextureStatus as a TexturePath does, capped by texture_quality.
  *
@@ -279,8 +279,8 @@ ECS_ENUM(TextureValueType, {
  * @code
  * plating {
  *   uv     { nodes.Coords: {} }
- *   bright { nodes.Math: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
- *   tinted { nodes.Math: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
+ *   bright { nodes.Multiply: {a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
+ *   tinted { nodes.Add: {a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
  *   Graph: {output: tinted, width: 1024}
  * }
  * @endcode
@@ -330,81 +330,207 @@ ECS_STRUCT(TexTime, {
 });
 
 /** Node of a TextureGraph that spreads a scalar over the four channels of a vector, such as a
- * TexTime into a TexMath */
+ * TexTime into a TexMultiply */
 ECS_STRUCT(TexSplat, {
     ecs_entity_t in; /**< Scalar input node, 0 for in_value */
     float in_value;  /**< Value of in without a node */
 });
 
-/** Operation of a TexMath node. Each one works per channel unless it says otherwise. */
-ECS_ENUM(TextureMathOp, {
-    MathAdd = 0,         /**< a + b, the default */
-    MathSubtract = 1,    /**< a - b */
-    MathMultiply = 2,    /**< a * b */
-    MathMin = 3,         /**< min(a, b) */
-    MathMax = 4,         /**< max(a, b) */
-    MathMix = 5,         /**< mix(a, b, c): a where c is 0, b where c is 1 */
-    MathClamp = 6,       /**< clamp(a, b, c): a limited to b..c */
-    MathDivide = 7,      /**< a / b, 0 where b is 0 */
-    MathPower = 8,       /**< a to the power b: 1 where b is 0, else 0 where a is 0 and where a
-                          *   is negative and b is not a whole number; a negative a with a whole
-                          *   b keeps the sign of an odd power */
-    MathAbs = 9,         /**< abs(a) */
-    MathNegate = 10,     /**< -a */
-    MathFloor = 11,      /**< floor(a) */
-    MathFract = 12,      /**< a - floor(a) */
-    MathSin = 13,        /**< sin(a), a in radians */
-    MathCos = 14,        /**< cos(a), a in radians */
-    MathStep = 15,       /**< 1 where a is at least the edge b, else 0 */
-    MathSmoothstep = 16, /**< smoothstep from the edge b to the edge c at a, 0 at b, 1 at c;
-                          *   a step at b where b and c are equal */
-    MathRemap = 17,      /**< a mapped from from_min..from_max to to_min..to_max, to_min where
-                          *   the from range is empty */
-    MathRemapClamped = 18, /**< MathRemap limited to the to range */
-    MathDot = 19,        /**< Scalar: dot product of the first three channels of a and b, a * b
-                          *   on Scalars */
-    MathLength = 20,     /**< Scalar: length of the first three channels of a, abs(a) on a
-                          *   Scalar */
-    MathNormalize = 21,  /**< The first three channels of a scaled to length 1 with its fourth
-                          *   kept, the sign of a on a Scalar; 0 stays 0 */
-    MathCross = 22       /**< Vector: cross product of the first three channels of a and b, with
-                          *   0 as the fourth */
-});
+/* The math nodes of a TextureGraph, one kind per operation. Each input takes a Scalar or a
+ * Vector node, or its value member without one, whose first channel is the value on Scalars.
+ * They output a Scalar when every input node they read is a Scalar, else a Vector with a Scalar
+ * broadcast, and work per channel unless they say otherwise. */
 
-/** Node of a TextureGraph that computes an operation on one, two or three values.
- *
- * Its inputs take Scalar and Vector nodes, or their value member without a node. It outputs a
- * Scalar when every input node its operation reads is a Scalar, else a Vector with a Scalar
- * broadcast; MathDot and MathLength always output a Scalar, MathCross a Vector.
- *
- * Unary operations read a, binary ones a and b, MathMix, MathClamp and MathSmoothstep a, b and
- * c. On Scalars a value member gives its first channel. The range members are the parameters
- * of MathRemap and MathRemapClamped.
+/** Node of a TextureGraph whose value is a + b.
  *
  * @code
  * glow {
  *   uv     { nodes.Coords: {} }
  *   red    { nodes.Split: {input: uv, channel: ChannelR} }
- *   wave   { nodes.Math: {op: MathSin, a: red} }
- *   level  { nodes.Math: {op: MathRemapClamped, a: wave, from_min: -1, from_max: 1,
- *                      to_min: 0.2, to_max: 0.8} }
- *   tinted { nodes.Math: {op: MathMultiply, a: level, b_value: {1, 0.5, 0.25, 1}} }
- *   Graph: {output: tinted}
+ *   wave   { nodes.Sin: {input: red} }
+ *   level  { nodes.Remap: {input: wave, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8,
+ *                          clamp: true} }
+ *   tinted { nodes.Multiply: {a: level, b_value: {1, 0.5, 0.25, 1}} }
+ *   lifted { nodes.Add: {a: tinted, b_value: {0.1, 0.1, 0.1, 0}} }
+ *   Graph: {output: lifted}
  * }
  * @endcode
  */
-ECS_STRUCT(TexMath, {
-    TextureMathOp op;   /**< Operation, default MathAdd */
-    ecs_entity_t a;     /**< First input node, 0 for a_value */
-    ecs_entity_t b;     /**< Second input node, 0 for b_value */
-    ecs_entity_t c;     /**< Third input node, 0 for c_value */
-    vec4 a_value;       /**< Value of a without a node */
-    vec4 b_value;       /**< Value of b without a node */
-    vec4 c_value;       /**< Value of c without a node */
-    float from_min;     /**< MathRemap: start of the range a is mapped from */
-    float from_max;     /**< MathRemap: end of the range a is mapped from */
-    float to_min;       /**< MathRemap: value at from_min */
-    float to_max;       /**< MathRemap: value at from_max */
+ECS_STRUCT(TexAdd, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is a - b */
+ECS_STRUCT(TexSubtract, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is a * b */
+ECS_STRUCT(TexMultiply, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is a / b, 0 where b is 0 */
+ECS_STRUCT(TexDivide, {
+    ecs_entity_t a; /**< Dividend input node, 0 for a_value */
+    ecs_entity_t b; /**< Divisor input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is min(a, b) */
+ECS_STRUCT(TexMin, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is max(a, b) */
+ECS_STRUCT(TexMax, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is a to the power b: 1 where b is 0, else 0 where a is 0
+ * and where a is negative and b is not a whole number; a negative a with a whole b keeps the
+ * sign of an odd power */
+ECS_STRUCT(TexPower, {
+    ecs_entity_t a; /**< Base input node, 0 for a_value */
+    ecs_entity_t b; /**< Exponent input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose Scalar value is the dot product of the first three channels of
+ * a and b, a * b on Scalars */
+ECS_STRUCT(TexDot, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose Vector value is the cross product of the first three channels
+ * of a and b, with 0 as the fourth */
+ECS_STRUCT(TexCross, {
+    ecs_entity_t a; /**< First input node, 0 for a_value */
+    ecs_entity_t b; /**< Second input node, 0 for b_value */
+    vec4 a_value;   /**< Value of a without a node */
+    vec4 b_value;   /**< Value of b without a node */
+});
+
+/** Node of a TextureGraph whose value is mix(a, b, factor): a where factor is 0, b where it
+ * is 1 */
+ECS_STRUCT(TexMix, {
+    ecs_entity_t a;      /**< Input node at factor 0, 0 for a_value */
+    ecs_entity_t b;      /**< Input node at factor 1, 0 for b_value */
+    ecs_entity_t factor; /**< Input node of the factor, 0 for factor_value */
+    vec4 a_value;        /**< Value of a without a node */
+    vec4 b_value;        /**< Value of b without a node */
+    vec4 factor_value;   /**< Value of factor without a node */
+});
+
+/** Node of a TextureGraph whose value is its input limited to min..max */
+ECS_STRUCT(TexClamp, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    ecs_entity_t min;   /**< Input node of the lower limit, 0 for min_value */
+    ecs_entity_t max;   /**< Input node of the upper limit, 0 for max_value */
+    vec4 input_value;   /**< Value of input without a node */
+    vec4 min_value;     /**< Value of min without a node */
+    vec4 max_value;     /**< Value of max without a node */
+});
+
+/** Node of a TextureGraph whose value is 1 where its input is at least edge, else 0 */
+ECS_STRUCT(TexStep, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    ecs_entity_t edge;  /**< Input node of the edge, 0 for edge_value */
+    vec4 input_value;   /**< Value of input without a node */
+    vec4 edge_value;    /**< Value of edge without a node */
+});
+
+/** Node of a TextureGraph whose value is the smoothstep from edge0 to edge1 at its input, 0 at
+ * edge0, 1 at edge1; a step at edge0 where the edges are equal */
+ECS_STRUCT(TexSmoothstep, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    ecs_entity_t edge0; /**< Input node of the edge at 0, 0 for edge0_value */
+    ecs_entity_t edge1; /**< Input node of the edge at 1, 0 for edge1_value */
+    vec4 input_value;   /**< Value of input without a node */
+    vec4 edge0_value;   /**< Value of edge0 without a node */
+    vec4 edge1_value;   /**< Value of edge1 without a node */
+});
+
+/** Node of a TextureGraph whose value is abs(input) */
+ECS_STRUCT(TexAbs, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is -input */
+ECS_STRUCT(TexNegate, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is floor(input) */
+ECS_STRUCT(TexFloor, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is input - floor(input) */
+ECS_STRUCT(TexFract, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is sin(input), input in radians */
+ECS_STRUCT(TexSin, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is cos(input), input in radians */
+ECS_STRUCT(TexCos, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose Scalar value is the length of the first three channels of its
+ * input, abs(input) on a Scalar */
+ECS_STRUCT(TexLength, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is the first three channels of its input scaled to length
+ * 1 with the fourth kept, the sign of the input on a Scalar; 0 stays 0 */
+ECS_STRUCT(TexNormalize, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+});
+
+/** Node of a TextureGraph whose value is its input mapped from from_min..from_max to
+ * to_min..to_max, to_min where the from range is empty */
+ECS_STRUCT(TexRemap, {
+    ecs_entity_t input; /**< Input node, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+    float from_min;     /**< Start of the range the input is mapped from */
+    float from_max;     /**< End of the range the input is mapped from */
+    float to_min;       /**< Value at from_min */
+    float to_max;       /**< Value at from_max */
+    bool clamp;         /**< Limit the value to the to range, default off */
 });
 
 /** Channel of a Vector */
@@ -464,7 +590,7 @@ ECS_STRUCT(TexCombine, {
  *
  * @code
  * warped {
- *   bumps { nodes.Math: {op: MathMultiply, a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
+ *   bumps { nodes.Multiply: {a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
  *   nodes.Warp: {offset: bumps, amount_value: 0.2}
  * }
  * @endcode
@@ -722,7 +848,7 @@ ECS_ENUM(TextureAddress, {
  * @code
  * tinted {
  *   albedo { nodes.Image: {texture: brick} }
- *   warm   { nodes.Math: {op: MathMultiply, a: albedo, b_value: {1, 0.9, 0.8, 1}} }
+ *   warm   { nodes.Multiply: {a: albedo, b_value: {1, 0.9, 0.8, 1}} }
  *   Graph: {output: warm, width: 512}
  * }
  * @endcode
@@ -830,7 +956,7 @@ ECS_STRUCT(TextureNodePort, {
 ECS_STRUCT(TextureNodeParam, {
     const char *name;   /**< Member copied into the parameter buffer */
     int32_t offset;     /**< Byte offset in the parameters of a node */
-    int32_t size;       /**< Bytes, 4 to 16 */
+    int32_t size;       /**< Bytes, 4 to 16, 4 for a bool */
 });
 
 /** Description of a node kind, set by the engine on the component entity of each registered
@@ -863,7 +989,8 @@ ECS_STRUCT(TextureNodeKind, {
 typedef enum box_texture_param_kind_t {
     BOX_TEXTURE_PARAM_F32 = 0, /**< float elements, f32 in WGSL */
     BOX_TEXTURE_PARAM_I32 = 1, /**< int32_t elements, such as an enum, i32 in WGSL */
-    BOX_TEXTURE_PARAM_U32 = 2  /**< uint32_t elements, u32 in WGSL */
+    BOX_TEXTURE_PARAM_U32 = 2, /**< uint32_t elements, u32 in WGSL */
+    BOX_TEXTURE_PARAM_BOOL = 3 /**< A bool of size 1, a u32 of 0 or 1 in WGSL */
 } box_texture_param_kind_t;
 
 /** An input of a node kind: an ecs_entity_t member of its component */
@@ -883,7 +1010,8 @@ typedef struct box_texture_node_input_t {
 typedef struct box_texture_node_param_t {
     const char *name;           /**< Name of the member, NULL ends the list */
     ecs_size_t offset;          /**< Offset of the member */
-    ecs_size_t size;            /**< Bytes of the member: 4, 8, 12 or 16 */
+    ecs_size_t size;            /**< Bytes of the member: 4, 8, 12 or 16, 1 for
+                                 *   BOX_TEXTURE_PARAM_BOOL */
     box_texture_param_kind_t kind; /**< Kind of its elements */
 } box_texture_node_param_t;
 

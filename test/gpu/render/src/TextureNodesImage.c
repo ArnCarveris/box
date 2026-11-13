@@ -421,7 +421,7 @@ void TextureNodesImage_wrap_and_clamp(void) {
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t shifted = ecs_new(world);
     ecs_set(world, uv, TexCoords, {0});
-    ecs_set(world, shifted, TexMath, {.op = MathAdd, .a = uv,
+    ecs_set(world, shifted, TexAdd, {.a = uv,
         .b_value = {1.0f / TI_W, 0, 0, 0}});
     ecs_entity_t wrap = ti_graph(world, image, shifted, AddressWrap, true, TI_W, TI_H,
         DomainPlane, GraphLinear, NULL);
@@ -590,7 +590,7 @@ void TextureNodesImage_four_images_one_graph(void) {
         ecs_entity_t next = ecs_new(world);
         ecs_set(world, image, TexImage, {.texture = ti_constant(world, values[i], NULL),
             .linear = true});
-        ecs_set(world, next, TexMath, {.op = MathAdd, .a = sum, .b = image});
+        ecs_set(world, next, TexAdd, {.a = sum, .b = image});
         sum = next;
     }
 
@@ -630,7 +630,7 @@ void TextureNodesImage_chain_updates(void) {
     ecs_set_id(world, shift_image, shift_c, ECS_SIZEOF(TgShift), &s);
     s.in = uv;
     ecs_set_id(world, shift_uv, shift_c, ECS_SIZEOF(TgShift), &s);
-    ecs_set(world, sum, TexMath, {.op = MathAdd, .a = shift_image, .b = shift_uv});
+    ecs_set(world, sum, TexAdd, {.a = shift_image, .b = shift_uv});
     ecs_set(world, tex, TextureGraph, {.output = sum, .width = 8, .height = 8,
         .format = GraphHdr});
     tg_ready(world, source, 1);
@@ -812,7 +812,7 @@ void TextureNodesImage_rebind_no_recompile(void) {
     ecs_entity_t constant = ecs_new(world);
     ecs_entity_t sum = ecs_new(world);
     ecs_set(world, constant, TexConstant, {.value = {0.25f, 0.25f, 0.25f, 0}});
-    ecs_set(world, sum, TexMath, {.op = MathAdd, .a = constant, .b = node});
+    ecs_set(world, sum, TexAdd, {.a = constant, .b = node});
     before = tg_stats(world);
     ecs_set(world, tex, TextureGraph, {.output = sum, .width = 8, .height = 8,
         .format = GraphHdr});

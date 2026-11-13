@@ -18,106 +18,6 @@ static const char *box_texture_coords_wgsl =
     "    return vec4f(coords.xyz * select(scale, 1.0, scale == 0.0), coords.w);\n"
     "}\n";
 
-/** WGSL of the TexMath node: the operation of its op on a, b and c.
- *
- * Its parameters are op, the remap range and the types word, so p[0] is (op, from_min,
- * from_max, to_min) and p[1] is (to_max, types). A Scalar input node is broadcast; the
- * operations that differ on Scalars check whether the inputs they read are Scalars.
- */
-static const char *box_texture_math_wgsl =
-    "fn box_tex_math_in(v: vec4f, types: u32, j: u32) -> vec4f {\n"
-    "    return select(v, v.xxxx, (types & (1u << j)) != 0u);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_scalar(types: u32, used: u32) -> bool {\n"
-    "    return (types & (used << 4u)) == 0u && (types & used) != 0u;\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_div(a: vec4f, b: vec4f) -> vec4f {\n"
-    "    let zero = b == vec4f(0.0);\n"
-    "    return select(a / select(b, vec4f(1.0), zero), vec4f(0.0), zero);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_pow(a: vec4f, b: vec4f) -> vec4f {\n"
-    "    let r = pow(max(abs(a), vec4f(1e-30)), b);\n"
-    "    let whole = fract(b) == vec4f(0.0);\n"
-    "    let odd = whole & (fract(b * 0.5) != vec4f(0.0));\n"
-    "    let negative = a < vec4f(0.0);\n"
-    "    var v = select(r, -r, negative & odd);\n"
-    "    v = select(v, vec4f(0.0), (negative & !whole) | (a == vec4f(0.0)));\n"
-    "    return select(v, vec4f(1.0), b == vec4f(0.0));\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_smoothstep(e0: vec4f, e1: vec4f, x: vec4f) -> vec4f {\n"
-    "    let d = e1 - e0;\n"
-    "    let same = d == vec4f(0.0);\n"
-    "    let t = clamp((x - e0) / select(d, vec4f(1.0), same), vec4f(0.0), vec4f(1.0));\n"
-    "    let s = t * t * (3.0 - 2.0 * t);\n"
-    "    return select(s, select(vec4f(0.0), vec4f(1.0), x >= e0), same);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_remap(a: vec4f, range: vec4f, clamped: bool) -> vec4f {\n"
-    "    let d = range.y - range.x;\n"
-    "    var t = select((a - range.x) / d, vec4f(0.0), d == 0.0);\n"
-    "    if (clamped) {\n"
-    "        t = clamp(t, vec4f(0.0), vec4f(1.0));\n"
-    "    }\n"
-    "\n"
-    "    return range.z + t * (range.w - range.z);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let types = p[1].y;\n"
-    "    let a = box_tex_math_in(i[0], types, 0u);\n"
-    "    let b = box_tex_math_in(i[1], types, 1u);\n"
-    "    let c = box_tex_math_in(i[2], types, 2u);\n"
-    "    let range = vec4f(bitcast<vec3f>(p[0].yzw), bitcast<f32>(p[1].x));\n"
-    "    switch bitcast<i32>(p[0].x) {\n"
-    "        case 1: { return a - b; }\n"
-    "        case 2: { return a * b; }\n"
-    "        case 3: { return min(a, b); }\n"
-    "        case 4: { return max(a, b); }\n"
-    "        case 5: { return mix(a, b, c); }\n"
-    "        case 6: { return min(max(a, b), c); }\n"
-    "        case 7: { return box_tex_math_div(a, b); }\n"
-    "        case 8: { return box_tex_math_pow(a, b); }\n"
-    "        case 9: { return abs(a); }\n"
-    "        case 10: { return -a; }\n"
-    "        case 11: { return floor(a); }\n"
-    "        case 12: { return a - floor(a); }\n"
-    "        case 13: { return sin(a); }\n"
-    "        case 14: { return cos(a); }\n"
-    "        case 15: { return select(vec4f(0.0), vec4f(1.0), a >= b); }\n"
-    "        case 16: { return box_tex_math_smoothstep(b, c, a); }\n"
-    "        case 17: { return box_tex_math_remap(a, range, false); }\n"
-    "        case 18: { return box_tex_math_remap(a, range, true); }\n"
-    "        case 19: {\n"
-    "            if (box_tex_math_scalar(types, 3u)) {\n"
-    "                return vec4f(a.x * b.x, 0.0, 0.0, 0.0);\n"
-    "            }\n"
-    "\n"
-    "            return vec4f(dot(a.xyz, b.xyz), 0.0, 0.0, 0.0);\n"
-    "        }\n"
-    "        case 20: {\n"
-    "            if (box_tex_math_scalar(types, 1u)) {\n"
-    "                return vec4f(abs(a.x), 0.0, 0.0, 0.0);\n"
-    "            }\n"
-    "\n"
-    "            return vec4f(length(a.xyz), 0.0, 0.0, 0.0);\n"
-    "        }\n"
-    "        case 21: {\n"
-    "            if (box_tex_math_scalar(types, 1u)) {\n"
-    "                return sign(a);\n"
-    "            }\n"
-    "\n"
-    "            let l = length(a.xyz);\n"
-    "            return vec4f(select(a.xyz / l, vec3f(0.0), l == 0.0), a.w);\n"
-    "        }\n"
-    "        case 22: { return vec4f(cross(a.xyz, b.xyz), 0.0); }\n"
-    "        default: { return a + b; }\n"
-    "    }\n"
-    "}\n";
-
 /** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
  * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
  * them further apart, between texels. */
@@ -586,54 +486,6 @@ static const char *box_texture_lut_wgsl =
     "    return box_texgraph_sample(t, (uv * (size - 1.0) + 0.5) / size, false);\n"
     "}\n";
 
-/** Get the type of the value of a TexMath node: a Scalar for MathDot and MathLength, a Vector
- * for MathCross, else the type that follows the inputs its operation reads.
- *
- * @param node The TexMath
- * @param inputs Type of the node of each input, TexAny for none
- * @return The type
- */
-static TextureValueType box_texture_math_type(
-    const void *node,
-    const TextureValueType *inputs)
-{
-    const TexMath *math = node;
-    TextureValueType result;
-    uint32_t used = 3;
-    switch (math->op) {
-    case MathDot:
-    case MathLength:
-        result = TexScalar;
-        break;
-    case MathCross:
-        result = TexVector;
-        break;
-    case MathAbs:
-    case MathNegate:
-    case MathFloor:
-    case MathFract:
-    case MathSin:
-    case MathCos:
-    case MathRemap:
-    case MathRemapClamped:
-    case MathNormalize:
-        used = 1;
-        result = box_texture_graph_follow(inputs, used);
-        break;
-    case MathMix:
-    case MathClamp:
-    case MathSmoothstep:
-        used = 7;
-        result = box_texture_graph_follow(inputs, used);
-        break;
-    default:
-        result = box_texture_graph_follow(inputs, used);
-        break;
-    }
-
-    return result;
-}
-
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -697,9 +549,9 @@ done:
     return result;
 }
 
-/** Register the built in node kinds of values and their math: TexConstant, TexCoords,
- * TexMath, TexNoise, TexBlur, TexSplit, TexCombine, TexWarp, TexTransform, TexTime and
- * TexSplat.
+/** Register the built in node kinds of values and their math: TexConstant, TexCoords, the
+ * math kinds such as TexAdd, TexNoise, TexBlur, TexSplit, TexCombine, TexWarp, TexTransform,
+ * TexTime and TexSplat.
  *
  * @param world The world
  */
@@ -722,26 +574,7 @@ static void box_texture_nodes_register_math(
         .source = box_texture_coords_wgsl
     });
 
-    box_texture_node_register(world, &(box_texture_node_desc_t){
-        .component = ecs_id(TexMath),
-        .output = TexAny,
-        .output_type = box_texture_math_type,
-        .inputs = {
-            { "a", offsetof(TexMath, a), TexAny, "a_value", offsetof(TexMath, a_value) },
-            { "b", offsetof(TexMath, b), TexAny, "b_value", offsetof(TexMath, b_value) },
-            { "c", offsetof(TexMath, c), TexAny, "c_value", offsetof(TexMath, c_value) }
-        },
-        .params = {
-            { "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 },
-            { "from_min", offsetof(TexMath, from_min), 4, BOX_TEXTURE_PARAM_F32 },
-            { "from_max", offsetof(TexMath, from_max), 4, BOX_TEXTURE_PARAM_F32 },
-            { "to_min", offsetof(TexMath, to_min), 4, BOX_TEXTURE_PARAM_F32 },
-            { "to_max", offsetof(TexMath, to_max), 4, BOX_TEXTURE_PARAM_F32 }
-        },
-        .function = "box_tex_math",
-        .source = box_texture_math_wgsl
-    });
-
+    box_texture_math_register(world);
     box_texture_noise_register(world);
 
     box_texture_node_register(world, &(box_texture_node_desc_t){

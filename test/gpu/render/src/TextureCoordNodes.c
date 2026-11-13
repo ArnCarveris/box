@@ -304,7 +304,7 @@ static void tc_identity_in(
     ecs_set(world, centred, TexWarp, {.coords = uv, .offset_value = {0.5f, 0.5f, 0.5f, 0.5f},
         .amount_value = 3});
     ecs_set(world, chained, TexTransform, {.coords = centred});
-    ecs_set(world, out, TexMath, {.op = MathAdd, .a = chained, .b = still});
+    ecs_set(world, out, TexAdd, {.a = chained, .b = still});
     ecs_entity_t tex = tc_graph(world, out, w, h, domain);
     ecs_entity_t extra = tc_graph(world, transform, w, h, domain);
     tc_wait(world, tex);
@@ -356,7 +356,7 @@ void TextureCoordNodes_warp_constant_plane(void) {
     ecs_set(world, by_value, TexWarp, {.offset_value = {0.7f, 0.4f, 0.5f, 0},
         .amount_value = 0.5f});
     ecs_set(world, by_node, TexWarp, {.offset = offset, .amount = amount});
-    ecs_set(world, out, TexMath, {.op = MathAdd, .a = by_value, .b = by_node});
+    ecs_set(world, out, TexAdd, {.a = by_value, .b = by_node});
     ecs_entity_t tex = tc_graph(world, out, w, h, DomainPlane);
     tc_wait(world, tex);
 
@@ -392,7 +392,7 @@ void TextureCoordNodes_warp_sphere_unit(void) {
     ecs_set(world, constant, TexWarp, {.offset_value = {0.9f, 0.2f, 0.6f, 0},
         .amount_value = 0.8f});
     ecs_set(world, varying, TexWarp, {.coords = constant, .offset = uv, .amount_value = 0.7f});
-    ecs_set(world, out, TexMath, {.op = MathAdd, .a = constant, .b = varying});
+    ecs_set(world, out, TexAdd, {.a = constant, .b = varying});
     ecs_entity_t tex = tc_graph(world, out, w, h, DomainSphere);
     tc_wait(world, tex);
 
@@ -448,7 +448,7 @@ void TextureCoordNodes_rotate_plane(void) {
     ecs_set(world, by_value, TexTransform, {.angle_value = 30});
     ecs_set(world, by_node, TexTransform, {.angle = angle, .angle_value = 45,
         .scale = {2, 2, 0}, .translate = {0.25f, -1, 0.5f}});
-    ecs_set(world, out, TexMath, {.op = MathAdd, .a = by_value, .b = by_node});
+    ecs_set(world, out, TexAdd, {.a = by_value, .b = by_node});
     ecs_entity_t tex = tc_graph(world, out, w, h, DomainPlane);
     tc_wait(world, tex);
 
@@ -503,8 +503,8 @@ void TextureCoordNodes_rotate_sphere(void) {
     ecs_set(world, turn, TexTransform, {.angle_value = 90});
     ecs_set(world, tilted, TexTransform, {.angle_value = 37, .axis = {3, 4, 0}});
     ecs_set(world, scaled, TexTransform, {.coords = tilted, .scale = {2, 2, 2}});
-    ecs_set(world, sum, TexMath, {.op = MathAdd, .a = turn, .b = tilted});
-    ecs_set(world, out, TexMath, {.op = MathAdd, .a = sum, .b = scaled});
+    ecs_set(world, sum, TexAdd, {.a = turn, .b = tilted});
+    ecs_set(world, out, TexAdd, {.a = sum, .b = scaled});
     ecs_entity_t tex = tc_graph(world, out, w, h, DomainSphere);
     tc_wait(world, tex);
 

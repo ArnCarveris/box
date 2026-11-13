@@ -401,7 +401,7 @@ static void tn_tiles(
         ecs_entity_t uv = ecs_new(world);
         ecs_entity_t moved = ecs_new(world);
         ecs_set(world, uv, TexCoords, {0});
-        ecs_set(world, moved, TexMath, {.op = MathAdd, .a = uv,
+        ecs_set(world, moved, TexAdd, {.a = uv,
             .b_value = {shifts[k][0], shifts[k][1], shifts[k][2], shifts[k][3]}});
         TexNoise shifted = *noise;
         shifted.coords = moved;

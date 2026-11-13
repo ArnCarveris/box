@@ -5,8 +5,8 @@ using box.texture
 
 graph_preview {
   uv     { nodes.Coords: {} }
-  scaled { nodes.Math: {op: MathMultiply, a: uv, b_value: {1, 0.5, 0, 1}} }
-  offset { nodes.Math: {op: MathAdd, a: scaled, b_value: {0, 0, 0.25, 0}} }
+  scaled { nodes.Multiply: {a: uv, b_value: {1, 0.5, 0, 1}} }
+  offset { nodes.Add: {a: scaled, b_value: {0, 0, 0.25, 0}} }
   loose  { nodes.Constant: {value: {1, 0, 1, 1}} }
   Graph: {output: offset, width: 256, height: 128, format: GraphLinear}
 }

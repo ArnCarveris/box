@@ -264,8 +264,8 @@ void TexturePreview_same_value_not_encoded(void) {
     test_assert(preview_reads(world) > reads + 2);
     test_int(ecs_get(world, scaled, TextureNodePreviewStatus)->revision, 1);
 
-    ecs_set(world, scaled, TexMath, {
-        .op = MathMultiply, .a = preview_node(world, "uv"), .b_value = { 0, 1, 0, 1 } });
+    ecs_set(world, scaled, TexMultiply, {
+        .a = preview_node(world, "uv"), .b_value = { 0, 1, 0, 1 } });
     const TextureNodePreviewStatus *status = preview_wait(world, scaled, 2);
     test_int(status->revision, 2);
     uint8_t *pixels = preview_decode(status);

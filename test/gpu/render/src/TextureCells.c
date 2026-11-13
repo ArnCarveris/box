@@ -504,7 +504,7 @@ void TextureCells_plane_tiles(void) {
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t shifted = ecs_new(world);
     ecs_set(world, uv, TexCoords, {0});
-    ecs_set(world, shifted, TexMath, {.op = MathAdd, .a = uv, .b_value = {1, -2, 0, 0}});
+    ecs_set(world, shifted, TexAdd, {.a = uv, .b_value = {1, -2, 0, 0}});
     cells.coords = shifted;
     float *moved = tc_eval(world, &cells, w, h, DomainPlane);
     for (y = 0; y < h; y ++) {
@@ -708,9 +708,9 @@ void TextureCells_coords_input(void) {
     ecs_entity_t shifted = ecs_new(world);
     ecs_entity_t opposite = ecs_new(world);
     ecs_set(world, uv, TexCoords, {0});
-    ecs_set(world, shifted, TexMath, {.op = MathAdd, .a = uv,
+    ecs_set(world, shifted, TexAdd, {.a = uv,
         .b_value = {5.0f / w, 3.0f / h, 0, 0}});
-    ecs_set(world, opposite, TexMath, {.op = MathMultiply, .a = uv,
+    ecs_set(world, opposite, TexMultiply, {.a = uv,
         .b_value = {-1, -1, -1, 1}});
     cells.coords = shifted;
     float *plane_shifted = tc_eval(world, &cells, w, h, DomainPlane);
