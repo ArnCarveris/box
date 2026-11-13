@@ -5,26 +5,26 @@ using box.light
 using box.animation
 
 assets {
-  yard_tex_hull { TexturePath: {path: "etc/scenes/shipyard/assets/hull.jpg"} }
-  yard_tex_hull_normal { TexturePath: {path: "etc/scenes/shipyard/assets/hull_normal.jpg"} }
-  yard_tex_hull_orm { TexturePath: {path: "etc/scenes/shipyard/assets/hull_orm.jpg"} }
-  yard_tex_floor { TexturePath: {path: "etc/scenes/shipyard/assets/floor.jpg"} }
-  yard_tex_floor_normal { TexturePath: {path: "etc/scenes/shipyard/assets/floor_normal.jpg"} }
-  yard_tex_floor_orm { TexturePath: {path: "etc/scenes/shipyard/assets/floor_orm.jpg"} }
-  yard_tex_screen { TexturePath: {path: "etc/scenes/shipyard/assets/screen.svg", width: 512} }
-  yard_tex_hazard { TexturePath: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
-  yard_tex_plume_core { TexturePath: {path: "etc/scenes/shipyard/assets/plume_core.png"} }
-  yard_tex_windows { TexturePath: {path: "etc/scenes/shipyard/assets/windows.png"} }
-  yard_tex_windows_albedo { TexturePath: {path: "etc/scenes/shipyard/assets/windows_albedo.png"} }
-  yard_tex_containers { TexturePath: {path: "etc/scenes/shipyard/assets/containers.jpg"} }
-  yard_tex_containers_normal { TexturePath: {path: "etc/scenes/shipyard/assets/containers_normal.jpg"} }
-  yard_tex_heat_fins { TexturePath: {path: "etc/scenes/shipyard/assets/heat_fins.png"} }
-  yard_tex_dots { TexturePath: {path: "etc/scenes/shipyard/assets/dots.png"} }
-  yard_tex_radiator { TexturePath: {path: "etc/scenes/shipyard/assets/radiator.jpg"} }
-  yard_tex_radiator_normal { TexturePath: {path: "etc/scenes/shipyard/assets/radiator_normal.jpg"} }
-  yard_tex_nozzle { TexturePath: {path: "etc/scenes/shipyard/assets/nozzle.jpg"} }
-  yard_tex_nozzle_normal { TexturePath: {path: "etc/scenes/shipyard/assets/nozzle_normal.jpg"} }
-  yard_tex_nozzle_glow { TexturePath: {path: "etc/scenes/shipyard/assets/nozzle_glow.png"} }
+  yard_tex_hull { Path: {path: "etc/scenes/shipyard/assets/hull.jpg"} }
+  yard_tex_hull_normal { Path: {path: "etc/scenes/shipyard/assets/hull_normal.jpg"} }
+  yard_tex_hull_orm { Path: {path: "etc/scenes/shipyard/assets/hull_orm.jpg"} }
+  yard_tex_floor { Path: {path: "etc/scenes/shipyard/assets/floor.jpg"} }
+  yard_tex_floor_normal { Path: {path: "etc/scenes/shipyard/assets/floor_normal.jpg"} }
+  yard_tex_floor_orm { Path: {path: "etc/scenes/shipyard/assets/floor_orm.jpg"} }
+  yard_tex_screen { Path: {path: "etc/scenes/shipyard/assets/screen.svg", width: 512} }
+  yard_tex_hazard { Path: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
+  yard_tex_plume_core { Path: {path: "etc/scenes/shipyard/assets/plume_core.png"} }
+  yard_tex_windows { Path: {path: "etc/scenes/shipyard/assets/windows.png"} }
+  yard_tex_windows_albedo { Path: {path: "etc/scenes/shipyard/assets/windows_albedo.png"} }
+  yard_tex_containers { Path: {path: "etc/scenes/shipyard/assets/containers.jpg"} }
+  yard_tex_containers_normal { Path: {path: "etc/scenes/shipyard/assets/containers_normal.jpg"} }
+  yard_tex_heat_fins { Path: {path: "etc/scenes/shipyard/assets/heat_fins.png"} }
+  yard_tex_dots { Path: {path: "etc/scenes/shipyard/assets/dots.png"} }
+  yard_tex_radiator { Path: {path: "etc/scenes/shipyard/assets/radiator.jpg"} }
+  yard_tex_radiator_normal { Path: {path: "etc/scenes/shipyard/assets/radiator_normal.jpg"} }
+  yard_tex_nozzle { Path: {path: "etc/scenes/shipyard/assets/nozzle.jpg"} }
+  yard_tex_nozzle_normal { Path: {path: "etc/scenes/shipyard/assets/nozzle_normal.jpg"} }
+  yard_tex_nozzle_glow { Path: {path: "etc/scenes/shipyard/assets/nozzle_glow.png"} }
 
   prefab ShipHull { Rgb: {222, 226, 232}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 7, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
   prefab ShipHullDark { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 5, blend: 0.3} }

@@ -20,9 +20,9 @@ graph_animated {
   }
 
   image {
-    time { TexTime: {scale: 2, offset: 0.5} }
-    splat { TexSplat: {in: time} }
-    TextureGraph: {output: splat, width: 8, format: GraphHdr}
+    time { nodes.Time: {scale: 2, offset: 0.5} }
+    splat { nodes.Splat: {in: time} }
+    Graph: {output: splat, width: 8, format: GraphHdr}
   }
 
   quad {

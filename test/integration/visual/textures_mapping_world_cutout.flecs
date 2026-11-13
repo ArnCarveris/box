@@ -34,7 +34,7 @@ sun {
 }
 
 fence_tex {
-  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+  Path: {path: "test/integration/visual/assets/fence.png"}
 }
 
 floor {

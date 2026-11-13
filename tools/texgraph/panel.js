@@ -1,7 +1,7 @@
 "use strict";
 
 // The side panel: the selected node with its large preview, inputs and parameters edited from
-// the reflected type of its component, or the TextureGraph of the texture with its status when
+// the reflected type of its component, or the Graph of the texture with its status when
 // no node is selected. Edits are written live with TG.write.
 
 const P = window.P = { refreshers: [] };
@@ -307,7 +307,7 @@ P.renderNode = (root, n) => {
   const errors = tex && tex.status && tex.status.error &&
     TGM.errorTargets(TG.graph(), tex.status.error).includes(n.path) ? tex.status.error : null;
   root.appendChild(el("div", { class: "phead" },
-    el("span", { class: "swatch", style: { background: G.color(n.kinds.map(TGM.short).join(" + ") + (kind && kind.output === "TexScalar" ? " · scalar" : "")) } }),
+    el("span", { class: "swatch", style: { background: G.color(n.kinds.map(TGM.short).join(" + ") + (kind && kind.output === "Scalar" ? " · scalar" : "")) } }),
     el("div", {},
       el("div", { class: "ptitle" }, n.name, isOutput ? el("span", { class: "badge" }, "output") : null),
       el("div", { class: "psub", title: n.path }, n.path))));
@@ -315,7 +315,7 @@ P.renderNode = (root, n) => {
   if (n.kinds.length > 1) root.appendChild(el("div", { class: "perror" }, `more than one node component: ${n.kinds.map(TGM.short).join(", ")}`));
   root.appendChild(P.previewBlock(n.path));
   root.appendChild(el("div", { class: "pbuttons" },
-    el("button", { text: isOutput ? "is the graph output" : "set as graph output", disabled: isOutput || !kind || kind.output === "TexScalar", onclick: () => TG.connectPorts(n.path, "@output", "output") }),
+    el("button", { text: isOutput ? "is the graph output" : "set as graph output", disabled: isOutput || !kind || kind.output === "Scalar", onclick: () => TG.connectPorts(n.path, "@output", "output") }),
     el("button", { text: "delete", class: "danger", onclick: () => G.deleteNodes([n.path]) })));
   if (!kind) return;
   root.appendChild(el("div", { class: "pinfo" },
@@ -370,7 +370,7 @@ P.renderNode = (root, n) => {
 };
 
 P.renderTexture = (root, tex) => {
-  const comp = TEX + "TextureGraph";
+  const comp = TEX + "Graph";
   const ti = TG.types[comp];
   const st = tex.status || {};
   root.appendChild(el("div", { class: "phead" },
@@ -395,8 +395,8 @@ P.renderTexture = (root, tex) => {
     P.bindValue(tex.path, comp, k, ed);
     fields.push(P.field(k, ed));
   }
-  if (!ti) fields.push(el("div", { class: "dim" }, "waiting for the type of TextureGraph"));
-  root.appendChild(P.section("TextureGraph", ...fields));
+  if (!ti) fields.push(el("div", { class: "dim" }, "waiting for the type of Graph"));
+  root.appendChild(P.section("Graph", ...fields));
   const g = TG.graph();
   root.appendChild(P.section(`${g.nodes.size} nodes`, ...[...g.nodes.values()].map((n) => el("div", {
     class: "plink", onclick: () => TG.select(n.path), title: n.path

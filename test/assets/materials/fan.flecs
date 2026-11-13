@@ -10,13 +10,13 @@ using box.material
 using box.texture
 
 fan_tex {
-  TexturePath: {
+  Path: {
     path: "test/assets/materials/fan_blades.svg", width: 256, height: 256, linear: true
   }
 }
 
 fan_norm {
-  TexturePath: {path: "test/assets/materials/fan_blades_normal.svg", width: 256, height: 256}
+  Path: {path: "test/assets/materials/fan_blades_normal.svg", width: 256, height: 256}
 }
 
 prefab FanDisc {

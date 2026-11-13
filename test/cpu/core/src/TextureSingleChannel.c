@@ -104,8 +104,8 @@ void TextureSingleChannel_default_off(void) {
 
     const char *code =
         "using box.texture\n"
-        "plain { TexturePath: {path: \"" GRAY_PNG "\"} }\n"
-        "mask { TexturePath: {path: \"" GRAY_PNG "\", single_channel: true} }\n";
+        "plain { Path: {path: \"" GRAY_PNG "\"} }\n"
+        "mask { Path: {path: \"" GRAY_PNG "\", single_channel: true} }\n";
     test_assert(ecs_script_run(world, "single", code, NULL) == 0);
     test_bool(ecs_get(world, ecs_lookup(world, "plain"), TexturePath)->single_channel, false);
     test_bool(ecs_get(world, ecs_lookup(world, "mask"), TexturePath)->single_channel, true);

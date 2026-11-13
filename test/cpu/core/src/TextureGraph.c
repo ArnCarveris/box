@@ -361,9 +361,153 @@ void TextureGraph_kind_reflected_json(void) {
     test_assert(strstr(json, "\"box_tex_math\"") != NULL);
     test_assert(strstr(json, "\"name\":\"a_value\"") == NULL);
     test_assert(strstr(json, "\"value\":\"a_value\"") != NULL);
-    test_assert(strstr(json, "\"TexAny\"") != NULL);
+    test_assert(strstr(json, "\"Any\"") != NULL);
     test_assert(strstr(json, "\"b\"") != NULL);
     ecs_os_free(json);
+
+    ecs_fini(world);
+}
+
+/** Check that a path names an entity, and the given one when it is not 0.
+ *
+ * @param world The world
+ * @param path The path
+ * @param expect The entity, 0 for any
+ */
+static void test_path(
+    ecs_world_t *world,
+    const char *path,
+    ecs_entity_t expect)
+{
+    ecs_entity_t e = ecs_lookup(world, path);
+    if (!e || (expect && e != expect)) {
+        printf("path: %s\n", path);
+    }
+
+    test_assert(e != 0);
+    if (expect) {
+        test_assert(e == expect);
+    }
+}
+
+void TextureGraph_names(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    test_path(world, "box.texture.Texture", ecs_id(Texture));
+    test_path(world, "box.texture.Path", ecs_id(TexturePath));
+    test_path(world, "box.texture.Gen", ecs_id(TextureGen));
+    test_path(world, "box.texture.Graph", ecs_id(TextureGraph));
+    test_path(world, "box.texture.State", ecs_id(TextureState));
+    test_path(world, "box.texture.Status", ecs_id(TextureStatus));
+    test_path(world, "box.texture.Registry", ecs_id(TextureRegistry));
+    test_path(world, "box.texture.Pixels", ecs_id(TexturePixels));
+    test_path(world, "box.texture.gen.Pattern", ecs_id(TextureGenPattern));
+    test_path(world, "box.texture.gen.Op", ecs_id(TextureGenOp));
+    test_path(world, "box.texture.gen.Distance", ecs_id(TextureGenDistance));
+    test_path(world, "box.texture.gen.ToneOrder", ecs_id(TextureGenToneOrder));
+    test_path(world, "box.texture.gen.Output", ecs_id(TextureGenOutput));
+    test_path(world, "box.texture.gen.Layer", ecs_id(TextureGenLayer));
+    test_path(world, "box.texture.gen.Key", ecs_id(TextureGenKey));
+    test_path(world, "box.texture.graph.Domain", ecs_id(TextureGraphDomain));
+    test_path(world, "box.texture.graph.Format", ecs_id(TextureGraphFormat));
+    test_path(world, "box.texture.graph.ValueType", ecs_id(TextureValueType));
+    test_path(world, "box.texture.graph.Cache", ecs_id(TextureGraphCache));
+    test_path(world, "box.texture.graph.Stats", ecs_id(TextureGraphStats));
+    test_path(world, "box.texture.graph.NodeKind", ecs_id(TextureNodeKind));
+    test_path(world, "box.texture.graph.Port", ecs_id(TextureNodePort));
+    test_path(world, "box.texture.graph.Param", ecs_id(TextureNodeParam));
+    test_path(world, "box.texture.graph.Preview", ecs_id(TextureNodePreview));
+    test_path(world, "box.texture.graph.PreviewStatus", ecs_id(TextureNodePreviewStatus));
+    test_path(world, "box.texture.nodes.Constant", ecs_id(TexConstant));
+    test_path(world, "box.texture.nodes.Coords", ecs_id(TexCoords));
+    test_path(world, "box.texture.nodes.Time", ecs_id(TexTime));
+    test_path(world, "box.texture.nodes.Splat", ecs_id(TexSplat));
+    test_path(world, "box.texture.nodes.Math", ecs_id(TexMath));
+    test_path(world, "box.texture.nodes.MathOp", ecs_id(TextureMathOp));
+    test_path(world, "box.texture.nodes.Split", ecs_id(TexSplit));
+    test_path(world, "box.texture.nodes.Combine", ecs_id(TexCombine));
+    test_path(world, "box.texture.nodes.Warp", ecs_id(TexWarp));
+    test_path(world, "box.texture.nodes.Transform", ecs_id(TexTransform));
+    test_path(world, "box.texture.nodes.Ramp", ecs_id(TexRamp));
+    test_path(world, "box.texture.nodes.Curve", ecs_id(TexCurve));
+    test_path(world, "box.texture.nodes.Blocks", ecs_id(TexBlocks));
+    test_path(world, "box.texture.nodes.Cells", ecs_id(TexCells));
+    test_path(world, "box.texture.nodes.Blur", ecs_id(TexBlur));
+    test_path(world, "box.texture.nodes.Noise", ecs_id(TexNoise));
+    test_path(world, "box.texture.nodes.Image", ecs_id(TexImage));
+    test_path(world, "box.texture.nodes.Lut", ecs_id(TexLut));
+    test_path(world, "box.texture.nodes.Normal", ecs_id(TexNormal));
+    test_path(world, "box.texture.nodes.Slope", ecs_id(TexSlope));
+    test_path(world, "box.texture.nodes.Channel", ecs_id(TextureChannel));
+    test_path(world, "box.texture.nodes.CellsDistance", ecs_id(TextureCellsDistance));
+    test_path(world, "box.texture.nodes.NoiseFractal", ecs_id(TextureNoiseFractal));
+    test_path(world, "box.texture.nodes.Address", ecs_id(TextureAddress));
+
+    test_path(world, "box.texture.graph.ValueType.Scalar", 0);
+    test_path(world, "box.texture.graph.ValueType.Vector", 0);
+    test_path(world, "box.texture.graph.ValueType.Any", 0);
+    test_path(world, "box.texture.graph.Domain.DomainPlane", 0);
+    test_path(world, "box.texture.graph.Format.GraphColor", 0);
+    test_path(world, "box.texture.gen.Pattern.GenNoise", 0);
+    test_path(world, "box.texture.gen.ToneOrder.GenToneChecker", 0);
+    test_path(world, "box.texture.nodes.MathOp.MathAdd", 0);
+    test_path(world, "box.texture.nodes.Channel.ChannelR", 0);
+    test_path(world, "box.texture.nodes.Address.AddressWrap", 0);
+    test_path(world, "box.texture.nodes.CellsDistance.CellsNearest", 0);
+    test_path(world, "box.texture.nodes.NoiseFractal.NoiseFbm", 0);
+    test_path(world, "box.texture.State.Ready", 0);
+
+    test_assert(ecs_lookup(world, "box.texture.TexturePath") == 0);
+    test_assert(ecs_lookup(world, "box.texture.TexNoise") == 0);
+    test_assert(ecs_lookup(world, "box.texture.nodes.TexNoise") == 0);
+    test_assert(ecs_lookup(world, "box.texture.graph.ValueType.TexScalar") == 0);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_names_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    register_scalar(world);
+    const char *code =
+        "using box.texture\n"
+        "qualified {\n"
+        "  uv { nodes.Coords: {} }\n"
+        "  noise { nodes.Noise: {coords: uv, frequency: 4, fractal: NoiseRidged} }\n"
+        "  Graph: {output: noise, width: 16, domain: DomainPlane}\n"
+        "}\n";
+    test_assert(ecs_script_run(world, "names", code, NULL) == 0);
+    code =
+        "using box.texture\n"
+        "using box.texture.nodes\n"
+        "unqualified {\n"
+        "  red { Constant: {value: {1, 0, 0, 1}} }\n"
+        "  r { Split: {input: red, channel: ChannelG} }\n"
+        "  out { Combine: {r: r} }\n"
+        "  Graph: {output: out, width: 16}\n"
+        "}\n";
+    test_assert(ecs_script_run(world, "names_using", code, NULL) == 0);
+
+    ecs_entity_t qualified = ecs_lookup(world, "qualified");
+    ecs_entity_t noise = ecs_lookup(world, "qualified.noise");
+    test_assert(qualified && noise);
+    test_assert(ecs_get(world, qualified, TextureGraph)->output == noise);
+    test_int(ecs_get(world, noise, TexNoise)->fractal, NoiseRidged);
+    test_assert(ecs_get(world, noise, TexNoise)->coords == ecs_lookup(world, "qualified.uv"));
+
+    ecs_entity_t r = ecs_lookup(world, "unqualified.r");
+    test_assert(r != 0);
+    test_int(ecs_get(world, r, TexSplit)->channel, ChannelG);
+    test_assert(ecs_get(world, r, TexSplit)->input == ecs_lookup(world, "unqualified.red"));
+
+    /* A kind an application registers keeps the scope of its component. */
+    ecs_entity_t c = ecs_lookup(world, "TestScalar");
+    test_assert(c != 0);
+    test_assert(ecs_get(world, c, TextureNodeKind) != NULL);
+    test_assert(ecs_get_parent(world, c) == 0);
+
+    test_int(frame_status(world, qualified)->state, TextureReady);
+    test_int(frame_status(world, ecs_lookup(world, "unqualified"))->state, TextureReady);
 
     ecs_fini(world);
 }
@@ -1087,8 +1231,8 @@ void TextureGraph_with_path_error(void) {
     ecs_set(world, tex, TexturePath, { .path = "test/assets/textures/gray.png" });
     ecs_set(world, tex, TextureGraph, { .output = node, .width = 8 });
     frame_status(world, tex);
-    test_failed(world, tex, "'both'", "TextureGraph");
-    test_failed(world, tex, "TexturePath", "TextureGraph");
+    test_failed(world, tex, "'both'", "a Graph");
+    test_failed(world, tex, "a Path", "a Graph");
 
     ecs_remove(world, tex, TexturePath);
     const TextureStatus *status = frame_status(world, tex);
@@ -1109,7 +1253,7 @@ void TextureGraph_with_gen_error(void) {
     ecs_set(world, tex, TextureGraph, { .output = node, .width = 8 });
     ecs_set(world, tex, TextureGen, { .width = 16 });
     frame_status(world, tex);
-    test_failed(world, tex, "TextureGen", "TextureGraph");
+    test_failed(world, tex, "a Gen", "a Graph");
 
     ecs_remove(world, tex, TextureGraph);
     int32_t frames = 0;
@@ -2115,7 +2259,7 @@ void TextureGraph_blocks_sphere_error(void) {
         .domain = DomainSphere });
     frame_status(world, tex);
     test_failed(world, tex, "'blocks'", "DomainPlane");
-    test_failed(world, tex, "TexBlocks", "'graph'");
+    test_failed(world, tex, "box.texture.nodes.Blocks", "'graph'");
 
     ecs_set(world, tex, TextureGraph, { .output = blocks, .width = 32, .height = 16,
         .domain = DomainPlane });

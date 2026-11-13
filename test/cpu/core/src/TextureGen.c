@@ -534,14 +534,14 @@ void TextureGen_writes_texture_and_status(void) {
     const char *code =
         "using box.texture\n"
         "stone {\n"
-        "  TextureGen: {width: 32, height: 16, seed: 2, layers: [\n"
+        "  Gen: {width: 32, height: 16, seed: 2, layers: [\n"
         "    {kind: GenBlocks, courses: 2, per_course: 2, gap: 0.05, amount: 1}\n"
         "    {kind: GenNoise, frequency: 8, octaves: 2, amount: 0.3}\n"
         "  ]}\n"
         "}\n"
-        "stone_color { TextureGen: {source: stone, output: GenAlbedo,\n"
+        "stone_color { Gen: {source: stone, output: GenAlbedo,\n"
         "  colors: [{0, {10, 20, 30}}, {1, {200, 210, 220}}]} }\n"
-        "stone_n { TextureGen: {source: stone, output: GenNormal, strength: 2} }\n";
+        "stone_n { Gen: {source: stone, output: GenNormal, strength: 2} }\n";
     test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
     ecs_entity_t stone = ecs_lookup(world, "stone");
     ecs_entity_t color = ecs_lookup(world, "stone_color");
@@ -621,9 +621,9 @@ void TextureGen_source_change_regenerates(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "field { TextureGen: {width: 32, height: 32, seed: 1,\n"
+        "field { Gen: {width: 32, height: 32, seed: 1,\n"
         "  layers: [{kind: GenCells, count: 6, amount: 1}]} }\n"
-        "field_n { TextureGen: {source: field, output: GenNormal} }\n";
+        "field_n { Gen: {source: field, output: GenNormal} }\n";
     test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
     ecs_entity_t field = ecs_lookup(world, "field");
     ecs_entity_t normal = ecs_lookup(world, "field_n");
@@ -673,8 +673,8 @@ void TextureGen_source_declared_after(void) {
     const char *code =
         "using box.texture\n"
         "ashlar_height {}\n"
-        "ashlar { TextureGen: {source: ashlar_height, output: GenNormal} }\n"
-        "ashlar_height { TextureGen: {width: 16, height: 16, seed: 3,\n"
+        "ashlar { Gen: {source: ashlar_height, output: GenNormal} }\n"
+        "ashlar_height { Gen: {width: 16, height: 16, seed: 3,\n"
         "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n";
     test_assert(ecs_script_run(world, "ashlar", code, NULL) == 0);
     ecs_entity_t tex = ecs_lookup(world, "ashlar");
@@ -692,9 +692,9 @@ void TextureGen_source_gen_removed(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "field { TextureGen: {width: 16, height: 16, seed: 1,\n"
+        "field { Gen: {width: 16, height: 16, seed: 1,\n"
         "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n"
-        "field_n { TextureGen: {source: field, output: GenNormal} }\n";
+        "field_n { Gen: {source: field, output: GenNormal} }\n";
     test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
     ecs_entity_t field = ecs_lookup(world, "field");
     ecs_entity_t normal = ecs_lookup(world, "field_n");
@@ -707,7 +707,7 @@ void TextureGen_source_gen_removed(void) {
     test_assert(status->error != NULL);
     test_assert(strstr(status->error, "field_n") != NULL);
     test_assert(strstr(status->error, "'field'") != NULL);
-    test_assert(strstr(status->error, "TextureGen") != NULL);
+    test_assert(strstr(status->error, "no Gen with") != NULL);
 
     ecs_fini(world);
 }
@@ -717,9 +717,9 @@ void TextureGen_source_deleted(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "field { TextureGen: {width: 16, height: 16, seed: 1,\n"
+        "field { Gen: {width: 16, height: 16, seed: 1,\n"
         "  layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n"
-        "field_a { TextureGen: {source: field, output: GenAlbedo} }\n";
+        "field_a { Gen: {source: field, output: GenAlbedo} }\n";
     test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
     ecs_entity_t field = ecs_lookup(world, "field");
     ecs_entity_t albedo = ecs_lookup(world, "field_a");
@@ -743,8 +743,8 @@ void TextureGen_with_path_error(void) {
     const char *code =
         "using box.texture\n"
         "both {\n"
-        "  TexturePath: {path: \"test/assets/textures/gray.png\"}\n"
-        "  TextureGen: {width: 8, height: 8}\n"
+        "  Path: {path: \"test/assets/textures/gray.png\"}\n"
+        "  Gen: {width: 8, height: 8}\n"
         "}\n";
     ecs_log_set_level(-4);
     test_assert(ecs_script_run(world, "both", code, NULL) == 0);
@@ -754,8 +754,8 @@ void TextureGen_with_path_error(void) {
     test_int(status->state, TextureFailed);
     test_assert(status->error != NULL);
     test_assert(strstr(status->error, "both") != NULL);
-    test_assert(strstr(status->error, "TexturePath") != NULL);
-    test_assert(strstr(status->error, "TextureGen") != NULL);
+    test_assert(strstr(status->error, "a Path") != NULL);
+    test_assert(strstr(status->error, "a Gen") != NULL);
     test_assert(ecs_get(world, both, Texture) == NULL);
 
     ecs_remove(world, both, TexturePath);
@@ -830,9 +830,9 @@ void TextureGen_source_deleted_with_derived(void) {
     const char *code =
         "using box.texture\n"
         "stone {\n"
-        "  field { TextureGen: {width: 16, height: 16, seed: 1,\n"
+        "  field { Gen: {width: 16, height: 16, seed: 1,\n"
         "    layers: [{kind: GenNoise, frequency: 4, octaves: 2, amount: 1}]} }\n"
-        "  field_n { TextureGen: {source: field, output: GenNormal} }\n"
+        "  field_n { Gen: {source: field, output: GenNormal} }\n"
         "}\n";
     test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
     ecs_entity_t stone = ecs_lookup(world, "stone");
@@ -853,11 +853,11 @@ void TextureGen_tone_checker(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "floor_height { TextureGen: {width: 64, height: 48, seed: 3, layers: [\n"
+        "floor_height { Gen: {width: 64, height: 48, seed: 3, layers: [\n"
         "  {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.02, jitter: 0,\n"
         "   tones: 2, tone_order: GenToneChecker, amount: 1, id_amount: 0.2}\n"
         "]} }\n"
-        "floor { TextureGen: {source: floor_height, output: GenAlbedo,\n"
+        "floor { Gen: {source: floor_height, output: GenAlbedo,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
     int32_t size = 0, k, i;
     uint8_t *px = script_bytes(world, code, "floor", &size);
@@ -881,11 +881,11 @@ void TextureGen_tone_checker_staggered(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "floor_height { TextureGen: {width: 64, height: 64, seed: 7, layers: [\n"
+        "floor_height { Gen: {width: 64, height: 64, seed: 7, layers: [\n"
         "  {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.02, jitter: 0.3, stagger: 0.5,\n"
         "   tones: 2, tone_order: GenToneChecker, amount: 1, id_amount: 0.2}\n"
         "]} }\n"
-        "floor { TextureGen: {source: floor_height, output: GenAlbedo,\n"
+        "floor { Gen: {source: floor_height, output: GenAlbedo,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
     int32_t size = 0, k, i, x;
     uint8_t *px = script_bytes(world, code, "floor", &size);
@@ -918,11 +918,11 @@ void TextureGen_tone_courses(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "wall_height { TextureGen: {width: 64, height: 48, seed: 3, layers: [\n"
+        "wall_height { Gen: {width: 64, height: 48, seed: 3, layers: [\n"
         "  {kind: GenBlocks, courses: 6, per_course: 4, gap: 0.02,\n"
         "   tones: 3, tone_order: GenToneCourses, amount: 1}\n"
         "]} }\n"
-        "wall { TextureGen: {source: wall_height, output: GenAlbedo,\n"
+        "wall { Gen: {source: wall_height, output: GenAlbedo,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}, {0, 180, 0}]} }\n";
     int32_t size = 0, k, i;
     uint8_t *px = script_bytes(world, code, "wall", &size);
@@ -941,11 +941,11 @@ void TextureGen_tone_columns(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "planks_height { TextureGen: {width: 96, height: 48, seed: 3, layers: [\n"
+        "planks_height { Gen: {width: 96, height: 48, seed: 3, layers: [\n"
         "  {kind: GenBlocks, courses: 4, per_course: 6, gap: 0.02,\n"
         "   tones: 3, tone_order: GenToneColumns, amount: 1}\n"
         "]} }\n"
-        "planks { TextureGen: {source: planks_height, output: GenAlbedo,\n"
+        "planks { Gen: {source: planks_height, output: GenAlbedo,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}, {0, 180, 0}]} }\n";
     int32_t size = 0, k, i;
     uint8_t *px = script_bytes(world, code, "planks", &size);
@@ -1003,11 +1003,11 @@ void TextureGen_tone_tiles(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "floor_height { TextureGen: {width: 64, height: 48, seed: 3, layers: [\n"
+        "floor_height { Gen: {width: 64, height: 48, seed: 3, layers: [\n"
         "  {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.02,\n"
         "   tones: 2, tone_order: GenToneChecker, amount: 1}\n"
         "]} }\n"
-        "floor { TextureGen: {source: floor_height, output: GenAlbedo,\n"
+        "floor { Gen: {source: floor_height, output: GenAlbedo,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
     int32_t size = 0, x, y;
     uint8_t *px = script_bytes(world, code, "floor", &size);
@@ -1098,10 +1098,10 @@ void TextureGen_palette_cells(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "cobble_height { TextureGen: {width: 64, height: 64, seed: 3, layers: [\n"
+        "cobble_height { Gen: {width: 64, height: 64, seed: 3, layers: [\n"
         "  {kind: GenCells, count: 36, distance: GenEdge, tones: 3, amount: 1, id_amount: 0.2}\n"
         "]} }\n"
-        "cobble { TextureGen: {source: cobble_height, output: GenAlbedo,\n"
+        "cobble { Gen: {source: cobble_height, output: GenAlbedo,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}, {0, 180, 0}]} }\n";
     int32_t size = 0, used[3] = { 0 }, i, c;
     uint8_t *px = script_bytes(world, code, "cobble", &size);
@@ -1134,13 +1134,13 @@ void TextureGen_palette_layer_invalid(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "field { TextureGen: {width: 16, height: 16, seed: 1, layers: [\n"
+        "field { Gen: {width: 16, height: 16, seed: 1, layers: [\n"
         "  {kind: GenBlocks, courses: 2, per_course: 2, tones: 2, amount: 1}\n"
         "  {kind: GenNoise, frequency: 4, amount: 0.2}\n"
         "]} }\n"
-        "field_far { TextureGen: {source: field, output: GenAlbedo, palette_layer: 5,\n"
+        "field_far { Gen: {source: field, output: GenAlbedo, palette_layer: 5,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n"
-        "field_noise { TextureGen: {source: field, output: GenAlbedo, palette_layer: 1,\n"
+        "field_noise { Gen: {source: field, output: GenAlbedo, palette_layer: 1,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}]} }\n";
     ecs_log_set_level(-4);
     test_assert(ecs_script_run(world, "gen", code, NULL) == 0);
@@ -1169,15 +1169,15 @@ void TextureGen_palette_ignored_for_normal(void) {
     ecs_world_t *world = world_new();
     const char *code =
         "using box.texture\n"
-        "field { TextureGen: {width: 32, height: 32, seed: 1, layers: [\n"
+        "field { Gen: {width: 32, height: 32, seed: 1, layers: [\n"
         "  {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.04, tones: 2,\n"
         "   tone_order: GenToneChecker, amount: 1, id_amount: 0.2}\n"
         "]} }\n"
-        "field_n { TextureGen: {source: field, output: GenNormal, strength: 2} }\n"
-        "field_np { TextureGen: {source: field, output: GenNormal, strength: 2,\n"
+        "field_n { Gen: {source: field, output: GenNormal, strength: 2} }\n"
+        "field_np { Gen: {source: field, output: GenNormal, strength: 2,\n"
         "  palette: [{200, 0, 0}, {0, 0, 200}], palette_layer: 7} }\n"
-        "field_h { TextureGen: {source: field} }\n"
-        "field_hp { TextureGen: {source: field, palette: [{200, 0, 0}]} }\n";
+        "field_h { Gen: {source: field} }\n"
+        "field_hp { Gen: {source: field, palette: [{200, 0, 0}]} }\n";
     int32_t a_size = 0, b_size = 0;
     uint8_t *a = script_bytes(world, code, "field_n", &a_size);
     uint8_t *b = script_bytes(world, NULL, "field_np", &b_size);

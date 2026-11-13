@@ -37,11 +37,11 @@ scroll {
   }
 
   checker {
-    TexturePath: {path: "test/integration/visual/assets/checker.png"}
+    Path: {path: "test/integration/visual/assets/checker.png"}
   }
 
   bumps {
-    TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+    Path: {path: "test/integration/visual/assets/bumps.png"}
   }
 
   still {

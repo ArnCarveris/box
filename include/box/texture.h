@@ -163,7 +163,7 @@ ECS_STRUCT(TextureGenKey, {
  * 0.2), the two noise layers its fine and big noise.
  * @code
  * ashlar_height {
- *   TextureGen: {
+ *   Gen: {
  *     width: 512, height: 512, seed: 11
  *     layers: [
  *       {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.006, jitter: 0.22, stagger: 0.5,
@@ -174,17 +174,17 @@ ECS_STRUCT(TextureGenKey, {
  *   }
  * }
  * ashlar {
- *   TextureGen: {source: ashlar_height, output: GenAlbedo,
+ *   Gen: {source: ashlar_height, output: GenAlbedo,
  *                colors: [{0, {150, 146, 138}}, {0.5, {214, 208, 196}}, {1, {240, 234, 222}}]}
  * }
- * ashlar_n { TextureGen: {source: ashlar_height, output: GenNormal, strength: 3} }
+ * ashlar_n { Gen: {source: ashlar_height, output: GenNormal, strength: 3} }
  * @endcode
  * @par Cobble of generate.py: 100 cells, a mortar mask of the narrow smoothstep of the edge
  * distance with the cell id as tone (smooth(2, 7, edge) of about 51 pixel cells), a dome of the
  * wide one (sqrt(edge / 22)) and fine noise; the ramp puts the dark joints at the bottom.
  * @code
  * cobble_height {
- *   TextureGen: {
+ *   Gen: {
  *     width: 512, height: 512, seed: 111
  *     layers: [
  *       {kind: GenCells, count: 100, distance: GenEdge, edge: 0.14, amount: 0.5,
@@ -195,16 +195,16 @@ ECS_STRUCT(TextureGenKey, {
  *   }
  * }
  * cobble {
- *   TextureGen: {source: cobble_height, output: GenAlbedo,
+ *   Gen: {source: cobble_height, output: GenAlbedo,
  *                colors: [{0, {72, 66, 58}}, {0.3, {120, 114, 106}}, {1, {222, 214, 202}}]}
  * }
- * cobble_n { TextureGen: {source: cobble_height, output: GenNormal, strength: 3.6} }
+ * cobble_n { Gen: {source: cobble_height, output: GenNormal, strength: 3.6} }
  * @endcode
  * @par Two-tone checker floor: the tone of each tile picks its palette color, a ramp near white
  * darkens the joints, and the random id and the noise vary the tiles of one tone.
  * @code
  * floor_height {
- *   TextureGen: {
+ *   Gen: {
  *     width: 512, height: 512, seed: 5
  *     layers: [
  *       {kind: GenBlocks, courses: 2, per_course: 2, gap: 0.004, softness: 0.006,
@@ -214,11 +214,11 @@ ECS_STRUCT(TextureGenKey, {
  *   }
  * }
  * floor {
- *   TextureGen: {source: floor_height, output: GenAlbedo,
+ *   Gen: {source: floor_height, output: GenAlbedo,
  *                palette: [{92, 103, 101}, {39, 53, 55}],
  *                colors: [{0, {120, 120, 120}}, {0.6, {235, 235, 235}}, {1, {255, 255, 255}}]}
  * }
- * floor_n { TextureGen: {source: floor_height, output: GenNormal, strength: 2} }
+ * floor_n { Gen: {source: floor_height, output: GenNormal, strength: 2} }
  * @endcode
  */
 ECS_STRUCT(TextureGen, {
@@ -278,10 +278,10 @@ ECS_ENUM(TextureValueType, {
  *
  * @code
  * plating {
- *   uv     { TexCoords: {} }
- *   bright { TexMath: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
- *   tinted { TexMath: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
- *   TextureGraph: {output: tinted, width: 1024}
+ *   uv     { nodes.Coords: {} }
+ *   bright { nodes.Math: {op: MathMultiply, a: uv, b_value: {0.5, 0.5, 0.5, 1}} }
+ *   tinted { nodes.Math: {op: MathAdd, a: bright, b_value: {0.2, 0.1, 0.05, 0}} }
+ *   Graph: {output: tinted, width: 1024}
  * }
  * @endcode
  */
@@ -383,13 +383,13 @@ ECS_ENUM(TextureMathOp, {
  *
  * @code
  * glow {
- *   uv     { TexCoords: {} }
- *   red    { TexSplit: {input: uv, channel: ChannelR} }
- *   wave   { TexMath: {op: MathSin, a: red} }
- *   level  { TexMath: {op: MathRemapClamped, a: wave, from_min: -1, from_max: 1,
+ *   uv     { nodes.Coords: {} }
+ *   red    { nodes.Split: {input: uv, channel: ChannelR} }
+ *   wave   { nodes.Math: {op: MathSin, a: red} }
+ *   level  { nodes.Math: {op: MathRemapClamped, a: wave, from_min: -1, from_max: 1,
  *                      to_min: 0.2, to_max: 0.8} }
- *   tinted { TexMath: {op: MathMultiply, a: level, b_value: {1, 0.5, 0.25, 1}} }
- *   TextureGraph: {output: tinted}
+ *   tinted { nodes.Math: {op: MathMultiply, a: level, b_value: {1, 0.5, 0.25, 1}} }
+ *   Graph: {output: tinted}
  * }
  * @endcode
  */
@@ -419,9 +419,9 @@ ECS_ENUM(TextureChannel, {
  *
  * @code
  * height {
- *   uv { TexCoords: {} }
- *   v  { TexSplit: {input: uv, channel: ChannelG} }
- *   TextureGraph: {output: v, format: GraphSingle}
+ *   uv { nodes.Coords: {} }
+ *   v  { nodes.Split: {input: uv, channel: ChannelG} }
+ *   Graph: {output: v, format: GraphSingle}
  * }
  * @endcode
  */
@@ -436,11 +436,11 @@ ECS_STRUCT(TexSplit, {
  *
  * @code
  * swapped {
- *   uv { TexCoords: {} }
- *   u  { TexSplit: {input: uv, channel: ChannelR} }
- *   v  { TexSplit: {input: uv, channel: ChannelG} }
- *   vu { TexCombine: {r: v, g: u, b_value: 0, a_value: 1} }
- *   TextureGraph: {output: vu}
+ *   uv { nodes.Coords: {} }
+ *   u  { nodes.Split: {input: uv, channel: ChannelR} }
+ *   v  { nodes.Split: {input: uv, channel: ChannelG} }
+ *   vu { nodes.Combine: {r: v, g: u, b_value: 0, a_value: 1} }
+ *   Graph: {output: vu}
  * }
  * @endcode
  */
@@ -464,8 +464,8 @@ ECS_STRUCT(TexCombine, {
  *
  * @code
  * warped {
- *   bumps { TexMath: {op: MathMultiply, a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
- *   TexWarp: {offset: bumps, amount_value: 0.2}
+ *   bumps { nodes.Math: {op: MathMultiply, a_value: {0.5, 0.5, 0.5, 1}, b: noise} }
+ *   nodes.Warp: {offset: bumps, amount_value: 0.2}
  * }
  * @endcode
  */
@@ -499,7 +499,7 @@ ECS_STRUCT(TexWarp, {
  *
  * @code
  * turned {
- *   TexTransform: {angle_value: 90, scale: {2, 2, 1}}
+ *   nodes.Transform: {angle_value: 90, scale: {2, 2, 1}}
  * }
  * @endcode
  */
@@ -533,7 +533,7 @@ ECS_STRUCT(TexTransform, {
  *
  * @code
  * // height is a node whose value is a Scalar
- * albedo { TexRamp: {input: height, keys: [{0, {20, 40, 90}}, {0.5, {200, 180, 120}}]} }
+ * albedo { nodes.Ramp: {input: height, keys: [{0, {20, 40, 90}}, {0.5, {200, 180, 120}}]} }
  * @endcode
  */
 ECS_STRUCT(TexRamp, {
@@ -552,7 +552,7 @@ ECS_STRUCT(TexRamp, {
  * graph.
  *
  * @code
- * bumps { TexCurve: {input: height, curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1, 0.6}]}} }
+ * bumps { nodes.Curve: {input: height, curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1, 0.6}]}} }
  * @endcode
  */
 ECS_STRUCT(TexCurve, {
@@ -574,9 +574,9 @@ ECS_STRUCT(TexCurve, {
  *
  * @code
  * ashlar {
- *   blocks { TexBlocks: {courses: 8, per_course: 4, gap: 0.006, jitter: 0.22, stagger: 0.5,
+ *   blocks { nodes.Blocks: {courses: 8, per_course: 4, gap: 0.006, jitter: 0.22, stagger: 0.5,
  *                        seed: 11} }
- *   TextureGraph: {output: blocks, format: GraphLinear}
+ *   Graph: {output: blocks, format: GraphLinear}
  * }
  * @endcode
  */
@@ -620,8 +620,8 @@ ECS_ENUM(TextureCellsDistance, {
  *
  * @code
  * stones {
- *   cells  { TexCells: {count: 100, distance: CellsEdge, edge: 0.15, seed: 3} }
- *   TextureGraph: {output: cells, width: 512}
+ *   cells  { nodes.Cells: {count: 100, distance: CellsEdge, edge: 0.15, seed: 3} }
+ *   Graph: {output: cells, width: 512}
  * }
  * @endcode
  */
@@ -647,7 +647,7 @@ ECS_STRUCT(TexCells, {
  * horizontal radius by 1/cos(latitude) and continues vertical taps across a pole.
  *
  * @code
- * soft { TexBlur: {input: noise, radius: 8} }
+ * soft { nodes.Blur: {input: noise, radius: 8} }
  * @endcode
  */
 ECS_STRUCT(TexBlur, {
@@ -679,8 +679,8 @@ ECS_ENUM(TextureNoiseFractal, {
  *
  * @code
  * clouds {
- *   noise { TexNoise: {frequency: 4, octaves: 6, fractal: NoiseBillow, seed: 3} }
- *   TextureGraph: {output: noise, width: 1024, format: GraphSingle}
+ *   noise { nodes.Noise: {frequency: 4, octaves: 6, fractal: NoiseBillow, seed: 3} }
+ *   Graph: {output: noise, width: 1024, format: GraphSingle}
  * }
  * @endcode
  */
@@ -721,9 +721,9 @@ ECS_ENUM(TextureAddress, {
  *
  * @code
  * tinted {
- *   albedo { TexImage: {texture: brick} }
- *   warm   { TexMath: {op: MathMultiply, a: albedo, b_value: {1, 0.9, 0.8, 1}} }
- *   TextureGraph: {output: warm, width: 512}
+ *   albedo { nodes.Image: {texture: brick} }
+ *   warm   { nodes.Math: {op: MathMultiply, a: albedo, b_value: {1, 0.9, 0.8, 1}} }
+ *   Graph: {output: warm, width: 512}
  * }
  * @endcode
  */
@@ -763,10 +763,10 @@ ECS_STRUCT(TexLut, {
  *
  * @code
  * relief {
- *   dir    { TexCoords: {} }
- *   height { TexSplit: {input: dir, channel: ChannelG} }
- *   normal { TexNormal: {height: height, strength: 4} }
- *   TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
+ *   dir    { nodes.Coords: {} }
+ *   height { nodes.Split: {input: dir, channel: ChannelG} }
+ *   normal { nodes.Normal: {height: height, strength: 4} }
+ *   Graph: {output: normal, width: 512, height: 256, domain: DomainSphere,
  *                  format: GraphLinear}
  * }
  * @endcode

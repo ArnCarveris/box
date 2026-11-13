@@ -4,10 +4,10 @@
 using box.texture
 
 graph_channels {
-  uv   { TexCoords: {} }
-  u    { TexSplit: {input: uv, channel: ChannelR} }
-  v    { TexSplit: {input: uv, channel: ChannelG} }
-  ramp { TexMath: {op: MathRemapClamped, a: u, from_min: 0, from_max: 0.5, to_min: 0, to_max: 1} }
-  vu   { TexCombine: {r: v, g: u, b: ramp, a_value: 1} }
-  TextureGraph: {output: vu, width: 16, height: 8, format: GraphHdr}
+  uv   { nodes.Coords: {} }
+  u    { nodes.Split: {input: uv, channel: ChannelR} }
+  v    { nodes.Split: {input: uv, channel: ChannelG} }
+  ramp { nodes.Math: {op: MathRemapClamped, a: u, from_min: 0, from_max: 0.5, to_min: 0, to_max: 1} }
+  vu   { nodes.Combine: {r: v, g: u, b: ramp, a_value: 1} }
+  Graph: {output: vu, width: 16, height: 8, format: GraphHdr}
 }

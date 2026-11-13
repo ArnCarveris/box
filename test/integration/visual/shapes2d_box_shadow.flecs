@@ -17,7 +17,7 @@ $ {
 // faint shadows on a light and a dark panel, which must not band.
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 world_camera {

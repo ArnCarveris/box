@@ -9,12 +9,12 @@ using box.light
 using box.animation
 
 assets {
-  ship_plate_color { TexturePath: {path: "etc/scenes/spaceship/assets/plating.svg", width: 1024} }
-  ship_plate_orm { TexturePath: {path: "etc/scenes/spaceship/assets/orm.svg", width: 1024} }
-  ship_plate_normal { TexturePath: {path: "etc/scenes/spaceship/assets/normal.png"} }
-  ship_registry { TexturePath: {path: "etc/scenes/spaceship/assets/registry.svg", width: 2048} }
-  ship_warning { TexturePath: {path: "etc/scenes/spaceship/assets/hazard.svg", width: 512} }
-  ship_display { TexturePath: {path: "etc/scenes/spaceship/assets/display.svg", width: 512} }
+  ship_plate_color { Path: {path: "etc/scenes/spaceship/assets/plating.svg", width: 1024} }
+  ship_plate_orm { Path: {path: "etc/scenes/spaceship/assets/orm.svg", width: 1024} }
+  ship_plate_normal { Path: {path: "etc/scenes/spaceship/assets/normal.png"} }
+  ship_registry { Path: {path: "etc/scenes/spaceship/assets/registry.svg", width: 2048} }
+  ship_warning { Path: {path: "etc/scenes/spaceship/assets/hazard.svg", width: 512} }
+  ship_display { Path: {path: "etc/scenes/spaceship/assets/display.svg", width: 512} }
   prefab HullArmor { Rgb: {196, 214, 218}; PbrMaterial: {metallic: 0.62, roughness: 0.68}; PbrTextures: {albedo: ship_plate_color, normal: ship_plate_normal, orm: ship_plate_orm}; TextureMapping: {MappingObject, size: 20, blend: 0.2} }
   prefab PaleArmor { Rgb: {204, 214, 207}; PbrMaterial: {metallic: 0.45, roughness: 0.54}; PbrTextures: {normal: ship_plate_normal}; TextureMapping: {MappingObject, size: 8, blend: 0.2} }
   prefab DarkArmor { Rgb: {39, 54, 65}; PbrMaterial: {metallic: 0.7, roughness: 0.63} }
@@ -34,13 +34,13 @@ assets {
   prefab BeaconLight { Rgb: {245, 137, 45}; Emissive: {strength: 3, color: {255, 139, 40}}; Animator: {clip: ship_beacon_blink}; NoBake }
   prefab WhiteLight { Rgb: {175, 218, 230}; Emissive: {strength: 2.5, color: {195, 230, 255}} }
 
-  dock_registry { TexturePath: {path: "etc/scenes/spaceship/assets/dock_registry.svg", width: 1024} }
+  dock_registry { Path: {path: "etc/scenes/spaceship/assets/dock_registry.svg", width: 1024} }
 
   prefab ServiceTeal { Rgb: {42, 103, 112}; PbrMaterial: {metallic: 0.45, roughness: 0.6} }
   prefab CeramicArmor { Rgb: {179, 191, 184}; PbrMaterial: {metallic: 0.25, roughness: 0.72}; PbrTextures: {normal: ship_plate_normal}; TextureMapping: {MappingObject, size: 8, blend: 0.2} }
   prefab ReplacementArmor { Rgb: {94, 119, 132}; PbrMaterial: {metallic: 0.65, roughness: 0.48} }
-  dock_deck_fuel { TexturePath: {path: "etc/scenes/spaceship/assets/deck_fuel.svg", width: 1024} }
-  dock_deck_power { TexturePath: {path: "etc/scenes/spaceship/assets/deck_power.svg", width: 1024} }
-  dock_deck_cargo { TexturePath: {path: "etc/scenes/spaceship/assets/deck_cargo.svg", width: 1024} }
-  dock_deck_repair { TexturePath: {path: "etc/scenes/spaceship/assets/deck_repair.svg", width: 1024} }
+  dock_deck_fuel { Path: {path: "etc/scenes/spaceship/assets/deck_fuel.svg", width: 1024} }
+  dock_deck_power { Path: {path: "etc/scenes/spaceship/assets/deck_power.svg", width: 1024} }
+  dock_deck_cargo { Path: {path: "etc/scenes/spaceship/assets/deck_cargo.svg", width: 1024} }
+  dock_deck_repair { Path: {path: "etc/scenes/spaceship/assets/deck_repair.svg", width: 1024} }
 }

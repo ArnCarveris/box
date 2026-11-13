@@ -16,7 +16,7 @@ main_view {
 }
 
 letter {
-  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+  Path: {path: "test/integration/visual/assets/letter.png"}
 }
 
 backdrop {

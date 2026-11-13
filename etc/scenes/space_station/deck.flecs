@@ -196,10 +196,10 @@ assets {
     }
   }
 
-  planet_tex { TexturePath: {path: "etc/scenes/space_station/assets/planet.jpg"} }
-  planet_night_tex { TexturePath: {path: "etc/scenes/space_station/assets/planet_night.jpg"} }
-  planet_cloud_tex { TexturePath: {path: "etc/scenes/space_station/assets/clouds.png"} }
-  planet_halo_tex { TexturePath: {path: "etc/scenes/space_station/assets/halo.png"} }
+  planet_tex { Path: {path: "etc/scenes/space_station/assets/planet.jpg"} }
+  planet_night_tex { Path: {path: "etc/scenes/space_station/assets/planet_night.jpg"} }
+  planet_cloud_tex { Path: {path: "etc/scenes/space_station/assets/clouds.png"} }
+  planet_halo_tex { Path: {path: "etc/scenes/space_station/assets/halo.png"} }
 
   template StationPlanet {
     surface {

@@ -43,7 +43,7 @@ $ {
 window { Surface: {width: 1440, height: 960, vsync: true} }
 
 assets {
-  clouds { TextureGen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
+  clouds { Gen: {width: 256, seed: 17, layers: [{kind: GenNoise, frequency: 3, octaves: 4, gain: 0.55}]} }
 }
 
 camera {

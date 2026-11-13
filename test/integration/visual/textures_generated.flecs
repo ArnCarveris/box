@@ -6,7 +6,7 @@ using box.camera
 using box.view
 using box.light
 
-// Generated textures (TextureGen): a row of three boxes with ashlar-like blocks, Voronoi cobble
+// Generated textures (Gen): a row of three boxes with ashlar-like blocks, Voronoi cobble
 // and fbm noise, each with the albedo and normal map derived from one height field, lit by a low
 // sun from the left so the joints, domes and bumps of the normal maps cast highlights. Behind them
 // a wall tiles the ashlar 4 x 4 to show that it has no seams.
@@ -32,7 +32,7 @@ sun {
 }
 
 ashlar_height {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 11
     layers: [
       {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.008, jitter: 0.22, stagger: 0.5,
@@ -44,16 +44,16 @@ ashlar_height {
 }
 
 ashlar {
-  TextureGen: {source: ashlar_height, output: GenAlbedo,
+  Gen: {source: ashlar_height, output: GenAlbedo,
                colors: [{0, {150, 146, 138}}, {0.5, {214, 208, 196}}, {1, {240, 234, 222}}]}
 }
 
 ashlar_n {
-  TextureGen: {source: ashlar_height, output: GenNormal, strength: 3}
+  Gen: {source: ashlar_height, output: GenNormal, strength: 3}
 }
 
 cobble_height {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 111
     layers: [
       {kind: GenCells, count: 36, distance: GenEdge, edge: 0.14, amount: 0.5, id_amount: 0.15}
@@ -64,16 +64,16 @@ cobble_height {
 }
 
 cobble {
-  TextureGen: {source: cobble_height, output: GenAlbedo,
+  Gen: {source: cobble_height, output: GenAlbedo,
                colors: [{0, {72, 66, 58}}, {0.3, {120, 114, 106}}, {1, {222, 214, 202}}]}
 }
 
 cobble_n {
-  TextureGen: {source: cobble_height, output: GenNormal, strength: 3.6}
+  Gen: {source: cobble_height, output: GenNormal, strength: 3.6}
 }
 
 earth_height {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 41
     layers: [
       {kind: GenNoise, frequency: 4, octaves: 6, amount: 1}
@@ -83,12 +83,12 @@ earth_height {
 }
 
 earth {
-  TextureGen: {source: earth_height, output: GenAlbedo,
+  Gen: {source: earth_height, output: GenAlbedo,
                colors: [{0, {70, 52, 36}}, {0.6, {128, 98, 66}}, {1, {170, 150, 110}}]}
 }
 
 earth_n {
-  TextureGen: {source: earth_height, output: GenNormal, strength: 4}
+  Gen: {source: earth_height, output: GenNormal, strength: 4}
 }
 
 floor {

@@ -508,7 +508,7 @@ static void box_texture_request_gen(
             char *name = ecs_get_path(world, e);
             char *source = exists ? ecs_get_path(world, gen->source) : NULL;
             const char *source_name = source ? source : tex->source_name;
-            char *error = flecs_asprintf("texture '%s': source '%s' has no TextureGen with "
+            char *error = flecs_asprintf("texture '%s': source '%s' has no Gen with "
                 "layers", name, source_name ? source_name : "(deleted)");
             box_texture_fail(world, t, e, error);
             ecs_os_free(error);
@@ -625,8 +625,8 @@ void box_texture_load(
         box_texture_set_pixels(world, t, e, pixels);
     } else if (graph && (path || gen)) {
         char *name = ecs_get_path(world, e);
-        char *error = flecs_asprintf("texture '%s' has both a TextureGraph and a %s", name,
-            path ? "TexturePath" : "TextureGen");
+        char *error = flecs_asprintf("texture '%s' has both a Graph and a %s", name,
+            path ? "Path" : "Gen");
         box_texture_fail(world, t, e, error);
         ecs_os_free(error);
         ecs_os_free(name);
@@ -635,7 +635,7 @@ void box_texture_load(
     } else if (path && gen) {
         char *name = ecs_get_path(world, e);
         char *error = flecs_asprintf(
-            "texture '%s' has both a TexturePath and a TextureGen", name);
+            "texture '%s' has both a Path and a Gen", name);
         box_texture_fail(world, t, e, error);
         ecs_os_free(error);
         ecs_os_free(name);
@@ -1137,6 +1137,100 @@ done:
     return;
 }
 
+/* Registers a component under its C type and names it after: the name prefixes cannot produce
+ * the name, or would strip the name of the type from the constants of an enum (ChannelR). */
+#define BOX_TEXTURE_COMPONENT(world, T, name)\
+    ECS_META_COMPONENT(world, T);\
+    ecs_set_name(world, ecs_id(T), name)
+
+/** Register the components of box.texture. The C types keep their prefixes, the entities do
+ * not: box.texture.Path, box.texture.gen.Layer, box.texture.graph.NodeKind, nodes.Noise.
+ *
+ * TexScalar becomes Scalar and TextureReady becomes Ready; the constants of the other enums
+ * keep their names (DomainPlane, ChannelR).
+ *
+ * TexCurve is registered as TexCurve and renamed after, because its member type Curve would
+ * otherwise resolve to the node itself instead of box.curve.Curve.
+ *
+ * @param world The world, in the scope of box.texture
+ */
+static void box_texture_register(
+    ecs_world_t *world)
+{
+    ecs_entity_t module = ecs_get_scope(world);
+    ecs_entity_t gen = ecs_entity(world, { .name = "gen" });
+    ecs_add_id(world, gen, EcsModule);
+    ecs_entity_t graph = ecs_entity(world, { .name = "graph" });
+    ecs_add_id(world, graph, EcsModule);
+    ecs_entity_t nodes = ecs_entity(world, { .name = "nodes" });
+    ecs_add_id(world, nodes, EcsModule);
+
+    ecs_set_scope(world, gen);
+    ecs_set_name_prefix(world, "TextureGen");
+    ECS_META_COMPONENT(world, TextureGenPattern);
+    ECS_META_COMPONENT(world, TextureGenOp);
+    ECS_META_COMPONENT(world, TextureGenDistance);
+    ECS_META_COMPONENT(world, TextureGenToneOrder);
+    ECS_META_COMPONENT(world, TextureGenOutput);
+    ECS_META_COMPONENT(world, TextureGenLayer);
+    ECS_META_COMPONENT(world, TextureGenKey);
+
+    ecs_set_scope(world, graph);
+    ecs_set_name_prefix(world, "Tex");
+    BOX_TEXTURE_COMPONENT(world, TextureValueType, "ValueType");
+    ecs_set_name_prefix(world, NULL);
+    BOX_TEXTURE_COMPONENT(world, TextureGraphDomain, "Domain");
+    BOX_TEXTURE_COMPONENT(world, TextureGraphFormat, "Format");
+    BOX_TEXTURE_COMPONENT(world, TextureGraphCache, "Cache");
+    BOX_TEXTURE_COMPONENT(world, TextureNodePort, "Port");
+    BOX_TEXTURE_COMPONENT(world, TextureNodeParam, "Param");
+    BOX_TEXTURE_COMPONENT(world, TextureNodeKind, "NodeKind");
+    BOX_TEXTURE_COMPONENT(world, TextureNodePreview, "Preview");
+    BOX_TEXTURE_COMPONENT(world, TextureNodePreviewStatus, "PreviewStatus");
+    BOX_TEXTURE_COMPONENT(world, TextureGraphStats, "Stats");
+
+    ecs_set_scope(world, nodes);
+    ecs_set_name_prefix(world, "Tex");
+    ECS_META_COMPONENT(world, TexConstant);
+    ECS_META_COMPONENT(world, TexCoords);
+    BOX_TEXTURE_COMPONENT(world, TextureMathOp, "MathOp");
+    ECS_META_COMPONENT(world, TexMath);
+    BOX_TEXTURE_COMPONENT(world, TextureNoiseFractal, "NoiseFractal");
+    ECS_META_COMPONENT(world, TexNoise);
+    BOX_TEXTURE_COMPONENT(world, TextureCellsDistance, "CellsDistance");
+    ECS_META_COMPONENT(world, TexCells);
+    ECS_META_COMPONENT(world, TexBlocks);
+    BOX_TEXTURE_COMPONENT(world, TextureChannel, "Channel");
+    ECS_META_COMPONENT(world, TexSplit);
+    ECS_META_COMPONENT(world, TexCombine);
+    ECS_META_COMPONENT(world, TexWarp);
+    ECS_META_COMPONENT(world, TexTransform);
+    ECS_META_COMPONENT(world, TexTime);
+    ECS_META_COMPONENT(world, TexSplat);
+    BOX_TEXTURE_COMPONENT(world, TextureAddress, "Address");
+    ECS_META_COMPONENT(world, TexImage);
+    ECS_META_COMPONENT(world, TexLut);
+    ECS_META_COMPONENT(world, TexRamp);
+    ecs_set_name_prefix(world, NULL);
+    BOX_TEXTURE_COMPONENT(world, TexCurve, "Curve");
+    ecs_set_name_prefix(world, "Tex");
+    ECS_META_COMPONENT(world, TexBlur);
+    ECS_META_COMPONENT(world, TexNormal);
+    ECS_META_COMPONENT(world, TexSlope);
+
+    ecs_set_scope(world, module);
+    ecs_set_name_prefix(world, "Texture");
+    ECS_META_COMPONENT(world, Texture);
+    ECS_META_COMPONENT(world, TexturePath);
+    ECS_META_COMPONENT(world, TextureGen);
+    ECS_META_COMPONENT(world, TextureGraph);
+    ECS_META_COMPONENT(world, TextureState);
+    ECS_META_COMPONENT(world, TextureStatus);
+    ECS_COMPONENT_DEFINE(world, TextureRegistry);
+    ECS_COMPONENT_DEFINE(world, TexturePixels);
+    ecs_set_name_prefix(world, NULL);
+}
+
 void BoxTextureImport(
     ecs_world_t *world)
 {
@@ -1148,53 +1242,7 @@ void BoxTextureImport(
     ECS_IMPORT(world, BoxJobs);
     ECS_IMPORT(world, BoxCurve);
 
-    ECS_META_COMPONENT(world, Texture);
-    ECS_META_COMPONENT(world, TexturePath);
-    ECS_META_COMPONENT(world, TextureGenPattern);
-    ECS_META_COMPONENT(world, TextureGenOp);
-    ECS_META_COMPONENT(world, TextureGenDistance);
-    ECS_META_COMPONENT(world, TextureGenToneOrder);
-    ECS_META_COMPONENT(world, TextureGenOutput);
-    ECS_META_COMPONENT(world, TextureGenLayer);
-    ECS_META_COMPONENT(world, TextureGenKey);
-    ECS_META_COMPONENT(world, TextureGen);
-    ECS_META_COMPONENT(world, TextureGraphDomain);
-    ECS_META_COMPONENT(world, TextureGraphFormat);
-    ECS_META_COMPONENT(world, TextureValueType);
-    ECS_META_COMPONENT(world, TextureGraph);
-    ECS_META_COMPONENT(world, TexConstant);
-    ECS_META_COMPONENT(world, TexCoords);
-    ECS_META_COMPONENT(world, TextureMathOp);
-    ECS_META_COMPONENT(world, TexMath);
-    ECS_META_COMPONENT(world, TextureNoiseFractal);
-    ECS_META_COMPONENT(world, TexNoise);
-    ECS_META_COMPONENT(world, TextureCellsDistance);
-    ECS_META_COMPONENT(world, TexCells);
-    ECS_META_COMPONENT(world, TexBlocks);
-    ECS_META_COMPONENT(world, TextureChannel);
-    ECS_META_COMPONENT(world, TexSplit);
-    ECS_META_COMPONENT(world, TexCombine);
-    ECS_META_COMPONENT(world, TexWarp);
-    ECS_META_COMPONENT(world, TexTransform);
-    ECS_META_COMPONENT(world, TexTime);
-    ECS_META_COMPONENT(world, TexSplat);
-    ECS_META_COMPONENT(world, TextureAddress);
-    ECS_META_COMPONENT(world, TexImage);
-    ECS_META_COMPONENT(world, TexLut);
-    ECS_META_COMPONENT(world, TextureGraphCache);
-    ECS_META_COMPONENT(world, TexRamp);
-    ECS_META_COMPONENT(world, TexCurve);
-    ECS_META_COMPONENT(world, TexBlur);
-    ECS_META_COMPONENT(world, TexNormal);
-    ECS_META_COMPONENT(world, TexSlope);
-    ECS_META_COMPONENT(world, TextureNodePort);
-    ECS_META_COMPONENT(world, TextureNodeParam);
-    ECS_META_COMPONENT(world, TextureNodeKind);
-    ECS_META_COMPONENT(world, TextureState);
-    ECS_META_COMPONENT(world, TextureStatus);
-    ECS_META_COMPONENT(world, TextureNodePreview);
-    ECS_META_COMPONENT(world, TextureNodePreviewStatus);
-    ECS_META_COMPONENT(world, TextureGraphStats);
+    box_texture_register(world);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
     box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
@@ -1228,8 +1276,6 @@ void BoxTextureImport(
     box_owned_hooks(world, TextureNodePreviewStatus,
         BOX_OWNED_STR(TextureNodePreviewStatus, png));
 
-    ECS_COMPONENT_DEFINE(world, TextureRegistry);
-    ECS_COMPONENT_DEFINE(world, TexturePixels);
     ecs_set_hooks(world, TexturePixels, {
         .ctor = flecs_default_ctor,
         .dtor = box_texture_pixels_dtor,

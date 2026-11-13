@@ -19,8 +19,8 @@ graph_material {
   }
 
   image {
-    red { TexConstant: {value: {1, 0, 0, 1}} }
-    TextureGraph: {output: red, width: 16}
+    red { nodes.Constant: {value: {1, 0, 0, 1}} }
+    Graph: {output: red, width: 16}
   }
 
   quad {

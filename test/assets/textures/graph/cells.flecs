@@ -4,6 +4,6 @@
 using box.texture
 
 graph_cells {
-  cells { TexCells: {count: 25, seed: 7, distance: CellsEdge} }
-  TextureGraph: {output: cells, width: 64, height: 64, format: GraphHdr}
+  cells { nodes.Cells: {count: 25, seed: 7, distance: CellsEdge} }
+  Graph: {output: cells, width: 64, height: 64, format: GraphHdr}
 }

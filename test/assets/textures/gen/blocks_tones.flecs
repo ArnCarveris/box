@@ -1,11 +1,11 @@
 // Fixed description of a GenBlocks height field with a two-tone checker, jittered and staggered,
-// with its albedo through a palette and a ramp and its normal map, whose bytes the TextureGen
+// with its albedo through a palette and a ramp and its normal map, whose bytes the Gen
 // tests hash so a change of the output is noticed.
 
 using box.texture
 
 blocks_tones_height {
-  TextureGen: {
+  Gen: {
     width: 64, height: 48, seed: 5
     layers: [
       {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.04, jitter: 0.2, stagger: 0.5,
@@ -16,11 +16,11 @@ blocks_tones_height {
 }
 
 blocks_tones_albedo {
-  TextureGen: {source: blocks_tones_height, output: GenAlbedo,
+  Gen: {source: blocks_tones_height, output: GenAlbedo,
                palette: [{92, 103, 101}, {39, 53, 55}],
                colors: [{0, {120, 120, 120}}, {0.6, {235, 235, 235}}, {1, {255, 255, 255}}]}
 }
 
 blocks_tones_normal {
-  TextureGen: {source: blocks_tones_height, output: GenNormal, strength: 2}
+  Gen: {source: blocks_tones_height, output: GenNormal, strength: 2}
 }

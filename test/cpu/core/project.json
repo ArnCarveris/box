@@ -367,6 +367,8 @@
                     "builtin_kinds",
                     "normal_slope_kinds",
                     "kind_reflected_json",
+                    "names",
+                    "names_script",
                     "cells_kind",
                     "script",
                     "script_declared_after",

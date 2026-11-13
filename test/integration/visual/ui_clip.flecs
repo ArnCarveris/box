@@ -39,11 +39,11 @@ ground {
 }
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 letter {
-  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+  Path: {path: "test/integration/visual/assets/letter.png"}
 }
 
 board {

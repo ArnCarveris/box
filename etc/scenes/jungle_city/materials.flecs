@@ -3,37 +3,37 @@ using box.texture
 using box.light
 
 assets {
-  canopy_tex_plaster { TexturePath: {path: "etc/scenes/jungle_city/textures/plaster.jpg"} }
-  canopy_tex_plaster_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/plaster_normal.jpg"} }
-  canopy_tex_concrete { TexturePath: {path: "etc/scenes/jungle_city/textures/concrete.jpg"} }
-  canopy_tex_concrete_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/concrete_normal.jpg"} }
-  canopy_tex_wood { TexturePath: {path: "etc/scenes/jungle_city/textures/wood.jpg"} }
-  canopy_tex_wood_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/wood_normal.jpg"} }
-  canopy_tex_deck { TexturePath: {path: "etc/scenes/jungle_city/textures/deck.jpg"} }
-  canopy_tex_deck_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/deck_normal.jpg"} }
-  canopy_tex_pavers { TexturePath: {path: "etc/scenes/jungle_city/textures/pavers.jpg"} }
-  canopy_tex_pavers_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/pavers_normal.jpg"} }
-  canopy_tex_ashlar { TexturePath: {path: "etc/scenes/jungle_city/textures/ashlar.jpg"} }
-  canopy_tex_ashlar_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/ashlar_normal.jpg"} }
-  canopy_tex_bark { TexturePath: {path: "etc/scenes/jungle_city/textures/bark.jpg"} }
-  canopy_tex_bark_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/bark_normal.jpg"} }
-  canopy_tex_ground { TexturePath: {path: "etc/scenes/jungle_city/textures/ground.jpg"} }
-  canopy_tex_ground_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/ground_normal.jpg"} }
-  canopy_tex_strata { TexturePath: {path: "etc/scenes/jungle_city/textures/strata.jpg"} }
-  canopy_tex_strata_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/strata_normal.jpg"} }
-  canopy_tex_water_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/water_normal.jpg"} }
-  canopy_tex_facade { TexturePath: {path: "etc/scenes/jungle_city/textures/facade.jpg"} }
-  canopy_tex_facade_emissive { TexturePath: {path: "etc/scenes/jungle_city/textures/facade_emissive.jpg"} }
-  canopy_tex_facade_orm { TexturePath: {path: "etc/scenes/jungle_city/textures/facade_orm.jpg"} }
-  canopy_tex_broadleaf { TexturePath: {path: "etc/scenes/jungle_city/textures/broadleaf.png"} }
-  canopy_tex_bigleaf { TexturePath: {path: "etc/scenes/jungle_city/textures/bigleaf.png"} }
-  canopy_tex_blossom { TexturePath: {path: "etc/scenes/jungle_city/textures/blossom.png"} }
-  canopy_tex_palm { TexturePath: {path: "etc/scenes/jungle_city/textures/palm.png"} }
-  canopy_tex_fern { TexturePath: {path: "etc/scenes/jungle_city/textures/fern.png"} }
-  canopy_tex_vine { TexturePath: {path: "etc/scenes/jungle_city/textures/vine.png"} }
-  canopy_tex_tuft { TexturePath: {path: "etc/scenes/jungle_city/textures/tuft.png"} }
-  canopy_tex_mosaic { TexturePath: {path: "etc/scenes/jungle_city/textures/mosaic.png"} }
-  canopy_tex_mosaic_normal { TexturePath: {path: "etc/scenes/jungle_city/textures/mosaic_normal.jpg"} }
+  canopy_tex_plaster { Path: {path: "etc/scenes/jungle_city/textures/plaster.jpg"} }
+  canopy_tex_plaster_normal { Path: {path: "etc/scenes/jungle_city/textures/plaster_normal.jpg"} }
+  canopy_tex_concrete { Path: {path: "etc/scenes/jungle_city/textures/concrete.jpg"} }
+  canopy_tex_concrete_normal { Path: {path: "etc/scenes/jungle_city/textures/concrete_normal.jpg"} }
+  canopy_tex_wood { Path: {path: "etc/scenes/jungle_city/textures/wood.jpg"} }
+  canopy_tex_wood_normal { Path: {path: "etc/scenes/jungle_city/textures/wood_normal.jpg"} }
+  canopy_tex_deck { Path: {path: "etc/scenes/jungle_city/textures/deck.jpg"} }
+  canopy_tex_deck_normal { Path: {path: "etc/scenes/jungle_city/textures/deck_normal.jpg"} }
+  canopy_tex_pavers { Path: {path: "etc/scenes/jungle_city/textures/pavers.jpg"} }
+  canopy_tex_pavers_normal { Path: {path: "etc/scenes/jungle_city/textures/pavers_normal.jpg"} }
+  canopy_tex_ashlar { Path: {path: "etc/scenes/jungle_city/textures/ashlar.jpg"} }
+  canopy_tex_ashlar_normal { Path: {path: "etc/scenes/jungle_city/textures/ashlar_normal.jpg"} }
+  canopy_tex_bark { Path: {path: "etc/scenes/jungle_city/textures/bark.jpg"} }
+  canopy_tex_bark_normal { Path: {path: "etc/scenes/jungle_city/textures/bark_normal.jpg"} }
+  canopy_tex_ground { Path: {path: "etc/scenes/jungle_city/textures/ground.jpg"} }
+  canopy_tex_ground_normal { Path: {path: "etc/scenes/jungle_city/textures/ground_normal.jpg"} }
+  canopy_tex_strata { Path: {path: "etc/scenes/jungle_city/textures/strata.jpg"} }
+  canopy_tex_strata_normal { Path: {path: "etc/scenes/jungle_city/textures/strata_normal.jpg"} }
+  canopy_tex_water_normal { Path: {path: "etc/scenes/jungle_city/textures/water_normal.jpg"} }
+  canopy_tex_facade { Path: {path: "etc/scenes/jungle_city/textures/facade.jpg"} }
+  canopy_tex_facade_emissive { Path: {path: "etc/scenes/jungle_city/textures/facade_emissive.jpg"} }
+  canopy_tex_facade_orm { Path: {path: "etc/scenes/jungle_city/textures/facade_orm.jpg"} }
+  canopy_tex_broadleaf { Path: {path: "etc/scenes/jungle_city/textures/broadleaf.png"} }
+  canopy_tex_bigleaf { Path: {path: "etc/scenes/jungle_city/textures/bigleaf.png"} }
+  canopy_tex_blossom { Path: {path: "etc/scenes/jungle_city/textures/blossom.png"} }
+  canopy_tex_palm { Path: {path: "etc/scenes/jungle_city/textures/palm.png"} }
+  canopy_tex_fern { Path: {path: "etc/scenes/jungle_city/textures/fern.png"} }
+  canopy_tex_vine { Path: {path: "etc/scenes/jungle_city/textures/vine.png"} }
+  canopy_tex_tuft { Path: {path: "etc/scenes/jungle_city/textures/tuft.png"} }
+  canopy_tex_mosaic { Path: {path: "etc/scenes/jungle_city/textures/mosaic.png"} }
+  canopy_tex_mosaic_normal { Path: {path: "etc/scenes/jungle_city/textures/mosaic_normal.jpg"} }
 
   prefab CanopyIvory { Rgb: {226, 235, 211}; PbrMaterial: {roughness: 0.82}; PbrTextures: {albedo: canopy_tex_plaster, normal: canopy_tex_plaster_normal}; TextureMapping: {mode: MappingObject, size: 3.5, blend: 0.2} }
   prefab CanopyTrim { Rgb: {232, 232, 214}; PbrMaterial: {roughness: 0.55} }
@@ -81,7 +81,7 @@ assets {
   prefab CanopyTerracotta { Rgb: {176, 96, 64}; PbrMaterial: {roughness: 0.88} }
 
   canopy_tex_moss_mask {
-    TextureGen: {
+    Gen: {
       width: 256, height: 256, seed: 23,
       layers: [
         {kind: GenNoise, frequency: 3, octaves: 4, amount: 1},
@@ -90,7 +90,7 @@ assets {
     }
   }
   canopy_tex_clouds {
-    TextureGen: {
+    Gen: {
       width: 256, height: 256, seed: 41,
       layers: [
         {kind: GenNoise, frequency: 3, octaves: 5, gain: 0.55, amount: 1}

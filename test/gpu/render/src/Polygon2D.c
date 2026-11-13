@@ -500,7 +500,7 @@ void Polygon2D_image(void) {
 
     test_assert(stbi_write_png(file, 4, 4, 4, texels, 4 * 4) != 0);
     char *code = flecs_asprintf(POLY_PRELUDE POLY_L
-        "quadrants { TexturePath: {path: \"%s\"} }\n"
+        "quadrants { Path: {path: \"%s\"} }\n"
         "l_shape {\n"
         "  Position: {0, 0, 0}\n"
         "  Polygon2D: {path: l_path, scale: {10, 10}, offset: {-20, -20}}\n"

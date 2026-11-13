@@ -10,7 +10,7 @@ using state
 using planets
 
 assets {
-  sky_tex { TexturePath: {path: "etc/scenes/planet/assets/sky.jpg"} }
+  sky_tex { Path: {path: "etc/scenes/planet/assets/sky.jpg"} }
 }
 
 stage {

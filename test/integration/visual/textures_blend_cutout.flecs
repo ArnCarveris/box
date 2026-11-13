@@ -40,19 +40,19 @@ sun {
 }
 
 mask {
-  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+  Path: {path: "test/integration/visual/assets/blend_mask.png"}
 }
 
 fence_tex {
-  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+  Path: {path: "test/integration/visual/assets/fence.png"}
 }
 
 leaf_tex {
-  TexturePath: {path: "test/integration/visual/assets/leaf.png"}
+  Path: {path: "test/integration/visual/assets/leaf.png"}
 }
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 fence_layer {

@@ -30,27 +30,27 @@ assets {
   export const C_INK_SOFT: Rgb = {110, 78, 50}
   export const C_SHADE: Rgb = {26, 16, 10}
 
-  castle_ui_wood { TexturePath: {path: "etc/scenes/castle/ui/wood.jpg"} }
-  castle_ui_parchment { TexturePath: {path: "etc/scenes/castle/ui/parchment.jpg"} }
-  castle_ui_corner { TexturePath: {path: "etc/scenes/castle/ui/corner.svg", width: 128} }
-  castle_ui_crest { TexturePath: {path: "etc/scenes/castle/ui/crest.svg", width: 192} }
-  castle_ui_seal { TexturePath: {path: "etc/scenes/castle/ui/seal.svg", width: 128} }
-  castle_icon_wall { TexturePath: {path: "etc/scenes/castle/ui/icons/wall.svg", width: 128} }
-  castle_icon_tower { TexturePath: {path: "etc/scenes/castle/ui/icons/tower.svg", width: 128} }
-  castle_icon_gate { TexturePath: {path: "etc/scenes/castle/ui/icons/gate.svg", width: 128} }
-  castle_icon_keep { TexturePath: {path: "etc/scenes/castle/ui/icons/keep.svg", width: 128} }
-  castle_icon_cottage { TexturePath: {path: "etc/scenes/castle/ui/icons/cottage.svg", width: 128} }
-  castle_icon_quarry { TexturePath: {path: "etc/scenes/castle/ui/icons/quarry.svg", width: 128} }
-  castle_icon_farm { TexturePath: {path: "etc/scenes/castle/ui/icons/farm.svg", width: 128} }
-  castle_icon_smithy { TexturePath: {path: "etc/scenes/castle/ui/icons/smithy.svg", width: 128} }
-  castle_icon_food { TexturePath: {path: "etc/scenes/castle/ui/icons/food.svg", width: 96} }
-  castle_icon_folk { TexturePath: {path: "etc/scenes/castle/ui/icons/folk.svg", width: 96} }
-  castle_icon_moat { TexturePath: {path: "etc/scenes/castle/ui/icons/moat.svg", width: 128} }
-  castle_icon_tree { TexturePath: {path: "etc/scenes/castle/ui/icons/tree.svg", width: 128} }
-  castle_icon_path { TexturePath: {path: "etc/scenes/castle/ui/icons/path.svg", width: 128} }
-  castle_icon_demolish { TexturePath: {path: "etc/scenes/castle/ui/icons/demolish.svg", width: 128} }
-  castle_icon_coin { TexturePath: {path: "etc/scenes/castle/ui/icons/coin.svg", width: 96} }
-  castle_icon_stone { TexturePath: {path: "etc/scenes/castle/ui/icons/stone.svg", width: 96} }
+  castle_ui_wood { Path: {path: "etc/scenes/castle/ui/wood.jpg"} }
+  castle_ui_parchment { Path: {path: "etc/scenes/castle/ui/parchment.jpg"} }
+  castle_ui_corner { Path: {path: "etc/scenes/castle/ui/corner.svg", width: 128} }
+  castle_ui_crest { Path: {path: "etc/scenes/castle/ui/crest.svg", width: 192} }
+  castle_ui_seal { Path: {path: "etc/scenes/castle/ui/seal.svg", width: 128} }
+  castle_icon_wall { Path: {path: "etc/scenes/castle/ui/icons/wall.svg", width: 128} }
+  castle_icon_tower { Path: {path: "etc/scenes/castle/ui/icons/tower.svg", width: 128} }
+  castle_icon_gate { Path: {path: "etc/scenes/castle/ui/icons/gate.svg", width: 128} }
+  castle_icon_keep { Path: {path: "etc/scenes/castle/ui/icons/keep.svg", width: 128} }
+  castle_icon_cottage { Path: {path: "etc/scenes/castle/ui/icons/cottage.svg", width: 128} }
+  castle_icon_quarry { Path: {path: "etc/scenes/castle/ui/icons/quarry.svg", width: 128} }
+  castle_icon_farm { Path: {path: "etc/scenes/castle/ui/icons/farm.svg", width: 128} }
+  castle_icon_smithy { Path: {path: "etc/scenes/castle/ui/icons/smithy.svg", width: 128} }
+  castle_icon_food { Path: {path: "etc/scenes/castle/ui/icons/food.svg", width: 96} }
+  castle_icon_folk { Path: {path: "etc/scenes/castle/ui/icons/folk.svg", width: 96} }
+  castle_icon_moat { Path: {path: "etc/scenes/castle/ui/icons/moat.svg", width: 128} }
+  castle_icon_tree { Path: {path: "etc/scenes/castle/ui/icons/tree.svg", width: 128} }
+  castle_icon_path { Path: {path: "etc/scenes/castle/ui/icons/path.svg", width: 128} }
+  castle_icon_demolish { Path: {path: "etc/scenes/castle/ui/icons/demolish.svg", width: 128} }
+  castle_icon_coin { Path: {path: "etc/scenes/castle/ui/icons/coin.svg", width: 96} }
+  castle_icon_stone { Path: {path: "etc/scenes/castle/ui/icons/stone.svg", width: 96} }
 }
 
 state {

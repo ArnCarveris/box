@@ -7,7 +7,7 @@ using box.view
 using box.light
 using box.atmosphere
 
-// A layer of cumulus at 1.5 km over a field at noon: a seamless fbm noise (TextureGen, the
+// A layer of cumulus at 1.5 km over a field at noon: a seamless fbm noise (Gen, the
 // red channel as stored) repeats every 15 km, threshold 0.5 and softness 0.12 leave about half
 // the sky covered. Overhead the clouds are white with gray bases; toward the horizon the plane
 // grazes the view, the texture filters through its mips and the clouds fade into the haze.
@@ -37,7 +37,7 @@ $ {
 }
 
 cloud_noise {
-  TextureGen: {
+  Gen: {
     width: 512, height: 512, seed: 7
     layers: [
       {kind: GenNoise, frequency: 10, octaves: 5, gain: 0.5}

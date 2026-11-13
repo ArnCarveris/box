@@ -2,7 +2,7 @@
 
 // Connection to a box app over the flecs REST API: polls the node kinds, texture graphs, nodes,
 // previews and statistics, writes components coalesced per entity and component (as DAW.write
-// in tools/daw/core.js) and keeps TextureNodePreview on the nodes the graph view shows.
+// in tools/daw/core.js) and keeps graph.Preview on the nodes the graph view shows.
 
 const TEX = TGM.TEX;
 
@@ -74,7 +74,7 @@ function getComponent(comp) {
 
 TG.valueOf = (path, comp) => {
   if (TG.nodes[path] && TG.nodes[path].values[comp] !== undefined) return TG.nodes[path].values[comp];
-  if (TG.textures[path] && comp === TEX + "TextureGraph") return TG.textures[path].graph;
+  if (TG.textures[path] && comp === TEX + "Graph") return TG.textures[path].graph;
   return undefined;
 };
 
@@ -82,7 +82,7 @@ function applyLocal(path, comp, partial) {
   const n = TG.nodes[path];
   if (n && n.values[comp]) Object.assign(n.values[comp], TG.clone(partial));
   const t = TG.textures[path];
-  if (t && comp === TEX + "TextureGraph" && t.graph) Object.assign(t.graph, TG.clone(partial));
+  if (t && comp === TEX + "Graph" && t.graph) Object.assign(t.graph, TG.clone(partial));
 }
 
 TG.write = (path, comp, partial) => {
@@ -159,7 +159,7 @@ function signature() {
 }
 
 async function pollKinds(needTypes) {
-  const r = await query(TEX + "TextureNodeKind", { type_info: needTypes });
+  const r = await query(TEX + "graph.NodeKind", { type_info: needTypes });
   const kinds = {};
   for (const res of r.results || []) {
     const v = res.fields && res.fields.values ? res.fields.values[0] : null;
@@ -169,7 +169,7 @@ async function pollKinds(needTypes) {
 }
 
 async function pollTextures(needTypes) {
-  const r = await query(`${TEX}TextureGraph, ?${TEX}TextureStatus, ?${TEX}Texture`, { type_info: needTypes });
+  const r = await query(`${TEX}Graph, ?${TEX}Status, ?${TEX}Texture`, { type_info: needTypes });
   if (r.type_info) for (const c in r.type_info) if (r.type_info[c]) TG.types[c] = r.type_info[c];
   const textures = {};
   for (const res of r.results || []) {
@@ -213,7 +213,7 @@ async function pollStructure(epoch) {
       const kinds = await pollKinds(needTypes);
       if (epoch !== TG.epoch) return;
       const [textures, nodes, stats] = await Promise.all([
-        pollTextures(needTypes), pollNodes(kinds, needTypes), getComponent(TEX + "TextureGraphStats")
+        pollTextures(needTypes), pollNodes(kinds, needTypes), getComponent(TEX + "graph.Stats")
       ]);
       if (epoch !== TG.epoch) return;
       TG.kinds = kinds;
@@ -225,7 +225,7 @@ async function pollStructure(epoch) {
         TG.stats = stats;
         TG.statsTime = performance.now();
       }
-      TG.typesDirty = Object.keys(kinds).some((c) => !TG.types[c]) || !TG.types[TEX + "TextureGraph"];
+      TG.typesDirty = Object.keys(kinds).some((c) => !TG.types[c]) || !TG.types[TEX + "Graph"];
       overlayPending();
       if (TG.tex && !TG.textures[TG.tex]) TG.tex = null;
       if (!TG.tex) {
@@ -249,7 +249,7 @@ async function pollPreviews(epoch) {
   if (epoch !== TG.epoch) return;
   if (TG.connected && TG.previewSet.size) {
     try {
-      const r = await query(TEX + "TextureNodePreviewStatus");
+      const r = await query(TEX + "graph.PreviewStatus");
       if (epoch !== TG.epoch) return;
       const changed = [];
       const seen = new Set();
@@ -278,14 +278,14 @@ async function pollPreviews(epoch) {
   setTimeout(() => pollPreviews(epoch), 250);
 }
 
-// Set TextureNodePreview on the nodes of a map from path to size and remove it from the nodes
+// Set graph.Preview on the nodes of a map from path to size and remove it from the nodes
 // the editor previewed before that are not in it.
 TG.syncPreviews = (wanted) => {
   if (!TG.conn || !TG.connected) return;
   for (const [path, size] of wanted) {
     if (TG.previewSet.get(path) === size || !TG.nodes[path] || TG.deleting.has(path)) continue;
     TG.previewSet.set(path, size);
-    TG.add(path, TEX + "TextureNodePreview", { size, rate: 4 }).catch((e) => {
+    TG.add(path, TEX + "graph.Preview", { size, rate: 4 }).catch((e) => {
       TG.previewSet.delete(path);
       console.warn("preview of " + path + ": " + e);
     });
@@ -293,16 +293,16 @@ TG.syncPreviews = (wanted) => {
   for (const path of [...TG.previewSet.keys()]) {
     if (wanted.has(path)) continue;
     TG.previewSet.delete(path);
-    if (TG.nodes[path]) TG.removeComp(path, TEX + "TextureNodePreview").catch(() => { });
+    if (TG.nodes[path]) TG.removeComp(path, TEX + "graph.Preview").catch(() => { });
   }
 };
 
 TG.releasePreviews = (sync) => {
   if (!TG.conn) return;
   for (const path of TG.previewSet.keys()) {
-    const url = TG.conn.url + "/component/" + TG.entityPath(path) + "?component=" + encodeURIComponent(TEX + "TextureNodePreview");
+    const url = TG.conn.url + "/component/" + TG.entityPath(path) + "?component=" + encodeURIComponent(TEX + "graph.Preview");
     if (sync && typeof fetch === "function") fetch(url, { method: "DELETE", keepalive: true }).catch(() => { });
-    else TG.removeComp(path, TEX + "TextureNodePreview").catch(() => { });
+    else TG.removeComp(path, TEX + "graph.Preview").catch(() => { });
   }
   TG.previewSet.clear();
 };
@@ -409,7 +409,7 @@ TG.deleteNodes = async (paths) => {
     if (Object.keys(partial).length) clear(n.path, n.kinds[0], partial);
   }
   for (const t of Object.values(TG.textures)) {
-    if (t.graph && gone.has(t.graph.output)) clear(t.path, TEX + "TextureGraph", { output: "#0" });
+    if (t.graph && gone.has(t.graph.output)) clear(t.path, TEX + "Graph", { output: "#0" });
   }
   await Promise.all(clears);
   for (const path of paths) {
@@ -434,14 +434,14 @@ TG.connectPorts = (from, to, port) => {
     TG.toast("cannot connect: " + err, true);
     return false;
   }
-  if (to === "@output") TG.write(TG.tex, TEX + "TextureGraph", { output: from });
+  if (to === "@output") TG.write(TG.tex, TEX + "Graph", { output: from });
   else TG.write(to, TG.nodes[to].kinds[0], { [port]: from });
   TG.emit("structure");
   return true;
 };
 
 TG.disconnectPort = (to, port) => {
-  if (to === "@output") TG.write(TG.tex, TEX + "TextureGraph", { output: "#0" });
+  if (to === "@output") TG.write(TG.tex, TEX + "Graph", { output: "#0" });
   else TG.write(to, TG.nodes[to].kinds[0], { [port]: "#0" });
   TG.emit("structure");
 };

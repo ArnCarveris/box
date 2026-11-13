@@ -29,40 +29,40 @@ assets {
   export const C_PANEL: Rgb = {44, 58, 36}
   export const C_PANEL_HI: Rgb = {70, 92, 56}
 
-  mv_ui_parchment { TexturePath: {path: "etc/scenes/mossvale/ui/parchment.jpg"} }
-  mv_ui_leather { TexturePath: {path: "etc/scenes/mossvale/ui/leather.jpg"} }
-  mv_ui_vignette { TexturePath: {path: "etc/scenes/mossvale/ui/vignette.png"} }
-  mv_ui_scrim { TexturePath: {path: "etc/scenes/mossvale/ui/scrim.png"} }
-  mv_ui_corner { TexturePath: {path: "etc/scenes/mossvale/ui/corner.svg", width: 128} }
-  mv_ui_divider { TexturePath: {path: "etc/scenes/mossvale/ui/divider.svg", width: 1024} }
-  mv_ui_ribbon { TexturePath: {path: "etc/scenes/mossvale/ui/ribbon.svg", width: 800} }
-  mv_ui_roller { TexturePath: {path: "etc/scenes/mossvale/ui/roller.svg", width: 96} }
-  mv_ui_compass { TexturePath: {path: "etc/scenes/mossvale/ui/compass.svg", width: 256} }
-  mv_ui_vial_frame { TexturePath: {path: "etc/scenes/mossvale/ui/vial_frame.svg", width: 512} }
-  mv_ui_vial_gloss { TexturePath: {path: "etc/scenes/mossvale/ui/vial_gloss.svg", width: 512} }
-  mv_ui_quill { TexturePath: {path: "etc/scenes/mossvale/ui/quill.svg", width: 96} }
-  mv_ui_wisp { TexturePath: {path: "etc/scenes/mossvale/ui/wisp.svg", width: 96} }
-  mv_ui_leaf { TexturePath: {path: "etc/scenes/mossvale/ui/leaf.svg", width: 96} }
-  mv_ui_spell_1 { TexturePath: {path: "etc/scenes/mossvale/ui/spell_1.svg", width: 128} }
-  mv_ui_spell_2 { TexturePath: {path: "etc/scenes/mossvale/ui/spell_2.svg", width: 128} }
-  mv_ui_spell_3 { TexturePath: {path: "etc/scenes/mossvale/ui/spell_3.svg", width: 128} }
-  mv_ui_spell_4 { TexturePath: {path: "etc/scenes/mossvale/ui/spell_4.svg", width: 128} }
-  mv_ui_spell_5 { TexturePath: {path: "etc/scenes/mossvale/ui/spell_5.svg", width: 128} }
-  mv_ui_spell_6 { TexturePath: {path: "etc/scenes/mossvale/ui/spell_6.svg", width: 128} }
-  mv_ui_portrait_0 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_0.svg", width: 256} }
-  mv_ui_portrait_1 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_1.svg", width: 256} }
-  mv_ui_portrait_2 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_2.svg", width: 256} }
-  mv_ui_portrait_3 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_3.svg", width: 256} }
-  mv_ui_portrait_4 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_4.svg", width: 256} }
-  mv_ui_portrait_5 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_5.svg", width: 256} }
-  mv_ui_portrait_6 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_6.svg", width: 256} }
-  mv_ui_portrait_7 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_7.svg", width: 256} }
-  mv_ui_portrait_8 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_8.svg", width: 256} }
-  mv_ui_portrait_9 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_9.svg", width: 256} }
-  mv_ui_portrait_10 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_10.svg", width: 256} }
-  mv_ui_portrait_11 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_11.svg", width: 256} }
-  mv_ui_portrait_12 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_12.svg", width: 256} }
-  mv_ui_portrait_13 { TexturePath: {path: "etc/scenes/mossvale/ui/portrait_13.svg", width: 256} }
+  mv_ui_parchment { Path: {path: "etc/scenes/mossvale/ui/parchment.jpg"} }
+  mv_ui_leather { Path: {path: "etc/scenes/mossvale/ui/leather.jpg"} }
+  mv_ui_vignette { Path: {path: "etc/scenes/mossvale/ui/vignette.png"} }
+  mv_ui_scrim { Path: {path: "etc/scenes/mossvale/ui/scrim.png"} }
+  mv_ui_corner { Path: {path: "etc/scenes/mossvale/ui/corner.svg", width: 128} }
+  mv_ui_divider { Path: {path: "etc/scenes/mossvale/ui/divider.svg", width: 1024} }
+  mv_ui_ribbon { Path: {path: "etc/scenes/mossvale/ui/ribbon.svg", width: 800} }
+  mv_ui_roller { Path: {path: "etc/scenes/mossvale/ui/roller.svg", width: 96} }
+  mv_ui_compass { Path: {path: "etc/scenes/mossvale/ui/compass.svg", width: 256} }
+  mv_ui_vial_frame { Path: {path: "etc/scenes/mossvale/ui/vial_frame.svg", width: 512} }
+  mv_ui_vial_gloss { Path: {path: "etc/scenes/mossvale/ui/vial_gloss.svg", width: 512} }
+  mv_ui_quill { Path: {path: "etc/scenes/mossvale/ui/quill.svg", width: 96} }
+  mv_ui_wisp { Path: {path: "etc/scenes/mossvale/ui/wisp.svg", width: 96} }
+  mv_ui_leaf { Path: {path: "etc/scenes/mossvale/ui/leaf.svg", width: 96} }
+  mv_ui_spell_1 { Path: {path: "etc/scenes/mossvale/ui/spell_1.svg", width: 128} }
+  mv_ui_spell_2 { Path: {path: "etc/scenes/mossvale/ui/spell_2.svg", width: 128} }
+  mv_ui_spell_3 { Path: {path: "etc/scenes/mossvale/ui/spell_3.svg", width: 128} }
+  mv_ui_spell_4 { Path: {path: "etc/scenes/mossvale/ui/spell_4.svg", width: 128} }
+  mv_ui_spell_5 { Path: {path: "etc/scenes/mossvale/ui/spell_5.svg", width: 128} }
+  mv_ui_spell_6 { Path: {path: "etc/scenes/mossvale/ui/spell_6.svg", width: 128} }
+  mv_ui_portrait_0 { Path: {path: "etc/scenes/mossvale/ui/portrait_0.svg", width: 256} }
+  mv_ui_portrait_1 { Path: {path: "etc/scenes/mossvale/ui/portrait_1.svg", width: 256} }
+  mv_ui_portrait_2 { Path: {path: "etc/scenes/mossvale/ui/portrait_2.svg", width: 256} }
+  mv_ui_portrait_3 { Path: {path: "etc/scenes/mossvale/ui/portrait_3.svg", width: 256} }
+  mv_ui_portrait_4 { Path: {path: "etc/scenes/mossvale/ui/portrait_4.svg", width: 256} }
+  mv_ui_portrait_5 { Path: {path: "etc/scenes/mossvale/ui/portrait_5.svg", width: 256} }
+  mv_ui_portrait_6 { Path: {path: "etc/scenes/mossvale/ui/portrait_6.svg", width: 256} }
+  mv_ui_portrait_7 { Path: {path: "etc/scenes/mossvale/ui/portrait_7.svg", width: 256} }
+  mv_ui_portrait_8 { Path: {path: "etc/scenes/mossvale/ui/portrait_8.svg", width: 256} }
+  mv_ui_portrait_9 { Path: {path: "etc/scenes/mossvale/ui/portrait_9.svg", width: 256} }
+  mv_ui_portrait_10 { Path: {path: "etc/scenes/mossvale/ui/portrait_10.svg", width: 256} }
+  mv_ui_portrait_11 { Path: {path: "etc/scenes/mossvale/ui/portrait_11.svg", width: 256} }
+  mv_ui_portrait_12 { Path: {path: "etc/scenes/mossvale/ui/portrait_12.svg", width: 256} }
+  mv_ui_portrait_13 { Path: {path: "etc/scenes/mossvale/ui/portrait_13.svg", width: 256} }
 }
 
 state {

@@ -13,13 +13,13 @@ clouds {
     prop rate: f32 = 30
     prop size: i32 = 512
 
-    uv { TexCoords: {scale: 1} }
-    sky { TexMath: {op: MathMix, a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, c: uv} }
-    time { TexTime: {scale: speed, offset: 0} }
-    drift { TexSplat: {in: time} }
-    moved { TexMath: {op: MathAdd, a: uv, b: drift} }
-    puffs { TexMath: {op: MathMultiply, a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
-    out { TexMath: {op: MathMax, a: sky, b: puffs} }
-    TextureGraph: {output: out, width: size, height: size, domain: DomainPlane, format: GraphColor, rate: rate}
+    uv { nodes.Coords: {scale: 1} }
+    sky { nodes.Math: {op: MathMix, a_value: {0.35, 0.55, 0.85, 1}, b_value: {0.8, 0.9, 1, 1}, c: uv} }
+    time { nodes.Time: {scale: speed, offset: 0} }
+    drift { nodes.Splat: {in: time} }
+    moved { nodes.Math: {op: MathAdd, a: uv, b: drift} }
+    puffs { nodes.Math: {op: MathMultiply, a: moved, b_value: {0.9, 0.9, 0.95, 1}} }
+    out { nodes.Math: {op: MathMax, a: sky, b: puffs} }
+    Graph: {output: out, width: size, height: size, domain: DomainPlane, format: GraphColor, rate: rate}
   }
 }

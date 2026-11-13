@@ -27,7 +27,7 @@
 
   M.under = (path, scope) => !!scope && !!path && path.startsWith(scope + ".");
 
-  // The kind of a TextureNodeKind value as the editor uses it: the inputs and parameters that
+  // The kind of a graph.NodeKind value as the editor uses it: the inputs and parameters that
   // are set, by name.
   M.kindOf = (comp, k) => {
     const inputs = (k.inputs || []).slice(0, k.input_count || 0).map((p) => ({
@@ -129,7 +129,7 @@
     if (!srcKind) return "the source is not a node";
     let expect;
     if (to === "@output") {
-      expect = "TexVector";
+      expect = "Vector";
     } else {
       const dst = state.nodes[to];
       const dstKind = dst ? M.nodeKind(state, dst) : null;
@@ -140,16 +140,16 @@
         return "the connection would make a cycle";
       }
     }
-    // A TexAny port takes or gives either type; the engine checks the types it resolves to.
-    if (srcKind.output !== expect && srcKind.output !== "TexAny" && expect !== "TexAny") {
+    // An Any port takes or gives either type; the engine checks the types it resolves to.
+    if (srcKind.output !== expect && srcKind.output !== "Any" && expect !== "Any") {
       return `${M.leaf(from)} outputs ${M.typeLabel(srcKind.output)}, ${port} takes ${M.typeLabel(expect)}`;
     }
     return null;
   };
 
-  M.typeLabel = (t) => t === "TexScalar" ? "a scalar" : t === "TexVector" ? "a vector" : String(t);
+  M.typeLabel = (t) => t === "Scalar" ? "a scalar" : t === "Vector" ? "a vector" : String(t);
 
-  // The node paths a TextureStatus error names: "node 'a.b'" and "of node 'a.b'".
+  // The node paths a Status error names: "node 'a.b'" and "of node 'a.b'".
   M.errorNodes = (error) => {
     const out = [];
     if (!error) return out;
@@ -252,7 +252,7 @@
   };
 
   // The graph of a texture as flecs script: the texture entity named as its leaf, its nodes
-  // as children in the order of their inputs and its TextureGraph. Nodes outside the texture
+  // as children in the order of their inputs and its Graph. Nodes outside the texture
   // are referred to by their full path and listed in a comment.
   M.toScript = (state, texPath) => {
     const g = M.graphOf(state, texPath);
@@ -293,8 +293,8 @@
       }
     };
     emit(tree, "  ");
-    const graphType = state.types[TEX + "TextureGraph"];
-    lines.push(`  TextureGraph: ${M.scriptValue(g.tex.graph || {}, graphType || null, ref)}`);
+    const graphType = state.types[TEX + "Graph"];
+    lines.push(`  Graph: ${M.scriptValue(g.tex.graph || {}, graphType || null, ref)}`);
     lines.push("}");
     lines.push("");
     return lines.join("\n");
@@ -302,7 +302,7 @@
 
   // A name for a new node of a kind in a texture that no entity has.
   M.uniqueName = (state, texPath, comp) => {
-    const base = M.short(comp).replace(/^Tex/, "").replace(/^[A-Z]/, (c) => c.toLowerCase()) || "node";
+    const base = M.leaf(comp).replace(/^[A-Z]/, (c) => c.toLowerCase()) || "node";
     let i = 1;
     while (state.nodes[`${texPath}.${base}_${i}`] || (state.names && state.names.has(`${texPath}.${base}_${i}`))) i++;
     return `${texPath}.${base}_${i}`;

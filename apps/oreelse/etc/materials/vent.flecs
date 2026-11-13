@@ -6,13 +6,13 @@ using box.material
 using box.texture
 
 vent_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/factory_vent.svg", width: 256, height: 256, linear: true
   }
 }
 
 vent_norm {
-  TexturePath: {path: "apps/oreelse/etc/assets/factory_vent_normal.svg", width: 256, height: 256}
+  Path: {path: "apps/oreelse/etc/assets/factory_vent_normal.svg", width: 256, height: 256}
 }
 
 prefab VentGrille {

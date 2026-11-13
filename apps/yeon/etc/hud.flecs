@@ -17,7 +17,7 @@ $ {
 const lostAlpha: f32 = 70.0 / 255.0
 
 life_icon {
-  TexturePath: {path: "apps/yeon/etc/icons/kite_life.svg", width: 128, height: 128}
+  Path: {path: "apps/yeon/etc/icons/kite_life.svg", width: 128, height: 128}
 }
 
 template LifeIcon {

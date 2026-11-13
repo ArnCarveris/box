@@ -187,7 +187,7 @@ room {
   }
 
   bumps {
-    TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+    Path: {path: "test/integration/visual/assets/bumps.png"}
   }
 
   bumpy_panel {

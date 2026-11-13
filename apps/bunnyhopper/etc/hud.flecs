@@ -24,7 +24,7 @@ const lostAlpha: f32 = 70.0 / 255.0
 
 // The icon of a life, rendered from the SVG at 128x128
 life_icon {
-  TexturePath: {path: "apps/bunnyhopper/etc/icons/bunny_life.svg", width: 128, height: 128}
+  Path: {path: "apps/bunnyhopper/etc/icons/bunny_life.svg", width: 128, height: 128}
 }
 
 // One life in the row of lives, index from the left: the icon fitted in a size by size square,

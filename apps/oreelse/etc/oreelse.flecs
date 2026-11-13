@@ -126,7 +126,7 @@ camera {
 //   buildings and the plants, which all take the shadows. Only a rocket climbing above it
 //   leaves them.
 cloud_noise {
-  TexturePath: {path: "apps/oreelse/etc/assets/textures/cloud_noise.png", single_channel: true}
+  Path: {path: "apps/oreelse/etc/assets/textures/cloud_noise.png", single_channel: true}
 }
 
 // The sun of the original shines from (-1.4, 1.8, 1.2) toward the origin, its +Z along

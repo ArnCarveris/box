@@ -37,27 +37,27 @@ key {
 }
 
 mask {
-  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+  Path: {path: "test/integration/visual/assets/blend_mask.png"}
 }
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 letter {
-  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+  Path: {path: "test/integration/visual/assets/letter.png"}
 }
 
 stripes {
-  TexturePath: {path: "test/integration/visual/assets/stripes.png"}
+  Path: {path: "test/integration/visual/assets/stripes.png"}
 }
 
 bumps {
-  TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+  Path: {path: "test/integration/visual/assets/bumps.png"}
 }
 
 orm {
-  TexturePath: {path: "test/integration/visual/assets/orm.png"}
+  Path: {path: "test/integration/visual/assets/orm.png"}
 }
 
 checker_layer {

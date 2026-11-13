@@ -42,7 +42,7 @@ perf_surface {
 }
 
 waves_height {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 7
     layers: [
       {kind: GenNoise, frequency: 4, octaves: 4, amount: 1}
@@ -51,11 +51,11 @@ waves_height {
 }
 
 waves {
-  TextureGen: {source: waves_height, output: GenNormal, strength: 2}
+  Gen: {source: waves_height, output: GenNormal, strength: 2}
 }
 
 foam_noise {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 3
     layers: [
       {kind: GenNoise, frequency: 8, octaves: 3, amount: 1}

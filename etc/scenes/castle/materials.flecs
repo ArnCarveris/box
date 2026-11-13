@@ -19,33 +19,33 @@ assets {
   castle_font_display { Font: {path: "etc/scenes/castle/fonts/Cinzel.ttf"} }
   castle_font_body { Font: {path: "etc/scenes/castle/fonts/Spectral-Regular.ttf"} }
 
-  castle_tex_ashlar { TexturePath: {path: "etc/scenes/castle/textures/ashlar.jpg"} }
-  castle_tex_ashlar_n { TexturePath: {path: "etc/scenes/castle/textures/ashlar_normal.jpg"} }
-  castle_tex_rubble { TexturePath: {path: "etc/scenes/castle/textures/rubble.jpg"} }
-  castle_tex_rubble_n { TexturePath: {path: "etc/scenes/castle/textures/rubble_normal.jpg"} }
-  castle_tex_slate { TexturePath: {path: "etc/scenes/castle/textures/slate.jpg"} }
-  castle_tex_slate_n { TexturePath: {path: "etc/scenes/castle/textures/slate_normal.jpg"} }
-  castle_tex_tile { TexturePath: {path: "etc/scenes/castle/textures/rooftile.jpg"} }
-  castle_tex_tile_n { TexturePath: {path: "etc/scenes/castle/textures/rooftile_normal.jpg"} }
-  castle_tex_thatch { TexturePath: {path: "etc/scenes/castle/textures/thatch.jpg"} }
-  castle_tex_thatch_n { TexturePath: {path: "etc/scenes/castle/textures/thatch_normal.jpg"} }
-  castle_tex_plaster { TexturePath: {path: "etc/scenes/castle/textures/plaster.jpg"} }
-  castle_tex_plaster_n { TexturePath: {path: "etc/scenes/castle/textures/plaster_normal.jpg"} }
-  castle_tex_planks { TexturePath: {path: "etc/scenes/castle/textures/planks.jpg"} }
-  castle_tex_planks_n { TexturePath: {path: "etc/scenes/castle/textures/planks_normal.jpg"} }
-  castle_tex_bark { TexturePath: {path: "etc/scenes/castle/textures/bark.jpg"} }
-  castle_tex_bark_n { TexturePath: {path: "etc/scenes/castle/textures/bark_normal.jpg"} }
-  castle_tex_grass { TexturePath: {path: "etc/scenes/castle/textures/grass.jpg"} }
-  castle_tex_grass_n { TexturePath: {path: "etc/scenes/castle/textures/grass_normal.jpg"} }
-  castle_tex_earth { TexturePath: {path: "etc/scenes/castle/textures/earth.jpg"} }
-  castle_tex_earth_n { TexturePath: {path: "etc/scenes/castle/textures/earth_normal.jpg"} }
-  castle_tex_cobble { TexturePath: {path: "etc/scenes/castle/textures/cobble.jpg"} }
-  castle_tex_cobble_n { TexturePath: {path: "etc/scenes/castle/textures/cobble_normal.jpg"} }
-  castle_tex_water_n { TexturePath: {path: "etc/scenes/castle/textures/water_normal.jpg"} }
-  castle_tex_leaves { TexturePath: {path: "etc/scenes/castle/textures/leaves.jpg"} }
-  castle_tex_leaves_n { TexturePath: {path: "etc/scenes/castle/textures/leaves_normal.jpg"} }
-  castle_tex_furrows { TexturePath: {path: "etc/scenes/castle/textures/furrows.jpg"} }
-  castle_tex_furrows_n { TexturePath: {path: "etc/scenes/castle/textures/furrows_normal.jpg"} }
+  castle_tex_ashlar { Path: {path: "etc/scenes/castle/textures/ashlar.jpg"} }
+  castle_tex_ashlar_n { Path: {path: "etc/scenes/castle/textures/ashlar_normal.jpg"} }
+  castle_tex_rubble { Path: {path: "etc/scenes/castle/textures/rubble.jpg"} }
+  castle_tex_rubble_n { Path: {path: "etc/scenes/castle/textures/rubble_normal.jpg"} }
+  castle_tex_slate { Path: {path: "etc/scenes/castle/textures/slate.jpg"} }
+  castle_tex_slate_n { Path: {path: "etc/scenes/castle/textures/slate_normal.jpg"} }
+  castle_tex_tile { Path: {path: "etc/scenes/castle/textures/rooftile.jpg"} }
+  castle_tex_tile_n { Path: {path: "etc/scenes/castle/textures/rooftile_normal.jpg"} }
+  castle_tex_thatch { Path: {path: "etc/scenes/castle/textures/thatch.jpg"} }
+  castle_tex_thatch_n { Path: {path: "etc/scenes/castle/textures/thatch_normal.jpg"} }
+  castle_tex_plaster { Path: {path: "etc/scenes/castle/textures/plaster.jpg"} }
+  castle_tex_plaster_n { Path: {path: "etc/scenes/castle/textures/plaster_normal.jpg"} }
+  castle_tex_planks { Path: {path: "etc/scenes/castle/textures/planks.jpg"} }
+  castle_tex_planks_n { Path: {path: "etc/scenes/castle/textures/planks_normal.jpg"} }
+  castle_tex_bark { Path: {path: "etc/scenes/castle/textures/bark.jpg"} }
+  castle_tex_bark_n { Path: {path: "etc/scenes/castle/textures/bark_normal.jpg"} }
+  castle_tex_grass { Path: {path: "etc/scenes/castle/textures/grass.jpg"} }
+  castle_tex_grass_n { Path: {path: "etc/scenes/castle/textures/grass_normal.jpg"} }
+  castle_tex_earth { Path: {path: "etc/scenes/castle/textures/earth.jpg"} }
+  castle_tex_earth_n { Path: {path: "etc/scenes/castle/textures/earth_normal.jpg"} }
+  castle_tex_cobble { Path: {path: "etc/scenes/castle/textures/cobble.jpg"} }
+  castle_tex_cobble_n { Path: {path: "etc/scenes/castle/textures/cobble_normal.jpg"} }
+  castle_tex_water_n { Path: {path: "etc/scenes/castle/textures/water_normal.jpg"} }
+  castle_tex_leaves { Path: {path: "etc/scenes/castle/textures/leaves.jpg"} }
+  castle_tex_leaves_n { Path: {path: "etc/scenes/castle/textures/leaves_normal.jpg"} }
+  castle_tex_furrows { Path: {path: "etc/scenes/castle/textures/furrows.jpg"} }
+  castle_tex_furrows_n { Path: {path: "etc/scenes/castle/textures/furrows_normal.jpg"} }
 
   prefab CastleStone { Rgb: {230, 220, 198}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: castle_tex_ashlar, normal: castle_tex_ashlar_n}; TextureTransform: {scale_x: 0.25, scale_y: 0.25} }
   prefab CastlePaleStone { Rgb: {236, 228, 210}; PbrMaterial: {roughness: 0.88}; PbrTextures: {albedo: castle_tex_rubble, normal: castle_tex_rubble_n}; TextureTransform: {scale_x: 2, scale_y: 0.5} }
@@ -108,7 +108,7 @@ assets {
   prefab CastleDarkStoneBlock : CastleDarkStone { TextureMapping: {mode: MappingObject, size: TR}; TextureTransform: {scale_x: 1, scale_y: 1} }
 
   castle_meadow_noise {
-    TextureGen: {
+    Gen: {
       width: 512, height: 512, seed: 41
       layers: [
         {kind: GenNoise, frequency: 5, octaves: 4, amount: 0.8}
@@ -117,7 +117,7 @@ assets {
     }
   }
   castle_meadow_mask {
-    TextureGen: {source: castle_meadow_noise, output: GenAlbedo, colors: [{0, {255, 0, 0}}, {0.45, {120, 135, 0}}, {0.7, {0, 255, 0}}, {0.88, {0, 200, 55}}, {1, {0, 60, 195}}]}
+    Gen: {source: castle_meadow_noise, output: GenAlbedo, colors: [{0, {255, 0, 0}}, {0.45, {120, 135, 0}}, {0.7, {0, 255, 0}}, {0.88, {0, 200, 55}}, {1, {0, 60, 195}}]}
   }
   castle_meadow_lush { PbrTextures: {albedo: castle_tex_grass, normal: castle_tex_grass_n}; TextureTransform: {scale_x: 16, scale_y: 16} }
   castle_meadow_rough { PbrTextures: {albedo: castle_tex_grass, normal: castle_tex_grass_n}; TextureTransform: {scale_x: 9.3, scale_y: -9.3, offset_x: 0.37} }

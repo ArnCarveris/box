@@ -11,10 +11,10 @@ using box.transition
 using state
 
 assets {
-  yard_planet_tex { TexturePath: {path: "etc/scenes/shipyard/assets/planet.jpg"} }
-  yard_planet_night_tex { TexturePath: {path: "etc/scenes/shipyard/assets/planet_night.jpg"} }
-  yard_cloud_tex { TexturePath: {path: "etc/scenes/shipyard/assets/clouds.png"} }
-  yard_halo_tex { TexturePath: {path: "etc/scenes/shipyard/assets/halo.png"} }
+  yard_planet_tex { Path: {path: "etc/scenes/shipyard/assets/planet.jpg"} }
+  yard_planet_night_tex { Path: {path: "etc/scenes/shipyard/assets/planet_night.jpg"} }
+  yard_cloud_tex { Path: {path: "etc/scenes/shipyard/assets/clouds.png"} }
+  yard_halo_tex { Path: {path: "etc/scenes/shipyard/assets/halo.png"} }
 
   template HoloLine {
     prop len: f32 = 1

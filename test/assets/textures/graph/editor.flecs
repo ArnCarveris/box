@@ -27,19 +27,19 @@ texgraph_editor {
   }
 
   tiles {
-    uv     { TexCoords: {scale: 2} }
-    warm   { TexConstant: {value: {0.9, 0.5, 0.2, 1}} }
-    cool   { TexConstant: {value: {0.1, 0.3, 0.8, 1}} }
-    blend  { TexMath: {op: MathMix, a: warm, b: cool, c: uv} }
-    dimmed { TexMath: {op: MathMultiply, a: blend, b_value: {0.8, 0.8, 0.8, 1}} }
-    TextureGraph: {output: dimmed, width: 256}
+    uv     { nodes.Coords: {scale: 2} }
+    warm   { nodes.Constant: {value: {0.9, 0.5, 0.2, 1}} }
+    cool   { nodes.Constant: {value: {0.1, 0.3, 0.8, 1}} }
+    blend  { nodes.Math: {op: MathMix, a: warm, b: cool, c: uv} }
+    dimmed { nodes.Math: {op: MathMultiply, a: blend, b_value: {0.8, 0.8, 0.8, 1}} }
+    Graph: {output: dimmed, width: 256}
   }
 
   globe {
-    dir   { TexCoords: {} }
-    half  { TexMath: {op: MathMultiply, a: dir, b_value: {0.5, 0.5, 0.5, 1}} }
-    shift { TexMath: {op: MathAdd, a: half, b_value: {0.5, 0.5, 0.5, 0}} }
-    TextureGraph: {output: shift, width: 256, height: 128, domain: DomainSphere}
+    dir   { nodes.Coords: {} }
+    half  { nodes.Math: {op: MathMultiply, a: dir, b_value: {0.5, 0.5, 0.5, 1}} }
+    shift { nodes.Math: {op: MathAdd, a: half, b_value: {0.5, 0.5, 0.5, 0}} }
+    Graph: {output: shift, width: 256, height: 128, domain: DomainSphere}
   }
 
   tiles_quad {

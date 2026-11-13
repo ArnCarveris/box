@@ -3,13 +3,13 @@ using box.material
 using box.texture
 
 assets {
-  station_tex_hull { TexturePath: {path: "etc/scenes/space_station/assets/hull.jpg"} }
-  station_tex_hull_normal { TexturePath: {path: "etc/scenes/space_station/assets/hull_normal.jpg"} }
-  station_tex_hull_orm { TexturePath: {path: "etc/scenes/space_station/assets/hull_orm.jpg"} }
-  station_tex_deck { TexturePath: {path: "etc/scenes/space_station/assets/deck.jpg"} }
-  station_tex_deck_normal { TexturePath: {path: "etc/scenes/space_station/assets/deck_normal.jpg"} }
-  station_tex_deck_orm { TexturePath: {path: "etc/scenes/space_station/assets/deck_orm.jpg"} }
-  station_tex_solar { TexturePath: {path: "etc/scenes/space_station/assets/solar.jpg"} }
+  station_tex_hull { Path: {path: "etc/scenes/space_station/assets/hull.jpg"} }
+  station_tex_hull_normal { Path: {path: "etc/scenes/space_station/assets/hull_normal.jpg"} }
+  station_tex_hull_orm { Path: {path: "etc/scenes/space_station/assets/hull_orm.jpg"} }
+  station_tex_deck { Path: {path: "etc/scenes/space_station/assets/deck.jpg"} }
+  station_tex_deck_normal { Path: {path: "etc/scenes/space_station/assets/deck_normal.jpg"} }
+  station_tex_deck_orm { Path: {path: "etc/scenes/space_station/assets/deck_orm.jpg"} }
+  station_tex_solar { Path: {path: "etc/scenes/space_station/assets/solar.jpg"} }
 
   prefab StationHull { Rgb: {226, 230, 236}; PbrMaterial: {metallic: 0.55, roughness: 0.62}; PbrTextures: {albedo: station_tex_hull, normal: station_tex_hull_normal, orm: station_tex_hull_orm}; TextureMapping: {MappingObject, size: 3, blend: 0.25} }
   prefab StationPanel { Rgb: {168, 176, 186}; PbrMaterial: {metallic: 0.7, roughness: 0.56}; PbrTextures: {albedo: station_tex_hull, normal: station_tex_hull_normal, orm: station_tex_hull_orm}; TextureMapping: {MappingObject, size: 3, blend: 0.25} }

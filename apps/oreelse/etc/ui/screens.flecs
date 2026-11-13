@@ -15,9 +15,9 @@ using box.transition
 using oreelse
 
 ui_signs {
-  mine { TexturePath: {path: "apps/oreelse/etc/ui/signs/mine.svg", width: 512, height: 512} }
-  defend { TexturePath: {path: "apps/oreelse/etc/ui/signs/defend.svg", width: 512, height: 512} }
-  escape { TexturePath: {path: "apps/oreelse/etc/ui/signs/escape.svg", width: 512, height: 512} }
+  mine { Path: {path: "apps/oreelse/etc/ui/signs/mine.svg", width: 512, height: 512} }
+  defend { Path: {path: "apps/oreelse/etc/ui/signs/defend.svg", width: 512, height: 512} }
+  escape { Path: {path: "apps/oreelse/etc/ui/signs/escape.svg", width: 512, height: 512} }
 }
 
 const keyWidth: f32 = 92

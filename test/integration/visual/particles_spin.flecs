@@ -31,7 +31,7 @@ sun {
 }
 
 letter_tex {
-  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+  Path: {path: "test/integration/visual/assets/letter.png"}
 }
 
 debris {

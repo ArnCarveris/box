@@ -2426,7 +2426,7 @@ window.BOX_AUDIO_DOCS = {
  "SongFile": "The song to play: one .flecs file, a singleton.",
  "SongLane": "A channel of a song that a host can meter: a name to show and the bus to read.",
  "SongStatus": "Outcome of the load of an AudioSong, a singleton written by box.audio and read only for applications.",
- "SoundFile": "A sound decoded from a WAV or FLAC file on the job system, found as a TexturePath is.",
+ "SoundFile": "A sound decoded from a WAV or FLAC file on the job system, found as a box.texture.Path is.",
  "SoundStatus": "Outcome of the load of a SoundFile, written by box.audio and read only for applications.",
  "Source": "A sound that plays while the entity exists and playing is true.",
  "Spatial": "Places an AudioSource in the world: it follows the WorldTransform of the entity, gets quieter with its distance d from the listener and pans with its direction.",

@@ -41,15 +41,15 @@ sun {
 }
 
 mask {
-  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+  Path: {path: "test/integration/visual/assets/blend_mask.png"}
 }
 
 red {
-  TexturePath: {path: "test/assets/textures/mask_red.png"}
+  Path: {path: "test/assets/textures/mask_red.png"}
 }
 
 green {
-  TexturePath: {path: "test/assets/textures/mask_rgb.png"}
+  Path: {path: "test/assets/textures/mask_rgb.png"}
 }
 
 red_layer {

@@ -5,55 +5,55 @@ using box.light
 using state
 
 assets {
-  isle_grass_h { TextureGen: {width: 512, height: 512, seed: 3, layers: [
+  isle_grass_h { Gen: {width: 512, height: 512, seed: 3, layers: [
     {kind: GenNoise, frequency: 6, octaves: 5, amount: 0.7}
     {kind: GenNoise, frequency: 48, octaves: 3, amount: 0.3, seed: 1}
   ]} }
-  isle_grass_summer { TextureGen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {58, 112, 44}}, {0.5, {96, 156, 58}}, {1, {150, 190, 80}}]} }
-  isle_grass_spring { TextureGen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {70, 134, 58}}, {0.5, {118, 180, 74}}, {1, {178, 214, 104}}]} }
-  isle_grass_autumn { TextureGen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {98, 104, 44}}, {0.5, {150, 142, 62}}, {1, {196, 170, 84}}]} }
-  isle_grass_winter { TextureGen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {196, 206, 220}}, {0.5, {228, 234, 242}}, {1, {250, 252, 255}}]} }
-  isle_grass_n { TextureGen: {source: isle_grass_h, output: GenNormal, strength: 0.6} }
+  isle_grass_summer { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {58, 112, 44}}, {0.5, {96, 156, 58}}, {1, {150, 190, 80}}]} }
+  isle_grass_spring { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {70, 134, 58}}, {0.5, {118, 180, 74}}, {1, {178, 214, 104}}]} }
+  isle_grass_autumn { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {98, 104, 44}}, {0.5, {150, 142, 62}}, {1, {196, 170, 84}}]} }
+  isle_grass_winter { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {196, 206, 220}}, {0.5, {228, 234, 242}}, {1, {250, 252, 255}}]} }
+  isle_grass_n { Gen: {source: isle_grass_h, output: GenNormal, strength: 0.6} }
 
-  isle_rock_h { TextureGen: {width: 512, height: 512, seed: 21, layers: [
+  isle_rock_h { Gen: {width: 512, height: 512, seed: 21, layers: [
     {kind: GenCells, count: 40, distance: GenEdge, edge: 0.6, amount: 0.6, id_amount: 0.25}
     {kind: GenNoise, frequency: 8, octaves: 5, amount: 0.5}
   ]} }
-  isle_rock_a { TextureGen: {source: isle_rock_h, output: GenAlbedo, colors: [{0, {70, 62, 58}}, {0.45, {128, 116, 104}}, {1, {188, 176, 158}}]} }
-  isle_rock_n { TextureGen: {source: isle_rock_h, output: GenNormal, strength: 4} }
+  isle_rock_a { Gen: {source: isle_rock_h, output: GenAlbedo, colors: [{0, {70, 62, 58}}, {0.45, {128, 116, 104}}, {1, {188, 176, 158}}]} }
+  isle_rock_n { Gen: {source: isle_rock_h, output: GenNormal, strength: 4} }
 
-  isle_brick_h { TextureGen: {width: 512, height: 512, seed: 11, layers: [
+  isle_brick_h { Gen: {width: 512, height: 512, seed: 11, layers: [
     {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.008, jitter: 0.2, stagger: 0.5, amount: 0.8, id_amount: 0.2}
     {kind: GenNoise, frequency: 16, octaves: 4, amount: 0.2}
   ]} }
-  isle_brick_a { TextureGen: {source: isle_brick_h, output: GenAlbedo, colors: [{0, {96, 90, 84}}, {0.5, {186, 178, 164}}, {1, {232, 224, 208}}]} }
-  isle_brick_n { TextureGen: {source: isle_brick_h, output: GenNormal, strength: 3} }
+  isle_brick_a { Gen: {source: isle_brick_h, output: GenAlbedo, colors: [{0, {96, 90, 84}}, {0.5, {186, 178, 164}}, {1, {232, 224, 208}}]} }
+  isle_brick_n { Gen: {source: isle_brick_h, output: GenNormal, strength: 3} }
 
-  isle_cobble_h { TextureGen: {width: 512, height: 512, seed: 111, layers: [
+  isle_cobble_h { Gen: {width: 512, height: 512, seed: 111, layers: [
     {kind: GenCells, count: 100, distance: GenEdge, edge: 0.14, amount: 0.5, id_amount: 0.15}
     {kind: GenCells, count: 100, distance: GenEdge, edge: 0.45, amount: 0.6}
     {kind: GenNoise, frequency: 32, octaves: 3, amount: 0.15}
   ]} }
-  isle_cobble_a { TextureGen: {source: isle_cobble_h, output: GenAlbedo, colors: [{0, {72, 66, 58}}, {0.3, {128, 120, 108}}, {1, {214, 204, 188}}]} }
-  isle_cobble_n { TextureGen: {source: isle_cobble_h, output: GenNormal, strength: 3.6} }
+  isle_cobble_a { Gen: {source: isle_cobble_h, output: GenAlbedo, colors: [{0, {72, 66, 58}}, {0.3, {128, 120, 108}}, {1, {214, 204, 188}}]} }
+  isle_cobble_n { Gen: {source: isle_cobble_h, output: GenNormal, strength: 3.6} }
 
-  isle_plank_h { TextureGen: {width: 512, height: 512, seed: 5, layers: [
+  isle_plank_h { Gen: {width: 512, height: 512, seed: 5, layers: [
     {kind: GenBlocks, courses: 8, per_course: 1, gap: 0.01, jitter: 0.3, stagger: 0.37, amount: 0.7, id_amount: 0.3}
     {kind: GenNoise, frequency: 3, octaves: 4, lacunarity: 3, amount: 0.3}
   ]} }
-  isle_plank_a { TextureGen: {source: isle_plank_h, output: GenAlbedo, colors: [{0, {120, 110, 100}}, {0.5, {214, 206, 196}}, {1, {255, 252, 246}}]} }
-  isle_plank_n { TextureGen: {source: isle_plank_h, output: GenNormal, strength: 2.5} }
+  isle_plank_a { Gen: {source: isle_plank_h, output: GenAlbedo, colors: [{0, {120, 110, 100}}, {0.5, {214, 206, 196}}, {1, {255, 252, 246}}]} }
+  isle_plank_n { Gen: {source: isle_plank_h, output: GenNormal, strength: 2.5} }
 
-  isle_tile_h { TextureGen: {width: 512, height: 512, seed: 9, layers: [
+  isle_tile_h { Gen: {width: 512, height: 512, seed: 9, layers: [
     {kind: GenBlocks, courses: 10, per_course: 8, gap: 0.012, softness: 0.05, jitter: 0.05, stagger: 0.5, amount: 0.85, id_amount: 0.15}
     {kind: GenNoise, frequency: 24, octaves: 3, amount: 0.15}
   ]} }
-  isle_tile_a { TextureGen: {source: isle_tile_h, output: GenAlbedo, colors: [{0, {110, 104, 100}}, {0.5, {208, 202, 198}}, {1, {255, 255, 255}}]} }
-  isle_tile_n { TextureGen: {source: isle_tile_h, output: GenNormal, strength: 4} }
+  isle_tile_a { Gen: {source: isle_tile_h, output: GenAlbedo, colors: [{0, {110, 104, 100}}, {0.5, {208, 202, 198}}, {1, {255, 255, 255}}]} }
+  isle_tile_n { Gen: {source: isle_tile_h, output: GenNormal, strength: 4} }
 
-  isle_wave_h { TextureGen: {width: 256, height: 256, seed: 7, layers: [{kind: GenNoise, frequency: 5, octaves: 4, amount: 1}]} }
-  isle_wave_n { TextureGen: {source: isle_wave_h, output: GenNormal, strength: 1.6} }
-  isle_cloud_h { TextureGen: {width: 512, height: 512, seed: 17, layers: [{kind: GenNoise, frequency: 7, octaves: 5, gain: 0.5}]} }
+  isle_wave_h { Gen: {width: 256, height: 256, seed: 7, layers: [{kind: GenNoise, frequency: 5, octaves: 4, amount: 1}]} }
+  isle_wave_n { Gen: {source: isle_wave_h, output: GenNormal, strength: 1.6} }
+  isle_cloud_h { Gen: {width: 512, height: 512, seed: 17, layers: [{kind: GenNoise, frequency: 7, octaves: 5, gain: 0.5}]} }
 
   const grass_tex = match season { 0: isle_grass_spring; 1: isle_grass_summer; 2: isle_grass_autumn; _: isle_grass_winter }
   const leaf_rgb: Rgb = match season { 0: {112, 186, 84}; 1: {70, 150, 62}; 2: {222, 120, 40}; _: {236, 242, 250} }

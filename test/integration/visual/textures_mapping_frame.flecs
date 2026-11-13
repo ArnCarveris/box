@@ -39,11 +39,11 @@ sun {
 }
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 fence_tex {
-  TexturePath: {path: "test/integration/visual/assets/fence.png"}
+  Path: {path: "test/integration/visual/assets/fence.png"}
 }
 
 floor {

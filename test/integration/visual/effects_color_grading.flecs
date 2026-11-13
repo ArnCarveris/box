@@ -12,7 +12,7 @@ tonemap {
 }
 
 sepia_lut {
-  TexturePath: {path: "test/assets/luts/sepia_16.png"}
+  Path: {path: "test/assets/luts/sepia_16.png"}
 }
 
 // A warm, contrasty look with lifted blue shadows, partly through a sepia LUT

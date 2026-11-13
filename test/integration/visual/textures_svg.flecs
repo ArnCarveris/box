@@ -15,19 +15,19 @@ main_view {
 }
 
 badge_16 {
-  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 16, height: 16}
+  Path: {path: "test/integration/visual/assets/badge.svg", width: 16, height: 16}
 }
 
 badge_64 {
-  TexturePath: {path: "test/integration/visual/assets/badge.svg"}
+  Path: {path: "test/integration/visual/assets/badge.svg"}
 }
 
 badge_512 {
-  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 512}
+  Path: {path: "test/integration/visual/assets/badge.svg", width: 512}
 }
 
 badge_wide {
-  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 256, height: 128}
+  Path: {path: "test/integration/visual/assets/badge.svg", width: 256, height: 128}
 }
 
 small {

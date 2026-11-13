@@ -30,11 +30,11 @@ main_view {
 }
 
 ring_tex {
-  TexturePath: {path: "test/integration/visual/assets/ring.png"}
+  Path: {path: "test/integration/visual/assets/ring.png"}
 }
 
 checker_tex {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 floor {

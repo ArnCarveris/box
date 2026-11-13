@@ -56,28 +56,28 @@ box {
 }
 
 assets {
-  station_icon_solar { TexturePath: {path: "etc/scenes/space_station/assets/icons/solar.svg", width: 96} }
-  station_icon_reactor { TexturePath: {path: "etc/scenes/space_station/assets/icons/reactor.svg", width: 96} }
-  station_icon_life { TexturePath: {path: "etc/scenes/space_station/assets/icons/life.svg", width: 96} }
-  station_icon_air { TexturePath: {path: "etc/scenes/space_station/assets/icons/air.svg", width: 96} }
-  station_icon_farm { TexturePath: {path: "etc/scenes/space_station/assets/icons/farm.svg", width: 96} }
-  station_icon_hab { TexturePath: {path: "etc/scenes/space_station/assets/icons/hab.svg", width: 96} }
-  station_icon_pax { TexturePath: {path: "etc/scenes/space_station/assets/icons/pax.svg", width: 96} }
-  station_icon_cargo { TexturePath: {path: "etc/scenes/space_station/assets/icons/cargo.svg", width: 96} }
-  station_icon_bay { TexturePath: {path: "etc/scenes/space_station/assets/icons/bay.svg", width: 96} }
-  station_icon_sell { TexturePath: {path: "etc/scenes/space_station/assets/icons/sell.svg", width: 96} }
-  station_icon_credit { TexturePath: {path: "etc/scenes/space_station/assets/icons/credit.svg", width: 96} }
-  station_icon_power { TexturePath: {path: "etc/scenes/space_station/assets/icons/power.svg", width: 96} }
-  station_icon_people { TexturePath: {path: "etc/scenes/space_station/assets/icons/people.svg", width: 96} }
-  station_icon_food { TexturePath: {path: "etc/scenes/space_station/assets/icons/food.svg", width: 96} }
-  station_icon_star { TexturePath: {path: "etc/scenes/space_station/assets/icons/star.svg", width: 96} }
-  station_icon_pause { TexturePath: {path: "etc/scenes/space_station/assets/icons/pause.svg", width: 96} }
-  station_icon_play1 { TexturePath: {path: "etc/scenes/space_station/assets/icons/play1.svg", width: 96} }
-  station_icon_play2 { TexturePath: {path: "etc/scenes/space_station/assets/icons/play2.svg", width: 96} }
-  station_icon_play4 { TexturePath: {path: "etc/scenes/space_station/assets/icons/play4.svg", width: 96} }
-  station_icon_rank { TexturePath: {path: "etc/scenes/space_station/assets/icons/rank.svg", width: 96} }
-  station_icon_shuttle { TexturePath: {path: "etc/scenes/space_station/assets/icons/shuttle.svg", width: 96} }
-  station_icon_freighter { TexturePath: {path: "etc/scenes/space_station/assets/icons/freighter.svg", width: 96} }
+  station_icon_solar { Path: {path: "etc/scenes/space_station/assets/icons/solar.svg", width: 96} }
+  station_icon_reactor { Path: {path: "etc/scenes/space_station/assets/icons/reactor.svg", width: 96} }
+  station_icon_life { Path: {path: "etc/scenes/space_station/assets/icons/life.svg", width: 96} }
+  station_icon_air { Path: {path: "etc/scenes/space_station/assets/icons/air.svg", width: 96} }
+  station_icon_farm { Path: {path: "etc/scenes/space_station/assets/icons/farm.svg", width: 96} }
+  station_icon_hab { Path: {path: "etc/scenes/space_station/assets/icons/hab.svg", width: 96} }
+  station_icon_pax { Path: {path: "etc/scenes/space_station/assets/icons/pax.svg", width: 96} }
+  station_icon_cargo { Path: {path: "etc/scenes/space_station/assets/icons/cargo.svg", width: 96} }
+  station_icon_bay { Path: {path: "etc/scenes/space_station/assets/icons/bay.svg", width: 96} }
+  station_icon_sell { Path: {path: "etc/scenes/space_station/assets/icons/sell.svg", width: 96} }
+  station_icon_credit { Path: {path: "etc/scenes/space_station/assets/icons/credit.svg", width: 96} }
+  station_icon_power { Path: {path: "etc/scenes/space_station/assets/icons/power.svg", width: 96} }
+  station_icon_people { Path: {path: "etc/scenes/space_station/assets/icons/people.svg", width: 96} }
+  station_icon_food { Path: {path: "etc/scenes/space_station/assets/icons/food.svg", width: 96} }
+  station_icon_star { Path: {path: "etc/scenes/space_station/assets/icons/star.svg", width: 96} }
+  station_icon_pause { Path: {path: "etc/scenes/space_station/assets/icons/pause.svg", width: 96} }
+  station_icon_play1 { Path: {path: "etc/scenes/space_station/assets/icons/play1.svg", width: 96} }
+  station_icon_play2 { Path: {path: "etc/scenes/space_station/assets/icons/play2.svg", width: 96} }
+  station_icon_play4 { Path: {path: "etc/scenes/space_station/assets/icons/play4.svg", width: 96} }
+  station_icon_rank { Path: {path: "etc/scenes/space_station/assets/icons/rank.svg", width: 96} }
+  station_icon_shuttle { Path: {path: "etc/scenes/space_station/assets/icons/shuttle.svg", width: 96} }
+  station_icon_freighter { Path: {path: "etc/scenes/space_station/assets/icons/freighter.svg", width: 96} }
 }
 
 state {

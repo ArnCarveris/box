@@ -12,43 +12,43 @@ assets {
   mv_font_display { Font: {path: "etc/scenes/mossvale/fonts/Cinzel.ttf"} }
   mv_font_body { Font: {path: "etc/scenes/mossvale/fonts/Spectral-Regular.ttf"} }
 
-  mv_tex_grass { TexturePath: {path: "etc/scenes/mossvale/textures/grass.jpg"} }
-  mv_tex_grass_n { TexturePath: {path: "etc/scenes/mossvale/textures/grass_normal.jpg"} }
-  mv_tex_forest { TexturePath: {path: "etc/scenes/mossvale/textures/forest_floor.jpg"} }
-  mv_tex_forest_n { TexturePath: {path: "etc/scenes/mossvale/textures/forest_floor_normal.jpg"} }
-  mv_tex_dirt { TexturePath: {path: "etc/scenes/mossvale/textures/dirt.jpg"} }
-  mv_tex_dirt_n { TexturePath: {path: "etc/scenes/mossvale/textures/dirt_normal.jpg"} }
-  mv_tex_cobble { TexturePath: {path: "etc/scenes/mossvale/textures/cobble.jpg"} }
-  mv_tex_cobble_n { TexturePath: {path: "etc/scenes/mossvale/textures/cobble_normal.jpg"} }
-  mv_tex_rubble { TexturePath: {path: "etc/scenes/mossvale/textures/rubble.jpg"} }
-  mv_tex_rubble_n { TexturePath: {path: "etc/scenes/mossvale/textures/rubble_normal.jpg"} }
-  mv_tex_ashlar { TexturePath: {path: "etc/scenes/mossvale/textures/ashlar.jpg"} }
-  mv_tex_ashlar_n { TexturePath: {path: "etc/scenes/mossvale/textures/ashlar_normal.jpg"} }
-  mv_tex_rock { TexturePath: {path: "etc/scenes/mossvale/textures/rock.jpg"} }
-  mv_tex_rock_n { TexturePath: {path: "etc/scenes/mossvale/textures/rock_normal.jpg"} }
-  mv_tex_plaster { TexturePath: {path: "etc/scenes/mossvale/textures/plaster.jpg"} }
-  mv_tex_plaster_n { TexturePath: {path: "etc/scenes/mossvale/textures/plaster_normal.jpg"} }
-  mv_tex_wood { TexturePath: {path: "etc/scenes/mossvale/textures/wood.jpg"} }
-  mv_tex_wood_n { TexturePath: {path: "etc/scenes/mossvale/textures/wood_normal.jpg"} }
-  mv_tex_timber { TexturePath: {path: "etc/scenes/mossvale/textures/timber.jpg"} }
-  mv_tex_timber_n { TexturePath: {path: "etc/scenes/mossvale/textures/timber_normal.jpg"} }
-  mv_tex_shingles { TexturePath: {path: "etc/scenes/mossvale/textures/shingles.jpg"} }
-  mv_tex_shingles_n { TexturePath: {path: "etc/scenes/mossvale/textures/shingles_normal.jpg"} }
-  mv_tex_thatch { TexturePath: {path: "etc/scenes/mossvale/textures/thatch.jpg"} }
-  mv_tex_thatch_n { TexturePath: {path: "etc/scenes/mossvale/textures/thatch_normal.jpg"} }
-  mv_tex_bark { TexturePath: {path: "etc/scenes/mossvale/textures/bark.jpg"} }
-  mv_tex_bark_n { TexturePath: {path: "etc/scenes/mossvale/textures/bark_normal.jpg"} }
-  mv_tex_birch { TexturePath: {path: "etc/scenes/mossvale/textures/birch.jpg"} }
-  mv_tex_birch_n { TexturePath: {path: "etc/scenes/mossvale/textures/birch_normal.jpg"} }
-  mv_tex_foliage { TexturePath: {path: "etc/scenes/mossvale/textures/foliage.jpg"} }
-  mv_tex_foliage_n { TexturePath: {path: "etc/scenes/mossvale/textures/foliage_normal.jpg"} }
-  mv_tex_water_n { TexturePath: {path: "etc/scenes/mossvale/textures/water_normal.jpg"} }
-  mv_tex_cloth { TexturePath: {path: "etc/scenes/mossvale/textures/cloth.jpg"} }
-  mv_tex_cloth_n { TexturePath: {path: "etc/scenes/mossvale/textures/cloth_normal.jpg"} }
-  mv_tex_sand { TexturePath: {path: "etc/scenes/mossvale/textures/sand.jpg"} }
-  mv_tex_sand_n { TexturePath: {path: "etc/scenes/mossvale/textures/sand_normal.jpg"} }
-  mv_tex_wheat { TexturePath: {path: "etc/scenes/mossvale/textures/wheat.jpg"} }
-  mv_tex_wheat_n { TexturePath: {path: "etc/scenes/mossvale/textures/wheat_normal.jpg"} }
+  mv_tex_grass { Path: {path: "etc/scenes/mossvale/textures/grass.jpg"} }
+  mv_tex_grass_n { Path: {path: "etc/scenes/mossvale/textures/grass_normal.jpg"} }
+  mv_tex_forest { Path: {path: "etc/scenes/mossvale/textures/forest_floor.jpg"} }
+  mv_tex_forest_n { Path: {path: "etc/scenes/mossvale/textures/forest_floor_normal.jpg"} }
+  mv_tex_dirt { Path: {path: "etc/scenes/mossvale/textures/dirt.jpg"} }
+  mv_tex_dirt_n { Path: {path: "etc/scenes/mossvale/textures/dirt_normal.jpg"} }
+  mv_tex_cobble { Path: {path: "etc/scenes/mossvale/textures/cobble.jpg"} }
+  mv_tex_cobble_n { Path: {path: "etc/scenes/mossvale/textures/cobble_normal.jpg"} }
+  mv_tex_rubble { Path: {path: "etc/scenes/mossvale/textures/rubble.jpg"} }
+  mv_tex_rubble_n { Path: {path: "etc/scenes/mossvale/textures/rubble_normal.jpg"} }
+  mv_tex_ashlar { Path: {path: "etc/scenes/mossvale/textures/ashlar.jpg"} }
+  mv_tex_ashlar_n { Path: {path: "etc/scenes/mossvale/textures/ashlar_normal.jpg"} }
+  mv_tex_rock { Path: {path: "etc/scenes/mossvale/textures/rock.jpg"} }
+  mv_tex_rock_n { Path: {path: "etc/scenes/mossvale/textures/rock_normal.jpg"} }
+  mv_tex_plaster { Path: {path: "etc/scenes/mossvale/textures/plaster.jpg"} }
+  mv_tex_plaster_n { Path: {path: "etc/scenes/mossvale/textures/plaster_normal.jpg"} }
+  mv_tex_wood { Path: {path: "etc/scenes/mossvale/textures/wood.jpg"} }
+  mv_tex_wood_n { Path: {path: "etc/scenes/mossvale/textures/wood_normal.jpg"} }
+  mv_tex_timber { Path: {path: "etc/scenes/mossvale/textures/timber.jpg"} }
+  mv_tex_timber_n { Path: {path: "etc/scenes/mossvale/textures/timber_normal.jpg"} }
+  mv_tex_shingles { Path: {path: "etc/scenes/mossvale/textures/shingles.jpg"} }
+  mv_tex_shingles_n { Path: {path: "etc/scenes/mossvale/textures/shingles_normal.jpg"} }
+  mv_tex_thatch { Path: {path: "etc/scenes/mossvale/textures/thatch.jpg"} }
+  mv_tex_thatch_n { Path: {path: "etc/scenes/mossvale/textures/thatch_normal.jpg"} }
+  mv_tex_bark { Path: {path: "etc/scenes/mossvale/textures/bark.jpg"} }
+  mv_tex_bark_n { Path: {path: "etc/scenes/mossvale/textures/bark_normal.jpg"} }
+  mv_tex_birch { Path: {path: "etc/scenes/mossvale/textures/birch.jpg"} }
+  mv_tex_birch_n { Path: {path: "etc/scenes/mossvale/textures/birch_normal.jpg"} }
+  mv_tex_foliage { Path: {path: "etc/scenes/mossvale/textures/foliage.jpg"} }
+  mv_tex_foliage_n { Path: {path: "etc/scenes/mossvale/textures/foliage_normal.jpg"} }
+  mv_tex_water_n { Path: {path: "etc/scenes/mossvale/textures/water_normal.jpg"} }
+  mv_tex_cloth { Path: {path: "etc/scenes/mossvale/textures/cloth.jpg"} }
+  mv_tex_cloth_n { Path: {path: "etc/scenes/mossvale/textures/cloth_normal.jpg"} }
+  mv_tex_sand { Path: {path: "etc/scenes/mossvale/textures/sand.jpg"} }
+  mv_tex_sand_n { Path: {path: "etc/scenes/mossvale/textures/sand_normal.jpg"} }
+  mv_tex_wheat { Path: {path: "etc/scenes/mossvale/textures/wheat.jpg"} }
+  mv_tex_wheat_n { Path: {path: "etc/scenes/mossvale/textures/wheat_normal.jpg"} }
 
   prefab MvGrass { Rgb: {122, 172, 80}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
   prefab MvGrassDark { Rgb: {90, 136, 64}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
@@ -70,38 +70,38 @@ assets {
   prefab MvDeepWater { Rgb: {28, 70, 98}; PbrMaterial: {roughness: 0.04}; ClearCoat: {strength: 1, roughness: 0.02}; PbrTextures: {normal: mv_tex_water_n}; TextureTransform: {3, 3, 0, 0} }
   prefab MvIce { Rgb: {210, 236, 250}; PbrMaterial: {roughness: 0.15}; ClearCoat: {strength: 1, roughness: 0.05}; Transmission: {transmission_factor: 0.6, ior: 1.31, thickness_factor: 0.25, attenuation_distance: 0.6, attenuation_color: {170, 214, 240}} }
 
-  mv_tile_grass_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/grass.png"} }
-  mv_tile_grass_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/grass_normal.jpg"} }
+  mv_tile_grass_a { Path: {path: "etc/scenes/mossvale/textures/tiles/grass.png"} }
+  mv_tile_grass_n { Path: {path: "etc/scenes/mossvale/textures/tiles/grass_normal.jpg"} }
   mv_tile_grass { PbrTextures: {albedo: mv_tile_grass_a, normal: mv_tile_grass_n} }
-  mv_tile_meadow_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/meadow.png"} }
-  mv_tile_meadow_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/meadow_normal.jpg"} }
+  mv_tile_meadow_a { Path: {path: "etc/scenes/mossvale/textures/tiles/meadow.png"} }
+  mv_tile_meadow_n { Path: {path: "etc/scenes/mossvale/textures/tiles/meadow_normal.jpg"} }
   mv_tile_meadow { PbrTextures: {albedo: mv_tile_meadow_a, normal: mv_tile_meadow_n} }
-  mv_tile_hills_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/hills.png"} }
-  mv_tile_hills_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/hills_normal.jpg"} }
+  mv_tile_hills_a { Path: {path: "etc/scenes/mossvale/textures/tiles/hills.png"} }
+  mv_tile_hills_n { Path: {path: "etc/scenes/mossvale/textures/tiles/hills_normal.jpg"} }
   mv_tile_hills { PbrTextures: {albedo: mv_tile_hills_a, normal: mv_tile_hills_n} }
-  mv_tile_forest_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/forest.png"} }
-  mv_tile_forest_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/forest_normal.jpg"} }
+  mv_tile_forest_a { Path: {path: "etc/scenes/mossvale/textures/tiles/forest.png"} }
+  mv_tile_forest_n { Path: {path: "etc/scenes/mossvale/textures/tiles/forest_normal.jpg"} }
   mv_tile_forest { PbrTextures: {albedo: mv_tile_forest_a, normal: mv_tile_forest_n} }
-  mv_tile_sand_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/sand.png"} }
-  mv_tile_sand_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/sand_normal.jpg"} }
+  mv_tile_sand_a { Path: {path: "etc/scenes/mossvale/textures/tiles/sand.png"} }
+  mv_tile_sand_n { Path: {path: "etc/scenes/mossvale/textures/tiles/sand_normal.jpg"} }
   mv_tile_sand { PbrTextures: {albedo: mv_tile_sand_a, normal: mv_tile_sand_n} }
-  mv_tile_dirt_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/dirt.png"} }
-  mv_tile_dirt_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/dirt_normal.jpg"} }
+  mv_tile_dirt_a { Path: {path: "etc/scenes/mossvale/textures/tiles/dirt.png"} }
+  mv_tile_dirt_n { Path: {path: "etc/scenes/mossvale/textures/tiles/dirt_normal.jpg"} }
   mv_tile_dirt { PbrTextures: {albedo: mv_tile_dirt_a, normal: mv_tile_dirt_n} }
-  mv_tile_ash_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/ash.png"} }
-  mv_tile_ash_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/ash_normal.jpg"} }
+  mv_tile_ash_a { Path: {path: "etc/scenes/mossvale/textures/tiles/ash.png"} }
+  mv_tile_ash_n { Path: {path: "etc/scenes/mossvale/textures/tiles/ash_normal.jpg"} }
   mv_tile_ash { PbrTextures: {albedo: mv_tile_ash_a, normal: mv_tile_ash_n} }
-  mv_tile_rubble_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/rubble.png"} }
-  mv_tile_rubble_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/rubble_normal.jpg"} }
+  mv_tile_rubble_a { Path: {path: "etc/scenes/mossvale/textures/tiles/rubble.png"} }
+  mv_tile_rubble_n { Path: {path: "etc/scenes/mossvale/textures/tiles/rubble_normal.jpg"} }
   mv_tile_rubble { PbrTextures: {albedo: mv_tile_rubble_a, normal: mv_tile_rubble_n} }
-  mv_tile_cobble_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/cobble.png"} }
-  mv_tile_cobble_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/cobble_normal.jpg"} }
+  mv_tile_cobble_a { Path: {path: "etc/scenes/mossvale/textures/tiles/cobble.png"} }
+  mv_tile_cobble_n { Path: {path: "etc/scenes/mossvale/textures/tiles/cobble_normal.jpg"} }
   mv_tile_cobble { PbrTextures: {albedo: mv_tile_cobble_a, normal: mv_tile_cobble_n} }
-  mv_tile_flags_a { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/flags.png"} }
-  mv_tile_flags_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/flags_normal.jpg"} }
+  mv_tile_flags_a { Path: {path: "etc/scenes/mossvale/textures/tiles/flags.png"} }
+  mv_tile_flags_n { Path: {path: "etc/scenes/mossvale/textures/tiles/flags_normal.jpg"} }
   mv_tile_flags { PbrTextures: {albedo: mv_tile_flags_a, normal: mv_tile_flags_n} }
-  mv_tex_ground { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/grass_tile.jpg"} }
-  mv_tex_ground_n { TexturePath: {path: "etc/scenes/mossvale/textures/tiles/grass_tile_normal.jpg"} }
+  mv_tex_ground { Path: {path: "etc/scenes/mossvale/textures/tiles/grass_tile.jpg"} }
+  mv_tex_ground_n { Path: {path: "etc/scenes/mossvale/textures/tiles/grass_tile_normal.jpg"} }
 
   prefab MvStone { Rgb: {196, 188, 172}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_ashlar, normal: mv_tex_ashlar_n} }
   prefab MvDarkStone { Rgb: {140, 134, 124}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_rubble, normal: mv_tex_rubble_n} }

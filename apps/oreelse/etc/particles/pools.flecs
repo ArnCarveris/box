@@ -30,28 +30,28 @@ using box.particle
 
 // The soft round puff of dust and smoke
 sprPuff {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/particles/puff.svg", width: 256, height: 256, linear: true
   }
 }
 
 // The bright flare of fire and of the halos
 sprFlare {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/particles/flare.svg", width: 256, height: 256, linear: true
   }
 }
 
 // The small hot spark of glints, sparks and embers
 sprSpark {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/particles/spark.svg", width: 128, height: 128, linear: true
   }
 }
 
 // The rock chunk of debris
 sprChunk {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/particles/chunk.svg", width: 64, height: 64, linear: true
   }
 }

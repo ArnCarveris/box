@@ -16,7 +16,7 @@ main_view {
 }
 
 badge {
-  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 128}
+  Path: {path: "test/integration/visual/assets/badge.svg", width: 128}
 }
 
 ground {

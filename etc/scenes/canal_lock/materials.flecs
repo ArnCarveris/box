@@ -5,32 +5,32 @@ using box.material
 using box.texture
 
 assets {
-  canal_tex_chamber { TexturePath: {path: "etc/scenes/canal_lock/textures/chamber_wall.jpg"} }
-  canal_tex_chamber_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/chamber_wall_normal.jpg"} }
-  canal_tex_chamber_orm { TexturePath: {path: "etc/scenes/canal_lock/textures/chamber_wall_orm.jpg"} }
-  canal_tex_ashlar { TexturePath: {path: "etc/scenes/canal_lock/textures/ashlar.jpg"} }
-  canal_tex_ashlar_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/ashlar_normal.jpg"} }
-  canal_tex_stone { TexturePath: {path: "etc/scenes/canal_lock/textures/stone.jpg"} }
-  canal_tex_stone_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/stone_normal.jpg"} }
-  canal_tex_brick { TexturePath: {path: "etc/scenes/canal_lock/textures/brick.jpg"} }
-  canal_tex_brick_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/brick_normal.jpg"} }
-  canal_tex_wood { TexturePath: {path: "etc/scenes/canal_lock/textures/wood.jpg"} }
-  canal_tex_wood_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/wood_normal.jpg"} }
-  canal_tex_table { TexturePath: {path: "etc/scenes/canal_lock/textures/table.jpg"} }
-  canal_tex_slate { TexturePath: {path: "etc/scenes/canal_lock/textures/slate.jpg"} }
-  canal_tex_slate_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/slate_normal.jpg"} }
-  canal_tex_plaster { TexturePath: {path: "etc/scenes/canal_lock/textures/plaster.jpg"} }
-  canal_tex_plaster_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/plaster_normal.jpg"} }
-  canal_tex_bark { TexturePath: {path: "etc/scenes/canal_lock/textures/bark.jpg"} }
-  canal_tex_bark_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/bark_normal.jpg"} }
-  canal_tex_strata { TexturePath: {path: "etc/scenes/canal_lock/textures/strata.jpg"} }
-  canal_tex_strata_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/strata_normal.jpg"} }
-  canal_tex_water_normal { TexturePath: {path: "etc/scenes/canal_lock/textures/water_normal.jpg"} }
-  canal_tex_ground { TexturePath: {path: "etc/scenes/canal_lock/textures/ground.jpg", width: 2048} }
-  canal_tex_leaves { TexturePath: {path: "etc/scenes/canal_lock/textures/leaves.png"} }
-  canal_tex_tuft { TexturePath: {path: "etc/scenes/canal_lock/textures/tuft.png"} }
-  canal_tex_boat_side { TexturePath: {path: "etc/scenes/canal_lock/textures/boat_side.svg", width: 1024} }
-  canal_tex_plate { TexturePath: {path: "etc/scenes/canal_lock/textures/plate.svg", width: 512} }
+  canal_tex_chamber { Path: {path: "etc/scenes/canal_lock/textures/chamber_wall.jpg"} }
+  canal_tex_chamber_normal { Path: {path: "etc/scenes/canal_lock/textures/chamber_wall_normal.jpg"} }
+  canal_tex_chamber_orm { Path: {path: "etc/scenes/canal_lock/textures/chamber_wall_orm.jpg"} }
+  canal_tex_ashlar { Path: {path: "etc/scenes/canal_lock/textures/ashlar.jpg"} }
+  canal_tex_ashlar_normal { Path: {path: "etc/scenes/canal_lock/textures/ashlar_normal.jpg"} }
+  canal_tex_stone { Path: {path: "etc/scenes/canal_lock/textures/stone.jpg"} }
+  canal_tex_stone_normal { Path: {path: "etc/scenes/canal_lock/textures/stone_normal.jpg"} }
+  canal_tex_brick { Path: {path: "etc/scenes/canal_lock/textures/brick.jpg"} }
+  canal_tex_brick_normal { Path: {path: "etc/scenes/canal_lock/textures/brick_normal.jpg"} }
+  canal_tex_wood { Path: {path: "etc/scenes/canal_lock/textures/wood.jpg"} }
+  canal_tex_wood_normal { Path: {path: "etc/scenes/canal_lock/textures/wood_normal.jpg"} }
+  canal_tex_table { Path: {path: "etc/scenes/canal_lock/textures/table.jpg"} }
+  canal_tex_slate { Path: {path: "etc/scenes/canal_lock/textures/slate.jpg"} }
+  canal_tex_slate_normal { Path: {path: "etc/scenes/canal_lock/textures/slate_normal.jpg"} }
+  canal_tex_plaster { Path: {path: "etc/scenes/canal_lock/textures/plaster.jpg"} }
+  canal_tex_plaster_normal { Path: {path: "etc/scenes/canal_lock/textures/plaster_normal.jpg"} }
+  canal_tex_bark { Path: {path: "etc/scenes/canal_lock/textures/bark.jpg"} }
+  canal_tex_bark_normal { Path: {path: "etc/scenes/canal_lock/textures/bark_normal.jpg"} }
+  canal_tex_strata { Path: {path: "etc/scenes/canal_lock/textures/strata.jpg"} }
+  canal_tex_strata_normal { Path: {path: "etc/scenes/canal_lock/textures/strata_normal.jpg"} }
+  canal_tex_water_normal { Path: {path: "etc/scenes/canal_lock/textures/water_normal.jpg"} }
+  canal_tex_ground { Path: {path: "etc/scenes/canal_lock/textures/ground.jpg", width: 2048} }
+  canal_tex_leaves { Path: {path: "etc/scenes/canal_lock/textures/leaves.png"} }
+  canal_tex_tuft { Path: {path: "etc/scenes/canal_lock/textures/tuft.png"} }
+  canal_tex_boat_side { Path: {path: "etc/scenes/canal_lock/textures/boat_side.svg", width: 1024} }
+  canal_tex_plate { Path: {path: "etc/scenes/canal_lock/textures/plate.svg", width: 512} }
 
   prefab CanalChamberWall { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: canal_tex_chamber, normal: canal_tex_chamber_normal, orm: canal_tex_chamber_orm} }
   prefab CanalAshlar { Rgb: {232, 226, 212}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: canal_tex_ashlar, normal: canal_tex_ashlar_normal}; TextureMapping: {mode: MappingObject, size: 3.2} }

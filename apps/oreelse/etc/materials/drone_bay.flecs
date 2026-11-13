@@ -10,13 +10,13 @@ using box.material
 using box.texture
 
 bay_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/drone_bay.svg", width: 256, height: 256, linear: true
   }
 }
 
 bay_norm {
-  TexturePath: {path: "apps/oreelse/etc/assets/drone_bay_normal.svg", width: 256, height: 256}
+  Path: {path: "apps/oreelse/etc/assets/drone_bay_normal.svg", width: 256, height: 256}
 }
 
 prefab BayPad {

@@ -36,7 +36,7 @@ $ {
 }
 
 cumulus_noise {
-  TextureGen: {
+  Gen: {
     width: 512, height: 512, seed: 3
     layers: [
       {kind: GenNoise, frequency: 12, octaves: 5, gain: 0.5}
@@ -45,7 +45,7 @@ cumulus_noise {
 }
 
 cirrus_noise {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 19
     layers: [
       {kind: GenNoise, frequency: 2, octaves: 4, gain: 0.6}

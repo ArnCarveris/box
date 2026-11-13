@@ -1,4 +1,4 @@
-// A quad whose emission samples a graph that samples an animated graph through a TexImage: the
+// A quad whose emission samples a graph that samples an animated graph through a nodes.Image: the
 // world time twice plus a half in every channel, framed by a camera over a black clear. Tests
 // take the image off the quad, so no draw samples it or the animated graph.
 
@@ -20,14 +20,14 @@ graph_image_animated {
   }
 
   source {
-    time { TexTime: {scale: 2, offset: 0.5} }
-    splat { TexSplat: {in: time} }
-    TextureGraph: {output: splat, width: 8, format: GraphHdr}
+    time { nodes.Time: {scale: 2, offset: 0.5} }
+    splat { nodes.Splat: {in: time} }
+    Graph: {output: splat, width: 8, format: GraphHdr}
   }
 
   image {
-    sampled { TexImage: {texture: source} }
-    TextureGraph: {output: sampled, width: 8, format: GraphHdr}
+    sampled { nodes.Image: {texture: source} }
+    Graph: {output: sampled, width: 8, format: GraphHdr}
   }
 
   quad {

@@ -60,7 +60,7 @@ function updateStats() {
   const bar = T.stats;
   bar.textContent = "";
   if (!s) {
-    bar.append(TG.connected ? "no TextureGraphStats (the app does not render with the GPU backend)" : "");
+    bar.append(TG.connected ? "no graph.Stats (the app does not render with the GPU backend)" : "");
     return;
   }
   const r = TG.statsRates();
@@ -75,7 +75,7 @@ function updateStats() {
       "GPU time per measured packet of evaluations"),
     item("pool", fmtBytes(s.pool_bytes), "pooled intermediate textures"),
     item("reads", fmtInt(s.reads) + (r ? ` (${r.reads.toFixed(1)}/s)` : ""), "readbacks delivered, previews included"),
-    item("previews", fmtInt(s.previews), "nodes with a TextureNodePreview"));
+    item("previews", fmtInt(s.previews), "nodes with a graph.Preview"));
 }
 
 function buildTopbar() {

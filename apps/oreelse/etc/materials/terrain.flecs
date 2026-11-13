@@ -6,17 +6,17 @@ using box.material
 using box.texture
 
 dirt_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/terrain_dirt.svg", width: 256, height: 256, linear: true
   }
 }
 
 dirt_orm_tex {
-  TexturePath: {path: "apps/oreelse/etc/assets/terrain_dirt_orm.svg", width: 256, height: 256}
+  Path: {path: "apps/oreelse/etc/assets/terrain_dirt_orm.svg", width: 256, height: 256}
 }
 
 dirt_norm {
-  TexturePath: {path: "apps/oreelse/etc/assets/terrain_dirt_normal.svg", width: 256, height: 256}
+  Path: {path: "apps/oreelse/etc/assets/terrain_dirt_normal.svg", width: 256, height: 256}
 }
 
 prefab GroundSurface {

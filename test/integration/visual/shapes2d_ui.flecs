@@ -19,15 +19,15 @@ main_view {
 }
 
 letter {
-  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+  Path: {path: "test/integration/visual/assets/letter.png"}
 }
 
 badge {
-  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 128}
+  Path: {path: "test/integration/visual/assets/badge.svg", width: 128}
 }
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 panel {

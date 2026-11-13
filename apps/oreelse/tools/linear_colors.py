@@ -37,8 +37,8 @@ and were changed by hand: the random tints of the scenery's flora encode the ori
 with oreelse.srgb() (src/look.c). The health bar is UI: it blends cfg.hpBarFull, hpBarMid and
 hpBarLow, the original's bytes, and shows the blend as it is.
 
-apply also sets `linear: true` on every TexturePath except the normal and ORM maps, so the
-albedo and particle images load as the original samples them (TexturePath.linear in
+apply also sets `linear: true` on every box.texture.Path except the normal and ORM maps, so the
+albedo and particle images load as the original samples them (box.texture.Path.linear in
 include/box/texture.h); the UI images (the icons, the hazard strip of the panels, the signs)
 load without it.
 """
@@ -77,7 +77,7 @@ INT_LIST = re.compile(
 DECL = re.compile(r"(\w+)\s*:\s*(\w+)\s*=\s*$")
 MATCH = re.compile(r":\s*(\w+)\s*=\s*match\b[^{}]*$")
 KEY = re.compile(r"(\w+)\s*:\s*$")
-TEXTURE = re.compile(r"TexturePath:\s*\{([^{}]*)\}")
+TEXTURE = re.compile(r"(?<![\w.])Path:\s*\{([^{}]*)\}")
 
 
 def srgb_encode(c):
@@ -194,12 +194,12 @@ def line_of(text, offset):
 
 
 def textures(text):
-    """The text with linear: true added to every TexturePath of a color image."""
+    """The text with linear: true added to every box.texture.Path of a color image."""
     def add(m):
         body = m.group(1)
         if re.search(r"_(normal|orm|rough)\.svg", body) or "linear:" in body:
             return m.group(0)
-        return "TexturePath: {" + body.rstrip() + ", linear: true}"
+        return "Path: {" + body.rstrip() + ", linear: true}"
     return TEXTURE.sub(add, text)
 
 

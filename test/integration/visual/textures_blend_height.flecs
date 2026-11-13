@@ -14,7 +14,7 @@ $ {
 // and a grass layer (bottom half) under the mask of textures_blend.flecs, whose red and green
 // weigh the cobble and blue and alpha the grass, so the border is a soft horizontal band through
 // the middle of each quad. The camera is close to the inner halves of the quads, around their
-// borders. Both layers have a TextureGen height: the stones are domes that are high in the middle
+// borders. Both layers have a Gen height: the stones are domes that are high in the middle
 // and low in the joints, the grass is noise around the middle height. The left quad has a
 // contrast of 0, the linear blend, where the grass fades over the stones as a double exposure;
 // the right one a contrast of 24, where the grass fills the joints between the stones and the
@@ -40,11 +40,11 @@ key {
 }
 
 mask {
-  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+  Path: {path: "test/integration/visual/assets/blend_mask.png"}
 }
 
 cobble_height {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 111
     layers: [
       {kind: GenCells, count: 36, distance: GenEdge, edge: 0.14, amount: 0.5, id_amount: 0.15}
@@ -55,16 +55,16 @@ cobble_height {
 }
 
 cobble {
-  TextureGen: {source: cobble_height, output: GenAlbedo,
+  Gen: {source: cobble_height, output: GenAlbedo,
                colors: [{0, {72, 66, 58}}, {0.3, {120, 114, 106}}, {1, {222, 214, 202}}]}
 }
 
 cobble_n {
-  TextureGen: {source: cobble_height, output: GenNormal, strength: 3.6}
+  Gen: {source: cobble_height, output: GenNormal, strength: 3.6}
 }
 
 grass_height {
-  TextureGen: {
+  Gen: {
     width: 256, height: 256, seed: 23
     layers: [
       {kind: GenNoise, frequency: 64, octaves: 2, amount: 0.7}
@@ -74,12 +74,12 @@ grass_height {
 }
 
 grass {
-  TextureGen: {source: grass_height, output: GenAlbedo,
+  Gen: {source: grass_height, output: GenAlbedo,
                colors: [{0, {34, 62, 22}}, {0.5, {70, 128, 40}}, {1, {150, 200, 80}}]}
 }
 
 grass_n {
-  TextureGen: {source: grass_height, output: GenNormal, strength: 2}
+  Gen: {source: grass_height, output: GenNormal, strength: 2}
 }
 
 cobble_layer {

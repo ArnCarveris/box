@@ -1,4 +1,4 @@
-// Graphs that sample a TextureGen and the texture of a Surface through a TexImage. The surface
+// Graphs that sample a Gen and the texture of a Surface through a nodes.Image. The surface
 // renders only its own view, which looks away from the quad over a red clear; the quad, framed by
 // the camera of the unclaimed view, draws the graph of the surface so it follows the surface.
 
@@ -21,12 +21,12 @@ graph_image_sources {
   }
 
   noise {
-    TextureGen: {width: 16, layers: [{kind: GenNoise, frequency: 4}]}
+    Gen: {width: 16, layers: [{kind: GenNoise, frequency: 4}]}
   }
 
   from_noise {
-    sampled { TexImage: {texture: noise, linear: true} }
-    TextureGraph: {output: sampled, width: 16, format: GraphHdr}
+    sampled { nodes.Image: {texture: noise, linear: true} }
+    Graph: {output: sampled, width: 16, format: GraphHdr}
   }
 
   target_camera {
@@ -46,8 +46,8 @@ graph_image_sources {
   }
 
   from_surface {
-    sampled { TexImage: {texture: target} }
-    TextureGraph: {output: sampled, width: 8, format: GraphHdr}
+    sampled { nodes.Image: {texture: target} }
+    Graph: {output: sampled, width: 8, format: GraphHdr}
   }
 
   quad {

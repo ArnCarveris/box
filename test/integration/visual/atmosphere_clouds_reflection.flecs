@@ -23,7 +23,7 @@ sky {
   Atmosphere: {units_per_km: 100, sun: sun}
 
   cloud_noise {
-    TextureGen: {
+    Gen: {
       width: 512, height: 512, seed: 7
       layers: [
         {kind: GenNoise, frequency: 10, octaves: 5, gain: 0.5}

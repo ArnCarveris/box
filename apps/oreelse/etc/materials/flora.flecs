@@ -15,35 +15,35 @@ using box.material
 using box.texture
 
 frond_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/flora_frond.svg", width: 256, height: 256, linear: true
   }
 }
 
 frond_b_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/flora_frond_b.svg", width: 256, height: 256, linear: true
   }
 }
 
 frond_norm {
-  TexturePath: {path: "apps/oreelse/etc/assets/flora_frond_normal.svg", width: 256, height: 256}
+  Path: {path: "apps/oreelse/etc/assets/flora_frond_normal.svg", width: 256, height: 256}
 }
 
 membrane_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/flora_pad.svg", width: 256, height: 256, linear: true
   }
 }
 
 membrane_b_tex {
-  TexturePath: {
+  Path: {
     path: "apps/oreelse/etc/assets/flora_pad_b.svg", width: 256, height: 256, linear: true
   }
 }
 
 membrane_norm {
-  TexturePath: {path: "apps/oreelse/etc/assets/flora_pad_normal.svg", width: 256, height: 256}
+  Path: {path: "apps/oreelse/etc/assets/flora_pad_normal.svg", width: 256, height: 256}
 }
 
 prefab FloraFrond {

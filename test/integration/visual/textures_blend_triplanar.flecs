@@ -38,19 +38,19 @@ sun {
 }
 
 mask {
-  TexturePath: {path: "test/integration/visual/assets/blend_mask.png"}
+  Path: {path: "test/integration/visual/assets/blend_mask.png"}
 }
 
 checker {
-  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+  Path: {path: "test/integration/visual/assets/checker.png"}
 }
 
 stripes {
-  TexturePath: {path: "test/integration/visual/assets/stripes.png"}
+  Path: {path: "test/integration/visual/assets/stripes.png"}
 }
 
 bumps {
-  TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+  Path: {path: "test/integration/visual/assets/bumps.png"}
 }
 
 checker_layer {

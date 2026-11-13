@@ -2,7 +2,7 @@ using box.material
 using box.texture
 
 assets {
-  jb_wood_texture { TexturePath: {path: "etc/scenes/jungle_city/textures/wood.jpg"} }
+  jb_wood_texture { Path: {path: "etc/scenes/jungle_city/textures/wood.jpg"} }
 
   prefab JBWood {
     Rgb: {116, 50, 28}

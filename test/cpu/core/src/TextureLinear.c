@@ -157,8 +157,8 @@ void TextureLinear_default_off(void) {
 
     const char *code =
         "using box.texture\n"
-        "plain { TexturePath: {path: \"test/integration/visual/assets/checker.png\"} }\n"
-        "lin { TexturePath: {path: \"test/integration/visual/assets/checker.png\", "
+        "plain { Path: {path: \"test/integration/visual/assets/checker.png\"} }\n"
+        "lin { Path: {path: \"test/integration/visual/assets/checker.png\", "
         "linear: true} }\n";
     test_assert(ecs_script_run(world, "linear", code, NULL) == 0);
     test_bool(ecs_get(world, ecs_lookup(world, "plain"), TexturePath)->linear, false);

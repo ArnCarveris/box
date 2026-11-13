@@ -41,7 +41,7 @@ G.color = (name) => {
   return `hsl(${h % 360}, 55%, 58%)`;
 };
 
-G.typeClass = (t) => t === "TexScalar" ? "t-scalar" : "t-vector";
+G.typeClass = (t) => t === "Scalar" ? "t-scalar" : "t-vector";
 
 G.menu = (x, y, items) => {
   G.closeMenu();
@@ -87,18 +87,18 @@ G.model = () => {
     const inputs = kind ? kind.inputs : [];
     nodes.set(n.path, {
       id: n.path, path: n.path, rec: n, kind, title: n.name,
-      sub: n.kinds.map(TGM.short).join(" + ") + (kind ? (kind.output === "TexScalar" ? " · scalar" : "") : " · not a node"),
+      sub: n.kinds.map(TGM.short).join(" + ") + (kind ? (kind.output === "Scalar" ? " · scalar" : "") : " · not a node"),
       inputs, h: GHEAD + thumb + inputs.length * GROW + 6, thumb, ins: [], outs: [], order: n.path
     });
   }
   if (g.tex) {
     nodes.set(SINK, {
       id: SINK, path: g.tex.path, sink: true, title: "output", sub: TGM.leaf(g.tex.path),
-      inputs: [{ name: "output", type: "TexVector" }], h: GHEAD + thumb + GROW + 6, thumb, ins: [], outs: [], order: "~"
+      inputs: [{ name: "output", type: "Vector" }], h: GHEAD + thumb + GROW + 6, thumb, ins: [], outs: [], order: "~"
     });
   }
   const edges = g.edges.map((e) => Object.assign({}, e));
-  if (g.output && nodes.has(g.output)) edges.push({ from: g.output, to: SINK, port: "output", index: 0, type: "TexVector" });
+  if (g.output && nodes.has(g.output)) edges.push({ from: g.output, to: SINK, port: "output", index: 0, type: "Vector" });
   for (const e of edges) {
     nodes.get(e.from).outs.push(e);
     nodes.get(e.to).ins.push(e);
@@ -439,7 +439,7 @@ G.addMenu = (ev) => {
   if (!TG.tex) return;
   const items = [{ title: "add node" }];
   for (const k of kinds) {
-    const ins = k.inputs.map((p) => p.name + (p.type === "TexScalar" ? ":s" : "")).join(", ");
+    const ins = k.inputs.map((p) => p.name + (p.type === "Scalar" ? ":s" : "")).join(", ");
     items.push({
       label: `${TGM.short(k.comp)}  ${ins ? "(" + ins + ")" : ""}`,
       doc: `${k.comp}: outputs ${TGM.typeLabel(k.output)}${k.neighbourhood ? ", reads neighbours" : ""}${k.animated ? ", animated" : ""}`,
@@ -664,7 +664,7 @@ G.render = (root) => {
   root.appendChild(G.el("div", { class: "graph-wrap" }, tools, banner, scroller));
 
   if (!tex) {
-    canvas.appendChild(G.el("div", { class: "gempty" }, TG.connected ? "no TextureGraph in this app" : "not connected"));
+    canvas.appendChild(G.el("div", { class: "gempty" }, TG.connected ? "no texture Graph in this app" : "not connected"));
   }
 
   const svgNs = "http://www.w3.org/2000/svg";

@@ -292,7 +292,7 @@ planets {
   const garden_gas: PlanetGas = gas_preset(23)
   const garden_rings: PlanetRings = rings_preset(5, 23)
 
-  ring_tex { TexturePath: {path: "etc/scenes/planet/assets/rings.png"} }
+  ring_tex { Path: {path: "etc/scenes/planet/assets/rings.png"} }
 
   // A planet whose maps are texture graphs on the sphere domain, from its kind (the palettes and
   // whether it is a rocky planet or a gas giant), seed, detail and parameters, which default to a
@@ -466,97 +466,97 @@ planets {
 
     if surf_on {
       // Continents
-      s_wn { TexNoise: {channels: 3, frequency: 1.3, octaves: 3, seed: sd * 16 + 2} }
-      s_wp { TexWarp: {offset: s_wn, amount_value: warp_amt} }
-      s_cn { TexNoise: {coords: s_wp, frequency: f1, octaves: 5, seed: sd * 16 + 1} }
-      s_dn { TexNoise: {frequency: 12, octaves: oct - 3, seed: sd * 16 + 9} }
+      s_wn { nodes.Noise: {channels: 3, frequency: 1.3, octaves: 3, seed: sd * 16 + 2} }
+      s_wp { nodes.Warp: {offset: s_wn, amount_value: warp_amt} }
+      s_cn { nodes.Noise: {coords: s_wp, frequency: f1, octaves: 5, seed: sd * 16 + 1} }
+      s_dn { nodes.Noise: {frequency: 12, octaves: oct - 3, seed: sd * 16 + 9} }
       s_dt {
-        TexMath: {op: MathRemap, a: s_dn, from_min: 0, from_max: 1, to_min: -0.07, to_max: 0.07}
+        nodes.Math: {op: MathRemap, a: s_dn, from_min: 0, from_max: 1, to_min: -0.07, to_max: 0.07}
       }
-      s_cd { TexMath: {op: MathAdd, a: s_cn, b: s_dt} }
+      s_cd { nodes.Math: {op: MathAdd, a: s_cn, b: s_dt} }
       s_c {
-        TexMath: {op: MathRemap, a: s_cd, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
+        nodes.Math: {op: MathRemap, a: s_cd, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
       }
 
       // Mountain ranges: ridged noise in some regions, rising inland from the coast
       s_rn {
-        TexNoise: {
+        nodes.Noise: {
           coords: s_wp, frequency: 2.4, octaves: oct - 1, fractal: NoiseRidged, seed: sd * 16 + 3
         }
       }
       s_r {
-        TexMath: {op: MathSmoothstep, a: s_rn, b_value: {0.45, 0, 0, 0}, c_value: {1, 0, 0, 0}}
+        nodes.Math: {op: MathSmoothstep, a: s_rn, b_value: {0.45, 0, 0, 0}, c_value: {1, 0, 0, 0}}
       }
-      s_mn { TexNoise: {frequency: 0.9, octaves: 2, seed: sd * 16 + 4} }
+      s_mn { nodes.Noise: {frequency: 0.9, octaves: 2, seed: sd * 16 + 4} }
       s_mm {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_mn, b_value: {mtn_lo, 0, 0, 0}, c_value: {mtn_lo + 0.1, 0, 0, 0}
         }
       }
       s_ml {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_c, b_value: {sea_h, 0, 0, 0}, c_value: {sea_h + 0.08, 0, 0, 0}
         }
       }
-      s_m0 { TexMath: {op: MathMultiply, a: s_r, b: s_mm} }
-      s_m1 { TexMath: {op: MathMultiply, a: s_m0, b: s_ml} }
-      s_m2 { TexMath: {op: MathMultiply, a: s_m1, b_value: {mtn, 0, 0, 0}} }
+      s_m0 { nodes.Math: {op: MathMultiply, a: s_r, b: s_mm} }
+      s_m1 { nodes.Math: {op: MathMultiply, a: s_m0, b: s_ml} }
+      s_m2 { nodes.Math: {op: MathMultiply, a: s_m1, b_value: {mtn, 0, 0, 0}} }
 
       // Craters of two sizes: bowls with a rim, deeper the wider they are, around the points
       // of cells whose size is random
-      s_k1 { TexCells: {count: 60, jitter: 0.9, seed: sd * 16 + 5} }
-      s_k1d { TexSplit: {input: s_k1, channel: ChannelR} }
-      s_k1z { TexSplit: {input: s_k1, channel: ChannelB} }
+      s_k1 { nodes.Cells: {count: 60, jitter: 0.9, seed: sd * 16 + 5} }
+      s_k1d { nodes.Split: {input: s_k1, channel: ChannelR} }
+      s_k1z { nodes.Split: {input: s_k1, channel: ChannelB} }
       s_k1r {
-        TexMath: {op: MathRemap, a: s_k1z, from_min: 0, from_max: 1, to_min: 0.08, to_max: 0.32}
+        nodes.Math: {op: MathRemap, a: s_k1z, from_min: 0, from_max: 1, to_min: 0.08, to_max: 0.32}
       }
-      s_k1n { TexMath: {op: MathDivide, a: s_k1d, b: s_k1r} }
+      s_k1n { nodes.Math: {op: MathDivide, a: s_k1d, b: s_k1r} }
       s_k1p {
-        TexCurve: {input: s_k1n, curve: {kind: CurveCatmullRom, keys: [
+        nodes.Curve: {input: s_k1n, curve: {kind: CurveCatmullRom, keys: [
           {0, -1}, {0.5, -0.85}, {0.85, -0.2}, {1, 0.3}, {1.3, 0.06}, {1.8, 0}, {4, 0}
         ]}}
       }
-      s_k1h { TexMath: {op: MathMultiply, a: s_k1p, b: s_k1r} }
-      s_k2 { TexCells: {count: 700, jitter: 0.9, seed: sd * 16 + 6} }
-      s_k2d { TexSplit: {input: s_k2, channel: ChannelR} }
-      s_k2z { TexSplit: {input: s_k2, channel: ChannelB} }
+      s_k1h { nodes.Math: {op: MathMultiply, a: s_k1p, b: s_k1r} }
+      s_k2 { nodes.Cells: {count: 700, jitter: 0.9, seed: sd * 16 + 6} }
+      s_k2d { nodes.Split: {input: s_k2, channel: ChannelR} }
+      s_k2z { nodes.Split: {input: s_k2, channel: ChannelB} }
       s_k2r {
-        TexMath: {op: MathRemap, a: s_k2z, from_min: 0, from_max: 1, to_min: 0.04, to_max: 0.12}
+        nodes.Math: {op: MathRemap, a: s_k2z, from_min: 0, from_max: 1, to_min: 0.04, to_max: 0.12}
       }
-      s_k2n { TexMath: {op: MathDivide, a: s_k2d, b: s_k2r} }
+      s_k2n { nodes.Math: {op: MathDivide, a: s_k2d, b: s_k2r} }
       s_k2p {
-        TexCurve: {input: s_k2n, curve: {kind: CurveCatmullRom, keys: [
+        nodes.Curve: {input: s_k2n, curve: {kind: CurveCatmullRom, keys: [
           {0, -1}, {0.5, -0.85}, {0.85, -0.2}, {1, 0.3}, {1.3, 0.06}, {1.8, 0}, {4, 0}
         ]}}
       }
-      s_k2h { TexMath: {op: MathMultiply, a: s_k2p, b: s_k2r} }
-      s_k0 { TexMath: {op: MathAdd, a: s_k1h, b: s_k2h} }
-      s_k { TexMath: {op: MathMultiply, a: s_k0, b_value: {crater, 0, 0, 0}} }
+      s_k2h { nodes.Math: {op: MathMultiply, a: s_k2p, b: s_k2r} }
+      s_k0 { nodes.Math: {op: MathAdd, a: s_k1h, b: s_k2h} }
+      s_k { nodes.Math: {op: MathMultiply, a: s_k0, b_value: {crater, 0, 0, 0}} }
 
       // Cracked plates of ice and lava worlds: 0 on the border of two cells
       s_cl {
-        TexCells: {
+        nodes.Cells: {
           coords: s_wp, count: cn, jitter: 1, distance: CellsEdge, edge: 0.25, seed: sd * 16 + 7
         }
       }
-      s_clx { TexSplit: {input: s_cl, channel: ChannelR} }
+      s_clx { nodes.Split: {input: s_cl, channel: ChannelR} }
       s_ck {
-        TexMath: {op: MathRemap, a: s_clx, from_min: 0, from_max: 1, to_min: 0 - crack, to_max: 0}
+        nodes.Math: {op: MathRemap, a: s_clx, from_min: 0, from_max: 1, to_min: 0 - crack, to_max: 0}
       }
 
       // Height, the relief with flat seas, altitude above the sea, land and slope
-      s_h0 { TexMath: {op: MathAdd, a: s_c, b: s_m2} }
-      s_h1 { TexMath: {op: MathAdd, a: s_h0, b: s_k} }
-      s_h { TexMath: {op: MathAdd, a: s_h1, b: s_ck} }
-      s_relief { TexMath: {op: MathMax, a: s_h, b_value: {sea_h, 0, 0, 0}} }
-      s_slope { TexSlope: {height: s_relief, strength: nstr} }
+      s_h0 { nodes.Math: {op: MathAdd, a: s_c, b: s_m2} }
+      s_h1 { nodes.Math: {op: MathAdd, a: s_h0, b: s_k} }
+      s_h { nodes.Math: {op: MathAdd, a: s_h1, b: s_ck} }
+      s_relief { nodes.Math: {op: MathMax, a: s_h, b_value: {sea_h, 0, 0, 0}} }
+      s_slope { nodes.Slope: {height: s_relief, strength: nstr} }
       s_alt {
-        TexMath: {
+        nodes.Math: {
           op: MathRemapClamped, a: s_h, from_min: base_h, from_max: top_h, to_min: 0, to_max: 1
         }
       }
       s_land {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_h, b_value: {sea_h - 0.002, 0, 0, 0},
           c_value: {sea_h + 0.002, 0, 0, 0}
         }
@@ -564,60 +564,60 @@ planets {
 
       // Temperature at sea level (s_t0) from the warped latitude, so the climate zones meander,
       // and with the altitude (s_t)
-      s_wy { TexSplit: {input: s_wp, channel: ChannelG} }
-      s_ay { TexMath: {op: MathAbs, a: s_wy} }
-      s_y2 { TexMath: {op: MathMultiply, a: s_wy, b: s_wy} }
+      s_wy { nodes.Split: {input: s_wp, channel: ChannelG} }
+      s_ay { nodes.Math: {op: MathAbs, a: s_wy} }
+      s_y2 { nodes.Math: {op: MathMultiply, a: s_wy, b: s_wy} }
       s_tl {
-        TexMath: {
+        nodes.Math: {
           op: MathRemap, a: s_y2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_pole
         }
       }
-      s_jn { TexNoise: {channels: 3, frequency: 2.5, octaves: 3, seed: sd * 16 + 8} }
-      s_jt { TexSplit: {input: s_jn, channel: ChannelR} }
-      s_jm { TexSplit: {input: s_jn, channel: ChannelG} }
-      s_jg { TexSplit: {input: s_jn, channel: ChannelB} }
+      s_jn { nodes.Noise: {channels: 3, frequency: 2.5, octaves: 3, seed: sd * 16 + 8} }
+      s_jt { nodes.Split: {input: s_jn, channel: ChannelR} }
+      s_jm { nodes.Split: {input: s_jn, channel: ChannelG} }
+      s_jg { nodes.Split: {input: s_jn, channel: ChannelB} }
       s_tj {
-        TexMath: {op: MathRemap, a: s_jt, from_min: 0.4, from_max: 0.6, to_min: -0.05, to_max: 0.05}
+        nodes.Math: {op: MathRemap, a: s_jt, from_min: 0.4, from_max: 0.6, to_min: -0.05, to_max: 0.05}
       }
-      s_t0 { TexMath: {op: MathAdd, a: s_tl, b: s_tj} }
-      s_ta { TexMath: {op: MathMultiply, a: s_alt, b_value: {t_alt, 0, 0, 0}} }
-      s_t { TexMath: {op: MathSubtract, a: s_t0, b: s_ta} }
+      s_t0 { nodes.Math: {op: MathAdd, a: s_tl, b: s_tj} }
+      s_ta { nodes.Math: {op: MathMultiply, a: s_alt, b_value: {t_alt, 0, 0, 0}} }
+      s_t { nodes.Math: {op: MathSubtract, a: s_t0, b: s_ta} }
       s_icem {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_t0, b_value: {freeze + 0.03, 0, 0, 0},
           c_value: {freeze - 0.03, 0, 0, 0}
         }
       }
 
       // Moisture: the land around (s_near) dries the inland, the latitude bands
-      s_near { TexBlur: {input: s_land, radius: 24} }
+      s_near { nodes.Blur: {input: s_land, radius: 24} }
       s_band {
-        TexCurve: {input: s_ay, curve: {kind: CurveCatmullRom, keys: [
+        nodes.Curve: {input: s_ay, curve: {kind: CurveCatmullRom, keys: [
           {0, 1}, {0.2, 0.85}, {0.42, 0.35}, {0.55, 0.35}, {0.78, 0.8}, {0.9, 0.7}, {1, 0.4}
         ]}}
       }
       s_mc {
-        TexMath: {
+        nodes.Math: {
           op: MathRemapClamped, a: s_near, from_min: 0.35, from_max: 1, to_min: wet,
           to_max: wet * 0.3
         }
       }
-      s_mb { TexMath: {op: MathMultiply, a: s_mc, b: s_band} }
+      s_mb { nodes.Math: {op: MathMultiply, a: s_mc, b: s_band} }
       s_mj {
-        TexMath: {op: MathRemap, a: s_jm, from_min: 0.4, from_max: 0.6, to_min: -0.1, to_max: 0.1}
+        nodes.Math: {op: MathRemap, a: s_jm, from_min: 0.4, from_max: 0.6, to_min: -0.1, to_max: 0.1}
       }
-      s_m { TexMath: {op: MathAdd, a: s_mb, b: s_mj} }
+      s_m { nodes.Math: {op: MathAdd, a: s_mb, b: s_mj} }
       s_hab {
-        TexCurve: {input: s_t, curve: {keys: [{0, 0}, {0.16, 0}, {0.32, 1}, {0.8, 1}, {1, 0.2}]}}
+        nodes.Curve: {input: s_t, curve: {keys: [{0, 0}, {0.16, 0}, {0.32, 1}, {0.8, 1}, {1, 0.2}]}}
       }
 
       // Biome table: the vegetation by temperature (u) and moisture (v), its cover in alpha
       lut {
-        l_uv { TexCoords: {} }
-        l_t { TexSplit: {input: l_uv, channel: ChannelR} }
-        l_m { TexSplit: {input: l_uv, channel: ChannelG} }
+        l_uv { nodes.Coords: {} }
+        l_t { nodes.Split: {input: l_uv, channel: ChannelR} }
+        l_m { nodes.Split: {input: l_uv, channel: ChannelG} }
         l_dry {
-          TexRamp: {input: l_t, keys: [
+          nodes.Ramp: {input: l_t, keys: [
             {0.1, {128, 122, 96}}
             {0.3, {118, 126, 78}}
             {0.55, {gr2.r, gr2.g, gr2.b}}
@@ -626,7 +626,7 @@ planets {
           ]}
         }
         l_wet {
-          TexRamp: {input: l_t, keys: [
+          nodes.Ramp: {input: l_t, keys: [
             {0.1, {88, 96, 74}}
             {0.25, {40, 64, 48}}
             {0.5, {fo2.r, fo2.g, fo2.b}}
@@ -635,30 +635,30 @@ planets {
           ]}
         }
         l_lush {
-          TexMath: {op: MathSmoothstep, a: l_m, b_value: {0.3, 0, 0, 0}, c_value: {0.7, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: l_m, b_value: {0.3, 0, 0, 0}, c_value: {0.7, 0, 0, 0}}
         }
-        l_veg { TexMath: {op: MathMix, a: l_dry, b: l_wet, c: l_lush} }
+        l_veg { nodes.Math: {op: MathMix, a: l_dry, b: l_wet, c: l_lush} }
         l_hab {
-          TexCurve: {
+          nodes.Curve: {
             input: l_t,
             curve: {keys: [{0, 0}, {0.1, 0}, {0.22, 0.6}, {0.3, 1}, {0.85, 1}, {1, 0.6}]}
           }
         }
         l_moist {
-          TexMath: {op: MathSmoothstep, a: l_m, b_value: {0.06, 0, 0, 0}, c_value: {0.35, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: l_m, b_value: {0.06, 0, 0, 0}, c_value: {0.35, 0, 0, 0}}
         }
-        l_cov0 { TexMath: {op: MathMultiply, a: l_hab, b: l_moist} }
-        l_cov { TexMath: {op: MathMultiply, a: l_cov0, b_value: {veg_k, 0, 0, 0}} }
-        l_cova { TexSplat: {in: l_cov} }
-        l_alpha { TexMath: {op: MathMultiply, a: l_cova, b_value: {0, 0, 0, 1}} }
-        l_rgb { TexMath: {op: MathMultiply, a: l_veg, b_value: {1, 1, 1, 0}} }
-        l_out { TexMath: {op: MathAdd, a: l_rgb, b: l_alpha} }
-        TextureGraph: {output: l_out, width: 32, height: 32}
+        l_cov0 { nodes.Math: {op: MathMultiply, a: l_hab, b: l_moist} }
+        l_cov { nodes.Math: {op: MathMultiply, a: l_cov0, b_value: {veg_k, 0, 0, 0}} }
+        l_cova { nodes.Splat: {in: l_cov} }
+        l_alpha { nodes.Math: {op: MathMultiply, a: l_cova, b_value: {0, 0, 0, 1}} }
+        l_rgb { nodes.Math: {op: MathMultiply, a: l_veg, b_value: {1, 1, 1, 0}} }
+        l_out { nodes.Math: {op: MathAdd, a: l_rgb, b: l_alpha} }
+        Graph: {output: l_out, width: 32, height: 32}
       }
 
       geo {
-        n_normal { TexNormal: {height: s_relief, strength: nstr} }
-        TextureGraph: {
+        n_normal { nodes.Normal: {height: s_relief, strength: nstr} }
+        Graph: {
           output: n_normal, width: tw, height: tw / 2, domain: DomainSphere, format: GraphLinear
         }
       }
@@ -667,114 +667,114 @@ planets {
       // of the biome below the treeline, rock on steep ground, sand at the shore and snow where
       // it is cold. Sea: tinted by depth, frozen where it is cold
       alb {
-        a_lut { TexLut: {texture: lut, u: s_t, v: s_m} }
-        a_cov0 { TexSplit: {input: a_lut, channel: ChannelA} }
+        a_lut { nodes.Lut: {texture: lut, u: s_t, v: s_m} }
+        a_cov0 { nodes.Split: {input: a_lut, channel: ChannelA} }
         a_tree {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: s_alt, b_value: {tl_hi, 0, 0, 0}, c_value: {tl_lo, 0, 0, 0}
           }
         }
-        a_cov { TexMath: {op: MathMultiply, a: a_cov0, b: a_tree} }
+        a_cov { nodes.Math: {op: MathMultiply, a: a_cov0, b: a_tree} }
         a_gv {
-          TexMath: {
+          nodes.Math: {
             op: MathRemap, a: s_jg, from_min: 0.4, from_max: 0.6, to_min: 0 - gvar, to_max: gvar
           }
         }
-        a_gh { TexMath: {op: MathAdd, a: s_alt, b: a_gv} }
+        a_gh { nodes.Math: {op: MathAdd, a: s_alt, b: a_gv} }
         a_ground {
-          TexRamp: {input: a_gh, keys: [
+          nodes.Ramp: {input: a_gh, keys: [
             {0, {tc0.r, tc0.g, tc0.b}}
             {0.22, {tc1.r, tc1.g, tc1.b}}
             {0.55, {tc2.r, tc2.g, tc2.b}}
             {0.95, {tc3.r, tc3.g, tc3.b}}
           ]}
         }
-        a_land0 { TexMath: {op: MathMix, a: a_ground, b: a_lut, c: a_cov} }
+        a_land0 { nodes.Math: {op: MathMix, a: a_ground, b: a_lut, c: a_cov} }
         a_rockm {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: s_slope, b_value: {rock_lo, 0, 0, 0}, c_value: {rock_hi, 0, 0, 0}
           }
         }
         a_rock {
-          TexRamp: {input: s_alt, keys: [{0, {rk0.r, rk0.g, rk0.b}}, {1, {rk1.r, rk1.g, rk1.b}}]}
+          nodes.Ramp: {input: s_alt, keys: [{0, {rk0.r, rk0.g, rk0.b}}, {1, {rk1.r, rk1.g, rk1.b}}]}
         }
-        a_land1 { TexMath: {op: MathMix, a: a_land0, b: a_rock, c: a_rockm} }
+        a_land1 { nodes.Math: {op: MathMix, a: a_land0, b: a_rock, c: a_rockm} }
         a_shore {
-          TexMath: {op: MathSmoothstep, a: s_alt, b_value: {0.025, 0, 0, 0}, c_value: {0, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: s_alt, b_value: {0.025, 0, 0, 0}, c_value: {0, 0, 0, 0}}
         }
-        a_beach { TexMath: {op: MathMultiply, a: a_shore, b_value: {sand, 0, 0, 0}} }
-        a_sand { TexRamp: {keys: [{0, {212, 196, 150}}]} }
-        a_land2 { TexMath: {op: MathMix, a: a_land1, b: a_sand, c: a_beach} }
+        a_beach { nodes.Math: {op: MathMultiply, a: a_shore, b_value: {sand, 0, 0, 0}} }
+        a_sand { nodes.Ramp: {keys: [{0, {212, 196, 150}}]} }
+        a_land2 { nodes.Math: {op: MathMix, a: a_land1, b: a_sand, c: a_beach} }
         a_crk {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: s_clx, from_min: 0, from_max: 0.7, to_min: crack_k, to_max: 0
           }
         }
-        a_crc { TexRamp: {keys: [{0, {crack_c.r, crack_c.g, crack_c.b}}]} }
-        a_land3 { TexMath: {op: MathMix, a: a_land2, b: a_crc, c: a_crk} }
+        a_crc { nodes.Ramp: {keys: [{0, {crack_c.r, crack_c.g, crack_c.b}}]} }
+        a_land3 { nodes.Math: {op: MathMix, a: a_land2, b: a_crc, c: a_crk} }
         a_cold {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: s_t, b_value: {sn_t, 0, 0, 0}, c_value: {sn_t - 0.07, 0, 0, 0}
           }
         }
-        a_snowm { TexMath: {op: MathMultiply, a: a_cold, b_value: {snow_k, 0, 0, 0}} }
-        a_snow { TexRamp: {keys: [{0, {236, 242, 250}}]} }
-        a_land { TexMath: {op: MathMix, a: a_land3, b: a_snow, c: a_snowm} }
+        a_snowm { nodes.Math: {op: MathMultiply, a: a_cold, b_value: {snow_k, 0, 0, 0}} }
+        a_snow { nodes.Ramp: {keys: [{0, {236, 242, 250}}]} }
+        a_land { nodes.Math: {op: MathMix, a: a_land3, b: a_snow, c: a_snowm} }
         a_shelf {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: s_h, from_min: sea_h, from_max: sea_h - 0.12, to_min: 0,
             to_max: 1
           }
         }
         a_open {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: s_near, from_min: 0.35, from_max: 0, to_min: 0.3, to_max: 1
           }
         }
-        a_depth { TexMath: {op: MathMultiply, a: a_shelf, b: a_open} }
+        a_depth { nodes.Math: {op: MathMultiply, a: a_shelf, b: a_open} }
         a_water {
-          TexRamp: {input: a_depth, keys: [
+          nodes.Ramp: {input: a_depth, keys: [
             {0.02, {s3.r, s3.g, s3.b}}
             {0.12, {s2.r, s2.g, s2.b}}
             {0.4, {s1.r, s1.g, s1.b}}
             {0.9, {s0.r, s0.g, s0.b}}
           ]}
         }
-        a_ice { TexRamp: {input: a_depth, keys: [{0, {226, 238, 248}}, {1, {170, 198, 222}}]} }
-        a_sea { TexMath: {op: MathMix, a: a_water, b: a_ice, c: s_icem} }
-        a_out { TexMath: {op: MathMix, a: a_sea, b: a_land, c: s_land} }
-        TextureGraph: {output: a_out, width: tw, height: tw / 2, domain: DomainSphere}
+        a_ice { nodes.Ramp: {input: a_depth, keys: [{0, {226, 238, 248}}, {1, {170, 198, 222}}]} }
+        a_sea { nodes.Math: {op: MathMix, a: a_water, b: a_ice, c: s_icem} }
+        a_out { nodes.Math: {op: MathMix, a: a_sea, b: a_land, c: s_land} }
+        Graph: {output: a_out, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
       // Roughness: glossy open sea, rough ice and land
       orm {
         o_sea {
-          TexMath: {op: MathRemap, a: s_icem, from_min: 0, from_max: 1, to_min: 0.42, to_max: 0.85}
+          nodes.Math: {op: MathRemap, a: s_icem, from_min: 0, from_max: 1, to_min: 0.42, to_max: 0.85}
         }
-        o_rough { TexMath: {op: MathMix, a: o_sea, b_value: {1, 0, 0, 0}, c: s_land} }
-        o_out { TexCombine: {r_value: 1, g: o_rough, b_value: 0, a_value: 1} }
-        TextureGraph: {
+        o_rough { nodes.Math: {op: MathMix, a: o_sea, b_value: {1, 0, 0, 0}, c: s_land} }
+        o_out { nodes.Combine: {r_value: 1, g: o_rough, b_value: 0, a_value: 1} }
+        Graph: {
           output: o_out, width: tw / 2, height: tw / 4, domain: DomainSphere, format: GraphLinear
         }
       }
 
       glow {
         e_low {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: s_h, from_min: lava_h - 0.06, from_max: lava_h, to_min: 1,
             to_max: 0
           }
         }
         e_crack {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: s_clx, from_min: 0, from_max: 0.5, to_min: crack_glow,
             to_max: 0
           }
         }
-        e_v0 { TexMath: {op: MathMax, a: e_low, b: e_crack} }
-        e_v { TexMath: {op: MathMultiply, a: e_v0, b_value: {lava_k, 0, 0, 0}} }
+        e_v0 { nodes.Math: {op: MathMax, a: e_low, b: e_crack} }
+        e_v { nodes.Math: {op: MathMultiply, a: e_v0, b_value: {lava_k, 0, 0, 0}} }
         e_col {
-          TexRamp: {input: e_v, keys: [
+          nodes.Ramp: {input: e_v, keys: [
             {0, {0, 0, 0}}
             {0.04, {36, 4, 0}}
             {0.25, {160, 28, 6}}
@@ -782,7 +782,7 @@ planets {
             {1, {255, 176, 70}}
           ]}
         }
-        TextureGraph: {output: e_col, width: tw, height: tw / 2, domain: DomainSphere}
+        Graph: {output: e_col, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
       // City lights: the density is habitable, watered, flat land, thickest near the coast and
@@ -790,63 +790,63 @@ planets {
       // density is at least their id, with a faint glow where it is highest
       town {
         w_wet {
-          TexMath: {op: MathSmoothstep, a: s_m, b_value: {0.05, 0, 0, 0}, c_value: {0.3, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: s_m, b_value: {0.05, 0, 0, 0}, c_value: {0.3, 0, 0, 0}}
         }
         w_coast {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: s_near, from_min: 0.55, from_max: 0.95, to_min: 1,
             to_max: 0.25
           }
         }
         w_flat {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: s_slope, b_value: {rock_hi, 0, 0, 0}, c_value: {rock_lo, 0, 0, 0}
           }
         }
-        w_cn { TexNoise: {frequency: 3.5, octaves: 3, seed: sd * 16 + 9} }
+        w_cn { nodes.Noise: {frequency: 3.5, octaves: 3, seed: sd * 16 + 9} }
         w_cl {
-          TexMath: {op: MathSmoothstep, a: w_cn, b_value: {0.46, 0, 0, 0}, c_value: {0.62, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: w_cn, b_value: {0.46, 0, 0, 0}, c_value: {0.62, 0, 0, 0}}
         }
-        w_d0 { TexMath: {op: MathMultiply, a: s_land, b: s_hab} }
-        w_d1 { TexMath: {op: MathMultiply, a: w_d0, b: w_wet} }
-        w_d2 { TexMath: {op: MathMultiply, a: w_d1, b: w_flat} }
-        w_d3 { TexMath: {op: MathMultiply, a: w_d2, b: w_coast} }
-        w_d4 { TexMath: {op: MathMultiply, a: w_d3, b: w_cl} }
-        w_d { TexMath: {op: MathMultiply, a: w_d4, b_value: {night.density, 0, 0, 0}} }
-        w_c1 { TexCells: {count: towns, jitter: 1, seed: sd * 16 + 10} }
-        w_c1x { TexSplit: {input: w_c1, channel: ChannelR} }
-        w_c1y { TexSplit: {input: w_c1, channel: ChannelG} }
-        w_c1z { TexSplit: {input: w_c1, channel: ChannelB} }
+        w_d0 { nodes.Math: {op: MathMultiply, a: s_land, b: s_hab} }
+        w_d1 { nodes.Math: {op: MathMultiply, a: w_d0, b: w_wet} }
+        w_d2 { nodes.Math: {op: MathMultiply, a: w_d1, b: w_flat} }
+        w_d3 { nodes.Math: {op: MathMultiply, a: w_d2, b: w_coast} }
+        w_d4 { nodes.Math: {op: MathMultiply, a: w_d3, b: w_cl} }
+        w_d { nodes.Math: {op: MathMultiply, a: w_d4, b_value: {night.density, 0, 0, 0}} }
+        w_c1 { nodes.Cells: {count: towns, jitter: 1, seed: sd * 16 + 10} }
+        w_c1x { nodes.Split: {input: w_c1, channel: ChannelR} }
+        w_c1y { nodes.Split: {input: w_c1, channel: ChannelG} }
+        w_c1z { nodes.Split: {input: w_c1, channel: ChannelB} }
         w_dot1 {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: w_c1x, b_value: {0.22, 0, 0, 0}, c_value: {0.03, 0, 0, 0}
           }
         }
-        w_g1 { TexMath: {op: MathStep, a: w_d, b: w_c1y} }
-        w_l1 { TexMath: {op: MathMultiply, a: w_dot1, b: w_g1} }
+        w_g1 { nodes.Math: {op: MathStep, a: w_d, b: w_c1y} }
+        w_l1 { nodes.Math: {op: MathMultiply, a: w_dot1, b: w_g1} }
         w_b1 {
-          TexMath: {op: MathRemap, a: w_c1z, from_min: 0, from_max: 1, to_min: 0.45, to_max: 1}
+          nodes.Math: {op: MathRemap, a: w_c1z, from_min: 0, from_max: 1, to_min: 0.45, to_max: 1}
         }
-        w_t1 { TexMath: {op: MathMultiply, a: w_l1, b: w_b1} }
-        w_c2 { TexCells: {count: towns * 4, jitter: 1, seed: sd * 16 + 11} }
-        w_c2x { TexSplit: {input: w_c2, channel: ChannelR} }
-        w_c2y { TexSplit: {input: w_c2, channel: ChannelG} }
+        w_t1 { nodes.Math: {op: MathMultiply, a: w_l1, b: w_b1} }
+        w_c2 { nodes.Cells: {count: towns * 4, jitter: 1, seed: sd * 16 + 11} }
+        w_c2x { nodes.Split: {input: w_c2, channel: ChannelR} }
+        w_c2y { nodes.Split: {input: w_c2, channel: ChannelG} }
         w_dot2 {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: w_c2x, b_value: {0.16, 0, 0, 0}, c_value: {0.02, 0, 0, 0}
           }
         }
-        w_d2s { TexMath: {op: MathMultiply, a: w_d, b_value: {0.45, 0, 0, 0}} }
-        w_g2 { TexMath: {op: MathStep, a: w_d2s, b: w_c2y} }
-        w_l2 { TexMath: {op: MathMultiply, a: w_dot2, b: w_g2} }
-        w_t2 { TexMath: {op: MathMultiply, a: w_l2, b_value: {0.55, 0, 0, 0}} }
-        w_dd { TexMath: {op: MathMultiply, a: w_d, b: w_d} }
-        w_haze { TexMath: {op: MathMultiply, a: w_dd, b_value: {0.035, 0, 0, 0}} }
-        w_v0 { TexMath: {op: MathMax, a: w_t1, b: w_t2} }
-        w_v1 { TexMath: {op: MathAdd, a: w_v0, b: w_haze} }
-        w_v { TexMath: {op: MathMultiply, a: w_v1, b_value: {city_k, 0, 0, 0}} }
+        w_d2s { nodes.Math: {op: MathMultiply, a: w_d, b_value: {0.45, 0, 0, 0}} }
+        w_g2 { nodes.Math: {op: MathStep, a: w_d2s, b: w_c2y} }
+        w_l2 { nodes.Math: {op: MathMultiply, a: w_dot2, b: w_g2} }
+        w_t2 { nodes.Math: {op: MathMultiply, a: w_l2, b_value: {0.55, 0, 0, 0}} }
+        w_dd { nodes.Math: {op: MathMultiply, a: w_d, b: w_d} }
+        w_haze { nodes.Math: {op: MathMultiply, a: w_dd, b_value: {0.035, 0, 0, 0}} }
+        w_v0 { nodes.Math: {op: MathMax, a: w_t1, b: w_t2} }
+        w_v1 { nodes.Math: {op: MathAdd, a: w_v0, b: w_haze} }
+        w_v { nodes.Math: {op: MathMultiply, a: w_v1, b_value: {city_k, 0, 0, 0}} }
         w_col {
-          TexRamp: {input: w_v, keys: [
+          nodes.Ramp: {input: w_v, keys: [
             {0, {0, 0, 0}}
             {0.02, {0, 0, 0}}
             {0.12, {70, 36, 14}}
@@ -855,7 +855,7 @@ planets {
             {1, {255, 244, 210}}
           ]}
         }
-        TextureGraph: {output: w_col, width: tw, height: tw / 2, domain: DomainSphere}
+        Graph: {output: w_col, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
       // Clouds of the seed: weather systems of a noise that evolves slowly at warped coordinates
@@ -864,91 +864,91 @@ planets {
       // The warp, the bands and the billows do not depend on the time, so they are computed
       // once and each update evaluates the coverage only
       cld {
-        k_time { TexTime: {scale: clouds.evolve, offset: v3 * 40} }
-        k_w1 { TexNoise: {channels: 3, frequency: 1.2, octaves: 2, seed: sd * 16 + 12} }
-        k_p1 { TexWarp: {offset: k_w1, amount_value: 0.7} }
-        k_st { TexTransform: {coords: k_p1, scale: {1, 1.6, 1}} }
+        k_time { nodes.Time: {scale: clouds.evolve, offset: v3 * 40} }
+        k_w1 { nodes.Noise: {channels: 3, frequency: 1.2, octaves: 2, seed: sd * 16 + 12} }
+        k_p1 { nodes.Warp: {offset: k_w1, amount_value: 0.7} }
+        k_st { nodes.Transform: {coords: k_p1, scale: {1, 1.6, 1}} }
         k_n {
-          TexNoise: {
+          nodes.Noise: {
             coords: k_st, frequency: clouds.frequency, octaves: 3, evolve: k_time,
             seed: sd * 16 + 13
           }
         }
         k_z {
-          TexMath: {op: MathRemap, a: k_n, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
+          nodes.Math: {op: MathRemap, a: k_n, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
         }
         k_f {
-          TexNoise: {
+          nodes.Noise: {
             coords: k_st, frequency: clouds.frequency * 10 / 3, octaves: oct - 2, gain: 0.6,
             fractal: NoiseBillow, seed: sd * 16 + 15
           }
         }
         k_fz {
-          TexMath: {op: MathRemap, a: k_f, from_min: 0.23, from_max: 0.32, to_min: 0, to_max: 0.8}
+          nodes.Math: {op: MathRemap, a: k_f, from_min: 0.23, from_max: 0.32, to_min: 0, to_max: 0.8}
         }
-        k_y { TexSplit: {input: k_p1, channel: ChannelG} }
-        k_ay { TexMath: {op: MathAbs, a: k_y} }
+        k_y { nodes.Split: {input: k_p1, channel: ChannelG} }
+        k_ay { nodes.Math: {op: MathAbs, a: k_y} }
         k_band {
-          TexCurve: {input: k_ay, curve: {kind: CurveCatmullRom, keys: [
+          nodes.Curve: {input: k_ay, curve: {kind: CurveCatmullRom, keys: [
             {0, 0.7}, {0.15, 0.3}, {0.42, -0.9}, {0.58, -0.3}, {0.8, 0.7}, {0.92, 0.4}, {1, -0.4}
           ]}}
         }
-        k_s0 { TexMath: {op: MathAdd, a: k_z, b: k_band} }
-        k_sum { TexMath: {op: MathAdd, a: k_s0, b: k_fz} }
+        k_s0 { nodes.Math: {op: MathAdd, a: k_z, b: k_band} }
+        k_sum { nodes.Math: {op: MathAdd, a: k_s0, b: k_fz} }
         k_d {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: k_sum, b_value: {thr, 0, 0, 0}, c_value: {thr + 1.8, 0, 0, 0}
           }
         }
-        k_s { TexSplat: {in: k_d} }
+        k_s { nodes.Splat: {in: k_d} }
         k_out {
-          TexMath: {op: MathMix, a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, c: k_s}
+          nodes.Math: {op: MathMix, a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, c: k_s}
         }
-        TextureGraph: {output: k_out, width: tw, height: tw / 2, domain: DomainSphere, rate: 3}
+        Graph: {output: k_out, width: tw, height: tw / 2, domain: DomainSphere, rate: 3}
       }
     } else if gas_on {
       // Zones and belts from the sine of the latitude, made irregular by a noise of the latitude
-      g_dir { TexCoords: {} }
-      g_y { TexSplit: {input: g_dir, channel: ChannelG} }
-      g_line { TexCombine: {r_value: v2 * 7, g: g_y, b_value: v4 * 7, a_value: 1} }
-      g_ln { TexNoise: {coords: g_line, frequency: 2, octaves: 2, seed: sd * 16 + 3} }
+      g_dir { nodes.Coords: {} }
+      g_y { nodes.Split: {input: g_dir, channel: ChannelG} }
+      g_line { nodes.Combine: {r_value: v2 * 7, g: g_y, b_value: v4 * 7, a_value: 1} }
+      g_ln { nodes.Noise: {coords: g_line, frequency: 2, octaves: 2, seed: sd * 16 + 3} }
       g_lo {
-        TexMath: {op: MathRemap, a: g_ln, from_min: 0.5, from_max: 1, to_min: 0, to_max: 0.6}
+        nodes.Math: {op: MathRemap, a: g_ln, from_min: 0.5, from_max: 1, to_min: 0, to_max: 0.6}
       }
-      g_lat { TexMath: {op: MathAdd, a: g_y, b: g_lo} }
-      g_ph { TexMath: {op: MathMultiply, a: g_lat, b_value: {bf, 0, 0, 0}} }
-      g_sin { TexMath: {op: MathSin, a: g_ph} }
+      g_lat { nodes.Math: {op: MathAdd, a: g_y, b: g_lo} }
+      g_ph { nodes.Math: {op: MathMultiply, a: g_lat, b_value: {bf, 0, 0, 0}} }
+      g_sin { nodes.Math: {op: MathSin, a: g_ph} }
 
       // The bands in their own frame, computed once: turbulence of warped noise stretched along
       // the bands, wavy band edges and storm ovals held between two jets
       bands {
-        b_wn { TexNoise: {channels: 3, frequency: 2.5, octaves: 2, seed: sd * 16 + 5} }
-        b_wp { TexWarp: {offset: b_wn, amount_value: 0.3} }
-        b_st { TexTransform: {coords: b_wp, scale: {1, 4, 1}} }
+        b_wn { nodes.Noise: {channels: 3, frequency: 2.5, octaves: 2, seed: sd * 16 + 5} }
+        b_wp { nodes.Warp: {offset: b_wn, amount_value: 0.3} }
+        b_st { nodes.Transform: {coords: b_wp, scale: {1, 4, 1}} }
         b_tn {
-          TexNoise: {coords: b_st, frequency: 3, octaves: oct - 1, gain: 0.55, seed: sd * 16 + 6}
+          nodes.Noise: {coords: b_st, frequency: 3, octaves: oct - 1, gain: 0.55, seed: sd * 16 + 6}
         }
-        b_wy { TexSplit: {input: b_wp, channel: ChannelG} }
-        b_wl { TexMath: {op: MathAdd, a: b_wy, b: g_lo} }
-        b_wph { TexMath: {op: MathMultiply, a: b_wl, b_value: {bf, 0, 0, 0}} }
-        b_ws { TexMath: {op: MathSin, a: b_wph} }
-        b_sub { TexCombine: {r_value: v2 * 7 + 3, g: b_wy, b_value: v4 * 7 + 3, a_value: 1} }
-        b_sn { TexNoise: {coords: b_sub, frequency: 9, octaves: 3, gain: 0.6, seed: sd * 16 + 1} }
+        b_wy { nodes.Split: {input: b_wp, channel: ChannelG} }
+        b_wl { nodes.Math: {op: MathAdd, a: b_wy, b: g_lo} }
+        b_wph { nodes.Math: {op: MathMultiply, a: b_wl, b_value: {bf, 0, 0, 0}} }
+        b_ws { nodes.Math: {op: MathSin, a: b_wph} }
+        b_sub { nodes.Combine: {r_value: v2 * 7 + 3, g: b_wy, b_value: v4 * 7 + 3, a_value: 1} }
+        b_sn { nodes.Noise: {coords: b_sub, frequency: 9, octaves: 3, gain: 0.6, seed: sd * 16 + 1} }
         b_b0 {
-          TexMath: {op: MathRemap, a: b_ws, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8}
+          nodes.Math: {op: MathRemap, a: b_ws, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8}
         }
         b_b1 {
-          TexMath: {op: MathRemap, a: b_sn, from_min: 0.4, from_max: 0.6, to_min: -0.2, to_max: 0.2}
+          nodes.Math: {op: MathRemap, a: b_sn, from_min: 0.4, from_max: 0.6, to_min: -0.2, to_max: 0.2}
         }
         b_t {
-          TexMath: {
+          nodes.Math: {
             op: MathRemap, a: b_tn, from_min: 0.4, from_max: 0.6, to_min: 0 - turb, to_max: turb
           }
         }
-        b_v0 { TexMath: {op: MathAdd, a: b_b0, b: b_b1} }
-        b_v { TexMath: {op: MathAdd, a: b_v0, b: b_t} }
+        b_v0 { nodes.Math: {op: MathAdd, a: b_b0, b: b_b1} }
+        b_v { nodes.Math: {op: MathAdd, a: b_v0, b: b_t} }
         b_col {
-          TexRamp: {input: b_v, keys: [
+          nodes.Ramp: {input: b_v, keys: [
             {0.15, {g3.r, g3.g, g3.b}}
             {0.35, {g1.r, g1.g, g1.b}}
             {0.5, {g4.r, g4.g, g4.b}}
@@ -956,33 +956,33 @@ planets {
             {0.85, {g2.r, g2.g, g2.b}}
           ]}
         }
-        b_sc { TexTransform: {scale: {1, 2.2, 1}} }
-        b_cells { TexCells: {coords: b_sc, count: 48, jitter: 0.8, seed: sd * 16 + 4} }
-        b_cx { TexSplit: {input: b_cells, channel: ChannelR} }
-        b_cz { TexSplit: {input: b_cells, channel: ChannelB} }
-        b_cw { TexSplit: {input: b_cells, channel: ChannelA} }
+        b_sc { nodes.Transform: {scale: {1, 2.2, 1}} }
+        b_cells { nodes.Cells: {coords: b_sc, count: 48, jitter: 0.8, seed: sd * 16 + 4} }
+        b_cx { nodes.Split: {input: b_cells, channel: ChannelR} }
+        b_cz { nodes.Split: {input: b_cells, channel: ChannelB} }
+        b_cw { nodes.Split: {input: b_cells, channel: ChannelA} }
         b_core {
-          TexMath: {op: MathSmoothstep, a: b_cx, b_value: {0.42, 0, 0, 0}, c_value: {0.34, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: b_cx, b_value: {0.42, 0, 0, 0}, c_value: {0.34, 0, 0, 0}}
         }
-        b_gate { TexMath: {op: MathStep, a_value: {storm_frac, 0, 0, 0}, b: b_cz} }
-        b_as { TexMath: {op: MathAbs, a: g_sin} }
+        b_gate { nodes.Math: {op: MathStep, a_value: {storm_frac, 0, 0, 0}, b: b_cz} }
+        b_as { nodes.Math: {op: MathAbs, a: g_sin} }
         b_pl {
-          TexMath: {op: MathSmoothstep, a: b_as, b_value: {0.35, 0, 0, 0}, c_value: {0.9, 0, 0, 0}}
+          nodes.Math: {op: MathSmoothstep, a: b_as, b_value: {0.35, 0, 0, 0}, c_value: {0.9, 0, 0, 0}}
         }
-        b_st0 { TexMath: {op: MathMultiply, a: b_core, b: b_gate} }
-        b_storm { TexMath: {op: MathMultiply, a: b_st0, b: b_pl} }
-        b_sk { TexMath: {op: MathMultiply, a: b_storm, b_value: {0.9, 0, 0, 0}} }
+        b_st0 { nodes.Math: {op: MathMultiply, a: b_core, b: b_gate} }
+        b_storm { nodes.Math: {op: MathMultiply, a: b_st0, b: b_pl} }
+        b_sk { nodes.Math: {op: MathMultiply, a: b_storm, b_value: {0.9, 0, 0, 0}} }
         b_ring {
-          TexMath: {
+          nodes.Math: {
             op: MathRemapClamped, a: b_cx, from_min: 0, from_max: 0.42, to_min: 0.7, to_max: 1.1
           }
         }
         b_scol0 {
-          TexRamp: {input: b_cw, keys: [{0, {st0.r, st0.g, st0.b}}, {1, {st1.r, st1.g, st1.b}}]}
+          nodes.Ramp: {input: b_cw, keys: [{0, {st0.r, st0.g, st0.b}}, {1, {st1.r, st1.g, st1.b}}]}
         }
-        b_scol { TexMath: {op: MathMultiply, a: b_scol0, b: b_ring} }
-        b_out { TexMath: {op: MathMix, a: b_col, b: b_scol, c: b_sk} }
-        TextureGraph: {output: b_out, width: tw, height: tw / 2, domain: DomainSphere}
+        b_scol { nodes.Math: {op: MathMultiply, a: b_scol0, b: b_ring} }
+        b_out { nodes.Math: {op: MathMix, a: b_col, b: b_scol, c: b_sk} }
+        Graph: {output: b_out, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
       // Differential rotation: each band turns about the pole at the speed of its jet, the
@@ -991,28 +991,28 @@ planets {
       // direction, so an update costs a lookup per texel
       alb {
         a_jet {
-          TexMath: {
+          nodes.Math: {
             op: MathSmoothstep, a: g_sin, b_value: {-0.8, 0, 0, 0}, c_value: {0.8, 0, 0, 0}
           }
         }
         a_amp {
-          TexMath: {
+          nodes.Math: {
             op: MathRemap, a: a_jet, from_min: 0, from_max: 1, to_min: 0 - drift, to_max: drift
           }
         }
-        a_time { TexTime: {scale: 0.00524, offset: -0.3 - v3 * 0.4} }
-        a_swing { TexMath: {op: MathSin, a: a_time} }
-        a_ang { TexMath: {op: MathMultiply, a: a_amp, b: a_swing} }
-        a_rot { TexTransform: {coords: g_dir, angle: a_ang} }
-        a_img { TexImage: {texture: bands, coords: a_rot} }
-        TextureGraph: {output: a_img, width: tw, height: tw / 2, domain: DomainSphere, rate: 12}
+        a_time { nodes.Time: {scale: 0.00524, offset: -0.3 - v3 * 0.4} }
+        a_swing { nodes.Math: {op: MathSin, a: a_time} }
+        a_ang { nodes.Math: {op: MathMultiply, a: a_amp, b: a_swing} }
+        a_rot { nodes.Transform: {coords: g_dir, angle: a_ang} }
+        a_img { nodes.Image: {texture: bands, coords: a_rot} }
+        Graph: {output: a_img, width: tw, height: tw / 2, domain: DomainSphere, rate: 12}
       }
     }
 
-    const ready: bool = detail > 0 && alb[TextureStatus].revision > 0
-    const lava_ready: bool = lava_on && glow[TextureStatus].revision > 0
-    const city_ready: bool = city_on && town[TextureStatus].revision > 0
-    const cloud_ready: bool = surf_on && cld[TextureStatus].revision > 0
+    const ready: bool = detail > 0 && alb[Status].revision > 0
+    const lava_ready: bool = lava_on && glow[Status].revision > 0
+    const city_ready: bool = city_on && town[Status].revision > 0
+    const cloud_ready: bool = surf_on && cld[Status].revision > 0
 
     axis {
       Position: {0, 0, 0}
@@ -1226,78 +1226,78 @@ planets {
     const cor: f32 = max(corona, 0)
 
     surf {
-      t_g { TexTime: {scale: 0.3, offset: v1 * 60} }
-      t_s { TexTime: {scale: 0.04, offset: v2 * 60} }
+      t_g { nodes.Time: {scale: 0.3, offset: v1 * 60} }
+      t_s { nodes.Time: {scale: 0.04, offset: v2 * 60} }
 
       // Granules: bright cells with dark lanes between them, the points of the cells moving
       // with the time, each cell a little brighter or darker
       g_wn {
-        TexNoise: {
+        nodes.Noise: {
           channels: 3, frequency: 1.4 / gcell, octaves: 2, evolve: t_g, seed: sd * 16 + 1
         }
       }
-      g_wp { TexWarp: {offset: g_wn, amount_value: gcell * 0.7} }
+      g_wp { nodes.Warp: {offset: g_wn, amount_value: gcell * 0.7} }
       g_c {
-        TexCells: {
+        nodes.Cells: {
           coords: g_wp, count: gcount, jitter: 1, distance: CellsEdge, edge: 0.3,
           evolve: t_g, seed: sd * 16 + 2
         }
       }
-      g_e { TexSplit: {input: g_c, channel: ChannelR} }
-      g_z { TexSplit: {input: g_c, channel: ChannelB} }
+      g_e { nodes.Split: {input: g_c, channel: ChannelR} }
+      g_z { nodes.Split: {input: g_c, channel: ChannelB} }
       g_ez {
-        TexMath: {op: MathRemap, a: g_z, from_min: 0, from_max: 1, to_min: -0.12, to_max: 0.12}
+        nodes.Math: {op: MathRemap, a: g_z, from_min: 0, from_max: 1, to_min: -0.12, to_max: 0.12}
       }
       g_fn {
-        TexNoise: {
+        nodes.Noise: {
           frequency: 3.5 / gcell, octaves: detail > 1 ? 2 : 1, evolve: t_g, seed: sd * 16 + 3
         }
       }
       g_fd {
-        TexMath: {op: MathRemap, a: g_fn, from_min: 0.3, from_max: 0.7, to_min: -0.1, to_max: 0.1}
+        nodes.Math: {op: MathRemap, a: g_fn, from_min: 0.3, from_max: 0.7, to_min: -0.1, to_max: 0.1}
       }
-      g_s0 { TexMath: {op: MathAdd, a: g_e, b: g_ez} }
-      g_raw { TexMath: {op: MathAdd, a: g_s0, b: g_fd} }
+      g_s0 { nodes.Math: {op: MathAdd, a: g_e, b: g_ez} }
+      g_raw { nodes.Math: {op: MathAdd, a: g_s0, b: g_fd} }
       g_v {
-        TexMath: {op: MathRemap, a: g_raw, from_min: 0, from_max: 1, to_min: 1 - gc, to_max: 1}
+        nodes.Math: {op: MathRemap, a: g_raw, from_min: 0, from_max: 1, to_min: 1 - gc, to_max: 1}
       }
 
       // The network of the supergranules, about 25 granules across, bright on their borders
       n_c {
-        TexCells: {
+        nodes.Cells: {
           count: max(gcount / 25, 8), jitter: 1, distance: CellsEdge, edge: 0.12, evolve: t_s,
           seed: sd * 16 + 4
         }
       }
-      n_x { TexSplit: {input: n_c, channel: ChannelR} }
+      n_x { nodes.Split: {input: n_c, channel: ChannelR} }
       n_net {
-        TexMath: {op: MathRemapClamped, a: n_x, from_min: 0, from_max: 1, to_min: 1, to_max: 0}
+        nodes.Math: {op: MathRemapClamped, a: n_x, from_min: 0, from_max: 1, to_min: 1, to_max: 0}
       }
 
       // Sunspots: a slowly changing noise, held to two bands from about 5 to 35 degrees of
       // latitude, a penumbra where it beats the threshold and an umbra inside it
       s_n {
-        TexNoise: {
+        nodes.Noise: {
           frequency: 5, octaves: detail > 1 ? 5 : 4, evolve: t_s, seed: sd * 16 + 5
         }
       }
-      s_uv { TexCoords: {} }
-      s_y { TexSplit: {input: s_uv, channel: ChannelG} }
-      s_ay { TexMath: {op: MathAbs, a: s_y} }
+      s_uv { nodes.Coords: {} }
+      s_y { nodes.Split: {input: s_uv, channel: ChannelG} }
+      s_ay { nodes.Math: {op: MathAbs, a: s_y} }
       s_band {
-        TexCurve: {input: s_ay, curve: {kind: CurveCatmullRom, keys: [
+        nodes.Curve: {input: s_ay, curve: {kind: CurveCatmullRom, keys: [
           {0, -0.25}, {0.08, -0.06}, {0.18, 0}, {0.48, 0}, {0.62, -0.12}, {0.8, -0.45},
           {1, -0.6}
         ]}}
       }
-      s_v { TexMath: {op: MathAdd, a: s_n, b: s_band} }
+      s_v { nodes.Math: {op: MathAdd, a: s_n, b: s_band} }
       s_pen {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_v, b_value: {sp_th, 0, 0, 0}, c_value: {sp_th + 0.012, 0, 0, 0}
         }
       }
       s_umb {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_v, b_value: {sp_th + 0.03, 0, 0, 0},
           c_value: {sp_th + 0.045, 0, 0, 0}
         }
@@ -1306,44 +1306,44 @@ planets {
       // Faculae: the network in the active regions around the spots, and a bright ring at
       // their edge
       f_act {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_v, b_value: {sp_th - 0.16, 0, 0, 0},
           c_value: {sp_th - 0.01, 0, 0, 0}
         }
       }
       f_ring {
-        TexMath: {
+        nodes.Math: {
           op: MathSmoothstep, a: s_v, b_value: {sp_th - 0.07, 0, 0, 0},
           c_value: {sp_th - 0.01, 0, 0, 0}
         }
       }
-      f_net { TexMath: {op: MathMultiply, a: n_net, b: f_act} }
-      f_rk { TexMath: {op: MathMultiply, a: f_ring, b_value: {0.6, 0, 0, 0}} }
-      f_m { TexMath: {op: MathMax, a: f_net, b: f_rk} }
-      f_k { TexMath: {op: MathMultiply, a: f_m, b_value: {fac_k, 0, 0, 0}} }
-      f_up { TexMath: {op: MathAdd, a: f_k, b_value: {1, 0, 0, 0}} }
+      f_net { nodes.Math: {op: MathMultiply, a: n_net, b: f_act} }
+      f_rk { nodes.Math: {op: MathMultiply, a: f_ring, b_value: {0.6, 0, 0, 0}} }
+      f_m { nodes.Math: {op: MathMax, a: f_net, b: f_rk} }
+      f_k { nodes.Math: {op: MathMultiply, a: f_m, b_value: {fac_k, 0, 0, 0}} }
+      f_up { nodes.Math: {op: MathAdd, a: f_k, b_value: {1, 0, 0, 0}} }
 
       // Brightness: the granules, brightened by the faculae, darkened in the penumbra and more
       // in the umbra, and the spots redder
-      i_0 { TexMath: {op: MathMultiply, a: g_v, b: f_up} }
+      i_0 { nodes.Math: {op: MathMultiply, a: g_v, b: f_up} }
       i_pm {
-        TexMath: {op: MathRemap, a: s_pen, from_min: 0, from_max: 1, to_min: 1, to_max: 0.52}
+        nodes.Math: {op: MathRemap, a: s_pen, from_min: 0, from_max: 1, to_min: 1, to_max: 0.52}
       }
-      i_1 { TexMath: {op: MathMultiply, a: i_0, b: i_pm} }
+      i_1 { nodes.Math: {op: MathMultiply, a: i_0, b: i_pm} }
       i_um {
-        TexMath: {op: MathRemap, a: s_umb, from_min: 0, from_max: 1, to_min: 1, to_max: 0.25}
+        nodes.Math: {op: MathRemap, a: s_umb, from_min: 0, from_max: 1, to_min: 1, to_max: 0.25}
       }
-      i_2 { TexMath: {op: MathMultiply, a: i_1, b: i_um} }
-      c_cool { TexMath: {op: MathAdd, a: s_pen, b: s_umb} }
+      i_2 { nodes.Math: {op: MathMultiply, a: i_1, b: i_um} }
+      c_cool { nodes.Math: {op: MathAdd, a: s_pen, b: s_umb} }
       c_tint {
-        TexRamp: {input: c_cool, keys: [
+        nodes.Ramp: {input: c_cool, keys: [
           {0, {255, 255, 255}}
           {1, {255, 222, 196}}
           {2, {255, 168, 118}}
         ]}
       }
-      out { TexMath: {op: MathMultiply, a: c_tint, b: i_2} }
-      TextureGraph: {
+      out { nodes.Math: {op: MathMultiply, a: c_tint, b: i_2} }
+      Graph: {
         output: out, width: tw, height: tw / 2, domain: DomainSphere, format: GraphHdr,
         rate: detail > 1 ? 10 : 8
       }
@@ -1353,34 +1353,34 @@ planets {
     // sprite from the center), falls off beyond it and is broken up into rays by a noise of the
     // angle around the center
     streamer {
-      c_uv { TexCoords: {} }
-      c_p { TexMath: {op: MathSubtract, a: c_uv, b_value: {0.5, 0.5, 0, 0}} }
-      c_r { TexMath: {op: MathLength, a: c_p} }
-      c_dir { TexMath: {op: MathNormalize, a: c_p} }
-      c_dn { TexMath: {op: MathMultiply, a: c_dir, b_value: {2.5, 2.5, 2.5, 1}} }
-      c_n { TexNoise: {coords: c_dn, frequency: 2, octaves: 3, gain: 0.6, seed: sd * 16 + 6} }
+      c_uv { nodes.Coords: {} }
+      c_p { nodes.Math: {op: MathSubtract, a: c_uv, b_value: {0.5, 0.5, 0, 0}} }
+      c_r { nodes.Math: {op: MathLength, a: c_p} }
+      c_dir { nodes.Math: {op: MathNormalize, a: c_p} }
+      c_dn { nodes.Math: {op: MathMultiply, a: c_dir, b_value: {2.5, 2.5, 2.5, 1}} }
+      c_n { nodes.Noise: {coords: c_dn, frequency: 2, octaves: 3, gain: 0.6, seed: sd * 16 + 6} }
       c_ray {
-        TexMath: {op: MathRemap, a: c_n, from_min: 0.3, from_max: 0.7, to_min: 0.3, to_max: 1.5}
+        nodes.Math: {op: MathRemap, a: c_n, from_min: 0.3, from_max: 0.7, to_min: 0.3, to_max: 1.5}
       }
       c_rw {
-        TexMath: {
+        nodes.Math: {
           op: MathRemapClamped, a: c_r, from_min: 0.2, from_max: 0.34, to_min: 0, to_max: 1
         }
       }
-      c_m { TexMath: {op: MathMix, a_value: {1, 1, 1, 1}, b: c_ray, c: c_rw} }
+      c_m { nodes.Math: {op: MathMix, a_value: {1, 1, 1, 1}, b: c_ray, c: c_rw} }
       c_fall {
-        TexCurve: {input: c_r, curve: {kind: CurveCatmullRom, keys: [
+        nodes.Curve: {input: c_r, curve: {kind: CurveCatmullRom, keys: [
           {0, 1}, {0.2, 1}, {0.23, 0.62}, {0.28, 0.3}, {0.35, 0.12}, {0.42, 0.04}, {0.5, 0}
         ]}}
       }
-      c_a0 { TexMath: {op: MathMultiply, a: c_fall, b: c_m} }
-      c_a { TexMath: {op: MathClamp, a: c_a0, b_value: {0, 0, 0, 0}, c_value: {1, 0, 0, 0}} }
-      c_out { TexCombine: {r_value: 1, g_value: 1, b_value: 1, a: c_a} }
-      TextureGraph: {output: c_out, width: 256, height: 256, format: GraphLinear}
+      c_a0 { nodes.Math: {op: MathMultiply, a: c_fall, b: c_m} }
+      c_a { nodes.Math: {op: MathClamp, a: c_a0, b_value: {0, 0, 0, 0}, c_value: {1, 0, 0, 0}} }
+      c_out { nodes.Combine: {r_value: 1, g_value: 1, b_value: 1, a: c_a} }
+      Graph: {output: c_out, width: 256, height: 256, format: GraphLinear}
     }
 
-    const ready: bool = surf[TextureStatus].revision > 0
-    const streamer_ready: bool = streamer[TextureStatus].revision > 0
+    const ready: bool = surf[Status].revision > 0
+    const streamer_ready: bool = streamer[Status].revision > 0
 
     axis {
       Position: {0, 0, 0}

@@ -32,7 +32,7 @@ $ {
 }
 
 clouds {
-  TexturePath: {path: "test/assets/textures/cloud_noise_256.png", single_channel: true}
+  Path: {path: "test/assets/textures/cloud_noise_256.png", single_channel: true}
 }
 
 sun {

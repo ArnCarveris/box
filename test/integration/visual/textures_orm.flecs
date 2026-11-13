@@ -25,7 +25,7 @@ orm_scene {
   }
 
   orm {
-    TexturePath: {path: "test/integration/visual/assets/orm.png"}
+    Path: {path: "test/integration/visual/assets/orm.png"}
   }
 
   sun {

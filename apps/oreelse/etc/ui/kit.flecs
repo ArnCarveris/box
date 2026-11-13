@@ -14,12 +14,12 @@ using oreelse
 window {}
 
 ui_art {
-  halo { TexturePath: {path: "apps/oreelse/etc/ui/art/halo.png"} }
-  vignette { TexturePath: {path: "apps/oreelse/etc/ui/art/vignette.png"} }
-  plate { TexturePath: {path: "apps/oreelse/etc/ui/art/plate.png"} }
-  bracket { TexturePath: {path: "apps/oreelse/etc/ui/art/bracket.svg", width: 64} }
-  rays { TexturePath: {path: "apps/oreelse/etc/ui/art/rays.svg", width: 1024} }
-  hazard { TexturePath: {path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12} }
+  halo { Path: {path: "apps/oreelse/etc/ui/art/halo.png"} }
+  vignette { Path: {path: "apps/oreelse/etc/ui/art/vignette.png"} }
+  plate { Path: {path: "apps/oreelse/etc/ui/art/plate.png"} }
+  bracket { Path: {path: "apps/oreelse/etc/ui/art/bracket.svg", width: 64} }
+  rays { Path: {path: "apps/oreelse/etc/ui/art/rays.svg", width: 1024} }
+  hazard { Path: {path: "apps/oreelse/etc/ui/hazard_strip.svg", width: 2048, height: 12} }
 }
 
 ui_tick_a {}

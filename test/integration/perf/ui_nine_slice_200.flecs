@@ -19,7 +19,7 @@ main_view {
 }
 
 frame {
-  TexturePath: {path: "test/integration/visual/assets/frame.png"}
+  Path: {path: "test/integration/visual/assets/frame.png"}
 }
 
 ui {

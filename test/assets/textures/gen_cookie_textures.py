@@ -3,7 +3,7 @@
 
 The images are committed next to this script; run it again only to change them:
 python3 test/assets/textures/gen_cookie_textures.py. The first row of an image is the top, at
-v = 0; the tests load them with TexturePath.single_channel, which reads the gray as stored.
+v = 0; the tests load them with box.texture.Path.single_channel, which reads the gray as stored.
 
 cookie_gray.png    16 x 16 of 128, a uniform half
 cookie_black.png   16 x 16 of 0

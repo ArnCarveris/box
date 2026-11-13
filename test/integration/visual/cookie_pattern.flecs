@@ -31,7 +31,7 @@ $ {
 }
 
 grid {
-  TexturePath: {path: "test/integration/visual/assets/cookie_grid.png", single_channel: true}
+  Path: {path: "test/integration/visual/assets/cookie_grid.png", single_channel: true}
 }
 
 sun {

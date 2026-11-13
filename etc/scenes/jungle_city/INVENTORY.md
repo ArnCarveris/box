@@ -10,7 +10,7 @@ Inspected before scene design: `include/box/geometry.h`, `material.h`, `texture.
 | Surface detail | SurfaceAttachment positions details by surface coordinates; SurfaceMaterials separates outer, inner, rim and cap materials |
 | Transforms and reuse | Position, Rotation (radians), Scale, parent hierarchies, prefabs and script templates; cached primitive meshes |
 | Materials | Rgb, hierarchical Tint and Opacity, metallic/roughness PbrMaterial, ClearCoat, Emissive, refractive Transmission, AlphaCutoff, blend modes, back-face modes, NoShadow |
-| Textures | TexturePath; PbrTextures albedo, normal, emissive and packed ORM; TextureTransform and wrapping |
+| Textures | box.texture.Path; PbrTextures albedo, normal, emissive and packed ORM; TextureTransform and wrapping |
 | Lighting | Directional, point, spot and ambient lights; cookies; shadow atlas; indirect LightBake; ReflectionBake and local ReflectionProbe; image environments |
 | Rendering | Scene/View/Surface, perspective and orthographic cameras, camera controllers, instanced meshes and culling, opaque/alpha-tested and sorted blended passes |
 | Image effects | Gtao, Bloom, HeightFog, AutoExposure, Tonemap (PBR Neutral or Tony McMapface), Smaa |

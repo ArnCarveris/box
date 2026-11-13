@@ -8,15 +8,15 @@ using box.texture
 
 assets {
   korean_ground {
-    tone { TextureGen: {width: 256, seed: 5, layers: [{kind: GenNoise, frequency: 16, octaves: 3}]} }
-    patches_height { TextureGen: {width: 256, seed: 9, layers: [{kind: GenNoise, frequency: 4, octaves: 2}, {kind: GenNoise, frequency: 8, octaves: 2, amount: 0.35, seed: 3}]} }
-    patches { TextureGen: {source: patches_height, output: GenAlbedo, colors: [{0, {255, 0, 0}}, {0.48, {255, 0, 0}}, {0.6, {0, 255, 0}}, {1, {0, 255, 0}}]} }
-    dirt_a_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {160, 143, 106}}, {1, {174, 157, 117}}]} }
-    dirt_b_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {154, 139, 103}}, {1, {170, 155, 116}}]} }
-    yard_a_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {181, 167, 133}}, {1, {192, 178, 143}}]} }
-    yard_b_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {176, 162, 128}}, {1, {190, 176, 141}}]} }
-    grass_a_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {100, 120, 70}}, {1, {116, 136, 82}}]} }
-    grass_b_tex { TextureGen: {source: tone, output: GenAlbedo, colors: [{0, {86, 114, 60}}, {1, {122, 146, 80}}]} }
+    tone { Gen: {width: 256, seed: 5, layers: [{kind: GenNoise, frequency: 16, octaves: 3}]} }
+    patches_height { Gen: {width: 256, seed: 9, layers: [{kind: GenNoise, frequency: 4, octaves: 2}, {kind: GenNoise, frequency: 8, octaves: 2, amount: 0.35, seed: 3}]} }
+    patches { Gen: {source: patches_height, output: GenAlbedo, colors: [{0, {255, 0, 0}}, {0.48, {255, 0, 0}}, {0.6, {0, 255, 0}}, {1, {0, 255, 0}}]} }
+    dirt_a_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {160, 143, 106}}, {1, {174, 157, 117}}]} }
+    dirt_b_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {154, 139, 103}}, {1, {170, 155, 116}}]} }
+    yard_a_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {181, 167, 133}}, {1, {192, 178, 143}}]} }
+    yard_b_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {176, 162, 128}}, {1, {190, 176, 141}}]} }
+    grass_a_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {100, 120, 70}}, {1, {116, 136, 82}}]} }
+    grass_b_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {86, 114, 60}}, {1, {122, 146, 80}}]} }
     dirt_a { PbrTextures: {albedo: korean_ground.dirt_a_tex}; TextureTransform: {4, 4, 0, 0} }
     dirt_b { PbrTextures: {albedo: korean_ground.dirt_b_tex}; TextureTransform: {4, 4, 0, 0} }
     yard_a { PbrTextures: {albedo: korean_ground.yard_a_tex}; TextureTransform: {4, 4, 0, 0} }

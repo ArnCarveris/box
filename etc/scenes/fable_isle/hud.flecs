@@ -124,17 +124,17 @@ assets {
   isle_font_title { Font: {path: "etc/scenes/fable_isle/assets/fonts/Cinzel.ttf"} }
   isle_font_body { Font: {path: "etc/scenes/fable_isle/assets/fonts/Spectral-Regular.ttf"} }
   isle_font_note { Font: {path: "etc/scenes/fable_isle/assets/fonts/Spectral-Italic.ttf"} }
-  isle_icon_sun { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/sun.svg", width: 96} }
-  isle_icon_moon { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/moon.svg", width: 96} }
-  isle_icon_play { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/play.svg", width: 96} }
-  isle_icon_pause { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/pause.svg", width: 96} }
-  isle_icon_minus { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/minus.svg", width: 96} }
-  isle_icon_plus { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/plus.svg", width: 96} }
-  isle_icon_bell { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/bell.svg", width: 96} }
-  isle_icon_whistle { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/whistle.svg", width: 96} }
-  isle_icon_spark { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/spark.svg", width: 96} }
-  isle_icon_sound { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/sound.svg", width: 96} }
-  isle_icon_mute { TexturePath: {path: "etc/scenes/fable_isle/assets/icons/mute.svg", width: 96} }
+  isle_icon_sun { Path: {path: "etc/scenes/fable_isle/assets/icons/sun.svg", width: 96} }
+  isle_icon_moon { Path: {path: "etc/scenes/fable_isle/assets/icons/moon.svg", width: 96} }
+  isle_icon_play { Path: {path: "etc/scenes/fable_isle/assets/icons/play.svg", width: 96} }
+  isle_icon_pause { Path: {path: "etc/scenes/fable_isle/assets/icons/pause.svg", width: 96} }
+  isle_icon_minus { Path: {path: "etc/scenes/fable_isle/assets/icons/minus.svg", width: 96} }
+  isle_icon_plus { Path: {path: "etc/scenes/fable_isle/assets/icons/plus.svg", width: 96} }
+  isle_icon_bell { Path: {path: "etc/scenes/fable_isle/assets/icons/bell.svg", width: 96} }
+  isle_icon_whistle { Path: {path: "etc/scenes/fable_isle/assets/icons/whistle.svg", width: 96} }
+  isle_icon_spark { Path: {path: "etc/scenes/fable_isle/assets/icons/spark.svg", width: 96} }
+  isle_icon_sound { Path: {path: "etc/scenes/fable_isle/assets/icons/sound.svg", width: 96} }
+  isle_icon_mute { Path: {path: "etc/scenes/fable_isle/assets/icons/mute.svg", width: 96} }
 
   template IsleHotKey {
     prop action: entity = 0

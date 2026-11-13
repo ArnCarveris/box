@@ -16,15 +16,15 @@ main_view {
 }
 
 bumps {
-  TexturePath: {path: "test/integration/visual/assets/bumps.png"}
+  Path: {path: "test/integration/visual/assets/bumps.png"}
 }
 
 stripes {
-  TexturePath: {path: "test/integration/visual/assets/stripes.png"}
+  Path: {path: "test/integration/visual/assets/stripes.png"}
 }
 
 ring {
-  TexturePath: {path: "test/integration/visual/assets/ring.png"}
+  Path: {path: "test/integration/visual/assets/ring.png"}
 }
 
 floor {

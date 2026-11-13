@@ -153,9 +153,9 @@ def test_particles(app):
 
 def test_life_icon(app):
     setup(app)
-    app.expect("get %s box.texture.TexturePath.path" % LIFE_ICON,
+    app.expect("get %s box.texture.Path.path" % LIFE_ICON,
                '"apps/bunnyhopper/etc/icons/bunny_life.svg"')
-    app.wait_for("get %s box.texture.TextureStatus.state" % LIFE_ICON,
+    app.wait_for("get %s box.texture.Status.state" % LIFE_ICON,
                  lambda out: parse_value(out).endswith("Ready"),
                  what="the life icon loaded from apps/bunnyhopper/etc/icons")
     app.expect("get %s box.texture.Texture.width" % LIFE_ICON, "128")

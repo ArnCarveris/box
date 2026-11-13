@@ -34,7 +34,7 @@ backlit {
   }
 
   leaf_tex {
-    TexturePath: {path: "test/integration/visual/assets/leaf.png"}
+    Path: {path: "test/integration/visual/assets/leaf.png"}
   }
 
   floor {
