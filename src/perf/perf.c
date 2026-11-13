@@ -185,6 +185,8 @@ static void BoxPerfOnSet(
     perf->cull_frame = -1;
     ecs_os_memset(perf->cull_last, 0, ECS_SIZEOF(perf->cull_last));
     ecs_os_memset(perf->cull_sum, 0, ECS_SIZEOF(perf->cull_sum));
+    perf->graph_sampled = false;
+    ecs_os_memset(perf->graph_sum, 0, ECS_SIZEOF(perf->graph_sum));
     ecs_vec_clear(&perf->intervals);
     if (!valid) {
         ecs_err("PerfRun.fps is %g, expected 30, 60, 90 or 120", (double)run->fps);
@@ -529,6 +531,53 @@ static void box_perf_sample_cull(
     }
 }
 
+/** Sample the texture graph cache counts of a measured frame: the hits, misses, evictions and
+ * animated updates since the previous measured frame and the cached kilobytes.
+ *
+ * @param world The world
+ * @param perf The state of the module
+ * @param status The status to update
+ */
+static void box_perf_sample_graphs(
+    ecs_world_t *world,
+    box_perf_t *perf,
+    PerfStatus *status)
+{
+    PerfTextureGraphs *g = &status->texture_graphs;
+    PerfRange *ranges[5] = { &g->hits, &g->misses, &g->evictions, &g->updates, &g->cached_kb };
+    box_render_gpu_stats_t stats;
+    int64_t now[4];
+    int32_t counts[5], i;
+    if (!box_render_gpu_stats(world, &stats)) {
+        goto done;
+    }
+
+    now[0] = stats.texture_graph_hits;
+    now[1] = stats.texture_graph_misses;
+    now[2] = stats.texture_graph_evictions;
+    now[3] = stats.texture_graph_updates;
+    if (perf->graph_sampled) {
+        g->samples ++;
+        for (i = 0; i < 4; i ++) {
+            counts[i] = (int32_t)(now[i] - perf->graph_last[i]);
+        }
+
+        counts[4] = (int32_t)(stats.texture_graph_cached_bytes / 1024);
+        for (i = 0; i < 5; i ++) {
+            perf->graph_sum[i] += counts[i];
+            box_perf_range(ranges[i], counts[i], perf->graph_sum[i], g->samples);
+        }
+    }
+
+    for (i = 0; i < 4; i ++) {
+        perf->graph_last[i] = now[i];
+    }
+
+    perf->graph_sampled = true;
+done:
+    return;
+}
+
 /** Complete the CPU usage and the presents of a run.
  *
  * @param world The world
@@ -647,6 +696,7 @@ static void box_perf_measure(
         ecs_singleton_get(world, AudioStatus) : NULL;
     box_perf_count(perf, status, now - perf->mark);
     box_perf_sample_cull(world, perf, status, camera);
+    box_perf_sample_graphs(world, perf, status);
     if (audio && audio->load > status->audio_load) {
         status->audio_load = audio->load;
     }
@@ -759,6 +809,7 @@ void BoxPerfImport(
     ECS_META_COMPONENT(world, PerfState);
     ECS_META_COMPONENT(world, PerfRange);
     ECS_META_COMPONENT(world, PerfChecks);
+    ECS_META_COMPONENT(world, PerfTextureGraphs);
     ECS_META_COMPONENT(world, PerfRun);
     ECS_META_COMPONENT(world, PerfStatus);
     box_owned_hooks(world, PerfRun, BOX_OWNED_STR(PerfRun, report));

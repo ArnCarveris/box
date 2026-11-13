@@ -205,10 +205,14 @@ static void box_render_texture_kinds_send(
         desc->input_count = (uint32_t)kind->input_count;
         for (i = 0; i < kind->input_count; i ++) {
             desc->input_types[i] = (uint32_t)kind->inputs[i].type;
+            if (kind->inputs[i].coords && !kind->inputs[i].value) {
+                desc->coords_inputs |= 1u << i;
+            }
         }
 
         desc->param_size = (uint32_t)kind->param_size;
         desc->flags = kind->flags;
+        desc->passes = (uint32_t)kind->passes;
         desc->function_size = function_size;
         desc->source_size = source_size;
         ecs_os_memcpy((char*)(desc + 1), kind->function, (ecs_size_t)function_size);
@@ -218,25 +222,51 @@ static void box_render_texture_kinds_send(
     }
 }
 
-/** Send the compiled graph of a texture, which the backend evaluates into its image.
+/** Get the backend handle of the image of a texture a graph samples: the target of the
+ * surface that renders into it, else the handle of its entry.
  *
+ * @param world The world
+ * @param t The registry
+ * @param e The texture entity
+ * @return The handle, 0 while it has none
+ */
+static uint32_t box_render_texture_graph_source(
+    const ecs_world_t *world,
+    const box_textures_t *t,
+    ecs_entity_t e)
+{
+    uint32_t result = box_render_texture_target_handle(world, e);
+    const box_texture_t *tex = result ? NULL
+        : ecs_map_get_deref(&t->textures, box_texture_t, e);
+
+    return tex ? tex->handle : result;
+}
+
+/** Send the compiled graph of a texture, which the backend evaluates into its image, with the
+ * handles of the textures it samples now.
+ *
+ * @param world The world
  * @param p The packet
  * @param t The registry
  * @param tex The texture
  */
 static void box_render_texture_graph_send(
+    const ecs_world_t *world,
     box_render_packet_t *p,
     box_textures_t *t,
     box_texture_t *tex)
 {
-    const box_texture_graph_t *graph = tex->graph;
+    box_texture_graph_t *graph = tex->graph;
     int32_t i, j;
     uint32_t nodes = (uint32_t)graph->node_count * (uint32_t)sizeof(
         box_render_texture_graph_node_t);
+    uint32_t textures = (uint32_t)graph->texture_count * (uint32_t)sizeof(
+        box_render_texture_graph_texture_t);
     box_render_texture_handle_of(t, tex);
     box_render_texture_graph_t *desc = box_render_packet_resource(p,
         BOX_RENDER_TEXTURE_GRAPH, BOX_RENDER_CREATE, tex->handle,
-        (uint32_t)sizeof(box_render_texture_graph_t) + nodes + (uint32_t)graph->param_size);
+        (uint32_t)sizeof(box_render_texture_graph_t) + nodes + (uint32_t)graph->param_size +
+        textures);
     desc->width = (uint32_t)graph->width;
     desc->height = (uint32_t)graph->height;
     desc->domain = (uint32_t)graph->domain;
@@ -246,7 +276,8 @@ static void box_render_texture_graph_send(
     desc->structure_hash = graph->structure_hash;
     desc->param_hash = graph->param_hash;
     desc->serial = tex->graph_serial;
-    desc->pad = 0;
+    desc->rate = graph->rate;
+    desc->texture_count = (uint32_t)graph->texture_count;
     box_render_texture_graph_node_t *out = (box_render_texture_graph_node_t*)(desc + 1);
     for (i = 0; i < graph->node_count; i ++) {
         const box_texture_graph_node_t *node = &graph->nodes[i];
@@ -258,13 +289,54 @@ static void box_render_texture_graph_send(
 
         out[i].params = (uint32_t)node->params;
         out[i].param_size = (uint32_t)node->param_size;
+        out[i].texture = node->texture;
     }
 
     if (graph->param_size) {
         ecs_os_memcpy((uint8_t*)(out + graph->node_count), graph->params, graph->param_size);
     }
 
+    box_render_texture_graph_texture_t *bound = (box_render_texture_graph_texture_t*)(
+        (uint8_t*)(out + graph->node_count) + graph->param_size);
+    for (i = 0; i < graph->texture_count; i ++) {
+        box_texture_graph_texture_t *src = &graph->textures[i];
+        src->handle = box_render_texture_graph_source(world, t, src->entity);
+        bound[i].handle = src->handle;
+        bound[i].flags = src->linear ? BOX_RENDER_TEXTURE_GRAPH_LINEAR : 0u;
+    }
+
     tex->graph_sent = true;
+}
+
+/** Queue the sent graphs again whose sampled textures got another backend handle, such as a
+ * texture whose first image went to the backend after the graph, so the backend binds it.
+ *
+ * @param world The world
+ * @param t The registry
+ */
+static void box_render_texture_graphs_rebind(
+    const ecs_world_t *world,
+    box_textures_t *t)
+{
+    int32_t i;
+    ecs_map_iter_t it = ecs_map_iter(&t->textures);
+    while (ecs_map_next(&it)) {
+        box_texture_t *tex = ecs_map_ptr(&it);
+        bool changed = false;
+        if (!tex->graph || !tex->graph_sent || tex->graph_queued) {
+            continue;
+        }
+
+        for (i = 0; i < tex->graph->texture_count && !changed; i ++) {
+            const box_texture_graph_texture_t *src = &tex->graph->textures[i];
+            changed = src->handle != box_render_texture_graph_source(world, t, src->entity);
+        }
+
+        if (changed) {
+            tex->graph_queued = true;
+            *ecs_vec_append_t(NULL, &t->graph_queued, ecs_entity_t) = tex->entity;
+        }
+    }
 }
 
 /** Destroy the graphs of removed textures, before their images are destroyed.
@@ -285,18 +357,24 @@ static void box_render_texture_graphs_release(
     ecs_vec_clear(&t->graph_released);
 }
 
-/** Send the queued graphs, after the node kinds the backend does not have. Without a graph
+/** Send the queued graphs, after the node kinds the backend does not have, giving them their
+ * handles first so a graph that samples another one in the queue binds it. Without a graph
  * to send no kind is sent, so a world without graphs sends nothing.
  *
+ * @param world The world
  * @param p The packet
  * @param t The registry
  */
 static void box_render_texture_graphs_send(
+    const ecs_world_t *world,
     box_render_packet_t *p,
     box_textures_t *t)
 {
-    int32_t i, count = ecs_vec_count(&t->graph_queued);
-    ecs_entity_t *queued = ecs_vec_first(&t->graph_queued);
+    int32_t i, count;
+    ecs_entity_t *queued;
+    box_render_texture_graphs_rebind(world, t);
+    count = ecs_vec_count(&t->graph_queued);
+    queued = ecs_vec_first(&t->graph_queued);
     if (count) {
         box_render_texture_kinds_send(p, t);
     }
@@ -304,7 +382,14 @@ static void box_render_texture_graphs_send(
     for (i = 0; i < count; i ++) {
         box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, queued[i]);
         if (tex && tex->graph_queued && tex->graph) {
-            box_render_texture_graph_send(p, t, tex);
+            box_render_texture_handle_of(t, tex);
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_texture_t *tex = ecs_map_get_deref(&t->textures, box_texture_t, queued[i]);
+        if (tex && tex->graph_queued && tex->graph) {
+            box_render_texture_graph_send(world, p, t, tex);
         }
 
         if (tex) {
@@ -439,6 +524,19 @@ done:
 }
 
 bool box_render_texture_graph_reads(
+    ecs_world_t *world,
+    ecs_vec_t *out)
+{
+    int32_t first = ecs_vec_count(out);
+    bool result;
+    box_render_texture_previews_kept(world, out);
+    result = box_render_texture_graph_reads_take(world, out);
+    box_render_texture_previews_filter(world, out, first);
+
+    return result;
+}
+
+bool box_render_texture_graph_reads_take(
     ecs_world_t *world,
     ecs_vec_t *out)
 {
@@ -614,7 +712,9 @@ static void BoxRenderExtractTextures(
 
     ecs_vec_clear(&t->released);
     box_render_textures_send(p, t, restart);
-    box_render_texture_graphs_send(p, t);
+    box_render_texture_graphs_send(world, p, t);
+    const TextureGraphCache *cache = ecs_singleton_get(world, TextureGraphCache);
+    p->texture_graph_budget = cache ? cache->budget : 0;
     p->anisotropy = box_render_anisotropy(world, t);
 done:
     return;

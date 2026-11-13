@@ -33,6 +33,8 @@ typedef struct box_render_draws_stats_t {
     int64_t page_surface_bytes; /**< Bytes of the surface buffers of the instance pages alive,
                                  *   which only the pages of the meshes with a parametric
                                  *   surface have */
+    int64_t page_frame_bytes;   /**< Bytes of the frame buffers of the instance pages alive,
+                                 *   which only the pages of the MappingFrame materials have */
     int64_t page_bytes;         /**< Bytes of every buffer of the instance pages alive, the sum
                                  *   of the bytes of the streams */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers, the
@@ -52,6 +54,9 @@ typedef struct box_render_draws_stats_t {
     int64_t surface_bytes;      /**< Bytes the last extract uploaded into the surface streams
                                  *   of the mesh pages with parametric surfaces, runs and
                                  *   scatter segments, only when a ShapeMesh changed */
+    int64_t frame_bytes;        /**< Bytes the last extract uploaded into the frame streams of
+                                 *   the pages of the MappingFrame materials, runs and scatter
+                                 *   segments, when a transform or a frame changed */
     int32_t clips;              /**< ClipChildren elements in the clip buffer */
     int32_t runs;               /**< Runs of consecutive 2D slots of the order, the draws of
                                  *   the ordered 2D shapes before a view splits them: a shadow
@@ -149,6 +154,17 @@ bool box_render_clip_hides(
     const ecs_world_t *world,
     ecs_entity_t e);
 
+/** Find the texture frame of an entity, whose space MappingFrame projects in: the entity itself
+ * when it has TextureFrame, else the nearest ancestor with it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The frame, 0 for none
+ */
+ecs_entity_t box_render_texture_frame(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Set the instances one batch holds before its shapes continue in another, for tests.
  *
  * A batch is one run of slots of an instance page, so the default of each store is its chunk,
@@ -218,6 +234,48 @@ uint32_t box_render_texture_target_handle(
  * @param world The world
  */
 void box_render_textures_init(
+    ecs_world_t *world);
+
+/** Take the texture graph readbacks the GPU backend delivered since the last call, with their
+ * texture and node entities, without the ones the previews kept for
+ * box_render_texture_graph_reads.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_read_t
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_texture_graph_reads_take(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** Move the readbacks of other callers that the previews took along with theirs to the end of
+ * a vector.
+ *
+ * @param world The world
+ * @param out Receives box_render_texture_read_t
+ */
+void box_render_texture_previews_kept(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
+/** Move the readbacks of the previews among the ones a caller of
+ * box_render_texture_graph_reads took to the previews, which encode them in their next frame.
+ *
+ * @param world The world
+ * @param out The readbacks, compacted
+ * @param first Index of the first readback the caller took
+ */
+void box_render_texture_previews_filter(
+    ecs_world_t *world,
+    ecs_vec_t *out,
+    int32_t first);
+
+/** Register the system that reads back the nodes with a TextureNodePreview and writes their
+ * TextureNodePreviewStatus, and TextureGraphStats. It runs after the texture extract.
+ *
+ * @param world The world
+ */
+void box_render_texture_previews_init(
     ecs_world_t *world);
 
 /** Counters of the light extract of a world */

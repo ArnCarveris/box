@@ -86,6 +86,17 @@ ECS_STRUCT(PerfChecks, {
     float travelled;      /**< Distance the camera moved during the measurement */
 });
 
+/** Texture graph cache counts per frame of the measurement of a run, from the backend
+ * statistics (zero without the GPU backend) */
+ECS_STRUCT(PerfTextureGraphs, {
+    int32_t samples;     /**< Frames sampled */
+    PerfRange hits;      /**< Stages whose value the cache had, per frame */
+    PerfRange misses;    /**< Stages computed into a new cached value, per frame */
+    PerfRange evictions; /**< Cached values evicted to keep the budget, per frame */
+    PerfRange updates;   /**< Updates of animated graphs, per frame */
+    PerfRange cached_kb; /**< Kilobytes of the cached values at each frame */
+});
+
 /** Result of a performance run, written by the engine and read only for applications */
 ECS_STRUCT(PerfStatus, {
     PerfState state;      /**< Progress of the run */
@@ -121,6 +132,7 @@ ECS_STRUCT(PerfStatus, {
                                  *   sample */
     float audio_load;     /**< Largest AudioStatus.load of the measured frames, the share of
                            *   real time the audio.render took */
+    PerfTextureGraphs texture_graphs; /**< Texture graph cache counts per measured frame */
 });
 
 /** Register the box.perf module.

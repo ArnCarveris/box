@@ -52,6 +52,8 @@ typedef struct box_texture_t {
     bool graph_dirty;       /**< Its TextureGraph builds at the next graph build */
     bool graph_waiting;     /**< The last build waited for a node without a node component,
                              *   the next build fails it unless the node got one */
+    bool graph_held;        /**< The last build waited for a texture it samples to get an
+                             *   image, it builds again every frame until it has one */
     bool graph_queued;      /**< The entity is in the list of graphs to send */
     bool graph_sent;        /**< The current backend has the graph under handle */
     uint32_t graph_serial;  /**< Graphs taken for the backend, the serial of the last one */
@@ -64,19 +66,34 @@ typedef struct box_texture_t {
 typedef struct box_texture_node_kind_t {
     int32_t id;                 /**< Id of the kind, from 1 */
     ecs_entity_t component;     /**< Component of its nodes */
-    TextureValueType output;    /**< Type of its value */
+    TextureValueType output;    /**< Type of its value, TexAny when it follows the inputs */
+    box_texture_node_type_t output_type; /**< Type of a node when output is TexAny, NULL for
+                                          *   the default */
     int32_t input_count;        /**< Inputs in inputs */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs, names owned */
     int32_t param_count;        /**< Parameters in params */
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters, names owned */
     int32_t param_offsets[BOX_TEXTURE_NODE_PARAMS]; /**< Offset of each parameter in the
                                  *   parameter bytes of a node */
-    int32_t param_size;         /**< Bytes of the parameters, a multiple of 16 */
+    box_texture_node_array_t array; /**< Array parameter, name owned, NULL for none */
+    int32_t array_header;       /**< Offset of the header of the array in the parameters */
+    int32_t param_size;         /**< Bytes of the parameters with the header of the array, a
+                                 *   multiple of 16 */
+    int32_t types_offset;       /**< Offset of the types word of the inputs in the parameter
+                                 *   bytes of a node, -1 without a TexAny input */
     int32_t node_size;          /**< Parameter bytes of a node: the parameters, then a vec4 per
-                                 *   input with the constant of an input without a node */
+                                 *   input with the constant of an input without a node, then
+                                 *   the max elements of the array */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_PLANE, BOX_TEXTURE_NODE_SAMPLES */
+    int32_t passes;             /**< Passes of the function, from 1 */
+    char *texture;              /**< Member of the texture entity a node samples, NULL for
+                                 *   none */
+    ecs_size_t texture_offset;  /**< Offset of that member */
+    char *linear;               /**< Member that reads the texture as stored, NULL for none */
+    ecs_size_t linear_offset;   /**< Offset of that member */
     bool sent;                  /**< The current backend has the kind */
 } box_texture_node_kind_t;
 
@@ -89,7 +106,16 @@ typedef struct box_texture_graph_node_t {
                                  *   for none: the constant in its parameters */
     int32_t params;             /**< Offset of its parameter bytes in the graph parameters */
     int32_t param_size;         /**< Its parameter bytes, the node_size of its kind */
+    int32_t texture;            /**< Index of the texture it samples in the textures of the
+                                 *   graph, -1 for none */
 } box_texture_graph_node_t;
+
+/** A texture a compiled graph samples, one per node of a sampling kind */
+typedef struct box_texture_graph_texture_t {
+    ecs_entity_t entity;        /**< The texture entity */
+    bool linear;                /**< Its color channels read as stored */
+    uint32_t handle;            /**< Backend handle the graph was last sent with, 0 before */
+} box_texture_graph_texture_t;
 
 /** A TextureGraph compiled: the nodes from its output in topological order, the output last */
 typedef struct box_texture_graph_t {
@@ -97,10 +123,13 @@ typedef struct box_texture_graph_t {
     int32_t height;             /**< Height of the image, capped */
     TextureGraphDomain domain;  /**< Coordinates of the texels */
     TextureGraphFormat format;  /**< What the image stores */
+    float rate;                 /**< Updates per second of an animated graph, 0 every frame */
     int32_t node_count;         /**< Nodes in nodes */
     box_texture_graph_node_t *nodes; /**< The nodes, inputs first */
     int32_t param_size;         /**< Bytes in params */
     uint8_t *params;            /**< Parameter bytes of the nodes */
+    int32_t texture_count;      /**< Textures in textures */
+    box_texture_graph_texture_t *textures; /**< The textures its nodes sample, in node order */
     uint64_t structure_hash;    /**< Hash of the kinds and edges of the nodes */
     uint64_t param_hash;        /**< Hash of the parameter bytes */
 } box_texture_graph_t;
@@ -420,6 +449,31 @@ void box_texture_graphs_init(
     ecs_world_t *world,
     box_textures_t *t);
 
+/** Register the TexNoise node kind.
+ *
+ * @param world The world
+ */
+void box_texture_noise_register(
+    ecs_world_t *world);
+
+/** Register the built in node kinds.
+ *
+ * @param world The world
+ */
+void box_texture_nodes_register(
+    ecs_world_t *world);
+
+/** Get the type that follows the inputs a node reads: a Vector when one of them has a Vector
+ * node, else a Scalar when one has a Scalar node, else a Vector.
+ *
+ * @param inputs Type of the node of each input, TexAny for none
+ * @param used Bit j set when input j is read
+ * @return The type
+ */
+TextureValueType box_texture_graph_follow(
+    const TextureValueType *inputs,
+    uint32_t used);
+
 /** Free the node kinds and the graph lists of a registry.
  *
  * @param t The registry
@@ -433,6 +487,16 @@ void box_texture_graphs_fini(
  */
 void box_texture_graph_clear(
     box_texture_t *tex);
+
+/** Mark every graph dirty that reached an entity in its last build, such as a node or a
+ * texture it samples, or every graph.
+ *
+ * @param t The registry
+ * @param e The entity, 0 for every graph
+ */
+void box_texture_graphs_touch(
+    box_textures_t *t,
+    ecs_entity_t e);
 
 /** Build the TextureGraph of a texture at the next graph build, showing it as loading.
  *

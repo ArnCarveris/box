@@ -219,6 +219,10 @@ static void box_draws_page_release(
     box_draw_page_t *pg = ecs_vec_get_t(&s->pages, box_draw_page_t, page);
     int32_t i;
     for (i = 0; pg->capacity && i < s->layout.streams; i ++) {
+        if (!s->layout.stride[i]) {
+            continue;
+        }
+
         box_render_packet_resource(p, BOX_RENDER_BUFFER, BOX_RENDER_DESTROY,
             box_draws_store_handle(s, page, i), 0);
     }
@@ -346,6 +350,10 @@ bool box_draws_store_reserve(
     }
 
     for (i = 0; i < s->layout.streams; i ++) {
+        if (!s->layout.stride[i]) {
+            continue;
+        }
+
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, box_draws_store_handle(s, page, i),
             sizeof(box_render_buffer_desc_t));

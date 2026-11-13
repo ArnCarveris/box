@@ -22,12 +22,23 @@
  * output and the texture of the inputs without a node */
 #define BOX_GPU_TG_FIRST_INPUT (4)
 
+/** Textures of sampling nodes one stage binds at most, with its materialized inputs and the
+ * texture of the inputs without a node within the 16 sampled textures every device binds */
+#define BOX_GPU_TG_TEXTURES (3)
+
+/** Binding of the first texture the sampling nodes of a stage sample, after the bindings of
+ * the most materialized inputs */
+#define BOX_GPU_TG_FIRST_TEXTURE (BOX_GPU_TG_FIRST_INPUT + BOX_GPU_TG_INPUTS)
+
 /** Bytes after the parameters of a graph, so the four vec4 a node function gets stay in the
  * buffer for the last node */
 #define BOX_GPU_TG_PARAM_PAD (64)
 
 /** Bytes of BoxTexGraphStage */
-#define BOX_GPU_TG_UNIFORM_SIZE (16)
+#define BOX_GPU_TG_UNIFORM_SIZE (32)
+
+/** Bytes of the cached values no graph uses kept by default (TextureGraphCache.budget) */
+#define BOX_GPU_TG_CACHE_BUDGET (256ll * 1024 * 1024)
 
 /** Packets a pooled intermediate that no graph used stays in the pool */
 #define BOX_GPU_TG_POOL_KEEP (120)
@@ -52,7 +63,10 @@ typedef struct box_gpu_tg_kind_t {
     uint32_t output;            /**< TextureValueType of its value */
     uint32_t input_count;       /**< Inputs of a node */
     uint32_t param_size;        /**< Bytes of the parameters before the input constants */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE,
+                                 *   _SAMPLES */
+    uint32_t passes;            /**< Passes of the function, from 1 */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint64_t hash;              /**< Hash of the description, part of the program keys */
@@ -65,22 +79,31 @@ typedef struct box_gpu_tg_line_t {
     int32_t node;               /**< Index of the node, -1 for the shared code */
 } box_gpu_tg_line_t;
 
-/** Bind group and pipeline layout of the stages with a number of inputs and an output format */
+/** Bind group and pipeline layout of the stages with a number of inputs, of sampled textures
+ * and an output format */
 typedef struct box_gpu_tg_layout_t {
     int32_t inputs;             /**< Materialized inputs */
+    int32_t textures;           /**< Sampled textures */
     WGPUTextureFormat format;   /**< Format of the storage texture the stage writes */
     WGPUBindGroupLayout group;  /**< The bind group layout */
     WGPUPipelineLayout pipeline; /**< The pipeline layout */
 } box_gpu_tg_layout_t;
 
-/** A stage of a program: one compute shader that materializes one node */
+/** A stage of a program: one compute shader that materializes one node, or one pass but the
+ * last of a node of a kind of more than one pass */
 typedef struct box_gpu_tg_stage_t {
     uint32_t shader;            /**< Shader handle of its module */
-    int32_t root;               /**< Node whose value it stores */
+    int32_t root;               /**< Node whose value, or whose pass, it stores */
+    int32_t pass;               /**< Pass of root it stores, -1 for the value of root */
+    int32_t slot;               /**< Slot of the texture it writes: root for its value, from the
+                                 *   node count for the earlier passes of the nodes */
     bool output;                /**< It stores the image */
     WGPUTextureFormat format;   /**< Format of the texture it writes */
-    int32_t input_count;        /**< Materialized nodes it reads */
-    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those nodes, binding BOX_GPU_TG_FIRST_INPUT + i */
+    int32_t input_count;        /**< Materialized slots it reads */
+    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those slots, binding BOX_GPU_TG_FIRST_INPUT + i */
+    int32_t texture_count;      /**< Textures its sampling nodes sample */
+    int32_t textures[BOX_GPU_TG_TEXTURES]; /**< Those textures by index in the textures of
+                                 *   the graph, binding BOX_GPU_TG_FIRST_TEXTURE + i */
     box_gpu_tg_layout_t *layout; /**< Its layouts, owned by the graph state */
     WGPUComputePipeline pipeline; /**< Its pipeline once created */
     ecs_vec_t lines;            /**< box_gpu_tg_line_t of its code */
@@ -91,6 +114,8 @@ typedef struct box_gpu_tg_program_t {
     uint64_t key;               /**< Key of the structure, see box_gpu_tg_key */
     int32_t refs;               /**< Graphs that use it as current or pending program */
     int32_t node_count;         /**< Nodes of the structure */
+    int32_t slot_count;         /**< Texture slots of an evaluation: one per node, then one per
+                                 *   pass but the last of each node of more than one pass */
     int32_t stage_count;        /**< Stages in stages */
     box_gpu_tg_stage_t *stages; /**< The stages in order, the output stage last */
     bool failed;                /**< A stage did not compile, or the structure cannot be made */
@@ -104,6 +129,9 @@ typedef struct box_gpu_tg_graph_t {
     box_render_texture_graph_t desc; /**< Its description */
     box_render_texture_graph_node_t *nodes; /**< Its nodes */
     uint8_t *params;            /**< Its parameter bytes */
+    box_render_texture_graph_texture_t *textures; /**< The textures its nodes sample */
+    uint64_t *bound;            /**< Serial of the image of each texture its last evaluation
+                                 *   read, see box_gpu_tg_source_serial */
     ecs_vec_t forced;           /**< int32_t, nodes it keeps materialized for readbacks */
     uint64_t key;               /**< Key of the program it needs, 0 to compute again */
     box_gpu_tg_program_t *current; /**< Program it evaluates with */
@@ -115,6 +143,18 @@ typedef struct box_gpu_tg_graph_t {
     bool dirty;                 /**< The image is older than the description */
     bool written;               /**< The image of the handle was written by the graph */
     uint32_t reported;          /**< Serial whose outcome was reported, 0 for none */
+    uint64_t *hashes;           /**< Content hash of each node, computed with the key */
+    bool *animated;             /**< Whether each node depends on time, computed with the key */
+    bool *sampling;             /**< Whether each node depends on a sampled texture */
+    bool is_animated;           /**< The output depends on time */
+    struct box_gpu_tg_entry_t **entries; /**< Cache entry each node of the last evaluation
+                                 *   held, by node of the current program, NULL for none */
+    int32_t entry_count;        /**< Nodes in entries */
+    int64_t sampled;            /**< Packet of the graph state whose draws last sampled the
+                                 *   image, -1 for none */
+    double time;                /**< World time of the last evaluation */
+    int64_t mark;               /**< Packet whose evaluation order it was put in */
+    int32_t eval;               /**< Index of its evaluation in the packet, -1 for none */
 } box_gpu_tg_graph_t;
 
 /** A pooled intermediate */
@@ -127,6 +167,24 @@ typedef struct box_gpu_tg_pooled_t {
     bool used;                  /**< An evaluation of this packet holds it */
     int64_t last;               /**< Packet it was last used in */
 } box_gpu_tg_pooled_t;
+
+/** A materialized value of the cache, shared by the graphs whose node has its content hash.
+ *
+ * An entry the graphs use has references; one without is in the LRU list of the cache, most
+ * recently used last, until it is evicted or used again.
+ */
+typedef struct box_gpu_tg_entry_t {
+    uint64_t hash;              /**< Content hash of the node */
+    box_gpu_tg_pooled_t value;  /**< Texture of the value, never in the pool */
+    uint64_t bytes;             /**< Bytes of the texture */
+    int32_t refs;               /**< Graphs that hold it */
+    bool sampling;              /**< Its value depends on the image of a sampled texture, so
+                                 *   it is freed when no graph holds it, and reused in place for
+                                 *   the next image by the one graph that holds it */
+    struct box_gpu_tg_entry_t *prev; /**< Previous entry of the LRU list */
+    struct box_gpu_tg_entry_t *next; /**< Next entry of the LRU list */
+    bool listed;                /**< It is in the LRU list */
+} box_gpu_tg_entry_t;
 
 /** Where a readback is */
 typedef enum box_gpu_tg_read_state_t {
@@ -165,10 +223,18 @@ typedef struct box_gpu_tg_stamp_t {
 /** What an evaluation of a packet holds until its copies are recorded */
 typedef struct box_gpu_tg_eval_t {
     box_gpu_tg_graph_t *graph;  /**< The graph */
-    box_gpu_tg_pooled_t **textures; /**< Intermediate of each materialized node, by node */
+    box_gpu_tg_pooled_t **textures; /**< Intermediate of each materialized slot, by slot: the
+                                 *   nodes, then the earlier passes */
     box_gpu_tg_pooled_t *temp;  /**< Texture the output stage writes before a blit, or NULL */
+    box_gpu_tg_entry_t **entries; /**< Cache entry of each node it reads or writes, by node,
+                                 *   which the graph holds after the evaluation */
     bool held;                  /**< The intermediates stay until the end of the packet */
     bool stored;                /**< The image of the handle was written */
+    bool update;                /**< Only an update: the graph did not change, its animated
+                                 *   nodes or the textures it samples did */
+    int32_t pass;               /**< Compute pass it is recorded in: a graph that samples the
+                                 *   single channel image of a graph of the packet comes after
+                                 *   the blit of that image */
 } box_gpu_tg_eval_t;
 
 /** Texture graphs of the backend */
@@ -190,7 +256,24 @@ typedef struct box_gpu_texgraphs_t {
     WGPUQuerySet queries;       /**< Two timestamps per readback, NULL without the feature */
     WGPUBuffer resolve;         /**< Resolved timestamps */
     box_gpu_tg_stamp_t stamps[BOX_GPU_TG_STAMPS]; /**< Timestamp readbacks */
+    ecs_map_t cache;            /**< Content hash to box_gpu_tg_entry_t* */
+    box_gpu_tg_entry_t *lru_first; /**< Least recently used entry no graph holds */
+    box_gpu_tg_entry_t *lru_last; /**< Most recently used entry no graph holds */
+    uint64_t budget;            /**< Bytes the cache holds at most, evicting from the LRU list */
+    double time;                /**< World time of the packet being evaluated */
 } box_gpu_texgraphs_t;
+
+/** Get the bytes of a texel of a format of an intermediate, a cached value or a readback.
+ *
+ * @param format The format
+ * @return The bytes
+ */
+static inline uint32_t box_gpu_tg_texel_size(
+    WGPUTextureFormat format)
+{
+    return format == WGPUTextureFormat_RGBA16Float ? 8
+        : format == BOX_GPU_TEXTURE_SINGLE ? 1 : 4;
+}
 
 /** Get the format of the texture of the image of a graph.
  *
@@ -216,6 +299,122 @@ static inline WGPUTextureFormat box_gpu_tg_output_format(
     return format == GraphColor || format == GraphLinear
         ? BOX_GPU_TEXTURE_FORMAT : WGPUTextureFormat_RGBA16Float;
 }
+
+/** Get a node kind by id.
+ *
+ * @param tg The graph state
+ * @param id Id of the kind
+ * @return The kind, NULL when the backend has none of the id
+ */
+static inline box_gpu_tg_kind_t* box_gpu_tg_kind(
+    box_gpu_texgraphs_t *tg,
+    uint32_t id)
+{
+    return ecs_map_get_deref(&tg->kinds, box_gpu_tg_kind_t, id);
+}
+
+/** Get the passes of a kind.
+ *
+ * @param kind The kind
+ * @return The passes, from 1
+ */
+static inline int32_t box_gpu_tg_passes(
+    const box_gpu_tg_kind_t *kind)
+{
+    return kind && kind->passes > 1 ? (int32_t)kind->passes : 1;
+}
+
+/** Generate the code of a stage: the shared code, the functions of its kinds, its bindings and
+ * a main that loads its materialized inputs, calls the functions of its nodes in order and
+ * stores the value of its root, or calls the function of its root for its pass and stores that.
+ *
+ * @param tg The graph state
+ * @param graph The graph
+ * @param stage The stage
+ * @param owner The materialized node whose stage computes each node
+ * @param first Slot of the first pass of each node of more than one pass, -1 for the others
+ * @return The code, freed by the caller
+ */
+char* box_gpu_tg_code(
+    box_gpu_texgraphs_t *tg,
+    const box_gpu_tg_graph_t *graph,
+    box_gpu_tg_stage_t *stage,
+    const int32_t *owner,
+    const int32_t *first);
+
+/** Get the graph whose image a texture handle is.
+ *
+ * @param tg The graph state
+ * @param handle The texture handle
+ * @return The graph, NULL when the handle is no graph or a target
+ */
+box_gpu_tg_graph_t* box_gpu_tg_source_graph(
+    box_gpu_texgraphs_t *tg,
+    uint32_t handle);
+
+/** Get the serial of the image a texture of a graph samples now: the serial of the image of its
+ * handle, a new one in every packet for the image of a target, which renders every frame.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param graph The graph
+ * @param index Index of the texture in the textures of the graph
+ * @return The serial, 0 for no image
+ */
+uint64_t box_gpu_tg_source_serial(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    const box_gpu_tg_graph_t *graph,
+    int32_t index);
+
+/** Put a graph in the evaluation order of the packet after the graphs whose images it samples;
+ * a cycle, which the main thread fails, is cut where it closes.
+ *
+ * @param tg The graph state
+ * @param graph The graph
+ * @param order Receives box_gpu_tg_graph_t*
+ */
+void box_gpu_tg_order(
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_graph_t *graph,
+    ecs_vec_t *order);
+
+/** Count a graph that a draw sampled as sampling the graphs whose images it samples, so an
+ * animated graph that only another drawn graph samples keeps updating.
+ *
+ * @param tg The graph state
+ * @param graph The graph
+ */
+void box_gpu_tg_propagate(
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_graph_t *graph);
+
+/** Check whether an image a graph samples changed since its last evaluation: a graph it samples
+ * evaluates in this packet, or the serial of an image differs from the one it read. The image
+ * of a target changes every packet, which only counts while a draw samples the graph.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param graph The graph, ready
+ * @return Whether it evaluates again
+ */
+bool box_gpu_tg_sources_changed(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    const box_gpu_tg_graph_t *graph);
+
+/** Give the evaluations of a packet their compute passes: one that samples the single channel
+ * image of a graph of the same pass starts the next one, after the blit of that image.
+ *
+ * @param tg The graph state
+ * @param evals The evaluations, in order
+ * @param count Number of evaluations
+ * @return Number of passes
+ */
+int32_t box_gpu_tg_eval_passes(
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_eval_t *evals,
+    int32_t count);
 
 /** Fail a readback and free it, removing it from the readbacks in flight.
  *

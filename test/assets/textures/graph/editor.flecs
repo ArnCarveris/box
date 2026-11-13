@@ -1,0 +1,60 @@
+// A scene to drive tools/texgraph against: a quad that shows a plane graph of every built in
+// kind and a sphere whose albedo is a sphere domain graph, under a sun and an ambient light.
+
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+texgraph_editor {
+  AmbientLight: {sky: {120, 140, 170}, ground: {40, 40, 40}, intensity: 0.8}
+
+  sun {
+    Rotation: {-0.6, 0.8, 0}
+    DirectionalLight: {intensity: 3}
+  }
+
+  camera {
+    Position: {0, 0, 6}
+    Camera: {fov: 50}
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+  }
+
+  tiles {
+    uv     { TexCoords: {scale: 2} }
+    warm   { TexConstant: {value: {0.9, 0.5, 0.2, 1}} }
+    cool   { TexConstant: {value: {0.1, 0.3, 0.8, 1}} }
+    blend  { TexMath: {op: MathMix, a: warm, b: cool, c: uv} }
+    dimmed { TexMath: {op: MathMultiply, a: blend, b_value: {0.8, 0.8, 0.8, 1}} }
+    TextureGraph: {output: dimmed, width: 256}
+  }
+
+  globe {
+    dir   { TexCoords: {} }
+    half  { TexMath: {op: MathMultiply, a: dir, b_value: {0.5, 0.5, 0.5, 1}} }
+    shift { TexMath: {op: MathAdd, a: half, b_value: {0.5, 0.5, 0.5, 0}} }
+    TextureGraph: {output: shift, width: 256, height: 128, domain: DomainSphere}
+  }
+
+  tiles_quad {
+    Position: {-1.6, 0, 0}
+    Quad: {2.6, 2.6}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: tiles}
+  }
+
+  globe_sphere {
+    Position: {1.6, 0, 0}
+    Sphere: {segments: 48, smooth: true, radius: 1.2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.6}
+    PbrTextures: {albedo: globe}
+  }
+}

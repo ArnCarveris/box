@@ -171,7 +171,8 @@ int32_t box_textures_quality(
     return result ? result : BOX_TEXTURE_QUALITY_DEFAULT;
 }
 
-/** Write the status of a texture.
+/** Write the status of a texture. A change of its state or revision builds the graphs that
+ * sample it again.
  *
  * @param world The world or a stage
  * @param e The texture entity
@@ -186,6 +187,12 @@ void box_texture_status(
     int32_t revision,
     const char *error)
 {
+    const TextureStatus *prev = ecs_get(world, e, TextureStatus);
+    box_textures_t *t = box_textures_get(world);
+    if (t && (!prev || prev->state != state || prev->revision != revision)) {
+        box_texture_graphs_touch(t, e);
+    }
+
     ecs_set(world, e, TextureStatus, {
         .state = state,
         .revision = revision,
@@ -778,6 +785,7 @@ static void box_texture_forget(
         }
 
         ecs_map_remove(&t->textures, e);
+        box_texture_graphs_touch(t, e);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
         box_texture_graph_clear(tex);
@@ -814,6 +822,26 @@ static void BoxTexturePixelsOnRemove(
 
 done:
     return;
+}
+
+/** Construct TexCells components with full jitter and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_cells_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexCells *cells = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&cells[i], 0, TexCells);
+        cells[i].jitter = 1;
+    }
 }
 
 /** Free the image of TexturePixels components.
@@ -1070,7 +1098,7 @@ static void box_textures_fail_waiting(
  *
  * @param it The iterator of the system
  */
-static void BoxTextureFrame(
+static void BoxTextureUpdate(
     ecs_iter_t *it)
 {
     box_textures_t *t = box_textures_get(it->world);
@@ -1118,6 +1146,7 @@ void BoxTextureImport(
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
+    ECS_IMPORT(world, BoxCurve);
 
     ECS_META_COMPONENT(world, Texture);
     ECS_META_COMPONENT(world, TexturePath);
@@ -1137,19 +1166,71 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
+<<<<<<< HEAD
     ECS_META_COMPONENT(world, TexChannel);
     ECS_META_COMPONENT(world, TexNormal);
     ECS_META_COMPONENT(world, TexSlope);
+=======
+    ECS_META_COMPONENT(world, TextureNoiseFractal);
+    ECS_META_COMPONENT(world, TexNoise);
+    ECS_META_COMPONENT(world, TextureCellsDistance);
+    ECS_META_COMPONENT(world, TexCells);
+    ECS_META_COMPONENT(world, TexBlocks);
+    ECS_META_COMPONENT(world, TextureChannel);
+    ECS_META_COMPONENT(world, TexSplit);
+    ECS_META_COMPONENT(world, TexCombine);
+    ECS_META_COMPONENT(world, TexWarp);
+    ECS_META_COMPONENT(world, TexTransform);
+    ECS_META_COMPONENT(world, TexTime);
+    ECS_META_COMPONENT(world, TexSplat);
+    ECS_META_COMPONENT(world, TextureAddress);
+    ECS_META_COMPONENT(world, TexImage);
+    ECS_META_COMPONENT(world, TexLut);
+    ECS_META_COMPONENT(world, TextureGraphCache);
+    ECS_META_COMPONENT(world, TexRamp);
+    ECS_META_COMPONENT(world, TexCurve);
+    ECS_META_COMPONENT(world, TexBlur);
+>>>>>>> ee049f70a1b62a0d6d2fb9671a5a77399f089ce4
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
     ECS_META_COMPONENT(world, TextureState);
     ECS_META_COMPONENT(world, TextureStatus);
+    ECS_META_COMPONENT(world, TextureNodePreview);
+    ECS_META_COMPONENT(world, TextureNodePreviewStatus);
+    ECS_META_COMPONENT(world, TextureGraphStats);
     box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
     box_owned_hooks(world, TextureGen, BOX_OWNED_VEC(TextureGen, layers, TextureGenLayer),
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
         BOX_OWNED_VEC(TextureGen, palette, rgb));
+    box_owned_hooks(world, TexRamp, BOX_OWNED_VEC(TexRamp, keys, TextureGenKey));
+    box_owned_hooks(world, TexCurve, BOX_OWNED_CURVE(TexCurve, curve));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+    ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
+    box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name),
+        BOX_OWNED_STR(TextureNodePort, value));
+    box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));
+    box_owned_hooks(world, TextureNodeKind, BOX_OWNED_STR(TextureNodeKind, function),
+        BOX_OWNED_STR(TextureNodeKind, texture),
+        BOX_OWNED_STR(TextureNodeKind, inputs[0].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[0].value),
+        BOX_OWNED_STR(TextureNodeKind, inputs[1].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[1].value),
+        BOX_OWNED_STR(TextureNodeKind, inputs[2].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[2].value),
+        BOX_OWNED_STR(TextureNodeKind, inputs[3].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[3].value),
+        BOX_OWNED_STR(TextureNodeKind, params[0].name),
+        BOX_OWNED_STR(TextureNodeKind, params[1].name),
+        BOX_OWNED_STR(TextureNodeKind, params[2].name),
+        BOX_OWNED_STR(TextureNodeKind, params[3].name),
+        BOX_OWNED_STR(TextureNodeKind, params[4].name),
+        BOX_OWNED_STR(TextureNodeKind, params[5].name),
+        BOX_OWNED_STR(TextureNodeKind, params[6].name),
+        BOX_OWNED_STR(TextureNodeKind, params[7].name),
+        BOX_OWNED_STR(TextureNodeKind, array));
+    box_owned_hooks(world, TextureNodePreviewStatus,
+        BOX_OWNED_STR(TextureNodePreviewStatus, png));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);
@@ -1241,8 +1322,8 @@ void BoxTextureImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextureFrame" }),
+        .entity = ecs_entity(world, { .name = "TextureUpdate" }),
         .phase = EcsPreFrame,
-        .run = BoxTextureFrame
+        .run = BoxTextureUpdate
     });
 }

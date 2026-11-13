@@ -1,7 +1,7 @@
 // Shared code of the compute stages the GPU backend generates for the texture graphs
 // (src/render/gpu_texture_graph.c). A stage evaluates its nodes per texel in workgroups of 8x8
 // and stores the value of its last node in box_texgraph_out at binding 2. The node kinds call
-// the hashing and the reads of materialized inputs below.
+// the hashing, the reads of materialized inputs and the samples of bound textures below.
 
 const BOX_TEXGRAPH_PI: f32 = 3.141592653589793;
 
@@ -14,6 +14,11 @@ struct BoxTexGraphStage {
     // How the output stage stores its value: 0 as computed, 1 display encoded with alpha kept,
     // 2 the first channel as (x, 0, 0, 1)
     encode: u32,
+    // Seconds of the world clock at the evaluation, which TexTime reads
+    time: f32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // Parameter bytes of every node of the graph, at the offsets of the compiled graph
@@ -66,6 +71,30 @@ fn box_texgraph_load(t: texture_2d<f32>, texel: vec2i) -> vec4f {
     return textureLoad(t, box_texgraph_wrap(texel), 0);
 }
 
+// Texel of the image at integer coordinates outside it, continuing across the poles of the
+// sphere: a row past the top or the bottom is the row mirrored back on the opposite meridian,
+// half the width around; the plane repeats as box_texgraph_wrap does
+fn box_texgraph_wrap_poles(texel: vec2i) -> vec2i {
+    let size = vec2i(box_texgraph_stage.size);
+    var t = texel;
+    if (box_texgraph_stage.domain == 1u) {
+        let period = 2 * size.y;
+        var y = ((t.y % period) + period) % period;
+        if (y >= size.y) {
+            y = period - 1 - y;
+            t.x = t.x + size.x / 2;
+        }
+        t.y = y;
+    }
+
+    return box_texgraph_wrap(t);
+}
+
+// Value of a materialized input at a texel, continuing across the poles on the sphere
+fn box_texgraph_load_poles(t: texture_2d<f32>, texel: vec2i) -> vec4f {
+    return textureLoad(t, box_texgraph_wrap_poles(texel), 0);
+}
+
 // Value of a materialized input between texels, bilinear by hand at a position in texels with
 // the texel centers at + 0.5
 fn box_texgraph_bilinear(t: texture_2d<f32>, pos: vec2f) -> vec4f {
@@ -80,6 +109,7 @@ fn box_texgraph_bilinear(t: texture_2d<f32>, pos: vec2f) -> vec4f {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+<<<<<<< HEAD
 // Position in texels of the image of a direction on the sphere, the inverse of
 // box_texgraph_coords, with the texel centers at + 0.5
 fn box_texgraph_sphere_position(d: vec3f) -> vec2f {
@@ -147,6 +177,54 @@ fn box_texgraph_normal_scale(texel: vec2i) -> vec2f {
     let theta = (f32(texel.y) + 0.5) / f32(box_texgraph_stage.size.y) * BOX_TEXGRAPH_PI;
     let r = 2.0 * sin(theta);
     return vec2f(r, 1.0) * clamp(1.0 / r, 1.0, BOX_TEXGRAPH_POLE_SCALE);
+=======
+// Equirectangular uv of a direction, the inverse of box_texgraph_coords on the sphere: u 0.5 at
+// -z, v 0 at +y
+fn box_texgraph_equirect(d: vec3f) -> vec2f {
+    let len = length(d);
+    let n = select(vec3f(0.0, 0.0, -1.0), d / len, len > 0.0);
+    let phi = atan2(n.x, -n.z);
+    let theta = acos(clamp(n.y, -1.0, 1.0));
+    return vec2f(phi / (2.0 * BOX_TEXGRAPH_PI) + 0.5, theta / BOX_TEXGRAPH_PI);
+}
+
+// Texel of a sampled texture at integer coordinates, which repeat or clamp outside it: with wrap
+// on the sphere only the longitude repeats and the rows clamp at the poles
+fn box_texgraph_texel(t: texture_2d<f32>, texel: vec2i, wrap: bool) -> vec4f {
+    let size = vec2i(textureDimensions(t, 0));
+    var p = clamp(texel, vec2i(0), size - 1);
+    if (wrap) {
+        p.x = ((texel.x % size.x) + size.x) % size.x;
+        if (box_texgraph_stage.domain != 1u) {
+            p.y = ((texel.y % size.y) + size.y) % size.y;
+        }
+    }
+
+    return textureLoad(t, p, 0);
+}
+
+// Bilinear sample of the first level of a sampled texture at uv, 0..1 across it with v 0 at the
+// top row, repeating or clamping outside it; a single channel texture reads as (r, 0, 0, 1)
+fn box_texgraph_sample(t: texture_2d<f32>, uv: vec2f, wrap: bool) -> vec4f {
+    let size = vec2f(textureDimensions(t, 0));
+    var q = uv;
+    if (wrap) {
+        q.x = fract(q.x);
+        if (box_texgraph_stage.domain != 1u) {
+            q.y = fract(q.y);
+        }
+    }
+
+    let p = clamp(q, vec2f(-1.0), vec2f(2.0)) * size - 0.5;
+    let base = floor(p);
+    let f = p - base;
+    let i = vec2i(base);
+    let a = box_texgraph_texel(t, i, wrap);
+    let b = box_texgraph_texel(t, i + vec2i(1, 0), wrap);
+    let c = box_texgraph_texel(t, i + vec2i(0, 1), wrap);
+    let d = box_texgraph_texel(t, i + vec2i(1, 1), wrap);
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+>>>>>>> ee049f70a1b62a0d6d2fb9671a5a77399f089ce4
 }
 
 // PCG hash of a word
@@ -175,6 +253,12 @@ fn box_texgraph_random(h: u32) -> f32 {
 fn box_texgraph_srgb(c: vec3f) -> vec3f {
     let x = clamp(c, vec3f(0.0), vec3f(1.0));
     return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3f(0.0031308));
+}
+
+// Linear light of a display encoded color, the inverse of box_texgraph_srgb, clamped to 0..1
+fn box_texgraph_linear(c: vec3f) -> vec3f {
+    let x = clamp(c, vec3f(0.0), vec3f(1.0));
+    return select(pow((x + 0.055) / 1.055, vec3f(2.4)), x / 12.92, x <= vec3f(0.04045));
 }
 
 // Value the output stage stores, as box_texgraph_stage.encode asks

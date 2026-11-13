@@ -27,10 +27,12 @@ void box_gpu_cull_fini(
 /** Create the bind group layouts of the instance pages.
  *
  * instance_layout binds the transform stream (0), the surface assets of the mesh (1), the shading
- * stream (2), the surface stream (3) and the material table (4); transform_layout every binding
- * but the shading stream and the material table. Only the transform stream is visible to compute.
+ * stream (2), the surface stream (3), the material table (4) and the frame stream (5);
+ * transform_layout every binding but the shading stream, the material table and the frame
+ * stream. Only the transform stream is visible to compute.
  *
- * A plain mesh page and a 2D page have no surface stream and bind gpu->no_surfaces at 3.
+ * A plain mesh page and a 2D page have no surface stream and bind gpu->no_surfaces at 3; every
+ * page but a frame page has no frame stream and binds gpu->no_frames at 5.
  *
  * @param gpu The backend
  */

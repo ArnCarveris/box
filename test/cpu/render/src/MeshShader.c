@@ -671,6 +671,75 @@ void MeshShader_mapping_blend_change_moves_shape(void) {
     box_render_null_free(null);
 }
 
+/** A MappingFrame shape draws with the mesh shader in a frame batch, with the extended mesh
+ * shader once it has a triplanar blend; a MappingWorld shape next to it stays out of the frame
+ * store. */
+void MeshShader_frame_mapping_batch(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
+        .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
+        .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
+    ecs_entity_t frame = ecs_new(world);
+    ecs_add(world, frame, TextureFrame);
+    ecs_entity_t shape = ecs_new_w_pair(world, EcsChildOf, frame);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, TextureMapping, {.mode = MappingFrame, .size = 1, .blend = 0});
+    ecs_entity_t other = ecs_new_w_pair(world, EcsChildOf, frame);
+    ecs_set(world, other, Position, {2, 0, 0});
+    ecs_set(world, other, Box, {1, 1, 1});
+    ecs_set(world, other, TextureMapping, {.mode = MappingWorld, .size = 1, .blend = 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, shape_slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_bool(b->key.frame, true);
+    test_assert(box_draws_batch_store(d, b) == &d->stores[BOX_DRAWS_STORE_FRAME]);
+
+    const DrawSlot *other_slot = ecs_get(world, other, DrawSlot);
+    test_assert(other_slot != NULL && other_slot->batch >= 0);
+    b = box_draws_batch(d, other_slot->batch);
+    test_bool(b->key.frame, false);
+    test_assert(box_draws_batch_store(d, b) == &d->stores[BOX_DRAWS_STORE_MESH]);
+
+    ecs_set(world, shape, TextureMapping, {.mode = MappingFrame, .size = 1, .blend = 0.25f});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    shape_slot = ecs_get(world, shape, DrawSlot);
+    test_assert(shape_slot != NULL && shape_slot->batch >= 0);
+    b = box_draws_batch(d, shape_slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    test_bool(b->key.frame, true);
+
+    ecs_set(world, shape, TextureMapping, {.mode = MappingWorld, .size = 1, .blend = 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    shape_slot = ecs_get(world, shape, DrawSlot);
+    b = box_draws_batch(d, shape_slot->batch);
+    test_bool(b->key.frame, false);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
 void MeshShader_add_sheen_moves_to_extended(void) {
     // render/mesh_shader
     ecs_world_t *world = ecs_init();

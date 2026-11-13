@@ -24,7 +24,7 @@ state {
   export const L_SENSOR: i32 = 41
   export const L_QUARTERS: i32 = 42
   export const L_HABRING: i32 = 43
-  export const L_PARKRING: i32 = 44
+  export const L_ESTATE: i32 = 44
   export const L_REACTOR: i32 = 45
   export const L_RADIATOR: i32 = 46
   export const L_JUMP: i32 = 47
@@ -65,7 +65,7 @@ state {
     OP_PASSENGER, 0, 8, 9, L_TRUSS,
     OP_PASSENGER, 0, 10, 10, L_HABRING,
     OP_PASSENGER, 0, 11, 11, L_QUARTERS,
-    OP_PASSENGER, 0, 12, 12, L_PARKRING,
+    OP_PASSENGER, 0, 12, 12, L_ESTATE,
     OP_PASSENGER, 0, 13, 13, L_QUARTERS,
     OP_PASSENGER, 0, 14, 14, L_HABRING,
     OP_PASSENGER, 0, 15, 15, L_HANGAR,
@@ -110,7 +110,7 @@ state {
     OP_TENDER, 0, 8, 9, L_REFINERY,
     OP_TENDER, 0, 10, 10, L_YOKE,
     OP_TENDER, 0, 11, 11, L_TRUSS,
-    OP_TENDER, 0, 12, 12, L_PARKRING,
+    OP_TENDER, 0, 12, 12, L_ESTATE,
     OP_TENDER, 0, 13, 14, L_QUARTERS,
     OP_TENDER, 0, 15, 15, L_BRIDGE,
     OP_TENDER, 4, 7, 10, L_CARGO,
@@ -185,7 +185,7 @@ state {
   fn lane_r(l: i32) -> f32 { l == 0 ? R_CORE : R_OUT }
   fn slot_z(z: i32) -> f32 { (z - SLOTS / 2.0 + 0.5) * SEG }
 
-  fn ringed(k: i32) -> bool { k == L_HABRING || k == L_PARKRING }
+  fn ringed(k: i32) -> bool { k == L_HABRING || k == L_ESTATE }
   fn housed(k: i32) -> bool { k == L_QUARTERS || ringed(k) }
   fn core_only(k: i32) -> bool { ringed(k) || k == L_JUMP || k == L_YOKE }
 

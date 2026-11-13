@@ -558,12 +558,7 @@ def scene_frames(source, args):
     return int(line.group(1)) if line else DEFAULT_FRAMES
 
 
-def render_scene(scene, png, args):
-    width, height = (int(v) for v in args.size.lower().split("x"))
-    with open(scene) as f:
-        source = f.read()
-    frames = scene_frames(source, args)
-    harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
+def link_includes(directory):
     # Include paths cannot leave the folder of the script: link etc, apps and test/assets so a
     # scene can include etc/..., a scene of a game apps/<game>/etc/<game> and the test scripts
     # test/assets/.... The links are relative, since the checkout may be reached by another path
@@ -571,7 +566,7 @@ def render_scene(scene, png, args):
     # between real paths, as a relative link resolves from where its folder really is: an --out
     # under /tmp, a link to /private/tmp on macOS, would otherwise point one level off.
     for folder in ("etc", "apps", os.path.join("test", "assets")):
-        link = os.path.join(os.path.dirname(png), folder)
+        link = os.path.join(directory, folder)
         os.makedirs(os.path.dirname(link), exist_ok=True)
         target = os.path.relpath(os.path.realpath(os.path.join(ROOT, folder)),
                                  os.path.realpath(os.path.dirname(link)))
@@ -579,6 +574,15 @@ def render_scene(scene, png, args):
             os.unlink(link)
         if not os.path.lexists(link):
             os.symlink(target, link)
+
+
+def render_scene(scene, png, args):
+    width, height = (int(v) for v in args.size.lower().split("x"))
+    with open(scene) as f:
+        source = f.read()
+    frames = scene_frames(source, args)
+    harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
+    link_includes(os.path.dirname(png))
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
@@ -976,6 +980,7 @@ def run_perf_scene(scene, out, args):
         if "PerfRun" not in f.read():
             result.update({"detail": "the scene sets no PerfRun", "elapsed": 0})
             return result
+    link_includes(out)
     with open(harness, "w") as f:
         f.write(perf_script(scene, report, args))
     result["load_before"] = wait_for_load(args.max_load, args.load_wait)
