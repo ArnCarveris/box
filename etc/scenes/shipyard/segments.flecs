@@ -1603,7 +1603,7 @@ assets {
     } else if k == L_TRUSS {
       SpineTruss part(r: r)
     } else if k == L_YOKE {
-      Yoke part(r: r, p1: lkind(1, z) != 0, p2: lkind(2, z) != 0, p3: lkind(3, z) != 0, p4: lkind(4, z) != 0)
+      Yoke part(r: r, p1: lkind(1, z) == L_TRUSS, p2: lkind(2, z) == L_TRUSS, p3: lkind(3, z) == L_TRUSS, p4: lkind(4, z) == L_TRUSS)
     } else if k == L_ARMOR {
       ArmorSleeve part(r: r, fe: fe, be: be)
     } else if k == L_TURRET {
