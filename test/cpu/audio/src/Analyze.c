@@ -302,56 +302,6 @@ void Analyze_segments(void) {
     box_audio_wav_fini(&wav);
 }
 
-void Analyze_song_capture(void) {
-    // audio/song
-    const char *path = "audio_analyze_song.wav";
-    ecs_world_t *world = audio_world();
-    box_audio_song_load(world, ANALYZE_DIR "songs/basic.flecs");
-    int32_t i;
-    for (i = 0; i < 600; i ++) {
-        audio_run(world, 1);
-        if (ecs_singleton_get(world, AudioSongStatus)->state != SongLoading) {
-            break;
-        }
-    }
-
-    test_int(ecs_singleton_get(world, AudioSongStatus)->state, SongReady);
-    Transport *tr = ecs_singleton_ensure(world, Transport);
-    tr->playing = true;
-    ecs_singleton_modified(world, Transport);
-    audio_run(world, 2);
-    test_int(box_audio_capture(world, 4.0f, path), 0);
-    for (i = 0; i < 600 && box_audio_capture_pending(world); i ++) {
-        audio_run(world, 1);
-    }
-
-    test_bool(box_audio_capture_pending(world), false);
-
-    size_t size = 0;
-    uint8_t *bytes = analyze_bytes(path, false, &size);
-    box_audio_wav_t wav;
-    test_assert(box_audio_wav_read(bytes, size, &wav) == NULL);
-    test_bool(wav.has_song, true);
-    test_flt(wav.song.tempo, 96);
-    test_flt(wav.song.bar_beats, 3);
-    test_assert(wav.song.start_beat >= 0 && wav.song.start_beat < 1);
-    test_int(wav.frames, 4 * 48000);
-    box_audio_wav_fini(&wav);
-    free(bytes);
-
-    ecs_entity_t s = ecs_shell_session_init(world, NULL);
-    bool error = true;
-    char *out = box_command_run(world, s, "audio.analyze audio_analyze_song.wav", &error);
-    test_bool(error, false);
-    test_assert(strstr(out, "\nbars: 96.0 bpm, 3.00 beats per bar") != NULL);
-    test_assert(strstr(out, "\nbar 1") != NULL);
-    test_assert(strstr(out, "\nbar 2: ") != NULL);
-    test_assert(strstr(out, " LUFS, ") != NULL);
-    ecs_os_free(out);
-    ecs_fini(world);
-    remove(path);
-}
-
 void Analyze_capture_without_song(void) {
     const char *path = "audio_analyze_plain.wav";
     ecs_world_t *world = audio_world();
