@@ -14,6 +14,11 @@ struct BoxTexGraphStage {
     // How the output stage stores its value: 0 as computed, 1 display encoded with alpha kept,
     // 2 the first channel as (x, 0, 0, 1)
     encode: u32,
+    // Seconds of the world clock at the evaluation, which TexTime reads
+    time: f32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // Parameter bytes of every node of the graph, at the offsets of the compiled graph
@@ -98,6 +103,12 @@ fn box_texgraph_random(h: u32) -> f32 {
 fn box_texgraph_srgb(c: vec3f) -> vec3f {
     let x = clamp(c, vec3f(0.0), vec3f(1.0));
     return select(1.055 * pow(x, vec3f(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3f(0.0031308));
+}
+
+// Linear light of a display encoded color, the inverse of box_texgraph_srgb, clamped to 0..1
+fn box_texgraph_linear(c: vec3f) -> vec3f {
+    let x = clamp(c, vec3f(0.0), vec3f(1.0));
+    return select(pow((x + 0.055) / 1.055, vec3f(2.4)), x / 12.92, x <= vec3f(0.04045));
 }
 
 // Value the output stage stores, as box_texgraph_stage.encode asks

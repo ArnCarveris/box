@@ -424,18 +424,22 @@ ECS_STRUCT(TextureScroll, {
 ECS_ENUM(TextureMappingMode, {
     MappingUv = 0,      /**< The UVs of the mesh, the default */
     MappingObject = 1,  /**< Projected from the object space position times the instance scale */
-    MappingWorld = 2    /**< Projected from the world position, fixed in the world */
+    MappingWorld = 2,   /**< Projected from the world position, fixed in the world */
+    MappingFrame = 3    /**< Projected from the position in the space of the nearest
+                         *   TextureFrame, the shape or an ancestor; moves with that frame */
 });
 
 /** How the texture coordinates of a material are made, default MappingUv with a size of 1 and a
  * blend of 0, inherited by instances, like TextureTransform.
  *
  * MappingObject projects the object space position times the instance scale, MappingWorld the
- * world position, divided by size, onto the plane of the dominant normal axis, oriented as the
+ * world position, MappingFrame the position relative to the origin and orientation of the
+ * nearest TextureFrame (in world units, without the scale of the frame; as MappingWorld without
+ * one), divided by size, onto the plane of the dominant normal axis, oriented as the
  * faces of a Box. A blend above 0 mixes the three projections (triplanar) to hide seams.
  *
  * TextureTransform applies after the mapping. Parametric surfaces keep their own UVs, except a
- * Sweep with MappingObject (see Sweep).
+ * Sweep with MappingObject (see Sweep) and MappingFrame, which projects them too.
  */
 ECS_STRUCT(TextureMapping, {
     TextureMappingMode mode; /**< Source of the texture coordinates */
@@ -491,6 +495,11 @@ ECS_STRUCT(TextureBlend, {
 
 /** Material properties change every frame, applies to descendants */
 extern ECS_TAG_DECLARE(DynamicMaterial);
+
+/** Marks an entity as the frame of the projected textures of its subtree: a MappingFrame
+ * material of the entity or of a descendant projects from the position relative to the nearest
+ * one, so shapes under one frame show one continuous texture that moves with it */
+extern ECS_TAG_DECLARE(TextureFrame);
 
 /** Keeps an entity and its descendants out of the shadow pass of every view */
 extern ECS_TAG_DECLARE(NoShadow);
