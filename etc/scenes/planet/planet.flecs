@@ -58,28 +58,6 @@ planets {
     mixc(pal_a(kind * 4 + lvl), pal_b(kind * 4 + lvl), v)
   }
 
-  fn terrain(kind: i32, v: f32, e: f32) -> Col {
-    const lo: Col = mixc(pal(kind, 0, v), pal(kind, 1, v), sat(e / 0.22))
-    const mid: Col = mixc(lo, pal(kind, 2, v), sat((e - 0.22) / 0.33))
-    mixc(mid, pal(kind, 3, v), sat((e - 0.55) / 0.4))
-  }
-
-  fn veg(vv: f32, e: f32) -> Col {
-    const lo: Col = mixc({78, 132, 52}, {44, 124, 96}, vv)
-    const mid: Col = mixc({30, 84, 38}, {24, 76, 66}, vv)
-    const hi: Col = mixc({96, 104, 56}, {70, 96, 78}, vv)
-    mixc(mixc(lo, mid, sat(e * 3.2)), hi, sat((e - 0.34) * 3.5))
-  }
-
-  fn land(kind: i32, v: f32, vv: f32, e: f32, bio: f32, hot: f32, wet: f32) -> Col {
-    const base: Col = mixc(terrain(kind, v, e), {112, 92, 70}, wet * 0.35 * sat(1 - e * 2))
-    const cover: f32 = sat((bio * 0.85 - e) * 4.5 + bio * 0.3) * (bio > 0 ? 1 : 0)
-    const green: Col = mixc(veg(vv, e), {158, 146, 78}, sat(hot * 1.2))
-    const grown: Col = mixc(base, green, cover * 0.94)
-    const parched: Col = mixc(grown, {150, 84, 50}, hot * 0.4)
-    mixc(parched, {52, 34, 30}, sat(hot * 2.5 - 1.5) * 0.7)
-  }
-
   // Bare ground of a kind at a palette level, darkened where wet and parched where hot: the
   // keys of the ramp of the ground by altitude
   fn ground(kind: i32, v: f32, lvl: i32, e: f32, hot: f32, wet: f32) -> Col {
@@ -125,109 +103,267 @@ planets {
     }
   }
 
+  // Tint of the bands of a gas giant, warmer the hotter and bluer the colder its equator
+  fn gas_tint(equator: f32) -> Col {
+    const t: f32 = (equator - 0.25) / 0.9
+    const warm: Col = mixc({255, 255, 255}, {255, 196, 150}, sat((t - 0.62) / 0.38) * 0.5)
+    mixc(warm, {170, 200, 255}, sat((0.42 - t) / 0.42) * 0.5)
+  }
+
+  // Color i of the bands of a gas giant of a seed: a palette of the seed, nudged toward the next
+  fn gas_tone(sd: i32, i: i32, tint: Col) -> Col {
+    const gp: i32 = sd % 5
+    mulc(mixc(gas_col(gp, i), gas_col((gp + 1) % 5, i), h01(sd, 2) * 0.35), tint)
+  }
+
+  // The parameters of a planet, in the units of the generation. Heights are in units of the
+  // height map, whose continents are about 0.5 with a standard deviation of 1/6; temperatures
+  // are in units of the climate, about 0.15 where the vegetation starts and 0.3 where it thrives;
+  // the atmosphere is in km of a planet of 6360 km.
+
+  // The body: radius in world units, the axis tilted by tilt degrees about the view and leaned
+  // by lean degrees toward it, spin in radians per second
+  struct PlanetBody(radius: f32, tilt: f32, lean: f32, spin: f32)
+
+  // The relief of a rocky planet: the fraction of the surface under the sea, the frequency of
+  // the continents and the warp of their coordinates, the height of the mountain ranges and the
+  // fraction of the regions they cover, the depth of the craters, the depth of the cracks between
+  // the plates, the number of plates and how dark their cracks are, the strength of the normal
+  // map, the variation of the ground color and the sand at the shore
+  struct PlanetSurface(
+    ocean: f32, continents: f32, warp: f32, mountains: f32, mountain_cover: f32, craters: f32,
+    cracks: f32, plates: f32, crack_shade: f32, normal: f32, variation: f32, beach: f32)
+
+  // The climate: the temperature at sea level at the equator and at the poles, its fall at the
+  // highest ground, the temperature below which the sea freezes and below which the land is
+  // snow, the amount of snow, the moisture near the sea, the vegetation cover and the treeline
+  // in altitude of 0 (the shore) to 1 (the highest ground)
+  struct PlanetClimate(
+    equator: f32, poles: f32, lapse: f32, ice: f32, snow_line: f32, snow: f32, moisture: f32,
+    vegetation: f32, treeline: f32)
+
+  // The atmosphere: density, a scale of both scatterings, the Rayleigh and Mie scale heights in
+  // km and scattering scales, the Mie anisotropy and the tint of the haze. No atmosphere at a
+  // density of 0
+  struct PlanetAir(
+    density: f32, rayleigh_height: f32, rayleigh: f32, mie_height: f32, mie: f32,
+    anisotropy: f32, tint: Col)
+
+  // The clouds: the fraction of the sky with some cloud, the opacity of the layer (none below
+  // 0.02), the frequency of the weather systems, their speed over the ground in radians per
+  // second, how fast they change and their color
+  struct PlanetClouds(
+    cover: f32, opacity: f32, frequency: f32, speed: f32, evolve: f32, color: Col)
+
+  // The night side: city lights, how densely they fill the habitable land and their brightness
+  struct PlanetNight(lights: bool, density: f32, brightness: f32)
+
+  // Lava: the fraction of the lowlands it fills (none at 0), the glow of the cracks between the
+  // plates and the strength of its emission
+  struct PlanetLava(level: f32, cracks: f32, emission: f32)
+
+  // A gas giant: the frequency of the bands over the sine of the latitude, the turbulence of
+  // their edges, how far in degrees the jets drift them and the fraction of cells with a storm
+  struct PlanetGas(bands: f32, turbulence: f32, drift: f32, storms: f32)
+
+  // Rings: their outer radius in planet radii, opacity and color
+  struct PlanetRings(enabled: bool, size: f32, opacity: f32, color: Col)
+
+  // Presets of the kinds (0 rock, 1 desert, 2 ice, 3 lava, 4 gas giant, 5 garden) for a seed
+  fn seed_of(seed: i32) -> i32 { seed < 0 ? 0 - seed : seed }
+
+  fn body_preset(seed: i32) -> PlanetBody {
+    const v3: f32 = h01(seed_of(seed), 3)
+    const v4: f32 = h01(seed_of(seed), 4)
+    const lean: f32 = 0.1 + v3 * 0.2
+    const tilt: f32 = (v4 - 0.5) * 0.5 + (v4 > 0.5 ? 0.12 : -0.12)
+    {radius: 2.2, tilt: tilt * 180 / PI, lean: lean * 180 / PI, spin: 0.12}
+  }
+
+  fn surface_preset(kind: i32, seed: i32) -> PlanetSurface {
+    const sd: i32 = seed_of(seed)
+    const ocean: f32 = match kind { 0: 0.05; 1: 0.05; 2: 0.5; 5: 0.65; _: 0 }
+    const continents: f32 = match kind {
+      0: 1.1 + (sd % 3) * 0.15; 5: 1.1 + (sd % 3) * 0.15; 1: 1.2 + (sd % 2) * 0.2
+      _: 1.4 + (sd % 2) * 0.2
+    }
+    const mountains: f32 = match kind { 0: 0.12; 1: 0.16; 2: 0.06; 3: 0.1; _: 0.2 }
+    const craters: f32 = match kind { 0: 0.5; 1: 0.16; 2: 0.06; _: 0 }
+    const cracks: f32 = match kind { 2: 0.03; 3: 0.08; _: 0 }
+    const plates: f32 = match kind { 2: 90 + sd % 60; 3: 50 + sd % 40; _: 64 }
+    const crack_shade: f32 = match kind { 2: 0.55; 3: 0.8; _: 0 }
+    const normal: f32 = match kind { 2: 2.5; 3: 3; _: 3.5 }
+    const variation: f32 = match kind { 0: 0.18; 1: 0.25; 5: 0.15; _: 0.12 }
+    const beach: f32 = match kind { 0: 0.18; 1: 0.45; 5: 0.45; _: 0 }
+    {
+      ocean: ocean, continents: continents, warp: 0.8 + h01(sd, 4) * 0.4, mountains: mountains,
+      mountain_cover: 0.5 - (h01(sd, 2) - 0.5) * 0.06, craters: craters, cracks: cracks,
+      plates: plates, crack_shade: crack_shade, normal: normal, variation: variation, beach: beach
+    }
+  }
+
+  fn climate_preset(kind: i32) -> PlanetClimate {
+    const equator: f32 = match kind { 0: 0.61; 1: 0.88; 2: 0.385; 3: 1.105; 4: 0.61; _: 0.7 }
+    const poles: f32 = match kind { 0: -0.029; 1: 0.214; 2: -0.365; 3: 0.451; 4: -0.14; _: -0.05 }
+    const lapse: f32 = match kind { 0: 0.1365; 1: 0.186; 2: 0.1695; 3: 0.219; 4: 0.45; _: 0.417 }
+    const ice: f32 = match kind { 0: 0.55; 2: 0.85; _: 0.1 }
+    const snow_line: f32 = match kind { 0: 0.0486; 1: 0.0684; 3: 0.0596; _: 0.13 }
+    const snow: f32 = match kind { 0: 0.48; 1: 0.57; 3: 0.43; 4: 0.85; _: 1 }
+    const moisture: f32 = match kind {
+      0: 0.0875; 1: 0.1253; 2: 0.7525; 3: 0.0594; 4: 0.35; _: 1
+    }
+    {
+      equator: equator, poles: poles, lapse: lapse, ice: ice, snow_line: snow_line, snow: snow,
+      moisture: moisture, vegetation: kind == 5 ? 0.9286 : 0, treeline: kind == 5 ? 0.6675 : 0.2
+    }
+  }
+
+  fn air_preset(kind: i32, seed: i32) -> PlanetAir {
+    const sd: i32 = seed_of(seed)
+    const tint_gas: Col = gas_tint(0.61)
+    const g: Col = mixc(gas_tone(sd, 2, tint_gas), gas_tone(sd, 1, tint_gas), 0.4)
+    const g_max: f32 = max(max(g.r, g.g), max(g.b, 1))
+    const tint: Col = match kind {
+      0: {255, 225, 195}; 1: {255, 175.9, 105.5}; 2: {180.6, 227.4, 255}; 3: {255, 104, 48}
+      4: {g.r * 255 / g_max, g.g * 255 / g_max, g.b * 255 / g_max}
+      _: {96, 160, 255}
+    }
+    const density: f32 = match kind { 0: 0.145; 1: 0.28; 2: 0.235; 3: 0.37; 4: 1; _: 0.91 }
+    const rayleigh_height: f32 = match kind {
+      0: 93.44; 1: 118.08; 2: 63.2; 3: 154.88; 4: 144; _: 158.72
+    }
+    const rayleigh: f32 = match kind {
+      0: 0.094178; 1: 0.022866; 2: 0.094937; 3: 0.028409; 4: 0.015625; _: 0.050403
+    }
+    const mie_height: f32 = match kind { 0: 17.52; 1: 104.96; 2: 37.92; 3: 140.8; 4: 112; _: 29.76 }
+    const mie: f32 = match kind {
+      0: 0.171233; 1: 2.134146; 2: 1.740506; 3: 3.125; 4: 0.375; _: 0.100806
+    }
+    const anisotropy: f32 = match kind { 0: 0.75; 1: 0.4; 2: 0.7; 3: 0.4; 4: 0.5; _: 0.75 }
+    {
+      density: density, rayleigh_height: rayleigh_height, rayleigh: rayleigh,
+      mie_height: mie_height, mie: mie, anisotropy: anisotropy, tint: tint
+    }
+  }
+
+  fn clouds_preset(kind: i32) -> PlanetClouds {
+    const cover: f32 = match kind {
+      0: 0.225981; 1: 0.242414; 2: 0.265788; 3: 0.241962; 4: 0.22; _: 0.55
+    }
+    const opacity: f32 = match kind {
+      0: 0.018125; 1: 0.067921; 2: 0.13875; 3: 0.066553; 4: 0; _: 1
+    }
+    const color: Col = match kind {
+      0: {204, 192, 180}; 1: {241.2, 198, 159.6}; 3: {255, 141.8, 99.8}; _: {255, 255, 255}
+    }
+    {
+      cover: cover, opacity: opacity, frequency: 1.8, speed: 0.034, evolve: 0.01, color: color
+    }
+  }
+
+  fn night_preset(kind: i32) -> PlanetNight {
+    {lights: kind == 5, density: 1.6, brightness: 0.6}
+  }
+
+  fn lava_preset(kind: i32) -> PlanetLava {
+    {level: kind == 3 ? 0.14 : 0, cracks: kind == 3 ? 0.7 : 0, emission: 1.8}
+  }
+
+  fn gas_preset(seed: i32) -> PlanetGas {
+    const sd: i32 = seed_of(seed)
+    {
+      bands: 13 + h01(sd, 1) * 6, turbulence: 0.07, drift: 35 + h01(sd, 2) * 20,
+      storms: 0.12 + h01(sd, 4) * 0.12
+    }
+  }
+
+  fn rings_preset(kind: i32, seed: i32) -> PlanetRings {
+    const sd: i32 = seed_of(seed)
+    const tint_gas: Col = gas_tint(0.61)
+    const dust: Col = mixc({214, 204, 184}, {196, 170, 140}, h01(sd, 1))
+    const ice: Col = mixc(gas_tone(sd, 2, tint_gas), {255, 255, 255}, 0.4)
+    {enabled: kind == 4, size: 2.3, opacity: 1, color: mixc(dust, ice, kind == 4 ? 0.35 : 0)}
+  }
+
+  const garden_body: PlanetBody = body_preset(23)
+  const garden_surface: PlanetSurface = surface_preset(5, 23)
+  const garden_climate: PlanetClimate = climate_preset(5)
+  const garden_air: PlanetAir = air_preset(5, 23)
+  const garden_clouds: PlanetClouds = clouds_preset(5)
+  const garden_night: PlanetNight = night_preset(5)
+  const garden_lava: PlanetLava = lava_preset(5)
+  const garden_gas: PlanetGas = gas_preset(23)
+  const garden_rings: PlanetRings = rings_preset(5, 23)
+
   ring_tex { TexturePath: {path: "etc/scenes/planet/assets/rings.png"} }
 
-  // A planet whose maps are texture graphs on the sphere domain. For a kind and a detail the
-  // nodes are fixed: the sliders (atm, water, temp, bio, seed, lights) change their parameters
-  // only, so no slider compiles a graph again. A feature that is off keeps its nodes with a zero
-  // contribution.
+  // A planet whose maps are texture graphs on the sphere domain, from its kind (the palettes and
+  // whether it is a rocky planet or a gas giant), seed, detail and parameters, which default to a
+  // garden planet. For a kind and a detail the nodes are fixed: the parameters and the seed
+  // change the values of nodes only, so no parameter compiles a graph again. A feature that is
+  // off keeps its nodes with a zero contribution.
   //
   // One height (s_h) feeds every map of a rocky planet: warped fbm continents, ridged mountain
   // ranges masked to some regions, craters and, for ice and lava, cracked plates. The climate
-  // follows from it: a temperature (s_t) from the latitude, the temp prop and the altitude, a
-  // moisture (s_m) from the water prop, the distance to the sea (the land mask blurred) and the
-  // latitude bands. The land is the ground of the kind by altitude, covered by the vegetation of
-  // the biome table (lut, by temperature and moisture), rock on steep ground, sand at the coast
-  // and snow where it is cold; the sea is tinted by depth and freezes where it is cold. The
-  // clouds (cld) and the bands of a gas giant are animated.
+  // follows from it: a temperature (s_t) from the latitude and the altitude, a moisture (s_m)
+  // from the distance to the sea (the land mask blurred) and the latitude bands. The land is the
+  // ground of the kind by altitude, covered by the vegetation of the biome table (lut, by
+  // temperature and moisture), rock on steep ground, sand at the coast and snow where it is
+  // cold; the sea is tinted by depth and freezes where it is cold. The clouds (cld) and the
+  // bands of a gas giant are animated.
   template Planet {
-    prop kind: i32 = 0
-    prop seed: i32 = 0
-    prop atm: f32 = 0
-    prop water: f32 = 0
-    prop temp: f32 = 50
-    prop bio: f32 = 0
-    prop radius: f32 = 1
-    prop lights: bool = false
-    prop rings: bool = false
+    prop kind: i32 = 5
+    prop seed: i32 = 23
     prop detail: i32 = 1
-    prop spin: f32 = 0.05
-    prop air_scale: f32 = 1
+    prop body: PlanetBody = garden_body
+    prop surface: PlanetSurface = garden_surface
+    prop climate: PlanetClimate = garden_climate
+    prop air: PlanetAir = garden_air
+    prop clouds: PlanetClouds = garden_clouds
+    prop night: PlanetNight = garden_night
+    prop lava: PlanetLava = garden_lava
+    prop gas: PlanetGas = garden_gas
+    prop rings: PlanetRings = garden_rings
 
-    const qa: i32 = clamp(floor(atm / 5 + 0.5), 0, 20)
-    const qw: i32 = clamp(floor(water / 5 + 0.5), 0, 20)
-    const qt: i32 = clamp(floor(temp / 5 + 0.5), 0, 20)
-    const qb: i32 = clamp(floor(bio / 5 + 0.5), 0, 20)
     const is_gas: bool = kind == 4
     const k: i32 = (kind < 0 || kind > 5) ? 0 : kind
-    const a: f32 = qa / 20
-    const w: f32 = is_gas ? 0 : qw / 20
-    const t: f32 = qt / 20
-    const b: f32 = is_gas ? 0 : qb / 20
+    const radius: f32 = body.radius
+    const w: f32 = is_gas ? 0 : sat(surface.ocean)
+    const has_sea: bool = w > 0
 
-    const sd: i32 = seed < 0 ? 0 - seed : seed
+    const sd: i32 = seed_of(seed)
     const v1: f32 = h01(sd, 1)
     const v2: f32 = h01(sd, 2)
     const v3: f32 = h01(sd, 3)
     const v4: f32 = h01(sd, 4)
 
-    const cold: f32 = sat((0.42 - t) / 0.42)
+    // The ground parches and the sea turns murky with the heat of the equator
+    const t: f32 = (climate.equator - 0.25) / 0.9
     const hot: f32 = sat((t - 0.62) / 0.38)
-    const frozen: f32 = max(smoothstep(0.2, 0.5, cold), sat(1 - a * 8))
-    const shelf: f32 = 0.035 + 0.82 * min(w, 0.25) + 0.575 * clamp(w - 0.25, 0, 0.4)
-    const deep: f32 = 0.698 * clamp(w - 0.65, 0, 0.15) + 1.435 * max(w - 0.8, 0)
-    const sea: f32 = qw > 0 ? shelf + deep : -0.08
-    const damp: f32 = sat(w * 4 + a * 1.2)
-    const snow: f32 = max(0.365 + 0.936 * t + (1 - damp) * 0.8 + hot * 1.9, sea + 0.01)
-    const span: f32 = max(snow - sea - 0.006, 0.003)
-    const top: f32 = max(0.95 - max(sea, 0), 0.2)
-    const l2: f32 = sea + 0.006 + span * 0.16
-    const c2: Col = land(k, v1, v2, sat((l2 - sea) / top), b, hot, w)
     const s0: Col = sea_col(0, v3, 0, hot)
     const s1: Col = sea_col(1, v3, 0, hot)
     const s2: Col = sea_col(2, v3, 0, hot)
     const s3: Col = sea_col(3, v3, 0, hot)
-    const s1f: Col = sea_col(1, v3, frozen, hot)
 
-    const gp: i32 = sd % 5
-    const warm: Col = mixc({255, 255, 255}, {255, 196, 150}, hot * 0.5)
-    const gtint: Col = mixc(warm, {170, 200, 255}, cold * 0.5)
-    const g0: Col = mulc(mixc(gas_col(gp, 0), gas_col((gp + 1) % 5, 0), v2 * 0.35), gtint)
-    const g1: Col = mulc(mixc(gas_col(gp, 1), gas_col((gp + 1) % 5, 1), v2 * 0.35), gtint)
-    const g2: Col = mulc(mixc(gas_col(gp, 2), gas_col((gp + 1) % 5, 2), v2 * 0.35), gtint)
-    const g3: Col = mulc(mixc(gas_col(gp, 3), gas_col((gp + 1) % 5, 3), v2 * 0.35), gtint)
-    const g4: Col = mulc(mixc(gas_col(gp, 4), gas_col((gp + 1) % 5, 4), v2 * 0.35), gtint)
+    const gtint: Col = gas_tint(climate.equator)
+    const g0: Col = gas_tone(sd, 0, gtint)
+    const g1: Col = gas_tone(sd, 1, gtint)
+    const g2: Col = gas_tone(sd, 2, gtint)
+    const g3: Col = gas_tone(sd, 3, gtint)
+    const g4: Col = gas_tone(sd, 4, gtint)
 
-    const heat: f32 = sat((t - (k == 3 ? 0.55 : 0.8)) / 0.2) * sat(1 - w * 8)
-    const lava_lvl: f32 = heat * (k == 3 ? 0.16 : 0.14)
-    const lava_on: bool = !is_gas && detail > 0 && lava_lvl > 0
-    const city_on: bool = !is_gas && detail > 0 && lights && !lava_on
+    const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
+    const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
 
-    const cover: f32 = is_gas ? 0 : sat(a * (0.3 + 1.25 * w)) * (1 - hot * 0.3)
-    const breath: f32 = smoothstep(0.3, 0.8, a) * sat(0.25 + w + b)
-    const airc: Col = mixc(mixc(haze(k), {96, 160, 255}, breath), mixc(g2, g1, 0.4), is_gas ? 1 : 0)
-    const air_k: f32 = is_gas ? 0.5 : a
-    const air_max: f32 = max(max(airc.r, airc.g), max(airc.b, 1))
-    const air_on: bool = detail > 0 && air_k > 0.02
-    const lift: f32 = 16 * air_scale * (0.7 + 0.6 * air_k)
-    const dens: f32 = is_gas ? 1 : 0.1 + 0.9 * a
-    const ray_k: f32 = match k { 0: 1.1; 1: 0.3; 2: 1.2; 3: 0.4; 4: 0.25; _: 1 }
-    const mie_k: f32 = match k { 0: 2; 1: 28; 2: 22; 3: 44; 4: 6; _: 2 }
-    const ray_h: f32 = match k { 0: 8; 1: 9; 2: 5; 3: 11; 4: 9; _: 8 }
-    const mie_h: f32 = match k { 0: 1.5; 1: 8; 2: 3; 3: 10; 4: 7; _: 1.5 }
-    const mie_g: f32 = match k { 0: 0.75; 1: 0.4; 2: 0.7; 3: 0.4; 4: 0.5; _: 0.75 }
-    const dust: Col = mixc({214, 204, 184}, {196, 170, 140}, v1)
-    const ringc: Col = mixc(dust, mixc(g2, {255, 255, 255}, 0.4), is_gas ? 0.35 : 0)
-    const mist: Col = mixc(mixc(haze(k), {255, 255, 255}, 0.25), {255, 255, 255}, sat(w * 4))
-    const pale: f32 = sat(0.9 - snow) * 0.9 + cover * 0.15
-    const far: Col = mixc(mixc(c2, s1f, sat(w * 1.3)), {236, 242, 250}, pale)
-    const flat: Col = mixc(far, g0, is_gas ? 1 : 0)
+    const air_on: bool = detail > 0 && air.density > 0
+    const air_k: f32 = min(air.density, 1)
+    const tint: Col = air.tint
 
     const tw: i32 = detail > 1 ? 1024 : 512
     const seg: i32 = detail > 1 ? 96 : (detail > 0 ? 48 : 20)
     const oct: i32 = detail > 1 ? 7 : 6
-    const lean: f32 = 0.1 + v3 * 0.2
-    const tilt: f32 = (v4 - 0.5) * 0.5 + (v4 > 0.5 ? 0.12 : -0.12)
+    const lean: f32 = body.lean * PI / 180
+    const tilt: f32 = body.tilt * PI / 180
     const surf_on: bool = detail > 0 && !is_gas
     const gas_on: bool = detail > 0 && is_gas
 
@@ -235,40 +371,36 @@ planets {
     // with a standard deviation of 1/6 over the sphere, so the sea level that leaves a fraction w
     // of the surface under water is their quantile. Mountain ranges, craters and cracked plates
     // are added on top
-    const f1: f32 = match k {
-      0: 1.1 + (sd % 3) * 0.15; 5: 1.1 + (sd % 3) * 0.15; 1: 1.2 + (sd % 2) * 0.2
-      _: 1.4 + (sd % 2) * 0.2
-    }
-    const warp_amt: f32 = 0.8 + v4 * 0.4
-    const mtn: f32 = match k { 0: 0.12; 1: 0.16; 2: 0.06; 3: 0.1; _: 0.2 }
-    const mtn_lo: f32 = 0.5 + (v2 - 0.5) * 0.06
-    const crater: f32 = match k { 0: 0.5; 1: 0.16; 2: 0.06; _: 0 }
-    const crack: f32 = match k { 2: 0.03; 3: 0.08; _: 0 }
-    const cn: i32 = match k { 2: 90 + sd % 60; 3: 50 + sd % 40; _: 64 }
-    const sea_h: f32 = qw > 0 ? 0.5 + probit(w) / 6 : -1
-    const base_h: f32 = qw > 0 ? sea_h : 0.15
+    const f1: f32 = surface.continents
+    const warp_amt: f32 = surface.warp
+    const mtn: f32 = surface.mountains
+    const mtn_lo: f32 = 1 - surface.mountain_cover
+    const crater: f32 = surface.craters
+    const crack: f32 = surface.cracks
+    const cn: i32 = max(surface.plates, 1)
+    const sea_h: f32 = has_sea ? 0.5 + probit(w) / 6 : -1
+    const base_h: f32 = has_sea ? sea_h : 0.15
     const top_h: f32 = max(0.92 + mtn * 0.6, base_h + 0.25)
-    const nstr: f32 = match k { 2: 2.5; 3: 3; _: 3.5 }
+    const nstr: f32 = surface.normal
     const rock_lo: f32 = 0.25
     const rock_hi: f32 = 0.5
 
-    // Climate: the temperature at sea level falls from t_eq at the equator by t_lat at the
-    // poles and by t_alt at the highest ground, less in a thin air; below sn_t it snows, colder
-    // on a dry world. The moisture is wet near the sea, at the equator and around 55 degrees and
-    // dry around 30 degrees and inland
-    const t_eq: f32 = 0.25 + 0.9 * t
-    const t_lat: f32 = 0.6 + 0.15 * damp
-    const t_alt: f32 = 0.12 + 0.33 * a
-    const freeze: f32 = 0.1 + 0.75 * frozen
-    const wet: f32 = sat(w * 1.4 + a * 0.35) * (1 - hot * 0.5)
-    const snow_k: f32 = sat(0.25 + w * 4 + a * 0.6)
-    const sn_t: f32 = 0.02 + 0.11 * damp
-    const sand: f32 = qw > 0 ? 0.45 * (1 - frozen) : 0
-    const veg_k: f32 = sat(b * 1.15) * 0.95
-    const tl_hi: f32 = 0.2 + 0.55 * b
+    // Climate: the temperature at sea level falls from t_eq at the equator to t_pole at the
+    // poles and by t_alt at the highest ground; below sn_t it snows. The moisture is wet near
+    // the sea, at the equator and around 55 degrees and dry around 30 degrees and inland
+    const t_eq: f32 = climate.equator
+    const t_pole: f32 = climate.poles
+    const t_alt: f32 = climate.lapse
+    const freeze: f32 = climate.ice
+    const wet: f32 = climate.moisture
+    const snow_k: f32 = climate.snow
+    const sn_t: f32 = climate.snow_line
+    const sand: f32 = has_sea ? surface.beach : 0
+    const veg_k: f32 = climate.vegetation
+    const tl_hi: f32 = climate.treeline
     const tl_lo: f32 = tl_hi - 0.25
-    const gvar: f32 = match k { 0: 0.18; 1: 0.25; 5: 0.15; _: 0.12 }
-    const crack_k: f32 = match k { 2: 0.55; 3: 0.8; _: 0 }
+    const gvar: f32 = surface.variation
+    const crack_k: f32 = surface.crack_shade
     const crack_c: Col = mixc({150, 98, 70}, {26, 12, 10}, k == 3 ? 1 : 0)
 
     // Colors of the ramps
@@ -281,10 +413,17 @@ planets {
     const gr2: Col = mixc({118, 140, 66}, {96, 136, 80}, v2)
     const fo2: Col = mixc({36, 82, 36}, {30, 74, 52}, v2)
 
+    // Color of the planet until its maps are ready and without them: the low ground, its
+    // vegetation, the sea and the sea ice
+    const frost: f32 = sat((freeze - 0.1) / 0.75)
+    const lowland: Col = mixc(tc1, gr2, veg_k * 0.6)
+    const far: Col = mixc(mixc(lowland, s1, sat(w * 1.3)), {236, 242, 250}, frost * 0.6)
+    const flat: Col = mixc(far, g0, is_gas ? 1 : 0)
+
     // Lava fills the lowlands up to lava_h and glows in the cracks of the plates
-    const lava_h: f32 = 0.5 + probit(max(heat * (k == 3 ? 0.14 : 0.1), 0.02)) / 6
+    const lava_h: f32 = 0.5 + probit(max(lava.level, 0.02)) / 6
     const lava_k: f32 = lava_on ? 1 : 0
-    const crack_glow: f32 = k == 3 ? 0.7 * heat : 0
+    const crack_glow: f32 = lava.cracks
 
     // City lights: towns at the points of cells, lit where the density beats their id
     const city_k: f32 = city_on ? 1 : 0
@@ -292,27 +431,31 @@ planets {
 
     // Clouds: a fraction cf of the sky has some cloud, thr the threshold of the noise in
     // standard deviations that leaves it
-    const cf: f32 = 0.22 + 0.33 * cover
+    const cf: f32 = clouds.cover
     const thr: f32 = 1.28 * probit(1 - cf)
 
     // Gas giants: zones and belts from the sine of the latitude, jets that drift the bands
     // back and forth by up to drift degrees over a period of 20 minutes, storm ovals on a
     // fraction of the cells, held between two jets
-    const bf: f32 = 13 + v1 * 6
-    const drift: f32 = 35 + v2 * 20
-    const storm_frac: f32 = 0.12 + v4 * 0.12
+    const bf: f32 = gas.bands
+    const drift: f32 = gas.drift
+    const storm_frac: f32 = gas.storms
+    const turb: f32 = gas.turbulence
     const st0: Col = mixc(g3, {196, 84, 56}, 0.65)
     const st1: Col = mixc(g2, {250, 246, 236}, 0.7)
+    const ringc: Col = rings.color
 
     if air_on {
       PlanetAtmosphere: {
         sun: sun
         radius: radius
-        thickness: max(ray_h, mie_h) * lift * 6
-        rayleigh: {scale_height: ray_h * lift, scattering_scale: ray_k * dens / lift}
+        thickness: max(air.rayleigh_height, air.mie_height) * 6
+        rayleigh: {
+          scale_height: air.rayleigh_height, scattering_scale: air.rayleigh * air.density
+        }
         mie: {
-          scale_height: mie_h * lift, anisotropy: mie_g, scattering_scale: mie_k * dens / lift,
-          tint: {airc.r * 255 / air_max, airc.g * 255 / air_max, airc.b * 255 / air_max}
+          scale_height: air.mie_height, anisotropy: air.anisotropy,
+          scattering_scale: air.mie * air.density, tint: {tint.r, tint.g, tint.b}
         }
         ozone_scale: 0
       }
@@ -431,7 +574,7 @@ planets {
       s_y2 { TexMath: {op: MathMultiply, a: s_wy, b: s_wy} }
       s_tl {
         TexMath: {
-          op: MathRemap, a: s_y2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_eq - t_lat
+          op: MathRemap, a: s_y2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_pole
         }
       }
       s_jn { TexNoise: {channels: 3, frequency: 2.5, octaves: 3, seed: sd * 16 + 8} }
@@ -674,7 +817,7 @@ planets {
         w_d2 { TexMath: {op: MathMultiply, a: w_d1, b: w_flat} }
         w_d3 { TexMath: {op: MathMultiply, a: w_d2, b: w_coast} }
         w_d4 { TexMath: {op: MathMultiply, a: w_d3, b: w_cl} }
-        w_d { TexMath: {op: MathMultiply, a: w_d4, b_value: {1.6, 0, 0, 0}} }
+        w_d { TexMath: {op: MathMultiply, a: w_d4, b_value: {night.density, 0, 0, 0}} }
         w_c1 { TexCells: {count: towns, jitter: 1, seed: sd * 16 + 10} }
         w_c1x { TexSplit: {input: w_c1, channel: ChannelR} }
         w_c1y { TexSplit: {input: w_c1, channel: ChannelG} }
@@ -726,20 +869,23 @@ planets {
       // The warp, the bands and the billows do not depend on the time, so they are computed
       // once and each update evaluates the coverage only
       cld {
-        k_time { TexTime: {scale: 0.01, offset: v3 * 40} }
+        k_time { TexTime: {scale: clouds.evolve, offset: v3 * 40} }
         k_w1 { TexNoise: {channels: 3, frequency: 1.2, octaves: 2, seed: sd * 16 + 12} }
         k_p1 { TexWarp: {offset: k_w1, amount_value: 0.7} }
         k_st { TexTransform: {coords: k_p1, scale: {1, 1.6, 1}} }
         k_n {
-          TexNoise: {coords: k_st, frequency: 1.8, octaves: 3, evolve: k_time, seed: sd * 16 + 13}
+          TexNoise: {
+            coords: k_st, frequency: clouds.frequency, octaves: 3, evolve: k_time,
+            seed: sd * 16 + 13
+          }
         }
         k_z {
           TexMath: {op: MathRemap, a: k_n, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
         }
         k_f {
           TexNoise: {
-            coords: k_st, frequency: 6, octaves: oct - 2, gain: 0.6, fractal: NoiseBillow,
-            seed: sd * 16 + 15
+            coords: k_st, frequency: clouds.frequency * 10 / 3, octaves: oct - 2, gain: 0.6,
+            fractal: NoiseBillow, seed: sd * 16 + 15
           }
         }
         k_fz {
@@ -801,7 +947,7 @@ planets {
         }
         b_t {
           TexMath: {
-            op: MathRemap, a: b_tn, from_min: 0.4, from_max: 0.6, to_min: -0.07, to_max: 0.07
+            op: MathRemap, a: b_tn, from_min: 0.4, from_max: 0.6, to_min: 0 - turb, to_max: turb
           }
         }
         b_v0 { TexMath: {op: MathAdd, a: b_b0, b: b_b1} }
@@ -877,9 +1023,9 @@ planets {
       Position: {0, 0, 0}
       Rotation: {lean, 0, tilt}
 
-      body {
+      globe {
         Position: {0, 0, 0}
-        AngularVelocity: {0, spin, 0}
+        AngularVelocity: {0, body.spin, 0}
         Sphere: {radius: radius, segments: seg, smooth: true}
         PbrMaterial: {roughness: is_gas ? 0.8 : 0.92}
         NoShadow
@@ -894,12 +1040,12 @@ planets {
           Rgb: {flat.r, flat.g, flat.b}
         }
         if detail <= 0 && air_k > 0.1 {
-          Fresnel: {color: {airc.r, airc.g, airc.b}, strength: 0.6 * air_k, power: 2.5}
+          Fresnel: {color: {tint.r, tint.g, tint.b}, strength: 0.6 * air_k, power: 2.5}
         }
         if lava_ready {
-          Emissive: {strength: 1.8, color: {255, 200, 150}}
-        } else if detail <= 0 && heat > 0 && !is_gas {
-          Emissive: {strength: 0.3 * heat, color: {255, 96, 32}}
+          Emissive: {strength: lava.emission, color: {255, 200, 150}}
+        } else if detail <= 0 && lava.level > 0 && !is_gas {
+          Emissive: {strength: lava.emission / 6, color: {255, 96, 32}}
         }
         if city_ready {
           city {
@@ -907,7 +1053,7 @@ planets {
             Sphere: {radius: radius * 1.002, segments: seg, smooth: true}
             Rgb: {0, 0, 0}
             PbrMaterial: {roughness: 1}
-            Emissive: {strength: 0.6, color: {255, 224, 176}}
+            Emissive: {strength: night.brightness, color: {255, 224, 176}}
             PbrTextures: {emissive: town}
             BlendMode: Max
             NoShadow
@@ -916,44 +1062,50 @@ planets {
         }
       }
 
-      if cloud_ready && cover > 0.02 {
-        clouds {
+      if cloud_ready && clouds.opacity > 0.02 {
+        cloud_layer {
           Position: {0, 0, 0}
-          AngularVelocity: {0, spin * 1.25 + 0.004, 0}
+          AngularVelocity: {0, body.spin + clouds.speed, 0}
           Sphere: {radius: radius * 1.012, segments: seg, smooth: true}
-          Rgb: {mist.r, mist.g, mist.b}
+          Rgb: {clouds.color.r, clouds.color.g, clouds.color.b}
           PbrMaterial: {roughness: 1}
           PbrTextures: {albedo: cld}
           BlendMode: AlphaBlend
-          Opacity: {cover}
+          Opacity: {clouds.opacity}
           Transition: [Opacity: {duration: 2}, Rgb: {duration: 2}]
           NoShadow
           SpatialIgnore
         }
       }
 
-      if rings {
+      if rings.enabled {
         ring {
           Position: {0, 0, 0}
           Rotation: {0 - PI / 2, 0, 0}
-          Quad: {radius * 4.6, radius * 4.6}
+          Quad: {radius * rings.size * 2, radius * rings.size * 2}
           Rgb: {ringc.r * 0.6, ringc.g * 0.6, ringc.b * 0.6}
           PbrMaterial: {roughness: 1}
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
           PbrTextures: {albedo: ring_tex, emissive: ring_tex}
           BlendMode: AlphaBlend
+          if rings.opacity < 1 {
+            Opacity: {rings.opacity}
+          }
           NoShadow
           SpatialIgnore
         }
         ring_back {
           Position: {0, 0, 0}
           Rotation: {PI / 2, 0, 0}
-          Quad: {radius * 4.6, radius * 4.6}
+          Quad: {radius * rings.size * 2, radius * rings.size * 2}
           Rgb: {ringc.r * 0.6, ringc.g * 0.6, ringc.b * 0.6}
           PbrMaterial: {roughness: 1}
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
           PbrTextures: {albedo: ring_tex, emissive: ring_tex}
           BlendMode: AlphaBlend
+          if rings.opacity < 1 {
+            Opacity: {rings.opacity}
+          }
           NoShadow
           SpatialIgnore
         }

@@ -5,153 +5,169 @@ using box.ui
 using box.widgets
 using box.task
 using state
+using planets
 
 state {
-  fn show(target: i32) {
-    if target == PAGE_NIGHT {
-      state.sun_angle = SUN_NIGHT
-      state.lights = true
-    } else if state.page == PAGE_NIGHT {
-      state.sun_angle = SUN_DAY
-    }
-
-    state.orbit_yaw = 0
-    state.orbit_pitch = 0
-    state.reveal = 0
-    state.page = target
-  }
-
+  // Load the preset of a kind for the seed: every parameter as that kind looks by default
   fn preset(target: i32) {
     state.kind = target
-    state.atm = kind_atm(target)
-    state.water = kind_water(target)
-    state.temp = kind_temp(target)
-    state.bio = kind_bio(target)
-    state.lights = target == KIND_GARDEN
-    state.rings = target == KIND_GAS
-    state.terraform = false
+    state.body = body_preset(state.seed)
+    state.surface = surface_preset(target, state.seed)
+    state.climate = climate_preset(target)
+    state.air = air_preset(target, state.seed)
+    state.clouds = clouds_preset(target)
+    state.night = night_preset(target)
+    state.lava = lava_preset(target)
+    state.gas = gas_preset(state.seed)
+    state.rings = rings_preset(target, state.seed)
+    state.edits += 1
   }
 
   fn reset() {
-    preset(KIND_GARDEN)
     state.seed = 23
     state.detail = 2
-    state.radius = 2.2
-    state.spin = 0.12
-    state.sun_angle = state.page == PAGE_NIGHT ? SUN_NIGHT : SUN_DAY
+    preset(KIND_GARDEN)
+    state.sun_angle = SUN_DAY
     state.orbit_yaw = 0
     state.orbit_pitch = 0
-  }
-
-  fn barren() {
-    state.atm = 5
-    state.water = 0
-    state.temp = 30
-    state.bio = 0
-  }
-
-  fn grow(dt: f32) {
-    state.atm = toward(state.atm, GOAL_ATM, 3 * dt)
-    state.water = toward(state.water, GOAL_WATER, 2.3 * dt)
-    state.temp = toward(state.temp, GOAL_TEMP, dt)
-    if state.atm >= 40 && state.water >= 30 {
-      state.bio = toward(state.bio, GOAL_BIO, 4.5 * dt)
-    }
   }
 
   fn apply() {
     state.shown_kind = state.kind
     state.shown_seed = state.seed
-    state.shown_atm = state.atm
-    state.shown_water = state.water
-    state.shown_temp = state.temp
-    state.shown_bio = state.bio
     state.shown_detail = state.detail
-    state.shown_lights = state.lights
-  }
-
-  fn grown(slack: f32) -> bool {
-    atm >= GOAL_ATM - slack && water >= GOAL_WATER - slack && bio >= GOAL_BIO - slack
-  }
-
-  fn stale() -> bool {
-    shown_kind != kind || shown_seed != seed || shown_atm != atm || shown_water != water ||
-    shown_temp != temp || shown_bio != bio || shown_detail != detail || shown_lights != lights
+    state.shown_surface = state.surface
+    state.shown_climate = state.climate
+    state.shown_clouds = state.clouds
+    state.shown_night = state.night
+    state.shown_lava = state.lava
+    state.shown_gas = state.gas
+    state.shown_edits = state.edits
   }
 }
 
+// A change of a widget of the panel reads the values of the widgets: a new type loads its
+// preset, else the parameters of the groups the type shows take the values of their sliders
 async {
   while true {
-    await on.pressed(state.actions.show_planet)
-    show(state.PAGE_PLANET)
-  }
-}
-
-async {
-  while true {
-    await on.pressed(state.actions.show_types)
-    show(state.PAGE_TYPES)
-  }
-}
-
-async {
-  while true {
-    await on.pressed(state.actions.show_stages)
-    show(state.PAGE_STAGES)
-  }
-}
-
-async {
-  while true {
-    await on.pressed(state.actions.show_rings)
-    show(state.PAGE_RINGS)
-  }
-}
-
-async {
-  while true {
-    await on.pressed(state.actions.show_night)
-    show(state.PAGE_NIGHT)
-  }
-}
-
-async {
-  while true {
-    await on.pressed(state.actions.terraform)
-    state.terraform = !state.terraform
-  }
-}
-
-async {
-  while true {
-    await next_frame()
-    await next_frame()
-    await next_frame()
-    if state.reveal < 6 {
-      state.reveal += 1
-    }
-  }
-}
-
-async {
-  while true {
-    await on.change(hud.screen.side.panel)
+    const e = await on.change(hud.screen.side.panel)
     const picked: i32 = hud.screen.side.panel.type.kind[Dropdown.mut].current
-    if picked != state.kind {
+    if e.widget.has(Button) {
+      // The Random and Reset buttons act through their actions
+    } else if picked != state.kind {
       preset(picked)
     } else {
+      const g = hud.screen.side.panel.lookup("groups")
       state.seed = hud.screen.side.panel.variant.seed[Stepper.mut].current
-      state.atm = hud.screen.side.panel.atm[Slider.mut].current
-      state.water = hud.screen.side.panel.water[Slider.mut].current
-      state.temp = hud.screen.side.panel.temp[Slider.mut].current
-      state.bio = hud.screen.side.panel.bio[Slider.mut].current
-      state.radius = hud.screen.side.panel.radius[Slider.mut].current
-      state.spin = hud.screen.side.panel.spin[Slider.mut].current
-      state.sun_angle = hud.screen.side.panel.sun[Slider.mut].current
       state.detail = hud.screen.side.panel.level.detail[Stepper.mut].current
-      state.lights = hud.screen.side.panel.checks.lights[Checkbox.mut].current
-      state.rings = hud.screen.side.panel.checks.rings[Checkbox.mut].current
-      state.terraform = hud.screen.side.panel.run.terraform[Switch.mut].current
+      state.sun_angle = hud.screen.side.panel.sun[Slider.mut].current
+
+      const b = g.lookup("body")
+      state.body = {
+        radius: b.lookup("radius")[Slider.mut].current,
+        tilt: b.lookup("tilt")[Slider.mut].current,
+        lean: b.lookup("lean")[Slider.mut].current,
+        spin: b.lookup("spin")[Slider.mut].current
+      }
+
+      const a = g.lookup("air")
+      const at = a.lookup("tint").lookup("channels")
+      state.air = {
+        density: a.lookup("density")[Slider.mut].current,
+        rayleigh_height: a.lookup("rayleigh_height")[Slider.mut].current,
+        rayleigh: a.lookup("rayleigh")[Slider.mut].current,
+        mie_height: a.lookup("mie_height")[Slider.mut].current,
+        mie: a.lookup("mie")[Slider.mut].current,
+        anisotropy: a.lookup("anisotropy")[Slider.mut].current,
+        tint: {
+          at.lookup("r")[Slider.mut].current,
+          at.lookup("g")[Slider.mut].current,
+          at.lookup("b")[Slider.mut].current
+        }
+      }
+
+      const r = g.lookup("rings")
+      const rc = r.lookup("color").lookup("channels")
+      state.rings = {
+        enabled: r.lookup("enabled")[Checkbox.mut].current,
+        size: r.lookup("size")[Slider.mut].current,
+        opacity: r.lookup("opacity")[Slider.mut].current,
+        color: {
+          rc.lookup("r")[Slider.mut].current,
+          rc.lookup("g")[Slider.mut].current,
+          rc.lookup("b")[Slider.mut].current
+        }
+      }
+
+      if state.kind == state.KIND_GAS {
+        const gg = g.lookup("gas")
+        state.gas = {
+          bands: gg.lookup("bands")[Slider.mut].current,
+          turbulence: gg.lookup("turbulence")[Slider.mut].current,
+          drift: gg.lookup("drift")[Slider.mut].current,
+          storms: gg.lookup("storms")[Slider.mut].current
+        }
+      } else {
+        const s = g.lookup("surface")
+        state.surface = {
+          ocean: s.lookup("ocean")[Slider.mut].current,
+          continents: s.lookup("continents")[Slider.mut].current,
+          warp: s.lookup("warp")[Slider.mut].current,
+          mountains: s.lookup("mountains")[Slider.mut].current,
+          mountain_cover: s.lookup("mountain_cover")[Slider.mut].current,
+          craters: s.lookup("craters")[Slider.mut].current,
+          cracks: s.lookup("cracks")[Slider.mut].current,
+          plates: s.lookup("plates")[Slider.mut].current,
+          crack_shade: s.lookup("crack_shade")[Slider.mut].current,
+          normal: s.lookup("normal")[Slider.mut].current,
+          variation: s.lookup("variation")[Slider.mut].current,
+          beach: s.lookup("beach")[Slider.mut].current
+        }
+
+        const c = g.lookup("climate")
+        state.climate = {
+          equator: c.lookup("equator")[Slider.mut].current,
+          poles: c.lookup("poles")[Slider.mut].current,
+          lapse: c.lookup("lapse")[Slider.mut].current,
+          ice: c.lookup("ice")[Slider.mut].current,
+          snow_line: c.lookup("snow_line")[Slider.mut].current,
+          snow: c.lookup("snow")[Slider.mut].current,
+          moisture: c.lookup("moisture")[Slider.mut].current,
+          vegetation: c.lookup("vegetation")[Slider.mut].current,
+          treeline: c.lookup("treeline")[Slider.mut].current
+        }
+
+        const k = g.lookup("clouds")
+        const kc = k.lookup("color").lookup("channels")
+        state.clouds = {
+          cover: k.lookup("cover")[Slider.mut].current,
+          opacity: k.lookup("opacity")[Slider.mut].current,
+          frequency: k.lookup("frequency")[Slider.mut].current,
+          speed: k.lookup("speed")[Slider.mut].current,
+          evolve: k.lookup("evolve")[Slider.mut].current,
+          color: {
+            kc.lookup("r")[Slider.mut].current,
+            kc.lookup("g")[Slider.mut].current,
+            kc.lookup("b")[Slider.mut].current
+          }
+        }
+
+        const n = g.lookup("night")
+        state.night = {
+          lights: n.lookup("lights")[Checkbox.mut].current,
+          density: n.lookup("density")[Slider.mut].current,
+          brightness: n.lookup("brightness")[Slider.mut].current
+        }
+
+        const l = g.lookup("lava")
+        state.lava = {
+          level: l.lookup("level")[Slider.mut].current,
+          cracks: l.lookup("cracks")[Slider.mut].current,
+          emission: l.lookup("emission")[Slider.mut].current
+        }
+      }
+
+      state.edits += 1
     }
   }
 }
@@ -160,6 +176,7 @@ async {
   while true {
     await on.pressed(state.actions.random_seed)
     state.seed = (state.seed * 621 + 271) % 1000
+    state.edits += 1
   }
 }
 
@@ -178,11 +195,12 @@ async {
   }
 }
 
+// Show the latest values once the planet's graphs are evaluated, or after 1.5 seconds
 async {
   mut waited: f32 = 0
   while true {
     await delay(0.1)
-    if stale() {
+    if state.edits != state.shown_edits {
       if InProgressTask[InProgressTask].blocking == 0 || waited >= 1.5 {
         apply()
         waited = 0
@@ -191,35 +209,6 @@ async {
       }
     } else {
       waited = 0
-    }
-  }
-}
-
-async {
-  mut running: bool = false
-  while true {
-    await delay(0.1)
-    if state.terraform && state.kind == state.KIND_GAS {
-      state.terraform = false
-    }
-
-    if state.terraform {
-      if !running {
-        if grown(2) {
-          barren()
-        }
-
-        state.lights = false
-      }
-
-      running = true
-      grow(0.1)
-      if grown(0) && state.temp == state.GOAL_TEMP {
-        state.terraform = false
-        state.lights = true
-      }
-    } else {
-      running = false
     }
   }
 }

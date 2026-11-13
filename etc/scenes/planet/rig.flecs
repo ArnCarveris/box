@@ -18,13 +18,7 @@ rig {
   Rotation: {0 - orbit_pitch, orbit_yaw, 0}
 
   camera {
-    Position: match page {
-      1: {-2.6, -0.5, 64}
-      2: {-2.2, 0, 52}
-      3: {-1.6, 3.6, 27}
-      _: {-1.4, 0, 27}
-    }
-    Rotation: {page == PAGE_RINGS ? -0.133 : 0, 0, 0}
+    Position: {-1.4, 0, 27}
     Camera: {fov: 16, near_: 0.5, far_: 20000}
   }
 }

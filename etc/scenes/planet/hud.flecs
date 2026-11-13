@@ -14,29 +14,6 @@ using box.widgets
 using state
 
 assets {
-  template Tag {
-    prop text: string = ""
-    prop target: entity = 0
-
-    ProjectedAnchor: {target: target, view: view}
-    Layout: {direction: Row, padding: {2, 2, 6, 6}, h: Center}
-
-    caption {
-      Text: {value: text, size: 13}
-      Rgb: {164, 170, 180}
-    }
-  }
-
-  template PageButton {
-    prop label: string = ""
-    prop action: entity = 0
-    prop target: i32 = 0
-
-    Layout: {}
-
-    Button face(label: label, action: action, variant: page == target ? "primary" : "secondary")
-  }
-
   template Field {
     prop text: string = ""
 
@@ -51,6 +28,27 @@ assets {
       }
     }
   }
+
+  // A color as three sliders, r, g and b, from 0 to 255 under a label
+  template ColorField {
+    prop text: string = ""
+    prop red: f32 = 255
+    prop green: f32 = 255
+    prop blue: f32 = 255
+
+    Layout: {direction: Column, spacing: 2}
+    LayoutItem: {width: {mode: Grow}}
+
+    Label name(text: text)
+
+    channels {
+      Layout: {direction: Row, spacing: 7}
+
+      Slider r(label: "R", width: 74, min: 0, max: 255, value: red)
+      Slider g(label: "G", width: 74, min: 0, max: 255, value: green)
+      Slider b(label: "B", width: 74, min: 0, max: 255, value: blue)
+    }
+  }
 }
 
 hud {
@@ -61,45 +59,19 @@ hud {
     Camera: {ortho: true, ortho_scale: 1}
   }
 
-  tags {
-    if page == PAGE_TYPES {
-      for i in 0..6 {
-        assets.Tag "kind_{i}"(text: kind_name(i), target: stage.marks.lookup("column_{i}"))
-      }
-
-      for i in 0..3 {
-        assets.Tag "detail_{i}"(text: "Detail {2 - i}", target: stage.marks.lookup("row_{i}"))
-      }
-    } else if page == PAGE_STAGES {
-      for i in 0..5 {
-        assets.Tag "stage_{i}"(text: "{i * 25}%", target: stage.marks.lookup("column_{i}"))
-      }
-    }
-  }
-
   screen {
     LayoutFill: {surface: window}
     Layout: {padding: {16, 16, 16, 16}}
     FocusScope
-
-    bar {
-      Layout: {direction: Row, spacing: 6}
-      LayoutItem: {h: Center, v: Top}
-      InputBlocker
-
-      assets.PageButton planet(label: "1 Planet", action: actions.show_planet, target: PAGE_PLANET)
-      assets.PageButton types(label: "2 Types", action: actions.show_types, target: PAGE_TYPES)
-      assets.PageButton stages(label: "3 Stages", action: actions.show_stages, target: PAGE_STAGES)
-      assets.PageButton rings(label: "4 Rings", action: actions.show_rings, target: PAGE_RINGS)
-      assets.PageButton night(label: "5 Night", action: actions.show_night, target: PAGE_NIGHT)
-    }
 
     side {
       Layout: {}
       LayoutItem: {h: Left, v: Middle}
       InputBlocker
 
-      Panel panel(title: "Planet", width: 276) {
+      // The panel: what the planet is (type, seed, detail), its parameters in groups, which
+      // depend on the type, and the light of the scene
+      Panel panel(title: "Planet", width: 300) {
         assets.Field type(text: "Type") {
           Dropdown kind(
             options: ["Rock", "Desert", "Ice", "Lava", "Gas giant", "Garden"],
@@ -112,35 +84,254 @@ hud {
           Stepper seed(min: 0, max: 999, value: state.seed, width: 104)
         }
 
-        Slider atm(label: "Atmosphere", width: 252, value: state.atm)
-        Slider water(label: "Water", width: 252, value: state.water)
-        Slider temp(label: "Temperature", width: 252, value: state.temp)
-        Slider bio(label: "Biomass", width: 252, value: state.bio)
-        Slider radius(
-          label: "Radius", width: 252, min: 0.5, max: 3, step: 0.1, value: state.radius, decimals: 1
-        )
-        Slider spin(
-          label: "Spin", width: 252, min: 0, max: 1, step: 0.01, value: state.spin, decimals: 2
-        )
-        Slider sun(label: "Sun", width: 252, min: 0, max: 360, value: state.sun_angle, unit: "°")
-
         assets.Field level(text: "Detail") {
           Stepper detail(min: 0, max: 2, value: state.detail, width: 104)
         }
 
-        checks {
-          Layout: {direction: Row, spacing: 20, v: Middle}
-          LayoutItem: {width: {mode: Grow}}
+        Separator top_rule()
 
-          Checkbox lights(label: "City lights", value: state.lights)
-          Checkbox rings(label: "Rings", value: state.rings)
+        // The parameter groups of the kind, in a column that scrolls. Each slider sets one
+        // parameter of the Planet template in its own units
+        ScrollView groups(width: 276, height: 600, frame: false, focusable: false) {
+          if state.kind != KIND_GAS {
+            Collapsible surface(title: "Surface", value: true, width: 262) {
+              Slider ocean(
+                label: "Ocean fraction", width: 236, min: 0, max: 0.95, step: 0.01,
+                value: state.surface.ocean, decimals: 2
+              )
+              Slider continents(
+                label: "Continent frequency", width: 236, min: 0.5, max: 3, step: 0.05,
+                value: state.surface.continents, decimals: 2
+              )
+              Slider warp(
+                label: "Continent warp", width: 236, min: 0, max: 2, step: 0.01,
+                value: state.surface.warp, decimals: 2
+              )
+              Slider mountains(
+                label: "Mountain height", width: 236, min: 0, max: 0.4, step: 0.01,
+                value: state.surface.mountains, decimals: 2
+              )
+              Slider mountain_cover(
+                label: "Mountain cover", width: 236, min: 0.3, max: 0.7, step: 0.001,
+                value: state.surface.mountain_cover, decimals: 3
+              )
+              Slider craters(
+                label: "Crater depth", width: 236, min: 0, max: 1, step: 0.01,
+                value: state.surface.craters, decimals: 2
+              )
+              Slider cracks(
+                label: "Crack depth", width: 236, min: 0, max: 0.2, step: 0.005,
+                value: state.surface.cracks, decimals: 3
+              )
+              Slider plates(
+                label: "Plates", width: 236, min: 8, max: 200, step: 1,
+                value: state.surface.plates
+              )
+              Slider crack_shade(
+                label: "Crack shade", width: 236, min: 0, max: 1, step: 0.05,
+                value: state.surface.crack_shade, decimals: 2
+              )
+              Slider normal(
+                label: "Normal strength", width: 236, min: 0, max: 8, step: 0.1,
+                value: state.surface.normal, decimals: 1
+              )
+              Slider variation(
+                label: "Ground variation", width: 236, min: 0, max: 0.4, step: 0.01,
+                value: state.surface.variation, decimals: 2
+              )
+              Slider beach(
+                label: "Beaches", width: 236, min: 0, max: 1, step: 0.01,
+                value: state.surface.beach, decimals: 2
+              )
+            }
+
+            Collapsible climate(title: "Climate", width: 262) {
+              Slider equator(
+                label: "Equator temperature", width: 236, min: 0, max: 1.4, step: 0.005,
+                value: state.climate.equator, decimals: 3
+              )
+              Slider poles(
+                label: "Pole temperature", width: 236, min: -0.6, max: 1.2, step: 0.001,
+                value: state.climate.poles, decimals: 3
+              )
+              Slider lapse(
+                label: "Cooling with altitude", width: 236, min: 0, max: 0.6, step: 0.0005,
+                value: state.climate.lapse, decimals: 3
+              )
+              Slider ice(
+                label: "Sea ice below", width: 236, min: -0.2, max: 1.2, step: 0.01,
+                value: state.climate.ice, decimals: 2
+              )
+              Slider snow_line(
+                label: "Snow below", width: 236, min: -0.2, max: 0.6, step: 0.0001,
+                value: state.climate.snow_line, decimals: 3
+              )
+              Slider snow(
+                label: "Snow amount", width: 236, min: 0, max: 1, step: 0.01,
+                value: state.climate.snow, decimals: 2
+              )
+              Slider moisture(
+                label: "Moisture", width: 236, min: 0, max: 1, step: 0.0001,
+                value: state.climate.moisture, decimals: 3
+              )
+              Slider vegetation(
+                label: "Vegetation", width: 236, min: 0, max: 1, step: 0.0001,
+                value: state.climate.vegetation, decimals: 3
+              )
+              Slider treeline(
+                label: "Treeline", width: 236, min: 0, max: 1, step: 0.0005,
+                value: state.climate.treeline, decimals: 3
+              )
+            }
+          } else {
+            Collapsible gas(title: "Gas giant", value: true, width: 262) {
+              Slider bands(
+                label: "Band frequency", width: 236, min: 4, max: 30, step: 0.01,
+                value: state.gas.bands, decimals: 2
+              )
+              Slider turbulence(
+                label: "Turbulence", width: 236, min: 0, max: 0.2, step: 0.005,
+                value: state.gas.turbulence, decimals: 3
+              )
+              Slider drift(
+                label: "Band drift", width: 236, min: 0, max: 90, step: 0.1,
+                value: state.gas.drift, decimals: 1, unit: "°"
+              )
+              Slider storms(
+                label: "Storms", width: 236, min: 0, max: 0.5, step: 0.001,
+                value: state.gas.storms, decimals: 3
+              )
+            }
+          }
+
+          Collapsible air(title: "Atmosphere", width: 262) {
+            Slider density(
+              label: "Density", width: 236, min: 0, max: 2, step: 0.005,
+              value: state.air.density, decimals: 3
+            )
+            Slider rayleigh_height(
+              label: "Rayleigh scale height", width: 236, min: 5, max: 300, step: 0.01,
+              value: state.air.rayleigh_height, decimals: 1, unit: " km"
+            )
+            Slider rayleigh(
+              label: "Rayleigh scattering", width: 236, min: 0, max: 0.2, step: 0.0001,
+              value: state.air.rayleigh, decimals: 4
+            )
+            Slider mie_height(
+              label: "Mie scale height", width: 236, min: 1, max: 250, step: 0.01,
+              value: state.air.mie_height, decimals: 1, unit: " km"
+            )
+            Slider mie(
+              label: "Mie scattering", width: 236, min: 0, max: 4, step: 0.0001,
+              value: state.air.mie, decimals: 3
+            )
+            Slider anisotropy(
+              label: "Mie anisotropy", width: 236, min: -0.9, max: 0.95, step: 0.01,
+              value: state.air.anisotropy, decimals: 2
+            )
+            assets.ColorField tint(
+              text: "Haze tint", red: state.air.tint.r, green: state.air.tint.g,
+              blue: state.air.tint.b
+            )
+          }
+
+          if state.kind != KIND_GAS {
+            Collapsible clouds(title: "Clouds", width: 262) {
+              Slider cover(
+                label: "Cover", width: 236, min: 0.02, max: 0.98, step: 0.0001,
+                value: state.clouds.cover, decimals: 3
+              )
+              Slider opacity(
+                label: "Opacity", width: 236, min: 0, max: 1, step: 0.0001,
+                value: state.clouds.opacity, decimals: 3
+              )
+              Slider frequency(
+                label: "Frequency", width: 236, min: 0.5, max: 5, step: 0.05,
+                value: state.clouds.frequency, decimals: 2
+              )
+              Slider speed(
+                label: "Speed", width: 236, min: -0.2, max: 0.3, step: 0.001,
+                value: state.clouds.speed, decimals: 3, unit: " rad/s"
+              )
+              Slider evolve(
+                label: "Change rate", width: 236, min: 0, max: 0.05, step: 0.001,
+                value: state.clouds.evolve, decimals: 3
+              )
+              assets.ColorField color(
+                text: "Color", red: state.clouds.color.r, green: state.clouds.color.g,
+                blue: state.clouds.color.b
+              )
+            }
+
+            Collapsible night(title: "Night", width: 262) {
+              Checkbox lights(label: "City lights", value: state.night.lights)
+              Slider density(
+                label: "City density", width: 236, min: 0, max: 4, step: 0.05,
+                value: state.night.density, decimals: 2
+              )
+              Slider brightness(
+                label: "City brightness", width: 236, min: 0, max: 2, step: 0.05,
+                value: state.night.brightness, decimals: 2
+              )
+            }
+
+            Collapsible lava(title: "Lava", width: 262) {
+              Slider level(
+                label: "Lowlands filled", width: 236, min: 0, max: 0.5, step: 0.01,
+                value: state.lava.level, decimals: 2
+              )
+              Slider cracks(
+                label: "Crack glow", width: 236, min: 0, max: 1, step: 0.05,
+                value: state.lava.cracks, decimals: 2
+              )
+              Slider emission(
+                label: "Emission", width: 236, min: 0, max: 4, step: 0.1,
+                value: state.lava.emission, decimals: 1
+              )
+            }
+          }
+
+          Collapsible rings(title: "Rings", width: 262) {
+            Checkbox enabled(label: "Rings", value: state.rings.enabled)
+            Slider size(
+              label: "Outer radius", width: 236, min: 1.2, max: 4, step: 0.05,
+              value: state.rings.size, decimals: 2, unit: " r"
+            )
+            Slider opacity(
+              label: "Opacity", width: 236, min: 0, max: 1, step: 0.05,
+              value: state.rings.opacity, decimals: 2
+            )
+            assets.ColorField color(
+              text: "Color", red: state.rings.color.r, green: state.rings.color.g,
+              blue: state.rings.color.b
+            )
+          }
+
+          Collapsible body(title: "Body", width: 262) {
+            Slider radius(
+              label: "Radius", width: 236, min: 0.5, max: 3, step: 0.1,
+              value: state.body.radius, decimals: 1
+            )
+            Slider tilt(
+              label: "Axial tilt", width: 236, min: -60, max: 60, step: 0.1,
+              value: state.body.tilt, decimals: 1, unit: "°"
+            )
+            Slider lean(
+              label: "Lean toward view", width: 236, min: -60, max: 60, step: 0.1,
+              value: state.body.lean, decimals: 1, unit: "°"
+            )
+            Slider spin(
+              label: "Spin", width: 236, min: 0, max: 1, step: 0.01,
+              value: state.body.spin, decimals: 2, unit: " rad/s"
+            )
+          }
         }
 
-        Separator rule()
+        Separator bottom_rule()
+
+        Slider sun(label: "Sun", width: 276, min: 0, max: 360, value: state.sun_angle, unit: "°")
 
         assets.Field run(text: "") {
-          Switch terraform(label: "Terraform", value: state.terraform)
-
           gap {
             LayoutItem: {width: {mode: Grow}}
           }

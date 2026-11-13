@@ -29,87 +29,15 @@ stage {
     SpatialIgnore
   }
 
-  marks {
-    for i in 0..6 {
-      "column_{i}" {
-        Position: match page {
-          2: {(i - 2) * 3.8, -2.4, 0}
-          _: {(i - 2.5) * 3.5, -4.1, 0}
-        }
-      }
-    }
-
-    for i in 0..3 {
-      "row_{i}" {
-        Position: match i {
-          0: {11, 3.2, 0}
-          1: {11, -0.15, 0}
-          _: {11, -3, 0}
-        }
-      }
-    }
-  }
-
   orbit {
     Position: {0, 0, 0}
     Interactive
 
-    if page == PAGE_PLANET || page == PAGE_NIGHT {
-      Planet hero(
-        kind: shown_kind, seed: shown_seed, atm: shown_atm, water: shown_water,
-        temp: shown_temp, bio: shown_bio, radius: radius, lights: shown_lights, rings: rings,
-        detail: shown_detail, spin: spin
-      ) {
-        Position: {0, 0, 0}
-      }
-    }
-  }
-
-  if page == PAGE_TYPES {
-    for i in 0..6 {
-      if i < reveal {
-        Planet "hero_{i}"(
-          kind: i, seed: 11 + i * 3, atm: kind_atm(i), water: kind_water(i), temp: kind_temp(i),
-          bio: kind_bio(i), radius: 1.35, lights: i == KIND_GARDEN, rings: i == KIND_GAS, detail: 2,
-          air_scale: 2.5
-        ) {
-          Position: {(i - 2.5) * 3.5, 3.2, 0}
-        }
-
-        Planet "system_{i}"(
-          kind: i, seed: 11 + i * 3, atm: kind_atm(i), water: kind_water(i), temp: kind_temp(i),
-          bio: kind_bio(i), radius: 0.9, lights: i == KIND_GARDEN, rings: i == KIND_GAS, detail: 1,
-          air_scale: 2.5
-        ) {
-          Position: {(i - 2.5) * 3.5, -0.15, 0}
-        }
-
-        Planet "marker_{i}"(
-          kind: i, seed: 11 + i * 3, atm: kind_atm(i), water: kind_water(i), temp: kind_temp(i),
-          bio: kind_bio(i), radius: 0.4, lights: i == KIND_GARDEN, rings: i == KIND_GAS, detail: 0
-        ) {
-          Position: {(i - 2.5) * 3.5, -3, 0}
-        }
-      }
-    }
-  }
-
-  if page == PAGE_STAGES {
-    for i in 0..5 {
-      if i < reveal {
-        Planet "stage_{i}"(
-          kind: 0, seed: 7, atm: 5 + (GOAL_ATM - 5) * i / 4, water: GOAL_WATER * i / 4,
-          temp: 30 + (GOAL_TEMP - 30) * i / 4, bio: GOAL_BIO * i / 4, radius: 1.6,
-          lights: i == 4, detail: 2, spin: 0.03, air_scale: 1.6
-        ) {
-          Position: {(i - 2) * 3.8, 0, 0}
-        }
-      }
-    }
-  }
-
-  if page == PAGE_RINGS {
-    Planet giant(kind: KIND_GAS, seed: 5, atm: 100, temp: 40, radius: 2, rings: true, detail: 2) {
+    Planet hero(
+      kind: shown_kind, seed: shown_seed, detail: shown_detail, body: body,
+      surface: shown_surface, climate: shown_climate, air: air, clouds: shown_clouds,
+      night: shown_night, lava: shown_lava, gas: shown_gas, rings: rings
+    ) {
       Position: {0, 0, 0}
     }
   }
