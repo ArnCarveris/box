@@ -79,7 +79,9 @@ view {
 
 yard {
   if liner {
-    Drydock dock()
+    if show_gantry {
+      Drydock dock()
+    }
   } else {
     Slipway slipway()
   }
