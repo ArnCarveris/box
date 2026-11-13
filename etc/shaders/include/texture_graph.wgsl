@@ -41,15 +41,23 @@ fn box_texgraph_coords(texel: vec2i) -> vec4f {
 }
 
 // Texel of the image at integer coordinates outside it: the plane repeats, the sphere wraps
-// around in longitude and clamps at the poles
+// around in longitude and continues past a pole on the opposite meridian (a row above the top
+// is the row below it half a turn away), up to one height beyond
 fn box_texgraph_wrap(texel: vec2i) -> vec2i {
     let size = vec2i(box_texgraph_stage.size);
-    let x = ((texel.x % size.x) + size.x) % size.x;
-    var y = ((texel.y % size.y) + size.y) % size.y;
+    var t = texel;
     if (box_texgraph_stage.domain == 1u) {
-        y = clamp(texel.y, 0, size.y - 1);
+        if (t.y < 0) {
+            t = vec2i(t.x + size.x / 2, -1 - t.y);
+        } else if (t.y >= size.y) {
+            t = vec2i(t.x + size.x / 2, 2 * size.y - 1 - t.y);
+        }
+
+        t.y = clamp(t.y, 0, size.y - 1);
     }
 
+    let x = ((t.x % size.x) + size.x) % size.x;
+    let y = ((t.y % size.y) + size.y) % size.y;
     return vec2i(x, y);
 }
 
@@ -70,6 +78,53 @@ fn box_texgraph_bilinear(t: texture_2d<f32>, pos: vec2f) -> vec4f {
     let c = box_texgraph_load(t, i + vec2i(0, 1));
     let d = box_texgraph_load(t, i + vec2i(1, 1));
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// Position in texels of the image of a direction on the sphere, the inverse of
+// box_texgraph_coords, with the texel centers at + 0.5
+fn box_texgraph_sphere_position(d: vec3f) -> vec2f {
+    let theta = acos(clamp(d.y, -1.0, 1.0));
+    let phi = atan2(d.x, -d.z);
+    let uv = vec2f(phi / (2.0 * BOX_TEXGRAPH_PI) + 0.5, theta / BOX_TEXGRAPH_PI);
+    return uv * vec2f(box_texgraph_stage.size);
+}
+
+// Differences of a materialized scalar input around a texel as GenNormal takes them: (east -
+// west, south - north) of its neighbours, times strength (0 for 1) and the width over 512, so
+// the slope does not depend on the size. On the plane the neighbours are the adjacent texels,
+// wrapped. On the sphere they lie on the great circles through the texel toward east (growing
+// u) and north (shrinking v), one texel of the equator away, read between texels: the spacing
+// along a row follows the latitude, the longitude wraps and the poles are crossed. east and
+// north are the frame of the UV tangents of a Sphere mesh, so the normal maps match it.
+fn box_texgraph_gradient(t: texture_2d<f32>, texel: vec2i, strength: f32) -> vec2f {
+    let size = vec2f(box_texgraph_stage.size);
+    let scale = select(strength, 1.0, strength == 0.0) * size.x / 512.0;
+    if (box_texgraph_stage.domain == 1u) {
+        let uv = (vec2f(texel) + 0.5) / size;
+        let phi = (uv.x - 0.5) * 2.0 * BOX_TEXGRAPH_PI;
+        let theta = uv.y * BOX_TEXGRAPH_PI;
+        let st = sin(theta);
+        let ct = cos(theta);
+        let sp = sin(phi);
+        let cp = cos(phi);
+        let p = vec3f(st * sp, ct, -st * cp);
+        let east = vec3f(cp, 0.0, sp);
+        let north = vec3f(-ct * sp, st, ct * cp);
+        let angle = 2.0 * BOX_TEXGRAPH_PI / size.x;
+        let c = p * cos(angle);
+        let s = sin(angle);
+        let e = box_texgraph_bilinear(t, box_texgraph_sphere_position(c + east * s)).x;
+        let w = box_texgraph_bilinear(t, box_texgraph_sphere_position(c - east * s)).x;
+        let n = box_texgraph_bilinear(t, box_texgraph_sphere_position(c + north * s)).x;
+        let so = box_texgraph_bilinear(t, box_texgraph_sphere_position(c - north * s)).x;
+        return vec2f(e - w, so - n) * scale;
+    }
+
+    let e = box_texgraph_load(t, texel + vec2i(1, 0)).x;
+    let w = box_texgraph_load(t, texel - vec2i(1, 0)).x;
+    let n = box_texgraph_load(t, texel - vec2i(0, 1)).x;
+    let so = box_texgraph_load(t, texel + vec2i(0, 1)).x;
+    return vec2f(e - w, so - n) * scale;
 }
 
 // PCG hash of a word

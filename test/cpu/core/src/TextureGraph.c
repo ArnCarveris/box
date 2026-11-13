@@ -281,6 +281,69 @@ void TextureGraph_builtin_kinds(void) {
     ecs_fini(world);
 }
 
+void TextureGraph_normal_slope_kinds(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexNormal), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexVector);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "height");
+    test_int(kind->inputs[0].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, true);
+    test_int(kind->param_count, 1);
+    test_str(kind->params[0].name, "strength");
+    test_int(kind->params[0].size, 4);
+    test_str(kind->function, "box_tex_normal");
+    test_bool(kind->neighbourhood, true);
+    test_bool(kind->animated, false);
+
+    kind = ecs_get(world, ecs_id(TexSlope), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 1);
+    test_int(kind->inputs[0].type, TexScalar);
+    test_str(kind->params[0].name, "strength");
+    test_str(kind->function, "box_tex_slope");
+    test_bool(kind->neighbourhood, true);
+
+    kind = ecs_get(world, ecs_id(TexChannel), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->inputs[0].type, TexVector);
+    test_str(kind->params[0].name, "channel");
+    test_bool(kind->neighbourhood, false);
+
+    ecs_entity_t tex = ecs_entity(world, { .name = "relief" });
+    ecs_entity_t uv = ecs_entity(world, { .name = "uv" });
+    ecs_entity_t height = ecs_entity(world, { .name = "height" });
+    ecs_entity_t normal = ecs_entity(world, { .name = "normal" });
+    ecs_set(world, uv, TexCoords, { .scale = 0 });
+    ecs_set(world, height, TexChannel, { .in = uv, .channel = 1 });
+    ecs_set(world, normal, TexNormal, { .height = height, .strength = 2 });
+    ecs_set(world, tex, TextureGraph, { .output = normal, .width = 32, .height = 16,
+        .format = GraphLinear });
+    ecs_progress(world, 0);
+    const TextureStatus *status = ecs_get(world, tex, TextureStatus);
+    test_assert(status != NULL);
+    test_assert(status->state != TextureFailed);
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_assert(graph != NULL);
+    test_int(graph->node_count, 3);
+    test_int(graph->nodes[2].kind, kind_id(world, ecs_id(TexNormal)));
+    test_int(graph->nodes[2].inputs[0], 1);
+
+    ecs_entity_t wrong = ecs_entity(world, { .name = "wrong" });
+    ecs_set(world, wrong, TexSlope, { .height = uv });
+    ecs_set(world, tex, TextureGraph, { .output = wrong, .width = 32, .height = 16 });
+    ecs_progress(world, 0);
+    status = ecs_get(world, tex, TextureStatus);
+    test_int(status->state, TextureFailed);
+    test_assert(strstr(status->error, "expects Scalar") != NULL);
+
+    ecs_fini(world);
+}
+
 void TextureGraph_kind_reflected_json(void) {
     // materials/textures
     ecs_world_t *world = world_new();

@@ -10,6 +10,7 @@
     "lang.c": {
         "include": [
             "../../../src/render",
+            "../../../src/texture",
             "../../../src/geometry",
             "../../../src/spatial"
         ]
@@ -1472,6 +1473,16 @@
                     "compile_failure_reports_node",
                     "status_transitions",
                     "material_samples_graph"
+                ]
+            },
+            {
+                "id": "TextureGraphNormal",
+                "testcases": [
+                    "normal_plane_slope",
+                    "normal_sphere_slope",
+                    "slope_plane_sphere",
+                    "normal_matches_gen",
+                    "normal_sphere_seam_poles"
                 ]
             }
         ]

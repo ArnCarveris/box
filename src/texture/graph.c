@@ -50,6 +50,31 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexChannel node: one channel of its input */
+static const char *box_texture_channel_wgsl =
+    "fn box_tex_channel(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let channel = u32(clamp(bitcast<i32>(p[0].x), 0, 3));\n"
+    "    return vec4f(i[0][channel], 0.0, 0.0, 0.0);\n"
+    "}\n";
+
+/** WGSL of the TexNormal node: the normal of the differences of its height, encoded as
+ * GenNormal stores it */
+static const char *box_texture_normal_wgsl =
+    "fn box_tex_normal(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    height: texture_2d<f32>) -> vec4f {\n"
+    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x));\n"
+    "    let n = vec3f(-d.x, d.y, 1.0) * inverseSqrt(dot(d, d) + 1.0);\n"
+    "    return vec4f(0.5 + 0.5 * n, 1.0);\n"
+    "}\n";
+
+/** WGSL of the TexSlope node: the length of the differences of its height */
+static const char *box_texture_slope_wgsl =
+    "fn box_tex_slope(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    height: texture_2d<f32>) -> vec4f {\n"
+    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x));\n"
+    "    return vec4f(length(d), 0.0, 0.0, 0.0);\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -861,7 +886,8 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords and TexMath.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexChannel, TexNormal
+ * and TexSlope.
  *
  * @param world The world
  */
@@ -895,6 +921,44 @@ static void box_texture_nodes_register(
         .params = {{ "op", offsetof(TexMath, op), 4, BOX_TEXTURE_PARAM_I32 }},
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexChannel),
+        .output = TexScalar,
+        .inputs = {
+            { "in", offsetof(TexChannel, in), TexVector, "in_value",
+                offsetof(TexChannel, in_value) }
+        },
+        .params = {{ "channel", offsetof(TexChannel, channel), 4, BOX_TEXTURE_PARAM_I32 }},
+        .function = "box_tex_channel",
+        .source = box_texture_channel_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexNormal),
+        .output = TexVector,
+        .inputs = {
+            { "height", offsetof(TexNormal, height), TexScalar, "height_value",
+                offsetof(TexNormal, height_value) }
+        },
+        .params = {{ "strength", offsetof(TexNormal, strength), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_normal",
+        .source = box_texture_normal_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexSlope),
+        .output = TexScalar,
+        .inputs = {
+            { "height", offsetof(TexSlope, height), TexScalar, "height_value",
+                offsetof(TexSlope, height_value) }
+        },
+        .params = {{ "strength", offsetof(TexSlope, strength), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_slope",
+        .source = box_texture_slope_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
     });
 }
 
