@@ -666,11 +666,8 @@ ECS_STRUCT(TextureNodePort, {
     const char *name;      /**< Member of the ecs_entity_t of the input node */
     TextureValueType type; /**< Type the input node must output */
     bool fallback;         /**< The input has a constant member used without a node */
-<<<<<<< HEAD
-    bool coords;           /**< Without a node the input is the coordinates of the texel */
-=======
     const char *value;     /**< Name of that constant member, NULL without one */
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
+    bool coords;           /**< Without a node the input is the coordinates of the texel */
 });
 
 /** A parameter of a node kind, as TextureNodeKind lists it */
@@ -719,14 +716,8 @@ typedef struct box_texture_node_input_t {
                                  *   for TexScalar or a vec4 for TexVector and TexAny, NULL for
                                  *   none */
     ecs_size_t value_offset;    /**< Offset of that member */
-<<<<<<< HEAD
-    bool coords;                /**< Without a node the input is the coordinates of the texel
-                                 *   in the domain, as the coords of a generator; value is
-                                 *   NULL then */
-=======
     bool coords;                /**< A TexVector input without value: without a node it is the
                                  *   coordinates of the texel in the domain of the graph */
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
 } box_texture_node_input_t;
 
 /** A parameter of a node kind: a member copied into the parameter buffer */
@@ -781,16 +772,9 @@ typedef TextureValueType (*box_texture_node_type_t)(
 
 /** Description of a node kind for box_texture_node_register.
  *
-<<<<<<< HEAD
- * The WGSL function is fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
- * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
- * order, a scalar in x and the constant of an input without a node (the coordinates for an
- * input with coords), and the coordinates.
-=======
  * The WGSL function fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
  * of the parameter bytes p, the input values i (a scalar in x, the constant without a node)
  * and the coordinates returns the value of the node, a scalar in x.
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
  *
  * A kind with an array parameter reads its elements from box_texgraph_params at the index in
  * its header, see box_texture_node_array_t.

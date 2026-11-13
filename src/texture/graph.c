@@ -133,7 +133,6 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
-<<<<<<< HEAD
 /** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
  * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
  * and w.
@@ -234,7 +233,8 @@ static const char *box_texture_cells_wgsl =
     "\n"
     "    return vec4f(d, box_tex_cells_random(near, 6u), box_tex_cells_random(near, 7u),\n"
     "        box_tex_cells_random(near, 8u));\n"
-=======
+    "}\n";
+
 /** WGSL of the TexBlocks node: the courses of blocks of box_gen_blocks of texture/gen.c.
  *
  * The cuts of the course of the texel are made again rather than sorted: the block starts at
@@ -506,7 +506,6 @@ static const char *box_texture_time_wgsl =
 static const char *box_texture_splat_wgsl =
     "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x);\n"
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
     "}\n";
 
 /** State of the build of one graph */
@@ -779,11 +778,8 @@ static void box_texture_node_kind_reflect(
         value.inputs[i].name = kind->inputs[i].name;
         value.inputs[i].type = kind->inputs[i].type;
         value.inputs[i].fallback = kind->inputs[i].value != NULL;
-<<<<<<< HEAD
-        value.inputs[i].coords = kind->inputs[i].coords;
-=======
         value.inputs[i].value = kind->inputs[i].value;
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
+        value.inputs[i].coords = kind->inputs[i].coords;
     }
 
     for (i = 0; i < kind->param_count; i ++) {
@@ -1543,9 +1539,6 @@ done:
     return;
 }
 
-<<<<<<< HEAD
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexCells.
-=======
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -1610,8 +1603,7 @@ done:
 }
 
 /** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
- * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve and TexBlocks.
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
+ * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve, TexBlocks and TexCells.
  *
  * @param world The world
  */
@@ -1655,24 +1647,6 @@ static void box_texture_nodes_register(
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
-<<<<<<< HEAD
-        .component = ecs_id(TexCells),
-        .output = TexVector,
-        .inputs = {
-            { "coords", offsetof(TexCells, coords), TexVector, .coords = true },
-            { "evolve", offsetof(TexCells, evolve), TexScalar, "evolve_value",
-                offsetof(TexCells, evolve_value) }
-        },
-        .params = {
-            { "count", offsetof(TexCells, count), 4, BOX_TEXTURE_PARAM_I32 },
-            { "jitter", offsetof(TexCells, jitter), 4, BOX_TEXTURE_PARAM_F32 },
-            { "seed", offsetof(TexCells, seed), 4, BOX_TEXTURE_PARAM_I32 },
-            { "distance", offsetof(TexCells, distance), 4, BOX_TEXTURE_PARAM_I32 },
-            { "edge", offsetof(TexCells, edge), 4, BOX_TEXTURE_PARAM_F32 }
-        },
-        .function = "box_tex_cells",
-        .source = box_texture_cells_wgsl
-=======
         .component = ecs_id(TexSplit),
         .output = TexScalar,
         .inputs = {
@@ -1794,7 +1768,25 @@ static void box_texture_nodes_register(
         .function = "box_tex_blocks",
         .source = box_texture_blocks_wgsl,
         .flags = BOX_TEXTURE_NODE_PLANE
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCells),
+        .output = TexVector,
+        .inputs = {
+            { "coords", offsetof(TexCells, coords), TexVector, NULL, 0, true },
+            { "evolve", offsetof(TexCells, evolve), TexScalar, "evolve_value",
+                offsetof(TexCells, evolve_value) }
+        },
+        .params = {
+            { "count", offsetof(TexCells, count), 4, BOX_TEXTURE_PARAM_I32 },
+            { "jitter", offsetof(TexCells, jitter), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexCells, seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "distance", offsetof(TexCells, distance), 4, BOX_TEXTURE_PARAM_I32 },
+            { "edge", offsetof(TexCells, edge), 4, BOX_TEXTURE_PARAM_F32 }
+        },
+        .function = "box_tex_cells",
+        .source = box_texture_cells_wgsl
     });
 }
 

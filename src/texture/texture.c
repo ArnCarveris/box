@@ -1158,10 +1158,8 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
-<<<<<<< HEAD
     ECS_META_COMPONENT(world, TextureCellsDistance);
     ECS_META_COMPONENT(world, TexCells);
-=======
     ECS_META_COMPONENT(world, TexBlocks);
     ECS_META_COMPONENT(world, TextureChannel);
     ECS_META_COMPONENT(world, TexSplit);
@@ -1173,7 +1171,6 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TextureGraphCache);
     ECS_META_COMPONENT(world, TexRamp);
     ECS_META_COMPONENT(world, TexCurve);
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
@@ -1189,9 +1186,7 @@ void BoxTextureImport(
     box_owned_hooks(world, TexRamp, BOX_OWNED_VEC(TexRamp, keys, TextureGenKey));
     box_owned_hooks(world, TexCurve, BOX_OWNED_CURVE(TexCurve, curve));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
-<<<<<<< HEAD
     ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
-=======
     box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name),
         BOX_OWNED_STR(TextureNodePort, value));
     box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));
@@ -1215,7 +1210,6 @@ void BoxTextureImport(
         BOX_OWNED_STR(TextureNodeKind, array));
     box_owned_hooks(world, TextureNodePreviewStatus,
         BOX_OWNED_STR(TextureNodePreviewStatus, png));
->>>>>>> ec4963cf181bd9d1a403187fb2437ae201c7c186
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);
