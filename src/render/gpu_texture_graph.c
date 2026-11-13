@@ -1,6 +1,6 @@
 /**
  * @file render/gpu_texture_graph.c
- * @brief Evaluation of the texture graphs on the webgpu backend: stages, code and programs.
+ * @brief Evaluation of the texture graphs on the webgpu backend: stages and programs.
  *
  * A graph is cut into stages that each fuse pointwise nodes into one compute shader ending in
  * a materialized texture; programs of stages are shared by the graphs of one structure. Graphs
@@ -74,31 +74,6 @@ static box_gpu_texgraphs_t* box_gpu_tg_get(
     gpu->texture_graphs = tg;
 done:
     return tg;
-}
-
-/** Get a node kind by id.
- *
- * @param tg The graph state
- * @param id Id of the kind
- * @return The kind, NULL when the backend has none of the id
- */
-static box_gpu_tg_kind_t* box_gpu_tg_kind(
-    box_gpu_texgraphs_t *tg,
-    uint32_t id)
-{
-    return ecs_map_get_deref(&tg->kinds, box_gpu_tg_kind_t, id);
-}
-
-/** Get the WGSL name of a storage texture format of a stage.
- *
- * @param format The format
- * @return The name
- */
-static const char* box_gpu_tg_format_name(
-    WGPUTextureFormat format)
-{
-    return format == WGPUTextureFormat_R32Float ? "r32float"
-        : format == BOX_GPU_TEXTURE_FORMAT ? "rgba8unorm" : "rgba16float";
 }
 
 /** Queue the outcome of a graph for the main thread, once per serial.
@@ -566,9 +541,8 @@ static bool box_gpu_tg_due(
  * one pass included, and the static inputs of animated nodes are materialized, then every node
  * that the stages of two materialized nodes reach, until none is.
  *
- * A static node is then never computed by an animated stage.
- *
- * The sampling nodes of a stage past the textures it binds are materialized too.
+ * A static node is then never computed by an animated stage, and the sampling nodes of a stage
+ * past the textures it binds are materialized too.
  *
  * @param tg The graph state
  * @param graph The graph
@@ -669,367 +643,6 @@ static void box_gpu_tg_partition(
 
     ecs_os_free(sampled);
     ecs_os_free(stack);
-}
-
-/** Append text to the code of a stage, counting its lines.
- *
- * @param buf The code
- * @param line The line the text starts on, receives the line after it
- * @param text The text
- */
-static void box_gpu_tg_append(
-    ecs_strbuf_t *buf,
-    int32_t *line,
-    const char *text)
-{
-    const char *c;
-    ecs_strbuf_appendstr(buf, text);
-    for (c = text; *c; c ++) {
-        *line += *c == '\n';
-    }
-}
-
-/** Record the lines of the code of a stage that came from a node.
- *
- * @param lines The lines of the stage
- * @param first First line
- * @param last Last line
- * @param node The node, -1 for the shared code
- */
-static void box_gpu_tg_lines(
-    ecs_vec_t *lines,
-    int32_t first,
-    int32_t last,
-    int32_t node)
-{
-    *ecs_vec_append_t(NULL, lines, box_gpu_tg_line_t) = (box_gpu_tg_line_t){
-        .first = first, .last = last, .node = node
-    };
-}
-
-/** Write the WGSL expression of input j of a node in a stage: the value of its node, or without
-<<<<<<< HEAD
- * one the constant in its parameters, or the coordinates for a vector input without a constant.
-=======
- * one the domain coordinates for a coords input and the constant in its parameters otherwise.
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
- *
- * @param buf The code
- * @param graph The graph
- * @param kind The kind of the node
- * @param node The node
- * @param j The input
- */
-static void box_gpu_tg_input(
-    ecs_strbuf_t *buf,
-    const box_gpu_tg_graph_t *graph,
-    const box_gpu_tg_kind_t *kind,
-    int32_t node,
-    int32_t j)
-{
-    const box_render_texture_graph_node_t *n = &graph->nodes[node];
-    if ((uint32_t)j >= kind->input_count) {
-        ecs_strbuf_appendstr(buf, "vec4f(0.0)");
-    } else if (n->inputs[j] >= 0) {
-        ecs_strbuf_append(buf, "node_%d", n->inputs[j]);
-<<<<<<< HEAD
-    } else if (kind->coords & (1u << j)) {
-=======
-    } else if (kind->coords_inputs & (1u << j)) {
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
-        ecs_strbuf_appendstr(buf, "coords");
-    } else {
-        ecs_strbuf_append(buf, "bitcast<vec4f>(box_texgraph_params[%uu])",
-            (n->params + kind->param_size) / 16 + (uint32_t)j);
-    }
-}
-
-/** Get the WGSL name of the value of a texture slot in a stage: node_i for node i, pass_k for
- * the k-th slot of the earlier passes.
- *
- * @param buf Receives the name
- * @param size Bytes of buf
- * @param n Nodes of the graph
- * @param slot The slot
- */
-static void box_gpu_tg_slot_name(
-    char *buf,
-    ecs_size_t size,
-    int32_t n,
-    int32_t slot)
-{
-    if (slot < n) {
-        ecs_os_snprintf(buf, size, "node_%d", slot);
-    } else {
-        ecs_os_snprintf(buf, size, "pass_%d", slot - n);
-    }
-}
-
-/** Write the texture a stage binds for a slot, the 1x1 zero texture when it reads no such slot.
- *
- * @param buf The code
- * @param stage The stage
- * @param slot The slot, -1 for none
- */
-static void box_gpu_tg_texture(
-    ecs_strbuf_t *buf,
-    const box_gpu_tg_stage_t *stage,
-    int32_t slot)
-{
-    int32_t k, found = -1;
-    for (k = 0; slot >= 0 && k < stage->input_count; k ++) {
-        if (stage->inputs[k] == slot) {
-            found = k;
-        }
-    }
-
-    if (found >= 0) {
-        ecs_strbuf_append(buf, ", box_texgraph_in%d", found);
-    } else {
-        ecs_strbuf_appendstr(buf, ", box_texgraph_none");
-    }
-}
-
-/** Get the passes of a kind.
- *
- * @param kind The kind
- * @return The passes, from 1
- */
-static int32_t box_gpu_tg_passes(
-    const box_gpu_tg_kind_t *kind)
-{
-    return kind && kind->passes > 1 ? (int32_t)kind->passes : 1;
-}
-
-/** Write the call of the function of a node in a stage for one of its passes.
- *
- * A neighbourhood function also gets the texel and the texture of each of its inputs, the
-<<<<<<< HEAD
- * texture of an input without a node being a 1x1 zero texture. A sampling function gets the
- * texture it samples last.
-=======
- * texture of an input without a node being a 1x1 zero texture; a function of more than one pass
- * gets the pass and the texture of the pass before it between the two.
- *
- * @param buf The code
- * @param graph The graph
- * @param stage The stage
- * @param kind The kind of the node
- * @param node The node
- * @param pass The pass, the last one for the value of the node
- * @param prev Slot of the pass before, -1 for none
- */
-static void box_gpu_tg_call(
-    ecs_strbuf_t *buf,
-    const box_gpu_tg_graph_t *graph,
-    const box_gpu_tg_stage_t *stage,
-    const box_gpu_tg_kind_t *kind,
-    int32_t node,
-    int32_t pass,
-    int32_t prev)
-{
-    const box_render_texture_graph_node_t *n = &graph->nodes[node];
-    int32_t j;
-    ecs_strbuf_append(buf, "%s(box_texgraph_node_params(%uu), array<vec4f, 4>(",
-        kind->function, n->params / 16);
-    for (j = 0; j < BOX_TEXTURE_NODE_INPUTS; j ++) {
-        if (j) {
-            ecs_strbuf_appendstr(buf, ", ");
-        }
-
-        box_gpu_tg_input(buf, graph, kind, node, j);
-    }
-
-    ecs_strbuf_appendstr(buf, "), coords");
-    if ((kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) || box_gpu_tg_passes(kind) > 1) {
-        ecs_strbuf_appendstr(buf, ", texel");
-        if (box_gpu_tg_passes(kind) > 1) {
-            ecs_strbuf_append(buf, ", %du", pass);
-            box_gpu_tg_texture(buf, stage, prev);
-        }
-
-        for (j = 0; j < (int32_t)kind->input_count; j ++) {
-            box_gpu_tg_texture(buf, stage, n->inputs[j]);
-        }
-    }
-
-    ecs_strbuf_appendstr(buf, ")");
-}
-
-/** Generate the code of a stage: the shared code, the functions of its kinds, its bindings and
- * a main that loads its materialized inputs, calls the functions of its nodes in order and
- * stores the value of its root, or calls the function of its root for its pass and stores that.
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
- *
- * @param tg The graph state
- * @param graph The graph
- * @param stage The stage
- * @param owner The materialized node whose stage computes each node
- * @param first Slot of the first pass of each node of more than one pass, -1 for the others
- * @return The code, freed by the caller
- */
-static char* box_gpu_tg_code(
-    box_gpu_texgraphs_t *tg,
-    const box_gpu_tg_graph_t *graph,
-    box_gpu_tg_stage_t *stage,
-    const int32_t *owner,
-    const int32_t *first)
-{
-    ecs_strbuf_t buf = ECS_STRBUF_INIT;
-    int32_t line = 1, i, k, first_line, n = (int32_t)graph->desc.node_count;
-    ecs_vec_t used;
-    char text[256], name[32];
-    ecs_vec_init_t(NULL, &used, uint32_t, 0);
-    box_gpu_tg_append(&buf, &line, tg->prelude);
-    box_gpu_tg_lines(&stage->lines, 1, line - 1, -1);
-    box_gpu_tg_append(&buf, &line, "\n");
-    for (i = 0; i <= stage->root; i ++) {
-        const box_gpu_tg_kind_t *kind;
-        bool seen = false;
-        if (stage->pass >= 0 ? i != stage->root : owner[i] != stage->root) {
-            continue;
-        }
-
-        for (k = 0; k < ecs_vec_count(&used); k ++) {
-            seen = seen || *ecs_vec_get_t(&used, uint32_t, k) == graph->nodes[i].kind;
-        }
-
-        if (seen) {
-            continue;
-        }
-
-        *ecs_vec_append_t(NULL, &used, uint32_t) = graph->nodes[i].kind;
-        kind = box_gpu_tg_kind(tg, graph->nodes[i].kind);
-        first_line = line;
-        box_gpu_tg_append(&buf, &line, kind->source);
-        if (kind->source[0] && kind->source[ecs_os_strlen(kind->source) - 1] != '\n') {
-            box_gpu_tg_append(&buf, &line, "\n");
-        }
-
-        box_gpu_tg_lines(&stage->lines, first_line, line - 1, i);
-        box_gpu_tg_append(&buf, &line, "\n");
-    }
-
-    ecs_os_snprintf(text, ECS_SIZEOF(text),
-        "@group(0) @binding(2) var box_texgraph_out: texture_storage_2d<%s, write>;\n"
-        "@group(0) @binding(3) var box_texgraph_none: texture_2d<f32>;\n",
-        box_gpu_tg_format_name(stage->format));
-    box_gpu_tg_append(&buf, &line, text);
-    for (k = 0; k < stage->input_count; k ++) {
-        ecs_os_snprintf(text, ECS_SIZEOF(text),
-            "@group(0) @binding(%d) var box_texgraph_in%d: texture_2d<f32>;\n",
-            BOX_GPU_TG_FIRST_INPUT + k, k);
-        box_gpu_tg_append(&buf, &line, text);
-    }
-
-    for (k = 0; k < stage->texture_count; k ++) {
-        ecs_os_snprintf(text, ECS_SIZEOF(text),
-            "@group(0) @binding(%d) var box_texgraph_tex%d: texture_2d<f32>;\n",
-            BOX_GPU_TG_FIRST_TEXTURE + k, k);
-        box_gpu_tg_append(&buf, &line, text);
-    }
-
-    box_gpu_tg_append(&buf, &line,
-        "\n"
-        "@compute @workgroup_size(8, 8, 1)\n"
-        "fn main(@builtin(global_invocation_id) id: vec3u) {\n"
-        "    if (id.x >= box_texgraph_stage.size.x || id.y >= box_texgraph_stage.size.y) {\n"
-        "        return;\n"
-        "    }\n"
-        "    let texel = vec2i(id.xy);\n"
-        "    let coords = box_texgraph_coords(texel);\n");
-    for (k = 0; k < stage->input_count; k ++) {
-        int32_t in = stage->inputs[k];
-        box_gpu_tg_slot_name(name, ECS_SIZEOF(name), n, in);
-        ecs_os_snprintf(text, ECS_SIZEOF(text),
-            "    let %s = textureLoad(box_texgraph_in%d, texel, 0);\n", name, k);
-        box_gpu_tg_lines(&stage->lines, line, line, in < n ? in : stage->root);
-        box_gpu_tg_append(&buf, &line, text);
-    }
-
-    if (stage->pass >= 0) {
-        const box_gpu_tg_kind_t *kind = box_gpu_tg_kind(tg, graph->nodes[stage->root].kind);
-        box_gpu_tg_slot_name(name, ECS_SIZEOF(name), n, stage->slot);
-        ecs_strbuf_append(&buf, "    let %s = ", name);
-        box_gpu_tg_call(&buf, graph, stage, kind, stage->root, stage->pass,
-            stage->pass > 0 ? stage->slot - 1 : -1);
-        ecs_strbuf_appendstr(&buf, ";\n");
-        box_gpu_tg_lines(&stage->lines, line, line, stage->root);
-        line ++;
-    }
-
-    for (i = 0; stage->pass < 0 && i <= stage->root; i ++) {
-        const box_gpu_tg_kind_t *kind;
-        int32_t passes;
-        if (owner[i] != stage->root) {
-            continue;
-        }
-
-<<<<<<< HEAD
-        kind = box_gpu_tg_kind(tg, n->kind);
-        ecs_strbuf_append(&buf, "    let node_%d = %s(box_texgraph_node_params(%uu), "
-            "array<vec4f, 4>(", i, kind->function, n->params / 16);
-        for (j = 0; j < BOX_TEXTURE_NODE_INPUTS; j ++) {
-            if (j) {
-                ecs_strbuf_appendstr(&buf, ", ");
-            }
-
-            box_gpu_tg_input(&buf, graph, kind, i, j);
-        }
-
-        ecs_strbuf_appendstr(&buf, "), coords");
-        if (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) {
-            ecs_strbuf_appendstr(&buf, ", texel");
-            for (j = 0; j < (int32_t)kind->input_count; j ++) {
-                int32_t in = n->inputs[j], slot = -1;
-                for (k = 0; in >= 0 && k < stage->input_count; k ++) {
-                    if (stage->inputs[k] == in) {
-                        slot = k;
-                    }
-                }
-
-                if (slot >= 0) {
-                    ecs_strbuf_append(&buf, ", box_texgraph_in%d", slot);
-                } else {
-                    ecs_strbuf_appendstr(&buf, ", box_texgraph_none");
-                }
-            }
-        }
-
-        if (kind->flags & BOX_TEXTURE_NODE_SAMPLES) {
-            int32_t slot = 0;
-            for (k = 0; k < stage->texture_count; k ++) {
-                if (stage->textures[k] == n->texture) {
-                    slot = k;
-                }
-            }
-
-            ecs_strbuf_append(&buf, ", box_texgraph_tex%d", slot);
-        }
-
-        ecs_strbuf_appendstr(&buf, ");\n");
-=======
-        kind = box_gpu_tg_kind(tg, graph->nodes[i].kind);
-        passes = box_gpu_tg_passes(kind);
-        ecs_strbuf_append(&buf, "    let node_%d = ", i);
-        box_gpu_tg_call(&buf, graph, stage, kind, i, passes - 1,
-            passes > 1 ? first[i] + passes - 2 : -1);
-        ecs_strbuf_appendstr(&buf, ";\n");
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
-        box_gpu_tg_lines(&stage->lines, line, line, i);
-        line ++;
-    }
-
-    box_gpu_tg_slot_name(name, ECS_SIZEOF(name), n, stage->slot);
-    ecs_os_snprintf(text, ECS_SIZEOF(text), stage->output
-        ? "    textureStore(box_texgraph_out, texel, box_texgraph_encode(%s));\n"
-        : "    textureStore(box_texgraph_out, texel, %s);\n", name);
-    box_gpu_tg_lines(&stage->lines, line, line, stage->root);
-    box_gpu_tg_append(&buf, &line, text);
-    box_gpu_tg_append(&buf, &line, "}\n");
-    ecs_vec_fini_t(NULL, &used, uint32_t);
-
-    return ecs_strbuf_get(&buf);
 }
 
 /** Compile the code of a stage under its handle through the shader path.
@@ -1194,7 +807,12 @@ static void box_gpu_tg_program_build(
                 goto done;
             }
 
-            stage->layout = box_gpu_tg_layout(gpu, tg, stage->input_count, stage->format);
+            if (graph->nodes[i].texture >= 0) {
+                stage->textures[stage->texture_count ++] = graph->nodes[i].texture;
+            }
+
+            stage->layout = box_gpu_tg_layout(gpu, tg, stage->input_count, stage->texture_count,
+                stage->format);
             stage->shader = tg->next_shader ++;
             ecs_map_insert_ptr(&tg->stages, stage->shader, program);
         }
@@ -1636,17 +1254,8 @@ void box_gpu_texture_node_kind_apply(
     kind->coords_inputs = desc->coords_inputs;
     kind->param_size = desc->param_size;
     kind->flags = desc->flags;
-<<<<<<< HEAD
-    for (i = 0; i < kind->input_count; i ++) {
-        if (!(desc->input_constants & (1u << i)) && desc->input_types[i] == TexVector) {
-            kind->coords |= 1u << i;
-        }
-    }
-
-=======
     kind->passes = desc->passes < 1 ? 1 : desc->passes > BOX_TEXTURE_NODE_PASSES
         ? BOX_TEXTURE_NODE_PASSES : desc->passes;
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     kind->function = ecs_os_strdup(box_render_texture_node_kind_function(desc));
     kind->source = ecs_os_strdup(box_render_texture_node_kind_source(desc));
     kind->hash = box_gpu_tg_hash(BOX_GPU_TG_FNV_BASIS, desc, sizeof(*desc));
@@ -1793,13 +1402,11 @@ static void box_gpu_tg_upload(
  * cached value of its node and is dispatched only when the cache did not have it, an animated
  * stage writes an intermediate of the pool.
  *
-<<<<<<< HEAD
  * The hashes of a graph that samples textures are computed again with the images it samples
  * now, whose serials it keeps. An image written directly is queued for its mip levels at once,
  * so the graphs after it in the packet hash its new serial.
-=======
+ *
  * An earlier pass of a node writes an intermediate of the pool when a dispatched stage reads it.
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
  *
  * @param gpu The backend
  * @param tg The graph state
@@ -1823,7 +1430,7 @@ static void box_gpu_tg_record(
     box_gpu_texture_t *tex = box_gpu_texture_output(gpu, graph->handle, w, h, image,
         graph->desc.format == GraphColor);
     bool *computed = ecs_os_calloc_n(bool, program->stage_count);
-<<<<<<< HEAD
+    bool *needed = ecs_os_calloc_n(bool, program->slot_count);
     if (graph->desc.texture_count) {
         box_gpu_tg_hashes(gpu, tg, graph);
         for (k = 0; k < (int32_t)graph->desc.texture_count; k ++) {
@@ -1831,9 +1438,6 @@ static void box_gpu_tg_record(
         }
     }
 
-=======
-    bool *needed = ecs_os_calloc_n(bool, program->slot_count);
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     box_gpu_tg_upload(gpu, tg, graph);
     graph->time = tg->time;
     if (image == BOX_GPU_TEXTURE_SINGLE) {
@@ -2013,7 +1617,7 @@ void box_gpu_texture_graphs_evaluate(
     }
 
     count = ecs_vec_count(&evals);
-    passes = box_gpu_tg_passes(tg, ecs_vec_first(&evals), count);
+    passes = box_gpu_tg_eval_passes(tg, ecs_vec_first(&evals), count);
     for (i = 0; i < BOX_GPU_TG_STAMPS && passes == 1 && tg->queries && stamp < 0; i ++) {
         if (tg->stamps[i].state == BOX_GPU_TG_STAMP_FREE) {
             stamp = i;

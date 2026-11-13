@@ -87,17 +87,13 @@ typedef struct box_texture_node_kind_t {
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-<<<<<<< HEAD
-                                 *   BOX_TEXTURE_NODE_SAMPLES */
+                                 *   BOX_TEXTURE_NODE_PLANE, BOX_TEXTURE_NODE_SAMPLES */
+    int32_t passes;             /**< Passes of the function, from 1 */
     char *texture;              /**< Member of the texture entity a node samples, NULL for
                                  *   none */
     ecs_size_t texture_offset;  /**< Offset of that member */
     char *linear;               /**< Member that reads the texture as stored, NULL for none */
     ecs_size_t linear_offset;   /**< Offset of that member */
-=======
-                                 *   BOX_TEXTURE_NODE_PLANE */
-    int32_t passes;             /**< Passes of the function, from 1 */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     bool sent;                  /**< The current backend has the kind */
 } box_texture_node_kind_t;
 
@@ -452,6 +448,24 @@ void box_texture_capped_size(
 void box_texture_graphs_init(
     ecs_world_t *world,
     box_textures_t *t);
+
+/** Register the built in node kinds.
+ *
+ * @param world The world
+ */
+void box_texture_nodes_register(
+    ecs_world_t *world);
+
+/** Get the type that follows the inputs a node reads: a Vector when one of them has a Vector
+ * node, else a Scalar when one has a Scalar node, else a Vector.
+ *
+ * @param inputs Type of the node of each input, TexAny for none
+ * @param used Bit j set when input j is read
+ * @return The type
+ */
+TextureValueType box_texture_graph_follow(
+    const TextureValueType *inputs,
+    uint32_t used);
 
 /** Free the node kinds and the graph lists of a registry.
  *

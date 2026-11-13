@@ -107,7 +107,7 @@ bool box_gpu_tg_sources_changed(
     return result;
 }
 
-int32_t box_gpu_tg_passes(
+int32_t box_gpu_tg_eval_passes(
     box_gpu_texgraphs_t *tg,
     box_gpu_tg_eval_t *evals,
     int32_t count)

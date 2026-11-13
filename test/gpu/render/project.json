@@ -1557,24 +1557,6 @@
                 ]
             },
             {
-<<<<<<< HEAD
-                "id": "TextureNodesImage",
-                "testcases": [
-                    "sample_plane",
-                    "wrap_and_clamp",
-                    "sample_sphere",
-                    "lut",
-                    "gen_and_surface_sources",
-                    "four_images_one_graph",
-                    "chain_updates",
-                    "single_source_same_packet",
-                    "texture_revision_updates",
-                    "animated_source",
-                    "rebind_no_recompile",
-                    "cycle_fails",
-                    "loading_holds",
-                    "failure_names_texture"
-=======
                 "id": "TextureCells",
                 "testcases": [
                     "plane_distances",
@@ -1604,7 +1586,25 @@
                     "sphere_poles",
                     "radius_edit_no_recompile",
                     "follows_input_type"
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
+                ]
+            },
+            {
+                "id": "TextureNodesImage",
+                "testcases": [
+                    "sample_plane",
+                    "wrap_and_clamp",
+                    "sample_sphere",
+                    "lut",
+                    "gen_and_surface_sources",
+                    "four_images_one_graph",
+                    "chain_updates",
+                    "single_source_same_packet",
+                    "texture_revision_updates",
+                    "animated_source",
+                    "rebind_no_recompile",
+                    "cycle_fails",
+                    "loading_holds",
+                    "failure_names_texture"
                 ]
             }
         ]

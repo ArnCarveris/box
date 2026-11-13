@@ -728,17 +728,15 @@ ECS_STRUCT(TexLut, {
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
 
-<<<<<<< HEAD
-/** Flag of a node kind that samples a texture entity, set by box_texture_node_register for a
- * kind with a texture member (box_texture_node_desc_t.texture) */
-#define BOX_TEXTURE_NODE_SAMPLES (1u << 2)
-=======
 /** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
 #define BOX_TEXTURE_NODE_PLANE (1u << 2)
 
+/** Flag of a node kind that samples a texture entity, set by box_texture_node_register for a
+ * kind with a texture member (box_texture_node_desc_t.texture) */
+#define BOX_TEXTURE_NODE_SAMPLES (1u << 3)
+
 /** Most passes of a node kind */
 #define BOX_TEXTURE_NODE_PASSES (4)
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
 
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
@@ -776,13 +774,10 @@ ECS_STRUCT(TextureNodeKind, {
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
-<<<<<<< HEAD
-    const char *texture;     /**< Member of the texture entity a node samples, NULL for a kind
-                              *   that samples none */
-=======
     bool plane;              /**< The node works on DomainPlane only */
     int32_t passes;          /**< Passes that compute the value, 1 for most kinds */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
+    const char *texture;     /**< Member of the texture entity a node samples, NULL for a kind
+                              *   that samples none */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -797,15 +792,9 @@ typedef struct box_texture_node_input_t {
     const char *name;           /**< Name of the member, NULL ends the list */
     ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
     TextureValueType type;      /**< Type the input node must output */
-<<<<<<< HEAD
-    const char *value;          /**< Constant member used without a node, a float for
-                                 *   TexScalar or a vec4 for TexVector; NULL for none, then a
-                                 *   TexVector input takes the coordinates, a TexScalar one 0 */
-=======
     const char *value;          /**< Name of the constant member used without a node, a float
                                  *   for TexScalar or a vec4 for TexVector and TexAny, NULL for
                                  *   none */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     ecs_size_t value_offset;    /**< Offset of that member */
     bool coords;                /**< A TexVector input without value: without a node it is the
                                  *   coordinates of the texel in the domain of the graph */
@@ -867,11 +856,6 @@ typedef TextureValueType (*box_texture_node_type_t)(
  * of the parameter bytes p, the input values i (a scalar in x, the constant without a node)
  * and the coordinates returns the value of the node, a scalar in x.
  *
-<<<<<<< HEAD
- * A neighbourhood kind also gets the texel (vec2i) and the texture of each input, a sampling
- * kind (texture) the texture_2d<f32> it samples last, read with box_texgraph_sample. It
- * returns the value of the node, a scalar in x.
-=======
  * A kind with an array parameter reads its elements from box_texgraph_params at the index in
  * its header, see box_texture_node_array_t.
  *
@@ -882,7 +866,9 @@ typedef TextureValueType (*box_texture_node_type_t)(
  * A neighbourhood kind also gets texel: vec2i, then t0: texture_2d<f32>, ... per input. A kind of
  * more passes gets pass_index: u32 and prev: texture_2d<f32> (the pass before, 1x1 zero in pass
  * 0) between texel and t0; its last pass is the value of the node.
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
+ *
+ * A sampling kind (texture) gets the texture_2d<f32> it samples last, read with
+ * box_texgraph_sample.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -895,8 +881,11 @@ typedef struct box_texture_node_desc_t {
     box_texture_node_array_t array; /**< Array parameter, name NULL for none */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
-<<<<<<< HEAD
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_PLANE */
+    int32_t passes;             /**< Passes of the function, 0 for 1, at most
+                                 *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
+                                 *   neighbourhood kind */
     const char *texture;        /**< ecs_entity_t member of the texture entity a node
                                  *   samples, NULL for none; which entity it is only binds the
                                  *   image, it is not part of the structure of the graph */
@@ -905,13 +894,6 @@ typedef struct box_texture_node_desc_t {
                                  *   the texture as stored instead of decoded from display
                                  *   encoding, NULL to always decode them */
     ecs_size_t linear_offset;   /**< Offset of that member */
-=======
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-                                 *   BOX_TEXTURE_NODE_PLANE */
-    int32_t passes;             /**< Passes of the function, 0 for 1, at most
-                                 *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
-                                 *   neighbourhood kind */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

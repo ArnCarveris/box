@@ -327,17 +327,11 @@ typedef struct box_render_texture_node_kind_t {
     uint32_t input_types[BOX_TEXTURE_NODE_INPUTS]; /**< TextureValueType of each input */
     uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
     uint32_t param_size;        /**< Bytes of the parameters of a node, a multiple of 16 */
-<<<<<<< HEAD
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-                                 *   BOX_TEXTURE_NODE_SAMPLES */
-=======
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE,
+                                 *   _SAMPLES */
     uint32_t passes;            /**< Passes of the function, from 1 */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     uint32_t function_size;     /**< Bytes of the function name, its terminator included */
     uint32_t source_size;       /**< Bytes of the source, its terminator included */
-    uint32_t input_constants;   /**< Bit i set when input i has a constant used without a node;
-                                 *   a TexVector input without one takes the coordinates */
 } box_render_texture_node_kind_t;
 
 /** A node of a compiled texture graph, which comes after the nodes of its inputs */

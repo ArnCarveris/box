@@ -63,16 +63,10 @@ typedef struct box_gpu_tg_kind_t {
     uint32_t output;            /**< TextureValueType of its value */
     uint32_t input_count;       /**< Inputs of a node */
     uint32_t param_size;        /**< Bytes of the parameters before the input constants */
-<<<<<<< HEAD
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-                                 *   BOX_TEXTURE_NODE_SAMPLES */
-    uint32_t coords;            /**< Bit i set when input i takes the coordinates of the texel
-                                 *   without a node: a vector input without a constant */
-=======
     uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE,
+                                 *   _SAMPLES */
     uint32_t passes;            /**< Passes of the function, from 1 */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint64_t hash;              /**< Hash of the description, part of the program keys */
@@ -105,16 +99,11 @@ typedef struct box_gpu_tg_stage_t {
                                  *   node count for the earlier passes of the nodes */
     bool output;                /**< It stores the image */
     WGPUTextureFormat format;   /**< Format of the texture it writes */
-<<<<<<< HEAD
-    int32_t input_count;        /**< Materialized nodes it reads */
-    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those nodes, binding BOX_GPU_TG_FIRST_INPUT + i */
+    int32_t input_count;        /**< Materialized slots it reads */
+    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those slots, binding BOX_GPU_TG_FIRST_INPUT + i */
     int32_t texture_count;      /**< Textures its sampling nodes sample */
     int32_t textures[BOX_GPU_TG_TEXTURES]; /**< Those textures by index in the textures of
                                  *   the graph, binding BOX_GPU_TG_FIRST_TEXTURE + i */
-=======
-    int32_t input_count;        /**< Materialized slots it reads */
-    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those slots, binding BOX_GPU_TG_FIRST_INPUT + i */
->>>>>>> e676cfb85f792e412629ba6f2a7b7793c8e00917
     box_gpu_tg_layout_t *layout; /**< Its layouts, owned by the graph state */
     WGPUComputePipeline pipeline; /**< Its pipeline once created */
     ecs_vec_t lines;            /**< box_gpu_tg_line_t of its code */
@@ -311,6 +300,48 @@ static inline WGPUTextureFormat box_gpu_tg_output_format(
         ? BOX_GPU_TEXTURE_FORMAT : WGPUTextureFormat_RGBA16Float;
 }
 
+/** Get a node kind by id.
+ *
+ * @param tg The graph state
+ * @param id Id of the kind
+ * @return The kind, NULL when the backend has none of the id
+ */
+static inline box_gpu_tg_kind_t* box_gpu_tg_kind(
+    box_gpu_texgraphs_t *tg,
+    uint32_t id)
+{
+    return ecs_map_get_deref(&tg->kinds, box_gpu_tg_kind_t, id);
+}
+
+/** Get the passes of a kind.
+ *
+ * @param kind The kind
+ * @return The passes, from 1
+ */
+static inline int32_t box_gpu_tg_passes(
+    const box_gpu_tg_kind_t *kind)
+{
+    return kind && kind->passes > 1 ? (int32_t)kind->passes : 1;
+}
+
+/** Generate the code of a stage: the shared code, the functions of its kinds, its bindings and
+ * a main that loads its materialized inputs, calls the functions of its nodes in order and
+ * stores the value of its root, or calls the function of its root for its pass and stores that.
+ *
+ * @param tg The graph state
+ * @param graph The graph
+ * @param stage The stage
+ * @param owner The materialized node whose stage computes each node
+ * @param first Slot of the first pass of each node of more than one pass, -1 for the others
+ * @return The code, freed by the caller
+ */
+char* box_gpu_tg_code(
+    box_gpu_texgraphs_t *tg,
+    const box_gpu_tg_graph_t *graph,
+    box_gpu_tg_stage_t *stage,
+    const int32_t *owner,
+    const int32_t *first);
+
 /** Get the graph whose image a texture handle is.
  *
  * @param tg The graph state
@@ -380,7 +411,7 @@ bool box_gpu_tg_sources_changed(
  * @param count Number of evaluations
  * @return Number of passes
  */
-int32_t box_gpu_tg_passes(
+int32_t box_gpu_tg_eval_passes(
     box_gpu_texgraphs_t *tg,
     box_gpu_tg_eval_t *evals,
     int32_t count);
