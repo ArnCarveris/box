@@ -33,12 +33,22 @@ stage {
     Position: {0, 0, 0}
     Interactive
 
-    Planet hero(
-      kind: shown_kind, seed: shown_seed, detail: shown_detail, body: body,
-      surface: shown_surface, climate: shown_climate, air: air, clouds: shown_clouds,
-      night: shown_night, lava: shown_lava, gas: shown_gas, rings: rings
-    ) {
-      Position: {0, 0, 0}
+    if mode == MODE_STAR {
+      Star hero_star(
+        temperature: star.temperature, radius: star.radius, sunspots: star.sunspots,
+        granulation: star.granulation, contrast: star.contrast, prominences: star.prominences,
+        spin: star.spin, seed: star_seed, detail: star_detail
+      ) {
+        Position: {0, 0, 0}
+      }
+    } else {
+      Planet hero(
+        kind: shown_kind, seed: shown_seed, detail: shown_detail, body: body,
+        surface: shown_surface, climate: shown_climate, air: air, clouds: shown_clouds,
+        night: shown_night, lava: shown_lava, gas: shown_gas, rings: rings
+      ) {
+        Position: {0, 0, 0}
+      }
     }
   }
 }

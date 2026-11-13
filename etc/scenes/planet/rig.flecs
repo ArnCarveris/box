@@ -8,6 +8,8 @@ using box.light
 using box.effects
 using box.surface
 using state
+using planets
+using box.transition
 
 window {
   Surface: {width: 1600, height: 1000, vsync: true}
@@ -17,15 +19,20 @@ rig {
   Position: {0, 0, 0}
   Rotation: {0 - orbit_pitch, orbit_yaw, 0}
 
+  // The star is framed with its corona, farther for a larger star
+  const dist: f32 = mode == MODE_STAR ? star_distance(star.radius) : 27
+
   camera {
-    Position: {-1.4, 0, 27}
+    Position: {-1.4 * dist / 27, 0, dist}
+    Transition: [Position: {duration: 0.5, timing_function: EaseInOut}]
     Camera: {fov: 16, near_: 0.5, far_: 20000}
   }
 }
 
 sun {
   Rotation: {0.3, sun_angle * PI / 180, 0}
-  DirectionalLight: {intensity: 6.5}
+  // The star is not lit by the sun: it is off while the star shows
+  DirectionalLight: {intensity: mode == MODE_STAR ? 0 : 6.5}
   Rgb: {255, 246, 232}
 }
 

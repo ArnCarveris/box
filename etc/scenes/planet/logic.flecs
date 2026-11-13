@@ -32,6 +32,31 @@ state {
     state.orbit_pitch = 0
   }
 
+  // Load the preset of a star type
+  fn star_load(target: i32) {
+    state.star_kind = target
+    state.star = star_preset(target)
+  }
+
+  fn star_reset() {
+    state.star_seed = START_STAR_SEED
+    state.star_detail = 2
+    star_load(START_STAR)
+    state.orbit_yaw = 0
+    state.orbit_pitch = 0
+  }
+
+  // Set the parameter of the slider n of the star group to v
+  fn edit_star(n: string, v: f32) {
+    if n == "temperature" { state.star.temperature = v }
+    else if n == "radius" { state.star.radius = v }
+    else if n == "sunspots" { state.star.sunspots = v }
+    else if n == "granulation" { state.star.granulation = v }
+    else if n == "contrast" { state.star.contrast = v }
+    else if n == "prominences" { state.star.prominences = v }
+    else if n == "spin" { state.star.spin = v }
+  }
+
   fn apply() {
     state.shown_kind = state.kind
     state.shown_seed = state.seed
@@ -52,7 +77,7 @@ state {
 
   // Set the parameter of the slider n in the group of the panel g to v
   fn edit(g: string, n: string, v: f32) {
-    if g == "panel" {
+    if g == "page" {
       if n == "sun" { state.sun_angle = v }
     } else if g == "body" {
       if n == "radius" { state.body.radius = v }
@@ -145,11 +170,19 @@ async {
     const w = e.widget
     if w.has(Dropdown) {
       const picked: i32 = w[Dropdown.mut].current
-      if picked != state.kind {
+      if w.name() == "star_kind" {
+        if picked != state.star_kind {
+          star_load(picked)
+        }
+      } else if picked != state.kind {
         preset(picked)
       }
     } else if w.has(Stepper) {
-      if w.name() == "seed" {
+      if w.name() == "star_seed" {
+        state.star_seed = w[Stepper.mut].current
+      } else if w.name() == "star_detail" {
+        state.star_detail = w[Stepper.mut].current
+      } else if w.name() == "seed" {
         state.seed = w[Stepper.mut].current
       } else {
         state.detail = w[Stepper.mut].current
@@ -161,13 +194,17 @@ async {
     } else if w.has(Slider) {
       const v: f32 = w[Slider.mut].current
       const p = w.parent()
-      if p.name() == "channels" {
+      if p.name() == "star" {
+        edit_star(w.name(), v)
+      } else if p.name() == "channels" {
         const field = p.parent()
         edit_color(field.parent().name(), field.name(), w.name(), v)
       } else {
         edit(p.name(), w.name(), v)
       }
-      state.edits += 1
+      if p.name() != "star" {
+        state.edits += 1
+      }
     }
   }
 }
@@ -175,15 +212,39 @@ async {
 async {
   while true {
     await on.pressed(state.actions.random_seed)
-    state.seed = (state.seed * 621 + 271) % 1000
-    state.edits += 1
+    if state.mode == MODE_STAR {
+      state.star_seed = (state.star_seed * 621 + 271) % 1000
+    } else {
+      state.seed = (state.seed * 621 + 271) % 1000
+      state.edits += 1
+    }
   }
 }
 
 async {
   while true {
     await on.pressed(state.actions.reset)
-    reset()
+    if state.mode == MODE_STAR {
+      star_reset()
+    } else {
+      reset()
+    }
+  }
+}
+
+// The Planet / Star switch: each side keeps its values in the state, so switching back shows
+// the planet or the star as it was
+async {
+  while true {
+    await on.pressed(state.actions.show_planet)
+    state.mode = MODE_PLANET
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_star)
+    state.mode = MODE_STAR
   }
 }
 

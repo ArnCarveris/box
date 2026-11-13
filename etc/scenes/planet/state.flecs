@@ -11,10 +11,25 @@ state {
     }
 
     reset {
-      Action: {description: "Reset the planet"}
+      Action: {description: "Reset the planet or the star"}
       Binding: {key: Backspace}
     }
+
+    show_planet {
+      Action: {description: "Show the planet"}
+      Binding: {key: Num1}
+    }
+
+    show_star {
+      Action: {description: "Show the star"}
+      Binding: {key: Num2}
+    }
   }
+
+  // What the scene shows: the planet or the star, each with its own values
+  export const MODE_PLANET: i32 = 0
+  export const MODE_STAR: i32 = 1
+  export mut mode: i32 = MODE_PLANET
 
   export const KIND_GAS: i32 = 4
   export const KIND_GARDEN: i32 = 5
@@ -56,4 +71,16 @@ state {
   export mut shown_night: PlanetNight = night_preset(START_KIND)
   export mut shown_lava: PlanetLava = lava_preset(START_KIND)
   export mut shown_gas: PlanetGas = gas_preset(START_SEED)
+
+  // The star the scene starts with and resets to, and the star the panel edits: its type, seed,
+  // detail and parameters. A star has no evaluation to wait for, so the star shows them as they
+  // change
+  export const STAR_YELLOW: i32 = 1
+  export const START_STAR: i32 = STAR_YELLOW
+  export const START_STAR_SEED: i32 = 7
+
+  export mut star_kind: i32 = START_STAR
+  export mut star_seed: i32 = START_STAR_SEED
+  export mut star_detail: i32 = 2
+  export mut star: StarParams = star_preset(START_STAR)
 }
