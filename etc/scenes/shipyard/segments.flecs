@@ -391,6 +391,9 @@ assets {
     const n = RING_MODS
     const step = 2 * PI / n
     const am = step / 2
+    const rise = rl - sky
+    const vr = (rise * rise + RING_W * RING_W) / (2 * rise)
+    const va = asin(RING_W / vr)
 
     RingHub hub(r: r)
     rotor {
@@ -398,12 +401,8 @@ assets {
       RingChassis chassis(r: r, seed: seed)
       lawn : ShipMoss { Rgb: {58, 104, 56}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro - 0.3, thickness: 0.32, length: 2 * RING_IN, segments: 144, smooth: true} }
       canal : ShipWater { Rotation: {HALF_PI, 0, 0}; Tube: {radius: g + 0.02, thickness: 0.04, length: 0.32, segments: 144, smooth: true} }
-      glass : ShipGlass { Rotation: {HALF_PI, 0, 0}; Tube: {radius: sky, thickness: 0.04, length: 2 * RING_W - 0.02, segments: 144, smooth: true} }
+      vault : ShipGlass { Rotation: {HALF_PI, 0, 0}; TorusShell: {radius: sky + vr, tube: vr, ring_start: 0, ring_end: 2 * PI, tube_start: PI - va, tube_end: PI + va, thickness: 0.04, segments: 144, rings: 32} }
       sun : ShipWhiteLight { Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.02, tube: 0.04, segments: 144, rings: 4, smooth: true} }
-      for m in 0..6 {
-        const mz = (m < 3 ? -1 : 1) * (0.42 + (m % 3) * 0.48)
-        "mullion_{m}" : ShipTrim { Position: {0, 0, mz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.025, tube: 0.014, segments: 144, rings: 4, smooth: true} }
-      }
       for s in 0..2 {
         const sz = (s - 0.5) * 2
         "quay_{s}" : ShipPaving { Position: {0, 0, sz * 0.2}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: g + 0.015, thickness: 0.03, length: 0.08, segments: 144, smooth: true} }
@@ -413,8 +412,6 @@ assets {
         for k in 0..3 {
           "ledge_{s}_{k}" : ShipTrim { Position: {0, 0, sz * (RING_IN - 0.025)}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: g - (k + 1) * 0.245 + 0.008, thickness: 0.016, length: 0.05, segments: 144, smooth: true} }
         }
-        "wall_{s}" : ShipGlass { Position: {0, 0, sz * (RING_W - 0.02)}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: rl - 0.02, thickness: rl - 0.02 - sky, length: 0.02, segments: 144, smooth: true} }
-        "eave_{s}" : ShipTrim { Position: {0, 0, sz * (RING_W - 0.02)}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky + 0.01, tube: 0.04, segments: 144, rings: 4, smooth: true} }
       }
       for i in 0..6 {
         "daylight_{i}" { Rotation: {0, 0, i * PI / 3}; glow { Position: {0, sky + 0.3, 0}; PointLight: {intensity: 30, range: 9}; Rgb: {255, 238, 210} } }
@@ -422,15 +419,9 @@ assets {
       for i in 0..n {
         "frame_{i}" {
           Rotation: {0, 0, i * step}
-          arch : ShipTrim { Position: {sky - 0.03, 0, 0}; Box: {0.05, 0.05, 2 * RING_W} }
           for s in 0..2 {
             const sz = (s - 0.5) * 2
-            for k in 0..3 {
-              const ka = k * step / 3
-              "stile_{s}_{k}" : ShipTrim { Position: {cos(ka) * (rl + sky) / 2, sin(ka) * (rl + sky) / 2, sz * RING_W}; Rotation: {0, 0, ka}; Box: {rl - sky, k == 0 ? 0.04 : 0.018, 0.018} }
-            }
-            "transom_{s}" : ShipTrim { Position: {cos(am) * (rl - 0.5), sin(am) * (rl - 0.5), sz * RING_W}; Rotation: {0, 0, am}; Box: {0.015, step * (rl - 0.5), 0.015} }
-            RingTree "terrace_tree_{s}"(h: 0.24, kind: 2) { Position: {cos(am) * rl, sin(am) * rl, sz * (RING_IN + 0.2)}; Rotation: {0, 0, am - HALF_PI} }
+            RingTree "terrace_tree_{s}"(h: 0.24, kind: 2) { Position: {cos(am) * rl, sin(am) * rl, sz * (RING_IN + 0.1)}; Rotation: {0, 0, am - HALF_PI} }
             "planter_{s}" : ShipLeafDark { Position: {cos(step * 0.2) * (rl - 0.04), sin(step * 0.2) * (rl - 0.04), sz * (RING_IN + 0.32)}; Rotation: {0, 0, step * 0.2}; RoundedBox: {0.07, 0.6, 0.1, 0.03, segments: 2} }
           }
         }
