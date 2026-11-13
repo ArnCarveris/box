@@ -27,6 +27,9 @@ const OCTANT_AXIS: f32 = 0.57735026919;
 @group(1) @binding(2) var<storage, read> shadings: array<MeshShading>;
 @group(1) @binding(3) var<storage, read> surfaces: array<SurfaceData>;
 @group(1) @binding(4) var<storage, read> materials: array<Material>;
+// Transforms relative to the texture frame, read by MappingFrame materials only: the frame pages
+// have the stream, the other pages bind one zero record.
+@group(1) @binding(5) var<storage, read> frames: array<InstanceTransform>;
 
 @group(2) @binding(0) var albedo_map: texture_2d<f32>;
 @group(2) @binding(4) var material_sampler: sampler;
@@ -47,9 +50,9 @@ struct VertexIn {
     @location(3) slot: u32,
 };
 
-// The UV of a vertex, or for a MappingObject or MappingWorld material (mapped 1 plus its blend)
-// the offset of its projection, with the object (or world) position and normal mapping_uv
-// projects, as mesh.wgsl has them.
+// The UV of a vertex, or for a MappingObject, MappingWorld or MappingFrame material (mapped 1 plus
+// its blend) the offset of its projection, with the object (world, frame) position and normal
+// mapping_uv projects, as mesh.wgsl has them.
 struct CasterOut {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
@@ -112,6 +115,38 @@ fn caster_world(slot: u32, vertex: vec3f) -> vec3f {
     return (model * vec4f(position, 1.0)).xyz;
 }
 
+// Object position and normal of a vertex of a parametric surface caster, as place of place.wgsl
+// derives them, for the projection of a MappingFrame material. Reads surface_data, so
+// caster_world comes first.
+struct CasterLocal {
+    position: vec3f,
+    normal: vec3f,
+};
+
+fn caster_local(v: VertexIn) -> CasterLocal {
+    var position = v.position;
+    var normal = v.normal;
+    var derive = false;
+    if (surface_data.p[19].x != 0.0) {
+        position = v.position;
+    } else if (surface_data.p[0].x == 7.0) {
+        position.y *= surface_data.p[1].y;
+    } else if (surface_data.p[0].x == 1.0 && v.position.z < 2.0) {
+        let sample = surface_sweep_sample(i32(v.position.z), v.position.x, v.position.y);
+        position = sample.position;
+        normal = sv_unit(sample.normal);
+        derive = sv_dot(sample.normal, sample.normal) < 0.000000000001;
+    } else if (surface_data.p[0].x != 0.0) {
+        position = surface_position(i32(v.position.z), v.position.x, v.position.y);
+        derive = true;
+    }
+
+    if (derive) {
+        normal = surface_normal(i32(v.position.z), v.position.x, v.position.y);
+    }
+    return CasterLocal(position, normal);
+}
+
 // Position of a vertex of a caster in the clip space of the cascade.
 fn caster_position(slot: u32, vertex: vec3f) -> vec4f {
     return cascade.matrix * vec4f(caster_world(slot, vertex), 1.0);
@@ -172,13 +207,18 @@ fn cutout_attributes(v: VertexIn, o: ptr<function, CasterOut>) {
     (*o).object = vec4f(0.0);
     (*o).object_normal = vec3f(0.0);
     if (material_mapped(material) && surface_data.p[0].x == 0.0) {
-        cutout_mapping(v, material, o);
+        cutout_mapping(v, material, v.position, v.normal, o);
+    } else if (material_frame(material)) {
+        let local = caster_local(v);
+        cutout_mapping(v, material, local.position, local.normal, o);
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
 }
 
-fn cutout_mapping(v: VertexIn, material: Material, o: ptr<function, CasterOut>) {
+// position and normal: the object position and normal of the vertex.
+fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3f,
+    o: ptr<function, CasterOut>) {
     let model = instance_model(transforms[v.slot]);
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
@@ -186,14 +226,22 @@ fn cutout_mapping(v: VertexIn, material: Material, o: ptr<function, CasterOut>) 
     let scale = vec3f(length(c0), length(c1), length(c2));
     (*o).mapped = 1.0 + material_blend(material);
     (*o).uv = mapping_offset(material);
-    (*o).object = mapping_object(material, v.position, scale);
-    (*o).object_normal = v.normal;
+    (*o).object = mapping_object(material, position, scale);
+    (*o).object_normal = normal;
     if (material_world(material)) {
         let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
-        (*o).object = mapping_object(material, (model * vec4f(v.position, 1.0)).xyz,
+        (*o).object = mapping_object(material, (model * vec4f(position, 1.0)).xyz,
             vec3f(1.0));
         (*o).object_normal = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1)) *
-            v.normal * flip;
+            normal * flip;
+    } else if (material_frame(material)) {
+        var relative = model;
+        if (v.slot < arrayLength(&frames)) {
+            relative = instance_frame(frames[v.slot], model);
+        }
+        let f = mapping_frame(material, relative, position, normal);
+        (*o).object = f.object;
+        (*o).object_normal = f.normal;
     }
 }
 
@@ -205,7 +253,7 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
     (*o).object = vec4f(0.0);
     (*o).object_normal = vec3f(0.0);
     if (material_mapped(material)) {
-        cutout_mapping(v, material, o);
+        cutout_mapping(v, material, v.position, v.normal, o);
     }
     (*o).alpha = shading.alpha;
     (*o).cutoff = material.cutoff;
@@ -234,7 +282,7 @@ fn cutout_attributes_mesh(v: VertexIn, o: ptr<function, CasterOut>) {
 }
 
 // Discard where the alpha times the albedo alpha of the batch is below the cutoff: at the
-// interpolated UV, or projected for a MappingObject or MappingWorld material (mapped not 0),
+// interpolated UV, or projected for a projected mapping (mapped not 0),
 // blended over the three axes with a blend (mapped above 1), as mapping_alpha makes it.
 fn cutout_test(uv: vec2f, alpha: f32, cutoff: f32, mapped: f32, object: vec4f,
     object_normal: vec3f) {

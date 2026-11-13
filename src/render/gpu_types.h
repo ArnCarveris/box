@@ -993,13 +993,16 @@ typedef struct box_gpu_t {
     ecs_vec_t atlas_reads;          /**< box_gpu_atlas_read_t, the draws of those tiles */
     WGPUBindGroupLayout instance_layout; /**< Binds the streams of an instance page: 0
                                      *   transforms, 1 surface assets, 2 shading, 3 surfaces,
-                                     *   4 material table; forward pass and alpha tested casters */
+                                     *   4 material table, 5 frames; forward pass and alpha
+                                     *   tested casters */
     WGPUBindGroupLayout transform_layout; /**< instance_layout without the shading stream: the
                                      *   cull, the shadow casters and the capture cull */
     WGPUBuffer no_assets;           /**< One zero vec4, the surface assets of the draws of
                                      *   meshes without any */
     WGPUBuffer no_surfaces;         /**< One zero box_render_surface_t, the surface stream of
                                      *   the pages without one, the plain mesh and 2D pages */
+    WGPUBuffer no_frames;           /**< One zero box_render_transform_t, the frame stream of
+                                     *   the pages without one, all but the frame pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
     box_gpu_cull_t cull;            /**< Cull pass state */
@@ -1085,6 +1088,8 @@ typedef struct box_gpu_t {
     int32_t texture_graph_count;    /**< Texture graphs alive */
     int32_t texture_graph_programs; /**< Texture graph programs alive */
     uint64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediates */
+    uint64_t texture_graph_cached_bytes; /**< Bytes of the cached texture graph values */
+    int32_t texture_graph_cached;   /**< Cached texture graph values */
     bool lost;                      /**< The device was lost, the ring recreates it */
     bool lose;                      /**< box_render_gpu_lose_device asked to destroy it */
 } box_gpu_t;
