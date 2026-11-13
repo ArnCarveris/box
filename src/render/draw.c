@@ -1558,10 +1558,18 @@ void box_render_draws_init(
         .stride = {
             [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
             [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
-            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t),
             [BOX_RENDER_STREAM_FRAME] = (uint32_t)sizeof(box_render_transform_t)
         }
     }, BOX_RENDER_BUFFER_FIRST_FRAME);
+    box_draws_store_init(&d->stores[BOX_DRAWS_STORE_FRAME_SURFACE], &(box_draw_layout_t){
+        .streams = BOX_DRAWS_STREAMS,
+        .stride = {
+            [BOX_RENDER_STREAM_TRANSFORM] = (uint32_t)sizeof(box_render_transform_t),
+            [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_mesh_shading_t),
+            [BOX_RENDER_STREAM_SURFACE] = (uint32_t)sizeof(box_render_surface_t),
+            [BOX_RENDER_STREAM_FRAME] = (uint32_t)sizeof(box_render_transform_t)
+        }
+    }, BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_2D], &(box_draw_layout_t){
         .streams = BOX_RENDER_INSTANCE_STREAMS_2D,
         .stride = {

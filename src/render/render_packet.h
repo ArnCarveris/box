@@ -226,17 +226,22 @@ static inline bool box_render_is_mesh(
 #define BOX_RENDER_BUFFER_FIRST_SURFACE \
     (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x02000000u)
 
-/** Buffer handle of the first instance page of the meshes whose material uses MappingFrame,
- * plain or with a parametric surface, which have every stream: the surface stream (zero for a
- * plain mesh) and the frame stream. Page p of these pages has the handle
- * BOX_RENDER_BUFFER_FIRST_FRAME + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+/** Buffer handle of the first instance page of the plain meshes whose material uses
+ * MappingFrame, which have the frame stream but no surface stream. Page p of these pages has the
+ * handle BOX_RENDER_BUFFER_FIRST_FRAME + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_FRAME \
     (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x03000000u)
+
+/** Buffer handle of the first instance page of the meshes with a parametric surface whose
+ * material uses MappingFrame, which have every stream. Page p of these pages has the handle
+ * BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
+#define BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
 
 /** Buffer handle of the first instance page of the 2D shapes and glyphs. Page p of the 2D pages
  * has the handle BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_2D \
-    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x05000000u)
 
 /** Stream of the transforms of an instance page, box_render_transform_t per slot */
 #define BOX_RENDER_STREAM_TRANSFORM (0)
@@ -245,8 +250,8 @@ static inline bool box_render_is_mesh(
  * a mesh page, box_render_shading_t per slot of a 2D page */
 #define BOX_RENDER_STREAM_SHADING (1)
 
-/** Stream of the surface parameters of a mesh instance page with parametric surfaces or of a
- * frame page, box_render_surface_t per slot; plain mesh pages and 2D pages have none */
+/** Stream of the surface parameters of a mesh instance page with parametric surfaces,
+ * box_render_surface_t per slot; plain mesh pages and 2D pages have none */
 #define BOX_RENDER_STREAM_SURFACE (2)
 
 /** Stream of the transforms relative to the texture frame of a frame page, the pages of the

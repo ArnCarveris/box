@@ -126,19 +126,19 @@ static bool box_draws_is_2d(
     return b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D;
 }
 
-/** Check whether a batch has the surface stream: a mesh batch with a parametric surface, or a
- * frame batch, whose pages have every stream.
+/** Check whether a batch has the surface stream: a mesh batch with a parametric surface.
  *
  * @param b The batch
- * @return Whether its pages are of the surface or the frame store
+ * @return Whether its pages are of the surface or the frame surface store
  */
 static bool box_draws_has_surface(
     const box_draw_batch_t *b)
 {
-    return (b->key.surface || b->key.frame) && !box_draws_is_2d(b);
+    return b->key.surface && !box_draws_is_2d(b);
 }
 
-/** Get the store of the batches of a key: 2D, frame, surface or plain mesh.
+/** Get the store of the batches of a key: 2D, frame (with or without a parametric surface),
+ * surface or plain mesh.
  *
  * @param d The state
  * @param key The key
@@ -152,7 +152,7 @@ static box_draw_store_t* box_draws_key_store(
     if (key->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
         store = BOX_DRAWS_STORE_2D;
     } else if (key->frame) {
-        store = BOX_DRAWS_STORE_FRAME;
+        store = key->surface ? BOX_DRAWS_STORE_FRAME_SURFACE : BOX_DRAWS_STORE_FRAME;
     } else if (key->surface) {
         store = BOX_DRAWS_STORE_SURFACE;
     }
@@ -170,9 +170,8 @@ box_draw_store_t* box_draws_batch_store(
 uint8_t box_draws_batch_kinds(
     const box_draw_batch_t *b)
 {
-    return b->key.frame ? BOX_DRAW_ALL
-        : box_draws_has_surface(b) ? (uint8_t)(BOX_DRAW_BOTH | BOX_DRAW_SURFACE)
-        : BOX_DRAW_BOTH;
+    return (uint8_t)(BOX_DRAW_BOTH | (box_draws_has_surface(b) ? BOX_DRAW_SURFACE : 0) |
+        (b->key.frame && !box_draws_is_2d(b) ? BOX_DRAW_FRAME : 0));
 }
 
 box_render_surface_t* box_draws_slot_surface(
@@ -932,6 +931,10 @@ static void box_draws_pages(
             }
 
             for (s = 0; s < store->layout.streams; s ++) {
+                if (!store->layout.stride[s]) {
+                    continue;
+                }
+
                 d->stats.kept_pages ++;
                 d->stats.kept_bytes += (int64_t)kept * store->layout.stride[s];
             }
@@ -1312,7 +1315,9 @@ static void box_draws_send_batch(
 
     for (s = 0; s < store->layout.streams; s ++) {
         uint32_t entries = (uint32_t)ecs_vec_count(&b->changed[s]);
-        if ((dynamic | b->full) & (1 << s)) {
+        if (!store->layout.stride[s]) {
+            continue;
+        } else if ((dynamic | b->full) & (1 << s)) {
             box_draws_upload_all(p, d, b, s);
         } else if (moved) {
             box_draws_send_moved(p, d, b, s, changes, copies);

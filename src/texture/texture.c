@@ -1070,7 +1070,7 @@ static void box_textures_fail_waiting(
  *
  * @param it The iterator of the system
  */
-static void BoxTextureFrame(
+static void BoxTextureUpdate(
     ecs_iter_t *it)
 {
     box_textures_t *t = box_textures_get(it->world);
@@ -1241,8 +1241,8 @@ void BoxTextureImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextureFrame" }),
+        .entity = ecs_entity(world, { .name = "TextureUpdate" }),
         .phase = EcsPreFrame,
-        .run = BoxTextureFrame
+        .run = BoxTextureUpdate
     });
 }

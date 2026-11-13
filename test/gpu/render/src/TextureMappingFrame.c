@@ -417,8 +417,9 @@ void TextureMappingFrame_cutout_shadow_follows_frame(void) {
         "  }\n"
         "}\n";
     mapping_frame_move_t moved = { .x = 0.55f, .z = -0.35f, .yaw = 0 };
-    char *frame_scene = flecs_asprintf(scene, "MappingFrame");
-    char *world_scene = flecs_asprintf(scene, "MappingWorld");
+    char frame_scene[2048], world_scene[2048];
+    snprintf(frame_scene, sizeof(frame_scene), scene, "MappingFrame");
+    snprintf(world_scene, sizeof(world_scene), scene, "MappingWorld");
     unsigned char *still = mapping_frame_render("MappingFrame", "ship.camera", frame_scene,
         NULL, "mapping_frame_cutout_still.png");
     unsigned char *moved_frame = mapping_frame_render("MappingFrame", "ship.camera",
@@ -440,6 +441,4 @@ void TextureMappingFrame_cutout_shadow_follows_frame(void) {
     stbi_image_free(still);
     stbi_image_free(moved_frame);
     stbi_image_free(moved_world);
-    ecs_os_free(frame_scene);
-    ecs_os_free(world_scene);
 }

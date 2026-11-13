@@ -7,9 +7,9 @@
  * swap-removed slot per entity and at most the chunk of its store (box_draw_store_t.chunk).
  *
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream; a change
- * uploads only its streams. Only the pages of the surface and frame stores have a surface stream,
- * plain mesh and 2D pages bind a zero record; only frame pages, those of the MappingFrame
- * materials, have a frame stream. A mesh shading is a tint, an alpha and a material slot.
+ * uploads only its streams. Only the pages of the parametric surfaces have a surface stream, the
+ * others bind a zero record; only frame pages, those of the MappingFrame materials, have a frame
+ * stream. A mesh shading is a tint, an alpha and a material slot.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -55,13 +55,17 @@
  * from BOX_RENDER_BUFFER_FIRST_SURFACE */
 #define BOX_DRAWS_STORE_SURFACE (2)
 
-/** Store of the instance pages of the mesh batches whose material uses MappingFrame, plain or
- * with a parametric surface: every stream, the frame stream included, from
+/** Store of the instance pages of the plain mesh batches whose material uses MappingFrame: the
+ * transform, the shading and the frame stream, without a surface stream (its stride 0), from
  * BOX_RENDER_BUFFER_FIRST_FRAME */
 #define BOX_DRAWS_STORE_FRAME (3)
 
+/** Store of the instance pages of the mesh batches with a parametric surface whose material uses
+ * MappingFrame: every stream, from BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE */
+#define BOX_DRAWS_STORE_FRAME_SURFACE (4)
+
 /** Stores of instance pages, one per page layout */
-#define BOX_DRAWS_STORES (4)
+#define BOX_DRAWS_STORES (5)
 
 /** Streams of an instance that a change writes, a bit per stream of the instance pages */
 typedef enum box_draw_kind_t {
@@ -77,7 +81,8 @@ typedef enum box_draw_kind_t {
 /** Layout of the instance pages of a store: one buffer per stream, each with its bytes per slot */
 typedef struct box_draw_layout_t {
     int32_t streams;                    /**< Buffers of a page, 1 to BOX_DRAWS_STREAMS */
-    uint32_t stride[BOX_DRAWS_STREAMS]; /**< Bytes of one slot in each buffer */
+    uint32_t stride[BOX_DRAWS_STREAMS]; /**< Bytes of one slot in each buffer, 0 for a stream
+                                         *   below streams that the pages do not have */
 } box_draw_layout_t;
 
 /** Free slots of an instance page below the end of its highest run */
@@ -177,8 +182,8 @@ typedef struct box_draw_key_t {
                              *   surface stream, its pages are of the surface store. The mesh
                              *   already tells surfaces apart, the bit selects the store */
     bool frame;             /**< The material of the 3D shapes uses MappingFrame: the batch has
-                             *   the surface and the frame stream, its pages are of the frame
-                             *   store. Other materials never pay for the frame */
+                             *   the frame stream, its pages are of a frame store. Other
+                             *   materials never pay for the frame */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
     bool box_shadow;        /**< The shadows of 2D shapes (BoxShadow), drawn with the
@@ -444,7 +449,7 @@ typedef struct box_draw_batch_t {
     ecs_vec_t shadings;     /**< box_render_shading_t per slot of a 2D batch */
     ecs_vec_t mesh_shadings; /**< box_render_mesh_shading_t per slot of a mesh batch */
     ecs_vec_t surfaces;     /**< box_render_surface_t per slot of a mesh batch with a parametric
-                             *   surface or of a frame batch, empty for any other batch */
+                             *   surface, empty for any other batch */
     ecs_vec_t frames;       /**< box_render_transform_t per slot of a frame batch, its transform
                              *   relative to its texture frame (box_draws_frame), empty for any
                              *   other batch */
@@ -876,9 +881,9 @@ box_draw_store_t* box_draws_batch_store(
     box_render_draws_t *d,
     const box_draw_batch_t *b);
 
-/** Get the streams the instance pages of a batch have: every stream for a frame batch, all but
- * the frame stream for a mesh batch with a parametric surface, the transform and the shading for
- * a plain mesh, 2D shape or glyph batch.
+/** Get the streams the instance pages of a batch have: the transform and the shading, the
+ * surface stream for a mesh batch with a parametric surface and the frame stream for a batch of
+ * a MappingFrame material.
  *
  * @param b The batch
  * @return box_draw_kind_t, a bit per stream of its pages
@@ -905,17 +910,6 @@ box_render_surface_t* box_draws_slot_surface(
 box_render_transform_t* box_draws_slot_frame(
     box_draw_batch_t *b,
     int32_t slot);
-
-/** Find the texture frame of an entity: the entity itself when it has TextureFrame, else the
- * nearest ChildOf ancestor with it.
- *
- * @param world The world
- * @param e The entity
- * @return The frame, 0 for none
- */
-ecs_entity_t box_draws_frame_of(
-    const ecs_world_t *world,
-    ecs_entity_t e);
 
 /** Write the transform of an instance relative to its texture frame: the inverse of the world
  * transform of the frame without its scale (the columns normalized), times the model matrix of

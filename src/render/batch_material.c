@@ -616,7 +616,7 @@ box_render_transform_t* box_draws_slot_frame(
     return b->key.frame ? ecs_vec_get_t(&b->frames, box_render_transform_t, slot) : NULL;
 }
 
-ecs_entity_t box_draws_frame_of(
+ecs_entity_t box_render_texture_frame(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
@@ -625,8 +625,12 @@ ecs_entity_t box_draws_frame_of(
         goto done;
     }
 
-    result = ecs_has_id(world, e, TextureFrame)
-        ? e : ecs_get_target_for_id(world, e, EcsChildOf, TextureFrame);
+    for (; e && !result; e = ecs_get_parent(world, e)) {
+        if (ecs_has_id(world, e, TextureFrame)) {
+            result = e;
+        }
+    }
+
 done:
     return result;
 }
@@ -682,7 +686,7 @@ void box_draws_frame_of_shape(
     box_render_transform_t *out,
     const box_render_transform_t *model)
 {
-    ecs_entity_t frame = box_draws_frame_of(world, e);
+    ecs_entity_t frame = box_render_texture_frame(world, e);
     box_draws_frame(out, model, frame ? ecs_get(world, frame, WorldTransform) : NULL);
 }
 

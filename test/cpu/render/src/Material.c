@@ -1702,7 +1702,7 @@ void Material_texture_mapping_frame_of(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_entity_t loose = ecs_new(world);
-    test_uint(box_draws_frame_of(world, loose), 0);
+    test_uint(box_render_texture_frame(world, loose), 0);
 
     ecs_entity_t outer = ecs_new(world);
     ecs_add(world, outer, TextureFrame);
@@ -1712,15 +1712,15 @@ void Material_texture_mapping_frame_of(void) {
     ecs_entity_t leaf = ecs_new_w_pair(world, EcsChildOf, inner);
     ecs_entity_t side = ecs_new_w_pair(world, EcsChildOf, middle);
 
-    test_uint(box_draws_frame_of(world, outer), outer);
-    test_uint(box_draws_frame_of(world, inner), inner);
-    test_uint(box_draws_frame_of(world, middle), outer);
-    test_uint(box_draws_frame_of(world, side), outer);
-    test_uint(box_draws_frame_of(world, leaf), inner);
-    test_uint(box_draws_frame_of(world, loose), 0);
+    test_uint(box_render_texture_frame(world, outer), outer);
+    test_uint(box_render_texture_frame(world, inner), inner);
+    test_uint(box_render_texture_frame(world, middle), outer);
+    test_uint(box_render_texture_frame(world, side), outer);
+    test_uint(box_render_texture_frame(world, leaf), inner);
+    test_uint(box_render_texture_frame(world, loose), 0);
 
     ecs_remove(world, inner, TextureFrame);
-    test_uint(box_draws_frame_of(world, leaf), outer);
+    test_uint(box_render_texture_frame(world, leaf), outer);
 
     ecs_fini(world);
 }
@@ -1912,10 +1912,28 @@ void Material_texture_mapping_frame_no_stream(void) {
     box_draw_batch_t *batch = frame_batch_of(world, c, &slot);
     test_assert(batch->key.frame);
     test_assert(box_draws_batch_store(d, batch) == &d->stores[BOX_DRAWS_STORE_FRAME]);
-    test_uint(box_draws_batch_kinds(batch), BOX_DRAW_ALL);
+    test_uint(box_draws_batch_kinds(batch), BOX_DRAW_BOTH | BOX_DRAW_FRAME);
     test_assert(box_draws_slot_frame(batch, slot) != NULL);
+    test_assert(box_draws_slot_surface(batch, slot) == NULL);
     box_render_draws_stats(world, &stats);
     test_assert(stats.page_frame_bytes > 0);
+    test_int(stats.page_surface_bytes, 0);
+
+    /* A parametric surface under the frame takes the store with both streams */
+    ecs_entity_t torus = ecs_new(world);
+    ecs_add_pair(world, torus, EcsChildOf, parent);
+    ecs_set(world, torus, Position, {3, 0, 0});
+    ecs_set(world, torus, TorusShell, {
+        .radius = 1, .tube = 0.25f,
+        .ring_start = 0, .ring_end = 2 * (float)GLM_PI,
+        .tube_start = 0, .tube_end = 2 * (float)GLM_PI });
+    ecs_set_ptr(world, torus, TextureMapping, &frame_mapping);
+    mapping_frame(world);
+    batch = frame_batch_of(world, torus, &slot);
+    test_assert(batch->key.frame && batch->key.surface);
+    test_assert(box_draws_batch_store(d, batch) == &d->stores[BOX_DRAWS_STORE_FRAME_SURFACE]);
+    test_uint(box_draws_batch_kinds(batch), BOX_DRAW_ALL);
+    test_assert(box_draws_slot_surface(batch, slot) != NULL);
 
     ecs_fini(world);
     box_render_null_free(null);

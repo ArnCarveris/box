@@ -1044,7 +1044,8 @@ static void test_store_of(
     test_bool(b->key.surface, surface);
     test_assert(box_draws_batch_store(d, b) ==
         &d->stores[surface ? BOX_DRAWS_STORE_SURFACE : BOX_DRAWS_STORE_MESH]);
-    test_uint(box_draws_batch_kinds(b), surface ? BOX_DRAW_ALL : BOX_DRAW_BOTH);
+    test_uint(box_draws_batch_kinds(b),
+        surface ? (BOX_DRAW_BOTH | BOX_DRAW_SURFACE) : BOX_DRAW_BOTH);
     test_int(ecs_vec_count(&b->surfaces), surface ? ecs_vec_count(&b->entities) : 0);
     if (surface) {
         test_assert(box_draws_slot_surface(b, slot)->p[0][0] != 0.0f);

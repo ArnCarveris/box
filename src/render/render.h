@@ -154,6 +154,17 @@ bool box_render_clip_hides(
     const ecs_world_t *world,
     ecs_entity_t e);
 
+/** Find the texture frame of an entity, whose space MappingFrame projects in: the entity itself
+ * when it has TextureFrame, else the nearest ancestor with it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The frame, 0 for none
+ */
+ecs_entity_t box_render_texture_frame(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Set the instances one batch holds before its shapes continue in another, for tests.
  *
  * A batch is one run of slots of an instance page, so the default of each store is its chunk,

@@ -444,11 +444,18 @@ WGPUBindGroup box_gpu_instance_group(
 {
     WGPUBindGroup result = NULL;
     box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
-    bool surface = page >= BOX_RENDER_BUFFER_FIRST_SURFACE && page < BOX_RENDER_BUFFER_FIRST_FRAME;
+    bool surface = (page >= BOX_RENDER_BUFFER_FIRST_SURFACE &&
+        page < BOX_RENDER_BUFFER_FIRST_FRAME) ||
+        (page >= BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE && page < BOX_RENDER_BUFFER_FIRST_2D);
     bool frame = page >= BOX_RENDER_BUFFER_FIRST_FRAME && page < BOX_RENDER_BUFFER_FIRST_2D;
-    int32_t i, count = frame ? BOX_RENDER_INSTANCE_STREAMS
-        : surface ? BOX_RENDER_INSTANCE_STREAMS_SURFACE : BOX_RENDER_INSTANCE_STREAMS_PLAIN;
-    for (i = 0; i < count; i ++) {
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_INSTANCE_STREAMS; i ++) {
+        if ((i == BOX_RENDER_STREAM_SURFACE && !surface) ||
+            (i == BOX_RENDER_STREAM_FRAME && !frame))
+        {
+            continue;
+        }
+
         streams[i] = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, page + (uint32_t)i);
         if (!streams[i] || !(streams[i]->usage & BOX_RENDER_BUFFER_STORAGE)) {
             goto done;

@@ -1045,28 +1045,6 @@ static float box_pick_wrap(
     return result;
 }
 
-/** Find the texture frame of an entity, as the renderer does (box_draws_frame_of): the entity
- * itself when it has TextureFrame, else the nearest ChildOf ancestor with it.
- *
- * @param world The world
- * @param e The entity
- * @return The frame, 0 for none
- */
-static ecs_entity_t box_pick_frame_of(
-    const ecs_world_t *world,
-    ecs_entity_t e)
-{
-    ecs_entity_t result = 0;
-    if (!ecs_id_in_use(world, TextureFrame)) {
-        goto done;
-    }
-
-    result = ecs_has_id(world, e, TextureFrame)
-        ? e : ecs_get_target_for_id(world, e, EcsChildOf, TextureFrame);
-done:
-    return result;
-}
-
 /** Texture coordinates of a hit on a plain mesh with a MappingObject, MappingWorld or
  * MappingFrame TextureMapping, before the TextureTransform, as mapping_uv of material.wgsl
  * projects them.
@@ -1284,7 +1262,8 @@ static bool box_pick_texture(
             mapping->mode == MappingWorld || mapping->mode == MappingFrame))
         {
             mat4 m, fm;
-            ecs_entity_t frame = mapping->mode == MappingFrame ? box_pick_frame_of(world, e) : 0;
+            ecs_entity_t frame = mapping->mode == MappingFrame
+                ? box_render_texture_frame(world, e) : 0;
             box_pick_transform(world, e, m);
             if (frame) {
                 box_pick_transform(world, frame, fm);
