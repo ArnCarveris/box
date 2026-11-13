@@ -1358,8 +1358,8 @@ void BevelShapes_lod_keys(void) {
     test_uint(lod_mesh(world, extrusion, 3), lod_mesh(world, extrusion, 2));
     lod_test_fewer_indices(world, extrusion, 1);
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
-    const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, extrusion, 0));
     const box_mesh_t *variant = box_mesh_cache_get(cache, lod_mesh(world, extrusion, 1));
+    const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, extrusion, 0));
     test_assert(variant->surface_assets == NULL || variant->surface_assets != base->surface_assets);
 
     /* A plain ProfileExtrusion has no segments and no levels */

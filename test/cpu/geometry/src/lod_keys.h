@@ -61,8 +61,9 @@ static void lod_test_fewer_indices(
     int32_t level)
 {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
-    const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
+    /* Get the variant first, generating it can move the cache entries */
     const box_mesh_t *variant = box_mesh_cache_get(cache, lod_mesh(world, e, level));
+    const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
     test_assert(base != NULL);
     test_assert(variant != NULL);
     test_assert(variant->index_count > 0);

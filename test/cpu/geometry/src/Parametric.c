@@ -612,10 +612,11 @@ void Parametric_lod_surface_assets(void) {
     for (int32_t i = 0; i < 3; i ++) {
         ecs_entity_t e = ecs_lookup(world, names[i]);
         const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
-        const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
-        test_assert(base->surface_assets != NULL);
         for (int32_t level = 1; level < BOX_LOD_LEVELS_MAX; level ++) {
+            /* Get the base after the variant, generating a variant can move the cache entries */
             const box_mesh_t *variant = box_mesh_cache_get(cache, lod_mesh(world, e, level));
+            const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
+            test_assert(base->surface_assets != NULL);
             test_assert(variant != base);
             test_assert(variant->surface_assets != NULL);
             test_assert(variant->surface_assets != base->surface_assets);
@@ -630,6 +631,7 @@ void Parametric_lod_surface_assets(void) {
 
         /* The shape keeps the level 0 mesh and its surface */
         test_uint(ecs_get(world, e, ShapeMesh)->mesh, lod_mesh(world, e, 0));
+        const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
         test_assert(shape->surface.assets == base->surface_assets);
     }
 
