@@ -113,7 +113,7 @@ ship {
     if pf[C_SHIELDS] > 0 && ship_z1 > ship_z0 {
       shield_bubble {
         Position: {0, AXIS_Y, (ship_z0 + ship_z1) / 2}
-        Scale: {RING_R + 6, RING_R + 6, (ship_z1 - ship_z0) / 2 + 9}
+        Scale: {RING_R + 3.5, RING_R + 3.5, (ship_z1 - ship_z0) / 2 + 8}
         Sphere: {radius: 1, segments: 48, smooth: true}
         Rgb: {110, 170, 255}
         Emissive: {strength: 0.05 * pf[C_SHIELDS], color: {110, 170, 255}}
