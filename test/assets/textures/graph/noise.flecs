@@ -1,0 +1,14 @@
+// Noise nodes of a texture graph: a vector of warp offsets and billow noise at warped
+// coordinates, built from a script.
+
+using box.texture
+
+clouds {
+  uv     { TexCoords: {} }
+  warp   { TexNoise: {frequency: 3, channels: 4, seed: 7} }
+  moved  { TexMath: {op: MathMix, a: uv, b: warp, c_value: {0.1, 0.1, 0.1, 0}} }
+  noise  {
+    TexNoise: {coords: moved, frequency: 6, octaves: 5, lacunarity: 2.5, gain: 0.45, fractal: NoiseBillow, seed: 3}
+  }
+  TextureGraph: {output: noise, width: 256, format: GraphSingle}
+}

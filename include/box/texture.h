@@ -323,6 +323,49 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** Fractal sum of the octaves of a TexNoise node */
+ECS_ENUM(TextureNoiseFractal, {
+    NoiseFbm = 0,    /**< Fractal brownian motion: the octaves added, the default */
+    NoiseRidged = 1, /**< Ridged multifractal: each octave (offset - |noise|)^2, weighted by the
+                      *   octave before it, so the detail gathers on sharp ridges */
+    NoiseBillow = 2  /**< Billow: the octaves of |noise| added, round lumps with creases */
+});
+
+/** Node of a TextureGraph with gradient noise, 0..1 around 0.5 like GenNoise.
+ *
+ * The noise is three dimensional at coords. On DomainPlane its lattice repeats with a whole
+ * number of cells across the image in each octave, frequency and the frequency of each octave
+ * rounded as GenNoise does them, so the image tiles; on DomainSphere it is seamless without a
+ * period. An evolve node moves the noise through a fourth dimension, so it animates in place
+ * without sliding; without one the node evaluates three dimensional noise only.
+ *
+ * With channels 1 the node outputs a Scalar, with 3 or 4 a Vector of independent noise per
+ * channel (w 1 with 3), for instance the offsets of a warp.
+ *
+ * @code
+ * clouds {
+ *   noise { TexNoise: {frequency: 4, octaves: 6, fractal: NoiseBillow, seed: 3} }
+ *   TextureGraph: {output: noise, width: 1024, format: GraphSingle}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexNoise, {
+    ecs_entity_t coords;        /**< Vector node of the point, 0 for the coordinates of the
+                                 *   texel in the domain of the graph */
+    ecs_entity_t evolve;        /**< Scalar node of the fourth coordinate, such as a time, in
+                                 *   lattice cells of the first octave, 0 for none */
+    float frequency;            /**< Lattice cells per unit of coords in the first octave,
+                                 *   default 4; on the plane rounded to whole cells across */
+    int32_t octaves;            /**< Octaves of the fractal, default 1, at most 16 */
+    float lacunarity;           /**< Frequency factor from one octave to the next, default 2 */
+    float gain;                 /**< Amplitude factor from one octave to the next, default 0.5 */
+    int32_t seed;               /**< Seed of the lattice */
+    TextureNoiseFractal fractal; /**< Sum of the octaves, default NoiseFbm */
+    float offset;               /**< NoiseRidged: value the ridge reaches, 0 for 1; a lower
+                                 *   offset makes the ridges sharper and the valleys wider */
+    int32_t channels;           /**< 1 for a Scalar, the default, 3 or 4 for a Vector */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
@@ -380,7 +423,9 @@ typedef struct box_texture_node_input_t {
     ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
     TextureValueType type;      /**< Type the input node must output */
     const char *value;          /**< Name of the constant member used without a node, a float
-                                 *   for TexScalar or a vec4 for TexVector, NULL for none */
+                                 *   for TexScalar or a vec4 for TexVector, NULL for none: a
+                                 *   TexVector input then reads the coordinates of the texel,
+                                 *   a TexScalar input 0 */
     ecs_size_t value_offset;    /**< Offset of that member */
 } box_texture_node_input_t;
 
@@ -408,6 +453,9 @@ typedef struct box_texture_node_desc_t {
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    TextureValueType (*output_of)(const void *node); /**< Type of the value of a node from its
+                                 *   component, for a kind whose type depends on its members;
+                                 *   NULL for output */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

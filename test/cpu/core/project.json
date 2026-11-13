@@ -399,7 +399,11 @@
                     "null_backend_remove",
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
-                    "custom_kind_sent"
+                    "custom_kind_sent",
+                    "noise_kind",
+                    "noise_channels_type",
+                    "noise_params_keep_structure",
+                    "noise_script"
                 ]
             },
             {

@@ -16,6 +16,9 @@
 /** A graph whose output node gets its node component after the graph */
 #define GRAPH_DECLARED_AFTER "test/assets/textures/graph/declared_after.flecs"
 
+/** Billow noise at coordinates warped by a vector of noise */
+#define GRAPH_NOISE "test/assets/textures/graph/noise.flecs"
+
 /** Node of a scalar kind registered by the tests, as an application registers its own */
 typedef struct TestScalar {
     float value;        /**< Parameter */
@@ -1032,7 +1035,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 4);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1069,7 +1072,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 3);
+    test_int(null->texture_node_kinds, 4);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1161,7 +1164,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 3);
+    test_int(second->texture_node_kinds, 4);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1188,7 +1191,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 4);
+    test_int(null->texture_node_kinds, 5);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -1200,4 +1203,148 @@ void TextureGraph_custom_kind_sent(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+void TextureGraph_noise_kind(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexNoise), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 2);
+    test_str(kind->inputs[0].name, "coords");
+    test_int(kind->inputs[0].type, TexVector);
+    test_bool(kind->inputs[0].fallback, false);
+    test_str(kind->inputs[1].name, "evolve");
+    test_int(kind->inputs[1].type, TexScalar);
+    test_bool(kind->inputs[1].fallback, false);
+    test_int(kind->param_count, 8);
+    test_str(kind->params[1].name, "octaves");
+    test_int(kind->param_size, 32);
+    test_str(kind->function, "box_tex_noise");
+    test_bool(kind->neighbourhood, false);
+    test_bool(kind->animated, false);
+
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t noise = ecs_entity(world, { .name = "noise" });
+    ecs_set(world, noise, TexNoise, { .frequency = 4, .octaves = 3 });
+    ecs_set(world, tex, TextureGraph, { .output = noise, .width = 8 });
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
+        (uint32_t)kind->id);
+    test_assert(k != NULL);
+    test_int(k->input_coords, 1);
+    test_assert(strstr(box_render_texture_node_kind_source(k), "fn box_tex_noise(") != NULL);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void TextureGraph_noise_channels_type(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t noise = ecs_entity(world, { .name = "noise" });
+    ecs_entity_t math = ecs_entity(world, { .name = "math" });
+    ecs_set(world, noise, TexNoise, { .channels = 1 });
+    ecs_set(world, math, TexMath, { .op = MathAdd, .a = noise });
+    ecs_set(world, tex, TextureGraph, { .output = noise, .width = 8 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    test_int(graph_of(world, tex)->nodes[0].output, TexScalar);
+    uint64_t structure = graph_of(world, tex)->structure_hash;
+
+    ecs_set(world, tex, TextureGraph, { .output = math, .width = 8 });
+    ecs_log_set_level(-4);
+    frame_status(world, tex);
+    test_failed(world, tex, "node 'noise' outputs Scalar", "input 'a' of node 'math'");
+
+    ecs_set(world, noise, TexNoise, { .channels = 3 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    test_int(graph_of(world, tex)->nodes[0].output, TexVector);
+
+    ecs_set(world, noise, TexNoise, { .channels = 4 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    test_int(graph_of(world, tex)->nodes[0].output, TexVector);
+
+    ecs_set(world, tex, TextureGraph, { .output = noise, .width = 8 });
+    test_int(frame_status(world, tex)->state, TextureReady);
+    test_assert(graph_of(world, tex)->structure_hash != structure);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_noise_params_keep_structure(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_entity(world, { .name = "graph" });
+    ecs_entity_t noise = ecs_entity(world, { .name = "noise" });
+    ecs_set(world, noise, TexNoise, { .frequency = 4, .octaves = 1 });
+    ecs_set(world, tex, TextureGraph, { .output = noise, .width = 8 });
+    test_int(frame_status(world, tex)->revision, 1);
+    uint64_t structure = graph_of(world, tex)->structure_hash;
+    uint64_t params = graph_of(world, tex)->param_hash;
+
+    ecs_set(world, noise, TexNoise, { .frequency = 4, .octaves = 7 });
+    test_int(frame_status(world, tex)->revision, 2);
+    test_assert(graph_of(world, tex)->structure_hash == structure);
+    test_assert(graph_of(world, tex)->param_hash != params);
+    params = graph_of(world, tex)->param_hash;
+
+    ecs_set(world, noise, TexNoise, { .frequency = 9, .octaves = 7, .seed = 3,
+        .fractal = NoiseRidged, .offset = 0.8f, .lacunarity = 2.5f, .gain = 0.4f });
+    test_int(frame_status(world, tex)->revision, 3);
+    test_assert(graph_of(world, tex)->structure_hash == structure);
+    test_assert(graph_of(world, tex)->param_hash != params);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_noise_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    run_file(world, GRAPH_NOISE);
+    ecs_entity_t tex = ecs_lookup(world, "clouds");
+    ecs_entity_t warp = ecs_lookup(world, "clouds.warp");
+    ecs_entity_t moved = ecs_lookup(world, "clouds.moved");
+    ecs_entity_t noise = ecs_lookup(world, "clouds.noise");
+    test_assert(tex && warp && moved && noise);
+    const TexNoise *n = ecs_get(world, noise, TexNoise);
+    test_assert(n != NULL);
+    test_assert(n->coords == moved);
+    test_assert(n->evolve == 0);
+    test_int(n->octaves, 5);
+    test_int(n->seed, 3);
+    test_int(n->fractal, NoiseBillow);
+    test_flt(n->lacunarity, 2.5f);
+
+    test_int(frame_status(world, tex)->state, TextureReady);
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_int(graph->node_count, 4);
+    test_assert(graph->nodes[3].entity == noise);
+    test_int(graph->nodes[3].output, TexScalar);
+    test_int(graph->nodes[3].inputs[1], -1);
+    int32_t i, warp_index = -1;
+    for (i = 0; i < 3; i ++) {
+        if (graph->nodes[i].entity == warp) {
+            warp_index = i;
+        }
+    }
+
+    test_assert(warp_index >= 0);
+    test_int(graph->nodes[warp_index].output, TexVector);
+
+    int32_t octaves, fractal;
+    float frequency;
+    const uint8_t *params = graph->params + graph->nodes[3].params;
+    ecs_os_memcpy(&frequency, params, 4);
+    ecs_os_memcpy(&octaves, params + 4, 4);
+    ecs_os_memcpy(&fractal, params + 20, 4);
+    test_flt(frequency, 6.0f);
+    test_int(octaves, 5);
+    test_int(fractal, NoiseBillow);
+    test_int(graph->nodes[3].param_size, 32 + 2 * 16);
+
+    ecs_fini(world);
 }
