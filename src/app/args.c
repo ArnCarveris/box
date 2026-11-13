@@ -6,6 +6,7 @@
 #include "app.h"
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -204,6 +205,46 @@ static bool box_app_has_value(
         !strcmp(flag, "out") || !strcmp(flag, "gpu");
 }
 
+/** Usage of the command line, one line per option the parser accepts. Add a line here with
+ * every option added to box_app_parse or box_app_has_value.
+ */
+static const char *box_app_usage_options =
+    "options:\n"
+    "  -h, --help             print this usage and exit\n"
+    "  --headless             run without a window, needs --frames or --timeout\n"
+    "  --design               render the gallery of design cameras, not with --camera\n"
+    "  --no-audio             open no audio output\n"
+    "  --unguarded            start a headless run even when the machine is oversubscribed\n"
+    "  --async-loads          headless frames don't wait for texture, text and other loads\n"
+    "  --fail-on-error        exit with 1 when an error was logged during the run\n"
+    "  --frames <n>           stop after n frames, n >= 1\n"
+    "  --timeout <s|infinite> stop after s seconds (s > 0), or never with infinite\n"
+    "  --cpu-budget <pct>     percent of one core a headless run may use, such as 50 or 50%,\n"
+    "                         default 100\n"
+    "  --fps <n>              target frames per second, 0 for no cap (default: the scene's)\n"
+    "  --delta-time <s>       seconds every frame advances, such as 0.016 or 1/60,\n"
+    "                         0 to measure the delta\n"
+    "  --port <n>             port of the REST command endpoints, 0 disables them,\n"
+    "                         default 27750\n"
+    "  --surface <w>x<h>      size of the window surface, 1 to 8192 each, such as 1280x720\n"
+    "  --camera <name>        camera the surface shows\n"
+    "  --out <file>           image file the surface is written to, such as /tmp/frame.png\n"
+    "  --gpu <value>          accepted and ignored by the app\n";
+
+/** Print the usage of the command line to stdout.
+ *
+ * @param program The executable, argv[0], NULL for boxrun
+ */
+static void box_app_usage(
+    const char *program)
+{
+    const char *name = program && program[0] ? program : "boxrun";
+    const char *slash = strrchr(name, '/');
+    name = slash && slash[1] ? slash + 1 : name;
+    printf("usage: %s [options] [scene.flecs]\n\n%s", name, box_app_usage_options);
+    fflush(stdout);
+}
+
 int box_app_parse(
     ecs_world_t *world,
     int argc,
@@ -229,6 +270,10 @@ int box_app_parse(
                 app->scene = ecs_os_strdup(arg);
                 scene = true;
             }
+        } else if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+            app->help = true;
+            box_app_usage(argv[0]);
+            break;
         } else if (!strcmp(arg, "--headless")) {
             app->headless = true;
         } else if (!strcmp(arg, "--design")) {
@@ -245,12 +290,12 @@ int box_app_parse(
             result = box_app_option(app, &arg[2], i + 1 < argc ? argv[i + 1] : NULL);
             i ++;
         } else {
-            ecs_err("unknown option '%s'", arg);
+            ecs_err("unknown option '%s', see --help", arg);
             result = -1;
         }
     }
 
-    if (!result && app->design && app->camera) {
+    if (!result && !app->help && app->design && app->camera) {
         ecs_err("--design and --camera cannot be combined");
         result = -1;
     }

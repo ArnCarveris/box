@@ -296,6 +296,69 @@ void Args_unknown_option(void) {
     ecs_fini(world);
 }
 
+void Args_help(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "--help"};
+    test_int(box_app_parse(world, 2, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->help, true);
+    test_assert(app->scene == NULL);
+
+    ecs_fini(world);
+}
+
+void Args_help_short(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "-h"};
+    test_int(box_app_parse(world, 2, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->help, true);
+
+    ecs_fini(world);
+}
+
+void Args_help_with_options(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "5", "--design", "--camera", "main",
+        "scene.flecs", "--help", "--fast", "--frames", "abc"};
+    test_int(box_app_parse(world, 12, argv), 0);
+
+    const App *app = ecs_singleton_get(world, App);
+    test_bool(app->help, true);
+    test_bool(app->headless, true);
+    test_int(app->frames, 5);
+
+    ecs_fini(world);
+}
+
+void Args_no_help(void) {
+    // engine_core/app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *argv[] = {"boxrun", "--headless", "--frames", "5"};
+    test_int(box_app_parse(world, 4, argv), 0);
+    test_bool(ecs_singleton_get(world, App)->help, false);
+
+    char *unknown[] = {"boxrun", "--hel"};
+    ecs_log_set_level(-4);
+    test_assert(box_app_parse(world, 2, unknown) != 0);
+    test_bool(ecs_singleton_get(world, App)->help, false);
+
+    ecs_fini(world);
+}
+
 void Args_missing_value(void) {
     // engine_core/app
     ecs_world_t *world = ecs_init();

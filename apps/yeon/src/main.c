@@ -21,7 +21,7 @@ int main(
     ecs_singleton_modified(world, App);
 
     result = box_app_parse(world, argc, argv);
-    if (!result) {
+    if (!result && !ecs_singleton_get(world, App)->help) {
         result = box_app_run(world);
     }
 

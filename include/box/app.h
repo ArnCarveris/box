@@ -69,6 +69,7 @@ ECS_STRUCT(App, {
     char *out;          /**< Image file the surface is written to, set by --out, NULL for none */
     bool no_audio;      /**< Open no audio output, set by --no-audio */
     bool fail_on_error; /**< A run during which an error was logged fails, by --fail-on-error */
+    bool help;          /**< The usage was printed by --help or -h, the app exits with 0 */
 });
 
 /** Frame rate cap of a scene, a singleton a scene script sets, such as
@@ -85,7 +86,7 @@ ECS_STRUCT(FpsTarget, {
 ECS_STRUCT(AppStatus, {
     int32_t frame;      /**< Frames completed since the world was created */
     double elapsed;     /**< Wall seconds since the world was created */
-    double delta_time;  /**< Seconds the last frame advanced the world, the fixed App.delta_time when set */
+    double delta_time;  /**< Seconds the last frame advanced the world, App.delta_time when set */
     double slept;       /**< Wall seconds the CPU budget has slept in total */
     char *tmp_dir;      /**< Folder for temporary files of a headless process, else NULL */
     bool running;       /**< box_app_run is stepping the world */
@@ -189,16 +190,15 @@ void BoxAppImport(
 
 /** Write command line arguments into the App singleton: --headless, --unguarded, --frames <n>,
  * --timeout <s|infinite>, --cpu-budget <pct>, --fps <n>, --delta-time <s>, --port <n>,
- * --surface <w>x<h>, --fail-on-error, --async-loads, a scene.
+ * --surface <w>x<h>, --fail-on-error, --async-loads, --help, a scene.
  *
  * --async-loads lets headless frames run on while texture, TextureGen, glyph and other jobs are
  * in flight, so their results appear in a later frame as in a windowed run. Without it a
  * headless frame waits for them, so captures are deterministic.
  *
- * --fail-on-error makes box_app_run fail when an error was logged during the run.
- *
- * --fps <n> sets the target fps of flecs in every mode, 0 or none for no cap. --delta-time <s>
- * makes every frame advance s seconds, 0 or none to measure the delta, headless too.
+ * --fail-on-error makes box_app_run fail when an error was logged during the run. --help and -h
+ * print the usage of every option to stdout, stop parsing and set App.help: the app exits with
+ * 0 without running the world. --fps 0 means no cap, --delta-time 0 measures the delta.
  *
  * @param world The world
  * @param argc Argument count, including the executable
