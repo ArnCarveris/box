@@ -376,6 +376,30 @@ void box_gpu_texture_output_written(
     box_gpu_t *gpu,
     uint32_t handle);
 
+/** Get the serial of the image of a texture handle, which changes with every image written to
+ * it and is unique across textures.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the texture, without BOX_RENDER_TEXTURE_TARGET
+ * @return The serial, 0 when the handle has no texture
+ */
+uint32_t box_gpu_texture_serial(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
+/** Get the view a texture graph samples the image of a handle with: the output of a target,
+ * or the texture of the handle decoded from display encoding or as stored.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the texture, with BOX_RENDER_TEXTURE_TARGET for a target
+ * @param linear Read the color channels as stored
+ * @return The view of every level, NULL when the handle has no image
+ */
+WGPUTextureView box_gpu_texture_sampled_view(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    bool linear);
+
 /** Create, replace or release a node kind of the texture graphs from a
  * BOX_RENDER_TEXTURE_NODE_KIND resource.
  *

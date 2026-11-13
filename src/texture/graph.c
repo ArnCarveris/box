@@ -65,6 +65,28 @@ static const char *box_texture_splat_wgsl =
     "    return vec4f(i[0].x);\n"
     "}\n";
 
+/** WGSL of the TexImage node: its texture at the uv of coords on the plane, at the
+ * equirectangular uv of the direction of coords on the sphere, wrapped or clamped */
+static const char *box_texture_image_wgsl =
+    "fn box_tex_image(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f,\n"
+    "    t: texture_2d<f32>) -> vec4f {\n"
+    "    var uv = i[0].xy;\n"
+    "    if (box_texgraph_stage.domain == 1u) {\n"
+    "        uv = box_texgraph_equirect(i[0].xyz);\n"
+    "    }\n"
+    "    return box_texgraph_sample(t, uv, bitcast<i32>(p[0].x) == 0);\n"
+    "}\n";
+
+/** WGSL of the TexLut node: its texture at column u and row v, from the center of the first
+ * texel to the center of the last one, clamped */
+static const char *box_texture_lut_wgsl =
+    "fn box_tex_lut(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f,\n"
+    "    t: texture_2d<f32>) -> vec4f {\n"
+    "    let size = vec2f(textureDimensions(t, 0));\n"
+    "    let uv = clamp(vec2f(i[0].x, i[1].x), vec2f(0.0), vec2f(1.0));\n"
+    "    return box_texgraph_sample(t, (uv * (size - 1.0) + 0.5) / size, false);\n"
+    "}\n";
+
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -75,9 +97,13 @@ typedef struct box_texture_graph_build_t {
     ecs_vec_t nodes;            /**< box_texture_graph_node_t in topological order */
     ecs_vec_t params;           /**< uint8_t, parameter bytes of the nodes */
     ecs_vec_t *reached;         /**< ecs_entity_t, the entities the walk reached */
+    ecs_vec_t textures;         /**< box_texture_graph_texture_t, the textures the nodes sample
+                                 *   in node order */
     char *error;                /**< Why the build failed, NULL while it did not */
     bool wait;                  /**< Wait for a node without a node component */
-    bool waiting;               /**< The walk found a node without a node component */
+    bool waiting;               /**< The walk found a node without a node component, or a
+                                 *   sampled entity without a texture component */
+    bool held;                  /**< A sampled texture has no image yet */
 } box_texture_graph_build_t;
 
 /** Add bytes to a 64 bit FNV-1a hash.
@@ -133,21 +159,34 @@ static void box_texture_node_kind_strings_free(
 
     ecs_os_free(kind->function);
     ecs_os_free(kind->source);
+    ecs_os_free(kind->texture);
+    ecs_os_free(kind->linear);
+}
+
+/** Free a compiled graph.
+ *
+ * @param graph The graph, may be NULL
+ */
+static void box_texture_graph_free(
+    box_texture_graph_t *graph)
+{
+    if (graph) {
+        ecs_os_free(graph->nodes);
+        ecs_os_free(graph->params);
+        ecs_os_free(graph->textures);
+        ecs_os_free(graph);
+    }
 }
 
 void box_texture_graph_clear(
     box_texture_t *tex)
 {
-    if (tex->graph) {
-        ecs_os_free(tex->graph->nodes);
-        ecs_os_free(tex->graph->params);
-        ecs_os_free(tex->graph);
-        tex->graph = NULL;
-    }
-
+    box_texture_graph_free(tex->graph);
+    tex->graph = NULL;
     ecs_vec_fini_t(NULL, &tex->reached, ecs_entity_t);
     tex->graph_dirty = false;
     tex->graph_waiting = false;
+    tex->graph_held = false;
     tex->graph_sent = false;
     tex->graph_pending = false;
 }
@@ -180,12 +219,7 @@ void box_texture_graph_request(
     box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
 }
 
-/** Mark every graph dirty that reached an entity in its last build, or every graph.
- *
- * @param t The registry
- * @param e The entity, 0 for every graph
- */
-static void box_texture_graphs_touch(
+void box_texture_graphs_touch(
     box_textures_t *t,
     ecs_entity_t e)
 {
@@ -247,6 +281,15 @@ static int box_texture_node_kind_fill(
     kind->flags = desc->flags;
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
+    kind->flags &= ~BOX_TEXTURE_NODE_SAMPLES;
+    if (desc->texture) {
+        kind->flags |= BOX_TEXTURE_NODE_SAMPLES;
+        kind->texture = ecs_os_strdup(desc->texture);
+        kind->texture_offset = desc->texture_offset;
+        kind->linear = desc->linear ? ecs_os_strdup(desc->linear) : NULL;
+        kind->linear_offset = desc->linear_offset;
+    }
+
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS && desc->inputs[i].name; i ++) {
         kind->inputs[i] = desc->inputs[i];
         kind->inputs[i].name = ecs_os_strdup(desc->inputs[i].name);
@@ -297,7 +340,8 @@ static void box_texture_node_kind_reflect(
         .param_size = kind->param_size,
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
-        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
+        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0,
+        .texture = kind->texture
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -467,13 +511,15 @@ static void box_texture_graph_reach(
  * @param e The node entity
  * @param kind Its kind
  * @param inputs Index of the node of each input, -1 for none
+ * @param texture Index of the texture it samples, -1 for none
  * @return Index of the node
  */
 static int32_t box_texture_graph_append(
     box_texture_graph_build_t *b,
     ecs_entity_t e,
     const box_texture_node_kind_t *kind,
-    const int32_t *inputs)
+    const int32_t *inputs,
+    int32_t texture)
 {
     const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
     int32_t i, offset = ecs_vec_count(&b->params);
@@ -501,6 +547,7 @@ static int32_t box_texture_graph_append(
     node->output = kind->output;
     node->params = offset;
     node->param_size = kind->node_size;
+    node->texture = texture;
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
         node->inputs[i] = i < kind->input_count ? inputs[i] : -1;
     }
@@ -538,6 +585,201 @@ static void box_texture_graph_check_type(
     }
 }
 
+static bool box_texture_graph_node_samples_back(
+    box_texture_graph_build_t *b,
+    ecs_entity_t node,
+    ecs_map_t *textures,
+    ecs_map_t *nodes);
+
+/** Check whether the TextureGraph of a texture samples the graph of a build, through the
+ * textures its nodes sample and their graphs in turn.
+ *
+ * @param b The build
+ * @param texture The texture entity
+ * @param textures Texture entities visited
+ * @param nodes Node entities visited
+ * @return Whether it samples the graph
+ */
+static bool box_texture_graph_samples_back(
+    box_texture_graph_build_t *b,
+    ecs_entity_t texture,
+    ecs_map_t *textures,
+    ecs_map_t *nodes)
+{
+    const TextureGraph *graph = NULL;
+    bool result = false;
+    if (!ecs_is_alive(b->world, texture) || ecs_map_get(textures, texture)) {
+        goto done;
+    }
+
+    ecs_map_insert(textures, texture, 1);
+    graph = ecs_get(b->world, texture, TextureGraph);
+    if (graph && graph->output) {
+        result = box_texture_graph_node_samples_back(b, graph->output, textures, nodes);
+    }
+
+done:
+    return result;
+}
+
+/** Check whether a node or a node before it samples the graph of a build, directly or
+ * through the graph of a texture it samples.
+ *
+ * @param b The build
+ * @param node The node entity
+ * @param textures Texture entities visited
+ * @param nodes Node entities visited
+ * @return Whether it samples the graph
+ */
+static bool box_texture_graph_node_samples_back(
+    box_texture_graph_build_t *b,
+    ecs_entity_t node,
+    ecs_map_t *textures,
+    ecs_map_t *nodes)
+{
+    const box_texture_node_kind_t *kind;
+    const uint8_t *ptr;
+    bool result = false;
+    int32_t i, kinds;
+    if (!ecs_is_alive(b->world, node) || ecs_map_get(nodes, node)) {
+        goto done;
+    }
+
+    ecs_map_insert(nodes, node, 1);
+    kind = box_texture_graph_kind_of(b, node, &kinds);
+    if (!kind) {
+        goto done;
+    }
+
+    ptr = ecs_get_id(b->world, node, kind->component);
+    if (kind->texture) {
+        ecs_entity_t texture = *(const ecs_entity_t*)(ptr + kind->texture_offset);
+        result = texture == b->graph ||
+            (texture && box_texture_graph_samples_back(b, texture, textures, nodes));
+    }
+
+    for (i = 0; !result && i < kind->input_count; i ++) {
+        ecs_entity_t in = *(const ecs_entity_t*)(ptr + kind->inputs[i].offset);
+        result = in && box_texture_graph_node_samples_back(b, in, textures, nodes);
+    }
+
+done:
+    return result;
+}
+
+/** Check whether an entity has an image to sample: a TexturePath, a TextureGen, a TextureGraph,
+ * an image made by the engine, or it is the texture of a Surface.
+ *
+ * @param b The build
+ * @param e The entity
+ * @return Whether it is a texture
+ */
+static bool box_texture_graph_is_texture(
+    box_texture_graph_build_t *b,
+    ecs_entity_t e)
+{
+    bool result = ecs_has(b->world, e, TexturePath) || ecs_has(b->world, e, TextureGen) ||
+        ecs_has(b->world, e, TextureGraph) || ecs_has(b->world, e, TexturePixels);
+    int32_t i;
+    ecs_iter_t it = ecs_query_iter(b->world, b->t->surfaces);
+    while (!result && ecs_query_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count; i ++) {
+            result = result || s[i].texture == e;
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+/** Check the texture a node of a sampling kind samples and give it the next texture of the
+ * graph: it fails the build when it is missing, part of a cycle of graphs or failed, waits a
+ * frame for an entity without a texture component and holds the graph while it has no image.
+ *
+ * @param b The build
+ * @param e The node entity
+ * @param kind Its kind, BOX_TEXTURE_NODE_SAMPLES
+ * @return Index of the texture, -1 when the build failed or waits
+ */
+static int32_t box_texture_graph_sample(
+    box_texture_graph_build_t *b,
+    ecs_entity_t e,
+    const box_texture_node_kind_t *kind)
+{
+    const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
+    ecs_entity_t texture = *(const ecs_entity_t*)(ptr + kind->texture_offset);
+    bool linear = kind->linear && *(const bool*)(ptr + kind->linear_offset);
+    char *name = ecs_get_path(b->world, e), *texture_name = NULL;
+    const TextureStatus *status;
+    int32_t result = -1, width, height;
+    ecs_map_t textures, nodes;
+    bool cycle;
+    if (!texture) {
+        box_texture_graph_error(b, "node '%s' samples no texture", name);
+        goto done;
+    }
+
+    box_texture_graph_reach(b, texture);
+    if (!ecs_is_alive(b->world, texture)) {
+        box_texture_graph_error(b, "node '%s' samples a missing texture #%u", name,
+            (uint32_t)texture);
+        goto done;
+    }
+
+    texture_name = ecs_get_path(b->world, texture);
+    ecs_map_init(&textures, NULL);
+    ecs_map_init(&nodes, NULL);
+    cycle = texture == b->graph ||
+        box_texture_graph_samples_back(b, texture, &textures, &nodes);
+    ecs_map_fini(&textures);
+    ecs_map_fini(&nodes);
+    if (cycle) {
+        box_texture_graph_error(b, "node '%s' samples texture '%s', which samples this graph: "
+            "a cycle of graphs", name, texture_name);
+        goto done;
+    }
+
+    if (box_surface_texture_size(b->world, texture, &width, &height)) {
+        goto bind;
+    }
+
+    if (!box_texture_graph_is_texture(b, texture)) {
+        if (b->wait) {
+            b->waiting = true;
+        } else {
+            box_texture_graph_error(b, "node '%s' samples '%s', which is not a texture", name,
+                texture_name);
+        }
+
+        goto done;
+    }
+
+    status = ecs_get(b->world, texture, TextureStatus);
+    if (status && status->state == TextureFailed) {
+        box_texture_graph_error(b, "node '%s' samples texture '%s', which failed: %s", name,
+            texture_name, status->error ? status->error : "no image");
+        goto done;
+    }
+
+    if (!status || (status->state != TextureReady && !status->revision)) {
+        b->held = true;
+    }
+
+bind:
+    result = ecs_vec_count(&b->textures);
+    *ecs_vec_append_t(NULL, &b->textures, box_texture_graph_texture_t) =
+        (box_texture_graph_texture_t){ .entity = texture, .linear = linear };
+done:
+    ecs_os_free(texture_name);
+    ecs_os_free(name);
+
+    return result;
+}
+
 /** Visit a node, compiling its inputs before it.
  *
  * @param b The build
@@ -554,7 +796,7 @@ static int32_t box_texture_graph_visit(
     const char *input,
     TextureValueType expected)
 {
-    int32_t result = -1, i, kinds = 0;
+    int32_t result = -1, i, kinds = 0, texture = -1;
     int32_t inputs[BOX_TEXTURE_NODE_INPUTS] = { -1, -1, -1, -1 };
     char *name = NULL;
     box_texture_node_kind_t *kind = NULL;
@@ -621,8 +863,12 @@ static int32_t box_texture_graph_visit(
         }
     }
 
+    if (!b->error && !b->waiting && (kind->flags & BOX_TEXTURE_NODE_SAMPLES)) {
+        texture = box_texture_graph_sample(b, e, kind);
+    }
+
     if (!b->error && !b->waiting) {
-        result = box_texture_graph_append(b, e, kind, inputs);
+        result = box_texture_graph_append(b, e, kind, inputs, texture);
     }
 
 done:
@@ -655,6 +901,11 @@ static box_texture_graph_t* box_texture_graph_compile(
     result->params = result->param_size
         ? ecs_os_memdup(ecs_vec_first(&b->params), result->param_size)
         : NULL;
+    result->texture_count = ecs_vec_count(&b->textures);
+    result->textures = result->texture_count
+        ? ecs_os_memdup(ecs_vec_first(&b->textures),
+            result->texture_count * ECS_SIZEOF(box_texture_graph_texture_t))
+        : NULL;
     result->structure_hash = box_texture_graph_hash(BOX_TEXTURE_GRAPH_FNV_BASIS,
         &result->node_count, ECS_SIZEOF(int32_t));
     for (i = 0; i < result->node_count; i ++) {
@@ -663,6 +914,8 @@ static box_texture_graph_t* box_texture_graph_compile(
             ECS_SIZEOF(int32_t));
         result->structure_hash = box_texture_graph_hash(result->structure_hash, node->inputs,
             ECS_SIZEOF(node->inputs));
+        result->structure_hash = box_texture_graph_hash(result->structure_hash, &node->texture,
+            ECS_SIZEOF(int32_t));
     }
 
     result->param_hash = box_texture_graph_hash(BOX_TEXTURE_GRAPH_FNV_BASIS, result->params,
@@ -675,17 +928,25 @@ static box_texture_graph_t* box_texture_graph_compile(
  *
  * @param a The first graph
  * @param b The second graph
- * @return Whether their size, domain, format, rate, structure and parameters are the same
+ * @return Whether their size, domain, format, rate, structure, parameters and sampled textures
+ * are the same
  */
 static bool box_texture_graph_same(
     const box_texture_graph_t *a,
     const box_texture_graph_t *b)
 {
-    return a->width == b->width && a->height == b->height && a->domain == b->domain &&
+    bool result = a->width == b->width && a->height == b->height && a->domain == b->domain &&
         a->format == b->format && a->rate == b->rate && a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&
-        a->param_size == b->param_size &&
+        a->param_size == b->param_size && a->texture_count == b->texture_count &&
         (!a->param_size || !ecs_os_memcmp(a->params, b->params, a->param_size));
+    int32_t i;
+    for (i = 0; result && i < a->texture_count; i ++) {
+        result = a->textures[i].entity == b->textures[i].entity &&
+            a->textures[i].linear == b->textures[i].linear;
+    }
+
+    return result;
 }
 
 /** Check whether the backend of a world evaluates the graphs and reports their outcome, so
@@ -723,20 +984,13 @@ static void box_texture_graph_accept(
     int32_t revision = box_texture_revision(world, e);
     bool deferred = box_texture_graph_deferred(world);
     if (tex->graph && box_texture_graph_same(tex->graph, graph)) {
-        ecs_os_free(graph->nodes);
-        ecs_os_free(graph->params);
-        ecs_os_free(graph);
+        box_texture_graph_free(graph);
         box_texture_status(world, e, tex->graph_pending ? TextureLoading : TextureReady,
             revision, NULL);
         goto done;
     }
 
-    if (tex->graph) {
-        ecs_os_free(tex->graph->nodes);
-        ecs_os_free(tex->graph->params);
-        ecs_os_free(tex->graph);
-    }
-
+    box_texture_graph_free(tex->graph);
     tex->graph = graph;
     tex->loaded = true;
     tex->width = graph->width;
@@ -780,6 +1034,7 @@ static void box_texture_graph_build(
     };
     tex->graph_dirty = false;
     tex->graph_waiting = false;
+    tex->graph_held = false;
     if (ecs_has(world, e, TexturePath) || ecs_has(world, e, TextureGen)) {
         box_texture_load(world, t, e);
         goto done;
@@ -789,6 +1044,7 @@ static void box_texture_graph_build(
     ecs_map_init(&b.index, NULL);
     ecs_vec_init_t(NULL, &b.nodes, box_texture_graph_node_t, 0);
     ecs_vec_init_t(NULL, &b.params, uint8_t, 0);
+    ecs_vec_init_t(NULL, &b.textures, box_texture_graph_texture_t, 0);
     ecs_vec_clear(&tex->reached);
     if (!graph->output) {
         box_texture_graph_error(&b, "no output node");
@@ -801,6 +1057,9 @@ static void box_texture_graph_build(
     } else if (b.waiting) {
         tex->graph_waiting = true;
         box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
+    } else if (b.held) {
+        tex->graph_held = true;
+        box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
     } else {
         box_texture_graph_accept(world, t, e, box_texture_graph_compile(&b, graph));
     }
@@ -810,12 +1069,14 @@ static void box_texture_graph_build(
     ecs_map_fini(&b.index);
     ecs_vec_fini_t(NULL, &b.nodes, box_texture_graph_node_t);
     ecs_vec_fini_t(NULL, &b.params, uint8_t);
+    ecs_vec_fini_t(NULL, &b.textures, box_texture_graph_texture_t);
 done:
     return;
 }
 
 /** Load the textures whose source component was removed, then build the graphs that changed
- * and fail the ones that waited a frame for a node without a node component.
+ * or wait for a sampled texture to get an image, and fail the ones that waited a frame for a
+ * node without a node component.
  *
  * @param it The iterator of the system
  */
@@ -849,7 +1110,7 @@ static void BoxTextureGraphBuild(
     ecs_map_iter_t mit = ecs_map_iter(&t->textures);
     while (ecs_map_next(&mit)) {
         box_texture_t *tex = ecs_map_ptr(&mit);
-        if (tex->graph_dirty || tex->graph_waiting) {
+        if (tex->graph_dirty || tex->graph_waiting || tex->graph_held) {
             *ecs_vec_append_t(NULL, &build, ecs_entity_t) = tex->entity;
         }
     }
@@ -866,6 +1127,7 @@ static void BoxTextureGraphBuild(
         if (!ecs_is_alive(world, e) || !ecs_has(world, e, TextureGraph)) {
             tex->graph_dirty = false;
             tex->graph_waiting = false;
+            tex->graph_held = false;
             continue;
         }
 
@@ -877,7 +1139,8 @@ done:
     return;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexTime and TexSplat.
+/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexTime, TexSplat,
+ * TexImage and TexLut.
  *
  * @param world The world
  */
@@ -933,6 +1196,34 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_splat",
         .source = box_texture_splat_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexImage),
+        .output = TexVector,
+        .inputs = {{ "coords", offsetof(TexImage, coords), TexVector }},
+        .params = {{ "address", offsetof(TexImage, address), 4, BOX_TEXTURE_PARAM_I32 }},
+        .function = "box_tex_image",
+        .source = box_texture_image_wgsl,
+        .texture = "texture",
+        .texture_offset = offsetof(TexImage, texture),
+        .linear = "linear",
+        .linear_offset = offsetof(TexImage, linear)
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexLut),
+        .output = TexVector,
+        .inputs = {
+            { "u", offsetof(TexLut, u), TexScalar, "u_value", offsetof(TexLut, u_value) },
+            { "v", offsetof(TexLut, v), TexScalar, "v_value", offsetof(TexLut, v_value) }
+        },
+        .function = "box_tex_lut",
+        .source = box_texture_lut_wgsl,
+        .texture = "texture",
+        .texture_offset = offsetof(TexLut, texture),
+        .linear = "linear",
+        .linear_offset = offsetof(TexLut, linear)
     });
 }
 

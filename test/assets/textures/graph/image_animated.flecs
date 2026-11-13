@@ -1,0 +1,41 @@
+// A quad whose emission samples a graph that samples an animated graph through a TexImage: the
+// world time twice plus a half in every channel, framed by a camera over a black clear. Tests
+// take the image off the quad, so no draw samples it or the animated graph.
+
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+graph_image_animated {
+  camera {
+    Position: {0, 0, 4}
+    Camera: {fov: 60}
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+  }
+
+  source {
+    time { TexTime: {scale: 2, offset: 0.5} }
+    splat { TexSplat: {in: time} }
+    TextureGraph: {output: splat, width: 8, format: GraphHdr}
+  }
+
+  image {
+    sampled { TexImage: {texture: source} }
+    TextureGraph: {output: sampled, width: 8, format: GraphHdr}
+  }
+
+  quad {
+    Position: {0, 0, 0}
+    Quad: {6, 6}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 1, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {emissive: image}
+  }
+}

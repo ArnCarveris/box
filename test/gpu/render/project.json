@@ -1486,6 +1486,22 @@
                     "eviction_under_budget",
                     "animated_static_part"
                 ]
+            },
+            {
+                "id": "TextureNodesImage",
+                "testcases": [
+                    "sample_plane",
+                    "wrap_and_clamp",
+                    "sample_sphere",
+                    "lut",
+                    "chain_updates",
+                    "texture_revision_updates",
+                    "animated_source",
+                    "rebind_no_recompile",
+                    "cycle_fails",
+                    "loading_holds",
+                    "failure_names_texture"
+                ]
             }
         ]
     }

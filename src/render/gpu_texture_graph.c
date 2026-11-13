@@ -132,12 +132,13 @@ done:
     return;
 }
 
-/** Get the layouts of the stages with a number of inputs and an output format, creating them on
- * first use.
+/** Get the layouts of the stages with a number of inputs, of sampled textures and an output
+ * format, creating them on first use.
  *
  * @param gpu The backend
  * @param tg The graph state
  * @param inputs Materialized inputs
+ * @param textures Sampled textures
  * @param format Format of the storage texture
  * @return The layouts
  */
@@ -145,14 +146,15 @@ static box_gpu_tg_layout_t* box_gpu_tg_layout(
     box_gpu_t *gpu,
     box_gpu_texgraphs_t *tg,
     int32_t inputs,
+    int32_t textures,
     WGPUTextureFormat format)
 {
-    WGPUBindGroupLayoutEntry entries[BOX_GPU_TG_FIRST_INPUT + BOX_GPU_TG_INPUTS];
+    WGPUBindGroupLayoutEntry entries[BOX_GPU_TG_FIRST_TEXTURE + BOX_GPU_TG_TEXTURES];
     box_gpu_tg_layout_t *result = NULL;
-    int32_t i;
+    int32_t i, count = BOX_GPU_TG_FIRST_INPUT + inputs + textures;
     for (i = 0; i < ecs_vec_count(&tg->layouts); i ++) {
         box_gpu_tg_layout_t *l = *ecs_vec_get_t(&tg->layouts, box_gpu_tg_layout_t*, i);
-        if (l->inputs == inputs && l->format == format) {
+        if (l->inputs == inputs && l->textures == textures && l->format == format) {
             result = l;
             goto done;
         }
@@ -178,9 +180,11 @@ static box_gpu_tg_layout_t* box_gpu_tg_layout(
             .viewDimension = WGPUTextureViewDimension_2D
         }
     };
-    for (i = 3; i < BOX_GPU_TG_FIRST_INPUT + inputs; i ++) {
+    for (i = 3; i < count; i ++) {
+        int32_t binding = i < BOX_GPU_TG_FIRST_INPUT + inputs ? i
+            : BOX_GPU_TG_FIRST_TEXTURE + i - BOX_GPU_TG_FIRST_INPUT - inputs;
         entries[i] = (WGPUBindGroupLayoutEntry){
-            .binding = (uint32_t)i,
+            .binding = (uint32_t)binding,
             .visibility = WGPUShaderStage_Compute,
             .texture = {
                 .sampleType = WGPUTextureSampleType_UnfilterableFloat,
@@ -191,10 +195,11 @@ static box_gpu_tg_layout_t* box_gpu_tg_layout(
 
     result = ecs_os_calloc_t(box_gpu_tg_layout_t);
     result->inputs = inputs;
+    result->textures = textures;
     result->format = format;
     result->group = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){
-            .entryCount = (size_t)(BOX_GPU_TG_FIRST_INPUT + inputs),
+            .entryCount = (size_t)count,
             .entries = entries
         });
     result->pipeline = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -208,7 +213,8 @@ done:
 }
 
 /** Compute the key of the program a graph needs: its structure, the kinds of its nodes, the
- * format its output stage writes, its forced boundaries and the shared code.
+ * format its output stage writes, its forced boundaries and the shared code. Which images its
+ * sampling nodes sample is not part of it, only their indices.
  *
  * @param tg The graph state
  * @param graph The graph
@@ -232,6 +238,7 @@ static uint64_t box_gpu_tg_key(
         result = box_gpu_tg_hash(result, graph->nodes[i].inputs,
             sizeof(graph->nodes[i].inputs));
         result = box_gpu_tg_hash(result, &graph->nodes[i].params, sizeof(uint32_t));
+        result = box_gpu_tg_hash(result, &graph->nodes[i].texture, sizeof(int32_t));
     }
 
     result = box_gpu_tg_hash(result, ecs_vec_first(&graph->forced),
@@ -240,29 +247,45 @@ static uint64_t box_gpu_tg_key(
     return result ? result : 1;
 }
 
-/** Compute the content hash of every node of a graph and whether it is animated.
+/** Compute the content hash of every node of a graph, whether it is animated and whether it
+ * depends on a sampled texture.
  *
- * The hash of a node covers its kind, its output type, its parameter bytes, the hashes of its
- * input nodes, the size and domain of the graph and the shared code, so two nodes of one hash
- * make the same value. A node is animated when its kind is or one of its inputs is.
+ * The hash of a node covers its kind, output type, parameter bytes, the hashes of its inputs,
+ * the size and domain of the graph and the shared code, so two nodes of one hash make the same
+ * value; for a sampling node also the handle, flags and serial of the image it samples now.
  *
+ * A node is animated when its kind is or one of its inputs is.
+ *
+ * @param gpu The backend
  * @param tg The graph state
  * @param graph The graph, valid
  */
 static void box_gpu_tg_hashes(
+    box_gpu_t *gpu,
     box_gpu_texgraphs_t *tg,
     box_gpu_tg_graph_t *graph)
 {
     int32_t n = (int32_t)graph->desc.node_count, i, j;
     ecs_os_free(graph->hashes);
     ecs_os_free(graph->animated);
+    ecs_os_free(graph->sampling);
     graph->hashes = ecs_os_calloc_n(uint64_t, n);
     graph->animated = ecs_os_calloc_n(bool, n);
+    graph->sampling = ecs_os_calloc_n(bool, n);
     for (i = 0; i < n; i ++) {
         const box_render_texture_graph_node_t *node = &graph->nodes[i];
         const box_gpu_tg_kind_t *kind = box_gpu_tg_kind(tg, node->kind);
         uint64_t h = BOX_GPU_TG_FNV_BASIS, kind_hash = kind ? kind->hash : 0;
         bool animated = kind && (kind->flags & BOX_TEXTURE_NODE_ANIMATED);
+        bool sampling = node->texture >= 0;
+        if (sampling) {
+            const box_render_texture_graph_texture_t *src = &graph->textures[node->texture];
+            uint64_t serial = box_gpu_tg_source_serial(gpu, tg, graph, node->texture);
+            h = box_gpu_tg_hash(h, &src->handle, sizeof(uint32_t));
+            h = box_gpu_tg_hash(h, &src->flags, sizeof(uint32_t));
+            h = box_gpu_tg_hash(h, &serial, sizeof(uint64_t));
+        }
+
         h = box_gpu_tg_hash(h, &kind_hash, sizeof(uint64_t));
         h = box_gpu_tg_hash(h, &node->output, sizeof(uint32_t));
         h = box_gpu_tg_hash(h, &tg->prelude_hash, sizeof(uint64_t));
@@ -275,10 +298,12 @@ static void box_gpu_tg_hashes(
             uint64_t input = in >= 0 ? graph->hashes[in] : 0;
             h = box_gpu_tg_hash(h, &input, sizeof(uint64_t));
             animated = animated || (in >= 0 && graph->animated[in]);
+            sampling = sampling || (in >= 0 && graph->sampling[in]);
         }
 
         graph->hashes[i] = h ? h : 1;
         graph->animated[i] = animated;
+        graph->sampling[i] = sampling;
     }
 
     graph->is_animated = n > 0 && graph->animated[n - 1];
@@ -313,6 +338,9 @@ static void box_gpu_tg_lru_remove(
 /** Take a reference to the cached value of a node of a graph: the entry the graph held for the
  * node, else the entry of its content hash, else a new entry whose stage the caller dispatches.
  *
+ * A value that depends on a sampled image which only this graph holds moves to the new hash in
+ * place when that image changed, so a sampled animated graph does not make a value per update.
+ *
  * @param gpu The backend
  * @param tg The graph state
  * @param graph The graph
@@ -331,7 +359,8 @@ static box_gpu_tg_entry_t* box_gpu_tg_cache_take(
 {
     uint64_t hash = graph->hashes[node];
     uint32_t w = graph->desc.width, h = graph->desc.height;
-    box_gpu_tg_entry_t *result = node < graph->entry_count ? graph->entries[node] : NULL;
+    box_gpu_tg_entry_t *held = node < graph->entry_count ? graph->entries[node] : NULL;
+    box_gpu_tg_entry_t *result = held;
     *computed = true;
     if (result && result->hash == hash) {
         goto done;
@@ -343,8 +372,21 @@ static box_gpu_tg_entry_t* box_gpu_tg_cache_take(
         goto done;
     }
 
+    if (held && held->sampling && graph->sampling[node] && held->refs == 1 &&
+        held->value.width == w && held->value.height == h && held->value.format == format)
+    {
+        ecs_map_remove(&tg->cache, held->hash);
+        held->hash = hash;
+        ecs_map_insert_ptr(&tg->cache, hash, held);
+        gpu->pending.texture_graph_misses ++;
+        *computed = false;
+        result = held;
+        goto done;
+    }
+
     result = ecs_os_calloc_t(box_gpu_tg_entry_t);
     result->hash = hash;
+    result->sampling = graph->sampling[node];
     result->value.width = w;
     result->value.height = h;
     result->value.format = format;
@@ -374,16 +416,29 @@ done:
     return result;
 }
 
-/** Drop a reference to a cached value; the last one puts it at the end of the LRU list.
+static void box_gpu_tg_entry_free(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_entry_t *e);
+
+/** Drop a reference to a cached value; the last one puts it at the end of the LRU list, or
+ * frees a value that depends on a sampled image, which a later image makes stale.
  *
+ * @param gpu The backend
  * @param tg The graph state
  * @param e The entry, may be NULL
  */
 static void box_gpu_tg_cache_release(
+    box_gpu_t *gpu,
     box_gpu_texgraphs_t *tg,
     box_gpu_tg_entry_t *e)
 {
     if (!e || -- e->refs > 0) {
+        goto done;
+    }
+
+    if (e->sampling) {
+        box_gpu_tg_entry_free(gpu, tg, e);
         goto done;
     }
 
@@ -440,12 +495,14 @@ static void box_gpu_tg_cache_evict(
 
 /** Make the entries of an evaluation the ones a graph holds, releasing those it held.
  *
+ * @param gpu The backend
  * @param tg The graph state
  * @param graph The graph
  * @param entries The entries by node, taken, may be NULL
  * @param count Nodes in entries
  */
 static void box_gpu_tg_cache_hold(
+    box_gpu_t *gpu,
     box_gpu_texgraphs_t *tg,
     box_gpu_tg_graph_t *graph,
     box_gpu_tg_entry_t **entries,
@@ -453,7 +510,7 @@ static void box_gpu_tg_cache_hold(
 {
     int32_t i;
     for (i = 0; i < graph->entry_count; i ++) {
-        box_gpu_tg_cache_release(tg, graph->entries[i]);
+        box_gpu_tg_cache_release(gpu, tg, graph->entries[i]);
     }
 
     ecs_os_free(graph->entries);
@@ -626,8 +683,8 @@ static void box_gpu_tg_lines(
     };
 }
 
-/** Write the WGSL expression of input j of a node in a stage: the value of its node, or the
- * constant in its parameters without one.
+/** Write the WGSL expression of input j of a node in a stage: the value of its node, or without
+ * one the constant in its parameters, or the coordinates for a vector input without a constant.
  *
  * @param buf The code
  * @param graph The graph
@@ -647,6 +704,8 @@ static void box_gpu_tg_input(
         ecs_strbuf_appendstr(buf, "vec4f(0.0)");
     } else if (n->inputs[j] >= 0) {
         ecs_strbuf_append(buf, "node_%d", n->inputs[j]);
+    } else if (kind->coords & (1u << j)) {
+        ecs_strbuf_appendstr(buf, "coords");
     } else {
         ecs_strbuf_append(buf, "bitcast<vec4f>(box_texgraph_params[%uu])",
             (n->params + kind->param_size) / 16 + (uint32_t)j);
@@ -658,7 +717,8 @@ static void box_gpu_tg_input(
  * stores the value of its root.
  *
  * A neighbourhood function also gets the texel and the texture of each of its inputs, the
- * texture of an input without a node being a 1x1 zero texture.
+ * texture of an input without a node being a 1x1 zero texture. A sampling function gets the
+ * texture it samples last.
  *
  * @param tg The graph state
  * @param graph The graph
@@ -719,6 +779,13 @@ static char* box_gpu_tg_code(
         box_gpu_tg_append(&buf, &line, text);
     }
 
+    for (k = 0; k < stage->texture_count; k ++) {
+        ecs_os_snprintf(text, ECS_SIZEOF(text),
+            "@group(0) @binding(%d) var box_texgraph_tex%d: texture_2d<f32>;\n",
+            BOX_GPU_TG_FIRST_TEXTURE + k, k);
+        box_gpu_tg_append(&buf, &line, text);
+    }
+
     box_gpu_tg_append(&buf, &line,
         "\n"
         "@compute @workgroup_size(8, 8, 1)\n"
@@ -771,6 +838,17 @@ static char* box_gpu_tg_code(
                     ecs_strbuf_appendstr(&buf, ", box_texgraph_none");
                 }
             }
+        }
+
+        if (kind->flags & BOX_TEXTURE_NODE_SAMPLES) {
+            int32_t slot = 0;
+            for (k = 0; k < stage->texture_count; k ++) {
+                if (stage->textures[k] == n->texture) {
+                    slot = k;
+                }
+            }
+
+            ecs_strbuf_append(&buf, ", box_texgraph_tex%d", slot);
         }
 
         ecs_strbuf_appendstr(&buf, ");\n");
@@ -850,10 +928,18 @@ static void box_gpu_tg_program_build(
     bool *mat = ecs_os_calloc_n(bool, n);
     int32_t *owner = ecs_os_calloc_n(int32_t, n);
     for (i = 0; i < n; i ++) {
-        if (!box_gpu_tg_kind(tg, graph->nodes[i].kind)) {
+        const box_gpu_tg_kind_t *kind = box_gpu_tg_kind(tg, graph->nodes[i].kind);
+        if (!kind) {
             char *error = flecs_asprintf("unknown node kind %u", graph->nodes[i].kind);
             box_gpu_tg_program_fail(program, i, error);
             ecs_os_free(error);
+            goto done;
+        }
+
+        if (((kind->flags & BOX_TEXTURE_NODE_SAMPLES) != 0) != (graph->nodes[i].texture >= 0)) {
+            box_gpu_tg_program_fail(program, i, graph->nodes[i].texture >= 0
+                ? "a node of a kind that samples no texture has a texture"
+                : "a node of a sampling kind has no texture");
             goto done;
         }
     }
@@ -907,9 +993,24 @@ static void box_gpu_tg_program_build(
 
                 stage->inputs[stage->input_count ++] = in;
             }
+
+            if (graph->nodes[j].texture < 0) {
+                continue;
+            }
+
+            if (stage->texture_count == BOX_GPU_TG_TEXTURES) {
+                char *error = flecs_asprintf("a stage samples more than %d textures",
+                    BOX_GPU_TG_TEXTURES);
+                box_gpu_tg_program_fail(program, j, error);
+                ecs_os_free(error);
+                goto done;
+            }
+
+            stage->textures[stage->texture_count ++] = graph->nodes[j].texture;
         }
 
-        stage->layout = box_gpu_tg_layout(gpu, tg, stage->input_count, stage->format);
+        stage->layout = box_gpu_tg_layout(gpu, tg, stage->input_count, stage->texture_count,
+            stage->format);
         stage->shader = tg->next_shader ++;
         ecs_map_insert_ptr(&tg->stages, stage->shader, program);
     }
@@ -1091,9 +1192,13 @@ static void box_gpu_tg_graph_desc_free(
 {
     ecs_os_free(graph->nodes);
     ecs_os_free(graph->params);
+    ecs_os_free(graph->textures);
+    ecs_os_free(graph->bound);
     ecs_os_free(graph->invalid);
     graph->nodes = NULL;
     graph->params = NULL;
+    graph->textures = NULL;
+    graph->bound = NULL;
     graph->invalid = NULL;
 }
 
@@ -1118,9 +1223,10 @@ static void box_gpu_tg_graph_free(
 
     box_gpu_tg_program_release(gpu, tg, graph->current);
     box_gpu_tg_program_release(gpu, tg, graph->pending);
-    box_gpu_tg_cache_hold(tg, graph, NULL, 0);
+    box_gpu_tg_cache_hold(gpu, tg, graph, NULL, 0);
     ecs_os_free(graph->hashes);
     ecs_os_free(graph->animated);
+    ecs_os_free(graph->sampling);
     if (graph->param_buffer) {
         wgpuBufferRelease(graph->param_buffer);
     }
@@ -1147,8 +1253,8 @@ static uint64_t box_gpu_tg_param_bytes(
     return ((uint64_t)desc->param_size + BOX_GPU_TG_PARAM_PAD + 15) / 16 * 16;
 }
 
-/** Check the description of a graph: its nodes come after their inputs and their parameters
- * are within the parameter bytes, 16 byte aligned.
+/** Check the description of a graph: its nodes come after their inputs, their parameters are
+ * within the parameter bytes, 16 byte aligned, and their textures within its textures.
  *
  * @param desc The description
  * @param nodes Its nodes
@@ -1177,6 +1283,11 @@ static char* box_gpu_tg_check(
                 goto done;
             }
         }
+
+        if (nodes[i].texture >= (int32_t)desc->texture_count) {
+            result = flecs_asprintf("texture of node %u out of range", i);
+            goto done;
+        }
     }
 
 done:
@@ -1194,7 +1305,7 @@ void box_gpu_texture_graph_apply(
         : box_gpu_tg_get(gpu);
     box_gpu_tg_graph_t *graph = tg
         ? ecs_map_get_deref(&tg->graphs, box_gpu_tg_graph_t, handle) : NULL;
-    uint64_t nodes_size, total;
+    uint64_t nodes_size, textures_size, total;
     if (op == BOX_RENDER_DESTROY || !desc) {
         if (graph) {
             ecs_map_remove(&tg->graphs, handle);
@@ -1205,7 +1316,8 @@ void box_gpu_texture_graph_apply(
     }
 
     nodes_size = (uint64_t)desc->node_count * sizeof(box_render_texture_graph_node_t);
-    total = sizeof(box_render_texture_graph_t) + nodes_size + desc->param_size;
+    textures_size = (uint64_t)desc->texture_count * sizeof(box_render_texture_graph_texture_t);
+    total = sizeof(box_render_texture_graph_t) + nodes_size + desc->param_size + textures_size;
     if (total > size) {
         ecs_err("texture graph %u: description of %u bytes is truncated", handle, size);
         goto done;
@@ -1215,6 +1327,7 @@ void box_gpu_texture_graph_apply(
         graph = ecs_os_calloc_t(box_gpu_tg_graph_t);
         graph->handle = handle;
         graph->sampled = -1;
+        graph->eval = -1;
         ecs_vec_init_t(NULL, &graph->forced, int32_t, 0);
         ecs_map_insert_ptr(&tg->graphs, handle, graph);
         gpu->texture_graph_count ++;
@@ -1233,6 +1346,12 @@ void box_gpu_texture_graph_apply(
     if (desc->param_size) {
         ecs_os_memcpy(graph->params, box_render_texture_graph_params(desc),
             (ecs_size_t)desc->param_size);
+    }
+
+    if (desc->texture_count) {
+        graph->textures = ecs_os_memdup(box_render_texture_graph_textures(desc),
+            (ecs_size_t)textures_size);
+        graph->bound = ecs_os_calloc_n(uint64_t, (int32_t)desc->texture_count);
     }
 
     graph->invalid = box_gpu_tg_check(desc, graph->nodes);
@@ -1274,6 +1393,12 @@ void box_gpu_texture_node_kind_apply(
         ? BOX_TEXTURE_NODE_INPUTS : desc->input_count;
     kind->param_size = desc->param_size;
     kind->flags = desc->flags;
+    for (i = 0; i < kind->input_count; i ++) {
+        if (!(desc->input_constants & (1u << i)) && desc->input_types[i] == TexVector) {
+            kind->coords |= 1u << i;
+        }
+    }
+
     kind->function = ecs_os_strdup(box_render_texture_node_kind_function(desc));
     kind->source = ecs_os_strdup(box_render_texture_node_kind_source(desc));
     kind->hash = box_gpu_tg_hash(BOX_GPU_TG_FNV_BASIS, desc, sizeof(*desc));
@@ -1344,7 +1469,7 @@ static bool box_gpu_tg_graph_ready(
 
     if (!graph->key) {
         graph->key = box_gpu_tg_key(tg, graph);
-        box_gpu_tg_hashes(tg, graph);
+        box_gpu_tg_hashes(gpu, tg, graph);
     }
 
     if (graph->current && graph->current->key == graph->key) {
@@ -1420,6 +1545,10 @@ static void box_gpu_tg_upload(
  * cached value of its node and is dispatched only when the cache did not have it, an animated
  * stage writes an intermediate of the pool.
  *
+ * The hashes of a graph that samples textures are computed again with the images it samples
+ * now, whose serials it keeps. An image written directly is queued for its mip levels at once,
+ * so the graphs after it in the packet hash its new serial.
+ *
  * @param gpu The backend
  * @param tg The graph state
  * @param pass The compute pass
@@ -1436,11 +1565,19 @@ static void box_gpu_tg_record(
     uint32_t w = graph->desc.width, h = graph->desc.height;
     WGPUTextureFormat image = box_gpu_tg_image_format(graph->desc.format);
     WGPUTextureView out = NULL;
-    WGPUBindGroupEntry entries[BOX_GPU_TG_FIRST_INPUT + BOX_GPU_TG_INPUTS];
+    WGPUBindGroupEntry entries[BOX_GPU_TG_FIRST_INPUT + BOX_GPU_TG_INPUTS +
+        BOX_GPU_TG_TEXTURES];
     int32_t s, k;
     box_gpu_texture_t *tex = box_gpu_texture_output(gpu, graph->handle, w, h, image,
         graph->desc.format == GraphColor);
     bool *computed = ecs_os_calloc_n(bool, program->stage_count);
+    if (graph->desc.texture_count) {
+        box_gpu_tg_hashes(gpu, tg, graph);
+        for (k = 0; k < (int32_t)graph->desc.texture_count; k ++) {
+            graph->bound[k] = box_gpu_tg_source_serial(gpu, tg, graph, k);
+        }
+    }
+
     box_gpu_tg_upload(gpu, tg, graph);
     graph->time = tg->time;
     if (image == BOX_GPU_TEXTURE_SINGLE) {
@@ -1500,10 +1637,24 @@ static void box_gpu_tg_record(
             };
         }
 
+        for (k = 0; k < stage->texture_count; k ++) {
+            const box_render_texture_graph_texture_t *src =
+                &graph->textures[stage->textures[k]];
+            WGPUTextureView view = src->handle && src->handle != graph->handle
+                ? box_gpu_texture_sampled_view(gpu, src->handle,
+                    (src->flags & BOX_RENDER_TEXTURE_GRAPH_LINEAR) != 0)
+                : NULL;
+            entries[BOX_GPU_TG_FIRST_INPUT + stage->input_count + k] = (WGPUBindGroupEntry){
+                .binding = (uint32_t)(BOX_GPU_TG_FIRST_TEXTURE + k),
+                .textureView = view ? view : tg->none_view
+            };
+        }
+
         WGPUBindGroup group = wgpuDeviceCreateBindGroup(gpu->device,
             &(WGPUBindGroupDescriptor){
                 .layout = stage->layout->group,
-                .entryCount = (size_t)(BOX_GPU_TG_FIRST_INPUT + stage->input_count),
+                .entryCount = (size_t)(BOX_GPU_TG_FIRST_INPUT + stage->input_count +
+                    stage->texture_count),
                 .entries = entries
             });
         wgpuComputePassEncoderSetPipeline(pass, stage->pipeline);
@@ -1518,6 +1669,8 @@ static void box_gpu_tg_record(
 
     if (out) {
         wgpuTextureViewRelease(out);
+        box_gpu_texture_output_written(gpu, graph->handle);
+        ev->stored = true;
     }
 
     ecs_os_free(computed);
@@ -1534,9 +1687,9 @@ void box_gpu_texture_graphs_evaluate(
     const box_render_packet_t *packet)
 {
     box_gpu_texgraphs_t *tg = gpu->texture_graphs;
-    ecs_vec_t evals;
+    ecs_vec_t evals, order;
     WGPUCommandEncoder encoder = NULL;
-    int32_t i, count, stamp = -1;
+    int32_t i, count, stamp = -1, passes = 0, pass;
     bool requested;
     ecs_os_mutex_lock(gpu->lock);
     requested = ecs_vec_count(&gpu->graph_requests) > 0;
@@ -1557,16 +1710,28 @@ void box_gpu_texture_graphs_evaluate(
     box_gpu_tg_requests(gpu, tg);
     box_gpu_tg_stamps_init(gpu, tg);
     ecs_vec_init_t(NULL, &evals, box_gpu_tg_eval_t, 0);
+    ecs_vec_init_t(NULL, &order, box_gpu_tg_graph_t*, 0);
     ecs_map_iter_t it = ecs_map_iter(&tg->graphs);
     while (ecs_map_next(&it)) {
-        box_gpu_tg_graph_t *graph = ecs_map_ptr(&it);
+        box_gpu_tg_order(tg, ecs_map_ptr(&it), &order);
+    }
+
+    box_gpu_tg_graph_t **graphs = ecs_vec_first(&order);
+    for (i = ecs_vec_count(&order) - 1; i >= 0; i --) {
+        box_gpu_tg_propagate(tg, graphs[i]);
+    }
+
+    for (i = 0; i < ecs_vec_count(&order); i ++) {
+        box_gpu_tg_graph_t *graph = graphs[i];
         bool reads = box_gpu_tg_node_reads(tg, graph), update;
         if (!box_gpu_tg_graph_ready(gpu, tg, graph)) {
             continue;
         }
 
-        update = !graph->dirty && !reads && box_gpu_tg_due(tg, graph);
+        update = !graph->dirty && !reads && (box_gpu_tg_due(tg, graph) ||
+            box_gpu_tg_sources_changed(gpu, tg, graph));
         if (graph->dirty || reads || update) {
+            graph->eval = ecs_vec_count(&evals);
             *ecs_vec_append_t(NULL, &evals, box_gpu_tg_eval_t) = (box_gpu_tg_eval_t){
                 .graph = graph,
                 .held = reads || graph->desc.format == GraphSingle,
@@ -1576,7 +1741,8 @@ void box_gpu_texture_graphs_evaluate(
     }
 
     count = ecs_vec_count(&evals);
-    for (i = 0; i < BOX_GPU_TG_STAMPS && count && tg->queries && stamp < 0; i ++) {
+    passes = box_gpu_tg_passes(tg, ecs_vec_first(&evals), count);
+    for (i = 0; i < BOX_GPU_TG_STAMPS && passes == 1 && tg->queries && stamp < 0; i ++) {
         if (tg->stamps[i].state == BOX_GPU_TG_STAMP_FREE) {
             stamp = i;
         }
@@ -1588,29 +1754,37 @@ void box_gpu_texture_graphs_evaluate(
 
     encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     box_gpu_tg_stamps_resolve(tg, encoder);
-    if (count) {
+    for (pass = 0, i = 0; pass < passes; pass ++) {
         box_gpu_tg_eval_t *ev = ecs_vec_first(&evals);
+        int32_t first = i, j;
         WGPUPassTimestampWrites writes = {
             .querySet = tg->queries,
             .beginningOfPassWriteIndex = (uint32_t)stamp * 2,
             .endOfPassWriteIndex = (uint32_t)stamp * 2 + 1
         };
-        WGPUComputePassEncoder pass = box_gpu_compute_begin(encoder,
+        WGPUComputePassEncoder cpass = box_gpu_compute_begin(encoder,
             stamp >= 0 ? &writes : NULL);
-        for (i = 0; i < count; i ++) {
-            box_gpu_tg_record(gpu, tg, pass, &ev[i]);
+        for (; i < count && ev[i].pass == pass; i ++) {
+            box_gpu_tg_record(gpu, tg, cpass, &ev[i]);
         }
 
-        wgpuComputePassEncoderEnd(pass);
-        wgpuComputePassEncoderRelease(pass);
-        for (i = 0; i < count; i ++) {
-            ev[i].stored = !ev[i].temp ||
-                box_gpu_texture_output_blit(gpu, encoder, ev[i].graph->handle, ev[i].temp->view);
-        }
+        wgpuComputePassEncoderEnd(cpass);
+        wgpuComputePassEncoderRelease(cpass);
+        for (j = first; j < i; j ++) {
+            if (!ev[j].temp) {
+                continue;
+            }
 
-        if (stamp >= 0) {
-            tg->stamps[stamp].state = BOX_GPU_TG_STAMP_WRITTEN;
+            ev[j].stored = box_gpu_texture_output_blit(gpu, encoder, ev[j].graph->handle,
+                ev[j].temp->view);
+            if (ev[j].stored) {
+                box_gpu_texture_output_written(gpu, ev[j].graph->handle);
+            }
         }
+    }
+
+    if (stamp >= 0) {
+        tg->stamps[stamp].state = BOX_GPU_TG_STAMP_WRITTEN;
     }
 
     box_gpu_tg_copies(gpu, tg, encoder, ecs_vec_first(&evals), count);
@@ -1629,12 +1803,11 @@ void box_gpu_texture_graphs_evaluate(
 
         box_gpu_tg_pool_put(ev->temp);
         ecs_os_free(ev->textures);
-        box_gpu_tg_cache_hold(tg, graph, ev->entries, graph->current->node_count);
+        box_gpu_tg_cache_hold(gpu, tg, graph, ev->entries, graph->current->node_count);
         if (!ev->stored) {
             continue;
         }
 
-        box_gpu_texture_output_written(gpu, graph->handle);
         graph->dirty = false;
         graph->written = true;
         gpu->pending.texture_graph_updates += ev->update;
@@ -1642,6 +1815,11 @@ void box_gpu_texture_graphs_evaluate(
     }
 
 sweep:
+    for (i = 0; i < ecs_vec_count(&order); i ++) {
+        graphs[i]->eval = -1;
+    }
+
+    ecs_vec_fini_t(NULL, &order, box_gpu_tg_graph_t*);
     ecs_vec_fini_t(NULL, &evals, box_gpu_tg_eval_t);
     box_gpu_tg_cache_evict(gpu, tg);
     box_gpu_tg_pool_sweep(gpu, tg, false);

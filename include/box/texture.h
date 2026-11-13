@@ -355,6 +355,58 @@ ECS_STRUCT(TexMath, {
     vec4 c_value;       /**< Value of c without a node */
 });
 
+/** Addressing of the texels outside a texture a TexImage samples */
+ECS_ENUM(TextureAddress, {
+    AddressWrap = 0, /**< The texture repeats, the default. On DomainSphere only the longitude
+                      *   wraps, the rows of an equirectangular image clamp at the poles */
+    AddressClamp = 1 /**< The edge texels extend */
+});
+
+/** Node of a TextureGraph whose value samples the image of a texture entity: a TexturePath, a
+ * TextureGen, another TextureGraph or the texture of a Surface, bilinear between its texels.
+ *
+ * On DomainPlane it samples at the uv of coords, v 0 at the top; on DomainSphere at the
+ * equirectangular uv of the direction of coords, so a graph of the size of an equirectangular
+ * image reads it back texel by texel. A single channel image reads as (r, 0, 0, 1).
+ *
+ * The graph waits in TextureLoading until the texture has an image, fails when it fails or
+ * samples the graph back, and evaluates after a graph it samples and again when its image
+ * changes. Rebinding the node to another texture compiles nothing.
+ *
+ * @code
+ * tinted {
+ *   albedo { TexImage: {texture: brick} }
+ *   warm   { TexMath: {op: MathMultiply, a: albedo, b_value: {1, 0.9, 0.8, 1}} }
+ *   TextureGraph: {output: warm, width: 512}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexImage, {
+    ecs_entity_t texture;   /**< Texture entity sampled */
+    ecs_entity_t coords;    /**< Vector input node of where to sample, 0 for the coordinates
+                             *   of the texel in the domain of the graph */
+    TextureAddress address; /**< Texels outside the image, default AddressWrap */
+    bool linear;            /**< Read the color channels as stored, default off: RGBA8 is
+                             *   decoded from display encoding as color layers do, so a
+                             *   GraphColor image reads as its output; R8 and HDR as stored */
+});
+
+/** Node of a TextureGraph that looks up a texture entity as a 2D table by two scalars, such as
+ * a biome color by height and temperature, bound as the texture of a TexImage.
+ *
+ * u 0..1 runs from the center of the first column of the image to the center of the last one,
+ * v from the top row to the bottom row, bilinear between them and clamped outside. An input
+ * without a node takes its value member instead.
+ */
+ECS_STRUCT(TexLut, {
+    ecs_entity_t texture;   /**< Texture entity of the table */
+    ecs_entity_t u;         /**< Scalar input node of the column, 0 for u_value */
+    ecs_entity_t v;         /**< Scalar input node of the row, 0 for v_value */
+    float u_value;          /**< Value of u without a node */
+    float v_value;          /**< Value of v without a node */
+    bool linear;            /**< Read the color channels as stored, see TexImage.linear */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
@@ -369,6 +421,10 @@ ECS_STRUCT(TexMath, {
 
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
+
+/** Flag of a node kind that samples a texture entity, set by box_texture_node_register for a
+ * kind with a texture member (box_texture_node_desc_t.texture) */
+#define BOX_TEXTURE_NODE_SAMPLES (1u << 2)
 
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
@@ -397,6 +453,8 @@ ECS_STRUCT(TextureNodeKind, {
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
+    const char *texture;     /**< Member of the texture entity a node samples, NULL for a kind
+                              *   that samples none */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -411,8 +469,9 @@ typedef struct box_texture_node_input_t {
     const char *name;           /**< Name of the member, NULL ends the list */
     ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
     TextureValueType type;      /**< Type the input node must output */
-    const char *value;          /**< Name of the constant member used without a node, a float
-                                 *   for TexScalar or a vec4 for TexVector, NULL for none */
+    const char *value;          /**< Constant member used without a node, a float for
+                                 *   TexScalar or a vec4 for TexVector; NULL for none, then a
+                                 *   TexVector input takes the coordinates, a TexScalar one 0 */
     ecs_size_t value_offset;    /**< Offset of that member */
 } box_texture_node_input_t;
 
@@ -430,7 +489,9 @@ typedef struct box_texture_node_param_t {
  * of the parameter bytes p at the offsets of TextureNodeKind.params, the input values i in
  * order, a scalar in x and the constant of an input without a node, and the coordinates.
  *
- * It returns the value of the node, a scalar in x.
+ * A neighbourhood kind also gets the texel (vec2i) and the texture of each input, a sampling
+ * kind (texture) the texture_2d<f32> it samples last, read with box_texgraph_sample. It
+ * returns the value of the node, a scalar in x.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -440,6 +501,14 @@ typedef struct box_texture_node_desc_t {
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    const char *texture;        /**< ecs_entity_t member of the texture entity a node
+                                 *   samples, NULL for none; which entity it is only binds the
+                                 *   image, it is not part of the structure of the graph */
+    ecs_size_t texture_offset;  /**< Offset of that member */
+    const char *linear;         /**< Name of a bool member that reads the color channels of
+                                 *   the texture as stored instead of decoded from display
+                                 *   encoding, NULL to always decode them */
+    ecs_size_t linear_offset;   /**< Offset of that member */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs
