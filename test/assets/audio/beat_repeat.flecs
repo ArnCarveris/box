@@ -5,12 +5,12 @@
 using box.audio
 
 stutter {
-  AudioBus: {volume: 0.25, effects: [stutter]}
+  Bus: {volume: 0.25, effects: [stutter]}
   BeatRepeat: {slice: 0.25, decay: 1, mix: 1}
 }
 
 drop {
-  AudioBus: {volume: 0.25, effects: [drop]}
+  Bus: {volume: 0.25, effects: [drop]}
   TapeStop: {stop_time: 0.75, start_time: 0.3, curve: 0.5}
 }
 

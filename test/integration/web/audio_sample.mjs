@@ -249,7 +249,7 @@ async function main() {
     }
     expect(await waitFor('Module.boxAudio.ctx.state === "running"', 5000),
       'the gesture did not start the audio');
-    await waitFor(`${shell('get $ box.audio.AudioStatus')}.includes('AudioRunning')`, 3000);
+    await waitFor(`${shell('get $ box.audio.Status')}.includes('Running')`, 3000);
 
     // One play of the tone during a capture of two seconds: one second of 440 Hz at the rate of
     // the context, whatever it is
@@ -257,7 +257,7 @@ async function main() {
     // The capture starts with the next frames, so the play has to come after them
     await sleep(250);
     await evaluate(shell('script_write player_script ' +
-      JSON.stringify('using box.audio\nplayer {\n  AudioSource: {sound: tone}\n}\n')));
+      JSON.stringify('using box.audio\nplayer {\n  Source: {sound: tone}\n}\n')));
     let capture = null;
     const deadline = Date.now() + 6000;
     while (Date.now() < deadline && !(capture && capture.frames)) {
@@ -294,7 +294,7 @@ async function main() {
     await evaluate(shell('script_write loop_script ' + JSON.stringify(
       'using box.audio\nloop_sound {\n  SoundFile: {path: "test/assets/audio/loop.wav"}\n}\n')));
     await evaluate(shell('script_write looper_script ' + JSON.stringify(
-      'using box.audio\nlooper {\n  AudioSource: {sound: loop_sound, loop: true}\n}\n')));
+      'using box.audio\nlooper {\n  Source: {sound: loop_sound, loop: true}\n}\n')));
     await sleep(1000);
     const playing = await evaluate('Module.boxAudio.stats()');
     await evaluate(shell('rm loop_sound'));

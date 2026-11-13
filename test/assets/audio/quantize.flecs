@@ -2,7 +2,7 @@
 // at 120 quarter notes per minute, and a hit of 0.5 is played on the next beat.
 //
 // A beat lasts 24000 frames at 48 kHz, so the hit starts 12000 frames after the clock of the
-// frame the script ran in, silent before. A script names the constants of AudioQuantize without
+// frame the script ran in, silent before. A script names the constants of Quantize without
 // the prefix of the enum: None, Beat and Bar.
 using box.audio
 
@@ -11,7 +11,7 @@ $ {
 }
 
 hit {
-  AudioPcm: {samples: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]}
+  Pcm: {samples: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]}
 }
 
 const played: bool = box.audio.play_quantized(hit, 1.0, Beat)

@@ -456,11 +456,11 @@ void Spatial_play_at_synth_and_file(void) {
         "  SynthSound: {}\n"
         "  SynthEnvelope: {attack: 0.001, sustain: 1, hold: 0.5, release: 0.01}\n"
         "  SynthOscillator: {frequency: 500, level: 0.5}\n"
-        "  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
+        "  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
         "}\n"
         "chime {\n"
         "  SoundFile: {path: \"test/assets/audio/sine_16.wav\"}\n"
-        "  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
+        "  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
         "}\n", NULL) == 0);
     ecs_entity_t sounds[] = { ecs_lookup(world, "Beep"), ecs_lookup(world, "chime") };
     int32_t i, start;
@@ -1044,7 +1044,7 @@ void Spatial_cutoff_synth(void) {
         "  SynthSound: {}\n"
         "  SynthEnvelope: {attack: 0.001, sustain: 1, hold: 1, release: 0.01}\n"
         "  SynthOscillator: {frequency: 8000, level: 0.5}\n"
-        "  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0, cutoff: 200}\n"
+        "  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0, cutoff: 200}\n"
         "}\n", NULL) == 0);
     ecs_entity_t beep = ecs_lookup(world, "Beep");
     float near_, far_;

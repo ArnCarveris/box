@@ -5,45 +5,45 @@ box { audio { Song { Rgb: {205, 150, 60} } } }
 assets {
 
   hn_hall {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.7, effects: [hn_hall]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.7, effects: [hn_hall]}
     Reverb: {decay: 2.3, damping: 0.6, predelay: 0.028, size: 0.8}
   }
   hn_brass_eq {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 28},
-      {kind: AudioEqPeak, frequency: 220, gain: -1.5, q: 0.9}
+      {kind: EqLowCut, frequency: 28},
+      {kind: EqPeak, frequency: 220, gain: -1.5, q: 0.9}
     ]}
   }
   hn_brass_glue { Compressor: {threshold: -10, ratio: 2, attack: 0.03, release: 0.25, knee: 8, makeup: 0} }
   hn_brass {
-    AudioBus: {output: master, volume: 0.5, effects: [hn_brass_eq, hn_brass_glue]}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.5, effects: [hn_brass_eq, hn_brass_glue]}
+    Meter: {}
   }
 
   hn_horn_tone {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 400, gain: 3, q: 1},
-      {kind: AudioEqHighShelf, frequency: 2000, gain: -6}
+      {kind: EqPeak, frequency: 400, gain: 3, q: 1},
+      {kind: EqHighShelf, frequency: 2000, gain: -6}
     ]}
   }
   hn_stopped_tone {
     Equalizer: {bands: [
-      {kind: AudioEqLowShelf, frequency: 600, gain: -9},
-      {kind: AudioEqPeak, frequency: 3000, gain: 4, q: 1.2}
+      {kind: EqLowShelf, frequency: 600, gain: -9},
+      {kind: EqPeak, frequency: 3000, gain: 4, q: 1.2}
     ]}
   }
-  hn_trombone_tone { Equalizer: {bands: [{kind: AudioEqPeak, frequency: 550, gain: 3, q: 1.1}]} }
-  hn_bass_trombone_tone { Equalizer: {bands: [{kind: AudioEqPeak, frequency: 420, gain: 3, q: 1}]} }
+  hn_trombone_tone { Equalizer: {bands: [{kind: EqPeak, frequency: 550, gain: 3, q: 1.1}]} }
+  hn_bass_trombone_tone { Equalizer: {bands: [{kind: EqPeak, frequency: 420, gain: 3, q: 1}]} }
   hn_euphonium_tone {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 380, gain: 2.5, q: 1},
-      {kind: AudioEqHighShelf, frequency: 3000, gain: -3}
+      {kind: EqPeak, frequency: 380, gain: 2.5, q: 1},
+      {kind: EqHighShelf, frequency: 3000, gain: -3}
     ]}
   }
   hn_tuba_tone {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 240, gain: 3, q: 1},
-      {kind: AudioEqHighShelf, frequency: 2000, gain: -4}
+      {kind: EqPeak, frequency: 240, gain: 3, q: 1},
+      {kind: EqHighShelf, frequency: 2000, gain: -4}
     ]}
   }
 
@@ -385,47 +385,47 @@ assets {
 
   hn_track_horn {
     Track: {instrument: hn_horn, humanize: {velocity: 0.04}}
-    AudioBus: {output: hn_brass, effects: [hn_horn_tone], volume: 0.9, pan: -0.35, sends: [{bus: hn_hall, level: 0.65}]}
-    AudioMeter: {}
+    Bus: {output: hn_brass, effects: [hn_horn_tone], volume: 0.9, pan: -0.35, sends: [{bus: hn_hall, level: 0.65}]}
+    Meter: {}
     hn_solo { ClipPlacement: {clip: hn_horn_call, start: 0} }
     hn_tutti { ClipPlacement: {clip: hn_horn_chorale, start: 48} }
   }
 
   hn_track_stopped {
     Track: {instrument: hn_stopped, humanize: {velocity: 0.04}}
-    AudioBus: {output: hn_brass, effects: [hn_stopped_tone], volume: 0.6, pan: -0.4, sends: [{bus: hn_hall, level: 0.55}]}
-    AudioMeter: {}
+    Bus: {output: hn_brass, effects: [hn_stopped_tone], volume: 0.6, pan: -0.4, sends: [{bus: hn_hall, level: 0.55}]}
+    Meter: {}
     hn_solo { ClipPlacement: {clip: hn_stopped_echo, start: 9} }
   }
 
   hn_track_trombone {
     Track: {instrument: hn_trombone, humanize: {velocity: 0.04}}
-    AudioBus: {output: hn_brass, effects: [hn_trombone_tone], volume: 0.8, pan: 0.25, sends: [{bus: hn_hall, level: 0.4}]}
-    AudioMeter: {}
+    Bus: {output: hn_brass, effects: [hn_trombone_tone], volume: 0.8, pan: 0.25, sends: [{bus: hn_hall, level: 0.4}]}
+    Meter: {}
     hn_solo { ClipPlacement: {clip: hn_trombone_solo, start: 13} }
     hn_tutti { ClipPlacement: {clip: hn_trombone_chorale, start: 48} }
   }
 
   hn_track_bass_trombone {
     Track: {instrument: hn_bass_trombone, humanize: {velocity: 0.04}}
-    AudioBus: {output: hn_brass, effects: [hn_bass_trombone_tone], volume: 0.8, pan: 0.45, sends: [{bus: hn_hall, level: 0.4}]}
-    AudioMeter: {}
+    Bus: {output: hn_brass, effects: [hn_bass_trombone_tone], volume: 0.8, pan: 0.45, sends: [{bus: hn_hall, level: 0.4}]}
+    Meter: {}
     hn_solo { ClipPlacement: {clip: hn_bass_trombone_solo, start: 22} }
     hn_tutti { ClipPlacement: {clip: hn_bass_trombone_chorale, start: 48} }
   }
 
   hn_track_euphonium {
     Track: {instrument: hn_euphonium, humanize: {velocity: 0.04}}
-    AudioBus: {output: hn_brass, effects: [hn_euphonium_tone], volume: 0.8, pan: -0.1, sends: [{bus: hn_hall, level: 0.45}]}
-    AudioMeter: {}
+    Bus: {output: hn_brass, effects: [hn_euphonium_tone], volume: 0.8, pan: -0.1, sends: [{bus: hn_hall, level: 0.45}]}
+    Meter: {}
     hn_solo { ClipPlacement: {clip: hn_euphonium_solo, start: 30} }
     hn_tutti { ClipPlacement: {clip: hn_euphonium_chorale, start: 48} }
   }
 
   hn_track_tuba {
     Track: {instrument: hn_tuba, humanize: {velocity: 0.04}}
-    AudioBus: {output: hn_brass, effects: [hn_tuba_tone], volume: 0.9, pan: 0.15, sends: [{bus: hn_hall, level: 0.4}]}
-    AudioMeter: {}
+    Bus: {output: hn_brass, effects: [hn_tuba_tone], volume: 0.9, pan: 0.15, sends: [{bus: hn_hall, level: 0.4}]}
+    Meter: {}
     hn_solo { ClipPlacement: {clip: hn_tuba_solo, start: 39} }
     hn_tutti { ClipPlacement: {clip: hn_tuba_chorale, start: 48} }
   }

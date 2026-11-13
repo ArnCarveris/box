@@ -775,10 +775,10 @@ assets {
 
 isle_creature_audio {
   deep {
-    AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.8, sends: [{bus: isle_audio.hall, level: 0.9}]}
+    Bus: {output: master, kind: ChannelSfx, volume: 0.8, sends: [{bus: isle_audio.hall, level: 0.9}]}
   }
   prefab whale_call {
-    AudioOutput: {bus: deep}
+    Output: {bus: deep}
     SynthSound: {seed: 91, drift: 9}
     SynthEnvelope: {attack: 0.55, decay: 0.5, sustain: 0.8, release: 1.6, curve: 2}
     SynthFilter: {kind: SynthLowPass, cutoff: 1500, resonance: 0.25}

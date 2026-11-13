@@ -727,5 +727,5 @@ isle_hotkeys {
 }
 
 $ {
-  AudioSettings: {master_volume: 1, mute: assets.hud_muted}
+  Settings: {master_volume: 1, mute: assets.hud_muted}
 }

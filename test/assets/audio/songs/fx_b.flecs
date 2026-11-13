@@ -1,55 +1,55 @@
 using box.audio
 
-fx_b_fx_0_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_0_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_0_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_0_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_0 { AudioBus: {volume: 0.5, effects: [fx_b_fx_0_0, fx_b_fx_0_1, fx_b_fx_0_2, fx_b_fx_0_3]} }
-fx_b_fx_1_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_1_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_1_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_1_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_1 { AudioBus: {volume: 0.5, effects: [fx_b_fx_1_0, fx_b_fx_1_1, fx_b_fx_1_2, fx_b_fx_1_3]} }
-fx_b_fx_2_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_2_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_2_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_2_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_2 { AudioBus: {volume: 0.5, effects: [fx_b_fx_2_0, fx_b_fx_2_1, fx_b_fx_2_2, fx_b_fx_2_3]} }
-fx_b_fx_3_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_3_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_3_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_3_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_3 { AudioBus: {volume: 0.5, effects: [fx_b_fx_3_0, fx_b_fx_3_1, fx_b_fx_3_2, fx_b_fx_3_3]} }
-fx_b_fx_4_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_4_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_4_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_4_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_4 { AudioBus: {volume: 0.5, effects: [fx_b_fx_4_0, fx_b_fx_4_1, fx_b_fx_4_2, fx_b_fx_4_3]} }
-fx_b_fx_5_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_5_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_5_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_5_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_5 { AudioBus: {volume: 0.5, effects: [fx_b_fx_5_0, fx_b_fx_5_1, fx_b_fx_5_2, fx_b_fx_5_3]} }
-fx_b_fx_6_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_6_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_6_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_6_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_6 { AudioBus: {volume: 0.5, effects: [fx_b_fx_6_0, fx_b_fx_6_1, fx_b_fx_6_2, fx_b_fx_6_3]} }
-fx_b_fx_7_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_7_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_7_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_7_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_7 { AudioBus: {volume: 0.5, effects: [fx_b_fx_7_0, fx_b_fx_7_1, fx_b_fx_7_2, fx_b_fx_7_3]} }
-fx_b_fx_8_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_8_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_8_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_8_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_8 { AudioBus: {volume: 0.5, effects: [fx_b_fx_8_0, fx_b_fx_8_1, fx_b_fx_8_2, fx_b_fx_8_3]} }
-fx_b_fx_9_0 { AudioFilter: {kind: SynthLowPass, cutoff: 8000} }
-fx_b_fx_9_1 { AudioFilter: {kind: SynthLowPass, cutoff: 8100} }
-fx_b_fx_9_2 { AudioFilter: {kind: SynthLowPass, cutoff: 8200} }
-fx_b_fx_9_3 { AudioFilter: {kind: SynthLowPass, cutoff: 8300} }
-fx_b_bus_9 { AudioBus: {volume: 0.5, effects: [fx_b_fx_9_0, fx_b_fx_9_1, fx_b_fx_9_2, fx_b_fx_9_3]} }
+fx_b_fx_0_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_0_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_0_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_0_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_0 { Bus: {volume: 0.5, effects: [fx_b_fx_0_0, fx_b_fx_0_1, fx_b_fx_0_2, fx_b_fx_0_3]} }
+fx_b_fx_1_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_1_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_1_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_1_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_1 { Bus: {volume: 0.5, effects: [fx_b_fx_1_0, fx_b_fx_1_1, fx_b_fx_1_2, fx_b_fx_1_3]} }
+fx_b_fx_2_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_2_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_2_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_2_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_2 { Bus: {volume: 0.5, effects: [fx_b_fx_2_0, fx_b_fx_2_1, fx_b_fx_2_2, fx_b_fx_2_3]} }
+fx_b_fx_3_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_3_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_3_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_3_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_3 { Bus: {volume: 0.5, effects: [fx_b_fx_3_0, fx_b_fx_3_1, fx_b_fx_3_2, fx_b_fx_3_3]} }
+fx_b_fx_4_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_4_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_4_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_4_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_4 { Bus: {volume: 0.5, effects: [fx_b_fx_4_0, fx_b_fx_4_1, fx_b_fx_4_2, fx_b_fx_4_3]} }
+fx_b_fx_5_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_5_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_5_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_5_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_5 { Bus: {volume: 0.5, effects: [fx_b_fx_5_0, fx_b_fx_5_1, fx_b_fx_5_2, fx_b_fx_5_3]} }
+fx_b_fx_6_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_6_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_6_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_6_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_6 { Bus: {volume: 0.5, effects: [fx_b_fx_6_0, fx_b_fx_6_1, fx_b_fx_6_2, fx_b_fx_6_3]} }
+fx_b_fx_7_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_7_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_7_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_7_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_7 { Bus: {volume: 0.5, effects: [fx_b_fx_7_0, fx_b_fx_7_1, fx_b_fx_7_2, fx_b_fx_7_3]} }
+fx_b_fx_8_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_8_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_8_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_8_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_8 { Bus: {volume: 0.5, effects: [fx_b_fx_8_0, fx_b_fx_8_1, fx_b_fx_8_2, fx_b_fx_8_3]} }
+fx_b_fx_9_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
+fx_b_fx_9_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
+fx_b_fx_9_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
+fx_b_fx_9_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_b_bus_9 { Bus: {volume: 0.5, effects: [fx_b_fx_9_0, fx_b_fx_9_1, fx_b_fx_9_2, fx_b_fx_9_3]} }
 
 prefab fx_b_sound_0 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 200, level: 0.1} }
 prefab fx_b_sound_1 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 201, level: 0.1} }

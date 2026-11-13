@@ -1,8 +1,8 @@
 using box.audio
 
 include_part_bus {
-  AudioBus: {volume: 0.5}
-  AudioMeter: {}
+  Bus: {volume: 0.5}
+  Meter: {}
 }
 
 prefab include_part_tone {

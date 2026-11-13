@@ -3,32 +3,32 @@
 const A = "box.audio.";
 
 const EFFECTS = [
-  "Reverb", "Equalizer", "AudioFilter", "Compressor", "Gate", "Delay", "Phaser", "Chorus",
+  "Reverb", "Equalizer", "Filter", "Compressor", "Gate", "Delay", "Phaser", "Chorus",
   "Saturator", "TransientShaper", "Vocoder", "FrequencyShifter", "PitchShifter", "PatternGate",
   "Rotary", "BeatRepeat", "TapeStop"
 ];
 
 const NOT_EFFECTS = new Set([
-  "AudioBus", "AudioMeter", "AudioOutput", "Track", "AudioEffectState", "AudioBusState",
-  "AudioTrackState", "Instrument", "AudioSource", "AudioStream", "AudioSpatial", "AudioModulator",
-  "AudioMacro", "AudioMacroMap", "ClipPlacement", "NoteClip", "AudioClip", "AutomationClip"
+  "Bus", "Meter", "Output", "Track", "EffectState", "BusState",
+  "TrackState", "Instrument", "Source", "Stream", "Spatial", "Modulator",
+  "Macro", "MacroMap", "ClipPlacement", "NoteClip", "Clip", "AutomationClip"
 ]);
 
 const STRUCTURE_QUERIES = [
-  { expr: A + "AudioBus" },
-  { expr: A + "AudioEffectState" },
+  { expr: A + "Bus" },
+  { expr: A + "EffectState" },
   { expr: A + "ClipPlacement" },
-  { expr: A + "NoteClip || " + A + "AudioClip || " + A + "AutomationClip" },
+  { expr: A + "NoteClip || " + A + "Clip || " + A + "AutomationClip" },
   { expr: A + "Instrument" },
   { expr: A + "SynthSound || " + A + "SoundFile" },
   { expr: A + "SynthOscillator || " + A + "SynthModRoute || " + A + "SynthLfo" },
-  { expr: A + "AudioModulator || " + A + "AudioMacro || " + A + "AudioMacroMap" },
-  { expr: A + "AudioSource || " + A + "AudioStream" },
-  { expr: A + "AudioPcm", values: false },
+  { expr: A + "Modulator || " + A + "Macro || " + A + "MacroMap" },
+  { expr: A + "Source || " + A + "Stream" },
+  { expr: A + "Pcm", values: false },
   { expr: A + "Wavetable", values: false }
 ];
 
-const SINGLETONS = ["Transport", "Song", "AudioSong", "AudioSongStatus", "AudioSettings", "AudioStatus"];
+const SINGLETONS = ["Transport", "Song", "SongFile", "SongStatus", "Settings", "Status"];
 
 const DAW = window.DAW = {
   conn: null,
@@ -64,7 +64,7 @@ DAW.leaf = (path) => {
 DAW.isNone = (ref) => !ref || ref === "#0" || ref === 0;
 
 DAW.hidden = (comp) => /State$/.test(comp) || /^flecs\./.test(comp) ||
-  ["box.audio.AudioVoice", "box.audio.AudioSoundId", "box.audio.AudioSynth"].includes(comp);
+  ["box.audio.Voice", "box.audio.SoundId", "box.audio.Synth"].includes(comp);
 
 DAW.on = (fn) => DAW.listeners.push(fn);
 DAW.emit = (what) => { for (const fn of DAW.listeners) fn(what); };
@@ -103,13 +103,13 @@ DAW.list = (short, filter) => Object.values(DAW.ents)
   .filter((r) => r.comps[A + short] !== undefined && (!filter || filter(r)))
   .sort((a, b) => a.order - b.order);
 
-DAW.buses = () => DAW.list("AudioBus");
+DAW.buses = () => DAW.list("Bus");
 DAW.tracks = () => DAW.list("Track");
 DAW.effects = () => Object.values(DAW.ents).filter((r) => DAW.isEffect(r));
 DAW.clips = () => Object.values(DAW.ents).filter((r) =>
-  DAW.has(r, "NoteClip") || DAW.has(r, "AudioClip") || DAW.has(r, "AutomationClip"));
+  DAW.has(r, "NoteClip") || DAW.has(r, "Clip") || DAW.has(r, "AutomationClip"));
 DAW.sounds = () => Object.values(DAW.ents).filter((r) =>
-  (DAW.has(r, "SynthSound") || DAW.has(r, "SoundFile") || DAW.has(r, "AudioPcm")));
+  (DAW.has(r, "SynthSound") || DAW.has(r, "SoundFile") || DAW.has(r, "Pcm")));
 DAW.placementsOf = (track) => Object.values(DAW.ents)
   .filter((r) => r.parent === track && DAW.has(r, "ClipPlacement"));
 DAW.childrenOf = (path) => Object.values(DAW.ents).filter((r) => r.parent === path)
@@ -117,22 +117,22 @@ DAW.childrenOf = (path) => Object.values(DAW.ents).filter((r) => r.parent === pa
 DAW.isAudition = (path) => /^daw_audition(_\w+)?(\.|$)/.test(path || "");
 
 DAW.busOfEffect = (path) => DAW.buses().find((b) => {
-  const fx = b.comps[A + "AudioBus"].effects || [];
+  const fx = b.comps[A + "Bus"].effects || [];
   return fx.includes(path);
 });
 
 DAW.kindOf = (rec) => {
   if (!rec) return null;
   if (DAW.has(rec, "Track")) return "track";
-  if (DAW.has(rec, "AudioBus")) return "bus";
+  if (DAW.has(rec, "Bus")) return "bus";
   if (DAW.has(rec, "ClipPlacement")) return "placement";
-  if (DAW.has(rec, "NoteClip") || DAW.has(rec, "AutomationClip") || DAW.has(rec, "AudioClip")) return "clip";
+  if (DAW.has(rec, "NoteClip") || DAW.has(rec, "AutomationClip") || DAW.has(rec, "Clip")) return "clip";
   if (DAW.isEffect(rec)) return "effect";
   if (DAW.has(rec, "Instrument")) return "instrument";
-  if (DAW.has(rec, "SynthSound") || DAW.has(rec, "SoundFile") || DAW.has(rec, "AudioPcm")) return "sound";
-  if (DAW.has(rec, "AudioMacro")) return "macro";
-  if (DAW.has(rec, "AudioModulator")) return "modulator";
-  if (DAW.has(rec, "AudioSource") || DAW.has(rec, "AudioStream")) return "source";
+  if (DAW.has(rec, "SynthSound") || DAW.has(rec, "SoundFile") || DAW.has(rec, "Pcm")) return "sound";
+  if (DAW.has(rec, "Macro")) return "macro";
+  if (DAW.has(rec, "Modulator")) return "modulator";
+  if (DAW.has(rec, "Source") || DAW.has(rec, "Stream")) return "source";
   if (DAW.has(rec, "SynthOscillator")) return "layer";
   return "entity";
 };
@@ -281,7 +281,7 @@ function signature() {
     const rec = DAW.ents[path];
     parts.push("|" + path + (rec.disabled ? "!" : ""));
     for (const c of Object.keys(rec.comps).sort()) {
-      if (c === A + "AudioMeter") continue;
+      if (c === A + "Meter") continue;
       parts.push(c);
       if (c === A + "NoteClip" || c === A + "AutomationClip") continue;
       walk(rec.comps[c]);
@@ -289,7 +289,7 @@ function signature() {
   }
   const song = DAW.single.Song;
   if (song) walk(song.lanes);
-  parts.push(DAW.single.AudioSongStatus ? DAW.single.AudioSongStatus.state : "");
+  parts.push(DAW.single.SongStatus ? DAW.single.SongStatus.state : "");
   return parts.join(",");
 }
 
@@ -316,7 +316,7 @@ async function pollStructure(epoch) {
         parse(r.results, ents, order);
       });
       SINGLETONS.forEach((s, i) => { DAW.single[s] = singles[i]; });
-      DAW.hasAudio = !replies[0].error && !!singles[SINGLETONS.indexOf("AudioStatus")];
+      DAW.hasAudio = !replies[0].error && !!singles[SINGLETONS.indexOf("Status")];
       for (const p of Object.keys(ents)) if (DAW.isAudition(p)) delete ents[p];
       DAW.ents = ents;
       DAW.typesDirty = Object.values(ents).some((r) =>
@@ -338,11 +338,11 @@ async function pollStructure(epoch) {
 function ensureMeters() {
   if (!DAW.autoMeter) return;
   for (const rec of Object.values(DAW.ents)) {
-    const want = DAW.has(rec, "AudioBus") || DAW.isEffect(rec);
-    if (!want || DAW.has(rec, "AudioMeter") || rec.prefab) continue;
+    const want = DAW.has(rec, "Bus") || DAW.isEffect(rec);
+    if (!want || DAW.has(rec, "Meter") || rec.prefab) continue;
     if (DAW.requestedMeters.has(rec.path)) continue;
     DAW.requestedMeters.add(rec.path);
-    DAW.add(rec.path, A + "AudioMeter").catch(() => { });
+    DAW.add(rec.path, A + "Meter").catch(() => { });
   }
 }
 
@@ -351,7 +351,7 @@ async function pollFast(epoch) {
   if (DAW.connected && DAW.hasAudio) {
     try {
       const [meters, transport] = await Promise.all([
-        new Promise((resolve) => DAW.conn.query(A + "AudioMeter", { values: true },
+        new Promise((resolve) => DAW.conn.query(A + "Meter", { values: true },
           (r) => resolve(r), () => resolve(null))),
         getComponent("Transport")
       ]);
@@ -386,9 +386,9 @@ async function pollFast(epoch) {
 async function pollStatus(epoch) {
   if (epoch !== DAW.epoch) return;
   if (DAW.connected) {
-    const status = await getComponent("AudioStatus");
+    const status = await getComponent("Status");
     if (epoch !== DAW.epoch) return;
-    DAW.single.AudioStatus = status;
+    DAW.single.Status = status;
     DAW.emit("status");
   }
   setTimeout(() => pollStatus(epoch), 500);
@@ -501,8 +501,8 @@ DAW.noteOn = async (note, target, velocity) => {
     DAW.voices[path] = DAW.create(path).catch(() => { });
   }
   await DAW.voices[path];
-  DAW.write(path, A + "AudioOutput", { bus: target.bus || "#0" });
-  DAW.write(path, A + "AudioSource", {
+  DAW.write(path, A + "Output", { bus: target.bus || "#0" });
+  DAW.write(path, A + "Source", {
     sound: target.sound,
     pitch: Math.pow(2, (note - root) / 12),
     volume: Math.pow(vel, curve),
@@ -513,7 +513,7 @@ DAW.noteOn = async (note, target, velocity) => {
 
 DAW.noteOff = (note) => {
   const path = DAW.auditionPath + ".k" + Math.round(note * 100);
-  if (DAW.voices[path]) DAW.write(path, A + "AudioSource", { playing: false });
+  if (DAW.voices[path]) DAW.write(path, A + "Source", { playing: false });
 };
 
 DAW.releaseAudition = (sync) => {

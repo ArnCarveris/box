@@ -37,7 +37,7 @@ V.auditionFor = (path) => {
     return fromInstrument(path, track ? track.path : null);
   }
   if (kind === "sound") {
-    const out = rec.comps[A + "AudioOutput"];
+    const out = rec.comps[A + "Output"];
     const inst = DAW.list("Instrument").find((i) => i.comps[A + "Instrument"].sound === path);
     if (inst) {
       const a = V.auditionFor(inst.path);
@@ -101,12 +101,12 @@ V.arrange = (root) => {
     lanes.appendChild(UI.el("div", { class: "placeholder" }, "No tracks. Load a song in the bar above."));
   }
   for (const t of tracks) {
-    const bus = t.comps[A + "AudioBus"];
+    const bus = t.comps[A + "Bus"];
     const tr = t.comps[A + "Track"];
-    const mute = UI.toggle({ label: "M", cls: "small mute", value: bus.mute, onchange: (v) => DAW.write(t.path, A + "AudioBus", { mute: v }) });
-    const solo = UI.toggle({ label: "S", cls: "small solo", value: bus.solo, onchange: (v) => DAW.write(t.path, A + "AudioBus", { solo: v }) });
-    UI.bind(t.path, A + "AudioBus", ["mute"], (v) => mute.set(v), mute);
-    UI.bind(t.path, A + "AudioBus", ["solo"], (v) => solo.set(v), solo);
+    const mute = UI.toggle({ label: "M", cls: "small mute", value: bus.mute, onchange: (v) => DAW.write(t.path, A + "Bus", { mute: v }) });
+    const solo = UI.toggle({ label: "S", cls: "small solo", value: bus.solo, onchange: (v) => DAW.write(t.path, A + "Bus", { solo: v }) });
+    UI.bind(t.path, A + "Bus", ["mute"], (v) => mute.set(v), mute);
+    UI.bind(t.path, A + "Bus", ["solo"], (v) => solo.set(v), solo);
     const meter = UI.meter(t.path, { noScale: true });
     meter.style.height = (ROWH - 8) + "px";
     heads.appendChild(UI.el("div", {
@@ -155,7 +155,7 @@ V.resetRange = () => {
 V.clipComp = (clipPath) => {
   const r = DAW.ents[clipPath];
   if (!r) return null;
-  return r.comps[A + "NoteClip"] || r.comps[A + "AutomationClip"] || r.comps[A + "AudioClip"];
+  return r.comps[A + "NoteClip"] || r.comps[A + "AutomationClip"] || r.comps[A + "Clip"];
 };
 
 V.placementLength = (cp) => {
@@ -469,10 +469,10 @@ V.addEffectMenu = (e, bus, slot) => {
 };
 
 V.setSlot = (bus, slot, fx) => {
-  const b = DAW.val(bus, "AudioBus");
+  const b = DAW.val(bus, "Bus");
   const effects = (b.effects || ["#0", "#0", "#0", "#0"]).slice();
   effects[slot] = fx || "#0";
-  DAW.write(bus, A + "AudioBus", { effects });
+  DAW.write(bus, A + "Bus", { effects });
   DAW.sig = "";
 };
 
@@ -491,7 +491,7 @@ V.addEffect = async (bus, slot, fx) => {
 
 V.effectMenu = (e, bus, slot, fx) => {
   const rec = DAW.ents[fx];
-  const b = DAW.val(bus, "AudioBus");
+  const b = DAW.val(bus, "Bus");
   const items = [
     { label: "Open", action: () => DAW.openWindow(fx) },
     rec && rec.path !== bus ? { label: rec.disabled ? "Enable" : "Bypass (disable entity)", action: () => DAW.enable(fx, rec.disabled) } : null,
@@ -506,17 +506,17 @@ V.effectMenu = (e, bus, slot, fx) => {
 };
 
 V.moveSlot = (bus, slot, d) => {
-  const b = DAW.val(bus, "AudioBus");
+  const b = DAW.val(bus, "Bus");
   const effects = b.effects.slice();
   const j = slot + d;
   [effects[slot], effects[j]] = [effects[j], effects[slot]];
-  DAW.write(bus, A + "AudioBus", { effects });
+  DAW.write(bus, A + "Bus", { effects });
   DAW.sig = "";
 };
 
 V.strip = (rec) => {
   const path = rec.path;
-  const bus = rec.comps[A + "AudioBus"];
+  const bus = rec.comps[A + "Bus"];
   const isMaster = path === A + "master";
   const isTrack = DAW.has(rec, "Track");
   const name = isMaster ? "Master" : isTrack ? V.laneName(path) : rec.name;
@@ -543,13 +543,13 @@ V.strip = (rec) => {
     (bus.sends || []).forEach((s, i) => {
       const range = UI.el("input", { type: "range", min: 0, max: 1, step: 0.01, value: Math.min(1, s.level), title: `send to ${s.bus}` });
       range.addEventListener("input", () => {
-        const list = DAW.clone(DAW.val(path, "AudioBus").sends);
+        const list = DAW.clone(DAW.val(path, "Bus").sends);
         list[i].level = parseFloat(range.value);
-        DAW.write(path, A + "AudioBus", { sends: list });
+        DAW.write(path, A + "Bus", { sends: list });
       });
       range.addEventListener("pointerdown", () => range.classList.add("active"));
       range.addEventListener("pointerup", () => range.classList.remove("active"));
-      UI.bind(path, A + "AudioBus", ["sends", i, "level"], (v) => { range.value = Math.min(1, v); }, range);
+      UI.bind(path, A + "Bus", ["sends", i, "level"], (v) => { range.value = Math.min(1, v); }, range);
       sends.appendChild(UI.el("div", { class: "send" }, UI.el("span", { title: s.bus }, (s.pre_fader ? "pre " : "") + DAW.leaf(s.bus)), range));
     });
     const others = DAW.buses().filter((b) => b.path !== path && b.path !== A + "master" && !(bus.sends || []).some((s) => s.bus === b.path));
@@ -559,7 +559,7 @@ V.strip = (rec) => {
           label: o.path, action: () => {
             const list = DAW.clone(bus.sends || []);
             list.push({ bus: o.path, level: 0.5, pre_fader: false });
-            DAW.write(path, A + "AudioBus", { sends: list });
+            DAW.write(path, A + "Bus", { sends: list });
             DAW.sig = "";
           }
         })))
@@ -569,17 +569,17 @@ V.strip = (rec) => {
   } else {
     el.appendChild(UI.el("div", { class: "sends" }));
   }
-  const pan = UI.knob({ label: "pan", meta: UI.meta("AudioBus", "pan"), value: bus.pan, onchange: (v) => DAW.write(path, A + "AudioBus", { pan: v }) });
-  const width = UI.knob({ label: "width", meta: UI.meta("AudioBus", "width"), value: bus.width, onchange: (v) => DAW.write(path, A + "AudioBus", { width: v }) });
-  UI.bind(path, A + "AudioBus", ["pan"], (v) => pan.set(v), pan);
-  UI.bind(path, A + "AudioBus", ["width"], (v) => width.set(v), width);
+  const pan = UI.knob({ label: "pan", meta: UI.meta("Bus", "pan"), value: bus.pan, onchange: (v) => DAW.write(path, A + "Bus", { pan: v }) });
+  const width = UI.knob({ label: "width", meta: UI.meta("Bus", "width"), value: bus.width, onchange: (v) => DAW.write(path, A + "Bus", { width: v }) });
+  UI.bind(path, A + "Bus", ["pan"], (v) => pan.set(v), pan);
+  UI.bind(path, A + "Bus", ["width"], (v) => width.set(v), width);
   el.appendChild(UI.el("div", { class: "knobs" }, pan, width));
   if (!isMaster) {
     const out = UI.select({
       options: [{ value: A + "master", label: "→ master" }].concat(DAW.buses().filter((b) => b.path !== path && b.path !== A + "master")
         .map((b) => ({ value: b.path, label: "→ " + b.path }))),
       value: DAW.isNone(bus.output) ? A + "master" : bus.output,
-      onchange: (v) => DAW.write(path, A + "AudioBus", { output: v })
+      onchange: (v) => DAW.write(path, A + "Bus", { output: v })
     });
     el.appendChild(UI.el("div", { class: "out" }, out));
   } else {
@@ -587,19 +587,19 @@ V.strip = (rec) => {
   }
   const db = UI.el("div", { class: "db" });
   const fader = UI.fader({
-    value: bus.volume, onchange: (v) => DAW.write(path, A + "AudioBus", { volume: v }),
+    value: bus.volume, onchange: (v) => DAW.write(path, A + "Bus", { volume: v }),
     onlabel: (v) => { db.textContent = UI.fmt(v, { unit: "gain" }); }
   });
-  UI.bind(path, A + "AudioBus", ["volume"], (v) => fader.set(v), fader);
+  UI.bind(path, A + "Bus", ["volume"], (v) => fader.set(v), fader);
   const meter = UI.meter(path);
   el.appendChild(UI.el("div", { class: "fader-row" }, fader, meter));
   el.appendChild(db);
-  const mute = UI.toggle({ label: "M", cls: "small mute", value: bus.mute, onchange: (v) => DAW.write(path, A + "AudioBus", { mute: v }) });
-  UI.bind(path, A + "AudioBus", ["mute"], (v) => mute.set(v), mute);
+  const mute = UI.toggle({ label: "M", cls: "small mute", value: bus.mute, onchange: (v) => DAW.write(path, A + "Bus", { mute: v }) });
+  UI.bind(path, A + "Bus", ["mute"], (v) => mute.set(v), mute);
   const btns = UI.el("div", { class: "btns" }, mute);
   if (!isMaster) {
-    const solo = UI.toggle({ label: "S", cls: "small solo", value: bus.solo, onchange: (v) => DAW.write(path, A + "AudioBus", { solo: v }) });
-    UI.bind(path, A + "AudioBus", ["solo"], (v) => solo.set(v), solo);
+    const solo = UI.toggle({ label: "S", cls: "small solo", value: bus.solo, onchange: (v) => DAW.write(path, A + "Bus", { solo: v }) });
+    UI.bind(path, A + "Bus", ["solo"], (v) => solo.set(v), solo);
     btns.appendChild(solo);
   }
   el.appendChild(btns);
@@ -615,9 +615,9 @@ V.mixer = (root) => {
   const el = UI.el("div", { class: "mixer" });
   const buses = DAW.buses();
   const tracks = V.trackOrder();
-  const rank = { AudioChannelGroup: 1, AudioChannelReturn: 2, AudioChannelSfx: 3 };
+  const rank = { ChannelGroup: 1, ChannelReturn: 2, ChannelSfx: 3 };
   const rest = buses.filter((b) => !DAW.has(b, "Track") && b.path !== A + "master")
-    .sort((a, b) => rank[a.comps[A + "AudioBus"].kind] - rank[b.comps[A + "AudioBus"].kind] || a.order - b.order);
+    .sort((a, b) => rank[a.comps[A + "Bus"].kind] - rank[b.comps[A + "Bus"].kind] || a.order - b.order);
   for (const r of tracks.concat(rest)) el.appendChild(V.strip(r));
   const master = DAW.ents[A + "master"];
   if (master) el.appendChild(V.strip(master));
@@ -626,15 +626,15 @@ V.mixer = (root) => {
 
 V.modulation = (root) => {
   const el = UI.el("div", { class: "macro-grid" });
-  const macros = DAW.list("AudioMacro");
+  const macros = DAW.list("Macro");
   el.appendChild(UI.el("div", { class: "section-title" }, "Macros"));
   if (!macros.length) el.appendChild(UI.el("div", { style: { color: "var(--fg2)" } }, "No macros"));
   for (const m of macros) {
-    const v = m.comps[A + "AudioMacro"];
-    const k = UI.knob({ label: m.name, meta: { min: 0, max: 1, def: 0 }, value: v.value, onchange: (x) => DAW.write(m.path, A + "AudioMacro", { value: x }) });
-    UI.bind(m.path, A + "AudioMacro", ["value"], (x) => k.set(x), k);
-    const maps = DAW.childrenOf(m.path).filter((r) => DAW.has(r, "AudioMacroMap")).map((r) => {
-      const mm = r.comps[A + "AudioMacroMap"];
+    const v = m.comps[A + "Macro"];
+    const k = UI.knob({ label: m.name, meta: { min: 0, max: 1, def: 0 }, value: v.value, onchange: (x) => DAW.write(m.path, A + "Macro", { value: x }) });
+    UI.bind(m.path, A + "Macro", ["value"], (x) => k.set(x), k);
+    const maps = DAW.childrenOf(m.path).filter((r) => DAW.has(r, "MacroMap")).map((r) => {
+      const mm = r.comps[A + "MacroMap"];
       return UI.el("div", { title: `${mm.target} ${DAW.short(mm.component)}.${mm.member}` },
         `${DAW.leaf(mm.target)}.${mm.member} ${UI.fmt(mm.min, {})}→${UI.fmt(mm.max, {})}`);
     });
@@ -642,11 +642,11 @@ V.modulation = (root) => {
       k, UI.el("a", { class: "link", onclick: () => DAW.openWindow(m.path) }, "edit maps"), UI.el("div", { class: "maps" }, maps)));
   }
   el.appendChild(UI.el("div", { class: "section-title" }, "Modulators"));
-  const mods = DAW.list("AudioModulator");
+  const mods = DAW.list("Modulator");
   if (!mods.length) el.appendChild(UI.el("div", { style: { color: "var(--fg2)" } }, "No modulators"));
   for (const m of mods) {
-    const mv = m.comps[A + "AudioModulator"];
-    el.appendChild(V.cardFor(m.path, A + "AudioModulator", {
+    const mv = m.comps[A + "Modulator"];
+    el.appendChild(V.cardFor(m.path, A + "Modulator", {
       title: m.name, sel: DAW.sel === m.path,
       buttons: [UI.el("span", { class: "comp" }, `${DAW.leaf(mv.target)} ${DAW.short(mv.component)}.${mv.member}`), V.enableBtn(m)]
     }));
@@ -663,7 +663,7 @@ V.enableBtn = (rec) => UI.el("button", {
 V.cardFor = (path, comp, opts) => {
   opts = Object.assign({}, opts);
   const s = DAW.short(comp);
-  if (s === "Equalizer" || s === "AudioFilter") opts.graph = ED.responseGraph(path, comp);
+  if (s === "Equalizer" || s === "Filter") opts.graph = ED.responseGraph(path, comp);
   if (/Envelope$/.test(s) && s !== "SynthPitchEnvelope") opts.graph = ED.envelopeGraph(path, comp);
   return UI.card(path, comp, opts);
 };
@@ -690,7 +690,7 @@ V.updateGr = () => {
 };
 
 V.slot = (busPath, i) => {
-  const fx = DAW.val(busPath, "AudioBus").effects[i];
+  const fx = DAW.val(busPath, "Bus").effects[i];
   if (DAW.isNone(fx)) {
     return [UI.el("div", { class: "slot-empty" }, `slot ${i + 1}`,
       UI.el("button", { class: "small", text: "+ effect", onclick: (e) => V.addEffectMenu(e, busPath, i) }))];
@@ -709,7 +709,7 @@ V.slot = (busPath, i) => {
 };
 
 V.chain = (busPath) => {
-  const bus = DAW.val(busPath, "AudioBus");
+  const bus = DAW.val(busPath, "Bus");
   const chain = UI.el("div", { class: "chain" });
   (bus.effects || []).forEach((_, i) => V.slot(busPath, i).forEach((c) => chain.appendChild(c)));
   return chain;
@@ -721,7 +721,7 @@ V.synthEditor = (soundPath) => {
   if (!rec) return wrap;
   const cards = UI.el("div", { class: "chain" });
   for (const comp of Object.keys(rec.comps)) {
-    if (DAW.hidden(comp) || rec.comps[comp] === null || comp === A + "AudioPcm") continue;
+    if (DAW.hidden(comp) || rec.comps[comp] === null || comp === A + "Pcm") continue;
     cards.appendChild(V.cardFor(soundPath, comp, { title: comp === A + "SynthSound" ? rec.name : null }));
   }
   wrap.appendChild(UI.el("div", { class: "section-title" }, "Sound " + soundPath));
@@ -799,7 +799,7 @@ V.clipEditor = (clipPath, body, placementPath) => {
     body.appendChild(ED.curveEditor(clipPath, { placement: placementPath }));
     body.appendChild(UI.el("div", { class: "chain", style: { marginTop: "8px" } }, V.cardFor(clipPath, A + "AutomationClip", { skip: ["curve"] })));
   } else {
-    body.appendChild(UI.el("div", { class: "chain" }, V.cardFor(clipPath, A + "AudioClip", { title: DAW.leaf(clipPath) })));
+    body.appendChild(UI.el("div", { class: "chain" }, V.cardFor(clipPath, A + "Clip", { title: DAW.leaf(clipPath) })));
   }
 };
 
@@ -822,7 +822,7 @@ V.renderDetail = () => {
     UI.el("span", { class: "title" }, kind === "track" ? V.laneName(rec.path) : DAW.selInsert ? DAW.effectComps(rec).map(DAW.short).join(" / ") : rec.name),
     UI.el("span", { class: "kind" }, `${kind}  ${rec.path}${rec.prefab ? "  (prefab)" : ""}${rec.script ? "  from " + rec.script : ""}`),
     UI.el("span", { class: "grow" }));
-  if (kind !== "track" && kind !== "bus" && rec.path !== A + "master" && !DAW.has(rec, "AudioBus")) head.appendChild(V.enableBtn(rec));
+  if (kind !== "track" && kind !== "bus" && rec.path !== A + "master" && !DAW.has(rec, "Bus")) head.appendChild(V.enableBtn(rec));
   if (!DAW.detailPath) {
     head.appendChild(UI.el("button", { class: "small", text: "window", title: "Open in its own window", onclick: () => DAW.openWindow(rec.path) }));
     head.appendChild(UI.el("button", { class: "small", text: "×", title: "Close (Escape)", onclick: () => G.clearFocus() }));
@@ -840,11 +840,11 @@ V.renderDetail = () => {
     body.appendChild(UI.el("div", { class: "section-title" }, "Inserts"));
     body.appendChild(V.chain(rec.path));
     body.appendChild(UI.el("div", { class: "section-title" }, "Channel"));
-    const row = UI.el("div", { class: "chain" }, V.cardFor(rec.path, A + "AudioBus", { skip: ["effects"] }));
+    const row = UI.el("div", { class: "chain" }, V.cardFor(rec.path, A + "Bus", { skip: ["effects"] }));
     if (kind === "track") row.appendChild(V.cardFor(rec.path, A + "Track", {}));
     for (const comp of Object.keys(rec.comps)) {
       if (DAW.hidden(comp) || rec.comps[comp] === null || DAW.effectComp(comp)) continue;
-      if ([A + "AudioBus", A + "Track", A + "AudioMeter"].includes(comp)) continue;
+      if ([A + "Bus", A + "Track", A + "Meter"].includes(comp)) continue;
       row.appendChild(V.cardFor(rec.path, comp, {}));
     }
     body.appendChild(row);
@@ -878,15 +878,15 @@ V.renderDetail = () => {
     body.appendChild(ED.keyboard(() => V.auditionFor(rec.parent)));
   } else if (kind === "macro") {
     body.appendChild(V.genericCards(rec.path));
-    const maps = DAW.childrenOf(rec.path).filter((r) => DAW.has(r, "AudioMacroMap"));
+    const maps = DAW.childrenOf(rec.path).filter((r) => DAW.has(r, "MacroMap"));
     if (maps.length) {
       body.appendChild(UI.el("div", { class: "section-title" }, "Maps"));
-      body.appendChild(UI.el("div", { class: "chain" }, maps.map((m) => V.cardFor(m.path, A + "AudioMacroMap", { title: m.name }))));
+      body.appendChild(UI.el("div", { class: "chain" }, maps.map((m) => V.cardFor(m.path, A + "MacroMap", { title: m.name }))));
     }
   } else {
     body.appendChild(V.genericCards(rec.path));
-    if (DAW.has(rec, "AudioSource")) {
-      const s = rec.comps[A + "AudioSource"];
+    if (DAW.has(rec, "Source")) {
+      const s = rec.comps[A + "Source"];
       if (!DAW.isNone(s.sound)) body.appendChild(UI.el("a", { class: "link", onclick: () => DAW.select(s.sound) }, `sound ${s.sound}`));
     }
   }

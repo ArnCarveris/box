@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const USAGE = `Checks music streams of box.audio (AudioStream) in headless Chrome with
+const USAGE = `Checks music streams of box.audio (Stream) in headless Chrome with
 test/integration/web/audio_stream.flecs, whose stream plays test/assets/audio/tone.ogg, 480 Hz at a
 peak of 0.5 in a loop of 0.25 s. The server serves the file by its path; the page does not
 preload it, so the stream fetches it next to the page.
@@ -17,7 +17,7 @@ preload it, so the stream fetches it next to the page.
 start at a trusted click, a capture of two seconds (audio.capture 2) with 480 Hz at 0.5 and no
 step larger than the sine's over its loop crossings, at least 1.5 s decoded ahead in the worklet
 and no underrun after a 500 ms stall of the main thread, the decode cost per frame
-(AudioStreamStatus.decode_ms and the longest animation frame), the file fetched once and not in
+(StreamStatus.decode_ms and the longest animation frame), the file fetched once and not in
 the file system of the page, one error and a running page for a file served at no path, and
 tone_960.ogg, which the page preloads with ?preload=, playing 960 Hz from the page's file system
 without a fetch. Exits 0 on a pass, 1 on a failure and 2 when Chrome or the page cannot start.`;
@@ -235,7 +235,7 @@ async function main() {
         return { raw: out };
       }
     };
-    const streamOf = (entity) => component(entity, 'AudioStreamStatus');
+    const streamOf = (entity) => component(entity, 'StreamStatus');
     const worklet = () => evaluate('Module.boxAudio.stats()');
 
     // Before the gesture the stream loops, so it starts and waits for the gesture
@@ -254,8 +254,8 @@ async function main() {
     }
     expect(await waitFor('Module.boxAudio.ctx.state === "running"', 5000),
       'the gesture did not start the audio');
-    expect(await waitFor(`${shell('get music box.audio.AudioStreamStatus')}` +
-      `.includes('AudioStreamPlaying')`, 5000), 'the stream does not play');
+    expect(await waitFor(`${shell('get music box.audio.StreamStatus')}` +
+      `.includes('StreamPlaying')`, 5000), 'the stream does not play');
     await sleep(1500);
 
     // The frequency and the level, and no step over the loop crossings, 8 of them in 2 s
@@ -318,9 +318,9 @@ async function main() {
     await evaluate(shell('rm music'));
     await sleep(300);
     await evaluate(shell('script_write missing_script ' + JSON.stringify(
-      'using box.audio\nmissing {\n  AudioStream: {path: "test/assets/audio/nowhere.ogg"}\n}\n')));
-    const failed = await waitFor(`${shell('get missing box.audio.AudioStreamStatus')}` +
-      `.includes('AudioStreamFailed')`, 5000);
+      'using box.audio\nmissing {\n  Stream: {path: "test/assets/audio/nowhere.ogg"}\n}\n')));
+    const failed = await waitFor(`${shell('get missing box.audio.StreamStatus')}` +
+      `.includes('StreamFailed')`, 5000);
     const drawn = await evaluate('window.boxFrames');
     await sleep(1000);
     const drawnAfter = await evaluate('window.boxFrames');
@@ -337,9 +337,9 @@ async function main() {
     await sleep(300);
     const fetchesBefore = requests[PRELOADED] || 0;
     await evaluate(shell('script_write preloaded_script ' + JSON.stringify(
-      'using box.audio\npreloaded {\n  AudioStream: {path: "test/assets/audio/tone_960.ogg"}\n}\n')));
-    expect(await waitFor(`${shell('get preloaded box.audio.AudioStreamStatus')}` +
-      `.includes('AudioStreamPlaying')`, 5000), 'the preloaded file does not play');
+      'using box.audio\npreloaded {\n  Stream: {path: "test/assets/audio/tone_960.ogg"}\n}\n')));
+    expect(await waitFor(`${shell('get preloaded box.audio.StreamStatus')}` +
+      `.includes('StreamPlaying')`, 5000), 'the preloaded file does not play');
     await sleep(500);
     const path2 = await evaluate(shell('audio.capture 1'));
     let capture2 = null;

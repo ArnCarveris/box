@@ -3,19 +3,19 @@
 using box.audio
 
 grit {
-  AudioBus: {effects: [grit]}
-  AudioFilter: {cutoff: 1000}
+  Bus: {effects: [grit]}
+  Filter: {cutoff: 1000}
 }
 
-// No member of AudioFilter is called brightness
+// No member of Filter is called brightness
 prefab unknown_member {
-  AutomationClip: {target: grit, component: AudioFilter, member: "brightness",
+  AutomationClip: {target: grit, component: Filter, member: "brightness",
     curve: {keys: [{0, 0}, {4, 1}]}}
 }
 
 // The kind of a filter is not continuous
 prefab not_continuous {
-  AutomationClip: {target: grit, component: AudioFilter, member: "kind",
+  AutomationClip: {target: grit, component: Filter, member: "kind",
     curve: {keys: [{0, 0}, {4, 1}]}}
 }
 

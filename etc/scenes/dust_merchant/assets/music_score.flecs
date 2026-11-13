@@ -10,9 +10,9 @@ using flecs.script.math
 using box.app
 using box.audio
 
-hall { AudioBus: {output: master, kind: AudioChannelReturn, effects: [hall]}; Reverb: {decay: 1.6, damping: 0.55, predelay: 0.03, size: 0.7} }
-band { AudioBus: {output: master, volume: 0.55, sends: [{bus: hall, level: 0.35}]} }
-kit { AudioBus: {output: master, volume: 0.5, sends: [{bus: hall, level: 0.12}]} }
+hall { Bus: {output: master, kind: ChannelReturn, effects: [hall]}; Reverb: {decay: 1.6, damping: 0.55, predelay: 0.03, size: 0.7} }
+band { Bus: {output: master, volume: 0.55, sends: [{bus: hall, level: 0.35}]} }
+kit { Bus: {output: master, volume: 0.5, sends: [{bus: hall, level: 0.12}]} }
 
 // A chord of three notes and an octave, swelling over a bar
 template Pad {
@@ -20,7 +20,7 @@ template Pad {
   prop b: f32 = 261.63
   prop c: f32 = 329.63
 
-  AudioOutput: {bus: band}
+  Output: {bus: band}
   SynthSound: {seed: 5}
   SynthEnvelope: {attack: 0.7, decay: 0.5, sustain: 0.75, hold: 0.6, release: 1.1}
   SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15}
@@ -35,7 +35,7 @@ template Pad {
 template Bass {
   prop f: f32 = 55
 
-  AudioOutput: {bus: band}
+  Output: {bus: band}
   SynthSound: {level_variance: 0.05}
   SynthEnvelope: {attack: 0.004, decay: 0.42}
   SynthFilter: {kind: SynthLowPass, cutoff: 220, resonance: 0.25}
@@ -48,7 +48,7 @@ template Bass {
 template Lead {
   prop f: f32 = 440
 
-  AudioOutput: {bus: band}
+  Output: {bus: band}
   SynthSound: {level_variance: 0.08}
   SynthEnvelope: {attack: 0.006, decay: 0.5}
   SynthFilter: {kind: SynthLowPass, cutoff: 700, resonance: 0.3}
@@ -62,7 +62,7 @@ template Lead {
 }
 
 prefab Kick {
-  AudioOutput: {bus: kit}
+  Output: {bus: kit}
   SynthSound: {}
   SynthEnvelope: {attack: 0.002, decay: 0.28}
   SynthFilter: {kind: SynthLowPass, cutoff: 2400}
@@ -74,7 +74,7 @@ prefab Kick {
 }
 
 prefab Rim {
-  AudioOutput: {bus: kit}
+  Output: {bus: kit}
   SynthSound: {seed: 4, level_variance: 0.1}
   SynthEnvelope: {attack: 0.001, decay: 0.06}
   SynthFilter: {kind: SynthBandPass, cutoff: 1800, resonance: 0.5}
@@ -83,7 +83,7 @@ prefab Rim {
 }
 
 prefab Hat {
-  AudioOutput: {bus: kit}
+  Output: {bus: kit}
   SynthSound: {seed: 9, level_variance: 0.2}
   SynthEnvelope: {attack: 0.001, decay: 0.045}
   SynthFilter: {kind: SynthHighPass, cutoff: 7000, resonance: 0.2}

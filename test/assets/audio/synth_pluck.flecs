@@ -2,12 +2,12 @@
 // Synth suite of test/cpu/audio checks that they parse, compile without errors, play and end.
 using box.audio
 
-music { AudioBus: {volume: 1} }
+music { Bus: {volume: 1} }
 
 // A guitar: a steel string on G3 plucked with a pick, through the lowpass of its body, 3 s,
 // with a vibrato of 10 cents at 5.5 Hz that the finger brings in once the note is held
 prefab Guitar {
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {level_variance: 0.05}
   SynthFilter: {kind: SynthLowPass, cutoff: 4500}
   string {
@@ -20,7 +20,7 @@ prefab Guitar {
 // A 12 string guitar: G3 strung as a pair of steel strings 6 cents apart across half of the
 // stereo field, with a quieter octave string in the center, 3 strings, 3 s
 prefab TwelveString {
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {level_variance: 0.05}
   SynthFilter: {kind: SynthLowPass, cutoff: 5000}
   string {
@@ -37,7 +37,7 @@ prefab TwelveString {
 // A koto: a bright silk string on D4 plucked with a hard pick, pressed up a semitone after
 // the pluck, and a quieter string an octave up that dies sooner, 1.5 s
 prefab Koto {
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {}
   string {
     SynthOscillator: {wave: SynthPluck, frequency: 293.66, frequency_end: 311.13, sweep: 0.25, level: 0.5}
@@ -53,7 +53,7 @@ prefab Koto {
 // a finger, which rings out on its own, over a soft sine for the body of the soundboard
 template Harp {
   prop f: f32 = 220
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {level_variance: 0.1}
   SynthFilter: {kind: SynthLowPass, cutoff: 3500, resonance: 0.05}
   pluck { SynthOscillator: {wave: SynthPluck, frequency: f, level: 0.45}; SynthString: {decay: 2.2, brightness: 0.35, hardness: 0.45} }

@@ -4,12 +4,12 @@ using box.material
 box { audio { Song { Rgb: {200, 100, 50} } } }
 
 basic_room {
-  AudioBus: {kind: AudioChannelReturn, effects: [basic_room]}
+  Bus: {kind: ChannelReturn, effects: [basic_room]}
   Reverb: {decay: 1, damping: 0.5, size: 0.4}
 }
 
 basic_group {
-  AudioBus: {volume: 0.8}
+  Bus: {volume: 0.8}
 }
 
 prefab basic_tone {
@@ -30,8 +30,8 @@ prefab basic_notes {
 
 basic_lead {
   Track: {instrument: basic_inst}
-  AudioBus: {output: basic_group, sends: [{bus: basic_room, level: 0.3}]}
-  AudioMeter: {}
+  Bus: {output: basic_group, sends: [{bus: basic_room, level: 0.3}]}
+  Meter: {}
   phrase { ClipPlacement: {clip: basic_notes, start: 0, duration: 12, loop: true} }
 }
 

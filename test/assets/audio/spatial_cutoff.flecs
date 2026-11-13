@@ -1,5 +1,5 @@
 // A spatial scene with a distance filter for the Script suite of test/cpu/audio: an
-// AudioListener at the origin that looks down -Z and a looping buzz at the Nyquist, samples of
+// Listener at the origin that looks down -Z and a looping buzz at the Nyquist, samples of
 // 0.5 and -0.5, 25 units in front of it. The buzz does not fall off with distance (rolloff 0),
 // but its low-pass closes from open at min_distance 1 to 400 Hz at max_distance 50, which
 // takes the buzz to near silence. A click that box.audio.play_at plays at the listener, within
@@ -9,22 +9,22 @@ using box.audio
 
 ears {
   Position: {0, 0, 0}
-  AudioListener
+  Listener
 }
 
 buzz {
-  AudioPcm: {samples: [0.5, -0.5, 0.5, -0.5]}
+  Pcm: {samples: [0.5, -0.5, 0.5, -0.5]}
 }
 
 click {
-  AudioPcm: {samples: [0.4, 0.4, 0.4], sample_rate: 10}
-  AudioSpatial: {rolloff: 0, cutoff: 400}
+  Pcm: {samples: [0.4, 0.4, 0.4], sample_rate: 10}
+  Spatial: {rolloff: 0, cutoff: 400}
 }
 
 buzz_source {
   Position: {0, 0, -25}
-  AudioSource: {sound: buzz, loop: true}
-  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0, cutoff: 400}
+  Source: {sound: buzz, loop: true}
+  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0, cutoff: 400}
 }
 
 const played: bool = box.audio.play_at(click, {0, 0, -0.5}, 1.0)

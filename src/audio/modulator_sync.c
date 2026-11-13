@@ -126,7 +126,7 @@ static bool box_audio_modulator_build(
     cmd->depth = mod->depth;
     if (spec.kind == BOX_AUDIO_TARGET_MACRO) {
         if (mod->scale == AudioModOctaves) {
-            *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to the value "
+            *error = flecs_asprintf("ModOctaves applies to a frequency, not to the value "
                 "of a macro");
             goto done;
         }
@@ -146,8 +146,8 @@ static bool box_audio_modulator_build(
         cmd->scale = BOX_AUDIO_MOD_LINEAR;
     } else if (spec.kind == BOX_AUDIO_TARGET_BUS) {
         if (mod->scale == AudioModOctaves) {
-            *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to '%s' of "
-                "AudioBus", mod->member);
+            *error = flecs_asprintf("ModOctaves applies to a frequency, not to '%s' of "
+                "Bus", mod->member);
             goto done;
         }
 
@@ -179,7 +179,7 @@ static bool box_audio_modulator_build(
         if (mod->scale == AudioModOctaves &&
             !box_audio_member_frequency(mod->component, mod->member))
         {
-            *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to '%s'",
+            *error = flecs_asprintf("ModOctaves applies to a frequency, not to '%s'",
                 mod->member);
             goto done;
         }
@@ -496,7 +496,7 @@ void box_audio_modulators_init(
     box_audio_module_t *state)
 {
     state->modulators.query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioModulators" }),
+        .entity = ecs_entity(world, { .name = "Modulators" }),
         .terms = {
             { .id = ecs_id(AudioModulator), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioModulatorState), .src.id = EcsSelf }
@@ -506,7 +506,7 @@ void box_audio_modulators_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioModulatorSet" }),
+        .entity = ecs_entity(world, { .name = "ModulatorSet" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(AudioModulator), .src.id = EcsSelf }},
         .events = { EcsOnSet },

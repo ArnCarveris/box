@@ -51,8 +51,8 @@ void Module_defaults_script(void) {
     ECS_IMPORT(world, Box);
     test_assert(ecs_script_run(world, "defaults",
         "using box.audio\n"
-        "bus { AudioBus: {} }\n"
-        "src { AudioSource: {} }\n", NULL) == 0);
+        "bus { Bus: {} }\n"
+        "src { Source: {} }\n", NULL) == 0);
 
     ecs_entity_t bus = ecs_lookup(world, "bus");
     ecs_entity_t src = ecs_lookup(world, "src");
@@ -72,8 +72,8 @@ void Module_partial_keeps_defaults(void) {
     ECS_IMPORT(world, Box);
     test_assert(ecs_script_run(world, "partial",
         "using box.audio\n"
-        "bus { AudioBus: {pan: 0.5} }\n"
-        "src { AudioSource: {loop: true} }\n", NULL) == 0);
+        "bus { Bus: {pan: 0.5} }\n"
+        "src { Source: {loop: true} }\n", NULL) == 0);
 
     const AudioBus *bus = ecs_get(world, ecs_lookup(world, "bus"), AudioBus);
     test_flt(bus->pan, 0.5f);

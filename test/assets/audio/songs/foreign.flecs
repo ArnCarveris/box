@@ -1,11 +1,11 @@
 using box.audio
 
 foreign_bus {
-  AudioBus: {}
+  Bus: {}
 }
 
 host_room {
-  AudioBus: {volume: 0.25}
+  Bus: {volume: 0.25}
 }
 
 $ { Song: {title: "Foreign", tempo: 120, beats: 8} }

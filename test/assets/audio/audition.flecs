@@ -8,13 +8,13 @@ verb {
 }
 
 hall {
-  AudioBus: {volume: 1, effects: [verb]}
+  Bus: {volume: 1, effects: [verb]}
 }
 
 // Silence over the start ramp of a voice, then one sample of 0.5
 click {
-  AudioPcm: {samples: [0, 0, 0, 0, 0.5], sample_rate: 400}
-  AudioOutput: {bus: hall}
+  Pcm: {samples: [0, 0, 0, 0, 0.5], sample_rate: 400}
+  Output: {bus: hall}
 }
 
 // A sine at 440 Hz that sustains at 0.5 while a note holds and releases over 20 ms

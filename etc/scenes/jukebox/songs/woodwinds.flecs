@@ -5,19 +5,19 @@ box { audio { Song { Rgb: {176, 196, 112} } } }
 assets {
 
   ww_hall {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.32, effects: [ww_hall]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.32, effects: [ww_hall]}
     Reverb: {decay: 1.9, damping: 0.55, predelay: 0.024, size: 0.8}
   }
   ww_winds_eq {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 35},
-      {kind: AudioEqPeak, frequency: 3200, gain: -1, q: 0.8}
+      {kind: EqLowCut, frequency: 35},
+      {kind: EqPeak, frequency: 3200, gain: -1, q: 0.8}
     ]}
   }
   ww_winds_glue { Compressor: {threshold: -14, ratio: 1.8, attack: 0.03, release: 0.3, knee: 8, makeup: 0.5} }
   ww_winds {
-    AudioBus: {output: master, volume: 0.7, effects: [ww_winds_eq, ww_winds_glue]}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.7, effects: [ww_winds_eq, ww_winds_glue]}
+    Meter: {}
   }
 
   prefab ww_flute_sound {
@@ -517,48 +517,48 @@ assets {
 
   ww_track_flute {
     Track: {instrument: ww_flute_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: ww_winds, volume: 0.95, pan: -0.3, sends: [{bus: ww_hall, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: ww_winds, volume: 0.95, pan: -0.3, sends: [{bus: ww_hall, level: 0.3}]}
+    Meter: {}
     ww_solo { ClipPlacement: {clip: ww_flute_solo, start: 0} }
     ww_tutti { ClipPlacement: {clip: ww_flute_tutti, start: 48} }
   }
 
   ww_track_oboe {
     Track: {instrument: ww_oboe_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: ww_winds, volume: 1, pan: -0.05, sends: [{bus: ww_hall, level: 0.28}]}
-    AudioMeter: {}
+    Bus: {output: ww_winds, volume: 1, pan: -0.05, sends: [{bus: ww_hall, level: 0.28}]}
+    Meter: {}
     ww_solo { ClipPlacement: {clip: ww_oboe_solo, start: 8} }
     ww_tutti { ClipPlacement: {clip: ww_oboe_tutti, start: 48} }
   }
 
   ww_track_clarinet {
     Track: {instrument: ww_clarinet_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: ww_winds, volume: 1.4, pan: 0.2, sends: [{bus: ww_hall, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: ww_winds, volume: 1.4, pan: 0.2, sends: [{bus: ww_hall, level: 0.3}]}
+    Meter: {}
     ww_solo { ClipPlacement: {clip: ww_clarinet_solo, start: 16} }
     ww_tutti { ClipPlacement: {clip: ww_clarinet_tutti, start: 48} }
   }
 
   ww_track_bassoon {
     Track: {instrument: ww_bassoon_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: ww_winds, volume: 2, pan: 0.4, sends: [{bus: ww_hall, level: 0.28}]}
-    AudioMeter: {}
+    Bus: {output: ww_winds, volume: 2, pan: 0.4, sends: [{bus: ww_hall, level: 0.28}]}
+    Meter: {}
     ww_solo { ClipPlacement: {clip: ww_bassoon_solo, start: 24} }
     ww_tutti { ClipPlacement: {clip: ww_bassoon_tutti, start: 48} }
   }
 
   ww_track_sax {
     Track: {instrument: ww_sax_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: ww_winds, volume: 1, pan: -0.15, sends: [{bus: ww_hall, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: ww_winds, volume: 1, pan: -0.15, sends: [{bus: ww_hall, level: 0.3}]}
+    Meter: {}
     ww_solo { ClipPlacement: {clip: ww_sax_solo, start: 32} }
     ww_tutti { ClipPlacement: {clip: ww_sax_tutti, start: 48} }
   }
 
   ww_track_piccolo {
     Track: {instrument: ww_piccolo_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: ww_winds, volume: 0.95, pan: -0.5, sends: [{bus: ww_hall, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: ww_winds, volume: 0.95, pan: -0.5, sends: [{bus: ww_hall, level: 0.3}]}
+    Meter: {}
     ww_solo { ClipPlacement: {clip: ww_piccolo_solo, start: 40} }
     ww_tutti { ClipPlacement: {clip: ww_piccolo_tutti, start: 64} }
   }

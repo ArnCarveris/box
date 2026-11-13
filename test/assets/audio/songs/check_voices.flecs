@@ -91,7 +91,7 @@ prefab check_voice_notes {
 
 check_voices {
   Track: {instrument: check_voice_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_voice_notes, start: 0, duration: 16} }
 }
 

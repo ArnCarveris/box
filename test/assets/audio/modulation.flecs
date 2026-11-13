@@ -4,11 +4,11 @@
 using box.audio
 
 keys {
-  AudioBus: {output: master, effects: [keys]}
+  Bus: {output: master, effects: [keys]}
   Phaser: {stages: 6, rate: 0.3, feedback: 0.5}
 }
 
 pad {
-  AudioBus: {output: master, effects: [pad]}
+  Bus: {output: master, effects: [pad]}
   Chorus: {voices: 3, spread: 1, mix: 0.4}
 }

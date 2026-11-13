@@ -34,7 +34,7 @@ spinner {
 
 // One period of a sine in 20 samples at 8800 Hz plays at 440 Hz at any rate of the output
 tone {
-  AudioPcm: {
+  Pcm: {
     samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
       0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
       -0.146946, -0.0772542],
@@ -45,16 +45,16 @@ tone {
 // Three seconds of a constant 0.1, which would still play right after a gesture if it had
 // not been dropped
 click {
-  AudioPcm: {samples: [0.1, 0.1, 0.1, 0.1], sample_rate: 1}
+  Pcm: {samples: [0.1, 0.1, 0.1, 0.1], sample_rate: 1}
 }
 
 music {
-  AudioBus: {volume: 1}
+  Bus: {volume: 1}
 }
 
 tone_source {
-  AudioSource: {sound: tone, loop: true}
-  AudioOutput: {bus: music}
+  Source: {sound: tone, loop: true}
+  Output: {bus: music}
 }
 
 const early: bool = box.audio.play(click, 1.0)

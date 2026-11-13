@@ -221,8 +221,8 @@ static bool box_audio_macro_map_build(
 
     if (spec.kind == BOX_AUDIO_TARGET_BUS) {
         if (map->scale == AudioModOctaves) {
-            *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to '%s' of "
-                "AudioBus", map->member);
+            *error = flecs_asprintf("ModOctaves applies to a frequency, not to '%s' of "
+                "Bus", map->member);
             goto done;
         }
 
@@ -254,13 +254,13 @@ static bool box_audio_macro_map_build(
         if (map->scale == AudioModOctaves &&
             !box_audio_member_frequency(map->component, map->member))
         {
-            *error = flecs_asprintf("AudioModOctaves applies to a frequency, not to '%s'",
+            *error = flecs_asprintf("ModOctaves applies to a frequency, not to '%s'",
                 map->member);
             goto done;
         }
 
         if (map->scale == AudioModOctaves && !(min > 0 && max > 0)) {
-            *error = flecs_asprintf("AudioModOctaves needs a min and a max above 0, not %g "
+            *error = flecs_asprintf("ModOctaves needs a min and a max above 0, not %g "
                 "and %g", (double)min, (double)max);
             goto done;
         }
@@ -423,7 +423,7 @@ static int32_t box_audio_macro_maps_collect(
             if (!owner) {
                 ms[i].status = BOX_AUDIO_MACRO_STATUS_ERROR;
                 box_audio_macro_map_error(world, state, e, &ms[i],
-                    "it is not a child of an entity with AudioMacro");
+                    "it is not a child of an entity with Macro");
                 continue;
             }
 
@@ -650,7 +650,7 @@ void box_audio_macros_init(
     box_audio_module_t *state)
 {
     state->macros.query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioMacros" }),
+        .entity = ecs_entity(world, { .name = "Macros" }),
         .terms = {
             { .id = ecs_id(AudioMacro), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioMacroState), .src.id = EcsSelf }
@@ -660,7 +660,7 @@ void box_audio_macros_init(
     });
 
     state->macros.map_query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioMacroMaps" }),
+        .entity = ecs_entity(world, { .name = "MacroMaps" }),
         .terms = {
             { .id = ecs_id(AudioMacroMap), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioMacroMapState), .src.id = EcsSelf }
@@ -670,7 +670,7 @@ void box_audio_macros_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioMacroMapSet" }),
+        .entity = ecs_entity(world, { .name = "MacroMapSet" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(AudioMacroMap), .src.id = EcsSelf }},
         .events = { EcsOnSet },

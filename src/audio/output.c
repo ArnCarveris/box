@@ -76,7 +76,13 @@ static void AudioTransportUpdate(
 void box_audio_output_init(
     ecs_world_t *world)
 {
-    ECS_COMPONENT_DEFINE(world, AudioTransport);
+    ecs_id(AudioTransport) = ecs_component(world, {
+        .entity = ecs_entity(world, {
+            .id = ecs_id(AudioTransport), .name = "AudioDevice",
+            .symbol = "AudioTransport", .use_low_id = true }),
+        .type = {
+            .size = ECS_SIZEOF(AudioTransport), .alignment = ECS_ALIGNOF(AudioTransport) }
+    });
     ecs_set_hooks(world, AudioTransport, {
         .ctor = flecs_default_ctor,
         .dtor = box_audio_output_dtor,
@@ -84,7 +90,7 @@ void box_audio_output_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AudioTransportUpdate" }),
+        .entity = ecs_entity(world, { .name = "AudioDeviceUpdate" }),
         .phase = EcsOnStore,
         .query.terms = {{ .id = ecs_id(AudioTransport), .src.id = ecs_id(AudioTransport) }},
         .callback = AudioTransportUpdate

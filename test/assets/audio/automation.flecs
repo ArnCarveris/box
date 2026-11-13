@@ -6,37 +6,37 @@
 using box.audio
 
 synth {
-  AudioBus: {effects: [synth]}
-  AudioFilter: {cutoff: 1000}
+  Bus: {effects: [synth]}
+  Filter: {cutoff: 1000}
 }
 
 // A return that only the send of fx reaches: fx itself is silent and its send taps before
 // its volume
-room { AudioBus: {kind: AudioChannelReturn} }
+room { Bus: {kind: ChannelReturn} }
 
-fx { AudioBus: {volume: 0, sends: [{bus: room, level: 0, pre_fader: true}]} }
+fx { Bus: {volume: 0, sends: [{bus: room, level: 0, pre_fader: true}]} }
 
 // A peak at 2 kHz whose gain the third band's lane raises
 eq {
-  AudioBus: {effects: [eq]}
-  Equalizer: {bands: [{}, {}, {kind: AudioEqPeak, frequency: 2000, gain: 0, q: 1}, {}]}
+  Bus: {effects: [eq]}
+  Equalizer: {bands: [{}, {}, {kind: EqPeak, frequency: 2000, gain: 0, q: 1}, {}]}
 }
 
 // A track that fades itself, with its lane below
 lead { Track: {} }
 
 prefab sweep {
-  AutomationClip: {target: synth, component: AudioFilter, member: "cutoff", length: 4,
+  AutomationClip: {target: synth, component: Filter, member: "cutoff", length: 4,
     curve: {keys: [{0, 200}, {4, 5000}]}}
 }
 
 prefab fade {
-  AutomationClip: {target: lead, component: AudioBus, member: "volume", length: 4,
+  AutomationClip: {target: lead, component: Bus, member: "volume", length: 4,
     curve: {keys: [{0, 1}, {4, 0}]}}
 }
 
 prefab open {
-  AutomationClip: {target: fx, component: AudioBus, member: "sends[0].level", length: 2,
+  AutomationClip: {target: fx, component: Bus, member: "sends[0].level", length: 2,
     curve: {keys: [{0, 0}, {1, 1}, {2, 1}]}}
 }
 

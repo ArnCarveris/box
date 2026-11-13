@@ -15,6 +15,6 @@ prefab render_hum {
   SynthOscillator: {wave: SynthSine, frequency: 1000, level: 0.3}
 }
 
-render_drone { AudioSource: {sound: render_hum, loop: true} }
+render_drone { Source: {sound: render_hum, loop: true} }
 
 render_keys { Instrument: {sound: render_blip} }

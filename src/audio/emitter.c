@@ -407,7 +407,7 @@ void box_audio_emitter_init(
     box_audio_module_t *state)
 {
     state->emitters = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioEmitters" }),
+        .entity = ecs_entity(world, { .name = "Emitters" }),
         .terms = {
             { .id = ecs_id(AudioEmitter), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioEmitterState), .src.id = EcsSelf },

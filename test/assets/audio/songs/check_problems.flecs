@@ -74,67 +74,67 @@ prefab check_tone_notes {
 
 check_high {
   Track: {instrument: check_high_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_high_notes, start: 0, duration: 4} }
 }
 
 check_low {
   Track: {instrument: check_low_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_low_notes, start: 4, duration: 4} }
 }
 
 check_dup {
   Track: {instrument: check_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_dup_notes, start: 0, duration: 4} }
 }
 
 check_glide {
   Track: {instrument: check_glide_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_glide_notes, start: 0, duration: 4} }
 }
 
 check_late {
   Track: {instrument: check_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_late_notes, start: 14, duration: 4} }
 }
 
 check_stack {
   Track: {instrument: check_inst}
-  AudioBus: {}
+  Bus: {}
   first { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
   second { ClipPlacement: {clip: check_tone_notes, start: 2, duration: 4} }
 }
 
 check_no_inst {
   Track: {}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: check_tone_notes, start: 0, duration: 4} }
 }
 
 // From bar 2: the core ramps the volume of a new bus from 1 to 0 over its first milliseconds
 check_silent {
   Track: {instrument: check_inst}
-  AudioBus: {volume: 0}
+  Bus: {volume: 0}
   part { ClipPlacement: {clip: check_tone_notes, start: 4, duration: 4} }
 }
 
 check_not_a_bus {}
 
 check_send_bus {
-  AudioBus: {sends: [{bus: check_not_a_bus, level: 0.5}]}
+  Bus: {sends: [{bus: check_not_a_bus, level: 0.5}]}
 }
 
 check_off_group {
-  AudioBus: {}
+  Bus: {}
   flecs.core.Disabled
 }
 
 check_orphan_bus {
-  AudioBus: {output: check_off_group}
+  Bus: {output: check_off_group}
 }
 
 check_eq { Equalizer: {} }
@@ -146,7 +146,7 @@ check_reverb {
 }
 
 check_fx_bus {
-  AudioBus: {effects: [check_eq, check_gap, check_reverb]}
+  Bus: {effects: [check_eq, check_gap, check_reverb]}
 }
 
 $ {

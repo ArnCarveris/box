@@ -195,11 +195,11 @@ does not return either), look for another launch check holding it the same way.
 `audio_module.mjs` checks the `box.audio` module in headless Chrome with
 `test/integration/web/audio_module.flecs`, a scene that only uses the module and script: a
 looping 440 Hz tone at a peak of 0.25 on a bus, and a click that `box.audio.play` plays at load.
-It reads `AudioStatus` and runs commands through the shell of the page
+It reads `Status` and runs commands through the shell of the page
 (`Module.cwrap('box_command_web_run', 'string', ['string'])`). It expects
-`AudioWaitingForGesture` before a trusted click and the click dropped, the tone at its level
+`WaitingForGesture` before a trusted click and the click dropped, the tone at its level
 after it, half the level after a script that the shell writes (`script_write`) sets
-`AudioBus: {volume: 0.5}` on the bus, a suspended context (`AudioSuspended`) while the page is
+`Bus: {volume: 0.5}` on the bus, a suspended context (`Suspended`) while the page is
 hidden and a resumed one when it shows again, a one second `audio.capture 1` in `/tmp` of the
 page's file system with the tone, and the loop still playing after a 500 ms stall of the main
 thread:
@@ -210,8 +210,8 @@ node test/integration/web/audio_module.mjs \
 ```
 
 `audio_spatial.mjs` checks spatial audio in headless Chrome with
-`test/integration/web/audio_spatial.flecs`: a looping 440 Hz tone on an `AudioSpatial` source
-heard from an `AudioListener` at the origin. After a trusted click it moves the source with
+`test/integration/web/audio_spatial.flecs`: a looping 440 Hz tone on a `Spatial` source
+heard from a `Listener` at the origin. After a trusted click it moves the source with
 `script_write` from the left of the listener through its position to its right and beyond
 `max_distance`, and measures the RMS of each channel of the output through a
 `ChannelSplitter`: left louder on the left, both equal at the listener, right louder on the
@@ -262,13 +262,13 @@ node test/integration/web/audio_sample.mjs \
     "$(tools/integration.py local-env --env audio)/wasm32-Emscripten/debug/bin"
 ```
 
-`audio_stream.mjs` checks music streams (`AudioStream`, see `docs/audio.md`) in Chrome with
+`audio_stream.mjs` checks music streams (`Stream`, see `docs/audio.md`) in Chrome with
 `test/integration/web/audio_stream.flecs`, whose stream plays `test/assets/audio/tone.ogg`, 480 Hz
 at a peak of 0.5 in a loop of 0.25 s. The server serves the Ogg files by their path and the page
 preloads only the scene and `tone_960.ogg`, so the stream fetches `tone.ogg` next to the page.
 After a trusted click it records two seconds (`audio.capture 2`), which have to hold 480 Hz at 0.5
 without a step larger than the sine's over the eight loop crossings and without a gap. It prints
-`AudioStreamStatus.decode_ms`, the decode cost of a frame, and the longest animation frame, then
+`StreamStatus.decode_ms`, the decode cost of a frame, and the longest animation frame, then
 expects at least 1.5 s buffered in the worklet and no underrun, in the status and in the worklet,
 after a 500 ms stall of the main thread. The file has to be fetched once and not be in the file
 system of the page. A stream of a file served at no path has to fail with one error while the page

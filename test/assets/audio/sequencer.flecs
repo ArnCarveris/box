@@ -23,7 +23,7 @@ prefab riff {
 
 bass {
   Track: {instrument: pluck}
-  AudioBus: {volume: 0.8}
+  Bus: {volume: 0.8}
 
   // Twice through the riff
   intro { ClipPlacement: {clip: riff, start: 0, duration: 4, loop: true} }

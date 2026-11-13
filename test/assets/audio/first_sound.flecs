@@ -2,10 +2,10 @@
 // played once on an SFX bus.
 using box.audio
 
-sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+sfx { Bus: {output: master, kind: ChannelSfx} }
 
 prefab Beep {
-  AudioOutput: {bus: sfx}
+  Output: {bus: sfx}
   SynthSound: {}
   SynthEnvelope: {attack: 0.002, decay: 0.25}
   SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.5}

@@ -15,7 +15,7 @@ state {
 
 assets {
   prefab jb_crash {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 43, level_variance: 0.05}
     SynthEnvelope: {attack: 0.001, decay: 2.2, curve: 5}
     SynthFilter: {kind: SynthHighPass, cutoff: 2600, resonance: 0.1}
@@ -31,14 +31,14 @@ assets {
 box {
   audio {
     master {
-      AudioMeter: {}
+      Meter: {}
     }
   }
 }
 
 $ {
-  AudioSettings: {master_volume: volume_level / 100}
-  AudioSong: {file: "etc/scenes/jukebox/songs/{SONGS[song].file}.flecs"}
+  Settings: {master_volume: volume_level / 100}
+  SongFile: {file: "etc/scenes/jukebox/songs/{SONGS[song].file}.flecs"}
   Transport = {playing: playing}
 }
 
@@ -61,7 +61,7 @@ async {
     const t = Transport[Transport]
     const s = Song[Song]
     const se: entity = Song
-    const status = AudioSongStatus[AudioSongStatus]
+    const status = SongStatus[SongStatus]
     const b = t.position
     beat = b
     song_beats = max(s.beats, 1)
@@ -85,7 +85,7 @@ async {
       color = IDLE
     }
 
-    const mm = box.audio.master[AudioMeter]
+    const mm = box.audio.master[Meter]
     master_level[0] = clamp((20 * log10(max(mm.rms_left, 0.00001)) + 48) / 48, 0, 1)
     master_level[1] = clamp((20 * log10(max(mm.rms_right, 0.00001)) + 48) / 48, 0, 1)
     glow = clamp((20 * log10(max(max(mm.peak_left, mm.peak_right), 0.00001)) + 30) / 30, 0, 1)

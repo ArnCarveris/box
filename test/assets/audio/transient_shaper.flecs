@@ -7,5 +7,5 @@ drum_punch {
 }
 
 drums {
-  AudioBus: {output: master, effects: [drum_punch]}
+  Bus: {output: master, effects: [drum_punch]}
 }

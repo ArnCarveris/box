@@ -138,7 +138,7 @@ void box_audio_listener_find(
 
     if (count > 1 && !state->listener_warned) {
         char *path = ecs_get_path(world, listener->entity);
-        ecs_warn("box.audio: %d entities have AudioListener, '%s' listens", count, path);
+        ecs_warn("box.audio: %d entities have Listener, '%s' listens", count, path);
         ecs_os_free(path);
         state->listener_warned = true;
     } else if (count <= 1) {

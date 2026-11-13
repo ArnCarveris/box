@@ -1488,7 +1488,7 @@ void box_audio_song_init(
     ecs_singleton_set(world, AudioSongStatus, { .state = SongNone });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioSongOwner" }),
+        .entity = ecs_entity(world, { .name = "SongOwner" }),
         .query.terms = {{ .id = ecs_pair(ecs_id(EcsScript), EcsWildcard), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnAdd, EcsOnRemove },
@@ -1497,7 +1497,7 @@ void box_audio_song_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AudioSongUpdate" }),
+        .entity = ecs_entity(world, { .name = "SongUpdate" }),
         .phase = EcsOnLoad,
         .run = BoxAudioSongUpdate,
         .ctx = state,

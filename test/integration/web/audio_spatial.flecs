@@ -35,12 +35,12 @@ spinner {
 // The ears, at the origin and not rotated: +x is to the right
 listener {
   Position: {0, 0, 0}
-  AudioListener
+  Listener
 }
 
 // One period of a sine in 20 samples at 8800 Hz plays at 440 Hz at any rate of the output
 tone {
-  AudioPcm: {
+  Pcm: {
     samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
       0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
       -0.146946, -0.0772542],
@@ -50,6 +50,6 @@ tone {
 
 source {
   Position: {-10, 0, 0}
-  AudioSource: {sound: tone, loop: true}
-  AudioSpatial: {min_distance: 1, max_distance: 500, rolloff: 0}
+  Source: {sound: tone, loop: true}
+  Spatial: {min_distance: 1, max_distance: 500, rolloff: 0}
 }

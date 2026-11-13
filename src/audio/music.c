@@ -928,21 +928,21 @@ static void BoxAudioStreamSet(
 
         if (!path || !path[0]) {
             char *name = ecs_get_path(it->world, e);
-            ecs_err("box.audio: the AudioStream of '%s' has no path", name);
+            ecs_err("box.audio: the Stream of '%s' has no path", name);
             ecs_os_free(name);
-            box_audio_music_refuse(it->stage, e, "the AudioStream has no path");
+            box_audio_music_refuse(it->stage, e, "the Stream has no path");
             continue;
         }
 
         if (state->music_active && state->music_active->entity != e) {
             if (!am->refused) {
                 char *name = ecs_get_path(it->world, e);
-                ecs_err("box.audio: one AudioStream plays at once, '%s' is silent", name);
+                ecs_err("box.audio: one Stream plays at once, '%s' is silent", name);
                 ecs_os_free(name);
                 am->refused = true;
             }
 
-            box_audio_music_refuse(it->stage, e, "one AudioStream plays at once");
+            box_audio_music_refuse(it->stage, e, "one Stream plays at once");
             continue;
         }
 
@@ -994,7 +994,7 @@ void box_audio_music_init(
     ecs_vec_init_t(NULL, &state->music, box_audio_music_t*, 0);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioStreamSet" }),
+        .entity = ecs_entity(world, { .name = "StreamSet" }),
         .query.terms = {{ .id = ecs_id(AudioStream), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnSet },
@@ -1003,7 +1003,7 @@ void box_audio_music_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioStreamRemove" }),
+        .entity = ecs_entity(world, { .name = "StreamRemove" }),
         .query.terms = {{ .id = ecs_id(AudioStream), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove },

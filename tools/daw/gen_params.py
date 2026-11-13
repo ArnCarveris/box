@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+import glob
 import json
 import os
 import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-HEADER = os.path.join(ROOT, "include", "box", "audio.h")
+HEADERS = os.path.join(ROOT, "include", "box", "audio*.h")
 OUT = os.path.join(ROOT, "tools", "daw", "params.js")
 
 NUM = r"-?\d+(?:\.\d+)?(?:\s*/\s*\d+)?"
@@ -14,6 +15,18 @@ UNITS = [
     ("Hz", "Hz"), ("dB", "dB"), ("Seconds", "s"), ("Milliseconds", "ms"), ("Beats", "beats"),
     ("Semitones", "st"), ("Cents", "ct"), ("Octaves", "oct"), ("MIDI note", "note"),
 ]
+
+
+# Script names of the components whose C names start with Audio
+NAMES = {"AudioSong": "SongFile"}
+
+
+def script_name(name):
+    if name in NAMES:
+        return NAMES[name]
+    if name.startswith("Audio") and name[5:6].isupper():
+        return name[5:]
+    return name
 
 
 def number(text):
@@ -96,11 +109,11 @@ def guess(name, unit, default):
 
 
 def parse():
-    src = open(HEADER).read()
+    src = "".join(open(path).read() for path in sorted(glob.glob(HEADERS)))
     params = {}
     docs = {}
     for match in STRUCT.finditer(src):
-        struct_doc, name, body = match.group(1), match.group(2), match.group(3)
+        struct_doc, name, body = match.group(1), script_name(match.group(2)), match.group(3)
         summary = clean(struct_doc.strip("/*"))
         docs[name] = summary.split(". ")[0].rstrip(".") + "."
         members = {}

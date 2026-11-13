@@ -961,7 +961,7 @@ static void box_cmd_check_instruments(
         {
             char *sound = ecs_get_path(world, in->sound);
             box_cmd_check_add(c, BOX_CMD_CHECK_ERROR, "instrument-sound", where,
-                "its sound %s has no SynthSound, AudioPcm or SoundFile, so its notes are "
+                "its sound %s has no SynthSound, Pcm or SoundFile, so its notes are "
                 "silent; point Instrument.sound at a sound", sound);
             ecs_os_free(sound);
         }
@@ -1010,11 +1010,11 @@ static void box_cmd_check_routing(
 
     if (bus->output && !ecs_is_alive(world, bus->output)) {
         box_cmd_check_add(c, BOX_CMD_CHECK_WARNING, "bus-output", where,
-            "its output names a deleted bus, so it plays on the master; set AudioBus.output");
+            "its output names a deleted bus, so it plays on the master; set Bus.output");
     } else if (bus->output && bus->output != master && !ecs_has(world, bus->output, AudioBus)) {
         char *name = ecs_get_path(world, bus->output);
         box_cmd_check_add(c, BOX_CMD_CHECK_WARNING, "bus-output", where,
-            "its output %s is no bus, so it plays on the master; set AudioBus.output", name);
+            "its output %s is no bus, so it plays on the master; set Bus.output", name);
         ecs_os_free(name);
     }
 
@@ -1034,7 +1034,7 @@ static void box_cmd_check_routing(
         if (next == e || j < count) {
             box_cmd_check_add(c, BOX_CMD_CHECK_ERROR, "bus-unreachable", where,
                 "its output path loops back through %s and never reaches the master; break "
-                "the cycle of AudioBus.output", name);
+                "the cycle of Bus.output", name);
             count = BOX_AUDIO_BUS_MAX;
         } else if (ecs_has_id(world, next, EcsDisabled)) {
             box_cmd_check_add(c, BOX_CMD_CHECK_WARNING, "bus-unreachable", where,
@@ -1159,7 +1159,7 @@ static void box_cmd_check_effects(
             snprintf(where, sizeof(where), "effect %s", e[i].path);
             box_cmd_check_add(c, BOX_CMD_CHECK_WARNING, "effect-unused", where,
                 "no insert slot of a bus names it, so it does nothing; add it to "
-                "AudioBus.effects of a bus or remove it");
+                "Bus.effects of a bus or remove it");
         }
     }
 

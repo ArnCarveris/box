@@ -1,13 +1,13 @@
 // A saturator set by a scene, for the Saturator suite of test/cpu/audio: grit on the drum bus,
-// a little asymmetric and crushed to 12 bits, mixed in parallel, whose AudioMeter reads how
+// a little asymmetric and crushed to 12 bits, mixed in parallel, whose Meter reads how
 // hard its clipper squashes. An effect entity comes before the bus that names it.
 using box.audio
 
 drum_grit {
   Saturator: {drive: 0.8, asymmetry: 0.25, bits: 12, mix: 0.8}
-  AudioMeter: {}
+  Meter: {}
 }
 
 drums {
-  AudioBus: {output: master, effects: [drum_grit]}
+  Bus: {output: master, effects: [drum_grit]}
 }

@@ -3,11 +3,11 @@
 using box.audio
 
 ui {
-  AudioBus: {volume: 1}
+  Bus: {volume: 1}
 }
 
 prefab UiClick {
-  AudioOutput: {bus: ui}
+  Output: {bus: ui}
   SynthSound: {pitch_variance: 0.05}
   SynthEnvelope: {attack: 0.001, decay: 0.03}
   noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }

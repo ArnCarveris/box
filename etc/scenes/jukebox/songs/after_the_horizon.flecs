@@ -18,71 +18,71 @@ assets {
 
   // Mixer and effect routing.
   hzn_glue { Compressor: {threshold: -15.5, ratio: 2.0, attack: 0.025, release: 0.22, knee: 5, makeup: 0.5, mix: 0.76} }
-  hzn_master_shelf { Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 26}, {kind: AudioEqPeak, frequency: 285, gain: -2.0, q: 1.1}, {kind: AudioEqHighShelf, frequency: 8200, gain: 1.3, q: 0.707}, {kind: AudioEqOff, frequency: 16000}]} }
+  hzn_master_shelf { Equalizer: {bands: [{kind: EqLowCut, frequency: 26}, {kind: EqPeak, frequency: 285, gain: -2.0, q: 1.1}, {kind: EqHighShelf, frequency: 8200, gain: 1.3, q: 0.707}, {kind: EqOff, frequency: 16000}]} }
   hzn_mix {
-    AudioBus: {output: master, volume: 0.84, kind: AudioChannelGroup, effects: [hzn_master_shelf, hzn_glue]}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.84, kind: ChannelGroup, effects: [hzn_master_shelf, hzn_glue]}
+    Meter: {}
   }
-  hzn_hall_hp { AudioFilter: {kind: SynthHighPass, cutoff: 240, resonance: 0.08, slope: SynthSlope24} }
-  hzn_echo_hp { AudioFilter: {kind: SynthHighPass, cutoff: 275, resonance: 0.06, slope: SynthSlope12} }
+  hzn_hall_hp { Filter: {kind: SynthHighPass, cutoff: 240, resonance: 0.08, slope: SynthSlope24} }
+  hzn_echo_hp { Filter: {kind: SynthHighPass, cutoff: 275, resonance: 0.06, slope: SynthSlope12} }
   hzn_hall {
-    AudioBus: {output: hzn_mix, volume: 0.66, kind: AudioChannelReturn, effects: [hzn_hall, hzn_hall_hp]}
+    Bus: {output: hzn_mix, volume: 0.66, kind: ChannelReturn, effects: [hzn_hall, hzn_hall_hp]}
     Reverb: {decay: 4.1, damping: 0.51, predelay: 0.045, size: 0.91, mix: 1, shimmer: 0.08, shimmer_pitch: 12}
   }
   hzn_echo {
-    AudioBus: {output: hzn_mix, volume: 0.52, kind: AudioChannelReturn, effects: [hzn_echo, hzn_echo_hp]}
+    Bus: {output: hzn_mix, volume: 0.52, kind: ChannelReturn, effects: [hzn_echo, hzn_echo_hp]}
     Delay: {sync: 0.75, feedback: 0.43, mix: 1, ping_pong: true, damping: 4900}
   }
   hzn_drum_sculpt { TransientShaper: {attack: 0.24, sustain: -0.12} }
   hzn_drum_sat { Saturator: {drive: 0.13, mode: SaturatorTanh, mix: 0.7, low_cut: 35, high_cut: 14500} }
   hzn_drum_bus {
-    AudioBus: {output: hzn_mix, volume: 0.76, kind: AudioChannelGroup, effects: [hzn_drum_sculpt, hzn_drum_sat]}
-    AudioMeter: {}
+    Bus: {output: hzn_mix, volume: 0.76, kind: ChannelGroup, effects: [hzn_drum_sculpt, hzn_drum_sat]}
+    Meter: {}
   }
-  hzn_bass_hp { AudioFilter: {kind: SynthHighPass, cutoff: 28, resonance: 0.06, slope: SynthSlope24} }
-  hzn_bass_eq { Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 27}, {kind: AudioEqPeak, frequency: 245, gain: -3.3, q: 1.1}, {kind: AudioEqHighCut, frequency: 900}, {kind: AudioEqOff, frequency: 16000}]} }
-  hzn_bass_lp { AudioFilter: {kind: SynthLowPass, cutoff: 640, resonance: 0.10, slope: SynthSlope24} }
+  hzn_bass_hp { Filter: {kind: SynthHighPass, cutoff: 28, resonance: 0.06, slope: SynthSlope24} }
+  hzn_bass_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 27}, {kind: EqPeak, frequency: 245, gain: -3.3, q: 1.1}, {kind: EqHighCut, frequency: 900}, {kind: EqOff, frequency: 16000}]} }
+  hzn_bass_lp { Filter: {kind: SynthLowPass, cutoff: 640, resonance: 0.10, slope: SynthSlope24} }
   // Growl occupies the mid-bass above the sub rather than muddying the kick fundamental.
-  hzn_growl_hp { AudioFilter: {kind: SynthHighPass, cutoff: 118, resonance: 0.10, slope: SynthSlope24} }
-  hzn_growl_lp { AudioFilter: {kind: SynthLowPass, cutoff: 1900, resonance: 0.29, slope: SynthSlope24} }
-  hzn_growl_eq { Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 112}, {kind: AudioEqPeak, frequency: 280, gain: -2.7, q: 1.15}, {kind: AudioEqPeak, frequency: 950, gain: 2.0, q: 0.85}, {kind: AudioEqHighCut, frequency: 6200}]} }
+  hzn_growl_hp { Filter: {kind: SynthHighPass, cutoff: 118, resonance: 0.10, slope: SynthSlope24} }
+  hzn_growl_lp { Filter: {kind: SynthLowPass, cutoff: 1900, resonance: 0.29, slope: SynthSlope24} }
+  hzn_growl_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 112}, {kind: EqPeak, frequency: 280, gain: -2.7, q: 1.15}, {kind: EqPeak, frequency: 950, gain: 2.0, q: 0.85}, {kind: EqHighCut, frequency: 6200}]} }
   hzn_growl_sat { Saturator: {drive: 0.37, asymmetry: 0.13, mode: SaturatorTube, mix: 0.83, low_cut: 110, high_cut: 6000} }
   hzn_growl_gate { PatternGate: {steps: [0.4, 1, 0.7, 0.95, 0.45, 1, 0.75, 0.35, 0.45, 1, 0.8, 0.95, 0.4, 1, 0.75, 0.55], length: 16, rate: 0.25, swing: 0.04, attack: 0.004, release: 0.065, gate: 0.84, floor: -13, mix: 0.5} }
-  hzn_pad_hp { AudioFilter: {kind: SynthHighPass, cutoff: 175, resonance: 0.07, slope: SynthSlope24} }
+  hzn_pad_hp { Filter: {kind: SynthHighPass, cutoff: 175, resonance: 0.07, slope: SynthSlope24} }
   hzn_pad_gate { PatternGate: {steps: [1, 0.22, 0.7, 0.25, 0.9, 0.28, 0.78, 0.25, 1, 0.22, 0.67, 0.3, 0.9, 0.28, 0.72, 0.4], length: 16, rate: 0.25, attack: 0.009, release: 0.105, gate: 0.77, floor: -17, mix: 0} }
-  hzn_kick_eq { Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 27}, {kind: AudioEqPeak, frequency: 57, gain: 1.4, q: 1.2}, {kind: AudioEqPeak, frequency: 270, gain: -1.6, q: 1.1}, {kind: AudioEqHighShelf, frequency: 5500, gain: 0.8, q: 0.707}]} }
-  hzn_pad_lp { AudioFilter: {kind: SynthLowPass, cutoff: 2800, resonance: 0.14} }
+  hzn_kick_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 27}, {kind: EqPeak, frequency: 57, gain: 1.4, q: 1.2}, {kind: EqPeak, frequency: 270, gain: -1.6, q: 1.1}, {kind: EqHighShelf, frequency: 5500, gain: 0.8, q: 0.707}]} }
+  hzn_pad_lp { Filter: {kind: SynthLowPass, cutoff: 2800, resonance: 0.14} }
   hzn_pad_chorus { Chorus: {voices: 3, rate: 0.23, depth: 5, delay: 17, mix: 0.48, spread: 0.85} }
-  hzn_arp_filter { AudioFilter: {kind: SynthLowPass, cutoff: 4300, resonance: 0.36} }
+  hzn_arp_filter { Filter: {kind: SynthLowPass, cutoff: 4300, resonance: 0.36} }
   hzn_arp_phaser { Phaser: {stages: 6, rate: 0.12, depth: 0.6, center: 1100, feedback: 0.15, mix: 0.37, stereo: 0.65} }
-  hzn_haze_filter { AudioFilter: {kind: SynthHighPass, cutoff: 310, resonance: 0.06} }
-  hzn_riser_filter { AudioFilter: {kind: SynthHighPass, cutoff: 180, resonance: 0.32} }
-  hzn_riser_wobble { AudioModulator: {target: hzn_riser_filter, component: AudioFilter, member: "cutoff",
-    wave: AudioModTriangle, scale: AudioModOctaves, depth: 1, sync: 0.25} }
+  hzn_haze_filter { Filter: {kind: SynthHighPass, cutoff: 310, resonance: 0.06} }
+  hzn_riser_filter { Filter: {kind: SynthHighPass, cutoff: 180, resonance: 0.32} }
+  hzn_riser_wobble { Modulator: {target: hzn_riser_filter, component: Filter, member: "cutoff",
+    wave: ModTriangle, scale: ModOctaves, depth: 1, sync: 0.25} }
 
   // Air-pad tone stays in the upper-midrange, away from kick and bass fundamentals.
-  hzn_air_hp { AudioFilter: {kind: SynthHighPass, cutoff: 290, resonance: 0.06, slope: SynthSlope12} }
-  hzn_air_lp { AudioFilter: {kind: SynthLowPass, cutoff: 3850, resonance: 0.08, slope: SynthSlope12} }
+  hzn_air_hp { Filter: {kind: SynthHighPass, cutoff: 290, resonance: 0.06, slope: SynthSlope12} }
+  hzn_air_lp { Filter: {kind: SynthLowPass, cutoff: 3850, resonance: 0.08, slope: SynthSlope12} }
   hzn_air_chorus { Chorus: {voices: 2, rate: 0.19, depth: 3.5, delay: 16, mix: 0.35, spread: 0.7} }
 
 
   // Collective musical bus filter: DJ-style sweeps apply to chords, pads, and motifs
   // while the kick and sub remain dry, so the drops regain real full-band punch.
-  hzn_music_lp { AudioFilter: {kind: SynthLowPass, cutoff: 15500, resonance: 0.16, slope: SynthSlope24} }
+  hzn_music_lp { Filter: {kind: SynthLowPass, cutoff: 15500, resonance: 0.16, slope: SynthSlope24} }
   hzn_music_bus {
-    AudioBus: {output: hzn_mix, volume: 0.95, kind: AudioChannelGroup, effects: [hzn_music_lp]}
-    AudioMeter: {}
+    Bus: {output: hzn_mix, volume: 0.95, kind: ChannelGroup, effects: [hzn_music_lp]}
+    Meter: {}
   }
   // An additional filter is automated separately on the new harmonic stabs.
-  hzn_stab_hp { AudioFilter: {kind: SynthHighPass, cutoff: 250, resonance: 0.08, slope: SynthSlope24} }
-  hzn_stab_lp { AudioFilter: {kind: SynthLowPass, cutoff: 3400, resonance: 0.28, slope: SynthSlope24} }
+  hzn_stab_hp { Filter: {kind: SynthHighPass, cutoff: 250, resonance: 0.08, slope: SynthSlope24} }
+  hzn_stab_lp { Filter: {kind: SynthLowPass, cutoff: 3400, resonance: 0.28, slope: SynthSlope24} }
   hzn_stab_chorus { Chorus: {voices: 2, rate: 0.17, depth: 2.2, delay: 12, mix: 0.26, spread: 0.6} }
-  hzn_choir_hp { AudioFilter: {kind: SynthHighPass, cutoff: 280, resonance: 0.05, slope: SynthSlope12} }
-  hzn_choir_lp { AudioFilter: {kind: SynthLowPass, cutoff: 4500, resonance: 0.14, slope: SynthSlope12} }
+  hzn_choir_hp { Filter: {kind: SynthHighPass, cutoff: 280, resonance: 0.05, slope: SynthSlope12} }
+  hzn_choir_lp { Filter: {kind: SynthLowPass, cutoff: 4500, resonance: 0.14, slope: SynthSlope12} }
   hzn_choir_chorus { Chorus: {voices: 3, rate: 0.14, depth: 5, delay: 23, mix: 0.50, spread: 0.95} }
-  hzn_rim_hp { AudioFilter: {kind: SynthHighPass, cutoff: 800, resonance: 0.06} }
-  hzn_tom_lp { AudioFilter: {kind: SynthLowPass, cutoff: 3900, resonance: 0.14} }
-  hzn_crash_hp { AudioFilter: {kind: SynthHighPass, cutoff: 2200, resonance: 0.06} }
+  hzn_rim_hp { Filter: {kind: SynthHighPass, cutoff: 800, resonance: 0.06} }
+  hzn_tom_lp { Filter: {kind: SynthLowPass, cutoff: 3900, resonance: 0.14} }
+  hzn_crash_hp { Filter: {kind: SynthHighPass, cutoff: 2200, resonance: 0.06} }
 
   // Synthesized sound design.
   prefab hzn_kick_sound {
@@ -2090,8 +2090,8 @@ assets {
   // Song arrangement.
   hzn_kick_track {
     Track: {instrument: hzn_kick_inst}
-    AudioBus: {output: hzn_drum_bus, volume: 1.0, effects: [hzn_kick_eq]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 1.0, effects: [hzn_kick_eq]}
+    Meter: {}
     hzn_kick_p00 { ClipPlacement: {clip: hzn_clip_kick, start: 64, duration: 128, loop: true} }
     hzn_kick_p01 { ClipPlacement: {clip: hzn_clip_kick_half, start: 256, duration: 8, loop: true, gain: 0.54} }
     hzn_kick_p02 { ClipPlacement: {clip: hzn_clip_kick_half, start: 272, duration: 8, loop: true, gain: 0.64} }
@@ -2104,8 +2104,8 @@ assets {
   }
   hzn_clap_track {
     Track: {instrument: hzn_clap_inst}
-    AudioBus: {output: hzn_drum_bus, volume: 0.66, sends: [{bus: hzn_hall, level: 0.10}]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.66, sends: [{bus: hzn_hall, level: 0.10}]}
+    Meter: {}
     // Small cues into the build and response sections.
     hzn_clap_p00 { ClipPlacement: {clip: hzn_clip_clap, start: 64, duration: 128, loop: true, gain: 0.88} }
     hzn_clap_p01 { ClipPlacement: {clip: hzn_clip_roll, start: 256, duration: 30.85, gain: 0.72} }
@@ -2124,8 +2124,8 @@ assets {
   }
   hzn_hat_track {
     Track: {instrument: hzn_hat_inst, swing: 0.06, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_drum_bus, volume: 0.52, pan: 0.11}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.52, pan: 0.11}
+    Meter: {}
     hzn_hat_p00 { ClipPlacement: {clip: hzn_clip_hats, start: 64, duration: 128, loop: true, gain: 0.83} }
     hzn_hat_p01 { ClipPlacement: {clip: hzn_clip_hats, start: 288, duration: 48, loop: true, gain: 1} }
     hzn_hat_p02 { ClipPlacement: {clip: hzn_clip_hats, start: 352, duration: 32, loop: true, gain: 1.12} }
@@ -2134,8 +2134,8 @@ assets {
   }
   hzn_shaker_track {
     Track: {instrument: hzn_shaker_inst, swing: 0.07, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_drum_bus, volume: 0.4, pan: -0.14}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.4, pan: -0.14}
+    Meter: {}
     hzn_shaker_p00 { ClipPlacement: {clip: hzn_clip_shaker, start: 96, duration: 96, loop: true, gain: 0.62} }
     hzn_shaker_p01 { ClipPlacement: {clip: hzn_clip_shaker, start: 288, duration: 48, loop: true, gain: 0.83} }
     hzn_shaker_p02 { ClipPlacement: {clip: hzn_clip_shaker, start: 352, duration: 32, loop: true, gain: 0.91} }
@@ -2143,8 +2143,8 @@ assets {
   }
   hzn_openhat_track {
     Track: {instrument: hzn_openhat_inst, swing: 0.03, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_drum_bus, volume: 0.49, pan: -0.07}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.49, pan: -0.07}
+    Meter: {}
     hzn_openhat_p00 { ClipPlacement: {clip: hzn_clip_openhat, start: 128, duration: 64, loop: true, gain: 0.7} }
     hzn_openhat_p01 { ClipPlacement: {clip: hzn_clip_openhat, start: 288, duration: 48, loop: true, gain: 0.93} }
     hzn_openhat_p02 { ClipPlacement: {clip: hzn_clip_openhat, start: 352, duration: 32, loop: true, gain: 1.0} }
@@ -2153,17 +2153,17 @@ assets {
   // Kick is declared first so its output can key the bass compressor.
   hzn_bass_duck {
     Compressor: {threshold: -28, ratio: 6.0, attack: 0.003, release: 0.155, knee: 3, sidechain: hzn_kick_track}
-    AudioMeter: {}
+    Meter: {}
   }
   hzn_growl_duck {
     Compressor: {threshold: -27, ratio: 6.2, attack: 0.003, release: 0.18, knee: 3, sidechain: hzn_kick_track}
-    AudioMeter: {}
+    Meter: {}
   }
-  hzn_growl_motion { AudioModulator: {target: hzn_growl_lp, component: AudioFilter, member: "cutoff", source: AudioModLfo, scale: AudioModOctaves, depth: 0.58, wave: AudioModTriangle, sync: 2} }
+  hzn_growl_motion { Modulator: {target: hzn_growl_lp, component: Filter, member: "cutoff", source: ModLfo, scale: ModOctaves, depth: 0.58, wave: ModTriangle, sync: 2} }
   hzn_bass_track {
     Track: {instrument: hzn_bass_inst, swing: 0.01, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_mix, volume: 0.73, effects: [hzn_bass_hp, hzn_bass_eq, hzn_bass_lp, hzn_bass_duck]}
-    AudioMeter: {}
+    Bus: {output: hzn_mix, volume: 0.73, effects: [hzn_bass_hp, hzn_bass_eq, hzn_bass_lp, hzn_bass_duck]}
+    Meter: {}
     hzn_bass_p00 { ClipPlacement: {clip: hzn_clip_bass, start: 64, duration: 128, loop: true, gain: 0.95} }
     hzn_bass_p01 { ClipPlacement: {clip: hzn_clip_bass_drop_a, start: 288, duration: 32, gain: 1.0} }
     hzn_bass_p02 { ClipPlacement: {clip: hzn_clip_bass_drop_bridge, start: 320, duration: 16, gain: 0.97} }
@@ -2172,8 +2172,8 @@ assets {
   }
   hzn_growl_track {
     Track: {instrument: hzn_growl_inst, swing: 0.015, swing_grid: TrackSwing16, humanize: {timing: 3, velocity: 0.045}}
-    AudioBus: {output: hzn_mix, volume: 0.58, effects: [hzn_growl_hp, hzn_growl_eq, hzn_growl_lp, hzn_growl_sat, hzn_growl_gate, hzn_growl_duck]}
-    AudioMeter: {}
+    Bus: {output: hzn_mix, volume: 0.58, effects: [hzn_growl_hp, hzn_growl_eq, hzn_growl_lp, hzn_growl_sat, hzn_growl_gate, hzn_growl_duck]}
+    Meter: {}
     hzn_growl_p00 { ClipPlacement: {clip: hzn_clip_bass, start: 96, duration: 96, loop: true, transpose: 12, gain: 0.67} }
     hzn_growl_p01 { ClipPlacement: {clip: hzn_clip_growl_drop_a, start: 288, duration: 48, gain: 0.84} }
     hzn_growl_p02 { ClipPlacement: {clip: hzn_clip_growl_drop_b, start: 352, duration: 32, gain: 0.97} }
@@ -2181,15 +2181,15 @@ assets {
   }
   hzn_pad_track {
     Track: {instrument: hzn_pad_inst}
-    AudioBus: {output: hzn_music_bus, volume: 0.70, effects: [hzn_pad_hp, hzn_pad_lp, hzn_pad_gate, hzn_pad_chorus], sends: [{bus: hzn_hall, level: 0.25}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.70, effects: [hzn_pad_hp, hzn_pad_lp, hzn_pad_gate, hzn_pad_chorus], sends: [{bus: hzn_hall, level: 0.25}]}
+    Meter: {}
     hzn_pad_p00 { ClipPlacement: {clip: hzn_clip_pad, start: 0, duration: 448, loop: true} }
   }
   // Air counterpad lives behind the main chord pad and does not carry a melody.
   hzn_air_track {
     Track: {instrument: hzn_air_pad_inst}
-    AudioBus: {output: hzn_music_bus, volume: 0.40, effects: [hzn_air_hp, hzn_air_lp, hzn_air_chorus], sends: [{bus: hzn_hall, level: 0.31}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.40, effects: [hzn_air_hp, hzn_air_lp, hzn_air_chorus], sends: [{bus: hzn_hall, level: 0.31}]}
+    Meter: {}
     hzn_air_p00 { ClipPlacement: {clip: hzn_clip_air_intro, start: 0, duration: 64, gain: 0.7} }
     hzn_air_p01 { ClipPlacement: {clip: hzn_clip_air_groove, start: 64, duration: 64, gain: 0.85} }
     hzn_air_p02 { ClipPlacement: {clip: hzn_clip_air_hook, start: 128, duration: 64, gain: 0.89} }
@@ -2201,16 +2201,16 @@ assets {
   }
   hzn_haze_track {
     Track: {instrument: hzn_haze_inst}
-    AudioBus: {output: hzn_music_bus, volume: 0.43, effects: [hzn_haze_filter], sends: [{bus: hzn_hall, level: 0.49}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.43, effects: [hzn_haze_filter], sends: [{bus: hzn_hall, level: 0.49}]}
+    Meter: {}
     hzn_haze_p00 { ClipPlacement: {clip: hzn_clip_haze, start: 0, duration: 64, loop: true, gain: 0.72} }
     hzn_haze_p01 { ClipPlacement: {clip: hzn_clip_haze, start: 160, duration: 128, loop: true, gain: 0.72} }
     hzn_haze_p02 { ClipPlacement: {clip: hzn_clip_haze, start: 352, duration: 96, loop: true, gain: 0.72} }
   }
   hzn_arp_track {
     Track: {instrument: hzn_arp_inst, swing: 0.09, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_music_bus, volume: 0.48, width: 1.25, effects: [hzn_arp_filter, hzn_arp_phaser], sends: [{bus: hzn_echo, level: 0.30}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.48, width: 1.25, effects: [hzn_arp_filter, hzn_arp_phaser], sends: [{bus: hzn_echo, level: 0.30}]}
+    Meter: {}
     hzn_arp_p00 { ClipPlacement: {clip: hzn_clip_arp, start: 96, duration: 32, loop: true, gain: 0.55} }
     hzn_arp_p01 { ClipPlacement: {clip: hzn_clip_arp, start: 160, duration: 32, loop: true, gain: 0.64} }
     hzn_arp_p02 { ClipPlacement: {clip: hzn_clip_arp, start: 272, duration: 12, loop: true, gain: 0.45} }
@@ -2218,8 +2218,8 @@ assets {
   }
   hzn_pluck_track {
     Track: {instrument: hzn_pluck_inst, swing: 0.08, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_music_bus, volume: 0.42, sends: [{bus: hzn_echo, level: 0.24}, {bus: hzn_hall, level: 0.14}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.42, sends: [{bus: hzn_echo, level: 0.24}, {bus: hzn_hall, level: 0.14}]}
+    Meter: {}
     hzn_pluck_p00 { ClipPlacement: {clip: hzn_clip_pluck, start: 32, duration: 32, loop: true, gain: 0.83} }
     hzn_pluck_p01 { ClipPlacement: {clip: hzn_clip_pluck, start: 144, duration: 16, loop: true, gain: 0.63} }
     hzn_pluck_p02 { ClipPlacement: {clip: hzn_clip_pluck, start: 176, duration: 16, loop: true, gain: 0.75} }
@@ -2228,8 +2228,8 @@ assets {
   }
   hzn_bells_track {
     Track: {instrument: hzn_bell_inst}
-    AudioBus: {output: hzn_music_bus, volume: 0.37, sends: [{bus: hzn_hall, level: 0.45}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.37, sends: [{bus: hzn_hall, level: 0.45}]}
+    Meter: {}
     hzn_bells_p00 { ClipPlacement: {clip: hzn_clip_bells, start: 0, duration: 64, loop: true, gain: 0.78} }
     hzn_bells_p01 { ClipPlacement: {clip: hzn_clip_bells, start: 192, duration: 64, loop: true, gain: 0.78} }
     hzn_bells_p02 { ClipPlacement: {clip: hzn_clip_bells, start: 384, duration: 40, loop: true, gain: 0.78} }
@@ -2238,8 +2238,8 @@ assets {
   // Independent recognisable chord rhythm; changes identity at hook and drops.
   hzn_stab_track {
     Track: {instrument: hzn_stab_inst, swing: 0.045, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_music_bus, volume: 0.78, effects: [hzn_stab_hp, hzn_stab_lp, hzn_stab_chorus], sends: [{bus: hzn_hall, level: 0.16}, {bus: hzn_echo, level: 0.16}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.78, effects: [hzn_stab_hp, hzn_stab_lp, hzn_stab_chorus], sends: [{bus: hzn_hall, level: 0.16}, {bus: hzn_echo, level: 0.16}]}
+    Meter: {}
     hzn_stab_p00 { ClipPlacement: {clip: hzn_clip_stabs_groove, start: 64, duration: 64, gain: 0.66} }
     hzn_stab_p01 { ClipPlacement: {clip: hzn_clip_stabs_hook, start: 128, duration: 64, gain: 0.82} }
     hzn_stab_p02 { ClipPlacement: {clip: hzn_clip_stabs_drop_a, start: 288, duration: 48, gain: 1.0} }
@@ -2249,8 +2249,8 @@ assets {
   // Large long-attack choral pad appears as a section-level NEW idea, not a quiet per-bar variation.
   hzn_choir_track {
     Track: {instrument: hzn_choir_inst}
-    AudioBus: {output: hzn_music_bus, volume: 0.71, effects: [hzn_choir_hp, hzn_choir_lp, hzn_choir_chorus], sends: [{bus: hzn_hall, level: 0.30}]}
-    AudioMeter: {}
+    Bus: {output: hzn_music_bus, volume: 0.71, effects: [hzn_choir_hp, hzn_choir_lp, hzn_choir_chorus], sends: [{bus: hzn_hall, level: 0.30}]}
+    Meter: {}
     hzn_choir_p00 { ClipPlacement: {clip: hzn_clip_choir_intro, start: 32, duration: 32, gain: 0.60} }
     hzn_choir_p01 { ClipPlacement: {clip: hzn_clip_choir_break_a, start: 192, duration: 32, gain: 0.97} }
     hzn_choir_p02 { ClipPlacement: {clip: hzn_clip_choir_break_b, start: 224, duration: 32, gain: 1.00} }
@@ -2262,8 +2262,8 @@ assets {
   // Extra transient palette; rim is never a duplicate of the main clap pattern.
   hzn_rim_track {
     Track: {instrument: hzn_rim_inst, swing: 0.10, swing_grid: TrackSwing16}
-    AudioBus: {output: hzn_drum_bus, volume: 0.61, pan: -0.18, effects: [hzn_rim_hp], sends: [{bus: hzn_echo, level: 0.09}]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.61, pan: -0.18, effects: [hzn_rim_hp], sends: [{bus: hzn_echo, level: 0.09}]}
+    Meter: {}
     hzn_rim_p00 { ClipPlacement: {clip: hzn_clip_rim_groove, start: 64, duration: 64, gain: 0.66} }
     hzn_rim_p01 { ClipPlacement: {clip: hzn_clip_rim_groove, start: 128, duration: 64, gain: 0.75} }
     hzn_rim_p02 { ClipPlacement: {clip: hzn_clip_rim_drop_a, start: 288, duration: 48, gain: 0.92} }
@@ -2272,8 +2272,8 @@ assets {
   }
   hzn_tom_track {
     Track: {instrument: hzn_tom_inst}
-    AudioBus: {output: hzn_drum_bus, volume: 0.69, effects: [hzn_tom_lp], sends: [{bus: hzn_hall, level: 0.12}]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.69, effects: [hzn_tom_lp], sends: [{bus: hzn_hall, level: 0.12}]}
+    Meter: {}
     hzn_tom_p00 { ClipPlacement: {clip: hzn_clip_toms_short, start: 124, duration: 4, gain: 0.53} }
     hzn_tom_p01 { ClipPlacement: {clip: hzn_clip_toms_break, start: 188, duration: 4, gain: 0.63} }
     hzn_tom_p02 { ClipPlacement: {clip: hzn_clip_toms_short, start: 252, duration: 4, gain: 0.43} }
@@ -2285,16 +2285,16 @@ assets {
   }
   hzn_crash_track {
     Track: {instrument: hzn_crash_inst}
-    AudioBus: {output: hzn_drum_bus, volume: 0.65, effects: [hzn_crash_hp], sends: [{bus: hzn_hall, level: 0.28}]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.65, effects: [hzn_crash_hp], sends: [{bus: hzn_hall, level: 0.28}]}
+    Meter: {}
     hzn_crash_p00 { ClipPlacement: {clip: hzn_clip_crash, start: 128, duration: 4, gain: 0.54} }
     hzn_crash_p01 { ClipPlacement: {clip: hzn_clip_crash, start: 288, duration: 4, gain: 0.97} }
     hzn_crash_p02 { ClipPlacement: {clip: hzn_clip_crash, start: 352, duration: 4, gain: 1.0} }
   }
   hzn_sweep_track {
     Track: {instrument: hzn_sweep_inst}
-    AudioBus: {output: hzn_drum_bus, volume: 0.48, sends: [{bus: hzn_hall, level: 0.20}]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.48, sends: [{bus: hzn_hall, level: 0.20}]}
+    Meter: {}
     hzn_sweep_p00 { ClipPlacement: {clip: hzn_clip_sweep, start: 60, duration: 4, gain: 0.57} }
     hzn_sweep_p01 { ClipPlacement: {clip: hzn_clip_sweep, start: 124, duration: 4, gain: 0.61} }
     hzn_sweep_p02 { ClipPlacement: {clip: hzn_clip_sweep, start: 188, duration: 4, gain: 0.55} }
@@ -2305,8 +2305,8 @@ assets {
 
   hzn_riser_track {
     Track: {instrument: hzn_riser_inst}
-    AudioBus: {output: hzn_mix, volume: 0.32, effects: [hzn_riser_filter], sends: [{bus: hzn_hall, level: 0.24}]}
-    AudioMeter: {}
+    Bus: {output: hzn_mix, volume: 0.32, effects: [hzn_riser_filter], sends: [{bus: hzn_hall, level: 0.24}]}
+    Meter: {}
     hzn_riser_p00 { ClipPlacement: {clip: hzn_clip_riser, start: 48, duration: 16, gain: 0.66} }
     hzn_riser_p01 { ClipPlacement: {clip: hzn_clip_riser, start: 240, duration: 16, gain: 0.66} }
     hzn_riser_p02 { ClipPlacement: {clip: hzn_clip_riser, start: 272, duration: 16, gain: 0.85} }
@@ -2314,8 +2314,8 @@ assets {
   }
   hzn_impact_track {
     Track: {instrument: hzn_impact_inst}
-    AudioBus: {output: hzn_drum_bus, volume: 0.51, sends: [{bus: hzn_hall, level: 0.2}]}
-    AudioMeter: {}
+    Bus: {output: hzn_drum_bus, volume: 0.51, sends: [{bus: hzn_hall, level: 0.2}]}
+    Meter: {}
     hzn_impact_p00 { ClipPlacement: {clip: hzn_clip_impact, start: 64, duration: 4, gain: 0.6} }
     hzn_impact_p01 { ClipPlacement: {clip: hzn_clip_impact, start: 128, duration: 4, gain: 0.6} }
     hzn_impact_p02 { ClipPlacement: {clip: hzn_clip_impact, start: 288, duration: 4, gain: 0.86} }
@@ -2324,8 +2324,8 @@ assets {
   }
   hzn_downer_track {
     Track: {instrument: hzn_downer_inst}
-    AudioBus: {output: hzn_mix, volume: 0.38}
-    AudioMeter: {}
+    Bus: {output: hzn_mix, volume: 0.38}
+    Meter: {}
     hzn_downer_p00 { ClipPlacement: {clip: hzn_clip_downer, start: 288, duration: 4, gain: 0.45} }
     hzn_downer_p01 { ClipPlacement: {clip: hzn_clip_downer, start: 352, duration: 4, gain: 0.45} }
     hzn_downer_p02 { ClipPlacement: {clip: hzn_clip_downer, start: 336, duration: 4, gain: 0.52} }
@@ -2334,19 +2334,19 @@ assets {
   // Full-track filter and energy envelopes: breakdown lowpasses, tension rises,
   // near-silence in the last half beat, abrupt full-band drops at 288 and 352.
   prefab hzn_auto_music_lp {
-    AutomationClip: {target: hzn_music_lp, component: AudioFilter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1050}, {time: 8, value: 1280}, {time: 24, value: 2200}, {time: 31.9, value: 2600}, {time: 32, value: 3400}, {time: 59, value: 3900}, {time: 63.6, value: 1800}, {time: 64, value: 7300}, {time: 92, value: 6800}, {time: 120, value: 6200}, {time: 126, value: 2400}, {time: 127.94, value: 950}, {time: 128, value: 14300}, {time: 158, value: 11100}, {time: 180, value: 10000}, {time: 190, value: 5000}, {time: 191.94, value: 1700}, {time: 192, value: 1250}, {time: 208, value: 1800}, {time: 224, value: 900}, {time: 236, value: 1900}, {time: 252, value: 3200}, {time: 256, value: 1200}, {time: 268, value: 1700}, {time: 276, value: 3300}, {time: 282, value: 6200}, {time: 284, value: 2900}, {time: 286.5, value: 620}, {time: 287.94, value: 380}, {time: 288, value: 17300}, {time: 302, value: 14800}, {time: 316, value: 9000}, {time: 319.95, value: 3900}, {time: 320, value: 13800}, {time: 331, value: 12800}, {time: 335, value: 11000}, {time: 336, value: 1600}, {time: 341, value: 950}, {time: 344, value: 2100}, {time: 348, value: 3400}, {time: 350, value: 830}, {time: 351.94, value: 400}, {time: 352, value: 18200}, {time: 368, value: 16000}, {time: 379.7, value: 14000}, {time: 383.94, value: 7800}, {time: 384, value: 5400}, {time: 399, value: 3700}, {time: 400, value: 7200}, {time: 412, value: 6200}, {time: 416, value: 3800}, {time: 424, value: 2450}, {time: 432, value: 1500}, {time: 440, value: 1050}, {time: 448, value: 550}]}}
+    AutomationClip: {target: hzn_music_lp, component: Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1050}, {time: 8, value: 1280}, {time: 24, value: 2200}, {time: 31.9, value: 2600}, {time: 32, value: 3400}, {time: 59, value: 3900}, {time: 63.6, value: 1800}, {time: 64, value: 7300}, {time: 92, value: 6800}, {time: 120, value: 6200}, {time: 126, value: 2400}, {time: 127.94, value: 950}, {time: 128, value: 14300}, {time: 158, value: 11100}, {time: 180, value: 10000}, {time: 190, value: 5000}, {time: 191.94, value: 1700}, {time: 192, value: 1250}, {time: 208, value: 1800}, {time: 224, value: 900}, {time: 236, value: 1900}, {time: 252, value: 3200}, {time: 256, value: 1200}, {time: 268, value: 1700}, {time: 276, value: 3300}, {time: 282, value: 6200}, {time: 284, value: 2900}, {time: 286.5, value: 620}, {time: 287.94, value: 380}, {time: 288, value: 17300}, {time: 302, value: 14800}, {time: 316, value: 9000}, {time: 319.95, value: 3900}, {time: 320, value: 13800}, {time: 331, value: 12800}, {time: 335, value: 11000}, {time: 336, value: 1600}, {time: 341, value: 950}, {time: 344, value: 2100}, {time: 348, value: 3400}, {time: 350, value: 830}, {time: 351.94, value: 400}, {time: 352, value: 18200}, {time: 368, value: 16000}, {time: 379.7, value: 14000}, {time: 383.94, value: 7800}, {time: 384, value: 5400}, {time: 399, value: 3700}, {time: 400, value: 7200}, {time: 412, value: 6200}, {time: 416, value: 3800}, {time: 424, value: 2450}, {time: 432, value: 1500}, {time: 440, value: 1050}, {time: 448, value: 550}]}}
   }
   prefab hzn_auto_stab_lp {
-    AutomationClip: {target: hzn_stab_lp, component: AudioFilter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 3400}, {time: 64, value: 900}, {time: 88, value: 1800}, {time: 120, value: 2200}, {time: 127.94, value: 1600}, {time: 128, value: 4600}, {time: 160, value: 6500}, {time: 188, value: 4500}, {time: 192, value: 2200}, {time: 255.94, value: 2200}, {time: 256, value: 1100}, {time: 280, value: 4200}, {time: 286.8, value: 650}, {time: 287.94, value: 420}, {time: 288, value: 8500}, {time: 304, value: 7200}, {time: 320, value: 5900}, {time: 334, value: 3600}, {time: 335.94, value: 1450}, {time: 336, value: 1250}, {time: 347.5, value: 2600}, {time: 351.94, value: 520}, {time: 352, value: 10500}, {time: 367.9, value: 7600}, {time: 376, value: 8900}, {time: 384, value: 2500}, {time: 416, value: 1400}, {time: 448, value: 700}]}}
+    AutomationClip: {target: hzn_stab_lp, component: Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 3400}, {time: 64, value: 900}, {time: 88, value: 1800}, {time: 120, value: 2200}, {time: 127.94, value: 1600}, {time: 128, value: 4600}, {time: 160, value: 6500}, {time: 188, value: 4500}, {time: 192, value: 2200}, {time: 255.94, value: 2200}, {time: 256, value: 1100}, {time: 280, value: 4200}, {time: 286.8, value: 650}, {time: 287.94, value: 420}, {time: 288, value: 8500}, {time: 304, value: 7200}, {time: 320, value: 5900}, {time: 334, value: 3600}, {time: 335.94, value: 1450}, {time: 336, value: 1250}, {time: 347.5, value: 2600}, {time: 351.94, value: 520}, {time: 352, value: 10500}, {time: 367.9, value: 7600}, {time: 376, value: 8900}, {time: 384, value: 2500}, {time: 416, value: 1400}, {time: 448, value: 700}]}}
   }
   prefab hzn_auto_growl_lp {
-    AutomationClip: {target: hzn_growl_lp, component: AudioFilter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1900}, {time: 96, value: 1500}, {time: 160, value: 2100}, {time: 192, value: 1600}, {time: 288, value: 2500}, {time: 300, value: 3100}, {time: 320, value: 2100}, {time: 334, value: 1450}, {time: 336, value: 1300}, {time: 351.94, value: 650}, {time: 352, value: 4200}, {time: 364, value: 2400}, {time: 376, value: 3700}, {time: 384, value: 1600}, {time: 400, value: 2200}, {time: 416, value: 1350}, {time: 448, value: 900}]}}
+    AutomationClip: {target: hzn_growl_lp, component: Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1900}, {time: 96, value: 1500}, {time: 160, value: 2100}, {time: 192, value: 1600}, {time: 288, value: 2500}, {time: 300, value: 3100}, {time: 320, value: 2100}, {time: 334, value: 1450}, {time: 336, value: 1300}, {time: 351.94, value: 650}, {time: 352, value: 4200}, {time: 364, value: 2400}, {time: 376, value: 3700}, {time: 384, value: 1600}, {time: 400, value: 2200}, {time: 416, value: 1350}, {time: 448, value: 900}]}}
   }
   prefab hzn_auto_music_volume {
-    AutomationClip: {target: hzn_music_bus, component: AudioBus, member: "volume", length: 448, curve: {keys: [{time: 0, value: 0.95}, {time: 63.9, value: 0.95}, {time: 64, value: 0.95}, {time: 127.85, value: 0.84}, {time: 128, value: 0.95}, {time: 191.8, value: 0.83}, {time: 192, value: 0.93}, {time: 252, value: 0.95}, {time: 276, value: 0.99}, {time: 284, value: 0.96}, {time: 286.5, value: 0.6}, {time: 287.7, value: 0.22}, {time: 287.94, value: 0.08}, {time: 288, value: 1}, {time: 319.94, value: 0.96}, {time: 320, value: 1}, {time: 335.8, value: 0.84}, {time: 336, value: 0.78}, {time: 344, value: 0.8}, {time: 350.4, value: 0.55}, {time: 351.94, value: 0.06}, {time: 352, value: 1}, {time: 383.94, value: 0.98}, {time: 384, value: 0.94}, {time: 416, value: 0.9}, {time: 440, value: 0.76}, {time: 448, value: 0.48}]}}
+    AutomationClip: {target: hzn_music_bus, component: Bus, member: "volume", length: 448, curve: {keys: [{time: 0, value: 0.95}, {time: 63.9, value: 0.95}, {time: 64, value: 0.95}, {time: 127.85, value: 0.84}, {time: 128, value: 0.95}, {time: 191.8, value: 0.83}, {time: 192, value: 0.93}, {time: 252, value: 0.95}, {time: 276, value: 0.99}, {time: 284, value: 0.96}, {time: 286.5, value: 0.6}, {time: 287.7, value: 0.22}, {time: 287.94, value: 0.08}, {time: 288, value: 1}, {time: 319.94, value: 0.96}, {time: 320, value: 1}, {time: 335.8, value: 0.84}, {time: 336, value: 0.78}, {time: 344, value: 0.8}, {time: 350.4, value: 0.55}, {time: 351.94, value: 0.06}, {time: 352, value: 1}, {time: 383.94, value: 0.98}, {time: 384, value: 0.94}, {time: 416, value: 0.9}, {time: 440, value: 0.76}, {time: 448, value: 0.48}]}}
   }
   prefab hzn_auto_pad_dynamic {
-    AutomationClip: {target: hzn_pad_track, component: AudioBus, member: "volume", length: 448, curve: {keys: [{time: 0, value: 0.24}, {time: 16, value: 0.48}, {time: 32, value: 0.7}, {time: 192, value: 0.62}, {time: 200, value: 0.39}, {time: 216, value: 0.28}, {time: 224, value: 0.23}, {time: 240, value: 0.23}, {time: 252, value: 0.3}, {time: 256, value: 0.36}, {time: 272, value: 0.39}, {time: 286, value: 0.29}, {time: 288, value: 0.38}, {time: 320, value: 0.35}, {time: 336, value: 0.51}, {time: 344, value: 0.48}, {time: 352, value: 0.36}, {time: 368, value: 0.34}, {time: 384, value: 0.58}, {time: 416, value: 0.71}, {time: 424, value: 0.56}, {time: 440, value: 0.28}, {time: 448, value: 0.06}]}}
+    AutomationClip: {target: hzn_pad_track, component: Bus, member: "volume", length: 448, curve: {keys: [{time: 0, value: 0.24}, {time: 16, value: 0.48}, {time: 32, value: 0.7}, {time: 192, value: 0.62}, {time: 200, value: 0.39}, {time: 216, value: 0.28}, {time: 224, value: 0.23}, {time: 240, value: 0.23}, {time: 252, value: 0.3}, {time: 256, value: 0.36}, {time: 272, value: 0.39}, {time: 286, value: 0.29}, {time: 288, value: 0.38}, {time: 320, value: 0.35}, {time: 336, value: 0.51}, {time: 344, value: 0.48}, {time: 352, value: 0.36}, {time: 368, value: 0.34}, {time: 384, value: 0.58}, {time: 416, value: 0.71}, {time: 424, value: 0.56}, {time: 440, value: 0.28}, {time: 448, value: 0.06}]}}
   }
 
   // Automation.
@@ -2360,16 +2360,16 @@ assets {
         {time: 412, value: 0.62}, {time: 416, value: 0.34}, {time: 448, value: 0}
       ]}}
   }
-  prefab hzn_auto_break_arp { AutomationClip: {target: hzn_arp_filter, component: AudioFilter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 1300}, {time: 12, value: 2250}, {time: 28, value: 6000}, {time: 32, value: 4300}]} } }
-  prefab hzn_auto_final_arp { AutomationClip: {target: hzn_arp_filter, component: AudioFilter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 4600}, {time: 24, value: 5800}, {time: 32, value: 4200}]} } }
+  prefab hzn_auto_break_arp { AutomationClip: {target: hzn_arp_filter, component: Filter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 1300}, {time: 12, value: 2250}, {time: 28, value: 6000}, {time: 32, value: 4300}]} } }
+  prefab hzn_auto_final_arp { AutomationClip: {target: hzn_arp_filter, component: Filter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 4600}, {time: 24, value: 5800}, {time: 32, value: 4200}]} } }
   prefab hzn_auto_end_air {
-    AutomationClip: {target: hzn_air_track, component: AudioBus, member: "volume", length: 32,
+    AutomationClip: {target: hzn_air_track, component: Bus, member: "volume", length: 32,
       curve: {keys: [{time: 0, value: 0.40}, {time: 8, value: 0.35}, {time: 20, value: 0.22}, {time: 28, value: 0.11}, {time: 32, value: 0.025}]}}
   }
-  prefab hzn_auto_end_haze { AutomationClip: {target: hzn_haze_track, component: AudioBus, member: "volume", length: 32, curve: {keys: [{time: 0, value: 0.43}, {time: 8, value: 0.37}, {time: 24, value: 0.23}, {time: 32, value: 0.08}]} } }
+  prefab hzn_auto_end_haze { AutomationClip: {target: hzn_haze_track, component: Bus, member: "volume", length: 32, curve: {keys: [{time: 0, value: 0.43}, {time: 8, value: 0.37}, {time: 24, value: 0.23}, {time: 32, value: 0.08}]} } }
   hzn_automation_track {
     Track: {}
-    AudioBus: {output: hzn_mix}
+    Bus: {output: hzn_mix}
     hzn_auto_pad_gate_p { ClipPlacement: {clip: hzn_auto_pad_gate, start: 0} }
     hzn_auto_music_lp_p { ClipPlacement: {clip: hzn_auto_music_lp, start: 0} }
     hzn_auto_stab_lp_p { ClipPlacement: {clip: hzn_auto_stab_lp, start: 0} }

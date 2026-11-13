@@ -56,19 +56,19 @@ spinner {
 
 ears {
   Position: {0, 0, 0}
-  AudioListener
+  Listener
 }
 
 room {
-  AudioBus: {output: master, kind: AudioChannelReturn, effects: [room]}
+  Bus: {output: master, kind: ChannelReturn, effects: [room]}
   Reverb: {decay: 1.2, damping: 0.5, predelay: 0.01, size: 0.4}
 }
-world { AudioBus: {output: master, kind: AudioChannelSfx, sends: [{bus: room, level: 0.5}]} }
-ui { AudioBus: {output: master, volume: 0.8} }
-music { AudioBus: {output: master, volume: 0.3} }
+world { Bus: {output: master, kind: ChannelSfx, sends: [{bus: room, level: 0.5}]} }
+ui { Bus: {output: master, volume: 0.8} }
+music { Bus: {output: master, volume: 0.3} }
 
 prefab WorldClick {
-  AudioOutput: {bus: world}
+  Output: {bus: world}
   SynthSound: {seed: 1}
   SynthEnvelope: {attack: 0.001, decay: 0.03}
   noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
@@ -76,7 +76,7 @@ prefab WorldClick {
 }
 
 prefab UiClick {
-  AudioOutput: {bus: ui}
+  Output: {bus: ui}
   SynthSound: {seed: 2, pitch_variance: 0.1, level_variance: 0.1}
   SynthEnvelope: {attack: 0.0005, decay: 0.02}
   SynthFilter: {kind: SynthHighPass, cutoff: 800}
@@ -94,8 +94,8 @@ prefab EngineHum {
 
 chime {
   SoundFile: {path: "test/assets/audio/sine_16.wav"}
-  AudioOutput: {bus: world}
-  AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0}
+  Output: {bus: world}
+  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0}
 }
 
 // The engine and the music, which play once on is true
@@ -104,13 +104,13 @@ template Loops {
   if !this.has(SetAt) {
     engine {
       Position: {-4, 0, 0}
-      AudioSource: {sound: EngineHum, loop: true, playing: on}
-      AudioOutput: {bus: world}
-      AudioSpatial: {min_distance: 1, max_distance: 50, rolloff: 0.5}
+      Source: {sound: EngineHum, loop: true, playing: on}
+      Output: {bus: world}
+      Spatial: {min_distance: 1, max_distance: 50, rolloff: 0.5}
     }
     music_track {
-      AudioStream: {path: "test/assets/audio/tone.ogg", playing: on}
-      AudioOutput: {bus: music}
+      Stream: {path: "test/assets/audio/tone.ogg", playing: on}
+      Output: {bus: music}
     }
   }
 }

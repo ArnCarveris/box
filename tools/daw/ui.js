@@ -3,16 +3,16 @@
 const UI = window.UI = {};
 
 const OVERRIDES = {
-  "AudioBus.volume": { min: 0, max: 4, def: 1, unit: "gain" },
-  "AudioBus.pan": { min: -1, max: 1, def: 0 },
-  "AudioBus.width": { min: 0, max: 2, def: 1 },
-  "AudioSend.level": { min: 0, max: 4, def: 0.5, unit: "gain" },
-  "AudioFilter.resonance": { def: 0 },
+  "Bus.volume": { min: 0, max: 4, def: 1, unit: "gain" },
+  "Bus.pan": { min: -1, max: 1, def: 0 },
+  "Bus.width": { min: 0, max: 2, def: 1 },
+  "Send.level": { min: 0, max: 4, def: 0.5, unit: "gain" },
+  "Filter.resonance": { def: 0 },
   "SynthFilter.resonance": { def: 0 },
-  "AudioSource.volume": { min: 0, max: 4, def: 1, unit: "gain" },
-  "AudioSource.pitch": { min: 0.125, max: 8, def: 1, log: true },
-  "AudioStream.volume": { min: 0, max: 4, def: 1, unit: "gain" },
-  "AudioSettings.master_volume": { min: 0, max: 4, def: 1, unit: "gain" },
+  "Source.volume": { min: 0, max: 4, def: 1, unit: "gain" },
+  "Source.pitch": { min: 0.125, max: 8, def: 1, log: true },
+  "Stream.volume": { min: 0, max: 4, def: 1, unit: "gain" },
+  "Settings.master_volume": { min: 0, max: 4, def: 1, unit: "gain" },
   "ClipPlacement.gain": { min: 0, max: 4, def: 1, unit: "gain" },
   "ClipPlacement.transpose": { min: -24, max: 24, def: 0, unit: "st" },
   "ClipPlacement.start": { min: 0, max: 256, def: 0, unit: "beats", soft: true },
@@ -20,22 +20,22 @@ const OVERRIDES = {
   "ClipPlacement.offset": { min: 0, max: 64, def: 0, unit: "beats", soft: true },
   "Instrument.root": { min: 0, max: 127, def: 69, unit: "note" },
   "Instrument.velocity_curve": { min: 0, max: 4, def: 2 },
-  "AudioModulator.depth": { min: -1, max: 1, def: 0, soft: true },
-  "AudioMacroMap.min": { soft: true, min: 0, max: 1 },
-  "AudioMacroMap.max": { soft: true, min: 0, max: 1 },
-  "AudioMacroMap.curve": { min: -1, max: 1, def: 0 },
+  "Modulator.depth": { min: -1, max: 1, def: 0, soft: true },
+  "MacroMap.min": { soft: true, min: 0, max: 1 },
+  "MacroMap.max": { soft: true, min: 0, max: 1 },
+  "MacroMap.curve": { min: -1, max: 1, def: 0 },
   "Transport.position": { min: 0, max: 256, soft: true, unit: "beats" },
   "Transport.loop_start": { min: 0, max: 256, soft: true, unit: "beats" },
   "Transport.loop_end": { min: 0, max: 256, soft: true, unit: "beats" },
   "SynthOscillator.level": { min: 0, max: 2, def: 1, unit: "gain" },
   "NoteClip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true },
   "AutomationClip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true },
-  "AudioClip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true }
+  "Clip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true }
 };
 
 const NESTED = {
-  "Equalizer.bands": "AudioEqBand",
-  "AudioBus.sends": "AudioSend",
+  "Equalizer.bands": "EqBand",
+  "Bus.sends": "Send",
   "Track.humanize": "TrackHumanize",
   "Song.lanes": "SongLane",
   "NoteClip.notes": "Note"
@@ -538,7 +538,7 @@ UI.entityOptions = (member, struct) => {
   else if (n === "sound") recs = DAW.sounds();
   else if (n === "instrument") recs = DAW.list("Instrument");
   else if (n === "clip") recs = DAW.clips();
-  else if (n === "target") recs = Object.values(DAW.ents).filter((r) => DAW.has(r, "AudioBus") || DAW.isEffect(r));
+  else if (n === "target") recs = Object.values(DAW.ents).filter((r) => DAW.has(r, "Bus") || DAW.isEffect(r));
   else if (n === "table") recs = DAW.list("Wavetable");
   else if (n === "component") return null;
   else recs = Object.values(DAW.ents);

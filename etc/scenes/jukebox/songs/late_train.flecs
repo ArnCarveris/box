@@ -12,19 +12,19 @@ box { audio { Song { Rgb: {255, 150, 60} } } }
 assets {
 
   dk_room {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.24, effects: [dk_room]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.24, effects: [dk_room]}
     Reverb: {decay: 0.72, damping: 0.65, predelay: 0.012, size: 0.30}
   }
   dk_drum_eq {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 30},
-      {kind: AudioEqPeak, frequency: 360, gain: -2.3, q: 1}
+      {kind: EqLowCut, frequency: 30},
+      {kind: EqPeak, frequency: 360, gain: -2.3, q: 1}
     ]}
   }
   dk_drum_glue { Compressor: {threshold: -16, ratio: 2.4, attack: 0.026, release: 0.15, knee: 6, makeup: 1.12} }
   dk_drums {
-    AudioBus: {output: master, volume: 0.78, effects: [dk_drum_eq, dk_drum_glue]}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.78, effects: [dk_drum_eq, dk_drum_glue]}
+    Meter: {}
   }
 
   prefab dk_kick_sound {
@@ -1310,8 +1310,8 @@ assets {
 
   lp_track_kick {
     Track: {instrument: dk_kick_inst, humanize: {timing: 2, velocity: 0.035}}
-    AudioBus: {output: dk_drums, volume: 0.93}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.93}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_kick_intro, start: 0} }
     clip_02 { ClipPlacement: {clip: lp_kick_verse_a, start: 16} }
     clip_03 { ClipPlacement: {clip: lp_kick_verse_b, start: 32} }
@@ -1325,8 +1325,8 @@ assets {
 
   lp_track_snare {
     Track: {instrument: dk_snare_inst, humanize: {timing: 3, velocity: 0.055}}
-    AudioBus: {output: dk_drums, volume: 0.74, sends: [{bus: dk_room, level: 0.17}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.74, sends: [{bus: dk_room, level: 0.17}]}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_snare_intro, start: 0} }
     clip_02 { ClipPlacement: {clip: lp_snare_verse_a, start: 16} }
     clip_03 { ClipPlacement: {clip: lp_snare_verse_b, start: 32} }
@@ -1339,8 +1339,8 @@ assets {
 
   lp_track_hat {
     Track: {instrument: dk_hat_inst, humanize: {timing: 3, velocity: 0.08}}
-    AudioBus: {output: dk_drums, volume: 0.46, pan: -0.15}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.46, pan: -0.15}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_hat_intro, start: 0} }
     clip_02 { ClipPlacement: {clip: lp_hat_verse_a, start: 16} }
     clip_03 { ClipPlacement: {clip: lp_hat_verse_b, start: 32} }
@@ -1353,8 +1353,8 @@ assets {
 
   lp_track_open_hat {
     Track: {instrument: dk_open_hat_inst, humanize: {timing: 4, velocity: 0.06}}
-    AudioBus: {output: dk_drums, volume: 0.36, pan: 0.19}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.36, pan: 0.19}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_open_hat_hook_a, start: 48} }
     clip_02 { ClipPlacement: {clip: lp_open_hat_hook_b, start: 64} }
     clip_03 { ClipPlacement: {clip: lp_open_hat_final_a, start: 96} }
@@ -1363,8 +1363,8 @@ assets {
 
   lp_track_clap {
     Track: {instrument: dk_clap_inst, humanize: {timing: 4, velocity: 0.05}}
-    AudioBus: {output: dk_drums, volume: 0.26, sends: [{bus: dk_room, level: 0.17}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.26, sends: [{bus: dk_room, level: 0.17}]}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_clap_hook_a, start: 48} }
     clip_02 { ClipPlacement: {clip: lp_clap_hook_b, start: 64} }
     clip_03 { ClipPlacement: {clip: lp_clap_final_a, start: 96} }
@@ -1373,8 +1373,8 @@ assets {
 
   lp_track_tom {
     Track: {instrument: dk_tom_inst, humanize: {timing: 4, velocity: 0.07}}
-    AudioBus: {output: dk_drums, volume: 0.56, sends: [{bus: dk_room, level: 0.19}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.56, sends: [{bus: dk_room, level: 0.19}]}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_tom_intro, start: 0} }
     clip_02 { ClipPlacement: {clip: lp_tom_verse_a, start: 16} }
     clip_03 { ClipPlacement: {clip: lp_tom_verse_b, start: 32} }
@@ -1388,16 +1388,16 @@ assets {
 
   lp_track_ride {
     Track: {instrument: dk_ride_inst, humanize: {timing: 3, velocity: 0.07}}
-    AudioBus: {output: dk_drums, volume: 0.34, pan: 0.30}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.34, pan: 0.30}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_ride_hook_b, start: 64} }
     clip_02 { ClipPlacement: {clip: lp_ride_final_b, start: 112} }
   }
 
   lp_track_crash {
     Track: {instrument: dk_crash_inst, humanize: {timing: 2, velocity: 0.035}}
-    AudioBus: {output: dk_drums, volume: 0.37, pan: -0.24, sends: [{bus: dk_room, level: 0.13}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.37, pan: -0.24, sends: [{bus: dk_room, level: 0.13}]}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_crash_hook_a, start: 48} }
     clip_02 { ClipPlacement: {clip: lp_crash_hook_b, start: 64} }
     clip_03 { ClipPlacement: {clip: lp_crash_final_a, start: 96} }
@@ -1407,16 +1407,16 @@ assets {
 
   lp_track_rim {
     Track: {instrument: lp_rim_inst, humanize: {timing: 4, velocity: 0.07}}
-    AudioBus: {output: dk_drums, volume: 0.36, pan: -0.10, sends: [{bus: dk_room, level: 0.11}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.36, pan: -0.10, sends: [{bus: dk_room, level: 0.11}]}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_rim_intro, start: 0} }
     clip_02 { ClipPlacement: {clip: lp_rim_break, start: 80} }
   }
 
   lp_track_shaker {
     Track: {instrument: lp_shaker_inst, humanize: {timing: 4, velocity: 0.09}}
-    AudioBus: {output: dk_drums, volume: 0.26, pan: 0.23}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.26, pan: 0.23}
+    Meter: {}
     clip_01 { ClipPlacement: {clip: lp_shaker_verse_a, start: 16} }
     clip_02 { ClipPlacement: {clip: lp_shaker_verse_b, start: 32} }
     clip_03 { ClipPlacement: {clip: lp_shaker_hook_a, start: 48} }

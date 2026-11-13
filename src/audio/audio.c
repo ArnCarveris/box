@@ -33,6 +33,19 @@ ECS_COMPONENT_DECLARE(AudioWavetable);
 ECS_COMPONENT_DECLARE(AudioInstrumentState);
 ECS_COMPONENT_DECLARE(AudioTrackState);
 
+/** Define a component whose name is not its C name without the Audio prefix. */
+#define BOX_AUDIO_COMPONENT_NAMED(world, T, name_)\
+    ecs_id(T) = ecs_component(world, {\
+        .entity = ecs_entity(world, {\
+            .id = ecs_id(T), .name = name_, .symbol = #T, .use_low_id = true }),\
+        .type = { .size = ECS_SIZEOF(T), .alignment = ECS_ALIGNOF(T) } })
+
+/** Define a component with reflection whose name is not its C name without the
+ * Audio prefix. */
+#define BOX_AUDIO_META_COMPONENT_NAMED(world, T, name_)\
+    BOX_AUDIO_COMPONENT_NAMED(world, T, name_);\
+    ecs_meta_from_desc(world, ecs_id(T), FLECS__##T##_kind, FLECS__##T##_desc)
+
 /** Construct AudioBus values: unity volume and width to the master, centered, no sends.
  *
  * @param ptr The components
@@ -1774,7 +1787,7 @@ static void box_audio_music_register(
     ecs_set_hooks(world, Transport, { .ctor = box_audio_transport_ctor });
     ECS_META_COMPONENT(world, SongLane);
     ECS_META_COMPONENT(world, Song);
-    ECS_META_COMPONENT(world, AudioSong);
+    BOX_AUDIO_META_COMPONENT_NAMED(world, AudioSong, "SongFile");
     ECS_META_COMPONENT(world, SongState);
     ECS_META_COMPONENT(world, AudioSongStatus);
     box_audio_song_hooks(world);
@@ -1829,7 +1842,7 @@ static void box_audio_state_register(
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ECS_COMPONENT_DEFINE(world, AudioMusic);
     ECS_COMPONENT_DEFINE(world, AudioSynth);
-    ECS_COMPONENT_DEFINE(world, AudioWavetable);
+    BOX_AUDIO_COMPONENT_NAMED(world, AudioWavetable, "WavetableState");
     ECS_COMPONENT_DEFINE(world, AudioInstrumentState);
     ECS_COMPONENT_DEFINE(world, AudioTrackState);
     ECS_COMPONENT_DEFINE(world, AudioEmitterState);
@@ -1888,6 +1901,8 @@ void BoxAudioImport(
     ECS_IMPORT(world, BoxJobs);
     ECS_IMPORT(world, BoxCurve);
 
+    ecs_set_name_prefix(world, "Audio");
+
     box_audio_mixer_register(world);
     box_audio_synth_register(world);
     box_audio_effects_register(world);
@@ -1928,4 +1943,6 @@ void BoxAudioImport(
     box_audio_macros_init(world, state);
     box_audio_song_init(world, state);
     box_audio_functions_init(world);
+
+    ecs_set_name_prefix(world, NULL);
 }

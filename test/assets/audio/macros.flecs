@@ -7,48 +7,48 @@ using box.audio
 
 // A lowpass whose authored cutoff the build-up replaces
 synth {
-  AudioBus: {effects: [synth]}
-  AudioFilter: {cutoff: 1000}
+  Bus: {effects: [synth]}
+  Filter: {cutoff: 1000}
 }
 
 // A return that only the send of fx reaches: fx itself is silent and its send taps before
 // its volume, at an authored level the build-up replaces
-room { AudioBus: {kind: AudioChannelReturn} }
+room { Bus: {kind: ChannelReturn} }
 
-fx { AudioBus: {volume: 0, sends: [{bus: room, level: 0.1, pre_fader: true}]} }
+fx { Bus: {volume: 0, sends: [{bus: room, level: 0.1, pre_fader: true}]} }
 
 build {
-  AudioMacro: {value: 0.5}
+  Macro: {value: 0.5}
   cutoff {
-    AudioMacroMap: {target: synth, component: AudioFilter, member: "cutoff", min: 200,
-      max: 8000, scale: AudioModOctaves}
+    MacroMap: {target: synth, component: Filter, member: "cutoff", min: 200,
+      max: 8000, scale: ModOctaves}
   }
   reverb {
-    AudioMacroMap: {target: fx, component: AudioBus, member: "sends[0].level", min: 0,
+    MacroMap: {target: fx, component: Bus, member: "sends[0].level", min: 0,
       max: 0.6}
   }
 }
 
 // Two buses that the inverted macro moves down as it rises
-lead { AudioBus: {} }
+lead { Bus: {} }
 
 pad {
-  AudioBus: {effects: [pad]}
-  AudioFilter: {cutoff: 1000}
+  Bus: {effects: [pad]}
+  Filter: {cutoff: 1000}
 }
 
 calm {
-  AudioMacro: {value: 0.25}
-  level { AudioMacroMap: {target: lead, component: AudioBus, member: "volume", min: 1, max: 0.2} }
+  Macro: {value: 0.25}
+  level { MacroMap: {target: lead, component: Bus, member: "volume", min: 1, max: 0.2} }
   dark {
-    AudioMacroMap: {target: pad, component: AudioFilter, member: "cutoff", min: 8000,
-      max: 200, scale: AudioModOctaves}
+    MacroMap: {target: pad, component: Filter, member: "cutoff", min: 8000,
+      max: 200, scale: ModOctaves}
   }
 }
 
 // The lane of the build-up: its value from 0 to 1 over the 4 beats of its pass
 prefab rise {
-  AutomationClip: {target: build, component: AudioMacro, member: "value", length: 4,
+  AutomationClip: {target: build, component: Macro, member: "value", length: 4,
     curve: {keys: [{0, 0}, {4, 1}]}}
 }
 

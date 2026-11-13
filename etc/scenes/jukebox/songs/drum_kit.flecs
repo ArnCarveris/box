@@ -5,19 +5,19 @@ box { audio { Song { Rgb: {255, 150, 60} } } }
 assets {
 
   dk_room {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.3, effects: [dk_room]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.3, effects: [dk_room]}
     Reverb: {decay: 0.9, damping: 0.55, predelay: 0.008, size: 0.35}
   }
   dk_drum_eq {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 30},
-      {kind: AudioEqPeak, frequency: 400, gain: -2, q: 1}
+      {kind: EqLowCut, frequency: 30},
+      {kind: EqPeak, frequency: 400, gain: -2, q: 1}
     ]}
   }
   dk_drum_glue { Compressor: {threshold: -14, ratio: 3, attack: 0.02, release: 0.12, knee: 6, makeup: 1.3} }
   dk_drums {
-    AudioBus: {output: master, volume: 0.65, effects: [dk_drum_eq, dk_drum_glue]}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.65, effects: [dk_drum_eq, dk_drum_glue]}
+    Meter: {}
   }
 
   prefab dk_kick_sound {
@@ -293,8 +293,8 @@ assets {
 
   dk_track_kick {
     Track: {instrument: dk_kick_inst}
-    AudioBus: {output: dk_drums, volume: 0.95}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.95}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_kick_four, start: 0} }
     groove { ClipPlacement: {clip: dk_kick_four, start: 28, duration: 12, loop: true} }
     turn { ClipPlacement: {clip: dk_kick_turn, start: 40} }
@@ -304,8 +304,8 @@ assets {
 
   dk_track_snare {
     Track: {instrument: dk_snare_inst, humanize: {velocity: 0.08}}
-    AudioBus: {output: dk_drums, volume: 0.7, sends: [{bus: dk_room, level: 0.25}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.7, sends: [{bus: dk_room, level: 0.25}]}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_snare_solo, start: 4} }
     groove { ClipPlacement: {clip: dk_snare_groove, start: 28, duration: 12, loop: true} }
     fill { ClipPlacement: {clip: dk_snare_fill, start: 40} }
@@ -315,48 +315,48 @@ assets {
 
   dk_track_hat {
     Track: {instrument: dk_hat_inst, swing: 0.1, swing_grid: TrackSwing16, humanize: {timing: 3, velocity: 0.12}}
-    AudioBus: {output: dk_drums, volume: 0.9}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.9}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_hat_sixteenths, start: 8} }
     groove { ClipPlacement: {clip: dk_hat_sixteenths, start: 28, duration: 16, loop: true} }
   }
 
   dk_track_open_hat {
     Track: {instrument: dk_open_hat_inst, humanize: {velocity: 0.1}}
-    AudioBus: {output: dk_drums, volume: 0.75, pan: 0.2}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.75, pan: 0.2}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_open_hat_offbeats, start: 8} }
     groove { ClipPlacement: {clip: dk_open_hat_offbeats, start: 36, duration: 8, loop: true} }
   }
 
   dk_track_clap {
     Track: {instrument: dk_clap_inst}
-    AudioBus: {output: dk_drums, volume: 1.0, sends: [{bus: dk_room, level: 0.35}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 1.0, sends: [{bus: dk_room, level: 0.35}]}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_clap_backbeat, start: 12} }
     groove { ClipPlacement: {clip: dk_clap_backbeat, start: 44, duration: 12, loop: true} }
   }
 
   dk_track_tom {
     Track: {instrument: dk_tom_inst}
-    AudioBus: {output: dk_drums, volume: 0.8, sends: [{bus: dk_room, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.8, sends: [{bus: dk_room, level: 0.3}]}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_tom_solo, start: 16} }
     fill { ClipPlacement: {clip: dk_tom_fill, start: 56} }
   }
 
   dk_track_ride {
     Track: {instrument: dk_ride_inst, humanize: {timing: 2, velocity: 0.08}}
-    AudioBus: {output: dk_drums, volume: 0.6, pan: 0.3}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.6, pan: 0.3}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_ride_eighths, start: 20} }
     groove { ClipPlacement: {clip: dk_ride_eighths, start: 44, duration: 12, loop: true} }
   }
 
   dk_track_crash {
     Track: {instrument: dk_crash_inst}
-    AudioBus: {output: dk_drums, volume: 0.55, pan: -0.3, sends: [{bus: dk_room, level: 0.2}]}
-    AudioMeter: {}
+    Bus: {output: dk_drums, volume: 0.55, pan: -0.3, sends: [{bus: dk_room, level: 0.2}]}
+    Meter: {}
     solo { ClipPlacement: {clip: dk_crash_hit, start: 24} }
     verse { ClipPlacement: {clip: dk_crash_hit, start: 28} }
     chorus { ClipPlacement: {clip: dk_crash_hit, start: 44} }

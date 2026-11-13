@@ -1,13 +1,13 @@
 // The examples of LFOs in docs/audio.md, which Synth_docs_lfo_examples plays
 using box.audio
 
-music { AudioBus: {volume: 1} }
+music { Bus: {volume: 1} }
 
 // The Mossvale flute: a vibrato of 14 cents at 5.2 Hz with a slight tremolo, which comes in
 // 0.2 s after the start of the note and fades in over 0.3 s, at a random phase per note
 template Flute {
   prop f: f32 = 440
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {level_variance: 0.05}
   SynthEnvelope: {attack: 0.06, decay: 0.25, sustain: 0.55, hold: 0.22, release: 0.5, curve: 2.5, attack_curve: 1.5}
   SynthFilter: {kind: SynthLowPass, cutoff: 2600, resonance: 0.1}
@@ -23,7 +23,7 @@ Flute flute_a4(f: 440)
 // A pad: two squares whose pulse widths a slow triangle moves with the cutoff, and the upper
 // square alone drifting a few cents against the lower
 prefab PwmPad {
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {seed: 3}
   SynthEnvelope: {attack: 1.2, decay: 0.5, sustain: 0.8, hold: 1.5, release: 1.5, curve: 2, attack_curve: 1}
   SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.2}

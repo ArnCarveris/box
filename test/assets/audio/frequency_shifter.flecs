@@ -8,5 +8,5 @@ pad_bell {
 }
 
 pad {
-  AudioBus: {output: master, effects: [pad_bell]}
+  Bus: {output: master, effects: [pad_bell]}
 }

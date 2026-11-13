@@ -4,7 +4,7 @@
 using box.audio
 
 tone {
-  AudioPcm: {
+  Pcm: {
     samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
       0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
       -0.146946, -0.0772542],
@@ -13,19 +13,19 @@ tone {
 }
 
 left {
-  AudioBus: {volume: 1, pan: -1}
+  Bus: {volume: 1, pan: -1}
 }
 
 right {
-  AudioBus: {volume: 1, pan: 1}
+  Bus: {volume: 1, pan: 1}
 }
 
 left_source {
-  AudioSource: {sound: tone, loop: true}
-  AudioOutput: {bus: left}
+  Source: {sound: tone, loop: true}
+  Output: {bus: left}
 }
 
 right_source {
-  AudioSource: {sound: tone, loop: true}
-  AudioOutput: {bus: right}
+  Source: {sound: tone, loop: true}
+  Output: {bus: right}
 }

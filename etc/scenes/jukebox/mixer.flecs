@@ -3,30 +3,30 @@ using state
 
 assets {
   room {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.9 * reverb_level / 100, effects: [room]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.9 * reverb_level / 100, effects: [room]}
     Reverb: {decay: 0.9, damping: 0.6, predelay: 0.012, size: 0.3}
   }
 
   plate {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.8 * reverb_level / 100, effects: [plate]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.8 * reverb_level / 100, effects: [plate]}
     Reverb: {decay: 1.9, damping: 0.25, predelay: 0.022, size: 0.55}
   }
 
   hall {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: reverb_level / 100, effects: [hall]}
+    Bus: {output: master, kind: ChannelReturn, volume: reverb_level / 100, effects: [hall]}
     Reverb: {decay: 3.6, damping: 0.45, predelay: 0.045, size: 1}
   }
 
   echo_lows {
-    Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 280}]}
+    Equalizer: {bands: [{kind: EqLowCut, frequency: 280}]}
   }
 
   echo {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.8, effects: [echo, echo_lows]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.8, effects: [echo, echo_lows]}
     Delay: {sync: 0.75, feedback: 0.42, mix: 1, damping: 3200, ping_pong: true}
   }
 
   sfx {
-    AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.8, sends: [{bus: plate, level: 0.25}]}
+    Bus: {output: master, kind: ChannelSfx, volume: 0.8, sends: [{bus: plate, level: 0.25}]}
   }
 }

@@ -13,12 +13,12 @@ the bus music and a click that box.audio.play plays at load.
   node test/integration/web/audio_module.mjs [--chrome <path>] <bin dir>
 
 <bin dir> holds boxrun.html, .js and .wasm (see audio_core.mjs). Without an autoplay flag the
-check expects AudioStatus.state AudioWaitingForGesture before a gesture, then starts the audio
+check expects Status.state WaitingForGesture before a gesture, then starts the audio
 with a trusted click: the tone has to reach the worklet at 440 Hz and a peak of 0.25 with one
-voice, the click dropped. A script that sets AudioBus.volume to 0.5 (script_write) has to halve
-the level. With AudioMeter on the bus the worklet has to post meters messages and the
+voice, the click dropped. A script that sets Bus.volume to 0.5 (script_write) has to halve
+the level. With Meter on the bus the worklet has to post meters messages and the
 meter has to read the peak and the RMS of the tone. A hidden page has to fade out and suspend
-the context (AudioSuspended), its meter read silence, and a visible one resume it. A capture
+the context (Suspended), its meter read silence, and a visible one resume it. A capture
 of one second (audio.capture 1) has to land as a WAV in the file system of the page with the
 tone, and a 500 ms busy loop on the main thread has to leave the loop playing. The commands run
 through Module.cwrap('box_command_web_run'), the shell of the page. The log has no error and no
@@ -250,9 +250,9 @@ async function main() {
     const expect = (ok, what) => { if (!ok) failures.push(what); };
     // The shell gets whole components, the member is taken here: a JSON string as get prints it
     const audioStatus = async (member) => {
-      const out = await evaluate(shell('get $ box.audio.AudioStatus'));
+      const out = await evaluate(shell('get $ box.audio.Status'));
       try {
-        return JSON.stringify(JSON.parse(out).AudioStatus[member]);
+        return JSON.stringify(JSON.parse(out).Status[member]);
       } catch {
         return out;
       }
@@ -262,12 +262,12 @@ async function main() {
       throw new Error('the scene did not start rendering');
     }
 
-    // Before a gesture: AudioStatus waits for it, and the play of the click is dropped
+    // Before a gesture: Status waits for it, and the play of the click is dropped
     await sleep(500);
     const waiting = await audioStatus('state');
-    console.log(`before the gesture: AudioStatus.state ${waiting}, context ` +
+    console.log(`before the gesture: Status.state ${waiting}, context ` +
       `${await evaluate('Module.boxAudio.ctx.state')}`);
-    expect(waiting === '"AudioWaitingForGesture"', 'AudioStatus does not wait for a gesture');
+    expect(waiting === '"WaitingForGesture"', 'Status does not wait for a gesture');
 
     for (const type of ['mousePressed', 'mouseReleased']) {
       await send('Input.dispatchMouseEvent',
@@ -277,13 +277,13 @@ async function main() {
     const running = await waitFor('Module.boxAudio.ctx.state === "running"', 5000);
     expect(running, 'the gesture did not start the audio');
     const runningBy = Date.now() + 3000;
-    while (Date.now() < runningBy && await audioStatus('state') !== '"AudioRunning"') {
+    while (Date.now() < runningBy && await audioStatus('state') !== '"Running"') {
       await sleep(100);
     }
     const state = await audioStatus('state');
     const stats = await evaluate('Module.boxAudio.stats()');
-    console.log(`after the gesture: AudioStatus.state ${state}, worklet voices ${stats.voices}`);
-    expect(state === '"AudioRunning"', 'AudioStatus is not AudioRunning after the gesture');
+    console.log(`after the gesture: Status.state ${state}, worklet voices ${stats.voices}`);
+    expect(state === '"Running"', 'Status is not Running after the gesture');
     expect(stats.voices === 1, 'the worklet does not play the tone alone, the click was not ' +
       'dropped or the tone does not play');
 
@@ -296,27 +296,27 @@ async function main() {
     expect(Math.abs(tone.mean) < 0.02, 'the output has an offset, the click played');
 
     // A script that changes the volume of the bus halves the level
-    const code = `using box.audio\nmusic {\n  AudioBus: {volume: ${VOLUME}}\n}\n`;
+    const code = `using box.audio\nmusic {\n  Bus: {volume: ${VOLUME}}\n}\n`;
     const written = await evaluate(shell(`script_write mixer ${JSON.stringify(code)}`));
     await sleep(1000);
     const half = await evaluate(MEASURE);
-    const bus = await evaluate(shell('get music box.audio.AudioBus'));
-    console.log(`after a script sets AudioBus.volume ${VOLUME} (${written}, ${bus}): peak ` +
+    const bus = await evaluate(shell('get music box.audio.Bus'));
+    console.log(`after a script sets Bus.volume ${VOLUME} (${written}, ${bus}): peak ` +
       `${half.tail.toFixed(4)}`);
     expect(Math.abs(half.tail - LEVEL * VOLUME) < 0.01, 'the volume of the bus did not apply');
 
-    // The meters: the worklet posts them while a bus plays, and AudioMeter of the bus reads
+    // The meters: the worklet posts them while a bus plays, and Meter of the bus reads
     // the tone at its output, after the volume
     const audioMeter = async () => {
-      const out = await evaluate(shell('get music box.audio.AudioMeter'));
+      const out = await evaluate(shell('get music box.audio.Meter'));
       try {
-        return JSON.parse(out).AudioMeter;
+        return JSON.parse(out).Meter;
       } catch {
         return null;
       }
     };
-    const meterCode = `using box.audio\nmusic {\n  AudioBus: {volume: ${VOLUME}}\n` +
-      `  AudioMeter: {}\n}\n`;
+    const meterCode = `using box.audio\nmusic {\n  Bus: {volume: ${VOLUME}}\n` +
+      `  Meter: {}\n}\n`;
     await evaluate(shell(`script_write mixer ${JSON.stringify(meterCode)}`));
     await sleep(1000);
     const posted = await evaluate(`(() => {
@@ -326,7 +326,7 @@ async function main() {
     })()`);
     const meter = await audioMeter();
     console.log(`meters: ${posted.received} messages, ${posted.frames} frames in the last, ` +
-      `AudioMeter ${JSON.stringify(meter)}`);
+      `Meter ${JSON.stringify(meter)}`);
     expect(posted.received > 0 && posted.frames >= 4 * 128, 'the worklet posts no meters');
     expect(meter && Math.abs(meter.peak_left - LEVEL * VOLUME) < 0.01 &&
       Math.abs(meter.peak_right - LEVEL * VOLUME) < 0.01, 'the peak of the meter is not ' +
@@ -339,12 +339,12 @@ async function main() {
     const suspended = await waitFor('Module.boxAudio.ctx.state === "suspended"', 3000);
     const hiddenState = await audioStatus('state');
     console.log(`hidden: context ${await evaluate('Module.boxAudio.ctx.state')}, ` +
-      `AudioStatus.state ${hiddenState}, suspends ${await evaluate('Module.boxAudio.suspends')}`);
+      `Status.state ${hiddenState}, suspends ${await evaluate('Module.boxAudio.suspends')}`);
     expect(suspended, 'the hidden page did not suspend its audio');
-    expect(hiddenState === '"AudioSuspended"', 'AudioStatus is not AudioSuspended when hidden');
+    expect(hiddenState === '"Suspended"', 'Status is not Suspended when hidden');
     await sleep(300);
     const hiddenMeter = await audioMeter();
-    console.log(`hidden: AudioMeter ${JSON.stringify(hiddenMeter)}`);
+    console.log(`hidden: Meter ${JSON.stringify(hiddenMeter)}`);
     expect(hiddenMeter && hiddenMeter.peak_left === 0 && hiddenMeter.rms_left === 0,
       'the meter of a suspended page does not read silence');
     await evaluate(visibility('visible'));

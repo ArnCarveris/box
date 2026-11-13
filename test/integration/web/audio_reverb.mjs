@@ -242,7 +242,7 @@ async function main() {
     // The load of the reverb and 32 voices in the worklet
     let code = 'using box.audio\n';
     for (let i = 0; i < VOICES; i++) {
-      code += `voice_${i} {\n  AudioSource: {sound: tone, loop: true, volume: 0.02, ` +
+      code += `voice_${i} {\n  Source: {sound: tone, loop: true, volume: 0.02, ` +
         `pitch: ${(0.75 + 0.01 * i).toFixed(2)}}\n}\n`;
     }
     await evaluate(shell(`script_write voices ${JSON.stringify(code)}`));

@@ -1440,7 +1440,7 @@ void box_audio_sync_init(
     box_audio_module_t *state)
 {
     state->buses = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioBuses" }),
+        .entity = ecs_entity(world, { .name = "Buses" }),
         .terms = {
             { .id = ecs_id(AudioBus), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioBusState), .src.id = EcsSelf }
@@ -1450,7 +1450,7 @@ void box_audio_sync_init(
     });
 
     state->sources = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioSources" }),
+        .entity = ecs_entity(world, { .name = "Sources" }),
         .terms = {
             { .id = ecs_id(AudioSource), .src.id = EcsSelf },
             { .id = ecs_id(AudioVoice), .src.id = EcsSelf },
@@ -1462,7 +1462,7 @@ void box_audio_sync_init(
     });
 
     state->spatial = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioSpatialSources" }),
+        .entity = ecs_entity(world, { .name = "SpatialSources" }),
         .terms = {
             { .id = ecs_id(AudioSource), .src.id = EcsSelf },
             { .id = ecs_id(AudioVoice), .src.id = EcsSelf },
@@ -1476,7 +1476,7 @@ void box_audio_sync_init(
     });
 
     state->listeners = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioListeners" }),
+        .entity = ecs_entity(world, { .name = "Listeners" }),
         .terms = {
             { .id = ecs_id(WorldTransform), .inout = EcsIn, .src.id = EcsSelf },
             { .id = AudioListener, .src.id = EcsSelf }
@@ -1485,7 +1485,7 @@ void box_audio_sync_init(
     });
 
     state->views = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioViews" }),
+        .entity = ecs_entity(world, { .name = "Views" }),
         .terms = {{ .id = ecs_id(View), .inout = EcsIn, .src.id = EcsSelf }},
         .cache_kind = EcsQueryCacheAuto
     });
@@ -1493,7 +1493,7 @@ void box_audio_sync_init(
     box_transform_on_moved(world, box_audio_on_moved, state, NULL);
 
     state->sounds = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioSounds" }),
+        .entity = ecs_entity(world, { .name = "Sounds" }),
         .terms = {
             { .id = ecs_id(AudioPcm), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioSoundId), .src.id = EcsSelf }
@@ -1502,7 +1502,7 @@ void box_audio_sync_init(
     });
 
     state->synths = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioSynths" }),
+        .entity = ecs_entity(world, { .name = "Synths" }),
         .terms = {
             { .id = ecs_id(SynthSound), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioSynth), .src.id = EcsSelf },
@@ -1513,7 +1513,7 @@ void box_audio_sync_init(
     });
 
     state->wavetables = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioWavetables" }),
+        .entity = ecs_entity(world, { .name = "Wavetables" }),
         .terms = {
             { .id = ecs_id(Wavetable), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioWavetable), .src.id = EcsSelf }
@@ -1523,7 +1523,7 @@ void box_audio_sync_init(
     });
 
     state->meter_query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioMeters" }),
+        .entity = ecs_entity(world, { .name = "Meters" }),
         .terms = {
             { .id = ecs_id(AudioMeter), .inout = EcsOut, .src.id = EcsSelf },
             { .id = ecs_id(AudioBusState), .inout = EcsIn, .src.id = EcsSelf,
@@ -1536,7 +1536,7 @@ void box_audio_sync_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AudioSync" }),
+        .entity = ecs_entity(world, { .name = "Sync" }),
         .phase = EcsPreStore,
         .run = BoxAudioSync,
         .ctx = state,
@@ -1544,7 +1544,7 @@ void box_audio_sync_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioBusRemove" }),
+        .entity = ecs_entity(world, { .name = "BusRemove" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(AudioBus), .src.id = EcsSelf }},
         .events = { EcsOnRemove },
@@ -1553,7 +1553,7 @@ void box_audio_sync_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioSourceRemove" }),
+        .entity = ecs_entity(world, { .name = "SourceRemove" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(AudioSource), .src.id = EcsSelf }},
         .events = { EcsOnRemove },
@@ -1562,7 +1562,7 @@ void box_audio_sync_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioPcmChange" }),
+        .entity = ecs_entity(world, { .name = "PcmChange" }),
         .query.terms = {{ .id = ecs_id(AudioPcm), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },
         .callback = BoxAudioPcmChange,
@@ -1570,7 +1570,7 @@ void box_audio_sync_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioWavetableChange" }),
+        .entity = ecs_entity(world, { .name = "WavetableChange" }),
         .query.flags = EcsQueryMatchPrefab,
         .query.terms = {{ .id = ecs_id(Wavetable), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },
@@ -1581,7 +1581,7 @@ void box_audio_sync_init(
     box_audio_wavetable_init(world, state);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioSynthRemove" }),
+        .entity = ecs_entity(world, { .name = "SynthRemove" }),
         .query.flags = EcsQueryMatchPrefab,
         .query.terms = {{ .id = ecs_id(SynthSound), .src.id = EcsSelf }},
         .events = { EcsOnRemove },

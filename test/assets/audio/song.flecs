@@ -4,7 +4,7 @@
 // event plays on the next bar.
 //
 // kick.wav and shaker.wav are written by make_sounds.py next to this file. Every channel has an
-// AudioMeter, so a test or an agent sees what each one plays.
+// Meter, so a test or an agent sees what each one plays.
 using flecs.script
 using box.app
 using box.audio
@@ -17,34 +17,34 @@ $ { Transport: {tempo: 120, loop: true, loop_start: 0, loop_end: 16} }
 //
 // The SFX bus of the game, dry, straight into the master
 sfx {
-  AudioBus: {output: master, kind: AudioChannelSfx}
-  AudioMeter: {}
+  Bus: {output: master, kind: ChannelSfx}
+  Meter: {}
 }
 
 // The compressor of the music group: it keys on sfx and ducks the music while the game plays
 music_duck {
   Compressor: {threshold: -24, ratio: 4, attack: 0.005, release: 0.3, sidechain: sfx}
-  AudioMeter: {}
+  Meter: {}
 }
 
 // The music group: every track and both returns end here
 music {
-  AudioBus: {output: master, volume: 0.6, effects: [music_duck]}
-  AudioMeter: {}
+  Bus: {output: master, volume: 0.6, effects: [music_duck]}
+  Meter: {}
 }
 
 // Two returns in the group, so the duck takes their tails too: a hall and a dotted eighth
 // that follows the tempo and bounces between left and right
 hall {
-  AudioBus: {output: music, kind: AudioChannelReturn, effects: [hall]}
+  Bus: {output: music, kind: ChannelReturn, effects: [hall]}
   Reverb: {decay: 1.8, damping: 0.5, predelay: 0.02, size: 0.6}
-  AudioMeter: {}
+  Meter: {}
 }
 
 echo {
-  AudioBus: {output: music, kind: AudioChannelReturn, effects: [echo]}
+  Bus: {output: music, kind: ChannelReturn, effects: [echo]}
   Delay: {sync: 0.75, feedback: 0.35, mix: 1, ping_pong: true, damping: 4000}
-  AudioMeter: {}
+  Meter: {}
 }
 
 // 3. The instruments: two synths whose oscillators are at 440 Hz, in tune at the default root
@@ -103,14 +103,14 @@ prefab four_on_the_floor {
 
 // An audio clip: the whole shaker, 2 beats long
 shaker_sample { SoundFile: {path: "test/assets/audio/shaker.wav"} }
-shaker { AudioClip: {sound: shaker_sample, length: 2} }
+shaker { Clip: {sound: shaker_sample, length: 2} }
 
 // 5. The tracks, mixer channels in the music group. One clip per part, placed again a fourth
 // (5) and a fifth (7) up: Am for two bars, then Dm, then Em.
 bass {
   Track: {instrument: bass_synth}
-  AudioBus: {output: music, volume: 0.8}
-  AudioMeter: {}
+  Bus: {output: music, volume: 0.8}
+  Meter: {}
   one { ClipPlacement: {clip: bass_line, start: 0, duration: 8, loop: true} }
   four { ClipPlacement: {clip: bass_line, start: 8, transpose: 5} }
   five { ClipPlacement: {clip: bass_line, start: 12, transpose: 7} }
@@ -118,8 +118,8 @@ bass {
 
 keys {
   Track: {instrument: keys_synth}
-  AudioBus: {output: music, volume: 0.5, width: 1.4, sends: [{bus: hall, level: 0.4}, {bus: echo, level: 0.25}]}
-  AudioMeter: {}
+  Bus: {output: music, volume: 0.5, width: 1.4, sends: [{bus: hall, level: 0.4}, {bus: echo, level: 0.25}]}
+  Meter: {}
   one { ClipPlacement: {clip: minor_chord, start: 0, duration: 8, loop: true} }
   four { ClipPlacement: {clip: minor_chord, start: 8, transpose: 5} }
   five { ClipPlacement: {clip: minor_chord, start: 12, transpose: 7, gain: 0.8} }
@@ -127,24 +127,24 @@ keys {
 
 drums {
   Track: {instrument: kick_drum}
-  AudioBus: {output: music, volume: 0.7, sends: [{bus: hall, level: 0.1}]}
-  AudioMeter: {}
+  Bus: {output: music, volume: 0.7, sends: [{bus: hall, level: 0.1}]}
+  Meter: {}
   beat { ClipPlacement: {clip: four_on_the_floor, start: 0, duration: 16, loop: true} }
 }
 
 // A track of audio clips needs no instrument; the shaker comes in at bar 3
 perc {
   Track: {}
-  AudioBus: {output: music, volume: 0.6, pan: 0.3, sends: [{bus: echo, level: 0.2}]}
-  AudioMeter: {}
+  Bus: {output: music, volume: 0.6, pan: 0.3, sends: [{bus: echo, level: 0.2}]}
+  Meter: {}
   groove { ClipPlacement: {clip: shaker, start: 8, duration: 8, loop: true} }
 }
 
-box { audio { master { AudioMeter: {} } } }
+box { audio { master { Meter: {} } } }
 
 // 6. A stinger on the SFX bus, on the next bar after a pickup in the game
 prefab Stinger {
-  AudioOutput: {bus: sfx}
+  Output: {bus: sfx}
   SynthSound: {}
   SynthEnvelope: {attack: 0.002, decay: 0.8, curve: 3}
   root { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.4} }

@@ -1,7 +1,7 @@
 using box.audio
 
 ringing_group {
-  AudioBus: {}
+  Bus: {}
 }
 
 prefab ringing_tone {
@@ -20,8 +20,8 @@ prefab ringing_notes {
 
 ringing_bell {
   Track: {instrument: ringing_inst}
-  AudioBus: {output: ringing_group}
-  AudioMeter: {}
+  Bus: {output: ringing_group}
+  Meter: {}
   hit { ClipPlacement: {clip: ringing_notes, start: 0} }
 }
 

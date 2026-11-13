@@ -7,24 +7,24 @@
 using box.audio
 
 hum {
-  AudioPcm: {samples: [0.5, 0.5, 0.5, 0.5]}
+  Pcm: {samples: [0.5, 0.5, 0.5, 0.5]}
 }
 
 click {
-  AudioPcm: {samples: [0.4, 0.4, 0.4], sample_rate: 10}
+  Pcm: {samples: [0.4, 0.4, 0.4], sample_rate: 10}
 }
 
 music {
-  AudioBus: {volume: 0.5}
+  Bus: {volume: 0.5}
 }
 
 sfx {
-  AudioBus: {output: music, volume: 0.5}
+  Bus: {output: music, volume: 0.5}
 }
 
 hum_source {
-  AudioSource: {sound: hum, loop: true}
-  AudioOutput: {bus: sfx}
+  Source: {sound: hum, loop: true}
+  Output: {bus: sfx}
 }
 
 const played: bool = box.audio.play(click, 1.0)

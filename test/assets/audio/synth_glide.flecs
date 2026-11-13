@@ -2,12 +2,12 @@
 // test/cpu/audio measures glides and legato notes with.
 using box.audio
 
-music { AudioBus: {volume: 1} }
+music { Bus: {volume: 1} }
 
 // A lead: a mono saw an octave over a sine whose notes slide into each other over 80 ms
 template Lead {
   prop f: f32 = 220
-  AudioOutput: {bus: music}
+  Output: {bus: music}
   SynthSound: {}
   SynthGlide: {time: 0.08, legato: true, channel: 1}
   SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.25, curve: 2}

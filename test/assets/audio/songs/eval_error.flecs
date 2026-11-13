@@ -1,7 +1,7 @@
 using box.audio
 
 eval_error_bus {
-  AudioBus: {volume: 0.5}
+  Bus: {volume: 0.5}
 }
 
 prefab eval_error_tone {
@@ -11,7 +11,7 @@ prefab eval_error_tone {
 }
 
 eval_error_bad {
-  AudioBus: {no_such_member: 1}
+  Bus: {no_such_member: 1}
 }
 
 $ { Song: {title: "Eval error", tempo: 100, beats: 8} }

@@ -4,16 +4,16 @@ using box.material
 box { audio { Song { Rgb: {40, 180, 220} } } }
 
 other_echo_lows {
-  Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 300}]}
+  Equalizer: {bands: [{kind: EqLowCut, frequency: 300}]}
 }
 
 other_echo {
-  AudioBus: {kind: AudioChannelReturn, effects: [other_echo, other_echo_lows]}
+  Bus: {kind: ChannelReturn, effects: [other_echo, other_echo_lows]}
   Delay: {sync: 0.5, feedback: 0.3, mix: 1}
 }
 
 other_group {
-  AudioBus: {volume: 0.9}
+  Bus: {volume: 0.9}
 }
 
 prefab other_low {
@@ -48,15 +48,15 @@ prefab other_keys_notes {
 
 other_bass {
   Track: {instrument: other_bass_inst}
-  AudioBus: {output: other_group}
-  AudioMeter: {}
+  Bus: {output: other_group}
+  Meter: {}
   line { ClipPlacement: {clip: other_bass_notes, start: 0, duration: 16, loop: true} }
 }
 
 other_keys {
   Track: {instrument: other_keys_inst}
-  AudioBus: {output: other_group, sends: [{bus: other_echo, level: 0.4}]}
-  AudioMeter: {}
+  Bus: {output: other_group, sends: [{bus: other_echo, level: 0.4}]}
+  Meter: {}
   line { ClipPlacement: {clip: other_keys_notes, start: 0, duration: 16, loop: true} }
 }
 

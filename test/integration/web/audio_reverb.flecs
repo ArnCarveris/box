@@ -32,27 +32,27 @@ spinner {
 }
 
 hall {
-  AudioBus: {output: master, effects: [hall]}
+  Bus: {output: master, effects: [hall]}
   Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02}
 }
 
 world {
-  AudioBus: {output: master, sends: [{bus: hall, level: 0.5}]}
+  Bus: {output: master, sends: [{bus: hall, level: 0.5}]}
 }
 
 // 10 ms of 0.5 at 1000 Hz, which plays as a click at any rate of the output
 click {
-  AudioPcm: {samples: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], sample_rate: 1000}
-  AudioOutput: {bus: world}
+  Pcm: {samples: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], sample_rate: 1000}
+  Output: {bus: world}
 }
 
 // A tone for the load of 32 voices, which the check starts with a script
 tone {
-  AudioPcm: {
+  Pcm: {
     samples: [0, 0.0772542, 0.146946, 0.202254, 0.237764, 0.25, 0.237764, 0.202254, 0.146946,
       0.0772542, 0, -0.0772542, -0.146946, -0.202254, -0.237764, -0.25, -0.237764, -0.202254,
       -0.146946, -0.0772542],
     sample_rate: 8800
   }
-  AudioOutput: {bus: world}
+  Output: {bus: world}
 }

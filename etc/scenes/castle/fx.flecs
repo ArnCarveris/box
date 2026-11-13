@@ -13,12 +13,12 @@ $ {
 }
 
 assets {
-  sfx { AudioBus: {volume: 0.9} }
+  sfx { Bus: {volume: 0.9} }
 
   // Stone set on stone: a thud with a gritty top
   prefab SfxBuild {
-    AudioOutput: {bus: sfx}
-    AudioSpatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
+    Output: {bus: sfx}
+    Spatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
     SynthSound: {seed: 3, pitch_variance: 0.12, level_variance: 0.1}
     SynthEnvelope: {attack: 0.002, decay: 0.28}
     SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.1}
@@ -32,8 +32,8 @@ assets {
 
   // A wall coming down: a long rumble of noise
   prefab SfxRaze {
-    AudioOutput: {bus: sfx}
-    AudioSpatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
+    Output: {bus: sfx}
+    Spatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
     SynthSound: {seed: 9, pitch_variance: 0.1}
     SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.5, hold: 0.15, release: 0.45}
     SynthFilter: {kind: SynthLowPass, cutoff: 200, resonance: 0.2}
@@ -44,8 +44,8 @@ assets {
 
   // A rustle of leaves and earth
   prefab SfxPlant {
-    AudioOutput: {bus: sfx}
-    AudioSpatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
+    Output: {bus: sfx}
+    Spatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
     SynthSound: {seed: 5, pitch_variance: 0.15}
     SynthEnvelope: {attack: 0.01, decay: 0.18}
     SynthFilter: {kind: SynthBandPass, cutoff: 1200, resonance: 0.4}
@@ -55,8 +55,8 @@ assets {
 
   // Water poured into the moat
   prefab SfxSplash {
-    AudioOutput: {bus: sfx}
-    AudioSpatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
+    Output: {bus: sfx}
+    Spatial: {min_distance: 30, max_distance: 260, rolloff: 0.5}
     SynthSound: {seed: 11, pitch_variance: 0.1}
     SynthEnvelope: {attack: 0.005, decay: 0.4}
     SynthFilter: {kind: SynthBandPass, cutoff: 600, resonance: 0.55}
@@ -67,7 +67,7 @@ assets {
 
   // A wooden knock when a tool is picked
   prefab SfxClick {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {pitch_variance: 0.04}
     SynthEnvelope: {attack: 0.001, decay: 0.06}
     SynthFilter: {kind: SynthLowPass, cutoff: 2200}
@@ -77,7 +77,7 @@ assets {
 
   // A low buzz when something cannot be done
   prefab SfxDeny {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthEnvelope: {attack: 0.004, decay: 0.05, sustain: 0.6, hold: 0.08, release: 0.06}
     SynthFilter: {kind: SynthLowPass, cutoff: 900}
     low { SynthOscillator: {wave: SynthSquare, frequency: 110, level: 0.25} }
@@ -86,7 +86,7 @@ assets {
 
   // The four notes of the fanfare of a new rank
   prefab SfxFanfareA {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthEnvelope: {attack: 0.01, decay: 0.08, sustain: 0.6, hold: 0.08, release: 0.12}
     SynthFilter: {kind: SynthLowPass, cutoff: 3200, resonance: 0.2}
     horn { SynthOscillator: {wave: SynthSaw, frequency: 392, level: 0.25} }
@@ -94,7 +94,7 @@ assets {
   }
 
   prefab SfxFanfareB {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthEnvelope: {attack: 0.01, decay: 0.08, sustain: 0.6, hold: 0.08, release: 0.12}
     SynthFilter: {kind: SynthLowPass, cutoff: 3200, resonance: 0.2}
     horn { SynthOscillator: {wave: SynthSaw, frequency: 523.25, level: 0.25} }
@@ -102,7 +102,7 @@ assets {
   }
 
   prefab SfxFanfareC {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthEnvelope: {attack: 0.01, decay: 0.08, sustain: 0.6, hold: 0.08, release: 0.12}
     SynthFilter: {kind: SynthLowPass, cutoff: 3200, resonance: 0.2}
     horn { SynthOscillator: {wave: SynthSaw, frequency: 659.25, level: 0.25} }
@@ -110,7 +110,7 @@ assets {
   }
 
   prefab SfxFanfareD {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.7, hold: 0.5, release: 0.6}
     SynthFilter: {kind: SynthLowPass, cutoff: 3600, resonance: 0.2}
     horn { SynthOscillator: {wave: SynthSaw, frequency: 783.99, level: 0.25} }
@@ -120,7 +120,7 @@ assets {
 
   // The crack of a firework
   prefab SfxPop {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 21, pitch_variance: 0.3, level_variance: 0.2}
     SynthEnvelope: {attack: 0.001, decay: 0.35}
     SynthFilter: {kind: SynthLowPass, cutoff: 400}

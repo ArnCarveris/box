@@ -405,7 +405,7 @@ float* box_audio_wavetable_of(
         data = ecs_vec_first_t(&pcm->samples, float);
         length = ecs_vec_count(&pcm->samples) / channels;
     } else {
-        why = ecs_os_strdup("it is not an entity with AudioPcm or SoundFile");
+        why = ecs_os_strdup("it is not an entity with Pcm or SoundFile");
     }
 
     if (!why && length < size) {
@@ -492,7 +492,7 @@ void box_audio_wavetable_init(
     box_audio_module_t *state)
 {
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioWavetablePcm" }),
+        .entity = ecs_entity(world, { .name = "WavetablePcm" }),
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(AudioPcm), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },
@@ -501,7 +501,7 @@ void box_audio_wavetable_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioWavetableSoundStatus" }),
+        .entity = ecs_entity(world, { .name = "WavetableSoundStatus" }),
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(SoundStatus), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },

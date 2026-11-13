@@ -7,11 +7,11 @@ using state
 using assets
 
 assets {
-  mv_hall { AudioBus: {output: master, kind: AudioChannelReturn, effects: [mv_hall]}; Reverb: {decay: 1.4, damping: 0.5, predelay: 0.02, size: 0.6} }
-  mv_sfx { AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.85, sends: [{bus: mv_hall, level: 0.18}]} }
-  mv_spell { AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.64, sends: [{bus: mv_hall, level: 0.18}]} }
-  mv_ui { AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.6} }
-  mv_music { AudioBus: {output: master, volume: 0.42, sends: [{bus: mv_hall, level: 0.3}]} }
+  mv_hall { Bus: {output: master, kind: ChannelReturn, effects: [mv_hall]}; Reverb: {decay: 1.4, damping: 0.5, predelay: 0.02, size: 0.6} }
+  mv_sfx { Bus: {output: master, kind: ChannelSfx, volume: 0.85, sends: [{bus: mv_hall, level: 0.18}]} }
+  mv_spell { Bus: {output: master, kind: ChannelSfx, volume: 0.64, sends: [{bus: mv_hall, level: 0.18}]} }
+  mv_ui { Bus: {output: master, kind: ChannelSfx, volume: 0.6} }
+  mv_music { Bus: {output: master, volume: 0.42, sends: [{bus: mv_hall, level: 0.3}]} }
 }
 
 $ {
@@ -20,8 +20,8 @@ $ {
 
 assets {
   prefab SfxSpark {
-    AudioOutput: {bus: mv_sfx}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_sfx}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 3, pitch_variance: 0.1, level_variance: 0.1}
     SynthEnvelope: {attack: 0.002, decay: 0.35}
     SynthFilter: {kind: SynthBandPass, cutoff: 800, resonance: 0.3}
@@ -31,8 +31,8 @@ assets {
   }
 
   prefab SfxSplash {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 11, pitch_variance: 0.1}
     SynthEnvelope: {attack: 0.005, decay: 0.4}
     SynthFilter: {kind: SynthBandPass, cutoff: 600, resonance: 0.4}
@@ -41,8 +41,8 @@ assets {
   }
 
   prefab SfxFrost {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 17, pitch_variance: 0.05}
     SynthEnvelope: {attack: 0.01, decay: 0.55, curve: 2}
     SynthFilter: {kind: SynthHighPass, cutoff: 2500, resonance: 0.2}
@@ -54,8 +54,8 @@ assets {
   }
 
   prefab SfxIceCrack {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 73, pitch_variance: 0.3, level_variance: 0.4}
     SynthEnvelope: {attack: 0.0005, decay: 0.04, curve: 4}
     SynthFilter: {kind: SynthBandPass, cutoff: 3500, resonance: 0.55, keytrack: 1}
@@ -64,7 +64,7 @@ assets {
   }
 
   prefab SfxFizzle {
-    AudioOutput: {bus: mv_sfx}
+    Output: {bus: mv_sfx}
     SynthSound: {}
     SynthEnvelope: {attack: 0.004, decay: 0.05, sustain: 0.5, hold: 0.06, release: 0.08}
     SynthFilter: {kind: SynthLowPass, cutoff: 800}
@@ -73,8 +73,8 @@ assets {
   }
 
   prefab SfxFireWhoomp {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 3, pitch_variance: 0.08}
     SynthEnvelope: {attack: 0.015, decay: 0.35, curve: 3}
     SynthFilter: {kind: SynthBandPass, cutoff: 700, resonance: 0.1}
@@ -83,8 +83,8 @@ assets {
   }
 
   prefab SfxFireBed {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 21}
     SynthEnvelope: {attack: 0.06, sustain: 1, hold: 0.35, release: 0.4, curve: 2}
     SynthFilter: {kind: SynthBandPass, cutoff: 1400, resonance: 0.05}
@@ -93,8 +93,8 @@ assets {
   }
 
   prefab SfxFireCrackle {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 7, pitch_variance: 0.4, level_variance: 0.6}
     SynthEnvelope: {attack: 0.0005, decay: 0.016, curve: 6}
     SynthFilter: {kind: SynthBandPass, cutoff: 2400, resonance: 0.2, keytrack: 1}
@@ -102,8 +102,8 @@ assets {
   }
 
   prefab SfxRainHiss {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 13}
     SynthEnvelope: {attack: 0.08, sustain: 1, hold: 0.4, release: 0.45, curve: 2}
     SynthFilter: {kind: SynthHighPass, cutoff: 1600, resonance: 0.1}
@@ -112,8 +112,8 @@ assets {
   }
 
   prefab SfxRainDrop {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 29, pitch_variance: 0.35, level_variance: 0.5}
     SynthEnvelope: {attack: 0.0005, decay: 0.018, curve: 4}
     SynthFilter: {kind: SynthBandPass, cutoff: 1500, resonance: 0.35, keytrack: 1}
@@ -122,8 +122,8 @@ assets {
   }
 
   prefab SfxGust {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 5, pitch_variance: 0.08}
     SynthEnvelope: {attack: 0.25, decay: 0.3, sustain: 0.7, hold: 0.3, release: 0.6, curve: 2}
     SynthFilter: {kind: SynthBandPass, cutoff: 420, resonance: 0.75}
@@ -134,8 +134,8 @@ assets {
   }
 
   prefab SfxWoodCrack {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 23, pitch_variance: 0.2, level_variance: 0.3}
     SynthEnvelope: {attack: 0.0005, decay: 0.08, curve: 4}
     SynthFilter: {kind: SynthBandPass, cutoff: 1700, resonance: 0.3}
@@ -151,8 +151,8 @@ assets {
   }
 
   prefab SfxWoodSplinter {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 31}
     SynthEnvelope: {attack: 0.002, decay: 0.2, curve: 3}
     SynthFilter: {kind: SynthBandPass, cutoff: 2800, resonance: 0.1}
@@ -162,8 +162,8 @@ assets {
   }
 
   prefab SfxLift {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 41, pitch_variance: 0.03, drift: 8}
     SynthEnvelope: {attack: 0.25, decay: 0.15, sustain: 0.8, hold: 0.25, release: 0.5, curve: 2}
     SynthFilter: {kind: SynthLowPass, cutoff: 700, resonance: 0.25}
@@ -181,8 +181,8 @@ assets {
   }
 
   prefab SfxLiftGlint {
-    AudioOutput: {bus: mv_spell}
-    AudioSpatial: {min_distance: 36, max_distance: 90}
+    Output: {bus: mv_spell}
+    Spatial: {min_distance: 36, max_distance: 90}
     SynthSound: {seed: 43, level_variance: 0.3}
     SynthEnvelope: {attack: 0.002, decay: 0.5, curve: 4}
     bell {
@@ -192,7 +192,7 @@ assets {
   }
 
   prefab SfxCastFire {
-    AudioOutput: {bus: mv_spell}
+    Output: {bus: mv_spell}
     SynthSound: {seed: 47, pitch_variance: 0.06}
     SynthEnvelope: {attack: 0.004, decay: 0.3, curve: 3}
     SynthFilter: {kind: SynthBandPass, cutoff: 3000, resonance: 0.3}
@@ -202,7 +202,7 @@ assets {
   }
 
   prefab SfxCastWater {
-    AudioOutput: {bus: mv_spell}
+    Output: {bus: mv_spell}
     SynthSound: {seed: 53, pitch_variance: 0.08}
     SynthEnvelope: {attack: 0.01, decay: 0.32, curve: 2}
     SynthFilter: {kind: SynthBandPass, cutoff: 900, resonance: 0.3}
@@ -212,7 +212,7 @@ assets {
   }
 
   prefab SfxCastWind {
-    AudioOutput: {bus: mv_spell}
+    Output: {bus: mv_spell}
     SynthSound: {seed: 59, pitch_variance: 0.06}
     SynthEnvelope: {attack: 0.1, decay: 0.28, curve: 2}
     SynthFilter: {kind: SynthBandPass, cutoff: 400, resonance: 0.6}
@@ -221,7 +221,7 @@ assets {
   }
 
   prefab SfxCastWood {
-    AudioOutput: {bus: mv_spell}
+    Output: {bus: mv_spell}
     SynthSound: {seed: 61, pitch_variance: 0.1}
     SynthEnvelope: {attack: 0.0005, decay: 0.05, curve: 4}
     SynthFilter: {kind: SynthBandPass, cutoff: 2200, resonance: 0.3}
@@ -237,7 +237,7 @@ assets {
   }
 
   prefab SfxCastFrost {
-    AudioOutput: {bus: mv_spell}
+    Output: {bus: mv_spell}
     SynthSound: {seed: 67, pitch_variance: 0.05}
     SynthEnvelope: {attack: 0.01, decay: 0.28, curve: 2}
     SynthFilter: {kind: SynthHighPass, cutoff: 2800, resonance: 0.2}
@@ -249,7 +249,7 @@ assets {
   }
 
   prefab SfxCastLift {
-    AudioOutput: {bus: mv_spell}
+    Output: {bus: mv_spell}
     SynthSound: {seed: 71, pitch_variance: 0.03}
     SynthEnvelope: {attack: 0.15, decay: 0.15, sustain: 0.6, hold: 0.05, release: 0.2, curve: 2}
     SynthFilter: {kind: SynthLowPass, cutoff: 800, resonance: 0.25}
@@ -262,7 +262,7 @@ assets {
   }
 
   prefab SfxTalk {
-    AudioOutput: {bus: mv_ui}
+    Output: {bus: mv_ui}
     SynthSound: {pitch_variance: 0.12}
     SynthEnvelope: {attack: 0.003, decay: 0.08}
     SynthFilter: {kind: SynthLowPass, cutoff: 2400}
@@ -270,7 +270,7 @@ assets {
   }
 
   prefab SfxMote {
-    AudioOutput: {bus: mv_sfx}
+    Output: {bus: mv_sfx}
     SynthSound: {}
     SynthEnvelope: {attack: 0.005, decay: 0.7}
     a { SynthOscillator: {wave: SynthSine, frequency: 1318.5, level: 0.25} }
@@ -281,7 +281,7 @@ assets {
   template Note {
     prop f: f32 = 440
     prop len: f32 = 0.5
-    AudioOutput: {bus: mv_ui}
+    Output: {bus: mv_ui}
     SynthSound: {}
     SynthEnvelope: {attack: 0.01, decay: 0.1, sustain: 0.6, hold: len, release: 0.35}
     SynthFilter: {kind: SynthLowPass, cutoff: 3600, resonance: 0.15}
@@ -517,31 +517,31 @@ mossvale {
     crackles {
       if sfx_on[SP_SPARK] {
         Position: {sfx_x[SP_SPARK], 0.7, sfx_z[SP_SPARK]}
-        AudioEmitter: {sound: assets.SfxFireCrackle, interval_min: 0.02, interval_max: 0.14, shape: AudioEmitterSphere, radius: 0.8, volume_min: 0.25, volume_max: 1, pitch_min: 0.6, pitch_max: 1.6}
+        Emitter: {sound: assets.SfxFireCrackle, interval_min: 0.02, interval_max: 0.14, shape: EmitterSphere, radius: 0.8, volume_min: 0.25, volume_max: 1, pitch_min: 0.6, pitch_max: 1.6}
       }
     }
     raindrops {
       if sfx_on[SP_SPLASH] {
         Position: {sfx_x[SP_SPLASH], 0.7, sfx_z[SP_SPLASH]}
-        AudioEmitter: {sound: assets.SfxRainDrop, interval_min: 0.012, interval_max: 0.06, shape: AudioEmitterDisc, radius: 2.5, volume_min: 0.2, volume_max: 0.9, pitch_min: 0.7, pitch_max: 1.4}
+        Emitter: {sound: assets.SfxRainDrop, interval_min: 0.012, interval_max: 0.06, shape: EmitterDisc, radius: 2.5, volume_min: 0.2, volume_max: 0.9, pitch_min: 0.7, pitch_max: 1.4}
       }
     }
     branches {
       if sfx_on[SP_BLOOM] {
         Position: {sfx_x[SP_BLOOM], 0.7, sfx_z[SP_BLOOM]}
-        AudioEmitter: {sound: assets.SfxWoodCrack, interval_min: 0.06, interval_max: 0.25, shape: AudioEmitterSphere, radius: 1, volume_min: 0.25, volume_max: 0.7, pitch_min: 0.7, pitch_max: 1.3}
+        Emitter: {sound: assets.SfxWoodCrack, interval_min: 0.06, interval_max: 0.25, shape: EmitterSphere, radius: 1, volume_min: 0.25, volume_max: 0.7, pitch_min: 0.7, pitch_max: 1.3}
       }
     }
     ice {
       if sfx_on[SP_FROST] {
         Position: {sfx_x[SP_FROST], 0.7, sfx_z[SP_FROST]}
-        AudioEmitter: {sound: assets.SfxIceCrack, interval_min: 0.03, interval_max: 0.12, shape: AudioEmitterSphere, radius: 1.2, volume_min: 0.25, volume_max: 0.8, pitch_min: 0.7, pitch_max: 1.4}
+        Emitter: {sound: assets.SfxIceCrack, interval_min: 0.03, interval_max: 0.12, shape: EmitterSphere, radius: 1.2, volume_min: 0.25, volume_max: 0.8, pitch_min: 0.7, pitch_max: 1.4}
       }
     }
     glints {
       if sfx_on[SP_LIFT] {
         Position: {sfx_x[SP_LIFT], 1.2, sfx_z[SP_LIFT]}
-        AudioEmitter: {sound: assets.SfxLiftGlint, interval_min: 0.06, interval_max: 0.2, shape: AudioEmitterHemisphere, radius: 1.2, volume_min: 0.3, volume_max: 0.8, pitch_min: 0.75, pitch_max: 1.5}
+        Emitter: {sound: assets.SfxLiftGlint, interval_min: 0.06, interval_max: 0.2, shape: EmitterHemisphere, radius: 1.2, volume_min: 0.3, volume_max: 0.8, pitch_min: 0.75, pitch_max: 1.5}
       }
     }
   }
@@ -685,10 +685,10 @@ async {
 }
 
 assets {
-  mv_ambience { AudioBus: {output: master, volume: 0.55} }
+  mv_ambience { Bus: {output: master, volume: 0.55} }
 
   prefab SfxStep {
-    AudioOutput: {bus: mv_sfx}
+    Output: {bus: mv_sfx}
     SynthSound: {seed: 31, pitch_variance: 0.3, level_variance: 0.35}
     SynthEnvelope: {attack: 0.002, decay: 0.06}
     SynthFilter: {kind: SynthLowPass, cutoff: 1100, resonance: 0.1}
@@ -697,7 +697,7 @@ assets {
   }
 
   prefab SfxBirdA {
-    AudioOutput: {bus: mv_ambience}
+    Output: {bus: mv_ambience}
     SynthSound: {pitch_variance: 0.12, level_variance: 0.2}
     SynthEnvelope: {attack: 0.005, decay: 0.09}
     chirp { SynthOscillator: {wave: SynthSine, frequency: 2900, frequency_end: 3900, sweep: 0.07, level: 0.25} }
@@ -705,14 +705,14 @@ assets {
   }
 
   prefab SfxBirdB {
-    AudioOutput: {bus: mv_ambience}
+    Output: {bus: mv_ambience}
     SynthSound: {pitch_variance: 0.1, level_variance: 0.2}
     SynthEnvelope: {attack: 0.01, decay: 0.05, sustain: 0.7, hold: 0.12, release: 0.06}
     whistle { SynthOscillator: {wave: SynthSine, frequency: 2200, frequency_end: 1700, sweep: 0.2, level: 0.22} }
   }
 
   prefab SfxCricket {
-    AudioOutput: {bus: mv_ambience}
+    Output: {bus: mv_ambience}
     SynthSound: {pitch_variance: 0.05, level_variance: 0.3}
     SynthEnvelope: {attack: 0.002, decay: 0.03}
     SynthFilter: {kind: SynthBandPass, cutoff: 4400, resonance: 0.6}
@@ -720,7 +720,7 @@ assets {
   }
 
   prefab SfxWater {
-    AudioOutput: {bus: mv_ambience}
+    Output: {bus: mv_ambience}
     SynthSound: {seed: 41}
     SynthEnvelope: {attack: 0.4, sustain: 1, hold: 3.2, release: 0.4}
     SynthFilter: {kind: SynthBandPass, cutoff: 700, resonance: 0.35}
@@ -728,7 +728,7 @@ assets {
   }
 
   prefab SfxWind {
-    AudioOutput: {bus: mv_ambience}
+    Output: {bus: mv_ambience}
     SynthSound: {seed: 43}
     SynthEnvelope: {attack: 1.5, sustain: 1, hold: 4, release: 1.5}
     SynthFilter: {kind: SynthBandPass, cutoff: 380, resonance: 0.3}
@@ -737,7 +737,7 @@ assets {
   }
 
   prefab SfxSelect {
-    AudioOutput: {bus: mv_ui}
+    Output: {bus: mv_ui}
     SynthSound: {pitch_variance: 0.02}
     SynthEnvelope: {attack: 0.002, decay: 0.12}
     SynthFilter: {kind: SynthLowPass, cutoff: 4000}
@@ -752,17 +752,17 @@ mossvale {
       const zz = -88 + i * 22
       "river_{i}" {
         Position: {river_x(zz), 0.5, zz}
-        AudioSource: {sound: assets.SfxWater, loop: true, volume: 0.5}
-        AudioSpatial: {min_distance: 4, max_distance: 22}
+        Source: {sound: assets.SfxWater, loop: true, volume: 0.5}
+        Spatial: {min_distance: 4, max_distance: 22}
       }
     }
     lake_a {
       Position: {LAKE_X + 8, 0.5, LAKE_Z + 6}
-      AudioSource: {sound: assets.SfxWater, loop: true, volume: 0.3}
-      AudioSpatial: {min_distance: 8, max_distance: 30}
+      Source: {sound: assets.SfxWater, loop: true, volume: 0.3}
+      Spatial: {min_distance: 8, max_distance: 30}
     }
     wind {
-      AudioSource: {sound: assets.SfxWind, loop: true, volume: 0.6}
+      Source: {sound: assets.SfxWind, loop: true, volume: 0.6}
     }
   }
 }

@@ -27,7 +27,7 @@ ED.clipPosition = (clipPath, placementPath) => {
   const pos = DAW.position();
   const clip = DAW.ents[clipPath];
   if (!clip) return null;
-  const c = clip.comps[A + "NoteClip"] || clip.comps[A + "AutomationClip"] || clip.comps[A + "AudioClip"];
+  const c = clip.comps[A + "NoteClip"] || clip.comps[A + "AutomationClip"] || clip.comps[A + "Clip"];
   if (!c) return null;
   const placements = placementPath ? [DAW.ents[placementPath]] :
     Object.values(DAW.ents).filter((r) => DAW.has(r, "ClipPlacement") && r.comps[A + "ClipPlacement"].clip === clipPath);
@@ -487,22 +487,22 @@ function biquadMag(kind, f0, gain, q, f, sr) {
   const cs = Math.cos(w0), sn = Math.sin(w0);
   const alpha = sn / (2 * q);
   let b0, b1, b2, a0, a1, a2;
-  if (kind === "AudioEqPeak") {
+  if (kind === "EqPeak") {
     b0 = 1 + alpha * A2; b1 = -2 * cs; b2 = 1 - alpha * A2;
     a0 = 1 + alpha / A2; a1 = -2 * cs; a2 = 1 - alpha / A2;
-  } else if (kind === "AudioEqLowShelf" || kind === "AudioEqHighShelf") {
+  } else if (kind === "EqLowShelf" || kind === "EqHighShelf") {
     const sq = 2 * Math.sqrt(A2) * alpha;
-    const s = kind === "AudioEqLowShelf" ? 1 : -1;
+    const s = kind === "EqLowShelf" ? 1 : -1;
     b0 = A2 * ((A2 + 1) - s * (A2 - 1) * cs + sq);
     b1 = s * 2 * A2 * ((A2 - 1) - s * (A2 + 1) * cs);
     b2 = A2 * ((A2 + 1) - s * (A2 - 1) * cs - sq);
     a0 = (A2 + 1) + s * (A2 - 1) * cs + sq;
     a1 = -s * 2 * ((A2 - 1) + s * (A2 + 1) * cs);
     a2 = (A2 + 1) + s * (A2 - 1) * cs - sq;
-  } else if (kind === "AudioEqLowCut" || kind === "SynthHighPass") {
+  } else if (kind === "EqLowCut" || kind === "SynthHighPass") {
     b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2;
     a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
-  } else if (kind === "AudioEqHighCut" || kind === "SynthLowPass") {
+  } else if (kind === "EqHighCut" || kind === "SynthLowPass") {
     b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2;
     a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
   } else if (kind === "SynthBandPass") {
@@ -531,7 +531,7 @@ ED.responseGraph = (path, comp) => {
     ctx.fillStyle = "#0c0e10";
     ctx.fillRect(0, 0, w, h);
     if (!v) return;
-    const sr = (DAW.single.AudioStatus || {}).sample_rate || 48000;
+    const sr = (DAW.single.Status || {}).sample_rate || 48000;
     const fx = (f) => Math.log(f / 20) / Math.log(20000 / 20) * w;
     const dbr = 24;
     const fy = (db) => h / 2 - db / dbr * (h / 2 - 4);
@@ -540,8 +540,8 @@ ED.responseGraph = (path, comp) => {
     for (const db of [-12, 0, 12]) ctx.fillRect(0, fy(db), w, 1);
     const stages = [];
     if (comp === A + "Equalizer") {
-      for (const b of v.bands || []) if (b.kind !== "AudioEqOff") stages.push([b.kind, b.frequency, b.gain, b.q]);
-    } else if (comp === A + "AudioFilter") {
+      for (const b of v.bands || []) if (b.kind !== "EqOff") stages.push([b.kind, b.frequency, b.gain, b.q]);
+    } else if (comp === A + "Filter") {
       const q = 0.7071 + (v.resonance || 0) * 8;
       stages.push([v.kind, v.cutoff, 0, q]);
       if (v.slope === "SynthSlope24") stages.push([v.kind, v.cutoff, 0, 0.7071]);
@@ -553,7 +553,7 @@ ED.responseGraph = (path, comp) => {
       const f = 20 * Math.pow(1000, x / w);
       let mag = 1;
       for (const s of stages) mag *= biquadMag(s[0], Math.min(s[1], sr * 0.49), s[2], Math.max(0.1, s[3]), f, sr);
-      if (comp === A + "AudioFilter") {
+      if (comp === A + "Filter") {
         const mix = v.mix === undefined ? 1 : v.mix;
         mag = mix * mag + (1 - mix);
       }
@@ -564,14 +564,14 @@ ED.responseGraph = (path, comp) => {
     ctx.lineWidth = 1;
     if (comp === A + "Equalizer") {
       (v.bands || []).forEach((b, i) => {
-        if (b.kind === "AudioEqOff") return;
+        if (b.kind === "EqOff") return;
         ctx.fillStyle = "#4fc3f7";
         ctx.beginPath();
-        ctx.arc(fx(b.frequency), fy(["AudioEqLowCut", "AudioEqHighCut"].includes(b.kind) ? 0 : b.gain), 4, 0, Math.PI * 2);
+        ctx.arc(fx(b.frequency), fy(["EqLowCut", "EqHighCut"].includes(b.kind) ? 0 : b.gain), 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "#0c0e10";
         ctx.font = "8px sans-serif";
-        ctx.fillText(String(i + 1), fx(b.frequency) - 2, fy(["AudioEqLowCut", "AudioEqHighCut"].includes(b.kind) ? 0 : b.gain) + 3);
+        ctx.fillText(String(i + 1), fx(b.frequency) - 2, fy(["EqLowCut", "EqHighCut"].includes(b.kind) ? 0 : b.gain) + 3);
       });
     }
   };
@@ -586,8 +586,8 @@ ED.responseGraph = (path, comp) => {
       const w = r.width, h = r.height;
       const fx = (f) => Math.log(f / 20) / Math.log(1000) * w;
       const fy = (db) => h / 2 - db / 24 * (h / 2 - 4);
-      drag = (v.bands || []).findIndex((b) => b.kind !== "AudioEqOff" &&
-        Math.hypot(fx(b.frequency) - x, fy(["AudioEqLowCut", "AudioEqHighCut"].includes(b.kind) ? 0 : b.gain) - y) < 8);
+      drag = (v.bands || []).findIndex((b) => b.kind !== "EqOff" &&
+        Math.hypot(fx(b.frequency) - x, fy(["EqLowCut", "EqHighCut"].includes(b.kind) ? 0 : b.gain) - y) < 8);
       if (drag >= 0) { c.setPointerCapture(e.pointerId); DAW.dragging++; }
     });
     c.addEventListener("pointermove", (e) => {
@@ -598,7 +598,7 @@ ED.responseGraph = (path, comp) => {
       const x = e.clientX - r.left, y = e.clientY - r.top;
       const b = v.bands[drag];
       b.frequency = Math.round(20 * Math.pow(1000, Math.max(0, Math.min(1, x / r.width))));
-      if (!["AudioEqLowCut", "AudioEqHighCut"].includes(b.kind)) {
+      if (!["EqLowCut", "EqHighCut"].includes(b.kind)) {
         b.gain = Math.round(Math.max(-24, Math.min(24, (r.height / 2 - y) / (r.height / 2 - 4) * 24)) * 10) / 10;
       }
       DAW.write(path, comp, { bands: v.bands });

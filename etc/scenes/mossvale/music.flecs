@@ -435,14 +435,14 @@ assets {
     for i in 0..3 {
       "strings_{MV_LAYER[i]}" {
         Track: {instrument: MV_STRING_INST[i]}
-        AudioBus: {output: mv_music}
+        Bus: {output: mv_music}
         bars { ClipPlacement: {clip: MV_STRING_PARTS[i], start: 0, duration: 192, loop: true, gain: music_forest ? 0.9 : 0.7} }
       }
     }
 
     bass {
       Track: {instrument: mv_band.bass}
-      AudioBus: {output: mv_music}
+      Bus: {output: mv_music}
       down { ClipPlacement: {clip: mv_bass_part, start: 0, duration: 192, loop: true, gain: 0.75} }
       if !music_forest {
         push { ClipPlacement: {clip: mv_bass_push_part, start: 0, duration: 192, loop: true, gain: 0.45} }
@@ -451,7 +451,7 @@ assets {
 
     harp {
       Track: {instrument: mv_band.harp}
-      AudioBus: {output: mv_music}
+      Bus: {output: mv_music}
       down { ClipPlacement: {clip: mv_harp_down_part, start: 0, duration: 192, loop: true} }
       if !music_forest {
         off { ClipPlacement: {clip: mv_harp_off_part, start: 0, duration: 192, loop: true} }
@@ -460,7 +460,7 @@ assets {
 
     flute {
       Track: {instrument: mv_band.flute}
-      AudioBus: {output: mv_music}
+      Bus: {output: mv_music}
       if !music_forest {
         first { ClipPlacement: {clip: mv_melody_part, start: 0} }
         third { ClipPlacement: {clip: mv_melody_part, start: 128} }
@@ -472,7 +472,7 @@ assets {
 
     kick {
       Track: {instrument: mv_band.kick}
-      AudioBus: {output: mv_music}
+      Bus: {output: mv_music}
       if music_festive {
         beat { ClipPlacement: {clip: mv_kick_part, start: 0, duration: 192, loop: true} }
       }
@@ -480,7 +480,7 @@ assets {
 
     tamb {
       Track: {instrument: mv_band.tamb}
-      AudioBus: {output: mv_music}
+      Bus: {output: mv_music}
       if music_festive {
         beat { ClipPlacement: {clip: mv_tamb_part, start: 0, duration: 192, loop: true} }
       }

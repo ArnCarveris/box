@@ -62,7 +62,7 @@ G.model = () => {
   for (const b of DAW.buses()) {
     if (b.path === master) continue;
     const isTrack = DAW.has(b, "Track");
-    const bus = b.comps[A + "AudioBus"];
+    const bus = b.comps[A + "Bus"];
     add(b.path, {
       kind: isTrack ? "track" : "bus", rec: b, order: b.order, meter: true,
       title: isTrack ? V.laneName(b.path) : b.name,
@@ -73,8 +73,8 @@ G.model = () => {
   if (masterRec) nodes.get(master).rec = masterRec;
 
   for (const n of nodes.values()) {
-    if (!n.rec || !DAW.has(n.rec, "AudioBus")) continue;
-    (n.rec.comps[A + "AudioBus"].effects || []).forEach((fx, slot) => {
+    if (!n.rec || !DAW.has(n.rec, "Bus")) continue;
+    (n.rec.comps[A + "Bus"].effects || []).forEach((fx, slot) => {
       if (DAW.isNone(fx)) return;
       const frec = DAW.ents[fx];
       const label = frec ? DAW.effectComps(frec).map(DAW.short).join(" / ") || DAW.leaf(fx) : DAW.leaf(fx);
@@ -93,13 +93,13 @@ G.model = () => {
     add(r.path, { kind: "instrument", rec: r, order: r.order, title: r.name, sub: "instrument" + (inst.polyphony ? ` ${inst.polyphony} voices` : "") });
   }
 
-  for (const r of DAW.list("AudioModulator")) {
-    const mv = r.comps[A + "AudioModulator"];
+  for (const r of DAW.list("Modulator")) {
+    const mv = r.comps[A + "Modulator"];
     add(r.path, { kind: "modulator", rec: r, order: r.order, title: r.name, sub: `modulator ${UI.enumLabel(mv.shape || "").toLowerCase()}`.trim() });
   }
 
-  for (const r of DAW.list("AudioMacro")) {
-    add(r.path, { kind: "macro", rec: r, order: r.order, title: r.name, sub: `macro ${(r.comps[A + "AudioMacro"].value || 0).toFixed(2)}` });
+  for (const r of DAW.list("Macro")) {
+    add(r.path, { kind: "macro", rec: r, order: r.order, title: r.name, sub: `macro ${(r.comps[A + "Macro"].value || 0).toFixed(2)}` });
   }
 
   const usedClips = new Set();
@@ -114,9 +114,9 @@ G.model = () => {
 
   const soundRefs = new Set();
   for (const r of DAW.list("Instrument")) soundRefs.add(r.comps[A + "Instrument"].sound);
-  for (const r of DAW.list("AudioClip")) soundRefs.add(r.comps[A + "AudioClip"].sound);
+  for (const r of DAW.list("Clip")) soundRefs.add(r.comps[A + "Clip"].sound);
   for (const r of Object.values(DAW.ents)) {
-    if (DAW.has(r, "AudioSource")) soundRefs.add(r.comps[A + "AudioSource"].sound);
+    if (DAW.has(r, "Source")) soundRefs.add(r.comps[A + "Source"].sound);
   }
   for (const r of DAW.sounds()) {
     if (nodes.has(r.path)) continue;
@@ -126,11 +126,11 @@ G.model = () => {
   }
 
   const sources = Object.values(DAW.ents).filter((r) =>
-    (DAW.has(r, "AudioSource") || DAW.has(r, "AudioStream")) && !nodes.has(r.path))
+    (DAW.has(r, "Source") || DAW.has(r, "Stream")) && !nodes.has(r.path))
     .sort((a, b) => a.order - b.order);
   const groups = new Map();
   for (const r of sources) {
-    const out = r.comps[A + "AudioOutput"];
+    const out = r.comps[A + "Output"];
     const bus = out && !DAW.isNone(out.bus) ? out.bus : master;
     const anon = r.name.startsWith("#");
     const id = anon ? `sources:${r.parent || ""}:${bus}` : r.path;
@@ -143,7 +143,7 @@ G.model = () => {
   }
   for (const g of groups.values()) {
     const first = g.members[0];
-    const stream = DAW.has(first, "AudioStream");
+    const stream = DAW.has(first, "Stream");
     const n = add(g.id, {
       kind: "source", rec: first, path: first.path, order: first.order,
       title: g.anon ? `${g.members.length} ${stream ? "streams" : "sources"}` : first.name,
@@ -153,14 +153,14 @@ G.model = () => {
     const to = resolve(g.bus) || { id: master };
     link({ id: g.id }, to, "audio");
     for (const m of g.members) {
-      const s = m.comps[A + "AudioSource"];
+      const s = m.comps[A + "Source"];
       if (s) link(resolve(s.sound), { id: g.id }, "sound");
     }
   }
 
   for (const n of [...nodes.values()]) {
-    if (!n.rec || !DAW.has(n.rec, "AudioBus") || n.id === master) continue;
-    const bus = n.rec.comps[A + "AudioBus"];
+    if (!n.rec || !DAW.has(n.rec, "Bus") || n.id === master) continue;
+    const bus = n.rec.comps[A + "Bus"];
     link({ id: n.id }, resolve(bus.output) || { id: master }, "audio");
     for (const s of bus.sends || []) {
       link({ id: n.id }, resolve(s.bus), "send", `${s.pre_fader ? "pre " : ""}${(+s.level).toFixed(2)}`);
@@ -176,8 +176,8 @@ G.model = () => {
     link(resolve(r.comps[A + "Instrument"].sound), { id: r.path }, "sound");
   }
 
-  for (const r of DAW.list("AudioClip")) {
-    link(resolve(r.comps[A + "AudioClip"].sound), { id: r.path }, "sound");
+  for (const r of DAW.list("Clip")) {
+    link(resolve(r.comps[A + "Clip"].sound), { id: r.path }, "sound");
   }
 
   for (const r of Object.values(DAW.ents)) {
@@ -186,7 +186,7 @@ G.model = () => {
     const clip = DAW.ents[cp.clip];
     if (!clip) continue;
     if (DAW.has(clip, "AutomationClip")) continue;
-    link(resolve(cp.clip), resolve(r.parent), DAW.has(clip, "AudioClip") ? "audio" : "notes");
+    link(resolve(cp.clip), resolve(r.parent), DAW.has(clip, "Clip") ? "audio" : "notes");
   }
 
   for (const r of DAW.list("AutomationClip")) {
@@ -194,15 +194,15 @@ G.model = () => {
     link({ id: r.path }, resolve(ac.target), "mod", ac.member);
   }
 
-  for (const r of DAW.list("AudioModulator")) {
-    const mv = r.comps[A + "AudioModulator"];
+  for (const r of DAW.list("Modulator")) {
+    const mv = r.comps[A + "Modulator"];
     link({ id: r.path }, resolve(mv.target), "mod", mv.member);
     link(resolve(mv.key), { id: r.path }, "key");
   }
 
-  for (const r of DAW.list("AudioMacro")) {
+  for (const r of DAW.list("Macro")) {
     for (const c of DAW.childrenOf(r.path)) {
-      const mm = c.comps[A + "AudioMacroMap"];
+      const mm = c.comps[A + "MacroMap"];
       if (mm) link({ id: r.path }, resolve(mm.target), "mod", mm.member);
     }
   }
@@ -327,7 +327,7 @@ G.hot = (id) => {
 };
 
 G.posKey = () => {
-  const song = DAW.single.AudioSong;
+  const song = DAW.single.SongFile;
   return "daw.graph.pos:" + (song && song.file ? song.file : DAW.host || "");
 };
 
@@ -661,8 +661,8 @@ G.render = (root) => {
     const head = UI.el("div", { class: "ghead" },
       UI.el("span", { class: "swatch", style: { background: DAW.color(n.path) } }),
       UI.el("div", { class: "gtext" }, UI.el("div", { class: "gtitle" }, n.title), UI.el("div", { class: "gsub" }, n.sub)));
-    if (rec && DAW.has(rec, "AudioBus")) {
-      const free = (rec.comps[A + "AudioBus"].effects || ["#0"]).findIndex((fx) => DAW.isNone(fx));
+    if (rec && DAW.has(rec, "Bus")) {
+      const free = (rec.comps[A + "Bus"].effects || ["#0"]).findIndex((fx) => DAW.isNone(fx));
       if (free >= 0) {
         head.appendChild(UI.el("button", {
           class: "small gadd", text: "+", title: "Add an insert",
@@ -691,7 +691,7 @@ G.render = (root) => {
     }
     if (n.meter && rec) {
       el.appendChild(UI.meter(n.path, { noScale: true }));
-      UI.bind(n.path, A + "AudioBus", ["mute"], (v) => el.classList.toggle("muted", !!v), el);
+      UI.bind(n.path, A + "Bus", ["mute"], (v) => el.classList.toggle("muted", !!v), el);
     }
     canvas.appendChild(el);
   }

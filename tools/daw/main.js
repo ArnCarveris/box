@@ -24,11 +24,11 @@ function buildTopbar() {
 
   const sg = document.getElementById("song-group");
   T.songTitle = UI.el("span", { class: "status" });
-  T.songFile = UI.el("input", { placeholder: "song .flecs file", style: { width: "220px" }, title: "AudioSong.file: Enter loads, empty unloads" });
+  T.songFile = UI.el("input", { placeholder: "song .flecs file", style: { width: "220px" }, title: "SongFile.file: Enter loads, empty unloads" });
   T.songFile.addEventListener("keydown", (e) => {
     e.stopPropagation();
     if (e.key === "Enter") {
-      DAW.write(A + "AudioSong", A + "AudioSong", { file: T.songFile.value.trim() });
+      DAW.write(A + "SongFile", A + "SongFile", { file: T.songFile.value.trim() });
       T.songFile.blur();
     }
   });
@@ -38,8 +38,8 @@ function buildTopbar() {
 
   const mg = document.getElementById("master-group");
   T.master = UI.knob({
-    label: "master", meta: UI.meta("AudioSettings", "master_volume"), value: 1,
-    onchange: (v) => DAW.write(A + "AudioSettings", A + "AudioSettings", { master_volume: v })
+    label: "master", meta: UI.meta("Settings", "master_volume"), value: 1,
+    onchange: (v) => DAW.write(A + "Settings", A + "Settings", { master_volume: v })
   });
   T.master.style.width = "50px";
   T.master.querySelector("svg").style.width = "24px";
@@ -47,7 +47,7 @@ function buildTopbar() {
   T.master.style.flexDirection = "row";
   T.master.style.gap = "4px";
   T.master.querySelector(".klabel").style.display = "none";
-  T.mute = UI.toggle({ label: "mute", cls: "small mute", value: false, onchange: (v) => DAW.write(A + "AudioSettings", A + "AudioSettings", { mute: v }) });
+  T.mute = UI.toggle({ label: "mute", cls: "small mute", value: false, onchange: (v) => DAW.write(A + "Settings", A + "Settings", { mute: v }) });
   T.meter = UI.meter(A + "master", { noScale: true });
   T.meter.style.height = "26px";
   T.meter.style.width = "8px";
@@ -100,12 +100,12 @@ function updateTopbar() {
       if (!T.unit.classList.contains("active")) T.unit.set(t.beat_unit);
     }
   }
-  const s = DAW.single.AudioSettings;
-  if (s && !DAW.isPending(A + "AudioSettings", A + "AudioSettings")) {
+  const s = DAW.single.Settings;
+  if (s && !DAW.isPending(A + "Settings", A + "Settings")) {
     if (!T.master.classList.contains("active")) T.master.set(s.master_volume);
     T.mute.set(s.mute);
   }
-  const song = DAW.single.Song, ss = DAW.single.AudioSongStatus, as = DAW.single.AudioSong;
+  const song = DAW.single.Song, ss = DAW.single.SongStatus, as = DAW.single.SongFile;
   const state = ss ? UI.enumLabel(ss.state) : "";
   T.songTitle.textContent = song && song.title ? song.title : (state === "None" ? "no song" : state);
   T.songTitle.title = ss && ss.error ? ss.error : (ss ? `${ss.state} ${ss.file || ""}` : "");
@@ -126,7 +126,7 @@ function updateTopbar() {
 }
 
 function updateStatus() {
-  const st = DAW.single.AudioStatus;
+  const st = DAW.single.Status;
   if (!st) { T.status.textContent = DAW.conn ? (DAW.connected ? "no audio" : "offline") : ""; return; }
   T.status.innerHTML = "";
   T.status.append(

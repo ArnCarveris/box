@@ -4,14 +4,14 @@
 using box.audio
 
 vocals {
-  AudioBus: {output: master, effects: [vocals]}
+  Bus: {output: master, effects: [vocals]}
   Equalizer: {bands: [
-    {kind: AudioEqLowCut, frequency: 120},
-    {kind: AudioEqPeak, frequency: 3000, gain: 3, q: 1.2}
+    {kind: EqLowCut, frequency: 120},
+    {kind: EqPeak, frequency: 3000, gain: 3, q: 1.2}
   ]}
 }
 
 music {
-  AudioBus: {output: master, effects: [music]}
-  AudioFilter: {cutoff: 400, resonance: 0.3, slope: SynthSlope24}
+  Bus: {output: master, effects: [music]}
+  Filter: {cutoff: 400, resonance: 0.3, slope: SynthSlope24}
 }

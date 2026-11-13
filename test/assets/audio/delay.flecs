@@ -4,8 +4,8 @@
 using box.audio
 
 echo {
-  AudioBus: {output: master, kind: AudioChannelReturn, effects: [echo]}
+  Bus: {output: master, kind: ChannelReturn, effects: [echo]}
   Delay: {sync: 0.75, feedback: 0.4, mix: 1, ping_pong: true, damping: 4000}
 }
 
-world { AudioBus: {output: master, sends: [{bus: echo, level: 0.4}]} }
+world { Bus: {output: master, sends: [{bus: echo, level: 0.4}]} }

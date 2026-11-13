@@ -16,12 +16,12 @@ prefab check_clip_notes {
 }
 
 check_hot {
-  AudioBus: {volume: 4}
+  Bus: {volume: 4}
 }
 
 check_clip_track {
   Track: {instrument: check_clip_inst}
-  AudioBus: {output: check_hot}
+  Bus: {output: check_hot}
   part { ClipPlacement: {clip: check_clip_notes, start: 0, duration: 4} }
 }
 

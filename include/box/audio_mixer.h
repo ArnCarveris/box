@@ -93,7 +93,7 @@ ECS_STRUCT(AudioBus, {
 
 /** A reverb, an effect: it runs in the insert slot of an AudioBus that names its entity in
  * effects, usually on a return bus that sources reach through a send:
- * hall { AudioBus: {effects: [hall]}; Reverb: {decay: 2} }.
+ * hall { Bus: {effects: [hall]}; Reverb: {decay: 2} }.
  *
  * Every reverb has its own delay memory. Decay, damping and mix change smoothly; a change of size
  * or predelay, a move to another slot, a delete or a disable fades the wet signal.
@@ -144,8 +144,8 @@ ECS_STRUCT(AudioEqBand, {
  * BOX_AUDIO_EQ_BANDS bands in a row.
  *
  * By default every band is off, at 100, 400, 2000 and 8000 Hz, and the equalizer passes its
- * input bit for bit: vocals { AudioBus: {effects: [vocals]};
- * Equalizer: {bands: [{kind: AudioEqLowCut, frequency: 120}]} }.
+ * input bit for bit: vocals { Bus: {effects: [vocals]};
+ * Equalizer: {bands: [{kind: EqLowCut, frequency: 120}]} }.
  *
  * A change of a band moves it over 20 ms, so a script may automate it every frame without
  * zipper noise or clicks.

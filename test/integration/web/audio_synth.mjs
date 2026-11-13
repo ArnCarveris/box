@@ -244,7 +244,7 @@ async function main() {
     // The load of 64 synth voices in the worklet
     let code = 'using box.audio\n';
     for (let i = 0; i < VOICES; i++) {
-      code += `voice_${i} {\n  AudioSource: {sound: Hum, loop: true, volume: 0.02, ` +
+      code += `voice_${i} {\n  Source: {sound: Hum, loop: true, volume: 0.02, ` +
         `pitch: ${(0.75 + 0.01 * i).toFixed(2)}}\n}\n`;
     }
     await evaluate(shell(`script_write voices ${JSON.stringify(code)}`));

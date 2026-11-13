@@ -33,5 +33,5 @@ spinner {
 }
 
 music {
-  AudioStream: {path: "test/assets/audio/tone.ogg"}
+  Stream: {path: "test/assets/audio/tone.ogg"}
 }

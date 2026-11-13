@@ -2,11 +2,11 @@
 // checks that they parse, compile without errors, play and end.
 using box.audio
 
-ui { AudioBus: {volume: 1} }
+ui { Bus: {volume: 1} }
 
 // A click: a burst of noise and a falling tone, 31 ms
 prefab UiClick {
-  AudioOutput: {bus: ui}
+  Output: {bus: ui}
   SynthSound: {pitch_variance: 0.05}
   SynthEnvelope: {attack: 0.001, decay: 0.03}
   noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
@@ -15,7 +15,7 @@ prefab UiClick {
 
 // A UI blip: a soft square that steps up a fifth, through a lowpass
 prefab UiBlip {
-  AudioOutput: {bus: ui}
+  Output: {bus: ui}
   SynthSound: {level_variance: 0.1}
   SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
   SynthFilter: {kind: SynthLowPass, cutoff: 3000, resonance: 0.2}
@@ -96,7 +96,7 @@ prefab Pluck {
 // A ring: a curved decay that falls fast and rings out, no sustain, its lowpass closing from
 // 4 kHz to 1.2 kHz over 0.3 s
 prefab Ring {
-  AudioOutput: {bus: ui}
+  Output: {bus: ui}
   SynthSound: {level_variance: 0.1}
   SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5}
   SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.1}

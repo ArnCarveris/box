@@ -541,11 +541,11 @@ void Macros_command(void) {
     test_assert(out != NULL);
     printf("%s\n", out);
     test_assert(strstr(out, "macro build: value 0.50 (runs)") != NULL);
-    test_assert(strstr(out, "map build.cutoff: synth AudioFilter.cutoff 200.00..8000.00 oct "
+    test_assert(strstr(out, "map build.cutoff: synth Filter.cutoff 200.00..8000.00 oct "
         "= 1264.91 (runs)") != NULL);
-    test_assert(strstr(out, "map build.reverb: fx AudioBus.sends[0].level 0.00..0.60 = 0.30 "
+    test_assert(strstr(out, "map build.reverb: fx Bus.sends[0].level 0.00..0.60 = 0.30 "
         "(runs)") != NULL);
-    test_assert(strstr(out, "map calm.level: lead AudioBus.volume 1.00..0.20 = 0.80 (runs)") !=
+    test_assert(strstr(out, "map calm.level: lead Bus.volume 1.00..0.20 = 0.80 (runs)") !=
         NULL);
     ecs_os_free(out);
     ecs_fini(world);

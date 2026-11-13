@@ -3,15 +3,15 @@
 // click on world.
 using box.audio
 
-hall { AudioBus: {output: master, effects: [hall]}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
-world { AudioBus: {output: master, sends: [{bus: hall, level: 0.3}]} }
+hall { Bus: {output: master, effects: [hall]}; Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02} }
+world { Bus: {output: master, sends: [{bus: hall, level: 0.3}]} }
 
 // Silence over the start ramp of a voice, then one sample of 0.5
 click {
-  AudioPcm: {samples: [0, 0, 0, 0, 0.5], sample_rate: 400}
+  Pcm: {samples: [0, 0, 0, 0, 0.5], sample_rate: 400}
 }
 
 click_source {
-  AudioSource: {sound: click}
-  AudioOutput: {bus: world}
+  Source: {sound: click}
+  Output: {bus: world}
 }

@@ -69,11 +69,11 @@ void box_audio_synth_init(
         ecs_id(SynthTable), ecs_id(SynthModRoute), ecs_id(SynthModEnvelope), ecs_id(SynthBow)
     };
     const char *names[] = {
-        "AudioSynthSoundDirty", "AudioSynthOscillatorDirty", "AudioSynthEnvelopeDirty",
-        "AudioSynthFilterDirty", "AudioSynthFilterEnvelopeDirty", "AudioSynthGlideDirty",
-        "AudioSynthUnisonDirty", "AudioSynthStringDirty", "AudioSynthLfoDirty",
-        "AudioSynthPitchEnvelopeDirty", "AudioSynthDriveDirty", "AudioSynthTableDirty",
-        "AudioSynthModRouteDirty", "AudioSynthModEnvelopeDirty", "AudioSynthBowDirty"
+        "SynthSoundDirty", "SynthOscillatorDirty", "SynthEnvelopeDirty",
+        "SynthFilterDirty", "SynthFilterEnvelopeDirty", "SynthGlideDirty",
+        "SynthUnisonDirty", "SynthStringDirty", "SynthLfoDirty",
+        "SynthPitchEnvelopeDirty", "SynthDriveDirty", "SynthTableDirty",
+        "SynthModRouteDirty", "SynthModEnvelopeDirty", "SynthBowDirty"
     };
     int32_t i;
     for (i = 0; i < 15; i ++) {

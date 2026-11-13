@@ -64,10 +64,10 @@ builtins of the flecs shell (`ls`, `get`, `set`, `query`, ...):
 | `render <subject>` | Write a PNG of an entity, prefab or template on its own |
 | `fit [camera]` | Move the active camera or a camera so that it sees the whole scene |
 | `audio` | Print the audio state, rate, voices, load and the buses in processing order |
-| `audio.volume <volume>` | Set `AudioSettings.master_volume`, 0 to 4 |
-| `audio.mute [state]` | Set (`on`, `off`) or toggle `AudioSettings.mute` |
-| `audio.solo <bus> [state]` | Set or toggle `AudioBus.solo`; `audio.solo none` clears every solo |
-| `audio.mute_bus <bus> [state]` | Set or toggle `AudioBus.mute` of a bus |
+| `audio.volume <volume>` | Set `Settings.master_volume`, 0 to 4 |
+| `audio.mute [state]` | Set (`on`, `off`) or toggle `Settings.mute` |
+| `audio.solo <bus> [state]` | Set or toggle `Bus.solo`; `audio.solo none` clears every solo |
+| `audio.mute_bus <bus> [state]` | Set or toggle `Bus.mute` of a bus |
 | `audio.bypass <effect> [state]` | Bypass an effect, or stop bypassing it, with `Disabled` |
 | `audio.note <subject> <note> [velocity] [duration]` | Play one note (C2, F#3 or a MIDI number) of a sound or instrument now, velocity 0 to 1, for `duration` seconds (default 0.5) |
 | `audio.play`, `audio.stop`, `audio.seek <beats>`, `audio.tempo <bpm>` | Drive the transport |

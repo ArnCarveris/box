@@ -75,18 +75,18 @@ def test_status(app):
     app.check("master: volume 1.00" in out, "audio does not show the master: %r" % out)
     app.check("music: group volume 1.00 pan 0.00 width 1.00 -> master" in out,
               "audio does not show the bus music: %r" % out)
-    state = app.exec("get $ box.audio.AudioStatus.state")
-    app.check(state == '"AudioNoDevice"', "AudioStatus.state is %s" % state)
+    state = app.exec("get $ box.audio.Status.state")
+    app.check(state == '"NoDevice"', "Status.state is %s" % state)
 
 
 def test_volume_mute(app):
     out = parse_value(app.exec("audio.volume 0.5"))
     app.check(out == "master volume 0.50", "audio.volume printed %r" % out)
-    volume = float(app.exec("get $ box.audio.AudioSettings.master_volume"))
-    app.check(abs(volume - 0.5) < 1e-6, "AudioSettings.master_volume is %g" % volume)
+    volume = float(app.exec("get $ box.audio.Settings.master_volume"))
+    app.check(abs(volume - 0.5) < 1e-6, "Settings.master_volume is %g" % volume)
     out = parse_value(app.exec("audio.mute on"))
     app.check(out == "mute on", "audio.mute on printed %r" % out)
-    app.check(app.exec("get $ box.audio.AudioSettings.mute") == "true", "mute is not set")
+    app.check(app.exec("get $ box.audio.Settings.mute") == "true", "mute is not set")
     out = parse_value(app.exec("audio.mute"))
     app.check(out == "mute off", "audio.mute printed %r" % out)
 
@@ -119,8 +119,8 @@ def test_capture_volume(app):
 def test_no_device_no_error(app):
     out = app.exec("logs warning")
     app.check("box.audio" not in out, "the app logged %s without a device" % out)
-    app.check(math.isfinite(float(app.exec("get $ box.audio.AudioStatus.load"))),
-              "AudioStatus.load is not a number")
+    app.check(math.isfinite(float(app.exec("get $ box.audio.Status.load"))),
+              "Status.load is not a number")
 
 
 ALL_FEATURES = ["test/assets/audio/all_features.flecs"]

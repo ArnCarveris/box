@@ -22,13 +22,13 @@ prefab render_high_notes {
 
 render_low {
   Track: {instrument: render_low_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: render_low_notes, start: 0, duration: 16, loop: true} }
 }
 
 render_high {
   Track: {instrument: render_high_inst}
-  AudioBus: {}
+  Bus: {}
   part { ClipPlacement: {clip: render_high_notes, start: 0, duration: 16, loop: true} }
 }
 

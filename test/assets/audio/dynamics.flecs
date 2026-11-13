@@ -1,19 +1,19 @@
 // Dynamics set by a scene, for the Dynamics suite of test/cpu/audio: the music group ducks under
-// the SFX bus through a compressor keyed on it, whose AudioMeter reads the gain reduction, and
+// the SFX bus through a compressor keyed on it, whose Meter reads the gain reduction, and
 // a gate cleans up the dialog bus. An effect entity comes before the bus that names it.
 using box.audio
 
 sfx {
-  AudioBus: {output: master, kind: AudioChannelSfx}
+  Bus: {output: master, kind: ChannelSfx}
 }
 
 music_duck {
   Compressor: {threshold: -30, ratio: 8, attack: 0.005, release: 0.3, sidechain: sfx}
-  AudioMeter: {}
+  Meter: {}
 }
 
 music {
-  AudioBus: {output: master, effects: [music_duck]}
+  Bus: {output: master, effects: [music_duck]}
 }
 
 dialog_gate {
@@ -21,5 +21,5 @@ dialog_gate {
 }
 
 dialog {
-  AudioBus: {output: master, effects: [dialog_gate]}
+  Bus: {output: master, effects: [dialog_gate]}
 }

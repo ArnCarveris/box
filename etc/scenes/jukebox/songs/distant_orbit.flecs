@@ -5,13 +5,13 @@ box { audio { Song { Rgb: {130, 160, 255} } } }
 
 assets {
   orbit_space {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: state.reverb_level / 100, effects: [orbit_space]}
+    Bus: {output: master, kind: ChannelReturn, volume: state.reverb_level / 100, effects: [orbit_space]}
     Reverb: {decay: 7, damping: 0.5, predelay: 0.06, size: 1}
   }
 
   orbit {
-    AudioBus: {output: master, volume: 0.8}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.8}
+    Meter: {}
   }
 
   prefab orbit_cloud {
@@ -118,8 +118,8 @@ assets {
 
   orbit_pad {
     Track: {instrument: orbit_pad_inst}
-    AudioBus: {output: orbit, volume: 0.7, sends: [{bus: orbit_space, level: 0.65}]}
-    AudioMeter: {}
+    Bus: {output: orbit, volume: 0.7, sends: [{bus: orbit_space, level: 0.65}]}
+    Meter: {}
     phrase { ClipPlacement: {clip: orbit_pad_notes, start: 0} }
   }
 
@@ -138,8 +138,8 @@ assets {
 
   orbit_bass {
     Track: {instrument: orbit_bass_inst}
-    AudioBus: {output: orbit, volume: 0.7, sends: [{bus: orbit_space, level: 0.15}]}
-    AudioMeter: {}
+    Bus: {output: orbit, volume: 0.7, sends: [{bus: orbit_space, level: 0.15}]}
+    Meter: {}
     phrase { ClipPlacement: {clip: orbit_bass_notes, start: 0} }
   }
 
@@ -166,8 +166,8 @@ assets {
 
   orbit_bells {
     Track: {instrument: orbit_bells_inst}
-    AudioBus: {output: orbit, volume: 0.4, sends: [{bus: orbit_space, level: 0.45}]}
-    AudioMeter: {}
+    Bus: {output: orbit, volume: 0.4, sends: [{bus: orbit_space, level: 0.45}]}
+    Meter: {}
     phrase { ClipPlacement: {clip: orbit_bells_notes, start: 0} }
   }
 
@@ -202,8 +202,8 @@ assets {
 
   orbit_melody {
     Track: {instrument: orbit_voice_inst}
-    AudioBus: {output: orbit, volume: 0.9, sends: [{bus: orbit_space, level: 0.4}]}
-    AudioMeter: {}
+    Bus: {output: orbit, volume: 0.9, sends: [{bus: orbit_space, level: 0.4}]}
+    Meter: {}
     phrase { ClipPlacement: {clip: orbit_voice_notes, start: 0} }
   }
 

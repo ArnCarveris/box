@@ -1,600 +1,4 @@
 window.BOX_AUDIO_PARAMS = {
- "AudioBus": {
-  "effects": {
-   "doc": "Effect entities of the BOX_AUDIO_EFFECT_SLOTS insert slots, in the order they run, 0 for an empty slot"
-  },
-  "kind": {
-   "doc": "What the channel is, default AudioChannelGroup"
-  },
-  "mute": {
-   "doc": "Silence the bus, default false"
-  },
-  "output": {
-   "doc": "Bus it feeds, 0 (or a deleted bus) for the master"
-  },
-  "pan": {
-   "def": 0.0,
-   "doc": "-1 left to 1 right, default 0",
-   "max": 1.0,
-   "min": -1.0,
-   "soft": true,
-   "unit": ""
-  },
-  "sends": {
-   "doc": "Up to BOX_AUDIO_SENDS sends to other buses"
-  },
-  "solo": {
-   "doc": "Solo the channel, default false"
-  },
-  "volume": {
-   "def": 1.0,
-   "doc": "Linear gain, default 1",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "width": {
-   "doc": "Stereo width, 0 mono, 1 as is (default), 2 doubles the side; a mid/side gain after the inserts and before the pan",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  }
- },
- "AudioClip": {
-  "length": {
-   "def": 4.0,
-   "doc": "Beats, default 4: the length of a pass when a placement loops the clip, and of a placement of duration 0",
-   "max": 16.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "beats"
-  },
-  "offset": {
-   "doc": "Seconds into the sound at which the clip starts",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "sound": {
-   "doc": "The sound, an entity with AudioPcm or SoundFile"
-  }
- },
- "AudioEmitter": {
-  "extents": {
-   "doc": "Half size of the box, default {0, 0, 0}; their absolute values"
-  },
-  "interval_max": {
-   "def": 4.0,
-   "doc": "Seconds between plays, upper bound, default 4; swapped with interval_min when below it",
-   "log": true,
-   "max": 16.0,
-   "min": 0.008,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "interval_min": {
-   "def": 1.0,
-   "doc": "Seconds between plays, lower bound, default 1; at least 0.01",
-   "log": true,
-   "max": 4.0,
-   "min": 0.002,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "max_active": {
-   "doc": "Plays of this emitter that may sound at once, 0 for no limit, default 0"
-  },
-  "pitch_max": {
-   "def": 1.0,
-   "doc": "Playback ratio, upper bound, default 1",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "pitch_min": {
-   "def": 1.0,
-   "doc": "Playback ratio, lower bound, default 1",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "playing": {
-   "doc": "Whether it plays, default true"
-  },
-  "radius": {
-   "def": 0.0,
-   "doc": "Radius of disc, sphere and hemisphere, default 0; its absolute value",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "seed": {
-   "doc": "Seed of the randomness, default 0"
-  },
-  "shape": {
-   "doc": "Volume plays are placed in, default AudioEmitterPoint"
-  },
-  "sound": {
-   "doc": "AudioPcm, SoundFile or SynthSound to play"
-  },
-  "volume_max": {
-   "def": 1.0,
-   "doc": "Linear gain, upper bound, default 1",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "volume_min": {
-   "def": 1.0,
-   "doc": "Linear gain, lower bound, default 1; at least 0",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  }
- },
- "AudioEqBand": {
-  "frequency": {
-   "doc": "Hz, the center of a peak or the corner of a shelf or a cut, 10 to 0.49 of the sample rate",
-   "log": true,
-   "max": 20000.0,
-   "min": 10.0,
-   "unit": "Hz"
-  },
-  "gain": {
-   "def": 0.0,
-   "doc": "dB, -24 to 24, of a peak or a shelf, default 0; a peak or a shelf at 0 dB is flat and costs nothing",
-   "max": 24.0,
-   "min": -24.0,
-   "unit": "dB"
-  },
-  "kind": {
-   "doc": "What the band does, default AudioEqOff"
-  },
-  "q": {
-   "def": 0.7071,
-   "doc": "0.1 to 18, default 0.7071: the width of a peak (higher is narrower), the resonance of a shelf or a cut at its corner",
-   "max": 18.0,
-   "min": 0.1,
-   "unit": ""
-  }
- },
- "AudioFilter": {
-  "cutoff": {
-   "def": 1000.0,
-   "doc": "Hz, default 1000, 10 to 0.49 of the sample rate",
-   "log": true,
-   "max": 20000.0,
-   "min": 10.0,
-   "unit": "Hz"
-  },
-  "drive": {
-   "def": 0.0,
-   "doc": "Saturation, 0 to 1, default 0 (linear), as the drive of SynthFilter; moves over 20 ms",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "kind": {
-   "doc": "The kind, default SynthLowPass; SynthNotch for a notch"
-  },
-  "mix": {
-   "def": 1.0,
-   "doc": "Wet level, 0 to 1, default 1; the dry signal passes at 1 - mix",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "resonance": {
-   "doc": "0 (a Butterworth response, the default) to 1 (rings the longest)",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "slope": {
-   "doc": "Steepness, default SynthSlope12; at SynthSlope24 the resonance applies to the second stage only"
-  }
- },
- "AudioMacro": {
-  "value": {
-   "def": 0.0,
-   "doc": "0..1, default 0, clamped",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "AudioMacroMap": {
-  "component": {
-   "doc": "The component: AudioBus or an effect component"
-  },
-  "curve": {
-   "doc": "-1 logarithmic .. 0 linear (default) .. 1 exponential",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "max": {
-   "def": 1.0,
-   "doc": "Value at a macro of 1, default 1; below min inverts",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "min": {
-   "def": 0.0,
-   "doc": "Value at a macro of 0, in the units of the member, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "scale": {
-   "doc": "AudioModLinear (default) or AudioModOctaves, for a frequency, with min and max above 0"
-  },
-  "target": {
-   "doc": "The entity with the AudioBus or the effect component"
-  }
- },
- "AudioMeter": {
-  "peak_left": {
-   "doc": "Linear, the largest absolute left sample since the last frame",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "peak_right": {
-   "doc": "Linear, the largest absolute right sample since the last frame",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "reduction": {
-   "doc": "dB, on an effect entity: the largest gain reduction since the last frame, for dynamics effects and a PatternGate, and how hard the clipper of a Saturator squashes; 0 for others",
-   "max": 12.0,
-   "min": -60.0,
-   "soft": true,
-   "unit": "dB"
-  },
-  "rms_left": {
-   "doc": "Linear, the RMS of the left channel over the last BOX_AUDIO_METER_WINDOW seconds of output",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "rms_right": {
-   "doc": "Linear, the RMS of the right channel over the window",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  }
- },
- "AudioModulator": {
-  "attack": {
-   "def": 0.01,
-   "doc": "Seconds of the rise of a follower, default 0.01",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "component": {
-   "doc": "The component: AudioBus or an effect component"
-  },
-  "depth": {
-   "doc": "Swing either way at a source of 1, in the units of the member, or in octaves; negative turns it upside down. Default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "key": {
-   "doc": "Bus whose level a follower follows, measured before its inserts and volume; 0 for the bus that holds the target effect, or the target bus"
-  },
-  "phase": {
-   "doc": "Phase in turns, 0..1: of a cycle of an LFO, of the whole sequence of steps",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "rate": {
-   "def": 1.0,
-   "doc": "Hz of an LFO, or steps per second, when sync is 0, 0..100, default 1",
-   "log": true,
-   "max": 100.0,
-   "min": 0.05,
-   "unit": "Hz",
-   "zero": true
-  },
-  "release": {
-   "def": 0.1,
-   "doc": "Seconds of the fall of a follower, default 0.1",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "scale": {
-   "doc": "Linear (default) or in octaves, for a frequency"
-  },
-  "smooth": {
-   "doc": "Share of a step the value glides from the step before over, 0 for hard steps (default) .. 1",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "source": {
-   "doc": "What moves it, default AudioModLfo"
-  },
-  "step_count": {
-   "doc": "Steps that play, 1..16, default 16"
-  },
-  "steps": {
-   "doc": "Values of the steps, -1..1",
-   "max": 1.0,
-   "min": -1.0,
-   "unit": ""
-  },
-  "sync": {
-   "def": 0.0,
-   "doc": "Beats of a cycle of an LFO, or of a step, 0..256, default 0 for rate; when positive it wins over rate, like SynthLfo.sync and Delay.sync: 0.5 is an eighth, 0.25 a sixteenth",
-   "max": 256.0,
-   "min": 0.0,
-   "unit": "beats"
-  },
-  "target": {
-   "doc": "The entity with the AudioBus or the effect component"
-  },
-  "unipolar": {
-   "doc": "An LFO moves 0..1 instead of -1..1, for a tremolo that only dips: depth -1 on a volume of 1"
-  },
-  "wave": {
-   "doc": "Wave of an LFO, default AudioModSine"
-  }
- },
- "AudioOutput": {
-  "bus": {
-   "doc": "Bus entity, 0 for the master"
-  }
- },
- "AudioPcm": {
-  "channels": {
-   "doc": "1 or 2, 0 for 1"
-  },
-  "sample_rate": {
-   "doc": "Frames per second, 0 for the rate of the output",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "samples": {
-   "doc": "Frames, interleaved when stereo"
-  }
- },
- "AudioSend": {
-  "bus": {
-   "doc": "Bus that receives the send, 0 (or a deleted bus) for none"
-  },
-  "level": {
-   "doc": "Linear gain of the send, 0 to 4",
-   "max": 4.0,
-   "min": 0.0,
-   "unit": "gain"
-  },
-  "pre_fader": {
-   "doc": "Tap before the volume and pan of the channel instead of after them; the mute and the solo still silence it"
-  }
- },
- "AudioSettings": {
-  "master_volume": {
-   "def": 1.0,
-   "doc": "Linear gain of the master bus, default 1",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "mute": {
-   "doc": "Silence everything, default false"
-  }
- },
- "AudioSong": {},
- "AudioSongStatus": {
-  "foreign": {
-   "doc": "Entities the song changed that it did not create, each logged with a warning; their changes stay after the song unloads"
-  },
-  "state": {
-   "doc": "Progress of the load"
-  }
- },
- "AudioSource": {
-  "loop": {
-   "doc": "Play the sound over and over, default false"
-  },
-  "pitch": {
-   "def": 1.0,
-   "doc": "Ratio of the playback speed, default 1",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "playing": {
-   "doc": "Whether it plays, default true"
-  },
-  "sound": {
-   "doc": "The sound to play, an entity with AudioPcm, SoundFile or SynthSound; a looping synth starts over at the end of its envelopes"
-  },
-  "volume": {
-   "def": 1.0,
-   "doc": "Linear gain, default 1",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  }
- },
- "AudioSpatial": {
-  "cutoff": {
-   "def": 0.0,
-   "doc": "Low-pass cutoff in Hz at max_distance, 0 for no filter, default 0",
-   "log": true,
-   "max": 20000.0,
-   "min": 10.0,
-   "soft": true,
-   "unit": "Hz",
-   "zero": true
-  },
-  "max_distance": {
-   "def": 50.0,
-   "doc": "Silent from this distance, default 50",
-   "max": 200.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "min_distance": {
-   "def": 1.0,
-   "doc": "Full volume within this distance, default 1",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "rolloff": {
-   "def": 1.0,
-   "doc": "How fast the volume falls beyond min_distance, default 1",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  }
- },
- "AudioStatus": {
-  "buses": {
-   "doc": "Buses in the processing order, the master included"
-  },
-  "clock": {
-   "doc": "Frame of the core that renders now, as far as the main thread can tell; stops while the output does not run, 0 for a new output"
-  },
-  "load": {
-   "doc": "Share of real time the render takes, 0 where it is not measured (the web)",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "sample_rate": {
-   "doc": "Frames per second of the output, 0 while not known"
-  },
-  "state": {
-   "doc": "What the output does"
-  },
-  "voices": {
-   "doc": "Voices that play, without the ones that fade out"
-  },
-  "voices_refused": {
-   "doc": "Plays refused so far at the voice cap because every voice that played had a higher priority"
-  },
-  "voices_stolen": {
-   "doc": "Voices the voice cap of 64 stopped so far"
-  }
- },
- "AudioStream": {
-  "loop": {
-   "doc": "Start over at the end without a gap, default true"
-  },
-  "playing": {
-   "doc": "Whether it plays, default true; false fades it out and true resumes it where it stopped"
-  },
-  "volume": {
-   "def": 1.0,
-   "doc": "Linear gain, default 1",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  }
- },
- "AudioStreamStatus": {
-  "buffered": {
-   "doc": "Seconds decoded ahead of what plays",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "channels": {
-   "doc": "1 or 2 after the mix down, 0 until it opened"
-  },
-  "decode_max_ms": {
-   "doc": "Largest decode_ms so far",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "decode_ms": {
-   "doc": "Milliseconds the last decode took; on the web the main thread spends it in its frame",
-   "log": true,
-   "max": 50.0,
-   "min": 0.025,
-   "soft": true,
-   "unit": "ms",
-   "zero": true
-  },
-  "frames": {
-   "doc": "Frames of the file, 0 until it opened"
-  },
-  "position": {
-   "doc": "Seconds into the file of what plays",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "sample_rate": {
-   "doc": "Frames per second of the file, 0 until it opened",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "state": {
-   "doc": "What it does"
-  },
-  "underruns": {
-   "doc": "Times the output ran out of decoded frames and faded to silence"
-  }
- },
  "AutomationClip": {
   "component": {
    "doc": "The component: AudioBus or an effect component"
@@ -672,6 +76,49 @@ window.BOX_AUDIO_PARAMS = {
    "unit": "beats"
   }
  },
+ "Bus": {
+  "effects": {
+   "doc": "Effect entities of the BOX_AUDIO_EFFECT_SLOTS insert slots, in the order they run, 0 for an empty slot"
+  },
+  "kind": {
+   "doc": "What the channel is, default AudioChannelGroup"
+  },
+  "mute": {
+   "doc": "Silence the bus, default false"
+  },
+  "output": {
+   "doc": "Bus it feeds, 0 (or a deleted bus) for the master"
+  },
+  "pan": {
+   "def": 0.0,
+   "doc": "-1 left to 1 right, default 0",
+   "max": 1.0,
+   "min": -1.0,
+   "soft": true,
+   "unit": ""
+  },
+  "sends": {
+   "doc": "Up to BOX_AUDIO_SENDS sends to other buses"
+  },
+  "solo": {
+   "doc": "Solo the channel, default false: while any channel is soloed, only soloed channels, channels on or feeding their path, returns, SFX buses and what these feed are heard. mute always wins"
+  },
+  "volume": {
+   "def": 1.0,
+   "doc": "Linear gain, default 1",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "width": {
+   "doc": "Stereo width, 0 mono, 1 as is (default), 2 doubles the side; a mid/side gain after the inserts and before the pan",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  }
+ },
  "Chorus": {
   "delay": {
    "def": 12.0,
@@ -723,6 +170,28 @@ window.BOX_AUDIO_PARAMS = {
   },
   "voices": {
    "doc": "Taps, 1 to 4, default 2"
+  }
+ },
+ "Clip": {
+  "length": {
+   "def": 4.0,
+   "doc": "Beats, default 4: the length of a pass when a placement loops the clip, and of a placement of duration 0",
+   "max": 16.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "beats"
+  },
+  "offset": {
+   "doc": "Seconds into the sound at which the clip starts",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "sound": {
+   "doc": "The sound, an entity with AudioPcm or SoundFile"
   }
  },
  "ClipPlacement": {
@@ -854,7 +323,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "sync": {
    "def": 0.0,
-   "doc": "Beats between the repeats, 0 (the default) to use time; when positive it wins over time, which becomes sync 60 / tempo at the tempo of the Transport (120 without one): 0.5 is an eighth, 0.75 a dotted eighth",
+   "doc": "Beats between the repeats, 0 (the default) to use time; when positive it wins over time at the tempo of the Transport (120 without one): 0.5 is an eighth, 0.75 a dotted eighth",
    "max": 16.0,
    "min": 0.0,
    "soft": true,
@@ -870,9 +339,152 @@ window.BOX_AUDIO_PARAMS = {
    "zero": true
   }
  },
+ "Emitter": {
+  "extents": {
+   "doc": "Half size of the box, default {0, 0, 0}; their absolute values"
+  },
+  "interval_max": {
+   "def": 4.0,
+   "doc": "Seconds between plays, upper bound, default 4; swapped with interval_min when below it",
+   "log": true,
+   "max": 16.0,
+   "min": 0.008,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "interval_min": {
+   "def": 1.0,
+   "doc": "Seconds between plays, lower bound, default 1; at least 0.01",
+   "log": true,
+   "max": 4.0,
+   "min": 0.002,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "max_active": {
+   "doc": "Plays of this emitter that may sound at once, 0 for no limit, default 0"
+  },
+  "pitch_max": {
+   "def": 1.0,
+   "doc": "Playback ratio, upper bound, default 1",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "pitch_min": {
+   "def": 1.0,
+   "doc": "Playback ratio, lower bound, default 1",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "playing": {
+   "doc": "Whether it plays, default true"
+  },
+  "radius": {
+   "def": 0.0,
+   "doc": "Radius of disc, sphere and hemisphere, default 0; its absolute value",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "seed": {
+   "doc": "Seed of the randomness, default 0"
+  },
+  "shape": {
+   "doc": "Volume plays are placed in, default AudioEmitterPoint"
+  },
+  "sound": {
+   "doc": "AudioPcm, SoundFile or SynthSound to play"
+  },
+  "volume_max": {
+   "def": 1.0,
+   "doc": "Linear gain, upper bound, default 1",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "volume_min": {
+   "def": 1.0,
+   "doc": "Linear gain, lower bound, default 1; at least 0",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  }
+ },
+ "EqBand": {
+  "frequency": {
+   "doc": "Hz, the center of a peak or the corner of a shelf or a cut, 10 to 0.49 of the sample rate",
+   "log": true,
+   "max": 20000.0,
+   "min": 10.0,
+   "unit": "Hz"
+  },
+  "gain": {
+   "def": 0.0,
+   "doc": "dB, -24 to 24, of a peak or a shelf, default 0; a peak or a shelf at 0 dB is flat and costs nothing",
+   "max": 24.0,
+   "min": -24.0,
+   "unit": "dB"
+  },
+  "kind": {
+   "doc": "What the band does, default AudioEqOff"
+  },
+  "q": {
+   "def": 0.7071,
+   "doc": "0.1 to 18, default 0.7071: the width of a peak (higher is narrower), the resonance of a shelf or a cut at its corner",
+   "max": 18.0,
+   "min": 0.1,
+   "unit": ""
+  }
+ },
  "Equalizer": {
   "bands": {
    "doc": "The BOX_AUDIO_EQ_BANDS bands, in the order they run"
+  }
+ },
+ "Filter": {
+  "cutoff": {
+   "def": 1000.0,
+   "doc": "Hz, default 1000, 10 to 0.49 of the sample rate",
+   "log": true,
+   "max": 20000.0,
+   "min": 10.0,
+   "unit": "Hz"
+  },
+  "drive": {
+   "def": 0.0,
+   "doc": "Saturation, 0 to 1, default 0 (linear), as the drive of SynthFilter; moves over 20 ms",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "kind": {
+   "doc": "The kind, default SynthLowPass; SynthNotch for a notch"
+  },
+  "mix": {
+   "def": 1.0,
+   "doc": "Wet level, 0 to 1, default 1; the dry signal passes at 1 - mix",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "resonance": {
+   "doc": "0 (a Butterworth response, the default) to 1 (rings the longest)",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "slope": {
+   "doc": "Steepness, default SynthSlope12; at SynthSlope24 the resonance applies to the second stage only"
   }
  },
  "FrequencyShifter": {
@@ -997,9 +609,177 @@ window.BOX_AUDIO_PARAMS = {
    "unit": ""
   }
  },
+ "Macro": {
+  "value": {
+   "def": 0.0,
+   "doc": "0..1, default 0, clamped",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "MacroMap": {
+  "component": {
+   "doc": "The component: AudioBus or an effect component"
+  },
+  "curve": {
+   "doc": "-1 logarithmic .. 0 linear (default) .. 1 exponential",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "max": {
+   "def": 1.0,
+   "doc": "Value at a macro of 1, default 1; below min inverts",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "min": {
+   "def": 0.0,
+   "doc": "Value at a macro of 0, in the units of the member, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "scale": {
+   "doc": "AudioModLinear (default) or AudioModOctaves, for a frequency, with min and max above 0"
+  },
+  "target": {
+   "doc": "The entity with the AudioBus or the effect component"
+  }
+ },
+ "Meter": {
+  "peak_left": {
+   "doc": "Linear, the largest absolute left sample since the last frame",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "peak_right": {
+   "doc": "Linear, the largest absolute right sample since the last frame",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "reduction": {
+   "doc": "dB, on an effect entity: the largest gain reduction since the last frame, for dynamics effects and a PatternGate, and how hard the clipper of a Saturator squashes; 0 for others",
+   "max": 12.0,
+   "min": -60.0,
+   "soft": true,
+   "unit": "dB"
+  },
+  "rms_left": {
+   "doc": "Linear, the RMS of the left channel over the last BOX_AUDIO_METER_WINDOW seconds of output",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "rms_right": {
+   "doc": "Linear, the RMS of the right channel over the window",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  }
+ },
+ "Modulator": {
+  "attack": {
+   "def": 0.01,
+   "doc": "Seconds of the rise of a follower, default 0.01",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "component": {
+   "doc": "The component: AudioBus or an effect component"
+  },
+  "depth": {
+   "doc": "Swing either way at a source of 1, in the units of the member, or in octaves; negative turns it upside down. Default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "key": {
+   "doc": "Bus whose level a follower follows, measured before its inserts and volume; 0 for the bus that holds the target effect, or the target bus"
+  },
+  "phase": {
+   "doc": "Phase in turns, 0..1: of a cycle of an LFO, of the whole sequence of steps",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "rate": {
+   "def": 1.0,
+   "doc": "Hz of an LFO, or steps per second, when sync is 0, 0..100, default 1",
+   "log": true,
+   "max": 100.0,
+   "min": 0.05,
+   "unit": "Hz",
+   "zero": true
+  },
+  "release": {
+   "def": 0.1,
+   "doc": "Seconds of the fall of a follower, default 0.1",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "scale": {
+   "doc": "Linear (default) or in octaves, for a frequency"
+  },
+  "smooth": {
+   "doc": "Share of a step the value glides from the step before over, 0 for hard steps (default) .. 1",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "source": {
+   "doc": "What moves it, default AudioModLfo"
+  },
+  "step_count": {
+   "doc": "Steps that play, 1..16, default 16"
+  },
+  "steps": {
+   "doc": "Values of the steps, -1..1",
+   "max": 1.0,
+   "min": -1.0,
+   "unit": ""
+  },
+  "sync": {
+   "def": 0.0,
+   "doc": "Beats of a cycle of an LFO, or of a step, 0..256, default 0 for rate; when positive it wins over rate, like SynthLfo.sync and Delay.sync: 0.5 is an eighth, 0.25 a sixteenth",
+   "max": 256.0,
+   "min": 0.0,
+   "unit": "beats"
+  },
+  "target": {
+   "doc": "The entity with the AudioBus or the effect component"
+  },
+  "unipolar": {
+   "doc": "An LFO moves 0..1 instead of -1..1, for a tremolo that only dips: depth -1 on a volume of 1"
+  },
+  "wave": {
+   "doc": "Wave of an LFO, default AudioModSine"
+  }
+ },
  "Note": {
   "bend": {
-   "doc": "Pitch bend in semitones, -48..48, over beats of the note: the pitch of the voice times 2^(bend / 12), its glide, oscillators, pluck strings and key tracking included; synth and sample voices. Without keys 0"
+   "doc": "Pitch bend in semitones, -48..48, over beats of the note: the pitch of the voice times 2^(bend / 12), on synth and sample voices. Without keys 0"
   },
   "duration": {
    "doc": "Beats",
@@ -1054,6 +834,11 @@ window.BOX_AUDIO_PARAMS = {
   },
   "notes": {
    "doc": "The notes, in any order; the clip owns the keys of their curves, copying the clip copies them"
+  }
+ },
+ "Output": {
+  "bus": {
+   "doc": "Bus entity, 0 for the master"
   }
  },
  "PatternGate": {
@@ -1119,6 +904,21 @@ window.BOX_AUDIO_PARAMS = {
    "max": 0.75,
    "min": 0.0,
    "unit": ""
+  }
+ },
+ "Pcm": {
+  "channels": {
+   "doc": "1 or 2, 0 for 1"
+  },
+  "sample_rate": {
+   "doc": "Frames per second, 0 for the rate of the output",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "samples": {
+   "doc": "Frames, interleaved when stereo"
   }
  },
  "Phaser": {
@@ -1415,10 +1215,37 @@ window.BOX_AUDIO_PARAMS = {
   },
   "tone": {
    "def": 0.0,
-   "doc": "-1 to 1, default 0: a tilt of up to 9 dB either way at the ends of the spectrum around 1 kHz before the clipper, the inverse after it; above 0 the highs distort most, below 0 the lows",
+   "doc": "-1 to 1, default 0: a tilt of up to 9 dB around 1 kHz before the clipper, the inverse after it; above 0 the highs distort most, below 0 the lows",
    "max": 1.0,
    "min": -1.0,
    "unit": ""
+  }
+ },
+ "Send": {
+  "bus": {
+   "doc": "Bus that receives the send, 0 (or a deleted bus) for none"
+  },
+  "level": {
+   "doc": "Linear gain of the send, 0 to 4",
+   "max": 4.0,
+   "min": 0.0,
+   "unit": "gain"
+  },
+  "pre_fader": {
+   "doc": "Tap before the volume and pan of the channel instead of after them; the mute and the solo still silence it"
+  }
+ },
+ "Settings": {
+  "master_volume": {
+   "def": 1.0,
+   "doc": "Linear gain of the master bus, default 1",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "mute": {
+   "doc": "Silence everything, default false"
   }
  },
  "Song": {
@@ -1450,9 +1277,18 @@ window.BOX_AUDIO_PARAMS = {
    "unit": ""
   }
  },
+ "SongFile": {},
  "SongLane": {
   "bus": {
    "doc": "The bus of the channel, an entity with AudioBus of the song"
+  }
+ },
+ "SongStatus": {
+  "foreign": {
+   "doc": "Entities the song changed that it did not create, each logged with a warning; their changes stay after the song unloads"
+  },
+  "state": {
+   "doc": "Progress of the load"
   }
  },
  "SoundFile": {},
@@ -1472,6 +1308,215 @@ window.BOX_AUDIO_PARAMS = {
   },
   "state": {
    "doc": "Progress of the load"
+  }
+ },
+ "Source": {
+  "loop": {
+   "doc": "Play the sound over and over, default false"
+  },
+  "pitch": {
+   "def": 1.0,
+   "doc": "Ratio of the playback speed, default 1",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "playing": {
+   "doc": "Whether it plays, default true"
+  },
+  "sound": {
+   "doc": "The sound to play, an entity with AudioPcm, SoundFile or SynthSound; a looping synth starts over at the end of its envelopes"
+  },
+  "volume": {
+   "def": 1.0,
+   "doc": "Linear gain, default 1",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  }
+ },
+ "Spatial": {
+  "cutoff": {
+   "def": 0.0,
+   "doc": "Low-pass cutoff in Hz at max_distance, 0 for no filter, default 0; clamped to BOX_AUDIO_SPATIAL_CUTOFF_MIN, and one of at least BOX_AUDIO_SPATIAL_OPEN filters nothing",
+   "log": true,
+   "max": 20000.0,
+   "min": 10.0,
+   "soft": true,
+   "unit": "Hz",
+   "zero": true
+  },
+  "max_distance": {
+   "def": 50.0,
+   "doc": "Silent from this distance, default 50",
+   "max": 200.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "min_distance": {
+   "def": 1.0,
+   "doc": "Full volume within this distance, default 1",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "rolloff": {
+   "def": 1.0,
+   "doc": "How fast the volume falls beyond min_distance, default 1",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  }
+ },
+ "Status": {
+  "buses": {
+   "doc": "Buses in the processing order, the master included"
+  },
+  "clock": {
+   "doc": "Frame of the core that renders now, as far as the main thread can tell; stops while the output does not run, 0 for a new output"
+  },
+  "load": {
+   "doc": "Share of real time the render takes, 0 where it is not measured (the web)",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "sample_rate": {
+   "doc": "Frames per second of the output, 0 while not known"
+  },
+  "state": {
+   "doc": "What the output does"
+  },
+  "voices": {
+   "doc": "Voices that play, without the ones that fade out"
+  },
+  "voices_refused": {
+   "doc": "Plays refused so far at the voice cap because every voice that played had a higher priority"
+  },
+  "voices_stolen": {
+   "doc": "Voices the voice cap of 64 stopped so far"
+  }
+ },
+ "Stream": {
+  "loop": {
+   "doc": "Start over at the end without a gap, default true"
+  },
+  "playing": {
+   "doc": "Whether it plays, default true; false fades it out and true resumes it where it stopped"
+  },
+  "volume": {
+   "def": 1.0,
+   "doc": "Linear gain, default 1",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  }
+ },
+ "StreamStatus": {
+  "buffered": {
+   "doc": "Seconds decoded ahead of what plays",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "channels": {
+   "doc": "1 or 2 after the mix down, 0 until it opened"
+  },
+  "decode_max_ms": {
+   "doc": "Largest decode_ms so far",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "decode_ms": {
+   "doc": "Milliseconds the last decode took; on the web the main thread spends it in its frame",
+   "log": true,
+   "max": 50.0,
+   "min": 0.025,
+   "soft": true,
+   "unit": "ms",
+   "zero": true
+  },
+  "frames": {
+   "doc": "Frames of the file, 0 until it opened"
+  },
+  "position": {
+   "doc": "Seconds into the file of what plays",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "sample_rate": {
+   "doc": "Frames per second of the file, 0 until it opened",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "state": {
+   "doc": "What it does"
+  },
+  "underruns": {
+   "doc": "Times the output ran out of decoded frames and faded to silence"
+  }
+ },
+ "SynthBow": {
+  "brightness": {
+   "def": 0.5,
+   "doc": "Damping of the loop, 0 dark to 1 bright, default 0.5, as SynthString.brightness: a lowpass that follows the note",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "noise": {
+   "def": 0.1,
+   "doc": "Noise of the bow hair added at the contact point, 0..1, default 0.1",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "position": {
+   "def": 0.12,
+   "doc": "Distance of the bow from the bridge as a share of the string, 0.02..0.5, default 0.12: nearer is brighter. It notches the harmonics at the multiples of 1 / position",
+   "max": 0.5,
+   "min": 0.02,
+   "unit": ""
+  },
+  "pressure": {
+   "def": 0.5,
+   "doc": "Force of the bow, 0..1, default 0.5: low gives a soft, airy tone, the middle the Helmholtz motion, high a harder tone with more upper harmonics",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "speed": {
+   "def": 0.5,
+   "doc": "Velocity of the bow, 0..1, default 0.5: the level, the tone stays; 0 is silent",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "velocity": {
+   "def": 0.0,
+   "doc": "Share 0..1 of the pressure and the speed that the velocity of a note scales, as SynthString.velocity; default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
   }
  },
  "SynthDrive": {
@@ -1532,7 +1577,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "key_scale": {
    "def": 0.0,
-   "doc": "Key scaling 0..1, default 0: the decay and the release are times 2^(-key_scale key / 12) at the key of the note (see SynthFilter), fixed at its start, so at 1 they halve per octave above the root and double per octave below; clamped to the times of an envelope",
+   "doc": "Key scaling 0..1, default 0: the decay and the release are times 2^(-key_scale key / 12) at the key of the note, so at 1 they halve per octave above the root",
    "max": 1.0,
    "min": 0.0,
    "unit": ""
@@ -1573,7 +1618,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "feedback": {
    "def": 0.5,
-   "doc": "SynthComb: gain of the delayed output fed back to the input, -0.98..0.98, default 0.5: positive peaks at the harmonics of the comb, negative at the odd harmonics of half of it, hollow like a closed pipe; near 1 either way rings long",
+   "doc": "SynthComb: gain of the delayed output fed back, -0.98..0.98, default 0.5: positive peaks at the harmonics of the comb, negative at its odd harmonics an octave down",
    "max": 0.98,
    "min": -0.98,
    "unit": ""
@@ -1589,7 +1634,7 @@ window.BOX_AUDIO_PARAMS = {
    "doc": "The kind, default SynthLowPass"
   },
   "model": {
-   "doc": "The model, default SynthFilterSvf. SynthFilterLadder is a transistor ladder: SynthSlope24 is its 4-pole lowpass and SynthSlope12 the 2-pole tap; the highpass, bandpass and notch mix the poles as a multimode ladder. Its resonance oscillates at 1 as a near sine at the cutoff, its lowpass keeps its passband within 2 dB as the resonance rises, and drive is the gain into it, from -6 dB to +12 dB, the output scaled back"
+   "doc": "The model, default SynthFilterSvf. SynthFilterLadder is a transistor ladder that self-oscillates at resonance 1; its drive is the gain into it, -6 dB to +12 dB"
   },
   "resonance": {
    "doc": "0 (a Butterworth response) to 1 (rings the longest)",
@@ -1617,7 +1662,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "vowel": {
    "def": 0.0,
-   "doc": "SynthFormant: the vowel, 0 a, 1 e, 2 i, 3 o, 4 u, default 0; a fraction interpolates the frequencies, levels and widths of the formants of the two nearest vowels. SynthLfo.vowel and SynthFilterEnvelope.vowel move it, clamped to 0..4",
+   "doc": "SynthFormant: the vowel, 0 a, 1 e, 2 i, 3 o, 4 u, default 0; a fraction interpolates the two nearest vowels. SynthLfo.vowel and SynthFilterEnvelope.vowel move it, clamped to 0..4",
    "max": 4.0,
    "min": 0.0,
    "unit": ""
@@ -1751,7 +1796,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "hard_sync": {
    "def": 0.0,
-   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the top of the wave, -48..48, default 0; the moved ratio is clamped to 1..16. On a layer it syncs that layer, from a ratio of 1 when it has none; on the root it moves every layer with a ratio over 1",
+   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the top of the wave, -48..48, default 0, clamped to 1..16. On a layer it syncs that layer; on the root every synced layer",
    "max": 48.0,
    "min": -48.0,
    "unit": "st"
@@ -1795,7 +1840,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "sync": {
    "def": 0.0,
-   "doc": "Cycle in beats of the Transport, 0..256, default 0 for rate. When positive it wins over rate, like Delay.sync: a beat is a quarter note at the tempo of the Transport, 120 without one, so 0.25 is a sixteenth and 1.5 a dotted quarter. The LFO starts at phase + fract(beat / sync), beat being the position of the Transport at the start of the note, so every note sees the same phase of the grid. A voice keeps the tempo it started at: a tempo change applies to the next notes. Delay and fade stay in seconds; SynthLfoRandom steps once per cycle",
+   "doc": "Cycle in beats of the Transport, 0..256, default 0 for rate; when positive it wins over rate. The phase follows the beat at the start of a note; delay and fade stay in seconds",
    "max": 256.0,
    "min": 0.0,
    "unit": ""
@@ -1896,7 +1941,7 @@ window.BOX_AUDIO_PARAMS = {
    "doc": "Whether a modulator is heard as well, at its level"
   },
   "color": {
-   "doc": "SynthNoise: color of the noise, default SynthNoiseWhite. The white noise it filters is seeded as white noise is, so a colored layer is as deterministic; each unison voice filters its own. Ignored by the other waves"
+   "doc": "SynthNoise: color of the noise, default SynthNoiseWhite, seeded as white noise; each unison voice filters its own. Ignored by the other waves"
   },
   "feedback": {
    "doc": "Radians of its own output on its phase, 0..1.5, a sawlike tone",
@@ -1947,7 +1992,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "sub": {
    "def": 0.0,
-   "doc": "Level of the sub oscillator, 0..1, default 0 (off): a band limited square sub_octave octaves under the layer, added to its signal before its level and envelope. It is derived from the phase of the layer, so it follows its pitch, sweep, glide, vibrato and unison, but not its phase modulation or feedback; a modulator modulates with the sub included. Ignored by SynthNoise and SynthPluck",
+   "doc": "Level 0..1 of a band limited square sub_octave octaves under the layer, default 0 (off). It follows the pitch of the layer but not its phase modulation; ignored by SynthNoise, SynthPluck",
    "max": 1.0,
    "min": 0.0,
    "unit": ""
@@ -1966,7 +2011,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "sync": {
    "def": 0.0,
-   "doc": "Hard sync: ratio 1..16 of the wave heard to the note, default 0, which counts as 1 (off). The note frequency of the layer, its sweep, glide, vibrato, unison detune and the pitch of the voice included, is the master: the wave runs at the master times the ratio and restarts at phase 0 on every cycle of the master, band limited at the restart, for sync leads and, with SynthLfo.hard_sync, sync sweeps. Each unison voice syncs to its own master; the sub stays at the master and phase modulation adds to the synced phase. Ignored by SynthNoise and SynthPluck",
+   "doc": "Hard sync: ratio 1..16 of the wave to the note, default 0 (off). The wave restarts on every cycle of the note frequency, band limited, for sync leads; ignored by SynthNoise and SynthPluck",
    "max": 16.0,
    "min": 0.0,
    "unit": ""
@@ -2015,7 +2060,7 @@ window.BOX_AUDIO_PARAMS = {
   },
   "sync": {
    "def": 0.0,
-   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the start of a note, -48..48, default 0, returning to 0 with the decay: the sweep of a sync lead. Only on layers with a ratio over 1; the moved ratio is clamped to 1..16",
+   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the start of a note, -48..48, default 0, returning with the decay. Only on layers with a ratio over 1, clamped to 1..16",
    "max": 48.0,
    "min": -48.0,
    "unit": "st"
@@ -2024,7 +2069,7 @@ window.BOX_AUDIO_PARAMS = {
  "SynthSound": {
   "drift": {
    "def": 0.0,
-   "doc": "Cents of analog drift, 0..50, default 0: the pitch of each voice and of each unison voice of each layer wanders smoothly within this, over about 0.2 to 2 seconds, and the cutoff of its SynthFilter by a quarter of it; seeded from seed and the count of plays",
+   "doc": "Cents of analog drift, 0..50, default 0: the pitch of each voice wanders smoothly within this, and the cutoff by a quarter of it; seeded from seed and the count of plays",
    "max": 50.0,
    "min": 0.0,
    "unit": "ct"
@@ -2164,7 +2209,7 @@ window.BOX_AUDIO_PARAMS = {
    "doc": "The entity with Instrument that plays the notes of its note clips; a track of only audio clips and automation needs none"
   },
   "priority": {
-   "doc": "Priority of the voices of its notes and audio clips, 0..255, default 1: at the voice cap of 64 a play steals only a voice of at most its priority, so one shots (0) cannot steal the voices of a track; streams play at 255"
+   "doc": "Priority of the voices of its notes and audio clips, 0..255, default 1: at the voice cap a play steals only a voice of at most its priority, so one shots (0) cannot steal them"
   },
   "swing": {
    "def": 0.0,
@@ -2346,48 +2391,49 @@ window.BOX_AUDIO_PARAMS = {
  }
 };
 window.BOX_AUDIO_DOCS = {
- "AudioBus": "A mixer bus, the component of a mixer channel: a group, a return, an SFX bus, the bus of a track and the master.",
- "AudioClip": "A clip of recorded audio, reusable as a NoteClip is: a part of a sound that a ClipPlacement plays on the bus of its track, a vocal, a loop or a stem.",
- "AudioEmitter": "Plays a sound once at random intervals, at a random point of a shape, with a random volume and pitch, seeded from seed, the entity and the count of plays: insects, drips and rain.",
- "AudioEqBand": "A band of an Equalizer: an RBJ cookbook biquad.",
- "AudioFilter": "A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable filter of SynthFilter on the signal of a bus, for a sweep on a music group, a muffled SFX bus or a telephone voice.",
- "AudioMacro": "A macro, on an entity of its own: one value of 0..1 that its AudioMacroMap children turn into several members of buses and effects at once, each over its own range and curve, like a knob of a Combinator.",
- "AudioMacroMap": "A map of a macro, a child of the AudioMacro entity: one member of a bus or an effect that the macro moves from min at a value of 0 to max at 1.",
- "AudioMeter": "The levels of a mixer channel, read only: box.audio writes it each frame on every channel entity that has it, the master (box.audio.master) included, and on effect entities.",
- "AudioModulator": "A modulator, on an entity of its own: moves a float member of a bus or an effect on its own, in time with the song, for a filter that wobbles in eighths, a send that pulses, a tremolo, an auto-pan or an auto-wah: wobble { AudioModulator: {target: bass_filter, component: AudioFilter, member: \"cutoff\", scale: AudioModOctaves, depth: 2, sync: 0.5} }.",
- "AudioOutput": "The bus a sound or a source plays on.",
- "AudioPcm": "Samples of a sound, the sound kind of this module.",
- "AudioSend": "A send of a mixer channel to another bus.",
- "AudioSettings": "Settings of the audio of the world, a singleton.",
- "AudioSong": "The song to play: one .flecs file, a singleton.",
- "AudioSongStatus": "Outcome of the load of an AudioSong, a singleton written by box.audio and read only for applications.",
- "AudioSource": "A sound that plays while the entity exists and playing is true.",
- "AudioSpatial": "Places an AudioSource in the world: it follows the WorldTransform of the entity, parents included, gets quieter with its distance from the listener and pans with its direction.",
- "AudioStatus": "What the audio output does, a singleton written by box.audio and read only for apps.",
- "AudioStream": "Music: one Ogg Vorbis file that streams while the entity exists and playing is true.",
- "AudioStreamStatus": "What an AudioStream does, written by box.audio and read only for applications.",
- "AutomationClip": "A clip of automation, reusable as a NoteClip is: a Curve over beats that a ClipPlacement on a Track plays into one float member of a bus or an effect, for a filter sweep, a send that opens for a chorus or the fade of a track: sweep { AutomationClip: {target: synth, component: AudioFilter, member: \"cutoff\", curve: {keys: [{0, 200}, {4, 5000}]}} }.",
- "BeatRepeat": "A beat repeat, an effect in an insert slot of an AudioBus, as a Reverb is: the stutter of a fill, which captures a slice of the beat and repeats it, each repeat quieter, pitched or reversed, while active is up.",
- "Chorus": "A chorus, an effect in an insert slot of an AudioBus, as a Reverb is: up to 4 voices, each a tap of a delay line that a sine LFO moves around delay by depth, their LFOs spread evenly in phase and the voices panned across the stereo field by spread: pad { AudioBus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.",
+ "AutomationClip": "A clip of automation, reusable as a NoteClip is: a Curve over beats that a ClipPlacement on a Track plays into one float member of a bus, an effect or an AudioMacro value: sweep { AutomationClip: {target: synth, component: Filter, member: \"cutoff\", ...} }.",
+ "BeatRepeat": "A beat repeat, an effect in an insert slot of an AudioBus, as a Reverb is: the stutter of a fill, which captures a slice of the beat and repeats it while active is up: drums { Bus: {effects: [drums]}; BeatRepeat: {slice: 0.125, decay: 0.8} }.",
+ "Bus": "A mixer bus, the component of a mixer channel: a group, a return, an SFX bus, the bus of a track and the master.",
+ "Chorus": "A chorus, an effect in an insert slot of an AudioBus, as a Reverb is: up to 4 taps of a delay line that sine LFOs move around delay by depth, panned across the stereo field by spread: pad { Bus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.",
+ "Clip": "A clip of recorded audio, reusable as a NoteClip is: a part of a sound that a ClipPlacement plays on the bus of its track, a vocal, a loop or a stem.",
  "ClipPlacement": "A clip on the timeline, on a child of a Track: a NoteClip, an AudioClip or an AutomationClip.",
- "Compressor": "A compressor, an effect in an insert slot of an AudioBus, as a Reverb is: feed-forward and stereo linked, it detects the peak of the louder channel, smooths it with its attack and release in dB and reduces the gain over its threshold by its ratio, with a soft knee.",
- "Delay": "A delay, an effect in an insert slot of an AudioBus, as a Reverb is: echoes of its input every time seconds, each feedback times the last and darker by a lowpass at damping Hz in the feedback path.",
+ "Compressor": "A compressor, an effect in an insert slot of an AudioBus, as a Reverb is: feed-forward and stereo linked, it reduces the gain of the louder channel over its threshold by its ratio, with a soft knee.",
+ "Delay": "A delay, an effect in an insert slot of an AudioBus, as a Reverb is: echoes of its input every time seconds, each feedback times the last and darkened by a lowpass at damping Hz.",
+ "Emitter": "Plays a sound once at random intervals, at a random point of a shape, with a random volume and pitch, seeded from seed, the entity and the count of plays: insects, drips and rain.",
+ "EqBand": "A band of an Equalizer: an RBJ cookbook biquad.",
  "Equalizer": "An equalizer, an effect in an insert slot of an AudioBus, as a Reverb is: up to BOX_AUDIO_EQ_BANDS bands in a row.",
+ "Filter": "A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable filter of SynthFilter on the signal of a bus, for a sweep, a muffled bus or a telephone voice.",
  "FrequencyShifter": "A frequency shifter, an effect in an insert slot of an AudioBus, as a Reverb is: every partial moves by the same number of Hz, so harmonic sounds turn inharmonic.",
- "Gate": "A gate, an effect in an insert slot of an AudioBus, as a Reverb is: it opens when the peak of the louder channel reaches its threshold, stays open while the level is above the threshold less 4 dB of hysteresis and for its hold after, and then closes to its range.",
+ "Gate": "A gate, an effect in an insert slot of an AudioBus, as a Reverb is: it opens when the peak of the louder channel reaches its threshold, stays open while the level is above the threshold less 4 dB and for its hold after, and then closes to its range.",
  "Instrument": "An instrument: a synth or a sampler that plays notes with a pitch, a velocity, a pan and a duration, ad hoc with box_audio_play_note, on the bus of its AudioOutput, else of its sound.",
+ "Macro": "A macro, on an entity of its own: one value of 0..1 that its AudioMacroMap children turn into several members of buses and effects at once, each over its own range and curve, so game code drives the intensity of the music with one value.",
+ "MacroMap": "A map of a macro, a child of the AudioMacro entity: one member of a bus or an effect that the macro moves from min at a value of 0 to max at 1, named as an AutomationClip does.",
+ "Meter": "The levels of a mixer channel, read only: box.audio writes it each frame on every channel entity that has it, the master and effect entities included.",
+ "Modulator": "A modulator, on an entity of its own: moves a float member of a bus, an effect or an AudioMacro value on its own, in time with the song, for a wobble, a tremolo or an auto-pan: wobble { Modulator: {target: bass_filter, component: Filter, member: \"cutoff\"} }.",
  "Note": "A note of a NoteClip, in beats from the start of the clip.",
  "NoteClip": "A clip of notes, reusable: usually a prefab or a plain entity that any number of ClipPlacement on any tracks name.",
- "PatternGate": "A pattern gate, an effect in an insert slot of an AudioBus, as a Reverb is: a tempo-synced level pattern that chops a sustained sound into rhythm, the trance gate.",
- "Phaser": "A phaser, an effect in an insert slot of an AudioBus, as a Reverb is: a chain of first order allpasses whose break frequency a sine LFO sweeps around a center, mixed with the dry signal, so its notches move up and down at the rate: keys { AudioBus: {effects: [keys]}; Phaser: {stages: 6, rate: 0.3, feedback: 0.5} }.",
- "PitchShifter": "A pitch shifter, an effect in an insert slot of an AudioBus, as a Reverb is: thickens a lead by a few cents either way, adds octaves to basses and leads and makes harmonies, without changing the speed of what plays through it.",
- "Reverb": "A reverb, an effect: it runs in the insert slot of an AudioBus that names its entity in effects, and does nothing while no slot names it.",
- "Rotary": "A rotary, an effect in an insert slot of an AudioBus, as a Reverb is: a rotating speaker cabinet, the swirl of an organ, also on guitars, electric pianos and vocals.",
- "Saturator": "A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or lo-fi for a drum bus, a synth bus or the master.",
+ "Output": "The bus a sound or a source plays on.",
+ "PatternGate": "A pattern gate, an effect in an insert slot of an AudioBus, as a Reverb is: a tempo-synced level pattern that chops a sustained sound into rhythm: pad { Bus: {effects: [pad]}; PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1], length: 8, release: 0.05} }.",
+ "Pcm": "Samples of a sound, the sound kind of this module.",
+ "Phaser": "A phaser, an effect in an insert slot of an AudioBus, as a Reverb is: a chain of first order allpasses swept around a center by a sine LFO, mixed with the dry signal: keys { Bus: {effects: [keys]}; Phaser: {stages: 6, rate: 0.3, feedback: 0.5} }.",
+ "PitchShifter": "A pitch shifter, an effect in an insert slot of an AudioBus, as a Reverb is: thickens a lead by a few cents, adds octaves and makes harmonies without changing the speed of what plays: lead { Bus: {effects: [lead]}; PitchShifter: {cents: 8, stereo: 1, window: 30} }.",
+ "Reverb": "A reverb, an effect: it runs in the insert slot of an AudioBus that names its entity in effects, usually on a return bus that sources reach through a send: hall { Bus: {effects: [hall]}; Reverb: {decay: 2} }.",
+ "Rotary": "A rotary, an effect in an insert slot of an AudioBus, as a Reverb is: a rotating speaker cabinet with a tube preamp, a drum below 800 Hz and a horn above, heard by two virtual mics: organ { Bus: {effects: [organ]}; Rotary: {speed: 0, drive: 0.3} }.",
+ "Saturator": "A saturator, an effect in an insert slot of an AudioBus, as a Reverb is: warmth, grit or lo-fi.",
+ "Send": "A send of a mixer channel to another bus.",
+ "Settings": "Settings of the audio of the world, a singleton.",
  "Song": "What a host reads of the song that is loaded, a singleton that always exists, with its default value while no song is loaded.",
+ "SongFile": "The song to play: one .flecs file, a singleton.",
  "SongLane": "A channel of a song that a host can meter: a name to show and the bus to read.",
+ "SongStatus": "Outcome of the load of an AudioSong, a singleton written by box.audio and read only for applications.",
  "SoundFile": "A sound decoded from a WAV or FLAC file on the job system, found as a TexturePath is.",
  "SoundStatus": "Outcome of the load of a SoundFile, written by box.audio and read only for applications.",
+ "Source": "A sound that plays while the entity exists and playing is true.",
+ "Spatial": "Places an AudioSource in the world: it follows the WorldTransform of the entity, gets quieter with its distance d from the listener and pans with its direction.",
+ "Status": "What the audio output does, a singleton written by box.audio and read only for apps.",
+ "Stream": "Music: one Ogg Vorbis file that streams while the entity exists and playing is true.",
+ "StreamStatus": "What an AudioStream does, written by box.audio and read only for applications.",
+ "SynthBow": "The bow and the string of a SynthBowed layer, on the layer: a digital waveguide string driven by a bow through a friction curve that sticks and slips.",
  "SynthDrive": "A drive stage of a synth sound, on its root: the mix of the layers of each voice runs through a tanh soft clipper before the SynthFilter, or before the amp without one, where an analog synth gets most of its thickness.",
  "SynthEnvelope": "An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to 0 over release.",
  "SynthFilter": "The filter of a synth sound, on its root: a state variable filter on the mix of the layers, stable at any cutoff and resonance.",
@@ -2395,18 +2441,18 @@ window.BOX_AUDIO_DOCS = {
  "SynthGlide": "Portamento and mono legato of a synth sound, on its root.",
  "SynthLfo": "An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff, the pulse width of squares, the ratio of hard sync and the position of wavetables of the sound, each by its own depth, after a delay and a fade in.",
  "SynthModEnvelope": "A third envelope of a synth sound, on its root, with the segments of a SynthEnvelope: a source of SynthModRoute, SynthSourceModEnvelope.",
- "SynthModRoute": "A route of the modulation matrix of a synth sound, on an entity of its own: the value of a source times an amount moves a target, on top of the fixed routes (the depths of SynthLfo, SynthFilterEnvelope.amount, the velocity and keytrack fields), once per control block of the LFOs.",
+ "SynthModRoute": "A route of the modulation matrix of a synth sound, on an entity of its own: the value of a source times an amount moves a target, on top of the fixed routes, once per control block.",
  "SynthOscillator": "An oscillator of a synth sound, a layer: on the root of the sound, on a child of it, or on a child of a layer.",
- "SynthPitchEnvelope": "A pitch envelope of a synth sound, relative to the note so it fits every pitch: the pitch starts amount semitones off the note and returns to it over the decay with a curve, the drop of a kick or a tom, the blip of a zap or the scoop of brass.",
- "SynthSound": "A sound made by the synth from the components of this entity and its children, without a file: SynthOscillator layers, each with an optional SynthUnison, a SynthTable, a SynthEnvelope, a SynthDrive, a SynthFilter, a SynthFilterEnvelope, a SynthPitchEnvelope, a SynthGlide, SynthLfo, a SynthModEnvelope and SynthModRoute children.",
+ "SynthPitchEnvelope": "A pitch envelope of a synth sound, relative to the note: the pitch starts amount semitones off the note and returns to it over the decay, the drop of a kick or the scoop of brass.",
+ "SynthSound": "A sound made by the synth from the components of this entity and its children, without a file: SynthOscillator layers and their SynthEnvelope, SynthFilter, SynthLfo and other synth components.",
  "SynthString": "The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a burst of seeded noise, whose loop damps it.",
  "SynthTable": "The wavetable of a SynthWavetable layer, on the entity of its SynthOscillator.",
  "SynthUnison": "Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several copies of its oscillator, detuned evenly over a spread in cents and placed from left to right over the stereo width, each starting at a seeded random phase.",
- "TapeStop": "A tape stop, an effect in an insert slot of an AudioBus, as a Reverb is: the drop of a transition, which slows what plays through it down to a halt, pitch and time together, and spins it back up.",
+ "TapeStop": "A tape stop, an effect in an insert slot of an AudioBus, as a Reverb is: slows what plays through it down to a halt, pitch and time together, and spins it back up: master_fx { Bus: {effects: [master_fx]}; TapeStop: {stop_time: 1, curve: 0.5} }.",
  "Track": "A track of the timeline: a mixer channel whose notes play on an instrument.",
  "TrackHumanize": "How far the notes of a Track move at random from where they are programmed.",
- "TransientShaper": "A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or less punch and tail on drums and plucks, without a threshold, at most 12 dB either way: drums { AudioBus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.",
+ "TransientShaper": "A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or less punch and tail on drums and plucks, without a threshold, at most 12 dB either way: drums { Bus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.",
  "Transport": "The transport of the timeline in beats, a singleton: the tempo, the time signature, the position, play and stop, the loop and the metronome.",
- "Vocoder": "A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of its modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own channel, the carrier.",
+ "Vocoder": "A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of its modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own channel: pad { Bus: {effects: [pad]}; Vocoder: {modulator: drums, bands: 16} }.",
  "Wavetable": "A wavetable, on an entity of its own, usually a prefab, that the SynthTable of wavetable layers names: frames of one period each that a layer morphs through."
 };

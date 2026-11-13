@@ -6,49 +6,49 @@ using box.audio
 
 // A lowpass on the noise of the bus, its cutoff 2 octaves either way of 1000 Hz, twice a beat
 wobble {
-  AudioBus: {effects: [wobble]}
-  AudioFilter: {cutoff: 1000}
+  Bus: {effects: [wobble]}
+  Filter: {cutoff: 1000}
 }
 
 wobble_lfo {
-  AudioModulator: {target: wobble, component: AudioFilter, member: "cutoff",
-    scale: AudioModOctaves, depth: 2, sync: 0.5}
+  Modulator: {target: wobble, component: Filter, member: "cutoff",
+    scale: ModOctaves, depth: 2, sync: 0.5}
 }
 
 // A tremolo that cuts the bus in the first half of each eighth
-trem { AudioBus: {} }
+trem { Bus: {} }
 
 trem_lfo {
-  AudioModulator: {target: trem, component: AudioBus, member: "volume",
-    wave: AudioModSquare, unipolar: true, depth: -1, sync: 0.5}
+  Modulator: {target: trem, component: Bus, member: "volume",
+    wave: ModSquare, unipolar: true, depth: -1, sync: 0.5}
 }
 
 // An auto-pan, right at the first quarter of each beat, left at the third
-pan { AudioBus: {} }
+pan { Bus: {} }
 
 pan_lfo {
-  AudioModulator: {target: pan, component: AudioBus, member: "pan", depth: 1, sync: 1}
+  Modulator: {target: pan, component: Bus, member: "pan", depth: 1, sync: 1}
 }
 
 // Four hard steps of a sixteenth each: volumes of 1, 0, 0.75 and 0.5
-seq { AudioBus: {volume: 0.5} }
+seq { Bus: {volume: 0.5} }
 
 seq_steps {
-  AudioModulator: {target: seq, component: AudioBus, member: "volume",
-    source: AudioModSteps, steps: [1, -1, 0.5, 0], step_count: 4, sync: 0.25, depth: 0.5}
+  Modulator: {target: seq, component: Bus, member: "volume",
+    source: ModSteps, steps: [1, -1, 0.5, 0], step_count: 4, sync: 0.25, depth: 0.5}
 }
 
 // A drum bus nobody hears, which a lowpass of the pad follows up to 4 octaves above 200 Hz
-drums { AudioBus: {volume: 0} }
+drums { Bus: {volume: 0} }
 
 pad {
-  AudioBus: {effects: [pad]}
-  AudioFilter: {cutoff: 200}
+  Bus: {effects: [pad]}
+  Filter: {cutoff: 200}
 }
 
 pad_follow {
-  AudioModulator: {target: pad, component: AudioFilter, member: "cutoff",
-    source: AudioModFollower, key: drums, scale: AudioModOctaves, depth: 4,
+  Modulator: {target: pad, component: Filter, member: "cutoff",
+    source: ModFollower, key: drums, scale: ModOctaves, depth: 4,
     attack: 0.002, release: 0.05}
 }
 
@@ -56,7 +56,7 @@ pad_follow {
 lead { Track: {} }
 
 prefab fade {
-  AutomationClip: {target: lead, component: AudioBus, member: "volume", length: 4,
+  AutomationClip: {target: lead, component: Bus, member: "volume", length: 4,
     curve: {keys: [{0, 1}, {4, 0}]}}
 }
 
@@ -65,15 +65,15 @@ lead {
 }
 
 lead_lift {
-  AudioModulator: {target: lead, component: AudioBus, member: "volume",
-    source: AudioModSteps, steps: [1], step_count: 1, sync: 1, depth: 0.2}
+  Modulator: {target: lead, component: Bus, member: "volume",
+    source: ModSteps, steps: [1], step_count: 1, sync: 1, depth: 0.2}
 }
 
 // A swell of the volume at 4 Hz, free running, that the suite deletes
-swell { AudioBus: {} }
+swell { Bus: {} }
 
 swell_lfo {
-  AudioModulator: {target: swell, component: AudioBus, member: "volume", depth: 0.5, rate: 4}
+  Modulator: {target: swell, component: Bus, member: "volume", depth: 0.5, rate: 4}
 }
 
 $ { Transport: {tempo: 120} }

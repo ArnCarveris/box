@@ -67,7 +67,7 @@ void Script_level_change(void) {
 
     test_assert(ecs_script_run(world, "louder",
         "using box.audio\n"
-        "music { AudioBus: {volume: 1.0} }\n", NULL) == 0);
+        "music { Bus: {volume: 1.0} }\n", NULL) == 0);
     audio_run(world, 5);
     test_flt(audio_level(AUDIO_FRAME), 0.25f);
     ecs_fini(world);
@@ -78,7 +78,7 @@ void Script_play_function(void) {
     ecs_world_t *world = audio_world();
     test_assert(ecs_script_run(world, "play",
         "using box.audio\n"
-        "dc { AudioPcm: {samples: [0.3, 0.3, 0.3, 0.3], sample_rate: 20} }\n"
+        "dc { Pcm: {samples: [0.3, 0.3, 0.3, 0.3], sample_rate: 20} }\n"
         "const a: bool = box.audio.play(dc, 0.5)\n"
         "const b: bool = box.audio.play(dc, 0.5)\n", NULL) == 0);
     audio_run(world, 6);

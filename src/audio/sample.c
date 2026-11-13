@@ -441,7 +441,7 @@ void box_audio_sample_init(
     state->sample_sync->refs = 1;
 
     state->sample_users = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "AudioSampleUsers" }),
+        .entity = ecs_entity(world, { .name = "SampleUsers" }),
         .terms = {{ .id = ecs_id(AudioSample), .inout = EcsIn, .src.id = EcsSelf }},
         .flags = EcsQueryMatchDisabled,
         .cache_kind = EcsQueryCacheAuto
@@ -466,7 +466,7 @@ void box_audio_sample_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AudioSampleFrame" }),
+        .entity = ecs_entity(world, { .name = "SampleFrame" }),
         .phase = EcsPreFrame,
         .run = BoxAudioSampleFrame,
         .ctx = state

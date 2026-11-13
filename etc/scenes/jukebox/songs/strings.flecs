@@ -5,306 +5,306 @@ box { audio { Song { Rgb: {200, 140, 80} } } }
 assets {
 
   st_hall {
-    AudioBus: {output: master, kind: AudioChannelReturn, volume: 0.32, effects: [st_hall]}
+    Bus: {output: master, kind: ChannelReturn, volume: 0.32, effects: [st_hall]}
     Reverb: {decay: 2.3, damping: 0.45, predelay: 0.022, size: 0.85}
   }
   st_glue { Compressor: {threshold: -12, ratio: 2, attack: 0.03, release: 0.25, knee: 8} }
   st_strings {
-    AudioBus: {output: master, volume: 0.66, effects: [st_glue]}
-    AudioMeter: {}
+    Bus: {output: master, volume: 0.66, effects: [st_glue]}
+    Meter: {}
   }
 
   st_violin_body_a {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 190, q: 0.9},
-      {kind: AudioEqPeak, frequency: 275, gain: 4, q: 4},
-      {kind: AudioEqPeak, frequency: 470, gain: 3, q: 5},
-      {kind: AudioEqPeak, frequency: 550, gain: 3, q: 4}
+      {kind: EqLowCut, frequency: 190, q: 0.9},
+      {kind: EqPeak, frequency: 275, gain: 4, q: 4},
+      {kind: EqPeak, frequency: 470, gain: 3, q: 5},
+      {kind: EqPeak, frequency: 550, gain: 3, q: 4}
     ]}
   }
   st_violin_body_b {
     Equalizer: {bands: [
-      {kind: AudioEqHighShelf, frequency: 1000, gain: 3, q: 0.6},
-      {kind: AudioEqPeak, frequency: 2700, gain: 2.5, q: 1.2},
-      {kind: AudioEqHighCut, frequency: 5500, q: 0.7},
-      {kind: AudioEqHighShelf, frequency: 8000, gain: -10}
+      {kind: EqHighShelf, frequency: 1000, gain: 3, q: 0.6},
+      {kind: EqPeak, frequency: 2700, gain: 2.5, q: 1.2},
+      {kind: EqHighCut, frequency: 5500, q: 0.7},
+      {kind: EqHighShelf, frequency: 8000, gain: -10}
     ]}
   }
   st_violin_body_c {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 633, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1039, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1783, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2968, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 633, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1039, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1783, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 2968, gain: 3.5, q: 18}
     ]}
   }
   st_violin_body_d {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 706, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1134, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1886, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 3166, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 706, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1134, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1886, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 3166, gain: -3.5, q: 18}
     ]}
   }
   st_violin_body_e {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 773, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1304, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2030, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 3546, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 773, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1304, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 2030, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 3546, gain: 3.5, q: 18}
     ]}
   }
   st_violin_body_f {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 807, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1386, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2308, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 3650, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 807, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1386, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 2308, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 3650, gain: -3.5, q: 18}
     ]}
   }
   st_violin_body_g {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 884, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1479, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2488, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 4064, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 884, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1479, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 2488, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 4064, gain: 3.5, q: 18}
     ]}
   }
   st_violin_body_h {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 1015, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1624, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2674, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 4395, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 1015, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1624, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 2674, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 4395, gain: -3.5, q: 18}
     ]}
   }
 
   st_viola_body_a {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 150, q: 0.9},
-      {kind: AudioEqPeak, frequency: 230, gain: 4, q: 4},
-      {kind: AudioEqPeak, frequency: 370, gain: 3, q: 4},
-      {kind: AudioEqPeak, frequency: 450, gain: 3, q: 4}
+      {kind: EqLowCut, frequency: 150, q: 0.9},
+      {kind: EqPeak, frequency: 230, gain: 4, q: 4},
+      {kind: EqPeak, frequency: 370, gain: 3, q: 4},
+      {kind: EqPeak, frequency: 450, gain: 3, q: 4}
     ]}
   }
   st_viola_body_b {
     Equalizer: {bands: [
-      {kind: AudioEqHighShelf, frequency: 750, gain: 3, q: 0.6},
-      {kind: AudioEqPeak, frequency: 1600, gain: 2, q: 1.5},
-      {kind: AudioEqHighCut, frequency: 4600, q: 0.7},
-      {kind: AudioEqHighShelf, frequency: 7000, gain: -10}
+      {kind: EqHighShelf, frequency: 750, gain: 3, q: 0.6},
+      {kind: EqPeak, frequency: 1600, gain: 2, q: 1.5},
+      {kind: EqHighCut, frequency: 4600, q: 0.7},
+      {kind: EqHighShelf, frequency: 7000, gain: -10}
     ]}
   }
   st_viola_body_c {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 475, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 786, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1307, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2096, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 475, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 786, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1307, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 2096, gain: 3.5, q: 18}
     ]}
   }
   st_viola_body_d {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 525, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 842, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1374, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2296, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 525, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 842, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1374, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 2296, gain: -3.5, q: 18}
     ]}
   }
   st_viola_body_e {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 556, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 902, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1567, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2571, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 556, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 902, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1567, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 2571, gain: 3.5, q: 18}
     ]}
   }
   st_viola_body_f {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 628, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1037, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1622, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2751, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 628, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1037, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1622, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 2751, gain: -3.5, q: 18}
     ]}
   }
   st_viola_body_g {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 685, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1090, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1739, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 2914, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 685, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1090, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1739, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 2914, gain: 3.5, q: 18}
     ]}
   }
   st_viola_body_h {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 706, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1160, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1910, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 3094, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 706, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1160, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1910, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 3094, gain: -3.5, q: 18}
     ]}
   }
 
   st_cello_body_a {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 85, q: 0.9},
-      {kind: AudioEqPeak, frequency: 100, gain: 4, q: 3},
-      {kind: AudioEqPeak, frequency: 175, gain: 3, q: 4},
-      {kind: AudioEqPeak, frequency: 215, gain: 3, q: 4}
+      {kind: EqLowCut, frequency: 85, q: 0.9},
+      {kind: EqPeak, frequency: 100, gain: 4, q: 3},
+      {kind: EqPeak, frequency: 175, gain: 3, q: 4},
+      {kind: EqPeak, frequency: 215, gain: 3, q: 4}
     ]}
   }
   st_cello_body_b {
     Equalizer: {bands: [
-      {kind: AudioEqHighShelf, frequency: 500, gain: 3, q: 0.6},
-      {kind: AudioEqPeak, frequency: 1700, gain: 2, q: 1.2},
-      {kind: AudioEqHighCut, frequency: 3800, q: 0.7},
-      {kind: AudioEqHighShelf, frequency: 6000, gain: -10}
+      {kind: EqHighShelf, frequency: 500, gain: 3, q: 0.6},
+      {kind: EqPeak, frequency: 1700, gain: 2, q: 1.2},
+      {kind: EqHighCut, frequency: 3800, q: 0.7},
+      {kind: EqHighShelf, frequency: 6000, gain: -10}
     ]}
   }
   st_cello_body_c {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 234, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 422, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 683, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1175, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 234, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 422, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 683, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1175, gain: 3.5, q: 18}
     ]}
   }
   st_cello_body_d {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 272, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 453, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 791, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1335, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 272, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 453, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 791, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1335, gain: -3.5, q: 18}
     ]}
   }
   st_cello_body_e {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 286, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 486, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 844, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1491, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 286, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 486, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 844, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1491, gain: 3.5, q: 18}
     ]}
   }
   st_cello_body_f {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 319, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 532, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 901, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1535, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 319, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 532, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 901, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1535, gain: -3.5, q: 18}
     ]}
   }
   st_cello_body_g {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 333, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 573, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1029, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1774, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 333, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 573, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1029, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1774, gain: 3.5, q: 18}
     ]}
   }
   st_cello_body_h {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 364, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 631, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1084, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1859, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 364, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 631, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1084, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1859, gain: -3.5, q: 18}
     ]}
   }
 
   st_bass_body_a {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 60, q: 1},
-      {kind: AudioEqPeak, frequency: 60, gain: 4, q: 3},
-      {kind: AudioEqPeak, frequency: 100, gain: 3, q: 3},
-      {kind: AudioEqPeak, frequency: 140, gain: 2, q: 3}
+      {kind: EqLowCut, frequency: 60, q: 1},
+      {kind: EqPeak, frequency: 60, gain: 4, q: 3},
+      {kind: EqPeak, frequency: 100, gain: 3, q: 3},
+      {kind: EqPeak, frequency: 140, gain: 2, q: 3}
     ]}
   }
   st_bass_body_b {
     Equalizer: {bands: [
-      {kind: AudioEqHighShelf, frequency: 260, gain: 3, q: 0.6},
-      {kind: AudioEqPeak, frequency: 800, gain: 2, q: 1.5},
-      {kind: AudioEqHighCut, frequency: 2400, q: 0.7},
-      {kind: AudioEqHighShelf, frequency: 4000, gain: -10}
+      {kind: EqHighShelf, frequency: 260, gain: 3, q: 0.6},
+      {kind: EqPeak, frequency: 800, gain: 2, q: 1.5},
+      {kind: EqHighCut, frequency: 2400, q: 0.7},
+      {kind: EqHighShelf, frequency: 4000, gain: -10}
     ]}
   }
   st_bass_body_c {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 117, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 210, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 380, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 668, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 117, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 210, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 380, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 668, gain: 3.5, q: 18}
     ]}
   }
   st_bass_body_d {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 128, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 232, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 414, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 767, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 128, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 232, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 414, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 767, gain: -3.5, q: 18}
     ]}
   }
   st_bass_body_e {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 143, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 255, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 470, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 838, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 143, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 255, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 470, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 838, gain: 3.5, q: 18}
     ]}
   }
   st_bass_body_f {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 163, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 295, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 493, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 910, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 163, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 295, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 493, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 910, gain: -3.5, q: 18}
     ]}
   }
   st_bass_body_g {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 176, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 324, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 544, gain: 3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1010, gain: 3.5, q: 18}
+      {kind: EqPeak, frequency: 176, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 324, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 544, gain: 3.5, q: 18},
+      {kind: EqPeak, frequency: 1010, gain: 3.5, q: 18}
     ]}
   }
   st_bass_body_h {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 199, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 342, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 613, gain: -3.5, q: 18},
-      {kind: AudioEqPeak, frequency: 1115, gain: -3.5, q: 18}
+      {kind: EqPeak, frequency: 199, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 342, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 613, gain: -3.5, q: 18},
+      {kind: EqPeak, frequency: 1115, gain: -3.5, q: 18}
     ]}
   }
 
   st_section_body_a {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 140, q: 0.8},
-      {kind: AudioEqPeak, frequency: 260, gain: 3, q: 2},
-      {kind: AudioEqPeak, frequency: 500, gain: 3, q: 2},
-      {kind: AudioEqHighShelf, frequency: 900, gain: 11, q: 0.6}
+      {kind: EqLowCut, frequency: 140, q: 0.8},
+      {kind: EqPeak, frequency: 260, gain: 3, q: 2},
+      {kind: EqPeak, frequency: 500, gain: 3, q: 2},
+      {kind: EqHighShelf, frequency: 900, gain: 11, q: 0.6}
     ]}
   }
   st_section_body_b {
     Equalizer: {bands: [
-      {kind: AudioEqPeak, frequency: 2500, gain: 3, q: 1},
-      {kind: AudioEqPeak, frequency: 4300, gain: -3, q: 2},
-      {kind: AudioEqHighCut, frequency: 6000, q: 0.7},
-      {kind: AudioEqHighShelf, frequency: 9000, gain: -10}
+      {kind: EqPeak, frequency: 2500, gain: 3, q: 1},
+      {kind: EqPeak, frequency: 4300, gain: -3, q: 2},
+      {kind: EqHighCut, frequency: 6000, q: 0.7},
+      {kind: EqHighShelf, frequency: 9000, gain: -10}
     ]}
   }
 
   st_pizz_hi_body {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 170, q: 0.8},
-      {kind: AudioEqPeak, frequency: 275, gain: 5, q: 3},
-      {kind: AudioEqPeak, frequency: 520, gain: 4, q: 3},
-      {kind: AudioEqPeak, frequency: 2600, gain: 2, q: 1.2}
+      {kind: EqLowCut, frequency: 170, q: 0.8},
+      {kind: EqPeak, frequency: 275, gain: 5, q: 3},
+      {kind: EqPeak, frequency: 520, gain: 4, q: 3},
+      {kind: EqPeak, frequency: 2600, gain: 2, q: 1.2}
     ]}
   }
   st_pizz_lo_body {
     Equalizer: {bands: [
-      {kind: AudioEqLowCut, frequency: 38, q: 0.8},
-      {kind: AudioEqPeak, frequency: 65, gain: 4, q: 3},
-      {kind: AudioEqPeak, frequency: 105, gain: 4, q: 3},
-      {kind: AudioEqPeak, frequency: 190, gain: 3, q: 3}
+      {kind: EqLowCut, frequency: 38, q: 0.8},
+      {kind: EqPeak, frequency: 65, gain: 4, q: 3},
+      {kind: EqPeak, frequency: 105, gain: 4, q: 3},
+      {kind: EqPeak, frequency: 190, gain: 3, q: 3}
     ]}
   }
 
@@ -637,54 +637,54 @@ assets {
 
   st_track_violin {
     Track: {instrument: st_violin_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: st_strings, volume: 0.62, pan: -0.3, effects: [st_violin_body_a, st_violin_body_b, st_violin_body_c, st_violin_body_d, st_violin_body_e, st_violin_body_f, st_violin_body_g, st_violin_body_h], sends: [{bus: st_hall, level: 0.35}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 0.62, pan: -0.3, effects: [st_violin_body_a, st_violin_body_b, st_violin_body_c, st_violin_body_d, st_violin_body_e, st_violin_body_f, st_violin_body_g, st_violin_body_h], sends: [{bus: st_hall, level: 0.35}]}
+    Meter: {}
     solo { ClipPlacement: {clip: st_violin_solo, start: 0} }
     tutti { ClipPlacement: {clip: st_violin_tutti, start: 40} }
   }
 
   st_track_viola {
     Track: {instrument: st_viola_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: st_strings, volume: 0.75, pan: 0.15, effects: [st_viola_body_a, st_viola_body_b, st_viola_body_c, st_viola_body_d, st_viola_body_e, st_viola_body_f, st_viola_body_g, st_viola_body_h], sends: [{bus: st_hall, level: 0.35}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 0.75, pan: 0.15, effects: [st_viola_body_a, st_viola_body_b, st_viola_body_c, st_viola_body_d, st_viola_body_e, st_viola_body_f, st_viola_body_g, st_viola_body_h], sends: [{bus: st_hall, level: 0.35}]}
+    Meter: {}
     solo { ClipPlacement: {clip: st_viola_solo, start: 8} }
     tutti { ClipPlacement: {clip: st_viola_tutti, start: 40, gain: 0.8} }
   }
 
   st_track_cello {
     Track: {instrument: st_cello_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: st_strings, volume: 0.72, pan: 0.35, effects: [st_cello_body_a, st_cello_body_b, st_cello_body_c, st_cello_body_d, st_cello_body_e, st_cello_body_f, st_cello_body_g, st_cello_body_h], sends: [{bus: st_hall, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 0.72, pan: 0.35, effects: [st_cello_body_a, st_cello_body_b, st_cello_body_c, st_cello_body_d, st_cello_body_e, st_cello_body_f, st_cello_body_g, st_cello_body_h], sends: [{bus: st_hall, level: 0.3}]}
+    Meter: {}
     solo { ClipPlacement: {clip: st_cello_solo, start: 16} }
     tutti { ClipPlacement: {clip: st_cello_tutti, start: 40, gain: 0.9} }
   }
 
   st_track_bass {
     Track: {instrument: st_bass_inst, humanize: {velocity: 0.05}}
-    AudioBus: {output: st_strings, volume: 0.6, pan: 0.5, effects: [st_bass_body_a, st_bass_body_b, st_bass_body_c, st_bass_body_d, st_bass_body_e, st_bass_body_f, st_bass_body_g, st_bass_body_h], sends: [{bus: st_hall, level: 0.25}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 0.6, pan: 0.5, effects: [st_bass_body_a, st_bass_body_b, st_bass_body_c, st_bass_body_d, st_bass_body_e, st_bass_body_f, st_bass_body_g, st_bass_body_h], sends: [{bus: st_hall, level: 0.25}]}
+    Meter: {}
     solo { ClipPlacement: {clip: st_bass_solo, start: 24} }
     final { ClipPlacement: {clip: st_bass_final, start: 56, gain: 0.85} }
   }
 
   st_track_section {
     Track: {instrument: st_section_inst, humanize: {timing: 8, velocity: 0.05}}
-    AudioBus: {output: st_strings, volume: 0.4, pan: -0.1, effects: [st_section_body_a, st_section_body_b], sends: [{bus: st_hall, level: 0.45}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 0.4, pan: -0.1, effects: [st_section_body_a, st_section_body_b], sends: [{bus: st_hall, level: 0.45}]}
+    Meter: {}
     tutti { ClipPlacement: {clip: st_section_chords, start: 40} }
   }
 
   st_track_pizz_hi {
     Track: {instrument: st_pizz_inst, humanize: {timing: 6, velocity: 0.08}}
-    AudioBus: {output: st_strings, volume: 1, pan: -0.25, effects: [st_pizz_hi_body], sends: [{bus: st_hall, level: 0.4}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 1, pan: -0.25, effects: [st_pizz_hi_body], sends: [{bus: st_hall, level: 0.4}]}
+    Meter: {}
     vamp { ClipPlacement: {clip: st_pizz_hi_vamp, start: 32} }
   }
 
   st_track_pizz_lo {
     Track: {instrument: st_pizz_inst, humanize: {timing: 6, velocity: 0.08}}
-    AudioBus: {output: st_strings, volume: 1, pan: 0.45, effects: [st_pizz_lo_body], sends: [{bus: st_hall, level: 0.3}]}
-    AudioMeter: {}
+    Bus: {output: st_strings, volume: 1, pan: 0.45, effects: [st_pizz_lo_body], sends: [{bus: st_hall, level: 0.3}]}
+    Meter: {}
     walk { ClipPlacement: {clip: st_pizz_lo_walk, start: 32} }
     tutti { ClipPlacement: {clip: st_pizz_lo_tutti, start: 40} }
   }

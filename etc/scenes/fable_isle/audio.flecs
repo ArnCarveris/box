@@ -5,17 +5,17 @@ using state
 
 isle_audio {
   hall {
-    AudioBus: {output: master, kind: AudioChannelReturn, effects: [hall]}
+    Bus: {output: master, kind: ChannelReturn, effects: [hall]}
     Reverb: {decay: 2.8, damping: 0.45, predelay: 0.025, size: 0.65}
   }
   music {
-    AudioBus: {output: master, volume: 0.5, sends: [{bus: hall, level: night ? 0.55 : 0.3}]}
+    Bus: {output: master, volume: 0.5, sends: [{bus: hall, level: night ? 0.55 : 0.3}]}
   }
   sfx {
-    AudioBus: {output: master, kind: AudioChannelSfx, volume: 0.65, sends: [{bus: hall, level: 0.3}]}
+    Bus: {output: master, kind: ChannelSfx, volume: 0.65, sends: [{bus: hall, level: 0.3}]}
   }
   air {
-    AudioBus: {output: master, kind: AudioChannelSfx, volume: 1}
+    Bus: {output: master, kind: ChannelSfx, volume: 1}
   }
 
   prefab box_tone {
@@ -173,31 +173,31 @@ isle_audio {
 
   lead {
     Track: {instrument: music_box, humanize: {timing: 5, velocity: 0.1}}
-    AudioBus: {output: music, volume: night ? 0 : 1}
+    Bus: {output: music, volume: night ? 0 : 1}
     a { ClipPlacement: {clip: tune_a, start: 0} }
     b { ClipPlacement: {clip: tune_b, start: 32} }
   }
   hush {
     Track: {instrument: music_box, humanize: {timing: 8, velocity: 0.1}}
-    AudioBus: {output: music, volume: night ? 0.9 : 0}
+    Bus: {output: music, volume: night ? 0.9 : 0}
     a { ClipPlacement: {clip: hush_a, start: 0, transpose: -12} }
     b { ClipPlacement: {clip: hush_b, start: 32, transpose: -12} }
   }
   low {
     Track: {instrument: low_box}
-    AudioBus: {output: music, volume: night ? 0.55 : 0.85}
+    Bus: {output: music, volume: night ? 0.55 : 0.85}
     a { ClipPlacement: {clip: low_a, start: 0} }
     b { ClipPlacement: {clip: low_b, start: 32} }
   }
   pad {
     Track: {instrument: pad_voice}
-    AudioBus: {output: music, volume: night ? 1 : 0.8}
+    Bus: {output: music, volume: night ? 1 : 0.8}
     a { ClipPlacement: {clip: pad_a, start: 0} }
     b { ClipPlacement: {clip: pad_b, start: 32} }
   }
 
   prefab whistle_tone {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 61, drift: 5}
     SynthEnvelope: {attack: 0.05, decay: 0.12, sustain: 0.85, release: 0.24, curve: 2}
     SynthFilter: {kind: SynthLowPass, cutoff: 2600, resonance: 0.1}
@@ -216,7 +216,7 @@ isle_audio {
   whistle { Instrument: {sound: whistle_tone, velocity_curve: 1} }
 
   prefab bell_strike {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 71, pitch_variance: 0.004}
     SynthEnvelope: {attack: 0.002, decay: 4.5, curve: 4}
     hum {
@@ -251,7 +251,7 @@ isle_audio {
   }
 
   prefab rocket_rise {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 81, pitch_variance: 0.1}
     SynthEnvelope: {attack: 0.5, decay: 0.3, curve: 2}
     SynthFilter: {kind: SynthBandPass, cutoff: 700, resonance: 0.35}
@@ -261,7 +261,7 @@ isle_audio {
   }
 
   prefab rocket_boom {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 82, pitch_variance: 0.18, level_variance: 0.2}
     SynthEnvelope: {attack: 0.001, decay: 0.7, curve: 5}
     SynthFilter: {kind: SynthLowPass, cutoff: 1100}
@@ -273,7 +273,7 @@ isle_audio {
   }
 
   prefab rocket_crackle {
-    AudioOutput: {bus: sfx}
+    Output: {bus: sfx}
     SynthSound: {seed: 83, pitch_variance: 0.2, level_variance: 0.25}
     SynthEnvelope: {attack: 0.02, decay: 1.1, curve: 2}
     SynthFilter: {kind: SynthHighPass, cutoff: 3000}
@@ -290,8 +290,8 @@ isle_audio {
   }
 
   wind_bed_source {
-    AudioSource: {sound: wind_bed, loop: true, volume: 0.03 + 0.3 * wind * wind}
-    AudioOutput: {bus: air}
+    Source: {sound: wind_bed, loop: true, volume: 0.03 + 0.3 * wind * wind}
+    Output: {bus: air}
   }
 }
 

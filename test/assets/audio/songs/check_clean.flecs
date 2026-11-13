@@ -23,12 +23,12 @@ prefab check_clean_notes {
 check_clean_verb { Reverb: {decay: 1, mix: 1} }
 
 check_clean_return {
-  AudioBus: {kind: AudioChannelReturn, effects: [check_clean_verb]}
+  Bus: {kind: ChannelReturn, effects: [check_clean_verb]}
 }
 
 check_clean_lead {
   Track: {instrument: check_clean_inst}
-  AudioBus: {sends: [{bus: check_clean_return, level: 0.2}]}
+  Bus: {sends: [{bus: check_clean_return, level: 0.2}]}
   part { ClipPlacement: {clip: check_clean_notes, start: 0, duration: 8, loop: true} }
 }
 

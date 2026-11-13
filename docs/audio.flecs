@@ -1,6 +1,6 @@
 // box.audio spec: every audio feature, as one playable song file.
 //
-// Play: $ { AudioSong: {file: "docs/audio.flecs"} } and $ { Transport: {playing: true} },
+// Play: $ { SongFile: {file: "docs/audio.flecs"} } and $ { Transport: {playing: true} },
 // or the shell commands `audio.song docs/audio.flecs` and `audio.play`.
 //
 // Flecs script
@@ -19,7 +19,7 @@
 //   Prefix every entity with a tag of the song (demo_) so names never collide with the host.
 //   Only set components on entities the song creates. The exceptions: master (box.audio.master)
 //   may be named as an output, and box.audio.Song may get an Rgb.
-//   Never write Transport or AudioSettings. The Song singleton, set last, sets tempo and length.
+//   Never write Transport or Settings. The Song singleton, set last, sets tempo and length.
 //   Every song starts at beat 0 and loops over 0..Song.beats.
 //
 // Units: beats are quarter notes; pitch is a MIDI note (69 = A4 = 440 Hz, fractions allowed);
@@ -39,10 +39,10 @@ const demo_bar = 4
 box { audio { Song { Rgb: {90, 200, 255} } } }
 
 // Mixer. Signal flow per bus: inserts in order, width, pre-fader sends, volume/pan/mute,
-// output, post-fader sends. kind: AudioChannelGroup | AudioChannelReturn | AudioChannelSfx.
+// output, post-fader sends. kind: ChannelGroup | ChannelReturn | ChannelSfx.
 
 demo_lift {
-  AudioFilter: {
+  Filter: {
     kind: SynthHighPass,   // SynthLowPass | SynthHighPass | SynthBandPass | SynthNotch
     cutoff: 20,
     resonance: 0.2,
@@ -75,22 +75,22 @@ demo_drop {
 }
 
 demo_mix {
-  AudioBus: {
+  Bus: {
     output: master,
     volume: 0.75,          // 0..4
     pan: 0,                // -1..1
     width: 1,              // 0 mono, 1 as is, 2 extra wide
     mute: false,
     solo: false,
-    kind: AudioChannelGroup,
+    kind: ChannelGroup,
     sends: [],
     effects: [demo_lift, demo_glue, demo_drop]
   }
-  AudioMeter: {}
+  Meter: {}
 }
 
 demo_hall {
-  AudioBus: {output: demo_mix, kind: AudioChannelReturn, effects: [demo_hall]}
+  Bus: {output: demo_mix, kind: ChannelReturn, effects: [demo_hall]}
   Reverb: {
     decay: 3.2,
     damping: 0.45,
@@ -104,15 +104,15 @@ demo_hall {
 
 demo_echo_eq {
   Equalizer: {bands: [
-    {kind: AudioEqLowCut, frequency: 250, gain: 0, q: 0.7071},
-    {kind: AudioEqPeak, frequency: 900, gain: -2, q: 1},
-    {kind: AudioEqHighShelf, frequency: 6000, gain: -4, q: 0.7071},
-    {kind: AudioEqOff, frequency: 8000, gain: 0, q: 0.7071}
+    {kind: EqLowCut, frequency: 250, gain: 0, q: 0.7071},
+    {kind: EqPeak, frequency: 900, gain: -2, q: 1},
+    {kind: EqHighShelf, frequency: 6000, gain: -4, q: 0.7071},
+    {kind: EqOff, frequency: 8000, gain: 0, q: 0.7071}
   ]}
 }
 
 demo_echo {
-  AudioBus: {output: demo_mix, kind: AudioChannelReturn, effects: [demo_echo, demo_echo_eq]}
+  Bus: {output: demo_mix, kind: ChannelReturn, effects: [demo_echo, demo_echo_eq]}
   Delay: {
     time: 0.25,
     sync: 0.75,            // beats, > 0 wins over time
@@ -153,19 +153,19 @@ demo_stutter {
 }
 
 demo_drums {
-  AudioBus: {output: demo_mix, volume: 0.6, effects: [demo_punch, demo_crunch, demo_stutter],
+  Bus: {output: demo_mix, volume: 0.6, effects: [demo_punch, demo_crunch, demo_stutter],
     sends: [{bus: demo_hall, level: 0.08, pre_fader: false}]}
-  AudioMeter: {}
+  Meter: {}
 }
 
-// Sounds. A sound is an entity with SynthSound, SoundFile or AudioPcm. A synth sound is a root
+// Sounds. A sound is an entity with SynthSound, SoundFile or Pcm. A synth sound is a root
 // plus children; the root and every child with a SynthOscillator is a layer. Envelopes, LFOs and
 // routes on the root apply to all layers; on a layer to that layer.
 
 demo_kick_file { SoundFile: {path: "test/assets/audio/kick.wav"} }
 
 demo_tick_pcm {
-  AudioPcm: {samples: [0.6, -0.6, 0.5, -0.5, 0.4, -0.4, 0.3, -0.3, 0.2, -0.2, 0.1, -0.1, 0],
+  Pcm: {samples: [0.6, -0.6, 0.5, -0.5, 0.4, -0.4, 0.3, -0.3, 0.2, -0.2, 0.1, -0.1, 0],
     channels: 1, sample_rate: 8000}
 }
 
@@ -570,18 +570,18 @@ prefab demo_comb_line {
   ]}
 }
 
-prefab demo_impact { AudioClip: {sound: demo_kick_file, offset: 0, length: 4} }  // offset in seconds
-prefab demo_tick { AudioClip: {sound: demo_tick_pcm, length: 1} }
+prefab demo_impact { Clip: {sound: demo_kick_file, offset: 0, length: 4} }  // offset in seconds
+prefab demo_tick { Clip: {sound: demo_tick_pcm, length: 1} }
 
-// Tracks. A Track is a mixer channel (it brings an AudioBus) that plays its ClipPlacement
+// Tracks. A Track is a mixer channel (it brings a Bus) that plays its ClipPlacement
 // children on its instrument. A track needs no instrument for audio and automation clips.
 // ClipPlacement: start, duration (0 = clip length), loop repeats the clip until duration ends,
 // offset in beats into the clip, gain, transpose in semitones.
 
 demo_kick {
   Track: {instrument: demo_kick_inst}
-  AudioBus: {output: demo_drums}
-  AudioMeter: {}
+  Bus: {output: demo_drums}
+  Meter: {}
   groove { ClipPlacement: {clip: demo_kick_four, start: 16, duration: 44, loop: true} }
 }
 
@@ -597,8 +597,8 @@ demo_snare_gate {
 
 demo_snare {
   Track: {instrument: demo_snare_inst}
-  AudioBus: {output: demo_drums, effects: [demo_snare_gate], sends: [{bus: demo_hall, level: 0.15}]}
-  AudioMeter: {}
+  Bus: {output: demo_drums, effects: [demo_snare_gate], sends: [{bus: demo_hall, level: 0.15}]}
+  Meter: {}
   groove { ClipPlacement: {clip: demo_snare_back, start: 16, duration: 44, loop: true} }
 }
 
@@ -610,40 +610,40 @@ demo_hats {
     swing_grid: TrackSwing8,  // TrackSwing8 | TrackSwing16
     humanize: {timing: 6, velocity: 0.1}  // ms, share
   }
-  AudioBus: {output: demo_drums, pan: 0.15, sends: [{bus: demo_echo, level: 0.15}]}
-  AudioMeter: {}
+  Bus: {output: demo_drums, pan: 0.15, sends: [{bus: demo_echo, level: 0.15}]}
+  Meter: {}
   groove { ClipPlacement: {clip: demo_hat_eighths, start: 16, duration: 44, loop: true} }
 }
 
 demo_samples {
   Track: {instrument: demo_sampler_inst}
-  AudioBus: {output: demo_drums, volume: 0.7}
-  AudioMeter: {}
+  Bus: {output: demo_drums, volume: 0.7}
+  Meter: {}
   ticks { ClipPlacement: {clip: demo_tick, start: 0, duration: 16, loop: true, gain: 0.3} }
   ghosts { ClipPlacement: {clip: demo_ghosts, start: 16, duration: 44, loop: true} }
   drop_in { ClipPlacement: {clip: demo_impact, start: 16, gain: 0.8, transpose: -5} }
   build_in { ClipPlacement: {clip: demo_impact, start: 48, gain: 0.6} }
 }
 
-demo_bass_filter { AudioFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.3} }
+demo_bass_filter { Filter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.3} }
 demo_duck {
   Compressor: {threshold: -30, ratio: 6, attack: 0.003, release: 0.15, sidechain: demo_kick}
-  AudioMeter: {}           // on an effect: reduction is the gain reduction in dB
+  Meter: {}           // on an effect: reduction is the gain reduction in dB
 }
 
 demo_bass {
   Track: {instrument: demo_bass_inst, humanize: {timing: 3, velocity: 0.05}}
-  AudioBus: {output: demo_mix, volume: 0.85, effects: [demo_bass_filter, demo_duck]}
-  AudioMeter: {}
+  Bus: {output: demo_mix, volume: 0.85, effects: [demo_bass_filter, demo_duck]}
+  Meter: {}
   line { ClipPlacement: {clip: demo_bass_line, start: 16, duration: 44, loop: true} }
 }
 
 demo_lead_eq {
   Equalizer: {bands: [
-    {kind: AudioEqLowCut, frequency: 180},
-    {kind: AudioEqPeak, frequency: 2500, gain: 2, q: 1.2},
-    {kind: AudioEqHighCut, frequency: 14000},
-    {kind: AudioEqHighShelf, frequency: 8000, gain: 0}  // AudioEqOff | AudioEqPeak | AudioEqLowShelf | AudioEqHighShelf | AudioEqLowCut | AudioEqHighCut
+    {kind: EqLowCut, frequency: 180},
+    {kind: EqPeak, frequency: 2500, gain: 2, q: 1.2},
+    {kind: EqHighCut, frequency: 14000},
+    {kind: EqHighShelf, frequency: 8000, gain: 0}  // EqOff | EqPeak | EqLowShelf | EqHighShelf | EqLowCut | EqHighCut
   ]}
 }
 
@@ -672,9 +672,9 @@ demo_lead_chorus {
 
 demo_lead {
   Track: {instrument: demo_lead_inst}
-  AudioBus: {output: demo_mix, volume: 0.75, effects: [demo_lead_eq, demo_lead_shift, demo_lead_chorus],
+  Bus: {output: demo_mix, volume: 0.75, effects: [demo_lead_eq, demo_lead_shift, demo_lead_chorus],
     sends: [{bus: demo_hall, level: 0.2}, {bus: demo_echo, level: 0.25}]}
-  AudioMeter: {}
+  Meter: {}
   melody { ClipPlacement: {clip: demo_melody, start: 32, duration: 32, loop: true} }
 }
 
@@ -692,9 +692,9 @@ demo_arp_phaser {
 
 demo_arp {
   Track: {instrument: demo_arp_inst, swing: 0.1, swing_grid: TrackSwing16}
-  AudioBus: {output: demo_mix, volume: 0.55, width: 1.4, effects: [demo_arp_phaser],
+  Bus: {output: demo_mix, volume: 0.55, width: 1.4, effects: [demo_arp_phaser],
     sends: [{bus: demo_echo, level: 0.3}]}
-  AudioMeter: {}
+  Meter: {}
   am { ClipPlacement: {clip: demo_arp_line, start: 4 * demo_bar} }
   f { ClipPlacement: {clip: demo_arp_line, start: 5 * demo_bar, transpose: -4} }
   c { ClipPlacement: {clip: demo_arp_line, start: 6 * demo_bar, transpose: 3} }
@@ -721,8 +721,8 @@ demo_pad_gate {
 
 demo_pad {
   Track: {instrument: demo_pad_inst}
-  AudioBus: {output: demo_mix, volume: 0.9, effects: [demo_pad_gate], sends: [{bus: demo_hall, level: 0.3}]}
-  AudioMeter: {}
+  Bus: {output: demo_mix, volume: 0.9, effects: [demo_pad_gate], sends: [{bus: demo_hall, level: 0.3}]}
+  Meter: {}
   chords { ClipPlacement: {clip: demo_chords, start: 0, duration: 64, loop: true} }
 }
 
@@ -743,8 +743,8 @@ demo_choir_vocoder {
 
 demo_choir {
   Track: {instrument: demo_choir_inst, humanize: {timing: 12, velocity: 0.05}}
-  AudioBus: {output: demo_mix, volume: 0.7, effects: [demo_choir_vocoder], sends: [{bus: demo_hall, level: 0.4}]}
-  AudioMeter: {}
+  Bus: {output: demo_mix, volume: 0.7, effects: [demo_choir_vocoder], sends: [{bus: demo_hall, level: 0.4}]}
+  Meter: {}
   chords { ClipPlacement: {clip: demo_choir_chords, start: 16, duration: 32, loop: true} }
 }
 
@@ -765,8 +765,8 @@ demo_rotary {
 
 demo_organ {
   Track: {instrument: demo_organ_inst}
-  AudioBus: {output: demo_mix, volume: 0.5, effects: [demo_rotary], sends: [{bus: demo_hall, level: 0.15}]}
-  AudioMeter: {}
+  Bus: {output: demo_mix, volume: 0.5, effects: [demo_rotary], sends: [{bus: demo_hall, level: 0.15}]}
+  Meter: {}
   chords { ClipPlacement: {clip: demo_chords, start: 32, duration: 32, loop: true, transpose: -12, gain: 0.7} }
 }
 
@@ -782,42 +782,42 @@ demo_bell_shift {
 
 demo_bells {
   Track: {instrument: demo_bell_inst}
-  AudioBus: {output: demo_mix, volume: 0.6, effects: [demo_bell_shift],
+  Bus: {output: demo_mix, volume: 0.6, effects: [demo_bell_shift],
     sends: [{bus: demo_hall, level: 0.4}, {bus: demo_echo, level: 0.2, pre_fader: true}]}
-  AudioMeter: {}
+  Meter: {}
   intro { ClipPlacement: {clip: demo_bells_line, start: 0} }
   answer { ClipPlacement: {clip: demo_bells_line, start: 32, offset: 8, duration: 8} }
 }
 
-demo_pluck_wah { AudioFilter: {kind: SynthBandPass, cutoff: 500, resonance: 0.5, mix: 0.7} }
+demo_pluck_wah { Filter: {kind: SynthBandPass, cutoff: 500, resonance: 0.5, mix: 0.7} }
 
 demo_plucks {
   Track: {instrument: demo_pluck_inst, humanize: {timing: 5, velocity: 0.15}}
-  AudioBus: {output: demo_mix, volume: 0.6, effects: [demo_pluck_wah], sends: [{bus: demo_echo, level: 0.2}]}
-  AudioMeter: {}
+  Bus: {output: demo_mix, volume: 0.6, effects: [demo_pluck_wah], sends: [{bus: demo_echo, level: 0.2}]}
+  Meter: {}
   line { ClipPlacement: {clip: demo_pluck_line, start: 16, duration: 32, loop: true} }
 }
 
 demo_combs {
   Track: {instrument: demo_comb_inst}
-  AudioBus: {output: demo_mix, volume: 0.5, sends: [{bus: demo_hall, level: 0.35}]}
-  AudioMeter: {}
+  Bus: {output: demo_mix, volume: 0.5, sends: [{bus: demo_hall, level: 0.35}]}
+  Meter: {}
   line { ClipPlacement: {clip: demo_comb_line, start: 16, duration: 32, loop: true} }
 }
 
 // Modulators add to a float member of a bus, an effect or a macro, without writing the component.
 // member is a path: "volume", "pan", "width", "sends[0].level", "cutoff", "bands[2].gain", "value".
-// source: AudioModLfo | AudioModSteps | AudioModFollower; scale: AudioModLinear | AudioModOctaves.
+// source: ModLfo | ModSteps | ModFollower; scale: ModLinear | ModOctaves.
 
 demo_wobble {
-  AudioModulator: {
+  Modulator: {
     target: demo_bass_filter,
-    component: AudioFilter,
+    component: Filter,
     member: "cutoff",
-    source: AudioModLfo,
+    source: ModLfo,
     depth: 1,              // either way, member units or octaves
-    scale: AudioModOctaves,
-    wave: AudioModSine,    // AudioModSine | AudioModTriangle | AudioModSquare | AudioModSawUp | AudioModSawDown | AudioModRandom
+    scale: ModOctaves,
+    wave: ModSine,    // ModSine | ModTriangle | ModSquare | ModSawUp | ModSawDown | ModRandom
     rate: 1,
     sync: 0.5,             // beats per cycle (or per step), > 0 wins over rate
     phase: 0,
@@ -825,44 +825,44 @@ demo_wobble {
   }
 }
 
-demo_autopan { AudioModulator: {target: demo_organ, component: AudioBus, member: "pan", wave: AudioModTriangle,
+demo_autopan { Modulator: {target: demo_organ, component: Bus, member: "pan", wave: ModTriangle,
   depth: 0.5, sync: 8} }
 
 demo_hat_steps {
-  AudioModulator: {target: demo_hats, component: AudioBus, member: "sends[0].level", source: AudioModSteps,
+  Modulator: {target: demo_hats, component: Bus, member: "sends[0].level", source: ModSteps,
     depth: 0.3, sync: 0.5, steps: [1, -1, 0, -1, 1, -1, 0.5, -1, 0, 0, 0, 0, 0, 0, 0, 0], step_count: 8,
     smooth: 0.2}
 }
 
 demo_wah {
-  AudioModulator: {target: demo_pluck_wah, component: AudioFilter, member: "cutoff", source: AudioModFollower,
-    scale: AudioModOctaves, depth: 2,
+  Modulator: {target: demo_pluck_wah, component: Filter, member: "cutoff", source: ModFollower,
+    scale: ModOctaves, depth: 2,
     key: 0,                // bus to follow, 0 = the bus holding the target
     attack: 0.005, release: 0.15}
 }
 
-// A macro is one 0..1 value that drives several members through its AudioMacroMap children.
+// A macro is one 0..1 value that drives several members through its MacroMap children.
 // While a map runs it replaces the member's value; curve: -1 log .. 0 linear .. 1 exponential.
 
 demo_build {
-  AudioMacro: {value: 0}
-  lift { AudioMacroMap: {target: demo_lift, component: AudioFilter, member: "cutoff", min: 20, max: 700,
-    curve: 0, scale: AudioModOctaves} }
-  wash { AudioMacroMap: {target: demo_lead, component: AudioBus, member: "sends[0].level", min: 0.2, max: 0.7} }
-  heat { AudioMacroMap: {target: demo_crunch, component: Saturator, member: "drive", min: 0.2, max: 0.7,
+  Macro: {value: 0}
+  lift { MacroMap: {target: demo_lift, component: Filter, member: "cutoff", min: 20, max: 700,
+    curve: 0, scale: ModOctaves} }
+  wash { MacroMap: {target: demo_lead, component: Bus, member: "sends[0].level", min: 0.2, max: 0.7} }
+  heat { MacroMap: {target: demo_crunch, component: Saturator, member: "drive", min: 0.2, max: 0.7,
     curve: 0.5} }
-  climb { AudioMacroMap: {target: demo_echo, component: Delay, member: "feedback", min: 0.4, max: 0.65,
+  climb { MacroMap: {target: demo_echo, component: Delay, member: "feedback", min: 0.4, max: 0.65,
     curve: -0.5} }
 }
 
-demo_build_pulse { AudioModulator: {target: demo_build, component: AudioMacro, member: "value",
-  wave: AudioModSquare, unipolar: true, depth: 0.05, sync: 0.5} }
+demo_build_pulse { Modulator: {target: demo_build, component: Macro, member: "value",
+  wave: ModSquare, unipolar: true, depth: 0.05, sync: 0.5} }
 
 // Automation clips play a Curve over beats into one float member, placed like any clip.
 // Outside a placement, and while stopped, the member has its component value again.
 
 prefab demo_pad_fade {
-  AutomationClip: {target: demo_pad, component: AudioBus, member: "volume", length: 16,
+  AutomationClip: {target: demo_pad, component: Bus, member: "volume", length: 16,
     curve: {keys: [{0, 0.2}, {16, 0.9}]}}
 }
 
@@ -877,7 +877,7 @@ prefab demo_fill {
 }
 
 prefab demo_rise {
-  AutomationClip: {target: demo_build, component: AudioMacro, member: "value", length: 12,
+  AutomationClip: {target: demo_build, component: Macro, member: "value", length: 12,
     curve: {kind: CurveCatmullRom, keys: [{0, 0}, {6, 0.35}, {12, 1}]}}
 }
 
@@ -893,7 +893,7 @@ prefab demo_stop {
 
 demo_lanes {
   Track: {}
-  AudioBus: {output: demo_mix}
+  Bus: {output: demo_mix}
   pad_fade { ClipPlacement: {clip: demo_pad_fade, start: 0} }
   air { ClipPlacement: {clip: demo_lead_air, start: 32} }
   fill { ClipPlacement: {clip: demo_fill, start: 44} }
@@ -903,20 +903,20 @@ demo_lanes {
 }
 
 // Scene features. Prefabs never play, so these are inert here; in a scene, put them on entities.
-// AudioSource plays a sound on an entity, AudioSpatial places it relative to the AudioListener,
-// AudioEmitter plays a sound at random times and places, AudioStream streams one Ogg Vorbis file.
+// Source plays a sound on an entity, Spatial places it relative to the Listener,
+// Emitter plays a sound at random times and places, Stream streams one Ogg Vorbis file.
 
 prefab demo_engine {
-  AudioSource: {sound: demo_organ_sound, volume: 0.5, pitch: 1, loop: true, playing: true}
-  AudioOutput: {bus: demo_organ}
-  AudioSpatial: {min_distance: 2, max_distance: 40, rolloff: 1, cutoff: 800}
+  Source: {sound: demo_organ_sound, volume: 0.5, pitch: 1, loop: true, playing: true}
+  Output: {bus: demo_organ}
+  Spatial: {min_distance: 2, max_distance: 40, rolloff: 1, cutoff: 800}
 }
 
 prefab demo_crickets {
-  AudioEmitter: {
+  Emitter: {
     sound: demo_pluck_sound,
     interval_min: 0.5, interval_max: 3,
-    shape: AudioEmitterSphere,  // AudioEmitterPoint | AudioEmitterDisc | AudioEmitterSphere | AudioEmitterHemisphere | AudioEmitterBox (extents)
+    shape: EmitterSphere,  // EmitterPoint | EmitterDisc | EmitterSphere | EmitterHemisphere | EmitterBox (extents)
     radius: 8,
     volume_min: 0.3, volume_max: 0.8,
     pitch_min: 0.9, pitch_max: 1.2,
@@ -926,22 +926,22 @@ prefab demo_crickets {
   }
 }
 
-prefab demo_music { AudioStream: {path: "test/assets/audio/tone.ogg", volume: 1, loop: true, playing: true} }
+prefab demo_music { Stream: {path: "test/assets/audio/tone.ogg", volume: 1, loop: true, playing: true} }
 
-prefab demo_ears { AudioListener }
+prefab demo_ears { Listener }
 
 // Scene and game code only, never in a song file:
 //   $ { Transport: {tempo: 120, beats_per_bar: 4, beat_unit: 4, position: 0, playing: true, loop: false,
 //       loop_start: 0, loop_end: 0, lookahead: 0.15, metronome: false} }
-//   $ { AudioSettings: {master_volume: 1, mute: false} }
-//   $ { AudioSong: {file: "docs/audio.flecs"} }
-//   box { audio { master { AudioBus: {width: 0.9}; AudioMeter: {} } } }
+//   $ { Settings: {master_volume: 1, mute: false} }
+//   $ { SongFile: {file: "docs/audio.flecs"} }
+//   box { audio { master { Bus: {width: 0.9}; Meter: {} } } }
 //   box.audio.play(sound, volume)
 //   box.audio.play_at(sound, {x, y, z}, volume)
 //   box.audio.play_quantized(sound, volume, Bar)   // None | Beat | Bar
 //   box.audio.play_note(instrument, pitch, velocity, duration_in_beats)
 //   box.audio.capture(seconds, "out.wav")
-// Written by the engine: SoundStatus, AudioStatus, AudioStreamStatus, AudioSongStatus, AudioMeter.
+// Written by the engine: SoundStatus, Status, StreamStatus, SongStatus, Meter.
 
 $ {
   Song: {

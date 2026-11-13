@@ -254,17 +254,17 @@ async function main() {
         return { raw: out };
       }
     };
-    const audioState = async () => (await component('$', 'AudioStatus')).state;
-    const streamOf = () => component('loops.music_track', 'AudioStreamStatus');
+    const audioState = async () => (await component('$', 'Status')).state;
+    const streamOf = () => component('loops.music_track', 'StreamStatus');
     const openStream = (stats) => (stats.streams || []).find((s) => s && s.open);
 
     // Before the gesture: the page waits, and the scene plays its timeline silently
     await sleep(1500);
     const quiet = await evaluate(frameTimes(0));
     const waiting = await audioState();
-    console.log(`before the gesture: AudioStatus.state ${waiting}, frames ${quiet.frames}, ` +
+    console.log(`before the gesture: Status.state ${waiting}, frames ${quiet.frames}, ` +
       `longest ${quiet.work.toFixed(2)} ms, mean ${quiet.mean.toFixed(2)} ms`);
-    expect(waiting === 'AudioWaitingForGesture', 'AudioStatus does not wait for a gesture');
+    expect(waiting === 'WaitingForGesture', 'Status does not wait for a gesture');
 
     for (const type of ['mousePressed', 'mouseReleased']) {
       await send('Input.dispatchMouseEvent',
@@ -274,10 +274,10 @@ async function main() {
     expect(await waitFor('Module.boxAudio.ctx.state === "running"', 5000),
       'the gesture did not start the audio');
     const runningBy = Date.now() + 3000;
-    while (Date.now() < runningBy && await audioState() !== 'AudioRunning') await sleep(100);
-    expect(await audioState() === 'AudioRunning', 'AudioStatus is not AudioRunning');
-    expect(await waitFor(`${shell('get loops.music_track box.audio.AudioStreamStatus')}` +
-      `.includes('AudioStreamPlaying')`, 5000), 'the music does not play');
+    while (Date.now() < runningBy && await audioState() !== 'Running') await sleep(100);
+    expect(await audioState() === 'Running', 'Status is not Running');
+    expect(await waitFor(`${shell('get loops.music_track box.audio.StreamStatus')}` +
+      `.includes('StreamPlaying')`, 5000), 'the music does not play');
     await sleep(1000);
 
     // Both channels carry a level: the engine on the left, the music, the clicks and the chime
@@ -321,9 +321,9 @@ async function main() {
     const suspended = await waitFor('Module.boxAudio.ctx.state === "suspended"', 3000);
     const hiddenState = await audioState();
     console.log(`hidden: context ${await evaluate('Module.boxAudio.ctx.state')}, ` +
-      `AudioStatus.state ${hiddenState}`);
+      `Status.state ${hiddenState}`);
     expect(suspended, 'the hidden page did not suspend its audio');
-    expect(hiddenState === 'AudioSuspended', 'AudioStatus is not AudioSuspended when hidden');
+    expect(hiddenState === 'Suspended', 'Status is not Suspended when hidden');
     await evaluate(visibility('visible'));
     const resumed = await waitFor('Module.boxAudio.ctx.state === "running"', 3000);
     await sleep(800);

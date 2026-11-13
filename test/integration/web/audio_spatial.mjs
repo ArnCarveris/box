@@ -7,7 +7,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const USAGE = `Checks spatial audio in headless Chrome with test/integration/web/audio_spatial.flecs:
-a looping 440 Hz tone at a peak of 0.25 on an AudioSpatial source, heard from an AudioListener
+a looping 440 Hz tone at a peak of 0.25 on a Spatial source, heard from a Listener
 at the origin.
 
   node test/integration/web/audio_spatial.mjs [--chrome <path>] <bin dir>
@@ -191,9 +191,9 @@ async function main() {
     const expect = (ok, what) => { if (!ok) failures.push(what); };
     // The shell gets whole components, the member is taken here: a JSON string as get prints it
     const audioStatus = async (member) => {
-      const out = await evaluate(shell('get $ box.audio.AudioStatus'));
+      const out = await evaluate(shell('get $ box.audio.Status'));
       try {
-        return JSON.stringify(JSON.parse(out).AudioStatus[member]);
+        return JSON.stringify(JSON.parse(out).Status[member]);
       } catch {
         return out;
       }
@@ -211,11 +211,11 @@ async function main() {
     const running = await waitFor('Module.boxAudio.ctx.state === "running"', 5000);
     expect(running, 'the gesture did not start the audio');
     const runningBy = Date.now() + 3000;
-    while (Date.now() < runningBy && await audioStatus('state') !== '"AudioRunning"') {
+    while (Date.now() < runningBy && await audioStatus('state') !== '"Running"') {
       await sleep(100);
     }
-    expect(await audioStatus('state') === '"AudioRunning"',
-      'AudioStatus is not AudioRunning after the gesture');
+    expect(await audioStatus('state') === '"Running"',
+      'Status is not Running after the gesture');
 
     // The RMS of a sine of peak LEVEL, centered, in each channel
     const center = LEVEL / Math.SQRT2;

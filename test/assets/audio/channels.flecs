@@ -1,19 +1,19 @@
 // Mixer channels set by a scene, for the Mixer suite of test/cpu/audio: the tracks lead and pad
 // in the group band, the return hall that both reach through a send, pre-fader for pad, the SFX
-// bus sfx, and an AudioBus on the master for its volume and width. lead is soloed, so pad and
+// bus sfx, and a Bus on the master for its volume and width. lead is soloed, so pad and
 // its pre-fader send are silent while band, hall and sfx play.
 using box.audio
 
-box { audio { master { AudioBus: {volume: 0.8, width: 0.5} } } }
+box { audio { master { Bus: {volume: 0.8, width: 0.5} } } }
 
-hall { AudioBus: {output: master, kind: AudioChannelReturn} }
-sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
-band { AudioBus: {output: master, volume: 0.5} }
+hall { Bus: {output: master, kind: ChannelReturn} }
+sfx { Bus: {output: master, kind: ChannelSfx} }
+band { Bus: {output: master, volume: 0.5} }
 
 lead {
-  AudioBus: {output: band, solo: true, width: 0, sends: [{bus: hall, level: 0.25}]}
+  Bus: {output: band, solo: true, width: 0, sends: [{bus: hall, level: 0.25}]}
 }
 
 pad {
-  AudioBus: {output: band, pan: -0.5, sends: [{bus: hall, level: 0.5, pre_fader: true}]}
+  Bus: {output: band, pan: -0.5, sends: [{bus: hall, level: 0.5, pre_fader: true}]}
 }

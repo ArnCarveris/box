@@ -667,7 +667,7 @@ void SongFile_foreign(void) {
     ecs_world_t *world = audio_world();
     ecs_entity_t host = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "host_scene" }),
-        .code = "using box.audio\nhost_room { AudioBus: {volume: 0.9} }\n"
+        .code = "using box.audio\nhost_room { Bus: {volume: 0.9} }\n"
     });
     test_assert(host != 0);
     ecs_entity_t room = ecs_lookup(world, "host_room");
@@ -700,7 +700,7 @@ void SongFile_external_reload(void) {
     test_assert(script != 0);
     test_int(ecs_script_update(world, script, 0,
         "using box.audio\n"
-        "edited_bus { AudioBus: {} }\n"
+        "edited_bus { Bus: {} }\n"
         "$ { Song: {title: \"Edited\", tempo: 90, beats: 8, "
             "lanes: [{name: \"Solo\", bus: edited_bus}]} }\n"), 0);
     songfile_settle(world);
@@ -739,7 +739,7 @@ static void songfile_write(
         "using box.audio\n"
         "using box.material\n"
         "box { audio { Song { Rgb: {10, 20, 30} } } }\n"
-        "%s { AudioBus: {}; AudioMeter: {} }\n"
+        "%s { Bus: {}; Meter: {} }\n"
         "$ { Song: {title: \"%s\", tempo: 100, beats: 8, lanes: [{name: \"Main\", bus: %s}]} }\n",
         name, name, name);
     fclose(f);

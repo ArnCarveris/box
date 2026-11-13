@@ -21,7 +21,7 @@ extern "C" {
 
 /** A filter, an effect in an insert slot of an AudioBus, as a Reverb is: the state variable
  * filter of SynthFilter on the signal of a bus, for a sweep, a muffled bus or a telephone voice.
- * music { AudioBus: {effects: [music]}; AudioFilter: {cutoff: 400, resonance: 0.3} }.
+ * music { Bus: {effects: [music]}; Filter: {cutoff: 400, resonance: 0.3} }.
  *
  * The cutoff and the resonance move toward a new value over about 10 ms, so a sweep driven from
  * a script every frame is smooth; the mix and the drive move over 20 ms. A change of the kind or
@@ -45,7 +45,7 @@ ECS_STRUCT(AudioFilter, {
  * a soft knee. An AudioMeter on its entity reads its gain reduction.
  *
  * With a sidechain it keys on the output of that channel instead of its own input, to duck one
- * channel under another: music { AudioBus: {effects: [music]};
+ * channel under another: music { Bus: {effects: [music]};
  * Compressor: {threshold: -30, ratio: 8, sidechain: sfx} }.
  *
  * The sidechain runs first; one that would form a cycle logs one error, and the compressor keys
@@ -69,7 +69,7 @@ ECS_STRUCT(Compressor, {
  * of the louder channel reaches its threshold, stays open while the level is above the threshold
  * less 4 dB and for its hold after, and then closes to its range.
  *
- * drums { AudioBus: {effects: [drums]}; Gate: {threshold: -40, hold: 0.02} }.
+ * drums { Bus: {effects: [drums]}; Gate: {threshold: -40, hold: 0.02} }.
  * An AudioMeter on its entity reads its gain reduction.
  */
 ECS_STRUCT(Gate, {
@@ -88,7 +88,7 @@ ECS_STRUCT(Gate, {
  * every time seconds, each feedback times the last and darkened by a lowpass at damping Hz.
  *
  * With sync it follows the tempo of the Transport, for a dotted eighth on a return:
- * echo { AudioBus: {kind: AudioChannelReturn, effects: [echo]};
+ * echo { Bus: {kind: ChannelReturn, effects: [echo]};
  * Delay: {sync: 0.75, feedback: 0.4, mix: 1} }.
  *
  * Every delay has its own memory of BOX_AUDIO_DELAY_MAX seconds. A change of the time crossfades
@@ -112,7 +112,7 @@ ECS_STRUCT(Delay, {
 
 /** A phaser, an effect in an insert slot of an AudioBus, as a Reverb is: a chain of first order
  * allpasses swept around a center by a sine LFO, mixed with the dry signal:
- * keys { AudioBus: {effects: [keys]}; Phaser: {stages: 6, rate: 0.3, feedback: 0.5} }.
+ * keys { Bus: {effects: [keys]}; Phaser: {stages: 6, rate: 0.3, feedback: 0.5} }.
  *
  * The LFO runs on through a change of the rate without a jump; the right channel runs it stereo
  * half turns later. Depth, center, feedback, mix and stereo move over 20 ms; a change of the
@@ -139,11 +139,11 @@ ECS_STRUCT(Phaser, {
 
 /** A chorus, an effect in an insert slot of an AudioBus, as a Reverb is: up to 4 taps of a delay
  * line that sine LFOs move around delay by depth, panned across the stereo field by spread:
- * pad { AudioBus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.
+ * pad { Bus: {effects: [pad]}; Chorus: {voices: 3, spread: 1, mix: 0.4} }.
  *
  * With feedback it is a flanger: the first tap of each channel goes back into its line, so a
  * short delay resonates at multiples of 1000 / delay Hz, and a negative feedback sounds hollow:
- * drums { AudioBus: {effects: [drums]}; Chorus: {voices: 1, delay: 2, feedback: 0.7} }.
+ * drums { Bus: {effects: [drums]}; Chorus: {voices: 1, delay: 2, feedback: 0.7} }.
  *
  * Every chorus has its own memory of BOX_AUDIO_CHORUS_MAX milliseconds. Depth, delay, mix, spread
  * and feedback move over 20 ms; a change of the voices fades the wet signal out and back in.
@@ -185,7 +185,7 @@ ECS_ENUM(SaturatorMode, {
  * compensated so that the drive mostly changes the tone and not the loudness.
  *
  * low_cut and tone shape what distorts before the clipper; high_cut, bits and rate shape the
- * output: drums { AudioBus: {effects: [drums]}; Saturator: {drive: 0.6, asymmetry: 0.2} }.
+ * output: drums { Bus: {effects: [drums]}; Saturator: {drive: 0.6, asymmetry: 0.2} }.
  * Lo-fi drums: {drive: 0.4, bits: 8, rate: 8000, high_cut: 6000}.
  *
  * The oversampling delays the channel, its dry signal too, by 15 frames (23 in SaturatorFold).
@@ -215,7 +215,7 @@ ECS_STRUCT(Saturator, {
 
 /** A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or
  * less punch and tail on drums and plucks, without a threshold, at most 12 dB either way:
- * drums { AudioBus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.
+ * drums { Bus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.
  *
  * Stereo linked as a Compressor, it compares a fast envelope (1 ms up, 20 ms down) of the
  * louder channel with a slow one (20 ms up, 200 ms down) in dB. 0 and 0 pass the signal
@@ -230,7 +230,7 @@ ECS_STRUCT(TransientShaper, {
 
 /** A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of its
  * modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own
- * channel: pad { AudioBus: {effects: [pad]}; Vocoder: {modulator: drums, bands: 16} }.
+ * channel: pad { Bus: {effects: [pad]}; Vocoder: {modulator: drums, bands: 16} }.
  *
  * Both run through bands log spaced bandpasses; an envelope follower on each modulator band
  * scales the carrier band of the same index. Shift moves the carrier bands against the modulator
@@ -269,7 +269,7 @@ ECS_ENUM(FrequencyShifterMode, {
 
 /** A frequency shifter, an effect in an insert slot of an AudioBus, as a Reverb is: every
  * partial moves by the same number of Hz, so harmonic sounds turn inharmonic. The ring mode is a
- * ring modulator: pad { AudioBus: {effects: [pad]}; FrequencyShifter: {shift: 2, stereo: 1} }.
+ * ring modulator: pad { Bus: {effects: [pad]}; FrequencyShifter: {shift: 2, stereo: 1} }.
  *
  * It shifts the analytic signal of an allpass Hilbert transformer, so a shift of 0 at a mix of 1
  * changes the phase only. The feedback runs through a DC blocker and a soft limit.
@@ -294,7 +294,7 @@ ECS_STRUCT(FrequencyShifter, {
 
 /** A pitch shifter, an effect in an insert slot of an AudioBus, as a Reverb is: thickens a lead
  * by a few cents, adds octaves and makes harmonies without changing the speed of what plays:
- * lead { AudioBus: {effects: [lead]}; PitchShifter: {cents: 8, stereo: 1, window: 30} }.
+ * lead { Bus: {effects: [lead]}; PitchShifter: {cents: 8, stereo: 1, window: 30} }.
  *
  * Each channel is a delay line read by two crossfaded taps that slide through the window; shorter
  * windows suit percussive material, longer ones pads. Feedback shifts the signal again on each
@@ -316,7 +316,7 @@ ECS_STRUCT(PitchShifter, {
 });
 
 /** A pattern gate, an effect in an insert slot of an AudioBus, as a Reverb is: a tempo-synced
- * level pattern that chops a sustained sound into rhythm: pad { AudioBus: {effects: [pad]};
+ * level pattern that chops a sustained sound into rhythm: pad { Bus: {effects: [pad]};
  * PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1], length: 8, release: 0.05} }.
  *
  * The pattern is locked to the beat of the Transport, at 120 bpm without one that plays. A step
@@ -348,7 +348,7 @@ ECS_STRUCT(PatternGate, {
 
 /** A rotary, an effect in an insert slot of an AudioBus, as a Reverb is: a rotating speaker
  * cabinet with a tube preamp, a drum below 800 Hz and a horn above, heard by two virtual mics:
- * organ { AudioBus: {effects: [organ]}; Rotary: {speed: 0, drive: 0.3} }.
+ * organ { Bus: {effects: [organ]}; Rotary: {speed: 0, drive: 0.3} }.
  *
  * The rotors turn at their slow rates at speed 0 and their fast rates at speed 1. The horn reaches
  * a new speed within acceleration seconds and the drum three times slower, as a real cabinet.
@@ -380,7 +380,7 @@ ECS_STRUCT(Rotary, {
 
 /** A beat repeat, an effect in an insert slot of an AudioBus, as a Reverb is: the stutter of a
  * fill, which captures a slice of the beat and repeats it while active is up:
- * drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.125, decay: 0.8} }.
+ * drums { Bus: {effects: [drums]}; BeatRepeat: {slice: 0.125, decay: 0.8} }.
  *
  * When active rises to 0.5 or above, the capture waits for the next grid point of the Transport
  * and holds slice beats. Each repeat is decay times the gain and pitch semitones from the one
@@ -407,7 +407,7 @@ ECS_STRUCT(BeatRepeat, {
 
 /** A tape stop, an effect in an insert slot of an AudioBus, as a Reverb is: slows what plays
  * through it down to a halt, pitch and time together, and spins it back up:
- * master_fx { AudioBus: {effects: [master_fx]}; TapeStop: {stop_time: 1, curve: 0.5} }.
+ * master_fx { Bus: {effects: [master_fx]}; TapeStop: {stop_time: 1, curve: 0.5} }.
  *
  * While active is 0.5 or above the speed falls from 1 to 0 over stop_time; under 0.5 it rises
  * back over start_time. curve shapes both ramps: the speed is 1 - p^(4^curve) at a phase p.

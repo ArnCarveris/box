@@ -1570,7 +1570,7 @@ void box_audio_sequencer_init(
     box_audio_timeline_hook(state, &hook);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioPlacementChange" }),
+        .entity = ecs_entity(world, { .name = "PlacementChange" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(ClipPlacement), .src.id = EcsSelf }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
@@ -1579,7 +1579,7 @@ void box_audio_sequencer_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioTrackChange" }),
+        .entity = ecs_entity(world, { .name = "TrackChange" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(Track), .src.id = EcsSelf }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
@@ -1588,7 +1588,7 @@ void box_audio_sequencer_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioClipChange" }),
+        .entity = ecs_entity(world, { .name = "ClipChange" }),
         .query.flags = EcsQueryMatchDisabled | EcsQueryMatchPrefab,
         .query.terms = {{ .id = ecs_id(NoteClip), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },
@@ -1597,7 +1597,7 @@ void box_audio_sequencer_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioClipSoundChange" }),
+        .entity = ecs_entity(world, { .name = "ClipSoundChange" }),
         .query.flags = EcsQueryMatchDisabled | EcsQueryMatchPrefab,
         .query.terms = {{ .id = ecs_id(AudioClip), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },

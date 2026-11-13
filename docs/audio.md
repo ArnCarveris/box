@@ -7,19 +7,19 @@ and [the example scenes](../test/assets/audio/) for working patches and songs.
 
 ## The model
 
-- A **sound** is an `AudioPcm`, `SoundFile` or `SynthSound`. Play it once with
-  `box.audio.play`, or attach an `AudioSource` to an entity for controlled playback.
+- A **sound** is a `Pcm`, `SoundFile` or `SynthSound`. Play it once with
+  `box.audio.play`, or attach a `Source` to an entity for controlled playback.
 - A **voice** plays a sound on a mixer bus, with volume, pan and pitch. There are
   64 voices. At the cap, a play steals the quietest voice of equal or lower priority;
   it is refused if every voice ranks higher. One shots and sources have priority 0,
   tracks default to 1, and streamed music uses 255.
-- An **AudioBus** is a mixer channel: output, volume, pan, width, mute, solo,
+- An **Bus** is a mixer channel: output, volume, pan, width, mute, solo,
   four sends and four insert effects. All buses ultimately feed the master.
 - A **Transport** provides a timeline in beats. Tracks place reusable note or audio
   clips on it; instruments turn notes into synth or sampler voices.
-- An **AudioStream** plays one Ogg Vorbis file, independently of the timeline.
-- **AudioSpatial** derives a source's volume and pan from its position relative to
-  the listener. **AudioSettings** controls master volume and mute.
+- An **Stream** plays one Ogg Vorbis file, independently of the timeline.
+- **Spatial** derives a source's volume and pan from its position relative to
+  the listener. **Settings** controls master volume and mute.
 
 The audio core renders independently of the game thread. A slow game frame delays
 new commands; it does not stop voices already playing. Gain changes normally ramp
@@ -30,10 +30,10 @@ over 5 ms. The master's limiter keeps output peaks under 0.95.
 ```flecs
 using box.audio
 
-sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
+sfx { Bus: {output: master, kind: ChannelSfx} }
 
 prefab Beep {
-  AudioOutput: {bus: sfx}
+  Output: {bus: sfx}
   SynthSound: {}
   SynthEnvelope: {attack: 0.002, decay: 0.25}
   SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.5}
@@ -43,12 +43,12 @@ const played: bool = box.audio.play(Beep, 0.8)
 ```
 
 A prefab defines the sound without playing continuously. `play` returns whether the
-request was queued. Call it when the game event occurs; use `AudioSource` for a
+request was queued. Call it when the game event occurs; use `Source` for a
 sound such as an engine or fire that belongs to an entity.
 
 | Script function | Purpose |
 | --- | --- |
-| `box.audio.play(sound, volume)` | Play once on the sound's `AudioOutput`, or master |
+| `box.audio.play(sound, volume)` | Play once on the sound's `Output`, or master |
 | `box.audio.play_at(sound, {x, y, z}, volume)` | Play once at a fixed world position |
 | `box.audio.play_quantized(sound, volume, quantize)` | Play on the next beat or bar |
 | `box.audio.play_note(instrument, pitch, velocity, duration)` | Play a note; duration is in beats |
@@ -71,16 +71,16 @@ using box.audio
 click { SoundFile: {path: "etc/assets/sounds/click.wav"} }
 hum { SoundFile: {path: "etc/assets/sounds/hum.flac"} }
 engine {
-  AudioSource: {sound: hum, loop: true, volume: 0.4}
+  Source: {sound: hum, loop: true, volume: 0.4}
 }
 ```
 
-`AudioSource` has `sound`, `volume` (1), `pitch` (1), `loop` (false) and
+`Source` has `sound`, `volume` (1), `pitch` (1), `loop` (false) and
 `playing` (true). It starts when playing and its sound is ready. Setting playing
 false, deleting the source, or changing its sound or loop stops the voice with a
 fade; a legato synth sound change can retarget it instead. A nonlooping source sets
 playing false when it ends. Disabled sources keep their voices at volume zero.
-Prefabs do not play; instances get their own copy of `AudioSource`.
+Prefabs do not play; instances get their own copy of `Source`.
 
 `SoundFile` decodes WAV or FLAC fully into memory. Paths may be absolute, relative
 to the working directory or its ancestors, or relative to ancestors of the executable's
@@ -97,22 +97,22 @@ Load short sounds with the scene to avoid browser frame stalls during play.
   resamples to the output rate with linear interpolation.
 - Input files are limited to 256 MB and decoded frames to 512 MB.
 
-For generated samples, use `AudioPcm` (`samples`, `channels`, `sample_rate`), or
+For generated samples, use `Pcm` (`samples`, `channels`, `sample_rate`), or
 `box_audio_sound_from_pcm` from C. A sample rate of zero means the output rate.
 
 ## Mixer channels
 
-`AudioOutput: {bus: channel}` routes a source, stream or sound to a bus. Without it,
+`Output: {bus: channel}` routes a source, stream or sound to a bus. Without it,
 plays go to master. A source can override its sound's routing.
 
-| `AudioBus` field | Meaning and default |
+| `Bus` field | Meaning and default |
 | --- | --- |
 | `output` | Destination bus; zero or `master` means master |
 | `volume` | Linear gain, 1; range 0..4 |
 | `pan` | -1 left to 1 right, 0 centered |
 | `width` | 0 mono, 1 unchanged, 2 doubles the side signal |
 | `mute`, `solo` | Both false |
-| `kind` | `AudioChannelGroup`, `AudioChannelReturn` or `AudioChannelSfx`; group by default |
+| `kind` | `ChannelGroup`, `ChannelReturn` or `ChannelSfx`; group by default |
 | `sends` | Up to four `{bus, level, pre_fader}` entries |
 | `effects` | Four effect entities, run in array order; zero skips a slot |
 
@@ -124,13 +124,13 @@ toward either side, the far channel fades and the near channel rises by up to 3 
 using box.audio
 
 hall {
-  AudioBus: {output: master, kind: AudioChannelReturn, effects: [hall]}
+  Bus: {output: master, kind: ChannelReturn, effects: [hall]}
   Reverb: {decay: 2.4, damping: 0.4, predelay: 0.02}
 }
-sfx { AudioBus: {output: master, kind: AudioChannelSfx} }
-music { AudioBus: {output: master, volume: 0.6} }
+sfx { Bus: {output: master, kind: ChannelSfx} }
+music { Bus: {output: master, volume: 0.6} }
 lead {
-  AudioBus: {output: music, sends: [{bus: hall, level: 0.3}]}
+  Bus: {output: music, sends: [{bus: hall, level: 0.3}]}
 }
 ```
 
@@ -144,11 +144,11 @@ bus is muted and does not solo. Thus soloing music does not silence the game.
 The master is `box.audio.master`. Set it through nested scopes in script:
 
 ```flecs
-box { audio { master { AudioBus: {width: 0.9}; AudioMeter: {} } } }
+box { audio { master { Bus: {width: 0.9}; Meter: {} } } }
 ```
 
-Its bus volume multiplies `AudioSettings.master_volume` (1), and its mute combines
-with `AudioSettings.mute`. Master output, sends, solo and kind are ignored.
+Its bus volume multiplies `Settings.master_volume` (1), and its mute combines
+with `Settings.mute`. Master output, sends, solo and kind are ignored.
 
 There are 63 buses besides master. Excess buses are silent and excess sends are
 ignored, with errors. Output/send cycles log an error and keep the last valid order.
@@ -169,7 +169,7 @@ their tails end.
 | --- | --- |
 | `Reverb` | `decay: 1.5` s, `damping: 0.5`, `predelay: 0.02` s, `size: 0.5`, `mix: 1`, `shimmer: 0`, `shimmer_pitch: 12` semitones |
 | `Equalizer` | Four `bands` of `kind`, `frequency`, `gain` dB and `q`; off by default |
-| `AudioFilter` | `kind: SynthLowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: SynthSlope12`, `mix: 1`, `drive: 0` |
+| `Filter` | `kind: SynthLowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: SynthSlope12`, `mix: 1`, `drive: 0` |
 | `Compressor` | `threshold: -18` dB, `ratio: 4`, `attack: 0.01` s, `release: 0.15` s, `knee: 6` dB, `makeup: 0` dB, `mix: 1`, `sidechain: 0` |
 | `Gate` | `threshold: -50` dB, `attack: 0.001` s, `hold: 0.05` s, `release: 0.1` s, `range: -80` dB |
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
@@ -185,8 +185,8 @@ their tails end.
 | `TapeStop` | `active: 0`, `stop_time: 0.5` s, `start_time: 0.2` s, `curve: 0` |
 | `Vocoder` | `modulator: 0`, `bands: 16`, `low: 100` Hz, `high: 8000` Hz, `q: 1`, `attack: 0.005` s, `release: 0.05` s, `shift: 0`, `unvoiced: 0`, `mix: 1` |
 
-Equalizer bands use `AudioEqOff`, `AudioEqPeak`, `AudioEqLowShelf`,
-`AudioEqHighShelf`, `AudioEqLowCut` or `AudioEqHighCut`. Defaults are 100, 400,
+Equalizer bands use `EqOff`, `EqPeak`, `EqLowShelf`,
+`EqHighShelf`, `EqLowCut` or `EqHighCut`. Defaults are 100, 400,
 2000 and 8000 Hz, gain 0 dB and Q 0.7071. Gains range from -24 to 24 dB.
 Filters also support `SynthHighPass`, `SynthBandPass`, `SynthNotch` and
 `SynthSlope24`; cutoff is clamped below Nyquist.
@@ -207,7 +207,7 @@ exactly as without it. For a flanger use one voice, a `delay` of about 0.1 to
 
 ```flecs
 drums {
-  AudioBus: {effects: [drums]}
+  Bus: {effects: [drums]}
   Chorus: {voices: 1, rate: 0.2, delay: 2, depth: 1.8, feedback: 0.7, mix: 0.5}
 }
 ```
@@ -251,7 +251,7 @@ which gives the aliasing lo-fi sound of an old sampler. A cut, or the rate, of 0
 off. Below 16, `bits` runs a bit crusher last: 4 bits gives 16 levels. Oversampling
 delays the bus by 15 frames (23 for `SaturatorFold`), and the dry signal is delayed the
 same amount, so `mix` does not comb. Changes move over 20 ms; a change of `mode` applies at once.
-An `AudioMeter` on the saturator reads how hard the clipper squashes, in dB.
+A `Meter` on the saturator reads how hard the clipper squashes, in dB.
 
 Recipes:
 
@@ -302,14 +302,14 @@ the same as without it, sample for sample.
 
 ```flecs
 // A widener: the left channel 8 cents up, the right 8 cents down
-wide { AudioBus: {effects: [wide]}; PitchShifter: {cents: 8, stereo: 1, window: 30, mix: 0.5} }
+wide { Bus: {effects: [wide]}; PitchShifter: {cents: 8, stereo: 1, window: 30, mix: 0.5} }
 
 // An octave-up lead: the octave under the dry signal
-lead { AudioBus: {effects: [lead]}; PitchShifter: {semitones: 12, window: 25, mix: 0.35} }
+lead { Bus: {effects: [lead]}; PitchShifter: {semitones: 12, window: 25, mix: 0.35} }
 
 // A shimmer return that sources reach through a send
 shimmer {
-  AudioBus: {effects: [shimmer]}
+  Bus: {effects: [shimmer]}
   Reverb: {decay: 6, damping: 0.4, size: 0.8, shimmer: 0.5, mix: 1}
 }
 ```
@@ -355,7 +355,7 @@ neighbouring open steps run together. The gain rises in `attack` seconds and fal
 softer pulse. Closed is `floor` dB, -80 to 0: a floor of -6 to -12 dB pumps instead of
 chopping. Both channels get the same gain. A change of a step or of the timing moves
 the gain at the speed of the edges, and `floor` and `mix` move over 20 ms, so
-automating `steps[3]` or modulating a step is smooth. An `AudioMeter` on the gate reads
+automating `steps[3]` or modulating a step is smooth. A `Meter` on the gate reads
 its gain reduction, and the gate stops while its input is silent.
 
 ```flecs
@@ -364,7 +364,7 @@ pad_gate {
   PatternGate: {steps: [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0.5, 0, 1, 0.5, 1],
     gate: 0.6, release: 0.05}
 }
-pad { AudioBus: {effects: [pad_gate]} }
+pad { Bus: {effects: [pad_gate]} }
 
 // A gentle pump on chords: eighths with swing that only dip 9 dB
 chords_pump { PatternGate: {length: 2, steps: [1, 0], rate: 0.5, swing: 0.2, gate: 0.7,
@@ -390,7 +390,7 @@ Switch the speed like the half-moon switch of an organ by automating `speed`:
 using box.audio
 
 organ {
-  AudioBus: {output: master, effects: [organ]}
+  Bus: {output: master, effects: [organ]}
   Rotary: {speed: 0, drive: 0.3}
 }
 
@@ -442,7 +442,7 @@ using box.audio
 
 // A stutter fill: the last beat of a four bar phrase repeats a sixteenth, each
 // repeat a little quieter and a semitone down
-drums { AudioBus: {effects: [drums]}; BeatRepeat: {slice: 0.25, decay: 0.85, pitch: -1} }
+drums { Bus: {effects: [drums]}; BeatRepeat: {slice: 0.25, decay: 0.85, pitch: -1} }
 
 prefab fill {
   AutomationClip: {target: drums, component: BeatRepeat, member: "active", length: 16,
@@ -451,7 +451,7 @@ prefab fill {
 
 // A tape stop drop: the music winds down over the last two beats at 120 bpm and
 // spins back up on the downbeat of the next phrase
-music { AudioBus: {effects: [music]}; TapeStop: {stop_time: 1, start_time: 0.15, curve: 0.3} }
+music { Bus: {effects: [music]}; TapeStop: {stop_time: 1, start_time: 0.15, curve: 0.3} }
 
 prefab drop {
   AutomationClip: {target: music, component: TapeStop, member: "active", length: 16,
@@ -486,12 +486,12 @@ vocoder takes memory for 32 bands. The band count is not automatable; changing i
 the vocoded sound out and back in. A drum loop vocodes a saw pad:
 
 ```flecs
-drum_key { AudioBus: {output: master, volume: 0} }
-drums { AudioBus: {output: drum_key} }
+drum_key { Bus: {output: master, volume: 0} }
+drums { Bus: {output: drum_key} }
 pad_vocoder {
   Vocoder: {modulator: drums, bands: 16, attack: 0.002, release: 0.08, unvoiced: 0.2}
 }
-pad { AudioBus: {output: master, effects: [pad_vocoder]} }
+pad { Bus: {output: master, effects: [pad_vocoder]} }
 ```
 
 Play the drum loop on `drums` and a saw pad (a synth sound with a `SynthSaw` layer) on
@@ -507,9 +507,9 @@ For ducking, key a compressor on another channel:
 ```flecs
 music_duck {
   Compressor: {threshold: -30, ratio: 8, attack: 0.005, release: 0.3, sidechain: sfx}
-  AudioMeter: {}
+  Meter: {}
 }
-music { AudioBus: {output: master, effects: [music_duck]} }
+music { Bus: {output: master, effects: [music_duck]} }
 ```
 
 The sidechain runs before the compressed bus. A sidechain cycle logs an error and
@@ -519,25 +519,25 @@ A gate always keys on its own input. See the effect scenes in
 
 #### Modulators
 
-An `AudioModulator` on an entity of its own moves one float member of a bus or an
+A `Modulator` on an entity of its own moves one float member of a bus or an
 effect on its own, in time with the song: a filter that wobbles in eighths, a send
 that pulses, a tremolo, an auto-pan, an auto-wah. `target`, `component` and `member`
 name what it moves exactly as an [AutomationClip](#automation) does: `volume`, `pan`,
-`width` and `sends[i].level` of an `AudioBus` or of the master, every float member
+`width` and `sends[i].level` of a `Bus` or of the master, every float member
 of an effect component, such as `cutoff` or `bands[2].gain`, and the `value` of an
-[AudioMacro](#macros).
+[Macro](#macros).
 
 The modulator adds to the value the output has, from the component or from an
 automation lane, and the sum is clamped to the range of the member. It never writes
 the component. `depth` is the swing either way in the units of the member; with
-`scale: AudioModOctaves` it is in octaves, for a frequency (`cutoff`, `center`, the
+`scale: ModOctaves` it is in octaves, for a frequency (`cutoff`, `center`, the
 `frequency` of a band, the `damping` of a `Delay`), so a sweep sounds even.
 
 | Field | Meaning and default |
 | --- | --- |
-| `source` | `AudioModLfo` (default), `AudioModSteps` or `AudioModFollower` |
-| `depth`, `scale` | `0`, `AudioModLinear` |
-| `wave` | `AudioModSine`, `AudioModTriangle`, `AudioModSquare`, `AudioModSawUp`, `AudioModSawDown` or `AudioModRandom` (sample and hold) |
+| `source` | `ModLfo` (default), `ModSteps` or `ModFollower` |
+| `depth`, `scale` | `0`, `ModLinear` |
+| `wave` | `ModSine`, `ModTriangle`, `ModSquare`, `ModSawUp`, `ModSawDown` or `ModRandom` (sample and hold) |
 | `rate`, `sync`, `phase` | `1` Hz, `0` beats, `0` turns; a positive `sync` wins over `rate` |
 | `unipolar` | `false`: an LFO moves 0..1 instead of -1..1 |
 | `steps`, `step_count`, `smooth` | up to 16 values in -1..1, `16`, `0` (hard steps) .. 1 (fully glided); `sync` is the length of a step |
@@ -564,32 +564,32 @@ Recipes, at the tempo of the Transport:
 
 ```flecs
 // Tremolo: the volume dips to 0 for the first half of every eighth
-trem { AudioModulator: {target: keys, component: AudioBus, member: "volume",
-  wave: AudioModSquare, unipolar: true, depth: -1, sync: 0.5} }
+trem { Modulator: {target: keys, component: Bus, member: "volume",
+  wave: ModSquare, unipolar: true, depth: -1, sync: 0.5} }
 
 // Auto-pan: left and right once per bar
-autopan { AudioModulator: {target: pad, component: AudioBus, member: "pan",
+autopan { Modulator: {target: pad, component: Bus, member: "pan",
   depth: 0.8, sync: 4} }
 
 // Wobble: the cutoff of a bass filter two octaves either way, in eighths
-bass_filter { AudioFilter: {cutoff: 400, resonance: 0.5} }
-bass { AudioBus: {effects: [bass_filter]} }
-wobble { AudioModulator: {target: bass_filter, component: AudioFilter,
-  member: "cutoff", scale: AudioModOctaves, depth: 2, sync: 0.5} }
+bass_filter { Filter: {cutoff: 400, resonance: 0.5} }
+bass { Bus: {effects: [bass_filter]} }
+wobble { Modulator: {target: bass_filter, component: Filter,
+  member: "cutoff", scale: ModOctaves, depth: 2, sync: 0.5} }
 
 // Auto-wah: a bandpass that opens with the level of its own bus
-wah_filter { AudioFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6} }
-guitar { AudioBus: {effects: [wah_filter]} }
-wah { AudioModulator: {target: wah_filter, component: AudioFilter, member: "cutoff",
-  source: AudioModFollower, scale: AudioModOctaves, depth: 3, attack: 0.005,
+wah_filter { Filter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6} }
+guitar { Bus: {effects: [wah_filter]} }
+wah { Modulator: {target: wah_filter, component: Filter, member: "cutoff",
+  source: ModFollower, scale: ModOctaves, depth: 3, attack: 0.005,
   release: 0.15} }
 ```
 
 #### Macros
 
-An `AudioMacro` on an entity of its own is one value of 0..1 that moves several members
+A `Macro` on an entity of its own is one value of 0..1 that moves several members
 at once, each over its own range and curve, like a knob of a Combinator. Its maps are
-children with an `AudioMacroMap`: `target`, `component` and `member` name a member
+children with a `MacroMap`: `target`, `component` and `member` name a member
 exactly as an [AutomationClip](#automation) and a modulator do, and the member goes
 from `min` at a value of 0 to `max` at 1. A build-up is then one automation lane on one
 macro instead of four lanes kept in sync by hand, and game code drives the intensity of
@@ -597,14 +597,14 @@ the music by writing one value.
 
 | Field | Meaning and default |
 | --- | --- |
-| `AudioMacro.value` | `0`, clamped to 0..1 |
+| `Macro.value` | `0`, clamped to 0..1 |
 | `target`, `component`, `member` | The member, as of an `AutomationClip` |
 | `min`, `max` | `0`, `1`, in the units of the member; a `min` above `max` inverts |
 | `curve` | `0` linear; `1` exponential, the middle gives 11% of the range; `-1` logarithmic, 89% |
-| `scale` | `AudioModLinear`, or `AudioModOctaves` for a frequency, with `min` and `max` above 0 |
+| `scale` | `ModLinear`, or `ModOctaves` for a frequency, with `min` and `max` above 0 |
 
 The value of a member is `min + (max - min) * shape(value)`, or with
-`scale: AudioModOctaves` `min * (max / min)^shape(value)`, even in pitch like a modulator
+`scale: ModOctaves` `min * (max / min)^shape(value)`, even in pitch like a modulator
 in octaves: 200..8000 Hz at 0.5 is 1265 Hz. The curve is
 `shape(x) = (2^(6 curve x) - 1) / (2^(6 curve) - 1)`.
 
@@ -615,14 +615,14 @@ reading and writing the authored values. When two maps move one member, the one 
 last (the higher entity id) wins; the other logs one warning that names both and does
 nothing until the newer one is gone, then takes over with a fade.
 
-The value of a macro is itself a target: an `AutomationClip` or an `AudioModulator` with
-`component: AudioMacro, member: "value"` moves it, sample accurately. The macros are
+The value of a macro is itself a target: an `AutomationClip` or a `Modulator` with
+`component: Macro, member: "value"` moves it, sample accurately. The macros are
 expanded in the audio core, not on the main thread: the module sends each macro and its
 maps to the core once, an automation lane schedules `MACRO` commands with the value at
 their frame as it schedules any value, and the modulators of a macro add to its value in
 the core. Every 32 frames, and at the frame of every scheduled value, the core clamps the
 value plus its modulators to 0..1 and shapes it into each map, so neither automation nor
-modulation writes a component. A write of `AudioMacro.value` from a script or from C goes
+modulation writes a component. A write of `Macro.value` from a script or from C goes
 the same way at once, with the usual smoothing of the targets: a bus ramps over at least
 5 ms, an effect smooths over its usual 10 to 20 ms. A modulator of a macro is linear; a
 follower of a macro needs a `key` bus.
@@ -631,7 +631,7 @@ A new map fades in over 50 ms. Disabling or deleting a map or its macro, or reta
 map, fades it out over 50 ms, and the member returns to its authored value without a
 click. There are 32 macros and 8 maps per macro; a macro past a limit logs one error that
 names it. A map whose target, component or member is unknown, whose parent has no
-`AudioMacro`, that maps the value of a macro, or in octaves of a member that is no
+`Macro`, that maps the value of a macro, or in octaves of a member that is no
 frequency, logs one error that names it. The `audio` command lists the macros with their
 value and each map with its member, range and the value it gives.
 
@@ -640,28 +640,28 @@ A build-up over 16 beats, on one lane, with the music intensity also in reach of
 ```flecs
 using box.audio
 
-synth_filter { AudioFilter: {cutoff: 1000} }
+synth_filter { Filter: {cutoff: 1000} }
 drive { Saturator: {drive: 0} }
 echo { Delay: {time: 0.375, feedback: 0.2, mix: 0.3} }
-room { AudioBus: {kind: AudioChannelReturn, effects: [room]}
+room { Bus: {kind: ChannelReturn, effects: [room]}
   Reverb: {} }
-synth { AudioBus: {effects: [synth_filter, drive, echo],
+synth { Bus: {effects: [synth_filter, drive, echo],
   sends: [{bus: room, level: 0.1}]} }
 
 build {
-  AudioMacro: {}
-  open { AudioMacroMap: {target: synth_filter, component: AudioFilter,
-    member: "cutoff", min: 300, max: 9000, scale: AudioModOctaves} }
-  heat { AudioMacroMap: {target: drive, component: Saturator, member: "drive",
+  Macro: {}
+  open { MacroMap: {target: synth_filter, component: Filter,
+    member: "cutoff", min: 300, max: 9000, scale: ModOctaves} }
+  heat { MacroMap: {target: drive, component: Saturator, member: "drive",
     min: 0, max: 0.8, curve: 0.5} }
-  wash { AudioMacroMap: {target: synth, component: AudioBus,
+  wash { MacroMap: {target: synth, component: Bus,
     member: "sends[0].level", min: 0.1, max: 0.6} }
-  climb { AudioMacroMap: {target: echo, component: Delay, member: "feedback",
+  climb { MacroMap: {target: echo, component: Delay, member: "feedback",
     min: 0.2, max: 0.7, curve: 0.3} }
 }
 
 prefab rise {
-  AutomationClip: {target: build, component: AudioMacro, member: "value",
+  AutomationClip: {target: build, component: Macro, member: "value",
     length: 16, curve: {keys: [{0, 0}, {16, 1}]}}
 }
 
@@ -671,18 +671,18 @@ lanes {
 }
 
 // A pulse on top of the rise, in eighths
-build_pulse { AudioModulator: {target: build, component: AudioMacro,
+build_pulse { Modulator: {target: build, component: Macro,
   member: "value", depth: 0.05, sync: 0.5} }
 ```
 
 From game code the same macro follows the danger of the scene:
-`ecs_set(world, build, AudioMacro, { .value = danger })`.
+`ecs_set(world, build, Macro, { .value = danger })`.
 [macros.flecs](../test/assets/audio/macros.flecs) maps a cutoff and a send, sweeps them
 with a lane and inverts two ranges.
 
 ### Meters
 
-Add `AudioMeter: {}` to a bus, master or effect to read it every frame:
+Add `Meter: {}` to a bus, master or effect to read it every frame:
 
 - `peak_left` and `peak_right`: largest absolute sample since the last frame, linear.
 - `rms_left` and `rms_right`: RMS over the last 300 ms of output, limited to
@@ -694,7 +694,7 @@ Buses meter their output after inserts, width, pan, volume and mute. Master mete
 **before the limiter**, so values above 1 indicate an overdriven mix. Lower the group
 or master gain instead of relying on limiting. Meter values lag commands; with the
 null transport a change appears two application frames later. Suspended, failed or
-waiting outputs read silence. The `audio` command shows levels without `AudioMeter`.
+waiting outputs read silence. The `audio` command shows levels without `Meter`.
 
 ## Spatial audio
 
@@ -702,24 +702,24 @@ waiting outputs read silence. The `audio` command shows levels without `AudioMet
 using box.audio
 using box.transform
 
-ears { Position: {0, 1.7, 0}; AudioListener }
+ears { Position: {0, 1.7, 0}; Listener }
 engine {
   Position: {4, 0, -10}
-  AudioSource: {sound: hum, loop: true}
-  AudioSpatial: {min_distance: 2, max_distance: 40, cutoff: 800}
+  Source: {sound: hum, loop: true}
+  Spatial: {min_distance: 2, max_distance: 40, cutoff: 800}
 }
 const shot: bool = box.audio.play_at(click, {-3, 0, -5}, 1.0)
 ```
 
-The listener is an `AudioListener` with `WorldTransform`; otherwise it is the camera
+The listener is a `Listener` with `WorldTransform`; otherwise it is the camera
 of the first enabled view in render order. Tag the main camera explicitly in scenes
 with render-to-texture views. Multiple listeners warn and use the lowest entity ID.
 Without a listener, spatial sounds play centered at full volume.
 
-`AudioSpatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`,
+`Spatial` defaults to `min_distance: 1`, `max_distance: 50`, `rolloff: 1`,
 `cutoff: 0`.
 A source uses its world position, including parent transforms; without a
-`WorldTransform` it plays nonspatially. On a sound entity, `AudioSpatial` supplies
+`WorldTransform` it plays nonspatially. On a sound entity, `Spatial` supplies
 distances for `play_at`, whose position stays fixed while the listener moves.
 
 Gain is 1 within min distance and zero at max distance. Between them it follows
@@ -768,7 +768,7 @@ voices on play, so edits affect subsequent plays.
 | `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
 | `SynthBow` | Bowed layer: `pressure` (0.5, 0..1), `speed` (0.5, 0..1), `position` (0.12, 0.02..0.5), `brightness` (0.5), `noise` (0.1, 0..1), `velocity` (0) |
 | `SynthTable` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
-| `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `AudioPcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
+| `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `Pcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
 
 Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`,
 `SynthPluck`, `SynthWavetable` and `SynthBowed`. Frequency sweeps are exponential. Positive envelope curves make
@@ -813,7 +813,7 @@ generated by additive synthesis, so they need no file:
   1/n, so moving the position sweeps like a lowpass.
 
 A table authored in another tool loads from a sound: `Wavetable.sound` names an entity
-with `AudioPcm` or `SoundFile` (WAV or FLAC, decoded as other sounds are), and wins over
+with `Pcm` or `SoundFile` (WAV or FLAC, decoded as other sounds are), and wins over
 `kind`. The common format is a WAV of N single cycle frames of 2048 samples one after the
 other; `frame_size` (default 2048, clamped to 64..4096, 0 for the default) is the samples
 per frame. The sound is cut into floor(frames / frame_size) frames, at most 256, the
@@ -827,7 +827,7 @@ a frame size that is not a power of 2 is first resampled with a cubic spline to 
 one. The table gets the same mip levels as the built-in ones. Until the sound is ready
 the table has no frames and its layers play a sine; when the sound becomes ready or
 changes the table is built again, and the next play of the synth sounds that name it
-takes the new table. A sound that fails to load, that is not an entity with `AudioPcm` or
+takes the new table. A sound that fails to load, that is not an entity with `Pcm` or
 `SoundFile`, or that is shorter than one frame logs one error that names the `Wavetable`,
 and its layers play a sine.
 
@@ -920,7 +920,7 @@ envelope; author both when they should move together.
 both stages at `SynthSlope24`. Quiet signals pass almost unchanged and loud ones
 compress and gain harmonics; a high resonance settles at a bounded level and growls
 instead of whistling. Zero is linear and costs nothing; 1 drives the filter hard.
-`AudioFilter.drive` does the same on a bus and moves over 20 ms like `mix`.
+`Filter.drive` does the same on a bus and moves over 20 ms like `mix`.
 In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 128-frame quantum), drive raises a 12 dB filter from about 75 to 115 µs and a 24 dB
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
@@ -979,7 +979,7 @@ vowel is clamped to 0..4. The filter envelope runs on a formant filter whenever 
 The level is normalized for a saw at 110 Hz, which comes out within about 3 dB of its
 level without a filter on every vowel; a higher note puts more of its power into the
 formants and comes out louder. On the stereo path both channels run the same filter.
-`AudioFilter` has no formant kind and takes `SynthFormant` as a lowpass.
+`Filter` has no formant kind and takes `SynthFormant` as a lowpass.
 
 ```
 prefab Talk {
@@ -1022,7 +1022,7 @@ The core holds 32 comb delay lines, each long enough for 40 Hz (up to 81.8 kHz s
 rates; at higher rates the lowest comb frequency is the rate over 2045). A voice with a
 comb takes one line, or two on the stereo path, and gives them back when it ends; a
 play that finds too few free is ignored, as a pluck play without a free string is.
-Combs below 40 Hz are clamped to 40 Hz. `AudioFilter` has no comb kind and takes
+Combs below 40 Hz are clamped to 40 Hz. `Filter` has no comb kind and takes
 `SynthComb` as a lowpass.
 
 ```
@@ -1160,19 +1160,19 @@ the voice as well as its gain, so harder notes can be brighter, not only louder.
 - `SynthBow.velocity` scales the pressure and the speed of a bow the same way, so soft notes
   are bowed lighter and quieter.
 
-Plays that are not notes, such as `AudioSource`, `box_audio_play`, quantized plays and
+Plays that are not notes, such as `Source`, `box_audio_play`, quantized plays and
 streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
 
 The pitch of a note reaches the voice too, as key tracking on analog synths. The key of
 a voice is `12 * log2(ratio)` semitones, where the ratio is the pitch of its play without
 the `pitch_variance` of `SynthSound`. For an `Instrument` note the ratio is
 `2^((pitch - root) / 12)`, so the key is relative to `Instrument.root`; for any other play
-it is relative to a ratio of 1, the pitch of an `AudioSource` or of `box_audio_play`. Both
+it is relative to a ratio of 1, the pitch of a `Source` or of `box_audio_play`. Both
 fields default to 0, which leaves the sound as it was:
 
 - `SynthFilter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
   cutoff 1:1 with the pitch and 0.5 half an octave per octave. It follows the current pitch
-  of the voice: a glide, a change of `AudioSource.pitch` or a legato retarget moves the
+  of the voice: a glide, a change of `Source.pitch` or a legato retarget moves the
   cutoff along, at the control rate of the LFOs. It adds to the filter envelope, the
   velocity and the LFOs.
 - `SynthEnvelope.key_scale`, 0..1, multiplies the decay and the release by
@@ -1374,11 +1374,11 @@ the sum is clamped to -1..1. `spread_mode` picks the offset:
 
 A `NoteClip` has a `length` (4 beats) and notes with `start`, `duration`, `pitch`,
 `velocity` (1), `pan` (0) and the expression curves `bend`, `mod` and `pressure` (none).
-A `Track` supplies the instrument and brings an `AudioBus`. Its child `ClipPlacement` entities arrange clips:
+A `Track` supplies the instrument and brings a `Bus`. Its child `ClipPlacement` entities arrange clips:
 
 | Placement field | Meaning and default |
 | --- | --- |
-| `clip` | Reusable `NoteClip`, `AudioClip` or `AutomationClip` |
+| `clip` | Reusable `NoteClip`, `Clip` or `AutomationClip` |
 | `start` | Beat on the timeline |
 | `duration` | 0 uses clip length minus placement offset |
 | `loop` | False; true repeats passes until duration ends |
@@ -1407,7 +1407,7 @@ prefab bass_line {
 
 bass {
   Track: {instrument: bass_synth}
-  AudioBus: {volume: 0.9}
+  Bus: {volume: 0.9}
   verse { ClipPlacement: {clip: bass_line, start: 0, duration: 16, loop: true} }
   turn { ClipPlacement: {clip: bass_line, start: 16, offset: 2, transpose: 5, gain: 0.6} }
 }
@@ -1464,8 +1464,8 @@ ends where the rules above say. A track with humanized timing schedules its note
 as much earlier than others as its `timing`, so a note that moves earlier still
 plays on time. Audio clips neither swing nor humanize.
 
-An `AudioClip` has `sound`, `offset` in **seconds**, and `length` in beats. It uses
-`AudioPcm` or `SoundFile`, and needs no instrument. A track can mix note and audio
+A `Clip` has `sound`, `offset` in **seconds**, and `length` in beats. It uses
+`Pcm` or `SoundFile`, and needs no instrument. A track can mix note and audio
 placements. Placement offsets remain in beats; transpose changes pitch and speed
 together. Audio is not stretched to tempo. Each looping pass starts a new voice;
 its seam uses the 5 ms stop fade. A seek or start within an audio placement resumes
@@ -1481,8 +1481,8 @@ automation needs no instrument.
 
 | Field | Meaning and default |
 | --- | --- |
-| `target` | The entity with the `AudioBus` or the effect component |
-| `component` | `AudioBus` or an effect component, such as `AudioFilter` |
+| `target` | The entity with the `Bus` or the effect component |
+| `component` | `Bus` or an effect component, such as `Filter` |
 | `member` | Path of a float member: `cutoff`, `volume`, `sends[1].level`, `bands[2].gain` |
 | `length` | Beats of a pass, 4 |
 | `curve` | A [Curve](curves.md): time in beats from the clip start, value in member units |
@@ -1491,12 +1491,12 @@ automation needs no instrument.
 using box.audio
 
 synth {
-  AudioBus: {effects: [synth]}
-  AudioFilter: {cutoff: 1000}
+  Bus: {effects: [synth]}
+  Filter: {cutoff: 1000}
 }
 
 prefab sweep {
-  AutomationClip: {target: synth, component: AudioFilter, member: "cutoff",
+  AutomationClip: {target: synth, component: Filter, member: "cutoff",
     curve: {kind: CurveCatmullRom, keys: [{0, 200}, {2, 1200}, {4, 5000}]}}
 }
 
@@ -1506,11 +1506,11 @@ lanes {
 }
 ```
 
-An `AudioBus` automates `volume`, `pan`, `width` and the `level` of its sends; the
+A `Bus` automates `volume`, `pan`, `width` and the `level` of its sends; the
 master automates its `volume`, `pan` and `width`. An effect automates every float
-member of its effect component: Reverb, Equalizer bands, AudioFilter, Compressor,
+member of its effect component: Reverb, Equalizer bands, Filter, Compressor,
 Gate, Delay, Phaser, Chorus, Saturator, Rotary and later effects. An
-[AudioMacro](#macros) automates its `value`, which moves all its maps. Kinds, slopes,
+[Macro](#macros) automates its `value`, which moves all its maps. Kinds, slopes,
 stages, voices, entities and bools are not continuous and not automatable. A clip whose
 target, component or member is unknown or not automatable logs one error that
 names it and does nothing until it changes.
@@ -1556,9 +1556,9 @@ using box.material
 
 box { audio { Song { Rgb: {255, 60, 200} } } }
 
-neon { AudioBus: {output: master}; AudioMeter: {} }
-nr_bass { Track: {instrument: nr_bass_inst}; AudioBus: {output: neon}; AudioMeter: {} }
-nr_lead { Track: {instrument: nr_lead_inst}; AudioBus: {output: neon}; AudioMeter: {} }
+neon { Bus: {output: master}; Meter: {} }
+nr_bass { Track: {instrument: nr_bass_inst}; Bus: {output: neon}; Meter: {} }
+nr_lead { Track: {instrument: nr_lead_inst}; Bus: {output: neon}; Meter: {} }
 
 $ {
   Song: {
@@ -1568,17 +1568,17 @@ $ {
 }
 ```
 
-Play it by setting the `AudioSong` singleton, `$ { AudioSong: {file: "songs/neon_run.flecs"} }`,
+Play it by setting the `SongFile` singleton, `$ { SongFile: {file: "songs/neon_run.flecs"} }`,
 or with `box_audio_song_load(world, file)` and `box_audio_song_unload(world)` in C,
 or `audio.song <file>` in the shell (`audio.song` shows it, `audio.song none`
 unloads it). The path is found as the one of a `SoundFile`. A new file swaps the
-song; an empty file or removing `AudioSong` unloads it.
+song; an empty file or removing `SongFile` unloads it.
 
 | Component | Meaning |
 | --- | --- |
 | `Song` | Singleton the song sets: `title`, `tempo`, `beats_per_bar`, `beat_unit`, `beats` (its length), `loop` (true) and `lanes`, the `{name, bus}` channels a host meters. Default value without a song |
-| `AudioSong` | Singleton with the `file` of the song to play |
-| `AudioSongStatus` | Written by the engine: `SongLoading`, `SongReady`, `SongFailed` with `error`, or `SongNone`; `file`; `foreign` counts the host entities the song changed |
+| `SongFile` | Singleton with the `file` of the song to play |
+| `SongStatus` | Written by the engine: `SongLoading`, `SongReady`, `SongFailed` with `error`, or `SongNone`; `file`; `foreign` counts the host entities the song changed |
 
 The song entity is `box.audio.Song`, the entity of the singleton. A song file
 sets it and puts what describes the song on it, such as its `Rgb`, with
@@ -1605,7 +1605,7 @@ evaluated in the root scope like a scene, so it resolves the names of the host:
 it may send to host returns and read exported variables such as a reverb level.
 It must not change host entities. A song that sets a component on an entity it
 did not create, or names an entity that existed before it, is reported with a
-warning and in `AudioSongStatus.foreign`, and that change stays after unload.
+warning and in `SongStatus.foreign`, and that change stays after unload.
 A song file may `include` other files; they become managed scripts next to it
 under `box.audio.songs` and unload with it.
 
@@ -1636,11 +1636,11 @@ is adding its file and its name.
 ```flecs
 using box.audio
 music_track {
-  AudioStream: {path: "etc/scenes/dust_merchant/assets/dust_merchant_loop.ogg"}
+  Stream: {path: "etc/scenes/dust_merchant/assets/dust_merchant_loop.ogg"}
 }
 ```
 
-`AudioStream` defaults to volume 1, loop true and playing true. Only one stream can
+`Stream` defaults to volume 1, loop true and playing true. Only one stream can
 play at once. Vorbis is decoded in 4096-frame chunks, up to two seconds ahead;
 the compressed file stays in memory. A stream starts after half a second is decoded,
 or all of a shorter file. Native decoding runs on jobs; web decoding has a 2 ms
@@ -1649,7 +1649,7 @@ budget per frame. Loops continue within chunks without gaps.
 Playing false fades out and preserves position; true resumes. A nonlooping stream
 ends with playing false, and playing true then restarts it. Changing path fades
 out the old stream over 5 ms and starts the new one, without a full crossfade.
-`AudioStreamStatus` reports state, position, buffered seconds, underruns, decode
+`StreamStatus` reports state, position, buffered seconds, underruns, decode
 cost and errors. Starvation fades to silence, then back in when chunks arrive.
 
 Use a live timeline when the arrangement or tempo responds to the game. Render a
@@ -1667,15 +1667,15 @@ python3 etc/scenes/dust_merchant/assets/make_music.py <boxrun binary>
 ### Web
 
 - Audio starts on the first key or mouse button. Until then
-  `AudioStatus.state` is `AudioWaitingForGesture`. Nonlooping plays are dropped;
+  `Status.state` is `WaitingForGesture`. Nonlooping plays are dropped;
   loops and looping streams become audible after the gesture.
-- Hidden pages fade out over 50 ms and suspend (`AudioSuspended`), then resume
+- Hidden pages fade out over 50 ms and suspend (`Suspended`), then resume
   when shown. Output sample rate is chosen by the browser, commonly 44100 or 48000 Hz.
 - The core runs in an AudioWorklet, so main-thread stalls leave existing sounds
   playing. Sound-file decoding still stalls the main thread; load files early.
 - Short files under embedded folders such as `etc` join the page download. Keep
   long music outside those folders and deploy it beside the page at the relative
-  path named by `AudioStream`. The stream checks the page filesystem, then fetches.
+  path named by `Stream`. The stream checks the page filesystem, then fetches.
 - AudioWorklet requires a secure context; localhost works for development.
 
 ```sh
@@ -1689,7 +1689,7 @@ the canvas. A startup failure warns once and the app continues silently.
 ### Native and headless
 
 macOS and Linux use miniaudio's default device on an audio thread. No device logs
-one warning and uses the null transport (`AudioNoDevice`). Device loss falls back
+one warning and uses the null transport (`NoDevice`). Device loss falls back
 to main-thread rendering and retries the default device every two seconds.
 `--headless` always uses the null transport; `--no-audio` opens nothing.
 Importing box alone does not open an output: `box_app_run` does.
@@ -1728,14 +1728,14 @@ typed, and `state` is the `box.command.Switch` enum, `on` or `off`; without it t
 toggles.
 
 Solo, mute and bypass judge one element of a mix without editing the song. Solo and
-mute write `AudioBus` and bypass adds or removes `Disabled` on the effect entity, as a
+mute write `Bus` and bypass adds or removes `Disabled` on the effect entity, as a
 script or `set` would; bypass fails for an entity that is not an effect. `audio.mute` is the
 master mute, `audio.mute_bus` the mute of one bus, `master` for the master bus. These are runtime
 changes like any `set`: a song reload resets them. `audio` marks soloed and muted buses
 and bypassed effects.
 
 `audio.note` plays one note on the live output, through the bus of the instrument when
-it has an `AudioOutput`, else of its sound, and releases it after `duration` seconds. A note is
+it has an `Output`, else of its sound, and releases it after `duration` seconds. A note is
 a name, `C2`, `F#3` or `Bb4` with `C4` at 60, or a MIDI number 0..127. A sound without an
 instrument plays through an instrument of its own in `box.command.audition`, with the
 default root of A4, so `A4` plays the sound as authored. The note does not touch the
@@ -1751,7 +1751,7 @@ without the rest of the scene:
 
 | Subject | Options | What it renders |
 | --- | --- | --- |
-| a sound (`SynthSound`, `SoundFile`, `AudioPcm`) | `note`, `vel`, `dur`, `tail` | One note of the sound, on the bus of its `AudioOutput` |
+| a sound (`SynthSound`, `SoundFile`, `Pcm`) | `note`, `vel`, `dur`, `tail` | One note of the sound, on the bus of its `Output` |
 | an instrument | `note`, `vel`, `dur`, `tail` | One note through the instrument and its bus chain |
 | a bus | `bars`, `beats`, `solo`, `mute`, `tail`; `dur` without a song | The song with only that bus audible, as its solo makes it, with its returns; without a song the scene from its start, `dur` seconds (10) |
 | `song` | `bars`, `beats`, `solo`, `mute`, `tail` | The loaded song, or the `Transport` of the scene with a range |
@@ -1789,7 +1789,7 @@ the rounding to 16 bits. In the browser the render also runs on the main thread,
 not in the worklet, and writes `/tmp/audio_render_<n>.wav`. A render
 of a note silences the sources, streams, emitters and the timeline of the scene.
 Only what scripts and the song file make is rendered again: a subject made in C
-is an error, except a sound with `AudioPcm`, whose samples are copied. A render
+is an error, except a sound with `Pcm`, whose samples are copied. A render
 takes at most `BOX_AUDIO_CAPTURE_MAX` seconds; a longer one, a subject that is
 not a sound, instrument or bus, or a section without a song and range is an
 error that names why. To analyse a render, pass the resource it returns to the
@@ -1877,7 +1877,7 @@ table, which it prints only once. Without buses it measures every bus of the pro
 and the master. With `bars=a..b` and a loaded song it seeks the transport to bar `a`, plays and
 measures the length of the bars at the tempo of the transport. A call with arguments replaces a
 measurement that runs. It needs an output that runs, the null output of a headless run
-included; the AudioMeter of the entities, and which entities have one, stay as they are.
+included; the Meter of the entities, and which entities have one, stay as they are.
 
 ```
 > audio.meter drums bass 2
@@ -2003,7 +2003,7 @@ The static checks read the data:
 | `note-late`, `clip-late` | Notes that start and placements that end after `Song.beats` |
 | `clip-overlap` | Note or audio placements that overlap on a track |
 | `track-instrument`, `instrument-sound` | A track with note clips and no instrument, an instrument without a sound |
-| `bus-send`, `bus-output` | A send to a deleted entity or one without `AudioBus`; an output that is no bus |
+| `bus-send`, `bus-output` | A send to a deleted entity or one without `Bus`; an output that is no bus |
 | `bus-unreachable` | A bus whose output path loops or goes through a disabled bus, so it never reaches the master |
 | `bus-slot`, `effect-missing` | An empty insert slot between used ones (info); a slot that names no effect |
 | `effect-disabled`, `effect-unused` | An effect in a slot that is disabled; an effect no slot names |
@@ -2031,7 +2031,7 @@ reports whether each effect runs, is bypassed or waits for resources.
 
 ## Implementation and limits
 
-`AudioSync` runs in `PreStore` after transforms, batching changed state and plays
+`Sync` runs in `PreStore` after transforms, batching changed state and plays
 once per frame. The transport updates in `OnStore`. Spatial sources update on
 relevant changes; moving the listener updates all of them.
 

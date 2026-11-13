@@ -4,11 +4,11 @@
 using box.audio
 
 drum_key {
-  AudioBus: {output: master, volume: 0}
+  Bus: {output: master, volume: 0}
 }
 
 drums {
-  AudioBus: {output: drum_key}
+  Bus: {output: drum_key}
 }
 
 pad_vocoder {
@@ -16,5 +16,5 @@ pad_vocoder {
 }
 
 pad {
-  AudioBus: {output: master, effects: [pad_vocoder]}
+  Bus: {output: master, effects: [pad_vocoder]}
 }

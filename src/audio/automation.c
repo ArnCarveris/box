@@ -154,7 +154,7 @@ static char* box_audio_bus_member(
         *param = j ? (uint32_t)(BOX_AUDIO_PARAM_SEND_1 + j - 1) : BOX_AUDIO_PARAM_SEND;
         *send = j;
     } else {
-        result = flecs_asprintf("member '%s' of AudioBus is not automatable, only volume, pan, "
+        result = flecs_asprintf("member '%s' of Bus is not automatable, only volume, pan, "
             "width and sends[0..%d].level are", member, BOX_AUDIO_SENDS - 1);
     }
 
@@ -200,15 +200,15 @@ char* box_audio_target_resolve(
     if (component_id == ecs_id(AudioMacro)) {
         out->kind = BOX_AUDIO_TARGET_MACRO;
         if (!ecs_has(world, target, AudioMacro)) {
-            result = flecs_asprintf("the target '%s' has no AudioMacro", name);
+            result = flecs_asprintf("the target '%s' has no Macro", name);
         } else if (!member || strcmp(member, "value")) {
-            result = flecs_asprintf("member '%s' of AudioMacro does not move, only value does",
+            result = flecs_asprintf("member '%s' of Macro does not move, only value does",
                 member ? member : "");
         }
     } else if (component_id == ecs_id(AudioBus)) {
         out->kind = BOX_AUDIO_TARGET_BUS;
         if (target != state->master && !ecs_has(world, target, AudioBus)) {
-            result = flecs_asprintf("the target '%s' has no AudioBus", name);
+            result = flecs_asprintf("the target '%s' has no Bus", name);
         } else {
             result = box_audio_bus_member(member, &out->param, &out->send);
         }
@@ -219,7 +219,7 @@ char* box_audio_target_resolve(
     } else if (box_audio_module_effect_params(world, component_id, NULL, NULL) ==
         BOX_AUDIO_EFFECT_NONE)
     {
-        result = flecs_asprintf("the component '%s' is neither AudioBus nor an effect",
+        result = flecs_asprintf("the component '%s' is neither Bus nor an effect",
             component);
     } else if (!(ptr = ecs_get_id(world, target, component_id))) {
         result = flecs_asprintf("the target '%s' has no %s", name, component);
@@ -1127,7 +1127,7 @@ void box_audio_automation_init(
     box_audio_timeline_hook(state, &hook);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioAutomationPlacement" }),
+        .entity = ecs_entity(world, { .name = "AutomationPlacement" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(ClipPlacement), .src.id = EcsSelf }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
@@ -1136,7 +1136,7 @@ void box_audio_automation_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioAutomationTrack" }),
+        .entity = ecs_entity(world, { .name = "AutomationTrack" }),
         .query.flags = EcsQueryMatchDisabled,
         .query.terms = {{ .id = ecs_id(Track), .src.id = EcsSelf }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
@@ -1145,7 +1145,7 @@ void box_audio_automation_init(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AudioAutomationClip" }),
+        .entity = ecs_entity(world, { .name = "AutomationClipChange" }),
         .query.flags = EcsQueryMatchDisabled | EcsQueryMatchPrefab,
         .query.terms = {{ .id = ecs_id(AutomationClip), .src.id = EcsSelf }},
         .events = { EcsOnSet, EcsOnRemove },

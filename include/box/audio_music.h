@@ -189,7 +189,7 @@ ECS_STRUCT(AudioClip, {
 
 /** A clip of automation, reusable as a NoteClip is: a Curve over beats that a ClipPlacement
  * on a Track plays into one float member of a bus, an effect or an AudioMacro value:
- * sweep { AutomationClip: {target: synth, component: AudioFilter, member: "cutoff", ...} }.
+ * sweep { AutomationClip: {target: synth, component: Filter, member: "cutoff", ...} }.
  *
  * While the Transport plays, the curve is sampled in the lookahead window and each value is
  * scheduled sample accurately. A clip whose target, component or member is unknown or not
@@ -247,7 +247,7 @@ ECS_ENUM(AudioModScale, {
 
 /** A modulator, on an entity of its own: moves a float member of a bus, an effect or an
  * AudioMacro value on its own, in time with the song, for a wobble, a tremolo or an auto-pan:
- * wobble { AudioModulator: {target: bass_filter, component: AudioFilter, member: "cutoff"} }.
+ * wobble { Modulator: {target: bass_filter, component: Filter, member: "cutoff"} }.
  *
  * Its value adds to the value the output has, clamped to the range of the member, and never
  * writes the component. A positive sync locks it to the beat of the Transport. Up to
