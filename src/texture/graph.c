@@ -133,7 +133,6 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
-<<<<<<< HEAD
 /** WGSL of the TexRamp node: the display encoded colors of the keys around the input mixed as
  * box_gen_ramp does, decoded to linear; the elements are (position, r, g, b) in 0..1 */
 static const char *box_texture_ramp_wgsl =
@@ -207,7 +206,8 @@ static const char *box_texture_curve_wgsl =
     "    let n0 = box_tex_curve_mix(m0, m1, t);\n"
     "    let n1 = box_tex_curve_mix(m1, m2, t);\n"
     "    return vec4f(box_tex_curve_mix(n0, n1, t), 0.0, 0.0, 0.0);\n"
-=======
+    "}\n";
+
 /** WGSL of the TexSplit node: one channel of its input */
 static const char *box_texture_split_wgsl =
     "fn box_tex_split(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
@@ -284,7 +284,6 @@ static const char *box_texture_time_wgsl =
 static const char *box_texture_splat_wgsl =
     "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x);\n"
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
     "}\n";
 
 /** State of the build of one graph */
@@ -542,13 +541,10 @@ static void box_texture_node_kind_reflect(
         .input_count = kind->input_count,
         .param_count = kind->param_count,
         .param_size = kind->param_size,
-<<<<<<< HEAD
         .array = kind->array.name,
         .array_max = kind->array.name ? kind->array.max : 0,
         .array_header = kind->array_header,
-=======
         .types_offset = kind->types_offset,
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
         .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
@@ -716,7 +712,6 @@ static void box_texture_graph_reach(
     }
 }
 
-<<<<<<< HEAD
 /** Write the array parameter of a node: its header and its elements after the constants of
  * its inputs, failing the build with more elements than the kind takes or invalid ones.
  *
@@ -769,7 +764,8 @@ static void box_texture_graph_array(
 
 done:
     return;
-=======
+}
+
 /** Get the type that follows the inputs a node reads: a Vector when one of them has a Vector
  * node, else a Scalar when one has a Scalar node, else a Vector.
  *
@@ -868,7 +864,6 @@ static TextureValueType box_texture_math_type(
     }
 
     return result;
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
 }
 
 /** Append the compiled node of an entity whose inputs are compiled, with its parameters and
@@ -913,13 +908,12 @@ static int32_t box_texture_graph_append(
         }
     }
 
-<<<<<<< HEAD
-    if (kind->array.name) {
-        box_texture_graph_array(b, e, kind, ptr, params, offset);
-=======
     if (kind->types_offset >= 0) {
         ecs_os_memcpy(params + kind->types_offset, &word, ECS_SIZEOF(uint32_t));
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
+    }
+
+    if (kind->array.name) {
+        box_texture_graph_array(b, e, kind, ptr, params, offset);
     }
 
     box_texture_graph_node_t *node = ecs_vec_append_t(NULL, &b->nodes,
@@ -1312,7 +1306,6 @@ done:
     return;
 }
 
-<<<<<<< HEAD
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -1376,11 +1369,8 @@ done:
     return result;
 }
 
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexRamp and TexCurve.
-=======
 /** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
- * TexWarp, TexTransform, TexTime and TexSplat.
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
+ * TexWarp, TexTransform, TexTime, TexSplat, TexRamp and TexCurve.
  *
  * @param world The world
  */
@@ -1424,31 +1414,6 @@ static void box_texture_nodes_register(
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
-<<<<<<< HEAD
-        .component = ecs_id(TexRamp),
-        .output = TexVector,
-        .inputs = {
-            { "input", offsetof(TexRamp, input), TexScalar, "input_value",
-                offsetof(TexRamp, input_value) }
-        },
-        .array = { "keys", offsetof(TexRamp, keys), ECS_SIZEOF(TextureGenKey),
-            BOX_TEXTURE_RAMP_KEYS, box_texture_ramp_pack },
-        .function = "box_tex_ramp",
-        .source = box_texture_ramp_wgsl
-    });
-
-    box_texture_node_register(world, &(box_texture_node_desc_t){
-        .component = ecs_id(TexCurve),
-        .output = TexScalar,
-        .inputs = {
-            { "input", offsetof(TexCurve, input), TexScalar, "input_value",
-                offsetof(TexCurve, input_value) }
-        },
-        .array = { "curve.keys", offsetof(TexCurve, curve.keys), ECS_SIZEOF(CurveKey),
-            BOX_TEXTURE_CURVE_KEYS, box_texture_curve_pack },
-        .function = "box_tex_curve",
-        .source = box_texture_curve_wgsl
-=======
         .component = ecs_id(TexSplit),
         .output = TexScalar,
         .inputs = {
@@ -1523,7 +1488,32 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_splat",
         .source = box_texture_splat_wgsl
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexRamp),
+        .output = TexVector,
+        .inputs = {
+            { "input", offsetof(TexRamp, input), TexScalar, "input_value",
+                offsetof(TexRamp, input_value) }
+        },
+        .array = { "keys", offsetof(TexRamp, keys), ECS_SIZEOF(TextureGenKey),
+            BOX_TEXTURE_RAMP_KEYS, box_texture_ramp_pack },
+        .function = "box_tex_ramp",
+        .source = box_texture_ramp_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCurve),
+        .output = TexScalar,
+        .inputs = {
+            { "input", offsetof(TexCurve, input), TexScalar, "input_value",
+                offsetof(TexCurve, input_value) }
+        },
+        .array = { "curve.keys", offsetof(TexCurve, curve.keys), ECS_SIZEOF(CurveKey),
+            BOX_TEXTURE_CURVE_KEYS, box_texture_curve_pack },
+        .function = "box_tex_curve",
+        .source = box_texture_curve_wgsl
     });
 }
 

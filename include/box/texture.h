@@ -604,16 +604,13 @@ ECS_STRUCT(TextureNodeKind, {
     int32_t param_count;     /**< Parameters in params */
     TextureNodeParam params[8]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
     int32_t param_size;      /**< Bytes of the parameters of a node, a multiple of 16 */
-<<<<<<< HEAD
     const char *array;       /**< Member of the array parameter, NULL for none */
     int32_t array_max;       /**< Most elements of the array parameter */
     int32_t array_header;    /**< Byte offset in the parameters of the vec4u of the array:
                               *   (vec4 index of its first element in the parameter buffer,
                               *   element count, 0, 0) */
-=======
     int32_t types_offset;    /**< Byte offset of the types word of a kind with a TexAny input,
                               *   see box_texture_node_desc_t, -1 without */
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
@@ -647,7 +644,6 @@ typedef struct box_texture_node_param_t {
     box_texture_param_kind_t kind; /**< Kind of its elements */
 } box_texture_node_param_t;
 
-<<<<<<< HEAD
 /** Pack the elements of the array parameter of a node into the parameter buffer.
  *
  * @param node The node component
@@ -676,7 +672,7 @@ typedef struct box_texture_node_array_t {
     int32_t max;                /**< Most elements, 1 to BOX_TEXTURE_NODE_ARRAY_MAX */
     box_texture_node_pack_t pack; /**< Writes the elements, NULL to copy them */
 } box_texture_node_array_t;
-=======
+
 /** Type of the value of a node of a kind whose output is TexAny.
  *
  * The default, without a function or when it returns TexAny, is a Vector when an input node
@@ -689,7 +685,6 @@ typedef struct box_texture_node_array_t {
 typedef TextureValueType (*box_texture_node_type_t)(
     const void *node,
     const TextureValueType *inputs);
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
 
 /** Description of a node kind for box_texture_node_register.
  *
@@ -697,14 +692,12 @@ typedef TextureValueType (*box_texture_node_type_t)(
  * of the parameter bytes p, the input values i (a scalar in x, the constant without a node)
  * and the coordinates returns the value of the node, a scalar in x.
  *
-<<<<<<< HEAD
- * It returns the value of the node, a scalar in x. A kind with an array parameter reads its
- * elements from box_texgraph_params at the index in its header, see box_texture_node_array_t.
-=======
+ * A kind with an array parameter reads its elements from box_texgraph_params at the index in
+ * its header, see box_texture_node_array_t.
+ *
  * A kind with a TexAny input gets a u32 after its last parameter, 4 byte aligned, with bit j
  * set when input j has a Scalar node and bit 4 + j when it has a Vector node; its function
  * broadcasts a Scalar input itself.
->>>>>>> 7702aad1d2b020e94876d469555ac283e246846d
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
