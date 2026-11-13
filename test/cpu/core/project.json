@@ -362,6 +362,7 @@
                 "testcases": [
                     "builtin_kinds",
                     "kind_reflected_json",
+                    "cells_kind",
                     "script",
                     "script_declared_after",
                     "node_set_next_frame",
@@ -417,7 +418,10 @@
                     "ramp_too_many_keys",
                     "curve_keys_layout",
                     "curve_invalid",
-                    "array_register_invalid"
+                    "array_register_invalid",
+                    "blocks_kind",
+                    "blocks_plane",
+                    "blocks_sphere_error"
                 ]
             },
             {

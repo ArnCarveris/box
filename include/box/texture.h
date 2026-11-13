@@ -561,11 +561,108 @@ ECS_STRUCT(TexCurve, {
     Curve curve;                 /**< The curve */
 });
 
+/** Node of a TextureGraph of courses of blocks or planks, as a GenBlocks layer of TextureGen
+ * makes them: the same parameters and seeds give the same blocks, ids and tones.
+ *
+ * Its value is (mask, id, tone, random): mask 1 on a face and 0 in the joints, beveled; id the
+ * random id of the block in 0..1 as GenBlocks gives it; tone the tone level of the block,
+ * tone / (tones - 1), 0 with fewer than two tones; random a second random number of the block
+ * in 0..1, independent of id. Lengths are fractions of the width of the image, the courses
+ * repeat down v and the cuts wrap along u, so it tiles over 0..1.
+ *
+ * DomainPlane only: on DomainSphere it fails the graph.
+ *
+ * @code
+ * ashlar {
+ *   blocks { TexBlocks: {courses: 8, per_course: 4, gap: 0.006, jitter: 0.22, stagger: 0.5,
+ *                        seed: 11} }
+ *   TextureGraph: {output: blocks, format: GraphLinear}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexBlocks, {
+    ecs_entity_t coords;    /**< Vector input node of the (u, v) the blocks are evaluated at, 0
+                             *   for the coordinates of the domain */
+    int32_t courses;        /**< Courses down the texture, default 8 */
+    int32_t per_course;     /**< Blocks along a course, default 4 */
+    float gap;              /**< Width of the joints as a fraction of the width */
+    float jitter;           /**< Random shift of each cut, up to +-jitter blocks */
+    float stagger;          /**< Shift of every second course in blocks */
+    float softness;         /**< Width of the bevel from a joint to the face as a fraction of the
+                             *   width, default 1.3 times gap; with neither a hard edge */
+    int32_t tones;          /**< Number of tones a block takes, 0 for none */
+    TextureGenToneOrder tone_order; /**< Order of the tones, default GenToneRandom */
+    int32_t seed;           /**< Seed, as TextureGen.seed */
+    int32_t layer_seed;     /**< Seed mixed with seed, as TextureGenLayer.seed */
+});
+
+/** What the x of a TexCells node measures */
+ECS_ENUM(TextureCellsDistance, {
+    CellsNearest = 0, /**< Distance to the nearest point (F1) in cell sizes: 0 at the point, the
+                       *   default */
+    CellsSecond = 1,  /**< Distance to the second nearest point (F2) in cell sizes */
+    CellsEdge = 2     /**< F2 - F1 through a smoothstep over edge: 0 on the border between two
+                       *   cells, 1 inside, as GenEdge */
+});
+
+/** Node of a TextureGraph with Voronoi cells of jittered lattice points: a Vector of the
+ * distance of distance in x, a random id in 0..1 of the cell in y and two more random values
+ * of the cell in z and w, for tones and per cell variation; each is the same over a cell and
+ * stable for a seed.
+ *
+ * On DomainPlane the cells are a periodic lattice of about count cells over the image, so it
+ * tiles; distances are in cell sizes as TextureGen measures them, the square root of the area
+ * of a cell in pixels. On DomainSphere they are 3D cells evaluated at the coordinates, scaled
+ * so about count cells cover the unit sphere, seamless; distances are in 3D lattice cells.
+ *
+ * Each point moves within its cell, back and forth at its own speed, as evolve changes, so a
+ * time on evolve animates the cells continuously; 0 keeps the points where the seed puts them.
+ *
+ * @code
+ * stones {
+ *   cells  { TexCells: {count: 100, distance: CellsEdge, edge: 0.15, seed: 3} }
+ *   TextureGraph: {output: cells, width: 512}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexCells, {
+    TextureCellsDistance distance; /**< What x measures, default CellsNearest */
+    int32_t count;      /**< Approximate number of cells over the domain, 0 for 64 */
+    float jitter;       /**< Random shift of the points, 0 for a regular lattice with the
+                         *   points at the cell centers to 1 for anywhere in their cell; 1
+                         *   when the component is added */
+    int32_t seed;       /**< Seed of the points and the random values of the cells */
+    float edge;         /**< Width of the smoothstep of CellsEdge in cell sizes, 0 for 0.25 */
+    ecs_entity_t coords; /**< Vector input node of the coordinates, 0 for the coordinates of
+                          *   the texel in the domain */
+    ecs_entity_t evolve; /**< Scalar input node that moves the points, 0 for evolve_value */
+    float evolve_value; /**< Value of evolve without a node: a point crosses its cell and back
+                         *   in 1 to 2 units */
+});
+
+/** Node of a TextureGraph that blurs its input with a separable gaussian, in two passes.
+ *
+ * The input is a Scalar or a Vector node and the value has its type, input_value without one.
+ * DomainPlane wraps, so a tiling input still tiles. DomainSphere wraps in longitude, scales the
+ * horizontal radius by 1/cos(latitude) and continues vertical taps across a pole.
+ *
+ * @code
+ * soft { TexBlur: {input: noise, radius: 8} }
+ * @endcode
+ */
+ECS_STRUCT(TexBlur, {
+    ecs_entity_t input; /**< Node to blur, a Scalar or a Vector, 0 for input_value */
+    vec4 input_value;   /**< Value of input without a node */
+    float radius;       /**< Reach of the gaussian in texels of a 512 pixel wide image, scaled
+                         *   with the width so the look does not change with the resolution:
+                         *   three standard deviations, 0 for no blur */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
 /** Most parameters of a node kind */
-#define BOX_TEXTURE_NODE_PARAMS (8)
+#define BOX_TEXTURE_NODE_PARAMS (16)
 
 /** Most bytes of the parameters of a node kind in the parameter buffer */
 #define BOX_TEXTURE_NODE_PARAM_BYTES (64)
@@ -579,12 +676,19 @@ ECS_STRUCT(TexCurve, {
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
 
+/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
+#define BOX_TEXTURE_NODE_PLANE (1u << 2)
+
+/** Most passes of a node kind */
+#define BOX_TEXTURE_NODE_PASSES (4)
+
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
     const char *name;      /**< Member of the ecs_entity_t of the input node */
     TextureValueType type; /**< Type the input node must output */
     bool fallback;         /**< The input has a constant member used without a node */
     const char *value;     /**< Name of that constant member, NULL without one */
+    bool coords;           /**< Without a node the input is the coordinates of the texel */
 });
 
 /** A parameter of a node kind, as TextureNodeKind lists it */
@@ -602,7 +706,7 @@ ECS_STRUCT(TextureNodeKind, {
     int32_t input_count;     /**< Inputs in inputs */
     TextureNodePort inputs[4]; /**< The BOX_TEXTURE_NODE_INPUTS inputs, in order */
     int32_t param_count;     /**< Parameters in params */
-    TextureNodeParam params[8]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
+    TextureNodeParam params[16]; /**< The BOX_TEXTURE_NODE_PARAMS parameters, in order */
     int32_t param_size;      /**< Bytes of the parameters of a node, a multiple of 16 */
     const char *array;       /**< Member of the array parameter, NULL for none */
     int32_t array_max;       /**< Most elements of the array parameter */
@@ -614,6 +718,8 @@ ECS_STRUCT(TextureNodeKind, {
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
+    bool plane;              /**< The node works on DomainPlane only */
+    int32_t passes;          /**< Passes that compute the value, 1 for most kinds */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -698,6 +804,10 @@ typedef TextureValueType (*box_texture_node_type_t)(
  * A kind with a TexAny input gets a u32 after its last parameter, 4 byte aligned, with bit j
  * set when input j has a Scalar node and bit 4 + j when it has a Vector node; its function
  * broadcasts a Scalar input itself.
+ *
+ * A neighbourhood kind also gets texel: vec2i, then t0: texture_2d<f32>, ... per input. A kind of
+ * more passes gets pass_index: u32 and prev: texture_2d<f32> (the pass before, 1x1 zero in pass
+ * 0) between texel and t0; its last pass is the value of the node.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -710,7 +820,11 @@ typedef struct box_texture_node_desc_t {
     box_texture_node_array_t array; /**< Array parameter, name NULL for none */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_PLANE */
+    int32_t passes;             /**< Passes of the function, 0 for 1, at most
+                                 *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
+                                 *   neighbourhood kind */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

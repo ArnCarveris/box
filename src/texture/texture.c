@@ -816,6 +816,26 @@ done:
     return;
 }
 
+/** Construct TexCells components with full jitter and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_cells_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexCells *cells = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&cells[i], 0, TexCells);
+        cells[i].jitter = 1;
+    }
+}
+
 /** Free the image of TexturePixels components.
  *
  * @param ptr The components
@@ -1138,6 +1158,9 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexCoords);
     ECS_META_COMPONENT(world, TextureMathOp);
     ECS_META_COMPONENT(world, TexMath);
+    ECS_META_COMPONENT(world, TextureCellsDistance);
+    ECS_META_COMPONENT(world, TexCells);
+    ECS_META_COMPONENT(world, TexBlocks);
     ECS_META_COMPONENT(world, TextureChannel);
     ECS_META_COMPONENT(world, TexSplit);
     ECS_META_COMPONENT(world, TexCombine);
@@ -1148,6 +1171,7 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TextureGraphCache);
     ECS_META_COMPONENT(world, TexRamp);
     ECS_META_COMPONENT(world, TexCurve);
+    ECS_META_COMPONENT(world, TexBlur);
     ECS_META_COMPONENT(world, TextureNodePort);
     ECS_META_COMPONENT(world, TextureNodeParam);
     ECS_META_COMPONENT(world, TextureNodeKind);
@@ -1163,6 +1187,7 @@ void BoxTextureImport(
     box_owned_hooks(world, TexRamp, BOX_OWNED_VEC(TexRamp, keys, TextureGenKey));
     box_owned_hooks(world, TexCurve, BOX_OWNED_CURVE(TexCurve, curve));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+    ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
     box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name),
         BOX_OWNED_STR(TextureNodePort, value));
     box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));

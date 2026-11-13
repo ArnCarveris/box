@@ -133,6 +133,280 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
+/** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
+ * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
+ * them further apart, between texels. */
+static const char *box_texture_blur_wgsl =
+    "const BOX_TEX_BLUR_TAPS: i32 = 64;\n"
+    "\n"
+    "fn box_tex_blur_tap(t: texture_2d<f32>, texel: vec2i, axis: u32, offset: f32) -> vec4f {\n"
+    "    let o = floor(offset);\n"
+    "    let f = offset - o;\n"
+    "    let dir = select(vec2i(0, 1), vec2i(1, 0), axis == 0u);\n"
+    "    let a = texel + dir * i32(o);\n"
+    "    return mix(box_texgraph_load_poles(t, a), box_texgraph_load_poles(t, a + dir), f);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blur_axis(t: texture_2d<f32>, texel: vec2i, axis: u32, radius: f32) -> vec4f {\n"
+    "    if (radius <= 0.0) {\n"
+    "        return box_texgraph_load_poles(t, texel);\n"
+    "    }\n"
+    "    let taps = clamp(i32(ceil(radius)), 1, BOX_TEX_BLUR_TAPS);\n"
+    "    let spacing = radius / f32(taps);\n"
+    "    let sigma = radius / 3.0;\n"
+    "    var sum = vec4f(0.0);\n"
+    "    var total = 0.0;\n"
+    "    for (var k = -taps; k <= taps; k ++) {\n"
+    "        let o = f32(k) * spacing;\n"
+    "        let w = exp(-0.5 * o * o / (sigma * sigma));\n"
+    "        sum += w * box_tex_blur_tap(t, texel, axis, o);\n"
+    "        total += w;\n"
+    "    }\n"
+    "    return sum / total;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blur(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    pass_index: u32, prev: texture_2d<f32>, t0: texture_2d<f32>) -> vec4f {\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let radius = max(bitcast<f32>(p[0].x), 0.0) * size.x / 512.0;\n"
+    "    let sphere = box_texgraph_stage.domain == 1u;\n"
+    "    if (pass_index == 0u) {\n"
+    "        if (any(textureDimensions(t0) != box_texgraph_stage.size)) {\n"
+    "            return i[0];\n"
+    "        }\n"
+    "        var r = radius;\n"
+    "        if (sphere) {\n"
+    "            let s = sin((f32(texel.y) + 0.5) / size.y * BOX_TEXGRAPH_PI);\n"
+    "            r = min(radius / max(s, 1e-6), size.x * 0.5);\n"
+    "        }\n"
+    "        return box_tex_blur_axis(t0, texel, 0u, r);\n"
+    "    }\n"
+    "    return box_tex_blur_axis(prev, texel, 1u,\n"
+    "        select(radius, radius * 2.0 * size.y / size.x, sphere));\n"
+    "}\n";
+
+/** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
+ * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
+ * and w.
+ *
+ * The cells around the texel are searched inner ring first, skipping a cell whose box, which
+ * holds its point wherever evolve moves it, is farther than the second nearest point found. */
+static const char *box_texture_cells_wgsl =
+    "fn box_tex_cells_hash(cell: vec3i, seed: u32) -> u32 {\n"
+    "    return box_texgraph_hash(box_texgraph_hash3(bitcast<vec3u>(cell)) ^\n"
+    "        box_texgraph_hash(seed + 0x9e3779b9u));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells_random(h: u32, k: u32) -> f32 {\n"
+    "    return box_texgraph_random(box_texgraph_hash(h ^ (k * 0x9e3779b9u)));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells_wave(x: vec3f) -> vec3f {\n"
+    "    return abs(fract(x) * 2.0 - 1.0);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells_point(h: u32, jitter: f32, evolve: f32) -> vec3f {\n"
+    "    let r = vec3f(box_tex_cells_random(h, 0u), box_tex_cells_random(h, 1u),\n"
+    "        box_tex_cells_random(h, 2u));\n"
+    "    let speed = 0.5 + 0.5 * vec3f(box_tex_cells_random(h, 3u),\n"
+    "        box_tex_cells_random(h, 4u), box_tex_cells_random(h, 5u));\n"
+    "    return 0.5 + jitter * (box_tex_cells_wave(r + evolve * speed) - 0.5);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_cells(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let count_param = bitcast<i32>(p[0].x);\n"
+    "    let count = f32(select(count_param, 64, count_param <= 0));\n"
+    "    let jitter = clamp(bitcast<f32>(p[0].y), 0.0, 1.0);\n"
+    "    let seed = p[0].z;\n"
+    "    let mode = bitcast<i32>(p[0].w);\n"
+    "    let edge_param = bitcast<f32>(p[1].x);\n"
+    "    let edge = select(edge_param, 0.25, edge_param <= 0.0);\n"
+    "    let evolve = i[1].x;\n"
+    "    var q = vec3f(0.0);\n"
+    "    var period = vec3i(0);\n"
+    "    var weight = vec3f(1.0);\n"
+    "    var reach = 2;\n"
+    "    if (box_texgraph_stage.domain == 1u) {\n"
+    "        q = i[0].xyz * sqrt(count / (6.0 * BOX_TEXGRAPH_PI));\n"
+    "    } else {\n"
+    "        let size = vec2f(box_texgraph_stage.size);\n"
+    "        let gx = clamp(floor(sqrt(count * size.x / size.y) + 0.5), 1.0, 4096.0);\n"
+    "        let gy = clamp(floor(count / gx + 0.5), 1.0, 4096.0);\n"
+    "        let ratio = sqrt((size.x / gx) / (size.y / gy));\n"
+    "        q = vec3f(i[0].xy * vec2f(gx, gy), 0.0);\n"
+    "        period = vec3i(i32(gx), i32(gy), 1);\n"
+    "        weight = vec3f(ratio, 1.0 / ratio, 0.0);\n"
+    "        reach = 0;\n"
+    "    }\n"
+    "\n"
+    "    let base = vec3i(floor(q));\n"
+    "    var f1 = 1e30;\n"
+    "    var f2 = 1e30;\n"
+    "    var near = 0u;\n"
+    "    for (var ring = 0; ring < 2; ring ++) {\n"
+    "        for (var z = -reach; z <= reach; z ++) {\n"
+    "            for (var y = -2; y <= 2; y ++) {\n"
+    "                for (var x = -2; x <= 2; x ++) {\n"
+    "                    let o = vec3i(x, y, z);\n"
+    "                    let c = base + o;\n"
+    "                    let gap = max(max(vec3f(c) - q, q - vec3f(c + vec3i(1))),\n"
+    "                        vec3f(0.0)) * weight;\n"
+    "                    let inner = all(abs(o) <= vec3i(1));\n"
+    "                    if (inner != (ring == 0) || dot(gap, gap) >= f2 * f2) {\n"
+    "                        continue;\n"
+    "                    }\n"
+    "\n"
+    "                    var cell = c;\n"
+    "                    if (period.x > 0) {\n"
+    "                        cell = ((c % period) + period) % period;\n"
+    "                    }\n"
+    "\n"
+    "                    let h = box_tex_cells_hash(cell, seed);\n"
+    "                    let at = box_tex_cells_point(h, jitter, evolve);\n"
+    "                    let d = length((vec3f(c) + at - q) * weight);\n"
+    "                    if (d < f1) {\n"
+    "                        f2 = f1;\n"
+    "                        f1 = d;\n"
+    "                        near = h;\n"
+    "                    } else if (d < f2) {\n"
+    "                        f2 = d;\n"
+    "                    }\n"
+    "                }\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+    "\n"
+    "    var d = f1;\n"
+    "    if (mode == 1) {\n"
+    "        d = f2;\n"
+    "    } else if (mode == 2) {\n"
+    "        d = smoothstep(0.0, edge, f2 - f1);\n"
+    "    }\n"
+    "\n"
+    "    return vec4f(d, box_tex_cells_random(near, 6u), box_tex_cells_random(near, 7u),\n"
+    "        box_tex_cells_random(near, 8u));\n"
+    "}\n";
+
+/** WGSL of the TexBlocks node: the courses of blocks of box_gen_blocks of texture/gen.c.
+ *
+ * The cuts of the course of the texel are made again rather than sorted: the block starts at
+ * the largest cut at or before u, the last in index order among equal cuts as the stable sort
+ * keeps them; its id comes from its rank among the cuts and its tone from its index.
+ *
+ * Before the first cut the block is the last one with its end one past the first cut, as gen.c
+ * has it. Lengths are in widths of the image. */
+static const char *box_texture_blocks_wgsl =
+    "fn box_tex_blocks_mix(v: u32) -> u32 {\n"
+    "    var x = v;\n"
+    "    x ^= x >> 16u;\n"
+    "    x *= 0x7feb352du;\n"
+    "    x ^= x >> 15u;\n"
+    "    x *= 0x846ca68bu;\n"
+    "    x ^= x >> 16u;\n"
+    "    return x;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks_hash(h: u32, v: u32) -> u32 {\n"
+    "    return box_tex_blocks_mix(h ^ box_tex_blocks_mix(v + 0x9e3779b9u));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks_unit(h: u32) -> f32 {\n"
+    "    return f32(h >> 8u) / 16777216.0;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks_cut(hk: u32, b: i32, n: i32, jitter: f32, shift: f32) -> f32 {\n"
+    "    let r = box_tex_blocks_unit(box_tex_blocks_hash(hk, u32(b)));\n"
+    "    let cut = (f32(b) + (r * 2.0 - 1.0) * jitter + shift) / f32(n);\n"
+    "    return cut - floor(cut);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_blocks(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
+    "    let counts = bitcast<vec4i>(p[0]);\n"
+    "    let shape = bitcast<vec4f>(p[1]);\n"
+    "    let courses = select(min(counts.x, 4096), 8, counts.x <= 0);\n"
+    "    let n = select(min(counts.y, 4096), 4, counts.y <= 0);\n"
+    "    let tones = clamp(counts.z, 0, 4096);\n"
+    "    let tone_order = counts.w;\n"
+    "    let gap = shape.x;\n"
+    "    let jitter = shape.y;\n"
+    "    let softness = shape.w;\n"
+    "    let at = i[0];\n"
+    "    var seed = box_tex_blocks_hash(0x5bd1e995u, p[2].x);\n"
+    "    seed = box_tex_blocks_hash(seed, p[2].y);\n"
+    "    seed = box_tex_blocks_hash(seed, 1u);\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let v = (at.y - floor(at.y)) * f32(courses);\n"
+    "    let u = at.x - floor(at.x);\n"
+    "    let k = min(i32(floor(v)), courses - 1);\n"
+    "    let dy = min(v - f32(k), f32(k + 1) - v) * size.y / (f32(courses) * size.x);\n"
+    "    let hk = box_tex_blocks_hash(seed, u32(k));\n"
+    "    let shift = select(0.0, shape.z, (k % 2) == 1);\n"
+    "    var start = -1.0;\n"
+    "    var start_b = -1;\n"
+    "    var end = 2.0;\n"
+    "    var lo = 2.0;\n"
+    "    var hi = -1.0;\n"
+    "    var hi_b = 0;\n"
+    "    for (var b = 0; b < n; b ++) {\n"
+    "        let c = box_tex_blocks_cut(hk, b, n, jitter, shift);\n"
+    "        if (c <= u && c >= start) {\n"
+    "            start = c;\n"
+    "            start_b = b;\n"
+    "        }\n"
+    "        if (c > u) {\n"
+    "            end = min(end, c);\n"
+    "        }\n"
+    "        if (c >= hi) {\n"
+    "            hi = c;\n"
+    "            hi_b = b;\n"
+    "        }\n"
+    "        lo = min(lo, c);\n"
+    "    }\n"
+    "    var cut = start;\n"
+    "    if (start_b < 0) {\n"
+    "        cut = hi;\n"
+    "        start = hi - 1.0;\n"
+    "        start_b = hi_b;\n"
+    "        end = lo + 1.0;\n"
+    "    } else if (end > 1.5) {\n"
+    "        end = lo + 1.0;\n"
+    "    }\n"
+    "    var rank = 0;\n"
+    "    for (var b = 0; b < n; b ++) {\n"
+    "        let c = box_tex_blocks_cut(hk, b, n, jitter, shift);\n"
+    "        if (c < cut || (c == cut && b < start_b)) {\n"
+    "            rank ++;\n"
+    "        }\n"
+    "    }\n"
+    "    let hid = box_tex_blocks_hash(hk ^ 0xa511e9b3u, 1u);\n"
+    "    let htone = box_tex_blocks_hash(hk ^ 0x3c6ef372u, 2u);\n"
+    "    let hrandom = box_tex_blocks_hash(hk ^ 0x85ebca6bu, 3u);\n"
+    "    let id = box_tex_blocks_unit(box_tex_blocks_hash(hid, u32(rank)));\n"
+    "    let random = box_tex_blocks_unit(box_tex_blocks_hash(hrandom, u32(rank)));\n"
+    "    var tone = 0;\n"
+    "    if (tones > 0) {\n"
+    "        if (tone_order == 1) {\n"
+    "            tone = (k + start_b) % tones;\n"
+    "        } else if (tone_order == 2) {\n"
+    "            tone = k % tones;\n"
+    "        } else if (tone_order == 3) {\n"
+    "            tone = start_b % tones;\n"
+    "        } else {\n"
+    "            let r = box_tex_blocks_unit(box_tex_blocks_hash(htone, u32(start_b)));\n"
+    "            tone = min(i32(floor(r * f32(tones))), tones - 1);\n"
+    "        }\n"
+    "    }\n"
+    "    let d = min(min(u - start, end - u), dy);\n"
+    "    let half = 0.5 * gap;\n"
+    "    let bevel = select(1.3 * gap, softness, softness > 0.0);\n"
+    "    var mask = select(0.0, 1.0, d >= half);\n"
+    "    if (bevel > 0.0) {\n"
+    "        mask = smoothstep(half, half + bevel, d);\n"
+    "    }\n"
+    "    let level = select(0.0, f32(tone) / f32(max(tones - 1, 1)), tones > 1);\n"
+    "    return vec4f(mask, id, level, random);\n"
+    "}\n";
+
 /** WGSL of the TexRamp node: the display encoded colors of the keys around the input mixed as
  * box_gen_ramp does, decoded to linear; the elements are (position, r, g, b) in 0..1 */
 static const char *box_texture_ramp_wgsl =
@@ -296,6 +570,7 @@ typedef struct box_texture_graph_build_t {
     ecs_vec_t nodes;            /**< box_texture_graph_node_t in topological order */
     ecs_vec_t params;           /**< uint8_t, parameter bytes of the nodes */
     ecs_vec_t *reached;         /**< ecs_entity_t, the entities the walk reached */
+    TextureGraphDomain domain;  /**< Coordinates of the texels of the graph */
     char *error;                /**< Why the build failed, NULL while it did not */
     bool wait;                  /**< Wait for a node without a node component */
     bool waiting;               /**< The walk found a node without a node component */
@@ -470,6 +745,15 @@ static int box_texture_node_kind_fill(
     kind->output = desc->output;
     kind->output_type = desc->output_type;
     kind->flags = desc->flags;
+    kind->passes = desc->passes > 1 ? desc->passes : 1;
+    if (kind->passes > 1) {
+        kind->flags |= BOX_TEXTURE_NODE_NEIGHBOURHOOD;
+    }
+
+    if (kind->passes > BOX_TEXTURE_NODE_PASSES) {
+        result = -1;
+    }
+
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS && desc->inputs[i].name; i ++) {
@@ -547,7 +831,9 @@ static void box_texture_node_kind_reflect(
         .types_offset = kind->types_offset,
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
-        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0
+        .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0,
+        .plane = (kind->flags & BOX_TEXTURE_NODE_PLANE) != 0,
+        .passes = kind->passes
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -555,6 +841,7 @@ static void box_texture_node_kind_reflect(
         value.inputs[i].type = kind->inputs[i].type;
         value.inputs[i].fallback = kind->inputs[i].value != NULL;
         value.inputs[i].value = kind->inputs[i].value;
+        value.inputs[i].coords = kind->inputs[i].coords;
     }
 
     for (i = 0; i < kind->param_count; i ++) {
@@ -589,9 +876,9 @@ int32_t box_texture_node_register(
     kind = ecs_os_calloc_t(box_texture_node_kind_t);
     if (box_texture_node_kind_fill(kind, desc)) {
         char *name = ecs_get_path(world, desc->component);
-        ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size "
-            "or more than %d parameter bytes, or an invalid array", name,
-            BOX_TEXTURE_NODE_PARAM_BYTES);
+        ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size, "
+            "more than %d parameter bytes, more than %d passes or an invalid array", name,
+            BOX_TEXTURE_NODE_PARAM_BYTES, BOX_TEXTURE_NODE_PASSES);
         ecs_os_free(name);
         box_texture_node_kind_strings_free(kind);
         ecs_os_free(kind);
@@ -940,7 +1227,7 @@ static int32_t box_texture_graph_append(
  * @param output Type of the node
  * @param from Node of the input, 0 for the output of the graph
  * @param input Name of the input
- * @param expected Type the input expects
+ * @param expected Type the input expects, TexAny for either
  */
 static void box_texture_graph_check_type(
     box_texture_graph_build_t *b,
@@ -967,7 +1254,7 @@ static void box_texture_graph_check_type(
  * @param e The node entity
  * @param from Node whose input it is, 0 for the output of the graph
  * @param input Name of that input
- * @param expected Type that input expects
+ * @param expected Type that input expects, TexAny for either
  * @return Index of the node, -1 when the build failed or waits
  */
 static int32_t box_texture_graph_visit(
@@ -1025,6 +1312,13 @@ static int32_t box_texture_graph_visit(
     if (!kind) {
         box_texture_graph_error(b, "node '%s' has no node component", name);
         goto done;
+    }
+
+    if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain == DomainSphere) {
+        char *component = ecs_get_path(b->world, kind->component);
+        box_texture_graph_error(b, "node '%s' (%s) works on DomainPlane only, the graph is on "
+            "DomainSphere", name, component);
+        ecs_os_free(component);
     }
 
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
@@ -1205,7 +1499,8 @@ static void box_texture_graph_build(
     const TextureGraph *graph = ecs_get(world, e, TextureGraph);
     box_texture_t *tex = box_texture_entry(t, e);
     box_texture_graph_build_t b = {
-        .world = world, .t = t, .graph = e, .reached = &tex->reached, .wait = wait
+        .world = world, .t = t, .graph = e, .reached = &tex->reached, .wait = wait,
+        .domain = graph->domain
     };
     tex->graph_dirty = false;
     tex->graph_waiting = false;
@@ -1370,7 +1665,8 @@ done:
 }
 
 /** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
- * TexWarp, TexTransform, TexTime, TexSplat, TexRamp and TexCurve.
+ * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve, TexBlocks, TexCells and
+ * TexBlur.
  *
  * @param world The world
  */
@@ -1411,6 +1707,20 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_math",
         .source = box_texture_math_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexBlur),
+        .output = TexAny,
+        .inputs = {
+            { "input", offsetof(TexBlur, input), TexAny, "input_value",
+                offsetof(TexBlur, input_value) }
+        },
+        .params = {{ "radius", offsetof(TexBlur, radius), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_blur",
+        .source = box_texture_blur_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
+        .passes = 2
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
@@ -1514,6 +1824,46 @@ static void box_texture_nodes_register(
             BOX_TEXTURE_CURVE_KEYS, box_texture_curve_pack },
         .function = "box_tex_curve",
         .source = box_texture_curve_wgsl
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexBlocks),
+        .output = TexVector,
+        .inputs = {{ "coords", offsetof(TexBlocks, coords), TexVector, NULL, 0, true }},
+        .params = {
+            { "courses", offsetof(TexBlocks, courses), 4, BOX_TEXTURE_PARAM_I32 },
+            { "per_course", offsetof(TexBlocks, per_course), 4, BOX_TEXTURE_PARAM_I32 },
+            { "tones", offsetof(TexBlocks, tones), 4, BOX_TEXTURE_PARAM_I32 },
+            { "tone_order", offsetof(TexBlocks, tone_order), 4, BOX_TEXTURE_PARAM_I32 },
+            { "gap", offsetof(TexBlocks, gap), 4, BOX_TEXTURE_PARAM_F32 },
+            { "jitter", offsetof(TexBlocks, jitter), 4, BOX_TEXTURE_PARAM_F32 },
+            { "stagger", offsetof(TexBlocks, stagger), 4, BOX_TEXTURE_PARAM_F32 },
+            { "softness", offsetof(TexBlocks, softness), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexBlocks, seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "layer_seed", offsetof(TexBlocks, layer_seed), 4, BOX_TEXTURE_PARAM_I32 }
+        },
+        .function = "box_tex_blocks",
+        .source = box_texture_blocks_wgsl,
+        .flags = BOX_TEXTURE_NODE_PLANE
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexCells),
+        .output = TexVector,
+        .inputs = {
+            { "coords", offsetof(TexCells, coords), TexVector, NULL, 0, true },
+            { "evolve", offsetof(TexCells, evolve), TexScalar, "evolve_value",
+                offsetof(TexCells, evolve_value) }
+        },
+        .params = {
+            { "count", offsetof(TexCells, count), 4, BOX_TEXTURE_PARAM_I32 },
+            { "jitter", offsetof(TexCells, jitter), 4, BOX_TEXTURE_PARAM_F32 },
+            { "seed", offsetof(TexCells, seed), 4, BOX_TEXTURE_PARAM_I32 },
+            { "distance", offsetof(TexCells, distance), 4, BOX_TEXTURE_PARAM_I32 },
+            { "edge", offsetof(TexCells, edge), 4, BOX_TEXTURE_PARAM_F32 }
+        },
+        .function = "box_tex_cells",
+        .source = box_texture_cells_wgsl
     });
 }
 

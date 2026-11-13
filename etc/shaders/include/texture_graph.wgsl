@@ -63,6 +63,30 @@ fn box_texgraph_load(t: texture_2d<f32>, texel: vec2i) -> vec4f {
     return textureLoad(t, box_texgraph_wrap(texel), 0);
 }
 
+// Texel of the image at integer coordinates outside it, continuing across the poles of the
+// sphere: a row past the top or the bottom is the row mirrored back on the opposite meridian,
+// half the width around; the plane repeats as box_texgraph_wrap does
+fn box_texgraph_wrap_poles(texel: vec2i) -> vec2i {
+    let size = vec2i(box_texgraph_stage.size);
+    var t = texel;
+    if (box_texgraph_stage.domain == 1u) {
+        let period = 2 * size.y;
+        var y = ((t.y % period) + period) % period;
+        if (y >= size.y) {
+            y = period - 1 - y;
+            t.x = t.x + size.x / 2;
+        }
+        t.y = y;
+    }
+
+    return box_texgraph_wrap(t);
+}
+
+// Value of a materialized input at a texel, continuing across the poles on the sphere
+fn box_texgraph_load_poles(t: texture_2d<f32>, texel: vec2i) -> vec4f {
+    return textureLoad(t, box_texgraph_wrap_poles(texel), 0);
+}
+
 // Value of a materialized input between texels, bilinear by hand at a position in texels with
 // the texel centers at + 0.5
 fn box_texgraph_bilinear(t: texture_2d<f32>, pos: vec2f) -> vec4f {

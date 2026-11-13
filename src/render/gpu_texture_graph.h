@@ -56,7 +56,8 @@ typedef struct box_gpu_tg_kind_t {
     uint32_t input_count;       /**< Inputs of a node */
     uint32_t param_size;        /**< Bytes of the parameters before the input constants */
     uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE */
+    uint32_t passes;            /**< Passes of the function, from 1 */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint64_t hash;              /**< Hash of the description, part of the program keys */
@@ -77,14 +78,18 @@ typedef struct box_gpu_tg_layout_t {
     WGPUPipelineLayout pipeline; /**< The pipeline layout */
 } box_gpu_tg_layout_t;
 
-/** A stage of a program: one compute shader that materializes one node */
+/** A stage of a program: one compute shader that materializes one node, or one pass but the
+ * last of a node of a kind of more than one pass */
 typedef struct box_gpu_tg_stage_t {
     uint32_t shader;            /**< Shader handle of its module */
-    int32_t root;               /**< Node whose value it stores */
+    int32_t root;               /**< Node whose value, or whose pass, it stores */
+    int32_t pass;               /**< Pass of root it stores, -1 for the value of root */
+    int32_t slot;               /**< Slot of the texture it writes: root for its value, from the
+                                 *   node count for the earlier passes of the nodes */
     bool output;                /**< It stores the image */
     WGPUTextureFormat format;   /**< Format of the texture it writes */
-    int32_t input_count;        /**< Materialized nodes it reads */
-    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those nodes, binding BOX_GPU_TG_FIRST_INPUT + i */
+    int32_t input_count;        /**< Materialized slots it reads */
+    int32_t inputs[BOX_GPU_TG_INPUTS]; /**< Those slots, binding BOX_GPU_TG_FIRST_INPUT + i */
     box_gpu_tg_layout_t *layout; /**< Its layouts, owned by the graph state */
     WGPUComputePipeline pipeline; /**< Its pipeline once created */
     ecs_vec_t lines;            /**< box_gpu_tg_line_t of its code */
@@ -95,6 +100,8 @@ typedef struct box_gpu_tg_program_t {
     uint64_t key;               /**< Key of the structure, see box_gpu_tg_key */
     int32_t refs;               /**< Graphs that use it as current or pending program */
     int32_t node_count;         /**< Nodes of the structure */
+    int32_t slot_count;         /**< Texture slots of an evaluation: one per node, then one per
+                                 *   pass but the last of each node of more than one pass */
     int32_t stage_count;        /**< Stages in stages */
     box_gpu_tg_stage_t *stages; /**< The stages in order, the output stage last */
     bool failed;                /**< A stage did not compile, or the structure cannot be made */
@@ -193,7 +200,8 @@ typedef struct box_gpu_tg_stamp_t {
 /** What an evaluation of a packet holds until its copies are recorded */
 typedef struct box_gpu_tg_eval_t {
     box_gpu_tg_graph_t *graph;  /**< The graph */
-    box_gpu_tg_pooled_t **textures; /**< Intermediate of each materialized node, by node */
+    box_gpu_tg_pooled_t **textures; /**< Intermediate of each materialized slot, by slot: the
+                                 *   nodes, then the earlier passes */
     box_gpu_tg_pooled_t *temp;  /**< Texture the output stage writes before a blit, or NULL */
     box_gpu_tg_entry_t **entries; /**< Cache entry of each node it reads or writes, by node,
                                  *   which the graph holds after the evaluation */

@@ -84,7 +84,9 @@ typedef struct box_texture_node_kind_t {
                                  *   the max elements of the array */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
+                                 *   BOX_TEXTURE_NODE_PLANE */
+    int32_t passes;             /**< Passes of the function, from 1 */
     bool sent;                  /**< The current backend has the kind */
 } box_texture_node_kind_t;
 

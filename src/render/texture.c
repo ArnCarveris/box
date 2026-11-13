@@ -212,6 +212,7 @@ static void box_render_texture_kinds_send(
 
         desc->param_size = (uint32_t)kind->param_size;
         desc->flags = kind->flags;
+        desc->passes = (uint32_t)kind->passes;
         desc->function_size = function_size;
         desc->source_size = source_size;
         ecs_os_memcpy((char*)(desc + 1), kind->function, (ecs_size_t)function_size);

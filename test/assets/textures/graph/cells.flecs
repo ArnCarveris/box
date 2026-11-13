@@ -1,0 +1,9 @@
+// Voronoi cells authored from a script: jitter is left out, so it takes its default of full
+// jitter, and the cells are stored as HDR so the distance and ids read back at half precision.
+
+using box.texture
+
+graph_cells {
+  cells { TexCells: {count: 25, seed: 7, distance: CellsEdge} }
+  TextureGraph: {output: cells, width: 64, height: 64, format: GraphHdr}
+}
