@@ -9,6 +9,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 #include "mesh_gen.h"
 
 /** Profiles of the extrusions, a 2 by 1 rectangle with and without a 0.6 by 0.4 hole */
@@ -1298,5 +1299,73 @@ void BevelShapes_no_effect(void) {
         bs_same_shape(world, e, plain);
     }
 
+    ecs_fini(world);
+}
+
+void BevelShapes_lod_keys(void) {
+    // renderer/meshes
+    ecs_world_t *world = bs_world();
+    Cylinder cylinder = { .segments = 24, .smooth = true, .length = 2, .radius = 1 };
+    Frustum frustum = { .segments = 24, .smooth = true, .length = 2, .radius_bottom = 1,
+        .radius_top = 0.5f };
+    Tube tube = { .segments = 24, .smooth = true, .length = 2, .radius = 1, .thickness = 0.3f };
+    Bevel bevel = { .radius = 0.1f, .segments = 8 };
+    ecs_entity_t round[4] = {
+        bs_entity(world, ecs_id(Cylinder), &cylinder, bevel),
+        bs_entity(world, ecs_id(Cone), &cylinder, bevel),
+        bs_entity(world, ecs_id(Frustum), &frustum, bevel),
+        bs_entity(world, ecs_id(Tube), &tube, bevel)
+    };
+
+    /* The segments around the axis and the steps per rim, above the marker, halve */
+    for (int32_t i = 0; i < 4; i ++) {
+        ecs_entity_t e = round[i];
+        test_int(lod_key(world, e, 0)->i[1] >> 8, 8);
+        test_int(lod_key(world, e, 1)->i[0], 12);
+        test_int(lod_key(world, e, 1)->i[1] >> 8, 4);
+        test_int(lod_key(world, e, 2)->i[0], 6);
+        test_int(lod_key(world, e, 2)->i[1] >> 8, 2);
+        test_int(lod_key(world, e, 3)->i[0], 3);
+        test_int(lod_key(world, e, 3)->i[1] >> 8, 2);
+        lod_test_fewer_indices(world, e, 1);
+        lod_test_fewer_indices(world, e, 3);
+    }
+
+    /* A faceted host keeps its segments, its rims still drop steps */
+    cylinder.smooth = false;
+    ecs_entity_t faceted = bs_entity(world, ecs_id(Cylinder), &cylinder, bevel);
+    test_int(lod_key(world, faceted, 1)->i[0], 24);
+    test_int(lod_key(world, faceted, 1)->i[1] >> 8, 4);
+    test_int(lod_key(world, faceted, 3)->i[0], 24);
+
+    TrianglePrism prism = { 1, 1, 2 };
+    ecs_entity_t prisms[2] = {
+        bs_entity(world, ecs_id(TrianglePrism), &prism, bevel),
+        bs_entity(world, ecs_id(RightTrianglePrism), &prism, bevel)
+    };
+    for (int32_t i = 0; i < 2; i ++) {
+        test_int(lod_key(world, prisms[i], 1)->i[0], 4);
+        test_int(lod_key(world, prisms[i], 2)->i[0], 2);
+        test_uint(lod_mesh(world, prisms[i], 3), lod_mesh(world, prisms[i], 2));
+        lod_test_fewer_indices(world, prisms[i], 1);
+    }
+
+    /* The steps per rim of an extrusion are in i[0], at least 2 */
+    ecs_entity_t extrusion = bs_extrusion(world, "rect", 1, false, bevel);
+    test_int(lod_key(world, extrusion, 0)->i[0], 8);
+    test_int(lod_key(world, extrusion, 1)->i[0], 4);
+    test_int(lod_key(world, extrusion, 2)->i[0], 2);
+    test_uint(lod_mesh(world, extrusion, 3), lod_mesh(world, extrusion, 2));
+    lod_test_fewer_indices(world, extrusion, 1);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, extrusion, 0));
+    const box_mesh_t *variant = box_mesh_cache_get(cache, lod_mesh(world, extrusion, 1));
+    test_assert(variant->surface_assets == NULL || variant->surface_assets != base->surface_assets);
+
+    /* A plain ProfileExtrusion has no segments and no levels */
+    ProfileExtrusion plain = { .profile = ecs_lookup(world, "rect"), .depth = 1,
+        .cap_start = true, .cap_end = true };
+    ecs_entity_t flat = bs_plain(world, ecs_id(ProfileExtrusion), &plain);
+    test_uint(lod_mesh(world, flat, 3), lod_mesh(world, flat, 0));
     ecs_fini(world);
 }

@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 void HemiSphere_segments(void) {
     // renderer/meshes
@@ -232,5 +233,27 @@ void HemiSphere_scale(void) {
     test_flt(sm->scale[1], 3.0f);
     test_flt(sm->scale[2], 3.0f);
 
+    ecs_fini(world);
+}
+
+void HemiSphere_lod_keys(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, HemiSphere, { .segments = 24, .smooth = true, .radius = 1 });
+    test_int(lod_key(world, e, 1)->i[0], 12);
+    test_int(lod_key(world, e, 2)->i[0], 6);
+    test_int(lod_key(world, e, 3)->i[0], 3);
+    lod_test_fewer_indices(world, e, 2);
+
+    /* A HemiSphere does not share the meshes of a Sphere with the same key */
+    ecs_entity_t sphere = ecs_new(world);
+    ecs_set(world, sphere, Sphere, { .segments = 12, .smooth = true, .radius = 1 });
+    test_assert(lod_mesh(world, e, 1) != lod_mesh(world, sphere, 0));
+
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, HemiSphere, { .segments = 24, .smooth = false, .radius = 1 });
+    test_uint(lod_mesh(world, flat, 2), lod_mesh(world, flat, 0));
     ecs_fini(world);
 }

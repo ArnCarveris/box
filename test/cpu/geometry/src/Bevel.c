@@ -9,6 +9,7 @@
 #include <math.h>
 #include <stddef.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 #include "face_uvs.h"
 
 /** Edge of a box by its Bevel member and the two axes and sides it lies on */
@@ -645,5 +646,34 @@ void Bevel_face_orientation(void) {
             .back_left = 0.15f, .back_right = 0.15f, .segments = 3 });
     test_int(face_uvs_check(bevel_mesh(world, all)), 63);
 
+    ecs_fini(world);
+}
+
+void Bevel_lod_keys(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Box, { 1, 1, 1 });
+    ecs_set(world, e, Bevel, { .radius = 0.1f, .segments = 8 });
+    test_int(lod_key(world, e, 1)->i[0], 4);
+    test_int(lod_key(world, e, 2)->i[0], 2);
+    test_uint(lod_mesh(world, e, 3), lod_mesh(world, e, 2));
+    lod_test_fewer_indices(world, e, 1);
+
+    /* Edges with their own radii keep them in each level */
+    ecs_entity_t edges = ecs_new(world);
+    ecs_set(world, edges, Box, { 1, 1, 1 });
+    ecs_set(world, edges, Bevel, { .top_front = 0.1f, .front_left = 0.2f, .segments = 8 });
+    test_int(lod_key(world, edges, 1)->i[0], 4);
+    test_int(lod_key(world, edges, 1)->i[1], lod_key(world, edges, 0)->i[1]);
+    test_int(lod_key(world, edges, 2)->i[0], 2);
+    lod_test_fewer_indices(world, edges, 2);
+
+    /* A flat Bevel resolves as a plain Box, which has no levels */
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, Box, { 1, 1, 1 });
+    ecs_set(world, flat, Bevel, { .segments = 8 });
+    test_uint(lod_mesh(world, flat, 3), lod_mesh(world, flat, 0));
     ecs_fini(world);
 }

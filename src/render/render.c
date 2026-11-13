@@ -304,6 +304,7 @@ static void box_render_extract_view(
     v->camera_data = *data;
     v->clear = view->clear;
     v->debug = view->debug;
+    box_render_lod_settings(&view->lod, &v->lod);
     v->cull.enabled = view->culling.enabled;
     v->cull.occlusion = view->culling.enabled && view->culling.occlusion &&
         view->debug.wireframe != WireframeOnly;
@@ -320,6 +321,26 @@ static void box_render_extract_view(
     glm_mat4_inv(v->camera_transform, v->view_matrix);
 done:
     return;
+}
+
+/* LodSettings.distances holds one distance per level */
+typedef char box_render_lod_distances_t[
+    sizeof(((LodSettings*)0)->distances) == BOX_LOD_LEVELS_MAX * sizeof(float) ? 1 : -1];
+
+void box_render_lod_settings(
+    const LodSettings *settings,
+    LodSettings *out)
+{
+    int32_t levels = settings->levels > BOX_LOD_LEVELS_MAX ? BOX_LOD_LEVELS_MAX :
+        settings->levels;
+    float previous = 0.0f;
+    *out = (LodSettings){0};
+    out->levels = levels > 1 ? levels : 0;
+    for (int32_t i = 1; i < out->levels; i ++) {
+        float distance = settings->distances[i];
+        distance = isfinite(distance) && distance > 0.0f ? distance : 0.0f;
+        out->distances[i] = previous = glm_max(distance, previous);
+    }
 }
 
 /** Add a view to the packet for every View whose camera is alive and has a Camera, in

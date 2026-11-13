@@ -36,6 +36,40 @@ static int32_t box_segments(
     return result > BOX_MAX_SEGMENTS ? BOX_MAX_SEGMENTS : result;
 }
 
+int32_t box_shape_lod_count(
+    int32_t count,
+    int32_t floor,
+    int32_t level)
+{
+    for (int32_t i = 0; i < level; i ++) {
+        int32_t half = count / 2;
+        count = half > floor ? half : (count < floor ? count : floor);
+    }
+
+    return count;
+}
+
+/** Get the subdivisions of a level of detail of a count that the generator rounds up to even:
+ * the even count of level 0 halved per level and rounded up to even, at least 2.
+ *
+ * @param segments The count of level 0, from 1 to 64
+ * @param level The level
+ * @return The count of the level, segments itself while it generates the mesh of level 0
+ */
+static int32_t box_shape_lod_even(
+    int32_t segments,
+    int32_t level)
+{
+    int32_t even = 2 * ((segments + 1) / 2 < 1 ? 1 : (segments + 1) / 2);
+    int32_t count = even;
+    for (int32_t i = 0; i < level; i ++) {
+        count = box_shape_lod_count(count, 2, 1);
+        count += count & 1;
+    }
+
+    return count == even ? segments : count;
+}
+
 /** Construct shape values whose first member is a count, set to the count in the context.
  *
  * @param ptr The components
@@ -332,6 +366,25 @@ static void box_key_sphere(
     key->i[1] = v->smooth;
 }
 
+/** Key of a level of detail of a smooth shape with the layout of Sphere.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_sphere(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Sphere v = *(const Sphere*)value;
+    if (v.smooth) {
+        v.segments = box_shape_lod_count(box_segments(v.segments), 3, level);
+    }
+
+    box_key_sphere(&v, key);
+}
+
 /** Scale of a shape with the layout of Sphere.
  *
  * @param value The shape value
@@ -388,6 +441,26 @@ static void box_key_icosphere(
     key->i[1] = v->smooth;
 }
 
+/** Key of a level of detail of a smooth IcoSphere: one subdivision level less per level.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_icosphere(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    IcoSphere v = *(const IcoSphere*)value;
+    if (v.smooth) {
+        v.segments = v.segments < 0 ? 0 : (v.segments > 6 ? 6 : v.segments);
+        v.segments = v.segments > level ? v.segments - level : 0;
+    }
+
+    box_key_icosphere(&v, key);
+}
+
 /** Generate an IcoSphere mesh.
  *
  * @param value The shape value
@@ -415,6 +488,25 @@ static void box_key_cylinder(
     const Cylinder *v = value;
     key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
+}
+
+/** Key of a level of detail of a smooth shape with the layout of Cylinder.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_cylinder(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Cylinder v = *(const Cylinder*)value;
+    if (v.smooth) {
+        v.segments = box_shape_lod_count(box_segments(v.segments), 3, level);
+    }
+
+    box_key_cylinder(&v, key);
 }
 
 /** Scale of a shape with the layout of Cylinder.
@@ -476,6 +568,26 @@ static void box_key_torus(
     key->f[0] = box_shape_quantize(box_ratio(v->tube, v->radius, 0.0f));
 }
 
+/** Key of a level of detail of a smooth Torus.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_torus(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Torus v = *(const Torus*)value;
+    if (v.smooth) {
+        v.segments = box_shape_lod_count(box_segments(v.segments), 3, level);
+        v.rings = box_shape_lod_count(box_segments(v.rings), 3, level);
+    }
+
+    box_key_torus(&v, key);
+}
+
 /** Scale of a Torus.
  *
  * @param value The shape value
@@ -517,6 +629,25 @@ static void box_key_capsule(
     key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
     key->f[0] = box_shape_quantize(length > 0.0f ? length : 0.0f);
+}
+
+/** Key of a level of detail of a smooth Capsule.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_capsule(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Capsule v = *(const Capsule*)value;
+    if (v.smooth) {
+        v.segments = box_shape_lod_count(box_segments(v.segments), 3, level);
+    }
+
+    box_key_capsule(&v, key);
 }
 
 /** Scale of a Capsule.
@@ -564,6 +695,25 @@ static void box_key_tube(
     key->f[1] = full ? 0.0f : box_shape_quantize(v->arc);
 }
 
+/** Key of a level of detail of a smooth Tube.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_tube(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Tube v = *(const Tube*)value;
+    if (v.smooth) {
+        v.segments = box_shape_lod_count(box_segments(v.segments), 3, level);
+    }
+
+    box_key_tube(&v, key);
+}
+
 /** Generate a Tube mesh.
  *
  * @param value The shape value
@@ -594,6 +744,25 @@ static void box_key_frustum(
     key->i[1] = v->smooth;
     key->f[0] = box_shape_quantize(glm_max(box_ratio(v->radius_bottom, max, 1.0f), 0.0f));
     key->f[1] = box_shape_quantize(glm_max(box_ratio(v->radius_top, max, 1.0f), 0.0f));
+}
+
+/** Key of a level of detail of a smooth Frustum.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_frustum(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Frustum v = *(const Frustum*)value;
+    if (v.smooth) {
+        v.segments = box_shape_lod_count(box_segments(v.segments), 3, level);
+    }
+
+    box_key_frustum(&v, key);
 }
 
 /** Scale of a Frustum.
@@ -647,6 +816,23 @@ static void box_key_rounded_box(
     float radius = glm_clamp(box_ratio(v->radius, max, 0.0f), 0.0f, 0.5f * smallest);
     key->f[3] = glm_min(box_shape_quantize(radius), 0.5f * smallest);
     key->i[0] = v->segments < 1 ? 1 : (v->segments > 64 ? 64 : v->segments);
+}
+
+/** Key of a level of detail of a RoundedBox.
+ *
+ * @param value The shape value
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_rounded_box(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    RoundedBox v = *(const RoundedBox*)value;
+    v.segments = box_shape_lod_even(v.segments < 1 ? 1 : (v.segments > 64 ? 64 : v.segments),
+        level);
+    box_key_rounded_box(&v, key);
 }
 
 /** Scale of a RoundedBox.
@@ -831,6 +1017,22 @@ static void box_key_bevel(
         key->i[2] = (int32_t)(uint32_t)hash;
         key->i[3] = (int32_t)(uint32_t)(hash >> 32);
     }
+}
+
+/** Key of a level of detail of a Bevel of a Box.
+ *
+ * @param value The Box and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_bevel(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_value_t v = *(const box_bevel_value_t*)value;
+    v.bevel.segments = box_shape_lod_even(box_bevel_segments(&v.bevel), level);
+    box_key_bevel(&v, key);
 }
 
 /** Scale of a Bevel, the largest size of its Box as for a RoundedBox.
@@ -1029,7 +1231,8 @@ static bool box_bevel_round_flat(
 }
 
 /** Key of a beveled round shape: a hash of its cross section, its rim radii relative to the
- * scale radius and to the length, the steps per rim and smooth.
+ * scale radius and to the length, the steps per rim and smooth, with the segments in i[0] and
+ * the steps per rim in i[1] above the marker, which the generators read.
  *
  * @param shape The shape
  * @param key The key
@@ -1049,9 +1252,45 @@ static void box_key_bevel_round(
     values[5 + 2 * BoxRimCount] = (float)shape->steps;
     values[6 + 2 * BoxRimCount] = shape->smooth ? 1.0f : 0.0f;
     key->i[0] = shape->segments;
-    key->i[1] = BOX_BEVEL_ROUND;
+    key->i[1] = BOX_BEVEL_ROUND | (shape->steps << 8);
     box_key_hash(box_hash_floats(14695981039346656037ull, values,
         (int32_t)(sizeof(values) / sizeof(values[0]))), key);
+}
+
+/** Reduce the counts of a beveled round shape to a level of detail: the segments around the
+ * axis of a smooth shape and the steps per rim, at least 2.
+ *
+ * @param segments The segments around the axis of the host
+ * @param smooth Whether the host is smooth
+ * @param bevel The Bevel
+ * @param level The level
+ */
+static void box_bevel_round_lod(
+    int32_t *segments,
+    bool smooth,
+    Bevel *bevel,
+    int32_t level)
+{
+    if (smooth) {
+        *segments = box_shape_lod_count(box_segments(*segments), 3, level);
+    }
+
+    bevel->segments = box_shape_lod_count(box_bevel_segments(bevel), 2, level);
+}
+
+/** Set the counts of a beveled round shape to those of its key.
+ *
+ * @param key The key
+ * @param segments The segments around the axis of the host
+ * @param bevel The Bevel, whose steps per rim are set
+ */
+static void box_bevel_round_counts(
+    const box_shape_key_t *key,
+    int32_t *segments,
+    Bevel *bevel)
+{
+    *segments = key->i[0];
+    bevel->segments = key->i[1] >> 8;
 }
 
 /** Key of a beveled Cylinder.
@@ -1110,6 +1349,22 @@ static void box_key_bevel_tube(
     box_key_bevel_round(&shape, key);
 }
 
+/** Key of a level of detail of a beveled Cylinder.
+ *
+ * @param value The Cylinder and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_bevel_cylinder(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_cylinder_t v = *(const box_bevel_cylinder_t*)value;
+    box_bevel_round_lod(&v.host.segments, v.host.smooth, &v.bevel, level);
+    box_key_bevel_cylinder(&v, key);
+}
+
 /** Generate a beveled Cylinder mesh.
  *
  * @param value The Cylinder and the Bevel that produced the key
@@ -1122,9 +1377,26 @@ static void box_gen_bevel_cylinder(
     box_mesh_t *mesh)
 {
     box_bevel_round_t shape;
-    (void)key;
-    box_bevel_cylinder(value, false, &shape);
+    box_bevel_cylinder_t v = *(const box_bevel_cylinder_t*)value;
+    box_bevel_round_counts(key, &v.host.segments, &v.bevel);
+    box_bevel_cylinder(&v, false, &shape);
     box_mesh_gen_bevel_round(mesh, &shape);
+}
+
+/** Key of a level of detail of a beveled Cone.
+ *
+ * @param value The Cone and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_bevel_cone(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_cylinder_t v = *(const box_bevel_cylinder_t*)value;
+    box_bevel_round_lod(&v.host.segments, v.host.smooth, &v.bevel, level);
+    box_key_bevel_cone(&v, key);
 }
 
 /** Generate a beveled Cone mesh.
@@ -1139,9 +1411,26 @@ static void box_gen_bevel_cone(
     box_mesh_t *mesh)
 {
     box_bevel_round_t shape;
-    (void)key;
-    box_bevel_cylinder(value, true, &shape);
+    box_bevel_cylinder_t v = *(const box_bevel_cylinder_t*)value;
+    box_bevel_round_counts(key, &v.host.segments, &v.bevel);
+    box_bevel_cylinder(&v, true, &shape);
     box_mesh_gen_bevel_round(mesh, &shape);
+}
+
+/** Key of a level of detail of a beveled Frustum.
+ *
+ * @param value The Frustum and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_bevel_frustum(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_frustum_t v = *(const box_bevel_frustum_t*)value;
+    box_bevel_round_lod(&v.host.segments, v.host.smooth, &v.bevel, level);
+    box_key_bevel_frustum(&v, key);
 }
 
 /** Generate a beveled Frustum mesh.
@@ -1156,9 +1445,26 @@ static void box_gen_bevel_frustum(
     box_mesh_t *mesh)
 {
     box_bevel_round_t shape;
-    (void)key;
-    box_bevel_frustum(value, &shape);
+    box_bevel_frustum_t v = *(const box_bevel_frustum_t*)value;
+    box_bevel_round_counts(key, &v.host.segments, &v.bevel);
+    box_bevel_frustum(&v, &shape);
     box_mesh_gen_bevel_round(mesh, &shape);
+}
+
+/** Key of a level of detail of a beveled Tube.
+ *
+ * @param value The Tube and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_bevel_tube(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_tube_t v = *(const box_bevel_tube_t*)value;
+    box_bevel_round_lod(&v.host.segments, v.host.smooth, &v.bevel, level);
+    box_key_bevel_tube(&v, key);
 }
 
 /** Generate a beveled Tube mesh.
@@ -1173,8 +1479,9 @@ static void box_gen_bevel_tube(
     box_mesh_t *mesh)
 {
     box_bevel_round_t shape;
-    (void)key;
-    box_bevel_tube(value, &shape);
+    box_bevel_tube_t v = *(const box_bevel_tube_t*)value;
+    box_bevel_round_counts(key, &v.host.segments, &v.bevel);
+    box_bevel_tube(&v, &shape);
     box_mesh_gen_bevel_round(mesh, &shape);
 }
 
@@ -1258,6 +1565,22 @@ static void box_key_bevel_prism(
     key->i[0] = box_bevel_segments(&v->bevel);
     key->i[1] = BOX_BEVEL_PRISM;
     box_key_hash(box_hash_floats(14695981039346656037ull, key->f, 4), key);
+}
+
+/** Key of a level of detail of a beveled TrianglePrism or RightTrianglePrism.
+ *
+ * @param value The prism and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_lod_bevel_prism(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_prism_t v = *(const box_bevel_prism_t*)value;
+    v.bevel.segments = box_shape_lod_even(box_bevel_segments(&v.bevel), level);
+    box_key_bevel_prism(&v, key);
 }
 
 /** Key of a beveled RightTrianglePrism, the key of a TrianglePrism.
@@ -1385,6 +1708,7 @@ static void box_gen_mesh3(
  * @param generate The generator
  * @param scale The scale function
  * @param exclude Component of entities another resolver owns, Bevel for a host, 0 for none
+ * @param lod The key function of the levels of detail, NULL for none
  */
 static void box_shape_builtin(
     ecs_world_t *world,
@@ -1392,14 +1716,16 @@ static void box_shape_builtin(
     box_shape_key_fn key,
     box_shape_generate_fn generate,
     box_shape_scale_fn scale,
-    ecs_entity_t exclude)
+    ecs_entity_t exclude,
+    box_shape_lod_fn lod)
 {
     box_shape_register(world, &(box_shape_desc_t){
         .component = component,
         .key = key,
         .generate = generate,
         .scale = scale,
-        .exclude = exclude
+        .exclude = exclude,
+        .lod = lod
     });
 }
 
@@ -1407,36 +1733,38 @@ void box_geometry_shapes_init(
     ecs_world_t *world)
 {
     ecs_entity_t bevel = ecs_id(Bevel);
-    box_shape_builtin(world, ecs_id(Mesh3), box_key_mesh3, box_gen_mesh3, NULL, 0);
-    box_shape_builtin(world, ecs_id(Box), box_key_none, box_gen_box, box_scale_xyz, bevel);
-    box_shape_builtin(world, ecs_id(Quad), box_key_none, box_gen_quad, box_scale_xy, 0);
-    box_shape_builtin(world, ecs_id(Triangle), box_key_none, box_gen_triangle, box_scale_xy, 0);
+    box_shape_builtin(world, ecs_id(Mesh3), box_key_mesh3, box_gen_mesh3, NULL, 0, NULL);
+    box_shape_builtin(world, ecs_id(Box), box_key_none, box_gen_box, box_scale_xyz, bevel, NULL);
+    box_shape_builtin(world, ecs_id(Quad), box_key_none, box_gen_quad, box_scale_xy, 0, NULL);
+    box_shape_builtin(world, ecs_id(Triangle), box_key_none, box_gen_triangle, box_scale_xy, 0,
+        NULL);
     box_shape_builtin(world, ecs_id(RightTriangle), box_key_none,
-        box_gen_right_triangle, box_scale_xy, 0);
+        box_gen_right_triangle, box_scale_xy, 0, NULL);
     box_shape_builtin(world, ecs_id(TrianglePrism), box_key_none,
-        box_gen_triangle_prism, box_scale_xyz, bevel);
+        box_gen_triangle_prism, box_scale_xyz, bevel, NULL);
     box_shape_builtin(world, ecs_id(RightTrianglePrism), box_key_none,
-        box_gen_right_triangle_prism, box_scale_xyz, bevel);
-    box_shape_builtin(world, ecs_id(NGon), box_key_ngon, box_gen_ngon, box_scale_ngon, 0);
+        box_gen_right_triangle_prism, box_scale_xyz, bevel, NULL);
+    box_shape_builtin(world, ecs_id(NGon), box_key_ngon, box_gen_ngon, box_scale_ngon, 0, NULL);
     box_shape_builtin(world, ecs_id(Sphere), box_key_sphere, box_gen_sphere,
-        box_scale_sphere, 0);
+        box_scale_sphere, 0, box_lod_sphere);
     box_shape_builtin(world, ecs_id(HemiSphere), box_key_sphere,
-        box_gen_hemisphere, box_scale_sphere, 0);
+        box_gen_hemisphere, box_scale_sphere, 0, box_lod_sphere);
     box_shape_builtin(world, ecs_id(IcoSphere), box_key_icosphere,
-        box_gen_icosphere, box_scale_sphere, 0);
+        box_gen_icosphere, box_scale_sphere, 0, box_lod_icosphere);
     box_shape_builtin(world, ecs_id(Cone), box_key_cylinder, box_gen_cone,
-        box_scale_cylinder, bevel);
+        box_scale_cylinder, bevel, box_lod_cylinder);
     box_shape_builtin(world, ecs_id(Cylinder), box_key_cylinder,
-        box_gen_cylinder, box_scale_cylinder, bevel);
-    box_shape_builtin(world, ecs_id(Torus), box_key_torus, box_gen_torus, box_scale_torus, 0);
+        box_gen_cylinder, box_scale_cylinder, bevel, box_lod_cylinder);
+    box_shape_builtin(world, ecs_id(Torus), box_key_torus, box_gen_torus, box_scale_torus, 0,
+        box_lod_torus);
     box_shape_builtin(world, ecs_id(Capsule), box_key_capsule,
-        box_gen_capsule, box_scale_capsule, 0);
+        box_gen_capsule, box_scale_capsule, 0, box_lod_capsule);
     box_shape_builtin(world, ecs_id(Tube), box_key_tube, box_gen_tube,
-        box_scale_cylinder, bevel);
+        box_scale_cylinder, bevel, box_lod_tube);
     box_shape_builtin(world, ecs_id(Frustum), box_key_frustum,
-        box_gen_frustum, box_scale_frustum, bevel);
+        box_gen_frustum, box_scale_frustum, bevel, box_lod_frustum);
     box_shape_builtin(world, ecs_id(RoundedBox), box_key_rounded_box,
-        box_gen_rounded_box, box_scale_rounded_box, 0);
+        box_gen_rounded_box, box_scale_rounded_box, 0, box_lod_rounded_box);
 
     box_shape_count_hooks(world, ecs_id(NGon), BOX_NGON_SIDES);
     box_shape_count_hooks(world, ecs_id(Sphere), BOX_SEGMENTS);
@@ -1451,38 +1779,39 @@ void box_geometry_shapes_init(
     ecs_set_hooks(world, Bevel, { .ctor = box_bevel_ctor });
 
     box_geometry_bevel_host(world, &(box_shape_desc_t){
-        .key = box_key_bevel, .generate = box_gen_bevel, .scale = box_scale_bevel },
+        .key = box_key_bevel, .generate = box_gen_bevel, .scale = box_scale_bevel,
+        .lod = box_lod_bevel },
         ecs_id(Box), ECS_SIZEOF(Box), (ecs_size_t)offsetof(box_bevel_value_t, bevel),
         ECS_SIZEOF(box_bevel_value_t), box_bevel_box_flat);
     box_geometry_bevel_host(world, &(box_shape_desc_t){
         .key = box_key_bevel_cylinder, .generate = box_gen_bevel_cylinder,
-        .scale = box_scale_cylinder },
+        .scale = box_scale_cylinder, .lod = box_lod_bevel_cylinder },
         ecs_id(Cylinder), ECS_SIZEOF(Cylinder), (ecs_size_t)offsetof(box_bevel_cylinder_t, bevel),
         ECS_SIZEOF(box_bevel_cylinder_t), box_bevel_cylinder_flat);
     box_geometry_bevel_host(world, &(box_shape_desc_t){
         .key = box_key_bevel_cone, .generate = box_gen_bevel_cone,
-        .scale = box_scale_cylinder },
+        .scale = box_scale_cylinder, .lod = box_lod_bevel_cone },
         ecs_id(Cone), ECS_SIZEOF(Cone), (ecs_size_t)offsetof(box_bevel_cylinder_t, bevel),
         ECS_SIZEOF(box_bevel_cylinder_t), box_bevel_cone_flat);
     box_geometry_bevel_host(world, &(box_shape_desc_t){
         .key = box_key_bevel_frustum, .generate = box_gen_bevel_frustum,
-        .scale = box_scale_frustum },
+        .scale = box_scale_frustum, .lod = box_lod_bevel_frustum },
         ecs_id(Frustum), ECS_SIZEOF(Frustum), (ecs_size_t)offsetof(box_bevel_frustum_t, bevel),
         ECS_SIZEOF(box_bevel_frustum_t), box_bevel_frustum_flat);
     box_geometry_bevel_host(world, &(box_shape_desc_t){
         .key = box_key_bevel_tube, .generate = box_gen_bevel_tube,
-        .scale = box_scale_cylinder },
+        .scale = box_scale_cylinder, .lod = box_lod_bevel_tube },
         ecs_id(Tube), ECS_SIZEOF(Tube), (ecs_size_t)offsetof(box_bevel_tube_t, bevel),
         ECS_SIZEOF(box_bevel_tube_t), box_bevel_tube_flat);
     box_geometry_bevel_host(world, &(box_shape_desc_t){
         .key = box_key_bevel_prism, .generate = box_gen_bevel_prism,
-        .scale = box_scale_xyz },
+        .scale = box_scale_xyz, .lod = box_lod_bevel_prism },
         ecs_id(TrianglePrism), ECS_SIZEOF(TrianglePrism),
         (ecs_size_t)offsetof(box_bevel_prism_t, bevel), ECS_SIZEOF(box_bevel_prism_t),
         box_bevel_prism_flat);
     box_geometry_bevel_host(world, &(box_shape_desc_t){
         .key = box_key_bevel_right_prism, .generate = box_gen_bevel_right_prism,
-        .scale = box_scale_xyz },
+        .scale = box_scale_xyz, .lod = box_lod_bevel_prism },
         ecs_id(RightTrianglePrism), ECS_SIZEOF(RightTrianglePrism),
         (ecs_size_t)offsetof(box_bevel_prism_t, bevel), ECS_SIZEOF(box_bevel_prism_t),
         box_bevel_prism_flat);

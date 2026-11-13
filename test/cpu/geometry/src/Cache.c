@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 static void SetSphere(ecs_iter_t *it) {
     ecs_entity_t *e = it->ctx;
@@ -443,5 +444,127 @@ void Cache_replace_shape_template_branch(void) {
     test_assert(sm != NULL);
     test_int(sm->mesh, sphere_mesh);
 
+    ecs_fini(world);
+}
+
+void Cache_lod_shared(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t e1 = ecs_new(world), e2 = ecs_new(world), half = ecs_new(world);
+    ecs_set(world, e1, Sphere, { .segments = 24, .smooth = true, .radius = 1 });
+    ecs_set(world, e2, Sphere, { .segments = 24, .smooth = true, .radius = 5 });
+    test_uint(lod_mesh(world, e1, 0), lod_mesh(world, e2, 0));
+    test_int(box_mesh_cache_count(cache), 1);
+
+    /* Levels are generated on request, once per mesh */
+    for (int32_t level = 1; level < BOX_LOD_LEVELS_MAX; level ++) {
+        test_uint(lod_mesh(world, e1, level), lod_mesh(world, e2, level));
+        test_assert(lod_mesh(world, e1, level) != lod_mesh(world, e1, level - 1));
+    }
+
+    test_int(box_mesh_cache_count(cache), BOX_LOD_LEVELS_MAX);
+
+    /* A shape whose level 0 is the level 1 of another shares its mesh */
+    ecs_set(world, half, Sphere, { .segments = 12, .smooth = true, .radius = 1 });
+    test_uint(lod_mesh(world, half, 0), lod_mesh(world, e1, 1));
+    test_uint(lod_mesh(world, half, 1), lod_mesh(world, e1, 2));
+    test_int(box_mesh_cache_count(cache), BOX_LOD_LEVELS_MAX);
+
+    /* Shapes keep the mesh of level 0 */
+    test_uint(ecs_get(world, e1, ShapeMesh)->mesh, lod_mesh(world, e1, 0));
+    ecs_fini(world);
+}
+
+void Cache_lod_freed_with_base(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t e1 = ecs_new(world), e2 = ecs_new(world);
+    ecs_set(world, e1, Torus, { .segments = 24, .rings = 12, .smooth = true, .radius = 1,
+        .tube = 0.25f });
+    ecs_set(world, e2, Torus, { .segments = 24, .rings = 12, .smooth = true, .radius = 2,
+        .tube = 0.5f });
+    uint32_t base = lod_mesh(world, e1, 0);
+    uint32_t level3 = lod_mesh(world, e1, 3);
+    test_int(box_mesh_cache_count(cache), 4);
+    test_int(box_mesh_cache_users(cache, base), 2);
+
+    ecs_delete(world, e1);
+    test_assert(box_mesh_cache_get(cache, level3) != NULL);
+    test_int(box_mesh_cache_count(cache), 4);
+
+    /* A module that holds the mesh keeps its levels alive */
+    box_mesh_cache_hold(cache, base);
+    ecs_delete(world, e2);
+    test_assert(box_mesh_cache_get(cache, base) != NULL);
+    test_assert(box_mesh_cache_get(cache, level3) != NULL);
+    test_uint(box_mesh_cache_lod(cache, base, 3), level3);
+    box_mesh_cache_unhold(cache, base);
+    test_assert(box_mesh_cache_get(cache, base) == NULL);
+    test_assert(box_mesh_cache_get(cache, level3) == NULL);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    /* A level that another shape uses outlives the mesh it was generated for */
+    ecs_entity_t full = ecs_new(world), half = ecs_new(world);
+    ecs_set(world, full, Sphere, { .segments = 24, .smooth = true, .radius = 1 });
+    uint32_t level1 = lod_mesh(world, full, 1);
+    lod_mesh(world, full, 3);
+    ecs_set(world, half, Sphere, { .segments = 12, .smooth = true, .radius = 1 });
+    test_uint(lod_mesh(world, half, 0), level1);
+    ecs_delete(world, full);
+    test_assert(box_mesh_cache_get(cache, level1) != NULL);
+    test_int(box_mesh_cache_count(cache), 1);
+    ecs_delete(world, half);
+    test_int(box_mesh_cache_count(cache), 0);
+    ecs_fini(world);
+}
+
+void Cache_lod_change_value(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Cylinder, { .segments = 32, .smooth = true, .length = 1, .radius = 1 });
+    lod_mesh(world, e, 3);
+    test_int(box_mesh_cache_count(cache), 4);
+    ecs_set(world, e, Cylinder, { .segments = 6, .smooth = true, .length = 1, .radius = 1 });
+    test_int(box_mesh_cache_count(cache), 1);
+    test_int(lod_key(world, e, 1)->i[0], 3);
+    test_int(box_mesh_cache_count(cache), 2);
+    ecs_remove(world, e, Cylinder);
+    test_int(box_mesh_cache_count(cache), 0);
+    ecs_fini(world);
+}
+
+void Cache_lod_flat_shapes(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t shapes[7];
+    for (int32_t i = 0; i < 7; i ++) {
+        shapes[i] = ecs_new(world);
+    }
+
+    ecs_set(world, shapes[0], Box, { 1, 2, 3 });
+    ecs_set(world, shapes[1], Quad, { 1, 2 });
+    ecs_set(world, shapes[2], NGon, { .sides = 32, .radius = 1 });
+    ecs_set(world, shapes[3], TrianglePrism, { 1, 2, 3 });
+    ecs_set(world, shapes[4], RightTrianglePrism, { 1, 2, 3 });
+    ecs_set(world, shapes[5], Star, { .points = 12, .inner = 0.5f, .radius = 1 });
+    ecs_set(world, shapes[6], Triangle, { 1, 2 });
+    int32_t count = box_mesh_cache_count(cache);
+    for (int32_t i = 0; i < 7; i ++) {
+        for (int32_t level = 1; level < BOX_LOD_LEVELS_MAX; level ++) {
+            test_uint(lod_mesh(world, shapes[i], level), lod_mesh(world, shapes[i], 0));
+        }
+    }
+
+    test_int(box_mesh_cache_count(cache), count);
+    test_uint(box_mesh_cache_lod(cache, 0, 1), 0);
     ecs_fini(world);
 }

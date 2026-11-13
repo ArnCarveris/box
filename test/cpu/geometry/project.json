@@ -122,7 +122,9 @@
                     "scale",
                     "default_segments",
                     "default_segments_normals",
-                    "lantern_ribs"
+                    "lantern_ribs",
+                    "lod_keys",
+                    "lod_not_smooth"
                 ]
             },
             {
@@ -134,7 +136,8 @@
                     "flat_normals",
                     "uvs",
                     "cache_shared",
-                    "scale"
+                    "scale",
+                    "lod_keys"
                 ]
             },
             {
@@ -148,7 +151,8 @@
                     "cache_shared",
                     "scale",
                     "level_0",
-                    "level_0_normals"
+                    "level_0_normals",
+                    "lod_levels"
                 ]
             },
             {
@@ -160,7 +164,8 @@
                     "flat_normals",
                     "uvs",
                     "cache_shared",
-                    "scale"
+                    "scale",
+                    "lod_keys"
                 ]
             },
             {
@@ -172,7 +177,8 @@
                     "flat_normals",
                     "uvs",
                     "cache_shared",
-                    "scale"
+                    "scale",
+                    "lod_keys"
                 ]
             },
             {
@@ -184,7 +190,8 @@
                     "flat_normals",
                     "uvs",
                     "cache_shared",
-                    "scale"
+                    "scale",
+                    "lod_keys"
                 ]
             },
             {
@@ -198,7 +205,8 @@
                     "cache_shared",
                     "scale",
                     "zero_length",
-                    "zero_length_normals"
+                    "zero_length_normals",
+                    "lod_keys"
                 ]
             },
             {
@@ -211,7 +219,8 @@
                     "uvs",
                     "cache_shared",
                     "scale",
-                    "partial_arc"
+                    "partial_arc",
+                    "lod_keys"
                 ]
             },
             {
@@ -225,7 +234,8 @@
                     "cache_shared",
                     "scale",
                     "zero_top",
-                    "zero_top_normals"
+                    "zero_top_normals",
+                    "lod_keys"
                 ]
             },
             {
@@ -237,7 +247,8 @@
                     "cache_shared",
                     "scale",
                     "zero_radius",
-                    "zero_radius_normals"
+                    "zero_radius_normals",
+                    "lod_keys"
                 ]
             },
             {
@@ -264,7 +275,8 @@
                     "delete",
                     "prefab_instance",
                     "prefab_override",
-                    "face_orientation"
+                    "face_orientation",
+                    "lod_keys"
                 ]
             },
             {
@@ -306,7 +318,8 @@
                     "resolve_prefab",
                     "box_top_bottom",
                     "box_edge_wins",
-                    "no_effect"
+                    "no_effect",
+                    "lod_keys"
                 ]
             },
             {
@@ -347,7 +360,11 @@
                     "replace_shape_remove_then_set",
                     "replace_shape_deferred_set_then_remove",
                     "replace_shape_deferred_remove_then_set",
-                    "replace_shape_template_branch"
+                    "replace_shape_template_branch",
+                    "lod_shared",
+                    "lod_freed_with_base",
+                    "lod_change_value",
+                    "lod_flat_shapes"
                 ]
             },
             {
@@ -360,7 +377,9 @@
                     "register_invalid",
                     "register_without_module",
                     "star",
-                    "star_cache_shared"
+                    "star_cache_shared",
+                    "custom_without_lod",
+                    "custom_lod"
                 ]
             },
             {
@@ -425,7 +444,12 @@
                     "attachment_chain",
                     "loft_segments",
                     "sweep_segments",
-                    "segments_clamped"
+                    "segments_clamped",
+                    "lod_shells",
+                    "lod_sweep",
+                    "lod_loft",
+                    "lod_lathe",
+                    "lod_surface_assets"
                 ]
             },
             {

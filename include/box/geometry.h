@@ -786,6 +786,34 @@ typedef void (*box_shape_surface_world_fn)(
     vec3 min,
     vec3 max);
 
+/** Compute the mesh key of a level of detail of a shape value; the key is zeroed before the
+ * call. The key is generated with the generate function of the shape.
+ *
+ * Each level halves the segment counts of the level before it down to the minimum of the shape;
+ * a value without detail to drop fills the key of the level before.
+ *
+ * @param value The shape component value
+ * @param level The level, 1 to BOX_LOD_LEVELS_MAX - 1
+ * @param key The key to fill
+ */
+typedef void (*box_shape_lod_fn)(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key);
+
+/** Compute the mesh key of a level of detail of a shape value that references other entities.
+ *
+ * @param world The world
+ * @param value The shape component value
+ * @param level The level, 1 to BOX_LOD_LEVELS_MAX - 1
+ * @param key The key to fill
+ */
+typedef void (*box_shape_lod_world_fn)(
+    const ecs_world_t *world,
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key);
+
 /** Registration of a shape component, with key or key_world and generate or generate_world */
 typedef struct box_shape_desc_t {
     ecs_entity_t component;         /**< The shape component */
@@ -801,6 +829,10 @@ typedef struct box_shape_desc_t {
     box_shape_surface_fn surface;   /**< Parametric surface function, NULL for none */
     ecs_entity_t exclude;           /**< Component of entities whose shape another resolver
                                      *   sets, 0 for none */
+    box_shape_lod_fn lod;           /**< Key function of the levels of detail, NULL for a shape
+                                     *   without levels of detail */
+    box_shape_lod_world_fn lod_world; /**< Key function of the levels of detail that reads
+                                       *   other entities, used instead of lod */
 } box_shape_desc_t;
 
 /** Register a shape so that setting its component selects a cached mesh.

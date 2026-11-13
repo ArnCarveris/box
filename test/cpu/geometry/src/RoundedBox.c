@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 void RoundedBox_size(void) {
     // renderer/meshes
@@ -219,6 +220,42 @@ void RoundedBox_zero_radius_normals(void) {
         glm_vec3_add((float*)a->normal, (float*)b->normal, sum);
         glm_vec3_add((float*)c->normal, sum, sum);
         test_assert(glm_vec3_dot(face, sum) > 0.0f);
+    }
+
+    ecs_fini(world);
+}
+
+void RoundedBox_lod_keys(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, RoundedBox, { .x = 1, .y = 1, .z = 1, .radius = 0.2f, .segments = 16 });
+    test_int(lod_key(world, e, 1)->i[0], 8);
+    test_int(lod_key(world, e, 2)->i[0], 4);
+    test_int(lod_key(world, e, 3)->i[0], 2);
+    lod_test_fewer_indices(world, e, 1);
+    lod_test_fewer_indices(world, e, 3);
+
+    /* Counts round up to even after halving: 6 halves to 3, which generates as 4 */
+    ecs_entity_t six = ecs_new(world);
+    ecs_set(world, six, RoundedBox, { .x = 1, .y = 1, .z = 1, .radius = 0.2f, .segments = 6 });
+    test_int(lod_key(world, six, 1)->i[0], 4);
+    test_int(lod_key(world, six, 2)->i[0], 2);
+    test_uint(lod_mesh(world, six, 3), lod_mesh(world, six, 2));
+
+    /* 3 generates as 4, so level 1 has 2 */
+    ecs_entity_t odd = ecs_new(world);
+    ecs_set(world, odd, RoundedBox, { .x = 1, .y = 1, .z = 1, .radius = 0.2f, .segments = 3 });
+    test_int(lod_key(world, odd, 1)->i[0], 2);
+
+    /* 1 and 2 generate as 2, the minimum, and have no levels */
+    for (int32_t segments = 1; segments <= 2; segments ++) {
+        ecs_entity_t least = ecs_new(world);
+        ecs_set(world, least, RoundedBox, { .x = 1, .y = 2, .z = 1, .radius = 0.2f,
+            .segments = segments });
+        test_uint(lod_mesh(world, least, 1), lod_mesh(world, least, 0));
+        test_uint(lod_mesh(world, least, 3), lod_mesh(world, least, 0));
     }
 
     ecs_fini(world);

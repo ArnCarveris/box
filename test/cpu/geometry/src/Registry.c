@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 /** Project shape used to exercise the registry */
 typedef struct Pyramid {
@@ -265,5 +266,64 @@ void Registry_star_cache_shared(void) {
     test_assert(ecs_get(world, e3, ShapeMesh)->mesh != m1);
     test_assert(ecs_get(world, e4, ShapeMesh)->mesh != m1);
 
+    ecs_fini(world);
+}
+
+void Registry_custom_without_lod(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ECS_COMPONENT(world, Pyramid);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    test_int(box_shape_register(world, &(box_shape_desc_t){
+        .component = ecs_id(Pyramid),
+        .key = PyramidKey,
+        .generate = PyramidGenerate,
+        .scale = PyramidScale
+    }), 0);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Pyramid, { .sides = 32, .size = 1 });
+    for (int32_t level = 1; level < BOX_LOD_LEVELS_MAX; level ++) {
+        test_uint(lod_mesh(world, e, level), lod_mesh(world, e, 0));
+    }
+
+    test_int(box_mesh_cache_count(cache), 1);
+    ecs_fini(world);
+}
+
+/** Key of a level of detail of a Pyramid: half the sides per level, at least 3.
+ *
+ * @param value The Pyramid
+ * @param level The level
+ * @param key The key
+ */
+static void PyramidLod(const void *value, int32_t level, box_shape_key_t *key) {
+    key->i[0] = box_shape_lod_count(((const Pyramid*)value)->sides, 3, level);
+}
+
+void Registry_custom_lod(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ECS_COMPONENT(world, Pyramid);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    test_int(box_shape_register(world, &(box_shape_desc_t){
+        .component = ecs_id(Pyramid),
+        .key = PyramidKey,
+        .generate = PyramidGenerate,
+        .scale = PyramidScale,
+        .lod = PyramidLod
+    }), 0);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Pyramid, { .sides = 16, .size = 1 });
+    test_int(lod_key(world, e, 1)->i[0], 8);
+    test_int(lod_key(world, e, 2)->i[0], 4);
+    test_int(lod_key(world, e, 3)->i[0], 3);
+    test_int(box_mesh_cache_count(cache), 4);
+    test_int(box_mesh_cache_get(cache, lod_mesh(world, e, 3))->index_count, 9);
+    ecs_delete(world, e);
+    test_int(box_mesh_cache_count(cache), 0);
     ecs_fini(world);
 }

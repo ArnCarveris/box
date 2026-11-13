@@ -859,6 +859,8 @@ typedef struct box_render_view_t {
     ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
                                  *   all zero for the other captures (probes, reflections,
                                  *   bakes, no view), which draw no debug pass */
+    LodSettings lod;            /**< View.lod resolved by box_render_lod_settings, all zero
+                                 *   (every shape at full detail) without a view */
     uint32_t features;          /**< BOX_RENDER_FEATURE_* features: those of its scene, without
                                  *   the lighting ones its LightSettings turn off, and the depth
                                  *   prepass */

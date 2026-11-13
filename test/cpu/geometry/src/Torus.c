@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 void Torus_segments(void) {
     // renderer/meshes
@@ -237,5 +238,29 @@ void Torus_scale(void) {
     test_flt(sm->scale[1], 3.0f);
     test_flt(sm->scale[2], 3.0f);
 
+    ecs_fini(world);
+}
+
+void Torus_lod_keys(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Torus, { .segments = 24, .rings = 12, .smooth = true, .radius = 1,
+        .tube = 0.25f });
+    test_int(lod_key(world, e, 1)->i[0], 12);
+    test_int(lod_key(world, e, 1)->i[1], 6);
+    test_int(lod_key(world, e, 2)->i[0], 6);
+    test_int(lod_key(world, e, 2)->i[1], 3);
+    test_int(lod_key(world, e, 3)->i[0], 3);
+    test_int(lod_key(world, e, 3)->i[1], 3);
+    test_flt(lod_key(world, e, 3)->f[0], lod_key(world, e, 0)->f[0]);
+    lod_test_fewer_indices(world, e, 1);
+    lod_test_fewer_indices(world, e, 3);
+
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, Torus, { .segments = 24, .rings = 12, .smooth = false, .radius = 1,
+        .tube = 0.25f });
+    test_uint(lod_mesh(world, flat, 3), lod_mesh(world, flat, 0));
     ecs_fini(world);
 }

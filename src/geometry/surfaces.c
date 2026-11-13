@@ -92,6 +92,51 @@ static void box_shell_key(box_shape_key_t *key, int segments, int rings,
     }
 }
 
+/** Reduce the steps of a shell key to a level of detail, at least 3 each.
+ *
+ * @param key The key of level 0, reduced in place
+ * @param level The level
+ */
+static void box_shell_lod(
+    box_shape_key_t *key,
+    int32_t level)
+{
+    key->i[0] = box_shape_lod_count(key->i[0], 3, level);
+    key->i[1] = box_shape_lod_count(key->i[1], 3, level);
+}
+
+/** Compute the mesh cache key of a level of detail of an ellipsoid shell.
+ *
+ * @param value The EllipsoidShell component.
+ * @param level The level.
+ * @param key Output cache key.
+ */
+static void box_ellipsoid_lod(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    const EllipsoidShell *s = value;
+    box_shell_key(key, s->segments, s->rings, s->thickness, s->rims);
+    box_shell_lod(key, level);
+}
+
+/** Compute the mesh cache key of a level of detail of a torus shell.
+ *
+ * @param value The TorusShell component.
+ * @param level The level.
+ * @param key Output cache key.
+ */
+static void box_torus_shell_lod(
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    const TorusShell *s = value;
+    box_shell_key(key, s->segments, s->rings, s->thickness, s->rims);
+    box_shell_lod(key, level);
+}
+
 /** Compute the mesh cache key for a ellipsoid shell.
  *
  * @param value The EllipsoidShell component.
@@ -318,9 +363,11 @@ void box_geometry_surfaces_init(
 {
     box_owned_hooks(world, BeveledPrism, BOX_OWNED_VEC(BeveledPrism, footprint, vec2));
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(EllipsoidShell),
-        .key = box_ellipsoid_key, .generate = box_surface_grid, .surface = box_ellipsoid_data});
+        .key = box_ellipsoid_key, .generate = box_surface_grid, .surface = box_ellipsoid_data,
+        .lod = box_ellipsoid_lod});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(TorusShell),
-        .key = box_torus_shell_key, .generate = box_surface_grid, .surface = box_torus_shell_data});
+        .key = box_torus_shell_key, .generate = box_surface_grid, .surface = box_torus_shell_data,
+        .lod = box_torus_shell_lod});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(BeveledPrism),
         .key = box_prism_key, .generate = box_surface_grid, .surface = box_prism_data});
 }

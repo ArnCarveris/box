@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 void Sphere_segments(void) {
     // renderer/meshes
@@ -352,5 +353,50 @@ void Sphere_lantern_ribs(void) {
         test_int(outside, 0);
     }
 
+    ecs_fini(world);
+}
+
+void Sphere_lod_keys(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Sphere, { .segments = 24, .smooth = true, .radius = 1 });
+    test_int(lod_key(world, e, 0)->i[0], 24);
+    test_int(lod_key(world, e, 1)->i[0], 12);
+    test_int(lod_key(world, e, 2)->i[0], 6);
+    test_int(lod_key(world, e, 3)->i[0], 3);
+    test_int(lod_key(world, e, 3)->i[1], 1);
+    test_uint(lod_mesh(world, e, 0), ecs_get(world, e, ShapeMesh)->mesh);
+    test_uint(lod_mesh(world, e, BOX_LOD_LEVELS_MAX + 2), lod_mesh(world, e, 3));
+    lod_test_fewer_indices(world, e, 1);
+    lod_test_fewer_indices(world, e, 3);
+
+    /* Halving stops at 3 segments, the levels past it reuse the mesh of the level before */
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Sphere, { .segments = 8, .smooth = true, .radius = 1 });
+    test_int(lod_key(world, floor, 1)->i[0], 4);
+    test_int(lod_key(world, floor, 2)->i[0], 3);
+    test_uint(lod_mesh(world, floor, 3), lod_mesh(world, floor, 2));
+    ecs_entity_t least = ecs_new(world);
+    ecs_set(world, least, Sphere, { .segments = 3, .smooth = true, .radius = 1 });
+    test_uint(lod_mesh(world, least, 1), lod_mesh(world, least, 0));
+    test_uint(lod_mesh(world, least, 3), lod_mesh(world, least, 0));
+    ecs_fini(world);
+}
+
+void Sphere_lod_not_smooth(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Sphere, { .segments = 24, .smooth = false, .radius = 1 });
+    int32_t count = box_mesh_cache_count(cache);
+    for (int32_t level = 1; level < BOX_LOD_LEVELS_MAX; level ++) {
+        test_uint(lod_mesh(world, e, level), lod_mesh(world, e, 0));
+    }
+
+    test_int(box_mesh_cache_count(cache), count);
     ecs_fini(world);
 }
