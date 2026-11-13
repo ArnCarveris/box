@@ -1,17 +1,18 @@
 // The sounds the Synth suite of test/cpu/audio measures the sub oscillator from script with.
 using box.audio
+using box.audio.synth
 
 // A bass: a saw with a sub an octave under, and a sine with a sub two octaves under, 0.5 s
 prefab SubBass {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.7, hold: 0.3, release: 0.1}
-  SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.3, sub: 0.6}
-  low { SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.2, sub: 0.4, sub_octave: 2} }
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.1, sustain: 0.7, hold: 0.3, release: 0.1}
+  Oscillator: {wave: Saw, frequency: 110, level: 0.3, sub: 0.6}
+  low { Oscillator: {wave: Sine, frequency: 220, level: 0.2, sub: 0.4, sub_octave: 2} }
 }
 
 // The defaults: no sub, one octave under
 prefab Plain {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
-  SynthOscillator: {frequency: 440, level: 0.3}
+  Sound: {}
+  Envelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
+  Oscillator: {frequency: 440, level: 0.3}
 }

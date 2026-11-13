@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 
 include_part_bus {
   Bus: {volume: 0.5}
@@ -6,7 +7,7 @@ include_part_bus {
 }
 
 prefab include_part_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, decay: 0.2}
-  SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.2}
+  Sound: {}
+  Envelope: {attack: 0.01, decay: 0.2}
+  Oscillator: {wave: Sine, frequency: 330, level: 0.2}
 }

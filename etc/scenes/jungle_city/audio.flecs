@@ -2,6 +2,7 @@ using flecs.script
 using flecs.script.math
 using box.transform
 using box.audio
+using box.audio.synth
 using box.widgets
 
 state {
@@ -30,136 +31,136 @@ assets {
   canopy_water { Bus: {output: master, kind: ChannelSfx, volume: 0.85, sends: [{bus: canopy_verb, level: 0.1}]} }
   canopy_far {
     Bus: {output: master, effects: [canopy_far], sends: [{bus: canopy_verb, level: 0.45}]}
-    Filter: {kind: SynthLowPass, cutoff: 3800}
+    box.audio.Filter: {kind: LowPass, cutoff: 3800}
   }
   canopy_wild { Bus: {output: master, kind: ChannelSfx, volume: 1.6, sends: [{bus: canopy_verb, level: 0.3}]} }
 
   prefab CanopyCicadas {
     Output: {bus: canopy_bed}
-    SynthSound: {seed: 62, drift: 20}
-    SynthEnvelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
-    SynthFilter: {kind: SynthBandPass, cutoff: 5200, resonance: 0.5}
+    Sound: {seed: 62, drift: 20}
+    Envelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
+    Filter: {kind: BandPass, cutoff: 5200, resonance: 0.5}
     buzz {
-      SynthOscillator: {wave: SynthTriangle, frequency: 4900, level: 0.2}
-      SynthUnison: {voices: 3, detune: 35, width: 0}
+      Oscillator: {wave: Triangle, frequency: 4900, level: 0.2}
+      Unison: {voices: 3, detune: 35, width: 0}
     }
-    hiss { SynthOscillator: {wave: SynthNoise, level: 0.14} }
-    pulse { SynthLfo: {wave: SynthLfoTriangle, rate: 41, random_phase: true, amplitude: 0.75} }
-    swell { SynthLfo: {wave: SynthLfoSine, rate: 0.045, random_phase: true, amplitude: 0.9} }
+    hiss { Oscillator: {wave: Noise, level: 0.14} }
+    pulse { Lfo: {wave: LfoTriangle, rate: 41, random_phase: true, amplitude: 0.75} }
+    swell { Lfo: {wave: LfoSine, rate: 0.045, random_phase: true, amplitude: 0.9} }
   }
 
   prefab CanopyCrickets {
     Output: {bus: canopy_bed}
-    SynthSound: {seed: 63, drift: 8}
-    SynthEnvelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
-    SynthFilter: {kind: SynthBandPass, cutoff: 4200, resonance: 0.6}
-    near { SynthOscillator: {wave: SynthSine, frequency: 4300, level: 0.2} }
+    Sound: {seed: 63, drift: 8}
+    Envelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
+    Filter: {kind: BandPass, cutoff: 4200, resonance: 0.6}
+    near { Oscillator: {wave: Sine, frequency: 4300, level: 0.2} }
     far {
-      SynthOscillator: {wave: SynthSine, frequency: 3750, level: 0.14}
-      SynthUnison: {voices: 4, detune: 60, width: 0}
+      Oscillator: {wave: Sine, frequency: 3750, level: 0.14}
+      Unison: {voices: 4, detune: 60, width: 0}
     }
-    chirp { SynthLfo: {wave: SynthLfoSquare, rate: 3.1, random_phase: true, amplitude: 0.9} }
-    trill { SynthLfo: {wave: SynthLfoTriangle, rate: 27, random_phase: true, amplitude: 0.6} }
+    chirp { Lfo: {wave: LfoSquare, rate: 3.1, random_phase: true, amplitude: 0.9} }
+    trill { Lfo: {wave: LfoTriangle, rate: 27, random_phase: true, amplitude: 0.6} }
   }
 
   prefab CanopySpill {
     Output: {bus: canopy_water}
-    SynthSound: {seed: 71}
-    SynthEnvelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2000, resonance: 0.15}
-    pour { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.5} }
-    splash { SynthOscillator: {wave: SynthNoise, level: 0.15} }
-    babble { SynthLfo: {wave: SynthLfoTriangle, rate: 2.7, random_phase: true, cutoff: 0.35, amplitude: 0.2} }
+    Sound: {seed: 71}
+    Envelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
+    Filter: {kind: BandPass, cutoff: 2000, resonance: 0.15}
+    pour { Oscillator: {wave: Noise, color: NoisePink, level: 0.5} }
+    splash { Oscillator: {wave: Noise, level: 0.15} }
+    babble { Lfo: {wave: LfoTriangle, rate: 2.7, random_phase: true, cutoff: 0.35, amplitude: 0.2} }
   }
 
   prefab CanopySluice {
     Output: {bus: canopy_water}
-    SynthSound: {seed: 72}
-    SynthEnvelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1500, resonance: 0.2}
-    jet { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.6} }
-    splash { SynthOscillator: {wave: SynthNoise, level: 0.2} }
-    churn { SynthLfo: {wave: SynthLfoTriangle, rate: 0.6, random_phase: true, cutoff: 0.3, amplitude: 0.15} }
+    Sound: {seed: 72}
+    Envelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
+    Filter: {kind: BandPass, cutoff: 1500, resonance: 0.2}
+    jet { Oscillator: {wave: Noise, color: NoisePink, level: 0.6} }
+    splash { Oscillator: {wave: Noise, level: 0.2} }
+    churn { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, cutoff: 0.3, amplitude: 0.15} }
   }
 
   prefab CanopyFountain {
     Output: {bus: canopy_water}
-    SynthSound: {seed: 73}
-    SynthEnvelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
-    SynthFilter: {kind: SynthHighPass, cutoff: 1300, resonance: 0.1}
-    spray { SynthOscillator: {wave: SynthNoise, level: 0.45} }
-    patter { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.35} }
-    flutter { SynthLfo: {wave: SynthLfoTriangle, rate: 7.5, amplitude: 0.18} }
+    Sound: {seed: 73}
+    Envelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
+    Filter: {kind: HighPass, cutoff: 1300, resonance: 0.1}
+    spray { Oscillator: {wave: Noise, level: 0.45} }
+    patter { Oscillator: {wave: Noise, color: NoisePink, level: 0.35} }
+    flutter { Lfo: {wave: LfoTriangle, rate: 7.5, amplitude: 0.18} }
   }
 
   prefab CanopyTrickle {
     Output: {bus: canopy_water}
-    SynthSound: {seed: 74}
-    SynthEnvelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2200, resonance: 0.3}
-    pour { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.5} }
-    gurgle { SynthLfo: {wave: SynthLfoTriangle, rate: 3.3, random_phase: true, cutoff: 0.5} }
+    Sound: {seed: 74}
+    Envelope: {attack: 0.01, sustain: 1, hold: 59.98, release: 0.01}
+    Filter: {kind: BandPass, cutoff: 2200, resonance: 0.3}
+    pour { Oscillator: {wave: Noise, color: NoisePink, level: 0.5} }
+    gurgle { Lfo: {wave: LfoTriangle, rate: 3.3, random_phase: true, cutoff: 0.5} }
   }
 
   prefab CanopyWhistle {
     Output: {bus: canopy_wild}
     Spatial: {min_distance: 5, max_distance: 130, cutoff: 2500}
-    SynthSound: {seed: 81, pitch_variance: 0.14, level_variance: 0.2}
-    SynthEnvelope: {attack: 0.012, decay: 0.05, sustain: 0.7, hold: 0.1, release: 0.07}
-    tone { SynthOscillator: {wave: SynthSine, frequency: 2100, frequency_end: 2850, sweep: 0.14, level: 0.3} }
-    over { SynthOscillator: {wave: SynthSine, frequency: 4200, frequency_end: 5700, sweep: 0.14, level: 0.04} }
-    warble { SynthLfo: {wave: SynthLfoSine, rate: 22, pitch: 35} }
+    Sound: {seed: 81, pitch_variance: 0.14, level_variance: 0.2}
+    Envelope: {attack: 0.012, decay: 0.05, sustain: 0.7, hold: 0.1, release: 0.07}
+    tone { Oscillator: {wave: Sine, frequency: 2100, frequency_end: 2850, sweep: 0.14, level: 0.3} }
+    over { Oscillator: {wave: Sine, frequency: 4200, frequency_end: 5700, sweep: 0.14, level: 0.04} }
+    warble { Lfo: {wave: LfoSine, rate: 22, pitch: 35} }
   }
 
   prefab CanopyParrot {
     Output: {bus: canopy_wild}
     Spatial: {min_distance: 6, max_distance: 160, cutoff: 1800}
-    SynthSound: {seed: 82, pitch_variance: 0.12, level_variance: 0.2}
-    SynthEnvelope: {attack: 0.006, decay: 0.05, sustain: 0.65, hold: 0.13, release: 0.07}
-    SynthDrive: {drive: 0.45}
-    SynthFilter: {kind: SynthFormant, vowel: 0.2, resonance: 0.45}
-    SynthFilterEnvelope: {attack: 0.02, decay: 0.2, vowel: 1.6}
-    squawk { SynthOscillator: {wave: SynthSaw, frequency: 1150, frequency_end: 860, sweep: 0.2, level: 0.5} }
-    rasp { SynthOscillator: {wave: SynthNoise, level: 0.18} }
-    grit { SynthLfo: {wave: SynthLfoRandom, rate: 60, pitch: 90} }
+    Sound: {seed: 82, pitch_variance: 0.12, level_variance: 0.2}
+    Envelope: {attack: 0.006, decay: 0.05, sustain: 0.65, hold: 0.13, release: 0.07}
+    Drive: {drive: 0.45}
+    Filter: {kind: Formant, vowel: 0.2, resonance: 0.45}
+    FilterEnvelope: {attack: 0.02, decay: 0.2, vowel: 1.6}
+    squawk { Oscillator: {wave: Saw, frequency: 1150, frequency_end: 860, sweep: 0.2, level: 0.5} }
+    rasp { Oscillator: {wave: Noise, level: 0.18} }
+    grit { Lfo: {wave: LfoRandom, rate: 60, pitch: 90} }
   }
 
   prefab CanopyToucan {
     Output: {bus: canopy_wild}
     Spatial: {min_distance: 5, max_distance: 130, cutoff: 1500}
-    SynthSound: {seed: 83, pitch_variance: 0.05, level_variance: 0.15}
-    SynthEnvelope: {attack: 0.008, decay: 0.04, sustain: 0.7, hold: 0.14, release: 0.05}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1250, resonance: 0.4}
-    croak { SynthOscillator: {wave: SynthSquare, frequency: 520, frequency_end: 470, sweep: 0.2, level: 0.45} }
-    rattle { SynthLfo: {wave: SynthLfoSquare, rate: 34, amplitude: 0.85} }
+    Sound: {seed: 83, pitch_variance: 0.05, level_variance: 0.15}
+    Envelope: {attack: 0.008, decay: 0.04, sustain: 0.7, hold: 0.14, release: 0.05}
+    Filter: {kind: BandPass, cutoff: 1250, resonance: 0.4}
+    croak { Oscillator: {wave: Square, frequency: 520, frequency_end: 470, sweep: 0.2, level: 0.45} }
+    rattle { Lfo: {wave: LfoSquare, rate: 34, amplitude: 0.85} }
   }
 
   prefab CanopyDove {
     Output: {bus: canopy_wild}
     Spatial: {min_distance: 4, max_distance: 110, cutoff: 1200}
-    SynthSound: {seed: 84, pitch_variance: 0.04, level_variance: 0.15}
-    SynthEnvelope: {attack: 0.06, decay: 0.08, sustain: 0.7, hold: 0.22, release: 0.2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1400}
-    hoo { SynthOscillator: {wave: SynthSine, frequency: 640, frequency_end: 560, sweep: 0.4, level: 0.4} }
-    breath { SynthOscillator: {wave: SynthTriangle, frequency: 1280, frequency_end: 1120, sweep: 0.4, level: 0.06} }
+    Sound: {seed: 84, pitch_variance: 0.04, level_variance: 0.15}
+    Envelope: {attack: 0.06, decay: 0.08, sustain: 0.7, hold: 0.22, release: 0.2}
+    Filter: {kind: LowPass, cutoff: 1400}
+    hoo { Oscillator: {wave: Sine, frequency: 640, frequency_end: 560, sweep: 0.4, level: 0.4} }
+    breath { Oscillator: {wave: Triangle, frequency: 1280, frequency_end: 1120, sweep: 0.4, level: 0.06} }
   }
 
   prefab CanopyTreeFrog {
     Output: {bus: canopy_wild}
     Spatial: {min_distance: 3, max_distance: 80, cutoff: 2500}
-    SynthSound: {seed: 86, pitch_variance: 0.08, level_variance: 0.25}
-    SynthEnvelope: {attack: 0.004, decay: 0.07}
-    peep { SynthOscillator: {wave: SynthSine, frequency: 2350, frequency_end: 2950, sweep: 0.05, level: 0.3} }
+    Sound: {seed: 86, pitch_variance: 0.08, level_variance: 0.25}
+    Envelope: {attack: 0.004, decay: 0.07}
+    peep { Oscillator: {wave: Sine, frequency: 2350, frequency_end: 2950, sweep: 0.05, level: 0.3} }
   }
 
   prefab CanopyCroaker {
     Output: {bus: canopy_wild}
     Spatial: {min_distance: 3, max_distance: 90, cutoff: 900}
-    SynthSound: {seed: 87, pitch_variance: 0.1, level_variance: 0.2}
-    SynthEnvelope: {attack: 0.01, decay: 0.05, sustain: 0.6, hold: 0.16, release: 0.06}
-    SynthFilter: {kind: SynthBandPass, cutoff: 650, resonance: 0.45}
-    throat { SynthOscillator: {wave: SynthSaw, frequency: 150, frequency_end: 125, sweep: 0.25, level: 0.6} }
-    rattle { SynthLfo: {wave: SynthLfoSquare, rate: 28, amplitude: 0.8} }
+    Sound: {seed: 87, pitch_variance: 0.1, level_variance: 0.2}
+    Envelope: {attack: 0.01, decay: 0.05, sustain: 0.6, hold: 0.16, release: 0.06}
+    Filter: {kind: BandPass, cutoff: 650, resonance: 0.45}
+    throat { Oscillator: {wave: Saw, frequency: 150, frequency_end: 125, sweep: 0.25, level: 0.6} }
+    rattle { Lfo: {wave: LfoSquare, rate: 28, amplitude: 0.8} }
   }
 
   template CanopySoundscape {

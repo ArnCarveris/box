@@ -1474,701 +1474,6 @@ window.BOX_AUDIO_PARAMS = {
    "doc": "Times the output ran out of decoded frames and faded to silence"
   }
  },
- "SynthBow": {
-  "brightness": {
-   "def": 0.5,
-   "doc": "Damping of the loop, 0 dark to 1 bright, default 0.5, as SynthString.brightness: a lowpass that follows the note",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "noise": {
-   "def": 0.1,
-   "doc": "Noise of the bow hair added at the contact point, 0..1, default 0.1",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "position": {
-   "def": 0.12,
-   "doc": "Distance of the bow from the bridge as a share of the string, 0.02..0.5, default 0.12: nearer is brighter. It notches the harmonics at the multiples of 1 / position",
-   "max": 0.5,
-   "min": 0.02,
-   "unit": ""
-  },
-  "pressure": {
-   "def": 0.5,
-   "doc": "Force of the bow, 0..1, default 0.5: low gives a soft, airy tone, the middle the Helmholtz motion, high a harder tone with more upper harmonics",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "speed": {
-   "def": 0.5,
-   "doc": "Velocity of the bow, 0..1, default 0.5: the level, the tone stays; 0 is silent",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "velocity": {
-   "def": 0.0,
-   "doc": "Share 0..1 of the pressure and the speed that the velocity of a note scales, as SynthString.velocity; default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "SynthDrive": {
-  "asymmetry": {
-   "def": 0.0,
-   "doc": "0..1, default 0: an offset before the clipper that adds even harmonics; its DC is blocked",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "drive": {
-   "def": 0.3,
-   "doc": "0..1, default 0.3: a gain of -6 to +24 dB before the clipper",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "SynthEnvelope": {
-  "attack": {
-   "doc": "Seconds from 0 to 1, at least 0.5 ms so it does not click",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "attack_curve": {
-   "doc": "Curve of the attack, 0 linear (default), -16..16",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "curve": {
-   "doc": "Curve of the decay and the release, 0 linear (default), -16..16",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "decay": {
-   "doc": "Seconds from 1 to the sustain level",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "hold": {
-   "doc": "Seconds at the sustain level before the release",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "key_scale": {
-   "def": 0.0,
-   "doc": "Key scaling 0..1, default 0: the decay and the release are times 2^(-key_scale key / 12) at the key of the note, so at 1 they halve per octave above the root",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "release": {
-   "doc": "Seconds from the sustain level to 0",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "sustain": {
-   "def": 0.0,
-   "doc": "Level after the decay, 0..1, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "SynthFilter": {
-  "cutoff": {
-   "def": 1000.0,
-   "doc": "Hz, default 1000, clamped under Nyquist",
-   "log": true,
-   "max": 20000.0,
-   "min": 20.0,
-   "soft": true,
-   "unit": "Hz"
-  },
-  "drive": {
-   "def": 0.0,
-   "doc": "Saturation, 0 to 1, default 0 (linear): soft clips the input and the resonance of each stage, so a high resonance compresses and growls instead of whistling; 1 drives it hard",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "feedback": {
-   "def": 0.5,
-   "doc": "SynthComb: gain of the delayed output fed back, -0.98..0.98, default 0.5: positive peaks at the harmonics of the comb, negative at its odd harmonics an octave down",
-   "max": 0.98,
-   "min": -0.98,
-   "unit": ""
-  },
-  "keytrack": {
-   "def": 0.0,
-   "doc": "Key tracking 0..1, default 0: the cutoff is times the pitch ratio of the voice to the keytrack, so 1 moves it 1:1 with the pitch; it follows the pitch of the voice, glides included",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "kind": {
-   "doc": "The kind, default SynthLowPass"
-  },
-  "model": {
-   "doc": "The model, default SynthFilterSvf. SynthFilterLadder is a transistor ladder that self-oscillates at resonance 1; its drive is the gain into it, -6 dB to +12 dB"
-  },
-  "resonance": {
-   "doc": "0 (a Butterworth response) to 1 (rings the longest)",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "slope": {
-   "doc": "Steepness, default SynthSlope12; at SynthSlope24 the resonance applies to the second stage only"
-  },
-  "tune": {
-   "def": 1.0,
-   "doc": "SynthComb: ratio of the frequency of the comb to the note, 0.125..8, default 1; 2 an octave up, 1.5 a fifth",
-   "max": 8.0,
-   "min": 0.125,
-   "unit": ""
-  },
-  "velocity": {
-   "def": 0.0,
-   "doc": "Octaves of the cutoff at velocity 1 over velocity 0, -10..10, default 0: the cutoff applies as authored at velocity 1 and is cutoff 2^(velocity (v - 1)) at the velocity v of a note",
-   "max": 10.0,
-   "min": -10.0,
-   "unit": "oct"
-  },
-  "vowel": {
-   "def": 0.0,
-   "doc": "SynthFormant: the vowel, 0 a, 1 e, 2 i, 3 o, 4 u, default 0; a fraction interpolates the two nearest vowels. SynthLfo.vowel and SynthFilterEnvelope.vowel move it, clamped to 0..4",
-   "max": 4.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "SynthFilterEnvelope": {
-  "amount": {
-   "def": 0.0,
-   "doc": "Octaves the cutoff moves at level 1, -10..10, negative closes the filter, default 0",
-   "max": 10.0,
-   "min": -10.0,
-   "unit": "oct"
-  },
-  "attack": {
-   "doc": "Seconds from 0 to 1, at least 0.5 ms",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "attack_curve": {
-   "doc": "Curve of the attack, 0 linear (default), -16..16",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "curve": {
-   "doc": "Curve of the decay and the release, 0 linear (default), -16..16",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "decay": {
-   "doc": "Seconds from 1 to the sustain level",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "hold": {
-   "doc": "Seconds at the sustain level before the release",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "release": {
-   "doc": "Seconds from the sustain level to 0",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "sustain": {
-   "def": 0.0,
-   "doc": "Level after the decay, 0..1, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "velocity": {
-   "def": 0.0,
-   "doc": "Share 0..1 of the amount that the velocity of a note scales, amount (1 - share + share v), default 0; it scales vowel too",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "vowel": {
-   "def": 0.0,
-   "doc": "SynthFormant: vowels the vowel moves by at level 1, -4..4, default 0; the moved vowel is clamped to 0..4",
-   "max": 4.0,
-   "min": -4.0,
-   "unit": ""
-  }
- },
- "SynthGlide": {
-  "channel": {
-   "doc": "Mono voice of the one shots of legato sounds, default 0: legato sounds of the same channel share one voice"
-  },
-  "legato": {
-   "doc": "Play as a note of a mono voice, default false"
-  },
-  "time": {
-   "def": 0.0,
-   "doc": "Seconds of a glide, 0 to 10, default 0",
-   "log": true,
-   "max": 10.0,
-   "min": 0.005,
-   "unit": "s",
-   "zero": true
-  }
- },
- "SynthLfo": {
-  "amplitude": {
-   "doc": "Tremolo: share of the level it takes at the bottom of the wave, 0..1",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "cutoff": {
-   "doc": "Octaves of the cutoff of the SynthFilter at the top of the wave, -10..10; nothing on a SynthFormant filter",
-   "max": 10.0,
-   "min": -10.0,
-   "unit": "oct"
-  },
-  "delay": {
-   "doc": "Seconds after the start of the note before it moves anything",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "fade": {
-   "doc": "Seconds it fades in over after its delay, 0 at once",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "hard_sync": {
-   "def": 0.0,
-   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the top of the wave, -48..48, default 0, clamped to 1..16. On a layer it syncs that layer; on the root every synced layer",
-   "max": 48.0,
-   "min": -48.0,
-   "unit": "st"
-  },
-  "phase": {
-   "doc": "Phase it starts at in turns, 0..1, 0.25 is the top of a sine",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "pitch": {
-   "doc": "Cents of vibrato at the top of the wave, -2400..2400",
-   "max": 2400.0,
-   "min": -2400.0,
-   "unit": "ct"
-  },
-  "position": {
-   "def": 0.0,
-   "doc": "Frames the position of SynthWavetable layers moves by at the top of the wave, -256..256, default 0; the moved position is clamped to the frames of the table",
-   "max": 256.0,
-   "min": -256.0,
-   "unit": ""
-  },
-  "pulse_width": {
-   "doc": "Share of the period the pulse width of squares moves by at the top of the wave, -0.49..0.49",
-   "max": 0.49,
-   "min": -0.49,
-   "unit": ""
-  },
-  "random_phase": {
-   "doc": "Start at a random phase per play instead, seeded from SynthSound.seed and the count of plays"
-  },
-  "rate": {
-   "def": 5.0,
-   "doc": "Hz, 0..100, default 5",
-   "log": true,
-   "max": 100.0,
-   "min": 0.05,
-   "unit": "Hz",
-   "zero": true
-  },
-  "sync": {
-   "def": 0.0,
-   "doc": "Cycle in beats of the Transport, 0..256, default 0 for rate; when positive it wins over rate. The phase follows the beat at the start of a note; delay and fade stay in seconds",
-   "max": 256.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "vowel": {
-   "def": 0.0,
-   "doc": "Vowels of the SynthFormant filter at the top of the wave, -4..4, default 0; the moved vowel is clamped to 0..4. Of the sound on a layer too, as the cutoff",
-   "max": 4.0,
-   "min": -4.0,
-   "unit": ""
-  },
-  "wave": {
-   "doc": "The wave, default SynthLfoSine"
-  }
- },
- "SynthModEnvelope": {
-  "attack": {
-   "doc": "Seconds from 0 to 1, at least 0.5 ms",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "attack_curve": {
-   "doc": "Curve of the attack, 0 linear (default), -16..16",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "curve": {
-   "doc": "Curve of the decay and the release, 0 linear (default), -16..16",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "decay": {
-   "doc": "Seconds from 1 to the sustain level",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "hold": {
-   "doc": "Seconds at the sustain level before the release",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "key_scale": {
-   "def": 0.0,
-   "doc": "Key scaling 0..1, default 0, as SynthEnvelope.key_scale",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "release": {
-   "doc": "Seconds from the sustain level to 0",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "sustain": {
-   "def": 0.0,
-   "doc": "Level after the decay, 0..1, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "SynthModRoute": {
-  "amount": {
-   "def": 0.0,
-   "doc": "Amount at a source value of 1, in the unit of the target, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "source": {
-   "doc": "The source, default SynthSourceAmpEnvelope"
-  },
-  "target": {
-   "doc": "The target, default SynthTargetCutoff"
-  }
- },
- "SynthOscillator": {
-  "audible": {
-   "doc": "Whether a modulator is heard as well, at its level"
-  },
-  "color": {
-   "doc": "SynthNoise: color of the noise, default SynthNoiseWhite, seeded as white noise; each unison voice filters its own. Ignored by the other waves"
-  },
-  "feedback": {
-   "doc": "Radians of its own output on its phase, 0..1.5, a sawlike tone",
-   "max": 1.5,
-   "min": 0.0,
-   "unit": ""
-  },
-  "frequency": {
-   "def": 440.0,
-   "doc": "Hz, default 440, ignored by noise",
-   "log": true,
-   "max": 20000.0,
-   "min": 20.0,
-   "soft": true,
-   "unit": "Hz"
-  },
-  "frequency_end": {
-   "doc": "Hz the pitch sweeps to, 0 for no sweep",
-   "log": true,
-   "max": 20000.0,
-   "min": 20.0,
-   "soft": true,
-   "unit": "Hz"
-  },
-  "index": {
-   "doc": "SynthPhase: peak index in radians at the top of its envelope, 0..32, limited against the frequency so FM aliases little; SynthRing: depth 0..1. Default 1",
-   "max": 32.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "level": {
-   "def": 1.0,
-   "doc": "Linear gain, default 1",
-   "max": 4.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": "gain"
-  },
-  "modulation": {
-   "doc": "What it does with its signal, default SynthMix"
-  },
-  "pulse_width": {
-   "def": 0.5,
-   "doc": "SynthSquare: share of the period it is high, 0.01..0.99, default 0.5; band limited at every width, without DC",
-   "max": 0.99,
-   "min": 0.01,
-   "unit": ""
-  },
-  "sub": {
-   "def": 0.0,
-   "doc": "Level 0..1 of a band limited square sub_octave octaves under the layer, default 0 (off). It follows the pitch of the layer but not its phase modulation; ignored by SynthNoise, SynthPluck",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "sub_octave": {
-   "doc": "Octaves the sub is under the layer, 1 or 2, default 1; 0 counts as 1 and other values are clamped"
-  },
-  "sweep": {
-   "doc": "Seconds of the sweep, exponential in frequency",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "sync": {
-   "def": 0.0,
-   "doc": "Hard sync: ratio 1..16 of the wave to the note, default 0 (off). The wave restarts on every cycle of the note frequency, band limited, for sync leads; ignored by SynthNoise and SynthPluck",
-   "max": 16.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "velocity": {
-   "def": 0.0,
-   "doc": "SynthPhase, SynthRing: share 0..1 of the index that the velocity of a note scales, index (1 - share + share v), so soft notes have fewer sidebands; default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "wave": {
-   "doc": "The wave, default SynthSine"
-  }
- },
- "SynthPitchEnvelope": {
-  "amount": {
-   "def": 0.0,
-   "doc": "Semitones at the start of a note, -48..48, default 0",
-   "max": 48.0,
-   "min": -48.0,
-   "unit": "st"
-  },
-  "curve": {
-   "doc": "Curve of the decay and the release, 0 linear (default), -16..16, as SynthEnvelope.curve: positive moves fast at first",
-   "max": 16.0,
-   "min": -16.0,
-   "unit": ""
-  },
-  "decay": {
-   "def": 0.0,
-   "doc": "Seconds back to the note, default 0",
-   "log": true,
-   "max": 2.0,
-   "min": 0.001,
-   "soft": true,
-   "unit": "s",
-   "zero": true
-  },
-  "release_amount": {
-   "def": 0.0,
-   "doc": "Semitones the pitch moves to over the release, -48..48, default 0",
-   "max": 48.0,
-   "min": -48.0,
-   "unit": "st"
-  },
-  "sync": {
-   "def": 0.0,
-   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the start of a note, -48..48, default 0, returning with the decay. Only on layers with a ratio over 1, clamped to 1..16",
-   "max": 48.0,
-   "min": -48.0,
-   "unit": "st"
-  }
- },
- "SynthSound": {
-  "drift": {
-   "def": 0.0,
-   "doc": "Cents of analog drift, 0..50, default 0: the pitch of each voice wanders smoothly within this, and the cutoff by a quarter of it; seeded from seed and the count of plays",
-   "max": 50.0,
-   "min": 0.0,
-   "unit": "ct"
-  },
-  "free_phase": {
-   "doc": "Start the oscillators of each play, and their subs, at a random phase instead of 0, seeded as drift; default false. Unison voices always start at random phases"
-  },
-  "level_variance": {
-   "def": 0.0,
-   "doc": "Random share of the level per play, 0..1, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "pitch_variance": {
-   "def": 0.0,
-   "doc": "Random share of the pitch per play, 0..1, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  },
-  "seed": {
-   "doc": "Seed of the noise and the variances, with a count of plays"
-  }
- },
- "SynthString": {
-  "brightness": {
-   "def": 0.5,
-   "doc": "Lowpass of the pluck and in the loop: 0 dark, the harmonics start soft and die fast, to 1 bright, a metallic ring; default 0.5",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "decay": {
-   "def": 2.0,
-   "doc": "Seconds the fundamental takes to fall by 60 dB, 0.01..60, default 2",
-   "log": true,
-   "max": 60.0,
-   "min": 0.01,
-   "unit": "s"
-  },
-  "hardness": {
-   "def": 0.8,
-   "doc": "Lowpass of the noise that plucks: 0 a soft finger, 1 a hard pick; default 0.8",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "velocity": {
-   "def": 0.0,
-   "doc": "Share 0..1 of the hardness that the velocity of a note scales, hardness (1 - share + share v), so soft notes are plucked softer; default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "unit": ""
-  }
- },
- "SynthTable": {
-  "envelope": {
-   "def": 0.0,
-   "doc": "Frames the position moves by at level 1 of the envelope of the layer, either way, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "position": {
-   "def": 0.0,
-   "doc": "Frame it plays, 0..frames - 1, default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  },
-  "table": {
-   "doc": "The entity with the Wavetable"
-  }
- },
- "SynthUnison": {
-  "detune": {
-   "def": 10.0,
-   "doc": "Cents from the lowest copy to the highest, 0 to 100, default 10",
-   "max": 100.0,
-   "min": 0.0,
-   "unit": "ct"
-  },
-  "voices": {
-   "doc": "Copies of the oscillator, 1 to 7, default 3"
-  },
-  "width": {
-   "def": 0.0,
-   "doc": "0 (every copy in the center, mono) to 1 (the lowest copy left, the highest right), default 0",
-   "max": 1.0,
-   "min": 0.0,
-   "soft": true,
-   "unit": ""
-  }
- },
  "TapeStop": {
   "active": {
    "def": 0.0,
@@ -2378,7 +1683,702 @@ window.BOX_AUDIO_PARAMS = {
    "unit": ""
   }
  },
- "Wavetable": {
+ "synth.Bow": {
+  "brightness": {
+   "def": 0.5,
+   "doc": "Damping of the loop, 0 dark to 1 bright, default 0.5, as SynthString.brightness: a lowpass that follows the note",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "noise": {
+   "def": 0.1,
+   "doc": "Noise of the bow hair added at the contact point, 0..1, default 0.1",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "position": {
+   "def": 0.12,
+   "doc": "Distance of the bow from the bridge as a share of the string, 0.02..0.5, default 0.12: nearer is brighter. It notches the harmonics at the multiples of 1 / position",
+   "max": 0.5,
+   "min": 0.02,
+   "unit": ""
+  },
+  "pressure": {
+   "def": 0.5,
+   "doc": "Force of the bow, 0..1, default 0.5: low gives a soft, airy tone, the middle the Helmholtz motion, high a harder tone with more upper harmonics",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "speed": {
+   "def": 0.5,
+   "doc": "Velocity of the bow, 0..1, default 0.5: the level, the tone stays; 0 is silent",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "velocity": {
+   "def": 0.0,
+   "doc": "Share 0..1 of the pressure and the speed that the velocity of a note scales, as SynthString.velocity; default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "synth.Drive": {
+  "asymmetry": {
+   "def": 0.0,
+   "doc": "0..1, default 0: an offset before the clipper that adds even harmonics; its DC is blocked",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "drive": {
+   "def": 0.3,
+   "doc": "0..1, default 0.3: a gain of -6 to +24 dB before the clipper",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "synth.Envelope": {
+  "attack": {
+   "doc": "Seconds from 0 to 1, at least 0.5 ms so it does not click",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "attack_curve": {
+   "doc": "Curve of the attack, 0 linear (default), -16..16",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "curve": {
+   "doc": "Curve of the decay and the release, 0 linear (default), -16..16",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "decay": {
+   "doc": "Seconds from 1 to the sustain level",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "hold": {
+   "doc": "Seconds at the sustain level before the release",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "key_scale": {
+   "def": 0.0,
+   "doc": "Key scaling 0..1, default 0: the decay and the release are times 2^(-key_scale key / 12) at the key of the note, so at 1 they halve per octave above the root",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "release": {
+   "doc": "Seconds from the sustain level to 0",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "sustain": {
+   "def": 0.0,
+   "doc": "Level after the decay, 0..1, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "synth.Filter": {
+  "cutoff": {
+   "def": 1000.0,
+   "doc": "Hz, default 1000, clamped under Nyquist",
+   "log": true,
+   "max": 20000.0,
+   "min": 20.0,
+   "soft": true,
+   "unit": "Hz"
+  },
+  "drive": {
+   "def": 0.0,
+   "doc": "Saturation, 0 to 1, default 0 (linear): soft clips the input and the resonance of each stage, so a high resonance compresses and growls instead of whistling; 1 drives it hard",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "feedback": {
+   "def": 0.5,
+   "doc": "SynthComb: gain of the delayed output fed back, -0.98..0.98, default 0.5: positive peaks at the harmonics of the comb, negative at its odd harmonics an octave down",
+   "max": 0.98,
+   "min": -0.98,
+   "unit": ""
+  },
+  "keytrack": {
+   "def": 0.0,
+   "doc": "Key tracking 0..1, default 0: the cutoff is times the pitch ratio of the voice to the keytrack, so 1 moves it 1:1 with the pitch; it follows the pitch of the voice, glides included",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "kind": {
+   "doc": "The kind, default SynthLowPass"
+  },
+  "model": {
+   "doc": "The model, default SynthFilterSvf. SynthFilterLadder is a transistor ladder that self-oscillates at resonance 1; its drive is the gain into it, -6 dB to +12 dB"
+  },
+  "resonance": {
+   "doc": "0 (a Butterworth response) to 1 (rings the longest)",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "slope": {
+   "doc": "Steepness, default SynthSlope12; at SynthSlope24 the resonance applies to the second stage only"
+  },
+  "tune": {
+   "def": 1.0,
+   "doc": "SynthComb: ratio of the frequency of the comb to the note, 0.125..8, default 1; 2 an octave up, 1.5 a fifth",
+   "max": 8.0,
+   "min": 0.125,
+   "unit": ""
+  },
+  "velocity": {
+   "def": 0.0,
+   "doc": "Octaves of the cutoff at velocity 1 over velocity 0, -10..10, default 0: the cutoff applies as authored at velocity 1 and is cutoff 2^(velocity (v - 1)) at the velocity v of a note",
+   "max": 10.0,
+   "min": -10.0,
+   "unit": "oct"
+  },
+  "vowel": {
+   "def": 0.0,
+   "doc": "SynthFormant: the vowel, 0 a, 1 e, 2 i, 3 o, 4 u, default 0; a fraction interpolates the two nearest vowels. SynthLfo.vowel and SynthFilterEnvelope.vowel move it, clamped to 0..4",
+   "max": 4.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "synth.FilterEnvelope": {
+  "amount": {
+   "def": 0.0,
+   "doc": "Octaves the cutoff moves at level 1, -10..10, negative closes the filter, default 0",
+   "max": 10.0,
+   "min": -10.0,
+   "unit": "oct"
+  },
+  "attack": {
+   "doc": "Seconds from 0 to 1, at least 0.5 ms",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "attack_curve": {
+   "doc": "Curve of the attack, 0 linear (default), -16..16",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "curve": {
+   "doc": "Curve of the decay and the release, 0 linear (default), -16..16",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "decay": {
+   "doc": "Seconds from 1 to the sustain level",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "hold": {
+   "doc": "Seconds at the sustain level before the release",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "release": {
+   "doc": "Seconds from the sustain level to 0",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "sustain": {
+   "def": 0.0,
+   "doc": "Level after the decay, 0..1, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "velocity": {
+   "def": 0.0,
+   "doc": "Share 0..1 of the amount that the velocity of a note scales, amount (1 - share + share v), default 0; it scales vowel too",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "vowel": {
+   "def": 0.0,
+   "doc": "SynthFormant: vowels the vowel moves by at level 1, -4..4, default 0; the moved vowel is clamped to 0..4",
+   "max": 4.0,
+   "min": -4.0,
+   "unit": ""
+  }
+ },
+ "synth.Glide": {
+  "channel": {
+   "doc": "Mono voice of the one shots of legato sounds, default 0: legato sounds of the same channel share one voice"
+  },
+  "legato": {
+   "doc": "Play as a note of a mono voice, default false"
+  },
+  "time": {
+   "def": 0.0,
+   "doc": "Seconds of a glide, 0 to 10, default 0",
+   "log": true,
+   "max": 10.0,
+   "min": 0.005,
+   "unit": "s",
+   "zero": true
+  }
+ },
+ "synth.Lfo": {
+  "amplitude": {
+   "doc": "Tremolo: share of the level it takes at the bottom of the wave, 0..1",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "cutoff": {
+   "doc": "Octaves of the cutoff of the SynthFilter at the top of the wave, -10..10; nothing on a SynthFormant filter",
+   "max": 10.0,
+   "min": -10.0,
+   "unit": "oct"
+  },
+  "delay": {
+   "doc": "Seconds after the start of the note before it moves anything",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "fade": {
+   "doc": "Seconds it fades in over after its delay, 0 at once",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "hard_sync": {
+   "def": 0.0,
+   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the top of the wave, -48..48, default 0, clamped to 1..16. On a layer it syncs that layer; on the root every synced layer",
+   "max": 48.0,
+   "min": -48.0,
+   "unit": "st"
+  },
+  "phase": {
+   "doc": "Phase it starts at in turns, 0..1, 0.25 is the top of a sine",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "pitch": {
+   "doc": "Cents of vibrato at the top of the wave, -2400..2400",
+   "max": 2400.0,
+   "min": -2400.0,
+   "unit": "ct"
+  },
+  "position": {
+   "def": 0.0,
+   "doc": "Frames the position of SynthWavetable layers moves by at the top of the wave, -256..256, default 0; the moved position is clamped to the frames of the table",
+   "max": 256.0,
+   "min": -256.0,
+   "unit": ""
+  },
+  "pulse_width": {
+   "doc": "Share of the period the pulse width of squares moves by at the top of the wave, -0.49..0.49",
+   "max": 0.49,
+   "min": -0.49,
+   "unit": ""
+  },
+  "random_phase": {
+   "doc": "Start at a random phase per play instead, seeded from SynthSound.seed and the count of plays"
+  },
+  "rate": {
+   "def": 5.0,
+   "doc": "Hz, 0..100, default 5",
+   "log": true,
+   "max": 100.0,
+   "min": 0.05,
+   "unit": "Hz",
+   "zero": true
+  },
+  "sync": {
+   "def": 0.0,
+   "doc": "Cycle in beats of the Transport, 0..256, default 0 for rate; when positive it wins over rate. The phase follows the beat at the start of a note; delay and fade stay in seconds",
+   "max": 256.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "vowel": {
+   "def": 0.0,
+   "doc": "Vowels of the SynthFormant filter at the top of the wave, -4..4, default 0; the moved vowel is clamped to 0..4. Of the sound on a layer too, as the cutoff",
+   "max": 4.0,
+   "min": -4.0,
+   "unit": ""
+  },
+  "wave": {
+   "doc": "The wave, default SynthLfoSine"
+  }
+ },
+ "synth.ModEnvelope": {
+  "attack": {
+   "doc": "Seconds from 0 to 1, at least 0.5 ms",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "attack_curve": {
+   "doc": "Curve of the attack, 0 linear (default), -16..16",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "curve": {
+   "doc": "Curve of the decay and the release, 0 linear (default), -16..16",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "decay": {
+   "doc": "Seconds from 1 to the sustain level",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "hold": {
+   "doc": "Seconds at the sustain level before the release",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "key_scale": {
+   "def": 0.0,
+   "doc": "Key scaling 0..1, default 0, as SynthEnvelope.key_scale",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "release": {
+   "doc": "Seconds from the sustain level to 0",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "sustain": {
+   "def": 0.0,
+   "doc": "Level after the decay, 0..1, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "synth.ModRoute": {
+  "amount": {
+   "def": 0.0,
+   "doc": "Amount at a source value of 1, in the unit of the target, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "source": {
+   "doc": "The source, default SynthSourceAmpEnvelope"
+  },
+  "target": {
+   "doc": "The target, default SynthTargetCutoff"
+  }
+ },
+ "synth.Oscillator": {
+  "audible": {
+   "doc": "Whether a modulator is heard as well, at its level"
+  },
+  "color": {
+   "doc": "SynthNoise: color of the noise, default SynthNoiseWhite, seeded as white noise; each unison voice filters its own. Ignored by the other waves"
+  },
+  "feedback": {
+   "doc": "Radians of its own output on its phase, 0..1.5, a sawlike tone",
+   "max": 1.5,
+   "min": 0.0,
+   "unit": ""
+  },
+  "frequency": {
+   "def": 440.0,
+   "doc": "Hz, default 440, ignored by noise",
+   "log": true,
+   "max": 20000.0,
+   "min": 20.0,
+   "soft": true,
+   "unit": "Hz"
+  },
+  "frequency_end": {
+   "doc": "Hz the pitch sweeps to, 0 for no sweep",
+   "log": true,
+   "max": 20000.0,
+   "min": 20.0,
+   "soft": true,
+   "unit": "Hz"
+  },
+  "index": {
+   "doc": "SynthPhase: peak index in radians at the top of its envelope, 0..32, limited against the frequency so FM aliases little; SynthRing: depth 0..1. Default 1",
+   "max": 32.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "level": {
+   "def": 1.0,
+   "doc": "Linear gain, default 1",
+   "max": 4.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": "gain"
+  },
+  "modulation": {
+   "doc": "What it does with its signal, default SynthMix"
+  },
+  "pulse_width": {
+   "def": 0.5,
+   "doc": "SynthSquare: share of the period it is high, 0.01..0.99, default 0.5; band limited at every width, without DC",
+   "max": 0.99,
+   "min": 0.01,
+   "unit": ""
+  },
+  "sub": {
+   "def": 0.0,
+   "doc": "Level 0..1 of a band limited square sub_octave octaves under the layer, default 0 (off). It follows the pitch of the layer but not its phase modulation; ignored by SynthNoise, SynthPluck",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "sub_octave": {
+   "doc": "Octaves the sub is under the layer, 1 or 2, default 1; 0 counts as 1 and other values are clamped"
+  },
+  "sweep": {
+   "doc": "Seconds of the sweep, exponential in frequency",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "sync": {
+   "def": 0.0,
+   "doc": "Hard sync: ratio 1..16 of the wave to the note, default 0 (off). The wave restarts on every cycle of the note frequency, band limited, for sync leads; ignored by SynthNoise and SynthPluck",
+   "max": 16.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "velocity": {
+   "def": 0.0,
+   "doc": "SynthPhase, SynthRing: share 0..1 of the index that the velocity of a note scales, index (1 - share + share v), so soft notes have fewer sidebands; default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "wave": {
+   "doc": "The wave, default SynthSine"
+  }
+ },
+ "synth.PitchEnvelope": {
+  "amount": {
+   "def": 0.0,
+   "doc": "Semitones at the start of a note, -48..48, default 0",
+   "max": 48.0,
+   "min": -48.0,
+   "unit": "st"
+  },
+  "curve": {
+   "doc": "Curve of the decay and the release, 0 linear (default), -16..16, as SynthEnvelope.curve: positive moves fast at first",
+   "max": 16.0,
+   "min": -16.0,
+   "unit": ""
+  },
+  "decay": {
+   "def": 0.0,
+   "doc": "Seconds back to the note, default 0",
+   "log": true,
+   "max": 2.0,
+   "min": 0.001,
+   "soft": true,
+   "unit": "s",
+   "zero": true
+  },
+  "release_amount": {
+   "def": 0.0,
+   "doc": "Semitones the pitch moves to over the release, -48..48, default 0",
+   "max": 48.0,
+   "min": -48.0,
+   "unit": "st"
+  },
+  "sync": {
+   "def": 0.0,
+   "doc": "Semitones the ratio of SynthOscillator.sync moves by at the start of a note, -48..48, default 0, returning with the decay. Only on layers with a ratio over 1, clamped to 1..16",
+   "max": 48.0,
+   "min": -48.0,
+   "unit": "st"
+  }
+ },
+ "synth.Sound": {
+  "drift": {
+   "def": 0.0,
+   "doc": "Cents of analog drift, 0..50, default 0: the pitch of each voice wanders smoothly within this, and the cutoff by a quarter of it; seeded from seed and the count of plays",
+   "max": 50.0,
+   "min": 0.0,
+   "unit": "ct"
+  },
+  "free_phase": {
+   "doc": "Start the oscillators of each play, and their subs, at a random phase instead of 0, seeded as drift; default false. Unison voices always start at random phases"
+  },
+  "level_variance": {
+   "def": 0.0,
+   "doc": "Random share of the level per play, 0..1, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "pitch_variance": {
+   "def": 0.0,
+   "doc": "Random share of the pitch per play, 0..1, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  },
+  "seed": {
+   "doc": "Seed of the noise and the variances, with a count of plays"
+  }
+ },
+ "synth.String": {
+  "brightness": {
+   "def": 0.5,
+   "doc": "Lowpass of the pluck and in the loop: 0 dark, the harmonics start soft and die fast, to 1 bright, a metallic ring; default 0.5",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "decay": {
+   "def": 2.0,
+   "doc": "Seconds the fundamental takes to fall by 60 dB, 0.01..60, default 2",
+   "log": true,
+   "max": 60.0,
+   "min": 0.01,
+   "unit": "s"
+  },
+  "hardness": {
+   "def": 0.8,
+   "doc": "Lowpass of the noise that plucks: 0 a soft finger, 1 a hard pick; default 0.8",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "velocity": {
+   "def": 0.0,
+   "doc": "Share 0..1 of the hardness that the velocity of a note scales, hardness (1 - share + share v), so soft notes are plucked softer; default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "unit": ""
+  }
+ },
+ "synth.Table": {
+  "envelope": {
+   "def": 0.0,
+   "doc": "Frames the position moves by at level 1 of the envelope of the layer, either way, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "position": {
+   "def": 0.0,
+   "doc": "Frame it plays, 0..frames - 1, default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  },
+  "table": {
+   "doc": "The entity with the Wavetable"
+  }
+ },
+ "synth.Unison": {
+  "detune": {
+   "def": 10.0,
+   "doc": "Cents from the lowest copy to the highest, 0 to 100, default 10",
+   "max": 100.0,
+   "min": 0.0,
+   "unit": "ct"
+  },
+  "voices": {
+   "doc": "Copies of the oscillator, 1 to 7, default 3"
+  },
+  "width": {
+   "def": 0.0,
+   "doc": "0 (every copy in the center, mono) to 1 (the lowest copy left, the highest right), default 0",
+   "max": 1.0,
+   "min": 0.0,
+   "soft": true,
+   "unit": ""
+  }
+ },
+ "synth.Wavetable": {
   "frame_size": {
    "doc": "Samples per frame of the sound, 64..4096, default 2048; 0 is the default"
   },
@@ -2433,26 +2433,26 @@ window.BOX_AUDIO_DOCS = {
  "Status": "What the audio output does, a singleton written by box.audio and read only for apps.",
  "Stream": "Music: one Ogg Vorbis file that streams while the entity exists and playing is true.",
  "StreamStatus": "What an AudioStream does, written by box.audio and read only for applications.",
- "SynthBow": "The bow and the string of a SynthBowed layer, on the layer: a digital waveguide string driven by a bow through a friction curve that sticks and slips.",
- "SynthDrive": "A drive stage of a synth sound, on its root: the mix of the layers of each voice runs through a tanh soft clipper before the SynthFilter, or before the amp without one, where an analog synth gets most of its thickness.",
- "SynthEnvelope": "An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to 0 over release.",
- "SynthFilter": "The filter of a synth sound, on its root: a state variable filter on the mix of the layers, stable at any cutoff and resonance.",
- "SynthFilterEnvelope": "An envelope of the cutoff of the SynthFilter of the same root, with the segments of a SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope, so it rises over the attack, settles at the sustain and returns over the release.",
- "SynthGlide": "Portamento and mono legato of a synth sound, on its root.",
- "SynthLfo": "An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff, the pulse width of squares, the ratio of hard sync and the position of wavetables of the sound, each by its own depth, after a delay and a fade in.",
- "SynthModEnvelope": "A third envelope of a synth sound, on its root, with the segments of a SynthEnvelope: a source of SynthModRoute, SynthSourceModEnvelope.",
- "SynthModRoute": "A route of the modulation matrix of a synth sound, on an entity of its own: the value of a source times an amount moves a target, on top of the fixed routes, once per control block.",
- "SynthOscillator": "An oscillator of a synth sound, a layer: on the root of the sound, on a child of it, or on a child of a layer.",
- "SynthPitchEnvelope": "A pitch envelope of a synth sound, relative to the note: the pitch starts amount semitones off the note and returns to it over the decay, the drop of a kick or the scoop of brass.",
- "SynthSound": "A sound made by the synth from the components of this entity and its children, without a file: SynthOscillator layers and their SynthEnvelope, SynthFilter, SynthLfo and other synth components.",
- "SynthString": "The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a burst of seeded noise, whose loop damps it.",
- "SynthTable": "The wavetable of a SynthWavetable layer, on the entity of its SynthOscillator.",
- "SynthUnison": "Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several copies of its oscillator, detuned evenly over a spread in cents and placed from left to right over the stereo width, each starting at a seeded random phase.",
  "TapeStop": "A tape stop, an effect in an insert slot of an AudioBus, as a Reverb is: slows what plays through it down to a halt, pitch and time together, and spins it back up: master_fx { Bus: {effects: [master_fx]}; TapeStop: {stop_time: 1, curve: 0.5} }.",
  "Track": "A track of the timeline: a mixer channel whose notes play on an instrument.",
  "TrackHumanize": "How far the notes of a Track move at random from where they are programmed.",
  "TransientShaper": "A transient shaper, an effect in an insert slot of an AudioBus, as a Reverb is: more or less punch and tail on drums and plucks, without a threshold, at most 12 dB either way: drums { Bus: {effects: [drums]}; TransientShaper: {attack: 0.6, sustain: -0.4} }.",
  "Transport": "The transport of the timeline in beats, a singleton: the tempo, the time signature, the position, play and stop, the loop and the metronome.",
  "Vocoder": "A vocoder, an effect in an insert slot of an AudioBus, as a Reverb is: the spectrum of its modulator, a channel keyed as the sidechain of a Compressor, shapes the input of its own channel: pad { Bus: {effects: [pad]}; Vocoder: {modulator: drums, bands: 16} }.",
- "Wavetable": "A wavetable, on an entity of its own, usually a prefab, that the SynthTable of wavetable layers names: frames of one period each that a layer morphs through."
+ "synth.Bow": "The bow and the string of a SynthBowed layer, on the layer: a digital waveguide string driven by a bow through a friction curve that sticks and slips.",
+ "synth.Drive": "A drive stage of a synth sound, on its root: the mix of the layers of each voice runs through a tanh soft clipper before the SynthFilter, or before the amp without one, where an analog synth gets most of its thickness.",
+ "synth.Envelope": "An envelope: from 0 to 1 over attack, to sustain over decay, hold seconds there, then to 0 over release.",
+ "synth.Filter": "The filter of a synth sound, on its root: a state variable filter on the mix of the layers, stable at any cutoff and resonance.",
+ "synth.FilterEnvelope": "An envelope of the cutoff of the SynthFilter of the same root, with the segments of a SynthEnvelope: the cutoff is cutoff times 2 to the amount times the level of the envelope, so it rises over the attack, settles at the sustain and returns over the release.",
+ "synth.Glide": "Portamento and mono legato of a synth sound, on its root.",
+ "synth.Lfo": "An LFO of a synth sound: a wave at a rate that moves the pitch, the level, the cutoff, the pulse width of squares, the ratio of hard sync and the position of wavetables of the sound, each by its own depth, after a delay and a fade in.",
+ "synth.ModEnvelope": "A third envelope of a synth sound, on its root, with the segments of a SynthEnvelope: a source of SynthModRoute, SynthSourceModEnvelope.",
+ "synth.ModRoute": "A route of the modulation matrix of a synth sound, on an entity of its own: the value of a source times an amount moves a target, on top of the fixed routes, once per control block.",
+ "synth.Oscillator": "An oscillator of a synth sound, a layer: on the root of the sound, on a child of it, or on a child of a layer.",
+ "synth.PitchEnvelope": "A pitch envelope of a synth sound, relative to the note: the pitch starts amount semitones off the note and returns to it over the decay, the drop of a kick or the scoop of brass.",
+ "synth.Sound": "A sound made by the synth from the components of this entity and its children, without a file: SynthOscillator layers and their SynthEnvelope, SynthFilter, SynthLfo and other synth components.",
+ "synth.String": "The string of a SynthPluck layer, on the layer: a delay line a period long, plucked with a burst of seeded noise, whose loop damps it.",
+ "synth.Table": "The wavetable of a SynthWavetable layer, on the entity of its SynthOscillator.",
+ "synth.Unison": "Unison of a synth layer, on the entity of its SynthOscillator: the layer plays as several copies of its oscillator, detuned evenly over a spread in cents and placed from left to right over the stereo width, each starting at a seeded random phase.",
+ "synth.Wavetable": "A wavetable, on an entity of its own, usually a prefab, that the SynthTable of wavetable layers names: frames of one period each that a layer morphs through."
 };

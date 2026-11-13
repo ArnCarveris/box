@@ -1,12 +1,13 @@
 // Instruments the Instrument suite of test/cpu/audio plays notes on: a sine synth in tune at
 // A4 and a legato lead, each played through an Instrument.
 using box.audio
+using box.audio.synth
 
 // A sine at 440 Hz that sustains at 0.5 while a note holds and releases over 50 ms
 prefab tone_synth {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.01, sustain: 1, hold: 0.05, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.5}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.01, sustain: 1, hold: 0.05, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.5}
 }
 
 // A synth instrument at the default root of 69, so a note of 69 plays 440 Hz
@@ -16,10 +17,10 @@ lead {
 
 // A mono legato line: notes that follow each other glide over 50 ms
 prefab legato_synth {
-  SynthSound: {}
-  SynthGlide: {time: 0.05, legato: true, channel: 3}
-  SynthEnvelope: {attack: 0.02, decay: 0.02, sustain: 0.8, hold: 0.05, release: 0.1}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.5}
+  Sound: {}
+  Glide: {time: 0.05, legato: true, channel: 3}
+  Envelope: {attack: 0.02, decay: 0.02, sustain: 0.8, hold: 0.05, release: 0.1}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.5}
 }
 
 line {

@@ -2,11 +2,12 @@
 // four note phrase with a send to a reverb return, 2 bars of 4/4 at 120 bpm, which audio.check
 // reports no problems for.
 using box.audio
+using box.audio.synth
 
 prefab check_clean_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.3}
 }
 
 check_clean_inst { Instrument: {sound: check_clean_tone} }

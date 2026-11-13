@@ -7,7 +7,7 @@ and [the example scenes](../test/assets/audio/) for working patches and songs.
 
 ## The model
 
-- A **sound** is a `Pcm`, `SoundFile` or `SynthSound`. Play it once with
+- A **sound** is a `Pcm`, `SoundFile` or `synth.Sound`. Play it once with
   `box.audio.play`, or attach a `Source` to an entity for controlled playback.
 - A **voice** plays a sound on a mixer bus, with volume, pan and pitch. There are
   64 voices. At the cap, a play steals the quietest voice of equal or lower priority;
@@ -34,9 +34,9 @@ sfx { Bus: {output: master, kind: ChannelSfx} }
 
 prefab Beep {
   Output: {bus: sfx}
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.25}
-  SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.5}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.002, decay: 0.25}
+  synth.Oscillator: {wave: Sine, frequency: 660, level: 0.5}
 }
 
 const played: bool = box.audio.play(Beep, 0.8)
@@ -169,7 +169,7 @@ their tails end.
 | --- | --- |
 | `Reverb` | `decay: 1.5` s, `damping: 0.5`, `predelay: 0.02` s, `size: 0.5`, `mix: 1`, `shimmer: 0`, `shimmer_pitch: 12` semitones |
 | `Equalizer` | Four `bands` of `kind`, `frequency`, `gain` dB and `q`; off by default |
-| `Filter` | `kind: SynthLowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: SynthSlope12`, `mix: 1`, `drive: 0` |
+| `Filter` | `kind: LowPass`, `cutoff: 1000` Hz, `resonance: 0`, `slope: Slope12`, `mix: 1`, `drive: 0` |
 | `Compressor` | `threshold: -18` dB, `ratio: 4`, `attack: 0.01` s, `release: 0.15` s, `knee: 6` dB, `makeup: 0` dB, `mix: 1`, `sidechain: 0` |
 | `Gate` | `threshold: -50` dB, `attack: 0.001` s, `hold: 0.05` s, `release: 0.1` s, `range: -80` dB |
 | `Delay` | `time: 0.25` s, `sync: 0` beats, `feedback: 0.35`, `mix: 0.3`, `ping_pong: false`, `damping: 6000` Hz |
@@ -188,8 +188,8 @@ their tails end.
 Equalizer bands use `EqOff`, `EqPeak`, `EqLowShelf`,
 `EqHighShelf`, `EqLowCut` or `EqHighCut`. Defaults are 100, 400,
 2000 and 8000 Hz, gain 0 dB and Q 0.7071. Gains range from -24 to 24 dB.
-Filters also support `SynthHighPass`, `SynthBandPass`, `SynthNotch` and
-`SynthSlope24`; cutoff is clamped below Nyquist.
+Filters also support `HighPass`, `BandPass`, `Notch` and
+`Slope24`; cutoff is clamped below Nyquist.
 
 A positive delay `sync` overrides time: `sync * 60 / tempo` seconds, capped at
 4 seconds. An eighth is 0.5 beats, a dotted eighth 0.75. A synth LFO `sync` counts
@@ -494,7 +494,7 @@ pad_vocoder {
 pad { Bus: {output: master, effects: [pad_vocoder]} }
 ```
 
-Play the drum loop on `drums` and a saw pad (a synth sound with a `SynthSaw` layer) on
+Play the drum loop on `drums` and a saw pad (a synth sound with a `Saw` layer) on
 `pad`; add `drums` to the master too, or give `drum_key` volume, to hear the loop with it.
 
 The cost grows with the bands: each band runs eight bandpass stages per frame. The
@@ -578,7 +578,7 @@ wobble { Modulator: {target: bass_filter, component: Filter,
   member: "cutoff", scale: ModOctaves, depth: 2, sync: 0.5} }
 
 // Auto-wah: a bandpass that opens with the level of its own bus
-wah_filter { Filter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6} }
+wah_filter { Filter: {kind: BandPass, cutoff: 300, resonance: 0.6} }
 guitar { Bus: {effects: [wah_filter]} }
 wah { Modulator: {target: wah_filter, component: Filter, member: "cutoff",
   source: ModFollower, scale: ModOctaves, depth: 3, attack: 0.005,
@@ -748,30 +748,30 @@ transforms and use the core's 5 ms ramps.
 
 ## Synth sounds
 
-`SynthSound` marks a sound's root. The root and descendants with `SynthOscillator`
-are its layers, up to eight. Layers use their own `SynthEnvelope` or the root's;
+`synth.Sound` marks a sound's root. The root and descendants with `synth.Oscillator`
+are its layers, up to eight. Layers use their own `synth.Envelope` or the root's;
 the root's filter processes the mix. A patch is compiled on change and copied into
 voices on play, so edits affect subsequent plays.
 
 | Component | Authoring controls |
 | --- | --- |
-| `SynthSound` | `seed`, `pitch_variance`, `level_variance`, `drift` (0 cents, 0..50), `free_phase` (false); variances default to zero |
-| `SynthOscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`SynthNoiseWhite`), modulation controls, `velocity` (0) |
-| `SynthEnvelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
-| `SynthDrive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
-| `SynthFilter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`SynthSlope12` or `SynthSlope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`SynthFilterSvf` or `SynthFilterLadder`), `vowel` (0, 0..4, `SynthFormant`), `feedback` (0.5, -0.98..0.98, `SynthComb`), `tune` (1, 0.125..8, `SynthComb`) |
-| `SynthFilterEnvelope` | Envelope controls plus `amount` in octaves, `velocity` (0) and `vowel` (0, -4..4, `SynthFormant`); requires a filter |
-| `SynthPitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
-| `SynthUnison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
-| `SynthGlide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
-| `SynthLfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
-| `SynthString` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
-| `SynthBow` | Bowed layer: `pressure` (0.5, 0..1), `speed` (0.5, 0..1), `position` (0.12, 0.02..0.5), `brightness` (0.5), `noise` (0.1, 0..1), `velocity` (0) |
-| `SynthTable` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
+| `synth.Sound` | `seed`, `pitch_variance`, `level_variance`, `drift` (0 cents, 0..50), `free_phase` (false); variances default to zero |
+| `synth.Oscillator` | `wave`, `frequency` (440 Hz), `frequency_end` (0, no sweep), `sweep` seconds, `level` (1), `pulse_width` (0.5), `sub` (0, 0..1), `sub_octave` (1, 1..2), `sync` (0, off, 1..16), `color` (`NoiseWhite`), modulation controls, `velocity` (0) |
+| `synth.Envelope` | `attack`, `decay`, `sustain`, `hold`, `release`, `curve`, `attack_curve`, `key_scale`; all zero by default |
+| `synth.Drive` | Root: `drive` (0.3, 0..1), `asymmetry` (0, 0..1) |
+| `synth.Filter` | `kind`, `cutoff` (1000 Hz), `resonance` (0), `slope` (`Slope12` or `Slope24`), `drive` (0, 0..1), `velocity` (0 octaves), `keytrack` (0), `model` (`FilterSvf` or `FilterLadder`), `vowel` (0, 0..4, `Formant`), `feedback` (0.5, -0.98..0.98, `Comb`), `tune` (1, 0.125..8, `Comb`) |
+| `synth.FilterEnvelope` | Envelope controls plus `amount` in octaves, `velocity` (0) and `vowel` (0, -4..4, `Formant`); requires a filter |
+| `synth.PitchEnvelope` | `amount` (0 semitones, -48..48), `decay` seconds, `curve` (0, -16..16), `release_amount` (0 semitones, -48..48), `sync` (0 semitones, -48..48) |
+| `synth.Unison` | Per layer: `voices` (3, 1..7), `detune` (10 cents, 0..100), `width` (0, 0..1) |
+| `synth.Glide` | Root: `time` seconds (0, up to 10), `legato` (false), `channel` (0) |
+| `synth.Lfo` | `wave`, `rate` (5 Hz), `sync` (0 beats, off, 0..256), `delay`, `fade`, `phase`, `random_phase`, destination depths |
+| `synth.String` | Pluck layer: `decay` (2 s to -60 dB), `brightness` (0.5), `hardness` (0.8), `velocity` (0) |
+| `synth.Bow` | Bowed layer: `pressure` (0.5, 0..1), `speed` (0.5, 0..1), `position` (0.12, 0.02..0.5), `brightness` (0.5), `noise` (0.1, 0..1), `velocity` (0) |
+| `synth.Table` | Wavetable layer: `table` (an entity with `Wavetable`), `position` (0 frames), `envelope` (0 frames) |
 | `Wavetable` | On an entity of its own, usually a prefab: `kind` (`WavetableBasic`), `sound` (0, an entity with `Pcm` or `SoundFile` that wins over `kind`), `frame_size` (2048 samples, 64..4096) |
 
-Waves are `SynthSine`, `SynthSaw`, `SynthSquare`, `SynthTriangle`, `SynthNoise`,
-`SynthPluck`, `SynthWavetable` and `SynthBowed`. Frequency sweeps are exponential. Positive envelope curves make
+Waves are `Sine`, `Saw`, `Square`, `Triangle`, `Noise`,
+`Pluck`, `Wavetable` and `Bowed`. Frequency sweeps are exponential. Positive envelope curves make
 decay/release fall quickly then settle; zero is linear, negative curves start slowly.
 Curve values range from -16 to 16. A sustain of zero ends after decay.
 For gated notes, sustain holds until release, ignoring hold.
@@ -781,16 +781,16 @@ for weight under basses and leads without another layer. It is added before the
 layer's level and envelope, so it shares them. It is derived from the layer's
 phase: it follows sweeps, glides, legato, pitch LFOs and every unison voice, but
 not phase modulation or feedback. A modulator modulates with its sub included.
-`SynthNoise` and `SynthPluck` ignore it.
+`Noise` and `Pluck` ignore it.
 
-`color` sets the color of a `SynthNoise` layer, for wind, surf, hiss and softer
-percussion than white noise: `SynthNoiseWhite` (the default), `SynthNoisePink`, which
-falls by 3 dB per octave, or `SynthNoiseBrown`, which falls by 6 dB per octave. Pink
+`color` sets the color of a `Noise` layer, for wind, surf, hiss and softer
+percussion than white noise: `NoiseWhite` (the default), `NoisePink`, which
+falls by 3 dB per octave, or `NoiseBrown`, which falls by 6 dB per octave. Pink
 filters the white noise through a cascade of poles and zeros two octaves apart, brown
 through a leaky integrator and a highpass that removes its DC. The filters are set in
 Hz from the sample rate, flat under 5 Hz (pink) or 10 Hz (brown), so the slope holds
 at every rate. Each color is at about the RMS level of white noise at the same `level`.
-The noise stays seeded per play from `SynthSound.seed`, so colored noise is as
+The noise stays seeded per play from `synth.Sound.seed`, so colored noise is as
 deterministic as white, and each unison voice colors its own noise. Other waves ignore it.
 
 `sync` hard syncs a layer, for sync leads and sync sweeps. The layer's note frequency,
@@ -800,10 +800,10 @@ phase 0 on every master cycle, so the sound keeps the master's pitch while the r
 shapes its timbre. A ratio of 0 or 1 is off. The restart is band limited by a polyBLEP
 sized by the jump, and a polyBLAMP for the slope of triangles and sines. Each unison
 voice syncs to its own detuned master, the sub stays at the master, and phase
-modulation adds to the synced phase. `SynthNoise` and `SynthPluck` ignore it.
+modulation adds to the synced phase. `Noise` and `Pluck` ignore it.
 
-`SynthWavetable` plays the frames of a wavetable, single periods that the layer morphs
-through by a position. The `SynthTable` of the layer names the entity with the
+`Wavetable` plays the frames of a wavetable, single periods that the layer morphs
+through by a position. The `synth.Table` of the layer names the entity with the
 `Wavetable`, which is shared by every sound that names it. The built-in kinds are
 generated by additive synthesis, so they need no file:
 
@@ -839,17 +839,17 @@ SawSquareFile {
 }
 
 prefab SawSquare {
-  Wavetable: {sound: SawSquareFile, frame_size: 2048}
+  synth.Wavetable: {sound: SawSquareFile, frame_size: 2048}
 }
 ```
 
 `position` is a frame, 0 to frames - 1; between two frames the layer plays a linear mix
 of them, so 2.5 is half of frame 2 and half of frame 3. `envelope` is the frames the
-position moves at level 1 of the layer's envelope, its own `SynthEnvelope` or the root's,
-and `SynthLfo.position` the frames it moves at the top of the LFO wave; the moved position
+position moves at level 1 of the layer's envelope, its own `synth.Envelope` or the root's,
+and `synth.Lfo.position` the frames it moves at the top of the LFO wave; the moved position
 is clamped to the frames of the table. Frequency, sweeps, glide, pitch LFOs, unison, phase
 and ring modulation (as carrier and as modulator), `sync` and `sub` work as for the other
-waves. A wavetable layer without a `SynthTable`, or whose `table` is not an entity with
+waves. A wavetable layer without a `synth.Table`, or whose `table` is not an entity with
 `Wavetable`, plays a sine and logs one error that names the sound.
 
 Each frame is stored as mip levels, one per octave. Level 0 holds 512 harmonics in
@@ -875,17 +875,17 @@ tables and synth patches together. In the `Synth` bench (`voices_64_wavetable`, 
 of two `WavetableHarmonics` layers into a lowpass, 48 kHz) the voices take about 2100 ns
 per sample (268 µs per 128-frame quantum), where `voices_64` takes about 780.
 
-`SynthPitchEnvelope` bends the pitch relative to the note, so one patch fits every
+`synth.PitchEnvelope` bends the pitch relative to the note, so one patch fits every
 pitch of an instrument, where `frequency_end` sweeps to one absolute frequency: the
 drop of a kick or a tom, the blip of a zap, the scoop of brass. A note starts `amount`
 semitones off and returns to the note over `decay`, with a `curve` that bends that
-return as `SynthEnvelope.curve` bends a decay. From the start of the release the offset
+return as `synth.Envelope.curve` bends a decay. From the start of the release the offset
 moves from where it is to `release_amount` semitones, over the release of the layer's
 amplitude envelope, its own or the root's, with the same curve. `sync` is the semitones
 the ratio of hard sync starts off by, returning to the layer's `sync` with the decay:
 the classic sync sweep, on layers whose `sync` is over 1 only. On the root it moves
 every layer; on a layer it moves that layer in place of the root's. It adds to glides,
-sweeps and pitch LFOs, moves `SynthPluck` strings as vibrato does, runs at the control
+sweeps and pitch LFOs, moves `Pluck` strings as vibrato does, runs at the control
 rate of the LFOs, does not keep a voice playing and is not restarted by a legato
 retarget.
 
@@ -893,22 +893,22 @@ retarget.
 using box.audio
 
 prefab Harmonics {
-  Wavetable: {kind: WavetableHarmonics}
+  synth.Wavetable: {kind: WavetableHarmonics}
 }
 
 prefab Morph {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.6, hold: 0.2, release: 0.1}
-  SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}
-  SynthTable: {table: Harmonics, position: 2, envelope: 20}
-  SynthLfo: {wave: SynthLfoTriangle, rate: 0.5, position: 6}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.1, decay: 0.2, sustain: 0.6, hold: 0.2, release: 0.1}
+  synth.Oscillator: {wave: Wavetable, frequency: 220, level: 0.3}
+  synth.Table: {table: Harmonics, position: 2, envelope: 20}
+  synth.Lfo: {wave: LfoTriangle, rate: 0.5, position: 6}
 }
 
 prefab Kick {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
-  SynthPitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
-  SynthOscillator: {frequency: 50, level: 0.8}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
+  synth.PitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
+  synth.Oscillator: {frequency: 50, level: 0.8}
 }
 ```
 
@@ -917,7 +917,7 @@ cutoff 300 and amount 3 open to 2400 Hz. Its timing is independent of the amplit
 envelope; author both when they should move together.
 
 `drive` soft clips the filter input and its resonance inside each filter stage,
-both stages at `SynthSlope24`. Quiet signals pass almost unchanged and loud ones
+both stages at `Slope24`. Quiet signals pass almost unchanged and loud ones
 compress and gain harmonics; a high resonance settles at a bounded level and growls
 instead of whistling. Zero is linear and costs nothing; 1 drives the filter hard.
 `Filter.drive` does the same on a bus and moves over 20 ms like `mix`.
@@ -926,11 +926,11 @@ In the `Synth` bench of [bench/audio](../bench/audio/) (64 voices, 48 kHz, one
 filter with an envelope from about 125 to 170 µs: roughly 4 ns per stage and frame of
 a voice.
 
-`model: SynthFilterLadder` swaps the state variable filter for a transistor ladder:
+`model: FilterLadder` swaps the state variable filter for a transistor ladder:
 four one-pole stages with a tanh in each stage and in the feedback loop, solved with
 zero delay feedback, so it stays in tune up to the clamp of the cutoff under Nyquist
-without oversampling. `SynthSlope24` is the fat 4-pole lowpass and `SynthSlope12` its
-2-pole tap; `SynthHighPass`, `SynthBandPass` and `SynthNotch` mix the poles as a
+without oversampling. `Slope24` is the fat 4-pole lowpass and `Slope12` its
+2-pole tap; `HighPass`, `BandPass` and `Notch` mix the poles as a
 multimode ladder does. Resonance 1 self-oscillates: with no input, after a pluck, it
 rings as a near sine at the cutoff at a steady level, so the cutoff envelope, the LFOs
 and keytrack can play it as an oscillator. A ladder loses its bass as the resonance
@@ -944,15 +944,15 @@ the 24 dB state variable filter in the same run: about 12 ns more per voice and 
 
 ```
 prefab Acid {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.1}
-  SynthFilter: {cutoff: 400, resonance: 0.85, slope: SynthSlope24, model: SynthFilterLadder}
-  SynthFilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
-  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.2, release: 0.1}
+  synth.Filter: {cutoff: 400, resonance: 0.85, slope: Slope24, model: FilterLadder}
+  synth.FilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
+  synth.Oscillator: {wave: Saw, frequency: 55, level: 0.6}
 }
 ```
 
-`kind: SynthFormant` runs three resonant bandpasses of the state variable filter in
+`kind: Formant` runs three resonant bandpasses of the state variable filter in
 parallel, at the first three formants of a vowel, each at its own level: vowels,
 talking pads and wah-like movement. `vowel` picks it, 0 a, 1 e, 2 i, 3 o and 4 u; a
 fraction interpolates the frequencies, the levels and the widths of the two nearest
@@ -968,30 +968,30 @@ manual (Appendix, "Formant Values"):
 | 4 u | 350, 600, 2700 | 0, -20, -17 | 40, 60, 100 |
 
 The formant frequencies are fixed: `cutoff`, `slope`, `model`, `velocity` and
-`keytrack` do nothing, and neither the filter envelope `amount` nor `SynthLfo.cutoff`
+`keytrack` do nothing, and neither the filter envelope `amount` nor `synth.Lfo.cutoff`
 moves them. `resonance` narrows the widths, from those of the table at 0 to a tenth of
 them at 1, and `drive` applies to each bandpass. The vowel is the modulation target
-instead: `SynthLfo.vowel` moves it by that many vowels at the top of the wave and
-`SynthFilterEnvelope.vowel` at level 1 of the envelope, both -4..4, and the moved
+instead: `synth.Lfo.vowel` moves it by that many vowels at the top of the wave and
+`synth.FilterEnvelope.vowel` at level 1 of the envelope, both -4..4, and the moved
 vowel is clamped to 0..4. The filter envelope runs on a formant filter whenever its
 `vowel` is not 0, whatever its `amount`; its `velocity` scales the vowel depth.
 
 The level is normalized for a saw at 110 Hz, which comes out within about 3 dB of its
 level without a filter on every vowel; a higher note puts more of its power into the
 formants and comes out louder. On the stereo path both channels run the same filter.
-`Filter` has no formant kind and takes `SynthFormant` as a lowpass.
+`Filter` has no formant kind and takes `Formant` as a lowpass.
 
 ```
 prefab Talk {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 1, release: 0.3}
-  SynthFilter: {kind: SynthFormant, vowel: 1, resonance: 0.3}
-  SynthLfo: {rate: 1.5, vowel: 1}
-  SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.6}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.05, sustain: 1, hold: 1, release: 0.3}
+  synth.Filter: {kind: Formant, vowel: 1, resonance: 0.3}
+  synth.Lfo: {rate: 1.5, vowel: 1}
+  synth.Oscillator: {wave: Saw, frequency: 110, level: 0.6}
 }
 ```
 
-`kind: SynthComb` is a feedback comb tuned to the note: `y = x + feedback * y` delayed
+`kind: Comb` is a feedback comb tuned to the note: `y = x + feedback * y` delayed
 by one period of the note times `tune`. Metallic and flanged tones, resonators, and
 plucks from short noise bursts come out of it. Positive `feedback` (default 0.5) puts
 peaks at the harmonics of the comb frequency; negative feedback puts them at the odd
@@ -1000,14 +1000,14 @@ rings long. `tune` (default 1, 0.125..8) is the ratio of the comb frequency to t
 note: 2 an octave up, 1.5 a fifth.
 
 The note is the frequency of the first layer times the current pitch of the voice:
-its pitch ratio, glide, pitch variance, bend, the `SynthPitchEnvelope` of that layer
-and the pitch depth of a `SynthLfo` on every layer. Unison detune, drift and the LFOs
+its pitch ratio, glide, pitch variance, bend, the `synth.PitchEnvelope` of that layer
+and the pitch depth of a `synth.Lfo` on every layer. Unison detune, drift and the LFOs
 of single layers are left out. The delay line is read with a 3rd order Lagrange
 fractional delay, so the comb stays in tune at high notes too, within a few cents at
 1760 Hz.
 
 `cutoff` damps the loop with a one-pole lowpass, so the filter envelope `amount`,
-`SynthLfo.cutoff`, `velocity` and `keytrack` darken the comb over time; the phase
+`synth.Lfo.cutoff`, `velocity` and `keytrack` darken the comb over time; the phase
 delay of that lowpass at the fundamental comes off the delay, so a damped comb keeps
 its pitch. A cutoff of 0.49 of the sample rate or above leaves it undamped. The
 default cutoff of 1000 Hz damps a comb strongly, so set 20000 for a bright one.
@@ -1023,18 +1023,18 @@ rates; at higher rates the lowest comb frequency is the rate over 2045). A voice
 comb takes one line, or two on the stereo path, and gives them back when it ends; a
 play that finds too few free is ignored, as a pluck play without a free string is.
 Combs below 40 Hz are clamped to 40 Hz. `Filter` has no comb kind and takes
-`SynthComb` as a lowpass.
+`Comb` as a lowpass.
 
 ```
 prefab NoisePluck {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01}
-  SynthFilter: {kind: SynthComb, cutoff: 6000, feedback: 0.95}
-  SynthOscillator: {wave: SynthNoise, frequency: 220, level: 0.5}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01}
+  synth.Filter: {kind: Comb, cutoff: 6000, feedback: 0.95}
+  synth.Oscillator: {wave: Noise, frequency: 220, level: 0.5}
 }
 ```
 
-`SynthDrive` on the root drives the mix of the layers of each voice through a tanh
+`synth.Drive` on the root drives the mix of the layers of each voice through a tanh
 soft clipper before the filter, or before the amp without a filter: the stage where
 analog synths get most of their thickness. Since it works on the mix, plucks, unison
 voices and FM pass through it, and layers that play together intermodulate. `drive`
@@ -1058,21 +1058,21 @@ voice; it is kept because a clipper at the base rate aliases audibly on high not
 using box.audio
 
 prefab Pluck {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
-  SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.3, slope: SynthSlope24}
-  SynthFilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
+  synth.Filter: {kind: LowPass, cutoff: 300, resonance: 0.3, slope: Slope24}
+  synth.FilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
+  synth.Oscillator: {wave: Saw, frequency: 220, level: 0.5}
 }
 ```
 
-A layer without an envelope logs an error and plays for 10 seconds. `SynthPluck`
+A layer without an envelope logs an error and plays for 10 seconds. `Pluck`
 is the exception: its physical string model rings out without an envelope. Brightness
 controls how quickly harmonics fade; hardness controls the attack. Frequencies below
 40 Hz warn and clamp. There are 32 strings total, one per pluck or bowed unison voice;
 long ringing chords can exhaust them and cause plays to be ignored.
 
-`SynthBowed` is the sustained counterpart of the pluck: a bowed string for violins,
+`Bowed` is the sustained counterpart of the pluck: a bowed string for violins,
 violas, cellos and basses, with the bow noise, the small jitter of pitch and level and
 the changing tone a saw through a filter does not have. It is a digital waveguide split
 at the bow into a bridge side and a nut side (McIntyre, Schumacher and Woodhouse; Smith;
@@ -1084,7 +1084,7 @@ sides are read at fractional delays with a 3rd order Lagrange interpolation, and
 phase delay of the lowpass at the fundamental comes off the loop, so a note settles in
 tune at high notes too.
 
-The `SynthBow` of the layer sets the bow; a bowed layer without one takes the defaults:
+The `synth.Bow` of the layer sets the bow; a bowed layer without one takes the defaults:
 
 - `pressure` (0.5): the force of the bow, the width of the stick region of the friction,
   and how sharp the bow keeps the corner of the Helmholtz motion: it moves the lowpass of
@@ -1102,7 +1102,7 @@ The `SynthBow` of the layer sets the bow; a bowed layer without one takes the de
 - `noise` (0.1): the noise of the bow hair, added at the contact point in proportion to
   the bow velocity, which the string filters into its own bow noise and jitter.
 - `velocity` (0): the share of the pressure and the speed that the velocity of a note
-  scales, as `SynthString.velocity` does the hardness.
+  scales, as `synth.String.velocity` does the hardness.
 
 The bow speed follows the amplitude envelope of the layer, its own or the root's, in
 place of the level: the attack starts the bow, the decay and sustain hold it, the release
@@ -1110,20 +1110,20 @@ lifts it. The bow touches the string while the envelope is over 0, firmly from a
 0.25 up. Once it lifts, the string rings out through its damping, its fundamental falling
 60 dB over about 220 periods (a second at A3, at most 4 seconds), less in a bright string; the voice ends once the envelope ended
 and the string is silent, as a pluck ends. A bowed layer without any envelope bows for 10
-seconds, as other waves do. Glide, legato, bend, pitch LFOs, `SynthPitchEnvelope` and
+seconds, as other waves do. Glide, legato, bend, pitch LFOs, `synth.PitchEnvelope` and
 drift change the length of the string smoothly without restarting it, as they move a
 pluck, so vibrato and legato do not click. Phase modulation, `sync` and `sub` do not apply.
-With `SynthUnison` each copy is a bowed string of its own, detuned and panned, on the mono
-and the stereo path. The routes `SynthTargetBowPressure`, `SynthTargetBowSpeed` and
-`SynthTargetBowPosition` move the bow, smoothed over about 5 ms, so the pressure curve of a
-note (`SynthSourcePressure`), the LFOs and the mod envelope can drive it.
+With `synth.Unison` each copy is a bowed string of its own, detuned and panned, on the mono
+and the stereo path. The routes `TargetBowPressure`, `TargetBowSpeed` and
+`TargetBowPosition` move the bow, smoothed over about 5 ms, so the pressure curve of a
+note (`SourcePressure`), the LFOs and the mod envelope can drive it.
 
 Bowed strings take their delay lines, one per unison copy, from the same 32 strings of the
 core as plucks, each long enough for 40 Hz (up to 81.8 kHz sample rates); a play that finds
 too few free is ignored with an ignored event, as a pluck play is, and a voice gives
 its strings back when it ends. A bowed note holds its string for its whole envelope and the
 ring out after it, so a part should keep its overlapping notes under 32 strings: a legato
-`SynthGlide` plays a whole line on one. Body resonance stays out of the model: it is the
+`synth.Glide` plays a whole line on one. Body resonance stays out of the model: it is the
 job of the bus EQ, as in the strings song of the jukebox. In the `Synth` bench
 (`voices_32_bowed`, 32 bowed voices under a vibrato and two routes to the bow, through a
 lowpass, 48 kHz) a bowed voice costs about 40 ns per frame (165 µs per 128-frame
@@ -1133,14 +1133,14 @@ quantum for all 32), against about 25 ns for a pluck under a vibrato.
 using box.audio
 
 prefab Violin {
-  SynthSound: {seed: 11, drift: 3}
-  SynthGlide: {time: 0.045, legato: true}
-  SynthEnvelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.9, release: 0.25, curve: 2}
-  SynthLfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 20}
-  SynthOscillator: {wave: SynthBowed, frequency: 440, level: 0.5}
-  SynthBow: {pressure: 0.45, speed: 0.6, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
-  swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.4} }
-  push { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
+  synth.Sound: {seed: 11, drift: 3}
+  synth.Glide: {time: 0.045, legato: true}
+  synth.Envelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.9, release: 0.25, curve: 2}
+  synth.Lfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 20}
+  synth.Oscillator: {wave: Bowed, frequency: 440, level: 0.5}
+  synth.Bow: {pressure: 0.45, speed: 0.6, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
+  swell { synth.ModRoute: {source: SourcePressure, target: TargetBowPressure, amount: 0.4} }
+  push { synth.ModRoute: {source: SourcePressure, target: TargetBowSpeed, amount: 0.3} }
 }
 ```
 
@@ -1148,16 +1148,16 @@ The velocity of a note (an `Instrument` play or a `NoteClip`, clamped to 0..1) r
 the voice as well as its gain, so harder notes can be brighter, not only louder. Each
 `velocity` field defaults to 0, which leaves the sound as it was:
 
-- `SynthFilter.velocity` is the octaves of cutoff at velocity 1 over velocity 0, -10..10.
+- `synth.Filter.velocity` is the octaves of cutoff at velocity 1 over velocity 0, -10..10.
   The authored cutoff applies at velocity 1; at velocity `v` it is
   `cutoff * 2^(velocity * (v - 1))`.
-- `SynthFilterEnvelope.velocity`, a share 0..1, scales the envelope amount:
+- `synth.FilterEnvelope.velocity`, a share 0..1, scales the envelope amount:
   `amount * (1 - share + share * v)`.
-- `SynthOscillator.velocity` scales the index of a phase or ring modulator the same way,
+- `synth.Oscillator.velocity` scales the index of a phase or ring modulator the same way,
   so soft notes have fewer sidebands.
-- `SynthString.velocity` scales the hardness of a pluck the same way, so soft notes are
+- `synth.String.velocity` scales the hardness of a pluck the same way, so soft notes are
   plucked softer.
-- `SynthBow.velocity` scales the pressure and the speed of a bow the same way, so soft notes
+- `synth.Bow.velocity` scales the pressure and the speed of a bow the same way, so soft notes
   are bowed lighter and quieter.
 
 Plays that are not notes, such as `Source`, `box_audio_play`, quantized plays and
@@ -1165,17 +1165,17 @@ streams, play at velocity 1. Sample voices ignore velocity beyond its gain.
 
 The pitch of a note reaches the voice too, as key tracking on analog synths. The key of
 a voice is `12 * log2(ratio)` semitones, where the ratio is the pitch of its play without
-the `pitch_variance` of `SynthSound`. For an `Instrument` note the ratio is
+the `pitch_variance` of `synth.Sound`. For an `Instrument` note the ratio is
 `2^((pitch - root) / 12)`, so the key is relative to `Instrument.root`; for any other play
 it is relative to a ratio of 1, the pitch of a `Source` or of `box_audio_play`. Both
 fields default to 0, which leaves the sound as it was:
 
-- `SynthFilter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
+- `synth.Filter.keytrack`, 0..1, multiplies the cutoff by `ratio^keytrack`, so 1 moves the
   cutoff 1:1 with the pitch and 0.5 half an octave per octave. It follows the current pitch
   of the voice: a glide, a change of `Source.pitch` or a legato retarget moves the
   cutoff along, at the control rate of the LFOs. It adds to the filter envelope, the
   velocity and the LFOs.
-- `SynthEnvelope.key_scale`, 0..1, multiplies the decay and the release by
+- `synth.Envelope.key_scale`, 0..1, multiplies the decay and the release by
   `2^(-key_scale * key / 12)`, fixed at the start of the note, so at 1 they halve per
   octave above the root and double per octave below. It applies to the root envelope and
   to the envelopes of layers, clamped to the limits of an envelope; the filter envelope
@@ -1183,7 +1183,7 @@ fields default to 0, which leaves the sound as it was:
 
 ### Modulation, unison and glide
 
-A child oscillator with `modulation: SynthPhase` or `SynthRing` modulates its
+A child oscillator with `modulation: Phase` or `Ring` modulates its
 parent layer. Phase `index` is radians, up to 32 and limited against frequency;
 ring index is a depth from 0 to 1. A modulator is heard separately only with
 `audible: true`. `feedback` adds self phase modulation, up to 1.5 radians.
@@ -1197,7 +1197,7 @@ pan balances their channels rather than narrowing them with distance.
 
 A sound supports two LFOs, on the root, a layer or another root child. Waves include
 sine, triangle, square, rising saw and sample-and-hold. Destinations are `pitch`
-(cents), `amplitude` (0..1), `cutoff` (octaves), `vowel` (vowels of a `SynthFormant`
+(cents), `amplitude` (0..1), `cutoff` (octaves), `vowel` (vowels of a `Formant`
 filter, -4..4), `pulse_width`, `hard_sync`, the
 semitones (-48..48) the ratio of hard sync moves at the top of the wave, clamped to
 1..16, and `position`, the frames (-256..256) the position of wavetable layers moves.
@@ -1217,17 +1217,17 @@ voice keeps the tempo it started at: a tempo change while it holds does not reac
 only the next notes. Delay and fade stay in seconds, and the random wave steps once per
 cycle. A retargeted legato voice keeps its LFOs.
 
-`SynthSound.drift` adds analog drift, so digital patches are never perfectly in tune.
+`synth.Sound.drift` adds analog drift, so digital patches are never perfectly in tune.
 The pitch of each layer of a voice, and of each unison copy, wanders on its own smooth
 random walk within ±`drift` cents, moving over roughly 0.2 to 2 seconds; the cutoff of
 the filter drifts per voice by a quarter of it in cents. Pluck strings follow the drift
 as they follow vibrato. It adds to the pitch LFOs and pitch envelopes, at their control
-rate. `SynthSound.free_phase` starts the oscillators of each play, and their subs, at a
+rate. `synth.Sound.free_phase` starts the oscillators of each play, and their subs, at a
 random phase instead of 0; unison copies always start at random phases. Both are seeded
 from `seed` and the count of plays, so the same sequence of plays renders the same; at
 their defaults a sound renders exactly as without them.
 
-`SynthGlide.time` moves pitch exponentially in frequency. With `legato: true`,
+`synth.Glide.time` moves pitch exponentially in frequency. With `legato: true`,
 notes on the same channel retarget a held voice without restarting its envelopes.
 They keep the original waves, levels, filters and variances; use patches from the
 same template so layer order agrees. A note after release starts a new voice.
@@ -1242,8 +1242,8 @@ strings and key tracking follow it, and a glide that runs keeps going. Hardwired
 `mod` scales the pitch depth of the LFOs, the vibrato (1 without a curve, so a
 sound keeps its vibrato), and `pressure` moves the cutoff up by `pressure * 2` octaves
 (`BOX_AUDIO_SYNTH_PRESSURE_OCTAVES`, 0 without a curve); a formant filter ignores it.
-A sound with a `SynthModRoute` from `SynthSourceMod` turns the hardwired vibrato depth
-off, and one from `SynthSourcePressure` the hardwired cutoff, so the route alone decides
+A sound with a `synth.ModRoute` from `SourceMod` turns the hardwired vibrato depth
+off, and one from `SourcePressure` the hardwired cutoff, so the route alone decides
 what they do (see the modulation matrix below). A
 retargeted legato voice takes the expression of the new note. The voice takes the values
 of the ramps every 8 frames while they move; a note without expression renders exactly
@@ -1251,8 +1251,8 @@ as before.
 
 ### Modulation matrix
 
-The fixed routes above (the depths of `SynthLfo`, `SynthFilterEnvelope.amount`, the
-`velocity` and `keytrack` fields) cover the usual patches. A `SynthModRoute` adds a free
+The fixed routes above (the depths of `synth.Lfo`, `synth.FilterEnvelope.amount`, the
+`velocity` and `keytrack` fields) cover the usual patches. A `synth.ModRoute` adds a free
 route on top of them: the value of a `source` times an `amount` moves a `target`. Each
 route is an entity of its own, a child of the root, where it moves every layer, or a child
 of a layer, where it moves that layer and takes the amp envelope of that layer as its
@@ -1267,50 +1267,50 @@ an error.
 
 ```
 lead {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, sustain: 1, release: 0.3}
-  SynthFilter: {kind: SynthLowPass, cutoff: 400}
-  SynthModEnvelope: {attack: 0.2, decay: 0.5, sustain: 0.2, release: 0.3}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.4}
-  SynthLfo: {rate: 0.3}
-  wobble { SynthLfo: {rate: 6} }   // a child of the root: the second LFO
-  sweep { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetCutoff, amount: 4} }
-  drift { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetPan, amount: 0.6} }
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.01, sustain: 1, release: 0.3}
+  synth.Filter: {kind: LowPass, cutoff: 400}
+  synth.ModEnvelope: {attack: 0.2, decay: 0.5, sustain: 0.2, release: 0.3}
+  synth.Oscillator: {wave: Saw, frequency: 220, level: 0.4}
+  synth.Lfo: {rate: 0.3}
+  wobble { synth.Lfo: {rate: 6} }   // a child of the root: the second LFO
+  sweep { synth.ModRoute: {source: SourceModEnvelope, target: TargetCutoff, amount: 4} }
+  drift { synth.ModRoute: {source: SourceLfo1, target: TargetPan, amount: 0.6} }
 }
 ```
 
 | Source | Value |
 |---|---|
-| `SynthSourceAmpEnvelope` | The amp envelope, 0..1: of the layer for a route on a layer, else the `SynthEnvelope` of the root (of the first layer when the root has none) |
-| `SynthSourceFilterEnvelope` | The `SynthFilterEnvelope`, 0..1; it runs for the route even without a `SynthFilter` |
-| `SynthSourceModEnvelope` | The `SynthModEnvelope` of the root, 0..1 |
-| `SynthSourceLfo1`, `SynthSourceLfo2` | The first and second LFO of the patch, -1..1, after their delay and fade, in the order of the LFOs above: the root, the layers, the other children |
-| `SynthSourceVelocity` | The velocity of the note, 0..1, 1 for a play that is not a note |
-| `SynthSourceKey` | The key of the note in octaves from the root, the key of `keytrack` / 12 |
-| `SynthSourceRandom` | A random value per note, -1..1, seeded from `SynthSound.seed` and the count of plays |
-| `SynthSourceMod`, `SynthSourcePressure` | `Note.mod` (1 without a curve) and `Note.pressure` (0 without), 0..1; a route from either turns its hardwiring off |
+| `SourceAmpEnvelope` | The amp envelope, 0..1: of the layer for a route on a layer, else the `synth.Envelope` of the root (of the first layer when the root has none) |
+| `SourceFilterEnvelope` | The `synth.FilterEnvelope`, 0..1; it runs for the route even without a `synth.Filter` |
+| `SourceModEnvelope` | The `synth.ModEnvelope` of the root, 0..1 |
+| `SourceLfo1`, `SourceLfo2` | The first and second LFO of the patch, -1..1, after their delay and fade, in the order of the LFOs above: the root, the layers, the other children |
+| `SourceVelocity` | The velocity of the note, 0..1, 1 for a play that is not a note |
+| `SourceKey` | The key of the note in octaves from the root, the key of `keytrack` / 12 |
+| `SourceRandom` | A random value per note, -1..1, seeded from `synth.Sound.seed` and the count of plays |
+| `SourceMod`, `SourcePressure` | `Note.mod` (1 without a curve) and `Note.pressure` (0 without), 0..1; a route from either turns its hardwiring off |
 
 | Target | Amount at a source value of 1 |
 |---|---|
-| `SynthTargetCutoff` | Octaves of the cutoff, -10..10; nothing on a `SynthFormant` filter |
-| `SynthTargetResonance` | Share of the resonance, -1..1, the result clamped to 0..1; nothing on a `SynthComb` |
-| `SynthTargetIndex` | Radians of the index of a `SynthPhase` modulator, -32..32, or the depth of a `SynthRing` one, clamped as `index`; nothing on a layer that does not modulate |
-| `SynthTargetPitch` | Semitones, -48..48 |
-| `SynthTargetPan` | Pan of the voice, -2..2, on top of its own, the result clamped to -1..1 and smoothed; a sound with a route to the pan renders in stereo |
-| `SynthTargetDetune` | Cents of the unison detune, -100..100, the result clamped to 0..100 |
-| `SynthTargetPulseWidth` | Share of the period of the pulse width of squares, -0.49..0.49 |
-| `SynthTargetLevel` | Share of the level of the layer, -4..4: the level is times `1 + amount * value`, clamped at 0, and smoothed |
-| `SynthTargetHardSync` | Semitones of the ratio of `sync`, -48..48, the result clamped to 1..16; nothing on a layer without sync (a ratio over 1 or a `hard_sync` LFO of the layer) |
-| `SynthTargetPosition` | Frames of the position of a `SynthWavetable` layer, -256..256, the result clamped to 0..N-1 of its table; nothing on a layer that is not a wavetable |
-| `SynthTargetVowel` | Vowels of the `SynthFormant` filter, -4..4, the result clamped to 0..4; of the sound on a layer too; nothing without a `SynthFormant` filter |
-| `SynthTargetBowPressure` | Share of `SynthBow.pressure`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
-| `SynthTargetBowSpeed` | Share of `SynthBow.speed`, -1..1, the result clamped to 0..1; nothing on a layer that is not `SynthBowed` |
-| `SynthTargetBowPosition` | Share of the string of `SynthBow.position`, -0.5..0.5, the result clamped to 0.02..0.5; nothing on a layer that is not `SynthBowed` |
+| `TargetCutoff` | Octaves of the cutoff, -10..10; nothing on a `Formant` filter |
+| `TargetResonance` | Share of the resonance, -1..1, the result clamped to 0..1; nothing on a `Comb` |
+| `TargetIndex` | Radians of the index of a `Phase` modulator, -32..32, or the depth of a `Ring` one, clamped as `index`; nothing on a layer that does not modulate |
+| `TargetPitch` | Semitones, -48..48 |
+| `TargetPan` | Pan of the voice, -2..2, on top of its own, the result clamped to -1..1 and smoothed; a sound with a route to the pan renders in stereo |
+| `TargetDetune` | Cents of the unison detune, -100..100, the result clamped to 0..100 |
+| `TargetPulseWidth` | Share of the period of the pulse width of squares, -0.49..0.49 |
+| `TargetLevel` | Share of the level of the layer, -4..4: the level is times `1 + amount * value`, clamped at 0, and smoothed |
+| `TargetHardSync` | Semitones of the ratio of `sync`, -48..48, the result clamped to 1..16; nothing on a layer without sync (a ratio over 1 or a `hard_sync` LFO of the layer) |
+| `TargetPosition` | Frames of the position of a `Wavetable` layer, -256..256, the result clamped to 0..N-1 of its table; nothing on a layer that is not a wavetable |
+| `TargetVowel` | Vowels of the `Formant` filter, -4..4, the result clamped to 0..4; of the sound on a layer too; nothing without a `Formant` filter |
+| `TargetBowPressure` | Share of `synth.Bow.pressure`, -1..1, the result clamped to 0..1; nothing on a layer that is not `Bowed` |
+| `TargetBowSpeed` | Share of `synth.Bow.speed`, -1..1, the result clamped to 0..1; nothing on a layer that is not `Bowed` |
+| `TargetBowPosition` | Share of the string of `synth.Bow.position`, -0.5..0.5, the result clamped to 0.02..0.5; nothing on a layer that is not `Bowed` |
 
-`SynthModEnvelope` is a third envelope on the root with the fields of `SynthEnvelope`.
+`synth.ModEnvelope` is a third envelope on the root with the fields of `synth.Envelope`.
 It runs only when a route uses it and does not keep the voice playing, as the filter
 envelope. A sound without routes renders exactly as before, whatever its
-`SynthModEnvelope` holds. In the `Synth` bench (`voices_64_routes`, 64 voices, 48 kHz,
+`synth.ModEnvelope` holds. In the `Synth` bench (`voices_64_routes`, 64 voices, 48 kHz,
 the patch of `voices_64_lfo` with 8 routes of every target but the index and the detune
 and the mod envelope) the matrix raises the 64 voices from about 1350 ns per sample
 (`voices_64_lfo`) to 1500, about 11%.
@@ -1390,9 +1390,9 @@ A `Track` supplies the instrument and brings a `Bus`. Its child `ClipPlacement` 
 using box.audio
 
 prefab bass_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.7, release: 0.08, curve: 3}
-  SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.3}
+  synth.Sound: {}
+  synth.Envelope: {attack: 0.005, decay: 0.1, sustain: 0.7, release: 0.08, curve: 3}
+  synth.Oscillator: {wave: Saw, frequency: 440, level: 0.3}
 }
 bass_synth { Instrument: {sound: bass_tone} }
 
@@ -1751,7 +1751,7 @@ without the rest of the scene:
 
 | Subject | Options | What it renders |
 | --- | --- | --- |
-| a sound (`SynthSound`, `SoundFile`, `Pcm`) | `note`, `vel`, `dur`, `tail` | One note of the sound, on the bus of its `Output` |
+| a sound (`synth.Sound`, `SoundFile`, `Pcm`) | `note`, `vel`, `dur`, `tail` | One note of the sound, on the bus of its `Output` |
 | an instrument | `note`, `vel`, `dur`, `tail` | One note through the instrument and its bus chain |
 | a bus | `bars`, `beats`, `solo`, `mute`, `tail`; `dur` without a song | The song with only that bus audible, as its solo makes it, with its returns; without a song the scene from its start, `dur` seconds (10) |
 | `song` | `bars`, `beats`, `solo`, `mute`, `tail` | The loaded song, or the `Transport` of the scene with a range |
@@ -1999,7 +1999,7 @@ The static checks read the data:
 | --- | --- |
 | `note-range` | A note under 20 Hz or over 22.05 kHz, the Nyquist of 44.1 kHz, on the fundamental of its synth after the pitch ratio; a note past the 4 octaves up or 6 down the core plays |
 | `note-length`, `note-velocity` | A note of zero length on a gated instrument, a note of velocity 0 |
-| `note-overlap`, `note-legato` | Notes of one pitch that overlap on a track; notes that overlap on a legato (`SynthGlide.legato`) sound, which glide (info) |
+| `note-overlap`, `note-legato` | Notes of one pitch that overlap on a track; notes that overlap on a legato (`synth.Glide.legato`) sound, which glide (info) |
 | `note-late`, `clip-late` | Notes that start and placements that end after `Song.beats` |
 | `clip-overlap` | Note or audio placements that overlap on a track |
 | `track-instrument`, `instrument-sound` | A track with note clips and no instrument, an instrument without a sound |

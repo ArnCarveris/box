@@ -1,6 +1,7 @@
 using flecs.script
 using flecs.script.math
 using box.audio
+using box.audio.synth
 using box.particle
 using box.transform
 using state
@@ -22,271 +23,271 @@ assets {
   prefab SfxSpark {
     Output: {bus: mv_sfx}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 3, pitch_variance: 0.1, level_variance: 0.1}
-    SynthEnvelope: {attack: 0.002, decay: 0.35}
-    SynthFilter: {kind: SynthBandPass, cutoff: 800, resonance: 0.3}
-    SynthFilterEnvelope: {decay: 0.3, amount: 1.907}
-    crackle { SynthOscillator: {wave: SynthNoise, level: 0.7} }
-    whoomp { SynthOscillator: {wave: SynthSine, frequency: 220, frequency_end: 90, sweep: 0.2, level: 0.5} }
+    Sound: {seed: 3, pitch_variance: 0.1, level_variance: 0.1}
+    Envelope: {attack: 0.002, decay: 0.35}
+    Filter: {kind: BandPass, cutoff: 800, resonance: 0.3}
+    FilterEnvelope: {decay: 0.3, amount: 1.907}
+    crackle { Oscillator: {wave: Noise, level: 0.7} }
+    whoomp { Oscillator: {wave: Sine, frequency: 220, frequency_end: 90, sweep: 0.2, level: 0.5} }
   }
 
   prefab SfxSplash {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 11, pitch_variance: 0.1}
-    SynthEnvelope: {attack: 0.005, decay: 0.4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 600, resonance: 0.4}
-    SynthFilterEnvelope: {attack: 0.2, sustain: 1, hold: 0.15, amount: 2.4}
-    water { SynthOscillator: {wave: SynthNoise, level: 0.8} }
+    Sound: {seed: 11, pitch_variance: 0.1}
+    Envelope: {attack: 0.005, decay: 0.4}
+    Filter: {kind: BandPass, cutoff: 600, resonance: 0.4}
+    FilterEnvelope: {attack: 0.2, sustain: 1, hold: 0.15, amount: 2.4}
+    water { Oscillator: {wave: Noise, level: 0.8} }
   }
 
   prefab SfxFrost {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 17, pitch_variance: 0.05}
-    SynthEnvelope: {attack: 0.01, decay: 0.55, curve: 2}
-    SynthFilter: {kind: SynthHighPass, cutoff: 2500, resonance: 0.2}
-    SynthLfo: {wave: SynthLfoRandom, rate: 90}
+    Sound: {seed: 17, pitch_variance: 0.05}
+    Envelope: {attack: 0.01, decay: 0.55, curve: 2}
+    Filter: {kind: HighPass, cutoff: 2500, resonance: 0.2}
+    Lfo: {wave: LfoRandom, rate: 90}
     crunch {
-      SynthOscillator: {wave: SynthNoise, level: 0.5}
-      grain { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 3} }
+      Oscillator: {wave: Noise, level: 0.5}
+      grain { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 3} }
     }
   }
 
   prefab SfxIceCrack {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 73, pitch_variance: 0.3, level_variance: 0.4}
-    SynthEnvelope: {attack: 0.0005, decay: 0.04, curve: 4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 3500, resonance: 0.55, keytrack: 1}
-    SynthFilterEnvelope: {attack: 0.0005, decay: 0.03, amount: 1}
-    snap { SynthOscillator: {wave: SynthNoise, level: 1.2} }
+    Sound: {seed: 73, pitch_variance: 0.3, level_variance: 0.4}
+    Envelope: {attack: 0.0005, decay: 0.04, curve: 4}
+    Filter: {kind: BandPass, cutoff: 3500, resonance: 0.55, keytrack: 1}
+    FilterEnvelope: {attack: 0.0005, decay: 0.03, amount: 1}
+    snap { Oscillator: {wave: Noise, level: 1.2} }
   }
 
   prefab SfxFizzle {
     Output: {bus: mv_sfx}
-    SynthSound: {}
-    SynthEnvelope: {attack: 0.004, decay: 0.05, sustain: 0.5, hold: 0.06, release: 0.08}
-    SynthFilter: {kind: SynthLowPass, cutoff: 800}
-    low { SynthOscillator: {wave: SynthSquare, frequency: 110, level: 0.22} }
-    beat { SynthOscillator: {wave: SynthSquare, frequency: 117, level: 0.18} }
+    Sound: {}
+    Envelope: {attack: 0.004, decay: 0.05, sustain: 0.5, hold: 0.06, release: 0.08}
+    Filter: {kind: LowPass, cutoff: 800}
+    low { Oscillator: {wave: Square, frequency: 110, level: 0.22} }
+    beat { Oscillator: {wave: Square, frequency: 117, level: 0.18} }
   }
 
   prefab SfxFireWhoomp {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 3, pitch_variance: 0.08}
-    SynthEnvelope: {attack: 0.015, decay: 0.35, curve: 3}
-    SynthFilter: {kind: SynthBandPass, cutoff: 700, resonance: 0.1}
-    SynthFilterEnvelope: {attack: 0.03, decay: 0.3, curve: 2, amount: 1.2}
-    roar { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.6} }
+    Sound: {seed: 3, pitch_variance: 0.08}
+    Envelope: {attack: 0.015, decay: 0.35, curve: 3}
+    Filter: {kind: BandPass, cutoff: 700, resonance: 0.1}
+    FilterEnvelope: {attack: 0.03, decay: 0.3, curve: 2, amount: 1.2}
+    roar { Oscillator: {wave: Noise, color: NoisePink, level: 0.6} }
   }
 
   prefab SfxFireBed {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 21}
-    SynthEnvelope: {attack: 0.06, sustain: 1, hold: 0.35, release: 0.4, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1400, resonance: 0.05}
-    SynthLfo: {wave: SynthLfoRandom, rate: 11, cutoff: 0.6, amplitude: 0.55}
-    flame { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.3} }
+    Sound: {seed: 21}
+    Envelope: {attack: 0.06, sustain: 1, hold: 0.35, release: 0.4, curve: 2}
+    Filter: {kind: BandPass, cutoff: 1400, resonance: 0.05}
+    Lfo: {wave: LfoRandom, rate: 11, cutoff: 0.6, amplitude: 0.55}
+    flame { Oscillator: {wave: Noise, color: NoisePink, level: 0.3} }
   }
 
   prefab SfxFireCrackle {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 7, pitch_variance: 0.4, level_variance: 0.6}
-    SynthEnvelope: {attack: 0.0005, decay: 0.016, curve: 6}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2400, resonance: 0.2, keytrack: 1}
-    pop { SynthOscillator: {wave: SynthNoise, level: 1.1} }
+    Sound: {seed: 7, pitch_variance: 0.4, level_variance: 0.6}
+    Envelope: {attack: 0.0005, decay: 0.016, curve: 6}
+    Filter: {kind: BandPass, cutoff: 2400, resonance: 0.2, keytrack: 1}
+    pop { Oscillator: {wave: Noise, level: 1.1} }
   }
 
   prefab SfxRainHiss {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 13}
-    SynthEnvelope: {attack: 0.08, sustain: 1, hold: 0.4, release: 0.45, curve: 2}
-    SynthFilter: {kind: SynthHighPass, cutoff: 1600, resonance: 0.1}
-    SynthLfo: {wave: SynthLfoRandom, rate: 30, amplitude: 0.4}
-    sheet { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.3} }
+    Sound: {seed: 13}
+    Envelope: {attack: 0.08, sustain: 1, hold: 0.4, release: 0.45, curve: 2}
+    Filter: {kind: HighPass, cutoff: 1600, resonance: 0.1}
+    Lfo: {wave: LfoRandom, rate: 30, amplitude: 0.4}
+    sheet { Oscillator: {wave: Noise, color: NoisePink, level: 0.3} }
   }
 
   prefab SfxRainDrop {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 29, pitch_variance: 0.35, level_variance: 0.5}
-    SynthEnvelope: {attack: 0.0005, decay: 0.018, curve: 4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1500, resonance: 0.35, keytrack: 1}
-    SynthFilterEnvelope: {attack: 0.01, sustain: 1, hold: 0.02, amount: 0.8}
-    patter { SynthOscillator: {wave: SynthNoise, level: 1} }
+    Sound: {seed: 29, pitch_variance: 0.35, level_variance: 0.5}
+    Envelope: {attack: 0.0005, decay: 0.018, curve: 4}
+    Filter: {kind: BandPass, cutoff: 1500, resonance: 0.35, keytrack: 1}
+    FilterEnvelope: {attack: 0.01, sustain: 1, hold: 0.02, amount: 0.8}
+    patter { Oscillator: {wave: Noise, level: 1} }
   }
 
   prefab SfxGust {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 5, pitch_variance: 0.08}
-    SynthEnvelope: {attack: 0.25, decay: 0.3, sustain: 0.7, hold: 0.3, release: 0.6, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 420, resonance: 0.75}
-    SynthFilterEnvelope: {attack: 0.45, decay: 0.7, curve: 2, amount: 2}
-    SynthLfo: {rate: 2.2, cutoff: 0.6}
-    gusts { SynthLfo: {wave: SynthLfoRandom, rate: 6, amplitude: 0.45} }
-    air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 1.2} }
+    Sound: {seed: 5, pitch_variance: 0.08}
+    Envelope: {attack: 0.25, decay: 0.3, sustain: 0.7, hold: 0.3, release: 0.6, curve: 2}
+    Filter: {kind: BandPass, cutoff: 420, resonance: 0.75}
+    FilterEnvelope: {attack: 0.45, decay: 0.7, curve: 2, amount: 2}
+    Lfo: {rate: 2.2, cutoff: 0.6}
+    gusts { Lfo: {wave: LfoRandom, rate: 6, amplitude: 0.45} }
+    air { Oscillator: {wave: Noise, color: NoisePink, level: 1.2} }
   }
 
   prefab SfxWoodCrack {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 23, pitch_variance: 0.2, level_variance: 0.3}
-    SynthEnvelope: {attack: 0.0005, decay: 0.08, curve: 4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1700, resonance: 0.3}
-    SynthLfo: {wave: SynthLfoRandom, rate: 100}
+    Sound: {seed: 23, pitch_variance: 0.2, level_variance: 0.3}
+    Envelope: {attack: 0.0005, decay: 0.08, curve: 4}
+    Filter: {kind: BandPass, cutoff: 1700, resonance: 0.3}
+    Lfo: {wave: LfoRandom, rate: 100}
     snap {
-      SynthOscillator: {wave: SynthNoise, level: 1}
-      fracture { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 3} }
+      Oscillator: {wave: Noise, level: 1}
+      fracture { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 3} }
     }
     knock {
-      SynthOscillator: {wave: SynthPluck, frequency: 640, level: 0.5}
-      SynthString: {decay: 0.05, brightness: 0.3, hardness: 1}
+      Oscillator: {wave: Pluck, frequency: 640, level: 0.5}
+      String: {decay: 0.05, brightness: 0.3, hardness: 1}
     }
   }
 
   prefab SfxWoodSplinter {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 31}
-    SynthEnvelope: {attack: 0.002, decay: 0.2, curve: 3}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2800, resonance: 0.1}
-    SynthLfo: {wave: SynthLfoRandom, rate: 70}
-    grain { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 3} }
-    fibers { SynthOscillator: {wave: SynthNoise, level: 0.25} }
+    Sound: {seed: 31}
+    Envelope: {attack: 0.002, decay: 0.2, curve: 3}
+    Filter: {kind: BandPass, cutoff: 2800, resonance: 0.1}
+    Lfo: {wave: LfoRandom, rate: 70}
+    grain { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 3} }
+    fibers { Oscillator: {wave: Noise, level: 0.25} }
   }
 
   prefab SfxLift {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 41, pitch_variance: 0.03, drift: 8}
-    SynthEnvelope: {attack: 0.25, decay: 0.15, sustain: 0.8, hold: 0.25, release: 0.5, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 700, resonance: 0.25}
-    SynthFilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.2, release: 0.4, amount: 1.5}
-    SynthLfo: {rate: 5.5, pitch: 18, fade: 0.3}
+    Sound: {seed: 41, pitch_variance: 0.03, drift: 8}
+    Envelope: {attack: 0.25, decay: 0.15, sustain: 0.8, hold: 0.25, release: 0.5, curve: 2}
+    Filter: {kind: LowPass, cutoff: 700, resonance: 0.25}
+    FilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.2, release: 0.4, amount: 1.5}
+    Lfo: {rate: 5.5, pitch: 18, fade: 0.3}
     voice {
-      SynthOscillator: {wave: SynthSaw, frequency: 196, frequency_end: 294, sweep: 0.7, level: 0.11}
-      SynthUnison: {voices: 5, detune: 30}
+      Oscillator: {wave: Saw, frequency: 196, frequency_end: 294, sweep: 0.7, level: 0.11}
+      Unison: {voices: 5, detune: 30}
     }
-    fifth { SynthOscillator: {wave: SynthSaw, frequency: 294, frequency_end: 440, sweep: 0.7, level: 0.055} }
+    fifth { Oscillator: {wave: Saw, frequency: 294, frequency_end: 440, sweep: 0.7, level: 0.055} }
     glass {
-      SynthOscillator: {wave: SynthSine, frequency: 1568, frequency_end: 2349, sweep: 0.7, level: 0.05}
-      tremble { SynthOscillator: {wave: SynthSine, frequency: 41, modulation: SynthRing, index: 0.7} }
+      Oscillator: {wave: Sine, frequency: 1568, frequency_end: 2349, sweep: 0.7, level: 0.05}
+      tremble { Oscillator: {wave: Sine, frequency: 41, modulation: Ring, index: 0.7} }
     }
   }
 
   prefab SfxLiftGlint {
     Output: {bus: mv_spell}
     Spatial: {min_distance: 36, max_distance: 90}
-    SynthSound: {seed: 43, level_variance: 0.3}
-    SynthEnvelope: {attack: 0.002, decay: 0.5, curve: 4}
+    Sound: {seed: 43, level_variance: 0.3}
+    Envelope: {attack: 0.002, decay: 0.5, curve: 4}
     bell {
-      SynthOscillator: {wave: SynthSine, frequency: 1760, level: 0.22}
-      ring { SynthOscillator: {wave: SynthSine, frequency: 4857, modulation: SynthPhase, index: 3}; SynthEnvelope: {attack: 0.001, decay: 0.25} }
+      Oscillator: {wave: Sine, frequency: 1760, level: 0.22}
+      ring { Oscillator: {wave: Sine, frequency: 4857, modulation: Phase, index: 3}; Envelope: {attack: 0.001, decay: 0.25} }
     }
   }
 
   prefab SfxCastFire {
     Output: {bus: mv_spell}
-    SynthSound: {seed: 47, pitch_variance: 0.06}
-    SynthEnvelope: {attack: 0.004, decay: 0.3, curve: 3}
-    SynthFilter: {kind: SynthBandPass, cutoff: 3000, resonance: 0.3}
-    SynthFilterEnvelope: {attack: 0.0005, decay: 0.2, amount: -1.8}
-    strike { SynthOscillator: {wave: SynthNoise, level: 1.1} }
-    flame { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.6}; SynthEnvelope: {attack: 0.04, decay: 0.3, curve: 2} }
+    Sound: {seed: 47, pitch_variance: 0.06}
+    Envelope: {attack: 0.004, decay: 0.3, curve: 3}
+    Filter: {kind: BandPass, cutoff: 3000, resonance: 0.3}
+    FilterEnvelope: {attack: 0.0005, decay: 0.2, amount: -1.8}
+    strike { Oscillator: {wave: Noise, level: 1.1} }
+    flame { Oscillator: {wave: Noise, color: NoisePink, level: 0.6}; Envelope: {attack: 0.04, decay: 0.3, curve: 2} }
   }
 
   prefab SfxCastWater {
     Output: {bus: mv_spell}
-    SynthSound: {seed: 53, pitch_variance: 0.08}
-    SynthEnvelope: {attack: 0.01, decay: 0.32, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 900, resonance: 0.3}
-    SynthLfo: {wave: SynthLfoRandom, rate: 22, pitch: 900}
-    blub { SynthOscillator: {wave: SynthSine, frequency: 420, frequency_end: 900, sweep: 0.3, level: 0.4} }
-    swish { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.25} }
+    Sound: {seed: 53, pitch_variance: 0.08}
+    Envelope: {attack: 0.01, decay: 0.32, curve: 2}
+    Filter: {kind: BandPass, cutoff: 900, resonance: 0.3}
+    Lfo: {wave: LfoRandom, rate: 22, pitch: 900}
+    blub { Oscillator: {wave: Sine, frequency: 420, frequency_end: 900, sweep: 0.3, level: 0.4} }
+    swish { Oscillator: {wave: Noise, color: NoisePink, level: 0.25} }
   }
 
   prefab SfxCastWind {
     Output: {bus: mv_spell}
-    SynthSound: {seed: 59, pitch_variance: 0.06}
-    SynthEnvelope: {attack: 0.1, decay: 0.28, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 400, resonance: 0.6}
-    SynthFilterEnvelope: {attack: 0.18, decay: 0.2, amount: 2.5}
-    air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.9} }
+    Sound: {seed: 59, pitch_variance: 0.06}
+    Envelope: {attack: 0.1, decay: 0.28, curve: 2}
+    Filter: {kind: BandPass, cutoff: 400, resonance: 0.6}
+    FilterEnvelope: {attack: 0.18, decay: 0.2, amount: 2.5}
+    air { Oscillator: {wave: Noise, color: NoisePink, level: 0.9} }
   }
 
   prefab SfxCastWood {
     Output: {bus: mv_spell}
-    SynthSound: {seed: 61, pitch_variance: 0.1}
-    SynthEnvelope: {attack: 0.0005, decay: 0.05, curve: 4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2200, resonance: 0.3}
-    SynthLfo: {wave: SynthLfoRandom, rate: 100}
+    Sound: {seed: 61, pitch_variance: 0.1}
+    Envelope: {attack: 0.0005, decay: 0.05, curve: 4}
+    Filter: {kind: BandPass, cutoff: 2200, resonance: 0.3}
+    Lfo: {wave: LfoRandom, rate: 100}
     snap {
-      SynthOscillator: {wave: SynthNoise, level: 0.9}
-      fracture { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 3} }
+      Oscillator: {wave: Noise, level: 0.9}
+      fracture { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 3} }
     }
     knock {
-      SynthOscillator: {wave: SynthPluck, frequency: 880, level: 0.4}
-      SynthString: {decay: 0.04, brightness: 0.3, hardness: 1}
+      Oscillator: {wave: Pluck, frequency: 880, level: 0.4}
+      String: {decay: 0.04, brightness: 0.3, hardness: 1}
     }
   }
 
   prefab SfxCastFrost {
     Output: {bus: mv_spell}
-    SynthSound: {seed: 67, pitch_variance: 0.05}
-    SynthEnvelope: {attack: 0.01, decay: 0.28, curve: 2}
-    SynthFilter: {kind: SynthHighPass, cutoff: 2800, resonance: 0.2}
-    SynthLfo: {wave: SynthLfoRandom, rate: 90}
+    Sound: {seed: 67, pitch_variance: 0.05}
+    Envelope: {attack: 0.01, decay: 0.28, curve: 2}
+    Filter: {kind: HighPass, cutoff: 2800, resonance: 0.2}
+    Lfo: {wave: LfoRandom, rate: 90}
     crunch {
-      SynthOscillator: {wave: SynthNoise, level: 0.5}
-      grain { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 3} }
+      Oscillator: {wave: Noise, level: 0.5}
+      grain { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 3} }
     }
   }
 
   prefab SfxCastLift {
     Output: {bus: mv_spell}
-    SynthSound: {seed: 71, pitch_variance: 0.03}
-    SynthEnvelope: {attack: 0.15, decay: 0.15, sustain: 0.6, hold: 0.05, release: 0.2, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 800, resonance: 0.25}
-    SynthFilterEnvelope: {attack: 0.3, sustain: 1, hold: 0.1, release: 0.2, amount: 1}
-    SynthLfo: {rate: 6, pitch: 20}
+    Sound: {seed: 71, pitch_variance: 0.03}
+    Envelope: {attack: 0.15, decay: 0.15, sustain: 0.6, hold: 0.05, release: 0.2, curve: 2}
+    Filter: {kind: LowPass, cutoff: 800, resonance: 0.25}
+    FilterEnvelope: {attack: 0.3, sustain: 1, hold: 0.1, release: 0.2, amount: 1}
+    Lfo: {rate: 6, pitch: 20}
     voice {
-      SynthOscillator: {wave: SynthSaw, frequency: 220, frequency_end: 440, sweep: 0.35, level: 0.09}
-      SynthUnison: {voices: 3, detune: 25}
+      Oscillator: {wave: Saw, frequency: 220, frequency_end: 440, sweep: 0.35, level: 0.09}
+      Unison: {voices: 3, detune: 25}
     }
   }
 
   prefab SfxTalk {
     Output: {bus: mv_ui}
-    SynthSound: {pitch_variance: 0.12}
-    SynthEnvelope: {attack: 0.003, decay: 0.08}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2400}
-    blip { SynthOscillator: {wave: SynthTriangle, frequency: 440, frequency_end: 520, sweep: 0.05, level: 0.4} }
+    Sound: {pitch_variance: 0.12}
+    Envelope: {attack: 0.003, decay: 0.08}
+    Filter: {kind: LowPass, cutoff: 2400}
+    blip { Oscillator: {wave: Triangle, frequency: 440, frequency_end: 520, sweep: 0.05, level: 0.4} }
   }
 
   prefab SfxMote {
     Output: {bus: mv_sfx}
-    SynthSound: {}
-    SynthEnvelope: {attack: 0.005, decay: 0.7}
-    a { SynthOscillator: {wave: SynthSine, frequency: 1318.5, level: 0.25} }
-    b { SynthOscillator: {wave: SynthSine, frequency: 1975.5, level: 0.18}; SynthEnvelope: {attack: 0.08, decay: 0.6} }
-    c { SynthOscillator: {wave: SynthTriangle, frequency: 2637, level: 0.08}; SynthEnvelope: {attack: 0.16, decay: 0.5} }
+    Sound: {}
+    Envelope: {attack: 0.005, decay: 0.7}
+    a { Oscillator: {wave: Sine, frequency: 1318.5, level: 0.25} }
+    b { Oscillator: {wave: Sine, frequency: 1975.5, level: 0.18}; Envelope: {attack: 0.08, decay: 0.6} }
+    c { Oscillator: {wave: Triangle, frequency: 2637, level: 0.08}; Envelope: {attack: 0.16, decay: 0.5} }
   }
 
   template Note {
     prop f: f32 = 440
     prop len: f32 = 0.5
     Output: {bus: mv_ui}
-    SynthSound: {}
-    SynthEnvelope: {attack: 0.01, decay: 0.1, sustain: 0.6, hold: len, release: 0.35}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3600, resonance: 0.15}
-    lead { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.35} }
-    air { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.1} }
+    Sound: {}
+    Envelope: {attack: 0.01, decay: 0.1, sustain: 0.6, hold: len, release: 0.35}
+    Filter: {kind: LowPass, cutoff: 3600, resonance: 0.15}
+    lead { Oscillator: {wave: Triangle, frequency: f, level: 0.35} }
+    air { Oscillator: {wave: Sine, frequency: f * 2, level: 0.1} }
   }
 
   Note jingle_c5(f: 523.25, len: 0.08)
@@ -689,60 +690,60 @@ assets {
 
   prefab SfxStep {
     Output: {bus: mv_sfx}
-    SynthSound: {seed: 31, pitch_variance: 0.3, level_variance: 0.35}
-    SynthEnvelope: {attack: 0.002, decay: 0.06}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1100, resonance: 0.1}
-    scuff { SynthOscillator: {wave: SynthNoise, level: 0.35} }
-    thud { SynthOscillator: {wave: SynthSine, frequency: 120, frequency_end: 70, sweep: 0.05, level: 0.25} }
+    Sound: {seed: 31, pitch_variance: 0.3, level_variance: 0.35}
+    Envelope: {attack: 0.002, decay: 0.06}
+    Filter: {kind: LowPass, cutoff: 1100, resonance: 0.1}
+    scuff { Oscillator: {wave: Noise, level: 0.35} }
+    thud { Oscillator: {wave: Sine, frequency: 120, frequency_end: 70, sweep: 0.05, level: 0.25} }
   }
 
   prefab SfxBirdA {
     Output: {bus: mv_ambience}
-    SynthSound: {pitch_variance: 0.12, level_variance: 0.2}
-    SynthEnvelope: {attack: 0.005, decay: 0.09}
-    chirp { SynthOscillator: {wave: SynthSine, frequency: 2900, frequency_end: 3900, sweep: 0.07, level: 0.25} }
-    over { SynthOscillator: {wave: SynthSine, frequency: 5800, frequency_end: 7800, sweep: 0.07, level: 0.04} }
+    Sound: {pitch_variance: 0.12, level_variance: 0.2}
+    Envelope: {attack: 0.005, decay: 0.09}
+    chirp { Oscillator: {wave: Sine, frequency: 2900, frequency_end: 3900, sweep: 0.07, level: 0.25} }
+    over { Oscillator: {wave: Sine, frequency: 5800, frequency_end: 7800, sweep: 0.07, level: 0.04} }
   }
 
   prefab SfxBirdB {
     Output: {bus: mv_ambience}
-    SynthSound: {pitch_variance: 0.1, level_variance: 0.2}
-    SynthEnvelope: {attack: 0.01, decay: 0.05, sustain: 0.7, hold: 0.12, release: 0.06}
-    whistle { SynthOscillator: {wave: SynthSine, frequency: 2200, frequency_end: 1700, sweep: 0.2, level: 0.22} }
+    Sound: {pitch_variance: 0.1, level_variance: 0.2}
+    Envelope: {attack: 0.01, decay: 0.05, sustain: 0.7, hold: 0.12, release: 0.06}
+    whistle { Oscillator: {wave: Sine, frequency: 2200, frequency_end: 1700, sweep: 0.2, level: 0.22} }
   }
 
   prefab SfxCricket {
     Output: {bus: mv_ambience}
-    SynthSound: {pitch_variance: 0.05, level_variance: 0.3}
-    SynthEnvelope: {attack: 0.002, decay: 0.03}
-    SynthFilter: {kind: SynthBandPass, cutoff: 4400, resonance: 0.6}
-    buzz { SynthOscillator: {wave: SynthSquare, frequency: 4400, level: 0.12} }
+    Sound: {pitch_variance: 0.05, level_variance: 0.3}
+    Envelope: {attack: 0.002, decay: 0.03}
+    Filter: {kind: BandPass, cutoff: 4400, resonance: 0.6}
+    buzz { Oscillator: {wave: Square, frequency: 4400, level: 0.12} }
   }
 
   prefab SfxWater {
     Output: {bus: mv_ambience}
-    SynthSound: {seed: 41}
-    SynthEnvelope: {attack: 0.4, sustain: 1, hold: 3.2, release: 0.4}
-    SynthFilter: {kind: SynthBandPass, cutoff: 700, resonance: 0.35}
-    rush { SynthOscillator: {wave: SynthNoise, level: 0.5} }
+    Sound: {seed: 41}
+    Envelope: {attack: 0.4, sustain: 1, hold: 3.2, release: 0.4}
+    Filter: {kind: BandPass, cutoff: 700, resonance: 0.35}
+    rush { Oscillator: {wave: Noise, level: 0.5} }
   }
 
   prefab SfxWind {
     Output: {bus: mv_ambience}
-    SynthSound: {seed: 43}
-    SynthEnvelope: {attack: 1.5, sustain: 1, hold: 4, release: 1.5}
-    SynthFilter: {kind: SynthBandPass, cutoff: 380, resonance: 0.3}
-    SynthFilterEnvelope: {attack: 3, sustain: 1, hold: 4, amount: 0.453}
-    air { SynthOscillator: {wave: SynthNoise, level: 0.18} }
+    Sound: {seed: 43}
+    Envelope: {attack: 1.5, sustain: 1, hold: 4, release: 1.5}
+    Filter: {kind: BandPass, cutoff: 380, resonance: 0.3}
+    FilterEnvelope: {attack: 3, sustain: 1, hold: 4, amount: 0.453}
+    air { Oscillator: {wave: Noise, level: 0.18} }
   }
 
   prefab SfxSelect {
     Output: {bus: mv_ui}
-    SynthSound: {pitch_variance: 0.02}
-    SynthEnvelope: {attack: 0.002, decay: 0.12}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4000}
-    ting { SynthOscillator: {wave: SynthTriangle, frequency: 1320, level: 0.25} }
-    bell { SynthOscillator: {wave: SynthSine, frequency: 1980, level: 0.12} }
+    Sound: {pitch_variance: 0.02}
+    Envelope: {attack: 0.002, decay: 0.12}
+    Filter: {kind: LowPass, cutoff: 4000}
+    ting { Oscillator: {wave: Triangle, frequency: 1320, level: 0.25} }
+    bell { Oscillator: {wave: Sine, frequency: 1980, level: 0.12} }
   }
 }
 

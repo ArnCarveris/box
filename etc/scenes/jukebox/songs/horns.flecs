@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {205, 150, 60} } } }
@@ -48,175 +49,175 @@ assets {
   }
 
   prefab hn_horn_sound {
-    SynthSound: {seed: 11}
-    SynthGlide: {time: 0.03, legato: true, channel: 11}
-    SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
-    SynthPitchEnvelope: {amount: -0.5, decay: 0.07, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 650, resonance: 0.15, velocity: 3.7, keytrack: 0.5, drive: 0.25}
-    SynthFilterEnvelope: {attack: 0.02, decay: 0.15, sustain: 0, release: 0.1, amount: 0.8, velocity: 1, curve: 2}
-    hn_wander { SynthLfo: {rate: 0.23, pitch: 3, random_phase: true} }
-    hn_bloom { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetCutoff, amount: 1} }
-    hn_push { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.2} }
-    hn_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 3.5} }
-    hn_swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.8} }
+    Sound: {seed: 11}
+    Glide: {time: 0.03, legato: true, channel: 11}
+    Envelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
+    PitchEnvelope: {amount: -0.5, decay: 0.07, curve: 2}
+    Filter: {kind: LowPass, cutoff: 650, resonance: 0.15, velocity: 3.7, keytrack: 0.5, drive: 0.25}
+    FilterEnvelope: {attack: 0.02, decay: 0.15, sustain: 0, release: 0.1, amount: 0.8, velocity: 1, curve: 2}
+    hn_wander { Lfo: {rate: 0.23, pitch: 3, random_phase: true} }
+    hn_bloom { ModRoute: {source: SourceAmpEnvelope, target: TargetCutoff, amount: 1} }
+    hn_push { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.2} }
+    hn_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 3.5} }
+    hn_swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.8} }
     hn_body {
-      SynthOscillator: {wave: SynthSaw, frequency: 174.614, level: 0.04}
-      SynthEnvelope: {attack: 0.06, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
-      hn_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 5.5} }
+      Oscillator: {wave: Saw, frequency: 174.614, level: 0.04}
+      Envelope: {attack: 0.06, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
+      hn_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 5.5} }
     }
     hn_soft {
-      SynthOscillator: {wave: SynthSaw, frequency: 174.614, level: 0.32}
-      SynthEnvelope: {attack: 0.16, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
-      hn_gentle { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: -1} }
+      Oscillator: {wave: Saw, frequency: 174.614, level: 0.32}
+      Envelope: {attack: 0.16, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
+      hn_gentle { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: -1} }
     }
-    hn_core { SynthOscillator: {wave: SynthSine, frequency: 174.614, level: -0.1} }
-    hn_air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.012} }
+    hn_core { Oscillator: {wave: Sine, frequency: 174.614, level: -0.1} }
+    hn_air { Oscillator: {wave: Noise, color: NoisePink, level: 0.012} }
     hn_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.1}
-      SynthEnvelope: {attack: 0.001, decay: 0.025, curve: 4}
-      hn_tongue_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Noise, level: 0.1}
+      Envelope: {attack: 0.001, decay: 0.025, curve: 4}
+      hn_tongue_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
   }
 
   prefab hn_stopped_sound {
-    SynthSound: {seed: 12}
-    SynthGlide: {time: 0.02, legato: true, channel: 12}
-    SynthEnvelope: {attack: 0.03, decay: 0.1, sustain: 0.85, release: 0.09, curve: 2}
-    SynthPitchEnvelope: {amount: -0.35, decay: 0.05, curve: 2}
-    SynthDrive: {drive: 0.35, asymmetry: 0.3}
-    SynthLfo: {rate: 0.23, pitch: 3, random_phase: true}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2800, resonance: 0.35, velocity: 1, keytrack: 0.2}
-    hn_push { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.2} }
-    hn_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 3.5} }
-    hn_swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
-    hn_body { SynthOscillator: {wave: SynthSaw, frequency: 174.614, level: 0.35} }
+    Sound: {seed: 12}
+    Glide: {time: 0.02, legato: true, channel: 12}
+    Envelope: {attack: 0.03, decay: 0.1, sustain: 0.85, release: 0.09, curve: 2}
+    PitchEnvelope: {amount: -0.35, decay: 0.05, curve: 2}
+    Drive: {drive: 0.35, asymmetry: 0.3}
+    Lfo: {rate: 0.23, pitch: 3, random_phase: true}
+    Filter: {kind: BandPass, cutoff: 2800, resonance: 0.35, velocity: 1, keytrack: 0.2}
+    hn_push { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.2} }
+    hn_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 3.5} }
+    hn_swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
+    hn_body { Oscillator: {wave: Saw, frequency: 174.614, level: 0.35} }
     hn_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.08}
-      SynthEnvelope: {attack: 0.001, decay: 0.02, curve: 4}
+      Oscillator: {wave: Noise, level: 0.08}
+      Envelope: {attack: 0.001, decay: 0.02, curve: 4}
     }
   }
 
   prefab hn_trombone_sound {
-    SynthSound: {seed: 21}
-    SynthGlide: {time: 0.04, legato: true, channel: 21}
-    SynthEnvelope: {attack: 0.04, decay: 0.2, sustain: 0.88, release: 0.11, curve: 2}
-    SynthPitchEnvelope: {amount: -0.5, decay: 0.07, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1600, resonance: 0.2, velocity: 3.8, keytrack: 0.6, drive: 0.4}
-    SynthFilterEnvelope: {attack: 0.012, decay: 0.12, sustain: 0, release: 0.1, amount: 1.2, velocity: 1, curve: 2}
-    hn_wander { SynthLfo: {rate: 0.23, pitch: 3, random_phase: true} }
-    hn_bloom { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetCutoff, amount: 1} }
-    hn_push { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.2} }
-    hn_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 3.5} }
-    hn_swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.8} }
+    Sound: {seed: 21}
+    Glide: {time: 0.04, legato: true, channel: 21}
+    Envelope: {attack: 0.04, decay: 0.2, sustain: 0.88, release: 0.11, curve: 2}
+    PitchEnvelope: {amount: -0.5, decay: 0.07, curve: 2}
+    Filter: {kind: LowPass, cutoff: 1600, resonance: 0.2, velocity: 3.8, keytrack: 0.6, drive: 0.4}
+    FilterEnvelope: {attack: 0.012, decay: 0.12, sustain: 0, release: 0.1, amount: 1.2, velocity: 1, curve: 2}
+    hn_wander { Lfo: {rate: 0.23, pitch: 3, random_phase: true} }
+    hn_bloom { ModRoute: {source: SourceAmpEnvelope, target: TargetCutoff, amount: 1} }
+    hn_push { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.2} }
+    hn_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 3.5} }
+    hn_swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.8} }
     hn_body {
-      SynthOscillator: {wave: SynthSaw, frequency: 174.614, level: 0.04}
-      SynthEnvelope: {attack: 0.04, decay: 0.2, sustain: 0.88, release: 0.11, curve: 2}
-      hn_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 5.5} }
+      Oscillator: {wave: Saw, frequency: 174.614, level: 0.04}
+      Envelope: {attack: 0.04, decay: 0.2, sustain: 0.88, release: 0.11, curve: 2}
+      hn_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 5.5} }
     }
     hn_soft {
-      SynthOscillator: {wave: SynthSaw, frequency: 174.614, level: 0.32}
-      SynthEnvelope: {attack: 0.11, decay: 0.2, sustain: 0.88, release: 0.11, curve: 2}
-      hn_gentle { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: -1} }
+      Oscillator: {wave: Saw, frequency: 174.614, level: 0.32}
+      Envelope: {attack: 0.11, decay: 0.2, sustain: 0.88, release: 0.11, curve: 2}
+      hn_gentle { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: -1} }
     }
-    hn_air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.012} }
+    hn_air { Oscillator: {wave: Noise, color: NoisePink, level: 0.012} }
     hn_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.12}
-      SynthEnvelope: {attack: 0.001, decay: 0.022, curve: 4}
-      hn_tongue_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Noise, level: 0.12}
+      Envelope: {attack: 0.001, decay: 0.022, curve: 4}
+      hn_tongue_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
   }
 
   prefab hn_bass_trombone_sound {
-    SynthSound: {seed: 31}
-    SynthGlide: {time: 0.045, legato: true, channel: 31}
-    SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
-    SynthPitchEnvelope: {amount: -0.6, decay: 0.09, curve: 2, release_amount: -0.15}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1180, resonance: 0.2, velocity: 5, keytrack: 0.6, drive: 0.55}
-    SynthFilterEnvelope: {attack: 0.015, decay: 0.15, sustain: 0, release: 0.1, amount: 1.4, velocity: 1, curve: 2}
-    hn_wander { SynthLfo: {rate: 0.23, pitch: 3, random_phase: true} }
-    hn_bloom { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetCutoff, amount: 1} }
-    hn_push { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
-    hn_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 3.5} }
-    hn_swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.8} }
+    Sound: {seed: 31}
+    Glide: {time: 0.045, legato: true, channel: 31}
+    Envelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
+    PitchEnvelope: {amount: -0.6, decay: 0.09, curve: 2, release_amount: -0.15}
+    Filter: {kind: LowPass, cutoff: 1180, resonance: 0.2, velocity: 5, keytrack: 0.6, drive: 0.55}
+    FilterEnvelope: {attack: 0.015, decay: 0.15, sustain: 0, release: 0.1, amount: 1.4, velocity: 1, curve: 2}
+    hn_wander { Lfo: {rate: 0.23, pitch: 3, random_phase: true} }
+    hn_bloom { ModRoute: {source: SourceAmpEnvelope, target: TargetCutoff, amount: 1} }
+    hn_push { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
+    hn_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 3.5} }
+    hn_swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.8} }
     hn_body {
-      SynthOscillator: {wave: SynthSaw, frequency: 87.307, level: 0.04}
-      SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
-      hn_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 5.5} }
+      Oscillator: {wave: Saw, frequency: 87.307, level: 0.04}
+      Envelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
+      hn_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 5.5} }
     }
     hn_soft {
-      SynthOscillator: {wave: SynthSaw, frequency: 87.307, level: 0.32}
-      SynthEnvelope: {attack: 0.13, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
-      hn_gentle { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: -1} }
+      Oscillator: {wave: Saw, frequency: 87.307, level: 0.32}
+      Envelope: {attack: 0.13, decay: 0.2, sustain: 0.88, release: 0.14, curve: 2}
+      hn_gentle { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: -1} }
     }
-    hn_core { SynthOscillator: {wave: SynthSine, frequency: 87.307, level: -0.06} }
-    hn_air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.012} }
+    hn_core { Oscillator: {wave: Sine, frequency: 87.307, level: -0.06} }
+    hn_air { Oscillator: {wave: Noise, color: NoisePink, level: 0.012} }
     hn_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.12}
-      SynthEnvelope: {attack: 0.001, decay: 0.025, curve: 4}
-      hn_tongue_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Noise, level: 0.12}
+      Envelope: {attack: 0.001, decay: 0.025, curve: 4}
+      hn_tongue_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
   }
 
   prefab hn_euphonium_sound {
-    SynthSound: {seed: 41}
-    SynthGlide: {time: 0.025, legato: true, channel: 41}
-    SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.16, curve: 2}
-    SynthPitchEnvelope: {amount: -0.4, decay: 0.07, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 855, resonance: 0.12, velocity: 4, keytrack: 0.55, drive: 0.25}
-    SynthFilterEnvelope: {attack: 0.02, decay: 0.15, sustain: 0, release: 0.1, amount: 0.4, velocity: 1, curve: 2}
-    SynthLfo: {rate: 5.4, pitch: 12, amplitude: 0.04, delay: 0.25, fade: 0.4}
-    hn_wander { SynthLfo: {rate: 0.23, pitch: 3, random_phase: true} }
-    hn_bloom { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetCutoff, amount: 1} }
-    hn_push { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.2} }
-    hn_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 3.5} }
-    hn_swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.8} }
+    Sound: {seed: 41}
+    Glide: {time: 0.025, legato: true, channel: 41}
+    Envelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.16, curve: 2}
+    PitchEnvelope: {amount: -0.4, decay: 0.07, curve: 2}
+    Filter: {kind: LowPass, cutoff: 855, resonance: 0.12, velocity: 4, keytrack: 0.55, drive: 0.25}
+    FilterEnvelope: {attack: 0.02, decay: 0.15, sustain: 0, release: 0.1, amount: 0.4, velocity: 1, curve: 2}
+    Lfo: {rate: 5.4, pitch: 12, amplitude: 0.04, delay: 0.25, fade: 0.4}
+    hn_wander { Lfo: {rate: 0.23, pitch: 3, random_phase: true} }
+    hn_bloom { ModRoute: {source: SourceAmpEnvelope, target: TargetCutoff, amount: 1} }
+    hn_push { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.2} }
+    hn_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 3.5} }
+    hn_swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.8} }
     hn_body {
-      SynthOscillator: {wave: SynthSaw, frequency: 116.541, level: 0.04}
-      SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.16, curve: 2}
-      hn_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 5.5} }
+      Oscillator: {wave: Saw, frequency: 116.541, level: 0.04}
+      Envelope: {attack: 0.05, decay: 0.2, sustain: 0.88, release: 0.16, curve: 2}
+      hn_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 5.5} }
     }
     hn_soft {
-      SynthOscillator: {wave: SynthSaw, frequency: 116.541, level: 0.32}
-      SynthEnvelope: {attack: 0.13, decay: 0.2, sustain: 0.88, release: 0.16, curve: 2}
-      hn_gentle { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: -1} }
+      Oscillator: {wave: Saw, frequency: 116.541, level: 0.32}
+      Envelope: {attack: 0.13, decay: 0.2, sustain: 0.88, release: 0.16, curve: 2}
+      hn_gentle { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: -1} }
     }
-    hn_core { SynthOscillator: {wave: SynthSine, frequency: 116.541, level: -0.15} }
-    hn_air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.01} }
+    hn_core { Oscillator: {wave: Sine, frequency: 116.541, level: -0.15} }
+    hn_air { Oscillator: {wave: Noise, color: NoisePink, level: 0.01} }
     hn_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.09}
-      SynthEnvelope: {attack: 0.001, decay: 0.025, curve: 4}
-      hn_tongue_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Noise, level: 0.09}
+      Envelope: {attack: 0.001, decay: 0.025, curve: 4}
+      hn_tongue_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
   }
 
   prefab hn_tuba_sound {
-    SynthSound: {seed: 51}
-    SynthGlide: {time: 0.035, legato: true, channel: 51}
-    SynthEnvelope: {attack: 0.07, decay: 0.2, sustain: 0.88, release: 0.2, curve: 2}
-    SynthPitchEnvelope: {amount: -0.6, decay: 0.1, curve: 2, release_amount: -0.15}
-    SynthFilter: {kind: SynthLowPass, cutoff: 480, resonance: 0.12, velocity: 4.15, keytrack: 0.5, drive: 0.3}
-    SynthFilterEnvelope: {attack: 0.025, decay: 0.18, sustain: 0, release: 0.1, amount: 0.9, velocity: 1, curve: 2}
-    hn_wander { SynthLfo: {rate: 0.23, pitch: 3, random_phase: true} }
-    hn_bloom { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetCutoff, amount: 1} }
-    hn_push { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.2} }
-    hn_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 3.5} }
-    hn_swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.8} }
+    Sound: {seed: 51}
+    Glide: {time: 0.035, legato: true, channel: 51}
+    Envelope: {attack: 0.07, decay: 0.2, sustain: 0.88, release: 0.2, curve: 2}
+    PitchEnvelope: {amount: -0.6, decay: 0.1, curve: 2, release_amount: -0.15}
+    Filter: {kind: LowPass, cutoff: 480, resonance: 0.12, velocity: 4.15, keytrack: 0.5, drive: 0.3}
+    FilterEnvelope: {attack: 0.025, decay: 0.18, sustain: 0, release: 0.1, amount: 0.9, velocity: 1, curve: 2}
+    hn_wander { Lfo: {rate: 0.23, pitch: 3, random_phase: true} }
+    hn_bloom { ModRoute: {source: SourceAmpEnvelope, target: TargetCutoff, amount: 1} }
+    hn_push { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.2} }
+    hn_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 3.5} }
+    hn_swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.8} }
     hn_body {
-      SynthOscillator: {wave: SynthSaw, frequency: 58.270, level: 0.04}
-      SynthEnvelope: {attack: 0.08, decay: 0.2, sustain: 0.88, release: 0.2, curve: 2}
-      hn_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 5.5} }
+      Oscillator: {wave: Saw, frequency: 58.270, level: 0.04}
+      Envelope: {attack: 0.08, decay: 0.2, sustain: 0.88, release: 0.2, curve: 2}
+      hn_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 5.5} }
     }
     hn_soft {
-      SynthOscillator: {wave: SynthSaw, frequency: 58.270, level: 0.32}
-      SynthEnvelope: {attack: 0.2, decay: 0.2, sustain: 0.88, release: 0.2, curve: 2}
-      hn_gentle { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: -1} }
+      Oscillator: {wave: Saw, frequency: 58.270, level: 0.32}
+      Envelope: {attack: 0.2, decay: 0.2, sustain: 0.88, release: 0.2, curve: 2}
+      hn_gentle { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: -1} }
     }
-    hn_core { SynthOscillator: {wave: SynthSine, frequency: 58.270, level: -0.18} }
-    hn_air { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.01} }
+    hn_core { Oscillator: {wave: Sine, frequency: 58.270, level: -0.18} }
+    hn_air { Oscillator: {wave: Noise, color: NoisePink, level: 0.01} }
     hn_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.08}
-      SynthEnvelope: {attack: 0.001, decay: 0.03, curve: 4}
-      hn_tongue_hard { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Noise, level: 0.08}
+      Envelope: {attack: 0.001, decay: 0.03, curve: 4}
+      hn_tongue_hard { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
   }
 

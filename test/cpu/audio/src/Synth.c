@@ -2082,8 +2082,8 @@ void Synth_endless_logs_error(void) {
     test_assert(ecs_script_run(world, "hum",
         "using box.audio\n"
         "prefab Hum {\n"
-        "  SynthSound: {}\n"
-        "  SynthOscillator: {wave: SynthTriangle, frequency: 110, level: 0.3}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Oscillator: {wave: Triangle, frequency: 110, level: 0.3}\n"
         "}\n", NULL) == 0);
     audio_run(world, 2);
     hum = ecs_lookup(world, "Hum");
@@ -3223,15 +3223,15 @@ void Synth_script_lfo(void) {
     test_assert(ecs_script_run(world, "lfos",
         "using box.audio\n"
         "prefab Wobble {\n"
-        "  SynthSound: {seed: 4}\n"
-        "  SynthEnvelope: {attack: 0.01, decay: 0.1}\n"
-        "  SynthFilter: {cutoff: 800}\n"
+        "  synth.Sound: {seed: 4}\n"
+        "  synth.Envelope: {attack: 0.01, decay: 0.1}\n"
+        "  synth.Filter: {cutoff: 800}\n"
         "  tone {\n"
-        "    SynthOscillator: {wave: SynthSquare, frequency: 220, level: 0.3, pulse_width: 0.2}\n"
-        "    SynthLfo: {wave: SynthLfoSquare, rate: 3, pulse_width: 0.1}\n"
+        "    synth.Oscillator: {wave: Square, frequency: 220, level: 0.3, pulse_width: 0.2}\n"
+        "    synth.Lfo: {wave: LfoSquare, rate: 3, pulse_width: 0.1}\n"
         "  }\n"
-        "  wah { SynthLfo: {wave: SynthLfoRandom, rate: 7, cutoff: 1.5} }\n"
-        "  more { SynthLfo: {rate: 1, pitch: 10} }\n"
+        "  wah { synth.Lfo: {wave: LfoRandom, rate: 7, cutoff: 1.5} }\n"
+        "  more { synth.Lfo: {rate: 1, pitch: 10} }\n"
         "}\n", NULL) == 0);
     audio_run(world, 1);
     audio_log_stop();
@@ -4373,13 +4373,13 @@ void Synth_script_pluck(void) {
     test_assert(ecs_script_run(world, "pluck",
         "using box.audio\n"
         "prefab Plain {\n"
-        "  SynthSound: {}\n"
-        "  SynthOscillator: {wave: SynthPluck, frequency: 220, level: 0.5}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Oscillator: {wave: Pluck, frequency: 220, level: 0.5}\n"
         "}\n"
         "prefab Low {\n"
-        "  SynthSound: {}\n"
-        "  SynthOscillator: {wave: SynthPluck, frequency: 30, level: 0.5}\n"
-        "  SynthString: {decay: 0.2, brightness: 0.25, hardness: 0.3}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Oscillator: {wave: Pluck, frequency: 30, level: 0.5}\n"
+        "  synth.String: {decay: 0.2, brightness: 0.25, hardness: 0.3}\n"
         "}\n", NULL) == 0);
     audio_run(world, 2);
     audio_log_stop();

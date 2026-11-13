@@ -3,11 +3,12 @@
 // than the 64 voices of the core, so the voices are stolen from bar 3 on. 4 bars of 4/4 at 120
 // bpm.
 using box.audio
+using box.audio.synth
 
 prefab check_voice_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 1, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.01}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.05, sustain: 1, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.01}
 }
 
 check_voice_inst { Instrument: {sound: check_voice_tone} }

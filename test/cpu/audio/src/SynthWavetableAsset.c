@@ -290,12 +290,12 @@ void SynthWavetableAsset_too_short(void) {
     sound = audio_tone(world, "Short", 200, 0.5f, 1000);
     test_assert(ecs_script_run(world, "short",
         "using box.audio\n"
-        "prefab ShortTable { Wavetable: {sound: Short} }\n"
+        "prefab ShortTable { synth.Wavetable: {sound: Short} }\n"
         "prefab Pad {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.01}\n"
-        "  SynthOscillator: {wave: SynthWavetable, frequency: 200, level: 0.3}\n"
-        "  SynthTable: {table: ShortTable}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Envelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.01}\n"
+        "  synth.Oscillator: {wave: Wavetable, frequency: 200, level: 0.3}\n"
+        "  synth.Table: {table: ShortTable}\n"
         "}\n", NULL) == 0);
     audio_run(world, 4);
     audio_log_stop();

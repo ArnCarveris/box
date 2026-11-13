@@ -5,6 +5,7 @@
 // on a bus of its own, which wins over the sfx bus of the drip.
 using box.transform
 using box.audio
+using box.audio.synth
 
 ears {
   Position: {0, 1.7, 0}
@@ -16,9 +17,9 @@ rain_bus { Bus: {output: master, volume: 0.5} }
 
 prefab Chirp {
   Output: {bus: sfx}
-  SynthSound: {pitch_variance: 0.1}
-  SynthEnvelope: {attack: 0.002, decay: 0.08}
-  SynthOscillator: {wave: SynthSine, frequency: 3200, level: 0.3}
+  Sound: {pitch_variance: 0.1}
+  Envelope: {attack: 0.002, decay: 0.08}
+  Oscillator: {wave: Sine, frequency: 3200, level: 0.3}
   Spatial: {min_distance: 1, max_distance: 40, rolloff: 1}
 }
 

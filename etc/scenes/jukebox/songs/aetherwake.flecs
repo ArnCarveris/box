@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 // AETHERWAKE — entirely original instrumental, 154 BPM, B minor.
 // 96 bars. All melodic hooks use SIMULTANEOUS 3- or 4-note voicings.
@@ -11,41 +12,41 @@ assets {
   aw_master_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 27}, {kind: EqPeak, frequency: 280, gain: -1.6, q: 1.1}, {kind: EqHighShelf, frequency: 9000, gain: 1.0, q: 0.8}] } }
   aw_master_glue { Compressor: {threshold: -16, ratio: 2.1, attack: 0.020, release: 0.2, knee: 4, makeup: 0.0, mix: 0.65} }
   aw_mix { Bus: {output: master, volume: 0.88, kind: ChannelGroup, effects: [aw_master_eq, aw_master_glue]}; Meter: {} }
-  aw_reverb_hp { Filter: {kind: SynthHighPass, cutoff: 240} }
-  aw_echo_hp { Filter: {kind: SynthHighPass, cutoff: 315} }
+  aw_reverb_hp { box.audio.Filter: {kind: HighPass, cutoff: 240} }
+  aw_echo_hp { box.audio.Filter: {kind: HighPass, cutoff: 315} }
   aw_hall { Bus: {output: aw_mix, volume: 0.37, kind: ChannelReturn, effects: [aw_hall, aw_reverb_hp]}; Reverb: {decay: 3.3, damping: 0.55, predelay: 0.035, size: 0.86, mix: 1} }
   aw_delay { Bus: {output: aw_mix, volume: 0.34, kind: ChannelReturn, effects: [aw_delay, aw_echo_hp]}; Delay: {sync: 0.75, feedback: 0.34, mix: 1, ping_pong: true, damping: 4800} }
   aw_drums { Bus: {output: aw_mix, volume: 0.80, kind: ChannelGroup}; Meter: {} }
-  aw_music_lp { Filter: {kind: SynthLowPass, cutoff: 14000, resonance: 0.09} }
+  aw_music_lp { box.audio.Filter: {kind: LowPass, cutoff: 14000, resonance: 0.09} }
   aw_music { Bus: {output: aw_mix, volume: 0.78, kind: ChannelGroup, effects: [aw_music_lp]}; Meter: {} }
   aw_kick_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 26}, {kind: EqPeak, frequency: 61, gain: 1.2, q: 1.1}, {kind: EqPeak, frequency: 260, gain: -2, q: 0.85}]} }
-  aw_sub_hp { Filter: {kind: SynthHighPass, cutoff: 28} }
-  aw_mid_hp { Filter: {kind: SynthHighPass, cutoff: 113} }
-  aw_mid_lp { Filter: {kind: SynthLowPass, cutoff: 2600} }
-  aw_stab_hp { Filter: {kind: SynthHighPass, cutoff: 190} }
-  aw_offbeat_hp { Filter: {kind: SynthHighPass, cutoff: 190} }
-  aw_saw_hp { Filter: {kind: SynthHighPass, cutoff: 190} }
-  aw_saw_lp { Filter: {kind: SynthLowPass, cutoff: 8000} }
-  aw_choir_hp { Filter: {kind: SynthHighPass, cutoff: 290} }
-  aw_pad_hp { Filter: {kind: SynthHighPass, cutoff: 210} }
+  aw_sub_hp { box.audio.Filter: {kind: HighPass, cutoff: 28} }
+  aw_mid_hp { box.audio.Filter: {kind: HighPass, cutoff: 113} }
+  aw_mid_lp { box.audio.Filter: {kind: LowPass, cutoff: 2600} }
+  aw_stab_hp { box.audio.Filter: {kind: HighPass, cutoff: 190} }
+  aw_offbeat_hp { box.audio.Filter: {kind: HighPass, cutoff: 190} }
+  aw_saw_hp { box.audio.Filter: {kind: HighPass, cutoff: 190} }
+  aw_saw_lp { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+  aw_choir_hp { box.audio.Filter: {kind: HighPass, cutoff: 290} }
+  aw_pad_hp { box.audio.Filter: {kind: HighPass, cutoff: 210} }
   aw_chord_chorus { Chorus: {voices: 3, rate: 0.18, depth: 3.9, delay: 15, mix: 0.31, spread: 0.86} }
   aw_poly_chorus { Chorus: {voices: 3, rate: 0.18, depth: 3.9, delay: 15, mix: 0.31, spread: 0.86} }
 
-  prefab aw_kick_s { SynthSound: {seed: 501}; aw_low { SynthOscillator: {wave: SynthSine, frequency: 60, level: 0.8}; SynthEnvelope: {attack: 0.001, decay: 0.30, curve: 5}; SynthPitchEnvelope: {amount: 43, decay: 0.057, curve: 5} }; aw_click { SynthOscillator: {wave: SynthNoise, level: 0.16}; SynthEnvelope: {attack: 0.001, decay: 0.017} } }
-  prefab aw_snare_s { SynthSound: {seed: 502}; SynthFilter: {kind: SynthHighPass, cutoff: 590}; aw_noise { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.50}; SynthEnvelope: {attack: 0.002, decay: 0.16, curve: 4} }; aw_body { SynthOscillator: {wave: SynthTriangle, frequency: 190, level: 0.18}; SynthEnvelope: {attack: 0.001, decay: 0.11} } }
-  prefab aw_hat_s { SynthSound: {seed: 503}; SynthOscillator: {wave: SynthNoise, level: 0.28}; SynthEnvelope: {attack: 0.001, decay: 0.07}; SynthFilter: {kind: SynthHighPass, cutoff: 6900} }
-  prefab aw_open_s { SynthSound: {seed: 504}; SynthOscillator: {wave: SynthNoise, level: 0.22}; SynthEnvelope: {attack: 0.001, decay: 0.27}; SynthFilter: {kind: SynthHighPass, cutoff: 6800} }
-  prefab aw_perc_s { SynthSound: {seed: 505}; SynthOscillator: {wave: SynthNoise, level: 0.24}; SynthEnvelope: {attack: 0.001, decay: 0.06}; SynthFilter: {kind: SynthBandPass, cutoff: 1700, resonance: 0.19} }
-  prefab aw_sub_s { SynthSound: {seed: 506}; SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.79, sub: 0.2}; SynthEnvelope: {attack: 0.005, decay: 0.16, sustain: 0.76, release: 0.07} }
-  prefab aw_growl_s { SynthSound: {seed: 507, drift: 2}; SynthEnvelope: {attack: 0.009, decay: 0.28, sustain: 0.45, release: 0.09}; SynthDrive: {drive: 0.30}; SynthFilter: {kind: SynthFormant, vowel: 2.2, resonance: 0.37}; SynthFilterEnvelope: {attack: 0.01, decay: 0.28, sustain: 0.23, vowel: -1.1}; aw_mid_saw { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.38}; SynthUnison: {voices: 2, detune: 5.0, width: 0.45} } }
-  prefab aw_pad_s { SynthSound: {seed: 508, drift: 4, free_phase: true}; SynthEnvelope: {attack: 0.31, decay: 0.5, sustain: 0.72, release: 1.2}; SynthFilter: {kind: SynthLowPass, cutoff: 2600}; aw_pad_wave { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.20}; SynthUnison: {voices: 3, detune: 7, width: 0.86} }; aw_pad_sine { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.17} } }
-  prefab aw_choir_s { SynthSound: {seed: 509, free_phase: true}; SynthEnvelope: {attack: 0.48, decay: 0.5, sustain: 0.70, release: 1.2}; SynthFilter: {kind: SynthLowPass, cutoff: 3600}; aw_choir_wave { SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.25}; SynthUnison: {voices: 3, detune: 5.5, width: 0.9} } }
-  prefab aw_poly_s { SynthSound: {seed: 510, drift: 2}; SynthEnvelope: {attack: 0.008, decay: 0.16, sustain: 0.44, release: 0.20}; SynthFilter: {kind: SynthLowPass, cutoff: 6500, resonance: 0.12}; aw_poly_wave { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.28}; SynthUnison: {voices: 5, detune: 9, width: 0.91} }; aw_poly_sine { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.09} } }
-  prefab aw_saw_s { SynthSound: {seed: 511, drift: 4}; SynthEnvelope: {attack: 0.015, decay: 0.2, sustain: 0.6, release: 0.22}; SynthDrive: {drive: 0.18}; aw_saw_wave { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.32}; SynthUnison: {voices: 6, detune: 12.5, width: 0.93} } }
-  prefab aw_offbeat_s { SynthSound: {seed: 512, drift: 2}; SynthEnvelope: {attack: 0.008, decay: 0.19, sustain: 0.14, release: 0.1}; SynthFilter: {kind: SynthLowPass, cutoff: 3900}; aw_stab_osc { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.29}; SynthUnison: {voices: 3, detune: 6.0, width: 0.65} } }
-  prefab aw_glass_s { SynthSound: {seed: 513}; SynthEnvelope: {attack: 0.002, decay: 1.8, sustain: 0.0, release: 0.32}; aw_glass_sin { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.44} }; aw_glass_tri { SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.16} } }
-  prefab aw_impact_s { SynthSound: {seed: 514}; aw_boom { SynthOscillator: {wave: SynthSine, frequency: 68, level: 0.50}; SynthEnvelope: {attack: 0.001, decay: 1.1}; SynthPitchEnvelope: {amount: 21, decay: 0.12} }; aw_air { SynthOscillator: {wave: SynthNoise, level: 0.22}; SynthEnvelope: {attack: 0.002, decay: 1.1}; SynthFilter: {kind: SynthHighPass, cutoff: 1900} } }
-  prefab aw_rise_s { SynthSound: {seed: 515}; SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.26}; SynthEnvelope: {attack: 1.35, decay: 0.2, sustain: 0, release: 0.15, attack_curve: -1}; SynthFilter: {kind: SynthHighPass, cutoff: 430} }
+  prefab aw_kick_s { Sound: {seed: 501}; aw_low { Oscillator: {wave: Sine, frequency: 60, level: 0.8}; Envelope: {attack: 0.001, decay: 0.30, curve: 5}; PitchEnvelope: {amount: 43, decay: 0.057, curve: 5} }; aw_click { Oscillator: {wave: Noise, level: 0.16}; Envelope: {attack: 0.001, decay: 0.017} } }
+  prefab aw_snare_s { Sound: {seed: 502}; Filter: {kind: HighPass, cutoff: 590}; aw_noise { Oscillator: {wave: Noise, color: NoisePink, level: 0.50}; Envelope: {attack: 0.002, decay: 0.16, curve: 4} }; aw_body { Oscillator: {wave: Triangle, frequency: 190, level: 0.18}; Envelope: {attack: 0.001, decay: 0.11} } }
+  prefab aw_hat_s { Sound: {seed: 503}; Oscillator: {wave: Noise, level: 0.28}; Envelope: {attack: 0.001, decay: 0.07}; Filter: {kind: HighPass, cutoff: 6900} }
+  prefab aw_open_s { Sound: {seed: 504}; Oscillator: {wave: Noise, level: 0.22}; Envelope: {attack: 0.001, decay: 0.27}; Filter: {kind: HighPass, cutoff: 6800} }
+  prefab aw_perc_s { Sound: {seed: 505}; Oscillator: {wave: Noise, level: 0.24}; Envelope: {attack: 0.001, decay: 0.06}; Filter: {kind: BandPass, cutoff: 1700, resonance: 0.19} }
+  prefab aw_sub_s { Sound: {seed: 506}; Oscillator: {wave: Sine, frequency: 440, level: 0.79, sub: 0.2}; Envelope: {attack: 0.005, decay: 0.16, sustain: 0.76, release: 0.07} }
+  prefab aw_growl_s { Sound: {seed: 507, drift: 2}; Envelope: {attack: 0.009, decay: 0.28, sustain: 0.45, release: 0.09}; Drive: {drive: 0.30}; Filter: {kind: Formant, vowel: 2.2, resonance: 0.37}; FilterEnvelope: {attack: 0.01, decay: 0.28, sustain: 0.23, vowel: -1.1}; aw_mid_saw { Oscillator: {wave: Saw, frequency: 440, level: 0.38}; Unison: {voices: 2, detune: 5.0, width: 0.45} } }
+  prefab aw_pad_s { Sound: {seed: 508, drift: 4, free_phase: true}; Envelope: {attack: 0.31, decay: 0.5, sustain: 0.72, release: 1.2}; Filter: {kind: LowPass, cutoff: 2600}; aw_pad_wave { Oscillator: {wave: Saw, frequency: 440, level: 0.20}; Unison: {voices: 3, detune: 7, width: 0.86} }; aw_pad_sine { Oscillator: {wave: Sine, frequency: 440, level: 0.17} } }
+  prefab aw_choir_s { Sound: {seed: 509, free_phase: true}; Envelope: {attack: 0.48, decay: 0.5, sustain: 0.70, release: 1.2}; Filter: {kind: LowPass, cutoff: 3600}; aw_choir_wave { Oscillator: {wave: Triangle, frequency: 440, level: 0.25}; Unison: {voices: 3, detune: 5.5, width: 0.9} } }
+  prefab aw_poly_s { Sound: {seed: 510, drift: 2}; Envelope: {attack: 0.008, decay: 0.16, sustain: 0.44, release: 0.20}; Filter: {kind: LowPass, cutoff: 6500, resonance: 0.12}; aw_poly_wave { Oscillator: {wave: Saw, frequency: 440, level: 0.28}; Unison: {voices: 5, detune: 9, width: 0.91} }; aw_poly_sine { Oscillator: {wave: Sine, frequency: 440, level: 0.09} } }
+  prefab aw_saw_s { Sound: {seed: 511, drift: 4}; Envelope: {attack: 0.015, decay: 0.2, sustain: 0.6, release: 0.22}; Drive: {drive: 0.18}; aw_saw_wave { Oscillator: {wave: Saw, frequency: 440, level: 0.32}; Unison: {voices: 6, detune: 12.5, width: 0.93} } }
+  prefab aw_offbeat_s { Sound: {seed: 512, drift: 2}; Envelope: {attack: 0.008, decay: 0.19, sustain: 0.14, release: 0.1}; Filter: {kind: LowPass, cutoff: 3900}; aw_stab_osc { Oscillator: {wave: Saw, frequency: 440, level: 0.29}; Unison: {voices: 3, detune: 6.0, width: 0.65} } }
+  prefab aw_glass_s { Sound: {seed: 513}; Envelope: {attack: 0.002, decay: 1.8, sustain: 0.0, release: 0.32}; aw_glass_sin { Oscillator: {wave: Sine, frequency: 440, level: 0.44} }; aw_glass_tri { Oscillator: {wave: Triangle, frequency: 440, level: 0.16} } }
+  prefab aw_impact_s { Sound: {seed: 514}; aw_boom { Oscillator: {wave: Sine, frequency: 68, level: 0.50}; Envelope: {attack: 0.001, decay: 1.1}; PitchEnvelope: {amount: 21, decay: 0.12} }; aw_air { Oscillator: {wave: Noise, level: 0.22}; Envelope: {attack: 0.002, decay: 1.1}; Filter: {kind: HighPass, cutoff: 1900} } }
+  prefab aw_rise_s { Sound: {seed: 515}; Oscillator: {wave: Noise, color: NoisePink, level: 0.26}; Envelope: {attack: 1.35, decay: 0.2, sustain: 0, release: 0.15, attack_curve: -1}; Filter: {kind: HighPass, cutoff: 430} }
   aw_kick_inst { Instrument: {sound: aw_kick_s, root: 36, gate: false } }
   aw_snare_inst { Instrument: {sound: aw_snare_s, root: 36, gate: false } }
   aw_hats_inst { Instrument: {sound: aw_hat_s, root: 36, gate: false } }
@@ -62,7 +63,7 @@ assets {
   aw_impact_inst { Instrument: {sound: aw_impact_s, root: 36, gate: false } }
   aw_rise_inst { Instrument: {sound: aw_rise_s, root: 36, gate: false } }
 
-  prefab aw_lp_auto { AutomationClip: {target: aw_music_lp, component: Filter, member: "cutoff", length: 384, curve: {keys: [{time: 0, value: 1700}, {time: 24, value: 2400}, {time: 32, value: 3500}, {time: 60, value: 2300}, {time: 63.8, value: 900}, {time: 64, value: 14000}, {time: 120, value: 11000}, {time: 127.8, value: 1300}, {time: 128, value: 15000}, {time: 158, value: 7000}, {time: 160, value: 1000}, {time: 176, value: 1400}, {time: 208, value: 1000}, {time: 224, value: 1800}, {time: 240, value: 5500}, {time: 255.8, value: 700}, {time: 256, value: 16000}, {time: 310, value: 14200}, {time: 319.8, value: 1100}, {time: 320, value: 15800}, {time: 352, value: 5200}, {time: 383, value: 650}, {time: 384, value: 550}]} } }
+  prefab aw_lp_auto { AutomationClip: {target: aw_music_lp, component: box.audio.Filter, member: "cutoff", length: 384, curve: {keys: [{time: 0, value: 1700}, {time: 24, value: 2400}, {time: 32, value: 3500}, {time: 60, value: 2300}, {time: 63.8, value: 900}, {time: 64, value: 14000}, {time: 120, value: 11000}, {time: 127.8, value: 1300}, {time: 128, value: 15000}, {time: 158, value: 7000}, {time: 160, value: 1000}, {time: 176, value: 1400}, {time: 208, value: 1000}, {time: 224, value: 1800}, {time: 240, value: 5500}, {time: 255.8, value: 700}, {time: 256, value: 16000}, {time: 310, value: 14200}, {time: 319.8, value: 1100}, {time: 320, value: 15800}, {time: 352, value: 5200}, {time: 383, value: 650}, {time: 384, value: 550}]} } }
 
   prefab aw_clip_glass_keys_00 {
     NoteClip: {length: 32, notes: [

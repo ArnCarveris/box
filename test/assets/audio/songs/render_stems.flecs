@@ -2,11 +2,12 @@
 // buses, a held A3 (220 Hz) on render_low and a held A6 (1760 Hz) on render_high, 4 bars of 4/4
 // at 120 bpm, so a stem of one bus shows by its frequency that the other is absent.
 using box.audio
+using box.audio.synth
 
 prefab render_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.4}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.05, sustain: 0.8, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.4}
 }
 
 render_low_inst { Instrument: {sound: render_tone} }

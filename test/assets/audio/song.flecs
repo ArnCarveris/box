@@ -8,6 +8,7 @@
 using flecs.script
 using box.app
 using box.audio
+using box.audio.synth
 
 // 1. The timeline: 120 quarter notes per minute, 4/4, a loop of 4 bars (16 beats), stopped
 // until the game starts it, once the sound files are ready
@@ -50,19 +51,19 @@ echo {
 // 3. The instruments: two synths whose oscillators are at 440 Hz, in tune at the default root
 // of 69 (A4), and a sampled kick that plays as recorded at C1 (36) and ignores durations
 prefab bass_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.004, decay: 0.2, sustain: 0.6, release: 0.08, curve: 3}
-  SynthFilter: {kind: SynthLowPass, cutoff: 600, resonance: 0.2}
-  body { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.35} }
-  sub { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.45} }
+  Sound: {}
+  Envelope: {attack: 0.004, decay: 0.2, sustain: 0.6, release: 0.08, curve: 3}
+  Filter: {kind: LowPass, cutoff: 600, resonance: 0.2}
+  body { Oscillator: {wave: Saw, frequency: 440, level: 0.35} }
+  sub { Oscillator: {wave: Sine, frequency: 440, level: 0.45} }
 }
 
 prefab keys_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.4, curve: 3}
-  SynthFilter: {kind: SynthLowPass, cutoff: 2400, resonance: 0.1}
-  body { SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.3} }
-  air { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.08} }
+  Sound: {}
+  Envelope: {attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.4, curve: 3}
+  Filter: {kind: LowPass, cutoff: 2400, resonance: 0.1}
+  body { Oscillator: {wave: Triangle, frequency: 440, level: 0.3} }
+  air { Oscillator: {wave: Saw, frequency: 440, level: 0.08} }
 }
 
 kick_sample { SoundFile: {path: "test/assets/audio/kick.wav"} }
@@ -145,10 +146,10 @@ box { audio { master { Meter: {} } } }
 // 6. A stinger on the SFX bus, on the next bar after a pickup in the game
 prefab Stinger {
   Output: {bus: sfx}
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.8, curve: 3}
-  root { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.4} }
-  fifth { SynthOscillator: {wave: SynthSine, frequency: 1318.5, level: 0.3} }
+  Sound: {}
+  Envelope: {attack: 0.002, decay: 0.8, curve: 3}
+  root { Oscillator: {wave: Triangle, frequency: 880, level: 0.4} }
+  fifth { Oscillator: {wave: Sine, frequency: 1318.5, level: 0.3} }
 }
 
 // The game event: the game raises count by one per pickup (a script, the REST API, the set

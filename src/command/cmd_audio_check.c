@@ -961,7 +961,7 @@ static void box_cmd_check_instruments(
         {
             char *sound = ecs_get_path(world, in->sound);
             box_cmd_check_add(c, BOX_CMD_CHECK_ERROR, "instrument-sound", where,
-                "its sound %s has no SynthSound, Pcm or SoundFile, so its notes are "
+                "its sound %s has no synth.Sound, Pcm or SoundFile, so its notes are "
                 "silent; point Instrument.sound at a sound", sound);
             ecs_os_free(sound);
         }

@@ -1569,6 +1569,7 @@ void box_audio_sync_init(
         .ctx = state
     });
 
+    ecs_entity_t scope = box_audio_synth_scope_push(world);
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "WavetableChange" }),
         .query.flags = EcsQueryMatchPrefab,
@@ -1581,11 +1582,13 @@ void box_audio_sync_init(
     box_audio_wavetable_init(world, state);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "SynthRemove" }),
+        .entity = ecs_entity(world, { .name = "SoundRemove" }),
         .query.flags = EcsQueryMatchPrefab,
         .query.terms = {{ .id = ecs_id(SynthSound), .src.id = EcsSelf }},
         .events = { EcsOnRemove },
         .callback = BoxAudioPcmChange,
         .ctx = state
     });
+
+    box_audio_synth_scope_pop(world, scope);
 }

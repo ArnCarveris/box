@@ -1,17 +1,18 @@
 // The sounds the SynthSync suite of test/cpu/audio measures hard sync from script with.
 using box.audio
+using box.audio.synth
 
 // A sync lead: a saw at 220 Hz synced at a ratio of 2.5, which an LFO sweeps by an octave
 prefab SyncLead {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.7, hold: 0.3, release: 0.1}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.3, sync: 2.5}
-  SynthLfo: {wave: SynthLfoTriangle, rate: 2, hard_sync: 12}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.1, sustain: 0.7, hold: 0.3, release: 0.1}
+  Oscillator: {wave: Saw, frequency: 220, level: 0.3, sync: 2.5}
+  Lfo: {wave: LfoTriangle, rate: 2, hard_sync: 12}
 }
 
 // The defaults: no sync
 prefab Plain {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
-  SynthOscillator: {frequency: 440, level: 0.3}
+  Sound: {}
+  Envelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
+  Oscillator: {frequency: 440, level: 0.3}
 }

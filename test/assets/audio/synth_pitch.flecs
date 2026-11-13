@@ -1,29 +1,30 @@
 // The sounds the SynthPitch suite of test/cpu/audio measures the pitch envelope from script with.
 using box.audio
+using box.audio.synth
 
 // A kick: a sine that starts three octaves up and drops to its note, fast at first
 prefab Kick {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
-  SynthPitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
-  SynthOscillator: {frequency: 50, level: 0.8}
+  Sound: {}
+  Envelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.05, curve: 4}
+  PitchEnvelope: {amount: 36, decay: 0.08, curve: 6}
+  Oscillator: {frequency: 50, level: 0.8}
 }
 
 // A sync zap: a sine under a synced saw whose own pitch envelope blips its pitch, sweeps its
 // ratio of sync and drops it an octave over the release; the sine keeps its note
 prefab SyncZap {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.2}
-  SynthOscillator: {frequency: 110, level: 0.2}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.2}
+  Oscillator: {frequency: 110, level: 0.2}
   lead {
-    SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.3, sync: 2}
-    SynthPitchEnvelope: {amount: 12, decay: 0.3, release_amount: -12, sync: 24}
+    Oscillator: {wave: Saw, frequency: 220, level: 0.3, sync: 2}
+    PitchEnvelope: {amount: 12, decay: 0.3, release_amount: -12, sync: 24}
   }
 }
 
 // The defaults: no pitch envelope
 prefab Plain {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
-  SynthOscillator: {frequency: 440, level: 0.3}
+  Sound: {}
+  Envelope: {attack: 0.005, sustain: 1, hold: 0.1, release: 0.05}
+  Oscillator: {frequency: 440, level: 0.3}
 }

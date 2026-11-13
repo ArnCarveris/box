@@ -12,6 +12,7 @@ using box.input
 using box.animation
 using box.curve
 using box.audio
+using box.audio.synth
 using state
 using assets
 
@@ -779,23 +780,23 @@ isle_creature_audio {
   }
   prefab whale_call {
     Output: {bus: deep}
-    SynthSound: {seed: 91, drift: 9}
-    SynthEnvelope: {attack: 0.55, decay: 0.5, sustain: 0.8, release: 1.6, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1500, resonance: 0.25}
-    SynthPitchEnvelope: {amount: -7, decay: 1.3, curve: -2, release_amount: -5}
-    SynthLfo: {wave: SynthLfoSine, rate: 4.2, cutoff: 0.25, amplitude: 0.12}
+    Sound: {seed: 91, drift: 9}
+    Envelope: {attack: 0.55, decay: 0.5, sustain: 0.8, release: 1.6, curve: 2}
+    Filter: {kind: LowPass, cutoff: 1500, resonance: 0.25}
+    PitchEnvelope: {amount: -7, decay: 1.3, curve: -2, release_amount: -5}
+    Lfo: {wave: LfoSine, rate: 4.2, cutoff: 0.25, amplitude: 0.12}
     moan {
-      SynthOscillator: {frequency: 440, level: 0.34}
-      SynthUnison: {voices: 2, detune: 9, width: 0.6}
+      Oscillator: {frequency: 440, level: 0.34}
+      Unison: {voices: 2, detune: 9, width: 0.6}
     }
-    throat { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.1} }
+    throat { Oscillator: {wave: Triangle, frequency: 880, level: 0.1} }
     cry {
-      SynthOscillator: {frequency: 1320, level: 0.035}
-      SynthEnvelope: {attack: 0.9, decay: 0.8, sustain: 0.5, release: 1.2}
+      Oscillator: {frequency: 1320, level: 0.035}
+      Envelope: {attack: 0.9, decay: 0.8, sustain: 0.5, release: 1.2}
     }
     breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.03}
-      SynthEnvelope: {attack: 0.3, decay: 0.6, sustain: 0.3, release: 0.8}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.03}
+      Envelope: {attack: 0.3, decay: 0.6, sustain: 0.3, release: 0.8}
     }
   }
   whale_voice { Instrument: {sound: whale_call, velocity_curve: 1} }

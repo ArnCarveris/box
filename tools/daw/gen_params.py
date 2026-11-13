@@ -21,11 +21,19 @@ UNITS = [
 NAMES = {"AudioSong": "SongFile"}
 
 
+# Components of box.audio.synth, named relative to box.audio
+SYNTH = ("Wavetable", "WavetableKind")
+
+
 def script_name(name):
     if name in NAMES:
         return NAMES[name]
     if name.startswith("Audio") and name[5:6].isupper():
         return name[5:]
+    if name.startswith("Synth") and name[5:6].isupper():
+        return "synth." + name[5:]
+    if name in SYNTH:
+        return "synth." + name
     return name
 
 

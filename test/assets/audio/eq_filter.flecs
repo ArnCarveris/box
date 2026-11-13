@@ -13,5 +13,5 @@ vocals {
 
 music {
   Bus: {output: master, effects: [music]}
-  Filter: {cutoff: 400, resonance: 0.3, slope: SynthSlope24}
+  Filter: {cutoff: 400, resonance: 0.3, slope: Slope24}
 }

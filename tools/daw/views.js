@@ -664,7 +664,7 @@ V.cardFor = (path, comp, opts) => {
   opts = Object.assign({}, opts);
   const s = DAW.short(comp);
   if (s === "Equalizer" || s === "Filter") opts.graph = ED.responseGraph(path, comp);
-  if (/Envelope$/.test(s) && s !== "SynthPitchEnvelope") opts.graph = ED.envelopeGraph(path, comp);
+  if (/Envelope$/.test(s) && s !== "synth.PitchEnvelope") opts.graph = ED.envelopeGraph(path, comp);
   return UI.card(path, comp, opts);
 };
 
@@ -722,7 +722,7 @@ V.synthEditor = (soundPath) => {
   const cards = UI.el("div", { class: "chain" });
   for (const comp of Object.keys(rec.comps)) {
     if (DAW.hidden(comp) || rec.comps[comp] === null || comp === A + "Pcm") continue;
-    cards.appendChild(V.cardFor(soundPath, comp, { title: comp === A + "SynthSound" ? rec.name : null }));
+    cards.appendChild(V.cardFor(soundPath, comp, { title: comp === A + "synth.Sound" ? rec.name : null }));
   }
   wrap.appendChild(UI.el("div", { class: "section-title" }, "Sound " + soundPath));
   wrap.appendChild(cards);

@@ -1,5 +1,6 @@
 // The sounds the SynthWavetable suite of test/cpu/audio plays wavetables from script with.
 using box.audio
+using box.audio.synth
 
 // A built-in table of 32 frames, each with one more harmonic of a saw
 prefab HarmonicsTable {
@@ -8,9 +9,9 @@ prefab HarmonicsTable {
 
 // A pad that opens from frame 2 by 20 frames with its envelope, which an LFO sweeps by 6
 prefab Morph {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.6, hold: 0.2, release: 0.1}
-  SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}
-  SynthTable: {table: HarmonicsTable, position: 2, envelope: 20}
-  SynthLfo: {wave: SynthLfoTriangle, rate: 0.5, position: 6}
+  Sound: {}
+  Envelope: {attack: 0.1, decay: 0.2, sustain: 0.6, hold: 0.2, release: 0.1}
+  Oscillator: {wave: Wavetable, frequency: 220, level: 0.3}
+  Table: {table: HarmonicsTable, position: 2, envelope: 20}
+  Lfo: {wave: LfoTriangle, rate: 0.5, position: 6}
 }

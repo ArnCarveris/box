@@ -499,16 +499,16 @@ function biquadMag(kind, f0, gain, q, f, sr) {
     a0 = (A2 + 1) + s * (A2 - 1) * cs + sq;
     a1 = -s * 2 * ((A2 - 1) + s * (A2 + 1) * cs);
     a2 = (A2 + 1) + s * (A2 - 1) * cs - sq;
-  } else if (kind === "EqLowCut" || kind === "SynthHighPass") {
+  } else if (kind === "EqLowCut" || kind === "HighPass") {
     b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2;
     a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
-  } else if (kind === "EqHighCut" || kind === "SynthLowPass") {
+  } else if (kind === "EqHighCut" || kind === "LowPass") {
     b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2;
     a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
-  } else if (kind === "SynthBandPass") {
+  } else if (kind === "BandPass") {
     b0 = alpha; b1 = 0; b2 = -alpha;
     a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
-  } else if (kind === "SynthNotch") {
+  } else if (kind === "Notch") {
     b0 = 1; b1 = -2 * cs; b2 = 1;
     a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
   } else {
@@ -544,7 +544,7 @@ ED.responseGraph = (path, comp) => {
     } else if (comp === A + "Filter") {
       const q = 0.7071 + (v.resonance || 0) * 8;
       stages.push([v.kind, v.cutoff, 0, q]);
-      if (v.slope === "SynthSlope24") stages.push([v.kind, v.cutoff, 0, 0.7071]);
+      if (v.slope === "Slope24") stages.push([v.kind, v.cutoff, 0, 0.7071]);
     }
     ctx.strokeStyle = "#ff9f2e";
     ctx.lineWidth = 1.5;

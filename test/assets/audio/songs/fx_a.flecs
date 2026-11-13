@@ -1,255 +1,256 @@
 using box.audio
+using box.audio.synth
 
-fx_a_fx_0_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_0_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_0_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_0_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_0_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_0_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_0_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_0_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_0 { Bus: {volume: 0.5, effects: [fx_a_fx_0_0, fx_a_fx_0_1, fx_a_fx_0_2, fx_a_fx_0_3]} }
-fx_a_fx_1_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_1_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_1_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_1_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_1_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_1_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_1_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_1_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_1 { Bus: {volume: 0.5, effects: [fx_a_fx_1_0, fx_a_fx_1_1, fx_a_fx_1_2, fx_a_fx_1_3]} }
-fx_a_fx_2_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_2_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_2_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_2_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_2_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_2_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_2_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_2_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_2 { Bus: {volume: 0.5, effects: [fx_a_fx_2_0, fx_a_fx_2_1, fx_a_fx_2_2, fx_a_fx_2_3]} }
-fx_a_fx_3_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_3_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_3_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_3_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_3_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_3_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_3_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_3_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_3 { Bus: {volume: 0.5, effects: [fx_a_fx_3_0, fx_a_fx_3_1, fx_a_fx_3_2, fx_a_fx_3_3]} }
-fx_a_fx_4_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_4_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_4_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_4_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_4_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_4_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_4_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_4_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_4 { Bus: {volume: 0.5, effects: [fx_a_fx_4_0, fx_a_fx_4_1, fx_a_fx_4_2, fx_a_fx_4_3]} }
-fx_a_fx_5_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_5_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_5_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_5_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_5_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_5_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_5_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_5_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_5 { Bus: {volume: 0.5, effects: [fx_a_fx_5_0, fx_a_fx_5_1, fx_a_fx_5_2, fx_a_fx_5_3]} }
-fx_a_fx_6_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_6_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_6_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_6_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_6_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_6_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_6_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_6_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_6 { Bus: {volume: 0.5, effects: [fx_a_fx_6_0, fx_a_fx_6_1, fx_a_fx_6_2, fx_a_fx_6_3]} }
-fx_a_fx_7_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_7_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_7_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_7_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_7_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_7_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_7_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_7_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_7 { Bus: {volume: 0.5, effects: [fx_a_fx_7_0, fx_a_fx_7_1, fx_a_fx_7_2, fx_a_fx_7_3]} }
-fx_a_fx_8_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_8_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_8_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_8_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_8_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_8_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_8_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_8_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_8 { Bus: {volume: 0.5, effects: [fx_a_fx_8_0, fx_a_fx_8_1, fx_a_fx_8_2, fx_a_fx_8_3]} }
-fx_a_fx_9_0 { Filter: {kind: SynthLowPass, cutoff: 8000} }
-fx_a_fx_9_1 { Filter: {kind: SynthLowPass, cutoff: 8100} }
-fx_a_fx_9_2 { Filter: {kind: SynthLowPass, cutoff: 8200} }
-fx_a_fx_9_3 { Filter: {kind: SynthLowPass, cutoff: 8300} }
+fx_a_fx_9_0 { box.audio.Filter: {kind: LowPass, cutoff: 8000} }
+fx_a_fx_9_1 { box.audio.Filter: {kind: LowPass, cutoff: 8100} }
+fx_a_fx_9_2 { box.audio.Filter: {kind: LowPass, cutoff: 8200} }
+fx_a_fx_9_3 { box.audio.Filter: {kind: LowPass, cutoff: 8300} }
 fx_a_bus_9 { Bus: {volume: 0.5, effects: [fx_a_fx_9_0, fx_a_fx_9_1, fx_a_fx_9_2, fx_a_fx_9_3]} }
 
-prefab fx_a_sound_0 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 200, level: 0.1} }
-prefab fx_a_sound_1 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 201, level: 0.1} }
-prefab fx_a_sound_2 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 202, level: 0.1} }
-prefab fx_a_sound_3 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 203, level: 0.1} }
-prefab fx_a_sound_4 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 204, level: 0.1} }
-prefab fx_a_sound_5 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 205, level: 0.1} }
-prefab fx_a_sound_6 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 206, level: 0.1} }
-prefab fx_a_sound_7 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 207, level: 0.1} }
-prefab fx_a_sound_8 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 208, level: 0.1} }
-prefab fx_a_sound_9 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 209, level: 0.1} }
-prefab fx_a_sound_10 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 210, level: 0.1} }
-prefab fx_a_sound_11 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 211, level: 0.1} }
-prefab fx_a_sound_12 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 212, level: 0.1} }
-prefab fx_a_sound_13 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 213, level: 0.1} }
-prefab fx_a_sound_14 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 214, level: 0.1} }
-prefab fx_a_sound_15 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 215, level: 0.1} }
-prefab fx_a_sound_16 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 216, level: 0.1} }
-prefab fx_a_sound_17 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 217, level: 0.1} }
-prefab fx_a_sound_18 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 218, level: 0.1} }
-prefab fx_a_sound_19 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 219, level: 0.1} }
-prefab fx_a_sound_20 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.1} }
-prefab fx_a_sound_21 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 221, level: 0.1} }
-prefab fx_a_sound_22 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 222, level: 0.1} }
-prefab fx_a_sound_23 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 223, level: 0.1} }
-prefab fx_a_sound_24 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 224, level: 0.1} }
-prefab fx_a_sound_25 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 225, level: 0.1} }
-prefab fx_a_sound_26 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 226, level: 0.1} }
-prefab fx_a_sound_27 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 227, level: 0.1} }
-prefab fx_a_sound_28 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 228, level: 0.1} }
-prefab fx_a_sound_29 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 229, level: 0.1} }
-prefab fx_a_sound_30 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 230, level: 0.1} }
-prefab fx_a_sound_31 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 231, level: 0.1} }
-prefab fx_a_sound_32 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 232, level: 0.1} }
-prefab fx_a_sound_33 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 233, level: 0.1} }
-prefab fx_a_sound_34 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 234, level: 0.1} }
-prefab fx_a_sound_35 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 235, level: 0.1} }
-prefab fx_a_sound_36 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 236, level: 0.1} }
-prefab fx_a_sound_37 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 237, level: 0.1} }
-prefab fx_a_sound_38 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 238, level: 0.1} }
-prefab fx_a_sound_39 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 239, level: 0.1} }
-prefab fx_a_sound_40 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 240, level: 0.1} }
-prefab fx_a_sound_41 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 241, level: 0.1} }
-prefab fx_a_sound_42 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 242, level: 0.1} }
-prefab fx_a_sound_43 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 243, level: 0.1} }
-prefab fx_a_sound_44 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 244, level: 0.1} }
-prefab fx_a_sound_45 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 245, level: 0.1} }
-prefab fx_a_sound_46 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 246, level: 0.1} }
-prefab fx_a_sound_47 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 247, level: 0.1} }
-prefab fx_a_sound_48 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 248, level: 0.1} }
-prefab fx_a_sound_49 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 249, level: 0.1} }
-prefab fx_a_sound_50 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 250, level: 0.1} }
-prefab fx_a_sound_51 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 251, level: 0.1} }
-prefab fx_a_sound_52 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 252, level: 0.1} }
-prefab fx_a_sound_53 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 253, level: 0.1} }
-prefab fx_a_sound_54 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 254, level: 0.1} }
-prefab fx_a_sound_55 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 255, level: 0.1} }
-prefab fx_a_sound_56 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 256, level: 0.1} }
-prefab fx_a_sound_57 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 257, level: 0.1} }
-prefab fx_a_sound_58 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 258, level: 0.1} }
-prefab fx_a_sound_59 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 259, level: 0.1} }
-prefab fx_a_sound_60 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 260, level: 0.1} }
-prefab fx_a_sound_61 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 261, level: 0.1} }
-prefab fx_a_sound_62 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 262, level: 0.1} }
-prefab fx_a_sound_63 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 263, level: 0.1} }
-prefab fx_a_sound_64 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 264, level: 0.1} }
-prefab fx_a_sound_65 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 265, level: 0.1} }
-prefab fx_a_sound_66 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 266, level: 0.1} }
-prefab fx_a_sound_67 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 267, level: 0.1} }
-prefab fx_a_sound_68 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 268, level: 0.1} }
-prefab fx_a_sound_69 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 269, level: 0.1} }
-prefab fx_a_sound_70 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 270, level: 0.1} }
-prefab fx_a_sound_71 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 271, level: 0.1} }
-prefab fx_a_sound_72 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 272, level: 0.1} }
-prefab fx_a_sound_73 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 273, level: 0.1} }
-prefab fx_a_sound_74 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 274, level: 0.1} }
-prefab fx_a_sound_75 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 275, level: 0.1} }
-prefab fx_a_sound_76 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 276, level: 0.1} }
-prefab fx_a_sound_77 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 277, level: 0.1} }
-prefab fx_a_sound_78 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 278, level: 0.1} }
-prefab fx_a_sound_79 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 279, level: 0.1} }
-prefab fx_a_sound_80 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 280, level: 0.1} }
-prefab fx_a_sound_81 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 281, level: 0.1} }
-prefab fx_a_sound_82 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 282, level: 0.1} }
-prefab fx_a_sound_83 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 283, level: 0.1} }
-prefab fx_a_sound_84 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 284, level: 0.1} }
-prefab fx_a_sound_85 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 285, level: 0.1} }
-prefab fx_a_sound_86 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 286, level: 0.1} }
-prefab fx_a_sound_87 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 287, level: 0.1} }
-prefab fx_a_sound_88 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 288, level: 0.1} }
-prefab fx_a_sound_89 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 289, level: 0.1} }
-prefab fx_a_sound_90 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 290, level: 0.1} }
-prefab fx_a_sound_91 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 291, level: 0.1} }
-prefab fx_a_sound_92 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 292, level: 0.1} }
-prefab fx_a_sound_93 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 293, level: 0.1} }
-prefab fx_a_sound_94 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 294, level: 0.1} }
-prefab fx_a_sound_95 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 295, level: 0.1} }
-prefab fx_a_sound_96 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 296, level: 0.1} }
-prefab fx_a_sound_97 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 297, level: 0.1} }
-prefab fx_a_sound_98 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 298, level: 0.1} }
-prefab fx_a_sound_99 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 299, level: 0.1} }
-prefab fx_a_sound_100 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 300, level: 0.1} }
-prefab fx_a_sound_101 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 301, level: 0.1} }
-prefab fx_a_sound_102 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 302, level: 0.1} }
-prefab fx_a_sound_103 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 303, level: 0.1} }
-prefab fx_a_sound_104 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 304, level: 0.1} }
-prefab fx_a_sound_105 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 305, level: 0.1} }
-prefab fx_a_sound_106 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 306, level: 0.1} }
-prefab fx_a_sound_107 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 307, level: 0.1} }
-prefab fx_a_sound_108 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 308, level: 0.1} }
-prefab fx_a_sound_109 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 309, level: 0.1} }
-prefab fx_a_sound_110 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 310, level: 0.1} }
-prefab fx_a_sound_111 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 311, level: 0.1} }
-prefab fx_a_sound_112 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 312, level: 0.1} }
-prefab fx_a_sound_113 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 313, level: 0.1} }
-prefab fx_a_sound_114 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 314, level: 0.1} }
-prefab fx_a_sound_115 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 315, level: 0.1} }
-prefab fx_a_sound_116 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 316, level: 0.1} }
-prefab fx_a_sound_117 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 317, level: 0.1} }
-prefab fx_a_sound_118 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 318, level: 0.1} }
-prefab fx_a_sound_119 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 319, level: 0.1} }
-prefab fx_a_sound_120 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 320, level: 0.1} }
-prefab fx_a_sound_121 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 321, level: 0.1} }
-prefab fx_a_sound_122 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 322, level: 0.1} }
-prefab fx_a_sound_123 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 323, level: 0.1} }
-prefab fx_a_sound_124 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 324, level: 0.1} }
-prefab fx_a_sound_125 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 325, level: 0.1} }
-prefab fx_a_sound_126 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 326, level: 0.1} }
-prefab fx_a_sound_127 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 327, level: 0.1} }
-prefab fx_a_sound_128 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 328, level: 0.1} }
-prefab fx_a_sound_129 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 329, level: 0.1} }
-prefab fx_a_sound_130 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.1} }
-prefab fx_a_sound_131 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 331, level: 0.1} }
-prefab fx_a_sound_132 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 332, level: 0.1} }
-prefab fx_a_sound_133 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 333, level: 0.1} }
-prefab fx_a_sound_134 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 334, level: 0.1} }
-prefab fx_a_sound_135 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 335, level: 0.1} }
-prefab fx_a_sound_136 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 336, level: 0.1} }
-prefab fx_a_sound_137 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 337, level: 0.1} }
-prefab fx_a_sound_138 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 338, level: 0.1} }
-prefab fx_a_sound_139 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 339, level: 0.1} }
-prefab fx_a_sound_140 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 340, level: 0.1} }
-prefab fx_a_sound_141 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 341, level: 0.1} }
-prefab fx_a_sound_142 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 342, level: 0.1} }
-prefab fx_a_sound_143 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 343, level: 0.1} }
-prefab fx_a_sound_144 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 344, level: 0.1} }
-prefab fx_a_sound_145 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 345, level: 0.1} }
-prefab fx_a_sound_146 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 346, level: 0.1} }
-prefab fx_a_sound_147 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 347, level: 0.1} }
-prefab fx_a_sound_148 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 348, level: 0.1} }
-prefab fx_a_sound_149 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 349, level: 0.1} }
-prefab fx_a_sound_150 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 350, level: 0.1} }
-prefab fx_a_sound_151 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 351, level: 0.1} }
-prefab fx_a_sound_152 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 352, level: 0.1} }
-prefab fx_a_sound_153 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 353, level: 0.1} }
-prefab fx_a_sound_154 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 354, level: 0.1} }
-prefab fx_a_sound_155 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 355, level: 0.1} }
-prefab fx_a_sound_156 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 356, level: 0.1} }
-prefab fx_a_sound_157 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 357, level: 0.1} }
-prefab fx_a_sound_158 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 358, level: 0.1} }
-prefab fx_a_sound_159 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 359, level: 0.1} }
-prefab fx_a_sound_160 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 360, level: 0.1} }
-prefab fx_a_sound_161 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 361, level: 0.1} }
-prefab fx_a_sound_162 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 362, level: 0.1} }
-prefab fx_a_sound_163 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 363, level: 0.1} }
-prefab fx_a_sound_164 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 364, level: 0.1} }
-prefab fx_a_sound_165 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 365, level: 0.1} }
-prefab fx_a_sound_166 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 366, level: 0.1} }
-prefab fx_a_sound_167 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 367, level: 0.1} }
-prefab fx_a_sound_168 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 368, level: 0.1} }
-prefab fx_a_sound_169 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 369, level: 0.1} }
-prefab fx_a_sound_170 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 370, level: 0.1} }
-prefab fx_a_sound_171 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 371, level: 0.1} }
-prefab fx_a_sound_172 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 372, level: 0.1} }
-prefab fx_a_sound_173 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 373, level: 0.1} }
-prefab fx_a_sound_174 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 374, level: 0.1} }
-prefab fx_a_sound_175 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 375, level: 0.1} }
-prefab fx_a_sound_176 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 376, level: 0.1} }
-prefab fx_a_sound_177 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 377, level: 0.1} }
-prefab fx_a_sound_178 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 378, level: 0.1} }
-prefab fx_a_sound_179 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 379, level: 0.1} }
-prefab fx_a_sound_180 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 380, level: 0.1} }
-prefab fx_a_sound_181 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 381, level: 0.1} }
-prefab fx_a_sound_182 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 382, level: 0.1} }
-prefab fx_a_sound_183 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 383, level: 0.1} }
-prefab fx_a_sound_184 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 384, level: 0.1} }
-prefab fx_a_sound_185 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 385, level: 0.1} }
-prefab fx_a_sound_186 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 386, level: 0.1} }
-prefab fx_a_sound_187 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 387, level: 0.1} }
-prefab fx_a_sound_188 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 388, level: 0.1} }
-prefab fx_a_sound_189 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 389, level: 0.1} }
-prefab fx_a_sound_190 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 390, level: 0.1} }
-prefab fx_a_sound_191 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 391, level: 0.1} }
-prefab fx_a_sound_192 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 392, level: 0.1} }
-prefab fx_a_sound_193 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 393, level: 0.1} }
-prefab fx_a_sound_194 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 394, level: 0.1} }
-prefab fx_a_sound_195 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 395, level: 0.1} }
-prefab fx_a_sound_196 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 396, level: 0.1} }
-prefab fx_a_sound_197 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 397, level: 0.1} }
-prefab fx_a_sound_198 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 398, level: 0.1} }
-prefab fx_a_sound_199 { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.1}; SynthOscillator: {wave: SynthSine, frequency: 399, level: 0.1} }
+prefab fx_a_sound_0 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 200, level: 0.1} }
+prefab fx_a_sound_1 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 201, level: 0.1} }
+prefab fx_a_sound_2 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 202, level: 0.1} }
+prefab fx_a_sound_3 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 203, level: 0.1} }
+prefab fx_a_sound_4 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 204, level: 0.1} }
+prefab fx_a_sound_5 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 205, level: 0.1} }
+prefab fx_a_sound_6 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 206, level: 0.1} }
+prefab fx_a_sound_7 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 207, level: 0.1} }
+prefab fx_a_sound_8 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 208, level: 0.1} }
+prefab fx_a_sound_9 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 209, level: 0.1} }
+prefab fx_a_sound_10 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 210, level: 0.1} }
+prefab fx_a_sound_11 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 211, level: 0.1} }
+prefab fx_a_sound_12 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 212, level: 0.1} }
+prefab fx_a_sound_13 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 213, level: 0.1} }
+prefab fx_a_sound_14 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 214, level: 0.1} }
+prefab fx_a_sound_15 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 215, level: 0.1} }
+prefab fx_a_sound_16 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 216, level: 0.1} }
+prefab fx_a_sound_17 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 217, level: 0.1} }
+prefab fx_a_sound_18 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 218, level: 0.1} }
+prefab fx_a_sound_19 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 219, level: 0.1} }
+prefab fx_a_sound_20 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 220, level: 0.1} }
+prefab fx_a_sound_21 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 221, level: 0.1} }
+prefab fx_a_sound_22 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 222, level: 0.1} }
+prefab fx_a_sound_23 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 223, level: 0.1} }
+prefab fx_a_sound_24 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 224, level: 0.1} }
+prefab fx_a_sound_25 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 225, level: 0.1} }
+prefab fx_a_sound_26 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 226, level: 0.1} }
+prefab fx_a_sound_27 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 227, level: 0.1} }
+prefab fx_a_sound_28 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 228, level: 0.1} }
+prefab fx_a_sound_29 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 229, level: 0.1} }
+prefab fx_a_sound_30 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 230, level: 0.1} }
+prefab fx_a_sound_31 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 231, level: 0.1} }
+prefab fx_a_sound_32 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 232, level: 0.1} }
+prefab fx_a_sound_33 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 233, level: 0.1} }
+prefab fx_a_sound_34 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 234, level: 0.1} }
+prefab fx_a_sound_35 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 235, level: 0.1} }
+prefab fx_a_sound_36 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 236, level: 0.1} }
+prefab fx_a_sound_37 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 237, level: 0.1} }
+prefab fx_a_sound_38 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 238, level: 0.1} }
+prefab fx_a_sound_39 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 239, level: 0.1} }
+prefab fx_a_sound_40 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 240, level: 0.1} }
+prefab fx_a_sound_41 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 241, level: 0.1} }
+prefab fx_a_sound_42 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 242, level: 0.1} }
+prefab fx_a_sound_43 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 243, level: 0.1} }
+prefab fx_a_sound_44 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 244, level: 0.1} }
+prefab fx_a_sound_45 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 245, level: 0.1} }
+prefab fx_a_sound_46 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 246, level: 0.1} }
+prefab fx_a_sound_47 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 247, level: 0.1} }
+prefab fx_a_sound_48 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 248, level: 0.1} }
+prefab fx_a_sound_49 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 249, level: 0.1} }
+prefab fx_a_sound_50 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 250, level: 0.1} }
+prefab fx_a_sound_51 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 251, level: 0.1} }
+prefab fx_a_sound_52 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 252, level: 0.1} }
+prefab fx_a_sound_53 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 253, level: 0.1} }
+prefab fx_a_sound_54 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 254, level: 0.1} }
+prefab fx_a_sound_55 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 255, level: 0.1} }
+prefab fx_a_sound_56 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 256, level: 0.1} }
+prefab fx_a_sound_57 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 257, level: 0.1} }
+prefab fx_a_sound_58 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 258, level: 0.1} }
+prefab fx_a_sound_59 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 259, level: 0.1} }
+prefab fx_a_sound_60 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 260, level: 0.1} }
+prefab fx_a_sound_61 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 261, level: 0.1} }
+prefab fx_a_sound_62 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 262, level: 0.1} }
+prefab fx_a_sound_63 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 263, level: 0.1} }
+prefab fx_a_sound_64 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 264, level: 0.1} }
+prefab fx_a_sound_65 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 265, level: 0.1} }
+prefab fx_a_sound_66 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 266, level: 0.1} }
+prefab fx_a_sound_67 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 267, level: 0.1} }
+prefab fx_a_sound_68 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 268, level: 0.1} }
+prefab fx_a_sound_69 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 269, level: 0.1} }
+prefab fx_a_sound_70 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 270, level: 0.1} }
+prefab fx_a_sound_71 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 271, level: 0.1} }
+prefab fx_a_sound_72 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 272, level: 0.1} }
+prefab fx_a_sound_73 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 273, level: 0.1} }
+prefab fx_a_sound_74 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 274, level: 0.1} }
+prefab fx_a_sound_75 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 275, level: 0.1} }
+prefab fx_a_sound_76 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 276, level: 0.1} }
+prefab fx_a_sound_77 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 277, level: 0.1} }
+prefab fx_a_sound_78 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 278, level: 0.1} }
+prefab fx_a_sound_79 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 279, level: 0.1} }
+prefab fx_a_sound_80 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 280, level: 0.1} }
+prefab fx_a_sound_81 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 281, level: 0.1} }
+prefab fx_a_sound_82 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 282, level: 0.1} }
+prefab fx_a_sound_83 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 283, level: 0.1} }
+prefab fx_a_sound_84 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 284, level: 0.1} }
+prefab fx_a_sound_85 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 285, level: 0.1} }
+prefab fx_a_sound_86 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 286, level: 0.1} }
+prefab fx_a_sound_87 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 287, level: 0.1} }
+prefab fx_a_sound_88 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 288, level: 0.1} }
+prefab fx_a_sound_89 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 289, level: 0.1} }
+prefab fx_a_sound_90 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 290, level: 0.1} }
+prefab fx_a_sound_91 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 291, level: 0.1} }
+prefab fx_a_sound_92 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 292, level: 0.1} }
+prefab fx_a_sound_93 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 293, level: 0.1} }
+prefab fx_a_sound_94 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 294, level: 0.1} }
+prefab fx_a_sound_95 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 295, level: 0.1} }
+prefab fx_a_sound_96 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 296, level: 0.1} }
+prefab fx_a_sound_97 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 297, level: 0.1} }
+prefab fx_a_sound_98 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 298, level: 0.1} }
+prefab fx_a_sound_99 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 299, level: 0.1} }
+prefab fx_a_sound_100 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 300, level: 0.1} }
+prefab fx_a_sound_101 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 301, level: 0.1} }
+prefab fx_a_sound_102 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 302, level: 0.1} }
+prefab fx_a_sound_103 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 303, level: 0.1} }
+prefab fx_a_sound_104 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 304, level: 0.1} }
+prefab fx_a_sound_105 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 305, level: 0.1} }
+prefab fx_a_sound_106 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 306, level: 0.1} }
+prefab fx_a_sound_107 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 307, level: 0.1} }
+prefab fx_a_sound_108 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 308, level: 0.1} }
+prefab fx_a_sound_109 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 309, level: 0.1} }
+prefab fx_a_sound_110 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 310, level: 0.1} }
+prefab fx_a_sound_111 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 311, level: 0.1} }
+prefab fx_a_sound_112 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 312, level: 0.1} }
+prefab fx_a_sound_113 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 313, level: 0.1} }
+prefab fx_a_sound_114 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 314, level: 0.1} }
+prefab fx_a_sound_115 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 315, level: 0.1} }
+prefab fx_a_sound_116 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 316, level: 0.1} }
+prefab fx_a_sound_117 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 317, level: 0.1} }
+prefab fx_a_sound_118 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 318, level: 0.1} }
+prefab fx_a_sound_119 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 319, level: 0.1} }
+prefab fx_a_sound_120 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 320, level: 0.1} }
+prefab fx_a_sound_121 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 321, level: 0.1} }
+prefab fx_a_sound_122 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 322, level: 0.1} }
+prefab fx_a_sound_123 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 323, level: 0.1} }
+prefab fx_a_sound_124 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 324, level: 0.1} }
+prefab fx_a_sound_125 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 325, level: 0.1} }
+prefab fx_a_sound_126 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 326, level: 0.1} }
+prefab fx_a_sound_127 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 327, level: 0.1} }
+prefab fx_a_sound_128 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 328, level: 0.1} }
+prefab fx_a_sound_129 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 329, level: 0.1} }
+prefab fx_a_sound_130 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 330, level: 0.1} }
+prefab fx_a_sound_131 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 331, level: 0.1} }
+prefab fx_a_sound_132 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 332, level: 0.1} }
+prefab fx_a_sound_133 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 333, level: 0.1} }
+prefab fx_a_sound_134 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 334, level: 0.1} }
+prefab fx_a_sound_135 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 335, level: 0.1} }
+prefab fx_a_sound_136 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 336, level: 0.1} }
+prefab fx_a_sound_137 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 337, level: 0.1} }
+prefab fx_a_sound_138 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 338, level: 0.1} }
+prefab fx_a_sound_139 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 339, level: 0.1} }
+prefab fx_a_sound_140 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 340, level: 0.1} }
+prefab fx_a_sound_141 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 341, level: 0.1} }
+prefab fx_a_sound_142 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 342, level: 0.1} }
+prefab fx_a_sound_143 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 343, level: 0.1} }
+prefab fx_a_sound_144 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 344, level: 0.1} }
+prefab fx_a_sound_145 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 345, level: 0.1} }
+prefab fx_a_sound_146 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 346, level: 0.1} }
+prefab fx_a_sound_147 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 347, level: 0.1} }
+prefab fx_a_sound_148 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 348, level: 0.1} }
+prefab fx_a_sound_149 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 349, level: 0.1} }
+prefab fx_a_sound_150 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 350, level: 0.1} }
+prefab fx_a_sound_151 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 351, level: 0.1} }
+prefab fx_a_sound_152 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 352, level: 0.1} }
+prefab fx_a_sound_153 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 353, level: 0.1} }
+prefab fx_a_sound_154 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 354, level: 0.1} }
+prefab fx_a_sound_155 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 355, level: 0.1} }
+prefab fx_a_sound_156 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 356, level: 0.1} }
+prefab fx_a_sound_157 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 357, level: 0.1} }
+prefab fx_a_sound_158 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 358, level: 0.1} }
+prefab fx_a_sound_159 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 359, level: 0.1} }
+prefab fx_a_sound_160 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 360, level: 0.1} }
+prefab fx_a_sound_161 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 361, level: 0.1} }
+prefab fx_a_sound_162 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 362, level: 0.1} }
+prefab fx_a_sound_163 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 363, level: 0.1} }
+prefab fx_a_sound_164 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 364, level: 0.1} }
+prefab fx_a_sound_165 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 365, level: 0.1} }
+prefab fx_a_sound_166 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 366, level: 0.1} }
+prefab fx_a_sound_167 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 367, level: 0.1} }
+prefab fx_a_sound_168 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 368, level: 0.1} }
+prefab fx_a_sound_169 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 369, level: 0.1} }
+prefab fx_a_sound_170 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 370, level: 0.1} }
+prefab fx_a_sound_171 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 371, level: 0.1} }
+prefab fx_a_sound_172 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 372, level: 0.1} }
+prefab fx_a_sound_173 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 373, level: 0.1} }
+prefab fx_a_sound_174 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 374, level: 0.1} }
+prefab fx_a_sound_175 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 375, level: 0.1} }
+prefab fx_a_sound_176 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 376, level: 0.1} }
+prefab fx_a_sound_177 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 377, level: 0.1} }
+prefab fx_a_sound_178 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 378, level: 0.1} }
+prefab fx_a_sound_179 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 379, level: 0.1} }
+prefab fx_a_sound_180 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 380, level: 0.1} }
+prefab fx_a_sound_181 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 381, level: 0.1} }
+prefab fx_a_sound_182 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 382, level: 0.1} }
+prefab fx_a_sound_183 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 383, level: 0.1} }
+prefab fx_a_sound_184 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 384, level: 0.1} }
+prefab fx_a_sound_185 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 385, level: 0.1} }
+prefab fx_a_sound_186 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 386, level: 0.1} }
+prefab fx_a_sound_187 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 387, level: 0.1} }
+prefab fx_a_sound_188 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 388, level: 0.1} }
+prefab fx_a_sound_189 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 389, level: 0.1} }
+prefab fx_a_sound_190 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 390, level: 0.1} }
+prefab fx_a_sound_191 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 391, level: 0.1} }
+prefab fx_a_sound_192 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 392, level: 0.1} }
+prefab fx_a_sound_193 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 393, level: 0.1} }
+prefab fx_a_sound_194 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 394, level: 0.1} }
+prefab fx_a_sound_195 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 395, level: 0.1} }
+prefab fx_a_sound_196 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 396, level: 0.1} }
+prefab fx_a_sound_197 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 397, level: 0.1} }
+prefab fx_a_sound_198 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 398, level: 0.1} }
+prefab fx_a_sound_199 { Sound: {}; Envelope: {attack: 0.01, decay: 0.1}; Oscillator: {wave: Sine, frequency: 399, level: 0.1} }
 
 $ { Song: {title: "Effects A", tempo: 120, beats: 8, lanes: [{name: "First", bus: fx_a_bus_0}]} }

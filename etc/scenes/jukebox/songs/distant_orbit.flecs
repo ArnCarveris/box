@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {130, 160, 255} } } }
@@ -15,62 +16,62 @@ assets {
   }
 
   prefab orbit_cloud {
-    SynthSound: {seed: 59}
-    SynthEnvelope: {attack: 3, decay: 2, sustain: 0.75, release: 4}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.08}
-    SynthLfo: {rate: 0.07, random_phase: true, cutoff: 0.35, amplitude: 0.12}
+    Sound: {seed: 59}
+    Envelope: {attack: 3, decay: 2, sustain: 0.75, release: 4}
+    Filter: {kind: LowPass, cutoff: 1200, resonance: 0.08}
+    Lfo: {rate: 0.07, random_phase: true, cutoff: 0.35, amplitude: 0.12}
     body {
-      SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.22}
-      SynthUnison: {voices: 3, detune: 9, width: 0.85}
+      Oscillator: {wave: Triangle, frequency: 440, level: 0.22}
+      Unison: {voices: 3, detune: 9, width: 0.85}
     }
-    air { SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.035} }
+    air { Oscillator: {wave: Sine, frequency: 880, level: 0.035} }
   }
 
   prefab orbit_floor {
-    SynthSound: {}
-    SynthEnvelope: {attack: 2, decay: 1, sustain: 0.8, release: 4}
-    SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.32}
+    Sound: {}
+    Envelope: {attack: 2, decay: 1, sustain: 0.8, release: 4}
+    Oscillator: {wave: Sine, frequency: 440, level: 0.32}
   }
 
   prefab orbit_signal {
-    SynthSound: {seed: 61, level_variance: 0.04}
-    SynthEnvelope: {attack: 1.8, decay: 10, curve: 0.6}
-    SynthFilter: {kind: SynthLowPass, cutoff: 6500}
+    Sound: {seed: 61, level_variance: 0.04}
+    Envelope: {attack: 1.8, decay: 10, curve: 0.6}
+    Filter: {kind: LowPass, cutoff: 6500}
     body {
-      SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.26}
-      SynthUnison: {voices: 2, detune: 4, width: 0.65}
+      Oscillator: {wave: Sine, frequency: 440, level: 0.26}
+      Unison: {voices: 2, detune: 4, width: 0.65}
       overtone {
-        SynthOscillator: {frequency: 1232, modulation: SynthPhase, index: 1.4}
-        SynthEnvelope: {attack: 2.2, decay: 3.5, curve: 2}
+        Oscillator: {frequency: 1232, modulation: Phase, index: 1.4}
+        Envelope: {attack: 2.2, decay: 3.5, curve: 2}
       }
     }
     halo {
-      SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.065}
-      SynthEnvelope: {attack: 2.6, decay: 11, curve: 0.8}
-      SynthUnison: {voices: 2, detune: 7, width: 1}
-      SynthLfo: {rate: 0.16, random_phase: true, amplitude: 0.15}
+      Oscillator: {wave: Sine, frequency: 880, level: 0.065}
+      Envelope: {attack: 2.6, decay: 11, curve: 0.8}
+      Unison: {voices: 2, detune: 7, width: 1}
+      Lfo: {rate: 0.16, random_phase: true, amplitude: 0.15}
     }
     glass {
-      SynthOscillator: {wave: SynthSine, frequency: 1848, level: 0.035}
-      SynthEnvelope: {attack: 2, decay: 2.8, curve: 2}
+      Oscillator: {wave: Sine, frequency: 1848, level: 0.035}
+      Envelope: {attack: 2, decay: 2.8, curve: 2}
     }
   }
 
   prefab orbit_voice {
-    SynthSound: {seed: 67, level_variance: 0.025}
-    SynthEnvelope: {attack: 0.8, decay: 1.2, sustain: 0.7, release: 2.5}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2100, resonance: 0.12}
-    SynthFilterEnvelope: {attack: 1.5, decay: 2, sustain: 0.25, release: 2, amount: 0.6}
-    SynthLfo: {rate: 4.1, delay: 0.7, fade: 1.5, pitch: 5}
+    Sound: {seed: 67, level_variance: 0.025}
+    Envelope: {attack: 0.8, decay: 1.2, sustain: 0.7, release: 2.5}
+    Filter: {kind: LowPass, cutoff: 2100, resonance: 0.12}
+    FilterEnvelope: {attack: 1.5, decay: 2, sustain: 0.25, release: 2, amount: 0.6}
+    Lfo: {rate: 4.1, delay: 0.7, fade: 1.5, pitch: 5}
     reed {
-      SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.24}
-      SynthUnison: {voices: 3, detune: 6, width: 0.45}
+      Oscillator: {wave: Triangle, frequency: 440, level: 0.24}
+      Unison: {voices: 3, detune: 6, width: 0.45}
     }
     breath {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.045}
-      SynthLfo: {rate: 0.13, random_phase: true, amplitude: 0.18}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.045}
+      Lfo: {rate: 0.13, random_phase: true, amplitude: 0.18}
     }
-    warmth { SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.05} }
+    warmth { Oscillator: {wave: Sine, frequency: 220, level: 0.05} }
   }
 
   orbit_voice_inst { Instrument: {sound: orbit_voice} }

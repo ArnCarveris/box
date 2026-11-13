@@ -461,6 +461,24 @@ void box_audio_sync_init(
     ecs_world_t *world,
     box_audio_module_t *state);
 
+/** Make box.audio.synth, a child module of box.audio, the scope of new entities and Synth
+ * their name prefix, creating it the first time.
+ *
+ * @param world The world
+ * @return The scope before, for box_audio_synth_scope_pop
+ */
+ecs_entity_t box_audio_synth_scope_push(
+    ecs_world_t *world);
+
+/** Restore the scope of box_audio_synth_scope_push and the Audio name prefix.
+ *
+ * @param world The world
+ * @param scope The scope before
+ */
+void box_audio_synth_scope_pop(
+    ecs_world_t *world,
+    ecs_entity_t scope);
+
 /** Register the observers that mark a synth sound for a new compile when a component of it
  * or of one of its layers changes.
  *

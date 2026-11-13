@@ -2,23 +2,24 @@
 // sweeps its ratio and whose first LFO moves the vowel of its formant filter, with a wavetable
 // layer that a route of its own makes brighter at a high velocity.
 using box.audio
+using box.audio.synth
 
 prefab TargetsTable {
   Wavetable: {kind: WavetableHarmonics}
 }
 
 targets_lead {
-  SynthSound: {seed: 7}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.5, release: 0.05}
-  SynthFilter: {kind: SynthFormant, vowel: 1}
-  SynthModEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.4, sync: 2}
-  SynthLfo: {rate: 3}
-  sweep { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetHardSync, amount: 12} }
-  talk { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetVowel, amount: 1.5} }
+  Sound: {seed: 7}
+  Envelope: {attack: 0.005, sustain: 1, hold: 0.5, release: 0.05}
+  Filter: {kind: Formant, vowel: 1}
+  ModEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1}
+  Oscillator: {wave: Saw, frequency: 220, level: 0.4, sync: 2}
+  Lfo: {rate: 3}
+  sweep { ModRoute: {source: SourceModEnvelope, target: TargetHardSync, amount: 12} }
+  talk { ModRoute: {source: SourceLfo1, target: TargetVowel, amount: 1.5} }
   bright {
-    SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.2}
-    SynthTable: {table: TargetsTable}
-    open { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetPosition, amount: 3} }
+    Oscillator: {wave: Wavetable, frequency: 220, level: 0.2}
+    Table: {table: TargetsTable}
+    open { ModRoute: {source: SourceVelocity, target: TargetPosition, amount: 3} }
   }
 }

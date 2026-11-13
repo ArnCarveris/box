@@ -1,6 +1,7 @@
 // The glide example of docs/audio.md, kept the same, then the sounds the Synth suite of
 // test/cpu/audio measures glides and legato notes with.
 using box.audio
+using box.audio.synth
 
 music { Bus: {volume: 1} }
 
@@ -8,12 +9,12 @@ music { Bus: {volume: 1} }
 template Lead {
   prop f: f32 = 220
   Output: {bus: music}
-  SynthSound: {}
-  SynthGlide: {time: 0.08, legato: true, channel: 1}
-  SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.25, curve: 2}
-  SynthFilter: {kind: SynthLowPass, cutoff: 1800, resonance: 0.2}
-  saw { SynthOscillator: {wave: SynthSaw, frequency: f, level: 0.3} }
-  sub { SynthOscillator: {wave: SynthSine, frequency: f * 0.5, level: 0.2} }
+  Sound: {}
+  Glide: {time: 0.08, legato: true, channel: 1}
+  Envelope: {attack: 0.01, decay: 0.2, sustain: 0.6, hold: 0.3, release: 0.25, curve: 2}
+  Filter: {kind: LowPass, cutoff: 1800, resonance: 0.2}
+  saw { Oscillator: {wave: Saw, frequency: f, level: 0.3} }
+  sub { Oscillator: {wave: Sine, frequency: f * 0.5, level: 0.2} }
 }
 
 Lead lead_a3(f: 220)
@@ -24,18 +25,18 @@ Lead lead_e4(f: 329.63)
 // pitch glides over 0.2 s
 template GlideNote {
   prop f: f32 = 300
-  SynthSound: {}
-  SynthGlide: {time: 0.1, legato: true, channel: 2}
-  SynthEnvelope: {attack: 0.01, decay: 0.05, sustain: 0.8, hold: 1.0, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: f, level: 0.5}
+  Sound: {}
+  Glide: {time: 0.1, legato: true, channel: 2}
+  Envelope: {attack: 0.01, decay: 0.05, sustain: 0.8, hold: 1.0, release: 0.05}
+  Oscillator: {wave: Sine, frequency: f, level: 0.5}
 }
 
 GlideNote glide_low(f: 300)
 GlideNote glide_high(f: 450)
 
 prefab Slide {
-  SynthSound: {}
-  SynthGlide: {time: 0.2}
-  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 2, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 300, level: 0.5}
+  Sound: {}
+  Glide: {time: 0.2}
+  Envelope: {attack: 0.01, sustain: 1, hold: 2, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 300, level: 0.5}
 }

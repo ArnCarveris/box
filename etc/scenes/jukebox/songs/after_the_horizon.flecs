@@ -10,6 +10,7 @@
 //              88-96 drop B | 96-104 halftime response | 104-112 outro.
 // Usage in the host: audio song /path/to/after_the_horizon_arrangement_remix.flecs ; audio play
 using box.audio
+using box.audio.synth
 using box.material
 const hzn_tempo = 122
 const hzn_bar = 4
@@ -23,8 +24,8 @@ assets {
     Bus: {output: master, volume: 0.84, kind: ChannelGroup, effects: [hzn_master_shelf, hzn_glue]}
     Meter: {}
   }
-  hzn_hall_hp { Filter: {kind: SynthHighPass, cutoff: 240, resonance: 0.08, slope: SynthSlope24} }
-  hzn_echo_hp { Filter: {kind: SynthHighPass, cutoff: 275, resonance: 0.06, slope: SynthSlope12} }
+  hzn_hall_hp { box.audio.Filter: {kind: HighPass, cutoff: 240, resonance: 0.08, slope: Slope24} }
+  hzn_echo_hp { box.audio.Filter: {kind: HighPass, cutoff: 275, resonance: 0.06, slope: Slope12} }
   hzn_hall {
     Bus: {output: hzn_mix, volume: 0.66, kind: ChannelReturn, effects: [hzn_hall, hzn_hall_hp]}
     Reverb: {decay: 4.1, damping: 0.51, predelay: 0.045, size: 0.91, mix: 1, shimmer: 0.08, shimmer_pitch: 12}
@@ -39,243 +40,243 @@ assets {
     Bus: {output: hzn_mix, volume: 0.76, kind: ChannelGroup, effects: [hzn_drum_sculpt, hzn_drum_sat]}
     Meter: {}
   }
-  hzn_bass_hp { Filter: {kind: SynthHighPass, cutoff: 28, resonance: 0.06, slope: SynthSlope24} }
+  hzn_bass_hp { box.audio.Filter: {kind: HighPass, cutoff: 28, resonance: 0.06, slope: Slope24} }
   hzn_bass_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 27}, {kind: EqPeak, frequency: 245, gain: -3.3, q: 1.1}, {kind: EqHighCut, frequency: 900}, {kind: EqOff, frequency: 16000}]} }
-  hzn_bass_lp { Filter: {kind: SynthLowPass, cutoff: 640, resonance: 0.10, slope: SynthSlope24} }
+  hzn_bass_lp { box.audio.Filter: {kind: LowPass, cutoff: 640, resonance: 0.10, slope: Slope24} }
   // Growl occupies the mid-bass above the sub rather than muddying the kick fundamental.
-  hzn_growl_hp { Filter: {kind: SynthHighPass, cutoff: 118, resonance: 0.10, slope: SynthSlope24} }
-  hzn_growl_lp { Filter: {kind: SynthLowPass, cutoff: 1900, resonance: 0.29, slope: SynthSlope24} }
+  hzn_growl_hp { box.audio.Filter: {kind: HighPass, cutoff: 118, resonance: 0.10, slope: Slope24} }
+  hzn_growl_lp { box.audio.Filter: {kind: LowPass, cutoff: 1900, resonance: 0.29, slope: Slope24} }
   hzn_growl_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 112}, {kind: EqPeak, frequency: 280, gain: -2.7, q: 1.15}, {kind: EqPeak, frequency: 950, gain: 2.0, q: 0.85}, {kind: EqHighCut, frequency: 6200}]} }
   hzn_growl_sat { Saturator: {drive: 0.37, asymmetry: 0.13, mode: SaturatorTube, mix: 0.83, low_cut: 110, high_cut: 6000} }
   hzn_growl_gate { PatternGate: {steps: [0.4, 1, 0.7, 0.95, 0.45, 1, 0.75, 0.35, 0.45, 1, 0.8, 0.95, 0.4, 1, 0.75, 0.55], length: 16, rate: 0.25, swing: 0.04, attack: 0.004, release: 0.065, gate: 0.84, floor: -13, mix: 0.5} }
-  hzn_pad_hp { Filter: {kind: SynthHighPass, cutoff: 175, resonance: 0.07, slope: SynthSlope24} }
+  hzn_pad_hp { box.audio.Filter: {kind: HighPass, cutoff: 175, resonance: 0.07, slope: Slope24} }
   hzn_pad_gate { PatternGate: {steps: [1, 0.22, 0.7, 0.25, 0.9, 0.28, 0.78, 0.25, 1, 0.22, 0.67, 0.3, 0.9, 0.28, 0.72, 0.4], length: 16, rate: 0.25, attack: 0.009, release: 0.105, gate: 0.77, floor: -17, mix: 0} }
   hzn_kick_eq { Equalizer: {bands: [{kind: EqLowCut, frequency: 27}, {kind: EqPeak, frequency: 57, gain: 1.4, q: 1.2}, {kind: EqPeak, frequency: 270, gain: -1.6, q: 1.1}, {kind: EqHighShelf, frequency: 5500, gain: 0.8, q: 0.707}]} }
-  hzn_pad_lp { Filter: {kind: SynthLowPass, cutoff: 2800, resonance: 0.14} }
+  hzn_pad_lp { box.audio.Filter: {kind: LowPass, cutoff: 2800, resonance: 0.14} }
   hzn_pad_chorus { Chorus: {voices: 3, rate: 0.23, depth: 5, delay: 17, mix: 0.48, spread: 0.85} }
-  hzn_arp_filter { Filter: {kind: SynthLowPass, cutoff: 4300, resonance: 0.36} }
+  hzn_arp_filter { box.audio.Filter: {kind: LowPass, cutoff: 4300, resonance: 0.36} }
   hzn_arp_phaser { Phaser: {stages: 6, rate: 0.12, depth: 0.6, center: 1100, feedback: 0.15, mix: 0.37, stereo: 0.65} }
-  hzn_haze_filter { Filter: {kind: SynthHighPass, cutoff: 310, resonance: 0.06} }
-  hzn_riser_filter { Filter: {kind: SynthHighPass, cutoff: 180, resonance: 0.32} }
-  hzn_riser_wobble { Modulator: {target: hzn_riser_filter, component: Filter, member: "cutoff",
+  hzn_haze_filter { box.audio.Filter: {kind: HighPass, cutoff: 310, resonance: 0.06} }
+  hzn_riser_filter { box.audio.Filter: {kind: HighPass, cutoff: 180, resonance: 0.32} }
+  hzn_riser_wobble { Modulator: {target: hzn_riser_filter, component: box.audio.Filter, member: "cutoff",
     wave: ModTriangle, scale: ModOctaves, depth: 1, sync: 0.25} }
 
   // Air-pad tone stays in the upper-midrange, away from kick and bass fundamentals.
-  hzn_air_hp { Filter: {kind: SynthHighPass, cutoff: 290, resonance: 0.06, slope: SynthSlope12} }
-  hzn_air_lp { Filter: {kind: SynthLowPass, cutoff: 3850, resonance: 0.08, slope: SynthSlope12} }
+  hzn_air_hp { box.audio.Filter: {kind: HighPass, cutoff: 290, resonance: 0.06, slope: Slope12} }
+  hzn_air_lp { box.audio.Filter: {kind: LowPass, cutoff: 3850, resonance: 0.08, slope: Slope12} }
   hzn_air_chorus { Chorus: {voices: 2, rate: 0.19, depth: 3.5, delay: 16, mix: 0.35, spread: 0.7} }
 
 
   // Collective musical bus filter: DJ-style sweeps apply to chords, pads, and motifs
   // while the kick and sub remain dry, so the drops regain real full-band punch.
-  hzn_music_lp { Filter: {kind: SynthLowPass, cutoff: 15500, resonance: 0.16, slope: SynthSlope24} }
+  hzn_music_lp { box.audio.Filter: {kind: LowPass, cutoff: 15500, resonance: 0.16, slope: Slope24} }
   hzn_music_bus {
     Bus: {output: hzn_mix, volume: 0.95, kind: ChannelGroup, effects: [hzn_music_lp]}
     Meter: {}
   }
   // An additional filter is automated separately on the new harmonic stabs.
-  hzn_stab_hp { Filter: {kind: SynthHighPass, cutoff: 250, resonance: 0.08, slope: SynthSlope24} }
-  hzn_stab_lp { Filter: {kind: SynthLowPass, cutoff: 3400, resonance: 0.28, slope: SynthSlope24} }
+  hzn_stab_hp { box.audio.Filter: {kind: HighPass, cutoff: 250, resonance: 0.08, slope: Slope24} }
+  hzn_stab_lp { box.audio.Filter: {kind: LowPass, cutoff: 3400, resonance: 0.28, slope: Slope24} }
   hzn_stab_chorus { Chorus: {voices: 2, rate: 0.17, depth: 2.2, delay: 12, mix: 0.26, spread: 0.6} }
-  hzn_choir_hp { Filter: {kind: SynthHighPass, cutoff: 280, resonance: 0.05, slope: SynthSlope12} }
-  hzn_choir_lp { Filter: {kind: SynthLowPass, cutoff: 4500, resonance: 0.14, slope: SynthSlope12} }
+  hzn_choir_hp { box.audio.Filter: {kind: HighPass, cutoff: 280, resonance: 0.05, slope: Slope12} }
+  hzn_choir_lp { box.audio.Filter: {kind: LowPass, cutoff: 4500, resonance: 0.14, slope: Slope12} }
   hzn_choir_chorus { Chorus: {voices: 3, rate: 0.14, depth: 5, delay: 23, mix: 0.50, spread: 0.95} }
-  hzn_rim_hp { Filter: {kind: SynthHighPass, cutoff: 800, resonance: 0.06} }
-  hzn_tom_lp { Filter: {kind: SynthLowPass, cutoff: 3900, resonance: 0.14} }
-  hzn_crash_hp { Filter: {kind: SynthHighPass, cutoff: 2200, resonance: 0.06} }
+  hzn_rim_hp { box.audio.Filter: {kind: HighPass, cutoff: 800, resonance: 0.06} }
+  hzn_tom_lp { box.audio.Filter: {kind: LowPass, cutoff: 3900, resonance: 0.14} }
+  hzn_crash_hp { box.audio.Filter: {kind: HighPass, cutoff: 2200, resonance: 0.06} }
 
   // Synthesized sound design.
   prefab hzn_kick_sound {
-    SynthSound: {seed: 101}
+    Sound: {seed: 101}
     hzn_kick_body {
-      SynthOscillator: {wave: SynthSine, frequency: 56, level: 0.82}
-      SynthEnvelope: {attack: 0.001, decay: 0.39, curve: 5}
-      SynthPitchEnvelope: {amount: 33, decay: 0.055, curve: 5}
+      Oscillator: {wave: Sine, frequency: 56, level: 0.82}
+      Envelope: {attack: 0.001, decay: 0.39, curve: 5}
+      PitchEnvelope: {amount: 33, decay: 0.055, curve: 5}
     }
     hzn_kick_click {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoiseWhite, level: 0.16}
-      SynthEnvelope: {attack: 0.0004, decay: 0.009, curve: 4}
+      Oscillator: {wave: Noise, color: NoiseWhite, level: 0.16}
+      Envelope: {attack: 0.0004, decay: 0.009, curve: 4}
     }
   }
   prefab hzn_clap_sound {
-    SynthSound: {seed: 102, level_variance: 0.04}
-    SynthFilter: {kind: SynthHighPass, cutoff: 760, slope: SynthSlope12}
+    Sound: {seed: 102, level_variance: 0.04}
+    Filter: {kind: HighPass, cutoff: 760, slope: Slope12}
     hzn_clap_noise {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.57}
-      SynthEnvelope: {attack: 0.001, decay: 0.18, curve: 3}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.57}
+      Envelope: {attack: 0.001, decay: 0.18, curve: 3}
     }
     hzn_clap_body {
-      SynthOscillator: {wave: SynthTriangle, frequency: 185, level: 0.11}
-      SynthEnvelope: {attack: 0.001, decay: 0.10}
+      Oscillator: {wave: Triangle, frequency: 185, level: 0.11}
+      Envelope: {attack: 0.001, decay: 0.10}
     }
   }
   prefab hzn_hat_sound {
-    SynthSound: {seed: 103, level_variance: 0.06}
-    SynthOscillator: {wave: SynthNoise, color: SynthNoiseWhite, level: 0.32}
-    SynthEnvelope: {attack: 0.0008, decay: 0.085, curve: 5}
-    SynthFilter: {kind: SynthHighPass, cutoff: 7200}
+    Sound: {seed: 103, level_variance: 0.06}
+    Oscillator: {wave: Noise, color: NoiseWhite, level: 0.32}
+    Envelope: {attack: 0.0008, decay: 0.085, curve: 5}
+    Filter: {kind: HighPass, cutoff: 7200}
   }
   prefab hzn_shaker_sound {
-    SynthSound: {seed: 104}
-    SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.21}
-    SynthEnvelope: {attack: 0.002, decay: 0.05, curve: 4}
-    SynthFilter: {kind: SynthHighPass, cutoff: 5400}
+    Sound: {seed: 104}
+    Oscillator: {wave: Noise, color: NoisePink, level: 0.21}
+    Envelope: {attack: 0.002, decay: 0.05, curve: 4}
+    Filter: {kind: HighPass, cutoff: 5400}
   }
   prefab hzn_openhat_sound {
-    SynthSound: {seed: 105}
-    SynthOscillator: {wave: SynthNoise, color: SynthNoiseWhite, level: 0.24}
-    SynthEnvelope: {attack: 0.001, decay: 0.31, curve: 2}
-    SynthFilter: {kind: SynthHighPass, cutoff: 8400}
+    Sound: {seed: 105}
+    Oscillator: {wave: Noise, color: NoiseWhite, level: 0.24}
+    Envelope: {attack: 0.001, decay: 0.31, curve: 2}
+    Filter: {kind: HighPass, cutoff: 8400}
   }
   prefab hzn_bass_sound {
-    SynthSound: {seed: 111, drift: 1}
-    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.38, sub: 0.78, sub_octave: 1}
-    SynthEnvelope: {attack: 0.006, decay: 0.20, sustain: 0.54, release: 0.075, curve: 4}
-    SynthDrive: {drive: 0.16, asymmetry: 0.04}
-    SynthFilter: {kind: SynthLowPass, cutoff: 275, resonance: 0.15, slope: SynthSlope24, velocity: 0.5, keytrack: 0.62, model: SynthFilterLadder}
-    SynthFilterEnvelope: {attack: 0.005, decay: 0.24, sustain: 0.08, release: 0.09, amount: 2.3}
+    Sound: {seed: 111, drift: 1}
+    Oscillator: {wave: Saw, frequency: 440, level: 0.38, sub: 0.78, sub_octave: 1}
+    Envelope: {attack: 0.006, decay: 0.20, sustain: 0.54, release: 0.075, curve: 4}
+    Drive: {drive: 0.16, asymmetry: 0.04}
+    Filter: {kind: LowPass, cutoff: 275, resonance: 0.15, slope: Slope24, velocity: 0.5, keytrack: 0.62, model: FilterLadder}
+    FilterEnvelope: {attack: 0.005, decay: 0.24, sustain: 0.08, release: 0.09, amount: 2.3}
   }
   // Formant growl: stereo mid-bass, with shifting vowel and filter articulation.
   prefab hzn_growl_sound {
-    SynthSound: {seed: 112, drift: 3, free_phase: true}
-    SynthEnvelope: {attack: 0.007, decay: 0.23, sustain: 0.62, release: 0.10, curve: 3}
-    SynthDrive: {drive: 0.31, asymmetry: 0.11}
-    SynthFilter: {kind: SynthFormant, vowel: 2.6, resonance: 0.40, drive: 0.16}
-    SynthFilterEnvelope: {attack: 0.012, decay: 0.27, sustain: 0.27, release: 0.13, vowel: -1.35}
-    SynthLfo: {wave: SynthLfoTriangle, sync: 2, vowel: 1.15, random_phase: false}
+    Sound: {seed: 112, drift: 3, free_phase: true}
+    Envelope: {attack: 0.007, decay: 0.23, sustain: 0.62, release: 0.10, curve: 3}
+    Drive: {drive: 0.31, asymmetry: 0.11}
+    Filter: {kind: Formant, vowel: 2.6, resonance: 0.40, drive: 0.16}
+    FilterEnvelope: {attack: 0.012, decay: 0.27, sustain: 0.27, release: 0.13, vowel: -1.35}
+    Lfo: {wave: LfoTriangle, sync: 2, vowel: 1.15, random_phase: false}
     hzn_growl_saw {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.38}
-      SynthUnison: {voices: 2, detune: 5.5, width: 0.18}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.38}
+      Unison: {voices: 2, detune: 5.5, width: 0.18}
     }
-    hzn_growl_square { SynthOscillator: {wave: SynthSquare, frequency: 440, pulse_width: 0.36, level: 0.19} }
+    hzn_growl_square { Oscillator: {wave: Square, frequency: 440, pulse_width: 0.36, level: 0.19} }
   }
   prefab hzn_pad_sound {
-    SynthSound: {seed: 120, drift: 5, free_phase: true}
-    SynthEnvelope: {attack: 0.45, decay: 0.6, sustain: 0.82, release: 1.35, attack_curve: 0.3}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2300, resonance: 0.12, keytrack: 0.18}
-    SynthLfo: {wave: SynthLfoTriangle, sync: 8, cutoff: 0.22, random_phase: true}
+    Sound: {seed: 120, drift: 5, free_phase: true}
+    Envelope: {attack: 0.45, decay: 0.6, sustain: 0.82, release: 1.35, attack_curve: 0.3}
+    Filter: {kind: LowPass, cutoff: 2300, resonance: 0.12, keytrack: 0.18}
+    Lfo: {wave: LfoTriangle, sync: 8, cutoff: 0.22, random_phase: true}
     hzn_pad_saw {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.155}
-      SynthUnison: {voices: 3, detune: 10, width: 0.92}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.155}
+      Unison: {voices: 3, detune: 10, width: 0.92}
     }
-    hzn_pad_tri { SynthOscillator: {wave: SynthTriangle, frequency: 220, level: 0.22} }
+    hzn_pad_tri { Oscillator: {wave: Triangle, frequency: 220, level: 0.22} }
   }
   // Soft, non-lead chord-bed: slow attack, smooth triangle/sine voices, long release.
   prefab hzn_air_pad_sound {
-    SynthSound: {seed: 122, drift: 3, free_phase: true}
-    SynthEnvelope: {attack: 0.30, decay: 0.45, sustain: 0.65, release: 1.05}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3600, resonance: 0.09}
+    Sound: {seed: 122, drift: 3, free_phase: true}
+    Envelope: {attack: 0.30, decay: 0.45, sustain: 0.65, release: 1.05}
+    Filter: {kind: LowPass, cutoff: 3600, resonance: 0.09}
     hzn_air_tri {
-      SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.22}
-      SynthUnison: {voices: 2, detune: 5.5, width: 0.7}
+      Oscillator: {wave: Triangle, frequency: 440, level: 0.22}
+      Unison: {voices: 2, detune: 5.5, width: 0.7}
     }
-    hzn_air_sine { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.11} }
+    hzn_air_sine { Oscillator: {wave: Sine, frequency: 440, level: 0.11} }
   }
   prefab hzn_haze_sound {
-    SynthSound: {seed: 121, drift: 7, free_phase: true}
-    SynthEnvelope: {attack: 1.1, decay: 0.7, sustain: 0.66, release: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4600}
-    SynthLfo: {wave: SynthLfoSine, rate: 0.18, pitch: 8, fade: 0.4}
+    Sound: {seed: 121, drift: 7, free_phase: true}
+    Envelope: {attack: 1.1, decay: 0.7, sustain: 0.66, release: 2}
+    Filter: {kind: LowPass, cutoff: 4600}
+    Lfo: {wave: LfoSine, rate: 0.18, pitch: 8, fade: 0.4}
     hzn_haze_air {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.15}
-      SynthUnison: {voices: 3, detune: 12, width: 1}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.15}
+      Unison: {voices: 3, detune: 12, width: 1}
     }
   }
   prefab hzn_arp_sound {
-    SynthSound: {seed: 130, drift: 2}
-    SynthOscillator: {wave: SynthSquare, frequency: 440, pulse_width: 0.42, level: 0.22, sub: 0.19}
-    SynthEnvelope: {attack: 0.004, decay: 0.20, sustain: 0.1, release: 0.10, curve: 4}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3100, resonance: 0.22, velocity: 0.65}
-    SynthFilterEnvelope: {attack: 0.003, decay: 0.17, sustain: 0, release: 0.08, amount: 1.0}
+    Sound: {seed: 130, drift: 2}
+    Oscillator: {wave: Square, frequency: 440, pulse_width: 0.42, level: 0.22, sub: 0.19}
+    Envelope: {attack: 0.004, decay: 0.20, sustain: 0.1, release: 0.10, curve: 4}
+    Filter: {kind: LowPass, cutoff: 3100, resonance: 0.22, velocity: 0.65}
+    FilterEnvelope: {attack: 0.003, decay: 0.17, sustain: 0, release: 0.08, amount: 1.0}
   }
   prefab hzn_pluck_sound {
-    SynthSound: {seed: 131, drift: 3}
-    SynthOscillator: {wave: SynthPluck, frequency: 440, level: 0.39}
-    SynthString: {decay: 1.2, brightness: 0.66, hardness: 0.65, velocity: 0.35}
-    SynthUnison: {voices: 2, detune: 4.5, width: 0.72}
+    Sound: {seed: 131, drift: 3}
+    Oscillator: {wave: Pluck, frequency: 440, level: 0.39}
+    String: {decay: 1.2, brightness: 0.66, hardness: 0.65, velocity: 0.35}
+    Unison: {voices: 2, detune: 4.5, width: 0.72}
   }
   prefab hzn_bell_sound {
-    SynthSound: {seed: 150}
-    SynthEnvelope: {attack: 0.003, decay: 2.2, sustain: 0, release: 0.6, curve: 3}
+    Sound: {seed: 150}
+    Envelope: {attack: 0.003, decay: 2.2, sustain: 0, release: 0.6, curve: 3}
     hzn_bell_carrier {
-      SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.34}
+      Oscillator: {wave: Sine, frequency: 440, level: 0.34}
       hzn_bell_fm {
-        SynthOscillator: {wave: SynthSine, frequency: 1080, modulation: SynthPhase, index: 2.3}
-        SynthEnvelope: {attack: 0.002, decay: 0.49, sustain: 0, release: 0.2}
+        Oscillator: {wave: Sine, frequency: 1080, modulation: Phase, index: 2.3}
+        Envelope: {attack: 0.002, decay: 0.49, sustain: 0, release: 0.2}
       }
     }
   }
   prefab hzn_riser_sound {
-    SynthSound: {seed: 160}
-    SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.25}
-    SynthEnvelope: {attack: 7, decay: 0.5, sustain: 0.75, release: 0.17, attack_curve: -1}
-    SynthFilter: {kind: SynthHighPass, cutoff: 300, resonance: 0.25}
-    SynthFilterEnvelope: {attack: 7, decay: 0.2, sustain: 1, release: 0.2, amount: 5}
+    Sound: {seed: 160}
+    Oscillator: {wave: Noise, color: NoisePink, level: 0.25}
+    Envelope: {attack: 7, decay: 0.5, sustain: 0.75, release: 0.17, attack_curve: -1}
+    Filter: {kind: HighPass, cutoff: 300, resonance: 0.25}
+    FilterEnvelope: {attack: 7, decay: 0.2, sustain: 1, release: 0.2, amount: 5}
   }
   prefab hzn_impact_sound {
-    SynthSound: {seed: 161}
+    Sound: {seed: 161}
     hzn_impact_low {
-      SynthOscillator: {wave: SynthSine, frequency: 75, frequency_end: 35, sweep: 0.29, level: 0.7}
-      SynthEnvelope: {attack: 0.001, decay: 1.9, curve: 3}
+      Oscillator: {wave: Sine, frequency: 75, frequency_end: 35, sweep: 0.29, level: 0.7}
+      Envelope: {attack: 0.001, decay: 1.9, curve: 3}
     }
     hzn_impact_airy {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, level: 0.42}
-      SynthEnvelope: {attack: 0.003, decay: 0.8, curve: 3}
+      Oscillator: {wave: Noise, color: NoiseBrown, level: 0.42}
+      Envelope: {attack: 0.003, decay: 0.8, curve: 3}
     }
   }
   prefab hzn_downer_sound {
-    SynthSound: {seed: 162}
-    SynthOscillator: {wave: SynthSine, frequency: 120, frequency_end: 40, sweep: 1.4, level: 0.4}
-    SynthEnvelope: {attack: 0.003, decay: 2.4, curve: 2}
+    Sound: {seed: 162}
+    Oscillator: {wave: Sine, frequency: 120, frequency_end: 40, sweep: 1.4, level: 0.4}
+    Envelope: {attack: 0.003, decay: 2.4, curve: 2}
   }
 
 
   // Polyphonic, short-decay chord stabs: an accompaniment rhythm, not a lead line.
   prefab hzn_stab_sound {
-    SynthSound: {seed: 170, drift: 2, free_phase: true}
-    SynthEnvelope: {attack: 0.008, decay: 0.30, sustain: 0.21, release: 0.17, curve: 3}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4900, resonance: 0.22, velocity: 0.40, keytrack: 0.2}
-    SynthFilterEnvelope: {attack: 0.006, decay: 0.23, sustain: 0.0, release: 0.12, amount: 1.45}
-    hzn_stab_organ { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.17}
-      SynthUnison: {voices: 2, detune: 6.0, width: 0.69} }
-    hzn_stab_round { SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.17} }
+    Sound: {seed: 170, drift: 2, free_phase: true}
+    Envelope: {attack: 0.008, decay: 0.30, sustain: 0.21, release: 0.17, curve: 3}
+    Filter: {kind: LowPass, cutoff: 4900, resonance: 0.22, velocity: 0.40, keytrack: 0.2}
+    FilterEnvelope: {attack: 0.006, decay: 0.23, sustain: 0.0, release: 0.12, amount: 1.45}
+    hzn_stab_organ { Oscillator: {wave: Saw, frequency: 440, level: 0.17}
+      Unison: {voices: 2, detune: 6.0, width: 0.69} }
+    hzn_stab_round { Oscillator: {wave: Triangle, frequency: 440, level: 0.17} }
   }
   // Wide, unmistakable atmospheric choral chord bed for contrast with rhythmic sections.
   prefab hzn_choir_sound {
-    SynthSound: {seed: 171, drift: 5, free_phase: true}
-    SynthEnvelope: {attack: 0.62, decay: 0.75, sustain: 0.84, release: 1.65}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3150, resonance: 0.06}
-    SynthLfo: {wave: SynthLfoSine, sync: 8, cutoff: 0.30, random_phase: true}
-    hzn_choir_ooh { SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.27}
-      SynthUnison: {voices: 3, detune: 10, width: 0.95} }
-    hzn_choir_air { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.15} }
+    Sound: {seed: 171, drift: 5, free_phase: true}
+    Envelope: {attack: 0.62, decay: 0.75, sustain: 0.84, release: 1.65}
+    Filter: {kind: LowPass, cutoff: 3150, resonance: 0.06}
+    Lfo: {wave: LfoSine, sync: 8, cutoff: 0.30, random_phase: true}
+    hzn_choir_ooh { Oscillator: {wave: Triangle, frequency: 440, level: 0.27}
+      Unison: {voices: 3, detune: 10, width: 0.95} }
+    hzn_choir_air { Oscillator: {wave: Sine, frequency: 440, level: 0.15} }
   }
   // Distinct woody high percussion and pitched low toms for new grooves/fills.
   prefab hzn_rim_sound {
-    SynthSound: {seed: 172, level_variance: 0.025}
-    hzn_rim_click { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.27}
-      SynthEnvelope: {attack: 0.0005, decay: 0.024, curve: 5} }
-    hzn_rim_body { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.20}
-      SynthEnvelope: {attack: 0.001, decay: 0.058, curve: 3} }
+    Sound: {seed: 172, level_variance: 0.025}
+    hzn_rim_click { Oscillator: {wave: Noise, color: NoisePink, level: 0.27}
+      Envelope: {attack: 0.0005, decay: 0.024, curve: 5} }
+    hzn_rim_body { Oscillator: {wave: Triangle, frequency: 880, level: 0.20}
+      Envelope: {attack: 0.001, decay: 0.058, curve: 3} }
   }
   prefab hzn_tom_sound {
-    SynthSound: {seed: 173}
-    SynthOscillator: {wave: SynthSine, frequency: 138, level: 0.54}
-    SynthEnvelope: {attack: 0.003, decay: 0.22, curve: 3}
-    SynthPitchEnvelope: {amount: 26, decay: 0.045, curve: 3}
+    Sound: {seed: 173}
+    Oscillator: {wave: Sine, frequency: 138, level: 0.54}
+    Envelope: {attack: 0.003, decay: 0.22, curve: 3}
+    PitchEnvelope: {amount: 26, decay: 0.045, curve: 3}
   }
   prefab hzn_crash_sound {
-    SynthSound: {seed: 174}
-    SynthOscillator: {wave: SynthNoise, color: SynthNoiseWhite, level: 0.45}
-    SynthEnvelope: {attack: 0.001, decay: 1.50, sustain: 0, release: 0.4, curve: 2}
-    SynthFilter: {kind: SynthHighPass, cutoff: 2400, slope: SynthSlope12}
+    Sound: {seed: 174}
+    Oscillator: {wave: Noise, color: NoiseWhite, level: 0.45}
+    Envelope: {attack: 0.001, decay: 1.50, sustain: 0, release: 0.4, curve: 2}
+    Filter: {kind: HighPass, cutoff: 2400, slope: Slope12}
   }
   prefab hzn_sweep_sound {
-    SynthSound: {seed: 175}
-    SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.36}
-    SynthEnvelope: {attack: 1.45, decay: 0.15, sustain: 0, release: 0.15, attack_curve: -1}
-    SynthFilter: {kind: SynthHighPass, cutoff: 290, resonance: 0.12}
-    SynthFilterEnvelope: {attack: 1.45, decay: 0.15, sustain: 0, release: 0.15, amount: 4}
+    Sound: {seed: 175}
+    Oscillator: {wave: Noise, color: NoisePink, level: 0.36}
+    Envelope: {attack: 1.45, decay: 0.15, sustain: 0, release: 0.15, attack_curve: -1}
+    Filter: {kind: HighPass, cutoff: 290, resonance: 0.12}
+    FilterEnvelope: {attack: 1.45, decay: 0.15, sustain: 0, release: 0.15, amount: 4}
   }
 
   // Instruments.
@@ -2159,7 +2160,7 @@ assets {
     Compressor: {threshold: -27, ratio: 6.2, attack: 0.003, release: 0.18, knee: 3, sidechain: hzn_kick_track}
     Meter: {}
   }
-  hzn_growl_motion { Modulator: {target: hzn_growl_lp, component: Filter, member: "cutoff", source: ModLfo, scale: ModOctaves, depth: 0.58, wave: ModTriangle, sync: 2} }
+  hzn_growl_motion { Modulator: {target: hzn_growl_lp, component: box.audio.Filter, member: "cutoff", source: ModLfo, scale: ModOctaves, depth: 0.58, wave: ModTriangle, sync: 2} }
   hzn_bass_track {
     Track: {instrument: hzn_bass_inst, swing: 0.01, swing_grid: TrackSwing16}
     Bus: {output: hzn_mix, volume: 0.73, effects: [hzn_bass_hp, hzn_bass_eq, hzn_bass_lp, hzn_bass_duck]}
@@ -2334,13 +2335,13 @@ assets {
   // Full-track filter and energy envelopes: breakdown lowpasses, tension rises,
   // near-silence in the last half beat, abrupt full-band drops at 288 and 352.
   prefab hzn_auto_music_lp {
-    AutomationClip: {target: hzn_music_lp, component: Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1050}, {time: 8, value: 1280}, {time: 24, value: 2200}, {time: 31.9, value: 2600}, {time: 32, value: 3400}, {time: 59, value: 3900}, {time: 63.6, value: 1800}, {time: 64, value: 7300}, {time: 92, value: 6800}, {time: 120, value: 6200}, {time: 126, value: 2400}, {time: 127.94, value: 950}, {time: 128, value: 14300}, {time: 158, value: 11100}, {time: 180, value: 10000}, {time: 190, value: 5000}, {time: 191.94, value: 1700}, {time: 192, value: 1250}, {time: 208, value: 1800}, {time: 224, value: 900}, {time: 236, value: 1900}, {time: 252, value: 3200}, {time: 256, value: 1200}, {time: 268, value: 1700}, {time: 276, value: 3300}, {time: 282, value: 6200}, {time: 284, value: 2900}, {time: 286.5, value: 620}, {time: 287.94, value: 380}, {time: 288, value: 17300}, {time: 302, value: 14800}, {time: 316, value: 9000}, {time: 319.95, value: 3900}, {time: 320, value: 13800}, {time: 331, value: 12800}, {time: 335, value: 11000}, {time: 336, value: 1600}, {time: 341, value: 950}, {time: 344, value: 2100}, {time: 348, value: 3400}, {time: 350, value: 830}, {time: 351.94, value: 400}, {time: 352, value: 18200}, {time: 368, value: 16000}, {time: 379.7, value: 14000}, {time: 383.94, value: 7800}, {time: 384, value: 5400}, {time: 399, value: 3700}, {time: 400, value: 7200}, {time: 412, value: 6200}, {time: 416, value: 3800}, {time: 424, value: 2450}, {time: 432, value: 1500}, {time: 440, value: 1050}, {time: 448, value: 550}]}}
+    AutomationClip: {target: hzn_music_lp, component: box.audio.Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1050}, {time: 8, value: 1280}, {time: 24, value: 2200}, {time: 31.9, value: 2600}, {time: 32, value: 3400}, {time: 59, value: 3900}, {time: 63.6, value: 1800}, {time: 64, value: 7300}, {time: 92, value: 6800}, {time: 120, value: 6200}, {time: 126, value: 2400}, {time: 127.94, value: 950}, {time: 128, value: 14300}, {time: 158, value: 11100}, {time: 180, value: 10000}, {time: 190, value: 5000}, {time: 191.94, value: 1700}, {time: 192, value: 1250}, {time: 208, value: 1800}, {time: 224, value: 900}, {time: 236, value: 1900}, {time: 252, value: 3200}, {time: 256, value: 1200}, {time: 268, value: 1700}, {time: 276, value: 3300}, {time: 282, value: 6200}, {time: 284, value: 2900}, {time: 286.5, value: 620}, {time: 287.94, value: 380}, {time: 288, value: 17300}, {time: 302, value: 14800}, {time: 316, value: 9000}, {time: 319.95, value: 3900}, {time: 320, value: 13800}, {time: 331, value: 12800}, {time: 335, value: 11000}, {time: 336, value: 1600}, {time: 341, value: 950}, {time: 344, value: 2100}, {time: 348, value: 3400}, {time: 350, value: 830}, {time: 351.94, value: 400}, {time: 352, value: 18200}, {time: 368, value: 16000}, {time: 379.7, value: 14000}, {time: 383.94, value: 7800}, {time: 384, value: 5400}, {time: 399, value: 3700}, {time: 400, value: 7200}, {time: 412, value: 6200}, {time: 416, value: 3800}, {time: 424, value: 2450}, {time: 432, value: 1500}, {time: 440, value: 1050}, {time: 448, value: 550}]}}
   }
   prefab hzn_auto_stab_lp {
-    AutomationClip: {target: hzn_stab_lp, component: Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 3400}, {time: 64, value: 900}, {time: 88, value: 1800}, {time: 120, value: 2200}, {time: 127.94, value: 1600}, {time: 128, value: 4600}, {time: 160, value: 6500}, {time: 188, value: 4500}, {time: 192, value: 2200}, {time: 255.94, value: 2200}, {time: 256, value: 1100}, {time: 280, value: 4200}, {time: 286.8, value: 650}, {time: 287.94, value: 420}, {time: 288, value: 8500}, {time: 304, value: 7200}, {time: 320, value: 5900}, {time: 334, value: 3600}, {time: 335.94, value: 1450}, {time: 336, value: 1250}, {time: 347.5, value: 2600}, {time: 351.94, value: 520}, {time: 352, value: 10500}, {time: 367.9, value: 7600}, {time: 376, value: 8900}, {time: 384, value: 2500}, {time: 416, value: 1400}, {time: 448, value: 700}]}}
+    AutomationClip: {target: hzn_stab_lp, component: box.audio.Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 3400}, {time: 64, value: 900}, {time: 88, value: 1800}, {time: 120, value: 2200}, {time: 127.94, value: 1600}, {time: 128, value: 4600}, {time: 160, value: 6500}, {time: 188, value: 4500}, {time: 192, value: 2200}, {time: 255.94, value: 2200}, {time: 256, value: 1100}, {time: 280, value: 4200}, {time: 286.8, value: 650}, {time: 287.94, value: 420}, {time: 288, value: 8500}, {time: 304, value: 7200}, {time: 320, value: 5900}, {time: 334, value: 3600}, {time: 335.94, value: 1450}, {time: 336, value: 1250}, {time: 347.5, value: 2600}, {time: 351.94, value: 520}, {time: 352, value: 10500}, {time: 367.9, value: 7600}, {time: 376, value: 8900}, {time: 384, value: 2500}, {time: 416, value: 1400}, {time: 448, value: 700}]}}
   }
   prefab hzn_auto_growl_lp {
-    AutomationClip: {target: hzn_growl_lp, component: Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1900}, {time: 96, value: 1500}, {time: 160, value: 2100}, {time: 192, value: 1600}, {time: 288, value: 2500}, {time: 300, value: 3100}, {time: 320, value: 2100}, {time: 334, value: 1450}, {time: 336, value: 1300}, {time: 351.94, value: 650}, {time: 352, value: 4200}, {time: 364, value: 2400}, {time: 376, value: 3700}, {time: 384, value: 1600}, {time: 400, value: 2200}, {time: 416, value: 1350}, {time: 448, value: 900}]}}
+    AutomationClip: {target: hzn_growl_lp, component: box.audio.Filter, member: "cutoff", length: 448, curve: {keys: [{time: 0, value: 1900}, {time: 96, value: 1500}, {time: 160, value: 2100}, {time: 192, value: 1600}, {time: 288, value: 2500}, {time: 300, value: 3100}, {time: 320, value: 2100}, {time: 334, value: 1450}, {time: 336, value: 1300}, {time: 351.94, value: 650}, {time: 352, value: 4200}, {time: 364, value: 2400}, {time: 376, value: 3700}, {time: 384, value: 1600}, {time: 400, value: 2200}, {time: 416, value: 1350}, {time: 448, value: 900}]}}
   }
   prefab hzn_auto_music_volume {
     AutomationClip: {target: hzn_music_bus, component: Bus, member: "volume", length: 448, curve: {keys: [{time: 0, value: 0.95}, {time: 63.9, value: 0.95}, {time: 64, value: 0.95}, {time: 127.85, value: 0.84}, {time: 128, value: 0.95}, {time: 191.8, value: 0.83}, {time: 192, value: 0.93}, {time: 252, value: 0.95}, {time: 276, value: 0.99}, {time: 284, value: 0.96}, {time: 286.5, value: 0.6}, {time: 287.7, value: 0.22}, {time: 287.94, value: 0.08}, {time: 288, value: 1}, {time: 319.94, value: 0.96}, {time: 320, value: 1}, {time: 335.8, value: 0.84}, {time: 336, value: 0.78}, {time: 344, value: 0.8}, {time: 350.4, value: 0.55}, {time: 351.94, value: 0.06}, {time: 352, value: 1}, {time: 383.94, value: 0.98}, {time: 384, value: 0.94}, {time: 416, value: 0.9}, {time: 440, value: 0.76}, {time: 448, value: 0.48}]}}
@@ -2360,8 +2361,8 @@ assets {
         {time: 412, value: 0.62}, {time: 416, value: 0.34}, {time: 448, value: 0}
       ]}}
   }
-  prefab hzn_auto_break_arp { AutomationClip: {target: hzn_arp_filter, component: Filter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 1300}, {time: 12, value: 2250}, {time: 28, value: 6000}, {time: 32, value: 4300}]} } }
-  prefab hzn_auto_final_arp { AutomationClip: {target: hzn_arp_filter, component: Filter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 4600}, {time: 24, value: 5800}, {time: 32, value: 4200}]} } }
+  prefab hzn_auto_break_arp { AutomationClip: {target: hzn_arp_filter, component: box.audio.Filter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 1300}, {time: 12, value: 2250}, {time: 28, value: 6000}, {time: 32, value: 4300}]} } }
+  prefab hzn_auto_final_arp { AutomationClip: {target: hzn_arp_filter, component: box.audio.Filter, member: "cutoff", length: 32, curve: {keys: [{time: 0, value: 4600}, {time: 24, value: 5800}, {time: 32, value: 4200}]} } }
   prefab hzn_auto_end_air {
     AutomationClip: {target: hzn_air_track, component: Bus, member: "volume", length: 32,
       curve: {keys: [{time: 0, value: 0.40}, {time: 8, value: 0.35}, {time: 20, value: 0.22}, {time: 28, value: 0.11}, {time: 32, value: 0.025}]}}

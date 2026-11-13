@@ -1558,9 +1558,33 @@ static void box_audio_module_free(
     ecs_os_free(state);
 }
 
-/** Give SynthWavetable its full name. The reflection of a C enum strips the name of the enum
- * from its constants, which would leave it as "table" in scripts. Setting the value of the
- * constant again stores the new name in the constants of the enum.
+ecs_entity_t box_audio_synth_scope_push(
+    ecs_world_t *world)
+{
+    ecs_entity_t scope = ecs_get_scope(world);
+    ecs_entity_t synth = ecs_lookup_child(world, scope, "synth");
+    if (!synth) {
+        synth = ecs_entity(world, { .name = "synth", .parent = scope });
+        ecs_add_id(world, synth, EcsModule);
+    }
+
+    ecs_set_scope(world, synth);
+    ecs_set_name_prefix(world, "Synth");
+
+    return scope;
+}
+
+void box_audio_synth_scope_pop(
+    ecs_world_t *world,
+    ecs_entity_t scope)
+{
+    ecs_set_scope(world, scope);
+    ecs_set_name_prefix(world, "Audio");
+}
+
+/** Give SynthWavetable its script name Wavetable. The reflection of a C enum strips the
+ * name of the enum from its constants, which would leave it as "table" in scripts. Setting
+ * the value of the constant again stores the new name in the constants of the enum.
  *
  * @param world The world
  */
@@ -1569,7 +1593,7 @@ static void box_audio_synth_wave_names(
 {
     ecs_entity_t c = ecs_lookup_child(world, ecs_id(SynthWave), "table");
     ecs_assert(c != 0, ECS_INTERNAL_ERROR, NULL);
-    ecs_set_name(world, c, "SynthWavetable");
+    ecs_set_name(world, c, "Wavetable");
     ecs_set_pair_second(world, c, EcsConstant, ecs_i32_t, {SynthWavetable});
 }
 
@@ -1685,14 +1709,16 @@ static void box_audio_mixer_register(
     ecs_set_hooks(world, Equalizer, { .ctor = box_audio_equalizer_ctor });
 }
 
-/** Register the waves, oscillators, strings, bows, wavetables, envelopes and
- * filters of synth sounds.
+/** Register the components of synth sounds in box.audio.synth: the waves, oscillators,
+ * strings, bows, wavetables, envelopes, filters, LFOs, routes, SynthSound and the
+ * components the module keeps the state of synths and wavetables in.
  *
  * @param world The world
  */
 static void box_audio_synth_register(
     ecs_world_t *world)
 {
+    ecs_entity_t scope = box_audio_synth_scope_push(world);
     ECS_META_COMPONENT(world, SynthWave);
     box_audio_synth_wave_names(world);
     ECS_META_COMPONENT(world, SynthFilterKind);
@@ -1715,6 +1741,22 @@ static void box_audio_synth_register(
     ECS_META_COMPONENT(world, SynthEnvelope);
     ECS_META_COMPONENT(world, SynthFilter);
     ecs_set_hooks(world, SynthFilter, { .ctor = box_audio_synth_filter_ctor });
+    ECS_META_COMPONENT(world, SynthFilterEnvelope);
+    ECS_META_COMPONENT(world, SynthPitchEnvelope);
+    ECS_META_COMPONENT(world, SynthGlide);
+    ECS_META_COMPONENT(world, SynthDrive);
+    ecs_set_hooks(world, SynthDrive, { .ctor = box_audio_synth_drive_ctor });
+    ECS_META_COMPONENT(world, SynthLfoWave);
+    ECS_META_COMPONENT(world, SynthLfo);
+    ecs_set_hooks(world, SynthLfo, { .ctor = box_audio_synth_lfo_ctor });
+    ECS_META_COMPONENT(world, SynthModSource);
+    ECS_META_COMPONENT(world, SynthModTarget);
+    ECS_META_COMPONENT(world, SynthModRoute);
+    ECS_META_COMPONENT(world, SynthModEnvelope);
+    ECS_META_COMPONENT(world, SynthSound);
+    BOX_AUDIO_COMPONENT_NAMED(world, AudioSynth, "State");
+    BOX_AUDIO_COMPONENT_NAMED(world, AudioWavetable, "WavetableState");
+    box_audio_synth_scope_pop(world, scope);
 }
 
 /** Register the effect components from AudioFilter to TapeStop.
@@ -1758,27 +1800,14 @@ static void box_audio_effects_register(
     ecs_set_hooks(world, TapeStop, { .ctor = box_audio_tape_stop_ctor });
 }
 
-/** Register the synth envelopes, LFOs and routes, SynthSound, the settings, the
- * status, the transport, songs, instruments, clips, modulators, macros and tracks.
+/** Register the settings, the status, the transport, songs, instruments, clips,
+ * modulators, macros and tracks.
  *
  * @param world The world
  */
 static void box_audio_music_register(
     ecs_world_t *world)
 {
-    ECS_META_COMPONENT(world, SynthFilterEnvelope);
-    ECS_META_COMPONENT(world, SynthPitchEnvelope);
-    ECS_META_COMPONENT(world, SynthGlide);
-    ECS_META_COMPONENT(world, SynthDrive);
-    ecs_set_hooks(world, SynthDrive, { .ctor = box_audio_synth_drive_ctor });
-    ECS_META_COMPONENT(world, SynthLfoWave);
-    ECS_META_COMPONENT(world, SynthLfo);
-    ecs_set_hooks(world, SynthLfo, { .ctor = box_audio_synth_lfo_ctor });
-    ECS_META_COMPONENT(world, SynthModSource);
-    ECS_META_COMPONENT(world, SynthModTarget);
-    ECS_META_COMPONENT(world, SynthModRoute);
-    ECS_META_COMPONENT(world, SynthModEnvelope);
-    ECS_META_COMPONENT(world, SynthSound);
     ECS_META_COMPONENT(world, AudioSettings);
     ecs_set_hooks(world, AudioSettings, { .ctor = box_audio_settings_ctor });
     ECS_META_COMPONENT(world, AudioStatus);
@@ -1841,8 +1870,6 @@ static void box_audio_state_register(
     ECS_COMPONENT_DEFINE(world, AudioModulatorState);
     ECS_COMPONENT_DEFINE(world, AudioSample);
     ECS_COMPONENT_DEFINE(world, AudioMusic);
-    ECS_COMPONENT_DEFINE(world, AudioSynth);
-    BOX_AUDIO_COMPONENT_NAMED(world, AudioWavetable, "WavetableState");
     ECS_COMPONENT_DEFINE(world, AudioInstrumentState);
     ECS_COMPONENT_DEFINE(world, AudioTrackState);
     ECS_COMPONENT_DEFINE(world, AudioEmitterState);

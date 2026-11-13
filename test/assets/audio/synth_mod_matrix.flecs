@@ -2,18 +2,19 @@
 // sweeps its cutoff and whose first LFO pans it, with a square layer that a route of its own
 // makes softer at a high velocity.
 using box.audio
+using box.audio.synth
 
 matrix_lead {
-  SynthSound: {seed: 7}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.5, release: 0.05}
-  SynthFilter: {kind: SynthLowPass, cutoff: 500}
-  SynthModEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.4}
-  SynthLfo: {rate: 3}
-  sweep { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetCutoff, amount: 3} }
-  wobble { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetPan, amount: 0.5} }
+  Sound: {seed: 7}
+  Envelope: {attack: 0.005, sustain: 1, hold: 0.5, release: 0.05}
+  Filter: {kind: LowPass, cutoff: 500}
+  ModEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.3, release: 0.1}
+  Oscillator: {wave: Saw, frequency: 220, level: 0.4}
+  Lfo: {rate: 3}
+  sweep { ModRoute: {source: SourceModEnvelope, target: TargetCutoff, amount: 3} }
+  wobble { ModRoute: {source: SourceLfo1, target: TargetPan, amount: 0.5} }
   fifth {
-    SynthOscillator: {wave: SynthSquare, frequency: 330, level: 0.2}
-    soft { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: -0.5} }
+    Oscillator: {wave: Square, frequency: 330, level: 0.2}
+    soft { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: -0.5} }
   }
 }

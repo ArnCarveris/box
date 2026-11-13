@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {200, 100, 50} } } }
@@ -13,9 +14,9 @@ basic_group {
 }
 
 prefab basic_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3}
+  Sound: {}
+  Envelope: {attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.3}
 }
 
 basic_inst { Instrument: {sound: basic_tone} }

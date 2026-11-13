@@ -10,6 +10,7 @@ using box.view
 using box.movement
 using box.surface
 using box.audio
+using box.audio.synth
 
 window {
   Surface: {width: 640, height: 480}
@@ -34,20 +35,20 @@ spinner {
 
 // 660 Hz at 0.5: 10 ms up, 300 ms held, 50 ms down, 0.36 s in all at any rate
 prefab Beep {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 0.3, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.5}
+  Sound: {}
+  Envelope: {attack: 0.01, sustain: 1, hold: 0.3, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 660, level: 0.5}
 }
 
 prefab Hum {
-  SynthSound: {seed: 3}
-  SynthEnvelope: {attack: 0.05, decay: 0.2, sustain: 0.6, hold: 2, release: 0.2}
-  SynthFilter: {kind: SynthLowPass, cutoff: 400, resonance: 0.6}
-  SynthFilterEnvelope: {attack: 2, sustain: 1, hold: 0.46, amount: 3.907}
-  saw { SynthOscillator: {wave: SynthSaw, frequency: 110, frequency_end: 220, sweep: 2, level: 0.4} }
+  Sound: {seed: 3}
+  Envelope: {attack: 0.05, decay: 0.2, sustain: 0.6, hold: 2, release: 0.2}
+  Filter: {kind: LowPass, cutoff: 400, resonance: 0.6}
+  FilterEnvelope: {attack: 2, sustain: 1, hold: 0.46, amount: 3.907}
+  saw { Oscillator: {wave: Saw, frequency: 110, frequency_end: 220, sweep: 2, level: 0.4} }
   square {
-    SynthOscillator: {wave: SynthSquare, frequency: 330, level: 0.2}
-    SynthEnvelope: {attack: 0.005, decay: 0.3, sustain: 0.3, hold: 2, release: 0.1}
+    Oscillator: {wave: Square, frequency: 330, level: 0.2}
+    Envelope: {attack: 0.005, decay: 0.3, sustain: 0.3, hold: 2, release: 0.1}
   }
-  noise { SynthOscillator: {wave: SynthNoise, level: 0.1} }
+  noise { Oscillator: {wave: Noise, level: 0.1} }
 }

@@ -120,7 +120,7 @@ G.model = () => {
   }
   for (const r of DAW.sounds()) {
     if (nodes.has(r.path)) continue;
-    const isSynth = DAW.has(r, "SynthSound");
+    const isSynth = DAW.has(r, "synth.Sound");
     if (!isSynth && !soundRefs.has(r.path)) continue;
     add(r.path, { kind: "sound", rec: r, order: r.order, title: r.name, sub: isSynth ? "synth" : "sample" });
   }

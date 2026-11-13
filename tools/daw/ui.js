@@ -8,7 +8,7 @@ const OVERRIDES = {
   "Bus.width": { min: 0, max: 2, def: 1 },
   "Send.level": { min: 0, max: 4, def: 0.5, unit: "gain" },
   "Filter.resonance": { def: 0 },
-  "SynthFilter.resonance": { def: 0 },
+  "synth.Filter.resonance": { def: 0 },
   "Source.volume": { min: 0, max: 4, def: 1, unit: "gain" },
   "Source.pitch": { min: 0.125, max: 8, def: 1, log: true },
   "Stream.volume": { min: 0, max: 4, def: 1, unit: "gain" },
@@ -27,7 +27,7 @@ const OVERRIDES = {
   "Transport.position": { min: 0, max: 256, soft: true, unit: "beats" },
   "Transport.loop_start": { min: 0, max: 256, soft: true, unit: "beats" },
   "Transport.loop_end": { min: 0, max: 256, soft: true, unit: "beats" },
-  "SynthOscillator.level": { min: 0, max: 2, def: 1, unit: "gain" },
+  "synth.Oscillator.level": { min: 0, max: 2, def: 1, unit: "gain" },
   "NoteClip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true },
   "AutomationClip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true },
   "Clip.length": { min: 1, max: 128, def: 4, unit: "beats", soft: true }
@@ -445,7 +445,7 @@ UI.select = (opts) => {
 };
 
 UI.enumLabel = (v) => String(v)
-  .replace(/^(Audio(Channel|Eq|Mod|Emitter|Stream|Quantize|Song)?|Synth(Filter|Lfo|Source|Target|Noise|Slope)?|Instrument(Spread)?|Track(Swing)?|Saturator|FrequencyShifter|Frequency|Song|Sound|Wavetable|Curve)(?=[A-Z0-9])/, "");
+  .replace(/^(Audio(Channel|Eq|Mod|Emitter|Stream|Quantize|Song)?|Filter|Lfo|Source|Target|Noise|Slope|Instrument(Spread)?|Track(Swing)?|Saturator|FrequencyShifter|Frequency|Song|Sound|Wavetable|Curve)(?=[A-Z0-9])/, "");
 
 UI.dragNum = (opts) => {
   let value = opts.value;
@@ -539,7 +539,7 @@ UI.entityOptions = (member, struct) => {
   else if (n === "instrument") recs = DAW.list("Instrument");
   else if (n === "clip") recs = DAW.clips();
   else if (n === "target") recs = Object.values(DAW.ents).filter((r) => DAW.has(r, "Bus") || DAW.isEffect(r));
-  else if (n === "table") recs = DAW.list("Wavetable");
+  else if (n === "table") recs = DAW.list("synth.Wavetable");
   else if (n === "component") return null;
   else recs = Object.values(DAW.ents);
   const opts = [{ value: "#0", label: n === "output" ? "master" : "(none)" }];

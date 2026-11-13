@@ -453,9 +453,9 @@ void Spatial_play_at_synth_and_file(void) {
     test_assert(ecs_script_run(world, "beep",
         "using box.audio\n"
         "prefab Beep {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.001, sustain: 1, hold: 0.5, release: 0.01}\n"
-        "  SynthOscillator: {frequency: 500, level: 0.5}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Envelope: {attack: 0.001, sustain: 1, hold: 0.5, release: 0.01}\n"
+        "  synth.Oscillator: {frequency: 500, level: 0.5}\n"
         "  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0}\n"
         "}\n"
         "chime {\n"
@@ -1041,9 +1041,9 @@ void Spatial_cutoff_synth(void) {
     test_assert(ecs_script_run(world, "beep",
         "using box.audio\n"
         "prefab Beep {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.001, sustain: 1, hold: 1, release: 0.01}\n"
-        "  SynthOscillator: {frequency: 8000, level: 0.5}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Envelope: {attack: 0.001, sustain: 1, hold: 1, release: 0.01}\n"
+        "  synth.Oscillator: {frequency: 8000, level: 0.5}\n"
         "  Spatial: {min_distance: 1, max_distance: 50, rolloff: 0, cutoff: 200}\n"
         "}\n", NULL) == 0);
     ecs_entity_t beep = ecs_lookup(world, "Beep");

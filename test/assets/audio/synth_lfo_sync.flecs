@@ -1,28 +1,29 @@
 // The sounds the SynthLfoSync suite of test/cpu/audio plays LFOs synced to the Transport with.
 using box.audio
+using box.audio.synth
 
 // A tremolo once a beat: a sine at 2000 Hz whose level a sine LFO moves from 0 to 1
 prefab Beat {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0, sustain: 1, hold: 0.05, release: 0.02}
-  SynthOscillator: {wave: SynthSine, frequency: 2000, level: 0.5}
-  SynthLfo: {wave: SynthLfoSine, rate: 7, sync: 1, amplitude: 1}
+  Sound: {}
+  Envelope: {attack: 0.001, decay: 0, sustain: 1, hold: 0.05, release: 0.02}
+  Oscillator: {wave: Sine, frequency: 2000, level: 0.5}
+  Lfo: {wave: LfoSine, rate: 7, sync: 1, amplitude: 1}
 }
 
 // The same tremolo twice a beat, an eighth
 prefab Eighth {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0, sustain: 1, hold: 0.05, release: 0.02}
-  SynthOscillator: {wave: SynthSine, frequency: 2000, level: 0.5}
-  SynthLfo: {wave: SynthLfoSine, sync: 0.5, amplitude: 1}
+  Sound: {}
+  Envelope: {attack: 0.001, decay: 0, sustain: 1, hold: 0.05, release: 0.02}
+  Oscillator: {wave: Sine, frequency: 2000, level: 0.5}
+  Lfo: {wave: LfoSine, sync: 0.5, amplitude: 1}
 }
 
 // The tremolo of Beat at 2 Hz without sync, a beat at 120 bpm
 prefab Free {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0, sustain: 1, hold: 0.05, release: 0.02}
-  SynthOscillator: {wave: SynthSine, frequency: 2000, level: 0.5}
-  SynthLfo: {wave: SynthLfoSine, rate: 2, amplitude: 1}
+  Sound: {}
+  Envelope: {attack: 0.001, decay: 0, sustain: 1, hold: 0.05, release: 0.02}
+  Oscillator: {wave: Sine, frequency: 2000, level: 0.5}
+  Lfo: {wave: LfoSine, rate: 2, amplitude: 1}
 }
 
 beat_lead {

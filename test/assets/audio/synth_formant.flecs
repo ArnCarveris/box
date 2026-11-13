@@ -1,21 +1,22 @@
 // The sounds the SynthFormantWorld suite of test/cpu/audio compiles the formant filter from
 // script with.
 using box.audio
+using box.audio.synth
 
 // A talking pad: a saw through the formants of e, an LFO on the vowel
 prefab Talk {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.05, sustain: 1, hold: 0.5, release: 0.2}
-  SynthFilter: {kind: SynthFormant, vowel: 1, resonance: 0.3}
-  SynthLfo: {rate: 1.5, vowel: 1}
-  SynthOscillator: {wave: SynthSaw, frequency: 110, level: 0.6}
+  Sound: {}
+  Envelope: {attack: 0.05, sustain: 1, hold: 0.5, release: 0.2}
+  Filter: {kind: Formant, vowel: 1, resonance: 0.3}
+  Lfo: {rate: 1.5, vowel: 1}
+  Oscillator: {wave: Saw, frequency: 110, level: 0.6}
 }
 
 // A wah: the filter envelope moves the vowel from a to o, with an amount of 0
 prefab Wah {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, sustain: 1, hold: 0.3, release: 0.1}
-  SynthFilter: {kind: SynthFormant}
-  SynthFilterEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.2, release: 0.1, vowel: 3}
-  SynthOscillator: {wave: SynthSaw, frequency: 82.5, level: 0.6}
+  Sound: {}
+  Envelope: {attack: 0.002, sustain: 1, hold: 0.3, release: 0.1}
+  Filter: {kind: Formant}
+  FilterEnvelope: {attack: 0.1, decay: 0.2, sustain: 0.2, release: 0.1, vowel: 3}
+  Oscillator: {wave: Saw, frequency: 82.5, level: 0.6}
 }

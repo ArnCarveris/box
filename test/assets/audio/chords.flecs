@@ -2,15 +2,16 @@
 // at 120 bpm, C Am F G7, held by keys over a bass. A motif plays twice, at bars 1 and 3, a duo
 // plays two notes and a kick that only plays C1 is a drum track left out of the chords.
 using box.audio
+using box.audio.synth
 
 prefab chords_tone {
-  SynthSound: {}
-  body { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3} }
+  Sound: {}
+  body { Oscillator: {wave: Sine, frequency: 440, level: 0.3} }
 }
 
 prefab chords_kick_sound {
-  SynthSound: {}
-  body { SynthOscillator: {wave: SynthSine, frequency: 50, level: 0.8} }
+  Sound: {}
+  body { Oscillator: {wave: Sine, frequency: 50, level: 0.8} }
 }
 
 chords_inst { Instrument: {sound: chords_tone} }

@@ -9,6 +9,7 @@ using flecs.script
 using flecs.script.math
 using box.app
 using box.audio
+using box.audio.synth
 
 hall { Bus: {output: master, kind: ChannelReturn, effects: [hall]}; Reverb: {decay: 1.6, damping: 0.55, predelay: 0.03, size: 0.7} }
 band { Bus: {output: master, volume: 0.55, sends: [{bus: hall, level: 0.35}]} }
@@ -21,14 +22,14 @@ template Pad {
   prop c: f32 = 329.63
 
   Output: {bus: band}
-  SynthSound: {seed: 5}
-  SynthEnvelope: {attack: 0.7, decay: 0.5, sustain: 0.75, hold: 0.6, release: 1.1}
-  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15}
-  SynthFilterEnvelope: {attack: 1.5, sustain: 1, hold: 1.41, amount: 0.83}
-  low { SynthOscillator: {wave: SynthSaw, frequency: a, level: 0.15} }
-  mid { SynthOscillator: {wave: SynthSaw, frequency: b * 1.003, level: 0.12} }
-  high { SynthOscillator: {wave: SynthTriangle, frequency: c, level: 0.2} }
-  air { SynthOscillator: {wave: SynthSaw, frequency: a * 1.994, level: 0.05} }
+  Sound: {seed: 5}
+  Envelope: {attack: 0.7, decay: 0.5, sustain: 0.75, hold: 0.6, release: 1.1}
+  Filter: {kind: LowPass, cutoff: 900, resonance: 0.15}
+  FilterEnvelope: {attack: 1.5, sustain: 1, hold: 1.41, amount: 0.83}
+  low { Oscillator: {wave: Saw, frequency: a, level: 0.15} }
+  mid { Oscillator: {wave: Saw, frequency: b * 1.003, level: 0.12} }
+  high { Oscillator: {wave: Triangle, frequency: c, level: 0.2} }
+  air { Oscillator: {wave: Saw, frequency: a * 1.994, level: 0.05} }
 }
 
 // A plucked bass whose filter closes as it decays
@@ -36,12 +37,12 @@ template Bass {
   prop f: f32 = 55
 
   Output: {bus: band}
-  SynthSound: {level_variance: 0.05}
-  SynthEnvelope: {attack: 0.004, decay: 0.42}
-  SynthFilter: {kind: SynthLowPass, cutoff: 220, resonance: 0.25}
-  SynthFilterEnvelope: {decay: 0.3, amount: 1.67}
-  body { SynthOscillator: {wave: SynthSaw, frequency: f, level: 0.4} }
-  sub { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.5} }
+  Sound: {level_variance: 0.05}
+  Envelope: {attack: 0.004, decay: 0.42}
+  Filter: {kind: LowPass, cutoff: 220, resonance: 0.25}
+  FilterEnvelope: {decay: 0.3, amount: 1.67}
+  body { Oscillator: {wave: Saw, frequency: f, level: 0.4} }
+  sub { Oscillator: {wave: Sine, frequency: f, level: 0.5} }
 }
 
 // A twangy pluck with a short ring an octave up
@@ -49,45 +50,45 @@ template Lead {
   prop f: f32 = 440
 
   Output: {bus: band}
-  SynthSound: {level_variance: 0.08}
-  SynthEnvelope: {attack: 0.006, decay: 0.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 700, resonance: 0.3}
-  SynthFilterEnvelope: {decay: 0.35, amount: 2.193}
-  pluck { SynthOscillator: {wave: SynthSquare, frequency: f, level: 0.14} }
-  body { SynthOscillator: {wave: SynthTriangle, frequency: f, level: 0.28} }
+  Sound: {level_variance: 0.08}
+  Envelope: {attack: 0.006, decay: 0.5}
+  Filter: {kind: LowPass, cutoff: 700, resonance: 0.3}
+  FilterEnvelope: {decay: 0.35, amount: 2.193}
+  pluck { Oscillator: {wave: Square, frequency: f, level: 0.14} }
+  body { Oscillator: {wave: Triangle, frequency: f, level: 0.28} }
   ring {
-    SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.08}
-    SynthEnvelope: {attack: 0.003, decay: 0.2}
+    Oscillator: {wave: Sine, frequency: f * 2, level: 0.08}
+    Envelope: {attack: 0.003, decay: 0.2}
   }
 }
 
 prefab Kick {
   Output: {bus: kit}
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.28}
-  SynthFilter: {kind: SynthLowPass, cutoff: 2400}
-  tone { SynthOscillator: {wave: SynthSine, frequency: 150, frequency_end: 46, sweep: 0.09, level: 0.9} }
+  Sound: {}
+  Envelope: {attack: 0.002, decay: 0.28}
+  Filter: {kind: LowPass, cutoff: 2400}
+  tone { Oscillator: {wave: Sine, frequency: 150, frequency_end: 46, sweep: 0.09, level: 0.9} }
   tap {
-    SynthOscillator: {wave: SynthNoise, level: 0.25}
-    SynthEnvelope: {attack: 0.001, decay: 0.008}
+    Oscillator: {wave: Noise, level: 0.25}
+    Envelope: {attack: 0.001, decay: 0.008}
   }
 }
 
 prefab Rim {
   Output: {bus: kit}
-  SynthSound: {seed: 4, level_variance: 0.1}
-  SynthEnvelope: {attack: 0.001, decay: 0.06}
-  SynthFilter: {kind: SynthBandPass, cutoff: 1800, resonance: 0.5}
-  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
-  tone { SynthOscillator: {wave: SynthTriangle, frequency: 820, level: 0.3} }
+  Sound: {seed: 4, level_variance: 0.1}
+  Envelope: {attack: 0.001, decay: 0.06}
+  Filter: {kind: BandPass, cutoff: 1800, resonance: 0.5}
+  noise { Oscillator: {wave: Noise, level: 0.6} }
+  tone { Oscillator: {wave: Triangle, frequency: 820, level: 0.3} }
 }
 
 prefab Hat {
   Output: {bus: kit}
-  SynthSound: {seed: 9, level_variance: 0.2}
-  SynthEnvelope: {attack: 0.001, decay: 0.045}
-  SynthFilter: {kind: SynthHighPass, cutoff: 7000, resonance: 0.2}
-  SynthOscillator: {wave: SynthNoise, level: 0.5}
+  Sound: {seed: 9, level_variance: 0.2}
+  Envelope: {attack: 0.001, decay: 0.045}
+  Filter: {kind: HighPass, cutoff: 7000, resonance: 0.2}
+  Oscillator: {wave: Noise, level: 0.5}
 }
 
 Pad pad_am(a: 220, b: 261.63, c: 329.63)

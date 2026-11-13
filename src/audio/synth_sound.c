@@ -75,6 +75,7 @@ void box_audio_synth_init(
         "SynthPitchEnvelopeDirty", "SynthDriveDirty", "SynthTableDirty",
         "SynthModRouteDirty", "SynthModEnvelopeDirty", "SynthBowDirty"
     };
+    ecs_entity_t scope = box_audio_synth_scope_push(world);
     int32_t i;
     for (i = 0; i < 15; i ++) {
         ecs_observer(world, {
@@ -85,6 +86,8 @@ void box_audio_synth_init(
             .callback = BoxAudioSynthDirty
         });
     }
+
+    box_audio_synth_scope_pop(world, scope);
 }
 
 /** Copy an envelope of the components into a patch.
@@ -562,7 +565,7 @@ bool box_audio_synth_compile(
         }
 
         if (routes) {
-            ecs_err("box.audio: synth '%s' has %d SynthModRoute, more than %d, the rest are "
+            ecs_err("box.audio: synth '%s' has %d synth.ModRoute, more than %d, the rest are "
                 "left out", path, (int)p.routes + routes, BOX_AUDIO_SYNTH_ROUTES);
         }
 
@@ -572,7 +575,7 @@ bool box_audio_synth_compile(
         }
 
         if (endless) {
-            ecs_err("box.audio: synth '%s' has a layer without a SynthEnvelope and would never "
+            ecs_err("box.audio: synth '%s' has a layer without a synth.Envelope and would never "
                 "end, it plays for %.0f seconds", path, (double)BOX_AUDIO_SYNTH_ENDLESS);
             p.envelope = (box_audio_synth_envelope_t){
                 .sustain = 1.0f, .hold = BOX_AUDIO_SYNTH_ENDLESS,
@@ -585,8 +588,8 @@ bool box_audio_synth_compile(
         }
 
         if (untabled) {
-            ecs_err("box.audio: synth '%s' has %d wavetable layers without a SynthTable that "
-                "names a Wavetable, they play a sine", path, (int)untabled);
+            ecs_err("box.audio: synth '%s' has %d wavetable layers without a synth.Table that "
+                "names a synth.Wavetable, they play a sine", path, (int)untabled);
         }
 
         ecs_os_free(path);

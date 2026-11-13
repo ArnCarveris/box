@@ -31,6 +31,7 @@
 // 32 comb filters, 64 modulators (4 per member), 32 macros of 8 maps, 256 synth sounds.
 
 using box.audio
+using box.audio.synth
 using box.material
 
 const demo_tempo = 120
@@ -42,11 +43,11 @@ box { audio { Song { Rgb: {90, 200, 255} } } }
 // output, post-fader sends. kind: ChannelGroup | ChannelReturn | ChannelSfx.
 
 demo_lift {
-  Filter: {
-    kind: SynthHighPass,   // SynthLowPass | SynthHighPass | SynthBandPass | SynthNotch
+  box.audio.Filter: {
+    kind: HighPass,   // LowPass | HighPass | BandPass | Notch
     cutoff: 20,
     resonance: 0.2,
-    slope: SynthSlope12,   // SynthSlope12 | SynthSlope24
+    slope: Slope12,   // Slope12 | Slope24
     mix: 1,
     drive: 0
   }
@@ -158,8 +159,8 @@ demo_drums {
   Meter: {}
 }
 
-// Sounds. A sound is an entity with SynthSound, SoundFile or Pcm. A synth sound is a root
-// plus children; the root and every child with a SynthOscillator is a layer. Envelopes, LFOs and
+// Sounds. A sound is an entity with Sound, SoundFile or Pcm. A synth sound is a root
+// plus children; the root and every child with a Oscillator is a layer. Envelopes, LFOs and
 // routes on the root apply to all layers; on a layer to that layer.
 
 demo_kick_file { SoundFile: {path: "test/assets/audio/kick.wav"} }
@@ -175,75 +176,75 @@ prefab demo_sawsquare { Wavetable: {kind: WavetableBasic, sound: demo_sawsquare_
 prefab demo_harmonics { Wavetable: {kind: WavetableHarmonics} }  // WavetableBasic | WavetablePulse | WavetableHarmonics
 
 prefab demo_kick_sound {
-  SynthSound: {seed: 1}
-  SynthDrive: {drive: 0.4, asymmetry: 0.1}
+  Sound: {seed: 1}
+  Drive: {drive: 0.4, asymmetry: 0.1}
   body {
-    SynthOscillator: {wave: SynthSine, frequency: 50, level: 0.9}
-    SynthEnvelope: {attack: 0.001, decay: 0.45, curve: 4}
-    SynthPitchEnvelope: {amount: 30, decay: 0.06, curve: 6}
+    Oscillator: {wave: Sine, frequency: 50, level: 0.9}
+    Envelope: {attack: 0.001, decay: 0.45, curve: 4}
+    PitchEnvelope: {amount: 30, decay: 0.06, curve: 6}
   }
   click {
-    SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, level: 0.4}
-    SynthEnvelope: {attack: 0.0005, decay: 0.01, curve: 3}
+    Oscillator: {wave: Noise, color: NoiseBrown, level: 0.4}
+    Envelope: {attack: 0.0005, decay: 0.01, curve: 3}
   }
 }
 
 prefab demo_snare_sound {
-  SynthSound: {seed: 2, pitch_variance: 0.02, level_variance: 0.05}
-  SynthFilter: {kind: SynthHighPass, cutoff: 160}
+  Sound: {seed: 2, pitch_variance: 0.02, level_variance: 0.05}
+  Filter: {kind: HighPass, cutoff: 160}
   body {
-    SynthOscillator: {wave: SynthTriangle, frequency: 240, frequency_end: 170, sweep: 0.05, level: 0.5}
-    SynthEnvelope: {attack: 0.001, decay: 0.12, curve: 4}
+    Oscillator: {wave: Triangle, frequency: 240, frequency_end: 170, sweep: 0.05, level: 0.5}
+    Envelope: {attack: 0.001, decay: 0.12, curve: 4}
   }
   wires {
-    SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.5}
-    SynthEnvelope: {attack: 0.001, decay: 0.22, curve: 5}
+    Oscillator: {wave: Noise, color: NoisePink, level: 0.5}
+    Envelope: {attack: 0.001, decay: 0.22, curve: 5}
   }
 }
 
 prefab demo_hat_sound {
-  SynthSound: {seed: 3, level_variance: 0.1}
-  SynthEnvelope: {attack: 0.0005, decay: 0.05, curve: 5}
-  SynthFilter: {kind: SynthHighPass, cutoff: 7500, resonance: 0.2, slope: SynthSlope24}
-  SynthOscillator: {wave: SynthNoise, color: SynthNoiseWhite, level: 0.5}
+  Sound: {seed: 3, level_variance: 0.1}
+  Envelope: {attack: 0.0005, decay: 0.05, curve: 5}
+  Filter: {kind: HighPass, cutoff: 7500, resonance: 0.2, slope: Slope24}
+  Oscillator: {wave: Noise, color: NoiseWhite, level: 0.5}
 }
 
 prefab demo_bass_sound {
-  SynthSound: {seed: 11}
-  SynthEnvelope: {attack: 0.003, decay: 0.25, sustain: 0.6, release: 0.08, curve: 4, key_scale: 0.3}
-  SynthDrive: {drive: 0.4, asymmetry: 0.2}
-  SynthFilter: {
-    kind: SynthLowPass,    // also SynthFormant (vowel filter) and SynthComb (tuned comb)
+  Sound: {seed: 11}
+  Envelope: {attack: 0.003, decay: 0.25, sustain: 0.6, release: 0.08, curve: 4, key_scale: 0.3}
+  Drive: {drive: 0.4, asymmetry: 0.2}
+  Filter: {
+    kind: LowPass,    // also Formant (vowel filter) and Comb (tuned comb)
     cutoff: 300,
     resonance: 0.6,
-    slope: SynthSlope24,
+    slope: Slope24,
     drive: 0.2,
     velocity: 1.5,         // octaves of cutoff at velocity 1 over velocity 0
     keytrack: 1,           // 0..1, cutoff follows the pitch
-    model: SynthFilterLadder,  // SynthFilterSvf | SynthFilterLadder
-    vowel: 0,              // SynthFormant only, 0 a, 1 e, 2 i, 3 o, 4 u
-    feedback: 0.5,         // SynthComb only, -0.98..0.98
-    tune: 1                // SynthComb only, comb frequency / note
+    model: FilterLadder,  // FilterSvf | FilterLadder
+    vowel: 0,              // Formant only, 0 a, 1 e, 2 i, 3 o, 4 u
+    feedback: 0.5,         // Comb only, -0.98..0.98
+    tune: 1                // Comb only, comb frequency / note
   }
-  SynthFilterEnvelope: {
+  FilterEnvelope: {
     attack: 0.002, decay: 0.18, sustain: 0.1, release: 0.1, hold: 0, curve: 3, attack_curve: 0,
     amount: 3,             // octaves at level 1, -10..10
     velocity: 0.6,
-    vowel: 0               // SynthFormant only, -4..4
+    vowel: 0               // Formant only, -4..4
   }
-  SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.5, sub: 0.6, sub_octave: 1}
-  accent { SynthModRoute: {source: SynthSourceFilterEnvelope, target: SynthTargetLevel, amount: 0.3} }
+  Oscillator: {wave: Saw, frequency: 440, level: 0.5, sub: 0.6, sub_octave: 1}
+  accent { ModRoute: {source: SourceFilterEnvelope, target: TargetLevel, amount: 0.3} }
 }
 
 prefab demo_lead_sound {
-  SynthSound: {
+  Sound: {
     seed: 21,
     pitch_variance: 0,
     level_variance: 0,
     drift: 4,              // cents, 0..50
     free_phase: true
   }
-  SynthEnvelope: {
+  Envelope: {
     attack: 0.01,
     decay: 0.3,
     sustain: 0.8,
@@ -253,17 +254,17 @@ prefab demo_lead_sound {
     attack_curve: 0,
     key_scale: 0           // 0..1, shorter decay/release for higher notes
   }
-  SynthFilter: {kind: SynthLowPass, cutoff: 1800, resonance: 0.25, slope: SynthSlope24, drive: 0.3,
+  Filter: {kind: LowPass, cutoff: 1800, resonance: 0.25, slope: Slope24, drive: 0.3,
     velocity: 1, keytrack: 0.5}
-  SynthFilterEnvelope: {attack: 0.005, decay: 0.4, sustain: 0.3, release: 0.3, amount: 1.5, velocity: 0.5}
-  SynthGlide: {
+  FilterEnvelope: {attack: 0.005, decay: 0.4, sustain: 0.3, release: 0.3, amount: 1.5, velocity: 0.5}
+  Glide: {
     time: 0.06,            // seconds, 0..10
     legato: true,          // overlapping notes glide in one voice
     channel: 1
   }
-  SynthModEnvelope: {attack: 0.3, decay: 0.8, sustain: 0.2, release: 0.3}
-  SynthLfo: {
-    wave: SynthLfoSine,    // SynthLfoSine | SynthLfoTriangle | SynthLfoSquare | SynthLfoSaw | SynthLfoRandom
+  ModEnvelope: {attack: 0.3, decay: 0.8, sustain: 0.2, release: 0.3}
+  Lfo: {
+    wave: LfoSine,    // LfoSine | LfoTriangle | LfoSquare | LfoSaw | LfoRandom
     rate: 5.5,
     sync: 0,               // beats per cycle, > 0 wins over rate
     delay: 0.25,
@@ -279,18 +280,18 @@ prefab demo_lead_sound {
     position: 0            // wavetable frames
   }
   saw {
-    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.3}
-    SynthUnison: {voices: 5, detune: 18, width: 0.8}
-    narrow { SynthModRoute: {source: SynthSourceKey, target: SynthTargetDetune, amount: -8} }
+    Oscillator: {wave: Saw, frequency: 440, level: 0.3}
+    Unison: {voices: 5, detune: 18, width: 0.8}
+    narrow { ModRoute: {source: SourceKey, target: TargetDetune, amount: -8} }
   }
   square {
-    SynthOscillator: {
-      wave: SynthSquare,   // SynthSine | SynthSaw | SynthSquare | SynthTriangle | SynthNoise | SynthPluck | SynthWavetable
+    Oscillator: {
+      wave: Square,   // Sine | Saw | Square | Triangle | Noise | Pluck | Wavetable
       frequency: 440,      // with Instrument.root 69 a layer at 440 plays the note's own pitch
       frequency_end: 0,    // sweep target, 0 = no sweep
       sweep: 0,
       level: 0.15,
-      modulation: SynthMix,  // SynthMix | SynthPhase (FM of parent) | SynthRing (ring mod of parent)
+      modulation: Mix,  // Mix | Phase (FM of parent) | Ring (ring mod of parent)
       index: 1,
       feedback: 0,
       audible: false,
@@ -299,113 +300,113 @@ prefab demo_lead_sound {
       sub_octave: 1,       // 1..2
       velocity: 0,
       sync: 0,             // hard sync ratio 1..16, 0 = off
-      color: SynthNoiseWhite  // SynthNoiseWhite | SynthNoisePink | SynthNoiseBrown
+      color: NoiseWhite  // NoiseWhite | NoisePink | NoiseBrown
     }
-    SynthLfo: {wave: SynthLfoTriangle, rate: 0.7}
-    pwm { SynthModRoute: {source: SynthSourceLfo2, target: SynthTargetPulseWidth, amount: 0.15} }
+    Lfo: {wave: LfoTriangle, rate: 0.7}
+    pwm { ModRoute: {source: SourceLfo2, target: TargetPulseWidth, amount: 0.15} }
   }
-  swell { SynthModRoute: {source: SynthSourceModEnvelope, target: SynthTargetCutoff, amount: 2} }
-  place { SynthModRoute: {source: SynthSourceRandom, target: SynthTargetPan, amount: 0.3} }
-  bite { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetResonance, amount: 0.3} }
+  swell { ModRoute: {source: SourceModEnvelope, target: TargetCutoff, amount: 2} }
+  place { ModRoute: {source: SourceRandom, target: TargetPan, amount: 0.3} }
+  bite { ModRoute: {source: SourceVelocity, target: TargetResonance, amount: 0.3} }
 }
 
 prefab demo_arp_sound {
-  SynthSound: {seed: 51}
-  SynthEnvelope: {attack: 0.002, decay: 0.15, sustain: 0.2, release: 0.1, curve: 4}
-  SynthFilter: {kind: SynthLowPass, cutoff: 5000, velocity: 1}
-  SynthPitchEnvelope: {
+  Sound: {seed: 51}
+  Envelope: {attack: 0.002, decay: 0.15, sustain: 0.2, release: 0.1, curve: 4}
+  Filter: {kind: LowPass, cutoff: 5000, velocity: 1}
+  PitchEnvelope: {
     amount: 0,             // semitones at note start, -48..48
     decay: 0.12,
     curve: 3,
     release_amount: -2,
     sync: 12               // semitones of the sync ratio at note start
   }
-  SynthLfo: {wave: SynthLfoSaw, sync: 4, hard_sync: 7}
+  Lfo: {wave: LfoSaw, sync: 4, hard_sync: 7}
   sync_saw {
-    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.25, sync: 2, sub: 0.3, sub_octave: 2}
-    rip { SynthModRoute: {source: SynthSourceAmpEnvelope, target: SynthTargetHardSync, amount: 5} }
+    Oscillator: {wave: Saw, frequency: 440, level: 0.25, sync: 2, sub: 0.3, sub_octave: 2}
+    rip { ModRoute: {source: SourceAmpEnvelope, target: TargetHardSync, amount: 5} }
   }
   table {
-    SynthOscillator: {wave: SynthWavetable, frequency: 440, level: 0.15}
-    SynthTable: {table: demo_sawsquare, position: 0, envelope: 1}
-    morph { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetPosition, amount: 0.5} }
+    Oscillator: {wave: Wavetable, frequency: 440, level: 0.15}
+    Table: {table: demo_sawsquare, position: 0, envelope: 1}
+    morph { ModRoute: {source: SourceLfo1, target: TargetPosition, amount: 0.5} }
   }
 }
 
 prefab demo_pad_sound {
-  SynthSound: {seed: 41, drift: 6, free_phase: true}
-  SynthEnvelope: {attack: 0.8, decay: 1, sustain: 0.8, release: 1.5, attack_curve: 1}
-  SynthFilter: {kind: SynthLowPass, cutoff: 4000, keytrack: 0.3}
-  SynthLfo: {wave: SynthLfoTriangle, sync: 8, position: 8}
+  Sound: {seed: 41, drift: 6, free_phase: true}
+  Envelope: {attack: 0.8, decay: 1, sustain: 0.8, release: 1.5, attack_curve: 1}
+  Filter: {kind: LowPass, cutoff: 4000, keytrack: 0.3}
+  Lfo: {wave: LfoTriangle, sync: 8, position: 8}
   table {
-    SynthOscillator: {wave: SynthWavetable, frequency: 440, level: 0.25}
-    SynthTable: {table: demo_harmonics, position: 3, envelope: 10}
-    SynthUnison: {voices: 4, detune: 14, width: 1}
+    Oscillator: {wave: Wavetable, frequency: 440, level: 0.25}
+    Table: {table: demo_harmonics, position: 3, envelope: 10}
+    Unison: {voices: 4, detune: 14, width: 1}
   }
 }
 
 prefab demo_choir_sound {
-  SynthSound: {seed: 91, drift: 7, free_phase: true}
-  SynthEnvelope: {attack: 0.5, decay: 0.5, sustain: 0.9, release: 1.2, attack_curve: 1}
-  SynthFilter: {kind: SynthFormant, vowel: 0, resonance: 0.3, drive: 0.1}
-  SynthFilterEnvelope: {attack: 1.5, decay: 1, sustain: 0.5, release: 1, vowel: 2}
-  SynthLfo: {rate: 0.2, random_phase: true, vowel: 0.5}
-  vibrato { SynthLfo: {rate: 5, delay: 0.4, fade: 0.8, random_phase: true, pitch: 8, amplitude: 0.1} }
+  Sound: {seed: 91, drift: 7, free_phase: true}
+  Envelope: {attack: 0.5, decay: 0.5, sustain: 0.9, release: 1.2, attack_curve: 1}
+  Filter: {kind: Formant, vowel: 0, resonance: 0.3, drive: 0.1}
+  FilterEnvelope: {attack: 1.5, decay: 1, sustain: 0.5, release: 1, vowel: 2}
+  Lfo: {rate: 0.2, random_phase: true, vowel: 0.5}
+  vibrato { Lfo: {rate: 5, delay: 0.4, fade: 0.8, random_phase: true, pitch: 8, amplitude: 0.1} }
   voices {
-    SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.35}
-    SynthUnison: {voices: 3, detune: 12, width: 0.7}
+    Oscillator: {wave: Saw, frequency: 440, level: 0.35}
+    Unison: {voices: 3, detune: 12, width: 0.7}
   }
-  breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.03} }
-  open { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetVowel, amount: 1.5} }
-  spread { SynthModRoute: {source: SynthSourceMod, target: SynthTargetDetune, amount: 15} }
-  shade { SynthModRoute: {source: SynthSourceKey, target: SynthTargetVowel, amount: 0.5} }
+  breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.03} }
+  open { ModRoute: {source: SourcePressure, target: TargetVowel, amount: 1.5} }
+  spread { ModRoute: {source: SourceMod, target: TargetDetune, amount: 15} }
+  shade { ModRoute: {source: SourceKey, target: TargetVowel, amount: 0.5} }
 }
 
 prefab demo_organ_sound {
-  SynthSound: {seed: 101}
-  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 1, release: 0.06}
-  sub { SynthOscillator: {frequency: 220, level: 0.25} }
-  main { SynthOscillator: {frequency: 440, level: 0.25} }
-  octave { SynthOscillator: {frequency: 880, level: 0.12} }
-  fifth { SynthOscillator: {frequency: 1320, level: 0.1} }
+  Sound: {seed: 101}
+  Envelope: {attack: 0.005, decay: 0.05, sustain: 1, release: 0.06}
+  sub { Oscillator: {frequency: 220, level: 0.25} }
+  main { Oscillator: {frequency: 440, level: 0.25} }
+  octave { Oscillator: {frequency: 880, level: 0.12} }
+  fifth { Oscillator: {frequency: 1320, level: 0.1} }
 }
 
 prefab demo_bell_sound {
-  SynthSound: {seed: 61, level_variance: 0.05}
-  SynthEnvelope: {attack: 0.002, decay: 1.8, sustain: 0, release: 1, curve: 4}
+  Sound: {seed: 61, level_variance: 0.05}
+  Envelope: {attack: 0.002, decay: 1.8, sustain: 0, release: 1, curve: 4}
   carrier {
-    SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.35}
+    Oscillator: {wave: Sine, frequency: 440, level: 0.35}
     fm {
-      SynthOscillator: {wave: SynthSine, frequency: 1232, modulation: SynthPhase, index: 3, feedback: 0.2,
+      Oscillator: {wave: Sine, frequency: 1232, modulation: Phase, index: 3, feedback: 0.2,
         velocity: 0.7}
-      SynthEnvelope: {attack: 0.001, decay: 0.6, sustain: 0.1, release: 0.5, curve: 4}
-      hit { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetIndex, amount: 2} }
+      Envelope: {attack: 0.001, decay: 0.6, sustain: 0.1, release: 0.5, curve: 4}
+      hit { ModRoute: {source: SourceVelocity, target: TargetIndex, amount: 2} }
     }
   }
   shine {
-    SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.12}
-    ring { SynthOscillator: {wave: SynthSine, frequency: 1310, modulation: SynthRing, index: 0.6} }
+    Oscillator: {wave: Triangle, frequency: 880, level: 0.12}
+    ring { Oscillator: {wave: Sine, frequency: 1310, modulation: Ring, index: 0.6} }
   }
-  detune { SynthModRoute: {source: SynthSourceRandom, target: SynthTargetPitch, amount: 0.1} }
+  detune { ModRoute: {source: SourceRandom, target: TargetPitch, amount: 0.1} }
 }
 
 prefab demo_pluck_sound {
-  SynthSound: {seed: 71}
-  SynthOscillator: {wave: SynthPluck, frequency: 440, level: 0.5}
-  SynthString: {
+  Sound: {seed: 71}
+  Oscillator: {wave: Pluck, frequency: 440, level: 0.5}
+  String: {
     decay: 1.5,            // seconds to -60 dB
     brightness: 0.6,
     hardness: 0.8,
     velocity: 0.5
   }
-  SynthUnison: {voices: 2, detune: 6, width: 0.6}
+  Unison: {voices: 2, detune: 6, width: 0.6}
 }
 
 prefab demo_comb_sound {
-  SynthSound: {seed: 81}
-  SynthEnvelope: {attack: 0.001, decay: 0.02, release: 0.01}
-  SynthFilter: {kind: SynthComb, cutoff: 8000, feedback: 0.95, tune: 1}
-  SynthOscillator: {wave: SynthNoise, frequency: 440, level: 0.5}
+  Sound: {seed: 81}
+  Envelope: {attack: 0.001, decay: 0.02, release: 0.01}
+  Filter: {kind: Comb, cutoff: 8000, feedback: 0.95, tune: 1}
+  Oscillator: {wave: Noise, frequency: 440, level: 0.5}
 }
 
 // Instruments turn notes into voices. Pitch ratio = 2^((pitch - root) / 12), gain = velocity^velocity_curve.
@@ -625,7 +626,7 @@ demo_samples {
   build_in { ClipPlacement: {clip: demo_impact, start: 48, gain: 0.6} }
 }
 
-demo_bass_filter { Filter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.3} }
+demo_bass_filter { box.audio.Filter: {kind: LowPass, cutoff: 1200, resonance: 0.3} }
 demo_duck {
   Compressor: {threshold: -30, ratio: 6, attack: 0.003, release: 0.15, sidechain: demo_kick}
   Meter: {}           // on an effect: reduction is the gain reduction in dB
@@ -789,7 +790,7 @@ demo_bells {
   answer { ClipPlacement: {clip: demo_bells_line, start: 32, offset: 8, duration: 8} }
 }
 
-demo_pluck_wah { Filter: {kind: SynthBandPass, cutoff: 500, resonance: 0.5, mix: 0.7} }
+demo_pluck_wah { box.audio.Filter: {kind: BandPass, cutoff: 500, resonance: 0.5, mix: 0.7} }
 
 demo_plucks {
   Track: {instrument: demo_pluck_inst, humanize: {timing: 5, velocity: 0.15}}
@@ -812,7 +813,7 @@ demo_combs {
 demo_wobble {
   Modulator: {
     target: demo_bass_filter,
-    component: Filter,
+    component: box.audio.Filter,
     member: "cutoff",
     source: ModLfo,
     depth: 1,              // either way, member units or octaves
@@ -835,7 +836,7 @@ demo_hat_steps {
 }
 
 demo_wah {
-  Modulator: {target: demo_pluck_wah, component: Filter, member: "cutoff", source: ModFollower,
+  Modulator: {target: demo_pluck_wah, component: box.audio.Filter, member: "cutoff", source: ModFollower,
     scale: ModOctaves, depth: 2,
     key: 0,                // bus to follow, 0 = the bus holding the target
     attack: 0.005, release: 0.15}
@@ -846,7 +847,7 @@ demo_wah {
 
 demo_build {
   Macro: {value: 0}
-  lift { MacroMap: {target: demo_lift, component: Filter, member: "cutoff", min: 20, max: 700,
+  lift { MacroMap: {target: demo_lift, component: box.audio.Filter, member: "cutoff", min: 20, max: 700,
     curve: 0, scale: ModOctaves} }
   wash { MacroMap: {target: demo_lead, component: Bus, member: "sends[0].level", min: 0.2, max: 0.7} }
   heat { MacroMap: {target: demo_crunch, component: Saturator, member: "drive", min: 0.2, max: 0.7,

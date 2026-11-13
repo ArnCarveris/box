@@ -16,6 +16,7 @@
 using flecs.script
 using box.transform
 using box.audio
+using box.audio.synth
 using state
 using assets
 
@@ -33,70 +34,70 @@ assets {
   // A toggle switch: a hard snap of noise over a falling tick and the knock of its body
   prefab SfxToggle {
     Output: {bus: ui}
-    SynthSound: {seed: 21, pitch_variance: 0.08, level_variance: 0.12}
-    SynthEnvelope: {attack: 0.0005, decay: 0.04}
-    SynthFilter: {kind: SynthHighPass, cutoff: 600, resonance: 0.15}
+    Sound: {seed: 21, pitch_variance: 0.08, level_variance: 0.12}
+    Envelope: {attack: 0.0005, decay: 0.04}
+    Filter: {kind: HighPass, cutoff: 600, resonance: 0.15}
     snap {
-      SynthOscillator: {wave: SynthNoise, level: 0.5}
-      SynthEnvelope: {attack: 0.0005, decay: 0.012}
+      Oscillator: {wave: Noise, level: 0.5}
+      Envelope: {attack: 0.0005, decay: 0.012}
     }
     tick {
-      SynthOscillator: {wave: SynthTriangle, frequency: 2600, frequency_end: 1400, sweep: 0.02, level: 0.45}
-      SynthEnvelope: {attack: 0.0005, decay: 0.025}
+      Oscillator: {wave: Triangle, frequency: 2600, frequency_end: 1400, sweep: 0.02, level: 0.45}
+      Envelope: {attack: 0.0005, decay: 0.025}
     }
-    knock { SynthOscillator: {wave: SynthSine, frequency: 1100, frequency_end: 700, sweep: 0.04, level: 0.35} }
+    knock { Oscillator: {wave: Sine, frequency: 1100, frequency_end: 700, sweep: 0.04, level: 0.35} }
   }
 
   // The red guard of the main switch, a plastic lid that flops open or shut
   prefab SfxGuard {
     Output: {bus: ui}
-    SynthSound: {seed: 22, pitch_variance: 0.06, level_variance: 0.1}
-    SynthEnvelope: {attack: 0.001, decay: 0.07}
-    SynthFilter: {kind: SynthBandPass, cutoff: 950, resonance: 0.3}
-    rub { SynthOscillator: {wave: SynthNoise, level: 0.7} }
-    thud { SynthOscillator: {wave: SynthTriangle, frequency: 520, frequency_end: 300, sweep: 0.06, level: 0.4} }
+    Sound: {seed: 22, pitch_variance: 0.06, level_variance: 0.1}
+    Envelope: {attack: 0.001, decay: 0.07}
+    Filter: {kind: BandPass, cutoff: 950, resonance: 0.3}
+    rub { Oscillator: {wave: Noise, level: 0.7} }
+    thud { Oscillator: {wave: Triangle, frequency: 520, frequency_end: 300, sweep: 0.06, level: 0.4} }
   }
 
   // The detent of a knob or a lever, a tiny bright tick
   prefab SfxDetent {
     Output: {bus: ui}
-    SynthSound: {seed: 23, pitch_variance: 0.12, level_variance: 0.2}
-    SynthEnvelope: {attack: 0.0005, decay: 0.008}
-    SynthFilter: {kind: SynthHighPass, cutoff: 2500}
-    grit { SynthOscillator: {wave: SynthNoise, level: 0.4} }
-    ping { SynthOscillator: {wave: SynthSine, frequency: 3400, level: 0.3} }
+    Sound: {seed: 23, pitch_variance: 0.12, level_variance: 0.2}
+    Envelope: {attack: 0.0005, decay: 0.008}
+    Filter: {kind: HighPass, cutoff: 2500}
+    grit { Oscillator: {wave: Noise, level: 0.4} }
+    ping { Oscillator: {wave: Sine, frequency: 3400, level: 0.3} }
   }
 
   // A cap button going down or coming up, soft and short
   prefab SfxButton {
     Output: {bus: ui}
-    SynthSound: {seed: 24, pitch_variance: 0.06, level_variance: 0.1}
-    SynthEnvelope: {attack: 0.001, decay: 0.03}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2200}
-    pad { SynthOscillator: {wave: SynthNoise, level: 0.4} }
-    tone { SynthOscillator: {wave: SynthSine, frequency: 720, frequency_end: 480, sweep: 0.03, level: 0.45} }
+    Sound: {seed: 24, pitch_variance: 0.06, level_variance: 0.1}
+    Envelope: {attack: 0.001, decay: 0.03}
+    Filter: {kind: LowPass, cutoff: 2200}
+    pad { Oscillator: {wave: Noise, level: 0.4} }
+    tone { Oscillator: {wave: Sine, frequency: 720, frequency_end: 480, sweep: 0.03, level: 0.45} }
   }
 
   // A circuit breaker popping out or pushed back in: a clack
   prefab SfxBreaker {
     Output: {bus: ui}
-    SynthSound: {seed: 25, pitch_variance: 0.07, level_variance: 0.1}
-    SynthEnvelope: {attack: 0.0005, decay: 0.035}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1500, resonance: 0.3}
-    clack { SynthOscillator: {wave: SynthNoise, level: 0.7} }
-    body { SynthOscillator: {wave: SynthSquare, frequency: 900, frequency_end: 400, sweep: 0.025, level: 0.22} }
+    Sound: {seed: 25, pitch_variance: 0.07, level_variance: 0.1}
+    Envelope: {attack: 0.0005, decay: 0.035}
+    Filter: {kind: BandPass, cutoff: 1500, resonance: 0.3}
+    clack { Oscillator: {wave: Noise, level: 0.7} }
+    body { Oscillator: {wave: Square, frequency: 900, frequency_end: 400, sweep: 0.025, level: 0.22} }
   }
 
   // A hand slapping the radio: a dull thump
   prefab SfxThump {
     Output: {bus: ui}
-    SynthSound: {seed: 26, pitch_variance: 0.05, level_variance: 0.1}
-    SynthEnvelope: {attack: 0.001, decay: 0.14}
-    SynthFilter: {kind: SynthLowPass, cutoff: 600}
-    boom { SynthOscillator: {wave: SynthSine, frequency: 130, frequency_end: 60, sweep: 0.09, level: 0.8} }
+    Sound: {seed: 26, pitch_variance: 0.05, level_variance: 0.1}
+    Envelope: {attack: 0.001, decay: 0.14}
+    Filter: {kind: LowPass, cutoff: 600}
+    boom { Oscillator: {wave: Sine, frequency: 130, frequency_end: 60, sweep: 0.09, level: 0.8} }
     slap {
-      SynthOscillator: {wave: SynthNoise, level: 0.5}
-      SynthEnvelope: {attack: 0.001, decay: 0.04}
+      Oscillator: {wave: Noise, level: 0.5}
+      Envelope: {attack: 0.001, decay: 0.04}
     }
   }
 
@@ -104,13 +105,13 @@ assets {
   // noise. It loops one pass of 60 seconds; the edges of 2 ms where a pass restarts are a gap the
   // lowpass smooths over.
   prefab EngineHum {
-    SynthSound: {seed: 11}
-    SynthEnvelope: {attack: 0.002, sustain: 1, hold: 59.99, release: 0.002}
-    SynthFilter: {kind: SynthLowPass, cutoff: 380, resonance: 0.35}
-    base { SynthOscillator: {wave: SynthSaw, frequency: 46, level: 0.5} }
-    fifth { SynthOscillator: {wave: SynthSquare, frequency: 69.3, level: 0.16} }
-    whine { SynthOscillator: {wave: SynthTriangle, frequency: 368, level: 0.05} }
-    rumble { SynthOscillator: {wave: SynthNoise, level: 0.22} }
+    Sound: {seed: 11}
+    Envelope: {attack: 0.002, sustain: 1, hold: 59.99, release: 0.002}
+    Filter: {kind: LowPass, cutoff: 380, resonance: 0.35}
+    base { Oscillator: {wave: Saw, frequency: 46, level: 0.5} }
+    fifth { Oscillator: {wave: Square, frequency: 69.3, level: 0.16} }
+    whine { Oscillator: {wave: Triangle, frequency: 368, level: 0.05} }
+    rumble { Oscillator: {wave: Noise, level: 0.22} }
   }
 }
 

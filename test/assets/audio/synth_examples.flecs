@@ -1,70 +1,71 @@
 // The nine synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
 // checks that they parse, compile without errors, play and end.
 using box.audio
+using box.audio.synth
 
 ui { Bus: {volume: 1} }
 
 // A click: a burst of noise and a falling tone, 31 ms
 prefab UiClick {
   Output: {bus: ui}
-  SynthSound: {pitch_variance: 0.05}
-  SynthEnvelope: {attack: 0.001, decay: 0.03}
-  noise { SynthOscillator: {wave: SynthNoise, level: 0.6} }
-  tone { SynthOscillator: {wave: SynthSine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
+  Sound: {pitch_variance: 0.05}
+  Envelope: {attack: 0.001, decay: 0.03}
+  noise { Oscillator: {wave: Noise, level: 0.6} }
+  tone { Oscillator: {wave: Sine, frequency: 1800, frequency_end: 900, sweep: 0.03, level: 0.4} }
 }
 
 // A UI blip: a soft square that steps up a fifth, through a lowpass
 prefab UiBlip {
   Output: {bus: ui}
-  SynthSound: {level_variance: 0.1}
-  SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
-  SynthFilter: {kind: SynthLowPass, cutoff: 3000, resonance: 0.2}
-  low { SynthOscillator: {wave: SynthSquare, frequency: 660, level: 0.25} }
+  Sound: {level_variance: 0.1}
+  Envelope: {attack: 0.004, decay: 0.06, sustain: 0.4, hold: 0.04, release: 0.05}
+  Filter: {kind: LowPass, cutoff: 3000, resonance: 0.2}
+  low { Oscillator: {wave: Square, frequency: 660, level: 0.25} }
   high {
-    SynthOscillator: {wave: SynthTriangle, frequency: 990, level: 0.3}
-    SynthEnvelope: {attack: 0.04, decay: 0.08}
+    Oscillator: {wave: Triangle, frequency: 990, level: 0.3}
+    Envelope: {attack: 0.04, decay: 0.08}
   }
 }
 
 // A whoosh: noise through a resonant bandpass that a filter envelope opens as it fades in
 prefab Whoosh {
-  SynthSound: {seed: 7, level_variance: 0.1}
-  SynthEnvelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
-  SynthFilter: {kind: SynthBandPass, cutoff: 300, resonance: 0.6}
-  SynthFilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.31, amount: 3.737}
-  SynthOscillator: {wave: SynthNoise, level: 0.8}
+  Sound: {seed: 7, level_variance: 0.1}
+  Envelope: {attack: 0.15, decay: 0.25, sustain: 0.3, hold: 0.1, release: 0.3}
+  Filter: {kind: BandPass, cutoff: 300, resonance: 0.6}
+  FilterEnvelope: {attack: 0.5, sustain: 1, hold: 0.31, amount: 3.737}
+  Oscillator: {wave: Noise, level: 0.8}
 }
 
 // A bell: a modulator at 3.5 times the pitch makes an inharmonic spectrum, and its envelope
 // is shorter than the carrier's, so the bell starts bright and rings out pure, 2.5 s
 prefab Bell {
-  SynthSound: {level_variance: 0.05}
-  SynthEnvelope: {attack: 0.002, decay: 2.5}
-  SynthOscillator: {frequency: 660, level: 0.4}
+  Sound: {level_variance: 0.05}
+  Envelope: {attack: 0.002, decay: 2.5}
+  Oscillator: {frequency: 660, level: 0.4}
   bright {
-    SynthOscillator: {frequency: 2310, modulation: SynthPhase, index: 4}
-    SynthEnvelope: {attack: 0.001, decay: 1.2}
+    Oscillator: {frequency: 2310, modulation: Phase, index: 4}
+    Envelope: {attack: 0.001, decay: 1.2}
   }
 }
 
 // An electric piano: a 1:1 pair for the body and a short tine, a modulator at 14 times the
 // pitch that fades in 80 ms, 1.6 s
 prefab ElectricPiano {
-  SynthSound: {}
+  Sound: {}
   body {
-    SynthOscillator: {frequency: 220, level: 0.35}
-    SynthEnvelope: {attack: 0.002, decay: 1.6}
+    Oscillator: {frequency: 220, level: 0.35}
+    Envelope: {attack: 0.002, decay: 1.6}
     warmth {
-      SynthOscillator: {frequency: 220, modulation: SynthPhase, index: 1.8}
-      SynthEnvelope: {attack: 0.002, decay: 0.6}
+      Oscillator: {frequency: 220, modulation: Phase, index: 1.8}
+      Envelope: {attack: 0.002, decay: 0.6}
     }
   }
   tine {
-    SynthOscillator: {frequency: 220, level: 0.12}
-    SynthEnvelope: {attack: 0.001, decay: 0.3}
+    Oscillator: {frequency: 220, level: 0.12}
+    Envelope: {attack: 0.001, decay: 0.3}
     strike {
-      SynthOscillator: {frequency: 3080, modulation: SynthPhase, index: 2.5}
-      SynthEnvelope: {attack: 0.001, decay: 0.08}
+      Oscillator: {frequency: 3080, modulation: Phase, index: 2.5}
+      Envelope: {attack: 0.001, decay: 0.08}
     }
   }
 }
@@ -72,53 +73,53 @@ prefab ElectricPiano {
 // A metallic hit: two partials that do not share harmonics, ring modulated, the modulator
 // gritty with feedback, and a short clang of FM on top, through a highpass, 0.6 s
 prefab MetalHit {
-  SynthSound: {pitch_variance: 0.03}
-  SynthEnvelope: {attack: 0.001, decay: 0.6}
-  SynthFilter: {kind: SynthHighPass, cutoff: 400}
-  SynthOscillator: {frequency: 587, level: 0.4}
-  ring { SynthOscillator: {frequency: 1371, modulation: SynthRing, index: 1, feedback: 0.6} }
+  Sound: {pitch_variance: 0.03}
+  Envelope: {attack: 0.001, decay: 0.6}
+  Filter: {kind: HighPass, cutoff: 400}
+  Oscillator: {frequency: 587, level: 0.4}
+  ring { Oscillator: {frequency: 1371, modulation: Ring, index: 1, feedback: 0.6} }
   clang {
-    SynthOscillator: {frequency: 1960, modulation: SynthPhase, index: 3}
-    SynthEnvelope: {attack: 0.001, decay: 0.15}
+    Oscillator: {frequency: 1960, modulation: Phase, index: 3}
+    Envelope: {attack: 0.001, decay: 0.15}
   }
 }
 
 // A pluck: a saw through a 24 dB lowpass that its filter envelope opens 4 octaves on the attack
 // and closes with the note
 prefab Pluck {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
-  SynthFilter: {kind: SynthLowPass, cutoff: 300, resonance: 0.3, slope: SynthSlope24}
-  SynthFilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.5}
+  Sound: {}
+  Envelope: {attack: 0.002, decay: 0.4, sustain: 0.3, hold: 0.1, release: 0.2}
+  Filter: {kind: LowPass, cutoff: 300, resonance: 0.3, slope: Slope24}
+  FilterEnvelope: {attack: 0.002, decay: 0.25, sustain: 0.2, hold: 0.25, release: 0.2, amount: 4}
+  Oscillator: {wave: Saw, frequency: 220, level: 0.5}
 }
 
 // A ring: a curved decay that falls fast and rings out, no sustain, its lowpass closing from
 // 4 kHz to 1.2 kHz over 0.3 s
 prefab Ring {
   Output: {bus: ui}
-  SynthSound: {level_variance: 0.1}
-  SynthEnvelope: {attack: 0.002, decay: 0.6, curve: 5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.1}
-  SynthFilterEnvelope: {decay: 0.3, amount: 1.737}
-  string { SynthOscillator: {wave: SynthTriangle, frequency: 330, level: 0.4} }
-  body { SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.3} }
+  Sound: {level_variance: 0.1}
+  Envelope: {attack: 0.002, decay: 0.6, curve: 5}
+  Filter: {kind: LowPass, cutoff: 1200, resonance: 0.1}
+  FilterEnvelope: {decay: 0.3, amount: 1.737}
+  string { Oscillator: {wave: Triangle, frequency: 330, level: 0.4} }
+  body { Oscillator: {wave: Sine, frequency: 330, level: 0.3} }
 }
 
 // Strings: an ensemble of five saws detuned around 220 Hz and one an octave up, a sine an
 // octave down and a breath of noise, eight layers, through a 24 dB lowpass that opens with the
 // bow and swells in, 1.6 s
 prefab Strings {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.3, decay: 0.2, sustain: 0.7, hold: 0.5, release: 0.6, curve: 2.5, attack_curve: 1.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.15, slope: SynthSlope24}
-  SynthFilterEnvelope: {attack: 0.4, sustain: 1, hold: 0.7, release: 0.5, amount: 1.5}
-  SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.08}
-  a { SynthOscillator: {wave: SynthSaw, frequency: 219.2, level: 0.08} }
-  b { SynthOscillator: {wave: SynthSaw, frequency: 220.9, level: 0.08} }
-  c { SynthOscillator: {wave: SynthSaw, frequency: 218.5, level: 0.07} }
-  d { SynthOscillator: {wave: SynthSaw, frequency: 221.6, level: 0.07} }
-  e { SynthOscillator: {wave: SynthSaw, frequency: 440.6, level: 0.04} }
-  sub { SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.12} }
-  air { SynthOscillator: {wave: SynthNoise, level: 0.01} }
+  Sound: {}
+  Envelope: {attack: 0.3, decay: 0.2, sustain: 0.7, hold: 0.5, release: 0.6, curve: 2.5, attack_curve: 1.5}
+  Filter: {kind: LowPass, cutoff: 900, resonance: 0.15, slope: Slope24}
+  FilterEnvelope: {attack: 0.4, sustain: 1, hold: 0.7, release: 0.5, amount: 1.5}
+  Oscillator: {wave: Saw, frequency: 220, level: 0.08}
+  a { Oscillator: {wave: Saw, frequency: 219.2, level: 0.08} }
+  b { Oscillator: {wave: Saw, frequency: 220.9, level: 0.08} }
+  c { Oscillator: {wave: Saw, frequency: 218.5, level: 0.07} }
+  d { Oscillator: {wave: Saw, frequency: 221.6, level: 0.07} }
+  e { Oscillator: {wave: Saw, frequency: 440.6, level: 0.04} }
+  sub { Oscillator: {wave: Sine, frequency: 110, level: 0.12} }
+  air { Oscillator: {wave: Noise, level: 0.01} }
 }

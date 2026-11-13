@@ -2,12 +2,13 @@
 // track twice, looped from beat 0 and transposed up an octave from beat 4, under a transport
 // at 132 bpm that loops from beat 0 to 6.
 using box.audio
+using box.audio.synth
 
 // A triangle at 440 Hz that sustains while a note holds and releases over 50 ms
 prefab pluck_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.05, sustain: 0.6, hold: 0.05, release: 0.05}
-  SynthOscillator: {wave: SynthTriangle, frequency: 440, level: 0.4}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.05, sustain: 0.6, hold: 0.05, release: 0.05}
+  Oscillator: {wave: Triangle, frequency: 440, level: 0.4}
 }
 
 pluck { Instrument: {sound: pluck_tone} }

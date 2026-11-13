@@ -1,5 +1,6 @@
 // The sounds the SynthWavetableAsset suite of test/cpu/audio loads wavetables from a file with.
 using box.audio
+using box.audio.synth
 
 // 8 frames of 2048 samples from a saw to a square, written by make_sounds.py
 SawSquareFile {
@@ -18,8 +19,8 @@ prefab SawSquareHalf {
 
 // A note of 200 Hz on frame 0 of the table, the saw
 prefab Morph {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.01}
-  SynthOscillator: {wave: SynthWavetable, frequency: 200, level: 0.3}
-  SynthTable: {table: SawSquare, position: 0}
+  Sound: {}
+  Envelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.01}
+  Oscillator: {wave: Wavetable, frequency: 200, level: 0.3}
+  Table: {table: SawSquare, position: 0}
 }

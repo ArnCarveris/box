@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {170, 110, 255} } } }
@@ -26,93 +27,93 @@ assets {
   prefab pd_pulses { Wavetable: {kind: WavetablePulse} }
 
   prefab pd_warm_sound {
-    SynthSound: {seed: 101, drift: 6, free_phase: true}
-    SynthEnvelope: {attack: 0.9, decay: 1.5, sustain: 0.85, release: 2.2, attack_curve: 1}
-    SynthFilter: {kind: SynthLowPass, cutoff: 750, resonance: 0.22, slope: SynthSlope24, model: SynthFilterLadder, keytrack: 0.4, drive: 0.2}
-    SynthFilterEnvelope: {attack: 1.4, decay: 2.5, sustain: 0.45, release: 2, amount: 1.4}
-    SynthLfo: {rate: 0.18, random_phase: true, cutoff: 0.25}
+    Sound: {seed: 101, drift: 6, free_phase: true}
+    Envelope: {attack: 0.9, decay: 1.5, sustain: 0.85, release: 2.2, attack_curve: 1}
+    Filter: {kind: LowPass, cutoff: 750, resonance: 0.22, slope: Slope24, model: FilterLadder, keytrack: 0.4, drive: 0.2}
+    FilterEnvelope: {attack: 1.4, decay: 2.5, sustain: 0.45, release: 2, amount: 1.4}
+    Lfo: {rate: 0.18, random_phase: true, cutoff: 0.25}
     saw {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.3}
-      SynthUnison: {voices: 5, detune: 16, width: 0.85}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.3}
+      Unison: {voices: 5, detune: 16, width: 0.85}
     }
     low {
-      SynthOscillator: {wave: SynthSaw, frequency: 220, level: 0.12}
-      SynthUnison: {voices: 3, detune: 9, width: 0.5}
+      Oscillator: {wave: Saw, frequency: 220, level: 0.12}
+      Unison: {voices: 3, detune: 9, width: 0.5}
     }
   }
 
   prefab pd_pulse_sound {
-    SynthSound: {seed: 102, drift: 4, free_phase: true}
-    SynthEnvelope: {attack: 0.35, decay: 1, sustain: 0.8, release: 1.6}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1900, resonance: 0.15, keytrack: 0.5}
-    SynthLfo: {wave: SynthLfoTriangle, rate: 0.35, random_phase: true, pulse_width: 0.38}
+    Sound: {seed: 102, drift: 4, free_phase: true}
+    Envelope: {attack: 0.35, decay: 1, sustain: 0.8, release: 1.6}
+    Filter: {kind: LowPass, cutoff: 1900, resonance: 0.15, keytrack: 0.5}
+    Lfo: {wave: LfoTriangle, rate: 0.35, random_phase: true, pulse_width: 0.38}
     wide {
-      SynthOscillator: {wave: SynthSquare, frequency: 440, level: 0.22, pulse_width: 0.5}
-      SynthUnison: {voices: 3, detune: 7, width: 0.7}
+      Oscillator: {wave: Square, frequency: 440, level: 0.22, pulse_width: 0.5}
+      Unison: {voices: 3, detune: 7, width: 0.7}
     }
     thin {
-      SynthOscillator: {wave: SynthSquare, frequency: 880, level: 0.06, pulse_width: 0.3}
-      SynthEnvelope: {attack: 0.8, decay: 1, sustain: 0.7, release: 1.6}
+      Oscillator: {wave: Square, frequency: 880, level: 0.06, pulse_width: 0.3}
+      Envelope: {attack: 0.8, decay: 1, sustain: 0.7, release: 1.6}
     }
   }
 
   prefab pd_glass_sound {
-    SynthSound: {seed: 103, drift: 3, level_variance: 0.03}
-    SynthEnvelope: {attack: 0.25, decay: 2.5, sustain: 0.6, release: 3}
-    SynthFilter: {kind: SynthLowPass, cutoff: 9000, velocity: 1}
-    SynthLfo: {rate: 3.2, random_phase: true, amplitude: 0.12}
+    Sound: {seed: 103, drift: 3, level_variance: 0.03}
+    Envelope: {attack: 0.25, decay: 2.5, sustain: 0.6, release: 3}
+    Filter: {kind: LowPass, cutoff: 9000, velocity: 1}
+    Lfo: {rate: 3.2, random_phase: true, amplitude: 0.12}
     bell {
-      SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3}
-      SynthUnison: {voices: 2, detune: 5, width: 0.8}
+      Oscillator: {wave: Sine, frequency: 440, level: 0.3}
+      Unison: {voices: 2, detune: 5, width: 0.8}
       ping {
-        SynthOscillator: {frequency: 1540, modulation: SynthPhase, index: 2.2, velocity: 0.6}
-        SynthEnvelope: {attack: 0.01, decay: 1.6, sustain: 0.15, release: 2, curve: 3}
+        Oscillator: {frequency: 1540, modulation: Phase, index: 2.2, velocity: 0.6}
+        Envelope: {attack: 0.01, decay: 1.6, sustain: 0.15, release: 2, curve: 3}
       }
     }
     shine {
-      SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.07}
-      SynthEnvelope: {attack: 1.2, decay: 2, sustain: 0.8, release: 3}
-      SynthUnison: {voices: 2, detune: 9, width: 1}
+      Oscillator: {wave: Sine, frequency: 880, level: 0.07}
+      Envelope: {attack: 1.2, decay: 2, sustain: 0.8, release: 3}
+      Unison: {voices: 2, detune: 9, width: 1}
     }
   }
 
   prefab pd_morph_sound {
-    SynthSound: {seed: 104, drift: 5, free_phase: true}
-    SynthEnvelope: {attack: 1.6, decay: 2, sustain: 0.85, release: 2.8, attack_curve: 1}
-    SynthFilter: {kind: SynthLowPass, cutoff: 5000, keytrack: 0.3}
-    SynthLfo: {wave: SynthLfoTriangle, sync: 8, position: 9}
+    Sound: {seed: 104, drift: 5, free_phase: true}
+    Envelope: {attack: 1.6, decay: 2, sustain: 0.85, release: 2.8, attack_curve: 1}
+    Filter: {kind: LowPass, cutoff: 5000, keytrack: 0.3}
+    Lfo: {wave: LfoTriangle, sync: 8, position: 9}
     sweep {
-      SynthOscillator: {wave: SynthWavetable, frequency: 440, level: 0.22}
-      SynthTable: {table: pd_harmonics, position: 2, envelope: 8}
-      SynthUnison: {voices: 4, detune: 12, width: 1}
+      Oscillator: {wave: Wavetable, frequency: 440, level: 0.22}
+      Table: {table: pd_harmonics, position: 2, envelope: 8}
+      Unison: {voices: 4, detune: 12, width: 1}
     }
     grain {
-      SynthOscillator: {wave: SynthWavetable, frequency: 880, level: 0.07}
-      SynthTable: {table: pd_pulses, position: 3, envelope: 6}
-      SynthUnison: {voices: 2, detune: 8, width: 0.6}
+      Oscillator: {wave: Wavetable, frequency: 880, level: 0.07}
+      Table: {table: pd_pulses, position: 3, envelope: 6}
+      Unison: {voices: 2, detune: 8, width: 0.6}
     }
   }
 
   prefab pd_choir_sound {
-    SynthSound: {seed: 105, drift: 7, level_variance: 0.04, free_phase: true}
-    SynthEnvelope: {attack: 0.8, decay: 1.2, sustain: 0.9, release: 1.8, attack_curve: 1}
-    SynthFilter: {kind: SynthFormant, vowel: 3, resonance: 0.35}
-    SynthLfo: {rate: 0.11, random_phase: true, vowel: 1.3}
-    vibrato { SynthLfo: {rate: 4.8, delay: 0.5, fade: 1.2, random_phase: true, pitch: 7} }
+    Sound: {seed: 105, drift: 7, level_variance: 0.04, free_phase: true}
+    Envelope: {attack: 0.8, decay: 1.2, sustain: 0.9, release: 1.8, attack_curve: 1}
+    Filter: {kind: Formant, vowel: 3, resonance: 0.35}
+    Lfo: {rate: 0.11, random_phase: true, vowel: 1.3}
+    vibrato { Lfo: {rate: 4.8, delay: 0.5, fade: 1.2, random_phase: true, pitch: 7} }
     voices {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.38}
-      SynthUnison: {voices: 4, detune: 11, width: 0.75}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.38}
+      Unison: {voices: 4, detune: 11, width: 0.75}
     }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.03} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.03} }
   }
 
   prefab pd_air_sound {
-    SynthSound: {seed: 106, drift: 4}
-    SynthEnvelope: {attack: 1.4, decay: 1.5, sustain: 0.85, release: 2.6, attack_curve: 1}
-    SynthFilter: {kind: SynthComb, feedback: 0.93, cutoff: 7000, keytrack: 0.3}
-    SynthLfo: {rate: 0.21, random_phase: true, amplitude: 0.25}
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, frequency: 440, level: 0.9} }
-    hum { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.05} }
+    Sound: {seed: 106, drift: 4}
+    Envelope: {attack: 1.4, decay: 1.5, sustain: 0.85, release: 2.6, attack_curve: 1}
+    Filter: {kind: Comb, feedback: 0.93, cutoff: 7000, keytrack: 0.3}
+    Lfo: {rate: 0.21, random_phase: true, amplitude: 0.25}
+    breath { Oscillator: {wave: Noise, color: NoisePink, frequency: 440, level: 0.9} }
+    hum { Oscillator: {wave: Sine, frequency: 440, level: 0.05} }
   }
 
   pd_warm { Instrument: {sound: pd_warm_sound, velocity_curve: 1.3} }

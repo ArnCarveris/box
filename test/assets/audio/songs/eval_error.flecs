@@ -1,13 +1,14 @@
 using box.audio
+using box.audio.synth
 
 eval_error_bus {
   Bus: {volume: 0.5}
 }
 
 prefab eval_error_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, decay: 0.2}
-  SynthOscillator: {wave: SynthSine, frequency: 330, level: 0.2}
+  Sound: {}
+  Envelope: {attack: 0.01, decay: 0.2}
+  Oscillator: {wave: Sine, frequency: 330, level: 0.2}
 }
 
 eval_error_bad {

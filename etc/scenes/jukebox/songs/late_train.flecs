@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 // LATE TRAIN - LIVE POCKET
@@ -28,142 +29,142 @@ assets {
   }
 
   prefab dk_kick_sound {
-    SynthSound: {seed: 1}
-    SynthDrive: {drive: 0.23}
-    SynthFilter: {kind: SynthLowPass, cutoff: 6200}
+    Sound: {seed: 1}
+    Drive: {drive: 0.23}
+    Filter: {kind: LowPass, cutoff: 6200}
     body {
-      SynthOscillator: {wave: SynthSine, frequency: 54, level: 0.92}
-      SynthEnvelope: {attack: 0.001, decay: 0.39, curve: 3}
-      SynthPitchEnvelope: {amount: 44, decay: 0.046, curve: 6}
+      Oscillator: {wave: Sine, frequency: 54, level: 0.92}
+      Envelope: {attack: 0.001, decay: 0.39, curve: 3}
+      PitchEnvelope: {amount: 44, decay: 0.046, curve: 6}
     }
     click {
-      SynthOscillator: {wave: SynthNoise, level: 0.22}
-      SynthEnvelope: {attack: 0.0005, decay: 0.009, curve: 3}
+      Oscillator: {wave: Noise, level: 0.22}
+      Envelope: {attack: 0.0005, decay: 0.009, curve: 3}
     }
   }
 
   prefab dk_snare_sound {
-    SynthSound: {seed: 2, level_variance: 0.065}
-    SynthDrive: {drive: 0.19}
-    SynthFilter: {kind: SynthHighPass, cutoff: 165}
+    Sound: {seed: 2, level_variance: 0.065}
+    Drive: {drive: 0.19}
+    Filter: {kind: HighPass, cutoff: 165}
     head {
-      SynthOscillator: {wave: SynthSine, frequency: 183, level: 0.58}
-      SynthEnvelope: {attack: 0.001, decay: 0.15, curve: 4}
-      SynthPitchEnvelope: {amount: 7, decay: 0.03, curve: 4}
+      Oscillator: {wave: Sine, frequency: 183, level: 0.58}
+      Envelope: {attack: 0.001, decay: 0.15, curve: 4}
+      PitchEnvelope: {amount: 7, decay: 0.03, curve: 4}
     }
     ring {
-      SynthOscillator: {wave: SynthSine, frequency: 326, level: 0.17}
-      SynthEnvelope: {attack: 0.001, decay: 0.07, curve: 4}
-      SynthPitchEnvelope: {amount: 5, decay: 0.02, curve: 4}
+      Oscillator: {wave: Sine, frequency: 326, level: 0.17}
+      Envelope: {attack: 0.001, decay: 0.07, curve: 4}
+      PitchEnvelope: {amount: 5, decay: 0.02, curve: 4}
     }
     wires {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.5}
-      SynthEnvelope: {attack: 0.001, decay: 0.205, curve: 5}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.5}
+      Envelope: {attack: 0.001, decay: 0.205, curve: 5}
     }
   }
 
   prefab dk_hat_sound {
-    SynthSound: {seed: 3, level_variance: 0.08}
-    SynthEnvelope: {attack: 0.0005, decay: 0.070, curve: 5}
-    SynthFilter: {kind: SynthHighPass, cutoff: 5700, resonance: 0.12, slope: SynthSlope24}
-    m1 { SynthOscillator: {wave: SynthSquare, frequency: 205.3, level: 0.2} }
-    m2 { SynthOscillator: {wave: SynthSquare, frequency: 304.4, level: 0.2} }
-    m3 { SynthOscillator: {wave: SynthSquare, frequency: 369.6, level: 0.2} }
-    m4 { SynthOscillator: {wave: SynthSquare, frequency: 522.7, level: 0.2} }
-    m5 { SynthOscillator: {wave: SynthSquare, frequency: 540, level: 0.2} }
-    m6 { SynthOscillator: {wave: SynthSquare, frequency: 800, level: 0.2} }
-    air { SynthOscillator: {wave: SynthNoise, level: 0.29} }
+    Sound: {seed: 3, level_variance: 0.08}
+    Envelope: {attack: 0.0005, decay: 0.070, curve: 5}
+    Filter: {kind: HighPass, cutoff: 5700, resonance: 0.12, slope: Slope24}
+    m1 { Oscillator: {wave: Square, frequency: 205.3, level: 0.2} }
+    m2 { Oscillator: {wave: Square, frequency: 304.4, level: 0.2} }
+    m3 { Oscillator: {wave: Square, frequency: 369.6, level: 0.2} }
+    m4 { Oscillator: {wave: Square, frequency: 522.7, level: 0.2} }
+    m5 { Oscillator: {wave: Square, frequency: 540, level: 0.2} }
+    m6 { Oscillator: {wave: Square, frequency: 800, level: 0.2} }
+    air { Oscillator: {wave: Noise, level: 0.29} }
   }
 
   prefab dk_open_hat_sound {
-    SynthSound: {seed: 4, level_variance: 0.05}
-    SynthEnvelope: {attack: 0.001, decay: 0.29, curve: 3}
-    SynthFilter: {kind: SynthHighPass, cutoff: 5700, resonance: 0.12, slope: SynthSlope24}
-    m1 { SynthOscillator: {wave: SynthSquare, frequency: 205.3, level: 0.2} }
-    m2 { SynthOscillator: {wave: SynthSquare, frequency: 304.4, level: 0.2} }
-    m3 { SynthOscillator: {wave: SynthSquare, frequency: 369.6, level: 0.2} }
-    m4 { SynthOscillator: {wave: SynthSquare, frequency: 522.7, level: 0.2} }
-    m5 { SynthOscillator: {wave: SynthSquare, frequency: 540, level: 0.2} }
-    m6 { SynthOscillator: {wave: SynthSquare, frequency: 800, level: 0.2} }
-    air { SynthOscillator: {wave: SynthNoise, level: 0.32} }
+    Sound: {seed: 4, level_variance: 0.05}
+    Envelope: {attack: 0.001, decay: 0.29, curve: 3}
+    Filter: {kind: HighPass, cutoff: 5700, resonance: 0.12, slope: Slope24}
+    m1 { Oscillator: {wave: Square, frequency: 205.3, level: 0.2} }
+    m2 { Oscillator: {wave: Square, frequency: 304.4, level: 0.2} }
+    m3 { Oscillator: {wave: Square, frequency: 369.6, level: 0.2} }
+    m4 { Oscillator: {wave: Square, frequency: 522.7, level: 0.2} }
+    m5 { Oscillator: {wave: Square, frequency: 540, level: 0.2} }
+    m6 { Oscillator: {wave: Square, frequency: 800, level: 0.2} }
+    air { Oscillator: {wave: Noise, level: 0.32} }
   }
 
   prefab dk_clap_sound {
-    SynthSound: {seed: 5, level_variance: 0.08}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1200, resonance: 0.3}
+    Sound: {seed: 5, level_variance: 0.08}
+    Filter: {kind: BandPass, cutoff: 1200, resonance: 0.3}
     hand1 {
-      SynthOscillator: {wave: SynthNoise, level: 1.3}
-      SynthEnvelope: {attack: 0.0005, decay: 0.009, curve: 4}
+      Oscillator: {wave: Noise, level: 1.3}
+      Envelope: {attack: 0.0005, decay: 0.009, curve: 4}
     }
     hand2 {
-      SynthOscillator: {wave: SynthNoise, level: 1.2}
-      SynthEnvelope: {attack: 0.011, attack_curve: -16, decay: 0.009, curve: 4}
+      Oscillator: {wave: Noise, level: 1.2}
+      Envelope: {attack: 0.011, attack_curve: -16, decay: 0.009, curve: 4}
     }
     hand3 {
-      SynthOscillator: {wave: SynthNoise, level: 1.2}
-      SynthEnvelope: {attack: 0.021, attack_curve: -16, decay: 0.009, curve: 4}
+      Oscillator: {wave: Noise, level: 1.2}
+      Envelope: {attack: 0.021, attack_curve: -16, decay: 0.009, curve: 4}
     }
     tail {
-      SynthOscillator: {wave: SynthNoise, level: 1.1}
-      SynthEnvelope: {attack: 0.031, attack_curve: -16, decay: 0.2, curve: 4}
-      SynthUnison: {voices: 2, detune: 0, width: 0.5}
+      Oscillator: {wave: Noise, level: 1.1}
+      Envelope: {attack: 0.031, attack_curve: -16, decay: 0.2, curve: 4}
+      Unison: {voices: 2, detune: 0, width: 0.5}
     }
   }
 
   prefab dk_tom_sound {
-    SynthSound: {seed: 6, level_variance: 0.04}
-    SynthDrive: {drive: 0.3}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4500}
+    Sound: {seed: 6, level_variance: 0.04}
+    Drive: {drive: 0.3}
+    Filter: {kind: LowPass, cutoff: 4500}
     head {
-      SynthOscillator: {wave: SynthSine, frequency: 110, level: 0.8}
-      SynthEnvelope: {attack: 0.001, decay: 0.55, curve: 3.5, key_scale: 0.5}
-      SynthPitchEnvelope: {amount: 5, decay: 0.12, curve: 3}
+      Oscillator: {wave: Sine, frequency: 110, level: 0.8}
+      Envelope: {attack: 0.001, decay: 0.55, curve: 3.5, key_scale: 0.5}
+      PitchEnvelope: {amount: 5, decay: 0.12, curve: 3}
     }
     mode {
-      SynthOscillator: {wave: SynthSine, frequency: 175, level: 0.22}
-      SynthEnvelope: {attack: 0.001, decay: 0.18, curve: 4, key_scale: 0.5}
-      SynthPitchEnvelope: {amount: 5, decay: 0.08, curve: 3}
+      Oscillator: {wave: Sine, frequency: 175, level: 0.22}
+      Envelope: {attack: 0.001, decay: 0.18, curve: 4, key_scale: 0.5}
+      PitchEnvelope: {amount: 5, decay: 0.08, curve: 3}
     }
     stick {
-      SynthOscillator: {wave: SynthNoise, level: 0.3}
-      SynthEnvelope: {attack: 0.0005, decay: 0.012, curve: 3}
+      Oscillator: {wave: Noise, level: 0.3}
+      Envelope: {attack: 0.0005, decay: 0.012, curve: 3}
     }
   }
 
   prefab dk_ride_sound {
-    SynthSound: {seed: 7, level_variance: 0.05}
-    SynthEnvelope: {attack: 0.001, decay: 1.65, curve: 4}
-    SynthFilter: {kind: SynthHighPass, cutoff: 3100}
-    m1 { SynthOscillator: {wave: SynthSquare, frequency: 287, level: 0.1} }
-    m2 { SynthOscillator: {wave: SynthSquare, frequency: 431, level: 0.1} }
-    m3 { SynthOscillator: {wave: SynthSquare, frequency: 513, level: 0.1} }
-    m4 { SynthOscillator: {wave: SynthSquare, frequency: 653, level: 0.1} }
-    m5 { SynthOscillator: {wave: SynthSquare, frequency: 769, level: 0.1} }
-    m6 { SynthOscillator: {wave: SynthSquare, frequency: 1021, level: 0.1} }
+    Sound: {seed: 7, level_variance: 0.05}
+    Envelope: {attack: 0.001, decay: 1.65, curve: 4}
+    Filter: {kind: HighPass, cutoff: 3100}
+    m1 { Oscillator: {wave: Square, frequency: 287, level: 0.1} }
+    m2 { Oscillator: {wave: Square, frequency: 431, level: 0.1} }
+    m3 { Oscillator: {wave: Square, frequency: 513, level: 0.1} }
+    m4 { Oscillator: {wave: Square, frequency: 653, level: 0.1} }
+    m5 { Oscillator: {wave: Square, frequency: 769, level: 0.1} }
+    m6 { Oscillator: {wave: Square, frequency: 1021, level: 0.1} }
     ping {
-      SynthOscillator: {wave: SynthSine, frequency: 3100, level: 0.23}
-      SynthEnvelope: {attack: 0.001, decay: 0.35, curve: 3}
-      bell { SynthOscillator: {frequency: 4371, modulation: SynthPhase, index: 2.2} }
+      Oscillator: {wave: Sine, frequency: 3100, level: 0.23}
+      Envelope: {attack: 0.001, decay: 0.35, curve: 3}
+      bell { Oscillator: {frequency: 4371, modulation: Phase, index: 2.2} }
     }
   }
 
   prefab dk_crash_sound {
-    SynthSound: {seed: 8, level_variance: 0.04}
-    SynthEnvelope: {attack: 0.002, decay: 2.05, curve: 3}
-    SynthFilter: {kind: SynthHighPass, cutoff: 2200}
-    m1 { SynthOscillator: {wave: SynthSquare, frequency: 245, level: 0.09} }
-    m2 { SynthOscillator: {wave: SynthSquare, frequency: 367, level: 0.09} }
-    m3 { SynthOscillator: {wave: SynthSquare, frequency: 459, level: 0.09} }
-    m4 { SynthOscillator: {wave: SynthSquare, frequency: 611, level: 0.09} }
-    m5 { SynthOscillator: {wave: SynthSquare, frequency: 692, level: 0.09} }
+    Sound: {seed: 8, level_variance: 0.04}
+    Envelope: {attack: 0.002, decay: 2.05, curve: 3}
+    Filter: {kind: HighPass, cutoff: 2200}
+    m1 { Oscillator: {wave: Square, frequency: 245, level: 0.09} }
+    m2 { Oscillator: {wave: Square, frequency: 367, level: 0.09} }
+    m3 { Oscillator: {wave: Square, frequency: 459, level: 0.09} }
+    m4 { Oscillator: {wave: Square, frequency: 611, level: 0.09} }
+    m5 { Oscillator: {wave: Square, frequency: 692, level: 0.09} }
     wash {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.6}
-      SynthUnison: {voices: 3, detune: 0, width: 0.9}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.6}
+      Unison: {voices: 3, detune: 0, width: 0.9}
     }
     splash {
-      SynthOscillator: {wave: SynthNoise, level: 0.6}
-      SynthEnvelope: {attack: 0.001, decay: 0.18, curve: 4}
-      SynthUnison: {voices: 2, detune: 0, width: 0.7}
+      Oscillator: {wave: Noise, level: 0.6}
+      Envelope: {attack: 0.001, decay: 0.18, curve: 4}
+      Unison: {voices: 2, detune: 0, width: 0.7}
     }
   }
 
@@ -179,27 +180,27 @@ assets {
 
   // Additional low-level acoustic-style articulations for quiet moments and ghost texture.
   prefab lp_rim_sound {
-    SynthSound: {seed: 11, level_variance: 0.085}
-    SynthFilter: {kind: SynthHighPass, cutoff: 350}
+    Sound: {seed: 11, level_variance: 0.085}
+    Filter: {kind: HighPass, cutoff: 350}
     wood {
-      SynthOscillator: {wave: SynthSine, frequency: 830, level: 0.42}
-      SynthEnvelope: {attack: 0.0008, decay: 0.055, curve: 4}
+      Oscillator: {wave: Sine, frequency: 830, level: 0.42}
+      Envelope: {attack: 0.0008, decay: 0.055, curve: 4}
     }
     overtone {
-      SynthOscillator: {wave: SynthSine, frequency: 1225, level: 0.13}
-      SynthEnvelope: {attack: 0.0005, decay: 0.032, curve: 5}
+      Oscillator: {wave: Sine, frequency: 1225, level: 0.13}
+      Envelope: {attack: 0.0005, decay: 0.032, curve: 5}
     }
     tick {
-      SynthOscillator: {wave: SynthNoise, level: 0.24}
-      SynthEnvelope: {attack: 0.0005, decay: 0.012, curve: 5}
+      Oscillator: {wave: Noise, level: 0.24}
+      Envelope: {attack: 0.0005, decay: 0.012, curve: 5}
     }
   }
   prefab lp_shaker_sound {
-    SynthSound: {seed: 12, level_variance: 0.11}
-    SynthFilter: {kind: SynthHighPass, cutoff: 5400}
-    SynthEnvelope: {attack: 0.002, decay: 0.064, curve: 5}
-    sand { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.65} }
-    grain { SynthOscillator: {wave: SynthNoise, level: 0.29} }
+    Sound: {seed: 12, level_variance: 0.11}
+    Filter: {kind: HighPass, cutoff: 5400}
+    Envelope: {attack: 0.002, decay: 0.064, curve: 5}
+    sand { Oscillator: {wave: Noise, color: NoisePink, level: 0.65} }
+    grain { Oscillator: {wave: Noise, level: 0.29} }
   }
   lp_rim_inst { Instrument: {sound: lp_rim_sound, root: 37, gate: false} }
   lp_shaker_inst { Instrument: {sound: lp_shaker_sound, root: 82, gate: false, spread: 0.20, spread_mode: InstrumentSpreadRandom} }

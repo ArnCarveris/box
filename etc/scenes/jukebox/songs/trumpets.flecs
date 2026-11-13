@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {232, 172, 64} } } }
@@ -67,182 +68,182 @@ assets {
   tp_harmon_buzz { Saturator: {drive: 0.15, tone: 0.4, low_cut: 700, high_cut: 11000, mix: 0.7} }
 
   prefab tp_trumpet_sound {
-    SynthSound: {seed: 11, level_variance: 0.03}
-    SynthGlide: {time: 0.03, legato: true, channel: 1}
-    SynthEnvelope: {attack: 0.03, attack_curve: 0.5, decay: 0.16, sustain: 0.78, release: 0.09, curve: 2}
-    SynthPitchEnvelope: {amount: -0.8, decay: 0.06, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1500, resonance: 0.3, velocity: 4, keytrack: 0.35}
-    SynthFilterEnvelope: {attack: 0.045, attack_curve: -1, decay: 0.3, sustain: 0.4, release: 0.15, amount: 1, velocity: 0.6}
-    SynthLfo: {rate: 5.5, delay: 0.3, fade: 0.35, random_phase: true, pitch: 9, amplitude: 0.03, cutoff: 0.05}
-    wander { SynthLfo: {wave: SynthLfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
+    Sound: {seed: 11, level_variance: 0.03}
+    Glide: {time: 0.03, legato: true, channel: 1}
+    Envelope: {attack: 0.03, attack_curve: 0.5, decay: 0.16, sustain: 0.78, release: 0.09, curve: 2}
+    PitchEnvelope: {amount: -0.8, decay: 0.06, curve: 2}
+    Filter: {kind: LowPass, cutoff: 1500, resonance: 0.3, velocity: 4, keytrack: 0.35}
+    FilterEnvelope: {attack: 0.045, attack_curve: -1, decay: 0.3, sustain: 0.4, release: 0.15, amount: 1, velocity: 0.6}
+    Lfo: {rate: 5.5, delay: 0.3, fade: 0.35, random_phase: true, pitch: 9, amplitude: 0.03, cutoff: 0.05}
+    wander { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
     buzz {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.08}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.08}
       bloom {
-        SynthOscillator: {wave: SynthSine, frequency: 440, modulation: SynthPhase, index: 1.35, velocity: 1}
-        SynthEnvelope: {attack: 0.05, attack_curve: -1, decay: 0.25, sustain: 0.85, release: 0.1, curve: 2}
+        Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 1.35, velocity: 1}
+        Envelope: {attack: 0.05, attack_curve: -1, decay: 0.25, sustain: 0.85, release: 0.1, curve: 2}
       }
     }
     tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.02}
-      SynthEnvelope: {attack: 0.001, decay: 0.025, sustain: 0, release: 0.01, curve: 3}
-      attack_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Noise, level: 0.02}
+      Envelope: {attack: 0.001, decay: 0.025, sustain: 0, release: 0.01, curve: 3}
+      attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.0025} }
-    breath_bloom { SynthModRoute: {source: SynthSourceMod, target: SynthTargetIndex, amount: 0.15} }
-    breath_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 3} }
-    breath_tone { SynthModRoute: {source: SynthSourceMod, target: SynthTargetCutoff, amount: 1.2} }
-    push_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
-    push_bloom { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetIndex, amount: 0.6} }
-    push_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.0025} }
+    breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.15} }
+    breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
+    breath_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.2} }
+    push_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
+    push_bloom { ModRoute: {source: SourcePressure, target: TargetIndex, amount: 0.6} }
+    push_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
   }
 
   prefab tp_piccolo_sound {
-    SynthSound: {seed: 21, level_variance: 0.03}
-    SynthGlide: {time: 0.02, legato: true, channel: 2}
-    SynthEnvelope: {attack: 0.018, attack_curve: 0.5, decay: 0.1, sustain: 0.75, release: 0.07, curve: 2}
-    SynthPitchEnvelope: {amount: -0.4, decay: 0.035, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2800, resonance: 0.2, velocity: 2.4, keytrack: 0.3}
-    SynthFilterEnvelope: {attack: 0.03, attack_curve: -1, decay: 0.2, sustain: 0.5, release: 0.1, amount: 0.8, velocity: 0.5}
-    SynthLfo: {rate: 5.8, delay: 0.45, fade: 0.4, random_phase: true, pitch: 4, amplitude: 0.02}
-    wander { SynthLfo: {wave: SynthLfoTriangle, rate: 0.7, random_phase: true, pitch: 2} }
+    Sound: {seed: 21, level_variance: 0.03}
+    Glide: {time: 0.02, legato: true, channel: 2}
+    Envelope: {attack: 0.018, attack_curve: 0.5, decay: 0.1, sustain: 0.75, release: 0.07, curve: 2}
+    PitchEnvelope: {amount: -0.4, decay: 0.035, curve: 2}
+    Filter: {kind: LowPass, cutoff: 2800, resonance: 0.2, velocity: 2.4, keytrack: 0.3}
+    FilterEnvelope: {attack: 0.03, attack_curve: -1, decay: 0.2, sustain: 0.5, release: 0.1, amount: 0.8, velocity: 0.5}
+    Lfo: {rate: 5.8, delay: 0.45, fade: 0.4, random_phase: true, pitch: 4, amplitude: 0.02}
+    wander { Lfo: {wave: LfoTriangle, rate: 0.7, random_phase: true, pitch: 2} }
     buzz {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.075}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.075}
       bloom {
-        SynthOscillator: {wave: SynthSine, frequency: 440, modulation: SynthPhase, index: 1.15, velocity: 1}
-        SynthEnvelope: {attack: 0.03, attack_curve: -1, decay: 0.18, sustain: 0.7, release: 0.1, curve: 2}
+        Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 1.15, velocity: 1}
+        Envelope: {attack: 0.03, attack_curve: -1, decay: 0.18, sustain: 0.7, release: 0.1, curve: 2}
       }
     }
     tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.018}
-      SynthEnvelope: {attack: 0.001, decay: 0.018, sustain: 0, release: 0.01, curve: 3}
-      attack_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Noise, level: 0.018}
+      Envelope: {attack: 0.001, decay: 0.018, sustain: 0, release: 0.01, curve: 3}
+      attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.0015} }
-    breath_bloom { SynthModRoute: {source: SynthSourceMod, target: SynthTargetIndex, amount: 0.25} }
-    breath_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 3} }
-    breath_tone { SynthModRoute: {source: SynthSourceMod, target: SynthTargetCutoff, amount: 1.2} }
-    push_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
-    push_bloom { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetIndex, amount: 0.5} }
-    push_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.0015} }
+    breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.25} }
+    breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
+    breath_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.2} }
+    push_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
+    push_bloom { ModRoute: {source: SourcePressure, target: TargetIndex, amount: 0.5} }
+    push_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
   }
 
   prefab tp_cornet_sound {
-    SynthSound: {seed: 31, level_variance: 0.03}
-    SynthGlide: {time: 0.035, legato: true, channel: 3}
-    SynthEnvelope: {attack: 0.034, attack_curve: 0.5, decay: 0.18, sustain: 0.8, release: 0.11, curve: 2}
-    SynthPitchEnvelope: {amount: -0.6, decay: 0.06, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 850, resonance: 0.15, velocity: 2.6, keytrack: 0.4}
-    SynthFilterEnvelope: {attack: 0.05, attack_curve: -1, decay: 0.3, sustain: 0.4, release: 0.15, amount: 0.9, velocity: 0.6}
-    SynthLfo: {rate: 5.6, delay: 0.32, fade: 0.4, random_phase: true, pitch: 13, amplitude: 0.04}
-    wander { SynthLfo: {wave: SynthLfoTriangle, rate: 0.55, random_phase: true, pitch: 2.5} }
+    Sound: {seed: 31, level_variance: 0.03}
+    Glide: {time: 0.035, legato: true, channel: 3}
+    Envelope: {attack: 0.034, attack_curve: 0.5, decay: 0.18, sustain: 0.8, release: 0.11, curve: 2}
+    PitchEnvelope: {amount: -0.6, decay: 0.06, curve: 2}
+    Filter: {kind: LowPass, cutoff: 850, resonance: 0.15, velocity: 2.6, keytrack: 0.4}
+    FilterEnvelope: {attack: 0.05, attack_curve: -1, decay: 0.3, sustain: 0.4, release: 0.15, amount: 0.9, velocity: 0.6}
+    Lfo: {rate: 5.6, delay: 0.32, fade: 0.4, random_phase: true, pitch: 13, amplitude: 0.04}
+    wander { Lfo: {wave: LfoTriangle, rate: 0.55, random_phase: true, pitch: 2.5} }
     buzz {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.075}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.075}
       bloom {
-        SynthOscillator: {wave: SynthSine, frequency: 440, modulation: SynthPhase, index: 0.6, velocity: 1}
-        SynthEnvelope: {attack: 0.055, attack_curve: -1, decay: 0.3, sustain: 0.7, release: 0.1, curve: 2}
+        Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.6, velocity: 1}
+        Envelope: {attack: 0.055, attack_curve: -1, decay: 0.3, sustain: 0.7, release: 0.1, curve: 2}
       }
     }
     tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.015}
-      SynthEnvelope: {attack: 0.001, decay: 0.022, sustain: 0, release: 0.01, curve: 3}
-      attack_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Noise, level: 0.015}
+      Envelope: {attack: 0.001, decay: 0.022, sustain: 0, release: 0.01, curve: 3}
+      attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.003} }
-    breath_bloom { SynthModRoute: {source: SynthSourceMod, target: SynthTargetIndex, amount: 0.2} }
-    breath_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 3} }
-    breath_tone { SynthModRoute: {source: SynthSourceMod, target: SynthTargetCutoff, amount: 1.2} }
-    push_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
-    push_bloom { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetIndex, amount: 0.4} }
-    push_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.003} }
+    breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.2} }
+    breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
+    breath_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.2} }
+    push_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
+    push_bloom { ModRoute: {source: SourcePressure, target: TargetIndex, amount: 0.4} }
+    push_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
   }
 
   prefab tp_flugel_sound {
-    SynthSound: {seed: 41, level_variance: 0.03}
-    SynthGlide: {time: 0.045, legato: true, channel: 4}
-    SynthEnvelope: {attack: 0.05, attack_curve: 0.5, decay: 0.25, sustain: 0.85, release: 0.18, curve: 2}
-    SynthPitchEnvelope: {amount: -0.5, decay: 0.08, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 800, resonance: 0.05, slope: SynthSlope24, velocity: 2.2, keytrack: 0.45}
-    SynthFilterEnvelope: {attack: 0.07, attack_curve: -1, decay: 0.35, sustain: 0.4, release: 0.2, amount: 0.7, velocity: 0.5}
-    SynthLfo: {rate: 5.2, delay: 0.4, fade: 0.5, random_phase: true, pitch: 11, amplitude: 0.05}
-    wander { SynthLfo: {wave: SynthLfoTriangle, rate: 0.5, random_phase: true, pitch: 3} }
+    Sound: {seed: 41, level_variance: 0.03}
+    Glide: {time: 0.045, legato: true, channel: 4}
+    Envelope: {attack: 0.05, attack_curve: 0.5, decay: 0.25, sustain: 0.85, release: 0.18, curve: 2}
+    PitchEnvelope: {amount: -0.5, decay: 0.08, curve: 2}
+    Filter: {kind: LowPass, cutoff: 800, resonance: 0.05, slope: Slope24, velocity: 2.2, keytrack: 0.45}
+    FilterEnvelope: {attack: 0.07, attack_curve: -1, decay: 0.35, sustain: 0.4, release: 0.2, amount: 0.7, velocity: 0.5}
+    Lfo: {rate: 5.2, delay: 0.4, fade: 0.5, random_phase: true, pitch: 11, amplitude: 0.05}
+    wander { Lfo: {wave: LfoTriangle, rate: 0.5, random_phase: true, pitch: 3} }
     buzz {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.075}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.075}
       bloom {
-        SynthOscillator: {wave: SynthSine, frequency: 440, modulation: SynthPhase, index: 0.3, velocity: 1}
-        SynthEnvelope: {attack: 0.075, attack_curve: -1, decay: 0.35, sustain: 0.7, release: 0.1, curve: 2}
+        Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.3, velocity: 1}
+        Envelope: {attack: 0.075, attack_curve: -1, decay: 0.35, sustain: 0.7, release: 0.1, curve: 2}
       }
     }
     tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.01}
-      SynthEnvelope: {attack: 0.002, decay: 0.03, sustain: 0, release: 0.01, curve: 3}
-      attack_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Noise, level: 0.01}
+      Envelope: {attack: 0.002, decay: 0.03, sustain: 0, release: 0.01, curve: 3}
+      attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.008} }
-    breath_bloom { SynthModRoute: {source: SynthSourceMod, target: SynthTargetIndex, amount: 0.2} }
-    breath_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 3} }
-    breath_tone { SynthModRoute: {source: SynthSourceMod, target: SynthTargetCutoff, amount: 1.2} }
-    push_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
-    push_bloom { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetIndex, amount: 0.3} }
-    push_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.008} }
+    breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.2} }
+    breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
+    breath_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.2} }
+    push_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
+    push_bloom { ModRoute: {source: SourcePressure, target: TargetIndex, amount: 0.3} }
+    push_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
   }
 
   prefab tp_straight_sound {
-    SynthSound: {seed: 51, level_variance: 0.03}
-    SynthGlide: {time: 0.025, legato: true, channel: 5}
-    SynthEnvelope: {attack: 0.022, attack_curve: 0.5, decay: 0.12, sustain: 0.75, release: 0.08, curve: 2}
-    SynthPitchEnvelope: {amount: -0.6, decay: 0.045, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1050, resonance: 0.25, velocity: 1.8, keytrack: 0.3}
-    SynthFilterEnvelope: {attack: 0.035, attack_curve: -1, decay: 0.2, sustain: 0.5, release: 0.1, amount: 0.8, velocity: 0.5}
-    SynthLfo: {rate: 5.8, delay: 0.3, fade: 0.3, random_phase: true, pitch: 8, amplitude: 0.03}
-    wander { SynthLfo: {wave: SynthLfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
+    Sound: {seed: 51, level_variance: 0.03}
+    Glide: {time: 0.025, legato: true, channel: 5}
+    Envelope: {attack: 0.022, attack_curve: 0.5, decay: 0.12, sustain: 0.75, release: 0.08, curve: 2}
+    PitchEnvelope: {amount: -0.6, decay: 0.045, curve: 2}
+    Filter: {kind: LowPass, cutoff: 1050, resonance: 0.25, velocity: 1.8, keytrack: 0.3}
+    FilterEnvelope: {attack: 0.035, attack_curve: -1, decay: 0.2, sustain: 0.5, release: 0.1, amount: 0.8, velocity: 0.5}
+    Lfo: {rate: 5.8, delay: 0.3, fade: 0.3, random_phase: true, pitch: 8, amplitude: 0.03}
+    wander { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
     buzz {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.08}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.08}
       bloom {
-        SynthOscillator: {wave: SynthSine, frequency: 440, modulation: SynthPhase, index: 0.8, velocity: 1}
-        SynthEnvelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.7, release: 0.1, curve: 2}
+        Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.8, velocity: 1}
+        Envelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.7, release: 0.1, curve: 2}
       }
     }
     tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.018}
-      SynthEnvelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01, curve: 3}
-      attack_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Noise, level: 0.018}
+      Envelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01, curve: 3}
+      attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.002} }
-    breath_bloom { SynthModRoute: {source: SynthSourceMod, target: SynthTargetIndex, amount: 0.25} }
-    breath_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 3} }
-    breath_tone { SynthModRoute: {source: SynthSourceMod, target: SynthTargetCutoff, amount: 1.2} }
-    push_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
-    push_bloom { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetIndex, amount: 0.5} }
-    push_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.002} }
+    breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.25} }
+    breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
+    breath_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.2} }
+    push_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
+    push_bloom { ModRoute: {source: SourcePressure, target: TargetIndex, amount: 0.5} }
+    push_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
   }
 
   prefab tp_harmon_sound {
-    SynthSound: {seed: 61, level_variance: 0.03}
-    SynthGlide: {time: 0.03, legato: true, channel: 6}
-    SynthEnvelope: {attack: 0.025, attack_curve: 0.5, decay: 0.15, sustain: 0.8, release: 0.1, curve: 2}
-    SynthPitchEnvelope: {amount: -0.8, decay: 0.07, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 900, resonance: 0.55, velocity: 0.8, keytrack: 0.25}
-    SynthFilterEnvelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.6, release: 0.1, amount: 0.3, velocity: 0.5}
-    SynthLfo: {rate: 5.6, delay: 0.35, fade: 0.4, random_phase: true, pitch: 12, amplitude: 0.03}
-    wander { SynthLfo: {wave: SynthLfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
+    Sound: {seed: 61, level_variance: 0.03}
+    Glide: {time: 0.03, legato: true, channel: 6}
+    Envelope: {attack: 0.025, attack_curve: 0.5, decay: 0.15, sustain: 0.8, release: 0.1, curve: 2}
+    PitchEnvelope: {amount: -0.8, decay: 0.07, curve: 2}
+    Filter: {kind: LowPass, cutoff: 900, resonance: 0.55, velocity: 0.8, keytrack: 0.25}
+    FilterEnvelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.6, release: 0.1, amount: 0.3, velocity: 0.5}
+    Lfo: {rate: 5.6, delay: 0.35, fade: 0.4, random_phase: true, pitch: 12, amplitude: 0.03}
+    wander { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
     buzz {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.15}
+      Oscillator: {wave: Saw, frequency: 440, level: 0.15}
       bloom {
-        SynthOscillator: {wave: SynthSine, frequency: 440, modulation: SynthPhase, index: 0.8, velocity: 1}
-        SynthEnvelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.75, release: 0.1, curve: 2}
+        Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.8, velocity: 1}
+        Envelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.75, release: 0.1, curve: 2}
       }
     }
     tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.03}
-      SynthEnvelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01, curve: 3}
-      attack_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Noise, level: 0.03}
+      Envelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01, curve: 3}
+      attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
-    hand_bloom { SynthModRoute: {source: SynthSourceMod, target: SynthTargetIndex, amount: 0.3} }
-    sizzle { SynthOscillator: {wave: SynthNoise, level: 0.006} }
-    hand_tone { SynthModRoute: {source: SynthSourceMod, target: SynthTargetCutoff, amount: 1.4} }
-    hand_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 0.8} }
-    push_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
-    push_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.6} }
+    hand_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.3} }
+    sizzle { Oscillator: {wave: Noise, level: 0.006} }
+    hand_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.4} }
+    hand_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 0.8} }
+    push_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
+    push_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.6} }
   }
 
   tp_trumpet_inst { Instrument: {sound: tp_trumpet_sound, velocity_curve: 1.8} }
@@ -253,11 +254,11 @@ assets {
   tp_harmon_inst { Instrument: {sound: tp_harmon_sound, velocity_curve: 1.6} }
 
   prefab tp_flugel_air_sound {
-    SynthSound: {seed: 42, level_variance: 0.05}
-    SynthEnvelope: {attack: 0.04, attack_curve: 0.5, decay: 0.15, sustain: 0.5, release: 0.15, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 2600, resonance: 0.15, velocity: 0.8, keytrack: 0.3}
-    hiss { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.019} }
-    breath_level { SynthModRoute: {source: SynthSourceMod, target: SynthTargetLevel, amount: 3} }
+    Sound: {seed: 42, level_variance: 0.05}
+    Envelope: {attack: 0.04, attack_curve: 0.5, decay: 0.15, sustain: 0.5, release: 0.15, curve: 2}
+    Filter: {kind: BandPass, cutoff: 2600, resonance: 0.15, velocity: 0.8, keytrack: 0.3}
+    hiss { Oscillator: {wave: Noise, color: NoisePink, level: 0.019} }
+    breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
   }
   tp_flugel_air_inst { Instrument: {sound: tp_flugel_air_sound, velocity_curve: 1.6} }
 

@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {176, 196, 112} } } }
@@ -21,192 +22,192 @@ assets {
   }
 
   prefab ww_flute_sound {
-    SynthSound: {seed: 11, drift: 3}
-    SynthGlide: {time: 0.018, legato: true, channel: 11}
-    SynthEnvelope: {attack: 0.07, decay: 0.12, sustain: 0.85, release: 0.09, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 7000, keytrack: 0.3, velocity: 1}
-    SynthLfo: {rate: 5, delay: 0.22, fade: 0.4, pitch: 10, amplitude: 0.18, random_phase: true}
-    ww_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.7} }
+    Sound: {seed: 11, drift: 3}
+    Glide: {time: 0.018, legato: true, channel: 11}
+    Envelope: {attack: 0.07, decay: 0.12, sustain: 0.85, release: 0.09, curve: 2}
+    Filter: {kind: LowPass, cutoff: 7000, keytrack: 0.3, velocity: 1}
+    Lfo: {rate: 5, delay: 0.22, fade: 0.4, pitch: 10, amplitude: 0.18, random_phase: true}
+    ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.7} }
     ww_tone {
-      SynthOscillator: {wave: SynthSine, frequency: 523.25, level: 0.5}
-      ww_turbulence { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, modulation: SynthRing, index: 0.2} }
+      Oscillator: {wave: Sine, frequency: 523.25, level: 0.5}
+      ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.2} }
     }
     ww_h2 {
-      SynthOscillator: {wave: SynthSine, frequency: 1046.5, level: 0.11}
-      ww_register { SynthModRoute: {source: SynthSourceKey, target: SynthTargetLevel, amount: -1.1} }
-      ww_vib { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 0.8} }
-      ww_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 2} }
-      ww_press { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Sine, frequency: 1046.5, level: 0.11}
+      ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -1.1} }
+      ww_vib { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 0.8} }
+      ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
+      ww_press { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 1.5} }
     }
     ww_h3 {
-      SynthOscillator: {wave: SynthSine, frequency: 1569.75, level: 0.086}
-      ww_register { SynthModRoute: {source: SynthSourceKey, target: SynthTargetLevel, amount: -0.77} }
+      Oscillator: {wave: Sine, frequency: 1569.75, level: 0.086}
+      ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -0.77} }
     }
     ww_chiff {
-      SynthOscillator: {wave: SynthSine, frequency: 1046.5, level: 0.15}
-      SynthEnvelope: {attack: 0.004, decay: 0.05, curve: 3}
+      Oscillator: {wave: Sine, frequency: 1046.5, level: 0.15}
+      Envelope: {attack: 0.004, decay: 0.05, curve: 3}
     }
     ww_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.2}
-      SynthEnvelope: {attack: 0.002, decay: 0.035, curve: 3}
+      Oscillator: {wave: Noise, level: 0.2}
+      Envelope: {attack: 0.002, decay: 0.035, curve: 3}
     }
     ww_edge {
-      SynthOscillator: {wave: SynthSaw, frequency: 523.25, level: 0.02}
-      ww_register { SynthModRoute: {source: SynthSourceKey, target: SynthTargetLevel, amount: -2} }
-      ww_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 3} }
+      Oscillator: {wave: Saw, frequency: 523.25, level: 0.02}
+      ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -2} }
+      ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 3} }
     }
     ww_breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.045}
-      SynthEnvelope: {attack: 0.02, sustain: 1, release: 0.07}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.045}
+      Envelope: {attack: 0.02, sustain: 1, release: 0.07}
     }
   }
 
   prefab ww_piccolo_sound {
-    SynthSound: {seed: 16, drift: 2.5}
-    SynthGlide: {time: 0.015, legato: true, channel: 16}
-    SynthEnvelope: {attack: 0.045, decay: 0.1, sustain: 0.85, release: 0.07, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 10000, keytrack: 0.2, velocity: 1}
-    SynthLfo: {rate: 5.6, delay: 0.2, fade: 0.35, pitch: 8, amplitude: 0.12, random_phase: true}
-    ww_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.6} }
-    ww_shine { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1} }
+    Sound: {seed: 16, drift: 2.5}
+    Glide: {time: 0.015, legato: true, channel: 16}
+    Envelope: {attack: 0.045, decay: 0.1, sustain: 0.85, release: 0.07, curve: 2}
+    Filter: {kind: LowPass, cutoff: 10000, keytrack: 0.2, velocity: 1}
+    Lfo: {rate: 5.6, delay: 0.2, fade: 0.35, pitch: 8, amplitude: 0.12, random_phase: true}
+    ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
+    ww_shine { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1} }
     ww_tone {
-      SynthOscillator: {wave: SynthSine, frequency: 1046.5, level: 0.45}
-      ww_turbulence { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, modulation: SynthRing, index: 0.15} }
+      Oscillator: {wave: Sine, frequency: 1046.5, level: 0.45}
+      ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.15} }
     }
     ww_h2 {
-      SynthOscillator: {wave: SynthSine, frequency: 2093, level: 0.035}
-      ww_register { SynthModRoute: {source: SynthSourceKey, target: SynthTargetLevel, amount: -0.5} }
-      ww_vib { SynthModRoute: {source: SynthSourceLfo1, target: SynthTargetLevel, amount: 0.6} }
-      ww_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 1.5} }
+      Oscillator: {wave: Sine, frequency: 2093, level: 0.035}
+      ww_register { ModRoute: {source: SourceKey, target: TargetLevel, amount: -0.5} }
+      ww_vib { ModRoute: {source: SourceLfo1, target: TargetLevel, amount: 0.6} }
+      ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 1.5} }
     }
     ww_h3 {
-      SynthOscillator: {wave: SynthSine, frequency: 3139.5, level: 0.02}
+      Oscillator: {wave: Sine, frequency: 3139.5, level: 0.02}
     }
     ww_chiff {
-      SynthOscillator: {wave: SynthSine, frequency: 2093, level: 0.1}
-      SynthEnvelope: {attack: 0.003, decay: 0.04, curve: 3}
+      Oscillator: {wave: Sine, frequency: 2093, level: 0.1}
+      Envelope: {attack: 0.003, decay: 0.04, curve: 3}
     }
     ww_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.15}
-      SynthEnvelope: {attack: 0.002, decay: 0.03, curve: 3}
+      Oscillator: {wave: Noise, level: 0.15}
+      Envelope: {attack: 0.002, decay: 0.03, curve: 3}
     }
     ww_breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.022}
-      SynthEnvelope: {attack: 0.02, sustain: 1, release: 0.06}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.022}
+      Envelope: {attack: 0.02, sustain: 1, release: 0.06}
     }
   }
 
   prefab ww_oboe_sound {
-    SynthSound: {seed: 12, drift: 2.5}
-    SynthGlide: {time: 0.018, legato: true, channel: 12}
-    SynthEnvelope: {attack: 0.025, decay: 0.08, sustain: 0.9, release: 0.05, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 1200, resonance: 0.3, slope: SynthSlope24}
-    SynthPitchEnvelope: {amount: -0.12, decay: 0.04, curve: 2}
-    SynthLfo: {rate: 5.2, delay: 0.25, fade: 0.35, pitch: 14, amplitude: 0.1, random_phase: true}
-    ww_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.6} }
+    Sound: {seed: 12, drift: 2.5}
+    Glide: {time: 0.018, legato: true, channel: 12}
+    Envelope: {attack: 0.025, decay: 0.08, sustain: 0.9, release: 0.05, curve: 2}
+    Filter: {kind: BandPass, cutoff: 1200, resonance: 0.3, slope: Slope24}
+    PitchEnvelope: {amount: -0.12, decay: 0.04, curve: 2}
+    Lfo: {rate: 5.2, delay: 0.25, fade: 0.35, pitch: 14, amplitude: 0.1, random_phase: true}
+    ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
     ww_reed {
-      SynthOscillator: {wave: SynthSaw, frequency: 440, level: 1}
-      ww_turbulence { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, modulation: SynthRing, index: 0.06} }
+      Oscillator: {wave: Saw, frequency: 440, level: 1}
+      ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.06} }
     }
     ww_formant {
-      SynthOscillator: {wave: SynthSine, frequency: 440, sync: 6.48, level: 0.035}
-      ww_fixed { SynthModRoute: {source: SynthSourceKey, target: SynthTargetHardSync, amount: -12} }
-      ww_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 4} }
-      ww_press { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Sine, frequency: 440, sync: 6.48, level: 0.035}
+      ww_fixed { ModRoute: {source: SourceKey, target: TargetHardSync, amount: -12} }
+      ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 4} }
+      ww_press { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 2} }
     }
     ww_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.2}
-      SynthEnvelope: {attack: 0.001, decay: 0.015, curve: 3}
+      Oscillator: {wave: Noise, level: 0.2}
+      Envelope: {attack: 0.001, decay: 0.015, curve: 3}
     }
     ww_breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.02}
-      SynthEnvelope: {attack: 0.02, sustain: 1, release: 0.05}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.02}
+      Envelope: {attack: 0.02, sustain: 1, release: 0.05}
     }
   }
 
   prefab ww_clarinet_sound {
-    SynthSound: {seed: 13, drift: 2}
-    SynthGlide: {time: 0.018, legato: true, channel: 13}
-    SynthEnvelope: {attack: 0.04, decay: 0.1, sustain: 0.9, release: 0.06, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2200, resonance: 0.1, slope: SynthSlope24, keytrack: 0.3, velocity: 1.3}
-    SynthPitchEnvelope: {amount: -0.08, decay: 0.05, curve: 2}
-    ww_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.6} }
-    ww_shine { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 0.8} }
+    Sound: {seed: 13, drift: 2}
+    Glide: {time: 0.018, legato: true, channel: 13}
+    Envelope: {attack: 0.04, decay: 0.1, sustain: 0.9, release: 0.06, curve: 2}
+    Filter: {kind: LowPass, cutoff: 2200, resonance: 0.1, slope: Slope24, keytrack: 0.3, velocity: 1.3}
+    PitchEnvelope: {amount: -0.08, decay: 0.05, curve: 2}
+    ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
+    ww_shine { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 0.8} }
     ww_reed {
-      SynthOscillator: {wave: SynthSquare, frequency: 164.81, level: 0.32}
-      ww_turbulence { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, modulation: SynthRing, index: 0.08} }
-      ww_register { SynthModRoute: {source: SynthSourceKey, target: SynthTargetPulseWidth, amount: -0.025} }
+      Oscillator: {wave: Square, frequency: 164.81, level: 0.32}
+      ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.08} }
+      ww_register { ModRoute: {source: SourceKey, target: TargetPulseWidth, amount: -0.025} }
     }
     ww_body {
-      SynthOscillator: {wave: SynthSine, frequency: 164.81, level: 0.05}
+      Oscillator: {wave: Sine, frequency: 164.81, level: 0.05}
     }
     ww_formant {
-      SynthOscillator: {wave: SynthSine, frequency: 164.81, sync: 13.35, level: 0.035}
-      ww_fixed { SynthModRoute: {source: SynthSourceKey, target: SynthTargetHardSync, amount: -12} }
+      Oscillator: {wave: Sine, frequency: 164.81, sync: 13.35, level: 0.035}
+      ww_fixed { ModRoute: {source: SourceKey, target: TargetHardSync, amount: -12} }
     }
     ww_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.12}
-      SynthEnvelope: {attack: 0.001, decay: 0.02, curve: 3}
+      Oscillator: {wave: Noise, level: 0.12}
+      Envelope: {attack: 0.001, decay: 0.02, curve: 3}
     }
     ww_breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.012}
-      SynthEnvelope: {attack: 0.02, sustain: 1, release: 0.06}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.012}
+      Envelope: {attack: 0.02, sustain: 1, release: 0.06}
     }
   }
 
   prefab ww_bassoon_sound {
-    SynthSound: {seed: 14, drift: 3}
-    SynthGlide: {time: 0.022, legato: true, channel: 14}
-    SynthEnvelope: {attack: 0.035, decay: 0.1, sustain: 0.9, release: 0.07, curve: 2}
-    SynthFilter: {kind: SynthBandPass, cutoff: 480, resonance: 0.3, slope: SynthSlope24}
-    SynthPitchEnvelope: {amount: -0.1, decay: 0.05, curve: 2}
-    SynthLfo: {rate: 4.8, delay: 0.3, fade: 0.4, pitch: 9, amplitude: 0.08, random_phase: true}
-    ww_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.6} }
+    Sound: {seed: 14, drift: 3}
+    Glide: {time: 0.022, legato: true, channel: 14}
+    Envelope: {attack: 0.035, decay: 0.1, sustain: 0.9, release: 0.07, curve: 2}
+    Filter: {kind: BandPass, cutoff: 480, resonance: 0.3, slope: Slope24}
+    PitchEnvelope: {amount: -0.1, decay: 0.05, curve: 2}
+    Lfo: {rate: 4.8, delay: 0.3, fade: 0.4, pitch: 9, amplitude: 0.08, random_phase: true}
+    ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
     ww_reed {
-      SynthOscillator: {wave: SynthSaw, frequency: 130.81, level: 1.1}
-      ww_turbulence { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, modulation: SynthRing, index: 0.06} }
+      Oscillator: {wave: Saw, frequency: 130.81, level: 1.1}
+      ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.06} }
     }
     ww_formant {
-      SynthOscillator: {wave: SynthSine, frequency: 130.81, sync: 9.17, level: 0.04}
-      ww_fixed { SynthModRoute: {source: SynthSourceKey, target: SynthTargetHardSync, amount: -12} }
-      ww_force { SynthModRoute: {source: SynthSourceVelocity, target: SynthTargetLevel, amount: 4} }
-      ww_press { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 2} }
+      Oscillator: {wave: Sine, frequency: 130.81, sync: 9.17, level: 0.04}
+      ww_fixed { ModRoute: {source: SourceKey, target: TargetHardSync, amount: -12} }
+      ww_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 4} }
+      ww_press { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 2} }
     }
     ww_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.2}
-      SynthEnvelope: {attack: 0.001, decay: 0.02, curve: 3}
+      Oscillator: {wave: Noise, level: 0.2}
+      Envelope: {attack: 0.001, decay: 0.02, curve: 3}
     }
     ww_breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.022}
-      SynthEnvelope: {attack: 0.02, sustain: 1, release: 0.06}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.022}
+      Envelope: {attack: 0.02, sustain: 1, release: 0.06}
     }
   }
 
   prefab ww_sax_sound {
-    SynthSound: {seed: 15, drift: 3}
-    SynthGlide: {time: 0.03, legato: true, channel: 15}
-    SynthDrive: {drive: 0.35, asymmetry: 0.25}
-    SynthEnvelope: {attack: 0.03, decay: 0.1, sustain: 0.85, release: 0.07, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3400, resonance: 0.4, keytrack: 0.2, velocity: 1}
-    SynthFilterEnvelope: {attack: 0.01, decay: 0.12, sustain: 0, release: 0.05, amount: 0.6}
-    SynthPitchEnvelope: {amount: -0.25, decay: 0.07, curve: 2}
-    SynthLfo: {rate: 5.4, delay: 0.3, fade: 0.5, pitch: 16, amplitude: 0.05, random_phase: true}
-    ww_swell { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.6} }
-    ww_shine { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.2} }
+    Sound: {seed: 15, drift: 3}
+    Glide: {time: 0.03, legato: true, channel: 15}
+    Drive: {drive: 0.35, asymmetry: 0.25}
+    Envelope: {attack: 0.03, decay: 0.1, sustain: 0.85, release: 0.07, curve: 2}
+    Filter: {kind: LowPass, cutoff: 3400, resonance: 0.4, keytrack: 0.2, velocity: 1}
+    FilterEnvelope: {attack: 0.01, decay: 0.12, sustain: 0, release: 0.05, amount: 0.6}
+    PitchEnvelope: {amount: -0.25, decay: 0.07, curve: 2}
+    Lfo: {rate: 5.4, delay: 0.3, fade: 0.5, pitch: 16, amplitude: 0.05, random_phase: true}
+    ww_swell { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
+    ww_shine { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.2} }
     ww_reed {
-      SynthOscillator: {wave: SynthSaw, frequency: 293.66, level: 0.4}
-      ww_turbulence { SynthOscillator: {wave: SynthNoise, color: SynthNoiseBrown, modulation: SynthRing, index: 0.1} }
+      Oscillator: {wave: Saw, frequency: 293.66, level: 0.4}
+      ww_turbulence { Oscillator: {wave: Noise, color: NoiseBrown, modulation: Ring, index: 0.1} }
     }
     ww_body {
-      SynthOscillator: {wave: SynthSine, frequency: 293.66, level: 0.06}
+      Oscillator: {wave: Sine, frequency: 293.66, level: 0.06}
     }
     ww_tongue {
-      SynthOscillator: {wave: SynthNoise, level: 0.12}
-      SynthEnvelope: {attack: 0.001, decay: 0.02, curve: 3}
+      Oscillator: {wave: Noise, level: 0.12}
+      Envelope: {attack: 0.001, decay: 0.02, curve: 3}
     }
     ww_breath {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.02}
-      SynthEnvelope: {attack: 0.02, sustain: 1, release: 0.06}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.02}
+      Envelope: {attack: 0.02, sustain: 1, release: 0.06}
     }
   }
 

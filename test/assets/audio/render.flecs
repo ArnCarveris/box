@@ -2,17 +2,18 @@
 // that the tests render on its own, and a hum at 1000 Hz that the scene plays on a loop
 // meanwhile, which a render of the blip must not contain.
 using box.audio
+using box.audio.synth
 
 prefab render_blip {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 0.1, sustain: 0.5, release: 0.1}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.5}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 0.1, sustain: 0.5, release: 0.1}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.5}
 }
 
 prefab render_hum {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 4, release: 0.05}
-  SynthOscillator: {wave: SynthSine, frequency: 1000, level: 0.3}
+  Sound: {}
+  Envelope: {attack: 0.01, sustain: 1, hold: 4, release: 0.05}
+  Oscillator: {wave: Sine, frequency: 1000, level: 0.3}
 }
 
 render_drone { Source: {sound: render_hum, loop: true} }

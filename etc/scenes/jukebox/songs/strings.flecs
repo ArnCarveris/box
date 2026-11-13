@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {200, 140, 80} } } }
@@ -309,116 +310,116 @@ assets {
   }
 
   prefab st_violin_sound {
-    SynthSound: {seed: 11, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
-    SynthGlide: {time: 0.045, legato: true, channel: 11}
-    SynthEnvelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.92, release: 0.28, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 7000, resonance: 0.05, velocity: 1.6, keytrack: 0.45}
-    SynthFilterEnvelope: {attack: 0.09, decay: 0.35, sustain: 0.7, release: 0.3, amount: 0.8, velocity: 0.6}
-    SynthPitchEnvelope: {amount: -0.12, decay: 0.07, curve: 3}
-    SynthLfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 22, amplitude: 0.05, cutoff: 0.04}
-    bow_speed { SynthLfo: {rate: 0.55, random_phase: true, cutoff: 0.04} }
+    Sound: {seed: 11, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
+    Glide: {time: 0.045, legato: true, channel: 11}
+    Envelope: {attack: 0.09, attack_curve: -1, decay: 0.3, sustain: 0.92, release: 0.28, curve: 2}
+    Filter: {kind: LowPass, cutoff: 7000, resonance: 0.05, velocity: 1.6, keytrack: 0.45}
+    FilterEnvelope: {attack: 0.09, decay: 0.35, sustain: 0.7, release: 0.3, amount: 0.8, velocity: 0.6}
+    PitchEnvelope: {amount: -0.12, decay: 0.07, curve: 3}
+    Lfo: {rate: 5.8, delay: 0.16, fade: 0.4, random_phase: true, pitch: 22, amplitude: 0.05, cutoff: 0.04}
+    bow_speed { Lfo: {rate: 0.55, random_phase: true, cutoff: 0.04} }
     string {
-      SynthOscillator: {wave: SynthBowed, frequency: 440, level: 0.5}
-      SynthBow: {pressure: 0.4, speed: 0.55, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
+      Oscillator: {wave: Bowed, frequency: 440, level: 0.5}
+      Bow: {pressure: 0.4, speed: 0.55, position: 0.11, brightness: 0.55, noise: 0.12, velocity: 0.5}
     }
-    swell_bow { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.35} }
-    swell_speed { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
-    bow_wander { SynthModRoute: {source: SynthSourceLfo2, target: SynthTargetBowSpeed, amount: 0.04} }
-    swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.2} }
+    swell_bow { ModRoute: {source: SourcePressure, target: TargetBowPressure, amount: 0.35} }
+    swell_speed { ModRoute: {source: SourcePressure, target: TargetBowSpeed, amount: 0.3} }
+    bow_wander { ModRoute: {source: SourceLfo2, target: TargetBowSpeed, amount: 0.04} }
+    swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.2} }
   }
 
   prefab st_viola_sound {
-    SynthSound: {seed: 21, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
-    SynthGlide: {time: 0.05, legato: true, channel: 12}
-    SynthEnvelope: {attack: 0.1, attack_curve: -1, decay: 0.3, sustain: 0.92, release: 0.32, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 5000, resonance: 0.05, velocity: 1.6, keytrack: 0.45}
-    SynthFilterEnvelope: {attack: 0.1, decay: 0.4, sustain: 0.7, release: 0.3, amount: 0.8, velocity: 0.6}
-    SynthPitchEnvelope: {amount: -0.12, decay: 0.08, curve: 3}
-    SynthLfo: {rate: 5.5, delay: 0.18, fade: 0.45, random_phase: true, pitch: 20, amplitude: 0.05, cutoff: 0.04}
-    bow_speed { SynthLfo: {rate: 0.5, random_phase: true, cutoff: 0.04} }
+    Sound: {seed: 21, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
+    Glide: {time: 0.05, legato: true, channel: 12}
+    Envelope: {attack: 0.1, attack_curve: -1, decay: 0.3, sustain: 0.92, release: 0.32, curve: 2}
+    Filter: {kind: LowPass, cutoff: 5000, resonance: 0.05, velocity: 1.6, keytrack: 0.45}
+    FilterEnvelope: {attack: 0.1, decay: 0.4, sustain: 0.7, release: 0.3, amount: 0.8, velocity: 0.6}
+    PitchEnvelope: {amount: -0.12, decay: 0.08, curve: 3}
+    Lfo: {rate: 5.5, delay: 0.18, fade: 0.45, random_phase: true, pitch: 20, amplitude: 0.05, cutoff: 0.04}
+    bow_speed { Lfo: {rate: 0.5, random_phase: true, cutoff: 0.04} }
     string {
-      SynthOscillator: {wave: SynthBowed, frequency: 261.63, level: 0.5}
-      SynthBow: {pressure: 0.42, speed: 0.55, position: 0.12, brightness: 0.5, noise: 0.12, velocity: 0.5}
+      Oscillator: {wave: Bowed, frequency: 261.63, level: 0.5}
+      Bow: {pressure: 0.42, speed: 0.55, position: 0.12, brightness: 0.5, noise: 0.12, velocity: 0.5}
     }
-    swell_bow { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.35} }
-    swell_speed { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
-    bow_wander { SynthModRoute: {source: SynthSourceLfo2, target: SynthTargetBowSpeed, amount: 0.04} }
-    swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.2} }
+    swell_bow { ModRoute: {source: SourcePressure, target: TargetBowPressure, amount: 0.35} }
+    swell_speed { ModRoute: {source: SourcePressure, target: TargetBowSpeed, amount: 0.3} }
+    bow_wander { ModRoute: {source: SourceLfo2, target: TargetBowSpeed, amount: 0.04} }
+    swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.2} }
   }
 
   prefab st_cello_sound {
-    SynthSound: {seed: 31, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
-    SynthGlide: {time: 0.06, legato: true, channel: 13}
-    SynthEnvelope: {attack: 0.13, attack_curve: -1, decay: 0.35, sustain: 0.92, release: 0.42, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3200, resonance: 0.05, velocity: 1.6, keytrack: 0.5}
-    SynthFilterEnvelope: {attack: 0.12, decay: 0.45, sustain: 0.7, release: 0.35, amount: 0.8, velocity: 0.6}
-    SynthPitchEnvelope: {amount: -0.12, decay: 0.09, curve: 3}
-    SynthLfo: {rate: 5.3, delay: 0.2, fade: 0.5, random_phase: true, pitch: 18, amplitude: 0.05, cutoff: 0.04}
-    bow_speed { SynthLfo: {rate: 0.45, random_phase: true, cutoff: 0.04} }
+    Sound: {seed: 31, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
+    Glide: {time: 0.06, legato: true, channel: 13}
+    Envelope: {attack: 0.13, attack_curve: -1, decay: 0.35, sustain: 0.92, release: 0.42, curve: 2}
+    Filter: {kind: LowPass, cutoff: 3200, resonance: 0.05, velocity: 1.6, keytrack: 0.5}
+    FilterEnvelope: {attack: 0.12, decay: 0.45, sustain: 0.7, release: 0.35, amount: 0.8, velocity: 0.6}
+    PitchEnvelope: {amount: -0.12, decay: 0.09, curve: 3}
+    Lfo: {rate: 5.3, delay: 0.2, fade: 0.5, random_phase: true, pitch: 18, amplitude: 0.05, cutoff: 0.04}
+    bow_speed { Lfo: {rate: 0.45, random_phase: true, cutoff: 0.04} }
     string {
-      SynthOscillator: {wave: SynthBowed, frequency: 130.81, level: 0.5}
-      SynthBow: {pressure: 0.45, speed: 0.55, position: 0.13, brightness: 0.45, noise: 0.1, velocity: 0.5}
+      Oscillator: {wave: Bowed, frequency: 130.81, level: 0.5}
+      Bow: {pressure: 0.45, speed: 0.55, position: 0.13, brightness: 0.45, noise: 0.1, velocity: 0.5}
     }
-    swell_bow { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.35} }
-    swell_speed { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
-    bow_wander { SynthModRoute: {source: SynthSourceLfo2, target: SynthTargetBowSpeed, amount: 0.04} }
-    swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.2} }
+    swell_bow { ModRoute: {source: SourcePressure, target: TargetBowPressure, amount: 0.35} }
+    swell_speed { ModRoute: {source: SourcePressure, target: TargetBowSpeed, amount: 0.3} }
+    bow_wander { ModRoute: {source: SourceLfo2, target: TargetBowSpeed, amount: 0.04} }
+    swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.2} }
   }
 
   prefab st_bass_sound {
-    SynthSound: {seed: 41, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
-    SynthGlide: {time: 0.07, legato: true, channel: 14}
-    SynthEnvelope: {attack: 0.18, attack_curve: -1, decay: 0.4, sustain: 0.92, release: 0.55, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 1800, resonance: 0.05, velocity: 1.6, keytrack: 0.5}
-    SynthFilterEnvelope: {attack: 0.16, decay: 0.5, sustain: 0.7, release: 0.4, amount: 0.8, velocity: 0.6}
-    SynthPitchEnvelope: {amount: -0.12, decay: 0.1, curve: 3}
-    SynthLfo: {rate: 5, delay: 0.25, fade: 0.55, random_phase: true, pitch: 12, amplitude: 0.05, cutoff: 0.04}
-    bow_speed { SynthLfo: {rate: 0.4, random_phase: true, cutoff: 0.04} }
+    Sound: {seed: 41, drift: 3, pitch_variance: 0.0012, level_variance: 0.03}
+    Glide: {time: 0.07, legato: true, channel: 14}
+    Envelope: {attack: 0.18, attack_curve: -1, decay: 0.4, sustain: 0.92, release: 0.55, curve: 2}
+    Filter: {kind: LowPass, cutoff: 1800, resonance: 0.05, velocity: 1.6, keytrack: 0.5}
+    FilterEnvelope: {attack: 0.16, decay: 0.5, sustain: 0.7, release: 0.4, amount: 0.8, velocity: 0.6}
+    PitchEnvelope: {amount: -0.12, decay: 0.1, curve: 3}
+    Lfo: {rate: 5, delay: 0.25, fade: 0.55, random_phase: true, pitch: 12, amplitude: 0.05, cutoff: 0.04}
+    bow_speed { Lfo: {rate: 0.4, random_phase: true, cutoff: 0.04} }
     string {
-      SynthOscillator: {wave: SynthBowed, frequency: 65.41, level: 0.5}
-      SynthBow: {pressure: 0.5, speed: 0.55, position: 0.14, brightness: 0.35, noise: 0.1, velocity: 0.5}
+      Oscillator: {wave: Bowed, frequency: 65.41, level: 0.5}
+      Bow: {pressure: 0.5, speed: 0.55, position: 0.14, brightness: 0.35, noise: 0.1, velocity: 0.5}
     }
-    swell_bow { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowPressure, amount: 0.35} }
-    swell_speed { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetBowSpeed, amount: 0.3} }
-    bow_wander { SynthModRoute: {source: SynthSourceLfo2, target: SynthTargetBowSpeed, amount: 0.04} }
-    swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.2} }
+    swell_bow { ModRoute: {source: SourcePressure, target: TargetBowPressure, amount: 0.35} }
+    swell_speed { ModRoute: {source: SourcePressure, target: TargetBowSpeed, amount: 0.3} }
+    bow_wander { ModRoute: {source: SourceLfo2, target: TargetBowSpeed, amount: 0.04} }
+    swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.2} }
   }
 
   prefab st_section_sound {
-    SynthSound: {seed: 51, drift: 7, level_variance: 0.03}
-    SynthEnvelope: {attack: 0.2, attack_curve: -1, decay: 0.4, sustain: 0.92, release: 0.6, curve: 2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4200, resonance: 0.05, velocity: 1.5, keytrack: 0.45}
-    SynthFilterEnvelope: {attack: 0.18, decay: 0.5, sustain: 0.75, release: 0.5, amount: 0.8, velocity: 0.5}
+    Sound: {seed: 51, drift: 7, level_variance: 0.03}
+    Envelope: {attack: 0.2, attack_curve: -1, decay: 0.4, sustain: 0.92, release: 0.6, curve: 2}
+    Filter: {kind: LowPass, cutoff: 4200, resonance: 0.05, velocity: 1.5, keytrack: 0.45}
+    FilterEnvelope: {attack: 0.18, decay: 0.5, sustain: 0.75, release: 0.5, amount: 0.8, velocity: 0.5}
     desk_a {
-      SynthOscillator: {wave: SynthSaw, frequency: 261.63, level: 0.4}
-      SynthUnison: {voices: 4, detune: 10, width: 1}
-      SynthLfo: {rate: 5.4, delay: 0.25, fade: 0.6, random_phase: true, pitch: 16, amplitude: 0.03}
+      Oscillator: {wave: Saw, frequency: 261.63, level: 0.4}
+      Unison: {voices: 4, detune: 10, width: 1}
+      Lfo: {rate: 5.4, delay: 0.25, fade: 0.6, random_phase: true, pitch: 16, amplitude: 0.03}
     }
     desk_b {
-      SynthOscillator: {wave: SynthSaw, frequency: 261.95, level: 0.4}
-      SynthUnison: {voices: 3, detune: 14, width: 0.6}
-      SynthLfo: {rate: 6.1, delay: 0.32, fade: 0.5, random_phase: true, pitch: 14, amplitude: 0.03}
+      Oscillator: {wave: Saw, frequency: 261.95, level: 0.4}
+      Unison: {voices: 3, detune: 14, width: 0.6}
+      Lfo: {rate: 6.1, delay: 0.32, fade: 0.5, random_phase: true, pitch: 14, amplitude: 0.03}
     }
     hair {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.03}
-      SynthUnison: {voices: 2, detune: 0, width: 1}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.03}
+      Unison: {voices: 2, detune: 0, width: 1}
     }
-    swell_level { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetLevel, amount: 0.6} }
-    swell_tone { SynthModRoute: {source: SynthSourcePressure, target: SynthTargetCutoff, amount: 1.2} }
+    swell_level { ModRoute: {source: SourcePressure, target: TargetLevel, amount: 0.6} }
+    swell_tone { ModRoute: {source: SourcePressure, target: TargetCutoff, amount: 1.2} }
   }
 
   prefab st_pizz_sound {
-    SynthSound: {seed: 61, pitch_variance: 0.0012, level_variance: 0.06}
-    SynthEnvelope: {attack: 0.001, decay: 1.5, sustain: 0, release: 0.2, curve: 3, key_scale: 1}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2600, resonance: 0.1, velocity: 1.2, keytrack: 0.5}
-    SynthFilterEnvelope: {attack: 0.001, decay: 0.12, sustain: 0, release: 0.1, amount: 1.2, velocity: 0.7}
+    Sound: {seed: 61, pitch_variance: 0.0012, level_variance: 0.06}
+    Envelope: {attack: 0.001, decay: 1.5, sustain: 0, release: 0.2, curve: 3, key_scale: 1}
+    Filter: {kind: LowPass, cutoff: 2600, resonance: 0.1, velocity: 1.2, keytrack: 0.5}
+    FilterEnvelope: {attack: 0.001, decay: 0.12, sustain: 0, release: 0.1, amount: 1.2, velocity: 0.7}
     string {
-      SynthOscillator: {wave: SynthPluck, frequency: 261.63, level: 0.8}
-      SynthString: {decay: 4, brightness: 0.3, hardness: 0.45, velocity: 0.6}
+      Oscillator: {wave: Pluck, frequency: 261.63, level: 0.8}
+      String: {decay: 4, brightness: 0.3, hardness: 0.45, velocity: 0.6}
     }
     finger {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.12}
-      SynthEnvelope: {attack: 0.001, decay: 0.015, curve: 3}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.12}
+      Envelope: {attack: 0.001, decay: 0.015, curve: 3}
     }
   }
 

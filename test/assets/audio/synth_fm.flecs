@@ -2,23 +2,24 @@
 // child that has its own envelope and a ring modulator of its own, a layer with feedback, and
 // a modulator whose parent is not a layer.
 using box.audio
+using box.audio.synth
 
 prefab FmBell {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0.5}
-  SynthOscillator: {frequency: 500, level: 0.5}
+  Sound: {}
+  Envelope: {attack: 0.001, decay: 0.5}
+  Oscillator: {frequency: 500, level: 0.5}
   bright {
-    SynthOscillator: {frequency: 700, modulation: SynthPhase, index: 2}
-    SynthEnvelope: {attack: 0.001, decay: 0.3}
-    deep { SynthOscillator: {frequency: 300, modulation: SynthRing, index: 0.5} }
+    Oscillator: {frequency: 700, modulation: Phase, index: 2}
+    Envelope: {attack: 0.001, decay: 0.3}
+    deep { Oscillator: {frequency: 300, modulation: Ring, index: 0.5} }
   }
-  tone { SynthOscillator: {frequency: 1000, level: 0.2, feedback: 0.5} }
+  tone { Oscillator: {frequency: 1000, level: 0.2, feedback: 0.5} }
 }
 
 // The root has no oscillator, so its modulator has no carrier
 prefab Orphan {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.001, decay: 0.1}
-  m { SynthOscillator: {frequency: 400, modulation: SynthPhase} }
-  c { SynthOscillator: {frequency: 200, level: 0.3} }
+  Sound: {}
+  Envelope: {attack: 0.001, decay: 0.1}
+  m { Oscillator: {frequency: 400, modulation: Phase} }
+  c { Oscillator: {frequency: 200, level: 0.3} }
 }

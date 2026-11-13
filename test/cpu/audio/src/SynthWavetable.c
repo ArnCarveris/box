@@ -790,9 +790,9 @@ void SynthWavetable_missing_table(void) {
     test_assert(ecs_script_run(world, "bare",
         "using box.audio\n"
         "prefab Bare {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.05}\n"
-        "  SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Envelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.05}\n"
+        "  synth.Oscillator: {wave: Wavetable, frequency: 220, level: 0.3}\n"
         "}\n", NULL) == 0);
     audio_run(world, 2);
     audio_log_stop();
@@ -811,10 +811,10 @@ void SynthWavetable_missing_table(void) {
         "using box.audio\n"
         "prefab NotATable {}\n"
         "prefab Plain {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.05}\n"
-        "  SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}\n"
-        "  SynthTable: {table: NotATable, position: 1}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Envelope: {attack: 0.005, sustain: 1, hold: 0.2, release: 0.05}\n"
+        "  synth.Oscillator: {wave: Wavetable, frequency: 220, level: 0.3}\n"
+        "  synth.Table: {table: NotATable, position: 1}\n"
         "}\n", NULL) == 0);
     audio_run(world, 2);
     audio_log_stop();
@@ -836,13 +836,13 @@ void SynthWavetable_delete_while_playing(void) {
     int32_t sounds, start;
     test_assert(ecs_script_run(world, "pad",
         "using box.audio\n"
-        "prefab PulseTable { Wavetable: {kind: WavetablePulse} }\n"
+        "prefab PulseTable { synth.Wavetable: {kind: WavetablePulse} }\n"
         "prefab Pad {\n"
-        "  SynthSound: {}\n"
-        "  SynthEnvelope: {attack: 0.01, sustain: 1, hold: 0.5, release: 0.05}\n"
-        "  SynthOscillator: {wave: SynthWavetable, frequency: 220, level: 0.3}\n"
-        "  SynthTable: {table: PulseTable, position: 4, envelope: 8}\n"
-        "  SynthLfo: {rate: 3, position: 3}\n"
+        "  synth.Sound: {}\n"
+        "  synth.Envelope: {attack: 0.01, sustain: 1, hold: 0.5, release: 0.05}\n"
+        "  synth.Oscillator: {wave: Wavetable, frequency: 220, level: 0.3}\n"
+        "  synth.Table: {table: PulseTable, position: 4, envelope: 8}\n"
+        "  synth.Lfo: {rate: 3, position: 3}\n"
         "}\n", NULL) == 0);
     audio_run(world, 2);
     pad = ecs_lookup(world, "Pad");

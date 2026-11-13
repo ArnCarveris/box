@@ -2,11 +2,12 @@
 // while its note does, its instrument at A3 so note 57 plays 220 Hz, and a clip whose notes
 // bend, swell their vibrato and press.
 using box.audio
+using box.audio.synth
 
 expr_sine {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, sustain: 1, hold: 4, release: 0.02}
-  SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.5}
+  Sound: {}
+  Envelope: {attack: 0.005, sustain: 1, hold: 4, release: 0.02}
+  Oscillator: {wave: Sine, frequency: 220, level: 0.5}
 }
 
 expr_sine_inst { Instrument: {sound: expr_sine, root: 57} }

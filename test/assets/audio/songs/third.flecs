@@ -1,7 +1,8 @@
 using box.audio
+using box.audio.synth
 
 third_bus { Bus: {} }
 
-prefab third_tone { SynthSound: {}; SynthEnvelope: {attack: 0.01, decay: 0.2}; SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.2} }
+prefab third_tone { Sound: {}; Envelope: {attack: 0.01, decay: 0.2}; Oscillator: {wave: Sine, frequency: 440, level: 0.2} }
 
 $ { Song: {title: "Third", tempo: 120, beats: 8, lanes: [{name: "Main", bus: third_bus}]} }

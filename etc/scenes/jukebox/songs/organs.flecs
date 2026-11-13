@@ -1,4 +1,5 @@
 using box.audio
+using box.audio.synth
 using box.material
 
 box { audio { Song { Rgb: {196, 92, 112} } } }
@@ -27,96 +28,96 @@ assets {
   }
 
   prefab og_tonewheel_sound {
-    SynthSound: {seed: 201, free_phase: true}
-    SynthEnvelope: {attack: 0.004, decay: 0.1, sustain: 1, release: 0.04}
-    SynthFilter: {kind: SynthLowPass, cutoff: 7000}
-    sub { SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.13} }
-    fifth { SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.13} }
-    unison { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.13} }
-    octave { SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.13} }
-    bright { SynthOscillator: {wave: SynthSine, frequency: 1760, level: 0.03} }
+    Sound: {seed: 201, free_phase: true}
+    Envelope: {attack: 0.004, decay: 0.1, sustain: 1, release: 0.04}
+    Filter: {kind: LowPass, cutoff: 7000}
+    sub { Oscillator: {wave: Sine, frequency: 220, level: 0.13} }
+    fifth { Oscillator: {wave: Sine, frequency: 660, level: 0.13} }
+    unison { Oscillator: {wave: Sine, frequency: 440, level: 0.13} }
+    octave { Oscillator: {wave: Sine, frequency: 880, level: 0.13} }
+    bright { Oscillator: {wave: Sine, frequency: 1760, level: 0.03} }
     click {
-      SynthOscillator: {wave: SynthNoise, level: 0.05}
-      SynthEnvelope: {attack: 0.001, decay: 0.012, sustain: 0, release: 0.01, curve: 3}
+      Oscillator: {wave: Noise, level: 0.05}
+      Envelope: {attack: 0.001, decay: 0.012, sustain: 0, release: 0.01, curve: 3}
     }
   }
 
   prefab og_jazz_sound {
-    SynthSound: {seed: 202, free_phase: true}
-    SynthEnvelope: {attack: 0.003, decay: 0.1, sustain: 1, release: 0.03}
-    SynthFilter: {kind: SynthLowPass, cutoff: 8000}
-    sub { SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.14} }
-    fifth { SynthOscillator: {wave: SynthSine, frequency: 660, level: 0.14} }
-    unison { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.14} }
+    Sound: {seed: 202, free_phase: true}
+    Envelope: {attack: 0.003, decay: 0.1, sustain: 1, release: 0.03}
+    Filter: {kind: LowPass, cutoff: 8000}
+    sub { Oscillator: {wave: Sine, frequency: 220, level: 0.14} }
+    fifth { Oscillator: {wave: Sine, frequency: 660, level: 0.14} }
+    unison { Oscillator: {wave: Sine, frequency: 440, level: 0.14} }
     percussion {
-      SynthOscillator: {wave: SynthSine, frequency: 1320, level: 0.16}
-      SynthEnvelope: {attack: 0.001, decay: 0.45, sustain: 0, release: 0.05, curve: 3}
+      Oscillator: {wave: Sine, frequency: 1320, level: 0.16}
+      Envelope: {attack: 0.001, decay: 0.45, sustain: 0, release: 0.05, curve: 3}
     }
     click {
-      SynthOscillator: {wave: SynthNoise, level: 0.07}
-      SynthEnvelope: {attack: 0.001, decay: 0.01, sustain: 0, release: 0.01, curve: 3}
+      Oscillator: {wave: Noise, level: 0.07}
+      Envelope: {attack: 0.001, decay: 0.01, sustain: 0, release: 0.01, curve: 3}
     }
   }
 
   prefab og_combo_sound {
-    SynthSound: {seed: 203}
-    SynthEnvelope: {attack: 0.003, decay: 0.1, sustain: 1, release: 0.03}
-    SynthFilter: {kind: SynthLowPass, cutoff: 4200, resonance: 0.1, keytrack: 0.4}
-    SynthLfo: {wave: SynthLfoTriangle, rate: 6.4, pitch: 16}
-    reed { SynthOscillator: {wave: SynthSquare, frequency: 440, level: 0.16, pulse_width: 0.32} }
-    flute { SynthOscillator: {wave: SynthTriangle, frequency: 880, level: 0.08} }
-    buzz { SynthOscillator: {wave: SynthSaw, frequency: 1760, level: 0.025} }
+    Sound: {seed: 203}
+    Envelope: {attack: 0.003, decay: 0.1, sustain: 1, release: 0.03}
+    Filter: {kind: LowPass, cutoff: 4200, resonance: 0.1, keytrack: 0.4}
+    Lfo: {wave: LfoTriangle, rate: 6.4, pitch: 16}
+    reed { Oscillator: {wave: Square, frequency: 440, level: 0.16, pulse_width: 0.32} }
+    flute { Oscillator: {wave: Triangle, frequency: 880, level: 0.08} }
+    buzz { Oscillator: {wave: Saw, frequency: 1760, level: 0.025} }
   }
 
   prefab og_flute_sound {
-    SynthSound: {seed: 204, drift: 1.5, free_phase: true}
-    SynthEnvelope: {attack: 0.05, decay: 0.1, sustain: 1, release: 0.15, attack_curve: 1}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2600, keytrack: 0.7}
-    SynthLfo: {rate: 5.6, amplitude: 0.12, pitch: 4}
-    stopped { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.3} }
-    twelfth { SynthOscillator: {wave: SynthSine, frequency: 1320, level: 0.025} }
-    open { SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.1} }
-    breath { SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.012} }
+    Sound: {seed: 204, drift: 1.5, free_phase: true}
+    Envelope: {attack: 0.05, decay: 0.1, sustain: 1, release: 0.15, attack_curve: 1}
+    Filter: {kind: LowPass, cutoff: 2600, keytrack: 0.7}
+    Lfo: {rate: 5.6, amplitude: 0.12, pitch: 4}
+    stopped { Oscillator: {wave: Sine, frequency: 440, level: 0.3} }
+    twelfth { Oscillator: {wave: Sine, frequency: 1320, level: 0.025} }
+    open { Oscillator: {wave: Sine, frequency: 880, level: 0.1} }
+    breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.012} }
     chiff {
-      SynthOscillator: {wave: SynthNoise, level: 0.08}
-      SynthEnvelope: {attack: 0.004, decay: 0.06, sustain: 0, release: 0.02, curve: 2}
+      Oscillator: {wave: Noise, level: 0.08}
+      Envelope: {attack: 0.004, decay: 0.06, sustain: 0, release: 0.02, curve: 2}
     }
   }
 
   prefab og_principal_sound {
-    SynthSound: {seed: 205, drift: 1.2, free_phase: true}
-    SynthEnvelope: {attack: 0.06, decay: 0.1, sustain: 1, release: 0.22, attack_curve: 1}
-    SynthFilter: {kind: SynthLowPass, cutoff: 3600, keytrack: 0.5}
-    body { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.07} }
-    eight { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.2} }
-    four { SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.11} }
-    twelfth { SynthOscillator: {wave: SynthSine, frequency: 1320, level: 0.05} }
-    two { SynthOscillator: {wave: SynthSine, frequency: 1760, level: 0.06} }
-    mixture { SynthOscillator: {wave: SynthSine, frequency: 2640, level: 0.03} }
+    Sound: {seed: 205, drift: 1.2, free_phase: true}
+    Envelope: {attack: 0.06, decay: 0.1, sustain: 1, release: 0.22, attack_curve: 1}
+    Filter: {kind: LowPass, cutoff: 3600, keytrack: 0.5}
+    body { Oscillator: {wave: Saw, frequency: 440, level: 0.07} }
+    eight { Oscillator: {wave: Sine, frequency: 440, level: 0.2} }
+    four { Oscillator: {wave: Sine, frequency: 880, level: 0.11} }
+    twelfth { Oscillator: {wave: Sine, frequency: 1320, level: 0.05} }
+    two { Oscillator: {wave: Sine, frequency: 1760, level: 0.06} }
+    mixture { Oscillator: {wave: Sine, frequency: 2640, level: 0.03} }
     chiff {
-      SynthOscillator: {wave: SynthNoise, color: SynthNoisePink, level: 0.06}
-      SynthEnvelope: {attack: 0.005, decay: 0.07, sustain: 0, release: 0.02, curve: 2}
+      Oscillator: {wave: Noise, color: NoisePink, level: 0.06}
+      Envelope: {attack: 0.005, decay: 0.07, sustain: 0, release: 0.02, curve: 2}
     }
   }
 
   prefab og_reed_sound {
-    SynthSound: {seed: 206, drift: 1, free_phase: true}
-    SynthEnvelope: {attack: 0.02, decay: 0.1, sustain: 1, release: 0.12}
-    SynthPitchEnvelope: {amount: -0.4, decay: 0.04, curve: 2}
-    SynthDrive: {drive: 0.3, asymmetry: 0.2}
-    SynthFilter: {kind: SynthLowPass, cutoff: 2400, resonance: 0.2, keytrack: 0.7}
-    SynthFilterEnvelope: {attack: 0.015, decay: 0.2, sustain: 0.6, release: 0.1, amount: 0.8}
-    tongue { SynthOscillator: {wave: SynthSaw, frequency: 440, level: 0.26} }
-    shallot { SynthOscillator: {wave: SynthSquare, frequency: 440, level: 0.06, pulse_width: 0.4} }
+    Sound: {seed: 206, drift: 1, free_phase: true}
+    Envelope: {attack: 0.02, decay: 0.1, sustain: 1, release: 0.12}
+    PitchEnvelope: {amount: -0.4, decay: 0.04, curve: 2}
+    Drive: {drive: 0.3, asymmetry: 0.2}
+    Filter: {kind: LowPass, cutoff: 2400, resonance: 0.2, keytrack: 0.7}
+    FilterEnvelope: {attack: 0.015, decay: 0.2, sustain: 0.6, release: 0.1, amount: 0.8}
+    tongue { Oscillator: {wave: Saw, frequency: 440, level: 0.26} }
+    shallot { Oscillator: {wave: Square, frequency: 440, level: 0.06, pulse_width: 0.4} }
   }
 
   prefab og_pedal_sound {
-    SynthSound: {seed: 207, drift: 1, free_phase: true}
-    SynthEnvelope: {attack: 0.07, decay: 0.1, sustain: 1, release: 0.3, attack_curve: 1}
-    subbass { SynthOscillator: {wave: SynthSine, frequency: 220, level: 0.34} }
-    octave { SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.14} }
-    definition { SynthOscillator: {wave: SynthTriangle, frequency: 220, level: 0.06} }
-    choral { SynthOscillator: {wave: SynthSine, frequency: 880, level: 0.04} }
+    Sound: {seed: 207, drift: 1, free_phase: true}
+    Envelope: {attack: 0.07, decay: 0.1, sustain: 1, release: 0.3, attack_curve: 1}
+    subbass { Oscillator: {wave: Sine, frequency: 220, level: 0.34} }
+    octave { Oscillator: {wave: Sine, frequency: 440, level: 0.14} }
+    definition { Oscillator: {wave: Triangle, frequency: 220, level: 0.06} }
+    choral { Oscillator: {wave: Sine, frequency: 880, level: 0.04} }
   }
 
   og_tonewheel { Instrument: {sound: og_tonewheel_sound, velocity_curve: 1} }

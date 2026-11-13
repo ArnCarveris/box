@@ -1,20 +1,21 @@
 // The sounds the SynthLadderWorld suite of test/cpu/audio compiles the model of the filter
 // from script with.
 using box.audio
+using box.audio.synth
 
 // An acid bass: a saw into a resonant ladder that its envelope opens
 prefab Acid {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.3, release: 0.1}
-  SynthFilter: {cutoff: 400, resonance: 0.85, slope: SynthSlope24, model: SynthFilterLadder}
-  SynthFilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
-  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+  Sound: {}
+  Envelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.3, release: 0.1}
+  Filter: {cutoff: 400, resonance: 0.85, slope: Slope24, model: FilterLadder}
+  FilterEnvelope: {decay: 0.2, sustain: 0, amount: 3}
+  Oscillator: {wave: Saw, frequency: 55, level: 0.6}
 }
 
 // The same without a model: the state variable filter
 prefab Plain {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.3, release: 0.1}
-  SynthFilter: {cutoff: 400, resonance: 0.85, slope: SynthSlope24}
-  SynthOscillator: {wave: SynthSaw, frequency: 55, level: 0.6}
+  Sound: {}
+  Envelope: {attack: 0.002, decay: 0.2, sustain: 0.5, hold: 0.3, release: 0.1}
+  Filter: {cutoff: 400, resonance: 0.85, slope: Slope24}
+  Oscillator: {wave: Saw, frequency: 55, level: 0.6}
 }

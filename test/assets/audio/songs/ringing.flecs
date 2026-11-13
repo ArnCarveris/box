@@ -1,13 +1,14 @@
 using box.audio
+using box.audio.synth
 
 ringing_group {
   Bus: {}
 }
 
 prefab ringing_tone {
-  SynthSound: {}
-  SynthEnvelope: {attack: 0.005, decay: 30, curve: 0.2}
-  SynthOscillator: {wave: SynthSine, frequency: 440, level: 0.4}
+  Sound: {}
+  Envelope: {attack: 0.005, decay: 30, curve: 0.2}
+  Oscillator: {wave: Sine, frequency: 440, level: 0.4}
 }
 
 ringing_inst { Instrument: {sound: ringing_tone, gate: false} }

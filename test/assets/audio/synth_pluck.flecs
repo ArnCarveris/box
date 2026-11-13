@@ -1,6 +1,7 @@
 // The pluck examples of docs/audio.md, kept the same, and the harp of the Mossvale score: the
 // Synth suite of test/cpu/audio checks that they parse, compile without errors, play and end.
 using box.audio
+using box.audio.synth
 
 music { Bus: {volume: 1} }
 
@@ -8,12 +9,12 @@ music { Bus: {volume: 1} }
 // with a vibrato of 10 cents at 5.5 Hz that the finger brings in once the note is held
 prefab Guitar {
   Output: {bus: music}
-  SynthSound: {level_variance: 0.05}
-  SynthFilter: {kind: SynthLowPass, cutoff: 4500}
+  Sound: {level_variance: 0.05}
+  Filter: {kind: LowPass, cutoff: 4500}
   string {
-    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
-    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
-    SynthLfo: {rate: 5.5, delay: 0.4, fade: 0.5, pitch: 10}
+    Oscillator: {wave: Pluck, frequency: 196, level: 0.6}
+    String: {decay: 3, brightness: 0.6, hardness: 0.9}
+    Lfo: {rate: 5.5, delay: 0.4, fade: 0.5, pitch: 10}
   }
 }
 
@@ -21,16 +22,16 @@ prefab Guitar {
 // stereo field, with a quieter octave string in the center, 3 strings, 3 s
 prefab TwelveString {
   Output: {bus: music}
-  SynthSound: {level_variance: 0.05}
-  SynthFilter: {kind: SynthLowPass, cutoff: 5000}
+  Sound: {level_variance: 0.05}
+  Filter: {kind: LowPass, cutoff: 5000}
   string {
-    SynthOscillator: {wave: SynthPluck, frequency: 196, level: 0.6}
-    SynthUnison: {voices: 2, detune: 6, width: 0.5}
-    SynthString: {decay: 3, brightness: 0.6, hardness: 0.9}
+    Oscillator: {wave: Pluck, frequency: 196, level: 0.6}
+    Unison: {voices: 2, detune: 6, width: 0.5}
+    String: {decay: 3, brightness: 0.6, hardness: 0.9}
   }
   octave {
-    SynthOscillator: {wave: SynthPluck, frequency: 392, level: 0.2}
-    SynthString: {decay: 2, brightness: 0.7, hardness: 0.9}
+    Oscillator: {wave: Pluck, frequency: 392, level: 0.2}
+    String: {decay: 2, brightness: 0.7, hardness: 0.9}
   }
 }
 
@@ -38,14 +39,14 @@ prefab TwelveString {
 // the pluck, and a quieter string an octave up that dies sooner, 1.5 s
 prefab Koto {
   Output: {bus: music}
-  SynthSound: {}
+  Sound: {}
   string {
-    SynthOscillator: {wave: SynthPluck, frequency: 293.66, frequency_end: 311.13, sweep: 0.25, level: 0.5}
-    SynthString: {decay: 1.5, brightness: 0.8, hardness: 1}
+    Oscillator: {wave: Pluck, frequency: 293.66, frequency_end: 311.13, sweep: 0.25, level: 0.5}
+    String: {decay: 1.5, brightness: 0.8, hardness: 1}
   }
   octave {
-    SynthOscillator: {wave: SynthPluck, frequency: 587.33, frequency_end: 622.25, sweep: 0.25, level: 0.12}
-    SynthString: {decay: 0.6, brightness: 0.7, hardness: 1}
+    Oscillator: {wave: Pluck, frequency: 587.33, frequency_end: 622.25, sweep: 0.25, level: 0.12}
+    String: {decay: 0.6, brightness: 0.7, hardness: 1}
   }
 }
 
@@ -54,10 +55,10 @@ prefab Koto {
 template Harp {
   prop f: f32 = 220
   Output: {bus: music}
-  SynthSound: {level_variance: 0.1}
-  SynthFilter: {kind: SynthLowPass, cutoff: 3500, resonance: 0.05}
-  pluck { SynthOscillator: {wave: SynthPluck, frequency: f, level: 0.45}; SynthString: {decay: 2.2, brightness: 0.35, hardness: 0.45} }
-  body { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.12}; SynthEnvelope: {attack: 0.004, decay: 1.2, curve: 4.5} }
+  Sound: {level_variance: 0.1}
+  Filter: {kind: LowPass, cutoff: 3500, resonance: 0.05}
+  pluck { Oscillator: {wave: Pluck, frequency: f, level: 0.45}; String: {decay: 2.2, brightness: 0.35, hardness: 0.45} }
+  body { Oscillator: {wave: Sine, frequency: f, level: 0.12}; Envelope: {attack: 0.004, decay: 1.2, curve: 4.5} }
 }
 
 Harp hp_c3(f: 130.81)

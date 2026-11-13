@@ -1,5 +1,6 @@
 // The examples of LFOs in docs/audio.md, which Synth_docs_lfo_examples plays
 using box.audio
+using box.audio.synth
 
 music { Bus: {volume: 1} }
 
@@ -8,14 +9,14 @@ music { Bus: {volume: 1} }
 template Flute {
   prop f: f32 = 440
   Output: {bus: music}
-  SynthSound: {level_variance: 0.05}
-  SynthEnvelope: {attack: 0.06, decay: 0.25, sustain: 0.55, hold: 0.22, release: 0.5, curve: 2.5, attack_curve: 1.5}
-  SynthFilter: {kind: SynthLowPass, cutoff: 2600, resonance: 0.1}
-  SynthLfo: {rate: 5.2, delay: 0.2, fade: 0.3, random_phase: true, pitch: 14, amplitude: 0.08}
-  tone { SynthOscillator: {wave: SynthSine, frequency: f, level: 0.42} }
-  reed { SynthOscillator: {wave: SynthTriangle, frequency: f * 1.002, level: 0.14} }
-  breath { SynthOscillator: {wave: SynthNoise, level: 0.025}; SynthEnvelope: {attack: 0.02, decay: 0.12} }
-  octave { SynthOscillator: {wave: SynthSine, frequency: f * 2, level: 0.05} }
+  Sound: {level_variance: 0.05}
+  Envelope: {attack: 0.06, decay: 0.25, sustain: 0.55, hold: 0.22, release: 0.5, curve: 2.5, attack_curve: 1.5}
+  Filter: {kind: LowPass, cutoff: 2600, resonance: 0.1}
+  Lfo: {rate: 5.2, delay: 0.2, fade: 0.3, random_phase: true, pitch: 14, amplitude: 0.08}
+  tone { Oscillator: {wave: Sine, frequency: f, level: 0.42} }
+  reed { Oscillator: {wave: Triangle, frequency: f * 1.002, level: 0.14} }
+  breath { Oscillator: {wave: Noise, level: 0.025}; Envelope: {attack: 0.02, decay: 0.12} }
+  octave { Oscillator: {wave: Sine, frequency: f * 2, level: 0.05} }
 }
 
 Flute flute_a4(f: 440)
@@ -24,13 +25,13 @@ Flute flute_a4(f: 440)
 // square alone drifting a few cents against the lower
 prefab PwmPad {
   Output: {bus: music}
-  SynthSound: {seed: 3}
-  SynthEnvelope: {attack: 1.2, decay: 0.5, sustain: 0.8, hold: 1.5, release: 1.5, curve: 2, attack_curve: 1}
-  SynthFilter: {kind: SynthLowPass, cutoff: 1200, resonance: 0.2}
-  SynthLfo: {wave: SynthLfoTriangle, rate: 0.3, pulse_width: 0.3, cutoff: 0.5}
-  low { SynthOscillator: {wave: SynthSquare, frequency: 220, level: 0.15} }
+  Sound: {seed: 3}
+  Envelope: {attack: 1.2, decay: 0.5, sustain: 0.8, hold: 1.5, release: 1.5, curve: 2, attack_curve: 1}
+  Filter: {kind: LowPass, cutoff: 1200, resonance: 0.2}
+  Lfo: {wave: LfoTriangle, rate: 0.3, pulse_width: 0.3, cutoff: 0.5}
+  low { Oscillator: {wave: Square, frequency: 220, level: 0.15} }
   high {
-    SynthOscillator: {wave: SynthSquare, frequency: 330, level: 0.12, pulse_width: 0.3}
-    SynthLfo: {rate: 0.4, phase: 0.5, fade: 1, pitch: 6}
+    Oscillator: {wave: Square, frequency: 330, level: 0.12, pulse_width: 0.3}
+    Lfo: {rate: 0.4, phase: 0.5, fade: 1, pitch: 6}
   }
 }

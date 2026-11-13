@@ -20,12 +20,12 @@ const STRUCTURE_QUERIES = [
   { expr: A + "ClipPlacement" },
   { expr: A + "NoteClip || " + A + "Clip || " + A + "AutomationClip" },
   { expr: A + "Instrument" },
-  { expr: A + "SynthSound || " + A + "SoundFile" },
-  { expr: A + "SynthOscillator || " + A + "SynthModRoute || " + A + "SynthLfo" },
+  { expr: A + "synth.Sound || " + A + "SoundFile" },
+  { expr: A + "synth.Oscillator || " + A + "synth.ModRoute || " + A + "synth.Lfo" },
   { expr: A + "Modulator || " + A + "Macro || " + A + "MacroMap" },
   { expr: A + "Source || " + A + "Stream" },
   { expr: A + "Pcm", values: false },
-  { expr: A + "Wavetable", values: false }
+  { expr: A + "synth.Wavetable", values: false }
 ];
 
 const SINGLETONS = ["Transport", "Song", "SongFile", "SongStatus", "Settings", "Status"];
@@ -55,7 +55,7 @@ const DAW = window.DAW = {
 };
 
 DAW.short = (comp) => comp && comp.startsWith(A) ? comp.slice(A.length) : comp;
-DAW.full = (short) => short.includes(".") ? short : A + short;
+DAW.full = (short) => /^(box|flecs)\./.test(short) ? short : A + short;
 DAW.leaf = (path) => {
   if (!path) return "";
   const i = path.lastIndexOf(".");
@@ -64,7 +64,7 @@ DAW.leaf = (path) => {
 DAW.isNone = (ref) => !ref || ref === "#0" || ref === 0;
 
 DAW.hidden = (comp) => /State$/.test(comp) || /^flecs\./.test(comp) ||
-  ["box.audio.Voice", "box.audio.SoundId", "box.audio.Synth"].includes(comp);
+  ["box.audio.Voice", "box.audio.SoundId", "box.audio.synth.State"].includes(comp);
 
 DAW.on = (fn) => DAW.listeners.push(fn);
 DAW.emit = (what) => { for (const fn of DAW.listeners) fn(what); };
@@ -109,7 +109,7 @@ DAW.effects = () => Object.values(DAW.ents).filter((r) => DAW.isEffect(r));
 DAW.clips = () => Object.values(DAW.ents).filter((r) =>
   DAW.has(r, "NoteClip") || DAW.has(r, "Clip") || DAW.has(r, "AutomationClip"));
 DAW.sounds = () => Object.values(DAW.ents).filter((r) =>
-  (DAW.has(r, "SynthSound") || DAW.has(r, "SoundFile") || DAW.has(r, "Pcm")));
+  (DAW.has(r, "synth.Sound") || DAW.has(r, "SoundFile") || DAW.has(r, "Pcm")));
 DAW.placementsOf = (track) => Object.values(DAW.ents)
   .filter((r) => r.parent === track && DAW.has(r, "ClipPlacement"));
 DAW.childrenOf = (path) => Object.values(DAW.ents).filter((r) => r.parent === path)
@@ -129,11 +129,11 @@ DAW.kindOf = (rec) => {
   if (DAW.has(rec, "NoteClip") || DAW.has(rec, "AutomationClip") || DAW.has(rec, "Clip")) return "clip";
   if (DAW.isEffect(rec)) return "effect";
   if (DAW.has(rec, "Instrument")) return "instrument";
-  if (DAW.has(rec, "SynthSound") || DAW.has(rec, "SoundFile") || DAW.has(rec, "Pcm")) return "sound";
+  if (DAW.has(rec, "synth.Sound") || DAW.has(rec, "SoundFile") || DAW.has(rec, "Pcm")) return "sound";
   if (DAW.has(rec, "Macro")) return "macro";
   if (DAW.has(rec, "Modulator")) return "modulator";
   if (DAW.has(rec, "Source") || DAW.has(rec, "Stream")) return "source";
-  if (DAW.has(rec, "SynthOscillator")) return "layer";
+  if (DAW.has(rec, "synth.Oscillator")) return "layer";
   return "entity";
 };
 

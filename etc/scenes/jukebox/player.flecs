@@ -1,6 +1,7 @@
 using flecs.script
 using flecs.script.math
 using box.audio
+using box.audio.synth
 using box.input
 using box.material
 using state
@@ -16,14 +17,14 @@ state {
 assets {
   prefab jb_crash {
     Output: {bus: sfx}
-    SynthSound: {seed: 43, level_variance: 0.05}
-    SynthEnvelope: {attack: 0.001, decay: 2.2, curve: 5}
-    SynthFilter: {kind: SynthHighPass, cutoff: 2600, resonance: 0.1}
-    wash { SynthOscillator: {wave: SynthNoise, level: 0.45} }
+    Sound: {seed: 43, level_variance: 0.05}
+    Envelope: {attack: 0.001, decay: 2.2, curve: 5}
+    Filter: {kind: HighPass, cutoff: 2600, resonance: 0.1}
+    wash { Oscillator: {wave: Noise, level: 0.45} }
     bell {
-      SynthOscillator: {frequency: 3170, level: 0.08, feedback: 0.9}
-      SynthEnvelope: {attack: 0.001, decay: 1.2, curve: 5}
-      shimmer { SynthOscillator: {frequency: 4470, modulation: SynthRing, index: 1} }
+      Oscillator: {frequency: 3170, level: 0.08, feedback: 0.9}
+      Envelope: {attack: 0.001, decay: 1.2, curve: 5}
+      shimmer { Oscillator: {frequency: 4470, modulation: Ring, index: 1} }
     }
   }
 }
