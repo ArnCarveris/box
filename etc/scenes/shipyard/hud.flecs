@@ -708,6 +708,7 @@ assets {
     const l_mass = liner_mass()
     const l_accel: f32 = l_drive * 60.0 / max(l_mass, 1)
     const l_range: f32 = l_jump * (8000.0 + l_tanks * 2500) / max(l_mass, 1)
+    const l_reach: f32 = l_tanks * 2000.0 / max(l_mass, 1)
     const l_power_ok = l_gen >= l_use && l_use > 0
     const l_cool_ok = l_radiator >= l_heat
     const l_food_ok = souls > 0 && food >= souls
@@ -733,10 +734,20 @@ assets {
       value: liner ? "{l_accel:.2} g" : "{accel:.1} g",
       ratio: liner ? l_accel / 0.5 : accel / 4,
       state: liner ? (l_drive == 0 ? UI_MUTED : l_accel >= 0.15 ? UI_GOOD : UI_WARN) : (c8 == 0 ? UI_MUTED : accel >= 1 ? UI_GOOD : UI_WARN))
-    YardStat range(icon: liner ? yard_icon_jump : yard_icon_range, label: liner ? "JUMP RANGE" : "RANGE",
-      value: liner ? "{l_range:.1} ly" : "{reach:.1} ly",
-      ratio: liner ? l_range / 40 : reach / 25,
-      state: (liner ? l_jump : c6) == 0 ? UI_MUTED : UI_OK)
+    ranges {
+      Layout: {direction: Column, spacing: spacing}
+      LayoutItem: {width: {mode: Grow}}
+      YardStat range(icon: liner ? yard_icon_jump : yard_icon_range, label: liner ? "JUMP RANGE" : "RANGE",
+        value: liner ? "{l_range:.1} ly" : "{reach:.1} ly",
+        ratio: liner ? l_range / 40 : reach / 25,
+        state: (liner ? l_jump : c6) == 0 ? UI_MUTED : UI_OK)
+      if liner {
+        YardStat reach_stat(icon: yard_icon_range, label: "RANGE",
+          value: "{l_reach:.1} AU",
+          ratio: l_reach / 40,
+          state: l_tanks == 0 ? UI_MUTED : UI_OK)
+      }
+    }
     YardStat hold(icon: liner ? yard_icon_freight : yard_icon_cargo, label: "CARGO",
       value: liner ? "{l_cargo * 60} kt" : "{c5 * 120} t",
       ratio: liner ? l_cargo / 45.0 : c5 / 12.0,
