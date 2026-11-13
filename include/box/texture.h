@@ -331,21 +331,13 @@ ECS_STRUCT(TexChannel, {
     int32_t channel;    /**< Channel 0..3 (x, y, z, w), default 0; clamped to 0..3 */
 });
 
-/** Node of a TextureGraph whose value is the tangent space normal map of a Scalar height, as
- * a GenNormal TextureGen makes it, for a GraphLinear output.
+/** Node of a TextureGraph whose value is the tangent space normal map of a Scalar height as
+ * GenNormal stores it, for a GraphLinear output: (dx, dy, 1) normalized, as (0.5 - 0.5 x,
+ * 0.5 + 0.5 y, 0.5 + 0.5 z, 1), green up the image; flat is (0.5, 0.5, 1, 1).
  *
- * The height is read at the neighbours of the texel, so it is materialized. Its central
- * differences dx (along u) and dy (down the image) are strength times the change of height
- * over the two neighbours of a 512 pixel wide image, whatever the width; the value is
- * (0.5 - 0.5 dx, 0.5 + 0.5 dy, 0.5 + 0.5, 1) of (dx, dy, 1) normalized: green up the image,
- * flat (0.5, 0.5, 1, 1). A graph and a TextureGen of the same height and strength store the
- * same normals.
- *
- * On DomainSphere the neighbours lie on the sphere one texel of the equator away, east and
- * north of the texel, read between texels: the spacing along a row follows the latitude, the
- * longitude wraps and a neighbour past a pole is on the opposite meridian. The frame is the
- * UV frame of a Sphere mesh (box/geometry.h), x toward growing u and y toward the north pole,
- * so a lit sphere shows the relief without a seam.
+ * dx (along u) and dy (down the image) are the central differences of the height, which is
+ * materialized, times strength and the width over 512, as TextureGen does for the same height.
+ * On DomainSphere they follow the layout in the UV frame of a Sphere mesh (texture_graph.wgsl).
  *
  * @code
  * relief {
@@ -365,8 +357,10 @@ ECS_STRUCT(TexNormal, {
 
 /** Node of a TextureGraph whose Scalar value is the magnitude of the gradient of a Scalar
  * height, length(dx, dy) in the units of TexNormal of the same strength: the tangent of the
- * tilt of its normal, 0 where flat. For masks such as rock on steep ground; on DomainSphere it
- * follows the layout as TexNormal does. */
+ * tilt of its normal, 0 where flat. For masks such as rock on steep ground.
+ *
+ * On DomainSphere it follows the layout as TexNormal does, with the same steepness in every
+ * direction up to the poles. */
 ECS_STRUCT(TexSlope, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
     float height_value;  /**< Value of height without a node */

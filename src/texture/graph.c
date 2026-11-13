@@ -57,12 +57,13 @@ static const char *box_texture_channel_wgsl =
     "    return vec4f(i[0][channel], 0.0, 0.0, 0.0);\n"
     "}\n";
 
-/** WGSL of the TexNormal node: the normal of the differences of its height, encoded as
- * GenNormal stores it */
+/** WGSL of the TexNormal node: the normal of the differences of its height in the UV frame of
+ * the domain, encoded as GenNormal stores it */
 static const char *box_texture_normal_wgsl =
     "fn box_tex_normal(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
     "    height: texture_2d<f32>) -> vec4f {\n"
-    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x));\n"
+    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x))\n"
+    "        * box_texgraph_normal_scale(texel);\n"
     "    let n = vec3f(-d.x, d.y, 1.0) * inverseSqrt(dot(d, d) + 1.0);\n"
     "    return vec4f(0.5 + 0.5 * n, 1.0);\n"
     "}\n";

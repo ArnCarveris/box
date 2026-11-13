@@ -95,7 +95,8 @@ fn box_texgraph_sphere_position(d: vec3f) -> vec2f {
 // wrapped. On the sphere they lie on the great circles through the texel toward east (growing
 // u) and north (shrinking v), one texel of the equator away, read between texels: the spacing
 // along a row follows the latitude, the longitude wraps and the poles are crossed. east and
-// north are the frame of the UV tangents of a Sphere mesh, so the normal maps match it.
+// north point along the UV tangents of a Sphere mesh, at unit length: a normal map scales them
+// with box_texgraph_normal_scale.
 fn box_texgraph_gradient(t: texture_2d<f32>, texel: vec2i, strength: f32) -> vec2f {
     let size = vec2f(box_texgraph_stage.size);
     let scale = select(strength, 1.0, strength == 0.0) * size.x / 512.0;
@@ -125,6 +126,27 @@ fn box_texgraph_gradient(t: texture_2d<f32>, texel: vec2i, strength: f32) -> vec
     let n = box_texgraph_load(t, texel - vec2i(0, 1)).x;
     let so = box_texgraph_load(t, texel + vec2i(0, 1)).x;
     return vec2f(e - w, so - n) * scale;
+}
+
+// Largest factor of box_texgraph_normal_scale near the poles, where the v tangent of the mesh
+// vanishes: closer to a pole the relief fades instead of losing the precision of an RGBA8 normal
+const BOX_TEXGRAPH_POLE_SCALE: f32 = 8.0;
+
+// Factors of the differences of box_texgraph_gradient for a normal map. A mesh takes the frame of
+// a normal map from its UVs (cotangent_frame in mesh_surface.wgsl): the gradients of u and v,
+// scaled by one factor so the longer has unit length. On the equirectangular UVs of a Sphere mesh
+// the gradient of u is 1 / (2 sin(theta)) times that of v, theta the angle from the north pole, so
+// the u tangent has length min(1, 1 / r) and the v tangent min(1, r) with r = 2 sin(theta). The
+// factors divide by them, so the normal decodes to the differences the sphere has. On the plane
+// they are 1, as GenNormal.
+fn box_texgraph_normal_scale(texel: vec2i) -> vec2f {
+    if (box_texgraph_stage.domain != 1u) {
+        return vec2f(1.0);
+    }
+
+    let theta = (f32(texel.y) + 0.5) / f32(box_texgraph_stage.size.y) * BOX_TEXGRAPH_PI;
+    let r = 2.0 * sin(theta);
+    return vec2f(r, 1.0) * clamp(1.0 / r, 1.0, BOX_TEXGRAPH_POLE_SCALE);
 }
 
 // PCG hash of a word

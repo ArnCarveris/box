@@ -22,6 +22,9 @@
 /** Pi */
 #define TN_PI (3.14159265358979)
 
+/** Largest factor of the sphere normals near the poles, BOX_TEXGRAPH_POLE_SCALE */
+#define TN_POLE_SCALE (8.0)
+
 /** Node of a scalar kind: the dot product of its vector input with weights */
 typedef struct TnDot {
     vec4 weights;       /**< Weights of the channels */
@@ -251,6 +254,26 @@ static void tn_sphere_frame(
     north[2] = cos(theta) * cos(phi);
 }
 
+/** Get the lengths of the u and v tangents of the frame a Sphere mesh takes from its UVs at a
+ * row (cotangent_frame in mesh_surface.wgsl): the gradients of u and v, the longer of unit
+ * length, where the gradient of u is 1 / (2 sin(theta)) times that of v.
+ *
+ * @param y Row
+ * @param height Height of the image
+ * @param tu Receives the length of the u tangent
+ * @param tv Receives the length of the v tangent
+ */
+static void tn_sphere_tangents(
+    int32_t y,
+    int32_t height,
+    double *tu,
+    double *tv)
+{
+    double r = 2.0 * sin(((double)y + 0.5) / height * TN_PI);
+    *tu = r > 1 ? 1 / r : 1;
+    *tv = r > 1 ? 1 : r;
+}
+
 /** Dot product of two 3D vectors.
  *
  * @param a The first vector
@@ -367,6 +390,74 @@ static ecs_entity_t tn_graph(
     return tex;
 }
 
+/** Get the world space normal of an encoded tangent space normal of a texel of the sphere, as
+ * a Sphere mesh decodes it in the frame of its UVs.
+ *
+ * @param texels The texels
+ * @param x Column
+ * @param y Row
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param out Receives the unit normal
+ */
+static void tn_world_normal(
+    const float *texels,
+    int32_t x,
+    int32_t y,
+    int32_t width,
+    int32_t height,
+    double out[3])
+{
+    double p[3], east[3], north[3], m[3], len, tu, tv;
+    const float *t = &texels[(y * width + x) * 4];
+    int32_t c;
+    tn_sphere_frame(x, y, width, height, p, east, north);
+    tn_sphere_tangents(y, height, &tu, &tv);
+    for (c = 0; c < 3; c ++) {
+        m[c] = 2.0 * t[c] - 1.0;
+    }
+
+    for (c = 0; c < 3; c ++) {
+        out[c] = east[c] * m[0] * tu + north[c] * m[1] * tv + p[c] * m[2];
+    }
+
+    len = sqrt(tn_dot3(out, out));
+    for (c = 0; c < 3; c ++) {
+        out[c] /= len;
+    }
+}
+
+/** Distance between the world space normals of two texels of the sphere.
+ *
+ * @param texels The texels
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param x0 Column of the first texel
+ * @param y0 Row of the first texel
+ * @param x1 Column of the second texel
+ * @param y1 Row of the second texel
+ * @return The distance
+ */
+static double tn_world_distance(
+    const float *texels,
+    int32_t width,
+    int32_t height,
+    int32_t x0,
+    int32_t y0,
+    int32_t x1,
+    int32_t y1)
+{
+    double a[3], b[3], d[3];
+    int32_t c;
+    tn_world_normal(texels, x0, y0, width, height, a);
+    tn_world_normal(texels, x1, y1, width, height, b);
+    for (c = 0; c < 3; c ++) {
+        d[c] = a[c] - b[c];
+    }
+
+    return sqrt(tn_dot3(d, d));
+}
+
 /** Differences of the height k . p on the sphere at a texel, as the node takes them: between
  * the points one texel of the equator east and west, and south and north, on great circles.
  *
@@ -395,6 +486,36 @@ static void tn_sphere_differences(
     tn_sphere_frame(x, y, width, height, p, east, north);
     *dx = tn_dot3(k, east) * step * scale;
     *dy = -tn_dot3(k, north) * step * scale;
+}
+
+/** Differences of the height k . p as TexNormal stores them on the sphere: divided by the
+ * lengths of the tangents of the UV frame of a Sphere mesh (tn_sphere_tangents), so the mesh
+ * decodes them to the differences, by at most TN_POLE_SCALE near the poles.
+ *
+ * @param k The gradient of the height in space
+ * @param x Column
+ * @param y Row
+ * @param width Width of the image
+ * @param height Height of the image
+ * @param strength Strength, 0 for 1
+ * @param dx Receives the stored difference along u
+ * @param dy Receives the stored difference down the image
+ */
+static void tn_sphere_normal_differences(
+    const double k[3],
+    int32_t x,
+    int32_t y,
+    int32_t width,
+    int32_t height,
+    double strength,
+    double *dx,
+    double *dy)
+{
+    double r = 2.0 * sin(((double)y + 0.5) / height * TN_PI);
+    double f = r > 1 ? 1 : (1 / r > TN_POLE_SCALE ? TN_POLE_SCALE : 1 / r);
+    tn_sphere_differences(k, x, y, width, height, strength, dx, dy);
+    *dx *= r * f;
+    *dy *= f;
 }
 
 /** Normals of a height plane: interior texels of a plane of slope (a, b) in u and v at two
@@ -429,8 +550,9 @@ void TextureGraphNormal_normal_plane_slope(void) {
     ecs_fini(world);
 }
 
-/** Normals of the height k . p on the sphere: every texel, the poles included, is the tangent
- * gradient of k in the east and north frame of the UV tangents. */
+/** Normals of the height k . p on the sphere: every texel, the poles included, is the gradient
+ * of k in the frame of the UV tangents, scaled for a Sphere mesh. Decoded as the mesh does, it
+ * is the normal on the sphere, but for the rows next to the poles where it fades. */
 void TextureGraphNormal_normal_sphere_slope(void) {
     // textures/graph
     ecs_world_t *world = tn_world();
@@ -446,8 +568,31 @@ void TextureGraphNormal_normal_sphere_slope(void) {
     float *texels = tn_read(world, tex, 0, w, h);
     for (y = 0; y < h; y ++) {
         for (x = 0; x < w; x ++) {
-            tn_sphere_differences(k, x, y, w, h, 0, &dx, &dy);
+            tn_sphere_normal_differences(k, x, y, w, h, 0, &dx, &dy);
             tn_expect_normal(texels, w, x, y, dx, dy, 0.012);
+        }
+    }
+
+    for (y = 2; y < h - 2; y ++) {
+        for (x = 0; x < w; x ++) {
+            double p[3], east[3], north[3], n[3], expect[3], len;
+            int32_t c;
+            tn_sphere_frame(x, y, w, h, p, east, north);
+            tn_sphere_differences(k, x, y, w, h, 0, &dx, &dy);
+            for (c = 0; c < 3; c ++) {
+                expect[c] = -dx * east[c] + dy * north[c] + p[c];
+            }
+
+            len = sqrt(tn_dot3(expect, expect));
+            tn_world_normal(texels, x, y, w, h, n);
+            for (c = 0; c < 3; c ++) {
+                if (fabs(n[c] - expect[c] / len) > 0.02) {
+                    printf("texel %d, %d: world normal %f, expected %f\n", x, y, n[c],
+                        expect[c] / len);
+                }
+
+                test_assert(fabs(n[c] - expect[c] / len) <= 0.02);
+            }
         }
     }
 
@@ -536,72 +681,6 @@ void TextureGraphNormal_normal_matches_gen(void) {
     ecs_os_free(heights);
     ecs_os_free(texels);
     ecs_fini(world);
-}
-
-/** Get the world space normal of an encoded tangent space normal of a texel of the sphere.
- *
- * @param texels The texels
- * @param x Column
- * @param y Row
- * @param width Width of the image
- * @param height Height of the image
- * @param out Receives the unit normal
- */
-static void tn_world_normal(
-    const float *texels,
-    int32_t x,
-    int32_t y,
-    int32_t width,
-    int32_t height,
-    double out[3])
-{
-    double p[3], east[3], north[3], m[3], len;
-    const float *t = &texels[(y * width + x) * 4];
-    int32_t c;
-    tn_sphere_frame(x, y, width, height, p, east, north);
-    for (c = 0; c < 3; c ++) {
-        m[c] = 2.0 * t[c] - 1.0;
-    }
-
-    for (c = 0; c < 3; c ++) {
-        out[c] = east[c] * m[0] + north[c] * m[1] + p[c] * m[2];
-    }
-
-    len = sqrt(tn_dot3(out, out));
-    for (c = 0; c < 3; c ++) {
-        out[c] /= len;
-    }
-}
-
-/** Distance between the world space normals of two texels of the sphere.
- *
- * @param texels The texels
- * @param width Width of the image
- * @param height Height of the image
- * @param x0 Column of the first texel
- * @param y0 Row of the first texel
- * @param x1 Column of the second texel
- * @param y1 Row of the second texel
- * @return The distance
- */
-static double tn_world_distance(
-    const float *texels,
-    int32_t width,
-    int32_t height,
-    int32_t x0,
-    int32_t y0,
-    int32_t x1,
-    int32_t y1)
-{
-    double a[3], b[3], d[3];
-    int32_t c;
-    tn_world_normal(texels, x0, y0, width, height, a);
-    tn_world_normal(texels, x1, y1, width, height, b);
-    for (c = 0; c < 3; c ++) {
-        d[c] = a[c] - b[c];
-    }
-
-    return sqrt(tn_dot3(d, d));
 }
 
 /** The world space normals of a curved height on the sphere change across the seam and across
