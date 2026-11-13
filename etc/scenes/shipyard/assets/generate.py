@@ -330,6 +330,13 @@ ICONS = {
             '<path d="M22 48v-6M32 48v-9M42 48v-6"/></g>',
     "refinery": f'<g {S}><path d="M6 56V22h12v34M22 56V12h12v44"/><path d="M38 56V38l9-7 9 7v18"/><path d="M2 56h60"/>'
                 '<path d="M44 46h6"/></g>',
+    "assembler": f'<g {S}><path d="M4 58h24M10 58v-8h12v8"/><circle cx="16" cy="44" r="5"/><path d="M19 40l9-18"/>'
+                 '<circle cx="30" cy="19" r="4"/><path d="M34 18l16-6"/><path d="M50 12l6-4M50 12l4 7"/>'
+                 '<path d="M24 34l8-6M36 58h24v-14H36z"/></g>',
+    "shield": f'<g {S}><path d="M32 4l22 8v16c0 14-9 24-22 32C19 52 10 42 10 28V12z"/><path d="M32 14v38"/>'
+              '<path d="M20 26c8-4 16-4 24 0"/></g>',
+    "railgun": f'<g {S}><path d="M4 22h18v20H4z"/><path d="M22 26h38M22 38h38"/><path d="M30 32h28"/>'
+               '<path d="M28 22v20M38 24v16M48 24v16"/></g>',
     "armor": f'<g {S}><path d="M6 56V26L30 8h28v48z"/><path d="M16 56V30l16-12h18"/><path d="M26 56V36l8-6h16"/></g>',
     "farm": f'<g {S}><path d="M32 56V10"/><path d="M32 22c-7 0-11-5-11-11 7 0 11 5 11 11zM32 22c7 0 11-5 11-11-7 0-11 5-11 11z"/>'
             '<path d="M32 36c-7 0-11-5-11-11 7 0 11 5 11 11zM32 36c7 0 11-5 11-11-7 0-11 5-11 11z"/><path d="M8 56h48"/></g>',

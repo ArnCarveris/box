@@ -1,0 +1,226 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.picking
+using box.input
+using box.spatial
+using box.transition
+using box.movement
+using box.particle
+using box.light
+using box.animation
+using state
+
+assets {
+  template LinerSegment {
+    prop k: i32 = 0
+    prop l: i32 = 0
+    prop z: i32 = 0
+    prop seed: i32 = 0
+    prop live: f32 = 1
+
+    const r = lane_r(l)
+    const core = l == 0
+    const kf = lkind(l, z + 1)
+    const kb = lkind(l, z - 1)
+    const fe = kf == 0 ? 2 : kf == k ? 0 : 1
+    const be = kb == 0 ? 2 : kb == k ? 0 : 1
+
+    if k == L_BRIDGE {
+      Bridge part(r: r, be: be)
+    } else if k == L_SENSOR {
+      Sensor part(r: r, core: core, fe: fe, be: be)
+    } else if k == L_QUARTERS {
+      Quarters part(r: r, fe: fe, be: be, seed: seed)
+    } else if k == L_HABRING {
+      HabRing part(r: r, seed: z)
+    } else if k == L_ESTATE {
+      EstateRing part(r: r, seed: z)
+    } else if k == L_FARM {
+      AgriRing part(r: r, seed: z)
+    } else if k == L_REACTOR {
+      Reactor part(r: r, fe: fe, be: be)
+    } else if k == L_RADIATOR {
+      Radiator part(r: r, core: core)
+    } else if k == L_JUMP {
+      JumpDrive part(r: r, fe: fe, be: be)
+    } else if k == L_DRIVE {
+      DriveSection part(r: r, fe: fe)
+    } else if k == L_TANKS {
+      TankCluster part(r: r)
+    } else if k == L_CARGO {
+      CargoBlock part(r: r, fe: fe, be: be, seed: seed)
+    } else if k == L_HANGAR {
+      Hangar part(r: r, core: core, flip: l == LANE_PORT, fe: fe, be: be, seed: seed)
+    } else if k == L_ASSEMBLER {
+      HeavyAssembler part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
+    } else if k == L_FAB {
+      FabBay part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
+    } else if k == L_SHIELD {
+      ShieldGenerator part(r: r, core: core, fe: fe, be: be, power: live)
+    } else if k == L_RAILGUN {
+      Railgun part(r: r, core: core, fe: fe, be: be, power: live)
+    } else if k == L_TRUSS {
+      SpineTruss part(r: r)
+    } else if k == L_YOKE {
+      Yoke part(r: r, p1: lkind(1, z) == L_TRUSS, p2: lkind(2, z) == L_TRUSS, p3: lkind(3, z) == L_TRUSS, p4: lkind(4, z) == L_TRUSS)
+    } else if k == L_ARMOR {
+      ArmorSleeve part(r: r, fe: fe, be: be)
+    } else if k == L_TURRET {
+      TurretDeck part(r: r, core: core, fe: fe, be: be)
+    }
+  }
+
+  template SlotCursor {
+    prop r: f32 = 1
+    prop color: Rgb = {255, 255, 255}
+
+    const cr = r * 1.4
+    for s in 0..2 {
+      "hoop_{s}" { Position: {0, 0, (s - 0.5) * SEG}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.045, segments: 40, rings: 3}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; SpatialIgnore }
+    }
+    for i in 0..4 {
+      const a = PI / 4 + i * HALF_PI
+      "edge_{i}" { Position: {cos(a) * cr, sin(a) * cr, 0}; Box: {0.05, 0.05, SEG}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; SpatialIgnore }
+    }
+  }
+
+  template LinerSlot {
+    prop idx: i32 = 0
+    mut rising = false
+    mut sparking = false
+
+    const l = lane_of(idx)
+    const z = slot_of(idx)
+    const k = lgrid[idx]
+    const r = lane_r(l)
+    const active = l == lane
+    const hovered = lhover == idx
+    const t = tool
+    const editing = t > 0
+    const placing = editing && t != T_REMOVE
+    const swap = placing && k != t
+    const fault = lstatus[idx]
+
+    Position: {lane_x(l), AXIS_Y + lane_y(l), slot_z(z)}
+
+    if active {
+      Interactive
+      Cursor: {CursorPointer}
+    }
+
+    if k != 0 {
+      body {
+        Position: {0, rising ? 2.5 : 0, 0}
+        Rotation: {0, 0, lane_angle(l)}
+        Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
+        if editing && !active {
+          Opacity: {0.16}
+          SpatialIgnore
+        }
+        if hovered && t == T_REMOVE {
+          Tint: {255, 70, 50, 150}
+        } else if hovered && swap {
+          Tint: {90, 255, 160, 120}
+        }
+        LinerSegment part(k: k, l: l, z: z, seed: idx)
+      }
+
+      if fault != 0 {
+        warning {
+          Position: {0, r * 1.5 + 1.4, 0}
+          AngularVelocity: {0, 1.6, 0}
+          SpatialIgnore
+          NoShadow
+          gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.6, 0.6, 0.6} }
+          glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 5}; Rgb: {255, 60, 40} }
+        }
+      }
+    }
+
+    if active && k == 0 && editing {
+      pad {
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: r, length: SEG * 0.94, segments: 32, smooth: true}
+        Rgb: {60, 180, 255}
+        Emissive: {strength: hovered ? 0.6 : 0.08, color: {60, 180, 255}}
+        Opacity: {hovered ? 0.2 : 0.05}
+        NoShadow
+      }
+    }
+
+    if hovered {
+      const color: Rgb = match swap {
+        true: {90, 255, 140}
+        _: match t == T_REMOVE && k != 0 { true: {255, 110, 60}; _: {140, 220, 255} }
+      }
+      SlotCursor cursor(r: r, color: color)
+
+      if placing && k == 0 {
+        ghost {
+          Rotation: {0, 0, lane_angle(l)}
+          Opacity: {0.55}
+          Tint: {90, 255, 160, 120}
+          SpatialIgnore
+          NoShadow
+          LinerSegment part(k: t, l: l, z: z, seed: idx)
+        }
+      }
+    }
+
+    if sparking {
+      sparks {
+        Position: {0, 0, 0}
+        ParticleEmitter: {
+          max: 240, rate: 260, shape: EmitterBox, extents: {r, r, 1.9},
+          direction: {0, 1, 0}, spread: 70, speed: {1.5, 5},
+          lifetime: {0.25, 0.7}, size: {0.03, 0.08}, opacity: {0.6, 1},
+          acceleration: {0, -4, 0}, color: {140, 220, 255}, seed: 30 + idx
+        }
+        ParticleAppearance: {blend: ParticleAdditive, stretch: 0.06}
+        ParticleCurves: {opacity: {keys: [{0, 1}, {0.7, 0.8}, {1, 0}]}}
+      }
+    }
+
+    async {
+      while true {
+        await on.enter(this)
+        lhover = idx
+      }
+    }
+
+    async {
+      while true {
+        await on.leave(this)
+        if lhover == idx {
+          lhover = -1
+        }
+      }
+    }
+
+    async {
+      while true {
+        const ev = await on.click(this)
+        if ev.button == 0 {
+          emit SlotClick(slot: idx)
+        }
+      }
+    }
+
+    async {
+      while true {
+        const e = await Built
+        if e.cell == idx {
+          rising = true
+          sparking = true
+          await delay(0.12)
+          rising = false
+          await delay(0.7)
+          sparking = false
+        }
+      }
+    }
+  }
+}

@@ -32,15 +32,17 @@ state {
   export const L_TANKS: i32 = 49
   export const L_CARGO: i32 = 50
   export const L_HANGAR: i32 = 51
-  export const L_REFINERY: i32 = 52
+  export const L_ASSEMBLER: i32 = 52
   export const L_FAB: i32 = 53
   export const L_TRUSS: i32 = 54
   export const L_YOKE: i32 = 55
   export const L_ARMOR: i32 = 56
   export const L_TURRET: i32 = 57
   export const L_FARM: i32 = 58
-  export const L_END: i32 = 59
-  export const LKINDS: i32 = 19
+  export const L_SHIELD: i32 = 59
+  export const L_RAILGUN: i32 = 60
+  export const L_END: i32 = 61
+  export const LKINDS: i32 = 21
 
   event SlotClick(slot: i32)
 
@@ -48,14 +50,14 @@ state {
   export mut lhover: i32 = -1
   export mut lgrid: i32[90] = {}
   export mut lstatus: i32[90] = {}
-  export mut lcounts: i32[19] = {}
+  export mut lcounts: i32[21] = {}
   export mut lmodules: i32 = 0
   export mut lproblems: i32 = 0
   export mut lspan: i32 = 0
   export mut lloaded: bool = false
 
-  export const LPLAN_ROWS: i32 = 139
-  export const liner_plan: i32[695] = [
+  export const LPLAN_ROWS: i32 = 142
+  export const liner_plan: i32[710] = [
     OP_PASSENGER, 0, 0, 0, L_DRIVE,
     OP_PASSENGER, 0, 1, 1, L_YOKE,
     OP_PASSENGER, 0, 2, 3, L_TANKS,
@@ -129,7 +131,7 @@ state {
     OP_TENDER, 0, 5, 5, L_JUMP,
     OP_TENDER, 0, 6, 6, L_RADIATOR,
     OP_TENDER, 0, 7, 7, L_YOKE,
-    OP_TENDER, 0, 8, 9, L_REFINERY,
+    OP_TENDER, 0, 8, 9, L_ASSEMBLER,
     OP_TENDER, 0, 10, 10, L_YOKE,
     OP_TENDER, 0, 11, 11, L_FARM,
     OP_TENDER, 0, 12, 12, L_TRUSS,
@@ -170,7 +172,8 @@ state {
     OP_BATTLESHIP, 0, 13, 13, L_TURRET,
     OP_BATTLESHIP, 0, 14, 14, L_YOKE,
     OP_BATTLESHIP, 0, 15, 15, L_TURRET,
-    OP_BATTLESHIP, 0, 16, 17, L_ARMOR,
+    OP_BATTLESHIP, 0, 16, 16, L_SHIELD,
+    OP_BATTLESHIP, 0, 17, 17, L_ARMOR,
     OP_BATTLESHIP, 1, 0, 0, L_DRIVE,
     OP_BATTLESHIP, 1, 1, 1, L_TRUSS,
     OP_BATTLESHIP, 1, 2, 3, L_TANKS,
@@ -180,6 +183,7 @@ state {
     OP_BATTLESHIP, 1, 12, 12, L_TURRET,
     OP_BATTLESHIP, 1, 13, 13, L_ARMOR,
     OP_BATTLESHIP, 1, 14, 14, L_TRUSS,
+    OP_BATTLESHIP, 1, 15, 15, L_RAILGUN,
     OP_BATTLESHIP, 2, 0, 0, L_DRIVE,
     OP_BATTLESHIP, 2, 1, 1, L_TRUSS,
     OP_BATTLESHIP, 2, 2, 3, L_TANKS,
@@ -189,6 +193,7 @@ state {
     OP_BATTLESHIP, 2, 12, 12, L_TURRET,
     OP_BATTLESHIP, 2, 13, 13, L_ARMOR,
     OP_BATTLESHIP, 2, 14, 14, L_TRUSS,
+    OP_BATTLESHIP, 2, 15, 15, L_RAILGUN,
     OP_BATTLESHIP, 3, 9, 9, L_TRUSS,
     OP_BATTLESHIP, 3, 10, 10, L_TURRET,
     OP_BATTLESHIP, 3, 11, 11, L_QUARTERS,
@@ -254,6 +259,7 @@ state {
     k == L_YOKE && trusses_at(z) == 0 ? 5 :
     housed(k) && (lkind(l, z - 1) == L_REACTOR || lkind(l, z + 1) == L_REACTOR) ? 6 :
     k == L_HANGAR && l == 0 && lkind(LANE_VENTRAL, z) != 0 ? 7 :
+    k == L_RAILGUN && !open_ahead(l, z) ? 10 :
     0
   }
 
@@ -268,13 +274,14 @@ state {
       7: "The hangar opens onto the ventral spine"
       8: "Cut off from the rest of the core"
       9: "This outrigger has no yoke to the core"
+      10: "A railgun needs a clear line of fire ahead"
       _: ""
     }
   }
 
   fn lvalidate() {
     mut st: i32[90] = {}
-    mut tally: i32[19] = {}
+    mut tally: i32[21] = {}
     mut front: i32 = SLOTS
     mut back: i32 = -1
     mut total: i32 = 0
@@ -350,6 +357,7 @@ state {
     lmodules = total
     lproblems = bad
     lspan = max(back - front + 1, 0)
+    layout_rev += 1
   }
 
   fn load_liner(design: i32) {
@@ -369,14 +377,14 @@ state {
   fn lkind_mass(k: i32) -> f32 {
     match k {
       40: 18; 41: 8; 42: 10; 43: 30; 44: 34; 45: 26; 46: 6; 47: 34; 48: 24
-      49: 18; 50: 14; 51: 12; 52: 22; 53: 16; 54: 3; 55: 8; 56: 20; 57: 18; 58: 32
+      49: 18; 50: 14; 51: 12; 52: 22; 53: 16; 54: 3; 55: 8; 56: 20; 57: 18; 58: 32; 59: 16; 60: 20
       _: 0
     }
   }
 
   fn lkind_power(k: i32) -> f32 {
     match k {
-      40: 2; 41: 4; 42: 1; 43: 6; 44: 4; 47: 30; 48: 10; 49: 0.2; 50: 0.2; 51: 2; 52: 8; 53: 6; 57: 6; 58: 2
+      40: 2; 41: 4; 42: 1; 43: 6; 44: 4; 47: 30; 48: 10; 49: 0.2; 50: 0.2; 51: 2; 52: 8; 53: 6; 57: 6; 58: 2; 59: 15; 60: 20
       _: 0
     }
   }
