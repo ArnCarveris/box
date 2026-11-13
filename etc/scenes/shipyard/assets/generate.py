@@ -163,6 +163,54 @@ def heat_fins(size=256, lines=10):
     save_emissive("heat_fins.png", lin)
 
 
+def radiator(size=512, lines=10):
+    v = (np.arange(size)[:, None] + 0.5) / size
+    u = (np.arange(size)[None, :] + 0.5) / size
+    phase = (v * lines) % 1.0 - 0.5
+    tube = np.exp(-(phase / 0.07) ** 2) * np.ones((1, size))
+    lip = np.exp(-((np.abs(phase) - 0.1) / 0.025) ** 2) * np.ones((1, size))
+    seam = np.exp(-(np.minimum(u, 1 - u) / 0.006) ** 2) * np.ones((size, 1))
+    streak = periodic_streaks(size, size, 41, 3, 24, 0.05).T
+    stain = noise(size, 1.6, 43)
+    speck = noise(size, 0.4, 47)
+    base = np.array([62, 60, 58], float)
+    metal = np.array([128, 122, 114], float)
+    rust = np.array([96, 66, 48], float)
+    img = base * (0.82 + 0.3 * streak[:, :, None])
+    img = img * (1 - tube[:, :, None]) + metal * tube[:, :, None]
+    img *= 1 - 0.45 * lip[:, :, None]
+    img *= 1 - 0.6 * seam[:, :, None]
+    burn = np.clip((stain - 0.45) * 2.5, 0, 1)[:, :, None]
+    img = img * (1 - 0.5 * burn) + rust * 0.5 * burn
+    img *= 0.88 + 0.24 * speck[:, :, None]
+    save_rgb("radiator.jpg", img)
+    height = tube - 0.5 * seam + 0.04 * streak
+    save_rgb("radiator_normal.jpg", normal_from_height(height, 2.4), 90)
+
+
+def nozzle(width=1024, height=256, tubes=120):
+    v = (np.arange(height)[:, None] + 0.5) / height
+    u = (np.arange(width)[None, :] + 0.5) / width
+    phase = (u * tubes) % 1.0 - 0.5
+    groove = np.exp(-(phase / 0.09) ** 2) * np.ones((height, 1))
+    rng = np.random.default_rng(53)
+    per_tube = rng.uniform(0.86, 1.08, tubes)[((u * tubes).astype(int)) % tubes] * np.ones((height, 1))
+    stops = [(0.0, (44, 40, 46)), (0.08, (62, 60, 80)), (0.16, (90, 84, 104)), (0.25, (136, 112, 84)),
+             (0.36, (148, 138, 118)), (0.52, (128, 126, 124)), (1.0, (106, 106, 108))]
+    ramp = np.dstack([np.interp(v[:, 0], [t for t, _ in stops], [c[i] for _, c in stops])[:, None]
+                      * np.ones((1, width)) for i in range(3)])
+    soot = periodic_streaks(width, height, 59, 4, 40, 0.02)
+    soot = np.clip((soot - 0.35) * 1.8, 0, 1) * np.clip((v - 0.55) / 0.45, 0, 1)
+    grime = noise(height, 1.4, 61)
+    grime = np.tile(grime, (1, width // height))
+    img = ramp * per_tube[:, :, None] * (1 - 0.55 * groove[:, :, None])
+    img *= (1 - 0.55 * soot[:, :, None]) * (0.86 + 0.22 * grime[:, :, None])
+    save_rgb("nozzle.jpg", img)
+    save_rgb("nozzle_normal.jpg", normal_from_height(-groove, 1.6), 90)
+    glow = np.exp(-v / 0.07) * (1 - 0.6 * groove) * per_tube
+    save_emissive("nozzle_glow.png", glow[:, :, None] * np.array([1.0, 0.36, 0.1]))
+
+
 def dots(size=128, count=2):
     u = (np.arange(size) + 0.5) / size
     pu = (u[None, :] * count) % 1.0 - 0.5
@@ -299,4 +347,6 @@ if __name__ == "__main__":
     windows()
     containers()
     heat_fins()
+    radiator()
+    nozzle()
     dots()
