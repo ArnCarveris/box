@@ -601,7 +601,7 @@ void TextureGraphNormal_normal_sphere_slope(void) {
 }
 
 /** Slopes of the same heights: the length of the differences of TexNormal, on the interior of
- * the plane with a TexChannel height and on the whole sphere. */
+ * the plane with a TexSplit height and on the whole sphere. */
 void TextureGraphNormal_slope_plane_sphere(void) {
     // textures/graph
     ecs_world_t *world = tn_world();
@@ -618,7 +618,7 @@ void TextureGraphNormal_slope_plane_sphere(void) {
     ecs_set(world, coords, TexCoords, {0});
     ecs_set(world, scaled, TexMath, {.op = MathMultiply, .a = coords,
         .b_value = {0, 48, 0, 0}});
-    ecs_set(world, channel, TexChannel, {.in = scaled, .channel = 1});
+    ecs_set(world, channel, TexSplit, {.input = scaled, .channel = ChannelG});
     ecs_entity_t tex = tn_graph(world, channel, true, 3, w, h, DomainPlane, &node);
     tn_wait(world, tex);
     float *texels = tn_read(world, tex, 0, w, h);

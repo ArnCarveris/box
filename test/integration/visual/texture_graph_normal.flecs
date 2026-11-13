@@ -43,7 +43,7 @@ graph_normals {
     mag    { TexMath: {op: MathMax, a: dir, b: neg} }
     tent   { TexMath: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
     ridge  { TexMath: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
-    height { TexChannel: {in: ridge, channel: 0} }
+    height { TexSplit: {input: ridge, channel: ChannelR} }
     normal { TexNormal: {height: height, strength: 20} }
     TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
                    format: GraphLinear}
@@ -55,7 +55,7 @@ graph_normals {
     mag    { TexMath: {op: MathMax, a: dir, b: neg} }
     tent   { TexMath: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
     ridge  { TexMath: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
-    height { TexChannel: {in: ridge, channel: 1} }
+    height { TexSplit: {input: ridge, channel: ChannelG} }
     normal { TexNormal: {height: height, strength: 20} }
     TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
                    format: GraphLinear}
@@ -67,7 +67,7 @@ graph_normals {
     mag    { TexMath: {op: MathMax, a: dir, b: neg} }
     tent   { TexMath: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
     ridge  { TexMath: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
-    height { TexChannel: {in: ridge, channel: 1} }
+    height { TexSplit: {input: ridge, channel: ChannelG} }
     slope  { TexSlope: {height: height, strength: 20} }
     TextureGraph: {output: slope, width: 512, height: 256, domain: DomainSphere,
                    format: GraphSingle}

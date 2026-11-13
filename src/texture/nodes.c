@@ -170,6 +170,25 @@ static const char *box_texture_blur_wgsl =
     "        select(radius, radius * 2.0 * size.y / size.x, sphere));\n"
     "}\n";
 
+/** WGSL of the TexNormal node: the normal of the differences of its height in the UV frame of
+ * the domain, encoded as GenNormal stores it */
+static const char *box_texture_normal_wgsl =
+    "fn box_tex_normal(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    height: texture_2d<f32>) -> vec4f {\n"
+    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x))\n"
+    "        * box_texgraph_normal_scale(texel);\n"
+    "    let n = vec3f(-d.x, d.y, 1.0) * inverseSqrt(dot(d, d) + 1.0);\n"
+    "    return vec4f(0.5 + 0.5 * n, 1.0);\n"
+    "}\n";
+
+/** WGSL of the TexSlope node: the length of the differences of its height */
+static const char *box_texture_slope_wgsl =
+    "fn box_tex_slope(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    height: texture_2d<f32>) -> vec4f {\n"
+    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x));\n"
+    "    return vec4f(length(d), 0.0, 0.0, 0.0);\n"
+    "}\n";
+
 /** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
  * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
  * and w.
@@ -920,9 +939,44 @@ static void box_texture_nodes_register_lookups(
     });
 }
 
+/** Register the built in node kinds of the differences of a height: TexNormal and TexSlope.
+ *
+ * @param world The world
+ */
+static void box_texture_nodes_register_relief(
+    ecs_world_t *world)
+{
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexNormal),
+        .output = TexVector,
+        .inputs = {
+            { "height", offsetof(TexNormal, height), TexScalar, "height_value",
+                offsetof(TexNormal, height_value) }
+        },
+        .params = {{ "strength", offsetof(TexNormal, strength), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_normal",
+        .source = box_texture_normal_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexSlope),
+        .output = TexScalar,
+        .inputs = {
+            { "height", offsetof(TexSlope, height), TexScalar, "height_value",
+                offsetof(TexSlope, height_value) }
+        },
+        .params = {{ "strength", offsetof(TexSlope, strength), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_slope",
+        .source = box_texture_slope_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+    });
+}
+
 void box_texture_nodes_register(
     ecs_world_t *world)
 {
     box_texture_nodes_register_math(world);
     box_texture_nodes_register_lookups(world);
+    box_texture_nodes_register_relief(world);
 }

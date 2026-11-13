@@ -753,14 +753,6 @@ ECS_STRUCT(TexLut, {
     bool linear;            /**< Read the color channels as stored, see TexImage.linear */
 });
 
-/** Node of a TextureGraph whose Scalar value is one channel of a vector, such as a height
- * from the coordinates. An input without a node takes in_value instead. */
-ECS_STRUCT(TexChannel, {
-    ecs_entity_t in;    /**< Vector input node, 0 for in_value */
-    vec4 in_value;      /**< Value of in without a node */
-    int32_t channel;    /**< Channel 0..3 (x, y, z, w), default 0; clamped to 0..3 */
-});
-
 /** Node of a TextureGraph whose value is the tangent space normal map of a Scalar height as
  * GenNormal stores it, for a GraphLinear output: (dx, dy, 1) normalized, as (0.5 - 0.5 x,
  * 0.5 + 0.5 y, 0.5 + 0.5 z, 1), green up the image; flat is (0.5, 0.5, 1, 1).
@@ -772,7 +764,7 @@ ECS_STRUCT(TexChannel, {
  * @code
  * relief {
  *   dir    { TexCoords: {} }
- *   height { TexChannel: {in: dir, channel: 1} }
+ *   height { TexSplit: {input: dir, channel: ChannelG} }
  *   normal { TexNormal: {height: height, strength: 4} }
  *   TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
  *                  format: GraphLinear}

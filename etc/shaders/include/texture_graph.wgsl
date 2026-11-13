@@ -109,7 +109,6 @@ fn box_texgraph_bilinear(t: texture_2d<f32>, pos: vec2f) -> vec4f {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-<<<<<<< HEAD
 // Position in texels of the image of a direction on the sphere, the inverse of
 // box_texgraph_coords, with the texel centers at + 0.5
 fn box_texgraph_sphere_position(d: vec3f) -> vec2f {
@@ -177,7 +176,8 @@ fn box_texgraph_normal_scale(texel: vec2i) -> vec2f {
     let theta = (f32(texel.y) + 0.5) / f32(box_texgraph_stage.size.y) * BOX_TEXGRAPH_PI;
     let r = 2.0 * sin(theta);
     return vec2f(r, 1.0) * clamp(1.0 / r, 1.0, BOX_TEXGRAPH_POLE_SCALE);
-=======
+}
+
 // Equirectangular uv of a direction, the inverse of box_texgraph_coords on the sphere: u 0.5 at
 // -z, v 0 at +y
 fn box_texgraph_equirect(d: vec3f) -> vec2f {
@@ -224,7 +224,6 @@ fn box_texgraph_sample(t: texture_2d<f32>, uv: vec2f, wrap: bool) -> vec4f {
     let c = box_texgraph_texel(t, i + vec2i(0, 1), wrap);
     let d = box_texgraph_texel(t, i + vec2i(1, 1), wrap);
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
->>>>>>> ee049f70a1b62a0d6d2fb9671a5a77399f089ce4
 }
 
 // PCG hash of a word
