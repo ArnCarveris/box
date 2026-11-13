@@ -18,6 +18,9 @@
 /** A quad whose emission samples a graph that samples an animated graph */
 #define GRAPH_IMAGE_ANIMATED "test/assets/textures/graph/image_animated.flecs"
 
+/** Graphs that sample a TextureGen and the texture of a Surface that clears to red */
+#define GRAPH_IMAGE_SOURCES "test/assets/textures/graph/image_sources.flecs"
+
 /** Width of IMAGE_8X4 */
 #define TI_W (8)
 
@@ -524,6 +527,83 @@ void TextureNodesImage_lut(void) {
     ecs_fini(world);
 }
 
+/** A graph samples the single channel image of a TextureGen as (r, 0, 0, 1) and the texture
+ * of a Surface, which it follows while a draw samples it. */
+void TextureNodesImage_gen_and_surface_sources(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    tg_run_file(world, GRAPH_IMAGE_SOURCES);
+    ecs_entity_t from_noise = ecs_lookup(world, "graph_image_sources.from_noise");
+    ecs_entity_t from_surface = ecs_lookup(world, "graph_image_sources.from_surface");
+    ecs_entity_t view = ecs_lookup(world, "graph_image_sources.target_views.view");
+    const float red[4] = {1, 0, 0, 1}, green[4] = {0, 1, 0, 1};
+    float low = 1, high = 0;
+    int32_t i;
+    test_assert(from_noise != 0);
+    test_assert(from_surface != 0);
+    test_assert(view != 0);
+    tg_ready(world, from_noise, 1);
+    tg_ready(world, from_surface, 1);
+    tg_frames(world, 3);
+
+    float *texels = tg_read(world, from_noise, 16, 16);
+    for (i = 0; i < 16 * 16; i ++) {
+        const float *t = &texels[i * 4];
+        test_assert(t[0] >= 0 && t[0] <= 1);
+        test_assert(fabsf(t[1]) <= TG_TOLERANCE_16);
+        test_assert(fabsf(t[2]) <= TG_TOLERANCE_16);
+        test_assert(fabsf(t[3] - 1) <= TG_TOLERANCE_16);
+        low = t[0] < low ? t[0] : low;
+        high = t[0] > high ? t[0] : high;
+    }
+
+    test_assert(high - low > 0.05f);
+    ecs_os_free(texels);
+
+    texels = tg_read(world, from_surface, 8, 8);
+    tg_expect(texels, 8, 3, 3, red, TG_TOLERANCE_8 + TG_TOLERANCE_16);
+    ecs_os_free(texels);
+
+    View *v = ecs_get_mut(world, view, View);
+    v->clear.color = (rgba){0, 255, 0, 255};
+    ecs_modified(world, view, View);
+    tg_frames(world, 5);
+    texels = tg_read(world, from_surface, 8, 8);
+    tg_expect(texels, 8, 3, 3, green, TG_TOLERANCE_8 + TG_TOLERANCE_16);
+    ecs_os_free(texels);
+    ecs_fini(world);
+}
+
+/** A graph that adds four sampled images in pointwise nodes, more than one stage binds, splits
+ * them over stages and adds them all. */
+void TextureNodesImage_four_images_one_graph(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    const float values[4][4] = {
+        {0.125f, 0, 0, 0}, {0, 0.25f, 0, 0}, {0, 0, 0.5f, 0}, {0, 0, 0, 1}
+    };
+    const float expect[4] = {0.125f, 0.25f, 0.5f, 1};
+    ecs_entity_t sum = 0, tex = ecs_new(world);
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t image = ecs_new(world);
+        ecs_entity_t next = ecs_new(world);
+        ecs_set(world, image, TexImage, {.texture = ti_constant(world, values[i], NULL),
+            .linear = true});
+        ecs_set(world, next, TexMath, {.op = MathAdd, .a = sum, .b = image});
+        sum = next;
+    }
+
+    ecs_set(world, tex, TextureGraph, {.output = sum, .width = 8, .height = 8,
+        .format = GraphHdr});
+    tg_ready(world, tex, 1);
+
+    float *texels = tg_read(world, tex, 8, 8);
+    tg_expect(texels, 8, 5, 2, expect, TG_TOLERANCE_16 * 4);
+    ecs_os_free(texels);
+    ecs_fini(world);
+}
+
 /** A graph that samples another graph follows an edit of it in the frame the source evaluates:
  * one evaluation of each and no more, the stage of the sampling node runs again in its cached
  * value, the stage that does not depend on it stays cached. */
@@ -587,6 +667,40 @@ void TextureNodesImage_chain_updates(void) {
     }
 
     tg_expect(texels, 8, x, y, expect, TG_TOLERANCE_16 * 4);
+    ecs_os_free(texels);
+    ecs_fini(world);
+}
+
+/** A graph that samples a GraphSingle graph, whose image is written after its stages, follows
+ * an edit of it in the frame the source evaluates: one evaluation of each and no more. */
+void TextureNodesImage_single_source_same_packet(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    ecs_entity_t source = ecs_new(world);
+    ecs_entity_t constant = ecs_new(world);
+    const float first[4] = {0.25f, 0, 0, 1}, second[4] = {0.75f, 0, 0, 1};
+    ecs_set(world, constant, TexConstant, {.value = {0.25f, 0.25f, 0.25f, 1}});
+    ecs_set(world, source, TextureGraph, {.output = constant, .width = 8, .height = 8,
+        .format = GraphSingle});
+    ecs_entity_t tex = ti_graph(world, source, 0, AddressWrap, true, 8, 8, DomainPlane,
+        GraphHdr, NULL);
+    tg_ready(world, source, 1);
+    tg_ready(world, tex, 1);
+    tg_frames(world, 3);
+
+    float *texels = tg_read(world, tex, 8, 8);
+    tg_expect(texels, 8, 4, 4, first, TG_TOLERANCE_8 + TG_TOLERANCE_16);
+    ecs_os_free(texels);
+
+    box_render_gpu_stats_t before = tg_stats(world);
+    ecs_set(world, constant, TexConstant, {.value = {0.75f, 0.75f, 0.75f, 1}});
+    tg_ready(world, source, 2);
+    tg_frames(world, 3);
+    box_render_gpu_stats_t after = tg_stats(world);
+    test_int(after.texture_graph_evaluations - before.texture_graph_evaluations, 2);
+
+    texels = tg_read(world, tex, 8, 8);
+    tg_expect(texels, 8, 4, 4, second, TG_TOLERANCE_8 + TG_TOLERANCE_16);
     ecs_os_free(texels);
     ecs_fini(world);
 }

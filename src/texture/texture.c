@@ -1161,6 +1161,22 @@ void BoxTextureImport(
         BOX_OWNED_VEC(TextureGen, colors, TextureGenKey),
         BOX_OWNED_VEC(TextureGen, palette, rgb));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+    box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name));
+    box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));
+    box_owned_hooks(world, TextureNodeKind, BOX_OWNED_STR(TextureNodeKind, function),
+        BOX_OWNED_STR(TextureNodeKind, texture),
+        BOX_OWNED_STR(TextureNodeKind, inputs[0].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[1].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[2].name),
+        BOX_OWNED_STR(TextureNodeKind, inputs[3].name),
+        BOX_OWNED_STR(TextureNodeKind, params[0].name),
+        BOX_OWNED_STR(TextureNodeKind, params[1].name),
+        BOX_OWNED_STR(TextureNodeKind, params[2].name),
+        BOX_OWNED_STR(TextureNodeKind, params[3].name),
+        BOX_OWNED_STR(TextureNodeKind, params[4].name),
+        BOX_OWNED_STR(TextureNodeKind, params[5].name),
+        BOX_OWNED_STR(TextureNodeKind, params[6].name),
+        BOX_OWNED_STR(TextureNodeKind, params[7].name));
 
     ECS_COMPONENT_DEFINE(world, TextureRegistry);
     ECS_COMPONENT_DEFINE(world, TexturePixels);

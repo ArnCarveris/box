@@ -566,6 +566,8 @@ static bool box_gpu_tg_due(
  * animated nodes are materialized, then every node that the stages of two materialized nodes
  * reach, until none is. A static node is then never computed by an animated stage.
  *
+ * The sampling nodes of a stage past the textures it binds are materialized too.
+ *
  * @param tg The graph state
  * @param graph The graph
  * @param mat Receives whether each node is materialized
@@ -579,6 +581,7 @@ static void box_gpu_tg_partition(
 {
     int32_t n = (int32_t)graph->desc.node_count, i, j, r;
     int32_t *stack = ecs_os_malloc_n(int32_t, n);
+    int32_t *sampled = ecs_os_malloc_n(int32_t, n);
     const int32_t *forced = ecs_vec_first(&graph->forced);
     bool changed;
     for (i = 0; i < n; i ++) {
@@ -642,8 +645,26 @@ static void box_gpu_tg_partition(
                 }
             }
         }
+
+        for (i = 0; i < n; i ++) {
+            sampled[i] = 0;
+        }
+
+        for (i = n - 1; i >= 0 && !changed; i --) {
+            if (owner[i] < 0 || graph->nodes[i].texture < 0) {
+                continue;
+            }
+
+            if (i != owner[i] && sampled[owner[i]] == BOX_GPU_TG_TEXTURES) {
+                mat[i] = true;
+                changed = true;
+            } else {
+                sampled[owner[i]] ++;
+            }
+        }
     } while (changed);
 
+    ecs_os_free(sampled);
     ecs_os_free(stack);
 }
 
