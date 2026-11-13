@@ -77,7 +77,7 @@ state {
 
   // Set the parameter of the slider n in the group of the panel g to v
   fn edit(g: string, n: string, v: f32) {
-    if g == "page" {
+    if g == "planet_page" {
       if n == "sun" { state.sun_angle = v }
     } else if g == "body" {
       if n == "radius" { state.body.radius = v }
@@ -182,12 +182,14 @@ async {
         state.star_seed = w[Stepper.mut].current
       } else if w.name() == "star_detail" {
         state.star_detail = w[Stepper.mut].current
-      } else if w.name() == "seed" {
-        state.seed = w[Stepper.mut].current
       } else {
-        state.detail = w[Stepper.mut].current
+        if w.name() == "seed" {
+          state.seed = w[Stepper.mut].current
+        } else {
+          state.detail = w[Stepper.mut].current
+        }
+        state.edits += 1
       }
-      state.edits += 1
     } else if w.has(Checkbox) {
       edit_switch(w.parent().name(), w.name(), w[Checkbox.mut].current)
       state.edits += 1

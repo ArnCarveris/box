@@ -1123,9 +1123,9 @@ planets {
   }
 
   // Emission of a star surface of a temperature, in the units of Emissive.strength: it rises
-  // slowly with the temperature, so a hot star blooms more without losing its color to the
-  // tonemapper
-  fn star_emission(kelvin: f32) -> f32 { 2.4 * pow(max(kelvin, 1000) / 5772, 0.35) }
+  // slowly with the temperature, so a hot star blooms more while the disc keeps its color and
+  // its limb darkening through the tonemapper
+  fn star_emission(kelvin: f32) -> f32 { 3.2 * pow(max(kelvin, 1000) / 5772, 0.25) }
 
   // Light of a star: its luminosity, the square of the radius times the fourth power of the
   // temperature relative to the sun, compressed by a square root so every preset lights a scene
@@ -1134,9 +1134,10 @@ planets {
     40 * sqrt(l)
   }
 
-  // Linear limb darkening coefficient of a star: the limb of a cool star is darker than that of
-  // a hot one, about 0.6 for the sun
-  fn limb_coefficient(kelvin: f32) -> f32 { clamp(0.95 - kelvin * 0.00006, 0.35, 0.8) }
+  // Limb darkening coefficient of a star, u of the law 1 - u (1 - mu)^0.8: stronger than the
+  // linear law of the sun (about 0.6) so the tonemapped disc still darkens visibly to the edge,
+  // and a little weaker for hot stars
+  fn limb_coefficient(kelvin: f32) -> f32 { clamp(1.05 - kelvin * 0.00001, 0.8, 0.95) }
 
   // The parameters of a star: the surface temperature in kelvin, the radius in world units, the
   // sunspot amount (0 none to 1 a very active star), the size of the granules relative to those
@@ -1152,9 +1153,9 @@ planets {
     match kind {
       0: {3100, 1.1, 0.7, 0.8, 0.38, 0.7, 0.14}
       1: {5772, 1.6, 0.35, 1, 0.3, 0.3, 0.05}
-      2: {9600, 1.8, 0, 0.7, 0.1, 0.05, 0.16}
-      3: {24000, 2.8, 0, 1.6, 0.08, 0.2, 0.1}
-      4: {3600, 3.6, 0.15, 3.2, 0.5, 0.25, 0.02}
+      2: {9600, 1.8, 0, 0.7, 0.16, 0.05, 0.16}
+      3: {24000, 2.8, 0, 1.6, 0.14, 0.2, 0.1}
+      4: {3600, 3.6, 0.15, 3.2, 0.42, 0.25, 0.02}
       _: {5772, 1.6, 0.35, 1, 0.3, 0.3, 0.05}
     }
   }
@@ -1169,17 +1170,17 @@ planets {
   // of the scene nor the ambient light reach it, and all it shows is its emission.
   //
   // The surface (surf) is an animated texture graph on the sphere domain: granules of cells
-  // whose points move with the time (noise at detail 0), the network of supergranules, sunspots
+  // whose points move with the time, the network of supergranules, sunspots
   // with umbra and penumbra in two latitude bands and bright faculae around them. It is the
   // brightness of the surface relative to the photosphere, the spots redder, which the Emissive
   // colors by the temperature, so a temperature changes no texel. As for the planets, the
   // parameters change the values of nodes only, so no slider compiles a graph again.
   //
   // The limb darkens and reddens by a shell just above the surface that blends toward a cooler
-  // color by a Fresnel opacity of power 1: the linear limb darkening law, from any angle. The
-  // corona is camera facing sprites of streamers around the center, hidden by the disc where they
-  // cross it, and a wider soft halo; active stars throw prominences off their surface. A point
-  // light of the color of the star lights what is around it.
+  // color by a Fresnel opacity of power 0.8, close to the linear limb darkening law, from any
+  // angle. The corona is camera facing sprites of streamers around the center, hidden by the
+  // disc where they cross it, and a wider soft halo; active stars throw prominences off their
+  // surface. A point light of the color of the star lights what is around it.
   template Star {
     prop temperature: f32 = sun_star.temperature
     prop radius: f32 = sun_star.radius
@@ -1200,7 +1201,7 @@ planets {
     const col: Col = blackbody(temperature)
     const limb_col: Col = blackbody(temperature * 0.7)
     const hal_col: Col = mixc(col, {255, 255, 255}, 0.2)
-    const prom_col: Col = mixc(col, {255, 84, 64}, 0.65)
+    const prom_col: Col = mixc(col, {255, 120, 80}, 0.5)
     const glow: f32 = star_emission(temperature)
     const limb_u: f32 = limb_coefficient(temperature)
 
@@ -1223,47 +1224,38 @@ planets {
     const prom: f32 = sat(prominences)
 
     surf {
-      t_g { TexTime: {scale: 0.12, offset: v1 * 60} }
-      t_s { TexTime: {scale: 0.012, offset: v2 * 60} }
+      t_g { TexTime: {scale: 0.3, offset: v1 * 60} }
+      t_s { TexTime: {scale: 0.04, offset: v2 * 60} }
 
       // Granules: bright cells with dark lanes between them, the points of the cells moving
       // with the time, each cell a little brighter or darker
-      if detail > 0 {
-        g_wn {
-          TexNoise: {
-            channels: 3, frequency: 1.4 / gcell, octaves: 2, evolve: t_g, seed: sd * 16 + 1
-          }
-        }
-        g_wp { TexWarp: {offset: g_wn, amount_value: gcell * 0.7} }
-        g_c {
-          TexCells: {
-            coords: g_wp, count: gcount, jitter: 1, distance: CellsEdge, edge: 0.55,
-            evolve: t_g, seed: sd * 16 + 2
-          }
-        }
-        g_e { TexSplit: {input: g_c, channel: ChannelR} }
-        g_z { TexSplit: {input: g_c, channel: ChannelB} }
-        g_ez {
-          TexMath: {op: MathRemap, a: g_z, from_min: 0, from_max: 1, to_min: -0.12, to_max: 0.12}
-        }
-        g_fn {
-          TexNoise: {
-            frequency: 3.5 / gcell, octaves: detail > 1 ? 2 : 1, evolve: t_g, seed: sd * 16 + 3
-          }
-        }
-        g_fd {
-          TexMath: {op: MathRemap, a: g_fn, from_min: 0.3, from_max: 0.7, to_min: -0.1, to_max: 0.1}
-        }
-        g_s0 { TexMath: {op: MathAdd, a: g_e, b: g_ez} }
-        g_raw { TexMath: {op: MathAdd, a: g_s0, b: g_fd} }
-      } else {
-        g_n {
-          TexNoise: {frequency: 1.3 / gcell, octaves: 2, evolve: t_g, seed: sd * 16 + 1}
-        }
-        g_raw {
-          TexMath: {op: MathRemap, a: g_n, from_min: 0.3, from_max: 0.7, to_min: 0, to_max: 1}
+      g_wn {
+        TexNoise: {
+          channels: 3, frequency: 1.4 / gcell, octaves: 2, evolve: t_g, seed: sd * 16 + 1
         }
       }
+      g_wp { TexWarp: {offset: g_wn, amount_value: gcell * 0.7} }
+      g_c {
+        TexCells: {
+          coords: g_wp, count: gcount, jitter: 1, distance: CellsEdge, edge: 0.3,
+          evolve: t_g, seed: sd * 16 + 2
+        }
+      }
+      g_e { TexSplit: {input: g_c, channel: ChannelR} }
+      g_z { TexSplit: {input: g_c, channel: ChannelB} }
+      g_ez {
+        TexMath: {op: MathRemap, a: g_z, from_min: 0, from_max: 1, to_min: -0.12, to_max: 0.12}
+      }
+      g_fn {
+        TexNoise: {
+          frequency: 3.5 / gcell, octaves: detail > 1 ? 2 : 1, evolve: t_g, seed: sd * 16 + 3
+        }
+      }
+      g_fd {
+        TexMath: {op: MathRemap, a: g_fn, from_min: 0.3, from_max: 0.7, to_min: -0.1, to_max: 0.1}
+      }
+      g_s0 { TexMath: {op: MathAdd, a: g_e, b: g_ez} }
+      g_raw { TexMath: {op: MathAdd, a: g_s0, b: g_fd} }
       g_v {
         TexMath: {op: MathRemap, a: g_raw, from_min: 0, from_max: 1, to_min: 1 - gc, to_max: 1}
       }
@@ -1405,14 +1397,14 @@ planets {
         NoShadow
       }
 
-      // Limb darkening: alpha u (1 - mu) toward a cooler, dimmer color
+      // Limb darkening: alpha u (1 - mu)^0.8 toward a cooler, dimmer color
       limb {
         Position: {0, 0, 0}
         Sphere: {radius: r * 1.0015, segments: seg, smooth: true}
         Rgb: {0, 0, 0}
         PbrMaterial: {metallic: 1, roughness: 1}
-        Emissive: {strength: glow * 0.2, color: {limb_col.r, limb_col.g, limb_col.b}}
-        Fresnel: {color: {0, 0, 0}, strength: 0, power: 1, bias: 0, opacity: limb_u}
+        Emissive: {strength: glow * 0.12, color: {limb_col.r, limb_col.g, limb_col.b}}
+        Fresnel: {color: {0, 0, 0}, strength: 0, power: 0.8, bias: 0, opacity: limb_u}
         BlendMode: AlphaBlend
         Opacity: {0.001}
         NoShadow
@@ -1426,7 +1418,7 @@ planets {
           ParticleEmitter: {
             max: 16, rate: 1.1, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
             lifetime: {4, 7}, size: {r * 5, r * 5.6}, rotation: {0, 360}, spin: {-4, 4},
-            opacity: {0.22, 0.3}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7
+            opacity: {0.11, 0.15}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7
           }
           ParticleBurst: {count: 6, at: 0}
           ParticleAppearance: {
@@ -1441,7 +1433,7 @@ planets {
         Position: {0, 0, 0}
         ParticleEmitter: {
           max: 8, rate: 0.6, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
-          lifetime: {5, 8}, size: {r * 8, r * 9}, opacity: {0.07, 0.09},
+          lifetime: {5, 8}, size: {r * 4.4, r * 5}, opacity: {0.04, 0.05},
           color: {col.r, col.g, col.b}, seed: sd * 16 + 8
         }
         ParticleBurst: {count: 4, at: 0}
@@ -1449,20 +1441,21 @@ planets {
         ParticleCurves: {opacity: {keys: [{0, 0.4}, {0.2, 1}, {0.75, 1}, {1, 0}]}}
       }
 
-      // Prominences: plasma thrown off the surface that rises, slows and falls back
+      // Prominences: thin jets of plasma thrown off the surface that rise, slow and fall back,
+      // stretched along their motion so they arc over the limb
       prominence {
         Position: {0, 0, 0}
         ParticleEmitter: {
-          max: detail > 1 ? 600 : 300, rate: prom * (detail > 0 ? 90 : 40), shape: EmitterMesh,
-          source: globe, direction: {0, 0, 0}, speed: {0, 0}, radial: {r * 0.12, r * 0.3},
-          lifetime: {2.5, 5}, size: {r * 0.04, r * 0.11}, opacity: {0.5, 0.9},
-          color: {prom_col.r, prom_col.g, prom_col.b}, color_variance: {10, 30, 20},
-          seed: sd * 16 + 9
+          max: detail > 1 ? 1200 : 600, rate: prom * (detail > 0 ? 300 : 150),
+          shape: EmitterMesh, source: globe, direction: {0, 0, 0}, speed: {0, 0},
+          radial: {r * 0.12, r * 0.3}, lifetime: {1.4, 2.6}, size: {r * 0.025, r * 0.05},
+          opacity: {0.6, 1}, color: {prom_col.r, prom_col.g, prom_col.b},
+          color_variance: {10, 30, 20}, seed: sd * 16 + 9
         }
         ParticleMotion: {speed: {keys: [{0, 1}, {0.45, 0.15}, {1, -0.9}]}}
-        ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 0.6}
+        ParticleAppearance: {shape: ParticleCircle, blend: ParticleAdditive, stretch: 6}
         ParticleCurves: {
-          size: {keys: [{0, 0.5}, {0.3, 1}, {1, 0.7}]},
+          size: {keys: [{0, 0.6}, {0.3, 1}, {1, 0.7}]},
           opacity: {keys: [{0, 0}, {0.15, 1}, {0.7, 0.8}, {1, 0}]}
         }
       }

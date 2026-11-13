@@ -51,12 +51,21 @@ assets {
     }
   }
 
-  // A column of widgets spaced as the widgets of a panel
+  // A column of widgets spaced as the widgets of a panel. A page that is not shown takes no
+  // space and clips its children away, so they are not drawn, picked or reached with Tab, but
+  // keep their values
   template Page {
+    prop shown: bool = true
+
     const t = box.ui.theme[UiTheme]
 
     Layout: {direction: Column, spacing: t.spacing}
-    LayoutItem: {width: {mode: Grow}}
+    if shown {
+      LayoutItem: {width: {mode: Grow}}
+    } else {
+      LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+      ClipChildren
+    }
   }
 
   // A segmented switch: a row of Segment buttons on a sunken strip, one of them selected
@@ -126,10 +135,14 @@ hud {
           )
         }
 
-        // The page of the side shown: its type, seed and detail, its parameters and, for the
-        // planet, the light of the scene
-        assets.Page page {
-          if state.mode == MODE_STAR {
+        // The pages of the two sides, of which the side shown takes the space: its type, seed
+        // and detail, its parameters and, for the planet, the light of the scene. Both pages
+        // stay, so switching keeps their widgets as they are
+        pages {
+          Layout: {direction: Column}
+          LayoutItem: {width: {mode: Grow}}
+
+          assets.Page star_page(shown: state.mode == MODE_STAR) {
             assets.Field star_type(text: "Type") {
               Dropdown star_kind(
                 options: ["Red dwarf", "Yellow dwarf", "White", "Blue giant", "Red giant"],
@@ -149,10 +162,10 @@ hud {
             Separator star_top_rule()
 
             // The parameters of the Star template, each slider in its own units
-            ScrollView star_groups(width: 276, height: 560, frame: false, focusable: false) {
+            ScrollView star_groups(width: 276, height: 603, frame: false, focusable: false) {
               Collapsible star(title: "Star", value: true, width: 262) {
                 Slider temperature(
-                  label: "Surface temperature", width: 236, min: 2500, max: 35000, step: 50,
+                  label: "Surface temperature", width: 236, min: 2500, max: 35000, step: 1,
                   value: state.star.temperature, unit: " K"
                 )
                 Slider radius(
@@ -183,7 +196,9 @@ hud {
             }
 
             Separator star_bottom_rule()
-          } else {
+          }
+
+          assets.Page planet_page(shown: state.mode != MODE_STAR) {
             assets.Field type(text: "Type") {
               Dropdown kind(
                 options: ["Rock", "Desert", "Ice", "Lava", "Gas giant", "Garden"],
