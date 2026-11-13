@@ -424,6 +424,20 @@ typedef struct box_gpu_cull_draw_t {
                                      *   records no draw but requests its pipelines, as when it
                                      *   draws no instance. Only the frustum with a history has
                                      *   arguments for it, else args and late are UINT32_MAX */
+    uint32_t lod;                   /**< First draw arguments of its levels of detail,
+                                     *   UINT32_MAX for a draw at level 0 only: levels for the
+                                     *   early or only phase, then with a late phase levels for
+                                     *   the late phase and levels for both (merged) */
+    uint32_t lod_base;              /**< First entry of its levels in the visible slots of the
+                                     *   page: levels runs of lod_stride entries for the early
+                                     *   or only phase, then with a late phase levels runs of
+                                     *   count entries for the late phase */
+    uint32_t lod_stride;            /**< Entries of a run of the early or only phase, count, or
+                                     *   twice count with a late phase, which appends to it */
+    int32_t levels;                 /**< Levels it draws, 0 for none */
+    bool merged;                    /**< The late phase ran, so the merged arguments draw what
+                                     *   both phases kept */
+    uint32_t meshes[BOX_LOD_LEVELS_MAX]; /**< Mesh handle of each of its levels */
 } box_gpu_cull_draw_t;
 
 /** A dispatch of the cull pass: the parallel job of a batch of a group and phase, with the
@@ -489,6 +503,42 @@ typedef struct box_gpu_cull_job_t {
     uint32_t pad;                   /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
+/** Workgroups along x of a cull_lod dispatch at most; each one strides over the instances */
+#define BOX_GPU_CULL_LOD_PARTS (256)
+
+/** Jobs of a cull_lod dispatch at most, its workgroups along y: the WebGPU dispatch size limit */
+#define BOX_GPU_CULL_LOD_JOBS (65535)
+
+/** A job of the cull_lod dispatch: sorts the instances one draw of a cull view kept in a phase
+ * into the runs of its levels (cull_lod of cull.wgsl). Uses the fields of a job as follows.
+ *
+ * first is the first visible entry of the draw, count its instances at most, args its draw
+ * arguments, center and extent the bounds of its mesh, mask its levels; base is the first
+ * visible entry of its level runs, history the entries of a run and list the first draw
+ * arguments of its levels. fixture is the first merged arguments plus one, 0 for none, and for
+ * a late job exclude is the first entry of the early runs plus one and pad their entries, which
+ * it appends to at the merged count. */
+typedef struct box_gpu_cull_lod_job_t {
+    box_gpu_cull_job_t job;         /**< The job as the shader reads it */
+    int32_t group;                  /**< Index of its cull group */
+    bool late;                      /**< Runs after the late cull phase */
+    uint32_t page;                  /**< Page that holds the visible slots of the draw */
+    uint32_t buffer;                /**< Handle of the instance page of the draw */
+} box_gpu_cull_lod_job_t;
+
+/** One cull_lod dispatch over consecutive level jobs of a cull group and phase that share a
+ * page and an instance page */
+typedef struct box_gpu_cull_lod_t {
+    int32_t group;                  /**< Index of the cull group */
+    bool late;                      /**< Phase of its jobs */
+    uint32_t page;                  /**< Page of its jobs */
+    uint32_t buffer;                /**< Instance page of its jobs, bound as group 1 */
+    uint32_t first;                 /**< Its first job in lod_jobs */
+    uint32_t count;                 /**< Its jobs, the workgroups along y */
+    uint32_t parts;                 /**< Workgroups along x */
+    uint32_t uniform;               /**< Byte offset of its uniforms */
+} box_gpu_cull_lod_t;
+
 /** A frustum of a cull group in the uniforms, as in Frustum of cull.wgsl */
 typedef struct box_gpu_cull_frustum_t {
     vec4 planes[6];                 /**< World space planes, inside where non negative */
@@ -518,6 +568,9 @@ typedef struct box_gpu_cull_uniforms_t {
     mat4 view_proj;                 /**< World to clip space of the view */
     uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
     uint32_t scan[4];               /**< Table entries, their count, workgroup list, workgroups */
+    float camera[4];                /**< World position of the camera that picks the levels of
+                                     *   detail, w unused */
+    float lod[4];                   /**< Distance at which level i starts, LodSettings.distances */
 } box_gpu_cull_uniforms_t;
 
 /** The frustums one pass of the cull shader tests together: a view of a target and the
@@ -614,6 +667,7 @@ typedef struct box_gpu_cull_t {
     WGPUComputePipeline ordered;    /**< Tests one job per invocation, keeping slot order */
     WGPUComputePipeline scan;       /**< Turns the workgroup counts of a dispatch into offsets */
     WGPUComputePipeline write;      /**< Writes the drawn slots of a dispatch at their offsets */
+    WGPUComputePipeline lod;        /**< Sorts the drawn slots of a draw into its levels */
     WGPUBindGroupLayout hiz_first_layout; /**< Binds the depth and the first level */
     WGPUBindGroupLayout hiz_reduce_layout; /**< Binds a level and the level above it */
     WGPUPipelineLayout hiz_first_pipeline_layout; /**< Pipeline layout of the first level */
@@ -665,6 +719,11 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t sort;                 /**< box_gpu_cull_sort_t, the batches of the group being
                                      *   added in the order of their draws */
     ecs_vec_t frustums;             /**< Frustums of the view being added */
+    ecs_vec_t lod_jobs;             /**< box_gpu_cull_lod_job_t of the target, by group */
+    ecs_vec_t lod_late;             /**< box_gpu_cull_lod_job_t of the late phase of the group
+                                     *   being added, appended after its other jobs */
+    ecs_vec_t lods;                 /**< box_gpu_cull_lod_t of the target */
+    int32_t lod_levels;             /**< Levels of detail of the group being added, 0 for none */
     int32_t copies;                 /**< Copies of cascade 0 added to each view, for tests */
     uint32_t exclude_page;          /**< Instance page of the instance the jobs of the group
                                      *   being added leave out, 0 for none */

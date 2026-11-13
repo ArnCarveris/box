@@ -145,6 +145,9 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->skips, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->sort, box_gpu_cull_sort_t, 0);
     ecs_vec_init_t(NULL, &c->frustums, box_gpu_cull_desc_t, 0);
+    ecs_vec_init_t(NULL, &c->lod_jobs, box_gpu_cull_lod_job_t, 0);
+    ecs_vec_init_t(NULL, &c->lod_late, box_gpu_cull_lod_job_t, 0);
+    ecs_vec_init_t(NULL, &c->lods, box_gpu_cull_lod_t, 0);
     if (gpu->timestamps) {
         c->stamps = wgpuDeviceCreateQuerySet(gpu->device, &(WGPUQuerySetDescriptor){
             .type = WGPUQueryType_Timestamp,
@@ -257,6 +260,9 @@ void box_gpu_cull_fini(
     ecs_vec_fini_t(NULL, &c->skips, uint32_t);
     ecs_vec_fini_t(NULL, &c->sort, box_gpu_cull_sort_t);
     ecs_vec_fini_t(NULL, &c->frustums, box_gpu_cull_desc_t);
+    ecs_vec_fini_t(NULL, &c->lod_jobs, box_gpu_cull_lod_job_t);
+    ecs_vec_fini_t(NULL, &c->lod_late, box_gpu_cull_lod_job_t);
+    ecs_vec_fini_t(NULL, &c->lods, box_gpu_cull_lod_t);
     if (c->stamps) {
         wgpuQuerySetRelease(c->stamps);
         c->stamps = NULL;
@@ -276,6 +282,7 @@ void box_gpu_cull_fini(
     box_gpu_cull_pipeline_release(&c->ordered);
     box_gpu_cull_pipeline_release(&c->scan);
     box_gpu_cull_pipeline_release(&c->write);
+    box_gpu_cull_pipeline_release(&c->lod);
     if (c->pipeline_layout) {
         wgpuPipelineLayoutRelease(c->pipeline_layout);
         c->pipeline_layout = NULL;
@@ -313,20 +320,25 @@ static bool box_gpu_cull_pipelines(
         goto done;
     }
 
-    WGPUComputePipeline next[6] = {
+    WGPUComputePipeline next[7] = {
         box_gpu_cull_pipeline(gpu, s->module, "cull_instances"),
         box_gpu_cull_pipeline(gpu, s->module, "cull_ordered"),
         box_gpu_cull_pipeline(gpu, s->module, "cull_scan"),
-        box_gpu_cull_pipeline(gpu, s->module, "cull_write")
+        box_gpu_cull_pipeline(gpu, s->module, "cull_write"),
+        NULL,
+        NULL,
+        box_gpu_cull_pipeline(gpu, s->module, "cull_lod")
     };
-    WGPUComputePipeline *current[6] = { &c->parallel, &c->ordered, &c->scan, &c->write };
+    WGPUComputePipeline *current[7] = {
+        &c->parallel, &c->ordered, &c->scan, &c->write, NULL, NULL, &c->lod
+    };
     box_gpu_hiz_pipelines(gpu, s->module, &next[4], &current[4]);
-    if (box_gpu_compute_pipelines_swap(current, next, 6)) {
+    if (box_gpu_compute_pipelines_swap(current, next, 7)) {
         c->revision = s->revision;
     }
 
 done:
-    return s && s->module && c->parallel && c->ordered && c->scan && c->write;
+    return s && s->module && c->parallel && c->ordered && c->scan && c->write && c->lod;
 }
 
 /** Record the outcome of the map of a counter copy.
@@ -811,6 +823,41 @@ static void box_gpu_cull_tables(
     }
 }
 
+/** Append the level jobs of the target after its cull jobs and the uniforms of their
+ * cull_lod dispatches.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_cull_lod_upload(
+    box_gpu_t *gpu)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    uint32_t first = (uint32_t)ecs_vec_count(&c->job_data);
+    int32_t i, count = ecs_vec_count(&c->lod_jobs);
+    if (!count) {
+        goto done;
+    }
+
+    box_gpu_cull_job_t *jobs = ecs_vec_grow_t(NULL, &c->job_data, box_gpu_cull_job_t, count);
+    for (i = 0; i < count; i ++) {
+        jobs[i] = ecs_vec_get_t(&c->lod_jobs, box_gpu_cull_lod_job_t, i)->job;
+    }
+
+    for (i = 0; i < ecs_vec_count(&c->lods); i ++) {
+        box_gpu_cull_lod_t *l = ecs_vec_get_t(&c->lods, box_gpu_cull_lod_t, i);
+        box_gpu_cull_uniforms_t u = ecs_vec_get_t(
+            &c->groups, box_gpu_cull_group_t, l->group)->base;
+        u.jobs[0] = first + l->first;
+        u.jobs[1] = l->count;
+        u.jobs[2] = l->late ? BOX_GPU_CULL_PHASE_LATE : BOX_GPU_CULL_PHASE_ALL;
+        u.jobs[3] = 0;
+        l->uniform = box_gpu_cull_uniform(c, &u, sizeof(u));
+    }
+
+done:
+    return;
+}
+
 void box_gpu_cull_upload(
     box_gpu_t *gpu)
 {
@@ -825,6 +872,7 @@ void box_gpu_cull_upload(
     }
 
     box_gpu_cull_tables(gpu);
+    box_gpu_cull_lod_upload(gpu);
     uint64_t uniforms = (uint64_t)ecs_vec_count(&c->uniform_data);
     grown |= box_gpu_cull_reserve(gpu, &c->uniforms, &c->uniforms_size,
         uniforms > BOX_GPU_CULL_FRUSTUMS_SIZE ? uniforms : BOX_GPU_CULL_FRUSTUMS_SIZE,
@@ -963,8 +1011,8 @@ static bool box_gpu_cull_slot(
 /** Record the dispatches of the cull groups of a slot in one phase.
  *
  * Every ordered dispatch has its cull_ordered dispatch, every run of parallel jobs its
- * cull_instances dispatch; then one cull_scan and one cull_write dispatch per table (cull
- * group, phase and page) finish the (job, frustum) entries of its jobs.
+ * cull_instances dispatch; one cull_scan and one cull_write dispatch per table (cull group,
+ * phase and page) finish its (job, frustum) entries, then cull_lod sorts out the levels.
  *
  * The draws keep the order of their slots at a number of dispatches that does not grow with
  * them nor with the frustums of a group. The dispatches of the cull of views count in the
@@ -1069,6 +1117,28 @@ static void box_gpu_cull_dispatches(
             {
                 box_gpu_count(gpu, BOX_GPU_STAT_CULL_DISPATCH);
             }
+        }
+    }
+
+    for (i = 0; i < ecs_vec_count(&c->lods); i ++) {
+        const box_gpu_cull_lod_t *l = ecs_vec_get_t(&c->lods, box_gpu_cull_lod_t, i);
+        const box_gpu_cull_group_t *g = ecs_vec_get_t(
+            &c->groups, box_gpu_cull_group_t, l->group);
+        uint32_t groups[2] = { l->parts, l->count };
+        if (!box_gpu_cull_slot(c, l->group, slot) || l->late != late) {
+            continue;
+        }
+
+        box_gpu_cull_pass(encoder, &pass, writes);
+        if (c->lod != bound) {
+            wgpuComputePassEncoderSetPipeline(pass, c->lod);
+            bound = c->lod;
+        }
+
+        if (box_gpu_cull_run(gpu, pass, l->page, l->uniform, g->frustums, l->buffer, false,
+            g->history, groups, &instances) && views)
+        {
+            box_gpu_count(gpu, BOX_GPU_STAT_CULL_DISPATCH);
         }
     }
 
@@ -1189,9 +1259,14 @@ void box_gpu_cull_record_late(
     }
 
     WGPUPassTimestampWrites writes;
+    int32_t d;
     box_gpu_hiz_build(gpu, encoder, cv->hiz, depth);
     box_gpu_cull_dispatches(gpu, encoder, slot, true,
         box_gpu_cull_timed(gpu, slot, true, &writes));
+    for (d = cv->first_draw; d < cv->first_draw + cv->draw_count; d ++) {
+        box_gpu_cull_draw_t *draw = ecs_vec_get_t(&gpu->cull.draws, box_gpu_cull_draw_t, d);
+        draw->merged = draw->levels && draw->late != UINT32_MAX;
+    }
 done:
     return;
 }
@@ -1305,24 +1380,38 @@ done:
     return;
 }
 
-bool box_gpu_cull_draw(
+/** Record one indirect draw of a mesh over a run of visible slots.
+ *
+ * @param gpu The backend
+ * @param pass The render pass
+ * @param b The batch
+ * @param handle Handle of the mesh
+ * @param page Page of the visible slots
+ * @param base First visible entry of the run
+ * @param count Entries of the run
+ * @param args Index of the draw arguments
+ * @param group Bind group index the instance page is bound at
+ * @param shading Bind the shading stream of the page too
+ * @param bound Instance bind group bound last in the pass, NULL for none, updated
+ * @return Whether the draw was recorded
+ */
+static bool box_gpu_cull_draw_mesh(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
-    const box_render_packet_t *packet,
-    const box_gpu_cull_draw_t *draw,
+    const box_render_batch_t *b,
+    uint32_t handle,
+    uint32_t page,
+    uint32_t base,
+    uint32_t count,
+    uint32_t args,
     uint32_t group,
-    bool late,
     bool shading,
     WGPUBindGroup *bound)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    const box_render_batch_t *b = ecs_vec_get_t(
-        &packet->batches, box_render_batch_t, draw->batch);
-    box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
+    box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, handle);
     WGPUBindGroup instances = m
-        ? box_gpu_instance_group(gpu, b->instances, b->mesh, m, shading) : NULL;
-    uint32_t args = late ? draw->late : draw->args;
-    uint32_t base = late ? draw->base + draw->count : draw->base;
+        ? box_gpu_instance_group(gpu, b->instances, handle, m, shading) : NULL;
     bool result = m && instances && args != UINT32_MAX;
     if (!result) {
         goto done;
@@ -1347,8 +1436,8 @@ bool box_gpu_cull_draw(
     }
 
     wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,
-        box_gpu_cull_page_t, (int32_t)draw->page)->visible,
-        (uint64_t)base * sizeof(uint32_t), (uint64_t)draw->count * sizeof(uint32_t));
+        box_gpu_cull_page_t, (int32_t)page)->visible,
+        (uint64_t)base * sizeof(uint32_t), (uint64_t)count * sizeof(uint32_t));
     if (c->mesh_indices != m->buffer || c->mesh_index_offset != m->index_offset) {
         wgpuRenderPassEncoderSetIndexBuffer(
             pass, m->buffer, WGPUIndexFormat_Uint32, m->index_offset, m->index_size);
@@ -1358,6 +1447,69 @@ bool box_gpu_cull_draw(
 
     wgpuRenderPassEncoderDrawIndexedIndirect(pass, c->args,
         (uint64_t)args * BOX_GPU_CULL_ARGS * sizeof(uint32_t));
+done:
+    return result;
+}
+
+/** Get the draw arguments and visible run of a level of a draw with levels of detail.
+ *
+ * @param draw The draw
+ * @param level The level
+ * @param late The late phase instead of the early or only phase, or both when merged
+ * @param base Receives the first visible entry of the run
+ * @param count Receives the entries of the run
+ * @return Index of the draw arguments of the level
+ */
+static uint32_t box_gpu_cull_lod_args(
+    const box_gpu_cull_draw_t *draw,
+    int32_t level,
+    bool late,
+    uint32_t *base,
+    uint32_t *count)
+{
+    uint32_t levels = (uint32_t)draw->levels, l = (uint32_t)level;
+    uint32_t result = draw->lod + l;
+    *base = draw->lod_base + l * draw->lod_stride;
+    *count = draw->lod_stride;
+    if (late) {
+        result = draw->lod + levels + l;
+        *base = draw->lod_base + levels * draw->lod_stride + l * draw->count;
+        *count = draw->count;
+    } else if (draw->merged) {
+        result = draw->lod + 2 * levels + l;
+    }
+
+    return result;
+}
+
+bool box_gpu_cull_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_gpu_cull_draw_t *draw,
+    uint32_t group,
+    bool late,
+    bool shading,
+    WGPUBindGroup *bound)
+{
+    const box_render_batch_t *b = ecs_vec_get_t(
+        &packet->batches, box_render_batch_t, draw->batch);
+    uint32_t args = late ? draw->late : draw->args;
+    uint32_t base = late ? draw->base + draw->count : draw->base;
+    bool result = false;
+    int32_t l;
+    if (!draw->levels || args == UINT32_MAX) {
+        result = box_gpu_cull_draw_mesh(gpu, pass, b, b->mesh, draw->page, base, draw->count,
+            args, group, shading, bound);
+        goto done;
+    }
+
+    for (l = 0; l < draw->levels; l ++) {
+        uint32_t count, level = box_gpu_cull_lod_args(draw, l, late, &base, &count);
+        result |= box_gpu_cull_draw_mesh(gpu, pass, b, draw->meshes[l], draw->page, base,
+            count, level, group, shading, bound);
+    }
+
 done:
     return result;
 }
@@ -1427,7 +1579,7 @@ static bool box_gpu_cull_stats_read(
     bool result = false;
     box_render_gpu_stats_t stats;
     ecs_vec_t args = {0};
-    int32_t i, d;
+    int32_t i, d, l;
     ecs_os_memset_t(out, 0, box_render_cull_stats_t);
     if (!box_render_gpu_stats(world, &stats) || !stats.ready) {
         goto done;
@@ -1477,12 +1629,28 @@ static bool box_gpu_cull_stats_read(
             }
 
             int32_t kept = (int32_t)counts[draw->args * BOX_GPU_CULL_ARGS + 1];
-            if (cv->cascade < 0 || !all) {
+            bool own = cv->cascade < 0 || !all;
+            int64_t *indices = own ? &out->indices : &out->casters_indices;
+            int32_t *levels = own ? out->levels : out->casters_levels;
+            if (own) {
                 out->tested += (int32_t)draw->count;
                 out->visible += kept;
             } else {
                 out->casters_tested += (int32_t)draw->count;
                 out->casters_visible += kept;
+            }
+
+            if (!draw->levels) {
+                levels[0] += kept;
+                *indices += (int64_t)kept * counts[draw->args * BOX_GPU_CULL_ARGS];
+                continue;
+            }
+
+            for (l = 0; l < draw->levels; l ++) {
+                uint32_t base, entries, at = box_gpu_cull_lod_args(draw, l, false, &base,
+                    &entries) * BOX_GPU_CULL_ARGS;
+                levels[l] += (int32_t)counts[at + 1];
+                *indices += (int64_t)counts[at + 1] * counts[at];
             }
         }
     }

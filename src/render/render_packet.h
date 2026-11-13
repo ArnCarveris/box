@@ -1558,6 +1558,11 @@ typedef struct box_render_batch_t {
                                  *   surface variants of the vertex stages of the mesh and shadow
                                  *   shaders */
     uint32_t mesh;              /**< Mesh handle */
+    uint32_t lods[BOX_LOD_LEVELS_MAX]; /**< Mesh handle of each level of detail of an opaque 3D
+                                 *   batch, lods[0] being mesh and a level that does not reduce
+                                 *   the level before having its handle; 0 past the levels the
+                                 *   views of the packet use (LodSettings) and for every other
+                                 *   batch, which draws at level 0 */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t foam;              /**< Texture handle of the Water.foam_texture of a water batch,
                                  *   0 for none */

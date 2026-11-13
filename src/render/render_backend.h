@@ -305,6 +305,13 @@ typedef struct box_render_cull_stats_t {
     int32_t skipped;            /**< Batches the view did not draw by their bounds
                                  *   (CullSettings.bounds), whose instances count as tested */
     int32_t casters_skipped;    /**< Batches the cascades did not draw by their bounds, summed */
+    int64_t indices;            /**< Indices the view draws: the index count of the mesh of the
+                                 *   level each visible instance draws at, summed */
+    int64_t casters_indices;    /**< Indices the cascades draw, summed */
+    int32_t levels[BOX_LOD_LEVELS_MAX]; /**< Visible instances the view draws at each level of
+                                 *   detail (LodSettings), all at level 0 without levels */
+    int32_t casters_levels[BOX_LOD_LEVELS_MAX]; /**< Casters drawn at each level, summed over
+                                 *   the cascades */
 } box_render_cull_stats_t;
 
 /** The culling of a view the GPU backend read back, for its CullStatus */

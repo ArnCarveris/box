@@ -814,6 +814,25 @@ typedef void (*box_shape_lod_world_fn)(
     int32_t level,
     box_shape_key_t *key);
 
+/** Fill the parametric surface of the mesh of a key of a shape value that references other
+ * entities, for a shape whose surface depends on the segment counts of the key, such as the
+ * resolved profile of a Sweep.
+ *
+ * @param world The world
+ * @param value The shape component value
+ * @param key The key of the mesh, of a level of detail of the value
+ * @param data The surface parameters to fill
+ * @param min The minimum corner of the bounds to fill
+ * @param max The maximum corner of the bounds to fill
+ */
+typedef void (*box_shape_surface_key_world_fn)(
+    const ecs_world_t *world,
+    const void *value,
+    const box_shape_key_t *key,
+    box_surface_data_t *data,
+    vec3 min,
+    vec3 max);
+
 /** Registration of a shape component, with key or key_world and generate or generate_world */
 typedef struct box_shape_desc_t {
     ecs_entity_t component;         /**< The shape component */
@@ -833,6 +852,9 @@ typedef struct box_shape_desc_t {
                                      *   without levels of detail */
     box_shape_lod_world_fn lod_world; /**< Key function of the levels of detail that reads
                                        *   other entities, used instead of lod */
+    box_shape_surface_key_world_fn surface_key_world; /**< Surface of the mesh of a level's
+                                                       *   key, NULL when every level has the
+                                                       *   surface of the value */
 } box_shape_desc_t;
 
 /** Register a shape so that setting its component selects a cached mesh.

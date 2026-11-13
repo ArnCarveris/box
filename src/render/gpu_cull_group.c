@@ -212,6 +212,150 @@ static bool box_gpu_cull_ready(
         ecs_map_get(&gpu->meshes, b->mesh) != NULL;
 }
 
+/** Get the levels of detail a batch draws with in the group being added and their meshes.
+ *
+ * Only the opaque 3D batches every view draws have levels: a blended or per view draw keeps
+ * the order of its slots, which the levels would not. A level the backend has no mesh for draws
+ * the level before.
+ *
+ * @param gpu The backend
+ * @param b The batch
+ * @param meshes Receives the mesh of each level
+ * @return The levels, those of the group, 0 when the group has none or no level of the batch
+ * has another mesh than the batch
+ */
+static int32_t box_gpu_cull_lod_meshes(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    uint32_t *meshes)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    int32_t result = 0, l;
+    bool reduced = false;
+    if (c->lod_levels < 2 || b->view != -1 || !box_render_is_mesh(b->pipeline) ||
+        b->lods[0] != b->mesh)
+    {
+        goto done;
+    }
+
+    meshes[0] = b->mesh;
+    for (l = 1; l < c->lod_levels; l ++) {
+        uint32_t handle = b->lods[l];
+        meshes[l] = handle && ecs_map_get(&gpu->meshes, handle) ? handle : meshes[l - 1];
+        reduced |= meshes[l] != b->mesh;
+    }
+
+    result = reduced ? c->lod_levels : 0;
+done:
+    return result;
+}
+
+/** Get the visible slots a draw takes in its page.
+ *
+ * @param count Instances of the batch
+ * @param twice Whether the draw has a late phase, which takes as many again
+ * @param levels Its levels of detail, 0 for none: a run per level for the early or only phase,
+ * twice as long with a late phase, and with one a run per level for the late phase
+ * @return The slots
+ */
+static uint64_t box_gpu_cull_draw_slots(
+    uint32_t count,
+    bool twice,
+    int32_t levels)
+{
+    uint64_t n = count, l = (uint64_t)levels;
+
+    return twice ? n * (2 + 3 * l) : n * (1 + l);
+}
+
+/** Append the level job of a draw with levels of detail for a phase (box_gpu_cull_lod_job_t).
+ *
+ * The job of the late phase goes to the late jobs of the group, which follow its other jobs.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param group Index of the cull group
+ * @param d The draw
+ * @param late Whether it sorts what the late phase kept
+ */
+static void box_gpu_cull_lod_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    int32_t group,
+    const box_gpu_cull_draw_t *d,
+    bool late)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, d->batch);
+    box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
+    box_gpu_cull_lod_job_t *lj = ecs_vec_append_t(NULL, late ? &c->lod_late : &c->lod_jobs,
+        box_gpu_cull_lod_job_t);
+    uint32_t levels = (uint32_t)d->levels;
+    ecs_os_memset_t(lj, 0, box_gpu_cull_lod_job_t);
+    lj->group = group;
+    lj->late = late;
+    lj->page = d->page;
+    lj->buffer = b->instances;
+    box_gpu_cull_job_t *job = &lj->job;
+    job->first = late ? d->base + d->count : d->base;
+    job->count = d->count;
+    job->args = late ? d->late : d->args;
+    job->base = d->lod_base + (late ? levels * d->lod_stride : 0);
+    job->history = late ? d->count : d->lod_stride;
+    job->list = d->lod + (late ? levels : 0);
+    job->mask = levels;
+    if (d->late != UINT32_MAX) {
+        job->fixture = d->lod + 2 * levels + 1;
+        if (late) {
+            job->exclude = d->lod_base + 1;
+            job->pad = d->lod_stride;
+        }
+    }
+
+    if (b->bounded) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->center), job->center);
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), job->extent);
+    } else {
+        glm_vec3_copy(m->center, job->center);
+        glm_vec3_copy(m->extent, job->extent);
+    }
+}
+
+/** Add the cull_lod dispatches of the level jobs of a group: consecutive jobs of one phase,
+ * page and instance page share one.
+ *
+ * @param c The cull state
+ * @param first First level job of the group
+ */
+static void box_gpu_cull_lod_dispatches(
+    box_gpu_cull_t *c,
+    int32_t first)
+{
+    box_gpu_cull_lod_t *d = NULL;
+    int32_t i, count = ecs_vec_count(&c->lod_jobs);
+    for (i = first; i < count; i ++) {
+        const box_gpu_cull_lod_job_t *lj = ecs_vec_get_t(
+            &c->lod_jobs, box_gpu_cull_lod_job_t, i);
+        uint32_t parts = (lj->job.count + BOX_GPU_CULL_GROUP - 1) / BOX_GPU_CULL_GROUP;
+        parts = parts < BOX_GPU_CULL_LOD_PARTS ? parts : BOX_GPU_CULL_LOD_PARTS;
+        parts = parts ? parts : 1;
+        if (!d || d->late != lj->late || d->page != lj->page || d->buffer != lj->buffer ||
+            d->count >= BOX_GPU_CULL_LOD_JOBS)
+        {
+            d = ecs_vec_append_t(NULL, &c->lods, box_gpu_cull_lod_t);
+            ecs_os_memset_t(d, 0, box_gpu_cull_lod_t);
+            d->group = lj->group;
+            d->late = lj->late;
+            d->page = lj->page;
+            d->buffer = lj->buffer;
+            d->first = (uint32_t)i;
+        }
+
+        d->count ++;
+        d->parts = parts > d->parts ? parts : d->parts;
+    }
+}
+
 /** Start the next page of visible slots of the target.
  *
  * @param c The cull state
@@ -499,12 +643,14 @@ static void box_gpu_cull_batch_part(
     bool view = hist >= 0 && ((mask >> hist) & 1u);
     bool late = view && b->view == -1 && box_render_is_mesh(b->pipeline);
     uint32_t skips = *ecs_vec_get_t(&c->skips, uint32_t, batch);
+    uint32_t meshes[BOX_LOD_LEVELS_MAX];
+    int32_t levels = box_gpu_cull_lod_meshes(gpu, b, meshes);
     int32_t draws[BOX_GPU_CULL_GROUP_VIEWS], first[BOX_GPU_CULL_GROUP_VIEWS];
-    int32_t f, i, k = 0, n = 0;
+    int32_t f, i, l, k = 0, n = 0;
     uint64_t slots = 0;
     for (f = 0; f < g->view_count; f ++) {
         if ((mask >> f) & 1u) {
-            slots += (uint64_t)b->instance_count * ((late && f == hist) ? 2u : 1u);
+            slots += box_gpu_cull_draw_slots(b->instance_count, late && f == hist, levels);
         }
     }
 
@@ -543,6 +689,36 @@ static void box_gpu_cull_batch_part(
             args[2] = 0;
             args[3] = 0;
             args[4] = 0;
+        }
+
+        d->lod = UINT32_MAX;
+        d->lod_base = 0;
+        d->lod_stride = 0;
+        d->levels = levels;
+        d->merged = false;
+        if (levels) {
+            d->lod = (uint32_t)(ecs_vec_count(&c->arg_data) / BOX_GPU_CULL_ARGS);
+            d->lod_stride = b->instance_count * (twice ? 2u : 1u);
+            d->lod_base = pg->used;
+            pg->used += (uint32_t)levels * (d->lod_stride + (twice ? b->instance_count : 0));
+            ecs_os_memcpy_n(d->meshes, meshes, uint32_t, levels);
+            for (i = 0; i < (twice ? 3 : 1); i ++) {
+                for (l = 0; l < levels; l ++) {
+                    uint32_t *args = ecs_vec_grow_t(
+                        NULL, &c->arg_data, uint32_t, BOX_GPU_CULL_ARGS);
+                    args[0] = ecs_map_get_deref(
+                        &gpu->meshes, box_gpu_mesh_t, meshes[l])->index_count;
+                    args[1] = 0;
+                    args[2] = 0;
+                    args[3] = 0;
+                    args[4] = 0;
+                }
+            }
+
+            box_gpu_cull_lod_add(gpu, packet, group, d, false);
+            if (twice) {
+                box_gpu_cull_lod_add(gpu, packet, group, d, true);
+            }
         }
 
         draws[k ++] = index;
@@ -618,7 +794,8 @@ static void box_gpu_cull_batch_skip(
             .batch = batch,
             .args = UINT32_MAX,
             .late = UINT32_MAX,
-            .skip = true
+            .skip = true,
+            .lod = UINT32_MAX
         };
     }
 }
@@ -657,6 +834,8 @@ static void box_gpu_cull_batch_add(
     const box_gpu_cull_group_t *g = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, group);
     bool late = hist >= 0 && ((mask >> hist) & 1u) && b->view == -1 &&
         box_render_is_mesh(b->pipeline);
+    uint32_t meshes[BOX_LOD_LEVELS_MAX];
+    int32_t levels = box_gpu_cull_lod_meshes(gpu, b, meshes);
     uint32_t part = 0;
     uint64_t slots = 0;
     int32_t f;
@@ -665,7 +844,7 @@ static void box_gpu_cull_batch_add(
             continue;
         }
 
-        uint64_t own = (uint64_t)b->instance_count * ((late && f == hist) ? 2u : 1u);
+        uint64_t own = box_gpu_cull_draw_slots(b->instance_count, late && f == hist, levels);
         if (part && slots + own > c->window) {
             box_gpu_cull_batch_part(gpu, packet, group, batch, part, filled, history, hist);
             part = 0;
@@ -803,6 +982,7 @@ static void box_gpu_cull_group_add(
     int32_t counts[BOX_GPU_CULL_GROUP_VIEWS] = {0}, filled[BOX_GPU_CULL_GROUP_VIEWS] = {0};
     int32_t group = ecs_vec_count(&c->groups), hist = -1, total = 0, f, i;
     int32_t batches = ecs_vec_count(&packet->batches), first = ecs_vec_count(&c->draws);
+    int32_t lod_first = ecs_vec_count(&c->lod_jobs);
     ecs_assert(count > 0 && count <= BOX_GPU_CULL_GROUP_VIEWS, ECS_INTERNAL_ERROR, NULL);
     ecs_os_memset(block, 0, (ecs_size_t)sizeof(block));
     box_gpu_cull_group_t *g = ecs_vec_append_t(NULL, &c->groups, box_gpu_cull_group_t);
@@ -929,6 +1109,14 @@ static void box_gpu_cull_group_add(
 
     g = ecs_vec_get_t(&c->groups, box_gpu_cull_group_t, group);
     g->dispatch_count = ecs_vec_count(&c->dispatches) - g->first_dispatch;
+    if (ecs_vec_count(&c->lod_late)) {
+        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &c->lod_jobs, box_gpu_cull_lod_job_t,
+            ecs_vec_count(&c->lod_late)), ecs_vec_first(&c->lod_late), box_gpu_cull_lod_job_t,
+            ecs_vec_count(&c->lod_late));
+        ecs_vec_clear(&c->lod_late);
+    }
+
+    box_gpu_cull_lod_dispatches(c, lod_first);
 }
 
 /** Add the frustums of a scene as cull groups of at most BOX_GPU_CULL_GROUP_VIEWS frustums,
@@ -972,6 +1160,46 @@ static void box_gpu_cull_frustum_all(
     for (i = 0; i < 6; i ++) {
         out->planes[i][3] = 1.0f;
     }
+}
+
+/** Give the groups of a view the levels of detail of the view (LodSettings), picked by the
+ * distance from a camera, until box_gpu_cull_lod_end.
+ *
+ * @param c The cull state
+ * @param v The view
+ * @param camera World position of the camera that picks the levels
+ * @param base Uniforms of the groups, which receive the camera and the distances
+ */
+static void box_gpu_cull_lod_begin(
+    box_gpu_cull_t *c,
+    const box_render_view_t *v,
+    const float *camera,
+    box_gpu_cull_uniforms_t *base)
+{
+    int32_t i;
+    c->lod_levels = v->lod.levels > 1 ? v->lod.levels : 0;
+    if (!c->lod_levels) {
+        goto done;
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, camera), base->camera);
+    base->camera[3] = 1.0f;
+    for (i = 0; i < BOX_LOD_LEVELS_MAX; i ++) {
+        base->lod[i] = v->lod.distances[i];
+    }
+
+done:
+    return;
+}
+
+/** Stop giving the groups that are added levels of detail.
+ *
+ * @param c The cull state
+ */
+static void box_gpu_cull_lod_end(
+    box_gpu_cull_t *c)
+{
+    c->lod_levels = 0;
 }
 
 void box_gpu_cull_add(
@@ -1055,8 +1283,10 @@ void box_gpu_cull_add(
         }
     }
 
+    box_gpu_cull_lod_begin(c, v, u->camera, &base);
     box_gpu_cull_groups_add(gpu, packet, v->scene, ecs_vec_first(&c->frustums),
         ecs_vec_count(&c->frustums), &base, history, hiz);
+    box_gpu_cull_lod_end(c);
 }
 
 void box_gpu_cull_reflect_add(
@@ -1065,6 +1295,7 @@ void box_gpu_cull_reflect_add(
     int32_t index,
     int32_t slot,
     mat4 view_proj,
+    const float *camera,
     float pixels,
     uint32_t exclude_page,
     uint32_t exclude_slot)
@@ -1097,7 +1328,9 @@ void box_gpu_cull_reflect_add(
 
     c->exclude_page = exclude_page;
     c->exclude_slot = exclude_slot;
+    box_gpu_cull_lod_begin(c, v, camera, &base);
     box_gpu_cull_group_add(gpu, packet, v->scene, &f, 1, &base, NULL, NULL);
+    box_gpu_cull_lod_end(c);
     c->exclude_page = 0;
     c->exclude_slot = 0;
 }
@@ -1163,6 +1396,10 @@ void box_gpu_cull_reset(
     c->page_count = 0;
     ecs_vec_clear(&c->tables);
     ecs_vec_clear(&c->runs);
+    ecs_vec_clear(&c->lod_jobs);
+    ecs_vec_clear(&c->lod_late);
+    ecs_vec_clear(&c->lods);
+    c->lod_levels = 0;
 }
 
 bool box_gpu_cull_capture_draws(

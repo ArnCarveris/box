@@ -10,6 +10,10 @@ struct Cull {
     view_proj: mat4x4f,
     hiz: vec4u,
     scan: vec4u,
+    // World position of the camera that picks the levels of detail.
+    camera: vec4f,
+    // Distance at which level i starts, for levels 1 to 3.
+    lod: vec4f,
 };
 
 struct Frustum {
@@ -37,6 +41,7 @@ struct Job {
     // Page slot plus one of the instance no frustum of the group draws, the shape of a planar
     // reflection, 0 for none.
     exclude: u32,
+    pad: u32,
 };
 
 // World space box around an instance.
@@ -61,6 +66,9 @@ const PHASE_LATE: u32 = 2u;
 
 // Frustums of a cull group at most, one bit each of a job's mask.
 const GROUP_VIEWS: u32 = 32u;
+
+// Levels of detail at most, BOX_LOD_LEVELS_MAX.
+const LOD_LEVELS: u32 = 4u;
 
 // Flag of a frustum (flags.y) with an occlusion history: it runs the phase of the dispatch,
 // the other frustums run one phase.
@@ -515,6 +523,56 @@ fn cull_ordered(
         atomicStore(&args[job.args * ARGS + 1u], count);
         atomicAdd(&counters[counter], count);
         atomicAdd(&counters[counter + 1u], atomicLoad(&group_culled[0]));
+    }
+}
+
+// Sorts the instances a draw of a cull view kept in a phase into the runs of its levels of
+// detail, a job (jobs.y of them from jobs.x) per row of workgroups that stride over its
+// instances. The level of an instance is the last whose distance (lod) its bounding sphere is
+// at from the camera, measured to the nearest point of the sphere, so a camera inside it keeps
+// level 0. The job reads its fields as:
+//   first, count, args: first visible entry, instances at most and arguments of the draw
+//   base, history, list: first entry of the level runs, entries of a run, first level arguments
+//   mask: levels; center, extent: bounds of the mesh
+//   fixture: first merged arguments plus one, counted with the level arguments, 0 for none
+//   exclude, pad: for a late job the first entry of the early runs plus one and their entries,
+//   which it appends to at the merged count, 0 for none
+// The order of the instances in a run does not matter, as only opaque draws have levels.
+@compute @workgroup_size(64)
+fn cull_lod(
+    @builtin(local_invocation_index) local: u32,
+    @builtin(workgroup_id) group: vec3u,
+    @builtin(num_workgroups) groups: vec3u)
+{
+    if (group.y >= cull.jobs.y) {
+        return;
+    }
+
+    let job = jobs[cull.jobs.x + group.y];
+    let total = min(atomicLoad(&args[job.args * ARGS + 1u]), job.count);
+    let levels = min(job.mask, LOD_LEVELS);
+    for (var i = group.x * 64u + local; i < total; i += groups.x * 64u) {
+        let slot = visible_slots[job.first + i];
+        let m = instance_model(transforms[slot]);
+        let center = (m * vec4f(job.center, 1.0)).xyz;
+        let scale = max(max(length(m[0].xyz), length(m[1].xyz)), length(m[2].xyz));
+        let radius = length(job.extent) * scale;
+        let distance = max(length(center - cull.camera.xyz) - radius, 0.0);
+        var level = 0u;
+        for (var l = 1u; l < levels; l++) {
+            if (distance >= cull.lod[l]) {
+                level = l;
+            }
+        }
+
+        let at = atomicAdd(&args[(job.list + level) * ARGS + 1u], 1u);
+        visible_slots[job.base + level * job.history + at] = slot;
+        if (job.fixture != 0u) {
+            let merged = atomicAdd(&args[(job.fixture - 1u + level) * ARGS + 1u], 1u);
+            if (job.exclude != 0u) {
+                visible_slots[job.exclude - 1u + level * job.pad + merged] = slot;
+            }
+        }
     }
 }
 

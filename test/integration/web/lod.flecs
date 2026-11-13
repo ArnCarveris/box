@@ -1,0 +1,83 @@
+// The scene of the browser check of the levels of detail (lod.mjs), which renders on the main
+// thread. The page opens a window only for a scene with a Surface; its 640x480 points fill the
+// viewport of the check. Rows of orange spheres, blue tori and green lathed vases run away from
+// the camera; the view has three levels, level 1 from 12 units and level 2 from 36 units, and
+// casts shadows, so the cull pass picks the levels for the view and its cascades. With occlusion
+// the late phase appends to the levels of the early phase.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.app
+using box.surface
+
+window {
+  Surface: {width: 640, height: 480}
+}
+
+camera {
+  Position: {0, 3, 6}
+  Rotation: {-0.18, 0, 0}
+  Camera: {fov: 50, near_: 0.1, far_: 500}
+}
+
+main_view {
+  View: {
+    camera: camera
+    clear: {enabled: true, color: {28, 34, 45, 255}}
+    lighting: {enabled: true}
+    culling: {enabled: true, occlusion: true}
+    shadows: {enabled: true, cascades: 2, resolution: 2048, max_distance: 120,
+      split_lambda: 0.7, depth_bias: 2, normal_offset: 2, filter_size: 3}
+    lod: {levels: 3, distances: [0, 12, 36, 0]}
+  }
+}
+
+sun {
+  Rotation: {0.7, 2.4, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+}
+
+$ {
+  AmbientLight: {sky: {150, 175, 210}, ground: {65, 60, 55}, intensity: 0.7}
+}
+
+floor {
+  Position: {0, -0.1, -40}
+  Box: {16, 0.2, 100}
+  Rgb: {95, 100, 110}
+}
+
+vase_profile {
+  Path2D: {
+    start: {0, 0},
+    segments: [
+      {kind: Line, end: {0.4, 0}},
+      {kind: CatmullRom, end: {0.75, 0.6}},
+      {kind: CatmullRom, end: {0.35, 1.4}},
+      {kind: CatmullRom, end: {0.5, 1.8}}
+    ],
+    closed: false
+  }
+}
+
+for i in 0..8 {
+  {
+    Position: {-3.5, 1, -i * 9}
+    Sphere: {radius: 1, segments: 32, smooth: true}
+    Rgb: {230, 155, 65}
+  }
+  {
+    Position: {0, 0.45, -i * 9}
+    Rotation: {0.6, 0, 0}
+    Torus: {radius: 0.8, tube: 0.3, segments: 32, rings: 16, smooth: true}
+    Rgb: {70, 165, 205}
+  }
+  {
+    Position: {3.5, 0, -i * 9}
+    Lathe: {profile: vase_profile, cap_start: true, cap_end: true, segments: 32, rings: 24}
+    Rgb: {150, 200, 120}
+  }
+}

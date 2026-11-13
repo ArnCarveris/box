@@ -439,7 +439,7 @@ int32_t box_gpu_planar_add(
         r->viewport[2] = 1.0f / (float)pass->width;
         r->viewport[3] = 1.0f / (float)pass->height;
         glm_vec4_zero(r->aerial);
-        box_gpu_cull_reflect_add(gpu, packet, index, pass->slot, r->view_proj,
+        box_gpu_cull_reflect_add(gpu, packet, index, pass->slot, r->view_proj, rec->camera,
             oblique[1][1] * (float)pass->height * 0.5f, rec->exclude_page, rec->exclude_slot);
         result += 2;
     }
