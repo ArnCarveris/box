@@ -27,6 +27,20 @@
                 ]
             },
             {
+                "id": "MeshLod",
+                "testcases": [
+                    "far_sphere_level_2",
+                    "levels_by_distance",
+                    "large_near_sphere_level_0",
+                    "second_view_without_lod",
+                    "flat_cylinder_and_box_not_reduced",
+                    "shadow_same_level",
+                    "culling_off",
+                    "occlusion",
+                    "one_level_unchanged"
+                ]
+            },
+            {
                 "id": "Reconfigure",
                 "testcases": [
                     "resize_updates_status",

@@ -83,6 +83,10 @@ void box_gpu_cull_begin(
 /** Add the frustums of a view: the view itself and every cascade of its shadows that renders in
  * the packet (box_gpu_shadow_renders), a kept cascade culls nothing.
  *
+ * With levels of detail (LodSettings) each frustum sorts what it keeps of a batch with levels
+ * into the draws of its levels, picked by the distance from the camera of the view, so the
+ * cascades draw the levels of the view.
+ *
  * @param gpu The backend
  * @param t The target
  * @param packet The packet
@@ -104,12 +108,14 @@ void box_gpu_cull_add(
  * scene of the view and of the view itself that are not transmissive, but the shape of the plane.
  *
  * They are tested against the mirrored frustum and the smallest size of the view, not by occlusion.
+ * The levels of detail of the view are picked by the distance from the mirrored camera.
  *
  * @param gpu The backend
  * @param packet The packet
  * @param index Index of the view in the packet
  * @param slot Slot of the reflection in the view buffer, which identifies its cull view
  * @param view_proj World to clip space of the reflection, with its oblique near plane
+ * @param camera World position of the mirrored camera
  * @param pixels Pixels per unit at w 1 of the reflection image
  * @param exclude_page Handle of the instance page of the shape of the plane, 0 for none
  * @param exclude_slot Slot of that shape in the page
@@ -120,6 +126,7 @@ void box_gpu_cull_reflect_add(
     int32_t index,
     int32_t slot,
     mat4 view_proj,
+    const float *camera,
     float pixels,
     uint32_t exclude_page,
     uint32_t exclude_slot);
@@ -414,7 +421,8 @@ const box_gpu_cull_view_t* box_gpu_cull_view(
 /** Record the indirect draw of a batch of a cull view.
  *
  * Binds the mesh, the instance page at group unless it is bound there already, the visible
- * slots of the draw and draws with the arguments the cull pass wrote.
+ * slots of the draw and draws with the arguments the cull pass wrote. A draw with levels of
+ * detail records an indirect draw per level instead, each with the mesh of its level.
  *
  * @param gpu The backend
  * @param pass The render pass
@@ -442,7 +450,8 @@ bool box_gpu_cull_draw(
  *
  * The arguments have a firstIndex, baseVertex and firstInstance of 0 (gpu_cull_group.c), so
  * vertex_index runs over 0 to index_count - 1. Binds the depth only instance group at group; the
- * caller binds the group of the mesh with its vertices and indices.
+ * caller binds the group of the mesh with its vertices and indices. It draws every instance the
+ * cull kept with the mesh of the batch, level 0, also for a draw with levels of detail.
  *
  * @param gpu The backend
  * @param pass The render pass
