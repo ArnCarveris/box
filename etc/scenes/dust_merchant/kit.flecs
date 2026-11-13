@@ -86,7 +86,7 @@ assets {
     Sweep: {path: run, profile: CableProfile, scale: {thick, thick}, rings: 20}
     Rgb: tone
     PbrMaterial: {metallic: 0, roughness: 0.55}
-    SpatialIgnore
+    Ignore
   }
 
   template Sheet {

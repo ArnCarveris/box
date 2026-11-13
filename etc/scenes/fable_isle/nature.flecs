@@ -73,9 +73,9 @@ assets {
         const a = i * GOLDEN + seed
         const r = h * (0.14 + i * 0.06)
         if i % 2 == 0 {
-          { (IsA, IsleLeaf); SpatialIgnore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.045 + rnd(i, seed) * 0.03), length: 0.012, segments: 10} }
+          { (IsA, IsleLeaf); Ignore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.045 + rnd(i, seed) * 0.03), length: 0.012, segments: 10} }
         } else {
-          { (IsA, IsleLeafAlt); SpatialIgnore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.03), length: 0.012, segments: 10} }
+          { (IsA, IsleLeafAlt); Ignore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.03), length: 0.012, segments: 10} }
         }
       }
     }
@@ -129,7 +129,7 @@ assets {
       for i in 0..3 {
         const a = i * GOLDEN + seed * 2
         const r = h * (0.14 + i * 0.08)
-        { (IsA, IsleLeafAlt); SpatialIgnore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.035), length: 0.012, segments: 10} }
+        { (IsA, IsleLeafAlt); Ignore; NoShadow; Position: {sin(a) * r, 0.015 + i * 0.003, cos(a) * r}; Rotation: {0, a, 0}; Scale: {1.4, 1, 0.8}; Cylinder: {radius: h * (0.04 + rnd(i, seed) * 0.035), length: 0.012, segments: 10} }
       }
     }
   }
@@ -151,7 +151,7 @@ assets {
   template IsleBush {
     prop size: f32 = 0.8
     prop seed: f32 = 0
-    SpatialIgnore
+    Ignore
     for i in 0..3 {
       const a = i * 2.094 + seed
       const r = i == 0 ? 0 : size * 0.48
@@ -169,7 +169,7 @@ assets {
   template IsleFlowerPatch {
     prop seed: f32 = 0
     prop count: i32 = 6
-    SpatialIgnore
+    Ignore
     for i in 0..count {
       const a = i * GOLDEN + seed
       const r = 0.12 + sqrt(i * 1.0) * 0.26
@@ -188,7 +188,7 @@ assets {
 
   template IsleGrassTuft {
     prop seed: f32 = 0
-    SpatialIgnore
+    Ignore
     for i in 0..4 {
       const a = i * 1.7 + seed
       const t = 0.3 + rnd(i, seed) * 0.3
@@ -200,7 +200,7 @@ assets {
     prop seed: f32 = 0
     prop glow = false
     prop lamp = false
-    SpatialIgnore
+    Ignore
     for i in 0..3 {
       const a = i * GOLDEN + seed
       const r = 0.1 + i * 0.16
@@ -221,7 +221,7 @@ assets {
 
   template IsleReeds {
     prop seed: f32 = 0
-    SpatialIgnore
+    Ignore
     for i in 0..5 {
       const a = i * GOLDEN + seed
       const r = 0.08 + i * 0.1
@@ -237,7 +237,7 @@ assets {
 
   template IsleDuck {
     prop brown = false
-    SpatialIgnore
+    Ignore
     if brown {
       body : IsleNatureDuckBrown { Position: {0, 0.06, 0}; Scale: {0.8, 0.7, 1.25}; IcoSphere: {radius: 0.2, segments: 2, smooth: true} }
       head : IsleNatureDuckBrown { Position: {0, 0.27, -0.2}; IcoSphere: {radius: 0.1, segments: 2, smooth: true} }
@@ -286,7 +286,7 @@ assets {
     prop len: f32 = 1.5
     prop sink: f32 = 0.2
     body { (IsA, mat); NoShadow; Position: {0, len * 0.5 - sink, 0}; Frustum: {radius_bottom: rad, radius_top: rad * 0.8, length: len, segments: 6} }
-    tip { (IsA, mat); NoShadow; SpatialIgnore; Position: {0, len - sink + rad * 0.72, 0}; Cone: {radius: rad * 0.8, length: rad * 1.44, segments: 6} }
+    tip { (IsA, mat); NoShadow; Ignore; Position: {0, len - sink + rad * 0.72, 0}; Cone: {radius: rad * 0.8, length: rad * 1.44, segments: 6} }
   }
 
   template IsleCrystalCluster {
@@ -504,9 +504,9 @@ assets {
           const a = i * GOLDEN
           const r = 4.6 + rnd(i, 54) * 2.7
           const s = 0.2 + rnd(i, 55) * 0.16
-          { (IsA, IsleNatureLily); SpatialIgnore; NoShadow; Position: {px(r, a), -0.235, pz(r, a)}; Cylinder: {radius: s, length: 0.02, segments: 9} }
+          { (IsA, IsleNatureLily); Ignore; NoShadow; Position: {px(r, a), -0.235, pz(r, a)}; Cylinder: {radius: s, length: 0.02, segments: 9} }
           if i % 4 == 0 {
-            { (IsA, IsleNatureLilyBloom); SpatialIgnore; NoShadow; Position: {px(r, a), -0.19, pz(r, a)}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 0.09, segments: 1} }
+            { (IsA, IsleNatureLilyBloom); Ignore; NoShadow; Position: {px(r, a), -0.19, pz(r, a)}; Scale: {1, 0.7, 1}; IcoSphere: {radius: 0.09, segments: 1} }
           }
         }
       }

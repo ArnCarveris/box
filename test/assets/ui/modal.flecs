@@ -25,7 +25,7 @@ template CloseButton : HeadlessButton {
   const arm = t.font_size * 0.3
 
   Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
   Rect: {1, 1}
 
   if down {
@@ -71,7 +71,7 @@ template CloseButton : HeadlessButton {
 }
 
 // Behavior of a modal dialog: current is whether it is open, open its initial value. While open
-// it floats (LayoutFloat) centered on the root of its layout tree, over every widget wherever it
+// it floats (Float) centered on the root of its layout tree, over every widget wherever it
 // is declared, above its child backdrop, a float as large as that root. Both are Interactive
 // InputBlockers, so they handle the pointer themselves and no click, scroll or hover reaches the
 // widgets or the 3D scene under them. The dialog is a FocusScope: the focus moves to its first
@@ -104,7 +104,7 @@ template HeadlessModal {
   // In front of the parts a text field lifts (Position z), so they neither draw over the
   // dialog nor take the pointer from it; the layout places x and y
   Position: {0, 0, 10}
-  LayoutFloat: {anchor: root, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+  Float: {anchor: root, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
 
   if current {
     FocusScope
@@ -112,13 +112,13 @@ template HeadlessModal {
     InputBlocker
   } else {
     ClipChildren
-    LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+    Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
   }
 
   backdrop {
     Layout: {}
-    LayoutFloat: {anchor: root, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Float: {anchor: root, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     if current {
       Interactive
@@ -233,7 +233,7 @@ template Modal : HeadlessModal {
   Layout: {direction: Column, padding: {pad, pad, pad, pad}, spacing: t.spacing * 1.5}
 
   if current {
-    LayoutItem: {width: {min: width, max: width}}
+    Item: {width: {min: width, max: width}}
   }
 
   // The backdrop and the surface come first here too, so they are created, and drawn, before
@@ -248,8 +248,8 @@ template Modal : HeadlessModal {
   }
 
   surface {
-    LayoutFloat: {anchor: dialog, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Float: {anchor: dialog, h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     if current {
       Rect: {1, 1}
@@ -263,16 +263,16 @@ template Modal : HeadlessModal {
 
   heading {
     Layout: {direction: Row, spacing: t.spacing * 2, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     caption {
-      LayoutItem: {height: {mode: Fixed, value: title_h}}
+      Item: {height: {mode: Fixed, value: title_h}}
       Text: {value: title, size: t.heading_font_size, line_height: title_h}
       Rgb: t.text
     }
 
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     CloseButton close()

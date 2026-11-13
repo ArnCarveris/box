@@ -46,7 +46,7 @@ template StartupWidget {
   Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
 
   heading {
-    LayoutItem: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: heading_h}}
+    Item: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: heading_h}}
     Text: {value: title, size: t.font_size, line_height: heading_h}
     Rgb: t.text
   }
@@ -64,10 +64,10 @@ template StartupWidget {
 
       label {
         Layout: {direction: Row}
-        LayoutItem: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: row_h}}
+        Item: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: row_h}}
 
         name {
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
           Text: {value: task.name, size: t.small_font_size, line_height: row_h}
           Rgb: match task.blocking { true: t.text; _: t.text_muted }
         }
@@ -88,12 +88,12 @@ template StartupWidget {
       // The bar: the track in the border color and the part done over it from the left
       bar {
         Layout: {direction: Row}
-        LayoutItem: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: bar_h}}
+        Item: {width: {mode: Fixed, value: row_w}, height: {mode: Fixed, value: bar_h}}
         Rect: {1, 1}
         Rgb: t.border
 
         done {
-          LayoutItem: {
+          Item: {
             width: {mode: Fixed, value: round(row_w * frac)},
             height: {mode: Fixed, value: bar_h}
           }

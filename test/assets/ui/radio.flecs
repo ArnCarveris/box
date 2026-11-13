@@ -28,7 +28,7 @@ template RadioGroup {
   const t = box.ui.theme[UiTheme]
 
   Layout: {direction: Column, spacing: t.spacing / 2}
-  LayoutItem: {width: {min: width, max: width}}
+  Item: {width: {min: width, max: width}}
 
   if disabled {
     Opacity: {t.disabled_opacity}
@@ -171,11 +171,11 @@ template RadioButton : HeadlessRadioButton {
   const size = 16
 
   Layout: {direction: Row, spacing: t.spacing, v: Middle}
-  LayoutItem: {height: {mode: Fixed, value: t.control_height}}
+  Item: {height: {mode: Fixed, value: t.control_height}}
 
   indicator {
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Rect: {1, 1}
 
     if down {
@@ -199,7 +199,7 @@ template RadioButton : HeadlessRadioButton {
 
     if checked {
       dot {
-        LayoutItem: {
+        Item: {
           h: Center, v: Middle,
           width: {mode: Fixed, value: 8}, height: {mode: Fixed, value: 8}
         }

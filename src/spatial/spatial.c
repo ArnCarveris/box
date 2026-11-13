@@ -802,6 +802,8 @@ void BoxSpatialImport(
     ECS_MODULE(world, BoxSpatial);
     ECS_IMPORT(world, BoxRender);
 
+    ecs_set_name_prefix(world, "Spatial");
+
     box_spatial_layout_init(world);
 
     box_spatial_t *index = box_spatial_new();
@@ -841,4 +843,6 @@ void BoxSpatialImport(
         .ctx = index,
         .ctx_free = box_spatial_release
     });
+
+    ecs_set_name_prefix(world, NULL);
 }

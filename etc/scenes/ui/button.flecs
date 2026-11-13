@@ -118,7 +118,7 @@ template Button : HeadlessButton {
   const edge = ring ? t.focus : t.border
 
   Layout: {direction: Row, padding: {0, 0, pad, pad}, h: Center, v: Middle}
-  LayoutItem: {
+  Item: {
     width: {min: width, max: width},
     height: {mode: Fixed, value: t.control_height}
   }

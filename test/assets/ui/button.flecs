@@ -114,7 +114,7 @@ template Button : HeadlessButton {
   const filled = variant == "primary" || variant == "danger"
 
   Layout: {direction: Row, padding: {0, 0, pad, pad}, h: Center, v: Middle}
-  LayoutItem: {
+  Item: {
     width: {min: width, max: width},
     height: {mode: Fixed, value: t.control_height}
   }

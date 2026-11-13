@@ -116,7 +116,7 @@ assets {
     prop h: f32 = 32
     prop tint: Rgb = {255, 255, 255}
 
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
     Rect: {1, 1}
     Image: {texture: tex}
     Rgb: tint
@@ -130,8 +130,8 @@ assets {
     prop dx: f32 = -5
     prop dy: f32 = 5
 
-    LayoutFloat: {h: h, v: v, anchor_h: h, anchor_v: v, x: dx, y: dy}
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Float: {h: h, v: v, anchor_h: h, anchor_v: v, x: dx, y: dy}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Rotation: {0, 0, turn}
     Rect: {1, 1}
     Image: {texture: castle_ui_corner}
@@ -140,7 +140,7 @@ assets {
   template Rivet {
     prop r: f32 = 3.5
 
-    LayoutItem: {width: {mode: Fixed, value: r * 2}, height: {mode: Fixed, value: r * 2}}
+    Item: {width: {mode: Fixed, value: r * 2}, height: {mode: Fixed, value: r * 2}}
     Circle: {r}
     Rgb: {112, 106, 98}
     Border: {width: 1.2, color: {24, 20, 18, 255}}
@@ -152,18 +152,18 @@ assets {
     prop w: f32 = 300
     prop top: bool = true
 
-    LayoutFloat: {h: Center, v: top ? Top : Bottom, anchor_h: Center, anchor_v: top ? Top : Bottom, y: top ? -7 : 7}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 10}}
+    Float: {h: Center, v: top ? Top : Bottom, anchor_h: Center, anchor_v: top ? Top : Bottom, y: top ? -7 : 7}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 10}}
     Layout: {direction: Row, h: Center, v: Middle, spacing: 0}
     Rect: {1, 1}
     Rgb: {70, 66, 62}
     Border: {width: 1.5, radius: 2, color: {22, 19, 17, 255}}
 
     sheen { Position: {0, 2, 0.04}; Rect: {w - 6, 1.2}; Rgb: {150, 144, 136}; Opacity: {0.6} }
-    Rivet ra(r: 2.6) { LayoutFloat: {h: Left, v: Middle, anchor_h: Left, anchor_v: Middle, x: 10} }
-    Rivet rb(r: 2.6) { LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: 0 - w * 0.25} }
-    Rivet rc(r: 2.6) { LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: w * 0.25} }
-    Rivet rd(r: 2.6) { LayoutFloat: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: -10} }
+    Rivet ra(r: 2.6) { Float: {h: Left, v: Middle, anchor_h: Left, anchor_v: Middle, x: 10} }
+    Rivet rb(r: 2.6) { Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: 0 - w * 0.25} }
+    Rivet rc(r: 2.6) { Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: w * 0.25} }
+    Rivet rd(r: 2.6) { Float: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: -10} }
   }
 
   template WoodPanel {
@@ -177,7 +177,7 @@ assets {
     prop gap: f32 = 6
 
     Layout: {direction: row ? Row : Column, padding: {pad, pad, pad + 4, pad + 4}, spacing: gap, h: row ? Center : Left, v: top ? Top : Middle}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
     Rect: {1, 1}
     Image: {texture: castle_ui_wood, u0: u, v0: v, u1: u + w / 2048, v1: v + h / 512}
     Rgb: {214, 196, 180}
@@ -200,7 +200,7 @@ assets {
     const afford = gold >= cost_gold(t, 1) && stone >= cost_stone(t, 1)
 
     Layout: {direction: Column, h: Center, v: Middle, spacing: 1, padding: {6, 6, 4, 4}}
-    LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 82}}
+    Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 82}}
     Rect: {1, 1}
     Image: {texture: castle_ui_parchment, u0: 0.05 + t * 0.05, v0: 0.2, u1: 0.13 + t * 0.05, v1: 0.53}
     if active {
@@ -251,14 +251,14 @@ assets {
     prop width: f32 = 206
 
     Layout: {direction: Row, padding: {3, 3, 3, 3}}
-    LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 16}}
+    Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 16}}
     Rect: {1, 1}
     Rgb: {24, 17, 12}
     Border: {width: 2, radius: 4, color: {84, 78, 72, 255}}
 
     fill {
       Layout: {}
-      LayoutItem: {width: {mode: Fixed, value: max((width - 6) * clamp(ratio, 0, 1), 6)}, height: {mode: Fixed, value: 10}}
+      Item: {width: {mode: Fixed, value: max((width - 6) * clamp(ratio, 0, 1), 6)}, height: {mode: Fixed, value: 10}}
       Rect: {1, 1}
       Rgb: {222, 166, 62}
       Border: {radius: 2, width: 1, color: {120, 74, 20, 255}}
@@ -269,8 +269,8 @@ assets {
         Opacity: {0.7}
       }
     }
-    Rivet left_(r: 3.2) { LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle} }
-    Rivet right_(r: 3.2) { LayoutFloat: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle} }
+    Rivet left_(r: 3.2) { Float: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle} }
+    Rivet right_(r: 3.2) { Float: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle} }
   }
 
   template NewRealmButton {
@@ -278,7 +278,7 @@ assets {
     mut armed = false
 
     Layout: {direction: Row, h: Center, v: Middle, padding: {4, 4, 12, 12}}
-    LayoutItem: {height: {mode: Fixed, value: 24}}
+    Item: {height: {mode: Fixed, value: 24}}
     Rect: {1, 1}
     if armed {
       Rgb: {150, 44, 34}
@@ -355,7 +355,7 @@ assets {
       }
       footer {
         Layout: {direction: Row, h: Right}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         NewRealmButton new_realm()
       }
     }
@@ -368,7 +368,7 @@ assets {
     prop alarm: bool = false
 
     Layout: {direction: Row, spacing: 8, v: Middle, padding: {4, 4, 6, 10}}
-    LayoutItem: {width: {mode: Fixed, value: 136}, height: {mode: Fixed, value: 50}}
+    Item: {width: {mode: Fixed, value: 136}, height: {mode: Fixed, value: 50}}
     Rect: {1, 1}
     Rgb: {40, 28, 19}
     Opacity: {0.85}
@@ -401,8 +401,8 @@ assets {
   template ScrollRod {
     prop h: Align = Left
 
-    LayoutFloat: {h: Center, v: Middle, anchor_h: h, anchor_v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: 14}, height: {mode: Grow, max: 80}}
+    Float: {h: Center, v: Middle, anchor_h: h, anchor_v: Middle}
+    Item: {width: {mode: Fixed, value: 14}, height: {mode: Grow, max: 80}}
     Layout: {}
     Rect: {1, 1}
     Image: {texture: castle_ui_wood, u0: 0.3, v0: 0.1, u1: 0.31, v1: 0.2}
@@ -493,7 +493,7 @@ assets {
     if text != "" {
       scroll {
         Layout: {direction: Column, h: Center, v: Middle, padding: {7, 7, 26, 26}, spacing: 4}
-        LayoutItem: {width: {mode: Fixed, value: 900}}
+        Item: {width: {mode: Fixed, value: 900}}
         Rect: {1, 1}
         Image: {texture: castle_ui_parchment, u0: 0.04, v0: 0.12, u1: 0.96, v1: 0.88}
         Border: {width: 1.5, radius: 3, color: {96, 62, 32, 255}}
@@ -518,7 +518,7 @@ assets {
               Layout: {direction: Row, v: Middle, padding: {0, 0, 6, 0}}
               cap {
                 Layout: {direction: Row, h: Center, v: Middle, padding: {1, 1, 6, 6}}
-                LayoutItem: {height: {mode: Fixed, value: 20}}
+                Item: {height: {mode: Fixed, value: 20}}
                 Rect: {1, 1}
                 Rgb: {236, 218, 184}
                 Border: {width: 1.5, radius: 3, color: {110, 78, 50, 255}}
@@ -551,7 +551,7 @@ assets {
         ToolButton b10(t: K_TREE)
         ToolButton b11(t: K_PATH)
         sep {
-          LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 76}}
+          Item: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 76}}
           Rect: {1, 1}
           Rgb: {62, 58, 54}
           Border: {width: 1.5, radius: 2, color: {20, 17, 15, 255}}
@@ -567,15 +567,15 @@ assets {
     if toast != "" {
       banner {
         Layout: {direction: Row, h: Center, v: Middle, padding: {14, 14, 64, 30}}
-        LayoutItem: {width: {mode: Fixed, value: 680}}
+        Item: {width: {mode: Fixed, value: 680}}
         Rect: {1, 1}
         Image: {texture: castle_ui_parchment, u0: 0.0, v0: 0.0, u1: 1, v1: 1}
         Border: {width: 2, radius: 4, color: {110, 70, 36, 255}}
         BoxShadow: {offset_y: -4, blur: 18, color: {0, 0, 0, 130}}
 
         seal {
-          LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle, x: 30}
-          LayoutItem: {width: {mode: Fixed, value: 52}, height: {mode: Fixed, value: 52}}
+          Float: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle, x: 30}
+          Item: {width: {mode: Fixed, value: 52}, height: {mode: Fixed, value: 52}}
           Rect: {1, 1}
           Image: {texture: castle_ui_seal}
         }
@@ -611,7 +611,7 @@ assets {
     }
 
     Layout: {direction: Column, h: Center, v: Middle, spacing: 1, padding: {6, 6, 10, 10}}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 48}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 48}}
     Rect: {1, 1}
     Rgb: bg
     Border: {width: 2, radius: 4, color: enabled && !danger ? {250, 206, 102, 255} : {28, 22, 18, 255}}
@@ -678,9 +678,9 @@ assets {
     prop color: Rgb = C_TEXT
 
     Layout: {direction: Row, spacing: 6, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Caption name_(text: label, size: 12, color: C_MUTED)
-    fill_ { LayoutItem: {width: {mode: Grow}} }
+    fill_ { Item: {width: {mode: Grow}} }
     Caption value_(text: value, size: 13, color: color)
   }
 
@@ -742,7 +742,7 @@ assets {
       WoodPanel panel(w: 344, h: smith ? 470 : max_level(k) > 1 ? 400 : 320, pad: 18, u: 0.6, v: 0.1, top: true, gap: 8) {
         body_ {
           Layout: {direction: Column, spacing: 8}
-          LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+          Item: {width: {mode: Grow}, height: {mode: Grow}}
           head {
             Layout: {direction: Row, spacing: 10, v: Middle}
             Picture icon(tex: tool_icon(k), w: 44, h: 44, tint: ruined ? {150, 140, 130} : {255, 255, 255})
@@ -758,31 +758,31 @@ assets {
           }
           stats {
             Layout: {direction: Column, spacing: 2}
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
             folk_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if !ruined && people > 0 {
                 InfoLine line_(label: "Folk", value: "{people}")
               }
             }
             eats_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if !ruined && eats > 0 {
                 InfoLine line_(label: "Eats", value: "{eats:.0} food a second", color: food_rate < 0 ? C_RED : C_TEXT)
               }
             }
             coin_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if !ruined && coin > 0 {
                 InfoLine line_(label: "Taxes", value: "{coin:.0} gold a second")
               }
             }
             extra_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if k == K_FARM {
                 InfoLine line_(label: "Grows", value: "{farm_yield(research):.1} food a second", color: {150, 210, 110})
               } else if k == K_HOUSE && !ruined && !top {
@@ -797,7 +797,7 @@ assets {
             }
             mining_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if smith {
                 InfoLine line_(label: "Quarrying", value: match m { 0: "no research yet"; _: "{mining_name(m - 1)}" })
               }
@@ -805,20 +805,20 @@ assets {
           }
           bar_slot {
             Layout: {direction: Column}
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
             if k == K_HOUSE && !ruined && !top {
               ProgressBar bar_(ratio: pts / protect_need(lvl), width: 300)
             } else if smith && researching {
               ProgressBar bar_(ratio: 1 - research_left / (busy ? mining_time(m) : research_time(r)), width: 300)
             }
           }
-          grow { LayoutItem: {height: {mode: Grow}} }
+          grow { Item: {height: {mode: Grow}} }
           actions {
             Layout: {direction: Column, spacing: 6}
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
             primary_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if smith {
                 if researching && !busy {
                   PanelButton button_(label: "Researching {research_name(r)}", detail: "{research_left:.0} seconds left", enabled: false, action: 1, cell: i)
@@ -854,7 +854,7 @@ assets {
             }
             mining_slot {
               Layout: {direction: Column}
-              LayoutItem: {width: {mode: Grow}}
+              Item: {width: {mode: Grow}}
               if smith {
                 if busy {
                   PanelButton button_(label: "Researching {mining_name(m)}", detail: "{research_left:.0} seconds left", enabled: false, action: 3, cell: i)
@@ -894,27 +894,27 @@ hud {
   }
 
   screen {
-    LayoutFill: {surface: window}
+    Fill: {surface: window}
     Layout: {direction: Column, padding: {18, 18, 18, 18}, spacing: 12}
 
     top {
       Layout: {direction: Row, spacing: 12}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       RealmCard realm()
-      spacer { LayoutItem: {width: {mode: Grow}} }
+      spacer { Item: {width: {mode: Grow}} }
       TreasuryCard treasury()
     }
 
     middle {
       Layout: {direction: Column, h: Center, padding: {24, 0, 0, 0}}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       ToastBanner toast_banner()
-      InfoPanel info() { LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Top} }
+      InfoPanel info() { Float: {h: Right, v: Top, anchor_h: Right, anchor_v: Top} }
     }
 
     bottom {
       Layout: {direction: Column, h: Center, spacing: 14}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       HintLine hint()
       Toolbar toolbar()
     }

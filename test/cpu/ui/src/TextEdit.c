@@ -120,11 +120,11 @@ static ecs_world_t* edit_world(
         "    Layout: {direction: Column, spacing: 20}\n"
         "    FocusScope\n"
         "    field {\n"
-        "      LayoutItem: {width: {mode: Fixed, value: 200}}\n"
+        "      Item: {width: {mode: Fixed, value: 200}}\n"
         "      %s\n"
         "    }\n"
         "    other {\n"
-        "      LayoutItem: {width: {mode: Fixed, value: 200}}\n"
+        "      Item: {width: {mode: Fixed, value: 200}}\n"
         "      TextEdit: {value: \"other\"}\n"
         "    }\n"
         "  }\n"
@@ -938,7 +938,7 @@ void TextEdit_drag_scrolls(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world(
         "TextEdit: {value: \"the quick brown fox jumps over\"}\n"
-        "LayoutItem: {width: {mode: Fixed, value: 60}}");
+        "Item: {width: {mode: Fixed, value: 60}}");
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     char from[64];
     const WorldTransform *t = ecs_get(world, edit_field(world), WorldTransform);
@@ -1283,7 +1283,7 @@ void TextEdit_scroll_keeps_caret(void) {
     // ui/text_edit
     ecs_world_t *world = edit_world(
         "TextEdit: {}\n"
-        "LayoutItem: {width: {mode: Fixed, value: 60}}");
+        "Item: {width: {mode: Fixed, value: 60}}");
     ecs_entity_t s = ecs_shell_session_init(world, NULL);
     edit_parts_t parts = edit_parts(world, edit_field(world));
     int32_t i;

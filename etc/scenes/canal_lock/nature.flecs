@@ -15,7 +15,7 @@ assets {
     prop card: f32 = 0.5
     prop seed: f32 = 0
 
-    SpatialIgnore
+    Ignore
     filler_core : CanalLeaf { Position: {}; Scale: {rx * 0.74, ry * 0.74, rz * 0.74}; IcoSphere: {radius: 1, segments: 2, smooth: true} }
     for i in 0..count {
       const up = 1 - 2 * (i + 0.5) / count
@@ -69,7 +69,7 @@ assets {
     prop gap_x1: f32 = 100
     prop gap_z0: f32 = 100
     prop gap_z1: f32 = 100
-    SpatialIgnore
+    Ignore
     for i in 0..count {
       const fx = (i * 0.61803398 + seed * 0.37) - math.floor(i * 0.61803398 + seed * 0.37)
       const fz = (i * 0.75487767 + seed * 0.71) - math.floor(i * 0.75487767 + seed * 0.71)
@@ -116,7 +116,7 @@ assets {
   template CanalLily {
     prop seed: f32 = 0
     const bob = 1.1 + seed * 0.2
-    SpatialIgnore
+    Ignore
     AngularVelocity: {0, 0.05, 0}
     sway {
       AngularVelocity: {bob, 0, 0}
@@ -135,7 +135,7 @@ assets {
   template CanalDuck {
     prop radius: f32 = 0.7
     prop bob: f32 = 1.5
-    SpatialIgnore
+    Ignore
     AngularVelocity: {0, 0.25, 0}
     sway {
       Position: {0, 0, radius}

@@ -28,11 +28,11 @@ template ProgressBar {
   const bar_h = 6
 
   Layout: {direction: Column, spacing: 2}
-  LayoutItem: {width: {mode: Fixed, value: bar_w}}
+  Item: {width: {mode: Fixed, value: bar_w}}
 
   head {
     Layout: {direction: Row, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     caption {
       Text: {value: label, size: t.font_size}
@@ -40,7 +40,7 @@ template ProgressBar {
     }
 
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     amount {
@@ -51,13 +51,13 @@ template ProgressBar {
 
   bar {
     Layout: {}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: bar_h}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: bar_h}}
     Rect: {1, 1}
     Rgb: t.surface_alt
     Border: {radius: bar_h / 2, width: 1, color: {t.border.r, t.border.g, t.border.b, 255}}
 
     fill {
-      LayoutItem: {
+      Item: {
         v: Middle,
         width: {mode: Fixed, value: ratio * bar_w + 0.01}, height: {mode: Fixed, value: bar_h}
       }

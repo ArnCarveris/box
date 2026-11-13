@@ -42,7 +42,7 @@ template Panel : OreOneShot {
   const top: f32 = match cap { true: capH; _: 0 }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: h, v: v, x: x, y: y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
@@ -59,7 +59,7 @@ template Panel : OreOneShot {
     Image: {texture: ui_art.halo}
     Rgb: {0, 0, 0}
     Opacity: {0.7}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   OreHalo rim(size: width + 44, height: height + 44, color: glow, alpha: aura, z: -5)
@@ -67,7 +67,7 @@ template Panel : OreOneShot {
   chrome {
     Position: {0, 0, -4}
     Layout: {}
-    LayoutItem: {
+    Item: {
       h: Left, v: Top,
       width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
     }
@@ -76,7 +76,7 @@ template Panel : OreOneShot {
 
     plate {
       Position: {0, 0, 0}
-      LayoutItem: {
+      Item: {
         h: Left, v: Top,
         width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
       }
@@ -90,7 +90,7 @@ template Panel : OreOneShot {
     if cap {
       strip {
         Position: {0, 0, 1}
-        LayoutItem: {
+        Item: {
           h: Left, v: Top,
           width: {mode: Fixed, value: width}, height: {mode: Fixed, value: capH}
         }
@@ -100,7 +100,7 @@ template Panel : OreOneShot {
           texture: ui_art.hazard,
           u0: 0.5 - spanU / 2, v0: 0.5 - spanV / 2, u1: 0.5 + spanU / 2, v1: 0.5 + spanV / 2
         }
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -117,7 +117,7 @@ template Panel : OreOneShot {
       Rect: {12, 12}
       Image: {texture: ui_art.bracket}
       Rgb: {edge.r, edge.g, edge.b}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     bracket_br {
@@ -126,7 +126,7 @@ template Panel : OreOneShot {
       Rect: {12, 12}
       Image: {texture: ui_art.bracket}
       Rgb: {edge.r, edge.g, edge.b}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 

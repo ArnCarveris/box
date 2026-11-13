@@ -79,11 +79,11 @@ assets {
 
     const cr = r * 1.4
     for s in 0..2 {
-      "hoop_{s}" { Position: {0, 0, (s - 0.5) * SEG}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.045, segments: 40, rings: 3}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; SpatialIgnore }
+      "hoop_{s}" { Position: {0, 0, (s - 0.5) * SEG}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.045, segments: 40, rings: 3}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; Ignore }
     }
     for i in 0..4 {
       const a = PI / 4 + i * HALF_PI
-      "edge_{i}" { Position: {cos(a) * cr, sin(a) * cr, 0}; Box: {0.05, 0.05, SEG}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; SpatialIgnore }
+      "edge_{i}" { Position: {cos(a) * cr, sin(a) * cr, 0}; Box: {0.05, 0.05, SEG}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; Ignore }
     }
   }
 
@@ -118,7 +118,7 @@ assets {
         Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
         if editing && !active {
           Opacity: {0.16}
-          SpatialIgnore
+          Ignore
         }
         if hovered && t == T_REMOVE {
           Tint: {255, 70, 50, 150}
@@ -132,7 +132,7 @@ assets {
         warning {
           Position: {0, r * 1.5 + 1.4, 0}
           AngularVelocity: {0, 1.6, 0}
-          SpatialIgnore
+          Ignore
           NoShadow
           gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.6, 0.6, 0.6} }
           glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 5}; Rgb: {255, 60, 40} }
@@ -163,7 +163,7 @@ assets {
           Rotation: {0, 0, lane_angle(l)}
           Opacity: {0.55}
           Tint: {90, 255, 160, 120}
-          SpatialIgnore
+          Ignore
           NoShadow
           LinerSegment part(k: t, l: l, z: z, seed: idx)
         }

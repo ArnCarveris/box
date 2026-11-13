@@ -296,7 +296,7 @@ assets {
     PbrMaterial: {metallic: 1, roughness: 1}
     PbrTextures: {albedo: tex_steel, orm: tex_steel_orm, normal: tex_steel_normal}
     TextureTransform: {scale_x: 0.25, scale_y: 7}
-    SpatialIgnore
+    Ignore
   }
 
   template LongFrame {
@@ -322,7 +322,7 @@ assets {
     PbrMaterial: {metallic: 1, roughness: 1}
     PbrTextures: {albedo: tex_steel, orm: tex_steel_orm, normal: tex_steel_normal}
     TextureTransform: {scale_x: 0.25, scale_y: 7}
-    SpatialIgnore
+    Ignore
   }
 
   template WallRib {
@@ -365,7 +365,7 @@ assets {
             PbrMaterial: {metallic: 0, roughness: 0.05}
             PbrTextures: {albedo: tex_grime}
             NoShadow
-            SpatialIgnore
+            Ignore
           }
         }
       }
@@ -387,7 +387,7 @@ assets {
       PbrMaterial: {metallic: 0, roughness: 0.05}
       PbrTextures: {albedo: tex_grime}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
   }
 
@@ -421,14 +421,14 @@ assets {
             Rgb: {64, 62, 56}
             PbrMaterial: {metallic: 1, roughness: 0.5}
             NoShadow
-            SpatialIgnore
+            Ignore
           }
           "boss_{k}_{j}" : BareSteel {
             Position: {p.x + n.x * 0.03, p.y + n.y * 0.03, p.z + n.z * 0.03}
             Sphere: {radius: 0.017, segments: 8, smooth: true}
             Rgb: {108, 104, 96}
             NoShadow
-            SpatialIgnore
+            Ignore
           }
         }
       }
@@ -439,17 +439,17 @@ assets {
       const a = hull_pt(ring_s(3) + 0.012, t)
       const b = hull_pt(ring_s(3) - 0.012, t)
       const n = hull_in(ring_s(3), t)
-      "rivet_a_{i}" : BareSteel { Position: {a.x + n.x * 0.04, a.y + n.y * 0.04, a.z + n.z * 0.04}; Sphere: {radius: 0.006, segments: 6}; Rgb: {120, 116, 106}; NoShadow; SpatialIgnore }
-      "rivet_b_{i}" : BareSteel { Position: {b.x + n.x * 0.04, b.y + n.y * 0.04, b.z + n.z * 0.04}; Sphere: {radius: 0.006, segments: 6}; Rgb: {120, 116, 106}; NoShadow; SpatialIgnore }
+      "rivet_a_{i}" : BareSteel { Position: {a.x + n.x * 0.04, a.y + n.y * 0.04, a.z + n.z * 0.04}; Sphere: {radius: 0.006, segments: 6}; Rgb: {120, 116, 106}; NoShadow; Ignore }
+      "rivet_b_{i}" : BareSteel { Position: {b.x + n.x * 0.04, b.y + n.y * 0.04, b.z + n.z * 0.04}; Sphere: {radius: 0.006, segments: 6}; Rgb: {120, 116, 106}; NoShadow; Ignore }
       const c = hull_pt(ring_s(6) - 0.018, t)
       const m = hull_in(ring_s(6), t)
-      "rivet_c_{i}" : BareSteel { Position: {c.x + m.x * 0.075, c.y + m.y * 0.075, c.z + m.z * 0.075}; Sphere: {radius: 0.008, segments: 6}; Rgb: {120, 116, 106}; NoShadow; SpatialIgnore }
+      "rivet_c_{i}" : BareSteel { Position: {c.x + m.x * 0.075, c.y + m.y * 0.075, c.z + m.z * 0.075}; Sphere: {radius: 0.008, segments: 6}; Rgb: {120, 116, 106}; NoShadow; Ignore }
     }
 
     sealer {
       for j in 0..2 {
         const side = j == 0 ? -1 : 1
-        "bar_{j}" : Rubber { Beam: {a: {side * 0.012, hull_pt(ring_s(0), 0).y - 0.02, hull_z(ring_s(0))}, b: {side * 0.012, hull_pt(ring_s(2), 0).y - 0.02, hull_z(ring_s(2))}, w: 0.006, h: 0.012}; NoShadow; SpatialIgnore }
+        "bar_{j}" : Rubber { Beam: {a: {side * 0.012, hull_pt(ring_s(0), 0).y - 0.02, hull_z(ring_s(0))}, b: {side * 0.012, hull_pt(ring_s(2), 0).y - 0.02, hull_z(ring_s(2))}, w: 0.006, h: 0.012}; NoShadow; Ignore }
       }
     }
   }
@@ -602,7 +602,7 @@ assets {
 
     Position: {at.x, at.y, at.z}
     Rotation: {PI / 2, 0, 0}
-    SpatialIgnore
+    Ignore
     body : HullPlate { Rotation: {0, spin, 0}; Cylinder: {radius: 0.15, length: 0.44, segments: 18, smooth: true}; Rgb: {134, 124, 100}; TextureTransform: {scale_x: 0.4, scale_y: 0.3}; NoShadow }
     band_a : Soot { Position: {0, 0.17, 0}; Cylinder: {radius: 0.158, length: 0.03, segments: 18, smooth: true}; NoShadow }
     band_b : Soot { Position: {0, -0.17, 0}; Cylinder: {radius: 0.158, length: 0.03, segments: 18, smooth: true}; NoShadow }
@@ -627,7 +627,7 @@ assets {
       TextureTransform: {scale_x: 2.4, scale_y: 5.5}
       Rgb: {150, 142, 124}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
 
     chine_top : Oxide {
@@ -644,11 +644,11 @@ assets {
       Sweep: {path: run, profile: FrameProfile, scale: {0.09, 0.03}, rings: 48}
       TextureTransform: {scale_x: 0.5, scale_y: 8}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
 
-    rack_rail_a : Soot { Beam: {a: pod_top(0.5, side, 0.06, 0.03), b: pod_top(0.76, side, 0.06, 0.03), w: 0.05, h: 0.05}; NoShadow; SpatialIgnore }
-    rack_rail_b : Soot { Beam: {a: pod_top(0.5, side, -0.06, 0.03), b: pod_top(0.76, side, -0.06, 0.03), w: 0.05, h: 0.05}; NoShadow; SpatialIgnore }
+    rack_rail_a : Soot { Beam: {a: pod_top(0.5, side, 0.06, 0.03), b: pod_top(0.76, side, 0.06, 0.03), w: 0.05, h: 0.05}; NoShadow; Ignore }
+    rack_rail_b : Soot { Beam: {a: pod_top(0.5, side, -0.06, 0.03), b: pod_top(0.76, side, -0.06, 0.03), w: 0.05, h: 0.05}; NoShadow; Ignore }
     for i in 0..7 {
       const t = 0.52 + i * 0.036
       const hue: Rgb = match i % 4 { 0: {186, 134, 46}; 1: {128, 58, 38}; 2: {66, 96, 92}; _: {176, 168, 148} }
@@ -659,19 +659,19 @@ assets {
         Tube: {radius: 0.166, thickness: 0.012, length: 0.04, segments: 18, smooth: true}
         Rgb: {100, 88, 54}
         NoShadow
-        SpatialIgnore
+        Ignore
       }
     }
 
     for i in 0..6 {
-      "vent_{i}" : Soot { Beam: {a: pod_top(0.8 + i * 0.016, side, 0.2, 0.012), b: pod_top(0.8 + i * 0.016, side, -0.04, 0.012), w: 0.09, h: 0.03}; NoShadow; SpatialIgnore }
+      "vent_{i}" : Soot { Beam: {a: pod_top(0.8 + i * 0.016, side, 0.2, 0.012), b: pod_top(0.8 + i * 0.016, side, -0.04, 0.012), w: 0.09, h: 0.03}; NoShadow; Ignore }
     }
 
     intake {
       const lip = pod_top(1, side, 0, 0)
       Position: {side * pod_x(1), pod_y(1), pod_z(1) - 0.18}
       Rotation: {PI / 2, 0, 0}
-      SpatialIgnore
+      Ignore
       cowl : Soot { Position: {0, 0, 0}; Frustum: {radius_bottom: 0.33, radius_top: 0.46, length: 0.42, segments: 32, smooth: true}; NoShadow }
       lip_ring : BareSteel { Position: {0, -0.22, 0}; Torus: {radius: 0.46, tube: 0.034, segments: 36, rings: 10, smooth: true}; Rgb: {132, 128, 118}; NoShadow }
       band : Oxide { Position: {0, 0.17, 0}; Cylinder: {radius: 0.35, length: 0.06, segments: 32, smooth: true}; NoShadow }
@@ -696,10 +696,10 @@ assets {
           Cylinder: {radius: 0.05, length: 0.05, segments: 12, smooth: true}
           Rgb: {112, 108, 100}
           NoShadow
-          SpatialIgnore
+          Ignore
         }
       }
-      head : Soot { Position: {side * 2.36, 0.74, -10.95}; Rotation: {PI / 2, 0, 0}; Frustum: {radius_bottom: 0.05, radius_top: 0.13, length: 0.3, segments: 18, smooth: true}; NoShadow; SpatialIgnore }
+      head : Soot { Position: {side * 2.36, 0.74, -10.95}; Rotation: {PI / 2, 0, 0}; Frustum: {radius_bottom: 0.05, radius_top: 0.13, length: 0.3, segments: 18, smooth: true}; NoShadow; Ignore }
     }
 
     tip_light {
@@ -708,7 +708,7 @@ assets {
       Rgb: {30, 6, 4}
       Emissive: {strength: slow_blink && bus ? 7 : 0.2, color: match side > 0 { true: {80, 255, 130}; _: {255, 60, 40} }}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
 
     neck : HullPlate {
@@ -725,7 +725,7 @@ assets {
       TextureTransform: {scale_x: 1, scale_y: 1}
       Rgb: {124, 118, 102}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
   }
 
@@ -746,17 +746,17 @@ assets {
       TextureTransform: {scale_x: 0.5, scale_y: 0.5}
       Rgb: {132, 124, 106}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
 
-    strip : Oxide { Beam: {a: {side * 1.1, 0.1, 0.7}, b: {side * 6.8, 0.1, 5.6}, w: 0.26, h: 0.012}; NoShadow; SpatialIgnore }
+    strip : Oxide { Beam: {a: {side * 1.1, 0.1, 0.7}, b: {side * 6.8, 0.1, 5.6}, w: 0.26, h: 0.012}; NoShadow; Ignore }
 
     nacelle {
       Position: {side * 4.0, 0.42, 4.0}
       Rotation: {PI / 2, 0, 0}
-      shell : HullPlate { Position: {0, 0, 0}; Cylinder: {radius: 0.62, length: 3.6, segments: 28, smooth: true}; TextureTransform: {scale_x: 2, scale_y: 2}; Rgb: {126, 118, 100}; NoShadow; SpatialIgnore }
-      inlet : Soot { Position: {0, -1.95, 0}; Frustum: {radius_bottom: 0.46, radius_top: 0.62, length: 0.3, segments: 28, smooth: true}; NoShadow; SpatialIgnore }
-      spinner : BareSteel { Position: {0, -2.1, 0}; Cone: {radius: 0.2, length: 0.4, segments: 18, smooth: true}; Rotation: {PI, 0, 0}; NoShadow; SpatialIgnore }
+      shell : HullPlate { Position: {0, 0, 0}; Cylinder: {radius: 0.62, length: 3.6, segments: 28, smooth: true}; TextureTransform: {scale_x: 2, scale_y: 2}; Rgb: {126, 118, 100}; NoShadow; Ignore }
+      inlet : Soot { Position: {0, -1.95, 0}; Frustum: {radius_bottom: 0.46, radius_top: 0.62, length: 0.3, segments: 28, smooth: true}; NoShadow; Ignore }
+      spinner : BareSteel { Position: {0, -2.1, 0}; Cone: {radius: 0.2, length: 0.4, segments: 18, smooth: true}; Rotation: {PI, 0, 0}; NoShadow; Ignore }
       for i in 0..5 {
         "gill_{i}" {
           Position: {0, -0.4 + i * 0.42, 0}
@@ -765,10 +765,10 @@ assets {
           Emissive: {strength: 0.1 + eng_rpm * 7, color: {120, 190, 255}}
           Transition: [Emissive: {duration: 0.4}]
           NoShadow
-          SpatialIgnore
+          Ignore
         }
       }
-      strut : Soot { Position: {side * 0, 0, 0.62}; Box: {0.14, 1.6, 0.36}; NoShadow; SpatialIgnore }
+      strut : Soot { Position: {side * 0, 0, 0.62}; Box: {0.14, 1.6, 0.36}; NoShadow; Ignore }
     }
   }
 
@@ -779,14 +779,14 @@ assets {
       TextureTransform: {scale_x: 4, scale_y: 4}
       Rgb: {122, 116, 100}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
-    flank_l : Oxide { Position: {-3.8, 1.6, 4.4}; Box: {0.04, 0.4, 4.6}; NoShadow; SpatialIgnore }
-    flank_r : Oxide { Position: {3.8, 1.6, 4.4}; Box: {0.04, 0.4, 4.6}; NoShadow; SpatialIgnore }
-    scoop_l : Soot { Position: {-2.9, 1.9, 2.04}; Box: {1.2, 0.5, 0.1}; NoShadow; SpatialIgnore }
-    scoop_r : Soot { Position: {2.9, 1.9, 2.04}; Box: {1.2, 0.5, 0.1}; NoShadow; SpatialIgnore }
-    antenna { Tube3: {a: {1.24, 0.84, -1.9}, b: {1.5, 1.82, -2.9}, r: 0.009, tone: {120, 118, 112}}; SpatialIgnore }
-    antenna_tip : SignalRed { Position: {1.5, 1.82, -2.9}; Sphere: {radius: 0.02, segments: 10, smooth: true}; NoShadow; SpatialIgnore }
+    flank_l : Oxide { Position: {-3.8, 1.6, 4.4}; Box: {0.04, 0.4, 4.6}; NoShadow; Ignore }
+    flank_r : Oxide { Position: {3.8, 1.6, 4.4}; Box: {0.04, 0.4, 4.6}; NoShadow; Ignore }
+    scoop_l : Soot { Position: {-2.9, 1.9, 2.04}; Box: {1.2, 0.5, 0.1}; NoShadow; Ignore }
+    scoop_r : Soot { Position: {2.9, 1.9, 2.04}; Box: {1.2, 0.5, 0.1}; NoShadow; Ignore }
+    antenna { Tube3: {a: {1.24, 0.84, -1.9}, b: {1.5, 1.82, -2.9}, r: 0.009, tone: {120, 118, 112}}; Ignore }
+    antenna_tip : SignalRed { Position: {1.5, 1.82, -2.9}; Sphere: {radius: 0.02, segments: 10, smooth: true}; NoShadow; Ignore }
   }
 
   template CabinLights {
@@ -824,7 +824,7 @@ assets {
 
     Position: {x, y, z}
     Rotation: {sin(clock * 1.3) * 0.03, 0, swing}
-    SpatialIgnore
+    Ignore
     chain : BareSteel { Position: {0, 0 - drop / 2, 0}; Cylinder: {radius: 0.0016, length: drop, segments: 6} }
     charm : Brass { Position: {0, -0.024 - drop, 0}; Rotation: {PI / 2, 0, 0.5}; Torus: {radius: 0.024, tube: 0.0055, segments: 18, rings: 8, smooth: true} }
     bead : SignalRed { Position: {0, -0.024 - drop, 0}; Sphere: {radius: 0.01, segments: 10, smooth: true} }
@@ -837,7 +837,7 @@ assets {
   template Clutter {
     mug {
       Position: {-0.82, 1.075, -1.12}
-      SpatialIgnore
+      Ignore
       wall : PaintedSteel { Rotation: {0, 0, 0}; Tube: {radius: 0.042, thickness: 0.004, length: 0.095, segments: 24, smooth: true}; Rgb: {120, 56, 40} }
       bottom : PaintedSteel { Position: {0, -0.044, 0}; Cylinder: {radius: 0.04, length: 0.006, segments: 20}; Rgb: {120, 56, 40} }
       brew { Position: {0, 0.028, 0}; Cylinder: {radius: 0.038, length: 0.002, segments: 20, smooth: true}; Rgb: {18, 9, 5}; PbrMaterial: {metallic: 0, roughness: 0.12} }
@@ -846,11 +846,11 @@ assets {
     wrench {
       Position: {0.58, 1.03, -1.12}
       Rotation: {0, 0.5, 0}
-      SpatialIgnore
+      Ignore
       bar : BareSteel { Position: {0, 0, 0}; Box: {0.17, 0.006, 0.018} }
       head : BareSteel { Position: {0.09, 0, 0}; Cylinder: {radius: 0.02, length: 0.008, segments: 6} }
     }
-    rag { Position: {0.94, 1.02, -0.86}; Rotation: {0.02, 0.8, 0.06}; RoundedBox: {0.2, 0.012, 0.13, 0.005, segments: 2}; Rgb: {92, 40, 30}; PbrMaterial: {metallic: 0, roughness: 1}; SpatialIgnore }
+    rag { Position: {0.94, 1.02, -0.86}; Rotation: {0.02, 0.8, 0.06}; RoundedBox: {0.2, 0.012, 0.13, 0.005, segments: 2}; Rgb: {92, 40, 30}; PbrMaterial: {metallic: 0, roughness: 1}; Ignore }
     Trinket lucky(x: -0.74, y: 2.28, z: -0.65, drop: 0.86)
     Cable loop_a(a: {-1.8, 0.74, 0.1}, b: {-1.38, 0.66, -0.42}, sag: 0.1, thick: 0.016) { Position: {0, 0, 0} }
     Cable loop_b(a: {-1.7, 0.74, 0.3}, b: {-1.2, 0.3, -0.5}, sag: 0.14, thick: 0.012, tone: {100, 34, 24}) { Position: {0, 0, 0} }

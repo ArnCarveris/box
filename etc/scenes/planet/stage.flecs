@@ -26,7 +26,7 @@ stage {
     Emissive: {strength: 0.45, color: {235, 240, 255}}
     PbrTextures: {emissive: assets.sky_tex}
     NoShadow
-    SpatialIgnore
+    Ignore
   }
 
   orbit {

@@ -41,7 +41,7 @@ assets {
     flange : IsleSteel { Position: {-side * 0.07, 0, 0}; Rotation: {0, 0, HALF_PI}; Tube: {radius: r + 0.04, thickness: r * 0.2, length: 0.03, segments: 24, smooth: true} }
     hub : IslePaintRed { Position: {side * 0.01, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: r * 0.3, length: 0.14, segments: 12, smooth: true} }
     for i in 0..n {
-      "spoke_{i}" : IslePaintRed { Rotation: {i * RAIL_PI / n, 0, 0}; Box: {0.07, r * 1.75, r * 0.2}; SpatialIgnore }
+      "spoke_{i}" : IslePaintRed { Rotation: {i * RAIL_PI / n, 0, 0}; Box: {0.07, r * 1.75, r * 0.2}; Ignore }
     }
   }
 
@@ -51,7 +51,7 @@ assets {
 
     IsleRailWheel left(r: r, n: n, side: 1) { Position: {0.6, 0, 0} }
     IsleRailWheel right(r: r, n: n, side: -1) { Position: {-0.6, 0, 0} }
-    axle : IsleIron { Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.05, length: 1.2, segments: 8}; SpatialIgnore; NoShadow }
+    axle : IsleIron { Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.05, length: 1.2, segments: 8}; Ignore; NoShadow }
   }
 
   template IsleRailRod {
@@ -81,7 +81,7 @@ assets {
     beam : IslePaintRed { Position: {0, 0.86, 1.99}; Box: {1.64, 0.34, 0.1} }
     catcher : IslePaintRed { Position: {0, 0.6, 2.27}; Rotation: {0, -HALF_PI, 0}; RightTrianglePrism: {0.5, 0.5, 1.5} }
     for i in 0..5 {
-      "slat_{i}" : IsleIron { Position: {-0.56 + i * 0.28, 0.61, 2.285}; Rotation: {-0.785, 0, 0}; Box: {0.06, 0.66, 0.03}; SpatialIgnore; NoShadow }
+      "slat_{i}" : IsleIron { Position: {-0.56 + i * 0.28, 0.61, 2.285}; Rotation: {-0.785, 0, 0}; Box: {0.06, 0.66, 0.03}; Ignore; NoShadow }
     }
     coupler : IsleIron { Position: {0, 0.8, -1.9}; Box: {0.12, 0.1, 0.4} }
 
@@ -93,10 +93,10 @@ assets {
     door_wheel : IsleBrass { Position: {0, 1.6, 2.15}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.1, tube: 0.02, segments: 16, rings: 6, smooth: true} }
     door_hub : IsleBrass { Position: {0, 1.6, 2.13}; Sphere: {radius: 0.04, segments: 10, smooth: true} }
     for i in 0..3 {
-      "band_{i}" : IsleBrass { Position: {0, 1.6, -0.3 + i * 0.75}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.503, tube: 0.022, segments: 32, rings: 6, smooth: true}; SpatialIgnore }
+      "band_{i}" : IsleBrass { Position: {0, 1.6, -0.3 + i * 0.75}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.503, tube: 0.022, segments: 32, rings: 6, smooth: true}; Ignore }
     }
-    rail_l : IsleBrass { Position: {0.53, 1.78, 0.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.018, length: 2.0, segments: 6}; SpatialIgnore }
-    rail_r : IsleBrass { Position: {-0.53, 1.78, 0.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.018, length: 2.0, segments: 6}; SpatialIgnore }
+    rail_l : IsleBrass { Position: {0.53, 1.78, 0.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.018, length: 2.0, segments: 6}; Ignore }
+    rail_r : IsleBrass { Position: {-0.53, 1.78, 0.5}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.018, length: 2.0, segments: 6}; Ignore }
 
     funnel_base : IsleIron { Position: {0, 2.14, 1.72}; Cylinder: {radius: 0.22, length: 0.1, segments: 20, smooth: true} }
     funnel : IsleIron { Position: {0, 2.45, 1.72}; Frustum: {radius_bottom: 0.13, radius_top: 0.2, length: 0.62, segments: 20, smooth: true} }
@@ -237,7 +237,7 @@ assets {
         Position: {-0.4 + rnd(i, 1) * 0.8, 1.86 + rnd(i, 2) * 0.16, -0.5 + rnd(i, 3) * 1.2}
         Rotation: {rnd(i, 4) * 3, rnd(i, 5) * 3, 0}
         IcoSphere: {radius: 0.12 + rnd(i, 6) * 0.08, segments: 0}
-        SpatialIgnore
+        Ignore
       }
     }
     hatch : IsleBrass { Position: {0, 1.84, -0.82}; Cylinder: {radius: 0.16, length: 0.06, segments: 14, smooth: true} }
@@ -264,15 +264,15 @@ assets {
       "win_{i}" : IsleWindow { Position: {0, 1.86, -1.2 + i * 0.6}; Box: {1.48, 0.46, 0.42} }
     }
     for i in 0..3 {
-      "vent_{i}" : IsleBrass { Position: {0, 2.56, -0.9 + i * 0.9}; Cylinder: {radius: 0.07, length: 0.1, segments: 8}; SpatialIgnore }
+      "vent_{i}" : IsleBrass { Position: {0, 2.56, -0.9 + i * 0.9}; Cylinder: {radius: 0.07, length: 0.1, segments: 8}; Ignore }
     }
     doors : IsleWoodDark { Position: {0, 1.55, 0}; Box: {0.52, 1.16, 3.32}; TextureMapping: {mode: MappingObject, size: 1.6} }
     door_win : IsleWindow { Position: {0, 1.86, 0}; Box: {0.3, 0.4, 3.34} }
     for s in 0..2 {
       const z = s * 3.72 - 1.86
-      "rail_{s}" : IsleBrass { Position: {0, 1.5, z}; Box: {1.3, 0.03, 0.03}; SpatialIgnore }
-      "post_l_{s}" : IsleBrass { Position: {0.63, 1.2, z}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
-      "post_r_{s}" : IsleBrass { Position: {-0.63, 1.2, z}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
+      "rail_{s}" : IsleBrass { Position: {0, 1.5, z}; Box: {1.3, 0.03, 0.03}; Ignore }
+      "post_l_{s}" : IsleBrass { Position: {0.63, 1.2, z}; Box: {0.03, 0.6, 0.03}; Ignore }
+      "post_r_{s}" : IsleBrass { Position: {-0.63, 1.2, z}; Box: {0.03, 0.6, 0.03}; Ignore }
       "coupler_{s}" : IsleIron { Position: {0, 0.8, s * 4.0 - 2.0}; Box: {0.12, 0.1, 0.3} }
       "bogie_{s}" : IsleIron { Position: {0, 0.62, s * 2.3 - 1.15}; Box: {1.34, 0.14, 1.0} }
       IsleRailAxle "axle_a_{s}"(r: 0.26) { Position: {0, 0.58, s * 2.3 - 1.15 + 0.32} }
@@ -294,9 +294,9 @@ assets {
     win_b : IsleWindow { Position: {0, 1.8, -0.3}; Box: {1.52, 0.42, 0.42} }
     door : IsleWoodDark { Position: {0, 1.5, 0.2}; Box: {0.52, 1.1, 2.02}; TextureMapping: {mode: MappingObject, size: 1.6} }
     chimney : IsleIron { Position: {0.45, 2.5, -0.5}; Cylinder: {radius: 0.06, length: 0.5, segments: 8} }
-    rail : IsleBrass { Position: {0, 1.5, -1.3}; Box: {1.3, 0.03, 0.03}; SpatialIgnore }
-    post_l : IsleBrass { Position: {0.63, 1.2, -1.3}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
-    post_r : IsleBrass { Position: {-0.63, 1.2, -1.3}; Box: {0.03, 0.6, 0.03}; SpatialIgnore }
+    rail : IsleBrass { Position: {0, 1.5, -1.3}; Box: {1.3, 0.03, 0.03}; Ignore }
+    post_l : IsleBrass { Position: {0.63, 1.2, -1.3}; Box: {0.03, 0.6, 0.03}; Ignore }
+    post_r : IsleBrass { Position: {-0.63, 1.2, -1.3}; Box: {0.03, 0.6, 0.03}; Ignore }
     tail : IsleSignalRed { Position: {0, 1.3, -1.36}; Sphere: {radius: 0.07, segments: 10}; NoShadow }
     coupler : IsleIron { Position: {0, 0.8, 1.4}; Box: {0.12, 0.1, 0.3} }
     IsleRailAxle axle_a(r: 0.28) { Position: {0, 0.6, 0.75} }
@@ -339,7 +339,7 @@ assets {
         "post_{s}_{i}" : IsleRailGirder { Position: {x, 1.08, -1.8 + i * 1.2}; Box: {0.1, 1.2, 0.1} }
       }
       for i in 0..3 {
-        "diag_{s}_{i}" : IsleRailGirder { Position: {x, 1.08, -1.2 + i * 1.2}; Rotation: {i == 1 ? -0.785 : 0.785, 0, 0}; Box: {0.07, 1.66, 0.07}; SpatialIgnore }
+        "diag_{s}_{i}" : IsleRailGirder { Position: {x, 1.08, -1.2 + i * 1.2}; Rotation: {i == 1 ? -0.785 : 0.785, 0, 0}; Box: {0.07, 1.66, 0.07}; Ignore }
       }
       "pier_a_{s}" : IsleStone { Position: {x, 0.5, 2.95}; Box: {0.75, 1.0, 0.85} }
       "pier_b_{s}" : IsleStone { Position: {x, 0.5, -2.95}; Box: {0.75, 1.0, 0.85} }
@@ -414,7 +414,7 @@ assets {
     floor : IsleWoodDark { Position: {0, 2.55, 0}; Box: {1.7, 0.1, 1.7} }
     tank : IsleWood { Position: {0, 3.35, 0}; Cylinder: {radius: 0.9, length: 1.5, segments: 24, smooth: true} }
     for i in 0..3 {
-      "hoop_{i}" : IsleIron { Position: {0, 2.85 + i * 0.5, 0}; Torus: {radius: 0.905, tube: 0.025, segments: 24, rings: 6}; SpatialIgnore }
+      "hoop_{i}" : IsleIron { Position: {0, 2.85 + i * 0.5, 0}; Torus: {radius: 0.905, tube: 0.025, segments: 24, rings: 6}; Ignore }
     }
     roof : IsleRoofSlate { Position: {0, 4.45, 0}; Cone: {radius: 1.08, length: 0.7, segments: 16} }
     knob : IsleBrass { Position: {0, 4.84, 0}; Sphere: {radius: 0.07, segments: 8} }
@@ -475,7 +475,7 @@ assets {
       IsleRailBench "bench_{i}"() { Position: {24.5, top, z} }
       IsleRailLamp "lamp_{i}"(lit: true) { Position: {24.3, top, i * 8.2 - 4.1} }
       "hang_{i}" : IsleLampGlow { Position: {24.1, top + 1.98, i * 3.6 - 1.8}; Sphere: {radius: 0.1, segments: 10}; NoShadow }
-      "hang_rod_{i}" : IsleIron { Position: {24.1, top + 2.14, i * 3.6 - 1.8}; Box: {0.02, 0.2, 0.02}; NoShadow; SpatialIgnore }
+      "hang_rod_{i}" : IsleIron { Position: {24.1, top + 2.14, i * 3.6 - 1.8}; Box: {0.02, 0.2, 0.02}; NoShadow; Ignore }
     }
     back_door : IsleWoodDark { Position: {27.21, top + 0.8, 0}; Box: {0.05, 1.5, 0.8} }
     back_sign : IsleWhite { Position: {27.22, top + 2.0, 0}; Box: {0.05, 0.4, 2.3} }
@@ -502,7 +502,7 @@ assets {
     case_c : IsleClothBlue { Position: {24.92, top + 0.68, 3.62}; Rotation: {0, 0.3, 0}; Box: {0.4, 0.2, 0.3} }
     for i in 0..3 {
       "churn_{i}" : IsleSteel { Position: {25.9 + (i % 2) * 0.34, top + 0.26, 3.2 + i * 0.3}; Cylinder: {radius: 0.15, length: 0.52, segments: 12, smooth: true} }
-      "churn_neck_{i}" : IsleSteel { Position: {25.9 + (i % 2) * 0.34, top + 0.58, 3.2 + i * 0.3}; Frustum: {radius_bottom: 0.15, radius_top: 0.09, length: 0.14, segments: 12, smooth: true}; SpatialIgnore }
+      "churn_neck_{i}" : IsleSteel { Position: {25.9 + (i % 2) * 0.34, top + 0.58, 3.2 + i * 0.3}; Frustum: {radius_bottom: 0.15, radius_top: 0.09, length: 0.14, segments: 12, smooth: true}; Ignore }
     }
 
     for s in 0..2 {
@@ -511,7 +511,7 @@ assets {
       "fence_low_{s}" : IsleWhite { Position: {0, top + 0.36, 0}; Rotation: {0, -a0, 0}; Tube: {radius: 27.22, thickness: 0.05, length: 0.06, arc: arc / 2 - 0.105, segments: 6} }
       for i in 0..7 {
         const a = a0 + i * (arc / 2 - 0.105) / 6
-        "picket_{s}_{i}" : IsleWhite { Position: {px(27.2, a), top + 0.45, pz(27.2, a)}; Rotation: {0, -a, 0}; Box: {0.08, 0.9, 0.08}; SpatialIgnore }
+        "picket_{s}_{i}" : IsleWhite { Position: {px(27.2, a), top + 0.45, pz(27.2, a)}; Rotation: {0, -a, 0}; Box: {0.08, 0.9, 0.08}; Ignore }
       }
     }
 
@@ -546,7 +546,7 @@ assets {
       for i in 0..n {
         const a = i * TAU / n
         if abs(a - 4.712389) > 0.37 {
-          "sleeper_{i}" : IsleRailSleeper { Position: {px(R, a), 0.2, pz(R, a)}; Rotation: {0, -a, 0}; Box: {1.9, 0.08, 0.3}; SpatialIgnore; NoShadow }
+          "sleeper_{i}" : IsleRailSleeper { Position: {px(R, a), 0.2, pz(R, a)}; Rotation: {0, -a, 0}; Box: {1.9, 0.08, 0.3}; Ignore; NoShadow }
         }
       }
     }

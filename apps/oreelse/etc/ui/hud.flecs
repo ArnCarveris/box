@@ -17,17 +17,17 @@ template OreLineTag {
   prop y: f32 = 0
 
   Layout: {direction: Row, spacing: 9, v: Middle, padding: {4, 4, 9, 13}}
-  LayoutItem: {h: Center, v: Bottom, y: y}
+  Item: {h: Center, v: Bottom, y: y}
   Rect: {1, 1}
   Rgb: {13, 14, 17}
   Border: {width: 1, radius: 2, color: {color.r / 2, color.g / 2, color.b / 2, 255}}
 
   tick {
-    LayoutItem: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 15}}
+    Item: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 15}}
     Rect: {1, 1}
     Rgb: color
     Emissive: {strength: 0.4, color: color}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   OreText line(text: text, size: 15, font: ui_fonts.label, color: color, glow: 0.12)
@@ -43,8 +43,8 @@ template OreToastLine {
   }
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-  box.spatial.SpatialIgnore
+  Item: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.Ignore
 
   if toastText != "" {
     OreLineTag toast(text: toastText, color: toastColor, y: 150)
@@ -55,8 +55,8 @@ template OreMineBar {
   const mineProgress: f32 = astronaut[OreMining].progress
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-  box.spatial.SpatialIgnore
+  Item: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.Ignore
 
   if mineProgress > 0 {
     OreBar mine_bar(
@@ -71,8 +71,8 @@ template OreBreachAlert {
   const hpFrac: f32 = health.value / health.max
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-  box.spatial.SpatialIgnore
+  Item: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.Ignore
 
   if hpFrac < 0.3 {
     OreVeil danger(dim: 0, edge: match fast { true: 0.55; _: 0.2 }, color: {210, 24, 16})
@@ -80,7 +80,7 @@ template OreBreachAlert {
     alert {
       Position: {0, 0, 1}
       Layout: {direction: Row, spacing: 8, v: Middle, padding: {4, 4, 9, 11}}
-      LayoutItem: {h: Center, v: Top, y: -18}
+      Item: {h: Center, v: Top, y: -18}
       Rect: {1, 1}
       if fast {
         Rgb: {78, 16, 12}
@@ -135,8 +135,8 @@ template OreRocketLine {
   }
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-  box.spatial.SpatialIgnore
+  Item: {width: {mode: Grow}, height: {mode: Grow}}
+  box.spatial.Ignore
 
   if hasPad {
     OreLineTag rocket_line(text: rocketText, color: rocketColor, y: 66)
@@ -149,13 +149,13 @@ template OreLuminiteGauge {
   const shipped = rocketState.shipped
 
   Layout: {}
-  LayoutItem: {h: Left, v: Top, x: 12, y: -11, width: {mode: Fixed, value: 130}, height: {mode: Fixed, value: 38}}
+  Item: {h: Left, v: Top, x: 12, y: -11, width: {mode: Fixed, value: 130}, height: {mode: Fixed, value: 38}}
 
   OreGlyph symbol(tex: icons.luminite, size: 30, y: 4)
 
   numbers {
     Layout: {direction: Row, spacing: 5, v: Bottom}
-    LayoutItem: {h: Left, v: Top, x: 37}
+    Item: {h: Left, v: Top, x: 37}
     OreText held_label(text: "{held}", size: 22, font: ui_fonts.mono, color: palette.luminite, glow: 0.15)
     OreText shipped_label(text: "/ {shipped}", size: 14, font: ui_fonts.mono, color: palette.soft)
   }
@@ -191,7 +191,7 @@ template OreWaveGauge {
   }
 
   Layout: {}
-  LayoutItem: {h: Left, v: Top, x: 158, y: -11, width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 38}}
+  Item: {h: Left, v: Top, x: 158, y: -11, width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 38}}
 
   OreGlyph symbol(tex: icons.critter, size: 28, y: 4)
   OreText caption(text: waveText, size: 11, font: ui_fonts.label, color: waveColor, x: 36, y: 3)
@@ -210,7 +210,7 @@ template OrePowerGauge {
   }
 
   Layout: {}
-  LayoutItem: {h: Left, v: Top, x: 344, y: -11, width: {mode: Fixed, value: 176}, height: {mode: Fixed, value: 38}}
+  Item: {h: Left, v: Top, x: 344, y: -11, width: {mode: Fixed, value: 176}, height: {mode: Fixed, value: 38}}
 
   OreGlyph symbol(tex: icons.power, size: 26, y: 5)
   OreText readout(text: "{production:.0} / {demand:.0} W", size: 14, font: ui_fonts.mono, color: powerColor, glow: 0.3, x: 34, y: 1)
@@ -220,13 +220,13 @@ template OrePowerGauge {
 template OreStatusDivider {
   prop x: f32 = 0
 
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: x, y: -14,
     width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 32}
   }
   Rect: {1, 1}
   Rgb: palette.divider
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreHudBloom {

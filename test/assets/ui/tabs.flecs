@@ -99,7 +99,7 @@ template TabHeader : HeadlessTabHeader {
   const pad = t.padding * 1.5
 
   Layout: {direction: Column, padding: {0, 0, pad, pad}, h: Center}
-  LayoutItem: {height: {mode: Fixed, value: t.control_height + 4}}
+  Item: {height: {mode: Fixed, value: t.control_height + 4}}
   Rect: {1, 1}
 
   if selected {
@@ -122,7 +122,7 @@ template TabHeader : HeadlessTabHeader {
   }
 
   above {
-    LayoutItem: {height: {mode: Grow}}
+    Item: {height: {mode: Grow}}
   }
 
   caption {
@@ -135,11 +135,11 @@ template TabHeader : HeadlessTabHeader {
   }
 
   below {
-    LayoutItem: {height: {mode: Grow}}
+    Item: {height: {mode: Grow}}
   }
 
   mark {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}
     if selected {
       Rect: {1, 1}
       Rgb: t.accent
@@ -177,12 +177,12 @@ template TabView {
 
   // The bar and the page sit inside the border, edge points wide
   Layout: {direction: Column, padding: {edge, edge, edge, edge}}
-  LayoutItem: {}
+  Item: {}
   if width > 0 {
-    LayoutItem = {width: {mode: Fixed, value: width}}
+    Item = {width: {mode: Fixed, value: width}}
   }
   if height > 0 {
-    LayoutItem = {height: {mode: Fixed, value: bar_h + height + edge * 2}}
+    Item = {height: {mode: Fixed, value: bar_h + height + edge * 2}}
   }
   Rect: {1, 1}
   Rgb: t.surface_alt
@@ -190,7 +190,7 @@ template TabView {
 
   bar {
     Layout: {direction: Row, spacing: 2}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     if first != 0 {
       for i in 0..count {
@@ -283,9 +283,9 @@ template HeadlessTab : parent TabView {
   TabLabel: {label}
   ClipChildren
   if index >= 0 && index == current {
-    LayoutItem: {width: {mode: Grow, value: 1}, height: {mode: Grow, value: 1}}
+    Item: {width: {mode: Grow, value: 1}, height: {mode: Grow, value: 1}}
   } else {
-    LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+    Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
   }
 
   async {

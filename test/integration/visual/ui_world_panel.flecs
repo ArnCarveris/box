@@ -54,7 +54,7 @@ template Row {
   prop b: u8 = 250
 
   Layout: {direction: Row, spacing: 8, padding: {6, 6, 8, 8}, v: Middle}
-  LayoutItem: {width: {mode: Grow}}
+  Item: {width: {mode: Grow}}
   Rect: {1, 1}
   Rgb: {52, 58, 76}
   Border: {radius: 6}
@@ -70,7 +70,7 @@ template Row {
   }
 
   gap {
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
   }
 
   amount {
@@ -84,7 +84,7 @@ board {
   Rotation: {0, 0.45, 0}
   Scale: {0.0065, 0.0065, 0.0065}
   Layout: {direction: Column, spacing: 8, padding: {14, 14, 16, 16}}
-  LayoutItem: {width: {mode: Fixed, value: 300}}
+  Item: {width: {mode: Fixed, value: 300}}
   Rect: {1, 1}
   Rgb: {30, 34, 46}
   Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
@@ -108,13 +108,13 @@ board {
 
   progress {
     Layout: {padding: {3, 3, 3, 3}}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 16}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 16}}
     Rect: {1, 1}
     Rgb: {52, 58, 76}
     Border: {radius: 8}
 
     fill {
-      LayoutItem: {h: Left, width: {mode: Fixed, value: 150}, height: {mode: Grow}}
+      Item: {h: Left, width: {mode: Fixed, value: 150}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {250, 190, 60}
       Border: {radius: 5}

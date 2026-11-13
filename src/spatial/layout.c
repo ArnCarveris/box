@@ -1822,7 +1822,7 @@ void box_spatial_layout_init(
                          .ctx = ctx,
                          .ctx_free = layout_free});
     ctx->refs++;
-    ecs_system(world, {.entity = ecs_entity(world, {.name = "SpatialLayout"}),
+    ecs_system(world, {.entity = ecs_entity(world, {.name = "Resolve"}),
                        .phase = EcsPostUpdate,
                        .run = layout_run,
                        .immediate = true,

@@ -7,7 +7,7 @@ using assets
 async {
   while true {
     const e = await Equip
-    eq[e.item[Item].slot] = e.item
+    eq[e.item[ArmoryItem].slot] = e.item
     emit StatsChanged()
     emit HoverChanged()
   }

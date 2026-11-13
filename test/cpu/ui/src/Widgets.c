@@ -166,12 +166,12 @@ static void widgets_offset(
     "using box.transform\n" \
     "ScrollView view(width: 200, height: 100) {\n" \
     "  Position: {0, 0, 0}\n" \
-    "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
-    "  b1 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
-    "  b2 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
-    "  b3 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
-    "  b4 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
-    "  b5 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b0 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b1 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b2 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b3 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b4 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
+    "  b5 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n" \
     "}\n"
 
 void Widgets_library_loads(void) {
@@ -541,7 +541,7 @@ void Widgets_scroll_gutter(void) {
         "using box.widgets\n"
         "using box.layout\n"
         "ScrollView view(width: 200, height: 100, horizontal: true) {\n"
-        "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
+        "  b0 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
         "}\n");
     widgets_frames(world);
 
@@ -616,7 +616,7 @@ void Widgets_panel_title_in_column(void) {
         "using box.transform\n"
         "Panel panel(title: \"Title\", width: 300) {\n"
         "  Position: {0, 0, 0}\n"
-        "  b0 { LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
+        "  b0 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
         "}\n");
     widgets_frames(world);
 
@@ -653,7 +653,7 @@ void Widgets_list_keeps_width(void) {
         "column {\n"
         "  Position: {0, 0, 0}\n"
         "  Layout: {direction: Column}\n"
-        "  LayoutItem: {width: {mode: Fixed, value: 300}}\n"
+        "  Item: {width: {mode: Fixed, value: 300}}\n"
         "  ListView list(items: [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\", \"h\"], height: 100)\n"
         "}\n");
     widgets_frames(world);
@@ -700,7 +700,7 @@ void Widgets_scroll_content_added_after_bars(void) {
         "view {\n"
         "  for i in 6..10 {\n"
         "    \"b{i}\" {\n"
-        "      LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}}\n"
+        "      Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}}\n"
         "    }\n"
         "  }\n"
         "}\n", NULL) == 0);

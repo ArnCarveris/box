@@ -55,7 +55,7 @@ assets {
     prop value: string = "0"
 
     Layout: {direction: Row, spacing: 8, padding: {6, 6, 8, 8}, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {52, 58, 76}
     Border: {radius: 6}
@@ -66,7 +66,7 @@ assets {
     }
 
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     amount {
@@ -93,7 +93,7 @@ assets {
 ui {
   ground {
     Position: {0, -0.05, 0}
-    Box: {30, 0.1, 30}
+    box.geometry.Box: {30, 0.1, 30}
     Rgb: {140, 150, 125}
     PbrMaterial: {roughness: 0.9}
   }
@@ -107,7 +107,7 @@ ui {
   crate {
     Position: {1.6, 0.5, 1.4}
     Rotation: {0, 0.4, 0}
-    Box: {1, 1, 1}
+    box.geometry.Box: {1, 1, 1}
     Rgb: {200, 150, 80}
   }
 
@@ -118,7 +118,7 @@ ui {
     Rotation: {0, 0.5, 0}
     Scale: {0.008, 0.008, 0.008}
     Layout: {direction: Column, spacing: 8, padding: {14, 14, 16, 16}}
-    LayoutItem: {width: {mode: Fixed, value: 300}}
+    Item: {width: {mode: Fixed, value: 300}}
     Rect: {1, 1}
     Rgb: {30, 34, 46}
     Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
@@ -152,7 +152,7 @@ ui {
     dashboard {
       Position: {0, 0, 0}
       Layout: {direction: Column, spacing: 10, padding: {16, 16, 20, 20}}
-      LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
+      Item: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
       Rect: {1, 1}
       Rgb: {14, 22, 40}
       Border: {width: 3, color: {60, 200, 230, 255}}
@@ -226,13 +226,13 @@ hud {
 
     track {
       Layout: {padding: {2, 2, 2, 2}}
-      LayoutItem: {width: {mode: Fixed, value: 180}, height: {mode: Fixed, value: 14}}
+      Item: {width: {mode: Fixed, value: 180}, height: {mode: Fixed, value: 14}}
       Rect: {1, 1}
       Rgb: {40, 44, 56}
       Border: {radius: 4}
 
       fill {
-        LayoutItem: {h: Left, width: {mode: Fixed, value: 130}, height: {mode: Grow}}
+        Item: {h: Left, width: {mode: Fixed, value: 130}, height: {mode: Grow}}
         Rect: {1, 1}
         Rgb: {90, 210, 110}
         Border: {radius: 3}
@@ -242,7 +242,7 @@ hud {
 
   // A nameplate that follows the hero: its position is projected through the 3D view
   hero_plate {
-    ProjectedAnchor: {target: ui.hero, view: view, offset: {0, 1.2, 0}}
+    Anchor: {target: ui.hero, view: view, offset: {0, 1.2, 0}}
     Layout: {direction: Column, spacing: 3, padding: {4, 4, 6, 6}, h: Center}
     Rect: {1, 1}
     Rgb: {16, 20, 28}
@@ -277,7 +277,7 @@ hud {
     panel {
       Position: {470, 280, 0}
       Layout: {direction: Column, spacing: 8, padding: {12, 12, 14, 14}, h: Center}
-      LayoutItem: {width: {mode: Fixed, value: 200}}
+      Item: {width: {mode: Fixed, value: 200}}
       Rect: {1, 1}
       Rgb: {34, 38, 50}
       Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
@@ -290,7 +290,7 @@ hud {
 
       resume {
         Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 1}
         Rgb: {70, 150, 90}
         Border: {radius: 6}
@@ -303,7 +303,7 @@ hud {
 
       quit {
         Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 1}
         Rgb: {170, 70, 60}
         Border: {radius: 6}

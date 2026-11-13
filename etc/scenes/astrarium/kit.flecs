@@ -72,7 +72,7 @@ assets {
     const s = window[SurfaceStatus]
     const k = fit_scale(s.point_width, s.point_height)
 
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: s.point_width / k},
       height: {mode: Fixed, value: s.point_height / k}
     }
@@ -98,7 +98,7 @@ assets {
 
     Text: {value: text, size: size, font: font, width: width, align: align}
     Rgb: color
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template Icon {
@@ -106,11 +106,11 @@ assets {
     prop size: f32 = 24
     prop color: Rgb = {255, 255, 255}
 
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Rect: {1, 1}
     Image: {texture: tex}
     Rgb: color
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template Halo {
@@ -125,28 +125,28 @@ assets {
     Image: {texture: tex_halo}
     Rgb: color
     BlendMode: Additive
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template FrameArt {
-    LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Top, clip: true}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Float: {h: Left, v: Top, anchor_h: Left, anchor_v: Top, clip: true}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     Image: {texture: tex_frame}
     ImageSlice: {left: 72, top: 72, right: 72, bottom: 72, scale: 0.5}
     Rgb: ui_gold
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template Divider {
     prop opacity: f32 = 0.8
 
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 16}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 16}}
     Rect: {1, 1}
     Image: {texture: tex_divider}
     Rgb: ui_gold
     Opacity: {opacity}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template Heading {
@@ -154,24 +154,24 @@ assets {
     prop size: f32 = 16
 
     Layout: {direction: Row, spacing: 9, v: Middle, h: Center}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     lead {
       Rotation: {0, 0, PI / 4}
-      LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 6}}
+      Item: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 6}}
       Rect: {1, 1}
       Rgb: ui_gold
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     Caption words(text: text, size: size, font: font_display, color: ui_pale)
 
     tail {
       Rotation: {0, 0, PI / 4}
-      LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 6}}
+      Item: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 6}}
       Rect: {1, 1}
       Rgb: ui_gold
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -184,7 +184,7 @@ assets {
 
     InputBlocker
     Layout: {direction: Column, padding: {pad, pad, pad, pad}, spacing: gap}
-    LayoutItem: {
+    Item: {
       width: {mode: width > 0 ? Fixed : Grow, value: width > 0 ? width : 1},
       height: {mode: height > 0 ? Fixed : Grow, value: height > 0 ? height : 1}
     }
@@ -220,7 +220,7 @@ assets {
       Scale: {duration: 0.75, delay: delay, timing_function: EaseOut},
       Opacity: {duration: 0.75, delay: delay, timing_function: EaseIn}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template Pop : OneShot {
@@ -242,7 +242,7 @@ assets {
       Scale: {duration: 0.65, delay: delay, timing_function: EaseOut},
       Opacity: {duration: 0.65, delay: delay, timing_function: EaseIn}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template HoldBar {
@@ -264,6 +264,6 @@ assets {
       Scale: {duration: dur, timing_function: Linear},
       Position: {duration: dur, timing_function: Linear}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 }

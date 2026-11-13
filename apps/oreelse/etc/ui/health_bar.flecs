@@ -42,17 +42,17 @@ template HealthBar {
   const b: f32 = fb + (tb - fb) * t
   const color: Rgb = {floor(r), floor(g), floor(b)}
 
-  ProjectedAnchor: {target: building, view: view}
-  ProjectedBox: {
+  Anchor: {target: building, view: view}
+  box.projection.Box: {
     min: {-w / 2, 0, -d / 2}, max: {w / 2, h, d / 2},
     offset: {0, cfg.hpBarMargin + cfg.hpBarHeight / 2},
     fit_width: true, min_width: cfg.hpBarMinWidth
   }
   Layout: {}
-  LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: cfg.hpBarHeight}}
+  Item: {width: {mode: Fixed}, height: {mode: Fixed, value: cfg.hpBarHeight}}
 
   plate {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {back.r, back.g, back.b}
     Opacity: {back.a / 255.0}
@@ -62,16 +62,16 @@ template HealthBar {
   track {
     Position: {0, 0, 1}
     Layout: {direction: Row, padding: {1, 1, 1, 1}}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     fill {
-      LayoutItem: {width: {mode: Grow, value: frac}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: frac}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: color
     }
 
     rest {
-      LayoutItem: {width: {mode: Grow, value: 1 - frac}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 1 - frac}, height: {mode: Grow}}
     }
   }
 }

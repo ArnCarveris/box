@@ -53,7 +53,7 @@ void box_layout_observe_children(
     if (!state->moved) {
         state->moved = ecs_query(world, {
             .entity = ecs_entity(world, {
-                .name = "LayoutMoved",
+                .name = "Moved",
                 .parent = ecs_get_parent(world, state->child_tag)
             }),
             .terms = {
@@ -869,6 +869,8 @@ void BoxLayoutImport(
 {
     ECS_MODULE(world, BoxLayout);
 
+    ecs_set_name_prefix(world, "Layout");
+
     ECS_META_COMPONENT(world, Align);
     ECS_META_COMPONENT(world, VAlign);
     ECS_META_COMPONENT(world, Direction);
@@ -995,4 +997,6 @@ void BoxLayoutImport(
         .ctx = state,
         .immediate = true
     });
+
+    ecs_set_name_prefix(world, NULL);
 }

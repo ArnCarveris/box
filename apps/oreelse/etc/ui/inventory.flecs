@@ -63,16 +63,16 @@ template OreSlotFace {
   }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top,
     width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
   }
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   plate {
     Position: {0, 0, 0}
     Layout: {}
-    LayoutItem: {
+    Item: {
       h: Left, v: Top,
       width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
     }
@@ -91,21 +91,21 @@ template OreSlotFace {
       Image: {texture: tex}
       Opacity: {iconAlpha}
       Transition: [Scale: {duration: 0.12 * motion, timing_function: EaseOut}]
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   } else {
     socket_a {
       Position: {0, 0, 1}
       Line: {-7, 0, 7, 0, width: 1}
       Rgb: {44, 47, 52}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     socket_b {
       Position: {0, 0, 1}
       Line: {0, -7, 0, 7, width: 1}
       Rgb: {44, 47, 52}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 }
@@ -121,7 +121,7 @@ template StockSlot : box.widgets.HeadlessButton {
   const filled = item != none
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: (index % 5) * pitch, y: -floor(index / 5) * pitch,
     width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}
   }
@@ -174,7 +174,7 @@ template SlotButton : box.widgets.HeadlessButton {
   const none: entity = 0
 
   Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}}
+  Item: {width: {mode: Fixed, value: slotSize}, height: {mode: Fixed, value: slotSize}}
   Rect: {1, 1}
   Rgb: {0, 0, 0}
   BlendMode: Additive
@@ -232,7 +232,7 @@ template TabButton : box.widgets.HeadlessButton {
   }
 
   Layout: {direction: Row, h: Center, v: Middle}
-  LayoutItem: {width: {mode: Fixed, value: tabWidth}, height: {mode: Fixed, value: tabHeight}}
+  Item: {width: {mode: Fixed, value: tabWidth}, height: {mode: Fixed, value: tabHeight}}
   Rect: {1, 1}
   Rgb: face
   Border: {width: 1, radius: slotRadius, color: {62, 66, 72, 255}}
@@ -262,10 +262,10 @@ template TabMarker {
 
   const motion = OreUiMotion[OreUiMotion].scale
 
-  LayoutFloat: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom, x: tab * (tabWidth + 8)}
-  LayoutItem: {width: {mode: Fixed, value: tabWidth}, height: {mode: Fixed, value: 3}}
+  Float: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom, x: tab * (tabWidth + 8)}
+  Item: {width: {mode: Fixed, value: tabWidth}, height: {mode: Fixed, value: 3}}
   Transition: [Position: {duration: 0.26 * motion, timing_function: EaseInOut}]
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   OreHalo beam(size: tabWidth, height: 18, color: palette.amber, alpha: 0.45, z: 0)
 
@@ -299,13 +299,13 @@ template InventoryButtonFace {
   }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top,
     width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}
   }
   Scale: {lift, lift, 1}
   Transition: [Scale: {duration: 0.08 * motion}]
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   OreHalo aura(size: buttonWidth + 60, height: buttonHeight + 50, color: palette.amber, alpha: halo, z: -1) {
     Transition: [Opacity: {duration: 0.16 * motion}]
@@ -313,7 +313,7 @@ template InventoryButtonFace {
 
   plate {
     Position: {0, 0, 0}
-    LayoutItem: {
+    Item: {
       h: Left, v: Top,
       width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}
     }
@@ -327,7 +327,7 @@ template InventoryButtonFace {
   row {
     Position: {0, 0, 1}
     Layout: {direction: Row, spacing: 10, h: Center, v: Middle}
-    LayoutItem: {
+    Item: {
       h: Left, v: Top,
       width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}
     }
@@ -340,7 +340,7 @@ template InventoryButtonFace {
 template InventoryButton : box.widgets.HeadlessButton {
   InputBlocker
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Center, v: Bottom, y: 22,
     width: {mode: Fixed, value: 196}, height: {mode: Fixed, value: 38}
   }
@@ -369,14 +369,14 @@ template StockBody {
   Layout: {
     direction: Column, spacing: 8, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
   }
-  LayoutItem: {h: Left, v: Top}
+  Item: {h: Left, v: Top}
 
   OreText title(text: "INVENTORY", size: titleSize, font: ui_fonts.stencil, color: palette.amber, glow: 0.35, glowColor: palette.amberGlow)
   OreText hint(text: "Click a building to place it - 15 slots", size: 13, color: palette.soft)
 
   grid {
     Layout: {}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: gridWidth}, height: {mode: Fixed, value: gridHeight}
     }
 
@@ -438,7 +438,7 @@ template ConstructBody {
   Layout: {
     direction: Column, spacing: 8, padding: {sectionPad, sectionPad, sectionPad, sectionPad}
   }
-  LayoutItem: {h: Left, v: Top}
+  Item: {h: Left, v: Top}
 
   OreText title(text: "CONSTRUCT", size: titleSize, font: ui_fonts.stencil, color: palette.amber, glow: 0.35, glowColor: palette.amberGlow)
 
@@ -452,7 +452,7 @@ template ConstructBody {
 
   pages {
     Layout: {direction: Column}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: pageWidth}, height: {mode: Fixed, value: pageHeight}
     }
 
@@ -514,7 +514,7 @@ template ItemInfoPanel {
   }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Center, v: Middle, y: -224,
     width: {mode: Fixed, value: infoWidth}, height: {mode: Fixed, value: infoHeight}
   }
@@ -530,7 +530,7 @@ template ItemInfoPanel {
 
       needs_list {
         Layout: {direction: Row, spacing: 18}
-        LayoutItem: {h: Left, v: Top, x: 82, y: -106}
+        Item: {h: Left, v: Top, x: 82, y: -106}
 
         for i in 0..needs.count {
           "need_{i}" {
@@ -565,7 +565,7 @@ template InventoryScreen {
   const tab = OreInventoryScreen[OreInventoryScreen].tab
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Center, v: Middle, y: 60,
     width: {mode: Fixed, value: screenWidth}, height: {mode: Fixed, value: screenHeight}
   }

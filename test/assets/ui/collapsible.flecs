@@ -38,9 +38,9 @@ template HeadlessCollapsible {
     Cursor: {CursorNotAllowed}
   }
   if current {
-    LayoutItem: {width: {min: width, max: width}, height: {mode: Fit, value: 1}}
+    Item: {width: {min: width, max: width}, height: {mode: Fit, value: 1}}
   } else {
-    LayoutItem: {width: {min: width, max: width}, height: {mode: Fixed, value: header}}
+    Item: {width: {min: width, max: width}, height: {mode: Fixed, value: header}}
   }
 
   head {
@@ -149,7 +149,7 @@ template Collapsible : HeadlessCollapsible {
 
   head {
     Layout: {direction: Row, spacing: t.spacing, padding: {0, 0, t.padding, t.padding}, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: header}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: header}}
     Rect: {1, 1}
 
     if down {

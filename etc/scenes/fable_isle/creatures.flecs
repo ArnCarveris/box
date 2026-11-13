@@ -180,7 +180,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 22
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove0, offset: {0, -0.193, -8.2}, rotation: {1.5708, 0, 0}, scale: {2.816, 2.512}},
@@ -196,7 +196,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove1, offset: {0, -0.21, -8.425}, rotation: {1.5708, 0, 0}, scale: {2.683, 2.393}},
@@ -212,7 +212,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove2, offset: {0, -0.228, -8.65}, rotation: {1.5708, 0, 0}, scale: {2.532, 2.258}},
@@ -228,7 +228,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove3, offset: {0, -0.247, -8.875}, rotation: {1.5708, 0, 0}, scale: {2.358, 2.103}},
@@ -244,7 +244,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove4, offset: {0, -0.266, -9.1}, rotation: {1.5708, 0, 0}, scale: {2.155, 1.922}},
@@ -260,7 +260,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove5, offset: {0, -0.286, -9.325}, rotation: {1.5708, 0, 0}, scale: {1.911, 1.705}},
@@ -276,7 +276,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove6, offset: {0, -0.286, -9.325}, rotation: {1.5708, 0, 0}, scale: {1.911, 1.705}},
@@ -292,7 +292,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove7, offset: {0, -0.266, -9.1}, rotation: {1.5708, 0, 0}, scale: {2.155, 1.922}},
@@ -308,7 +308,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove8, offset: {0, -0.247, -8.875}, rotation: {1.5708, 0, 0}, scale: {2.358, 2.103}},
@@ -324,7 +324,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove9, offset: {0, -0.228, -8.65}, rotation: {1.5708, 0, 0}, scale: {2.532, 2.258}},
@@ -340,7 +340,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove10, offset: {0, -0.21, -8.425}, rotation: {1.5708, 0, 0}, scale: {2.683, 2.393}},
@@ -356,7 +356,7 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; SpatialIgnore; Position: {0, 0, 0}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
       Loft: {
         sections: [
           {profile: IsleWhaleGroove11, offset: {0, -0.193, -8.2}, rotation: {1.5708, 0, 0}, scale: {2.816, 2.512}},
@@ -375,32 +375,32 @@ assets {
     smile : IsleCreatureDark { NoShadow; Position: {0, 0, 0}; Sweep: {path: IsleWhaleSmile, profile: IsleWhaleLine, rings: 48, segments: 2} }
     eye_r : IsleCreatureEye { Position: {3.4, 1.064, -3.781}; Sphere: {radius: 0.5, segments: 20, smooth: true} }
     pupil_r : IsleCreatureDark { NoShadow; Position: {3.589, 1.124, -3.845}; Sphere: {radius: 0.38, segments: 16, smooth: true} }
-    glint_r : IsleCreatureGlint { NoShadow; SpatialIgnore; Position: {3.892, 1.36, -3.963}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    blush_r : IsleCreatureBlush { NoShadow; SpatialIgnore; Position: {3.69, -0.318, -3.5}; Rotation: {0, 0, 0.12}; Scale: {0.25, 1, 1.5}; Sphere: {radius: 0.42, segments: 14, smooth: true} }
+    glint_r : IsleCreatureGlint { NoShadow; Ignore; Position: {3.892, 1.36, -3.963}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+    blush_r : IsleCreatureBlush { NoShadow; Ignore; Position: {3.69, -0.318, -3.5}; Rotation: {0, 0, 0.12}; Scale: {0.25, 1, 1.5}; Sphere: {radius: 0.42, segments: 14, smooth: true} }
     eye_l : IsleCreatureEye { Position: {-3.4, 1.064, -3.781}; Sphere: {radius: 0.5, segments: 20, smooth: true} }
     pupil_l : IsleCreatureDark { NoShadow; Position: {-3.589, 1.124, -3.845}; Sphere: {radius: 0.38, segments: 16, smooth: true} }
-    glint_l : IsleCreatureGlint { NoShadow; SpatialIgnore; Position: {-3.892, 1.36, -3.963}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    blush_l : IsleCreatureBlush { NoShadow; SpatialIgnore; Position: {-3.69, -0.318, -3.5}; Rotation: {0, 0, -0.12}; Scale: {0.25, 1, 1.5}; Sphere: {radius: 0.42, segments: 14, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {3.424, 1.379, -2.4}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-3.424, 1.379, -2.4}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {3.543, 0.816, -2}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-3.543, 0.816, -2}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {3.226, 1.603, -1.7}; Sphere: {radius: 0.25, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-3.226, 1.603, -1.7}; Sphere: {radius: 0.25, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {3.254, 1.169, -0.8}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-3.254, 1.169, -0.8}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {2.892, 1.6, 0}; Sphere: {radius: 0.21, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-2.892, 1.6, 0}; Sphere: {radius: 0.21, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {2.905, 1.161, 0.8}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-2.905, 1.161, 0.8}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {2.589, 1.421, 1.6}; Sphere: {radius: 0.18, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-2.589, 1.421, 1.6}; Sphere: {radius: 0.18, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {2.467, 1.144, 2.5}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-2.467, 1.144, 2.5}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {3.131, 1.975, -2.8}; Sphere: {radius: 0.11, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-3.131, 1.975, -2.8}; Sphere: {radius: 0.11, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {2.867, 1.963, -1}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-2.867, 1.963, -1}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    glint_l : IsleCreatureGlint { NoShadow; Ignore; Position: {-3.892, 1.36, -3.963}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+    blush_l : IsleCreatureBlush { NoShadow; Ignore; Position: {-3.69, -0.318, -3.5}; Rotation: {0, 0, -0.12}; Scale: {0.25, 1, 1.5}; Sphere: {radius: 0.42, segments: 14, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.424, 1.379, -2.4}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.424, 1.379, -2.4}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.543, 0.816, -2}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.543, 0.816, -2}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.226, 1.603, -1.7}; Sphere: {radius: 0.25, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.226, 1.603, -1.7}; Sphere: {radius: 0.25, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.254, 1.169, -0.8}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.254, 1.169, -0.8}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.892, 1.6, 0}; Sphere: {radius: 0.21, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.892, 1.6, 0}; Sphere: {radius: 0.21, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.905, 1.161, 0.8}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.905, 1.161, 0.8}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.589, 1.421, 1.6}; Sphere: {radius: 0.18, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.589, 1.421, 1.6}; Sphere: {radius: 0.18, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.467, 1.144, 2.5}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.467, 1.144, 2.5}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.131, 1.975, -2.8}; Sphere: {radius: 0.11, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.131, 1.975, -2.8}; Sphere: {radius: 0.11, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.867, 1.963, -1}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
+    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.867, 1.963, -1}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
     fin_r {
       Position: {2.721, -2.081, -3.4}
       Rotation: {0, 0, -0.3}
@@ -415,7 +415,7 @@ assets {
       blade : IsleCreatureFin { Position: {0, 0, 0}; ProfileExtrusion: {profile: IsleWhaleFinL, depth: 0.3, cap_start: true, cap_end: true, smooth: true}; Bevel: {radius: 0.12} }
       under : IsleCreatureBelly { NoShadow; Position: {0, -0.13, 0}; Scale: {0.94, 1, 0.9}; ProfileExtrusion: {profile: IsleWhaleFinL, depth: 0.1, cap_start: true, cap_end: true, smooth: true} }
     }
-    blowhole : IsleCreatureDark { NoShadow; SpatialIgnore; Position: {0, 2.894, -6.6}; Scale: {1, 0.3, 1.4}; Sphere: {radius: 0.3, segments: 12, smooth: true} }
+    blowhole : IsleCreatureDark { NoShadow; Ignore; Position: {0, 2.894, -6.6}; Scale: {1, 0.3, 1.4}; Sphere: {radius: 0.3, segments: 12, smooth: true} }
     spout {
       Position: {0, 3.024, -6.6}
       NoShadow
@@ -471,14 +471,14 @@ assets {
         cap_start: true, cap_end: true, segments: 6, rings: 11
       }
     }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {1.873, 0.894, 1.2}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-1.873, 0.894, 1.2}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {1.485, 0.974, 2.4}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-1.485, 0.974, 2.4}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {1.179, 0.869, 3.6}; Sphere: {radius: 0.14, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-1.179, 0.869, 3.6}; Sphere: {radius: 0.14, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {0.822, 0.947, 4.8}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; SpatialIgnore; Position: {-0.822, 0.947, 4.8}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {1.873, 0.894, 1.2}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-1.873, 0.894, 1.2}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {1.485, 0.974, 2.4}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-1.485, 0.974, 2.4}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {1.179, 0.869, 3.6}; Sphere: {radius: 0.14, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-1.179, 0.869, 3.6}; Sphere: {radius: 0.14, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {0.822, 0.947, 4.8}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
+      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-0.822, 0.947, 4.8}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
       flukes {
         Position: {0, 0.717, 6.7}
         Animator: {clip: isle_whale_fluke, time: seed * 0.9}
@@ -570,36 +570,36 @@ assets {
         Scale: {1, 1, 1}
         stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
         cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
+        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
+        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
+        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
       }
       shroom_1 {
         Position: {-1.5, 2.967, -1.3}
         Scale: {0.75, 0.75, 0.75}
         stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
         cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
+        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
+        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
+        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
       }
       shroom_2 {
         Position: {2, 2.73, -1.1}
         Scale: {0.6, 0.6, 0.6}
         stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
         cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
+        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
+        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
+        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
       }
       shroom_3 {
         Position: {0.6, 3.193, -5.1}
         Scale: {0.55, 0.55, 0.55}
         stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
         cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; SpatialIgnore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
+        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
+        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
+        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
       }
       { (IsA, IsleCrystal); NoShadow; Position: {-0.1, 3.182, 1.6}; Rotation: {0, 0, 0}; Cone: {radius: 0.2, length: 1.3, segments: 5} }
       { (IsA, IsleCrystal); NoShadow; Position: {0.4, 2.958, 1.9}; Rotation: {0.5, 0, 0.3}; Cone: {radius: 0.12, length: 0.78, segments: 5} }
@@ -607,39 +607,39 @@ assets {
       { (IsA, IsleCrystal); NoShadow; Position: {-0.5, 3.437, -5.5}; Rotation: {-0.3, 0, 0.3}; Cone: {radius: 0.12, length: 0.78, segments: 5} }
       { (IsA, IsleCrystal); NoShadow; Position: {0, 3.421, -5.3}; Rotation: {0.3, 0, -0.3}; Cone: {radius: 0.09, length: 0.585, segments: 5} }
       { (IsA, IsleCrystal); NoShadow; Position: {-2.1, 3.032, -1.8}; Rotation: {0.2, 0, 0.6}; Cone: {radius: 0.1, length: 0.65, segments: 5} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {2.713, 2.315, -5.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {2.923, 2.231, -3.7}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.62, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {2.792, 2.279, -2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {2.723, 2.06, -0.7}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {2.311, 2.055, 0.9}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-2.79, 2.326, -4.4}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.6, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-2.962, 2.194, -2.9}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-2.714, 2.23, -1.4}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-2.538, 2.019, 0.2}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.52, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-2.145, 2.013, 1.6}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.45, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {1.077, 3.005, -5.8}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-1.079, 3.014, -5.75}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.55, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {0.585, 2.613, 2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); SpatialIgnore; Position: {-0.585, 2.613, 2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.45, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureFlowerA); NoShadow; SpatialIgnore; Position: {0.2, 3.463, -4.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerB); NoShadow; SpatialIgnore; Position: {1.9, 3.154, -3.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureEye); NoShadow; SpatialIgnore; Position: {0.4, 3.367, -1.6}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerA); NoShadow; SpatialIgnore; Position: {-1.9, 2.775, -0.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerB); NoShadow; SpatialIgnore; Position: {1.8, 2.729, 0.4}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureEye); NoShadow; SpatialIgnore; Position: {-2.3, 2.933, -4}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerA); NoShadow; SpatialIgnore; Position: {1.3, 3.154, -1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerB); NoShadow; SpatialIgnore; Position: {-0.9, 3.428, -3}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {1.449, 1.887, -8.4}; Rotation: {1.6, -6, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.3, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {0.759, 2.488, -7.7}; Rotation: {2.3, -7.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.42, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {-1.027, 2.285, -8}; Rotation: {2, -10.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.34, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {-1.667, 2.473, -7.1}; Rotation: {2.9, -11.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.25, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {-0.27, 1.804, -8.9}; Rotation: {1.1, -9.5, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.22, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {2.237, 2.397, -6.4}; Rotation: {3.6, -5.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.22, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {0.964, 2.371, 3}; Rotation: {13, -7, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.3, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {-1.093, 2.408, 2.6}; Rotation: {12.6, -11.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.24, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {3.426, 0.568, -1}; Rotation: {9, -0.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.26, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {-3.31, 0.567, -0.4}; Rotation: {9.6, -17.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.26, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); SpatialIgnore; Position: {-2.885, 1.472, -7}; Rotation: {3, -15, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.2, segments: 1} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {2.713, 2.315, -5.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {2.923, 2.231, -3.7}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.62, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {2.792, 2.279, -2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {2.723, 2.06, -0.7}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {2.311, 2.055, 0.9}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.79, 2.326, -4.4}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.6, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.962, 2.194, -2.9}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.714, 2.23, -1.4}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.538, 2.019, 0.2}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.52, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.145, 2.013, 1.6}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.45, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {1.077, 3.005, -5.8}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-1.079, 3.014, -5.75}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.55, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {0.585, 2.613, 2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureMoss); Ignore; Position: {-0.585, 2.613, 2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.45, segments: 2, smooth: true} }
+      { (IsA, IsleCreatureFlowerA); NoShadow; Ignore; Position: {0.2, 3.463, -4.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureFlowerB); NoShadow; Ignore; Position: {1.9, 3.154, -3.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureEye); NoShadow; Ignore; Position: {0.4, 3.367, -1.6}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureFlowerA); NoShadow; Ignore; Position: {-1.9, 2.775, -0.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureFlowerB); NoShadow; Ignore; Position: {1.8, 2.729, 0.4}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureEye); NoShadow; Ignore; Position: {-2.3, 2.933, -4}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureFlowerA); NoShadow; Ignore; Position: {1.3, 3.154, -1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureFlowerB); NoShadow; Ignore; Position: {-0.9, 3.428, -3}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {1.449, 1.887, -8.4}; Rotation: {1.6, -6, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.3, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {0.759, 2.488, -7.7}; Rotation: {2.3, -7.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.42, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-1.027, 2.285, -8}; Rotation: {2, -10.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.34, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-1.667, 2.473, -7.1}; Rotation: {2.9, -11.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.25, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-0.27, 1.804, -8.9}; Rotation: {1.1, -9.5, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.22, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {2.237, 2.397, -6.4}; Rotation: {3.6, -5.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.22, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {0.964, 2.371, 3}; Rotation: {13, -7, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.3, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-1.093, 2.408, 2.6}; Rotation: {12.6, -11.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.24, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {3.426, 0.568, -1}; Rotation: {9, -0.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.26, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-3.31, 0.567, -0.4}; Rotation: {9.6, -17.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.26, segments: 1} }
+      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-2.885, 1.472, -7}; Rotation: {3, -15, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.2, segments: 1} }
     }
 
     async {
@@ -736,7 +736,7 @@ assets {
     for i in 0..4 {
       const sx = i % 2 == 0 ? 0.42 : -0.42
       const sz = i < 2 ? -1.5 : 0.9
-      { (IsA, IsleRope); NoShadow; SpatialIgnore; Position: {sx * 1.4, -2.1, sz}; Rotation: {0, 0, sx * 0.9}; Cylinder: {radius: 0.035, length: 0.7, segments: 5} }
+      { (IsA, IsleRope); NoShadow; Ignore; Position: {sx * 1.4, -2.1, sz}; Rotation: {0, 0, sx * 0.9}; Cylinder: {radius: 0.035, length: 0.7, segments: 5} }
     }
     outrigger : IsleBrass { Position: {0, -2.75, 0.75}; Box: {3.3, 0.07, 0.12} }
     for i in 0..2 {
@@ -750,14 +750,14 @@ assets {
         blade_b : IsleCreatureWood { NoShadow; Position: {0, 0, 0}; Rotation: {0.3, 0, 0}; Box: {0.16, 1.5, 0.03} }
       }
     }
-    chain : IsleRope { NoShadow; SpatialIgnore; Position: {0, -3.42, -1.5}; Cylinder: {radius: 0.02, length: 0.4, segments: 5} }
+    chain : IsleRope { NoShadow; Ignore; Position: {0, -3.42, -1.5}; Cylinder: {radius: 0.02, length: 0.4, segments: 5} }
     lamp_cap : IsleBrass { NoShadow; Position: {0, -3.6, -1.5}; Cone: {radius: 0.2, length: 0.16, segments: 8} }
     lamp : IsleLampGlow { NoShadow; Position: {0, -3.78, -1.5}; Sphere: {radius: 0.17, segments: 10, smooth: true} }
     if night {
       glow { Position: {0, -3.9, -1.5}; PointLight: {intensity: 14, range: 10}; Rgb: {255, 180, 100} }
     }
     pole : IsleBrass { NoShadow; Position: {0, 2.5, 3.9}; Cylinder: {radius: 0.025, length: 1.0, segments: 5} }
-    pennant : IsleCreatureCanvasRed { NoShadow; SpatialIgnore; Position: {0, 2.85, 4.3}; Box: {0.02, 0.26, 0.8} }
+    pennant : IsleCreatureCanvasRed { NoShadow; Ignore; Position: {0, 2.85, 4.3}; Box: {0.02, 0.26, 0.8} }
   }
 
   template IsleAirship {

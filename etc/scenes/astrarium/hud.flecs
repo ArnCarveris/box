@@ -53,7 +53,7 @@ assets {
       Scale: {duration: 0.45, timing_function: EaseOut},
       Opacity: {duration: 0.3}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template Orb {
@@ -73,19 +73,19 @@ assets {
     const surface = (level - 0.5) * inner
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
 
     Halo glow(size: size * 1.9, color: {bright.r * 0.34, bright.g * 0.34, bright.b * 0.34}, z: -2)
 
     glass {
       Position: {0, 0, 0}
       Layout: {}
-      LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: inner}, height: {mode: Fixed, value: inner}}
+      Item: {h: Center, v: Middle, width: {mode: Fixed, value: inner}, height: {mode: Fixed, value: inner}}
       Rect: {1, 1}
       Rgb: dark
       Border: {radius: inner / 2}
       ClipChildren
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
 
       back {
         Position: {0, surface - face * 0.545, 1}
@@ -123,7 +123,7 @@ assets {
       Image: {texture: tex_orb_gloss}
       Rgb: {255, 255, 255}
       BlendMode: Additive
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     rim {
@@ -131,7 +131,7 @@ assets {
       Rect: {size, size}
       Image: {texture: tex_orb_frame}
       Rgb: ui_gold
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     if shielded {
@@ -144,12 +144,12 @@ assets {
       amount {
         Text: {value: value, size: 21, font: font_display}
         Rgb: {255, 255, 255}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
       name {
         Text: {value: label, size: 10, font: font_display}
         Rgb: {255, 244, 226}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
   }
@@ -170,7 +170,7 @@ assets {
       Scale: {duration: seconds},
       Position: {duration: seconds}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template ReadyFlash : OneShot {
@@ -190,7 +190,7 @@ assets {
       Scale: {duration: 0.55, timing_function: EaseOut},
       Opacity: {duration: 0.55, timing_function: EaseOut}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template SpellFace {
@@ -212,7 +212,7 @@ assets {
       Position: {duration: 0.16, timing_function: EaseOut},
       Scale: {duration: 0.16, timing_function: EaseOut}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     Halo glow(size: size * 2.1, color: {hue.r * 0.32, hue.g * 0.32, hue.b * 0.32}, z: -1) {
       Opacity: {hover && live ? 1 : 0.22}
@@ -222,7 +222,7 @@ assets {
     plate {
       Position: {0, 0, 0}
       Layout: {}
-      LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+      Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
       Rect: {1, 1}
       Image: {texture: tex_panel}
       Rgb: live ? {hue.r * 0.17, hue.g * 0.17, hue.b * 0.2} : {18, 20, 30}
@@ -240,7 +240,7 @@ assets {
         Image: {texture: tex_sheen}
         Rgb: {hue.r * 0.4, hue.g * 0.4, hue.b * 0.4}
         BlendMode: Additive
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
 
       glyph {
@@ -255,7 +255,7 @@ assets {
           Emissive: {strength: 0, color: hue}
         }
         Transition: [Rgb: {duration: 0.25}]
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
 
       if cooling {
@@ -270,12 +270,12 @@ assets {
       Rect: {17, 17}
       Rgb: {8, 10, 22}
       Border: {width: 1, radius: 3, color: {ui_gold.r * 0.8, ui_gold.g * 0.8, ui_gold.b * 0.8, 255}}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
       letter {
         Position: {0, 0, 1}
         Text: {value: "{index + 1}", size: 11, font: font_display}
         Rgb: ui_pale
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -284,7 +284,7 @@ assets {
         Position: {size / 2 - 13, -size / 2 + 8, 4}
         Text: {value: "{spell_cost(index):.0}", size: 11, font: font_body}
         Rgb: afford ? {150, 214, 255} : {255, 96, 86}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
   }
@@ -292,7 +292,7 @@ assets {
   template SpellSlot : HeadlessButton {
     prop index: i32 = 0
 
-    LayoutItem: {width: {mode: Fixed, value: 66}, height: {mode: Fixed, value: 66}}
+    Item: {width: {mode: Fixed, value: 66}, height: {mode: Fixed, value: 66}}
     Layout: {}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
@@ -323,8 +323,8 @@ assets {
     const w = 472
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 10}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 10}}
+    box.spatial.Ignore
 
     track {
       Position: {0, 0, 0}
@@ -358,7 +358,7 @@ assets {
     const shown = hud_go && screen != SCREEN_TITLE
     const y = shown ? 0 : -190
 
-    LayoutItem: {h: Center, v: Bottom, width: {mode: Grow}, height: {mode: Grow}, y: y}
+    Item: {h: Center, v: Bottom, width: {mode: Grow}, height: {mode: Grow}, y: y}
     Layout: {direction: Row, v: Bottom, padding: {0, 14, 22, 22}}
     Transition: [Position: {duration: 0.8, delay: shown ? 0.35 : 0, timing_function: EaseInOut}]
 
@@ -372,7 +372,7 @@ assets {
       shielded: aegis_on)
 
     spacer_a {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     deck {
@@ -400,7 +400,7 @@ assets {
     }
 
     spacer_b {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     Orb mp(
@@ -420,8 +420,8 @@ assets {
     const active = screen == index
 
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+    box.spatial.Ignore
 
     name {
       Text: {value: label, size: 17, font: font_display}
@@ -436,7 +436,7 @@ assets {
         Emissive: {strength: 0, color: {255, 200, 120}}
       }
       Transition: [Rgb: {duration: 0.2}, Emissive: {duration: 0.2}]
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -444,7 +444,7 @@ assets {
     prop index: i32 = 0
 
     Layout: {direction: Row}
-    LayoutItem: {width: {mode: Fixed, value: nav_tab_width}, height: {mode: Grow}}
+    Item: {width: {mode: Fixed, value: nav_tab_width}, height: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
     BlendMode: Additive
@@ -462,10 +462,10 @@ assets {
   template NavMarker {
     const x = (screen - 2) * nav_tab_width
 
-    LayoutFloat: {h: Center, v: Bottom, anchor_h: Center, anchor_v: Bottom, x: x, y: 2}
-    LayoutItem: {width: {mode: Fixed, value: nav_tab_width}, height: {mode: Fixed, value: 14}}
+    Float: {h: Center, v: Bottom, anchor_h: Center, anchor_v: Bottom, x: x, y: 2}
+    Item: {width: {mode: Fixed, value: nav_tab_width}, height: {mode: Fixed, value: 14}}
     Transition: [Position: {duration: 0.42, timing_function: EaseInOut}]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     beam {
       Position: {0, 0, 0}
@@ -497,7 +497,7 @@ assets {
     prop width: f32 = 112
 
     Layout: {direction: Row, spacing: 7, v: Middle, padding: {5, 5, 10, 12}}
-    LayoutItem: {width: {min: width, max: 0}}
+    Item: {width: {min: width, max: 0}}
     Rect: {1, 1}
     Image: {texture: tex_panel}
     Rgb: ui_ink
@@ -517,8 +517,8 @@ assets {
 
     ring {
       Layout: {}
-      LayoutItem: {width: {mode: Fixed, value: 58}, height: {mode: Fixed, value: 58}}
-      box.spatial.SpatialIgnore
+      Item: {width: {mode: Fixed, value: 58}, height: {mode: Fixed, value: 58}}
+      box.spatial.Ignore
 
       disc {
         Position: {0, 0, 0}
@@ -565,19 +565,19 @@ assets {
     const shown = hud_go && screen != SCREEN_TITLE
     const y = shown ? 0 : 100
 
-    LayoutItem: {h: Center, v: Top, width: {mode: Grow}, height: {mode: Grow}, y: y}
+    Item: {h: Center, v: Top, width: {mode: Grow}, height: {mode: Grow}, y: y}
     Layout: {direction: Row, v: Middle, padding: {8, 8, 22, 22}}
     Transition: [Position: {duration: 0.8, delay: shown ? 0.2 : 0, timing_function: EaseInOut}]
 
     Crest crest()
 
     left_gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     tabs {
       Layout: {direction: Row}
-      LayoutItem: {height: {mode: Fixed, value: 46}}
+      Item: {height: {mode: Fixed, value: 46}}
       NavTab t_atlas(index: SCREEN_ATLAS, label: "Atlas")
       NavTab t_armory(index: SCREEN_ARMORY, label: "Armory")
       NavTab t_rites(index: SCREEN_RITES, label: "Rites")
@@ -585,7 +585,7 @@ assets {
     }
 
     right_gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     purse {
@@ -602,7 +602,7 @@ assets {
     const x = (i - 2.5) * 80
     const hue: Rgb = {spell_r(i), spell_g(i), spell_b(i)}
 
-    LayoutItem: {h: Center, v: Bottom, width: {mode: Fixed, value: 300}, x: x, y: 164}
+    Item: {h: Center, v: Bottom, width: {mode: Fixed, value: 300}, x: x, y: 164}
     Layout: {direction: Column, padding: {12, 12, 14, 14}, spacing: 4}
     Rect: {1, 1}
     Image: {texture: tex_panel}
@@ -614,7 +614,7 @@ assets {
       Opacity: {duration: 0.14},
       Position: {duration: 0.16, timing_function: EaseOut}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     Caption name(text: spell_name(i), size: 17, font: font_display, color: hue)
     Caption blurb(text: spell_desc(i), size: 14, width: 272, color: ui_text)
@@ -628,7 +628,7 @@ assets {
         {start: cool_at, end: xp_at, color: {ui_muted.r, ui_muted.g, ui_muted.b, 255}},
         {start: xp_at, end: 255, color: {ui_pale.r, ui_pale.g, ui_pale.b, 255}}
       ]}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -636,28 +636,28 @@ assets {
     const a = banner_on ? 1 : 0
     const y = banner_on ? -84 : -54
 
-    LayoutItem: {h: Center, v: Top, width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 96}, y: y}
+    Item: {h: Center, v: Top, width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 96}, y: y}
     Layout: {}
     Opacity: {a}
     Transition: [
       Opacity: {duration: 0.35, timing_function: EaseOut},
       Position: {duration: 0.5, timing_function: EaseOut}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     shade {
-      LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 900}, height: {mode: Fixed, value: 190}}
+      Item: {h: Center, v: Middle, width: {mode: Fixed, value: 900}, height: {mode: Fixed, value: 190}}
       Rect: {1, 1}
       Image: {texture: tex_halo}
       Rgb: {0, 0, 0}
       Opacity: {0.9}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     lines {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Layout: {direction: Column, h: Center, v: Middle, spacing: 3}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
 
       Caption big(text: banner_text, size: 38, font: font_display, color: ui_pale) {
         Emissive: {strength: 0.5, color: {255, 190, 100}}
@@ -667,22 +667,22 @@ assets {
   }
 
   template Hud {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Layout: {}
 
     rows {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Layout: {direction: Column}
 
       top_slot {
         Layout: {}
-        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: HUD_TOP}}
+        Item: {width: {mode: Grow}, height: {mode: Fixed, value: HUD_TOP}}
         TopBar top()
       }
 
       stage {
         Layout: {}
-        LayoutItem: {width: {mode: Grow}, height: {mode: Grow, content_min: false}}
+        Item: {width: {mode: Grow}, height: {mode: Grow, content_min: false}}
         AtlasPage atlas(index: SCREEN_ATLAS)
         ArmoryPage armory(index: SCREEN_ARMORY)
         RitesPage rites(index: SCREEN_RITES)
@@ -690,7 +690,7 @@ assets {
 
       bottom_slot {
         Layout: {}
-        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: HUD_BOTTOM}}
+        Item: {width: {mode: Grow}, height: {mode: Fixed, value: HUD_BOTTOM}}
         BottomDeck bottom()
       }
     }

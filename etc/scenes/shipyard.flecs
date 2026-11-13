@@ -121,7 +121,7 @@ ship {
         Opacity: {0.01}
         BlendMode: Additive
         NoShadow
-        SpatialIgnore
+        Ignore
       }
     }
   } else {

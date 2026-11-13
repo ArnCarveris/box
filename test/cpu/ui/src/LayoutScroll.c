@@ -489,8 +489,8 @@ void LayoutScroll_script(void) {
         "using box.geometry\n"
         "view {\n"
         "  Layout: {direction: Column}\n"
-        "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n"
-        "  LayoutScroll: {y: 10, vertical: true}\n"
+        "  Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n"
+        "  Scroll: {y: 10, vertical: true}\n"
         "  a { Rect: {50, 80} }\n"
         "  b { Rect: {50, 80} }\n"
         "}\n";

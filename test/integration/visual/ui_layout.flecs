@@ -17,7 +17,7 @@ main_view {
 window {
   Position: {0, 0, 0}
   Layout: {direction: Column, spacing: 10, padding: {12, 12, 12, 12}}
-  LayoutItem: {width: {mode: Fixed, value: 600}}
+  Item: {width: {mode: Fixed, value: 600}}
   Rect: {1, 1}
   Rgb: {40, 44, 56}
   Border: {width: 2, radius: 14, color: {120, 140, 200, 255}}
@@ -25,7 +25,7 @@ window {
   title_bar {
     Position: {0, 0, 1}
     Layout: {direction: Row, spacing: 8, padding: {6, 6, 10, 10}, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {60, 66, 84}
     Border: {radius: 8}
@@ -44,7 +44,7 @@ window {
     }
 
     spacer {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     minimize {
@@ -63,11 +63,11 @@ window {
   buttons {
     Position: {0, 0, 1}
     Layout: {direction: Row, spacing: 8}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     one {
       Position: {0, 0, 1}
-      LayoutItem: {width: {mode: Grow, value: 1}, height: {mode: Fixed, value: 36}}
+      Item: {width: {mode: Grow, value: 1}, height: {mode: Fixed, value: 36}}
       Rect: {1, 1}
       Rgb: {90, 160, 250}
       Border: {radius: 6}
@@ -75,7 +75,7 @@ window {
 
     two {
       Position: {0, 0, 1}
-      LayoutItem: {width: {mode: Grow, value: 2}, height: {mode: Fixed, value: 36}}
+      Item: {width: {mode: Grow, value: 2}, height: {mode: Fixed, value: 36}}
       Rect: {1, 1}
       Rgb: {250, 190, 60}
       Border: {radius: 6}
@@ -83,7 +83,7 @@ window {
 
     three {
       Position: {0, 0, 1}
-      LayoutItem: {width: {mode: Grow, value: 1}, height: {mode: Fixed, value: 36}}
+      Item: {width: {mode: Grow, value: 1}, height: {mode: Fixed, value: 36}}
       Rect: {1, 1}
       Rgb: {200, 110, 230}
       Border: {radius: 6}
@@ -93,7 +93,7 @@ window {
   chart {
     Position: {0, 0, 1}
     Layout: {direction: Row, spacing: 6, padding: {6, 6, 6, 6}, h: Center, v: Bottom}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 64}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 64}}
     Rect: {1, 1}
     Rgb: {55, 60, 76}
     Border: {radius: 8}
@@ -132,12 +132,12 @@ window {
   body {
     Position: {0, 0, 1}
     Layout: {direction: Row, spacing: 10}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     list {
       Position: {0, 0, 1}
       Layout: {direction: Column, spacing: 6, padding: {8, 8, 8, 8}, h: Right}
-      LayoutItem: {width: {mode: Fixed, value: 180}}
+      Item: {width: {mode: Fixed, value: 180}}
       Rect: {1, 1}
       Rgb: {55, 60, 76}
       Border: {radius: 8}
@@ -174,42 +174,42 @@ window {
     stage {
       Position: {0, 0, 1}
       Layout: {padding: {8, 8, 8, 8}}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {30, 33, 42}
       Border: {width: 1, radius: 8, color: {90, 100, 130, 255}}
 
       top_left {
         Position: {0, 0, 1}
-        LayoutItem: {h: Left, v: Top}
+        Item: {h: Left, v: Top}
         Circle: {10}
         Rgb: {230, 80, 70}
       }
 
       top_right {
         Position: {0, 0, 1}
-        LayoutItem: {h: Right, v: Top}
+        Item: {h: Right, v: Top}
         Rect: {30, 20}
         Rgb: {120, 220, 140}
       }
 
       bottom_left {
         Position: {0, 0, 1}
-        LayoutItem: {h: Left, v: Bottom, x: 10, y: 4}
+        Item: {h: Left, v: Bottom, x: 10, y: 4}
         Rect: {50, 10}
         Rgb: {90, 160, 250}
       }
 
       bottom_right {
         Position: {0, 0, 1}
-        LayoutItem: {h: Right, v: Bottom}
+        Item: {h: Right, v: Bottom}
         Circle: {10}
         Rgb: {250, 190, 60}
       }
 
       center {
         Position: {0, 0, 1}
-        LayoutItem: {
+        Item: {
           width: {mode: Fixed, value: 120}, height: {mode: Fixed, value: 36}, h: Center, v: Middle
         }
         Rect: {1, 1}

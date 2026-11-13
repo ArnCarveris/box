@@ -72,7 +72,7 @@ template OptionsPanel : HeadlessCollapsible {
 
   head {
     Layout: {}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: header}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: header}}
     Rect: {1, 1}
 
     if down {
@@ -91,7 +91,7 @@ template OptionsPanel : HeadlessCollapsible {
 
     if current {
       corners {
-        LayoutItem: {v: Bottom, width: {mode: Fixed, value: width}, height: {mode: Fixed, value: radius}}
+        Item: {v: Bottom, width: {mode: Fixed, value: width}, height: {mode: Fixed, value: radius}}
         Rect: {1, 1}
 
         if down {
@@ -106,7 +106,7 @@ template OptionsPanel : HeadlessCollapsible {
 
     row {
       Layout: {direction: Row, spacing: t.spacing, v: Middle}
-      LayoutItem: {h: Left, v: Middle, x: 12}
+      Item: {h: Left, v: Middle, x: 12}
 
       Chevron chevron(direction: match current { true: "down"; _: "right" }, color: t.text_muted)
 
@@ -127,7 +127,7 @@ hud {
   }
 
   screen {
-    LayoutFill: {surface: window}
+    Fill: {surface: window}
     Layout: {direction: Column, padding: {16, 16, 16, 16}, h: Right}
     FocusScope
 

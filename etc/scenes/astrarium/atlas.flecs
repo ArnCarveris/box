@@ -67,7 +67,7 @@ assets {
       Position: {duration: 0.44, timing_function: EaseIn},
       Opacity: {duration: 0.1, delay: 0.42}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     head {
       Position: {0, 0, 1}
@@ -103,7 +103,7 @@ assets {
     const hk = hover ? 1.3 : 1
 
     Position: {0, 0, 0}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     if from >= 0 {
       link {
@@ -123,7 +123,7 @@ assets {
           Rgb: {duration: 0.4, delay: awake ? 0.32 : 0},
           Emissive: {duration: 0.4, delay: awake ? 0.32 : 0}
         ]
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -143,7 +143,7 @@ assets {
         Rgb: {0, 0, 0}
         BlendMode: Additive
         Border: {width: 1.2, color: {hue.r, hue.g, hue.b, 255}}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -156,7 +156,7 @@ assets {
         Emissive: {strength: 0.5, color: {255, 200, 120}}
         BlendMode: Additive
         AngularVelocity: {0, 0, 0.8}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -180,7 +180,7 @@ assets {
         Emissive: {duration: 0.6, delay: awake ? 0.42 : 0},
         Scale: {duration: 0.2, timing_function: EaseOut}
       ]
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     if keystone {
@@ -199,7 +199,7 @@ assets {
         BlendMode: Additive
         AngularVelocity: {0, 0, 0.22}
         Transition: [Rgb: {duration: 0.5}, Scale: {duration: 0.2, timing_function: EaseOut}]
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -208,7 +208,7 @@ assets {
         Position: {0, 0 - core - 19, 7}
         Text: {value: name, size: keystone ? 14 : 13, font: font_display}
         Rgb: hover || selected ? {255, 246, 224} : {ui_gold.r * 0.82, ui_gold.g * 0.82, ui_gold.b * 0.82}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -261,13 +261,13 @@ assets {
     const hue: Rgb = {band_r(band), band_g(band), band_b(band)}
 
     Position: {x, y, 0}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     words {
       Position: {0, 0, 0}
       Text: {value: band_name(band), size: 18, font: font_display}
       Rgb: {hue.r * 0.92, hue.g * 0.92, hue.b * 0.92}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -281,11 +281,11 @@ assets {
     Rgb: {0, 0, 0}
     BlendMode: Additive
     Border: {width: width, color: {ui_gold.r * tone, ui_gold.g * tone, ui_gold.b * tone, 255}}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template StarChart {
-    LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
+    Item: {h: Center, v: Middle, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
     Position: {0, 0, 0}
 
     HollowRing r0(radius: 134, tone: 0.34)
@@ -299,7 +299,7 @@ assets {
         Line: {cos(a) * 134, sin(a) * 134, cos(a) * 306, sin(a) * 306, width: 1}
         Rgb: {ui_gold.r * 0.2, ui_gold.g * 0.2, ui_gold.b * 0.2}
         BlendMode: Additive
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -387,16 +387,16 @@ assets {
     const high = max(f, after)
 
     Layout: {direction: Column, spacing: 5}
-    LayoutItem: {width: {mode: Grow}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Grow}}
+    box.spatial.Ignore
 
     head {
       Layout: {direction: Row, spacing: 8, v: Middle}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       Icon glyph(tex: stat_tex(stat), size: 15, color: hue)
       Caption name(text: stat_name(stat), size: 14, font: font_display, color: ui_text)
       gap {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
       if delta != 0 {
         change {
@@ -409,8 +409,8 @@ assets {
 
     track {
       Layout: {}
-      LayoutItem: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 7}}
-      box.spatial.SpatialIgnore
+      Item: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 7}}
+      box.spatial.Ignore
 
       base {
         Position: {0, 0, 0}
@@ -452,18 +452,18 @@ assets {
     const hue: Rgb = {band_r(band), band_g(band), band_b(band)}
 
     Layout: {direction: Row, spacing: 6, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Grow}}
+    box.spatial.Ignore
 
     Caption name(text: band_name(band), size: 13, font: font_display, color: {hue.r * 0.92, hue.g * 0.92, hue.b * 0.92})
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
     for i in 0..7 {
       "pip_{i}" {
         const lit = i < count
         Rotation: {0, 0, PI / 4}
-        LayoutItem: {width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 7}}
+        Item: {width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 7}}
         Rect: {1, 1}
         if lit {
           Rgb: {min(255, hue.r + 50), min(255, hue.g + 50), min(255, hue.b + 50)}
@@ -493,7 +493,7 @@ assets {
     const k = down && enabled ? 0.985 : 1
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+    Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
     Rect: {1, 1}
     Scale: {k, k, 1}
     if !enabled {
@@ -508,7 +508,7 @@ assets {
     Border: {width: 1, radius: 4, color: {ui_gold.r * 0.8, ui_gold.g * 0.8, ui_gold.b * 0.8, 255}}
     Transition: [Rgb: {duration: 0.14}, Scale: {duration: 0.1}]
     ClipChildren
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     if seconds > 0 {
       HoldBar charge(width: width, height: height, holding: holding, seconds: seconds)
@@ -520,14 +520,14 @@ assets {
       Image: {texture: tex_sheen}
       Rgb: {ui_gold.r * 0.2, ui_gold.g * 0.18, ui_gold.b * 0.14}
       BlendMode: Additive
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     caption {
       Position: {0, 1, 3}
       Text: {value: label, size: 15, font: font_display}
       Rgb: !enabled ? {98, 100, 118} : holding ? {255, 255, 255} : ui_pale
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -540,8 +540,8 @@ assets {
     const open = s.from < 0 ? true : atlas_awake[s.from]
     const can = !awake && open && hero_points > 0
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 44}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 44}}
+    box.spatial.Ignore
 
     const label = awake ? "Awakened" : !open ? "Beyond Reach" : hero_points > 0 ? "Hold to Awaken" : "No Star Points"
 
@@ -552,7 +552,7 @@ assets {
 
   template AwakenButton : HeadlessButton {
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 44}}
+    Item: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 44}}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
     BlendMode: Additive
@@ -573,7 +573,7 @@ assets {
 
   template StarInspector {
     Layout: {direction: Row}
-    LayoutItem: {height: {mode: Grow}}
+    Item: {height: {mode: Grow}}
 
     const s = atlas_sel[Star]
     const hue: Rgb = {band_r(s.band), band_g(s.band), band_b(s.band)}
@@ -583,8 +583,8 @@ assets {
     Frame frame(title: "Star Reading", width: 272, gap: 12) {
       medal {
         Layout: {}
-        LayoutItem: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 92}}
-        box.spatial.SpatialIgnore
+        Item: {width: {mode: Fixed, value: 236}, height: {mode: Fixed, value: 92}}
+        box.spatial.Ignore
 
         Halo aura(size: 190, color: {hue.r * 0.42, hue.g * 0.42, hue.b * 0.42}, z: 0)
 
@@ -614,7 +614,7 @@ assets {
 
       titles {
         Layout: {direction: Column, h: Center, spacing: 3}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Caption name(text: s.name, size: 21, font: font_display, color: ui_pale)
         Caption place(text: star_rank(s.band, s.keystone), size: 13, font: font_italic, color: hue)
       }
@@ -622,12 +622,12 @@ assets {
       Divider rule_a()
 
       Caption flavor(text: s.flavor, size: 15, font: font_italic, width: 236, align: Center, color: ui_text) {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
 
       effect {
         Layout: {direction: Row, spacing: 8, h: Center, v: Middle, padding: {8, 8, 0, 0}}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 1}
         Rgb: {6, 8, 18}
         Border: {width: 1, radius: 4, color: {hue.r * 0.5, hue.g * 0.5, hue.b * 0.5, 255}}
@@ -636,12 +636,12 @@ assets {
       }
 
       gap {
-        LayoutItem: {height: {mode: Grow}}
+        Item: {height: {mode: Grow}}
       }
 
       status {
         Layout: {direction: Row, h: Center}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Caption line(
           text: awake ? "This star burns for you." : open ? "One star point, and a steady hand." : "Awaken the star before it.",
           size: 13, font: font_italic, color: ui_muted)
@@ -653,7 +653,7 @@ assets {
 
   template PlainButton : HeadlessButton {
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 36}}
+    Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 36}}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
     BlendMode: Additive
@@ -663,7 +663,7 @@ assets {
 
   template HeroLedger {
     Layout: {direction: Row}
-    LayoutItem: {height: {mode: Grow}}
+    Item: {height: {mode: Grow}}
 
     Frame frame(title: "Attributes", width: 272, gap: 12) {
       StatBar might(stat: 0, value: stat_might)
@@ -672,7 +672,7 @@ assets {
       StatBar aether(stat: 3, value: stat_aether)
 
       gap_a {
-        LayoutItem: {height: {mode: Fixed, value: 4}}
+        Item: {height: {mode: Fixed, value: 4}}
       }
 
       Heading sub(text: "Constellations", size: 14)
@@ -684,12 +684,12 @@ assets {
       BandRow veil(band: 3, count: atlas_count[3])
 
       gap_b {
-        LayoutItem: {height: {mode: Grow}}
+        Item: {height: {mode: Grow}}
       }
 
       points {
         Layout: {direction: Row, h: Center, spacing: 8, v: Middle}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Icon glyph(tex: tex_sigil, size: 18, color: {150, 214, 255})
         Caption line(text: "{hero_points} star points unspent", size: 14, font: font_italic, color: ui_text)
       }
@@ -712,7 +712,7 @@ assets {
     const a = here ? 1 : 0
     const k = here ? 1 : 0.975
 
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Opacity: {a}
     Scale: {k, k, 1}
     Transition: [
@@ -720,7 +720,7 @@ assets {
       Scale: {duration: 0.6, delay: here ? 0.2 : 0, timing_function: EaseOut}
     ]
     if !here {
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -730,13 +730,13 @@ assets {
     StarChart chart()
 
     columns {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Layout: {direction: Row, padding: {6, 6, 22, 22}}
 
       HeroLedger ledger()
 
       gap {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
 
       if atlas_sel != 0 {

@@ -108,7 +108,7 @@ template TextInput : HeadlessTextInput {
   const edge = focused ? t.focus : hover && !disabled && !read_only ? t.text_muted : t.border
 
   Layout: {direction: Column, spacing: 4}
-  LayoutItem: {width: {mode: Fixed, value: w}}
+  Item: {width: {mode: Fixed, value: w}}
 
   if label != "" {
     caption {
@@ -119,7 +119,7 @@ template TextInput : HeadlessTextInput {
 
   field {
     Layout: {direction: Row, v: Middle, padding: {0, 0, t.padding, t.padding}}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height}}
     Rect: {1, 1}
     Rgb: t.surface_alt
 

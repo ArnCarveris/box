@@ -18,7 +18,7 @@ main_view {
 panel {
   Position: {0, 0, 0}
   Layout: {direction: Column, spacing: 10, padding: {12, 12, 12, 12}}
-  LayoutItem: {width: {mode: Fixed, value: 600}}
+  Item: {width: {mode: Fixed, value: 600}}
   Rect: {1, 1}
   Rgb: {40, 44, 56}
   Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
@@ -41,12 +41,12 @@ panel {
   columns {
     Position: {0, 0, 1}
     Layout: {direction: Row, spacing: 10}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     center {
       Position: {0, 0, 1}
       Layout: {padding: {8, 8, 8, 8}}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {60, 66, 84}
       Border: {radius: 8}
@@ -57,7 +57,7 @@ panel {
           value: "Centered lines share a column with a neighbour of twice the weight.",
           size: 14, align: Center
         }
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rgb: {120, 220, 140}
       }
     }
@@ -65,7 +65,7 @@ panel {
     right {
       Position: {0, 0, 1}
       Layout: {padding: {8, 8, 8, 8}}
-      LayoutItem: {width: {mode: Grow, value: 2}}
+      Item: {width: {mode: Grow, value: 2}}
       Rect: {1, 1}
       Rgb: {60, 66, 84}
       Border: {radius: 8}
@@ -76,7 +76,7 @@ panel {
           value: "Right aligned lines end at the right edge of the column, whatever the length of the last word on each line.",
           size: 14, align: Right
         }
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rgb: {90, 160, 250}
       }
     }

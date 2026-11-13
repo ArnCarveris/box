@@ -1052,7 +1052,7 @@ planets {
             PbrTextures: {emissive: town}
             BlendMode: Max
             NoShadow
-            SpatialIgnore
+            Ignore
           }
         }
       }
@@ -1069,7 +1069,7 @@ planets {
           Opacity: {clouds.opacity}
           Transition: [Opacity: {duration: 2}, Rgb: {duration: 2}]
           NoShadow
-          SpatialIgnore
+          Ignore
         }
       }
 
@@ -1087,7 +1087,7 @@ planets {
             Opacity: {rings.opacity}
           }
           NoShadow
-          SpatialIgnore
+          Ignore
         }
         ring_back {
           Position: {0, 0, 0}
@@ -1102,7 +1102,7 @@ planets {
             Opacity: {rings.opacity}
           }
           NoShadow
-          SpatialIgnore
+          Ignore
         }
       }
     }
@@ -1410,7 +1410,7 @@ planets {
         BlendMode: AlphaBlend
         Opacity: {0.001}
         NoShadow
-        SpatialIgnore
+        Ignore
       }
 
       // The corona: streamers that turn slowly and fade in and out, about six at a time

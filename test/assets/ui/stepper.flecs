@@ -50,7 +50,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.move(this)
-      const w = this[LayoutBounds].width
+      const w = this[Bounds].width
       const at = match e.local_x < button - w / 2 {
         true: -1
         _: match e.local_x > w / 2 - button {
@@ -75,7 +75,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.press(this)
-      const w = this[LayoutBounds].width
+      const w = this[Bounds].width
       const at = match e.local_x < button - w / 2 {
         true: -1
         _: match e.local_x > w / 2 - button {
@@ -113,7 +113,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.activate(this)
-      const w = this[LayoutBounds].width
+      const w = this[Bounds].width
       if ui.activation(e) == this && !e.keyboard && !disabled {
         const dir = match e.local_x < button - w / 2 {
           true: -1
@@ -175,7 +175,7 @@ template Stepper : HeadlessStepper {
   }
 
   Layout: {direction: Row, v: Middle, padding: {edge, edge, edge, edge}}
-  LayoutItem: {
+  Item: {
     width: {mode: Fixed, value: w},
     height: {mode: Fixed, value: t.control_height}
   }
@@ -193,7 +193,7 @@ template Stepper : HeadlessStepper {
 
   minus {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
+    Item: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
     Rect: {1, 1}
     Border: {radius: t.radius - edge}
 
@@ -217,7 +217,7 @@ template Stepper : HeadlessStepper {
 
   amount {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     digits {
       Text: {value: "{current:.decimals}", size: t.font_size}
@@ -227,7 +227,7 @@ template Stepper : HeadlessStepper {
 
   plus {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
+    Item: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
     Rect: {1, 1}
     Border: {radius: t.radius - edge}
 

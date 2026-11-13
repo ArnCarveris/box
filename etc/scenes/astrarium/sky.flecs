@@ -98,7 +98,7 @@ assets {
 
       art {
         Position: {0, 0, -20}
-        LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+        Item: {width: {mode: Grow}, height: {mode: Grow}}
         Rect: {1, 1}
         Image: {texture: tex_nebula}
       }
@@ -157,11 +157,11 @@ assets {
         Layout: {}
 
         vignette {
-          LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+          Item: {width: {mode: Grow}, height: {mode: Grow}}
           Rect: {1, 1}
           Image: {texture: tex_vignette}
           Rgb: {255, 255, 255}
-          box.spatial.SpatialIgnore
+          box.spatial.Ignore
         }
       }
     }

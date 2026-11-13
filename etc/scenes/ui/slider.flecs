@@ -73,7 +73,7 @@ template HeadlessSlider {
   async {
     while true {
       const e = await on.press(this)
-      const b = this[LayoutBounds]
+      const b = this[Bounds]
       down = !disabled && e.local_y < thumb - b.height / 2
       if down {
         const v = slider_snap(min + slider_ratio(e.local_x, b.width, thumb) * range, min, max, step)
@@ -89,7 +89,7 @@ template HeadlessSlider {
     while true {
       const e = await on.drag(this)
       if down && !disabled {
-        const w = this[LayoutBounds].width
+        const w = this[Bounds].width
         const v = slider_snap(min + slider_ratio(e.local_x, w, thumb) * range, min, max, step)
         if v != current {
           current = v
@@ -164,11 +164,11 @@ template Slider : HeadlessSlider {
   const rail = 4
 
   Layout: {direction: Column, spacing: 2}
-  LayoutItem: {width: {mode: Fixed, value: track_w}}
+  Item: {width: {mode: Fixed, value: track_w}}
 
   head {
     Layout: {direction: Row, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     caption {
       Text: {value: label, size: t.font_size}
@@ -176,7 +176,7 @@ template Slider : HeadlessSlider {
     }
 
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
 
     amount {
@@ -187,10 +187,10 @@ template Slider : HeadlessSlider {
 
   track {
     Layout: {}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: thumb}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: thumb}}
 
     groove {
-      LayoutItem: {
+      Item: {
         v: Middle, x: thumb / 2,
         width: {mode: Fixed, value: track_w - thumb}, height: {mode: Fixed, value: rail}
       }
@@ -200,7 +200,7 @@ template Slider : HeadlessSlider {
     }
 
     fill {
-      LayoutItem: {
+      Item: {
         v: Middle, x: thumb / 2,
         width: {mode: Fixed, value: ratio * (track_w - thumb) + 0.01},
         height: {mode: Fixed, value: rail}
@@ -211,7 +211,7 @@ template Slider : HeadlessSlider {
     }
 
     knob {
-      LayoutItem: {
+      Item: {
         v: Middle, x: ratio * (track_w - thumb),
         width: {mode: Fixed, value: thumb}, height: {mode: Fixed, value: thumb}
       }

@@ -26,7 +26,7 @@ assets {
 
     Text: {value: text, size: size, font: font, align: align, width: width}
     Rgb: hue
-    SpatialIgnore
+    Ignore
   }
 
   template Stroke {
@@ -41,7 +41,7 @@ assets {
     Line: {x1: x1, y1: y1, x2: x2, y2: y2, width: w}
     Rgb: hue
     BlendMode: Additive
-    SpatialIgnore
+    Ignore
   }
 
   template RingLine {
@@ -53,7 +53,7 @@ assets {
     Rgb: {0, 0, 0}
     BlendMode: Additive
     Border: {width: w, color: {hue.r, hue.g, hue.b, 255}}
-    SpatialIgnore
+    Ignore
   }
 
   template CrtFeed {
@@ -73,11 +73,11 @@ assets {
       Image: {texture: tex_halo}
       Rgb: {tint.r * 3, tint.g * 3, tint.b * 3}
       BlendMode: Additive
-      SpatialIgnore
+      Ignore
     }
 
-    lines { Position: {0, 0, 50}; Rect: {w, h}; Image: {texture: tex_scanlines}; Rgb: {255, 255, 255}; BlendMode: AlphaBlend; SpatialIgnore }
-    shade { Position: {0, 0, 60}; Rect: {w, h}; Image: {texture: tex_vignette}; Rgb: {255, 255, 255}; BlendMode: AlphaBlend; SpatialIgnore }
+    lines { Position: {0, 0, 50}; Rect: {w, h}; Image: {texture: tex_scanlines}; Rgb: {255, 255, 255}; BlendMode: AlphaBlend; Ignore }
+    shade { Position: {0, 0, 60}; Rect: {w, h}; Image: {texture: tex_vignette}; Rgb: {255, 255, 255}; BlendMode: AlphaBlend; Ignore }
 
     rtt_views {
       rtt_view { View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, lighting: {enabled: false}, culling: {enabled: false}} }
@@ -88,7 +88,7 @@ assets {
   template Raster : parent CrtFeed {
     Scale: {1, on ? 1 : 0.004, 1}
     Transition: [Scale: {duration: on ? 0.32 : 0.13, timing_function: EaseOut}]
-    back { Position: {0, 0, -5}; Rect: {w + 4, h + 4}; Rgb: tint; SpatialIgnore }
+    back { Position: {0, 0, -5}; Rect: {w + 4, h + 4}; Rgb: tint; Ignore }
   }
 
   template Crt {
@@ -106,16 +106,16 @@ assets {
     const pad = 16
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: w + pad * 2 + 8}, height: {mode: Fixed, value: h + pad * 2 + 8}}
+    Item: {width: {mode: Fixed, value: w + pad * 2 + 8}, height: {mode: Fixed, value: h + pad * 2 + 8}}
 
-    hood_t : Soot { Position: {0, h / 2 + pad / 2 + 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; SpatialIgnore }
-    hood_b : Soot { Position: {0, 0 - h / 2 - pad / 2 - 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; SpatialIgnore }
-    hood_l : Soot { Position: {0 - w / 2 - pad / 2 - 2, 0, 14}; Box: {pad + 4, h + 8, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; SpatialIgnore }
-    hood_r : Soot { Position: {w / 2 + pad / 2 + 2, 0, 14}; Box: {pad + 4, h + 8, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; SpatialIgnore }
-    gasket_t : Rubber { Position: {0, h / 2 + 2, 17}; Box: {w + 6, 5, 28}; SpatialIgnore }
-    gasket_b : Rubber { Position: {0, 0 - h / 2 - 2, 17}; Box: {w + 6, 5, 28}; SpatialIgnore }
-    gasket_l : Rubber { Position: {0 - w / 2 - 2, 0, 17}; Box: {5, h + 6, 28}; SpatialIgnore }
-    gasket_r : Rubber { Position: {w / 2 + 2, 0, 17}; Box: {5, h + 6, 28}; SpatialIgnore }
+    hood_t : Soot { Position: {0, h / 2 + pad / 2 + 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_b : Soot { Position: {0, 0 - h / 2 - pad / 2 - 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_l : Soot { Position: {0 - w / 2 - pad / 2 - 2, 0, 14}; Box: {pad + 4, h + 8, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_r : Soot { Position: {w / 2 + pad / 2 + 2, 0, 14}; Box: {pad + 4, h + 8, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
+    gasket_t : Rubber { Position: {0, h / 2 + 2, 17}; Box: {w + 6, 5, 28}; Ignore }
+    gasket_b : Rubber { Position: {0, 0 - h / 2 - 2, 17}; Box: {w + 6, 5, 28}; Ignore }
+    gasket_l : Rubber { Position: {0 - w / 2 - 2, 0, 17}; Box: {5, h + 6, 28}; Ignore }
+    gasket_r : Rubber { Position: {w / 2 + 2, 0, 17}; Box: {5, h + 6, 28}; Ignore }
 
     tube {
       Position: {0, 0, 22 - curve}

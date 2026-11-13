@@ -33,12 +33,12 @@ frame {
 screen {
   Position: {0, 0, 0}
   Layout: {direction: None}
-  LayoutItem: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 360}}
+  Item: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 360}}
   Rect: {1, 1}
   Rgb: {24, 26, 34}
 
   stretch_small {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 64}, height: {mode: Fixed, value: 64},
       h: Left, v: Top, x: 20, y: -20
     }
@@ -48,7 +48,7 @@ screen {
   }
 
   stretch_wide {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 90},
       h: Left, v: Top, x: 100, y: -20
     }
@@ -58,7 +58,7 @@ screen {
   }
 
   tile_wide {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 90},
       h: Left, v: Top, x: 316, y: -20
     }
@@ -68,7 +68,7 @@ screen {
   }
 
   tile_tall {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 90}, height: {mode: Fixed, value: 150},
       h: Left, v: Top, x: 532, y: -20
     }
@@ -79,7 +79,7 @@ screen {
 
   backdrop {
     Layout: {direction: None}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 150}, height: {mode: Fixed, value: 120},
       h: Left, v: Top, x: 20, y: -200
     }
@@ -87,7 +87,7 @@ screen {
     Rgb: {250, 150, 40}
 
     hollow {
-      LayoutItem: {
+      Item: {
         width: {mode: Fixed, value: 130}, height: {mode: Fixed, value: 100},
         h: Center, v: Middle
       }
@@ -98,7 +98,7 @@ screen {
   }
 
   rounded {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 140}, height: {mode: Fixed, value: 100},
       h: Left, v: Top, x: 186, y: -210
     }
@@ -109,7 +109,7 @@ screen {
   }
 
   tinted {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 110}, height: {mode: Fixed, value: 100},
       h: Left, v: Top, x: 342, y: -210
     }
@@ -121,7 +121,7 @@ screen {
   }
 
   tiny {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 24}, height: {mode: Fixed, value: 40},
       h: Left, v: Top, x: 466, y: -210
     }
@@ -132,18 +132,18 @@ screen {
 
   scroll {
     Layout: {direction: Column, padding: {6, 6, 6, 6}}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 110}, height: {mode: Fixed, value: 110},
       h: Left, v: Top, x: 508, y: -200
     }
-    LayoutScroll: {x: 30, y: 40, horizontal: true, vertical: true}
+    Scroll: {x: 30, y: 40, horizontal: true, vertical: true}
     Rect: {1, 1}
     Rgb: {44, 48, 62}
     Border: {radius: 10}
     ClipChildren
 
     framed {
-      LayoutItem: {width: {mode: Fixed, value: 160}, height: {mode: Fixed, value: 150}}
+      Item: {width: {mode: Fixed, value: 160}, height: {mode: Fixed, value: 150}}
       Rect: {1, 1}
       Image: {texture: frame}
       ImageSlice: {left: 16, top: 16, right: 16, bottom: 16, scale: 2, edges: SliceTile}

@@ -34,7 +34,7 @@ fn scroll_track(size: f64, edge: f64, other: f64) -> f64 {
 }
 
 // Behavior of a scroll view: its children are the content, shifted by the offset in the muts x
-// and y (LayoutScroll), which the input clamps to 0..LayoutContent.max_x/max_y. The content is
+// and y (Scroll), which the input clamps to 0..Content.max_x/max_y. The content is
 // clipped to the view (ClipChildren), so the part outside it is not drawn or picked.
 //
 // The wheel scrolls step points per wheel step, shift turns a vertical step horizontal. The
@@ -67,15 +67,15 @@ template HeadlessScrollView {
   mut focused = false
 
   // The body reads no component: flecs script restarts the async blocks of a template when a
-  // component it reads changes, in the body or in an async block. The blocks read LayoutBounds
-  // and LayoutContent, which only change when the layout runs, after the events of a frame.
+  // component it reads changes, in the body or in an async block. The blocks read Bounds
+  // and Content, which only change when the layout runs, after the events of a frame.
   if focusable {
     Focusable
   } else {
     Interactive
   }
   ClipChildren
-  LayoutScroll: {x: x, y: y, horizontal: horizontal, vertical: vertical}
+  Scroll: {x: x, y: y, horizontal: horizontal, vertical: vertical}
 
   async {
     while true {
@@ -101,12 +101,12 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.focus(this)
-      const placed = this.has(LayoutContent) && this.has(WorldTransform) &&
-        e.target.has(LayoutBounds) && e.target.has(WorldTransform)
+      const placed = this.has(Content) && this.has(WorldTransform) &&
+        e.target.has(Bounds) && e.target.has(WorldTransform)
       if e.target != this && placed {
-        const b = this[LayoutBounds]
-        const content = this[LayoutContent]
-        const tb = e.target[LayoutBounds]
+        const b = this[Bounds]
+        const content = this[Content]
+        const tb = e.target[Bounds]
         const vm = this[WorldTransform].m.v
         const tm = e.target[WorldTransform].m.v
         const dx = tm[12] - vm[12]
@@ -132,7 +132,7 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.scroll(this)
-      const content = this[LayoutContent]
+      const content = this[Content]
       const dx = e.shift ? e.delta_x + e.delta_y : e.delta_x
       const dy = e.shift ? 0 : e.delta_y
       if horizontal && dx != 0 {
@@ -148,8 +148,8 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.press(this)
-      const b = this[LayoutBounds]
-      const content = this[LayoutContent]
+      const b = this[Bounds]
+      const content = this[Content]
       const on_v = vertical && content.max_y > 0
       const on_h = horizontal && content.max_x > 0
       const vtrack = scroll_track(b.height, edge, on_h ? bar : 0)
@@ -186,8 +186,8 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.move(this)
-      const b = this[LayoutBounds]
-      const content = this[LayoutContent]
+      const b = this[Bounds]
+      const content = this[Content]
       const on_v = vertical && content.max_y > 0
       const on_h = horizontal && content.max_x > 0
       const vtrack = scroll_track(b.height, edge, on_h ? bar : 0)
@@ -219,8 +219,8 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.drag(this)
-      const b = this[LayoutBounds]
-      const content = this[LayoutContent]
+      const b = this[Bounds]
+      const content = this[Content]
       if drag == 1 {
         const vtrack = scroll_track(b.height, edge, horizontal && content.max_x > 0 ? bar : 0)
         const vthumb = scroll_thumb(vtrack, b.height, content.height)
@@ -246,8 +246,8 @@ template HeadlessScrollView {
     while true {
       const e = await on.key_down(this)
       if keys && focused {
-        const b = this[LayoutBounds]
-        const content = this[LayoutContent]
+        const b = this[Bounds]
+        const content = this[Content]
         if vertical {
           const ty = match e.key {
             "ArrowUp": content.y - step
@@ -341,7 +341,7 @@ template ScrollBar {
 // Without frame it has no border or padding and the background of the theme, so only its content
 // and its bars show.
 //
-// The bars are in scrollbars, a clipped overlay (LayoutFloat with clip) of no size on the center
+// The bars are in scrollbars, a clipped overlay (Float with clip) of no size on the center
 // of the view: the column leaves it out of its flow and the scroll offset does not move it, yet
 // the view and the clips around it clip it, and it draws and picks over the content wherever it
 // is among the children, so content added after the bars show stays under them.
@@ -353,8 +353,8 @@ template ScrollView : HeadlessScrollView {
   const t = box.ui.theme[UiTheme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const pad = frame ? t.padding : 0
-  const b = this[LayoutBounds]
-  const c = this[LayoutContent]
+  const b = this[Bounds]
+  const c = this[Content]
   const vbar = vertical && c.max_y > 0
   const hbar = horizontal && c.max_x > 0
   const bars = vbar || hbar
@@ -362,16 +362,16 @@ template ScrollView : HeadlessScrollView {
   const pad_bottom = pad + (hbar ? bar : 0)
 
   Layout: {direction: Column, spacing: t.spacing, padding: {pad, pad_bottom, pad, pad_right}}
-  LayoutItem: {}
+  Item: {}
   if width > 0 {
-    LayoutItem = {width: {mode: Fixed, value: width}}
+    Item = {width: {mode: Fixed, value: width}}
   } else {
-    LayoutItem = {width: {mode: Grow}}
+    Item = {width: {mode: Grow}}
   }
   if height > 0 {
-    LayoutItem = {height: {mode: Fixed, value: height}}
+    Item = {height: {mode: Fixed, value: height}}
   } else {
-    LayoutItem = {height: {mode: Grow}}
+    Item = {height: {mode: Grow}}
   }
   Rect: {1, 1}
   Rgb: frame ? t.surface_alt : t.background
@@ -394,8 +394,8 @@ template ScrollView : HeadlessScrollView {
     const ring_under = ring ? max(t.focus_width - edge, 0) : 0
 
     scrollbars {
-      LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, clip: true}
-      LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+      Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, clip: true}
+      Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
 
       // Both tracks run the whole length of their edge and cover the corner between them
       if vbar {
@@ -456,8 +456,8 @@ template HeadlessListView : HeadlessScrollView {
   async {
     while true {
       const e = await on.move(this)
-      const b = this[LayoutBounds]
-      const content = this[LayoutContent]
+      const b = this[Bounds]
+      const content = this[Content]
       const along = b.height / 2 - e.local_y + content.y - inset
       const i = floor(along / max(row, 1))
       const over_bar = content.max_y > 0 && e.local_x >= b.width / 2 - edge - bar
@@ -478,8 +478,8 @@ template HeadlessListView : HeadlessScrollView {
   async {
     while true {
       const e = await on.press(this)
-      const b = this[LayoutBounds]
-      const content = this[LayoutContent]
+      const b = this[Bounds]
+      const content = this[Content]
       const along = b.height / 2 - e.local_y + content.y - inset
       const i = floor(along / max(row, 1))
       const over_bar = content.max_y > 0 && e.local_x >= b.width / 2 - edge - bar
@@ -494,8 +494,8 @@ template HeadlessListView : HeadlessScrollView {
     while true {
       const e = await on.key_down(this)
       if !disabled && count > 0 && focused {
-        const b = this[LayoutBounds]
-        const content = this[LayoutContent]
+        const b = this[Bounds]
+        const content = this[Content]
         const page = max(floor(b.height / max(row, 1)) - 1, 1)
         const target = match e.key {
           "ArrowDown": current < 0 ? 0 : current + 1
@@ -535,19 +535,19 @@ template ListView : HeadlessListView {
   const ring = focused && FocusStatus[FocusStatus].visible
   const view_h = height == 0 ? 200 : height
 
-  const b = this[LayoutBounds]
-  const c = this[LayoutContent]
+  const b = this[Bounds]
+  const c = this[Content]
   const vbar = c.max_y > 0
 
   // Without a direction, so the bar keeps its Position while the rows scroll. The rows stay
   // inside the border on the left and right and left of the bar while it shows.
   Layout: {padding: {inset, inset, edge, edge + (vbar ? bar : 0)}}
   if width > 0 {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: width}, height: {mode: Fixed, value: view_h}
     }
   } else {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: view_h}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: view_h}}
   }
   Rect: {1, 1}
 
@@ -568,7 +568,7 @@ template ListView : HeadlessListView {
   // The bars behind the rows show the selection and the hover without touching the rows. They
   // stay while hidden, so a press on one never deletes the entity it went to.
   selected_row {
-    LayoutItem: {
+    Item: {
       h: Left, v: Top, y: -max(current, 0) * row,
       width: {mode: Grow}, height: {mode: Fixed, value: row}
     }
@@ -579,7 +579,7 @@ template ListView : HeadlessListView {
   }
 
   hover_row {
-    LayoutItem: {
+    Item: {
       h: Left, v: Top, y: -max(hover, 0) * row,
       width: {mode: Grow}, height: {mode: Fixed, value: row}
     }
@@ -591,12 +591,12 @@ template ListView : HeadlessListView {
 
   rows {
     Layout: {direction: Column}
-    LayoutItem: {h: Left, v: Top, width: {mode: Grow}}
+    Item: {h: Left, v: Top, width: {mode: Grow}}
 
     for i in 0..count {
       "row_{i}" {
         Layout: {direction: Row, padding: {0, 0, t.padding, t.padding}, v: Middle}
-        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: row}}
+        Item: {width: {mode: Grow}, height: {mode: Fixed, value: row}}
 
         caption {
           Text: {value: items[i], size: t.font_size}
@@ -607,8 +607,8 @@ template ListView : HeadlessListView {
   }
 
   // The bar sits edge points inside the right, top and bottom edges, clear of the border. It is
-  // in scrollbars, which has no LayoutItem, so it does not scroll, and no size or Layout, so the
-  // layout does not measure the bar into the content: a child without a LayoutItem needs twice
+  // in scrollbars, which has no Item, so it does not scroll, and no size or Layout, so the
+  // layout does not measure the bar into the content: a child without an Item needs twice
   // its distance from the center, which would widen the list by the padding of the rows.
   if vbar {
     scrollbars {

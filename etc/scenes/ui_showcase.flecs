@@ -182,7 +182,7 @@ assets {
   // A button that taps its action when clicked, lighter while hovered and darker while pressed
   template Button : box.widgets.HeadlessButton {
     Layout: {direction: Row, padding: {8, 8, 12, 12}, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Rect: {1, 1}
     Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
 
@@ -210,17 +210,17 @@ assets {
     prop checked = false
 
     Layout: {direction: Row, spacing: 10, padding: {4, 4, 4, 4}, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     check {
       Layout: {}
-      LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+      Item: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
       Rect: {1, 1}
       Rgb: {30, 34, 46}
       Border: {radius: 5, width: 2, color: hover ? {170, 200, 255, 255} : {120, 130, 150, 255}}
 
       mark {
-        LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
+        Item: {h: Center, v: Middle, width: {mode: Fixed, value: 12}, height: {mode: Fixed, value: 12}}
         Rect: {1, 1}
         Rgb: {90, 210, 110}
         Opacity: {checked ? 1 : 0}
@@ -250,11 +250,11 @@ assets {
     const t = clamp((current - min) / (max - min), 0, 1)
 
     Layout: {direction: Column, spacing: 6}
-    LayoutItem: {width: {mode: Fixed, value: width}}
+    Item: {width: {mode: Fixed, value: width}}
 
     head {
       Layout: {direction: Row, v: Middle}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
 
       name {
         Text: {value: label, size: 16}
@@ -262,7 +262,7 @@ assets {
       }
 
       gap {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
 
       amount {
@@ -273,24 +273,24 @@ assets {
 
     track {
       Layout: {}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: SliderKnob}}
+      Item: {width: {mode: Grow}, height: {mode: Fixed, value: SliderKnob}}
 
       rail {
-        LayoutItem: {v: Middle, width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+        Item: {v: Middle, width: {mode: Grow}, height: {mode: Fixed, value: 6}}
         Rect: {1, 1}
         Rgb: {40, 44, 56}
         Border: {radius: 3}
       }
 
       fill {
-        LayoutItem: {h: Left, v: Middle, width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)}, height: {mode: Fixed, value: 6}}
+        Item: {h: Left, v: Middle, width: {mode: Fixed, value: SliderKnob / 2 + t * (width - SliderKnob)}, height: {mode: Fixed, value: 6}}
         Rect: {1, 1}
         Rgb: {250, 200, 90}
         Border: {radius: 3}
       }
 
       knob {
-        LayoutItem: {h: Left, v: Middle, x: t * (width - SliderKnob), width: {mode: Fixed, value: SliderKnob}, height: {mode: Fixed, value: SliderKnob}}
+        Item: {h: Left, v: Middle, x: t * (width - SliderKnob), width: {mode: Fixed, value: SliderKnob}, height: {mode: Fixed, value: SliderKnob}}
         Rect: {1, 1}
         Rgb: down || hover ? {255, 236, 170} : {255, 255, 255}
         Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
@@ -361,7 +361,7 @@ ui_showcase {
     Rotation: {0, 0.09, 0}
     Scale: {0.005, 0.005, 0.005}
     Layout: {direction: Column, spacing: 6, padding: {8, 8, 10, 10}}
-    LayoutItem: {width: {mode: Fixed, value: 140}}
+    Item: {width: {mode: Fixed, value: 140}}
     Rect: {1, 1}
     Rgb: {30, 34, 46}
     Border: {width: 2, radius: 8, color: {120, 140, 200, 255}}
@@ -429,7 +429,7 @@ ui_showcase {
     Rotation: {0.12, 0.24, 0}
     Scale: {0.006, 0.006, 0.006}
     Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
-    LayoutItem: {width: {mode: Fixed, value: 240}}
+    Item: {width: {mode: Fixed, value: 240}}
     Rect: {1, 1}
     Rgb: {30, 34, 46}
     Border: {width: 3, radius: 14, color: {120, 140, 200, 255}}
@@ -472,14 +472,14 @@ ui_showcase {
     dashboard {
       Position: {0, 0, 0}
       Layout: {direction: Column, spacing: 24, padding: {18, 18, 20, 20}, v: Middle}
-      LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
+      Item: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
       Rect: {1, 1}
       Rgb: {14, 22, 40}
       Border: {width: 3, color: {60, 200, 230, 255}}
 
       head {
         Layout: {direction: Row, v: Middle}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         title {
           Text: {value: "REACTOR", size: 36}
@@ -487,7 +487,7 @@ ui_showcase {
         }
 
         gap {
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
         }
 
         status {
@@ -499,14 +499,14 @@ ui_showcase {
 
       controls {
         Layout: {direction: Row, spacing: 12, v: Middle}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         start {
           assets.Button: {label: "START", action: state.actions.reactor_start}
         }
 
         gap {
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
         }
 
         stop {
@@ -558,14 +558,14 @@ hud {
   }
 
   screen {
-    LayoutFill: {surface: window}
+    Fill: {surface: window}
     Layout: {}
 
     // InputBlocker: clicks on the panel never reach the 3D scene behind it
     panel {
       InputBlocker
       Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
-      LayoutItem: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: 300}}
+      Item: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: 300}}
       Rect: {1, 1}
       Rgb: {16, 20, 28}
       Opacity: {0.9}

@@ -43,7 +43,7 @@ assets {
       Rgb: {ink.r * 0.16, ink.g * 0.16, ink.b * 0.16}
     }
     Transition: [Rgb: {duration: 0.9, delay: 0.15, timing_function: EaseOut}]
-    SpatialIgnore
+    Ignore
   }
 
   template Tape {
@@ -62,7 +62,7 @@ assets {
     PbrMaterial: {metallic: 0, roughness: 0.8}
     PbrTextures: {albedo: tex_tape}
     NoShadow
-    SpatialIgnore
+    Ignore
   }
 
   template Scrawl {
@@ -75,7 +75,7 @@ assets {
     Rotation: {0, 0, tilt}
     Text: {value: text, size: size, font: font_hand, align: Center, width: width, line_height: size * 0.84}
     Rgb: ink
-    SpatialIgnore
+    Ignore
   }
 
   template Row {
@@ -86,7 +86,7 @@ assets {
     prop v: VAlign = Middle
 
     Layout: {direction: Row, spacing: gap, h: Center, v: Middle}
-    LayoutItem: {h: h, v: v, x: x, y: y}
+    Item: {h: h, v: v, x: x, y: y}
   }
 
   template Column {
@@ -97,13 +97,13 @@ assets {
     prop v: VAlign = Middle
 
     Layout: {direction: Column, spacing: gap, h: Center, v: Middle}
-    LayoutItem: {h: h, v: v, x: x, y: y}
+    Item: {h: h, v: v, x: x, y: y}
   }
 
   template Gap {
     prop w: f32 = 8
     prop h: f32 = 8
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
   }
 
   template Screw {
@@ -114,7 +114,7 @@ assets {
     Position: {x, y, 0.5}
     head : BareSteel { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 5, length: 2.4, segments: 10, smooth: true}; Rgb: {140, 136, 128} }
     slot : BlackAnod { Position: {0, 0, 1.25}; Rotation: {0, 0, turn}; Box: {9, 1.3, 0.3} }
-    SpatialIgnore
+    Ignore
   }
 
   template Panel {
@@ -125,9 +125,9 @@ assets {
 
     Scale: {0.001, 0.001, 0.001}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
 
-    seam : BlackAnod { Position: {0, 0, -8}; Box: {w + 6, h + 6, 12}; Rgb: {8, 8, 8}; SpatialIgnore }
+    seam : BlackAnod { Position: {0, 0, -8}; Box: {w + 6, h + 6, 12}; Rgb: {8, 8, 8}; Ignore }
 
     plate : PaintedSteel {
       Position: {0, 0, -6}
@@ -176,7 +176,7 @@ assets {
     PbrMaterial: {metallic: 0, roughness: 0.95}
     PbrTextures: {albedo: tex}
     NoShadow
-    SpatialIgnore
+    Ignore
   }
 
   template Silk {
@@ -192,7 +192,7 @@ assets {
     const run = (w - gap) / 2
 
     Position: {x, y, 0.45}
-    SpatialIgnore
+    Ignore
     top { Position: {0, h / 2, 0}; Rect: {w, 1.4}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
     left { Position: {0 - w / 2, 0, 0}; Rect: {1.4, h}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
     right { Position: {w / 2, 0, 0}; Rect: {1.4, h}; Rgb: tone; Transition: [Rgb: {duration: 0.9, delay: 0.2}] }
@@ -215,7 +215,7 @@ assets {
 
     Position: {x, y, 1.3}
     Rotation: {0, 0, tilt}
-    SpatialIgnore
+    Ignore
     strip { Position: {0, 0, 0}; Box: {len, size * 1.5, 0.6}; Rgb: tone; PbrMaterial: {metallic: 0, roughness: 0.3} }
     words {
       Position: {0, 0, 0.4}
@@ -239,7 +239,7 @@ assets {
 
     Position: {x, y, 0.16}
     Rotation: {0, 0, tilt}
-    SpatialIgnore
+    Ignore
     gap { Position: {0, 0, -0.08}; Box: {w + 4, h + 4, 0.14}; Rgb: {6, 6, 6}; PbrMaterial: {metallic: 0, roughness: 0.9} }
     sheet : PaintedSteel { Position: {0, 0, 0.02}; Box: {w, h, 0.26}; Rgb: tone; TextureMapping: {mode: MappingObject, size: 0.52} }
   }
@@ -250,7 +250,7 @@ assets {
     prop turn: f32 = 0.5
 
     Position: {x, y, 0.5}
-    SpatialIgnore
+    Ignore
     cup : BareSteel { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7, length: 1, segments: 14, smooth: true}; Rgb: {104, 102, 96} }
     head : BareSteel { Position: {0, 0, 0.9}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 4.6, length: 1.2, segments: 12, smooth: true} }
     slot : BlackAnod { Position: {0, 0, 1.55}; Rotation: {0, 0, turn}; Box: {8, 1.4, 0.2} }
@@ -264,7 +264,7 @@ assets {
 
     const pitch = h / slats
 
-    SpatialIgnore
+    Ignore
     back { Position: {0, 0, 0.2}; Box: {w, h, 0.4}; Rgb: {6, 6, 6}; PbrMaterial: {metallic: 0, roughness: 0.9} }
     rim_t : Soot { Position: {0, h / 2 + 2, 1.8}; Box: {w + 8, 4, 3.6} }
     rim_b : Soot { Position: {0, 0 - h / 2 - 2, 1.8}; Box: {w + 8, 4, 3.6} }
@@ -292,13 +292,13 @@ assets {
     Interactive
     Cursor: {CursorPointer}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 48}, height: {mode: Fixed, value: 56}}
+    Item: {width: {mode: Fixed, value: 48}, height: {mode: Fixed, value: 56}}
 
     Label words(text: label, size: 11, font: font_mono) { Position: {0, 21, 0.6} }
 
     mount {
       Position: {0, -6, 0}
-      SpatialIgnore
+      Ignore
       if hover {
         halo { Position: {0, 0, 0.9}; Circle: {14}; Rgb: {0, 0, 0}; Border: {width: 1.2, color: {255, 200, 120, 255}}; Opacity: {0.9} }
       }
@@ -364,7 +364,7 @@ assets {
         Rgb: {44 + i * 2, 46 + i * 2, 42 + i * 2}
         PbrMaterial: {metallic: 0.9, roughness: 0.42}
         NoShadow
-        SpatialIgnore
+        Ignore
       }
     }
 
@@ -395,7 +395,7 @@ assets {
     prop size: f32 = 15
 
     Layout: {h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
     base : BlackAnod { Position: {0, 0, 0.6}; Box: {w, h, 1.2}; Rgb: tone }
     Label words(text: text, size: size, ink: ink) { Position: {0, 0, 1.5} }
   }
@@ -434,13 +434,13 @@ assets {
     Interactive
     Cursor: {CursorPointer}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 60}, height: {mode: Fixed, value: 96}}
+    Item: {width: {mode: Fixed, value: 60}, height: {mode: Fixed, value: 96}}
 
     Label words(text: label, size: 14) { Position: {0, 37, 0.6} }
 
     mount {
       Position: {0, -8, 0}
-      SpatialIgnore
+      Ignore
 
       if hover {
         halo { Position: {0, 0, 0.9}; Circle: {24}; Rgb: {0, 0, 0}; Border: {width: 1.6, color: {255, 200, 120, 255}}; Opacity: {0.9} }
@@ -494,16 +494,16 @@ assets {
     Interactive
     Cursor: {CursorPointer}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 96}, height: {mode: Fixed, value: 130}}
+    Item: {width: {mode: Fixed, value: 96}, height: {mode: Fixed, value: 130}}
 
     Label words(text: label, size: 15, ink: {255, 214, 160}) { Position: {0, 52, 0.6} }
 
-    hazard { Position: {0, -6, 0.5}; Quad: {74, 92}; Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 0.45, scale_y: 0.55}; SpatialIgnore }
+    hazard { Position: {0, -6, 0.5}; Quad: {74, 92}; Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 0.45, scale_y: 0.55}; Ignore }
     shadow_gap : BlackAnod { Position: {0, -6, 0.9}; Box: {54, 72, 0.8} }
 
     mount {
       Position: {0, -8, 1.5}
-      SpatialIgnore
+      Ignore
 
       nut : Chrome { Position: {0, 0, 3}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 11, length: 4, segments: 6}; Rgb: {150, 150, 152} }
       arm {
@@ -519,7 +519,7 @@ assets {
       Position: {0, 34, 3}
       Rotation: {open ? -1.95 : 0, 0, 0}
       Transition: [Rotation: {duration: 0.18, timing_function: EaseOut}]
-      SpatialIgnore
+      Ignore
 
       hinge : BareSteel { Rotation: {0, 0, PI / 2}; Cylinder: {radius: 3.2, length: 48, segments: 12, smooth: true} }
       lid : SignalRed { Position: {0, -36, 41}; RoundedBox: {46, 78, 3, 1.2, segments: 2} }
@@ -581,13 +581,13 @@ assets {
     Interactive
     Cursor: {CursorPointer}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: w + 10}, height: {mode: Fixed, value: h + 10}}
+    Item: {width: {mode: Fixed, value: w + 10}, height: {mode: Fixed, value: h + 10}}
 
-    housing : BlackAnod { Position: {0, 0, 2.5}; Box: {w + 10, h + 10, 5}; SpatialIgnore }
+    housing : BlackAnod { Position: {0, 0, 2.5}; Box: {w + 10, h + 10, 5}; Ignore }
     cap {
       Position: {0, 0, down ? 5 : 8}
       Transition: [Position: {duration: 0.05}]
-      SpatialIgnore
+      Ignore
       body {
         Position: {0, 0, 0}
         RoundedBox: {w, h, 8, 1.6, segments: 2}
@@ -607,14 +607,14 @@ assets {
           Position: {0, sub == "" ? 0 : 7, 4.3}
           Text: {value: legend, size: size, font: font_stencil, align: Center}
           Rgb: {1, 1, 1}
-          SpatialIgnore
+          Ignore
         }
         if sub != "" {
           minor_lit {
             Position: {0, -11, 4.3}
             Text: {value: sub, size: size * 0.72, font: font_stencil, align: Center}
             Rgb: {1, 1, 1}
-            SpatialIgnore
+            Ignore
           }
         }
       } else {
@@ -627,7 +627,7 @@ assets {
             Rgb: {hue.r * 0.14, hue.g * 0.14, hue.b * 0.14}
           }
           Transition: [Rgb: {duration: 0.5}]
-          SpatialIgnore
+          Ignore
         }
         if sub != "" {
           minor {
@@ -639,7 +639,7 @@ assets {
               Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
             }
             Transition: [Rgb: {duration: 0.5}]
-            SpatialIgnore
+            Ignore
           }
         }
       }
@@ -686,13 +686,13 @@ assets {
     Interactive
     Cursor: {CursorPointer}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: r * 3.6}, height: {mode: Fixed, value: r * 4.1}}
+    Item: {width: {mode: Fixed, value: r * 3.6}, height: {mode: Fixed, value: r * 4.1}}
 
     Label words(text: label, size: 14) { Position: {0, r * 1.72, 0.6} }
 
     scale_marks {
       Position: {0, -r * 0.18, 0.5}
-      SpatialIgnore
+      Ignore
       for i in 0..ticks {
         const a = 2.36 - i * 4.71 / (ticks - 1)
         "tick_{i}" {
@@ -710,14 +710,14 @@ assets {
     }
 
     if hover {
-      halo { Position: {0, -r * 0.18, 0.8}; Circle: {r * 1.12}; Rgb: {0, 0, 0}; Border: {width: 1.4, color: {255, 200, 120, 255}}; Opacity: {0.9}; SpatialIgnore }
+      halo { Position: {0, -r * 0.18, 0.8}; Circle: {r * 1.12}; Rgb: {0, 0, 0}; Border: {width: 1.4, color: {255, 200, 120, 255}}; Opacity: {0.9}; Ignore }
     }
 
     rotor {
       Position: {0, -r * 0.18, 1}
       Rotation: {0, 0, turn - PI / 2}
       Transition: [Rotation: {duration: 0.06}]
-      SpatialIgnore
+      Ignore
       skirt : BlackAnod { Position: {0, 0, 2}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r, length: 4, segments: 32, smooth: true} }
       grip : Bakelite { Position: {0, 0, 12}; Rotation: {PI / 2, 0, 0}; Frustum: {radius_bottom: r * 0.8, radius_top: r * 0.68, length: 18, segments: 16} }
       crown : BareSteel { Position: {0, 0, 21.3}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r * 0.62, length: 0.6, segments: 24, smooth: true}; Rgb: {150, 144, 130} }
@@ -778,13 +778,13 @@ assets {
     Interactive
     Cursor: {CursorPointer}
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 104}, height: {mode: Fixed, value: travel + 54}}
+    Item: {width: {mode: Fixed, value: 104}, height: {mode: Fixed, value: travel + 54}}
 
     Label name(text: label, size: 15) { Position: {0, travel / 2 + 15, 0.8} }
 
-    slot : BlackAnod { Position: {0, 0, 0.4}; Box: {18, travel - 12, 1}; SpatialIgnore }
-    slot_lip_a : BareSteel { Position: {-13, 0, 1.2}; Box: {4, travel, 2.2}; Rgb: {108, 104, 96}; SpatialIgnore }
-    slot_lip_b : BareSteel { Position: {13, 0, 1.2}; Box: {4, travel, 2.2}; Rgb: {108, 104, 96}; SpatialIgnore }
+    slot : BlackAnod { Position: {0, 0, 0.4}; Box: {18, travel - 12, 1}; Ignore }
+    slot_lip_a : BareSteel { Position: {-13, 0, 1.2}; Box: {4, travel, 2.2}; Rgb: {108, 104, 96}; Ignore }
+    slot_lip_b : BareSteel { Position: {13, 0, 1.2}; Box: {4, travel, 2.2}; Rgb: {108, 104, 96}; Ignore }
 
     for i in 0..11 {
       "mark_{i}" {
@@ -796,7 +796,7 @@ assets {
           Rgb: {38, 36, 32}
         }
         Transition: [Rgb: {duration: 0.9, delay: 0.2}]
-        SpatialIgnore
+        Ignore
       }
     }
 
@@ -807,7 +807,7 @@ assets {
       Position: {0, 0, 0 - reach * 0.56}
       Rotation: {swing, 0, 0}
       Transition: [Rotation: {duration: 0.05}]
-      SpatialIgnore
+      Ignore
 
       shaft : Chrome { Position: {0, 0, reach * 0.5}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 7, length: reach, segments: 14, smooth: true}; Rgb: {150, 150, 154} }
       grip_band : Brass { Position: {0, 0, reach * 0.96}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 13, length: 7, segments: 18, smooth: true} }
@@ -869,14 +869,14 @@ assets {
     const face_hue: Rgb = match ink_lit { true: hue; _: {30, 26, 20} }
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: r * 2.3}, height: {mode: Fixed, value: r * 2.3}}
+    Item: {width: {mode: Fixed, value: r * 2.3}, height: {mode: Fixed, value: r * 2.3}}
 
     bezel : Chrome { Position: {0, 0, 4}; Rotation: {PI / 2, 0, 0}; Tube: {radius: r + 7, thickness: 7.5, length: 9, segments: 48, smooth: true}; Rgb: {126, 124, 118}; PbrMaterial: {metallic: 1, roughness: 0.3} }
     well : BlackAnod { Position: {0, 0, 0.4}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r + 2, length: 0.8, segments: 48, smooth: true}; Rgb: {10, 10, 11} }
 
     face {
       Position: {0, 0, 1}
-      SpatialIgnore
+      Ignore
 
       disc { Position: {0, 0, 0}; Circle: {r}; Rgb: {10, 11, 12} }
       pool { Position: {0, 0, 0.1}; Rect: {r * 2.5, r * 2.5}; Image: {texture: tex_halo}; Rgb: {face_hue.r * 0.16, face_hue.g * 0.16, face_hue.b * 0.16}; BlendMode: Additive; Transition: [Rgb: {duration: 1.1}] }
@@ -916,7 +916,7 @@ assets {
       Position: {0, 0, 2.6}
       Rotation: {0, 0, dial}
       Transition: [Rotation: {duration: 0.35, timing_function: EaseOut}]
-      SpatialIgnore
+      Ignore
       blade { Position: {r * 0.37, 0, 0}; Box: {r * 1.05, r * 0.035, 0.6}; Rgb: {255, 96, 40}; Emissive: {strength: ink_lit ? 2.2 : 0.02, color: {255, 100, 40}}; Transition: [Emissive: {duration: 0.8}] }
       tail { Position: {0 - r * 0.16, 0, 0}; Box: {r * 0.32, r * 0.07, 0.6}; Rgb: {20, 20, 22} }
       hub : BlackAnod { Position: {0, 0, 0.8}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r * 0.09, length: 1.6, segments: 16, smooth: true} }
@@ -932,7 +932,7 @@ assets {
       BlendMode: AlphaBlend
       Opacity: {0.09}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
   }
 
@@ -948,12 +948,12 @@ assets {
     prop label: string = ""
 
     Layout: {}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: vertical ? thick + 18 : len + 12},
       height: {mode: Fixed, value: vertical ? len + 28 : thick + 28}
     }
 
-    back : BlackAnod { Position: {0, -6, 0.6}; Box: {vertical ? thick + 8 : len + 8, vertical ? len + 8 : thick + 8, 1.2}; Rgb: {12, 12, 13}; SpatialIgnore }
+    back : BlackAnod { Position: {0, -6, 0.6}; Box: {vertical ? thick + 8 : len + 8, vertical ? len + 8 : thick + 8, 1.2}; Rgb: {12, 12, 13}; Ignore }
 
     if label != "" {
       Label words(text: label, size: 13) { Position: {0, vertical ? len / 2 + 7 : thick / 2 + 9, 0.8} }
@@ -976,7 +976,7 @@ assets {
           Emissive: {strength: 0, color: tint}
         }
         Transition: [Emissive: {duration: 0.06}]
-        SpatialIgnore
+        Ignore
       }
     }
   }
@@ -993,9 +993,9 @@ assets {
     const shown = (active || lamp_test) && bus
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: w + 4}, height: {mode: Fixed, value: h + 4}}
+    Item: {width: {mode: Fixed, value: w + 4}, height: {mode: Fixed, value: h + 4}}
 
-    bezel : BlackAnod { Position: {0, 0, 1}; Box: {w + 4, h + 4, 2}; SpatialIgnore }
+    bezel : BlackAnod { Position: {0, 0, 1}; Box: {w + 4, h + 4, 2}; Ignore }
     tile {
       Position: {0, 0, 2.3}
       Box: {w, h, 0.8}
@@ -1007,33 +1007,33 @@ assets {
         Emissive: {strength: 0, color: hue}
       }
       Transition: [Emissive: {duration: 0.09, timing_function: EaseOut}]
-      SpatialIgnore
+      Ignore
     }
     if shown {
       words_lit {
         Position: {-0.2, sub == "" ? 0 : size * 0.5, 2.9}
         Text: {value: legend, size: size, font: font_stencil, align: Center}
         Rgb: {1, 1, 1}
-        SpatialIgnore
+        Ignore
       }
       words_lit_b {
         Position: {0.2, sub == "" ? 0 : size * 0.5, 2.92}
         Text: {value: legend, size: size, font: font_stencil, align: Center}
         Rgb: {1, 1, 1}
-        SpatialIgnore
+        Ignore
       }
       if sub != "" {
         minor_lit {
           Position: {-0.18, 0 - size * 0.56, 2.9}
           Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
           Rgb: {1, 1, 1}
-          SpatialIgnore
+          Ignore
         }
         minor_lit_b {
           Position: {0.18, 0 - size * 0.56, 2.92}
           Text: {value: sub, size: size * 0.86, font: font_stencil, align: Center}
           Rgb: {1, 1, 1}
-          SpatialIgnore
+          Ignore
         }
       }
     } else {
@@ -1046,7 +1046,7 @@ assets {
           Rgb: {hue.r * 0.1, hue.g * 0.1, hue.b * 0.1}
         }
         Transition: [Rgb: {duration: 0.5}]
-        SpatialIgnore
+        Ignore
       }
       if sub != "" {
         minor {
@@ -1058,7 +1058,7 @@ assets {
             Rgb: {hue.r * 0.08, hue.g * 0.08, hue.b * 0.08}
           }
           Transition: [Rgb: {duration: 0.5}]
-          SpatialIgnore
+          Ignore
         }
       }
     }
@@ -1093,7 +1093,7 @@ assets {
     const k = s * 0.14
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: s * 0.8}, height: {mode: Fixed, value: s * 1.5}}
+    Item: {width: {mode: Fixed, value: s * 0.8}, height: {mode: Fixed, value: s * 1.5}}
 
     for i in 0..7 {
       const on = has_bit(mask, i)
@@ -1109,7 +1109,7 @@ assets {
         } else {
           Emissive: {strength: 0, color: hue}
         }
-        SpatialIgnore
+        Ignore
       }
     }
   }
@@ -1130,7 +1130,7 @@ assets {
 
     window {
       Layout: {direction: Row, spacing: s * 0.14, padding: {6, 6, 8, 8}, h: Center, v: Middle}
-      pane : BlackAnod { Rgb: {6, 5, 5}; Position: {0, 0, 0}; Box: {(s * 0.94) * digits + 14, s * 1.5 + 12, 0.8}; LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}; SpatialIgnore }
+      pane : BlackAnod { Rgb: {6, 5, 5}; Position: {0, 0, 0}; Box: {(s * 0.94) * digits + 14, s * 1.5 + 12, 0.8}; Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}; Ignore }
       for i in 0..digits {
         SegDigit "d_{i}"(digit: floor(value / floor(pow(10, digits - 1 - i))) % 10, hue: hue, s: s, blank: dark)
       }
@@ -1145,13 +1145,13 @@ assets {
     const spin = digit * (2 * PI / 10)
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 24}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 24}}
 
     drum {
       Position: {0, 0, 0 - r + 2.6}
       Rotation: {spin, 0, 0}
       Transition: [Rotation: {duration: 0.45, timing_function: EaseInOut}]
-      SpatialIgnore
+      Ignore
       body { Rotation: {0, 0, PI / 2}; Cylinder: {radius: r, length: w - 2, segments: 24, smooth: true}; Rgb: {18, 17, 16}; PbrMaterial: {metallic: 0.2, roughness: 0.5} }
       for i in 0..10 {
         "face_{i}" {
@@ -1179,8 +1179,8 @@ assets {
 
     frame {
       Layout: {direction: Row, spacing: 1.5, padding: {3, 3, 4, 4}, h: Center, v: Middle}
-      bezel_t : BlackAnod { Position: {0, 16, 1.4}; Box: {digits * 20.5 + 14, 4, 2.8}; LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: 16}; SpatialIgnore }
-      bezel_b : BlackAnod { Position: {0, -16, 1.4}; Box: {digits * 20.5 + 14, 4, 2.8}; LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: -16}; SpatialIgnore }
+      bezel_t : BlackAnod { Position: {0, 16, 1.4}; Box: {digits * 20.5 + 14, 4, 2.8}; Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: 16}; Ignore }
+      bezel_b : BlackAnod { Position: {0, -16, 1.4}; Box: {digits * 20.5 + 14, 4, 2.8}; Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, y: -16}; Ignore }
       for i in 0..digits {
         DrumDigit "d_{i}"(digit: floor(value / floor(pow(10, digits - 1 - i))) % 10)
       }

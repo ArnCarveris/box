@@ -116,7 +116,7 @@ void SpatialLayout_unchanged_100_ships(
     // engine/spatial_layout_incremental
     ecs_entity_t hull = 0;
     ecs_world_t *world = bench_layout_world(&hull);
-    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialLayout");
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.Resolve");
     bench_set_items(b, BENCH_SHIPS);
     while (bench_iter(b)) {
         ecs_run(world, system, 0, NULL);
@@ -132,7 +132,7 @@ void SpatialLayout_one_target_resized_100_ships(
     // engine/spatial_layout_incremental
     ecs_entity_t hull = 0;
     ecs_world_t *world = bench_layout_world(&hull);
-    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialLayout");
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.Resolve");
     int32_t frame = 0;
     bench_set_items(b, BENCH_SHIPS);
     while (bench_iter(b)) {

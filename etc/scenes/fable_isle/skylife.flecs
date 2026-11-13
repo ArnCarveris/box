@@ -79,7 +79,7 @@ assets {
       for i in 0..4 {
         const sx = i % 2 == 0 ? 0.44 : -0.44
         const sz = i < 2 ? 0.44 : -0.44
-        "rope_{i}" : IsleRope { NoShadow; SpatialIgnore; Position: {sx, 1.3, sz}; Cylinder: {radius: 0.018, length: 1.1, segments: 5} }
+        "rope_{i}" : IsleRope { NoShadow; Ignore; Position: {sx, 1.3, sz}; Cylinder: {radius: 0.018, length: 1.1, segments: 5} }
       }
       burner : IsleSteel { Position: {0, 1.12, 0}; Cylinder: {radius: 0.14, length: 0.16, segments: 10} }
       flame : IsleFire { NoShadow; Position: {0, 1.4, 0}; Cone: {radius: 0.11, length: 0.4, segments: 8} }
@@ -91,7 +91,7 @@ assets {
         Forces: {gravity: {0, 0, 0}}
       }
       if firing {
-        blast : IsleFire { NoShadow; SpatialIgnore; Position: {0, 2.0, 0}; Cone: {radius: 0.24, length: 1.6, segments: 8} }
+        blast : IsleFire { NoShadow; Ignore; Position: {0, 2.0, 0}; Cone: {radius: 0.24, length: 1.6, segments: 8} }
         blast_light { Position: {0, 2.6, 0}; PointLight: {intensity: night ? 9 : 40, range: 10}; Rgb: {255, 160, 80} }
       } else if lit && night {
         glow { Position: {0, 2.4, 0}; PointLight: {intensity: 5, range: 8}; Rgb: {255, 170, 90} }
@@ -116,7 +116,7 @@ assets {
   }
 
   template IsleBird {
-    SpatialIgnore
+    Ignore
     body : IsleSkyBird { Position: {0, 0, 0}; Scale: {0.6, 0.6, 1.5}; IcoSphere: {radius: 0.16, segments: 1, smooth: true} }
     beak : IsleBrass { Position: {0, 0, -0.28}; Rotation: {-1.5708, 0, 0}; Cone: {radius: 0.04, length: 0.12, segments: 5} }
     tail : IsleSkyBirdDark { Position: {0, 0.01, 0.28}; Box: {0.14, 0.02, 0.2} }
@@ -186,7 +186,7 @@ assets {
   template IsleCloud {
     prop size: f32 = 4
     prop seed: f32 = 0
-    SpatialIgnore
+    Ignore
     for i in 0..5 {
       const a = i * GOLDEN + seed
       const r = i == 0 ? 0.0 : size * (0.55 + rnd(i, seed) * 0.35)

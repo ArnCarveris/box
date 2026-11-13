@@ -509,10 +509,12 @@ void BoxProjectionImport(
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxLayout);
 
+    ecs_set_name_prefix(world, "Projected");
     ECS_META_COMPONENT(world, ProjectedAnchor);
     ECS_META_COMPONENT(world, ProjectedBox);
     ECS_META_COMPONENT(world, ProjectedBounds);
     ECS_TAG_DEFINE(world, ProjectedHidden);
+    ecs_set_name_prefix(world, NULL);
     ecs_add_pair(world, ecs_id(ProjectedAnchor), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(ProjectedBox), EcsWith, ecs_id(ProjectedBounds));
 

@@ -55,7 +55,7 @@ template Chevron {
   }
 
   Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
 
   first {
     Position: {0, 0, 0}
@@ -80,7 +80,7 @@ template Chevron {
 // click chooses it. A click on the button, Tab or a press anywhere else (the dropdown loses the
 // focus) closes the list. Choosing another option reports a change.
 //
-// The list is the child list, a LayoutFloat below the button that flips above it when it does not
+// The list is the child list, a Float below the button that flips above it when it does not
 // fit below and hides (not drawn, not clicked) while a scroll view clips the button out of view,
 // staying open; its options are row points tall with inset points above and below them. over is
 // whether the pointer is over the list. The template reads no component, so its async blocks only
@@ -125,7 +125,7 @@ template HeadlessDropdown {
   }
 
   list {
-    LayoutFloat: {
+    Float: {
       h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -2, flip: true, hide_clipped: true
     }
   }
@@ -283,7 +283,7 @@ template Dropdown : HeadlessDropdown {
   }
 
   Layout: {direction: Row, padding: {0, 0, t.padding * 1.5, t.padding}, v: Middle}
-  LayoutItem: {
+  Item: {
     width: {mode: Fixed, value: w},
     height: {mode: Fixed, value: t.control_height}
   }
@@ -312,7 +312,7 @@ template Dropdown : HeadlessDropdown {
   }
 
   gap {
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
   }
 
   Chevron chevron(direction: match open { true: "up"; _: "down" }, color: t.text_muted)
@@ -320,7 +320,7 @@ template Dropdown : HeadlessDropdown {
   list {
     if open {
       Layout: {direction: Column, padding: {inset, inset, inset, inset}}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       Rect: {1, 1}
       Rgb: t.surface
       Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
@@ -328,7 +328,7 @@ template Dropdown : HeadlessDropdown {
       for i in 0..count {
         "option_{i}" {
           Layout: {direction: Row, padding: {0, 0, t.padding, t.padding}, v: Middle}
-          LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: row}}
+          Item: {width: {mode: Grow}, height: {mode: Fixed, value: row}}
           Rect: {1, 1}
           Border: {radius: t.radius - 1}
 

@@ -235,7 +235,7 @@ template Gallery {
     }
 
     root {
-      LayoutFill: {surface: window}
+      Fill: {surface: window}
       Layout: {direction: Column, spacing: 12, padding: {16, 16, 16, 16}}
       FocusScope
 
@@ -243,12 +243,12 @@ template Gallery {
       // first Tab stop, picks the theme ThemeSwitch assigns.
       header {
         Layout: {direction: Row, spacing: 16, v: Middle}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         Label title(text: "Widgets", variant: "heading")
 
         gap {
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
         }
 
         Dropdown theme(options: ["Dark", "Light"], value: 0, width: 120)
@@ -367,7 +367,7 @@ template Gallery {
 
           right {
             Layout: {direction: Column, spacing: 16}
-            LayoutItem: {height: {mode: Grow}}
+            Item: {height: {mode: Grow}}
             // The form: its widgets show draft, the preview applied. The widgets take the members
             // of draft as their values, so assigning draft (Reset) moves them.
             Panel form(title: "Form", width: 616) {
@@ -414,7 +414,7 @@ template Gallery {
 
                 controls {
                   Layout: {direction: Column, spacing: 8}
-                  LayoutItem: {width: {mode: Fixed, value: 260}}
+                  Item: {width: {mode: Fixed, value: 260}}
 
                   TextInput name(
                     label: "Name", placeholder: "Shown in the preview", value: draft.name, width: 260)
@@ -459,10 +459,10 @@ template Gallery {
                 // screen texture on its curved screen
                 preview {
                   Layout: {direction: Column, spacing: 8}
-                  LayoutItem: {height: {mode: Grow}}
+                  Item: {height: {mode: Grow}}
 
                   image {
-                    LayoutItem: {width: {mode: Fixed, value: 300}, height: {mode: Grow}}
+                    Item: {width: {mode: Fixed, value: 300}, height: {mode: Grow}}
                     Rect: {1, 1}
                     Image: {texture: preview_texture, u0: 0, v0: 0, u1: 1, v1: 1}
                     Border: {radius: 4}

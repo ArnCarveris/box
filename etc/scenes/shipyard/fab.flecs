@@ -51,7 +51,7 @@ assets {
     torch : ShipChrome { Position: {wx + tl / 2, ty, 0}; Rotation: {0, 0, HALF_PI}; Frustum: {radius_bottom: 0.016, radius_top: 0.04, length: tl, segments: 10, smooth: true} }
     if on {
       tip : ShipWeld { Position: {tx, ty, 0}; Sphere: {radius: 0.04, segments: 3, smooth: true} }
-      halo : FabGlow { Position: {tx, ty, 0}; Sphere: {radius: 0.09, segments: 12, smooth: true}; SpatialIgnore }
+      halo : FabGlow { Position: {tx, ty, 0}; Sphere: {radius: 0.09, segments: 12, smooth: true}; Ignore }
       lamp : ShipGreenLight { Position: {-0.05, 0.115, 0.14}; Box: {0.1, 0.01, 0.06} }
       if spark > 0 {
         sparks {
@@ -64,7 +64,7 @@ assets {
           }
           Appearance: {blend: Additive, stretch: 0.08}
           Curves: {opacity: {keys: [{0, 1}, {0.6, 0.8}, {1, 0}]}, color: {keys: [{0, {255, 255, 255}}, {0.3, {255, 200, 120}}, {1, {255, 110, 40}}]}}
-          SpatialIgnore
+          Ignore
         }
       }
       if arc {
@@ -219,7 +219,7 @@ assets {
               housing : ShipTrim { Box: {0.18, 0.34, 0.18} }
               if on {
                 lens : ShipWhiteLight { Position: {-0.095, 0, 0}; Box: {0.01, 0.28, 0.14} }
-                beam : FabBeam { Position: {-0.7, 0, 0}; Rotation: {0, 0, HALF_PI}; Frustum: {radius_bottom: 0.14, radius_top: 0.5, length: 1.2, segments: 16, smooth: true}; SpatialIgnore }
+                beam : FabBeam { Position: {-0.7, 0, 0}; Rotation: {0, 0, HALF_PI}; Frustum: {radius_bottom: 0.14, radius_top: 0.5, length: 1.2, segments: 16, smooth: true}; Ignore }
               } else {
                 lens : ShipRecess { Position: {-0.095, 0, 0}; Box: {0.01, 0.28, 0.14} }
               }

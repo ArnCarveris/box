@@ -366,7 +366,7 @@ static void bench_picking_wave(
     ecs_add(world, button, Interactive);
 
     ecs_entity_t picking = bench_picking_system(world, "box.picking.PickingUpdate");
-    ecs_entity_t spatial = bench_picking_system(world, "box.spatial.SpatialUpdate");
+    ecs_entity_t spatial = bench_picking_system(world, "box.spatial.Update");
     ecs_measure_system_time(world, true);
     box_input_mouse_move(world, 640, 360, false);
     ecs_progress(world, 0.016f);

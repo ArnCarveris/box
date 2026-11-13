@@ -34,7 +34,7 @@ assets {
       Opacity: {duration: 0.6, timing_function: EaseIn},
       Rotation: {duration: 0.6, timing_function: EaseOut}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
   }
 
   template ItemFace {
@@ -60,7 +60,7 @@ assets {
       Scale: {duration: 0.14, timing_function: EaseOut},
       Opacity: {duration: 0.3, delay: order * 0.018}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     if rarity >= 2 {
       Halo aura(size: 170, color: {hue.r * 0.3, hue.g * 0.3, hue.b * 0.3}, z: -1)
@@ -69,7 +69,7 @@ assets {
     plate {
       Position: {0, 0, 0}
       Layout: {}
-      LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+      Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
       Rect: {1, 1}
       Image: {texture: tex_panel}
       Rgb: {hue.r * 0.14 + 8, hue.g * 0.14 + 8, hue.b * 0.14 + 14}
@@ -81,7 +81,7 @@ assets {
         Border: {width: 1, radius: 6, color: {hue.r * 0.7, hue.g * 0.7, hue.b * 0.7, 255}}
       }
       ClipChildren
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
 
       if rarity == 3 {
         rays {
@@ -91,7 +91,7 @@ assets {
           Rgb: {hue.r * 0.3, hue.g * 0.25, hue.b * 0.16}
           BlendMode: Additive
           AngularVelocity: {0, 0, 0.3}
-          box.spatial.SpatialIgnore
+          box.spatial.Ignore
         }
       }
 
@@ -102,7 +102,7 @@ assets {
         Image: {texture: tex_sheen}
         Rgb: {hue.r * 0.4, hue.g * 0.4, hue.b * 0.4}
         BlendMode: Additive
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
 
       art {
@@ -112,7 +112,7 @@ assets {
         Rgb: {255, 255, 255}
         Emissive: {strength: hover ? 0.16 : 0, color: hue}
         Transition: [Emissive: {duration: 0.15}]
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
 
@@ -123,13 +123,13 @@ assets {
         Rect: {10, 10}
         Rgb: {255, 248, 226}
         Emissive: {strength: 1.4, color: {255, 196, 104}}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
       Sparkle sparkle(hue: hue)
     }
   }
 
-  template Item : HeadlessButton {
+  template ArmoryItem : HeadlessButton {
     prop order: i32 = 0
     prop name: string = ""
     prop slot: i32 = 0
@@ -144,7 +144,7 @@ assets {
     prop start: bool = false
 
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: 88}, height: {mode: Fixed, value: 88}}
+    Item: {width: {mode: Fixed, value: 88}, height: {mode: Fixed, value: 88}}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
     BlendMode: Additive
@@ -189,7 +189,7 @@ assets {
     const active = armory_filter == value
 
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     if active {
       Rgb: {ui_gold.r * 0.24, ui_gold.g * 0.2, ui_gold.b * 0.14}
@@ -202,7 +202,7 @@ assets {
       Border: {width: 1, radius: 4, color: {ui_gold.r * 0.3, ui_gold.g * 0.3, ui_gold.b * 0.3, 255}}
     }
     Transition: [Rgb: {duration: 0.15}]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     Caption name(text: label, size: 12, font: font_display, color: active ? ui_pale : ui_muted)
   }
@@ -211,7 +211,7 @@ assets {
     prop value: i32 = -1
 
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
     BlendMode: Additive
@@ -232,17 +232,17 @@ assets {
     prop delta: i32 = 0
 
     Layout: {direction: Row, spacing: 7, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Grow}}
+    box.spatial.Ignore
 
     Icon glyph(tex: stat_tex(stat), size: 13, color: {stat_r(stat), stat_g(stat), stat_b(stat)})
     Caption name(text: stat_name(stat), size: 14, color: ui_text)
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
     Caption amount(text: "{value}", size: 14, font: font_display, color: ui_pale)
     shift {
-      LayoutItem: {width: {min: 34, max: 34}}
+      Item: {width: {min: 34, max: 34}}
       Text: {
         value: delta > 0 ? "+{delta}" : delta < 0 ? "{delta}" : "=",
         size: 13,
@@ -254,13 +254,13 @@ assets {
   }
 
   template ItemTip {
-    const it = armory_tip[Item]
+    const it = armory_tip[ArmoryItem]
     const hue: Rgb = {rarity_r(it.rarity), rarity_g(it.rarity), rarity_b(it.rarity)}
     const a = armory_tip_on ? 1 : 0
 
     Position: {0, 0, 30}
-    LayoutFloat: {anchor: armory_tip, h: Right, v: Top, anchor_h: Left, anchor_v: Top, x: -12, y: 8, flip: true}
-    LayoutItem: {width: {mode: Fixed, value: 270}}
+    Float: {anchor: armory_tip, h: Right, v: Top, anchor_h: Left, anchor_v: Top, x: -12, y: 8, flip: true}
+    Item: {width: {mode: Fixed, value: 270}}
     Layout: {direction: Column, padding: {14, 14, 16, 16}, spacing: 7}
     Rect: {1, 1}
     Rgb: {8, 10, 24}
@@ -271,7 +271,7 @@ assets {
       Opacity: {duration: 0.14},
       Position: {duration: 0.2, timing_function: EaseOut}
     ]
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     Caption name(text: it.name, size: 20, font: font_display, color: hue)
     Caption kind(text: "{rarity_name(it.rarity)} {slot_name(it.slot)}", size: 13, font: font_italic, color: ui_muted)
@@ -288,11 +288,11 @@ assets {
     prop slot: i32 = 0
     prop item: entity = 0
 
-    const it = item[Item]
+    const it = item[ArmoryItem]
     const hue: Rgb = {rarity_r(it.rarity), rarity_g(it.rarity), rarity_b(it.rarity)}
 
     Position: {0, 0, 0}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     Halo aura(size: 120, color: {hue.r * 0.32, hue.g * 0.32, hue.b * 0.32}, z: -1)
 
@@ -324,7 +324,7 @@ assets {
     const e = eq[slot]
 
     Position: {x, y, 2}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     wire {
       Position: {0, 0, -2}
@@ -339,14 +339,14 @@ assets {
   }
 
   template ArmoryCenter {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Layout: {}
-    box.spatial.SpatialIgnore
+    box.spatial.Ignore
 
     stage_center {
-      LayoutItem: {h: Center, v: Middle, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
+      Item: {h: Center, v: Middle, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
       Position: {0, 0, 0}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
 
       Halo backglow(size: 620, color: {relic_r * 0.13, relic_g * 0.13, relic_b * 0.13}, z: -4) {
         Transition: [Rgb: {duration: 0.4}]
@@ -356,7 +356,7 @@ assets {
         Position: {0, 24, 0}
         Rect: {430, 430}
         Image: {texture: relic_texture}
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
 
       Socket s0(slot: 0, x: -176, y: 164)
@@ -366,9 +366,9 @@ assets {
     }
 
     plaque {
-      LayoutItem: {h: Center, v: Bottom, y: 6, width: {mode: Fixed, value: 420}}
+      Item: {h: Center, v: Bottom, y: 6, width: {mode: Fixed, value: 420}}
       Layout: {direction: Column, h: Center, spacing: 2}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
       Caption line(text: relic_line, size: 14, font: font_italic, color: {relic_r, relic_g, relic_b})
       Caption name(text: relic_name, size: 28, font: font_display, color: ui_pale) {
         Emissive: {strength: 0.22, color: {255, 200, 120}}
@@ -378,12 +378,12 @@ assets {
 
   template Satchel {
     Layout: {direction: Row}
-    LayoutItem: {height: {mode: Grow}}
+    Item: {height: {mode: Grow}}
 
     Frame frame(title: "Satchel", width: 424, gap: 10) {
       filters {
         Layout: {direction: Row, spacing: 4}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         FilterTab all(value: -1, label: "All")
         FilterTab blades(value: 0, label: "Blades")
         FilterTab relics(value: 1, label: "Relics")
@@ -393,49 +393,49 @@ assets {
 
       row_0 {
         Layout: {direction: Row, spacing: 10}
-        Item ember_fang(order: 0, name: "Ember Fang", slot: 0, rarity: 3, might: 34, haste: 8, icon: tex_ember_fang, model_hue: {255, 110, 40},
+        ArmoryItem ember_fang(order: 0, name: "Ember Fang", slot: 0, rarity: 3, might: 34, haste: 8, icon: tex_ember_fang, model_hue: {255, 110, 40},
           flavor: "Cut from the tooth of a sun that bit the wrong god.")
-        Item drowned_heart(order: 1, name: "Drowned Heart", slot: 1, rarity: 3, aether: 36, ward: 6, icon: tex_drowned_heart, model_hue: {255, 120, 40},
+        ArmoryItem drowned_heart(order: 1, name: "Drowned Heart", slot: 1, rarity: 3, aether: 36, ward: 6, icon: tex_drowned_heart, model_hue: {255, 120, 40},
           flavor: "It still beats, slowly, in time with no tide you know.")
-        Item nine_comets(order: 2, name: "Nine Comets", slot: 2, rarity: 2, might: 8, aether: 18, icon: tex_nine_comets, model_hue: {190, 110, 255},
+        ArmoryItem nine_comets(order: 2, name: "Nine Comets", slot: 2, rarity: 2, might: 8, aether: 18, icon: tex_nine_comets, model_hue: {190, 110, 255},
           flavor: "Each point was once a promise made to the sky.")
-        Item last_light(order: 3, name: "Band of Last Light", slot: 3, rarity: 3, might: 12, haste: 16, icon: tex_last_light, model_hue: {255, 96, 36},
+        ArmoryItem last_light(order: 3, name: "Band of Last Light", slot: 3, rarity: 3, might: 12, haste: 16, icon: tex_last_light, model_hue: {255, 96, 36},
           flavor: "The final thing the old world ever saw, set in gold.")
       }
 
       row_1 {
         Layout: {direction: Row, spacing: 10}
-        Item tidecaller(order: 4, name: "Tidecaller", slot: 0, rarity: 2, might: 22, aether: 10, icon: tex_tidecaller, model_hue: {80, 170, 255},
+        ArmoryItem tidecaller(order: 4, name: "Tidecaller", slot: 0, rarity: 2, might: 22, aether: 10, icon: tex_tidecaller, model_hue: {80, 170, 255},
           flavor: "Point it at the horizon, and the horizon comes.")
-        Item moon_prism(order: 5, name: "Moon Prism", slot: 1, rarity: 2, aether: 24, haste: 6, icon: tex_moon_prism, model_hue: {180, 120, 255},
+        ArmoryItem moon_prism(order: 5, name: "Moon Prism", slot: 1, rarity: 2, aether: 24, haste: 6, icon: tex_moon_prism, model_hue: {180, 120, 255},
           flavor: "Bends the moonlight until it confesses.")
-        Item vesper(order: 6, name: "Circlet of Vesper", slot: 2, rarity: 1, ward: 8, aether: 8, start: true, icon: tex_vesper, model_hue: {90, 170, 255},
+        ArmoryItem vesper(order: 6, name: "Circlet of Vesper", slot: 2, rarity: 1, ward: 8, aether: 8, start: true, icon: tex_vesper, model_hue: {90, 170, 255},
           flavor: "Worn by the first star to arrive, and the last to leave.")
-        Item serpent_loop(order: 7, name: "Serpent Loop", slot: 3, rarity: 1, ward: 6, haste: 8, icon: tex_serpent_loop, model_hue: {80, 230, 150},
+        ArmoryItem serpent_loop(order: 7, name: "Serpent Loop", slot: 3, rarity: 1, ward: 6, haste: 8, icon: tex_serpent_loop, model_hue: {80, 230, 150},
           flavor: "It has been swallowing itself for a very long time.")
       }
 
       row_2 {
         Layout: {direction: Row, spacing: 10}
-        Item thornreaver(order: 8, name: "Thornreaver", slot: 0, rarity: 1, might: 14, ward: 6, icon: tex_thornreaver, model_hue: {70, 220, 130},
+        ArmoryItem thornreaver(order: 8, name: "Thornreaver", slot: 0, rarity: 1, might: 14, ward: 6, icon: tex_thornreaver, model_hue: {70, 220, 130},
           flavor: "Grown, not forged. It would like some water.")
-        Item sun_lens(order: 9, name: "Sun Lens", slot: 1, rarity: 1, aether: 14, might: 2, start: true, icon: tex_sun_lens, model_hue: {80, 190, 255},
+        ArmoryItem sun_lens(order: 9, name: "Sun Lens", slot: 1, rarity: 1, aether: 14, might: 2, start: true, icon: tex_sun_lens, model_hue: {80, 190, 255},
           flavor: "Hold it to the light, and the light holds you.")
-        Item thorn_circlet(order: 10, name: "Thorn Circlet", slot: 2, rarity: 2, ward: 22, might: 4, icon: tex_thorn_circlet, model_hue: {70, 230, 140},
+        ArmoryItem thorn_circlet(order: 10, name: "Thorn Circlet", slot: 2, rarity: 2, ward: 22, might: 4, icon: tex_thorn_circlet, model_hue: {70, 230, 140},
           flavor: "Everything that would harm you must first ask it.")
-        Item mirror_loop(order: 11, name: "Mirror Loop", slot: 3, rarity: 2, aether: 12, haste: 12, icon: tex_mirror_loop, model_hue: {120, 210, 255},
+        ArmoryItem mirror_loop(order: 11, name: "Mirror Loop", slot: 3, rarity: 2, aether: 12, haste: 12, icon: tex_mirror_loop, model_hue: {120, 210, 255},
           flavor: "Look through it, and something looks through too.")
       }
 
       row_3 {
         Layout: {direction: Row, spacing: 10}
-        Item ash_dirk(order: 12, name: "Ash Dirk", slot: 0, rarity: 0, might: 6, start: true, icon: tex_ash_dirk, model_hue: {190, 190, 200},
+        ArmoryItem ash_dirk(order: 12, name: "Ash Dirk", slot: 0, rarity: 0, might: 6, start: true, icon: tex_ash_dirk, model_hue: {190, 190, 200},
           flavor: "Plain, reliable, and rarely thanked.")
-        Item moth_blade(order: 13, name: "Moth Blade", slot: 0, rarity: 2, might: 18, haste: 14, icon: tex_moth_blade, model_hue: {170, 110, 255},
+        ArmoryItem moth_blade(order: 13, name: "Moth Blade", slot: 0, rarity: 2, might: 18, haste: 14, icon: tex_moth_blade, model_hue: {170, 110, 255},
           flavor: "It only ever moves toward the light.")
-        Item star_compass(order: 14, name: "Star Compass", slot: 1, rarity: 1, aether: 8, haste: 10, icon: tex_star_compass, model_hue: {255, 196, 80},
+        ArmoryItem star_compass(order: 14, name: "Star Compass", slot: 1, rarity: 1, aether: 8, haste: 10, icon: tex_star_compass, model_hue: {255, 196, 80},
           flavor: "North is a matter of opinion, up here.")
-        Item iron_vow(order: 15, name: "Iron Vow", slot: 3, rarity: 0, ward: 4, start: true, icon: tex_iron_vow, model_hue: {180, 180, 192},
+        ArmoryItem iron_vow(order: 15, name: "Iron Vow", slot: 3, rarity: 0, ward: 4, start: true, icon: tex_iron_vow, model_hue: {180, 180, 192},
           flavor: "Worth exactly what you promised on it.")
       }
     }
@@ -449,20 +449,20 @@ assets {
     prop hue: Rgb = {255, 255, 255}
 
     Layout: {direction: Row, spacing: 8, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
-    box.spatial.SpatialIgnore
+    Item: {width: {mode: Grow}}
+    box.spatial.Ignore
 
     Icon glyph(tex: tex, size: 15, color: hue)
     Caption name(text: label, size: 14, color: ui_text)
     gap {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     }
     Caption amount(text: "{value:.0}{unit}", size: 15, font: font_display, color: ui_pale)
   }
 
   template ArmoryLedger {
     Layout: {direction: Row}
-    LayoutItem: {height: {mode: Grow}}
+    Item: {height: {mode: Grow}}
 
     Frame frame(title: "Attributes", width: 272, gap: 12) {
       StatBar might(stat: 0, value: stat_might, delta: preview[0])
@@ -471,7 +471,7 @@ assets {
       StatBar aether(stat: 3, value: stat_aether, delta: preview[3])
 
       gap_a {
-        LayoutItem: {height: {mode: Fixed, value: 6}}
+        Item: {height: {mode: Fixed, value: 6}}
       }
 
       Heading sub(text: "Vitals", size: 14)
@@ -479,18 +479,18 @@ assets {
 
       vitals {
         Layout: {direction: Column, spacing: 8}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Vital hp(label: "Vitality", value: hero_hp_max, tex: tex_heart, hue: {255, 96, 106})
         Vital mp(label: "Aether", value: hero_mp_max, tex: tex_stat_aether, hue: {120, 190, 255})
         Vital cd(label: "Recharge", value: 100 * haste_scale(stat_haste), unit: "%", tex: tex_stat_haste, hue: {196, 160, 255})
       }
 
       gap_b {
-        LayoutItem: {height: {mode: Grow}}
+        Item: {height: {mode: Grow}}
       }
 
       Caption hint(text: "Hover an item to weigh it against what you wear. Click to equip.", size: 14, font: font_italic, width: 234, align: Center, color: ui_muted) {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
     }
   }
@@ -499,7 +499,7 @@ assets {
     Layout: {}
 
     columns {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Layout: {direction: Row, padding: {6, 6, 22, 22}}
 
       ArmoryLedger ledger()

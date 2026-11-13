@@ -21,7 +21,7 @@ screen_ui {
   dashboard {
     Position: {0, 0, 0}
     Layout: {direction: Row, spacing: 16, padding: {14, 14, 18, 18}, v: Bottom}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}
     }
     Rect: {1, 1}
@@ -61,76 +61,76 @@ screen_ui {
 
     chart {
       Layout: {direction: Row, spacing: 8, padding: {8, 8, 8, 8}, v: Bottom}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {24, 36, 60}
       Border: {radius: 8}
 
       bar_0 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 34}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_1 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 52}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_2 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 78}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_3 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 96}
         Rgb: {250, 120, 90}
         Border: {radius: 3}
       }
 
       bar_4 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 70}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_5 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 58}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_6 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 88}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_7 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 64}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_8 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 40}
         Rgb: {60, 200, 230}
         Border: {radius: 3}
       }
 
       bar_9 {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Rect: {1, 26}
         Rgb: {60, 200, 230}
         Border: {radius: 3}

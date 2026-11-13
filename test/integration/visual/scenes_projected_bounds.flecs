@@ -18,31 +18,31 @@ world_view {
 
 floor {
   Position: {0, -0.1, -6}
-  Box: {30, 0.2, 30}
+  box.geometry.Box: {30, 0.2, 30}
   Rgb: {120, 128, 110}
 }
 
 house {
   Position: {-3, 1, 3}
-  Box: {2, 2, 2}
+  box.geometry.Box: {2, 2, 2}
   Rgb: {200, 170, 90}
 }
 
 tower {
   Position: {2, 1.5, -3}
-  Box: {2, 3, 2}
+  box.geometry.Box: {2, 3, 2}
   Rgb: {170, 90, 70}
 }
 
 hall {
   Position: {-1, 1, -14}
-  Box: {4, 2, 3}
+  box.geometry.Box: {4, 2, 3}
   Rgb: {90, 140, 200}
 }
 
 ghost {
   Position: {0, 1, 14}
-  Box: {1, 1, 1}
+  box.geometry.Box: {1, 1, 1}
   Rgb: {255, 255, 255}
 }
 
@@ -55,69 +55,69 @@ ui {
   }
 
   house_bar {
-    ProjectedAnchor: {target: house, view: world_view}
-    ProjectedBox: {min: {-1, -1, -1}, max: {1, 1, 1}, offset: {0, 10}, fit_width: true}
+    Anchor: {target: house, view: world_view}
+    box.projection.Box: {min: {-1, -1, -1}, max: {1, 1, 1}, offset: {0, 10}, fit_width: true}
     Layout: {direction: Row, padding: {1, 1, 1, 1}}
-    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Item: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
     Rect: {1, 8}
     Rgb: {20, 20, 24}
 
     fill {
       Position: {0, 0, 1}
-      LayoutItem: {width: {mode: Grow, value: 0.8}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 0.8}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {80, 220, 90}
     }
 
     empty {
-      LayoutItem: {width: {mode: Grow, value: 0.2}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 0.2}, height: {mode: Grow}}
     }
   }
 
   tower_bar {
-    ProjectedAnchor: {target: tower, view: world_view}
-    ProjectedBox: {min: {-1, -1.5, -1}, max: {1, 1.5, 1}, offset: {0, 10}, fit_width: true}
+    Anchor: {target: tower, view: world_view}
+    box.projection.Box: {min: {-1, -1.5, -1}, max: {1, 1.5, 1}, offset: {0, 10}, fit_width: true}
     Layout: {direction: Row, padding: {1, 1, 1, 1}}
-    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Item: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
     Rect: {1, 8}
     Rgb: {20, 20, 24}
 
     fill {
       Position: {0, 0, 1}
-      LayoutItem: {width: {mode: Grow, value: 0.5}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 0.5}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {240, 200, 40}
     }
 
     empty {
-      LayoutItem: {width: {mode: Grow, value: 0.5}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 0.5}, height: {mode: Grow}}
     }
   }
 
   hall_bar {
-    ProjectedAnchor: {target: hall, view: world_view}
-    ProjectedBox: {min: {-2, -1, -1.5}, max: {2, 1, 1.5}, offset: {0, 10}, fit_width: true}
+    Anchor: {target: hall, view: world_view}
+    box.projection.Box: {min: {-2, -1, -1.5}, max: {2, 1, 1.5}, offset: {0, 10}, fit_width: true}
     Layout: {direction: Row, padding: {1, 1, 1, 1}}
-    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Item: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
     Rect: {1, 8}
     Rgb: {20, 20, 24}
 
     fill {
       Position: {0, 0, 1}
-      LayoutItem: {width: {mode: Grow, value: 0.25}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 0.25}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {230, 60, 50}
     }
 
     empty {
-      LayoutItem: {width: {mode: Grow, value: 0.75}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: 0.75}, height: {mode: Grow}}
     }
   }
 
   ghost_bar {
-    ProjectedAnchor: {target: ghost, view: world_view}
-    ProjectedBox: {min: {-0.5, -0.5, -0.5}, max: {0.5, 0.5, 0.5}, offset: {0, 10}, fit_width: true}
-    LayoutItem: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
+    Anchor: {target: ghost, view: world_view}
+    box.projection.Box: {min: {-0.5, -0.5, -0.5}, max: {0.5, 0.5, 0.5}, offset: {0, 10}, fit_width: true}
+    Item: {width: {mode: Fixed}, height: {mode: Fixed, value: 8}}
     Rect: {1, 8}
     Rgb: {255, 0, 255}
   }

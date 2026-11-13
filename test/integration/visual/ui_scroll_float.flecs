@@ -24,7 +24,7 @@ template Row {
   prop r: u8 = 90
   prop g: u8 = 160
   prop b: u8 = 250
-  LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 36}}
+  Item: {width: {mode: Grow}, height: {mode: Fixed, value: 36}}
   Rect: {1, 1}
   Rgb: {r, g, b}
   Border: {radius: 6}
@@ -34,7 +34,7 @@ template Option {
   prop r: u8 = 200
   prop g: u8 = 235
   prop b: u8 = 205
-  LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 24}}
+  Item: {width: {mode: Grow}, height: {mode: Fixed, value: 24}}
   Rect: {1, 1}
   Rgb: {r, g, b}
   Border: {radius: 4}
@@ -44,7 +44,7 @@ template Tile {
   prop r: u8 = 250
   prop g: u8 = 190
   prop b: u8 = 60
-  LayoutItem: {width: {mode: Fixed, value: 60}, height: {mode: Fixed, value: 46}}
+  Item: {width: {mode: Fixed, value: 60}, height: {mode: Fixed, value: 46}}
   Rect: {1, 1}
   Rgb: {r, g, b}
   Border: {radius: 6}
@@ -53,17 +53,17 @@ template Tile {
 screen {
   Position: {0, 0, 0}
   Layout: {direction: None}
-  LayoutItem: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 360}}
+  Item: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 360}}
   Rect: {1, 1}
   Rgb: {24, 26, 34}
 
   list {
     Layout: {direction: Column, spacing: 4, padding: {6, 6, 6, 6}}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 230},
       h: Left, v: Top, x: 30, y: -30
     }
-    LayoutScroll: {y: 70, vertical: true}
+    Scroll: {y: 70, vertical: true}
     Rect: {1, 1}
     Rgb: {44, 48, 62}
     Border: {radius: 10}
@@ -74,7 +74,7 @@ screen {
 
     picker {
       Layout: {direction: Row, padding: {4, 4, 10, 10}, v: Middle}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
+      Item: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
       Rect: {1, 1}
       Rgb: {250, 190, 60}
       Border: {radius: 6}
@@ -85,9 +85,9 @@ screen {
       }
 
       options {
-        LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -4, flip: true}
+        Float: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, y: -4, flip: true}
         Layout: {direction: Column, spacing: 3, padding: {4, 4, 4, 4}}
-        LayoutItem: {width: {mode: Fixed, value: 260}}
+        Item: {width: {mode: Fixed, value: 260}}
         Rect: {1, 1}
         Rgb: {30, 90, 50}
         Border: {width: 2, radius: 6, color: {200, 235, 205, 255}}
@@ -106,7 +106,7 @@ screen {
   }
 
   card {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 200},
       h: Left, v: Top, x: 250, y: -30
     }
@@ -117,11 +117,11 @@ screen {
 
   strip {
     Layout: {direction: Row, spacing: 6, padding: {6, 6, 6, 6}}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 58},
       h: Left, v: Bottom, x: 30, y: 30
     }
-    LayoutScroll: {x: 40, horizontal: true}
+    Scroll: {x: 40, horizontal: true}
     Rect: {1, 1}
     Rgb: {44, 48, 62}
     Border: {radius: 10}
@@ -138,7 +138,7 @@ screen {
 
   menu_button {
     Layout: {direction: Row, padding: {4, 4, 10, 10}, v: Middle}
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 150}, height: {mode: Fixed, value: 34},
       h: Right, v: Bottom, x: -30, y: 30
     }
@@ -152,8 +152,8 @@ screen {
     }
 
     menu {
-      LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Bottom, y: -4, flip: true}
-      LayoutItem: {width: {mode: Grow, min: 180}, height: {mode: Fixed, value: 120}}
+      Float: {h: Right, v: Top, anchor_h: Right, anchor_v: Bottom, y: -4, flip: true}
+      Item: {width: {mode: Grow, min: 180}, height: {mode: Fixed, value: 120}}
       Rect: {1, 1}
       Rgb: {250, 240, 220}
       Border: {width: 2, radius: 8, color: {110, 80, 60, 255}}
@@ -161,7 +161,7 @@ screen {
   }
 
   hint {
-    LayoutItem: {
+    Item: {
       width: {mode: Fixed, value: 40}, height: {mode: Fixed, value: 40},
       h: Right, v: Top, x: -10, y: -90
     }
@@ -171,7 +171,7 @@ screen {
     Border: {radius: 20}
 
     tooltip {
-      LayoutFloat: {h: Center, v: Bottom, anchor_h: Center, anchor_v: Top, y: 6, flip: true}
+      Float: {h: Center, v: Bottom, anchor_h: Center, anchor_v: Top, y: 6, flip: true}
       Layout: {direction: Row, padding: {6, 6, 10, 10}}
       Rect: {1, 1}
       Rgb: {20, 20, 24}

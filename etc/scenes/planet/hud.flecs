@@ -19,13 +19,13 @@ assets {
     prop text: string = ""
 
     Layout: {direction: Row, spacing: 6, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     if text != "" {
       Label name(text: text)
 
       gap {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
     }
   }
@@ -38,7 +38,7 @@ assets {
     prop blue: f32 = 255
 
     Layout: {direction: Column, spacing: 2}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
 
     Label name(text: text)
 
@@ -61,9 +61,9 @@ assets {
 
     Layout: {direction: Column, spacing: t.spacing}
     if shown {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
     } else {
-      LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+      Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
       ClipChildren
     }
   }
@@ -73,7 +73,7 @@ assets {
     const t = box.ui.theme[UiTheme]
 
     Layout: {direction: Row, padding: {2, 2, 2, 2}, spacing: 2, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Rect: {1, 1}
     Rgb: t.surface_alt
     Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
@@ -87,7 +87,7 @@ assets {
     const ring = focused && FocusStatus[FocusStatus].visible
 
     Layout: {direction: Row, padding: {0, 0, t.padding, t.padding}, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height - 4}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height - 4}}
     Rect: {1, 1}
     Rgb: selected ? t.accent : down ? t.pressed : hover ? t.hover : t.surface_alt
     Transition: [Rgb: WidgetFade]
@@ -113,13 +113,13 @@ hud {
   }
 
   screen {
-    LayoutFill: {surface: window}
+    Fill: {surface: window}
     Layout: {padding: {16, 16, 16, 16}}
     FocusScope
 
     side {
       Layout: {}
-      LayoutItem: {h: Left, v: Middle}
+      Item: {h: Left, v: Middle}
       InputBlocker
 
       // The panel: the Planet / Star switch, then what the planet or the star is (type, seed,
@@ -140,7 +140,7 @@ hud {
         // stay, so switching keeps their widgets as they are
         pages {
           Layout: {direction: Column}
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
 
           assets.Page star_page(shown: state.mode == MODE_STAR) {
             assets.Field star_type(text: "Type") {
@@ -472,7 +472,7 @@ hud {
 
         assets.Field run(text: "") {
           gap {
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
           }
 
           Button reset(label: "Reset", variant: "secondary", action: actions.reset)

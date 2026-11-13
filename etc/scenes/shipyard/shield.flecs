@@ -13,7 +13,7 @@ using state
 assets {
   prefab ShieldGlow { Rgb: {176, 208, 255}; Emissive: {strength: 6, color: {96, 150, 255}} }
   prefab ShieldCell { Rgb: {26, 44, 84}; PbrMaterial: {metallic: 0.2, roughness: 0.12}; ClearCoat: {strength: 1, roughness: 0.04}; Emissive: {strength: 2, color: {80, 140, 255}} }
-  prefab ShieldField { Rgb: {110, 160, 255}; Emissive: {strength: 1.4, color: {100, 156, 255}}; Opacity: {0.08}; BlendMode: Additive; NoShadow; SpatialIgnore }
+  prefab ShieldField { Rgb: {110, 160, 255}; Emissive: {strength: 1.4, color: {100, 156, 255}}; Opacity: {0.08}; BlendMode: Additive; NoShadow; Ignore }
   prefab ShieldPaint { Rgb: {36, 70, 140}; PbrMaterial: {metallic: 0.35, roughness: 0.38}; ClearCoat: {strength: 0.6, roughness: 0.15} }
 
   template ShieldGenerator {

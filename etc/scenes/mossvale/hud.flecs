@@ -131,7 +131,7 @@ assets {
     prop w: f32 = 24
     prop h: f32 = 24
     prop tint: Rgb = {255, 255, 255}
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
     Rect: {1, 1}
     Image: {texture: tex}
     Rgb: tint
@@ -144,8 +144,8 @@ assets {
     prop size: f32 = 34
     prop dx: f32 = -7
     prop dy: f32 = 7
-    LayoutFloat: {h: h, v: v, anchor_h: h, anchor_v: v, x: dx, y: dy}
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Float: {h: h, v: v, anchor_h: h, anchor_v: v, x: dx, y: dy}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Rotation: {0, 0, turn}
     Rect: {1, 1}
     Image: {texture: mv_ui_corner}
@@ -162,7 +162,7 @@ assets {
     prop alpha: f32 = 1
     prop corners: bool = true
     Layout: {direction: row ? Row : Column, padding: {pad, pad, padx < 0 ? pad + 6 : padx, padx < 0 ? pad + 6 : padx}, spacing: gap, h: h, v: Middle}
-    LayoutItem: {width: {mode: w > 0 ? Fixed : Fit, value: w}, height: {mode: ht > 0 ? Fixed : Fit, value: ht}}
+    Item: {width: {mode: w > 0 ? Fixed : Fit, value: w}, height: {mode: ht > 0 ? Fixed : Fit, value: ht}}
     Rect: {1, 1}
     Image: {texture: mv_ui_parchment}
     Rgb: {255, 252, 244}
@@ -181,7 +181,7 @@ assets {
   template Divider {
     prop w: f32 = 300
     prop h: f32 = 22
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
     Rect: {1, 1}
     Image: {texture: mv_ui_divider}
     Rgb: {255, 255, 255}
@@ -191,7 +191,7 @@ assets {
     prop key: string = "E"
     prop size: f32 = 13
     Layout: {direction: Row, h: Center, v: Middle, padding: {3, 5, 7, 7}}
-    LayoutItem: {width: {mode: Fit, min: 24}, height: {mode: Fixed, value: 24}}
+    Item: {width: {mode: Fit, min: 24}, height: {mode: Fixed, value: 24}}
     Rect: {1, 1}
     Rgb: {246, 234, 204}
     Border: {width: 1.6, radius: 5, color: {70, 46, 24, 255}}
@@ -202,7 +202,7 @@ assets {
   template Medallion {
     prop id: i32 = 13
     prop size: f32 = 80
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Circle: {size / 2}
     Rgb: {214, 168, 82}
     Border: {width: 2.5, color: {54, 34, 16, 255}}
@@ -218,7 +218,7 @@ assets {
     prop active: bool = false
     prop over: bool = false
     const c: Rgb = {spell_r(s), spell_g(s), spell_b(s)}
-    LayoutItem: {width: {mode: Fixed, value: 62}, height: {mode: Fixed, value: 62}}
+    Item: {width: {mode: Fixed, value: 62}, height: {mode: Fixed, value: 62}}
     Circle: {31}
     if active {
       Rgb: {250, 214, 120}
@@ -251,14 +251,14 @@ assets {
     const have = known[s]
     const active = spell == s && have
     Layout: {direction: Column, h: Center, v: Middle, spacing: 4, padding: {6, 4, 2, 2}}
-    LayoutItem: {width: {mode: Fixed, value: 78}, height: {mode: Fixed, value: 96}}
+    Item: {width: {mode: Fixed, value: 78}, height: {mode: Fixed, value: 96}}
     Interactive
     Cursor: {CursorPointer}
     socket_slot { Layout: {direction: Row}; SpellSocket socket(s: s, have: have, active: active, over: over && have) }
     name_slot { Layout: {direction: Row}; Label name(text: have ? spell_name(s) : "Unknown", size: 12, color: active ? C_GOLD : have ? C_MUTED : {130, 120, 100}, display: true) }
     key {
-      LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Top, x: 13, y: -13}
-      LayoutItem: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+      Float: {h: Center, v: Middle, anchor_h: Left, anchor_v: Top, x: 13, y: -13}
+      Item: {width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
       Circle: {11}
       Rgb: active ? {255, 222, 130} : {232, 214, 172}
       Border: {width: 1.8, color: {50, 30, 12, 255}}
@@ -291,7 +291,7 @@ assets {
     const cy = -40 * u
     InputBlocker
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: 340 * u}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: 340 * u}}
     aura { Position: {0, cy, -0.2}; Circle: {inner * 0.5}; Rgb: {20, 30, 80}; BoxShadow: {blur: 46, spread: 4, color: {70, 110, 255, 120 + level * 60}} }
     neck {
       Position: {0, 88 * u, 0}
@@ -493,7 +493,7 @@ assets {
 
   template MiniMap {
     InputBlocker
-    LayoutItem: {width: {mode: Fixed, value: 240}, height: {mode: Fixed, value: 240}}
+    Item: {width: {mode: Fixed, value: 240}, height: {mode: Fixed, value: 240}}
     Rect: {1, 1}
     Rgb: {84, 56, 32}
     Border: {width: 3, radius: 6, color: {214, 168, 82, 255}}
@@ -608,7 +608,7 @@ assets {
   template Prompt {
     const show = near_npc >= 0 && talk_npc < 0 && game_state == 1
     Layout: {direction: Row, h: Center}
-    LayoutItem: {height: {mode: Fixed, value: 38}}
+    Item: {height: {mode: Fixed, value: 38}}
     if show {
       pill {
         Layout: {direction: Row, v: Middle, spacing: 9, padding: {6, 7, 10, 16}}
@@ -629,8 +629,8 @@ assets {
     Layout: {direction: Row, h: Center}
     if show {
       Panel box_(w: 880, ht: 168, pad: 16, padx: 46, gap: 20, row: true, corners: false) {
-        roll_l { LayoutFloat: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle, x: 2}; LayoutItem: {width: {mode: Fixed, value: 34}, height: {mode: Fixed, value: 196}}; Rect: {1, 1}; Image: {texture: mv_ui_roller}; Rgb: {255, 255, 255} }
-        roll_r { LayoutFloat: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle, x: -2}; LayoutItem: {width: {mode: Fixed, value: 34}, height: {mode: Fixed, value: 196}}; Rect: {1, 1}; Image: {texture: mv_ui_roller}; Rgb: {255, 255, 255} }
+        roll_l { Float: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle, x: 2}; Item: {width: {mode: Fixed, value: 34}, height: {mode: Fixed, value: 196}}; Rect: {1, 1}; Image: {texture: mv_ui_roller}; Rgb: {255, 255, 255} }
+        roll_r { Float: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle, x: -2}; Item: {width: {mode: Fixed, value: 34}, height: {mode: Fixed, value: 196}}; Rect: {1, 1}; Image: {texture: mv_ui_roller}; Rgb: {255, 255, 255} }
         content_ {
           Layout: {direction: Row, spacing: 20, v: Middle}
           face_slot { Layout: {direction: Row}; Portrait face(id: talk_npc) }
@@ -638,7 +638,7 @@ assets {
             Layout: {direction: Column, spacing: 6}
             plate {
               Layout: {direction: Row, h: Center, v: Middle, padding: {0, 8, 0, 0}}
-              LayoutItem: {width: {mode: Fixed, value: 330}, height: {mode: Fixed, value: 52}}
+              Item: {width: {mode: Fixed, value: 330}, height: {mode: Fixed, value: 52}}
               Rect: {1, 1}
               Image: {texture: mv_ui_ribbon}
               Rgb: {255, 255, 255}
@@ -647,7 +647,7 @@ assets {
             say_slot { Layout: {direction: Row}; Label say_(text: line(talk_topic * 10 + talk_line), size: 19, color: C_INK, width: 660) }
             more {
               Layout: {direction: Row, h: Right, v: Middle, spacing: 7}
-              LayoutItem: {width: {mode: Fixed, value: 660}}
+              Item: {width: {mode: Fixed, value: 660}}
               Keycap key(key: "E", size: 11)
               Label hint(text: last ? "farewell" : "continue", size: 14, color: C_INK_SOFT, display: true)
             }
@@ -703,36 +703,36 @@ assets {
   template TitleCard {
     Layout: {}
     shade_ {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {14, 10, 20}
       Opacity: {0.45}
     }
     vignette_ {
       Position: {0, 0, 0.1}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       Image: {texture: mv_ui_vignette}
       Rgb: {255, 255, 255}
     }
     scrim_ {
       Position: {0, 0, 0.15}
-      LayoutFloat: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
-      LayoutItem: {width: {mode: Fixed, value: 1400}, height: {mode: Fixed, value: 880}}
+      Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle}
+      Item: {width: {mode: Fixed, value: 1400}, height: {mode: Fixed, value: 880}}
       Rect: {1, 1}
       Image: {texture: mv_ui_scrim}
       Rgb: {255, 255, 255}
     }
     content {
       Position: {0, 0, 0.2}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Layout: {direction: Column, h: Center, v: Middle, spacing: 10, padding: {40, 40, 60, 60}}
       Divider top_rule(w: 420, h: 34)
       Engraved title(text: "MOSSVALE", size: 150, color: C_GOLD, depth: 6)
       Engraved sub(text: "The Hedge Mage", size: 36, color: C_TEXT, depth: 2.5)
       Divider rule(w: 620, h: 50)
       Engraved hook(text: "The old mage is gone. The village needs a new one.", size: 24, color: C_TEXT, display: false, depth: 2, align: Center)
-      gap_ { LayoutItem: {height: {mode: Fixed, value: 40}} }
+      gap_ { Item: {height: {mode: Fixed, value: 40}} }
       Pulse go(text: "Press Enter", size: 32)
     }
   }
@@ -741,26 +741,26 @@ assets {
     const mins = floor((finished_at - started_at) / 60)
     Layout: {}
     shade_ {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {14, 10, 20}
       Opacity: {0.5}
     }
     vignette_ {
       Position: {0, 0, 0.1}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
       Image: {texture: mv_ui_vignette}
       Rgb: {255, 255, 255}
     }
     content {
       Position: {0, 0, 0.2}
-      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Item: {width: {mode: Grow}, height: {mode: Grow}}
       Layout: {direction: Column, h: Center, v: Middle, spacing: 10, padding: {40, 40, 60, 60}}
       Engraved title(text: "The Festival of Lights", size: 66, color: C_GOLD, depth: 3)
       Divider rule(w: 560, h: 46)
       Engraved sub(text: "Mossvale has its mage again.", size: 26, color: C_TEXT, depth: 2)
-      gap { LayoutItem: {height: {mode: Fixed, value: 12}} }
+      gap { Item: {height: {mode: Fixed, value: 12}} }
       Panel stats_box(pad: 18, padx: 34, gap: 10, h: Center) {
         content_ {
           Layout: {direction: Column, spacing: 10, h: Center}
@@ -774,7 +774,7 @@ assets {
           }
         }
       }
-      gap_b { LayoutItem: {height: {mode: Fixed, value: 18}} }
+      gap_b { Item: {height: {mode: Fixed, value: 18}} }
       Engraved thanks(text: "Thank you for playing!", size: 26, color: C_GOLD, depth: 2)
       Engraved more(text: "Press Enter to keep wandering the festival", size: 16, color: C_MUTED, depth: 1.5)
     }
@@ -790,34 +790,34 @@ hud {
   }
 
   screen {
-    LayoutFill: {surface: window}
+    Fill: {surface: window}
     Layout: {direction: Column, padding: {18, 18, 18, 18}, spacing: 10}
 
     if game_state == 1 {
       top {
         Layout: {direction: Row, spacing: 12}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Badge badge()
         middle {
           Layout: {direction: Column, h: Center, spacing: 10, padding: {6, 0, 0, 0}}
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
           Banner banner_()
           ToastLine toast_()
         }
         Tracker tracker()
       }
-      spacer { LayoutItem: {height: {mode: Grow}} }
+      spacer { Item: {height: {mode: Grow}} }
       bottom {
         Layout: {direction: Column, h: Center, spacing: 10}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         Dialog dialog()
         Prompt prompt()
         SpellBar spells()
         MiniMap minimap {
-          LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom, x: 0, y: 0}
+          Float: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom, x: 0, y: 0}
         }
         ManaVial vial {
-          LayoutFloat: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom, x: 4, y: 0}
+          Float: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom, x: 4, y: 0}
         }
       }
     }
@@ -825,14 +825,14 @@ hud {
 
   if game_state == 0 {
     TitleCard title {
-      LayoutFill: {surface: window}
+      Fill: {surface: window}
       Position: {0, 0, 5}
     }
   }
 
   if game_state == 2 && clock > ending_t + 12 {
     EndCard ending {
-      LayoutFill: {surface: window}
+      Fill: {surface: window}
       Position: {0, 0, 5}
     }
   }

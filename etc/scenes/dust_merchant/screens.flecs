@@ -57,7 +57,7 @@ assets {
       Transition: [Rgb: {duration: 2.4, timing_function: EaseOut}]
     }
     BlendMode: Additive
-    SpatialIgnore
+    Ignore
   }
 
   template NavNode {
@@ -86,10 +86,10 @@ assets {
       Rgb: {0, 0, 0}
       BlendMode: Additive
       Border: {width: 2, color: {110, 255, 160, 255}}
-      SpatialIgnore
+      Ignore
     }
     if home {
-      core { Position: {0, 16, 1}; Circle: {5}; Rgb: NAV_INK; SpatialIgnore }
+      core { Position: {0, 16, 1}; Circle: {5}; Rgb: NAV_INK; Ignore }
     }
     Ink words(text: dest_name(dest), size: 30, align: Center, hue: picked || hover ? NAV_INK : NAV_DIM) { Position: {0, -8, 1} }
     Ink code(text: home ? "CURRENT" : dest_code(dest), size: 24, align: Center, hue: NAV_DIM) { Position: {0, -30, 1} }
@@ -197,10 +197,10 @@ assets {
     prop show: bool = false
 
     Layout: {direction: Row}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     if show {
       Ink a(text: name, size: 30, hue: NAV_DIM)
-      grow { LayoutItem: {width: {mode: Grow}} }
+      grow { Item: {width: {mode: Grow}} }
       Ink b(text: ok ? "OK" : "FAIL", size: 30, hue: match ok { true: NAV_INK; _: {255, 120, 90} })
     }
   }
@@ -209,10 +209,10 @@ assets {
     const lines = boot_lines
 
     Layout: {direction: Column, spacing: 4, padding: {14, 14, 22, 22}}
-    LayoutItem: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 480}}
+    Item: {width: {mode: Fixed, value: 640}, height: {mode: Fixed, value: 480}}
 
     Ink title(text: "SYS MONITOR  BIOS 2.11", size: 34, hue: NAV_INK)
-    rule { LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}; Rect: {1, 1}; Rgb: NAV_DIM }
+    rule { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}; Rect: {1, 1}; Rgb: NAV_DIM }
     SysLine l0(name: "CORE MEM 640K", show: lines > 0)
     SysLine l1(name: "BUS A  28V", show: lines > 1, ok: bus)
     SysLine l2(name: "BUS B  28V", show: lines > 2, ok: fault == false)
@@ -220,18 +220,18 @@ assets {
     SysLine l4(name: "COOLANT LOOP", show: lines > 4, ok: coolant > 0.3)
     SysLine l5(name: "FUEL CELLS", show: lines > 5)
     SysLine l6(name: "JUMP COMPUTER", show: lines > 6, ok: reactor > 0.4)
-    grow { LayoutItem: {height: {mode: Grow}} }
+    grow { Item: {height: {mode: Grow}} }
     if lines > 6 {
       Ink hdr(text: "REACTOR OUTPUT {reactor * 100:.0}%", size: 30, hue: reactor > 0.9 ? NAV_INK : NAV_DIM)
       track {
         Layout: {}
-        LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 26}}
+        Item: {width: {mode: Grow}, height: {mode: Fixed, value: 26}}
         Rect: {1, 1}
         Rgb: {0, 0, 0}
         BlendMode: Additive
         Border: {width: 2, color: {32, 104, 62, 255}}
         fill {
-          LayoutItem: {h: Left, v: Middle, x: 3, width: {mode: Fixed, value: 1 + reactor * 590}, height: {mode: Fixed, value: 18}}
+          Item: {h: Left, v: Middle, x: 3, width: {mode: Fixed, value: 1 + reactor * 590}, height: {mode: Fixed, value: 18}}
           Rect: {1, 1}
           Rgb: NAV_INK
         }
@@ -332,7 +332,7 @@ assets {
       Position: {0, -112, 2}
       box_ {
         Layout: {direction: Column, spacing: 0, padding: {4, 4, 6, 6}}
-        LayoutItem: {width: {mode: Fixed, value: 600}, height: {mode: Fixed, value: 210}}
+        Item: {width: {mode: Fixed, value: 600}, height: {mode: Fixed, value: 210}}
         if locked {
           for i in 0..7 {
             if com_shown > i {

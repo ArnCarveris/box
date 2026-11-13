@@ -237,22 +237,22 @@ void PickOrder_many_views_keep_top_created_last(void) {
     "  outer {\n" \
     "    Position: {0, 0, 0}\n" \
     "    Layout: {direction: Column}\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "    Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
     "    Rect: {1, 1}\n" \
     "    Interactive\n" \
     "    ClipChildren\n" \
     "    inner {\n" \
     "      Layout: {direction: Column}\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "      Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
     "      ClipChildren\n" \
     "      overlay {\n" \
-    "        LayoutFloat: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: 5" fl "}\n" \
-    "        LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Grow}}\n" \
+    "        Float: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: 5" fl "}\n" \
+    "        Item: {width: {mode: Fixed, value: 20}, height: {mode: Grow}}\n" \
     "        Rect: {1, 1}\n" \
     "        Interactive\n" \
     "      }\n" \
     "      content {\n" \
-    "        LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "        Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
     "        Rect: {1, 1}\n" \
     "        Interactive\n" \
     "      }\n" \
@@ -348,23 +348,23 @@ void PickOrder_float_picked_outside_clips(void) {
     "  scroll {\n" \
     "    Position: {0, 0, 0}\n" \
     "    Layout: {direction: Column}\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
-    "    LayoutScroll: {vertical: true}\n" \
+    "    Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "    Scroll: {vertical: true}\n" \
     "    Rect: {1, 1}\n" \
     "    ClipChildren\n" \
     "    anchor {\n" \
     "      Layout: {}\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n" \
+    "      Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n" \
     "      Rect: {1, 1}\n" \
     "      Interactive\n" \
     "      list {\n" \
-    "        LayoutFloat: {anchor_v: Bottom, v: Top, hide_clipped: true}\n" \
+    "        Float: {anchor_v: Bottom, v: Top, hide_clipped: true}\n" \
     "        Rect: {80, 50}\n" \
     "        Interactive\n" \
     "      }\n" \
     "    }\n" \
     "    filler {\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 300}}\n" \
+    "      Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 300}}\n" \
     "      Rect: {1, 1}\n" \
     "      Interactive\n" \
     "    }\n" \

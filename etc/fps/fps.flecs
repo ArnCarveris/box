@@ -103,14 +103,14 @@ template FpsWidget {
   Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
 
   heading {
-    LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: heading_h}}
+    Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: heading_h}}
     Text: {value: title, size: t.font_size, line_height: heading_h}
     Rgb: t.text
   }
 
   // The bars bar_0 to bar_119 in bars, then the reference lines over them
   chart {
-    LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: chart_h}}
+    Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: chart_h}}
 
     bars {
       FpsBars: {}
@@ -147,10 +147,10 @@ template FpsWidget {
     }
 
     Layout: {direction: Row}
-    LayoutItem: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: summary_h}}
+    Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: summary_h}}
 
     times {
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       Text: {
         value: "mean {sum.mean_ms:.1} ms, worst {sum.worst_ms:.1} ms",
         size: t.small_font_size,

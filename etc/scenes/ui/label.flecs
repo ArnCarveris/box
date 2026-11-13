@@ -42,9 +42,9 @@ template Panel {
   const title_h = t.heading_font_size * 1.25
 
   Layout: {direction: Column, padding: {pad, pad, pad, pad}, spacing: t.spacing}
-  LayoutItem: {width: {min: width, max: width}}
+  Item: {width: {min: width, max: width}}
   if grow {
-    LayoutItem = {height: {mode: Grow}}
+    Item = {height: {mode: Grow}}
   }
   Rect: {1, 1}
   Rgb: t.surface
@@ -53,7 +53,7 @@ template Panel {
 
   if title != "" {
     heading {
-      LayoutItem: {height: {mode: Fixed, value: title_h}}
+      Item: {height: {mode: Fixed, value: title_h}}
       Text: {value: title, size: t.heading_font_size, line_height: title_h}
       Rgb: t.text
     }
@@ -64,7 +64,7 @@ template Panel {
 template Separator {
   const t = box.ui.theme[UiTheme]
 
-  LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+  Item: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
   Rect: {1, 1}
   Rgb: t.border
 }

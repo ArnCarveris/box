@@ -11,7 +11,7 @@ async {
     for s in 0..4 {
       const e = eq[s]
       if e != 0 {
-        const a = e[Item]
+        const a = e[ArmoryItem]
         gear = [gear[0] + a.might, gear[1] + a.ward, gear[2] + a.haste, gear[3] + a.aether]
       }
     }

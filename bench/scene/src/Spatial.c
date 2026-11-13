@@ -253,7 +253,7 @@ void Spatial_overlap_sphere_1m(
 static void bench_spatial_manual(
     ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialUpdate");
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.Update");
     ecs_enable(world, system, false);
 }
 
@@ -766,7 +766,7 @@ void Spatial_idle_100k(
 {
     // scenes/spatial_idle_cost
     ecs_world_t *world = bench_spatial_idle_world(100000);
-    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialUpdate");
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.Update");
     box_spatial_stats_t stats = {0};
     bench_set_items(b, 100000);
     while (bench_iter(b)) {
@@ -784,7 +784,7 @@ void Spatial_idle_ray_100k(
 {
     // scenes/spatial_idle_cost
     ecs_world_t *world = bench_spatial_idle_world(100000);
-    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialUpdate");
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.Update");
     box_spatial_ray_t ray = { .origin = {10, 20, 10}, .dir = {0, -1, 0} };
     box_spatial_stats_t stats = {0};
     int32_t hits = 0;

@@ -28,31 +28,31 @@ assets {
     }
 
     screen {
-      LayoutFill: {surface: window}
+      Fill: {surface: window}
       Layout: {direction: Column, padding: {12, 12, 12, 12}}
       FocusScope
 
       content {
         Layout: {direction: Column, spacing: 10}
         if show_ui {
-          LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+          Item: {width: {mode: Grow}, height: {mode: Grow}}
         } else {
-          LayoutItem: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+          Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
           ClipChildren
         }
 
         top {
           Layout: {direction: Row, spacing: 10, v: Middle}
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
 
           YardStrip class_switch {
-            LayoutItem: {width: {min: 320, max: 320}}
+            Item: {width: {min: 320, max: 320}}
             YardSegment b_rigs(label: "Rigs", icon: yard_icon_ship, op: OP_RIGS, grow: true)
             YardSegment b_liners(label: "Liners", icon: yard_icon_liner, op: OP_LINERS, grow: true)
           }
 
           spacer_a {
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
           }
 
           YardStrip layer_picker {
@@ -63,27 +63,27 @@ assets {
           }
 
           spacer_b {
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
           }
 
           gap_right {
-            LayoutItem: {width: {mode: Fixed, value: 320}}
+            Item: {width: {mode: Fixed, value: 320}}
           }
         }
 
         middle {
           Layout: {direction: Row}
-          LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+          Item: {width: {mode: Grow}, height: {mode: Grow}}
 
           ModulesCard modules_card(title: liner ? "SEGMENTS" : "MODULES", width: 320, spacing: 10)
 
           spacer {
-            LayoutItem: {width: {mode: Grow}}
+            Item: {width: {mode: Grow}}
           }
 
           ops {
             Layout: {direction: Column, spacing: 10}
-            LayoutItem: {width: {min: 320, max: 320}}
+            Item: {width: {min: 320, max: 320}}
             ReactorPanel reactors(title: "REACTORS", width: 320, spacing: 7)
             PowerPanel power(title: "POWER", width: 320, spacing: 8)
             DrivePanel drive(title: "MAIN DRIVE", width: 320, spacing: 8)
@@ -93,7 +93,7 @@ assets {
 
         bottom {
           Layout: {direction: Row, h: Center}
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
 
           YardStrip presets {
             YardStripLabel caption(text: "PRESETS")
@@ -118,15 +118,15 @@ assets {
     }
 
     toggles {
-      LayoutFill: {surface: window}
+      Fill: {surface: window}
       Layout: {direction: Row, padding: {12, 12, 12, 12}, v: Top}
 
       spacer {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
 
       YardStrip view_switch {
-        LayoutItem: {width: {min: 320, max: 320}}
+        Item: {width: {min: 320, max: 320}}
         YardStripLabel caption(text: "SHOW")
         YardSegment b_ui(label: "Interface", op: OP_SHOW_UI, grow: true)
         YardSegment b_gantry(label: "Gantry", op: OP_SHOW_GANTRY, grow: true)

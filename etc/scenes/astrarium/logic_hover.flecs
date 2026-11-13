@@ -12,16 +12,16 @@ async {
     const focus = armory_hovering ? shown : eq[0]
     mut delta: i32[4] = {}
     if armory_hovering {
-      const h = shown[Item]
+      const h = shown[ArmoryItem]
       const held = eq[h.slot]
       if held != 0 && held != shown {
-        const w = held[Item]
+        const w = held[ArmoryItem]
         delta = [h.might - w.might, h.ward - w.ward, h.haste - w.haste, h.aether - w.aether]
       }
     }
     preview = delta
     if focus != 0 && focus != last_focus {
-      const f = focus[Item]
+      const f = focus[ArmoryItem]
       last_focus = focus
       relic_model = f.slot
       relic_r = f.model_hue.r

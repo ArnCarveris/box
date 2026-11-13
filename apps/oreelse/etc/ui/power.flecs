@@ -69,7 +69,7 @@ template PowerBar {
 
   Interactive
   Cursor: {CursorPointer}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: powerBarX, y: -y,
     width: {mode: Fixed, value: powerBarWidth}, height: {mode: Fixed, value: powerBarHeight}
   }
@@ -108,7 +108,7 @@ template PowerColumn {
   prop x: f32 = 0
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: x,
     width: {mode: Fixed, value: powerColumnWidth}, height: {mode: Fixed, value: 150}
   }
@@ -130,18 +130,18 @@ template PowerFree {
   const freeBars = cfg.powerBars - alloc.level[0] - alloc.level[1] - alloc.level[2]
 
   Layout: {direction: Row, spacing: 3, v: Middle}
-  LayoutItem: {h: Right, v: Top, x: -12, y: -12}
+  Item: {h: Right, v: Top, x: -12, y: -12}
 
   OreText word(text: "FREE {freeBars}", size: 11, font: ui_fonts.mono, color: palette.amber)
 
   gap {
-    LayoutItem: {width: {mode: Fixed, value: 4}}
+    Item: {width: {mode: Fixed, value: 4}}
   }
 
   for i in 0..cfg.powerBars {
     "pip_{i}" {
       const on = i < freeBars
-      LayoutItem: {width: {mode: Fixed, value: 5}, height: {mode: Fixed, value: 10}}
+      Item: {width: {mode: Fixed, value: 5}, height: {mode: Fixed, value: 10}}
       Rect: {1, 1}
       if on {
         Rgb: palette.amber
@@ -150,7 +150,7 @@ template PowerFree {
         Rgb: {38, 41, 46}
         Emissive: {strength: 0, color: palette.amberGlow}
       }
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 }

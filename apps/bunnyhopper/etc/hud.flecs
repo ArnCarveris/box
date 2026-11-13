@@ -34,7 +34,7 @@ template LifeIcon {
   prop size: f32 = 46
   prop alpha: f32 = 1
 
-  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
   Rect: {size, size}
   Image: {texture: life_icon, u1: 1, v1: 1}
   Opacity: {alpha}
@@ -63,18 +63,18 @@ template BunnyHud {
     }
 
     screen {
-      LayoutFill: {surface: surface}
+      Fill: {surface: surface}
       Layout: {}
 
       score {
-        LayoutItem: {h: Left, v: Top, x: 24, y: -24}
+        Item: {h: Left, v: Top, x: 24, y: -24}
         Text: {value: "Carrots: {carrotCount}", size: 30}
         Rgb: {255, 255, 255}
       }
 
       lives {
         Layout: {direction: Row, spacing: 12, padding: {12, 12, 12, 12}}
-        LayoutItem: {h: Right, v: Top, x: -14, y: -14}
+        Item: {h: Right, v: Top, x: -14, y: -14}
 
         for i in 0..maxLives {
           "life_{i}" {
@@ -85,7 +85,7 @@ template BunnyHud {
 
       if !over && carrotCount < 3 {
         hint {
-          LayoutItem: {h: Center, v: Bottom, y: 60}
+          Item: {h: Center, v: Bottom, y: 60}
           Text: {value: "SPACE to hop - hop again in the air for big carrots!", size: 24}
           Rgb: {255, 255, 255}
         }
@@ -95,13 +95,13 @@ template BunnyHud {
       if over {
         game_over {
           Layout: {}
-          LayoutItem: {
+          Item: {
             h: Center, v: Top, y: -256,
             width: {mode: Fixed, value: 560}, height: {mode: Fixed, value: 170}
           }
 
           background {
-            LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+            Item: {width: {mode: Grow}, height: {mode: Grow}}
             Rect: {1, 1}
             Rgb: {20, 30, 20}
             Opacity: {170.0 / 255.0}
@@ -110,13 +110,13 @@ template BunnyHud {
           }
 
           title {
-            LayoutItem: {h: Center, v: Top, y: -28}
+            Item: {h: Center, v: Top, y: -28}
             Text: {value: "GAME OVER", size: 64}
             Rgb: {255, 255, 255}
           }
 
           prompt {
-            LayoutItem: {h: Center, v: Top, y: -110}
+            Item: {h: Center, v: Top, y: -110}
             Text: {value: "Press R to try again", size: 26}
             Rgb: {255, 255, 255}
           }

@@ -125,7 +125,7 @@ assets {
         Layout: {}
 
         deck_anchor {
-          LayoutItem: {h: Center, v: Bottom, y: 57, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
+          Item: {h: Center, v: Bottom, y: 57, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
 
           if fx_cast_serial > 0 {
             CastFx "cast_{fx_cast_serial}"(spell: fx_cast)

@@ -102,7 +102,7 @@ assets {
       photo {
         Position: {284, -164, 1.2}
         Rotation: {0, 0, -0.09}
-        print { Position: {0, 0, 0}; Quad: {62, 75}; Rgb: {176, 172, 158}; PbrMaterial: {metallic: 0, roughness: 0.42}; PbrTextures: {albedo: tex_photo}; NoShadow; SpatialIgnore }
+        print { Position: {0, 0, 0}; Quad: {62, 75}; Rgb: {176, 172, 158}; PbrMaterial: {metallic: 0, roughness: 0.42}; PbrTextures: {albedo: tex_photo}; NoShadow; Ignore }
         Tape pin(w: 34, h: 12, x: 0, y: 34, tilt: 0.1, tone: {180, 176, 150})
       }
     }
@@ -155,7 +155,7 @@ assets {
 
       speaker {
         Position: {-376, -40, 0.6}
-        SpatialIgnore
+        Ignore
         rim : Soot { Rotation: {PI / 2, 0, 0}; Tube: {radius: 58, thickness: 6, length: 3, segments: 36, smooth: true} }
         cone : BlackAnod { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 54, length: 0.6, segments: 32, smooth: true}; Rgb: {10, 10, 10} }
         for i in 0..37 {
@@ -254,7 +254,7 @@ assets {
       Dymo slow(text: "NOT THIS WAY", x: -116, y: 96, size: 10, tilt: 1.57, len: 92)
       receipt {
         Position: {0, -68, 0}
-        SpatialIgnore
+        Ignore
         slot : BlackAnod { Position: {0, 0, 3}; RoundedBox: {230, 46, 6, 2, segments: 2} }
         mouth { Position: {0, 2, 6.2}; Box: {180, 5, 0.4}; Rgb: {2, 2, 2}; PbrMaterial: {metallic: 0, roughness: 0.9} }
         Dymo title(text: "INVOICE", x: 0, y: 14, size: 9, len: 60, tilt: 0)
@@ -320,7 +320,7 @@ assets {
         Row r3(gap: 30) {
           fan {
             Layout: {}
-            LayoutItem: {width: {mode: Fixed, value: 96}, height: {mode: Fixed, value: 96}}
+            Item: {width: {mode: Fixed, value: 96}, height: {mode: Fixed, value: 96}}
             rim : Soot { Rotation: {PI / 2, 0, 0}; Tube: {radius: 46, thickness: 5, length: 6, segments: 32, smooth: true} }
             blades {
               Rotation: {0, 0, 0}
@@ -331,8 +331,8 @@ assets {
               hub : BlackAnod { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 8, length: 5, segments: 14, smooth: true} }
             }
           }
-          scrub { Layout: {}; LayoutItem: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 60}}; Louver g(w: 300, h: 60, slats: 5, tone: {30, 30, 30}) }
-          vent_slot { Layout: {}; LayoutItem: {width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 24}}; Dymo vent_label(text: "CABIN AIR - IF ANY", x: 0, y: 0, size: 13, len: 170) }
+          scrub { Layout: {}; Item: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 60}}; Louver g(w: 300, h: 60, slats: 5, tone: {30, 30, 30}) }
+          vent_slot { Layout: {}; Item: {width: {mode: Fixed, value: 170}, height: {mode: Fixed, value: 24}}; Dymo vent_label(text: "CABIN AIR - IF ANY", x: 0, y: 0, size: 13, len: 170) }
         }
       }
       Tape t_a(w: 240, h: 54, x: -350, y: -255, tilt: 0.03)

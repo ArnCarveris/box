@@ -34,7 +34,7 @@ assets {
     Rgb: {70, 200, 255}
     Emissive: {strength: glow, color: {60, 190, 255}}
     NoShadow
-    SpatialIgnore
+    Ignore
   }
 
   template DeckGrid {
@@ -50,7 +50,7 @@ assets {
     for i in 0..4 {
       const sx = i % 2 == 0 ? -1 : 1
       const sz = i < 2 ? -1 : 1
-      "corner_{i}" : YardHolo { Position: {sx * GX * CW / 2, y + 0.02, sz * GZ * CW / 2}; Cylinder: {radius: 0.22, length: 0.04, segments: 16}; NoShadow; SpatialIgnore }
+      "corner_{i}" : YardHolo { Position: {sx * GX * CW / 2, y + 0.02, sz * GZ * CW / 2}; Cylinder: {radius: 0.22, length: 0.04, segments: 16}; NoShadow; Ignore }
     }
   }
 
@@ -66,7 +66,7 @@ assets {
         Rotation: {HALF_PI, 0, 0}
         Torus: {radius: r * 1.5, tube: 0.03, segments: 32, rings: 3}
         NoShadow
-        SpatialIgnore
+        Ignore
       }
     }
   }
@@ -431,7 +431,7 @@ assets {
       Emissive: {strength: 0.8, color: {255, 214, 160}}
       PbrTextures: {albedo: yard_planet_tex, emissive: yard_planet_night_tex}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
     clouds {
       Position: {0, 0, 0}
@@ -443,7 +443,7 @@ assets {
       BlendMode: AlphaBlend
       PbrTextures: {albedo: yard_cloud_tex}
       NoShadow
-      SpatialIgnore
+      Ignore
     }
   }
 }

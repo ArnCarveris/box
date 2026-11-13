@@ -1608,7 +1608,7 @@ void Containers_list_click_selects(void) {
     test_int(gallery_changes(world, s), 1);
     gallery_expect(world, s, "get gallery Gallery.mut.last", "\"files: 2\"");
     gallery_expect_focus(world, s, FILES);
-    gallery_expect(world, s, "get " FILES ".selected_row box.layout.LayoutItem.y", "-56");
+    gallery_expect(world, s, "get " FILES ".selected_row box.layout.Item.y", "-56");
     gallery_expect(world, s, "get " FILES ".selected_row box.material.Rgb",
         "{\"Rgb\":{\"r\":60, \"g\":104, \"b\":84}}");
 

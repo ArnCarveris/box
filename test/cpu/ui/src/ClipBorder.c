@@ -17,13 +17,13 @@
     "view {\n" \
     "  Position: {0, 0, 0}\n" \
     "  Layout: {}\n" \
-    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
     "  Rect: {1, 1}\n" \
     "  Rgb: {40, 40, 40}\n" \
     "  Border: " border "\n" \
     "  ClipChildren\n" \
     "  child {\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 140}, height: {mode: Fixed, value: 40}}\n" \
+    "    Item: {width: {mode: Fixed, value: 140}, height: {mode: Fixed, value: 40}}\n" \
     "    Rect: {1, 1}\n" \
     "    Rgb: {0, 0, 255}\n" \
     "  }\n" \

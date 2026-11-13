@@ -54,7 +54,7 @@ template OreScreenRoot {
   prop width: f32 = 1280
   prop height: f32 = 720
 
-  LayoutItem: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+  Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
 }
 
 template OreOneShot {
@@ -82,10 +82,10 @@ template OreText {
   prop v: VAlign = Top
 
   if width > 0 {
-    LayoutItem: {h: h, v: v, x: x, y: -y, width: {mode: Fixed, value: width}}
+    Item: {h: h, v: v, x: x, y: -y, width: {mode: Fixed, value: width}}
     Text: {value: text, size: size, font: font, width: width, align: align}
   } else {
-    LayoutItem: {h: h, v: v, x: x, y: -y}
+    Item: {h: h, v: v, x: x, y: -y}
     Text: {value: text, size: size, font: font, wrap: Newlines}
   }
   Rgb: color
@@ -95,7 +95,7 @@ template OreText {
       color: match glowColor.r + glowColor.g + glowColor.b > 0 { true: glowColor; _: color }
     }
   }
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreGlyph {
@@ -107,14 +107,14 @@ template OreGlyph {
   prop h: Align = Left
   prop v: VAlign = Top
 
-  LayoutItem: {
+  Item: {
     h: h, v: v, x: x, y: -y,
     width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}
   }
   Rect: {1, 1}
   Image: {texture: tex}
   Opacity: {alpha}
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreHalo {
@@ -132,7 +132,7 @@ template OreHalo {
   Rgb: color
   Opacity: {alpha}
   BlendMode: Additive
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreBar {
@@ -153,11 +153,11 @@ template OreBar {
   const inner = width - 2
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: h, v: v, x: x, y: -y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   well {
     Position: {0, 0, 0}
@@ -202,14 +202,14 @@ template OreKeyCap {
   prop v: VAlign = Top
 
   Layout: {direction: Row, h: Center, v: Middle}
-  LayoutItem: {
+  Item: {
     h: h, v: v, x: x, y: -y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
   Rect: {1, 1}
   Rgb: palette.well
   Border: {width: 1, radius: 2, color: {edge.r, edge.g, edge.b, 255}}
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   OreText cap(text: key, size: size, font: ui_fonts.mono, color: color)
 }
@@ -220,13 +220,13 @@ template OreRule {
   prop x: f32 = 0
   prop y: f32 = 0
 
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: x, y: -y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: 1}
   }
   Rect: {1, 1}
   Rgb: color
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreHazardRule {
@@ -240,7 +240,7 @@ template OreHazardRule {
   const spanU = width / (2048.0 * scale)
   const spanV = height / (12.0 * scale)
 
-  LayoutItem: {h: h, v: v, width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+  Item: {h: h, v: v, width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
   Rect: {1, 1}
   Rgb: {255, 255, 255}
   Opacity: {alpha}
@@ -248,7 +248,7 @@ template OreHazardRule {
     texture: ui_art.hazard,
     u0: 0.5 - spanU / 2, v0: 0.5 - spanV / 2, u1: 0.5 + spanU / 2, v1: 0.5 + spanV / 2
   }
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreVeil {
@@ -257,11 +257,11 @@ template OreVeil {
   prop color: Rgb = {0, 0, 0}
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}}
-  box.spatial.SpatialIgnore
+  Item: {width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}}
+  box.spatial.Ignore
 
   flat {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {0, 0, 0}
     Opacity: {dim}
@@ -269,7 +269,7 @@ template OreVeil {
 
   shade {
     Position: {0, 0, 1}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     Image: {texture: ui_art.vignette}
     Rgb: color

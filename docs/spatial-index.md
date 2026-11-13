@@ -9,16 +9,16 @@ Static shapes update when changed. `DynamicTransform` shapes refit every frame
 the index is queried, regardless of whether a query can use them. Picking queries
 every frame while a cursor is known.
 
-## SpatialIgnore
+## Ignore
 
-`SpatialIgnore` excludes an entity and all its `ChildOf` descendants from the index.
+`Ignore` (`SpatialIgnore` in C) excludes an entity and all its `ChildOf` descendants from the index.
 Excluded shapes have no index item or `SpatialPose` and add no per-frame index work.
 
 ```flecs
 using box.spatial
 
 prefab Critter {
-  SpatialIgnore
+  Ignore
   body {
     Position: {0, 0, 0}
     Box: {1, 1, 1}
@@ -29,7 +29,7 @@ prefab Critter {
 In C, make it automatic for a component/tag with
 `ecs_add_pair(world, ecs_id(MyEnemy), EcsWith, SpatialIgnore)`.
 Adding or removing the tag on an entity or ancestor takes effect in the next
-`SpatialUpdate`, excluding or rebuilding the subtree at its current position.
+`Update` system of `box.spatial`, excluding or rebuilding the subtree at its current position.
 
 Exclusion applies to every query:
 

@@ -98,7 +98,7 @@ template Button {
   prop b: u8 = 96
 
   Layout: {direction: Row, padding: {8, 8, 12, 12}, h: Center, v: Middle}
-  LayoutItem: {width: {mode: Grow}}
+  Item: {width: {mode: Grow}}
   Rect: {1, 1}
   Rgb: {r, g, b}
   Border: {radius: 8}
@@ -127,7 +127,7 @@ menu {
   panel {
     Position: {0, -10, 0}
     Layout: {direction: Column, spacing: 10, padding: {16, 16, 20, 20}, h: Center}
-    LayoutItem: {width: {mode: Fixed, value: 240}}
+    Item: {width: {mode: Fixed, value: 240}}
     Rect: {1, 1}
     Rgb: {34, 38, 50}
     Border: {width: 2, radius: 14, color: {120, 140, 200, 255}}

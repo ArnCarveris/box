@@ -866,13 +866,13 @@ void Layout_grow_script_keeps_content(void) {
         "using box.geometry\n"
         "row {\n"
         "  Layout: {direction: Row}\n"
-        "  LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 20}}\n"
+        "  Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 20}}\n"
         "  button {\n"
         "    Layout: {direction: Row}\n"
-        "    LayoutItem: {width: {mode: Grow}}\n"
+        "    Item: {width: {mode: Grow}}\n"
         "    label { Rect: {80, 10} }\n"
         "  }\n"
-        "  spacer { LayoutItem: {width: {mode: Grow}} }\n"
+        "  spacer { Item: {width: {mode: Grow}} }\n"
         "}\n";
     test_assert(ecs_script_run(world, "grow", code, NULL) == 0);
     ecs_progress(world, 0);
@@ -1204,7 +1204,7 @@ void Layout_child_leaving_tree_drops_layout_tag(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t tag = ecs_lookup(world, "box.layout.LayoutChild");
+    ecs_entity_t tag = ecs_lookup(world, "box.layout.Child");
     test_assert(tag != 0);
     ecs_entity_t p = ecs_new(world);
     ecs_set(world, p, Layout, { .padding = { 2, 2, 2, 2 } });
@@ -1864,7 +1864,7 @@ void Layout_script(void) {
         "  title { Rect: {60, 10} }\n"
         "  body {\n"
         "    Layout: {direction: Row, spacing: 2}\n"
-        "    LayoutItem: {width: {mode: Grow}}\n"
+        "    Item: {width: {mode: Grow}}\n"
         "    left { Rect: {10, 20} }\n"
         "    right { Rect: {10, 20} }\n"
         "  }\n"
@@ -2127,16 +2127,16 @@ void Layout_warn_script(void) {
         "hud {\n"
         "  screen {\n"
         "    Layout: {direction: Column}\n"
-        "    LayoutItem: {width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 100}}\n"
+        "    Item: {width: {mode: Fixed, value: 200}, height: {mode: Fixed, value: 100}}\n"
         "    top {\n"
         "      Rect: {1, 1}\n"
-        "      LayoutItem: {width: {mode: Grow}}\n"
+        "      Item: {width: {mode: Grow}}\n"
         "      realm {\n"
         "        Rect: {1, 1}\n"
-        "        LayoutItem: {}\n"
+        "        Item: {}\n"
         "        title {\n"
         "          Rect: {40, 10}\n"
-        "          LayoutItem: {}\n"
+        "          Item: {}\n"
         "        }\n"
         "      }\n"
         "    }\n"

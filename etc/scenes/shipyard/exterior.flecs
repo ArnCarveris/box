@@ -538,14 +538,14 @@ assets {
         Opacity: {0.14}
         BlendMode: Additive
         NoShadow
-        SpatialIgnore
+        Ignore
       }
       plume_core : ShipPlumeCore {
         Position: {0, cy, 0.34 - 1.7}
         Rotation: {0 - HALF_PI, 0, 0}
         Lathe: {profile: plume_core_shape, segments: 12, rings: 8}
         NoShadow
-        SpatialIgnore
+        Ignore
       }
       haze {
         Position: {0, cy, -1.6}
@@ -561,7 +561,7 @@ assets {
           opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.6}, {1, 0}]},
           color: {keys: [{0, {200, 230, 255}}, {0.4, {255, 255, 255}}, {1, {170, 110, 255}}]}
         }
-        SpatialIgnore
+        Ignore
       }
       exhaust {
         Position: {0, cy, -1.9}
@@ -578,7 +578,7 @@ assets {
           opacity: {keys: [{0, 0}, {0.08, 1}, {0.4, 0.45}, {1, 0}]},
           color: {keys: [{0, {255, 255, 255}}, {0.3, {130, 190, 255}}, {1, {90, 60, 255}}]}
         }
-        SpatialIgnore
+        Ignore
       }
       light {
         Position: {0, cy, -2.6}
@@ -1434,7 +1434,7 @@ assets {
         opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
         color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
       }
-      SpatialIgnore
+      Ignore
     }
   }
 

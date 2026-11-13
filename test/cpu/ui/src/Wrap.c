@@ -426,10 +426,10 @@ void Wrap_script_paragraph(void) {
         "using box.text\n"
         "panel {\n"
         "  Layout: {direction: Column, padding: {5, 5, 5, 5}}\n"
-        "  LayoutItem: {width: {mode: Fixed, value: 160}}\n"
+        "  Item: {width: {mode: Fixed, value: 160}}\n"
         "  para {\n"
         "    Text: {value: \"" WRAP_PARAGRAPH "\"}\n"
-        "    LayoutItem: {width: {mode: Grow}}\n"
+        "    Item: {width: {mode: Grow}}\n"
         "  }\n"
         "}\n";
     test_assert(ecs_script_run(world, "wrap", code, NULL) == 0);

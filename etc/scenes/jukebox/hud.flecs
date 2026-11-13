@@ -25,7 +25,7 @@ assets {
     const active = selected && lit
 
     Layout: {direction: Row, spacing: 10, padding: {7, 7, 10, 10}, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Rect: {1, 1}
 
     if active {
@@ -82,14 +82,14 @@ hud {
   }
 
   screen {
-    LayoutFill: {surface: window}
+    Fill: {surface: window}
     Layout: {}
     FocusScope
 
     panel {
       InputBlocker
       Layout: {direction: Column, spacing: 10, padding: {14, 14, 16, 16}}
-      LayoutItem: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: PANEL_W}}
+      Item: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: PANEL_W}}
       Rect: {1, 1}
       Rgb: {14, 16, 24}
       Opacity: {0.92}
@@ -102,7 +102,7 @@ hud {
 
       songs {
         Layout: {direction: Column, spacing: 4}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         for i in 0..SONGS.count() {
           "song_{i}" { SongButton: {index: i} }
@@ -111,7 +111,7 @@ hud {
 
       now {
         Layout: {direction: Column, spacing: 4, padding: {6, 0, 0, 0}}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         state {
           if lit {
@@ -133,17 +133,17 @@ hud {
 
         progress {
           Layout: {}
-          LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+          Item: {width: {mode: Grow}, height: {mode: Fixed, value: 6}}
 
           rail {
-            LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+            Item: {width: {mode: Grow}, height: {mode: Fixed, value: 6}}
             Rect: {1, 1}
             Rgb: {36, 40, 52}
             Border: {radius: 3}
           }
 
           fill {
-            LayoutItem: {h: Left, width: {mode: Fixed, value: max(6, clamp(beat / song_beats, 0, 1) * (PANEL_W - 32))}, height: {mode: Fixed, value: 6}}
+            Item: {h: Left, width: {mode: Fixed, value: max(6, clamp(beat / song_beats, 0, 1) * (PANEL_W - 32))}, height: {mode: Fixed, value: 6}}
             Rect: {1, 1}
             Rgb: color
             Border: {radius: 3}
@@ -153,7 +153,7 @@ hud {
 
       fx {
         Layout: {direction: Column, spacing: 8, padding: {4, 0, 0, 0}}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         Slider volume(label: "Volume", width: PANEL_W - 32, min: 0, max: 100, step: 1, value: volume_level, unit: "%")
         Slider reverb(label: "Reverb", width: PANEL_W - 32, min: 0, max: 200, step: 1, value: reverb_level, unit: "%")

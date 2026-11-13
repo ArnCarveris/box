@@ -95,7 +95,7 @@ template RocketSection {
   }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: x, y: -y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
@@ -138,7 +138,7 @@ template RocketSection {
       const filled = i < count
 
       "pip_{i}" {
-        LayoutItem: {
+        Item: {
           h: Left, v: Top, x: stripPad + i * (pipWidth + pipGap), y: -stripY,
           width: {mode: Fixed, value: pipWidth}, height: {mode: Fixed, value: pipHeight}
         }
@@ -152,7 +152,7 @@ template RocketSection {
           Emissive: {strength: 0, color: palette.amberGlow}
           Border: {width: 1, radius: 1, color: emptyEdge}
         }
-        box.spatial.SpatialIgnore
+        box.spatial.Ignore
       }
     }
   }
@@ -233,7 +233,7 @@ template RocketStep {
     Cursor: {CursorPointer}
   }
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: x, y: -y,
     width: {mode: Fixed, value: 38}, height: {mode: Fixed, value: 30}
   }
@@ -316,11 +316,11 @@ template RocketLaunchFace {
   }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   if enabled {
     OreHalo aura(size: width * 1.3, height: height * 2.6, color: palette.amber, alpha: pulse, z: -1) {
@@ -331,7 +331,7 @@ template RocketLaunchFace {
   plate {
     Position: {0, 0, 0}
     Layout: {}
-    LayoutItem: {
+    Item: {
       h: Left, v: Top,
       width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
     }
@@ -387,7 +387,7 @@ template RocketLaunch {
     Cursor: {CursorPointer}
   }
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: x, y: -y,
     width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}
   }
@@ -492,7 +492,7 @@ template OreRocketBody {
   }
 
   Layout: {}
-  LayoutItem: {h: Left, v: Top, width: {mode: Fixed, value: 284}, height: {mode: Fixed, value: 366}}
+  Item: {h: Left, v: Top, width: {mode: Fixed, value: 284}, height: {mode: Fixed, value: 366}}
 
   RocketSection life_section(
     label: "LIFE SUPPORT", icon: icons.rocket_life, y: sectionY,

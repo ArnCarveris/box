@@ -25,7 +25,7 @@ template LifeIcon {
   prop size: f32 = 46
   prop alpha: f32 = 1
 
-  LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+  Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
   Rect: {size, size}
   Image: {texture: life_icon, u1: 1, v1: 1}
   Opacity: {alpha}
@@ -50,18 +50,18 @@ template YeonHud {
     }
 
     screen {
-      LayoutFill: {surface: surface}
+      Fill: {surface: surface}
       Layout: {}
 
       score {
-        LayoutItem: {h: Left, v: Top, x: 24, y: -24}
+        Item: {h: Left, v: Top, x: 24, y: -24}
         Text: {value: "Lanterns: {lanternCount}", size: 30}
         Rgb: {255, 244, 220}
       }
 
       lives {
         Layout: {direction: Row, spacing: 12, padding: {12, 12, 12, 12}}
-        LayoutItem: {h: Right, v: Top, x: -14, y: -14}
+        Item: {h: Right, v: Top, x: -14, y: -14}
 
         for i in 0..maxLives {
           "life_{i}" {
@@ -72,7 +72,7 @@ template YeonHud {
 
       if !over && lanternCount < 3 {
         hint {
-          LayoutItem: {h: Center, v: Bottom, y: 50}
+          Item: {h: Center, v: Bottom, y: 50}
           Text: {value: "UP / DOWN to fly - catch the lanterns, dodge the rival kites!", size: 24}
           Rgb: {255, 255, 255}
         }
@@ -81,13 +81,13 @@ template YeonHud {
       if over {
         game_over {
           Layout: {}
-          LayoutItem: {
+          Item: {
             h: Center, v: Top, y: -220,
             width: {mode: Fixed, value: 600}, height: {mode: Fixed, value: 190}
           }
 
           background {
-            LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+            Item: {width: {mode: Grow}, height: {mode: Grow}}
             Rect: {1, 1}
             Rgb: {40, 20, 20}
             Opacity: {180.0 / 255.0}
@@ -96,19 +96,19 @@ template YeonHud {
           }
 
           title {
-            LayoutItem: {h: Center, v: Top, y: -26}
+            Item: {h: Center, v: Top, y: -26}
             Text: {value: "STRING CUT!", size: 64}
             Rgb: {255, 220, 200}
           }
 
           result {
-            LayoutItem: {h: Center, v: Top, y: -102}
+            Item: {h: Center, v: Top, y: -102}
             Text: {value: "{lanternCount} lanterns gathered", size: 26}
             Rgb: {255, 255, 255}
           }
 
           prompt {
-            LayoutItem: {h: Center, v: Top, y: -142}
+            Item: {h: Center, v: Top, y: -142}
             Text: {value: "Press R to fly again", size: 24}
             Rgb: {255, 255, 255}
           }

@@ -1124,7 +1124,7 @@ assets {
         Opacity: {0.07}
         BlendMode: Additive
         NoShadow
-        SpatialIgnore
+        Ignore
       }
       plume : ShipPlumeCore {
         Position: {0, 0, -1.5}
@@ -1132,7 +1132,7 @@ assets {
         Scale: {k, k, k}
         Lathe: {profile: plume_core_shape, segments: 24, rings: 16}
         NoShadow
-        SpatialIgnore
+        Ignore
       }
       haze {
         Position: {0, 0, ez - 0.1}
@@ -1150,7 +1150,7 @@ assets {
           opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.6}, {1, 0}]},
           color: {keys: [{0, {200, 230, 255}}, {0.4, {255, 255, 255}}, {1, {170, 110, 255}}]}
         }
-        SpatialIgnore
+        Ignore
       }
       exhaust {
         Position: {0, 0, ez - 0.25}
@@ -1168,7 +1168,7 @@ assets {
           opacity: {keys: [{0, 0}, {0.08, 1}, {0.4, 0.45}, {1, 0}]},
           color: {keys: [{0, {255, 255, 255}}, {0.3, {130, 190, 255}}, {1, {90, 60, 255}}]}
         }
-        SpatialIgnore
+        Ignore
       }
       light { Position: {0, 0, -5}; PointLight: {intensity: 40 * power, range: r * 9}; Rgb: {120, 180, 255} }
     }

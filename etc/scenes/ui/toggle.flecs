@@ -60,14 +60,14 @@ template Checkbox : HeadlessToggle {
   const edge = ring ? t.focus : current ? t.accent : t.border
 
   Layout: {direction: Row, spacing: t.spacing, v: Middle}
-  LayoutItem: {
+  Item: {
     width: {min: width, max: width},
     height: {mode: Fixed, value: t.control_height}
   }
 
   box {
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Rect: {1, 1}
     Rgb: current ? t.accent : down ? t.pressed : hover ? t.hover : t.surface_alt
 
@@ -82,7 +82,7 @@ template Checkbox : HeadlessToggle {
 
     if current {
       mark {
-        LayoutItem: {
+        Item: {
           h: Center, v: Middle,
           width: {mode: Fixed, value: 8}, height: {mode: Fixed, value: 8}
         }
@@ -116,14 +116,14 @@ template Switch : HeadlessToggle {
   const edge = ring ? t.focus : current ? t.accent : t.border
 
   Layout: {direction: Row, spacing: t.spacing, v: Middle}
-  LayoutItem: {
+  Item: {
     width: {min: width, max: width},
     height: {mode: Fixed, value: t.control_height}
   }
 
   track {
     Layout: {}
-    LayoutItem: {width: {mode: Fixed, value: track_w}, height: {mode: Fixed, value: track_h}}
+    Item: {width: {mode: Fixed, value: track_w}, height: {mode: Fixed, value: track_h}}
     Rect: {1, 1}
     Rgb: current ? t.accent : down ? t.pressed : hover ? t.hover : t.surface_alt
 
@@ -137,7 +137,7 @@ template Switch : HeadlessToggle {
     }
 
     knob {
-      LayoutItem: {
+      Item: {
         h: Left, v: Middle, x: current ? track_w - knob - inset : inset,
         width: {mode: Fixed, value: knob}, height: {mode: Fixed, value: knob}
       }

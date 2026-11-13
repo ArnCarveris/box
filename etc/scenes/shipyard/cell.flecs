@@ -21,7 +21,7 @@ assets {
     Rgb: color
     Emissive: {strength: 3, color: color}
     NoShadow
-    SpatialIgnore
+    Ignore
   }
 
   template CellCursor {
@@ -149,7 +149,7 @@ assets {
         warning {
           Position: {0, CH + 0.9, 0}
           AngularVelocity: {0, 1.6, 0}
-          SpatialIgnore
+          Ignore
           NoShadow
           gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.45, 0.45, 0.45} }
           glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 4}; Rgb: {255, 60, 40} }
@@ -179,7 +179,7 @@ assets {
         ghost {
           Opacity: {0.55}
           Tint: {90, 255, 160, 120}
-          SpatialIgnore
+          Ignore
           NoShadow
           ModuleView view(k: t, x: x, y: y, z: z, seed: idx)
         }

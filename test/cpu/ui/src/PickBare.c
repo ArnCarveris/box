@@ -28,17 +28,17 @@
     "  }\n" \
     "  main {\n" \
     "    Position: {0, 0, 10}\n" \
-    "    LayoutFill: {surface: window}\n" \
+    "    Fill: {surface: window}\n" \
     "    Layout: {direction: Column, h: Center, v: Middle}\n" \
     "    tab {\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 120}, height: {mode: Fixed, value: 32}}\n" \
+    "      Item: {width: {mode: Fixed, value: 120}, height: {mode: Fixed, value: 32}}\n" \
     "      Rect: {1, 1}\n" \
     "      Interactive\n" \
     "    }\n" \
     "  }\n" \
     "  top {\n" \
     "    Position: {0, 0, 20}\n" \
-    "    LayoutFill: {surface: window}\n" \
+    "    Fill: {surface: window}\n" \
     "    Layout: {}\n" \
     top \
     "  }\n" \
@@ -156,11 +156,11 @@ void PickBare_bare_child_delivers_to_parent(void) {
         "    button {\n"
         "      Position: {0, 0, 1}\n"
         "      Layout: {direction: Row}\n"
-        "      LayoutItem: {width: {mode: Fixed, value: 1280}, height: {mode: Fixed, value: 720}}\n"
+        "      Item: {width: {mode: Fixed, value: 1280}, height: {mode: Fixed, value: 720}}\n"
         "      Rect: {1, 1}\n"
         "      Interactive\n"
         "      row {\n"
-        "        LayoutItem: {width: {mode: Fixed, value: 1280}, height: {mode: Fixed, value: 720}}\n"
+        "        Item: {width: {mode: Fixed, value: 1280}, height: {mode: Fixed, value: 720}}\n"
         "      }\n"
         "    }\n"));
     ecs_entity_t button = bare_e(world, "hud.top.button");

@@ -186,7 +186,7 @@ assets {
                     opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
                     color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
                   }
-                  SpatialIgnore
+                  Ignore
                 }
               } else {
                 arc : ShipTrim { Position: {0, tl - 0.47, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true}; NoShadow }

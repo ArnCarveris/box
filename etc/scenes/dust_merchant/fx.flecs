@@ -54,7 +54,7 @@ assets {
     Forces: {gravity: {0, 0, 0}, turbulence: 0.03, drag: 0.6}
     Appearance: {shape: Circle, blend: Additive, lit: 1}
     Curves: {opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 1}, {1, 0}]}}
-    SpatialIgnore
+    Ignore
   }
 
   prefab VoidRing { Torus: {radius: 17, tube: 12, segments: 48, rings: 16} }
@@ -72,7 +72,7 @@ assets {
     }
     Forces: {gravity: {0, 0, 0}}
     Appearance: {shape: Circle, blend: Additive, stretch: jumping ? 0.16 : 0.018}
-    SpatialIgnore
+    Ignore
   }
 
   template VentSmoke {
@@ -87,7 +87,7 @@ assets {
       size: {keys: [{0, 0.4}, {0.33333334, 1}, {0.6666667, 1.6}, {1, 2.4}]}
       opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.6}, {1, 0}]}
     }
-    SpatialIgnore
+    Ignore
   }
 
   template CargoLeak {
@@ -104,7 +104,7 @@ assets {
       size: {keys: [{0, 0.5}, {0.33333334, 1}, {0.6666667, 1.7}, {1, 2.6}]}
       opacity: {keys: [{0, 0}, {0.33333334, 1}, {0.6666667, 0.7}, {1, 0}]}
     }
-    SpatialIgnore
+    Ignore
   }
 }
 
@@ -143,7 +143,7 @@ assets {
       HullPatch: {s0: s0, s1: s1, t0: t0, t1: t1, lift: -0.02, origin: {hub.x, hub.y, hub.z}}
       TextureTransform: {scale_x: 1, scale_y: 1}
       Rgb: {110, 106, 94}
-      SpatialIgnore
+      Ignore
     }
   }
 
@@ -176,11 +176,11 @@ assets {
       Scene: {}
       camera { Position: {0, 0, 100}; Camera: {ortho: true, ortho_scale: 1} }
       root {
-        LayoutFill: {surface: window}
+        Fill: {surface: window}
         Layout: {}
         if help_on {
           line {
-            LayoutItem: {h: Center, v: Bottom, y: 14}
+            Item: {h: Center, v: Bottom, y: 14}
             Layout: {padding: {7, 7, 14, 14}, h: Center, v: Middle}
             Rect: {1, 1}
             Rgb: {6, 6, 6}

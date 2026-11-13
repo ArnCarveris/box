@@ -699,13 +699,13 @@ void LayoutFloat_script(void) {
         "using box.geometry\n"
         "root {\n"
         "  Layout: {direction: Column, v: Bottom}\n"
-        "  LayoutItem: {width: {mode: Fixed, value: 400}, height: {mode: Fixed, value: 400}}\n"
+        "  Item: {width: {mode: Fixed, value: 400}, height: {mode: Fixed, value: 400}}\n"
         "  button {\n"
         "    Layout: {}\n"
-        "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 20}}\n"
+        "    Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 20}}\n"
         "    list {\n"
         "      Rect: {80, 50}\n"
-        "      LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, flip: true}\n"
+        "      Float: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom, flip: true}\n"
         "    }\n"
         "  }\n"
         "}\n";
@@ -732,14 +732,14 @@ void LayoutFloat_script(void) {
     "outer {\n" \
     "  Position: {0, 0, 0}\n" \
     "  Layout: {direction: Column}\n" \
-    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
     "  ClipChildren\n" \
     "  inner {\n" \
     "    Layout: {direction: Column}\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "    Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
     "    overlay {\n" \
-    "      LayoutFloat: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom" fl "}\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 10}, height: {mode: Fixed, value: 50}}\n" \
+    "      Float: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom" fl "}\n" \
+    "      Item: {width: {mode: Fixed, value: 10}, height: {mode: Fixed, value: 50}}\n" \
     "      Rect: {1, 1}\n" \
     "    }\n" \
     "  }\n" \
@@ -757,19 +757,19 @@ void LayoutFloat_script(void) {
     "outer {\n" \
     "  Position: {0, 0, 0}\n" \
     "  Layout: {direction: Column}\n" \
-    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
     "  ClipChildren\n" \
     "  inner {\n" \
     "    Layout: {direction: Column}\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "    Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
     "    ClipChildren\n" \
     "    overlay {\n" \
-    "      LayoutFloat: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: 5" fl "}\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Grow}}\n" \
+    "      Float: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: 5" fl "}\n" \
+    "      Item: {width: {mode: Fixed, value: 20}, height: {mode: Grow}}\n" \
     "      Rect: {1, 1}\n" \
     "    }\n" \
     "    content {\n" \
-    "      LayoutItem: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
+    "      Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 300}}\n" \
     "      Rect: {1, 1}\n" \
     "    }\n" \
     "  }\n" \
@@ -930,16 +930,16 @@ void LayoutFloat_clip_overlay_inside_float(void) {
         "outer {\n"
         "  Position: {0, 0, 0}\n"
         "  Layout: {direction: Column}\n"
-        "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n"
+        "  Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n"
         "  ClipChildren\n"
         "  list {\n"
-        "    LayoutFloat: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom}\n"
+        "    Float: {h: Left, v: Top, anchor_h: Left, anchor_v: Bottom}\n"
         "    Layout: {direction: Column}\n"
-        "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 200}}\n"
+        "    Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 200}}\n"
         "    ClipChildren\n"
         "    bar {\n"
-        "      LayoutFloat: {h: Right, v: Top, anchor_h: Right, anchor_v: Top, x: 5, clip: true}\n"
-        "      LayoutItem: {width: {mode: Fixed, value: 20}, height: {mode: Fixed, value: 50}}\n"
+        "      Float: {h: Right, v: Top, anchor_h: Right, anchor_v: Top, x: 5, clip: true}\n"
+        "      Item: {width: {mode: Fixed, value: 20}, height: {mode: Fixed, value: 50}}\n"
         "      Rect: {1, 1}\n"
         "    }\n"
         "  }\n"
@@ -968,15 +968,15 @@ void LayoutFloat_clip_overlay_inside_float(void) {
     "scroll {\n" \
     "  Position: {0, 0, 0}\n" \
     "  Layout: {direction: Column}\n" \
-    "  LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
-    "  LayoutScroll: {vertical: true}\n" \
+    "  Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 100}}\n" \
+    "  Scroll: {vertical: true}\n" \
     "  ClipChildren\n" \
     "  anchor {\n" \
     "    Layout: {}\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n" \
+    "    Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n" \
     "    Rect: {1, 1}\n" \
     "    list {\n" \
-    "      LayoutFloat: {anchor_v: Bottom, v: Top" fl "}\n" \
+    "      Float: {anchor_v: Bottom, v: Top" fl "}\n" \
     "      Rect: {80, 50}\n" \
     "      item {\n" \
     "        Position: {0, 0, 0}\n" \
@@ -985,7 +985,7 @@ void LayoutFloat_clip_overlay_inside_float(void) {
     "    }\n" \
     "  }\n" \
     "  filler {\n" \
-    "    LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 300}}\n" \
+    "    Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 300}}\n" \
     "    Rect: {1, 1}\n" \
     "  }\n" \
     "}\n"

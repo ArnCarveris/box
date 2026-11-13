@@ -44,7 +44,7 @@ panel {
   Position: {-0.6, 0.8, 0}
   Scale: {0.01, 0.01, 0.01}
   Layout: {direction: Column, spacing: 10, padding: {14, 14, 14, 14}}
-  LayoutItem: {width: {mode: Fixed, value: 520}}
+  Item: {width: {mode: Fixed, value: 520}}
   Rect: {1, 1}
   Rgb: {44, 48, 62}
   Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
@@ -95,7 +95,7 @@ panel {
       value: "Plain words, then bold words, then italic words, and bold italic words; a colored bold span overlaps an italic one, and the lines wrap where the wider bold glyphs push them.",
       size: 17, font: assets_font
     }
-    LayoutItem: {width: {mode: Grow, content_min: true}}
+    Item: {width: {mode: Grow, content_min: true}}
     Rgb: {220, 222, 230}
     TextSpans: {spans: [
       {start: 18, end: 28, bold: true, keep_color: true},

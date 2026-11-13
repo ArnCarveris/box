@@ -74,7 +74,7 @@ template OrePulseText {
     Opacity: {0.35}
   }
   Transition: [Opacity: {duration: 0.7 * motion, timing_function: EaseInOut}]
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreLogoGlyph : OreOneShot {
@@ -98,25 +98,25 @@ template OreLogoGlyph : OreOneShot {
     Opacity: {duration: 0.45 * motion, delay: delay, timing_function: EaseOut},
     Emissive: {duration: 1.4 * motion, delay: delay, timing_function: EaseOut}
   ]
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreLogo {
   Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: 860}, height: {mode: Fixed, value: 108}}
+  Item: {width: {mode: Fixed, value: 860}, height: {mode: Fixed, value: 108}}
 
   OreHalo glow(size: 860, height: 280, color: {255, 130, 30}, alpha: 0.22, z: -1)
 
   letters {
     Position: {0, 0, 1}
     Layout: {direction: Row, v: Middle, h: Center}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     OreLogoGlyph g0(letter: "O", index: 0)
     OreLogoGlyph g1(letter: "R", index: 1)
     OreLogoGlyph g2(letter: "E", index: 2)
     gap {
-      LayoutItem: {width: {mode: Fixed, value: 36}}
+      Item: {width: {mode: Fixed, value: 36}}
     }
     OreLogoGlyph g3(letter: "E", index: 3)
     OreLogoGlyph g4(letter: "L", index: 4)
@@ -137,7 +137,7 @@ template OreSign : OreOneShot {
   const a: f32 = match shown { true: 1; _: 0 }
 
   Layout: {}
-  LayoutItem: {width: {mode: Fixed, value: signWidth}, height: {mode: Fixed, value: signHeight}}
+  Item: {width: {mode: Fixed, value: signWidth}, height: {mode: Fixed, value: signHeight}}
   Opacity: {a}
   Transition: [Opacity: {duration: 0.4 * motion, delay: delay}]
 
@@ -155,14 +155,14 @@ template OreTitleScreen {
   const veilEdge: f32 = 0.95
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  Item: {width: {mode: Grow}, height: {mode: Grow}}
 
   OreVeil veil(dim: 0.52, edge: veilEdge)
 
   column {
     Position: {0, 0, 2}
     Layout: {direction: Column, h: Center, v: Middle, spacing: 14}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     OreLogo logo()
     OreHazardRule rule(width: 620, height: 6)
@@ -204,7 +204,7 @@ template OreQualityValue {
   for i in 0..3 {
     "led_{i}" {
       const on = i < level
-      LayoutItem: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 12}}
+      Item: {width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 12}}
       Rect: {1, 1}
       if on {
         Rgb: palette.amber
@@ -213,12 +213,12 @@ template OreQualityValue {
         Rgb: {38, 41, 46}
         Emissive: {strength: 0, color: palette.amberGlow}
       }
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
   gap {
-    LayoutItem: {width: {mode: Fixed, value: 4}}
+    Item: {width: {mode: Fixed, value: 4}}
   }
 
   OreText tier_name(text: tierText, size: 13, font: ui_fonts.mono, color: palette.amber, width: 48)
@@ -234,7 +234,7 @@ template OreQualityButton {
   ActionTrigger: {action: actions.Quality}
   Cursor: {CursorPointer}
   Layout: {direction: Row, spacing: 12, h: Center, v: Middle}
-  LayoutItem: {width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}}
+  Item: {width: {mode: Fixed, value: buttonWidth}, height: {mode: Fixed, value: buttonHeight}}
   Rect: {1, 1}
   if hover {
     Rgb: {66, 58, 38}
@@ -263,7 +263,7 @@ template OrePauseScreen {
   const panelHeight: f32 = 320
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+  Item: {width: {mode: Grow}, height: {mode: Grow}}
 
   OreVeil veil(dim: 0.3, edge: 0.8)
 
@@ -273,7 +273,7 @@ template OrePauseScreen {
     Position: {0, 0, 2}
     column {
       Layout: {direction: Column, h: Center, v: Middle, spacing: 16}
-      LayoutItem: {
+      Item: {
         h: Left, v: Top,
         width: {mode: Fixed, value: panelWidth}, height: {mode: Fixed, value: panelHeight}
       }
@@ -295,11 +295,11 @@ template OreStatTile {
   const tileHeight: f32 = 88
 
   Layout: {direction: Column, h: Center, v: Middle, spacing: 2}
-  LayoutItem: {width: {mode: Fixed, value: tileWidth}, height: {mode: Fixed, value: tileHeight}}
+  Item: {width: {mode: Fixed, value: tileWidth}, height: {mode: Fixed, value: tileHeight}}
   Rect: {1, 1}
   Rgb: palette.well
   Border: {width: 1, radius: 3, color: {color.r / 2, color.g / 2, color.b / 2, 255}}
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 
   OreText amount(text: value, size: 34, font: ui_fonts.mono, color: color, glow: 0.5)
   OreText name(text: caption, size: 11, font: ui_fonts.label, color: palette.soft)
@@ -320,7 +320,7 @@ template OreEndRays : OreOneShot {
   BlendMode: Additive
   AngularVelocity: {0, 0, 0.07}
   Transition: [Opacity: {duration: 1.4 * motion}]
-  box.spatial.SpatialIgnore
+  box.spatial.Ignore
 }
 
 template OreEndScreen {
@@ -349,7 +349,7 @@ template OreEndScreen {
   }
 
   Layout: {}
-  LayoutItem: {width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}}
+  Item: {width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}}
 
   OreVeil veil(dim: 0.5, edge: 0.95, color: veilTone)
   if won {
@@ -359,7 +359,7 @@ template OreEndScreen {
   column {
     Position: {0, 0, 2}
     Layout: {direction: Column, h: Center, v: Middle, spacing: 18}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     OreText heading(text: headingText, size: 72, font: ui_fonts.stencil, color: tone, glow: 0.5)
     OreHazardRule rule(width: 620, height: 6)

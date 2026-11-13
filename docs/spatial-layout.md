@@ -173,7 +173,7 @@ layout-generated instances. A group whose child fits to that same group's
 resolved bounds is a cycle and is rejected, rather than feeding back growth.
 No general constraint solving or iterative convergence is used.
 
-`SpatialDiagnostic` records an error code and related entity. Errors are logged
+`Diagnostic` records an error code and related entity. Errors are logged
 when they change, and dependent rules receive diagnostics too. Codes cover dead
 or missing targets, missing or zero-sized bounds, invalid attachment frames,
 cycles, conflicting drivers, and impossible sizes or spacing. Failed entities

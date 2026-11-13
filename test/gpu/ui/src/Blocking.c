@@ -83,7 +83,7 @@ void Blocking_stops_pass_through(void) {
         "    Layout: {direction: Row}\n"
         "    InputBlocker\n"
         "    item {\n"
-        "      LayoutItem: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n"
+        "      Item: {width: {mode: Fixed, value: 100}, height: {mode: Fixed, value: 40}}\n"
         "    }\n"
         "  }\n"
         "}\n"

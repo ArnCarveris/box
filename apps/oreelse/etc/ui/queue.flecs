@@ -70,7 +70,7 @@ template QueueRow {
   }
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top, x: queueRowX, y: -(queueRowY + row * queueRowPitch),
     width: {mode: Fixed, value: queueRowWidth}, height: {mode: Fixed, value: queueRowHeight}
   }
@@ -100,7 +100,7 @@ template QueueRow {
       Scale: {max(f, 0.005), 1, 1}
       Rect: {queueRowWidth, queueRowHeight}
       Rgb: fillColor
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     edge {
@@ -108,20 +108,20 @@ template QueueRow {
       Rect: {2, queueRowHeight}
       Rgb: glowColor
       Emissive: {strength: 0.5, color: glowColor}
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
   if sub {
     tick {
       Position: {0, 0, queueContentZ}
-      LayoutItem: {
+      Item: {
         h: Left, v: Top, x: 7, y: -12,
         width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 2}
       }
       Rect: {1, 1}
       Rgb: palette.faint
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -140,14 +140,14 @@ template QueueRow {
       Position: {queueRowWidth / 2 - 13, 0, queueContentZ}
       Line: {-4, -4, 4, 4, width: 2}
       Rgb: palette.red
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
 
     cancel_b {
       Position: {queueRowWidth / 2 - 13, 0, queueContentZ}
       Line: {-4, 4, 4, -4, width: 2}
       Rgb: palette.red
-      box.spatial.SpatialIgnore
+      box.spatial.Ignore
     }
   }
 
@@ -180,7 +180,7 @@ template OreQueueRows {
   const rowCount = book.row_count
 
   Layout: {}
-  LayoutItem: {
+  Item: {
     h: Left, v: Top,
     width: {mode: Grow, content_min: false}, height: {mode: Grow, content_min: false}
   }

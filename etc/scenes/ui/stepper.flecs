@@ -55,7 +55,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.move(this)
-      part = disabled ? 0 : stepper_part(e.local_x, this[LayoutBounds].width, button)
+      part = disabled ? 0 : stepper_part(e.local_x, this[Bounds].width, button)
     }
   }
 
@@ -69,7 +69,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.press(this)
-      pressed = disabled ? 0 : stepper_part(e.local_x, this[LayoutBounds].width, button)
+      pressed = disabled ? 0 : stepper_part(e.local_x, this[Bounds].width, button)
       await on.release(this)
       pressed = 0
     }
@@ -97,7 +97,7 @@ template HeadlessStepper {
     while true {
       const e = await on.activate(this)
       if ui.activation(e) == this && !e.keyboard && !disabled {
-        const dir = stepper_part(e.local_x, this[LayoutBounds].width, button)
+        const dir = stepper_part(e.local_x, this[Bounds].width, button)
         const v = clamp(current + dir * step, min, max)
         if v != current {
           current = v
@@ -144,7 +144,7 @@ template Stepper : HeadlessStepper {
   const outline = ring ? t.focus : t.border
 
   Layout: {direction: Row, v: Middle, padding: {edge, edge, edge, edge}}
-  LayoutItem: {
+  Item: {
     width: {mode: Fixed, value: w},
     height: {mode: Fixed, value: t.control_height}
   }
@@ -155,7 +155,7 @@ template Stepper : HeadlessStepper {
 
   minus {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
+    Item: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
     Rect: {1, 1}
     Border: {radius: t.radius - edge}
 
@@ -170,7 +170,7 @@ template Stepper : HeadlessStepper {
 
   amount {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
 
     digits {
       Text: {value: "{current:.decimals}", size: t.font_size}
@@ -180,7 +180,7 @@ template Stepper : HeadlessStepper {
 
   plus {
     Layout: {direction: Row, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
+    Item: {width: {mode: Fixed, value: button - edge}, height: {mode: Grow}}
     Rect: {1, 1}
     Border: {radius: t.radius - edge}
 

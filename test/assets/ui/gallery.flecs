@@ -260,7 +260,7 @@ template Gallery {
     }
 
     root {
-      LayoutFill: {surface: window}
+      Fill: {surface: window}
       Layout: {direction: Column, spacing: 12, padding: {16, 16, 16, 16}}
       FocusScope
 
@@ -305,14 +305,14 @@ template Gallery {
       // first Tab stop, picks the theme ThemeSwitch assigns.
       header {
         Layout: {direction: Row, spacing: 16, v: Middle}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
 
         Label title(text: "Widgets", variant: "heading")
         Label status(text: "Last change: {last}", variant: "muted")
         Label pings(text: "Pings: {pings}", variant: "caption")
 
         gap {
-          LayoutItem: {width: {mode: Grow}}
+          Item: {width: {mode: Grow}}
         }
 
         Label theme_label(text: "Theme", variant: "muted")
@@ -561,7 +561,7 @@ template Gallery {
 
               controls {
                 Layout: {direction: Column, spacing: 8}
-                LayoutItem: {width: {mode: Fixed, value: 260}}
+                Item: {width: {mode: Fixed, value: 260}}
 
                 TextInput name(
                   label: "Name", placeholder: "Shown in the preview", value: draft.name, width: 260)
@@ -608,7 +608,7 @@ template Gallery {
                 Layout: {direction: Column, spacing: 8}
 
                 image {
-                  LayoutItem: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 225}}
+                  Item: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 225}}
                   Rect: {1, 1}
                   Image: {texture: preview_texture, u0: 0, v0: 0, u1: 1, v1: 1}
                   Border: {radius: 4}

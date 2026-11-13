@@ -185,7 +185,7 @@ assets {
     prop size: f32 = 20
     prop state: i32 = 0
 
-    LayoutItem: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
+    Item: {width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}}
     Rect: {1, 1}
     Image: {texture: icon}
     Rgb: {ui_r(state), ui_g(state), ui_b(state)}
@@ -194,7 +194,7 @@ assets {
   template YardHazard {
     prop w: f32 = 5
 
-    LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Grow}}
+    Item: {width: {mode: Fixed, value: w}, height: {mode: Grow}}
     Rect: {1, 1}
     Image: {texture: yard_tex_hazard}
     ImageSlice: {scale: 0.05, edges: SliceTile, center: SliceTile}
@@ -208,7 +208,7 @@ assets {
     prop spacing: f32 = 8
 
     Layout: {direction: Column, padding: {10, 12, 12, 12}, spacing: spacing}
-    LayoutItem: {width: {min: width, max: width}}
+    Item: {width: {min: width, max: width}}
     Rect: {1, 1}
     Rgb: {5, 16, 26}
     Border: {width: 1, radius: 2, color: {34, 86, 110, 255}}
@@ -218,7 +218,7 @@ assets {
     if title != "" {
       heading {
         Layout: {direction: Row, spacing: 8, v: Middle}
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
         tab {
           Layout: {padding: {2, 2, 7, 7}}
           Rect: {1, 1}
@@ -230,7 +230,7 @@ assets {
           }
         }
         rail {
-          LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 3}}
+          Item: {width: {mode: Grow}, height: {mode: Fixed, value: 3}}
           Rect: {1, 1}
           Rgb: {28, 74, 96}
         }
@@ -264,19 +264,19 @@ assets {
   }
 
   template YardDivider {
-    LayoutItem: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 16}}
+    Item: {width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 16}}
     Rect: {1, 1}
     Rgb: {28, 74, 96}
   }
 
   template YardRule {
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
     Rect: {1, 1}
     Rgb: {18, 48, 64}
   }
 
   template YardFiller {
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
   }
 
   template YardAction : HeadlessButton {
@@ -302,7 +302,7 @@ assets {
     const selected = op_selected(op, liner ? lane : deck)
 
     Layout: {direction: Row, padding: {0, 0, 10, 10}, spacing: 6, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     if selected {
       Rgb: {95, 216, 255}
@@ -336,9 +336,9 @@ assets {
     prop grow: bool = false
 
     if grow {
-      LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 26}}
+      Item: {width: {mode: Grow}, height: {mode: Fixed, value: 26}}
     } else {
-      LayoutItem: {width: {min: 30}, height: {mode: Fixed, value: 26}}
+      Item: {width: {min: 30}, height: {mode: Fixed, value: 26}}
     }
     Layout: {}
 
@@ -353,7 +353,7 @@ assets {
     prop down: bool = false
 
     Layout: {direction: Row, padding: {4, 4, danger ? 4 : 10, 10}, spacing: 7, h: Center, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     if down {
       Rgb: {3, 10, 17}
@@ -385,7 +385,7 @@ assets {
     prop icon: entity = 0
     prop danger: bool = false
 
-    LayoutItem: {height: {mode: Fixed, value: 26}}
+    Item: {height: {mode: Fixed, value: 26}}
     Layout: {}
 
     YardGhostFace face(label: label, icon: icon, danger: danger, hover: hover, down: down)
@@ -402,7 +402,7 @@ assets {
     const danger = op == T_REMOVE
 
     Layout: {direction: Row, padding: {danger ? 4 : 0, danger ? 4 : 0, danger ? 4 : 8, 6}, spacing: 8, v: Middle}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
     if selected && danger {
       Rgb: {226, 169, 28}
@@ -428,7 +428,7 @@ assets {
     YardIcon glyph(icon: kind_icon(op), size: 16, state: selected ? UI_NAVY : danger ? UI_HAZARD : UI_OK)
     words {
       Layout: {direction: Column}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       name {
         Text: {value: label, size: 12, font: selected ? yard_font_title : yard_font_body}
         if selected {
@@ -455,7 +455,7 @@ assets {
   template YardTile : YardAction {
     prop key_hint: string = ""
 
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 30}}
     Layout: {direction: Column}
 
     YardTileFace face(op: op, label: label, key_hint: key_hint, hover: hover, down: down)
@@ -465,10 +465,10 @@ assets {
     prop title: string = ""
 
     Layout: {direction: Column, spacing: 4}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     heading {
       Layout: {direction: Row, spacing: 6, padding: {0, 1, 0, 0}, v: Middle}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       name {
         Text: {value: title, size: 10, font: yard_font_title}
         Rgb: {84, 132, 158}
@@ -479,7 +479,7 @@ assets {
 
   template YardTileRow {
     Layout: {direction: Row, spacing: 4}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
   }
 
   template YardMeter {
@@ -489,16 +489,16 @@ assets {
     const fill = clamp(ratio, 0.0, 1.0)
 
     Layout: {direction: Row}
-    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 3}}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 3}}
     Rect: {1, 1}
     Rgb: {ui_r(UI_DIM), ui_g(UI_DIM), ui_b(UI_DIM)}
     lit {
-      LayoutItem: {width: {mode: Grow, value: fill, content_min: false}, height: {mode: Grow}}
+      Item: {width: {mode: Grow, value: fill, content_min: false}, height: {mode: Grow}}
       Rect: {1, 1}
       Rgb: {ui_r(state), ui_g(state), ui_b(state)}
     }
     unlit {
-      LayoutItem: {width: {mode: Grow, value: 1 - fill, content_min: false}}
+      Item: {width: {mode: Grow, value: 1 - fill, content_min: false}}
     }
   }
 
@@ -512,17 +512,17 @@ assets {
     const shown = state == UI_OK ? UI_TEXT : state
 
     Layout: {direction: Column, spacing: 4}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     head {
       Layout: {direction: Row, spacing: 8, v: Middle}
-      LayoutItem: {width: {mode: Grow}}
+      Item: {width: {mode: Grow}}
       YardIcon glyph(icon: icon, size: 14, state: state)
       name {
         Text: {value: label, size: 11, font: yard_font_body}
         Rgb: {112, 152, 176}
       }
       gap {
-        LayoutItem: {width: {mode: Grow}}
+        Item: {width: {mode: Grow}}
       }
       amount {
         Text: {value: value, size: 13, font: yard_font_mono}
@@ -537,7 +537,7 @@ assets {
     prop ok: bool = false
 
     Layout: {direction: Row, spacing: 8, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     YardIcon glyph(icon: ok ? yard_icon_ok : yard_icon_warn, size: 13, state: ok ? UI_GOOD : UI_WARN)
     name {
       Text: {value: label, size: 11, font: yard_font_body}
@@ -556,7 +556,7 @@ assets {
     const s = ok ? UI_GOOD : UI_WARN
 
     Layout: {direction: Row, padding: {4, 4, 8, 8}, spacing: 7, v: Middle}
-    LayoutItem: {width: {mode: Grow}}
+    Item: {width: {mode: Grow}}
     Rect: {1, 1}
     Rgb: {ui_r(s), ui_g(s), ui_b(s)}
     Border: {radius: 1}

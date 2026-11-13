@@ -616,7 +616,7 @@ ECS_ENUM(SliceFill, {
  * template WoodPanel {
  *   prop w: f32 = 300
  *   prop h: f32 = 120
- *   LayoutItem: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
+ *   Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
  *   Rect: {1, 1}
  *   Image: {texture: castle_ui_frame}
  *   ImageSlice: {left: 20, top: 20, right: 20, bottom: 20, edges: SliceTile,

@@ -46,7 +46,7 @@ hud {
       BlendMode: Additive
       Opacity: {flash > 0.5 ? 1 : 0}
       Transition: [Opacity: {duration: flash > 0.5 ? 0.05 : 0.7, timing_function: EaseOut}]
-      SpatialIgnore
+      Ignore
     }
   }
 
