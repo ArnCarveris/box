@@ -135,6 +135,7 @@ def containers(size=512, tiers=4):
     paint = [(164, 70, 44), (38, 76, 132), (52, 106, 72), (206, 154, 38), (124, 130, 138),
              (30, 112, 120), (226, 228, 230), (214, 104, 40), (120, 40, 44)]
     img = np.zeros((size, size, 3))
+    height = np.zeros((size, size))
     th = size // tiers
     for t in range(tiers):
         y0 = t * th
@@ -150,8 +151,15 @@ def containers(size=512, tiers=4):
             block[:, -5:] *= 0.4
             block[th // 2 - 1:th // 2 + 1] *= 0.92
             img[y0:y0 + th, x0:x1] = block
+            relief = np.ones((th, x1 - x0)) * (0.5 + 0.5 * np.cos(np.arange(x1 - x0) * np.pi / 6))[None, :] * 0.35
+            relief[:5] = -1
+            relief[-5:] = -1
+            relief[:, :5] = -1
+            relief[:, -5:] = -1
+            height[y0:y0 + th, x0:x1] = relief
     grime = noise(size, 1.3, 33)[:, :, None]
     save_rgb("containers.jpg", img * (0.82 + 0.3 * grime))
+    save_rgb("containers_normal.jpg", normal_from_height(height, 1.2), 90)
 
 
 def heat_fins(size=256, lines=10):
