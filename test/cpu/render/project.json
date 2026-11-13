@@ -500,7 +500,7 @@
                     "none_without_view_lod",
                     "levels_of_view",
                     "box_not_reduced",
-                    "blended_level_0",
+                    "surface_levels",
                     "released_with_shape"
                 ]
             },

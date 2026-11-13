@@ -18,6 +18,8 @@ typedef struct box_mesh_entry_t {
                                *   generate its levels of detail from, NULL for none */
     uint32_t lod[BOX_LOD_LEVELS_MAX]; /**< Handle of each level of detail, 0 when not yet
                                        *   requested; lod[0] is not used */
+    uint32_t source;          /**< Referenced source of a resolved mesh with levels of
+                               *   detail, value its surface without assets; 0 for none */
 } box_mesh_entry_t;
 
 /** Mesh cache and shape registry */
@@ -255,48 +257,6 @@ uint32_t box_mesh_cache_acquire(
     return handle;
 }
 
-uint32_t box_mesh_cache_lod(
-    box_mesh_cache_t *cache,
-    uint32_t handle,
-    int32_t level)
-{
-    uint32_t result = handle;
-    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
-    if (!entry || !entry->shape || !entry->value || level < 1) {
-        goto done;
-    }
-
-    level = level < BOX_LOD_LEVELS_MAX ? level : BOX_LOD_LEVELS_MAX - 1;
-    if (entry->lod[level]) {
-        result = entry->lod[level];
-        goto done;
-    }
-
-    uint32_t previous = box_mesh_cache_lod(cache, handle, level - 1);
-    entry = box_mesh_cache_entry(cache, handle);
-    const box_shape_t *shape = entry->shape;
-    void *value = entry->value;
-    box_shape_key_t key;
-    ecs_os_memset_t(&key, 0, box_shape_key_t);
-    if (shape->desc.lod_world) {
-        shape->desc.lod_world(shape->world, value, level, &key);
-    } else {
-        shape->desc.lod(value, level, &key);
-    }
-
-    result = previous;
-    if (ecs_os_memcmp_t(&box_mesh_cache_entry(cache, previous)->key, &key, box_shape_key_t)) {
-        result = box_mesh_cache_insert(cache, shape, value, &key);
-        if (result == handle) {
-            box_mesh_cache_release(cache, result);
-        }
-    }
-
-    box_mesh_cache_entry(cache, handle)->lod[level] = result;
-done:
-    return result;
-}
-
 const box_shape_key_t* box_mesh_cache_key(
     const box_mesh_cache_t *cache,
     uint32_t handle)
@@ -391,6 +351,7 @@ void box_mesh_cache_release(
     box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
     if (entry && entry->shape && !(-- entry->refs)) {
         uint32_t lod[BOX_LOD_LEVELS_MAX];
+        uint32_t source = entry->source;
         ecs_os_memcpy_n(lod, entry->lod, uint32_t, BOX_LOD_LEVELS_MAX);
         box_mesh_cache_unlink(cache, handle);
         box_mesh_cache_value_fini(entry);
@@ -398,6 +359,7 @@ void box_mesh_cache_release(
         entry->shape = NULL;
         entry->next = 0;
         ecs_os_memset_n(entry->lod, 0, uint32_t, BOX_LOD_LEVELS_MAX);
+        entry->source = 0;
         *ecs_vec_append_t(NULL, &cache->free_list, uint32_t) = handle;
         cache->alive --;
 
@@ -407,6 +369,8 @@ void box_mesh_cache_release(
                 box_mesh_cache_release(cache, lod[i]);
             }
         }
+
+        box_mesh_cache_release(cache, source);
     }
 }
 
@@ -543,13 +507,15 @@ done:
     return;
 }
 
+/** Shape of the meshes resolved against a parametric surface */
+static const box_shape_t box_resolved_shape = {
+    .desc = {.key = box_resolved_mesh_key, .generate = box_resolved_mesh_generate}
+};
+
 uint32_t box_mesh_cache_resolve(
     box_mesh_cache_t *cache,
     const ShapeMesh *shape)
 {
-    static const box_shape_t resolved_shape = {
-        .desc = {.key = box_resolved_mesh_key, .generate = box_resolved_mesh_generate}
-    };
     uint32_t handle = 0;
     int kind = (int)shape->surface.p[0][0];
     box_mesh_entry_t *source = box_mesh_cache_entry(cache, shape->mesh);
@@ -560,16 +526,139 @@ uint32_t box_mesh_cache_resolve(
     }
 
     box_resolved_mesh_t value = {shape, &source->mesh, source->hash};
-    handle = box_mesh_cache_acquire(cache, &resolved_shape, &value);
+    bool lod = source->value != NULL;
+    handle = box_mesh_cache_acquire(cache, &box_resolved_shape, &value);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, handle);
     if (!mesh || !mesh->vertex_count || !mesh->index_count) {
         box_mesh_cache_release(cache, handle);
         handle = 0;
+        goto done;
+    }
+
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (lod && !entry->source) {
+        box_surface_data_t *surface = ecs_os_malloc_t(box_surface_data_t);
+        *surface = shape->surface;
+        surface->assets = NULL;
+        surface->asset_count = 0;
+        entry->value = surface;
+        entry->source = shape->mesh;
+        box_mesh_cache_keep(cache, shape->mesh);
     }
 
 done:
     return handle;
 }
+
+/** Resolve a level of detail of a mesh resolved against a surface, from the level of its source.
+ *
+ * @param cache The cache
+ * @param handle The resolved mesh, of level 0, with a source
+ * @param level The level, at least 1
+ * @param previous The handle of the level before
+ * @return The handle of the level, previous when the source has no detail to drop at the level
+ * or the level does not resolve
+ *
+ * The surface of a shape whose surface depends on its segment counts is resolved again for the
+ * key of the level of the source (box_shape_desc_t.surface_key_world).
+ */
+static uint32_t box_mesh_cache_resolved_lod(
+    box_mesh_cache_t *cache,
+    uint32_t handle,
+    int32_t level,
+    uint32_t previous)
+{
+    uint32_t result = previous;
+    uint32_t source = box_mesh_cache_entry(cache, handle)->source;
+    uint32_t mesh = box_mesh_cache_lod(cache, source, level);
+    if (mesh == box_mesh_cache_lod(cache, source, level - 1)) {
+        goto done;
+    }
+
+    const box_mesh_entry_t *from = box_mesh_cache_entry(cache, source);
+    const box_mesh_entry_t *to = box_mesh_cache_entry(cache, mesh);
+    ShapeMesh shape = {.mesh = mesh};
+    shape.surface = *(const box_surface_data_t*)box_mesh_cache_entry(cache, handle)->value;
+    if (from->shape->desc.surface_key_world) {
+        box_surface_data_t surface = {0};
+        vec3 min, max;
+        from->shape->desc.surface_key_world(from->shape->world, from->value, &to->key,
+            &surface, min, max);
+        ecs_os_free(surface.assets);
+        if (!surface.p[0][0]) {
+            goto done;
+        }
+
+        ecs_os_memcpy(shape.surface.p, surface.p, sizeof(surface.p));
+    }
+
+    if (!to->mesh.vertex_count || !to->mesh.index_count) {
+        goto done;
+    }
+
+    shape.surface.assets = to->mesh.surface_assets;
+    shape.surface.asset_count = to->mesh.surface_asset_count;
+    box_resolved_mesh_t value = {&shape, &to->mesh, to->hash};
+    uint32_t resolved = box_mesh_cache_acquire(cache, &box_resolved_shape, &value);
+    const box_mesh_t *m = box_mesh_cache_get(cache, resolved);
+    if (!m || !m->vertex_count || !m->index_count || resolved == previous) {
+        box_mesh_cache_release(cache, resolved);
+        goto done;
+    }
+
+    result = resolved;
+done:
+    return result;
+}
+
+uint32_t box_mesh_cache_lod(
+    box_mesh_cache_t *cache,
+    uint32_t handle,
+    int32_t level)
+{
+    uint32_t result = handle;
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (!entry || !entry->shape || !entry->value || level < 1) {
+        goto done;
+    }
+
+    level = level < BOX_LOD_LEVELS_MAX ? level : BOX_LOD_LEVELS_MAX - 1;
+    if (entry->lod[level]) {
+        result = entry->lod[level];
+        goto done;
+    }
+
+    uint32_t previous = box_mesh_cache_lod(cache, handle, level - 1);
+    entry = box_mesh_cache_entry(cache, handle);
+    if (entry->source) {
+        result = box_mesh_cache_resolved_lod(cache, handle, level, previous);
+        box_mesh_cache_entry(cache, handle)->lod[level] = result;
+        goto done;
+    }
+
+    const box_shape_t *shape = entry->shape;
+    void *value = entry->value;
+    box_shape_key_t key;
+    ecs_os_memset_t(&key, 0, box_shape_key_t);
+    if (shape->desc.lod_world) {
+        shape->desc.lod_world(shape->world, value, level, &key);
+    } else {
+        shape->desc.lod(value, level, &key);
+    }
+
+    result = previous;
+    if (ecs_os_memcmp_t(&box_mesh_cache_entry(cache, previous)->key, &key, box_shape_key_t)) {
+        result = box_mesh_cache_insert(cache, shape, value, &key);
+        if (result == handle) {
+            box_mesh_cache_release(cache, result);
+        }
+    }
+
+    box_mesh_cache_entry(cache, handle)->lod[level] = result;
+done:
+    return result;
+}
+
 
 void box_shape_mesh_release(
     box_mesh_cache_t *cache,

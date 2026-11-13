@@ -192,7 +192,10 @@ int32_t box_mesh_cache_users(
  *
  * Level 0 is the mesh itself. Each level halves the segment counts of the level before it
  * (box_shape_desc_t.lod); a level whose key does not change is the mesh of the level before,
- * and equal keys share one mesh. The mesh holds a reference to each of its levels, which are
+ * and equal keys share one mesh.
+ *
+ * A mesh resolved against a surface (box_mesh_cache_resolve) has the levels of its source, each
+ * resolved against the surface. The mesh holds a reference to each of its levels, which are
  * released with its last reference; the caller takes none.
  *
  * @param cache The cache

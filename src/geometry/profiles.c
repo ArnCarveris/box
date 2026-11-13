@@ -1025,6 +1025,46 @@ BOX_ASSET_SHAPE(loft, 2)
 BOX_ASSET_SHAPE(lathe, 3)
 BOX_ASSET_SHAPE(profile, 7)
 
+/** Surface of the mesh of a key of a Sweep or a Loft: its profile resolved with the steps of
+ * the key, as box_asset_generate resolves it.
+ *
+ * @param world The world
+ * @param value The Sweep or Loft
+ * @param kind 1 for a Sweep, 2 for a Loft
+ * @param key The key of the mesh
+ * @param d The surface to fill
+ * @param min The minimum corner of the bounds to fill
+ * @param max The maximum corner of the bounds to fill
+ */
+static void box_asset_surface_key(const ecs_world_t *world, const void *value, int kind,
+    const box_shape_key_t *key, box_surface_data_t *d, vec3 min, vec3 max)
+{
+    Sweep sweep;
+    Loft loft;
+    if (kind == 1) {
+        sweep = *(const Sweep*)value;
+        sweep.segments = key->i[0];
+        value = &sweep;
+    } else {
+        loft = *(const Loft*)value;
+        loft.segments = key->i[0];
+        value = &loft;
+    }
+    box_resolve(world, value, kind, d, min, max);
+}
+
+static void box_sweep_surface_key(const ecs_world_t *world, const void *value,
+    const box_shape_key_t *key, box_surface_data_t *d, vec3 min, vec3 max)
+{
+    box_asset_surface_key(world, value, 1, key, d, min, max);
+}
+
+static void box_loft_surface_key(const ecs_world_t *world, const void *value,
+    const box_shape_key_t *key, box_surface_data_t *d, vec3 min, vec3 max)
+{
+    box_asset_surface_key(world, value, 2, key, d, min, max);
+}
+
 /** Key of a level of detail of a Sweep: the steps of the curved profile segments, at least 1,
  * and the rings along the path, at least 3, halved per level.
  *
@@ -1738,10 +1778,12 @@ void box_geometry_profiles_init(
     ecs_add_pair(world, ecs_id(Profile2D), EcsOnInstantiate, EcsInherit);
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Sweep),
         .key_world = box_sweep_key, .generate_world = box_sweep_generate,
-        .surface_world = box_sweep_surface, .lod_world = box_sweep_lod});
+        .surface_world = box_sweep_surface, .lod_world = box_sweep_lod,
+        .surface_key_world = box_sweep_surface_key});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Loft),
         .key_world = box_loft_key, .generate_world = box_loft_generate,
-        .surface_world = box_loft_surface, .lod_world = box_loft_lod});
+        .surface_world = box_loft_surface, .lod_world = box_loft_lod,
+        .surface_key_world = box_loft_surface_key});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Lathe),
         .key_world = box_lathe_key, .generate_world = box_lathe_generate,
         .surface_world = box_lathe_surface, .lod_world = box_lathe_lod});

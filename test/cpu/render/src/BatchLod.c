@@ -85,6 +85,7 @@ void BatchLod_none_without_view_lod(void) {
     box_render_null_t *null;
     ecs_world_t *world = lod_world_new(&null, 0);
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Sphere, {.segments = 32, .smooth = true, .radius = 1});
     lod_frame(world);
 
@@ -103,6 +104,7 @@ void BatchLod_levels_of_view(void) {
     box_render_null_t *null;
     ecs_world_t *world = lod_world_new(&null, 3);
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Sphere, {.segments = 32, .smooth = true, .radius = 1});
     lod_frame(world);
 
@@ -127,6 +129,7 @@ void BatchLod_box_not_reduced(void) {
     box_render_null_t *null;
     ecs_world_t *world = lod_world_new(&null, 4);
     ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Position, {0, 0, 0});
     ecs_set(world, box, Box, {1, 1, 1});
     ecs_entity_t cylinder = ecs_new(world);
     ecs_set(world, cylinder, Position, {3, 0, 0});
@@ -148,30 +151,33 @@ void BatchLod_box_not_reduced(void) {
     box_render_null_free(null);
 }
 
-void BatchLod_blended_level_0(void) {
+void BatchLod_surface_levels(void) {
     box_render_null_t *null;
     ecs_world_t *world = lod_world_new(&null, 3);
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Sphere, {.segments = 32, .smooth = true, .radius = 1});
-    ecs_set(world, e, Opacity, {0.5f});
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, EllipsoidShell, {.radius = {2, 3, 4}, .longitude_end = GLM_PI * 2,
+        .latitude_start = -GLM_PI_2, .latitude_end = GLM_PI_2, .thickness = 0.2f,
+        .segments = 32, .rings = 16});
     lod_frame(world);
 
-    uint32_t mesh = ecs_get(world, e, ShapeMesh)->mesh;
-    int32_t i, found = 0;
-    for (i = 0; i < ecs_vec_count(&null->last.batches); i ++) {
-        const box_render_batch_t *draw = ecs_vec_get_t(
-            &null->last.batches, box_render_batch_t, i);
-        if (draw->mesh == mesh) {
-            test_assert(draw->view != -1);
-            for (int32_t l = 0; l < BOX_LOD_LEVELS_MAX; l ++) {
-                test_uint(draw->lods[l], 0);
-            }
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    test_assert(shape->render_mesh != 0);
+    const box_render_batch_t *draw = lod_draw_of(world, null, e);
+    test_uint(draw->mesh, shape->render_mesh);
+    test_uint(draw->lods[0], shape->render_mesh);
+    test_uint(draw->lods[1], box_mesh_cache_lod(cache, shape->render_mesh, 1));
+    test_uint(draw->lods[2], box_mesh_cache_lod(cache, shape->render_mesh, 2));
+    test_assert(draw->lods[1] != draw->lods[0]);
+    test_assert(draw->lods[2] != draw->lods[1]);
 
-            found ++;
-        }
-    }
-
-    test_assert(found > 0);
+    const box_mesh_t *level = box_mesh_cache_get(cache, draw->lods[2]);
+    const box_mesh_t *source = box_mesh_cache_get(cache,
+        box_mesh_cache_lod(cache, shape->mesh, 2));
+    test_assert(level->index_count < box_mesh_cache_get(cache, draw->mesh)->index_count);
+    test_int(level->index_count, source->index_count);
+    test_int(level->vertex_count, source->vertex_count);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -184,6 +190,7 @@ void BatchLod_released_with_shape(void) {
     lod_frame(world);
     int32_t before = box_mesh_cache_count(cache);
     ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, Sphere, {.segments = 32, .smooth = true, .radius = 1});
     lod_frame(world);
     test_assert(box_mesh_cache_count(cache) > before + 1);

@@ -35,6 +35,7 @@
                     "second_view_without_lod",
                     "flat_cylinder_and_box_not_reduced",
                     "shadow_same_level",
+                    "far_lathe_and_sweep_level_2",
                     "culling_off",
                     "occlusion",
                     "one_level_unchanged"

@@ -273,6 +273,79 @@ void MeshLod_shadow_same_level(void) {
     ecs_fini(world);
 }
 
+/** Get the index count of a level of the mesh a shape resolved against its surface.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param level The level
+ * @return The indices of the resolved mesh of the level
+ */
+static int64_t resolved_level_indices(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    int32_t level)
+{
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+    test_assert(sm != NULL && sm->render_mesh != 0);
+    const box_mesh_t *mesh = box_mesh_cache_get(cache,
+        box_mesh_cache_lod(cache, sm->render_mesh, level));
+    test_assert(mesh != NULL);
+
+    return (int64_t)mesh->index_count;
+}
+
+void MeshLod_far_lathe_and_sweep_level_2(void) {
+    ecs_world_t *world = world_new();
+    ecs_entity_t camera = camera_new(world);
+    ecs_entity_t view = view_new(world, camera, lod_three, true, false);
+    test_assert(ecs_script(world, { .code =
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.material\n"
+        "vase {\n"
+        "  Path2D: {start: {0, 0}, segments: [{kind: Line, end: {0.4, 0}},\n"
+        "    {kind: CatmullRom, end: {0.75, 0.6}}, {kind: CatmullRom, end: {0.5, 1.8}}]}\n"
+        "}\n"
+        "round {\n"
+        "  Path2D: {start: {0.3, 0}, closed: true, segments: [\n"
+        "    {kind: CatmullRom, end: {0, 0.3}}, {kind: CatmullRom, end: {-0.3, 0}},\n"
+        "    {kind: CatmullRom, end: {0, -0.3}}, {kind: CatmullRom, end: {0.3, 0}}]}\n"
+        "}\n"
+        "round_section { Profile2D: {outer: round} }\n"
+        "bend {\n"
+        "  Path3D: {start: {-1, 0, 0}, segments: [{kind: CatmullRom, end: {0, 0.5, 0}},\n"
+        "    {kind: CatmullRom, end: {1, 0, 0}}]}\n"
+        "}\n"
+        "lathe {\n"
+        "  Position: {-2, 0, -60}\n"
+        "  Lathe: {profile: vase, cap_start: true, cap_end: true, segments: 32, rings: 24}\n"
+        "  Rgb: {255, 255, 255}\n"
+        "}\n"
+        "sweep {\n"
+        "  Position: {2, 0, -60}\n"
+        "  Sweep: {path: bend, profile: round_section, segments: 16, rings: 32}\n"
+        "  Rgb: {255, 255, 255}\n"
+        "}\n" }) != 0);
+    ecs_entity_t lathe = ecs_lookup(world, "lathe");
+    ecs_entity_t sweep = ecs_lookup(world, "sweep");
+    frames(world, 2);
+
+    test_assert(resolved_level_indices(world, lathe, 2) <
+        resolved_level_indices(world, lathe, 0));
+    test_assert(resolved_level_indices(world, sweep, 2) <
+        resolved_level_indices(world, sweep, 0));
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.visible, 2);
+    test_int(stats.levels[0], 0);
+    test_int(stats.levels[2], 2);
+    test_int(stats.indices, resolved_level_indices(world, lathe, 2) +
+        resolved_level_indices(world, sweep, 2));
+
+    ecs_fini(world);
+}
+
 void MeshLod_culling_off(void) {
     ecs_world_t *world = world_new();
     ecs_entity_t camera = camera_new(world);
