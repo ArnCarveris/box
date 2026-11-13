@@ -859,13 +859,13 @@ void TextureBlur_follows_input_type(void) {
     ecs_entity_t wave_c = tb_wave_kind(world);
     ecs_entity_t wave = ecs_new(world);
     ecs_entity_t blur = ecs_new(world);
-    ecs_entity_t math = ecs_new(world);
+    ecs_entity_t split = ecs_new(world);
     ecs_entity_t tex = ecs_new(world);
     TbWave wv = {0};
     ecs_set_id(world, wave, wave_c, ECS_SIZEOF(TbWave), &wv);
     ecs_set(world, blur, TexBlur, {.input = wave, .radius = 8});
-    ecs_set(world, math, TexMath, {.op = MathAdd, .a = blur});
-    ecs_set(world, tex, TextureGraph, {.output = math, .width = 8, .height = 8,
+    ecs_set(world, split, TexSplit, {.input = blur});
+    ecs_set(world, tex, TextureGraph, {.output = split, .width = 8, .height = 8,
         .format = GraphHdr});
     ecs_log_set_level(-4);
     const TextureStatus *status = tb_wait(world, tex, 1);
@@ -877,8 +877,8 @@ void TextureBlur_follows_input_type(void) {
     const TextureNodeKind *kind = ecs_get(world, ecs_id(TexBlur), TextureNodeKind);
     test_assert(kind != NULL);
     test_int(kind->passes, 2);
-    test_bool(kind->follows_input, true);
     test_bool(kind->neighbourhood, true);
-    test_int(kind->output, TexVector);
+    test_int(kind->output, TexAny);
+    test_int(kind->inputs[0].type, TexAny);
     ecs_fini(world);
 }

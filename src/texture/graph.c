@@ -133,7 +133,6 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
-<<<<<<< HEAD
 /** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
  * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
  * them further apart, between texels. */
@@ -184,7 +183,8 @@ static const char *box_texture_blur_wgsl =
     "    }\n"
     "    return box_tex_blur_axis(prev, texel, 1u,\n"
     "        select(radius, radius * 2.0 * size.y / size.x, sphere));\n"
-=======
+    "}\n";
+
 /** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
  * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
  * and w.
@@ -558,7 +558,6 @@ static const char *box_texture_time_wgsl =
 static const char *box_texture_splat_wgsl =
     "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x);\n"
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
     "}\n";
 
 /** State of the build of one graph */
@@ -833,12 +832,8 @@ static void box_texture_node_kind_reflect(
         .function = kind->function,
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
         .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0,
-<<<<<<< HEAD
-        .follows_input = (kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT) != 0,
+        .plane = (kind->flags & BOX_TEXTURE_NODE_PLANE) != 0,
         .passes = kind->passes
-=======
-        .plane = (kind->flags & BOX_TEXTURE_NODE_PLANE) != 0
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -881,15 +876,9 @@ int32_t box_texture_node_register(
     kind = ecs_os_calloc_t(box_texture_node_kind_t);
     if (box_texture_node_kind_fill(kind, desc)) {
         char *name = ecs_get_path(world, desc->component);
-<<<<<<< HEAD
         ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size, "
-            "more than %d parameter bytes or more than %d passes", name,
+            "more than %d parameter bytes, more than %d passes or an invalid array", name,
             BOX_TEXTURE_NODE_PARAM_BYTES, BOX_TEXTURE_NODE_PASSES);
-=======
-        ecs_err("box_texture_node_register: node kind '%s' has a parameter of an invalid size "
-            "or more than %d parameter bytes, or an invalid array", name,
-            BOX_TEXTURE_NODE_PARAM_BYTES);
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
         ecs_os_free(name);
         box_texture_node_kind_strings_free(kind);
         ecs_os_free(kind);
@@ -1171,15 +1160,13 @@ static TextureValueType box_texture_math_type(
  * @param e The node entity
  * @param kind Its kind
  * @param inputs Index of the node of each input, -1 for none
- * @param output Type of the value of the node
  * @return Index of the node
  */
 static int32_t box_texture_graph_append(
     box_texture_graph_build_t *b,
     ecs_entity_t e,
     const box_texture_node_kind_t *kind,
-    const int32_t *inputs,
-    TextureValueType output)
+    const int32_t *inputs)
 {
     const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
     int32_t i, offset = ecs_vec_count(&b->params);
@@ -1221,11 +1208,7 @@ static int32_t box_texture_graph_append(
     ecs_os_memset_t(node, 0, box_texture_graph_node_t);
     node->entity = e;
     node->kind = kind->id;
-<<<<<<< HEAD
-    node->output = output;
-=======
     node->output = box_texture_graph_output_type(kind, ptr, types);
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
     node->params = offset;
     node->param_size = kind->node_size;
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
@@ -1244,7 +1227,7 @@ static int32_t box_texture_graph_append(
  * @param output Type of the node
  * @param from Node of the input, 0 for the output of the graph
  * @param input Name of the input
- * @param expected Type the input expects, -1 for either
+ * @param expected Type the input expects, TexAny for either
  */
 static void box_texture_graph_check_type(
     box_texture_graph_build_t *b,
@@ -1254,11 +1237,7 @@ static void box_texture_graph_check_type(
     const char *input,
     TextureValueType expected)
 {
-<<<<<<< HEAD
-    if (from && (int32_t)expected >= 0 && output != expected) {
-=======
     if (from && expected != TexAny && output != expected) {
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
         char *name = box_texture_graph_name(b->world, e);
         char *from_name = box_texture_graph_name(b->world, from);
         box_texture_graph_error(b, "node '%s' outputs %s but input '%s' of node '%s' expects "
@@ -1275,7 +1254,7 @@ static void box_texture_graph_check_type(
  * @param e The node entity
  * @param from Node whose input it is, 0 for the output of the graph
  * @param input Name of that input
- * @param expected Type that input expects, -1 for either
+ * @param expected Type that input expects, TexAny for either
  * @return Index of the node, -1 when the build failed or waits
  */
 static int32_t box_texture_graph_visit(
@@ -1335,16 +1314,11 @@ static int32_t box_texture_graph_visit(
         goto done;
     }
 
-<<<<<<< HEAD
-    if (!(kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT)) {
-        box_texture_graph_check_type(b, e, kind->output, from, input, expected);
-=======
     if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain == DomainSphere) {
         char *component = ecs_get_path(b->world, kind->component);
         box_texture_graph_error(b, "node '%s' (%s) works on DomainPlane only, the graph is on "
             "DomainSphere", name, component);
         ecs_os_free(component);
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
     }
 
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
@@ -1359,33 +1333,17 @@ static int32_t box_texture_graph_visit(
     for (i = 0; i < kind->input_count && !b->error && !b->waiting; i ++) {
         const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
         ecs_entity_t in = *(const ecs_entity_t*)(ptr + kind->inputs[i].offset);
-        bool follows = i == 0 && (kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT);
         if (in) {
             inputs[i] = box_texture_graph_visit(b, in, e, kind->inputs[i].name,
-                follows ? (TextureValueType)-1 : kind->inputs[i].type);
+                kind->inputs[i].type);
         }
     }
 
     if (!b->error && !b->waiting) {
-<<<<<<< HEAD
-        TextureValueType output = kind->output;
-        if ((kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT) && inputs[0] >= 0) {
-            output = ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, inputs[0])->output;
-        }
-
-        if (kind->flags & BOX_TEXTURE_NODE_FOLLOWS_INPUT) {
-            box_texture_graph_check_type(b, e, output, from, input, expected);
-        }
-
-        if (!b->error) {
-            result = box_texture_graph_append(b, e, kind, inputs, output);
-        }
-=======
         result = box_texture_graph_append(b, e, kind, inputs);
         box_texture_graph_check_type(b, e,
             ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, result)->output, from, input,
             expected);
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
     }
 
 done:
@@ -1643,9 +1601,6 @@ done:
     return;
 }
 
-<<<<<<< HEAD
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexBlur.
-=======
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -1710,8 +1665,8 @@ done:
 }
 
 /** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
- * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve, TexBlocks and TexCells.
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
+ * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve, TexBlocks, TexCells and
+ * TexBlur.
  *
  * @param world The world
  */
@@ -1755,19 +1710,20 @@ static void box_texture_nodes_register(
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){
-<<<<<<< HEAD
         .component = ecs_id(TexBlur),
-        .output = TexVector,
+        .output = TexAny,
         .inputs = {
-            { "input", offsetof(TexBlur, input), TexVector, "input_value",
+            { "input", offsetof(TexBlur, input), TexAny, "input_value",
                 offsetof(TexBlur, input_value) }
         },
         .params = {{ "radius", offsetof(TexBlur, radius), 4, BOX_TEXTURE_PARAM_F32 }},
         .function = "box_tex_blur",
         .source = box_texture_blur_wgsl,
-        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD | BOX_TEXTURE_NODE_FOLLOWS_INPUT,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
         .passes = 2
-=======
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
         .component = ecs_id(TexSplit),
         .output = TexScalar,
         .inputs = {
@@ -1908,7 +1864,6 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_cells",
         .source = box_texture_cells_wgsl
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
     });
 }
 

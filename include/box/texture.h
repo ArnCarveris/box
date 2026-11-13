@@ -676,17 +676,11 @@ ECS_STRUCT(TexBlur, {
 /** Flag of a node kind whose value depends on time */
 #define BOX_TEXTURE_NODE_ANIMATED (1u << 1)
 
-<<<<<<< HEAD
-/** Flag of a node kind whose first input takes a Scalar or a Vector node and whose value has
- * the type of that node; without a node the input and the value have the declared types */
-#define BOX_TEXTURE_NODE_FOLLOWS_INPUT (1u << 2)
+/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
+#define BOX_TEXTURE_NODE_PLANE (1u << 2)
 
 /** Most passes of a node kind */
 #define BOX_TEXTURE_NODE_PASSES (4)
-=======
-/** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
-#define BOX_TEXTURE_NODE_PLANE (1u << 2)
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
 
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {
@@ -724,12 +718,8 @@ ECS_STRUCT(TextureNodeKind, {
     const char *function;    /**< Name of the WGSL function of the node */
     bool neighbourhood;      /**< The node reads its inputs at other texels */
     bool animated;           /**< The node depends on time */
-<<<<<<< HEAD
-    bool follows_input;      /**< The value has the type of the node of the first input */
-    int32_t passes;          /**< Passes that compute the value, 1 for most kinds */
-=======
     bool plane;              /**< The node works on DomainPlane only */
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
+    int32_t passes;          /**< Passes that compute the value, 1 for most kinds */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -805,14 +795,6 @@ typedef TextureValueType (*box_texture_node_type_t)(
 /** Description of a node kind for box_texture_node_register.
  *
  * The WGSL function fn name(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f
-<<<<<<< HEAD
- * gets the parameter bytes at the offsets of TextureNodeKind.params, the input values (a scalar
- * in x, the constant without a node) and the coordinates, and returns the value, a scalar in x.
- *
- * A neighbourhood kind also gets texel: vec2i, then t0: texture_2d<f32>, ... per input. A kind of
- * more passes gets pass_index: u32 and prev: texture_2d<f32> (the pass before, 1x1 zero in pass
- * 0) between texel and t0; its last pass is the value of the node.
-=======
  * of the parameter bytes p, the input values i (a scalar in x, the constant without a node)
  * and the coordinates returns the value of the node, a scalar in x.
  *
@@ -822,7 +804,10 @@ typedef TextureValueType (*box_texture_node_type_t)(
  * A kind with a TexAny input gets a u32 after its last parameter, 4 byte aligned, with bit j
  * set when input j has a Scalar node and bit 4 + j when it has a Vector node; its function
  * broadcasts a Scalar input itself.
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
+ *
+ * A neighbourhood kind also gets texel: vec2i, then t0: texture_2d<f32>, ... per input. A kind of
+ * more passes gets pass_index: u32 and prev: texture_2d<f32> (the pass before, 1x1 zero in pass
+ * 0) between texel and t0; its last pass is the value of the node.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -836,14 +821,10 @@ typedef struct box_texture_node_desc_t {
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-<<<<<<< HEAD
-                                 *   BOX_TEXTURE_NODE_FOLLOWS_INPUT */
+                                 *   BOX_TEXTURE_NODE_PLANE */
     int32_t passes;             /**< Passes of the function, 0 for 1, at most
                                  *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
                                  *   neighbourhood kind */
-=======
-                                 *   BOX_TEXTURE_NODE_PLANE */
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

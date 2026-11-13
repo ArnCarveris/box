@@ -505,15 +505,11 @@ static bool box_gpu_tg_due(
 /** Partition the nodes of a graph into stages: mark the materialized nodes and give every node
  * the materialized node whose stage computes it.
  *
-<<<<<<< HEAD
- * The output, the forced boundaries and the inputs of neighbourhood nodes, those of more than
- * one pass included, are materialized,
- * then every node that the stages of two materialized nodes reach, until none is.
-=======
- * The output, the forced boundaries, the inputs of neighbourhood nodes and the static inputs of
- * animated nodes are materialized, then every node that the stages of two materialized nodes
- * reach, until none is. A static node is then never computed by an animated stage.
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
+ * The output, the forced boundaries, the inputs of neighbourhood nodes, those of more than
+ * one pass included, and the static inputs of animated nodes are materialized, then every node
+ * that the stages of two materialized nodes reach, until none is.
+ *
+ * A static node is then never computed by an animated stage.
  *
  * @param tg The graph state
  * @param graph The graph
@@ -1600,14 +1596,11 @@ static void box_gpu_tg_upload(
     wgpuQueueWriteBuffer(gpu->queue, graph->uniforms, 0, uniforms, sizeof(uniforms));
 }
 
-<<<<<<< HEAD
-/** Record the dispatches of the stages of a graph into its image, with an intermediate of the
- * pool for each other materialized node and each earlier pass.
-=======
 /** Record the dispatches of the stages of a graph into its image: a static stage takes the
  * cached value of its node and is dispatched only when the cache did not have it, an animated
  * stage writes an intermediate of the pool.
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
+ *
+ * An earlier pass of a node writes an intermediate of the pool when a dispatched stage reads it.
  *
  * @param gpu The backend
  * @param tg The graph state
@@ -1630,6 +1623,7 @@ static void box_gpu_tg_record(
     box_gpu_texture_t *tex = box_gpu_texture_output(gpu, graph->handle, w, h, image,
         graph->desc.format == GraphColor);
     bool *computed = ecs_os_calloc_n(bool, program->stage_count);
+    bool *needed = ecs_os_calloc_n(bool, program->slot_count);
     box_gpu_tg_upload(gpu, tg, graph);
     graph->time = tg->time;
     if (image == BOX_GPU_TEXTURE_SINGLE) {
@@ -1646,21 +1640,13 @@ static void box_gpu_tg_record(
         });
     }
 
-<<<<<<< HEAD
     ev->textures = ecs_os_calloc_n(box_gpu_tg_pooled_t*, program->slot_count);
-    for (s = 0; s < program->stage_count; s ++) {
-        const box_gpu_tg_stage_t *stage = &program->stages[s];
-        if (!stage->output) {
-            ev->textures[stage->slot] = box_gpu_tg_pool_take(gpu, tg, w, h, stage->format);
-=======
-    ev->textures = ecs_os_calloc_n(box_gpu_tg_pooled_t*, program->node_count);
     ev->entries = ecs_os_calloc_n(box_gpu_tg_entry_t*, program->node_count);
     for (s = 0; s < program->stage_count; s ++) {
         const box_gpu_tg_stage_t *stage = &program->stages[s];
         int32_t root = stage->root;
-        if (stage->output) {
+        if (stage->output || stage->pass >= 0) {
             continue;
->>>>>>> 643b0400c32cd427d2671ac89ac5d540153eba8d
         }
 
         if (graph->animated[root]) {
@@ -1671,6 +1657,21 @@ static void box_gpu_tg_record(
         ev->entries[root] = box_gpu_tg_cache_take(gpu, tg, graph, root, stage->format,
             &computed[s]);
         ev->textures[root] = &ev->entries[root]->value;
+    }
+
+    for (s = program->stage_count - 1; s >= 0; s --) {
+        const box_gpu_tg_stage_t *stage = &program->stages[s];
+        if (stage->pass >= 0) {
+            computed[s] = !needed[stage->slot];
+            if (!computed[s]) {
+                ev->textures[stage->slot] = box_gpu_tg_pool_take(gpu, tg, w, h,
+                    stage->format);
+            }
+        }
+
+        for (k = 0; !computed[s] && k < stage->input_count; k ++) {
+            needed[stage->inputs[k]] = true;
+        }
     }
 
     for (s = 0; s < program->stage_count; s ++) {
@@ -1717,6 +1718,7 @@ static void box_gpu_tg_record(
         wgpuTextureViewRelease(out);
     }
 
+    ecs_os_free(needed);
     ecs_os_free(computed);
     gpu->pending.texture_graph_evaluations ++;
     if (!ev->held) {
