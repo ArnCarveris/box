@@ -352,7 +352,7 @@ ECS_STRUCT(TexChannel, {
 ECS_STRUCT(TexNormal, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: flat */
     float height_value;  /**< Value of height without a node */
-    float strength;      /**< Steepness, 0 for 1, as TextureGen.strength */
+    float strength;      /**< Steepness, 1 when not above 0, as TextureGen.strength */
 });
 
 /** Node of a TextureGraph whose Scalar value is the magnitude of the gradient of a Scalar
@@ -364,7 +364,7 @@ ECS_STRUCT(TexNormal, {
 ECS_STRUCT(TexSlope, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
     float height_value;  /**< Value of height without a node */
-    float strength;      /**< Factor of the differences, 0 for 1, as TexNormal.strength */
+    float strength;      /**< Factor of the differences, 1 when not above 0, as TexNormal.strength */
 });
 
 /** Most inputs of a node kind */

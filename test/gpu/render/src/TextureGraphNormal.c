@@ -653,33 +653,38 @@ void TextureGraphNormal_normal_matches_gen(void) {
     // textures/graph
     ecs_world_t *world = tn_world();
     ecs_entity_t dot, wave, node;
-    int32_t i, x, y, c, w = 64, h = 32;
+    int32_t i, s, x, y, c, w = 64, h = 32;
+    float strengths[] = {24, -3}; /* GenNormal takes a strength not above 0 as 1 */
     tn_register(world, &dot, &wave);
     ecs_entity_t height = tn_height(world, wave, NULL);
-    ecs_entity_t tex = tn_graph(world, height, false, 24, w, h, DomainPlane, &node);
-    tn_wait(world, tex);
-    float *texels = tn_read(world, tex, 0, w, h);
-    float *heights = tn_read(world, tex, height, w, h);
-    float *field = ecs_os_malloc_n(float, w * h);
-    uint8_t *rgba = ecs_os_malloc_n(uint8_t, w * h * 4);
-    for (i = 0; i < w * h; i ++) {
-        field[i] = heights[i * 4];
-    }
+    for (s = 0; s < 2; s ++) {
+        ecs_entity_t tex = tn_graph(
+            world, height, false, strengths[s], w, h, DomainPlane, &node);
+        tn_wait(world, tex);
+        float *texels = tn_read(world, tex, 0, w, h);
+        float *heights = tn_read(world, tex, height, w, h);
+        float *field = ecs_os_malloc_n(float, w * h);
+        uint8_t *rgba = ecs_os_malloc_n(uint8_t, w * h * 4);
+        for (i = 0; i < w * h; i ++) {
+            field[i] = heights[i * 4];
+        }
 
-    box_texture_gen_normal(field, w, h, 24, rgba);
-    for (y = 0; y < h; y ++) {
-        for (x = 0; x < w; x ++) {
-            for (c = 0; c < 4; c ++) {
-                tn_expect(texels, w, x, y, c, rgba[(y * w + x) * 4 + c] / 255.0,
-                    1.0 / 255.0 + 1e-3);
+        box_texture_gen_normal(field, w, h, strengths[s], rgba);
+        for (y = 0; y < h; y ++) {
+            for (x = 0; x < w; x ++) {
+                for (c = 0; c < 4; c ++) {
+                    tn_expect(texels, w, x, y, c, rgba[(y * w + x) * 4 + c] / 255.0,
+                        1.0 / 255.0 + 1e-3);
+                }
             }
         }
+
+        ecs_os_free(rgba);
+        ecs_os_free(field);
+        ecs_os_free(heights);
+        ecs_os_free(texels);
     }
 
-    ecs_os_free(rgba);
-    ecs_os_free(field);
-    ecs_os_free(heights);
-    ecs_os_free(texels);
     ecs_fini(world);
 }
 
