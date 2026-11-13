@@ -1,0 +1,102 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+
+// Normal maps of texture graphs in the sphere domain on lit gray Sphere meshes, by TexNormal of
+// a tent height max(0, 0.3 - |d|) of the direction d, with the sun above and in front. On the
+// left the ridge of |x|: a raised band along the great circle through both poles that runs along
+// the seam of the image (u 0) and its middle (u 0.5), the sphere tilted so its north pole faces
+// the camera above the center and the band crosses the front from left to right through it. The
+// band is lit on its upper flank and shaded on its lower one with a sharp crest, equally steep on
+// both halves (the seam half on the right), without a crease, a flipped side or a spot at the
+// pole beyond a faint softening of the crest right at it. In the middle the ridge of |y|: a raised
+// belt around the equator, lit above and dark below, the sphere tilted toward the camera. On the
+// right a gray sphere whose albedo is the TexSlope of the same belt in a single channel: red on
+// the two flanks of the belt, where it is steep, a thin dark line on its crest, black at the poles
+// and over the rest of the sphere.
+// frames: 30
+
+graph_normals {
+  AmbientLight: {sky: {120, 140, 170}, ground: {40, 40, 40}, intensity: 0.5}
+
+  sun {
+    Rotation: {0.7, 2.6, 0}
+    DirectionalLight: {intensity: 1.5 * flecs.script.math.PI}
+  }
+
+  camera {
+    Position: {0, 0, 6.5}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+  }
+
+  meridian {
+    dir    { TexCoords: {} }
+    neg    { TexMath: {op: MathMultiply, a: dir, b_value: {-1, -1, -1, 1}} }
+    mag    { TexMath: {op: MathMax, a: dir, b: neg} }
+    tent   { TexMath: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
+    ridge  { TexMath: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
+    height { TexSplit: {input: ridge, channel: ChannelR} }
+    normal { TexNormal: {height: height, strength: 20} }
+    TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
+                   format: GraphLinear}
+  }
+
+  belt {
+    dir    { TexCoords: {} }
+    neg    { TexMath: {op: MathMultiply, a: dir, b_value: {-1, -1, -1, 1}} }
+    mag    { TexMath: {op: MathMax, a: dir, b: neg} }
+    tent   { TexMath: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
+    ridge  { TexMath: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
+    height { TexSplit: {input: ridge, channel: ChannelG} }
+    normal { TexNormal: {height: height, strength: 20} }
+    TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
+                   format: GraphLinear}
+  }
+
+  steep {
+    dir    { TexCoords: {} }
+    neg    { TexMath: {op: MathMultiply, a: dir, b_value: {-1, -1, -1, 1}} }
+    mag    { TexMath: {op: MathMax, a: dir, b: neg} }
+    tent   { TexMath: {op: MathSubtract, a_value: {0.3, 0.3, 0.3, 0}, b: mag} }
+    ridge  { TexMath: {op: MathMax, a: tent, b_value: {0, 0, 0, 0}} }
+    height { TexSplit: {input: ridge, channel: ChannelG} }
+    slope  { TexSlope: {height: height, strength: 20} }
+    TextureGraph: {output: slope, width: 512, height: 256, domain: DomainSphere,
+                   format: GraphSingle}
+  }
+
+  meridian_sphere {
+    Position: {-3, 0, 0}
+    Rotation: {1.1, 0, 0}
+    Sphere: {segments: 96, smooth: true, radius: 1.3}
+    Rgb: {200, 200, 200}
+    PbrMaterial: {roughness: 0.5}
+    PbrTextures: {normal: meridian}
+  }
+
+  belt_sphere {
+    Position: {0, 0, 0}
+    Rotation: {0.5, 0, 0}
+    Sphere: {segments: 96, smooth: true, radius: 1.3}
+    Rgb: {200, 200, 200}
+    PbrMaterial: {roughness: 0.5}
+    PbrTextures: {normal: belt}
+  }
+
+  steep_sphere {
+    Position: {3, 0, 0}
+    Rotation: {0.5, 0, 0}
+    Sphere: {segments: 96, smooth: true, radius: 1.3}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: steep}
+  }
+}

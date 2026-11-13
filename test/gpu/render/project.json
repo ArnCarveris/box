@@ -1623,6 +1623,16 @@
                     "loading_holds",
                     "failure_names_texture"
                 ]
+            },
+            {
+                "id": "TextureGraphNormal",
+                "testcases": [
+                    "normal_plane_slope",
+                    "normal_sphere_slope",
+                    "slope_plane_sphere",
+                    "normal_matches_gen",
+                    "normal_sphere_seam_poles"
+                ]
             }
         ]
     }

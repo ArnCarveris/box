@@ -753,6 +753,42 @@ ECS_STRUCT(TexLut, {
     bool linear;            /**< Read the color channels as stored, see TexImage.linear */
 });
 
+/** Node of a TextureGraph whose value is the tangent space normal map of a Scalar height as
+ * GenNormal stores it, for a GraphLinear output: (dx, dy, 1) normalized, as (0.5 - 0.5 x,
+ * 0.5 + 0.5 y, 0.5 + 0.5 z, 1), green up the image; flat is (0.5, 0.5, 1, 1).
+ *
+ * dx (along u) and dy (down the image) are the central differences of the height, which is
+ * materialized, times strength and the width over 512, as TextureGen does for the same height.
+ * On DomainSphere they follow the layout in the UV frame of a Sphere mesh (texture_graph.wgsl).
+ *
+ * @code
+ * relief {
+ *   dir    { TexCoords: {} }
+ *   height { TexSplit: {input: dir, channel: ChannelG} }
+ *   normal { TexNormal: {height: height, strength: 4} }
+ *   TextureGraph: {output: normal, width: 512, height: 256, domain: DomainSphere,
+ *                  format: GraphLinear}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexNormal, {
+    ecs_entity_t height; /**< Scalar height node, 0 for height_value: flat */
+    float height_value;  /**< Value of height without a node */
+    float strength;      /**< Steepness, 1 when not above 0, as TextureGen.strength */
+});
+
+/** Node of a TextureGraph whose Scalar value is the magnitude of the gradient of a Scalar
+ * height, length(dx, dy) in the units of TexNormal of the same strength: the tangent of the
+ * tilt of its normal, 0 where flat. For masks such as rock on steep ground.
+ *
+ * On DomainSphere it follows the layout as TexNormal does, with the same steepness in every
+ * direction up to the poles. */
+ECS_STRUCT(TexSlope, {
+    ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
+    float height_value;  /**< Value of height without a node */
+    float strength;      /**< Factor of the differences, 1 when not above 0, as TexNormal.strength */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 
