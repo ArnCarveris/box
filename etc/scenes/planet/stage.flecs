@@ -37,7 +37,7 @@ stage {
       Star hero_star(
         temperature: star.temperature, radius: star.radius, sunspots: star.sunspots,
         granulation: star.granulation, contrast: star.contrast, prominences: star.prominences,
-        spin: star.spin, seed: star_seed, detail: star_detail
+        spin: star.spin, corona: star.corona, seed: star_seed, detail: star_detail
       ) {
         Position: {0, 0, 0}
       }

@@ -188,6 +188,10 @@ hud {
                   label: "Prominences", width: 236, min: 0, max: 1, step: 0.01,
                   value: state.star.prominences, decimals: 2
                 )
+                Slider corona(
+                  label: "Corona glow", width: 236, min: 0, max: 3, step: 0.01,
+                  value: state.star.corona, decimals: 2
+                )
                 Slider spin(
                   label: "Spin", width: 236, min: 0, max: 0.5, step: 0.005,
                   value: state.star.spin, decimals: 3, unit: " rad/s"

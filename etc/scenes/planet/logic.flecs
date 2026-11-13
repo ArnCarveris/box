@@ -55,6 +55,7 @@ state {
     else if n == "contrast" { state.star.contrast = v }
     else if n == "prominences" { state.star.prominences = v }
     else if n == "spin" { state.star.spin = v }
+    else if n == "corona" { state.star.corona = v }
   }
 
   fn apply() {

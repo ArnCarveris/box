@@ -1142,21 +1142,21 @@ planets {
   // The parameters of a star: the surface temperature in kelvin, the radius in world units, the
   // sunspot amount (0 none to 1 a very active star), the size of the granules relative to those
   // of the sun, the contrast of the granulation, the amount of prominences on the limb and the
-  // spin in radians per second
+  // spin in radians per second and the strength of the glow of the corona and the halo
   struct StarParams(
     temperature: f32, radius: f32, sunspots: f32, granulation: f32, contrast: f32,
-    prominences: f32, spin: f32)
+    prominences: f32, spin: f32, corona: f32)
 
   // Presets of the star types: 0 red dwarf, 1 yellow dwarf (the sun), 2 white, 3 blue giant,
   // 4 red giant
   fn star_preset(kind: i32) -> StarParams {
     match kind {
-      0: {3100, 1.1, 0.7, 0.8, 0.38, 0.7, 0.14}
-      1: {5772, 1.6, 0.35, 1, 0.3, 0.3, 0.05}
-      2: {9600, 1.8, 0, 0.7, 0.16, 0.05, 0.16}
-      3: {24000, 2.8, 0, 1.6, 0.14, 0.2, 0.1}
-      4: {3600, 3.6, 0.15, 3.2, 0.42, 0.25, 0.02}
-      _: {5772, 1.6, 0.35, 1, 0.3, 0.3, 0.05}
+      0: {3100, 1.1, 0.7, 0.8, 0.38, 0.7, 0.14, 1}
+      1: {5772, 1.6, 0.35, 1, 0.3, 0.3, 0.05, 1}
+      2: {9600, 1.8, 0, 0.7, 0.16, 0.05, 0.16, 1}
+      3: {24000, 2.8, 0, 1.6, 0.14, 0.2, 0.1, 1}
+      4: {3600, 3.6, 0.15, 3.2, 0.42, 0.25, 0.02, 1}
+      _: {5772, 1.6, 0.35, 1, 0.3, 0.3, 0.05, 1}
     }
   }
 
@@ -1189,6 +1189,7 @@ planets {
     prop contrast: f32 = sun_star.contrast
     prop prominences: f32 = sun_star.prominences
     prop spin: f32 = sun_star.spin
+    prop corona: f32 = sun_star.corona
     prop seed: i32 = 7
     prop detail: i32 = 1
 
@@ -1222,6 +1223,7 @@ planets {
     const fac_k: f32 = 0.12 + 0.5 * spots
 
     const prom: f32 = sat(prominences)
+    const cor: f32 = max(corona, 0)
 
     surf {
       t_g { TexTime: {scale: 0.3, offset: v1 * 60} }
@@ -1418,7 +1420,7 @@ planets {
           ParticleEmitter: {
             max: 16, rate: 1.1, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
             lifetime: {4, 7}, size: {r * 5, r * 5.6}, rotation: {0, 360}, spin: {-4, 4},
-            opacity: {0.11, 0.15}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7
+            opacity: {0.11 * cor, 0.15 * cor}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7
           }
           ParticleBurst: {count: 6, at: 0}
           ParticleAppearance: {
@@ -1433,7 +1435,7 @@ planets {
         Position: {0, 0, 0}
         ParticleEmitter: {
           max: 8, rate: 0.6, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
-          lifetime: {5, 8}, size: {r * 4.4, r * 5}, opacity: {0.04, 0.05},
+          lifetime: {5, 8}, size: {r * 4.4, r * 5}, opacity: {0.04 * cor, 0.05 * cor},
           color: {col.r, col.g, col.b}, seed: sd * 16 + 8
         }
         ParticleBurst: {count: 4, at: 0}
