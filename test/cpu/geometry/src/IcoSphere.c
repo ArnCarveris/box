@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 
 void IcoSphere_subdivision(void) {
     // renderer/meshes
@@ -283,5 +284,35 @@ void IcoSphere_level_0_normals(void) {
         test_assert(glm_vec3_dot(face, sum) > 0.0f);
     }
 
+    ecs_fini(world);
+}
+
+void IcoSphere_lod_levels(void) {
+    // renderer/meshes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, IcoSphere, { .segments = 3, .smooth = true, .radius = 1 });
+    test_int(lod_key(world, e, 0)->i[0], 3);
+    test_int(lod_key(world, e, 1)->i[0], 2);
+    test_int(lod_key(world, e, 2)->i[0], 1);
+    test_int(lod_key(world, e, 3)->i[0], 0);
+    lod_test_fewer_indices(world, e, 1);
+    lod_test_fewer_indices(world, e, 3);
+
+    /* The subdivision level is clamped to 6 before it drops, and stops at 0 */
+    ecs_entity_t high = ecs_new(world);
+    ecs_set(world, high, IcoSphere, { .segments = 9, .smooth = true, .radius = 1 });
+    test_int(lod_key(world, high, 1)->i[0], 5);
+    test_int(lod_key(world, high, 3)->i[0], 3);
+    ecs_entity_t low = ecs_new(world);
+    ecs_set(world, low, IcoSphere, { .segments = 1, .smooth = true, .radius = 1 });
+    test_int(lod_key(world, low, 1)->i[0], 0);
+    test_uint(lod_mesh(world, low, 2), lod_mesh(world, low, 1));
+    test_uint(lod_mesh(world, low, 3), lod_mesh(world, low, 1));
+
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, IcoSphere, { .segments = 3, .smooth = false, .radius = 1 });
+    test_uint(lod_mesh(world, flat, 3), lod_mesh(world, flat, 0));
     ecs_fini(world);
 }

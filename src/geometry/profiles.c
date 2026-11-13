@@ -782,7 +782,9 @@ static void box_asset_key(const ecs_world_t *world, const void *value, int kind,
     } else if (kind == 3) {
         segments = ((const Lathe*)value)->segments; rings = ((const Lathe*)value)->rings;
     }
-    key->i[0] = box_steps(segments, 32);
+    /* A Sweep and a Loft keep the steps of the curved profile segments, which their generator
+     * reads, a Lathe the steps around the axis */
+    key->i[0] = kind == 1 || kind == 2 ? box_path_steps(segments) : box_steps(segments, 32);
     key->i[1] = box_steps(rings, 24);
     key->i[2] = (int)d.p[3][3];
     key->i[3] = kind;
@@ -822,6 +824,18 @@ static void box_asset_generate(const ecs_world_t *world, const void *value, int 
 {
     box_surface_data_t d = {0};
     vec3 min, max;
+    Sweep sweep;
+    Loft loft;
+    /* The profile of a level of detail has the steps of its key */
+    if (kind == 1) {
+        sweep = *(const Sweep*)value;
+        sweep.segments = key->i[0];
+        value = &sweep;
+    } else if (kind == 2) {
+        loft = *(const Loft*)value;
+        loft.segments = key->i[0];
+        value = &loft;
+    }
     if (!key->i[2] || !box_resolve(world, value, kind, &d, min, max)) {
         return;
     }
@@ -1011,6 +1025,97 @@ BOX_ASSET_SHAPE(loft, 2)
 BOX_ASSET_SHAPE(lathe, 3)
 BOX_ASSET_SHAPE(profile, 7)
 
+/** Key of a level of detail of a Sweep: the steps of the curved profile segments, at least 1,
+ * and the rings along the path, at least 3, halved per level.
+ *
+ * @param world The world
+ * @param value The Sweep
+ * @param level The level
+ * @param key The key
+ */
+static void box_sweep_lod(
+    const ecs_world_t *world,
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Sweep v = *(const Sweep*)value;
+    v.segments = box_shape_lod_count(box_path_steps(v.segments), 1, level);
+    v.rings = box_shape_lod_count(box_steps(v.rings, 24), 3, level);
+    box_asset_key(world, &v, 1, NULL, key);
+}
+
+/** Key of a level of detail of a Loft: the steps of the curved profile segments, at least 1,
+ * and the rings between the sections, at least 3, halved per level.
+ *
+ * @param world The world
+ * @param value The Loft
+ * @param level The level
+ * @param key The key
+ */
+static void box_loft_lod(
+    const ecs_world_t *world,
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Loft v = *(const Loft*)value;
+    v.segments = box_shape_lod_count(box_path_steps(v.segments), 1, level);
+    v.rings = box_shape_lod_count(box_steps(v.rings, 24), 3, level);
+    box_asset_key(world, &v, 2, NULL, key);
+}
+
+/** Key of a level of detail of a Lathe: the steps around the axis and along the profile, at
+ * least 3, halved per level.
+ *
+ * @param world The world
+ * @param value The Lathe
+ * @param level The level
+ * @param key The key
+ */
+static void box_lathe_lod(
+    const ecs_world_t *world,
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    Lathe v = *(const Lathe*)value;
+    v.segments = box_shape_lod_count(box_steps(v.segments, 32), 3, level);
+    v.rings = box_shape_lod_count(box_steps(v.rings, 24), 3, level);
+    box_asset_key(world, &v, 3, NULL, key);
+}
+
+/** Copy a Loft kept to generate its levels of detail from, with its own sections.
+ *
+ * @param dst The copy
+ * @param src The Loft
+ */
+static void box_loft_value_copy(
+    void *dst,
+    const void *src)
+{
+    const Loft *from = src;
+    Loft *to = dst;
+    int32_t count = ecs_vec_count(&from->sections);
+    *to = *from;
+    ecs_vec_init_t(NULL, &to->sections, LoftSection, count);
+    if (count) {
+        ecs_vec_set_count_t(NULL, &to->sections, LoftSection, count);
+        ecs_os_memcpy_n(ecs_vec_first(&to->sections), ecs_vec_first(&from->sections),
+            LoftSection, count);
+    }
+}
+
+/** Free the sections of a Loft copied with box_loft_value_copy.
+ *
+ * @param value The copy
+ */
+static void box_loft_value_fini(
+    void *value)
+{
+    ecs_vec_fini_t(NULL, &((Loft*)value)->sections, LoftSection);
+}
+
 /** Get the rims of the Bevel of a ProfileExtrusion: radius or bottom for the edges of
  * cap_start and radius or top for those of cap_end, none for an end without a cap.
  *
@@ -1029,7 +1134,8 @@ static void box_profile_bevel_of(
     out->steps = box_bevel_segments(bevel);
 }
 
-/** Key of a beveled ProfileExtrusion: the key of the extrusion with its rims hashed in.
+/** Key of a beveled ProfileExtrusion: the key of the extrusion with its rims hashed in and
+ * the steps per rim in i[0], which the generator reads.
  *
  * @param world The world
  * @param value The ProfileExtrusion and the Bevel
@@ -1043,6 +1149,26 @@ static void box_profile_bevel_key(
     box_profile_bevel_t bevel;
     box_profile_bevel_of(value, &bevel);
     box_asset_key(world, value, 7, &bevel, key);
+    key->i[0] = bevel.steps;
+}
+
+/** Key of a level of detail of a beveled ProfileExtrusion: the steps per rim, at least 2,
+ * halved per level.
+ *
+ * @param world The world
+ * @param value The ProfileExtrusion and the Bevel
+ * @param level The level
+ * @param key The key
+ */
+static void box_profile_bevel_lod(
+    const ecs_world_t *world,
+    const void *value,
+    int32_t level,
+    box_shape_key_t *key)
+{
+    box_bevel_extrusion_t v = *(const box_bevel_extrusion_t*)value;
+    v.bevel.segments = box_shape_lod_count(box_bevel_segments(&v.bevel), 2, level);
+    box_profile_bevel_key(world, &v, key);
 }
 
 /** Surface of a beveled ProfileExtrusion: the surface of the extrusion without the bevel, with
@@ -1290,7 +1416,7 @@ static void box_profile_bevel_generate(
     const vec4 *smooth = d.p[8][0] > 0 ? d.assets + (int)d.p[8][0] - 24 : NULL;
     float depth = d.p[1][1];
     int regions = (int)d.p[3][3];
-    int steps = bevel.steps;
+    int steps = key->i[0];
     if (!box_profile_resolve(world, v->host.profile, 0, BOX_PATH_STEPS, &profile, &outer,
         &corners) ||
         ecs_vec_count(&profile) != count || outer != (int)d.p[5][2] ||
@@ -1612,18 +1738,26 @@ void box_geometry_profiles_init(
     ecs_add_pair(world, ecs_id(Profile2D), EcsOnInstantiate, EcsInherit);
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Sweep),
         .key_world = box_sweep_key, .generate_world = box_sweep_generate,
-        .surface_world = box_sweep_surface});
+        .surface_world = box_sweep_surface, .lod_world = box_sweep_lod});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Loft),
         .key_world = box_loft_key, .generate_world = box_loft_generate,
-        .surface_world = box_loft_surface});
+        .surface_world = box_loft_surface, .lod_world = box_loft_lod});
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(Lathe),
         .key_world = box_lathe_key, .generate_world = box_lathe_generate,
-        .surface_world = box_lathe_surface});
+        .surface_world = box_lathe_surface, .lod_world = box_lathe_lod});
+
+    box_shape_t *loft = box_mesh_cache_shape(box_mesh_cache_of(world), ecs_id(Loft));
+    if (loft) {
+        loft->value_copy = box_loft_value_copy;
+        loft->value_fini = box_loft_value_fini;
+    }
+
     box_shape_register(world, &(box_shape_desc_t){.component = ecs_id(ProfileExtrusion),
         .key_world = box_profile_key, .generate_world = box_profile_generate,
         .surface_world = box_profile_surface, .exclude = ecs_id(Bevel)});
     box_geometry_bevel_host(world, &(box_shape_desc_t){.key_world = box_profile_bevel_key,
-        .generate_world = box_profile_bevel_generate, .surface_world = box_profile_bevel_surface},
+        .generate_world = box_profile_bevel_generate, .surface_world = box_profile_bevel_surface,
+        .lod_world = box_profile_bevel_lod},
         ecs_id(ProfileExtrusion), ECS_SIZEOF(ProfileExtrusion),
         (ecs_size_t)offsetof(box_bevel_extrusion_t, bevel), ECS_SIZEOF(box_bevel_extrusion_t),
         box_profile_bevel_flat);

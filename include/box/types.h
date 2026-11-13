@@ -94,6 +94,9 @@ void box_types_owned_hooks(
     const box_owned_t *members,
     int32_t count);
 
+/** Most levels of detail of a shape mesh, level 0 (the mesh as authored) included */
+#define BOX_LOD_LEVELS_MAX (4)
+
 /** Code point that stands for an ill formed UTF-8 sequence or an invalid code point */
 #define BOX_UTF8_REPLACEMENT (0xFFFD)
 

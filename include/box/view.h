@@ -195,6 +195,19 @@ ECS_STRUCT(ViewDebug, {
                              *   default 0 */
 });
 
+/** Distances at which a view draws the shapes with segment counts (round shapes, RoundedBox,
+ * Bevel, Sweep, Loft, Lathe and the shells) with fewer segments. Each level halves the segment
+ * counts of the level before it, level 0 being the shape as authored.
+ *
+ * Level 0 starts at distance 0, level i at distances[i] in world units, ascending; distances[0]
+ * is not used. A View, constructed or a C literal, has levels 0: every shape at full detail.
+ */
+ECS_STRUCT(LodSettings, {
+    int32_t levels;     /**< Number of levels, 0 or 1 for none, at most BOX_LOD_LEVELS_MAX */
+    float distances[4]; /**< Distance from the camera at which level i starts, for levels 1 to
+                         *   levels - 1 */
+});
+
 /** Element in view effects array. */
 ECS_STRUCT(ViewEffect, {
     bool enabled;           /**< Whether effect is enabled. */
@@ -237,6 +250,7 @@ ECS_STRUCT(View, {
     int32_t order;                  /**< Render order, default 0; box's overlays use
                                      *   BOX_VIEW_ORDER_EDITOR, BOX_VIEW_ORDER_FPS and
                                      *   BOX_VIEW_ORDER_CONSOLE */
+    LodSettings lod;                /**< Levels of detail, default none */
 });
 
 /** Component added to scene root.

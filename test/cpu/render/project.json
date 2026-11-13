@@ -633,6 +633,17 @@
                 ]
             },
             {
+                "id": "ViewLod",
+                "testcases": [
+                    "defaults_constructed",
+                    "defaults_literal",
+                    "defaults_script",
+                    "script_set",
+                    "resolve",
+                    "packet"
+                ]
+            },
+            {
                 "id": "ViewOrder",
                 "testcases": [
                     "default_is_zero",

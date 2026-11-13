@@ -1,0 +1,27 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.particle
+using box.light
+using box.animation
+using state
+
+assets {
+  template Railgun {
+    prop r: f32 = 1
+    prop core: bool = true
+    prop fe: i32 = 0
+    prop be: i32 = 0
+    prop power: f32 = 1
+
+    breech : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: SEG, segments: 24, smooth: true} }
+    for s in 0..2 {
+      "rail_{s}" : ShipSteel { Position: {(s - 0.5) * r * 0.5, 0, SEG}; Box: {0.2, 0.5, SEG * 1.5} }
+    }
+    SpineEnds ends(r: r, fe: 0, be: be)
+  }
+}

@@ -117,6 +117,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, WireframeMode);
     ECS_META_COMPONENT(world, OverdrawMode);
     ECS_META_COMPONENT(world, ViewDebug);
+    ECS_META_COMPONENT(world, LodSettings);
     ECS_META_COMPONENT(world, ViewEffect);
     ecs_set_hooks(world, ViewEffect, { .ctor = box_view_effect_ctor });
     ECS_META_COMPONENT(world, View);

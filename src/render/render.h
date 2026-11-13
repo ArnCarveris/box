@@ -821,6 +821,18 @@ void box_render_shadow_settings(
     const ShadowSettings *settings,
     ShadowSettings *out);
 
+/** Resolve the levels of detail of a view: levels is clamped to BOX_LOD_LEVELS_MAX and a
+ * single level is none (levels 0). distances[0] is 0, a negative or non-finite distance is 0
+ * and each distance is at least the one before it, so they ascend; the distances past the
+ * levels are 0.
+ *
+ * @param settings The settings of a view
+ * @param out Receives the resolved settings
+ */
+void box_render_lod_settings(
+    const LodSettings *settings,
+    LodSettings *out);
+
 /** Split the view depths between near and distance into cascades.
  *
  * A split mixes the uniform split near + (distance - near) * i / n with the logarithmic split

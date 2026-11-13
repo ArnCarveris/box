@@ -14,6 +14,10 @@ typedef struct box_mesh_entry_t {
     int32_t refs;             /**< Reference count */
     int32_t holds;            /**< References of modules that follow the mesh, part of refs */
     uint32_t next;            /**< Next handle with the same hash, 0 for none */
+    void *value;              /**< Copy of the first shape value that acquired the mesh, to
+                               *   generate its levels of detail from, NULL for none */
+    uint32_t lod[BOX_LOD_LEVELS_MAX]; /**< Handle of each level of detail, 0 when not yet
+                                       *   requested; lod[0] is not used */
 } box_mesh_entry_t;
 
 /** Mesh cache and shape registry */
@@ -68,6 +72,23 @@ static uint64_t box_mesh_cache_hash(
     return hash;
 }
 
+/** Free the copy of the shape value of an entry.
+ *
+ * @param entry The entry
+ */
+static void box_mesh_cache_value_fini(
+    box_mesh_entry_t *entry)
+{
+    if (entry->value) {
+        if (entry->shape->value_fini) {
+            entry->shape->value_fini(entry->value);
+        }
+
+        ecs_os_free(entry->value);
+        entry->value = NULL;
+    }
+}
+
 box_mesh_cache_t* box_mesh_cache_new(void)
 {
     box_mesh_cache_t *cache = ecs_os_calloc_t(box_mesh_cache_t);
@@ -85,6 +106,10 @@ void box_mesh_cache_free(
     box_mesh_cache_t *cache = ctx;
     box_mesh_entry_t *entries = ecs_vec_first(&cache->entries);
     for (int32_t i = 0; i < ecs_vec_count(&cache->entries); i ++) {
+        if (entries[i].shape) {
+            box_mesh_cache_value_fini(&entries[i]);
+        }
+
         box_mesh_fini(&entries[i].mesh);
     }
 
@@ -146,19 +171,21 @@ static uint32_t box_mesh_cache_find(
     return result;
 }
 
-uint32_t box_mesh_cache_acquire(
+/** Look up or generate the mesh of a key and take a reference to it.
+ *
+ * @param cache The cache
+ * @param shape The shape
+ * @param value The shape value to generate the mesh from
+ * @param key_ptr The key
+ * @return The mesh handle
+ */
+static uint32_t box_mesh_cache_insert(
     box_mesh_cache_t *cache,
     const box_shape_t *shape,
-    const void *value)
+    const void *value,
+    const box_shape_key_t *key_ptr)
 {
-    box_shape_key_t key;
-    ecs_os_memset_t(&key, 0, box_shape_key_t);
-    if (shape->desc.key_world) {
-        shape->desc.key_world(shape->world, value, &key);
-    } else {
-        shape->desc.key(value, &key);
-    }
-
+    box_shape_key_t key = *key_ptr;
     uint64_t hash = box_mesh_cache_hash(shape, &key);
     uint32_t handle = box_mesh_cache_find(cache, shape, &key, hash);
     if (!handle) {
@@ -199,6 +226,88 @@ uint32_t box_mesh_cache_acquire(
     box_mesh_cache_entry(cache, handle)->refs ++;
 
     return handle;
+}
+
+uint32_t box_mesh_cache_acquire(
+    box_mesh_cache_t *cache,
+    const box_shape_t *shape,
+    const void *value)
+{
+    box_shape_key_t key;
+    ecs_os_memset_t(&key, 0, box_shape_key_t);
+    if (shape->desc.key_world) {
+        shape->desc.key_world(shape->world, value, &key);
+    } else {
+        shape->desc.key(value, &key);
+    }
+
+    uint32_t handle = box_mesh_cache_insert(cache, shape, value, &key);
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (!entry->value && (shape->desc.lod || shape->desc.lod_world) && shape->size > 0) {
+        entry->value = ecs_os_malloc(shape->size);
+        if (shape->value_copy) {
+            shape->value_copy(entry->value, value);
+        } else {
+            ecs_os_memcpy(entry->value, value, shape->size);
+        }
+    }
+
+    return handle;
+}
+
+uint32_t box_mesh_cache_lod(
+    box_mesh_cache_t *cache,
+    uint32_t handle,
+    int32_t level)
+{
+    uint32_t result = handle;
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (!entry || !entry->shape || !entry->value || level < 1) {
+        goto done;
+    }
+
+    level = level < BOX_LOD_LEVELS_MAX ? level : BOX_LOD_LEVELS_MAX - 1;
+    if (entry->lod[level]) {
+        result = entry->lod[level];
+        goto done;
+    }
+
+    uint32_t previous = box_mesh_cache_lod(cache, handle, level - 1);
+    entry = box_mesh_cache_entry(cache, handle);
+    const box_shape_t *shape = entry->shape;
+    void *value = entry->value;
+    box_shape_key_t key;
+    ecs_os_memset_t(&key, 0, box_shape_key_t);
+    if (shape->desc.lod_world) {
+        shape->desc.lod_world(shape->world, value, level, &key);
+    } else {
+        shape->desc.lod(value, level, &key);
+    }
+
+    result = previous;
+    if (ecs_os_memcmp_t(&box_mesh_cache_entry(cache, previous)->key, &key, box_shape_key_t)) {
+        result = box_mesh_cache_insert(cache, shape, value, &key);
+        if (result == handle) {
+            box_mesh_cache_release(cache, result);
+        }
+    }
+
+    box_mesh_cache_entry(cache, handle)->lod[level] = result;
+done:
+    return result;
+}
+
+const box_shape_key_t* box_mesh_cache_key(
+    const box_mesh_cache_t *cache,
+    uint32_t handle)
+{
+    const box_shape_key_t *result = NULL;
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (entry && entry->shape) {
+        result = &entry->key;
+    }
+
+    return result;
 }
 
 void box_mesh_cache_keep(
@@ -281,12 +390,23 @@ void box_mesh_cache_release(
 {
     box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
     if (entry && entry->shape && !(-- entry->refs)) {
+        uint32_t lod[BOX_LOD_LEVELS_MAX];
+        ecs_os_memcpy_n(lod, entry->lod, uint32_t, BOX_LOD_LEVELS_MAX);
         box_mesh_cache_unlink(cache, handle);
+        box_mesh_cache_value_fini(entry);
         box_mesh_fini(&entry->mesh);
         entry->shape = NULL;
         entry->next = 0;
+        ecs_os_memset_n(entry->lod, 0, uint32_t, BOX_LOD_LEVELS_MAX);
         *ecs_vec_append_t(NULL, &cache->free_list, uint32_t) = handle;
         cache->alive --;
+
+        lod[0] = handle;
+        for (int32_t i = 1; i < BOX_LOD_LEVELS_MAX && lod[i]; i ++) {
+            if (lod[i] != handle && lod[i] != lod[i - 1]) {
+                box_mesh_cache_release(cache, lod[i]);
+            }
+        }
     }
 }
 

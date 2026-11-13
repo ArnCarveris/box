@@ -23,6 +23,22 @@ typedef struct box_mesh_cache_t box_mesh_cache_t;
 typedef bool (*box_bevel_flat_fn)(
     const void *value);
 
+/** Copy a shape value into memory of the size of the shape, deep copying what it owns.
+ *
+ * @param dst The memory to copy into
+ * @param src The value
+ */
+typedef void (*box_shape_value_copy_fn)(
+    void *dst,
+    const void *src);
+
+/** Free what a shape value copied with box_shape_value_copy_fn owns.
+ *
+ * @param value The value
+ */
+typedef void (*box_shape_value_fini_fn)(
+    void *value);
+
 /** Registered shape */
 typedef struct box_shape_t {
     const ecs_world_t *world; /**< World passed to the world-aware shape callbacks */
@@ -33,6 +49,9 @@ typedef struct box_shape_t {
     ecs_size_t host_size;    /**< Size of the host value at the start of a variant value */
     ecs_size_t bevel_offset; /**< Offset of the Bevel in the value of a Bevel variant */
     box_bevel_flat_fn flat;  /**< Whether a variant value rounds nothing */
+    box_shape_value_copy_fn value_copy; /**< Deep copy of a value kept to generate its levels
+                                         *   of detail from, NULL to copy its bytes */
+    box_shape_value_fini_fn value_fini; /**< Frees a value copied with value_copy */
 } box_shape_t;
 
 /** Mesh and instance scale an entity's shape resolved to; holds a reference to the mesh */
@@ -168,6 +187,47 @@ void box_mesh_cache_unhold(
 int32_t box_mesh_cache_users(
     const box_mesh_cache_t *cache,
     uint32_t handle);
+
+/** Get the mesh of a level of detail of a mesh, generating it on the first request.
+ *
+ * Level 0 is the mesh itself. Each level halves the segment counts of the level before it
+ * (box_shape_desc_t.lod); a level whose key does not change is the mesh of the level before,
+ * and equal keys share one mesh. The mesh holds a reference to each of its levels, which are
+ * released with its last reference; the caller takes none.
+ *
+ * @param cache The cache
+ * @param handle The mesh handle, of level 0
+ * @param level The level, clamped to BOX_LOD_LEVELS_MAX - 1
+ * @return The handle of the level, the handle itself for level 0, a mesh of a shape without
+ * levels of detail and a mesh not acquired from a shape value; 0 for handle 0
+ */
+uint32_t box_mesh_cache_lod(
+    box_mesh_cache_t *cache,
+    uint32_t handle,
+    int32_t level);
+
+/** Get the key a cached mesh was generated from.
+ *
+ * @param cache The cache
+ * @param handle The mesh handle
+ * @return The key, NULL when the handle is not alive
+ */
+const box_shape_key_t* box_mesh_cache_key(
+    const box_mesh_cache_t *cache,
+    uint32_t handle);
+
+/** Halve a segment count once per level of detail, never below a floor; a count that is
+ * already below the floor stays as it is.
+ *
+ * @param count The count of level 0
+ * @param floor The smallest count of the shape
+ * @param level The level
+ * @return The count of the level
+ */
+int32_t box_shape_lod_count(
+    int32_t count,
+    int32_t floor,
+    int32_t level);
 
 /** Get a cached mesh.
  *

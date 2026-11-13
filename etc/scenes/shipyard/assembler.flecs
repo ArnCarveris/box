@@ -1,0 +1,32 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.particle
+using box.light
+using box.animation
+using state
+
+assets {
+  template HeavyAssembler {
+    prop r: f32 = 1
+    prop core: bool = true
+    prop fe: i32 = 0
+    prop be: i32 = 0
+    prop seed: i32 = 0
+    prop power: f32 = 1
+
+    shaft : ShipHullDark { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.6, length: SEG, segments: 24, smooth: true} }
+    for i in 0..2 {
+      "arm_{i}" {
+        Rotation: {0, 0, i * PI}
+        base : ShipYellow { Position: {r * 0.75, 0, 0}; Box: {0.6, 0.6, 1.2} }
+        boom : ShipYellow { Position: {r * 0.75 + 1, 0, 0}; Rotation: {0, 0, 0.6}; Box: {2, 0.3, 0.3} }
+      }
+    }
+    SpineEnds ends(r: r, fe: fe, be: be)
+  }
+}

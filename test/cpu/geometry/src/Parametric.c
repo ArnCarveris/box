@@ -1,6 +1,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include "mesh_cache.h"
+#include "lod_keys.h"
 #include <math.h>
 
 #include "../../../geometry_assets.h"
@@ -461,5 +462,178 @@ void Parametric_segments_clamped(void) {
         "profile { Profile2D: {outer: ring}}\n"
         "body { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], segments: 1000}}\n", NULL), 0);
     test_int(ecs_get(world, ecs_lookup(world, "body"), ShapeMesh)->surface.p[5][1], 256);
+    ecs_fini(world);
+}
+
+/** Assets of the level of detail cases: a circle of four curved segments, a line and a side */
+static const char *lod_assets =
+    "using box.geometry\n"
+    "ring { Path2D: {start: {1,0}, segments: ["
+    "{kind: CubicBezier, end: {0,1}, control1: {1,0.5523}, control2: {0.5523,1}},"
+    "{kind: CubicBezier, end: {-1,0}, control1: {-0.5523,1}, control2: {-1,0.5523}},"
+    "{kind: CubicBezier, end: {0,-1}, control1: {-1,-0.5523}, control2: {-0.5523,-1}},"
+    "{kind: CubicBezier, end: {1,0}, control1: {0.5523,-1}, control2: {1,-0.5523}}], closed: true}}\n"
+    "profile { Profile2D: {outer: ring}}\n"
+    "route { Path3D: {segments: [{kind: Line, end: {0,3,0}}]}}\n"
+    "side { Path2D: {start: {1,0}, segments: [{kind: Line, end: {1.5,1}}, {kind: Line, end: {1,2}}]}}\n";
+
+void Parametric_lod_shells(void) {
+    ecs_world_t *world = surface_world();
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, EllipsoidShell, {.radius = {2, 3, 4}, .longitude_end = GLM_PI * 2,
+        .latitude_start = -GLM_PI_2, .latitude_end = GLM_PI_2, .thickness = 0.2f,
+        .segments = 32, .rings = 24});
+    test_int(lod_key(world, e, 1)->i[0], 16);
+    test_int(lod_key(world, e, 1)->i[1], 12);
+    test_int(lod_key(world, e, 2)->i[0], 8);
+    test_int(lod_key(world, e, 2)->i[1], 6);
+    test_int(lod_key(world, e, 3)->i[0], 4);
+    test_int(lod_key(world, e, 3)->i[1], 3);
+    test_int(lod_key(world, e, 3)->i[2], lod_key(world, e, 0)->i[2]);
+    lod_test_fewer_indices(world, e, 1);
+    lod_test_fewer_indices(world, e, 3);
+
+    /* The defaults of a TorusShell, 32 by 24, halve the same way; 3 is the floor */
+    ecs_entity_t t = ecs_new(world);
+    ecs_set(world, t, TorusShell, {.radius = 3, .tube = 1, .ring_end = GLM_PI * 2,
+        .tube_end = GLM_PI * 2, .rings = 5});
+    test_int(lod_key(world, t, 1)->i[0], 16);
+    test_int(lod_key(world, t, 1)->i[1], 3);
+    test_int(lod_key(world, t, 3)->i[0], 4);
+    test_int(lod_key(world, t, 3)->i[1], 3);
+    lod_test_fewer_indices(world, t, 2);
+
+    /* A BeveledPrism has no authored segments and no levels */
+    ecs_entity_t prism = ecs_new(world);
+    BeveledPrism value = {.depth = 2, .bevel = 0.1f};
+    vec2 points[4] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+    ecs_vec_init_t(NULL, &value.footprint, vec2, 4);
+    ecs_vec_set_count_t(NULL, &value.footprint, vec2, 4);
+    memcpy(ecs_vec_first(&value.footprint), points, sizeof(points));
+    ecs_set_ptr(world, prism, BeveledPrism, &value);
+    ecs_vec_fini_t(NULL, &value.footprint, vec2);
+    test_uint(lod_mesh(world, prism, 3), lod_mesh(world, prism, 0));
+    ecs_fini(world);
+}
+
+void Parametric_lod_sweep(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces", lod_assets, NULL), 0);
+    test_int(ecs_script_run(world, "sweeps",
+        "using box.geometry\n"
+        "fine { Sweep: {path: route, profile: profile}}\n"
+        "coarse { Sweep: {path: route, profile: profile, segments: 2, rings: 6}}\n", NULL), 0);
+    ecs_entity_t fine = ecs_lookup(world, "fine"), coarse = ecs_lookup(world, "coarse");
+    test_int(lod_key(world, fine, 0)->i[0], 16);
+    test_int(lod_key(world, fine, 1)->i[0], 8);
+    test_int(lod_key(world, fine, 1)->i[1], 12);
+    test_int(lod_key(world, fine, 2)->i[0], 4);
+    test_int(lod_key(world, fine, 2)->i[1], 6);
+    test_int(lod_key(world, fine, 3)->i[0], 2);
+    test_int(lod_key(world, fine, 3)->i[1], 3);
+    lod_test_fewer_indices(world, fine, 1);
+    lod_test_fewer_indices(world, fine, 3);
+
+    /* A curved segment keeps at least 1 step, the path at least 3 rings */
+    test_int(lod_key(world, coarse, 1)->i[0], 1);
+    test_int(lod_key(world, coarse, 1)->i[1], 3);
+    test_uint(lod_mesh(world, coarse, 2), lod_mesh(world, coarse, 1));
+    test_uint(lod_mesh(world, coarse, 3), lod_mesh(world, coarse, 1));
+
+    /* The level of 2 steps of the fine Sweep is not the coarse mesh: the rings differ */
+    test_assert(lod_mesh(world, fine, 3) != lod_mesh(world, coarse, 0));
+    ecs_fini(world);
+}
+
+void Parametric_lod_loft(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces", lod_assets, NULL), 0);
+    test_int(ecs_script_run(world, "lofts",
+        "using box.geometry\n"
+        "fine { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], cap_end: true}}\n"
+        "chord { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}], segments: 1}}\n",
+        NULL), 0);
+    ecs_entity_t fine = ecs_lookup(world, "fine"), chord = ecs_lookup(world, "chord");
+    test_int(lod_key(world, fine, 1)->i[0], 8);
+    test_int(lod_key(world, fine, 1)->i[1], 12);
+    test_int(lod_key(world, fine, 2)->i[0], 4);
+    test_int(lod_key(world, fine, 3)->i[0], 2);
+    test_int(lod_key(world, fine, 3)->i[1], 3);
+    lod_test_fewer_indices(world, fine, 1);
+    lod_test_fewer_indices(world, fine, 3);
+    test_int(lod_key(world, chord, 1)->i[0], 1);
+    test_int(lod_key(world, chord, 1)->i[1], 12);
+    test_int(lod_key(world, chord, 3)->i[0], 1);
+
+    /* The Loft keeps its own copy of its sections: changing the value of the entity leaves the
+     * levels of the mesh it had */
+    uint32_t mesh = lod_mesh(world, fine, 0);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    box_mesh_cache_hold(cache, mesh);
+    test_int(ecs_script_run(world, "lofts_edit",
+        "using box.geometry\n"
+        "fine { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,5,0}}], cap_end: true}}\n",
+        NULL), 0);
+    test_assert(lod_mesh(world, fine, 0) != mesh);
+    test_assert(box_mesh_cache_get(cache, box_mesh_cache_lod(cache, mesh, 1)) != NULL);
+    box_mesh_cache_unhold(cache, mesh);
+    test_assert(box_mesh_cache_get(cache, mesh) == NULL);
+    ecs_fini(world);
+}
+
+void Parametric_lod_lathe(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces", lod_assets, NULL), 0);
+    test_int(ecs_script_run(world, "lathes",
+        "using box.geometry\n"
+        "cup { Lathe: {profile: side, cap_start: true}}\n", NULL), 0);
+    ecs_entity_t cup = ecs_lookup(world, "cup");
+    test_int(lod_key(world, cup, 0)->i[0], 32);
+    test_int(lod_key(world, cup, 1)->i[0], 16);
+    test_int(lod_key(world, cup, 1)->i[1], 12);
+    test_int(lod_key(world, cup, 2)->i[0], 8);
+    test_int(lod_key(world, cup, 3)->i[0], 4);
+    test_int(lod_key(world, cup, 3)->i[1], 3);
+    lod_test_fewer_indices(world, cup, 1);
+    lod_test_fewer_indices(world, cup, 3);
+    ecs_fini(world);
+}
+
+void Parametric_lod_surface_assets(void) {
+    ecs_world_t *world = surface_world();
+    test_int(ecs_script_run(world, "surfaces", lod_assets, NULL), 0);
+    test_int(ecs_script_run(world, "shapes",
+        "using box.geometry\n"
+        "curve { Sweep: {path: route, profile: profile}}\n"
+        "body { Loft: {sections: [{profile: profile}, {profile: profile, offset: {0,2,0}}]}}\n"
+        "cup { Lathe: {profile: side}}\n", NULL), 0);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    const char *names[3] = {"curve", "body", "cup"};
+    for (int32_t i = 0; i < 3; i ++) {
+        ecs_entity_t e = ecs_lookup(world, names[i]);
+        const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+        for (int32_t level = 1; level < BOX_LOD_LEVELS_MAX; level ++) {
+            /* Get the base after the variant, generating a variant can move the cache entries */
+            const box_mesh_t *variant = box_mesh_cache_get(cache, lod_mesh(world, e, level));
+            const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
+            test_assert(base->surface_assets != NULL);
+            test_assert(variant != base);
+            test_assert(variant->surface_assets != NULL);
+            test_assert(variant->surface_assets != base->surface_assets);
+            test_assert(variant->surface_asset_count > 0);
+            /* The profile of a Sweep and a Loft has fewer points, a Lathe keeps its profile */
+            if (i < 2) {
+                test_assert(variant->surface_asset_count < base->surface_asset_count);
+            } else {
+                test_int(variant->surface_asset_count, base->surface_asset_count);
+            }
+        }
+
+        /* The shape keeps the level 0 mesh and its surface */
+        test_uint(ecs_get(world, e, ShapeMesh)->mesh, lod_mesh(world, e, 0));
+        const box_mesh_t *base = box_mesh_cache_get(cache, lod_mesh(world, e, 0));
+        test_assert(shape->surface.assets == base->surface_assets);
+    }
+
     ecs_fini(world);
 }

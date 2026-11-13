@@ -1,0 +1,25 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.particle
+using box.light
+using box.animation
+using state
+
+assets {
+  template ShieldGenerator {
+    prop r: f32 = 1
+    prop core: bool = true
+    prop fe: i32 = 0
+    prop be: i32 = 0
+    prop power: f32 = 1
+
+    shaft : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: SEG, segments: 32, smooth: true} }
+    emitter : ShipJump { Rotation: {HALF_PI, 0, 0}; Torus: {radius: r * 1.1, tube: 0.12, segments: 40, rings: 6, smooth: true} }
+    SpineEnds ends(r: r, fe: fe, be: be)
+  }
+}

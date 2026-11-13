@@ -32,14 +32,17 @@ state {
   export const L_TANKS: i32 = 49
   export const L_CARGO: i32 = 50
   export const L_HANGAR: i32 = 51
-  export const L_REFINERY: i32 = 52
+  export const L_ASSEMBLER: i32 = 52
   export const L_FAB: i32 = 53
   export const L_TRUSS: i32 = 54
   export const L_YOKE: i32 = 55
   export const L_ARMOR: i32 = 56
   export const L_TURRET: i32 = 57
-  export const L_END: i32 = 58
-  export const LKINDS: i32 = 18
+  export const L_FARM: i32 = 58
+  export const L_SHIELD: i32 = 59
+  export const L_RAILGUN: i32 = 60
+  export const L_END: i32 = 61
+  export const LKINDS: i32 = 21
 
   event SlotClick(slot: i32)
 
@@ -47,14 +50,14 @@ state {
   export mut lhover: i32 = -1
   export mut lgrid: i32[90] = {}
   export mut lstatus: i32[90] = {}
-  export mut lcounts: i32[18] = {}
+  export mut lcounts: i32[21] = {}
   export mut lmodules: i32 = 0
   export mut lproblems: i32 = 0
   export mut lspan: i32 = 0
   export mut lloaded: bool = false
 
-  export const LPLAN_ROWS: i32 = 105
-  export const liner_plan: i32[525] = [
+  export const LPLAN_ROWS: i32 = 142
+  export const liner_plan: i32[710] = [
     OP_PASSENGER, 0, 0, 0, L_DRIVE,
     OP_PASSENGER, 0, 1, 1, L_YOKE,
     OP_PASSENGER, 0, 2, 3, L_TANKS,
@@ -62,7 +65,8 @@ state {
     OP_PASSENGER, 0, 5, 5, L_RADIATOR,
     OP_PASSENGER, 0, 6, 6, L_JUMP,
     OP_PASSENGER, 0, 7, 7, L_RADIATOR,
-    OP_PASSENGER, 0, 8, 9, L_TRUSS,
+    OP_PASSENGER, 0, 8, 8, L_FARM,
+    OP_PASSENGER, 0, 9, 9, L_TRUSS,
     OP_PASSENGER, 0, 10, 10, L_HABRING,
     OP_PASSENGER, 0, 11, 11, L_QUARTERS,
     OP_PASSENGER, 0, 12, 12, L_ESTATE,
@@ -72,9 +76,11 @@ state {
     OP_PASSENGER, 0, 16, 16, L_SENSOR,
     OP_PASSENGER, 0, 17, 17, L_BRIDGE,
     OP_PASSENGER, 1, 0, 0, L_DRIVE,
-    OP_PASSENGER, 1, 1, 2, L_TANKS,
+    OP_PASSENGER, 1, 1, 1, L_TRUSS,
+    OP_PASSENGER, 1, 2, 3, L_TANKS,
     OP_PASSENGER, 2, 0, 0, L_DRIVE,
-    OP_PASSENGER, 2, 1, 2, L_TANKS,
+    OP_PASSENGER, 2, 1, 1, L_TRUSS,
+    OP_PASSENGER, 2, 2, 3, L_TANKS,
 
     OP_FREIGHTER, 0, 0, 0, L_DRIVE,
     OP_FREIGHTER, 0, 1, 1, L_YOKE,
@@ -91,13 +97,31 @@ state {
     OP_FREIGHTER, 0, 16, 16, L_QUARTERS,
     OP_FREIGHTER, 0, 17, 17, L_BRIDGE,
     OP_FREIGHTER, 1, 0, 0, L_DRIVE,
-    OP_FREIGHTER, 1, 1, 1, L_TANKS,
-    OP_FREIGHTER, 1, 7, 15, L_CARGO,
+    OP_FREIGHTER, 1, 1, 1, L_TRUSS,
+    OP_FREIGHTER, 1, 2, 2, L_TANKS,
+    OP_FREIGHTER, 1, 7, 7, L_TRUSS,
+    OP_FREIGHTER, 1, 8, 10, L_CARGO,
+    OP_FREIGHTER, 1, 11, 11, L_TRUSS,
+    OP_FREIGHTER, 1, 12, 14, L_CARGO,
+    OP_FREIGHTER, 1, 15, 15, L_TRUSS,
     OP_FREIGHTER, 2, 0, 0, L_DRIVE,
-    OP_FREIGHTER, 2, 1, 1, L_TANKS,
-    OP_FREIGHTER, 2, 7, 15, L_CARGO,
-    OP_FREIGHTER, 3, 7, 15, L_CARGO,
-    OP_FREIGHTER, 4, 7, 15, L_CARGO,
+    OP_FREIGHTER, 2, 1, 1, L_TRUSS,
+    OP_FREIGHTER, 2, 2, 2, L_TANKS,
+    OP_FREIGHTER, 2, 7, 7, L_TRUSS,
+    OP_FREIGHTER, 2, 8, 10, L_CARGO,
+    OP_FREIGHTER, 2, 11, 11, L_TRUSS,
+    OP_FREIGHTER, 2, 12, 14, L_CARGO,
+    OP_FREIGHTER, 2, 15, 15, L_TRUSS,
+    OP_FREIGHTER, 3, 7, 7, L_TRUSS,
+    OP_FREIGHTER, 3, 8, 10, L_CARGO,
+    OP_FREIGHTER, 3, 11, 11, L_TRUSS,
+    OP_FREIGHTER, 3, 12, 14, L_CARGO,
+    OP_FREIGHTER, 3, 15, 15, L_TRUSS,
+    OP_FREIGHTER, 4, 7, 7, L_TRUSS,
+    OP_FREIGHTER, 4, 8, 10, L_CARGO,
+    OP_FREIGHTER, 4, 11, 11, L_TRUSS,
+    OP_FREIGHTER, 4, 12, 14, L_CARGO,
+    OP_FREIGHTER, 4, 15, 15, L_TRUSS,
 
     OP_TENDER, 0, 0, 0, L_DRIVE,
     OP_TENDER, 0, 1, 1, L_YOKE,
@@ -107,23 +131,30 @@ state {
     OP_TENDER, 0, 5, 5, L_JUMP,
     OP_TENDER, 0, 6, 6, L_RADIATOR,
     OP_TENDER, 0, 7, 7, L_YOKE,
-    OP_TENDER, 0, 8, 9, L_REFINERY,
+    OP_TENDER, 0, 8, 9, L_ASSEMBLER,
     OP_TENDER, 0, 10, 10, L_YOKE,
-    OP_TENDER, 0, 11, 11, L_TRUSS,
-    OP_TENDER, 0, 12, 12, L_ESTATE,
-    OP_TENDER, 0, 13, 14, L_QUARTERS,
+    OP_TENDER, 0, 11, 11, L_FARM,
+    OP_TENDER, 0, 12, 12, L_TRUSS,
+    OP_TENDER, 0, 13, 13, L_ESTATE,
+    OP_TENDER, 0, 14, 14, L_QUARTERS,
     OP_TENDER, 0, 15, 15, L_BRIDGE,
-    OP_TENDER, 4, 7, 10, L_CARGO,
+    OP_TENDER, 4, 7, 7, L_TRUSS,
+    OP_TENDER, 4, 8, 9, L_CARGO,
+    OP_TENDER, 4, 10, 10, L_TRUSS,
     OP_TENDER, 1, 0, 0, L_DRIVE,
-    OP_TENDER, 1, 1, 1, L_TANKS,
-    OP_TENDER, 1, 7, 7, L_HANGAR,
-    OP_TENDER, 1, 8, 9, L_FAB,
-    OP_TENDER, 1, 10, 10, L_HANGAR,
+    OP_TENDER, 1, 1, 1, L_TRUSS,
+    OP_TENDER, 1, 2, 2, L_TANKS,
+    OP_TENDER, 1, 7, 7, L_TRUSS,
+    OP_TENDER, 1, 8, 8, L_HANGAR,
+    OP_TENDER, 1, 9, 9, L_FAB,
+    OP_TENDER, 1, 10, 10, L_TRUSS,
     OP_TENDER, 2, 0, 0, L_DRIVE,
-    OP_TENDER, 2, 1, 1, L_TANKS,
-    OP_TENDER, 2, 7, 7, L_HANGAR,
-    OP_TENDER, 2, 8, 9, L_FAB,
-    OP_TENDER, 2, 10, 10, L_HANGAR,
+    OP_TENDER, 2, 1, 1, L_TRUSS,
+    OP_TENDER, 2, 2, 2, L_TANKS,
+    OP_TENDER, 2, 7, 7, L_TRUSS,
+    OP_TENDER, 2, 8, 8, L_HANGAR,
+    OP_TENDER, 2, 9, 9, L_FAB,
+    OP_TENDER, 2, 10, 10, L_TRUSS,
 
     OP_BATTLESHIP, 0, 0, 0, L_DRIVE,
     OP_BATTLESHIP, 0, 1, 1, L_YOKE,
@@ -141,28 +172,37 @@ state {
     OP_BATTLESHIP, 0, 13, 13, L_TURRET,
     OP_BATTLESHIP, 0, 14, 14, L_YOKE,
     OP_BATTLESHIP, 0, 15, 15, L_TURRET,
-    OP_BATTLESHIP, 0, 16, 17, L_ARMOR,
+    OP_BATTLESHIP, 0, 16, 16, L_SHIELD,
+    OP_BATTLESHIP, 0, 17, 17, L_ARMOR,
     OP_BATTLESHIP, 1, 0, 0, L_DRIVE,
-    OP_BATTLESHIP, 1, 1, 2, L_TANKS,
-    OP_BATTLESHIP, 1, 9, 9, L_ARMOR,
+    OP_BATTLESHIP, 1, 1, 1, L_TRUSS,
+    OP_BATTLESHIP, 1, 2, 3, L_TANKS,
+    OP_BATTLESHIP, 1, 9, 9, L_TRUSS,
     OP_BATTLESHIP, 1, 10, 10, L_TURRET,
     OP_BATTLESHIP, 1, 11, 11, L_ARMOR,
     OP_BATTLESHIP, 1, 12, 12, L_TURRET,
-    OP_BATTLESHIP, 1, 13, 14, L_ARMOR,
+    OP_BATTLESHIP, 1, 13, 13, L_ARMOR,
+    OP_BATTLESHIP, 1, 14, 14, L_TRUSS,
+    OP_BATTLESHIP, 1, 15, 15, L_RAILGUN,
     OP_BATTLESHIP, 2, 0, 0, L_DRIVE,
-    OP_BATTLESHIP, 2, 1, 2, L_TANKS,
-    OP_BATTLESHIP, 2, 9, 9, L_ARMOR,
+    OP_BATTLESHIP, 2, 1, 1, L_TRUSS,
+    OP_BATTLESHIP, 2, 2, 3, L_TANKS,
+    OP_BATTLESHIP, 2, 9, 9, L_TRUSS,
     OP_BATTLESHIP, 2, 10, 10, L_TURRET,
     OP_BATTLESHIP, 2, 11, 11, L_ARMOR,
     OP_BATTLESHIP, 2, 12, 12, L_TURRET,
-    OP_BATTLESHIP, 2, 13, 14, L_ARMOR,
-    OP_BATTLESHIP, 3, 9, 9, L_ARMOR,
+    OP_BATTLESHIP, 2, 13, 13, L_ARMOR,
+    OP_BATTLESHIP, 2, 14, 14, L_TRUSS,
+    OP_BATTLESHIP, 2, 15, 15, L_RAILGUN,
+    OP_BATTLESHIP, 3, 9, 9, L_TRUSS,
     OP_BATTLESHIP, 3, 10, 10, L_TURRET,
     OP_BATTLESHIP, 3, 11, 11, L_QUARTERS,
     OP_BATTLESHIP, 3, 12, 12, L_TURRET,
     OP_BATTLESHIP, 3, 13, 13, L_SENSOR,
-    OP_BATTLESHIP, 3, 14, 14, L_BRIDGE,
-    OP_BATTLESHIP, 4, 9, 11, L_HANGAR
+    OP_BATTLESHIP, 3, 14, 14, L_TRUSS,
+    OP_BATTLESHIP, 3, 15, 15, L_BRIDGE,
+    OP_BATTLESHIP, 4, 9, 9, L_TRUSS,
+    OP_BATTLESHIP, 4, 10, 12, L_HANGAR
   ]
 
   fn lane_of(i: i32) -> i32 { (i - i % SLOTS) / SLOTS }
@@ -185,12 +225,16 @@ state {
   fn lane_r(l: i32) -> f32 { l == 0 ? R_CORE : R_OUT }
   fn slot_z(z: i32) -> f32 { (z - SLOTS / 2.0 + 0.5) * SEG }
 
-  fn ringed(k: i32) -> bool { k == L_HABRING || k == L_ESTATE }
+  fn ringed(k: i32) -> bool { k == L_HABRING || k == L_ESTATE || k == L_FARM }
   fn housed(k: i32) -> bool { k == L_QUARTERS || ringed(k) }
-  fn core_only(k: i32) -> bool { ringed(k) || k == L_JUMP || k == L_YOKE }
+  fn core_only(k: i32) -> bool { ringed(k) || k == L_YOKE }
 
   fn outriggers_at(z: i32) -> i32 {
     (lkind(1, z) != 0 ? 1 : 0) + (lkind(2, z) != 0 ? 1 : 0) + (lkind(3, z) != 0 ? 1 : 0) + (lkind(4, z) != 0 ? 1 : 0)
+  }
+
+  fn trusses_at(z: i32) -> i32 {
+    (lkind(1, z) == L_TRUSS ? 1 : 0) + (lkind(2, z) == L_TRUSS ? 1 : 0) + (lkind(3, z) == L_TRUSS ? 1 : 0) + (lkind(4, z) == L_TRUSS ? 1 : 0)
   }
 
   fn open_ahead(l: i32, z: i32) -> bool {
@@ -212,30 +256,32 @@ state {
     k == L_BRIDGE && !open_ahead(l, z) ? 2 :
     k == L_DRIVE && !open_behind(l, z) ? 3 :
     ringed(k) && outriggers_at(z) > 0 ? 4 :
-    k == L_YOKE && outriggers_at(z) == 0 ? 5 :
+    k == L_YOKE && trusses_at(z) == 0 ? 5 :
     housed(k) && (lkind(l, z - 1) == L_REACTOR || lkind(l, z + 1) == L_REACTOR) ? 6 :
     k == L_HANGAR && l == 0 && lkind(LANE_VENTRAL, z) != 0 ? 7 :
+    k == L_RAILGUN && !open_ahead(l, z) ? 10 :
     0
   }
 
   fn rule_text(code: i32) -> string {
     match code {
-      1: "Rings, yokes and jump drives sit on the core"
+      1: "Rings and yokes sit on the core"
       2: "A bridge needs open space ahead"
       3: "A drive needs open space behind"
       4: "A ring needs the outriggers clear beside it"
-      5: "A yoke needs an outrigger to hold"
+      5: "A yoke needs an outrigger truss to hold"
       6: "Living space too close to a reactor"
       7: "The hangar opens onto the ventral spine"
       8: "Cut off from the rest of the core"
       9: "This outrigger has no yoke to the core"
+      10: "A railgun needs a clear line of fire ahead"
       _: ""
     }
   }
 
   fn lvalidate() {
     mut st: i32[90] = {}
-    mut tally: i32[18] = {}
+    mut tally: i32[21] = {}
     mut front: i32 = SLOTS
     mut back: i32 = -1
     mut total: i32 = 0
@@ -283,7 +329,7 @@ state {
         if !on && start >= 0 {
           mut tied = false
           for q in start..z {
-            if lkind(0, q) == L_YOKE && q >= best_start && q < best_end {
+            if lkind(0, q) == L_YOKE && lkind(l, q) == L_TRUSS && q >= best_start && q < best_end {
               tied = true
             }
           }
@@ -311,6 +357,7 @@ state {
     lmodules = total
     lproblems = bad
     lspan = max(back - front + 1, 0)
+    layout_rev += 1
   }
 
   fn load_liner(design: i32) {
@@ -330,14 +377,14 @@ state {
   fn lkind_mass(k: i32) -> f32 {
     match k {
       40: 18; 41: 8; 42: 10; 43: 30; 44: 34; 45: 26; 46: 6; 47: 34; 48: 24
-      49: 18; 50: 14; 51: 12; 52: 22; 53: 16; 54: 3; 55: 8; 56: 20; 57: 18
+      49: 18; 50: 14; 51: 12; 52: 22; 53: 16; 54: 3; 55: 8; 56: 20; 57: 18; 58: 32; 59: 16; 60: 20
       _: 0
     }
   }
 
   fn lkind_power(k: i32) -> f32 {
     match k {
-      40: 2; 41: 4; 42: 1; 43: 6; 44: 4; 47: 30; 48: 10; 49: 0.2; 50: 0.2; 51: 2; 52: 8; 53: 6; 57: 6
+      40: 2; 41: 4; 42: 1; 43: 6; 44: 4; 47: 30; 48: 10; 49: 0.2; 50: 0.2; 51: 2; 52: 8; 53: 6; 57: 6; 58: 2; 59: 15; 60: 20
       _: 0
     }
   }

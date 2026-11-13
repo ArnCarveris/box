@@ -1,0 +1,53 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.movement
+using box.particle
+using box.light
+using box.animation
+using state
+
+assets {
+  template FabBay {
+    prop r: f32 = 1
+    prop core: bool = true
+    prop fe: i32 = 0
+    prop be: i32 = 0
+    prop seed: i32 = 0
+    prop power: f32 = 1
+
+    const cr = r * 1.45
+    shaft : ShipTrim { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.35, length: SEG, segments: 16, smooth: true} }
+    for s in 0..2 {
+      "hoop_{s}" : ShipYellow { Position: {0, 0, (s - 0.5) * 3.6}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: cr, thickness: 0.22, length: 0.3, segments: 40, smooth: true} }
+    }
+    for i in 0..6 {
+      "rail_{i}" {
+        Rotation: {0, 0, i * PI / 3}
+        bar : ShipYellow { Position: {cr - 0.11, 0, 0}; Box: {0.2, 0.2, 3.6} }
+        spoke_a : ShipSteel { Position: {cr / 2, 0, 1.8}; Box: {cr, 0.1, 0.1} }
+        spoke_b : ShipSteel { Position: {cr / 2, 0, -1.8}; Box: {cr, 0.1, 0.1} }
+      }
+    }
+    work {
+      Rotation: {0, 0, core ? 0 : 0 - HALF_PI}
+      hull {
+        Position: {0, r * 0.72, 0.4}
+        Scale: {0.24, 0.24, 0.24}
+        MiniShuttle craft(paint: seed % 2)
+      }
+      for f in 0..3 {
+        "frame_{f}" : ShipHullDark { Position: {0, 0 - r * 0.8, (f - 1) * 0.9}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: r * 0.45, tube: 0.06, segments: 20, rings: 3, smooth: true} }
+      }
+      keel : ShipHullDark { Position: {0, 0 - r * 0.8 - r * 0.45, 0}; Box: {0.12, 0.12, 2.2} }
+      arm_a : ShipSteel { Position: {r * 0.7, r * 0.95, -0.6}; Rotation: {0, 0, 0.9}; Box: {0.1, r * 0.9, 0.1} }
+      arm_b : ShipSteel { Position: {0 - r * 0.7, 0 - r * 0.6, 0.6}; Rotation: {0, 0, 2.2}; Box: {0.1, r * 0.9, 0.1} }
+      weld_a : ShipWeld { Position: {r * 0.38, r * 0.66, -0.6}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+      weld_b : ShipWeld { Position: {0 - r * 0.42, 0 - r * 0.85, 0.6}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
+      spark { Position: {r * 0.38, r * 0.66, -0.6}; PointLight: {intensity: 2, range: 3}; Rgb: {170, 220, 255} }
+    }
+  }
+}
