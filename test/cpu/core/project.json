@@ -401,12 +401,10 @@
                     "null_backend_failed_keeps_graph",
                     "null_backend_restart",
                     "custom_kind_sent",
-<<<<<<< HEAD
                     "noise_kind",
                     "noise_channels_type",
                     "noise_params_keep_structure",
-                    "noise_script"
-=======
+                    "noise_script",
                     "math_types",
                     "math_remap_params",
                     "math_op_output_changes_structure",
@@ -428,7 +426,6 @@
                     "blocks_kind",
                     "blocks_plane",
                     "blocks_sphere_error"
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
                 ]
             },
             {

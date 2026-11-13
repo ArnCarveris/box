@@ -778,14 +778,8 @@ typedef struct box_texture_node_input_t {
     ecs_size_t offset;          /**< Offset of the ecs_entity_t member */
     TextureValueType type;      /**< Type the input node must output */
     const char *value;          /**< Name of the constant member used without a node, a float
-<<<<<<< HEAD
-                                 *   for TexScalar or a vec4 for TexVector, NULL for none: a
-                                 *   TexVector input then reads the coordinates of the texel,
-                                 *   a TexScalar input 0 */
-=======
                                  *   for TexScalar or a vec4 for TexVector and TexAny, NULL for
                                  *   none */
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     ecs_size_t value_offset;    /**< Offset of that member */
     bool coords;                /**< A TexVector input without value: without a node it is the
                                  *   coordinates of the texel in the domain of the graph */
@@ -869,18 +863,11 @@ typedef struct box_texture_node_desc_t {
     box_texture_node_array_t array; /**< Array parameter, name NULL for none */
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
-<<<<<<< HEAD
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
-    TextureValueType (*output_of)(const void *node); /**< Type of the value of a node from its
-                                 *   component, for a kind whose type depends on its members;
-                                 *   NULL for output */
-=======
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
                                  *   BOX_TEXTURE_NODE_PLANE */
     int32_t passes;             /**< Passes of the function, 0 for 1, at most
                                  *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
                                  *   neighbourhood kind */
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

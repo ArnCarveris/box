@@ -133,158 +133,6 @@ static const char *box_texture_math_wgsl =
     "    }\n"
     "}\n";
 
-<<<<<<< HEAD
-/** WGSL of the TexNoise node: fbm, ridged or billow gradient noise per channel.
- *
- * The lattice is four dimensional, with 32 gradients of three components +-1 and one 0. A point
- * with w 0 needs only the eight corners at w 0, so without evolve the noise is three dimensional.
- *
- * At w 0 that noise is the evolved noise, so it continues into it. On the plane x and y wrap
- * with the whole number of cells across of each octave. */
-static const char *box_texture_noise_wgsl =
-    "// Gradient of a corner of the noise lattice dotted with the offset d from it\n"
-    "fn box_tex_noise_grad(h: u32, d: vec4f) -> f32 {\n"
-    "    let s = vec3f(select(1.0, -1.0, (h & 1u) != 0u), select(1.0, -1.0, (h & 2u) != 0u),\n"
-    "        select(1.0, -1.0, (h & 4u) != 0u));\n"
-    "    switch (h >> 3u) & 3u {\n"
-    "        case 0u: { return dot(s, d.yzw); }\n"
-    "        case 1u: { return dot(s, d.xzw); }\n"
-    "        case 2u: { return dot(s, d.xyw); }\n"
-    "        default: { return dot(s, d.xyz); }\n"
-    "    }\n"
-    "}\n"
-    "\n"
-    "// Lattice index wrapped into 0..period - 1, as it is without a period\n"
-    "fn box_tex_noise_wrap(i: i32, period: i32) -> u32 {\n"
-    "    if (period <= 0) {\n"
-    "        return bitcast<u32>(i);\n"
-    "    }\n"
-    "    return bitcast<u32>(((i % period) + period) % period);\n"
-    "}\n"
-    "\n"
-    "// Hash of a corner of the lattice, x and y wrapped\n"
-    "fn box_tex_noise_hash(seed: u32, c: vec4i, period: vec2i) -> u32 {\n"
-    "    let x = box_tex_noise_wrap(c.x, period.x);\n"
-    "    let y = box_tex_noise_wrap(c.y, period.y);\n"
-    "    return box_texgraph_hash(seed ^ box_texgraph_hash(x ^ box_texgraph_hash(y ^\n"
-    "        box_texgraph_hash(bitcast<u32>(c.z) ^ box_texgraph_hash(bitcast<u32>(c.w))))));\n"
-    "}\n"
-    "\n"
-    "// Noise of the eight corners of the cell i at the layer iw, d.w the offset from the layer\n"
-    "fn box_tex_noise_layer(seed: u32, i: vec3i, f: vec3f, u: vec3f, iw: i32, dw: f32,\n"
-    "    period: vec2i) -> f32 {\n"
-    "    var v: array<f32, 8>;\n"
-    "    for (var c = 0; c < 8; c ++) {\n"
-    "        let o = vec3i(c & 1, (c >> 1) & 1, (c >> 2) & 1);\n"
-    "        let h = box_tex_noise_hash(seed, vec4i(i + o, iw), period);\n"
-    "        v[c] = box_tex_noise_grad(h, vec4f(f - vec3f(o), dw));\n"
-    "    }\n"
-    "    let y0 = mix(mix(v[0], v[1], u.x), mix(v[2], v[3], u.x), u.y);\n"
-    "    let y1 = mix(mix(v[4], v[5], u.x), mix(v[6], v[7], u.x), u.y);\n"
-    "    return mix(y0, y1, u.z);\n"
-    "}\n"
-    "\n"
-    "// Gradient noise at a point, about -1..1, three dimensional where w is 0\n"
-    "fn box_tex_noise_gradient(seed: u32, p: vec4f, period: vec2i) -> f32 {\n"
-    "    let b = floor(p.xyz);\n"
-    "    let i = vec3i(b);\n"
-    "    let f = p.xyz - b;\n"
-    "    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);\n"
-    "    if (p.w == 0.0) {\n"
-    "        return box_tex_noise_layer(seed, i, f, u, 0, 0.0, period);\n"
-    "    }\n"
-    "    let bw = floor(p.w);\n"
-    "    let iw = i32(bw);\n"
-    "    let fw = p.w - bw;\n"
-    "    let uw = fw * fw * fw * (fw * (fw * 6.0 - 15.0) + 10.0);\n"
-    "    return mix(box_tex_noise_layer(seed, i, f, u, iw, fw, period),\n"
-    "        box_tex_noise_layer(seed, i, f, u, iw + 1, fw - 1.0, period), uw);\n"
-    "}\n"
-    "\n"
-    "// Fractal of the octaves of one channel, 0..1\n"
-    "fn box_tex_noise_fractal(p: array<vec4u, 4>, seed: u32, coords: vec4f, evolve: f32)\n"
-    "    -> f32 {\n"
-    "    let frequency = bitcast<f32>(p[0].x);\n"
-    "    let octaves = clamp(bitcast<i32>(p[0].y), 1, 16);\n"
-    "    let lacunarity = select(bitcast<f32>(p[0].z), 2.0, bitcast<f32>(p[0].z) <= 0.0);\n"
-    "    let gain = select(bitcast<f32>(p[0].w), 0.5, bitcast<f32>(p[0].w) <= 0.0);\n"
-    "    let fractal = bitcast<i32>(p[1].y);\n"
-    "    let offset = select(bitcast<f32>(p[1].z), 1.0, bitcast<f32>(p[1].z) == 0.0);\n"
-    "    let plane = box_texgraph_stage.domain == 0u;\n"
-    "    let size = vec2f(box_texgraph_stage.size);\n"
-    "    var f = select(frequency, 4.0, frequency <= 0.0);\n"
-    "    var time = evolve;\n"
-    "    var amp = 1.0;\n"
-    "    var norm = 0.0;\n"
-    "    var sum = 0.0;\n"
-    "    var weight = 1.0;\n"
-    "    for (var o = 0; o < 16; o ++) {\n"
-    "        if (o >= octaves) {\n"
-    "            break;\n"
-    "        }\n"
-    "        var q = coords.xyz * f;\n"
-    "        var period = vec2i(0);\n"
-    "        if (plane) {\n"
-    "            let px = clamp(i32(floor(f + 0.5)), 1, 4096);\n"
-    "            let py = clamp(i32(floor(f32(px) * size.y / size.x + 0.5)), 1, 4096);\n"
-    "            period = vec2i(px, py);\n"
-    "            q = coords.xyz * vec3f(f32(px), f32(py), f32(px));\n"
-    "        }\n"
-    "        let s = box_texgraph_hash(seed ^ box_texgraph_hash(u32(o) + 0x68e31da4u));\n"
-    "        let n = clamp(box_tex_noise_gradient(s, vec4f(q, time), period), -1.0, 1.0);\n"
-    "        switch fractal {\n"
-    "            case 1: {\n"
-    "                var signal = offset - abs(n);\n"
-    "                signal = signal * signal * weight;\n"
-    "                weight = clamp(signal, 0.0, 1.0);\n"
-    "                sum += amp * signal;\n"
-    "            }\n"
-    "            case 2: {\n"
-    "                sum += amp * abs(n);\n"
-    "            }\n"
-    "            default: {\n"
-    "                sum += amp * n;\n"
-    "            }\n"
-    "        }\n"
-    "        norm += amp;\n"
-    "        amp *= gain;\n"
-    "        f *= lacunarity;\n"
-    "        time *= lacunarity;\n"
-    "    }\n"
-    "    let v = sum / norm;\n"
-    "    return clamp(select(v, 0.5 + 0.5 * v, fractal != 1 && fractal != 2), 0.0, 1.0);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_noise(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let channels = bitcast<i32>(p[1].w);\n"
-    "    if (channels <= 1) {\n"
-    "        let n = box_tex_noise_fractal(p, box_texgraph_hash(p[1].x), i[0], i[1].x);\n"
-    "        return vec4f(n, n, n, 1.0);\n"
-    "    }\n"
-    "    var r = vec4f(0.0, 0.0, 0.0, 1.0);\n"
-    "    for (var c = 0; c < 4; c ++) {\n"
-    "        if (c >= channels) {\n"
-    "            break;\n"
-    "        }\n"
-    "        r[c] = box_tex_noise_fractal(p, box_texgraph_hash(p[1].x + u32(c) * 0x9e3779b9u),\n"
-    "            i[0], i[1].x);\n"
-    "    }\n"
-    "    return r;\n"
-    "}\n";
-
-/** Get the type of the value of a TexNoise node: a Scalar with one channel, else a Vector.
- *
- * @param node The TexNoise
- * @return The type
- */
-static TextureValueType box_texture_noise_output(
-    const void *node)
-{
-    const TexNoise *noise = node;
-
-    return noise->channels > 1 ? TexVector : TexScalar;
-}
-=======
 /** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
  * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
  * them further apart, between texels. */
@@ -711,7 +559,6 @@ static const char *box_texture_splat_wgsl =
     "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    return vec4f(i[0].x);\n"
     "}\n";
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
 
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
@@ -898,9 +745,6 @@ static int box_texture_node_kind_fill(
     kind->output = desc->output;
     kind->output_type = desc->output_type;
     kind->flags = desc->flags;
-<<<<<<< HEAD
-    kind->output_of = desc->output_of;
-=======
     kind->passes = desc->passes > 1 ? desc->passes : 1;
     if (kind->passes > 1) {
         kind->flags |= BOX_TEXTURE_NODE_NEIGHBOURHOOD;
@@ -910,7 +754,6 @@ static int box_texture_node_kind_fill(
         result = -1;
     }
 
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS && desc->inputs[i].name; i ++) {
@@ -1156,19 +999,6 @@ static void box_texture_graph_reach(
     }
 }
 
-<<<<<<< HEAD
-/** Get the type of the value of a node.
- *
- * @param kind The kind of the node
- * @param ptr Its component
- * @return The type of its kind, or the type its members give
- */
-static TextureValueType box_texture_graph_output(
-    const box_texture_node_kind_t *kind,
-    const void *ptr)
-{
-    return kind->output_of && ptr ? kind->output_of(ptr) : kind->output;
-=======
 /** Write the array parameter of a node: its header and its elements after the constants of
  * its inputs, failing the build with more elements than the kind takes or invalid ones.
  *
@@ -1321,7 +1151,6 @@ static TextureValueType box_texture_math_type(
     }
 
     return result;
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
 }
 
 /** Append the compiled node of an entity whose inputs are compiled, with its parameters and
@@ -1379,11 +1208,7 @@ static int32_t box_texture_graph_append(
     ecs_os_memset_t(node, 0, box_texture_graph_node_t);
     node->entity = e;
     node->kind = kind->id;
-<<<<<<< HEAD
-    node->output = box_texture_graph_output(kind, ptr);
-=======
     node->output = box_texture_graph_output_type(kind, ptr, types);
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     node->params = offset;
     node->param_size = kind->node_size;
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
@@ -1468,14 +1293,9 @@ static int32_t box_texture_graph_visit(
     kind = box_texture_graph_kind_of(b, e, &kinds);
     if (visited) {
         result = (int32_t)*visited - 1;
-<<<<<<< HEAD
-        box_texture_graph_check_type(b, e, ecs_vec_get_t(&b->nodes, box_texture_graph_node_t,
-            result)->output, from, input, expected);
-=======
         box_texture_graph_check_type(b, e,
             ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, result)->output, from, input,
             expected);
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
         goto done;
     }
 
@@ -1494,10 +1314,6 @@ static int32_t box_texture_graph_visit(
         goto done;
     }
 
-<<<<<<< HEAD
-    box_texture_graph_check_type(b, e, box_texture_graph_output(kind,
-        ecs_get_id(b->world, e, kind->component)), from, input, expected);
-=======
     if ((kind->flags & BOX_TEXTURE_NODE_PLANE) && b->domain == DomainSphere) {
         char *component = ecs_get_path(b->world, kind->component);
         box_texture_graph_error(b, "node '%s' (%s) works on DomainPlane only, the graph is on "
@@ -1505,7 +1321,6 @@ static int32_t box_texture_graph_visit(
         ecs_os_free(component);
     }
 
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     if (ecs_vec_count(&b->nodes) >= BOX_TEXTURE_GRAPH_NODES) {
         box_texture_graph_error(b, "more than %d nodes", BOX_TEXTURE_GRAPH_NODES);
     }
@@ -1788,9 +1603,6 @@ done:
     return;
 }
 
-<<<<<<< HEAD
-/** Register the built in node kinds: TexConstant, TexCoords, TexMath and TexNoise.
-=======
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -1855,9 +1667,8 @@ done:
 }
 
 /** Register the built in node kinds: TexConstant, TexCoords, TexMath, TexSplit, TexCombine,
- * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve, TexBlocks, TexCells and
- * TexBlur.
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
+ * TexWarp, TexTransform, TexTime, TexSplat, TexRamp, TexCurve, TexBlocks, TexCells,
+ * TexBlur and TexNoise.
  *
  * @param world The world
  */
@@ -1900,28 +1711,9 @@ static void box_texture_nodes_register(
         .source = box_texture_math_wgsl
     });
 
+    box_texture_noise_register(world);
+
     box_texture_node_register(world, &(box_texture_node_desc_t){
-<<<<<<< HEAD
-        .component = ecs_id(TexNoise),
-        .output = TexScalar,
-        .inputs = {
-            { "coords", offsetof(TexNoise, coords), TexVector },
-            { "evolve", offsetof(TexNoise, evolve), TexScalar }
-        },
-        .params = {
-            { "frequency", offsetof(TexNoise, frequency), 4, BOX_TEXTURE_PARAM_F32 },
-            { "octaves", offsetof(TexNoise, octaves), 4, BOX_TEXTURE_PARAM_I32 },
-            { "lacunarity", offsetof(TexNoise, lacunarity), 4, BOX_TEXTURE_PARAM_F32 },
-            { "gain", offsetof(TexNoise, gain), 4, BOX_TEXTURE_PARAM_F32 },
-            { "seed", offsetof(TexNoise, seed), 4, BOX_TEXTURE_PARAM_I32 },
-            { "fractal", offsetof(TexNoise, fractal), 4, BOX_TEXTURE_PARAM_I32 },
-            { "offset", offsetof(TexNoise, offset), 4, BOX_TEXTURE_PARAM_F32 },
-            { "channels", offsetof(TexNoise, channels), 4, BOX_TEXTURE_PARAM_I32 }
-        },
-        .function = "box_tex_noise",
-        .source = box_texture_noise_wgsl,
-        .output_of = box_texture_noise_output
-=======
         .component = ecs_id(TexBlur),
         .output = TexAny,
         .inputs = {
@@ -2076,7 +1868,6 @@ static void box_texture_nodes_register(
         },
         .function = "box_tex_cells",
         .source = box_texture_cells_wgsl
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     });
 }
 

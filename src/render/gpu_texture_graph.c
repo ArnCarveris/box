@@ -630,13 +630,8 @@ static void box_gpu_tg_lines(
     };
 }
 
-<<<<<<< HEAD
-/** Write the WGSL expression of input j of a node in a stage: the value of its node, or the
- * constant in its parameters without one, the coordinates for an input without a constant.
-=======
 /** Write the WGSL expression of input j of a node in a stage: the value of its node, or without
  * one the domain coordinates for a coords input and the constant in its parameters otherwise.
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
  *
  * @param buf The code
  * @param graph The graph
@@ -656,11 +651,7 @@ static void box_gpu_tg_input(
         ecs_strbuf_appendstr(buf, "vec4f(0.0)");
     } else if (n->inputs[j] >= 0) {
         ecs_strbuf_append(buf, "node_%d", n->inputs[j]);
-<<<<<<< HEAD
-    } else if (kind->input_coords & (1u << j)) {
-=======
     } else if (kind->coords_inputs & (1u << j)) {
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
         ecs_strbuf_appendstr(buf, "coords");
     } else {
         ecs_strbuf_append(buf, "bitcast<vec4f>(box_texgraph_params[%uu])",
@@ -1459,11 +1450,7 @@ void box_gpu_texture_node_kind_apply(
     kind->output = desc->output;
     kind->input_count = desc->input_count > BOX_TEXTURE_NODE_INPUTS
         ? BOX_TEXTURE_NODE_INPUTS : desc->input_count;
-<<<<<<< HEAD
-    kind->input_coords = desc->input_coords;
-=======
     kind->coords_inputs = desc->coords_inputs;
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     kind->param_size = desc->param_size;
     kind->flags = desc->flags;
     kind->passes = desc->passes < 1 ? 1 : desc->passes > BOX_TEXTURE_NODE_PASSES

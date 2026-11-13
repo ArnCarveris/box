@@ -205,13 +205,8 @@ static void box_render_texture_kinds_send(
         desc->input_count = (uint32_t)kind->input_count;
         for (i = 0; i < kind->input_count; i ++) {
             desc->input_types[i] = (uint32_t)kind->inputs[i].type;
-<<<<<<< HEAD
-            if (kind->inputs[i].type == TexVector && !kind->inputs[i].value) {
-                desc->input_coords |= 1u << i;
-=======
             if (kind->inputs[i].coords && !kind->inputs[i].value) {
                 desc->coords_inputs |= 1u << i;
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
             }
         }
 

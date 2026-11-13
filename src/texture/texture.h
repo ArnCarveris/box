@@ -84,15 +84,9 @@ typedef struct box_texture_node_kind_t {
                                  *   the max elements of the array */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
-<<<<<<< HEAD
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
-    TextureValueType (*output_of)(const void *node); /**< Type of a node from its component,
-                                 *   NULL for output */
-=======
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
                                  *   BOX_TEXTURE_NODE_PLANE */
     int32_t passes;             /**< Passes of the function, from 1 */
->>>>>>> 34cb32c1234cb7bb06d740279fdcb13c68f3e2d0
     bool sent;                  /**< The current backend has the kind */
 } box_texture_node_kind_t;
 
@@ -436,6 +430,13 @@ void box_texture_capped_size(
 void box_texture_graphs_init(
     ecs_world_t *world,
     box_textures_t *t);
+
+/** Register the TexNoise node kind.
+ *
+ * @param world The world
+ */
+void box_texture_noise_register(
+    ecs_world_t *world);
 
 /** Free the node kinds and the graph lists of a registry.
  *
