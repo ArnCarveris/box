@@ -611,6 +611,38 @@ done:
     return;
 }
 
+uint32_t box_gpu_texture_serial(
+    box_gpu_t *gpu,
+    uint32_t handle)
+{
+    box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
+        ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
+        : NULL;
+
+    return tex ? ((box_gpu_texture_entry_t*)tex)->serial : 0;
+}
+
+WGPUTextureView box_gpu_texture_sampled_view(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    bool linear)
+{
+    box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
+        ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
+        : NULL;
+    box_gpu_target_t *target = handle & BOX_RENDER_TEXTURE_TARGET
+        ? ecs_map_get_deref(&gpu->targets, box_gpu_target_t, handle & ~BOX_RENDER_TEXTURE_TARGET)
+        : NULL;
+    WGPUTextureView result = NULL;
+    if (target) {
+        result = target->output_view;
+    } else if (tex) {
+        result = linear ? tex->linear : tex->srgb;
+    }
+
+    return result;
+}
+
 static void box_gpu_texture_blit(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,

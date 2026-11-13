@@ -658,6 +658,7 @@ ECS_STRUCT(TexBlur, {
                          *   three standard deviations, 0 for no blur */
 });
 
+<<<<<<< HEAD
 /** Fractal sum of the octaves of a TexNoise node */
 ECS_ENUM(TextureNoiseFractal, {
     NoiseFbm = 0,    /**< Fractal brownian motion: the octaves added, the default */
@@ -699,6 +700,58 @@ ECS_STRUCT(TexNoise, {
     float offset;               /**< NoiseRidged: value the ridge reaches, 0 for 1; a lower
                                  *   offset makes the ridges sharper and the valleys wider */
     int32_t channels;           /**< 1 for a Scalar, the default, 3 or 4 for a Vector */
+=======
+/** Addressing of the texels outside a texture a TexImage samples */
+ECS_ENUM(TextureAddress, {
+    AddressWrap = 0, /**< The texture repeats, the default. On DomainSphere only the longitude
+                      *   wraps, the rows of an equirectangular image clamp at the poles */
+    AddressClamp = 1 /**< The edge texels extend */
+});
+
+/** Node of a TextureGraph whose value samples the image of a texture entity: a TexturePath, a
+ * TextureGen, another TextureGraph or the texture of a Surface, bilinear between its texels.
+ *
+ * On DomainPlane it samples at the uv of coords, v 0 at the top; on DomainSphere at the
+ * equirectangular uv of the direction of coords, so a graph of the size of an equirectangular
+ * image reads it back texel by texel. A single channel image reads as (r, 0, 0, 1).
+ *
+ * The graph waits in TextureLoading until the texture has an image, fails when it fails or
+ * samples the graph back, and evaluates after a graph it samples and again when its image
+ * changes. Rebinding the node to another texture compiles nothing.
+ *
+ * @code
+ * tinted {
+ *   albedo { TexImage: {texture: brick} }
+ *   warm   { TexMath: {op: MathMultiply, a: albedo, b_value: {1, 0.9, 0.8, 1}} }
+ *   TextureGraph: {output: warm, width: 512}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(TexImage, {
+    ecs_entity_t texture;   /**< Texture entity sampled */
+    ecs_entity_t coords;    /**< Vector input node of where to sample, 0 for the coordinates
+                             *   of the texel in the domain of the graph */
+    TextureAddress address; /**< Texels outside the image, default AddressWrap */
+    bool linear;            /**< Read the color channels as stored, default off: RGBA8 is
+                             *   decoded from display encoding as color layers do, so a
+                             *   GraphColor image reads as its output; R8 and HDR as stored */
+});
+
+/** Node of a TextureGraph that looks up a texture entity as a 2D table by two scalars, such as
+ * a biome color by height and temperature, bound as the texture of a TexImage.
+ *
+ * u 0..1 runs from the center of the first column of the image to the center of the last one,
+ * v from the top row to the bottom row, bilinear between them and clamped outside. An input
+ * without a node takes its value member instead.
+ */
+ECS_STRUCT(TexLut, {
+    ecs_entity_t texture;   /**< Texture entity of the table */
+    ecs_entity_t u;         /**< Scalar input node of the column, 0 for u_value */
+    ecs_entity_t v;         /**< Scalar input node of the row, 0 for v_value */
+    float u_value;          /**< Value of u without a node */
+    float v_value;          /**< Value of v without a node */
+    bool linear;            /**< Read the color channels as stored, see TexImage.linear */
+>>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
 });
 
 /** Most inputs of a node kind */
@@ -721,6 +774,10 @@ ECS_STRUCT(TexNoise, {
 
 /** Flag of a node kind that works on DomainPlane only, failing a graph on DomainSphere */
 #define BOX_TEXTURE_NODE_PLANE (1u << 2)
+
+/** Flag of a node kind that samples a texture entity, set by box_texture_node_register for a
+ * kind with a texture member (box_texture_node_desc_t.texture) */
+#define BOX_TEXTURE_NODE_SAMPLES (1u << 3)
 
 /** Most passes of a node kind */
 #define BOX_TEXTURE_NODE_PASSES (4)
@@ -763,6 +820,8 @@ ECS_STRUCT(TextureNodeKind, {
     bool animated;           /**< The node depends on time */
     bool plane;              /**< The node works on DomainPlane only */
     int32_t passes;          /**< Passes that compute the value, 1 for most kinds */
+    const char *texture;     /**< Member of the texture entity a node samples, NULL for a kind
+                              *   that samples none */
 });
 
 /** Kind of the scalar elements of a parameter of a node kind */
@@ -851,6 +910,9 @@ typedef TextureValueType (*box_texture_node_type_t)(
  * A neighbourhood kind also gets texel: vec2i, then t0: texture_2d<f32>, ... per input. A kind of
  * more passes gets pass_index: u32 and prev: texture_2d<f32> (the pass before, 1x1 zero in pass
  * 0) between texel and t0; its last pass is the value of the node.
+ *
+ * A sampling kind (texture) gets the texture_2d<f32> it samples last, read with
+ * box_texgraph_sample.
  */
 typedef struct box_texture_node_desc_t {
     ecs_entity_t component;     /**< Component of the nodes of the kind */
@@ -868,6 +930,14 @@ typedef struct box_texture_node_desc_t {
     int32_t passes;             /**< Passes of the function, 0 for 1, at most
                                  *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
                                  *   neighbourhood kind */
+    const char *texture;        /**< ecs_entity_t member of the texture entity a node
+                                 *   samples, NULL for none; which entity it is only binds the
+                                 *   image, it is not part of the structure of the graph */
+    ecs_size_t texture_offset;  /**< Offset of that member */
+    const char *linear;         /**< Name of a bool member that reads the color channels of
+                                 *   the texture as stored instead of decoded from display
+                                 *   encoding, NULL to always decode them */
+    ecs_size_t linear_offset;   /**< Offset of that member */
 } box_texture_node_desc_t;
 
 /** Register a node kind, or replace the kind of a component registered before; the graphs

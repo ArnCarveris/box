@@ -327,7 +327,8 @@ typedef struct box_render_texture_node_kind_t {
     uint32_t input_types[BOX_TEXTURE_NODE_INPUTS]; /**< TextureValueType of each input */
     uint32_t coords_inputs;     /**< Bit j: input j without a node is the domain coordinates */
     uint32_t param_size;        /**< Bytes of the parameters of a node, a multiple of 16 */
-    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE */
+    uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, _ANIMATED, _PLANE,
+                                 *   _SAMPLES */
     uint32_t passes;            /**< Passes of the function, from 1 */
     uint32_t function_size;     /**< Bytes of the function name, its terminator included */
     uint32_t source_size;       /**< Bytes of the source, its terminator included */
@@ -343,10 +344,25 @@ typedef struct box_render_texture_graph_node_t {
                                  *   of its kind, then a vec4 per input, the constant of an
                                  *   input without a node (zero without one) */
     uint32_t param_size;        /**< Bytes of the node in the parameter block */
+    int32_t texture;            /**< Index of the texture a node of a sampling kind samples in
+                                 *   the textures of the graph, -1 for none */
 } box_render_texture_graph_node_t;
 
+/** Flag of a texture of a compiled texture graph whose color channels read as stored, not
+ * decoded from display encoding */
+#define BOX_RENDER_TEXTURE_GRAPH_LINEAR (1u << 0)
+
+/** A texture a compiled texture graph samples. Which image it is does not belong to the
+ * structure of the graph, so another one only changes the bindings of its stages. */
+typedef struct box_render_texture_graph_texture_t {
+    uint32_t handle;            /**< Texture handle of the image, BOX_RENDER_TEXTURE_TARGET with
+                                 *   a target handle for the image of a surface, 0 for none */
+    uint32_t flags;             /**< BOX_RENDER_TEXTURE_GRAPH_LINEAR */
+} box_render_texture_graph_texture_t;
+
 /** Description of a BOX_RENDER_TEXTURE_GRAPH create, followed by node_count nodes in
- * topological order, the output last, then param_size bytes of parameters.
+ * topological order, the output last, then param_size bytes of parameters, then texture_count
+ * textures.
  *
  * The handle is the texture handle the image goes to. A change of the parameters only keeps
  * structure_hash, so the backend keeps the pipeline it evaluates the graph with.
@@ -364,6 +380,7 @@ typedef struct box_render_texture_graph_t {
                                  *   evaluation names (box_render_texture_graph_result_t) */
     float rate;                 /**< Updates per second of an animated graph, 0 for every
                                  *   frame (TextureGraph.rate) */
+    uint32_t texture_count;     /**< Textures after the parameters */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.
@@ -380,6 +397,14 @@ const box_render_texture_graph_node_t* box_render_texture_graph_nodes(
  * @return Its param_size bytes
  */
 const uint8_t* box_render_texture_graph_params(
+    const box_render_texture_graph_t *graph);
+
+/** Get the textures a compiled texture graph samples.
+ *
+ * @param graph The description
+ * @return Its texture_count textures
+ */
+const box_render_texture_graph_texture_t* box_render_texture_graph_textures(
     const box_render_texture_graph_t *graph);
 
 /** Get the name of the WGSL function of a node kind.

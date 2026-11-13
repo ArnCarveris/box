@@ -1,0 +1,61 @@
+// Graphs that sample a TextureGen and the texture of a Surface through a TexImage. The surface
+// renders only its own view, which looks away from the quad over a red clear; the quad, framed by
+// the camera of the unclaimed view, draws the graph of the surface so it follows the surface.
+
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.surface
+
+graph_image_sources {
+  camera {
+    Position: {0, 0, 4}
+    Camera: {fov: 60}
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+  }
+
+  noise {
+    TextureGen: {width: 16, layers: [{kind: GenNoise, frequency: 4}]}
+  }
+
+  from_noise {
+    sampled { TexImage: {texture: noise, linear: true} }
+    TextureGraph: {output: sampled, width: 16, format: GraphHdr}
+  }
+
+  target_camera {
+    Position: {0, 0, -4}
+    Camera: {fov: 60}
+  }
+
+  target_views {
+    view {
+      View: {camera: target_camera, clear: {enabled: true, color: {255, 0, 0, 255}}}
+    }
+  }
+
+  target {
+    Surface: {width: 8, height: 8, resolution_scale: 1, texture: target,
+      view_root: target_views}
+  }
+
+  from_surface {
+    sampled { TexImage: {texture: target} }
+    TextureGraph: {output: sampled, width: 8, format: GraphHdr}
+  }
+
+  quad {
+    Position: {0, 0, 0}
+    Quad: {6, 6}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 1, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {emissive: from_surface}
+  }
+}

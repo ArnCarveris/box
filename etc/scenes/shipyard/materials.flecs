@@ -19,6 +19,11 @@ assets {
   yard_tex_containers { TexturePath: {path: "etc/scenes/shipyard/assets/containers.jpg"} }
   yard_tex_heat_fins { TexturePath: {path: "etc/scenes/shipyard/assets/heat_fins.png"} }
   yard_tex_dots { TexturePath: {path: "etc/scenes/shipyard/assets/dots.png"} }
+  yard_tex_radiator { TexturePath: {path: "etc/scenes/shipyard/assets/radiator.jpg"} }
+  yard_tex_radiator_normal { TexturePath: {path: "etc/scenes/shipyard/assets/radiator_normal.jpg"} }
+  yard_tex_nozzle { TexturePath: {path: "etc/scenes/shipyard/assets/nozzle.jpg"} }
+  yard_tex_nozzle_normal { TexturePath: {path: "etc/scenes/shipyard/assets/nozzle_normal.jpg"} }
+  yard_tex_nozzle_glow { TexturePath: {path: "etc/scenes/shipyard/assets/nozzle_glow.png"} }
 
   prefab ShipHull { Rgb: {222, 226, 232}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 7, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
   prefab ShipHullDark { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 5, blend: 0.3} }
@@ -117,6 +122,10 @@ assets {
   prefab ShipCabins { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.5, roughness: 0.1}; Emissive: {strength: 3.5, color: {255, 255, 255}}; PbrTextures: {albedo: yard_tex_windows_albedo, emissive: yard_tex_windows}; TextureMapping: {MappingObject, size: 1} }
   prefab ShipContainers { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.45, roughness: 0.6}; PbrTextures: {albedo: yard_tex_containers}; TextureMapping: {MappingObject, size: 1.1} }
   prefab ShipHeatFin { Rgb: {58, 62, 70}; PbrMaterial: {metallic: 0.8, roughness: 0.35}; Emissive: {strength: 2.2, color: {255, 255, 255}}; PbrTextures: {emissive: yard_tex_heat_fins}; TextureMapping: {MappingObject, size: 1} }
+  prefab ShipRadiatorPanel { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.55, roughness: 0.5}; PbrTextures: {albedo: yard_tex_radiator, normal: yard_tex_radiator_normal, emissive: yard_tex_heat_fins}; TextureMapping: {MappingObject, size: 2.6}; Emissive: {strength: 1, color: {255, 255, 255}} }
+  prefab ShipNozzle { Rgb: {222, 220, 224}; PbrMaterial: {metallic: 0.85, roughness: 0.4}; PbrTextures: {albedo: yard_tex_nozzle, normal: yard_tex_nozzle_normal, emissive: yard_tex_nozzle_glow}; Emissive: {strength: 4, color: {255, 255, 255}} }
+  prefab ShipTankSkin { Rgb: {204, 198, 186}; PbrMaterial: {metallic: 0.25, roughness: 0.72}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; TextureMapping: {MappingObject, size: 2.2, blend: 0.3} }
+  prefab ShipInsulation { Rgb: {176, 150, 96}; PbrMaterial: {metallic: 0.8, roughness: 0.55}; PbrTextures: {normal: yard_tex_hull_normal}; TextureMapping: {MappingObject, size: 0.7, blend: 0.3} }
   prefab ShipRunLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {255, 196, 120}}; PbrTextures: {emissive: yard_tex_dots}; TextureMapping: {MappingObject, size: 0.5} }
   prefab ShipRunLightsCyan { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {90, 214, 255}}; PbrTextures: {emissive: yard_tex_dots}; TextureMapping: {MappingObject, size: 0.5} }
 

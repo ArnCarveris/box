@@ -217,6 +217,13 @@ const uint8_t* box_render_texture_graph_params(
     return (const uint8_t*)(box_render_texture_graph_nodes(graph) + graph->node_count);
 }
 
+const box_render_texture_graph_texture_t* box_render_texture_graph_textures(
+    const box_render_texture_graph_t *graph)
+{
+    return (const box_render_texture_graph_texture_t*)(box_render_texture_graph_params(graph) +
+        graph->param_size);
+}
+
 const char* box_render_texture_node_kind_function(
     const box_render_texture_node_kind_t *kind)
 {

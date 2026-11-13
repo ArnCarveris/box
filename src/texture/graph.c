@@ -20,546 +20,6 @@
 /** Prime of the 64 bit FNV-1a hash of the compiled graphs */
 #define BOX_TEXTURE_GRAPH_FNV_PRIME (1099511628211ull)
 
-/** WGSL of the TexConstant node: its value */
-static const char *box_texture_constant_wgsl =
-    "fn box_tex_constant(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    return bitcast<vec4f>(p[0]);\n"
-    "}\n";
-
-/** WGSL of the TexCoords node: the coordinates times its scale */
-static const char *box_texture_coords_wgsl =
-    "fn box_tex_coords(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let scale = bitcast<f32>(p[0].x);\n"
-    "    return vec4f(coords.xyz * select(scale, 1.0, scale == 0.0), coords.w);\n"
-    "}\n";
-
-/** WGSL of the TexMath node: the operation of its op on a, b and c.
- *
- * Its parameters are op, the remap range and the types word, so p[0] is (op, from_min,
- * from_max, to_min) and p[1] is (to_max, types). A Scalar input node is broadcast; the
- * operations that differ on Scalars check whether the inputs they read are Scalars.
- */
-static const char *box_texture_math_wgsl =
-    "fn box_tex_math_in(v: vec4f, types: u32, j: u32) -> vec4f {\n"
-    "    return select(v, v.xxxx, (types & (1u << j)) != 0u);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_scalar(types: u32, used: u32) -> bool {\n"
-    "    return (types & (used << 4u)) == 0u && (types & used) != 0u;\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_div(a: vec4f, b: vec4f) -> vec4f {\n"
-    "    let zero = b == vec4f(0.0);\n"
-    "    return select(a / select(b, vec4f(1.0), zero), vec4f(0.0), zero);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_pow(a: vec4f, b: vec4f) -> vec4f {\n"
-    "    let r = pow(max(abs(a), vec4f(1e-30)), b);\n"
-    "    let whole = fract(b) == vec4f(0.0);\n"
-    "    let odd = whole & (fract(b * 0.5) != vec4f(0.0));\n"
-    "    let negative = a < vec4f(0.0);\n"
-    "    var v = select(r, -r, negative & odd);\n"
-    "    v = select(v, vec4f(0.0), (negative & !whole) | (a == vec4f(0.0)));\n"
-    "    return select(v, vec4f(1.0), b == vec4f(0.0));\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_smoothstep(e0: vec4f, e1: vec4f, x: vec4f) -> vec4f {\n"
-    "    let d = e1 - e0;\n"
-    "    let same = d == vec4f(0.0);\n"
-    "    let t = clamp((x - e0) / select(d, vec4f(1.0), same), vec4f(0.0), vec4f(1.0));\n"
-    "    let s = t * t * (3.0 - 2.0 * t);\n"
-    "    return select(s, select(vec4f(0.0), vec4f(1.0), x >= e0), same);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math_remap(a: vec4f, range: vec4f, clamped: bool) -> vec4f {\n"
-    "    let d = range.y - range.x;\n"
-    "    var t = select((a - range.x) / d, vec4f(0.0), d == 0.0);\n"
-    "    if (clamped) {\n"
-    "        t = clamp(t, vec4f(0.0), vec4f(1.0));\n"
-    "    }\n"
-    "\n"
-    "    return range.z + t * (range.w - range.z);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_math(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let types = p[1].y;\n"
-    "    let a = box_tex_math_in(i[0], types, 0u);\n"
-    "    let b = box_tex_math_in(i[1], types, 1u);\n"
-    "    let c = box_tex_math_in(i[2], types, 2u);\n"
-    "    let range = vec4f(bitcast<vec3f>(p[0].yzw), bitcast<f32>(p[1].x));\n"
-    "    switch bitcast<i32>(p[0].x) {\n"
-    "        case 1: { return a - b; }\n"
-    "        case 2: { return a * b; }\n"
-    "        case 3: { return min(a, b); }\n"
-    "        case 4: { return max(a, b); }\n"
-    "        case 5: { return mix(a, b, c); }\n"
-    "        case 6: { return min(max(a, b), c); }\n"
-    "        case 7: { return box_tex_math_div(a, b); }\n"
-    "        case 8: { return box_tex_math_pow(a, b); }\n"
-    "        case 9: { return abs(a); }\n"
-    "        case 10: { return -a; }\n"
-    "        case 11: { return floor(a); }\n"
-    "        case 12: { return a - floor(a); }\n"
-    "        case 13: { return sin(a); }\n"
-    "        case 14: { return cos(a); }\n"
-    "        case 15: { return select(vec4f(0.0), vec4f(1.0), a >= b); }\n"
-    "        case 16: { return box_tex_math_smoothstep(b, c, a); }\n"
-    "        case 17: { return box_tex_math_remap(a, range, false); }\n"
-    "        case 18: { return box_tex_math_remap(a, range, true); }\n"
-    "        case 19: {\n"
-    "            if (box_tex_math_scalar(types, 3u)) {\n"
-    "                return vec4f(a.x * b.x, 0.0, 0.0, 0.0);\n"
-    "            }\n"
-    "\n"
-    "            return vec4f(dot(a.xyz, b.xyz), 0.0, 0.0, 0.0);\n"
-    "        }\n"
-    "        case 20: {\n"
-    "            if (box_tex_math_scalar(types, 1u)) {\n"
-    "                return vec4f(abs(a.x), 0.0, 0.0, 0.0);\n"
-    "            }\n"
-    "\n"
-    "            return vec4f(length(a.xyz), 0.0, 0.0, 0.0);\n"
-    "        }\n"
-    "        case 21: {\n"
-    "            if (box_tex_math_scalar(types, 1u)) {\n"
-    "                return sign(a);\n"
-    "            }\n"
-    "\n"
-    "            let l = length(a.xyz);\n"
-    "            return vec4f(select(a.xyz / l, vec3f(0.0), l == 0.0), a.w);\n"
-    "        }\n"
-    "        case 22: { return vec4f(cross(a.xyz, b.xyz), 0.0); }\n"
-    "        default: { return a + b; }\n"
-    "    }\n"
-    "}\n";
-
-/** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
- * the sum of its weights. At most BOX_TEX_BLUR_TAPS taps on each side; a larger reach spaces
- * them further apart, between texels. */
-static const char *box_texture_blur_wgsl =
-    "const BOX_TEX_BLUR_TAPS: i32 = 64;\n"
-    "\n"
-    "fn box_tex_blur_tap(t: texture_2d<f32>, texel: vec2i, axis: u32, offset: f32) -> vec4f {\n"
-    "    let o = floor(offset);\n"
-    "    let f = offset - o;\n"
-    "    let dir = select(vec2i(0, 1), vec2i(1, 0), axis == 0u);\n"
-    "    let a = texel + dir * i32(o);\n"
-    "    return mix(box_texgraph_load_poles(t, a), box_texgraph_load_poles(t, a + dir), f);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_blur_axis(t: texture_2d<f32>, texel: vec2i, axis: u32, radius: f32) -> vec4f {\n"
-    "    if (radius <= 0.0) {\n"
-    "        return box_texgraph_load_poles(t, texel);\n"
-    "    }\n"
-    "    let taps = clamp(i32(ceil(radius)), 1, BOX_TEX_BLUR_TAPS);\n"
-    "    let spacing = radius / f32(taps);\n"
-    "    let sigma = radius / 3.0;\n"
-    "    var sum = vec4f(0.0);\n"
-    "    var total = 0.0;\n"
-    "    for (var k = -taps; k <= taps; k ++) {\n"
-    "        let o = f32(k) * spacing;\n"
-    "        let w = exp(-0.5 * o * o / (sigma * sigma));\n"
-    "        sum += w * box_tex_blur_tap(t, texel, axis, o);\n"
-    "        total += w;\n"
-    "    }\n"
-    "    return sum / total;\n"
-    "}\n"
-    "\n"
-    "fn box_tex_blur(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
-    "    pass_index: u32, prev: texture_2d<f32>, t0: texture_2d<f32>) -> vec4f {\n"
-    "    let size = vec2f(box_texgraph_stage.size);\n"
-    "    let radius = max(bitcast<f32>(p[0].x), 0.0) * size.x / 512.0;\n"
-    "    let sphere = box_texgraph_stage.domain == 1u;\n"
-    "    if (pass_index == 0u) {\n"
-    "        if (any(textureDimensions(t0) != box_texgraph_stage.size)) {\n"
-    "            return i[0];\n"
-    "        }\n"
-    "        var r = radius;\n"
-    "        if (sphere) {\n"
-    "            let s = sin((f32(texel.y) + 0.5) / size.y * BOX_TEXGRAPH_PI);\n"
-    "            r = min(radius / max(s, 1e-6), size.x * 0.5);\n"
-    "        }\n"
-    "        return box_tex_blur_axis(t0, texel, 0u, r);\n"
-    "    }\n"
-    "    return box_tex_blur_axis(prev, texel, 1u,\n"
-    "        select(radius, radius * 2.0 * size.y / size.x, sphere));\n"
-    "}\n";
-
-/** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
- * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
- * and w.
- *
- * The cells around the texel are searched inner ring first, skipping a cell whose box, which
- * holds its point wherever evolve moves it, is farther than the second nearest point found. */
-static const char *box_texture_cells_wgsl =
-    "fn box_tex_cells_hash(cell: vec3i, seed: u32) -> u32 {\n"
-    "    return box_texgraph_hash(box_texgraph_hash3(bitcast<vec3u>(cell)) ^\n"
-    "        box_texgraph_hash(seed + 0x9e3779b9u));\n"
-    "}\n"
-    "\n"
-    "fn box_tex_cells_random(h: u32, k: u32) -> f32 {\n"
-    "    return box_texgraph_random(box_texgraph_hash(h ^ (k * 0x9e3779b9u)));\n"
-    "}\n"
-    "\n"
-    "fn box_tex_cells_wave(x: vec3f) -> vec3f {\n"
-    "    return abs(fract(x) * 2.0 - 1.0);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_cells_point(h: u32, jitter: f32, evolve: f32) -> vec3f {\n"
-    "    let r = vec3f(box_tex_cells_random(h, 0u), box_tex_cells_random(h, 1u),\n"
-    "        box_tex_cells_random(h, 2u));\n"
-    "    let speed = 0.5 + 0.5 * vec3f(box_tex_cells_random(h, 3u),\n"
-    "        box_tex_cells_random(h, 4u), box_tex_cells_random(h, 5u));\n"
-    "    return 0.5 + jitter * (box_tex_cells_wave(r + evolve * speed) - 0.5);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_cells(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let count_param = bitcast<i32>(p[0].x);\n"
-    "    let count = f32(select(count_param, 64, count_param <= 0));\n"
-    "    let jitter = clamp(bitcast<f32>(p[0].y), 0.0, 1.0);\n"
-    "    let seed = p[0].z;\n"
-    "    let mode = bitcast<i32>(p[0].w);\n"
-    "    let edge_param = bitcast<f32>(p[1].x);\n"
-    "    let edge = select(edge_param, 0.25, edge_param <= 0.0);\n"
-    "    let evolve = i[1].x;\n"
-    "    var q = vec3f(0.0);\n"
-    "    var period = vec3i(0);\n"
-    "    var weight = vec3f(1.0);\n"
-    "    var reach = 2;\n"
-    "    if (box_texgraph_stage.domain == 1u) {\n"
-    "        q = i[0].xyz * sqrt(count / (6.0 * BOX_TEXGRAPH_PI));\n"
-    "    } else {\n"
-    "        let size = vec2f(box_texgraph_stage.size);\n"
-    "        let gx = clamp(floor(sqrt(count * size.x / size.y) + 0.5), 1.0, 4096.0);\n"
-    "        let gy = clamp(floor(count / gx + 0.5), 1.0, 4096.0);\n"
-    "        let ratio = sqrt((size.x / gx) / (size.y / gy));\n"
-    "        q = vec3f(i[0].xy * vec2f(gx, gy), 0.0);\n"
-    "        period = vec3i(i32(gx), i32(gy), 1);\n"
-    "        weight = vec3f(ratio, 1.0 / ratio, 0.0);\n"
-    "        reach = 0;\n"
-    "    }\n"
-    "\n"
-    "    let base = vec3i(floor(q));\n"
-    "    var f1 = 1e30;\n"
-    "    var f2 = 1e30;\n"
-    "    var near = 0u;\n"
-    "    for (var ring = 0; ring < 2; ring ++) {\n"
-    "        for (var z = -reach; z <= reach; z ++) {\n"
-    "            for (var y = -2; y <= 2; y ++) {\n"
-    "                for (var x = -2; x <= 2; x ++) {\n"
-    "                    let o = vec3i(x, y, z);\n"
-    "                    let c = base + o;\n"
-    "                    let gap = max(max(vec3f(c) - q, q - vec3f(c + vec3i(1))),\n"
-    "                        vec3f(0.0)) * weight;\n"
-    "                    let inner = all(abs(o) <= vec3i(1));\n"
-    "                    if (inner != (ring == 0) || dot(gap, gap) >= f2 * f2) {\n"
-    "                        continue;\n"
-    "                    }\n"
-    "\n"
-    "                    var cell = c;\n"
-    "                    if (period.x > 0) {\n"
-    "                        cell = ((c % period) + period) % period;\n"
-    "                    }\n"
-    "\n"
-    "                    let h = box_tex_cells_hash(cell, seed);\n"
-    "                    let at = box_tex_cells_point(h, jitter, evolve);\n"
-    "                    let d = length((vec3f(c) + at - q) * weight);\n"
-    "                    if (d < f1) {\n"
-    "                        f2 = f1;\n"
-    "                        f1 = d;\n"
-    "                        near = h;\n"
-    "                    } else if (d < f2) {\n"
-    "                        f2 = d;\n"
-    "                    }\n"
-    "                }\n"
-    "            }\n"
-    "        }\n"
-    "    }\n"
-    "\n"
-    "    var d = f1;\n"
-    "    if (mode == 1) {\n"
-    "        d = f2;\n"
-    "    } else if (mode == 2) {\n"
-    "        d = smoothstep(0.0, edge, f2 - f1);\n"
-    "    }\n"
-    "\n"
-    "    return vec4f(d, box_tex_cells_random(near, 6u), box_tex_cells_random(near, 7u),\n"
-    "        box_tex_cells_random(near, 8u));\n"
-    "}\n";
-
-/** WGSL of the TexBlocks node: the courses of blocks of box_gen_blocks of texture/gen.c.
- *
- * The cuts of the course of the texel are made again rather than sorted: the block starts at
- * the largest cut at or before u, the last in index order among equal cuts as the stable sort
- * keeps them; its id comes from its rank among the cuts and its tone from its index.
- *
- * Before the first cut the block is the last one with its end one past the first cut, as gen.c
- * has it. Lengths are in widths of the image. */
-static const char *box_texture_blocks_wgsl =
-    "fn box_tex_blocks_mix(v: u32) -> u32 {\n"
-    "    var x = v;\n"
-    "    x ^= x >> 16u;\n"
-    "    x *= 0x7feb352du;\n"
-    "    x ^= x >> 15u;\n"
-    "    x *= 0x846ca68bu;\n"
-    "    x ^= x >> 16u;\n"
-    "    return x;\n"
-    "}\n"
-    "\n"
-    "fn box_tex_blocks_hash(h: u32, v: u32) -> u32 {\n"
-    "    return box_tex_blocks_mix(h ^ box_tex_blocks_mix(v + 0x9e3779b9u));\n"
-    "}\n"
-    "\n"
-    "fn box_tex_blocks_unit(h: u32) -> f32 {\n"
-    "    return f32(h >> 8u) / 16777216.0;\n"
-    "}\n"
-    "\n"
-    "fn box_tex_blocks_cut(hk: u32, b: i32, n: i32, jitter: f32, shift: f32) -> f32 {\n"
-    "    let r = box_tex_blocks_unit(box_tex_blocks_hash(hk, u32(b)));\n"
-    "    let cut = (f32(b) + (r * 2.0 - 1.0) * jitter + shift) / f32(n);\n"
-    "    return cut - floor(cut);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_blocks(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let counts = bitcast<vec4i>(p[0]);\n"
-    "    let shape = bitcast<vec4f>(p[1]);\n"
-    "    let courses = select(min(counts.x, 4096), 8, counts.x <= 0);\n"
-    "    let n = select(min(counts.y, 4096), 4, counts.y <= 0);\n"
-    "    let tones = clamp(counts.z, 0, 4096);\n"
-    "    let tone_order = counts.w;\n"
-    "    let gap = shape.x;\n"
-    "    let jitter = shape.y;\n"
-    "    let softness = shape.w;\n"
-    "    let at = i[0];\n"
-    "    var seed = box_tex_blocks_hash(0x5bd1e995u, p[2].x);\n"
-    "    seed = box_tex_blocks_hash(seed, p[2].y);\n"
-    "    seed = box_tex_blocks_hash(seed, 1u);\n"
-    "    let size = vec2f(box_texgraph_stage.size);\n"
-    "    let v = (at.y - floor(at.y)) * f32(courses);\n"
-    "    let u = at.x - floor(at.x);\n"
-    "    let k = min(i32(floor(v)), courses - 1);\n"
-    "    let dy = min(v - f32(k), f32(k + 1) - v) * size.y / (f32(courses) * size.x);\n"
-    "    let hk = box_tex_blocks_hash(seed, u32(k));\n"
-    "    let shift = select(0.0, shape.z, (k % 2) == 1);\n"
-    "    var start = -1.0;\n"
-    "    var start_b = -1;\n"
-    "    var end = 2.0;\n"
-    "    var lo = 2.0;\n"
-    "    var hi = -1.0;\n"
-    "    var hi_b = 0;\n"
-    "    for (var b = 0; b < n; b ++) {\n"
-    "        let c = box_tex_blocks_cut(hk, b, n, jitter, shift);\n"
-    "        if (c <= u && c >= start) {\n"
-    "            start = c;\n"
-    "            start_b = b;\n"
-    "        }\n"
-    "        if (c > u) {\n"
-    "            end = min(end, c);\n"
-    "        }\n"
-    "        if (c >= hi) {\n"
-    "            hi = c;\n"
-    "            hi_b = b;\n"
-    "        }\n"
-    "        lo = min(lo, c);\n"
-    "    }\n"
-    "    var cut = start;\n"
-    "    if (start_b < 0) {\n"
-    "        cut = hi;\n"
-    "        start = hi - 1.0;\n"
-    "        start_b = hi_b;\n"
-    "        end = lo + 1.0;\n"
-    "    } else if (end > 1.5) {\n"
-    "        end = lo + 1.0;\n"
-    "    }\n"
-    "    var rank = 0;\n"
-    "    for (var b = 0; b < n; b ++) {\n"
-    "        let c = box_tex_blocks_cut(hk, b, n, jitter, shift);\n"
-    "        if (c < cut || (c == cut && b < start_b)) {\n"
-    "            rank ++;\n"
-    "        }\n"
-    "    }\n"
-    "    let hid = box_tex_blocks_hash(hk ^ 0xa511e9b3u, 1u);\n"
-    "    let htone = box_tex_blocks_hash(hk ^ 0x3c6ef372u, 2u);\n"
-    "    let hrandom = box_tex_blocks_hash(hk ^ 0x85ebca6bu, 3u);\n"
-    "    let id = box_tex_blocks_unit(box_tex_blocks_hash(hid, u32(rank)));\n"
-    "    let random = box_tex_blocks_unit(box_tex_blocks_hash(hrandom, u32(rank)));\n"
-    "    var tone = 0;\n"
-    "    if (tones > 0) {\n"
-    "        if (tone_order == 1) {\n"
-    "            tone = (k + start_b) % tones;\n"
-    "        } else if (tone_order == 2) {\n"
-    "            tone = k % tones;\n"
-    "        } else if (tone_order == 3) {\n"
-    "            tone = start_b % tones;\n"
-    "        } else {\n"
-    "            let r = box_tex_blocks_unit(box_tex_blocks_hash(htone, u32(start_b)));\n"
-    "            tone = min(i32(floor(r * f32(tones))), tones - 1);\n"
-    "        }\n"
-    "    }\n"
-    "    let d = min(min(u - start, end - u), dy);\n"
-    "    let half = 0.5 * gap;\n"
-    "    let bevel = select(1.3 * gap, softness, softness > 0.0);\n"
-    "    var mask = select(0.0, 1.0, d >= half);\n"
-    "    if (bevel > 0.0) {\n"
-    "        mask = smoothstep(half, half + bevel, d);\n"
-    "    }\n"
-    "    let level = select(0.0, f32(tone) / f32(max(tones - 1, 1)), tones > 1);\n"
-    "    return vec4f(mask, id, level, random);\n"
-    "}\n";
-
-/** WGSL of the TexRamp node: the display encoded colors of the keys around the input mixed as
- * box_gen_ramp does, decoded to linear; the elements are (position, r, g, b) in 0..1 */
-static const char *box_texture_ramp_wgsl =
-    "fn box_tex_ramp_key(at: u32) -> vec4f {\n"
-    "    return bitcast<vec4f>(box_texgraph_params[at]);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_ramp(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let base = p[0].x;\n"
-    "    let count = p[0].y;\n"
-    "    let h = i[0].x;\n"
-    "    if (count == 0u) {\n"
-    "        return vec4f(box_texgraph_linear(vec3f(h)), 1.0);\n"
-    "    }\n"
-    "    var a = box_tex_ramp_key(base);\n"
-    "    var b = a;\n"
-    "    var t = 0.0;\n"
-    "    let last = box_tex_ramp_key(base + count - 1u);\n"
-    "    if (h >= last.x) {\n"
-    "        a = last;\n"
-    "        b = last;\n"
-    "    } else if (h > a.x) {\n"
-    "        var k = 0u;\n"
-    "        while (k + 1u < count && box_tex_ramp_key(base + k + 1u).x <= h) {\n"
-    "            k += 1u;\n"
-    "        }\n"
-    "        a = box_tex_ramp_key(base + k);\n"
-    "        b = box_tex_ramp_key(base + k + 1u);\n"
-    "        t = select(1.0, (h - a.x) / (b.x - a.x), b.x > a.x);\n"
-    "    }\n"
-    "    return vec4f(box_texgraph_linear(a.yzw + (b.yzw - a.yzw) * t), 1.0);\n"
-    "}\n";
-
-/** WGSL of the TexCurve node: box_curve_value of the curve at the input, the input without
- * keys; the elements are (time, value, control1, control2) of the span from each key, the
- * cubic the twin of curve_cubic in etc/shaders/include/curve.wgsl */
-static const char *box_texture_curve_wgsl =
-    "fn box_tex_curve_mix(a: f32, b: f32, t: f32) -> f32 {\n"
-    "    return a * (1.0 - t) + b * t;\n"
-    "}\n"
-    "\n"
-    "fn box_tex_curve_key(at: u32) -> vec4f {\n"
-    "    return bitcast<vec4f>(box_texgraph_params[at]);\n"
-    "}\n"
-    "\n"
-    "fn box_tex_curve(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let base = p[0].x;\n"
-    "    let count = p[0].y;\n"
-    "    let x = i[0].x;\n"
-    "    if (count == 0u) {\n"
-    "        return vec4f(x, 0.0, 0.0, 0.0);\n"
-    "    }\n"
-    "    let first = box_tex_curve_key(base);\n"
-    "    if (count == 1u || !(x > first.x)) {\n"
-    "        return vec4f(first.y, 0.0, 0.0, 0.0);\n"
-    "    }\n"
-    "    let last = box_tex_curve_key(base + count - 1u);\n"
-    "    if (x >= last.x) {\n"
-    "        return vec4f(last.y, 0.0, 0.0, 0.0);\n"
-    "    }\n"
-    "    var k = 0u;\n"
-    "    while (k + 2u < count && box_tex_curve_key(base + k + 1u).x <= x) {\n"
-    "        k += 1u;\n"
-    "    }\n"
-    "    let a = box_tex_curve_key(base + k);\n"
-    "    let b = box_tex_curve_key(base + k + 1u);\n"
-    "    let t = (x - a.x) / (b.x - a.x);\n"
-    "    let m0 = box_tex_curve_mix(a.y, a.z, t);\n"
-    "    let m1 = box_tex_curve_mix(a.z, a.w, t);\n"
-    "    let m2 = box_tex_curve_mix(a.w, b.y, t);\n"
-    "    let n0 = box_tex_curve_mix(m0, m1, t);\n"
-    "    let n1 = box_tex_curve_mix(m1, m2, t);\n"
-    "    return vec4f(box_tex_curve_mix(n0, n1, t), 0.0, 0.0, 0.0);\n"
-    "}\n";
-
-/** WGSL of the TexSplit node: one channel of its input */
-static const char *box_texture_split_wgsl =
-    "fn box_tex_split(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let v = i[0];\n"
-    "    switch bitcast<i32>(p[0].x) {\n"
-    "        case 1: { return vec4f(v.y, 0.0, 0.0, 0.0); }\n"
-    "        case 2: { return vec4f(v.z, 0.0, 0.0, 0.0); }\n"
-    "        case 3: { return vec4f(v.w, 0.0, 0.0, 0.0); }\n"
-    "        default: { return vec4f(v.x, 0.0, 0.0, 0.0); }\n"
-    "    }\n"
-    "}\n";
-
-/** WGSL of the TexCombine node: its four scalars as the channels of a vector */
-static const char *box_texture_combine_wgsl =
-    "fn box_tex_combine(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    return vec4f(i[0].x, i[1].x, i[2].x, i[3].x);\n"
-    "}\n";
-
-/** WGSL of the TexWarp node: its coordinates moved by (offset - 0.5) * amount, normalized on the
- * sphere */
-static const char *box_texture_warp_wgsl =
-    "fn box_tex_warp(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let c = i[0];\n"
-    "    let moved = c.xyz + (i[1].xyz - vec3f(0.5)) * i[2].x;\n"
-    "    if (box_texgraph_stage.domain == 1u) {\n"
-    "        let len = length(moved);\n"
-    "        if (len < 1e-6) {\n"
-    "            return c;\n"
-    "        }\n"
-    "        return vec4f(moved / len, c.w);\n"
-    "    }\n"
-    "    return vec4f(moved, c.w);\n"
-    "}\n";
-
-/** WGSL of the TexTransform node: its coordinates scaled and rotated about the centre of the
- * domain, then translated. A rotation by a multiple of 90 degrees is exact, so the plane tiles */
-static const char *box_texture_transform_wgsl =
-    "fn box_tex_transform(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let c = i[0];\n"
-    "    let axis = bitcast<vec3f>(p[0].xyz);\n"
-    "    let translate = bitcast<vec3f>(p[1].xyz);\n"
-    "    let factor = bitcast<vec3f>(p[2].xyz);\n"
-    "    let scale = select(factor, vec3f(1.0), factor == vec3f(0.0));\n"
-    "    let deg = i[1].x;\n"
-    "    let quarter = round(deg / 90.0);\n"
-    "    let k = ((i32(quarter) % 4) + 4) % 4;\n"
-    "    let exact = select(select(select(vec2f(0.0, -1.0), vec2f(-1.0, 0.0), k == 2),\n"
-    "        vec2f(0.0, 1.0), k == 1), vec2f(1.0, 0.0), k == 0);\n"
-    "    let angle = radians(deg);\n"
-    "    let cs = select(vec2f(cos(angle), sin(angle)), exact,\n"
-    "        abs(deg / 90.0 - quarter) < 1e-6);\n"
-    "    if (box_texgraph_stage.domain == 1u) {\n"
-    "        let len = length(axis);\n"
-    "        let n = select(vec3f(0.0, 1.0, 0.0), axis / max(len, 1e-6), len > 1e-6);\n"
-    "        let v = c.xyz * scale;\n"
-    "        let r = v * cs.x + cross(n, v) * cs.y + n * dot(n, v) * (1.0 - cs.x);\n"
-    "        return vec4f(r + translate, c.w);\n"
-    "    }\n"
-    "    let d = (c.xy - vec2f(0.5)) * scale.xy;\n"
-    "    let r = vec2f(cs.x * d.x - cs.y * d.y, cs.y * d.x + cs.x * d.y);\n"
-    "    return vec4f(r + vec2f(0.5) + translate.xy, c.z * scale.z + translate.z, c.w);\n"
-    "}\n";
-
-/** WGSL of the TexTime node: the seconds of the world clock times its scale plus its offset */
-static const char *box_texture_time_wgsl =
-    "fn box_tex_time(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let scale = bitcast<f32>(p[0].x);\n"
-    "    let offset = bitcast<f32>(p[0].y);\n"
-    "    return vec4f(box_texgraph_stage.time * select(scale, 1.0, scale == 0.0) + offset, 0.0,\n"
-    "        0.0, 0.0);\n"
-    "}\n";
-
-/** WGSL of the TexSplat node: its scalar input in every channel */
-static const char *box_texture_splat_wgsl =
-    "fn box_tex_splat(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    return vec4f(i[0].x);\n"
-    "}\n";
-
 /** State of the build of one graph */
 typedef struct box_texture_graph_build_t {
     ecs_world_t *world;         /**< The world or a stage */
@@ -570,10 +30,14 @@ typedef struct box_texture_graph_build_t {
     ecs_vec_t nodes;            /**< box_texture_graph_node_t in topological order */
     ecs_vec_t params;           /**< uint8_t, parameter bytes of the nodes */
     ecs_vec_t *reached;         /**< ecs_entity_t, the entities the walk reached */
+    ecs_vec_t textures;         /**< box_texture_graph_texture_t, the textures the nodes sample
+                                 *   in node order */
     TextureGraphDomain domain;  /**< Coordinates of the texels of the graph */
     char *error;                /**< Why the build failed, NULL while it did not */
     bool wait;                  /**< Wait for a node without a node component */
-    bool waiting;               /**< The walk found a node without a node component */
+    bool waiting;               /**< The walk found a node without a node component, or a
+                                 *   sampled entity without a texture component */
+    bool held;                  /**< A sampled texture has no image yet */
 } box_texture_graph_build_t;
 
 /** Add bytes to a 64 bit FNV-1a hash.
@@ -631,21 +95,34 @@ static void box_texture_node_kind_strings_free(
 
     ecs_os_free(kind->function);
     ecs_os_free(kind->source);
+    ecs_os_free(kind->texture);
+    ecs_os_free(kind->linear);
+}
+
+/** Free a compiled graph.
+ *
+ * @param graph The graph, may be NULL
+ */
+static void box_texture_graph_free(
+    box_texture_graph_t *graph)
+{
+    if (graph) {
+        ecs_os_free(graph->nodes);
+        ecs_os_free(graph->params);
+        ecs_os_free(graph->textures);
+        ecs_os_free(graph);
+    }
 }
 
 void box_texture_graph_clear(
     box_texture_t *tex)
 {
-    if (tex->graph) {
-        ecs_os_free(tex->graph->nodes);
-        ecs_os_free(tex->graph->params);
-        ecs_os_free(tex->graph);
-        tex->graph = NULL;
-    }
-
+    box_texture_graph_free(tex->graph);
+    tex->graph = NULL;
     ecs_vec_fini_t(NULL, &tex->reached, ecs_entity_t);
     tex->graph_dirty = false;
     tex->graph_waiting = false;
+    tex->graph_held = false;
     tex->graph_sent = false;
     tex->graph_pending = false;
 }
@@ -678,12 +155,7 @@ void box_texture_graph_request(
     box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
 }
 
-/** Mark every graph dirty that reached an entity in its last build, or every graph.
- *
- * @param t The registry
- * @param e The entity, 0 for every graph
- */
-static void box_texture_graphs_touch(
+void box_texture_graphs_touch(
     box_textures_t *t,
     ecs_entity_t e)
 {
@@ -756,6 +228,15 @@ static int box_texture_node_kind_fill(
 
     kind->function = ecs_os_strdup(desc->function);
     kind->source = ecs_os_strdup(desc->source);
+    kind->flags &= ~BOX_TEXTURE_NODE_SAMPLES;
+    if (desc->texture) {
+        kind->flags |= BOX_TEXTURE_NODE_SAMPLES;
+        kind->texture = ecs_os_strdup(desc->texture);
+        kind->texture_offset = desc->texture_offset;
+        kind->linear = desc->linear ? ecs_os_strdup(desc->linear) : NULL;
+        kind->linear_offset = desc->linear_offset;
+    }
+
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS && desc->inputs[i].name; i ++) {
         kind->inputs[i] = desc->inputs[i];
         kind->inputs[i].name = ecs_os_strdup(desc->inputs[i].name);
@@ -833,7 +314,8 @@ static void box_texture_node_kind_reflect(
         .neighbourhood = (kind->flags & BOX_TEXTURE_NODE_NEIGHBOURHOOD) != 0,
         .animated = (kind->flags & BOX_TEXTURE_NODE_ANIMATED) != 0,
         .plane = (kind->flags & BOX_TEXTURE_NODE_PLANE) != 0,
-        .passes = kind->passes
+        .passes = kind->passes,
+        .texture = kind->texture
     };
     int32_t i;
     for (i = 0; i < kind->input_count; i ++) {
@@ -1053,14 +535,7 @@ done:
     return;
 }
 
-/** Get the type that follows the inputs a node reads: a Vector when one of them has a Vector
- * node, else a Scalar when one has a Scalar node, else a Vector.
- *
- * @param inputs Type of the node of each input, TexAny for none
- * @param used Bit j set when input j is read
- * @return The type
- */
-static TextureValueType box_texture_graph_follow(
+TextureValueType box_texture_graph_follow(
     const TextureValueType *inputs,
     uint32_t used)
 {
@@ -1105,54 +580,6 @@ static TextureValueType box_texture_graph_output_type(
     return result;
 }
 
-/** Get the type of the value of a TexMath node: a Scalar for MathDot and MathLength, a Vector
- * for MathCross, else the type that follows the inputs its operation reads.
- *
- * @param node The TexMath
- * @param inputs Type of the node of each input, TexAny for none
- * @return The type
- */
-static TextureValueType box_texture_math_type(
-    const void *node,
-    const TextureValueType *inputs)
-{
-    const TexMath *math = node;
-    TextureValueType result;
-    uint32_t used = 3;
-    switch (math->op) {
-    case MathDot:
-    case MathLength:
-        result = TexScalar;
-        break;
-    case MathCross:
-        result = TexVector;
-        break;
-    case MathAbs:
-    case MathNegate:
-    case MathFloor:
-    case MathFract:
-    case MathSin:
-    case MathCos:
-    case MathRemap:
-    case MathRemapClamped:
-    case MathNormalize:
-        used = 1;
-        result = box_texture_graph_follow(inputs, used);
-        break;
-    case MathMix:
-    case MathClamp:
-    case MathSmoothstep:
-        used = 7;
-        result = box_texture_graph_follow(inputs, used);
-        break;
-    default:
-        result = box_texture_graph_follow(inputs, used);
-        break;
-    }
-
-    return result;
-}
-
 /** Append the compiled node of an entity whose inputs are compiled, with its parameters and
  * the constants of its inputs without a node.
  *
@@ -1160,13 +587,15 @@ static TextureValueType box_texture_math_type(
  * @param e The node entity
  * @param kind Its kind
  * @param inputs Index of the node of each input, -1 for none
+ * @param texture Index of the texture it samples, -1 for none
  * @return Index of the node
  */
 static int32_t box_texture_graph_append(
     box_texture_graph_build_t *b,
     ecs_entity_t e,
     const box_texture_node_kind_t *kind,
-    const int32_t *inputs)
+    const int32_t *inputs,
+    int32_t texture)
 {
     const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
     int32_t i, offset = ecs_vec_count(&b->params);
@@ -1211,6 +640,7 @@ static int32_t box_texture_graph_append(
     node->output = box_texture_graph_output_type(kind, ptr, types);
     node->params = offset;
     node->param_size = kind->node_size;
+    node->texture = texture;
     for (i = 0; i < BOX_TEXTURE_NODE_INPUTS; i ++) {
         node->inputs[i] = i < kind->input_count ? inputs[i] : -1;
     }
@@ -1248,6 +678,201 @@ static void box_texture_graph_check_type(
     }
 }
 
+static bool box_texture_graph_node_samples_back(
+    box_texture_graph_build_t *b,
+    ecs_entity_t node,
+    ecs_map_t *textures,
+    ecs_map_t *nodes);
+
+/** Check whether the TextureGraph of a texture samples the graph of a build, through the
+ * textures its nodes sample and their graphs in turn.
+ *
+ * @param b The build
+ * @param texture The texture entity
+ * @param textures Texture entities visited
+ * @param nodes Node entities visited
+ * @return Whether it samples the graph
+ */
+static bool box_texture_graph_samples_back(
+    box_texture_graph_build_t *b,
+    ecs_entity_t texture,
+    ecs_map_t *textures,
+    ecs_map_t *nodes)
+{
+    const TextureGraph *graph = NULL;
+    bool result = false;
+    if (!ecs_is_alive(b->world, texture) || ecs_map_get(textures, texture)) {
+        goto done;
+    }
+
+    ecs_map_insert(textures, texture, 1);
+    graph = ecs_get(b->world, texture, TextureGraph);
+    if (graph && graph->output) {
+        result = box_texture_graph_node_samples_back(b, graph->output, textures, nodes);
+    }
+
+done:
+    return result;
+}
+
+/** Check whether a node or a node before it samples the graph of a build, directly or
+ * through the graph of a texture it samples.
+ *
+ * @param b The build
+ * @param node The node entity
+ * @param textures Texture entities visited
+ * @param nodes Node entities visited
+ * @return Whether it samples the graph
+ */
+static bool box_texture_graph_node_samples_back(
+    box_texture_graph_build_t *b,
+    ecs_entity_t node,
+    ecs_map_t *textures,
+    ecs_map_t *nodes)
+{
+    const box_texture_node_kind_t *kind;
+    const uint8_t *ptr;
+    bool result = false;
+    int32_t i, kinds;
+    if (!ecs_is_alive(b->world, node) || ecs_map_get(nodes, node)) {
+        goto done;
+    }
+
+    ecs_map_insert(nodes, node, 1);
+    kind = box_texture_graph_kind_of(b, node, &kinds);
+    if (!kind) {
+        goto done;
+    }
+
+    ptr = ecs_get_id(b->world, node, kind->component);
+    if (kind->texture) {
+        ecs_entity_t texture = *(const ecs_entity_t*)(ptr + kind->texture_offset);
+        result = texture == b->graph ||
+            (texture && box_texture_graph_samples_back(b, texture, textures, nodes));
+    }
+
+    for (i = 0; !result && i < kind->input_count; i ++) {
+        ecs_entity_t in = *(const ecs_entity_t*)(ptr + kind->inputs[i].offset);
+        result = in && box_texture_graph_node_samples_back(b, in, textures, nodes);
+    }
+
+done:
+    return result;
+}
+
+/** Check whether an entity has an image to sample: a TexturePath, a TextureGen, a TextureGraph,
+ * an image made by the engine, or it is the texture of a Surface.
+ *
+ * @param b The build
+ * @param e The entity
+ * @return Whether it is a texture
+ */
+static bool box_texture_graph_is_texture(
+    box_texture_graph_build_t *b,
+    ecs_entity_t e)
+{
+    bool result = ecs_has(b->world, e, TexturePath) || ecs_has(b->world, e, TextureGen) ||
+        ecs_has(b->world, e, TextureGraph) || ecs_has(b->world, e, TexturePixels);
+    int32_t i;
+    ecs_iter_t it = ecs_query_iter(b->world, b->t->surfaces);
+    while (!result && ecs_query_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count; i ++) {
+            result = result || s[i].texture == e;
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+/** Check the texture a node of a sampling kind samples and give it the next texture of the
+ * graph: it fails the build when it is missing, part of a cycle of graphs or failed, waits a
+ * frame for an entity without a texture component and holds the graph while it has no image.
+ *
+ * @param b The build
+ * @param e The node entity
+ * @param kind Its kind, BOX_TEXTURE_NODE_SAMPLES
+ * @return Index of the texture, -1 when the build failed or waits
+ */
+static int32_t box_texture_graph_sample(
+    box_texture_graph_build_t *b,
+    ecs_entity_t e,
+    const box_texture_node_kind_t *kind)
+{
+    const uint8_t *ptr = ecs_get_id(b->world, e, kind->component);
+    ecs_entity_t texture = *(const ecs_entity_t*)(ptr + kind->texture_offset);
+    bool linear = kind->linear && *(const bool*)(ptr + kind->linear_offset);
+    char *name = ecs_get_path(b->world, e), *texture_name = NULL;
+    const TextureStatus *status;
+    int32_t result = -1, width, height;
+    ecs_map_t textures, nodes;
+    bool cycle;
+    if (!texture) {
+        box_texture_graph_error(b, "node '%s' samples no texture", name);
+        goto done;
+    }
+
+    box_texture_graph_reach(b, texture);
+    if (!ecs_is_alive(b->world, texture)) {
+        box_texture_graph_error(b, "node '%s' samples a missing texture #%u", name,
+            (uint32_t)texture);
+        goto done;
+    }
+
+    texture_name = ecs_get_path(b->world, texture);
+    ecs_map_init(&textures, NULL);
+    ecs_map_init(&nodes, NULL);
+    cycle = texture == b->graph ||
+        box_texture_graph_samples_back(b, texture, &textures, &nodes);
+    ecs_map_fini(&textures);
+    ecs_map_fini(&nodes);
+    if (cycle) {
+        box_texture_graph_error(b, "node '%s' samples texture '%s', which samples this graph: "
+            "a cycle of graphs", name, texture_name);
+        goto done;
+    }
+
+    if (box_surface_texture_size(b->world, texture, &width, &height)) {
+        goto bind;
+    }
+
+    if (!box_texture_graph_is_texture(b, texture)) {
+        if (b->wait) {
+            b->waiting = true;
+        } else {
+            box_texture_graph_error(b, "node '%s' samples '%s', which is not a texture", name,
+                texture_name);
+        }
+
+        goto done;
+    }
+
+    status = ecs_get(b->world, texture, TextureStatus);
+    if (status && status->state == TextureFailed) {
+        box_texture_graph_error(b, "node '%s' samples texture '%s', which failed: %s", name,
+            texture_name, status->error ? status->error : "no image");
+        goto done;
+    }
+
+    if (!status || (status->state != TextureReady && !status->revision)) {
+        b->held = true;
+    }
+
+bind:
+    result = ecs_vec_count(&b->textures);
+    *ecs_vec_append_t(NULL, &b->textures, box_texture_graph_texture_t) =
+        (box_texture_graph_texture_t){ .entity = texture, .linear = linear };
+done:
+    ecs_os_free(texture_name);
+    ecs_os_free(name);
+
+    return result;
+}
+
 /** Visit a node, compiling its inputs before it.
  *
  * @param b The build
@@ -1264,7 +889,7 @@ static int32_t box_texture_graph_visit(
     const char *input,
     TextureValueType expected)
 {
-    int32_t result = -1, i, kinds = 0;
+    int32_t result = -1, i, kinds = 0, texture = -1;
     int32_t inputs[BOX_TEXTURE_NODE_INPUTS] = { -1, -1, -1, -1 };
     char *name = NULL;
     box_texture_node_kind_t *kind = NULL;
@@ -1339,8 +964,12 @@ static int32_t box_texture_graph_visit(
         }
     }
 
+    if (!b->error && !b->waiting && (kind->flags & BOX_TEXTURE_NODE_SAMPLES)) {
+        texture = box_texture_graph_sample(b, e, kind);
+    }
+
     if (!b->error && !b->waiting) {
-        result = box_texture_graph_append(b, e, kind, inputs);
+        result = box_texture_graph_append(b, e, kind, inputs, texture);
         box_texture_graph_check_type(b, e,
             ecs_vec_get_t(&b->nodes, box_texture_graph_node_t, result)->output, from, input,
             expected);
@@ -1376,6 +1005,11 @@ static box_texture_graph_t* box_texture_graph_compile(
     result->params = result->param_size
         ? ecs_os_memdup(ecs_vec_first(&b->params), result->param_size)
         : NULL;
+    result->texture_count = ecs_vec_count(&b->textures);
+    result->textures = result->texture_count
+        ? ecs_os_memdup(ecs_vec_first(&b->textures),
+            result->texture_count * ECS_SIZEOF(box_texture_graph_texture_t))
+        : NULL;
     result->structure_hash = box_texture_graph_hash(BOX_TEXTURE_GRAPH_FNV_BASIS,
         &result->node_count, ECS_SIZEOF(int32_t));
     for (i = 0; i < result->node_count; i ++) {
@@ -1386,6 +1020,8 @@ static box_texture_graph_t* box_texture_graph_compile(
             ECS_SIZEOF(node->output));
         result->structure_hash = box_texture_graph_hash(result->structure_hash, node->inputs,
             ECS_SIZEOF(node->inputs));
+        result->structure_hash = box_texture_graph_hash(result->structure_hash, &node->texture,
+            ECS_SIZEOF(int32_t));
         result->structure_hash = box_texture_graph_hash(result->structure_hash, &node->output,
             ECS_SIZEOF(TextureValueType));
     }
@@ -1400,17 +1036,25 @@ static box_texture_graph_t* box_texture_graph_compile(
  *
  * @param a The first graph
  * @param b The second graph
- * @return Whether their size, domain, format, rate, structure and parameters are the same
+ * @return Whether their size, domain, format, rate, structure, parameters and sampled textures
+ * are the same
  */
 static bool box_texture_graph_same(
     const box_texture_graph_t *a,
     const box_texture_graph_t *b)
 {
-    return a->width == b->width && a->height == b->height && a->domain == b->domain &&
+    bool result = a->width == b->width && a->height == b->height && a->domain == b->domain &&
         a->format == b->format && a->rate == b->rate && a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&
-        a->param_size == b->param_size &&
+        a->param_size == b->param_size && a->texture_count == b->texture_count &&
         (!a->param_size || !ecs_os_memcmp(a->params, b->params, a->param_size));
+    int32_t i;
+    for (i = 0; result && i < a->texture_count; i ++) {
+        result = a->textures[i].entity == b->textures[i].entity &&
+            a->textures[i].linear == b->textures[i].linear;
+    }
+
+    return result;
 }
 
 /** Check whether the backend of a world evaluates the graphs and reports their outcome, so
@@ -1448,20 +1092,13 @@ static void box_texture_graph_accept(
     int32_t revision = box_texture_revision(world, e);
     bool deferred = box_texture_graph_deferred(world);
     if (tex->graph && box_texture_graph_same(tex->graph, graph)) {
-        ecs_os_free(graph->nodes);
-        ecs_os_free(graph->params);
-        ecs_os_free(graph);
+        box_texture_graph_free(graph);
         box_texture_status(world, e, tex->graph_pending ? TextureLoading : TextureReady,
             revision, NULL);
         goto done;
     }
 
-    if (tex->graph) {
-        ecs_os_free(tex->graph->nodes);
-        ecs_os_free(tex->graph->params);
-        ecs_os_free(tex->graph);
-    }
-
+    box_texture_graph_free(tex->graph);
     tex->graph = graph;
     tex->loaded = true;
     tex->width = graph->width;
@@ -1506,6 +1143,7 @@ static void box_texture_graph_build(
     };
     tex->graph_dirty = false;
     tex->graph_waiting = false;
+    tex->graph_held = false;
     if (ecs_has(world, e, TexturePath) || ecs_has(world, e, TextureGen)) {
         box_texture_load(world, t, e);
         goto done;
@@ -1515,6 +1153,7 @@ static void box_texture_graph_build(
     ecs_map_init(&b.index, NULL);
     ecs_vec_init_t(NULL, &b.nodes, box_texture_graph_node_t, 0);
     ecs_vec_init_t(NULL, &b.params, uint8_t, 0);
+    ecs_vec_init_t(NULL, &b.textures, box_texture_graph_texture_t, 0);
     ecs_vec_clear(&tex->reached);
     if (!graph->output) {
         box_texture_graph_error(&b, "no output node");
@@ -1527,6 +1166,9 @@ static void box_texture_graph_build(
     } else if (b.waiting) {
         tex->graph_waiting = true;
         box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
+    } else if (b.held) {
+        tex->graph_held = true;
+        box_texture_status(world, e, TextureLoading, box_texture_revision(world, e), NULL);
     } else {
         box_texture_graph_accept(world, t, e, box_texture_graph_compile(&b, graph));
     }
@@ -1536,12 +1178,14 @@ static void box_texture_graph_build(
     ecs_map_fini(&b.index);
     ecs_vec_fini_t(NULL, &b.nodes, box_texture_graph_node_t);
     ecs_vec_fini_t(NULL, &b.params, uint8_t);
+    ecs_vec_fini_t(NULL, &b.textures, box_texture_graph_texture_t);
 done:
     return;
 }
 
 /** Load the textures whose source component was removed, then build the graphs that changed
- * and fail the ones that waited a frame for a node without a node component.
+ * or wait for a sampled texture to get an image, and fail the ones that waited a frame for a
+ * node without a node component.
  *
  * @param it The iterator of the system
  */
@@ -1575,7 +1219,7 @@ static void BoxTextureGraphBuild(
     ecs_map_iter_t mit = ecs_map_iter(&t->textures);
     while (ecs_map_next(&mit)) {
         box_texture_t *tex = ecs_map_ptr(&mit);
-        if (tex->graph_dirty || tex->graph_waiting) {
+        if (tex->graph_dirty || tex->graph_waiting || tex->graph_held) {
             *ecs_vec_append_t(NULL, &build, ecs_entity_t) = tex->entity;
         }
     }
@@ -1592,6 +1236,7 @@ static void BoxTextureGraphBuild(
         if (!ecs_is_alive(world, e) || !ecs_has(world, e, TextureGraph)) {
             tex->graph_dirty = false;
             tex->graph_waiting = false;
+            tex->graph_held = false;
             continue;
         }
 
@@ -1603,6 +1248,7 @@ done:
     return;
 }
 
+<<<<<<< HEAD
 /** Pack the keys of a TexRamp: (position, r, g, b) with the display encoded channels in 0..1.
  *
  * @param node The TexRamp
@@ -1871,6 +1517,8 @@ static void box_texture_nodes_register(
     });
 }
 
+=======
+>>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
 void box_texture_graphs_init(
     ecs_world_t *world,
     box_textures_t *t)

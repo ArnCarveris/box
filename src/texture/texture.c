@@ -171,7 +171,8 @@ int32_t box_textures_quality(
     return result ? result : BOX_TEXTURE_QUALITY_DEFAULT;
 }
 
-/** Write the status of a texture.
+/** Write the status of a texture. A change of its state or revision builds the graphs that
+ * sample it again.
  *
  * @param world The world or a stage
  * @param e The texture entity
@@ -186,6 +187,12 @@ void box_texture_status(
     int32_t revision,
     const char *error)
 {
+    const TextureStatus *prev = ecs_get(world, e, TextureStatus);
+    box_textures_t *t = box_textures_get(world);
+    if (t && (!prev || prev->state != state || prev->revision != revision)) {
+        box_texture_graphs_touch(t, e);
+    }
+
     ecs_set(world, e, TextureStatus, {
         .state = state,
         .revision = revision,
@@ -778,6 +785,7 @@ static void box_texture_forget(
         }
 
         ecs_map_remove(&t->textures, e);
+        box_texture_graphs_touch(t, e);
         ecs_os_free(tex->pixels);
         ecs_os_free(tex->source_name);
         box_texture_graph_clear(tex);
@@ -1170,6 +1178,9 @@ void BoxTextureImport(
     ECS_META_COMPONENT(world, TexTransform);
     ECS_META_COMPONENT(world, TexTime);
     ECS_META_COMPONENT(world, TexSplat);
+    ECS_META_COMPONENT(world, TextureAddress);
+    ECS_META_COMPONENT(world, TexImage);
+    ECS_META_COMPONENT(world, TexLut);
     ECS_META_COMPONENT(world, TextureGraphCache);
     ECS_META_COMPONENT(world, TexRamp);
     ECS_META_COMPONENT(world, TexCurve);
@@ -1194,6 +1205,7 @@ void BoxTextureImport(
         BOX_OWNED_STR(TextureNodePort, value));
     box_owned_hooks(world, TextureNodeParam, BOX_OWNED_STR(TextureNodeParam, name));
     box_owned_hooks(world, TextureNodeKind, BOX_OWNED_STR(TextureNodeKind, function),
+        BOX_OWNED_STR(TextureNodeKind, texture),
         BOX_OWNED_STR(TextureNodeKind, inputs[0].name),
         BOX_OWNED_STR(TextureNodeKind, inputs[0].value),
         BOX_OWNED_STR(TextureNodeKind, inputs[1].name),

@@ -1589,6 +1589,7 @@
                 ]
             },
             {
+<<<<<<< HEAD
                 "id": "TextureNodesNoise",
                 "testcases": [
                     "range_mean_plane",
@@ -1603,6 +1604,24 @@
                     "evolve_sphere",
                     "ridged_billow",
                     "octaves_no_recompile"
+=======
+                "id": "TextureNodesImage",
+                "testcases": [
+                    "sample_plane",
+                    "wrap_and_clamp",
+                    "sample_sphere",
+                    "lut",
+                    "gen_and_surface_sources",
+                    "four_images_one_graph",
+                    "chain_updates",
+                    "single_source_same_packet",
+                    "texture_revision_updates",
+                    "animated_source",
+                    "rebind_no_recompile",
+                    "cycle_fails",
+                    "loading_holds",
+                    "failure_names_texture"
+>>>>>>> 3023c006a4d3aa6ade3881059ea4ebc9f97e82ad
                 ]
             }
         ]
