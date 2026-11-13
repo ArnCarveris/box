@@ -19,6 +19,7 @@ void GeometryCheck_coplanar_faces(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {0, 0.5f, 0});
     ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -43,6 +44,7 @@ void GeometryCheck_single_face(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {0.25f, 0.75f, 0});
     ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -88,6 +90,7 @@ void GeometryCheck_tolerance(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {0, 0.76f, 0});
     ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -117,6 +120,7 @@ void GeometryCheck_area(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {0, 0.5f, 0});
     ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -143,9 +147,11 @@ void GeometryCheck_max(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {0, 0.75f, 0});
     ecs_set(world, b, Box, {2, 0.5f, 2});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_entity_t c = ecs_entity(world, { .name = "c" });
     ecs_set(world, c, Position, {0, 0.75f, 0});
     ecs_set(world, c, Box, {1, 0.5f, 1});
+    ecs_set(world, c, Rgb, {40, 160, 90});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -172,12 +178,14 @@ void GeometryCheck_root(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b", .parent = ship });
     ecs_set(world, b, Position, {0, 0.75f, 0});
     ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_entity_t c = ecs_entity(world, { .name = "c" });
     ecs_set(world, c, Position, {10, 0.5f, 0});
     ecs_set(world, c, Box, {2, 1, 2});
     ecs_entity_t d = ecs_entity(world, { .name = "d" });
     ecs_set(world, d, Position, {10, 0.5f, 0});
     ecs_set(world, d, Box, {2, 1, 2});
+    ecs_set(world, d, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -210,6 +218,7 @@ void GeometryCheck_mirrored(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b", .parent = parent });
     ecs_set(world, b, Position, {0.25f, 0.75f, 0});
     ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -237,6 +246,7 @@ void GeometryCheck_rotated(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b", .parent = parent });
     ecs_set(world, b, Position, {0.25f, 0.75f, 0});
     ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -261,6 +271,7 @@ void GeometryCheck_tilted(void) {
     ecs_set(world, b, Position, {0, 0.75f, 0});
     ecs_set(world, b, Rotation, {0.035f, 0, 0});
     ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -282,6 +293,7 @@ void GeometryCheck_cylinder_caps(void) {
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {0, 0.5f, 0});
     ecs_set(world, b, Cylinder, { .segments = 24, .length = 1, .radius = 0.5f });
+    ecs_set(world, b, Rgb, {200, 60, 40});
     ecs_progress(world, 0);
 
     bool error = true;
@@ -408,6 +420,110 @@ void GeometryCheck_unplaced(void) {
     test_bool(error, false);
     test_str(out, "no problems in 1 shapes, 12 triangles; 1 shapes without a WorldTransform "
         "are not drawn and not checked");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void GeometryCheck_hidden(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t a = ecs_entity(world, { .name = "a" });
+    ecs_set(world, a, Position, {0, 0.5f, 0});
+    ecs_set(world, a, Box, {2, 1, 2});
+    ecs_entity_t b = ecs_entity(world, { .name = "b" });
+    ecs_set(world, b, Position, {0, 0.75f, 0});
+    ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
+    ecs_entity_t c = ecs_entity(world, { .name = "c" });
+    ecs_set(world, c, Position, {0, 1.4f, 0});
+    ecs_set(world, c, Box, {3, 1, 3});
+    ecs_progress(world, 0);
+
+    bool error = true;
+    char *out = box_command_run(world, s, "geometry.check", &error);
+    test_bool(error, false);
+    test_str(out, "no problems in 3 shapes, 36 triangles; 1 pair fights only where it cannot "
+        "be seen");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "geometry.check hidden", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "info coplanar-hidden a and b: area 1.0000 inside other shapes, "
+        "facing (0.00, 1.00, 0.00) at ") == out);
+    test_assert(strstr(out, "\nno problems in 3 shapes, 36 triangles; 1 pair fights only "
+        "where it cannot be seen") != NULL);
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void GeometryCheck_partly_hidden(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t a = ecs_entity(world, { .name = "a" });
+    ecs_set(world, a, Position, {0, 0.5f, 0});
+    ecs_set(world, a, Box, {2, 1, 2});
+    ecs_entity_t b = ecs_entity(world, { .name = "b" });
+    ecs_set(world, b, Position, {0, 0.5f, 0});
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Rgb, {200, 60, 40});
+    ecs_entity_t c = ecs_entity(world, { .name = "c" });
+    ecs_set(world, c, Position, {0, 1.4f, 0});
+    ecs_set(world, c, Box, {3, 1, 3});
+    ecs_progress(world, 0);
+
+    bool error = true;
+    char *out = box_command_run(world, s, "geometry.check", &error);
+    test_bool(error, false);
+    test_str(out,
+        "warning coplanar a and b: area 1.0000, gap 0.00000, facing (0.00, -1.00, 0.00) at "
+        "(0.00, 0.00, 0.00)\n"
+        "1 coplanar pair in 3 shapes, 36 triangles");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void GeometryCheck_alike(void) {
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_entity_t mat = ecs_entity(world, { .name = "mat" });
+    ecs_add_id(world, mat, EcsPrefab);
+    ecs_set(world, mat, Rgb, {90, 120, 160});
+    ecs_entity_t a = ecs_entity(world, { .name = "a" });
+    ecs_add_pair(world, a, EcsIsA, mat);
+    ecs_set(world, a, Position, {0, 0.5f, 0});
+    ecs_set(world, a, Box, {2, 1, 2});
+    ecs_entity_t b = ecs_entity(world, { .name = "b" });
+    ecs_add_pair(world, b, EcsIsA, mat);
+    ecs_set(world, b, Position, {0.25f, 0.75f, 0});
+    ecs_set(world, b, Box, {1, 0.5f, 1});
+    ecs_entity_t c = ecs_entity(world, { .name = "c" });
+    ecs_set(world, c, Position, {10, 0.5f, 0});
+    ecs_set(world, c, Box, {2, 1, 2});
+    ecs_entity_t d = ecs_entity(world, { .name = "d" });
+    ecs_add_pair(world, d, EcsIsA, mat);
+    ecs_set(world, d, Position, {10.25f, 0.75f, 0});
+    ecs_set(world, d, Box, {1, 0.5f, 1});
+    ecs_progress(world, 0);
+
+    bool error = true;
+    char *out = box_command_run(world, s, "geometry.check", &error);
+    test_bool(error, false);
+    test_str(out,
+        "warning coplanar c and d: area 1.0000, gap 0.00000, facing (0.00, 1.00, 0.00) at "
+        "(10.25, 1.00, 0.00)\n"
+        "1 coplanar pair in 4 shapes, 48 triangles; 1 pair fights only where it cannot be seen");
+    ecs_os_free(out);
+
+    out = box_command_run(world, s, "geometry.check hidden", &error);
+    test_bool(error, false);
+    test_assert(strstr(out, "\ninfo coplanar-alike a and b: area 1.0000 of flat faces that look "
+        "alike, facing (0.00, 1.00, 0.00) at ") != NULL);
     ecs_os_free(out);
 
     ecs_fini(world);

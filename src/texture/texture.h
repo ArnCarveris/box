@@ -64,16 +64,24 @@ typedef struct box_texture_t {
 typedef struct box_texture_node_kind_t {
     int32_t id;                 /**< Id of the kind, from 1 */
     ecs_entity_t component;     /**< Component of its nodes */
-    TextureValueType output;    /**< Type of its value */
+    TextureValueType output;    /**< Type of its value, TexAny when it follows the inputs */
+    box_texture_node_type_t output_type; /**< Type of a node when output is TexAny, NULL for
+                                          *   the default */
     int32_t input_count;        /**< Inputs in inputs */
     box_texture_node_input_t inputs[BOX_TEXTURE_NODE_INPUTS]; /**< Inputs, names owned */
     int32_t param_count;        /**< Parameters in params */
     box_texture_node_param_t params[BOX_TEXTURE_NODE_PARAMS]; /**< Parameters, names owned */
     int32_t param_offsets[BOX_TEXTURE_NODE_PARAMS]; /**< Offset of each parameter in the
                                  *   parameter bytes of a node */
-    int32_t param_size;         /**< Bytes of the parameters, a multiple of 16 */
+    box_texture_node_array_t array; /**< Array parameter, name owned, NULL for none */
+    int32_t array_header;       /**< Offset of the header of the array in the parameters */
+    int32_t param_size;         /**< Bytes of the parameters with the header of the array, a
+                                 *   multiple of 16 */
+    int32_t types_offset;       /**< Offset of the types word of the inputs in the parameter
+                                 *   bytes of a node, -1 without a TexAny input */
     int32_t node_size;          /**< Parameter bytes of a node: the parameters, then a vec4 per
-                                 *   input with the constant of an input without a node */
+                                 *   input with the constant of an input without a node, then
+                                 *   the max elements of the array */
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED */
