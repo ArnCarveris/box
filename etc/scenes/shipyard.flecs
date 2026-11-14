@@ -31,6 +31,7 @@ using box.effects
 using box.surface
 using box.spatial
 using box.texture
+using box.transition
 using state
 using assets
 
@@ -110,7 +111,7 @@ ship {
     for i in 0..LCELLS {
       LinerSlot "slot_{i}"(idx: i)
     }
-    if pf[C_SHIELDS] > 0 && ship_z1 > ship_z0 {
+    if lc(L_SHIELD) > 0 && ship_z1 > ship_z0 {
       shield_bubble {
         Position: {0, AXIS_Y, (ship_z0 + ship_z1) / 2}
         Scale: {RING_R + 3.5, RING_R + 3.5, (ship_z1 - ship_z0) / 2 + 8}
@@ -118,7 +119,8 @@ ship {
         Rgb: {110, 170, 255}
         Emissive: {strength: 0.05 * pf[C_SHIELDS], color: {110, 170, 255}}
         Fresnel: {color: {120, 190, 255}, strength: 1.4 * pf[C_SHIELDS], power: 4, bias: 0, opacity: 0.2 * pf[C_SHIELDS]}
-        Opacity: {0.01}
+        Opacity: {0.01 * pf[C_SHIELDS]}
+        Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Fresnel: {duration: 1, timing_function: EaseInOut}, Opacity: {duration: 1, timing_function: EaseInOut}]
         BlendMode: Additive
         NoShadow
         Ignore

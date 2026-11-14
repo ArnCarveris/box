@@ -8,6 +8,7 @@ using box.movement
 using box.particle
 using box.light
 using box.animation
+using box.transition
 using state
 
 assets {
@@ -15,7 +16,7 @@ assets {
     AnimationClip: {duration: 1.1}
     strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.05, 8}, {0.3, 8}, {0.38, 0.4}, {1.1, 0.4}]}} }
   }
-  prefab HeavyBeaconAmber { Rgb: {255, 170, 60}; Emissive: {strength: 1, color: {255, 150, 40}}; Animator: {clip: heavy_blink} }
+  prefab HeavyBeaconAmber { Rgb: {255, 170, 60}; Emissive: {strength: 1, color: {255, 150, 40}}; Animator: {clip: heavy_blink}; Transition: [Scale: {duration: 0.6, timing_function: EaseInOut}] }
 
   prefab heavy_weld_sweep {
     AnimationClip: {duration: 3.2}
@@ -54,6 +55,7 @@ assets {
     prop u: f32 = 1
 
     const on = power > 0
+    const w = on ? 1 : 0.001
     const ba = side > 0 ? PI / 4 : PI * 0.75
     const nx = cos(ba)
     const ny = sin(ba)
@@ -104,11 +106,8 @@ assets {
         "lug_{c}" : ShipTrim { Position: {0 - side * 0.45, 0.5, cz * 1.21}; Box: {0.26, 0.26, 0.14} }
       }
       mast : ShipTrim { Position: {side * 0.44, 0.74, 0}; Cylinder: {radius: 0.05, length: 0.14, segments: 8, smooth: true} }
-      if on {
-        lamp : HeavyBeaconAmber { Position: {side * 0.44, 0.86, 0}; Sphere: {radius: 0.08, segments: 3, smooth: true} }
-      } else {
-        lamp : ShipTrim { Position: {side * 0.44, 0.86, 0}; Sphere: {radius: 0.08, segments: 3, smooth: true} }
-      }
+      lamp_base : ShipTrim { Position: {side * 0.44, 0.86, 0}; Sphere: {radius: 0.075, segments: 3, smooth: true} }
+      lamp : HeavyBeaconAmber { Position: {side * 0.44, 0.86, 0}; Sphere: {radius: 0.08, segments: 3, smooth: true}; Scale: {w, w, w} }
     }
 
     pin : ShipSteel { Position: {ax, ay, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 1.3, segments: 8, smooth: true} }
@@ -170,27 +169,29 @@ assets {
               }
               barrel : ShipSteel { Position: {0, 0.15, 0}; Cylinder: {radius: 0.07, length: 0.3, segments: 10, smooth: true} }
               nozzle : ShipCopper { Position: {0, tl - 0.57, 0}; Frustum: {radius_bottom: 0.075, radius_top: 0.035, length: 0.2, segments: 10, smooth: true} }
-              if on {
-                arc : ShipWeld { Position: {0, tl - 0.47, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true}; NoShadow }
-                light { Position: {0, tl - 0.6, 0}; PointLight: {intensity: 6 / (u * u), range: 5 / u}; Rgb: {170, 210, 255} }
-                sparks {
-                  Position: {0, tl - 0.47, 0}
-                  Rotation: {PI, 0, 0}
-                  Emitter: {
-                    max: 120, rate: 150, shape: EmitterDisc, radius: 0.03,
-                    direction: {0, 1, 0}, spread: 70, speed: {1, 3.5},
-                    lifetime: {0.2, 0.6}, size: {0.02, 0.05}, opacity: {0.7, 1},
-                    color: {255, 190, 110}, seed: 510
-                  }
-                  Appearance: {blend: Additive, stretch: 0.05}
-                  Curves: {
-                    opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
-                    color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
-                  }
-                  Ignore
+              arc_base : ShipTrim { Position: {0, tl - 0.47, 0}; Sphere: {radius: 0.065, segments: 3, smooth: true}; NoShadow }
+              arc : ShipWeldFade { Position: {0, tl - 0.47, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true}; Scale: {w, w, w}; NoShadow }
+              light : PowerLight { Position: {0, tl - 0.6, 0}; PointLight: {intensity: 6 * power / (u * u), range: 5 / u}; Rgb: {170, 210, 255} }
+              sparks {
+                Position: {0, tl - 0.47, 0}
+                Rotation: {PI, 0, 0}
+                Emitter: {
+                  max: 120, rate: 150, shape: EmitterDisc, radius: 0.03,
+                  direction: {0, 1, 0}, spread: 70, speed: {1, 3.5},
+                  lifetime: {0.2, 0.6}, size: {0.02, 0.05}, opacity: {0.7, 1},
+                  color: {255, 190, 110}, seed: 510
                 }
-              } else {
-                arc : ShipTrim { Position: {0, tl - 0.47, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true}; NoShadow }
+                if on {
+                  Playback: {state: Playing}
+                } else {
+                  Playback: {state: Stopped}
+                }
+                Appearance: {blend: Additive, stretch: 0.05}
+                Curves: {
+                  opacity: {keys: [{0, 1}, {0.6, 0.7}, {1, 0}]},
+                  color: {keys: [{0, {255, 255, 230}}, {0.4, {255, 180, 90}}, {1, {255, 90, 30}}]}
+                }
+                Ignore
               }
             }
           }
@@ -230,11 +231,7 @@ assets {
           Position: {0, 2.36, rz}
           bracket : ShipTrim { Position: {0, 0.08, 0}; Box: {0.5, 0.16, 0.2} }
           head : ShipHullDark { Position: {0, 0.26, 0}; Rotation: {0 - (s - 0.5) * 0.5, 0, 0}; RoundedBox: {0.6, 0.2, 0.32, 0.04, segments: 2} }
-          if on {
-            lens : ShipWhiteLight { Position: {0, 0.36, 0 - (s - 0.5) * 0.05}; Rotation: {0 - (s - 0.5) * 0.5, 0, 0}; Box: {0.5, 0.02, 0.24} }
-          } else {
-            lens : ShipRecess { Position: {0, 0.36, 0 - (s - 0.5) * 0.05}; Rotation: {0 - (s - 0.5) * 0.5, 0, 0}; Box: {0.5, 0.02, 0.24} }
-          }
+          lens : PowerLamp { Position: {0, 0.36, 0 - (s - 0.5) * 0.05}; Rotation: {0 - (s - 0.5) * 0.5, 0, 0}; Box: {0.5, 0.02, 0.24}; Emissive: {strength: 4 * lit_share(power, s, 2), color: {220, 236, 255}} }
         }
       }
       for c in 0..3 {
@@ -296,11 +293,7 @@ assets {
               "diag_h_{b}_{s}" : ShipOrange { Position: {0, ss, bz}; Rotation: {0, flip * 0.7, 0}; Box: {0.05, 0.05, 1.08} }
             }
           }
-          if on {
-            hot : ShipHeat { Position: {m * 0.36, 0.36, wz}; Sphere: {radius: 0.09, segments: 3, smooth: true} }
-          } else {
-            hot : ShipSteel { Position: {m * 0.36, 0.36, wz}; Sphere: {radius: 0.09, segments: 3, smooth: true} }
-          }
+          hot : ShipHeatFade { Position: {m * 0.36, 0.36, wz}; Sphere: {radius: 0.09, segments: 3, smooth: true}; Emissive: {strength: 5 * power, color: {255, 110, 40}} }
         }
         arm_grip {
           Position: {0, 0, gz}
@@ -316,11 +309,7 @@ assets {
           plate_a : ShipHullFine { Position: {0, 0, (wz - 1.7) / 2}; Box: {1.9, 0.08, wz + 1.67} }
           plate_b : ShipHullFine { Position: {0, 0, (wz + 1.7) / 2}; Box: {1.9, 0.08, 1.67 - wz} }
           bead : ShipSteel { Position: {m * 0.35, 0, wz}; Box: {1.2, 0.1, 0.05} }
-          if on {
-            hot : ShipHeat { Position: {0 - m * 0.4, 0, wz}; Box: {0.3, 0.1, 0.05} }
-          } else {
-            hot : ShipSteel { Position: {0 - m * 0.4, 0, wz}; Box: {0.3, 0.1, 0.05} }
-          }
+          hot : ShipHeatFade { Position: {0 - m * 0.4, 0, wz}; Box: {0.3, 0.1, 0.05}; Emissive: {strength: 5 * power, color: {255, 110, 40}} }
           for f in 0..4 {
             "frame_{f}" : ShipTrim { Position: {0, -0.14, (f - 1.5) * 0.86}; Box: {1.5, 0.2, 0.06} }
           }
@@ -340,9 +329,7 @@ assets {
           HeavyAssemblerArm arm(side: m, tx: 0 - 0.4 * m, ty: cy + 0.05, ta: atan2(-1, 0 - 0.5 * m), tool: 1, power: power, u: u)
         }
       }
-      if on {
-        flood_light { Position: {0, cy - 1.0, 0}; PointLight: {intensity: 5 / (u * u), range: 6 / u}; Rgb: {255, 236, 210} }
-      }
+      flood_light : PowerLight { Position: {0, cy - 1.0, 0}; PointLight: {intensity: 5 * power / (u * u), range: 6 / u}; Rgb: {255, 236, 210} }
     }
     SpineEnds ends(r: r, fe: fe, be: be)
   }

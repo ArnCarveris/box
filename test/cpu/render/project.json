@@ -921,6 +921,13 @@
                 ]
             },
             {
+                "id": "TransitionScript",
+                "testcases": [
+                    "template_prop_animates_owned_emissive",
+                    "template_spec_switch_with_value"
+                ]
+            },
+            {
                 "id": "TransitionLight",
                 "testcases": [
                     "point_intensity",

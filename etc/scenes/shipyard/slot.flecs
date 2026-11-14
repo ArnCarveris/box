@@ -20,6 +20,10 @@ assets {
     prop z: i32 = 0
     prop seed: i32 = 0
     prop live: f32 = 1
+    prop heat: f32 = 0
+    prop trip: bool = false
+    prop cool: bool = false
+    prop spin: f32 = 1
 
     const r = lane_r(l)
     const core = l == 0
@@ -29,23 +33,23 @@ assets {
     const be = kb == 0 ? 2 : kb == k ? 0 : 1
 
     if k == L_BRIDGE {
-      Bridge part(r: r, be: be)
+      Bridge part(r: r, be: be, power: live)
     } else if k == L_SENSOR {
-      Sensor part(r: r, core: core, fe: fe, be: be)
+      Sensor part(r: r, core: core, fe: fe, be: be, power: live)
     } else if k == L_QUARTERS {
-      Quarters part(r: r, fe: fe, be: be, seed: seed)
+      Quarters part(r: r, fe: fe, be: be, seed: seed, power: live)
     } else if k == L_HABRING {
-      HabRing part(r: r, seed: z)
+      HabRing part(r: r, seed: z, power: live)
     } else if k == L_ESTATE {
-      EstateRing part(r: r, seed: z)
+      EstateRing part(r: r, seed: z, power: live)
     } else if k == L_FARM {
-      AgriRing part(r: r, seed: z)
+      AgriRing part(r: r, seed: z, power: live)
     } else if k == L_REACTOR {
-      Reactor part(r: r, fe: fe, be: be, power: live)
+      Reactor part(r: r, fe: fe, be: be, power: live, heat: heat, trip: trip)
     } else if k == L_RADIATOR {
-      Radiator part(r: r, core: core)
+      Radiator part(r: r, core: core, heat: heat, cool: cool)
     } else if k == L_JUMP {
-      JumpDrive part(r: r, fe: fe, be: be, power: live)
+      JumpDrive part(r: r, fe: fe, be: be, power: live, spin: spin)
     } else if k == L_DRIVE {
       DriveSection part(r: r, fe: fe, power: live)
     } else if k == L_TANKS {
@@ -53,7 +57,7 @@ assets {
     } else if k == L_CARGO {
       CargoBlock part(r: r, fe: fe, be: be, seed: seed)
     } else if k == L_HANGAR {
-      Hangar part(r: r, core: core, flip: l == LANE_PORT, fe: fe, be: be, seed: seed)
+      Hangar part(r: r, core: core, flip: l == LANE_PORT, fe: fe, be: be, seed: seed, power: live)
     } else if k == L_ASSEMBLER {
       HeavyAssembler part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
     } else if k == L_FAB {
@@ -69,7 +73,7 @@ assets {
     } else if k == L_ARMOR {
       ArmorSleeve part(r: r, fe: fe, be: be)
     } else if k == L_TURRET {
-      TurretDeck part(r: r, core: core, fe: fe, be: be)
+      TurretDeck part(r: r, core: core, fe: fe, be: be, power: live)
     }
   }
 
@@ -91,6 +95,7 @@ assets {
     prop idx: i32 = 0
     mut rising = false
     mut sparking = false
+    mut spin: f32 = 0
 
     const l = lane_of(idx)
     const z = slot_of(idx)
@@ -125,7 +130,8 @@ assets {
         } else if hovered && swap {
           Tint: {90, 255, 160, 120}
         }
-        LinerSegment part(k: k, l: l, z: z, seed: idx, live: ops_live(idx, k))
+        const heat = k == L_RADIATOR ? ship_heat : slot_heat[idx]
+        LinerSegment part(k: k, l: l, z: z, seed: idx, live: ops_live(idx, k), heat: heat, trip: slot_trip[idx], cool: k == L_RADIATOR && heat_falling, spin: k == L_JUMP ? spin : 0)
       }
 
       if fault != 0 {
@@ -205,6 +211,22 @@ assets {
         const ev = await on.click(this)
         if ev.button == 0 {
           emit SlotClick(slot: idx)
+        }
+      }
+    }
+
+    // Spins the rotor of a jump drive up and down over about 2 s when its power changes
+    async {
+      while true {
+        const sk = lgrid[idx]
+        const target = sk == L_JUMP ? ops_live(idx, sk) : 0
+        if sk != L_JUMP && spin != 0 {
+          spin = 0
+        } else if abs(target - spin) < 0.001 {
+          await delay(sk == L_JUMP ? 0.2 : 1)
+        } else {
+          spin = spin + clamp(target - spin, -0.05, 0.05)
+          await delay(0.1)
         }
       }
     }

@@ -8,11 +8,12 @@ using box.movement
 using box.particle
 using box.light
 using box.animation
+using box.transition
 using state
 
 assets {
-  prefab RailCharge { Rgb: {58, 46, 36}; PbrMaterial: {metallic: 0.4, roughness: 0.4}; Emissive: {strength: 6, color: {255, 150, 50}} }
-  prefab RailArc { Rgb: {70, 60, 52}; PbrMaterial: {metallic: 0.2, roughness: 0.5}; Emissive: {strength: 14, color: {255, 214, 160}} }
+  prefab RailCharge { Rgb: {58, 46, 36}; PbrMaterial: {metallic: 0.4, roughness: 0.4}; Emissive: {strength: 6, color: {255, 150, 50}}; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}] }
+  prefab RailArc { Rgb: {70, 60, 52}; PbrMaterial: {metallic: 0.2, roughness: 0.5}; Emissive: {strength: 14, color: {255, 214, 160}}; Transition: [Emissive: {duration: 0.8, timing_function: EaseInOut}] }
   prefab RailCeramic { Rgb: {222, 214, 196}; PbrMaterial: {metallic: 0, roughness: 0.55}; ClearCoat: {strength: 0.3, roughness: 0.3} }
 
   template Railgun {
@@ -50,7 +51,7 @@ assets {
       "facet_{i}" {
         Rotation: {0, 0, a}
         plate : ShipHull { Position: {apo + 0.04, 0, 0.1}; Box: {0.08, fw * 0.78, 2.2} }
-        strip : ShipRunLights { Position: {apo + 0.085, 0, 0.1}; Box: {0.012, fw * 0.12, 1.9} }
+        strip : PowerRunLights { Position: {apo + 0.085, 0, 0.1}; Box: {0.012, fw * 0.12, 1.9}; Emissive: {strength: 6 * power, color: {255, 196, 120}} }
       }
     }
     for i in 0..4 {
@@ -90,7 +91,7 @@ assets {
       }
       chute : ShipHullDark { Position: {0, 0.17 * s, 1.0}; Box: {0.36 * s, 0.3 * s, 1.5} }
       chute_top : ShipHazard { Position: {0, 0.325 * s, 1.0}; Box: {0.3 * s, 0.01, 1.3} }
-      lamp : ShipAmberLight { Position: {0.185 * s, 0.22 * s, 1.5}; Box: {0.012, 0.08 * s, 0.16} }
+      lamp : PowerLamp { Position: {0.185 * s, 0.22 * s, 1.5}; Box: {0.012, 0.08 * s, 0.16}; Emissive: {strength: 4 * power, color: {255, 160, 50}} }
     }
 
     cradle {
@@ -177,10 +178,10 @@ assets {
       mouth : RailArc { Position: {0, 0, -0.45}; Box: {0.5 * b, 2 * g, 0.03}; Emissive: {strength: 4 * power, color: hot} }
       beacon_a : ShipBeaconRed { Position: {0, g + 0.82 * b, 0.2}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
       beacon_b : ShipBeaconWhite { Position: {0, 0 - g - 0.82 * b, 0.2}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
-      glow { Position: {0, 0, 0.9}; PointLight: {intensity: 3 * power, range: r * 2.5}; Rgb: hot }
+      glow : PowerLight { Position: {0, 0, 0.9}; PointLight: {intensity: 3 * power, range: r * 2.5}; Rgb: hot }
     }
 
-    charge_glow { Position: {0, 0, 0.1}; PointLight: {intensity: 3 * power, range: r * 3}; Rgb: amber }
+    charge_glow : PowerLight { Position: {0, 0, 0.1}; PointLight: {intensity: 3 * power, range: r * 3}; Rgb: amber }
     SpineEnds ends(r: r, fe: 0, be: be)
   }
 }

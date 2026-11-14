@@ -8,12 +8,13 @@ using box.movement
 using box.particle
 using box.light
 using box.animation
+using box.transition
 using state
 
 assets {
-  prefab ShieldGlow { Rgb: {176, 208, 255}; Emissive: {strength: 6, color: {96, 150, 255}} }
-  prefab ShieldCell { Rgb: {26, 44, 84}; PbrMaterial: {metallic: 0.2, roughness: 0.12}; ClearCoat: {strength: 1, roughness: 0.04}; Emissive: {strength: 2, color: {80, 140, 255}} }
-  prefab ShieldField { Rgb: {110, 160, 255}; Emissive: {strength: 1.4, color: {100, 156, 255}}; Opacity: {0.08}; BlendMode: Additive; NoShadow; Ignore }
+  prefab ShieldGlow { Rgb: {176, 208, 255}; Emissive: {strength: 6, color: {96, 150, 255}}; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Rgb: {duration: 1}] }
+  prefab ShieldCell { Rgb: {26, 44, 84}; PbrMaterial: {metallic: 0.2, roughness: 0.12}; ClearCoat: {strength: 1, roughness: 0.04}; Emissive: {strength: 2, color: {80, 140, 255}}; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}] }
+  prefab ShieldField { Rgb: {110, 160, 255}; Emissive: {strength: 1.4, color: {100, 156, 255}}; Opacity: {0.08}; BlendMode: Additive; NoShadow; Ignore; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Opacity: {duration: 1, timing_function: EaseInOut}] }
   prefab ShieldPaint { Rgb: {36, 70, 140}; PbrMaterial: {metallic: 0.35, roughness: 0.38}; ClearCoat: {strength: 0.6, roughness: 0.15} }
 
   template ShieldGenerator {
@@ -24,7 +25,6 @@ assets {
     prop power: f32 = 1
 
     const p = clamp(power, 0, 1)
-    const on = p > 0.01
     const glow = 6 * p
     const lr = 44 + 132 * p
     const lg = 58 + 150 * p
@@ -79,16 +79,12 @@ assets {
         }
         corona : ShieldGlow { Position: {xt, 0, 0}; Rotation: {0, 0, 0 - HALF_PI}; Torus: {radius: r * 0.075, tube: r * 0.014, segments: 24, rings: 6, smooth: true}; Rgb: {lr, lg, lb}; Emissive: {strength: glow, color: {96, 150, 255}} }
         orb : ShieldGlow { Position: {xt + r * 0.03, 0, 0}; Sphere: {radius: r * 0.065, segments: 12, smooth: true}; Rgb: {lr, lg, lb}; Emissive: {strength: glow * 1.6, color: {130, 180, 255}} }
-        if on {
-          halo : ShieldField { Position: {xt + r * 0.03, 0, 0}; Sphere: {radius: r * 0.12, segments: 16, smooth: true}; Opacity: {0.08 * p}; Emissive: {strength: 1.4 * p, color: {100, 156, 255}} }
-        }
+        halo : ShieldField { Position: {xt + r * 0.03, 0, 0}; Sphere: {radius: r * 0.12, segments: 16, smooth: true}; Opacity: {0.08 * p}; Emissive: {strength: 1.4 * p, color: {100, 156, 255}} }
       }
     }
 
-    if on {
-      sheath : ShieldField { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr + 0.16, length: 2.84, segments: 48, smooth: true}; Opacity: {0.035 * p}; Emissive: {strength: 1.2 * p, color: {100, 156, 255}} }
-      light { Position: {0, 0, 0}; PointLight: {intensity: 4 * p, range: r * 4}; Rgb: {110, 160, 255} }
-    }
+    sheath : ShieldField { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr + 0.16, length: 2.84, segments: 48, smooth: true}; Opacity: {0.035 * p}; Emissive: {strength: 1.2 * p, color: {100, 156, 255}} }
+    light : PowerLight { Position: {0, 0, 0}; PointLight: {intensity: 4 * p, range: r * 4}; Rgb: {110, 160, 255} }
     SpineEnds ends(r: r, fe: fe, be: be)
   }
 }

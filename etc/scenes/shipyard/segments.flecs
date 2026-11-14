@@ -61,8 +61,8 @@ state {
 }
 
 assets {
-  prefab ShipFusionIdle { Rgb: {120, 96, 140}; Emissive: {strength: 0.3, color: {200, 110, 255}} }
-  prefab ShipJumpIdle { Rgb: {96, 128, 136}; Emissive: {strength: 0.25, color: {110, 236, 255}} }
+  prefab ShipFusionSeam { Rgb: {120, 96, 140}; Emissive: {strength: 0.3, color: {200, 110, 255}}; Transition: [Emissive: {duration: 1.2, timing_function: EaseInOut}] }
+  prefab ShipJumpCoil { Rgb: {96, 128, 136}; Emissive: {strength: 0.25, color: {110, 236, 255}}; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Rgb: {duration: 1}] }
 
   liner_bell_outer { Path2D: {start: {0.3, 0}, segments: [{kind: CubicBezier, end: {1.0, 2.4}, control1: {0.62, 0.3}, control2: {0.95, 1.4}}]} }
   liner_bell_inner { Path2D: {start: {0.26, 0}, segments: [{kind: CubicBezier, end: {0.96, 2.4}, control1: {0.58, 0.32}, control2: {0.91, 1.42}}]} }
@@ -145,17 +145,19 @@ assets {
     prop fe: i32 = 0
     prop be: i32 = 0
     prop seed: i32 = 0
+    prop power: f32 = 1
 
+    const hatch: Emissive = match power > 0 { true: {4 * power, {90, 255, 110}}; _: {1.2, {255, 50, 30}} }
     hull : ShipHullFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r, length: SEG, segments: 40, smooth: true} }
     for w in 0..3 {
-      "deck_{w}" : ShipCabins { Position: {0, 0, (w - 1) * 1.15}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.006, length: 0.62, segments: 40, smooth: true} }
+      "deck_{w}" : PowerCabins { Position: {0, 0, (w - 1) * 1.15}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.006, length: 0.62, segments: 40, smooth: true}; Emissive: {strength: 1.8 * lit_share(power, w, 3), color: {255, 255, 255}} }
     }
     stripe : ShipStripe { Position: {0, 0, 1.78}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.008, length: 0.12, segments: 40, smooth: true} }
     for h in 0..2 {
       "hatch_{h}" {
         Rotation: {0, 0, h * PI}
         door : ShipHullDark { Position: {r * 0.98, 0, -1.72}; Box: {0.12, r * 0.42, 0.34} }
-        lamp : ShipGreenLight { Position: {r * 1.04, r * 0.26, -1.72}; Box: {0.03, 0.06, 0.06} }
+        lamp : PowerLamp { Position: {r * 1.04, r * 0.26, -1.72}; Box: {0.03, 0.06, 0.06}; Emissive: hatch }
       }
     }
     SpineEnds ends(r: r, fe: fe, be: be)
@@ -180,11 +182,12 @@ assets {
     prop r0: f32 = 1
     prop r1: f32 = 10
     prop phase: i32 = 0
+    prop power: f32 = 1
 
     const len = r1 - r0
     const mid = (r0 + r1) / 2
     shaft : ShipHullSpin { Position: {0, mid, 0}; Cylinder: {radius: 0.26, length: len - 0.02, segments: 12, smooth: true} }
-    lift : ShipRunLightsCyan { Position: {0, mid, 0.25}; Box: {0.08, len - 0.4, 0.04} }
+    lift : PowerRunLightsCyan { Position: {0, mid, 0.25}; Box: {0.08, len - 0.4, 0.04}; Emissive: {strength: 6 * power, color: {90, 214, 255}} }
     for c in 0..3 {
       const a = c * 2.0944 + 0.5236
       "rail_{c}" : ShipSteel { Position: {cos(a) * 0.52, mid, sin(a) * 0.52}; Cylinder: {radius: 0.055, length: len - 0.5, segments: 6, smooth: true} }
@@ -199,7 +202,7 @@ assets {
         const f = k == 0 ? 1 : -1
         cab : ShipHullSpin { RoundedBox: {0.3, 0.38, 0.15, 0.03, segments: 2} }
         stripe : ShipStripe { Position: {0, -0.1, 0}; Box: {0.304, 0.03, 0.154} }
-        glazing : ShipWindow { Position: {0, 0.05, f * 0.076}; Box: {0.24, 0.1, 0.006} }
+        glazing : PowerWindow { Position: {0, 0.05, f * 0.076}; Box: {0.24, 0.1, 0.006}; Emissive: {strength: 3.2 * power, color: {255, 204, 136}} }
         for m in 0..3 {
           "mullion_{m}" : ShipTrim { Position: {(m - 1) * 0.08, 0.05, f * 0.08}; Box: {0.01, 0.11, 0.006} }
         }
@@ -209,7 +212,7 @@ assets {
           "buffer_{e}" : ShipTrim { Position: {0, ey * 0.23, 0}; Box: {0.14, 0.02, 0.08} }
           "fin_{e}" : ShipTrim { Position: {ey * 0.152, 0, 0}; Box: {0.006, 0.32, 0.11} }
           "door_{e}" : ShipHullDarkSpin { Position: {ey * 0.153, -0.01, 0}; Box: {0.004, 0.2, 0.07} }
-          "door_lamp_{e}" : ShipGreenLight { Position: {ey * 0.154, 0.11, 0}; Box: {0.004, 0.015, 0.03} }
+          "door_lamp_{e}" : PowerLamp { Position: {ey * 0.154, 0.11, 0}; Box: {0.004, 0.015, 0.03}; Emissive: {strength: 4 * power, color: {90, 255, 110}} }
           "shoe_{e}" : ShipSteel { Position: {ey * 0.09, 0, 0 - f * 0.085}; Box: {0.05, 0.34, 0.025} }
           for w in 0..2 {
             "roller_{e}_{w}" : ShipRubber { Position: {ey * 0.09, (w - 0.5) * 0.26, 0 - f * 0.1}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.018, length: 0.04, segments: 8, smooth: true} }
@@ -224,7 +227,7 @@ assets {
     junction_ring : ShipTrim { Position: {0, r1 - 0.5, 0}; Torus: {radius: 0.52, tube: 0.03, segments: 20, rings: 4, smooth: true} }
     for k in 0..4 {
       const ka = k * HALF_PI + PI / 4
-      "junction_lamp_{k}" : ShipWindow { Position: {cos(ka) * 0.57, r1 - 0.2, sin(ka) * 0.57}; Sphere: {radius: 0.025, segments: 6, smooth: true} }
+      "junction_lamp_{k}" : PowerWindow { Position: {cos(ka) * 0.57, r1 - 0.2, sin(ka) * 0.57}; Sphere: {radius: 0.025, segments: 6, smooth: true}; Emissive: {strength: 3.2 * power, color: {255, 204, 136}} }
     }
   }
 
@@ -235,6 +238,7 @@ assets {
     prop arc: f32 = 0.26
     prop shift: f32 = 0
     prop dark: bool = false
+    prop lit: f32 = 1
 
     for j in 0..3 {
       "part_{j}" {
@@ -242,7 +246,7 @@ assets {
         if dark {
           block : ShipHullDarkSpin { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ro, thickness: ro - ri, length: len, segments: 2, smooth: true, arc: arc / 3} }
         } else {
-          block : ShipCabins { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ro, thickness: ro - ri, length: len, segments: 2, smooth: true, arc: arc / 3}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: shift + j * 0.37, offset_y: 0} }
+          block : PowerCabins { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ro, thickness: ro - ri, length: len, segments: 2, smooth: true, arc: arc / 3}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: shift + j * 0.37, offset_y: 0}; Emissive: {strength: 1.8 * lit, color: {255, 255, 255}} }
         }
       }
     }
@@ -251,6 +255,7 @@ assets {
   template RingChassis {
     prop r: f32 = 1
     prop seed: i32 = 0
+    prop power: f32 = 1
 
     const ro = RING_R
     const rk = RING_KEEL
@@ -259,7 +264,7 @@ assets {
     const am = step / 2
     collar : ShipHullSpin { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.28, length: 1.6, segments: 32, smooth: true} }
     for i in 0..4 {
-      RingSpoke "spoke_{i}"(r0: r * 1.28, r1: RING_SKY, phase: (seed * 37 + i * 29) % 104) { Rotation: {0, 0, i * HALF_PI + PI / 4} }
+      RingSpoke "spoke_{i}"(r0: r * 1.28, r1: RING_SKY, phase: (seed * 37 + i * 29) % 104, power: power) { Rotation: {0, 0, i * HALF_PI + PI / 4} }
     }
     const kw = RING_W + 0.05
     const gw = 0.08
@@ -281,13 +286,14 @@ assets {
     }
     for i in 0..RING_MODS {
       const svc = ring_service(i)
+      const lit = lit_share(power, seg_hash(seed + 3, i, 4), 4)
       "mod_{i}" {
         Rotation: {0, 0, i * step}
         for s in 0..2 {
           const sz = (s - 0.5) * 2
           const zc = sz * (RING_W + RING_IN) / 2
           const ox = seg_hash(seed + s, i, 7) * 0.31
-          RingDeck "deck_{s}"(ro: rk, ri: rl, len: RING_W - RING_IN, arc: step, shift: ox, dark: svc) { Position: {0, 0, zc} }
+          RingDeck "deck_{s}"(ro: rk, ri: rl, len: RING_W - RING_IN, arc: step, shift: ox, dark: svc, lit: lit) { Position: {0, 0, zc} }
           if svc {
             "dock_{s}" : ShipSteel { Position: {cos(am) * (rl + 0.65), sin(am) * (rl + 0.65), sz * RING_W}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.32, length: 0.3, segments: 20, smooth: true} }
             "dock_ring_{s}" : ShipTrim { Position: {cos(am) * (rl + 0.65), sin(am) * (rl + 0.65), sz * (RING_W + 0.16)}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.3, tube: 0.04, segments: 20, rings: 4, smooth: true} }
@@ -304,7 +310,9 @@ assets {
           "rail_{s}" : ShipTrim { Position: {cos(am) * (rl - 0.04), sin(am) * (rl - 0.04), sz * (RING_W - 0.01)}; Rotation: {0, 0, am}; Box: {0.05, step * rl, 0.015} }
           for k in 0..2 {
             const la = step * (0.25 + k * 0.5)
-            "lamp_{s}_{k}" : ShipWhiteLight { Position: {cos(la) * (ro - 0.12), sin(la) * (ro - 0.12), sz * (RING_W + 0.06)}; Box: {0.05, 0.05, 0.02} }
+            const emergency = power == 0 && k == 0
+            const lamp: Emissive = match emergency { true: {1.0, {255, 50, 30}}; _: {4 * lit, {220, 236, 255}} }
+            "lamp_{s}_{k}" : PowerLamp { Position: {cos(la) * (ro - 0.12), sin(la) * (ro - 0.12), sz * (RING_W + 0.06)}; Box: {0.05, 0.05, 0.02}; Emissive: lamp }
           }
         }
       }
@@ -314,6 +322,7 @@ assets {
   template HabRing {
     prop r: f32 = 1
     prop seed: i32 = 0
+    prop power: f32 = 1
 
     const dir = seed % 2 == 0 ? 1 : -1
     const rk = RING_KEEL
@@ -328,7 +337,7 @@ assets {
       Rotation: {0, 0, ring_phase(seed)}
       rotor {
         AngularVelocity: {0, 0, dir * ring_spin(seed)}
-        RingChassis chassis(r: r, seed: seed)
+        RingChassis chassis(r: r, seed: seed, power: power)
         spine : ShipHullDarkSpin { Rotation: {HALF_PI, 0, 0}; Tube: {radius: ru, thickness: ru - rs, length: 0.64, segments: 144, smooth: true} }
         for s in 0..2 {
           const sz = (s - 0.5) * 2
@@ -344,7 +353,7 @@ assets {
             Rotation: {0, 0, i * step}
             core : ShipHullDarkSpin { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: rk, thickness: rk - rl, length: 2 * RING_IN, segments: 4, smooth: true, arc: step} }
             terrace : ShipHullSpin { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: rl + 0.03, thickness: 0.05, length: 2 * RING_IN, segments: 4, smooth: true, arc: step} }
-            RingDeck up(ro: rl + 0.02, ri: ru, len: 2.5, arc: step, shift: oy)
+            RingDeck up(ro: rl + 0.02, ri: ru, len: 2.5, arc: step, shift: oy, lit: lit_share(power, seg_hash(seed + 3, i, 4), 4))
             roof : ShipHullSpin { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ru + 0.03, thickness: 0.05, length: 2.54, segments: 4, smooth: true, arc: step} }
             rib_hi : ShipHullDarkSpin { Position: {(rl + ru) / 2, 0, 0}; Box: {rl - ru + 0.06, 0.1, 2.56} }
             rib_sp : ShipTrim { Position: {(ru + rs) / 2 - 0.02, 0, 0}; Box: {ru - rs + 0.06, 0.14, 1.16} }
@@ -387,12 +396,13 @@ assets {
     prop h: f32 = 0.3
     prop f: f32 = 1
     prop tower: bool = false
+    prop lit: f32 = 1
 
     if tower {
       const hs = h * 0.78
       podium : ShipVilla { Position: {0, -0.06, 0}; RoundedBox: {w * 1.35, 0.12, d * 1.35, 0.02, segments: 2} }
-      shaft : ShipCabins { Position: {0, 0 - hs / 2, 0}; RoundedBox: {w, hs, d, 0.03, segments: 2} }
-      top : ShipCabins { Position: {0, 0 - hs - (h - hs) / 2, 0}; RoundedBox: {w * 0.72, h - hs, d * 0.72, 0.025, segments: 2} }
+      shaft : PowerCabins { Position: {0, 0 - hs / 2, 0}; RoundedBox: {w, hs, d, 0.03, segments: 2}; Emissive: {strength: 1.8 * lit, color: {255, 255, 255}} }
+      top : PowerCabins { Position: {0, 0 - hs - (h - hs) / 2, 0}; RoundedBox: {w * 0.72, h - hs, d * 0.72, 0.025, segments: 2}; Emissive: {strength: 1.8 * lit, color: {255, 255, 255}} }
       for k in 0..3 {
         "ledge_{k}" : ShipTrim { Position: {0, 0 - (k + 1) * hs / 4, 0}; Box: {w + 0.02, 0.012, d + 0.02} }
       }
@@ -409,8 +419,8 @@ assets {
       unit : ShipHullDarkSpin { Position: {w * 0.25, 0 - h - 0.03, 0 - f * d * 0.15}; Box: {0.08, 0.04, 0.06} }
       for k in 0..fl {
         const ky = 0 - fh * (k + 0.55)
-        "glaze_{k}" : ShipWindow { Position: {0, ky, f * (d / 2 + 0.003)}; Box: {w * 0.82, fh * 0.5, 0.006} }
-        "side_{k}" : ShipWindow { Position: {w / 2 + 0.003, ky, 0}; Box: {0.006, fh * 0.4, d * 0.4} }
+        "glaze_{k}" : PowerWindow { Position: {0, ky, f * (d / 2 + 0.003)}; Box: {w * 0.82, fh * 0.5, 0.006}; Emissive: {strength: 3.2 * lit, color: {255, 204, 136}} }
+        "side_{k}" : PowerWindow { Position: {w / 2 + 0.003, ky, 0}; Box: {0.006, fh * 0.4, d * 0.4}; Emissive: {strength: 3.2 * lit, color: {255, 204, 136}} }
         for m in 0..4 {
           "mullion_{k}_{m}" : ShipTrim { Position: {(m - 1.5) * w * 0.27, ky, f * (d / 2 + 0.007)}; Box: {0.008, fh * 0.52, 0.006} }
         }
@@ -426,6 +436,7 @@ assets {
   template EstateRing {
     prop r: f32 = 1
     prop seed: i32 = 0
+    prop power: f32 = 1
 
     const dir = seed % 2 == 0 ? 1 : -1
     const ro = RING_R
@@ -445,11 +456,11 @@ assets {
       Rotation: {0, 0, ring_phase(seed)}
       rotor {
         AngularVelocity: {0, 0, dir * ring_spin(seed)}
-        RingChassis chassis(r: r, seed: seed)
+        RingChassis chassis(r: r, seed: seed, power: power)
         lawn : ShipMoss { Rgb: {58, 104, 56}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro - 0.3, thickness: 0.32, length: 2 * RING_IN, segments: 144, smooth: true} }
         canal : ShipWater { Rotation: {HALF_PI, 0, 0}; Tube: {radius: g + 0.02, thickness: 0.04, length: 0.32, segments: 144, smooth: true} }
         vault : ShipGlass { Rotation: {HALF_PI, 0, 0}; TorusShell: {radius: sky + vr, tube: vr, ring_start: 0, ring_end: 2 * PI, tube_start: PI - va, tube_end: PI + va, thickness: 0.04, segments: 144, rings: 32} }
-        sun : ShipWhiteLight { Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.02, tube: 0.04, segments: 144, rings: 4, smooth: true} }
+        sun : PowerLamp { Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.02, tube: 0.04, segments: 144, rings: 4, smooth: true}; Emissive: {strength: 4 * power, color: {220, 236, 255}} }
         for s in 0..2 {
           const sz = (s - 0.5) * 2
           "quay_{s}" : ShipPaving { Position: {0, 0, sz * 0.2}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: g + 0.015, thickness: 0.03, length: 0.08, segments: 144, smooth: true} }
@@ -461,9 +472,10 @@ assets {
           }
         }
         for i in 0..6 {
-          "daylight_{i}" { Rotation: {0, 0, i * PI / 3}; glow { Position: {0, sky + 0.3, 0}; PointLight: {intensity: 30, range: 9}; Rgb: {255, 238, 210} } }
+          "daylight_{i}" { Rotation: {0, 0, i * PI / 3}; glow : PowerLight { Position: {0, sky + 0.3, 0}; PointLight: {intensity: 30 * lit_share(power, i, 6), range: 9}; Rgb: {255, 238, 210} } }
         }
         for i in 0..n {
+          const lit = lit_share(power, seg_hash(seed + 5, i, 4), 4)
           "frame_{i}" {
             Rotation: {0, 0, i * step}
             for s in 0..2 {
@@ -480,13 +492,13 @@ assets {
               const zc = sz * 0.84
               "shade_{s}" : RingTree { Rotation: {0, 0, tilt(g, 0.55)}; Position: {0.55, ground(g, 0.55), sz * 0.42} }
               "shade_b_{s}" : RingTree { Rotation: {0, 0, tilt(g, -0.95)}; Position: {-0.95, ground(g, -0.95), sz * 0.42} }
-              "streetlamp_{s}" : ShipWindow { Rotation: {0, 0, tilt(g, -0.2)}; Position: {-0.2, ground(g, -0.2) - 0.3, sz * 0.31}; Sphere: {radius: 0.022, segments: 8, smooth: true} }
+              "streetlamp_{s}" : PowerWindow { Rotation: {0, 0, tilt(g, -0.2)}; Position: {-0.2, ground(g, -0.2) - 0.3, sz * 0.31}; Sphere: {radius: 0.022, segments: 8, smooth: true}; Emissive: {strength: 3.2 * lit, color: {255, 204, 136}} }
               "streetpole_{s}" : ShipTrim { Rotation: {0, 0, tilt(g, -0.2)}; Position: {-0.2, ground(g, -0.2) - 0.14, sz * 0.31}; Cylinder: {radius: 0.008, length: 0.28, segments: 6, smooth: true} }
               if kind == 0 {
                 for b in 0..5 {
                   const tall = seg_hash(seed + b, i, 5) == 0
                   const bh = tall ? 0.9 + seg_hash(seed + b * 2, i, 3) * 0.15 : 0.26 + seg_hash(seed + b * 3, i, 4) * 0.06
-                  RingHouse "house_{s}_{b}"(w: tall ? 0.4 : 0.5, d: tall ? 0.4 : 0.38, h: bh, f: 0 - sz, tower: tall) { Rotation: {0, 0, tilt(g, (b - 2) * 0.64)}; Position: {(b - 2) * 0.64, ground(g, (b - 2) * 0.64), zc + ((b % 2) - 0.5) * 0.36} }
+                  RingHouse "house_{s}_{b}"(w: tall ? 0.4 : 0.5, d: tall ? 0.4 : 0.38, h: bh, f: 0 - sz, tower: tall, lit: lit) { Rotation: {0, 0, tilt(g, (b - 2) * 0.64)}; Position: {(b - 2) * 0.64, ground(g, (b - 2) * 0.64), zc + ((b % 2) - 0.5) * 0.36} }
                 }
                 for q in 0..3 {
                   "plaza_{s}_{q}" : ShipPaving { Rotation: {0, 0, tilt(g, (q - 1) * 1.05)}; Position: {(q - 1) * 1.05, ground(g, (q - 1) * 1.05) - 0.006, zc}; Box: {1.05, 0.012, 0.16} }
@@ -496,7 +508,7 @@ assets {
                   const px = (p - 1) * 1.1
                   if seg_hash(seed + p, i, 3) == 0 {
                     "house_glass_{s}_{p}" : ShipGlass { Rotation: {0, 0, tilt(g, px) + HALF_PI}; Position: {px, ground(g, px), zc}; Cylinder: {radius: 0.3, length: 0.95, segments: 24, smooth: true} }
-                    "house_grow_{s}_{p}" : ShipGrowLight { Rotation: {0, 0, tilt(g, px)}; Position: {px, ground(g, px) - 0.28, zc}; Box: {0.9, 0.008, 0.06}; Emissive: {strength: 0.5, color: {255, 150, 220}} }
+                    "house_grow_{s}_{p}" : PowerLamp { Rgb: {255, 150, 220}; Rotation: {0, 0, tilt(g, px)}; Position: {px, ground(g, px) - 0.28, zc}; Box: {0.9, 0.008, 0.06}; Emissive: {strength: 0.5 * lit, color: {255, 150, 220}} }
                     for k in 0..5 {
                       "house_hoop_{s}_{p}_{k}" : ShipTrim { Rotation: {0, 0, tilt(g, px + (k - 2) * 0.22) + HALF_PI}; Position: {px + (k - 2) * 0.22, ground(g, px + (k - 2) * 0.22), zc}; Tube: {radius: 0.305, thickness: 0.012, length: 0.014, segments: 24, smooth: true} }
                     }
@@ -516,7 +528,7 @@ assets {
                     }
                   }
                 }
-                RingHouse "barn_{s}"(w: 0.3, d: 0.5, h: 0.26, f: 0 - sz) { Rotation: {0, 0, tilt(g, 1.62)}; Position: {1.62, ground(g, 1.62), zc} }
+                RingHouse "barn_{s}"(w: 0.3, d: 0.5, h: 0.26, f: 0 - sz, lit: lit) { Rotation: {0, 0, tilt(g, 1.62)}; Position: {1.62, ground(g, 1.62), zc} }
                 "silo_{s}" : ShipSteel { Rotation: {0, 0, tilt(g, 1.62)}; Position: {1.62, ground(g, 1.62) - 0.25, zc + sz * 0.38}; Cylinder: {radius: 0.09, length: 0.5, segments: 20, smooth: true} }
               } else if kind == 2 {
                 "hill_{s}" : ShipMoss { Position: {0.2, g + 0.02, zc}; Rotation: {PI, 0, 0}; Scale: {1, 0.22, 0.7}; HemiSphere: {radius: 1.2, segments: 40, smooth: true} }
@@ -530,8 +542,8 @@ assets {
               } else {
                 for v in 0..2 {
                   const vx = v == 0 ? -0.8 : 0.9
-                  RingHouse "villa_{s}_{v}"(w: 0.8, d: 0.46, h: 0.28, f: 0 - sz) { Rotation: {0, 0, tilt(g, vx)}; Position: {vx, ground(g, vx), zc + sz * 0.12} }
-                  RingHouse "villa_wing_{s}_{v}"(w: 0.42, d: 0.34, h: 0.24, f: 0 - sz) { Rotation: {0, 0, tilt(g, vx + 0.18)}; Position: {vx + 0.18, ground(g, vx + 0.18) - 0.28, zc + sz * 0.16} }
+                  RingHouse "villa_{s}_{v}"(w: 0.8, d: 0.46, h: 0.28, f: 0 - sz, lit: lit) { Rotation: {0, 0, tilt(g, vx)}; Position: {vx, ground(g, vx), zc + sz * 0.12} }
+                  RingHouse "villa_wing_{s}_{v}"(w: 0.42, d: 0.34, h: 0.24, f: 0 - sz, lit: lit) { Rotation: {0, 0, tilt(g, vx + 0.18)}; Position: {vx + 0.18, ground(g, vx + 0.18) - 0.28, zc + sz * 0.16} }
                   "pool_{s}_{v}" : ShipPool { Rotation: {0, 0, tilt(g, vx - 0.1)}; Position: {vx - 0.1, ground(g, vx - 0.1) - 0.009, zc - sz * 0.27}; Box: {0.5, 0.014, 0.16} }
                   "hedge_{s}_{v}" : ShipLeafDark { Rotation: {0, 0, tilt(g, vx)}; Position: {vx, ground(g, vx) - 0.04, zc + sz * 0.38}; Box: {0.9, 0.08, 0.05} }
                   RingTree "garden_tree_{s}_{v}"(h: 0.34, kind: 1) { Rotation: {0, 0, tilt(g, vx + 0.42)}; Position: {vx + 0.42, ground(g, vx + 0.42), zc - sz * 0.22} }
@@ -561,11 +573,12 @@ assets {
   prefab AgriOrchard { Rgb: {200, 160, 48}; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.35, color: {255, 220, 110}} }
   prefab AgriMeadow { Rgb: {168, 154, 70}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {240, 230, 150}, roughness: 0.6} }
   prefab AgriSeed { Rgb: {96, 58, 26}; PbrMaterial: {roughness: 0.9} }
-  prefab AgriLamp { Rgb: {255, 222, 160}; Emissive: {strength: 3, color: {255, 196, 120}} }
+  prefab AgriLamp { Rgb: {120, 108, 90}; Emissive: {strength: 3, color: {255, 196, 120}}; Transition: [Emissive: {duration: 1.2, timing_function: EaseInOut}] }
 
   template AgriRing {
     prop r: f32 = 1
     prop seed: i32 = 0
+    prop power: f32 = 1
 
     const dir = seed % 2 == 0 ? 1 : -1
     const ro = RING_R
@@ -590,13 +603,13 @@ assets {
       Rotation: {0, 0, ring_phase(seed)}
       rotor {
         AngularVelocity: {0, 0, dir * ring_spin(seed)}
-        RingChassis chassis(r: r, seed: seed)
+        RingChassis chassis(r: r, seed: seed, power: power)
         soil : AgriLoam { Rotation: {HALF_PI, 0, 0}; Tube: {radius: ro - 0.3, thickness: 0.32, length: 2 * RING_IN, segments: 144, smooth: true} }
         vault : ShipGlass { Rotation: {HALF_PI, 0, 0}; TorusShell: {radius: sky + vr, tube: vr, ring_start: 0, ring_end: 2 * PI, tube_start: PI - va, tube_end: PI + va, thickness: 0.04, segments: 144, rings: 32} }
         for c in 0..5 {
           "channel_{c}" : ShipWater { Position: {0, 0, (c - 2) * 0.44}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: g + 0.002, thickness: 0.008, length: 0.05, segments: 144, smooth: true} }
         }
-        sun : ShipWhiteLight { Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.02, tube: 0.04, segments: 144, rings: 4, smooth: true} }
+        sun : PowerLamp { Rotation: {HALF_PI, 0, 0}; Torus: {radius: sky - 0.02, tube: 0.04, segments: 144, rings: 4, smooth: true}; Emissive: {strength: 4 * power, color: {220, 236, 255}} }
         for s in 0..2 {
           const sz = (s - 0.5) * 2
           "gallery_{s}" : ShipGlass { Position: {0, 0, sz * gz}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: rl - 0.02, thickness: 0.22, length: 0.36, segments: 144, smooth: true} }
@@ -605,12 +618,13 @@ assets {
           "rail_{s}" : ShipSteel { Position: {0, 0, sz * 1.32}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: g - 0.012, tube: 0.012, segments: 144, rings: 4, smooth: true} }
         }
         for i in 0..6 {
-          "daylight_{i}" { Rotation: {0, 0, i * PI / 3}; glow { Position: {0, sky + 0.3, 0}; PointLight: {intensity: 30, range: 9}; Rgb: {255, 230, 190} } }
+          "daylight_{i}" { Rotation: {0, 0, i * PI / 3}; glow : PowerLight { Position: {0, sky + 0.3, 0}; PointLight: {intensity: 30 * lit_share(power, i, 6), range: 9}; Rgb: {255, 230, 190} } }
         }
         for i in 0..n {
           const depot = i % 4 == 1
           const field = agri_field(seed, i)
           const reap = field < 3 && (i * 7 + seed * 5) % 4 < 2
+          const lit = lit_share(power, seg_hash(seed + 5, i, 4), 4)
           "plot_{i}" {
             Rotation: {0, 0, i * step}
             if depot {
@@ -684,9 +698,9 @@ assets {
                 body : ShipRed { Position: {0, -0.15, 0}; RoundedBox: {0.8, 0.3, 0.46, 0.015, segments: 2} }
                 roof : ShipTrim { Position: {0, -0.31, 0}; RoundedBox: {0.84, 0.03, 0.5, 0.01, segments: 2} }
                 door : ShipHullDark { Position: {0, -0.1, 0.232}; Box: {0.24, 0.2, 0.006} }
-                lamp : ShipWindow { Position: {0, -0.23, 0.236}; Box: {0.08, 0.02, 0.006} }
+                lamp : PowerWindow { Position: {0, -0.23, 0.236}; Box: {0.08, 0.02, 0.006}; Emissive: {strength: 3.2 * lit, color: {255, 204, 136}} }
                 for w in 0..2 {
-                  "window_{w}" : ShipWindow { Position: {(w - 0.5) * 0.5, -0.2, 0.233}; Box: {0.1, 0.05, 0.006} }
+                  "window_{w}" : PowerWindow { Position: {(w - 0.5) * 0.5, -0.2, 0.233}; Box: {0.1, 0.05, 0.006}; Emissive: {strength: 3.2 * lit, color: {255, 204, 136}} }
                 }
               }
               for v in 0..2 {
@@ -716,7 +730,7 @@ assets {
                 Rotation: {0, 0, tilt(g, xg)}
                 Position: {xg, ground(g, xg), 0}
                 beam : ShipYellow { Position: {0, -0.62, 0}; Box: {0.06, 0.05, 2.72} }
-                lamp : AgriLamp { Position: {0, -0.592, 0}; Box: {0.09, 0.008, 2.5} }
+                lamp : AgriLamp { Position: {0, -0.592, 0}; Box: {0.09, 0.008, 2.5}; Emissive: {strength: 3 * lit, color: {255, 196, 120}} }
                 for s in 0..2 {
                   const sz = (s - 0.5) * 2
                   "leg_{s}" : ShipSteel { Position: {0, -0.31, sz * 1.32}; Box: {0.035, 0.6, 0.035} }
@@ -739,7 +753,7 @@ assets {
                   header : ShipYellow { Position: {-0.23, -0.035, 0}; Box: {0.08, 0.05, 0.9} }
                   reel : ShipYellow { Position: {-0.27, -0.1, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.03, length: 0.86, segments: 8, smooth: true} }
                   auger : ShipSteel { Position: {0.12, -0.24, 0.2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.014, length: 0.26, segments: 6, smooth: true} }
-                  beacon : ShipAmberLight { Position: {-0.07, -0.31, 0}; Box: {0.02, 0.012, 0.02} }
+                  beacon : PowerLamp { Position: {-0.07, -0.31, 0}; Box: {0.02, 0.012, 0.02}; Emissive: {strength: 4 * lit, color: {255, 160, 50}} }
                   for w in 0..2 {
                     const wz = (w - 0.5) * 0.22
                     "wheel_{w}" : ShipRubber { Position: {-0.04, -0.06, wz}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.06, length: 0.04, segments: 12, smooth: true} }
@@ -805,19 +819,38 @@ assets {
     prop fe: i32 = 0
     prop be: i32 = 0
     prop power: f32 = 1
+    prop heat: f32 = 0
+    prop trip: bool = false
 
     const tr = r * 0.98
     const tt = r * 0.42
     const vf = fe == 0 ? 0 : 0.01
     const vb = be == 0 ? 0 : 0.01
-    vessel : ShipHullDark { Position: {0, 0, (vb - vf) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.78, length: SEG - vf - vb, segments: 32, smooth: true} }
-    shell : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Torus: {radius: tr, tube: tt, segments: 48, rings: 20, smooth: true} }
-    if power > 0 {
-      seam : ShipFusion { Rotation: {HALF_PI, 0, 0}; Torus: {radius: tr + tt, tube: 0.05, segments: 64, rings: 4, smooth: true} }
-      glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: r * 4}; Rgb: {200, 120, 255} }
-    } else {
-      seam_idle : ShipFusionIdle { Rotation: {HALF_PI, 0, 0}; Torus: {radius: tr + tt, tube: 0.05, segments: 64, rings: 4, smooth: true} }
+    const on = power > 0
+    const hg = heat_glow(heat)
+    // A tripped reactor glows red while it is still hot; one switched off only has its idle seam
+    const alarm = trip && !on && heat > 0
+    const seam_glow: Emissive = match on {
+      true: {7 * power, {200, 110, 255}}
+      _: match alarm { true: {2 + 4 * heat, {255, 40, 24}}; _: {0.3, {200, 110, 255}} }
     }
+    const light_rgb: Rgb = match alarm { true: {255, 60, 40}; _: {200, 120, 255} }
+    const shell_rgb: Rgb = match alarm { true: {255, 24, 12}; _: heat_rgb(hg) }
+    vessel : ShipHullDark { Position: {0, 0, (vb - vf) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.78, length: SEG - vf - vb, segments: 32, smooth: true} }
+    shell : ShipHullDarkFine {
+      Rotation: {HALF_PI, 0, 0}
+      Torus: {radius: tr, tube: tt, segments: 48, rings: 20, smooth: true}
+      Emissive: {strength: 2.5 * hg, color: shell_rgb}
+      if on {
+        Transition: [Emissive: {duration: 3, timing_function: EaseInOut}]
+      } else {
+        Transition: [Emissive: {duration: 7, timing_function: EaseOut}]
+      }
+    }
+    seam : ShipFusionSeam { Rotation: {HALF_PI, 0, 0}; Torus: {radius: tr + tt, tube: 0.05, segments: 64, rings: 4, smooth: true}; Emissive: seam_glow }
+    // The flickering fusion glow over the seam, fading out when the reactor stops
+    flare : ShipFusionFade { Rotation: {HALF_PI, 0, 0}; Torus: {radius: tr + tt, tube: 0.06, segments: 64, rings: 4, smooth: true}; Opacity: {on ? power : 0} }
+    glow : PowerLight { Position: {0, 0, 0}; PointLight: {intensity: on ? 3 * power : (alarm ? 1 + 2 * heat : 0), range: r * 4}; Rgb: light_rgb }
     for i in 0..10 {
       "coil_{i}" {
         Rotation: {0, 0, i * PI / 5}
@@ -826,6 +859,12 @@ assets {
     }
     for s in 0..2 {
       "hazard_{s}" : ShipHazard { Position: {0, 0, (s - 0.5) * 3.3}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: 0.3, segments: 32, smooth: true} }
+      // Warning beacons that pulse while a tripped reactor is still hot
+      if alarm {
+        for i in 0..2 {
+          "alarm_{s}_{i}" : ShipWarning { Position: {0, (i - 0.5) * 2 * (r * 0.8 + 0.08), (s - 0.5) * 3.3}; Sphere: {radius: 0.14, segments: 8, smooth: true} }
+        }
+      }
     }
     SpineEnds ends(r: r, fe: fe, be: be)
   }
@@ -833,6 +872,8 @@ assets {
   template Radiator {
     prop r: f32 = 1
     prop core: bool = true
+    prop heat: f32 = 0
+    prop cool: bool = false
 
     const span = core ? 10 : 5.6
     const n = core ? 4 : 2
@@ -853,6 +894,8 @@ assets {
     const bx = x0 + bay * 1.4
     const sl = sqrt((bx - ax) * (bx - ax) + (ay - bh) * (ay - bh))
     const st = atan2(ay - bh, bx - ax)
+    const glow: Rgb = {255, 90 + 165 * heat, 60 + 195 * heat}
+    const pump: Emissive = match heat > 0 { true: {1.5 + 3 * heat, {90, 255, 110}}; _: {0.5, {255, 160, 50}} }
     body : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr, length: SEG, segments: 32, smooth: true} }
     for s in 0..2 {
       const sz = (s - 0.5) * 2
@@ -882,7 +925,7 @@ assets {
           "riser_{s}" : ShipSteel { Position: {hr + 0.66, 0, sz * 0.62}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: abs(sz) * 0.75, segments: 8, smooth: true} }
           "valve_{s}" : ShipTrim { Position: {hr + 0.66, 0, sz * 0.4}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.11, tube: 0.025, segments: 12, rings: 4} }
         }
-        status : ShipGreenLight { Position: {hr + 0.47, 0.42, 1.3}; Box: {0.02, 0.1, 0.18} }
+        status : PowerLamp { Position: {hr + 0.47, 0.42, 1.3}; Box: {0.02, 0.1, 0.18}; Emissive: pump }
         joint : ShipSteel { Position: {hr + 0.68, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.3, length: 0.36, segments: 20, smooth: true} }
         bearing : ShipTrim { Position: {hr + 0.78, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.34, length: 0.08, segments: 20, smooth: true} }
         for c in 0..4 {
@@ -905,11 +948,21 @@ assets {
         for b in 0..bays {
           const mx = x0 + (b + 0.5) * bay
           const flip = (b % 2 - 0.5) * 2
-          const heat = 4 * pow(0.45, b * 6.0 / bays)
+          const hot = 4 * pow(0.45, b * 6.0 / bays) * heat
           for s in 0..2 {
             const sz = (s - 0.5) * 2
             const tone = 200 + seg_hash(p * 2 + s + 5, b, 6) * 10
-            "panel_{b}_{s}" : ShipRadiatorPanel { Position: {mx, 0, sz * pc}; Box: {bay - 0.08, 0.04, pl}; Rgb: {tone, tone, tone}; Emissive: {strength: heat, color: {255, 255, 255}} }
+            "panel_{b}_{s}" : ShipRadiatorPanel {
+              Position: {mx, 0, sz * pc}
+              Box: {bay - 0.08, 0.04, pl}
+              Rgb: {tone, tone, tone}
+              Emissive: {strength: hot, color: glow}
+              if cool {
+                Transition: [Emissive: {duration: 7, timing_function: EaseOut}]
+              } else {
+                Transition: [Emissive: {duration: 3, timing_function: EaseInOut}]
+              }
+            }
             "diag_z_{b}_{s}" : YardGirder { Position: {mx, 0, sz * bh}; Rotation: {0, 0, flip * dt}; Box: {dl, 0.035, 0.035} }
             "diag_y_{b}_{s}" : YardGirder { Position: {mx, sz * bh, 0}; Rotation: {0, flip * dt, 0}; Box: {dl, 0.035, 0.035} }
           }
@@ -925,8 +978,10 @@ assets {
     prop fe: i32 = 0
     prop be: i32 = 0
     prop power: f32 = 1
+    prop spin: f32 = 1
 
     const cr = r * 1.55
+    const coil: Emissive = {6 * power, {110, 236, 255}}
     const hub = r * 0.78
     const pr = r * 1.15
     shaft : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.6, length: SEG, segments: 24, smooth: true} }
@@ -942,11 +997,8 @@ assets {
       for s in 0..2 {
         "lip_{c}_{s}" : ShipSteel { Position: {0, 0, cz + (s - 0.5) * 0.4}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: 0.06, segments: 32, smooth: true} }
       }
-      if power > 0 {
-        "coil_{c}" : ShipJump { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.12, segments: 48, rings: 8, smooth: true} }
-      } else {
-        "coil_idle_{c}" : ShipJumpIdle { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.12, segments: 48, rings: 8, smooth: true} }
-      }
+      "coil_{c}" : ShipJumpCoil { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.12, segments: 48, rings: 8, smooth: true}; Rgb: {96 + 74 * power, 128 + 122 * power, 136 + 119 * power}; Emissive: {strength: 6 * lit_share(power, c, 3), color: {110, 236, 255}} }
+      "pulse_{c}" : ShipJumpFade { Position: {0, 0, cz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.13, segments: 48, rings: 8, smooth: true}; Opacity: {lit_share(power, c, 3)} }
       for w in 0..4 {
         const ws = (w % 2 - 0.5) * 2
         "winding_{c}_{w}" : ShipCopper { Position: {0, 0, cz + ws * (0.2 + (w - w % 2) * 0.06)}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.05, segments: 48, rings: 6, smooth: true} }
@@ -983,7 +1035,7 @@ assets {
       for i in 0..3 {
         const a = (i - 2) * HALF_PI
         "cell_{g}_{i}" : ShipHullDark { Position: {cos(a) * r * 0.667, sin(a) * r * 0.667, (g - 0.5) * 1.3}; Rotation: {0, 0, a}; Box: {0.36, 0.7, 0.6} }
-        "charge_{g}_{i}" : ShipCyanLight { Position: {cos(a) * (r * 0.667 + 0.19), sin(a) * (r * 0.667 + 0.19), (g - 0.5) * 1.3}; Rotation: {0, 0, a}; Box: {0.03, 0.5, 0.06} }
+        "charge_{g}_{i}" : PowerLamp { Position: {cos(a) * (r * 0.667 + 0.19), sin(a) * (r * 0.667 + 0.19), (g - 0.5) * 1.3}; Rotation: {0, 0, a}; Box: {0.03, 0.5, 0.06}; Emissive: {strength: 4 * lit_share(power, g * 3 + i, 6), color: {80, 214, 255}} }
       }
     }
     catwalk {
@@ -992,34 +1044,27 @@ assets {
       for s in 0..2 {
         const sx = (s - 0.5) * 0.46
         "rail_{s}" : ShipSteel { Position: {sx, 0.14, 0}; Box: {0.025, 0.025, 3.3} }
-        "edge_{s}" : ShipRunLightsCyan { Position: {(s - 0.5) * 0.51, 0, 0}; Box: {0.02, 0.015, 3.3} }
+        "edge_{s}" : PowerRunLightsCyan { Position: {(s - 0.5) * 0.51, 0, 0}; Box: {0.02, 0.015, 3.3}; Emissive: {strength: 6 * power, color: {90, 214, 255}} }
         for p in 0..7 {
           "post_{s}_{p}" : ShipSteel { Position: {sx, 0.08, p * 0.55 - 1.65}; Box: {0.02, 0.12, 0.02} }
         }
       }
     }
     rotor {
-      if power > 0 {
-        AngularVelocity: {0, 0, 0.3 * power}
-      }
+      AngularVelocity: {0, 0, 0.3 * spin}
       for g in 0..2 {
         const gz = (g - 0.5) * 1.3
         "ring_{g}" : ShipChrome { Position: {0, 0, gz}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: pr, tube: 0.05, segments: 40, rings: 4, smooth: true} }
         for i in 0..6 {
           const a = i * PI / 3 + g * PI / 6
           "vane_{g}_{i}" : ShipTrim { Position: {cos(a) * pr, sin(a) * pr, gz}; Rotation: {0, 0, a}; Box: {0.5, 0.03, 0.36} }
-          if power > 0 {
-            "node_{g}_{i}" : ShipJump { Position: {cos(a) * (pr + 0.26), sin(a) * (pr + 0.26), gz}; Rotation: {0, 0, a}; Box: {0.06, 0.12, 0.12} }
-          } else {
-            "node_idle_{g}_{i}" : ShipJumpIdle { Position: {cos(a) * (pr + 0.26), sin(a) * (pr + 0.26), gz}; Rotation: {0, 0, a}; Box: {0.06, 0.12, 0.12} }
-          }
+          "node_{g}_{i}" : ShipJumpCoil { Position: {cos(a) * (pr + 0.26), sin(a) * (pr + 0.26), gz}; Rotation: {0, 0, a}; Box: {0.06, 0.12, 0.12}; Emissive: coil }
+          "pulse_{g}_{i}" : ShipJumpFade { Position: {cos(a) * (pr + 0.26), sin(a) * (pr + 0.26), gz}; Rotation: {0, 0, a}; Box: {0.07, 0.13, 0.13}; Opacity: {power} }
         }
       }
     }
-    if power > 0 {
-      field : ShipJumpField { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.45, length: SEG * 0.9, segments: 40, smooth: true} }
-      glow { Position: {0, 0, 0}; PointLight: {intensity: 4 * power, range: r * 5}; Rgb: {110, 236, 255} }
-    }
+    field : ShipJumpFieldFade { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.45, length: SEG * 0.9, segments: 40, smooth: true}; Opacity: {0.1 * power} }
+    glow : PowerLight { Position: {0, 0, 0}; PointLight: {intensity: 4 * power, range: r * 5}; Rgb: {110, 236, 255} }
     SpineEnds ends(r: r, fe: fe, be: be)
   }
 
@@ -1036,6 +1081,9 @@ assets {
     const pr = r * 0.085
     const bt = atan2(r * 0.44, 0.8)
     const bl = sqrt(r * 0.44 * r * 0.44 + 0.64)
+    const fire = power > 0
+    // A firing nozzle glows white hot; a cut one cools through red to dark metal
+    const nozzle: Emissive = match fire { true: {4 * power, {255, 255, 255}}; _: {0, {255, 40, 10}} }
 
     bulkhead : ShipHullDarkFine { Position: {0, 0, 1.7}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.96, length: 0.4, segments: 32, smooth: true} }
     rim : ShipTrim { Position: {0, 0, 1.52}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.99, length: 0.08, segments: 32, smooth: true} }
@@ -1092,6 +1140,12 @@ assets {
           Position: {0, 0, 0}
           Lathe: {profile: liner_bell_outer, inner: liner_bell_inner, cap_start: true, cap_end: true, segments: 48, rings: 16}
           SurfaceMaterials: {inner: {color: {54, 52, 58, 255}, metallic: 0.8, roughness: 0.6}}
+          Emissive: nozzle
+          if fire {
+            Transition: [Emissive: {duration: 2.5, timing_function: EaseInOut}]
+          } else {
+            Transition: [Emissive: {duration: 8, timing_function: EaseOut}]
+          }
         }
       }
     }
@@ -1113,65 +1167,76 @@ assets {
       }
     }
     lip : ShipTrim { Position: {0, 0, ez}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: r, tube: r * 0.03, segments: 48, rings: 4, smooth: true} }
-    throat : ShipPlasma { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.28, length: 0.04, segments: 16, smooth: true} }
-    if power > 0 {
-      glow {
-        Position: {0, 0, (bz + ez) / 2}
-        Rotation: {0 - HALF_PI, 0, 0}
-        Frustum: {radius_bottom: r * 0.24, radius_top: r * 0.5, length: bz - ez, segments: 24, smooth: true}
-        Rgb: {120, 190, 255}
-        Emissive: {strength: 2.5, color: {90, 170, 255}}
-        Opacity: {0.07}
-        BlendMode: Additive
-        NoShadow
-        Ignore
-      }
-      plume : ShipPlumeCore {
-        Position: {0, 0, -1.5}
-        Rotation: {0 - HALF_PI, 0, 0}
-        Scale: {k, k, k}
-        Lathe: {profile: plume_core_shape, segments: 24, rings: 16}
-        NoShadow
-        Ignore
-      }
-      haze {
-        Position: {0, 0, ez - 0.1}
-        Rotation: {0 - HALF_PI, 0, 0}
-        Emitter: {
-          max: 120, rate: 64, shape: EmitterDisc, radius: k * 0.5,
-          direction: {0, 1, 0}, spread: 6, speed: {k * 4.4, k * 6},
-          lifetime: {1.1, 1.75}, size: {k * 1.5, k * 2.1}, opacity: {0.07, 0.11},
-          color: {110, 150, 255}, seed: 170 + fe
-        }
-        Forces: {gravity: {0, 0, 0}}
-        Appearance: {blend: Additive, stretch: 0.05}
-        Curves: {
-          size: {keys: [{0, 0.7}, {1, 1.5}]},
-          opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.6}, {1, 0}]},
-          color: {keys: [{0, {200, 230, 255}}, {0.4, {255, 255, 255}}, {1, {170, 110, 255}}]}
-        }
-        Ignore
-      }
-      exhaust {
-        Position: {0, 0, ez - 0.25}
-        Rotation: {0 - HALF_PI, 0, 0}
-        Emitter: {
-          max: 360, rate: 240, shape: EmitterDisc, radius: k * 0.6,
-          direction: {0, 1, 0}, spread: 3, speed: {k * 7.2, k * 10.4},
-          lifetime: {0.55, 1.05}, size: {k * 0.22, k * 0.4}, opacity: {0.3, 0.55},
-          color: {170, 215, 255}, seed: 70 + fe
-        }
-        Forces: {gravity: {0, 0, 0}, turbulence: k * 1.3, turbulence_scale: 2 / k}
-        Appearance: {blend: Additive, stretch: 0.06}
-        Curves: {
-          size: {keys: [{0, 0.8}, {1, 1.3}]},
-          opacity: {keys: [{0, 0}, {0.08, 1}, {0.4, 0.45}, {1, 0}]},
-          color: {keys: [{0, {255, 255, 255}}, {0.3, {130, 190, 255}}, {1, {90, 60, 255}}]}
-        }
-        Ignore
-      }
-      light { Position: {0, 0, -5}; PointLight: {intensity: 40 * power, range: r * 9}; Rgb: {120, 180, 255} }
+    throat : ShipPlasma { Position: {0, 0, 0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.28, length: 0.04, segments: 16, smooth: true}; Emissive: {strength: 10 * power, color: {110, 190, 255}}; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}] }
+    glow {
+      Position: {0, 0, (bz + ez) / 2}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Frustum: {radius_bottom: r * 0.24, radius_top: r * 0.5, length: bz - ez, segments: 24, smooth: true}
+      Rgb: {120, 190, 255}
+      Emissive: {strength: 2.5 * power, color: {90, 170, 255}}
+      Opacity: {0.07 * power}
+      Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Opacity: {duration: 1, timing_function: EaseInOut}]
+      BlendMode: Additive
+      NoShadow
+      Ignore
     }
+    plume : ShipPlumeCore {
+      Position: {0, 0, -1.5}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Scale: {k, k, k}
+      Lathe: {profile: plume_core_shape, segments: 24, rings: 16}
+      Opacity: {0.2 * power}
+      Transition: [Opacity: {duration: 1, timing_function: EaseInOut}]
+      NoShadow
+      Ignore
+    }
+    haze {
+      Position: {0, 0, ez - 0.1}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Emitter: {
+        max: 120, rate: 64, shape: EmitterDisc, radius: k * 0.5,
+        direction: {0, 1, 0}, spread: 6, speed: {k * 4.4, k * 6},
+        lifetime: {1.1, 1.75}, size: {k * 1.5, k * 2.1}, opacity: {0.07, 0.11},
+        color: {110, 150, 255}, seed: 170 + fe
+      }
+      if fire {
+        Playback: {state: Playing}
+      } else {
+        Playback: {state: Stopped}
+      }
+      Forces: {gravity: {0, 0, 0}}
+      Appearance: {blend: Additive, stretch: 0.05}
+      Curves: {
+        size: {keys: [{0, 0.7}, {1, 1.5}]},
+        opacity: {keys: [{0, 0}, {0.15, 1}, {0.6, 0.6}, {1, 0}]},
+        color: {keys: [{0, {200, 230, 255}}, {0.4, {255, 255, 255}}, {1, {170, 110, 255}}]}
+      }
+      Ignore
+    }
+    exhaust {
+      Position: {0, 0, ez - 0.25}
+      Rotation: {0 - HALF_PI, 0, 0}
+      Emitter: {
+        max: 360, rate: 240, shape: EmitterDisc, radius: k * 0.6,
+        direction: {0, 1, 0}, spread: 3, speed: {k * 7.2, k * 10.4},
+        lifetime: {0.55, 1.05}, size: {k * 0.22, k * 0.4}, opacity: {0.3, 0.55},
+        color: {170, 215, 255}, seed: 70 + fe
+      }
+      if fire {
+        Playback: {state: Playing}
+      } else {
+        Playback: {state: Stopped}
+      }
+      Forces: {gravity: {0, 0, 0}, turbulence: k * 1.3, turbulence_scale: 2 / k}
+      Appearance: {blend: Additive, stretch: 0.06}
+      Curves: {
+        size: {keys: [{0, 0.8}, {1, 1.3}]},
+        opacity: {keys: [{0, 0}, {0.08, 1}, {0.4, 0.45}, {1, 0}]},
+        color: {keys: [{0, {255, 255, 255}}, {0.3, {130, 190, 255}}, {1, {90, 60, 255}}]}
+      }
+      Ignore
+    }
+    light : PowerLight { Position: {0, 0, -5}; PointLight: {intensity: 40 * power, range: r * 9}; Rgb: {120, 180, 255} }
     SpineEnds ends(r: r, fe: fe, be: 0)
   }
 
@@ -1302,7 +1367,9 @@ assets {
     prop fe: i32 = 0
     prop be: i32 = 0
     prop seed: i32 = 0
+    prop power: f32 = 1
 
+    const pad: Emissive = match power > 0 { true: {4 * power, {255, 160, 50}}; _: {0.8, {255, 50, 30}} }
     const h = r * 0.6
     const x0 = r * 1.3
     const x1 = r * 1.98
@@ -1315,7 +1382,7 @@ assets {
     const t = 0.1
     const sc = 0.15
     hull : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r, length: SEG, segments: 40, smooth: true} }
-    keel_lights : ShipRunLights { Position: {0 - r - 0.005, 0, 0}; Box: {0.02, r * 0.3, 3.2} }
+    keel_lights : PowerRunLights { Position: {0 - r - 0.005, 0, 0}; Box: {0.02, r * 0.3, 3.2}; Emissive: {strength: 6 * power, color: {255, 196, 120}} }
     bay {
       Rotation: {flip ? PI : 0, 0, core ? 0 - HALF_PI : 0}
       back : ShipHullDark { Position: {(x0 + r * 0.9) / 2, 0, 0}; Box: {x0 - r * 0.9, h * 2, hz * 2} }
@@ -1328,7 +1395,7 @@ assets {
         "back_rib_{i}" : ShipTrim { Position: {x0 + 0.02, 0, (i - 2) * 0.72}; Box: {0.04, h * 2, 0.07} }
       }
       for i in 0..3 {
-        "ceiling_light_{i}" : ShipWhiteLight { Position: {xm, h - 0.016, (i - 1) * 1.05}; Box: {dd - 0.12, 0.012, 0.05} }
+        "ceiling_light_{i}" : PowerLamp { Position: {xm, h - 0.016, (i - 1) * 1.05}; Box: {dd - 0.12, 0.012, 0.05}; Emissive: {strength: 4 * lit_share(power, i, 3), color: {220, 236, 255}} }
       }
       for s in 0..2 {
         const sy = s == 0 ? -1 : 1
@@ -1337,7 +1404,7 @@ assets {
         "end_{s}" : ShipHullFine { Position: {xs, 0, sz * (hz + t / 2)}; Box: {ls, h * 2, t} }
         "lip_{s}" : ShipTrim { Position: {x1 - 0.03, sy * (h + t / 2), 0}; Box: {0.1, t + 0.06, hz * 2 + t * 2 + 0.06} }
         "jamb_{s}" : ShipTrim { Position: {x1 - 0.03, 0, sz * (hz + t / 2)}; Box: {0.1, h * 2, t + 0.06} }
-        "edge_light_{s}" : ShipWhiteLight { Position: {x1 - 0.04, sy * (h - 0.02), 0}; Box: {0.03, 0.03, hz * 2 - 0.1} }
+        "edge_light_{s}" : PowerLamp { Position: {x1 - 0.04, sy * (h - 0.02), 0}; Box: {0.03, 0.03, hz * 2 - 0.1}; Emissive: {strength: 4 * power, color: {220, 236, 255}} }
         for i in 0..4 {
           "rib_{s}_{i}" : ShipTrim { Position: {xs - 0.05, sy * (h + t + 0.015), (i - 1.5) * 0.9}; Box: {ls - 0.1, 0.03, 0.07} }
         }
@@ -1346,7 +1413,7 @@ assets {
         "boom_{s}" : ShipSteel { Position: {x1 + 0.45, 0 - h - t / 2, sz * (hz - 0.15)}; Box: {0.9, 0.05, 0.05} }
         "boom_tip_{s}" : ShipBeaconWhite { Position: {x1 + 0.92, 0 - h - t / 2, sz * (hz - 0.15)}; Sphere: {radius: 0.03, segments: 4, smooth: true} }
         for g in 0..3 {
-          "guide_{s}_{g}" : ShipGreenLight { Position: {x1 + 0.18 + g * 0.25, 0.03 - h - t / 2, sz * (hz - 0.15)}; Box: {0.05, 0.02, 0.05} }
+          "guide_{s}_{g}" : PowerLamp { Position: {x1 + 0.18 + g * 0.25, 0.03 - h - t / 2, sz * (hz - 0.15)}; Box: {0.05, 0.02, 0.05}; Emissive: {strength: 4 * lit_share(power, g, 3), color: {90, 255, 110}} }
         }
         const cz = sz * 0.78
         "craft_{s}" {
@@ -1356,9 +1423,9 @@ assets {
         }
         "wall_rib_{s}_0" : ShipTrim { Position: {x0 + dd * 0.33, 0, sz * (hz - 0.02)}; Box: {0.05, h * 2, 0.04} }
         "wall_rib_{s}_1" : ShipTrim { Position: {x0 + dd * 0.66, 0, sz * (hz - 0.02)}; Box: {0.05, h * 2, 0.04} }
-        "wall_panel_{s}" : ShipScreen { Position: {x0 + dd * 0.5, h * 0.25, sz * (hz - 0.012)}; Box: {dd * 0.24, h * 0.3, 0.01} }
+        "wall_panel_{s}" : PowerScreen { Position: {x0 + dd * 0.5, h * 0.25, sz * (hz - 0.012)}; Box: {dd * 0.24, h * 0.3, 0.01}; Emissive: {strength: 1.8 * power, color: {90, 210, 255}} }
         for c in 0..4 {
-          "pad_light_{s}_{c}" : ShipAmberLight { Position: {xm + (c % 2 - 0.5) * (dd - 0.2), 0.03 - h, cz + (c - c % 2 - 1) * 0.62}; Box: {0.04, 0.012, 0.04} }
+          "pad_light_{s}_{c}" : PowerLamp { Position: {xm + (c % 2 - 0.5) * (dd - 0.2), 0.03 - h, cz + (c - c % 2 - 1) * 0.62}; Box: {0.04, 0.012, 0.04}; Emissive: pad }
         }
         "cart_{s}" : ShipYellow { Position: {x0 + 0.14, 0.074 - h, cz + sz * 0.62}; Box: {0.16, 0.1, 0.22} }
         "hose_{s}" : ShipRubber { Position: {x0 + 0.24, 0.034 - h, cz + sz * 0.42}; Box: {0.03, 0.02, 0.3} }
@@ -1368,9 +1435,9 @@ assets {
         "shutter_cap_{s}" : ShipYellow { Position: {x1 - 0.14, h + t + 0.11, (s - 0.5) * 2 * (hz + t + 0.03)}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.13, length: 0.06, segments: 16, smooth: true} }
       }
       booth : ShipHullDark { Position: {x1 - 0.2, 0 - h * 0.35, hz + t + 0.16}; Box: {0.34, 0.34, 0.32} }
-      booth_glass : ShipWindow { Position: {x1 - 0.028, 0 - h * 0.3, hz + t + 0.16}; Box: {0.01, 0.12, 0.26} }
-      field : ShipAirField { Position: {x1 - 0.06, 0, 0}; Box: {0.01, h * 2 - 0.02, hz * 2 - 0.02} }
-      lamp { Position: {x1 - 0.15, h * 0.75, 0}; PointLight: {intensity: 1.2, range: r * 1.6}; Rgb: {255, 226, 186} }
+      booth_glass : PowerWindow { Position: {x1 - 0.028, 0 - h * 0.3, hz + t + 0.16}; Box: {0.01, 0.12, 0.26}; Emissive: {strength: 3.2 * power, color: {255, 204, 136}} }
+      field : PowerField { Position: {x1 - 0.06, 0, 0}; Box: {0.01, h * 2 - 0.02, hz * 2 - 0.02}; Opacity: {0.05 * power}; Emissive: {strength: 0.5 * power, color: {90, 200, 255}} }
+      lamp : PowerLight { Position: {x1 - 0.15, h * 0.75, 0}; PointLight: {intensity: 1.2 * power, range: r * 1.6}; Rgb: {255, 226, 186} }
     }
     SpineEnds ends(r: r, fe: fe, be: be)
   }
@@ -1443,6 +1510,9 @@ assets {
   }
 
   template TurretMount {
+    prop power: f32 = 1
+
+    const sight_glow: Emissive = match power > 0 { true: {5 * power, {255, 60, 40}}; _: {0, {255, 60, 40}} }
     shield : ShipTrim { Position: {0, 0.1, 0}; Cylinder: {radius: 0.95, length: 0.2, segments: 20, smooth: true} }
     house : ShipHullDarkFine { Position: {0, 0.55, -0.1}; RoundedBox: {1.5, 0.7, 1.9, 0.22, segments: 2} }
     mantlet : ShipHullDark { Position: {0, 0.55, 0.9}; Box: {1.1, 0.5, 0.3} }
@@ -1450,7 +1520,10 @@ assets {
       "barrel_{b}" : ShipSteel { Position: {(b - 0.5) * 0.5, 0.55, 1.95}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.09, length: 2.1, segments: 10, smooth: true} }
       "brake_{b}" : ShipTrim { Position: {(b - 0.5) * 0.5, 0.55, 3.0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.13, length: 0.26, segments: 10, smooth: true} }
     }
-    sight : ShipRedLight { Position: {0.52, 0.94, 0.3}; Box: {0.18, 0.1, 0.18} }
+    sight : PowerLamp { Position: {0.52, 0.94, 0.3}; Box: {0.18, 0.1, 0.18}; Emissive: sight_glow }
+    for i in 0..3 {
+      "status_{i}" : PowerLamp { Position: {0.76, 0.62 - i * 0.12, -0.4}; Box: {0.02, 0.07, 0.16}; Emissive: {strength: 4 * lit_share(power, i, 3), color: {90, 255, 110}} }
+    }
   }
 
   template TurretDeck {
@@ -1458,6 +1531,7 @@ assets {
     prop core: bool = true
     prop fe: i32 = 0
     prop be: i32 = 0
+    prop power: f32 = 1
 
     const rr = r * 1.2 * 0.9239 + 0.1
     ArmorSleeve sleeve(r: r, fe: fe, be: be)
@@ -1465,13 +1539,13 @@ assets {
       for s in 0..2 {
         "gun_{s}" {
           Rotation: {0, 0, s * PI}
-          TurretMount mount() { Position: {0, rr, 0} }
+          TurretMount mount(power: power) { Position: {0, rr, 0} }
         }
       }
     } else {
       gun_0 {
         Rotation: {0, 0, 0 - HALF_PI}
-        TurretMount mount() { Position: {0, rr, 0} }
+        TurretMount mount(power: power) { Position: {0, rr, 0} }
       }
     }
   }
@@ -1481,6 +1555,7 @@ assets {
     prop core: bool = true
     prop fe: i32 = 0
     prop be: i32 = 0
+    prop power: f32 = 1
 
     const cr = r * 1.14
     const ca = cr * cos(PI / 8)
@@ -1507,7 +1582,8 @@ assets {
           "row_{g}" : ShipTrim { Position: {ca + 0.03, (g - 2) * cr * 0.13, 0}; Box: {0.008, 0.008, 1.4} }
           "col_{g}" : ShipTrim { Position: {ca + 0.03, 0, (g - 2) * 0.28}; Box: {0.008, cr * 0.66, 0.008} }
         }
-        status : ShipGreenLight { Position: {ca + 0.04, cr * 0.3, 0.62}; Box: {0.01, 0.03, 0.06} }
+        status : PowerLamp { Position: {ca + 0.04, cr * 0.3, 0.62}; Box: {0.01, 0.03, 0.06}; Emissive: {strength: 4 * lit_share(power, k, 4), color: {90, 255, 110}} }
+        scan : PowerLamp { Position: {ca + 0.028, 0, 0}; Box: {0.006, cr * 0.6, 0.02}; Emissive: {strength: 3 * lit_share(power, k, 4), color: {80, 214, 255}} }
       }
     }
     mount {
@@ -1550,7 +1626,7 @@ assets {
           base : ShipHullDark { Position: {0, 0.06, 0}; Cylinder: {radius: 0.14, length: 0.12, segments: 12, smooth: true} }
           head : ShipHullFine { Position: {0, 0.24, 0}; Sphere: {radius: 0.16, segments: 16, smooth: true} }
           tube : ShipTrim { Position: {0, 0.24, 0.18}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.07, length: 0.26, segments: 12, smooth: true} }
-          lens : ShipVisor { Position: {0, 0.24, 0.315}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.055, length: 0.01, segments: 12, smooth: true} }
+          lens : PowerLamp { Position: {0, 0.24, 0.315}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.055, length: 0.01, segments: 12, smooth: true}; Emissive: {strength: 5 * lit_share(power, s, 2), color: {255, 60, 40}} }
         }
       }
       for w in 0..4 {
@@ -1567,6 +1643,7 @@ assets {
   template Bridge {
     prop r: f32 = 1
     prop be: i32 = 0
+    prop power: f32 = 1
 
     const z0 = -0.8
     const pl = 3.4
@@ -1577,6 +1654,8 @@ assets {
     const el = sqrt((r - rt) * (r - rt) + pl * pl)
     const ft = atan2((r - rt) * ap, pl)
     const top = r * ap
+    // The command deck keeps a dim red emergency glow without power
+    const deck_glow: Emissive = match power > 0 { true: {1.6 * power, {255, 214, 160}}; _: {0.35, {255, 50, 30}} }
     neck : ShipHullFine { Position: {0, 0, -1.4}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r, length: 1.2, segments: 48, smooth: true} }
     stripe : ShipStripe { Position: {0, 0, -1.75}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.006, length: 0.2, segments: 48, smooth: true} }
     collar : ShipTrim { Position: {0, 0, z0}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 1.02, length: 0.12, segments: 48, smooth: true} }
@@ -1584,7 +1663,7 @@ assets {
       for i in 0..40 {
         "pane_{w}_{i}" {
           Rotation: {0, 0, i * PI / 20 + w * PI / 40}
-          light : ShipWindow { Position: {r * 1.003, 0, -1.25 + w * 0.22}; Box: {0.02, r * 0.07, 0.1} }
+          light : PowerWindow { Position: {r * 1.003, 0, -1.25 + w * 0.22}; Box: {0.02, r * 0.07, 0.1}; Emissive: {strength: 3.2 * lit_share(power, i, 8), color: {255, 204, 136}} }
         }
       }
     }
@@ -1604,7 +1683,7 @@ assets {
       "facet_{k}" {
         Rotation: {0, 0, fa}
         if side {
-          deck : ShipCabins { Position: {(r - (r - rt) * 0.42) * ap + 0.012, 0, z0 + pl * 0.42}; Rotation: {0, 0 - ft, 0}; Box: {0.02, r * 0.42, pl * 0.5} }
+          deck : PowerCabins { Position: {(r - (r - rt) * 0.42) * ap + 0.012, 0, z0 + pl * 0.42}; Rotation: {0, 0 - ft, 0}; Box: {0.02, r * 0.42, pl * 0.5}; Emissive: {strength: 1.8 * lit_share(power, k, 8), color: {255, 255, 255}} }
           sill : ShipTrim { Position: {(r - (r - rt) * 0.42) * ap + 0.03, 0, z0 + pl * 0.42}; Rotation: {0, 0 - ft, 0}; Box: {0.03, r * 0.46, 0.04} }
         }
         hatch : ShipHullDark { Position: {r * 0.94 * ap, 0, z0 + 0.35}; Rotation: {0, 0 - ft, 0}; Box: {0.03, r * 0.2, 0.3} }
@@ -1639,15 +1718,15 @@ assets {
       }
       roof : ShipTrim { Position: {0, 0.69, -0.2}; RoundedBox: {r * 0.74, 0.05, 1.3, 0.02, segments: 2} }
       band : ShipCanopy { Position: {0, 0.52, 0.605}; Box: {r * 0.78, 0.15, 0.02} }
-      glow : ShipWindow { Position: {0, 0.52, 0.598}; Box: {r * 0.74, 0.12, 0.01}; Emissive: {strength: 1.6, color: {255, 214, 160}} }
+      glow : PowerWindow { Position: {0, 0.52, 0.598}; Box: {r * 0.74, 0.12, 0.01}; Emissive: deck_glow }
       for m in 0..13 {
         "mullion_{m}" : ShipTrim { Position: {(m - 6) * r * 0.06, 0.52, 0.62}; Box: {0.012, 0.16, 0.012} }
       }
       for s in 0..2 {
         const sx = (s - 0.5) * 2
         "side_band_{s}" : ShipCanopy { Position: {sx * r * 0.4, 0.52, -0.1}; Box: {0.02, 0.13, 1.2} }
-        "side_glow_{s}" : ShipWindow { Position: {sx * (r * 0.4 - 0.008), 0.52, -0.1}; Box: {0.01, 0.1, 1.15}; Emissive: {strength: 1.2, color: {255, 214, 160}} }
-        "lower_glow_{s}" : ShipWindow { Position: {sx * (r * 0.475 + 0.003), 0.2, 0}; Box: {0.006, 0.05, 1.7}; Emissive: {strength: 1, color: {255, 214, 160}} }
+        "side_glow_{s}" : PowerWindow { Position: {sx * (r * 0.4 - 0.008), 0.52, -0.1}; Box: {0.01, 0.1, 1.15}; Emissive: {strength: 1.2 * power, color: {255, 214, 160}} }
+        "lower_glow_{s}" : PowerWindow { Position: {sx * (r * 0.475 + 0.003), 0.2, 0}; Box: {0.006, 0.05, 1.7}; Emissive: {strength: 1 * power, color: {255, 214, 160}} }
         "fin_{s}" : ShipTrim { Position: {sx * r * 0.3, 0.88, -0.6}; Box: {0.03, 0.34, 0.5} }
         "whip_{s}" : ShipSteel { Position: {sx * r * 0.2, 1.1, -0.2}; Cylinder: {radius: 0.012, length: 0.8, segments: 4} }
       }
