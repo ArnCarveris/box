@@ -24,10 +24,10 @@ prefab BunnyFur {
 // The red blink of a hurt bunny: the strength of the Tint of the pose, 0 at the start, so a
 // paused animator seeked to 0 leaves the bunny untinted
 bunny_hurt_blink {
-  AnimationClip: {duration: 0.16}
+  Clip: {duration: 0.16}
 
   strength {
-    AnimationTrack: {component: Tint, member: "a", curve: {keys: [{0, 0}, {0.08, 150}, {0.16, 0}]}}
+    Track: {component: Tint, member: "a", curve: {keys: [{0, 0}, {0.08, 150}, {0.16, 0}]}}
   }
 }
 
@@ -38,7 +38,7 @@ template BunnyModel {
 
   const eye: Rgb = {40, 40, 40}
   const earTilt = clamp((speed - 12) * 0.05, -0.45, 0.75)
-  const ease: TransitionSpec = {duration: 0.45, timing_function: EaseOut}
+  const ease: Spec = {duration: 0.45, timing_function: EaseOut}
 
   // The dead bunny rolls onto its back, its origin cfg.deadHeight above the ground
   pose {
@@ -46,7 +46,7 @@ template BunnyModel {
     Rotation: {0, 0, dead ? cfg.deadAngle : 0}
     Transition: [Position: ease, Rotation: ease]
     Tint: {255, 60, 60, 0}
-    Animator: {clip: bunny_hurt_blink, time: 0, speed: 1, mode: AnimationLoop, paused: !hurt}
+    Animator: {clip: bunny_hurt_blink, time: 0, speed: 1, mode: Loop, paused: !hurt}
 
     body : BunnyFur {
       Position: {-0.05, 0.55, 0}

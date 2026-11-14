@@ -859,8 +859,10 @@ void BoxSurfaceImport(
     ECS_META_COMPONENT(world, Surface);
     box_owned_hooks(world, Surface, BOX_OWNED_STR(Surface, write_to_file));
     ecs_set_hooks(world, Surface, { .ctor = box_surface_ctor });
+    ecs_set_name_prefix(world, "Surface");
     ECS_META_COMPONENT(world, SurfaceStatus);
     ECS_COMPONENT_DEFINE(world, SurfaceImpl);
+    ecs_set_name_prefix(world, NULL);
 
     box_surface_state_t *state = ecs_os_calloc_t(box_surface_state_t);
     ecs_vec_init_t(NULL, &state->retired, box_surface_retired_t, 0);

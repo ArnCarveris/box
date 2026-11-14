@@ -46,12 +46,12 @@ window {
 
 assets {
   firefly_drift {
-    AnimationClip: {duration: 4}
+    Clip: {duration: 4}
     rise {
-      AnimationTrack: {component: Position, member: "y", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.14}, {2.3, 0.04}, {3.2, 0.18}, {4, 0}]}}
+      Track: {component: Position, member: "y", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.1, 0.14}, {2.3, 0.04}, {3.2, 0.18}, {4, 0}]}}
     }
     sway {
-      AnimationTrack: {component: Position, member: "x", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.4, 0.09}, {2.7, -0.07}, {4, 0}]}}
+      Track: {component: Position, member: "x", target: "glow", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.4, 0.09}, {2.7, -0.07}, {4, 0}]}}
     }
   }
 }

@@ -1117,7 +1117,7 @@ assets {
     visor : ShipVisor { Position: {0, fy + 0.3, fz + 0.075}; RoundedBox: {hw * 2 - 0.6, 0.42, 0.05, 0.14, segments: 3} }
     scan {
       Position: {0, fy + 0.3, fz + 0.105}
-      Animator: {clip: yard_scan, mode: AnimationPingPong}
+      Animator: {clip: yard_scan, mode: PingPong}
       bar : ShipScanner { Position: {0, 0, 0}; Box: {0.34, 0.1, 0.02} }
       light { Position: {0, 0, 0.35}; PointLight: {intensity: 1.5, range: 2.5}; Rgb: {255, 60, 40} }
     }

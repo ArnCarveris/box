@@ -14,7 +14,7 @@ async {
 async {
   while true {
     const e = await HoldStarted
-    await delay(e.until - AppStatus[AppStatus].elapsed)
+    await delay(e.until - box.app.Status[box.app.Status].elapsed)
     if atlas_holding && e.serial == atlas_hold_serial {
       atlas_holding = false
       emit Awaken()

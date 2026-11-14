@@ -725,7 +725,9 @@ void box_render_textures_init(
 {
     box_render_textures_t *state = ecs_os_calloc_t(box_render_textures_t);
     ecs_map_t *targets = ecs_os_calloc_t(ecs_map_t);
+    ecs_set_name_prefix(world, "Render");
     ECS_COMPONENT_DEFINE(world, RenderTargetTextures);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, RenderTargetTextures, {
         .ctor = flecs_default_ctor,
         .dtor = box_render_target_textures_dtor,

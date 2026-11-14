@@ -402,10 +402,12 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxText);
     ECS_IMPORT(world, BoxTransition);
 
+    ecs_set_name_prefix(world, "Render");
     ECS_META_COMPONENT(world, RenderSettings);
     ECS_META_COMPONENT(world, RenderStatus);
-    ECS_META_COMPONENT(world, CullStatus);
     ECS_COMPONENT_DEFINE(world, RenderRing);
+    ecs_set_name_prefix(world, NULL);
+    ECS_META_COMPONENT(world, CullStatus);
 
     ecs_set_hooks(world, RenderRing, {
         .ctor = flecs_default_ctor,

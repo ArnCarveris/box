@@ -1797,7 +1797,7 @@ next command, in two steps.
 
 Headless with fixed `--delta-time`, repeated runs capture bit-identical audio on
 the same build. Use this to render music, compare changes or inspect scenes offline.
-`PerfStatus.audio_load` records the largest load of the run; worklet load reports
+`box.perf.Status.audio_load` records the largest load of the run; worklet load reports
 zero because it has no suitable high-resolution timer.
 
 `audio.analyze` reads a resource of the session (by the name of the resource `audio.capture`

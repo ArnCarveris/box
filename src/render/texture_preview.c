@@ -790,7 +790,9 @@ void box_render_texture_previews_init(
     ecs_world_t *world)
 {
     box_render_previews_t *p = ecs_os_calloc_t(box_render_previews_t);
+    ecs_set_name_prefix(world, "Render");
     ECS_COMPONENT_DEFINE(world, RenderTexturePreviews);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, RenderTexturePreviews, {
         .ctor = flecs_default_ctor,
         .dtor = box_render_texture_previews_dtor,

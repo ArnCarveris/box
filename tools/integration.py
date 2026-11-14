@@ -45,7 +45,7 @@ run in runs.jsonl. The last 30 runs are kept.
 
 perf runs every <dir>/<scene>.flecs (test/integration/perf by default) headless with boxrun on an
 offscreen surface of --size, unless the scene declares its own Surface. The scene sets the
-box.perf.PerfRun singleton (30, 60, 90 or 120 FPS) and runs in a release build (--cfg overrides
+box.perf.Run singleton (30, 60, 90 or 120 FPS) and runs in a release build (--cfg overrides
 it); the run sets App.fps to the target, so flecs caps every frame at it, orbits the camera
 around the bounds of the shapes (or lets its controller fly it) and counts as errors every frame
 interval outside [0.9, 1.1] target intervals and every delta_time that differs more than 1 ms from
@@ -891,7 +891,7 @@ def perf_script(scene, report, args):
     extra = ""
     if args.stall:
         extra += ", stall: %g" % args.stall
-    run = re.search(r"PerfRun:\s*\{([^}]*)\}", source)
+    run = re.search(r"box\.perf\.Run:\s*\{([^}]*)\}", source)
     members = run.group(1).strip() if run else ""
     fps = re.search(r"\bfps:\s*(\d+)", members)
     if args.seconds and fps:
@@ -901,8 +901,8 @@ def perf_script(scene, report, args):
     if not re.search(r"\bSurface:", source):
         surface = "perf_surface {\n  box.surface.Surface: {width: %d, height: %d}\n}\n\n" % (
             width, height)
-    # Setting PerfRun again replaces the value of the scene, so the run repeats its members
-    return "%s\n\n%s$ {\n  box.perf.PerfRun: {%s%squit: true, report: \"%s\"%s}\n}\n" % (
+    # Setting box.perf.Run again replaces the value of the scene, so the run repeats its members
+    return "%s\n\n%s$ {\n  box.perf.Run: {%s%squit: true, report: \"%s\"%s}\n}\n" % (
         source.rstrip(), surface, members, ", " if members else "", report, extra)
 
 
@@ -977,8 +977,8 @@ def run_perf_scene(scene, out, args):
     result = {"scene": display(scene), "name": name, "status": "fail",
               "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     with open(scene) as f:
-        if "PerfRun" not in f.read():
-            result.update({"detail": "the scene sets no PerfRun", "elapsed": 0})
+        if "box.perf.Run" not in f.read():
+            result.update({"detail": "the scene sets no box.perf.Run", "elapsed": 0})
             return result
     link_includes(out)
     with open(harness, "w") as f:

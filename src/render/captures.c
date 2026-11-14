@@ -335,7 +335,9 @@ int32_t box_render_captures_pending(
 void box_render_captures_init(
     ecs_world_t *world)
 {
+    ecs_set_name_prefix(world, "Render");
     ECS_COMPONENT_DEFINE(world, RenderCaptures);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, RenderCaptures, {
         .ctor = flecs_default_ctor,
         .dtor = box_render_captures_dtor,

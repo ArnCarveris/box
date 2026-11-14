@@ -568,7 +568,9 @@ void BoxTaskImport(
         .copy = box_task_tasks_copy,
         .move = box_task_tasks_move
     });
+    ecs_set_name_prefix(world, "Task");
     ECS_COMPONENT_DEFINE(world, TaskRegistry);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, TaskRegistry, {
         .ctor = flecs_default_ctor,
         .dtor = box_task_registry_dtor,
@@ -582,7 +584,7 @@ void BoxTaskImport(
     ecs_singleton_ensure(world, TaskRegistry)->tasks = t;
     ecs_singleton_set(world, InProgressTask, {0});
 
-    TaskPublish = ecs_entity(world, { .name = "TaskPublish" });
+    TaskPublish = ecs_entity(world, { .name = "Publish" });
     ecs_add_id(world, TaskPublish, EcsPhase);
     ecs_add_pair(world, TaskPublish, EcsDependsOn, EcsPostFrame);
     ecs_id(TaskPublish) = TaskPublish;

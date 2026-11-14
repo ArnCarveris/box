@@ -9,12 +9,12 @@ using box.animation
 
 assets {
   CanopyWingFlap {
-    AnimationClip: {duration: 0.5}
+    Clip: {duration: 0.5}
     left {
-      AnimationTrack: {component: Rotation, member: "z", target: "wing_l", curve: {kind: CurveCatmullRom, keys: [{0, 0.55}, {0.25, -0.35}, {0.5, 0.55}]}}
+      Track: {component: Rotation, member: "z", target: "wing_l", curve: {kind: CurveCatmullRom, keys: [{0, 0.55}, {0.25, -0.35}, {0.5, 0.55}]}}
     }
     right {
-      AnimationTrack: {component: Rotation, member: "z", target: "wing_r", curve: {kind: CurveCatmullRom, keys: [{0, -0.55}, {0.25, 0.35}, {0.5, -0.55}]}}
+      Track: {component: Rotation, member: "z", target: "wing_r", curve: {kind: CurveCatmullRom, keys: [{0, -0.55}, {0.25, 0.35}, {0.5, -0.55}]}}
     }
   }
 

@@ -528,6 +528,7 @@ void BoxAnimationImport(
     ECS_MODULE(world, BoxAnimation);
     ECS_IMPORT(world, BoxCurve);
 
+    ecs_set_name_prefix(world, "Animation");
     ECS_META_COMPONENT(world, AnimationTrack);
     box_owned_hooks(world, AnimationTrack,
         BOX_OWNED_STR(AnimationTrack, member), BOX_OWNED_STR(AnimationTrack, target),
@@ -535,6 +536,7 @@ void BoxAnimationImport(
     ECS_META_COMPONENT(world, AnimationClip);
     ECS_COMPONENT_DEFINE(world, AnimationTrackState);
     ECS_META_COMPONENT(world, AnimationMode);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Animator);
     box_animator_import(world);
 

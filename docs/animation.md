@@ -1,7 +1,7 @@
 # Keyframe animation
 
-`box.animation` plays clips as data. An `AnimationClip` entity contains child
-`AnimationTrack` entities; each track uses a [Curve](curves.md) to key one numeric
+`box.animation` plays clips as data. A `Clip` entity contains child
+`Track` entities; each track uses a [Curve](curves.md) to key one numeric
 member of one component. An `Animator` plays the clip on an entity and its descendants.
 
 Clips write real components on the game thread, so application code reads the
@@ -18,17 +18,17 @@ using box.animation
 using box.curve
 
 bounce {
-  AnimationClip: {duration: 2}
+  Clip: {duration: 2}
   height {
-    AnimationTrack: {component: Position, member: "y", curve: {
+    Track: {component: Position, member: "y", curve: {
       kind: CurveCatmullRom, keys: [{0, 0}, {1, 2}, {2, 0}]
     }}
   }
   red {
-    AnimationTrack: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
+    Track: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
   }
   blue {
-    AnimationTrack: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
+    Track: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
   }
 }
 
@@ -43,8 +43,8 @@ ball {
 
 | Component | Fields |
 | --- | --- |
-| `AnimationClip` | `duration` in seconds; zero uses the last key of any track |
-| `AnimationTrack` | `component`, `member`, optional `target`, `curve` |
+| `Clip` | `duration` in seconds; zero uses the last key of any track |
+| `Track` | `component`, `member`, optional `target`, `curve` |
 | `Animator` | `clip`, `time`, `speed`, `mode`, `paused`, `finished` |
 
 One track animates one number. Separate axes/channels need separate tracks, each
@@ -74,7 +74,7 @@ its strings and curve keys; callers retain ownership of their input storage.
 ## Playback
 
 `AnimatorPlay` advances time by `delta_time * speed`, samples tracks and writes
-their values. Constructor defaults are speed 1 and `AnimationLoop`. In C, preserve
+their values. Constructor defaults are speed 1 and `Loop`. In C, preserve
 them with `ecs_ensure`, or supply every field when using `ecs_set`, which zeros
 omitted members:
 
@@ -86,9 +86,9 @@ ecs_modified(world, ball, Animator);
 
 | Mode | Behavior |
 | --- | --- |
-| `AnimationOnce` | Clamp to 0..duration; hold the final value and set `finished` |
-| `AnimationLoop` | Wrap into 0..duration; duration itself becomes zero |
-| `AnimationPingPong` | Play forward, backward, then repeat |
+| `Once` | Clamp to 0..duration; hold the final value and set `finished` |
+| `Loop` | Wrap into 0..duration; duration itself becomes zero |
+| `PingPong` | Play forward, backward, then repeat |
 
 Once finishes at the end it plays toward: duration for positive speed, zero for
 negative speed. Seeking back or reversing speed clears finished. Ping-pong keeps

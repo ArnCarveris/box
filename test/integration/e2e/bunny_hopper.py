@@ -65,7 +65,7 @@ def setup(app):
     app.exec("set window box.surface.Surface {width: 640, height: 480}")
     app.exec("set main_view box.view.View.effects []")
     app.exec("set main_view box.view.View.shadows.enabled false")
-    app.wait_for("get window box.surface.SurfaceStatus.height", "480")
+    app.wait_for("get window box.surface.Status.height", "480")
 
 
 def key(app, name):

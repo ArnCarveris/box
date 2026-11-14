@@ -204,7 +204,7 @@ state {
     banner_sub = sub
     banner_on = true
     banner_serial += 1
-    emit BannerShown(serial: banner_serial, until: AppStatus[AppStatus].elapsed + 2.8)
+    emit BannerShown(serial: banner_serial, until: box.app.Status[box.app.Status].elapsed + 2.8)
   }
 
   fn check_afford() {

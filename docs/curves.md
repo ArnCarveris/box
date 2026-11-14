@@ -30,10 +30,10 @@ A `Curve` is `{kind, keys}` (`include/box/curve.h`):
 
 | Field  | Type              | Default       | Meaning                                         |
 |--------|-------------------|---------------|-------------------------------------------------|
-| `kind` | `CurveKind`       | `CurveLinear` | Shape of every span of the curve                |
+| `kind` | `box.curve.Kind`       | `CurveLinear` | Shape of every span of the curve                |
 | `keys` | `ecs_vec(CurveKey)` | none        | Keys in order of strictly increasing time       |
 
-A `CurveKey` is `{time, value, in, out}`, positionally `{0.5, 2}` or by name
+A `box.curve.Key` is `{time, value, in, out}`, positionally `{0.5, 2}` or by name
 `{time: 0.5, value: 2, out: -3}`:
 
 | Field   | Default | Meaning                                                        |
@@ -43,7 +43,7 @@ A `CurveKey` is `{time, value, in, out}`, positionally `{0.5, 2}` or by name
 | `in`    | 0       | Slope into the key in value per unit of time, `CurveBezier` only |
 | `out`   | 0       | Slope out of the key in value per unit of time, `CurveBezier` only |
 
-- `CurveKind` is `CurveLinear` (0), `CurveCatmullRom` or `CurveBezier`. The kind is per curve,
+- `box.curve.Kind` is `CurveLinear` (0), `CurveCatmullRom` or `CurveBezier`. The kind is per curve,
   not per key. Write the full names: `Linear` is a `TimingFunction` constant and `CatmullRom` a
   `PathSegmentKind` constant, and either in a curve is a script error, `unresolved reference
   'Linear'`, that stops the script.
@@ -80,7 +80,7 @@ kind, blended in linear light; a channel above 255 is a script error. Without ke
 | `ParticleLight` | `curve` | Multiplies `intensity` | 1 | 0 to 1 of `period` of the playback clock | CPU, exact | error |
 | `ParticleTimeline` | `rate` | Multiplies `ParticleEmitter.rate` | 1 | 0 to 1 of `period` | CPU, exact | error |
 | `ParticleTimeline` | `speed` | Multiplies the start speed of the particles spawned now | 1 | 0 to 1 of `period` | CPU, exact | error |
-| `AnimationTrack` | `curve` | Is the value of the member, a `Curve` without `max_keys` | none, a track needs keys | seconds of the clip | CPU, exact | - |
+| `Track` | `curve` | Is the value of the member, a `Curve` without `max_keys` | none, a track needs keys | seconds of the clip | CPU, exact | - |
 
 "Life" is the normalized age of a particle, 0 at birth and 1 at death. The GPU curves are baked
 to 64 samples; the CPU curves are evaluated exactly at their time. `ParticleCurves` sits on the
@@ -91,7 +91,7 @@ Two neighbours use the same cubic math without a `Curve`:
 
 - `Path2D` and `Path3D` segments of kind `CatmullRom` (`include/box/geometry.h`) are uniform
   Catmull-Rom curves through their anchors, for profiles, lathes and sweeps.
-- `TransitionSpec` with `timing_function: CubicBezier` and `bezier: {x1, y1, x2, y2}` is a CSS
+- `Spec` with `timing_function: CubicBezier` and `bezier: {x1, y1, x2, y2}` is a CSS
   `cubic-bezier()` ease of a transition (see [Transitions](transitions.md)).
 
 ## Choosing a kind
@@ -127,7 +127,7 @@ wherever a slope is steep or points the other way. Where values clamp:
 - A negative `ParticleTimeline.rate` counts as 0. `speed` is not clamped; below 0 it reverses
   the start velocity.
 - `ParticleLight.curve` is not clamped.
-- An `AnimationTrack` of an integer member rounds and clamps to its type, so an `Rgb` channel stays
+- An `Track` of an integer member rounds and clamps to its type, so an `Rgb` channel stays
   in 0..255; a float member takes the overshoot.
 
 To keep a curve within its keys, use `CurveLinear`, or give a Catmull-Rom peak neighbours of

@@ -417,11 +417,15 @@ void BoxAtmosphereImport(
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxRender);
 
+    ecs_set_name_prefix(world, "Atmosphere");
     ECS_META_COMPONENT(world, AtmosphereRayleigh);
     ECS_META_COMPONENT(world, AtmosphereMie);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Atmosphere);
     ecs_set_hooks(world, Atmosphere, { .ctor = box_atmosphere_ctor });
+    ecs_set_name_prefix(world, "Atmosphere");
     ECS_META_COMPONENT(world, AtmosphereStatus);
+    ecs_set_name_prefix(world, NULL);
     box_owned_hooks(world, AtmosphereStatus, BOX_OWNED_STR(AtmosphereStatus, error));
     ECS_META_COMPONENT(world, PlanetAtmosphere);
     ecs_set_hooks(world, PlanetAtmosphere, { .ctor = box_planet_atmosphere_ctor });

@@ -479,8 +479,10 @@ void BoxTransitionImport(
     ECS_IMPORT(world, BoxMaterial);
 
     ECS_META_COMPONENT(world, TimingFunction);
+    ecs_set_name_prefix(world, "Transition");
     ECS_META_COMPONENT(world, TransitionBezier);
     ECS_META_COMPONENT(world, TransitionSpec);
+    ecs_set_name_prefix(world, NULL);
 
     ecs_id(Transition) = ecs_map_type(world, {
         .entity = ecs_entity(world, { .name = "Transition" }),
@@ -489,8 +491,10 @@ void BoxTransitionImport(
     });
     ecs_add_pair(world, ecs_id(Transition), EcsOnInstantiate, EcsInherit);
 
+    ecs_set_name_prefix(world, "Transition");
     ECS_COMPONENT_DEFINE(world, TransitionPendingFlush);
     ECS_COMPONENT_DEFINE(world, TransitionPending);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, TransitionPending, {
         .ctor = flecs_default_ctor,
         .dtor = box_transition_pending_dtor,

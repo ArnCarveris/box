@@ -82,28 +82,28 @@ assets {
   prefab IsleWhaleDorsal { Profile2D: {outer: IsleWhaleDorsalPath} }
 
   isle_whale_swim {
-    AnimationClip: {duration: 12}
-    y { AnimationTrack: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.5, 0.707}, {3, 1}, {4.5, 0.707}, {6, 0}, {7.5, -0.707}, {9, -1}, {10.5, -0.707}, {12, -0}]}} }
-    pitch { AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.045}, {1.5, 0.032}, {3, 0}, {4.5, -0.032}, {6, -0.045}, {7.5, -0.032}, {9, -0}, {10.5, 0.032}, {12, 0.045}]}} }
-    roll { AnimationTrack: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.025}, {1.5, 0.029}, {3, 0.016}, {4.5, -0.006}, {6, -0.025}, {7.5, -0.029}, {9, -0.016}, {10.5, 0.006}, {12, 0.025}]}} }
+    box.animation.Clip: {duration: 12}
+    y { box.animation.Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.5, 0.707}, {3, 1}, {4.5, 0.707}, {6, 0}, {7.5, -0.707}, {9, -1}, {10.5, -0.707}, {12, -0}]}} }
+    pitch { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.045}, {1.5, 0.032}, {3, 0}, {4.5, -0.032}, {6, -0.045}, {7.5, -0.032}, {9, -0}, {10.5, 0.032}, {12, 0.045}]}} }
+    roll { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.025}, {1.5, 0.029}, {3, 0.016}, {4.5, -0.006}, {6, -0.025}, {7.5, -0.029}, {9, -0.016}, {10.5, 0.006}, {12, 0.025}]}} }
   }
   isle_whale_tail {
-    AnimationClip: {duration: 6}
-    x { AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.02}, {0.75, 0.112}, {1.5, 0.15}, {2.25, 0.112}, {3, 0.02}, {3.75, -0.072}, {4.5, -0.11}, {5.25, -0.072}, {6, 0.02}]}} }
+    box.animation.Clip: {duration: 6}
+    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.02}, {0.75, 0.112}, {1.5, 0.15}, {2.25, 0.112}, {3, 0.02}, {3.75, -0.072}, {4.5, -0.11}, {5.25, -0.072}, {6, 0.02}]}} }
   }
   isle_whale_fluke {
-    AnimationClip: {duration: 6}
-    x { AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, -0.347}, {0.75, -0.177}, {1.5, 0.096}, {2.25, 0.313}, {3, 0.347}, {3.75, 0.177}, {4.5, -0.096}, {5.25, -0.313}, {6, -0.347}]}} }
+    box.animation.Clip: {duration: 6}
+    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, -0.347}, {0.75, -0.177}, {1.5, 0.096}, {2.25, 0.313}, {3, 0.347}, {3.75, 0.177}, {4.5, -0.096}, {5.25, -0.313}, {6, -0.347}]}} }
   }
   isle_whale_fin_r {
-    AnimationClip: {duration: 8}
-    z { AnimationTrack: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, -0.3}, {1, -0.144}, {2, -0.08}, {3, -0.144}, {4, -0.3}, {5, -0.456}, {6, -0.52}, {7, -0.456}, {8, -0.3}]}} }
-    x { AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.075}, {1, 0.073}, {2, 0.029}, {3, -0.032}, {4, -0.075}, {5, -0.073}, {6, -0.029}, {7, 0.032}, {8, 0.075}]}} }
+    box.animation.Clip: {duration: 8}
+    z { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, -0.3}, {1, -0.144}, {2, -0.08}, {3, -0.144}, {4, -0.3}, {5, -0.456}, {6, -0.52}, {7, -0.456}, {8, -0.3}]}} }
+    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.075}, {1, 0.073}, {2, 0.029}, {3, -0.032}, {4, -0.075}, {5, -0.073}, {6, -0.029}, {7, 0.032}, {8, 0.075}]}} }
   }
   isle_whale_fin_l {
-    AnimationClip: {duration: 8}
-    z { AnimationTrack: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.3}, {1, 0.144}, {2, 0.08}, {3, 0.144}, {4, 0.3}, {5, 0.456}, {6, 0.52}, {7, 0.456}, {8, 0.3}]}} }
-    x { AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.075}, {1, 0.073}, {2, 0.029}, {3, -0.032}, {4, -0.075}, {5, -0.073}, {6, -0.029}, {7, 0.032}, {8, 0.075}]}} }
+    box.animation.Clip: {duration: 8}
+    z { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.3}, {1, 0.144}, {2, 0.08}, {3, 0.144}, {4, 0.3}, {5, 0.456}, {6, 0.52}, {7, 0.456}, {8, 0.3}]}} }
+    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.075}, {1, 0.073}, {2, 0.029}, {3, -0.032}, {4, -0.075}, {5, -0.073}, {6, -0.029}, {7, 0.032}, {8, 0.075}]}} }
   }
 
   template IsleWhale {
@@ -704,9 +704,9 @@ assets {
   prefab IsleAirshipNosePath { Path2D: {start: {0.02, -4.66}, segments: [{kind: CatmullRom, end: {0.4, -4.56}}, {kind: CatmullRom, end: {0.8, -4.3}}]} }
 
   isle_airship_bob {
-    AnimationClip: {duration: 9}
-    y { AnimationTrack: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {2.25, 0.5}, {4.5, 0}, {6.75, -0.5}, {9, 0}]}} }
-    roll { AnimationTrack: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.03}, {2.25, 0}, {4.5, -0.03}, {6.75, 0}, {9, 0.03}]}} }
+    box.animation.Clip: {duration: 9}
+    y { box.animation.Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {2.25, 0.5}, {4.5, 0}, {6.75, -0.5}, {9, 0}]}} }
+    roll { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.03}, {2.25, 0}, {4.5, -0.03}, {6.75, 0}, {9, 0.03}]}} }
   }
 
   template IsleAirshipModel {

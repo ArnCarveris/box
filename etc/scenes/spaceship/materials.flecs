@@ -28,8 +28,8 @@ assets {
   prefab CrewSuit { Rgb: {221, 156, 60}; PbrMaterial: {metallic: 0, roughness: 0.85}; Sheen: {color: {255, 236, 200}, roughness: 0.45} }
   prefab WindshieldGlass { Rgb: {170, 220, 236}; PbrMaterial: {metallic: 0, roughness: 0.04}; Transmission: {transmission_factor: 0.9, ior: 1.5, thickness_factor: 0.12, attenuation_distance: 3, attenuation_color: {120, 200, 230}}; Emissive: {strength: 0.12, color: {65, 180, 220}} }
   prefab ship_beacon_blink {
-    AnimationClip: {duration: 1.6}
-    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.06, 7}, {0.3, 7}, {0.42, 0.4}, {1.6, 0.4}]}} }
+    Clip: {duration: 1.6}
+    strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.06, 7}, {0.3, 7}, {0.42, 0.4}, {1.6, 0.4}]}} }
   }
   prefab BeaconLight { Rgb: {245, 137, 45}; Emissive: {strength: 3, color: {255, 139, 40}}; Animator: {clip: ship_beacon_blink}; NoBake }
   prefab WhiteLight { Rgb: {175, 218, 230}; Emissive: {strength: 2.5, color: {195, 230, 255}} }

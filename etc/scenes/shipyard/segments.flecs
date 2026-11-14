@@ -174,8 +174,8 @@ assets {
   }
 
   prefab yard_lift {
-    AnimationClip: {duration: LIFT_CYCLE}
-    y { AnimationTrack: {component: Position, member: "y", curve: {kind: CurveBezier, keys: [{0, LIFT_LO, 0, 0}, {12, LIFT_LO, 0, 0}, {52, LIFT_HI, 0, 0}, {64, LIFT_HI, 0, 0}, {LIFT_CYCLE, LIFT_LO, 0, 0}]}} }
+    Clip: {duration: LIFT_CYCLE}
+    y { Track: {component: Position, member: "y", curve: {kind: CurveBezier, keys: [{0, LIFT_LO, 0, 0}, {12, LIFT_LO, 0, 0}, {52, LIFT_HI, 0, 0}, {64, LIFT_HI, 0, 0}, {LIFT_CYCLE, LIFT_LO, 0, 0}]}} }
   }
 
   template RingSpoke {

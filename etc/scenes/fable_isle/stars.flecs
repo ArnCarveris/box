@@ -17,10 +17,10 @@ assets {
   prefab IsleStarBlue { Rgb: {200, 220, 255}; Emissive: {strength: 11, color: {170, 200, 255}}; NoShadow; Ignore }
 
   prefab isle_twinkle {
-    AnimationClip: {duration: 3}
-    glow { AnimationTrack: {component: Scale, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
-    glow_y { AnimationTrack: {component: Scale, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
-    glow_z { AnimationTrack: {component: Scale, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
+    Clip: {duration: 3}
+    glow { Track: {component: Scale, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
+    glow_y { Track: {component: Scale, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
+    glow_z { Track: {component: Scale, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 1}, {0.7, 1.5}, {1.5, 0.8}, {2.2, 1.35}, {3, 1}]}} }
   }
 
   template IsleShootingStar {

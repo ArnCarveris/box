@@ -13,14 +13,14 @@ using state
 
 assets {
   prefab heavy_blink {
-    AnimationClip: {duration: 1.1}
-    strength { AnimationTrack: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.05, 8}, {0.3, 8}, {0.38, 0.4}, {1.1, 0.4}]}} }
+    Clip: {duration: 1.1}
+    strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.05, 8}, {0.3, 8}, {0.38, 0.4}, {1.1, 0.4}]}} }
   }
   prefab HeavyBeaconAmber { Rgb: {255, 170, 60}; Emissive: {strength: 1, color: {255, 150, 40}}; Animator: {clip: heavy_blink}; Transition: [Scale: {duration: 0.6, timing_function: EaseInOut}] }
 
   prefab heavy_weld_sweep {
-    AnimationClip: {duration: 3.2}
-    sweep { AnimationTrack: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, -0.12}, {1.6, 0.12}, {3.2, -0.12}]}} }
+    Clip: {duration: 3.2}
+    sweep { Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, -0.12}, {1.6, 0.12}, {3.2, -0.12}]}} }
   }
 
   template HeavyRam {

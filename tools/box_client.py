@@ -84,8 +84,8 @@ def text(value):
 
 
 def split_member(path):
-    """Split a component path with members, such as box.app.AppStatus.frame or
-    oreelse.OreInventory.slots[0].amount, into the component (box.app.AppStatus) and its member
+    """Split a component path with members, such as box.app.Status.frame or
+    oreelse.OreInventory.slots[0].amount, into the component (box.app.Status) and its member
     names and element indices (["frame"], ["slots", 0, "amount"]): the component ends at the first
     name that starts with an upper case letter."""
     splits = split_members(path)
@@ -335,7 +335,7 @@ class App:
             self.fail("cannot parse the output: %s" % e, line, out)
 
     def frame(self):
-        return int(self.exec("get $ box.app.AppStatus.frame"))
+        return int(self.exec("get $ box.app.Status.frame"))
 
     def wait_frames(self, frames):
         """Let a number of frames pass, to check that something does not happen."""

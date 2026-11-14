@@ -1009,10 +1009,10 @@ planets {
       }
     }
 
-    const ready: bool = detail > 0 && alb[Status].revision > 0
-    const lava_ready: bool = lava_on && glow[Status].revision > 0
-    const city_ready: bool = city_on && town[Status].revision > 0
-    const cloud_ready: bool = surf_on && cld[Status].revision > 0
+    const ready: bool = detail > 0 && alb[box.texture.Status].revision > 0
+    const lava_ready: bool = lava_on && glow[box.texture.Status].revision > 0
+    const city_ready: bool = city_on && town[box.texture.Status].revision > 0
+    const cloud_ready: bool = surf_on && cld[box.texture.Status].revision > 0
 
     axis {
       Position: {0, 0, 0}
@@ -1379,8 +1379,8 @@ planets {
       Graph: {output: c_out, width: 256, height: 256, format: GraphLinear}
     }
 
-    const ready: bool = surf[Status].revision > 0
-    const streamer_ready: bool = streamer[Status].revision > 0
+    const ready: bool = surf[box.texture.Status].revision > 0
+    const streamer_ready: bool = streamer[box.texture.Status].revision > 0
 
     axis {
       Position: {0, 0, 0}

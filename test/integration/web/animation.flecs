@@ -39,19 +39,19 @@ target_marker {
 }
 
 slide {
-  AnimationClip: {duration: 2}
+  Clip: {duration: 2}
   x {
-    AnimationTrack: {component: Position, member: "x", curve: {keys: [{0, -150}, {2, 150}]}}
+    Track: {component: Position, member: "x", curve: {keys: [{0, -150}, {2, 150}]}}
   }
 }
 
 fade {
-  AnimationClip: {duration: 2}
+  Clip: {duration: 2}
   red {
-    AnimationTrack: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
+    Track: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
   }
   blue {
-    AnimationTrack: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
+    Track: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
   }
 }
 
@@ -59,7 +59,7 @@ mover {
   Position: {-150, 0, 0}
   Rect: {30, 30}
   Rgb: {255, 255, 255}
-  Animator: {clip: slide, mode: AnimationPingPong}
+  Animator: {clip: slide, mode: PingPong}
 }
 
 shifter {
@@ -67,5 +67,5 @@ shifter {
   Rect: {30, 30}
   Rgb: {255, 0, 0}
   DynamicMaterial
-  Animator: {clip: fade, mode: AnimationPingPong}
+  Animator: {clip: fade, mode: PingPong}
 }

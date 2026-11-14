@@ -56,5 +56,5 @@ for x in 0..50 {
 }
 
 $ {
-  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 1, elevation: 15, camera: camera}
+  box.perf.Run: {fps: 120, frames: 600, warmup: 120, period: 1, elevation: 15, camera: camera}
 }

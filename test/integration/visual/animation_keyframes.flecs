@@ -43,33 +43,33 @@ floor {
 }
 
 turn {
-  AnimationClip: {duration: 2}
+  Clip: {duration: 2}
   spin {
-    AnimationTrack: {component: Rotation, member: "y", curve: {
+    Track: {component: Rotation, member: "y", curve: {
       keys: [{0, 0}, {2, flecs.script.math.PI}]
     }}
   }
   lift {
-    AnimationTrack: {component: Position, member: "y", target: "arm", curve: {
+    Track: {component: Position, member: "y", target: "arm", curve: {
       keys: [{0, 1.1}, {2, 2.1}]
     }}
   }
 }
 
 fade {
-  AnimationClip: {duration: 2}
+  Clip: {duration: 2}
   red {
-    AnimationTrack: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
+    Track: {component: Rgb, member: "r", curve: {keys: [{0, 255}, {2, 0}]}}
   }
   blue {
-    AnimationTrack: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
+    Track: {component: Rgb, member: "b", curve: {keys: [{0, 0}, {2, 255}]}}
   }
 }
 
 bob {
-  AnimationClip: {duration: 1}
+  Clip: {duration: 1}
   lift {
-    AnimationTrack: {component: Position, member: "y", curve: {keys: [{0, 0.25}, {1, 2.25}]}}
+    Track: {component: Position, member: "y", curve: {keys: [{0, 0.25}, {1, 2.25}]}}
   }
 }
 
@@ -98,7 +98,7 @@ lamp {
 prefab Bob {
   Box: {0.5, 0.5, 0.5}
   Rgb: {80, 200, 120}
-  Animator: {clip: bob, mode: AnimationPingPong}
+  Animator: {clip: bob, mode: PingPong}
 }
 
 bob_0 : Bob {
@@ -107,15 +107,15 @@ bob_0 : Bob {
 
 bob_1 : Bob {
   Position: {2.9, 0.25, 0}
-  Animator: {clip: bob, time: 0.3, mode: AnimationPingPong}
+  Animator: {clip: bob, time: 0.3, mode: PingPong}
 }
 
 bob_2 : Bob {
   Position: {3.8, 0.25, 0}
-  Animator: {clip: bob, time: 0.6, mode: AnimationPingPong}
+  Animator: {clip: bob, time: 0.6, mode: PingPong}
 }
 
 bob_3 : Bob {
   Position: {4.7, 0.25, 0}
-  Animator: {clip: bob, time: 0.9, mode: AnimationPingPong}
+  Animator: {clip: bob, time: 0.9, mode: PingPong}
 }

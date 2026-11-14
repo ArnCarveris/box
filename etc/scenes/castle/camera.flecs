@@ -109,10 +109,10 @@ async {
 }
 
 async {
-  mut last: f64 = AppStatus[AppStatus].elapsed
+  mut last: f64 = box.app.Status[box.app.Status].elapsed
   while true {
     await next_frame()
-    const now = AppStatus[AppStatus].elapsed
+    const now = box.app.Status[box.app.Status].elapsed
     const fixed = App[App].delta_time
     const dt = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
     last = now
@@ -161,7 +161,7 @@ async {
         }
       } else {
         const ps = PickStatus[PickStatus]
-        const ss = window[SurfaceStatus]
+        const ss = window[box.surface.Status]
         const sw = ss.point_width > 0 ? ss.point_width : 1600
         const sh = ss.point_height > 0 ? ss.point_height : 960
         const th = tan(20 * PI / 180)

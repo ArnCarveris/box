@@ -806,12 +806,14 @@ void BoxPerfImport(
 {
     ECS_MODULE(world, BoxPerf);
 
+    ecs_set_name_prefix(world, "Perf");
     ECS_META_COMPONENT(world, PerfState);
     ECS_META_COMPONENT(world, PerfRange);
     ECS_META_COMPONENT(world, PerfChecks);
     ECS_META_COMPONENT(world, PerfTextureGraphs);
     ECS_META_COMPONENT(world, PerfRun);
     ECS_META_COMPONENT(world, PerfStatus);
+    ecs_set_name_prefix(world, NULL);
     box_owned_hooks(world, PerfRun, BOX_OWNED_STR(PerfRun, report));
     ecs_set_hooks(world, PerfRun, { .ctor = box_perf_run_ctor });
 

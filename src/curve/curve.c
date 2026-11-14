@@ -445,7 +445,10 @@ void BoxCurveImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, CurveKind);
+    ecs_set_name(world, ecs_id(CurveKind), "Kind");
+    ecs_set_name_prefix(world, "Curve");
     ECS_META_COMPONENT(world, CurveKey);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Curve);
     box_owned_hooks(world, Curve, BOX_OWNED_VEC(Curve, keys, CurveKey));
 }

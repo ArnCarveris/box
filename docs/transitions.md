@@ -25,7 +25,7 @@ e {
 }
 ```
 
-`Transition` maps component names to `TransitionSpec` values:
+`Transition` maps component names to `Spec` values:
 
 | Field | Default | Meaning |
 | --- | --- | --- |

@@ -63,7 +63,7 @@ template OrePulseText {
   prop font: entity = ui_fonts.stencil
 
   const motion = OreUiMotion[OreUiMotion].scale
-  const beat: i32 = floor(AppStatus[AppStatus].elapsed * 1.25)
+  const beat: i32 = floor(box.app.Status[box.app.Status].elapsed * 1.25)
   const bright = motion == 0 || beat % 2 == 0
 
   Text: {value: text, size: size, font: font}

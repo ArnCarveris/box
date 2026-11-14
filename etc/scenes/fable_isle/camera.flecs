@@ -60,11 +60,11 @@ async {
 }
 
 async {
-  mut last: f64 = AppStatus[AppStatus].elapsed
+  mut last: f64 = box.app.Status[box.app.Status].elapsed
   mut age: f32 = 0
   while true {
     await next_frame()
-    const now = AppStatus[AppStatus].elapsed
+    const now = box.app.Status[box.app.Status].elapsed
     const fixed = App[App].delta_time
     const dt = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
     last = now

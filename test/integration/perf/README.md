@@ -23,13 +23,13 @@ testing/town_stutter; `--cfg debug` overrides it). Earlier baselines, the scene 
 ## A scene
 
 A scene declares its content, camera and views like a visual scene and opts in with the
-`box.perf.PerfRun` singleton. The runner adds an offscreen `Surface` of `--size` (1280x720) unless
+`box.perf.Run` singleton. The runner adds an offscreen `Surface` of `--size` (1280x720) unless
 the scene declares its own, like the town scenes, which measure the retina window of the town
 (1280x720 points at `pixel_ratio: 2`, 2560x1440 pixels):
 
 ```
 $ {
-  box.perf.PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+  box.perf.Run: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
 }
 ```
 
@@ -61,7 +61,7 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 
 | Member | Meaning |
 | --- | --- |
-| `fps` | Target: 30, 60, 90 or 120 (60 when added without a value). Anything else makes the run `PerfInvalid`. Also written to `App.fps`. |
+| `fps` | Target: 30, 60, 90 or 120 (60 when added without a value). Anything else makes the run `Invalid`. Also written to `App.fps`. |
 | `frames` | Frames measured (300). At least `fps * period` for the runner. |
 | `warmup` | Capped, orbiting frames before the measurement (60), at least 2. At most `fps` for the runner. |
 | `camera` | Camera to orbit, 0 for the first entity with `Camera`. |
@@ -70,8 +70,8 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 | `stall` | Busy milliseconds added to every frame, only to prove that the checks catch a slow scene. |
 | `quit`, `report` | Quit when the run completes; JSON file the result is written to. |
 
-Setting `PerfRun` again, from a script, C or the REST API, restarts the run. The engine writes the
-result into the `box.perf.PerfStatus` singleton (state, errors, slow, fast, frame interval
+Setting `box.perf.Run` again, from a script, C or the REST API, restarts the run. The engine writes the
+result into the `box.perf.Status` singleton (state, errors, slow, fast, frame interval
 statistics, bounds, revolutions, orbit views, culling ranges and, in `checks`, the delta, present
 and CPU checks and the distance a fly run travelled), which the command port and REST read like
 any other component.
@@ -95,7 +95,7 @@ any other component.
 - Culling: every measured frame reads the `CullStatus` of the views that render the orbiting
   camera (or a camera under it) and, when the GPU published a new result, adds a sample: the
   visible, frustum culled (outside the frustum or below the smallest size) and occlusion culled
-  instances, summed over those views. `PerfStatus.visible`, `frustum_culled` and
+  instances, summed over those views. `box.perf.Status.visible`, `frustum_culled` and
   `occlusion_culled` hold the minimum, maximum and mean, `cull_changes` how many samples differ
   from the sample before: the proof that the orbit makes culling decide again every frame.
 - Delta: a run leaves `App.delta_time` at 0, so flecs measures `delta_time`. Every measured frame

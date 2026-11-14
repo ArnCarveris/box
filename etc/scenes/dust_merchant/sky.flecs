@@ -19,18 +19,18 @@ state {
 
 assets {
   GlareFlickerA {
-    AnimationClip: {duration: 0.1698}
+    Clip: {duration: 0.1698}
     flicker {
-      AnimationTrack: {component: PointLight, member: "intensity", curve: {kind: CurveBezier, keys: [
+      Track: {component: PointLight, member: "intensity", curve: {kind: CurveBezier, keys: [
         {0, 2.2, 14.8, 14.8}, {0.0425, 2.6, 0, 0}, {0.0849, 2.2, -14.8, -14.8}, {0.1274, 1.8, 0, 0}, {0.1698, 2.2, 14.8, 14.8}
       ]}}
     }
   }
 
   GlareFlickerB {
-    AnimationClip: {duration: 0.1232}
+    Clip: {duration: 0.1232}
     flicker {
-      AnimationTrack: {component: PointLight, member: "intensity", curve: {kind: CurveBezier, keys: [
+      Track: {component: PointLight, member: "intensity", curve: {kind: CurveBezier, keys: [
         {0, 2.8, 25.5, 25.5}, {0.0308, 3.3, 0, 0}, {0.0616, 2.8, -25.5, -25.5}, {0.0924, 2.3, 0, 0}, {0.1232, 2.8, 25.5, 25.5}
       ]}}
     }

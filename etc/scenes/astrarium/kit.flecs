@@ -62,14 +62,14 @@ state {
 
 assets {
   template ScreenCamera {
-    const s = window[SurfaceStatus]
+    const s = window[box.surface.Status]
 
     Position: {0, 0, 100}
     Camera: {ortho: true, ortho_scale: fit_scale(s.point_width, s.point_height)}
   }
 
   template ScreenRoot {
-    const s = window[SurfaceStatus]
+    const s = window[box.surface.Status]
     const k = fit_scale(s.point_width, s.point_height)
 
     Item: {

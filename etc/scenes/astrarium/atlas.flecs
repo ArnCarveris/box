@@ -564,7 +564,7 @@ assets {
         await on.press(this)
         atlas_holding = true
         atlas_hold_serial += 1
-        emit HoldStarted(serial: atlas_hold_serial, until: AppStatus[AppStatus].elapsed + HOLD_SECONDS)
+        emit HoldStarted(serial: atlas_hold_serial, until: box.app.Status[box.app.Status].elapsed + HOLD_SECONDS)
         await on.release(this)
         atlas_holding = false
       }

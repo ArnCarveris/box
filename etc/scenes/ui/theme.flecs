@@ -70,6 +70,6 @@ export const LightTheme: UiTheme = {
   caret_blink: 0.5
 }
 
-export const WidgetFade: TransitionSpec = {duration: 0.12, timing_function: EaseOut}
+export const WidgetFade: Spec = {duration: 0.12, timing_function: EaseOut}
 
-export const WidgetSlide: TransitionSpec = {duration: 0.15, timing_function: EaseInOut}
+export const WidgetSlide: Spec = {duration: 0.15, timing_function: EaseInOut}

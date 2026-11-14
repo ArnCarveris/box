@@ -878,7 +878,9 @@ void BoxShaderImport(
     ECS_IMPORT(world, BoxTask);
 
     ECS_META_COMPONENT(world, Shader);
+    ecs_set_name_prefix(world, "Shader");
     ECS_META_COMPONENT(world, ShaderStatus);
+    ecs_set_name_prefix(world, NULL);
 
     ecs_set_hooks(world, Shader, {
         .ctor = flecs_default_ctor,

@@ -20,9 +20,9 @@ assets {
   export const HOLO: Rgb = {110, 214, 255}
 
   HoloScanBob {
-    AnimationClip: {duration: 6.981}
+    Clip: {duration: 6.981}
     lift {
-      AnimationTrack: {component: Position, member: "y", curve: {kind: CurveBezier, keys: [
+      Track: {component: Position, member: "y", curve: {kind: CurveBezier, keys: [
         {0, 16, 88.2, 88.2}, {1.745, 114, 0, 0}, {3.491, 16, -88.2, -88.2}, {5.236, -82, 0, 0}, {6.981, 16, 88.2, 88.2}
       ]}}
     }

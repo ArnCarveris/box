@@ -251,17 +251,17 @@ template OreHud {
   const rowCount = OreCraftBook[OreCraftBook].row_count
   const lowTier = OreQuality[OreQuality].tier == Low
 
-  const hasStatus = window?[SurfaceStatus]
+  const hasStatus = window?[box.surface.Status]
   const isWindow: bool = match hasStatus {
-    true: window[SurfaceStatus].window
+    true: window[box.surface.Status].window
     false: false
   }
   const pointWidth: f32 = match isWindow {
-    true: window[SurfaceStatus].point_width
+    true: window[box.surface.Status].point_width
     false: window[Surface].width
   }
   const pointHeight: f32 = match isWindow {
-    true: window[SurfaceStatus].point_height
+    true: window[box.surface.Status].point_height
     false: window[Surface].height
   }
   const screenScale = ore_screen_scale(pointWidth, pointHeight)

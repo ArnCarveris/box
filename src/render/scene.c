@@ -55,7 +55,9 @@ done:
 void box_render_scenes_init(
     ecs_world_t *world)
 {
+    ecs_set_name_prefix(world, "Render");
     ECS_COMPONENT_DEFINE(world, RenderScenes);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, RenderScenes, { .ctor = flecs_default_ctor });
     ecs_query_t *q = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "RenderSceneMembers" }),

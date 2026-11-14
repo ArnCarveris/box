@@ -1229,7 +1229,9 @@ void BoxAppImport(
 
     ECS_META_COMPONENT(world, App);
     ECS_META_COMPONENT(world, FpsTarget);
+    ecs_set_name_prefix(world, "App");
     ECS_META_COMPONENT(world, AppStatus);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, FrameRange);
     ECS_META_COMPONENT(world, FrameTiming);
     ECS_META_COMPONENT(world, FrameSamples);

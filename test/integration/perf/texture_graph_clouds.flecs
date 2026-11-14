@@ -49,5 +49,5 @@ offscreen {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 600, warmup: 60, period: 10, elevation: 20, camera: camera}
+  box.perf.Run: {fps: 60, frames: 600, warmup: 60, period: 10, elevation: 20, camera: camera}
 }

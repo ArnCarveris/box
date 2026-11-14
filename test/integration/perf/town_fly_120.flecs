@@ -1077,5 +1077,5 @@ view {
 }
 
 $ {
-  PerfRun: {fps: 120, frames: 7200, warmup: 120, period: 0, elevation: 30, camera: camera, fly: true}
+  box.perf.Run: {fps: 120, frames: 7200, warmup: 120, period: 0, elevation: 30, camera: camera, fly: true}
 }

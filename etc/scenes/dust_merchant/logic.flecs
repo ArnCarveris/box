@@ -34,7 +34,7 @@ async {
   mut pan_y: f32 = 0
   while true {
     await next_frame()
-    const step = clamp(AppStatus[AppStatus].delta_time, 0.001, 0.1)
+    const step = clamp(box.app.Status[box.app.Status].delta_time, 0.001, 0.1)
     clock += step
     dt = step
     if fract(clock * 2.6) < 0.5 != blink {

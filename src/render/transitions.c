@@ -1910,6 +1910,11 @@ void box_render_transitions_init(
     ecs_world_t *world)
 {
     box_render_transitions_t *s = ecs_os_calloc_t(box_render_transitions_t);
+    ecs_entity_t scope = ecs_get_scope(world);
+    ecs_entity_t transition = ecs_entity(world, { .name = "transition", .parent = scope });
+    ecs_add_id(world, transition, EcsModule);
+    ecs_set_scope(world, transition);
+    ecs_set_name_prefix(world, "Transition");
     ECS_TAG_DEFINE(world, TransitionTransform);
     ecs_add_pair(world, TransitionTransform, EcsOnInstantiate, EcsDontInherit);
     ECS_TAG_DEFINE(world, TransitionMaterial);
@@ -1918,7 +1923,10 @@ void box_render_transitions_init(
     ecs_add_pair(world, TransitionOpacity, EcsOnInstantiate, EcsDontInherit);
     ECS_TAG_DEFINE(world, TransitionBoxShadow);
     ecs_add_pair(world, TransitionBoxShadow, EcsOnInstantiate, EcsDontInherit);
+    ecs_set_name_prefix(world, "RenderTransition");
     ECS_COMPONENT_DEFINE(world, RenderTransitionState);
+    ecs_set_name_prefix(world, NULL);
+    ecs_set_scope(world, scope);
     ecs_map_init(&s->by_entity, NULL);
     ecs_map_init(&s->moving, NULL);
     ecs_map_init(&s->tagged, NULL);

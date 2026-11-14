@@ -32,7 +32,7 @@ async {
       } else if i == 2 {
         aegis_on = true
         aegis_serial += 1
-        emit AegisRaised(serial: aegis_serial, until: AppStatus[AppStatus].elapsed + 8)
+        emit AegisRaised(serial: aegis_serial, until: box.app.Status[box.app.Status].elapsed + 8)
       } else if i == 4 {
         hero_dust += 250 + stat_might * 2
       } else if i == 5 {

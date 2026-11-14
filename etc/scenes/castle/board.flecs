@@ -395,10 +395,10 @@ assets {
     Scale: {1.6, 1.6, 1.6}
 
     stroll {
-      AnimationClip: {duration: period * 2}
-      track_x { AnimationTrack: {component: Position, member: "x", curve: {keys: [{0, x1}, {period, x0}, {period * 2, x1}]}} }
-      track_z { AnimationTrack: {component: Position, member: "z", curve: {keys: [{0, z1}, {period, z0}, {period * 2, z1}]}} }
-      track_yaw { AnimationTrack: {component: Rotation, member: "y", curve: {keys: [{0, yaw + PI}, {period - turn, yaw + PI}, {period, yaw}, {period * 2 - turn, yaw}, {period * 2, yaw + PI}]}} }
+      Clip: {duration: period * 2}
+      track_x { Track: {component: Position, member: "x", curve: {keys: [{0, x1}, {period, x0}, {period * 2, x1}]}} }
+      track_z { Track: {component: Position, member: "z", curve: {keys: [{0, z1}, {period, z0}, {period * 2, z1}]}} }
+      track_yaw { Track: {component: Rotation, member: "y", curve: {keys: [{0, yaw + PI}, {period - turn, yaw + PI}, {period, yaw}, {period * 2 - turn, yaw}, {period * 2, yaw + PI}]}} }
     }
 
     Animator: {clip: stroll}

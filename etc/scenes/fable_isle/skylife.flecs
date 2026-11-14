@@ -27,16 +27,16 @@ assets {
   prefab IsleSkyRock { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; texture.Mapping: {mode: MappingObject, size: 7, blend: 0.3} }
 
   isle_sky_bob {
-    AnimationClip: {duration: 7}
-    y { AnimationTrack: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.75, 0.45}, {3.5, 0}, {5.25, -0.45}, {7, 0}]}} }
+    Clip: {duration: 7}
+    y { Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.75, 0.45}, {3.5, 0}, {5.25, -0.45}, {7, 0}]}} }
   }
   isle_sky_flap_l {
-    AnimationClip: {duration: 0.42}
-    z { AnimationTrack: {component: Rotation, member: "z", curve: {keys: [{0, 0.55}, {0.42, -0.5}]}} }
+    Clip: {duration: 0.42}
+    z { Track: {component: Rotation, member: "z", curve: {keys: [{0, 0.55}, {0.42, -0.5}]}} }
   }
   isle_sky_flap_r {
-    AnimationClip: {duration: 0.42}
-    z { AnimationTrack: {component: Rotation, member: "z", curve: {keys: [{0, -0.55}, {0.42, 0.5}]}} }
+    Clip: {duration: 0.42}
+    z { Track: {component: Rotation, member: "z", curve: {keys: [{0, -0.55}, {0.42, 0.5}]}} }
   }
 
   template IsleBalloon {
@@ -122,13 +122,13 @@ assets {
     tail : IsleSkyBirdDark { Position: {0, 0.01, 0.28}; Box: {0.14, 0.02, 0.2} }
     wl {
       Position: {0.06, 0.03, 0}
-      Animator: {clip: isle_sky_flap_l, mode: AnimationPingPong}
+      Animator: {clip: isle_sky_flap_l, mode: PingPong}
       { (IsA, IsleSkyBird); Position: {0.3, 0, 0.02}; Box: {0.6, 0.025, 0.26} }
       { (IsA, IsleSkyBirdDark); Position: {0.7, 0, 0.06}; Rotation: {0, -0.35, 0}; Box: {0.3, 0.025, 0.18} }
     }
     wr {
       Position: {-0.06, 0.03, 0}
-      Animator: {clip: isle_sky_flap_r, mode: AnimationPingPong}
+      Animator: {clip: isle_sky_flap_r, mode: PingPong}
       { (IsA, IsleSkyBird); Position: {-0.3, 0, 0.02}; Box: {0.6, 0.025, 0.26} }
       { (IsA, IsleSkyBirdDark); Position: {-0.7, 0, 0.06}; Rotation: {0, 0.35, 0}; Box: {0.3, 0.025, 0.18} }
     }

@@ -26,7 +26,7 @@ main_view {
 const age = 2.0 / 60.0
 
 template Dot {
-  prop kind: CurveKind = CurveLinear
+  prop kind: box.curve.Kind = CurveLinear
   prop t = 0.5
 
   Emitter: {

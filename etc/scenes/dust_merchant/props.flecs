@@ -125,9 +125,9 @@ assets {
   }
 
   DustJarPulse {
-    AnimationClip: {duration: 8.976}
+    Clip: {duration: 8.976}
     glow {
-      AnimationTrack: {component: Emissive, member: "strength", curve: {kind: CurveBezier, keys: [
+      Track: {component: Emissive, member: "strength", curve: {kind: CurveBezier, keys: [
         {0, 0.55, 0.28, 0.28}, {2.244, 0.95, 0, 0}, {4.488, 0.55, -0.28, -0.28}, {6.732, 0.15, 0, 0}, {8.976, 0.55, 0.28, 0.28}
       ]}}
     }

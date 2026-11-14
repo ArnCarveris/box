@@ -21,7 +21,7 @@ async {
 async {
   while true {
     const e = await BannerShown
-    await delay(e.until - AppStatus[AppStatus].elapsed)
+    await delay(e.until - box.app.Status[box.app.Status].elapsed)
     if e.serial == banner_serial {
       banner_on = false
     }
@@ -31,7 +31,7 @@ async {
 async {
   while true {
     const e = await AegisRaised
-    await delay(e.until - AppStatus[AppStatus].elapsed)
+    await delay(e.until - box.app.Status[box.app.Status].elapsed)
     if e.serial == aegis_serial {
       aegis_on = false
     }

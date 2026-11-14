@@ -115,7 +115,7 @@ void Report_status_reflected(void) {
     const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
     char *json = ecs_ptr_to_json(world, ecs_id(PerfStatus), status);
     test_assert(json != NULL);
-    test_assert(strstr(json, "\"state\":\"PerfDone\"") != NULL);
+    test_assert(strstr(json, "\"state\":\"Done\"") != NULL);
     test_assert(strstr(json, "\"passed\":true") != NULL);
     test_assert(strstr(json, "\"errors\":0") != NULL);
     ecs_os_free(json);
@@ -139,8 +139,8 @@ void Report_script_run(void) {
         "using box.camera\n"
         "using box.perf\n"
         "cam { Camera: {fov: 50} }\n"
-        "$ { PerfRun: {fps: 90, frames: 4, warmup: 3, camera: cam} }\n"
-        "$ { PerfRun = {quit: true, stall: 1} }\n", NULL) == 0);
+        "$ { box.perf.Run: {fps: 90, frames: 4, warmup: 3, camera: cam} }\n"
+        "$ { box.perf.Run = {quit: true, stall: 1} }\n", NULL) == 0);
 
     const PerfRun *run = ecs_singleton_get(world, PerfRun);
     test_assert(run != NULL);

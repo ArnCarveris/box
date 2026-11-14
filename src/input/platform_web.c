@@ -517,7 +517,7 @@ static void box_web_poll(
     const SurfaceStatus *s;
     float w, h;
     if (!web->status) {
-        web->status = ecs_lookup(world, "box.surface.SurfaceStatus");
+        web->status = ecs_lookup(world, "box.surface.Status");
     }
 
     box_web_follow(world, web);

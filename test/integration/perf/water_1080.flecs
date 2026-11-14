@@ -107,5 +107,5 @@ sea {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 300, warmup: 60, period: 5, elevation: 70, camera: camera}
+  box.perf.Run: {fps: 60, frames: 300, warmup: 60, period: 5, elevation: 70, camera: camera}
 }
