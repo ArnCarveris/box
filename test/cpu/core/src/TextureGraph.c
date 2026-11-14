@@ -478,6 +478,39 @@ void TextureGraph_names(void) {
     ecs_fini(world);
 }
 
+void TextureGraph_system_names(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    test_path(world, "box.texture.OnSet", 0);
+    test_path(world, "box.texture.OnRemove", 0);
+    test_path(world, "box.texture.Surfaces", 0);
+    test_path(world, "box.texture.Update", 0);
+    test_path(world, "box.texture.PixelsOnSet", 0);
+    test_path(world, "box.texture.PixelsOnRemove", 0);
+    test_path(world, "box.texture.gen.OnSet", 0);
+    test_path(world, "box.texture.gen.OnRemove", 0);
+    test_path(world, "box.texture.graph.Build", 0);
+    test_path(world, "box.texture.graph.OnSet", 0);
+    test_path(world, "box.texture.graph.OnRemove", 0);
+
+    test_assert(ecs_has_id(world,
+        ecs_lookup(world, "box.texture.Update"), EcsSystem));
+    test_assert(ecs_has_id(world,
+        ecs_lookup(world, "box.texture.graph.Build"), EcsSystem));
+    test_assert(ecs_has_id(world,
+        ecs_lookup(world, "box.texture.gen.OnSet"), EcsObserver));
+
+    test_assert(ecs_lookup(world, "box.texture.TextureOnSet") == 0);
+    test_assert(ecs_lookup(world, "box.texture.TextureUpdate") == 0);
+    test_assert(ecs_lookup(world, "box.texture.TextureGenOnSet") == 0);
+    test_assert(ecs_lookup(world, "box.texture.GenOnSet") == 0);
+    test_assert(ecs_lookup(world, "box.texture.TextureGraphBuild") == 0);
+    test_assert(ecs_lookup(world, "box.texture.GraphBuild") == 0);
+    test_assert(ecs_lookup(world, "box.texture.GraphOnRemove") == 0);
+
+    ecs_fini(world);
+}
+
 void TextureGraph_names_script(void) {
     // materials/textures
     ecs_world_t *world = world_new();

@@ -1268,7 +1268,10 @@ void box_texture_graphs_init(
     ecs_vec_init_t(NULL, &t->reload, ecs_entity_t, 0);
     box_texture_nodes_register(world);
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextureGraphBuild" }),
+        .entity = ecs_entity(world, {
+            .name = "Build",
+            .parent = ecs_lookup_child(world, ecs_get_scope(world), "graph")
+        }),
         .phase = EcsOnStore,
         .run = BoxTextureGraphBuild
     });

@@ -369,6 +369,7 @@
                     "kind_reflected_json",
                     "names",
                     "names_script",
+                    "system_names",
                     "cells_kind",
                     "script",
                     "script_declared_after",

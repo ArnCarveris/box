@@ -1319,72 +1319,75 @@ void BoxTextureImport(
     t->sync->lock = ecs_os_mutex_new();
     t->sync->refs = 1;
     t->surfaces = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "TextureSurfaces" }),
+        .entity = ecs_entity(world, { .name = "Surfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
     t->watch = box_file_watch_kind(world, "texture", box_texture_changed, NULL);
     ecs_singleton_ensure(world, TextureRegistry)->textures = t;
     box_texture_graphs_init(world, t);
+    ecs_entity_t module = ecs_get_scope(world);
+    ecs_entity_t gen = ecs_lookup_child(world, module, "gen");
+    ecs_entity_t graph = ecs_lookup_child(world, module, "graph");
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextureOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(TexturePath) }},
         .events = { EcsOnSet },
         .callback = BoxTextureOnSet
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextureOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove" }),
         .query.terms = {{ .id = ecs_id(TexturePath) }},
         .events = { EcsOnRemove },
         .callback = BoxTextureOnRemove
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextureGenOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet", .parent = gen }),
         .query.terms = {{ .id = ecs_id(TextureGen) }},
         .events = { EcsOnSet },
         .callback = BoxTextureGenOnSet
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TexturePixelsOnSet" }),
+        .entity = ecs_entity(world, { .name = "PixelsOnSet" }),
         .query.terms = {{ .id = ecs_id(TexturePixels) }},
         .events = { EcsOnSet },
         .callback = BoxTextureOnSet
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TexturePixelsOnRemove" }),
+        .entity = ecs_entity(world, { .name = "PixelsOnRemove" }),
         .query.terms = {{ .id = ecs_id(TexturePixels) }},
         .events = { EcsOnRemove },
         .callback = BoxTexturePixelsOnRemove
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextureGenOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove", .parent = gen }),
         .query.terms = {{ .id = ecs_id(TextureGen) }},
         .events = { EcsOnRemove },
         .callback = BoxTextureOnRemove
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextureGraphOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet", .parent = graph }),
         .query.terms = {{ .id = ecs_id(TextureGraph) }},
         .events = { EcsOnSet },
         .callback = BoxTextureOnSet
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextureGraphOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove", .parent = graph }),
         .query.terms = {{ .id = ecs_id(TextureGraph) }},
         .events = { EcsOnRemove },
         .callback = BoxTextureGraphOnRemove
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextureUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsPreFrame,
         .run = BoxTextureUpdate
     });
