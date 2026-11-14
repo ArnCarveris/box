@@ -25,17 +25,39 @@ done:
     return result;
 }
 
-/** Get the per channel factor the extract applied to the color of a light after its Rgb and
- * intensity: the attenuation of a sun or a moon. A channel without color takes the mean of
- * the others, and a light without color 1.
+/** Get the uniform world scale the extract applied to the range of a point or spot light, from
+ * the range of the light of the list and the range of its target (box_lights_point_light).
  *
  * @param lt The transition of the light
  * @param light The light of the list
+ * @return The scale, 1 for a directional light
+ */
+static float box_lights_range_scale(
+    const box_render_light_transition_t *lt,
+    const box_render_light_t *light)
+{
+    float range, result = 1.0f;
+    if (lt->kind) {
+        ecs_os_memcpy(&range, &lt->value[ECS_SIZEOF(float)], ECS_SIZEOF(float));
+        result = light->range / glm_max(range, BOX_LIGHTS_MIN_RANGE);
+    }
+
+    return result;
+}
+
+/** Get the per channel factor the extract applied to the color of a light after its Rgb and
+ * intensity: the attenuation of a sun or a moon, the square of the world scale of a point or
+ * spot light. A channel without color takes the mean of the others, and no color 1.
+ *
+ * @param lt The transition of the light
+ * @param light The light of the list
+ * @param range_scale The world scale of the light (box_lights_range_scale)
  * @param out Receives the factor
  */
 static void box_lights_scale(
     const box_render_light_transition_t *lt,
     const box_render_light_t *light,
+    float range_scale,
     float *out)
 {
     float intensity, base, sum = 0.0f;
@@ -43,6 +65,7 @@ static void box_lights_scale(
     const uint8_t *rgb = &lt->rgb.r;
     glm_vec3_one(out);
     if (lt->kind) {
+        glm_vec3_fill(out, range_scale * range_scale);
         goto done;
     }
 
@@ -92,7 +115,10 @@ void box_lights_send_transitions(
         target.rgb[1] = lt->rgb.g;
         target.rgb[2] = lt->rgb.b;
         target.has_rgb = lt->has_rgb;
-        box_lights_scale(lt, ecs_vec_get_t(&s->lights, box_render_light_t, i), target.scale);
+        target.range_scale = box_lights_range_scale(lt,
+            ecs_vec_get_t(&s->lights, box_render_light_t, i));
+        box_lights_scale(lt, ecs_vec_get_t(&s->lights, box_render_light_t, i),
+            target.range_scale, target.scale);
         ecs_os_memcpy(box_render_packet_reserve(p, (uint32_t)sizeof(target), &offset),
             &target, ECS_SIZEOF(target));
         r = box_render_packet_transition(p, BOX_RENDER_TRANSITION_LIGHT, lt->node);
@@ -149,7 +175,7 @@ void box_render_lights_patch(
     }
 
     if (target->kind) {
-        light->range = glm_max(values[1], BOX_LIGHTS_MIN_RANGE);
+        light->range = glm_max(values[1], BOX_LIGHTS_MIN_RANGE) * target->range_scale;
     }
 
     if (target->kind == 2) {

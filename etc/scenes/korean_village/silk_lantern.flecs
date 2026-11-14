@@ -8,6 +8,7 @@ using box.light
 assets {
   template KoreanSilkLantern {
     prop drop: f32 = 0.35
+    prop parent_scale: f32 = 1
     { (IsA, KoreanIron); Position: {0, -drop / 2, 0}; Cylinder: {radius: 0.009, length: drop, segments: 6} }
     {
       Position: {0, -drop, 0}
@@ -25,7 +26,7 @@ assets {
       for thread in 0..3 {
         { Position: {(thread - 1) * 0.02, -0.57, 0}; Cylinder: {radius: 0.008, length: 0.18, segments: 5}; Rgb: {198, 60, 50} }
       }
-      { Position: {0, -0.25, 0}; PointLight: {intensity: 1.2, range: 4, shadows: true, shadow_resolution: 256}; Rgb: {255, 150, 92} }
+      { Position: {0, -0.25, 0}; PointLight: {intensity: 1.2 / (parent_scale * parent_scale), range: 4 / parent_scale, shadows: true, shadow_resolution: 256}; Rgb: {255, 150, 92} }
     }
   }
 }

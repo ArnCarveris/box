@@ -141,7 +141,7 @@ assets {
 
     spill {
       Position: {0, 0, 170}
-      PointLight: {intensity: on ? glow_power : 0, range: 1.6}
+      PointLight: {intensity: on ? glow_power * 1000000 : 0, range: 1600}
       Rgb: glow
     }
   }

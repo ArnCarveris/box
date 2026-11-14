@@ -177,7 +177,7 @@ assets {
           leaf_a : MvLeafLight { Position: {0.12, 1.18, 0.02}; Rotation: {0, 0, -0.6}; Scale: {0.5, 1, 0.2}; Sphere: {radius: 0.07, segments: 6, smooth: true} }
           leaf_b : MvLeaf { Position: {-0.1, 1.22, 0.02}; Rotation: {0, 0, 0.7}; Scale: {0.5, 1, 0.2}; Sphere: {radius: 0.06, segments: 6, smooth: true} }
           orb_ { Position: {0, 1.36, 0}; Sphere: {radius: 0.11, segments: 12, smooth: true}; Rgb: gem; Emissive: {strength: 3, color: gem}; NoShadow }
-          glow_ { Position: {0, 1.36, 0}; PointLight: {intensity: 1.5, range: 4}; Rgb: gem }
+          glow_ { Position: {0, 1.36, 0}; PointLight: {intensity: 1.134, range: 3.478}; Rgb: gem }
         }
       }
       head {

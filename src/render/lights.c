@@ -244,11 +244,11 @@ static void box_lights_axis(
 
 /** Write a light with a position, a range and no cone.
  *
- * @param transform World transform of the light, NULL for a directional light,
- * which has no position
+ * @param transform World transform of the light, NULL for a directional light (no position)
  * @param rgb Color of the light, NULL for white
- * @param intensity Irradiance scale
- * @param range Distance at which the light reaches zero
+ * @param intensity Irradiance scale in local units, times the square of the scale
+ * @param range Local distance at which the light reaches zero, times the scale
+ * @param scale Uniform world scale of the light (box_transform_world_scale), 1 for none
  * @param out Receives the light
  */
 static void box_lights_point(
@@ -256,6 +256,7 @@ static void box_lights_point(
     const Rgb *rgb,
     float intensity,
     float range,
+    float scale,
     box_render_light_t *out)
 {
     ecs_os_memset_t(out, 0, box_render_light_t);
@@ -264,8 +265,8 @@ static void box_lights_point(
     }
 
     out->shadow = BOX_RENDER_SHADOW_NONE;
-    out->range = range;
-    box_lights_color(rgb, intensity, out->color);
+    out->range = range * scale;
+    box_lights_color(rgb, intensity * scale * scale, out->color);
     glm_vec3_copy((vec3){0, 0, 1}, out->direction);
     out->spot_scale = 0.0f;
     out->spot_offset = 1.0f;
@@ -452,12 +453,13 @@ void box_lights_point_light(
 {
     box_render_light_t out;
     int32_t index = ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights);
-    if (!(p->intensity > 0 && p->range > 0) && !lt) {
+    float scale = transform ? box_transform_world_scale(transform) : 1.0f;
+    if (!(p->intensity > 0 && p->range * scale > 0) && !lt) {
         goto done;
     }
 
     box_lights_point(transform, rgb, p->intensity,
-        lt ? glm_max(p->range, BOX_LIGHTS_MIN_RANGE) : p->range, &out);
+        lt ? glm_max(p->range, BOX_LIGHTS_MIN_RANGE) : p->range, scale, &out);
     box_lights_push(s, e, p->bake, &out);
     if (p->shadows && p->bake != LightBakeModeBaked &&
         ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights) > index)
@@ -466,7 +468,7 @@ void box_lights_point_light(
             .entity = e,
             .index = index,
             .resolution = p->shadow_resolution,
-            .range = lt ? glm_max(lt->range, p->range) : p->range,
+            .range = (lt ? glm_max(lt->range, p->range) : p->range) * scale,
             .point = true
         };
     }
@@ -485,12 +487,13 @@ void box_lights_spot_light(
     box_render_light_t out;
     int32_t index = ecs_vec_count(&s->lists[BOX_LIGHTS_VIEW].lights);
     float outer = glm_clamp(sp->outer_angle, 0.01f, 89.9f);
-    if (!(sp->intensity > 0 && sp->range > 0) && !lt) {
+    float scale = transform ? box_transform_world_scale(transform) : 1.0f;
+    if (!(sp->intensity > 0 && sp->range * scale > 0) && !lt) {
         goto done;
     }
 
     box_lights_point(transform, rgb, sp->intensity,
-        lt ? glm_max(sp->range, BOX_LIGHTS_MIN_RANGE) : sp->range, &out);
+        lt ? glm_max(sp->range, BOX_LIGHTS_MIN_RANGE) : sp->range, scale, &out);
     box_lights_axis(transform, out.direction);
     box_lights_cone(sp->inner_angle, sp->outer_angle, &out);
     box_lights_push(s, e, sp->bake, &out);
@@ -501,7 +504,7 @@ void box_lights_spot_light(
             .entity = e,
             .index = index,
             .resolution = sp->shadow_resolution,
-            .range = lt ? glm_max(lt->range, sp->range) : sp->range,
+            .range = (lt ? glm_max(lt->range, sp->range) : sp->range) * scale,
             .outer = lt ? glm_clamp(glm_max(lt->outer, outer), 0.01f, 89.9f) : outer
         };
     }
@@ -548,7 +551,7 @@ static void box_lights_collect(
             if (kind == 0) {
                 const DirectionalLight *d = &ecs_field(&it, DirectionalLight, 0)[i];
                 box_render_light_t out;
-                box_lights_point(NULL, rgb, d->intensity, 0, &out);
+                box_lights_point(NULL, rgb, d->intensity, 0, 1.0f, &out);
                 box_lights_axis(transform, out.position);
                 glm_vec3_negate(out.position);
                 *ecs_vec_append_t(NULL, &s->suns, box_light_sun_t) =

@@ -68,7 +68,9 @@ ecs_entity_t ore_explosion(
 
     result = ore_burst(w, effect, position, scale);
     if (result) {
-        ecs_set(w, result, OreBlastFlash, { .peak = peak * scale, .range = range * scale });
+        /* The root has the Scale of the play, which scales the range of its light and the
+         * square of its intensity: a peak of peak * scale and a range of range * scale */
+        ecs_set(w, result, OreBlastFlash, { .peak = peak / scale, .range = range });
     }
 
     return result;
@@ -89,8 +91,8 @@ ecs_entity_t ore_combust(
     ecs_entity_t result = ore_burst(w, effect, at, r);
     if (result) {
         ecs_set(w, result, OreBlastFlash, {
-            .peak = ORE_CFG(real, "combustPeak") * s,
-            .range = ORE_CFG(real, "combustRange") + ORE_CFG(real, "combustRangeRadius") * r
+            .peak = ORE_CFG(real, "combustPeak") * s / (r * r),
+            .range = (ORE_CFG(real, "combustRange") + ORE_CFG(real, "combustRangeRadius") * r) / r
         });
     }
 

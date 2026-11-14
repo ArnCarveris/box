@@ -51,6 +51,7 @@ assets {
     prop tool: i32 = 0
     prop grip: f32 = 0.45
     prop power: f32 = 1
+    prop u: f32 = 1
 
     const on = power > 0
     const ba = side > 0 ? PI / 4 : PI * 0.75
@@ -171,7 +172,7 @@ assets {
               nozzle : ShipCopper { Position: {0, tl - 0.57, 0}; Frustum: {radius_bottom: 0.075, radius_top: 0.035, length: 0.2, segments: 10, smooth: true} }
               if on {
                 arc : ShipWeld { Position: {0, tl - 0.47, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true}; NoShadow }
-                light { Position: {0, tl - 0.6, 0}; PointLight: {intensity: 6, range: 5}; Rgb: {170, 210, 255} }
+                light { Position: {0, tl - 0.6, 0}; PointLight: {intensity: 6 / (u * u), range: 5 / u}; Rgb: {170, 210, 255} }
                 sparks {
                   Position: {0, tl - 0.47, 0}
                   Rotation: {PI, 0, 0}
@@ -303,11 +304,11 @@ assets {
         }
         arm_grip {
           Position: {0, 0, gz}
-          HeavyAssemblerArm arm(side: 0 - m, tx: 0 - 0.405 * m, ty: cy, ta: m > 0 ? 0 : PI, tool: 0, grip: 0.42, power: power)
+          HeavyAssemblerArm arm(side: 0 - m, tx: 0 - 0.405 * m, ty: cy, ta: m > 0 ? 0 : PI, tool: 0, grip: 0.42, power: power, u: u)
         }
         arm_weld {
           Position: {0, 0, wz}
-          HeavyAssemblerArm arm(side: m, tx: 0.43 * m, ty: cy + 0.43, ta: atan2(-1, 0 - m), tool: 1, power: power)
+          HeavyAssemblerArm arm(side: m, tx: 0.43 * m, ty: cy + 0.43, ta: atan2(-1, 0 - m), tool: 1, power: power, u: u)
         }
       } else {
         piece {
@@ -332,15 +333,15 @@ assets {
         }
         arm_grip {
           Position: {0, 0, gz}
-          HeavyAssemblerArm arm(side: 0 - m, tx: 0 - 0.95 * m, ty: cy, ta: m > 0 ? 0 : PI, tool: 0, grip: 0.06, power: power)
+          HeavyAssemblerArm arm(side: 0 - m, tx: 0 - 0.95 * m, ty: cy, ta: m > 0 ? 0 : PI, tool: 0, grip: 0.06, power: power, u: u)
         }
         arm_weld {
           Position: {0, 0, wz}
-          HeavyAssemblerArm arm(side: m, tx: 0 - 0.4 * m, ty: cy + 0.05, ta: atan2(-1, 0 - 0.5 * m), tool: 1, power: power)
+          HeavyAssemblerArm arm(side: m, tx: 0 - 0.4 * m, ty: cy + 0.05, ta: atan2(-1, 0 - 0.5 * m), tool: 1, power: power, u: u)
         }
       }
       if on {
-        flood_light { Position: {0, cy - 1.0, 0}; PointLight: {intensity: 5, range: 6}; Rgb: {255, 236, 210} }
+        flood_light { Position: {0, cy - 1.0, 0}; PointLight: {intensity: 5 / (u * u), range: 6 / u}; Rgb: {255, 236, 210} }
       }
     }
     SpineEnds ends(r: r, fe: fe, be: be)

@@ -113,7 +113,7 @@ assets {
     { KoreanGlyphCenter: {}; Position: {-0.24, 2.68, 2.1} }
     { KoreanGlyphRight: {}; Position: {0.24, 2.68, 2.1} }
     for side in 0..2 {
-      { KoreanSilkLantern: {drop: 0.1}; Position: {(side - 0.5) * 4.3, 3, 2.25} }
+      { KoreanSilkLantern: {drop: 0.1, parent_scale: 1.12}; Position: {(side - 0.5) * 4.3, 3, 2.25} }
     }
     { KoreanRoof: {ornate: true, rafter: {56, 124, 96}, rafter_end: {226, 170, 72}}; Position: {0, 3.72, 0} }
   }

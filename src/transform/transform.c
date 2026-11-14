@@ -5,6 +5,7 @@
 
 #define BOX_TRANSFORM_IMPL
 #include "transform.h"
+#include <math.h>
 
 ECS_TAG_DECLARE(DynamicTransform);
 ECS_TAG_DECLARE(ManualTransform);
@@ -41,6 +42,21 @@ void box_transform_local(
     out[3][0] = p->x;
     out[3][1] = p->y;
     out[3][2] = p->z;
+}
+
+float box_transform_world_scale(
+    const WorldTransform *transform)
+{
+    mat3 m;
+    glm_mat4_pick3(ECS_CONST_CAST(vec4*, transform->m), m);
+    float result = cbrtf(fabsf(glm_mat3_det(m)));
+    if (!isfinite(result)) {
+        result = 1.0f;
+    } else if (fabsf(result - 1.0f) < 1e-5f) {
+        result = 1.0f;
+    }
+
+    return result;
 }
 
 void transformSingle(

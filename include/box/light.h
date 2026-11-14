@@ -100,6 +100,10 @@ ECS_STRUCT(LightCookie, {
  * distance d (from 0.01 up) it is intensity / d^2, windowed by (1 - (d / range)^4)^2 so the light
  * reaches zero at range, and a white diffuse surface reflects that over pi.
  *
+ * Range and intensity are in the local units of the light: under a uniform world scale s (the
+ * cube root of the absolute determinant of its WorldTransform) it reaches range * s and lights
+ * with intensity * s^2, so a lit model looks the same at any scale, only larger.
+ *
  * A light with shadows gets a square tile of the ShadowAtlas of its scene while a view of the
  * scene that renders shadows (ShadowSettings.enabled) sees its range, as a spot light does.
  *
@@ -107,8 +111,9 @@ ECS_STRUCT(LightCookie, {
  * perspective octants from 0.005 range (at least 0.001) to range; casters beyond it cast none.
  */
 ECS_STRUCT(PointLight, {
-    float intensity;    /**< Irradiance on a facing surface 1 unit away, default 1, 0 none */
-    float range;        /**< Distance at which the light reaches zero, default 10 */
+    float intensity;    /**< Irradiance on a facing surface 1 local unit away, default 1, 0
+                         *   none */
+    float range;        /**< Local distance at which the light reaches zero, default 10 */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
     bool shadows;       /**< The light casts shadows in the views of its scene that render
                          *   them, default false; a Baked light has no realtime light and casts
@@ -120,6 +125,9 @@ ECS_STRUCT(PointLight, {
 
 /** Cone light along the entity's local +Z, angles are half angles in degrees.
  *
+ * Range and intensity are in the local units of the light and follow its uniform world scale
+ * as those of a PointLight do.
+ *
  * A light with shadows gets a tile of the ShadowAtlas of its scene while a view of the scene
  * that renders shadows (ShadowSettings.enabled) sees its range: a reversed Z perspective along
  * +Z from 0.005 range (at least 0.001) to range.
@@ -128,8 +136,9 @@ ECS_STRUCT(PointLight, {
  * wider cone is unshadowed beyond that.
  */
 ECS_STRUCT(SpotLight, {
-    float intensity;    /**< Irradiance on a facing surface 1 unit away, default 1, 0 none */
-    float range;        /**< Distance at which the light reaches zero, default 10 */
+    float intensity;    /**< Irradiance on a facing surface 1 local unit away, default 1, 0
+                         *   none */
+    float range;        /**< Local distance at which the light reaches zero, default 10 */
     float inner_angle;  /**< Full intensity cone half angle, default 20 */
     float outer_angle;  /**< Zero intensity cone half angle, default 30 */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */

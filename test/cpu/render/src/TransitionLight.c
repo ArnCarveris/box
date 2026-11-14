@@ -297,6 +297,33 @@ void TransitionLight_point_range(void) {
     tr_fini(world, null);
 }
 
+void TransitionLight_point_range_scaled(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, Position, {0, 0, 0});
+    ecs_set(world, root, Scale, {2, 2, 2});
+    ecs_entity_t e = tl_point(world, 4, 10);
+    ecs_add_pair(world, e, EcsChildOf, root);
+    box_transition_set(world, e, ecs_id(PointLight), &tl_spec);
+    box_render_light_t light;
+    tr_frames(world, 2);
+
+    ecs_set(world, e, PointLight, {.intensity = 8, .range = 20, .shadow_resolution = 512});
+    tr_frame(world);
+    tr_frames(world, 2);
+    light = tl_light(world, null, e);
+    test_assert(fabsf(light.range - 30.0f) < TL_EPS);
+    test_assert(fabsf(light.color[0] - 24.0f) < TL_EPS);
+
+    tr_frames(world, 2);
+    light = tl_light(world, null, e);
+    test_assert(fabsf(light.range - 40.0f) < TL_EPS);
+    test_assert(fabsf(light.color[0] - 32.0f) < TL_EPS);
+    tr_fini(world, null);
+}
+
 void TransitionLight_range_to_zero(void) {
     // engine_core/transition
     box_render_null_t *null;

@@ -1661,7 +1661,9 @@ typedef struct box_render_transition_light_t {
     float values[4];        /**< Target intensity, range, inner and outer angle */
     float scale[3];         /**< Per channel factor the extract applied to the color of the
                              *   light after its Rgb and intensity: the attenuation of a sun or
-                             *   moon, 1 for the others */
+                             *   moon, the square of the world scale for the others */
+    float range_scale;      /**< Factor the extract applied to the range: the uniform world
+                             *   scale of a point or spot light, 1 for a directional light */
     uint8_t rgb[3];         /**< Target Rgb, white without one */
     uint8_t has_rgb;        /**< The light has an Rgb */
 } box_render_transition_light_t;

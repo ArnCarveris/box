@@ -516,6 +516,18 @@
                 ]
             },
             {
+                "id": "ScaledLights",
+                "testcases": [
+                    "world_scale",
+                    "point_uniform",
+                    "spot_uniform",
+                    "non_uniform",
+                    "scale_one_unchanged",
+                    "point_shadow_tile",
+                    "flat_parent"
+                ]
+            },
+            {
                 "id": "ShadowAtlas",
                 "setup": true,
                 "testcases": [
@@ -903,6 +915,7 @@
                 "testcases": [
                     "point_intensity",
                     "point_range",
+                    "point_range_scaled",
                     "range_to_zero",
                     "spot_intensity_range_angles",
                     "point_color",

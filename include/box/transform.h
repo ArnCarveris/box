@@ -94,6 +94,16 @@ void box_transform_local(
     const Scale *s,
     mat4 out);
 
+/** Get the uniform scale of a world transform, the cube root of the absolute determinant of
+ * its upper 3x3: the geometric mean of the axis lengths without shear. A scale within float
+ * rounding of 1, as of a rotation, is 1, so an unscaled entity is unchanged bit for bit.
+ *
+ * @param transform The world transform
+ * @return The scale, 0 for a flat transform, 1 for one that is not finite
+ */
+float box_transform_world_scale(
+    const WorldTransform *transform);
+
 /** Receives the entities whose WorldTransform a TransformStatic run changed, once per run
  * that changed any: every computed root and every descendant whose WorldTransform it wrote.
  *

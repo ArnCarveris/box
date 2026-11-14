@@ -1298,6 +1298,8 @@ assets {
   }
 
   template DrillHead {
+    prop parent_scale: f32 = 1
+
     plate : ShipHullDark { Position: {0, 0.06, 0}; RoundedBox: {2.6, 0.12, 2.6, 0.05, segments: 2} }
     for i in 0..4 {
       const a = i * HALF_PI + 0.785
@@ -1334,7 +1336,7 @@ assets {
       }
       tip : ShipHeat { Position: {0, 2.26, 0}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
     }
-    heat { Position: {0, 3.7, 0}; PointLight: {intensity: 2, range: 3}; Rgb: {255, 140, 60} }
+    heat { Position: {0, 3.7, 0}; PointLight: {intensity: 2 / (parent_scale * parent_scale), range: 3 / parent_scale}; Rgb: {255, 140, 60} }
   }
 
   template DrillMount {
@@ -1347,9 +1349,9 @@ assets {
     } else if side == 5 {
       mount { Position: {0, CH / 2, -2}; Rotation: {HALF_PI, 0, 0}; DrillHead drill() }
     } else if side == 6 {
-      mount { Position: {0, CH, 0}; Rotation: {PI, 0, 0}; Scale: {0.8, 0.8, 0.8}; DrillHead drill() }
+      mount { Position: {0, CH, 0}; Rotation: {PI, 0, 0}; Scale: {0.8, 0.8, 0.8}; DrillHead drill(parent_scale: 0.8) }
     } else {
-      mount { Scale: {0.8, 0.8, 0.8}; DrillHead drill() }
+      mount { Scale: {0.8, 0.8, 0.8}; DrillHead drill(parent_scale: 0.8) }
     }
   }
 

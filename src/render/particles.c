@@ -899,28 +899,6 @@ static void box_particles_block_forces(
     }
 }
 
-/** Get the uniform scale of the world transform of an emitter, the cube root of the absolute
- * determinant of its upper 3x3: the geometric mean of the axis lengths without shear. A scale
- * within float rounding of 1, as of a rotation, is 1, so an unscaled emitter is unchanged.
- *
- * @param transform World transform of the emitter
- * @return The scale, 0 for a flat transform
- */
-static float box_particles_world_scale(
-    const WorldTransform *transform)
-{
-    mat3 m;
-    glm_mat4_pick3(ECS_CONST_CAST(vec4*, transform->m), m);
-    float result = cbrtf(fabsf(glm_mat3_det(m)));
-    if (!isfinite(result)) {
-        result = 1.0f;
-    } else if (fabsf(result - 1.0f) < 1e-5f) {
-        result = 1.0f;
-    }
-
-    return result;
-}
-
 /** Write the parameters of an emitter for this frame but its forces.
  *
  * @param emitter The emitter values
@@ -1376,7 +1354,7 @@ static void box_particles_emitter(
     ParticleForces forces;
     box_particles_forces(world, e, emitter->forces, own, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
-    float scale = box_particles_world_scale(transform);
+    float scale = box_transform_world_scale(transform);
     vec3 acceleration;
     glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
     box_particles_block(emitter, transform, ecs_get(world, e, ParticleCollision), velocity,

@@ -723,8 +723,9 @@ ECS_PRIVATE                    /**< The cells are not reflected */
  * with an EffectFlash and a PointLight) takes the peak and the range of the play.
  */
 ECS_STRUCT(OreBlastFlash, {
-    float peak;  /**< Intensity the flash starts at, the EffectFlash.intensity of the light */
-    float range; /**< Range of the light */
+    float peak;  /**< Intensity the flash starts at, the EffectFlash.intensity of the light, in
+                  *   the local units of the light, which the Scale of the play scales */
+    float range; /**< Range of the light in its local units */
 });
 
 /** Phases of a rocket on the pad, the type of OreRocketState.phase */
