@@ -1,4 +1,4 @@
-// The song of "Making music" in docs/audio.md, which the Song suite of test/cpu/audio plays: a
+// A song, which the Song suite of test/cpu/audio plays: a
 // loop of 4 bars in A minor at 120 bpm, Am Am Dm Em, on a timeline of tracks and clips, mixed
 // through a music group with two returns and ducked under the SFX bus by a stinger that a game
 // event plays on the next bar.

@@ -1,4 +1,4 @@
-// The glide example of docs/audio.md, kept the same, then the sounds the Synth suite of
+// A glide example, then the sounds the Synth suite of
 // test/cpu/audio measures glides and legato notes with.
 using box.audio
 using box.audio.synth

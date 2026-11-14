@@ -1,7 +1,7 @@
 /**
  * @file CurveRecipes.c
- * @brief Tests for the recipes of docs/curves.md in test/assets/curves: every recipe loads, runs
- * and logs nothing, the mistakes of test/assets/curves/mistakes log the errors the guide quotes,
+ * @brief Tests for the curve recipes in test/assets/curves: every recipe loads, runs and logs
+ * nothing, the mistakes of test/assets/curves/mistakes log the expected errors,
  * and a script reports only its first error.
  */
 

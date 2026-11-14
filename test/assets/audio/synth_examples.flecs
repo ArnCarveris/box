@@ -1,4 +1,4 @@
-// The nine synth sounds of docs/audio.md, kept the same: the Synth suite of test/cpu/audio
+// Nine synth sounds: the Synth suite of test/cpu/audio
 // checks that they parse, compile without errors, play and end.
 using box.audio
 using box.audio.synth

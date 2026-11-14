@@ -7,7 +7,7 @@
  * flecs.script.input, and an element with an ActionTrigger drives an input Action.
  *
  * Rays go through the spatial index, so an entity under SpatialIgnore (box.spatial) is never
- * picked and does not block a pick, which reaches what is behind it (docs/spatial-index.md).
+ * picked and does not block a pick, which reaches what is behind it (docs/spatial.md).
  */
 
 #ifndef BOX_PICKING_H

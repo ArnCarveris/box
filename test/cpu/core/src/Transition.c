@@ -103,7 +103,7 @@ static bool transition_near(
     return fabsf(a - b) <= tolerance;
 }
 
-/** The script of docs/transitions.md */
+/** A script that styles a design with transitions */
 static const char *transition_design_script =
     "using box.transform\n"
     "using box.material\n"

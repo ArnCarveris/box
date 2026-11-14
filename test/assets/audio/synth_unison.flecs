@@ -1,4 +1,4 @@
-// The unison example of docs/audio.md, kept the same, then the sounds the Synth suite of
+// A unison example, then the sounds the Synth suite of
 // test/cpu/audio measures unison from script with.
 using box.audio
 using box.audio.synth

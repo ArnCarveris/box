@@ -1,4 +1,4 @@
-// The pluck examples of docs/audio.md, kept the same, and the harp of the Mossvale score: the
+// Pluck examples and the harp of the Mossvale score: the
 // Synth suite of test/cpu/audio checks that they parse, compile without errors, play and end.
 using box.audio
 using box.audio.synth

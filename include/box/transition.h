@@ -4,7 +4,7 @@
  *
  * Transition maps a component to a TransitionSpec. The component holds a new value at once for
  * every game thread reader; only the rendered pixels move to it along the spec. Inherited by
- * instances. See docs/transitions.md, and Transition below for the rules of its entries.
+ * instances. See docs/transition.md, and Transition below for the rules of its entries.
  */
 
 #ifndef BOX_TRANSITION_H

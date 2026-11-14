@@ -6,7 +6,7 @@
  * and the renderer keeps the particles in pools it owns, so a fixed timestep gives the same
  * particles run after run.
  *
- * docs/curves.md is the guide to the curves of ParticleCurves, ParticleMotion, ParticleLight and
+ * docs/curve.md is the guide to the curves of ParticleCurves, ParticleMotion, ParticleLight and
  * ParticleTimeline, with recipes for common effects.
  */
 

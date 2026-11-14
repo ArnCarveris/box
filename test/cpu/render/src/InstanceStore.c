@@ -1701,7 +1701,7 @@ void InstanceStore_exact_run_grows_moved(void) {
     box_render_null_free(null);
 }
 
-/** The spawn scene of docs/gpu-instance-memory.md: 1,000 boxes added in each of 64 frames. */
+/** A spawn scene: 1,000 boxes added in each of 64 frames. */
 void InstanceStore_spawn_grows_pages_without_moves(void) {
     // gpu_instance_data/instance_run_exact
     box_render_null_t *null;

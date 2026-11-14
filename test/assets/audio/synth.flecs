@@ -1,4 +1,4 @@
-// Synth sounds for the Synth suite of test/cpu/audio: the click of docs/audio.md on a ui bus,
+// Synth sounds for the Synth suite of test/cpu/audio: a click on a ui bus,
 // and a steady tone whose frequency the suite changes between two plays.
 using box.audio
 using box.audio.synth

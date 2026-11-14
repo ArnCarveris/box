@@ -24,7 +24,7 @@ extern "C" {
  * signature, so a bar is beats_per_bar * 4 / beat_unit beats.
  *
  * While it plays, box.audio writes position every frame from the clock of the output, the
- * beat the core renders now. A write of another position is a seek. See Transport in
+ * beat the core renders now. A write of another position is a seek. See Timeline in
  * docs/audio.md.
  */
 ECS_STRUCT(Transport, {
@@ -196,7 +196,7 @@ ECS_STRUCT(AudioClip, {
  * automatable logs one error that names it, and does nothing until it changes.
  *
  * The automation owns the value the output hears, never the component. While no automation
- * covers the target the output has the value of the component again. See Automation in
+ * covers the target the output has the value of the component again. See Timeline in
  * docs/audio.md.
  */
 ECS_STRUCT(AutomationClip, {
@@ -348,7 +348,7 @@ ECS_STRUCT(TrackHumanize, {
  * AudioBus (the With trait), so its notes play on its own bus.
  *
  * Its ClipPlacement children place clips on the timeline. While the Transport plays, every
- * enabled track schedules the notes that start in the lookahead window. See Clips and tracks in
+ * enabled track schedules the notes that start in the lookahead window. See Timeline in
  * docs/audio.md.
  *
  * Swing works on the grid of the timeline from its beat 0, so clips placed anywhere swing alike.

@@ -1936,9 +1936,10 @@ void Synth_script_loop_source(void) {
     ecs_fini(world);
 }
 
-/** The examples of docs/audio.md compile without errors, play and end: the click within 3
- * frames of AUDIO_DT, the blip within 12, the whoosh within 70, the bell within 155, the
- * electric piano within 100, the metallic hit and the ring within 40 and the pluck within 48. */
+/** The examples of test/assets/audio/synth_examples.flecs compile without errors, play and
+ * end: the click within 3 frames of AUDIO_DT, the blip within 12, the whoosh within 70, the
+ * bell within 155, the electric piano within 100, the metallic hit and the ring within 40 and
+ * the pluck within 48. */
 void Synth_docs_examples(void) {
     // audio/synth
     ecs_world_t *world = audio_world();
@@ -2498,8 +2499,8 @@ void Synth_script_legato_source(void) {
     ecs_fini(world);
 }
 
-/** The lead of docs/audio.md compiles without errors; three notes a few frames apart play as
- * one voice that ends after the last. */
+/** The lead of test/assets/audio/synth_glide.flecs compiles without errors; three notes a few
+ * frames apart play as one voice that ends after the last. */
 void Synth_docs_glide_example(void) {
     // audio/synth
     ecs_world_t *world;
@@ -3147,7 +3148,7 @@ void Synth_lfo_random_phase_seeded(void) {
     test_assert(memcmp(audio_sound_a, audio_sound_b, 24000 * sizeof(float)) != 0);
 }
 
-/** The examples of LFOs of docs/audio.md, from test/assets/audio/synth_lfo.flecs, compile
+/** The examples of LFOs of test/assets/audio/synth_lfo.flecs compile
  * into their patches without errors, play and end. */
 void Synth_docs_lfo_examples(void) {
     // audio/synth
@@ -3644,7 +3645,7 @@ void Synth_unison_stereo_chain(void) {
     test_assert(err < 1e-5f);
 }
 
-/** The pad of docs/audio.md and the sounds of test/assets/audio/synth_unison.flecs compile with
+/** The pad and the sounds of test/assets/audio/synth_unison.flecs compile with
  * their unison, the pad plays wide and ends, the defaults play mono, a change of a SynthUnison
  * compiles the sound again, and a wide sound in space is heard from its side alone. */
 void Synth_script_unison(void) {
@@ -4414,8 +4415,8 @@ void Synth_script_pluck(void) {
     ecs_fini(world);
 }
 
-/** The guitar, the 12 string guitar and the koto of docs/audio.md and the harp of the Mossvale
- * score compile without errors, play and end on their own.
+/** The guitar, the 12 string guitar and the koto of test/assets/audio/synth_pluck.flecs and the
+ * harp of the Mossvale score compile without errors, play and end on their own.
  *
  * The guitars, the 12 string with a pair of strings in unison, end within 280 frames of
  * AUDIO_DT, the koto and two notes of the harp within 230. */

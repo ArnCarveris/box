@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks a C source against CODING_STYLE.md. Runs as the bake3 "lint" command.
+"""Checks a C source against the coding style. Runs as the bake3 "lint" command.
 
 Usage: lint.py <file> <log|error|autofix>
 """

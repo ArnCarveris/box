@@ -166,7 +166,7 @@ typedef struct ArrayInstance {
  *
  * No query finds them: picks neither hit them nor are blocked by them, Interactive or not, nor
  * do move controllers, box_spatial_bounds, design mode or bake regions. Adding or removing the
- * tag takes effect in the next update. See docs/spatial-index.md.
+ * tag takes effect in the next update. See docs/spatial.md.
  */
 extern ECS_TAG_DECLARE(SpatialIgnore);
 

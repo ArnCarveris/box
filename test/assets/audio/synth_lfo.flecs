@@ -1,4 +1,4 @@
-// The examples of LFOs in docs/audio.md, which Synth_docs_lfo_examples plays
+// Examples of LFOs, which Synth_docs_lfo_examples plays
 using box.audio
 using box.audio.synth
 

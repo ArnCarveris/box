@@ -7,7 +7,7 @@
  *
  * Without keys a curve has the default of its field, one key is a constant, and outside the keys
  * the curve holds the first or last. In script: {kind: CurveCatmullRom, keys: [{0, 0.3}, {1, 2}]}.
- * docs/curves.md is the authoring guide, with every field that takes a curve and recipes.
+ * docs/curve.md is the authoring guide, with every field that takes a curve and recipes.
  */
 
 #ifndef BOX_CURVE_H
