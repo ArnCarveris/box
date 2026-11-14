@@ -7,7 +7,7 @@
  * drift of the forces carries particles at rest across the image, a radial speed expands
  * a ring in the rotated plane of its emitter and by the scale of its effect, and the velocity
  * and force curves of a ParticleMotion move particles at rest by their age: 2 units in their
- * first second.
+ * first second, and the particle of a local emitter follows its moving parent.
  *
  * Frames advance a fixed 1/60 s.
  * An unlit orthographic camera 10 units in front of the origin looks into a 32x32 capture of
@@ -534,6 +534,38 @@ void Particle_lingering_renders_after_delete(void) {
     test_assert(green_at(px, 2, 0) < 8);
     test_int(ecs_singleton_get(world, ParticleStats)->lingering, 1);
     test_int(ecs_singleton_get(world, ParticleStats)->emitters, 0);
+
+    stbi_image_free(px);
+    ecs_fini(world);
+}
+
+void Particle_local_follows_parent(void) {
+    // particle/local
+    ecs_world_t *world = world_new("local.png");
+    ecs_entity_t a = ecs_new(world), b = ecs_new(world);
+    ecs_set(world, a, Position, {-2, 1.5f, 0});
+    ecs_set(world, b, Position, {-2, -1.5f, 0});
+    ecs_entity_t local = emitter_new(world, a, 60, 1);
+    ecs_entity_t plain = emitter_new(world, b, 60, 1);
+    ParticleEmitter *p = ecs_get_mut(world, local, ParticleEmitter);
+    p->direction[1] = 0;
+    p->local = true;
+    ecs_modified(world, local, ParticleEmitter);
+    ecs_get_mut(world, plain, ParticleEmitter)->direction[1] = 0;
+    ecs_modified(world, plain, ParticleEmitter);
+    unsigned char *px = run(world, "local.png", 3);
+    test_assert(green_at(px, -2, 1.5f) > 128);
+    test_assert(green_at(px, -2, -1.5f) > 128);
+    stbi_image_free(px);
+
+    ecs_set(world, a, Position, {2, 1.5f, 0});
+    ecs_set(world, b, Position, {2, -1.5f, 0});
+    px = run(world, "local.png", 1);
+    test_assert(green_at(px, 2, 1.5f) > 128);
+    test_assert(green_at(px, -2, 1.5f) < 8);
+    test_assert(green_at(px, -2, -1.5f) > 128);
+    test_assert(green_at(px, 2, -1.5f) < 8);
+    test_int(ecs_singleton_get(world, ParticleStats)->particles, 2);
 
     stbi_image_free(px);
     ecs_fini(world);

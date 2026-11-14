@@ -1230,6 +1230,7 @@
                     "flash_lights_wall",
                     "lingering_renders_after_delete",
                     "drift_moves_particles",
+                    "local_follows_parent",
                     "radial_ring_in_plane",
                     "radial_burst_scaled",
                     "motion_velocity_curve_moves",

@@ -106,9 +106,17 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     var axis_x = vec2f(c, s);
     var axis_y = vec2f(-s, c);
     var stretched = 1.0;
-    var moving = p.velocity;
+    // A local emitter draws its particles through its current model
+    var center = p.position;
+    var travel = p.velocity;
+    if (emitter.gradient_max.w != 0u) {
+        center = (emitter.model * vec4f(p.position, 1.0)).xyz;
+        travel = (emitter.model * vec4f(p.velocity, 0.0)).xyz;
+    }
+
+    var moving = travel;
     if (emitter.params.z > 0.0 && emitter.gradient_max.y != 0u) {
-        moving = particle_moving(p.velocity, particle_motion_scaled(
+        moving = particle_moving(travel, particle_motion_scaled(
             particle_motion_velocity(emitter.motion, seed, p.index, t), emitter.turbulence.z));
     }
 
@@ -121,7 +129,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     }
 
     let turned = axis_x * (corner.x * stretched) + axis_y * corner.y;
-    let world = p.position + (right * turned.x + up * turned.y) * (0.5 * size);
+    let world = center + (right * turned.x + up * turned.y) * (0.5 * size);
     out.uv = corner;
     if (emitter.look.x == PARTICLE_SPRITE) {
         let frame = particle_frame(emitter.look.z, emitter.look.w, emitter.params.x, age,

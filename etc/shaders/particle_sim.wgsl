@@ -6,7 +6,9 @@
 // and collides them with the ground plane. spawn then writes the spawned particles into the
 // slots the extract picked. Each spawn draws its lifetime, position, direction, speed and radial
 // speed from the seed and its spawn index, each from its own stream, and adds the velocity it
-// inherits from the emitter; the C twin is box_particle_* in src/particle/simulate.h.
+// inherits from the emitter; the C twin is box_particle_* in src/particle/simulate.h. A local
+// emitter spawns, moves and keeps its particles in its space, under its world forces turned
+// into that space.
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
 
@@ -61,9 +63,28 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
                 particle_life_age(life, p.remaining)), emitter.turbulence.z);
         }
 
-        particle_integrate(&p, emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,
-            emitter.wander.xyz, emitter.drift, motion, emitter.acceleration.w);
-        if (!particle_collide(&p, emitter.ground.xyz, emitter.collide)) {
+        // A local emitter turns its world forces into its space and keeps the one integrate.
+        var forces = LocalForces(emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,
+            emitter.drift);
+        let local = emitter.gradient_max.w != 0u;
+        var inverse = mat3x3f();
+        if (local) {
+            inverse = particle_inverse(emitter.model);
+            particle_local(&p, emitter.model, inverse, &forces, &motion, emitter.wander.xyz,
+                emitter.acceleration.w);
+        }
+
+        particle_integrate(&p, forces.acceleration, forces.wind, forces.turbulence,
+            emitter.wander.xyz, forces.drift, motion, emitter.acceleration.w);
+        var alive = true;
+        if (local) {
+            alive = particle_collide_local(&p, emitter.model, inverse, emitter.ground.xyz,
+                emitter.collide);
+        } else {
+            alive = particle_collide(&p, emitter.ground.xyz, emitter.collide);
+        }
+
+        if (!alive) {
             p.remaining = 0u;
         }
     }
@@ -114,5 +135,11 @@ fn spawn(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) lane
     p.remaining = particle_life(seed, index, emitter.life.y, emitter.life.z);
     p.velocity = direction * speed + particle_radial(offset, radial) + emitter.inherit.xyz;
     p.index = index;
+    if (emitter.gradient_max.w != 0u) {
+        // A local emitter keeps its particles in its space; its inherit is zero
+        p.position = local;
+        p.velocity = particle_inverse(emitter.model) * p.velocity;
+    }
+
     particles[emitter.gradient_max.z + slot] = p;
 }

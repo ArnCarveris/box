@@ -142,9 +142,9 @@ typedef struct box_particle_point_t {
  * particle is drawn, so a slot holds only what moves.
  */
 typedef struct box_particle_t {
-    float position[3];      /**< World position */
+    float position[3];      /**< World position, in the space of a local emitter */
     uint32_t remaining;     /**< Microseconds left to live, 0 for a free slot */
-    float velocity[3];      /**< World velocity */
+    float velocity[3];      /**< World velocity, in the space of a local emitter */
     uint32_t index;         /**< Spawn index of the particle in its emitter */
 } box_particle_t;
 
@@ -631,6 +631,172 @@ static inline bool box_particle_collide(
 
     velocity[0] *= 1.0f - ground->friction;
     velocity[2] *= 1.0f - ground->friction;
+done:
+    return result;
+}
+
+/** A point or direction of the space of an emitter in the world, model * vec4f(v, w) in WGSL,
+ * which the draw and the passes of a local emitter compute inline, so it has no WGSL twin.
+ *
+ * @param model The model of the emitter, columns
+ * @param v The point or direction
+ * @param w 1 for a point, 0 for a direction
+ * @param out Receives the world point or direction, may be v
+ */
+static inline void box_particle_transform(
+    const float model[4][4],
+    const float *v,
+    float w,
+    float *out)
+{
+    float r[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        r[i] = model[0][i] * v[0] + model[1][i] * v[1] + model[2][i] * v[2] + model[3][i] * w;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        out[i] = r[i];
+    }
+}
+
+/** A vector times a 3x3 matrix of columns, inverse * v in WGSL, so it has no WGSL twin.
+ *
+ * @param m The matrix, nine floats column by column
+ * @param v The vector
+ * @param out Receives the product, may be v
+ */
+static inline void box_particle_mul3(
+    const float *m,
+    const float *v,
+    float *out)
+{
+    float r[3];
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        r[i] = m[i] * v[0] + m[3 + i] * v[1] + m[6 + i] * v[2];
+    }
+
+    for (i = 0; i < 3; i ++) {
+        out[i] = r[i];
+    }
+}
+
+/** The inverse of the 3x3 of the model of an emitter, which takes world directions into the
+ * space of a local emitter: the cross products of its columns over its determinant.
+ *
+ * @param model The model, columns
+ * @param out Receives the inverse, nine floats column by column, zero for a model without
+ *            volume
+ */
+static inline void box_particle_inverse(
+    const float model[4][4],
+    float *out)
+{
+    const float *a = model[0], *b = model[1], *c = model[2];
+    float rows[3][3] = {
+        {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2], b[0] * c[1] - b[1] * c[0]},
+        {c[1] * a[2] - c[2] * a[1], c[2] * a[0] - c[0] * a[2], c[0] * a[1] - c[1] * a[0]},
+        {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}
+    };
+    float det = a[0] * rows[0][0] + a[1] * rows[0][1] + a[2] * rows[0][2];
+    float k = det != 0.0f ? 1.0f / det : 0.0f;
+    int32_t i, j;
+    for (i = 0; i < 3; i ++) {
+        for (j = 0; j < 3; j ++) {
+            out[j * 3 + i] = rows[i][j] * k;
+        }
+    }
+}
+
+/** Prepare the step of a particle of a local emitter, which lives in the space of the emitter:
+ * add the wander field at its world position to its velocity, taken into that space, and turn
+ * the world acceleration, wind, drift and the velocity and force of the motion curves into it,
+ * so box_particle_integrate with the results moves it as a world particle under world forces.
+ *
+ * The forces it hands on have no turbulence, as the wander field is in the velocity already.
+ *
+ * @param model The model of the emitter, columns
+ * @param inverse Its box_particle_inverse
+ * @param position Position in the space of the emitter
+ * @param velocity Velocity in the space of the emitter, the wander of the frame added in place
+ * @param forces The world forces of the frame
+ * @param motion The curves of ParticleMotion at the age of the particle, NULL for none
+ * @param delta Seconds of the frame
+ * @param out_forces Receives the forces in the space of the emitter
+ * @param out_motion Receives the curves in the space of the emitter
+ */
+static inline void box_particle_local(
+    const float model[4][4],
+    const float *inverse,
+    const float *position,
+    float *velocity,
+    const box_particle_forces_t *forces,
+    const box_particle_motion_t *motion,
+    float delta,
+    box_particle_forces_t *out_forces,
+    box_particle_motion_t *out_motion)
+{
+    static const box_particle_motion_t none = {
+        .velocity = {0, 0, 0}, .speed = 1.0f, .force = {0, 0, 0}, .drag = 1.0f
+    };
+    float world[3], wander[3];
+    int32_t i;
+    box_particle_transform(model, position, 1.0f, world);
+    box_particle_wander(world, forces->phase, forces->scale, forces->turbulence, wander);
+    box_particle_mul3(inverse, wander, wander);
+    for (i = 0; i < 3; i ++) {
+        velocity[i] += wander[i] * delta;
+    }
+
+    *out_forces = *forces;
+    box_particle_mul3(inverse, forces->acceleration, out_forces->acceleration);
+    box_particle_mul3(inverse, forces->wind, out_forces->wind);
+    box_particle_mul3(inverse, forces->drift, out_forces->drift);
+    out_forces->turbulence = 0.0f;
+    *out_motion = motion ? *motion : none;
+    box_particle_mul3(inverse, out_motion->velocity, out_motion->velocity);
+    box_particle_mul3(inverse, out_motion->force, out_motion->force);
+}
+
+/** Collide a particle of a local emitter with the world ground plane after its step, as
+ * box_particle_collide does at its world position and velocity, which a hit takes back into
+ * the space of the emitter.
+ *
+ * @param model The model of the emitter, columns
+ * @param inverse Its box_particle_inverse
+ * @param position Position in the space of the emitter, lifted in place
+ * @param velocity Velocity in the space of the emitter, changed in place
+ * @param ground The ground plane
+ * @return Whether the particle lives on
+ */
+static inline bool box_particle_collide_local(
+    const float model[4][4],
+    const float *inverse,
+    float *position,
+    float *velocity,
+    const box_particle_ground_t *ground)
+{
+    float world[3], moving[3];
+    bool result = true;
+    int32_t i;
+    if (ground->mode == BOX_PARTICLE_GROUND_NONE) {
+        goto done;
+    }
+
+    box_particle_transform(model, position, 1.0f, world);
+    if (world[1] >= ground->height) {
+        goto done;
+    }
+
+    box_particle_transform(model, velocity, 0.0f, moving);
+    result = box_particle_collide(world, moving, ground);
+    for (i = 0; i < 3; i ++) {
+        world[i] -= model[3][i];
+    }
+
+    box_particle_mul3(inverse, world, position);
+    box_particle_mul3(inverse, moving, velocity);
 done:
     return result;
 }

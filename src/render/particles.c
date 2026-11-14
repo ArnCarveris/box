@@ -80,6 +80,7 @@ typedef struct box_particle_pool_t {
     vec3 last_position;     /**< World position of the emitter in the last frame */
     bool has_last;          /**< last_position holds a position */
     bool linger;            /**< ParticleEmitter.linger of the last frame the emitter was seen */
+    bool local;             /**< ParticleEmitter.local its particles were spawned with */
     bool lingering;         /**< The emitter was deleted and the pool runs out its particles,
                              *   no longer in by_entity */
     uint64_t faded;         /**< Microseconds of stopped frames since the emitter stopped, the
@@ -1288,6 +1289,12 @@ static void box_particles_emitter(
         pool->faded = 0;
     }
 
+    if (pool->local != emitter->local) {
+        box_particles_empty(pool);
+        pool->fresh = true;
+        pool->local = emitter->local;
+    }
+
     pool->seen = true;
     pool->scene = scene;
     pool->linger = emitter->linger;
@@ -1362,6 +1369,10 @@ static void box_particles_emitter(
     ParticleForces forces;
     box_particles_forces(world, e, emitter->forces, own, &forces);
     glm_vec3_scale(velocity, emitter->inherit_velocity, velocity);
+    if (emitter->local) {
+        glm_vec3_zero(velocity);
+    }
+
     float scale = box_transform_world_scale(transform);
     vec3 acceleration;
     glm_vec3_scale(ECS_CONST_CAST(float*, emitter->acceleration), scale, acceleration);
@@ -1381,6 +1392,7 @@ static void box_particles_emitter(
     }
 
     box_particles_block_look(look, pool, scale, &entry->block);
+    entry->block.local = emitter->local ? 1u : 0u;
     entry->curves = pool->curved && (box_particle_rows_used(&pool->curves) ||
         box_particle_rows_motion_used(&pool->motion))
         ? BOX_RENDER_BUFFER_PARTICLE_CURVES

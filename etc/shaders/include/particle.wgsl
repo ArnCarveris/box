@@ -91,13 +91,14 @@ struct Emitter {
     curve_max: vec4u,
     // x: first of the GRADIENT_ROWS rows of the max gradient, CURVE_CONSTANT for none, y: 1
     // when the emitter has a ParticleMotion that changes its motion, z: first slot of the pool
-    // in the particle arena
+    // in the particle arena, w: 1 when its particles live in the space of model
     gradient_max: vec4u,
     // Rows of the curves of the ParticleMotion, read only while gradient_max.y is 1
     motion: MotionRows,
 };
 
-// A pool slot, box_particle_t: remaining is 0 for a free slot.
+// A pool slot, box_particle_t: remaining is 0 for a free slot. Position and velocity are in the
+// world, or in the space of model for a local emitter.
 struct Particle {
     position: vec3f,
     remaining: u32,
@@ -329,6 +330,75 @@ fn particle_collide(p: ptr<function, Particle>, ground: vec3f, mode: u32) -> boo
     (*p).velocity.x *= 1.0 - ground.z;
     (*p).velocity.z *= 1.0 - ground.z;
     return true;
+}
+
+// The forces of a frame of the step of a particle of a local emitter in the space of the
+// emitter, as the members of Emitter: xyz of the acceleration, wind with the drag in w,
+// turbulence and drift.
+struct LocalForces {
+    acceleration: vec3f,
+    wind: vec4f,
+    turbulence: vec2f,
+    drift: vec3f,
+};
+
+// The inverse of the 3x3 of the model of an emitter, which takes world directions into the
+// space of a local emitter: the cross products of its columns over its determinant, zero for a
+// model without volume.
+fn particle_inverse(model: mat4x4f) -> mat3x3f {
+    let a = model[0].xyz;
+    let b = model[1].xyz;
+    let c = model[2].xyz;
+    let rows = mat3x3f(
+        vec3f(b.y * c.z - b.z * c.y, b.z * c.x - b.x * c.z, b.x * c.y - b.y * c.x),
+        vec3f(c.y * a.z - c.z * a.y, c.z * a.x - c.x * a.z, c.x * a.y - c.y * a.x),
+        vec3f(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x));
+    let det = a.x * rows[0].x + a.y * rows[0].y + a.z * rows[0].z;
+    let k = select(0.0, 1.0 / det, det != 0.0);
+    return transpose(rows) * k;
+}
+
+// Prepare the step of a particle of a local emitter: add the wander field at its world position,
+// taken into the space of the emitter, to its velocity, and turn the world acceleration, wind,
+// drift and the velocity and force of the motion into that space, so particle_integrate with
+// the results moves it as a world particle under world forces. The forces keep no turbulence,
+// as the wander field is in the velocity already.
+fn particle_local(p: ptr<function, Particle>, model: mat4x4f, inverse: mat3x3f,
+    forces: ptr<function, LocalForces>, motion: ptr<function, Motion>, phase: vec3f, delta: f32)
+{
+    let world = (model * vec4f((*p).position, 1.0)).xyz;
+    let wander = inverse * particle_wander(world, phase, (*forces).turbulence.y,
+        (*forces).turbulence.x);
+    (*p).velocity += wander * delta;
+    (*forces).acceleration = inverse * (*forces).acceleration;
+    (*forces).wind = vec4f(inverse * (*forces).wind.xyz, (*forces).wind.w);
+    (*forces).drift = inverse * (*forces).drift;
+    (*forces).turbulence.x = 0.0;
+    (*motion).velocity = inverse * (*motion).velocity;
+    (*motion).force = inverse * (*motion).force;
+}
+
+// Collide a particle of a local emitter with the world ground plane after its step, as
+// particle_collide does at its world position and velocity, which a hit takes back into the
+// space of the emitter. Returns whether the particle lives on.
+fn particle_collide_local(p: ptr<function, Particle>, model: mat4x4f, inverse: mat3x3f,
+    ground: vec3f, mode: u32) -> bool
+{
+    if (mode == GROUND_NONE) {
+        return true;
+    }
+
+    var w = *p;
+    w.position = (model * vec4f((*p).position, 1.0)).xyz;
+    if (w.position.y >= ground.x) {
+        return true;
+    }
+
+    w.velocity = (model * vec4f((*p).velocity, 0.0)).xyz;
+    let result = particle_collide(&w, ground, mode);
+    (*p).position = inverse * (w.position - model[3].xyz);
+    (*p).velocity = inverse * w.velocity;
+    return result;
 }
 
 // The age of a particle over its life, 0 to 1.

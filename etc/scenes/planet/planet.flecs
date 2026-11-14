@@ -1420,7 +1420,8 @@ planets {
           Emitter: {
             max: 16, rate: 1.1, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
             lifetime: {4, 7}, size: {r * 5, r * 5.6}, rotation: {0, 360}, spin: {-4, 4},
-            opacity: {0.11 * cor, 0.15 * cor}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7
+            opacity: {0.11 * cor, 0.15 * cor}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7,
+            local: true
           }
           Burst: {count: 6, at: 0}
           Appearance: {
@@ -1436,7 +1437,7 @@ planets {
         Emitter: {
           max: 8, rate: 0.6, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
           lifetime: {5, 8}, size: {r * 4.4, r * 5}, opacity: {0.04 * cor, 0.05 * cor},
-          color: {col.r, col.g, col.b}, seed: sd * 16 + 8
+          color: {col.r, col.g, col.b}, seed: sd * 16 + 8, local: true
         }
         Burst: {count: 4, at: 0}
         Appearance: {shape: Circle, blend: Additive, softness: 0}
@@ -1452,7 +1453,7 @@ planets {
           shape: EmitterMesh, source: globe, direction: {0, 0, 0}, speed: {0, 0},
           radial: {r * 0.12, r * 0.3}, lifetime: {1.4, 2.6}, size: {r * 0.025, r * 0.05},
           opacity: {0.6, 1}, color: {prom_col.r, prom_col.g, prom_col.b},
-          color_variance: {10, 30, 20}, seed: sd * 16 + 9
+          color_variance: {10, 30, 20}, seed: sd * 16 + 9, local: true
         }
         Motion: {speed: {keys: [{0, 1}, {0.45, 0.15}, {1, -0.9}]}}
         Appearance: {shape: Circle, blend: Additive, stretch: 6}

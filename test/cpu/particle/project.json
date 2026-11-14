@@ -45,6 +45,22 @@
                 ]
             },
             {
+                "id": "Local",
+                "testcases": [
+                    "c_default",
+                    "script_value",
+                    "in_block",
+                    "moves_with_parent",
+                    "turns_with_parent",
+                    "scales_with_parent",
+                    "gravity_points_down",
+                    "ground_in_world",
+                    "still_matches_world",
+                    "world_space_unchanged",
+                    "change_empties_pool"
+                ]
+            },
+            {
                 "id": "Spawn",
                 "testcases": [
                     "count_on_fixed_clock",

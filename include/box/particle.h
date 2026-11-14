@@ -97,7 +97,8 @@ ECS_STRUCT(ParticleCollision, {
 
 /** An emitter that spawns rate times the frame delta particles a frame, carrying the fraction.
  * Its WorldTransform places the spawn volume and direction; live particles stay in world space
- * but for the drift of their ParticleForces. A full pool spawns nothing; a new max empties it.
+ * but for the drift of their ParticleForces, unless local keeps them in the space of the
+ * emitter. A full pool spawns nothing; a new max empties it.
  *
  * Particles move under the acceleration and the ParticleForces, collide with the ground plane
  * of a ParticleCollision of the emitter entity and die once their age reaches their lifetime.
@@ -154,6 +155,14 @@ ECS_STRUCT(ParticleEmitter, {
     bool linger;            /**< Deleting the emitter leaves its live particles to finish
                              *   their lives in a pool that spawns nothing, default false
                              *   to free the pool at once */
+    bool local;             /**< Spawn, move and keep the particles in the space of the
+                             *   emitter and draw them through its current WorldTransform, so
+                             *   live particles move, turn and scale with it, default false
+                             *   for world space. Gravity, wind, drift, acceleration, the
+                             *   wander field, the ParticleMotion curves and the ground plane
+                             *   keep acting in world directions and world units at the
+                             *   world position of a particle; inherit_velocity does nothing,
+                             *   as the particles already move with the emitter */
 });
 
 /** What an emitter with ParticlePlayback does this frame */
