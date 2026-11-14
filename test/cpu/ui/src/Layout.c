@@ -1932,7 +1932,7 @@ void Layout_warn_parent_without_layout(void) {
     ecs_log_enable_colors(colors);
 
     test_int(layout_warning_count, 1);
-    test_assert(strstr(layout_warnings, "'panel.title' has a LayoutItem") != NULL);
+    test_assert(strstr(layout_warnings, "'panel.title' has a box.layout.Item") != NULL);
     test_assert(strstr(layout_warnings, "parent 'panel' has no Layout") != NULL);
     test_flt(ecs_get(world, c, LayoutBounds)->width, 20);
     test_flt(ecs_get(world, c, Position)->x, 3);
@@ -1970,7 +1970,7 @@ void Layout_warn_plain_parent_in_layout(void) {
     ecs_log_enable_colors(colors);
 
     test_int(layout_warning_count, 1);
-    test_assert(strstr(layout_warnings, "'root.group.item' has a LayoutItem") != NULL);
+    test_assert(strstr(layout_warnings, "'root.group.item' has a box.layout.Item") != NULL);
     test_assert(strstr(layout_warnings, "parent 'root.group' has no Layout") != NULL);
 
     ecs_fini(world);
@@ -2111,7 +2111,7 @@ void Layout_warn_again_after_fix(void) {
     ecs_log_enable_colors(colors);
 
     test_int(layout_warning_count, 2);
-    test_assert(strstr(layout_warnings, "'panel.title' has a LayoutItem") != NULL);
+    test_assert(strstr(layout_warnings, "'panel.title' has a box.layout.Item") != NULL);
 
     ecs_fini(world);
 }
@@ -2158,11 +2158,11 @@ void Layout_warn_script(void) {
 
     test_int(layout_warning_count, 2);
     test_assert(strstr(layout_warnings,
-        "layout: 'hud.screen.top.realm' has a LayoutItem but its parent "
+        "layout: 'hud.screen.top.realm' has a box.layout.Item but its parent "
         "'hud.screen.top' has no Layout, so it is laid out as a root at its own Position")
         != NULL);
     test_assert(strstr(layout_warnings,
-        "'hud.screen.top.realm.title' has a LayoutItem but its parent "
+        "'hud.screen.top.realm.title' has a box.layout.Item but its parent "
         "'hud.screen.top.realm' has no Layout") != NULL);
 
     ecs_fini(world);

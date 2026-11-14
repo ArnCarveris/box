@@ -794,13 +794,13 @@ void BoxFpsImport(
     fps->watch = box_file_watch_kind(world, "fps script", box_fps_script_changed, fps);
 
     fps->surfaces = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "FpsSurfaces" }),
+        .entity = ecs_entity(world, { .name = "Surfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "FpsSamplesOnSet" }),
+        .entity = ecs_entity(world, { .name = "SamplesOnSet" }),
         .query.terms = {{
             .id = ecs_id(FrameSamples),
             .src.id = ecs_id(FrameSamples),
@@ -812,7 +812,7 @@ void BoxFpsImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "FpsUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsOnLoad,
         .run = BoxFpsUpdate,
         .ctx = fps,

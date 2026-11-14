@@ -167,7 +167,7 @@ void BoxInputImport(
     ecs_singleton_modified(world, Input);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "InputUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsOnLoad,
         .run = BoxInputUpdate,
         .immediate = true

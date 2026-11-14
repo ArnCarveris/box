@@ -161,7 +161,7 @@ typedef struct ArrayInstance {
 } ArrayInstance;
 
 /** Keeps an entity and its descendants out of the spatial index, for actors that move every
- * frame and that no query needs, such as enemies: they then cost SpatialUpdate nothing.
+ * frame and that no query needs, such as enemies: they then cost box.spatial.Update nothing.
  *
  * No query finds them: picks neither hit them nor are blocked by them, Interactive or not, nor
  * do move controllers, box_spatial_bounds, design mode or bake regions. Adding or removing the

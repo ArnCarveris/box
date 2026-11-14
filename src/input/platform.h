@@ -20,7 +20,8 @@ typedef struct box_input_glfw_target_t {
  * install the glfw backend, which captures the cursor, unless the world already has a backend.
  *
  * box.surface polls glfw once per frame in box.surface.Poll, in the PreFrame phase before the
- * OnLoad InputUpdate, so the events of a frame apply in that frame. Does nothing without box.input.
+ * OnLoad box.input.Update, so the events of a frame apply in that frame. Does nothing without
+ * box.input.
  *
  * @param target World and surface of the window, must outlive the callbacks
  * @param window The GLFWwindow

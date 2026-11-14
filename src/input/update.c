@@ -9,7 +9,7 @@
 /** Copy the text collected this frame into Input.text.
  *
  * Input.text is reallocated to the size of the text rather than grown in place, so a string
- * that was replaced from outside InputUpdate never has its capacity guessed.
+ * that was replaced from outside box.input.Update never has its capacity guessed.
  *
  * @param dev The device state, which holds the text of the frame
  * @param in The Input singleton

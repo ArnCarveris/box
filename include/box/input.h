@@ -2,7 +2,7 @@
  * @file box/input.h
  * @brief Keyboard and mouse device state, the synthetic input queue and the platform hook.
  *
- * A platform backend pushes device events and agents queue synthetic ones; the InputUpdate
+ * A platform backend pushes device events and agents queue synthetic ones; the box.input.Update
  * system applies both to the Input singleton and emits them through flecs.script.input.
  * Binding entities map keys to Action entities, which ActionUpdate resolves every frame.
  */
@@ -117,7 +117,7 @@ ECS_STRUCT(Mouse, {
     bool captured;   /**< The platform holds the cursor: hidden, kept in the window, unbounded */
 });
 
-/** Device state of the current frame, written by the InputUpdate system.
+/** Device state of the current frame, written by the box.input.Update system.
  *
  * The application sets capture to capture the cursor while input is focused, through glfw's
  * disabled cursor with raw motion natively and Pointer Lock in the browser, which grants it at
@@ -282,7 +282,7 @@ void box_input_platform_set(
     ecs_world_t *world,
     const box_input_platform_t *platform);
 
-/** Push a real device event, applied by the next InputUpdate unless input is unfocused.
+/** Push a real device event, applied by the next box.input.Update unless input is unfocused.
  *
  * Cursor moves are ignored while a synthetic cursor is pinned; focus and resize events
  * always apply. The delay of the event is ignored.

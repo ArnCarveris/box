@@ -1226,7 +1226,7 @@ void LayoutFloat_warn_parent_without_layout(void) {
 
     test_int(float_warning_count, 1);
     test_assert(strstr(float_warnings,
-        "layout: 'menu.button.list' has a LayoutFloat but its parent 'menu.button' has no "
+        "layout: 'menu.button.list' has a box.layout.Float but its parent 'menu.button' has no "
         "Layout, so the float is ignored") != NULL);
     test_flt(ecs_get(world, list, Position)->x, 3);
     test_flt(ecs_get(world, list, Position)->y, 4);
@@ -1257,7 +1257,7 @@ void LayoutFloat_warn_root(void) {
     ecs_log_enable_colors(colors);
 
     test_int(float_warning_count, 1);
-    test_assert(strstr(float_warnings, "'popup' has a LayoutFloat") != NULL);
+    test_assert(strstr(float_warnings, "'popup' has a box.layout.Float") != NULL);
     test_assert(strstr(float_warnings, "the float is ignored") != NULL);
 
     ecs_fini(world);

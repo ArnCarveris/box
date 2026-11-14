@@ -452,7 +452,7 @@ void box_startup_script(
     ecs_world_t *world,
     const char *path)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.startup.StartupUpdate");
+    ecs_entity_t system = ecs_lookup(world, "box.startup.Update");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
     box_startup_t *st = s ? s->ctx : NULL;
     if (st) {
@@ -503,13 +503,13 @@ void BoxStartupImport(
     st->watch = box_file_watch_kind(world, "startup script", box_startup_script_changed, st);
 
     st->surfaces = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "StartupSurfaces" }),
+        .entity = ecs_entity(world, { .name = "Surfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "StartupUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsOnLoad,
         .run = BoxStartupUpdate,
         .ctx = st,

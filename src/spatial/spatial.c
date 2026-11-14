@@ -4,7 +4,7 @@
  *
  * Observers collect changed shapes and subtrees, so an update only bounds what changed. Moved
  * leaves and DynamicTransform shapes (posed by SpatialPose) are placed by the first query of a
- * frame, or by SpatialUpdate when the last frame queried, as picking does every frame.
+ * frame, or by box.spatial.Update when the last frame queried, as picking does every frame.
  *
  * An entity with SpatialIgnore on itself or an ancestor is not indexed and has no SpatialPose,
  * so it costs no update; adding or removing the tag walks the subtree like a change of scene.
@@ -825,7 +825,7 @@ void BoxSpatialImport(
 
     index->refs = 1;
     index->dynamic = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "SpatialDynamic" }),
+        .entity = ecs_entity(world, { .name = "Dynamic" }),
         .terms = {
             { .id = ecs_id(SpatialProxy), .inout = EcsIn },
             { .id = ecs_id(SpatialPose), .inout = EcsInOut },
@@ -837,7 +837,7 @@ void BoxSpatialImport(
     box_spatial_observers(world, index);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "SpatialUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsOnStore,
         .run = BoxSpatialUpdate,
         .ctx = index,

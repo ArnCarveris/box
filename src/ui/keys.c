@@ -4,7 +4,7 @@
  * Space on the focused entity, the to_focus hook that decides every move of the flecs focus,
  * ui.activation, and the hand off of keys, text and presses to a focused TextEdit.
  *
- * The claim runs in InputUpdate with the focus the last frame left; the keys and presses then
+ * The claim runs in box.input.Update with the focus the last frame left; the keys and presses then
  * reach the hook in box.picking in order. flecs moves the focus of a press through to_focus
  * before it sends the press, the hook sends the keys to flecs and moves the focus for Tab.
  */

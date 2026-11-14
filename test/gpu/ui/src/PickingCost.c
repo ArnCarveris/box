@@ -766,7 +766,7 @@ static void WaveReboundBefore(
     wave_rebound_before = stats.rebound;
 }
 
-/** Add what PreUpdate, the phase of PickingUpdate, placed again to the total.
+/** Add what PreUpdate, the phase of box.picking.Update, placed again to the total.
  *
  * @param it The iterator of the system
  */
@@ -855,7 +855,7 @@ void PickingCost_wave_not_placed_by_pick(void) {
     ecs_progress(world, 0.016f);
     ecs_progress(world, 0.016f);
 
-    /* The cursor stays still over the wave, so PickingUpdate picks again every frame */
+    /* The cursor stays still over the wave, so box.picking.Update picks again every frame */
     wave_rebound_by_pick = 0;
     for (i = 0; i < frames; i ++) {
         ecs_progress(world, 0.016f);

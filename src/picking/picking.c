@@ -728,7 +728,7 @@ void BoxPickingImport(
         .to_local = box_pick_to_local, .to_focus = box_pick_to_focus, .ctx = st });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "PickingUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsPreUpdate,
         .run = BoxPickingUpdate,
         .ctx = st,

@@ -2,7 +2,7 @@
  * @file layout/layout.c
  * @brief Registers the box.layout module and lays out the trees that changed.
  *
- * Observers mark the elements whose layout input changed; the LayoutUpdate system lays out
+ * Observers mark the elements whose layout input changed; the box.layout.Update system lays out
  * the tree of every marked element in EcsPostUpdate, before transforms propagate.
  */
 
@@ -266,7 +266,7 @@ static int box_layout_compare(
 }
 
 /** LayoutScroll observer: a new or removed offset lays the tree out again, a set one only
- * moves the children unless the axes that scroll changed (LayoutUpdate decides).
+ * moves the children unless the axes that scroll changed (box.layout.Update decides).
  *
  * @param it Iterator over the elements
  */
@@ -632,13 +632,13 @@ static void box_layout_check(
     char *path = ecs_get_path(world, e);
     char *parent_path = parent ? ecs_get_path(world, parent) : NULL;
     if (has_float && parent) {
-        ecs_warn("layout: '%s' has a LayoutFloat but its parent '%s' has no Layout, "
+        ecs_warn("layout: '%s' has a box.layout.Float but its parent '%s' has no Layout, "
             "so the float is ignored", path, parent_path);
     } else if (has_float) {
-        ecs_warn("layout: '%s' has a LayoutFloat but no parent with a Layout, "
+        ecs_warn("layout: '%s' has a box.layout.Float but no parent with a Layout, "
             "so the float is ignored", path);
     } else {
-        ecs_warn("layout: '%s' has a LayoutItem but its parent '%s' has no Layout, "
+        ecs_warn("layout: '%s' has a box.layout.Item but its parent '%s' has no Layout, "
             "so it is laid out as a root at its own Position", path, parent_path);
     }
 
@@ -913,7 +913,7 @@ void BoxLayoutImport(
     ecs_vec_init_t(NULL, &state->placing, box_layout_placing_t, 0);
     ecs_map_init(&state->scrolled, NULL);
     ecs_map_init(&state->anchor_sizes, NULL);
-    state->child_tag = ecs_entity(world, { .name = "LayoutChild" });
+    state->child_tag = ecs_entity(world, { .name = "Child" });
     ecs_map_init(&state->parents, NULL);
     ecs_map_init(&state->warned, NULL);
     ecs_singleton_ensure(world, LayoutRegistry)->state = state;
@@ -933,7 +933,7 @@ void BoxLayoutImport(
     }
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnScroll" }),
+        .entity = ecs_entity(world, { .name = "OnScroll" }),
         .query.terms = {{ .id = ecs_id(LayoutScroll), .inout = EcsInOutNone }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
         .callback = box_layout_on_scroll,
@@ -941,7 +941,7 @@ void BoxLayoutImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnFloat" }),
+        .entity = ecs_entity(world, { .name = "OnFloat" }),
         .query.terms = {{ .id = ecs_id(LayoutFloat), .inout = EcsInOutNone }},
         .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
         .callback = box_layout_on_float,
@@ -949,7 +949,7 @@ void BoxLayoutImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnLayoutRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove" }),
         .query.terms = {{ .id = ecs_id(Layout), .inout = EcsInOutNone }},
         .events = { EcsOnRemove },
         .callback = box_layout_on_layout_remove,
@@ -957,7 +957,7 @@ void BoxLayoutImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnOrdered" }),
+        .entity = ecs_entity(world, { .name = "OnOrdered" }),
         .query.terms = {{ .id = EcsOrderedChildren }},
         .events = { EcsOnAdd },
         .callback = box_layout_on_ordered,
@@ -965,7 +965,7 @@ void BoxLayoutImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnChildOf" }),
+        .entity = ecs_entity(world, { .name = "OnChildOf" }),
         .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard), .inout = EcsInOutNone }},
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = box_layout_on_childof,
@@ -973,7 +973,7 @@ void BoxLayoutImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnParent" }),
+        .entity = ecs_entity(world, { .name = "OnParent" }),
         .query.terms = {{ .id = ecs_id(EcsParent) }},
         .events = { EcsOnSet, EcsOnRemove },
         .callback = box_layout_on_parent,
@@ -981,7 +981,7 @@ void BoxLayoutImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "LayoutFillUpdate" }),
+        .entity = ecs_entity(world, { .name = "FillUpdate" }),
         .phase = EcsPostUpdate,
         .query.terms = {
             { .id = ecs_id(LayoutFill), .inout = EcsIn },
@@ -991,7 +991,7 @@ void BoxLayoutImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "LayoutUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsPostUpdate,
         .run = LayoutUpdate,
         .ctx = state,

@@ -275,7 +275,7 @@ void box_ui_events_import(
         .ctx = st
     });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "UiDelayUpdate" }),
+        .entity = ecs_entity(world, { .name = "DelayUpdate" }),
         .phase = EcsOnLoad,
         .run = BoxUiDelayUpdate,
         .ctx = st,

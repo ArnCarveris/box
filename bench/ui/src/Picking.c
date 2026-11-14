@@ -4,7 +4,7 @@
  *
  * The HUD covers part of the window, so a pick tests the UI and, where no element handles the
  * event, the shapes behind it. Cases move the cursor, keep it still and leave it unknown.
- * The wave cases report PickingUpdate and SpatialUpdate per frame under a moving wave.
+ * The wave cases report box.picking.Update and box.spatial.Update per frame under a moving wave.
  */
 
 #include <box.h>
@@ -308,7 +308,7 @@ static double bench_picking_time(
 
 /** Run frames with a still cursor over a wave of critters of 8 parts, none Interactive, each
  * turning every frame around the point under the cursor, below a HUD with one button, and
- * report the time per frame of PickingUpdate and SpatialUpdate.
+ * report the time per frame of box.picking.Update and box.spatial.Update.
  *
  * @param b The benchmark
  * @param side Rows and columns of the wave
@@ -365,7 +365,7 @@ static void bench_picking_wave(
     ecs_set(world, button, Rect, {80, 40});
     ecs_add(world, button, Interactive);
 
-    ecs_entity_t picking = bench_picking_system(world, "box.picking.PickingUpdate");
+    ecs_entity_t picking = bench_picking_system(world, "box.picking.Update");
     ecs_entity_t spatial = bench_picking_system(world, "box.spatial.Update");
     ecs_measure_system_time(world, true);
     box_input_mouse_move(world, 640, 360, false);

@@ -560,13 +560,13 @@ void BoxConsoleImport(
     ecs_singleton_add(world, Console);
 
     con->surfaces = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "ConsoleSurfaces" }),
+        .entity = ecs_entity(world, { .name = "Surfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "ConsoleCapture" }),
+        .entity = ecs_entity(world, { .name = "Capture" }),
         .query.terms = {{ .id = ecs_id(Input), .inout = EcsInOut }},
         .events = { EcsOnSet },
         .callback = box_console_capture,
@@ -574,7 +574,7 @@ void BoxConsoleImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "ConsoleOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(Console), .inout = EcsInOutNone }},
         .events = { EcsOnSet },
         .callback = box_console_on_set,
@@ -582,7 +582,7 @@ void BoxConsoleImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "ConsoleUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsOnLoad,
         .run = BoxConsoleUpdate,
         .ctx = con,

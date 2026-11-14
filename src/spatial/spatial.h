@@ -196,7 +196,7 @@ int32_t box_spatial_tree_walk(
 
 /** Bring the index up to date with the changes since the last update.
  *
- * The SpatialUpdate system does this every frame in OnStore, after the transforms.
+ * The box.spatial.Update system does this every frame in OnStore, after the transforms.
  *
  * @param world The world
  */

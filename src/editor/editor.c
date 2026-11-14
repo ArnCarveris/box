@@ -286,13 +286,13 @@ void BoxEditorImport(
     ed->watch = box_file_watch_kind(world, "editor script", box_editor_script_changed, ed);
 
     ed->surfaces = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "EditorSurfaces" }),
+        .entity = ecs_entity(world, { .name = "Surfaces" }),
         .terms = {{ .id = ecs_id(Surface), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "EditorOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(Editor), .inout = EcsInOutNone }},
         .events = { EcsOnSet },
         .callback = box_editor_on_set,
@@ -300,7 +300,7 @@ void BoxEditorImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "EditorUpdate" }),
+        .entity = ecs_entity(world, { .name = "Update" }),
         .phase = EcsOnLoad,
         .run = BoxEditorUpdate,
         .ctx = ed,

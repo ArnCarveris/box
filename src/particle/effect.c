@@ -1007,12 +1007,12 @@ void box_particle_effects_import(
     ecs_vec_init_t(NULL, &s->effects, box_particle_effect_t*, 0);
     ecs_vec_init_t(NULL, &s->stack, ecs_entity_t, 0);
     s->views = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "ParticleEffectViews" }),
+        .entity = ecs_entity(world, { .name = "EffectViews" }),
         .terms = {{ .id = ecs_id(View), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
     s->surfaces = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "ParticleEffectSurfaces" }),
+        .entity = ecs_entity(world, { .name = "EffectSurfaces" }),
         .terms = {
             { .id = ecs_id(Surface), .inout = EcsIn },
             { .id = ecs_id(SurfaceStatus), .inout = EcsIn, .oper = EcsOptional }
@@ -1026,7 +1026,7 @@ void box_particle_effects_import(
     ecs_singleton_set(world, ParticleEffectState, { .state = s });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "ParticleEffectsCollect" }),
+        .entity = ecs_entity(world, { .name = "EffectsCollect" }),
         .phase = EcsPostUpdate,
         .run = BoxParticleEffectsCollect,
         .ctx = s,
@@ -1034,7 +1034,7 @@ void box_particle_effects_import(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "ParticleEffects" }),
+        .entity = ecs_entity(world, { .name = "Effects" }),
         .phase = RenderExtract,
         .run = BoxParticleEffects,
         .ctx = s,

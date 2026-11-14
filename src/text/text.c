@@ -472,13 +472,13 @@ static void box_text_state_init(
     s->sync->lock = ecs_os_mutex_new();
     s->sync->refs = 1;
     s->query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "TextTexts" }),
+        .entity = ecs_entity(world, { .name = "Texts" }),
         .terms = {{ .id = ecs_id(Text), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto,
         .flags = EcsQueryMatchDisabled
     });
     s->shown = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "TextShown" }),
+        .entity = ecs_entity(world, { .name = "Shown" }),
         .terms = {{ .id = ecs_id(TextGlyphs), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto,
         .flags = EcsQueryMatchDisabled
@@ -565,21 +565,21 @@ static void box_text_systems_init(
     ecs_world_t *world)
 {
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(Text) }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnSet },
         .callback = BoxTextOnSet
     });
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove" }),
         .query.terms = {{ .id = ecs_id(Text) }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnRemove },
         .callback = BoxTextOnRemove
     });
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TextSpansOnChange" }),
+        .entity = ecs_entity(world, { .name = "SpansOnChange" }),
         .query.terms = {{ .id = ecs_id(TextSpans) }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnSet, EcsOnRemove },
@@ -604,18 +604,18 @@ static void box_text_systems_init(
         .callback = BoxFontVariantsOnChange
     });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextFrame" }),
+        .entity = ecs_entity(world, { .name = "Frame" }),
         .phase = EcsPreFrame,
         .run = BoxTextFrame
     });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextRefresh" }),
+        .entity = ecs_entity(world, { .name = "Refresh" }),
         .phase = EcsOnStore,
         .run = BoxTextRefresh,
         .immediate = true
     });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TextTrim" }),
+        .entity = ecs_entity(world, { .name = "Trim" }),
         .phase = EcsOnStore,
         .run = BoxTextTrim
     });
