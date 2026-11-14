@@ -301,3 +301,48 @@ bool box_spatial_static_bounds(
 
     return result;
 }
+
+/** Walk of the boxes of a tree for a box_spatial_box_visit_t */
+typedef struct box_spatial_tree_walk_t {
+    box_spatial_box_visit_t visit; /**< Receives the boxes */
+    void *ctx;                     /**< Context passed to visit */
+} box_spatial_tree_walk_t;
+
+/** Pass a box of a tree on to the visit of a tree walk.
+ *
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param depth Depth of the box
+ * @param item The item of a leaf, BOX_BVH_NULL for a node
+ * @param ctx The tree walk
+ * @return false to skip the children of the node
+ */
+static bool box_spatial_tree_box(
+    const vec3 min,
+    const vec3 max,
+    int32_t depth,
+    int32_t item,
+    void *ctx)
+{
+    const box_spatial_tree_walk_t *w = ctx;
+
+    return w->visit(min, max, depth, item != BOX_BVH_NULL, w->ctx);
+}
+
+int32_t box_spatial_tree_walk(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    int32_t tree,
+    box_spatial_box_visit_t visit,
+    void *ctx)
+{
+    const box_spatial_t *index = box_spatial_of(world);
+    const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    box_spatial_tree_walk_t w = { .visit = visit, .ctx = ctx };
+    int32_t result = 0;
+    if (s && tree >= 0 && tree < BOX_SPATIAL_TREES) {
+        result = box_bvh_walk(&s->trees[tree], box_spatial_tree_box, &w);
+    }
+
+    return result;
+}

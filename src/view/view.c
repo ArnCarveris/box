@@ -65,6 +65,7 @@ static void box_view_ctor(
         };
         values[i].debug.wireframe_color = (rgba){255, 255, 255, 200};
         values[i].debug.wireframe_width = 1.0f;
+        values[i].debug.bvh.leaves = true;
     }
 }
 
@@ -116,6 +117,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, GridSettings);
     ECS_META_COMPONENT(world, WireframeMode);
     ECS_META_COMPONENT(world, OverdrawMode);
+    ECS_META_COMPONENT(world, BvhDebug);
     ECS_META_COMPONENT(world, ViewDebug);
     ECS_META_COMPONENT(world, LodSettings);
     ECS_META_COMPONENT(world, ViewEffect);

@@ -461,6 +461,7 @@ static void box_shader_changed(
  * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
  * a view of the packet has one, or it draws the probe debug views and a view of the packet has
  * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled, or it
+ * draws the boxes of the spatial index trees and a view of the packet has some, or it
  * is the extended mesh shader and the scene of a view enables a material feature, or it is the
  * shared code of the texture graph stages and the packet creates a texture graph
  */
@@ -547,6 +548,14 @@ static bool box_shader_used(
         for (i = 0; i < ecs_vec_count(&p->views); i ++) {
             const ViewDebug *debug = &ecs_vec_get_t(&p->views, box_render_view_t, i)->debug;
             if (debug->light_probes || debug->reflection_probes) {
+                result = true;
+            }
+        }
+    }
+
+    if (handle == BOX_RENDER_SHADER_DEBUG_BVH) {
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            if (ecs_vec_get_t(&p->views, box_render_view_t, i)->debug_box_count) {
                 result = true;
             }
         }
@@ -983,6 +992,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_DEBUG_PROBES, true);
     box_shader_builtin(world, state, builtin, "debug_overdraw",
         "etc/shaders/debug_overdraw.wgsl", BOX_RENDER_SHADER_DEBUG_OVERDRAW, true);
+    box_shader_builtin(world, state, builtin, "debug_bvh", "etc/shaders/debug_bvh.wgsl",
+        BOX_RENDER_SHADER_DEBUG_BVH, true);
     box_shader_builtin(world, state, builtin, "texture_graph", "etc/shaders/texture_graph.wgsl",
         BOX_RENDER_SHADER_TEXTURE_GRAPH, true);
 }

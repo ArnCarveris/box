@@ -1112,6 +1112,55 @@ bool box_bvh_ray_box(
 }
 
 
+/** Visit the box of a child of a hierarchy, then the boxes below it.
+ *
+ * @param tree The tree
+ * @param ref The child, a node or an item
+ * @param min Minimum corner of the child
+ * @param max Maximum corner of the child
+ * @param depth Depth of the child
+ * @param visit Receives the boxes
+ * @param ctx Context passed to visit
+ * @return Number of boxes visited
+ */
+static int32_t box_bvh_walk_child(
+    const box_bvh_t *tree,
+    int32_t ref,
+    const vec3 min,
+    const vec3 max,
+    int32_t depth,
+    box_bvh_box_visit_t visit,
+    void *ctx)
+{
+    bool item = box_bvh_is_item(ref);
+    int32_t result = 1, i;
+    if (!visit(min, max, depth, item ? BOX_BVH_ITEM(ref) : BOX_BVH_NULL, ctx) || item) {
+        goto done;
+    }
+
+    const box_bvh_node_t *n = box_bvh_get(tree, ref);
+    for (i = 0; i < 2; i ++) {
+        result += box_bvh_walk_child(tree, n->child[i], n->min[i], n->max[i], depth + 1,
+            visit, ctx);
+    }
+
+done:
+    return result;
+}
+
+int32_t box_bvh_walk(
+    const box_bvh_t *tree,
+    box_bvh_box_visit_t visit,
+    void *ctx)
+{
+    int32_t result = 0;
+    if (tree->root != BOX_BVH_NULL) {
+        result = box_bvh_walk_child(tree, tree->root, tree->min, tree->max, 0, visit, ctx);
+    }
+
+    return result;
+}
+
 bool box_bvh_overlap(
     const box_bvh_t *tree,
     const vec3 min,

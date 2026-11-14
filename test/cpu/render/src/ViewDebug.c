@@ -15,6 +15,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include "render.h"
+#include "spatial.h"
 #include <string.h>
 
 /** Warnings logged while the log hook is set that name the view "probed" */
@@ -547,4 +548,287 @@ void ViewDebug_overdraw_script(void) {
     test_flt(v->debug.grid.cell_size, 1);
     test_bool(v->culling.occlusion, true);
     ecs_fini(world);
+}
+
+void ViewDebug_bvh_defaults(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, View);
+    const BvhDebug *b = &ecs_get(world, e, View)->debug.bvh;
+    test_bool(b->static_tree, false);
+    test_bool(b->dynamic_tree, false);
+    test_bool(b->ui_tree, false);
+    test_bool(b->leaves, true);
+    test_int(b->levels, 0);
+
+    ecs_entity_t literal = ecs_new(world);
+    ecs_set(world, literal, View, {0});
+    test_bool(ecs_get(world, literal, View)->debug.bvh.leaves, false);
+
+    test_assert(ecs_script_run(world, "debug_bvh",
+        "using box.view\n"
+        "trees { View: {debug: {bvh: {static_tree: true, dynamic_tree: true, levels: 3}}} }\n",
+        NULL) == 0);
+    b = &ecs_get(world, ecs_lookup(world, "trees"), View)->debug.bvh;
+    test_bool(b->static_tree, true);
+    test_bool(b->dynamic_tree, true);
+    test_bool(b->ui_tree, false);
+    test_bool(b->leaves, true);
+    test_int(b->levels, 3);
+    ecs_fini(world);
+}
+
+void ViewDebug_bvh_static_boxes(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i * 3.0f, 0, 0});
+        ecs_set(world, e, Box, {1, 1, 1});
+    }
+
+    ecs_entity_t off = ecs_new(world);
+    ecs_add(world, off, View);
+    ecs_get_mut(world, off, View)->camera = camera;
+    ecs_modified(world, off, View);
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *data = ecs_get_mut(world, view, View);
+    data->camera = camera;
+    data->order = 1;
+    data->debug.bvh.static_tree = true;
+    ecs_modified(world, view, View);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    test_int(ecs_vec_count(&p->views), 2);
+    const box_render_view_t *v0 = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    const box_render_view_t *v1 = ecs_vec_get_t(&p->views, box_render_view_t, 1);
+    test_uint(v0->view, off);
+    test_int(v0->debug_box_count, 0);
+    test_uint(v1->view, view);
+    test_int(v1->debug_box_count, 7);
+    test_int(ecs_vec_count(&p->debug_boxes), v1->debug_box_first + 7);
+
+    int32_t leaves = 0, roots = 0;
+    for (i = 0; i < v1->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = ecs_vec_get_t(&p->debug_boxes,
+            box_render_debug_box_t, v1->debug_box_first + i);
+        test_uint(b->kind & 3u, BOX_SPATIAL_STATIC);
+        if (b->kind & BOX_RENDER_DEBUG_BOX_LEAF) {
+            leaves ++;
+            test_assert(b->depth > 0);
+            test_flt(b->max[0] - b->min[0], 1);
+            test_flt(b->max[1] - b->min[1], 1);
+        }
+
+        if (b->depth == 0) {
+            roots ++;
+            test_flt(b->min[0], -0.5f);
+            test_flt(b->max[0], 9.5f);
+            test_flt(b->min[1], -0.5f);
+            test_flt(b->max[1], 0.5f);
+        }
+    }
+
+    test_int(leaves, 4);
+    test_int(roots, 1);
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.static_tree = false;
+    data->debug.bvh.dynamic_tree = true;
+    data->debug.bvh.ui_tree = true;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    test_int(ecs_vec_get_t(&p->views, box_render_view_t, 1)->debug_box_count, 0);
+    test_int(ecs_vec_count(&p->debug_boxes), 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_levels_and_leaves(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i * 3.0f, 0, 0});
+        ecs_set(world, e, Box, {1, 1, 1});
+    }
+
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *data = ecs_get_mut(world, view, View);
+    data->camera = camera;
+    data->debug.bvh.static_tree = true;
+    data->debug.bvh.levels = 1;
+    ecs_modified(world, view, View);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_view_t *v = ecs_vec_get_t(&null->last.views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 1);
+    const box_render_debug_box_t *b = ecs_vec_get_t(&null->last.debug_boxes,
+        box_render_debug_box_t, v->debug_box_first);
+    test_uint(b->depth, 0);
+    test_uint(b->kind, BOX_SPATIAL_STATIC);
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.levels = 2;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    v = ecs_vec_get_t(&null->last.views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 3);
+    for (i = 0; i < v->debug_box_count; i ++) {
+        b = ecs_vec_get_t(&null->last.debug_boxes, box_render_debug_box_t,
+            v->debug_box_first + i);
+        test_assert(b->depth < 2);
+    }
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.levels = 0;
+    data->debug.bvh.leaves = false;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    v = ecs_vec_get_t(&null->last.views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 3);
+    for (i = 0; i < v->debug_box_count; i ++) {
+        b = ecs_vec_get_t(&null->last.debug_boxes, box_render_debug_box_t,
+            v->debug_box_first + i);
+        test_uint(b->kind, BOX_SPATIAL_STATIC);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_dynamic_fat_leaves(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t still = ecs_new(world);
+    ecs_set(world, still, Position, {-5, 0, 0});
+    ecs_set(world, still, Box, {1, 1, 1});
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_add(world, e, DynamicTransform);
+        ecs_set(world, e, Position, {(float)i * 4.0f, 0, 0});
+        ecs_set(world, e, Box, {1, 1, 1});
+    }
+
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *data = ecs_get_mut(world, view, View);
+    data->camera = camera;
+    data->debug.bvh.dynamic_tree = true;
+    ecs_modified(world, view, View);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_view_t *v = ecs_vec_get_t(&null->last.views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 3);
+    int32_t leaves = 0;
+    for (i = 0; i < v->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = ecs_vec_get_t(&null->last.debug_boxes,
+            box_render_debug_box_t, v->debug_box_first + i);
+        test_uint(b->kind & 3u, BOX_SPATIAL_DYNAMIC);
+        test_assert(b->min[0] > -5.0f);
+        if (b->kind & BOX_RENDER_DEBUG_BOX_LEAF) {
+            leaves ++;
+            test_assert(b->max[0] - b->min[0] > 1.0f);
+            test_assert(b->min[1] < -0.5f);
+            test_assert(b->max[1] > 0.5f);
+        }
+    }
+
+    test_int(leaves, 2);
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.static_tree = true;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    v = ecs_vec_get_t(&null->last.views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 4);
+    const box_render_debug_box_t *first = ecs_vec_get_t(&null->last.debug_boxes,
+        box_render_debug_box_t, v->debug_box_first);
+    test_uint(first->kind, BOX_SPATIAL_STATIC | BOX_RENDER_DEBUG_BOX_LEAF);
+    test_uint(first->depth, 0);
+    test_flt(first->min[0], -5.5f);
+    test_flt(first->max[0], -4.5f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_capture_copies_boxes(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *data = ecs_get_mut(world, view, View);
+    data->camera = camera;
+    data->debug.bvh.static_tree = true;
+    ecs_modified(world, view, View);
+
+    test_int(box_render_capture(world, &(box_render_capture_desc_t){
+        .camera = camera, .width = 16, .height = 16, .path = "capture_bvh.png"}), 0);
+    test_int(box_render_capture(world, &(box_render_capture_desc_t){
+        .camera_data = {.fov = 60, .near_ = 0.1f}, .transform = GLM_MAT4_IDENTITY_INIT,
+        .width = 16, .height = 16, .path = "capture_bvh_desc.png"}), 0);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    const box_render_view_t *source = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_uint(source->view, view);
+    test_int(source->debug_box_count, 1);
+
+    const box_render_view_t *v = debug_view_of_target(p, BOX_RENDER_CAPTURE_TARGET_FIRST);
+    test_assert(v != NULL);
+    test_int(v->debug_box_first, source->debug_box_first);
+    test_int(v->debug_box_count, 1);
+
+    v = debug_view_of_target(p, BOX_RENDER_CAPTURE_TARGET_FIRST + 1);
+    test_assert(v != NULL);
+    test_int(v->debug_box_count, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

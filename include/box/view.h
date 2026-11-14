@@ -162,6 +162,25 @@ ECS_ENUM(OverdrawMode, {
     OverdrawCutout = 3    /**< Fragments of the alpha tested meshes (AlphaCutoff) */
 });
 
+/** Boxes of the bounding volume hierarchies of the spatial index of the scene of a view
+ * (ViewDebug.bvh), as lines that what is in front hides: the static tree in green, the dynamic
+ * tree in orange and the UI tree in magenta, fainter with the depth of a node.
+ *
+ * A leaf is the box of an entity at half the alpha: its exact bounds in the static and UI trees,
+ * its fat bounds, which reach ahead along its motion, in the dynamic tree. A view draws at most
+ * BOX_VIEW_DEBUG_BOXES_MAX boxes and leaves out the rest of its trees.
+ */
+ECS_STRUCT(BvhDebug, {
+    bool static_tree;       /**< Boxes of the static tree, the shapes that move on change */
+    bool dynamic_tree;      /**< Boxes of the dynamic tree, the shapes with DynamicTransform */
+    bool ui_tree;           /**< Boxes of the UI tree, the UI elements without a shape */
+    bool leaves;            /**< Also the boxes of the entities, default true */
+    int32_t levels;         /**< Levels drawn from the root down, 0 for every level */
+});
+
+/** Boxes of the BVH debug view (BvhDebug) a view draws at most */
+#define BOX_VIEW_DEBUG_BOXES_MAX (1048576)
+
 /** Debug drawing of a view, in a pass after its effects into the color of its target, with the
  * depth of the view read only. All zero (a C literal View) draws nothing and records no pass.
  *
@@ -193,6 +212,7 @@ ECS_STRUCT(ViewDebug, {
     float probe_size;       /**< World radius of the spheres, 0 for a quarter of the probe
                              *   spacing for a light probe and 0.25 for a reflection probe;
                              *   default 0 */
+    BvhDebug bvh;           /**< Boxes of the trees of the spatial index, default none */
 });
 
 /** Distances at which a view draws the shapes with segment counts (round shapes, RoundedBox,
@@ -315,8 +335,8 @@ int box_view_compare(
  * the atmosphere and the fog volumes, sets the environment intensity to 1 and the ShadowSettings
  * defaults with shadows disabled, enables culling with occlusion and a smallest size of 1 pixel.
  *
- * It sets the GridSettings defaults with the grid disabled, and the wireframe defaults with the
- * wireframe off. A C literal View starts from zero
+ * It sets the GridSettings defaults with the grid disabled, the wireframe defaults with the
+ * wireframe off and BvhDebug.leaves with no tree drawn. A C literal View starts from zero
  * instead: unlit, drawing every instance, without debug drawing.
  *
  * @param world The world

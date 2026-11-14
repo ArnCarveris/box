@@ -342,6 +342,16 @@ void box_render_fog_views(
     box_render_packet_t *p,
     box_render_lights_stats_t *stats);
 
+/** Give every view with a tree on in BvhDebug the boxes of those trees of the spatial index of
+ * the scene of its camera, after the boxes of the views before it.
+ *
+ * @param world The world
+ * @param p The packet
+ */
+void box_render_debug_bvh(
+    const ecs_world_t *world,
+    box_render_packet_t *p);
+
 /** Get the offset the wind of a FogVolume moves its noise by at a time: its wind times the time
  * on each axis, computed in double precision and wrapped to [0, BOX_RENDER_FOG_NOISE_PERIOD
  * times its noise_scale), the distance over which both noise samples of the shader repeat.

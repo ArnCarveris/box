@@ -3075,3 +3075,71 @@ void ViewDebug_overdraw_cutout_discard(void) {
     stbi_image_free(px);
     ecs_fini(world);
 }
+
+/** Looking down on a static box 4 units wide, the static tree draws its leaf as green lines
+ * along its edges over the black box and the black clear, in one debug pass per frame; without
+ * a tree on, the row holds no green. */
+void ViewDebug_bvh_static_lines(void) {
+    // debug/bvh
+    unsigned char *px[2];
+    int32_t passes[2], i, x;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = dg_world();
+        ecs_entity_t view = dg_view(world, dg_camera(world, 10, -(float)GLM_PI_2), NULL);
+        ecs_get_mut(world, view, View)->debug.bvh = (BvhDebug){
+            .static_tree = i == 1, .leaves = true};
+        ecs_modified(world, view, View);
+        dg_box(world, (float[]){0, 0, 0}, (float[]){4, 0.2f, 4}, (Rgb){0, 0, 0});
+        px[i] = dg_render(world, i ? "debug_bvh_on.png" : "debug_bvh_off.png");
+        box_render_gpu_stats_t before = dg_frames(world, 0);
+        box_render_gpu_stats_t after = dg_frames(world, 2);
+        passes[i] = after.debug_passes - before.debug_passes;
+        ecs_fini(world);
+    }
+
+    test_int(passes[0], 0);
+    test_int(passes[1], 2);
+    float edge = dg_pos(2, DG_SCALE * 10.0f / 9.9f);
+    float nearest = (float)DG_SIZE;
+    for (x = 0; x < DG_SIZE; x ++) {
+        const unsigned char *off = dg_px(px[0], x, DG_SIZE / 2);
+        const unsigned char *on = dg_px(px[1], x, DG_SIZE / 2);
+        test_assert(off[1] < 20);
+        if (on[1] > 100 && on[1] > on[0] + 60 && on[1] > on[2] + 60 &&
+            fabsf((float)x + 0.5f - edge) < nearest)
+        {
+            nearest = fabsf((float)x + 0.5f - edge);
+        }
+    }
+
+    test_assert(nearest <= 2.0f);
+    test_assert(dg_px(px[1], DG_SIZE / 2, DG_SIZE / 2)[1] < 20);
+    stbi_image_free(px[0]);
+    stbi_image_free(px[1]);
+}
+
+/** A dynamic box under the camera, with only the dynamic tree on, draws its fat leaf in
+ * orange: more red than green, more green than blue. */
+void ViewDebug_bvh_dynamic_orange(void) {
+    // debug/bvh
+    ecs_world_t *world = dg_world();
+    ecs_entity_t view = dg_view(world, dg_camera(world, 10, -(float)GLM_PI_2), NULL);
+    ecs_get_mut(world, view, View)->debug.bvh = (BvhDebug){
+        .dynamic_tree = true, .leaves = true};
+    ecs_modified(world, view, View);
+    ecs_entity_t e = dg_box(world, (float[]){0, 0, 0}, (float[]){4, 0.2f, 4}, (Rgb){0, 0, 0});
+    ecs_add(world, e, DynamicTransform);
+    dg_box(world, (float[]){0, 0, -3.5f}, (float[]){1, 0.2f, 1}, (Rgb){0, 0, 0});
+    unsigned char *px = dg_render(world, "debug_bvh_dynamic.png");
+    int32_t x, orange = 0, green = 0;
+    for (x = 0; x < DG_SIZE; x ++) {
+        const unsigned char *p = dg_px(px, x, DG_SIZE / 2);
+        orange += p[0] > 120 && p[0] > p[1] + 40 && p[1] > p[2];
+        green += p[1] > p[0] + 40;
+    }
+
+    test_assert(orange > 0);
+    test_int(green, 0);
+    stbi_image_free(px);
+    ecs_fini(world);
+}

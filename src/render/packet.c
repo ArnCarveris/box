@@ -28,6 +28,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->planet_atmospheres, box_render_planet_atmos_t, 0);
     ecs_vec_init_t(NULL, &p->planet_lights, box_render_planet_light_t, 0);
     ecs_vec_init_t(NULL, &p->planar_reflections, box_render_planar_t, 0);
+    ecs_vec_init_t(NULL, &p->debug_boxes, box_render_debug_box_t, 0);
     ecs_vec_init_t(NULL, &p->transitions, box_render_transition_record_t, 0);
     ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
 }
@@ -53,6 +54,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->planet_atmospheres, box_render_planet_atmos_t);
     ecs_vec_fini_t(NULL, &p->planet_lights, box_render_planet_light_t);
     ecs_vec_fini_t(NULL, &p->planar_reflections, box_render_planar_t);
+    ecs_vec_fini_t(NULL, &p->debug_boxes, box_render_debug_box_t);
     ecs_vec_fini_t(NULL, &p->transitions, box_render_transition_record_t);
     ecs_vec_fini_t(NULL, &p->data, uint8_t);
 }
@@ -89,6 +91,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->planet_atmospheres);
     ecs_vec_clear(&p->planet_lights);
     ecs_vec_clear(&p->planar_reflections);
+    ecs_vec_clear(&p->debug_boxes);
     ecs_vec_clear(&p->transitions);
     ecs_vec_clear(&p->data);
     if (capacity > BOX_RENDER_DATA_KEEP && (used <= BOX_RENDER_DATA_KEEP ||
@@ -164,6 +167,8 @@ void box_render_packet_copy(
         ECS_SIZEOF(box_render_planet_light_t));
     box_render_vec_copy(&dst->planar_reflections, &src->planar_reflections,
         ECS_SIZEOF(box_render_planar_t));
+    box_render_vec_copy(&dst->debug_boxes, &src->debug_boxes,
+        ECS_SIZEOF(box_render_debug_box_t));
     box_render_vec_copy(&dst->transitions, &src->transitions,
         ECS_SIZEOF(box_render_transition_record_t));
     box_render_vec_copy(&dst->data, &src->data, ECS_SIZEOF(uint8_t));

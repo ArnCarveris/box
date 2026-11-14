@@ -65,6 +65,22 @@ typedef bool (*box_bvh_visit_t)(
     int32_t item,
     void *ctx);
 
+/** Receive a box of a hierarchy, a node before its children.
+ *
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param depth Depth of the box, 0 for the root child
+ * @param item The item of a leaf, BOX_BVH_NULL for a node
+ * @param ctx Context of the walk
+ * @return false to skip the children of the node
+ */
+typedef bool (*box_bvh_box_visit_t)(
+    const vec3 min,
+    const vec3 max,
+    int32_t depth,
+    int32_t item,
+    void *ctx);
+
 /** Set up an empty hierarchy.
  *
  * @param tree The tree
@@ -168,6 +184,18 @@ void box_bvh_build(
  */
 float box_bvh_cost(
     const box_bvh_t *tree);
+
+/** Visit the boxes of every node and item of a hierarchy, depth first from the root.
+ *
+ * @param tree The tree
+ * @param visit Receives the boxes
+ * @param ctx Context passed to visit
+ * @return Number of boxes visited
+ */
+int32_t box_bvh_walk(
+    const box_bvh_t *tree,
+    box_bvh_box_visit_t visit,
+    void *ctx);
 
 /** Visit the items whose boxes overlap a box.
  *

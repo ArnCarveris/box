@@ -659,7 +659,12 @@
                     "wire_packet_copy",
                     "wire_only_no_occlusion",
                     "capture_copies_debug",
-                    "overdraw_script"
+                    "overdraw_script",
+                    "bvh_defaults",
+                    "bvh_static_boxes",
+                    "bvh_levels_and_leaves",
+                    "bvh_dynamic_fat_leaves",
+                    "bvh_capture_copies_boxes"
                 ]
             },
             {

@@ -16,18 +16,6 @@
 #include "spatial.h"
 #include "bvh.h"
 
-/** Tree of the entities that only move on change */
-#define BOX_SPATIAL_STATIC (0)
-
-/** Tree of the entities with DynamicTransform */
-#define BOX_SPATIAL_DYNAMIC (1)
-
-/** Tree of the UI elements without a shape: LayoutBounds or TextBounds, exact like static */
-#define BOX_SPATIAL_UI (2)
-
-/** Number of trees of a scene */
-#define BOX_SPATIAL_TREES (3)
-
 /** Place of an entity in the index, added with every ShapeMesh */
 typedef struct SpatialProxy {
     ecs_entity_t scene; /**< Scene the entity is indexed in */

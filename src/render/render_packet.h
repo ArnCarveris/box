@@ -90,6 +90,10 @@
  * view */
 #define BOX_RENDER_SHADER_DEBUG_OVERDRAW (55)
 
+/** Shader handle of the engine shader that draws the boxes of the spatial index trees of the
+ * debug pass of a view */
+#define BOX_RENDER_SHADER_DEBUG_BVH (63)
+
 /** Shader handle of the engine shader of the color grading pass */
 #define BOX_RENDER_SHADER_GRADING (56)
 
@@ -597,6 +601,19 @@ typedef struct box_render_view_env_t {
     bool background;        /**< Draw the environment in place of the clear color */
 } box_render_view_env_t;
 
+/** A box of a tree of the spatial index the debug pass of a view draws (BvhDebug), matching
+ * BvhBox in debug_bvh.wgsl */
+typedef struct box_render_debug_box_t {
+    vec3 min;           /**< Minimum corner in world space */
+    uint32_t kind;      /**< BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC or BOX_SPATIAL_UI, with
+                         *   BOX_RENDER_DEBUG_BOX_LEAF for the leaf of an entity */
+    vec3 max;           /**< Maximum corner in world space */
+    uint32_t depth;     /**< Depth of the box in its tree, 0 for the root */
+} box_render_debug_box_t;
+
+/** Bit of box_render_debug_box_t.kind of the leaf of an entity */
+#define BOX_RENDER_DEBUG_BOX_LEAF (4u)
+
 /** A FogVolume a view raymarches, resolved; the layout of FogVolume in fog_volume.wgsl.
  *
  * The box is centered on center and spans extent along each of its axes, the world rotation of
@@ -873,6 +890,10 @@ typedef struct box_render_view_t {
     ViewDebug debug;            /**< View.debug, copied by a capture of the camera of a view;
                                  *   all zero for the other captures (probes, reflections,
                                  *   bakes, no view), which draw no debug pass */
+    int32_t debug_box_first;    /**< Index of the first box of the view in the debug boxes of
+                                 *   the packet */
+    int32_t debug_box_count;    /**< Boxes of the spatial index trees the view draws (BvhDebug),
+                                 *   copied by a capture of the camera of the view */
     LodSettings lod;            /**< View.lod resolved by box_render_lod_settings, all zero
                                  *   (every shape at full detail) without a view */
     uint32_t features;          /**< BOX_RENDER_FEATURE_* features: those of its scene, without
@@ -1809,6 +1830,8 @@ typedef struct box_render_packet_t {
                              *   instances with a planet light slot are lit by */
     ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
                              *   views */
+    ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
+                             *   of the views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
                              *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */

@@ -19,6 +19,18 @@
 extern "C" {
 #endif
 
+/** Tree of the entities that only move on change */
+#define BOX_SPATIAL_STATIC (0)
+
+/** Tree of the entities with DynamicTransform */
+#define BOX_SPATIAL_DYNAMIC (1)
+
+/** Tree of the UI elements without a shape: LayoutBounds or TextBounds, exact like static */
+#define BOX_SPATIAL_UI (2)
+
+/** Number of trees of a scene */
+#define BOX_SPATIAL_TREES (3)
+
 /** An entity a ray hit */
 typedef struct box_spatial_hit_t {
     ecs_entity_t entity; /**< The entity */
@@ -149,6 +161,38 @@ bool box_spatial_static_bounds(
     ecs_entity_t scene,
     vec3 min,
     vec3 max);
+
+/** Receive a box of a tree of the spatial index, a node before the nodes below it.
+ *
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param depth Depth of the box, 0 for the root
+ * @param leaf The box is the leaf of an entity, else of a node over two boxes
+ * @param ctx Context of the walk
+ * @return false to skip the boxes below it
+ */
+typedef bool (*box_spatial_box_visit_t)(
+    const vec3 min,
+    const vec3 max,
+    int32_t depth,
+    bool leaf,
+    void *ctx);
+
+/** Walk the boxes of a tree of the spatial index of a scene, from the root down.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param tree BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC or BOX_SPATIAL_UI
+ * @param visit Receives the boxes
+ * @param ctx Context passed to visit
+ * @return Number of boxes visited
+ */
+int32_t box_spatial_tree_walk(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    int32_t tree,
+    box_spatial_box_visit_t visit,
+    void *ctx);
 
 /** Bring the index up to date with the changes since the last update.
  *

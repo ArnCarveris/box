@@ -1470,7 +1470,9 @@
                     "overdraw_all",
                     "overdraw_plain",
                     "overdraw_cutout",
-                    "overdraw_cutout_discard"
+                    "overdraw_cutout_discard",
+                    "bvh_static_lines",
+                    "bvh_dynamic_orange"
                 ]
             },
             {

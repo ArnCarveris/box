@@ -2,8 +2,8 @@
  * @file render/gpu_debug.c
  * @brief Debug passes of the webgpu backend: what View.debug draws over a view after its effects,
  * the infinite grid of etc/shaders/debug_grid.wgsl, the wireframe of etc/shaders/debug_wire.wgsl
- * the probes of etc/shaders/debug_probes.wgsl and the overdraw heat map of
- * etc/shaders/debug_overdraw.wgsl.
+ * the probes of etc/shaders/debug_probes.wgsl, the overdraw heat map of
+ * etc/shaders/debug_overdraw.wgsl and the spatial index trees of etc/shaders/debug_bvh.wgsl.
  *
  * A view with a debug item on records one render pass after its effects that loads the color
  * of the target and reads the depth of the view; without debug items it records nothing, and
@@ -68,7 +68,8 @@ typedef enum box_gpu_debug_kind_t {
     BOX_GPU_DEBUG_WIRE_ONLY = 2,    /**< Wireframe on its own, WireframeOnly */
     BOX_GPU_DEBUG_OVERDRAW_ALL = 3, /**< Heat map of the plain and alpha tested overdraw */
     BOX_GPU_DEBUG_OVERDRAW_PLAIN = 4, /**< Heat map of the plain overdraw */
-    BOX_GPU_DEBUG_OVERDRAW_CUTOUT = 5 /**< Heat map of the alpha tested overdraw */
+    BOX_GPU_DEBUG_OVERDRAW_CUTOUT = 5, /**< Heat map of the alpha tested overdraw */
+    BOX_GPU_DEBUG_BVH = 6           /**< Boxes of the spatial index trees */
 } box_gpu_debug_kind_t;
 
 /** Format of the texture the overdraw pass counts the fragments of a pixel in: the plain meshes
@@ -118,6 +119,13 @@ struct box_gpu_debug_t {
     WGPUTextureView overdraw_depth_view; /**< View of the overdraw depth texture */
     uint32_t overdraw_width;        /**< Width of the overdraw count texture */
     uint32_t overdraw_height;       /**< Height of the overdraw count texture */
+    WGPUBindGroupLayout bvh_layout; /**< Boxes of the BVH draw of a view, group 1 */
+    WGPUPipelineLayout bvh_pipeline_layout; /**< View and box groups */
+    int32_t bvh_revision;           /**< Revision of the BVH shader of the pipelines */
+    WGPUBuffer bvh_buffer;          /**< Boxes of the BVH draws of the packet, NULL until the
+                                     *   first draw */
+    uint64_t bvh_size;              /**< Bytes of the box buffer */
+    uint64_t bvh_used;              /**< Bytes of the box buffer the draws of the packet took */
 };
 
 /** Convert a display encoded channel to linear light.
@@ -240,6 +248,20 @@ void box_gpu_debug_init(
             .bindGroupLayoutCount = 2,
             .bindGroupLayouts = map_groups
         });
+
+    WGPUBindGroupLayoutEntry bvh_entry = {
+        .binding = 0,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    };
+    d->bvh_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &bvh_entry });
+    WGPUBindGroupLayout bvh_groups[2] = { gpu->view_layout, d->bvh_layout };
+    d->bvh_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = bvh_groups
+        });
     gpu->debug = d;
 }
 
@@ -354,6 +376,13 @@ void box_gpu_debug_fini(
     wgpuPipelineLayoutRelease(d->overdraw_map_pipeline_layout);
     wgpuBindGroupLayoutRelease(d->overdraw_map_layout);
 
+    if (d->bvh_buffer) {
+        wgpuBufferRelease(d->bvh_buffer);
+    }
+
+    wgpuPipelineLayoutRelease(d->bvh_pipeline_layout);
+    wgpuBindGroupLayoutRelease(d->bvh_layout);
+
     wgpuPipelineLayoutRelease(d->pipeline_layout);
     wgpuBindGroupLayoutRelease(d->layout);
     ecs_os_free(d);
@@ -368,6 +397,7 @@ void box_gpu_debug_begin(
     if (gpu->debug) {
         gpu->debug->used = 0;
         gpu->debug->probe_used = 0;
+        gpu->debug->bvh_used = 0;
     }
 }
 
@@ -400,7 +430,7 @@ bool box_gpu_debug_enabled(
 {
     return v->debug.grid.enabled || v->debug.wireframe != WireframeOff ||
         v->debug.overdraw != OverdrawOff || box_gpu_debug_light_probes(v) ||
-        box_gpu_debug_reflection_probes(v);
+        box_gpu_debug_reflection_probes(v) || v->debug_box_count > 0;
 }
 
 /** Key of a debug pipeline in the cache.
@@ -707,6 +737,153 @@ static WGPURenderPipeline box_gpu_debug_overdraw_map_pipeline(
         .fragment = &fragment
     });
     *ecs_map_ensure(&d->pipelines, key) = (ecs_map_val_t)(uintptr_t)result;
+done:
+    return result;
+}
+
+/** Get the pipeline that draws the boxes of the spatial index trees into a color format,
+ * created on first use and again when the shader was recompiled.
+ *
+ * Its lines test the depth of the view with GreaterEqual, pulled toward the camera by the
+ * shader, and do not write it; the premultiplied color and alpha blend over the target.
+ *
+ * @param gpu The backend
+ * @param format The format of the color target
+ * @return The pipeline, NULL until the shader exists
+ */
+static WGPURenderPipeline box_gpu_debug_bvh_pipeline(
+    box_gpu_t *gpu,
+    WGPUTextureFormat format)
+{
+    box_gpu_debug_t *d = gpu->debug;
+    box_gpu_shader_t *shader = ecs_map_get_deref(
+        &gpu->shaders, box_gpu_shader_t, BOX_RENDER_SHADER_DEBUG_BVH);
+    WGPURenderPipeline result = NULL;
+    ecs_map_val_t *cached;
+    ecs_map_key_t key;
+    if (!shader || !shader->module) {
+        goto done;
+    }
+
+    if (d->bvh_revision != shader->revision) {
+        box_gpu_debug_pipelines_free(d, 1u << BOX_GPU_DEBUG_BVH);
+        d->bvh_revision = shader->revision;
+    }
+
+    key = box_gpu_debug_key(BOX_GPU_DEBUG_BVH, format);
+    cached = ecs_map_get(&d->pipelines, key);
+    if (cached && *cached) {
+        result = (WGPURenderPipeline)(uintptr_t)*cached;
+        goto done;
+    }
+
+    WGPUBlendState blend = {
+        .color = {
+            .operation = WGPUBlendOperation_Add,
+            .srcFactor = WGPUBlendFactor_One,
+            .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha
+        },
+        .alpha = {
+            .operation = WGPUBlendOperation_Add,
+            .srcFactor = WGPUBlendFactor_One,
+            .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha
+        }
+    };
+    WGPUColorTargetState target = {
+        .format = format,
+        .blend = &blend,
+        .writeMask = WGPUColorWriteMask_All
+    };
+    WGPUFragmentState fragment = {
+        .module = shader->module,
+        .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
+        .targetCount = 1,
+        .targets = &target
+    };
+    WGPUDepthStencilState depth = {
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .depthWriteEnabled = WGPUOptionalBool_False,
+        .depthCompare = WGPUCompareFunction_GreaterEqual,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always }
+    };
+    result = box_gpu_render_pipeline(gpu, &(WGPURenderPipelineDescriptor){
+        .layout = d->bvh_pipeline_layout,
+        .vertex = {
+            .module = shader->module,
+            .entryPoint = { .data = "vs", .length = WGPU_STRLEN }
+        },
+        .primitive = {
+            .topology = WGPUPrimitiveTopology_LineList,
+            .frontFace = WGPUFrontFace_CCW,
+            .cullMode = WGPUCullMode_None
+        },
+        .depthStencil = &depth,
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = &fragment
+    });
+    *ecs_map_ensure(&d->pipelines, key) = (ecs_map_val_t)(uintptr_t)result;
+done:
+    return result;
+}
+
+/** Create the bind group of the BVH draw of a view with its boxes, written into the box buffer
+ * of the packet, replacing the buffer with a larger one when they do not fit; earlier draws
+ * keep the old one through their bind groups.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param v The view
+ * @return The bind group, NULL when the boxes of the view are not in the packet
+ */
+static WGPUBindGroup box_gpu_debug_bvh_group(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v)
+{
+    box_gpu_debug_t *d = gpu->debug;
+    uint64_t bytes = (uint64_t)v->debug_box_count * sizeof(box_render_debug_box_t);
+    uint64_t align = BOX_GPU_DEBUG_UNIFORM_STRIDE;
+    uint64_t offset = (d->bvh_used + align - 1) / align * align;
+    WGPUBindGroup result = NULL;
+    if (v->debug_box_first < 0 || v->debug_box_count <= 0 ||
+        v->debug_box_first + v->debug_box_count > ecs_vec_count(&packet->debug_boxes))
+    {
+        goto done;
+    }
+
+    if (!d->bvh_buffer || offset + bytes > d->bvh_size) {
+        uint64_t size = d->bvh_size ? d->bvh_size * 2 : BOX_GPU_DEBUG_BUFFER_MIN;
+        while (size < bytes) {
+            size *= 2;
+        }
+
+        if (d->bvh_buffer) {
+            wgpuBufferRelease(d->bvh_buffer);
+        }
+
+        d->bvh_buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+            .size = size
+        });
+        d->bvh_size = size;
+        offset = 0;
+    }
+
+    d->bvh_used = offset + bytes;
+    wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset, ecs_vec_get_t(
+        &packet->debug_boxes, box_render_debug_box_t, v->debug_box_first), (size_t)bytes);
+    WGPUBindGroupEntry entry = {
+        .binding = 0,
+        .buffer = d->bvh_buffer,
+        .offset = offset,
+        .size = bytes
+    };
+    result = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+        .layout = d->bvh_layout,
+        .entryCount = 1,
+        .entries = &entry
+    });
 done:
     return result;
 }
@@ -1608,10 +1785,10 @@ void box_gpu_debug_record(
     WGPUBindGroup group,
     int32_t slot)
 {
-    WGPURenderPipeline grid = NULL, wire = NULL, overdraw = NULL;
+    WGPURenderPipeline grid = NULL, wire = NULL, overdraw = NULL, bvh = NULL;
     const box_gpu_probe_pipelines_t *probes = NULL;
     uint32_t lights = 0, reflections = 0, probe_offset = 0;
-    WGPUBindGroup grid_group = NULL;
+    WGPUBindGroup grid_group = NULL, bvh_group = NULL;
     if (!gpu->debug || !color || !t->depth_view) {
         goto done;
     }
@@ -1643,8 +1820,16 @@ void box_gpu_debug_record(
         }
     }
 
-    if (!overdraw && !grid && !wire && !lights && !reflections) {
+    if (v->debug_box_count > 0) {
+        bvh = box_gpu_debug_bvh_pipeline(gpu, t->format);
+    }
+
+    if (!overdraw && !grid && !wire && !lights && !reflections && !bvh) {
         goto done;
+    }
+
+    if (bvh) {
+        bvh_group = box_gpu_debug_bvh_group(gpu, packet, v);
     }
 
     if (grid) {
@@ -1714,10 +1899,22 @@ void box_gpu_debug_record(
         box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
     }
 
+    if (bvh_group) {
+        wgpuRenderPassEncoderSetPipeline(pass, bvh);
+        wgpuRenderPassEncoderSetBindGroup(pass, 1, bvh_group, 0, NULL);
+        wgpuRenderPassEncoderDraw(pass, BOX_GPU_DEBUG_BOX_VERTICES,
+            (uint32_t)v->debug_box_count, 0, 0);
+        box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
+    }
+
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
     if (grid_group) {
         wgpuBindGroupRelease(grid_group);
+    }
+
+    if (bvh_group) {
+        wgpuBindGroupRelease(bvh_group);
     }
 
     box_gpu_count(gpu, BOX_GPU_STAT_DEBUG_PASS);

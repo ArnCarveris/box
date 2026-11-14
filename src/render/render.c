@@ -366,6 +366,8 @@ static void BoxRenderExtractViews(
         qsort(ecs_vec_first(&p->views), (size_t)count, sizeof(box_render_view_t),
             box_render_view_compare);
     }
+
+    box_render_debug_bvh(it->world, p);
 }
 
 /** Hand the packet of the frame to the renderer and publish the ring counters.
