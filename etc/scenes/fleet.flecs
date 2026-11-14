@@ -1,0 +1,122 @@
+// A fleet of the shipyard's ships as game assets, without the editor: rigs and liners from their
+// preset designs at one scale (1 unit = 1 m), some parked, some flying with their drives burning.
+include shipyard/ships
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.light
+using box.material
+using box.effects
+using box.surface
+using box.movement
+using state
+using assets
+
+assets {
+  fleet_stars { EnvironmentImage: {path: "etc/scenes/shipyard/assets/space.hdr"}; Environment: {resolution: 1024} }
+}
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {environment: true, blend_modes: true, transmission: true, fresnel: true, distortion: true}
+  AmbientLight: {sky: {120, 140, 180}, ground: {50, 60, 84}, intensity: 0.4}
+}
+
+window { Surface: {width: 1600, height: 1000, vsync: true} }
+
+// The camera circles the fleet slowly, looking down on it from about 1.7 km.
+orbit {
+  Position: {80, 0, -60}
+  Rotation: {0, 0.6, 0}
+  AngularVelocity: {0, 0.015, 0}
+  arm {
+    Rotation: {-0.4, 0, 0}
+    eye {
+      Position: {0, 0, 1700}
+      Camera: {fov: 40, near_: 2, far_: 30000}
+    }
+  }
+}
+
+sun {
+  Rotation: {0.7, 0.42, 0}
+  DirectionalLight: {intensity: 6}
+  Rgb: {255, 244, 226}
+}
+
+rim {
+  Rotation: {0.35, 3.7, 0}
+  DirectionalLight: {intensity: 1.8}
+  Rgb: {110, 160, 255}
+}
+
+view {
+  fleet_contact { Gtao: {radius: 9, final_value_power: 2.2} }
+  fleet_bloom { Bloom: {intensity: 0.2, threshold: 1.1, threshold_softness: 0.45} }
+  fleet_film { Tonemap: {operator_: TonyMcMapface} }
+  fleet_edges { Smaa: {} }
+
+  View: {
+    camera: orbit.arm.eye,
+    clear: {enabled: true, color: {3, 5, 10, 255}},
+    shadows: {enabled: true, cascades: 3, resolution: 1024, max_distance: 2500, filter_size: 2},
+    lighting: {reflections: true, baked: false, environment: {source: assets.fleet_stars, intensity: 0.7, background: true}},
+    effects: [{effect: fleet_contact}, {effect: fleet_bloom}, {effect: fleet_film}, {effect: fleet_edges}]
+  }
+}
+
+// The fleet, in meters: a liner is about 720 m long, a rig about 36 m.
+fleet {
+  // A passenger liner at rest, with a frigate parked beside the hangar near its bow, nose
+  // forward.
+  Liner flagship(design: passenger_design) {
+    Position: {-170, 0, 0}
+    Rotation: {0, 0, 0}
+    Rig parked(design: frigate_design) {
+      Position: {-55, -8, 285}
+      Rotation: {0, 0, 0}
+    }
+  }
+
+  // A battleship holding station with its shield lowered, a scout parked under its ventral
+  // hangar.
+  Liner warship(design: battleship_design, shield: 0.3) {
+    Position: {200, 0, -40}
+    Rotation: {0, -0.08, 0}
+    Rig picket(design: scout_design) {
+      Position: {0, -165, 100}
+      Rotation: {0, 0.4, 0}
+    }
+  }
+
+  // A second passenger liner circling the fleet with its drives burning, a frigate flying
+  // alongside above its rings. The pivot turns the pair, so they move bow first and their
+  // plumes trail straight back.
+  convoy {
+    Position: {0, 40, 0}
+    Rotation: {0, 0.6, 0}
+    AngularVelocity: {0, 0.04, 0}
+    Liner cruiser(design: passenger_design, burning: true) {
+      Position: {720, 0, 0}
+      Rotation: {0, PI, 0}
+    }
+    Rig escort(design: frigate_design, burning: true) {
+      Position: {720, 190, -100}
+      Rotation: {0, PI, 0}
+    }
+  }
+
+  // A miner flying a tight circle above the flagship's bow.
+  patrol {
+    Position: {-170, 110, 430}
+    Rotation: {0, 0, 0}
+    AngularVelocity: {0, 0.3, 0}
+    Rig miner(design: miner_design, burning: true) {
+      Position: {60, 0, 0}
+      Rotation: {0, PI, 0}
+    }
+  }
+}
