@@ -135,9 +135,12 @@ ECS_STRUCT(PlanetAtmosphere, {
     ecs_entity_t sun;       /**< DirectionalLight that lights it, default 0 for the first
                              *   DirectionalLight of the scene; its intensity and Rgb are top
                              *   of atmosphere values */
-    float radius;           /**< Radius of the ground sphere in world units, default 1 */
-    float planet_radius;    /**< The same radius in km, default 6360; with radius it sets the
-                             *   km in a world unit */
+    float radius;           /**< Radius of the ground sphere in the local units of the
+                             *   entity, default 1; it is multiplied by the uniform world
+                             *   scale of the entity, the geometric mean of the axis scales
+                             *   (non-uniform scale is not supported) */
+    float planet_radius;    /**< The same radius in km, default 6360; with the scaled radius
+                             *   it sets the km in a world unit */
     float thickness;        /**< Height of the atmosphere above the ground in km, default 100 */
     AtmosphereRayleigh rayleigh; /**< Air molecules, default {8, 1} */
     AtmosphereMie mie;      /**< Aerosols, default {1.2, 0.8, 1, {255, 255, 255}}; the tint

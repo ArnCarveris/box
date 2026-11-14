@@ -420,3 +420,53 @@ void PlanetSurfaceLight_view_features(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void PlanetSurfaceLight_scaled_parent_scales_light(void) {
+    // planet_atmosphere/scale
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world, true);
+    ecs_entity_t parent = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, parent, Scale, {2, 2, 2});
+    ecs_set(world, parent, Position, {1, 0, 0});
+    ecs_entity_t planet = planet_new(world, parent, 0.5f);
+    frame(world);
+    uint32_t slot = shape_planet(world, planet);
+    test_assert(slot != 0);
+    const box_render_planet_light_t *l = packet_light(null, planet);
+    test_assert(l != NULL);
+    test_uint(l->slot, slot);
+    test_near(l->center[0], 2, 1e-5f);
+    test_near(l->center[1], 0, 1e-5f);
+    test_near(l->center[3], 3180.0f, 1e-2f);
+    test_near(l->radii[0], 6360.0f, 1e-2f);
+    test_near(l->radii[1], 6460.0f, 1e-2f);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanetSurfaceLight_scaled_planet_scales_light(void) {
+    // planet_atmosphere/scale
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world, true);
+    ecs_entity_t planet = planet_new(world, scene, 0.5f);
+    ecs_entity_t clouds = shape_new(world, planet, 0);
+    ecs_set(world, planet, Scale, {4, 4, 4});
+    frame(world);
+    uint32_t slot = shape_planet(world, planet);
+    test_assert(slot != 0);
+    test_uint(shape_planet(world, clouds), slot);
+    const box_render_planet_light_t *l = packet_light(null, planet);
+    test_assert(l != NULL);
+    test_near(l->center[0], 0.5f, 1e-5f);
+    test_near(l->center[3], 1590.0f, 1e-2f);
+
+    ecs_remove(world, planet, Scale);
+    frame(world);
+    l = packet_light(null, planet);
+    test_assert(l != NULL);
+    test_assert(l->center[3] == 6360.0f);
+    ecs_fini(world);
+    box_render_null_free(null);
+}

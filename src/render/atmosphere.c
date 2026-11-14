@@ -60,6 +60,7 @@ typedef struct box_atmos_planet_t {
     box_render_atmosphere_desc_t key; /**< Medium of the last build */
     PlanetAtmosphere value; /**< Values of the PlanetAtmosphere in this frame */
     float center[3];        /**< World position of the entity in this frame */
+    float scale;            /**< Uniform world scale of the entity in this frame */
 } box_atmos_planet_t;
 
 /** A planet shell a view sees, by its distance from the camera */
@@ -487,8 +488,10 @@ static void box_atmos_collect_planets(
                 l->value = values[i];
                 if (transforms) {
                     glm_vec3_copy(ECS_CONST_CAST(float*, transforms[i].m[3]), l->center);
+                    l->scale = box_transform_world_scale(&transforms[i]);
                 } else {
                     glm_vec3_zero(l->center);
+                    l->scale = 1.0f;
                 }
 
                 if (!l->sent || ecs_os_memcmp_t(&key, &l->key, box_render_atmosphere_desc_t)) {
@@ -789,6 +792,20 @@ static int box_atmos_planet_compare(
     return result;
 }
 
+/** Get the km in a world unit of a planet: its planet_radius over its radius in world units,
+ * the radius times the uniform world scale of the entity.
+ *
+ * @param l The LUTs of the planet
+ * @return The km per world unit, 0 for a planet flattened to a scale of 0
+ */
+static float box_atmos_planet_km(
+    const box_atmos_planet_t *l)
+{
+    float radius = l->value.radius * l->scale;
+
+    return radius > 0.0f ? l->value.planet_radius / radius : 0.0f;
+}
+
 /** Write the shell of a planet as a view draws it, lit by its sun.
  *
  * @param lights The state of the light extract
@@ -804,7 +821,7 @@ static void box_atmos_planet_record(
     ecs_os_memset_t(out, 0, box_render_planet_atmos_t);
     out->medium = l->key;
     glm_vec3_copy(ECS_CONST_CAST(float*, l->center), out->center);
-    out->center[3] = value->planet_radius / value->radius;
+    out->center[3] = box_atmos_planet_km(l);
     if (!box_render_lights_planet_sun(lights, l->scene, value->sun, out->sun, out->sun_color)) {
         glm_vec3_copy((vec3){0, -1, 0}, out->sun);
         glm_vec3_zero(out->sun_color);
@@ -845,9 +862,11 @@ static void box_atmos_view_planets(
     ecs_vec_clear(&a->planet_order);
     for (i = 0; i < ecs_vec_count(&a->planet_luts); i ++) {
         const box_atmos_planet_t *l = ecs_vec_get_t(&a->planet_luts, box_atmos_planet_t, i);
-        float top = (l->value.planet_radius + l->value.thickness) * l->value.radius /
-            l->value.planet_radius;
-        if (!l->seen || l->scene != v->scene || !box_render_view_sees(v, l->center, top)) {
+        float top = (l->value.planet_radius + l->value.thickness) * l->value.radius *
+            l->scale / l->value.planet_radius;
+        if (!l->seen || !(top > 0.0f) || l->scene != v->scene ||
+            !box_render_view_sees(v, l->center, top))
+        {
             continue;
         }
 
@@ -904,7 +923,7 @@ static void box_atmos_planet_lights(
             NULL, &p->planet_lights, box_render_planet_light_t);
         ecs_os_memset_t(out, 0, box_render_planet_light_t);
         glm_vec3_copy(ECS_CONST_CAST(float*, l->center), out->center);
-        out->center[3] = l->value.planet_radius / l->value.radius;
+        out->center[3] = box_atmos_planet_km(l);
         out->radii[0] = l->key.radii[0];
         out->radii[1] = l->key.radii[1];
         if (box_render_lights_planet_sun(lights, l->scene, l->value.sun, out->sun, color) &&

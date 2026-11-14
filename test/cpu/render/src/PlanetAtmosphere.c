@@ -664,3 +664,108 @@ void PlanetAtmosphere_removed_frees_luts(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void PlanetAtmosphere_scaled_parent_scales_shell(void) {
+    // planet_atmosphere/scale
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world);
+    ecs_entity_t parent = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, parent, Scale, {2, 2, 2});
+    ecs_entity_t planet = planet_new(world, parent, 0.25f);
+    ecs_set(world, planet, PlanetAtmosphere, {
+        .radius = 2,
+        .planet_radius = 6000,
+        .thickness = 60,
+        .rayleigh = {8, 1},
+        .mie = {1.2f, 0.8f, 1, {255, 255, 255}},
+        .ozone_scale = 1,
+        .ground_albedo = {77, 77, 77},
+        .intensity = 1
+    });
+    view_new(world, scene, 10);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    test_int(v->planet_count, 1);
+    const box_render_planet_atmos_t *shell = view_shell(null, v, 0);
+    test_uint(shell->entity, planet);
+    test_near(shell->center[0], 0.5f, 1e-5f);
+    test_near(shell->center[1], 0, 1e-5f);
+    test_near(shell->center[2], 0, 1e-5f);
+    test_near(shell->center[3], 1500, 1e-2f);
+    test_near(shell->medium.radii[0], 6000, 1e-3f);
+    test_near(shell->medium.radii[1], 6060, 1e-3f);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanetAtmosphere_scaled_planet_scales_shell(void) {
+    // planet_atmosphere/scale
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world);
+    ecs_entity_t planet = planet_new(world, scene, 0.5f);
+    ecs_set(world, planet, Scale, {3, 3, 3});
+    view_new(world, scene, 10);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    test_int(v->planet_count, 1);
+    const box_render_planet_atmos_t *shell = view_shell(null, v, 0);
+    test_near(shell->center[0], 0.5f, 1e-5f);
+    test_near(shell->center[3], 6360.0f / 3.0f, 1e-2f);
+    test_near(shell->medium.radii[0], 6360, 1e-2f);
+
+    ecs_set(world, planet, Scale, {1, 1, 1});
+    v = frame_view(world, null, scene);
+    test_int(v->planet_count, 1);
+    shell = view_shell(null, v, 0);
+    test_assert(shell->center[3] == 6360.0f);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanetAtmosphere_non_uniform_scale_uses_mean(void) {
+    // planet_atmosphere/scale
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world);
+    ecs_entity_t planet = planet_new(world, scene, 0);
+    ecs_set(world, planet, Scale, {1, 2, 4});
+    view_new(world, scene, 10);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    test_int(v->planet_count, 1);
+    test_near(view_shell(null, v, 0)->center[3], 3180, 1e-1f);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanetAtmosphere_scaled_planet_culling(void) {
+    // planet_atmosphere/scale
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world);
+
+    /* The frustum of the view at the depth of the planets is about 5.77 high above the axis.
+     * The top of the shell of a planet of radius 1 is at about 1.016. */
+    ecs_entity_t outside = planet_new(world, scene, 0);
+    ecs_set(world, outside, Position, {0, 7.5f, 0});
+    ecs_entity_t inside = planet_new(world, scene, 0);
+    ecs_set(world, inside, Position, {0, -6.6f, 0});
+    view_new(world, scene, 10);
+    const box_render_view_t *v = frame_view(world, null, scene);
+    test_int(v->planet_count, 1);
+    test_uint(view_shell(null, v, 0)->entity, inside);
+
+    /* Grown by 4 the outside planet reaches into the frustum, shrunk by 2 the inside planet
+     * leaves it */
+    ecs_set(world, outside, Scale, {4, 4, 4});
+    ecs_set(world, inside, Scale, {0.5f, 0.5f, 0.5f});
+    v = frame_view(world, null, scene);
+    test_int(v->planet_count, 1);
+    test_uint(view_shell(null, v, 0)->entity, outside);
+
+    /* A planet flattened to a scale of 0 is not drawn */
+    ecs_set(world, outside, Scale, {0, 0, 0});
+    v = frame_view(world, null, scene);
+    test_int(v->planet_count, 0);
+    ecs_fini(world);
+    box_render_null_free(null);
+}

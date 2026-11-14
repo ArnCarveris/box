@@ -250,7 +250,11 @@
                     "other_scene_not_drawn",
                     "behind_camera_not_drawn",
                     "shells_back_to_front",
-                    "removed_frees_luts"
+                    "removed_frees_luts",
+                    "scaled_parent_scales_shell",
+                    "scaled_planet_scales_shell",
+                    "non_uniform_scale_uses_mean",
+                    "scaled_planet_culling"
                 ]
             },
             {
@@ -268,7 +272,9 @@
                     "no_planet_unbound",
                     "feature_off_unbound",
                     "override_follows_feature",
-                    "view_features"
+                    "view_features",
+                    "scaled_parent_scales_light",
+                    "scaled_planet_scales_light"
                 ]
             },
             {

@@ -1397,7 +1397,8 @@
                     "camera_inside",
                     "backlit_ring",
                     "terminator_smooth",
-                    "draws_per_planet"
+                    "draws_per_planet",
+                    "scaled_planet_matches"
                 ]
             },
             {

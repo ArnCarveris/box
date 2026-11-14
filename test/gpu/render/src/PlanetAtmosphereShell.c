@@ -686,3 +686,62 @@ void PlanetAtmosphereShell_draws_per_planet(void) {
     test_int(after.errors, before.errors);
     ecs_fini(world);
 }
+
+/** Render the day case at a scale: the planet at the origin scaled by a factor, lit from +X and
+ * +Z, seen from z 3 times the factor.
+ *
+ * @param scale Uniform Scale of the planet, 1 for none
+ * @param file Name of the PNG
+ * @return The pixels
+ */
+static unsigned char* pa_scaled(
+    float scale,
+    const char *file)
+{
+    ecs_world_t *world = pa_world(0, -135);
+    pa_view(world, 3 * scale, 0);
+    ecs_entity_t planet = pa_planet(world, 0, 0);
+    if (scale != 1.0f) {
+        ecs_set(world, planet, Scale, {scale, scale, scale});
+    }
+
+    pa_atmosphere(world, planet);
+    unsigned char *result = pa_render(world, file);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A planet scaled by 4 seen from 4 times farther looks as the unscaled planet: the shell, its
+ * limb and the haze over the surface scale with the globe. */
+void PlanetAtmosphereShell_scaled_planet_matches(void) {
+    // planet_atmosphere/scale
+    int32_t day[2], top[2], outside[2];
+    unsigned char *px = pa_scaled(4, "planet_scaled.png");
+    unsigned char *base = pa_scaled(1, "planet_scaled_base.png");
+    pa_limb(3, 0, 0, 1, 0, PA_LIMB, day);
+    pa_limb(3, 0, 0, 0, -1, PA_LIMB, top);
+    pa_limb(3, 0, 0, 1, 0, 1.3f, outside);
+    const unsigned char *p = pa_px(px, day[0], day[1]);
+    pa_print("scaled limb", p);
+    pa_print("unscaled limb", pa_px(base, day[0], day[1]));
+    test_assert(p[0] + p[1] + p[2] > 60);
+    test_assert(pa_diff(p, pa_px(base, day[0], day[1])) <= 2);
+    test_assert(pa_diff(pa_px(px, top[0], top[1]), pa_px(base, top[0], top[1])) <= 2);
+    test_assert(pa_diff(pa_px(px, outside[0], outside[1]),
+        pa_px(base, outside[0], outside[1])) <= 1);
+    test_assert(pa_diff(pa_px(px, PA_SIZE / 2, PA_SIZE / 2),
+        pa_px(base, PA_SIZE / 2, PA_SIZE / 2)) <= 2);
+
+    int32_t x, y, off = 0;
+    for (y = 0; y < PA_SIZE; y ++) {
+        for (x = 0; x < PA_SIZE; x ++) {
+            off += pa_diff(pa_px(px, x, y), pa_px(base, x, y)) > 2;
+        }
+    }
+
+    printf("pixels that differ by more than 2: %d\n", off);
+    test_assert(off <= PA_SIZE * PA_SIZE / 100);
+    stbi_image_free(px);
+    stbi_image_free(base);
+}
