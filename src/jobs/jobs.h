@@ -3,7 +3,7 @@
  * @brief Job system that box modules use to run long work such as IO on worker threads.
  *
  * Work runs on a worker without access to the world, completions run on the main thread
- * in the JobsComplete system in submission order. This header is private to box modules.
+ * in the box.jobs.Complete system in submission order. This header is private to box modules.
  */
 
 #ifndef BOX_JOBS_H
@@ -92,7 +92,7 @@ int32_t box_jobs_pending(
 
 /** Count the jobs a worker took whose work is not marked finished yet.
  *
- * Work that signals its own module before it returns is not yet visible to JobsComplete, so a
+ * Work that signals its own module before it returns is not yet visible to box.jobs.Complete, so a
  * headless frame that waits for its module's work also waits for this to reach 0.
  *
  * @param world The world

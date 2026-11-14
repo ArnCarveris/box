@@ -458,8 +458,11 @@ void TransformStaticImport(
     ecs_set_hooks(world, TransformStaticState, { .ctor = flecs_default_ctor });
     ecs_singleton_set(world, TransformStaticState, { .state = state });
 
+    ecs_entity_t scope = transformScopePush(world, "static");
+    ecs_entity_t ns = ecs_get_scope(world);
+
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnPosition" }),
+        .entity = ecs_entity(world, { .name = "OnPosition" }),
         .query.terms = {
             { .id = ecs_id(Position), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
@@ -469,7 +472,7 @@ void TransformStaticImport(
     });
 
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnRotation" }),
+        .entity = ecs_entity(world, { .name = "OnRotation" }),
         .query.terms = {
             { .id = ecs_id(Rotation), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
@@ -479,7 +482,7 @@ void TransformStaticImport(
     });
 
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnScale" }),
+        .entity = ecs_entity(world, { .name = "OnScale" }),
         .query.terms = {
             { .id = ecs_id(Scale), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
@@ -489,7 +492,7 @@ void TransformStaticImport(
     });
 
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnManual" }),
+        .entity = ecs_entity(world, { .name = "OnManual" }),
         .query.terms = {
             { .id = ecs_id(WorldTransform), .src.id = EcsSelf },
             { .id = ManualTransform, .inout = EcsInOutFilter }
@@ -498,15 +501,17 @@ void TransformStaticImport(
         .callback = TransformStatic_OnManual
     });
 
+    ecs_set_scope(world, scope);
+
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "Transform_OnDynamic" }),
+        .entity = ecs_entity(world, { .name = "OnDynamic" }),
         .query.terms = {{ .id = DynamicTransform }},
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = Transform_OnDynamic
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "Transform_OnRemovePosition" }),
+        .entity = ecs_entity(world, { .name = "OnRemovePosition" }),
         .query.terms = {
             { .id = ecs_id(Position), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot, .inout = EcsInOutFilter }
@@ -515,8 +520,10 @@ void TransformStaticImport(
         .callback = Transform_OnRemovePosition
     });
 
+    ecs_set_scope(world, ns);
+
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnChildOf" }),
+        .entity = ecs_entity(world, { .name = "OnChildOf" }),
         .query.terms = {
             { .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
@@ -526,7 +533,7 @@ void TransformStaticImport(
     });
 
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnParent" }),
+        .entity = ecs_entity(world, { .name = "OnParent" }),
         .query.terms = {
             { .id = ecs_id(EcsParent), .src.id = EcsSelf },
             { .id = ManualTransform, .oper = EcsNot }
@@ -536,7 +543,7 @@ void TransformStaticImport(
     });
 
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnEnable" }),
+        .entity = ecs_entity(world, { .name = "OnEnable" }),
         .query.terms = {
             { .id = EcsDisabled, .src.id = EcsSelf },
             { .id = ecs_id(Position), .src.id = EcsSelf, .inout = EcsInOutFilter }
@@ -549,11 +556,13 @@ void TransformStaticImport(
     state->refs ++;
     ecs_system(world, {
         .entity = ecs_entity(world, {
-            .name = "TransformStatic",
+            .name = "Update",
         }),
         .phase = EcsPreStore,
         .run = TransformStatic,
         .ctx = state,
         .ctx_free = transformStaticRelease
     });
+
+    ecs_set_scope(world, scope);
 }

@@ -904,7 +904,7 @@ void BoxShaderImport(
     state->watch = box_file_watch_kind(world, "shader", box_shader_changed, state);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "ShaderOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(Shader) }},
         .events = { EcsOnSet },
         .callback = BoxShaderOnSet,
@@ -913,7 +913,7 @@ void BoxShaderImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "ShaderOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove" }),
         .query.terms = {{ .id = ecs_id(Shader) }},
         .events = { EcsOnRemove },
         .callback = BoxShaderOnRemove,
@@ -922,7 +922,7 @@ void BoxShaderImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "ShaderExtract" }),
+        .entity = ecs_entity(world, { .name = "Extract" }),
         .phase = RenderExtract,
         .run = BoxShaderExtract,
         .ctx = state,

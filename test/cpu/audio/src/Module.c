@@ -376,3 +376,21 @@ void Module_names(void) {
     test_assert(ecs_lookup(world, "box.audio.Wavetables") == 0);
     ecs_fini(world);
 }
+
+void Module_app_names(void) {
+    // audio/module
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxApp);
+
+    ecs_entity_t device = ecs_lookup(world, "box.app.AudioDevice");
+    test_assert(device != 0);
+    test_uint(device, ecs_lookup_symbol(world, "AudioTransport", false, false));
+    test_assert(ecs_has(world, device, EcsComponent));
+
+    ecs_entity_t e = ecs_lookup(world, "box.app.AudioDeviceUpdate");
+    test_assert(e != 0);
+    test_assert(ecs_has_pair(world, e, ecs_id(EcsPoly), EcsSystem));
+    test_assert(ecs_lookup(world, "box.app.Device") == 0);
+    test_assert(ecs_lookup(world, "box.app.DeviceUpdate") == 0);
+    ecs_fini(world);
+}

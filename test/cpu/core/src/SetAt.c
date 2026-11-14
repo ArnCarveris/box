@@ -368,29 +368,29 @@ typedef struct SetAtOther {
     int32_t value;  /**< The value */
 } SetAtOther;
 
-/** Check whether the writes to SetAt entities are recorded: AppSetAtOnSet, the parent of their
+/** Check whether the writes to SetAt entities are recorded: SetAtOnSet, the parent of their
  * observers, exists only while the world has SetAt entities.
  *
  * @param world The world
- * @return Whether AppSetAtOnSet exists
+ * @return Whether SetAtOnSet exists
  */
 static bool set_at_active(
     ecs_world_t *world)
 {
-    return ecs_lookup(world, "box.app.AppSetAtOnSet") != 0;
+    return ecs_lookup(world, "box.app.SetAtOnSet") != 0;
 }
 
 /** Check whether the writes to a component of SetAt entities are recorded.
  *
  * @param world The world
  * @param id The component
- * @return Whether an observer of AppSetAtOnSet records the writes to id
+ * @return Whether an observer of SetAtOnSet records the writes to id
  */
 static bool set_at_observes(
     ecs_world_t *world,
     ecs_id_t id)
 {
-    ecs_entity_t scope = ecs_lookup(world, "box.app.AppSetAtOnSet");
+    ecs_entity_t scope = ecs_lookup(world, "box.app.SetAtOnSet");
     bool result = false;
     if (scope) {
         ecs_iter_t it = ecs_children(world, scope);

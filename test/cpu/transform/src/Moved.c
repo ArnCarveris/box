@@ -1,6 +1,6 @@
 /**
  * @file Moved.c
- * @brief box_transform_on_moved: which entities a TransformStatic run passes to listeners.
+ * @brief box_transform_on_moved: which entities a static.Update run passes to listeners.
  */
 
 #include <box.h>

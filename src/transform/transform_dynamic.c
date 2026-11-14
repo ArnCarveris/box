@@ -22,7 +22,7 @@ static transform_dynamic_ctx_t* transform_dynamic_ctx_new(
     transform_dynamic_ctx_t *result = ecs_os_malloc_t(transform_dynamic_ctx_t);
 
     result->q_childof = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "TransformDynamicChildOf" }),
+        .entity = ecs_entity(world, { .name = "ChildOfQuery" }),
         .terms = {{
             .id = ecs_id(WorldTransform),
             .inout = EcsOut,
@@ -56,7 +56,7 @@ static transform_dynamic_ctx_t* transform_dynamic_ctx_new(
     });
 
     result->q_parent = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "TransformDynamicParent" }),
+        .entity = ecs_entity(world, { .name = "ParentQuery" }),
         .terms = {{
             .id = ecs_id(WorldTransform),
             .inout = EcsOut,
@@ -208,9 +208,11 @@ static void TransformDynamic(
 void TransformDynamicImport(
     ecs_world_t *world)
 {
+    ecs_entity_t scope = transformScopePush(world, "dynamic");
+
     ecs_system(world, {
         .entity = ecs_entity(world, {
-            .name = "TransformDynamic",
+            .name = "Update",
         }),
         .phase = EcsPreStore,
         .run = TransformDynamic,
@@ -219,7 +221,7 @@ void TransformDynamicImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TransformDynamic_Spread" }),
+        .entity = ecs_entity(world, { .name = "Spread" }),
         .query.terms = {
             { .id = DynamicTransform, .src.id = EcsUp }
         },
@@ -229,7 +231,7 @@ void TransformDynamicImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TransformDynamic_SpreadToParented" }),
+        .entity = ecs_entity(world, { .name = "SpreadToParented" }),
         .query.terms = {
             { .id = ecs_id(EcsParent) }
         },
@@ -237,4 +239,5 @@ void TransformDynamicImport(
         .callback = TransformDynamic_SpreadToParented
     });
 
+    ecs_set_scope(world, scope);
 }

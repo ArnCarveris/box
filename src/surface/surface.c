@@ -878,7 +878,7 @@ void BoxSurfaceImport(
     ecs_add_pair(world, ecs_id(SurfaceImpl), EcsOnInstantiate, EcsDontInherit);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "SurfaceOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(Surface) }},
         .events = { EcsOnSet },
         .callback = BoxSurfaceOnSet,
@@ -886,28 +886,28 @@ void BoxSurfaceImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "SurfaceOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove" }),
         .query.terms = {{ .id = ecs_id(Surface) }},
         .events = { EcsOnRemove },
         .callback = BoxSurfaceOnRemove
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "SurfaceFromApp" }),
+        .entity = ecs_entity(world, { .name = "FromApp" }),
         .phase = EcsPreFrame,
         .immediate = true,
         .run = BoxSurfaceFromApp
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "SurfacePoll" }),
+        .entity = ecs_entity(world, { .name = "Poll" }),
         .phase = EcsPreFrame,
         .query.terms = {{ .id = ecs_id(SurfaceImpl), .inout = EcsIn }},
         .run = BoxSurfacePoll
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "SurfaceExtract" }),
+        .entity = ecs_entity(world, { .name = "Extract" }),
         .phase = RenderExtract,
         .query.terms = {
             { .id = ecs_id(Surface), .inout = EcsIn },

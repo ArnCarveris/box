@@ -621,22 +621,22 @@ void box_animator_import(
     ecs_add_pair(world, ecs_id(Animator), EcsWith, ecs_id(AnimatorState));
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "BoxAnimatorOnAnimator" }),
+        .entity = ecs_entity(world, { .name = "AnimatorOnAnimator" }),
         .query.terms = {{ .id = ecs_id(Animator), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchDisabled,
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = BoxAnimatorOnAnimator
     });
 
-    box_animator_observer(world, "BoxAnimatorOnState", ecs_id(AnimatorState),
+    box_animator_observer(world, "AnimatorOnState", ecs_id(AnimatorState),
         EcsOnAdd, EcsOnRemove, BoxAnimatorOnState);
-    box_animator_observer(world, "BoxAnimatorOnClip", ecs_id(AnimationClip),
+    box_animator_observer(world, "AnimatorOnClip", ecs_id(AnimationClip),
         EcsOnSet, EcsOnRemove, BoxAnimatorOnClip);
-    box_animator_observer(world, "BoxAnimatorOnChildOf", ecs_pair(EcsChildOf, EcsWildcard),
+    box_animator_observer(world, "AnimatorOnChildOf", ecs_pair(EcsChildOf, EcsWildcard),
         EcsOnAdd, EcsOnRemove, BoxAnimatorOnChildOf);
-    box_animator_observer(world, "BoxAnimatorOnParent", ecs_id(EcsParent),
+    box_animator_observer(world, "AnimatorOnParent", ecs_id(EcsParent),
         EcsOnSet, EcsOnRemove, BoxAnimatorOnParent);
-    box_animator_observer(world, "BoxAnimatorOnName", ecs_pair(ecs_id(EcsIdentifier), EcsName),
+    box_animator_observer(world, "AnimatorOnName", ecs_pair(ecs_id(EcsIdentifier), EcsName),
         EcsOnSet, 0, BoxAnimatorOnName);
 
     ecs_system(world, {

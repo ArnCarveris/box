@@ -822,7 +822,7 @@ void BoxPerfImport(
     box_perf_t *perf = box_perf_new();
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "PerfOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(PerfRun) }},
         .events = { EcsOnSet },
         .callback = BoxPerfOnSet,
@@ -831,7 +831,7 @@ void BoxPerfImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "PerfOrbit" }),
+        .entity = ecs_entity(world, { .name = "Orbit" }),
         .phase = EcsOnUpdate,
         .run = BoxPerfOrbit,
         .ctx = perf,
@@ -839,14 +839,14 @@ void BoxPerfImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "PerfBegin" }),
+        .entity = ecs_entity(world, { .name = "Begin" }),
         .phase = EcsPreFrame,
         .run = BoxPerfBegin,
         .ctx = perf
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "PerfFrame" }),
+        .entity = ecs_entity(world, { .name = "Frame" }),
         .phase = EcsPostFrame,
         .run = BoxPerfFrame,
         .ctx = perf

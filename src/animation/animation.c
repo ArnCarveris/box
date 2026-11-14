@@ -541,7 +541,7 @@ void BoxAnimationImport(
     box_animator_import(world);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "BoxAnimationTrackResolve" }),
+        .entity = ecs_entity(world, { .name = "TrackResolve" }),
         .query.terms = {{ .id = ecs_id(AnimationTrack), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnSet },
@@ -549,7 +549,7 @@ void BoxAnimationImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "BoxAnimationTrackRemove" }),
+        .entity = ecs_entity(world, { .name = "TrackRemove" }),
         .query.terms = {{ .id = ecs_id(AnimationTrack), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnRemove },

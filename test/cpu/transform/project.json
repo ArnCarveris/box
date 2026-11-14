@@ -918,6 +918,14 @@
                     "interleaved_parents",
                     "parent_without_transform"
                 ]
+            },
+            {
+                "id": "Names",
+                "testcases": [
+                    "static_names",
+                    "dynamic_names",
+                    "module_names"
+                ]
             }
         ]
     }

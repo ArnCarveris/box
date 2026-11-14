@@ -421,7 +421,7 @@ void BoxJobsImport(
     ecs_atfini(world, box_jobs_fini, jobs);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "JobsComplete" }),
+        .entity = ecs_entity(world, { .name = "Complete" }),
         .phase = EcsOnLoad,
         .run = BoxJobsComplete,
         .ctx = jobs,
@@ -429,7 +429,7 @@ void BoxJobsImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "JobsInline" }),
+        .entity = ecs_entity(world, { .name = "Inline" }),
         .phase = EcsPostFrame,
         .run = BoxJobsInline,
         .ctx = jobs

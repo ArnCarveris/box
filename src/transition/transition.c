@@ -507,14 +507,14 @@ void BoxTransitionImport(
     ecs_singleton_ensure(world, TransitionPending)->pending = pending;
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "BoxTransitionPendingFlush" }),
+        .entity = ecs_entity(world, { .name = "FlushPending" }),
         .query.terms = {{ .id = ecs_id(TransitionPending), .src.id = EcsSelf }},
         .events = { ecs_id(TransitionPendingFlush) },
         .callback = BoxTransitionPendingFlush
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "BoxTransitionValidate" }),
+        .entity = ecs_entity(world, { .name = "Validate" }),
         .query.terms = {{ .id = ecs_id(Transition), .src.id = EcsSelf }},
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnSet },

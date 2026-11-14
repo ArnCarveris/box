@@ -57,7 +57,7 @@ void BoxMovementImport(
     ecs_add_pair(world, ecs_id(AngularVelocity), EcsWith, ecs_id(Rotation));
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "BoxIntegrateVelocity" }),
+        .entity = ecs_entity(world, { .name = "IntegrateVelocity" }),
         .query.terms = {
             { .id = ecs_id(Position), .inout = EcsInOut },
             { .id = ecs_id(Velocity), .inout = EcsIn }
@@ -67,7 +67,7 @@ void BoxMovementImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "BoxIntegrateAngularVelocity" }),
+        .entity = ecs_entity(world, { .name = "IntegrateAngularVelocity" }),
         .query.terms = {
             { .id = ecs_id(Rotation), .inout = EcsInOut },
             { .id = ecs_id(AngularVelocity), .inout = EcsIn }

@@ -124,6 +124,18 @@ bool transformDeleting(
                 transformParentDeleting(it->world, it->entities[0]))));
 }
 
+ecs_entity_t transformScopePush(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t scope = ecs_get_scope(world);
+    ecs_entity_t ns = ecs_entity(world, { .name = name, .parent = scope });
+    ecs_add_id(world, ns, EcsModule);
+    ecs_set_scope(world, ns);
+
+    return scope;
+}
+
 void BoxTransformImport(
     ecs_world_t *world)
 {

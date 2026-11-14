@@ -4,7 +4,7 @@
  * window, to the world owning the window.
  *
  * glfw runs the callbacks inside glfwPollEvents on the main thread, which box.surface calls once
- * per frame in SurfacePoll (PreFrame), before InputUpdate (OnLoad) applies them.
+ * per frame in box.surface.Poll (PreFrame), before InputUpdate (OnLoad) applies them.
  *
  * The backend also holds the clipboard, read when the paste shortcut goes down, and shows the
  * pointer cursor shapes with the standard cursors of glfw.

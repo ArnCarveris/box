@@ -39,7 +39,7 @@ box_window_t* box_window_new(
 void box_window_free(
     box_window_t *window);
 
-/** Process the events of every window, once per frame in SurfacePoll. */
+/** Process the events of every window, once per frame in box.surface.Poll. */
 void box_window_poll(void);
 
 /** Read the size of the framebuffer of a window.

@@ -418,7 +418,7 @@ static void BoxAppSetAtOnSet(
  */
 typedef struct box_app_set_at_t {
     ecs_entity_t module;    /**< The box.app module */
-    ecs_entity_t scope;     /**< AppSetAtOnSet, parent of the observers, 0 without SetAt entities */
+    ecs_entity_t scope;     /**< SetAtOnSet, parent of the observers, 0 without SetAt entities */
     ecs_vec_t ids;          /**< ecs_id_t of the components with an observer */
     int32_t count;          /**< SetAt entities in the world */
 } box_app_set_at_t;
@@ -483,7 +483,7 @@ static void box_app_set_at_observe(
     ecs_world_t *world,
     box_app_set_at_t *state)
 {
-    state->scope = ecs_entity(world, { .name = "AppSetAtOnSet", .parent = state->module });
+    state->scope = ecs_entity(world, { .name = "SetAtOnSet", .parent = state->module });
     ecs_query_t *q = ecs_query(world, {
         .terms = {{ .id = ecs_id(SetAtWritten) }},
         .flags = EcsQueryMatchDisabled | EcsQueryMatchEmptyTables
@@ -612,7 +612,7 @@ static void box_app_set_at_warn(
 /** Record the components a SetAt entity had before SetAt was added, as when a script body
  * writes SetAt after the other components.
  *
- * Count the SetAt entities: the first one added creates the observers of AppSetAtOnSet, the
+ * Count the SetAt entities: the first one added creates the observers of SetAtOnSet, the
  * last one removed or deleted deletes them.
  *
  * @param it The iterator of the observer
@@ -1262,7 +1262,7 @@ void BoxAppImport(
     box_file_watch_init(world);
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AppOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(App) }},
         .events = { EcsOnSet },
         .callback = BoxAppOnSet
@@ -1278,7 +1278,7 @@ void BoxAppImport(
     box_app_set_at_t *set_at = ecs_os_calloc_t(box_app_set_at_t);
     set_at->module = ecs_id(BoxApp);
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AppSetAtOnAdd" }),
+        .entity = ecs_entity(world, { .name = "SetAtOnAdd" }),
         .query = {
             .terms = {{ .id = ecs_id(SetAt) }},
             .flags = EcsQueryMatchDisabled
@@ -1290,7 +1290,7 @@ void BoxAppImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "AppSetAtOnTable" }),
+        .entity = ecs_entity(world, { .name = "SetAtOnTable" }),
         .query = {
             .terms = {{ .id = ecs_id(SetAtWritten) }},
             .flags = EcsQueryMatchDisabled
@@ -1311,7 +1311,7 @@ void BoxAppImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AppSetAt" }),
+        .entity = ecs_entity(world, { .name = "SetAtUpdate" }),
         .query = {
             .terms = {{ .id = ecs_id(SetAt) }},
             .flags = EcsQueryMatchDisabled
@@ -1322,7 +1322,7 @@ void BoxAppImport(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "AppFrame" }),
+        .entity = ecs_entity(world, { .name = "Frame" }),
         .phase = EcsPostFrame,
         .run = BoxAppFrame,
         .ctx = clock

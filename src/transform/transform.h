@@ -79,6 +79,16 @@ void transformDynamicUnspread(
     ecs_iter_t *it,
     bool deleting);
 
+/** Create a namespace of box.transform, such as static, and make it the scope.
+ *
+ * @param world The world
+ * @param name The name of the namespace
+ * @return The previous scope, for ecs_set_scope after the registrations
+ */
+ecs_entity_t transformScopePush(
+    ecs_world_t *world,
+    const char *name);
+
 /** Register the systems and observers of dynamic transforms.
  *
  * @param world The world

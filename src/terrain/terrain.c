@@ -251,14 +251,14 @@ void BoxTerrainImport(
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TerrainOnSet" }),
+        .entity = ecs_entity(world, { .name = "OnSet" }),
         .query.terms = {{ .id = ecs_id(TileTerrain) }},
         .events = { EcsOnSet },
         .callback = BoxTerrainOnSet
     });
 
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TerrainOnRemove" }),
+        .entity = ecs_entity(world, { .name = "OnRemove" }),
         .query.terms = {{ .id = ecs_id(TileTerrain) }},
         .events = { EcsOnRemove },
         .callback = BoxTerrainOnRemove

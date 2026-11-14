@@ -590,7 +590,7 @@ void BoxTaskImport(
     ecs_id(TaskPublish) = TaskPublish;
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "TaskPublishTasks" }),
+        .entity = ecs_entity(world, { .name = "PublishTasks" }),
         .phase = TaskPublish,
         .run = BoxTaskPublish,
         .immediate = true
