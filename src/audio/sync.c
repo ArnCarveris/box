@@ -1501,8 +1501,9 @@ void box_audio_sync_init(
         .cache_kind = EcsQueryCacheAuto
     });
 
+    ecs_entity_t scope = box_audio_synth_scope_push(world);
     state->synths = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "Synths" }),
+        .entity = ecs_entity(world, { .name = "Sounds" }),
         .terms = {
             { .id = ecs_id(SynthSound), .inout = EcsIn, .src.id = EcsSelf },
             { .id = ecs_id(AudioSynth), .src.id = EcsSelf },
@@ -1521,6 +1522,7 @@ void box_audio_sync_init(
         .flags = EcsQueryMatchPrefab,
         .cache_kind = EcsQueryCacheAuto
     });
+    box_audio_synth_scope_pop(world, scope);
 
     state->meter_query = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "Meters" }),
@@ -1569,7 +1571,7 @@ void box_audio_sync_init(
         .ctx = state
     });
 
-    ecs_entity_t scope = box_audio_synth_scope_push(world);
+    scope = box_audio_synth_scope_push(world);
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "WavetableChange" }),
         .query.flags = EcsQueryMatchPrefab,

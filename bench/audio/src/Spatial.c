@@ -6,7 +6,7 @@
  *
  * Each iteration runs one frame of a world with box. The frames are short (a microsecond), so
  * the null output renders next to nothing and the time is the time of the frame, the
- * AudioSync of the module included; sources_0 is the same world without sources. The
+ * audio.Sync system of the module included; sources_0 is the same world without sources. The
  * filtered cases give the sources a distance filter.
  *
  * emitters_300_idle runs emitters that are never due. emitters_300_playing runs frames of 1/60

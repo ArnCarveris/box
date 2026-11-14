@@ -1,7 +1,8 @@
 /**
  * @file Module.c
  * @brief The box.audio module: defaults from C and script, the processing order of buses,
- * cycles, deleted buses, frames without changes and an import without a device.
+ * cycles, deleted buses, frames without changes, an import without a device and the names of
+ * the module.
  */
 
 #include "world.h"
@@ -295,5 +296,83 @@ void Module_new_output_resends(void) {
     test_int(ecs_singleton_get(world, AudioStatus)->state, AudioNoDevice);
     test_int(ecs_singleton_get(world, AudioStatus)->voices, 1);
     test_int(ecs_singleton_get(world, AudioStatus)->sample_rate, 48000);
+    ecs_fini(world);
+}
+
+/** Count the descendants of an entity whose name starts with the prefix followed by an
+ * uppercase letter or an underscore, and print their paths.
+ *
+ * @param world The world
+ * @param parent The entity whose descendants to check
+ * @param prefix The prefix that no name may start with
+ * @return Number of offending names
+ */
+static int32_t audio_names_with_prefix(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    const char *prefix)
+{
+    int32_t result = 0, len = ecs_os_strlen(prefix);
+    ecs_iter_t it = ecs_children(world, parent);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t e = it.entities[i];
+            const char *name = ecs_get_name(world, e);
+            if (name && !ecs_os_strncmp(name, prefix, len) &&
+                ((name[len] >= 'A' && name[len] <= 'Z') || name[len] == '_'))
+            {
+                char *path = ecs_get_path(world, e);
+                printf("name with prefix %s: %s\n", prefix, path);
+                ecs_os_free(path);
+                result ++;
+            }
+            result += audio_names_with_prefix(world, e, prefix);
+        }
+    }
+    return result;
+}
+
+void Module_names(void) {
+    // audio/module
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxAudio);
+
+    ecs_entity_t audio = ecs_lookup(world, "box.audio");
+    ecs_entity_t synth = ecs_lookup(world, "box.audio.synth");
+    test_assert(audio != 0);
+    test_assert(synth != 0);
+    test_int(audio_names_with_prefix(world, audio, "Audio"), 0);
+    test_int(audio_names_with_prefix(world, synth, "Synth"), 0);
+
+    test_uint(ecs_lookup(world, "box.audio.SongFile"), ecs_id(AudioSong));
+    test_uint(ecs_lookup(world, "box.audio.Bus"), ecs_id(AudioBus));
+    test_uint(ecs_lookup(world, "box.audio.synth.Sound"), ecs_id(SynthSound));
+    test_uint(ecs_lookup(world, "box.audio.synth.Wavetable"), ecs_id(Wavetable));
+    test_uint(ecs_lookup(world, "box.audio.synth.WavetableState"), ecs_id(AudioWavetable));
+    test_uint(ecs_lookup(world, "box.audio.synth.State"), ecs_id(AudioSynth));
+    test_assert(ecs_id(AudioWavetable) != 0);
+    test_assert(ecs_id(AudioWavetable) != ecs_id(Wavetable));
+
+    ecs_entity_t e = ecs_lookup(world, "box.audio.AutomationClipChange");
+    test_assert(e != 0);
+    test_assert(e != ecs_id(AutomationClip));
+    test_assert(ecs_has_pair(world, e, ecs_id(EcsPoly), EcsObserver));
+    test_uint(ecs_lookup(world, "box.audio.AutomationClip"), ecs_id(AutomationClip));
+
+    e = ecs_lookup(world, "box.audio.Sync");
+    test_assert(e != 0);
+    test_assert(ecs_has_pair(world, e, ecs_id(EcsPoly), EcsSystem));
+    e = ecs_lookup(world, "box.audio.synth.Sounds");
+    test_assert(e != 0);
+    test_assert(e != ecs_id(SynthSound));
+    e = ecs_lookup(world, "box.audio.synth.Wavetables");
+    test_assert(e != 0);
+    test_assert(e != ecs_id(Wavetable));
+    e = ecs_lookup(world, "box.audio.synth.SoundDirty");
+    test_assert(e != 0);
+    test_assert(ecs_has_pair(world, e, ecs_id(EcsPoly), EcsObserver));
+    test_assert(ecs_lookup(world, "box.audio.Synths") == 0);
+    test_assert(ecs_lookup(world, "box.audio.Wavetables") == 0);
     ecs_fini(world);
 }

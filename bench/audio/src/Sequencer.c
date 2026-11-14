@@ -4,7 +4,7 @@
  * of 64 notes each, through the null output, one item per frame of 1/60 s.
  *
  * Each iteration runs one frame of a world with box, so the time is the time of the frame:
- * the AudioSync of the module with the window of the timeline and the render of the frame.
+ * the audio.Sync system of the module with the window of the timeline and the render of the frame.
  * tracks_16_stopped is the same world with the transport stopped, tracks_0 one without tracks
  * whose transport plays.
  */

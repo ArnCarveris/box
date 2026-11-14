@@ -633,7 +633,8 @@
                     "no_commands_unchanged",
                     "one_batch_per_frame",
                     "import_opens_no_device",
-                    "new_output_resends"
+                    "new_output_resends",
+                    "names"
                 ]
             },
             {
