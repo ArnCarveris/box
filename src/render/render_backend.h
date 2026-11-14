@@ -133,6 +133,10 @@ typedef struct box_render_gpu_stats_t {
     int32_t texture_graph_timed; /**< Packets of evaluations whose GPU time texture_graph_ns
                                  *   holds */
     int64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediate textures now */
+    int64_t texture_graph_key_bytes; /**< Bytes of the key images of the interpolated texture
+                                 *   graphs now */
+    int32_t texture_graph_blends; /**< Crossfades of key images of interpolated texture graphs
+                                 *   recorded */
     int32_t texture_graph_reads; /**< Texture graph readbacks delivered */
     int32_t texture_graph_hits; /**< Stages of texture graphs whose value the cache had, so
                                  *   they were not dispatched; not the stages of an animated
@@ -388,6 +392,8 @@ typedef struct box_render_texture_graph_t {
     float rate;                 /**< Updates per second of an animated graph, 0 for every
                                  *   frame (TextureGraph.rate) */
     uint32_t texture_count;     /**< Textures after the parameters */
+    uint32_t interpolate;       /**< 1 to crossfade keyframes of an animated graph with a rate
+                                 *   (TextureGraph.interpolate) */
 } box_render_texture_graph_t;
 
 /** Get the nodes of a compiled texture graph.

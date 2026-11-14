@@ -317,4 +317,37 @@ char* box_gpu_tg_code(
     return ecs_strbuf_get(&buf);
 }
 
+char* box_gpu_tg_blend_code(
+    const box_gpu_texgraphs_t *tg,
+    WGPUTextureFormat format)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    ecs_strbuf_appendstr(&buf, tg->prelude);
+    ecs_strbuf_append(&buf,
+        "\n"
+        "@group(0) @binding(2) var box_texgraph_out: texture_storage_2d<%s, write>;\n"
+        "@group(0) @binding(%d) var box_texgraph_key0: texture_2d<f32>;\n"
+        "@group(0) @binding(%d) var box_texgraph_key1: texture_2d<f32>;\n"
+        "\n"
+        "@compute @workgroup_size(8, 8, 1)\n"
+        "fn main(@builtin(global_invocation_id) id: vec3u) {\n"
+        "    if (id.x >= box_texgraph_stage.size.x || id.y >= box_texgraph_stage.size.y) {\n"
+        "        return;\n"
+        "    }\n"
+        "    let texel = vec2i(id.xy);\n"
+        "    let a = textureLoad(box_texgraph_key0, texel, 0);\n"
+        "    let b = textureLoad(box_texgraph_key1, texel, 0);\n"
+        "    let f = clamp(box_texgraph_stage.time, 0.0, 1.0);\n"
+        "    var v = mix(a, b, f);\n"
+        "    if (box_texgraph_stage.encode == 1u) {\n"
+        "        v = vec4f(box_texgraph_srgb(mix(box_texgraph_linear(a.rgb),\n"
+        "            box_texgraph_linear(b.rgb), f)), v.a);\n"
+        "    }\n"
+        "    textureStore(box_texgraph_out, texel, v);\n"
+        "}\n",
+        box_gpu_tg_format_name(format), BOX_GPU_TG_FIRST_INPUT, BOX_GPU_TG_FIRST_INPUT + 1);
+
+    return ecs_strbuf_get(&buf);
+}
+
 #endif

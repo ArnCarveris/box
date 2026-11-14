@@ -904,7 +904,8 @@ planets {
         k_out {
           nodes.Mix: {a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, factor: k_s}
         }
-        Graph: {output: k_out, width: tw, height: tw / 2, domain: DomainSphere, rate: 3}
+        Graph: {output: k_out, width: tw, height: tw / 2, domain: DomainSphere, rate: 3,
+          interpolate: true}
       }
     } else if gas_on {
       // Zones and belts from the sine of the latitude, made irregular by a noise of the latitude
@@ -1005,7 +1006,8 @@ planets {
         a_ang { nodes.Multiply: {a: a_amp, b: a_swing} }
         a_rot { nodes.Transform: {coords: g_dir, angle: a_ang} }
         a_img { nodes.Image: {texture: bands, coords: a_rot} }
-        Graph: {output: a_img, width: tw, height: tw / 2, domain: DomainSphere, rate: 12}
+        Graph: {output: a_img, width: tw, height: tw / 2, domain: DomainSphere, rate: 12,
+          interpolate: true}
       }
     }
 
@@ -1345,7 +1347,7 @@ planets {
       out { nodes.Multiply: {a: c_tint, b: i_2} }
       Graph: {
         output: out, width: tw, height: tw / 2, domain: DomainSphere, format: GraphHdr,
-        rate: detail > 1 ? 10 : 8
+        rate: detail > 1 ? 10 : 8, interpolate: true
       }
     }
 

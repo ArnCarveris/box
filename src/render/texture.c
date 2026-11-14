@@ -277,6 +277,7 @@ static void box_render_texture_graph_send(
     desc->param_hash = graph->param_hash;
     desc->serial = tex->graph_serial;
     desc->rate = graph->rate;
+    desc->interpolate = graph->interpolate ? 1u : 0u;
     desc->texture_count = (uint32_t)graph->texture_count;
     box_render_texture_graph_node_t *out = (box_render_texture_graph_node_t*)(desc + 1);
     for (i = 0; i < graph->node_count; i ++) {

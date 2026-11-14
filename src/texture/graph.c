@@ -1008,6 +1008,7 @@ static box_texture_graph_t* box_texture_graph_compile(
     result->domain = graph->domain;
     result->format = graph->format;
     result->rate = graph->rate > 0 ? graph->rate : 0;
+    result->interpolate = graph->interpolate;
     result->node_count = ecs_vec_count(&b->nodes);
     result->nodes = ecs_os_memdup(ecs_vec_first(&b->nodes),
         result->node_count * ECS_SIZEOF(box_texture_graph_node_t));
@@ -1046,15 +1047,16 @@ static box_texture_graph_t* box_texture_graph_compile(
  *
  * @param a The first graph
  * @param b The second graph
- * @return Whether their size, domain, format, rate, structure, parameters and sampled textures
- * are the same
+ * @return Whether their size, domain, format, rate, interpolation, structure, parameters and
+ * sampled textures are the same
  */
 static bool box_texture_graph_same(
     const box_texture_graph_t *a,
     const box_texture_graph_t *b)
 {
     bool result = a->width == b->width && a->height == b->height && a->domain == b->domain &&
-        a->format == b->format && a->rate == b->rate && a->structure_hash == b->structure_hash &&
+        a->format == b->format && a->rate == b->rate &&
+        a->interpolate == b->interpolate && a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&
         a->param_size == b->param_size && a->texture_count == b->texture_count &&
         (!a->param_size || !ecs_os_memcmp(a->params, b->params, a->param_size));

@@ -719,6 +719,8 @@ static void box_render_previews_stats(
     stats.gpu_ms = (double)s.texture_graph_ns / 1e6;
     stats.timed = s.texture_graph_timed;
     stats.pool_bytes = s.texture_graph_pool_bytes;
+    stats.key_bytes = s.texture_graph_key_bytes;
+    stats.blends = s.texture_graph_blends;
     stats.reads = s.texture_graph_reads;
     stats.previews = previews;
     if (p->stats_written && !ecs_os_memcmp_t(&stats, &p->stats, TextureGraphStats)) {

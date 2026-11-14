@@ -34,6 +34,10 @@
  * buffer for the last node */
 #define BOX_GPU_TG_PARAM_PAD (64)
 
+/** Evaluation of a packet that crossfades the two keys of an interpolated graph into its
+ * image, see box_gpu_tg_eval_t.key */
+#define BOX_GPU_TG_BLEND (2)
+
 /** Bytes of BoxTexGraphStage */
 #define BOX_GPU_TG_UNIFORM_SIZE (32)
 
@@ -123,6 +127,17 @@ typedef struct box_gpu_tg_program_t {
     int32_t error_node;         /**< Node the error came from, -1 for none */
 } box_gpu_tg_program_t;
 
+/** A pooled intermediate */
+typedef struct box_gpu_tg_pooled_t {
+    WGPUTexture texture;        /**< The texture */
+    WGPUTextureView view;       /**< View of its one level */
+    uint32_t width;             /**< Width */
+    uint32_t height;            /**< Height */
+    WGPUTextureFormat format;   /**< Format */
+    bool used;                  /**< An evaluation of this packet holds it */
+    int64_t last;               /**< Packet it was last used in */
+} box_gpu_tg_pooled_t;
+
 /** A texture graph the main thread sent, under its texture handle */
 typedef struct box_gpu_tg_graph_t {
     uint32_t handle;            /**< Texture handle */
@@ -153,20 +168,16 @@ typedef struct box_gpu_tg_graph_t {
     int64_t sampled;            /**< Packet of the graph state whose draws last sampled the
                                  *   image, -1 for none */
     double time;                /**< World time of the last evaluation */
+    box_gpu_tg_pooled_t keys[2]; /**< Key images of an interpolated graph, never in the pool,
+                                 *   texture NULL until the first key evaluation */
+    int64_t key_index[2];       /**< Key k of the world clock (time k / rate) each key holds */
+    bool keys_valid;            /**< Both keys hold k and k + 1 of the current description */
+    WGPUBuffer key_uniforms[2]; /**< BoxTexGraphStage of the evaluation of each key */
+    WGPUBuffer blend_uniforms;  /**< BoxTexGraphStage of the crossfade, its time the factor */
+    double blended;             /**< World time of the last crossfade, NAN for none */
     int64_t mark;               /**< Packet whose evaluation order it was put in */
     int32_t eval;               /**< Index of its evaluation in the packet, -1 for none */
 } box_gpu_tg_graph_t;
-
-/** A pooled intermediate */
-typedef struct box_gpu_tg_pooled_t {
-    WGPUTexture texture;        /**< The texture */
-    WGPUTextureView view;       /**< View of its one level */
-    uint32_t width;             /**< Width */
-    uint32_t height;            /**< Height */
-    WGPUTextureFormat format;   /**< Format */
-    bool used;                  /**< An evaluation of this packet holds it */
-    int64_t last;               /**< Packet it was last used in */
-} box_gpu_tg_pooled_t;
 
 /** A materialized value of the cache, shared by the graphs whose node has its content hash.
  *
@@ -232,6 +243,10 @@ typedef struct box_gpu_tg_eval_t {
     bool stored;                /**< The image of the handle was written */
     bool update;                /**< Only an update: the graph did not change, its animated
                                  *   nodes or the textures it samples did */
+    int32_t key;                /**< -1 for an evaluation into the image, 0 or 1 for one into
+                                 *   that key of an interpolated graph, BOX_GPU_TG_BLEND for the
+                                 *   crossfade of its keys into the image */
+    int64_t key_index;          /**< Key k an evaluation into a key evaluates, at k / rate */
     int32_t pass;               /**< Compute pass it is recorded in: a graph that samples the
                                  *   single channel image of a graph of the packet comes after
                                  *   the blit of that image */
@@ -261,6 +276,10 @@ typedef struct box_gpu_texgraphs_t {
     box_gpu_tg_entry_t *lru_last; /**< Most recently used entry no graph holds */
     uint64_t budget;            /**< Bytes the cache holds at most, evicting from the LRU list */
     double time;                /**< World time of the packet being evaluated */
+    uint32_t blend_shaders[2];  /**< Shader handles of the crossfades of RGBA8Unorm and of
+                                 *   RGBA16Float images, 0 before they are compiled */
+    WGPUComputePipeline blend_pipelines[2]; /**< Their pipelines once created */
+    uint64_t blend_prelude;     /**< Hash of the shared code they were compiled with */
 } box_gpu_texgraphs_t;
 
 /** Get the bytes of a texel of a format of an intermediate, a cached value or a readback.
@@ -341,6 +360,122 @@ char* box_gpu_tg_code(
     box_gpu_tg_stage_t *stage,
     const int32_t *owner,
     const int32_t *first);
+
+/** Get the layouts of the stages with a number of inputs, of sampled textures and an output
+ * format, creating them on first use.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param inputs Materialized inputs
+ * @param textures Sampled textures
+ * @param format Format of the storage texture
+ * @return The layouts
+ */
+box_gpu_tg_layout_t* box_gpu_tg_layout(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    int32_t inputs,
+    int32_t textures,
+    WGPUTextureFormat format);
+
+/** Compile the code of a stage under its handle through the shader path.
+ *
+ * @param gpu The backend
+ * @param code The code
+ * @param label Label of the module
+ * @param handle Shader handle of the stage
+ */
+void box_gpu_tg_compile(
+    box_gpu_t *gpu,
+    const char *code,
+    const char *label,
+    uint32_t handle);
+
+/** Generate the code of the crossfade of the two keys of an interpolated graph into its
+ * image: the shared code, then a main that mixes box_texgraph_key0 and box_texgraph_key1 by
+ * box_texgraph_stage.time, in linear light when box_texgraph_stage.encode is 1.
+ *
+ * @param tg The graph state, with its shared code
+ * @param format Format of the image, RGBA8Unorm or RGBA16Float
+ * @return The code, freed by the caller
+ */
+char* box_gpu_tg_blend_code(
+    const box_gpu_texgraphs_t *tg,
+    WGPUTextureFormat format);
+
+/** Release the key images and their buffers of an interpolated graph.
+ *
+ * @param gpu The backend
+ * @param graph The graph
+ */
+void box_gpu_tg_keyframes_free(
+    box_gpu_t *gpu,
+    box_gpu_tg_graph_t *graph);
+
+/** Get a key image of an interpolated graph of the size and format its output stage writes,
+ * creating it again when it has another.
+ *
+ * @param gpu The backend
+ * @param graph The graph
+ * @param slot The key, 0 or 1
+ * @return The key image
+ */
+box_gpu_tg_pooled_t* box_gpu_tg_keyframe(
+    box_gpu_t *gpu,
+    box_gpu_tg_graph_t *graph,
+    int32_t slot);
+
+/** Release the crossfade shaders and pipelines.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ */
+void box_gpu_tg_blend_release(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg);
+
+/** Check whether a graph is interpolated: animated, with a rate and TextureGraph.interpolate,
+ * and an image a crossfade can store.
+ *
+ * @param graph The graph, its hashes computed
+ * @return Whether it is
+ */
+bool box_gpu_tg_interpolated(
+    const box_gpu_tg_graph_t *graph);
+
+/** Plan the evaluations of an interpolated graph in a packet with key k of the clock: keys k
+ * and k + 1 after a change, a readback, a changed source or a jump of the clock, else key
+ * k + 1 into the older key once the clock reached the newer one; then the crossfade.
+ *
+ * The crossfade is skipped while the clock is paused. A graph no draw sampled does nothing
+ * unless it changed, and nothing happens while the crossfade pipeline is created.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param graph The graph, ready and interpolated
+ * @param reads Readbacks of its nodes wait
+ * @param evals Receives the box_gpu_tg_eval_t of the packet
+ */
+void box_gpu_tg_plan_keys(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    box_gpu_tg_graph_t *graph,
+    bool reads,
+    ecs_vec_t *evals);
+
+/** Record the crossfade of the two keys of an interpolated graph into the first level of its
+ * image, by the fraction of the clock between them, and queue its mip levels.
+ *
+ * @param gpu The backend
+ * @param tg The graph state
+ * @param pass The compute pass
+ * @param ev The evaluation of the crossfade
+ */
+void box_gpu_tg_blend(
+    box_gpu_t *gpu,
+    box_gpu_texgraphs_t *tg,
+    WGPUComputePassEncoder pass,
+    box_gpu_tg_eval_t *ev);
 
 /** Get the graph whose image a texture handle is.
  *

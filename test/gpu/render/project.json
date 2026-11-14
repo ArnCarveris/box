@@ -1598,6 +1598,19 @@
                 ]
             },
             {
+                "id": "TextureGraphInterpolate",
+                "testcases": [
+                    "blend_between_keys",
+                    "color_linear_blend",
+                    "paused_constant",
+                    "param_change_no_old_blend",
+                    "clock_jump",
+                    "undrawn_skips",
+                    "off_unchanged",
+                    "toggle_frees_keys"
+                ]
+            },
+            {
                 "id": "TextureCells",
                 "testcases": [
                     "plane_distances",

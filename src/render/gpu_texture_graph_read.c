@@ -451,7 +451,8 @@ void box_gpu_tg_copies(
         }
 
         for (e = 0; e < eval_count && !ev; e ++) {
-            ev = evals[e].graph == graph && evals[e].stored ? &evals[e] : NULL;
+            ev = evals[e].graph == graph && (evals[e].stored || evals[e].key >= 0) &&
+                evals[e].key != BOX_GPU_TG_BLEND ? &evals[e] : NULL;
         }
 
         if (r->read.index >= 0) {

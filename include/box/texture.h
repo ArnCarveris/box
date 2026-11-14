@@ -294,6 +294,16 @@ ECS_STRUCT(TextureGraph, {
     float rate;                /**< Updates per second of an animated graph, 0 for every frame.
                                 *   An animated graph whose image no draw sampled in the
                                 *   previous frame skips its updates until one samples it */
+    bool interpolate;          /**< With a rate, the image of an animated graph crossfades its
+                                *   keys k and k + 1 of the clock (time k / rate), evaluated one
+                                *   ahead, by fract(time * rate), in linear light for GraphColor.
+                                *
+                                *   It keeps two key images (TextureGraphStats.key_bytes); a
+                                *   GraphSingle or static graph ignores it. A paused clock shows
+                                *   a fixed image, a jump or a change of the graph evaluates both.
+                                *
+                                *   TextureStatus.revision increments when a change of the graph
+                                *   was evaluated, not per key or crossfade, as other updates */
 });
 
 /** Settings of the cache of the values the texture graphs materialize, a singleton.
@@ -1180,6 +1190,10 @@ ECS_STRUCT(TextureGraphStats, {
                           *   queries */
     int32_t timed;       /**< Packets of evaluations whose GPU time gpu_ms holds */
     int64_t pool_bytes;  /**< Bytes of the pooled intermediate textures now */
+    int64_t key_bytes;   /**< Bytes of the key images of the interpolated graphs now, two per
+                          *   graph, see TextureGraph.interpolate */
+    int32_t blends;      /**< Crossfades of key images into the image of an interpolated
+                          *   graph recorded */
     int32_t reads;       /**< Readbacks delivered, previews included */
     int32_t previews;    /**< Nodes with a TextureNodePreview */
 });

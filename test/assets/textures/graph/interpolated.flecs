@@ -1,0 +1,53 @@
+// Two quads whose emission samples interpolated texture graphs of the world time at 2 updates
+// per second, framed by a camera over a black clear: hdr holds the time twice plus a half in
+// every channel on the plane, color a quarter of the time in GraphColor on the sphere. Tests
+// change the graphs or take the images off the quads, so no draw samples them.
+
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+graph_interpolated {
+  camera {
+    Position: {0, 0, 4}
+    Camera: {fov: 60}
+  }
+
+  view {
+    View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+  }
+
+  hdr {
+    time { nodes.Time: {scale: 2, offset: 0.5} }
+    splat { nodes.Splat: {in: time} }
+    Graph: {output: splat, width: 8, format: GraphHdr, rate: 2, interpolate: true}
+  }
+
+  color {
+    time { nodes.Time: {scale: 0.25, offset: 0} }
+    splat { nodes.Splat: {in: time} }
+    Graph: {output: splat, width: 8, format: GraphColor, domain: DomainSphere, rate: 2,
+      interpolate: true}
+  }
+
+  hdr_quad {
+    Position: {-1.5, 0, 0}
+    Quad: {2, 2}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 1, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {emissive: hdr}
+  }
+
+  color_quad {
+    Position: {1.5, 0, 0}
+    Quad: {2, 2}
+    Rgb: {0, 0, 0}
+    PbrMaterial: {metallic: 1, roughness: 1}
+    Emissive: {strength: 1, color: {255, 255, 255}}
+    PbrTextures: {emissive: color}
+  }
+}

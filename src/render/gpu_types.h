@@ -1148,6 +1148,7 @@ typedef struct box_gpu_t {
     int32_t texture_graph_count;    /**< Texture graphs alive */
     int32_t texture_graph_programs; /**< Texture graph programs alive */
     uint64_t texture_graph_pool_bytes; /**< Bytes of the pooled intermediates */
+    uint64_t texture_graph_key_bytes; /**< Bytes of the key images of interpolated graphs */
     uint64_t texture_graph_cached_bytes; /**< Bytes of the cached texture graph values */
     int32_t texture_graph_cached;   /**< Cached texture graph values */
     bool lost;                      /**< The device was lost, the ring recreates it */
