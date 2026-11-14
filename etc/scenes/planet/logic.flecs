@@ -157,6 +157,9 @@ state {
       else if n == "storms" { state.gas.storms = v }
     } else if g == "rings" {
       if n == "size" { state.rings.size = v }
+      else if n == "inner" { state.rings.inner = v }
+      else if n == "ringlets" { state.rings.ringlets = v }
+      else if n == "gaps" { state.rings.gaps = v }
       else if n == "opacity" { state.rings.opacity = v }
     }
   }

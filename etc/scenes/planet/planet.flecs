@@ -165,8 +165,11 @@ planets {
   // the tint of the colors of the bands, warm for a hot giant and blue for a cold one
   struct PlanetGas(bands: f32, turbulence: f32, drift: f32, storms: f32, tint: Col)
 
-  // Rings: their outer radius in planet radii, opacity and color
-  struct PlanetRings(enabled: bool, size: f32, opacity: f32, color: Col)
+  // Rings: their outer radius and inner edge in planet radii, the contrast of the ringlets and
+  // the broad bands (0 for an even density), the depth of the gaps (0 none, 1 clear), opacity
+  // and color
+  struct PlanetRings(
+    enabled: bool, size: f32, inner: f32, ringlets: f32, gaps: f32, opacity: f32, color: Col)
 
   // Presets of the kinds (0 rock, 1 desert, 2 ice, 3 lava, 4 gas giant, 5 garden) for a seed
   fn seed_of(seed: i32) -> i32 { seed < 0 ? 0 - seed : seed }
@@ -279,10 +282,12 @@ planets {
     const sd: i32 = seed_of(seed)
     const dust: Col = mixc({214, 204, 184}, {196, 170, 140}, h01(sd, 1))
     const ice: Col = mixc(gas_tone(sd, 2, gas_white()), {255, 255, 255}, 0.4)
-    {enabled: kind == 4, size: 2.3, opacity: 1, color: mixc(dust, ice, kind == 4 ? 0.35 : 0)}
+    {
+      enabled: kind == 4, size: 2.3, inner: 1.22 + h01(sd, 5) * 0.2,
+      ringlets: 0.5 + h01(sd, 6) * 0.35, gaps: 0.75 + h01(sd, 7) * 0.25, opacity: 1,
+      color: mixc(dust, ice, kind == 4 ? 0.35 : 0)
+    }
   }
-
-  ring_tex { Path: {path: "etc/scenes/planet/assets/rings.png"} }
 
   // A planet whose maps are texture graphs on the sphere domain, from its kind (the palettes and
   // whether it is a rocky planet or a gas giant), seed, detail and parameters, which default to a
@@ -297,7 +302,8 @@ planets {
   // ground of the kind by altitude, covered by the vegetation of the biome table (lut, by
   // temperature and moisture), rock on steep ground, sand at the coast and snow where it is
   // cold; the sea is tinted by depth and freezes where it is cold. The clouds (cld) and the
-  // bands of a gas giant are animated.
+  // bands of a gas giant are animated. The rings (rtex) are a profile of the distance from the
+  // centre of their quads on the plane domain.
   //
   // The atmosphere is lit by the DirectionalLight sun, or by the first one of the scene at 0.
   template Planet {
@@ -434,6 +440,127 @@ planets {
     const st0: Col = mixc(g3, {196, 84, 56}, 0.65)
     const st1: Col = mixc(g2, {250, 246, 236}, 0.7)
     const ringc: Col = rings.color
+
+    // Rings: the distance from the centre of the quads (r_r, 0.5 at the outer edge) and its
+    // fraction from the inner edge to the outer (r_t). Fine ringlets of a noise of r_r, its
+    // finest octave about 3 texels wide; broad bands of a noise of r_t; a base profile of a
+    // faint inner ring, a dense middle one and a fainter outer one; a broad gap and a narrow
+    // one, all placed by the seed
+    const rw: i32 = detail > 1 ? 2048 : (detail > 0 ? 1024 : 512)
+    const r_oct: i32 = detail > 1 ? 5 : (detail > 0 ? 4 : 3)
+    const r_in: f32 = clamp(rings.inner / (2 * max(rings.size, 0.01)), 0, 0.48)
+    const r_lc: f32 = max(rings.ringlets, 0)
+    const r_gap: f32 = clamp(rings.gaps, 0, 1)
+    const r_cb: f32 = 0.16 + h01(sd, 8) * 0.14
+    const r_g1: f32 = 0.55 + h01(sd, 9) * 0.15
+    const r_g2: f32 = 0.84 + h01(sd, 10) * 0.08
+
+    // The rings: albedo and emissive of both quads, the color about white (the quads tint it
+    // by rings.color), dusty to icy, and the density in alpha
+    rtex {
+      r_uv { nodes.Coords: {} }
+      r_c { nodes.Subtract: {a: r_uv, b_value: {0.5, 0.5, 0, 0}} }
+      r_r { nodes.Length: {input: r_c} }
+      r_t { nodes.Remap: {input: r_r, from_min: r_in, from_max: 0.5, to_min: 0, to_max: 1} }
+
+      // Edges: nothing inside the inner edge, so the planet shows through
+      r_e0 {
+        nodes.Smoothstep: {input: r_t, edge0_value: {0, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}}
+      }
+      r_e1 {
+        nodes.Smoothstep: {input: r_t, edge0_value: {1, 0, 0, 0}, edge1_value: {0.97, 0, 0, 0}}
+      }
+      r_edge { nodes.Multiply: {a: r_e0, b: r_e1} }
+
+      // Base profile
+      r_base {
+        nodes.Curve: {input: r_t, curve: {keys: [
+          {0, 0.12}, {r_cb, 0.26}, {r_cb + 0.04, 0.82}, {r_g1 - 0.08, 0.95}, {r_g1 + 0.08, 0.66},
+          {1, 0.42}
+        ]}}
+      }
+
+      // Ringlets
+      r_lp { nodes.Combine: {r: r_r, g_value: v1 * 7 + 0.3, b_value: v3 * 7 + 0.3, a_value: 1} }
+      r_ln {
+        nodes.Noise: {
+          coords: r_lp, frequency: 40, octaves: r_oct, gain: 0.7, seed: sd * 16 + 11
+        }
+      }
+      r_lk {
+        nodes.Remap: {
+          input: r_ln, from_min: 0.36, from_max: 0.64, to_min: 1 - r_lc, to_max: 1 + r_lc * 0.3,
+          clamp: true
+        }
+      }
+
+      // Broad bands
+      r_bp { nodes.Combine: {r: r_t, g_value: v2 * 7 + 0.6, b_value: v4 * 7 + 0.6, a_value: 1} }
+      r_bn { nodes.Noise: {coords: r_bp, frequency: 7, octaves: 2, seed: sd * 16 + 12} }
+      r_bk {
+        nodes.Remap: {
+          input: r_bn, from_min: 0.3, from_max: 0.7, to_min: 1 - r_lc * 0.6, to_max: 1,
+          clamp: true
+        }
+      }
+
+      // Gaps: 0 at their middle, mixed in by the gap amount
+      r_g1d { nodes.Subtract: {a: r_t, b_value: {r_g1, 0, 0, 0}} }
+      r_g1a { nodes.Abs: {input: r_g1d} }
+      r_g1s {
+        nodes.Smoothstep: {
+          input: r_g1a, edge0_value: {0.036, 0, 0, 0}, edge1_value: {0.05, 0, 0, 0}
+        }
+      }
+      r_g1k {
+        nodes.Mix: {a_value: {1, 1, 1, 1}, b: r_g1s, factor_value: {r_gap, r_gap, r_gap, r_gap}}
+      }
+      r_g2d { nodes.Subtract: {a: r_t, b_value: {r_g2, 0, 0, 0}} }
+      r_g2a { nodes.Abs: {input: r_g2d} }
+      r_g2s {
+        nodes.Smoothstep: {
+          input: r_g2a, edge0_value: {0.006, 0, 0, 0}, edge1_value: {0.011, 0, 0, 0}
+        }
+      }
+      r_g2k {
+        nodes.Mix: {a_value: {1, 1, 1, 1}, b: r_g2s, factor_value: {r_gap, r_gap, r_gap, r_gap}}
+      }
+
+      // Density
+      r_d0 { nodes.Multiply: {a: r_base, b: r_lk} }
+      r_d1 { nodes.Multiply: {a: r_d0, b: r_bk} }
+      r_d2 { nodes.Multiply: {a: r_d1, b: r_g1k} }
+      r_d3 { nodes.Multiply: {a: r_d2, b: r_g2k} }
+      r_d4 { nodes.Multiply: {a: r_d3, b: r_edge} }
+      r_d { nodes.Clamp: {input: r_d4, min_value: {0, 0, 0, 0}, max_value: {1, 1, 1, 1}} }
+
+      // Color: dusty inside and in the dark bands, icy outside and in the bright ones
+      r_c0 { nodes.Multiply: {a: r_t, b_value: {0.5, 0, 0, 0}} }
+      r_c1 { nodes.Remap: {input: r_bn, from_min: 0, from_max: 1, to_min: -0.4, to_max: 0.4} }
+      r_c2 { nodes.Remap: {input: r_ln, from_min: 0, from_max: 1, to_min: -0.2, to_max: 0.2} }
+      r_c3 { nodes.Add: {a: r_c0, b: r_c1} }
+      r_ci { nodes.Add: {a: r_c3, b: r_c2} }
+      r_col {
+        nodes.Ramp: {input: r_ci, keys: [
+          {0, {150, 126, 100}}
+          {0.35, {206, 186, 158}}
+          {0.7, {244, 236, 222}}
+          {1, {232, 240, 255}}
+        ]}
+      }
+      // Brighter where denser, so the ringlets show where the ring is opaque
+      r_lum {
+        nodes.Remap: {
+          input: r_d4, from_min: 0, from_max: 1.2, to_min: 0.5, to_max: 1.15, clamp: true
+        }
+      }
+      r_lit { nodes.Multiply: {a: r_col, b: r_lum} }
+      r_a { nodes.Splat: {in: r_d} }
+      r_alpha { nodes.Multiply: {a: r_a, b_value: {0, 0, 0, 1}} }
+      r_rgb { nodes.Multiply: {a: r_lit, b_value: {1, 1, 1, 0}} }
+      r_out { nodes.Add: {a: r_rgb, b: r_alpha} }
+      Graph: {output: r_out, width: rw, height: rw}
+    }
 
     lut {}
     geo {}
@@ -1035,6 +1162,7 @@ planets {
     const lava_ready: bool = lava_on && glow[box.texture.Status].revision > 0
     const city_ready: bool = city_on && town[box.texture.Status].revision > 0
     const cloud_ready: bool = surf_on && cld[box.texture.Status].revision > 0
+    const ring_ready: bool = rtex[box.texture.Status].revision > 0
 
     // The axis has a pose, so the atmosphere is centered on the instance also when it has no
     // Position of its own, and its meshes are those of the atmosphere for Scene.planet_light
@@ -1113,7 +1241,7 @@ planets {
         }
       }
 
-      if rings.enabled {
+      if rings.enabled && ring_ready {
         ring {
           Position: {0, 0, 0}
           Rotation: {0 - PI / 2, 0, 0}
@@ -1121,7 +1249,7 @@ planets {
           Rgb: {ringc.r * 0.6, ringc.g * 0.6, ringc.b * 0.6}
           PbrMaterial: {roughness: 1}
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
-          PbrTextures: {albedo: planets.ring_tex, emissive: planets.ring_tex}
+          PbrTextures: {albedo: rtex, emissive: rtex}
           BlendMode: AlphaBlend
           if rings.opacity < 1 {
             Opacity: {rings.opacity}
@@ -1136,7 +1264,7 @@ planets {
           Rgb: {ringc.r * 0.6, ringc.g * 0.6, ringc.b * 0.6}
           PbrMaterial: {roughness: 1}
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
-          PbrTextures: {albedo: planets.ring_tex, emissive: planets.ring_tex}
+          PbrTextures: {albedo: rtex, emissive: rtex}
           BlendMode: AlphaBlend
           if rings.opacity < 1 {
             Opacity: {rings.opacity}

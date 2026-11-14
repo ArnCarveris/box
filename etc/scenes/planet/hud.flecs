@@ -432,6 +432,18 @@ hud {
                   label: "Outer radius", width: 236, min: 1.2, max: 4, step: 0.05,
                   value: state.rings.size, decimals: 2, unit: " r"
                 )
+                Slider inner(
+                  label: "Inner edge", width: 236, min: 0, max: 3, step: 0.05,
+                  value: state.rings.inner, decimals: 2, unit: " r"
+                )
+                Slider ringlets(
+                  label: "Ringlet contrast", width: 236, min: 0, max: 1, step: 0.05,
+                  value: state.rings.ringlets, decimals: 2
+                )
+                Slider gaps(
+                  label: "Gaps", width: 236, min: 0, max: 1, step: 0.05,
+                  value: state.rings.gaps, decimals: 2
+                )
                 Slider opacity(
                   label: "Opacity", width: 236, min: 0, max: 1, step: 0.05,
                   value: state.rings.opacity, decimals: 2
