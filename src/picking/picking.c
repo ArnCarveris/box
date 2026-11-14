@@ -353,6 +353,42 @@ static uint64_t box_pick_sent_id(
     return last.id;
 }
 
+/** Move the cursor of flecs.script.input onto a press before it is sent, when the last event
+ * picking delivered was at another target or local point.
+ *
+ * flecs.script.input computes the delta of an event with a zero delta from the local point of
+ * the previous event, and the press fires on.drag. A press must start a drag with a zero delta,
+ * so the previous event has to be a move of the same target at the same local point.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param press The press, aimed at its target in its local space
+ */
+static void box_pick_align(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const EcsScriptMouseEvent *press)
+{
+    EcsScriptMouseEvent move = *press;
+    bool aligned = st->has_event && st->event.target == press->target &&
+        st->event.local_x == press->local_x && st->event.local_y == press->local_y;
+    if (st->buttons || aligned) {
+        goto done;
+    }
+
+    move.button = 0;
+    move.buttons = st->buttons;
+    move.delta_x = move.delta_y = 0;
+    if (st->has_cursor) {
+        move.delta_x = press->screen_x - st->cursor[0];
+        move.delta_y = press->screen_y - st->cursor[1];
+    }
+
+    ecs_script_mouse_event(world, &move);
+done:
+    return;
+}
+
 /** Send a pointer event along the path of its pick through flecs.script.input.
  *
  * @param world The world
@@ -380,6 +416,10 @@ static void box_pick_send(
     evt.target = pick->target ? pick->target : st->screen;
     box_pick_local(world, evt.target, pick, &evt);
     st->sending = pick;
+    if (press) {
+        box_pick_align(world, st, &evt);
+    }
+
     st->event = evt;
     st->event.id = 0;
     st->has_event = true;

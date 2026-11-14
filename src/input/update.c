@@ -413,6 +413,9 @@ static void box_input_surface_remember(
 /** Give the input to a surface that gains the focus: its last reported size and, unless a
  * synthetic cursor is pinned, its last cursor position, from which the next move measures.
  *
+ * The position is emitted as a move, so picking and the script events learn where the cursor
+ * is before the click that gave the focus instead of measuring from before the focus loss.
+ *
  * @param dev The device state
  * @param in The Input singleton
  * @param surface The surface
@@ -434,6 +437,7 @@ static void box_input_surface_take(
         in->mouse.position[0] = entry->position[0];
         in->mouse.position[1] = entry->position[1];
         dev->has_position = true;
+        box_input_emit_mouse(dev, in, 0);
     }
 }
 

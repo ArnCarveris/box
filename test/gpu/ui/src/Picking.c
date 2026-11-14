@@ -2416,6 +2416,210 @@ void Picking_focus_click_without_move(void) {
     ecs_fini(world);
 }
 
+void Picking_refocus_press_drag_zero_delta(void) {
+    // input_fixes/refocus_drag
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut drags: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  mut dy: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = e.delta_x\n"
+        "      dy = e.delta_y\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "camera {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "ground {\n"
+        "  Position: {0, 0, -5}\n"
+        "  box.geometry.Box: {200, 200, 1}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n"
+        "views {\n"
+        "  view { View: {camera: camera} }\n"
+        "}\n"
+        "surface {\n"
+        "  Surface: {width: 1280, height: 720, view_root: views}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t drags; float dx, dy; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t ground = ecs_lookup(world, "ground");
+    ecs_entity_t surface = ecs_lookup(world, "surface");
+    ecs_progress(world, 0);
+
+    /* The cursor is over one point of the ground */
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 200, 200 }, .surface = surface });
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, ground, mut))->drags, 0);
+
+    /* The window loses the focus and the cursor moves elsewhere */
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 0, .surface = surface });
+    ecs_progress(world, 0);
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 900, 500 }, .surface = surface });
+    ecs_progress(world, 0);
+
+    /* The window gains the focus as glfw reports it: the cursor position, then the focus */
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 640, 360 }, .surface = surface });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface });
+    ecs_progress(world, 0);
+
+    /* The press that starts the drag has no delta */
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyDown, .key = KeyMouseLeft, .surface = surface });
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, ground, mut);
+    test_int(m->drags, 1);
+    test_flt(m->dx, 0);
+    test_flt(m->dy, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+
+    /* The next moves give the distance the cursor moved */
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 650, 360 }, .surface = surface });
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, ground, mut);
+    test_int(m->drags, 2);
+    test_flt(m->dx, 10);
+    test_flt(m->dy, 0);
+    in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 10);
+    test_flt(in->mouse.delta[1], 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 650, 380 }, .surface = surface });
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, ground, mut);
+    test_int(m->drags, 3);
+    test_flt(m->dx, 0);
+    test_flt(m->dy, 20);
+    in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 20);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyUp, .key = KeyMouseLeft, .surface = surface });
+    ecs_progress(world, 0);
+
+    ecs_fini(world);
+}
+
+void Picking_press_new_target_drag_zero_delta(void) {
+    // input_fixes/refocus_drag
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut drags: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  mut dy: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = e.delta_x\n"
+        "      dy = e.delta_y\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "camera {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "ground {\n"
+        "  Position: {0, 1000, -5}\n"
+        "  box.geometry.Box: {200, 200, 1}\n"
+        "  Interactive\n"
+        "  Probe: {}\n"
+        "}\n"
+        "views {\n"
+        "  view { View: {camera: camera} }\n"
+        "}\n"
+        "surface {\n"
+        "  Surface: {width: 1280, height: 720, view_root: views}\n"
+        "}\n" }) != 0);
+
+    typedef struct { int32_t drags; float dx, dy; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t ground = ecs_lookup(world, "ground");
+    ecs_entity_t surface = ecs_lookup(world, "surface");
+    ecs_progress(world, 0);
+
+    /* The cursor is over empty space, so the last event goes to the screen in window points */
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputFocus, .code = 1, .surface = surface });
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 640, 360 }, .surface = surface });
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, ground, mut))->drags, 0);
+
+    /* The ground moves under the cursor after picking ran, so the press is the first event
+     * that picks it */
+    ecs_set(world, ground, Position, {0, 0, -5});
+    ecs_progress(world, 0);
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyDown, .key = KeyMouseLeft, .surface = surface });
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, ground, mut);
+    test_int(m->drags, 1);
+    test_flt(m->dx, 0);
+    test_flt(m->dy, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputMove, .value = { 650, 360 }, .surface = surface });
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, ground, mut);
+    test_int(m->drags, 2);
+    test_flt(m->dx, 10);
+    test_flt(m->dy, 0);
+
+    box_input_platform_push(world, &(InputEvent){
+        .kind = InputKeyUp, .key = KeyMouseLeft, .surface = surface });
+    ecs_progress(world, 0);
+
+    ecs_fini(world);
+}
+
 void Picking_image_slice_surface_corner(void) {
     // ui/picking
     ecs_world_t *world = ecs_init();

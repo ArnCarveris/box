@@ -140,6 +140,8 @@
                     "capture_cleared_when_deleted",
                     "focused_surface_views",
                     "focus_click_without_move",
+                    "refocus_press_drag_zero_delta",
+                    "press_new_target_drag_zero_delta",
                     "image_slice_surface_corner"
                 ]
             },
