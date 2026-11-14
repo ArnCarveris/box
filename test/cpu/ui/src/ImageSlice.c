@@ -564,7 +564,7 @@ void ImageSlice_record_lifecycle(void) {
     ecs_set(world, view, View, {.camera = camera});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     test_assert(system != 0);
     box_render_draws_t *d = ecs_system_get(world, system)->ctx;
     ecs_entity_t panel = ecs_lookup(world, "panel");
@@ -649,7 +649,7 @@ void ImageSlice_record_surface_texture(void) {
 
     /* The record in the clip buffer follows a resize of the surface without a change of the
      * panel: 96 pixels make the insets a sixth of the image */
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     test_assert(system != 0);
     box_render_draws_t *d = ecs_system_get(world, system)->ctx;
     slice_near(slice_record_of(world, d, panel)->u[1], 1.0f / 3.0f);

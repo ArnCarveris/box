@@ -1649,7 +1649,7 @@ static void box_particles_free(
 static box_render_particles_t* box_particles_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractParticles");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Particles");
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
 
     return sys ? sys->ctx : NULL;
@@ -1668,7 +1668,7 @@ void box_render_particles_init(
     box_particle_rows_init(&s->curves);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractParticles" }),
+        .entity = ecs_entity(world, { .name = "extract.Particles" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractParticles,
         .ctx = s,
@@ -1682,7 +1682,7 @@ void box_render_particles_import(
     box_render_particles_t *s = box_particles_state(world);
     if (s && !s->emitters) {
         s->emitters = ecs_query(world, {
-            .entity = ecs_entity(world, { .name = "RenderParticleEmitters" }),
+            .entity = ecs_entity(world, { .name = "ParticleEmitters" }),
             .terms = {
                 { .id = ecs_id(ParticleEmitter), .inout = EcsIn },
                 { .id = ecs_id(WorldTransform), .inout = EcsIn },
@@ -1720,7 +1720,7 @@ void box_render_particles_import(
             .cache_kind = EcsQueryCacheAuto
         });
         s->burst_query = ecs_query(world, {
-            .entity = ecs_entity(world, { .name = "RenderParticleBursts" }),
+            .entity = ecs_entity(world, { .name = "ParticleBursts" }),
             .terms = {
                 { .id = ecs_id(ParticleBurst), .inout = EcsIn },
                 {

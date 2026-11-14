@@ -60,7 +60,7 @@ void box_render_scenes_init(
     ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, RenderScenes, { .ctor = flecs_default_ctor });
     ecs_query_t *q = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderSceneMembers" }),
+        .entity = ecs_entity(world, { .name = "SceneMembers" }),
         .terms = {{
             .id = ecs_id(Scene),
             .src.id = EcsSelf | EcsUp,

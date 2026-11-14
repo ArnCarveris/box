@@ -364,14 +364,14 @@ static void bench_tr_run(
     bench_counter(bench, "resolver_active", (double)box_render_transition_test_active(world));
 
     ecs_measure_system_time(world, true);
-    double extract = bench_tr_system_time(world, "box.render.RenderExtractTransitions");
-    double slots = bench_tr_system_time(world, "box.render.RenderExtractTransitionSlots");
+    double extract = bench_tr_system_time(world, "box.render.extract.Transitions");
+    double slots = bench_tr_system_time(world, "box.render.extract.TransitionSlots");
     for (i = 0; i < BENCH_TR_TIMED; i ++) {
         bench_tr_frame(b);
     }
 
-    extract = bench_tr_system_time(world, "box.render.RenderExtractTransitions") - extract;
-    slots = bench_tr_system_time(world, "box.render.RenderExtractTransitionSlots") - slots;
+    extract = bench_tr_system_time(world, "box.render.extract.Transitions") - extract;
+    slots = bench_tr_system_time(world, "box.render.extract.TransitionSlots") - slots;
     bench_counter(bench, "transitions_ms", (extract + slots) * 1000.0 / BENCH_TR_TIMED);
 
     box_render_sync(world);

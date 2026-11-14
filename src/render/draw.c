@@ -1488,7 +1488,7 @@ static void box_draws_queries(
     box_render_draws_t *d)
 {
     d->dynamic_transform = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderDynamicTransforms" }),
+        .entity = ecs_entity(world, { .name = "dynamic.Transforms" }),
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
@@ -1514,7 +1514,7 @@ static void box_draws_queries(
     });
 
     d->dynamic_material = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderDynamicMaterials" }),
+        .entity = ecs_entity(world, { .name = "dynamic.Materials" }),
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsIn },
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
@@ -1544,7 +1544,7 @@ static void box_draws_queries(
     });
 
     d->extended = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtendedMaterials" }),
+        .entity = ecs_entity(world, { .name = "ExtendedMaterials" }),
         .terms = {
             { .id = ecs_id(ShapeMesh), .inout = EcsInOutNone },
             {
@@ -1662,7 +1662,7 @@ void box_render_draws_init(
     box_draws_transform_observers(world, d);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractDraws" }),
+        .entity = ecs_entity(world, { .name = "extract.Draws" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractDraws,
         .ctx = d,
@@ -1673,7 +1673,7 @@ void box_render_draws_init(
 box_render_draws_t* box_draws_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
@@ -1761,7 +1761,7 @@ void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
     ecs_os_memset_t(stats, 0, box_render_draws_stats_t);
     if (s && s->ctx) {

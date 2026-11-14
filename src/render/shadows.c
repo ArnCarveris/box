@@ -447,7 +447,7 @@ uint32_t box_render_shadow_rendered(
     const ecs_world_t *world,
     ecs_entity_t view)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractShadows");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Shadows");
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
     const box_shadows_t *state = sys ? sys->ctx : NULL;
     const box_shadows_history_t *h = state
@@ -463,7 +463,7 @@ void box_render_shadows_init(
     box_shadows_t *state = ecs_os_calloc_t(box_shadows_t);
     ecs_map_init(&state->views, NULL);
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractShadows" }),
+        .entity = ecs_entity(world, { .name = "extract.Shadows" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractShadows,
         .ctx = state,

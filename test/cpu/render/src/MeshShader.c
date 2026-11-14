@@ -28,7 +28,7 @@ void MeshShader_plain_mesh_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -61,7 +61,7 @@ void MeshShader_sheen_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -99,7 +99,7 @@ void MeshShader_clear_coat_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -137,7 +137,7 @@ void MeshShader_specular_anisotropy_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -175,7 +175,7 @@ void MeshShader_diffuse_transmission_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -213,7 +213,7 @@ void MeshShader_sheen_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.clear_coat = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -243,7 +243,7 @@ void MeshShader_clear_coat_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -273,7 +273,7 @@ void MeshShader_specular_anisotropy_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -303,7 +303,7 @@ void MeshShader_diffuse_transmission_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -333,7 +333,7 @@ void MeshShader_one_enabled_feature_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.clear_coat = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -364,7 +364,7 @@ void MeshShader_no_scene_features_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Box, {1, 1, 1});
@@ -401,7 +401,7 @@ void MeshShader_alpha_cutoff_off_draws_opaque(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -434,7 +434,7 @@ void MeshShader_blend_modes_off_draw_opaque(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -475,7 +475,7 @@ void MeshShader_transmission_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -509,7 +509,7 @@ void MeshShader_transmission_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -542,7 +542,7 @@ void MeshShader_triplanar_mapping_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -574,7 +574,7 @@ void MeshShader_triplanar_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -604,7 +604,7 @@ void MeshShader_planar_mapping_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -636,7 +636,7 @@ void MeshShader_mapping_blend_change_moves_shape(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -687,7 +687,7 @@ void MeshShader_frame_mapping_batch(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -753,7 +753,7 @@ void MeshShader_add_sheen_moves_to_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -792,7 +792,7 @@ void MeshShader_remove_clear_coat_moves_to_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -832,7 +832,7 @@ void MeshShader_inherited_sheen_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -865,7 +865,7 @@ void MeshShader_prefab_anisotropy_change_moves_instances(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -924,7 +924,7 @@ void MeshShader_scene_features_change_moves_shapes(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.clear_coat = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -983,7 +983,7 @@ void MeshShader_scene_root_features(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_entity_t scene = ecs_new(world);
     ecs_set(world, scene, Scene, {.sheen = true});
     ecs_entity_t inside = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -1170,7 +1170,7 @@ void MeshShader_texture_blend_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -1214,7 +1214,7 @@ void MeshShader_texture_blend_triplanar_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -1250,7 +1250,7 @@ void MeshShader_fresnel_draws_with_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.fresnel = true});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Position, {0, 0, 0});
@@ -1288,7 +1288,7 @@ void MeshShader_fresnel_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
         .transmission = true, .texture_blend = true, .triplanar = true, .sheen = true,
         .clear_coat = true, .anisotropy = true, .diffuse_transmission = true});
@@ -1320,7 +1320,7 @@ void MeshShader_add_fresnel_moves_to_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true, .fresnel = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -1365,7 +1365,7 @@ void MeshShader_water_draws_transmissive_extended(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.water = true, .texture_blend = true});
     ecs_entity_t foam = ecs_new(world);
     ecs_entity_t shape = ecs_new(world);
@@ -1418,7 +1418,7 @@ void MeshShader_water_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true, .transmission = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -1516,7 +1516,7 @@ void MeshShader_texture_scroll_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.texture_scroll = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -1557,7 +1557,7 @@ void MeshShader_texture_scroll_off_draws_with_mesh_shader(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.sheen = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -1719,7 +1719,7 @@ void MeshShader_distortion_draws_transmissive(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
@@ -1815,7 +1815,7 @@ void MeshShader_distortion_feature_costs_nothing(void) {
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     ecs_singleton_set(world, Scene, {.distortion = true});
     test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_DISTORTION);
     ecs_entity_t shape = ecs_new(world);

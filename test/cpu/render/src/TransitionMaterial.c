@@ -1384,7 +1384,7 @@ void TransitionMaterial_transitions_get_no_lookup(void) {
     test_assert(t != NULL);
     test_assert(t->state != NULL);
     test_assert(box_render_transitions_get(world) == t->state);
-    ecs_entity_t q = ecs_lookup(world, "box.render.RenderTransitions");
+    ecs_entity_t q = ecs_lookup(world, "box.render.Transitions");
     test_assert(q != ecs_id(RenderTransitionState));
     test_assert(ecs_query_get(world, q) != NULL);
     tr_fini(world, null);

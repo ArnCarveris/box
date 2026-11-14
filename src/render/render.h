@@ -2378,7 +2378,7 @@ extern ECS_TAG_DECLARE(TransitionBoxShadow);
 /** Singleton that holds the state of the transition extract, set by
  * box_render_transitions_init, so box_render_transitions_get reads it without a lookup */
 typedef struct RenderTransitionState {
-    box_render_transitions_t *state; /**< The state, owned by RenderExtractTransitions */
+    box_render_transitions_t *state; /**< The state, owned by extract.Transitions */
 } RenderTransitionState;
 
 /** Component id of RenderTransitionState */

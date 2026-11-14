@@ -26,7 +26,7 @@
 static ecs_vec_t* tr_regions(
     ecs_world_t *world)
 {
-    ecs_entity_t lights = ecs_lookup(world, "box.render.RenderExtractLights");
+    ecs_entity_t lights = ecs_lookup(world, "box.render.extract.Lights");
     test_assert(lights != 0);
     ecs_enable(world, lights, false);
     box_render_draws_shadow_record(world, true);

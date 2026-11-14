@@ -46,7 +46,7 @@ static uint32_t pipeline_of(
     ecs_entity_t e)
 {
     box_render_draws_t *d = ecs_system_get(world,
-        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+        ecs_lookup(world, "box.render.extract.Draws"))->ctx;
     const DrawSlot *slot = ecs_get(world, e, DrawSlot);
     test_assert(slot != NULL && slot->batch >= 0);
 

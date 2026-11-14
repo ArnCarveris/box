@@ -1130,7 +1130,7 @@ void LayoutFloat_hide_clipped_not_drawn(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     test_assert(system != 0);
     box_render_draws_t *d = ecs_system_get(world, system)->ctx;
     ecs_entity_t list = ecs_lookup(world, "scroll.anchor.list");

@@ -728,7 +728,7 @@ void Transition_no_transition_no_records(void) {
     test_int(ecs_vec_count(&null->last.transitions), 0);
     test_int(box_render_transition_test_node(world, e), 0);
 
-    ecs_entity_t q = ecs_lookup(world, "box.render.RenderTransitions");
+    ecs_entity_t q = ecs_lookup(world, "box.render.Transitions");
     test_assert(q != 0);
     const ecs_query_t *query = ecs_query_get(world, q);
     test_assert(query != NULL);
@@ -1873,12 +1873,12 @@ void Transition_idle_no_work(void) {
         test_assert(!ecs_has_id(world, shapes[i], TransitionOpacity));
     }
 
-    ecs_entity_t q = ecs_lookup(world, "box.render.RenderTransitions");
+    ecs_entity_t q = ecs_lookup(world, "box.render.Transitions");
     test_assert(q != 0);
     test_int(ecs_query_count(ecs_query_get(world, q)).tables, 0);
 
-    ecs_entity_t extract = ecs_lookup(world, "box.render.RenderExtractTransitions");
-    ecs_entity_t slots = ecs_lookup(world, "box.render.RenderExtractTransitionSlots");
+    ecs_entity_t extract = ecs_lookup(world, "box.render.extract.Transitions");
+    ecs_entity_t slots = ecs_lookup(world, "box.render.extract.TransitionSlots");
     test_assert(extract != 0);
     test_assert(slots != 0);
     box_render_transition_table_t t;

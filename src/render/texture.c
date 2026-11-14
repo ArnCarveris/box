@@ -737,7 +737,7 @@ void box_render_textures_init(
     ecs_map_init(targets, NULL);
     ecs_singleton_set(world, RenderTargetTextures, { .targets = targets });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractTextures" }),
+        .entity = ecs_entity(world, { .name = "extract.Textures" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractTextures,
         .ctx = state,

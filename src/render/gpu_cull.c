@@ -1794,7 +1794,7 @@ void box_render_cull_status_init(
     ecs_vec_t *statuses = ecs_os_calloc_t(ecs_vec_t);
     ecs_vec_init_t(NULL, statuses, box_render_cull_status_t, 0);
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderCullStatus" }),
+        .entity = ecs_entity(world, { .name = "CullStatuses" }),
         .phase = EcsOnLoad,
         .run = BoxRenderCullStatus,
         .ctx = statuses,

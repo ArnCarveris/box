@@ -415,12 +415,12 @@ void BoxRenderImport(
         .move = box_render_ring_move
     });
 
-    RenderExtract = ecs_entity(world, { .name = "RenderExtract" });
+    RenderExtract = ecs_entity(world, { .name = "Extract" });
     ecs_add_id(world, RenderExtract, EcsPhase);
     ecs_add_pair(world, RenderExtract, EcsDependsOn, EcsOnStore);
     ecs_id(RenderExtract) = RenderExtract;
 
-    RenderSubmit = ecs_entity(world, { .name = "RenderSubmit" });
+    RenderSubmit = ecs_entity(world, { .name = "Submit" });
     ecs_add_id(world, RenderSubmit, EcsPhase);
     ecs_add_pair(world, RenderSubmit, EcsDependsOn, RenderExtract);
     ecs_id(RenderSubmit) = RenderSubmit;
@@ -430,15 +430,20 @@ void BoxRenderImport(
     ecs_singleton_set(world, RenderStatus, {0});
     ecs_atfini(world, box_render_fini, NULL);
 
+    ecs_entity_t extract = ecs_entity(world, { .name = "extract" });
+    ecs_add_id(world, extract, EcsModule);
+    ecs_entity_t dynamic = ecs_entity(world, { .name = "dynamic" });
+    ecs_add_id(world, dynamic, EcsModule);
+
     ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "RenderSettingsOnSet" }),
+        .entity = ecs_entity(world, { .name = "SettingsOnSet" }),
         .query.terms = {{ .id = ecs_id(RenderSettings) }},
         .events = { EcsOnSet },
         .callback = BoxRenderSettingsOnSet
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractViews" }),
+        .entity = ecs_entity(world, { .name = "extract.Views" }),
         .phase = RenderExtract,
         .query.terms = {{ .id = ecs_id(View), .inout = EcsIn }},
         .run = BoxRenderExtractViews
@@ -466,7 +471,7 @@ void BoxRenderImport(
     box_render_atmosphere_environment_init(world);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),
+        .entity = ecs_entity(world, { .name = "SubmitPacket" }),
         .phase = RenderSubmit,
         .run = BoxRenderSubmit
     });

@@ -1894,7 +1894,7 @@ void box_render_draws_page(
     ecs_world_t *world,
     int32_t slots)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
     if (s && s->ctx && slots > 0) {
         box_render_draws_t *d = s->ctx;
@@ -1909,7 +1909,7 @@ void box_render_draws_chunk(
     ecs_world_t *world,
     int32_t instances)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
     if (s && s->ctx && instances > 0) {
         box_render_draws_t *d = s->ctx;

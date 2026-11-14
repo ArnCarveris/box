@@ -350,7 +350,7 @@ void box_render_captures_init(
     ecs_singleton_set(world, RenderCaptures, { .captures = q });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractCaptures" }),
+        .entity = ecs_entity(world, { .name = "extract.Captures" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractCaptures
     });

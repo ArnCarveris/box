@@ -54,7 +54,7 @@ typedef struct box_render_env_t {
 static box_render_env_t* box_env_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractEnvironment");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Environment");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
@@ -320,7 +320,7 @@ void box_render_environment_init(
     ecs_vec_init_t(NULL, &state->gone, ecs_entity_t, 0);
     state->next_handle = BOX_ENV_HANDLE_FIRST;
     state->environments = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderEnvironments" }),
+        .entity = ecs_entity(world, { .name = "Environments" }),
         .terms = {
             { .id = ecs_id(Environment), .inout = EcsIn },
             { .id = ecs_id(EnvironmentStatus), .inout = EcsInOutNone }
@@ -329,7 +329,7 @@ void box_render_environment_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractEnvironment" }),
+        .entity = ecs_entity(world, { .name = "extract.Environment" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractEnvironment,
         .ctx = state,

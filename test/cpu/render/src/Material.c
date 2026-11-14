@@ -500,7 +500,7 @@ static int32_t transmission_slots(
 static box_render_draws_t* transmission_draws(
     ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = ecs_system_get(world, system);
     test_assert(s != NULL && s->ctx != NULL);
 
@@ -1378,7 +1378,7 @@ static const box_render_material_t* mapping_record(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = ecs_system_get(world, system);
     test_assert(s != NULL && s->ctx != NULL);
     box_render_draws_t *d = s->ctx;

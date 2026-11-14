@@ -806,7 +806,7 @@ void box_render_texture_previews_init(
     p->next_ticket = 1;
     ecs_singleton_set(world, RenderTexturePreviews, { .previews = p });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractTexturePreviews" }),
+        .entity = ecs_entity(world, { .name = "extract.TexturePreviews" }),
         .phase = RenderExtract,
         .run = BoxRenderTexturePreviews
     });

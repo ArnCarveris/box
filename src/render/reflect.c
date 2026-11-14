@@ -1620,11 +1620,11 @@ void box_render_reflect_init(
     ecs_map_init(&r->light_map, NULL);
     r->next_buffer = BOX_RENDER_BUFFER_REFLECT_FIRST;
     r->probe_ms = BOX_REFLECT_PROBE_MS;
-    r->bakes = box_reflect_query(world, ecs_id(ReflectionBake), false, "RenderReflectionBakes");
-    r->probes = box_reflect_query(world, ecs_id(ReflectionProbe), true, "RenderReflectionProbes");
+    r->bakes = box_reflect_query(world, ecs_id(ReflectionBake), false, "ReflectionBakes");
+    r->probes = box_reflect_query(world, ecs_id(ReflectionProbe), true, "ReflectionProbes");
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractReflect" }),
+        .entity = ecs_entity(world, { .name = "extract.Reflect" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractReflect,
         .ctx = r,
@@ -1640,7 +1640,7 @@ void box_render_reflect_init(
 static const box_render_reflect_t* box_reflect_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractReflect");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Reflect");
     const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
 
     return sys ? sys->ctx : NULL;

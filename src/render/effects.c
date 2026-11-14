@@ -498,7 +498,7 @@ void box_render_effects_init(
     box_effects_state_t *state = ecs_os_calloc_t(box_effects_state_t);
     ecs_map_init(&state->lut_errors, NULL);
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractEffects" }),
+        .entity = ecs_entity(world, { .name = "extract.Effects" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractEffects,
         .ctx = state,

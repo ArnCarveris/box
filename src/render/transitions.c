@@ -1957,7 +1957,7 @@ void box_render_transitions_init(
     ecs_vec_init_t(NULL, &s->shadow_regions, box_render_shadow_region_t, 0);
     ecs_vec_init_t(NULL, &s->shadow_last, box_render_shadow_region_t, 0);
     s->query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderTransitions" }),
+        .entity = ecs_entity(world, { .name = "Transitions" }),
         .terms = {{
             .id = ecs_id(Transition),
             .src.id = EcsSelf | EcsUp,
@@ -1969,7 +1969,7 @@ void box_render_transitions_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractTransitions" }),
+        .entity = ecs_entity(world, { .name = "extract.Transitions" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractTransitions,
         .ctx = s,
@@ -1986,7 +1986,7 @@ void box_render_transitions_slots_init(
     ecs_assert(s != NULL, ECS_INTERNAL_ERROR, NULL);
     s->draws = box_draws_state(world);
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractTransitionSlots" }),
+        .entity = ecs_entity(world, { .name = "extract.TransitionSlots" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractTransitionSlots,
         .ctx = s

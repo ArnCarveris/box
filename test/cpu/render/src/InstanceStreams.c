@@ -139,7 +139,7 @@ static const box_render_shading_t* shading_of(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = ecs_system_get(world, system);
     const DrawSlot *slot = ecs_get(world, e, DrawSlot);
     test_assert(s != NULL && s->ctx != NULL);
@@ -533,7 +533,7 @@ void InstanceStreams_disabled_delete_frees_slot(void) {
     }
 
     frame(world);
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     box_render_draws_t *d = ecs_system_get(world, system)->ctx;
     const DrawSlot *slot = ecs_get(world, boxes[0], DrawSlot);
     box_draw_batch_t *b = box_draws_batch(d, slot->batch);
@@ -565,7 +565,7 @@ static float slot_x(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = ecs_system_get(world, system);
     const DrawSlot *slot = ecs_get(world, e, DrawSlot);
     test_assert(s != NULL && s->ctx != NULL);
@@ -1124,7 +1124,7 @@ void InstanceStreams_glyph_packed_color(void) {
     frame(world);
     frame(world);
 
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = ecs_system_get(world, system);
     test_assert(s != NULL && s->ctx != NULL);
     const TextSlots *ts = ecs_get(world, text, TextSlots);

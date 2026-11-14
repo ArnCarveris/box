@@ -548,7 +548,7 @@ void box_draws_text_init(
     }
 
     d->dynamic_texts = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderDynamicTexts" }),
+        .entity = ecs_entity(world, { .name = "dynamic.Texts" }),
         .terms = {
             { .id = ecs_id(Text), .inout = EcsInOutNone },
             { .id = ecs_id(TextSlots), .inout = EcsInOutNone },
@@ -558,7 +558,7 @@ void box_draws_text_init(
         .cache_kind = EcsQueryCacheAuto
     });
     d->dynamic_text_materials = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderDynamicTextMaterials" }),
+        .entity = ecs_entity(world, { .name = "dynamic.TextMaterials" }),
         .terms = {
             { .id = ecs_id(Text), .inout = EcsInOutNone },
             { .id = ecs_id(TextSlots), .inout = EcsInOutNone },
@@ -574,7 +574,7 @@ void box_draws_text_init(
         .cache_kind = EcsQueryCacheAuto
     });
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractTextAtlas" }),
+        .entity = ecs_entity(world, { .name = "extract.TextAtlas" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractTextAtlas,
         .ctx = ecs_os_calloc_t(box_draws_atlas_t),

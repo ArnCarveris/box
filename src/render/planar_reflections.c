@@ -324,7 +324,7 @@ void box_render_planar_init(
     ecs_vec_init_t(NULL, &l->planes, box_render_planar_plane_t, 0);
     ecs_vec_init_t(NULL, &l->indices, int32_t, 0);
     l->query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderPlanarReflections" }),
+        .entity = ecs_entity(world, { .name = "PlanarReflections" }),
         .terms = {
             { .id = ecs_id(PlanarReflection), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
@@ -340,7 +340,7 @@ void box_render_planar_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractPlanarReflections" }),
+        .entity = ecs_entity(world, { .name = "extract.PlanarReflections" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractPlanar,
         .ctx = l,

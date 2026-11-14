@@ -86,7 +86,7 @@ static int64_t scatter_bytes(
 static box_render_draws_t* draws_of(
     ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     const ecs_system_t *s = ecs_system_get(world, system);
     test_assert(s != NULL && s->ctx != NULL);
 
@@ -1427,7 +1427,7 @@ void MaterialIds_prefab_from_shared_slot_deferred(void) {
 static ecs_vec_t* regions_of(
     ecs_world_t *world)
 {
-    ecs_entity_t lights = ecs_lookup(world, "box.render.RenderExtractLights");
+    ecs_entity_t lights = ecs_lookup(world, "box.render.extract.Lights");
     test_assert(lights != 0);
     ecs_enable(world, lights, false);
     box_render_draws_shadow_record(world, true);

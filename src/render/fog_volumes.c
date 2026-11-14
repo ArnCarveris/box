@@ -490,7 +490,7 @@ box_render_fog_t* box_render_fog_new(
     ecs_vec_init_t(NULL, &result->fog_over, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &result->fog_over_next, ecs_entity_t, 0);
     result->query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderFogVolumes" }),
+        .entity = ecs_entity(world, { .name = "FogVolumes" }),
         .terms = {
             { .id = ecs_id(FogVolume), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },

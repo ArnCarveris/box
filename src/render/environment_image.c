@@ -54,7 +54,7 @@ typedef struct box_env_image_job_t {
 static box_env_images_t* box_env_images_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractEnvironmentImage");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.EnvironmentImage");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
@@ -355,7 +355,7 @@ void box_render_environment_image_init(
         state);
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractEnvironmentImage" }),
+        .entity = ecs_entity(world, { .name = "extract.EnvironmentImage" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractEnvironmentImage,
         .ctx = state,

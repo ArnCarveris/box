@@ -108,7 +108,7 @@ static float box_atmos_extract_linear(
 static box_render_atmos_t* box_atmos_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractAtmosphere");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Atmosphere");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;
@@ -1231,7 +1231,7 @@ void box_render_atmosphere_init(
     a->next_handle = BOX_ATMOS_HANDLE_FIRST;
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractAtmosphere" }),
+        .entity = ecs_entity(world, { .name = "extract.Atmosphere" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractAtmosphere,
         .ctx = a,
@@ -1243,7 +1243,7 @@ void box_render_atmosphere_views_init(
     ecs_world_t *world)
 {
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractAtmosphereViews" }),
+        .entity = ecs_entity(world, { .name = "extract.AtmosphereViews" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractAtmosphereViews
     });
@@ -1253,7 +1253,7 @@ void box_render_atmosphere_environment_init(
     ecs_world_t *world)
 {
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractAtmosphereEnvironment" }),
+        .entity = ecs_entity(world, { .name = "extract.AtmosphereEnvironment" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractAtmosphereEnvironment
     });
@@ -1265,7 +1265,7 @@ void box_render_atmosphere_import(
     box_render_atmos_t *a = box_atmos_state(world);
     if (a && !a->atmospheres) {
         a->atmospheres = ecs_query(world, {
-            .entity = ecs_entity(world, { .name = "RenderAtmospheres" }),
+            .entity = ecs_entity(world, { .name = "Atmospheres" }),
             .terms = {
                 { .id = ecs_id(Atmosphere), .inout = EcsIn },
                 {
@@ -1282,7 +1282,7 @@ void box_render_atmosphere_import(
 
     if (a && !a->planets) {
         a->planets = ecs_query(world, {
-            .entity = ecs_entity(world, { .name = "RenderPlanetAtmospheres" }),
+            .entity = ecs_entity(world, { .name = "PlanetAtmospheres" }),
             .terms = {
                 { .id = ecs_id(PlanetAtmosphere), .inout = EcsIn },
                 { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
@@ -1301,7 +1301,7 @@ void box_render_atmosphere_import(
 
     if (a && !a->clouds) {
         a->clouds = ecs_query(world, {
-            .entity = ecs_entity(world, { .name = "RenderCloudLayers" }),
+            .entity = ecs_entity(world, { .name = "CloudLayers" }),
             .terms = {
                 { .id = ecs_id(CloudLayer), .inout = EcsIn },
                 {

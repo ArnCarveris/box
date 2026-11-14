@@ -765,7 +765,7 @@ static const box_render_clip_t* containers_list_clip(
     ecs_world_t *world,
     const char *path)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Draws");
     test_assert(system != 0);
     box_render_draws_t *d = ecs_system_get(world, system)->ctx;
     const DrawSlot *slot = ecs_get(world, ecs_lookup(world, path), DrawSlot);

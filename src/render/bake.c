@@ -1704,7 +1704,7 @@ void box_render_bake_init(
     ecs_map_init(&b->light_map, NULL);
     b->next_handle = 1;
     b->bakes = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderBakes" }),
+        .entity = ecs_entity(world, { .name = "Bakes" }),
         .terms = {
             { .id = ecs_id(LightBake), .inout = EcsIn },
             {
@@ -1719,7 +1719,7 @@ void box_render_bake_init(
     });
 
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "RenderExtractBake" }),
+        .entity = ecs_entity(world, { .name = "extract.Bake" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractBake,
         .ctx = b,
@@ -1731,7 +1731,7 @@ void box_render_bake_init(
 box_render_bake_t* box_bake_state(
     const ecs_world_t *world)
 {
-    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractBake");
+    ecs_entity_t system = ecs_lookup(world, "box.render.extract.Bake");
     const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
 
     return s ? s->ctx : NULL;

@@ -921,7 +921,7 @@ void box_bake_observers(
     });
 
     b->blends = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "RenderBakeBlends" }),
+        .entity = ecs_entity(world, { .name = "BakeBlends" }),
         .terms = {
             {
                 .id = ecs_id(TextureBlend),
