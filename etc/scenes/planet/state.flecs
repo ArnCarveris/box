@@ -57,6 +57,11 @@ state {
   export mut orbit_yaw: f32 = 0
   export mut orbit_pitch: f32 = 0
 
+  // The wheel zoom: the camera distance is the framing distance of the mode times zoom. cam_dist
+  // is the distance the camera shows, eased toward it every frame by logic.flecs
+  export mut zoom: f32 = 1
+  export mut cam_dist: f32 = 27
+
   // The values that change the maps of the planet as the planet shows them: logic.flecs copies
   // them once the evaluations of its graphs are done, so dragging a slider does not queue an
   // evaluation per step. edits counts the changes, shown_edits the last one shown

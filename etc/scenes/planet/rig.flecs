@@ -19,12 +19,10 @@ rig {
   Position: {0, 0, 0}
   Rotation: {0 - orbit_pitch, orbit_yaw, 0}
 
-  // The star is framed with its corona, farther for a larger star
-  const dist: f32 = mode == MODE_STAR ? star_distance(star.radius) : 27
-
+  // The distance of the camera eases toward the framing of the planet or the star times the wheel
+  // zoom in logic.flecs, so the camera needs no transition
   camera {
-    Position: {-1.4 * dist / 27, 0, dist}
-    Transition: [Position: {duration: 0.5, timing_function: EaseInOut}]
+    Position: {-1.4 * cam_dist / 27, 0, cam_dist}
     Camera: {fov: 16, near_: 0.5, far_: 20000}
   }
 }

@@ -4,6 +4,7 @@ using box.input
 using box.ui
 using box.widgets
 using box.task
+using box.app
 using state
 using planets
 
@@ -30,7 +31,27 @@ state {
     state.sun_angle = SUN_DAY
     state.orbit_yaw = 0
     state.orbit_pitch = 0
+    state.zoom = 1
   }
+
+  // Distance of the camera that frames the body the scene shows: the star with its corona,
+  // farther for a larger star
+  fn framing() -> f32 { state.mode == MODE_STAR ? star_distance(state.star.radius) : 27 }
+
+  // Radius of the outermost part of the body. A planet: its atmosphere shell, its top
+  // (planet_radius + thickness) km over a planet_radius of 6360 km scaled to the radius in world
+  // units as the atmosphere does, the cloud layer and the rings when they are on. A star: its
+  // corona, camera facing sprites up to 5.6 radii wide, whose corners reach 4 radii
+  fn outer() -> f32 {
+    state.mode == MODE_STAR ? max(state.star.radius, 0.1) * 4 : max(
+      state.body.radius * max(
+        (6360 + max(state.air.rayleigh_height, state.air.mie_height) * 6) / 6360, 1.012),
+      state.rings.enabled ? state.body.radius * state.rings.size : 0)
+  }
+
+  // The closest zoom: the camera stays 10% outside the outermost part of the body, and past the
+  // near plane of the camera (0.5)
+  fn zoom_min() -> f32 { min((outer() * 1.1 + 0.6) / framing(), 1) }
 
   // Load the preset of a star type
   fn star_load(target: i32) {
@@ -44,6 +65,7 @@ state {
     star_load(START_STAR)
     state.orbit_yaw = 0
     state.orbit_pitch = 0
+    state.zoom = 1
   }
 
   // Set the parameter of the slider n of the star group to v
@@ -241,6 +263,7 @@ async {
   while true {
     await on.pressed(state.actions.show_planet)
     state.mode = MODE_PLANET
+    state.zoom = 1
   }
 }
 
@@ -248,6 +271,7 @@ async {
   while true {
     await on.pressed(state.actions.show_star)
     state.mode = MODE_STAR
+    state.zoom = 1
   }
 }
 
@@ -256,6 +280,34 @@ async {
     const e = await on.drag(stage.orbit)
     state.orbit_yaw = state.orbit_yaw - e.delta_x * 0.006
     state.orbit_pitch = clamp(state.orbit_pitch + e.delta_y * 0.006, -1.2, 1.2)
+  }
+}
+
+// The wheel zooms anywhere outside the panel, whose InputBlocker zeroes the scroll over it, so the
+// panel keeps scrolling its parameters. Each notch scales the zoom, held between the closest zoom
+// of the body as it is now and 3 times the framing, and the camera eases toward its distance
+async {
+  mut last: f64 = box.app.Status[box.app.Status].elapsed
+  while true {
+    await next_frame()
+    const now = box.app.Status[box.app.Status].elapsed
+    const fixed = App[App].delta_time
+    const dt: f32 = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
+    last = now
+
+    const scroll: f32 = Input[Input].mouse.scroll.y
+    const z: f32 = clamp(state.zoom * clamp(1 - scroll * 0.12, 0.5, 1.5), zoom_min(), 3)
+    if z != state.zoom {
+      state.zoom = z
+    }
+    // The camera eases toward its distance, but never through the body when it grows
+    const target: f32 = framing() * state.zoom
+    if abs(target - state.cam_dist) > 0.002 {
+      state.cam_dist = max(state.cam_dist + (target - state.cam_dist) * min(dt * 12, 1),
+        framing() * zoom_min())
+    } else if target != state.cam_dist {
+      state.cam_dist = target
+    }
   }
 }
 

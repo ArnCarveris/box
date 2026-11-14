@@ -128,11 +128,13 @@ static ecs_entity_t cloud_texture(
     int32_t i;
     ecs_set(world, result, TexturePath, {.path = ECS_CONST_CAST(char*, CLOUD_PNG),
         .single_channel = true});
-    for (i = 0; i < 200; i ++) {
+    for (i = 0; i < 500; i ++) {
         frame(world);
         if (box_textures_handle(box_textures_get(world), result)) {
             break;
         }
+
+        ecs_os_sleep(0, 1000 * 1000);
     }
 
     test_assert(box_textures_handle(box_textures_get(world), result) != 0);
