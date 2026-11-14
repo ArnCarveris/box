@@ -1,0 +1,322 @@
+using flecs.script
+using flecs.script.math
+using box.material
+using state
+
+// The design of a liner that a game can use without the editor: its lanes and slots, the kinds
+// of its segments, the preset plans and the helpers that the Liner template draws it with.
+state {
+  export const LANES: i32 = 5
+  export const SLOTS: i32 = 18
+  export const LCELLS: i32 = 90
+  export const SEG: f32 = 4
+  export const R_CORE: f32 = 2.4
+  export const R_OUT: f32 = 1.7
+  export const OUT_D: f32 = 8.5
+  export const RING_R: f32 = 14
+
+  export const LANE_CORE: i32 = 0
+  export const LANE_PORT: i32 = 1
+  export const LANE_STBD: i32 = 2
+  export const LANE_DORSAL: i32 = 3
+  export const LANE_VENTRAL: i32 = 4
+
+  export const L_BASE: i32 = 40
+  export const L_BRIDGE: i32 = 40
+  export const L_SENSOR: i32 = 41
+  export const L_QUARTERS: i32 = 42
+  export const L_HABRING: i32 = 43
+  export const L_ESTATE: i32 = 44
+  export const L_REACTOR: i32 = 45
+  export const L_RADIATOR: i32 = 46
+  export const L_JUMP: i32 = 47
+  export const L_DRIVE: i32 = 48
+  export const L_TANKS: i32 = 49
+  export const L_CARGO: i32 = 50
+  export const L_HANGAR: i32 = 51
+  export const L_ASSEMBLER: i32 = 52
+  export const L_FAB: i32 = 53
+  export const L_TRUSS: i32 = 54
+  export const L_YOKE: i32 = 55
+  export const L_ARMOR: i32 = 56
+  export const L_TURRET: i32 = 57
+  export const L_FARM: i32 = 58
+  export const L_SHIELD: i32 = 59
+  export const L_RAILGUN: i32 = 60
+  export const L_END: i32 = 61
+  export const LKINDS: i32 = 21
+
+  export const LINER_PASSENGER: i32 = 0
+  export const LINER_FREIGHTER: i32 = 1
+  export const LINER_TENDER: i32 = 2
+  export const LINER_BATTLESHIP: i32 = 3
+
+  // The kind of each slot of a liner, lane by lane from the core, 0 for an empty slot.
+  array LinerDesign(type: i32, count: 90)
+
+  // A level per slot, such as the power or the heat of its segment.
+  array LinerLevels(type: f32, count: 90)
+
+  // A flag per slot, such as whether its reactor tripped.
+  array LinerFlags(type: bool, count: 90)
+
+  // The kinds of the segments ahead (kf) and behind (kb) a slot on its lane, and whether the
+  // outriggers 1 to 4 hold a truss beside it.
+  struct LinerNear(kf: i32, kb: i32, p1: bool, p2: bool, p3: bool, p4: bool)
+
+  export const LPLAN_ROWS: i32 = 142
+  export const liner_plan: i32[710] = [
+    LINER_PASSENGER, 0, 0, 0, L_DRIVE,
+    LINER_PASSENGER, 0, 1, 1, L_YOKE,
+    LINER_PASSENGER, 0, 2, 3, L_TANKS,
+    LINER_PASSENGER, 0, 4, 4, L_REACTOR,
+    LINER_PASSENGER, 0, 5, 5, L_RADIATOR,
+    LINER_PASSENGER, 0, 6, 6, L_JUMP,
+    LINER_PASSENGER, 0, 7, 7, L_RADIATOR,
+    LINER_PASSENGER, 0, 8, 8, L_FARM,
+    LINER_PASSENGER, 0, 9, 9, L_TRUSS,
+    LINER_PASSENGER, 0, 10, 10, L_HABRING,
+    LINER_PASSENGER, 0, 11, 11, L_QUARTERS,
+    LINER_PASSENGER, 0, 12, 12, L_ESTATE,
+    LINER_PASSENGER, 0, 13, 13, L_QUARTERS,
+    LINER_PASSENGER, 0, 14, 14, L_HABRING,
+    LINER_PASSENGER, 0, 15, 15, L_HANGAR,
+    LINER_PASSENGER, 0, 16, 16, L_SENSOR,
+    LINER_PASSENGER, 0, 17, 17, L_BRIDGE,
+    LINER_PASSENGER, 1, 0, 0, L_DRIVE,
+    LINER_PASSENGER, 1, 1, 1, L_TRUSS,
+    LINER_PASSENGER, 1, 2, 3, L_TANKS,
+    LINER_PASSENGER, 2, 0, 0, L_DRIVE,
+    LINER_PASSENGER, 2, 1, 1, L_TRUSS,
+    LINER_PASSENGER, 2, 2, 3, L_TANKS,
+
+    LINER_FREIGHTER, 0, 0, 0, L_DRIVE,
+    LINER_FREIGHTER, 0, 1, 1, L_YOKE,
+    LINER_FREIGHTER, 0, 2, 2, L_TANKS,
+    LINER_FREIGHTER, 0, 3, 3, L_REACTOR,
+    LINER_FREIGHTER, 0, 4, 4, L_RADIATOR,
+    LINER_FREIGHTER, 0, 5, 5, L_JUMP,
+    LINER_FREIGHTER, 0, 6, 6, L_RADIATOR,
+    LINER_FREIGHTER, 0, 7, 7, L_YOKE,
+    LINER_FREIGHTER, 0, 8, 10, L_CARGO,
+    LINER_FREIGHTER, 0, 11, 11, L_YOKE,
+    LINER_FREIGHTER, 0, 12, 14, L_CARGO,
+    LINER_FREIGHTER, 0, 15, 15, L_YOKE,
+    LINER_FREIGHTER, 0, 16, 16, L_QUARTERS,
+    LINER_FREIGHTER, 0, 17, 17, L_BRIDGE,
+    LINER_FREIGHTER, 1, 0, 0, L_DRIVE,
+    LINER_FREIGHTER, 1, 1, 1, L_TRUSS,
+    LINER_FREIGHTER, 1, 2, 2, L_TANKS,
+    LINER_FREIGHTER, 1, 7, 7, L_TRUSS,
+    LINER_FREIGHTER, 1, 8, 10, L_CARGO,
+    LINER_FREIGHTER, 1, 11, 11, L_TRUSS,
+    LINER_FREIGHTER, 1, 12, 14, L_CARGO,
+    LINER_FREIGHTER, 1, 15, 15, L_TRUSS,
+    LINER_FREIGHTER, 2, 0, 0, L_DRIVE,
+    LINER_FREIGHTER, 2, 1, 1, L_TRUSS,
+    LINER_FREIGHTER, 2, 2, 2, L_TANKS,
+    LINER_FREIGHTER, 2, 7, 7, L_TRUSS,
+    LINER_FREIGHTER, 2, 8, 10, L_CARGO,
+    LINER_FREIGHTER, 2, 11, 11, L_TRUSS,
+    LINER_FREIGHTER, 2, 12, 14, L_CARGO,
+    LINER_FREIGHTER, 2, 15, 15, L_TRUSS,
+    LINER_FREIGHTER, 3, 7, 7, L_TRUSS,
+    LINER_FREIGHTER, 3, 8, 10, L_CARGO,
+    LINER_FREIGHTER, 3, 11, 11, L_TRUSS,
+    LINER_FREIGHTER, 3, 12, 14, L_CARGO,
+    LINER_FREIGHTER, 3, 15, 15, L_TRUSS,
+    LINER_FREIGHTER, 4, 7, 7, L_TRUSS,
+    LINER_FREIGHTER, 4, 8, 10, L_CARGO,
+    LINER_FREIGHTER, 4, 11, 11, L_TRUSS,
+    LINER_FREIGHTER, 4, 12, 14, L_CARGO,
+    LINER_FREIGHTER, 4, 15, 15, L_TRUSS,
+
+    LINER_TENDER, 0, 0, 0, L_DRIVE,
+    LINER_TENDER, 0, 1, 1, L_YOKE,
+    LINER_TENDER, 0, 2, 2, L_TANKS,
+    LINER_TENDER, 0, 3, 3, L_REACTOR,
+    LINER_TENDER, 0, 4, 4, L_RADIATOR,
+    LINER_TENDER, 0, 5, 5, L_JUMP,
+    LINER_TENDER, 0, 6, 6, L_RADIATOR,
+    LINER_TENDER, 0, 7, 7, L_YOKE,
+    LINER_TENDER, 0, 8, 9, L_ASSEMBLER,
+    LINER_TENDER, 0, 10, 10, L_YOKE,
+    LINER_TENDER, 0, 11, 11, L_FARM,
+    LINER_TENDER, 0, 12, 12, L_TRUSS,
+    LINER_TENDER, 0, 13, 13, L_ESTATE,
+    LINER_TENDER, 0, 14, 14, L_QUARTERS,
+    LINER_TENDER, 0, 15, 15, L_BRIDGE,
+    LINER_TENDER, 4, 7, 7, L_TRUSS,
+    LINER_TENDER, 4, 8, 9, L_CARGO,
+    LINER_TENDER, 4, 10, 10, L_TRUSS,
+    LINER_TENDER, 1, 0, 0, L_DRIVE,
+    LINER_TENDER, 1, 1, 1, L_TRUSS,
+    LINER_TENDER, 1, 2, 2, L_TANKS,
+    LINER_TENDER, 1, 7, 7, L_TRUSS,
+    LINER_TENDER, 1, 8, 8, L_HANGAR,
+    LINER_TENDER, 1, 9, 9, L_FAB,
+    LINER_TENDER, 1, 10, 10, L_TRUSS,
+    LINER_TENDER, 2, 0, 0, L_DRIVE,
+    LINER_TENDER, 2, 1, 1, L_TRUSS,
+    LINER_TENDER, 2, 2, 2, L_TANKS,
+    LINER_TENDER, 2, 7, 7, L_TRUSS,
+    LINER_TENDER, 2, 8, 8, L_HANGAR,
+    LINER_TENDER, 2, 9, 9, L_FAB,
+    LINER_TENDER, 2, 10, 10, L_TRUSS,
+
+    LINER_BATTLESHIP, 0, 0, 0, L_DRIVE,
+    LINER_BATTLESHIP, 0, 1, 1, L_YOKE,
+    LINER_BATTLESHIP, 0, 2, 2, L_TANKS,
+    LINER_BATTLESHIP, 0, 3, 3, L_REACTOR,
+    LINER_BATTLESHIP, 0, 4, 4, L_RADIATOR,
+    LINER_BATTLESHIP, 0, 5, 5, L_REACTOR,
+    LINER_BATTLESHIP, 0, 6, 6, L_RADIATOR,
+    LINER_BATTLESHIP, 0, 7, 7, L_JUMP,
+    LINER_BATTLESHIP, 0, 8, 8, L_RADIATOR,
+    LINER_BATTLESHIP, 0, 9, 9, L_YOKE,
+    LINER_BATTLESHIP, 0, 10, 10, L_ARMOR,
+    LINER_BATTLESHIP, 0, 11, 11, L_TURRET,
+    LINER_BATTLESHIP, 0, 12, 12, L_QUARTERS,
+    LINER_BATTLESHIP, 0, 13, 13, L_TURRET,
+    LINER_BATTLESHIP, 0, 14, 14, L_YOKE,
+    LINER_BATTLESHIP, 0, 15, 15, L_TURRET,
+    LINER_BATTLESHIP, 0, 16, 16, L_SHIELD,
+    LINER_BATTLESHIP, 0, 17, 17, L_ARMOR,
+    LINER_BATTLESHIP, 1, 0, 0, L_DRIVE,
+    LINER_BATTLESHIP, 1, 1, 1, L_TRUSS,
+    LINER_BATTLESHIP, 1, 2, 3, L_TANKS,
+    LINER_BATTLESHIP, 1, 9, 9, L_TRUSS,
+    LINER_BATTLESHIP, 1, 10, 10, L_TURRET,
+    LINER_BATTLESHIP, 1, 11, 11, L_ARMOR,
+    LINER_BATTLESHIP, 1, 12, 12, L_TURRET,
+    LINER_BATTLESHIP, 1, 13, 13, L_ARMOR,
+    LINER_BATTLESHIP, 1, 14, 14, L_TRUSS,
+    LINER_BATTLESHIP, 1, 15, 15, L_RAILGUN,
+    LINER_BATTLESHIP, 2, 0, 0, L_DRIVE,
+    LINER_BATTLESHIP, 2, 1, 1, L_TRUSS,
+    LINER_BATTLESHIP, 2, 2, 3, L_TANKS,
+    LINER_BATTLESHIP, 2, 9, 9, L_TRUSS,
+    LINER_BATTLESHIP, 2, 10, 10, L_TURRET,
+    LINER_BATTLESHIP, 2, 11, 11, L_ARMOR,
+    LINER_BATTLESHIP, 2, 12, 12, L_TURRET,
+    LINER_BATTLESHIP, 2, 13, 13, L_ARMOR,
+    LINER_BATTLESHIP, 2, 14, 14, L_TRUSS,
+    LINER_BATTLESHIP, 2, 15, 15, L_RAILGUN,
+    LINER_BATTLESHIP, 3, 9, 9, L_TRUSS,
+    LINER_BATTLESHIP, 3, 10, 10, L_TURRET,
+    LINER_BATTLESHIP, 3, 11, 11, L_QUARTERS,
+    LINER_BATTLESHIP, 3, 12, 12, L_TURRET,
+    LINER_BATTLESHIP, 3, 13, 13, L_SENSOR,
+    LINER_BATTLESHIP, 3, 14, 14, L_TRUSS,
+    LINER_BATTLESHIP, 3, 15, 15, L_BRIDGE,
+    LINER_BATTLESHIP, 4, 9, 9, L_TRUSS,
+    LINER_BATTLESHIP, 4, 10, 12, L_HANGAR
+  ]
+
+  fn lane_of(i: i32) -> i32 { (i - i % SLOTS) / SLOTS }
+  fn slot_of(i: i32) -> i32 { i % SLOTS }
+  fn lcell(l: i32, z: i32) -> i32 { l * SLOTS + z }
+
+  fn lane_angle(l: i32) -> f32 {
+    match l { 1: PI; 3: HALF_PI; 4: 0 - HALF_PI; _: 0 }
+  }
+
+  fn lane_x(l: i32) -> f32 { l == 0 ? 0 : cos(lane_angle(l)) * OUT_D }
+  fn lane_y(l: i32) -> f32 { l == 0 ? 0 : sin(lane_angle(l)) * OUT_D }
+  fn lane_r(l: i32) -> f32 { l == 0 ? R_CORE : R_OUT }
+  fn slot_z(z: i32) -> f32 { (z - SLOTS / 2.0 + 0.5) * SEG }
+
+  fn ringed(k: i32) -> bool { k == L_HABRING || k == L_ESTATE || k == L_FARM }
+  fn housed(k: i32) -> bool { k == L_QUARTERS || ringed(k) }
+  fn core_only(k: i32) -> bool { ringed(k) || k == L_YOKE }
+
+  // The kind in slot z of lane l of design d, 0 outside the liner.
+  fn lkind(d: LinerDesign, l: i32, z: i32) -> i32 {
+    const k = d[lcell(clamp(l, 0, LANES - 1), clamp(z, 0, SLOTS - 1))]
+    z >= 0 && z < SLOTS && l >= 0 && l < LANES ? k : 0
+  }
+
+  fn liner_near(d: LinerDesign, l: i32, z: i32) -> LinerNear {
+    const n: LinerNear = {
+      kf: lkind(d, l, z + 1), kb: lkind(d, l, z - 1),
+      p1: lkind(d, 1, z) == L_TRUSS, p2: lkind(d, 2, z) == L_TRUSS,
+      p3: lkind(d, 3, z) == L_TRUSS, p4: lkind(d, 4, z) == L_TRUSS
+    }
+    n
+  }
+
+  // The number of segments of kind k in design d.
+  fn liner_count(d: LinerDesign, k: i32) -> i32 {
+    mut n: i32 = 0
+    for i in 0..LCELLS {
+      if d[i] == k {
+        n += 1
+      }
+    }
+    n
+  }
+
+  // The front (bow, +z) and back of the occupied slots of design d along the spine.
+  fn liner_front(d: LinerDesign) -> f32 {
+    mut z1: i32 = -1
+    for i in 0..LCELLS {
+      if d[i] != 0 {
+        z1 = max(z1, slot_of(i))
+      }
+    }
+    slot_z(z1) + SEG / 2
+  }
+
+  fn liner_back(d: LinerDesign) -> f32 {
+    mut z0: i32 = SLOTS
+    for i in 0..LCELLS {
+      if d[i] != 0 {
+        z0 = min(z0, slot_of(i))
+      }
+    }
+    slot_z(z0) - SEG / 2
+  }
+
+  // The design of preset p (LINER_PASSENGER to LINER_BATTLESHIP), empty for any other p.
+  fn liner_preset(p: i32) -> LinerDesign {
+    mut g: LinerDesign = {}
+    for b in 0..LPLAN_ROWS {
+      const o = b * 5
+      if liner_plan[o] == p {
+        for z in liner_plan[o + 2]..liner_plan[o + 3] + 1 {
+          g[lcell(liner_plan[o + 1], z)] = liner_plan[o + 4]
+        }
+      }
+    }
+    g
+  }
+
+  export const passenger_design: LinerDesign = liner_preset(LINER_PASSENGER)
+  export const freighter_design: LinerDesign = liner_preset(LINER_FREIGHTER)
+  export const tender_design: LinerDesign = liner_preset(LINER_TENDER)
+  export const battleship_design: LinerDesign = liner_preset(LINER_BATTLESHIP)
+
+  fn liner_fill(v: f32) -> LinerLevels {
+    mut p: LinerLevels = {}
+    for i in 0..LCELLS {
+      p[i] = v
+    }
+    p
+  }
+
+  // Every slot at full power.
+  export const liner_full_power: LinerLevels = liner_fill(1)
+
+  // How much a segment of kind k at power level p works: a drive fires only while burning.
+  fn liner_live(k: i32, p: f32, burning: bool) -> f32 { k == L_DRIVE && !burning ? 0 : p }
+
+  // How much a part at heat level h glows, 0 below about 480 K to 1 at about 1830 K
+  fn heat_glow(h: f32) -> f32 { clamp((h - 0.1) / 0.7, 0, 1) }
+
+  // Color of a part that glows g: dull red, through orange, to yellow
+  fn heat_rgb(g: f32) -> Rgb { {255, 40 + 140 * g, 12 + 70 * g} }
+
+  // Share 0..1 of section i, of n sections, lit at power p: at partial power the first
+  // sections are lit and the rest are dark, instead of all of them being dim.
+  fn lit_share(p: f32, i: i32, n: i32) -> f32 { clamp(p * n - i % n, 0, 1) }
+}

@@ -41,8 +41,8 @@ state {
   export mut unit_charge: f32[12] = {}
   export mut unit_n: i32 = 0
   export mut slot_on: bool[90] = {}
-  export mut slot_trip: bool[90] = {}
-  export mut slot_heat: f32[90] = {}
+  export mut slot_trip: LinerFlags = {}
+  export mut slot_heat: LinerLevels = {}
   export mut unit_level: f32[12] = {}
   export mut ship_heat: f32 = 0
   export mut heat_falling: bool = false
@@ -59,8 +59,6 @@ state {
   export mut drive_on: bool = false
   export mut burning: bool = false
   export mut fuel: f32 = 1
-  export mut ship_z0: f32 = 0
-  export mut ship_z1: f32 = 0
 
   fn chan_name(c: i32) -> string {
     match c { 0: "LIFE"; 1: "HAB"; 2: "JUMP"; 3: "WPN"; 4: "DRV"; 5: "FAB"; 6: "MINE"; 7: "DATA"; _: "SHLD" }
@@ -220,6 +218,17 @@ state {
     }
   }
 
+  // The power level of each slot of the liner for the Liner template, which fires the drives
+  // itself while burning: what ops_live gives for each slot, without the burn of the drives.
+  fn liner_levels() -> LinerLevels {
+    mut p: LinerLevels = {}
+    for i in 0..LCELLS {
+      const k = lgrid[i]
+      p[i] = k == L_DRIVE ? pf[C_DRIVE] : ops_live(i, k)
+    }
+    p
+  }
+
   // Unit of the power plant at rig cell i, -1 for none
   fn rig_unit(i: i32) -> i32 {
     mut n: i32 = -1
@@ -305,19 +314,9 @@ state {
   // not every tick; a transition at least as long as a step bridges the levels.
   fn heat_level(h: f32) -> f32 { round(clamp(h, 0, 1) * HEAT_STEPS) / HEAT_STEPS }
 
-  // How much a part at heat level h glows, 0 below about 480 K to 1 at about 1830 K
-  fn heat_glow(h: f32) -> f32 { clamp((h - 0.1) / 0.7, 0, 1) }
-
-  // Color of a part that glows g: dull red, through orange, to yellow
-  fn heat_rgb(g: f32) -> Rgb { {255, 40 + 140 * g, 12 + 70 * g} }
-
-  // Share 0..1 of section i, of n sections, lit at power p: at partial power the first
-  // sections are lit and the rest are dark, instead of all of them being dim.
-  fn lit_share(p: f32, i: i32, n: i32) -> f32 { clamp(p * n - i % n, 0, 1) }
-
   // Heat level of the units and of the ship, updated only when a level changes
   fn mark_heat() {
-    mut sh: f32[90] = {}
+    mut sh: LinerLevels = {}
     mut ul: f32[12] = {}
     mut top: f32 = 0
     for u in 0..unit_n {
@@ -387,7 +386,7 @@ state {
 
   fn mark_slots() {
     mut so: bool[90] = {}
-    mut st: bool[90] = {}
+    mut st: LinerFlags = {}
     if liner {
       for u in 0..unit_n {
         so[units[u]] = unit_on[u]
@@ -453,17 +452,6 @@ state {
     }
     need = nn
     want = nw
-
-    mut z0: i32 = SLOTS
-    mut z1: i32 = -1
-    for i in 0..LCELLS {
-      if lgrid[i] != 0 {
-        z0 = min(z0, slot_of(i))
-        z1 = max(z1, slot_of(i))
-      }
-    }
-    ship_z0 = slot_z(z0) - SEG / 2
-    ship_z1 = slot_z(z1) + SEG / 2
 
     resupply()
     mark_heat()

@@ -170,7 +170,7 @@ assets {
       hold : ShipHullDarkFine { Position: {0, 0 - (ap + hf) / 2, 0}; Box: {2 * hf, ap - hf, hz} }
       hold_r : ShipHullDarkFine { Position: {(ap + hf) / 2, 0 - (ap + hf) / 2, 0}; Rotation: {PI, 0, 0}; RightTrianglePrism: {ap - hf, ap - hf, hz} }
       hold_l : ShipHullDarkFine { Position: {0 - (ap + hf) / 2, 0 - (ap + hf) / 2, 0}; Rotation: {0, 0, PI}; RightTrianglePrism: {ap - hf, ap - hf, hz} }
-      deck : YardDeckFine { Position: {0, fd - 0.025, 0}; Box: {2 * ap - 0.1, 0.05, zl - pt} }
+      deck : ShipDeckFine { Position: {0, fd - 0.025, 0}; Box: {2 * ap - 0.1, 0.05, zl - pt} }
       for s in 0..2 {
         const sx = (s - 0.5) * 2
         const fa = (s == 0 ? -0.75 : -0.25) * PI

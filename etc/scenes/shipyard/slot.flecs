@@ -14,69 +14,6 @@ using box.animation
 using state
 
 assets {
-  template LinerSegment {
-    prop k: i32 = 0
-    prop l: i32 = 0
-    prop z: i32 = 0
-    prop seed: i32 = 0
-    prop live: f32 = 1
-    prop heat: f32 = 0
-    prop trip: bool = false
-    prop cool: bool = false
-    prop spin: f32 = 1
-
-    const r = lane_r(l)
-    const core = l == 0
-    const kf = lkind(l, z + 1)
-    const kb = lkind(l, z - 1)
-    const fe = kf == 0 ? 2 : kf == k ? 0 : 1
-    const be = kb == 0 ? 2 : kb == k ? 0 : 1
-
-    if k == L_BRIDGE {
-      Bridge part(r: r, be: be, power: live)
-    } else if k == L_SENSOR {
-      Sensor part(r: r, core: core, fe: fe, be: be, power: live)
-    } else if k == L_QUARTERS {
-      Quarters part(r: r, fe: fe, be: be, seed: seed, power: live)
-    } else if k == L_HABRING {
-      HabRing part(r: r, seed: z, power: live)
-    } else if k == L_ESTATE {
-      EstateRing part(r: r, seed: z, power: live)
-    } else if k == L_FARM {
-      AgriRing part(r: r, seed: z, power: live)
-    } else if k == L_REACTOR {
-      Reactor part(r: r, fe: fe, be: be, power: live, heat: heat, trip: trip)
-    } else if k == L_RADIATOR {
-      Radiator part(r: r, core: core, heat: heat, cool: cool)
-    } else if k == L_JUMP {
-      JumpDrive part(r: r, fe: fe, be: be, power: live, spin: spin)
-    } else if k == L_DRIVE {
-      DriveSection part(r: r, fe: fe, power: live)
-    } else if k == L_TANKS {
-      TankCluster part(r: r)
-    } else if k == L_CARGO {
-      CargoBlock part(r: r, fe: fe, be: be, seed: seed)
-    } else if k == L_HANGAR {
-      Hangar part(r: r, core: core, flip: l == LANE_PORT, fe: fe, be: be, seed: seed, power: live)
-    } else if k == L_ASSEMBLER {
-      HeavyAssembler part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
-    } else if k == L_FAB {
-      FabBay part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
-    } else if k == L_SHIELD {
-      ShieldGenerator part(r: r, core: core, fe: fe, be: be, power: live)
-    } else if k == L_RAILGUN {
-      Railgun part(r: r, core: core, fe: fe, be: be, power: live)
-    } else if k == L_TRUSS {
-      SpineTruss part(r: r)
-    } else if k == L_YOKE {
-      Yoke part(r: r, p1: lkind(1, z) == L_TRUSS, p2: lkind(2, z) == L_TRUSS, p3: lkind(3, z) == L_TRUSS, p4: lkind(4, z) == L_TRUSS)
-    } else if k == L_ARMOR {
-      ArmorSleeve part(r: r, fe: fe, be: be)
-    } else if k == L_TURRET {
-      TurretDeck part(r: r, core: core, fe: fe, be: be, power: live)
-    }
-  }
-
   template SlotCursor {
     prop r: f32 = 1
     prop color: Rgb = {255, 255, 255}
@@ -91,11 +28,15 @@ assets {
     }
   }
 
+  // The editor over slot idx of the liner: picking on the lane being worked on, the build pad,
+  // the cursor, the fault warning and the sparks of a build. The Liner instance leaves the
+  // segments of that lane out and the slot draws its segment itself, so a pick on any part of it
+  // reaches the slot. The segment is tinted for the tool when hovered, rises after a build, and a
+  // ghost of the segment of the tool shows in a hovered empty slot.
   template LinerSlot {
     prop idx: i32 = 0
     mut rising = false
     mut sparking = false
-    mut spin: f32 = 0
 
     const l = lane_of(idx)
     const z = slot_of(idx)
@@ -109,40 +50,33 @@ assets {
     const swap = placing && k != t
     const fault = lstatus[idx]
 
-    Position: {lane_x(l), AXIS_Y + lane_y(l), slot_z(z)}
+    Position: {lane_x(l), lane_y(l), slot_z(z)}
 
     if active {
       Interactive
       Cursor: {CursorPointer}
     }
 
-    if k != 0 {
-      body {
-        Position: {0, rising ? 2.5 : 0, 0}
-        Rotation: {0, 0, lane_angle(l)}
-        Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
-        if editing && !active {
-          Opacity: {0.16}
-          Ignore
-        }
-        if hovered && t == T_REMOVE {
-          Tint: {255, 70, 50, 150}
-        } else if hovered && swap {
-          Tint: {90, 255, 160, 120}
-        }
-        const heat = k == L_RADIATOR ? ship_heat : slot_heat[idx]
-        LinerSegment part(k: k, l: l, z: z, seed: idx, live: ops_live(idx, k), heat: heat, trip: slot_trip[idx], cool: k == L_RADIATOR && heat_falling, spin: k == L_JUMP ? spin : 0)
+    if active && k != 0 {
+      const tint: Tint = match t == T_REMOVE {
+        true: {255, 70, 50, 150}
+        _: match swap { true: {90, 255, 160, 120}; _: {0, 0, 0, 0} }
       }
+      LinerPart unit(
+        idx: idx, k: k, n: liner_near(lgrid, l, z), live: ops_live(idx, k),
+        heat: k == L_RADIATOR ? ship_heat : slot_heat[idx], trip: slot_trip[idx],
+        cool: k == L_RADIATOR && heat_falling, lifted: rising, tinted: hovered && tint.a > 0, tint: tint
+      )
+    }
 
-      if fault != 0 {
-        warning {
-          Position: {0, r * 1.5 + 1.4, 0}
-          AngularVelocity: {0, 1.6, 0}
-          Ignore
-          NoShadow
-          gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.6, 0.6, 0.6} }
-          glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 5}; Rgb: {255, 60, 40} }
-        }
+    if k != 0 && fault != 0 {
+      warning {
+        Position: {0, r * 1.5 + 1.4, 0}
+        AngularVelocity: {0, 1.6, 0}
+        Ignore
+        NoShadow
+        gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.6, 0.6, 0.6} }
+        glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 5}; Rgb: {255, 60, 40} }
       }
     }
 
@@ -171,7 +105,7 @@ assets {
           Tint: {90, 255, 160, 120}
           Ignore
           NoShadow
-          LinerSegment part(k: t, l: l, z: z, seed: idx)
+          LinerSegment part(k: t, l: l, z: z, seed: idx, n: liner_near(lgrid, l, z))
         }
       }
     }
@@ -215,22 +149,6 @@ assets {
       }
     }
 
-    // Spins the rotor of a jump drive up and down over about 2 s when its power changes
-    async {
-      while true {
-        const sk = lgrid[idx]
-        const target = sk == L_JUMP ? ops_live(idx, sk) : 0
-        if sk != L_JUMP && spin != 0 {
-          spin = 0
-        } else if abs(target - spin) < 0.001 {
-          await delay(sk == L_JUMP ? 0.2 : 1)
-        } else {
-          spin = spin + clamp(target - spin, -0.05, 0.05)
-          await delay(0.1)
-        }
-      }
-    }
-
     async {
       while true {
         const e = await Built
@@ -242,6 +160,30 @@ assets {
           await delay(0.7)
           sparking = false
         }
+      }
+    }
+  }
+
+  // The liner that the editor works on: a Liner instance on the spine axis of the yard with the
+  // design and the power of the simulation (ops), and the editor over its slots. While a tool is
+  // out the instance fades and lets picks pass, so only the lane being worked on, which the
+  // editor draws itself, stands out.
+  template YardLiner {
+    Liner ship(
+      design: lgrid, power: liner_levels(), shield: pf[C_SHIELDS], burning: burning,
+      heat: slot_heat, radiator_heat: ship_heat, cooling: heat_falling, trip: slot_trip, skip: lane
+    ) {
+      Position: {0, AXIS_Y, 0}
+      if tool > 0 {
+        Opacity: {0.16}
+        Ignore
+      }
+    }
+
+    editor {
+      Position: {0, AXIS_Y, 0}
+      for i in 0..LCELLS {
+        LinerSlot "edit_{i}"(idx: i)
       }
     }
   }

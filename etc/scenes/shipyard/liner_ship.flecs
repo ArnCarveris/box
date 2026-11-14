@@ -1,0 +1,171 @@
+// The Liner template: a liner of the shipyard as a model that a game can include without the
+// editor, drawn from its design and power state.
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.spatial
+using box.transition
+using state
+
+assets {
+  // The segment of kind k in slot z of lane l, with the kinds around it in n.
+  template LinerSegment {
+    prop k: i32 = 0
+    prop l: i32 = 0
+    prop z: i32 = 0
+    prop seed: i32 = 0
+    prop live: f32 = 1
+    prop heat: f32 = 0
+    prop trip: bool = false
+    prop cool: bool = false
+    prop spin: f32 = 1
+    prop n: LinerNear = {}
+
+    const r = lane_r(l)
+    const core = l == 0
+    const kf = n.kf
+    const kb = n.kb
+    const fe = kf == 0 ? 2 : kf == k ? 0 : 1
+    const be = kb == 0 ? 2 : kb == k ? 0 : 1
+
+    if k == L_BRIDGE {
+      Bridge part(r: r, be: be, power: live)
+    } else if k == L_SENSOR {
+      Sensor part(r: r, core: core, fe: fe, be: be, power: live)
+    } else if k == L_QUARTERS {
+      Quarters part(r: r, fe: fe, be: be, seed: seed, power: live)
+    } else if k == L_HABRING {
+      HabRing part(r: r, seed: z, power: live)
+    } else if k == L_ESTATE {
+      EstateRing part(r: r, seed: z, power: live)
+    } else if k == L_FARM {
+      AgriRing part(r: r, seed: z, power: live)
+    } else if k == L_REACTOR {
+      Reactor part(r: r, fe: fe, be: be, power: live, heat: heat, trip: trip)
+    } else if k == L_RADIATOR {
+      Radiator part(r: r, core: core, heat: heat, cool: cool)
+    } else if k == L_JUMP {
+      JumpDrive part(r: r, fe: fe, be: be, power: live, spin: spin)
+    } else if k == L_DRIVE {
+      DriveSection part(r: r, fe: fe, power: live)
+    } else if k == L_TANKS {
+      TankCluster part(r: r)
+    } else if k == L_CARGO {
+      CargoBlock part(r: r, fe: fe, be: be, seed: seed)
+    } else if k == L_HANGAR {
+      Hangar part(r: r, core: core, flip: l == LANE_PORT, fe: fe, be: be, seed: seed, power: live)
+    } else if k == L_ASSEMBLER {
+      HeavyAssembler part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
+    } else if k == L_FAB {
+      FabBay part(r: r, core: core, fe: fe, be: be, seed: seed, power: live)
+    } else if k == L_SHIELD {
+      ShieldGenerator part(r: r, core: core, fe: fe, be: be, power: live)
+    } else if k == L_RAILGUN {
+      Railgun part(r: r, core: core, fe: fe, be: be, power: live)
+    } else if k == L_TRUSS {
+      SpineTruss part(r: r)
+    } else if k == L_YOKE {
+      Yoke part(r: r, p1: n.p1, p2: n.p2, p3: n.p3, p4: n.p4)
+    } else if k == L_ARMOR {
+      ArmorSleeve part(r: r, fe: fe, be: be)
+    } else if k == L_TURRET {
+      TurretDeck part(r: r, core: core, fe: fe, be: be, power: live)
+    }
+  }
+
+  // The segment of kind k in slot idx of a liner, in the frame of its slot. A lifted segment
+  // floats above its slot and settles into it when lifted goes back to false, a tinted one takes
+  // tint. The rotor of a jump drive spins up and down over about 2 s when its power (live)
+  // changes.
+  template LinerPart {
+    prop idx: i32 = 0
+    prop k: i32 = 0
+    prop n: LinerNear = {}
+    prop live: f32 = 1
+    prop heat: f32 = 0
+    prop trip: bool = false
+    prop cool: bool = false
+    prop lifted: bool = false
+    prop tinted: bool = false
+    prop tint: Tint = {0, 0, 0, 0}
+    mut spin: f32 = k == L_JUMP ? live : 0
+
+    const l = lane_of(idx)
+
+    body {
+      Position: {0, lifted ? 2.5 : 0, 0}
+      Rotation: {0, 0, lane_angle(l)}
+      Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
+      if tinted {
+        Tint: tint
+      }
+      LinerSegment part(k: k, l: l, z: slot_of(idx), seed: idx, n: n, live: live, heat: heat, trip: trip, cool: cool, spin: k == L_JUMP ? spin : 0)
+    }
+
+    // A change of live restarts the block, which steps spin to it and stops.
+    async {
+      while k == L_JUMP && abs(live - spin) >= 0.001 {
+        spin = spin + clamp(live - spin, -0.05, 0.05)
+        await delay(0.1)
+      }
+    }
+  }
+
+  // A liner with the segments of its design, about 10 m to the unit. The origin is on the axis of
+  // the core spine, halfway along the slots, and the bow points to +z.
+  //
+  // power holds the power level of each slot (0 to 1), shield the level of the shield bubble
+  // that the ship raises when it has shield generators, and burning fires the drives. heat holds
+  // the heat level of each slot, radiator_heat that of the radiators, which show cooling while the
+  // ship cools down, and trip the reactors that tripped.
+  //
+  // The segments of lane skip are left out, for an editor that draws the lane it works on itself
+  // (with LinerPart).
+  template Liner {
+    prop design: LinerDesign = passenger_design
+    prop power: LinerLevels = liner_full_power
+    prop shield: f32 = 1
+    prop burning: bool = false
+    prop heat: LinerLevels = {}
+    prop radiator_heat: f32 = 0
+    prop cooling: bool = false
+    prop trip: LinerFlags = {}
+    prop skip: i32 = -1
+
+    texture.Frame
+
+    for i in 0..LCELLS {
+      const k = design[i]
+      const l = lane_of(i)
+      const z = slot_of(i)
+      if k != 0 && l != skip {
+        LinerPart "slot_{i}"(
+          idx: i, k: k, n: liner_near(design, l, z), live: liner_live(k, power[i], burning),
+          heat: k == L_RADIATOR ? radiator_heat : heat[i], trip: trip[i],
+          cool: k == L_RADIATOR && cooling
+        ) {
+          Position: {lane_x(l), lane_y(l), slot_z(z)}
+        }
+      }
+    }
+
+    if liner_count(design, L_SHIELD) > 0 {
+      const z0 = liner_back(design)
+      const z1 = liner_front(design)
+      shield_bubble {
+        Position: {0, 0, (z0 + z1) / 2}
+        Scale: {RING_R + 3.5, RING_R + 3.5, (z1 - z0) / 2 + 8}
+        Sphere: {radius: 1, segments: 48, smooth: true}
+        Rgb: {0, 0, 0}
+        PbrMaterial: {metallic: 1, roughness: 1}
+        Emissive: {strength: 0.004 * shield, color: {110, 170, 255}}
+        Fresnel: {color: {120, 190, 255}, strength: 0.8 * shield, power: 3, bias: 0}
+        Distortion: {strength: 0.003 * shield, scale: 6, speed: 0.12}
+        Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Fresnel: {duration: 1, timing_function: EaseInOut}, Distortion: {duration: 1, timing_function: EaseInOut}]
+        Ignore
+      }
+    }
+  }
+}

@@ -1040,7 +1040,7 @@ assets {
     }
     catwalk {
       Position: {0, r * 0.8 + 0.03, 0}
-      deck : YardDeckFine { Box: {0.5, 0.04, 3.3} }
+      deck : ShipDeckFine { Box: {0.5, 0.04, 3.3} }
       for s in 0..2 {
         const sx = (s - 0.5) * 0.46
         "rail_{s}" : ShipSteel { Position: {sx, 0.14, 0}; Box: {0.025, 0.025, 3.3} }
@@ -1387,7 +1387,7 @@ assets {
       Rotation: {flip ? PI : 0, 0, core ? 0 - HALF_PI : 0}
       back : ShipHullDark { Position: {(x0 + r * 0.9) / 2, 0, 0}; Box: {x0 - r * 0.9, h * 2, hz * 2} }
       ceiling : ShipRecess { Position: {xm, h - 0.006, 0}; Box: {dd, 0.012, hz * 2} }
-      deck : YardDeckFine { Position: {xm, 0.012 - h, 0}; Box: {dd, 0.024, hz * 2} }
+      deck : ShipDeckFine { Position: {xm, 0.012 - h, 0}; Box: {dd, 0.024, hz * 2} }
       deck_edge : ShipHazard { Position: {x1 - 0.07, 0.026 - h, 0}; Box: {0.12, 0.006, hz * 2} }
       crane : ShipYellow { Position: {x0 + 0.22, h - 0.07, 0}; Box: {0.07, 0.07, hz * 2} }
       crane_hook : ShipTrim { Position: {x0 + 0.22, h - 0.2, 0.35}; Box: {0.1, 0.2, 0.1} }

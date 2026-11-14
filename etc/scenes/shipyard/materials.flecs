@@ -121,6 +121,7 @@ assets {
   prefab ShipWarning { Rgb: {255, 70, 50}; Emissive: {strength: 3, color: {255, 50, 30}}; Animator: {clip: yard_pulse} }
 
   prefab ShipHullFine { Rgb: {236, 240, 246}; PbrMaterial: {metallic: 0.45, roughness: 0.45}; PbrTextures: {normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 1.6, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
+  prefab ShipDeckFine { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; texture.Mapping: {MappingFrame, size: 0.6} }
   prefab ShipHullDarkFine { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 0.8, blend: 0.3} }
   prefab ShipHullSpin { Rgb: {236, 240, 246}; PbrMaterial: {metallic: 0.45, roughness: 0.45}; PbrTextures: {normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; texture.Mapping: {MappingObject, size: 1.6, blend: 0.3}; ClearCoat: {strength: 0.25, roughness: 0.3} }
   prefab ShipHullDarkSpin { Rgb: {92, 100, 112}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: yard_tex_hull, normal: yard_tex_hull_normal, orm: yard_tex_hull_orm}; texture.Mapping: {MappingObject, size: 0.8, blend: 0.3} }

@@ -1,7 +1,15 @@
 // The ships of the shipyard as models that a game can include without the editor: the design of a
-// rig and its preset plans, the materials, the hull and module templates and the Rig template.
+// rig and its preset plans, the materials, the hull and module templates and the Rig template, and
+// the design of a liner and its preset plans, the segment templates and the Liner template.
 include design
 include materials
 include hull
 include exterior
 include rig
+include liner_design
+include segments
+include fab
+include assembler
+include shield
+include railgun
+include liner_ship
