@@ -442,3 +442,65 @@ void TextureMappingFrame_cutout_shadow_follows_frame(void) {
     stbi_image_free(moved_frame);
     stbi_image_free(moved_world);
 }
+
+/** A frame scaled by 10 with a MappingFrame box, a MappingFrame plate under an extra scale and a
+ * turned MappingObject box renders, from an ortho view 10 times as high, as the unscaled frame:
+ * the textures scale with the frame. The same scene with MappingWorld renders another texture
+ * once scaled, so the comparison sees the scale. */
+void TextureMappingFrame_scaled_frame_matches(void) {
+    // materials/texture_mapping_frame
+    const char *scene =
+        "ship {\n"
+        "  TextureFrame\n"
+        "  Scale: {%g, %g, %g}\n"
+        "  a : Hull { Position: {-1.5, 0.5, -1}\n Box: {3, 1, 4} }\n"
+        "  stretched {\n"
+        "    Position: {1.5, 0, -1}\n"
+        "    Scale: {1.5, 1, 1}\n"
+        "    b : Hull { Position: {0, 0.5, 0}\n Box: {2, 1, 4} }\n"
+        "  }\n"
+        "  ring {\n"
+        "    Position: {0, 0.5, 2}\n"
+        "    Rotation: {0, 0.6, 0}\n"
+        "    Box: {4, 1, 1.5}\n"
+        "    Rgb: {0, 0, 0}\n"
+        "    PbrMaterial: {metallic: 1, roughness: 1}\n"
+        "    Emissive: {strength: 1, color: {255, 255, 255}}\n"
+        "    PbrTextures: {emissive: checker_tex}\n"
+        "    TextureMapping: {mode: MappingObject, size: 1.5}\n"
+        "  }\n"
+        "}\n"
+        "top_camera {\n"
+        "  Position: {0, %g, 0}\n"
+        "  Rotation: {-1.5707963, 0, 0}\n"
+        "  Camera: {ortho: true, ortho_height: %g, near_: 0.1, far_: %g}\n"
+        "}\n";
+    char unscaled[2048], scaled[2048];
+    snprintf(unscaled, sizeof(unscaled), scene, 1.0, 1.0, 1.0, 10.0, 8.0, 100.0);
+    snprintf(scaled, sizeof(scaled), scene, 10.0, 10.0, 10.0, 100.0, 80.0, 1000.0);
+    unsigned char *still = mapping_frame_render("MappingFrame", "top_camera", unscaled, NULL,
+        "mapping_frame_unscaled.png");
+    unsigned char *large = mapping_frame_render("MappingFrame", "top_camera", scaled, NULL,
+        "mapping_frame_scaled.png");
+    unsigned char *world_still = mapping_frame_render("MappingWorld", "top_camera", unscaled,
+        NULL, "mapping_frame_world_unscaled.png");
+    unsigned char *world_large = mapping_frame_render("MappingWorld", "top_camera", scaled,
+        NULL, "mapping_frame_world_scaled.png");
+
+    int32_t first = mapping_frame_pixel(-3) + 1, last = mapping_frame_pixel(3) - 1;
+    int32_t max = 0, count = 0;
+    mapping_frame_textured(still, first, first, last, last);
+    mapping_frame_compare(still, large, 0, 0, MAPPING_FRAME_PX, MAPPING_FRAME_PX,
+        &max, &count);
+    test_assert(max <= MAPPING_FRAME_MAX_DELTA || count <= MAPPING_FRAME_MAX_PIXELS);
+
+    max = 0;
+    count = 0;
+    mapping_frame_compare(world_still, world_large, first, first, last, last, &max, &count);
+    test_assert(count > MAPPING_FRAME_DIFFERENT_PIXELS);
+
+    stbi_image_free(still);
+    stbi_image_free(large);
+    stbi_image_free(world_still);
+    stbi_image_free(world_large);
+}

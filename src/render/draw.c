@@ -262,7 +262,8 @@ static void BoxDrawsOnHierarchy(
 }
 
 /** Remember the entities that got or lost TextureFrame as roots of subtrees whose instances
- * project from another frame: the MappingFrame shapes below write their frame stream.
+ * project from another frame: the MappingFrame shapes below write their frame stream, the
+ * MappingObject shapes below join or leave a frame batch.
  *
  * @param it The iterator of the observer
  */
@@ -851,7 +852,8 @@ static void box_draws_key(
     key->surface = shape->surface.p[0][0] != 0.0f;
     if (!shape2d) {
         const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
-        key->frame = mapping && mapping->mode == MappingFrame;
+        key->frame = mapping && (mapping->mode == MappingFrame ||
+            (mapping->mode == MappingObject && box_render_texture_frame(world, e)));
     }
 
     if (shape2d && shape2d->texture) {

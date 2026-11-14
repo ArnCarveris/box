@@ -135,9 +135,10 @@ fn material_blend(m: Material) -> f32 {
 }
 
 // What a vertex of a MappingObject material passes on for the projection of its fragments: its
-// object position times the scale of its instance (the lengths of the model matrix columns) over
-// the mapping size, with the TextureTransform scale of the texture axis each one maps to:
-// (x * su, y * sv, z * su, x * sv). It is linear in the position, so it interpolates exactly.
+// object position times the scale of its instance (the lengths of the model matrix columns, over
+// the uniform world scale of its texture frame if any) over the mapping size, with the
+// TextureTransform scale of the texture axis each one maps to: (x * su, y * sv, z * su, x * sv).
+// It is linear in the position, so it interpolates exactly.
 // A MappingWorld material passes its world position with a scale of 1.
 fn mapping_object(m: Material, position: vec3f, scale: vec3f) -> vec4f {
     let p = position * scale / m.mapping_size;
@@ -146,8 +147,8 @@ fn mapping_object(m: Material, position: vec3f, scale: vec3f) -> vec4f {
 
 // What a vertex of a MappingFrame material passes on: its object position moved by relative,
 // the transform of its instance relative to its texture frame, over the mapping size as
-// mapping_object makes it (with a scale of 1, so world units), and its object normal in the
-// space of the frame. Both are linear in the position, so they interpolate exactly.
+// mapping_object makes it (with a scale of 1, so the local units of the frame), and its object
+// normal in the space of the frame. Both are linear in the position, so they interpolate exactly.
 struct FrameMapping {
     object: vec4f,
     normal: vec3f,

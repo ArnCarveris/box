@@ -1725,9 +1725,9 @@ void Material_texture_mapping_frame_of(void) {
     ecs_fini(world);
 }
 
-/** The relative transform is the inverse of the frame without its scale times the model matrix:
- * the identity frame keeps the model matrix, and a moved, turned and scaled frame leaves the
- * scale of the instance and the frame scale of the position. */
+/** The relative transform is the inverse of the frame, its scale included, times the model
+ * matrix: the identity frame keeps the model matrix, and a moved, turned and scaled frame divides
+ * the position and the scale of the instance by the frame scale. */
 void Material_texture_mapping_frame_transform(void) {
     // materials/texture_mapping_frame
     box_render_transform_t model = {{
@@ -1743,17 +1743,28 @@ void Material_texture_mapping_frame_transform(void) {
     }};
     box_draws_frame(&out, &model, &frame);
 
-    /* The instance origin (5, 6, 7) is (4, 4, 4) from the frame, (4, -4, 4) in its axes */
-    test_flt(out.rows[0][3], 4);
-    test_flt(out.rows[1][3], -4);
-    test_flt(out.rows[2][3], 4);
+    /* The instance origin (5, 6, 7) is (4, 4, 4) from the frame, (4, -4, 4) in its axes,
+     * (2, -2, 2) in its units */
+    test_flt(out.rows[0][3], 2);
+    test_flt(out.rows[1][3], -2);
+    test_flt(out.rows[2][3], 2);
 
-    /* The model x axis (2, 0, 0) is -y of the frame, its y axis (0, 3, 0) +x */
+    /* The model x axis (2, 0, 0) is -y of the frame, its y axis (0, 3, 0) +x, each half as
+     * long in the units of the frame */
     test_flt(out.rows[0][0], 0);
-    test_flt(out.rows[1][0], -2);
-    test_flt(out.rows[0][1], 3);
+    test_flt(out.rows[1][0], -1);
+    test_flt(out.rows[2][0], 0);
+    test_flt(out.rows[0][1], 1.5f);
     test_flt(out.rows[1][1], 0);
-    test_flt(out.rows[2][2], 4);
+    test_flt(out.rows[2][1], 0);
+    test_flt(out.rows[2][2], 2);
+
+    /* A flat frame keeps the model matrix */
+    WorldTransform flat = {{
+        {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 1, 0}, {1, 2, 3, 1}
+    }};
+    box_draws_frame(&out, &model, &flat);
+    test_assert(!ecs_os_memcmp_t(&out, &model, box_render_transform_t));
 }
 
 /** Find the batch and slot of a drawn shape.
@@ -1811,7 +1822,7 @@ static void frame_record_check(
 
 /** A MappingFrame shape gets the frame stream with its transform relative to its frame, its
  * own TextureFrame, the nearest of two frames above it or none (its model matrix); the frame of
- * a moved, turned and scaled parent leaves the instance scale and the scaled offset. */
+ * a moved, turned and scaled parent leaves the transform in the local units of the frame. */
 void Material_texture_mapping_frame_record(void) {
     // materials/texture_mapping_frame
     box_render_null_t *null;
@@ -1849,7 +1860,7 @@ void Material_texture_mapping_frame_record(void) {
     mapping_frame(world);
 
     frame_record_check(world, in_outer, 1, 0, 0, 1);
-    frame_record_check(world, in_inner, 2, 0, 0, 2);
+    frame_record_check(world, in_inner, 1, 0, 0, 1);
     frame_record_check(world, own, 0, 0, 0, 1);
 
     int32_t slot;
@@ -1863,14 +1874,15 @@ void Material_texture_mapping_frame_record(void) {
     ecs_set(world, outer, Rotation, {0.4f, -1, 0.1f});
     mapping_frame(world);
     frame_record_check(world, in_outer, 1, 0, 0, 1);
-    frame_record_check(world, in_inner, 2, 0, 0, 2);
+    frame_record_check(world, in_inner, 1, 0, 0, 1);
 
     ecs_fini(world);
     box_render_null_free(null);
 }
 
-/** Materials without MappingFrame stay out of the frame store: their batches have no frame
- * stream and no page has a frame buffer, until a MappingFrame shape comes. */
+/** Materials without MappingFrame stay out of the frame store, as MappingObject without a
+ * TextureFrame does: their batches have no frame stream and no page has a frame buffer, until a
+ * MappingFrame shape comes. */
 void Material_texture_mapping_frame_no_stream(void) {
     // materials/texture_mapping_frame
     box_render_null_t *null;
@@ -1886,7 +1898,6 @@ void Material_texture_mapping_frame_no_stream(void) {
     ecs_entity_t b = mapping_box(world, 1, &world_mapping);
     ecs_entity_t c = mapping_box(world, 2, &object_mapping);
     ecs_add_pair(world, b, EcsChildOf, parent);
-    ecs_add_pair(world, c, EcsChildOf, parent);
     mapping_frame(world);
 
     ecs_entity_t shapes[3] = { a, b, c };
@@ -1985,6 +1996,180 @@ void Material_texture_mapping_frame_updates(void) {
     ecs_add(world, shape, TextureFrame);
     mapping_frame(world);
     frame_record_check(world, shape, 0, 0, 0, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A frame scaled uniformly by 10 divides the relative transform by 10: the texture of a shape
+ * of 10 units covers what one unit covered without the scale. */
+void Material_texture_mapping_frame_scaled(void) {
+    // materials/texture_mapping_frame
+    box_render_transform_t model = {{
+        {10, 0, 0, 20}, {0, 20, 0, 30}, {0, 0, 30, 40}
+    }};
+    box_render_transform_t out;
+
+    /* A frame at (10, 10, 10) scaled by 10 */
+    WorldTransform frame = {{
+        {10, 0, 0, 0}, {0, 10, 0, 0}, {0, 0, 10, 0}, {10, 10, 10, 1}
+    }};
+    box_draws_frame(&out, &model, &frame);
+    test_flt(out.rows[0][3], 1);
+    test_flt(out.rows[1][3], 2);
+    test_flt(out.rows[2][3], 3);
+    test_flt(out.rows[0][0], 1);
+    test_flt(out.rows[1][1], 2);
+    test_flt(out.rows[2][2], 3);
+    test_flt(out.rows[0][1], 0);
+    test_flt(out.rows[1][0], 0);
+
+    /* A frame of scale 1 keeps world units */
+    WorldTransform unit = {{
+        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {10, 10, 10, 1}
+    }};
+    box_draws_frame(&out, &model, &unit);
+    test_flt(out.rows[0][3], 10);
+    test_flt(out.rows[1][3], 20);
+    test_flt(out.rows[2][3], 30);
+    test_flt(out.rows[0][0], 10);
+    test_flt(out.rows[1][1], 20);
+    test_flt(out.rows[2][2], 30);
+}
+
+/** Under a frame scaled by 10 a MappingFrame shape gets the record it has under a frame of
+ * scale 1, and a scale between the frame and the shape stays in the record, so a stretched plate
+ * keeps its texel density. */
+void Material_texture_mapping_frame_scaled_record(void) {
+    // materials/texture_mapping_frame
+    box_render_null_t *null;
+    ecs_world_t *world = mapping_world(&null);
+    TextureMapping frame_mapping = { .mode = MappingFrame, .size = 1 };
+
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, TextureFrame);
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_set(world, root, Rotation, {0, 0.7f, 0});
+    ecs_set(world, root, Scale, {10, 10, 10});
+
+    ecs_entity_t plate = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, plate, Position, {1, 2, 0});
+    ecs_set(world, plate, Box, {1, 2, 3});
+    ecs_set_ptr(world, plate, TextureMapping, &frame_mapping);
+
+    ecs_entity_t stretch = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, stretch, Position, {0, 0, 1});
+    ecs_set(world, stretch, Scale, {2, 1, 3});
+    ecs_entity_t stretched = ecs_new_w_pair(world, EcsChildOf, stretch);
+    ecs_set(world, stretched, Position, {1, 1, 1});
+    ecs_set(world, stretched, Box, {1, 2, 3});
+    ecs_set_ptr(world, stretched, TextureMapping, &frame_mapping);
+    mapping_frame(world);
+
+    /* In the local units of the root, as with a root of scale 1 */
+    frame_record_check(world, plate, 1, 2, 0, 1);
+
+    /* The scale between the frame and the shape counts */
+    int32_t slot;
+    box_draw_batch_t *b = frame_batch_of(world, stretched, &slot);
+    const box_render_transform_t *rec = box_draws_slot_frame(b, slot);
+    const ShapeMesh *shape = ecs_get(world, stretched, ShapeMesh);
+    test_assert(rec != NULL);
+    test_assert(fabsf(rec->rows[0][3] - 2) < 1e-4f);
+    test_assert(fabsf(rec->rows[1][3] - 1) < 1e-4f);
+    test_assert(fabsf(rec->rows[2][3] - 4) < 1e-4f);
+    test_assert(fabsf(rec->rows[0][0] - 2 * shape->scale[0]) < 1e-4f);
+    test_assert(fabsf(rec->rows[1][1] - 1 * shape->scale[1]) < 1e-4f);
+    test_assert(fabsf(rec->rows[2][2] - 3 * shape->scale[2]) < 1e-4f);
+
+    /* Scaling the root again keeps the records */
+    ecs_set(world, root, Scale, {4, 4, 4});
+    mapping_frame(world);
+    frame_record_check(world, plate, 1, 2, 0, 1);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A MappingObject shape under a TextureFrame gets the frame stream with its model matrix over
+ * the uniform world scale of the frame, so the shader measures its scale relative to the frame;
+ * one without a frame stays out of the frame store and keeps its world scale. */
+void Material_texture_mapping_object_frame(void) {
+    // materials/texture_mapping_frame
+    box_render_null_t *null;
+    ecs_world_t *world = mapping_world(&null);
+    box_render_draws_t *d = box_draws_state(world);
+    TextureMapping object_mapping = { .mode = MappingObject, .size = 1 };
+
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, TextureFrame);
+    ecs_set(world, root, Position, {3, 0, 0});
+    ecs_set(world, root, Scale, {10, 10, 10});
+
+    ecs_entity_t ring = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, ring, Position, {1, 0, 0});
+    ecs_set(world, ring, Rotation, {0.5f, 0, 0});
+    ecs_set(world, ring, Scale, {1, 2, 1});
+    ecs_set(world, ring, Box, {1, 2, 3});
+    ecs_set_ptr(world, ring, TextureMapping, &object_mapping);
+
+    ecs_entity_t loose = mapping_box(world, 0, &object_mapping);
+    ecs_set(world, loose, Scale, {10, 10, 10});
+    mapping_frame(world);
+
+    /* Under the frame: the model matrix over 10, its column lengths the scale relative to the
+     * frame */
+    int32_t slot;
+    box_draw_batch_t *b = frame_batch_of(world, ring, &slot);
+    test_assert(b->key.frame);
+    test_assert(box_draws_batch_store(d, b) == &d->stores[BOX_DRAWS_STORE_FRAME]);
+    const box_render_transform_t *rec = box_draws_slot_frame(b, slot);
+    const box_render_transform_t *model = box_draws_slot_transform(b, slot);
+    const ShapeMesh *shape = ecs_get(world, ring, ShapeMesh);
+    test_assert(rec != NULL);
+    float rel[3] = { 1, 2, 1 };
+    for (int32_t c = 0; c < 3; c ++) {
+        float length = 0;
+        for (int32_t r = 0; r < 3; r ++) {
+            test_assert(fabsf(rec->rows[r][c] - model->rows[r][c] / 10) < 1e-4f);
+            length += rec->rows[r][c] * rec->rows[r][c];
+        }
+
+        test_assert(fabsf(sqrtf(length) - rel[c] * shape->scale[c]) < 1e-3f);
+    }
+
+    /* Without a frame: no frame stream, the shader takes the world scale */
+    b = frame_batch_of(world, loose, &slot);
+    test_assert(!b->key.frame);
+    test_assert(box_draws_slot_frame(b, slot) == NULL);
+    test_assert(box_draws_batch_store(d, b) != &d->stores[BOX_DRAWS_STORE_FRAME]);
+
+    /* A non uniform frame divides by the cube root of its volume scale */
+    ecs_set(world, root, Scale, {2, 4, 8});
+    mapping_frame(world);
+    b = frame_batch_of(world, ring, &slot);
+    rec = box_draws_slot_frame(b, slot);
+    model = box_draws_slot_transform(b, slot);
+    test_assert(rec != NULL);
+    for (int32_t r = 0; r < 3; r ++) {
+        for (int32_t c = 0; c < 4; c ++) {
+            float expect = c == 3 ? model->rows[r][c] : model->rows[r][c] / 4;
+            test_assert(fabsf(rec->rows[r][c] - expect) < 1e-3f);
+        }
+    }
+
+    /* Losing the frame leaves the frame store, getting it back joins it again */
+    ecs_remove(world, root, TextureFrame);
+    mapping_frame(world);
+    b = frame_batch_of(world, ring, &slot);
+    test_assert(!b->key.frame);
+    test_assert(box_draws_slot_frame(b, slot) == NULL);
+
+    ecs_add(world, root, TextureFrame);
+    mapping_frame(world);
+    b = frame_batch_of(world, ring, &slot);
+    test_assert(b->key.frame);
+    test_assert(box_draws_slot_frame(b, slot) != NULL);
 
     ecs_fini(world);
     box_render_null_free(null);

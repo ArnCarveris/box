@@ -255,9 +255,11 @@ static inline bool box_render_is_mesh(
 #define BOX_RENDER_STREAM_SURFACE (2)
 
 /** Stream of the transforms relative to the texture frame of a frame page, the pages of the
- * MappingFrame materials: box_render_transform_t per slot, the inverse of the world transform of
- * the nearest TextureFrame without its scale times the model matrix (the model matrix without a
- * frame); every other page has none */
+ * MappingFrame materials and of the MappingObject materials under a TextureFrame:
+ * box_render_transform_t per slot. For MappingFrame the inverse of the world transform of the
+ * nearest TextureFrame, its scale included, times the model matrix (the model matrix without a
+ * frame); for MappingObject the model matrix with its axes divided by the uniform world scale of
+ * the frame. Every other page has none */
 #define BOX_RENDER_STREAM_FRAME (3)
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */

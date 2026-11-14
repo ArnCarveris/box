@@ -296,6 +296,19 @@ fn frame_model(slot: u32, model: mat4x4f) -> mat4x4f {
     return result;
 }
 
+// Scale of the instance of a slot for a MappingObject material: the lengths of the columns of its
+// frame record when it is under a texture frame (the model matrix over the uniform world scale
+// of the frame), else scale, the lengths of the model matrix columns.
+fn object_scale(slot: u32, model: mat4x4f, scale: vec3f) -> vec3f {
+    var result = scale;
+    if (slot < arrayLength(&frames)) {
+        let relative = instance_frame(frames[slot], model);
+        result = vec3f(length(relative[0].xyz), length(relative[1].xyz),
+            length(relative[2].xyz));
+    }
+    return result;
+}
+
 fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Material, p: Placed,
     scale: vec3f, normal: vec3f) {
     let blend = material_blend(material);
@@ -313,7 +326,7 @@ fn vertex_mapping(o: ptr<function, VertexShading>, v: VertexIn, material: Materi
             (*o).rotation = mapping_frame_rotation(p.model, relative);
         }
     } else {
-        (*o).object = mapping_object(material, v.position, scale);
+        (*o).object = mapping_object(material, v.position, object_scale(v.slot, p.model, scale));
         (*o).object_normal = v.normal;
         if (blend > 0.0) {
             (*o).rotation = mapping_rotation(p.model[0].xyz, p.model[1].xyz, p.model[2].xyz);

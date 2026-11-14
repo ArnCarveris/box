@@ -1049,15 +1049,16 @@ static float box_pick_wrap(
  * MappingFrame TextureMapping, before the TextureTransform, as mapping_uv of material.wgsl
  * projects them.
  *
- * MappingObject projects the position times the scale of the world transform, MappingWorld the
- * world position, MappingFrame the world position in the frame without its scale.
+ * MappingObject projects the position times the scale of the world transform, over the uniform
+ * world scale of its texture frame when it has one (box_transform_world_scale), MappingWorld the
+ * world position, MappingFrame the position in the local units of the frame, its scale included.
  *
  * Each over the mapping size, onto the plane of the dominant axis of the normal (in the world or
  * the frame for MappingWorld and MappingFrame), plus half a repeat; a blend picks on that axis.
  *
  * @param m The world transform of the entity, without the ShapeMesh scale
- * @param frame The world transform of the texture frame of a MappingFrame mapping, NULL for
- * none, which projects as MappingWorld
+ * @param frame The world transform of the texture frame of a MappingFrame or MappingObject
+ * mapping, NULL for none, with which MappingFrame projects as MappingWorld
  * @param mapping The mapping
  * @param hit The hit
  * @param uv Receives the texture coordinates
@@ -1080,26 +1081,33 @@ static void box_pick_mapping_uv(
         glm_mat3_transpose(cofactor);
         glm_mat3_mulv(cofactor, (float*)hit->normal, n);
         if (mapping->mode == MappingFrame && frame) {
-            vec3 axes[3], d, fp, fn;
-            for (k = 0; k < 3; k ++) {
-                float length = glm_vec3_norm(frame[k]);
-                glm_vec3_scale(frame[k], length > 1e-20f ? 1.0f / length : 1.0f, axes[k]);
-            }
+            mat3 fr;
+            mat4 inv;
+            vec3 fn;
+            glm_mat4_pick3(frame, fr);
+            if (fabsf(glm_mat3_det(fr)) > 1e-30f) {
+                glm_mat4_inv(frame, inv);
+                glm_mat4_mulv3(inv, p, 1.0f, p);
+                for (k = 0; k < 3; k ++) {
+                    fn[k] = glm_vec3_dot(frame[k], n);
+                }
 
-            glm_vec3_sub(p, frame[3], d);
-            for (k = 0; k < 3; k ++) {
-                fp[k] = glm_vec3_dot(axes[k], d);
-                fn[k] = glm_vec3_dot(axes[k], n);
+                glm_vec3_copy(fn, n);
             }
-
-            glm_vec3_copy(fp, p);
-            glm_vec3_copy(fn, n);
         }
 
         glm_vec3_scale(p, 1.0f / size, p);
     } else {
+        float frame_scale = 1.0f;
+        if (frame) {
+            WorldTransform ft;
+            glm_mat4_copy(frame, ft.m);
+            frame_scale = box_transform_world_scale(&ft);
+            frame_scale = frame_scale > 1e-20f ? frame_scale : 1.0f;
+        }
+
         for (k = 0; k < 3; k ++) {
-            p[k] = hit->position[k] * glm_vec3_norm(m[k]) / size;
+            p[k] = hit->position[k] * glm_vec3_norm(m[k]) / frame_scale / size;
         }
 
         glm_vec3_copy((float*)hit->normal, n);
@@ -1262,7 +1270,7 @@ static bool box_pick_texture(
             mapping->mode == MappingWorld || mapping->mode == MappingFrame))
         {
             mat4 m, fm;
-            ecs_entity_t frame = mapping->mode == MappingFrame
+            ecs_entity_t frame = mapping->mode != MappingWorld
                 ? box_render_texture_frame(world, e) : 0;
             box_pick_transform(world, e, m);
             if (frame) {

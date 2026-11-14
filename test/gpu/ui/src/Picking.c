@@ -599,6 +599,115 @@ void Picking_render_to_texture_frame_mapped(void) {
     ecs_fini(world);
 }
 
+/** Click a wall under a TextureFrame scaled by 2 with a texture mapping mode, at x -1.2, where
+ * the button is when the texture scales with the frame, and at x 1.5, where it was when the
+ * texture kept its world size.
+ *
+ * @param mode The mapping mode of the wall, MappingFrame or MappingObject
+ */
+static void picking_scaled_frame_mapped(
+    const char *mode)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    // The wall is 2 x 1 in the frame, x -2..2 in the world. With a size of 2, MappingFrame
+    // projects x / 2, the frame units, and MappingObject the box position, x / 2 too, the scale
+    // of the wall relative to the frame being 1, so the button (surface x 20..80 of 200) is at
+    // x -1.6..-0.4, where world units would put it at x -0.8..-0.2 and 1.2..1.8.
+    char *code = flecs_asprintf(
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.material\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.surface\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut clicks: i32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.click(this)\n"
+        "      clicks = clicks + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "screen_texture {}\n"
+        "screen_ui {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  button {\n"
+        "    Position: {-50, 0, 0}\n"
+        "    Rect: {60, 60}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "screen_views {\n"
+        "  view {\n"
+        "    View: {camera: screen_ui.camera}\n"
+        "  }\n"
+        "}\n"
+        "screen_surface {\n"
+        "  Surface: {width: 200, height: 100, texture: screen_texture, view_root: screen_views}\n"
+        "}\n"
+        "camera {\n"
+        "  Position: {0, 0, 10}\n"
+        "  Camera: {}\n"
+        "}\n"
+        "main_view {\n"
+        "  View: {camera: camera}\n"
+        "}\n"
+        "ship {\n"
+        "  TextureFrame\n"
+        "  Scale: {2, 2, 2}\n"
+        "  wall {\n"
+        "    Position: {0, 0, -0.05}\n"
+        "    box.geometry.Box: {2, 1, 0.1}\n"
+        "    PbrTextures: {albedo: screen_texture}\n"
+        "    TextureMapping: {mode: %s, size: 2}\n"
+        "  }\n"
+        "}\n", mode);
+    test_assert(ecs_script(world, { .code = code }) != 0);
+    ecs_os_free(code);
+
+    typedef struct { int32_t clicks; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t button = ecs_lookup(world, "screen_ui.button");
+    ecs_progress(world, 0);
+
+    // x 1.5: on the button in world units, not in the units of the frame
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    ecs_os_free(box_command_run(world, s, "mouse_click left [733, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ecs_lookup(world, "ship.wall"));
+
+    // x -1.2: on the button in the units of the frame only
+    ecs_os_free(box_command_run(world, s, "mouse_click left [566, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(((const Mut*)ecs_get_id(world, button, mut))->clicks, 1);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, button);
+
+    ecs_fini(world);
+}
+
+void Picking_render_to_texture_scaled_frame_mapped(void) {
+    // ui/picking
+    picking_scaled_frame_mapped("MappingFrame");
+}
+
+void Picking_render_to_texture_scaled_frame_object_mapped(void) {
+    // ui/picking
+    picking_scaled_frame_mapped("MappingObject");
+}
+
 void Picking_render_to_texture_sweep_mapped(void) {
     // ui/picking
     ecs_world_t *world = ecs_init();

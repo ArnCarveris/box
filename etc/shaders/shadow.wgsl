@@ -223,7 +223,11 @@ fn cutout_mapping(v: VertexIn, material: Material, position: vec3f, normal: vec3
     let c0 = model[0].xyz;
     let c1 = model[1].xyz;
     let c2 = model[2].xyz;
-    let scale = vec3f(length(c0), length(c1), length(c2));
+    var scaled = model;
+    if (v.slot < arrayLength(&frames)) {
+        scaled = instance_frame(frames[v.slot], model);
+    }
+    let scale = vec3f(length(scaled[0].xyz), length(scaled[1].xyz), length(scaled[2].xyz));
     (*o).mapped = 1.0 + material_blend(material);
     (*o).uv = mapping_offset(material);
     (*o).object = mapping_object(material, position, scale);

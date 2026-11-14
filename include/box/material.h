@@ -459,20 +459,24 @@ ECS_STRUCT(TextureScroll, {
 /** Where the texture coordinates of a material come from */
 ECS_ENUM(TextureMappingMode, {
     MappingUv = 0,      /**< The UVs of the mesh, the default */
-    MappingObject = 1,  /**< Projected from the object space position times the instance scale */
+    MappingObject = 1,  /**< Projected from the object space position times the instance scale,
+                         *   relative to the scale of the nearest TextureFrame if any */
     MappingWorld = 2,   /**< Projected from the world position, fixed in the world */
     MappingFrame = 3    /**< Projected from the position in the space of the nearest
-                         *   TextureFrame, the shape or an ancestor; moves with that frame */
+                         *   TextureFrame, the shape or an ancestor; moves and scales with
+                         *   that frame */
 });
 
 /** How the texture coordinates of a material are made, default MappingUv with a size of 1 and a
  * blend of 0, inherited by instances, like TextureTransform.
  *
- * MappingObject projects the object space position times the instance scale, MappingWorld the
- * world position, MappingFrame the position relative to the origin and orientation of the
- * nearest TextureFrame (in world units, without the scale of the frame; as MappingWorld without
- * one), divided by size, onto the plane of the dominant normal axis, oriented as the
- * faces of a Box. A blend above 0 mixes the three projections (triplanar) to hide seams.
+ * MappingObject projects the object space position times the instance scale (the world scale
+ * of each axis, divided by the uniform world scale of the nearest TextureFrame if any, so the
+ * textures scale with a scaled model), MappingWorld the world position, MappingFrame the
+ * position in the local units of the nearest TextureFrame (its scale included, so a frame
+ * scaled by 10 shows its textures 10x larger; as MappingWorld without one), divided by size,
+ * onto the plane of the dominant normal axis, oriented as the faces of a Box. A blend above 0
+ * mixes the three projections (triplanar) to hide seams.
  *
  * TextureTransform applies after the mapping. Parametric surfaces keep their own UVs, except a
  * Sweep with MappingObject (see Sweep) and MappingFrame, which projects them too.

@@ -8,8 +8,9 @@
  *
  * A batch owns a run of slots of an instance page (store.c), a buffer per stream; a change
  * uploads only its streams. Only the pages of the parametric surfaces have a surface stream, the
- * others bind a zero record; only frame pages, those of the MappingFrame materials, have a frame
- * stream. A mesh shading is a tint, an alpha and a material slot.
+ * others bind a zero record; only frame pages, those of the MappingFrame materials and of the
+ * MappingObject materials under a TextureFrame, have a frame stream. A mesh shading is a tint,
+ * an alpha and a material slot.
  */
 
 #ifndef BOX_RENDER_DRAW_H
@@ -182,9 +183,10 @@ typedef struct box_draw_key_t {
     bool surface;           /**< The shapes have a parametric surface: the batch has the
                              *   surface stream, its pages are of the surface store. The mesh
                              *   already tells surfaces apart, the bit selects the store */
-    bool frame;             /**< The material of the 3D shapes uses MappingFrame: the batch has
-                             *   the frame stream, its pages are of a frame store. Other
-                             *   materials never pay for the frame */
+    bool frame;             /**< The material of the 3D shapes uses MappingFrame, or
+                             *   MappingObject under a TextureFrame: the batch has the frame
+                             *   stream, its pages are of a frame store. Other materials never
+                             *   pay for the frame */
     bool bake;              /**< Static 3D instances without NoBake of a scene with LightBake or
                              *   ReflectionBake, drawn by the captures */
     bool box_shadow;        /**< The shadows of 2D shapes (BoxShadow), drawn with the
@@ -456,8 +458,8 @@ typedef struct box_draw_batch_t {
     ecs_vec_t surfaces;     /**< box_render_surface_t per slot of a mesh batch with a parametric
                              *   surface, empty for any other batch */
     ecs_vec_t frames;       /**< box_render_transform_t per slot of a frame batch, its transform
-                             *   relative to its texture frame (box_draws_frame), empty for any
-                             *   other batch */
+                             *   relative to its texture frame (box_draws_frame_of_shape), empty
+                             *   for any other batch */
     ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
                              *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
@@ -917,9 +919,9 @@ box_render_transform_t* box_draws_slot_frame(
     int32_t slot);
 
 /** Write the transform of an instance relative to its texture frame: the inverse of the world
- * transform of the frame without its scale (the columns normalized), times the model matrix of
- * the instance. Positions stay in world units, relative to the origin of the frame and in its
- * orientation; without a frame it is the model matrix.
+ * transform of the frame, its scale included, times the model matrix of the instance. Positions
+ * are in the local units of the frame, so a frame scaled by 10 shows its textures 10x larger;
+ * without a frame, or with a flat one, it is the model matrix.
  *
  * @param out The relative transform
  * @param model The model matrix of the instance (box_draws_transform)
@@ -930,7 +932,21 @@ void box_draws_frame(
     const box_render_transform_t *model,
     const WorldTransform *frame);
 
-/** Write the transform of a shape relative to its texture frame, looking the frame up.
+/** Write the frame record of a MappingObject instance under a texture frame: the model matrix
+ * with its axes divided by the uniform world scale of the frame (box_transform_world_scale), so
+ * the lengths of its columns are the scale of the instance relative to the frame.
+ *
+ * @param out The record
+ * @param model The model matrix of the instance (box_draws_transform)
+ * @param frame World transform of the frame, NULL for none
+ */
+void box_draws_frame_scaled(
+    box_render_transform_t *out,
+    const box_render_transform_t *model,
+    const WorldTransform *frame);
+
+/** Write the frame record of a shape, looking its texture frame up: box_draws_frame_scaled for
+ * a MappingObject material, else box_draws_frame.
  *
  * @param world The world
  * @param e The entity
