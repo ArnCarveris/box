@@ -402,7 +402,7 @@ void TextSpans_script_sets_spans(void) {
         "using box.text\n"
         "label {\n"
         "  Text: {value: \"let x\", size: 16}\n"
-        "  TextSpans: {spans: [{start: 0, end: 3, color: {200, 100, 50, 255}}, "
+        "  Spans: {spans: [{start: 0, end: 3, color: {200, 100, 50, 255}}, "
         "{start: 4, end: 5, color: {1, 2, 3, 4}}]}\n"
         "}\n", NULL), 0);
     ecs_progress(world, 0);
@@ -1011,7 +1011,7 @@ void TextSpans_from_script(void) {
         "}\n"
         "label {\n"
         "  Text: {value: \"bold text\", size: 16, font: assets_font}\n"
-        "  TextSpans: {spans: [{start: 0, end: 4, bold: true, keep_color: true}]}\n"
+        "  Spans: {spans: [{start: 0, end: 4, bold: true, keep_color: true}]}\n"
         "}\n", NULL), 0);
     ecs_progress(world, 0);
 

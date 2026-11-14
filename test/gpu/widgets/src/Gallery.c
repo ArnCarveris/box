@@ -386,7 +386,7 @@ void Gallery_theme_switch(void) {
     gallery_tap(world, s, HEADER ".theme.list.option_1", 0, 0);
     gallery_expect_mut(world, s, HEADER ".theme", "Dropdown", "current", "1");
     gallery_expect(world, s, "get " HEADER ".theme.caption box.text.Text.value", "\"Light\"");
-    gallery_expect(world, s, "get box.ui.theme box.ui.UiTheme.background",
+    gallery_expect(world, s, "get box.ui.theme box.ui.Theme.background",
         "{\"r\":232, \"g\":235, \"b\":240}");
     gallery_expect(world, s, "get " BASICS ".buttons.save box.material.Rgb",
         "{\"Rgb\":{\"r\":44, \"g\":128, \"b\":82}}");

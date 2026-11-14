@@ -532,11 +532,15 @@ void BoxConsoleImport(
     ECS_IMPORT(world, BoxInput);
     ECS_IMPORT(world, BoxCommand);
 
+    ecs_set_name_prefix(world, "Console");
     ECS_META_COMPONENT(world, ConsoleSyntax);
     ECS_META_COMPONENT(world, ConsoleOutput);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Console);
     ecs_set_hooks(world, Console, { .ctor = box_console_ctor });
+    ecs_set_name_prefix(world, "Console");
     ECS_COMPONENT_DEFINE(world, ConsoleHost);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, ConsoleHost, { .ctor = flecs_default_ctor });
 
     box_console_t *con = ecs_os_calloc_t(box_console_t);

@@ -25,7 +25,7 @@ template RadioGroup {
   mut first: entity = 0   // First enabled button, the Tab stop while none is checked
   mut pending: entity = 0 // Button the arrow keys move the focus to, checked when focused
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
 
   Layout: {direction: Column, spacing: t.spacing / 2}
   Item: {width: {min: width, max: width}}
@@ -165,7 +165,7 @@ template HeadlessRadioButton : parent RadioGroup {
 
 // A radio button: a round indicator with a dot when checked and a label to its right
 template RadioButton : HeadlessRadioButton {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const checked = current == label
   const size = 16

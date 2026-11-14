@@ -268,10 +268,14 @@ void BoxEditorImport(
     ECS_IMPORT(world, BoxPicking);
     ECS_IMPORT(world, BoxUi);
 
+    ecs_set_name_prefix(world, "Editor");
     ECS_META_COMPONENT(world, EditorSide);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Editor);
     ecs_set_hooks(world, Editor, { .ctor = box_editor_ctor });
+    ecs_set_name_prefix(world, "Editor");
     ECS_COMPONENT_DEFINE(world, EditorHost);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, EditorHost, { .ctor = flecs_default_ctor });
 
     box_editor_t *ed = ecs_os_calloc_t(box_editor_t);

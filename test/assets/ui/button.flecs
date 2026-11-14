@@ -108,7 +108,7 @@ template HeadlessButton {
 template Button : HeadlessButton {
   prop variant: string = "primary"
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const pad = t.padding * 1.5
   const filled = variant == "primary" || variant == "danger"

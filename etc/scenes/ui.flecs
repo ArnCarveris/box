@@ -165,7 +165,7 @@ ui {
       status {
         Text: {value: "Output 82%   Coolant low", size: 22}
         Rgb: {250, 210, 90}
-        TextSpans: {spans: [{start: 13, end: 24, color: {250, 110, 80, 255}, bold: true}]}
+        Spans: {spans: [{start: 13, end: 24, color: {250, 110, 80, 255}, bold: true}]}
       }
     }
   }

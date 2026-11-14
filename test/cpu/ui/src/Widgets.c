@@ -373,7 +373,7 @@ void Widgets_theme_from_script(void) {
         "box {\n"
         "  ui {\n"
         "    theme {\n"
-        "      box.ui.UiTheme: LightTheme\n"
+        "      box.ui.Theme: LightTheme\n"
         "    }\n"
         "  }\n"
         "}\n"

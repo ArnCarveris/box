@@ -27,7 +27,7 @@ window {}
 box {
   ui {
     theme {
-      UiTheme: {
+      Theme: {
         background: {32, 35, 41},
         surface: {46, 50, 58},
         surface_alt: {38, 41, 48},
@@ -60,7 +60,7 @@ box {
 template OptionsPanel : HeadlessCollapsible {
   prop header: f32 = 24
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const radius = t.radius * 1.5
 

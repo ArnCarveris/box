@@ -6,7 +6,7 @@ using box.view
 using box.light
 using box.surface
 
-// The wireframe of a view (ViewDebug.wireframe) side by side: two cameras of one scene render
+// The wireframe of a view (box.view.Debug.wireframe) side by side: two cameras of one scene render
 // into two textures, the left one with WireframeOverlay and the right one with WireframeOnly,
 // shown on two tiles. The scene has a box, a sphere, a cup turned on a Lathe, a cable swept
 // along a curve and a row of instances of a prefab.

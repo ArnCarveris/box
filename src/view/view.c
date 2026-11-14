@@ -118,9 +118,13 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, WireframeMode);
     ECS_META_COMPONENT(world, OverdrawMode);
     ECS_META_COMPONENT(world, BvhDebug);
+    ecs_set_name_prefix(world, "View");
     ECS_META_COMPONENT(world, ViewDebug);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, LodSettings);
+    ecs_set_name_prefix(world, "View");
     ECS_META_COMPONENT(world, ViewEffect);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, ViewEffect, { .ctor = box_view_effect_ctor });
     ECS_META_COMPONENT(world, View);
     box_owned_hooks(world, View, BOX_OWNED_VEC(View, effects, ViewEffect));

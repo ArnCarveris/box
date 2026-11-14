@@ -105,18 +105,22 @@ void BoxUiImport(
     ECS_TAG_DEFINE(world, FocusScope);
     ECS_TAG_DEFINE(world, KeyCapture);
     ECS_META_COMPONENT(world, FocusStatus);
+    ecs_set_name_prefix(world, "Ui");
     ECS_META_COMPONENT(world, UiChangeEvent);
     ECS_META_COMPONENT(world, UiTheme);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, TextEdit);
     ECS_META_COMPONENT(world, TextEditStatus);
     ecs_set_hooks(world, FocusStatus, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiChangeEvent, { .ctor = flecs_default_ctor });
+    ecs_set_name_prefix(world, "Ui");
     ECS_COMPONENT_DEFINE(world, UiState);
     ecs_set_hooks(world, UiState, {
         .ctor = flecs_default_ctor,
         .dtor = box_ui_state_dtor,
         .flags = ECS_TYPE_HOOK_COPY_ILLEGAL | ECS_TYPE_HOOK_MOVE_ILLEGAL
     });
+    ecs_set_name_prefix(world, NULL);
 
     box_ui_state_t *st = ecs_os_calloc_t(box_ui_state_t);
     int32_t i;

@@ -493,7 +493,9 @@ void BoxStartupImport(
     ECS_IMPORT(world, BoxUi);
     ECS_IMPORT(world, BoxSpatial);
 
+    ecs_set_name_prefix(world, "Startup");
     ECS_META_COMPONENT(world, StartupOverlay);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, StartupOverlay, { .ctor = flecs_default_ctor });
 
     box_startup_t *st = ecs_os_calloc_t(box_startup_t);

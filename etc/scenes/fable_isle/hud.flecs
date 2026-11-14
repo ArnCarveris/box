@@ -364,14 +364,14 @@ assets {
       while true {
         const e = await on.press(this)
         down = true
-        hud_put(bind, hud_ratio(e.local_x, this[Bounds].width, thumb))
+        hud_put(bind, hud_ratio(e.local_x, this[box.layout.Bounds].width, thumb))
       }
     }
 
     async {
       while true {
         const e = await on.drag(this)
-        hud_put(bind, hud_ratio(e.local_x, this[Bounds].width, thumb))
+        hud_put(bind, hud_ratio(e.local_x, this[box.layout.Bounds].width, thumb))
       }
     }
 

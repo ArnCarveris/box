@@ -68,7 +68,7 @@ assets {
 box {
   ui {
     theme {
-      UiTheme = {accent: color, text: {240, 240, 245}, text_muted: {170, 175, 195}, font_size: 13}
+      Theme = {accent: color, text: {240, 240, 245}, text_muted: {170, 175, 195}, font_size: 13}
     }
   }
 }

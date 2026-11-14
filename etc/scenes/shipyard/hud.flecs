@@ -23,7 +23,7 @@ window {}
 box {
   ui {
     theme {
-      UiTheme: {
+      Theme: {
         background: {3, 10, 17},
         surface: {5, 16, 26},
         surface_alt: {9, 27, 41},

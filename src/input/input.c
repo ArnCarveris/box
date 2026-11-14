@@ -125,9 +125,13 @@ void BoxInputImport(
 
     ECS_META_COMPONENT(world, Key);
     ECS_META_COMPONENT(world, KeyState);
+    ecs_set_name_prefix(world, "Input");
     ECS_META_COMPONENT(world, InputEventKind);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, PointerCursor);
+    ecs_set_name_prefix(world, "Input");
     ECS_META_COMPONENT(world, InputEvent);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Mouse);
     ECS_META_COMPONENT(world, Input);
     ECS_META_COMPONENT(world, Action);
@@ -135,7 +139,9 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, ActionState);
     ECS_META_COMPONENT(world, Binding);
     ECS_META_COMPONENT(world, ActionEvent);
+    ecs_set_name_prefix(world, "Input");
     ECS_COMPONENT_DEFINE(world, InputDevice);
+    ecs_set_name_prefix(world, NULL);
 
     box_owned_hooks(world, Input, BOX_OWNED_STR(Input, text), BOX_OWNED_STR(Input, paste));
     box_owned_hooks(world, InputEvent, BOX_OWNED_STR(InputEvent, text));

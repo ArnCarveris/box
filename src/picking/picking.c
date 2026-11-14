@@ -662,7 +662,9 @@ void BoxPickingImport(
     ECS_META_COMPONENT(world, ActionTrigger);
     ECS_META_COMPONENT(world, Cursor);
     ECS_META_COMPONENT(world, PickStatus);
+    ecs_set_name_prefix(world, "Picking");
     ECS_COMPONENT_DEFINE(world, PickingState);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, PickingState, {
         .ctor = flecs_default_ctor,
         .dtor = box_pick_state_dtor,

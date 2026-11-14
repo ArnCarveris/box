@@ -6,7 +6,7 @@
 // of FpsWidget. Everything the panel shows is defined here, in the colors of the theme.
 //
 // The panel is a heading over a chart of the last 120 frame times and a summary of the last
-// second. The summary reads FpsSummary, which box.fps writes from FrameSamples. box.fps exports
+// second. The summary reads Summary, which box.fps writes from FrameSamples. box.fps exports
 // the colors of the bars (green, yellow, red) and the longest frame time of a green and a yellow
 // bar (fast_ms, slow_ms) from include/box/fps.h.
 //
@@ -87,7 +87,7 @@ template FpsBars {
 template FpsWidget {
   prop title: string = "Frame rate"
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
 
   // Rows of the heading and the summary, whole points so the chart stays on the pixel grid
   const heading_h: f32 = ceil(t.font_size * 1.4)
@@ -140,7 +140,7 @@ template FpsWidget {
 
   // The mean and worst frame time on the left, the fps on the right in the color of the mean
   summary {
-    const sum = FpsSummary[FpsSummary]
+    const sum = Summary[Summary]
     const level: i32 = match sum.mean_ms > slow_ms {
       true: 2
       _: match sum.mean_ms > fast_ms { true: 1; _: 0 }

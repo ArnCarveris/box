@@ -31,7 +31,7 @@ const bar_h: f32 = 3
 template StartupWidget {
   prop title: string = "Starting"
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const tasks = InProgressTask[InProgressTask]
 
   // Rows of the heading and the tasks, whole points so the bars stay on the pixel grid

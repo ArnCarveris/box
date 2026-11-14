@@ -451,7 +451,7 @@ void TextureMappingFrame_scaled_frame_matches(void) {
     // materials/texture_mapping_frame
     const char *scene =
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  Scale: {%g, %g, %g}\n"
         "  a : Hull { Position: {-1.5, 0.5, -1}\n Box: {3, 1, 4} }\n"
         "  stretched {\n"
@@ -467,7 +467,7 @@ void TextureMappingFrame_scaled_frame_matches(void) {
         "    PbrMaterial: {metallic: 1, roughness: 1}\n"
         "    Emissive: {strength: 1, color: {255, 255, 255}}\n"
         "    PbrTextures: {emissive: checker_tex}\n"
-        "    TextureMapping: {mode: MappingObject, size: 1.5}\n"
+        "    texture.Mapping: {mode: MappingObject, size: 1.5}\n"
         "  }\n"
         "}\n"
         "top_camera {\n"

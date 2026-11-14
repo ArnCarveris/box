@@ -53,14 +53,14 @@ panel {
     Position: {0, 0, 1}
     Text: {value: "Synthesized styles", size: 30, font: assets_font}
     Rgb: {250, 190, 60}
-    TextSpans: {spans: [{start: 0, end: 11, bold: true, keep_color: true}]}
+    Spans: {spans: [{start: 0, end: 11, bold: true, keep_color: true}]}
   }
 
   small {
     Position: {0, 0, 1}
     Text: {value: "Regular Bold Italic Both", size: 14, font: assets_font}
     Rgb: {230, 232, 240}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 8, end: 12, bold: true, keep_color: true},
       {start: 13, end: 19, italic: true, keep_color: true},
       {start: 20, end: 24, bold: true, italic: true, keep_color: true}
@@ -71,7 +71,7 @@ panel {
     Position: {0, 0, 1}
     Text: {value: "Regular Bold Italic Both", size: 22, font: assets_font}
     Rgb: {230, 232, 240}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 8, end: 12, bold: true, keep_color: true},
       {start: 13, end: 19, italic: true, keep_color: true},
       {start: 20, end: 24, bold: true, italic: true, keep_color: true}
@@ -82,7 +82,7 @@ panel {
     Position: {0, 0, 1}
     Text: {value: "Regular Bold Italic Both", size: 36, font: assets_font}
     Rgb: {230, 232, 240}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 8, end: 12, bold: true, keep_color: true},
       {start: 13, end: 19, italic: true, keep_color: true},
       {start: 20, end: 24, bold: true, italic: true, keep_color: true}
@@ -97,7 +97,7 @@ panel {
     }
     Item: {width: {mode: Grow, content_min: true}}
     Rgb: {220, 222, 230}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 18, end: 28, bold: true, keep_color: true},
       {start: 35, end: 47, italic: true, keep_color: true},
       {start: 53, end: 70, bold: true, keep_color: true},
@@ -112,14 +112,14 @@ panel {
     Position: {0, 0, 1}
     Text: {value: "Font variants", size: 30, font: variants_font}
     Rgb: {120, 210, 140}
-    TextSpans: {spans: [{start: 0, end: 13, bold: true, keep_color: true}]}
+    Spans: {spans: [{start: 0, end: 13, bold: true, keep_color: true}]}
   }
 
   variants_medium {
     Position: {0, 0, 1}
     Text: {value: "Regular Bold Italic Both", size: 22, font: variants_font}
     Rgb: {230, 232, 240}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 8, end: 12, bold: true, keep_color: true},
       {start: 13, end: 19, italic: true, keep_color: true},
       {start: 20, end: 24, bold: true, italic: true, keep_color: true}
@@ -130,7 +130,7 @@ panel {
     Position: {0, 0, 1}
     Text: {value: "Regular Bold Italic Both", size: 36, font: variants_font}
     Rgb: {230, 232, 240}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 8, end: 12, bold: true, keep_color: true},
       {start: 13, end: 19, italic: true, keep_color: true},
       {start: 20, end: 24, bold: true, italic: true, keep_color: true}
@@ -153,7 +153,7 @@ sign {
     Position: {0, 0, 0}
     Text: {value: "World label\nbold italic", size: 36, align: Center, font: assets_font}
     Rgb: {255, 255, 255}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 5, bold: true, keep_color: true},
       {start: 6, end: 11, italic: true, color: {250, 220, 120, 255}},
       {start: 12, end: 23, bold: true, italic: true, keep_color: true}

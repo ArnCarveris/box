@@ -773,8 +773,10 @@ void BoxFpsImport(
     ECS_IMPORT(world, BoxUi);
     ECS_IMPORT(world, BoxSpatial);
 
+    ecs_set_name_prefix(world, "Fps");
     ECS_META_COMPONENT(world, FpsPanel);
     ECS_META_COMPONENT(world, FpsSummary);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, FpsPanel, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, FpsSummary, { .ctor = flecs_default_ctor });
 

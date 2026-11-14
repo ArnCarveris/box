@@ -7,7 +7,7 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
 
-const USAGE = `Checks the wireframe of a view (ViewDebug.wireframe) in the browser build in
+const USAGE = `Checks the wireframe of a view (view.Debug.wireframe) in the browser build in
 headless Chrome, where WebGPU has no line polygon mode: the lines come from barycentric
 coordinates and the vertex stage pulls the vertices from storage buffers, with no optional device
 feature.

@@ -250,7 +250,7 @@ template Dropdown : HeadlessDropdown {
   prop row: f32 = 28
   prop inset: f32 = 4
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const count = options.count()
   const w = width == 0 ? 160 : width

@@ -97,7 +97,7 @@ template HeadlessTooltip {
 // A tooltip: the text in the caption style of the theme on a surface with a border, the corner
 // radius of the theme and a shadow. Its text wraps where the box would get wider than width points.
 template Tooltip : HeadlessTooltip {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const pad = t.padding * 0.75
 
   if shown {

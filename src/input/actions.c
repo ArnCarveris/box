@@ -796,7 +796,9 @@ void box_input_actions_import(
 {
     ecs_entity_t on;
     int32_t i;
+    ecs_set_name_prefix(world, "Input");
     ECS_COMPONENT_DEFINE(world, InputActions);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, ActionState, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Binding, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ActionEvent, { .ctor = flecs_default_ctor });

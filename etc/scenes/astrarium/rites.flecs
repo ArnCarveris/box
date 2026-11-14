@@ -372,7 +372,7 @@ assets {
 box {
   ui {
     theme {
-      UiTheme: {
+      Theme: {
         background: {6, 8, 18},
         surface: {13, 17, 38},
         surface_alt: {8, 10, 22},

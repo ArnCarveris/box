@@ -8,7 +8,7 @@ using box.text
 // Small text in ink on parchment-like panels next to the same text in parchment on ink panels,
 // at 11, 13, 15, 18 and 24 px, in a thin serif (Spectral) and a sans (B612). The edges of the
 // glyphs blend in linear light; the coverage of dark text is corrected for it so both columns
-// of a font look equally heavy. Below them colored TextSpans, dark on light and light on dark.
+// of a font look equally heavy. Below them colored Spans, dark on light and light on dark.
 
 spectral {
   Font: {path: "test/assets/fonts/Spectral-Regular.ttf"}
@@ -177,7 +177,7 @@ spans_dark {
     Position: {0, 30, 1}
     Text: {value: "Red ink, green and blue lines", size: 13, font: spectral}
     Rgb: {58, 36, 20}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 3, color: {150, 30, 20, 255}},
       {start: 9, end: 14, color: {30, 90, 40, 255}},
       {start: 19, end: 23, color: {30, 50, 130, 255}}
@@ -188,7 +188,7 @@ spans_dark {
     Position: {0, 0, 1}
     Text: {value: "Red ink, green and blue lines", size: 13, font: b612}
     Rgb: {58, 36, 20}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 3, color: {150, 30, 20, 255}},
       {start: 9, end: 14, color: {30, 90, 40, 255}},
       {start: 19, end: 23, color: {30, 50, 130, 255}}
@@ -199,7 +199,7 @@ spans_dark {
     Position: {0, -32, 1}
     Text: {value: "Red ink, green and blue lines", size: 18, font: spectral}
     Rgb: {58, 36, 20}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 3, color: {150, 30, 20, 255}},
       {start: 9, end: 14, color: {30, 90, 40, 255}},
       {start: 19, end: 23, color: {30, 50, 130, 255}}
@@ -216,7 +216,7 @@ spans_light {
     Position: {0, 30, 1}
     Text: {value: "Red ink, green and blue lines", size: 13, font: spectral}
     Rgb: {244, 226, 186}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 3, color: {250, 120, 100, 255}},
       {start: 9, end: 14, color: {130, 230, 140, 255}},
       {start: 19, end: 23, color: {140, 180, 255, 255}}
@@ -227,7 +227,7 @@ spans_light {
     Position: {0, 0, 1}
     Text: {value: "Red ink, green and blue lines", size: 13, font: b612}
     Rgb: {244, 226, 186}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 3, color: {250, 120, 100, 255}},
       {start: 9, end: 14, color: {130, 230, 140, 255}},
       {start: 19, end: 23, color: {140, 180, 255, 255}}
@@ -238,7 +238,7 @@ spans_light {
     Position: {0, -32, 1}
     Text: {value: "Red ink, green and blue lines", size: 18, font: spectral}
     Rgb: {244, 226, 186}
-    TextSpans: {spans: [
+    Spans: {spans: [
       {start: 0, end: 3, color: {250, 120, 100, 255}},
       {start: 9, end: 14, color: {130, 230, 140, 255}},
       {start: 19, end: 23, color: {140, 180, 255, 255}}

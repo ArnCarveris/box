@@ -16,7 +16,7 @@ template Label {
   prop variant: string = "body"
   prop width: f32 = 0
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const size = match variant {
     "heading": t.heading_font_size
     "caption": t.small_font_size
@@ -39,7 +39,7 @@ template Panel {
   prop title: string = ""
   prop width: f32 = 0
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const pad = t.padding * 1.5
   const title_h = t.heading_font_size * 1.25
 
@@ -60,7 +60,7 @@ template Panel {
 
 // A thin line across its parent, between groups of widgets in a Panel
 template Separator {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
 
   Item: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
   Rect: {1, 1}

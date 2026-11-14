@@ -634,6 +634,7 @@ void BoxTextImport(
     ECS_META_COMPONENT(world, FontVariants);
     ECS_META_COMPONENT(world, FontState);
     ECS_META_COMPONENT(world, FontStatus);
+    ecs_set_name_prefix(world, "Text");
     ECS_META_COMPONENT(world, TextWrap);
     ECS_META_COMPONENT(world, Text);
     ECS_META_COMPONENT(world, TextBounds);
@@ -657,6 +658,7 @@ void BoxTextImport(
         .dtor = box_text_registry_dtor,
         .move = box_text_registry_move
     });
+    ecs_set_name_prefix(world, NULL);
     ecs_add_pair(world, ecs_id(Text), EcsWith, ecs_id(TextGlyphs));
     ecs_add_pair(world, ecs_id(Text), EcsWith, ecs_id(TextBounds));
 

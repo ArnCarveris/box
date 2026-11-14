@@ -452,7 +452,9 @@ void TransformStaticImport(
     ecs_vec_init_t(NULL, &state->listeners, TransformStaticListener, 0);
     ecs_vec_init_t(NULL, &state->dynamic, TransformDynamicListener, 0);
 
+    ecs_set_name_prefix(world, "Transform");
     ECS_COMPONENT_DEFINE(world, TransformStaticState);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, TransformStaticState, { .ctor = flecs_default_ctor });
     ecs_singleton_set(world, TransformStaticState, { .state = state });
 

@@ -143,7 +143,7 @@ template HeadlessCollapsible {
 template Collapsible : HeadlessCollapsible {
   prop header: f32 = 32
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const edge = ring ? t.focus : t.border
 

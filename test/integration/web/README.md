@@ -78,7 +78,7 @@ node test/integration/web/particles.mjs \
     "$(tools/integration.py local-env --env <name>)/wasm32-Emscripten/debug/bin"
 ```
 
-`wireframe.mjs` checks the wireframe of a view (`ViewDebug.wireframe`) in the browser build,
+`wireframe.mjs` checks the wireframe of a view (`box.view.Debug.wireframe`) in the browser build,
 where WebGPU has no line polygon mode: the lines come from barycentric coordinates and the vertex
 stage pulls the vertices from storage buffers. It opens `test/integration/web/wireframe.flecs` the
 same way, at the same fixed delta and size: a red box and a red sphere with green lines of

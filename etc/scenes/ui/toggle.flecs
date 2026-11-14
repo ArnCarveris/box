@@ -54,7 +54,7 @@ template HeadlessToggle : HeadlessPressable {
 
 // A check box with a label to its right, both part of the hit area
 template Checkbox : HeadlessToggle {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const size = 16
   const edge = ring ? t.focus : current ? t.accent : t.border
@@ -107,7 +107,7 @@ template Checkbox : HeadlessToggle {
 
 // A switch: a track with a knob that sits right when on, with a label to its right
 template Switch : HeadlessToggle {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const track_w = 34
   const track_h = 18

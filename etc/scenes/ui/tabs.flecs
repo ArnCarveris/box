@@ -36,7 +36,7 @@ template HeadlessTabHeader : HeadlessPressable {
 // The header of a tab: the label, raised on the surface of the page and underlined with the
 // accent while selected. Its corners follow the inside of the border of the tab view.
 template TabHeader : HeadlessTabHeader {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const focus = FocusStatus[FocusStatus]
   const ring = focus.focused == this && focus.visible
   const pad = t.padding * 1.5
@@ -98,7 +98,7 @@ template TabView {
   mut header: entity = 0
 
   const none: entity = 0
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const bar_h = t.control_height + 4
   const edge = 1
 
@@ -225,7 +225,7 @@ template HeadlessTab : parent TabView {
 // A tab: a page on the surface that lays its children out in a column, its corners following
 // the inside of the border of the tab view
 template Tab : HeadlessTab {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const pad = t.padding * 1.5
 
   Layout: {direction: Column, padding: {pad, pad, pad, pad}, spacing: t.spacing}

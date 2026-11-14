@@ -19,7 +19,7 @@ using box.transform
 template CloseButton : HeadlessButton {
   prop label: string = "Close"
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const size = t.control_height
   const arm = t.font_size * 0.3
@@ -225,7 +225,7 @@ template HeadlessModal {
 // surface is the child surface, a float as large as the dialog drawn over the backdrop and under
 // the title and the children; a press on it goes to the dialog and does not dismiss it.
 template Modal : HeadlessModal {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const pad = t.padding * 2
   const title_h = t.heading_font_size * 1.25
   const dialog = this

@@ -70,5 +70,5 @@ $ {
     next: 120,
     hold: true
   }
-  FpsPanel: {open: true}
+  Panel: {open: true}
 }

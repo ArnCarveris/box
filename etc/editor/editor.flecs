@@ -16,7 +16,7 @@ template TreeIconButton : HeadlessButton {
   prop icon: string = "add"
   prop size: f32 = 20
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const s = size * 0.7
   const ink = hover || down ? (icon == "delete" ? t.danger : t.text) : t.text_muted
@@ -86,7 +86,7 @@ template TreeIconButton : HeadlessButton {
 template TreeAddButton : HeadlessButton {
   prop label: string = "New entity"
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const ink = hover || down ? t.text : t.text_muted
   const arm = t.font_size * 0.4
@@ -134,7 +134,7 @@ template EntityTreeNode {
   mut open = false
   mut hover = false
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const chevron = 10
   const inset = t.padding / 2 + depth * indent
 
@@ -250,7 +250,7 @@ template EntityTreeNode {
 template EntityTree {
   prop indent: f32 = 16
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
 
   query roots {
     !(flecs.core.ChildOf, *), ?flecs.core.Prefab, ?(flecs.core.Identifier, flecs.core.Name)
@@ -290,7 +290,7 @@ template EntityTree {
 template EditorPanel {
   prop title: string = "Entities"
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const bar_h = t.heading_font_size * 1.25 + t.padding * 2
 
   Layout: {direction: Column}

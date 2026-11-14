@@ -663,13 +663,13 @@ static void picking_scaled_frame_mapped(
         "  View: {camera: camera}\n"
         "}\n"
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  Scale: {2, 2, 2}\n"
         "  wall {\n"
         "    Position: {0, 0, -0.05}\n"
         "    box.geometry.Box: {2, 1, 0.1}\n"
         "    PbrTextures: {albedo: screen_texture}\n"
-        "    TextureMapping: {mode: %s, size: 2}\n"
+        "    texture.Mapping: {mode: %s, size: 2}\n"
         "  }\n"
         "}\n", mode);
     test_assert(ecs_script(world, { .code = code }) != 0);

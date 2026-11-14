@@ -55,7 +55,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.move(this)
-      part = disabled ? 0 : stepper_part(e.local_x, this[Bounds].width, button)
+      part = disabled ? 0 : stepper_part(e.local_x, this[layout.Bounds].width, button)
     }
   }
 
@@ -69,7 +69,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.press(this)
-      pressed = disabled ? 0 : stepper_part(e.local_x, this[Bounds].width, button)
+      pressed = disabled ? 0 : stepper_part(e.local_x, this[layout.Bounds].width, button)
       await on.release(this)
       pressed = 0
     }
@@ -97,7 +97,7 @@ template HeadlessStepper {
     while true {
       const e = await on.activate(this)
       if ui.activation(e) == this && !e.keyboard && !disabled {
-        const dir = stepper_part(e.local_x, this[Bounds].width, button)
+        const dir = stepper_part(e.local_x, this[layout.Bounds].width, button)
         const v = clamp(current + dir * step, min, max)
         if v != current {
           current = v
@@ -137,7 +137,7 @@ template Stepper : HeadlessStepper {
   prop decimals: i32 = 0
   prop button: f32 = 28
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const w = width == 0 ? 112 : width
   const edge = ring ? t.focus_width : 1

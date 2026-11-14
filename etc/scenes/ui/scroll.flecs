@@ -102,11 +102,11 @@ template HeadlessScrollView {
     while true {
       const e = await on.focus(this)
       const placed = this.has(Content) && this.has(WorldTransform) &&
-        e.target.has(Bounds) && e.target.has(WorldTransform)
+        e.target.has(layout.Bounds) && e.target.has(WorldTransform)
       if e.target != this && placed {
-        const b = this[Bounds]
+        const b = this[layout.Bounds]
         const content = this[Content]
-        const tb = e.target[Bounds]
+        const tb = e.target[layout.Bounds]
         const vm = this[WorldTransform].m.v
         const tm = e.target[WorldTransform].m.v
         const dx = tm[12] - vm[12]
@@ -148,7 +148,7 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.press(this)
-      const b = this[Bounds]
+      const b = this[layout.Bounds]
       const content = this[Content]
       const on_v = vertical && content.max_y > 0
       const on_h = horizontal && content.max_x > 0
@@ -186,7 +186,7 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.move(this)
-      const b = this[Bounds]
+      const b = this[layout.Bounds]
       const content = this[Content]
       const on_v = vertical && content.max_y > 0
       const on_h = horizontal && content.max_x > 0
@@ -219,7 +219,7 @@ template HeadlessScrollView {
   async {
     while true {
       const e = await on.drag(this)
-      const b = this[Bounds]
+      const b = this[layout.Bounds]
       const content = this[Content]
       if drag == 1 {
         const vtrack = scroll_track(b.height, edge, horizontal && content.max_x > 0 ? bar : 0)
@@ -246,7 +246,7 @@ template HeadlessScrollView {
     while true {
       const e = await on.key_down(this)
       if keys && focused {
-        const b = this[Bounds]
+        const b = this[layout.Bounds]
         const content = this[Content]
         if vertical {
           const ty = match e.key {
@@ -297,7 +297,7 @@ template ScrollBar {
   prop hover: bool = false
   prop ring: f32 = 0
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const inset = 2
   const w = vertical ? size : length
   const h = vertical ? length : size
@@ -350,10 +350,10 @@ template ScrollView : HeadlessScrollView {
   prop edge: f32 = 1
   prop frame: bool = true
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const pad = frame ? t.padding : 0
-  const b = this[Bounds]
+  const b = this[layout.Bounds]
   const c = this[Content]
   const vbar = vertical && c.max_y > 0
   const hbar = horizontal && c.max_x > 0
@@ -456,7 +456,7 @@ template HeadlessListView : HeadlessScrollView {
   async {
     while true {
       const e = await on.move(this)
-      const b = this[Bounds]
+      const b = this[layout.Bounds]
       const content = this[Content]
       const along = b.height / 2 - e.local_y + content.y - inset
       const i = floor(along / max(row, 1))
@@ -478,7 +478,7 @@ template HeadlessListView : HeadlessScrollView {
   async {
     while true {
       const e = await on.press(this)
-      const b = this[Bounds]
+      const b = this[layout.Bounds]
       const content = this[Content]
       const along = b.height / 2 - e.local_y + content.y - inset
       const i = floor(along / max(row, 1))
@@ -494,7 +494,7 @@ template HeadlessListView : HeadlessScrollView {
     while true {
       const e = await on.key_down(this)
       if !disabled && count > 0 && focused {
-        const b = this[Bounds]
+        const b = this[layout.Bounds]
         const content = this[Content]
         const page = max(floor(b.height / max(row, 1)) - 1, 1)
         const target = match e.key {
@@ -531,11 +531,11 @@ template ListView : HeadlessListView {
   prop bar: f32 = 10
   prop edge: f32 = 1
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
   const view_h = height == 0 ? 200 : height
 
-  const b = this[Bounds]
+  const b = this[layout.Bounds]
   const c = this[Content]
   const vbar = c.max_y > 0
 

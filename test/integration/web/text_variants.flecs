@@ -28,7 +28,7 @@ label {
   Scale: {0.01, 0.01, 0.01}
   Text: {value: "Regular Bold Italic Both", size: 48}
   Rgb: {255, 255, 255}
-  TextSpans: {spans: [
+  Spans: {spans: [
     {start: 8, end: 12, bold: true, keep_color: true},
     {start: 13, end: 19, italic: true, keep_color: true},
     {start: 20, end: 24, bold: true, italic: true, keep_color: true}

@@ -460,7 +460,7 @@ void FpsPanel_open_from_script(void) {
     test_int(ecs_script_run(world, "fps",
         "using box.fps\n"
         "$ {\n"
-        "  FpsPanel: {open: true}\n"
+        "  Panel: {open: true}\n"
         "}\n", NULL), 0);
     test_bool(ecs_singleton_get(world, FpsPanel)->open, true);
     ecs_progress(world, 0);

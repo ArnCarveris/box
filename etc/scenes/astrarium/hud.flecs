@@ -624,7 +624,7 @@ assets {
       const xp_at = cool_at + digits(cool) + 15
       Text: {value: "{spell_cost(i):.0} aether   {cool:.1}s recharge   +{spell_xp(i):.0} xp", size: 12, font: font_body}
       Rgb: {150, 214, 255}
-      TextSpans: {spans: [
+      Spans: {spans: [
         {start: cool_at, end: xp_at, color: {ui_muted.r, ui_muted.g, ui_muted.b, 255}},
         {start: xp_at, end: 255, color: {ui_pale.r, ui_pale.g, ui_pale.b, 255}}
       ]}

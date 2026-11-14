@@ -13,7 +13,7 @@
 #include <math.h>
 
 /** Path of the FpsPanel singleton, looked up because box.fps is imported after box.command */
-#define BOX_CMD_FPS_COMPONENT "box.fps.FpsPanel"
+#define BOX_CMD_FPS_COMPONENT "box.fps.Panel"
 
 /** Append the line of a range of frame times.
  *
@@ -141,7 +141,7 @@ static void box_cmd_fps_toggle(
 
     panel = ecs_singleton_get_mut(world, FpsPanel);
     if (!panel) {
-        ecs_err("the world has no FpsPanel");
+        ecs_err("the world has no box.fps.Panel");
         goto done;
     }
 

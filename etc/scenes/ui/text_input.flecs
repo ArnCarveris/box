@@ -81,7 +81,7 @@ template HeadlessTextInput {
   field {
     if !disabled {
       TextEdit: {
-        value: current, placeholder: placeholder, size: box.ui.theme[UiTheme].font_size,
+        value: current, placeholder: placeholder, size: box.ui.theme[Theme].font_size,
         password: password, read_only: read_only
       }
     }
@@ -102,7 +102,7 @@ template HeadlessTextInput {
 // whose border lightens while hovered and becomes the focus ring while focused (by pointer or
 // keyboard, as text fields show it). A width fixes it, 0 makes it 200 points.
 template TextInput : HeadlessTextInput {
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
   const w = width == 0 ? 200 : width
   const shown_text = current == "" ? placeholder : password ? "••••••••" : current
   const edge = focused ? t.focus : hover && !disabled && !read_only ? t.text_muted : t.border

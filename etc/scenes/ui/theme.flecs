@@ -1,7 +1,7 @@
-// The themes of the widget library. Widgets read box.ui.theme[UiTheme] reactively, so assigning
+// The themes of the widget library. Widgets read box.ui.theme[Theme] reactively, so assigning
 // one of these to it restyles every widget in the next frame:
 //
-//   box { ui { theme { UiTheme: LightTheme } } }
+//   box { ui { theme { Theme: LightTheme } } }
 //
 // The theme entity belongs to box.ui, so a script that assigns it never owns or deletes it.
 
@@ -10,8 +10,8 @@ module box.widgets
 using box.ui
 using box.transition
 
-// The dark theme a new UiTheme holds, in the style of the flecs script widget examples
-export const DarkTheme: UiTheme = {
+// The dark theme a new box.ui.Theme holds, in the style of the flecs script widget examples
+export const DarkTheme: Theme = {
   background: {32, 35, 41},
   surface: {46, 50, 58},
   surface_alt: {38, 41, 48},
@@ -41,7 +41,7 @@ export const DarkTheme: UiTheme = {
 }
 
 // A light theme with the same metrics
-export const LightTheme: UiTheme = {
+export const LightTheme: Theme = {
   background: {232, 235, 240},
   surface: {250, 251, 253},
   surface_alt: {222, 226, 233},

@@ -8,7 +8,7 @@
 //
 // Behavior and looks are separate templates. A headless template (HeadlessButton) owns the state
 // in mut variables and the async blocks that follow the input; the styled template (Button :
-// HeadlessButton) inherits it and only draws, from the theme in box.ui.theme[UiTheme]. An
+// HeadlessButton) inherits it and only draws, from the theme in box.ui.theme[Theme]. An
 // application restyles a widget by inheriting the headless template in a template of its own.
 //
 // Values: a widget with a value has `prop value`, the initial value, and `mut current`, the value

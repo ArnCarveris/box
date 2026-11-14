@@ -102,7 +102,7 @@ preview_texture {}
 template BackdropView {
   prop camera: entity = 0
 
-  const t = box.ui.theme[UiTheme]
+  const t = box.ui.theme[Theme]
 
   View: {
     camera: camera,
@@ -511,7 +511,7 @@ template ThemeSwitch {
 
   mut index: i32 = 0
 
-  UiTheme: match index {
+  Theme: match index {
     1: LightTheme
     _: DarkTheme
   }

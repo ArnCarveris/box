@@ -268,7 +268,7 @@ removing `Border` snaps.
   a transitioning ancestor. Tint and opacity still propagate through them.
 - Lights and cameras read target `WorldTransform`. Their positions, rotations and
   light colors do not transition. A shape on the same entity can still animate.
-- Colored `TextSpans` retain their span colors during an `Rgb` transition, though
+- Colored `text.Spans` retain their span colors during an `Rgb` transition, though
   text opacity still affects their alpha. `SurfaceMaterial`, `AmbientLight`
   and other colors outside `src/material` do not transition.
 - Draw order and batch membership follow targets. Picking and collision can therefore

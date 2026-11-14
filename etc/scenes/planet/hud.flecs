@@ -57,7 +57,7 @@ assets {
   template Page {
     prop shown: bool = true
 
-    const t = box.ui.theme[UiTheme]
+    const t = box.ui.theme[Theme]
 
     Layout: {direction: Column, spacing: t.spacing}
     if shown {
@@ -70,7 +70,7 @@ assets {
 
   // A segmented switch: a row of Segment buttons on a sunken strip, one of them selected
   template SegmentBar {
-    const t = box.ui.theme[UiTheme]
+    const t = box.ui.theme[Theme]
 
     Layout: {direction: Row, padding: {2, 2, 2, 2}, spacing: 2, v: Middle}
     Item: {width: {mode: Grow}}
@@ -83,7 +83,7 @@ assets {
   template Segment : HeadlessButton {
     prop selected: bool = false
 
-    const t = box.ui.theme[UiTheme]
+    const t = box.ui.theme[Theme]
     const ring = focused && FocusStatus[FocusStatus].visible
 
     Layout: {direction: Row, padding: {0, 0, t.padding, t.padding}, h: Center, v: Middle}
