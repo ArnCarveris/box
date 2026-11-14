@@ -282,16 +282,6 @@ planets {
     {enabled: kind == 4, size: 2.3, opacity: 1, color: mixc(dust, ice, kind == 4 ? 0.35 : 0)}
   }
 
-  const garden_body: PlanetBody = body_preset(23)
-  const garden_surface: PlanetSurface = surface_preset(5, 23)
-  const garden_climate: PlanetClimate = climate_preset(5)
-  const garden_air: PlanetAir = air_preset(5, 23)
-  const garden_clouds: PlanetClouds = clouds_preset(5)
-  const garden_night: PlanetNight = night_preset(5)
-  const garden_lava: PlanetLava = lava_preset(5)
-  const garden_gas: PlanetGas = gas_preset(23)
-  const garden_rings: PlanetRings = rings_preset(5, 23)
-
   ring_tex { Path: {path: "etc/scenes/planet/assets/rings.png"} }
 
   // A planet whose maps are texture graphs on the sphere domain, from its kind (the palettes and
@@ -308,19 +298,22 @@ planets {
   // temperature and moisture), rock on steep ground, sand at the coast and snow where it is
   // cold; the sea is tinted by depth and freezes where it is cold. The clouds (cld) and the
   // bands of a gas giant are animated.
+  //
+  // The atmosphere is lit by the DirectionalLight sun, or by the first one of the scene at 0.
   template Planet {
     prop kind: i32 = 5
     prop seed: i32 = 23
     prop detail: i32 = 1
-    prop body: PlanetBody = garden_body
-    prop surface: PlanetSurface = garden_surface
-    prop climate: PlanetClimate = garden_climate
-    prop air: PlanetAir = garden_air
-    prop clouds: PlanetClouds = garden_clouds
-    prop night: PlanetNight = garden_night
-    prop lava: PlanetLava = garden_lava
-    prop gas: PlanetGas = garden_gas
-    prop rings: PlanetRings = garden_rings
+    prop body: PlanetBody = body_preset(23)
+    prop surface: PlanetSurface = surface_preset(5, 23)
+    prop climate: PlanetClimate = climate_preset(5)
+    prop air: PlanetAir = air_preset(5, 23)
+    prop clouds: PlanetClouds = clouds_preset(5)
+    prop night: PlanetNight = night_preset(5)
+    prop lava: PlanetLava = lava_preset(5)
+    prop gas: PlanetGas = gas_preset(23)
+    prop rings: PlanetRings = rings_preset(5, 23)
+    prop sun: entity = 0
 
     const is_gas: bool = kind == 4
     const k: i32 = (kind < 0 || kind > 5) ? 0 : kind
@@ -440,21 +433,6 @@ planets {
     const st0: Col = mixc(g3, {196, 84, 56}, 0.65)
     const st1: Col = mixc(g2, {250, 246, 236}, 0.7)
     const ringc: Col = rings.color
-
-    if air_on {
-      PlanetAtmosphere: {
-        radius: radius
-        thickness: max(air.rayleigh_height, air.mie_height) * 6
-        rayleigh: {
-          scale_height: air.rayleigh_height, scattering_scale: air.rayleigh * air.density
-        }
-        mie: {
-          scale_height: air.mie_height, anisotropy: air.anisotropy,
-          scattering_scale: air.mie * air.density, tint: {tint.r, tint.g, tint.b}
-        }
-        ozone_scale: 0
-      }
-    }
 
     lut {}
     geo {}
@@ -1016,9 +994,27 @@ planets {
     const city_ready: bool = city_on && town[box.texture.Status].revision > 0
     const cloud_ready: bool = surf_on && cld[box.texture.Status].revision > 0
 
+    // The axis has a pose, so the atmosphere is centered on the instance also when it has no
+    // Position of its own, and its meshes are those of the atmosphere for Scene.planet_light
     axis {
       Position: {0, 0, 0}
       Rotation: {lean, 0, tilt}
+
+      if air_on {
+        PlanetAtmosphere: {
+          sun: sun
+          radius: radius
+          thickness: max(air.rayleigh_height, air.mie_height) * 6
+          rayleigh: {
+            scale_height: air.rayleigh_height, scattering_scale: air.rayleigh * air.density
+          }
+          mie: {
+            scale_height: air.mie_height, anisotropy: air.anisotropy,
+            scattering_scale: air.mie * air.density, tint: {tint.r, tint.g, tint.b}
+          }
+          ozone_scale: 0
+        }
+      }
 
       globe {
         Position: {0, 0, 0}
@@ -1083,7 +1079,7 @@ planets {
           Rgb: {ringc.r * 0.6, ringc.g * 0.6, ringc.b * 0.6}
           PbrMaterial: {roughness: 1}
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
-          PbrTextures: {albedo: ring_tex, emissive: ring_tex}
+          PbrTextures: {albedo: planets.ring_tex, emissive: planets.ring_tex}
           BlendMode: AlphaBlend
           if rings.opacity < 1 {
             Opacity: {rings.opacity}
@@ -1098,7 +1094,7 @@ planets {
           Rgb: {ringc.r * 0.6, ringc.g * 0.6, ringc.b * 0.6}
           PbrMaterial: {roughness: 1}
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
-          PbrTextures: {albedo: ring_tex, emissive: ring_tex}
+          PbrTextures: {albedo: planets.ring_tex, emissive: planets.ring_tex}
           BlendMode: AlphaBlend
           if rings.opacity < 1 {
             Opacity: {rings.opacity}
@@ -1162,11 +1158,6 @@ planets {
     }
   }
 
-  // Distance of the camera that frames a star of a radius with its corona
-  fn star_distance(radius: f32) -> f32 { 18 * radius + 2 }
-
-  const sun_star: StarParams = star_preset(1)
-
   // A star of a temperature, radius, activity, spin, seed and detail, which default to the sun.
   // It is lit by nothing: its base color is black and metallic, so neither the directional sun
   // of the scene nor the ambient light reach it, and all it shows is its emission.
@@ -1184,14 +1175,14 @@ planets {
   // disc where they cross it, and a wider soft halo; active stars throw prominences off their
   // surface. A point light of the color of the star lights what is around it.
   template Star {
-    prop temperature: f32 = sun_star.temperature
-    prop radius: f32 = sun_star.radius
-    prop sunspots: f32 = sun_star.sunspots
-    prop granulation: f32 = sun_star.granulation
-    prop contrast: f32 = sun_star.contrast
-    prop prominences: f32 = sun_star.prominences
-    prop spin: f32 = sun_star.spin
-    prop corona: f32 = sun_star.corona
+    prop temperature: f32 = star_preset(1).temperature
+    prop radius: f32 = star_preset(1).radius
+    prop sunspots: f32 = star_preset(1).sunspots
+    prop granulation: f32 = star_preset(1).granulation
+    prop contrast: f32 = star_preset(1).contrast
+    prop prominences: f32 = star_preset(1).prominences
+    prop spin: f32 = star_preset(1).spin
+    prop corona: f32 = star_preset(1).corona
     prop seed: i32 = 7
     prop detail: i32 = 1
 
@@ -1384,6 +1375,7 @@ planets {
     const ready: bool = surf[box.texture.Status].revision > 0
     const streamer_ready: bool = streamer[box.texture.Status].revision > 0
 
+    // A small default tilt of the axis; the instance's own Rotation orients the star
     axis {
       Position: {0, 0, 0}
       Rotation: {0.12, 0, 0.1}

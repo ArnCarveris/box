@@ -15,6 +15,9 @@ window {
   Surface: {width: 1600, height: 1000, vsync: true}
 }
 
+// Distance of the camera that frames a star of a radius with its corona
+fn star_distance(radius: f32) -> f32 { 18 * radius + 2 }
+
 rig {
   Position: {0, 0, 0}
   Rotation: {0 - orbit_pitch, orbit_yaw, 0}

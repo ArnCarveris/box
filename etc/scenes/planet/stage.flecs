@@ -45,7 +45,7 @@ stage {
       Planet hero(
         kind: shown_kind, seed: shown_seed, detail: shown_detail, body: body,
         surface: shown_surface, climate: shown_climate, air: air, clouds: shown_clouds,
-        night: shown_night, lava: shown_lava, gas: shown_gas, rings: rings
+        night: shown_night, lava: shown_lava, gas: shown_gas, rings: rings, sun: sun
       ) {
         Position: {0, 0, 0}
       }
