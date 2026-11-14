@@ -62,6 +62,11 @@ void box_draws_transition_target(
         out->fresnel = *material->fresnel;
     }
 
+    if (material->distortion) {
+        out->present |= 1u << BOX_RENDER_TRANSITION_DISTORTION;
+        out->distortion = *material->distortion;
+    }
+
     if (material->water) {
         out->watered = true;
         out->water = *material->water;
@@ -155,6 +160,7 @@ void* box_draws_transition_value(
         result = &material->diffuse_transmission;
         break;
     case BOX_RENDER_TRANSITION_FRESNEL: result = &material->fresnel; break;
+    case BOX_RENDER_TRANSITION_DISTORTION: result = &material->distortion; break;
     case BOX_RENDER_TRANSITION_OPACITY: result = &material->opacity; break;
     case BOX_RENDER_TRANSITION_TINT: result = &material->tint; break;
     case BOX_RENDER_TRANSITION_BORDER: result = &material->border; break;
@@ -230,6 +236,8 @@ static void box_draws_transition_parts(
             BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, &material->diffuse_transmission),
         .fresnel = box_draws_transition_part(material, BOX_RENDER_TRANSITION_FRESNEL,
             &material->fresnel),
+        .distortion = box_draws_transition_part(material, BOX_RENDER_TRANSITION_DISTORTION,
+            &material->distortion),
         .water = material->watered ? &material->water : NULL,
         .tint = box_draws_transition_part(material, BOX_RENDER_TRANSITION_TINT,
             &material->tint),

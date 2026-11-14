@@ -836,8 +836,8 @@ void box_bake_lights(
 }
 
 /** Register the observers of the changes of static shapes that rebake the probes near them,
- * AlphaCutoff, Transmission and Water also when they are added, as its holes change what the
- * captures see and a transmissive or water shape leaves them.
+ * AlphaCutoff, Transmission, Water and Distortion also when they are added, as its holes change
+ * what the captures see and a transmissive, distorted or water shape leaves them.
  *
  * A TextureBlend counts like PbrTextures, and so does a change of the PbrTextures or
  * TextureTransform of an entity that is a layer of one. A set or removed TextureScroll counts,
@@ -859,7 +859,9 @@ void box_bake_observers(
         ecs_id(ClearCoat), ecs_id(SpecularAnisotropy), ecs_id(Sheen), ecs_id(DiffuseTransmission),
         ecs_id(TextureMapping), ecs_id(TextureScroll), ecs_id(TileTerrain), ecs_id(Fresnel)
     };
-    ecs_entity_t added[3] = { ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(Water) };
+    ecs_entity_t added[4] = {
+        ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(Water), ecs_id(Distortion)
+    };
     ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
     for (i = 0; i < 16; i ++) {
@@ -878,7 +880,7 @@ void box_bake_observers(
         .ctx = b
     });
 
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 4; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = added[i] }},
             .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },

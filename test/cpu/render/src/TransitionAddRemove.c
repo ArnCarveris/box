@@ -108,6 +108,7 @@ static ecs_entity_t tr_id(
     case BOX_RENDER_TRANSITION_SHEEN: result = ecs_id(Sheen); break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: result = ecs_id(DiffuseTransmission); break;
     case BOX_RENDER_TRANSITION_FRESNEL: result = ecs_id(Fresnel); break;
+    case BOX_RENDER_TRANSITION_DISTORTION: result = ecs_id(Distortion); break;
     default: test_assert(false); break;
     }
 
@@ -176,6 +177,7 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_SHEEN: m->sheen = value; break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: m->diffuse_transmission = value; break;
     case BOX_RENDER_TRANSITION_FRESNEL: m->fresnel = value; break;
+    case BOX_RENDER_TRANSITION_DISTORTION: m->distortion = value; break;
     default: test_assert(false); break;
     }
 }
@@ -409,7 +411,7 @@ static void tr_test_mesh(
     ecs_world_t *world = tr_scene(&null);
     ecs_entity_t id = tr_id(c);
     ecs_size_t size = box_render_transition_layout(c)->size;
-    ecs_singleton_set(world, Scene, {.fresnel = true});
+    ecs_singleton_set(world, Scene, {.fresnel = true, .distortion = true});
     ecs_entity_t e = ecs_new(world);
     float target[BOX_RENDER_TRANSITION_VALUE / 4], neutral[BOX_RENDER_TRANSITION_VALUE / 4];
     float mid[BOX_RENDER_TRANSITION_VALUE / 4];
@@ -880,6 +882,73 @@ void TransitionAddRemove_fresnel_remove_transition(void) {
 
     ecs_remove(world, e, Transition);
     tr_frame(world);
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH);
+    tr_check_record_target(world, null, e);
+    tr_fini(world, null);
+}
+
+/** The Distortion the cases add and remove, without speed so the phase stays 0 */
+static const Distortion tr_distortion = { .strength = 0.01f, .scale = 2, .speed = 0 };
+
+void TransitionAddRemove_distortion_add(void) {
+    // engine_core/transition
+    tr_test_mesh(BOX_RENDER_TRANSITION_DISTORTION, &tr_distortion, false, false);
+}
+
+void TransitionAddRemove_distortion_remove(void) {
+    // engine_core/transition
+    tr_test_mesh(BOX_RENDER_TRANSITION_DISTORTION, &tr_distortion, true, false);
+}
+
+/** The neutral value of a Distortion is a strength of 0 with the target scale and speed. */
+void TransitionAddRemove_distortion_neutral(void) {
+    // engine_core/transition
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    float target[BOX_RENDER_TRANSITION_VALUE / 4], neutral[BOX_RENDER_TRANSITION_VALUE / 4];
+    Distortion d;
+    test_bool(box_transition_supported(world, ecs_id(Distortion)), true);
+    test_bool(box_transition_neutral_supported(world, ecs_id(Distortion), false), true);
+    test_bool(box_transition_neutral_supported(world, ecs_id(Distortion), true), true);
+    box_render_transition_pack(BOX_RENDER_TRANSITION_DISTORTION, &tr_distortion, target);
+    test_assert(box_render_transition_neutral(BOX_RENDER_TRANSITION_DISTORTION, target,
+        neutral));
+    ecs_os_memcpy(&d, neutral, ECS_SIZEOF(Distortion));
+    test_flt(d.strength, 0);
+    test_flt(d.scale, 2);
+    test_flt(d.speed, 0);
+    ecs_fini(world);
+}
+
+/** A shape whose Distortion fades out stays transmissive until its fade ends, then draws as
+ * without one. */
+void TransitionAddRemove_distortion_remove_keeps_transmissive(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.distortion = true});
+    ecs_entity_t e = ecs_new(world);
+    int32_t i;
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Box, {1, 2, 3});
+    ecs_set(world, e, Rgb, {200, 100, 50});
+    ecs_set_ptr(world, e, Distortion, &tr_distortion);
+    box_transition_set(world, e, ecs_id(Distortion), &tr_remove);
+    tr_frames(world, 2);
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    test_bool(tr_batch(world, e)->key.transmissive, true);
+    test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+
+    ecs_remove(world, e, Distortion);
+    for (i = 0; i < 4; i ++) {
+        tr_frame(world);
+        test_assert(!ecs_has(world, e, Distortion));
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_bool(tr_batch(world, e)->key.transmissive, true);
+    }
+
+    tr_frame(world);
+    test_bool(tr_batch(world, e)->key.transmissive, false);
     test_int(tr_batch(world, e)->key.pipeline, BOX_RENDER_SHADER_MESH);
     tr_check_record_target(world, null, e);
     tr_fini(world, null);

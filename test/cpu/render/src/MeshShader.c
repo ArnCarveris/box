@@ -1669,7 +1669,8 @@ void MeshShader_overrides_without_new_features(void) {
         "material_anisotropy", "material_diffuse_transmission", "material_triplanar"
     };
     const char *added[] = {
-        "material_texture_scroll", "material_fresnel", "scene_planar", "water"
+        "material_texture_scroll", "material_fresnel", "scene_planar", "water",
+        "material_distortion"
     };
     uint32_t others = BOX_RENDER_FEATURE_TRANSMISSION | BOX_RENDER_FEATURE_TEXTURE_BLEND |
         BOX_RENDER_FEATURE_ALPHA_CUTOUT | BOX_RENDER_FEATURE_BLEND_MODES;
@@ -1692,7 +1693,7 @@ void MeshShader_overrides_without_new_features(void) {
 
                 test_bool(override_on(o, "transmissive"), extended && transmissive);
                 expected += extended && transmissive;
-                for (i = 0; i < 4; i ++) {
+                for (i = 0; i < 5; i ++) {
                     test_bool(override_on(o, added[i]), false);
                 }
 
@@ -1700,4 +1701,149 @@ void MeshShader_overrides_without_new_features(void) {
             }
         }
     }
+}
+
+/** A shape with Distortion in a scene with Scene.distortion draws like a Transmission shape:
+ * transmissive on the extended mesh shader, AlphaBlend, not alpha tested, no shadow, not baked.
+ * Without Scene.distortion it draws as without one, and Water wins over it. */
+void MeshShader_distortion_draws_transmissive(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_add(world, shape, Distortion);
+    ecs_set(world, shape, AlphaCutoff, {0.5f});
+    ecs_set(world, shape, Opacity, {0.5f});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    /* Without Scene.distortion the shape draws as without it */
+    const DrawSlot *slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, slot->batch);
+    test_bool(b->key.transmissive, false);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    const box_render_material_t *record = ecs_vec_get_t(&d->materials.records,
+        box_render_material_t, (int32_t)ecs_get(world, shape, MaterialId)->value);
+    test_uint(record->distortion_flags, 0);
+    test_flt(record->transmission_factor, 0);
+
+    ecs_singleton_set(world, Scene, {.alpha_cutout = true, .blend_modes = true,
+        .distortion = true});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    b = box_draws_batch(d, slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH_EXTENDED);
+    test_bool(b->key.transmissive, true);
+    test_bool(b->key.water, false);
+    test_int(b->key.blend, AlphaBlend);
+    test_bool(b->key.cutout, false);
+    test_bool(b->key.shadow, false);
+    test_bool(b->key.bake, false);
+    test_assert(b->key.features & BOX_RENDER_FEATURE_DISTORTION);
+    record = ecs_vec_get_t(&d->materials.records, box_render_material_t,
+        (int32_t)ecs_get(world, shape, MaterialId)->value);
+    test_uint(record->distortion_flags,
+        BOX_RENDER_DISTORTION_PRESENT | BOX_RENDER_DISTORTION_SHARP);
+    test_flt(record->distortion_strength, BOX_MATERIAL_DISTORTION_STRENGTH);
+    test_flt(record->transmission_factor, 1);
+
+    /* Its pipeline has the transmissive and material_distortion overrides */
+    uint32_t o = box_render_mesh_overrides(b->key.pipeline, b->key.features, true, false);
+    test_bool(override_on(o, "transmissive"), true);
+    test_bool(override_on(o, "material_distortion"), true);
+    o = box_render_mesh_overrides(b->key.pipeline, b->key.features, false, false);
+    test_bool(override_on(o, "material_distortion"), false);
+
+    /* Removing it moves the shape back */
+    ecs_remove(world, shape, Distortion);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    b = box_draws_batch(d, slot->batch);
+    test_bool(b->key.transmissive, false);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+
+    /* Water wins over it */
+    ecs_singleton_set(world, Scene, {.distortion = true, .water = true});
+    ecs_add(world, shape, Distortion);
+    ecs_add(world, shape, Water);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    b = box_draws_batch(d, slot->batch);
+    test_bool(b->key.water, true);
+    test_bool(b->key.transmissive, true);
+    record = ecs_vec_get_t(&d->materials.records, box_render_material_t,
+        (int32_t)ecs_get(world, shape, MaterialId)->value);
+    test_uint(record->distortion_flags, 0);
+    test_assert(record->water_depth > 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** A shape without Distortion in a scene with Scene.distortion keeps its batch: the feature
+ * adds no override to the opaque pipelines, only to the transmissive ones. */
+void MeshShader_distortion_feature_costs_nothing(void) {
+    // render/mesh_shader
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_render_draws_t *d = ecs_system_get(world,
+        ecs_lookup(world, "box.render.RenderExtractDraws"))->ctx;
+    ecs_singleton_set(world, Scene, {.distortion = true});
+    test_uint(box_render_scene_features(world, 0), BOX_RENDER_FEATURE_DISTORTION);
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {1, 1, 1});
+    ecs_set(world, shape, Rgb, {200, 100, 50});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const DrawSlot *slot = ecs_get(world, shape, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    box_draw_batch_t *b = box_draws_batch(d, slot->batch);
+    test_int(b->key.pipeline, BOX_RENDER_SHADER_MESH);
+    test_bool(b->key.transmissive, false);
+    test_uint(box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED,
+        BOX_RENDER_FEATURE_DISTORTION, false, false), 0);
+    uint32_t o = box_render_mesh_overrides(BOX_RENDER_SHADER_MESH_EXTENDED,
+        BOX_RENDER_FEATURE_DISTORTION, true, false);
+    test_int(override_count(o), 2);
+    test_bool(override_on(o, "transmissive"), true);
+    test_bool(override_on(o, "material_distortion"), true);
+    test_uint(box_render_mesh_overrides(BOX_RENDER_SHADER_MESH,
+        BOX_RENDER_FEATURE_DISTORTION, true, false), 0);
+    const box_render_material_t *record = ecs_vec_get_t(&d->materials.records,
+        box_render_material_t, (int32_t)ecs_get(world, shape, MaterialId)->value);
+    test_uint(record->distortion_flags, 0);
+    test_flt(record->distortion_strength, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

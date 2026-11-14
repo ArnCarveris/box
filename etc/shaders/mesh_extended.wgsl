@@ -1,6 +1,7 @@
 // Forward pass of the meshes the mesh shader does not draw (box_draws_extended): transmissive
-// (Transmission), Water, with a triplanar TextureMapping, Sheen, ClearCoat, SpecularAnisotropy,
-// DiffuseTransmission or Fresnel, or with a PlanarReflection, with or without a TextureBlend.
+// (Transmission, Distortion), Water, with a triplanar TextureMapping, Sheen, ClearCoat,
+// SpecularAnisotropy, DiffuseTransmission or Fresnel, or with a PlanarReflection, with or
+// without a TextureBlend.
 #include "include/mesh_common.wgsl"
 #include "include/mesh_indirect.wgsl"
 #include "include/mesh_direct.wgsl"
@@ -11,7 +12,8 @@
 // test, the blend modes and the TextureBlend have no override. transmissive is set for the
 // pipelines of Transmission shapes, through which the opaque snapshot of the view shows, and
 // water, with transmissive, for those of Water shapes of a scene with Scene.water.
-// material_fresnel and scene_planar are in mesh_common.wgsl, the vertex stage reads them too.
+// material_fresnel, scene_planar and material_distortion are in mesh_common.wgsl, the vertex
+// stage reads them too.
 override material_sheen: bool = true;
 override material_anisotropy: bool = true;
 override material_clear_coat: bool = true;
@@ -610,10 +612,90 @@ fn transmission_blur_lod(world: vec3f, screen_uv: vec2f, blur: f32, rough_lod: f
     return clamp(max(rough_lod, blur_lod), 0.0, max_mip);
 }
 
+// Hash of a lattice point of the distortion noise.
+fn distortion_hash(c: vec3i) -> u32 {
+    let h = bitcast<vec3u>(c) * vec3u(0x8da6b343u, 0xd8163841u, 0xcb1ab31fu);
+    var x = h.x ^ h.y ^ h.z;
+    x ^= x >> 16u;
+    x *= 0x7feb352du;
+    x ^= x >> 15u;
+    x *= 0x846ca68bu;
+    x ^= x >> 16u;
+    return x;
+}
+
+// Next hash of a chain of hashes of the same lattice point.
+fn distortion_rehash(h: u32) -> u32 {
+    var x = h * 0x9e3779b9u + 0x632be5abu;
+    x ^= x >> 15u;
+    x *= 0x2c1b3c6du;
+    x ^= x >> 12u;
+    return x;
+}
+
+// Gradient of a lattice point at a phase: it turns once per phase in the plane of two hashed
+// vectors, from a hashed angle and in a hashed direction, so the noise evolves in place and
+// repeats when the phase wraps to 0.
+fn distortion_gradient(a: u32, b: u32, phase: f32) -> vec3f {
+    let ha = unpack4x8unorm(a);
+    let hb = unpack4x8unorm(b);
+    let turn = select(1.0, -1.0, hb.w >= 0.5);
+    let angle = 6.283185307 * (ha.w + turn * phase);
+    return (ha.xyz * 2.0 - 1.0) * cos(angle) + (hb.xyz * 2.0 - 1.0) * sin(angle);
+}
+
+// Two channels of evolving gradient noise (rotating gradients) at a point in features,
+// about -1..1.
+fn distortion_noise(p: vec3f, phase: f32) -> vec2f {
+    let cell = floor(p);
+    let x = p - cell;
+    let u = x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
+    let base = vec3i(cell);
+    var sum = vec2f(0.0);
+    for (var k = 0u; k < 8u; k++) {
+        let corner = vec3f(f32(k & 1u), f32((k >> 1u) & 1u), f32((k >> 2u) & 1u));
+        let h0 = distortion_hash(base + vec3i(corner));
+        let h1 = distortion_rehash(h0);
+        let h2 = distortion_rehash(h1);
+        let h3 = distortion_rehash(h2);
+        let w = mix(vec3f(1.0) - u, u, corner);
+        let d = x - corner;
+        sum += vec2f(dot(distortion_gradient(h0, h1, phase), d),
+            dot(distortion_gradient(h2, h3, phase), d)) * (w.x * w.y * w.z);
+    }
+    return clamp(sum * 1.6, vec2f(-1.0), vec2f(1.0));
+}
+
+// Screen space offset of the snapshot by the Distortion of a fragment of a material_distortion
+// pipeline, in UVs: its noise at the object position of the fragment times its strength, a
+// fraction of the image height on both axes; 0 without one.
+fn distortion_offset(f: VertexOut) -> vec2f {
+    var result = vec2f(0.0);
+    if (material_distortion && !water) {
+        let d = vo_distortion(f);
+        if (d.strength > 0.0) {
+            let n = distortion_noise(f.object.xyz * d.frequency.xyx, d.phase);
+            let aspect = view.viewport.y * view.viewport.z;
+            result = d.strength * vec2f(n.x * aspect, -n.y);
+        }
+    }
+    return result;
+}
+
+// Whether a fragment of a material_distortion pipeline has a Distortion without Transmission
+// (DISTORTION_SHARP).
+fn distortion_sharp(f: VertexOut) -> bool {
+    return material_distortion && !water && (vo_distortion(f).flags & DISTORTION_SHARP) != 0u;
+}
+
 // Color of a transmissive fragment, as flecs-engine shades it: the opaque snapshot where the
 // refracted ray leaves a volume of the material thickness, reduced by Fresnel and absorbed
 // (Beer-Lambert). The transmission factor replaces the diffuse light; specular and emission are
 // added on top. It writes no depth, so it takes no ambient occlusion of the view.
+//
+// A Distortion offsets the point of the snapshot by its noise (distortion_offset), clamped to
+// the image. Without Transmission (distortion_sharp) the snapshot shows at its sharp level,
+// without Fresnel, the albedo or absorption.
 fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     var ap = vec4f(0.0, 0.0, 0.0, 1.0);
     if (scene_aerial && view.aerial.w > 0.0) {
@@ -630,25 +712,29 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     }
 
     let ndotv = saturate(dot(s.normal, v));
+    let sharp = distortion_sharp(f);
 
     // Fresnel reflection (Schlick with IOR-derived F0)
     let ior_ratio = (1.0 - ior) / (1.0 + ior);
     let f0_ior = ior_ratio * ior_ratio;
     let fx = 1.0 - ndotv;
     let fx2 = fx * fx;
-    let fresnel = f0_ior + (1.0 - f0_ior) * (fx2 * fx2 * fx);
+    let fresnel = select(f0_ior + (1.0 - f0_ior) * (fx2 * fx2 * fx), 0.0, sharp);
 
     let refracted = refract(-v, s.normal, 1.0 / max(ior, 0.001));
     let exit_pos = f.world + normalize(refracted) * thickness * vo_model_scale(f);
     let exit_clip = view.view_proj * vec4f(exit_pos, 1.0);
     var screen_uv = exit_clip.xy / exit_clip.w * vec2f(0.5, -0.5) + vec2f(0.5, 0.5);
-    screen_uv = clamp(screen_uv, vec2f(0.0), vec2f(1.0));
+    screen_uv = clamp(screen_uv + distortion_offset(f), vec2f(0.0), vec2f(1.0));
 
     let max_mip = max(f32(textureNumLevels(opaque_snapshot)) - 1.0, 0.0);
     var bg_lod = s.roughness * max_mip;
     let diffuse_blur = vo_scalars(f).z;
     if (diffuse_blur > 0.0) {
         bg_lod = transmission_blur_lod(f.world, screen_uv, diffuse_blur, bg_lod, max_mip);
+    }
+    if (sharp) {
+        bg_lod = 0.0;
     }
     let background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
         bg_lod).rgb;
@@ -657,7 +743,8 @@ fn transmission(f: VertexOut, s: Surface, v: vec3f, reflected: Lit) -> vec4f {
     let att_color = max(vo_attenuation(f), vec3f(0.001));
     let att_ratio = thickness / max(att_distance, 0.001);
     let transmittance = pow(att_color, vec3f(att_ratio));
-    let transmitted = (1.0 - fresnel) * background * transmittance * s.albedo;
+    let albedo = select(s.albedo, vec3f(1.0), sharp);
+    let transmitted = (1.0 - fresnel) * background * transmittance * albedo;
 
     let tf = saturate(factor);
     let own = reflected.diffuse * (1.0 - tf) + reflected.specular;

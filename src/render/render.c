@@ -253,6 +253,7 @@ uint32_t box_render_scene_features(
     result |= f->planar_reflections ? BOX_RENDER_FEATURE_PLANAR : 0u;
     result |= f->texture_scroll ? BOX_RENDER_FEATURE_TEXTURE_SCROLL : 0u;
     result |= f->planet_light ? BOX_RENDER_FEATURE_PLANET_LIGHT : 0u;
+    result |= f->distortion ? BOX_RENDER_FEATURE_DISTORTION : 0u;
 done:
     return result;
 }

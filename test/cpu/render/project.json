@@ -85,7 +85,10 @@
                     "water_pack",
                     "water_depth_mix",
                     "water_transmittance",
-                    "water_foam"
+                    "water_foam",
+                    "distortion_defaults",
+                    "distortion_pack",
+                    "distortion_phase"
                 ]
             },
             {
@@ -462,7 +465,9 @@
                     "texture_scroll_prefab_repacks",
                     "texture_scroll_off_shares_slot",
                     "still_water_shares_slot",
-                    "water_off_not_repacked"
+                    "water_off_not_repacked",
+                    "distortion_shares_slot",
+                    "distortion_off_not_repacked"
                 ]
             },
             {
@@ -822,6 +827,7 @@
                     "fresnel_idle",
                     "fresnel_2d",
                     "fresnel_keeps_batch",
+                    "distortion_mesh",
                     "fresnel_interrupt",
                     "uv_mesh",
                     "cutoff_mesh",
@@ -894,6 +900,10 @@
                     "fresnel_remove",
                     "fresnel_remove_during_add",
                     "fresnel_remove_transition",
+                    "distortion_add",
+                    "distortion_remove",
+                    "distortion_neutral",
+                    "distortion_remove_keeps_transmissive",
                     "pbr_add",
                     "uv_remove",
                     "box_shadow_add",
@@ -980,7 +990,9 @@
                     "texture_scroll_off_draws_with_mesh_shader",
                     "overrides_off_by_default",
                     "overrides_independent",
-                    "overrides_without_new_features"
+                    "overrides_without_new_features",
+                    "distortion_draws_transmissive",
+                    "distortion_feature_costs_nothing"
                 ]
             },
             {

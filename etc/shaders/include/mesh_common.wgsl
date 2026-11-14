@@ -59,6 +59,12 @@ override scene_planar: bool = false;
 // the vertex stage passes the Water fields of the material (vo_water).
 override water: bool = false;
 
+// Transmissive shapes of a scene with Scene.distortion, set by the extended mesh shader with
+// transmissive: the vertex stage passes the Distortion of the material (vo_distortion) and the
+// position its noise is sampled at, and the snapshot is offset by the noise. Water pipelines
+// ignore it.
+override material_distortion: bool = false;
+
 const PI: f32 = 3.141592653589793;
 const MIN_ROUGHNESS: f32 = 0.045;
 
@@ -146,7 +152,8 @@ struct VertexOut {
     @location(13) @interpolate(flat) fresnel_color: vec2u,
     // Water foam width, ripple and foam scale (pack2x16float) and ripple offset of a Water
     // pipeline (water), which reuses flat2 and flat3.zw for the other Water fields: Water
-    // ignores Transmission, and the fragment stage cannot read the material table.
+    // ignores Transmission, and the fragment stage cannot read the material table. Of the other
+    // material_distortion pipelines, the Distortion of the material (vo_distortion).
     @location(8) @interpolate(flat) flat4: vec4u,
     // Low byte: planar reflection slot of the view plus one whose image the instance shows, 0
     // for none or without scene_planar (planar_owner). Above it: the planet light slot of the
@@ -196,6 +203,21 @@ fn vo_water(f: VertexOut) -> Material {
     m.water_foam_scale = unpack2x16float(f.flat4.y).y;
     m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
     return m;
+}
+
+// The Distortion of the material of a fragment of a material_distortion pipeline: strength,
+// the factors that turn object.xyz into noise coordinates (x for its x and z, y for its y),
+// phase and the DISTORTION_* flags, 0 without one.
+struct DistortionOut {
+    strength: f32,
+    frequency: vec2f,
+    phase: f32,
+    flags: u32,
+};
+
+fn vo_distortion(f: VertexOut) -> DistortionOut {
+    return DistortionOut(bitcast<f32>(f.flat4.x), unpack2x16float(f.flat4.y),
+        bitcast<f32>(f.flat4.z), f.flat4.w);
 }
 
 fn vo_emissive(f: VertexOut) -> vec3f {
@@ -376,6 +398,24 @@ fn vertex_scalars(material: Material, mapped: f32) -> vec2u {
         pack2x16float(vec2f(material.diffuse_blur, mapped)));
 }
 
+// The Distortion of a material_distortion pipeline: its noise follows the object position
+// times the scale of the instance (world units that move and rotate with the shape) in object,
+// which the fragment stage reads only for a projected mapping. A projected mapping keeps its
+// object, the position in its projection space over the mapping size, times the uv scale on
+// each axis (mapping_object): the frequency takes them out again.
+fn vertex_distortion(o: ptr<function, VertexOut>, p: Placed, material: Material,
+    frame: ModelFrame, mapped: f32) {
+    var k = vec2f(material.distortion_frequency);
+    if (mapped == 0.0) {
+        (*o).object = vec4f(p.local * frame.scale, 0.0);
+    } else {
+        let uv = select(material.uv.xy, vec2f(1.0), material.uv.xy == vec2f(0.0));
+        k = material.distortion_frequency * material.mapping_size / uv;
+    }
+    (*o).flat4 = vec4u(bitcast<u32>(material.distortion_strength), pack2x16float(k),
+        bitcast<u32>(material.distortion_phase), material.distortion_flags);
+}
+
 fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading)
     -> VertexOut
 {
@@ -416,6 +456,9 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
         o.flat4 = vec4u(bitcast<u32>(material.water_foam_width),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),
             bitcast<vec2u>(material.water_ripple_offset));
+    }
+    if (material_distortion && !water && material.distortion_flags != 0u) {
+        vertex_distortion(&o, p, material, frame, s.mapped);
     }
     return o;
 }

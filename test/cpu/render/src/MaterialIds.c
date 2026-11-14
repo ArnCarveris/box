@@ -2046,3 +2046,110 @@ void MaterialIds_water_off_not_repacked(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** A still Distortion shares its slot like the other material components and packs nothing per
+ * frame; one that moves gets its own slot, packed every frame; prefab instances share the slot
+ * of the prefab. */
+void MaterialIds_distortion_shares_slot(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_singleton_set(world, Scene, {.distortion = true});
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {40, 80, 120});
+    ecs_set(world, a, Distortion, {.strength = 0.01f, .scale = 2, .speed = 0});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Rgb, {40, 80, 120});
+    ecs_set(world, b, Distortion, {.strength = 0.01f, .scale = 2, .speed = 0});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+
+    uint32_t shared = id_of(world, a);
+    test_assert(shared != 0 && shared != UINT32_MAX);
+    test_uint(id_of(world, b), shared);
+    test_uint(shading_of(world, a)->material, shared);
+    test_uint(shading_of(world, b)->material, shared);
+    test_flt(record_of(world, shared)->distortion_strength, 0.01f);
+    test_flt(record_of(world, shared)->distortion_frequency, 0.5f);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    /* Another strength takes another slot */
+    ecs_set(world, b, Distortion, {.strength = 0.02f, .scale = 2, .speed = 0});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    test_assert(id_of(world, b) != id_of(world, a));
+    test_flt(record_of(world, id_of(world, b))->distortion_strength, 0.02f);
+
+    /* A speed gives the shape its own slot, packed every frame with a moving phase */
+    ecs_set(world, a, Distortion, {.strength = 0.01f, .scale = 2, .speed = 0.5f});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t own = id_of(world, a);
+    test_assert(own != 0 && own != UINT32_MAX);
+    test_uint(shading_of(world, a)->material, own);
+    float phase = record_of(world, own)->distortion_phase;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, MATERIAL);
+        test_assert(record_of(world, own)->distortion_phase != phase);
+        phase = record_of(world, own)->distortion_phase;
+    }
+
+    /* Prefab instances share the slot of their prefab */
+    ecs_entity_t prefab = prefab_new(world);
+    ecs_set(world, prefab, Rgb, {10, 20, 30});
+    ecs_set(world, prefab, Distortion, {.strength = 0.004f, .scale = 1, .speed = 0});
+    ecs_entity_t i0 = instance_new(world, prefab, 4);
+    ecs_entity_t i1 = instance_new(world, prefab, 6);
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+    uint32_t pid = id_of(world, prefab);
+    test_assert(pid != 0 && pid != UINT32_MAX);
+    test_uint(id_of(world, i0), pid);
+    test_uint(id_of(world, i1), pid);
+    test_uint(shading_of(world, i0)->material, pid);
+    test_uint(shading_of(world, i1)->material, pid);
+    test_uint(record_of(world, pid)->distortion_flags,
+        BOX_RENDER_DISTORTION_PRESENT | BOX_RENDER_DISTORTION_SHARP);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void MaterialIds_distortion_off_not_repacked(void) {
+    // materials/material_ids
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Rgb, {40, 80, 120});
+    ecs_set(world, a, Distortion, {.strength = 0.01f, .scale = 1, .speed = 1});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Rgb, {40, 80, 120});
+    frame_dt(world, 1.0f / 60.0f);
+    frame_dt(world, 1.0f / 60.0f);
+
+    /* A scene without Scene.distortion packs the shape as without its Distortion */
+    test_uint(id_of(world, a), id_of(world, b));
+    test_uint(record_of(world, id_of(world, a))->distortion_flags, 0);
+    test_flt(record_of(world, id_of(world, a))->transmission_factor, 0);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_render_draws_stats_t stats = frame_dt(world, 1.0f / 60.0f);
+        test_int(stats.material_bytes, 0);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

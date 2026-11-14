@@ -109,6 +109,7 @@ bool box_transition_supported(
         component == ecs_id(Sheen) ||
         component == ecs_id(DiffuseTransmission) ||
         component == ecs_id(Fresnel) ||
+        component == ecs_id(Distortion) ||
         component == ecs_id(BoxShadow) ||
         component == ecs_id(Border) ||
         component == ecs_id(PointLight) ||
@@ -135,6 +136,7 @@ bool box_transition_neutral_supported(
         component == ecs_id(Sheen) ||
         component == ecs_id(DiffuseTransmission) ||
         component == ecs_id(Fresnel) ||
+        component == ecs_id(Distortion) ||
         component == ecs_id(PointLight) ||
         component == ecs_id(SpotLight) ||
         (!remove && component == ecs_id(BoxShadow)));

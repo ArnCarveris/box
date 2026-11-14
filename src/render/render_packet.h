@@ -712,12 +712,16 @@ typedef struct box_render_view_gtao_t {
  * PlanetAtmosphere of an instance by its transmittance (scene_planet_light override) */
 #define BOX_RENDER_FEATURE_PLANET_LIGHT (1u << 20)
 
+/** Distortion (Scene.distortion): its shapes draw transmissive, and the transmissive pipelines
+ * of the extended mesh shader offset the snapshot by its noise (material_distortion override) */
+#define BOX_RENDER_FEATURE_DISTORTION (1u << 21)
+
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
 
 /** The scene features that draw with the extended mesh shader */
 #define BOX_RENDER_FEATURE_MATERIALS (0x3FC0u | BOX_RENDER_FEATURE_WATER | \
-    BOX_RENDER_FEATURE_PLANAR)
+    BOX_RENDER_FEATURE_PLANAR | BOX_RENDER_FEATURE_DISTORTION)
 
 /** The scene features that are overrides in the order of their bits, which key the pipelines
  * of the mesh shaders with the TEXTURE_SCROLL, PLANET_LIGHT and PLANAR features; the
@@ -726,8 +730,9 @@ typedef struct box_render_view_gtao_t {
 
 /** Overrides of the extended mesh shader, bit i the override box_render_mesh_override_key(i):
  * the lighting ones, material_texture_scroll, scene_planet_light, the material ones,
- * scene_planar, transmissive and water; the mesh shader has the first PLAIN ones. */
-#define BOX_RENDER_MESH_OVERRIDES (17)
+ * scene_planar, transmissive, water and material_distortion; the mesh shader has the first
+ * PLAIN ones. */
+#define BOX_RENDER_MESH_OVERRIDES (18)
 
 /** Overrides of the mesh shader: the lighting ones, material_texture_scroll and
  * scene_planet_light */
@@ -751,7 +756,11 @@ typedef struct box_render_view_gtao_t {
 /** Bit of the water override */
 #define BOX_RENDER_OVERRIDE_WATER (1u << 16)
 
-/** The overrides that come from the scene features, without transmissive and water */
+/** Bit of the material_distortion override */
+#define BOX_RENDER_OVERRIDE_DISTORTION (1u << 17)
+
+/** The overrides that come from the scene features, without transmissive, water and
+ * material_distortion */
 #define BOX_RENDER_OVERRIDE_SCENE (0x7FFFu)
 
 /** Get the name of an override of the mesh shaders.
@@ -767,7 +776,7 @@ static inline const char* box_render_mesh_override_key(
         "scene_environment", "scene_aerial", "material_texture_scroll", "scene_planet_light",
         "material_sheen", "material_clear_coat", "material_anisotropy",
         "material_diffuse_transmission", "material_triplanar", "material_fresnel",
-        "scene_planar", "transmissive", "water"
+        "scene_planar", "transmissive", "water", "material_distortion"
     };
 
     return keys[index];
@@ -777,8 +786,9 @@ static inline const char* box_render_mesh_override_key(
  * compiles out its code.
  *
  * The mesh shader takes the lighting features, the TextureScroll and the planet light ones,
- * the extended mesh shader all of them, transmissive for the pipelines of transmissive shapes
- * and water for those of transmissive Water shapes.
+ * the extended mesh shader all of them, transmissive for the pipelines of transmissive shapes,
+ * water for those of transmissive Water shapes and material_distortion for the transmissive
+ * ones of a scene with Scene.distortion.
  *
  * @param shader The shader handle, 0 overrides for one that is not a mesh shader
  * @param features BOX_RENDER_FEATURE_* features of the scene the pipeline draws
@@ -808,6 +818,8 @@ static inline uint32_t box_render_mesh_overrides(
     result |= features & BOX_RENDER_FEATURE_PLANAR ? BOX_RENDER_OVERRIDE_PLANAR : 0u;
     result |= transmissive ? BOX_RENDER_OVERRIDE_TRANSMISSIVE : 0u;
     result |= transmissive && water ? BOX_RENDER_OVERRIDE_WATER : 0u;
+    result |= transmissive && (features & BOX_RENDER_FEATURE_DISTORTION)
+        ? BOX_RENDER_OVERRIDE_DISTORTION : 0u;
 done:
     return result;
 }
@@ -1383,7 +1395,25 @@ typedef struct box_render_material_t {
     float water_ripple_scale; /**< Water.ripple_scale, 0 without one, when negative or not
                              *   finite */
     uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags, 0 without one */
+    float distortion_strength; /**< Distortion.strength, 0 without one or when negative or not
+                             *   finite (and for a shape with Water, which ignores it) */
+    float distortion_frequency; /**< 1 over Distortion.scale, which is at least
+                             *   BOX_RENDER_DISTORTION_MIN; 0 without one */
+    float distortion_phase; /**< Distortion.speed times the total render time wrapped to 0..1
+                             *   (box_draws_distortion_phase), 0 without one */
+    uint32_t distortion_flags; /**< BOX_RENDER_DISTORTION_* flags, 0 without one */
 } box_render_material_t;
+
+/** Smallest Distortion.scale of a record */
+#define BOX_RENDER_DISTORTION_MIN (1e-3f)
+
+/** Flag of a Distortion record: the material has a Distortion */
+#define BOX_RENDER_DISTORTION_PRESENT (1u << 0)
+
+/** Flag of a Distortion record without Transmission: the transmission words are those of a
+ * factor of 1 without refraction or absorption, and the snapshot is sampled at its sharp
+ * level */
+#define BOX_RENDER_DISTORTION_SHARP (1u << 1)
 
 /** Smallest depth and visibility of a Water record */
 #define BOX_RENDER_WATER_MIN (1e-3f)
@@ -1609,6 +1639,7 @@ typedef enum box_render_transition_component_t {
     BOX_RENDER_TRANSITION_SHEEN,            /**< Sheen */
     BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION, /**< DiffuseTransmission */
     BOX_RENDER_TRANSITION_FRESNEL,          /**< Fresnel */
+    BOX_RENDER_TRANSITION_DISTORTION,       /**< Distortion */
     BOX_RENDER_TRANSITION_BOX_SHADOW,       /**< BoxShadow */
     BOX_RENDER_TRANSITION_BORDER,           /**< Border */
     BOX_RENDER_TRANSITION_POINT_LIGHT,      /**< PointLight */

@@ -1449,6 +1449,7 @@ void Transition_supported(void) {
     test_assert(box_transition_supported(world, ecs_id(Sheen)));
     test_assert(box_transition_supported(world, ecs_id(DiffuseTransmission)));
     test_assert(box_transition_supported(world, ecs_id(Fresnel)));
+    test_assert(box_transition_supported(world, ecs_id(Distortion)));
     test_assert(box_transition_supported(world, ecs_id(BoxShadow)));
     test_assert(box_transition_supported(world, ecs_id(Border)));
     test_assert(box_transition_supported(world, ecs_id(PointLight)));

@@ -713,6 +713,35 @@ static bool box_draws_lobe_leaving(
     return result;
 }
 
+/** Check whether a 3D shape is transmissive by a Distortion its scene enables
+ * (Scene.distortion): it has or inherits one, or fades out a removed one with on_remove, which
+ * keeps it transmissive until the fade ends.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param features The scene features of its key
+ * @return Whether it draws over the snapshot for its Distortion
+ */
+static bool box_draws_distorted(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t features)
+{
+    bool result = false;
+    if (!(features & BOX_RENDER_FEATURE_DISTORTION)) {
+        goto done;
+    }
+
+    result = ecs_get(world, e, Distortion) != NULL;
+    if (!result) {
+        const box_render_transitions_t *s = box_render_transitions_get(world);
+        result = s && box_render_transitions_leaving(world, s, e,
+            BOX_RENDER_TRANSITION_DISTORTION);
+    }
+done:
+    return result;
+}
+
 /** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or
  * water, it has a PlanarReflection with Scene.planar_reflections or a material feature its scene
  * enables. Alpha tested, blended and TextureBlend shapes without those use the mesh shader.
@@ -778,9 +807,9 @@ done:
  * below 1. A 3D shape draws with the extended mesh shader when box_draws_extended says so; the
  * Scene features that are off are ignored.
  *
- * A 3D shape that has or inherits Transmission, or Water with Scene.water (without its
- * TextureBlend), is transmissive: it draws in the sorted blended pass (AlphaBlend), is not alpha
- * tested and casts no shadow, whatever its factor, BlendMode, Opacity and AlphaCutoff.
+ * A 3D shape that has or inherits Transmission, Distortion (box_draws_distorted), or Water
+ * with Scene.water (without its TextureBlend), is transmissive: it draws in the sorted blended
+ * pass, is not alpha tested and casts no shadow, whatever BlendMode, Opacity and AlphaCutoff.
  *
  * @param world The world
  * @param d The state
@@ -843,6 +872,8 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, LightFixture) != 0);
     key->transmissive = !shape2d && (key->features & BOX_RENDER_FEATURE_TRANSMISSION) &&
         ecs_get(world, e, Transmission) != NULL;
+    key->transmissive = key->transmissive ||
+        (!shape2d && box_draws_distorted(world, e, key->features));
     const Water *water = shape2d || !(key->features & BOX_RENDER_FEATURE_WATER)
         ? NULL : ecs_get(world, e, Water);
     if (water) {

@@ -12,6 +12,7 @@
 #include "render.h"
 #include "draw.h"
 #include "transition_test.h"
+#include <math.h>
 
 /** A material component, the value a case starts from and the one it transitions to */
 typedef struct tr_material_case_t {
@@ -45,6 +46,7 @@ static void tr_material_set(
     case BOX_RENDER_TRANSITION_SHEEN: m->sheen = value; break;
     case BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION: m->diffuse_transmission = value; break;
     case BOX_RENDER_TRANSITION_FRESNEL: m->fresnel = value; break;
+    case BOX_RENDER_TRANSITION_DISTORTION: m->distortion = value; break;
     default: test_assert(false); break;
     }
 }
@@ -1954,5 +1956,66 @@ void TransitionMaterial_fresnel_interrupt(void) {
     test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
     test_assert(tr_material_rendered(world, null, slot, &rendered));
     tr_fresnel_check(&rendered, &tr_fresnel_from);
+    tr_fini(world, null);
+}
+
+/** The Distortion case: every float steps by an exact amount each quarter, without speed, so
+ * the phase stays 0 */
+static const Distortion tr_distortion_from = { .strength = 0, .scale = 1, .speed = 0 };
+static const Distortion tr_distortion_to = { .strength = 0.008f, .scale = 3, .speed = 0 };
+
+/** A Distortion transitions its three floats linearly in the record of its slot, keeping the
+ * transmissive batch of the shape. */
+void TransitionMaterial_distortion_mesh(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_scene(&null);
+    ecs_singleton_set(world, Scene, {.distortion = true});
+    ecs_entity_t e = tr_shape(world, 0, 0);
+    box_render_material_t rendered, expected;
+    box_draw_material_t m;
+    int32_t i;
+    ecs_set_ptr(world, e, Distortion, &tr_distortion_from);
+    box_transition_set(world, e, ecs_id(Distortion), &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    tr_frame(world);
+    uint32_t slot = ecs_get(world, e, MaterialId)->value;
+    int32_t batch = ecs_get(world, e, DrawSlot)->batch;
+    test_assert(slot != 0 && slot != UINT32_MAX);
+    test_bool(tr_batch(world, e)->key.transmissive, true);
+
+    ecs_set_ptr(world, e, Distortion, &tr_distortion_to);
+    for (i = 0; i < 4; i ++) {
+        float from[BOX_RENDER_TRANSITION_VALUE / 4], to[BOX_RENDER_TRANSITION_VALUE / 4];
+        float value[BOX_RENDER_TRANSITION_VALUE / 4];
+        Distortion mid;
+        box_render_transition_pack(BOX_RENDER_TRANSITION_DISTORTION, &tr_distortion_from, from);
+        box_render_transition_pack(BOX_RENDER_TRANSITION_DISTORTION, &tr_distortion_to, to);
+        box_render_transition_mix(BOX_RENDER_TRANSITION_DISTORTION, from, to, (float)i / 4.0f,
+            value);
+        ecs_os_memcpy(&mid, value, ECS_SIZEOF(Distortion));
+        test_assert(fabsf(mid.strength - 0.002f * (float)i) < 1e-6f);
+        test_assert(fabsf(mid.scale - (1.0f + 0.5f * (float)i)) < 1e-6f);
+        tr_frame(world);
+        test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 1);
+        test_int(ecs_get(world, e, DrawSlot)->batch, batch);
+        test_bool(tr_batch(world, e)->key.transmissive, true);
+        test_assert(tr_material_rendered(world, null, slot, &rendered));
+        test_assert(fabsf(rendered.distortion_strength - mid.strength) < 1e-6f);
+        test_assert(fabsf(rendered.distortion_frequency - 1.0f / mid.scale) < 1e-5f);
+        test_flt(rendered.distortion_phase, 0);
+        test_uint(rendered.distortion_flags,
+            BOX_RENDER_DISTORTION_PRESENT | BOX_RENDER_DISTORTION_SHARP);
+        box_draws_material_of(world, e, 0, &m);
+        m.distortion = &mid;
+        box_draws_material_pack(&expected, &m);
+        test_assert(!ecs_os_memcmp_t(&rendered, &expected, box_render_material_t));
+    }
+
+    tr_frame(world);
+    test_int(tr_ops(world, null, BOX_RENDER_TRANSITION_MATERIAL), 0);
+    test_assert(tr_material_rendered(world, null, slot, &rendered));
+    test_flt(rendered.distortion_strength, 0.008f);
+    test_assert(fabsf(rendered.distortion_frequency - 1.0f / 3.0f) < 1e-6f);
     tr_fini(world, null);
 }

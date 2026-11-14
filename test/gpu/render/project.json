@@ -327,6 +327,19 @@
                 ]
             },
             {
+                "id": "Distortion",
+                "testcases": [
+                    "moves_stripes",
+                    "without_scene_transmission",
+                    "with_transmission_moves_stripes",
+                    "zero_strength_matches",
+                    "off_matches_without_distortion",
+                    "changes_over_time",
+                    "still_without_speed",
+                    "moves_with_shape"
+                ]
+            },
+            {
                 "id": "Fresnel",
                 "testcases": [
                     "red_rim_at_silhouette",

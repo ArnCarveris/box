@@ -111,7 +111,8 @@ static void box_transition_change(
  * shader while it leaves (box_render_transitions_leaving).
  *
  * @param component The component
- * @return Whether it is Sheen, ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel
+ * @return Whether it is Sheen, ClearCoat, SpecularAnisotropy, DiffuseTransmission, Fresnel or
+ * Distortion, which keeps the shape transmissive
  */
 static bool box_transition_lobe(
     box_render_transition_component_t component)
@@ -120,7 +121,8 @@ static bool box_transition_lobe(
         component == BOX_RENDER_TRANSITION_CLEAR_COAT ||
         component == BOX_RENDER_TRANSITION_ANISOTROPY ||
         component == BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION ||
-        component == BOX_RENDER_TRANSITION_FRESNEL;
+        component == BOX_RENDER_TRANSITION_FRESNEL ||
+        component == BOX_RENDER_TRANSITION_DISTORTION;
 }
 
 /** Mark the shapes that read the material lobes of an entity as changed: the entity and its

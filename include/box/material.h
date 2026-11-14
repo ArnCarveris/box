@@ -1,7 +1,7 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
- * diffuse transmission, emission, Fresnel rim, transmission and water.
+ * diffuse transmission, emission, Fresnel rim, transmission, distortion and water.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -273,6 +273,42 @@ ECS_STRUCT(Transmission, {
     float attenuation_distance; /**< Distance at which light has the attenuation color */
     Rgb attenuation_color;      /**< Color of the light after attenuation_distance, display
                                  *   encoded */
+});
+
+/** Strength of a constructed Distortion: a fraction of the image height */
+#define BOX_MATERIAL_DISTORTION_STRENGTH (0.004f)
+
+/** Scale of a constructed Distortion: world units of one feature of the noise */
+#define BOX_MATERIAL_DISTORTION_SCALE (1.0f)
+
+/** Speed of a constructed Distortion: features per second */
+#define BOX_MATERIAL_DISTORTION_SPEED (0.5f)
+
+/** Moving shimmer of the scene behind a 3D mesh (heat haze, shield bubbles), inherited by
+ * instances like Rgb, default strength 0.004, scale 1 and speed 0.5.
+ *
+ * It draws like Transmission: in the sorted blended pass without depth writes, casting no
+ * shadow, not captured, ignoring Opacity, BlendMode and AlphaCutoff. It shows the snapshot of
+ * what its view drew before it at the screen position of the fragment plus a screen space
+ * offset: smooth noise that evolves in place, sampled at the object position (or the position
+ * in the space of its TextureFrame with MappingFrame), so the pattern moves and rotates with the
+ * shape. The noise follows the total render time, wrapped in double precision.
+ *
+ * The distorted scene replaces the diffuse light as a transmission factor of 1 does; specular
+ * light, Emissive and Fresnel add on top. With Transmission the offset adds to its refraction
+ * and its factor, absorption and blur apply; alone it samples the sharp snapshot. A shape with
+ * Water ignores it.
+ *
+ * Its record is packed every frame while speed is not 0, like that of a TextureScroll.
+ * Transitionable: the three floats interpolate linearly, on_add and on_remove start from and
+ * end at a strength of 0. Needs Scene.distortion: a scene without it draws the shape as if it
+ * had no Distortion. Only 3D meshes have it, 2D shapes and text ignore it.
+ */
+ECS_STRUCT(Distortion, {
+    float strength; /**< Largest screen space offset of the scene behind, a fraction of the
+                     *   image height */
+    float scale;    /**< World units of one feature of the noise */
+    float speed;    /**< How fast the pattern changes, in features per second */
 });
 
 /** Shallow color of a constructed Water, display encoded */

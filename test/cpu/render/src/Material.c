@@ -839,7 +839,7 @@ void Material_specular_anisotropy_pack(void) {
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
     test_uint(record.anisotropy, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
 
     SpecularAnisotropy full = { .strength = 1, .rotation = 0 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .anisotropy = &full, .fade = 1 });
@@ -955,7 +955,7 @@ void Material_sheen_pack(void) {
     test_uint(record.diffuse_transmission, 0);
     test_flt(record.thickness, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
 
     Sheen white = { .color = {255, 255, 255}, .roughness = 1 };
     box_draws_material_pack(&record, &(box_draw_material_t){ .sheen = &white, .fade = 1 });
@@ -1070,7 +1070,7 @@ void Material_diffuse_transmission_defaults(void) {
 void Material_diffuse_transmission_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
     test_int(offsetof(box_render_material_t, diffuse_transmission), 76);
     test_int(offsetof(box_render_material_t, thickness), 80);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
@@ -1184,7 +1184,7 @@ void Material_diffuse_transmission_blur_defaults(void) {
 void Material_diffuse_transmission_blur_pack(void) {
     // materials/pbr
     box_render_material_t record, plain;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
     test_int(offsetof(box_render_material_t, diffuse_blur), 84);
     ecs_os_memset_t(&record, 0x55, box_render_material_t);
     box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
@@ -2691,7 +2691,7 @@ void Material_texture_scroll_pack(void) {
     test_uint(record.fresnel_color[0], 0);
     test_uint(record.fresnel_color[1], 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
 
     box_draws_material_pack(&record, &(box_draw_material_t){
         .uv = &uv, .fade = 1, .time = 1000 });
@@ -2872,7 +2872,7 @@ void Material_fresnel_pack(void) {
     test_flt(record.fresnel_bias, 0);
     test_flt(record.fresnel_opacity, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
     test_int(ECS_SIZEOF(box_render_material_t) % 16, 0);
     test_int(offsetof(box_render_material_t, fresnel_color), 104);
     test_int(offsetof(box_render_material_t, fresnel_strength), 112);
@@ -3060,7 +3060,7 @@ void Material_water_pack(void) {
     test_flt(record.water_ripple_scale, 0);
     test_uint(record.water_flags, 0);
     plain = record;
-    test_int(ECS_SIZEOF(box_render_material_t), 176);
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
     test_int(offsetof(box_render_material_t, water_ripple_offset), 128);
     test_int(offsetof(box_render_material_t, water_shallow), 136);
     test_int(offsetof(box_render_material_t, water_depth), 148);
@@ -3226,4 +3226,175 @@ void Material_water_foam(void) {
     float near_ = box_draws_water_foam(0.03f, 0.3f, true, 0.2f);
     float far_ = box_draws_water_foam(0.27f, 0.3f, true, 0.2f);
     test_assert(near_ > far_);
+}
+
+void Material_distortion_defaults(void) {
+    // materials/distortion
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script_run(world, "distortion",
+        "using box.material\n"
+        "haze { Distortion: {strength: 0.01, scale: 0.5, speed: 2} }\n", NULL) == 0);
+
+    ecs_entity_t added = ecs_new(world);
+    ecs_add(world, added, Distortion);
+    const Distortion *d = ecs_get(world, added, Distortion);
+    test_assert(d != NULL);
+    test_flt(d->strength, BOX_MATERIAL_DISTORTION_STRENGTH);
+    test_flt(d->strength, 0.004f);
+    test_flt(d->scale, 1);
+    test_flt(d->speed, 0.5f);
+    test_bool(ecs_owns(world, added, MaterialId), true);
+
+    ecs_entity_t haze = ecs_lookup(world, "haze");
+    d = ecs_get(world, haze, Distortion);
+    test_assert(d != NULL);
+    test_flt(d->strength, 0.01f);
+    test_flt(d->scale, 0.5f);
+    test_flt(d->speed, 2);
+    test_bool(ecs_owns(world, haze, MaterialId), true);
+
+    /* Reflection knows its members */
+    const EcsStruct *s = ecs_get(world, ecs_id(Distortion), EcsStruct);
+    test_assert(s != NULL);
+    test_int(ecs_vec_count(&s->members), 3);
+    test_str(ecs_vec_get_t(&s->members, ecs_member_t, 0)->name, "strength");
+    test_str(ecs_vec_get_t(&s->members, ecs_member_t, 1)->name, "scale");
+    test_str(ecs_vec_get_t(&s->members, ecs_member_t, 2)->name, "speed");
+
+    /* Instances inherit it like Rgb */
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set(world, prefab, Distortion, {.strength = 0.02f, .scale = 4, .speed = 0});
+    ecs_entity_t instance = ecs_new_w_pair(world, EcsIsA, prefab);
+    test_bool(ecs_owns(world, instance, Distortion), false);
+    test_flt(ecs_get(world, instance, Distortion)->strength, 0.02f);
+    test_flt(ecs_get(world, instance, Distortion)->scale, 4);
+    test_bool(ecs_owns(world, instance, MaterialId), false);
+
+    /* Scene.distortion is a member of Scene, off by default */
+    ecs_singleton_add(world, Scene);
+    test_bool(ecs_singleton_get(world, Scene)->distortion, false);
+    test_assert(ecs_script_run(world, "scene",
+        "using box.view\n"
+        "world_scene { Scene: {distortion: true} }\n", NULL) == 0);
+    test_bool(ecs_get(world, ecs_lookup(world, "world_scene"), Scene)->distortion, true);
+
+    ecs_fini(world);
+}
+
+/** The record holds the strength, the inverse scale and the wrapped phase of a Distortion; alone
+ * it packs the transmission of a factor of 1 without refraction or absorption and the sharp
+ * flag, with Transmission it keeps that, and Water drops it. */
+void Material_distortion_pack(void) {
+    // materials/distortion
+    box_render_material_t record, plain;
+    box_draws_tables_init();
+    ecs_os_memset_t(&record, 0x55, box_render_material_t);
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_flt(record.distortion_strength, 0);
+    test_flt(record.distortion_frequency, 0);
+    test_flt(record.distortion_phase, 0);
+    test_uint(record.distortion_flags, 0);
+    test_flt(record.transmission_factor, 0);
+    plain = record;
+    test_int(ECS_SIZEOF(box_render_material_t), 192);
+    test_int(offsetof(box_render_material_t, distortion_strength), 176);
+    test_int(offsetof(box_render_material_t, distortion_flags), 188);
+
+    Distortion haze = { .strength = 0.01f, .scale = 0.5f, .speed = 0.25f };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &haze, .time = 3, .fade = 1 });
+    test_flt(record.distortion_strength, 0.01f);
+    test_flt(record.distortion_frequency, 2);
+    test_flt(record.distortion_phase, 0.75f);
+    test_uint(record.distortion_flags,
+        BOX_RENDER_DISTORTION_PRESENT | BOX_RENDER_DISTORTION_SHARP);
+    test_flt(record.transmission_factor, 1);
+    test_flt(record.ior, 1);
+    test_flt(record.thickness_factor, 0);
+    test_flt(record.attenuation_distance, BOX_MATERIAL_ATTENUATION_DISTANCE);
+    test_uint(record.attenuation_color, 0xFFFFFFu);
+
+    /* A strength of 0 keeps the shape transmissive, with no offset */
+    Distortion still = { .strength = 0, .scale = 1, .speed = 0 };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &still, .time = 3, .fade = 1 });
+    test_flt(record.distortion_strength, 0);
+    test_flt(record.distortion_frequency, 1);
+    test_flt(record.distortion_phase, 0);
+    test_uint(record.distortion_flags,
+        BOX_RENDER_DISTORTION_PRESENT | BOX_RENDER_DISTORTION_SHARP);
+    test_flt(record.transmission_factor, 1);
+
+    /* With Transmission its words stay those of the Transmission */
+    Transmission glass = {
+        .transmission_factor = 0.5f, .ior = 1.5f, .thickness_factor = 0.25f,
+        .attenuation_distance = 2, .attenuation_color = {200, 100, 50}
+    };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &haze, .transmission = &glass, .time = 3, .fade = 1 });
+    test_flt(record.distortion_strength, 0.01f);
+    test_uint(record.distortion_flags, BOX_RENDER_DISTORTION_PRESENT);
+    test_flt(record.transmission_factor, 0.5f);
+    test_flt(record.ior, 1.5f);
+    test_flt(record.thickness_factor, 0.25f);
+    test_flt(record.attenuation_distance, 2);
+    test_uint(record.attenuation_color, 200u | (100u << 8) | (50u << 16));
+
+    /* With Transmission a strength of 0 packs as no Distortion */
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &still, .transmission = &glass, .time = 3, .fade = 1 });
+    test_flt(record.distortion_frequency, 0);
+    test_uint(record.distortion_flags, 0);
+    test_flt(record.transmission_factor, 0.5f);
+
+    /* Water ignores it */
+    Water pond = { .depth = 3, .visibility = 2 };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &haze, .water = &pond, .time = 3, .fade = 1 });
+    test_flt(record.distortion_strength, 0);
+    test_uint(record.distortion_flags, 0);
+    test_flt(record.transmission_factor, 0);
+
+    /* Values that are not finite or not positive are sanitized */
+    Distortion broken = { .strength = NAN, .scale = -1, .speed = INFINITY };
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &broken, .time = 3, .fade = 1 });
+    test_flt(record.distortion_strength, 0);
+    test_flt(record.distortion_frequency, 1.0f / BOX_RENDER_DISTORTION_MIN);
+    test_flt(record.distortion_phase, 0);
+    broken.strength = -0.5f;
+    broken.scale = NAN;
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .distortion = &broken, .time = 3, .fade = 1 });
+    test_flt(record.distortion_strength, 0);
+    test_flt(record.distortion_frequency, 1.0f / BOX_RENDER_DISTORTION_MIN);
+
+    /* Without one the record is that of a material without one */
+    box_draws_material_pack(&record, &(box_draw_material_t){ .fade = 1 });
+    test_assert(!ecs_os_memcmp_t(&record, &plain, box_render_material_t));
+}
+
+/** The phase wraps to 0..1 in double precision, so it stays exact after hours of uptime. */
+void Material_distortion_phase(void) {
+    // materials/distortion
+    test_flt(box_draws_distortion_phase(0.5f, 0), 0);
+    test_flt(box_draws_distortion_phase(0.5f, 1.5), 0.75f);
+    test_flt(box_draws_distortion_phase(-0.5f, 1.5), 0.25f);
+    test_flt(box_draws_distortion_phase(0, 12345.0), 0);
+    test_flt(box_draws_distortion_phase(NAN, 2), 0);
+    test_flt(box_draws_distortion_phase(0.5f, INFINITY), 0);
+
+    /* Ten hours in, a frame still moves the phase by speed times the frame time */
+    double t = 36000.0 + 0.125;
+    float a = box_draws_distortion_phase(0.5f, t);
+    float b = box_draws_distortion_phase(0.5f, t + 1.0 / 60.0);
+    test_assert(fabsf(a - 0.0625f) < 1e-5f);
+    test_assert(fabsf(b - a - 0.5f / 60.0f) < 1e-5f);
+    int32_t i;
+    for (i = 0; i < 100; i ++) {
+        float p = box_draws_distortion_phase(0.37f, 1e6 + (double)i * 0.01);
+        test_assert(p >= 0.0f && p < 1.0f);
+    }
 }

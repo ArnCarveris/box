@@ -160,7 +160,8 @@ typedef struct box_draw_key_t {
     uint32_t pipeline;      /**< Shader handle of the pipeline */
     uint8_t blend;          /**< Resolved BlendMode, Opaque unless the shape blends */
     bool cutout;            /**< A 3D shape with AlphaCutoff, alpha tested */
-    bool transmissive;      /**< A 3D shape that has or inherits Transmission: blend is
+    bool transmissive;      /**< A 3D shape that has or inherits Transmission, or Distortion
+                             *   with Scene.distortion: blend is
                              *   AlphaBlend, so it draws in the sorted blended pass, cutout and
                              *   shadow are false */
     bool water;             /**< A 3D shape that has or inherits Water in a scene with
@@ -256,6 +257,8 @@ typedef struct box_draw_material_t {
     const DiffuseTransmission *diffuse_transmission; /**< Back lit glow of a 3D shape, ignored
                                  *   by 2D shapes */
     const Fresnel *fresnel;     /**< Artistic rim of a 3D shape, ignored by 2D shapes */
+    const Distortion *distortion; /**< Shimmer of the scene behind a 3D shape, ignored by 2D
+                                 *   shapes and by Water */
     const Water *water;         /**< Water surface of a 3D shape, ignored by 2D shapes */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
     const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
@@ -312,6 +315,7 @@ typedef struct box_draw_transition_material_t {
     Sheen sheen;            /**< Sheen */
     DiffuseTransmission diffuse_transmission; /**< DiffuseTransmission */
     Fresnel fresnel;        /**< Fresnel */
+    Distortion distortion;  /**< Distortion */
     Water water;            /**< Water, which has no transition: the record keeps it */
     bool watered;           /**< The material has a Water */
     Opacity opacity;        /**< Opacity of the shape itself */
@@ -1013,7 +1017,8 @@ void box_draws_color_unpack(
  *
  * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color,
  * DiffuseTransmission 0 without one, its blur 0 when negative or not finite, Fresnel 0 without
- * one.
+ * one. A Distortion without Water packs its strength, frequency and phase, and without
+ * Transmission the transmission of a factor of 1 (box_draws_distortion_pack).
  * Opacity, tints and the 2D shape are not.
  *
  * @param out The record
@@ -1265,6 +1270,17 @@ float box_draws_fresnel_factor(
     float ndv,
     float power,
     float bias);
+
+/** Phase of the noise of a Distortion at a time: speed times time wrapped to [0, 1) in double
+ * precision, the period over which the noise of mesh_extended.wgsl repeats in time.
+ *
+ * @param speed Distortion.speed, features per second
+ * @param time Total render time
+ * @return The phase, 0 for a speed or time that is not finite
+ */
+float box_draws_distortion_phase(
+    float speed,
+    double time);
 
 /** Mix factor of the deep color of a Water body, the C twin of water_depth_mix of
  * material.wgsl: 1 - exp(-3 d / depth), 1 for an infinite depth (the sky behind).

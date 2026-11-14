@@ -223,6 +223,28 @@ static void box_transmission_ctor(
     }
 }
 
+/** Construct Distortion values: a strength of 0.004, a scale of 1 and a speed of 0.5.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_distortion_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Distortion *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Distortion){
+            .strength = BOX_MATERIAL_DISTORTION_STRENGTH,
+            .scale = BOX_MATERIAL_DISTORTION_SCALE,
+            .speed = BOX_MATERIAL_DISTORTION_SPEED };
+    }
+}
+
 /** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
  * refraction of 0.02 and an off white foam band of width 0.3 without texture or ripples.
  *
@@ -336,6 +358,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Emissive);
     ECS_META_COMPONENT(world, Fresnel);
     ECS_META_COMPONENT(world, Transmission);
+    ECS_META_COMPONENT(world, Distortion);
     ECS_META_COMPONENT(world, Water);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
@@ -358,20 +381,21 @@ void BoxMaterialImport(
     ecs_set_hooks(world, TextureScroll, { .ctor = box_texture_scroll_ctor });
     ecs_set_hooks(world, Transmission, { .ctor = box_transmission_ctor });
     ecs_set_hooks(world, Fresnel, { .ctor = box_fresnel_ctor });
+    ecs_set_hooks(world, Distortion, { .ctor = box_distortion_ctor });
     ecs_set_hooks(world, Water, { .ctor = box_water_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
 
-    ecs_entity_t materials[14] = {
+    ecs_entity_t materials[15] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),
         ecs_id(AlphaCutoff), ecs_id(Transmission), ecs_id(ClearCoat), ecs_id(SpecularAnisotropy),
         ecs_id(Sheen), ecs_id(DiffuseTransmission), ecs_id(TextureMapping), ecs_id(TextureScroll),
-        ecs_id(Fresnel), ecs_id(Water)
+        ecs_id(Fresnel), ecs_id(Water), ecs_id(Distortion)
     };
     int32_t i;
-    for (i = 0; i < 14; i ++) {
+    for (i = 0; i < 15; i ++) {
         ecs_add_pair(world, materials[i], EcsOnInstantiate, EcsInherit);
         ecs_add_pair(world, materials[i], EcsWith, ecs_id(MaterialId));
     }

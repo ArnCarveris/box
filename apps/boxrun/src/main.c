@@ -3,6 +3,11 @@
  * @brief Runs a box world with the settings of the command line.
  */
 
+#ifdef __EMSCRIPTEN__
+/* localtime_r is POSIX, which the C99 headers of Emscripten hide without it */
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <boxrun.h>
 #include <stdio.h>
 #include <string.h>

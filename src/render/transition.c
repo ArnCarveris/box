@@ -45,6 +45,7 @@ _Static_assert(sizeof(Sheen) <= BOX_RENDER_TRANSITION_VALUE, "Sheen fits a value
 _Static_assert(sizeof(DiffuseTransmission) <= BOX_RENDER_TRANSITION_VALUE,
     "DiffuseTransmission fits a value");
 _Static_assert(sizeof(Fresnel) <= BOX_RENDER_TRANSITION_VALUE, "Fresnel fits a value");
+_Static_assert(sizeof(Distortion) <= BOX_RENDER_TRANSITION_VALUE, "Distortion fits a value");
 _Static_assert(sizeof(BoxShadow) <= BOX_RENDER_TRANSITION_VALUE, "BoxShadow fits a value");
 _Static_assert(sizeof(Border) <= BOX_RENDER_TRANSITION_VALUE, "Border fits a value");
 _Static_assert(sizeof(PointLight) <= BOX_RENDER_TRANSITION_VALUE, "PointLight fits a value");
@@ -132,6 +133,10 @@ static const box_render_transition_layout_t box_transition_layouts[
         BOX_TRANSITION_FLOAT(Fresnel, power),
         BOX_TRANSITION_FLOAT(Fresnel, bias),
         BOX_TRANSITION_FLOAT(Fresnel, opacity) } },
+    [BOX_RENDER_TRANSITION_DISTORTION] = { ECS_SIZEOF(Distortion), 3, {
+        BOX_TRANSITION_FLOAT(Distortion, strength),
+        BOX_TRANSITION_FLOAT(Distortion, scale),
+        BOX_TRANSITION_FLOAT(Distortion, speed) } },
     [BOX_RENDER_TRANSITION_BOX_SHADOW] = { ECS_SIZEOF(BoxShadow), 8, {
         BOX_TRANSITION_FLOAT(BoxShadow, offset_x),
         BOX_TRANSITION_FLOAT(BoxShadow, offset_y),
@@ -347,6 +352,9 @@ bool box_render_transition_neutral(
     case BOX_RENDER_TRANSITION_FRESNEL:
         ((Fresnel*)value)->strength = 0.0f;
         ((Fresnel*)value)->opacity = 0.0f;
+        break;
+    case BOX_RENDER_TRANSITION_DISTORTION:
+        ((Distortion*)value)->strength = 0.0f;
         break;
     case BOX_RENDER_TRANSITION_BOX_SHADOW:
         ((BoxShadow*)value)->color.a = 0;

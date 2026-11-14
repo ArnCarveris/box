@@ -285,6 +285,7 @@ ECS_STRUCT(Scene, {
     bool diffuse_transmission; /**< DiffuseTransmission */
     bool fresnel;           /**< Fresnel */
     bool water;             /**< Water, else the shapes draw as without it */
+    bool distortion;        /**< Distortion, else the shapes draw as without it */
     bool planar_reflections; /**< PlanarReflection: the views render the mirrored images and the
                              *   shapes of the planes reflect them, else no reflection pass runs
                              *   and the shapes draw as without it */

@@ -79,6 +79,14 @@ struct Material {
     water_ripple_scale: f32,
     // WATER_FOAM_TEXTURE when the foam samples its texture
     water_flags: u32,
+    // Distortion strength (a fraction of the image height), 1 over its scale and the phase of
+    // its noise (speed times the time, wrapped to 0..1), all 0 without one
+    distortion_strength: f32,
+    distortion_frequency: f32,
+    distortion_phase: f32,
+    // DISTORTION_PRESENT with a Distortion, DISTORTION_SHARP too without Transmission; 0 without
+    // one
+    distortion_flags: u32,
 };
 
 // Smallest depth and visibility of a Water record (BOX_RENDER_WATER_MIN).
@@ -86,6 +94,14 @@ const WATER_MIN: f32 = 1e-3;
 
 // Flag of a Water record whose foam samples its texture (BOX_RENDER_WATER_FOAM_TEXTURE).
 const WATER_FOAM_TEXTURE: u32 = 1u;
+
+// Flag of a record with a Distortion (BOX_RENDER_DISTORTION_PRESENT).
+const DISTORTION_PRESENT: u32 = 1u;
+
+// Flag of a Distortion record without Transmission (BOX_RENDER_DISTORTION_SHARP): its
+// transmission is a factor of 1 without refraction, Fresnel, tint or absorption, and it samples
+// the sharp snapshot.
+const DISTORTION_SHARP: u32 = 2u;
 
 // Below this weight a projection of a triplanar mapping is dropped and the others renormalized,
 // so a fragment whose normal is (nearly) along an axis samples once.

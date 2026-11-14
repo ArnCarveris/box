@@ -26,7 +26,7 @@
 _Static_assert(sizeof(box_render_transform_t) == 48, "InstanceTransform of instance.wgsl");
 _Static_assert(sizeof(box_render_shading_t) == 64, "Shape2DShading of shape2d.wgsl");
 _Static_assert(sizeof(box_render_mesh_shading_t) == 16, "MeshShading of instance.wgsl");
-_Static_assert(sizeof(box_render_material_t) == 176, "Material of material.wgsl");
+_Static_assert(sizeof(box_render_material_t) == 192, "Material of material.wgsl");
 _Static_assert(BOX_RENDER_MATERIALS_MAX <= BOX_RENDER_MESH_MATERIAL_MASK,
     "the material slots fit below the planet light slot of a mesh shading");
 

@@ -453,6 +453,78 @@ done:
     return;
 }
 
+float box_draws_distortion_phase(
+    float speed,
+    double time)
+{
+    float result = 0.0f;
+    if (isfinite(speed) && isfinite(time)) {
+        double v = fmod((double)speed * time, 1.0);
+        if (v < 0.0) {
+            v += 1.0;
+        }
+
+        result = (float)v;
+        if (result >= 1.0f) {
+            result = 0.0f;
+        }
+    }
+
+    return result;
+}
+
+/** Pack a Distortion into the distortion words of a material record: its strength when
+ * positive and finite, the inverse of its scale and its phase at the time; 0 without one, and
+ * 0 with Transmission and no strength, which then looks as without one.
+ *
+ * A shape with a Distortion and no Transmission shows the scene behind as a transmission
+ * factor of 1 without refraction or absorption does, and samples the sharp snapshot
+ * (BOX_RENDER_DISTORTION_SHARP).
+ *
+ * @param out The record, its transmission words already packed
+ * @param distortion The component, NULL for none
+ * @param transmission The Transmission of the material, NULL for none
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_distortion_pack(
+    box_render_material_t *out,
+    const Distortion *distortion,
+    const Transmission *transmission,
+    double time)
+{
+    out->distortion_strength = 0.0f;
+    out->distortion_frequency = 0.0f;
+    out->distortion_phase = 0.0f;
+    out->distortion_flags = 0u;
+    if (!distortion) {
+        goto done;
+    }
+
+    float strength = isfinite(distortion->strength) && distortion->strength > 0.0f
+        ? distortion->strength : 0.0f;
+    if (transmission && strength == 0.0f) {
+        goto done;
+    }
+
+    float scale = isfinite(distortion->scale) && distortion->scale > BOX_RENDER_DISTORTION_MIN
+        ? distortion->scale : BOX_RENDER_DISTORTION_MIN;
+    out->distortion_strength = strength;
+    out->distortion_frequency = 1.0f / scale;
+    out->distortion_phase = box_draws_distortion_phase(distortion->speed, time);
+    out->distortion_flags = BOX_RENDER_DISTORTION_PRESENT;
+    if (!transmission) {
+        out->distortion_flags |= BOX_RENDER_DISTORTION_SHARP;
+        out->transmission_factor = 1.0f;
+        out->ior = 1.0f;
+        out->thickness_factor = 0.0f;
+        out->attenuation_distance = BOX_MATERIAL_ATTENUATION_DISTANCE;
+        out->attenuation_color = 0xFFFFFFu;
+    }
+
+done:
+    return;
+}
+
 /** Wrap one axis of a scroll offset to 0..2.
  *
  * @param velocity Texture widths per second
@@ -543,6 +615,8 @@ void box_draws_material_pack(
     out->sheen = box_draws_sheen_pack(material->sheen);
     out->diffuse_transmission = box_draws_diffuse_transmission_pack(
         material->diffuse_transmission);
+    box_draws_distortion_pack(out, material->water ? NULL : material->distortion,
+        transmission, material->time);
     out->thickness = material->diffuse_transmission &&
         isfinite(material->diffuse_transmission->thickness) &&
         material->diffuse_transmission->thickness > 0.0f

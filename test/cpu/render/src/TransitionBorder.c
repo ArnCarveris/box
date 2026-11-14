@@ -768,7 +768,7 @@ void TransitionBorder_present_bits(void) {
     };
     uint32_t all = (uint32_t)((1ull << BOX_RENDER_TRANSITION_COMPONENTS) - 1);
 
-    test_int(BOX_RENDER_TRANSITION_COMPONENTS, 20);
+    test_int(BOX_RENDER_TRANSITION_COMPONENTS, 21);
     test_assert(ECS_SIZEOF(target.present) * 8 >= BOX_RENDER_TRANSITION_COMPONENTS);
 
     box_draws_transition_target(&target, &m, BOX_DRAW_TRANSITION_SHAPE);
