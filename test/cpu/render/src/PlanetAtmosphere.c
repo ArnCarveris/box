@@ -10,6 +10,7 @@
 #include <string.h>
 #include "render.h"
 #include "bake.h"
+#include "draw.h"
 
 /** Check that two values are within a tolerance of each other.
  *
@@ -274,6 +275,7 @@ void PlanetAtmosphere_defaults(void) {
     test_int(p.ground_albedo.g, 77);
     test_int(p.ground_albedo.b, 77);
     test_flt(p.intensity, 1.0f);
+    test_flt(p.sun_radius, 0.266f);
 }
 
 void PlanetAtmosphere_script_defaults(void) {
@@ -296,6 +298,7 @@ void PlanetAtmosphere_script_defaults(void) {
     test_flt(p->rayleigh.scattering_scale, 1.0f);
     test_flt(p->mie.anisotropy, 0.8f);
     test_flt(p->intensity, 1.0f);
+    test_flt(p->sun_radius, 0.266f);
     ecs_fini(world);
 }
 
@@ -338,6 +341,8 @@ void PlanetAtmosphere_invalid_values_set_error(void) {
     p = d; p.mie.anisotropy = 1;
     expect_error(&p);
     p = d; p.radius = NAN;
+    expect_error(&p);
+    p = d; p.sun_radius = -0.1f;
     expect_error(&p);
 }
 
@@ -631,6 +636,101 @@ void PlanetAtmosphere_shells_back_to_front(void) {
     test_uint(view_shell(null, v, 0)->entity, far_);
     test_uint(view_shell(null, v, 1)->entity, near_);
     test_assert(view_shell(null, v, 0)->atmosphere != view_shell(null, v, 1)->atmosphere);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Get the blended batch of a view in the last packet with the mesh of a shape.
+ *
+ * @param world The world
+ * @param null The backend
+ * @param e The shape
+ * @return Index of the batch in the packet, -1 for none
+ */
+static int32_t blended_batch(
+    ecs_world_t *world,
+    box_render_null_t *null,
+    ecs_entity_t e)
+{
+    box_render_draws_t *d = box_draws_state(world);
+    const DrawSlot *slot = ecs_get(world, e, DrawSlot);
+    test_assert(slot != NULL && slot->batch >= 0);
+    uint32_t mesh = box_draws_batch(d, slot->batch)->key.mesh;
+    int32_t i, result = -1;
+    for (i = 0; result == -1 && i < ecs_vec_count(&null->last.batches); i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&null->last.batches, box_render_batch_t, i);
+        if (b->view != -1 && b->mesh == mesh) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
+void PlanetAtmosphere_blended_inside_drawn_first(void) {
+    // planet_atmosphere/order
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = ecs_new(world);
+    ecs_set(world, scene, Scene, {.blend_modes = true});
+    ecs_entity_t planet = planet_new(world, scene, 0);
+    ecs_set(world, planet, Sphere, {.radius = 1, .segments = 16});
+    ecs_entity_t clouds = ecs_new_w_pair(world, EcsChildOf, planet);
+    ecs_set(world, clouds, Position, {0, 0, 0});
+    ecs_set(world, clouds, Rotation, {0.4f, 0.7f, 0.2f});
+    ecs_set(world, clouds, Sphere, {.radius = 1.01f, .segments = 16});
+    ecs_set(world, clouds, Opacity, {0.5f});
+    ecs_entity_t ring = ecs_new_w_pair(world, EcsChildOf, planet);
+    ecs_set(world, ring, Position, {0, 0, 0});
+    ecs_set(world, ring, Quad, {4, 4});
+    ecs_set(world, ring, Opacity, {0.5f});
+    ecs_entity_t window = ecs_new_w_pair(world, EcsChildOf, planet);
+    ecs_set(world, window, Position, {0, 0, 1.005f});
+    ecs_set(world, window, Cone, {.radius = 0.002f, .length = 0.004f, .segments = 8});
+    ecs_set(world, window, Opacity, {0.5f});
+    ecs_entity_t glass = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, glass, Position, {0, 0, -5});
+    ecs_set(world, glass, Box, {1, 1, 1});
+    ecs_set(world, glass, Opacity, {0.5f});
+    view_new(world, scene, 10);
+    frame_view(world, null, scene);
+
+    // The blended shapes of the planet know it, the opaque ground and the glass do not
+    box_render_draws_t *d = box_draws_state(world);
+    test_uint(box_draws_batch(d, ecs_get(world, planet, DrawSlot)->batch)->key.atmosphere, 0);
+    test_uint(box_draws_batch(d, ecs_get(world, clouds, DrawSlot)->batch)->key.atmosphere,
+        planet);
+    test_uint(box_draws_batch(d, ecs_get(world, ring, DrawSlot)->batch)->key.atmosphere, planet);
+    test_uint(box_draws_batch(d, ecs_get(world, glass, DrawSlot)->batch)->key.atmosphere, 0);
+
+    // The clouds are a layer around the ground inside the atmosphere: they draw before the
+    // atmosphere shells, which haze them, so before the glass behind them. The ring reaches out
+    // of the atmosphere and the window does not hold the ground, so they are drawn back to front
+    // with the glass, after the shells
+    int32_t layer = blended_batch(world, null, clouds);
+    int32_t outside = blended_batch(world, null, glass);
+    int32_t ring_batch = blended_batch(world, null, ring);
+    int32_t window_batch = blended_batch(world, null, window);
+    test_assert(layer != -1 && outside != -1 && ring_batch != -1 && window_batch != -1);
+    test_assert(layer < outside);
+    test_assert(outside < ring_batch);
+    test_bool(ecs_vec_get_t(&null->last.batches, box_render_batch_t, layer)->atmosphere, true);
+    test_bool(ecs_vec_get_t(&null->last.batches, box_render_batch_t, outside)->atmosphere,
+        false);
+    test_bool(ecs_vec_get_t(&null->last.batches, box_render_batch_t, ring_batch)->atmosphere,
+        false);
+    test_bool(ecs_vec_get_t(&null->last.batches, box_render_batch_t, window_batch)->atmosphere,
+        false);
+
+    // Moved out of the planet the clouds are drawn back to front with the glass
+    ecs_add_pair(world, clouds, EcsChildOf, scene);
+    frame_view(world, null, scene);
+    test_uint(box_draws_batch(d, ecs_get(world, clouds, DrawSlot)->batch)->key.atmosphere, 0);
+    layer = blended_batch(world, null, clouds);
+    outside = blended_batch(world, null, glass);
+    test_assert(layer != -1 && outside != -1);
+    test_assert(outside < layer);
+    test_bool(ecs_vec_get_t(&null->last.batches, box_render_batch_t, layer)->atmosphere, false);
     ecs_fini(world);
     box_render_null_free(null);
 }

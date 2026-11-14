@@ -1,8 +1,8 @@
 // Sunlight of the planets on their meshes (PlanetAtmosphere with Scene.planet_light): the
 // instances at or below the entity of a planet carry its planet light slot, and the directional
 // light along the direction of its sun reaches their fragments through the transmittance of the
-// atmosphere and the fade into the shadow of the planet, as the shell lights its air
-// (planet_light_sun). Other lights, the ambient and the image based lighting are unchanged.
+// atmosphere and the penumbra of the shadow of the planet from the angular radius of the sun
+// disk (planet_light_sun). Other lights, the ambient and the image based lighting are unchanged.
 //
 // The transmittance LUTs of every planet are the layers of one array, read as a storage texture
 // with a bilinear filter of its own, since the sampled textures of the mesh pipelines are at the
@@ -16,16 +16,12 @@ const PLANET_LIGHTS: u32 = 64u;
 // sun.
 const PLANET_SUN_COS: f32 = 0.9999;
 
-// Width in cosine of the fade of the light into the shadow of the planet, either side of its
-// horizon, as earth_shadow of the shells.
-const PLANET_SHADOW_FADE: f32 = 0.02;
-
 struct PlanetLight {
     // xyz: world position of the center, w: km per world unit, 0 for an empty slot
     center: vec4f,
     // x: bottom radius, y: top radius in km, z: layer of its transmittance LUT
     radii: vec4f,
-    // xyz: direction toward the sun
+    // xyz: direction toward the sun, w: angular radius of the sun disk in radians
     sun: vec4f,
 };
 
@@ -75,9 +71,22 @@ fn planet_transmittance(layer: i32, uv: vec2f) -> vec3f {
     return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
 
+// Fraction of a uniform disk of angular radius radius whose center is elevation above a
+// straight horizon that is above it: the area of the circular segment, 1 / 2 at the horizon. A
+// disk of radius 0 is a step at the horizon.
+fn planet_disk_visible(elevation: f32, radius: f32) -> f32 {
+    if (!(radius > 0.0)) {
+        return select(0.0, 1.0, elevation >= 0.0);
+    }
+
+    let x = clamp(elevation / radius, -1.0, 1.0);
+    return 1.0 - (acos(x) - x * sqrt(max(0.0, 1.0 - x * x))) / PI;
+}
+
 // The sun of a planet light slot at a world position: the transmittance of the LUT at
 // r = max(|p|, bottom radius) and mu = dot(p / |p|, sun), with p the position from the center
-// in km, times the fade into the shadow of the planet. A direction of zero for no slot or an
+// in km, times the penumbra of the shadow of the planet: the fraction of the sun disk above the
+// horizon of the planet at r (planet_disk_visible). A direction of zero for no slot or an
 // empty one, which no light matches.
 fn planet_light_sun(slot: u32, world: vec3f) -> PlanetSun {
     var result = PlanetSun(vec3f(0.0), vec3f(1.0));
@@ -101,7 +110,7 @@ fn planet_light_sun(slot: u32, world: vec3f) -> PlanetSun {
 
     let mu = clamp(dot(up, planet.sun.xyz), -1.0, 1.0);
     let horizon = -sqrt(max(0.0, 1.0 - (rb * rb) / max(r * r, 1e-6)));
-    let shadow = smoothstep(horizon - PLANET_SHADOW_FADE, horizon + PLANET_SHADOW_FADE, mu);
+    let shadow = planet_disk_visible(acos(horizon) - acos(mu), planet.sun.w);
     let uv = planet_transmittance_uv(rb, planet.radii.y, r, mu);
     result.direction = planet.sun.xyz;
     result.transmittance = max(planet_transmittance(i32(planet.radii.z), uv), vec3f(0.0)) *

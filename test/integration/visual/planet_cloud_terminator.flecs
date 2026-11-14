@@ -1,0 +1,48 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// An Earth sized planet under a dense, alpha blended cloud deck 20 km up, its terminator across
+// the middle of the disc. The atmosphere hazes the clouds like the ground: past the terminator
+// the deck fades into the twilight glow of the air above it, without a hard line where the
+// clouds turn away from the sun. Without ambient light the night side is dark.
+
+$ {
+  Scene: {blend_modes: true, planet_light: true}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+}
+
+camera {
+  Position: {0, 0, 2.4}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {-0.1, -1.4, 0}
+  DirectionalLight: {intensity: 6}
+  Rgb: {255, 255, 255}
+}
+
+planet {
+  Position: {0, 0, 0}
+  Sphere: {segments: 128, smooth: true, radius: 1}
+  Rgb: {40, 70, 110}
+  PbrMaterial: {roughness: 0.9}
+  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 6360, thickness: 100}
+
+  clouds {
+    Position: {0, 0, 0}
+    Sphere: {segments: 128, smooth: true, radius: 1.003}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    Opacity: {0.9}
+  }
+}

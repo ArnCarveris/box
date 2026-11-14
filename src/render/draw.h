@@ -204,6 +204,9 @@ typedef struct box_draw_key_t {
                              *   2D shapes and texts */
     uint32_t planet;        /**< Planet light slot of the nearest PlanetAtmosphere at or above a
                              *   3D shape of a scene with Scene.planet_light, 0 for none */
+    ecs_entity_t atmosphere; /**< Nearest PlanetAtmosphere at or above a blended 3D shape, 0 for
+                             *   none: its instances that are layers around the ground of the
+                             *   planet draw before the atmosphere shells (box_draws_layer) */
 } box_draw_key_t;
 
 /** Batch and slot of one glyph of a Text */
@@ -375,6 +378,8 @@ typedef struct box_draw_transition_range_t {
 /** A blended instance of a view, ordered back to front by its view depth */
 typedef struct box_draw_sorted_t {
     float depth;            /**< View space z of the instance origin, smaller is farther */
+    bool atmosphere;        /**< The instance is a layer around the ground of a planet
+                             *   (box_draws_layer) */
     int32_t batch;          /**< Index of the batch */
     int32_t slot;           /**< Slot of the instance in the batch */
 } box_draw_sorted_t;
@@ -1936,6 +1941,42 @@ void box_draws_world_bounds(
     box_draw_batch_t *b,
     box_mesh_cache_t *cache,
     bool wanted);
+
+/** A planet whose blended instances may be layers around its ground, and the local bounds of
+ * the instances of a batch (box_draws_layer_of) */
+typedef struct box_draw_layer_t {
+    vec3 center;            /**< World position of the PlanetAtmosphere */
+    float ground;           /**< Radius of the ground sphere, PlanetAtmosphere.radius */
+    float top;              /**< Radius of the top sphere of the atmosphere */
+    vec3 local_center;      /**< Center of the local bounds of the instances */
+    vec3 local_extent;      /**< Half size of the local bounds of the instances */
+} box_draw_layer_t;
+
+/** Get the planet of a blended batch inside a PlanetAtmosphere (key.atmosphere), for
+ * box_draws_layer.
+ *
+ * @param d The state, during a send
+ * @param b The batch, ready
+ * @param out Receives the planet and the local bounds of the instances
+ * @return Whether the batch has a valid PlanetAtmosphere and bounds
+ */
+bool box_draws_layer_of(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_draw_layer_t *out);
+
+/** Check whether an instance is a layer around the ground of a planet, such as clouds: the
+ * sphere inscribed in its world bounds holds the ground sphere and lies within the top sphere.
+ * Such a layer draws before the atmosphere shells, which haze it with the ground; the other
+ * blended instances, such as a ring or a window near the camera, draw after them.
+ *
+ * @param l The planet and the local bounds of the instance
+ * @param t The transform of the instance
+ * @return Whether it is
+ */
+bool box_draws_layer(
+    const box_draw_layer_t *l,
+    const box_render_transform_t *t);
 
 /** Write the texture handles and the sampler wrap of a batch into its draw.
  *

@@ -897,7 +897,7 @@ done:
 }
 
 /** Write the planet light of every valid PlanetAtmosphere whose meshes took a planet light
- * slot: its center, radii and the direction toward its sun.
+ * slot: its center, radii, the direction toward its sun and the angular radius of its disk.
  *
  * @param world The world
  * @param lights The state of the light extract
@@ -934,6 +934,7 @@ static void box_atmos_planet_lights(
             glm_vec3_copy((vec3){0, -1, 0}, out->sun);
         }
 
+        out->sun[3] = glm_rad(glm_clamp(l->value.sun_radius, 0.0f, 90.0f));
         out->slot = slot;
         out->atmosphere = l->handle;
         out->entity = l->entity;

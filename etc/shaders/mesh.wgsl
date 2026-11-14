@@ -54,7 +54,8 @@ fn surface_of(f: VertexOut, front: bool, geometric: vec3f, layers: Layers) -> Su
     return s;
 }
 
-// Light reflected toward the eye by one light arriving from direction l with a radiance.
+// Light reflected toward the eye by one light arriving from direction l with a radiance, faded by
+// the shadow terminator of the shading normal (shadow_terminator).
 fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
@@ -68,7 +69,8 @@ fn light_lobes(s: Surface, v: vec3f, l: vec3f, radiance: vec3f, side: u32) -> Li
     let f = fresnel_schlick(ldh, f0);
     let specular = distribution_ggx(ndh, a) * visibility_smith(ndv, ndl, a) * f;
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
-    return Lit(diffuse * radiance * ndl, specular * radiance * ndl);
+    let shaded = ndl * shadow_terminator(s.geometric, n, l);
+    return Lit(diffuse * radiance * shaded, specular * radiance * shaded);
 }
 
 // An unlit view shows the albedo as the diffuse part and the emission as the specular one. The

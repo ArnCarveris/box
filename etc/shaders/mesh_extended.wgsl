@@ -356,7 +356,8 @@ fn sheen_compensation(sheen: vec3f) -> f32 {
 // it 1 - Fc of what it reflects without one. An anisotropic base stretches its lobe along the
 // tangent, its roughness there mixed toward 1 by the square of the strength. A sheen adds its
 // Charlie lobe on the mapped normal and scales the base by its compensation, below the coat. A
-// diffuse transmission keeps 1 - its factor of the diffuse color.
+// diffuse transmission keeps 1 - its factor of the diffuse color. The lobes of the mapped normal
+// fade by its shadow terminator (shadow_terminator); the coat follows the geometric normal.
 fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
     let n = s.normal;
     let a = s.roughness * s.roughness;
@@ -385,14 +386,15 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
                 dot(b, l)) * f;
     }
     let diffuse = (vec3f(1.0) - f) * diffuse_color / PI;
-    var lit = Lit(diffuse * radiance * ndl, specular * radiance * ndl);
+    let shaded = ndl * shadow_terminator(s.geometric, n, l);
+    var lit = Lit(diffuse * radiance * shaded, specular * radiance * shaded);
     if (material_sheen && any(s.sheen > vec3f(0.0))) {
         let alpha = s.sheen_roughness * s.sheen_roughness;
         let comp = sheen_compensation(s.sheen);
         let sheen_specular = s.sheen * distribution_charlie(alpha, ndh) *
             visibility_neubelt(ndv, ndl);
         lit.diffuse *= comp;
-        lit.specular = lit.specular * comp + sheen_specular * radiance * ndl;
+        lit.specular = lit.specular * comp + sheen_specular * radiance * shaded;
     }
     if (material_clear_coat && s.coat > 0.0) {
         let nc = s.geometric;
@@ -412,11 +414,12 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> Lit {
 
 // Light passed through the surface toward the eye by the back lobe of a diffuse transmission, of
 // one light arriving from direction l with a radiance at the far side: a Lambert lobe on the
-// inverted normal, without a Fresnel term or a specular lobe. The sheen scales it by its
-// compensation and the clear coat by 1 - its Fresnel toward the eye, as they do the front
-// diffuse lobe.
+// inverted normal, faded by its shadow terminator (shadow_terminator), without a Fresnel term or
+// a specular lobe. The sheen scales it by its compensation and the clear coat by 1 - its Fresnel
+// toward the eye, as they do the front diffuse lobe.
 fn brdf_back(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
-    var back = s.back_color / PI * radiance * max(dot(-s.normal, l), 0.0);
+    var back = s.back_color / PI * radiance * max(dot(-s.normal, l), 0.0) *
+        shadow_terminator(-s.geometric, -s.normal, l);
     if (material_sheen && any(s.sheen > vec3f(0.0))) {
         back *= sheen_compensation(s.sheen);
     }

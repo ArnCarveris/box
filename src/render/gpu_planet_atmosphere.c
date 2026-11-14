@@ -369,7 +369,7 @@ void box_gpu_planet_lights_prepare(
         table[slot].radii[0] = l->radii[0];
         table[slot].radii[1] = l->radii[1];
         table[slot].radii[2] = (float)(slot - 1u);
-        ecs_os_memcpy_n(table[slot].sun, l->sun, float, 3);
+        ecs_os_memcpy_n(table[slot].sun, l->sun, float, 4);
         if (!(table[slot].center[3] > 0.0f)) {
             sources[slot] = NULL;
             ecs_os_memset_t(&table[slot], 0, box_gpu_planet_light_t);

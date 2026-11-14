@@ -60,6 +60,7 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
     h ^= ((uint64_t)key->features + 1) * 0xA0761D6478BD642Full;
     h ^= ((uint64_t)key->planet + 1) * 0xE7037ED1A0B428DBull;
+    h ^= (key->atmosphere + 1) * 0x8EBC6AF09C88C6E3ull;
 
     return h ^ (h >> 29);
 }
@@ -82,7 +83,7 @@ static bool box_draws_key_eq(
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
-        a->surface == b->surface && a->frame == b->frame &&
+        a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
         a->box_shadow == b->box_shadow && a->slice == b->slice &&
         a->texture_blend == b->texture_blend && a->polygon == b->polygon;
 }
@@ -1281,7 +1282,9 @@ done:
     return;
 }
 
-/** Order blended instances back to front, then by batch and slot for equal depths.
+/** Order the blended instances that are layers around the ground of a planet before the others,
+ * which the atmosphere shells draw between (box_draws_layer), then back to front, then by batch
+ * and slot for equal depths.
  *
  * @param a The first instance
  * @param b The second instance
@@ -1292,7 +1295,11 @@ static int box_draws_sorted_cmp(
     const void *b)
 {
     const box_draw_sorted_t *sa = a, *sb = b;
-    int result = (sa->depth > sb->depth) - (sa->depth < sb->depth);
+    int result = (int)sb->atmosphere - (int)sa->atmosphere;
+    if (!result) {
+        result = (sa->depth > sb->depth) - (sa->depth < sb->depth);
+    }
+
     if (!result) {
         result = (sa->batch > sb->batch) - (sa->batch < sb->batch);
     }
@@ -1325,17 +1332,21 @@ static void box_draws_collect(
             continue;
         }
 
+        box_draw_layer_t layer;
+        bool planet = box_draws_layer_of(d, b, &layer);
         box_draw_sorted_t *out = ecs_vec_grow_t(NULL, &d->sorted, box_draw_sorted_t, count);
         for (s = 0; s < count; s ++) {
             float x = t[s].rows[0][3], y = t[s].rows[1][3], z = t[s].rows[2][3];
             out[s].depth = m[0][2] * x + m[1][2] * y + m[2][2] * z + m[3][2];
+            out[s].atmosphere = planet && box_draws_layer(&layer, &t[s]);
             out[s].batch = index;
             out[s].slot = s;
         }
     }
 }
 
-/** Add the blended instances of every view, sorted back to front, after the opaque batches.
+/** Add the blended instances of every view, sorted back to front, after the opaque batches; the
+ * layers around the ground of a planet come first (box_draws_sorted_cmp).
  *
  * The sorted page slots of a view go into the packet data; a run of one batch in that order is
  * one draw listing its slots, split every BOX_DRAWS_BLENDED_RUN slots. Sort and packet storage
@@ -1369,6 +1380,7 @@ static void box_draws_send_blended(
         for (i = 0; i < count; i ++) {
             box_draw_batch_t *b = box_draws_batch(d, sorted[i].batch);
             if (out && sorted[i].batch == sorted[i - 1].batch &&
+                sorted[i].atmosphere == sorted[i - 1].atmosphere &&
                 out->instance_count < BOX_DRAWS_BLENDED_RUN)
             {
                 out->instance_count ++;
@@ -1384,7 +1396,8 @@ static void box_draws_send_blended(
             out->back_face = b->key.back_face;
             out->cutout = b->key.cutout;
             out->transmissive = b->key.transmissive;
-    out->water = b->key.water;
+            out->water = b->key.water;
+            out->atmosphere = sorted[i].atmosphere;
             out->shadow = b->key.shadow;
             out->fixture = b->key.fixture;
             out->surface = b->key.surface;

@@ -138,3 +138,69 @@ void box_draws_world_bounds(
 done:
     return;
 }
+
+bool box_draws_layer_of(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_draw_layer_t *out)
+{
+    const PlanetAtmosphere *a = NULL;
+    const WorldTransform *t = NULL;
+    const box_mesh_t *mesh = NULL;
+    bool result = false;
+    int32_t r;
+    if (b->key.atmosphere && d->world) {
+        a = ecs_get(d->world, b->key.atmosphere, PlanetAtmosphere);
+        t = ecs_get(d->world, b->key.atmosphere, WorldTransform);
+    }
+
+    if (!a || !t || !(a->radius > 0.0f) || !(a->planet_radius > 0.0f)) {
+        goto done;
+    }
+
+    if (b->bounded) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->center), out->local_center);
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), out->local_extent);
+    } else {
+        mesh = box_mesh_cache_get(box_mesh_cache_of(d->world), b->key.mesh);
+        if (!mesh || !mesh->vertex_count) {
+            goto done;
+        }
+
+        for (r = 0; r < 3; r ++) {
+            out->local_center[r] = (mesh->min[r] + mesh->max[r]) * 0.5f;
+            out->local_extent[r] = (mesh->max[r] - mesh->min[r]) * 0.5f;
+        }
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, t->m[3]), out->center);
+    out->ground = a->radius;
+    out->top = a->radius * (1.0f + glm_max(a->thickness, 0.0f) / a->planet_radius);
+    result = true;
+done:
+    return result;
+}
+
+bool box_draws_layer(
+    const box_draw_layer_t *l,
+    const box_render_transform_t *t)
+{
+    float inner = FLT_MAX, dist2 = 0.0f;
+    int32_t r, c;
+    for (r = 0; r < 3; r ++) {
+        const float *row = t->rows[r];
+        float center = row[0] * l->local_center[0] + row[1] * l->local_center[1] +
+            row[2] * l->local_center[2] + row[3];
+        dist2 += (center - l->center[r]) * (center - l->center[r]);
+    }
+
+    for (c = 0; c < 3; c ++) {
+        float axis = sqrtf(t->rows[0][c] * t->rows[0][c] + t->rows[1][c] * t->rows[1][c] +
+            t->rows[2][c] * t->rows[2][c]);
+        inner = glm_min(inner, axis * l->local_extent[c]);
+    }
+
+    float pad = 1e-4f * l->top;
+
+    return sqrtf(dist2) + l->ground <= inner + pad && inner <= l->top + pad;
+}

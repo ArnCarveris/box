@@ -103,10 +103,12 @@ ECS_STRUCT(AtmosphereStatus, {
  * Environment and draws no sky, sun disk or clouds; it leaves the Atmosphere of its scene alone,
  * and both can be in one scene. A scene can have many.
  *
- * Every view of its scene that is lit and has a depth draws the shell after its opaque meshes and
- * its sky, and before its fog volumes, particles, 2D shapes and blended draws: transparent
- * geometry in front of the planet, such as the ring of a gas giant, is not hazed, while blended
- * geometry behind the shell but in front of the ground is not hazed either. Transmissive meshes
+ * Every view of its scene that is lit and has a depth draws the shell after its opaque meshes,
+ * its sky and the blended layers around its ground, and before its fog volumes, particles, 2D
+ * shapes and other blended draws. A blended layer is a mesh of the entity or its descendants
+ * whose bounds hold the ground sphere and lie within the top sphere, such as a cloud sphere: it
+ * is hazed with the ground below it. Other transparent geometry, such as the ring of a gas giant
+ * or a window near the camera, is not hazed. Transmissive meshes
  * draw before the shell and are hazed as opaque ones at their depth. Each pixel of the shell
  * marches the ray inside the atmosphere up to the ground sphere or the scene depth with single
  * and multi scattering of the sun, and blends as dst * transmittance + inscatter * intensity,
@@ -120,16 +122,17 @@ ECS_STRUCT(AtmosphereStatus, {
  * fragment, which reddens and darkens the terminator.
  *
  * At p = (world - center) * km per unit, r = max(|p|, planet_radius) and mu = dot(p / |p|, sun)
- * the sun is multiplied by the transmittance LUT at (r, mu) and the fade of the shell into the
- * shadow of the planet. A mesh belongs to its nearest PlanetAtmosphere along ChildOf.
+ * the sun is multiplied by the transmittance LUT at (r, mu) and the visible fraction of the sun
+ * disk of sun_radius above the horizon of the planet at r, its penumbra. A mesh belongs to its
+ * nearest PlanetAtmosphere along ChildOf.
  *
  * Only the DirectionalLight along the direction of the sun is attenuated; other lights, the
  * ambient, the image based lighting and the meshes outside any PlanetAtmosphere are lit as
  * without one. The meshes of at most 63 planets of a world are lit so, further ones are not.
  *
  * Values apply as specified; a radius, planet_radius, thickness or scale height that is not
- * positive, a negative scale or an anisotropy outside -1 to 1 sets PlanetAtmosphereStatus.error
- * and renders nothing.
+ * positive, a negative scale or sun_radius or an anisotropy outside -1 to 1 sets
+ * PlanetAtmosphereStatus.error and renders nothing.
  */
 ECS_STRUCT(PlanetAtmosphere, {
     ecs_entity_t sun;       /**< DirectionalLight that lights it, default 0 for the first
@@ -149,6 +152,9 @@ ECS_STRUCT(PlanetAtmosphere, {
     rgb ground_albedo;      /**< Display encoded albedo of the planet, which the multi
                              *   scattering LUT bounces, default {77, 77, 77} */
     float intensity;        /**< Scale of the drawn in scattered light, default 1 */
+    float sun_radius;       /**< Angular radius of the sun disk in degrees as seen from the
+                             *   planet, the penumbra of the shadow of the planet on its
+                             *   meshes, default 0.266 as Atmosphere.sun_radius */
 });
 
 /** State of the atmosphere of a planet, written by the engine next to PlanetAtmosphere */

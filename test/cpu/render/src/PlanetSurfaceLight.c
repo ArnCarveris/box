@@ -186,7 +186,32 @@ void PlanetSurfaceLight_planet_mesh_binds(void) {
     test_near(l->sun[1], 0.5f, 1e-4f);
     test_near(l->sun[0] * l->sun[0] + l->sun[1] * l->sun[1] + l->sun[2] * l->sun[2], 1,
         1e-4f);
+    test_near(l->sun[3], glm_rad(0.266f), 1e-6f);
     test_assert(l->atmosphere != 0);
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void PlanetSurfaceLight_sun_radius(void) {
+    // planet_atmosphere/surface_light
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t scene = scene_new(world, true);
+    ecs_entity_t planet = planet_new(world, scene, 0);
+    ecs_get_mut(world, planet, PlanetAtmosphere)->sun_radius = 2;
+    ecs_modified(world, planet, PlanetAtmosphere);
+    frame(world);
+    test_assert(shape_planet(world, planet) != 0);
+    const box_render_planet_light_t *l = packet_light(null, planet);
+    test_assert(l != NULL);
+    test_near(l->sun[3], glm_rad(2.0f), 1e-6f);
+
+    ecs_get_mut(world, planet, PlanetAtmosphere)->sun_radius = 0;
+    ecs_modified(world, planet, PlanetAtmosphere);
+    frame(world);
+    l = packet_light(null, planet);
+    test_assert(l != NULL);
+    test_flt(l->sun[3], 0);
     ecs_fini(world);
     box_render_null_free(null);
 }

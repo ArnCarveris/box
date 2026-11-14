@@ -1,7 +1,8 @@
 // Atmosphere shells of the planets a view draws (PlanetAtmosphere): one draw per planet of the
 // back faces of the box around its top sphere, raymarched in the forward pass of the view after
-// its opaque meshes and its sky, in a pass that reads the depth of the view instead of writing
-// it, before its fog volumes, particles and blended draws.
+// its opaque meshes, its sky and the blended layers around the ground of a planet, such as
+// clouds, which it hazes with the ground, in a pass that reads the depth of the view instead of
+// writing it, before its fog volumes, particles and other blended draws.
 //
 // A pixel marches from where its ray enters the top sphere, or from the camera inside it, to
 // where it leaves it, hits the ground sphere or the scene depth, whichever is first, with steps

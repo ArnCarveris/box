@@ -23,6 +23,10 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
+#include <stb_image_write.h>
+
 /** Edge of the square captures */
 #define PS_SIZE (128)
 
@@ -34,6 +38,16 @@
 
 /** Cosine of the angle between the normal and the sun of the sample near the terminator */
 #define PS_TERMINATOR_MU (0.2f)
+
+/** Z of the camera of the bumpy globe, close to the surface so the terminator fills the image */
+#define PS_CLOSE_Z (1.5f)
+
+/** Width in cosine to the sun of the bins of the profile across the terminator */
+#define PS_BIN (0.01f)
+
+/** First bin of the profile and the number of bins: mu from -0.1 to 0.3 */
+#define PS_BIN_MIN (-0.1f)
+#define PS_BINS (40)
 
 /** Create a headless world that renders on the main thread, without ambient light, with the
  * Scene features of the cases and a white sun toward +X and +Z.
@@ -61,6 +75,7 @@ static ecs_world_t* ps_world(
     ecs_set(world, sun, Rgb, {255, 255, 255});
 
     ecs_entity_t camera = ecs_new(world);
+    ecs_set_name(world, camera, "camera");
     ecs_set(world, camera, Position, {0, 0, PS_CAMERA_Z});
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.01f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
@@ -372,5 +387,327 @@ void PlanetSurfaceLight_transmission_reddens(void) {
     float subsolar, terminator;
     ps_ratios(world, "planet_light_transmission.png", &subsolar, &terminator);
     test_assert(terminator > subsolar * 1.25f);
+    ecs_fini(world);
+}
+
+/** Write a tangent space normal map of 32x32 texels whose normals tilt along +U and -U, toward
+ * and away from a light along U, by up to about 39 degrees, the tilt changing with the row: two
+ * periods of a sine down the image, the same in every column.
+ *
+ * @param world The world
+ * @return The texture, loaded
+ */
+static ecs_entity_t ps_bumps(
+    ecs_world_t *world)
+{
+    char *file = flecs_asprintf("%s/planet_bumps.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    uint8_t px[32 * 32 * 4];
+    int32_t x, y;
+    for (y = 0; y < 32; y ++) {
+        for (x = 0; x < 32; x ++) {
+            vec3 n = {0.8f * sinf(((float)y + 0.5f) * GLM_PIf / 8.0f), 0, 1};
+            glm_vec3_normalize(n);
+            uint8_t *p = &px[(y * 32 + x) * 4];
+            p[0] = (uint8_t)roundf((n[0] * 0.5f + 0.5f) * 255.0f);
+            p[1] = (uint8_t)roundf((n[1] * 0.5f + 0.5f) * 255.0f);
+            p[2] = (uint8_t)roundf((n[2] * 0.5f + 0.5f) * 255.0f);
+            p[3] = 255;
+        }
+    }
+
+    test_assert(stbi_write_png(file, 32, 32, 4, px, 32 * 4) != 0);
+    ecs_entity_t tex = ecs_new(world);
+    ecs_set(world, tex, TexturePath, {.path = file});
+    int32_t frames = 0;
+    while (ecs_get(world, tex, TextureStatus)->state == TextureLoading && frames < 100) {
+        ecs_progress(world, 0);
+        frames ++;
+    }
+
+    test_int(ecs_get(world, tex, TextureStatus)->state, TextureReady);
+    ecs_os_free(file);
+
+    return tex;
+}
+
+/** Point the sun along a direction in the XZ plane at an angle from +X toward +Z.
+ *
+ * @param world The world
+ * @param elevation The angle in radians
+ */
+static void ps_sun_at(
+    ecs_world_t *world,
+    float elevation)
+{
+    ecs_set(world, ecs_lookup(world, "sun"), Rotation, {0, -(float)GLM_PI_2 - elevation, 0});
+}
+
+/** Linear value of the red channel of a display encoded pixel.
+ *
+ * @param p The pixel
+ * @return The value, 0..1
+ */
+static float ps_linear(
+    const unsigned char *p)
+{
+    float c = (float)p[0] / 255.0f;
+
+    return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+}
+
+/** Render the unit sphere from PS_CLOSE_Z and average the linear brightness of its pixels in
+ * bins of the cosine between their geometric normal and the sun, found by casting the ray of
+ * each pixel at the sphere. Pixels of every row fall in a bin, so a bin averages every phase of
+ * the bumps of ps_bumps.
+ *
+ * @param world The world
+ * @param file Name of the PNG
+ * @param profile Receives the mean of each bin, -1 for an empty bin
+ */
+static void ps_profile(
+    ecs_world_t *world,
+    const char *file,
+    float *profile)
+{
+    unsigned char *px = ps_render(world, file);
+    vec3 s;
+    ps_sun_direction(world, s);
+    float sum[PS_BINS] = {0};
+    int32_t count[PS_BINS] = {0};
+    float t = tanf(glm_rad(30.0f));
+    int32_t x, y, i;
+    for (y = 0; y < PS_SIZE; y ++) {
+        for (x = 0; x < PS_SIZE; x ++) {
+            vec3 d = {
+                (((float)x + 0.5f) / PS_SIZE * 2 - 1) * t,
+                (1 - ((float)y + 0.5f) / PS_SIZE * 2) * t,
+                -1
+            };
+            glm_vec3_normalize(d);
+            vec3 o = {0, 0, PS_CLOSE_Z};
+            float b = glm_vec3_dot(o, d);
+            float c = glm_vec3_dot(o, o) - 1;
+            float disc = b * b - c;
+            if (disc < 0) {
+                continue;
+            }
+
+            float hit = -b - sqrtf(disc);
+            vec3 n;
+            glm_vec3_scale(d, hit, n);
+            glm_vec3_add(o, n, n);
+            int32_t bin = (int32_t)floorf((glm_vec3_dot(n, s) - PS_BIN_MIN) / PS_BIN);
+            if (bin < 0 || bin >= PS_BINS) {
+                continue;
+            }
+
+            sum[bin] += ps_linear(&px[(y * PS_SIZE + x) * 4]);
+            count[bin] ++;
+        }
+    }
+
+    for (i = 0; i < PS_BINS; i ++) {
+        profile[i] = count[i] ? sum[i] / (float)count[i] : -1;
+        printf("mu %.3f: %.4f (%d)\n", (double)(PS_BIN_MIN + ((float)i + 0.5f) * PS_BIN),
+            (double)profile[i], count[i]);
+    }
+
+    stbi_image_free(px);
+}
+
+/** Bin of a cosine to the sun.
+ *
+ * @param mu The cosine
+ * @return The bin
+ */
+static int32_t ps_bin(
+    float mu)
+{
+    return (int32_t)floorf((mu - PS_BIN_MIN) / PS_BIN);
+}
+
+void PlanetSurfaceLight_bumpy_terminator_continuous(void) {
+    // planet_atmosphere/surface_light
+    ecs_world_t *world = ps_world(true);
+    ps_sun_at(world, 0);
+    ecs_set(world, ecs_lookup(world, "camera"), Position, {0, 0, PS_CLOSE_Z});
+    ecs_entity_t planet = ps_sphere(world, 0);
+    ps_atmosphere(world, planet);
+    ecs_set(world, planet, PbrTextures, {.normal = ps_bumps(world)});
+    ecs_set(world, planet, TextureTransform, {.scale_x = 64, .scale_y = 32});
+    float profile[PS_BINS];
+    ps_profile(world, "planet_light_bumpy_terminator.png", profile);
+
+    // The light of the day side, from which the bumps fall off toward the night without a
+    // step: at most twice the mean slope of the day side between neighbouring bins.
+    float lit = profile[ps_bin(0.2f)];
+    test_assert(lit > 0.02f);
+    int32_t i;
+    for (i = ps_bin(-0.08f); i < ps_bin(0.1f); i ++) {
+        test_assert(profile[i] >= 0);
+        test_assert(profile[i + 1] >= 0);
+        float step = fabsf(profile[i + 1] - profile[i]);
+        printf("step %d: %.4f, bound %.4f\n", i, (double)step,
+            (double)(2.0f * lit * PS_BIN / 0.2f));
+        test_assert(step <= 2.0f * lit * PS_BIN / 0.2f);
+    }
+
+    // Close to the terminator the light fades with the geometric surface: the bumps that face
+    // the sun are not lit where the ground under them barely is, and past the penumbra of the
+    // sun disc the surface is dark.
+    printf("near terminator: %.4f, day side: %.4f\n", (double)profile[ps_bin(0.015f)],
+        (double)lit);
+    test_assert(profile[ps_bin(0.015f)] < 0.08f * lit);
+    for (i = 0; i < ps_bin(-0.01f); i ++) {
+        test_assert(profile[i] < 0.005f * lit);
+    }
+
+    ecs_fini(world);
+}
+
+/** Render a white bumpy quad facing the camera, lit by the sun at an elevation above its plane,
+ * and average the linear brightness of the middle of the image.
+ *
+ * @param world The world
+ * @param elevation Angle of the sun above the plane in degrees, below it when negative
+ * @param file Name of the PNG
+ * @return The mean
+ */
+static float ps_plane_mean(
+    ecs_world_t *world,
+    float elevation,
+    const char *file)
+{
+    ps_sun_at(world, glm_rad(elevation));
+    unsigned char *px = ps_render(world, file);
+    float sum = 0;
+    int32_t x, y, count = 0;
+    for (y = PS_SIZE / 4; y < PS_SIZE * 3 / 4; y ++) {
+        for (x = PS_SIZE / 4; x < PS_SIZE * 3 / 4; x ++) {
+            sum += ps_linear(&px[(y * PS_SIZE + x) * 4]);
+            count ++;
+        }
+    }
+
+    stbi_image_free(px);
+    printf("elevation %.1f: %.4f\n", (double)elevation, (double)(sum / (float)count));
+
+    return sum / (float)count;
+}
+
+void PlanetSurfaceLight_bumpy_plane_grazing(void) {
+    // planet_atmosphere/surface_light
+    ecs_world_t *world = ps_world(false);
+    ecs_entity_t quad = ecs_new(world);
+    ecs_set(world, quad, Position, {0, 0, 0});
+    ecs_set(world, quad, Quad, {4, 4});
+    ecs_set(world, quad, Rgb, {255, 255, 255});
+    ecs_set(world, quad, PbrMaterial, {.metallic = 0, .roughness = 1});
+    ecs_set(world, quad, PbrTextures, {.normal = ps_bumps(world)});
+    ecs_set(world, quad, TextureTransform, {.scale_x = 4, .scale_y = 4});
+
+    // The bumps facing a sun that grazes the plane fall off with it like the plane does, and a
+    // sun below the plane leaves the plane dark: no light through the geometric horizon.
+    float high = ps_plane_mean(world, 20, "planet_light_plane_20.png");
+    float low = ps_plane_mean(world, 1, "planet_light_plane_1.png");
+    float below = ps_plane_mean(world, -1, "planet_light_plane_m1.png");
+    float under = ps_plane_mean(world, -4, "planet_light_plane_m4.png");
+    test_assert(high > 0.02f);
+    test_assert(low < 0.25f * high);
+    test_assert(below < 0.02f * high + 0.002f);
+    test_assert(under < 0.02f * high + 0.002f);
+    ecs_fini(world);
+}
+
+/** Render a small white quad facing the camera on the ground of a planet whose up there is +X,
+ * lit by a sun at an angle above the horizon of the planet there, and average the linear
+ * brightness of the middle of the quad. The quad faces the sun almost head on, so only the
+ * shadow of the planet and the transmittance change with the angle.
+ *
+ * @param world The world
+ * @param angle Angle of the sun above the horizon of the planet in degrees
+ * @param file Name of the PNG
+ * @return The mean
+ */
+static float ps_horizon_mean(
+    ecs_world_t *world,
+    float angle,
+    const char *file)
+{
+    ps_sun_at(world, glm_rad(90.0f - angle));
+    unsigned char *px = ps_render(world, file);
+
+    float sum = 0;
+    int32_t x, y, count = 0;
+    for (y = PS_SIZE / 2 - 3; y < PS_SIZE / 2 + 3; y ++) {
+        for (x = PS_SIZE / 2 - 3; x < PS_SIZE / 2 + 3; x ++) {
+            sum += ps_linear(&px[(y * PS_SIZE + x) * 4]);
+            count ++;
+        }
+    }
+
+    stbi_image_free(px);
+    printf("sun %.1f above the horizon: %.4f\n", (double)angle, (double)(sum / (float)count));
+
+    return sum / (float)count;
+}
+
+/** Create a planet of radius 1 centered at (-1, 0, 0) without a mesh of its own and a white
+ * quad of it where its up is +X, facing the camera at Z 1 in front of the quad. The quad ends at
+ * the ground at the origin, below it: a point under the ground has the light of the ground, whose
+ * horizon is flat, while a point above it sees the sun past the horizon by the dip of its
+ * altitude, degrees for a quad a tenth of the radius high.
+ *
+ * @param world The world
+ * @param sun_radius PlanetAtmosphere.sun_radius
+ */
+static void ps_horizon_scene(
+    ecs_world_t *world,
+    float sun_radius)
+{
+    ecs_set(world, ecs_lookup(world, "camera"), Position, {-0.05f, 0, 1});
+    ecs_entity_t planet = ecs_new(world);
+    ecs_set(world, planet, Position, {-1, 0, 0});
+    ps_atmosphere(world, planet);
+    ecs_get_mut(world, planet, PlanetAtmosphere)->sun_radius = sun_radius;
+    ecs_modified(world, planet, PlanetAtmosphere);
+    ecs_entity_t quad = ecs_new_w_pair(world, EcsChildOf, planet);
+    ecs_set(world, quad, Position, {0.95f, 0, 0});
+    ecs_set(world, quad, Quad, {0.1f, 0.1f});
+    ecs_set(world, quad, Rgb, {255, 255, 255});
+    ecs_set(world, quad, PbrMaterial, {.metallic = 0, .roughness = 1});
+}
+
+void PlanetSurfaceLight_penumbra_sun_radius(void) {
+    // planet_atmosphere/surface_light
+    ecs_world_t *world = ps_world(true);
+    ps_horizon_scene(world, 2.0f);
+
+    // A sun disk of 2 degrees is half set with its center on the horizon and still shows a
+    // fifth of its disk a degree below it, the penumbra of the shadow of the planet; three
+    // degrees below it has set.
+    float above = ps_horizon_mean(world, 1, "planet_light_penumbra_1.png");
+    float on = ps_horizon_mean(world, 0, "planet_light_penumbra_0.png");
+    float below = ps_horizon_mean(world, -1, "planet_light_penumbra_m1.png");
+    float set = ps_horizon_mean(world, -3, "planet_light_penumbra_m3.png");
+    test_assert(above > 0.005f);
+    test_assert(on < above);
+    test_assert(on > 0.25f * above);
+    test_assert(below < on);
+    test_assert(below > 0.05f * above);
+    test_assert(set < 0.01f * above + 0.002f);
+    ecs_fini(world);
+}
+
+void PlanetSurfaceLight_penumbra_point_sun(void) {
+    // planet_atmosphere/surface_light
+    ecs_world_t *world = ps_world(true);
+    ps_horizon_scene(world, 0);
+
+    // A sun without a disk sets at once at the horizon.
+    float above = ps_horizon_mean(world, 1, "planet_light_point_1.png");
+    float below = ps_horizon_mean(world, -1, "planet_light_point_m1.png");
+    test_assert(above > 0.005f);
+    test_assert(below < 0.01f * above + 0.002f);
     ecs_fini(world);
 }

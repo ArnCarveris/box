@@ -1,0 +1,48 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.atmosphere
+
+// An Earth sized planet with a strong normal map, lit from the side with Scene.planet_light,
+// its terminator crossing the middle of the disc. The bumps that face the sun fade into the
+// night with the ground under them, through the penumbra of the planet's shadow, without a hard
+// line where the geometric surface turns away from the sun. Without ambient light the night
+// side is dark.
+
+$ {
+  Scene: {planet_light: true}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+}
+
+camera {
+  Position: {0, 0, 2.4}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+sun {
+  Rotation: {-0.1, -1.4, 0}
+  DirectionalLight: {intensity: 6}
+  Rgb: {255, 255, 255}
+}
+
+bumps {
+  Path: {path: "test/integration/visual/assets/bumps.png"}
+}
+
+planet {
+  Position: {0, 0, 0}
+  Sphere: {segments: 128, smooth: true, radius: 1}
+  Rgb: {200, 200, 200}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {normal: bumps}
+  texture.Transform: {scale_x: 32, scale_y: 16}
+  PlanetAtmosphere: {sun: sun, radius: 1, planet_radius: 6360, thickness: 100}
+}

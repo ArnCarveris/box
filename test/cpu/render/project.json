@@ -250,6 +250,7 @@
                     "other_scene_not_drawn",
                     "behind_camera_not_drawn",
                     "shells_back_to_front",
+                    "blended_inside_drawn_first",
                     "removed_frees_luts",
                     "scaled_parent_scales_shell",
                     "scaled_planet_scales_shell",
@@ -261,6 +262,7 @@
                 "id": "PlanetSurfaceLight",
                 "testcases": [
                     "planet_mesh_binds",
+                    "sun_radius",
                     "descendants_bind",
                     "nearest_planet_binds",
                     "not_descendant_unbound",

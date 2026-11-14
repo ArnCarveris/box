@@ -1394,6 +1394,7 @@
                     "surface_hazed",
                     "no_scattering_unchanged",
                     "front_geometry_unchanged",
+                    "blended_inside_hazed",
                     "two_planets_independent",
                     "camera_inside",
                     "backlit_ring",
@@ -1413,7 +1414,11 @@
                     "no_planet_unchanged",
                     "cloud_sphere_reddens",
                     "extended_reddens",
-                    "transmission_reddens"
+                    "transmission_reddens",
+                    "bumpy_terminator_continuous",
+                    "bumpy_plane_grazing",
+                    "penumbra_sun_radius",
+                    "penumbra_point_sun"
                 ]
             },
             {

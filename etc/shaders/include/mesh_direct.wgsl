@@ -1,8 +1,10 @@
-// Direct light of the mesh shaders: the GGX terms both share and the loop over the lights of a
-// fragment, with the shadows of the spot and point lights (scene_punctual_shadows) and the cookie
-// of the first directional light (scene_cookies). The includer includes mesh_common.wgsl first
-// and declares the Surface of its fragments, with at least the geometric normal, and
-// light_lobes, the light its surface reflects of one light.
+// Direct light of the mesh shaders: the GGX terms and the shadow terminator of a shading normal
+// (shadow_terminator) both share, and the loop over the lights of a fragment, with the shadows
+// of the spot and point lights (scene_punctual_shadows) and the cookie of the first directional
+// light (scene_cookies). The includer includes mesh_common.wgsl first and declares the Surface of
+// its fragments, with at least the shading normal and the geometric normal, and light_lobes, the
+// light its surface reflects of one light, whose lobes of the shading normal fade by
+// shadow_terminator.
 #pragma once
 
 // Light reflected toward the eye, split into its diffuse and specular parts; the emission is
@@ -29,6 +31,28 @@ fn fresnel_schlick(cos_theta: f32, f0: vec3f) -> vec3f {
     let x = 1.0 - cos_theta;
     let x2 = x * x;
     return f0 + (vec3f(1.0) - f0) * (x2 * x2 * x);
+}
+
+// Shadow terminator of a shading normal ns, such as a normal map, on a surface of geometric
+// normal ng for a light toward l (Chiang, Li and Burley 2019, "Taming the Shadow Terminator").
+// A shading normal that faces the light where the geometric surface turns away from it would
+// light the side the surface shadows, up to a hard cut where the light is shadowed. The fraction
+// G = dot(ng, l) / (dot(ns, l) * dot(ng, ns)) of the light that the bumps of the shading normal
+// leave unshadowed fades it smoothly as -G^3 + G^2 + G: 0 with the light below the geometric
+// surface, 1 where ns is ng or the light is high enough above it.
+fn shadow_terminator(ng: vec3f, ns: vec3f, l: vec3f) -> f32 {
+    let ngl = dot(ng, l);
+    if (ngl <= 0.0) {
+        return 0.0;
+    }
+
+    let d = dot(ns, l) * dot(ng, ns);
+    if (d <= ngl) {
+        return 1.0;
+    }
+
+    let g = ngl / d;
+    return g * (1.0 + g * (1.0 - g));
 }
 
 // Direct light: the directional lights, then the lights of the cluster. With

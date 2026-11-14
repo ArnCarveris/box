@@ -1141,7 +1141,8 @@ void Invalidation_bake_ignores_tint(void) {
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t sun = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, sun, DirectionalLight, {.intensity = 4});
-    ecs_set(world, sun, Rotation, {0, -1.5708f, 0});
+    // Low toward +X, above the floor so it is lit, the wall facing it
+    ecs_set(world, sun, Rotation, {0.3f, -1.5708f, 0});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 7, 0});
     ecs_set(world, camera, Rotation, {-1.5708f, 0, 0});

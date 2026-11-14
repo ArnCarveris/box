@@ -41,6 +41,9 @@
 /** Error of a negative disk radius */
 #define BOX_ATMOS_DISK_ERROR "sun_radius and moon_radius must not be negative"
 
+/** Error of a PlanetAtmosphere with a negative sun_radius */
+#define BOX_ATMOS_SUN_RADIUS_ERROR "sun_radius must not be negative"
+
 /** Error of a negative aerial perspective distance */
 #define BOX_ATMOS_AERIAL_ERROR "aerial_distance must not be negative"
 
@@ -111,7 +114,8 @@ static void box_planet_atmosphere_ctor(
             },
             .ozone_scale = 1.0f,
             .ground_albedo = {77, 77, 77},
-            .intensity = 1.0f
+            .intensity = 1.0f,
+            .sun_radius = 0.266f
         };
     }
 }
@@ -219,6 +223,8 @@ const char* box_atmos_planet_error(
         result = BOX_ATMOS_SCALE_ERROR;
     } else if (!(a->mie.anisotropy > -1 && a->mie.anisotropy < 1)) {
         result = BOX_ATMOS_ANISOTROPY_ERROR;
+    } else if (!(a->sun_radius >= 0)) {
+        result = BOX_ATMOS_SUN_RADIUS_ERROR;
     }
 
     return result;

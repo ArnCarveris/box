@@ -905,9 +905,11 @@ static void box_draws_key(
         key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
     }
 
-    if (!shape2d && (key->features & BOX_RENDER_FEATURE_PLANET_LIGHT)) {
+    bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
+    if (!shape2d && (planet_light || key->blend != Opaque)) {
         ecs_entity_t planet = box_draws_planet_of(world, e);
-        key->planet = planet ? box_draws_planet_slot(d, planet) : 0u;
+        key->planet = planet && planet_light ? box_draws_planet_slot(d, planet) : 0u;
+        key->atmosphere = key->blend != Opaque ? planet : 0;
     }
 
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&

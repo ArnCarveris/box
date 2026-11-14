@@ -1256,9 +1256,9 @@ static void box_gpu_draw_glass(
 /** Record the planet atmosphere shells of a view, then its fog volumes, then the particles of
  * its scene, then bind the groups of the forward pass again, which their pipelines do not share.
  *
- * A view with planet shells, fog volumes or a soft pool ends its pass, draws them in a pass that
- * samples the depth it reads and, unless they are the last draws of the view, continues in a new
- * pass. The shells come before the blended draws, so those in front of a planet are not hazed.
+ * A view with planet shells, fog volumes or a soft pool draws them in a pass of their own that
+ * samples its depth. The shells haze the blended layers around the ground of a planet, such as
+ * clouds, which come before them, but not the others, such as those in front of a planet.
  *
  * The fog volumes of a view with transmissive draws march only the rays behind the glass
  * (box_gpu_draw_glass), which its snapshot then holds.
@@ -1399,9 +1399,9 @@ static void box_gpu_draw_snapshot(
 
 /** Record the indirect draws of the batches a view renders in a pass, in packet order.
  *
- * The sky of a view that renders its atmosphere, then its planet atmosphere shells, then its fog
- * volumes, then the particles of its scene, draw after the 3D meshes shared by every view and
- * before the 2D shapes and the blended draws, in the phases that draw those.
+ * After the 3D meshes shared by every view come the sky of a view that renders its atmosphere,
+ * the blended layers around the ground of a planet (box_render_batch_t.atmosphere), its planet
+ * shells, fog volumes and particles, then its 2D shapes and other blended draws.
  *
  * After a depth prepass the opaque meshes draw once with the Equal pipelines and the early
  * arguments, which the late phase of occlusion appends to: what both prepasses drew. A
@@ -1476,7 +1476,7 @@ static void box_gpu_draw_batches(
             }
         }
 
-        if (!particles && !mesh) {
+        if (!particles && !mesh && !b->atmosphere) {
             particles = true;
             if (box_gpu_draw_particles(gpu, t, vp, format, packet, v, group, slot, false)) {
                 bound = NULL;

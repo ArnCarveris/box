@@ -1192,7 +1192,8 @@ typedef struct box_render_planet_atmos_t {
 typedef struct box_render_planet_light_t {
     float center[4];        /**< World position of the entity, w km per world unit */
     float radii[4];         /**< Bottom and top radius in km, z and w unused */
-    float sun[4];           /**< Direction toward its sun, w unused; (0, -1, 0) without a sun */
+    float sun[4];           /**< Direction toward its sun, (0, -1, 0) without a sun; w the
+                             *   angular radius of the sun disk in radians */
     uint32_t slot;          /**< Planet light slot the mesh instances reference, 1 to
                              *   BOX_RENDER_PLANET_LIGHT_MAX - 1 */
     uint32_t atmosphere;    /**< Handle of its BOX_RENDER_ATMOSPHERE, the LUTs */
@@ -1589,6 +1590,10 @@ typedef struct box_render_batch_t {
     bool water;                 /**< The instances have Water: transmissive too, drawn with the
                                  *   water override of the extended mesh shader, which binds
                                  *   foam as its foam texture */
+    bool atmosphere;            /**< Blended instances that are layers around the ground of a
+                                 *   planet, such as clouds, sorted before the other blended
+                                 *   instances of the view: they draw before the atmosphere
+                                 *   shells, which haze them with the ground, the others after */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     bool fixture;               /**< The instances are LightFixture shapes: the cull keeps them
                                  *   out of the tile of a light inside their world bounds. Only

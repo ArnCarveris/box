@@ -864,7 +864,8 @@ typedef struct box_gpu_atlas_read_t {
 typedef struct box_gpu_planet_light_t {
     float center[4];                /**< World center, km per world unit, 0 for an empty slot */
     float radii[4];                 /**< Bottom and top radius in km, layer of its LUT */
-    float sun[4];                   /**< Direction toward its sun */
+    float sun[4];                   /**< Direction toward its sun, w the angular radius of the
+                                     *   sun disk in radians */
 } box_gpu_planet_light_t;
 
 /** Bytes of the planet light table */

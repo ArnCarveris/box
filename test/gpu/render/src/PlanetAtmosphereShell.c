@@ -502,6 +502,73 @@ void PlanetAtmosphereShell_front_geometry_unchanged(void) {
     stbi_image_free(base);
 }
 
+/** Render the day case with a white, nearly opaque, alpha blended layer: a sphere around the
+ * ground inside the atmosphere, such as clouds, or a bar in front of the planet outside it.
+ *
+ * @param atmosphere Whether the planet has a PlanetAtmosphere
+ * @param inside Whether the layer is the sphere of the planet, else the bar
+ * @param file Name of the PNG
+ * @return The pixels
+ */
+static unsigned char* pa_layer(
+    bool atmosphere,
+    bool inside,
+    const char *file)
+{
+    ecs_world_t *world = pa_world(0, -135);
+    pa_view(world, 3, 0);
+    ecs_entity_t planet = pa_planet(world, 0, 0);
+    if (atmosphere) {
+        pa_atmosphere(world, planet);
+    }
+
+    ecs_entity_t layer;
+    if (inside) {
+        layer = ecs_new_w_pair(world, EcsChildOf, planet);
+        ecs_set(world, layer, Position, {0, 0, 0});
+        ecs_set(world, layer, Sphere, {.segments = 96, .smooth = true, .radius = 1.05f});
+        ecs_set(world, layer, Rgb, {160, 160, 160});
+        ecs_set(world, layer, PbrMaterial, {.metallic = 0, .roughness = 1});
+    } else {
+        layer = pa_bar(world, 2, 3, 0.4f);
+    }
+
+    ecs_set(world, layer, BlendMode, {AlphaBlend});
+    ecs_set(world, layer, Opacity, {0.98f});
+    unsigned char *result = pa_render(world, file);
+    ecs_fini(world);
+
+    return result;
+}
+
+/** A blended layer inside the atmosphere, such as clouds, is hazed like the ground, while one in
+ * front of the planet is not. */
+void PlanetAtmosphereShell_blended_inside_hazed(void) {
+    // planet_atmosphere/order
+    unsigned char *px = pa_layer(true, true, "planet_layer.png");
+    unsigned char *base = pa_layer(false, true, "planet_layer_base.png");
+    const unsigned char *p = pa_px(px, PA_SIZE / 2, PA_SIZE / 2);
+    const unsigned char *b = pa_px(base, PA_SIZE / 2, PA_SIZE / 2);
+    pa_print("hazed layer", p);
+    pa_print("bare layer", b);
+    test_assert(b[0] > 20);
+    test_assert(pa_diff(p, b) >= 3);
+    test_assert((int32_t)p[2] - (int32_t)b[2] > (int32_t)p[0] - (int32_t)b[0]);
+    stbi_image_free(px);
+    stbi_image_free(base);
+
+    px = pa_layer(true, false, "planet_layer_front.png");
+    base = pa_layer(false, false, "planet_layer_front_base.png");
+    p = pa_px(px, PA_SIZE / 2, PA_SIZE / 2);
+    pa_print("front layer", p);
+    test_assert(p[0] > 100);
+    test_assert(pa_diff(p, pa_px(base, PA_SIZE / 2, PA_SIZE / 2)) <= 1);
+    test_assert(pa_diff(pa_px(px, PA_SIZE / 2, PA_SIZE / 4), pa_px(base, PA_SIZE / 2,
+        PA_SIZE / 4)) >= 2);
+    stbi_image_free(px);
+    stbi_image_free(base);
+}
+
 /** Render planets lit from the camera side and above, seen from z 6: a blue one at x -1.6 and
  * an orange one without Rayleigh scattering at x 1.6.
  *
