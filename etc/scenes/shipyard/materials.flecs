@@ -159,6 +159,11 @@ assets {
   prefab ShipFusionFade { Rgb: {236, 176, 255}; Emissive: {strength: 7, color: {200, 110, 255}}; Opacity: {0}; Animator: {clip: yard_flicker}; Transition: [Opacity: {duration: 1.2, timing_function: EaseInOut}] }
   prefab ShipJumpFade { Rgb: {170, 250, 255}; Emissive: {strength: 6, color: {110, 236, 255}}; Opacity: {0}; Animator: {clip: yard_jump_pulse}; Transition: [Opacity: {duration: 1, timing_function: EaseInOut}] }
   prefab ShipJumpFieldFade { Rgb: {90, 220, 255}; Emissive: {strength: 1.6, color: {90, 220, 255}}; Opacity: {0}; BlendMode: Additive; NoShadow; Ignore; Animator: {clip: yard_jump_pulse}; Transition: [Opacity: {duration: 1.2, timing_function: EaseInOut}] }
+  prefab ShipFusionHotFade { Rgb: {255, 236, 255}; Emissive: {strength: 14, color: {246, 196, 255}}; Opacity: {0}; Transition: [Opacity: {duration: 1.2, timing_function: EaseInOut}] }
+  prefab ShipDataCyanFade { Rgb: {96, 220, 240}; Emissive: {strength: 5, color: {80, 214, 255}}; Opacity: {0}; Transition: [Opacity: {duration: 0.8, timing_function: EaseInOut}] }
+  prefab ShipDataAmberFade { Rgb: {255, 180, 70}; Emissive: {strength: 5, color: {255, 160, 50}}; Opacity: {0}; Transition: [Opacity: {duration: 0.8, timing_function: EaseInOut}] }
+  // Canopy glass lit from the consoles behind it
+  prefab PowerCanopy { Rgb: {40, 70, 96}; PbrMaterial: {metallic: 0.4, roughness: 0.04}; ClearCoat: {strength: 1, roughness: 0.02}; Emissive: {strength: 0, color: {60, 150, 210}}; Transition: [Emissive: {duration: 1.1, timing_function: EaseInOut}] }
   prefab PowerLight { Transition: [PointLight: {duration: 0.9, timing_function: EaseInOut}, Rgb: {duration: 0.9}] }
 
   prefab YardDeck { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 4} }

@@ -162,6 +162,13 @@ state {
 
   array RigViews(type: RigCellView, count: 1080)
 
+  // The power of the modules of a rig, when lit: the power level 0..1 of each cell, the heat
+  // level of each power plant and radiator, the power plants that tripped and whether the
+  // radiators cool down. Levels change only in steps, not every tick.
+  array RigLevels(type: f32, count: 1080)
+  array RigFlags(type: bool, count: 1080)
+  struct RigPower(lit: bool, live: RigLevels, heat: RigLevels, trip: RigFlags, cool: bool)
+
   fn cell_x(i: i32) -> i32 { i % GX }
   fn cell_z(i: i32) -> i32 { ((i - i % GX) / GX) % GZ }
   fn cell_y(i: i32) -> i32 { (i - i % LAYER) / LAYER }

@@ -43,6 +43,7 @@ state {
   export mut slot_on: bool[90] = {}
   export mut slot_trip: bool[90] = {}
   export mut slot_heat: f32[90] = {}
+  export mut unit_level: f32[12] = {}
   export mut ship_heat: f32 = 0
   export mut heat_falling: bool = false
 
@@ -219,6 +220,87 @@ state {
     }
   }
 
+  // Unit of the power plant at rig cell i, -1 for none
+  fn rig_unit(i: i32) -> i32 {
+    mut n: i32 = -1
+    for u in 0..unit_n {
+      if units[u] == i {
+        n = u
+      }
+    }
+    n
+  }
+
+  // Share of the supply that the channels draw, in quarters, so that it changes with the routing only
+  fn load_level() -> f32 {
+    mut q: f32 = 0
+    if supply > 0 {
+      q = round(used_bars() * 4.0 / supply) / 4
+    }
+    q
+  }
+
+  // Power level 0..1 of the rig module of kind k at cell i, like ops_live for liner slots. A
+  // power plant follows its unit and runs harder with the load, an engine shows its burn and
+  // every other module the power of its channel.
+  fn rig_live(i: i32, k: i32) -> f32 {
+    mut p: f32 = 0
+    if k == K_POWER {
+      const u = rig_unit(i)
+      if u >= 0 {
+        if unit_on[u] {
+          p = 0.5 + 0.5 * load_level()
+        }
+      }
+    } else if k == K_ENGINE {
+      p = burning ? pf[C_DRIVE] : 0
+    } else {
+      p = chan_power(rig_chan(k))
+    }
+    p
+  }
+
+  // Heat level of the rig module at cell i: its unit for a power plant, the ship for a radiator
+  fn rig_heat(i: i32, k: i32) -> f32 {
+    mut h: f32 = 0
+    if k == K_RADIATOR {
+      h = ship_heat
+    } else if k == K_POWER {
+      const u = rig_unit(i)
+      if u >= 0 {
+        h = unit_level[u]
+      }
+    }
+    h
+  }
+
+  // Whether the power plant at rig cell i tripped
+  fn rig_trip(i: i32) -> bool {
+    mut t = false
+    const u = rig_unit(i)
+    if u >= 0 {
+      t = unit_trip[u]
+    }
+    t
+  }
+
+  // The power and heat levels of the modules of the rig, for its Rig instance
+  fn rig_power() -> RigPower {
+    mut live: RigLevels = {}
+    mut heat: RigLevels = {}
+    mut trip: RigFlags = {}
+    for i in 0..CELLS {
+      const k = grid[i]
+      if k != 0 {
+        live[i] = rig_live(i, k)
+        heat[i] = rig_heat(i, k)
+        trip[i] = k == K_POWER && rig_trip(i)
+      }
+    }
+    const p: RigPower = {lit: true, live: live, heat: heat, trip: trip, cool: heat_falling}
+    p
+  }
+
   // Heat in HEAT_STEPS levels, so that what shows it changes a few times per heat cycle and
   // not every tick; a transition at least as long as a step bridges the levels.
   fn heat_level(h: f32) -> f32 { round(clamp(h, 0, 1) * HEAT_STEPS) / HEAT_STEPS }
@@ -236,12 +318,23 @@ state {
   // Heat level of the units and of the ship, updated only when a level changes
   fn mark_heat() {
     mut sh: f32[90] = {}
+    mut ul: f32[12] = {}
     mut top: f32 = 0
     for u in 0..unit_n {
       if liner {
         sh[units[u]] = heat_level(unit_heat[u])
       }
+      ul[u] = heat_level(unit_heat[u])
       top = max(top, unit_heat[u])
+    }
+    mut same_units = true
+    for u in 0..UNITS {
+      if ul[u] != unit_level[u] {
+        same_units = false
+      }
+    }
+    if !same_units {
+      unit_level = ul
     }
     mut same = true
     for i in 0..LCELLS {

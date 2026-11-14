@@ -130,7 +130,7 @@ if liner {
   // the deck it works on itself, so the instance leaves them out.
   const views = rig_views(yard_design, deck)
 
-  Rig rig_ship(design: yard_design, burning: burning, cut: deck, skip: deck) {
+  Rig rig_ship(design: yard_design, burning: burning, cut: deck, skip: deck, power: rig_power()) {
     for i in 0..CELLS {
       ShipCell "edit_{i}"(idx: i, v: views[i])
     }

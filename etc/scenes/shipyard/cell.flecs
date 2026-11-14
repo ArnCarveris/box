@@ -75,9 +75,10 @@ assets {
         true: {255, 70, 50, 150}
         _: match swap { true: {90, 255, 160, 120}; _: {0, 0, 0, 0} }
       }
+      // Power and heat levels that change only on user actions, trips and heat levels
       RigModule unit(
-        idx: idx, k: k, v: v, burning: burning && k == K_ENGINE, lifted: rising,
-        tinted: hovered && tint.a > 0, tint: tint
+        idx: idx, k: k, v: v, live: rig_live(idx, k), heat: rig_heat(idx, k), trip: k == K_POWER && rig_trip(idx),
+        cool: k == K_RADIATOR && heat_falling, lifted: rising, tinted: hovered && tint.a > 0, tint: tint
       )
     }
 
@@ -88,7 +89,7 @@ assets {
         Ignore
         NoShadow
         ModuleView view(
-          k: t, v: rig_ghost_view(yard_design, v, deck, idx, t), y: y, seed: idx, burning: burning
+          k: t, v: rig_ghost_view(yard_design, v, deck, idx, t), y: y, seed: idx, live: (t != K_ENGINE || burning) ? 1 : 0
         )
       }
     }
