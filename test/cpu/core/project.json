@@ -367,6 +367,7 @@
                 "testcases": [
                     "builtin_kinds",
                     "normal_slope_kinds",
+                    "distance_kind",
                     "kind_reflected_json",
                     "names",
                     "names_script",

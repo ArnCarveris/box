@@ -1407,6 +1407,7 @@ static void box_texture_register(
     BOX_TEXTURE_COMPONENT(world, TexCurve, "Curve");
     ecs_set_name_prefix(world, "Tex");
     ECS_META_COMPONENT(world, TexBlur);
+    ECS_META_COMPONENT(world, TexDistance);
     ECS_META_COMPONENT(world, TexNormal);
     ECS_META_COMPONENT(world, TexSlope);
 

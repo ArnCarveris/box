@@ -69,6 +69,139 @@ static const char *box_texture_blur_wgsl =
     "        select(radius, radius * 2.0 * size.y / size.x, sphere));\n"
     "}\n";
 
+/** WGSL of the TexDistance node, a jump flood in BOX_TEX_DISTANCE_PASSES passes whose textures
+ * hold the index y * width + x of the nearest seed found, -1 for none.
+ *
+ * Pass 0 seeds the texels that have a neighbour across the 0.5 contour. The passes before
+ * BOX_TEX_DISTANCE_LAST look at the seeds of the texels a step away, halving the step from the
+ * reach of the range.
+ *
+ * The last takes a step of one texel and measures the distance to the contour points of the
+ * seeds it finds: where the input, interpolated linearly along an edge between the seed and a
+ * neighbour across the contour, is 0.5. */
+static const char *box_texture_distance_wgsl =
+    "const BOX_TEX_DISTANCE_LAST: u32 = 11u;\n"
+    "const BOX_TEX_DISTANCE_STEP_MAX: u32 = 512u;\n"
+    "\n"
+    "fn box_tex_distance_seed(index: f32) -> vec2i {\n"
+    "    let w = i32(box_texgraph_stage.size.x);\n"
+    "    let k = i32(index);\n"
+    "    return vec2i(k % w, k / w);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_distance_dir(pos: vec2f) -> vec3f {\n"
+    "    let uv = pos / vec2f(box_texgraph_stage.size);\n"
+    "    let phi = (uv.x - 0.5) * 2.0 * BOX_TEXGRAPH_PI;\n"
+    "    let theta = clamp(uv.y, 0.0, 1.0) * BOX_TEXGRAPH_PI;\n"
+    "    return vec3f(sin(theta) * sin(phi), cos(theta), -sin(theta) * cos(phi));\n"
+    "}\n"
+    "\n"
+    "fn box_tex_distance_between(texel: vec2i, pos: vec2f) -> f32 {\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let c = vec2f(texel) + 0.5;\n"
+    "    if (box_texgraph_stage.domain == 1u) {\n"
+    "        let chord = length(box_tex_distance_dir(pos) - box_tex_distance_dir(c));\n"
+    "        return 2.0 * asin(min(chord * 0.5, 1.0)) * 256.0 / BOX_TEXGRAPH_PI;\n"
+    "    }\n"
+    "    var d = pos - c;\n"
+    "    d -= size * round(d / size);\n"
+    "    return length(d) * 512.0 / size.x;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_distance_contour(t: texture_2d<f32>, texel: vec2i, seed: vec2i) -> f32 {\n"
+    "    var dirs = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));\n"
+    "    let v = box_texgraph_load_poles(t, seed).x;\n"
+    "    let inside = v >= 0.5;\n"
+    "    var best = 3.4e38;\n"
+    "    for (var k = 0; k < 4; k ++) {\n"
+    "        let n = box_texgraph_load_poles(t, seed + dirs[k]).x;\n"
+    "        if ((n >= 0.5) == inside) {\n"
+    "            continue;\n"
+    "        }\n"
+    "        let f = clamp((v - 0.5) / (v - n), 0.0, 1.0);\n"
+    "        let at = vec2f(seed) + 0.5 + f * vec2f(dirs[k]);\n"
+    "        best = min(best, box_tex_distance_between(texel, at));\n"
+    "    }\n"
+    "    return best;\n"
+    "}\n"
+    "\n"
+    "fn box_tex_distance(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    pass_index: u32, prev: texture_2d<f32>, t0: texture_2d<f32>) -> vec4f {\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let range = max(bitcast<f32>(p[0].x), 0.0);\n"
+    "    let has_input = all(textureDimensions(t0) == box_texgraph_stage.size);\n"
+    "    if (pass_index == 0u) {\n"
+    "        if (!has_input) {\n"
+    "            return vec4f(-1.0, 0.0, 0.0, 0.0);\n"
+    "        }\n"
+    "        let inside = box_texgraph_load_poles(t0, texel).x >= 0.5;\n"
+    "        let e = box_texgraph_load_poles(t0, texel + vec2i(1, 0)).x >= 0.5;\n"
+    "        let w = box_texgraph_load_poles(t0, texel - vec2i(1, 0)).x >= 0.5;\n"
+    "        let s = box_texgraph_load_poles(t0, texel + vec2i(0, 1)).x >= 0.5;\n"
+    "        let n = box_texgraph_load_poles(t0, texel - vec2i(0, 1)).x >= 0.5;\n"
+    "        let edge = (e != inside) || (w != inside) || (s != inside) || (n != inside);\n"
+    "        let index = f32(texel.y * i32(box_texgraph_stage.size.x) + texel.x);\n"
+    "        return vec4f(select(-1.0, index, edge), 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "\n"
+    "    let last = pass_index == BOX_TEX_DISTANCE_LAST;\n"
+    "    var stride = 1u;\n"
+    "    if (!last) {\n"
+    "        let reach = range * size.x / 512.0;\n"
+    "        var s = 1u;\n"
+    "        while (f32(s) < reach && s < BOX_TEX_DISTANCE_STEP_MAX) {\n"
+    "            s = s * 2u;\n"
+    "        }\n"
+    "        stride = s >> (pass_index - 1u);\n"
+    "        if (stride == 0u) {\n"
+    "            return textureLoad(prev, texel, 0);\n"
+    "        }\n"
+    "    }\n"
+    "\n"
+    "    let sy = i32(stride);\n"
+    "    var sx = sy;\n"
+    "    if (box_texgraph_stage.domain == 1u) {\n"
+    "        let s = sin((f32(texel.y) + 0.5) / size.y * BOX_TEXGRAPH_PI);\n"
+    "        sx = max(i32(min(round(f32(stride) / max(s, 1e-6)), size.x * 0.5)), 1);\n"
+    "    }\n"
+    "\n"
+    "    var best = -1.0;\n"
+    "    var best_d = 3.4e38;\n"
+    "    for (var dy = -1; dy <= 1; dy ++) {\n"
+    "        for (var dx = -1; dx <= 1; dx ++) {\n"
+    "            let index = box_texgraph_load_poles(prev, texel + vec2i(dx * sx, dy * sy)).x;\n"
+    "            if (index < 0.0) {\n"
+    "                continue;\n"
+    "            }\n"
+    "            let seed = box_tex_distance_seed(index);\n"
+    "            var d = 0.0;\n"
+    "            if (last) {\n"
+    "                d = box_tex_distance_contour(t0, texel, seed);\n"
+    "            } else {\n"
+    "                d = box_tex_distance_between(texel, vec2f(seed) + 0.5);\n"
+    "            }\n"
+    "            if (d < best_d) {\n"
+    "                best_d = d;\n"
+    "                best = index;\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+    "\n"
+    "    if (!last) {\n"
+    "        return vec4f(best, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "\n"
+    "    var v = i[0].x;\n"
+    "    if (has_input) {\n"
+    "        v = box_texgraph_load_poles(t0, texel).x;\n"
+    "    }\n"
+    "    let side = select(-1.0, 1.0, v >= 0.5);\n"
+    "    if (best < 0.0) {\n"
+    "        return vec4f(side * range, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "    return vec4f(side * min(best_d, range), 0.0, 0.0, 0.0);\n"
+    "}\n";
+
 /** WGSL of the TexNormal node: the normal of the differences of its height in the UV frame of
  * the domain, encoded as GenNormal stores it */
 static const char *box_texture_normal_wgsl =
@@ -549,8 +682,8 @@ done:
 }
 
 /** Register the built in node kinds of values and their math: TexConstant, TexCoords, the
- * math kinds such as TexAdd, TexNoise, TexBlur, TexSplit, TexCombine, TexWarp, TexTransform,
- * TexTime and TexSplat.
+ * math kinds such as TexAdd, TexNoise, TexBlur, TexDistance, TexSplit, TexCombine, TexWarp,
+ * TexTransform, TexTime and TexSplat.
  *
  * @param world The world
  */
@@ -588,6 +721,20 @@ static void box_texture_nodes_register_math(
         .source = box_texture_blur_wgsl,
         .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
         .passes = 2
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexDistance),
+        .output = TexScalar,
+        .inputs = {
+            { "input", offsetof(TexDistance, input), TexScalar, "input_value",
+                offsetof(TexDistance, input_value) }
+        },
+        .params = {{ "range", offsetof(TexDistance, range), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_distance",
+        .source = box_texture_distance_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD,
+        .passes = BOX_TEX_DISTANCE_PASSES
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){

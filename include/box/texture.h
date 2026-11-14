@@ -800,6 +800,32 @@ ECS_STRUCT(TexBlur, {
                          *   three standard deviations, 0 for no blur */
 });
 
+/** Node of a TextureGraph whose Scalar value is the signed distance to the 0.5 contour of its
+ * Scalar input: positive where the input is at least 0.5, negative below, limited to
+ * -range..range, in texels of a 512 pixel wide image so it does not change with the
+ * resolution. For bands along the edge of a mask, such as beaches along a coast.
+ *
+ * The texels next to the contour seed a jump flood of BOX_TEX_DISTANCE_PASSES passes, and the
+ * contour is placed between texels where the input crosses 0.5, so the distance is smooth.
+ * DomainPlane wraps. DomainSphere measures along great circles: a texel of the equator is
+ * 2 pi / 512 radians, the longitude wraps and the flood crosses the poles. An input without a
+ * node has no contour, and the value is range or -range. The flood reaches about 1000 texels of
+ * the image; the image has at most 2^24 texels for exact seeds.
+ *
+ * @code
+ * coast { nodes.Distance: {input: land, range: 8} }
+ * @endcode
+ */
+ECS_STRUCT(TexDistance, {
+    ecs_entity_t input; /**< Scalar node whose 0.5 contour is measured, 0 for input_value */
+    float input_value;  /**< Value of input without a node */
+    float range;        /**< Largest distance measured, in texels of a 512 pixel wide image;
+                         *   0 for a value of 0 everywhere */
+});
+
+/** Passes of a TexDistance node: the seeds, the steps of the flood and the distance */
+#define BOX_TEX_DISTANCE_PASSES (12)
+
 /** Fractal sum of the octaves of a TexNoise node */
 ECS_ENUM(TextureNoiseFractal, {
     NoiseFbm = 0,    /**< Fractal brownian motion: the octaves added, the default */
@@ -968,7 +994,7 @@ ECS_STRUCT(TexSlope, {
 #define BOX_TEXTURE_NODE_TIME_SCALE (1u << 4)
 
 /** Most passes of a node kind */
-#define BOX_TEXTURE_NODE_PASSES (4)
+#define BOX_TEXTURE_NODE_PASSES (16)
 
 /** An input port of a node kind, as TextureNodeKind lists it */
 ECS_STRUCT(TextureNodePort, {

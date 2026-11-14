@@ -349,6 +349,7 @@ planets {
     const tint: Col = air.tint
 
     const tw: i32 = detail > 1 ? 1024 : 512
+    const coast_aa: f32 = detail > 1 ? 0.25 : 0.5
     const seg: i32 = detail > 1 ? 96 : (detail > 0 ? 48 : 20)
     const oct: i32 = detail > 1 ? 7 : 6
     const lean: f32 = body.lean * PI / 180
@@ -677,11 +678,46 @@ planets {
           nodes.Ramp: {input: s_alt, keys: [{0, {rk0.r, rk0.g, rk0.b}}, {1, {rk1.r, rk1.g, rk1.b}}]}
         }
         a_land1 { nodes.Mix: {a: a_land0, b: a_rock, factor: a_rockm} }
-        a_shore {
-          nodes.Smoothstep: {input: s_alt, edge0_value: {0.025, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+        // Beaches: sand from the coast up to a width inland, in texels of a 512 wide map so it
+        // does not change with the detail. The coast is the contour of the height at the sea
+        // level, between texels. Water within 3 texels of land is left out of the open water
+        // the width is measured from, so ponds and narrow inlets get no sand. The width varies
+        // along the coast with a low frequency noise, from none to four texels at full beach,
+        // and shrinks on steep coasts; the sand blends into the ground over a texel and a half
+        a_lh {
+          nodes.Remap: {
+            input: s_h, from_min: sea_h - 0.04, from_max: sea_h + 0.04, to_min: 0, to_max: 1,
+            clamp: true
+          }
         }
-        a_beach { nodes.Multiply: {a: a_shore, b_value: {sand, 0, 0, 0}} }
-        a_sand { nodes.Ramp: {keys: [{0, {212, 196, 150}}]} }
+        a_coast { nodes.Distance: {input: a_lh, range: 4} }
+        a_ow {
+          nodes.Smoothstep: {input: a_coast, edge0_value: {-2, 0, 0, 0}, edge1_value: {-4, 0, 0, 0}}
+        }
+        a_owd { nodes.Distance: {input: a_ow, range: 12} }
+        a_cl {
+          nodes.Remap: {input: a_owd, from_min: -3, from_max: -4, to_min: 0, to_max: 1}
+        }
+        a_cd { nodes.Max: {a: a_cl, b_value: {0, 0, 0, 0}} }
+        a_wn { nodes.Noise: {frequency: 3, octaves: 2, seed: sd * 16 + 14} }
+        a_wv {
+          nodes.Remap: {
+            input: a_wn, from_min: 0.4, from_max: 0.6, to_min: 0, to_max: sand * 4, clamp: true
+          }
+        }
+        a_sl { nodes.Blur: {input: s_slope, radius: 3} }
+        a_flat {
+          nodes.Smoothstep: {input: a_sl, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.1, 0, 0, 0}}
+        }
+        a_bw { nodes.Multiply: {a: a_wv, b: a_flat} }
+        a_bd { nodes.Subtract: {a: a_bw, b: a_cd} }
+        a_beach {
+          nodes.Smoothstep: {input: a_bd, edge0_value: {0, 0, 0, 0}, edge1_value: {1.5, 0, 0, 0}}
+        }
+        a_sn { nodes.Noise: {frequency: 24, octaves: 3, seed: sd * 16 + 14} }
+        a_sand {
+          nodes.Ramp: {input: a_sn, keys: [{0.3, {196, 178, 132}}, {0.7, {226, 210, 166}}]}
+        }
         a_land2 { nodes.Mix: {a: a_land1, b: a_sand, factor: a_beach} }
         a_crk {
           nodes.Remap: {
@@ -720,7 +756,13 @@ planets {
         }
         a_ice { nodes.Ramp: {input: a_depth, keys: [{0, {226, 238, 248}}, {1, {170, 198, 222}}]} }
         a_sea { nodes.Mix: {a: a_water, b: a_ice, factor: s_icem} }
-        a_out { nodes.Mix: {a: a_sea, b: a_land, factor: s_land} }
+        // The coast blends over a texel of the map, without the steps of the land mask
+        a_aa {
+          nodes.Smoothstep: {
+            input: a_coast, edge0_value: {0 - coast_aa, 0, 0, 0}, edge1_value: {coast_aa, 0, 0, 0}
+          }
+        }
+        a_out { nodes.Mix: {a: a_sea, b: a_land, factor: a_aa} }
         Graph: {output: a_out, width: tw, height: tw / 2, domain: DomainSphere}
       }
 

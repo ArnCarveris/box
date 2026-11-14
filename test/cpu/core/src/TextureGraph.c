@@ -365,6 +365,72 @@ void TextureGraph_normal_slope_kinds(void) {
     ecs_fini(world);
 }
 
+/** TexDistance is a built in kind of a Scalar input and a range, a neighbourhood kind of
+ * BOX_TEX_DISTANCE_PASSES passes, and a script names it nodes.Distance. */
+void TextureGraph_distance_kind(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    const TextureNodeKind *kind = ecs_get(world, ecs_id(TexDistance), TextureNodeKind);
+    test_assert(kind != NULL);
+    test_int(kind->output, TexScalar);
+    test_int(kind->input_count, 1);
+    test_str(kind->inputs[0].name, "input");
+    test_int(kind->inputs[0].type, TexScalar);
+    test_bool(kind->inputs[0].fallback, true);
+    test_str(kind->inputs[0].value, "input_value");
+    test_int(kind->param_count, 1);
+    test_str(kind->params[0].name, "range");
+    test_int(kind->params[0].offset, 0);
+    test_int(kind->params[0].size, 4);
+    test_int(kind->param_size, 16);
+    test_str(kind->function, "box_tex_distance");
+    test_bool(kind->neighbourhood, true);
+    test_bool(kind->animated, false);
+    test_bool(kind->plane, false);
+    test_int(kind->passes, BOX_TEX_DISTANCE_PASSES);
+    test_assert(BOX_TEX_DISTANCE_PASSES <= BOX_TEXTURE_NODE_PASSES);
+
+    const char *code =
+        "using box.texture\n"
+        "coast {\n"
+        "  uv { nodes.Coords: {} }\n"
+        "  u { nodes.Split: {input: uv, channel: ChannelR} }\n"
+        "  dist { nodes.Distance: {input: u, range: 8} }\n"
+        "  Graph: {output: dist, width: 32, height: 16, domain: DomainSphere}\n"
+        "}\n";
+    test_assert(ecs_script_run(world, "distance", code, NULL) == 0);
+    ecs_entity_t tex = ecs_lookup(world, "coast");
+    ecs_entity_t dist = ecs_lookup(world, "coast.dist");
+    test_assert(tex != 0 && dist != 0);
+    const TexDistance *d = ecs_get(world, dist, TexDistance);
+    test_assert(d != NULL);
+    test_assert(d->input == ecs_lookup(world, "coast.u"));
+    test_flt(d->range, 8);
+    test_flt(d->input_value, 0);
+    test_int(frame_status(world, tex)->state, TextureReady);
+    const box_texture_graph_t *graph = graph_of(world, tex);
+    test_assert(graph != NULL);
+    test_int(graph->node_count, 3);
+    test_int(graph->nodes[2].kind, kind_id(world, ecs_id(TexDistance)));
+    test_int(graph->nodes[2].inputs[0], 1);
+
+    /* A zero range stays zero. */
+    ecs_entity_t zero = ecs_new(world);
+    ecs_add(world, zero, TexDistance);
+    test_flt(ecs_get(world, zero, TexDistance)->range, 0);
+
+    /* The input is a Scalar. */
+    ecs_entity_t wrong = ecs_entity(world, { .name = "wrong" });
+    ecs_set(world, wrong, TexDistance, { .input = ecs_lookup(world, "coast.uv"), .range = 4 });
+    ecs_set(world, tex, TextureGraph, { .output = wrong, .width = 32, .height = 16 });
+    ecs_progress(world, 0);
+    const TextureStatus *status = ecs_get(world, tex, TextureStatus);
+    test_int(status->state, TextureFailed);
+    test_assert(strstr(status->error, "expects Scalar") != NULL);
+
+    ecs_fini(world);
+}
+
 void TextureGraph_kind_reflected_json(void) {
     // materials/textures
     ecs_world_t *world = world_new();
@@ -447,6 +513,7 @@ void TextureGraph_names(void) {
     test_path(world, "box.texture.nodes.Blocks", ecs_id(TexBlocks));
     test_path(world, "box.texture.nodes.Cells", ecs_id(TexCells));
     test_path(world, "box.texture.nodes.Blur", ecs_id(TexBlur));
+    test_path(world, "box.texture.nodes.Distance", ecs_id(TexDistance));
     test_path(world, "box.texture.nodes.Noise", ecs_id(TexNoise));
     test_path(world, "box.texture.nodes.Image", ecs_id(TexImage));
     test_path(world, "box.texture.nodes.Lut", ecs_id(TexLut));
@@ -1367,7 +1434,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 40);
+    test_int(null->texture_node_kinds, 41);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1408,10 +1475,15 @@ void TextureGraph_null_backend_records(void) {
     test_int(k->passes, 2);
     test_str(box_render_texture_node_kind_function(k), "box_tex_blur");
 
+    k = box_render_null_texture_node_kind(null, (uint32_t)kind_id(world, ecs_id(TexDistance)));
+    test_assert(k != NULL);
+    test_int(k->passes, BOX_TEX_DISTANCE_PASSES);
+    test_str(box_render_texture_node_kind_function(k), "box_tex_distance");
+
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 40);
+    test_int(null->texture_node_kinds, 41);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1503,7 +1575,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 40);
+    test_int(second->texture_node_kinds, 41);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1530,7 +1602,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 41);
+    test_int(null->texture_node_kinds, 42);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);

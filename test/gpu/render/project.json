@@ -1643,6 +1643,22 @@
                 ]
             },
             {
+                "id": "TextureDistance",
+                "testcases": [
+                    "hard_edges",
+                    "wave_plane",
+                    "range_limits",
+                    "scales_with_size",
+                    "zero_range",
+                    "without_input",
+                    "sphere_pole_cap",
+                    "sphere_seam",
+                    "sphere_across_pole",
+                    "range_edit_no_recompile",
+                    "scalar_input"
+                ]
+            },
+            {
                 "id": "TextureNodesNoise",
                 "testcases": [
                     "range_mean_plane",
