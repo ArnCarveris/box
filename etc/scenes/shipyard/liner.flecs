@@ -6,7 +6,7 @@ using state
 state {
   event SlotClick(slot: i32)
 
-  // Height of the spine axis of the liner above the yard
+  // Height of the spine axis of the liner above the yard, in the units of the segments (10 m)
   export const AXIS_Y: f32 = 6
 
   export mut lane: i32 = 0

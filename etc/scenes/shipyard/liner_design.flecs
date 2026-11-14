@@ -14,6 +14,9 @@ state {
   export const R_OUT: f32 = 1.7
   export const OUT_D: f32 = 8.5
   export const RING_R: f32 = 14
+  // Meters per unit of the segments, which are authored at about 10 m to the unit. The Liner
+  // template scales them by it, so a liner is in meters as a rig.
+  export const LINER_SCALE: f32 = 10
 
   export const LANE_CORE: i32 = 0
   export const LANE_PORT: i32 = 1

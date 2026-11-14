@@ -47,7 +47,7 @@ rig {
     Rotation: {0 - cam_pitch, 0, 0}
     eye {
       Position: {0, 0, cam_dist}
-      Camera: {fov: 38, near_: 0.3, far_: 3000}
+      Camera: {fov: 38, near_: liner ? 0.3 * LINER_SCALE : 0.3, far_: liner ? 3000 * LINER_SCALE : 3000}
     }
   }
 }
@@ -65,7 +65,7 @@ rim {
 }
 
 view {
-  yard_contact { Gtao: {radius: 0.9, final_value_power: 2.2} }
+  yard_contact { Gtao: {radius: liner ? 0.9 * LINER_SCALE : 0.9, final_value_power: 2.2} }
   yard_bloom { Bloom: {intensity: 0.2, threshold: 1.1, threshold_softness: 0.45} }
   yard_film { Tonemap: {operator_: TonyMcMapface} }
   yard_edges { Smaa: {} }
@@ -73,29 +73,43 @@ view {
   View: {
     camera: rig.arm.eye,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, cascades: 3, resolution: 1024, max_distance: 200, filter_size: 2},
+    shadows: {enabled: true, cascades: 3, resolution: 1024, max_distance: liner ? 200 * LINER_SCALE : 200, filter_size: 2},
     lighting: {reflections: true, baked: false, environment: {source: assets.yard_stars, intensity: 0.7, background: true}},
     effects: [{effect: yard_contact}, {effect: yard_bloom}, {effect: yard_film}, {effect: yard_edges}]
   }
 }
 
 yard {
-  if show_gantry {
-    if liner {
-      Drydock dock()
-    } else {
+  // The yard of liner mode, authored at 10 m to the unit as the segments of a liner, is scaled
+  // by LINER_SCALE to the liner. Its texture frame at the origin maps the drydock as the world
+  // did.
+  if liner {
+    liner_units {
+      Position: {0, 0, 0}
+      Scale: {LINER_SCALE, LINER_SCALE, LINER_SCALE}
+      texture.Frame
+      if show_gantry {
+        Drydock dock()
+      }
+      if tool > 0 {
+        SpineGuide spine_guide(l: lane)
+      }
+    }
+  } else {
+    if show_gantry {
       Slipway slipway()
     }
-  }
-  if !liner {
     BuildFrame frame()
+    if tool > 0 {
+      DeckGrid deck_grid(level: deck)
+    }
   }
-  if tool > 0 && liner {
-    SpineGuide spine_guide(l: lane)
-  } else if tool > 0 {
-    DeckGrid deck_grid(level: deck)
+  // The backdrop keeps its size to the camera, which frames a liner from 10 times as far.
+  const backdrop = liner ? LINER_SCALE : 1
+  YardPlanet planet() {
+    Position: {-1100 * backdrop, -760 * backdrop, -1500 * backdrop}
+    Scale: {backdrop, backdrop, backdrop}
   }
-  YardPlanet planet() { Position: {-1100, -760, -1500} }
 }
 
 if liner {

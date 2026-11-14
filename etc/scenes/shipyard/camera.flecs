@@ -29,7 +29,7 @@ state {
   export const VIEW_YAW: f32 = 1.02
   export const VIEW_PITCH: f32 = 0.42
   export const VIEW_DIST: f32 = 78
-  export const LINER_DIST: f32 = 140
+  export const LINER_DIST: f32 = 140 * LINER_SCALE
 
   export mut view_yaw: f32 = VIEW_YAW
   export mut view_pitch: f32 = VIEW_PITCH
@@ -83,6 +83,7 @@ async {
     const py = held(view_actions.Raise[ActionState].down) - held(view_actions.Lower[ActionState].down)
     const zoom = held(view_actions.ZoomOut[ActionState].down) - held(view_actions.ZoomIn[ActionState].down)
     const mouse = Input[Input].mouse
+    const min_dist = liner ? LINER_SCALE : 1
 
     if px != 0 || pz != 0 {
       const speed = view_dist * 0.6 * dt
@@ -103,14 +104,14 @@ async {
       view_pitch = clamp(view_pitch + mouse.delta.y * 0.004, -0.6, 1.45)
     }
     if zoom != 0 {
-      view_dist = max(view_dist * (1 + zoom * 1.2 * dt), 1)
+      view_dist = max(view_dist * (1 + zoom * 1.2 * dt), min_dist)
     }
     if mouse.scroll.y != 0 {
-      view_dist = max(view_dist * (1 - mouse.scroll.y * 0.08), 1)
+      view_dist = max(view_dist * (1 - mouse.scroll.y * 0.08), min_dist)
     }
 
     const ease = min(1, dt * 10)
-    const target_y = (liner ? AXIS_Y : deck * CH * 0.5 + 2.5) + view_y
+    const target_y = (liner ? AXIS_Y * LINER_SCALE : deck * CH * 0.5 + 2.5) + view_y
     if abs(cam_yaw - view_yaw) > 0.0001 || abs(cam_pitch - view_pitch) > 0.0001 {
       cam_yaw += (view_yaw - cam_yaw) * ease
       cam_pitch += (view_pitch - cam_pitch) * ease

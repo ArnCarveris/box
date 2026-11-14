@@ -167,13 +167,15 @@ assets {
   // The liner that the editor works on: a Liner instance on the spine axis of the yard with the
   // design and the power of the simulation (ops), and the editor over its slots. While a tool is
   // out the instance fades and lets picks pass, so only the lane being worked on, which the
-  // editor draws itself, stands out.
+  // editor draws itself, stands out. The editor is authored in the units of the segments and
+  // scaled by LINER_SCALE to the liner; its texture frame at the origin of the yard maps the
+  // segments it draws as the world did at 10 m to the unit.
   template YardLiner {
     Liner ship(
       design: lgrid, power: liner_levels(), shield: pf[C_SHIELDS], burning: burning,
       heat: slot_heat, radiator_heat: ship_heat, cooling: heat_falling, trip: slot_trip, skip: lane
     ) {
-      Position: {0, AXIS_Y, 0}
+      Position: {0, AXIS_Y * LINER_SCALE, 0}
       if tool > 0 {
         Opacity: {0.16}
         Ignore
@@ -181,9 +183,14 @@ assets {
     }
 
     editor {
-      Position: {0, AXIS_Y, 0}
-      for i in 0..LCELLS {
-        LinerSlot "edit_{i}"(idx: i)
+      Position: {0, 0, 0}
+      Scale: {LINER_SCALE, LINER_SCALE, LINER_SCALE}
+      texture.Frame
+      slots {
+        Position: {0, AXIS_Y, 0}
+        for i in 0..LCELLS {
+          LinerSlot "edit_{i}"(idx: i)
+        }
       }
     }
   }

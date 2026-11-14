@@ -168,7 +168,7 @@ assets {
   prefab PowerLight { Transition: [PointLight: {duration: 0.9, timing_function: EaseInOut}, Rgb: {duration: 0.9}] }
 
   prefab YardDeck { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 4} }
-  prefab YardDeckFine { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 0.6} }
+  prefab YardDeckFine { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: yard_tex_floor, normal: yard_tex_floor_normal, orm: yard_tex_floor_orm}; texture.Mapping: {MappingFrame, size: 0.6} }
   prefab YardGirder { Rgb: {64, 70, 80}; PbrMaterial: {metallic: 0.85, roughness: 0.45} }
   prefab YardHolo { Rgb: {70, 200, 255}; Emissive: {strength: 1.6, color: {60, 190, 255}} }
 }
