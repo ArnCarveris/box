@@ -440,7 +440,9 @@
                     "blocks_plane",
                     "blocks_sphere_error",
                     "planet_script",
-                    "planet_props_keep_structure"
+                    "planet_props_keep_structure",
+                    "nebula_script",
+                    "nebula_props_keep_structure"
                 ]
             },
             {

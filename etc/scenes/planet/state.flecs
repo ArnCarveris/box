@@ -11,7 +11,7 @@ state {
     }
 
     reset {
-      Action: {description: "Reset the planet or the star"}
+      Action: {description: "Reset the planet, the star or the background"}
       Binding: {key: Backspace}
     }
 
@@ -24,12 +24,24 @@ state {
       Action: {description: "Show the star"}
       Binding: {key: Num2}
     }
+
+    show_background {
+      Action: {description: "Edit the background"}
+      Binding: {key: Num3}
+    }
   }
 
   // What the scene shows: the planet or the star, each with its own values
   export const MODE_PLANET: i32 = 0
   export const MODE_STAR: i32 = 1
   export mut mode: i32 = MODE_PLANET
+
+  // What the panel shows: the page of the planet, of the star or of the background. Showing the
+  // planet or the star sets mode too, the background page keeps the body the stage shows
+  export const PAGE_PLANET: i32 = 0
+  export const PAGE_STAR: i32 = 1
+  export const PAGE_BACKGROUND: i32 = 2
+  export mut page: i32 = PAGE_PLANET
 
   export const KIND_GAS: i32 = 4
   export const KIND_GARDEN: i32 = 5
@@ -88,4 +100,29 @@ state {
   export mut star_seed: i32 = START_STAR_SEED
   export mut star_detail: i32 = 2
   export mut star: StarParams = star_preset(START_STAR)
+
+  // The background: the stars of the StarField of the sky (count, brightness of the brightest,
+  // falloff of the brightness, size in pixels, temperature range in kelvin, saturation of their
+  // colors, share along the band and its width in degrees, seed), the nebula of the sky shell
+  // (intensity, frequency, warp, the fraction of the sky its clouds cover, its colors from the
+  // thin parts to the dense ones, seed) and the orientation of the sky (yaw about the vertical
+  // and tilt of the band, in degrees). The milky band of the nebula follows the band of the stars
+  struct BackgroundParams(
+    count: f32, brightness: f32, falloff: f32, size: f32, temperature_min: f32,
+    temperature_max: f32, saturation: f32, band: f32, band_width: f32, star_seed: i32,
+    intensity: f32, frequency: f32, warp: f32, cover: f32, color_a: Col, color_b: Col,
+    color_c: Col, nebula_seed: i32, yaw: f32, tilt: f32)
+
+  // A dark sky of many faint stars and a few bright ones, a band across the view behind the
+  // body and a subtle nebula of dusty blue, violet and rose
+  fn background_preset() -> BackgroundParams {
+    {
+      count: 180000, brightness: 8, falloff: 7, size: 1.2, temperature_min: 3200,
+      temperature_max: 13000, saturation: 0.45, band: 0.5, band_width: 6, star_seed: 11,
+      intensity: 0.45, frequency: 2, warp: 0.7, cover: 0.45, color_a: {26, 44, 110},
+      color_b: {98, 50, 132}, color_c: {206, 112, 118}, nebula_seed: 5, yaw: 25, tilt: 38
+    }
+  }
+
+  export mut background: BackgroundParams = background_preset()
 }

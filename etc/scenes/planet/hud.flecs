@@ -122,27 +122,37 @@ hud {
       Item: {h: Left, v: Middle}
       InputBlocker
 
-      // The panel: the Planet / Star switch, then what the planet or the star is (type, seed,
-      // detail) and its parameters in groups, which for a planet depend on the type
-      Panel panel(title: state.mode == MODE_STAR ? "Star" : "Planet", width: 300) {
-        // The switch between the planet and the star, each with its own values
+      // The panel: the Planet / Star / Background switch, then what the planet or the star is
+      // (type, seed, detail) and its parameters in groups, which for a planet depend on the
+      // type, or the parameters of the background
+      Panel panel(
+        title: state.page == PAGE_BACKGROUND ? "Background" :
+          (state.page == PAGE_STAR ? "Star" : "Planet"),
+        width: 300
+      ) {
+        // The switch between the planet, the star, each with its own values, and the
+        // background, which keeps the body on the stage
         assets.SegmentBar view_switch {
           assets.Segment planet_side(
-            label: "Planet", action: actions.show_planet, selected: state.mode != MODE_STAR
+            label: "Planet", action: actions.show_planet, selected: state.page == PAGE_PLANET
           )
           assets.Segment star_side(
-            label: "Star", action: actions.show_star, selected: state.mode == MODE_STAR
+            label: "Star", action: actions.show_star, selected: state.page == PAGE_STAR
+          )
+          assets.Segment background_side(
+            label: "Background", action: actions.show_background,
+            selected: state.page == PAGE_BACKGROUND
           )
         }
 
-        // The pages of the two sides, of which the side shown takes the space: its type, seed
-        // and detail, its parameters and, for the planet, the light of the scene. Both pages
+        // The pages of the three sides, of which the side shown takes the space: its type, seed
+        // and detail, its parameters and, for the planet, the light of the scene. All pages
         // stay, so switching keeps their widgets as they are
         pages {
           Layout: {direction: Column}
           Item: {width: {mode: Grow}}
 
-          assets.Page star_page(shown: state.mode == MODE_STAR) {
+          assets.Page star_page(shown: state.page == PAGE_STAR) {
             assets.Field star_type(text: "Type") {
               Dropdown star_kind(
                 options: ["Red dwarf", "Yellow dwarf", "White", "Blue giant", "Red giant"],
@@ -202,7 +212,7 @@ hud {
             Separator star_bottom_rule()
           }
 
-          assets.Page planet_page(shown: state.mode != MODE_STAR) {
+          assets.Page planet_page(shown: state.page == PAGE_PLANET) {
             assets.Field type(text: "Type") {
               Dropdown kind(
                 options: ["Rock", "Desert", "Ice", "Lava", "Gas giant", "Garden"],
@@ -483,6 +493,109 @@ hud {
             Slider sun(
               label: "Sun", width: 276, min: 0, max: 360, value: state.sun_angle, unit: "°"
             )
+          }
+
+          // The background: the stars, the nebula and the orientation of the sky. Random picks
+          // other seeds for both
+          assets.Page background_page(shown: state.page == PAGE_BACKGROUND) {
+            assets.Field background_variant(text: "Seeds") {
+              Button random(label: "Random", variant: "secondary", action: actions.random_seed)
+            }
+
+            Separator background_top_rule()
+
+            ScrollView background_groups(width: 276, height: 680, frame: false, focusable: false) {
+              Collapsible stars(title: "Stars", value: true, width: 262) {
+                Slider count(
+                  label: "Count", width: 236, min: 0, max: 200000, step: 500,
+                  value: state.background.count
+                )
+                Slider brightness(
+                  label: "Brightness", width: 236, min: 0, max: 20, step: 0.1,
+                  value: state.background.brightness, decimals: 1
+                )
+                Slider falloff(
+                  label: "Falloff", width: 236, min: 0, max: 12, step: 0.1,
+                  value: state.background.falloff, decimals: 1
+                )
+                Slider size(
+                  label: "Size", width: 236, min: 0.3, max: 4, step: 0.05,
+                  value: state.background.size, decimals: 2, unit: " px"
+                )
+                Slider temperature_min(
+                  label: "Coolest", width: 236, min: 1500, max: 15000, step: 50,
+                  value: state.background.temperature_min, unit: " K"
+                )
+                Slider temperature_max(
+                  label: "Hottest", width: 236, min: 3000, max: 40000, step: 100,
+                  value: state.background.temperature_max, unit: " K"
+                )
+                Slider saturation(
+                  label: "Saturation", width: 236, min: 0, max: 1, step: 0.01,
+                  value: state.background.saturation, decimals: 2
+                )
+                Slider band(
+                  label: "Band", width: 236, min: 0, max: 1, step: 0.01,
+                  value: state.background.band, decimals: 2
+                )
+                Slider band_width(
+                  label: "Band width", width: 236, min: 0.5, max: 40, step: 0.1,
+                  value: state.background.band_width, decimals: 1, unit: "°"
+                )
+                assets.Field star_field_variant(text: "Seed") {
+                  Stepper sky_seed(min: 0, max: 999, value: state.background.star_seed, width: 104)
+                }
+              }
+
+              Collapsible nebula(title: "Nebula", value: true, width: 262) {
+                Slider intensity(
+                  label: "Intensity", width: 236, min: 0, max: 3, step: 0.01,
+                  value: state.background.intensity, decimals: 2
+                )
+                Slider frequency(
+                  label: "Frequency", width: 236, min: 0.3, max: 5, step: 0.05,
+                  value: state.background.frequency, decimals: 2
+                )
+                Slider warp(
+                  label: "Warp", width: 236, min: 0, max: 2, step: 0.01,
+                  value: state.background.warp, decimals: 2
+                )
+                Slider cover(
+                  label: "Cover", width: 236, min: 0, max: 1, step: 0.01,
+                  value: state.background.cover, decimals: 2
+                )
+                assets.ColorField color_a(
+                  text: "Thin gas", red: state.background.color_a.r,
+                  green: state.background.color_a.g, blue: state.background.color_a.b
+                )
+                assets.ColorField color_b(
+                  text: "Gas", red: state.background.color_b.r,
+                  green: state.background.color_b.g, blue: state.background.color_b.b
+                )
+                assets.ColorField color_c(
+                  text: "Dense gas", red: state.background.color_c.r,
+                  green: state.background.color_c.g, blue: state.background.color_c.b
+                )
+                assets.Field nebula_variant(text: "Seed") {
+                  Stepper nebula_seed(
+                    min: 0, max: 999, value: state.background.nebula_seed, width: 104
+                  )
+                }
+              }
+
+              Collapsible orientation(title: "Orientation", width: 262) {
+                Slider yaw(
+                  label: "Yaw", width: 236, min: -180, max: 180, step: 0.5,
+                  value: state.background.yaw, decimals: 1, unit: "°"
+                )
+                Slider tilt(
+                  label: "Tilt", width: 236, min: -90, max: 90, step: 0.5,
+                  value: state.background.tilt, decimals: 1, unit: "°"
+                )
+              }
+            }
+
+            Separator background_bottom_rule()
           }
         }
 

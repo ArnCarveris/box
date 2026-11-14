@@ -25,6 +25,9 @@
 /** A rocky world and a gas giant whose maps are graphs on the sphere domain, as templates */
 #define GRAPH_PLANET "test/assets/textures/graph/planet.flecs"
 
+/** The nebula of the background of the planet scene, a static graph on the sphere domain */
+#define GRAPH_NEBULA "test/assets/textures/graph/nebula.flecs"
+
 /** Node literals that leave members out */
 #define GRAPH_DEFAULTS "test/assets/textures/graph/defaults.flecs"
 
@@ -2830,6 +2833,87 @@ void TextureGraph_planet_props_keep_structure(void) {
 
     test_assert(ecs_is_alive(world, relief));
     test_assert(ecs_lookup(world, "earth.relief") == relief);
+
+    ecs_fini(world);
+}
+
+/** Load the nebula template, declare a Nebula and run frames until its graph is built.
+ *
+ * @param world The world
+ */
+static void nebula_load(
+    ecs_world_t *world)
+{
+    run_file(world, GRAPH_NEBULA);
+    test_int(ecs_script_run(world, "nebula",
+        "nebula_graph.Nebula sky(seed: 5, size: 64)\n", NULL), 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+}
+
+void TextureGraph_nebula_script(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    nebula_load(world);
+    const box_texture_graph_t *g = graph_of(world, planet_map(world, "sky.neb"));
+    test_int(g->domain, DomainSphere);
+    test_int(g->format, GraphHdr);
+    test_int(g->width, 64);
+    test_int(g->height, 32);
+    test_assert(g->rate == 0);
+    test_assert(planet_node(world, g, ecs_id(TexTime)) < 0);
+    test_assert(planet_node(world, g, ecs_id(TexWarp)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexRamp)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexSmoothstep)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexCoords)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexSplit)) >= 0);
+    test_int(g->nodes[g->node_count - 1].kind, kind_id(world, ecs_id(TexAdd)));
+
+    ecs_fini(world);
+}
+
+void TextureGraph_nebula_props_keep_structure(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    nebula_load(world);
+    const box_texture_graph_t *g = graph_of(world, planet_map(world, "sky.neb"));
+    uint64_t structure = g->structure_hash, params = g->param_hash;
+    ecs_entity_t gas = ecs_lookup(world, "sky.neb.n_gas");
+    test_assert(gas != 0);
+
+    ecs_entity_t sky = ecs_lookup(world, "sky");
+    ecs_entity_t tmpl = ecs_lookup(world, "nebula_graph.Nebula");
+    test_assert(sky != 0 && tmpl != 0);
+    const ecs_type_info_t *ti = ecs_get_type_info(world, tmpl);
+    test_assert(ti != NULL);
+    void *ptr = ecs_os_malloc(ti->size);
+    ecs_os_memcpy(ptr, ecs_get_id(world, sky, tmpl), ti->size);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, tmpl, ptr);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "seed"), 0);
+    test_int(ecs_meta_set_int(&cur, 12), 0);
+    test_int(ecs_meta_member(&cur, "frequency"), 0);
+    test_int(ecs_meta_set_float(&cur, 2.2), 0);
+    test_int(ecs_meta_member(&cur, "warp"), 0);
+    test_int(ecs_meta_set_float(&cur, 1.1), 0);
+    test_int(ecs_meta_member(&cur, "cover"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.8), 0);
+    test_int(ecs_meta_member(&cur, "band"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.1), 0);
+    test_int(ecs_meta_member(&cur, "band_width"), 0);
+    test_int(ecs_meta_set_float(&cur, 20), 0);
+    ecs_set_id(world, sky, tmpl, ti->size, ptr);
+    ecs_os_free(ptr);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    g = graph_of(world, planet_map(world, "sky.neb"));
+    test_assert(g->structure_hash == structure);
+    test_assert(g->param_hash != params);
+    test_assert(ecs_is_alive(world, gas));
+    test_assert(ecs_lookup(world, "sky.neb.n_gas") == gas);
 
     ecs_fini(world);
 }

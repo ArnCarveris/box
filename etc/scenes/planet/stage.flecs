@@ -6,28 +6,151 @@ using box.material
 using box.texture
 using box.spatial
 using box.picking
+using box.light
 using state
 using planets
 
 assets {
-  sky_tex { Path: {path: "etc/scenes/planet/assets/sky.jpg"} }
+  // The background of the scene, of the parameters of a BackgroundParams: the stars of a
+  // StarField and a nebula, the emission of a shell around the scene seen from the inside.
+  //
+  // The nebula (neb) is a static texture graph on the sphere domain, of the low frequencies an
+  // image of 2048 by 1024 texels shows at the narrow field of view of the camera: fbm gas at
+  // warped coordinates colored by a ramp of its value, masked by a noise of a larger scale into
+  // clouds (cover the fraction of the sky they fill) and cut by dark lanes, plus a faint
+  // unresolved band along the plane of the stars' band, broken up by the same gas and lanes.
+  // The parameters and the seed change the values of the nodes only, so no parameter compiles
+  // the graph again.
+  //
+  // The shell is a black mirror, so it reflects nothing: seen from its centre a smooth metal of
+  // black albedo only reflects the sun where the sun is behind the camera, where the Fresnel
+  // of a black metal is 0, while a rough one shows a wide glare around the sun. It is Additive,
+  // so the stars, drawn where no geometry is, show through its emission. Its v runs from the
+  // south pole to the north pole and its u once around the vertical, as the rows and columns of
+  // the sphere domain do turned over, so the image meets itself at the seam and its first and
+  // last rows are the poles. The graph's equator is the local XZ plane of the shell, the band
+  // plane of the StarField.
+  template SkyBackground {
+    prop params: BackgroundParams = background_preset()
+
+    const f: f32 = max(params.frequency, 0.05)
+    const ns: i32 = seed_of(params.nebula_seed)
+    const th: f32 = 0.66 - clamp(params.cover, 0, 1) * 0.32
+    const bw: f32 = sin(clamp(params.band_width, 0.5, 60) * 2.2 * PI / 180)
+    const bk: f32 = clamp(params.band, 0, 1) * 0.16
+    const ca: Col = params.color_a
+    const cb: Col = params.color_b
+    const cc: Col = params.color_c
+    const n: i32 = max(params.count, 0)
+    const ss: i32 = seed_of(params.star_seed)
+
+    Position: {0, 0, 0}
+    Rotation: {0, params.yaw * PI / 180, params.tilt * PI / 180}
+
+    neb {
+      // Gas: fbm at coordinates warped by a vector noise
+      n_wn { nodes.Noise: {channels: 3, frequency: f * 0.7, octaves: 3, seed: ns * 16 + 1} }
+      n_wp { nodes.Warp: {offset: n_wn, amount_value: params.warp} }
+      n_gas {
+        nodes.Noise: {coords: n_wp, frequency: f, octaves: 6, gain: 0.58, seed: ns * 16 + 2}
+      }
+      n_body {
+        nodes.Smoothstep: {input: n_gas, edge0_value: {0.36, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}}
+      }
+
+      // Clouds: where a noise of a larger scale is over the threshold of the cover
+      n_big { nodes.Noise: {frequency: f * 0.45, octaves: 3, seed: ns * 16 + 3} }
+      n_cloud {
+        nodes.Smoothstep: {
+          input: n_big, edge0_value: {th - 0.1, 0, 0, 0}, edge1_value: {th + 0.14, 0, 0, 0}
+        }
+      }
+
+      // Dark lanes: where a finer noise at the same warped coordinates is low
+      n_lane {
+        nodes.Noise: {coords: n_wp, frequency: f * 2.6, octaves: 4, gain: 0.6, seed: ns * 16 + 4}
+      }
+      n_lit {
+        nodes.Smoothstep: {input: n_lane, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+      }
+      n_dk {
+        nodes.Remap: {input: n_lit, from_min: 0, from_max: 1, to_min: 0.06, to_max: 1}
+      }
+
+      // Density and color: the ramp from the thin gas to the dense gas
+      n_d0 { nodes.Multiply: {a: n_body, b: n_cloud} }
+      n_d { nodes.Multiply: {a: n_d0, b: n_dk} }
+      n_tone {
+        nodes.Remap: {
+          input: n_gas, from_min: 0.32, from_max: 0.78, to_min: 0, to_max: 1, clamp: true
+        }
+      }
+      n_col {
+        nodes.Ramp: {input: n_tone, keys: [
+          {0, {ca.r, ca.g, ca.b}}
+          {0.55, {cb.r, cb.g, cb.b}}
+          {1, {cc.r, cc.g, cc.b}}
+        ]}
+      }
+      n_neb { nodes.Multiply: {a: n_col, b: n_d} }
+
+      // The band: unresolved stars within about the band width of the plane, patchy with the
+      // gas and cut by the lanes
+      n_uv { nodes.Coords: {} }
+      n_y { nodes.Split: {input: n_uv, channel: ChannelG} }
+      n_ay { nodes.Abs: {input: n_y} }
+      n_bm {
+        nodes.Smoothstep: {input: n_ay, edge0_value: {bw, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+      }
+      n_bn { nodes.Noise: {coords: n_wp, frequency: f * 1.2, octaves: 4, seed: ns * 16 + 5} }
+      n_bv {
+        nodes.Remap: {
+          input: n_bn, from_min: 0.36, from_max: 0.66, to_min: 0, to_max: 1.4, clamp: true
+        }
+      }
+      n_b0 { nodes.Multiply: {a: n_bm, b: n_bv} }
+      n_b1 { nodes.Multiply: {a: n_b0, b: n_dk} }
+      n_band { nodes.Multiply: {a: n_b1, b_value: {bk, bk * 0.86, bk * 0.7, 1}} }
+
+      n_out { nodes.Add: {a: n_neb, b: n_band} }
+      Graph: {
+        output: n_out, width: 2048, height: 1024, domain: DomainSphere, format: GraphHdr
+      }
+    }
+
+    const ready: bool = neb[box.texture.Status].revision > 0
+
+    shell {
+      Position: {0, 0, 0}
+      EllipsoidShell: {
+        radius: {6000, 6000, 6000}, longitude_start: 0, longitude_end: 2 * PI,
+        latitude_start: 0 - PI / 2, latitude_end: PI / 2, thickness: 1, segments: 96, rings: 48
+      }
+      Rgb: {0, 0, 0}
+      PbrMaterial: {metallic: 1, roughness: 0}
+      Emissive: {strength: ready ? max(params.intensity, 0) : 0, color: {255, 255, 255}}
+      if ready {
+        PbrTextures: {emissive: neb}
+      }
+      BlendMode: Additive
+      NoShadow
+      Ignore
+    }
+
+    stars {
+      Position: {0, 0, 0}
+      StarField: {
+        count: n, seed: ss, brightness: params.brightness, falloff: params.falloff,
+        size: params.size, temperature_min: params.temperature_min,
+        temperature_max: max(params.temperature_max, params.temperature_min),
+        saturation: params.saturation, band: params.band, band_width: params.band_width
+      }
+    }
+  }
 }
 
 stage {
-  sky {
-    Position: {0, 0, 0}
-    Rotation: {0.4, 1.2, 0.3}
-    EllipsoidShell: {
-      radius: {6000, 6000, 6000}, longitude_start: 0, longitude_end: 2 * PI,
-      latitude_start: 0 - PI / 2, latitude_end: PI / 2, thickness: 1, segments: 64, rings: 32
-    }
-    Rgb: {0, 0, 0}
-    PbrMaterial: {metallic: 1, roughness: 0.03}
-    Emissive: {strength: 0.45, color: {235, 240, 255}}
-    PbrTextures: {emissive: assets.sky_tex}
-    NoShadow
-    Ignore
-  }
+  assets.SkyBackground sky(params: background)
 
   orbit {
     Position: {0, 0, 0}

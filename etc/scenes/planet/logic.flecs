@@ -98,6 +98,47 @@ state {
     {channel == "r" ? v : c.r, channel == "g" ? v : c.g, channel == "b" ? v : c.b}
   }
 
+  fn background_reset() {
+    state.background = background_preset()
+  }
+
+  // Whether g is a group of the background page
+  fn is_background(g: string) -> bool { g == "stars" || g == "nebula" || g == "orientation" }
+
+  // Set the parameter of the slider n in the group g of the background page to v
+  fn edit_background(g: string, n: string, v: f32) {
+    if g == "stars" {
+      if n == "count" { state.background.count = v }
+      else if n == "brightness" { state.background.brightness = v }
+      else if n == "falloff" { state.background.falloff = v }
+      else if n == "size" { state.background.size = v }
+      else if n == "temperature_min" { state.background.temperature_min = v }
+      else if n == "temperature_max" { state.background.temperature_max = v }
+      else if n == "saturation" { state.background.saturation = v }
+      else if n == "band" { state.background.band = v }
+      else if n == "band_width" { state.background.band_width = v }
+    } else if g == "nebula" {
+      if n == "intensity" { state.background.intensity = v }
+      else if n == "frequency" { state.background.frequency = v }
+      else if n == "warp" { state.background.warp = v }
+      else if n == "cover" { state.background.cover = v }
+    } else if g == "orientation" {
+      if n == "yaw" { state.background.yaw = v }
+      else if n == "tilt" { state.background.tilt = v }
+    }
+  }
+
+  // Set channel c of the color n of the nebula to v
+  fn edit_nebula_color(n: string, c: string, v: f32) {
+    if n == "color_a" {
+      state.background.color_a = with_channel(state.background.color_a, c, v)
+    } else if n == "color_b" {
+      state.background.color_b = with_channel(state.background.color_b, c, v)
+    } else if n == "color_c" {
+      state.background.color_c = with_channel(state.background.color_c, c, v)
+    }
+  }
+
   // Set the parameter of the slider n in the group of the panel g to v
   fn edit(g: string, n: string, v: f32) {
     if g == "planet_page" {
@@ -190,7 +231,8 @@ state {
 
 // A change of a widget of the panel sets the value it stands for: a new type loads its preset,
 // the other widgets set their parameter, found by the names of the widget and of its group. Only
-// the widget that changed is read, so the other parameters keep their exact values
+// the widget that changed is read, so the other parameters keep their exact values. The star and
+// the background show their values as they change, the planet once its graphs are evaluated
 async {
   while true {
     const e = await on.change(hud.screen.side.panel)
@@ -207,6 +249,10 @@ async {
     } else if w.has(Stepper) {
       if w.name() == "star_seed" {
         state.star_seed = w[Stepper.mut].current
+      } else if w.name() == "sky_seed" {
+        state.background.star_seed = w[Stepper.mut].current
+      } else if w.name() == "nebula_seed" {
+        state.background.nebula_seed = w[Stepper.mut].current
       } else if w.name() == "star_detail" {
         state.star_detail = w[Stepper.mut].current
       } else {
@@ -227,11 +273,16 @@ async {
         edit_star(w.name(), v)
       } else if p.name() == "channels" {
         const field = p.parent()
-        edit_color(field.parent().name(), field.name(), w.name(), v)
+        if field.parent().name() == "nebula" {
+          edit_nebula_color(field.name(), w.name(), v)
+        } else {
+          edit_color(field.parent().name(), field.name(), w.name(), v)
+          state.edits += 1
+        }
+      } else if is_background(p.name()) {
+        edit_background(p.name(), w.name(), v)
       } else {
         edit(p.name(), w.name(), v)
-      }
-      if p.name() != "star" {
         state.edits += 1
       }
     }
@@ -241,7 +292,10 @@ async {
 async {
   while true {
     await on.pressed(state.actions.random_seed)
-    if state.mode == MODE_STAR {
+    if state.page == PAGE_BACKGROUND {
+      state.background.star_seed = (state.background.star_seed * 621 + 271) % 1000
+      state.background.nebula_seed = (state.background.nebula_seed * 621 + 271) % 1000
+    } else if state.mode == MODE_STAR {
       state.star_seed = (state.star_seed * 621 + 271) % 1000
     } else {
       state.seed = (state.seed * 621 + 271) % 1000
@@ -253,7 +307,9 @@ async {
 async {
   while true {
     await on.pressed(state.actions.reset)
-    if state.mode == MODE_STAR {
+    if state.page == PAGE_BACKGROUND {
+      background_reset()
+    } else if state.mode == MODE_STAR {
       star_reset()
     } else {
       reset()
@@ -261,11 +317,13 @@ async {
   }
 }
 
-// The Planet / Star switch: each side keeps its values in the state, so switching back shows
-// the planet or the star as it was
+// The Planet / Star / Background switch: each side keeps its values in the state, so switching
+// back shows the planet or the star as it was. The background page only changes the page, so the
+// stage keeps the body it shows
 async {
   while true {
     await on.pressed(state.actions.show_planet)
+    state.page = PAGE_PLANET
     state.mode = MODE_PLANET
     state.zoom = 1
   }
@@ -274,8 +332,16 @@ async {
 async {
   while true {
     await on.pressed(state.actions.show_star)
+    state.page = PAGE_STAR
     state.mode = MODE_STAR
     state.zoom = 1
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.show_background)
+    state.page = PAGE_BACKGROUND
   }
 }
 

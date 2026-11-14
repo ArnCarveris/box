@@ -1,0 +1,88 @@
+// A nebula of a texture graph on the sphere domain, as a template, as the background of the
+// planet scene builds it: fbm gas at warped coordinates colored by a ramp, masked by a noise of a
+// larger scale into clouds and cut by dark lanes, plus a faint band along the equator. It is
+// static, and its parameters change the values of its nodes only.
+//
+// cover is the fraction of the sky the clouds fill, band the brightness of the band and
+// band_width its width in degrees, size the width of the image.
+
+using flecs.script
+using flecs.script.math
+using box.texture
+
+nebula_graph {
+  template Nebula {
+    prop seed: i32 = 5
+    prop frequency: f32 = 2
+    prop warp: f32 = 0.7
+    prop cover: f32 = 0.45
+    prop band: f32 = 0.5
+    prop band_width: f32 = 6
+    prop size: i32 = 2048
+
+    const f: f32 = max(frequency, 0.05)
+    const th: f32 = 0.66 - clamp(cover, 0, 1) * 0.32
+    const bw: f32 = sin(clamp(band_width, 0.5, 60) * 2.2 * PI / 180)
+    const bk: f32 = clamp(band, 0, 1) * 0.16
+
+    neb {
+      n_wn { nodes.Noise: {channels: 3, frequency: f * 0.7, octaves: 3, seed: seed * 16 + 1} }
+      n_wp { nodes.Warp: {offset: n_wn, amount_value: warp} }
+      n_gas {
+        nodes.Noise: {coords: n_wp, frequency: f, octaves: 6, gain: 0.58, seed: seed * 16 + 2}
+      }
+      n_body {
+        nodes.Smoothstep: {input: n_gas, edge0_value: {0.36, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}}
+      }
+      n_big { nodes.Noise: {frequency: f * 0.45, octaves: 3, seed: seed * 16 + 3} }
+      n_cloud {
+        nodes.Smoothstep: {
+          input: n_big, edge0_value: {th - 0.1, 0, 0, 0}, edge1_value: {th + 0.14, 0, 0, 0}
+        }
+      }
+      n_lane {
+        nodes.Noise: {coords: n_wp, frequency: f * 2.6, octaves: 4, gain: 0.6, seed: seed * 16 + 4}
+      }
+      n_lit {
+        nodes.Smoothstep: {input: n_lane, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
+      }
+      n_dk {
+        nodes.Remap: {input: n_lit, from_min: 0, from_max: 1, to_min: 0.06, to_max: 1}
+      }
+      n_d0 { nodes.Multiply: {a: n_body, b: n_cloud} }
+      n_d { nodes.Multiply: {a: n_d0, b: n_dk} }
+      n_tone {
+        nodes.Remap: {
+          input: n_gas, from_min: 0.32, from_max: 0.78, to_min: 0, to_max: 1, clamp: true
+        }
+      }
+      n_col {
+        nodes.Ramp: {input: n_tone, keys: [
+          {0, {26, 44, 110}}
+          {0.55, {98, 50, 132}}
+          {1, {206, 112, 118}}
+        ]}
+      }
+      n_neb { nodes.Multiply: {a: n_col, b: n_d} }
+      n_uv { nodes.Coords: {} }
+      n_y { nodes.Split: {input: n_uv, channel: ChannelG} }
+      n_ay { nodes.Abs: {input: n_y} }
+      n_bm {
+        nodes.Smoothstep: {input: n_ay, edge0_value: {bw, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+      }
+      n_bn { nodes.Noise: {coords: n_wp, frequency: f * 1.2, octaves: 4, seed: seed * 16 + 5} }
+      n_bv {
+        nodes.Remap: {
+          input: n_bn, from_min: 0.36, from_max: 0.66, to_min: 0, to_max: 1.4, clamp: true
+        }
+      }
+      n_b0 { nodes.Multiply: {a: n_bm, b: n_bv} }
+      n_b1 { nodes.Multiply: {a: n_b0, b: n_dk} }
+      n_band { nodes.Multiply: {a: n_b1, b_value: {bk, bk * 0.86, bk * 0.7, 1}} }
+      n_out { nodes.Add: {a: n_neb, b: n_band} }
+      Graph: {
+        output: n_out, width: size, height: size / 2, domain: DomainSphere, format: GraphHdr
+      }
+    }
+  }
+}
