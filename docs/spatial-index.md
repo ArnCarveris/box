@@ -5,9 +5,15 @@ shapeless UI elements with `WorldTransform`. Picking, move controllers, design
 mode and light-bake change regions query it. Without Position, Rotation or Scale,
 an entity has no world transform and cannot be drawn or picked.
 
-Static shapes update when changed. `DynamicTransform` shapes refit every frame
-the index is queried, regardless of whether a query can use them. Picking queries
-every frame while a cursor is known.
+Static shapes update when changed. Shapes with `DynamicTransform` are indexed
+under their mover, the nearest entity that owns the tag, as one leaf with the
+bounds of all shapes under it. A mover places its leaf again in every frame it
+moves and the index is queried. A `Position`, `Rotation` or `Scale` set under a
+mover bounds its shapes again; a write that does not notify (`ecs_get_mut`
+without `ecs_modified`) is not seen, so give an entity that moves that way its own
+`DynamicTransform`. An `Animator` does this for the entities it moves. Queries
+answer with the mover; picking and move controllers test the shapes under it one
+by one. Picking queries every frame while a cursor is known.
 
 ## Ignore
 

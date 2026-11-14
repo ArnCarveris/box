@@ -339,6 +339,43 @@ void Animator_position_moves(void) {
     ecs_fini(world);
 }
 
+void Animator_transform_track_adds_dynamic(void) {
+    ecs_world_t *world = animator_world();
+    ecs_entity_t clip = animator_clip(world, "clip", 0);
+    animator_track(world, clip, "y", ecs_id(Position), "y", NULL, animator_ramp, 2);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_set(world, parent, AngularVelocity, {0, 1, 0});
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {1, 2, 3});
+    ecs_progress(world, 0);
+    test_assert(ecs_has_id(world, e, DynamicTransform));
+    test_assert(!ecs_owns_id(world, e, DynamicTransform));
+
+    animator_play(world, e, clip, AnimationLoop, 1);
+    ecs_progress(world, 0.5f);
+    ecs_progress(world, 0.5f);
+    test_assert(ecs_owns_id(world, e, DynamicTransform));
+
+    ecs_fini(world);
+}
+
+void Animator_color_track_stays_static(void) {
+    ecs_world_t *world = animator_world();
+    ecs_entity_t clip = animator_clip(world, "clip", 0);
+    CurveKey red[] = {{0, 0}, {1, 200}};
+    animator_track(world, clip, "r", ecs_id(Rgb), "r", NULL, red, 2);
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    animator_play(world, e, clip, AnimationLoop, 1);
+    ecs_progress(world, 0.5f);
+    ecs_progress(world, 0.5f);
+    test_assert(!ecs_has_id(world, e, DynamicTransform));
+
+    ecs_fini(world);
+}
+
 void Animator_rgb_changes(void) {
     ecs_world_t *world = animator_world();
     ecs_entity_t clip = animator_clip(world, "clip", 0);

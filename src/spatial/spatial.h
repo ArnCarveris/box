@@ -5,6 +5,10 @@
  * Every query is scoped to one scene (0 for the default scene) and answers with the world
  * bounds of shapes: the unit mesh bounds scaled by the shape and placed by WorldTransform.
  *
+ * A shape with DynamicTransform is answered for by its mover, the nearest of itself and its
+ * ancestors that owns the tag, with the bounds of all the shapes under the mover. A ray cast
+ * that asks for shapes and box_spatial_expand_box test those shapes one by one instead.
+ *
  * UI elements without a shape (LayoutBounds, else TextBounds, flat in the XY plane of their
  * WorldTransform) are indexed too, and only ray casts that ask for them see them. An entity
  * without a WorldTransform is not indexed.
@@ -58,15 +62,19 @@ typedef struct box_spatial_ray_t {
     box_spatial_filter_t filter; /**< Narrow phase, NULL to accept every hit of the bounds */
     void *ctx;                   /**< Context passed to filter */
     bool ui;                     /**< Also hit UI elements without a shape, false for shapes only */
+    bool shapes;                 /**< Hit the shapes under a mover one by one, false to hit the
+                                  *   mover */
 } box_spatial_ray_t;
 
 /** Counters of the spatial index of a world */
 typedef struct box_spatial_stats_t {
     int32_t scenes;   /**< Scenes with indexed entities */
-    int32_t entities; /**< Indexed entities */
+    int32_t entities; /**< Indexed entities, the shapes under movers included */
+    int32_t movers;   /**< Movers, each one leaf of the dynamic tree over the shapes under it */
     int32_t updated;  /**< Entities the last update placed again */
-    int32_t rebound;  /**< Dynamic entities whose transform changed since the last update */
-    int32_t moved;    /**< Dynamic entities the last update moved in their tree */
+    int32_t rebound;  /**< Movers and dynamic UI elements whose transform changed since the
+                       *   last update */
+    int32_t moved;    /**< Dynamic leaves the last update moved in their tree */
 } box_spatial_stats_t;
 
 /** Counters of the spatial layout of a world */
@@ -116,6 +124,23 @@ int32_t box_spatial_overlap_box(
     const vec3 max,
     ecs_vec_t *result);
 
+/** Append the shapes an entity of a query result stands for whose bounds overlap a box: the
+ * shapes under a mover, else the entity itself when its bounds overlap the box.
+ *
+ * @param world The world
+ * @param e An entity of a query result
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param result Vector of ecs_entity_t the shapes are appended to
+ * @return Number of shapes appended
+ */
+int32_t box_spatial_expand_box(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const vec3 min,
+    const vec3 max,
+    ecs_vec_t *result);
+
 /** Find the entities whose bounds overlap a sphere.
  *
  * @param world The world
@@ -132,7 +157,8 @@ int32_t box_spatial_overlap_sphere(
     float radius,
     ecs_vec_t *result);
 
-/** Get the bounds the index holds for an entity.
+/** Get the bounds the index holds for an entity: for a shape under a mover its bounds from its
+ * world transform, for a mover without a shape the bounds of the shapes under it.
  *
  * @param world The world
  * @param e The entity

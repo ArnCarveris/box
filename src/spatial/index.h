@@ -4,10 +4,11 @@
  *
  * A static tree with exact leaves and a dynamic tree with fat leaves per scene. A fat leaf
  * reaches ahead along the last displacement, so a mover moves in its tree once it leaves it.
- * A query computes bounds only for dynamic shapes whose transform differs from SpatialPose.
+ * The dynamic tree holds one leaf per mover, an entity that owns DynamicTransform, over the
+ * bounds of the shapes under it in its frame, so a mover places one leaf however many it holds.
  *
  * Items hold the bounds of the last update; moved static leaves catch up on the next query.
- * Entities under SpatialIgnore have no item and no SpatialPose, so they cost no update.
+ * Entities under SpatialIgnore have no item, so they cost no update.
  */
 
 #ifndef BOX_SPATIAL_INDEX_H
@@ -20,6 +21,8 @@
 typedef struct SpatialProxy {
     ecs_entity_t scene; /**< Scene the entity is indexed in */
     int32_t item;       /**< Item of the entity in its scene, -1 when it is not indexed */
+    int32_t mover;      /**< Mover the shape is indexed under, -1 when it is not */
+    int32_t member;     /**< Slot of the shape in its mover */
     bool dirty;         /**< The entity is in the list of changed entities */
     bool rescope;       /**< The scene of the entity may have changed */
 } SpatialProxy;
@@ -27,8 +30,8 @@ typedef struct SpatialProxy {
 /** Component id of SpatialProxy */
 extern ECS_COMPONENT_DECLARE(SpatialProxy);
 
-/** World transform the bounds of an indexed dynamic shape were computed from, all zero (which
- * no world transform is) until the first update places the shape */
+/** World transform the bounds of an indexed dynamic UI element were computed from, all zero
+ * (which no world transform is) until the first update places the element */
 typedef struct SpatialPose {
     mat4 m; /**< The matrix */
 } SpatialPose;
@@ -47,7 +50,35 @@ typedef struct box_spatial_item_t {
     bool moved;          /**< The static leaf of the item waits for the bounds of the item */
     bool stretched;      /**< The dynamic leaf of the item reaches ahead of its margin */
     bool disabled;       /**< The entity is disabled, queries skip the item */
+    int32_t mover;       /**< Mover the item is the leaf of, -1 for the item of an entity */
 } box_spatial_item_t;
+
+/** A shape under a mover */
+typedef struct box_spatial_member_t {
+    ecs_entity_t entity; /**< The shape, 0 when it left the mover */
+    vec3 shape_min;      /**< Minimum corner of the local bounds of the shape */
+    vec3 shape_max;      /**< Maximum corner of the local bounds of the shape */
+    vec3 min;            /**< Minimum corner of the bounds in the frame of the mover */
+    vec3 max;            /**< Maximum corner of the bounds in the frame of the mover */
+    bool disabled;       /**< The shape is disabled, queries skip it */
+} box_spatial_member_t;
+
+/** An entity that owns DynamicTransform, one leaf of the dynamic tree over the shapes under it
+ * that are not under another mover */
+typedef struct box_spatial_mover_t {
+    ecs_entity_t entity; /**< The mover, 0 when the slot is free */
+    ecs_entity_t frame;  /**< The mover or its nearest ancestor with a Position, 0 for none */
+    ecs_ref_t pose_ref;  /**< WorldTransform of frame */
+    ecs_entity_t scene;  /**< Scene of the leaf */
+    int32_t item;        /**< Item of the leaf in its scene, -1 when it has none */
+    ecs_vec_t members;   /**< box_spatial_member_t, the shapes under the mover */
+    int32_t live;        /**< Members that did not leave */
+    vec3 min;            /**< Minimum corner of the bounds of the members in the frame */
+    vec3 max;            /**< Maximum corner of the bounds of the members in the frame */
+    mat4 pose;           /**< World transform of frame the leaf was placed with */
+    bool dirty;          /**< The members or their place in the frame changed */
+    int32_t next;        /**< Next free slot when the slot is free */
+} box_spatial_mover_t;
 
 /** The index of one scene */
 typedef struct box_spatial_scene_t {
@@ -70,7 +101,11 @@ typedef struct box_spatial_t {
     ecs_vec_t walk;            /**< ecs_entity_t, stack of a subtree walk */
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */
     ecs_vec_t empty;           /**< ecs_entity_t, scenes that lost their last entity */
-    ecs_query_t *dynamic;      /**< Shapes with SpatialPose */
+    ecs_query_t *dynamic;      /**< UI elements with SpatialPose */
+    ecs_vec_t movers;          /**< box_spatial_mover_t by slot */
+    ecs_map_t mover_of;        /**< Mover entity to its slot */
+    ecs_vec_t changed;         /**< int32_t, movers whose members changed */
+    int32_t free_mover;        /**< First free mover slot, -1 when there is none */
     box_spatial_stats_t stats; /**< Counters of the last update */
     uint32_t frame;            /**< Updates so far, which tell the frames between bounds */
     bool stale;                /**< Leaves may lag behind the entities since the last update */
@@ -227,5 +262,147 @@ int32_t box_spatial_settle(
 void box_spatial_scene_rebuild(
     box_spatial_t *index,
     box_spatial_scene_t *s);
+
+/** Find the mover an entity moves with: the nearest of the entity and its ancestors that owns
+ * DynamicTransform, or that has it without inheriting it from DynamicTransformSpread.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The mover, 0 when the entity does not move with one
+ */
+ecs_entity_t box_spatial_mover_of(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get a mover of the index.
+ *
+ * @param index The index
+ * @param mover The slot of the mover
+ * @return The mover
+ */
+box_spatial_mover_t* box_spatial_mover(
+    const box_spatial_t *index,
+    int32_t mover);
+
+/** Get the slot of a mover.
+ *
+ * @param index The index
+ * @param e The mover entity
+ * @return The slot, -1 when the entity is not an indexed mover
+ */
+int32_t box_spatial_mover_slot(
+    const box_spatial_t *index,
+    ecs_entity_t e);
+
+/** Set up the movers of an index.
+ *
+ * @param index The index
+ */
+void box_spatial_movers_init(
+    box_spatial_t *index);
+
+/** Free the movers of an index.
+ *
+ * @param index The index
+ */
+void box_spatial_movers_fini(
+    box_spatial_t *index);
+
+/** Put a shape under its mover, or give it new local bounds when it is there.
+ *
+ * @param index The index
+ * @param p The proxy of the shape
+ * @param e The shape
+ * @param mover The mover entity
+ * @param shape_min Minimum corner of the local bounds of the shape
+ * @param shape_max Maximum corner of the local bounds of the shape
+ * @param disabled The shape is disabled
+ */
+void box_spatial_mover_join(
+    box_spatial_t *index,
+    SpatialProxy *p,
+    ecs_entity_t e,
+    ecs_entity_t mover,
+    const vec3 shape_min,
+    const vec3 shape_max,
+    bool disabled);
+
+/** Take a shape out of its mover.
+ *
+ * @param index The index
+ * @param p The proxy of the shape
+ */
+void box_spatial_mover_leave(
+    box_spatial_t *index,
+    SpatialProxy *p);
+
+/** Flag a shape under a mover as disabled or enabled.
+ *
+ * @param index The index
+ * @param p The proxy of the shape
+ * @param disabled The shape is disabled
+ */
+void box_spatial_mover_disable(
+    box_spatial_t *index,
+    const SpatialProxy *p,
+    bool disabled);
+
+/** Refit the mover an entity moves with, after its place in the frame of the mover changed.
+ *
+ * @param world The world
+ * @param index The index
+ * @param e The entity
+ */
+void box_spatial_mover_touch(
+    const ecs_world_t *world,
+    box_spatial_t *index,
+    ecs_entity_t e);
+
+/** Bound the members of the changed movers again and give them their leaves.
+ *
+ * @param world The world
+ * @param index The index
+ */
+void box_spatial_movers_refit(
+    ecs_world_t *world,
+    box_spatial_t *index);
+
+/** Move the leaves of the movers whose world transform changed.
+ *
+ * @param world The world
+ * @param index The index
+ * @return Number of movers whose transform changed
+ */
+int32_t box_spatial_movers_place(
+    const ecs_world_t *world,
+    box_spatial_t *index);
+
+/** Get the world bounds of a shape under a mover, from its world transform.
+ *
+ * @param world The world
+ * @param m The shape
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ */
+void box_spatial_member_bounds(
+    const ecs_world_t *world,
+    const box_spatial_member_t *m,
+    vec3 min,
+    vec3 max);
+
+/** Compute the world bounds of local bounds placed by a matrix.
+ *
+ * @param l_min Minimum corner of the local bounds
+ * @param l_max Maximum corner of the local bounds
+ * @param m The 16 floats of the matrix, column by column
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ */
+void box_spatial_bounds_of(
+    const vec3 l_min,
+    const vec3 l_max,
+    const float *m,
+    vec3 min,
+    vec3 max);
 
 #endif

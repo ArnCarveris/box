@@ -383,6 +383,29 @@ static void box_animator_write(
     }
 }
 
+/** Give the entities the tracks of an animator move their own DynamicTransform, so each one
+ * is a mover of the spatial index and its transform is computed every frame.
+ *
+ * @param world The world
+ * @param stage The stage the system writes through
+ * @param s The state of the animator
+ */
+static void box_animator_dynamic(
+    const ecs_world_t *world,
+    ecs_world_t *stage,
+    const AnimatorState *s)
+{
+    const animator_binding_t *b = ecs_vec_first_t(&s->bindings, animator_binding_t);
+    int32_t i, count = ecs_vec_count(&s->bindings);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t c = b[i].state.component;
+        bool transform = c == ecs_id(Position) || c == ecs_id(Rotation) || c == ecs_id(Scale);
+        if (transform && !ecs_owns_id(world, b[i].target, DynamicTransform)) {
+            ecs_add_id(stage, b[i].target, DynamicTransform);
+        }
+    }
+}
+
 /** Play one frame of an animator.
  *
  * @param world The world
@@ -408,6 +431,7 @@ static void box_animator_play(
         bool changed = false;
         if (rebuild) {
             changed = box_animator_build(world, e, a, s, version);
+            box_animator_dynamic(world, stage, s);
         }
 
         float time = a->time;

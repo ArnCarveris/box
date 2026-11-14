@@ -183,11 +183,18 @@ static bool box_move_gather(
     const vec3 max,
     int32_t crowd)
 {
-    ecs_vec_t found;
+    ecs_vec_t hits, found;
     int32_t i, j, k, count;
     bool result = false;
+    ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &found, ecs_entity_t, 0);
-    count = box_spatial_overlap_box(m->world, m->body->scene, min, max, &found);
+    count = box_spatial_overlap_box(m->world, m->body->scene, min, max, &hits);
+    for (i = 0; i < count; i ++) {
+        box_spatial_expand_box(m->world, *ecs_vec_get_t(&hits, ecs_entity_t, i), min, max,
+            &found);
+    }
+
+    count = ecs_vec_count(&found);
     if (count > crowd) {
         goto done;
     }
@@ -226,6 +233,7 @@ static bool box_move_gather(
     result = true;
 
 done:
+    ecs_vec_fini_t(NULL, &hits, ecs_entity_t);
     ecs_vec_fini_t(NULL, &found, ecs_entity_t);
 
     return result;
@@ -910,7 +918,8 @@ bool box_controller_ground_below(
         .origin = { ctx.origin[0], ctx.origin[1], ctx.origin[2] },
         .dir = { 0, -1, 0 },
         .filter = box_move_ground_filter,
-        .ctx = &ctx
+        .ctx = &ctx,
+        .shapes = true
     };
 
     return body->radius > 0 && box_spatial_ray(world, &ray, &hit);

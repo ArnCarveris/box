@@ -50,6 +50,7 @@ ECS_ENUM(AnimationMode, {
  *
  * Constructed with speed 1 and AnimationLoop. Each instance of a prefab owns its copy, so it
  * keeps its own time. One clip per entity: to play two, give each its own child with Animator.
+ * An entity a track writes Position, Rotation or Scale of gets its own DynamicTransform.
  */
 ECS_STRUCT(Animator, {
     ecs_entity_t clip;  /**< Entity with AnimationClip */

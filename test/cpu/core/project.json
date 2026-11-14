@@ -626,6 +626,8 @@
                 "testcases": [
                     "defaults",
                     "position_moves",
+                    "transform_track_adds_dynamic",
+                    "color_track_stays_static",
                     "rgb_changes",
                     "member_only_keeps_other_members",
                     "light_intensity",

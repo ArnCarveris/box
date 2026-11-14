@@ -36,6 +36,37 @@ void Collision_wall_stops(void) {
     ecs_fini(world);
 }
 
+void Collision_wall_under_mover_stops(void) {
+    // controllers/collision
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t ship = ecs_new(world);
+    ecs_set(world, ship, Position, { 0, 0, 0 });
+    ecs_add(world, ship, DynamicTransform);
+    ecs_entity_t wall = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, wall, Position, { 0, 1, -3 });
+    ecs_set(world, wall, Box, { 4, 2, 0.4f });
+    ecs_entity_t far = ecs_new_w_pair(world, EcsChildOf, ship);
+    ecs_set(world, far, Position, { 0, 1, 30 });
+    ecs_set(world, far, Box, { 1, 1, 1 });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 0.1f);
+
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 20; i ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(p->z > -2.52f);
+    test_assert(p->z < -2.45f);
+    test_flt(p->x, 0);
+
+    ecs_fini(world);
+}
+
 void Collision_slide_along_wall(void) {
     // controllers/collision
     ecs_world_t *world = ecs_init();

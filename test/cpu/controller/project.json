@@ -126,6 +126,7 @@
                 "id": "Collision",
                 "testcases": [
                     "wall_stops",
+                    "wall_under_mover_stops",
                     "slide_along_wall",
                     "slide_along_rotated_wall",
                     "land_on_box",

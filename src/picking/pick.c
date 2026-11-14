@@ -919,7 +919,8 @@ static bool box_pick_cast(
         .max_distance = ray->max_distance,
         .filter = box_pick_filter,
         .ctx = &cast,
-        .ui = true
+        .ui = true,
+        .shapes = true
     };
     glm_vec3_copy(ECS_CONST_CAST(float*, ray->origin), desc.origin);
     glm_vec3_copy(ECS_CONST_CAST(float*, ray->dir), desc.dir);

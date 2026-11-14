@@ -3,11 +3,12 @@
  * @brief Registers box.spatial and keeps the index of every scene up to date.
  *
  * Observers collect changed shapes and subtrees, so an update only bounds what changed. Moved
- * leaves and DynamicTransform shapes (posed by SpatialPose) are placed by the first query of a
- * frame, or by box.spatial.Update when the last frame queried, as picking does every frame.
+ * leaves, movers (mover.c) and dynamic UI elements (posed by SpatialPose) are placed by the
+ * first query of a frame, or by box.spatial.Update when the last frame queried.
  *
- * An entity with SpatialIgnore on itself or an ancestor is not indexed and has no SpatialPose,
- * so it costs no update; adding or removing the tag walks the subtree like a change of scene.
+ * A shape with DynamicTransform is indexed under its mover, the entity that owns the tag; a
+ * local transform set under a mover bounds its shapes again. SpatialIgnore subtrees are not
+ * indexed; adding or removing the tag or DynamicTransform walks the subtree.
  */
 
 #include "index.h"
@@ -35,7 +36,7 @@ static void box_spatial_proxy_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        proxies[i] = (SpatialProxy){ .item = -1 };
+        proxies[i] = (SpatialProxy){ .item = -1, .mover = -1, .member = -1 };
     }
 }
 
@@ -140,6 +141,21 @@ static void box_spatial_unindex(
     p->scene = 0;
 }
 
+/** Take an entity out of the index and out of its mover.
+ *
+ * @param index The index
+ * @param p The proxy of the entity
+ */
+static void box_spatial_forget(
+    box_spatial_t *index,
+    SpatialProxy *p)
+{
+    box_spatial_unindex(index, p);
+    if (p->mover >= 0) {
+        box_spatial_mover_leave(index, p);
+    }
+}
+
 /** Mark the entities of an observer event as changed.
  *
  * @param it The iterator of the observer
@@ -203,6 +219,25 @@ static void BoxSpatialOnRescope(
     }
 }
 
+/** Bound the shapes of a mover again when a local transform under it changed: the place of the
+ * entity in the frame of its mover moved. A mover that moves itself only places its leaf.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnLocal(
+    ecs_iter_t *it)
+{
+    box_spatial_t *index = it->ctx;
+    int32_t i;
+    if (!ecs_is_fini(it->world) && ecs_map_count(&index->mover_of)) {
+        for (i = 0; i < it->count; i ++) {
+            if (!ecs_owns_id(it->world, it->entities[i], DynamicTransform)) {
+                box_spatial_mover_touch(it->world, index, it->entities[i]);
+            }
+        }
+    }
+}
+
 /** Take entities that lose their shape out of the index.
  *
  * @param it The iterator of the observer
@@ -215,7 +250,7 @@ static void BoxSpatialOnRemove(
         for (i = 0; i < it->count; i ++) {
             SpatialProxy *p = ecs_get_mut(it->world, it->entities[i], SpatialProxy);
             if (p) {
-                box_spatial_unindex(it->ctx, p);
+                box_spatial_forget(it->ctx, p);
             }
         }
     }
@@ -257,6 +292,10 @@ static void BoxSpatialOnDisabled(
                 box_spatial_scene(index, p->scene) : NULL;
             if (s) {
                 box_spatial_item(s, p->item)->disabled = disabled;
+            }
+
+            if (p && p->mover >= 0) {
+                box_spatial_mover_disable(index, p, disabled);
             }
         }
     }
@@ -450,8 +489,21 @@ static void box_spatial_refresh(
         dynamic = ecs_has_id(world, e, DynamicTransform);
     }
 
-    if (p->item >= 0 && (!indexed || scene != p->scene)) {
+    ecs_entity_t mover = indexed && dynamic && !ui ? box_spatial_mover_of(world, e) : 0;
+    if (p->mover >= 0 && box_spatial_mover(index, p->mover)->entity != mover) {
+        box_spatial_mover_leave(index, p);
+    }
+
+    if (p->item >= 0 && (!indexed || scene != p->scene || mover)) {
         box_spatial_unindex(index, p);
+    }
+
+    if (mover) {
+        box_spatial_mover_join(index, p, e, mover, l_min, l_max,
+            ecs_has_id(world, e, EcsDisabled));
+        index->stats.updated ++;
+        box_spatial_pose(world, e, false, t);
+        goto done;
     }
 
     int32_t tree = ui ? BOX_SPATIAL_UI : dynamic ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
@@ -584,6 +636,7 @@ static void box_spatial_sync(
     if (index->stale) {
         index->stale = false;
         box_spatial_dynamic(world, index, box_mesh_cache_of(world));
+        index->stats.rebound += box_spatial_movers_place(world, index);
         box_spatial_move(index);
         index->stats.moved += box_spatial_settle(index);
     }
@@ -628,6 +681,7 @@ static void box_spatial_process(
     }
 
     ecs_vec_clear(&index->dirty);
+    box_spatial_movers_refit(world, index);
     index->stale = true;
     box_spatial_commit(index);
     if (queried) {
@@ -695,6 +749,15 @@ void box_spatial_stats(
         stats->entities += s->count;
     }
 
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&index->movers); i ++) {
+        const box_spatial_mover_t *m = box_spatial_mover(index, i);
+        if (m->entity && m->item >= 0) {
+            stats->movers ++;
+            stats->entities += m->live - 1;
+        }
+    }
+
 done:
     return;
 }
@@ -744,6 +807,28 @@ static void box_spatial_transform_observers(
     box_transform_on_moved(world, box_spatial_on_moved, index, box_spatial_release);
 }
 
+/** Follow the local transforms under movers, which move shapes in the frame of their mover.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_local_observers(
+    ecs_world_t *world,
+    box_spatial_t *index)
+{
+    ecs_id_t ids[] = { ecs_id(Position), ecs_id(Rotation), ecs_id(Scale) };
+    const char *names[] = { "SpatialOnPosition", "SpatialOnRotation", "SpatialOnScale" };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_spatial_observer(world, index, names[i], (ecs_observer_desc_t){
+            .query.terms = {
+                { .id = ids[i] },
+                { .id = DynamicTransform, .inout = EcsInOutNone }
+            },
+            .events = { EcsOnSet } }, BoxSpatialOnLocal);
+    }
+}
+
 /** Register the observers that collect changed entities and changed subtrees.
  *
  * A disabled entity stays in the index, with its item flagged so no query or ray sees it until
@@ -790,10 +875,14 @@ static void box_spatial_observers(
     box_spatial_observer(world, index, "SpatialOnParent", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(EcsParent) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnRescope);
+    box_spatial_observer(world, index, "SpatialOnMover", (ecs_observer_desc_t){
+        .query.terms = {{ .id = DynamicTransform, .src.id = EcsSelf }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnRescope);
     box_spatial_observer(world, index, "SpatialOnIgnore", (ecs_observer_desc_t){
         .query.terms = {{ .id = SpatialIgnore }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnRescope);
     box_spatial_transform_observers(world, index);
+    box_spatial_local_observers(world, index);
 }
 
 void BoxSpatialImport(

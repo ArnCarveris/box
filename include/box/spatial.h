@@ -2,8 +2,9 @@
  * @file box/spatial.h
  * @brief Spatial index per scene over the world bounds of shapes.
  *
- * Static shapes are placed in a bounding volume hierarchy once and again on change, shapes
- * with DynamicTransform every frame; ray casts and overlap queries are scoped to one scene.
+ * Static shapes are placed in a bounding volume hierarchy once and again on change. Shapes
+ * with DynamicTransform share one leaf per mover, the entity that owns the tag, placed every
+ * frame it moves; ray casts and overlap queries are scoped to one scene.
  * Prefabs and SpatialIgnore subtrees are not indexed; queries skip disabled entities.
  */
 

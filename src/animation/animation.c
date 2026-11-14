@@ -527,6 +527,7 @@ void BoxAnimationImport(
 {
     ECS_MODULE(world, BoxAnimation);
     ECS_IMPORT(world, BoxCurve);
+    ECS_IMPORT(world, BoxTransform);
 
     ecs_set_name_prefix(world, "Animation");
     ECS_META_COMPONENT(world, AnimationTrack);

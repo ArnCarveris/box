@@ -1,6 +1,9 @@
 /**
  * @file spatial/query.c
  * @brief Ray casts and overlap queries on the static and dynamic tree of one scene.
+ *
+ * The leaf of a mover answers for the mover, unless a ray asks for shapes: it then tests the
+ * shapes under the mover one by one, from their world transforms.
  */
 
 #include "index.h"
@@ -19,7 +22,83 @@ typedef struct box_spatial_walk_t {
     const float *max;                 /**< Maximum corner of a box query */
     const float *center;              /**< Center of a sphere query */
     float radius;                     /**< Radius of a sphere query */
+    const ecs_world_t *world;         /**< The world */
+    const box_spatial_t *index;       /**< The index */
 } box_spatial_walk_t;
+
+/** Test whether a ray hits the bounds of an entity and the filter of the ray accepts it.
+ *
+ * @param w The walk
+ * @param e The entity
+ * @param min Minimum corner of its bounds
+ * @param max Maximum corner of its bounds
+ * @param t Receives the distance of the hit
+ * @return true when the entity counts as a hit
+ */
+static bool box_spatial_ray_bounds(
+    box_spatial_walk_t *w,
+    ecs_entity_t e,
+    const vec3 min,
+    const vec3 max,
+    float *t)
+{
+    bool result = box_bvh_ray_box(&w->ray, min, max, w->reach, t);
+    if (result && w->desc->filter) {
+        result = w->desc->filter(w->desc->ctx, e, t) && *t <= w->reach;
+    }
+
+    return result;
+}
+
+/** Keep a hit as the nearest one or append it, by the kind of walk.
+ *
+ * @param w The walk
+ * @param e The entity hit
+ * @param t Distance of the hit
+ */
+static void box_spatial_ray_keep(
+    box_spatial_walk_t *w,
+    ecs_entity_t e,
+    float t)
+{
+    if (w->out) {
+        box_spatial_hit_t *hit = ecs_vec_append_t(NULL, w->out, box_spatial_hit_t);
+        hit->entity = e;
+        hit->distance = t;
+        w->count ++;
+    } else if (!w->found || t < w->best.distance) {
+        w->best.entity = e;
+        w->best.distance = t;
+        w->found = true;
+        w->reach = t;
+    }
+}
+
+/** Test the shapes under a mover whose leaf a ray hit one by one.
+ *
+ * @param w The walk
+ * @param mover The slot of the mover
+ */
+static void box_spatial_ray_mover(
+    box_spatial_walk_t *w,
+    int32_t mover)
+{
+    const box_spatial_mover_t *m = box_spatial_mover(w->index, mover);
+    const box_spatial_member_t *members = ecs_vec_first(&m->members);
+    int32_t i, count = ecs_vec_count(&m->members);
+    for (i = 0; i < count; i ++) {
+        vec3 min, max;
+        float t = 0;
+        if (!members[i].entity || members[i].disabled) {
+            continue;
+        }
+
+        box_spatial_member_bounds(w->world, &members[i], min, max);
+        if (box_spatial_ray_bounds(w, members[i].entity, min, max, &t)) {
+            box_spatial_ray_keep(w, members[i].entity, t);
+        }
+    }
+}
 
 /** Test whether a ray hits an item and the filter of the ray accepts it.
  *
@@ -34,11 +113,20 @@ static bool box_spatial_ray_item(
     float *t)
 {
     const box_spatial_item_t *it = box_spatial_item(w->scene, item);
-    bool result = !it->disabled && box_bvh_ray_box(&w->ray, it->min, it->max, w->reach, t);
-    if (result && w->desc->filter) {
-        result = w->desc->filter(w->desc->ctx, it->entity, t) && *t <= w->reach;
+    bool result = false;
+    if (it->disabled) {
+        goto done;
     }
 
+    if (it->mover >= 0 && w->desc->shapes) {
+        if (box_bvh_ray_box(&w->ray, it->min, it->max, w->reach, t)) {
+            box_spatial_ray_mover(w, it->mover);
+        }
+    } else {
+        result = box_spatial_ray_bounds(w, it->entity, it->min, it->max, t);
+    }
+
+done:
     return result;
 }
 
@@ -54,11 +142,8 @@ static bool box_spatial_visit_nearest(
 {
     box_spatial_walk_t *w = ctx;
     float t = 0;
-    if (box_spatial_ray_item(w, item, &t) && (!w->found || t < w->best.distance)) {
-        w->best.entity = box_spatial_item(w->scene, item)->entity;
-        w->best.distance = t;
-        w->found = true;
-        w->reach = t;
+    if (box_spatial_ray_item(w, item, &t)) {
+        box_spatial_ray_keep(w, box_spatial_item(w->scene, item)->entity, t);
     }
 
     return true;
@@ -77,10 +162,7 @@ static bool box_spatial_visit_all(
     box_spatial_walk_t *w = ctx;
     float t = 0;
     if (box_spatial_ray_item(w, item, &t)) {
-        box_spatial_hit_t *hit = ecs_vec_append_t(NULL, w->out, box_spatial_hit_t);
-        hit->entity = box_spatial_item(w->scene, item)->entity;
-        hit->distance = t;
-        w->count ++;
+        box_spatial_ray_keep(w, box_spatial_item(w->scene, item)->entity, t);
     }
 
     return true;
@@ -141,6 +223,8 @@ static bool box_spatial_ray_walk(
     const box_spatial_t *index = box_spatial_of(world);
     ecs_os_memset_t(w, 0, box_spatial_walk_t);
     w->scene = index ? box_spatial_scene(index, ray->scene) : NULL;
+    w->world = world;
+    w->index = index;
     w->desc = ray;
     w->reach = ray->max_distance > 0 ? ray->max_distance : FLT_MAX;
 
@@ -259,17 +343,73 @@ bool box_spatial_bounds(
 {
     const box_spatial_t *index = box_spatial_of(world);
     const SpatialProxy *p = index ? ecs_get(world, e, SpatialProxy) : NULL;
-    const box_spatial_scene_t *s = p && p->item >= 0 ? box_spatial_scene(index, p->scene) : NULL;
+    const box_spatial_mover_t *m = NULL;
+    int32_t item = p ? p->item : -1;
+    ecs_entity_t in = p ? p->scene : 0;
+    bool result = false;
+    if (p && p->mover >= 0) {
+        m = box_spatial_mover(index, p->mover);
+        box_spatial_member_bounds(world,
+            ecs_vec_get_t(&m->members, box_spatial_member_t, p->member), min, max);
+        in = m->scene;
+        result = m->item >= 0;
+    } else if (!p && index && box_spatial_mover_slot(index, e) >= 0) {
+        m = box_spatial_mover(index, box_spatial_mover_slot(index, e));
+        item = m->item;
+        in = m->scene;
+    }
+
+    const box_spatial_scene_t *s = !result && item >= 0 ? box_spatial_scene(index, in) : NULL;
     if (s) {
-        const box_spatial_item_t *it = box_spatial_item(s, p->item);
+        const box_spatial_item_t *it = box_spatial_item(s, item);
         glm_vec3_copy(ECS_CONST_CAST(float*, it->min), min);
         glm_vec3_copy(ECS_CONST_CAST(float*, it->max), max);
-        if (scene) {
-            *scene = p->scene;
+        result = true;
+    }
+
+    if (result && scene) {
+        *scene = in;
+    }
+
+    return result;
+}
+
+int32_t box_spatial_expand_box(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const vec3 min,
+    const vec3 max,
+    ecs_vec_t *result)
+{
+    const box_spatial_t *index = box_spatial_of(world);
+    int32_t slot = index ? box_spatial_mover_slot(index, e) : -1;
+    int32_t i, count = 0;
+    vec3 lo, hi;
+    if (slot < 0) {
+        if (box_spatial_bounds(world, e, NULL, lo, hi) && box_bvh_box_box(lo, hi, min, max)) {
+            *ecs_vec_append_t(NULL, result, ecs_entity_t) = e;
+            count ++;
+        }
+
+        goto done;
+    }
+
+    const box_spatial_mover_t *m = box_spatial_mover(index, slot);
+    const box_spatial_member_t *members = ecs_vec_first(&m->members);
+    for (i = 0; i < ecs_vec_count(&m->members); i ++) {
+        if (!members[i].entity || members[i].disabled) {
+            continue;
+        }
+
+        box_spatial_member_bounds(world, &members[i], lo, hi);
+        if (box_bvh_box_box(lo, hi, min, max)) {
+            *ecs_vec_append_t(NULL, result, ecs_entity_t) = members[i].entity;
+            count ++;
         }
     }
 
-    return s != NULL;
+done:
+    return count;
 }
 
 bool box_spatial_static_bounds(

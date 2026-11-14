@@ -18,6 +18,14 @@
             {
                 "id": "Spatial",
                 "testcases": [
+                    "mover_one_leaf",
+                    "mover_ray_shapes",
+                    "mover_moves_one_leaf",
+                    "mover_local_set_refits",
+                    "mover_expand_box",
+                    "mover_added_after_children",
+                    "mover_nested",
+                    "mover_child_picked",
                     "delete_dynamic_hierarchy",
                     "insert",
                     "insert_rotated_scaled",

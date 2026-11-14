@@ -93,6 +93,7 @@ box_spatial_t* box_spatial_new(void)
     ecs_vec_init_t(NULL, &index->walk, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->leaves, box_bvh_leaf_t, 0);
     ecs_vec_init_t(NULL, &index->empty, ecs_entity_t, 0);
+    box_spatial_movers_init(index);
 
     return index;
 }
@@ -100,6 +101,7 @@ box_spatial_t* box_spatial_new(void)
 void box_spatial_free(
     box_spatial_t *index)
 {
+    box_spatial_movers_fini(index);
     ecs_map_iter_t it = ecs_map_iter(&index->scenes);
     while (ecs_map_next(&it)) {
         box_spatial_scene_free(ecs_map_ptr(&it));
@@ -190,6 +192,7 @@ int32_t box_spatial_item_add(
     it->frame = frame;
     it->moved = false;
     it->disabled = false;
+    it->mover = -1;
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     s->count ++;

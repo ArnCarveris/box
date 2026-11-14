@@ -278,7 +278,8 @@ void SpatialIgnore_tag_added_and_removed(void) {
     box_spatial_ray_t ray = { .origin = {0, 0, -5}, .dir = {0, 0, 1} };
     test_assert(box_spatial_bounds(world, still, NULL, min, max));
     test_assert(box_spatial_bounds(world, moving, NULL, min, max));
-    test_assert(ecs_has(world, moving, SpatialPose));
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 1);
     test_assert(box_spatial_ray(world, &ray, &hit));
     test_uint(hit.entity, still);
 
@@ -286,7 +287,8 @@ void SpatialIgnore_tag_added_and_removed(void) {
     ecs_progress(world, 0);
     test_assert(!box_spatial_bounds(world, still, NULL, min, max));
     test_assert(!box_spatial_bounds(world, moving, NULL, min, max));
-    test_assert(!ecs_has(world, moving, SpatialPose));
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 0);
     test_assert(!box_spatial_ray(world, &ray, &hit));
     box_spatial_stats(world, &stats);
     test_int(stats.entities, 0);
@@ -309,7 +311,8 @@ void SpatialIgnore_tag_added_and_removed(void) {
     test_assert(box_spatial_bounds(world, late, NULL, min, max));
     test_assert(box_spatial_bounds(world, moving, NULL, min, max));
     test_flt(min[0], 3.5f);
-    test_assert(ecs_has(world, moving, SpatialPose));
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 1);
     test_assert(box_spatial_ray(world, &ray, &hit));
     test_uint(hit.entity, still);
     box_spatial_stats(world, &stats);
@@ -323,8 +326,8 @@ void SpatialIgnore_tag_added_and_removed(void) {
     ecs_fini(world);
 }
 
-/** Without SpatialIgnore the moving parts of a wave are indexed and refit every frame the index
- * is queried, as before.
+/** Without SpatialIgnore the moving parts of a wave are indexed, each critter one mover whose
+ * leaf is placed every frame the index is queried.
  */
 void SpatialIgnore_untagged_wave_still_refit(void) {
     // spatial_perf/picking_cost
@@ -347,7 +350,8 @@ void SpatialIgnore_untagged_wave_still_refit(void) {
         box_spatial_static_bounds(world, 0, min, max);
         ecs_progress(world, 0.016f);
         box_spatial_stats(world, &stats);
-        test_int(stats.rebound, COUNT * 4);
+        test_int(stats.rebound, COUNT);
+        test_int(stats.movers, COUNT);
     }
 
     ecs_fini(world);

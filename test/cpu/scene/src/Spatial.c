@@ -9,6 +9,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <float.h>
+#include <math.h>
 #include "spatial.h"
 
 /** Order entity ids ascending.
@@ -1073,7 +1074,7 @@ void Spatial_dynamic_unnotified_move_after_idle(void) {
     ecs_vec_t out;
     ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
     test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 5, 0}, 0.1f, &out), 1);
-    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), child);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), parent);
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
     }
@@ -1087,11 +1088,15 @@ void Spatial_dynamic_unnotified_move_after_idle(void) {
     test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), parent);
     ecs_vec_clear(&out);
     test_int(box_spatial_overlap_sphere(world, 0, (vec3){10, 5, 0}, 0.1f, &out), 1);
-    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), child);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), parent);
     vec3 min, max;
     test_assert(box_spatial_bounds(world, child, NULL, min, max));
     test_flt(min[0], 9.5f);
     test_flt(max[1], 5.5f);
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {10, 20, 0}, .dir = {0, -1, 0}, .shapes = true };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, child);
 
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
     ecs_fini(world);
@@ -1954,19 +1959,28 @@ void Spatial_delete_dynamic_hierarchy(void) {
     }
 
     ecs_progress(world, 0);
-    ecs_vec_t out;
+    vec3 lo = {-20, -20, -20}, hi = {20, 20, 20};
+    ecs_vec_t out, shapes;
     ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
-    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 20},
-        &out), 10);
+    ecs_vec_init_t(NULL, &shapes, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_box(world, 0, lo, hi, &out), 2);
+    for (i = 0; i < ecs_vec_count(&out); i ++) {
+        box_spatial_expand_box(world, *ecs_vec_get_t(&out, ecs_entity_t, i), lo, hi, &shapes);
+    }
+
+    test_int(ecs_vec_count(&shapes), 10);
     ecs_vec_clear(&out);
     test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, 3}, (vec3){20, 20, 20},
-        &out), 5);
+        &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), roots[1]);
 
     ecs_delete(world, roots[0]);
     ecs_progress(world, 0);
     ecs_vec_clear(&out);
-    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 20},
-        &out), 5);
+    ecs_vec_clear(&shapes);
+    test_int(box_spatial_overlap_box(world, 0, lo, hi, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), roots[1]);
+    test_int(box_spatial_expand_box(world, roots[1], lo, hi, &shapes), 5);
     ecs_vec_clear(&out);
     test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 3},
         &out), 0);
@@ -1974,10 +1988,14 @@ void Spatial_delete_dynamic_hierarchy(void) {
     ecs_delete(world, roots[1]);
     ecs_progress(world, 0);
     ecs_vec_clear(&out);
-    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 20},
-        &out), 0);
+    test_int(box_spatial_overlap_box(world, 0, lo, hi, &out), 0);
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 0);
+    test_int(stats.entities, 0);
 
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &shapes, ecs_entity_t);
     ecs_fini(world);
 }
 
@@ -2085,5 +2103,339 @@ void Spatial_dynamic_placed_by_query_when_idle(void) {
     ecs_vec_clear(&out);
     test_int(box_spatial_overlap_sphere(world, 0, (vec3){4, 0, 0}, 0.1f, &out), 0);
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_mover_one_leaf(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, a, Position, {-2, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, b);
+    ecs_set(world, c, Position, {0, 2, 0});
+    ecs_set(world, c, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 1);
+    test_int(stats.entities, 3);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), mover);
+
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, mover, NULL, min, max));
+    test_flt(min[0], -2.5f);
+    test_flt(max[0], 2.5f);
+    test_flt(min[1], -0.5f);
+    test_flt(max[1], 2.5f);
+    test_assert(box_spatial_bounds(world, c, NULL, min, max));
+    test_flt(min[0], 1.5f);
+    test_flt(min[1], 1.5f);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_mover_ray_shapes(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, a, Position, {-4, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, b, Position, {4, 0, 0});
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {4, 0, -10}, .dir = {0, 0, 1} };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, mover);
+    ray.shapes = true;
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, b);
+    test_flt(hit.distance, 9.5f);
+
+    box_spatial_ray_t gap = { .origin = {0, 0, -10}, .dir = {0, 0, 1} };
+    test_assert(box_spatial_ray(world, &gap, &hit));
+    test_uint(hit.entity, mover);
+    gap.shapes = true;
+    test_assert(!box_spatial_ray(world, &gap, &hit));
+
+    ecs_vec_t hits;
+    ecs_vec_init_t(NULL, &hits, box_spatial_hit_t, 0);
+    box_spatial_ray_t across = { .origin = {-10, 0, 0}, .dir = {1, 0, 0}, .shapes = true };
+    test_int(box_spatial_ray_all(world, &across, &hits), 2);
+    test_uint(ecs_vec_get_t(&hits, box_spatial_hit_t, 0)->entity, a);
+    test_uint(ecs_vec_get_t(&hits, box_spatial_hit_t, 1)->entity, b);
+
+    ecs_vec_fini_t(NULL, &hits, box_spatial_hit_t);
+    ecs_fini(world);
+}
+
+void Spatial_mover_moves_one_leaf(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_set(world, mover, AngularVelocity, {0, 1, 0});
+    int32_t i;
+    for (i = 0; i < 20; i ++) {
+        ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, mover);
+        ecs_set(world, e, Position, {cosf((float)i) * 5, 0, sinf((float)i) * 5});
+        ecs_set(world, e, Box, {0.5f, 0.5f, 0.5f});
+    }
+
+    ecs_progress(world, 0.1f);
+    vec3 min, max;
+    for (i = 0; i < 5; i ++) {
+        box_spatial_static_bounds(world, 0, min, max);
+        ecs_progress(world, 0.1f);
+        box_spatial_stats_t stats;
+        box_spatial_stats(world, &stats);
+        test_int(stats.rebound, 1);
+        test_int(stats.updated, 0);
+        test_int(stats.entities, 20);
+    }
+
+    ecs_iter_t it = ecs_children(world, mover);
+    test_assert(ecs_children_next(&it));
+    ecs_entity_t e = it.entities[0];
+    ecs_iter_fini(&it);
+    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = {
+        .origin = {t->m[3][0], 10, t->m[3][2]}, .dir = {0, -1, 0}, .shapes = true };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, e);
+
+    ecs_fini(world);
+}
+
+void Spatial_mover_local_set_refits(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t arm = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, arm, Position, {0, 0, 0});
+    ecs_entity_t hand = ecs_new_w_pair(world, EcsChildOf, arm);
+    ecs_set(world, hand, Position, {1, 0, 0});
+    ecs_set(world, hand, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, mover, NULL, min, max));
+    test_flt(max[0], 1.5f);
+
+    ecs_set(world, arm, Position, {5, 0, 0});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_bounds(world, mover, NULL, min, max));
+    test_flt(min[0], 5.5f);
+    test_flt(max[0], 6.5f);
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 1);
+
+    ecs_set(world, hand, Box, {3, 1, 1});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_bounds(world, mover, NULL, min, max));
+    test_flt(min[0], 4.5f);
+    test_flt(max[0], 7.5f);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){6, 0, 0}, 0.1f, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), mover);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){1, 0, 0}, 0.1f, &out), 0);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_mover_expand_box(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, a, Position, {-4, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, b, Position, {4, 0, 0});
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_entity_t still = ecs_new(world);
+    ecs_set(world, still, Position, {4, 0, 3});
+    ecs_set(world, still, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+
+    vec3 lo = {3, -1, -1}, hi = {5, 1, 4};
+    ecs_vec_t hits, out;
+    ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_box(world, 0, lo, hi, &hits), 2);
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&hits); i ++) {
+        box_spatial_expand_box(world, *ecs_vec_get_t(&hits, ecs_entity_t, i), lo, hi, &out);
+    }
+
+    test_int(ecs_vec_count(&out), 2);
+    ecs_entity_t e0 = *ecs_vec_get_t(&out, ecs_entity_t, 0);
+    ecs_entity_t e1 = *ecs_vec_get_t(&out, ecs_entity_t, 1);
+    test_assert((e0 == b && e1 == still) || (e0 == still && e1 == b));
+    test_assert(e0 != a && e1 != a);
+
+    ecs_vec_fini_t(NULL, &hits, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_mover_added_after_children(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, a, Position, {-2, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, b, Position, {2, 0, 0});
+    ecs_set(world, b, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 0);
+
+    ecs_add(world, parent, DynamicTransform);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 1);
+    test_int(stats.entities, 2);
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), parent);
+
+    ecs_add(world, b, DynamicTransform);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 2);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){2, 0, 0}, 0.1f, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), b);
+
+    ecs_remove(world, parent, DynamicTransform);
+    ecs_remove(world, b, DynamicTransform);
+    ecs_progress(world, 0);
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 0);
+    test_int(stats.entities, 2);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-10, -10, -10}, (vec3){10, 10, 10}, &out), 2);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_mover_nested(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t ring = ecs_new(world);
+    ecs_set(world, ring, Position, {0, 0, 0});
+    ecs_set(world, ring, AngularVelocity, {0, 1, 0});
+    ecs_entity_t hull = ecs_new_w_pair(world, EcsChildOf, ring);
+    ecs_set(world, hull, Position, {5, 0, 0});
+    ecs_set(world, hull, Box, {1, 1, 1});
+    ecs_entity_t car = ecs_new_w_pair(world, EcsChildOf, ring);
+    ecs_set(world, car, Position, {0, 0, 5});
+    ecs_set(world, car, Velocity, {0, 1, 0});
+    ecs_entity_t cab = ecs_new_w_pair(world, EcsChildOf, car);
+    ecs_set(world, cab, Position, {0, 0, 0});
+    ecs_set(world, cab, Box, {1, 1, 1});
+    ecs_progress(world, 0.1f);
+    ecs_progress(world, 0.1f);
+
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 2);
+    test_int(stats.entities, 2);
+
+    const WorldTransform *t = ecs_get(world, cab, WorldTransform);
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 10, t->m[3][2]},
+        .dir = {0, -1, 0} };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, car);
+    ray.shapes = true;
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, cab);
+
+    ecs_fini(world);
+}
+
+void Spatial_mover_child_picked(void) {
+    // spatial/movers
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 20});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t back = ecs_new(world);
+    ecs_set(world, back, Position, {0, 0, -5});
+    ecs_set(world, back, Box, {100, 100, 1});
+    ecs_add(world, back, Interactive);
+
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t left = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, left, Position, {-6, 0, 0});
+    ecs_set(world, left, Box, {2, 2, 2});
+    ecs_entity_t right = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, right, Position, {6, 0, 0});
+    ecs_set(world, right, Box, {2, 2, 2});
+    ecs_add(world, right, Interactive);
+
+    box_input_mouse_move(world, 640, 360, false);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->hit, back);
+    test_uint(status->target, back);
+
+    ecs_set(world, mover, Position, {-6, 0, 0});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->hit, right);
+    test_uint(status->target, right);
+    test_assert(ecs_has(world, right, Hovered));
+
     ecs_fini(world);
 }
