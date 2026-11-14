@@ -153,8 +153,9 @@ planets {
   struct PlanetClouds(
     cover: f32, opacity: f32, frequency: f32, speed: f32, evolve: f32, color: Col)
 
-  // The night side: city lights, how densely they fill the habitable land and their brightness
-  struct PlanetNight(lights: bool, density: f32, brightness: f32)
+  // The night side: city lights, how densely they fill the habitable land and their brightness,
+  // and the strength of the urban grey of the cities on the day side
+  struct PlanetNight(lights: bool, density: f32, brightness: f32, urban: f32)
 
   // Lava: the fraction of the lowlands it fills (none at 0), the glow of the cracks between the
   // plates and the strength of its emission
@@ -263,7 +264,7 @@ planets {
   }
 
   fn night_preset(kind: i32) -> PlanetNight {
-    {lights: kind == 5, density: 1.6, brightness: 0.6}
+    {lights: kind == 5, density: 1.6, brightness: 0.6, urban: 0.8}
   }
 
   fn lava_preset(kind: i32) -> PlanetLava {
@@ -421,8 +422,11 @@ planets {
     const lava_k: f32 = lava_on ? 1 : 0
     const crack_glow: f32 = lava.cracks
 
-    // City lights: towns at the points of cells, lit where the density beats their id
+    // City lights: towns at the points of cells, lit where the density beats their id. Without
+    // them the density is 0, so the graphs of the cities do not change with its slider
     const city_k: f32 = city_on ? 1 : 0
+    const city_d: f32 = city_on ? night.density : 0
+    const urban_k: f32 = city_on ? night.urban : 0
     const towns: i32 = detail > 1 ? 9000 : 3000
 
     // Clouds: a fraction cf of the sky has some cloud, thr the threshold of the noise in
@@ -717,6 +721,56 @@ planets {
         nodes.Curve: {input: s_t, curve: {keys: [{0, 0}, {0.16, 0}, {0.32, 1}, {0.8, 1}, {1, 0.2}]}}
       }
 
+      // Cities, shared by the lights (town) and the urban grey of the albedo: the density is
+      // habitable, watered, flat land, thickest near the coast and in clusters. Cities (s_uc1)
+      // and smaller towns (s_uc2) sit at the points of two cells; s_ul1 and s_ul2 are their dots
+      // where the density is at least their id
+      s_uwet {
+        nodes.Smoothstep: {input: s_m, edge0_value: {0.05, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}}
+      }
+      s_ucoast {
+        nodes.Remap: {
+          input: s_near, from_min: 0.55, from_max: 0.95, to_min: 1,
+          to_max: 0.25, clamp: true
+        }
+      }
+      s_uflat {
+        nodes.Smoothstep: {
+          input: s_slope, edge0_value: {rock_hi, 0, 0, 0}, edge1_value: {rock_lo, 0, 0, 0}
+        }
+      }
+      s_ucn { nodes.Noise: {frequency: 3.5, octaves: 3, seed: sd * 16 + 9} }
+      s_ucl {
+        nodes.Smoothstep: {input: s_ucn, edge0_value: {0.46, 0, 0, 0}, edge1_value: {0.62, 0, 0, 0}}
+      }
+      s_ud0 { nodes.Multiply: {a: s_land, b: s_hab} }
+      s_ud1 { nodes.Multiply: {a: s_ud0, b: s_uwet} }
+      s_ud2 { nodes.Multiply: {a: s_ud1, b: s_uflat} }
+      s_ud3 { nodes.Multiply: {a: s_ud2, b: s_ucoast} }
+      s_ud4 { nodes.Multiply: {a: s_ud3, b: s_ucl} }
+      s_ud { nodes.Multiply: {a: s_ud4, b_value: {city_d, 0, 0, 0}} }
+      s_uc1 { nodes.Cells: {count: towns, jitter: 1, seed: sd * 16 + 10} }
+      s_uc1x { nodes.Split: {input: s_uc1, channel: ChannelR} }
+      s_uc1y { nodes.Split: {input: s_uc1, channel: ChannelG} }
+      s_udot1 {
+        nodes.Smoothstep: {
+          input: s_uc1x, edge0_value: {0.22, 0, 0, 0}, edge1_value: {0.03, 0, 0, 0}
+        }
+      }
+      s_ug1 { nodes.Step: {input: s_ud, edge: s_uc1y} }
+      s_ul1 { nodes.Multiply: {a: s_udot1, b: s_ug1} }
+      s_uc2 { nodes.Cells: {count: towns * 4, jitter: 1, seed: sd * 16 + 11} }
+      s_uc2x { nodes.Split: {input: s_uc2, channel: ChannelR} }
+      s_uc2y { nodes.Split: {input: s_uc2, channel: ChannelG} }
+      s_udot2 {
+        nodes.Smoothstep: {
+          input: s_uc2x, edge0_value: {0.16, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}
+        }
+      }
+      s_ud2s { nodes.Multiply: {a: s_ud, b_value: {0.45, 0, 0, 0}} }
+      s_ug2 { nodes.Step: {input: s_ud2s, edge: s_uc2y} }
+      s_ul2 { nodes.Multiply: {a: s_udot2, b: s_ug2} }
+
       // Biome table: the vegetation by temperature (u) and moisture (v), its cover in alpha
       lut {
         l_uv { nodes.Coords: {} }
@@ -861,6 +915,29 @@ planets {
         a_snowm { nodes.Multiply: {a: a_cold, b_value: {snow_k, 0, 0, 0}} }
         a_snow { nodes.Ramp: {keys: [{0, {236, 242, 250}}]} }
         a_land { nodes.Mix: {a: a_land3, b: a_snow, factor: a_snowm} }
+        // Cities by day: a warm, desaturated grey over the dense city areas that glow at night,
+        // on the lit towns and in a sprawl around the biggest cities, those whose id is under
+        // half the density
+        a_uarea {
+          nodes.Smoothstep: {input: s_ud, edge0_value: {0.4, 0, 0, 0}, edge1_value: {1, 0, 0, 0}}
+        }
+        a_ubig0 { nodes.Multiply: {a: s_ud, b_value: {0.5, 0, 0, 0}} }
+        a_ubig { nodes.Step: {input: a_ubig0, edge: s_uc1y} }
+        a_usp0 {
+          nodes.Smoothstep: {
+            input: s_uc1x, edge0_value: {0.6, 0, 0, 0}, edge1_value: {0.15, 0, 0, 0}
+          }
+        }
+        a_usp { nodes.Multiply: {a: a_usp0, b: a_ubig} }
+        a_ul { nodes.Max: {a: s_ul1, b: s_ul2} }
+        a_u0 { nodes.Max: {a: a_ul, b: a_usp} }
+        a_u1 { nodes.Max: {a: a_u0, b: a_uarea} }
+        a_um { nodes.Multiply: {a: a_u1, b_value: {urban_k, 0, 0, 0}} }
+        a_un { nodes.Noise: {frequency: 9, octaves: 2, seed: sd * 16 + 12} }
+        a_ucol {
+          nodes.Ramp: {input: a_un, keys: [{0.35, {118, 115, 108}}, {0.65, {138, 133, 124}}]}
+        }
+        a_landu { nodes.Mix: {a: a_land, b: a_ucol, factor: a_um} }
         a_shelf {
           nodes.Remap: {
             input: s_h, from_min: sea_h, from_max: sea_h - 0.12, to_min: 0,
@@ -889,7 +966,7 @@ planets {
             input: a_coast, edge0_value: {0 - coast_aa, 0, 0, 0}, edge1_value: {coast_aa, 0, 0, 0}
           }
         }
-        a_out { nodes.Mix: {a: a_sea, b: a_land, factor: a_aa} }
+        a_out { nodes.Mix: {a: a_sea, b: a_landu, factor: a_aa} }
         Graph: {output: a_out, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
@@ -932,62 +1009,16 @@ planets {
         Graph: {output: e_col, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
-      // City lights: the density is habitable, watered, flat land, thickest near the coast and
-      // in clusters. Cities and smaller towns at the points of two cells light up where the
-      // density is at least their id, with a faint glow where it is highest
+      // City lights: cities and smaller towns at the shared points (s_ul1, s_ul2) light up where
+      // the density is at least their id, with a faint glow where it is highest
       town {
-        w_wet {
-          nodes.Smoothstep: {input: s_m, edge0_value: {0.05, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}}
-        }
-        w_coast {
-          nodes.Remap: {
-            input: s_near, from_min: 0.55, from_max: 0.95, to_min: 1,
-            to_max: 0.25, clamp: true
-          }
-        }
-        w_flat {
-          nodes.Smoothstep: {
-            input: s_slope, edge0_value: {rock_hi, 0, 0, 0}, edge1_value: {rock_lo, 0, 0, 0}
-          }
-        }
-        w_cn { nodes.Noise: {frequency: 3.5, octaves: 3, seed: sd * 16 + 9} }
-        w_cl {
-          nodes.Smoothstep: {input: w_cn, edge0_value: {0.46, 0, 0, 0}, edge1_value: {0.62, 0, 0, 0}}
-        }
-        w_d0 { nodes.Multiply: {a: s_land, b: s_hab} }
-        w_d1 { nodes.Multiply: {a: w_d0, b: w_wet} }
-        w_d2 { nodes.Multiply: {a: w_d1, b: w_flat} }
-        w_d3 { nodes.Multiply: {a: w_d2, b: w_coast} }
-        w_d4 { nodes.Multiply: {a: w_d3, b: w_cl} }
-        w_d { nodes.Multiply: {a: w_d4, b_value: {night.density, 0, 0, 0}} }
-        w_c1 { nodes.Cells: {count: towns, jitter: 1, seed: sd * 16 + 10} }
-        w_c1x { nodes.Split: {input: w_c1, channel: ChannelR} }
-        w_c1y { nodes.Split: {input: w_c1, channel: ChannelG} }
-        w_c1z { nodes.Split: {input: w_c1, channel: ChannelB} }
-        w_dot1 {
-          nodes.Smoothstep: {
-            input: w_c1x, edge0_value: {0.22, 0, 0, 0}, edge1_value: {0.03, 0, 0, 0}
-          }
-        }
-        w_g1 { nodes.Step: {input: w_d, edge: w_c1y} }
-        w_l1 { nodes.Multiply: {a: w_dot1, b: w_g1} }
+        w_c1z { nodes.Split: {input: s_uc1, channel: ChannelB} }
         w_b1 {
           nodes.Remap: {input: w_c1z, from_min: 0, from_max: 1, to_min: 0.45, to_max: 1}
         }
-        w_t1 { nodes.Multiply: {a: w_l1, b: w_b1} }
-        w_c2 { nodes.Cells: {count: towns * 4, jitter: 1, seed: sd * 16 + 11} }
-        w_c2x { nodes.Split: {input: w_c2, channel: ChannelR} }
-        w_c2y { nodes.Split: {input: w_c2, channel: ChannelG} }
-        w_dot2 {
-          nodes.Smoothstep: {
-            input: w_c2x, edge0_value: {0.16, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}
-          }
-        }
-        w_d2s { nodes.Multiply: {a: w_d, b_value: {0.45, 0, 0, 0}} }
-        w_g2 { nodes.Step: {input: w_d2s, edge: w_c2y} }
-        w_l2 { nodes.Multiply: {a: w_dot2, b: w_g2} }
-        w_t2 { nodes.Multiply: {a: w_l2, b_value: {0.55, 0, 0, 0}} }
-        w_dd { nodes.Multiply: {a: w_d, b: w_d} }
+        w_t1 { nodes.Multiply: {a: s_ul1, b: w_b1} }
+        w_t2 { nodes.Multiply: {a: s_ul2, b_value: {0.55, 0, 0, 0}} }
+        w_dd { nodes.Multiply: {a: s_ud, b: s_ud} }
         w_haze { nodes.Multiply: {a: w_dd, b_value: {0.035, 0, 0, 0}} }
         w_v0 { nodes.Max: {a: w_t1, b: w_t2} }
         w_v1 { nodes.Add: {a: w_v0, b: w_haze} }

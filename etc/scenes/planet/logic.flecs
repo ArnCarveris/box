@@ -146,6 +146,7 @@ state {
     } else if g == "night" {
       if n == "density" { state.night.density = v }
       else if n == "brightness" { state.night.brightness = v }
+      else if n == "urban" { state.night.urban = v }
     } else if g == "lava" {
       if n == "level" { state.lava.level = v }
       else if n == "cracks" { state.lava.cracks = v }

@@ -408,6 +408,10 @@ hud {
                     label: "City brightness", width: 236, min: 0, max: 2, step: 0.05,
                     value: state.night.brightness, decimals: 2
                   )
+                  Slider urban(
+                    label: "Urban tint", width: 236, min: 0, max: 1, step: 0.05,
+                    value: state.night.urban, decimals: 2
+                  )
                 }
 
                 Collapsible lava(title: "Lava", width: 262) {
