@@ -100,6 +100,8 @@ typedef struct box_gpu_atmos_luts_t {
     WGPUTextureView transmittance_view; /**< View sampled and written */
     WGPUTexture multi;              /**< Multi scattering LUT */
     WGPUTextureView multi_view;     /**< View sampled and written */
+    WGPUTexture irradiance;         /**< Sky irradiance LUT */
+    WGPUTextureView irradiance_view; /**< View written */
     box_render_atmosphere_desc_t medium; /**< The medium */
     bool dirty;                     /**< Build before the next targets */
     int32_t revision;               /**< Revision of the shader of the last build, 0 for none */
@@ -162,7 +164,8 @@ typedef struct box_gpu_atmos_env_request_t {
 
 /** Entry points of the passes, by box_render_atmos_pass_t */
 static const char *box_gpu_atmos_entries[BOX_RENDER_ATMOS_PASSES] = {
-    "transmittance", "multi_scattering", "sky_view", "aerial", "fog", "sky_view", "environment"
+    "transmittance", "multi_scattering", "sky_view", "aerial", "fog", "sky_view", "environment",
+    "irradiance"
 };
 
 /** Create a texture the passes write and sample.
@@ -233,8 +236,8 @@ static void box_gpu_atmos_release(
 /** Create the bind group layout and pipeline layout of a pass.
  *
  * Every pass binds the uniforms at 0; the passes after the transmittance sample it at 1 with the
- * sampler at 2; the sky views and aerial perspective sample the multi scattering at 3, the
- * aerial perspective, the fog and the environment the sky view at 4.
+ * sampler at 2; the sky views, the aerial perspective and the sky irradiance sample the multi
+ * scattering at 3, the aerial perspective, the fog and the environment the sky view at 4.
  *
  * The 2D LUTs and the fog color are written at 5, the aerial perspective volume at 6, the
  * cubemap of an environment at 7. The environment also binds the cloud layers as the sky draw
@@ -268,7 +271,7 @@ static void box_gpu_atmos_layout(
             .sampler = { .type = WGPUSamplerBindingType_Filtering } };
     }
 
-    if (sky || pass == BOX_RENDER_ATMOS_AERIAL) {
+    if (sky || pass == BOX_RENDER_ATMOS_AERIAL || pass == BOX_RENDER_ATMOS_IRRADIANCE) {
         entries[count ++] = (WGPUBindGroupLayoutEntry){ .binding = 3, .visibility = comp,
             .texture = sampled };
     }
@@ -470,6 +473,7 @@ static void box_gpu_atmos_luts_free(
 {
     box_gpu_atmos_release(&l->transmittance, &l->transmittance_view);
     box_gpu_atmos_release(&l->multi, &l->multi_view);
+    box_gpu_atmos_release(&l->irradiance, &l->irradiance_view);
     box_gpu_atmos_release(&l->env_sky, &l->env_sky_view);
     if (l->env_uniforms) {
         wgpuBufferRelease(l->env_uniforms);
@@ -595,6 +599,8 @@ void box_gpu_atmosphere_apply(
             BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, 1, &l->transmittance_view);
         l->multi = box_gpu_atmos_texture(gpu, BOX_RENDER_ATMOS_MULTI_WIDTH,
             BOX_RENDER_ATMOS_MULTI_HEIGHT, 1, &l->multi_view);
+        l->irradiance = box_gpu_atmos_texture(gpu, BOX_RENDER_ATMOS_IRRADIANCE_WIDTH,
+            BOX_RENDER_ATMOS_IRRADIANCE_HEIGHT, 1, &l->irradiance_view);
         ecs_map_insert_ptr(&a->luts, handle, l);
         gpu->pending.atmosphere_luts ++;
     }
@@ -871,7 +877,8 @@ static void box_gpu_atmos_dispatch(
     wgpuBindGroupRelease(group);
 }
 
-/** Record the transmittance and then the multi scattering LUT of a scene.
+/** Record the transmittance, then the multi scattering and then the sky irradiance LUT of a
+ * scene.
  *
  * @param gpu The backend
  * @param encoder The encoder
@@ -894,10 +901,19 @@ static void box_gpu_atmos_build(
         { .binding = 2, .sampler = a->sampler },
         { .binding = 5, .textureView = l->multi_view }
     };
+    WGPUBindGroupEntry irradiance[5] = {
+        { .binding = 0, .buffer = l->uniforms, .size = size },
+        { .binding = 1, .textureView = l->transmittance_view },
+        { .binding = 2, .sampler = a->sampler },
+        { .binding = 3, .textureView = l->multi_view },
+        { .binding = 5, .textureView = l->irradiance_view }
+    };
     box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_TRANSMITTANCE, transmittance, 2,
         BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH, BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, 1);
     box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_MULTI, multi, 4,
         BOX_RENDER_ATMOS_MULTI_WIDTH, BOX_RENDER_ATMOS_MULTI_HEIGHT, 1);
+    box_gpu_atmos_dispatch(gpu, encoder, BOX_RENDER_ATMOS_IRRADIANCE, irradiance, 5,
+        BOX_RENDER_ATMOS_IRRADIANCE_WIDTH, BOX_RENDER_ATMOS_IRRADIANCE_HEIGHT, 1);
     l->dirty = false;
     l->revision = a->revision;
     l->builds ++;
@@ -1214,6 +1230,7 @@ bool box_gpu_atmosphere_transmittance(
     box_gpu_t *gpu,
     uint32_t handle,
     WGPUTexture *texture,
+    WGPUTexture *irradiance,
     int32_t *builds)
 {
     const box_gpu_atmos_t *a = gpu->atmosphere;
@@ -1223,6 +1240,7 @@ bool box_gpu_atmosphere_transmittance(
     bool result = l && !l->dirty && a->revision && l->revision == a->revision;
     if (result) {
         *texture = l->transmittance;
+        *irradiance = l->irradiance;
         *builds = l->builds;
     }
 

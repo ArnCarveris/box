@@ -22,6 +22,16 @@
 /** Smallest buffer of the draws of a packet in bytes */
 #define BOX_GPU_PLANET_BUFFER_MIN (16384u)
 
+/** Texels of a row of a layer of the LUT array, the wider of the transmittance and the sky
+ * irradiance LUT */
+#define BOX_GPU_PLANET_LUT_WIDTH \
+    (BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH > BOX_RENDER_ATMOS_IRRADIANCE_WIDTH ? \
+        BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH : BOX_RENDER_ATMOS_IRRADIANCE_WIDTH)
+
+/** Rows of a layer of the LUT array: the transmittance LUT above the sky irradiance LUT */
+#define BOX_GPU_PLANET_LUT_HEIGHT \
+    (BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT + BOX_RENDER_ATMOS_IRRADIANCE_HEIGHT)
+
 /** Uniform of a draw, matching Planet in planet_atmosphere.wgsl */
 typedef struct box_gpu_planet_uniforms_t {
     box_render_atmosphere_desc_t medium; /**< The medium of the planet */
@@ -49,19 +59,21 @@ struct box_gpu_planets_t {
     uint64_t used;                  /**< Bytes of the buffer the draws of the packet took */
     WGPUBuffer lights;              /**< box_gpu_planet_light_t by planet light slot */
     bool lights_written;            /**< The table has a planet since it was last cleared */
-    WGPUTexture luts;               /**< Transmittance LUT array, layer slot - 1, NULL before
-                                     *   the first planet light */
+    WGPUTexture luts;               /**< LUT array, the transmittance LUT of a slot at the top
+                                     *   of layer slot - 1 and its sky irradiance LUT below it,
+                                     *   NULL before the first planet light */
     WGPUTextureView luts_view;      /**< 2D array view of luts */
-    uint32_t layers;                /**< Layers of luts */
+    uint32_t layers;                /**< Slots luts has the layers of */
     WGPUTexture placeholder;        /**< 1x1 LUT array bound before the first planet light */
     WGPUTextureView placeholder_view; /**< 2D array view of the placeholder */
     uint32_t copied[BOX_RENDER_PLANET_LIGHT_MAX]; /**< By slot, the handle of the atmosphere
-                                     *   whose LUT its layer holds, 0 for none */
+                                     *   whose LUTs its layers hold, 0 for none */
     int32_t builds[BOX_RENDER_PLANET_LIGHT_MAX]; /**< By slot, the builds of that LUT */
 };
 
-/** Create a 2D array of transmittance LUTs that the planet light binding reads, a read only
- * storage texture: the sampled textures of the mesh pipelines are at the limit of the device.
+/** Create a 2D array of transmittance and sky irradiance LUTs that the planet light binding
+ * reads, a read only storage texture: the sampled textures of the mesh pipelines are at the
+ * limit of the device.
  *
  * @param gpu The backend
  * @param width Texels of a row
@@ -302,8 +314,8 @@ done:
     return result;
 }
 
-/** Make the LUT array hold a layer per slot up to a slot, replacing it with a larger one,
- * whose layers are copied again.
+/** Make the LUT array hold the layer of every slot up to a slot, replacing it with a
+ * larger one, whose layers are copied again.
  *
  * @param gpu The backend
  * @param f The planet state
@@ -328,8 +340,8 @@ static void box_gpu_planet_luts_reserve(
         wgpuTextureRelease(f->luts);
     }
 
-    f->luts = box_gpu_planet_luts_new(gpu, BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH,
-        BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, layers, &f->luts_view);
+    f->luts = box_gpu_planet_luts_new(gpu, BOX_GPU_PLANET_LUT_WIDTH, BOX_GPU_PLANET_LUT_HEIGHT,
+        layers, &f->luts_view);
     f->layers = layers;
     ecs_os_memset_n(f->copied, 0, uint32_t, BOX_RENDER_PLANET_LIGHT_MAX);
 done:
@@ -343,6 +355,7 @@ void box_gpu_planet_lights_prepare(
     box_gpu_planets_t *f = gpu->planets;
     box_gpu_planet_light_t table[BOX_RENDER_PLANET_LIGHT_MAX];
     WGPUTexture sources[BOX_RENDER_PLANET_LIGHT_MAX];
+    WGPUTexture irradiance[BOX_RENDER_PLANET_LIGHT_MAX];
     int32_t builds[BOX_RENDER_PLANET_LIGHT_MAX];
     WGPUCommandEncoder encoder = NULL;
     int32_t i, count = ecs_vec_count(&packet->planet_lights);
@@ -360,7 +373,7 @@ void box_gpu_planet_lights_prepare(
         slot = l->slot;
         if (!slot || slot >= BOX_RENDER_PLANET_LIGHT_MAX ||
             !box_gpu_atmosphere_transmittance(gpu, l->atmosphere, &sources[slot],
-                &builds[slot]))
+                &irradiance[slot], &builds[slot]))
         {
             continue;
         }
@@ -369,6 +382,7 @@ void box_gpu_planet_lights_prepare(
         table[slot].radii[0] = l->radii[0];
         table[slot].radii[1] = l->radii[1];
         table[slot].radii[2] = (float)(slot - 1u);
+        table[slot].radii[3] = l->radii[3];
         ecs_os_memcpy_n(table[slot].sun, l->sun, float, 4);
         if (!(table[slot].center[3] > 0.0f)) {
             sources[slot] = NULL;
@@ -414,6 +428,18 @@ void box_gpu_planet_lights_prepare(
             },
             &(WGPUExtent3D){
                 BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH, BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, 1
+            });
+        wgpuCommandEncoderCopyTextureToTexture(encoder,
+            &(WGPUTexelCopyTextureInfo){
+                .texture = irradiance[slot], .aspect = WGPUTextureAspect_All
+            },
+            &(WGPUTexelCopyTextureInfo){
+                .texture = f->luts,
+                .origin = { 0, BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT, slot - 1u },
+                .aspect = WGPUTextureAspect_All
+            },
+            &(WGPUExtent3D){
+                BOX_RENDER_ATMOS_IRRADIANCE_WIDTH, BOX_RENDER_ATMOS_IRRADIANCE_HEIGHT, 1
             });
         f->copied[slot] = l->atmosphere;
         f->builds[slot] = builds[slot];

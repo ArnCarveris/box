@@ -1668,12 +1668,15 @@ bool box_gpu_atmosphere_luts(
     WGPUTextureView *multi,
     WGPUSampler *sampler);
 
-/** Get the transmittance LUT of an atmosphere that is built, for a copy of it.
+/** Get the transmittance and sky irradiance LUTs of an atmosphere that is built, for a copy of
+ * them.
  *
  * @param gpu The backend
  * @param handle Handle of the BOX_RENDER_ATMOSPHERE
  * @param texture Receives the transmittance LUT, BOX_RENDER_ATMOS_TRANSMITTANCE_WIDTH by
  * BOX_RENDER_ATMOS_TRANSMITTANCE_HEIGHT RGBA16Float texels
+ * @param irradiance Receives the sky irradiance LUT, BOX_RENDER_ATMOS_IRRADIANCE_WIDTH by
+ * BOX_RENDER_ATMOS_IRRADIANCE_HEIGHT RGBA16Float texels
  * @param builds Receives how often the LUTs were built, which changes with every build
  * @return Whether the LUTs exist and are built with the current shader
  */
@@ -1681,11 +1684,13 @@ bool box_gpu_atmosphere_transmittance(
     box_gpu_t *gpu,
     uint32_t handle,
     WGPUTexture *texture,
+    WGPUTexture *irradiance,
     int32_t *builds);
 
 /** Write the planet light table of a packet, a PlanetLight of planet_light.wgsl per slot, and
- * copy the transmittance LUT of each of its planets into its layer of the LUT array when the
- * LUT was built again or its slot changed, after the LUTs are built and before the targets.
+ * copy the transmittance and sky irradiance LUTs of each of its planets into its layer of the
+ * LUT array when the LUTs were built again or its slot changed, after the LUTs are built and
+ * before the targets.
  *
  * A planet whose LUTs are not built leaves its slot empty: its meshes are lit as without it.
  *
@@ -1697,8 +1702,8 @@ void box_gpu_planet_lights_prepare(
     const box_render_packet_t *packet);
 
 /** Write the planet light bindings of the view group: the table at BOX_GPU_PLANET_LIGHTS_BINDING
- * and the transmittance LUT array, a read only storage texture, at
- * BOX_GPU_PLANET_LUTS_BINDING; a 1 layer placeholder before any planet.
+ * and the LUT array, a read only storage texture of the transmittance and sky irradiance LUT of
+ * each slot, at BOX_GPU_PLANET_LUTS_BINDING; a 1 layer placeholder before any planet.
  *
  * @param gpu The backend
  * @param out Receives the two entries

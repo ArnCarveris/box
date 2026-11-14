@@ -115,7 +115,8 @@ ECS_STRUCT(AtmosphereStatus, {
  * the transmittance the mean of its channels. Reflection captures, reflection probes and
  * environment cubes do not include the shell.
  *
- * Its transmittance and multi scattering LUTs are built again only when the medium changes.
+ * Its transmittance, multi scattering and sky irradiance LUTs are built again only when the
+ * medium changes.
  *
  * With Scene.planet_light the meshes of the entity and its descendants, such as the planet body
  * and its cloud sphere, opaque, blended or transmissive, get the light of the sun attenuated per
@@ -126,9 +127,13 @@ ECS_STRUCT(AtmosphereStatus, {
  * disk of sun_radius above the horizon of the planet at r, its penumbra. A mesh belongs to its
  * nearest PlanetAtmosphere along ChildOf.
  *
- * Only the DirectionalLight along the direction of the sun is attenuated; other lights, the
- * ambient, the image based lighting and the meshes outside any PlanetAtmosphere are lit as
- * without one. The meshes of at most 63 planets of a world are lit so, further ones are not.
+ * The sun also lights them through the sky: the irradiance of the sky at (r, mu), from a sky
+ * irradiance LUT built with the others, times the intensity and Rgb of the sun and intensity,
+ * on the hemisphere around their normal, so the ground and clouds in the twilight past the
+ * terminator are lit by the glowing air. Only the DirectionalLight along the direction of the
+ * sun is attenuated; other lights, the ambient, the image based lighting and the meshes outside
+ * any PlanetAtmosphere are lit as without one. The meshes of at most 63 planets of a world are
+ * lit so, further ones are not.
  *
  * Values apply as specified; a radius, planet_radius, thickness or scale height that is not
  * positive, a negative scale or sun_radius or an anisotropy outside -1 to 1 sets
@@ -151,7 +156,8 @@ ECS_STRUCT(PlanetAtmosphere, {
     float ozone_scale;      /**< Scale of the absorption of the ozone layer, default 1 */
     rgb ground_albedo;      /**< Display encoded albedo of the planet, which the multi
                              *   scattering LUT bounces, default {77, 77, 77} */
-    float intensity;        /**< Scale of the drawn in scattered light, default 1 */
+    float intensity;        /**< Scale of the drawn in scattered light and of the sky light
+                             *   of its meshes, default 1 */
     float sun_radius;       /**< Angular radius of the sun disk in degrees as seen from the
                              *   planet, the penumbra of the shadow of the planet on its
                              *   meshes, default 0.266 as Atmosphere.sun_radius */

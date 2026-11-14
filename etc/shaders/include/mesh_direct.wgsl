@@ -2,9 +2,9 @@
 // (shadow_terminator) both share, and the loop over the lights of a fragment, with the shadows
 // of the spot and point lights (scene_punctual_shadows) and the cookie of the first directional
 // light (scene_cookies). The includer includes mesh_common.wgsl first and declares the Surface of
-// its fragments, with at least the shading normal and the geometric normal, and light_lobes, the
-// light its surface reflects of one light, whose lobes of the shading normal fade by
-// shadow_terminator.
+// its fragments, with at least the albedo, the metallic, the occlusion, the shading normal and
+// the geometric normal, and light_lobes, the light its surface reflects of one light, whose
+// lobes of the shading normal fade by shadow_terminator.
 #pragma once
 
 // Light reflected toward the eye, split into its diffuse and specular parts; the emission is
@@ -57,7 +57,8 @@ fn shadow_terminator(ng: vec3f, ns: vec3f, l: vec3f) -> f32 {
 
 // Direct light: the directional lights, then the lights of the cluster. With
 // scene_planet_light the sun of the planet of the fragment (fragment_planet) is attenuated by
-// the transmittance of its atmosphere at world. With sides 2 each light
+// the transmittance of its atmosphere at world, and its sky lights the diffuse term
+// (planet_light_sky) as a Lambert surface, unshadowed but occluded. With sides 2 each light
 // is evaluated again thickness behind the surface along the view ray, for the back lobe of a
 // diffuse transmission, which light_lobes returns for side 1. The directional and cluster lights
 // share one loop, and the sides one loop per light, so the shadows, the cookie and the lobes each
@@ -66,7 +67,8 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
     thickness: f32) -> Lit
 {
     var sum = Lit(vec3f(0.0), vec3f(0.0));
-    var planet = PlanetSun(vec3f(0.0), vec3f(1.0));
+    var sky = vec3f(0.0);
+    var planet = PlanetSun(vec3f(0.0), vec3f(1.0), vec3f(0.0, 1.0, 0.0), vec3f(0.0));
     if (scene_planet_light) {
         planet = planet_light_sun(fragment_planet, world);
     }
@@ -100,6 +102,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
             if (i < directional) {
                 l = normalize(light.position);
                 if (scene_planet_light) {
+                    if (side == 0u) {
+                        sky += planet_light_sky(planet, l, s.normal) * light.color;
+                    }
                     radiance *= planet_light_factor(planet, l);
                 }
                 if (i == 0u) {
@@ -122,6 +127,10 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
             sum.diffuse += lit.diffuse * visible;
             sum.specular += lit.specular * visible;
         }
+    }
+
+    if (scene_planet_light) {
+        sum.diffuse += s.albedo * (1.0 - s.metallic) * (s.occlusion / PI) * sky;
     }
 
     return sum;

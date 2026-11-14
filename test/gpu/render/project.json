@@ -1429,7 +1429,11 @@
                     "bumpy_terminator_continuous",
                     "bumpy_plane_grazing",
                     "penumbra_sun_radius",
-                    "penumbra_point_sun"
+                    "penumbra_point_sun",
+                    "twilight_sky_light",
+                    "night_no_sky_light",
+                    "no_scattering_no_sky_light",
+                    "shell_off_no_sky_light"
                 ]
             },
             {

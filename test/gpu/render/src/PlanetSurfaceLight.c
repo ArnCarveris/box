@@ -3,11 +3,13 @@
  * @brief Tests for the sunlight of a PlanetAtmosphere on its meshes: the terminator of a white
  * planet turns red while its subsolar point stays white, through the mesh shader, the blended
  * cloud sphere, the extended mesh shader and transmission; a mesh that is not a descendant and a
- * scene without PlanetAtmosphere are lit as before. Checked on PNG captures.
+ * scene without PlanetAtmosphere are lit as before. The sky of the atmosphere lights the
+ * ground in the twilight past the terminator with a tint of the medium, but not deep in the
+ * night nor without scattering. Checked on PNG captures.
  *
  * The planet is a white sphere of radius 1 with the Earth medium, 6360 km, whose shell draws no
- * light (intensity 0), so only the attenuation of the sun colors the surface; the shell darkens
- * the image by a gray transmittance only. The camera looks down -Z from Z 4 with a 60 degree
+ * light (intensity 0), which also turns off its sky light, so only the attenuation of the sun
+ * colors the surface; the shell darkens the image by a gray transmittance only. The camera looks down -Z from Z 4 with a 60 degree
  * field of view over a black clear color, without ambient light, and a white sun lights the
  * planet from the right, half way between +X and +Z.
  */
@@ -48,6 +50,23 @@
 /** First bin of the profile and the number of bins: mu from -0.1 to 0.3 */
 #define PS_BIN_MIN (-0.1f)
 #define PS_BINS (40)
+
+/** Intensity of the sun of the sky light cases, bright enough that the sky light of the
+ * twilight shows in the 8 bit captures */
+#define PS_SKY_SUN (300.0f)
+
+/** Intensity of the white ambient light of the sky light cases */
+#define PS_SKY_AMBIENT (0.005f)
+
+/** Cosine of the sun zenith angle on the ground of the twilight case, just past the
+ * terminator */
+#define PS_TWILIGHT_MU (-0.05f)
+
+/** Cosine of the sun zenith angle on the ground of the night case */
+#define PS_NIGHT_MU (-0.45f)
+
+/** Height of the camera of the sky light cases above the ground, about 1.3 km */
+#define PS_SKY_CAMERA (2e-4f)
 
 /** Create a headless world that renders on the main thread, without ambient light, with the
  * Scene features of the cases and a white sun toward +X and +Z.
@@ -119,6 +138,22 @@ static void ps_atmosphere(
     PlanetAtmosphere *a = ecs_get_mut(world, planet, PlanetAtmosphere);
     a->radius = 1;
     a->intensity = 0;
+    ecs_modified(world, planet, PlanetAtmosphere);
+}
+
+/** Take the scattering out of the medium of a PlanetAtmosphere: its air still absorbs by its
+ * ozone but its sky is black, so its meshes are lit by the direct sun alone.
+ *
+ * @param world The world
+ * @param planet The entity with the PlanetAtmosphere
+ */
+static void ps_no_scattering(
+    ecs_world_t *world,
+    ecs_entity_t planet)
+{
+    PlanetAtmosphere *a = ecs_get_mut(world, planet, PlanetAtmosphere);
+    a->rayleigh.scattering_scale = 0;
+    a->mie.scattering_scale = 0;
     ecs_modified(world, planet, PlanetAtmosphere);
 }
 
@@ -660,8 +695,9 @@ static float ps_horizon_mean(
  *
  * @param world The world
  * @param sun_radius PlanetAtmosphere.sun_radius
+ * @return The planet
  */
-static void ps_horizon_scene(
+static ecs_entity_t ps_horizon_scene(
     ecs_world_t *world,
     float sun_radius)
 {
@@ -676,6 +712,8 @@ static void ps_horizon_scene(
     ecs_set(world, quad, Quad, {0.1f, 0.1f});
     ecs_set(world, quad, Rgb, {255, 255, 255});
     ecs_set(world, quad, PbrMaterial, {.metallic = 0, .roughness = 1});
+
+    return planet;
 }
 
 void PlanetSurfaceLight_penumbra_sun_radius(void) {
@@ -709,5 +747,212 @@ void PlanetSurfaceLight_penumbra_point_sun(void) {
     float below = ps_horizon_mean(world, -1, "planet_light_point_m1.png");
     test_assert(above > 0.005f);
     test_assert(below < 0.01f * above + 0.002f);
+    ecs_fini(world);
+}
+
+/** Create a planet of radius 1 centered at (-1, 0, 0) without a mesh of its own, with a point
+ * sun of PS_SKY_SUN and a white ambient light of PS_SKY_AMBIENT, and a white quad of it on the
+ * ground at the origin facing up, +X, which the camera looks down at from PS_SKY_CAMERA. The
+ * camera is low enough to be in the shadow of the planet in the twilight, so the shell, which
+ * draws its light (intensity 1) and which the sky light scales with, adds little in front of
+ * the quad.
+ *
+ * @param world The world
+ * @return The planet
+ */
+static ecs_entity_t ps_sky_scene(
+    ecs_world_t *world)
+{
+    ecs_set(world, ecs_lookup(world, "sun"), DirectionalLight, {.intensity = PS_SKY_SUN});
+    ecs_singleton_set(world, AmbientLight, {.sky = {255, 255, 255}, .ground = {255, 255, 255},
+        .intensity = PS_SKY_AMBIENT});
+    ecs_entity_t camera = ecs_lookup(world, "camera");
+    ecs_set(world, camera, Position, {PS_SKY_CAMERA, 0, 0});
+    ecs_set(world, camera, Rotation, {0, (float)GLM_PI_2, 0});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = PS_SKY_CAMERA * 0.1f, .far_ = 1});
+    ecs_entity_t planet = ecs_new(world);
+    ecs_set(world, planet, Position, {-1, 0, 0});
+    ps_atmosphere(world, planet);
+    ecs_get_mut(world, planet, PlanetAtmosphere)->intensity = 1;
+    ecs_modified(world, planet, PlanetAtmosphere);
+    ecs_entity_t quad = ecs_new_w_pair(world, EcsChildOf, planet);
+    ecs_set_name(world, quad, "quad");
+    ecs_set(world, quad, Position, {1, 0, 0});
+    ecs_set(world, quad, Rotation, {0, (float)GLM_PI_2, 0});
+    ecs_set(world, quad, Quad, {0.01f, 0.01f});
+    ecs_set(world, quad, Rgb, {255, 255, 255});
+    ecs_set(world, quad, PbrMaterial, {.metallic = 0, .roughness = 1});
+
+    return planet;
+}
+
+/** Render the quad of ps_sky_scene with the sun at a cosine of its zenith angle on the ground
+ * and average the linear color of the middle of the quad.
+ *
+ * @param world The world
+ * @param mu The cosine of the sun zenith angle, +X being up
+ * @param file Name of the PNG
+ * @param out Receives the mean linear red, green and blue
+ */
+static void ps_sky_mean(
+    ecs_world_t *world,
+    float mu,
+    const char *file,
+    float *out)
+{
+    ps_sun_at(world, (float)GLM_PI_2 - asinf(mu));
+    unsigned char *px = ps_render(world, file);
+    int32_t x, y, c, count = 0;
+    out[0] = out[1] = out[2] = 0;
+    for (y = PS_SIZE / 2 - 3; y < PS_SIZE / 2 + 3; y ++) {
+        for (x = PS_SIZE / 2 - 3; x < PS_SIZE / 2 + 3; x ++) {
+            const unsigned char *p = &px[(y * PS_SIZE + x) * 4];
+            for (c = 0; c < 3; c ++) {
+                float v = (float)p[c] / 255.0f;
+                out[c] += v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f);
+            }
+
+            count ++;
+        }
+    }
+
+    for (c = 0; c < 3; c ++) {
+        out[c] /= (float)count;
+    }
+
+    stbi_image_free(px);
+    printf("%s, mu %.2f: %.4f %.4f %.4f\n", file, (double)mu, (double)out[0], (double)out[1],
+        (double)out[2]);
+}
+
+/** Render the quad of ps_sky_scene with the sun at a cosine of its zenith angle white and
+ * black and take the difference, the diffuse light of the quad: the light the shell draws in
+ * front of it and the specular cancel.
+ *
+ * @param world The world
+ * @param planet The planet of ps_sky_scene
+ * @param mu The cosine of the sun zenith angle
+ * @param name Name of the PNGs
+ * @param out Receives the mean linear diffuse color
+ */
+static void ps_sky_diffuse(
+    ecs_world_t *world,
+    ecs_entity_t planet,
+    float mu,
+    const char *name,
+    float *out)
+{
+    ecs_entity_t quad = ecs_lookup_child(world, planet, "quad");
+    float black[3];
+    test_assert(quad != 0);
+    char *file = flecs_asprintf("%s.png", name);
+    ps_sky_mean(world, mu, file, out);
+    ecs_os_free(file);
+    ecs_set(world, quad, Rgb, {0, 0, 0});
+    file = flecs_asprintf("%s_black.png", name);
+    ps_sky_mean(world, mu, file, black);
+    ecs_os_free(file);
+    ecs_set(world, quad, Rgb, {255, 255, 255});
+    glm_vec3_sub(out, black, out);
+}
+
+/** Get the diffuse light of the quad of ps_sky_scene with the sun at a cosine of its zenith
+ * angle, once lit by the sun and once with the sun turned off, by the ambient light alone.
+ *
+ * @param world The world
+ * @param planet The planet of ps_sky_scene
+ * @param mu The cosine of the sun zenith angle
+ * @param lit Receives the mean linear diffuse color lit by the sun
+ * @param ambient Receives the mean linear diffuse color lit by the ambient light alone
+ */
+static void ps_sky_pair(
+    ecs_world_t *world,
+    ecs_entity_t planet,
+    float mu,
+    float *lit,
+    float *ambient)
+{
+    ecs_entity_t sun = ecs_lookup(world, "sun");
+    char *name = flecs_asprintf("planet_sky_%d", (int)roundf(-mu * 100));
+    ps_sky_diffuse(world, planet, mu, name, lit);
+    ecs_os_free(name);
+    ecs_set(world, sun, DirectionalLight, {.intensity = 0});
+    name = flecs_asprintf("planet_sky_%d_ambient", (int)roundf(-mu * 100));
+    ps_sky_diffuse(world, planet, mu, name, ambient);
+    ecs_os_free(name);
+    ecs_set(world, sun, DirectionalLight, {.intensity = PS_SKY_SUN});
+}
+
+void PlanetSurfaceLight_twilight_sky_light(void) {
+    // planet_atmosphere/sky_light
+    ecs_world_t *world = ps_world(true);
+    ecs_entity_t planet = ps_sky_scene(world);
+
+    // Just past the terminator the sun is below the horizon of the ground, so no direct light
+    // reaches it, but the air above is still lit: the ground takes more than the ambient, and
+    // the light the sky adds is blue, the Rayleigh scattering of the Earth medium.
+    float lit[3], ambient[3], sky[3];
+    ps_sky_pair(world, planet, PS_TWILIGHT_MU, lit, ambient);
+    glm_vec3_sub(lit, ambient, sky);
+    test_assert(ambient[1] > 0.001f);
+    test_assert(lit[0] + lit[1] + lit[2] > 1.5f * (ambient[0] + ambient[1] + ambient[2]));
+    test_assert(sky[2] > 0);
+    test_assert(sky[2] > sky[0]);
+    ecs_fini(world);
+}
+
+void PlanetSurfaceLight_night_no_sky_light(void) {
+    // planet_atmosphere/sky_light
+    ecs_world_t *world = ps_world(true);
+    ecs_entity_t planet = ps_sky_scene(world);
+
+    // Deep in the night the air above the ground is in the shadow of the planet: the ground
+    // keeps the ambient alone.
+    float lit[3], ambient[3];
+    ps_sky_pair(world, planet, PS_NIGHT_MU, lit, ambient);
+    int32_t c;
+    test_assert(ambient[1] > 0.001f);
+    for (c = 0; c < 3; c ++) {
+        test_assert(fabsf(lit[c] - ambient[c]) < 0.1f * ambient[c] + 0.0005f);
+    }
+
+    ecs_fini(world);
+}
+
+void PlanetSurfaceLight_no_scattering_no_sky_light(void) {
+    // planet_atmosphere/sky_light
+    ecs_world_t *world = ps_world(true);
+    ecs_entity_t planet = ps_sky_scene(world);
+    ps_no_scattering(world, planet);
+
+    // A medium that does not scatter has a black sky, which lights nothing in the twilight.
+    float lit[3], ambient[3];
+    ps_sky_pair(world, planet, PS_TWILIGHT_MU, lit, ambient);
+    int32_t c;
+    test_assert(ambient[1] > 0.001f);
+    for (c = 0; c < 3; c ++) {
+        test_assert(fabsf(lit[c] - ambient[c]) < 0.1f * ambient[c] + 0.0005f);
+    }
+
+    ecs_fini(world);
+}
+
+void PlanetSurfaceLight_shell_off_no_sky_light(void) {
+    // planet_atmosphere/sky_light
+    ecs_world_t *world = ps_world(true);
+    ecs_entity_t planet = ps_sky_scene(world);
+    ecs_get_mut(world, planet, PlanetAtmosphere)->intensity = 0;
+    ecs_modified(world, planet, PlanetAtmosphere);
+
+    // The sky light scales with the light the shell draws, so a shell that draws none lights
+    // nothing in the twilight.
+    float lit[3], ambient[3];
+    ps_sky_pair(world, planet, PS_TWILIGHT_MU, lit, ambient);
+    int32_t c;
+    test_assert(ambient[1] > 0.001f);
+    for (c = 0; c < 3; c ++) {
+        test_assert(fabsf(lit[c] - ambient[c]) < 0.1f * ambient[c] + 0.0005f);
+    }
+
     ecs_fini(world);
 }

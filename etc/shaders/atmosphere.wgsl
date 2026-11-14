@@ -1,9 +1,9 @@
 // Lookup tables of the physically based atmosphere after Hillaire 2020, distances in km. The
-// transmittance and multi scattering LUTs belong to a scene, the sky view and aerial perspective
-// to a view. Every pass is a compute entry point with 8x8x1 workgroups that writes an
-// rgba16float storage texture, the 2D LUTs included, so no pass needs a render target. The sky
-// draw of a view is a fragment entry point that also composites its cloud layers (CloudLayer),
-// and so does the environment cubemap of a scene, seen from its capture point.
+// transmittance, multi scattering and sky irradiance LUTs belong to a scene, the sky view and
+// aerial perspective to a view. Every pass is a compute entry point with 8x8x1 workgroups that
+// writes an rgba16float storage texture, the 2D LUTs included, so no pass needs a render
+// target. The sky draw of a view is a fragment entry point that also composites its cloud layers
+// (CloudLayer), and so does the environment cubemap of a scene, seen from its capture point.
 #include "include/atmosphere_common.wgsl"
 #include "include/cube.wgsl"
 
@@ -79,6 +79,8 @@ const MULTI_DIRECTIONS: i32 = 8;
 const MULTI_STEPS: i32 = 20;
 const SKY_STEPS: i32 = 30;
 const AERIAL_STEPS: i32 = 6;
+const IRRADIANCE_DIRECTIONS: i32 = 8;
+const IRRADIANCE_STEPS: i32 = 20;
 // Coefficient u of the linear limb darkening law 1 - u (1 - mu)
 const LIMB_DARKENING: f32 = 0.6;
 
@@ -249,6 +251,41 @@ fn multi_scattering(@builtin(global_invocation_id) gid: vec3u) {
     }
 
     textureStore(out_2d, vec2i(gid.xy), vec4f(second / max(1.0 - transfer, 1e-4), 1.0));
+}
+
+// Sky irradiance of a horizontal surface facing up, per unit of sun irradiance: the single and
+// multi scattered light of the sky (scatter_ray, isotropic Mie, the sun itself excluded)
+// integrated over the upper hemisphere with the cosine, in Bruneton's sense of the ground
+// irradiance. u is the cosine of the sun zenith angle from -1 to 1, v the altitude from the
+// ground to the top, as the multi scattering LUT. The hemisphere is sampled by cosine: azimuths
+// spread evenly and the sine of the zenith angle the square root of an even fraction, so the
+// irradiance is pi times the mean radiance.
+@compute @workgroup_size(8, 8, 1)
+fn irradiance(@builtin(global_invocation_id) gid: vec3u) {
+    let dims = textureDimensions(out_2d);
+    if (gid.x >= dims.x || gid.y >= dims.y) {
+        return;
+    }
+
+    let uv = (vec2f(gid.xy) + 0.5) / vec2f(dims);
+    let cos_sun = uv.x * 2.0 - 1.0;
+    let alt = uv.y * (top_radius() - bottom_radius());
+    let ro = vec3f(0.0, bottom_radius() + max(alt, BOX_ATMOS_PLANET_OFFSET), 0.0);
+    let sun = vec3f(sqrt(max(0.0, 1.0 - cos_sun * cos_sun)), cos_sun, 0.0);
+    let samples = 1.0 / f32(IRRADIANCE_DIRECTIONS * IRRADIANCE_DIRECTIONS);
+    var sum = vec3f(0.0);
+    for (var i = 0; i < IRRADIANCE_DIRECTIONS; i = i + 1) {
+        for (var j = 0; j < IRRADIANCE_DIRECTIONS; j = j + 1) {
+            let phi = 2.0 * PI * (f32(i) + 0.5) / f32(IRRADIANCE_DIRECTIONS);
+            let sin_theta = sqrt((f32(j) + 0.5) / f32(IRRADIANCE_DIRECTIONS));
+            let cos_theta = sqrt(max(0.0, 1.0 - sin_theta * sin_theta));
+            let rd = vec3f(sin_theta * cos(phi), cos_theta, sin_theta * sin(phi));
+            let s = scatter_ray(ro, rd, 1e9, IRRADIANCE_STEPS, 1.0, true, sun, vec3f(1.0), 0.0);
+            sum = sum + s.light * samples;
+        }
+    }
+
+    textureStore(out_2d, vec2i(gid.xy), vec4f(max(sum * PI, vec3f(0.0)), 1.0));
 }
 
 @compute @workgroup_size(8, 8, 1)

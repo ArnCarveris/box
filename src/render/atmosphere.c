@@ -926,6 +926,7 @@ static void box_atmos_planet_lights(
         out->center[3] = box_atmos_planet_km(l);
         out->radii[0] = l->key.radii[0];
         out->radii[1] = l->key.radii[1];
+        out->radii[3] = glm_max(l->value.intensity, 0.0f);
         if (box_render_lights_planet_sun(lights, l->scene, l->value.sun, out->sun, color) &&
             glm_vec3_norm(out->sun) > 0.0f)
         {

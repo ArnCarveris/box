@@ -1146,6 +1146,12 @@ typedef struct box_render_reflect_batch_t {
 /** Width of the fog in scatter color of a view in texels: the ambient and the glow */
 #define BOX_RENDER_ATMOS_FOG_WIDTH (2)
 
+/** Width of the sky irradiance LUT of an atmosphere in texels, over the cosine of the sun */
+#define BOX_RENDER_ATMOS_IRRADIANCE_WIDTH (64)
+
+/** Height of the sky irradiance LUT of an atmosphere in texels, over the altitude */
+#define BOX_RENDER_ATMOS_IRRADIANCE_HEIGHT (16)
+
 /** Passes of the atmosphere, the order of their GPU times in box_render_gpu_stats_t */
 typedef enum box_render_atmos_pass_t {
     BOX_RENDER_ATMOS_TRANSMITTANCE, /**< Transmittance LUT of a scene */
@@ -1156,6 +1162,8 @@ typedef enum box_render_atmos_pass_t {
     BOX_RENDER_ATMOS_SCENE_SKY,     /**< Sky view LUT of a scene at its ground altitude, which
                                      *   its environment is rendered from */
     BOX_RENDER_ATMOS_ENVIRONMENT,   /**< Mip 0 of the environment cubemap of a scene */
+    BOX_RENDER_ATMOS_IRRADIANCE,    /**< Sky irradiance LUT of a scene, which lights the meshes
+                                     *   of a PlanetAtmosphere */
     BOX_RENDER_ATMOS_PASSES         /**< Number of passes */
 } box_render_atmos_pass_t;
 
@@ -1216,7 +1224,8 @@ typedef struct box_render_star_field_t {
  * slot; its first members are the layout of PlanetLight in planet_light.wgsl. */
 typedef struct box_render_planet_light_t {
     float center[4];        /**< World position of the entity, w km per world unit */
-    float radii[4];         /**< Bottom and top radius in km, z and w unused */
+    float radii[4];         /**< Bottom and top radius in km, z unused, w the scale of its
+                             *   sky light, PlanetAtmosphere.intensity */
     float sun[4];           /**< Direction toward its sun, (0, -1, 0) without a sun; w the
                              *   angular radius of the sun disk in radians */
     uint32_t slot;          /**< Planet light slot the mesh instances reference, 1 to
