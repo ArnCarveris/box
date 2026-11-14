@@ -39,7 +39,7 @@ assets {
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, blend_modes: true, transmission: true, fresnel: true}
+  Scene: {environment: true, blend_modes: true, transmission: true, fresnel: true, distortion: true}
   AmbientLight: {sky: {120, 140, 180}, ground: {50, 60, 84}, intensity: 0.4}
 }
 
@@ -114,13 +114,12 @@ if liner {
         Position: {0, AXIS_Y, (ship_z0 + ship_z1) / 2}
         Scale: {RING_R + 3.5, RING_R + 3.5, (ship_z1 - ship_z0) / 2 + 8}
         Sphere: {radius: 1, segments: 48, smooth: true}
-        Rgb: {110, 170, 255}
-        Emissive: {strength: 0.05 * pf[C_SHIELDS], color: {110, 170, 255}}
-        Fresnel: {color: {120, 190, 255}, strength: 1.4 * pf[C_SHIELDS], power: 4, bias: 0, opacity: 0.2 * pf[C_SHIELDS]}
-        Opacity: {0.01 * pf[C_SHIELDS]}
-        Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Fresnel: {duration: 1, timing_function: EaseInOut}, Opacity: {duration: 1, timing_function: EaseInOut}]
-        BlendMode: Additive
-        NoShadow
+        Rgb: {0, 0, 0}
+        PbrMaterial: {metallic: 1, roughness: 1}
+        Emissive: {strength: 0.004 * pf[C_SHIELDS], color: {110, 170, 255}}
+        Fresnel: {color: {120, 190, 255}, strength: 0.8 * pf[C_SHIELDS], power: 3, bias: 0}
+        Distortion: {strength: 0.003 * pf[C_SHIELDS], scale: 6, speed: 0.12}
+        Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Fresnel: {duration: 1, timing_function: EaseInOut}, Distortion: {duration: 1, timing_function: EaseInOut}]
         Ignore
       }
     }
