@@ -26,6 +26,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->shadow_tiles, box_render_shadow_tile_t, 0);
     ecs_vec_init_t(NULL, &p->fog_volumes, box_render_fog_volume_t, 0);
     ecs_vec_init_t(NULL, &p->planet_atmospheres, box_render_planet_atmos_t, 0);
+    ecs_vec_init_t(NULL, &p->star_fields, box_render_star_field_t, 0);
     ecs_vec_init_t(NULL, &p->planet_lights, box_render_planet_light_t, 0);
     ecs_vec_init_t(NULL, &p->planar_reflections, box_render_planar_t, 0);
     ecs_vec_init_t(NULL, &p->debug_boxes, box_render_debug_box_t, 0);
@@ -52,6 +53,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->shadow_tiles, box_render_shadow_tile_t);
     ecs_vec_fini_t(NULL, &p->fog_volumes, box_render_fog_volume_t);
     ecs_vec_fini_t(NULL, &p->planet_atmospheres, box_render_planet_atmos_t);
+    ecs_vec_fini_t(NULL, &p->star_fields, box_render_star_field_t);
     ecs_vec_fini_t(NULL, &p->planet_lights, box_render_planet_light_t);
     ecs_vec_fini_t(NULL, &p->planar_reflections, box_render_planar_t);
     ecs_vec_fini_t(NULL, &p->debug_boxes, box_render_debug_box_t);
@@ -89,6 +91,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->shadow_tiles);
     ecs_vec_clear(&p->fog_volumes);
     ecs_vec_clear(&p->planet_atmospheres);
+    ecs_vec_clear(&p->star_fields);
     ecs_vec_clear(&p->planet_lights);
     ecs_vec_clear(&p->planar_reflections);
     ecs_vec_clear(&p->debug_boxes);
@@ -163,6 +166,8 @@ void box_render_packet_copy(
         ECS_SIZEOF(box_render_fog_volume_t));
     box_render_vec_copy(&dst->planet_atmospheres, &src->planet_atmospheres,
         ECS_SIZEOF(box_render_planet_atmos_t));
+    box_render_vec_copy(&dst->star_fields, &src->star_fields,
+        ECS_SIZEOF(box_render_star_field_t));
     box_render_vec_copy(&dst->planet_lights, &src->planet_lights,
         ECS_SIZEOF(box_render_planet_light_t));
     box_render_vec_copy(&dst->planar_reflections, &src->planar_reflections,

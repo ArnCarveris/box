@@ -1346,6 +1346,17 @@
                 ]
             },
             {
+                "id": "StarField",
+                "testcases": [
+                    "points_deterministic",
+                    "subpixel_keeps_energy",
+                    "hidden_by_opaque",
+                    "rotation_moves",
+                    "count_zero_draws_nothing",
+                    "under_additive"
+                ]
+            },
+            {
                 "id": "FogVolume",
                 "testcases": [
                     "no_volume_no_pass",

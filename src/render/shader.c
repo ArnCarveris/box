@@ -457,7 +457,8 @@ static void box_shader_changed(
  * and the packet has a particle pool, or it blurs the opaque snapshot and a batch is
  * transmissive, or it raymarches fog volumes or assigns lights to clusters and a view of the
  * packet draws a fog volume, which reads the clusters for its point and spot lights, or it
- * raymarches planet atmosphere shells and a view of the packet draws one, or it
+ * raymarches planet atmosphere shells and a view of the packet draws one, or it draws star
+ * fields and a view of the packet draws one, or it
  * draws the debug grid and a view of the packet has it enabled, or it draws the wireframe and
  * a view of the packet has one, or it draws the probe debug views and a view of the packet has
  * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled, or it
@@ -509,6 +510,10 @@ static bool box_shader_used(
     if (handle == BOX_RENDER_SHADER_PLANET_ATMOSPHERE &&
         ecs_vec_count(&p->planet_atmospheres))
     {
+        result = true;
+    }
+
+    if (handle == BOX_RENDER_SHADER_STAR_FIELD && ecs_vec_count(&p->star_fields)) {
         result = true;
     }
 
@@ -986,6 +991,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_FOG_VOLUME, true);
     box_shader_builtin(world, state, builtin, "planet_atmosphere",
         "etc/shaders/planet_atmosphere.wgsl", BOX_RENDER_SHADER_PLANET_ATMOSPHERE, true);
+    box_shader_builtin(world, state, builtin, "star_field", "etc/shaders/star_field.wgsl",
+        BOX_RENDER_SHADER_STAR_FIELD, true);
     box_shader_builtin(world, state, builtin, "debug_grid", "etc/shaders/debug_grid.wgsl",
         BOX_RENDER_SHADER_DEBUG_GRID, true);
     box_shader_builtin(world, state, builtin, "debug_wire", "etc/shaders/debug_wire.wgsl",

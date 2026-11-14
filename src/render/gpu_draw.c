@@ -288,6 +288,7 @@ void box_gpu_draw_init(
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
     box_gpu_fog_volumes_init(gpu);
+    box_gpu_star_fields_init(gpu);
     box_gpu_planets_init(gpu);
     box_gpu_debug_init(gpu);
     box_gpu_planar_init(gpu);
@@ -695,6 +696,7 @@ void box_gpu_draw_fini(
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
+    box_gpu_star_fields_fini(gpu);
     box_gpu_planets_fini(gpu);
     box_gpu_debug_fini(gpu);
     box_gpu_planar_fini(gpu);
@@ -1399,9 +1401,9 @@ static void box_gpu_draw_snapshot(
 
 /** Record the indirect draws of the batches a view renders in a pass, in packet order.
  *
- * After the 3D meshes shared by every view come the sky of a view that renders its atmosphere,
- * the blended layers around the ground of a planet (box_render_batch_t.atmosphere), its planet
- * shells, fog volumes and particles, then its 2D shapes and other blended draws.
+ * After the 3D meshes shared by every view come the sky and star fields of a view, the blended
+ * layers around the ground of a planet (box_render_batch_t.atmosphere), its planet shells, fog
+ * volumes and particles, then its 2D shapes and other blended draws.
  *
  * After a depth prepass the opaque meshes draw once with the Equal pipelines and the early
  * arguments, which the late phase of occlusion appends to: what both prepasses drew. A
@@ -1440,6 +1442,7 @@ static void box_gpu_draw_batches(
     uint32_t material_kind = 0;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     bool sky = phase == 1 || !box_gpu_atmosphere_sky(gpu, v);
+    bool stars = phase == 1 || !box_gpu_star_fields_ready(gpu, v);
     bool particles = phase == 1;
     bool wired = v->debug.wireframe == WireframeOnly;
     int32_t i;
@@ -1470,6 +1473,15 @@ static void box_gpu_draw_batches(
         if (!sky && !mesh) {
             sky = true;
             if (box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset)) {
+                bound = NULL;
+                material = NULL;
+                instances = NULL;
+            }
+        }
+
+        if (!stars && !mesh) {
+            stars = true;
+            if (box_gpu_star_fields_draw(gpu, vp->pass, t, format, packet, v)) {
                 bound = NULL;
                 material = NULL;
                 instances = NULL;
@@ -1531,6 +1543,10 @@ static void box_gpu_draw_batches(
 
     if (!sky) {
         box_gpu_draw_sky(gpu, t, vp->pass, format, v, group, offset);
+    }
+
+    if (!stars) {
+        box_gpu_star_fields_draw(gpu, vp->pass, t, format, packet, v);
     }
 
     if (!particles) {

@@ -1,0 +1,65 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+
+$ {
+  Scene: {blend_modes: true}
+}
+
+// A procedural star field behind a dark moon seen through a narrow camera: sharp stars of
+// varied brightness and color, denser along a band tilted across the view, that bloom in the
+// HDR image. The moon hides the stars behind it; a faint additive veil on the right adds a
+// purple glow over the stars without hiding them.
+
+camera {
+  Position: {0, 0, 0}
+  Camera: {fov: 16, far_: 0}
+}
+
+bloom {
+  Bloom: {intensity: 0.3, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {0, 0, 0, 255}}, effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+$ {
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+}
+
+sun {
+  Rotation: {-0.3, 1.2, 0}
+  DirectionalLight: {intensity: 2 * flecs.script.math.PI}
+  Rgb: {255, 250, 240}
+}
+
+// The band is the local XZ plane, rolled about Z so that it crosses the center of the view
+// diagonally
+stars {
+  Rotation: {0, 0, 0.6}
+  StarField: {count: 40000, seed: 7, brightness: 8, falloff: 4, size: 1.6, temperature_min: 3000, temperature_max: 14000, saturation: 0.7, band: 0.7, band_width: 2}
+}
+
+moon {
+  Position: {-5, 1.5, -60}
+  Sphere: {radius: 3, segments: 64}
+  Rgb: {90, 88, 84}
+  PbrMaterial: {roughness: 0.95}
+}
+
+veil {
+  Position: {6, -2, -60}
+  Box: {6, 6, 0.1}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {40, 10, 60}}
+  BlendMode: {Additive}
+}

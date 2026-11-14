@@ -365,6 +365,99 @@ void box_render_fog_offset(
     double time,
     float *out);
 
+/** Star fields the light extract gives the views, see box_render_star_views */
+typedef struct box_render_stars_t box_render_stars_t;
+
+/** Radius in pixels below which a star is drawn as a point, its energy spread with a tent filter
+ * over the at most two by two pixels nearest its center */
+#define BOX_RENDER_STAR_MIN_RADIUS (0.5f)
+
+/** Create the state of the star fields of the views and its query.
+ *
+ * @param world The world
+ * @return The state
+ */
+box_render_stars_t* box_render_stars_new(
+    ecs_world_t *world);
+
+/** Free the state of the star fields of the views.
+ *
+ * @param stars The state, NULL for none
+ */
+void box_render_stars_free(
+    box_render_stars_t *stars);
+
+/** Write the record of a StarField: its values clamped to their ranges and the unit axes of the
+ * rotation of a world transform, the identity without one.
+ *
+ * @param field The StarField
+ * @param transform World transform of the entity, NULL for none
+ * @param entity The entity
+ * @param out Receives the record
+ */
+void box_render_star_record(
+    const StarField *field,
+    const WorldTransform *transform,
+    ecs_entity_t entity,
+    box_render_star_field_t *out);
+
+/** Give every lit view with a perspective camera with a depth range the StarFields of the scene
+ * of its camera, by entity id, after the records of the views before. A StarField with count 0
+ * is left out. Views without a view entity and captures get none.
+ *
+ * @param world The world
+ * @param stars The state
+ * @param p The packet, whose views are lit
+ */
+void box_render_star_views(
+    ecs_world_t *world,
+    box_render_stars_t *stars,
+    box_render_packet_t *p);
+
+/** A star of a star field as etc/shaders/star_field.wgsl generates it */
+typedef struct box_render_star_t {
+    float direction[3];     /**< Unit world direction toward the star */
+    float relative;         /**< Relative brightness, u^falloff, 0 to 1 */
+    float temperature;      /**< Temperature in kelvin */
+    float radius;           /**< Radius of its disc in pixels, size * sqrt(relative) */
+    float drawn;            /**< Radius of the disc it is drawn with, radius, or 0 for a point
+                             *   when radius is below BOX_RENDER_STAR_MIN_RADIUS */
+    float peak;             /**< Emission of a disc at its center, brightness * radius^2 /
+                             *   (radius^2 + 1/12), so the disc with its one pixel ramp keeps
+                             *   the energy brightness * pi * radius^2; of a point, that energy,
+                             *   the emission of a pixel it is centered on */
+    float color[3];         /**< Linear color, the brightest channel 1 */
+} box_render_star_t;
+
+/** Hash a 32 bit integer, the hash of etc/shaders/star_field.wgsl.
+ *
+ * @param x The integer
+ * @return The hash
+ */
+uint32_t box_render_star_hash(
+    uint32_t x);
+
+/** Get the display encoded blackbody color of a temperature, the fit of Tanner Helland that the
+ * planet scene uses: the brightest channel is 255.
+ *
+ * @param kelvin The temperature, clamped to 1000..40000
+ * @param out Receives r, g and b from 0 to 255
+ */
+void box_render_star_blackbody(
+    float kelvin,
+    float *out);
+
+/** Generate a star of a star field as the shader does.
+ *
+ * @param field The record of the star field
+ * @param index Index of the star, 0 to count - 1
+ * @param out Receives the star
+ */
+void box_render_star_sample(
+    const box_render_star_field_t *field,
+    uint32_t index,
+    box_render_star_t *out);
+
 /** Check whether a sphere may reach into the frustum of a view.
  *
  * A camera that follows the aspect of its surface is tested with a wide aspect of 4, an

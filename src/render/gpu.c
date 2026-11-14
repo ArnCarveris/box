@@ -543,6 +543,7 @@ static void box_gpu_render(
     box_gpu_environment_process(gpu, packet);
     box_gpu_particles_simulate(gpu, packet);
     box_gpu_fog_volumes_begin(gpu);
+    box_gpu_star_fields_begin(gpu);
     box_gpu_planets_begin(gpu);
     box_gpu_debug_begin(gpu);
     box_gpu_bake_capture(gpu, packet);
@@ -790,6 +791,9 @@ void box_gpu_count(
     case BOX_GPU_STAT_FOG_VOLUME:
         gpu->pending.fog_volumes ++;
         break;
+    case BOX_GPU_STAT_STAR_FIELD:
+        gpu->pending.star_fields ++;
+        break;
     case BOX_GPU_STAT_DEBUG_PASS:
         gpu->pending.debug_passes ++;
         break;
@@ -821,6 +825,7 @@ void box_gpu_stats_publish(
     s->prepass_draws += p->prepass_draws;
     s->debug_passes += p->debug_passes;
     s->fog_volumes += p->fog_volumes;
+    s->star_fields += p->star_fields;
     s->transmission_snapshots += p->transmission_snapshots;
     s->transmission_textures += p->transmission_textures;
     s->forward_passes += p->forward_passes;

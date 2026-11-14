@@ -141,6 +141,7 @@ typedef struct box_render_lights_t {
     ecs_query_t *atmospheres;   /**< Entities with Atmosphere, NULL without box.atmosphere */
     ecs_query_t *times;         /**< Entities with TimeOfDay, NULL without box.atmosphere */
     box_render_fog_t *fog;      /**< Fog volumes of the views, see box_render_fog_views */
+    box_render_stars_t *stars;  /**< Star fields of the views, see box_render_star_views */
     box_render_transitions_t *transitions; /**< State of the transition extract, which lists
                                  *   the lights that transition, NULL without it */
     ecs_vec_t scenes;           /**< box_light_scene_t */

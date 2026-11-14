@@ -1514,6 +1514,7 @@ static void BoxRenderExtractLights(
     box_lights_send(l, p);
     box_lights_views(world, l, p);
     box_render_fog_views(world, l->fog, p, &l->stats);
+    box_render_star_views(world, l->stars, p);
     box_lights_atmos_status(it, l);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
     if (status) {
@@ -1548,6 +1549,7 @@ static void box_lights_free(
     ecs_vec_fini_t(NULL, &l->candidates, int32_t);
     ecs_vec_fini_t(NULL, &l->views, int32_t);
     box_render_fog_free(l->fog);
+    box_render_stars_free(l->stars);
     ecs_map_fini(&l->lookup);
     ecs_os_free(l);
 }
@@ -1643,6 +1645,7 @@ void box_render_lights_init(
     l->bakes = box_lights_scene_query(world, ecs_id(LightBake), "RenderLightBakes");
     l->atlases = box_lights_scene_query(world, ecs_id(ShadowAtlas), "RenderShadowAtlases");
     l->fog = box_render_fog_new(world);
+    l->stars = box_render_stars_new(world);
     l->transitions = box_render_transitions_get(world);
 
     ecs_system(world, {

@@ -50,6 +50,8 @@ typedef struct box_render_gpu_stats_t {
                                  *   their draw calls count among draws */
     int32_t fog_volumes;        /**< Fog volumes drawn, one per volume of a view in each frame
                                  *   it renders; their draw calls count among draws */
+    int32_t star_fields;        /**< Star fields drawn, one per StarField of a view in each
+                                 *   frame it renders; their draw calls count among draws */
     int32_t transmission_snapshots; /**< Snapshots recorded for transmission, per frame of a
                                  *   view one before its first transmissive draw and one before
                                  *   each later one that follows other draws, at most 4 */

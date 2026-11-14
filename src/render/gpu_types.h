@@ -104,6 +104,9 @@ typedef struct box_gpu_particles_t box_gpu_particles_t;
 /** Pipelines and the buffer of the draws of the fog volumes */
 typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
 
+/** Pipelines and the buffer of the draws of the star fields */
+typedef struct box_gpu_star_fields_t box_gpu_star_fields_t;
+
 /** Pipelines and the buffer of the draws of the planet atmosphere shells */
 typedef struct box_gpu_planets_t box_gpu_planets_t;
 
@@ -1122,6 +1125,7 @@ typedef struct box_gpu_t {
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
+    box_gpu_star_fields_t *star_fields; /**< Star field draws */
     box_gpu_planets_t *planets;     /**< Planet atmosphere shell draws */
     box_gpu_debug_t *debug;         /**< Debug passes of the views */
     box_gpu_planar_t *planar;       /**< Planar reflections of the views */
@@ -1202,6 +1206,7 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_COPY_DIRECT,       /**< A copy went from its source to its destination */
     BOX_GPU_STAT_COPY_STAGED,       /**< A copy went through the staging buffer */
     BOX_GPU_STAT_FOG_VOLUME,        /**< A fog volume was drawn */
+    BOX_GPU_STAT_STAR_FIELD,        /**< A star field was drawn */
     BOX_GPU_STAT_DEBUG_PASS         /**< A debug render pass of a view was recorded */
 } box_gpu_stat_t;
 

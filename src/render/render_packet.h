@@ -77,6 +77,9 @@
  * view */
 #define BOX_RENDER_SHADER_PLANET_ATMOSPHERE (61)
 
+/** Shader handle of the engine shader that draws the stars of the StarFields of a view */
+#define BOX_RENDER_SHADER_STAR_FIELD (11)
+
 /** Shader handle of the engine shader that draws the infinite grid of the debug pass of a view */
 #define BOX_RENDER_SHADER_DEBUG_GRID (52)
 
@@ -884,6 +887,9 @@ typedef struct box_render_view_t {
                                  *   packet */
     int32_t planet_count;       /**< Planet atmospheres the view draws, back to front, filled
                                  *   by the atmosphere extract for a lit view with a depth */
+    int32_t star_first;         /**< Index of the first star field of the view in the packet */
+    int32_t star_count;         /**< Star fields the view draws, filled by the light extract
+                                 *   for a lit view with a perspective camera with a depth */
     int32_t fog_first;          /**< Index of the first fog volume of the view in the packet */
     int32_t fog_count;          /**< Fog volumes the view draws, back to front, filled by the
                                  *   light extract for a lit view with LightSettings.fog_volumes */
@@ -1181,6 +1187,25 @@ typedef struct box_render_planet_atmos_t {
     uint32_t atmosphere;    /**< Handle of its BOX_RENDER_ATMOSPHERE, the LUTs */
     ecs_entity_t entity;    /**< Entity with the PlanetAtmosphere */
 } box_render_planet_atmos_t;
+
+/** The stars of a StarField a view draws, resolved by the light extract (stars.c): its values
+ * clamped to their ranges and the rotation of its entity. */
+typedef struct box_render_star_field_t {
+    float rotation[3][4];   /**< Unit X, Y and Z axes of the world rotation of the entity, w
+                             *   unused; the band is the plane of X and Z */
+    int32_t count;          /**< Stars, 0 to BOX_STAR_FIELD_MAX */
+    uint32_t seed;          /**< Seed of the hash */
+    float brightness;       /**< Emission of the brightest stars, at least 0 */
+    float falloff;          /**< Exponent of the relative brightness, at least 0 */
+    float size;             /**< Radius of the brightest star in pixels, at least 0 */
+    float temperature_min;  /**< Coolest star in kelvin, 1000 to 40000 */
+    float temperature_max;  /**< Hottest star in kelvin, temperature_min to 40000 */
+    float saturation;       /**< Saturation of the colors, 0 to 1 */
+    float band;             /**< Share of the stars in the band, 0 to 1 */
+    float band_width;       /**< Standard deviation of the latitude of the band in radians, at
+                             *   least 0 */
+    ecs_entity_t entity;    /**< Entity with the StarField */
+} box_render_star_field_t;
 
 /** Planet light slots, slot 0 is none: a mesh shape whose nearest PlanetAtmosphere at or above
  * it has a slot from 1 to BOX_RENDER_PLANET_LIGHT_MAX - 1 attenuates the light of its sun */
@@ -1831,6 +1856,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t fog_volumes;  /**< box_render_fog_volume_t, the fog volumes of the views */
     ecs_vec_t planet_atmospheres; /**< box_render_planet_atmos_t, the planet atmosphere shells
                              *   of the views */
+    ecs_vec_t star_fields;  /**< box_render_star_field_t, the star fields of the views */
     ecs_vec_t planet_lights; /**< box_render_planet_light_t, the planets whose sun the mesh
                              *   instances with a planet light slot are lit by */
     ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the

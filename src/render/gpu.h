@@ -1832,6 +1832,57 @@ bool box_gpu_fog_volumes_draw(
     WGPUTextureView glass,
     box_gpu_fog_segment_t segment);
 
+/** Create the layouts of the star field draws, after the view layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_star_fields_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and buffer of the star field draws.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_star_fields_fini(
+    box_gpu_t *gpu);
+
+/** Start the star field draws of a packet, which fill the buffer of the draws from its start.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_star_fields_begin(
+    box_gpu_t *gpu);
+
+/** Check whether a view draws star fields: it has records and the shader is compiled.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return Whether the view draws its star fields in this frame
+ */
+bool box_gpu_star_fields_ready(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
+
+/** Record the star fields of a view, one instanced draw of a quad per star for each field, where
+ * the depth of the pass is still the clear value. Replaces the pipeline and the bind group at 1.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view, with the bind group of the view at 0
+ * @param t The target, whose size the projection and the pixels of the stars follow
+ * @param format The format of the color target
+ * @param packet The packet, which holds the records
+ * @param v The view
+ * @return Whether the pipeline of the fields was bound, so the pipeline and the group at 1
+ * bound before are not
+ */
+bool box_gpu_star_fields_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_gpu_target_t *t,
+    WGPUTextureFormat format,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
 /** Probes of a kind (light or reflection) the debug pass of a view draws at most */
 #define BOX_GPU_DEBUG_PROBES_MAX ((uint32_t)BOX_RENDER_DEBUG_PROBES_MAX)
 

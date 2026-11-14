@@ -380,6 +380,63 @@ ECS_STRUCT(FogVolume, {
                               *   default {0, 0, 0} */
 });
 
+/** Stars a StarField draws at most; a larger count draws this many */
+#define BOX_STAR_FIELD_MAX (1000000)
+
+/** A procedural field of stars on the background, points of light at infinite distance that
+ * every lit 3D view of its scene (a view with lighting and a perspective camera with a depth
+ * range) draws behind all geometry. It is background only: environment captures, image based
+ * lighting, reflection probes, reflection captures and bakes do not see it.
+ *
+ * Star i of count is generated on the GPU from a hash of i and the seed: a direction, uniform on
+ * the sphere or, with probability band, along the galactic plane, a relative brightness
+ * r = u^falloff for u uniform in 0..1, and a temperature uniform from temperature_min to
+ * temperature_max. The galactic plane is the local XZ plane of the entity, so the field turns
+ * with the rotation of its world transform; it does not move with the camera or the entity.
+ *
+ * A star is a disc of radius size * sqrt(r) pixels that emits brightness times its color,
+ * anti-aliased over one pixel, so its energy is proportional to r; a star whose radius is below
+ * half a pixel is a point that keeps that energy (dimmer, not smaller), spread over the at most
+ * two by two pixels nearest its center, so it does not flicker or crawl as the camera turns.
+ * The color is the blackbody color of the temperature (the blackbody() of the planet scene),
+ * decoded to linear and mixed toward white by 1 - saturation.
+ *
+ * Stars draw after the opaque meshes where no geometry is, after the sky and the environment
+ * background and before the planet atmosphere shells, fog volumes, particles and blended draws,
+ * into the HDR image of a view with effects, so bloom and the tonemapper apply. They add to the
+ * background and are not hazed by aerial perspective; a height fog effect fogs them as it fogs
+ * the rest of the background.
+ *
+ * 0 always means zero: count 0 draws nothing, brightness 0 draws black stars, band 0 is uniform.
+ *
+ * @par Stars along a band tilted 60 degrees:
+ * @code
+ * stars {
+ *   Rotation: {1.047, 0, 0}
+ *   StarField: {count: 30000, seed: 7, band: 0.6}
+ * }
+ * @endcode
+ */
+ECS_STRUCT(StarField, {
+    int32_t count;          /**< Number of stars, default 20000, clamped to 0..
+                             *   BOX_STAR_FIELD_MAX */
+    uint32_t seed;          /**< Seed of the hash, default 1 */
+    float brightness;       /**< Emission of the brightest stars in the units of
+                             *   Emissive.strength, default 6 */
+    float falloff;          /**< Slope of the brightness distribution, r = u^falloff, default
+                             *   4: larger makes more faint stars, 0 makes all stars as bright
+                             *   as the brightest */
+    float size;             /**< Radius of the brightest star in pixels, default 1.5 */
+    float temperature_min;  /**< Coolest star in kelvin, default 3000 */
+    float temperature_max;  /**< Hottest star in kelvin, default 12000 */
+    float saturation;       /**< Saturation of the blackbody colors, 0 white to 1 full,
+                             *   default 0.6 */
+    float band;             /**< Share of the stars concentrated along the galactic plane, 0
+                             *   uniform to 1 all of them, default 0.4 */
+    float band_width;       /**< Standard deviation in degrees of the latitude of the stars of
+                             *   the band, default 8 */
+});
+
 /** How the mip levels of an environment cubemap are prefiltered from its first level */
 ECS_ENUM(EnvironmentFilter, {
     EnvironmentFilterGgx = 0, /**< GGX radiance of a rougher surface at each higher level */

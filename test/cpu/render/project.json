@@ -119,6 +119,28 @@
                 ]
             },
             {
+                "id": "StarField",
+                "testcases": [
+                    "defaults",
+                    "zero_is_literal",
+                    "reflection",
+                    "record_in_packet",
+                    "rotated_record",
+                    "clamped_values",
+                    "count_zero_none",
+                    "unlit_view_none",
+                    "ortho_view_none",
+                    "other_scene_none",
+                    "two_fields_by_entity",
+                    "records_follow_add",
+                    "sample_deterministic",
+                    "sample_band",
+                    "sample_falloff",
+                    "sample_energy",
+                    "blackbody"
+                ]
+            },
+            {
                 "id": "ReflectionBake",
                 "testcases": [
                     "script_defaults",

@@ -301,6 +301,40 @@ static void box_fog_volume_ctor(
     }
 }
 
+/** Construct StarField values.
+ *
+ * 20000 stars of seed 1 whose brightest emits 6 with a radius of 1.5 pixels, a falloff of 4,
+ * temperatures from 3000 to 12000 kelvin at a saturation of 0.6 and 40% of them in a band of 8
+ * degrees.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_star_field_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    StarField *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (StarField){
+            .count = 20000,
+            .seed = 1,
+            .brightness = 6.0f,
+            .falloff = 4.0f,
+            .size = 1.5f,
+            .temperature_min = 3000.0f,
+            .temperature_max = 12000.0f,
+            .saturation = 0.6f,
+            .band = 0.4f,
+            .band_width = 8.0f
+        };
+    }
+}
+
 /** Add ReflectionBakeStatus to an entity that got ReflectionBake.
  *
  * @param it The observer iterator
@@ -414,6 +448,8 @@ void BoxLightImport(
     ecs_set_hooks(world, PlanarReflection, { .ctor = box_planar_reflection_ctor });
     ECS_META_COMPONENT(world, FogVolume);
     ecs_set_hooks(world, FogVolume, { .ctor = box_fog_volume_ctor });
+    ECS_META_COMPONENT(world, StarField);
+    ecs_set_hooks(world, StarField, { .ctor = box_star_field_ctor });
     ECS_META_COMPONENT(world, EnvironmentFilter);
     ECS_META_COMPONENT(world, Environment);
     ecs_set_hooks(world, Environment, { .ctor = box_environment_ctor });
