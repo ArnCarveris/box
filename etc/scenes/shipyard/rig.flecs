@@ -1,0 +1,122 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.transition
+using state
+
+assets {
+  // One module and the hull around it, with the faces and edges that its visible neighbors
+  // decide (v). The same template draws a built module and the see-through preview of a tool.
+  template ModuleView {
+    prop k: i32 = 0
+    prop v: RigCellView = {}
+    prop y: i32 = 0
+    prop seed: i32 = 0
+    prop burning: bool = false
+
+    const n = v.near
+    const px = n.px == 0
+    const nx = n.nx == 0
+    const py = !v.roof
+    const ny = n.ny == 0
+    const pz = n.pz == 0
+    const nz = n.nz == 0
+
+    if k == K_WEAPON {
+      WeaponMount mount(side: mount_side(n))
+    } else if k == K_DOCK {
+      DockMount mount(side: dock_side(n), seed: seed)
+    } else if k == K_ENGINE {
+      EngineMount mount(seed: seed, mounted: n.pz != 0, burning: burning)
+    } else if k == K_RADIATOR {
+      RadiatorMount mount(side: cool_side(n))
+    } else if k == K_DATA {
+      Datacenter racks(pz: n.pz != K_DATA, nz: n.nz != K_DATA, roof: v.roof, seed: seed)
+    } else if k == K_DRILL {
+      DrillMount mount(side: drill_side(n))
+    } else if k == K_BUILDER {
+      BuilderMount mount(side: mount_side(n), seed: seed)
+    } else if shaped(k) && v.shape != 0 {
+      HullFairing fairing(shape: v.shape, sx: v.sx, sy: v.sy, sz: v.sz)
+    } else if k == K_CARGO {
+      CargoRack rack(px: px, nx: nx, py: py, pz: !racked(n.pz), nz: !racked(n.nz), belly: y == 0, seed: seed)
+    } else if k == K_FUEL {
+      FuelRack rack(
+        px: !racked(n.px), nx: !racked(n.nx), pz: !racked(n.pz), nz: !racked(n.nz),
+        tp: n.pz == K_FUEL, tn: n.nz == K_FUEL
+      )
+    } else if k == K_POWER {
+      PowerPlant plant(pz: n.pz != K_POWER, nz: n.nz != K_POWER, roof: v.roof)
+    } else if k == K_LIFE {
+      LifePlant plant(pz: n.pz != K_LIFE, nz: n.nz != K_LIFE, roof: v.roof, seed: seed)
+    } else if k == K_BIOME {
+      BiomeHouse house(
+        px: n.px != K_BIOME, nx: n.nx != K_BIOME,
+        pz: n.pz != K_BIOME, nz: n.nz != K_BIOME, seed: seed
+      )
+    } else {
+      HullShell skin(
+        px: !v.skin_px, nx: !v.skin_nx, py: !v.skin_py,
+        ny: !v.skin_ny, pz: !v.skin_pz && !piloted(k), nz: !v.skin_nz,
+        xy_pp: v.xy_pp, xy_pn: v.xy_pn, xy_np: v.xy_np, xy_nn: v.xy_nn,
+        xz_pp: v.xz_pp, xz_pn: v.xz_pn, xz_np: v.xz_np, xz_nn: v.xz_nn,
+        yz_pp: v.yz_pp, yz_pn: v.yz_pn, yz_np: v.yz_np, yz_nn: v.yz_nn
+      )
+      ModuleExterior outfit(
+        k: k, px: px, nx: nx, py: py, ny: ny, pz: pz, nz: nz, seed: seed,
+        fpx: v.fpx, fnx: v.fnx
+      )
+    }
+  }
+
+  // The module in cell idx of a rig, in the frame of its cell. A lifted module floats above
+  // its cell and settles into it when lifted goes back to false, a tinted one takes tint. The
+  // power of the module goes with its props here.
+  template RigModule {
+    prop idx: i32 = 0
+    prop k: i32 = 0
+    prop v: RigCellView = {}
+    prop burning: bool = false
+    prop lifted: bool = false
+    prop tinted: bool = false
+    prop tint: Tint = {0, 0, 0, 0}
+
+    body {
+      Position: {0, lifted ? 2.5 : 0, 0}
+      Transition: [Position: {duration: 0.45, timing_function: EaseOut}]
+      if tinted {
+        Tint: tint
+      }
+      ModuleView view(k: k, v: v, y: cell_y(idx), seed: idx, burning: burning)
+    }
+  }
+
+  // A rig ship with the modules of its design, 1 unit to the meter. The grid is centered on x and
+  // z, deck 0 starts at y = 0 and the bow points to +z. Decks above cut are not drawn. burning
+  // fires the engines.
+  //
+  // The modules of deck skip are left out, for an editor that draws the deck it works on itself
+  // (with RigModule and the views of rig_views).
+  template Rig {
+    prop design: RigDesign = frigate_design
+    prop burning: bool = false
+    prop cut: i32 = GY - 1
+    prop skip: i32 = -1
+
+    texture.Frame
+
+    const views = rig_views(design, cut)
+
+    for i in 0..CELLS {
+      const k = design.kinds[i]
+      const y = cell_y(i)
+      if k != 0 && y <= cut && y != skip {
+        RigModule "cell_{i}"(idx: i, k: k, v: views[i], burning: burning && k == K_ENGINE) {
+          Position: {wx(i), wy(i), wz(i)}
+        }
+      }
+    }
+  }
+}

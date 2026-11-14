@@ -1,0 +1,7 @@
+// The ships of the shipyard as models that a game can include without the editor: the design of a
+// rig and its preset plans, the materials, the hull and module templates and the Rig template.
+include design
+include materials
+include hull
+include exterior
+include rig

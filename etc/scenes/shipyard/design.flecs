@@ -1,0 +1,505 @@
+using flecs.script
+using flecs.script.math
+
+// The model of a rig: its grid, the kinds of its modules, the preset plans and the design that a
+// Rig instance draws.
+state {
+  export const GX: i32 = 10
+  export const GZ: i32 = 18
+  export const GY: i32 = 6
+  export const LAYER: i32 = 180
+  export const CELLS: i32 = 1080
+  export const PLAN_X: i32 = 5
+  export const PLAN_Z: i32 = 9
+  export const PLAN_LAYER: i32 = 45
+  export const PLAN_CELLS: i32 = 135
+  export const PLAN_OX: i32 = 2
+  export const PLAN_OZ: i32 = 4
+  export const CW: f32 = 4
+  export const CH: f32 = 3
+  export const RAD: f32 = 0.42
+  export const SKIN: f32 = 0.12
+  export const HALF_PI: f32 = 1.5707963
+
+  export const K_EMPTY: i32 = 0
+  export const K_COCKPIT: i32 = 1
+  export const K_HAB: i32 = 2
+  export const K_LIFE: i32 = 3
+  export const K_POWER: i32 = 4
+  export const K_CARGO: i32 = 5
+  export const K_FUEL: i32 = 6
+  export const K_WEAPON: i32 = 7
+  export const K_ENGINE: i32 = 8
+  export const K_BIOME: i32 = 9
+  export const K_OBS: i32 = 10
+  export const K_DOCK: i32 = 11
+  export const K_HULL: i32 = 12
+  export const K_RADIATOR: i32 = 13
+  export const K_DRILL: i32 = 14
+  export const K_BUILDER: i32 = 15
+  export const K_DATA: i32 = 16
+  export const K_AUTO: i32 = 17
+
+  export const KINDS: i32 = 18
+
+  export const H_WEDGE: i32 = 1
+  export const H_SLOPE: i32 = 2
+  export const H_BLOCK: i32 = 3
+  export const H_VALLEY: i32 = 4
+  export const H_HIP: i32 = 5
+
+  array RigPlan(type: i32, count: 135)
+  array RigGrid(type: i32, count: 1080)
+
+  export const frigate_plan: RigPlan = [
+    0, 0, 0, 0, 0,
+    0, 8, 0, 8, 0,
+    0, 6, 0, 6, 0,
+    0, 5, 5, 5, 0,
+    7, 5, 5, 5, 7,
+    0, 5, 5, 5, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 8, 8, 8, 0,
+    0, 6, 6, 6, 0,
+    13, 4, 6, 4, 13,
+    0, 6, 6, 6, 0,
+    7, 3, 3, 3, 7,
+    11, 2, 3, 2, 11,
+    0, 2, 2, 2, 0,
+    0, 12, 1, 12, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 9, 7, 9, 0,
+    0, 9, 10, 9, 0,
+    0, 0, 0, 0, 0
+  ]
+
+  export const scout_plan: RigPlan = [
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 5, 0, 0,
+    0, 0, 5, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 8, 8, 8, 0,
+    0, 6, 6, 6, 0,
+    0, 13, 4, 13, 0,
+    0, 7, 3, 7, 0,
+    0, 0, 2, 0, 0,
+    0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 10, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0
+  ]
+
+  export const miner_plan: RigPlan = [
+    0, 8, 0, 8, 0,
+    0, 6, 6, 6, 0,
+    13, 4, 5, 4, 13,
+    0, 5, 5, 5, 0,
+    0, 5, 5, 5, 0,
+    0, 5, 17, 5, 0,
+    0, 14, 0, 14, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 13, 16, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 15, 0, 15, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0
+  ]
+
+  // The design of a rig: the kind of each cell and the hull fairing of each hull cell, its shape
+  // and the sides it leans to. rig_design derives the fairings from the kinds.
+  struct RigDesign(kinds: RigGrid, shape: RigGrid, sx: RigGrid, sy: RigGrid, sz: RigGrid)
+
+  // The kinds of the six neighbors of a cell, 0 outside the grid.
+  struct RigNear(px: i32, nx: i32, py: i32, ny: i32, pz: i32, nz: i32)
+
+  // What the module of a cell needs to know of the design around it: the kinds of its
+  // neighbors, whether the cell above is drawn, its drawn hull fairing, the faces that a solid or
+  // faired neighbor covers, the diagonal neighbors that are solid (as in HullShell) and whether
+  // the fairings on its x sides lean on it.
+  struct RigCellView(
+    near: RigNear, roof: bool, shape: i32, sx: i32, sy: i32, sz: i32,
+    skin_px: bool, skin_nx: bool, skin_py: bool, skin_ny: bool, skin_pz: bool, skin_nz: bool,
+    xy_pp: bool, xy_pn: bool, xy_np: bool, xy_nn: bool,
+    xz_pp: bool, xz_pn: bool, xz_np: bool, xz_nn: bool,
+    yz_pp: bool, yz_pn: bool, yz_np: bool, yz_nn: bool,
+    fpx: bool, fnx: bool)
+
+  array RigViews(type: RigCellView, count: 1080)
+
+  fn cell_x(i: i32) -> i32 { i % GX }
+  fn cell_z(i: i32) -> i32 { ((i - i % GX) / GX) % GZ }
+  fn cell_y(i: i32) -> i32 { (i - i % LAYER) / LAYER }
+  fn cell_at(x: i32, y: i32, z: i32) -> i32 { y * LAYER + z * GX + x }
+
+  fn inside(x: i32, y: i32, z: i32) -> bool {
+    x >= 0 && x < GX && y >= 0 && y < GY && z >= 0 && z < GZ
+  }
+
+  fn wx(i: i32) -> f32 { (cell_x(i) - GX / 2.0 + 0.5) * CW }
+  fn wy(i: i32) -> f32 { cell_y(i) * CH }
+  fn wz(i: i32) -> f32 { (cell_z(i) - GZ / 2.0 + 0.5) * CW }
+
+  fn boxy(k: i32) -> bool {
+    k == K_HAB || k == K_LIFE || k == K_POWER || k == K_CARGO || k == K_DATA
+  }
+
+  fn crewed(k: i32) -> bool {
+    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_BIOME
+  }
+
+  fn hulled(k: i32) -> bool {
+    k == K_COCKPIT || k == K_HAB || k == K_OBS || k == K_AUTO
+  }
+
+  fn piloted(k: i32) -> bool {
+    k == K_COCKPIT || k == K_AUTO
+  }
+
+  fn shaped(k: i32) -> bool {
+    k == K_HULL
+  }
+
+  fn fairable(k: i32) -> bool {
+    k != K_EMPTY && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL && k != K_RADIATOR &&
+    k != K_DRILL && k != K_BUILDER
+  }
+
+  fn racked(k: i32) -> bool {
+    k == K_CARGO || k == K_FUEL
+  }
+
+  fn dockable(k: i32) -> bool {
+    boxy(k) || piloted(k) || k == K_OBS
+  }
+
+  fn hot(k: i32) -> bool {
+    k == K_POWER || k == K_DATA
+  }
+
+  fn cooled(k: i32) -> bool {
+    hot(k) || k == K_RADIATOR
+  }
+
+  fn kind_in(g: RigGrid, x: i32, y: i32, z: i32) -> i32 {
+    inside(x, y, z) ? g[cell_at(x, y, z)] : 0
+  }
+
+  fn near_in(g: RigGrid, x: i32, y: i32, z: i32) -> RigNear {
+    {
+      px: kind_in(g, x + 1, y, z), nx: kind_in(g, x - 1, y, z),
+      py: kind_in(g, x, y + 1, z), ny: kind_in(g, x, y - 1, z),
+      pz: kind_in(g, x, y, z + 1), nz: kind_in(g, x, y, z - 1)
+    }
+  }
+
+  fn touches(n: RigNear, k: i32) -> bool {
+    n.px == k || n.nx == k || n.py == k || n.ny == k || n.pz == k || n.nz == k
+  }
+
+  fn touches_any(n: RigNear) -> bool {
+    n.px != 0 || n.nx != 0 || n.py != 0 || n.ny != 0 || n.pz != 0 || n.nz != 0
+  }
+
+  fn open_side(n: RigNear) -> bool {
+    n.nx == 0 || n.px == 0 || n.nz == 0 || n.pz == 0
+  }
+
+  fn mount_side(n: RigNear) -> i32 {
+    boxy(n.ny) ? 1 :
+    boxy(n.nx) ? 2 :
+    boxy(n.px) ? 3 :
+    0
+  }
+
+  fn dock_side(n: RigNear) -> i32 {
+    dockable(n.nx) ? 2 :
+    dockable(n.px) ? 3 :
+    dockable(n.ny) ? 1 :
+    dockable(n.nz) ? 5 :
+    dockable(n.pz) ? 4 :
+    dockable(n.py) ? 6 :
+    0
+  }
+
+  fn cool_side(n: RigNear) -> i32 {
+    hot(n.nx) ? 2 :
+    hot(n.px) ? 3 :
+    hot(n.nz) ? 5 :
+    hot(n.pz) ? 4 :
+    cooled(n.nx) ? 2 :
+    cooled(n.px) ? 3 :
+    cooled(n.nz) ? 5 :
+    cooled(n.pz) ? 4 :
+    0
+  }
+
+  fn drill_side(n: RigNear) -> i32 {
+    boxy(n.nz) ? 5 :
+    boxy(n.nx) ? 2 :
+    boxy(n.px) ? 3 :
+    boxy(n.py) ? 6 :
+    boxy(n.ny) ? 1 :
+    0
+  }
+
+  fn clear_ahead(g: RigGrid, x: i32, y: i32, z: i32) -> bool {
+    mut clear = true
+    for c in 0..GZ {
+      if c > z && g[cell_at(x, y, c)] != 0 {
+        clear = false
+      }
+    }
+    clear
+  }
+
+  fn clear_behind(g: RigGrid, x: i32, y: i32, z: i32) -> bool {
+    mut clear = true
+    for c in 0..GZ {
+      if c < z && g[cell_at(x, y, c)] != 0 {
+        clear = false
+      }
+    }
+    clear
+  }
+
+  fn kind_mass(k: i32) -> f32 {
+    match k {
+      1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; 9: 11; 10: 9; 11: 4; 12: 3; 13: 5; 14: 12; 15: 8; 16: 14; 17: 10
+      _: 0
+    }
+  }
+
+  fn kind_power(k: i32) -> f32 {
+    match k { 1: 2; 2: 1; 3: 2; 4: -30; 5: 0.5; 7: 3; 8: 3; 9: 1; 10: 1; 14: 4; 15: 2; 16: 12; 17: 2; _: 0 }
+  }
+
+  // Whether the cell holds something a hull fairing leans on: a module with walls, or a hull
+  // piece that fills its cell.
+  fn propped(g: RigGrid, shape: RigGrid, x: i32, y: i32, z: i32) -> bool {
+    const k = inside(x, y, z) ? g[cell_at(x, y, z)] : 0
+    fairable(k) || (shaped(k) && shape[cell_at(x, y, z)] == H_BLOCK)
+  }
+
+  // The hull fairing that a hull piece in cell x, y, z takes from the kinds g and the fairings
+  // shape around it: its shape (0 for none) and the sides it leans to.
+  struct RigFair(shape: i32, sx: i32, sy: i32, sz: i32)
+
+  fn fair_at(g: RigGrid, shape: RigGrid, x: i32, y: i32, z: i32) -> RigFair {
+    const ppx = propped(g, shape, x + 1, y, z)
+    const pnx = propped(g, shape, x - 1, y, z)
+    const ppz = propped(g, shape, x, y, z + 1)
+    const pnz = propped(g, shape, x, y, z - 1)
+    const dpp = propped(g, shape, x + 1, y, z + 1)
+    const dpn = propped(g, shape, x + 1, y, z - 1)
+    const dnp = propped(g, shape, x - 1, y, z + 1)
+    const dnn = propped(g, shape, x - 1, y, z - 1)
+    const n = (ppx ? 1 : 0) + (pnx ? 1 : 0) + (ppz ? 1 : 0) + (pnz ? 1 : 0)
+    const sx = ppx ? 1 : pnx ? -1 : 0
+    const sz = ppz ? 1 : pnz ? -1 : 0
+    const sy = propped(g, shape, x, y - 1, z) ? -1 : fairable(kind_in(g, x, y + 1, z)) ? 1 : 0
+    const dx = dpp || dpn ? 1 : dnp || dnn ? -1 : 0
+    const dz = dx == 0 ? 0 : (dx > 0 ? dpp : dnp) ? 1 : -1
+    const s =
+      n == 2 && sx != 0 && sz != 0 ? (sy != 0 ? H_VALLEY : H_WEDGE) :
+      n == 1 && sy != 0 ? H_SLOPE :
+      n > 0 ? H_BLOCK :
+      sy != 0 && dx != 0 ? H_HIP :
+      0
+    const f: RigFair = {shape: s, sx: s == H_HIP ? dx : sx, sy: sy, sz: s == H_HIP ? dz : sz}
+    f
+  }
+
+  // The design of the kinds g, with a hull fairing for each hull piece. The pieces of a deck take
+  // their shapes in the order they were placed in (placed, 0 for a preset), each from the
+  // modules and the pieces before it around it, until none changes.
+  fn rig_design(g: RigGrid, placed: RigGrid) -> RigDesign {
+    mut shapes: RigGrid = {}
+    mut sxs: RigGrid = {}
+    mut sys: RigGrid = {}
+    mut szs: RigGrid = {}
+    for y in 0..GY {
+      mut list: i32[180] = {}
+      mut m: i32 = 0
+      for j in 0..LAYER {
+        const i = y * LAYER + j
+        if shaped(g[i]) {
+          mut p = m
+          while p > 0 && placed[list[max(p - 1, 0)]] > placed[i] {
+            list[p] = list[p - 1]
+            p -= 1
+          }
+          list[p] = i
+          m += 1
+        }
+      }
+      mut more = true
+      while more {
+        more = false
+        for q in 0..m {
+          const i = list[q]
+          if shapes[i] == 0 {
+            const f = fair_at(g, shapes, cell_x(i), y, cell_z(i))
+            if f.shape != 0 {
+              shapes[i] = f.shape
+              sxs[i] = f.sx
+              sys[i] = f.sy
+              szs[i] = f.sz
+              more = true
+            }
+          }
+        }
+      }
+    }
+    const d: RigDesign = {kinds: g, shape: shapes, sx: sxs, sy: sys, sz: szs}
+    d
+  }
+
+  // The kinds of a plan, which covers the middle of the grid.
+  fn plan_kinds(plan: RigPlan) -> RigGrid {
+    mut g: RigGrid = {}
+    for i in 0..PLAN_CELLS {
+      const k = plan[i]
+      if k != 0 {
+        const py = (i - i % PLAN_LAYER) / PLAN_LAYER
+        g[cell_at(i % PLAN_X + PLAN_OX, py, ((i - i % PLAN_X) / PLAN_X) % PLAN_Z + PLAN_OZ)] = k
+      }
+    }
+    g
+  }
+
+  // The highest deck of a plan with a module on it.
+  fn plan_top(plan: RigPlan) -> i32 {
+    mut top: i32 = 0
+    for i in 0..PLAN_CELLS {
+      if plan[i] != 0 {
+        top = max(top, (i - i % PLAN_LAYER) / PLAN_LAYER)
+      }
+    }
+    top
+  }
+
+  fn rig_plan(plan: RigPlan) -> RigDesign {
+    const order: RigGrid = {}
+    rig_design(plan_kinds(plan), order)
+  }
+
+  export const frigate_design: RigDesign = rig_plan(frigate_plan)
+  export const scout_design: RigDesign = rig_plan(scout_plan)
+  export const miner_design: RigDesign = rig_plan(miner_plan)
+
+  // The views of the modules of a design with the decks above cut not drawn, for the cells with a
+  // module up to cut and for all cells of deck cut.
+  fn rig_views(d: RigDesign, cut: i32) -> RigViews {
+    mut drawn: RigGrid = {}
+    mut solid: bool[1080] = {}
+    mut faces: RigGrid = {}
+    mut roofs: RigGrid = {}
+    for i in 0..CELLS {
+      const k = d.kinds[i]
+      const y = (i - i % LAYER) / LAYER
+      if k != 0 && y <= cut {
+        const shape = shaped(k) && !(d.shape[i] == H_BLOCK || (d.sy[i] > 0 && y + 1 > cut)) ? d.shape[i] : 0
+        drawn[i] = shape
+        solid[i] = hulled(k) || (shaped(k) && shape == 0)
+        if shape != 0 && shape != H_HIP {
+          faces[i] = (d.sx[i] == -1 ? 1 : 0) + (d.sx[i] == 1 ? 2 : 0) + (d.sz[i] == -1 ? 4 : 0) + (d.sz[i] == 1 ? 8 : 0)
+        }
+        if shape == H_SLOPE || shape == H_VALLEY || shape == H_HIP {
+          roofs[i] = d.sy[i]
+        }
+      }
+    }
+
+    mut out: RigViews = {}
+    for i in 0..CELLS {
+      const k = d.kinds[i]
+      const x = i % GX
+      const y = (i - i % LAYER) / LAYER
+      const z = ((i - x) / GX) % GZ
+      if (k != 0 && y <= cut) || y == cut {
+        const hx = x < GX - 1
+        const lx = x > 0
+        const hy = y < GY - 1
+        const ly = y > 0
+        const hz = z < GZ - 1
+        const lz = z > 0
+        const kpy = hy ? d.kinds[i + LAYER] : 0
+        out[i] = {
+          near: {
+            px: hx ? d.kinds[i + 1] : 0, nx: lx ? d.kinds[i - 1] : 0,
+            py: kpy, ny: ly ? d.kinds[i - LAYER] : 0,
+            pz: hz ? d.kinds[i + GX] : 0, nz: lz ? d.kinds[i - GX] : 0
+          },
+          roof: kpy != 0 && y + 1 <= cut,
+          shape: drawn[i], sx: d.sx[i], sy: d.sy[i], sz: d.sz[i],
+          skin_px: hx && (solid[i + 1] || (faces[i + 1] & 1) != 0),
+          skin_nx: lx && (solid[i - 1] || (faces[i - 1] & 2) != 0),
+          skin_py: hy && (solid[i + LAYER] || roofs[i + LAYER] == -1),
+          skin_ny: ly && (solid[i - LAYER] || roofs[i - LAYER] == 1),
+          skin_pz: hz && (solid[i + GX] || (faces[i + GX] & 4) != 0),
+          skin_nz: lz && (solid[i - GX] || (faces[i - GX] & 8) != 0),
+          xy_pp: hx && hy && solid[i + 1 + LAYER], xy_pn: hx && ly && solid[i + 1 - LAYER],
+          xy_np: lx && hy && solid[i - 1 + LAYER], xy_nn: lx && ly && solid[i - 1 - LAYER],
+          xz_pp: hx && hz && solid[i + 1 + GX], xz_pn: hx && lz && solid[i + 1 - GX],
+          xz_np: lx && hz && solid[i - 1 + GX], xz_nn: lx && lz && solid[i - 1 - GX],
+          yz_pp: hy && hz && solid[i + LAYER + GX], yz_pn: hy && lz && solid[i + LAYER - GX],
+          yz_np: ly && hz && solid[i - LAYER + GX], yz_nn: ly && lz && solid[i - LAYER - GX],
+          fpx: hx && (faces[i + 1] & 1) != 0, fnx: lx && (faces[i - 1] & 2) != 0
+        }
+      }
+    }
+    out
+  }
+
+  // The view of a module of kind k in cell i of deck cut, from the view of the cell in the
+  // design (rig_views). A hull piece in an empty cell takes the fairing it would get once placed
+  // there.
+  fn rig_ghost_view(d: RigDesign, view: RigCellView, cut: i32, i: i32, k: i32) -> RigCellView {
+    mut v: RigCellView = view
+    if shaped(k) && d.kinds[i] == 0 {
+      const y = cell_y(i)
+      const f = fair_at(d.kinds, d.shape, cell_x(i), y, cell_z(i))
+      v.shape = f.shape == H_BLOCK || (f.sy > 0 && y + 1 > cut) ? 0 : f.shape
+      v.sx = f.sx
+      v.sy = f.sy
+      v.sz = f.sz
+    }
+    v
+  }
+}

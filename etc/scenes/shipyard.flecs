@@ -1,7 +1,5 @@
+include shipyard/ships
 include shipyard/state
-include shipyard/materials
-include shipyard/hull
-include shipyard/exterior
 include shipyard/liner
 include shipyard/ops
 include shipyard/segments
@@ -105,9 +103,9 @@ yard {
   YardPlanet planet() { Position: {-1100, -760, -1500} }
 }
 
-ship {
-  texture.Frame
-  if liner {
+if liner {
+  ship {
+    texture.Frame
     for i in 0..LCELLS {
       LinerSlot "slot_{i}"(idx: i)
     }
@@ -126,9 +124,15 @@ ship {
         Ignore
       }
     }
-  } else {
+  }
+} else {
+  // The rig being built, with the editor laid over its cells. The editor draws the modules of
+  // the deck it works on itself, so the instance leaves them out.
+  const views = rig_views(yard_design, deck)
+
+  Rig rig_ship(design: yard_design, burning: burning, cut: deck, skip: deck) {
     for i in 0..CELLS {
-      ShipCell "cell_{i}"(idx: i)
+      ShipCell "edit_{i}"(idx: i, v: views[i])
     }
   }
 }

@@ -483,6 +483,7 @@ assets {
   template EngineMount {
     prop seed: i32 = 0
     prop mounted: bool = true
+    prop burning: bool = false
 
     const cy = CH / 2
 

@@ -17,22 +17,14 @@ state {
     DeckDown { Action: {description: "Work on the deck below, or on the previous spine of a liner"}; Binding: {key: PageDown} }
   }
 
-  fn load(design: i32) {
-    mut g: i32[1080] = {}
-    mut order: i32[1080] = {}
-    mut top: i32 = 0
-    for i in 0..PLAN_CELLS {
-      const k = design == OP_FRIGATE ? frigate_plan[i] : design == OP_SCOUT ? scout_plan[i] : design == OP_MINER ? miner_plan[i] : 0
-      if k != 0 {
-        const py = (i - i % PLAN_LAYER) / PLAN_LAYER
-        g[cell_at(i % PLAN_X + PLAN_OX, py, ((i - i % PLAN_X) / PLAN_X) % PLAN_Z + PLAN_OZ)] = k
-        top = max(top, py)
-      }
-    }
-    grid = g
+  fn load(op: i32) {
+    const order: RigGrid = {}
+    const none: RigPlan = {}
+    const plan: RigPlan = op == OP_FRIGATE ? frigate_plan : op == OP_SCOUT ? scout_plan : op == OP_MINER ? miner_plan : none
+    grid = plan_kinds(plan)
     placed = order
     stamp = 0
-    deck = top
+    deck = plan_top(plan)
     validate()
   }
 
