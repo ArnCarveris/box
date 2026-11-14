@@ -280,7 +280,7 @@ assets {
     prop seed: f32 = 0
     prop s: f32 = 1
     r : MvRock { Position: {0, 0.26 * s, 0}; Rotation: {seed * 0.4, seed * 5, seed * 0.3}; Scale: {1.3 * s, 0.75 * s, 1.0 * s}; IcoSphere: {radius: 0.8, segments: 1} }
-    moss : MvLeafDark { Position: {0.05 * s, 0.62 * s, -0.05 * s}; Rotation: {0, seed * 5, 0}; Scale: {1.0 * s, 0.22 * s, 0.75 * s}; Sphere: {radius: 0.62, segments: 10, smooth: true}; Rgb: {104, 140, 70}; TextureTransform: {2, 1, 0, 0} }
+    moss : MvLeafDark { Position: {0.05 * s, 0.62 * s, -0.05 * s}; Rotation: {0, seed * 5, 0}; Scale: {1.0 * s, 0.22 * s, 0.75 * s}; Sphere: {radius: 0.62, segments: 10, smooth: true}; Rgb: {104, 140, 70}; texture.Transform: {2, 1, 0, 0} }
     if fract(seed * 3.3) > 0.5 {
       r2 : MvRock { Position: {0.75 * s, 0.14 * s, 0.45 * s}; Rotation: {seed * 2, seed, 0}; Scale: {s, 0.8 * s, s}; IcoSphere: {radius: 0.4, segments: 1}; Rgb: {150, 144, 132} }
     }
@@ -334,7 +334,7 @@ assets {
   }
 
   template Barrel {
-    body : MvWood { Position: {0, 0, 0}; Rotation: {0, 0, 0}; Lathe: {profile: MvBarrelShape, segments: 14, rings: 8}; TextureTransform: {0.25, 3, 0, 0} }
+    body : MvWood { Position: {0, 0, 0}; Rotation: {0, 0, 0}; Lathe: {profile: MvBarrelShape, segments: 14, rings: 8}; texture.Transform: {0.25, 3, 0, 0} }
     hoop_a : MvIron { Position: {0, 0.16, 0}; Torus: {radius: 0.36, tube: 0.022, segments: 16, rings: 4} }
     hoop_b : MvIron { Position: {0, 0.76, 0}; Torus: {radius: 0.36, tube: 0.022, segments: 16, rings: 4} }
     hoop_c : MvIron { Position: {0, 0.46, 0}; Torus: {radius: 0.405, tube: 0.02, segments: 16, rings: 4} }
@@ -355,7 +355,7 @@ assets {
   }
 
   template HayBale {
-    bale : MvHay { Position: {0, 0.5, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 1.2, radius: 0.5, segments: 14, smooth: true}; TextureTransform: {3, 1, 0, 0} }
+    bale : MvHay { Position: {0, 0.5, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 1.2, radius: 0.5, segments: 14, smooth: true}; texture.Transform: {3, 1, 0, 0} }
     band_a : MvTimber { Position: {-0.3, 0.5, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 0.04, radius: 0.51, segments: 14}; Rgb: {150, 120, 80} }
     band_b : MvTimber { Position: {0.3, 0.5, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 0.04, radius: 0.51, segments: 14}; Rgb: {150, 120, 80} }
   }
@@ -385,11 +385,11 @@ assets {
     const n = max(1, floor(len / 2))
     for i in 0..(n + 1) {
       const sway = (fract(i * 0.73 + len) - 0.5) * 0.08
-      "post_{i}" : MvOldWood { Position: {-len / 2 + i * len / n, 0.52, 0}; Rotation: {sway, 0, sway}; Box: {0.14, 1.04, 0.14}; Bevel: {radius: 0.02, segments: 1}; TextureTransform: {0.2, 1, 0, 0} }
+      "post_{i}" : MvOldWood { Position: {-len / 2 + i * len / n, 0.52, 0}; Rotation: {sway, 0, sway}; Box: {0.14, 1.04, 0.14}; Bevel: {radius: 0.02, segments: 1}; texture.Transform: {0.2, 1, 0, 0} }
       "tip_{i}" : MvOldWood { Position: {-len / 2 + i * len / n, 1.1, 0}; Rotation: {0, 0.785, 0}; Cone: {length: 0.14, radius: 0.1, segments: 4} }
     }
-    rail_a : MvOldWood { Position: {0, 0.78, 0.08}; Rotation: {0, 0, 0.015}; Box: {len, 0.1, 0.05}; Bevel: {radius: 0.015, segments: 1}; TextureTransform: {len / 2, 0.2, 0, 0} }
-    rail_b : MvOldWood { Position: {0, 0.38, 0.08}; Rotation: {0, 0, -0.012}; Box: {len, 0.1, 0.05}; Bevel: {radius: 0.015, segments: 1}; TextureTransform: {len / 2, 0.2, 0, 0} }
+    rail_a : MvOldWood { Position: {0, 0.78, 0.08}; Rotation: {0, 0, 0.015}; Box: {len, 0.1, 0.05}; Bevel: {radius: 0.015, segments: 1}; texture.Transform: {len / 2, 0.2, 0, 0} }
+    rail_b : MvOldWood { Position: {0, 0.38, 0.08}; Rotation: {0, 0, -0.012}; Box: {len, 0.1, 0.05}; Bevel: {radius: 0.015, segments: 1}; texture.Transform: {len / 2, 0.2, 0, 0} }
   }
 
   template WindowPane {
@@ -413,7 +413,7 @@ assets {
     if shutters {
       for k in 0..2 {
         const sx = match k { 0: 0 - w / 2 - 0.36; _: w / 2 + 0.36 }
-        "shutter_{k}" : MvWood { Position: {sx, 0, 0.03}; Box: {w * 0.52, h + 0.12, 0.05}; Rgb: shutter; Bevel: {radius: 0.015, segments: 1}; TextureTransform: {0.6, 1, 0, 0} }
+        "shutter_{k}" : MvWood { Position: {sx, 0, 0.03}; Box: {w * 0.52, h + 0.12, 0.05}; Rgb: shutter; Bevel: {radius: 0.015, segments: 1}; texture.Transform: {0.6, 1, 0, 0} }
         "slat_a_{k}" : MvWood { Position: {sx, h * 0.25, 0.065}; Box: {w * 0.44, 0.06, 0.02}; Rgb: {shutter.r * 0.8, shutter.g * 0.8, shutter.b * 0.8} }
         "slat_b_{k}" : MvWood { Position: {sx, 0 - h * 0.25, 0.065}; Box: {w * 0.44, 0.06, 0.02}; Rgb: {shutter.r * 0.8, shutter.g * 0.8, shutter.b * 0.8} }
         "heart_{k}" { Position: {sx, h * 0.02, 0.06}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.02, radius: 0.06, segments: 8}; Rgb: {30, 24, 20}; PbrMaterial: {roughness: 1} }
@@ -477,23 +477,23 @@ assets {
 
     frame {
       Rotation: {0, face * HALF_PI, 0}
-      plinth : MvRubble { Position: {0, 0.225, 0}; Box: {w + 0.36, 0.45, d + 0.36}; Bevel: {radius: 0.06, segments: 1}; TextureTransform: {w / 1.6, 0.35, 0, 0} }
+      plinth : MvRubble { Position: {0, 0.225, 0}; Box: {w + 0.36, 0.45, d + 0.36}; Bevel: {radius: 0.06, segments: 1}; texture.Transform: {w / 1.6, 0.35, 0, 0} }
       if stone {
-        walls : MvRubble { Position: {0, 0.45 + h / 2, 0}; Box: {w, h, d}; Rgb: wc; Opacity: {wo}; Transition: [Opacity: {duration: 0.3}]; TextureTransform: {w / 1.8, h / 1.8, 0, 0} }
+        walls : MvRubble { Position: {0, 0.45 + h / 2, 0}; Box: {w, h, d}; Rgb: wc; Opacity: {wo}; Transition: [Opacity: {duration: 0.3}]; texture.Transform: {w / 1.8, h / 1.8, 0, 0} }
         for c in 0..4 {
           const cx = match c % 2 { 0: -w / 2; _: w / 2 }
           const cz = c < 2 ? -d / 2 : d / 2
           for q in 0..4 {
             const big = q % 2 == 0
-            "quoin_{c}_{q}" : MvStone { Position: {cx, 0.45 + 0.25 + q * h / 4, cz}; Box: {big ? 0.6 : 0.36, h / 4 - 0.05, big ? 0.36 : 0.6}; Bevel: {radius: 0.04, segments: 1}; Rgb: {214, 206, 190}; Opacity: {wo}; TextureTransform: {0.3, 0.2, 0, 0} }
+            "quoin_{c}_{q}" : MvStone { Position: {cx, 0.45 + 0.25 + q * h / 4, cz}; Box: {big ? 0.6 : 0.36, h / 4 - 0.05, big ? 0.36 : 0.6}; Bevel: {radius: 0.04, segments: 1}; Rgb: {214, 206, 190}; Opacity: {wo}; texture.Transform: {0.3, 0.2, 0, 0} }
           }
         }
       } else {
-        walls { Position: {0, 0.45 + h / 2, 0}; Box: {w, h, d}; Rgb: wc; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}; TextureTransform: {w / 3, h / 3, 0, 0}; Opacity: {wo}; Transition: [Opacity: {duration: 0.3}] }
+        walls { Position: {0, 0.45 + h / 2, 0}; Box: {w, h, d}; Rgb: wc; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}; texture.Transform: {w / 3, h / 3, 0, 0}; Opacity: {wo}; Transition: [Opacity: {duration: 0.3}] }
         for c in 0..4 {
           const cx = match c % 2 { 0: -w / 2; _: w / 2 }
           const cz = c < 2 ? -d / 2 : d / 2
-          "post_{c}" : MvTimber { Position: {cx, 0.45 + h / 2, cz}; Box: {0.26, h, 0.26}; Bevel: {radius: 0.04, segments: 1}; Opacity: {wo}; TextureTransform: {0.3, 1.5, 0, 0} }
+          "post_{c}" : MvTimber { Position: {cx, 0.45 + h / 2, cz}; Box: {0.26, h, 0.26}; Bevel: {radius: 0.04, segments: 1}; Opacity: {wo}; texture.Transform: {0.3, 1.5, 0, 0} }
         }
         sole_f : MvTimber { Position: {0, 0.55, d / 2 + 0.03}; Box: {w, 0.2, 0.1}; Opacity: {wo} }
         rail_f_a : MvTimber { Position: {0 - w * 0.33, 0.45 + h * 0.3, d / 2 + 0.03}; Box: {w * 0.34, 0.14, 0.08}; Opacity: {wo} }
@@ -515,9 +515,9 @@ assets {
           "side_brace_b_{sd}" : MvTimber { Position: {sx, 0.45 + h / 2, -d * 0.39}; Rotation: {-0.5, 0, 0}; Box: {0.07, h * 1.1, 0.13}; Opacity: {wo} }
         }
       }
-      plate : MvTimber { Position: {0, 0.45 + h, 0}; Box: {w + 0.14, 0.22, d + 0.14}; Opacity: {wo}; TextureTransform: {w / 2, 0.3, 0, 0} }
+      plate : MvTimber { Position: {0, 0.45 + h, 0}; Box: {w + 0.14, 0.22, d + 0.14}; Opacity: {wo}; texture.Transform: {w / 2, 0.3, 0, 0} }
       if floors > 1 {
-        upper { Position: {0, 0.45 + h + h / 2 + 0.1, 0}; Box: {uw, h - 0.2, ud}; Rgb: wc; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}; TextureTransform: {uw / 3, h / 3, 0, 0}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
+        upper { Position: {0, 0.45 + h + h / 2 + 0.1, 0}; Box: {uw, h - 0.2, ud}; Rgb: wc; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}; texture.Transform: {uw / 3, h / 3, 0, 0}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
         jetty : MvTimber { Position: {0, 0.45 + h + 0.08, 0}; Box: {uw + 0.12, 0.2, ud + 0.12}; Opacity: {ro} }
         for j in 0..7 {
           "joist_{j}" : MvTimber { Position: {-w / 2 + 0.3 + j * (w - 0.6) / 6, 0.45 + h - 0.06, d / 2 + jet / 2}; Box: {0.14, 0.14, jet + 0.1}; Opacity: {ro} }
@@ -540,15 +540,15 @@ assets {
         WindowPane up_c(w: 0.7, h: 0.8, lit: night, shutters: false) { Position: {0, 0.45 + h * 1.55, 0 - ud / 2 - 0.06}; Rotation: {0, PI, 0}; Opacity: {ro} }
       }
       if thatched {
-        roof_a : MvThatch { Position: {0, top + rh / 2 + oy, run / 2 + ox}; Rotation: {slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Bevel: {radius: 0.18, segments: 2}; Rgb: rc; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}]; TextureTransform: {(uw + 1) / 2.4, slab / 1.6, 0, 0} }
-        roof_b : MvThatch { Position: {0, top + rh / 2 + oy, 0 - run / 2 - ox}; Rotation: {0 - slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Bevel: {radius: 0.18, segments: 2}; Rgb: rc; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}]; TextureTransform: {(uw + 1) / 2.4, slab / 1.6, 0, 0} }
-        ridge : MvThatch { Position: {0, top + rh + 0.12, 0}; Rotation: {0, 0, HALF_PI}; Scale: {1, 1, 0.8}; Capsule: {length: uw + 0.6, radius: 0.36, segments: 10, smooth: true}; Rgb: {rc.r * 0.86, rc.g * 0.86, rc.b * 0.8}; Opacity: {ro}; TextureTransform: {4, 1, 0, 0} }
+        roof_a : MvThatch { Position: {0, top + rh / 2 + oy, run / 2 + ox}; Rotation: {slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Bevel: {radius: 0.18, segments: 2}; Rgb: rc; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}]; texture.Transform: {(uw + 1) / 2.4, slab / 1.6, 0, 0} }
+        roof_b : MvThatch { Position: {0, top + rh / 2 + oy, 0 - run / 2 - ox}; Rotation: {0 - slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Bevel: {radius: 0.18, segments: 2}; Rgb: rc; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}]; texture.Transform: {(uw + 1) / 2.4, slab / 1.6, 0, 0} }
+        ridge : MvThatch { Position: {0, top + rh + 0.12, 0}; Rotation: {0, 0, HALF_PI}; Scale: {1, 1, 0.8}; Capsule: {length: uw + 0.6, radius: 0.36, segments: 10, smooth: true}; Rgb: {rc.r * 0.86, rc.g * 0.86, rc.b * 0.8}; Opacity: {ro}; texture.Transform: {4, 1, 0, 0} }
         for k in 0..6 {
           "pin_{k}" : MvTimber { Position: {-uw / 2 + 0.3 + k * uw / 6, top + rh + 0.12, 0}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.36, tube: 0.025, segments: 10, rings: 3}; Opacity: {ro} }
         }
       } else {
-        roof_a { Position: {0, top + rh / 2 + oy, run / 2 + ox}; Rotation: {slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; TextureTransform: {(uw + 1) / 1.5, slab / 1.3, 0, 0}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
-        roof_b { Position: {0, top + rh / 2 + oy, 0 - run / 2 - ox}; Rotation: {0 - slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; TextureTransform: {(uw + 1) / 1.5, slab / 1.3, 0, 0}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
+        roof_a { Position: {0, top + rh / 2 + oy, run / 2 + ox}; Rotation: {slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; texture.Transform: {(uw + 1) / 1.5, slab / 1.3, 0, 0}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
+        roof_b { Position: {0, top + rh / 2 + oy, 0 - run / 2 - ox}; Rotation: {0 - slope, 0, 0}; Box: {uw + 1.0, rt, slab + 0.2}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; texture.Transform: {(uw + 1) / 1.5, slab / 1.3, 0, 0}; Opacity: {ro}; Transition: [Opacity: {duration: 0.3}] }
         ridge { Position: {0, top + rh + rt * 0.8, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: uw + 1.0, radius: 0.15, segments: 10, smooth: true}; Rgb: rd; PbrMaterial: {roughness: 0.7}; Opacity: {ro} }
         for e in 0..2 {
           const ex = match e { 0: uw / 2 + 0.5; _: 0 - uw / 2 - 0.5 }
@@ -571,14 +571,14 @@ assets {
       }
       door_frame : MvTimber { Position: {0, 0.45 + 1.15, d / 2 + 0.05}; Box: {1.5, 2.3, 0.1}; Bevel: {radius: 0.03, segments: 1} }
       door_arch : MvTimber { Position: {0, 0.45 + 2.3, d / 2 + 0.05}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.1, radius: 0.75, segments: 16} }
-      door : MvWood { Position: {0, 0.45 + 1.02, d / 2 + 0.1}; Rotation: {0, 0, HALF_PI}; Box: {2.04, 1.12, 0.07}; Rgb: paint; TextureTransform: {1, 0.6, 0, 0} }
+      door : MvWood { Position: {0, 0.45 + 1.02, d / 2 + 0.1}; Rotation: {0, 0, HALF_PI}; Box: {2.04, 1.12, 0.07}; Rgb: paint; texture.Transform: {1, 0.6, 0, 0} }
       door_top : MvWood { Position: {0, 0.45 + 2.04, d / 2 + 0.1}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.07, radius: 0.56, segments: 16}; Rgb: paint }
       hinge_a : MvIron { Position: {-0.15, 0.45 + 0.5, d / 2 + 0.15}; Box: {0.8, 0.07, 0.02} }
       hinge_b : MvIron { Position: {-0.15, 0.45 + 1.6, d / 2 + 0.15}; Box: {0.8, 0.07, 0.02} }
       knocker : MvBrass { Position: {0.3, 0.45 + 1.1, d / 2 + 0.17}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 0.07, tube: 0.015, segments: 10, rings: 4} }
-      step : MvStone { Position: {0, 0.15, d / 2 + 0.6}; Box: {1.8, 0.3, 0.8}; Bevel: {radius: 0.05, segments: 1}; TextureTransform: {0.8, 0.3, 0, 0} }
-      hood_a { Position: {-0.4, 0.45 + 2.86, d / 2 + 0.38}; Rotation: {0, 0, 0.55}; Box: {1.0, 0.07, 0.8}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; TextureTransform: {0.7, 0.6, 0, 0} }
-      hood_b { Position: {0.4, 0.45 + 2.86, d / 2 + 0.38}; Rotation: {0, 0, -0.55}; Box: {1.0, 0.07, 0.8}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; TextureTransform: {0.7, 0.6, 0, 0} }
+      step : MvStone { Position: {0, 0.15, d / 2 + 0.6}; Box: {1.8, 0.3, 0.8}; Bevel: {radius: 0.05, segments: 1}; texture.Transform: {0.8, 0.3, 0, 0} }
+      hood_a { Position: {-0.4, 0.45 + 2.86, d / 2 + 0.38}; Rotation: {0, 0, 0.55}; Box: {1.0, 0.07, 0.8}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; texture.Transform: {0.7, 0.6, 0, 0} }
+      hood_b { Position: {0.4, 0.45 + 2.86, d / 2 + 0.38}; Rotation: {0, 0, -0.55}; Box: {1.0, 0.07, 0.8}; Rgb: rc; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}; texture.Transform: {0.7, 0.6, 0, 0} }
       hood_ridge { Position: {0, 0.45 + 3.1, d / 2 + 0.38}; Rotation: {HALF_PI, 0, 0}; Cylinder: {length: 0.84, radius: 0.06, segments: 8}; Rgb: rd; PbrMaterial: {roughness: 0.7} }
       bracket_a : MvTimber { Position: {-0.66, 0.45 + 2.62, d / 2 + 0.3}; Rotation: {0.75, 0, 0}; Box: {0.08, 0.08, 0.7} }
       bracket_b : MvTimber { Position: {0.66, 0.45 + 2.62, d / 2 + 0.3}; Rotation: {0.75, 0, 0}; Box: {0.08, 0.08, 0.7} }
@@ -641,8 +641,8 @@ assets {
         porch_light { Position: {0, 0.45 + 2.7, d / 2 + 0.9}; PointLight: {intensity: 2.5, range: 7}; Rgb: {255, 190, 120} }
       }
       if chimney {
-        chimney_ : MvRubble { Position: {uw * 0.3, top + rh * 0.75, -ud * 0.18}; Box: {0.85, rh * 1.5 + 0.7, 0.85}; Bevel: {radius: 0.05, segments: 1}; Opacity: {ro}; TextureTransform: {0.6, (rh * 1.5 + 0.7) / 1.4, 0, 0} }
-        chimney_band : MvStone { Position: {uw * 0.3, top + rh * 1.5 + 0.12, -ud * 0.18}; Box: {1.0, 0.16, 1.0}; Bevel: {radius: 0.03, segments: 1}; Opacity: {ro}; TextureTransform: {1, 0.3, 0, 0} }
+        chimney_ : MvRubble { Position: {uw * 0.3, top + rh * 0.75, -ud * 0.18}; Box: {0.85, rh * 1.5 + 0.7, 0.85}; Bevel: {radius: 0.05, segments: 1}; Opacity: {ro}; texture.Transform: {0.6, (rh * 1.5 + 0.7) / 1.4, 0, 0} }
+        chimney_band : MvStone { Position: {uw * 0.3, top + rh * 1.5 + 0.12, -ud * 0.18}; Box: {1.0, 0.16, 1.0}; Bevel: {radius: 0.03, segments: 1}; Opacity: {ro}; texture.Transform: {1, 0.3, 0, 0} }
         chimney_pot_a { Position: {uw * 0.3 - 0.18, top + rh * 1.5 + 0.38, -ud * 0.18}; Lathe: {profile: MvPotShape, cap_start: true, segments: 10, rings: 5}; Scale: {0.75, 1.1, 0.75}; Rgb: {176, 92, 60}; PbrMaterial: {roughness: 0.8}; Opacity: {ro} }
         chimney_soot_a : MvDark { Position: {uw * 0.3 - 0.18, top + rh * 1.5 + 0.38 + 0.37, -ud * 0.18}; Cylinder: {length: 0.02, radius: 0.175, segments: 10}; Rgb: {24, 20, 18}; Opacity: {ro} }
         chimney_soot_b : MvDark { Position: {uw * 0.3 + 0.2, top + rh * 1.5 + 0.38 + 0.29, -ud * 0.18}; Cylinder: {length: 0.02, radius: 0.165, segments: 10}; Rgb: {24, 20, 18}; Opacity: {ro} }
@@ -679,8 +679,8 @@ assets {
     prop x: f32 = 0
     prop z: f32 = 0
     Position: {x, 0, z}
-    ring : MvRubble { Position: {0, 0.5, 0}; Tube: {length: 1.0, radius: 1.1, thickness: 0.32, segments: 18}; TextureTransform: {3, 0.7, 0, 0} }
-    lip : MvStone { Position: {0, 1.04, 0}; Torus: {radius: 0.95, tube: 0.13, segments: 18, rings: 6}; TextureTransform: {4, 0.2, 0, 0} }
+    ring : MvRubble { Position: {0, 0.5, 0}; Tube: {length: 1.0, radius: 1.1, thickness: 0.32, segments: 18}; texture.Transform: {3, 0.7, 0, 0} }
+    lip : MvStone { Position: {0, 1.04, 0}; Torus: {radius: 0.95, tube: 0.13, segments: 18, rings: 6}; texture.Transform: {4, 0.2, 0, 0} }
     water : MvDeepWater { Position: {0, 0.55, 0}; Cylinder: {length: 0.05, radius: 0.8, segments: 16} }
     post_a : MvTimber { Position: {-0.95, 1.6, 0}; Box: {0.2, 2.2, 0.2}; Bevel: {radius: 0.03, segments: 1} }
     post_b : MvTimber { Position: {0.95, 1.6, 0}; Box: {0.2, 2.2, 0.2}; Bevel: {radius: 0.03, segments: 1} }
@@ -689,8 +689,8 @@ assets {
     crank_a : MvIron { Position: {1.2, 1.9, 0}; Box: {0.05, 0.35, 0.05} }
     crank_b : MvIron { Position: {1.28, 1.75, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 0.2, radius: 0.03, segments: 6} }
     rope : MvHay { Position: {0.2, 1.75, 0}; Cylinder: {length: 0.6, radius: 0.02, segments: 4}; Rgb: {200, 170, 120} }
-    roof_a : MvRoofRed { Position: {0, 3.0, 0.55}; Rotation: {0.72, 0, 0}; Box: {2.7, 0.08, 1.5}; TextureTransform: {2, 1, 0, 0} }
-    roof_b : MvRoofRed { Position: {0, 3.0, -0.55}; Rotation: {-0.72, 0, 0}; Box: {2.7, 0.08, 1.5}; TextureTransform: {2, 1, 0, 0} }
+    roof_a : MvRoofRed { Position: {0, 3.0, 0.55}; Rotation: {0.72, 0, 0}; Box: {2.7, 0.08, 1.5}; texture.Transform: {2, 1, 0, 0} }
+    roof_b : MvRoofRed { Position: {0, 3.0, -0.55}; Rotation: {-0.72, 0, 0}; Box: {2.7, 0.08, 1.5}; texture.Transform: {2, 1, 0, 0} }
     ridge : MvRoofRed { Position: {0, 3.5, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 2.8, radius: 0.08, segments: 8}; Rgb: {140, 62, 44} }
     bucket : MvWood { Position: {0.2, 1.25, 0}; Frustum: {length: 0.4, radius_bottom: 0.17, radius_top: 0.22, segments: 10} }
     bucket_hoop : MvIron { Position: {0.2, 1.4, 0}; Torus: {radius: 0.21, tube: 0.015, segments: 12, rings: 3} }
@@ -700,8 +700,8 @@ assets {
   }
 
   template Bench {
-    seat : MvWood { Position: {0, 0.5, 0}; Box: {2.0, 0.1, 0.6}; Bevel: {radius: 0.025, segments: 1}; TextureTransform: {1.5, 0.4, 0, 0} }
-    back : MvWood { Position: {0, 0.92, -0.3}; Rotation: {-0.12, 0, 0}; Box: {2.0, 0.42, 0.07}; Bevel: {radius: 0.025, segments: 1}; TextureTransform: {1.5, 0.35, 0, 0} }
+    seat : MvWood { Position: {0, 0.5, 0}; Box: {2.0, 0.1, 0.6}; Bevel: {radius: 0.025, segments: 1}; texture.Transform: {1.5, 0.4, 0, 0} }
+    back : MvWood { Position: {0, 0.92, -0.3}; Rotation: {-0.12, 0, 0}; Box: {2.0, 0.42, 0.07}; Bevel: {radius: 0.025, segments: 1}; texture.Transform: {1.5, 0.35, 0, 0} }
     for k in 0..2 {
       const sx = match k { 0: -0.8; _: 0.8 }
       "leg_f_{k}" : MvTimber { Position: {sx, 0.24, 0.2}; Box: {0.1, 0.48, 0.1}; Bevel: {radius: 0.02, segments: 1} }
@@ -719,8 +719,8 @@ assets {
     const cc: Rgb = match cloth { 0: {196, 62, 54}; 1: {70, 100, 176}; _: {236, 190, 70} }
     Position: {x, 0, z}
     Rotation: {0, rot, 0}
-    counter : MvWood { Position: {0, 0.5, 0.1}; Box: {2.8, 1.0, 1.0}; Bevel: {radius: 0.03, segments: 1}; TextureTransform: {2, 1, 0, 0} }
-    top_ : MvOldWood { Position: {0, 1.03, 0.15}; Box: {3.0, 0.08, 1.2}; Bevel: {radius: 0.02, segments: 1}; TextureTransform: {2, 1, 0, 0} }
+    counter : MvWood { Position: {0, 0.5, 0.1}; Box: {2.8, 1.0, 1.0}; Bevel: {radius: 0.03, segments: 1}; texture.Transform: {2, 1, 0, 0} }
+    top_ : MvOldWood { Position: {0, 1.03, 0.15}; Box: {3.0, 0.08, 1.2}; Bevel: {radius: 0.02, segments: 1}; texture.Transform: {2, 1, 0, 0} }
     skirt { Position: {0, 0.62, 0.62}; Box: {2.8, 0.5, 0.03}; Rgb: cc; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_cloth, normal: mv_tex_cloth_n} }
     for p in 0..4 {
       const sx = match p % 2 { 0: -1.35; _: 1.35 }
@@ -772,9 +772,9 @@ assets {
   }
 
   template Cart {
-    bed : MvOldWood { Position: {0, 0.9, 0}; Box: {2.4, 0.12, 1.4}; Bevel: {radius: 0.02, segments: 1}; TextureTransform: {2, 1, 0, 0} }
-    side_a : MvOldWood { Position: {0, 1.15, 0.68}; Box: {2.4, 0.38, 0.07}; TextureTransform: {2, 0.4, 0, 0} }
-    side_b : MvOldWood { Position: {0, 1.15, -0.68}; Box: {2.4, 0.38, 0.07}; TextureTransform: {2, 0.4, 0, 0} }
+    bed : MvOldWood { Position: {0, 0.9, 0}; Box: {2.4, 0.12, 1.4}; Bevel: {radius: 0.02, segments: 1}; texture.Transform: {2, 1, 0, 0} }
+    side_a : MvOldWood { Position: {0, 1.15, 0.68}; Box: {2.4, 0.38, 0.07}; texture.Transform: {2, 0.4, 0, 0} }
+    side_b : MvOldWood { Position: {0, 1.15, -0.68}; Box: {2.4, 0.38, 0.07}; texture.Transform: {2, 0.4, 0, 0} }
     end_ : MvOldWood { Position: {1.17, 1.15, 0}; Box: {0.07, 0.38, 1.4} }
     for k in 0..3 {
       "stake_a_{k}" : MvTimber { Position: {-1.0 + k, 1.15, 0.73}; Box: {0.07, 0.46, 0.05} }
@@ -786,12 +786,12 @@ assets {
     shaft_a : MvTimber { Position: {-1.9, 0.72, 0.45}; Rotation: {0, 0, 0.12}; Box: {1.8, 0.08, 0.08} }
     shaft_b : MvTimber { Position: {-1.9, 0.72, -0.45}; Rotation: {0, 0, 0.12}; Box: {1.8, 0.08, 0.08} }
     prop_ : MvTimber { Position: {-2.6, 0.32, 0}; Box: {0.08, 0.64, 0.08} }
-    load : MvHay { Position: {0.1, 1.3, 0}; Scale: {1.55, 0.5, 0.85}; Sphere: {radius: 0.8, segments: 12, smooth: true}; TextureTransform: {3, 1, 0, 0} }
+    load : MvHay { Position: {0.1, 1.3, 0}; Scale: {1.55, 0.5, 0.85}; Sphere: {radius: 0.8, segments: 12, smooth: true}; texture.Transform: {3, 1, 0, 0} }
     sack : MvCloth { Position: {0.7, 1.5, 0.2}; Scale: {0.8, 1, 0.7}; Sphere: {radius: 0.3, segments: 10, smooth: true}; Rgb: {214, 196, 160} }
   }
 
   template Boat {
-    hull : MvWood { Position: {0, 0.5, 0}; EllipsoidShell: {radius: {0.85, 0.5, 2.0}, longitude_start: 0, longitude_end: 6.2832, latitude_start: -1.5708, latitude_end: 0, thickness: 0.06, rims: true, segments: 24, rings: 8}; TextureTransform: {6, 1, 0, 0}; Rgb: {150, 104, 70} }
+    hull : MvWood { Position: {0, 0.5, 0}; EllipsoidShell: {radius: {0.85, 0.5, 2.0}, longitude_start: 0, longitude_end: 6.2832, latitude_start: -1.5708, latitude_end: 0, thickness: 0.06, rims: true, segments: 24, rings: 8}; texture.Transform: {6, 1, 0, 0}; Rgb: {150, 104, 70} }
     stripe : MvClothBlue { Position: {0, 0.42, 0}; Scale: {0.86, 1, 2.0}; Torus: {radius: 0.99, tube: 0.04, segments: 24, rings: 4} }
     gunwale : MvTimber { Position: {0, 0.5, 0}; Scale: {0.85, 1, 2.0}; Torus: {radius: 1.0, tube: 0.05, segments: 24, rings: 4} }
     seat_a : MvTimber { Position: {0, 0.36, 0.4}; Box: {1.55, 0.06, 0.32} }
@@ -826,8 +826,8 @@ assets {
 
   template Windmill {
     prop spin: bool = false
-    base : MvRubble { Position: {0, 0.5, 0}; Cylinder: {length: 1.0, radius: 3.0, segments: 18}; TextureTransform: {5, 0.5, 0, 0} }
-    body : MvPlaster { Position: {0, 4.5, 0}; Frustum: {length: 7.0, radius_bottom: 2.6, radius_top: 1.8, segments: 18}; TextureTransform: {4, 2, 0, 0} }
+    base : MvRubble { Position: {0, 0.5, 0}; Cylinder: {length: 1.0, radius: 3.0, segments: 18}; texture.Transform: {5, 0.5, 0, 0} }
+    body : MvPlaster { Position: {0, 4.5, 0}; Frustum: {length: 7.0, radius_bottom: 2.6, radius_top: 1.8, segments: 18}; texture.Transform: {4, 2, 0, 0} }
     for k in 0..6 {
       const a = k * 1.0472 + 0.5
       "rib_{k}" : MvTimber { Position: {cos(a) * 2.22, 4.5, sin(a) * 2.22}; Rotation: {sin(a) * 0.114, 0, 0 - cos(a) * 0.114}; Box: {0.16, 7.0, 0.16} }
@@ -839,7 +839,7 @@ assets {
       "baluster_{k}" : MvTimber { Position: {cos(a) * 2.9, 5.35, sin(a) * 2.9}; Box: {0.06, 0.6, 0.06} }
     }
     railing : MvTimber { Position: {0, 5.65, 0}; Torus: {radius: 2.9, tube: 0.04, segments: 24, rings: 4} }
-    cap : MvThatch { Position: {0, 8.15, 0}; Scale: {2.25, 2.4, 2.25}; Lathe: {profile: MvCapShape, cap_start: true, segments: 18, rings: 8}; TextureTransform: {6, 1, 0, 0} }
+    cap : MvThatch { Position: {0, 8.15, 0}; Scale: {2.25, 2.4, 2.25}; Lathe: {profile: MvCapShape, cap_start: true, segments: 18, rings: 8}; texture.Transform: {6, 1, 0, 0} }
     door : MvWood { Position: {0, 1.6, 2.5}; Rotation: {-0.1, 0, HALF_PI}; Box: {2.0, 1.1, 0.1}; Rgb: {84, 120, 80} }
     door_top : MvWood { Position: {0, 2.6, 2.4}; Rotation: {HALF_PI - 0.1, 0, 0}; Cylinder: {length: 0.1, radius: 0.55, segments: 12}; Rgb: {84, 120, 80} }
     win : MvWindowLit { Position: {0, 5.9, 2.2}; Rotation: {-0.1, 0, 0}; Box: {0.6, 0.7, 0.08} }
@@ -857,7 +857,7 @@ assets {
         "blade_{b}" {
           Rotation: {0, 0, b * HALF_PI}
           spar : MvTimber { Position: {0, 3.4, 0.2}; Box: {0.2, 6.8, 0.15} }
-          cloth : MvCloth { Position: {0.65, 4.1, 0.22}; Box: {1.05, 5.2, 0.03}; TextureTransform: {2, 6, 0, 0} }
+          cloth : MvCloth { Position: {0.65, 4.1, 0.22}; Box: {1.05, 5.2, 0.03}; texture.Transform: {2, 6, 0, 0} }
           edge : MvTimber { Position: {1.2, 4.1, 0.24}; Box: {0.07, 5.2, 0.07} }
           for r in 0..6 {
             "lath_{r}" : MvTimber { Position: {0.62, 1.6 + r * 1.0, 0.26}; Box: {1.25, 0.05, 0.05} }
@@ -881,21 +881,21 @@ assets {
     prop x: f32 = 0
     prop z: f32 = 0
     Position: {x, 0, z}
-    plinth : MvRubble { Position: {0, 0.3, 0}; Cylinder: {length: 0.6, radius: 2.5, segments: 16}; TextureTransform: {5, 0.4, 0, 0} }
-    base : MvStone { Position: {0, 4.3, 0}; Frustum: {length: 8, radius_bottom: 2.2, radius_top: 1.75, segments: 16}; TextureTransform: {4, 4, 0, 0} }
-    corbel : MvStone { Position: {0, 8.45, 0}; Frustum: {length: 0.4, radius_bottom: 1.8, radius_top: 2.15, segments: 16}; TextureTransform: {4, 0.3, 0, 0} }
-    top : MvStone { Position: {0, 8.95, 0}; Cylinder: {length: 0.6, radius: 2.15, segments: 16}; TextureTransform: {4, 0.4, 0, 0} }
+    plinth : MvRubble { Position: {0, 0.3, 0}; Cylinder: {length: 0.6, radius: 2.5, segments: 16}; texture.Transform: {5, 0.4, 0, 0} }
+    base : MvStone { Position: {0, 4.3, 0}; Frustum: {length: 8, radius_bottom: 2.2, radius_top: 1.75, segments: 16}; texture.Transform: {4, 4, 0, 0} }
+    corbel : MvStone { Position: {0, 8.45, 0}; Frustum: {length: 0.4, radius_bottom: 1.8, radius_top: 2.15, segments: 16}; texture.Transform: {4, 0.3, 0, 0} }
+    top : MvStone { Position: {0, 8.95, 0}; Cylinder: {length: 0.6, radius: 2.15, segments: 16}; texture.Transform: {4, 0.4, 0, 0} }
     for k in 0..8 {
       const a = k * 0.785
-      "merlon_{k}" : MvStone { Position: {cos(a) * 2.0, 9.45, sin(a) * 2.0}; Rotation: {0, 0 - a, 0}; Box: {0.4, 0.5, 0.7}; TextureTransform: {0.3, 0.3, 0, 0} }
+      "merlon_{k}" : MvStone { Position: {cos(a) * 2.0, 9.45, sin(a) * 2.0}; Rotation: {0, 0 - a, 0}; Box: {0.4, 0.5, 0.7}; texture.Transform: {0.3, 0.3, 0, 0} }
     }
-    roof_ : MvRoofPurple { Position: {0, 9.25, 0}; Scale: {2.6, 4.2, 2.6}; Lathe: {profile: MvPineTierShape, cap_start: true, segments: 16, rings: 8}; TextureTransform: {5, 3, 0, 0} }
+    roof_ : MvRoofPurple { Position: {0, 9.25, 0}; Scale: {2.6, 4.2, 2.6}; Lathe: {profile: MvPineTierShape, cap_start: true, segments: 16, rings: 8}; texture.Transform: {5, 3, 0, 0} }
     spire : MvGold { Position: {0, 13.6, 0}; Cylinder: {length: 0.6, radius: 0.04, segments: 6} }
     star : MvGold { Position: {0, 14.0, 0}; IcoSphere: {radius: 0.26, segments: 0}; Emissive: {strength: 0.6, color: {255, 210, 120}} }
     moon : MvGold { Position: {0, 13.55, 0}; Rotation: {0, 0, 0.6}; TorusShell: {radius: 0.22, tube: 0.04, ring_start: 0.6, ring_end: 3.6, tube_start: 0, tube_end: 6.283, segments: 10, rings: 4} }
     door : MvWood { Position: {0, 1.4, 2.07}; Rotation: {-0.06, 0, HALF_PI}; Box: {2.0, 1.0, 0.18}; Rgb: {110, 70, 120} }
     door_top : MvWood { Position: {0, 2.4, 2.02}; Rotation: {HALF_PI - 0.06, 0, 0}; Cylinder: {length: 0.18, radius: 0.5, segments: 12}; Rgb: {110, 70, 120} }
-    door_arch : MvStone { Position: {0, 2.45, 2.0}; Rotation: {HALF_PI - 0.06, 0, 0}; Tube: {length: 0.2, radius: 0.7, thickness: 0.18, segments: 14, arc: 3.14}; TextureTransform: {1, 0.2, 0, 0} }
+    door_arch : MvStone { Position: {0, 2.45, 2.0}; Rotation: {HALF_PI - 0.06, 0, 0}; Tube: {length: 0.2, radius: 0.7, thickness: 0.18, segments: 14, arc: 3.14}; texture.Transform: {1, 0.2, 0, 0} }
     win_a : MvWindowLit { Position: {0, 5, 1.97}; Rotation: {-0.06, 0, 0}; Box: {0.5, 0.9, 0.1} }
     win_a_top : MvWindowLit { Position: {0, 5.45, 1.95}; Rotation: {HALF_PI - 0.06, 0, 0}; Cylinder: {length: 0.1, radius: 0.25, segments: 10} }
     win_b : MvWindowLit { Position: {1.9, 6.5, 0}; Rotation: {0, 0, 0.06}; Box: {0.1, 0.9, 0.5} }
@@ -909,10 +909,10 @@ assets {
     prop x: f32 = 0
     prop z: f32 = 0
     Position: {x, 0, z}
-    cliff : MvCliff { Position: {0, 3, -3}; Scale: {9, 4, 3.5}; IcoSphere: {radius: 1, segments: 2}; TextureTransform: {4, 2, 0, 0} }
-    cliff_b : MvCliff { Position: {-6, 2, -1}; Scale: {4, 3, 3}; IcoSphere: {radius: 1, segments: 1}; TextureTransform: {2, 2, 0, 0} }
-    cliff_c : MvCliff { Position: {6.5, 2.4, -1.5}; Scale: {4, 3.2, 3}; IcoSphere: {radius: 1, segments: 1}; TextureTransform: {2, 2, 0, 0} }
-    grass_top : MvGrassDark { Position: {0, 6.6, -3.2}; Scale: {7.5, 0.9, 2.8}; Sphere: {radius: 1, segments: 14, smooth: true}; TextureTransform: {4, 2, 0, 0} }
+    cliff : MvCliff { Position: {0, 3, -3}; Scale: {9, 4, 3.5}; IcoSphere: {radius: 1, segments: 2}; texture.Transform: {4, 2, 0, 0} }
+    cliff_b : MvCliff { Position: {-6, 2, -1}; Scale: {4, 3, 3}; IcoSphere: {radius: 1, segments: 1}; texture.Transform: {2, 2, 0, 0} }
+    cliff_c : MvCliff { Position: {6.5, 2.4, -1.5}; Scale: {4, 3.2, 3}; IcoSphere: {radius: 1, segments: 1}; texture.Transform: {2, 2, 0, 0} }
+    grass_top : MvGrassDark { Position: {0, 6.6, -3.2}; Scale: {7.5, 0.9, 2.8}; Sphere: {radius: 1, segments: 14, smooth: true}; texture.Transform: {4, 2, 0, 0} }
     hole : MvDark { Position: {0, 1.5, 0.3}; Box: {3.2, 3.0, 0.4} }
     beam_l : MvTimber { Position: {-1.8, 1.6, 0.6}; Box: {0.35, 3.2, 0.35}; Bevel: {radius: 0.05, segments: 1} }
     beam_r : MvTimber { Position: {1.8, 1.6, 0.6}; Box: {0.35, 3.2, 0.35}; Bevel: {radius: 0.05, segments: 1} }
@@ -947,7 +947,7 @@ assets {
     prop len: f32 = 8
     Position: {x, 0, z}
     for k in 0..floor(len / 0.5) {
-      "plank_{k}" : MvWood { Position: {-0.25 - k * 0.5, 0.32 + (fract(k * 0.37) - 0.5) * 0.02, 0}; Rotation: {0, HALF_PI, (fract(k * 0.61) - 0.5) * 0.02}; Box: {2.4, 0.08, 0.46}; Rgb: {170 + fract(k * 0.7) * 30, 130, 92}; TextureTransform: {1.5, 0.2, 0, 0} }
+      "plank_{k}" : MvWood { Position: {-0.25 - k * 0.5, 0.32 + (fract(k * 0.37) - 0.5) * 0.02, 0}; Rotation: {0, HALF_PI, (fract(k * 0.61) - 0.5) * 0.02}; Box: {2.4, 0.08, 0.46}; Rgb: {170 + fract(k * 0.7) * 30, 130, 92}; texture.Transform: {1.5, 0.2, 0, 0} }
     }
     for i in 0..4 {
       "pile_a_{i}" : MvTimber { Position: {-i * len / 3, 0.2, 1.15}; Cylinder: {length: 1.0, radius: 0.16, segments: 8} }

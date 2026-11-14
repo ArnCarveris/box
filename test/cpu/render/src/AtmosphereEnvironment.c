@@ -296,7 +296,7 @@ void AtmosphereEnvironment_light_bake_environment_default(void) {
 
     test_assert(ecs_script_run(world, "bakes",
         "using box.light\n"
-        "scripted { LightBake: {} }\n", NULL) == 0);
+        "scripted { Bake: {} }\n", NULL) == 0);
     const LightBake *bake = ecs_get(world, ecs_lookup(world, "scripted"), LightBake);
     test_assert(bake != NULL);
     test_uint(bake->environment, 0);

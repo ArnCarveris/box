@@ -108,10 +108,10 @@ assets {
     Layout: {}
     Item: {width: {mode: Fixed, value: w + pad * 2 + 8}, height: {mode: Fixed, value: h + pad * 2 + 8}}
 
-    hood_t : Soot { Position: {0, h / 2 + pad / 2 + 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
-    hood_b : Soot { Position: {0, 0 - h / 2 - pad / 2 - 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
-    hood_l : Soot { Position: {0 - w / 2 - pad / 2 - 2, 0, 14}; Box: {pad + 4, h + 8, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
-    hood_r : Soot { Position: {w / 2 + pad / 2 + 2, 0, 14}; Box: {pad + 4, h + 8, 28}; TextureMapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_t : Soot { Position: {0, h / 2 + pad / 2 + 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_b : Soot { Position: {0, 0 - h / 2 - pad / 2 - 2, 14}; Box: {w + pad * 2 + 8, pad + 4, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_l : Soot { Position: {0 - w / 2 - pad / 2 - 2, 0, 14}; Box: {pad + 4, h + 8, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
+    hood_r : Soot { Position: {w / 2 + pad / 2 + 2, 0, 14}; Box: {pad + 4, h + 8, 28}; texture.Mapping: {mode: MappingObject, size: 0.77}; Ignore }
     gasket_t : Rubber { Position: {0, h / 2 + 2, 17}; Box: {w + 6, 5, 28}; Ignore }
     gasket_b : Rubber { Position: {0, 0 - h / 2 - 2, 17}; Box: {w + 6, 5, 28}; Ignore }
     gasket_l : Rubber { Position: {0 - w / 2 - 2, 0, 17}; Box: {5, h + 6, 28}; Ignore }
@@ -134,8 +134,8 @@ assets {
       Emissive: {strength: on ? brightness : 0, color: {255, 255, 255}}
       Transition: [Emissive: {duration: 0.4}]
       PbrTextures: {emissive: tex}
-      TextureTransform: {scale_x: -1, scale_y: -1, offset_x: 1, offset_y: 1}
-      TextureWrap: WrapClamp
+      texture.Transform: {scale_x: -1, scale_y: -1, offset_x: 1, offset_y: 1}
+      texture.Wrap: Clamp
       NoShadow
     }
 

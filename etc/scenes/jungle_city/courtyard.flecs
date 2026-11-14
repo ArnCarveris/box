@@ -23,9 +23,9 @@ assets {
         const y = 1.2 + f * 3.2
         { (IsA, CanopyIvory); Rgb: wall; Position: {x, y + 1.6, 0}; Box: {2.6, 3.2, 7.2}; Bevel: {front_left: 0.3, front_right: 0.3, back_left: 0.3, back_right: 0.3} }
         { (IsA, CanopyWood); Rgb: timber; Position: {x, y + 3.05, 0}; Box: {3.2, 0.18, 7.8} }
-        { (IsA, CanopyFacade); Position: {x, y + 1.55, 3.62}; Box: {2.3, 2.8, 0.06}; TextureMapping: {mode: MappingObject, size: 22.4}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
-        { (IsA, CanopyFacade); Position: {x + (0.5 - side) * 2.64, y + 1.55, 0}; Box: {0.06, 2.8, 6.6}; TextureMapping: {mode: MappingObject, size: 22.4}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
-        { (IsA, CanopyFacade); Position: {x - (0.5 - side) * 2.64, y + 1.55, 0}; Box: {0.06, 2.8, 6.6}; TextureMapping: {mode: MappingObject, size: 22.4}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
+        { (IsA, CanopyFacade); Position: {x, y + 1.55, 3.62}; Box: {2.3, 2.8, 0.06}; texture.Mapping: {mode: MappingObject, size: 22.4}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
+        { (IsA, CanopyFacade); Position: {x + (0.5 - side) * 2.64, y + 1.55, 0}; Box: {0.06, 2.8, 6.6}; texture.Mapping: {mode: MappingObject, size: 22.4}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
+        { (IsA, CanopyFacade); Position: {x - (0.5 - side) * 2.64, y + 1.55, 0}; Box: {0.06, 2.8, 6.6}; texture.Mapping: {mode: MappingObject, size: 22.4}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
         { (IsA, CanopyLeaf); Position: {x, y + 3.23, 3.3}; Box: {2.8, 0.3, 0.65}; Bevel: {top: 0.12, front_left: 0.12, front_right: 0.12, back_left: 0.12, back_right: 0.12} }
         CanopyVine(length: 1.8, phase: variant + f + side) { Position: {x + 0.9, y + 3.3, 3.7} }
       }

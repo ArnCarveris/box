@@ -10,12 +10,12 @@ using box.light
 // must be square everywhere: on long and short path segments and on long and short profile edges.
 //
 // Back: a flat road with a wide, unevenly split top and thin sides, swept along a Catmull-Rom
-// gently curving path whose points are spaced 1.2 to 2.8 apart, with a MappingObject TextureMapping of size 1,
+// gently curving path whose points are spaced 1.2 to 2.8 apart, with a MappingObject texture.Mapping of size 1,
 // so the cells are 0.25 wide along and across it without knowing its length.
 // Middle: a pipe of an irregular polygon section (points 10 to 80 degrees apart) along an
 // S-shaped Catmull-Rom path with uneven points, MappingObject of size 0.5.
 // Front: the default UVs (fractions of the lengths) on a 1.2 by 0.3 bar, 3 around, swept along
-// two lines 0.8 and 4 long, 4.8 along, with a TextureTransform of 6 by 9.6 repeats, 0.5 each.
+// two lines 0.8 and 4 long, 4.8 along, with a texture.Transform of 6 by 9.6 repeats, 0.5 each.
 // The profiles put their top at negative y: along a horizontal path the profile y points down.
 
 camera {
@@ -84,7 +84,7 @@ road {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: checker}
-  TextureMapping: {mode: MappingObject, size: 1}
+  texture.Mapping: {mode: MappingObject, size: 1}
 }
 
 pipe_shape {
@@ -124,7 +124,7 @@ pipe {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
   PbrTextures: {albedo: checker}
-  TextureMapping: {mode: MappingObject, size: 0.5}
+  texture.Mapping: {mode: MappingObject, size: 0.5}
 }
 
 bar_shape {
@@ -157,5 +157,5 @@ bar {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: checker}
-  TextureTransform: {6, 9.6, 0, 0}
+  texture.Transform: {6, 9.6, 0, 0}
 }

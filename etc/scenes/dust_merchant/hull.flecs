@@ -295,7 +295,7 @@ assets {
     Rgb: tone
     PbrMaterial: {metallic: 1, roughness: 1}
     PbrTextures: {albedo: tex_steel, orm: tex_steel_orm, normal: tex_steel_normal}
-    TextureTransform: {scale_x: 0.25, scale_y: 7}
+    texture.Transform: {scale_x: 0.25, scale_y: 7}
     Ignore
   }
 
@@ -321,7 +321,7 @@ assets {
     Rgb: tone
     PbrMaterial: {metallic: 1, roughness: 1}
     PbrTextures: {albedo: tex_steel, orm: tex_steel_orm, normal: tex_steel_normal}
-    TextureTransform: {scale_x: 0.25, scale_y: 7}
+    texture.Transform: {scale_x: 0.25, scale_y: 7}
     Ignore
   }
 
@@ -346,7 +346,7 @@ assets {
     Rgb: {58, 56, 50}
     PbrMaterial: {metallic: 1, roughness: 1}
     PbrTextures: {albedo: tex_steel, orm: tex_steel_orm, normal: tex_steel_normal}
-    TextureTransform: {scale_x: 0.25, scale_y: 2}
+    texture.Transform: {scale_x: 0.25, scale_y: 2}
   }
 
   template Glazing {
@@ -355,7 +355,7 @@ assets {
         if pane_solid(k, j) {
           "roof_{k}_{j}" : Quilt {
             HullPatch: {s0: ring_s(k), s1: ring_s(k + 1), t0: arc_t(j), t1: arc_t(j + 1)}
-            TextureTransform: {scale_x: 0.9, scale_y: 0.9}
+            texture.Transform: {scale_x: 0.9, scale_y: 0.9}
           }
         } else {
           "pane_{k}_{j}" {
@@ -461,7 +461,7 @@ assets {
         const s1 = s0 + 0.1676
         "skin_{k}_{j}" : Quilt {
           HullPatch: {s0: s0, s1: s1, t0: arc_t(j), t1: arc_t(j + 1)}
-          TextureTransform: {scale_x: 0.9, scale_y: 0.72}
+          texture.Transform: {scale_x: 0.9, scale_y: 0.72}
         }
       }
     }
@@ -472,7 +472,7 @@ assets {
     bulkhead : PaintedSteel {
       Position: {0, 1.36, 2.2}
       Box: {4.4, 2.8, 0.08}
-      TextureTransform: {scale_x: 3.4, scale_y: 2.2}
+      texture.Transform: {scale_x: 3.4, scale_y: 2.2}
       Rgb: {96, 92, 82}
     }
 
@@ -491,7 +491,7 @@ assets {
           Box: {0.1, 0.05, 0.02}
         }
       }
-      hazard { Position: {0, -0.8, -0.005}; Quad: {1.1, 0.09}; Rotation: {0, PI, 0}; Rgb: {180, 170, 150}; PbrMaterial: {metallic: 0, roughness: 0.7}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 5, scale_y: 0.4} }
+      hazard { Position: {0, -0.8, -0.005}; Quad: {1.1, 0.09}; Rotation: {0, PI, 0}; Rgb: {180, 170, 150}; PbrMaterial: {metallic: 0, roughness: 0.7}; PbrTextures: {albedo: tex_hazard}; texture.Transform: {scale_x: 5, scale_y: 0.4} }
       glow { Position: {0, 0.85, -0.06}; Sphere: {radius: 0.022, segments: 10, smooth: true}; Rgb: {24, 6, 4}; Emissive: {strength: 3, color: {255, 60, 40}} }
       glow_light { Position: {0, 0.8, -0.2}; PointLight: {intensity: 0.3, range: 1.8}; Rgb: {255, 70, 50} }
     }
@@ -502,14 +502,14 @@ assets {
       Position: {0, -0.03, 0.2}
       Box: {3.8, 0.06, 4.2}
       PbrTextures: {albedo: tex_grate, orm: tex_steel_orm, normal: tex_steel_normal}
-      TextureTransform: {scale_x: 5, scale_y: 5.5}
+      texture.Transform: {scale_x: 5, scale_y: 5.5}
     }
 
     for k in 2..8 {
       const a = k * 1.0 / 6
       const b = (k + 1) * 1.0 / 6
-      "wall_l_{k}" : Quilt { WallPatch: {sa: b, sb: a, side: -1}; TextureTransform: {scale_x: 0.8, scale_y: 0.8} }
-      "wall_r_{k}" : Quilt { WallPatch: {sa: a, sb: b, side: 1}; TextureTransform: {scale_x: 0.8, scale_y: 0.8} }
+      "wall_l_{k}" : Quilt { WallPatch: {sa: b, sb: a, side: -1}; texture.Transform: {scale_x: 0.8, scale_y: 0.8} }
+      "wall_r_{k}" : Quilt { WallPatch: {sa: a, sb: b, side: 1}; texture.Transform: {scale_x: 0.8, scale_y: 0.8} }
       WallRib "rib_l_{k}"(s: a, side: -1) { Position: {0, 0, 0} }
       WallRib "rib_r_{k}"(s: a, side: 1) { Position: {0, 0, 0} }
     }
@@ -565,19 +565,19 @@ assets {
         }
       }
       Sweep: {path: run, profile: HoodProfile, scale: {1, 1}, rings: 96}
-      TextureTransform: {scale_x: 1.4, scale_y: 18}
+      texture.Transform: {scale_x: 1.4, scale_y: 18}
     }
 
-    dash_face : Soot { Position: {-0.14, 0.47, -1.02}; Box: {1.5, 0.94, 0.05}; TextureMapping: {mode: MappingObject, size: 0.62} }
-    knee_l : Soot { Position: {-1.18, 0.47, -0.77}; Rotation: {0, 0.72, 0}; Box: {0.86, 0.94, 0.05}; TextureMapping: {mode: MappingObject, size: 0.62} }
-    knee_r : Soot { Position: {1.02, 0.47, -0.76}; Rotation: {0, -0.55, 0}; Box: {1.04, 0.94, 0.05}; TextureMapping: {mode: MappingObject, size: 0.62} }
+    dash_face : Soot { Position: {-0.14, 0.47, -1.02}; Box: {1.5, 0.94, 0.05}; texture.Mapping: {mode: MappingObject, size: 0.62} }
+    knee_l : Soot { Position: {-1.18, 0.47, -0.77}; Rotation: {0, 0.72, 0}; Box: {0.86, 0.94, 0.05}; texture.Mapping: {mode: MappingObject, size: 0.62} }
+    knee_r : Soot { Position: {1.02, 0.47, -0.76}; Rotation: {0, -0.55, 0}; Box: {1.04, 0.94, 0.05}; texture.Mapping: {mode: MappingObject, size: 0.62} }
 
-    ledge_l : Soot { Position: {-1.72, 0.7, 0.32}; Rotation: {0.0, 0, -0.12}; RoundedBox: {0.34, 0.05, 1.44, 0.018, segments: 2}; TextureMapping: {mode: MappingObject, size: 0.62} }
-    ledge_r : Soot { Position: {1.72, 0.7, 0.32}; Rotation: {0.0, 0, 0.12}; RoundedBox: {0.34, 0.05, 1.44, 0.018, segments: 2}; TextureMapping: {mode: MappingObject, size: 0.62} }
+    ledge_l : Soot { Position: {-1.72, 0.7, 0.32}; Rotation: {0.0, 0, -0.12}; RoundedBox: {0.34, 0.05, 1.44, 0.018, segments: 2}; texture.Mapping: {mode: MappingObject, size: 0.62} }
+    ledge_r : Soot { Position: {1.72, 0.7, 0.32}; Rotation: {0.0, 0, 0.12}; RoundedBox: {0.34, 0.05, 1.44, 0.018, segments: 2}; texture.Mapping: {mode: MappingObject, size: 0.62} }
     rail_l { Tube3: {a: {-1.76, 1.04, -0.22}, b: {-1.92, 1.04, 0.92}, r: 0.014, tone: {120, 118, 112}} }
     rail_r { Tube3: {a: {1.76, 1.04, -0.22}, b: {1.92, 1.04, 0.92}, r: 0.014, tone: {120, 118, 112}} }
 
-    pedestal : BoneWhite { Position: {0.24, 0.26, -0.3}; RoundedBox: {0.34, 0.52, 0.96, 0.02, segments: 2}; TextureMapping: {mode: MappingObject, size: 0.62}; Rgb: {120, 114, 100} }
+    pedestal : BoneWhite { Position: {0.24, 0.26, -0.3}; RoundedBox: {0.34, 0.52, 0.96, 0.02, segments: 2}; texture.Mapping: {mode: MappingObject, size: 0.62}; Rgb: {120, 114, 100} }
   }
 
   template Seat {
@@ -586,9 +586,9 @@ assets {
     rail_a : Soot { Position: {-0.2, 0.03, 0}; Box: {0.05, 0.05, 0.8} }
     rail_b : Soot { Position: {0.2, 0.03, 0}; Box: {0.05, 0.05, 0.8} }
     post : BareSteel { Position: {0, 0.24, 0.02}; Rotation: {0, 0, 0}; Cylinder: {radius: 0.05, length: 0.42, segments: 14, smooth: true} }
-    pan : Quilt { Position: {0, 0.52, 0}; Rotation: {0.05, 0, 0}; RoundedBox: {0.5, 0.11, 0.52, 0.05, segments: 4}; TextureMapping: {mode: MappingObject, size: 1}; Rgb: {78, 40, 26} }
-    back : Quilt { Position: {0, 0.92, 0.28}; Rotation: {0.14, 0, 0}; RoundedBox: {0.48, 0.74, 0.12, 0.05, segments: 4}; TextureMapping: {mode: MappingObject, size: 1}; Rgb: {78, 40, 26} }
-    head : Quilt { Position: {0, 1.36, 0.34}; Rotation: {0.08, 0, 0}; RoundedBox: {0.28, 0.17, 0.1, 0.04, segments: 4}; TextureMapping: {mode: MappingObject, size: 1}; Rgb: {66, 36, 24} }
+    pan : Quilt { Position: {0, 0.52, 0}; Rotation: {0.05, 0, 0}; RoundedBox: {0.5, 0.11, 0.52, 0.05, segments: 4}; texture.Mapping: {mode: MappingObject, size: 1}; Rgb: {78, 40, 26} }
+    back : Quilt { Position: {0, 0.92, 0.28}; Rotation: {0.14, 0, 0}; RoundedBox: {0.48, 0.74, 0.12, 0.05, segments: 4}; texture.Mapping: {mode: MappingObject, size: 1}; Rgb: {78, 40, 26} }
+    head : Quilt { Position: {0, 1.36, 0.34}; Rotation: {0.08, 0, 0}; RoundedBox: {0.28, 0.17, 0.1, 0.04, segments: 4}; texture.Mapping: {mode: MappingObject, size: 1}; Rgb: {66, 36, 24} }
     shell : Soot { Position: {0, 0.92, 0.36}; Rotation: {0.14, 0, 0}; Box: {0.42, 0.68, 0.03} }
     strap_a { Position: {-0.12, 1.02, 0.2}; Rotation: {0.14, 0, 0.05}; Box: {0.045, 0.56, 0.008}; Rgb: {100, 88, 54}; PbrMaterial: {metallic: 0, roughness: 0.9} }
     strap_b { Position: {0.12, 1.02, 0.2}; Rotation: {0.14, 0, -0.05}; Box: {0.045, 0.56, 0.008}; Rgb: {100, 88, 54}; PbrMaterial: {metallic: 0, roughness: 0.9} }
@@ -603,7 +603,7 @@ assets {
     Position: {at.x, at.y, at.z}
     Rotation: {PI / 2, 0, 0}
     Ignore
-    body : HullPlate { Rotation: {0, spin, 0}; Cylinder: {radius: 0.15, length: 0.44, segments: 18, smooth: true}; Rgb: {134, 124, 100}; TextureTransform: {scale_x: 0.4, scale_y: 0.3}; NoShadow }
+    body : HullPlate { Rotation: {0, spin, 0}; Cylinder: {radius: 0.15, length: 0.44, segments: 18, smooth: true}; Rgb: {134, 124, 100}; texture.Transform: {scale_x: 0.4, scale_y: 0.3}; NoShadow }
     band_a : Soot { Position: {0, 0.17, 0}; Cylinder: {radius: 0.158, length: 0.03, segments: 18, smooth: true}; NoShadow }
     band_b : Soot { Position: {0, -0.17, 0}; Cylinder: {radius: 0.158, length: 0.03, segments: 18, smooth: true}; NoShadow }
     lid { Position: {0, -0.235, 0}; Frustum: {radius_bottom: 0.15, radius_top: 0.09, length: 0.04, segments: 18, smooth: true}; Rgb: cap; PbrMaterial: {metallic: 0.6, roughness: 0.6}; NoShadow }
@@ -624,7 +624,7 @@ assets {
         ],
         cap_start: true, cap_end: true, rings: 60
       }
-      TextureTransform: {scale_x: 2.4, scale_y: 5.5}
+      texture.Transform: {scale_x: 2.4, scale_y: 5.5}
       Rgb: {150, 142, 124}
       NoShadow
       Ignore
@@ -642,7 +642,7 @@ assets {
         }
       }
       Sweep: {path: run, profile: FrameProfile, scale: {0.09, 0.03}, rings: 48}
-      TextureTransform: {scale_x: 0.5, scale_y: 8}
+      texture.Transform: {scale_x: 0.5, scale_y: 8}
       NoShadow
       Ignore
     }
@@ -722,7 +722,7 @@ assets {
         ],
         cap_start: true, cap_end: true, rings: 18
       }
-      TextureTransform: {scale_x: 1, scale_y: 1}
+      texture.Transform: {scale_x: 1, scale_y: 1}
       Rgb: {124, 118, 102}
       NoShadow
       Ignore
@@ -743,7 +743,7 @@ assets {
         inset: 0.04,
         bevel: 0.04
       }
-      TextureTransform: {scale_x: 0.5, scale_y: 0.5}
+      texture.Transform: {scale_x: 0.5, scale_y: 0.5}
       Rgb: {132, 124, 106}
       NoShadow
       Ignore
@@ -754,7 +754,7 @@ assets {
     nacelle {
       Position: {side * 4.0, 0.42, 4.0}
       Rotation: {PI / 2, 0, 0}
-      shell : HullPlate { Position: {0, 0, 0}; Cylinder: {radius: 0.62, length: 3.6, segments: 28, smooth: true}; TextureTransform: {scale_x: 2, scale_y: 2}; Rgb: {126, 118, 100}; NoShadow; Ignore }
+      shell : HullPlate { Position: {0, 0, 0}; Cylinder: {radius: 0.62, length: 3.6, segments: 28, smooth: true}; texture.Transform: {scale_x: 2, scale_y: 2}; Rgb: {126, 118, 100}; NoShadow; Ignore }
       inlet : Soot { Position: {0, -1.95, 0}; Frustum: {radius_bottom: 0.46, radius_top: 0.62, length: 0.3, segments: 28, smooth: true}; NoShadow; Ignore }
       spinner : BareSteel { Position: {0, -2.1, 0}; Cone: {radius: 0.2, length: 0.4, segments: 18, smooth: true}; Rotation: {PI, 0, 0}; NoShadow; Ignore }
       for i in 0..5 {
@@ -776,7 +776,7 @@ assets {
     mass : HullPlate {
       Position: {0, 0.9, 8.6}
       RoundedBox: {7.6, 4.6, 13, 0.5, segments: 6}
-      TextureTransform: {scale_x: 4, scale_y: 4}
+      texture.Transform: {scale_x: 4, scale_y: 4}
       Rgb: {122, 116, 100}
       NoShadow
       Ignore

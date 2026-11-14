@@ -79,7 +79,7 @@ floor {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
   PbrTextures: {albedo: floor_albedo, normal: floor_n}
-  TextureTransform: {scale_x: 4, scale_y: 4}
+  texture.Transform: {scale_x: 4, scale_y: 4}
 }
 
 wall {
@@ -88,5 +88,5 @@ wall {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.85}
   PbrTextures: {albedo: bricks, normal: bricks_n}
-  TextureTransform: {scale_x: 2, scale_y: 1.2}
+  texture.Transform: {scale_x: 2, scale_y: 1.2}
 }

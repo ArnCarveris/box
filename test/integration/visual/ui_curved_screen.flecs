@@ -191,8 +191,8 @@ template Slice {
   PbrMaterial: {metallic: 0, roughness: 1}
   Emissive: {strength: 1, color: {255, 255, 255}}
   PbrTextures: {albedo: screen_texture, emissive: screen_texture}
-  TextureTransform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
-  TextureWrap: WrapClamp
+  texture.Transform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
+  texture.Wrap: Clamp
 }
 
 screen {

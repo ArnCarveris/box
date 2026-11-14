@@ -1250,8 +1250,8 @@ void Material_texture_mapping_defaults(void) {
 
     test_assert(ecs_script_run(world, "texture_mapping",
         "using box.material\n"
-        "object { TextureMapping: {mode: MappingObject} }\n"
-        "sized { TextureMapping: {mode: MappingObject, size: 2} }\n", NULL) == 0);
+        "object { texture.Mapping: {mode: MappingObject} }\n"
+        "sized { texture.Mapping: {mode: MappingObject, size: 2} }\n", NULL) == 0);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, TextureMapping);
@@ -1484,9 +1484,9 @@ void Material_texture_mapping_world_defaults(void) {
 
     test_assert(ecs_script_run(world, "texture_mapping_world",
         "using box.material\n"
-        "world_mapped { TextureMapping: {mode: MappingWorld, size: 2} }\n"
-        "blended { TextureMapping: {mode: MappingWorld, blend: 0.25} }\n"
-        "object_blended { TextureMapping: {mode: MappingObject, blend: 0.5} }\n", NULL) == 0);
+        "world_mapped { texture.Mapping: {mode: MappingWorld, size: 2} }\n"
+        "blended { texture.Mapping: {mode: MappingWorld, blend: 0.25} }\n"
+        "object_blended { texture.Mapping: {mode: MappingObject, blend: 0.5} }\n", NULL) == 0);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, TextureMapping);
@@ -1671,7 +1671,7 @@ void Material_texture_mapping_frame_pack(void) {
     ECS_IMPORT(world, Box);
     test_assert(ecs_script_run(world, "texture_mapping_frame",
         "using box.material\n"
-        "hull { TextureFrame\n TextureMapping: {mode: MappingFrame, size: 2, blend: 0.5} }\n",
+        "hull { texture.Frame\n texture.Mapping: {mode: MappingFrame, size: 2, blend: 0.5} }\n",
         NULL) == 0);
     ecs_entity_t hull = ecs_lookup(world, "hull");
     test_assert(ecs_has_id(world, hull, TextureFrame));
@@ -2639,8 +2639,8 @@ void Material_texture_scroll_defaults(void) {
 
     test_assert(ecs_script_run(world, "scroll",
         "using box.material\n"
-        "river { TextureScroll: {velocity: {0.5, -0.25}} }\n"
-        "ripples { TextureScroll: {normal_velocity: {0, 0.1}} }\n", NULL) == 0);
+        "river { texture.Scroll: {velocity: {0.5, -0.25}} }\n"
+        "ripples { texture.Scroll: {normal_velocity: {0, 0.1}} }\n", NULL) == 0);
 
     ecs_entity_t added = ecs_new(world);
     ecs_add(world, added, TextureScroll);

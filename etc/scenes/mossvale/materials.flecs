@@ -57,7 +57,7 @@ assets {
   prefab MvHillGrass { Rgb: {160, 166, 96}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
   prefab MvDirt { Rgb: {196, 156, 108}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
   prefab MvPath { Rgb: {208, 178, 130}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
-  prefab MvCobble { Rgb: {204, 194, 178}; PbrMaterial: {roughness: 0.85}; PbrTextures: {albedo: mv_tex_cobble, normal: mv_tex_cobble_n}; TextureTransform: {6, 6, 0, 0} }
+  prefab MvCobble { Rgb: {204, 194, 178}; PbrMaterial: {roughness: 0.85}; PbrTextures: {albedo: mv_tex_cobble, normal: mv_tex_cobble_n}; texture.Transform: {6, 6, 0, 0} }
   prefab MvLane { Rgb: {212, 200, 180}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_rubble, normal: mv_tex_rubble_n} }
   prefab MvFlags { Rgb: {200, 190, 172}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_ashlar, normal: mv_tex_ashlar_n} }
   prefab MvVerge { Rgb: {178, 168, 112}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_grass, normal: mv_tex_grass_n} }
@@ -66,8 +66,8 @@ assets {
   prefab MvSoil { Rgb: {124, 90, 62}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
   prefab MvSoilDry { Rgb: {178, 142, 100}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
   prefab MvSand { Rgb: {236, 216, 166}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_sand, normal: mv_tex_sand_n} }
-  prefab MvWater { Rgb: {46, 104, 126}; PbrMaterial: {roughness: 0.04}; ClearCoat: {strength: 1, roughness: 0.02}; PbrTextures: {normal: mv_tex_water_n}; TextureTransform: {3, 3, 0, 0} }
-  prefab MvDeepWater { Rgb: {28, 70, 98}; PbrMaterial: {roughness: 0.04}; ClearCoat: {strength: 1, roughness: 0.02}; PbrTextures: {normal: mv_tex_water_n}; TextureTransform: {3, 3, 0, 0} }
+  prefab MvWater { Rgb: {46, 104, 126}; PbrMaterial: {roughness: 0.04}; ClearCoat: {strength: 1, roughness: 0.02}; PbrTextures: {normal: mv_tex_water_n}; texture.Transform: {3, 3, 0, 0} }
+  prefab MvDeepWater { Rgb: {28, 70, 98}; PbrMaterial: {roughness: 0.04}; ClearCoat: {strength: 1, roughness: 0.02}; PbrTextures: {normal: mv_tex_water_n}; texture.Transform: {3, 3, 0, 0} }
   prefab MvIce { Rgb: {210, 236, 250}; PbrMaterial: {roughness: 0.15}; ClearCoat: {strength: 1, roughness: 0.05}; Transmission: {transmission_factor: 0.6, ior: 1.31, thickness_factor: 0.25, attenuation_distance: 0.6, attenuation_color: {170, 214, 240}} }
 
   mv_tile_grass_a { Path: {path: "etc/scenes/mossvale/textures/tiles/grass.png"} }
@@ -114,8 +114,8 @@ assets {
   prefab MvTimber { Rgb: {112, 78, 52}; PbrMaterial: {roughness: 0.85}; PbrTextures: {albedo: mv_tex_timber, normal: mv_tex_timber_n} }
   prefab MvWood { Rgb: {184, 134, 88}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: mv_tex_wood, normal: mv_tex_wood_n} }
   prefab MvOldWood { Rgb: {150, 124, 96}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_wood, normal: mv_tex_wood_n} }
-  prefab MvBark { Rgb: {122, 92, 66}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_bark, normal: mv_tex_bark_n}; TextureTransform: {2, 1, 0, 0} }
-  prefab MvBirchBark { Rgb: {236, 232, 220}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_birch, normal: mv_tex_birch_n}; TextureTransform: {1, 2, 0, 0} }
+  prefab MvBark { Rgb: {122, 92, 66}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_bark, normal: mv_tex_bark_n}; texture.Transform: {2, 1, 0, 0} }
+  prefab MvBirchBark { Rgb: {236, 232, 220}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_birch, normal: mv_tex_birch_n}; texture.Transform: {1, 2, 0, 0} }
   prefab MvThatch { Rgb: {226, 188, 118}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_thatch, normal: mv_tex_thatch_n} }
   prefab MvRoofRed { Rgb: {196, 88, 62}; PbrMaterial: {roughness: 0.75}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n} }
   prefab MvRoofBlue { Rgb: {88, 112, 156}; PbrMaterial: {roughness: 0.65}; PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n} }
@@ -135,12 +135,12 @@ assets {
   prefab MvClothYellow { Rgb: {240, 198, 76}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_cloth, normal: mv_tex_cloth_n}; Sheen: {color: {120, 112, 90}, roughness: 0.5} }
   prefab MvClothGreen { Rgb: {90, 150, 86}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_cloth, normal: mv_tex_cloth_n}; Sheen: {color: {96, 120, 96}, roughness: 0.5} }
 
-  prefab MvLeaf { Rgb: {104, 160, 66}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; TextureTransform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {200, 255, 120}} }
-  prefab MvLeafLight { Rgb: {146, 190, 80}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; TextureTransform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {220, 255, 140}} }
-  prefab MvLeafDark { Rgb: {62, 116, 64}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; TextureTransform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.3, color: {160, 230, 120}} }
-  prefab MvLeafPine { Rgb: {56, 104, 72}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; TextureTransform: {4, 2, 0, 0} }
-  prefab MvLeafAutumn { Rgb: {236, 162, 64}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; TextureTransform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {255, 200, 120}} }
-  prefab MvLeafRed { Rgb: {210, 96, 58}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; TextureTransform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {255, 150, 110}} }
+  prefab MvLeaf { Rgb: {104, 160, 66}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; texture.Transform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {200, 255, 120}} }
+  prefab MvLeafLight { Rgb: {146, 190, 80}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; texture.Transform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {220, 255, 140}} }
+  prefab MvLeafDark { Rgb: {62, 116, 64}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; texture.Transform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.3, color: {160, 230, 120}} }
+  prefab MvLeafPine { Rgb: {56, 104, 72}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; texture.Transform: {4, 2, 0, 0} }
+  prefab MvLeafAutumn { Rgb: {236, 162, 64}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; texture.Transform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {255, 200, 120}} }
+  prefab MvLeafRed { Rgb: {210, 96, 58}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: mv_tex_foliage, normal: mv_tex_foliage_n}; texture.Transform: {3, 2, 0, 0}; DiffuseTransmission: {factor: 0.35, color: {255, 150, 110}} }
   prefab MvBurnt { Rgb: {44, 38, 34}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_bark, normal: mv_tex_bark_n} }
   prefab MvAsh { Rgb: {120, 114, 106}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: mv_tex_dirt, normal: mv_tex_dirt_n} }
   prefab MvWeed { Rgb: {104, 96, 48}; PbrMaterial: {roughness: 1} }

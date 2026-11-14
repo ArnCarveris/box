@@ -105,7 +105,7 @@ yard {
 }
 
 ship {
-  TextureFrame
+  texture.Frame
   if liner {
     for i in 0..LCELLS {
       LinerSlot "slot_{i}"(idx: i)

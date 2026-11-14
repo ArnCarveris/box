@@ -23,12 +23,12 @@ prefab GroundSurface {
   Rgb: {222, 194, 165}
   PbrMaterial: {metallic: 0, roughness: 1}
   PbrTextures: {albedo: dirt_tex, orm: dirt_orm_tex, normal: dirt_norm}
-  TextureTransform: {scale_x: 43.3333, scale_y: 43.3333}
+  texture.Transform: {scale_x: 43.3333, scale_y: 43.3333}
 }
 
 prefab BasinSurface {
   Rgb: {235, 208, 178}
   PbrMaterial: {metallic: 0, roughness: 1}
   PbrTextures: {albedo: dirt_tex, orm: dirt_orm_tex, normal: dirt_norm}
-  TextureTransform: {scale_x: 17.3333, scale_y: 17.3333}
+  texture.Transform: {scale_x: 17.3333, scale_y: 17.3333}
 }

@@ -84,7 +84,7 @@ sky {
 
 $ {
   ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 3}
-  LightBake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
+  Bake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.4, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
 }
 
 wild_wild_west {

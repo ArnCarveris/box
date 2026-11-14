@@ -10,9 +10,9 @@ $ {
   Scene: {texture_blend: true}
 }
 
-// TextureBlend: the large plane blends four layers under a mask of four quadrants with soft
+// texture.Blend: the large plane blends four layers under a mask of four quadrants with soft
 // borders (checker top left, letter top right, stripes bottom left, a normal mapped layer with
-// bumps and an ORM bottom right), each layer tiled by its own TextureTransform. On the right, the
+// bumps and an ORM bottom right), each layer tiled by its own texture.Transform. On the right, the
 // upper quad blends layer 0 alone without a mask and the lower one has the same textures through
 // PbrTextures: the two must look the same.
 
@@ -62,7 +62,7 @@ orm {
 
 checker_layer {
   PbrTextures: {albedo: checker}
-  TextureTransform: {scale_x: 2, scale_y: 2}
+  texture.Transform: {scale_x: 2, scale_y: 2}
 }
 
 letter_layer {
@@ -71,12 +71,12 @@ letter_layer {
 
 stripes_layer {
   PbrTextures: {albedo: stripes}
-  TextureTransform: {scale_x: 3, scale_y: 3}
+  texture.Transform: {scale_x: 3, scale_y: 3}
 }
 
 bumpy_layer {
   PbrTextures: {orm: orm, normal: bumps}
-  TextureTransform: {scale_x: 4, scale_y: 4}
+  texture.Transform: {scale_x: 4, scale_y: 4}
 }
 
 blended {
@@ -85,7 +85,7 @@ blended {
   Quad: {4, 4}
   Rgb: {240, 240, 240}
   PbrMaterial: {roughness: 0.5}
-  TextureBlend: {mask: mask, layers: [checker_layer, letter_layer, stripes_layer, bumpy_layer]}
+  texture.Blend: {mask: mask, layers: [checker_layer, letter_layer, stripes_layer, bumpy_layer]}
 }
 
 layer_zero {
@@ -94,7 +94,7 @@ layer_zero {
   Quad: {1.8, 1.8}
   Rgb: {240, 240, 240}
   PbrMaterial: {roughness: 0.5}
-  TextureBlend: {layers: [checker_layer]}
+  texture.Blend: {layers: [checker_layer]}
 }
 
 plain {
@@ -104,5 +104,5 @@ plain {
   Rgb: {240, 240, 240}
   PbrMaterial: {roughness: 0.5}
   PbrTextures: {albedo: checker}
-  TextureTransform: {scale_x: 2, scale_y: 2}
+  texture.Transform: {scale_x: 2, scale_y: 2}
 }

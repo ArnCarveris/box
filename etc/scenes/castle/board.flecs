@@ -199,11 +199,11 @@ assets {
     soil : CastleSoil {
       Position: {0, k == K_MOAT ? -1.15 : -0.55, 0}
       Box: {2, 0.9, 2}
-      TextureTransform: {scale_x: 1, scale_y: 0.45}
+      texture.Transform: {scale_x: 1, scale_y: 0.45}
     }
 
     if k == K_MOAT {
-      water : CastleWater { Position: {0, -0.32, 0}; Box: {2, 0.06, 2}; TextureMapping: {mode: MappingWorld, size: 2}; TextureTransform: {scale_x: 1, scale_y: 1} }
+      water : CastleWater { Position: {0, -0.32, 0}; Box: {2, 0.06, 2}; texture.Mapping: {mode: MappingWorld, size: 2}; texture.Transform: {scale_x: 1, scale_y: 1} }
       bank_n : CastleDarkStoneBlock { Position: {0, -0.62, -0.96}; Box: {2, 0.6, 0.08} }
       bank_s : CastleDarkStoneBlock { Position: {0, -0.62, 0.96}; Box: {2, 0.6, 0.08} }
       bank_e : CastleDarkStoneBlock { Position: {0.96, -0.62, 0}; Box: {0.08, 0.6, 2} }
@@ -214,7 +214,7 @@ assets {
         Position: {0, -0.05, 0}
         Box: {1.98, 0.1, 1.98}
         PbrMaterial: {roughness: 1}
-        TextureMapping: {mode: MappingWorld, size: 4}
+        texture.Mapping: {mode: MappingWorld, size: 4}
         if k == K_PATH {
           Rgb: {176 + shade, 148 + shade, 108 + shade}
           PbrTextures: {albedo: castle_tex_earth, normal: castle_tex_earth_n}
@@ -248,7 +248,7 @@ assets {
           Scale: {1.4, 1, 1}
           Rgb: {88, 116, 54}
           Cylinder: {length: 0.01, radius: pr, segments: 7}
-          TextureTransform: {scale_x: 0.2, scale_y: 0.2}
+          texture.Transform: {scale_x: 0.2, scale_y: 0.2}
         }
       }
       Tuft tuft_a(seed: hash(idx + 217)) { Position: {gx + 0.1, 0, gz - 0.05} }
@@ -424,12 +424,12 @@ assets {
   }
 
   template Windmill {
-    mound : CastleGrass { Position: {0, -2.2, 0}; Scale: {11, 3, 11}; Sphere: {radius: 1, segments: 24, smooth: true}; TextureMapping: {mode: MappingWorld, size: 4, blend: 0.3} }
-    base : CastleDarkStone { Position: {0, 0.95, 0}; Cylinder: {length: 0.5, radius: 1.35, segments: 16}; TextureTransform: {scale_x: 6, scale_y: 0.4} }
-    body : CastlePlaster { Position: {0, 2.8, 0}; Frustum: {length: 3.4, radius_bottom: 1.2, radius_top: 0.85, segments: 16}; TextureTransform: {scale_x: 4, scale_y: 2} }
+    mound : CastleGrass { Position: {0, -2.2, 0}; Scale: {11, 3, 11}; Sphere: {radius: 1, segments: 24, smooth: true}; texture.Mapping: {mode: MappingWorld, size: 4, blend: 0.3} }
+    base : CastleDarkStone { Position: {0, 0.95, 0}; Cylinder: {length: 0.5, radius: 1.35, segments: 16}; texture.Transform: {scale_x: 6, scale_y: 0.4} }
+    body : CastlePlaster { Position: {0, 2.8, 0}; Frustum: {length: 3.4, radius_bottom: 1.2, radius_top: 0.85, segments: 16}; texture.Transform: {scale_x: 4, scale_y: 2} }
     band : CastleTimber { Position: {0, 4.5, 0}; Cylinder: {length: 0.12, radius: 0.92, segments: 16} }
-    cap : CastleThatch { Position: {0, 5.1, 0}; Cone: {length: 1.2, radius: 1.05, segments: 16}; TextureTransform: {scale_x: 4, scale_y: 1} }
-    door : CastleWood { Position: {0, 1.6, 1.15}; Rotation: {-0.1, 0, 0}; Box: {0.5, 0.9, 0.06}; TextureTransform: {scale_x: 0.5, scale_y: 0.9} }
+    cap : CastleThatch { Position: {0, 5.1, 0}; Cone: {length: 1.2, radius: 1.05, segments: 16}; texture.Transform: {scale_x: 4, scale_y: 1} }
+    door : CastleWood { Position: {0, 1.6, 1.15}; Rotation: {-0.1, 0, 0}; Box: {0.5, 0.9, 0.06}; texture.Transform: {scale_x: 0.5, scale_y: 0.9} }
     win : CastleWindow { Position: {0, 3.4, 1.02}; Rotation: {-0.1, 0, 0}; Box: {0.3, 0.36, 0.04} }
     sacks : CastleCloth { Position: {0.7, 1.4, 1.2}; Scale: {1, 0.8, 0.8}; IcoSphere: {radius: 0.26, segments: 1} }
     Sails sails { Position: {0, 4.8, 1.05} }
@@ -444,19 +444,19 @@ assets {
     const turn = seed > 0.5 ? HALF_PI : 0
 
     if t == 0 {
-      soil : CastleWheat { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; TextureMapping: {mode: MappingObject, size: 4} }
+      soil : CastleWheat { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; texture.Mapping: {mode: MappingObject, size: 4} }
       if seed > 0.3 {
         for h in 0..4 {
-          "stook_{h}" : CastleHay { Position: {-4 + h * 2.6, -0.4, (hash(h + 3) - 0.5) * 8}; Cone: {length: 1.2, radius: 0.5, segments: 8}; TextureTransform: {scale_x: 2, scale_y: 1} }
+          "stook_{h}" : CastleHay { Position: {-4 + h * 2.6, -0.4, (hash(h + 3) - 0.5) * 8}; Cone: {length: 1.2, radius: 0.5, segments: 8}; texture.Transform: {scale_x: 2, scale_y: 1} }
         }
       }
     } else if t == 1 {
-      soil : CastleCrop { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; TextureMapping: {mode: MappingObject, size: 4} }
+      soil : CastleCrop { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; texture.Mapping: {mode: MappingObject, size: 4} }
     } else if t == 2 {
-      soil : CastlePlowed { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; TextureMapping: {mode: MappingObject, size: 4} }
+      soil : CastlePlowed { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; texture.Mapping: {mode: MappingObject, size: 4} }
       Folk farmer(seed: seed) { Position: {(seed - 0.5) * 8, -1, 2}; Scale: {1.6, 1.6, 1.6}; Rotation: {0, seed * 9, 0} }
     } else if t == 3 {
-      soil : CastleFlax { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; TextureMapping: {mode: MappingObject, size: 4} }
+      soil : CastleFlax { Position: {0, -0.985, 0}; Rotation: {0, turn, 0}; Box: {size, 0.03, size}; texture.Mapping: {mode: MappingObject, size: 4} }
     } else {
       for f in 0..4 {
         const fx = match f { 0: 0; 1: size / 2; 2: 0; _: 0 - size / 2 }
@@ -517,7 +517,7 @@ assets {
     road : CastleDirt {
       Position: {0, -1.002, 0}
       Sweep: {path: castle_road_path, profile: CastleFlatProfile, scale: {2.6, 0.04}, rings: 128}
-      TextureMapping: {mode: MappingObject, size: 3}
+      texture.Mapping: {mode: MappingObject, size: 3}
     }
 
     for i in 0..26 {
@@ -545,13 +545,13 @@ assets {
     river_bank : CastleDirt {
       Position: {0, -1.003, 0}
       Sweep: {path: castle_river_path, profile: CastleFlatProfile, scale: {7.4, 0.03}, rings: 256}
-      TextureMapping: {mode: MappingObject, size: 3.5}
+      texture.Mapping: {mode: MappingObject, size: 3.5}
     }
     river : CastleWater {
       Position: {0, -0.99, 0}
       Sweep: {path: castle_river_path, profile: CastleFlatProfile, scale: {5.4, 0.03}, rings: 256}
-      TextureMapping: {mode: MappingObject, size: 4}
-      TextureTransform: {scale_x: 1, scale_y: 1}
+      texture.Mapping: {mode: MappingObject, size: 4}
+      texture.Transform: {scale_x: 1, scale_y: 1}
     }
 
     for i in 0..44 {
@@ -580,9 +580,9 @@ assets {
     bridge {
       Position: {bx, -1, bz}
       Rotation: {0, atan2(road_x(bz + 4) - road_x(bz - 4), 8), 0}
-      deck : CastleOldWood { Position: {0, 0.32, 0}; Box: {3, 0.14, 8}; TextureTransform: {scale_x: 1, scale_y: 4} }
-      ramp_a : CastleOldWood { Position: {0, 0.15, 4.6}; Rotation: {0.2, 0, 0}; Box: {3, 0.12, 1.6}; TextureTransform: {scale_x: 1, scale_y: 1} }
-      ramp_b : CastleOldWood { Position: {0, 0.15, -4.6}; Rotation: {-0.2, 0, 0}; Box: {3, 0.12, 1.6}; TextureTransform: {scale_x: 1, scale_y: 1} }
+      deck : CastleOldWood { Position: {0, 0.32, 0}; Box: {3, 0.14, 8}; texture.Transform: {scale_x: 1, scale_y: 4} }
+      ramp_a : CastleOldWood { Position: {0, 0.15, 4.6}; Rotation: {0.2, 0, 0}; Box: {3, 0.12, 1.6}; texture.Transform: {scale_x: 1, scale_y: 1} }
+      ramp_b : CastleOldWood { Position: {0, 0.15, -4.6}; Rotation: {-0.2, 0, 0}; Box: {3, 0.12, 1.6}; texture.Transform: {scale_x: 1, scale_y: 1} }
       for p in 0..2 {
         const px = match p { 0: -1.45; _: 1.45 }
         "rail_{p}" : CastleTimber { Position: {px, 1.0, 0}; Box: {0.1, 0.1, 8} }
@@ -611,10 +611,10 @@ assets {
             Position: {cx, 0, cz}
           }
           if hash(i + 4600) > 0.35 {
-            "hedge_{i}" : CastleLeafDark { Position: {cx, -0.75, cz - 7.7}; Box: {15, 0.55, 0.6}; TextureTransform: {scale_x: 6, scale_y: 0.4} }
+            "hedge_{i}" : CastleLeafDark { Position: {cx, -0.75, cz - 7.7}; Box: {15, 0.55, 0.6}; texture.Transform: {scale_x: 6, scale_y: 0.4} }
           }
           if hash(i + 4700) > 0.45 {
-            "hedge_e_{i}" : CastleLeafDark { Position: {cx + 7.7, -0.75, cz}; Box: {0.6, 0.55, 15}; TextureTransform: {scale_x: 6, scale_y: 0.4} }
+            "hedge_e_{i}" : CastleLeafDark { Position: {cx + 7.7, -0.75, cz}; Box: {0.6, 0.55, 15}; texture.Transform: {scale_x: 6, scale_y: 0.4} }
           }
           if hash(i + 4800) > 0.55 {
             "copse_{i}" {

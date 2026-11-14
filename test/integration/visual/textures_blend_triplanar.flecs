@@ -10,7 +10,7 @@ $ {
   Scene: {texture_blend: true, triplanar: true}
 }
 
-// TextureBlend with a triplanar world mapping (TextureMapping MappingWorld, blend 0.5): a sphere
+// texture.Blend with a triplanar world mapping (texture.Mapping MappingWorld, blend 0.5): a sphere
 // and a rotated box blend two layers, a checker tiled twice and stripes with a bump map, under a
 // mask projected with them (blend_mask.png, red and green). Each projection samples the mask and
 // the layers it weighs, so the projections blend smoothly: there is no hard seam on the sphere
@@ -55,7 +55,7 @@ bumps {
 
 checker_layer {
   PbrTextures: {albedo: checker}
-  TextureTransform: {scale_x: 2, scale_y: 2}
+  texture.Transform: {scale_x: 2, scale_y: 2}
 }
 
 stripes_layer {
@@ -74,8 +74,8 @@ sphere {
   Sphere: {radius: 1, smooth: true, segments: 48}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
-  TextureBlend: {mask: mask, layers: [checker_layer, stripes_layer]}
-  TextureMapping: {mode: MappingWorld, size: 1.6, blend: 0.5}
+  texture.Blend: {mask: mask, layers: [checker_layer, stripes_layer]}
+  texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.5}
 }
 
 crate {
@@ -84,6 +84,6 @@ crate {
   Box: {1.4, 1.4, 1.4}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
-  TextureBlend: {mask: mask, layers: [checker_layer, stripes_layer]}
-  TextureMapping: {mode: MappingWorld, size: 1.6, blend: 0.5}
+  texture.Blend: {mask: mask, layers: [checker_layer, stripes_layer]}
+  texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.5}
 }

@@ -19,7 +19,7 @@ $ {
 // yellow; the right one is turned about Y and has a projection box, in cyan.
 room {
   Scene: {baked: true, reflections: true}
-  LightBake: {probe_spacing: 1.25, bounds_padding: 0}
+  Bake: {probe_spacing: 1.25, bounds_padding: 0}
   ReflectionBake: {resolution: 64, scene_probe: false}
   AmbientLight: {intensity: 0.1}
 

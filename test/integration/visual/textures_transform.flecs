@@ -39,7 +39,7 @@ stretched {
   Rgb: {0, 0, 0}
   Emissive: {strength: 1, color: {255, 255, 255}}
   PbrTextures: {emissive: letter}
-  TextureTransform: {scale_x: 2, scale_y: 1}
+  texture.Transform: {scale_x: 2, scale_y: 1}
 }
 
 shifted {
@@ -48,7 +48,7 @@ shifted {
   Rgb: {0, 0, 0}
   Emissive: {strength: 1, color: {255, 255, 255}}
   PbrTextures: {emissive: letter}
-  TextureTransform: {scale_x: 1, scale_y: 1, offset_x: 0.25, offset_y: 0.25}
+  texture.Transform: {scale_x: 1, scale_y: 1, offset_x: 0.25, offset_y: 0.25}
 }
 
 flipped {
@@ -57,7 +57,7 @@ flipped {
   Rgb: {0, 0, 0}
   Emissive: {strength: 1, color: {255, 255, 255}}
   PbrTextures: {emissive: letter}
-  TextureTransform: {scale_x: -1, scale_y: 1, offset_x: 1, offset_y: 0}
+  texture.Transform: {scale_x: -1, scale_y: 1, offset_x: 1, offset_y: 0}
 }
 
 cube {
@@ -76,7 +76,7 @@ ball {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
   PbrTextures: {albedo: letter}
-  TextureTransform: {scale_x: 2, scale_y: 1}
+  texture.Transform: {scale_x: 2, scale_y: 1}
 }
 
 tiled {
@@ -86,5 +86,5 @@ tiled {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: letter}
-  TextureTransform: {scale_x: 3, scale_y: 3}
+  texture.Transform: {scale_x: 3, scale_y: 3}
 }

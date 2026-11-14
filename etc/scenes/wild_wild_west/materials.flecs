@@ -19,8 +19,8 @@ assets {
   west_grain { Gen: {source: west_grain_height, output: GenAlbedo, colors: [{0, {196, 190, 184}}, {0.6, {238, 234, 228}}, {1, {255, 255, 255}}]} }
   west_grain_normal { Gen: {source: west_grain_height, output: GenNormal, strength: 1.2} }
 
-  prefab WestTimber { Rgb: {103, 64, 38}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: west_grain, normal: west_grain_normal}; TextureMapping: {mode: MappingObject, size: 1.2} }
-  prefab WestPlank { Rgb: {161, 114, 65}; PbrMaterial: {roughness: 0.86}; PbrTextures: {albedo: west_grain, normal: west_grain_normal}; TextureMapping: {mode: MappingObject, size: 1.2} }
+  prefab WestTimber { Rgb: {103, 64, 38}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: west_grain, normal: west_grain_normal}; texture.Mapping: {mode: MappingObject, size: 1.2} }
+  prefab WestPlank { Rgb: {161, 114, 65}; PbrMaterial: {roughness: 0.86}; PbrTextures: {albedo: west_grain, normal: west_grain_normal}; texture.Mapping: {mode: MappingObject, size: 1.2} }
   prefab WestCream { Rgb: {232, 207, 155}; PbrMaterial: {roughness: 0.8} }
   prefab WestRed { Rgb: {139, 52, 38}; PbrMaterial: {roughness: 0.85} }
   prefab WestTeal { Rgb: {62, 105, 101}; PbrMaterial: {roughness: 0.82} }

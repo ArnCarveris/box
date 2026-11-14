@@ -55,8 +55,8 @@ assets {
           Position: {(ax + bx) / 2, (ay + by) / 2, 0}
           Rotation: {math.acos(dy / length), math.atan2(dx, 0), 0}
           Frustum: {length: length, radius_bottom: height * 0.0246 * (1 - 0.62 * ys[k] / 0.92), radius_top: height * 0.0246 * (1 - 0.62 * ys[k + 1] / 0.92), segments: 4, smooth: true}
-          TextureMapping: {mode: MappingUv}
-          TextureTransform: {scale_x: 1, scale_y: 5 * (ys[k + 1] - ys[k]) / 0.92, offset_y: 5 * (0.92 - ys[k + 1]) / 0.92}
+          texture.Mapping: {mode: MappingUv}
+          texture.Transform: {scale_x: 1, scale_y: 5 * (ys[k + 1] - ys[k]) / 0.92, offset_y: 5 * (0.92 - ys[k + 1]) / 0.92}
         }
       }
       for i in 0..4 {

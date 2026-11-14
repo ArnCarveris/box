@@ -133,7 +133,7 @@ assets {
       Position: {0, 0, -6}
       RoundedBox: {w, h, 12, 2.4, segments: 2}
       Rgb: tone
-      TextureMapping: {mode: MappingObject, size: 0.86}
+      texture.Mapping: {mode: MappingObject, size: 0.86}
     }
 
     if edge {
@@ -241,7 +241,7 @@ assets {
     Rotation: {0, 0, tilt}
     Ignore
     gap { Position: {0, 0, -0.08}; Box: {w + 4, h + 4, 0.14}; Rgb: {6, 6, 6}; PbrMaterial: {metallic: 0, roughness: 0.9} }
-    sheet : PaintedSteel { Position: {0, 0, 0.02}; Box: {w, h, 0.26}; Rgb: tone; TextureMapping: {mode: MappingObject, size: 0.52} }
+    sheet : PaintedSteel { Position: {0, 0, 0.02}; Box: {w, h, 0.26}; Rgb: tone; texture.Mapping: {mode: MappingObject, size: 0.52} }
   }
 
   template Dzus {
@@ -276,7 +276,7 @@ assets {
         Rotation: {0.7, 0, 0}
         Box: {w, pitch * 0.72, 0.9}
         Rgb: tone
-        TextureMapping: {mode: MappingObject, size: 0.52}
+        texture.Mapping: {mode: MappingObject, size: 0.52}
       }
     }
   }
@@ -498,7 +498,7 @@ assets {
 
     Label words(text: label, size: 15, ink: {255, 214, 160}) { Position: {0, 52, 0.6} }
 
-    hazard { Position: {0, -6, 0.5}; Quad: {74, 92}; Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: tex_hazard}; TextureTransform: {scale_x: 0.45, scale_y: 0.55}; Ignore }
+    hazard { Position: {0, -6, 0.5}; Quad: {74, 92}; Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: tex_hazard}; texture.Transform: {scale_x: 0.45, scale_y: 0.55}; Ignore }
     shadow_gap : BlackAnod { Position: {0, -6, 0.9}; Box: {54, 72, 0.8} }
 
     mount {

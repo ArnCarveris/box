@@ -103,7 +103,7 @@ assets {
     frame_b : CanalWhite { Position: {0, -0.52, 0.012}; Box: {1.07, 0.05, 0.05} }
     bar_v : CanalWhite { Position: {0, 0, 0.018}; Box: {0.035, 1, 0.024} }
     bar_h : CanalWhite { Position: {0, 0.08, 0.018}; Box: {0.94, 0.035, 0.024} }
-    box : CanalPlanks { Position: {0, -0.74, 0.17}; RoundedBox: {1.16, 0.2, 0.26, 0.02, segments: 1}; TextureTransform: {scale_x: 0.5, scale_y: 0.2} }
+    box : CanalPlanks { Position: {0, -0.74, 0.17}; RoundedBox: {1.16, 0.2, 0.26, 0.02, segments: 1}; texture.Transform: {scale_x: 0.5, scale_y: 0.2} }
     for i in 0..15 {
       { (IsA, CanalLeafCard); Position: {-0.49 + i * 0.07, -0.58, 0.17 + (i % 3 - 1) * 0.07}; Rotation: {-0.9, i * 1.3, 0}; Quad: {0.2, 0.2} }
     }
@@ -122,8 +122,8 @@ assets {
   }
 
   template LockCottage {
-    foundation : CanalDarkStone { Position: {0, 0.17, 0}; RoundedBox: {6.3, 0.34, 4.3, 0.03, segments: 1}; TextureTransform: {scale_x: 6, scale_y: 0.5} }
-    walls : CanalPlaster { Position: {0, 1.66, 0}; Box: {6, 2.66, 4}; TextureTransform: {scale_x: 2.2, scale_y: 1} }
+    foundation : CanalDarkStone { Position: {0, 0.17, 0}; RoundedBox: {6.3, 0.34, 4.3, 0.03, segments: 1}; texture.Transform: {scale_x: 6, scale_y: 0.5} }
+    walls : CanalPlaster { Position: {0, 1.66, 0}; Box: {6, 2.66, 4}; texture.Transform: {scale_x: 2.2, scale_y: 1} }
 
     for i in 0..5 {
       const tx = -2.98 + i * 1.49
@@ -219,7 +219,7 @@ assets {
 
   template CanalCrate {
     prop size: f32 = 0.5
-    core : CanalPlanks { Position: {0, size / 2, 0}; RoundedBox: {size, size, size, 0.012, segments: 1}; TextureTransform: {scale_x: 0.5, scale_y: 0.5} }
+    core : CanalPlanks { Position: {0, size / 2, 0}; RoundedBox: {size, size, size, 0.012, segments: 1}; texture.Transform: {scale_x: 0.5, scale_y: 0.5} }
     for i in 0..4 {
       const a = i * math.PI / 2
       { (IsA, CanalOldTimber); Position: {math.sin(a) * size * 0.51, size / 2, math.cos(a) * size * 0.51}; Rotation: {0, a, 0}; Box: {size * 0.14, size * 0.96, 0.02} }
@@ -241,10 +241,10 @@ assets {
 
   template CanalBench {
     for i in 0..3 {
-      { (IsA, CanalPlanks); Position: {0, 0.44, 0.14 - i * 0.14}; RoundedBox: {1.5, 0.04, 0.12, 0.01, segments: 1}; TextureTransform: {scale_x: 0.6, scale_y: 0.1} }
+      { (IsA, CanalPlanks); Position: {0, 0.44, 0.14 - i * 0.14}; RoundedBox: {1.5, 0.04, 0.12, 0.01, segments: 1}; texture.Transform: {scale_x: 0.6, scale_y: 0.1} }
     }
     for i in 0..2 {
-      { (IsA, CanalPlanks); Position: {0, 0.68 + i * 0.16, -0.22}; RoundedBox: {1.5, 0.12, 0.03, 0.008, segments: 1}; TextureTransform: {scale_x: 0.6, scale_y: 0.1} }
+      { (IsA, CanalPlanks); Position: {0, 0.68 + i * 0.16, -0.22}; RoundedBox: {1.5, 0.12, 0.03, 0.008, segments: 1}; texture.Transform: {scale_x: 0.6, scale_y: 0.1} }
     }
     for s in 0..2 {
       const x = (s * 2 - 1) * 0.6

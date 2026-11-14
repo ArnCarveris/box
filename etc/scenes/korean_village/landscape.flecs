@@ -17,18 +17,18 @@ assets {
     yard_b_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {176, 162, 128}}, {1, {190, 176, 141}}]} }
     grass_a_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {100, 120, 70}}, {1, {116, 136, 82}}]} }
     grass_b_tex { Gen: {source: tone, output: GenAlbedo, colors: [{0, {86, 114, 60}}, {1, {122, 146, 80}}]} }
-    dirt_a { PbrTextures: {albedo: korean_ground.dirt_a_tex}; TextureTransform: {4, 4, 0, 0} }
-    dirt_b { PbrTextures: {albedo: korean_ground.dirt_b_tex}; TextureTransform: {4, 4, 0, 0} }
-    yard_a { PbrTextures: {albedo: korean_ground.yard_a_tex}; TextureTransform: {4, 4, 0, 0} }
-    yard_b { PbrTextures: {albedo: korean_ground.yard_b_tex}; TextureTransform: {4, 4, 0, 0} }
-    grass_a { PbrTextures: {albedo: korean_ground.grass_a_tex}; TextureTransform: {4, 4, 0, 0} }
-    grass_b { PbrTextures: {albedo: korean_ground.grass_b_tex}; TextureTransform: {4, 4, 0, 0} }
+    dirt_a { PbrTextures: {albedo: korean_ground.dirt_a_tex}; texture.Transform: {4, 4, 0, 0} }
+    dirt_b { PbrTextures: {albedo: korean_ground.dirt_b_tex}; texture.Transform: {4, 4, 0, 0} }
+    yard_a { PbrTextures: {albedo: korean_ground.yard_a_tex}; texture.Transform: {4, 4, 0, 0} }
+    yard_b { PbrTextures: {albedo: korean_ground.yard_b_tex}; texture.Transform: {4, 4, 0, 0} }
+    grass_a { PbrTextures: {albedo: korean_ground.grass_a_tex}; texture.Transform: {4, 4, 0, 0} }
+    grass_b { PbrTextures: {albedo: korean_ground.grass_b_tex}; texture.Transform: {4, 4, 0, 0} }
   }
 
   template KoreanLandscape {
     { Position: {0, -0.6, 0}; RoundedBox: {32, 1.15, 28, 0.45}; Rgb: {94, 105, 94}; PbrMaterial: {roughness: 1} }
-    { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; TextureBlend: {mask: korean_ground.patches, layers: [korean_ground.dirt_a, korean_ground.dirt_b]}; TextureMapping: {mode: MappingWorld, size: 8} }
-    { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; TextureBlend: {mask: korean_ground.patches, layers: [korean_ground.yard_a, korean_ground.yard_b]}; TextureMapping: {mode: MappingWorld, size: 5} }
+    { Position: {0, -0.035, 0}; RoundedBox: {31.8, 0.18, 27.8, 0.42}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; texture.Blend: {mask: korean_ground.patches, layers: [korean_ground.dirt_a, korean_ground.dirt_b]}; texture.Mapping: {mode: MappingWorld, size: 8} }
+    { Position: {0, 0.065, -0.2}; RoundedBox: {11.6, 0.12, 14, 0.16}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; texture.Blend: {mask: korean_ground.patches, layers: [korean_ground.yard_a, korean_ground.yard_b]}; texture.Mapping: {mode: MappingWorld, size: 5} }
     for i in 0..360 {
       const x = (i * 97 % 310) * 0.1 - 15.5
       const z = (i * 59 % 270) * 0.1 - 13.5
@@ -51,7 +51,7 @@ assets {
       }
     }
     for side in 0..2 {
-      { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; TextureBlend: {mask: korean_ground.patches, layers: [korean_ground.grass_a, korean_ground.grass_b]}; TextureMapping: {mode: MappingWorld, size: 6} }
+      { Position: {(side - 0.5) * 26, 0.07, -1}; RoundedBox: {4.5, 0.12, 23, 0.7}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; texture.Blend: {mask: korean_ground.patches, layers: [korean_ground.grass_a, korean_ground.grass_b]}; texture.Mapping: {mode: MappingWorld, size: 6} }
       for i in 0..23 {
         { Position: {(side - 0.5) * 25 + math.sin(i * 2.4) * 0.8, 0.18, -11.5 + i}; Scale: {0.5 + i % 3 * 0.13, 0.25, 0.4}; IcoSphere: {radius: 1, segments: 1}; Rgb: {132 + i % 3 * 9, 140 + i % 3 * 8, 120 + i % 3 * 7} }
       }

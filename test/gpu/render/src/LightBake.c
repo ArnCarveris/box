@@ -23,8 +23,8 @@ void LightBake_script_defaults(void) {
     test_assert(ecs_script_run(world, "defaults",
         "using box.light\n"
         "using box.view\n"
-        "scene {\n Scene: {}\n LightBake: {}\n}\n"
-        "custom {\n Scene: {}\n LightBake: {probe_spacing: 4, bounces: 3, capture_size: 32, "
+        "scene {\n Scene: {}\n Bake: {}\n}\n"
+        "custom {\n Scene: {}\n Bake: {probe_spacing: 4, bounces: 3, capture_size: 32, "
         "budget_ms: 5, bounds_padding: 2, cache: \"other\"}\n}\n", NULL) == 0);
 
     const LightBake *bake = ecs_get(world, ecs_lookup(world, "scene"), LightBake);
@@ -75,7 +75,7 @@ void LightBake_zero_is_literal(void) {
     test_assert(ecs_script_run(world, "zero",
         "using box.light\n"
         "using box.view\n"
-        "scene {\n Scene: {}\n LightBake: {bounces: 0, budget_ms: 0, probe_spacing: 0, "
+        "scene {\n Scene: {}\n Bake: {bounces: 0, budget_ms: 0, probe_spacing: 0, "
         "capture_size: 0, bounds_padding: 0, cache: \"\"}\n}\n", NULL) == 0);
 
     const LightBake *bake = ecs_get(world, ecs_lookup(world, "scene"), LightBake);
@@ -125,7 +125,7 @@ void LightBake_status_follows_bake(void) {
     test_assert(ecs_script_run(world, "status",
         "using box.light\n"
         "using box.view\n"
-        "other {\n Scene: {}\n LightBake: {}\n}\n", NULL) == 0);
+        "other {\n Scene: {}\n Bake: {}\n}\n", NULL) == 0);
     test_assert(ecs_has(world, ecs_lookup(world, "other"), LightBakeStatus));
 
     ecs_delete(world, scene);
@@ -487,8 +487,8 @@ void LightBake_compute_default_true(void) {
     test_assert(ecs_script_run(world, "compute",
         "using box.light\n"
         "using box.view\n"
-        "on {\n Scene: {}\n LightBake: {}\n}\n"
-        "off {\n Scene: {}\n LightBake: {compute: false}\n}\n", NULL) == 0);
+        "on {\n Scene: {}\n Bake: {}\n}\n"
+        "off {\n Scene: {}\n Bake: {compute: false}\n}\n", NULL) == 0);
     test_bool(ecs_get(world, ecs_lookup(world, "on"), LightBake)->compute, true);
     test_bool(ecs_get(world, ecs_lookup(world, "off"), LightBake)->compute, false);
 
@@ -806,7 +806,7 @@ void LightBake_compute_follows_checkbox(void) {
         "opts {\n Checkbox baked(label: \"Baked lighting\", value: true)\n}\n"
         "scene {\n"
         " Scene: {}\n"
-        " LightBake: {probe_spacing: 2, bounds_padding: 1, capture_size: 8, bounces: 0, "
+        " Bake: {probe_spacing: 2, bounds_padding: 1, capture_size: 8, bounces: 0, "
         "budget_ms: 2, compute: opts.baked[Checkbox.mut].current}\n"
         " camera { Position: {0, 4, 10}\n Camera: {fov: 60, near_: 0.1} }\n"
         " floor { Position: {0, -0.1, 0}\n Box: {16, 0.2, 4} }\n"

@@ -122,9 +122,9 @@ void Texture_stop_on_other_slice(void) {
     char *stop = texture_hit_slice(world, s);
     test_assert(strcmp(start, stop) != 0);
     char *start_offset = showcase_run(world, s,
-        "get %s box.material.TextureTransform.offset_x", start);
+        "get %s box.material.texture.Transform.offset_x", start);
     char *stop_offset = showcase_run(world, s,
-        "get %s box.material.TextureTransform.offset_x", stop);
+        "get %s box.material.texture.Transform.offset_x", stop);
     test_assert(strtod(start_offset, NULL) < 0.5);
     test_assert(strtod(stop_offset, NULL) > 0.5);
     showcase_click(world, s, TEXTURE_STOP);

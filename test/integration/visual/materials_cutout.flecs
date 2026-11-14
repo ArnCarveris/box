@@ -61,7 +61,7 @@ fence_front {
   Quad: {3.2, 1.6}
   Rgb: {235, 215, 190}
   PbrTextures: {albedo: fence_tex}
-  TextureTransform: {scale_x: 2, scale_y: 1, offset_x: 0, offset_y: 0}
+  texture.Transform: {scale_x: 2, scale_y: 1, offset_x: 0, offset_y: 0}
   BackFaceMode: {BackFacePlain}
   AlphaCutoff: {value: 0.5}
 }
@@ -72,7 +72,7 @@ fence_back {
   Quad: {3.2, 1.6}
   Rgb: {235, 215, 190}
   PbrTextures: {albedo: fence_tex}
-  TextureTransform: {scale_x: 2, scale_y: 1, offset_x: 0, offset_y: 0}
+  texture.Transform: {scale_x: 2, scale_y: 1, offset_x: 0, offset_y: 0}
   BackFaceMode: {BackFacePlain}
   AlphaCutoff: {value: 0.5}
 }

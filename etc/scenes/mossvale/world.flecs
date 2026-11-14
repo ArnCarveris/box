@@ -10,12 +10,12 @@ using state
 using assets
 
 mossvale {
-  ground { Position: {0, -0.05, 0}; Rotation: {0 - PI / 2, 0, 0}; Quad: {GROUND_SPAN, GROUND_SPAN}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_ground, normal: mv_tex_ground_n}; TextureTransform: {GROUND_SPAN / 2, GROUND_SPAN / 2, 0.5, 0.5}; NoShadow }
+  ground { Position: {0, -0.05, 0}; Rotation: {0 - PI / 2, 0, 0}; Quad: {GROUND_SPAN, GROUND_SPAN}; Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: mv_tex_ground, normal: mv_tex_ground_n}; texture.Transform: {GROUND_SPAN / 2, GROUND_SPAN / 2, 0.5, 0.5}; NoShadow }
 
   water {
-    river : MvWater { Position: {0, 0, 0}; Sweep: {path: MV_RIVER, profile: MvRoadProfile, scale: {6.2, 0.06}, rings: 256}; TextureMapping: {mode: MappingObject, size: 8}; TextureTransform: {1, 1, 0, 0} }
-    lake : MvWater { Position: {LAKE_X, 0.047, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R, segments: 48}; TextureTransform: {LAKE_R * 2 / 5, LAKE_R * 2 / 5, 0, 0} }
-    lake_deep : MvDeepWater { Position: {LAKE_X, 0.052, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R - 5, segments: 40}; TextureTransform: {(LAKE_R - 5) * 2 / 5, (LAKE_R - 5) * 2 / 5, 0, 0} }
+    river : MvWater { Position: {0, 0, 0}; Sweep: {path: MV_RIVER, profile: MvRoadProfile, scale: {6.2, 0.06}, rings: 256}; texture.Mapping: {mode: MappingObject, size: 8}; texture.Transform: {1, 1, 0, 0} }
+    lake : MvWater { Position: {LAKE_X, 0.047, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R, segments: 48}; texture.Transform: {LAKE_R * 2 / 5, LAKE_R * 2 / 5, 0, 0} }
+    lake_deep : MvDeepWater { Position: {LAKE_X, 0.052, LAKE_Z}; Cylinder: {length: 0.01, radius: LAKE_R - 5, segments: 40}; texture.Transform: {(LAKE_R - 5) * 2 / 5, (LAKE_R - 5) * 2 / 5, 0, 0} }
     lake_glints {
       Position: {LAKE_X, 0.2, LAKE_Z}
       Emitter: {max: 60, rate: 14, shape: EmitterDisc, radius: LAKE_R - 1, direction: {0, 1, 0}, speed: {0, 0.05}, lifetime: {0.6, 1.4}, size: {0.15, 0.3}, opacity: {0.6, 1}, color: {255, 250, 230}, seed: 61}
@@ -89,11 +89,11 @@ mossvale {
 
   square_detail {
     Position: {SQ_X, 0, SQ_Z}
-    band_w : MvStone { Position: {-7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
-    band_e : MvStone { Position: {7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
-    band_n : MvStone { Position: {0, 0.061, -4.7}; Box: {1.0, 0.01, 3.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
-    band_s : MvStone { Position: {0, 0.061, 4.7}; Box: {1.0, 0.01, 3.0}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
-    ring_a : MvStone { Position: {0, 0.062, 0}; Tube: {length: 0.01, radius: 4.6, thickness: 0.45, segments: 48}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_w : MvStone { Position: {-7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; texture.Mapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_e : MvStone { Position: {7.6, 0.061, 0}; Box: {6.8, 0.01, 1.0}; texture.Mapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_n : MvStone { Position: {0, 0.061, -4.7}; Box: {1.0, 0.01, 3.0}; texture.Mapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    band_s : MvStone { Position: {0, 0.061, 4.7}; Box: {1.0, 0.01, 3.0}; texture.Mapping: {mode: MappingWorld, size: TILE_FLAGS} }
+    ring_a : MvStone { Position: {0, 0.062, 0}; Tube: {length: 0.01, radius: 4.6, thickness: 0.45, segments: 48}; texture.Mapping: {mode: MappingWorld, size: TILE_FLAGS} }
   }
 
   road_edges {
@@ -184,7 +184,7 @@ mossvale {
     }
     for i in 0..24 {
       const a = i * 0.2618
-      "mount_{i}" : MvHillGrass { Position: {cos(a) * 170, -18, sin(a) * 170}; Rotation: {0, i, 0}; Scale: {50, 40 + hash(i) * 30, 50}; IcoSphere: {radius: 1, segments: 3, smooth: true}; Rgb: {150 + hash(i * 2) * 20, 162, 96}; TextureTransform: {8, 5, 0, 0} }
+      "mount_{i}" : MvHillGrass { Position: {cos(a) * 170, -18, sin(a) * 170}; Rotation: {0, i, 0}; Scale: {50, 40 + hash(i) * 30, 50}; IcoSphere: {radius: 1, segments: 3, smooth: true}; Rgb: {150 + hash(i * 2) * 20, 162, 96}; texture.Transform: {8, 5, 0, 0} }
     }
   }
 
@@ -460,7 +460,7 @@ mossvale {
       const a = i * 1.047
       FairyShroom "shroom_{i}"(id: 97 + i, q: Q_FAIRY, sp: SP_BLOOM, x: -78 + cos(a) * 4, z: 44 + sin(a) * 4, r: 1.6, hint: "A wilted fairy mushroom. It needs to grow again.")
     }
-    fairy_floor : MvMeadow { Position: {-78, 0.019, 44}; Cylinder: {length: 0.01, radius: 5.5, segments: 32}; Rgb: {120, 170, 90}; TextureTransform: {11 / TILE_GRASS, 11 / TILE_GRASS, 0, 0} }
+    fairy_floor : MvMeadow { Position: {-78, 0.019, 44}; Cylinder: {length: 0.01, radius: 5.5, segments: 32}; Rgb: {120, 170, 90}; texture.Transform: {11 / TILE_GRASS, 11 / TILE_GRASS, 0, 0} }
     Weed tower_thorn_0(id: 103, q: Q_TOWER, sp: SP_SPARK, x: -22, z: 66, hint: "Thornweed chokes the path. Burn it!")
     Weed tower_thorn_1(id: 104, q: Q_TOWER, sp: SP_SPARK, x: -22.5, z: 73, hint: "Thornweed chokes the path. Burn it!")
     Weed tower_thorn_2(id: 105, q: Q_TOWER, sp: SP_SPARK, x: -25, z: 79, hint: "Thornweed chokes the path. Burn it!")

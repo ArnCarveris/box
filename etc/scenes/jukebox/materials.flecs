@@ -8,7 +8,7 @@ assets {
     Rgb: {116, 50, 28}
     PbrMaterial: {roughness: 0.36}
     PbrTextures: {albedo: jb_wood_texture}
-    TextureMapping: {mode: MappingObject, size: 0.9, blend: 0.25}
+    texture.Mapping: {mode: MappingObject, size: 0.9, blend: 0.25}
     ClearCoat: {strength: 0.85, roughness: 0.16}
   }
   prefab JBEnamel { Rgb: {38, 78, 76}; PbrMaterial: {metallic: 0.25, roughness: 0.26}; ClearCoat: {strength: 1, roughness: 0.1} }

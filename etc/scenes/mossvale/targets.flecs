@@ -735,14 +735,14 @@ assets {
     prop z: f32 = 0
     const full = ts[id] > 0
     Position: {x, 0, z}
-    step : MvStone { Position: {0, 0.1, 0}; Cylinder: {length: 0.2, radius: 3.5, segments: 32}; TextureMapping: {mode: MappingWorld, size: TILE_FLAGS, blend: 0.3} }
-    basin : MvStone { Position: {0, 0.55, 0}; Tube: {length: 0.7, radius: 3.0, thickness: 0.35, segments: 32}; TextureTransform: {8, 0.35, 0, 0} }
-    rim : MvStone { Position: {0, 0.93, 0}; Torus: {radius: 2.83, tube: 0.2, segments: 40, rings: 6, smooth: true}; Rgb: {214, 206, 190}; TextureTransform: {8, 0.5, 0, 0} }
-    floor_ : MvDarkStone { Position: {0, 0.25, 0}; Cylinder: {length: 0.1, radius: 2.7, segments: 28}; TextureTransform: {1.8, 1.8, 0, 0} }
-    plinth : MvStone { Position: {0, 0.5, 0}; Cylinder: {length: 0.6, radius: 0.7, segments: 12}; TextureTransform: {2, 0.4, 0, 0} }
-    column : MvStone { Position: {0, 0.5, 0}; Scale: {1.6, 1.0, 1.6}; Lathe: {profile: MvPostShape, cap_start: true, segments: 14, rings: 10}; Rgb: {214, 206, 190}; TextureTransform: {2, 2, 0, 0} }
-    bowl : MvStone { Position: {0, 2.0, 0}; Lathe: {profile: MvBasinShape, cap_start: true, segments: 28, rings: 10}; Rgb: {214, 206, 190}; TextureTransform: {4, 1, 0, 0} }
-    bowl_top : MvStone { Position: {0, 2.42, 0}; Scale: {0.45, 0.6, 0.45}; Lathe: {profile: MvBasinShape, cap_start: true, segments: 20, rings: 8}; Rgb: {214, 206, 190}; TextureTransform: {3, 1, 0, 0} }
+    step : MvStone { Position: {0, 0.1, 0}; Cylinder: {length: 0.2, radius: 3.5, segments: 32}; texture.Mapping: {mode: MappingWorld, size: TILE_FLAGS, blend: 0.3} }
+    basin : MvStone { Position: {0, 0.55, 0}; Tube: {length: 0.7, radius: 3.0, thickness: 0.35, segments: 32}; texture.Transform: {8, 0.35, 0, 0} }
+    rim : MvStone { Position: {0, 0.93, 0}; Torus: {radius: 2.83, tube: 0.2, segments: 40, rings: 6, smooth: true}; Rgb: {214, 206, 190}; texture.Transform: {8, 0.5, 0, 0} }
+    floor_ : MvDarkStone { Position: {0, 0.25, 0}; Cylinder: {length: 0.1, radius: 2.7, segments: 28}; texture.Transform: {1.8, 1.8, 0, 0} }
+    plinth : MvStone { Position: {0, 0.5, 0}; Cylinder: {length: 0.6, radius: 0.7, segments: 12}; texture.Transform: {2, 0.4, 0, 0} }
+    column : MvStone { Position: {0, 0.5, 0}; Scale: {1.6, 1.0, 1.6}; Lathe: {profile: MvPostShape, cap_start: true, segments: 14, rings: 10}; Rgb: {214, 206, 190}; texture.Transform: {2, 2, 0, 0} }
+    bowl : MvStone { Position: {0, 2.0, 0}; Lathe: {profile: MvBasinShape, cap_start: true, segments: 28, rings: 10}; Rgb: {214, 206, 190}; texture.Transform: {4, 1, 0, 0} }
+    bowl_top : MvStone { Position: {0, 2.42, 0}; Scale: {0.45, 0.6, 0.45}; Lathe: {profile: MvBasinShape, cap_start: true, segments: 20, rings: 8}; Rgb: {214, 206, 190}; texture.Transform: {3, 1, 0, 0} }
     finial : MvStone { Position: {0, 2.7, 0}; Sphere: {radius: 0.16, segments: 12, smooth: true}; Rgb: {214, 206, 190} }
     for k in 0..4 {
       const a = k * HALF_PI + 0.785
@@ -752,7 +752,7 @@ assets {
       "flower_bush_{k}" : MvLeaf { Position: {cos(a) * 3.35, 0.65, sin(a) * 3.35}; Sphere: {radius: 0.24, segments: 10, smooth: true} }
     }
     if full {
-      water : MvWater { Position: {0, 0.82, 0}; Cylinder: {length: 0.05, radius: 2.68, segments: 32}; TextureTransform: {2, 2, 0, 0} }
+      water : MvWater { Position: {0, 0.82, 0}; Cylinder: {length: 0.05, radius: 2.68, segments: 32}; texture.Transform: {2, 2, 0, 0} }
       bowl_water : MvWater { Position: {0, 2.38, 0}; Cylinder: {length: 0.03, radius: 1.1, segments: 24} }
       for k in 0..4 {
         const a = k * HALF_PI + 0.785

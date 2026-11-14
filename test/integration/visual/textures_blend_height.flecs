@@ -10,7 +10,7 @@ $ {
   Scene: {texture_blend: true}
 }
 
-// Height based TextureBlend transitions: two quads blend a cobble layer (top half of the mask)
+// Height based texture.Blend transitions: two quads blend a cobble layer (top half of the mask)
 // and a grass layer (bottom half) under the mask of textures_blend.flecs, whose red and green
 // weigh the cobble and blue and alpha the grass, so the border is a soft horizontal band through
 // the middle of each quad. The camera is close to the inner halves of the quads, around their
@@ -84,12 +84,12 @@ grass_n {
 
 cobble_layer {
   PbrTextures: {albedo: cobble, normal: cobble_n}
-  TextureTransform: {scale_x: 2, scale_y: 2}
+  texture.Transform: {scale_x: 2, scale_y: 2}
 }
 
 grass_layer {
   PbrTextures: {albedo: grass, normal: grass_n}
-  TextureTransform: {scale_x: 3, scale_y: 3}
+  texture.Transform: {scale_x: 3, scale_y: 3}
 }
 
 linear {
@@ -97,7 +97,7 @@ linear {
   Quad: {3, 3}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
-  TextureBlend: {
+  texture.Blend: {
     mask: mask
     layers: [cobble_layer, cobble_layer, grass_layer, grass_layer]
     heights: [cobble_height, cobble_height, grass_height, grass_height]
@@ -109,7 +109,7 @@ sharp {
   Quad: {3, 3}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
-  TextureBlend: {
+  texture.Blend: {
     mask: mask
     layers: [cobble_layer, cobble_layer, grass_layer, grass_layer]
     heights: [cobble_height, cobble_height, grass_height, grass_height]

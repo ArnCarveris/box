@@ -50,7 +50,7 @@
     "  PbrMaterial: {metallic: 1, roughness: 1}\n" \
     "  Emissive: {strength: 1, color: {255, 255, 255}}\n" \
     "  PbrTextures: {emissive: checker_tex}\n" \
-    "  TextureMapping: {mode: %s, size: 3}\n" \
+    "  texture.Mapping: {mode: %s, size: 3}\n" \
     "}\n"
 
 /** The view of the scripts, after the scene, formatted with the camera */
@@ -262,7 +262,7 @@ void TextureMappingFrame_touching_boxes_continuous(void) {
     // materials/texture_mapping_frame
     const char *pair =
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  Position: {0.7, 0, 0.3}\n"
         "  Rotation: {0, 0.4, 0}\n"
         "  left : Hull { Position: {-1.5, 0.5, 0}\n Box: {3, 1, 6} }\n"
@@ -276,7 +276,7 @@ void TextureMappingFrame_touching_boxes_continuous(void) {
         "}\n";
     const char *single =
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  Position: {0.7, 0, 0.3}\n"
         "  Rotation: {0, 0.4, 0}\n"
         "  whole : Hull { Position: {0, 0.5, 0}\n Box: {6, 1, 6} }\n"
@@ -310,7 +310,7 @@ void TextureMappingFrame_moved_frame_matches(void) {
     // materials/texture_mapping_frame
     const char *scene =
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         MAPPING_FRAME_TOP_CAMERA
         "  a : Hull { Position: {-1.5, 0.5, -1}\n Box: {3, 1, 4} }\n"
         "  b : Hull { Position: {1.5, 0.5, -1}\n Rotation: {0, 1.5707963, 0}\n"
@@ -355,7 +355,7 @@ void TextureMappingFrame_surface_moved_frame_matches(void) {
         "{kind: Line, end: {1, 1}}, {kind: Line, end: {-1, 1}}], closed: true} }\n"
         "square_profile { Profile2D: {outer: square_shape} }\n"
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  camera {\n"
         "    Position: {0, 7, 7}\n"
         "    Rotation: {-0.7853982, 0, 0}\n"
@@ -400,7 +400,7 @@ void TextureMappingFrame_cutout_shadow_follows_frame(void) {
         "  Rgb: {255, 245, 230}\n"
         "}\n"
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  camera {\n"
         "    Position: {0, 2.8, 7.5}\n"
         "    Rotation: {-0.27, 0, 0}\n"
@@ -412,7 +412,7 @@ void TextureMappingFrame_cutout_shadow_follows_frame(void) {
         "    Box: {3, 1.6, 0.06}\n"
         "    Rgb: {235, 215, 190}\n"
         "    PbrTextures: {albedo: fence_tex}\n"
-        "    TextureMapping: {mode: %s, size: 1.6}\n"
+        "    texture.Mapping: {mode: %s, size: 1.6}\n"
         "    AlphaCutoff: {value: 0.5}\n"
         "  }\n"
         "}\n";

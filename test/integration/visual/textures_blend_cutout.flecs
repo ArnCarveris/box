@@ -10,7 +10,7 @@ $ {
   Scene: {alpha_cutout: true, blend_modes: true, texture_blend: true}
 }
 
-// TextureBlend on alpha tested and blended shapes. On the left a blended fence panel, a Quad with
+// texture.Blend on alpha tested and blended shapes. On the left a blended fence panel, a Quad with
 // AlphaCutoff, whose mask (blend_mask.png, red top left, green top right) shows the lattice of
 // fence.png on its left and bottom and the leaf of leaf.png, tiled twice so that one leaf fills
 // the quadrant, in its top right: the cutout follows the weighted alpha of the two layers, and
@@ -57,11 +57,11 @@ checker {
 
 fence_layer {
   PbrTextures: {albedo: fence_tex}
-  TextureTransform: {scale_x: 2, scale_y: 2}
+  texture.Transform: {scale_x: 2, scale_y: 2}
 }
 
 leaf_layer {
-  TextureTransform: {scale_x: 2, scale_y: 2}
+  texture.Transform: {scale_x: 2, scale_y: 2}
   PbrTextures: {albedo: leaf_tex}
 }
 
@@ -70,7 +70,7 @@ floor {
   Box: {16, 0.2, 10}
   Rgb: {200, 204, 190}
   PbrTextures: {albedo: checker}
-  TextureTransform: {scale_x: 8, scale_y: 5}
+  texture.Transform: {scale_x: 8, scale_y: 5}
 }
 
 fence {
@@ -79,7 +79,7 @@ fence {
   Quad: {2.4, 2.4}
   Rgb: {235, 215, 190}
   PbrMaterial: {roughness: 0.7}
-  TextureBlend: {mask: mask, layers: [fence_layer, leaf_layer]}
+  texture.Blend: {mask: mask, layers: [fence_layer, leaf_layer]}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -89,6 +89,6 @@ decal {
   Quad: {2.4, 2.4}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
-  TextureBlend: {mask: mask, layers: [fence_layer, leaf_layer]}
+  texture.Blend: {mask: mask, layers: [fence_layer, leaf_layer]}
   BlendMode: {AlphaBlend}
 }

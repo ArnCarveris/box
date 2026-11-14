@@ -22,7 +22,7 @@ assets {
       const depth = 8.4 - f * 1.05
       const z = -f * 0.5
       { (IsA, CanopyIvory); Rgb: wall; Position: {0, y + 1.5, z}; Box: {7.8, 3, depth}; Bevel: {front_left: 0.45, front_right: 0.45, back_left: 0.45, back_right: 0.45} }
-      { (IsA, CanopyFacade); Position: {0, y + 1.55, z + depth / 2 + 0.02}; Box: {6.9, 2.8, 0.08}; TextureMapping: {mode: MappingObject, size: 22.4}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
+      { (IsA, CanopyFacade); Position: {0, y + 1.55, z + depth / 2 + 0.02}; Box: {6.9, 2.8, 0.08}; texture.Mapping: {mode: MappingObject, size: 22.4}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
       for i in 0..5 + facade_style * 3 {
         { (IsA, CanopyWood); Rgb: timber; Position: {-3.3 + i * 6.6 / (4 + facade_style * 3), y + 1.65, z + depth / 2 + 0.12}; Box: {0.16, 2.4, 0.2} }
       }

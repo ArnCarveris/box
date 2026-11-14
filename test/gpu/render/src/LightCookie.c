@@ -356,7 +356,7 @@ void LightCookie_default_settings(void) {
 
     test_assert(ecs_script_run(world, "cookie",
         "using box.light\n"
-        "moon { DirectionalLight: {}\n LightCookie: {projection: Light, size: 8} }\n",
+        "moon { DirectionalLight: {}\n Cookie: {projection: Light, size: 8} }\n",
         NULL) == 0);
     c = ecs_get(world, ecs_lookup(world, "moon"), LightCookie);
     test_int(c->projection, LightCookieProjectionLight);

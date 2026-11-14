@@ -155,7 +155,7 @@ assets {
         PbrMaterial: {metallic: 1, roughness: 1}
         Emissive: {strength: 1.15, color: {200, 228, 255}}
         PbrTextures: {emissive: tex_tunnel}
-        TextureTransform: {scale_x: 3, scale_y: 5, offset_x: scroll * 0.012, offset_y: scroll}
+        texture.Transform: {scale_x: 3, scale_y: 5, offset_x: scroll * 0.012, offset_y: scroll}
         BlendMode: Additive
         NoShadow
         Ignore

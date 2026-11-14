@@ -17,5 +17,5 @@ prefab SolarCells {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.3, roughness: 0.18}
   PbrTextures: {albedo: solar_tex}
-  TextureTransform: {scale_x: 1.5, scale_y: 1.5}
+  texture.Transform: {scale_x: 1.5, scale_y: 1.5}
 }

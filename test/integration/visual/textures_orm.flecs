@@ -62,7 +62,7 @@ orm_scene {
     Rgb: {230, 180, 100}
     PbrMaterial: {metallic: 1, roughness: 0.9}
     PbrTextures: {orm: orm}
-    TextureTransform: {scale_x: 2, scale_y: 1}
+    texture.Transform: {scale_x: 2, scale_y: 1}
   }
 }
 

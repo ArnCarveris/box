@@ -18,13 +18,13 @@ assets {
 
   // Drydock surfaces: weathered plating at the 10 m per unit scale of the liner, emissive dot
   // textures for windows and running lights so they read from the default camera distance
-  prefab DockHull { Rgb: {134, 132, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.62}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 3.5, blend: 0.3} }
-  prefab DockHullDark { Rgb: {78, 82, 88}; PbrMaterial: {metallic: 0.65, roughness: 0.58}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 2.5, blend: 0.3} }
-  prefab DockGrime { Rgb: {98, 84, 70}; PbrMaterial: {metallic: 0.4, roughness: 0.8}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; TextureMapping: {MappingFrame, size: 2, blend: 0.3} }
+  prefab DockHull { Rgb: {134, 132, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.62}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 3.5, blend: 0.3} }
+  prefab DockHullDark { Rgb: {78, 82, 88}; PbrMaterial: {metallic: 0.65, roughness: 0.58}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 2.5, blend: 0.3} }
+  prefab DockGrime { Rgb: {98, 84, 70}; PbrMaterial: {metallic: 0.4, roughness: 0.8}; PbrTextures: {albedo: assets.yard_tex_hull, normal: assets.yard_tex_hull_normal, orm: assets.yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 2, blend: 0.3} }
   prefab DockPipe { Rgb: {150, 134, 104}; PbrMaterial: {metallic: 0.6, roughness: 0.55} }
-  prefab DockWindows { Rgb: {30, 33, 38}; PbrMaterial: {metallic: 0.5, roughness: 0.4}; Emissive: {strength: 1.4, color: {255, 220, 175}}; PbrTextures: {emissive: assets.yard_tex_windows}; TextureMapping: {MappingObject, size: 1.2} }
-  prefab DockRunLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {255, 196, 120}}; PbrTextures: {emissive: assets.yard_tex_dots}; TextureMapping: {MappingObject, size: 1.5} }
-  prefab DockRunLightsCyan { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {90, 214, 255}}; PbrTextures: {emissive: assets.yard_tex_dots}; TextureMapping: {MappingObject, size: 1.5} }
+  prefab DockWindows { Rgb: {30, 33, 38}; PbrMaterial: {metallic: 0.5, roughness: 0.4}; Emissive: {strength: 1.4, color: {255, 220, 175}}; PbrTextures: {emissive: assets.yard_tex_windows}; texture.Mapping: {MappingObject, size: 1.2} }
+  prefab DockRunLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {255, 196, 120}}; PbrTextures: {emissive: assets.yard_tex_dots}; texture.Mapping: {MappingObject, size: 1.5} }
+  prefab DockRunLightsCyan { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {90, 214, 255}}; PbrTextures: {emissive: assets.yard_tex_dots}; texture.Mapping: {MappingObject, size: 1.5} }
 
   template HoloLine {
     prop len: f32 = 1

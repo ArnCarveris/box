@@ -139,7 +139,7 @@ assets {
     }
     torso {
       Position: {0, bob, 0}
-      robe : MvCloth { Position: {0, 0.26, 0}; Rotation: {0, 0, sway * 0.3}; Lathe: {profile: MvRobeShape, segments: 18, rings: 14}; Rgb: {98, 66, 160}; TextureTransform: {4, 2, 0, 0} }
+      robe : MvCloth { Position: {0, 0.26, 0}; Rotation: {0, 0, sway * 0.3}; Lathe: {profile: MvRobeShape, segments: 18, rings: 14}; Rgb: {98, 66, 160}; texture.Transform: {4, 2, 0, 0} }
       hem : MvGold { Position: {0, 0.29, 0}; Torus: {radius: 0.585, tube: 0.028, segments: 20, rings: 4} }
       for k in 0..7 {
         const a = k * 0.8976 + 0.3
@@ -150,7 +150,7 @@ assets {
       pouch : MvLeather { Position: {0.28, 1.04, 0.18}; Rotation: {0, 0.6, 0}; RoundedBox: {0.16, 0.2, 0.1, 0.04, segments: 2} }
       pouch_flap : MvLeather { Position: {0.29, 1.12, 0.2}; Rotation: {0, 0.6, 0}; Box: {0.17, 0.06, 0.11}; Rgb: {80, 50, 32} }
       vial { Position: {-0.26, 1.06, 0.2}; Capsule: {length: 0.08, radius: 0.045, segments: 8, smooth: true}; Rgb: {120, 220, 160}; PbrMaterial: {roughness: 0.1}; ClearCoat: {strength: 1, roughness: 0.05}; Emissive: {strength: 0.6, color: {100, 220, 150}} }
-      cape : MvCloth { Position: {0, 1.05, -0.08}; Rotation: {0.1 + abs(legs) * 0.18, PI, 0}; Tube: {length: 1.45, radius: 0.36, thickness: 0.03, arc: 3.4, segments: 14}; Rgb: {58, 40, 112}; TextureTransform: {2, 2, 0, 0} }
+      cape : MvCloth { Position: {0, 1.05, -0.08}; Rotation: {0.1 + abs(legs) * 0.18, PI, 0}; Tube: {length: 1.45, radius: 0.36, thickness: 0.03, arc: 3.4, segments: 14}; Rgb: {58, 40, 112}; texture.Transform: {2, 2, 0, 0} }
       mantle : MvCloth { Position: {0, 1.68, -0.02}; Scale: {0.44, 0.17, 0.38}; Sphere: {radius: 1, segments: 16, smooth: true}; Rgb: {70, 48, 128} }
       clasp : MvGold { Position: {0, 1.72, 0.36}; Sphere: {radius: 0.05, segments: 8, smooth: true} }
       clasp_gem { Position: {0, 1.72, 0.405}; Sphere: {radius: 0.025, segments: 6}; Rgb: gem; Emissive: {strength: 1.5, color: gem}; NoShadow }
@@ -171,7 +171,7 @@ assets {
         staff {
           Position: {0, -0.66, 0.05}
           Rotation: {0.4, 0, 0}
-          pole : MvBark { Position: {0, 0, 0}; Sweep: {path: MvStaffPath, profile: MvRoundProfile, scale: {0.045, 0.045}, taper: 0.75, rings: 20}; Rgb: {120, 86, 56}; TextureTransform: {1, 3, 0, 0} }
+          pole : MvBark { Position: {0, 0, 0}; Sweep: {path: MvStaffPath, profile: MvRoundProfile, scale: {0.045, 0.045}, taper: 0.75, rings: 20}; Rgb: {120, 86, 56}; texture.Transform: {1, 3, 0, 0} }
           knot : MvBark { Position: {0.01, 0.35, 0}; Sphere: {radius: 0.06, segments: 8, smooth: true}; Rgb: {110, 78, 50} }
           crook : MvBark { Position: {0.0, 1.34, 0}; Rotation: {HALF_PI, 0, 0}; TorusShell: {radius: 0.15, tube: 0.03, ring_start: 4.4, ring_end: 10.6, tube_start: 0, tube_end: 6.283, segments: 14, rings: 5}; Rgb: {120, 86, 56} }
           leaf_a : MvLeafLight { Position: {0.12, 1.18, 0.02}; Rotation: {0, 0, -0.6}; Scale: {0.5, 1, 0.2}; Sphere: {radius: 0.07, segments: 6, smooth: true} }
@@ -201,7 +201,7 @@ assets {
           Rotation: {-0.12 - bool_f(moving) * 0.1, 0, sway}
           brim : MvCloth { Position: {0, 0, 0}; Scale: {1.05, 1, 1.05}; Lathe: {profile: MvBrimShape, segments: 22, rings: 8}; Rgb: {76, 52, 132} }
           band : MvGold { Position: {0, 0.07, 0}; Cylinder: {length: 0.07, radius: 0.285, segments: 16} }
-          cone : MvCloth { Position: {0, 0.05, 0}; Sweep: {path: MvHatPath, profile: MvRoundProfile, scale: {0.28, 0.28}, taper: 0.08, cap_start: true, cap_end: true, rings: 18}; Rgb: {84, 58, 142}; TextureTransform: {2, 2, 0, 0} }
+          cone : MvCloth { Position: {0, 0.05, 0}; Sweep: {path: MvHatPath, profile: MvRoundProfile, scale: {0.28, 0.28}, taper: 0.08, cap_start: true, cap_end: true, rings: 18}; Rgb: {84, 58, 142}; texture.Transform: {2, 2, 0, 0} }
           star { Position: {0, 0.08, 0.3}; Rotation: {0, 0, 0.3}; IcoSphere: {radius: 0.05, segments: 0}; Rgb: {255, 220, 120}; PbrMaterial: {metallic: 1, roughness: 0.3}; Emissive: {strength: 0.8, color: {255, 200, 100}} }
           tip_bell : MvGold { Position: {0, 1.08, -0.44}; Sphere: {radius: 0.04, segments: 8, smooth: true} }
         }

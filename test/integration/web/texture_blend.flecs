@@ -1,4 +1,4 @@
-// The scene of the browser check of TextureBlend (texture_blend.mjs), which renders on the main
+// The scene of the browser check of texture.Blend (texture_blend.mjs), which renders on the main
 // thread. The page opens a window only for a scene with a Surface; its 640x480 points fill the
 // viewport of the check. A quad facing the camera blends three layers under the mask of four
 // quadrants of the visual scene textures_blend: red (128, 0, 0) top left, (128, 200, 50) top
@@ -67,5 +67,5 @@ blended {
   Quad: {4, 4}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 1}
-  TextureBlend: {mask: mask, layers: [red_layer, green_layer, white_layer]}
+  texture.Blend: {mask: mask, layers: [red_layer, green_layer, white_layer]}
 }

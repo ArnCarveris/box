@@ -100,7 +100,7 @@ camera {
 // The cloud shadows of the original's cloud_shadow {strength: 0.6, scale: 13, coverage: 0.45,
 // softness: 0.35, speed: 3, direction: 0.7}, which darkened the direct sun by
 // 1 - smoothstep(thr - soft, thr + soft, n) * strength with thr = 1 - coverage, n two octaves of
-// value noise at world XZ / scale plus the drift. The sun's LightCookie casts them with the
+// value noise at world XZ / scale plus the drift. The sun's Cookie casts them with the
 // seamless fbm noise of the engine's CookieNoise (etc/assets/textures/cloud_noise.png, copied
 // here), read as stored:
 // - size: the base octave of the texture has 8 cells across the tile, so 8 * 13 = 104 world
@@ -136,7 +136,7 @@ sun {
   Rotation: {asin(1.8 / sqrt(1.96 + 3.24 + 1.44)), atan2(1.4, -1.2), 0}
   DirectionalLight: {intensity: 1.5}
   Rgb: {255, 232, 212}
-  LightCookie: {
+  Cookie: {
     texture: cloud_noise, projection: Plane, size: 8 * 13, height: 10,
     threshold: 0.47, softness: 0.35, strength: 0.6
   }

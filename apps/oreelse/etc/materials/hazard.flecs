@@ -20,7 +20,7 @@ prefab HazardTag {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.2, roughness: 0.68}
   PbrTextures: {albedo: hazard_tex}
-  TextureTransform: {scale_x: 1, scale_y: -3}
+  texture.Transform: {scale_x: 1, scale_y: -3}
 }
 
 prefab HazardTrim {
@@ -28,7 +28,7 @@ prefab HazardTrim {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.2, roughness: 0.68}
   PbrTextures: {albedo: hazard_tex}
-  TextureTransform: {scale_x: 1, scale_y: -5}
+  texture.Transform: {scale_x: 1, scale_y: -5}
 }
 
 prefab HazardTrimShort {
@@ -36,7 +36,7 @@ prefab HazardTrimShort {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.2, roughness: 0.68}
   PbrTextures: {albedo: hazard_tex}
-  TextureTransform: {scale_x: 1, scale_y: -2.7}
+  texture.Transform: {scale_x: 1, scale_y: -2.7}
 }
 
 prefab HazardBorderShort {
@@ -44,7 +44,7 @@ prefab HazardBorderShort {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.2, roughness: 0.68}
   PbrTextures: {albedo: hazard_tex}
-  TextureTransform: {scale_x: 1, scale_y: -11}
+  texture.Transform: {scale_x: 1, scale_y: -11}
 }
 
 prefab HazardBorderLong {
@@ -52,7 +52,7 @@ prefab HazardBorderLong {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.2, roughness: 0.68}
   PbrTextures: {albedo: hazard_tex}
-  TextureTransform: {scale_x: 1, scale_y: -14}
+  texture.Transform: {scale_x: 1, scale_y: -14}
 }
 
 prefab HazardBoundary {
@@ -60,5 +60,5 @@ prefab HazardBoundary {
   Rgb: {255, 255, 255}
   PbrMaterial: {metallic: 0.2, roughness: 0.68}
   PbrTextures: {albedo: hazard_tex}
-  TextureTransform: {scale_x: 2.5, scale_y: -22}
+  texture.Transform: {scale_x: 2.5, scale_y: -22}
 }

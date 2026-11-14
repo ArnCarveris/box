@@ -17,27 +17,27 @@ assets {
     PbrMaterial: {roughness: 0.05}
     Water: {shallow_color: {74, 188, 184}, deep_color: {22, 74, 112}, depth: 2.2, visibility: 2.6, refraction: 0.015, foam_width: 0.22, ripple_scale: 2.3, ripple_velocity: {0.02, 0.013}}
     PbrTextures: {normal: isle_wave_n}
-    TextureMapping: {mode: MappingWorld, size: 5}
-    TextureScroll: {velocity: {0.012, 0.02}}
+    texture.Mapping: {mode: MappingWorld, size: 5}
+    texture.Scroll: {velocity: {0.012, 0.02}}
   }
   prefab IsleBrookWater {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.05}
     Water: {shallow_color: {96, 200, 196}, deep_color: {40, 120, 150}, depth: 0.5, visibility: 0.5, refraction: 0.01, foam_width: 0}
     PbrTextures: {normal: isle_wave_n}
-    TextureScroll: {velocity: {0.9, 0}}
-    TextureTransform: {scale_x: 6, scale_y: 0.6}
+    texture.Scroll: {velocity: {0.9, 0}}
+    texture.Transform: {scale_x: 6, scale_y: 0.6}
   }
-  prefab IsleIce { Rgb: {206, 232, 246}; PbrMaterial: {metallic: 0.1, roughness: 0.14}; ClearCoat: {strength: 0.8, roughness: 0.08}; PbrTextures: {normal: isle_rock_n}; TextureMapping: {mode: MappingWorld, size: 7}; Sheen: {color: {230, 244, 255}, roughness: 0.3} }
-  prefab IsleEarth { Rgb: {104, 76, 54}; PbrMaterial: {roughness: 1}; PbrTextures: {normal: isle_rock_n}; TextureMapping: {mode: MappingWorld, size: 5, blend: 0.3} }
+  prefab IsleIce { Rgb: {206, 232, 246}; PbrMaterial: {metallic: 0.1, roughness: 0.14}; ClearCoat: {strength: 0.8, roughness: 0.08}; PbrTextures: {normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 7}; Sheen: {color: {230, 244, 255}, roughness: 0.3} }
+  prefab IsleEarth { Rgb: {104, 76, 54}; PbrMaterial: {roughness: 1}; PbrTextures: {normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 5, blend: 0.3} }
 
   prefab IsleFallWater {
     Rgb: {214, 238, 250}
     PbrMaterial: {roughness: 0.2}
     Emissive: {strength: 0.18, color: {200, 230, 255}}
     PbrTextures: {normal: isle_wave_n}
-    TextureTransform: {scale_x: 2, scale_y: 5}
-    TextureScroll: {velocity: {0, -1.6}}
+    texture.Transform: {scale_x: 2, scale_y: 5}
+    texture.Scroll: {velocity: {0, -1.6}}
   }
   isle_fall_shape { Path2D: {start: {-0.75, 0}, segments: [
     {kind: CubicBezier, end: {0.75, 0}, control1: {-0.75, 0.22}, control2: {0.75, 0.22}}

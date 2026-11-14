@@ -31,7 +31,7 @@ window { Surface: {width: 1600, height: 1000, vsync: true} }
 sun {
   DirectionalLight: {intensity: 3 * PI}
   Rgb: {255, 248, 236}
-  LightCookie: {texture: isle_cloud_h, size: 460, height: 400, threshold: 0.42, softness: 0.1, strength: 0.42, velocity: {3 + wind * 12, 1.5 + wind * 5}}
+  Cookie: {texture: isle_cloud_h, size: 460, height: 400, threshold: 0.42, softness: 0.1, strength: 0.42, velocity: {3 + wind * 12, 1.5 + wind * 5}}
 }
 
 moon {

@@ -33,7 +33,7 @@ floor {
   Rgb: {150, 150, 155}
   PbrMaterial: {roughness: 0.7}
   PbrTextures: {normal: bumps}
-  TextureTransform: {scale_x: 6, scale_y: 4}
+  texture.Transform: {scale_x: 6, scale_y: 4}
 }
 
 flat_panel {
@@ -59,7 +59,7 @@ bumpy_ball {
   Rgb: {90, 160, 220}
   PbrMaterial: {roughness: 0.35}
   PbrTextures: {normal: bumps}
-  TextureTransform: {scale_x: 4, scale_y: 2}
+  texture.Transform: {scale_x: 4, scale_y: 2}
 }
 
 striped_metal {

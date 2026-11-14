@@ -35,7 +35,7 @@ $ {
 }
 
 $ {
-  LightBake: {probe_spacing: 1.4, bounds_padding: 0.3, bounces: 1, capture_size: 32, budget_ms: 8}
+  Bake: {probe_spacing: 1.4, bounds_padding: 0.3, bounces: 1, capture_size: 32, budget_ms: 8}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 8}
   AmbientLight: {sky: {153, 198, 228}, ground: {134, 113, 91}, intensity: 0.45}
 }
@@ -57,7 +57,7 @@ sky {
   Rotation: {0.83, -2.3, 0}
   DirectionalLight: {intensity: 2.1 * math.PI}
   Rgb: {255, 237, 208}
-  LightCookie: {texture: assets.clouds, size: 48, height: 40, velocity: {0.7, 0.25}, threshold: 0.42, softness: 0.22, strength: 0.55}
+  Cookie: {texture: assets.clouds, size: 48, height: 40, velocity: {0.7, 0.25}, threshold: 0.42, softness: 0.22, strength: 0.55}
 }
 
 santorini {

@@ -3,7 +3,7 @@
 // light, so the white surfaces next to the red wall turn pink and those next to the green wall
 // turn green as the bounces bake. The room is made of quads that face inward: the bake sees a
 // closed room, the camera looks in through the front. Fly with WASD (QE for down/up, Shift to
-// go faster), hold the right mouse button to look around. Set LightBake.bounces to 0, 1 or
+// go faster), hold the right mouse button to look around. Set Bake.bounces to 0, 1 or
 // 3 to compare.
 
 using box.transform
@@ -19,7 +19,7 @@ using box.controllers
 $ {
   box.app.FpsTarget: {60}
   Scene: {baked: true}
-  LightBake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
+  Bake: {probe_spacing: 0.5, bounds_padding: -0.3, bounces: 3}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 }
 

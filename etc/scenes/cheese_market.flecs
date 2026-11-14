@@ -66,7 +66,7 @@ sky {
 
 $ {
   AmbientLight: {sky: {171, 193, 211}, ground: {119, 99, 72}, intensity: 0.35}
-  LightBake: {environment: sky, probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
+  Bake: {environment: sky, probe_spacing: 1, bounds_padding: 0.3, bounces: 1, capture_size: 64, budget_ms: 8}
   ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 2.5, environment: sky}
 }
 

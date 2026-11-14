@@ -24,7 +24,7 @@ assets {
       { (IsA, CanopyWood); Rgb: timber; Position: {offset, y, 0}; Box: {8.8, 0.24, 5.4}; Bevel: {top: 0.12, front_left: 0.12, front_right: 0.12, back_left: 0.12, back_right: 0.12} }
       for side in 0..2 {
         const z = (side - 0.5) * 4.56
-        { (IsA, CanopyFacade); Position: {offset, y + 1.55, z}; Box: {7.6, 2.8, 0.06}; TextureMapping: {mode: MappingObject, size: 22.4}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
+        { (IsA, CanopyFacade); Position: {offset, y + 1.55, z}; Box: {7.6, 2.8, 0.06}; texture.Mapping: {mode: MappingObject, size: 22.4}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: windows.f(1), offset_y: windows.u(8) / 8.0 + 0.0625} }
         { (IsA, CanopyMetal); Position: {offset, y + 1.2, z * 1.16}; Box: {7.9, 0.04, 0.04} }
         for c in 0..4 {
           { (IsA, CanopyLeafCard); Rgb: {72 + (f + c) % 3 * 12, 128, 56}; Position: {offset - 3 + c * 2, y + 0.72, z * 1.13}; Rotation: {-0.2, f + c, 0}; Quad: {1.7, 0.9} }

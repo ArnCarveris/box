@@ -10,7 +10,7 @@ $ {
   Scene: {triplanar: true}
 }
 
-// World space and triplanar texture mapping (TextureMapping MappingWorld and blend).
+// World space and triplanar texture mapping (texture.Mapping MappingWorld and blend).
 // On the left a 6 x 6 board of touching tiles like the castle board, every other one turned by
 // 90 degrees around y, with one grass-like texture projected from the world position
 // (MappingWorld) and normal mapped with the bumps: the grass and the bumps run across the tiles
@@ -80,7 +80,7 @@ board {
         Rgb: {255, 255, 255}
         PbrMaterial: {roughness: 0.9}
         PbrTextures: {albedo: grass, normal: bumps}
-        TextureMapping: {mode: MappingWorld, size: 1.7}
+        texture.Mapping: {mode: MappingWorld, size: 1.7}
       }
     }
   }
@@ -92,7 +92,7 @@ sphere_blend {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
   PbrTextures: {albedo: checker, normal: bumps}
-  TextureMapping: {mode: MappingWorld, size: 0.9, blend: 0.5}
+  texture.Mapping: {mode: MappingWorld, size: 0.9, blend: 0.5}
 }
 
 cone_blend {
@@ -101,7 +101,7 @@ cone_blend {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
   PbrTextures: {albedo: checker, normal: bumps}
-  TextureMapping: {mode: MappingWorld, size: 0.9, blend: 0.5}
+  texture.Mapping: {mode: MappingWorld, size: 0.9, blend: 0.5}
 }
 
 sphere_hard {
@@ -110,5 +110,5 @@ sphere_hard {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.6}
   PbrTextures: {albedo: checker, normal: bumps}
-  TextureMapping: {mode: MappingWorld, size: 0.9}
+  texture.Mapping: {mode: MappingWorld, size: 0.9}
 }

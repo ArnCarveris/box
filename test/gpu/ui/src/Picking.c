@@ -482,7 +482,7 @@ void Picking_render_to_texture_mapped(void) {
         "  Position: {0, 0, -0.1}\n"
         "  box.geometry.Box: {4, 2, 0.2}\n"
         "  PbrTextures: {albedo: screen_texture}\n"
-        "  TextureMapping: {mode: MappingObject, size: 2}\n"
+        "  texture.Mapping: {mode: MappingObject, size: 2}\n"
         "}\n" }) != 0);
 
     typedef struct { int32_t clicks; } Mut;
@@ -565,14 +565,14 @@ void Picking_render_to_texture_frame_mapped(void) {
         "  View: {camera: camera}\n"
         "}\n"
         "ship {\n"
-        "  TextureFrame\n"
+        "  texture.Frame\n"
         "  Position: {1.5, 0, 0}\n"
         "  Rotation: {0, 0, 3.1415927}\n"
         "  wall {\n"
         "    Position: {1.5, 0, -0.1}\n"
         "    box.geometry.Box: {4, 2, 0.2}\n"
         "    PbrTextures: {albedo: screen_texture}\n"
-        "    TextureMapping: {mode: MappingFrame, size: 2}\n"
+        "    texture.Mapping: {mode: MappingFrame, size: 2}\n"
         "  }\n"
         "}\n" }) != 0);
 
@@ -685,7 +685,7 @@ void Picking_render_to_texture_sweep_mapped(void) {
         "  Position: {0, 0, 0}\n"
         "  Sweep: {path: route, profile: section, scale: {1, 1}, rings: 48}\n"
         "  PbrTextures: {albedo: screen_texture}\n"
-        "  TextureMapping: {mode: MappingObject, size: 0.5}\n"
+        "  texture.Mapping: {mode: MappingObject, size: 0.5}\n"
         "}\n" }) != 0);
 
     typedef struct { int32_t clicks; float x; float y; } Mut;
@@ -816,7 +816,7 @@ void Picking_render_to_texture_sweep_mapped_cap(void) {
         "  Position: {0, 0, 0}\n"
         "  Sweep: {path: route, profile: section, scale: {2, 2}}\n"
         "  PbrTextures: {albedo: screen_texture}\n"
-        "  TextureMapping: {mode: MappingObject, size: 0.5}\n"
+        "  texture.Mapping: {mode: MappingObject, size: 0.5}\n"
         "}\n" }) != 0);
 
     typedef struct { int32_t clicks; float x; float y; } Mut;

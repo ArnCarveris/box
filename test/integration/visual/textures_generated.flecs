@@ -104,7 +104,7 @@ wall {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: ashlar, normal: ashlar_n}
-  TextureTransform: {scale_x: 4, scale_y: 4}
+  texture.Transform: {scale_x: 4, scale_y: 4}
 }
 
 ashlar_box {

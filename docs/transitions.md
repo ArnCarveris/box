@@ -76,7 +76,7 @@ or removing it while it animates in, starts from the rendered value without a ju
 | `Tint` | The target color with alpha 0 |
 | `Emissive` | Strength 0, the target color |
 | `PbrMaterial` | The metallic and roughness used without one |
-| `TextureTransform` | `{1, 1, 0, 0}` |
+| `texture.Transform` | `{1, 1, 0, 0}` |
 | `ClearCoat` | Strength 0, the target roughness |
 | `SpecularAnisotropy` | Strength 0, the target rotation |
 | `Sheen` | Black, the target roughness |
@@ -188,7 +188,7 @@ error naming the entity/component and ignore that entry. Other entries still wor
 | Category | Components | Scope |
 | --- | --- | --- |
 | Transform | `Position`, `Rotation`, `Scale` | Shape, text and shadow slots on the entity and descendants |
-| Material | `Rgb`, `Emissive`, `TextureTransform` | Meshes, 2D shapes and text where the field is rendered |
+| Material | `Rgb`, `Emissive`, `texture.Transform` | Meshes, 2D shapes and text where the field is rendered |
 | Mesh material | `AlphaCutoff`, `PbrMaterial`, `Transmission`, `ClearCoat`, `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission`, `Fresnel`, `Distortion` | Mesh material table |
 | Hierarchy | `Tint`, `Opacity` | Composed down `ChildOf` and `Parent` |
 | 2D shadow | `BoxShadow` | Shadow offset, blur, spread and color |

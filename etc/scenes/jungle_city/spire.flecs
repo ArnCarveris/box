@@ -20,7 +20,7 @@ assets {
     const fin = math.sqrt(height * height + 1.21)
     Scale: {sx, 1, sz}
     CanopyPlinth(round: true, radius: 3.7, variant: variant) {}
-    core : CanopyFacade { Position: {0, height / 2 + 1.2, 0}; Frustum: {radius_bottom: 2.9, radius_top: 1.8, length: height, segments: 8, smooth: true}; TextureTransform: {scale_x: bays / 8.0, scale_y: height / 25.6, offset_x: variant % 8 / 8.0, offset_y: variant % 13 / 8.0} }
+    core : CanopyFacade { Position: {0, height / 2 + 1.2, 0}; Frustum: {radius_bottom: 2.9, radius_top: 1.8, length: height, segments: 8, smooth: true}; texture.Transform: {scale_x: bays / 8.0, scale_y: height / 25.6, offset_x: variant % 8 / 8.0, offset_y: variant % 13 / 8.0} }
     for i in 0..8 + facade_style * 4 {
       const a = i * math.PI * 2 / (8 + facade_style * 4)
       {

@@ -349,7 +349,7 @@ assets {
       Transition: [PointLight: {duration: 2.6}]
     }
 
-    kick_a : Faceplate { Position: {0.28, 0.27, -0.99}; Box: {0.54, 0.2, 0.02}; Rgb: {58, 96, 92}; TextureMapping: {mode: MappingObject, size: 0.62} }
+    kick_a : Faceplate { Position: {0.28, 0.27, -0.99}; Box: {0.54, 0.2, 0.02}; Rgb: {58, 96, 92}; texture.Mapping: {mode: MappingObject, size: 0.62} }
     for i in 0..4 {
       "kick_dzus_{i}" : BareSteel { Position: {i % 2 == 0 ? 0.04 : 0.52, i < 2 ? 0.34 : 0.2, -0.978}; Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 0.009, length: 0.004, segments: 10, smooth: true}; Rgb: {120, 116, 106} }
     }
@@ -382,8 +382,8 @@ assets {
       Position: {0.82, 0.075, -0.3}
       Rotation: {0, 0.5, 0}
       Ignore
-      body : Mustard { Position: {0, 0, 0}; RoundedBox: {0.28, 0.13, 0.16, 0.012, segments: 2}; TextureMapping: {mode: MappingObject, size: 0.62} }
-      lid : Mustard { Position: {0, 0.085, 0}; RoundedBox: {0.285, 0.03, 0.165, 0.012, segments: 2}; Rgb: {160, 112, 36}; TextureMapping: {mode: MappingObject, size: 0.62} }
+      body : Mustard { Position: {0, 0, 0}; RoundedBox: {0.28, 0.13, 0.16, 0.012, segments: 2}; texture.Mapping: {mode: MappingObject, size: 0.62} }
+      lid : Mustard { Position: {0, 0.085, 0}; RoundedBox: {0.285, 0.03, 0.165, 0.012, segments: 2}; Rgb: {160, 112, 36}; texture.Mapping: {mode: MappingObject, size: 0.62} }
       latch : BareSteel { Position: {0, 0.065, 0.084}; Box: {0.03, 0.03, 0.004} }
       grip : BareSteel { Position: {0, 0.112, 0}; Rotation: {PI / 2, 0, 0}; TorusShell: {radius: 0.05, tube: 0.005, ring_start: -1.4, ring_end: 1.4, tube_start: 0, tube_end: 6.283, segments: 12, rings: 8} }
       Stamp words(text: "lunch. not cargo.", size: 22, font: font_hand) { Position = {0, 0, 0.0815} }

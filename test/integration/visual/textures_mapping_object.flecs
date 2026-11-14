@@ -5,7 +5,7 @@ using box.texture
 using box.camera
 using box.view
 
-// TextureMapping: the back row projects the letter from the object position times the size of
+// texture.Mapping: the back row projects the letter from the object position times the size of
 // each box (MappingObject, one letter per 0.5 units), so the letters are the same size on every
 // face and box and upright on the side faces. The front row has the same boxes with the UVs of
 // the mesh, one letter per face whatever its size; its +x faces show the letter upright too.
@@ -43,7 +43,7 @@ mapped_cube {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: letter}
-  TextureMapping: {mode: MappingObject, size: 0.5}
+  texture.Mapping: {mode: MappingObject, size: 0.5}
 }
 
 mapped_wall {
@@ -53,7 +53,7 @@ mapped_wall {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: letter}
-  TextureMapping: {mode: MappingObject, size: 0.5}
+  texture.Mapping: {mode: MappingObject, size: 0.5}
 }
 
 mapped_slab {
@@ -63,7 +63,7 @@ mapped_slab {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.8}
   PbrTextures: {albedo: letter}
-  TextureMapping: {mode: MappingObject, size: 0.5}
+  texture.Mapping: {mode: MappingObject, size: 0.5}
 }
 
 mapped_bumps {
@@ -73,7 +73,7 @@ mapped_bumps {
   Rgb: {90, 160, 220}
   PbrMaterial: {roughness: 0.35}
   PbrTextures: {normal: bumps}
-  TextureMapping: {mode: MappingObject, size: 0.5}
+  texture.Mapping: {mode: MappingObject, size: 0.5}
 }
 
 uv_cube {

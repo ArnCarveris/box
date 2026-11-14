@@ -10,7 +10,7 @@ $ {
   Scene: {alpha_cutout: true, triplanar: true}
 }
 
-// An alpha tested shape with a world mapped texture (TextureMapping MappingWorld, AlphaCutoff)
+// An alpha tested shape with a world mapped texture (texture.Mapping MappingWorld, AlphaCutoff)
 // casts the shadow it shows: a row of three touching fence panels of different widths, the
 // middle one turned around, shows one continuous lattice (fence.png) projected from the world
 // position, and the sun from behind casts the same continuous lattice of holes toward the
@@ -48,7 +48,7 @@ fence_left {
   Box: {1, 1.6, 0.06}
   Rgb: {235, 215, 190}
   PbrTextures: {albedo: fence_tex}
-  TextureMapping: {mode: MappingWorld, size: 1.6}
+  texture.Mapping: {mode: MappingWorld, size: 1.6}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -58,7 +58,7 @@ fence_middle {
   Box: {2, 1.6, 0.06}
   Rgb: {235, 215, 190}
   PbrTextures: {albedo: fence_tex}
-  TextureMapping: {mode: MappingWorld, size: 1.6}
+  texture.Mapping: {mode: MappingWorld, size: 1.6}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -67,7 +67,7 @@ fence_right {
   Box: {2.5, 1.6, 0.06}
   Rgb: {235, 215, 190}
   PbrTextures: {albedo: fence_tex}
-  TextureMapping: {mode: MappingWorld, size: 1.6}
+  texture.Mapping: {mode: MappingWorld, size: 1.6}
   AlphaCutoff: {value: 0.5}
 }
 
@@ -77,7 +77,7 @@ lattice_box {
   Box: {1.4, 1.4, 1.4}
   Rgb: {200, 170, 130}
   PbrTextures: {albedo: fence_tex}
-  TextureMapping: {mode: MappingWorld, size: 1.4, blend: 0.4}
+  texture.Mapping: {mode: MappingWorld, size: 1.4, blend: 0.4}
   AlphaCutoff: {value: 0.5}
   BackFaceMode: {BackFacePlain}
 }

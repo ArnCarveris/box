@@ -30,7 +30,7 @@ assets {
       await next_frame()
       flowing = true
     }
-    bedrock : CanopyStrata { Position: {0, -3.1, 0}; Box: {width, 4.4, depth}; Bevel: {bottom: 2, front_left: 2, front_right: 2, back_left: 2, back_right: 2, segments: 2}; TextureTransform: {scale_x: width / 36, scale_y: 1} }
+    bedrock : CanopyStrata { Position: {0, -3.1, 0}; Box: {width, 4.4, depth}; Bevel: {bottom: 2, front_left: 2, front_right: 2, back_left: 2, back_right: 2, segments: 2}; texture.Transform: {scale_x: width / 36, scale_y: 1} }
     for side in 0..2 {
       const outer = side == 0 ? 0.55 : 0.0
       const corner = side == 0 ? 2.0 : 0.0
@@ -58,14 +58,14 @@ assets {
     canal_water : CanopyCanalWater {
       Position: {0, -0.35, 0}
       Box: {10.3, 0.04, depth - 0.08}
-      TextureTransform: {scale_x: depth / 5, scale_y: 2, offset_x: flowing ? -1700 : 0, offset_y: flowing ? 120 : 0}
-      Transition: [TextureTransform: {duration: 14400, timing_function: Linear}]
+      texture.Transform: {scale_x: depth / 5, scale_y: 2, offset_x: flowing ? -1700 : 0, offset_y: flowing ? 120 : 0}
+      Transition: [texture.Transform: {duration: 14400, timing_function: Linear}]
     }
     spill : CanopyFoam {
       Position: {0, -2.4, depth / 2 + 0.03}
       Box: {10, 4.1, 0.06}
-      TextureTransform: {scale_x: 2, scale_y: 0.82, offset_y: flowing ? -3600 : 0}
-      Transition: [TextureTransform: {duration: 14400, timing_function: Linear}]
+      texture.Transform: {scale_x: 2, scale_y: 0.82, offset_y: flowing ? -3600 : 0}
+      Transition: [texture.Transform: {duration: 14400, timing_function: Linear}]
       Opacity: {0.85}
     }
     headwall : CanopyAshlar { Position: {0, 0.15, -depth / 2 + 0.7}; Box: {13.2, 2.1, 1.4} }

@@ -18,7 +18,7 @@ assets {
     const bays = math.max(1, math.round(math.PI * 2.8 * (sx + sz) / 3.2))
     Scale: {sx, 1, sz}
     CanopyPlinth(round: true, radius: 3.6, variant: variant) {}
-    core : CanopyFacade { Position: {0, height / 2 + 1.2, 0}; Cylinder: {radius: 2.8, length: height, segments: 12, smooth: true}; TextureTransform: {scale_x: bays / 8.0, scale_y: floors / 8.0, offset_x: variant % 8 / 8.0, offset_y: variant % 13 / 8.0} }
+    core : CanopyFacade { Position: {0, height / 2 + 1.2, 0}; Cylinder: {radius: 2.8, length: height, segments: 12, smooth: true}; texture.Transform: {scale_x: bays / 8.0, scale_y: floors / 8.0, offset_x: variant % 8 / 8.0, offset_y: variant % 13 / 8.0} }
     for f in 0..floors + 1 {
       const y = 1.2 + f * 3.2
       const radius = 3.8 + math.sin(f * 1.2 + variant) * 0.45

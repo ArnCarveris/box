@@ -47,7 +47,7 @@ assets {
   }
 
   template LockMillSluiceBoard {
-    gate : CanalPlanks { Position: {0, 0.3, 0}; Box: {0.08, 0.74, 1.02}; TextureTransform: {scale_x: 0.4, scale_y: 0.6} }
+    gate : CanalPlanks { Position: {0, 0.3, 0}; Box: {0.08, 0.74, 1.02}; texture.Transform: {scale_x: 0.4, scale_y: 0.6} }
     rod : CanalIron { Position: {0, 1.04, 0}; Cylinder: {radius: 0.03, length: 0.84, segments: 8} }
     handle : CanalRed { Position: {0, 1.46, 0}; RoundedBox: {0.08, 0.08, 0.6, 0.015, segments: 1} }
   }
@@ -70,16 +70,16 @@ assets {
 
   template LockMill {
     pond_bed : CanalMud { Position: {3.3, 0.02, 0}; Box: {4.7, 0.04, 3.9} }
-    pond : CanalPondWater { Position: {3.3, 0.1, 0}; Rotation: {-math.PI / 2, 0, 0}; Quad: {4.8, 4}; TextureTransform: {scale_x: 1, scale_y: 0.8} }
+    pond : CanalPondWater { Position: {3.3, 0.1, 0}; Rotation: {-math.PI / 2, 0, 0}; Quad: {4.8, 4}; texture.Transform: {scale_x: 1, scale_y: 0.8} }
     rim_w : CanalCoping { Position: {0.86, 0.1, 0}; RoundedBox: {0.26, 0.2, 4.54, 0.03, segments: 1} }
     rim_e : CanalCoping { Position: {5.8, 0.1, 0}; RoundedBox: {0.26, 0.2, 4.54, 0.03, segments: 1} }
     rim_n : CanalCopingOld { Position: {3.33, 0.1, -2.14}; RoundedBox: {4.68, 0.2, 0.26, 0.03, segments: 1} }
     rim_s : CanalCopingOld { Position: {3.33, 0.1, 2.14}; RoundedBox: {4.68, 0.2, 0.26, 0.03, segments: 1} }
 
     flume_floor : CanalOldTimber { Position: {-0.08, 0.15, 0}; Box: {1.96, 0.07, 1.1} }
-    flume_a : CanalPlanks { Position: {-0.08, 0.3, 0.57}; Box: {2.0, 0.3, 0.06}; TextureTransform: {scale_x: 0.8, scale_y: 0.2} }
-    flume_b : CanalPlanks { Position: {-0.08, 0.3, -0.57}; Box: {2.0, 0.3, 0.06}; TextureTransform: {scale_x: 0.8, scale_y: 0.2} }
-    flume_water : CanalPondWater { Position: {-0.08, 0.225, 0}; Rotation: {-math.PI / 2, 0, 0}; Quad: {1.96, 1.06}; TextureTransform: {scale_x: 0.5, scale_y: 0.25} }
+    flume_a : CanalPlanks { Position: {-0.08, 0.3, 0.57}; Box: {2.0, 0.3, 0.06}; texture.Transform: {scale_x: 0.8, scale_y: 0.2} }
+    flume_b : CanalPlanks { Position: {-0.08, 0.3, -0.57}; Box: {2.0, 0.3, 0.06}; texture.Transform: {scale_x: 0.8, scale_y: 0.2} }
+    flume_water : CanalPondWater { Position: {-0.08, 0.225, 0}; Rotation: {-math.PI / 2, 0, 0}; Quad: {1.96, 1.06}; texture.Transform: {scale_x: 0.5, scale_y: 0.25} }
     for s in 0..2 {
       const sz = (s * 2 - 1) * 0.64
       { (IsA, CanalOldTimber); Position: {-0.75, -0.48, sz}; Rotation: {0, 0, 0.0}; Box: {0.1, 1.3, 0.1} }

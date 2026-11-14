@@ -154,8 +154,8 @@ water {
     Rgb: {255, 255, 255}
     PbrMaterial: {metallic: 0, roughness: 0.08}
     PbrTextures: {normal: waves}
-    TextureTransform: {scale_x: 3, scale_y: 3, offset_x: 0, offset_y: 0}
-    TextureScroll: {velocity: {0.01, 0.004}, normal_velocity: {0.02, 0.01}}
+    texture.Transform: {scale_x: 3, scale_y: 3, offset_x: 0, offset_y: 0}
+    texture.Scroll: {velocity: {0.01, 0.004}, normal_velocity: {0.02, 0.01}}
     Water: {
       shallow_color: {60, 170, 160}
       deep_color: {8, 40, 64}

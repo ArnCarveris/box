@@ -242,7 +242,7 @@ assets {
         if dark {
           block : ShipHullDarkSpin { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ro, thickness: ro - ri, length: len, segments: 2, smooth: true, arc: arc / 3} }
         } else {
-          block : ShipCabins { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ro, thickness: ro - ri, length: len, segments: 2, smooth: true, arc: arc / 3}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: shift + j * 0.37, offset_y: 0} }
+          block : ShipCabins { Rotation: {0 - HALF_PI, 0, 0}; Tube: {radius: ro, thickness: ro - ri, length: len, segments: 2, smooth: true, arc: arc / 3}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: shift + j * 0.37, offset_y: 0} }
         }
       }
     }

@@ -36,7 +36,7 @@ assets {
     prop h: f32 = 4
     prop seed: f32 = 1
     const girth = h * 0.05
-    trunk : CanalBark { Position: {0, h * 0.27, 0}; Frustum: {radius_bottom: girth * 1.15, radius_top: girth * 0.62, length: h * 0.54, segments: 12, smooth: true}; TextureTransform: {scale_x: 2, scale_y: 2} }
+    trunk : CanalBark { Position: {0, h * 0.27, 0}; Frustum: {radius_bottom: girth * 1.15, radius_top: girth * 0.62, length: h * 0.54, segments: 12, smooth: true}; texture.Transform: {scale_x: 2, scale_y: 2} }
     flare : CanalBark { Position: {0, h * 0.03, 0}; Frustum: {radius_bottom: girth * 1.65, radius_top: girth * 1.12, length: h * 0.06, segments: 12, smooth: true} }
     for i in 0..5 {
       const a = i * 2.399 + seed

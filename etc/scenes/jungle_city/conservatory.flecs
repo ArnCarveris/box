@@ -304,7 +304,7 @@ assets {
       const slope = math.atan2(drop, total)
       const seg = math.sqrt(drop * drop + total * total)
       { (IsA, CanopyAshlar); Position: {x, height - drop / 2 + 0.15, radius - 0.2 + total / 2}; Rotation: {slope, 0, 0}; Box: {0.8, 0.5, seg + 0.3} }
-      { (IsA, CanopyFoam); Position: {x * 1.11, height - drop / 2 - 0.25, radius - 0.2 + total / 2}; Rotation: {slope, 0, 0}; Box: {0.32, 0.03, seg}; TextureTransform: {scale_x: 0.4, scale_y: 4} }
+      { (IsA, CanopyFoam); Position: {x * 1.11, height - drop / 2 - 0.25, radius - 0.2 + total / 2}; Rotation: {slope, 0, 0}; Box: {0.32, 0.03, seg}; texture.Transform: {scale_x: 0.4, scale_y: 4} }
       { (IsA, CanopyAshlar); Position: {x, height - 0.05, radius + 0.25}; Box: {1.1, 1.3, 1.1} }
       { (IsA, CanopyVerdigris); Position: {x, height + 1, radius + 0.25}; Frustum: {radius_bottom: 0.24, radius_top: 0.5, length: 0.7, segments: 7} }
       { (IsA, CanopyLeafCard); Rgb: {74, 128, 56}; Position: {x, height + 1.8, radius + 0.25}; Rotation: {0, 0.4, 0}; Quad: {1.5, 1.3} }

@@ -100,7 +100,7 @@ static ecs_world_t* garden_new(
     char *text = file_read(GARDEN_PATH);
     test_assert(text != NULL);
     lines_blank(text, "Surface:");
-    lines_blank(text, "LightBake:");
+    lines_blank(text, " Bake:");
     test_assert(ecs_script_run(world, GARDEN_PATH, text, NULL) == 0);
     ecs_os_free(text);
 

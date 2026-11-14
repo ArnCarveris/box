@@ -345,7 +345,9 @@ void BoxMaterialImport(
     ECS_MODULE(world, BoxMaterial);
     ECS_IMPORT(world, BoxTypes);
 
+    ecs_set_name_prefix(world, "Material");
     ECS_META_COMPONENT(world, MaterialId);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, Rgb);
     ECS_META_COMPONENT(world, Opacity);
     ECS_META_COMPONENT(world, AlphaCutoff);
@@ -362,13 +364,23 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Water);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
+    ECS_META_COMPONENT(world, PbrTextures);
+
+    ecs_entity_t module = ecs_get_scope(world);
+    ecs_entity_t texture = ecs_entity(world, { .name = "texture" });
+    ecs_add_id(world, texture, EcsModule);
+    ecs_set_scope(world, texture);
+    ecs_set_name_prefix(world, "Texture");
     ECS_META_COMPONENT(world, TextureWrap);
     ECS_META_COMPONENT(world, TextureTransform);
     ECS_META_COMPONENT(world, TextureScroll);
     ECS_META_COMPONENT(world, TextureMappingMode);
     ECS_META_COMPONENT(world, TextureMapping);
-    ECS_META_COMPONENT(world, PbrTextures);
     ECS_META_COMPONENT(world, TextureBlend);
+    ECS_TAG_DEFINE(world, TextureFrame);
+    ecs_set_name_prefix(world, NULL);
+    ecs_set_scope(world, module);
+
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
     ecs_set_hooks(world, AlphaCutoff, { .ctor = box_alpha_cutoff_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
@@ -401,7 +413,6 @@ void BoxMaterialImport(
     }
 
     ECS_TAG_DEFINE(world, DynamicMaterial);
-    ECS_TAG_DEFINE(world, TextureFrame);
     ECS_TAG_DEFINE(world, NoShadow);
     ECS_TAG_DEFINE(world, LightFixture);
 }

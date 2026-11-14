@@ -28,7 +28,7 @@ floor {
   Box: {16, 0.2, 10}
   Rgb: {255, 255, 255}
   PbrTextures: {albedo: checker}
-  TextureTransform: {scale_x: 8, scale_y: 5}
+  texture.Transform: {scale_x: 8, scale_y: 5}
 }
 
 repeat {
@@ -37,8 +37,8 @@ repeat {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.9}
   PbrTextures: {albedo: letter}
-  TextureWrap: WrapRepeat
-  TextureTransform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
+  texture.Wrap: Repeat
+  texture.Transform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
 }
 
 clamp {
@@ -47,8 +47,8 @@ clamp {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.9}
   PbrTextures: {albedo: letter}
-  TextureWrap: WrapClamp
-  TextureTransform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
+  texture.Wrap: Clamp
+  texture.Transform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
 }
 
 mirror {
@@ -57,6 +57,6 @@ mirror {
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.9}
   PbrTextures: {albedo: letter}
-  TextureWrap: WrapMirror
-  TextureTransform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
+  texture.Wrap: Mirror
+  texture.Transform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
 }

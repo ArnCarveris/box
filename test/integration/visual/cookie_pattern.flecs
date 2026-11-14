@@ -10,7 +10,7 @@ $ {
   Scene: {cookies: true}
 }
 
-// A classic directional cookie: the sun carries a LightCookie of a grid (cookie_grid.png, white
+// A classic directional cookie: the sun carries a Cookie of a grid (cookie_grid.png, white
 // with black lines and a black square in one cell, loaded single_channel) in its own space
 // (projection Light), repeating every 3 units. The sun is rolled about its axis, so the grid
 // lines run at an angle across the floor and the shapes, and softness 0 keeps the lines sharp.
@@ -38,7 +38,7 @@ sun {
   Rotation: {1.1, 0.3, 0.8}
   DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
   Rgb: {255, 240, 220}
-  LightCookie: {texture: grid, projection: Light, size: 3, threshold: 0.5, softness: 0}
+  Cookie: {texture: grid, projection: Light, size: 3, threshold: 0.5, softness: 0}
 }
 
 floor {

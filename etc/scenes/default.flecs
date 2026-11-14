@@ -18,7 +18,7 @@ $ {
 }
 
 $ {
-  LightBake: {probe_spacing: 0.3, bounds_padding: -0.3, capture_size: 128, bounces: 3, budget_ms: 16}
+  Bake: {probe_spacing: 0.3, bounds_padding: -0.3, capture_size: 128, bounces: 3, budget_ms: 16}
 }
 
 window {

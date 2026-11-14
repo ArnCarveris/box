@@ -62,7 +62,7 @@ assets {
   const leaf_glow: Rgb = match season { 0: {210, 255, 140}; 1: {200, 255, 120}; 2: {255, 190, 90}; _: {230, 240, 255} }
   const crop_rgb: Rgb = match season { 0: {140, 196, 92}; 1: {226, 190, 84}; 2: {168, 120, 70}; _: {232, 238, 246} }
 
-  prefab IsleGrass { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: grass_tex, normal: isle_grass_n}; TextureMapping: {mode: MappingWorld, size: 9} }
+  prefab IsleGrass { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: grass_tex, normal: isle_grass_n}; texture.Mapping: {mode: MappingWorld, size: 9} }
   prefab IsleLeaf { Rgb: leaf_rgb; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.35, color: leaf_glow} }
   prefab IsleLeafAlt { Rgb: leaf_alt_rgb; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.35, color: leaf_glow} }
   prefab IsleLeafDark { Rgb: leaf_dark_rgb; PbrMaterial: {roughness: 0.9} }
@@ -70,18 +70,18 @@ assets {
 
   prefab IsleDirt { Rgb: {122, 92, 64}; PbrMaterial: {roughness: 1} }
   prefab IsleSand { Rgb: {214, 196, 150}; PbrMaterial: {roughness: 1} }
-  prefab IsleRock { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; TextureMapping: {mode: MappingWorld, size: 7, blend: 0.3} }
-  prefab IsleRockDark { Rgb: {226, 206, 196}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; TextureMapping: {mode: MappingWorld, size: 11, blend: 0.3} }
-  prefab IsleStone { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: isle_brick_a, normal: isle_brick_n}; TextureMapping: {mode: MappingWorld, size: 2.4, blend: 0.2} }
-  prefab IsleCobble { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: isle_cobble_a, normal: isle_cobble_n}; TextureMapping: {mode: MappingWorld, size: 3} }
-  prefab IsleWood { Rgb: {168, 120, 78}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}; TextureMapping: {mode: MappingWorld, size: 1.6, blend: 0.2} }
-  prefab IsleWoodDark { Rgb: {96, 66, 46}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}; TextureMapping: {mode: MappingWorld, size: 1.6, blend: 0.2} }
+  prefab IsleRock { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 7, blend: 0.3} }
+  prefab IsleRockDark { Rgb: {226, 206, 196}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 11, blend: 0.3} }
+  prefab IsleStone { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: isle_brick_a, normal: isle_brick_n}; texture.Mapping: {mode: MappingWorld, size: 2.4, blend: 0.2} }
+  prefab IsleCobble { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: isle_cobble_a, normal: isle_cobble_n}; texture.Mapping: {mode: MappingWorld, size: 3} }
+  prefab IsleWood { Rgb: {168, 120, 78}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}; texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.2} }
+  prefab IsleWoodDark { Rgb: {96, 66, 46}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}; texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.2} }
   prefab IsleBark { Rgb: {98, 72, 52}; PbrMaterial: {roughness: 0.95} }
   prefab IslePlaster { Rgb: {240, 230, 208}; PbrMaterial: {roughness: 0.95} }
   prefab IslePlasterWarm { Rgb: {236, 204, 160}; PbrMaterial: {roughness: 0.95} }
-  prefab IsleRoofRed { Rgb: {196, 84, 60}; PbrMaterial: {roughness: 0.7}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; TextureMapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
-  prefab IsleRoofBlue { Rgb: {76, 108, 150}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; TextureMapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
-  prefab IsleRoofSlate { Rgb: {92, 96, 108}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; TextureMapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
+  prefab IsleRoofRed { Rgb: {196, 84, 60}; PbrMaterial: {roughness: 0.7}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
+  prefab IsleRoofBlue { Rgb: {76, 108, 150}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
+  prefab IsleRoofSlate { Rgb: {92, 96, 108}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
   prefab IsleRoofThatch { Rgb: {196, 164, 96}; PbrMaterial: {roughness: 1}; Sheen: {color: {255, 236, 170}, roughness: 0.6} }
   prefab IsleSnow { Rgb: {244, 248, 255}; PbrMaterial: {roughness: 0.6}; Sheen: {color: {220, 235, 255}, roughness: 0.4} }
 

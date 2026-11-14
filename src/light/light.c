@@ -378,7 +378,9 @@ void BoxLightImport(
     ECS_MODULE(world, BoxLight);
     ECS_IMPORT(world, BoxTypes);
 
+    ecs_set_name_prefix(world, "Light");
     ECS_META_COMPONENT(world, LightBakeMode);
+    ecs_set_name_prefix(world, NULL);
     ECS_META_COMPONENT(world, DirectionalLight);
     ECS_META_COMPONENT(world, PointLight);
     ECS_META_COMPONENT(world, SpotLight);
@@ -387,15 +389,19 @@ void BoxLightImport(
     ecs_set_hooks(world, PointLight, { .ctor = box_point_light_ctor });
     ecs_set_hooks(world, SpotLight, { .ctor = box_spot_light_ctor });
     ecs_set_hooks(world, AmbientLight, { .ctor = box_ambient_light_ctor });
+    ecs_set_name_prefix(world, "Light");
     ECS_META_COMPONENT(world, LightCookieProjection);
     ECS_META_COMPONENT(world, LightCookie);
+    ecs_set_name_prefix(world, NULL);
     ecs_set_hooks(world, LightCookie, { .ctor = box_light_cookie_ctor });
     ECS_META_COMPONENT(world, ShadowAtlas);
     ecs_set_hooks(world, ShadowAtlas, { .ctor = box_shadow_atlas_ctor });
+    ecs_set_name_prefix(world, "Light");
     ECS_META_COMPONENT(world, LightBake);
+    ECS_META_COMPONENT(world, LightBakeStatus);
+    ecs_set_name_prefix(world, NULL);
     box_owned_hooks(world, LightBake, BOX_OWNED_STR(LightBake, cache));
     ecs_set_hooks(world, LightBake, { .ctor = box_light_bake_ctor });
-    ECS_META_COMPONENT(world, LightBakeStatus);
     box_owned_hooks(world, LightBakeStatus, BOX_OWNED_STR(LightBakeStatus, error));
     ECS_TAG_DEFINE(world, NoBake);
     ECS_META_COMPONENT(world, ReflectionBake);

@@ -17,7 +17,7 @@ assets {
     const height = floors * 3.2
     Scale: {sx, 1, sz}
     CanopyPlinth(width: 8, depth: 8, variant: variant) {}
-    shell : CanopyFacade { Position: {0, height / 2 + 1.2, 0}; Box: {6.2, height, 6.2}; Bevel: {front_left: 0.2, front_right: 0.2, back_left: 0.2, back_right: 0.2, segments: 1}; TextureMapping: {mode: MappingObject, size: 25.6}; TextureTransform: {scale_x: 1, scale_y: 1, offset_x: variant % 8 / 8.0, offset_y: floors % 2 / 16.0 + variant % 13 / 8.0} }
+    shell : CanopyFacade { Position: {0, height / 2 + 1.2, 0}; Box: {6.2, height, 6.2}; Bevel: {front_left: 0.2, front_right: 0.2, back_left: 0.2, back_right: 0.2, segments: 1}; texture.Mapping: {mode: MappingObject, size: 25.6}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: variant % 8 / 8.0, offset_y: floors % 2 / 16.0 + variant % 13 / 8.0} }
     for f in 0..floors {
       const y = 1.2 + f * 3.2
       const w = 8.8 - f * 0.23

@@ -11,7 +11,7 @@ $ {
 
 // A baked room on the left next to an exterior on the right, both under the environment
 // sky.hdr, which the first view draws as the background. The room is a `Scene` with
-// `LightBake`, open toward the camera and lit only by a warm point light inside; the exterior is
+// `Bake`, open toward the camera and lit only by a warm point light inside; the exterior is
 // a `Scene` without one, lit only by the environment. The irradiance grid wins in the room: its
 // floor, walls and white box are lit warm by the lamp and its bounce, and the outer faces of its
 // walls are black, not blue from the sky, because the captures see the black hemisphere ambient
@@ -21,7 +21,7 @@ $ {
 // brown ground.
 room {
   Scene: {baked: true, environment: true}
-  LightBake: {probe_spacing: 0.5, bounces: 1, bounds_padding: 0.5}
+  Bake: {probe_spacing: 0.5, bounces: 1, bounds_padding: 0.5}
   AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
 
   darkness {

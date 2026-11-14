@@ -141,7 +141,7 @@ assets {
     plate : HullPlate {
       Position: {0, 0, 0}
       HullPatch: {s0: s0, s1: s1, t0: t0, t1: t1, lift: -0.02, origin: {hub.x, hub.y, hub.z}}
-      TextureTransform: {scale_x: 1, scale_y: 1}
+      texture.Transform: {scale_x: 1, scale_y: 1}
       Rgb: {110, 106, 94}
       Ignore
     }
