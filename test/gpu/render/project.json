@@ -1554,6 +1554,7 @@
                 "id": "TextureCoordNodes",
                 "testcases": [
                     "identity_plane",
+                    "zero_scale",
                     "identity_sphere",
                     "warp_constant_plane",
                     "warp_sphere_unit",
@@ -1580,6 +1581,7 @@
                 "id": "TextureGraphCache",
                 "testcases": [
                     "animated_changes",
+                    "time_zero_scale_still",
                     "rate_limits_updates",
                     "undrawn_skips_update",
                     "downstream_edit_keeps_upstream",
@@ -1625,6 +1627,7 @@
                 "id": "TextureNodesNoise",
                 "testcases": [
                     "range_mean_plane",
+                    "zero_gain_first_octave",
                     "range_mean_sphere",
                     "tiles_plane",
                     "tiles_plane_rounded",
@@ -1661,6 +1664,7 @@
                 "id": "TextureGraphNormal",
                 "testcases": [
                     "normal_plane_slope",
+                    "zero_strength_flat",
                     "normal_sphere_slope",
                     "slope_plane_sphere",
                     "normal_matches_gen",

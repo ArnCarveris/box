@@ -119,16 +119,16 @@ fn box_texgraph_sphere_position(d: vec3f) -> vec2f {
 }
 
 // Differences of a materialized scalar input around a texel as GenNormal takes them: (east -
-// west, south - north) of its neighbours, times strength (1 when not above 0) and the width over
-// 512, so the slope does not depend on the size. On the plane the neighbours are the adjacent texels,
-// wrapped. On the sphere they lie on the great circles through the texel toward east (growing
-// u) and north (shrinking v), one texel of the equator away, read between texels: the spacing
-// along a row follows the latitude, the longitude wraps and the poles are crossed. east and
-// north point along the UV tangents of a Sphere mesh, at unit length: a normal map scales them
-// with box_texgraph_normal_scale.
+// west, south - north) of its neighbours, times strength and the width over 512, so the slope
+// does not depend on the size. On the plane the neighbours are the adjacent texels, wrapped.
+// On the sphere they lie on the great circles through the texel toward east (growing u) and
+// north (shrinking v), one texel of the equator away, read between texels: the spacing along a
+// row follows the latitude, the longitude wraps and the poles are crossed. east and north point
+// along the UV tangents of a Sphere mesh, at unit length: a normal map scales them with
+// box_texgraph_normal_scale.
 fn box_texgraph_gradient(t: texture_2d<f32>, texel: vec2i, strength: f32) -> vec2f {
     let size = vec2f(box_texgraph_stage.size);
-    let scale = select(1.0, strength, strength > 0.0) * size.x / 512.0;
+    let scale = strength * size.x / 512.0;
     if (box_texgraph_stage.domain == 1u) {
         let uv = (vec2f(texel) + 0.5) / size;
         let phi = (uv.x - 0.5) * 2.0 * BOX_TEXGRAPH_PI;

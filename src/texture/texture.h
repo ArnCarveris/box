@@ -87,7 +87,8 @@ typedef struct box_texture_node_kind_t {
     char *function;             /**< Name of the WGSL function */
     char *source;               /**< WGSL source of the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-                                 *   BOX_TEXTURE_NODE_PLANE, BOX_TEXTURE_NODE_SAMPLES */
+                                 *   BOX_TEXTURE_NODE_TIME_SCALE, BOX_TEXTURE_NODE_PLANE,
+                                 *   BOX_TEXTURE_NODE_SAMPLES */
     int32_t passes;             /**< Passes of the function, from 1 */
     char *texture;              /**< Member of the texture entity a node samples, NULL for
                                  *   none */
@@ -346,7 +347,7 @@ void box_texture_gen_albedo(
  * @param height The heights row by row from the top
  * @param width Width in pixels
  * @param h Height in pixels
- * @param strength Steepness, see TextureGen.strength; 0 for 1
+ * @param strength Steepness, see TextureGen.strength, 0 for flat
  * @param rgba Receives four bytes per pixel, (128, 128, 255, 255) where flat
  */
 void box_texture_gen_normal(

@@ -237,9 +237,9 @@ ECS_STRUCT(TextureGen, {
     int32_t palette_layer;          /**< Layer of the height field (of the source with one)
                                      *   whose tone picks the palette color, default 0; it must
                                      *   exist and not be GenNoise */
-    float strength;                 /**< Steepness of GenNormal, default 1: the slope is strength
-                                     *   times the change of height per pixel of a 512 pixel wide
-                                     *   texture, whatever its size */
+    float strength;                 /**< Steepness of GenNormal, 1 when added, 0 for flat:
+                                     *   strength times the change of height per pixel of a 512
+                                     *   pixel wide texture, whatever its size */
 });
 
 /** Coordinates a TextureGraph is evaluated over, which TexCoords outputs */
@@ -318,14 +318,15 @@ ECS_STRUCT(TexConstant, {
 /** Node of a TextureGraph whose value is the coordinates of the texel in the domain of the
  * graph, see TextureGraphDomain */
 ECS_STRUCT(TexCoords, {
-    float scale; /**< Factor of the coordinates, 0 for 1 */
+    float scale; /**< Factor of the coordinates, 1 when the component is added */
 });
 
 /** Node of a TextureGraph whose scalar value is the world time: the seconds of the world clock
- * times scale plus offset, so a paused world shows the same image. It makes the nodes after it
- * and their graph animated, see TextureGraph.rate */
+ * times scale plus offset, so a paused world shows the same image. Unless its scale is 0, it
+ * makes the nodes after it and their graph animated, see TextureGraph.rate */
 ECS_STRUCT(TexTime, {
-    float scale;  /**< Factor of the seconds, 0 for 1 */
+    float scale;  /**< Factor of the seconds, 1 when the component is added; 0 for a constant
+                   *   offset */
     float offset; /**< Added after the factor */
 });
 
@@ -637,8 +638,8 @@ ECS_STRUCT(TexTransform, {
     vec3 axis;            /**< DomainSphere: axis of the rotation, normalized; 0 for +y, the
                            *   poles. Ignored on DomainPlane */
     vec3 translate;       /**< Added to the coordinates after scale and rotation */
-    vec3 scale;           /**< Factor of the coordinates about the centre, a 0 component for 1;
-                           *   whole numbers keep the plane tiling */
+    vec3 scale;           /**< Factor of the coordinates about the centre, {1, 1, 1} when the
+                           *   component is added; whole numbers keep the plane tiling */
 });
 
 /** Most keys of a TexRamp */
@@ -709,13 +710,16 @@ ECS_STRUCT(TexCurve, {
 ECS_STRUCT(TexBlocks, {
     ecs_entity_t coords;    /**< Vector input node of the (u, v) the blocks are evaluated at, 0
                              *   for the coordinates of the domain */
-    int32_t courses;        /**< Courses down the texture, default 8 */
-    int32_t per_course;     /**< Blocks along a course, default 4 */
+    int32_t courses;        /**< Courses down the texture, 8 when the component is added, at
+                             *   least 1 */
+    int32_t per_course;     /**< Blocks along a course, 4 when the component is added, at
+                             *   least 1 */
     float gap;              /**< Width of the joints as a fraction of the width */
     float jitter;           /**< Random shift of each cut, up to +-jitter blocks */
     float stagger;          /**< Shift of every second course in blocks */
     float softness;         /**< Width of the bevel from a joint to the face as a fraction of the
-                             *   width, default 1.3 times gap; with neither a hard edge */
+                             *   width, 0 for a hard edge; below 0 for 1.3 times gap, -1 when
+                             *   the component is added */
     int32_t tones;          /**< Number of tones a block takes, 0 for none */
     TextureGenToneOrder tone_order; /**< Order of the tones, default GenToneRandom */
     int32_t seed;           /**< Seed, as TextureGen.seed */
@@ -753,12 +757,14 @@ ECS_ENUM(TextureCellsDistance, {
  */
 ECS_STRUCT(TexCells, {
     TextureCellsDistance distance; /**< What x measures, default CellsNearest */
-    int32_t count;      /**< Approximate number of cells over the domain, 0 for 64 */
+    int32_t count;      /**< Approximate number of cells over the domain, 64 when the
+                         *   component is added, at least 1 */
     float jitter;       /**< Random shift of the points, 0 for a regular lattice with the
                          *   points at the cell centers to 1 for anywhere in their cell; 1
                          *   when the component is added */
     int32_t seed;       /**< Seed of the points and the random values of the cells */
-    float edge;         /**< Width of the smoothstep of CellsEdge in cell sizes, 0 for 0.25 */
+    float edge;         /**< Width of the smoothstep of CellsEdge in cell sizes, 0.25 when the
+                         *   component is added; 0 for a hard step */
     ecs_entity_t coords; /**< Vector input node of the coordinates, 0 for the coordinates of
                           *   the texel in the domain */
     ecs_entity_t evolve; /**< Scalar input node that moves the points, 0 for evolve_value */
@@ -815,15 +821,20 @@ ECS_STRUCT(TexNoise, {
                                  *   texel in the domain of the graph */
     ecs_entity_t evolve;        /**< Scalar node of the fourth coordinate, such as a time, in
                                  *   lattice cells of the first octave, 0 for none */
-    float frequency;            /**< Lattice cells per unit of coords in the first octave,
-                                 *   default 4; on the plane rounded to whole cells across */
-    int32_t octaves;            /**< Octaves of the fractal, default 1, at most 16 */
-    float lacunarity;           /**< Frequency factor from one octave to the next, default 2 */
-    float gain;                 /**< Amplitude factor from one octave to the next, default 0.5 */
+    float frequency;            /**< Lattice cells per unit of coords in the first octave, 4
+                                 *   when added; on the plane rounded to whole cells across, at
+                                 *   least 1, and 0 makes the octave constant */
+    int32_t octaves;            /**< Octaves of the fractal, 1 when the component is added,
+                                 *   1 to 16 */
+    float lacunarity;           /**< Frequency factor from one octave to the next, 2 when the
+                                 *   component is added */
+    float gain;                 /**< Amplitude factor from one octave to the next, 0.5 when
+                                 *   the component is added; 0 for the first octave only */
     int32_t seed;               /**< Seed of the lattice */
     TextureNoiseFractal fractal; /**< Sum of the octaves, default NoiseFbm */
-    float offset;               /**< NoiseRidged: value the ridge reaches, 0 for 1; a lower
-                                 *   offset makes the ridges sharper and the valleys wider */
+    float offset;               /**< NoiseRidged: value the ridge reaches, 1 when the component
+                                 *   is added; a lower offset makes the ridges sharper and the
+                                 *   valleys wider */
     int32_t channels;           /**< 1 for a Scalar, the default, 3 or 4 for a Vector */
 });
 
@@ -900,7 +911,8 @@ ECS_STRUCT(TexLut, {
 ECS_STRUCT(TexNormal, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: flat */
     float height_value;  /**< Value of height without a node */
-    float strength;      /**< Steepness, 1 when not above 0, as TextureGen.strength */
+    float strength;      /**< Steepness, 1 when the component is added, 0 for flat, as
+                          *   TextureGen.strength */
 });
 
 /** Node of a TextureGraph whose Scalar value is the magnitude of the gradient of a Scalar
@@ -912,7 +924,8 @@ ECS_STRUCT(TexNormal, {
 ECS_STRUCT(TexSlope, {
     ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
     float height_value;  /**< Value of height without a node */
-    float strength;      /**< Factor of the differences, 1 when not above 0, as TexNormal.strength */
+    float strength;      /**< Factor of the differences, 1 when the component is added, 0 for
+                          *   a slope of 0, as TexNormal.strength */
 });
 
 /** Most inputs of a node kind */
@@ -939,6 +952,10 @@ ECS_STRUCT(TexSlope, {
 /** Flag of a node kind that samples a texture entity, set by box_texture_node_register for a
  * kind with a texture member (box_texture_node_desc_t.texture) */
 #define BOX_TEXTURE_NODE_SAMPLES (1u << 3)
+
+/** Flag of an animated node kind whose first parameter is an f32 factor of the time: a node
+ * whose factor is 0 does not depend on time and is not animated */
+#define BOX_TEXTURE_NODE_TIME_SCALE (1u << 4)
 
 /** Most passes of a node kind */
 #define BOX_TEXTURE_NODE_PASSES (4)
@@ -1089,7 +1106,7 @@ typedef struct box_texture_node_desc_t {
     const char *function;       /**< Name of the WGSL function */
     const char *source;         /**< WGSL source that defines the function */
     uint32_t flags;             /**< BOX_TEXTURE_NODE_NEIGHBOURHOOD, BOX_TEXTURE_NODE_ANIMATED,
-                                 *   BOX_TEXTURE_NODE_PLANE */
+                                 *   BOX_TEXTURE_NODE_TIME_SCALE, BOX_TEXTURE_NODE_PLANE */
     int32_t passes;             /**< Passes of the function, 0 for 1, at most
                                  *   BOX_TEXTURE_NODE_PASSES; more than one makes the kind a
                                  *   neighbourhood kind */

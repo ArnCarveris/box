@@ -25,6 +25,9 @@
 /** A rocky world and a gas giant whose maps are graphs on the sphere domain, as templates */
 #define GRAPH_PLANET "test/assets/textures/graph/planet.flecs"
 
+/** Node literals that leave members out */
+#define GRAPH_DEFAULTS "test/assets/textures/graph/defaults.flecs"
+
 /** Node of a scalar kind registered by the tests, as an application registers its own */
 typedef struct TestScalar {
     float value;        /**< Parameter */
@@ -587,7 +590,7 @@ void TextureGraph_cells_kind(void) {
     ecs_add(world, node, TexCells);
     const TexCells *cells = ecs_get(world, node, TexCells);
     test_flt(cells->jitter, 1);
-    test_int(cells->count, 0);
+    test_int(cells->count, 64);
     test_int(cells->distance, CellsNearest);
 
     TexCells *mut = ecs_get_mut(world, node, TexCells);
@@ -2755,6 +2758,79 @@ void TextureGraph_planet_props_keep_structure(void) {
 
     test_assert(ecs_is_alive(world, relief));
     test_assert(ecs_lookup(world, "earth.relief") == relief);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_node_ctor_defaults(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, TexCoords);
+    ecs_add(world, e, TexTime);
+    ecs_add(world, e, TexTransform);
+    ecs_add(world, e, TexNormal);
+    ecs_add(world, e, TexSlope);
+    ecs_add(world, e, TexNoise);
+    ecs_add(world, e, TexCells);
+
+    test_flt(ecs_get(world, e, TexCoords)->scale, 1);
+    test_flt(ecs_get(world, e, TexTime)->scale, 1);
+    test_flt(ecs_get(world, e, TexTime)->offset, 0);
+    const TexTransform *transform = ecs_get(world, e, TexTransform);
+    test_flt(transform->scale[0], 1);
+    test_flt(transform->scale[1], 1);
+    test_flt(transform->scale[2], 1);
+    test_flt(ecs_get(world, e, TexNormal)->strength, 1);
+    test_flt(ecs_get(world, e, TexSlope)->strength, 1);
+    const TexNoise *noise = ecs_get(world, e, TexNoise);
+    test_flt(noise->frequency, 4);
+    test_int(noise->octaves, 1);
+    test_flt(noise->lacunarity, 2);
+    test_flt(noise->gain, 0.5f);
+    test_flt(noise->offset, 1);
+    const TexCells *cells = ecs_get(world, e, TexCells);
+    test_int(cells->count, 64);
+    test_flt(cells->jitter, 1);
+    test_flt(cells->edge, 0.25f);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_script_member_default(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    run_file(world, GRAPH_DEFAULTS);
+    ecs_entity_t uv = ecs_lookup(world, "defaults.uv");
+    ecs_entity_t time = ecs_lookup(world, "defaults.time");
+    ecs_entity_t moved = ecs_lookup(world, "defaults.moved");
+    ecs_entity_t noise = ecs_lookup(world, "defaults.noise");
+    ecs_entity_t cells = ecs_lookup(world, "defaults.cells");
+    ecs_entity_t normal = ecs_lookup(world, "defaults.normal");
+    ecs_entity_t slope = ecs_lookup(world, "defaults.slope");
+    test_assert(uv && time && moved && noise && cells && normal && slope);
+
+    test_flt(ecs_get(world, uv, TexCoords)->scale, 1);
+    test_flt(ecs_get(world, time, TexTime)->scale, 1);
+    test_flt(ecs_get(world, time, TexTime)->offset, 3);
+    const TexTransform *transform = ecs_get(world, moved, TexTransform);
+    test_assert(transform->coords == uv);
+    test_flt(transform->scale[0], 1);
+    test_flt(transform->scale[1], 1);
+    test_flt(transform->scale[2], 1);
+    const TexNoise *n = ecs_get(world, noise, TexNoise);
+    test_int(n->seed, 2);
+    test_flt(n->frequency, 4);
+    test_flt(n->lacunarity, 2);
+    test_flt(n->gain, 0.5f);
+    test_flt(n->offset, 1);
+    const TexCells *c = ecs_get(world, cells, TexCells);
+    test_int(c->seed, 4);
+    test_int(c->count, 64);
+    test_flt(c->jitter, 1);
+    test_flt(c->edge, 0.25f);
+    test_flt(ecs_get(world, normal, TexNormal)->strength, 1);
+    test_flt(ecs_get(world, slope, TexSlope)->strength, 1);
 
     ecs_fini(world);
 }

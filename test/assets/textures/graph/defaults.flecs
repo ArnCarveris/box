@@ -1,0 +1,14 @@
+// Nodes whose literals leave members out, which keep the defaults of their components.
+
+using box.texture
+
+defaults {
+  uv { nodes.Coords: {} }
+  time { nodes.Time: {offset: 3} }
+  moved { nodes.Transform: {coords: uv} }
+  noise { nodes.Noise: {coords: moved, seed: 2} }
+  cells { nodes.Cells: {seed: 4} }
+  normal { nodes.Normal: {height: noise} }
+  slope { nodes.Slope: {height: noise} }
+  Graph: {output: normal, width: 16, height: 16, format: GraphLinear}
+}

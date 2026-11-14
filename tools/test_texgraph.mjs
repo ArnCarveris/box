@@ -172,6 +172,23 @@ test("values serialize to flecs script", () => {
     ["vector", key], ref), "[{color: {10, 20, 30}}, {position: 1, color: {255, 255, 255}}]");
 });
 
+test("node members write zero where their default is not zero and leave out the default", () => {
+  const ref = (p) => p;
+  const coords = { scale: ["float"] };
+  const vec3 = { x: ["float"], y: ["float"], z: ["float"] };
+  const transform = { coords: ["entity"], angle_value: ["float"], scale: vec3 };
+  const time = { scale: ["float"], offset: ["float"] };
+  assert.equal(M.scriptValue({ scale: 0 }, coords, ref, M.nodeDefaults[N + "Coords"]), "{scale: 0}");
+  assert.equal(M.scriptValue({ scale: 1 }, coords, ref, M.nodeDefaults[N + "Coords"]), "{}");
+  assert.equal(M.scriptValue({ scale: 0, offset: 3 }, time, ref, M.nodeDefaults[N + "Time"]),
+    "{scale: 0, offset: 3}");
+  assert.equal(M.scriptValue({ coords: 0, angle_value: 0, scale: { x: 1, y: 1, z: 1 } }, transform, ref,
+    M.nodeDefaults[N + "Transform"]), "{}");
+  assert.equal(M.scriptValue({ coords: 0, angle_value: 90, scale: { x: 0, y: 1, z: 1 } }, transform, ref,
+    M.nodeDefaults[N + "Transform"]), "{angle_value: 90, scale: {0, 1, 1}}");
+  assert.equal(M.scriptValue({ scale: 0 }, null, ref, M.nodeDefaults[N + "Coords"]), "{scale: 0}");
+});
+
 test("new nodes get a name no entity has", () => {
   const s = world();
   s.nodes["scene.tiles.mix_1"] = s.nodes["scene.tiles.blend"];

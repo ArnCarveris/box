@@ -194,9 +194,32 @@
     return String(+v.toPrecision(7));
   };
 
-  // A value in flecs script syntax, members that are zero left out of structs. ref maps an
-  // entity path to the name the script uses for it.
-  M.scriptValue = (v, ti, ref) => {
+  // The members of node components whose ctor gives them a value other than zero. A script that
+  // leaves such a member out gets that value, so the script writes them when they differ from it,
+  // zero included.
+  M.nodeDefaults = {
+    [TEX + "nodes.Coords"]: { scale: 1 },
+    [TEX + "nodes.Time"]: { scale: 1 },
+    [TEX + "nodes.Transform"]: { scale: { x: 1, y: 1, z: 1 } },
+    [TEX + "nodes.Normal"]: { strength: 1 },
+    [TEX + "nodes.Slope"]: { strength: 1 },
+    [TEX + "nodes.Noise"]: { frequency: 4, octaves: 1, lacunarity: 2, gain: 0.5, offset: 1, channels: 1 },
+    [TEX + "nodes.Blocks"]: { courses: 8, per_course: 4, softness: -1 },
+    [TEX + "nodes.Cells"]: { count: 64, jitter: 1, edge: 0.25 },
+  };
+
+  // Whether a member value equals its default value.
+  M.sameValue = (v, d) => {
+    if (d && typeof d === "object") {
+      return Object.keys(d).every((k) => M.sameValue((v || {})[k], d[k]));
+    }
+    return (v === undefined || v === null ? 0 : v) === d;
+  };
+
+  // A value in flecs script syntax, members that are zero left out of structs, or with defaults
+  // (M.nodeDefaults of the component) members equal to their default. ref maps an entity path to
+  // the name the script uses for it.
+  M.scriptValue = (v, ti, ref, defaults) => {
     const kind = Array.isArray(ti) ? ti[0] : (ti && typeof ti === "object" ? "struct" : null);
     if (kind === "entity") return M.isNone(v) ? "0" : ref(v);
     if (kind === "enum" || kind === "bitmask") return String(v);
@@ -210,18 +233,25 @@
       const keys = Object.keys(ti).filter((k) => k !== "@self");
       const flat = ["x,y", "x,y,z", "x,y,z,w", "r,g,b", "r,g,b,a"].includes(keys.join()) &&
         keys.every((k) => Array.isArray(ti[k]) && ["float", "int", "byte"].includes(ti[k][0]));
-      if (flat && !M.isZero(v, ti)) return "{" + keys.map((k) => M.num((v || {})[k] || 0)).join(", ") + "}";
+      if (flat && (defaults || !M.isZero(v, ti))) {
+        return "{" + keys.map((k) => M.num((v || {})[k] || 0)).join(", ") + "}";
+      }
       const parts = [];
       for (const k of keys) {
-        if (M.isZero((v || {})[k], ti[k])) continue;
-        parts.push(`${k}: ${M.scriptValue(v[k], ti[k], ref)}`);
+        const d = defaults ? defaults[k] : undefined;
+        if (d === undefined ? M.isZero((v || {})[k], ti[k]) : M.sameValue((v || {})[k], d)) continue;
+        parts.push(`${k}: ${M.scriptValue((v || {})[k], ti[k], ref, d && typeof d === "object" ? d : undefined)}`);
       }
       return "{" + parts.join(", ") + "}";
     }
     if (Array.isArray(v)) return "[" + v.map((x) => M.scriptValue(x, null, ref)).join(", ") + "]";
     if (v && typeof v === "object") {
       const parts = [];
-      for (const k in v) if (!M.isZero(v[k])) parts.push(`${k}: ${M.scriptValue(v[k], null, ref)}`);
+      for (const k in v) {
+        const d = defaults ? defaults[k] : undefined;
+        if (d === undefined ? M.isZero(v[k]) : M.sameValue(v[k], d)) continue;
+        parts.push(`${k}: ${M.scriptValue(v[k], null, ref)}`);
+      }
       return "{" + parts.join(", ") + "}";
     }
     if (typeof v === "number") return M.num(v);
@@ -281,7 +311,8 @@
     const emit = (t, indent) => {
       for (const [name, child] of t.children) {
         const n = state.nodes[child.path];
-        const comps = n ? n.kinds.map((c) => `${M.scriptComp(c)}: ${M.scriptValue(n.values[c], state.types[c], ref)}`) : [];
+        const comps = n ? n.kinds.map((c) => `${M.scriptComp(c)}: ${M.scriptValue(n.values[c], state.types[c], ref,
+          M.nodeDefaults[c])}`) : [];
         if (!child.children.size && comps.length <= 1) {
           lines.push(comps.length ? `${indent}${name} { ${comps[0]} }` : `${indent}${name} {}`);
           continue;

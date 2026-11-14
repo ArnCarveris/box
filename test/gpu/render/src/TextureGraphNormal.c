@@ -342,7 +342,7 @@ static ecs_entity_t tn_height(
 {
     ecs_entity_t coords = ecs_new(world);
     ecs_entity_t height = ecs_new(world);
-    ecs_set(world, coords, TexCoords, {0});
+    ecs_set(world, coords, TexCoords, {.scale = 1});
     if (weights) {
         TnDot d = {.weights = {weights[0], weights[1], weights[2], weights[3]}, .in = coords};
         ecs_set_id(world, height, kind, ECS_SIZEOF(TnDot), &d);
@@ -466,7 +466,7 @@ static double tn_world_distance(
  * @param y Row
  * @param width Width of the image
  * @param height Height of the image
- * @param strength Strength, 0 for 1
+ * @param strength Strength
  * @param dx Receives the difference east - west
  * @param dy Receives the difference south - north
  */
@@ -481,7 +481,7 @@ static void tn_sphere_differences(
     double *dy)
 {
     double p[3], east[3], north[3];
-    double scale = (strength != 0 ? strength : 1.0) * width / 512.0;
+    double scale = strength * width / 512.0;
     double step = 2.0 * sin(2.0 * TN_PI / width);
     tn_sphere_frame(x, y, width, height, p, east, north);
     *dx = tn_dot3(k, east) * step * scale;
@@ -497,7 +497,7 @@ static void tn_sphere_differences(
  * @param y Row
  * @param width Width of the image
  * @param height Height of the image
- * @param strength Strength, 0 for 1
+ * @param strength Strength
  * @param dx Receives the stored difference along u
  * @param dy Receives the stored difference down the image
  */
@@ -563,12 +563,12 @@ void TextureGraphNormal_normal_sphere_slope(void) {
     double dx, dy;
     tn_register(world, &dot, &wave);
     ecs_entity_t height = tn_height(world, dot, weights);
-    ecs_entity_t tex = tn_graph(world, height, false, 0, w, h, DomainSphere, &node);
+    ecs_entity_t tex = tn_graph(world, height, false, 1, w, h, DomainSphere, &node);
     tn_wait(world, tex);
     float *texels = tn_read(world, tex, 0, w, h);
     for (y = 0; y < h; y ++) {
         for (x = 0; x < w; x ++) {
-            tn_sphere_normal_differences(k, x, y, w, h, 0, &dx, &dy);
+            tn_sphere_normal_differences(k, x, y, w, h, 1, &dx, &dy);
             tn_expect_normal(texels, w, x, y, dx, dy, 0.012);
         }
     }
@@ -578,7 +578,7 @@ void TextureGraphNormal_normal_sphere_slope(void) {
             double p[3], east[3], north[3], n[3], expect[3], len;
             int32_t c;
             tn_sphere_frame(x, y, w, h, p, east, north);
-            tn_sphere_differences(k, x, y, w, h, 0, &dx, &dy);
+            tn_sphere_differences(k, x, y, w, h, 1, &dx, &dy);
             for (c = 0; c < 3; c ++) {
                 expect[c] = -dx * east[c] + dy * north[c] + p[c];
             }
@@ -615,7 +615,7 @@ void TextureGraphNormal_slope_plane_sphere(void) {
     ecs_entity_t coords = ecs_new(world);
     ecs_entity_t scaled = ecs_new(world);
     ecs_entity_t channel = ecs_new(world);
-    ecs_set(world, coords, TexCoords, {0});
+    ecs_set(world, coords, TexCoords, {.scale = 1});
     ecs_set(world, scaled, TexMultiply, {.a = coords,
         .b_value = {0, 48, 0, 0}});
     ecs_set(world, channel, TexSplit, {.input = scaled, .channel = ChannelG});
@@ -632,12 +632,12 @@ void TextureGraphNormal_slope_plane_sphere(void) {
     ecs_os_free(texels);
 
     ecs_entity_t height = tn_height(world, dot, weights);
-    tex = tn_graph(world, height, true, 0, 128, 64, DomainSphere, &node);
+    tex = tn_graph(world, height, true, 1, 128, 64, DomainSphere, &node);
     tn_wait(world, tex);
     texels = tn_read(world, tex, 0, 128, 64);
     for (y = 0; y < 64; y ++) {
         for (x = 0; x < 128; x ++) {
-            tn_sphere_differences(k, x, y, 128, 64, 0, &dx, &dy);
+            tn_sphere_differences(k, x, y, 128, 64, 1, &dx, &dy);
             tn_expect(texels, 128, x, y, 0, sqrt(dx * dx + dy * dy), 0.02);
         }
     }
@@ -654,7 +654,7 @@ void TextureGraphNormal_normal_matches_gen(void) {
     ecs_world_t *world = tn_world();
     ecs_entity_t dot, wave, node;
     int32_t i, s, x, y, c, w = 64, h = 32;
-    float strengths[] = {24, -3}; /* GenNormal takes a strength not above 0 as 1 */
+    float strengths[] = {24, -3};
     tn_register(world, &dot, &wave);
     ecs_entity_t height = tn_height(world, wave, NULL);
     for (s = 0; s < 2; s ++) {
@@ -736,5 +736,37 @@ void TextureGraphNormal_normal_sphere_seam_poles(void) {
     }
 
     ecs_os_free(texels);
+    ecs_fini(world);
+}
+
+/** Strength 0 means no relief: a TexNormal of a sloped height is the flat normal (0.5, 0.5, 1,
+ * 1) and its TexSlope is 0, on the plane and on the sphere. */
+void TextureGraphNormal_zero_strength_flat(void) {
+    // textures/graph
+    ecs_world_t *world = tn_world();
+    ecs_entity_t dot, wave, node;
+    const float weights[4] = {12, 8, -16, 0.5f};
+    int32_t d, x, y, w = 32, h = 16;
+    const TextureGraphDomain domains[2] = {DomainPlane, DomainSphere};
+    tn_register(world, &dot, &wave);
+    for (d = 0; d < 2; d ++) {
+        ecs_entity_t height = tn_height(world, dot, weights);
+        ecs_entity_t tex = tn_graph(world, height, false, 0, w, h, domains[d], &node);
+        ecs_entity_t slope_tex = tn_graph(world, height, true, 0, w, h, domains[d], &node);
+        tn_wait(world, tex);
+        tn_wait(world, slope_tex);
+        float *normals = tn_read(world, tex, 0, w, h);
+        float *slopes = tn_read(world, slope_tex, 0, w, h);
+        for (y = 0; y < h; y ++) {
+            for (x = 0; x < w; x ++) {
+                tn_expect_normal(normals, w, x, y, 0, 0, TN_TOLERANCE_8);
+                tn_expect(slopes, w, x, y, 0, 0, 1e-4);
+            }
+        }
+
+        ecs_os_free(slopes);
+        ecs_os_free(normals);
+    }
+
     ecs_fini(world);
 }

@@ -642,7 +642,7 @@ void box_texture_gen_normal(
     float strength,
     uint8_t *rgba)
 {
-    double scale = (strength > 0 ? strength : 1.0) * width / BOX_GEN_STRENGTH_WIDTH;
+    double scale = (double)strength * width / BOX_GEN_STRENGTH_WIDTH;
     int32_t x, y;
     for (y = 0; y < h; y ++) {
         const float *row = &height[y * width];

@@ -14,8 +14,7 @@ static const char *box_texture_constant_wgsl =
 /** WGSL of the TexCoords node: the coordinates times its scale */
 static const char *box_texture_coords_wgsl =
     "fn box_tex_coords(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let scale = bitcast<f32>(p[0].x);\n"
-    "    return vec4f(coords.xyz * select(scale, 1.0, scale == 0.0), coords.w);\n"
+    "    return vec4f(coords.xyz * bitcast<f32>(p[0].x), coords.w);\n"
     "}\n";
 
 /** WGSL of the TexBlur node: a gaussian along x in pass 0, along y in pass 1, normalized by
@@ -118,13 +117,11 @@ static const char *box_texture_cells_wgsl =
     "}\n"
     "\n"
     "fn box_tex_cells(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
-    "    let count_param = bitcast<i32>(p[0].x);\n"
-    "    let count = f32(select(count_param, 64, count_param <= 0));\n"
+    "    let count = f32(max(bitcast<i32>(p[0].x), 1));\n"
     "    let jitter = clamp(bitcast<f32>(p[0].y), 0.0, 1.0);\n"
     "    let seed = p[0].z;\n"
     "    let mode = bitcast<i32>(p[0].w);\n"
-    "    let edge_param = bitcast<f32>(p[1].x);\n"
-    "    let edge = select(edge_param, 0.25, edge_param <= 0.0);\n"
+    "    let edge = bitcast<f32>(p[1].x);\n"
     "    let evolve = i[1].x;\n"
     "    var q = vec3f(0.0);\n"
     "    var period = vec3i(0);\n"
@@ -184,7 +181,11 @@ static const char *box_texture_cells_wgsl =
     "    if (mode == 1) {\n"
     "        d = f2;\n"
     "    } else if (mode == 2) {\n"
-    "        d = smoothstep(0.0, edge, f2 - f1);\n"
+    "        if (edge > 0.0) {\n"
+    "            d = smoothstep(0.0, edge, f2 - f1);\n"
+    "        } else {\n"
+    "            d = select(0.0, 1.0, f2 - f1 > 0.0);\n"
+    "        }\n"
     "    }\n"
     "\n"
     "    return vec4f(d, box_tex_cells_random(near, 6u), box_tex_cells_random(near, 7u),\n"
@@ -227,8 +228,8 @@ static const char *box_texture_blocks_wgsl =
     "fn box_tex_blocks(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    let counts = bitcast<vec4i>(p[0]);\n"
     "    let shape = bitcast<vec4f>(p[1]);\n"
-    "    let courses = select(min(counts.x, 4096), 8, counts.x <= 0);\n"
-    "    let n = select(min(counts.y, 4096), 4, counts.y <= 0);\n"
+    "    let courses = clamp(counts.x, 1, 4096);\n"
+    "    let n = clamp(counts.y, 1, 4096);\n"
     "    let tones = clamp(counts.z, 0, 4096);\n"
     "    let tone_order = counts.w;\n"
     "    let gap = shape.x;\n"
@@ -302,7 +303,7 @@ static const char *box_texture_blocks_wgsl =
     "    }\n"
     "    let d = min(min(u - start, end - u), dy);\n"
     "    let half = 0.5 * gap;\n"
-    "    let bevel = select(1.3 * gap, softness, softness > 0.0);\n"
+    "    let bevel = select(1.3 * gap, softness, softness >= 0.0);\n"
     "    var mask = select(0.0, 1.0, d >= half);\n"
     "    if (bevel > 0.0) {\n"
     "        mask = smoothstep(half, half + bevel, d);\n"
@@ -427,8 +428,7 @@ static const char *box_texture_transform_wgsl =
     "    let c = i[0];\n"
     "    let axis = bitcast<vec3f>(p[0].xyz);\n"
     "    let translate = bitcast<vec3f>(p[1].xyz);\n"
-    "    let factor = bitcast<vec3f>(p[2].xyz);\n"
-    "    let scale = select(factor, vec3f(1.0), factor == vec3f(0.0));\n"
+    "    let scale = bitcast<vec3f>(p[2].xyz);\n"
     "    let deg = i[1].x;\n"
     "    let quarter = round(deg / 90.0);\n"
     "    let k = ((i32(quarter) % 4) + 4) % 4;\n"
@@ -454,8 +454,7 @@ static const char *box_texture_time_wgsl =
     "fn box_tex_time(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f) -> vec4f {\n"
     "    let scale = bitcast<f32>(p[0].x);\n"
     "    let offset = bitcast<f32>(p[0].y);\n"
-    "    return vec4f(box_texgraph_stage.time * select(scale, 1.0, scale == 0.0) + offset, 0.0,\n"
-    "        0.0, 0.0);\n"
+    "    return vec4f(box_texgraph_stage.time * scale + offset, 0.0, 0.0, 0.0);\n"
     "}\n";
 
 /** WGSL of the TexSplat node: its scalar input in every channel */
@@ -655,7 +654,7 @@ static void box_texture_nodes_register_math(
         },
         .function = "box_tex_time",
         .source = box_texture_time_wgsl,
-        .flags = BOX_TEXTURE_NODE_ANIMATED
+        .flags = BOX_TEXTURE_NODE_ANIMATED | BOX_TEXTURE_NODE_TIME_SCALE
     });
 
     box_texture_node_register(world, &(box_texture_node_desc_t){

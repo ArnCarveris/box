@@ -1200,3 +1200,31 @@ void TextureGen_hash_blocks_tones(void) {
     // materials/textures
     test_hash(GEN_BLOCKS_TONES, "blocks_tones", 0xc39e2c64U);
 }
+
+void TextureGen_normal_zero_strength_flat(void) {
+    // materials/textures
+    float height[8 * 8];
+    uint8_t rgba[8 * 8 * 4];
+    int32_t x, y, i;
+    for (y = 0; y < 8; y ++) {
+        for (x = 0; x < 8; x ++) {
+            height[y * 8 + x] = x * 8.0f + y * 4.0f;
+        }
+    }
+
+    /* Strength 0 is no relief, not the default strength */
+    box_texture_gen_normal(height, 8, 8, 0, rgba);
+    for (i = 0; i < 8 * 8; i ++) {
+        test_int(rgba[i * 4 + 0], 128);
+        test_int(rgba[i * 4 + 1], 128);
+        test_int(rgba[i * 4 + 2], 255);
+        test_int(rgba[i * 4 + 3], 255);
+    }
+
+    /* The default strength comes from the component */
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex = ecs_new(world);
+    ecs_add(world, tex, TextureGen);
+    test_flt(ecs_get(world, tex, TextureGen)->strength, 1);
+    ecs_fini(world);
+}

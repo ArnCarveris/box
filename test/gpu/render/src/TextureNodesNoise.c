@@ -351,7 +351,8 @@ static void tn_range_in(
 {
     ecs_world_t *world = tn_world();
     int32_t w = 128, h = domain == DomainSphere ? 64 : 128;
-    TexNoise noise = {.frequency = 8, .octaves = 4, .seed = 1};
+    TexNoise noise = {.frequency = 8, .octaves = 4, .lacunarity = 2, .gain = 0.5f,
+        .seed = 1, .offset = 1};
     float *texels = tn_eval(world, &noise, w, h, domain);
     tn_stats_t s = tn_stats(texels, w * h, 0);
     int32_t i;
@@ -400,7 +401,7 @@ static void tn_tiles(
     for (k = 0; k < 2; k ++) {
         ecs_entity_t uv = ecs_new(world);
         ecs_entity_t moved = ecs_new(world);
-        ecs_set(world, uv, TexCoords, {0});
+        ecs_set(world, uv, TexCoords, {.scale = 1});
         ecs_set(world, moved, TexAdd, {.a = uv,
             .b_value = {shifts[k][0], shifts[k][1], shifts[k][2], shifts[k][3]}});
         TexNoise shifted = *noise;
@@ -437,14 +438,15 @@ static void tn_tiles(
 
 void TextureNodesNoise_tiles_plane(void) {
     // textures/graph/noise
-    TexNoise noise = {.frequency = 4, .octaves = 5, .seed = 2};
+    TexNoise noise = {.frequency = 4, .octaves = 5, .lacunarity = 2, .gain = 0.5f,
+        .seed = 2, .offset = 1};
     tn_tiles(&noise, 64, 64);
 }
 
 void TextureNodesNoise_tiles_plane_rounded(void) {
     // textures/graph/noise
     TexNoise noise = {.frequency = 3.3f, .octaves = 4, .lacunarity = 1.9f, .gain = 0.6f,
-        .seed = 5, .fractal = NoiseRidged};
+        .seed = 5, .fractal = NoiseRidged, .offset = 1};
     tn_tiles(&noise, 96, 48);
 }
 
@@ -455,7 +457,8 @@ void TextureNodesNoise_sphere_continuous(void) {
     // textures/graph/noise
     ecs_world_t *world = tn_world();
     int32_t w = 128, h = 64, x, y;
-    TexNoise noise = {.frequency = 2, .octaves = 3, .seed = 4};
+    TexNoise noise = {.frequency = 2, .octaves = 3, .lacunarity = 2, .gain = 0.5f,
+        .seed = 4, .offset = 1};
     float *texels = tn_eval(world, &noise, w, h, DomainSphere);
     float step_x = tn_neighbour_step(texels, w, h, 1, 0);
     float step_y = tn_neighbour_step(texels, w, h, 0, 1);
@@ -486,7 +489,8 @@ void TextureNodesNoise_same_seed_same_values(void) {
     // textures/graph/noise
     ecs_world_t *world = tn_world();
     int32_t w = 64, h = 32, i, c;
-    TexNoise noise = {.frequency = 5, .octaves = 3, .seed = 11, .fractal = NoiseBillow};
+    TexNoise noise = {.frequency = 5, .octaves = 3, .lacunarity = 2, .gain = 0.5f,
+        .seed = 11, .fractal = NoiseBillow, .offset = 1};
     float *a = tn_eval(world, &noise, w, h, DomainSphere);
     float *b = tn_eval(world, &noise, w, h, DomainSphere);
     for (i = 0; i < w * h; i ++) {
@@ -505,7 +509,8 @@ void TextureNodesNoise_seeds_uncorrelated(void) {
     // textures/graph/noise
     ecs_world_t *world = tn_world();
     int32_t w = 128, h = 128;
-    TexNoise noise = {.frequency = 16, .octaves = 1, .seed = 1};
+    TexNoise noise = {.frequency = 16, .octaves = 1, .lacunarity = 2, .gain = 0.5f,
+        .seed = 1, .offset = 1};
     float *a = tn_eval(world, &noise, w, h, DomainPlane);
     noise.seed = 2;
     float *b = tn_eval(world, &noise, w, h, DomainPlane);
@@ -528,7 +533,8 @@ void TextureNodesNoise_channels_uncorrelated(void) {
     // textures/graph/noise
     ecs_world_t *world = tn_world();
     int32_t w = 128, h = 128, i, j;
-    TexNoise noise = {.frequency = 16, .octaves = 2, .seed = 3, .channels = 4};
+    TexNoise noise = {.frequency = 16, .octaves = 2, .lacunarity = 2, .gain = 0.5f,
+        .seed = 3, .channels = 4, .offset = 1};
     float *v = tn_eval(world, &noise, w, h, DomainPlane);
     for (i = 0; i < 4; i ++) {
         tn_stats_t s = tn_stats(v, w * h, i);
@@ -566,7 +572,8 @@ static void tn_evolve_in(
     ecs_world_t *world = tn_world();
     ecs_entity_t scalar_c = tn_register_scalar(world);
     int32_t w = 64, h = domain == DomainSphere ? 32 : 64, i;
-    TexNoise noise = {.frequency = 4, .octaves = 4, .seed = 9};
+    TexNoise noise = {.frequency = 4, .octaves = 4, .lacunarity = 2, .gain = 0.5f,
+        .seed = 9, .offset = 1};
     float *still = tn_eval(world, &noise, w, h, domain);
     ecs_entity_t time = ecs_new(world);
     TnScalar t = {.value = 0};
@@ -630,7 +637,8 @@ void TextureNodesNoise_ridged_billow(void) {
     // textures/graph/noise
     ecs_world_t *world = tn_world();
     int32_t w = 128, h = 128, i;
-    TexNoise noise = {.frequency = 8, .octaves = 1, .seed = 6};
+    TexNoise noise = {.frequency = 8, .octaves = 1, .lacunarity = 2, .gain = 0.5f,
+        .seed = 6, .offset = 1};
     float *fbm = tn_eval(world, &noise, w, h, DomainPlane);
     noise.fractal = NoiseBillow;
     float *billow = tn_eval(world, &noise, w, h, DomainPlane);
@@ -685,7 +693,8 @@ void TextureNodesNoise_octaves_no_recompile(void) {
     int32_t w = 64, h = 64, i;
     box_render_gpu_stats_t before, after;
     ecs_entity_t node;
-    TexNoise noise = {.frequency = 4, .octaves = 1, .seed = 2};
+    TexNoise noise = {.frequency = 4, .octaves = 1, .lacunarity = 2, .gain = 0.5f,
+        .seed = 2, .offset = 1};
     ecs_entity_t tex = tn_graph(world, &noise, &node, w, h, DomainPlane);
     tn_wait(world, tex, 1);
     float *one = tn_read(world, tex, w, h);
@@ -713,5 +722,35 @@ void TextureNodesNoise_octaves_no_recompile(void) {
     test_assert(diff / (w * h) > 0.005);
     ecs_os_free(one);
     ecs_os_free(six);
+    ecs_fini(world);
+}
+
+/** Gain 0 leaves only the first octave: five octaves of gain 0 give the image of one octave, for
+ * every fractal. */
+void TextureNodesNoise_zero_gain_first_octave(void) {
+    // textures/graph/noise
+    ecs_world_t *world = tn_world();
+    int32_t w = 64, h = 64, i, f;
+    const TextureNoiseFractal fractals[3] = {NoiseFbm, NoiseBillow, NoiseRidged};
+    for (f = 0; f < 3; f ++) {
+        TexNoise noise = {.frequency = 8, .octaves = 1, .lacunarity = 2, .gain = 0.5f,
+            .seed = 5, .fractal = fractals[f], .offset = 1};
+        float *one = tn_eval(world, &noise, w, h, DomainPlane);
+        noise.octaves = 5;
+        noise.gain = 0;
+        float *five = tn_eval(world, &noise, w, h, DomainPlane);
+        for (i = 0; i < w * h; i ++) {
+            if (fabsf(five[i * 4] - one[i * 4]) > TN_TOLERANCE_16) {
+                printf("fractal %d texel %d: %f, expected %f\n", f, i, five[i * 4],
+                    one[i * 4]);
+            }
+
+            test_assert(fabsf(five[i * 4] - one[i * 4]) <= TN_TOLERANCE_16);
+        }
+
+        ecs_os_free(one);
+        ecs_os_free(five);
+    }
+
     ecs_fini(world);
 }

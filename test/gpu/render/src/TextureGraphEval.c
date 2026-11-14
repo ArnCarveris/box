@@ -348,7 +348,7 @@ static ecs_entity_t tg_scaled(
     ecs_entity_t uv = ecs_new(world);
     *constant = ecs_new(world);
     *math = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, *constant, TexConstant, {.value = {value[0], value[1], value[2], value[3]}});
     ecs_set(world, *math, TexMultiply, {.a = uv, .b = *constant});
     ecs_set(world, tex, TextureGraph, {.output = *math, .width = 8, .height = 8,
@@ -432,7 +432,7 @@ static void tg_coords_in(
     ecs_entity_t uv = ecs_new(world);
     int32_t x, y, w = 32, h = 16;
     float expect[4];
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, tex, TextureGraph, {.output = uv, .width = w, .height = h,
         .domain = domain, .format = GraphHdr});
     test_int(tg_wait(world, tex, 1)->state, TextureReady);
@@ -612,7 +612,7 @@ void TextureGraphEval_scalar_node_readback(void) {
     ecs_entity_t splat = ecs_new(world);
     TgScalar s = {.value = 2, .in = uv};
     TgSplat p = {.in = scalar};
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set_id(world, scalar, scalar_c, ECS_SIZEOF(TgScalar), &s);
     ecs_set_id(world, splat, splat_c, ECS_SIZEOF(TgSplat), &p);
     ecs_set(world, tex, TextureGraph, {.output = splat, .width = w, .height = h,
@@ -661,7 +661,7 @@ void TextureGraphEval_neighbourhood_materialized(void) {
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t shift = ecs_new(world);
     TgShift s = {.in = uv};
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set_id(world, shift, shift_c, ECS_SIZEOF(TgShift), &s);
     ecs_set(world, tex, TextureGraph, {.output = shift, .width = w, .height = h,
         .format = GraphHdr});
@@ -828,7 +828,7 @@ void TextureGraphEval_compile_failure_reports_node(void) {
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t broken = ecs_entity(world, { .name = "broken_node" });
     TgBroken bad = {.value = 1};
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set_id(world, broken, broken_c, ECS_SIZEOF(TgBroken), &bad);
     ecs_set(world, tex, TextureGraph, {.output = uv, .width = w, .height = h,
         .format = GraphHdr});
@@ -971,7 +971,8 @@ static ecs_entity_t tg_blocks(
 }
 
 /** Check the image of a TexBlocks node against the face mask, ids and tones of the GenBlocks
- * layer of the same parameters that TextureGen generates on the CPU.
+ * layer of the same parameters that TextureGen generates on the CPU. A softness below 0 is the
+ * softness 0 of the layer, 1.3 times the gap.
  *
  * @param blocks The node; its seed is the seed of the generator, layer_seed that of the layer
  * @param width Width
@@ -992,7 +993,7 @@ static void tg_blocks_match(
         .kind = GenBlocks, .seed = blocks->layer_seed, .tones = blocks->tones,
         .tone_order = blocks->tone_order, .courses = blocks->courses,
         .per_course = blocks->per_course, .gap = blocks->gap, .jitter = blocks->jitter,
-        .stagger = blocks->stagger, .softness = blocks->softness
+        .stagger = blocks->stagger, .softness = blocks->softness < 0 ? 0 : blocks->softness
     };
     float *value = ecs_os_malloc_n(float, count);
     float *id = ecs_os_malloc_n(float, count);
@@ -1028,7 +1029,7 @@ void TextureGraphEval_blocks_match_gen(void) {
     // textures/graph
     tg_blocks_match(&(TexBlocks){
         .courses = 8, .per_course = 4, .gap = 0.006f, .jitter = 0.22f, .stagger = 0.5f,
-        .seed = 11
+        .softness = -1, .seed = 11
     }, 128, 128);
 }
 
@@ -1049,7 +1050,7 @@ void TextureGraphEval_blocks_match_gen_tones(void) {
     for (o = 0; o < 4; o ++) {
         tg_blocks_match(&(TexBlocks){
             .courses = 4, .per_course = 4, .gap = 0.04f, .jitter = 0.2f, .stagger = 0.5f,
-            .tones = 3, .tone_order = orders[o], .seed = 5, .layer_seed = o
+            .softness = -1, .tones = 3, .tone_order = orders[o], .seed = 5, .layer_seed = o
         }, 64, 64);
     }
 }
@@ -1057,8 +1058,8 @@ void TextureGraphEval_blocks_match_gen_tones(void) {
 void TextureGraphEval_blocks_match_gen_hard(void) {
     // textures/graph
     tg_blocks_match(&(TexBlocks){
-        .courses = 3, .per_course = 2, .jitter = 0.6f, .stagger = 0.25f, .tones = 2,
-        .seed = 9
+        .courses = 3, .per_course = 2, .jitter = 0.6f, .stagger = 0.25f, .softness = -1,
+        .tones = 2, .seed = 9
     }, 64, 64);
 }
 
@@ -1069,13 +1070,15 @@ void TextureGraphEval_blocks_match_gen_wrap(void) {
     int32_t s;
     for (s = 0; s < 3; s ++) {
         tg_blocks_match(&(TexBlocks){
-            .courses = 8, .per_course = 2, .gap = 0.01f, .jitter = 0.5f, .seed = seeds[s]
+            .courses = 8, .per_course = 2, .gap = 0.01f, .jitter = 0.5f, .softness = -1,
+            .seed = seeds[s]
         }, 128, 128);
     }
 
     for (s = 0; s < 4; s ++) {
         tg_blocks_match(&(TexBlocks){
-            .courses = 1, .per_course = 1, .gap = 0.01f, .jitter = 0.5f, .seed = s
+            .courses = 1, .per_course = 1, .gap = 0.01f, .jitter = 0.5f, .softness = -1,
+            .seed = s
         }, 64, 64);
     }
 }
@@ -1085,14 +1088,14 @@ void TextureGraphEval_blocks_tiling(void) {
     ecs_world_t *world = tg_world();
     const TexBlocks blocks = {
         .courses = 4, .per_course = 3, .gap = 0.02f, .jitter = 0.3f, .stagger = 0.5f,
-        .tones = 2, .seed = 7
+        .softness = -1, .tones = 2, .seed = 7
     };
     int32_t w = 64, h = 64, x, y, outliers = 0;
     ecs_entity_t plain = tg_blocks(world, &blocks, 0, w, h, DomainPlane);
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t twice = ecs_new(world);
     ecs_entity_t shift = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, twice, TexMultiply, {.a = uv,
         .b_value = {2.0f, 2.0f, 1.0f, 1.0f}});
     ecs_set(world, shift, TexAdd, {.a = uv,
@@ -1153,7 +1156,7 @@ void TextureGraphEval_blocks_tiling(void) {
 void TextureGraphEval_blocks_sphere_error(void) {
     // textures/graph
     ecs_world_t *world = tg_world();
-    const TexBlocks blocks = {.courses = 4, .per_course = 3, .gap = 0.02f};
+    const TexBlocks blocks = {.courses = 4, .per_course = 3, .gap = 0.02f, .softness = -1};
     ecs_log_set_level(-4);
     ecs_entity_t tex = tg_blocks(world, &blocks, 0, 32, 16, DomainSphere);
     const TextureStatus *status = tg_wait(world, tex, 1);
@@ -1232,7 +1235,7 @@ static ecs_entity_t tg_coords_x(
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t scalar = ecs_new(world);
     TgScalar s = {.value = factor, .in = uv};
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set_id(world, scalar, scalar_c, ECS_SIZEOF(TgScalar), &s);
 
     return scalar;

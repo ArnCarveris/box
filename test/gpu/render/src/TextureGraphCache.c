@@ -658,3 +658,29 @@ void TextureGraphCache_animated_static_part(void) {
     test_int(ecs_get(world, tex, TextureStatus)->revision, 2);
     ecs_fini(world);
 }
+
+/** A TexTime of scale 0 holds its offset: its image does not follow the world clock and the
+ * graph is not animated, so it makes no updates while the clock runs. */
+void TextureGraphCache_time_zero_scale_still(void) {
+    // textures/graph
+    ecs_world_t *world = tg_world();
+    tg_run_file(world, GRAPH_ANIMATED);
+    ecs_entity_t tex = ecs_lookup(world, "graph_animated.image");
+    ecs_entity_t time = ecs_lookup(world, "graph_animated.image.time");
+    test_assert(tex != 0 && time != 0);
+    ecs_set(world, time, TexTime, {.scale = 0, .offset = 0.5f});
+    tg_wait(world, tex, 1);
+    tg_frames(world, 30);
+
+    box_render_gpu_stats_t before = tg_stats(world);
+    float a = tg_read_value(world, tex);
+    tg_frames(world, 30);
+    float b = tg_read_value(world, tex);
+    box_render_gpu_stats_t after = tg_stats(world);
+    test_assert(ecs_get_world_info(world)->world_time_total > 0.5);
+    tg_near(a, 0.5f, TG_TOLERANCE_TIME);
+    tg_near(b, 0.5f, TG_TOLERANCE_TIME);
+    test_int(after.texture_graph_updates, before.texture_graph_updates);
+    test_int(after.texture_graph_evaluations, before.texture_graph_evaluations);
+    ecs_fini(world);
+}

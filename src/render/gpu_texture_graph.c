@@ -187,12 +187,12 @@ done:
     return result;
 }
 
-/** Compute the key of the program a graph needs: its structure, the kinds of its nodes, the
- * format its output stage writes, its forced boundaries and the shared code. Which images its
- * sampling nodes sample is not part of it, only their indices.
+/** Compute the key of the program a graph needs: its structure, the kinds of its nodes, which
+ * nodes are animated, the format its output stage writes, its forced boundaries and the shared
+ * code. Which images its sampling nodes sample is not part of it, only their indices.
  *
  * @param tg The graph state
- * @param graph The graph
+ * @param graph The graph, its hashes computed
  * @return The key, never 0
  */
 static uint64_t box_gpu_tg_key(
@@ -215,6 +215,7 @@ static uint64_t box_gpu_tg_key(
         result = box_gpu_tg_hash(result, &graph->nodes[i].params, sizeof(uint32_t));
         result = box_gpu_tg_hash(result, &graph->nodes[i].output, sizeof(uint32_t));
         result = box_gpu_tg_hash(result, &graph->nodes[i].texture, sizeof(int32_t));
+        result = box_gpu_tg_hash(result, &graph->animated[i], sizeof(bool));
     }
 
     result = box_gpu_tg_hash(result, ecs_vec_first(&graph->forced),
@@ -230,7 +231,7 @@ static uint64_t box_gpu_tg_key(
  * the size and domain of the graph and the shared code, so two nodes of one hash make the same
  * value; for a sampling node also the handle, flags and serial of the image it samples now.
  *
- * A node is animated when its kind is or one of its inputs is.
+ * A node is animated when its kind is, unless its time factor is 0, or one of its inputs is.
  *
  * @param gpu The backend
  * @param tg The graph state
@@ -253,6 +254,12 @@ static void box_gpu_tg_hashes(
         const box_gpu_tg_kind_t *kind = box_gpu_tg_kind(tg, node->kind);
         uint64_t h = BOX_GPU_TG_FNV_BASIS, kind_hash = kind ? kind->hash : 0;
         bool animated = kind && (kind->flags & BOX_TEXTURE_NODE_ANIMATED);
+        if (animated && (kind->flags & BOX_TEXTURE_NODE_TIME_SCALE) && node->param_size >= 4) {
+            float scale;
+            ecs_os_memcpy(&scale, graph->params + node->params, ECS_SIZEOF(float));
+            animated = scale != 0;
+        }
+
         bool sampling = node->texture >= 0;
         if (sampling) {
             const box_render_texture_graph_texture_t *src = &graph->textures[node->texture];
@@ -1326,8 +1333,8 @@ static bool box_gpu_tg_graph_ready(
     }
 
     if (!graph->key) {
-        graph->key = box_gpu_tg_key(tg, graph);
         box_gpu_tg_hashes(gpu, tg, graph);
+        graph->key = box_gpu_tg_key(tg, graph);
     }
 
     if (graph->current && graph->current->key == graph->key) {

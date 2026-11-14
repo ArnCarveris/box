@@ -716,7 +716,7 @@ static void tm_sweep(
         tm_case_t *t = &cases[op];
         ecs_entity_t uv = ecs_new(world);
         ecs_entity_t in[3], output;
-        ecs_set(world, uv, TexCoords, {0});
+        ecs_set(world, uv, TexCoords, {.scale = 1});
         for (k = 0; k < 3; k ++) {
             bool scalar = mode == TmScalar || (k == 0 && mode != TmVector);
             in[k] = 0;
@@ -995,7 +995,7 @@ static void tm_split_round_trip(
     ecs_entity_t reversed = ecs_new(world);
     ecs_entity_t split[4];
     int32_t k, x, y, c;
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_entity_t vector = tm_vector(world, uv, 0);
     for (k = 0; k < 4; k ++) {
         split[k] = tm_split(world, vector, (TextureChannel)k);
@@ -1073,7 +1073,7 @@ static void tm_combine_round_trip(
     ecs_entity_t output = ecs_new(world);
     ecs_entity_t split[4];
     int32_t k, x, y, c;
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_entity_t vector = tm_vector(world, uv, 1);
     ecs_entity_t green = tm_split(world, vector, ChannelG);
     ecs_entity_t blue = tm_split(world, vector, ChannelB);

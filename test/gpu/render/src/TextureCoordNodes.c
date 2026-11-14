@@ -298,12 +298,12 @@ static void tc_identity_in(
     ecs_entity_t centred = ecs_new(world);
     ecs_entity_t chained = ecs_new(world);
     ecs_entity_t out = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
-    ecs_set(world, transform, TexTransform, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
+    ecs_set(world, transform, TexTransform, {.scale = {1, 1, 1}});
     ecs_set(world, still, TexWarp, {.offset_value = {0.9f, 0.1f, 0.3f, 0}});
     ecs_set(world, centred, TexWarp, {.coords = uv, .offset_value = {0.5f, 0.5f, 0.5f, 0.5f},
         .amount_value = 3});
-    ecs_set(world, chained, TexTransform, {.coords = centred});
+    ecs_set(world, chained, TexTransform, {.coords = centred, .scale = {1, 1, 1}});
     ecs_set(world, out, TexAdd, {.a = chained, .b = still});
     ecs_entity_t tex = tc_graph(world, out, w, h, domain);
     ecs_entity_t extra = tc_graph(world, transform, w, h, domain);
@@ -388,7 +388,7 @@ void TextureCoordNodes_warp_sphere_unit(void) {
     ecs_entity_t constant = ecs_new(world);
     ecs_entity_t varying = ecs_new(world);
     ecs_entity_t out = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, constant, TexWarp, {.offset_value = {0.9f, 0.2f, 0.6f, 0},
         .amount_value = 0.8f});
     ecs_set(world, varying, TexWarp, {.coords = constant, .offset = uv, .amount_value = 0.7f});
@@ -445,9 +445,9 @@ void TextureCoordNodes_rotate_plane(void) {
     ecs_entity_t out = ecs_new(world);
     TcScalar a = {.value = 90};
     ecs_set_id(world, angle, scalar_c, ECS_SIZEOF(TcScalar), &a);
-    ecs_set(world, by_value, TexTransform, {.angle_value = 30});
+    ecs_set(world, by_value, TexTransform, {.angle_value = 30, .scale = {1, 1, 1}});
     ecs_set(world, by_node, TexTransform, {.angle = angle, .angle_value = 45,
-        .scale = {2, 2, 0}, .translate = {0.25f, -1, 0.5f}});
+        .scale = {2, 2, 1}, .translate = {0.25f, -1, 0.5f}});
     ecs_set(world, out, TexAdd, {.a = by_value, .b = by_node});
     ecs_entity_t tex = tc_graph(world, out, w, h, DomainPlane);
     tc_wait(world, tex);
@@ -500,8 +500,9 @@ void TextureCoordNodes_rotate_sphere(void) {
     ecs_entity_t scaled = ecs_new(world);
     ecs_entity_t sum = ecs_new(world);
     ecs_entity_t out = ecs_new(world);
-    ecs_set(world, turn, TexTransform, {.angle_value = 90});
-    ecs_set(world, tilted, TexTransform, {.angle_value = 37, .axis = {3, 4, 0}});
+    ecs_set(world, turn, TexTransform, {.angle_value = 90, .scale = {1, 1, 1}});
+    ecs_set(world, tilted, TexTransform, {.angle_value = 37, .axis = {3, 4, 0},
+        .scale = {1, 1, 1}});
     ecs_set(world, scaled, TexTransform, {.coords = tilted, .scale = {2, 2, 2}});
     ecs_set(world, sum, TexAdd, {.a = turn, .b = tilted});
     ecs_set(world, out, TexAdd, {.a = sum, .b = scaled});
@@ -554,7 +555,8 @@ void TextureCoordNodes_sphere_seam(void) {
     ecs_entity_t turn = ecs_new(world);
     ecs_entity_t warp = ecs_new(world);
     ecs_set(world, uv, TexCoords, {.scale = 0.5f});
-    ecs_set(world, turn, TexTransform, {.angle_value = 40, .axis = {1, 1, 0.5f}});
+    ecs_set(world, turn, TexTransform, {.angle_value = 40, .axis = {1, 1, 0.5f},
+        .scale = {1, 1, 1}});
     ecs_set(world, warp, TexWarp, {.coords = turn, .offset = uv, .amount_value = 0.6f});
     ecs_entity_t tex = tc_graph(world, warp, w, h, DomainSphere);
     tc_wait(world, tex);
@@ -618,5 +620,47 @@ void TextureCoordNodes_script(void) {
     }
 
     ecs_os_free(texels);
+    ecs_fini(world);
+}
+
+/** A scale of 0 collapses the coordinates: TexCoords to the origin, TexTransform on the plane to
+ * the centre plus its translation, with the scale of only x at 0 collapsing only x. */
+void TextureCoordNodes_zero_scale(void) {
+    // textures/graph
+    ecs_world_t *world = tc_world();
+    int32_t x, y, w = 16, h = 8;
+    float expect[4];
+    ecs_entity_t uv = ecs_new(world);
+    ecs_entity_t collapsed = ecs_new(world);
+    ecs_entity_t flat_x = ecs_new(world);
+    ecs_entity_t out = ecs_new(world);
+    ecs_set(world, uv, TexCoords, {.scale = 0});
+    ecs_set(world, collapsed, TexTransform, {.translate = {0.1f, 0.2f, 0},
+        .scale = {0, 0, 0}});
+    ecs_set(world, flat_x, TexTransform, {.scale = {0, 1, 1}});
+    ecs_set(world, out, TexAdd, {.a = collapsed, .b = flat_x});
+    ecs_entity_t tex = tc_graph(world, out, w, h, DomainPlane);
+    ecs_entity_t coords = tc_graph(world, uv, w, h, DomainPlane);
+    tc_wait(world, tex);
+    tc_wait(world, coords);
+
+    float *zero = tc_read(world, coords, uv, w, h);
+    float *all = tc_read(world, tex, collapsed, w, h);
+    float *only_x = tc_read(world, tex, flat_x, w, h);
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            const float origin[4] = {0, 0, 0, 1};
+            const float centre[4] = {0.6f, 0.7f, 0, 1};
+            tc_expect(zero, w, x, y, origin, TC_TOLERANCE);
+            tc_expect(all, w, x, y, centre, TC_TOLERANCE);
+            tc_coords(DomainPlane, x, y, w, h, expect);
+            expect[0] = 0.5f;
+            tc_expect(only_x, w, x, y, expect, TC_TOLERANCE);
+        }
+    }
+
+    ecs_os_free(only_x);
+    ecs_os_free(all);
+    ecs_os_free(zero);
     ecs_fini(world);
 }

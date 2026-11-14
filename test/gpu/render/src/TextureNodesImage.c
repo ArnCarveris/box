@@ -420,7 +420,7 @@ void TextureNodesImage_wrap_and_clamp(void) {
     ecs_entity_t image = ti_image(world);
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t shifted = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, shifted, TexAdd, {.a = uv,
         .b_value = {1.0f / TI_W, 0, 0, 0}});
     ecs_entity_t wrap = ti_graph(world, image, shifted, AddressWrap, true, TI_W, TI_H,
@@ -625,7 +625,7 @@ void TextureNodesImage_chain_updates(void) {
     int32_t x = 2, y = 5, c;
     float expect[4];
     ecs_set(world, image, TexImage, {.texture = source});
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     s.in = image;
     ecs_set_id(world, shift_image, shift_c, ECS_SIZEOF(TgShift), &s);
     s.in = uv;

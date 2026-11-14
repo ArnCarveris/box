@@ -400,7 +400,7 @@ void TextureCells_sphere_distances(void) {
     int32_t x, y, w = 64, h = 32, count = 64, m, a;
     double s = tc_sphere_scale(count);
     for (m = CellsNearest; m <= CellsEdge; m ++) {
-        TexCells cells = {.distance = m, .count = count, .jitter = 0, .seed = 9};
+        TexCells cells = {.distance = m, .count = count, .jitter = 0, .seed = 9, .edge = 0.25f};
         float *texels = tc_eval(world, &cells, w, h, DomainSphere);
         for (y = 0; y < h; y ++) {
             for (x = 0; x < w; x ++) {
@@ -503,7 +503,7 @@ void TextureCells_plane_tiles(void) {
 
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t shifted = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, shifted, TexAdd, {.a = uv, .b_value = {1, -2, 0, 0}});
     cells.coords = shifted;
     float *moved = tc_eval(world, &cells, w, h, DomainPlane);
@@ -707,7 +707,7 @@ void TextureCells_coords_input(void) {
     ecs_entity_t uv = ecs_new(world);
     ecs_entity_t shifted = ecs_new(world);
     ecs_entity_t opposite = ecs_new(world);
-    ecs_set(world, uv, TexCoords, {0});
+    ecs_set(world, uv, TexCoords, {.scale = 1});
     ecs_set(world, shifted, TexAdd, {.a = uv,
         .b_value = {5.0f / w, 3.0f / h, 0, 0}});
     ecs_set(world, opposite, TexMultiply, {.a = uv,

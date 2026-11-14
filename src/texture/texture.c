@@ -824,7 +824,177 @@ done:
     return;
 }
 
-/** Construct TexCells components with full jitter and the other members zero.
+/** Construct TextureGen components with normal strength 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_gen_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TextureGen *gen = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&gen[i], 0, TextureGen);
+        gen[i].strength = 1;
+    }
+}
+
+/** Construct TexCoords components with scale 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_coords_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexCoords *coords = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        coords[i] = (TexCoords){ .scale = 1 };
+    }
+}
+
+/** Construct TexTime components with scale 1 and offset 0.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_time_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexTime *time = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        time[i] = (TexTime){ .scale = 1 };
+    }
+}
+
+/** Construct TexTransform components with scale {1, 1, 1} and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_transform_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexTransform *transform = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&transform[i], 0, TexTransform);
+        transform[i].scale[0] = 1;
+        transform[i].scale[1] = 1;
+        transform[i].scale[2] = 1;
+    }
+}
+
+/** Construct TexNormal components with strength 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_normal_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexNormal *normal = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&normal[i], 0, TexNormal);
+        normal[i].strength = 1;
+    }
+}
+
+/** Construct TexSlope components with strength 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_slope_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexSlope *slope = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&slope[i], 0, TexSlope);
+        slope[i].strength = 1;
+    }
+}
+
+/** Construct TexNoise components with frequency 4, one octave, lacunarity 2, gain 0.5, offset
+ * 1, one channel and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_noise_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexNoise *noise = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&noise[i], 0, TexNoise);
+        noise[i].frequency = 4;
+        noise[i].octaves = 1;
+        noise[i].lacunarity = 2;
+        noise[i].gain = 0.5f;
+        noise[i].offset = 1;
+        noise[i].channels = 1;
+    }
+}
+
+/** Construct TexBlocks components with 8 courses of 4 blocks, the softness of 1.3 times the
+ * gap and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_blocks_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexBlocks *blocks = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&blocks[i], 0, TexBlocks);
+        blocks[i].courses = 8;
+        blocks[i].per_course = 4;
+        blocks[i].softness = -1;
+    }
+}
+
+/** Construct TexCells components with 64 cells, full jitter, an edge of 0.25 and the other
+ * members zero.
  *
  * @param ptr The components
  * @param count Number of components
@@ -840,7 +1010,9 @@ static void box_texture_cells_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         ecs_os_memset_t(&cells[i], 0, TexCells);
+        cells[i].count = 64;
         cells[i].jitter = 1;
+        cells[i].edge = 0.25f;
     }
 }
 
@@ -1270,6 +1442,14 @@ void BoxTextureImport(
     box_owned_hooks(world, TexRamp, BOX_OWNED_VEC(TexRamp, keys, TextureGenKey));
     box_owned_hooks(world, TexCurve, BOX_OWNED_CURVE(TexCurve, curve));
     box_owned_hooks(world, TextureStatus, BOX_OWNED_STR(TextureStatus, error));
+    ecs_set_hooks(world, TextureGen, { .ctor = box_texture_gen_ctor });
+    ecs_set_hooks(world, TexCoords, { .ctor = box_texture_coords_ctor });
+    ecs_set_hooks(world, TexTime, { .ctor = box_texture_time_ctor });
+    ecs_set_hooks(world, TexTransform, { .ctor = box_texture_transform_ctor });
+    ecs_set_hooks(world, TexNormal, { .ctor = box_texture_normal_ctor });
+    ecs_set_hooks(world, TexSlope, { .ctor = box_texture_slope_ctor });
+    ecs_set_hooks(world, TexNoise, { .ctor = box_texture_noise_ctor });
+    ecs_set_hooks(world, TexBlocks, { .ctor = box_texture_blocks_ctor });
     ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });
     box_owned_hooks(world, TextureNodePort, BOX_OWNED_STR(TextureNodePort, name),
         BOX_OWNED_STR(TextureNodePort, value));
