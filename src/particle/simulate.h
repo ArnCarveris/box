@@ -1064,6 +1064,23 @@ static inline void box_particle_moving(
     }
 }
 
+/** Scale the curves of ParticleMotion of a particle by the uniform world scale of its emitter,
+ * turbulence z of the block: the velocity and the force, not the speed and the drag.
+ *
+ * @param motion The curves, scaled in place
+ * @param scale The uniform world scale
+ */
+static inline void box_particle_motion_scaled(
+    box_particle_motion_t *motion,
+    float scale)
+{
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        motion->velocity[c] *= scale;
+        motion->force[c] *= scale;
+    }
+}
+
 /** Get the degrees a particle has turned by its spin, the area under its spin curve up to its
  * age; a constant curve turns it by its spin times the value times its age.
  *

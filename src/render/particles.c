@@ -91,6 +91,7 @@ typedef struct box_particle_pool_t {
                              *   emitter */
     ecs_entity_t forces;    /**< ParticleEmitter.forces of that frame */
     ParticleForces own;     /**< ParticleForces of the emitter entity in that frame */
+    float scale;            /**< Uniform world scale of the emitter in that frame */
     bool has_own;           /**< The emitter entity had ParticleForces in that frame */
     box_render_particle_pool_t entry; /**< The pool of the last frame of a lingering emitter
                              *   in the packet, which a lingering pool runs again */
@@ -867,8 +868,12 @@ static void box_particles_forces(
  * burst starts in the field it has without drift.
  *
  * @param pool The pool, its frame of reference advanced
- * @param acceleration ParticleEmitter.acceleration
+ * @param acceleration ParticleEmitter.acceleration, already scaled
  * @param forces The sum of the forces on its particles
+ * @param scale The uniform scale of the emitter, box_transform_world_scale: multiplier of the
+ *              gravity, wind, turbulence and drift and divisor of the frequency of the wander
+ *              field, so a scaled emitter moves a scaled copy of its particles; the drag is a
+ *              rate and stays; turbulence z hands it to the curves of ParticleMotion
  * @param moves Whether the integrate pass moves particles in this frame
  * @param out The block, its seed and its seconds of the frame written
  */
@@ -876,24 +881,27 @@ static void box_particles_block_forces(
     box_particle_pool_t *pool,
     const vec3 acceleration,
     const ParticleForces *forces,
+    float scale,
     bool moves,
     box_render_particle_block_t *out)
 {
-    float phase[3];
+    float phase[3], frequency = scale > 0 ? forces->turbulence_scale / scale : 0.0f;
+    vec3 gravity;
     int32_t c;
     if (!moves) {
         pool->frame[0] = pool->frame[1] = pool->frame[2] = 0;
     }
 
-    glm_vec3_add(ECS_CONST_CAST(float*, acceleration),
-        ECS_CONST_CAST(float*, forces->gravity), out->acceleration);
-    glm_vec3_copy(ECS_CONST_CAST(float*, forces->wind), out->wind);
+    glm_vec3_scale(ECS_CONST_CAST(float*, forces->gravity), scale, gravity);
+    glm_vec3_add(ECS_CONST_CAST(float*, acceleration), gravity, out->acceleration);
+    glm_vec3_scale(ECS_CONST_CAST(float*, forces->wind), scale, out->wind);
     out->wind[3] = forces->drag > 0 ? forces->drag : 0.0f;
-    out->turbulence[0] = forces->turbulence;
-    out->turbulence[1] = forces->turbulence_scale;
+    out->turbulence[0] = forces->turbulence * scale;
+    out->turbulence[1] = frequency;
+    out->turbulence[2] = scale;
     box_particle_phase(out->seed, phase);
-    box_particle_frame_phase(phase, pool->frame, forces->turbulence_scale, out->wander);
-    glm_vec3_copy(ECS_CONST_CAST(float*, forces->drift), out->drift);
+    box_particle_frame_phase(phase, pool->frame, frequency, out->wander);
+    glm_vec3_scale(ECS_CONST_CAST(float*, forces->drift), scale, out->drift);
     for (c = 0; c < 3; c ++) {
         pool->frame[c] += moves ? (double)out->drift[c] * (double)out->acceleration[3] : 0.0;
     }
@@ -1365,7 +1373,7 @@ static void box_particles_emitter(
         entry->block.speed[1] *= speed;
     }
 
-    box_particles_block_forces(pool, acceleration, &forces, moves, &entry->block);
+    box_particles_block_forces(pool, acceleration, &forces, scale, moves, &entry->block);
     if (curves || motion || pool->curved) {
         box_particle_rows_update(&s->curves, &pool->curves, curves);
         box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
@@ -1392,6 +1400,7 @@ static void box_particles_emitter(
         pool->entry = *entry;
         glm_vec3_copy(acceleration, pool->acceleration);
         pool->forces = emitter->forces;
+        pool->scale = scale;
         pool->has_own = own != NULL;
         if (own) {
             pool->own = *own;
@@ -1445,8 +1454,8 @@ static bool box_particles_linger(
     entry->block.acceleration[3] = delta_us ? p->delta : 0.0f;
     box_particles_forces(world, pool->entity, pool->forces, pool->has_own ? &pool->own : NULL,
         &forces);
-    box_particles_block_forces(pool, pool->acceleration, &forces, pool->live != 0,
-        &entry->block);
+    box_particles_block_forces(pool, pool->acceleration, &forces, pool->scale,
+        pool->live != 0, &entry->block);
     entry->block.count = 0;
     entry->block.first = pool->next;
     entry->block.used = pool->used;

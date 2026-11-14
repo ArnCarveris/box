@@ -54,7 +54,8 @@ struct Emitter {
     life: vec4u,
     // xyz: world velocity the drag pulls toward, w: drag rate
     wind: vec4f,
-    // x: acceleration of the wander field, y: its frequency scale
+    // x: acceleration of the wander field, y: its frequency scale, z: uniform world scale of
+    // the emitter, the multiplier of the velocity and force of its ParticleMotion
     turbulence: vec4f,
     // xyz: phase of the wander field drawn from the seed, offset by the displacement of the
     // frame of reference
@@ -460,6 +461,12 @@ fn particle_motion(m: MotionRows, seed: u32, index: u32, t: f32) -> Motion {
 // along: speed times its stored velocity plus the velocity curve.
 fn particle_moving(velocity: vec3f, motion: Motion) -> vec3f {
     return velocity * motion.speed + motion.velocity;
+}
+
+// The curves of ParticleMotion of a particle under the uniform world scale of its emitter,
+// turbulence z of the block: the velocity and force times it, the speed and drag as they are.
+fn particle_motion_scaled(motion: Motion, scale: f32) -> Motion {
+    return Motion(motion.velocity * scale, motion.speed, motion.force * scale, motion.drag);
 }
 
 // Degrees a particle has turned by its spin: the area under the spin curve up to its age, and

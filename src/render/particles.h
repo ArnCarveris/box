@@ -66,8 +66,9 @@ typedef struct box_render_particle_block_t {
     uint32_t life_span;     /**< Microseconds the longest lifetime is above life_min */
     uint32_t pad0;          /**< Padding to the vec4 of Emitter */
     float wind[4];          /**< World velocity the drag pulls toward, w the drag rate */
-    float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, zw
-                             *   unused */
+    float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, z the
+                             *   uniform world scale of the emitter, which multiplies the
+                             *   velocity and force of its ParticleMotion, w unused */
     float wander[4];        /**< Phase of the wander field drawn from the seed, offset by the
                              *   displacement of the frame of reference, w unused */
     float variance[4];      /**< Display encoded color variance, 0 to 1, w unused */

@@ -37,7 +37,11 @@
                     "collision_in_block",
                     "world_scale_sizes_and_speeds",
                     "world_scale_one_unchanged",
-                    "world_scale_non_uniform"
+                    "world_scale_non_uniform",
+                    "world_scale_forces",
+                    "world_scale_forces_one_unchanged",
+                    "world_scale_forces_non_uniform",
+                    "world_scale_forces_linger"
                 ]
             },
             {

@@ -108,8 +108,8 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
     var stretched = 1.0;
     var moving = p.velocity;
     if (emitter.params.z > 0.0 && emitter.gradient_max.y != 0u) {
-        moving = particle_moving(p.velocity,
-            particle_motion_velocity(emitter.motion, seed, p.index, t));
+        moving = particle_moving(p.velocity, particle_motion_scaled(
+            particle_motion_velocity(emitter.motion, seed, p.index, t), emitter.turbulence.z));
     }
 
     let velocity = (view.view * vec4f(moving, 0.0)).xy;

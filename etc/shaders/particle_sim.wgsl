@@ -57,8 +57,8 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
         if (emitter.gradient_max.y != 0u) {
             let seed = emitter.spawn.y;
             let life = particle_life(seed, p.index, emitter.life.y, emitter.life.z);
-            motion = particle_motion(emitter.motion, seed, p.index,
-                particle_life_age(life, p.remaining));
+            motion = particle_motion_scaled(particle_motion(emitter.motion, seed, p.index,
+                particle_life_age(life, p.remaining)), emitter.turbulence.z);
         }
 
         particle_integrate(&p, emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,

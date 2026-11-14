@@ -55,21 +55,28 @@ ECS_STRUCT(ParticleRange, {
  * The drift is the velocity of a frame of reference the particles move with, as a world that
  * scrolls past a fixed camera: velocities, forces, curves and the wander field are relative to
  * it. The ground plane of ParticleCollision stays put.
+ *
+ * The forces follow the uniform world scale of the emitter they act on, as its speeds do: the
+ * gravity, wind, turbulence and drift are multiplied by it and the turbulence_scale divided by
+ * it, so a plume under a Scale 10 hull moves as the unscaled plume, 10 times larger. The drag
+ * is a rate and does not scale. The values below are those of an emitter of scale 1.
  */
 ECS_STRUCT(ParticleForces, {
-    vec3 gravity;           /**< Acceleration in world units per second squared added to the
-                             *   emitter acceleration, default {0, -9.81, 0} */
-    vec3 wind;              /**< Velocity in world units per second the drag pulls particles
-                             *   toward; wind acts through drag only, default {0, 0, 0} */
+    vec3 gravity;           /**< Acceleration in units per second squared, times the world
+                             *   scale, added to the emitter acceleration, default
+                             *   {0, -9.81, 0} */
+    vec3 wind;              /**< Velocity in units per second, times the world scale, the drag
+                             *   pulls particles toward; wind acts through drag only, default
+                             *   {0, 0, 0} */
     float drag;             /**< Fraction of the difference between the velocity and the wind
                              *   lost per second, as a rate of exponential decay, default 0 */
-    float turbulence;       /**< Acceleration of a smooth wander field in world units per
-                             *   second squared, default 0 */
-    float turbulence_scale; /**< Frequency multiplier of the wander field, above 1 for smaller
-                             *   swirls, default 1 */
-    vec3 drift;             /**< Velocity in world units per second of the frame of reference
-                             *   that moves the live particles from the next frame without
-                             *   entering their velocity, default {0, 0, 0} */
+    float turbulence;       /**< Acceleration of a smooth wander field in units per second
+                             *   squared, times the world scale, default 0 */
+    float turbulence_scale; /**< Frequency multiplier of the wander field, divided by the world
+                             *   scale, above 1 for smaller swirls, default 1 */
+    vec3 drift;             /**< Velocity in units per second, times the world scale, of the
+                             *   frame of reference that moves the live particles from the next
+                             *   frame without entering their velocity, default {0, 0, 0} */
 });
 
 /** Collision of the particles of the emitter entity with the horizontal plane at height.
@@ -99,8 +106,10 @@ ECS_STRUCT(ParticleCollision, {
  * Sizes and speeds follow the world scale: the size, speed, radial speed and acceleration, and
  * the softness of its ParticleAppearance, are multiplied by the uniform scale of the
  * WorldTransform, the cube root of the determinant of its 3x3, so a plume under a Scale 40 hull
- * is 40 times larger. A non-uniform scale stretches the spawn volume per axis. ParticleForces and
- * ParticleMotion are in world units and do not scale.
+ * is 40 times larger, and so are the gravity, wind, turbulence and drift of its ParticleForces
+ * and the velocity and force curves of its ParticleMotion, while the swirls of the turbulence
+ * widen by it. A non-uniform scale stretches the spawn volume per axis. The height of a
+ * ParticleCollision and the measured velocity of inherit_velocity stay in world units.
  *
  * Each is a camera facing soft circle of its size, color times opacity, over the opaque image,
  * unless ParticleCurves and ParticleAppearance on the emitter change that. Every drawn property
@@ -314,13 +323,15 @@ ECS_STRUCT(ParticleCurves, {
  * The ground plane lifts a particle whatever moved it in, but bounces and slows only v.
  */
 ECS_STRUCT(ParticleMotion, {
-    ParticleCurve velocity_x; /**< World units per second added to the movement along x, not
-                             *   stored so drag does not act on it, default 0; the three axes
-                             *   share one draw between their two curves */
+    ParticleCurve velocity_x; /**< Units per second, times the world scale, added to the
+                             *   movement along x, not stored so drag does not act on it,
+                             *   default 0; the three axes share one draw between their two
+                             *   curves */
     ParticleCurve velocity_y; /**< Along y, default 0 */
     ParticleCurve velocity_z; /**< Along z, default 0 */
-    ParticleCurve force_x;  /**< World units per second squared added to the acceleration
-                             *   along x, default 0; the three axes share one draw */
+    ParticleCurve force_x;  /**< Units per second squared, times the world scale, added to the
+                             *   acceleration along x, default 0; the three axes share one
+                             *   draw */
     ParticleCurve force_y;  /**< Along y, default 0 */
     ParticleCurve force_z;  /**< Along z, default 0 */
     ParticleCurve speed;    /**< Multiplier of the stored velocity in the movement of a frame,

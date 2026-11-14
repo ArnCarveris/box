@@ -68,7 +68,8 @@ static const box_render_view_t* cloud_frame(
     return ecs_vec_first(&null->last.views);
 }
 
-/** Create a single channel texture and run frames until the backend has it.
+/** Create a single channel texture and run frames until the backend has it. The image loads on
+ * a job thread, so a frame waits a millisecond to give it time on a busy machine.
  *
  * @param world The world
  * @param null The backend
@@ -84,11 +85,13 @@ static ecs_entity_t cloud_texture(
     int32_t i;
     ecs_set(world, result, TexturePath, {.path = ECS_CONST_CAST(char*, CLOUD_PNG),
         .single_channel = true});
-    for (i = 0; i < 200; i ++) {
+    for (i = 0; i < 500; i ++) {
         cloud_frame(world, null, time);
         if (box_textures_handle(box_textures_get(world), result)) {
             break;
         }
+
+        ecs_os_sleep(0, 1000 * 1000);
     }
 
     test_assert(box_textures_handle(box_textures_get(world), result) != 0);

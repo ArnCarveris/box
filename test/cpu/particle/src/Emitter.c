@@ -771,7 +771,7 @@ void Emitter_collision_in_block(void) {
 }
 
 /** Scenes of the world scale tests: a plume under a Scale 40 hull and the same plume unscaled,
- * with ParticleForces whose gravity does not scale */
+ * with ParticleForces whose gravity scales with them */
 #define SCALED_PLUMES \
     "using box.particle\n" \
     "using box.transform\n" \
@@ -823,9 +823,9 @@ void Emitter_world_scale_sizes_and_speeds(void) {
     test_flt(plain->block.stretch, 0.2f);
     test_flt(scaled->block.stretch, plain->block.stretch / 40);
 
-    /* the acceleration of the emitter scales, the gravity of the world does not */
+    /* the acceleration of the emitter and the gravity of its forces both scale */
     test_flt(plain->block.acceleration[1], -1);
-    test_flt(scaled->block.acceleration[1], 40 - 2);
+    test_flt(scaled->block.acceleration[1], (1 - 2) * 40);
 
     /* the spawn volume scales through the model matrix, not its radius */
     test_flt(scaled->block.extents[3], plain->block.extents[3]);
@@ -891,6 +891,162 @@ void Emitter_world_scale_non_uniform(void) {
     test_flt(pool->block.model[0][0], 2);
     test_flt(pool->block.model[1][1], 4);
     test_flt(pool->block.model[2][2], 8);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Create an emitter under a parent of a scale with ParticleForces of every kind, as a
+ * turbulent plume.
+ *
+ * @param world The world
+ * @param x Scale of the parent along x
+ * @param y Along y
+ * @param z Along z
+ * @return The emitter
+ */
+static ecs_entity_t forces_plume_new(
+    ecs_world_t *world,
+    float x,
+    float y,
+    float z)
+{
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Scale, {x, y, z});
+    ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, e, Position, {0, 0, 0});
+    ecs_set(world, e, ParticleEmitter, {
+        .max = 100, .rate = 60, .speed = {1, 1}, .size = {0.5f, 0.5f},
+        .lifetime = {1, 2}, .opacity = {1, 1}, .direction = {0, 1, 0},
+        .acceleration = {0, 1, 0}
+    });
+    ecs_set(world, e, ParticleForces, {
+        .gravity = {0, -2, 0.5f}, .wind = {1, 0, -3}, .drag = 0.75f, .turbulence = 3,
+        .turbulence_scale = 2, .drift = {0.5f, 0.25f, -1}
+    });
+    return e;
+}
+
+/** Check the forces of a block against those of forces_plume_new under a uniform scale.
+ *
+ * @param b The block
+ * @param s The uniform scale
+ */
+static void check_forces_scaled(
+    const box_render_particle_block_t *b,
+    float s)
+{
+    check_vec3(b->acceleration, 0, (1 - 2) * s, 0.5f * s);
+    check_vec3(b->wind, 1 * s, 0, -3 * s);
+    test_flt(b->wind[3], 0.75f);
+    test_flt(b->turbulence[0], 3 * s);
+    test_flt(b->turbulence[1], 2 / s);
+    test_flt(b->turbulence[2], s);
+    check_vec3(b->drift, 0.5f * s, 0.25f * s, -1 * s);
+}
+
+void Emitter_world_scale_forces(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t plain = forces_plume_new(world, 1, 1, 1);
+    ecs_entity_t scaled = forces_plume_new(world, 10, 10, 10);
+    frame(world);
+    frame(world);
+
+    /* gravity, wind, turbulence and drift times the scale, the frequency over it, drag kept */
+    const box_render_particle_pool_t *a = pool_of(null, plain);
+    const box_render_particle_pool_t *b = pool_of(null, scaled);
+    test_assert(a != NULL);
+    test_assert(b != NULL);
+    check_forces_scaled(&a->block, 1);
+    check_forces_scaled(&b->block, 10);
+
+    /* the frame of reference moves 10 times as far at a tenth of the frequency, so the wander
+     * field of the scaled plume has the phase of the unscaled one */
+    check_vec3(b->block.wander, a->block.wander[0], a->block.wander[1], a->block.wander[2]);
+
+    /* the wander field at a scaled position is the field of the plain plume, scaled */
+    float p[3] = {0.3f, -0.7f, 1.1f}, q[3] = {3, -7, 11}, wa[3], wb[3];
+    box_particle_wander(p, a->block.wander, a->block.turbulence[1], a->block.turbulence[0], wa);
+    box_particle_wander(q, b->block.wander, b->block.turbulence[1], b->block.turbulence[0], wb);
+    check_vec3(wb, wa[0] * 10, wa[1] * 10, wa[2] * 10);
+
+    /* the curves of ParticleMotion scale their velocity and force, not the speed and drag */
+    box_particle_motion_t m = {
+        .velocity = {1, 2, 3}, .speed = 0.5f, .force = {-1, 0, 4}, .drag = 2
+    };
+    box_particle_motion_scaled(&m, b->block.turbulence[2]);
+    check_vec3(m.velocity, 10, 20, 30);
+    check_vec3(m.force, -10, 0, 40);
+    test_flt(m.speed, 0.5f);
+    test_flt(m.drag, 2);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_world_scale_forces_one_unchanged(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = forces_plume_new(world, 1, 1, 1);
+    ecs_set(world, ecs_get_target(world, e, EcsChildOf, 0), Rotation, {0.3f, 1.1f, -0.7f});
+    frame(world);
+
+    /* a scale of 1 leaves every value exactly as authored */
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_assert(pool->block.acceleration[0] == 0.0f);
+    test_assert(pool->block.acceleration[1] == -1.0f);
+    test_assert(pool->block.acceleration[2] == 0.5f);
+    test_assert(pool->block.wind[0] == 1.0f);
+    test_assert(pool->block.wind[2] == -3.0f);
+    test_assert(pool->block.wind[3] == 0.75f);
+    test_assert(pool->block.turbulence[0] == 3.0f);
+    test_assert(pool->block.turbulence[1] == 2.0f);
+    test_assert(pool->block.turbulence[2] == 1.0f);
+    test_assert(pool->block.drift[0] == 0.5f);
+    test_assert(pool->block.drift[1] == 0.25f);
+    test_assert(pool->block.drift[2] == -1.0f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_world_scale_forces_non_uniform(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = forces_plume_new(world, 2, 4, 8);
+    frame(world);
+
+    /* the forces take the geometric mean of the axes, as the sizes and speeds */
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    test_flt(pool->block.speed[0], 4);
+    check_forces_scaled(&pool->block, 4);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void Emitter_world_scale_forces_linger(void) {
+    // particle/emitter
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t e = forces_plume_new(world, 10, 10, 10);
+    ecs_get_mut(world, e, ParticleEmitter)->linger = true;
+    ecs_modified(world, e, ParticleEmitter);
+    frame(world);
+    frame(world);
+
+    /* a deleted emitter runs out its particles under the forces of its last scale */
+    ecs_delete(world, e);
+    frame(world);
+    const box_render_particle_pool_t *pool = pool_of(null, e);
+    test_assert(pool != NULL);
+    check_forces_scaled(&pool->block, 10);
 
     ecs_fini(world);
     box_render_null_free(null);
