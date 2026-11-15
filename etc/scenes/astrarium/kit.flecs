@@ -62,19 +62,23 @@ state {
 
 assets {
   template ScreenCamera {
-    const s = window[box.surface.Status]
-
     Position: {0, 0, 100}
-    Camera: {ortho: true, ortho_scale: fit_scale(s.point_width, s.point_height)}
+
+    if window.has(box.surface.Status) {
+      const s = window[box.surface.Status]
+      Camera: {ortho: true, ortho_scale: fit_scale(s.point_width, s.point_height)}
+    }
   }
 
   template ScreenRoot {
-    const s = window[box.surface.Status]
-    const k = fit_scale(s.point_width, s.point_height)
+    if window.has(box.surface.Status) {
+      const s = window[box.surface.Status]
+      const k = fit_scale(s.point_width, s.point_height)
 
-    Item: {
-      width: {mode: Fixed, value: s.point_width / k},
-      height: {mode: Fixed, value: s.point_height / k}
+      Item: {
+        width: {mode: Fixed, value: s.point_width / k},
+        height: {mode: Fixed, value: s.point_height / k}
+      }
     }
   }
 

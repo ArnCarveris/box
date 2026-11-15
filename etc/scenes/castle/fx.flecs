@@ -133,7 +133,7 @@ assets {
   prefab DustBurst {
     particles {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 48, rate: 0,
         shape: EmitterBox, extents: {0.9, 0.05, 0.9},
         direction: {0, 1, 0}, spread: 70, speed: {0.8, 2.6},
@@ -151,7 +151,7 @@ assets {
   prefab RubbleBurst {
     dust {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 64, rate: 0,
         shape: EmitterBox, extents: {0.8, 0.6, 0.8},
         direction: {0, 1, 0}, spread: 80, speed: {0.6, 2.2},
@@ -165,7 +165,7 @@ assets {
     }
     stones {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 40, rate: 0,
         shape: EmitterBox, extents: {0.6, 0.8, 0.6},
         direction: {0, 1, 0}, spread: 60, speed: {2, 5},
@@ -183,7 +183,7 @@ assets {
   prefab SplashBurst {
     particles {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 48, rate: 0,
         shape: EmitterBox, extents: {0.8, 0.02, 0.8},
         direction: {0, 1, 0}, spread: 30, speed: {1.5, 3.5},
@@ -201,7 +201,7 @@ assets {
   prefab Firework {
     sparks {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 160, rate: 0,
         shape: EmitterSphere, radius: 0.1,
         direction: {0, 0, 0}, radial: {5, 8},

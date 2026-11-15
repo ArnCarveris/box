@@ -300,7 +300,7 @@ assets {
   prefab SparkBurst {
     sparks {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 80, rate: 0, shape: EmitterSphere, radius: 0.2,
         direction: {0, 1, 0}, spread: 70, speed: {2, 5},
         lifetime: {0.4, 0.9}, size: {0.08, 0.18}, opacity: {1, 1},
@@ -312,7 +312,7 @@ assets {
     }
     flash {
       Position: {0, 0, 0}
-      Emitter: {max: 4, rate: 0, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0}, lifetime: {0.25, 0.25}, size: {2.2, 2.2}, opacity: {0.9, 0.9}, color: {255, 170, 80}, seed: 4}
+      box.particle.Emitter: {max: 4, rate: 0, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0}, lifetime: {0.25, 0.25}, size: {2.2, 2.2}, opacity: {0.9, 0.9}, color: {255, 170, 80}, seed: 4}
       Appearance: {blend: Additive}
       Burst: {count: 1}
       Curves: {size: {keys: [{0, 0.5}, {1, 1.5}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
@@ -322,7 +322,7 @@ assets {
   prefab SplashBurst {
     drops {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 90, rate: 0, shape: EmitterSphere, radius: 0.3,
         direction: {0, 1, 0}, spread: 45, speed: {3, 6},
         lifetime: {0.5, 1.0}, size: {0.1, 0.2}, opacity: {0.7, 1},
@@ -333,7 +333,7 @@ assets {
     }
     mist {
       Position: {0, 0, 0}
-      Emitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.6, direction: {0, 1, 0}, spread: 80, speed: {0.5, 1.2}, lifetime: {0.8, 1.4}, size: {0.6, 1.0}, opacity: {0.3, 0.5}, color: {220, 240, 255}, seed: 6}
+      box.particle.Emitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.6, direction: {0, 1, 0}, spread: 80, speed: {0.5, 1.2}, lifetime: {0.8, 1.4}, size: {0.6, 1.0}, opacity: {0.3, 0.5}, color: {220, 240, 255}, seed: 6}
       Burst: {count: 14}
       Curves: {size: {keys: [{0, 0.6}, {1, 1.8}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
     }
@@ -342,7 +342,7 @@ assets {
   prefab GustBurst {
     swirl {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 70, rate: 0, shape: EmitterDisc, radius: 0.6,
         direction: {0, 0, 0}, radial: {4, 7}, speed: {0, 0.5},
         lifetime: {0.6, 1.1}, size: {0.25, 0.5}, opacity: {0.35, 0.6},
@@ -354,7 +354,7 @@ assets {
     }
     leaves {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 30, rate: 0, shape: EmitterDisc, radius: 0.5,
         direction: {0, 1, 0}, spread: 60, radial: {3, 6}, speed: {1, 3},
         lifetime: {0.8, 1.4}, size: {0.1, 0.18}, opacity: {1, 1},
@@ -368,7 +368,7 @@ assets {
   prefab BloomBurst {
     petals {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 70, rate: 0, shape: EmitterSphere, radius: 0.4,
         direction: {0, 1, 0}, spread: 60, speed: {1.5, 3.5},
         lifetime: {0.9, 1.6}, size: {0.1, 0.2}, opacity: {1, 1},
@@ -379,7 +379,7 @@ assets {
     }
     glow {
       Position: {0, 0, 0}
-      Emitter: {max: 40, rate: 0, shape: EmitterSphere, radius: 0.8, direction: {0, 1, 0}, spread: 30, speed: {0.5, 1.5}, lifetime: {0.8, 1.4}, size: {0.1, 0.18}, opacity: {1, 1}, color: {170, 255, 120}, seed: 10}
+      box.particle.Emitter: {max: 40, rate: 0, shape: EmitterSphere, radius: 0.8, direction: {0, 1, 0}, spread: 30, speed: {0.5, 1.5}, lifetime: {0.8, 1.4}, size: {0.1, 0.18}, opacity: {1, 1}, color: {170, 255, 120}, seed: 10}
       Appearance: {blend: Additive}
       Burst: {count: 30}
     }
@@ -388,7 +388,7 @@ assets {
   prefab FrostBurst {
     shards {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 80, rate: 0, shape: EmitterSphere, radius: 0.3,
         direction: {0, 1, 0}, spread: 90, speed: {2, 4.5},
         lifetime: {0.5, 1.0}, size: {0.08, 0.16}, opacity: {1, 1},
@@ -400,7 +400,7 @@ assets {
     }
     cloud {
       Position: {0, 0, 0}
-      Emitter: {max: 20, rate: 0, shape: EmitterDisc, radius: 1, direction: {0, 1, 0}, spread: 80, speed: {0.3, 0.9}, lifetime: {1, 1.6}, size: {0.8, 1.3}, opacity: {0.3, 0.5}, color: {230, 245, 255}, seed: 12}
+      box.particle.Emitter: {max: 20, rate: 0, shape: EmitterDisc, radius: 1, direction: {0, 1, 0}, spread: 80, speed: {0.3, 0.9}, lifetime: {1, 1.6}, size: {0.8, 1.3}, opacity: {0.3, 0.5}, color: {230, 245, 255}, seed: 12}
       Burst: {count: 14}
       Curves: {opacity: {keys: [{0, 1}, {1, 0}]}, size: {keys: [{0, 0.6}, {1, 1.8}]}}
     }
@@ -409,7 +409,7 @@ assets {
   prefab LiftBurst {
     motes {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 80, rate: 0, shape: EmitterDisc, radius: 1.2,
         direction: {0, 1, 0}, spread: 8, speed: {2, 4},
         lifetime: {0.8, 1.4}, size: {0.1, 0.18}, opacity: {1, 1},
@@ -420,7 +420,7 @@ assets {
     }
     ring {
       Position: {0, 0, 0}
-      Emitter: {max: 40, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0}, radial: {5, 6}, speed: {0, 0}, lifetime: {0.4, 0.6}, size: {0.15, 0.2}, opacity: {1, 1}, color: {200, 150, 255}, seed: 14}
+      box.particle.Emitter: {max: 40, rate: 0, shape: EmitterDisc, radius: 0.3, direction: {0, 0, 0}, radial: {5, 6}, speed: {0, 0}, lifetime: {0.4, 0.6}, size: {0.15, 0.2}, opacity: {1, 1}, color: {200, 150, 255}, seed: 14}
       Appearance: {blend: Additive}
       Burst: {count: 36}
     }
@@ -429,7 +429,7 @@ assets {
   prefab FizzleBurst {
     smoke {
       Position: {0, 0, 0}
-      Emitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.2, direction: {0, 1, 0}, spread: 40, speed: {0.5, 1.2}, lifetime: {0.6, 1.0}, size: {0.3, 0.5}, opacity: {0.4, 0.6}, color: {120, 110, 130}, seed: 15}
+      box.particle.Emitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.2, direction: {0, 1, 0}, spread: 40, speed: {0.5, 1.2}, lifetime: {0.6, 1.0}, size: {0.3, 0.5}, opacity: {0.4, 0.6}, color: {120, 110, 130}, seed: 15}
       Burst: {count: 12}
       Curves: {opacity: {keys: [{0, 1}, {1, 0}]}}
     }
@@ -438,7 +438,7 @@ assets {
   prefab LearnBurst {
     stars {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 160, rate: 0, shape: EmitterSphere, radius: 0.5,
         direction: {0, 1, 0}, spread: 180, speed: {2, 6},
         lifetime: {1, 2}, size: {0.1, 0.22}, opacity: {1, 1},
@@ -453,7 +453,7 @@ assets {
   prefab QuestBurst {
     stars {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 90, rate: 0, shape: EmitterDisc, radius: 0.4,
         direction: {0, 1, 0}, spread: 30, radial: {2, 4}, speed: {3, 6},
         lifetime: {0.9, 1.6}, size: {0.12, 0.22}, opacity: {1, 1},
@@ -465,7 +465,7 @@ assets {
     }
     ring {
       Position: {0, 0, 0}
-      Emitter: {max: 60, rate: 0, shape: EmitterDisc, radius: 0.2, direction: {0, 0, 0}, radial: {6, 7}, speed: {0, 0}, lifetime: {0.5, 0.7}, size: {0.2, 0.3}, opacity: {1, 1}, color: {255, 240, 190}, seed: 19}
+      box.particle.Emitter: {max: 60, rate: 0, shape: EmitterDisc, radius: 0.2, direction: {0, 0, 0}, radial: {6, 7}, speed: {0, 0}, lifetime: {0.5, 0.7}, size: {0.2, 0.3}, opacity: {1, 1}, color: {255, 240, 190}, seed: 19}
       Appearance: {blend: Additive}
       Burst: {count: 48}
       Curves: {opacity: {keys: [{0, 1}, {1, 0}]}}
@@ -475,7 +475,7 @@ assets {
   prefab MoteBurst {
     glints {
       Position: {0, 0, 0}
-      Emitter: {max: 60, rate: 0, shape: EmitterSphere, radius: 0.3, direction: {0, 1, 0}, spread: 180, speed: {1.5, 3.5}, lifetime: {0.6, 1.2}, size: {0.08, 0.14}, opacity: {1, 1}, color: {170, 230, 255}, seed: 17}
+      box.particle.Emitter: {max: 60, rate: 0, shape: EmitterSphere, radius: 0.3, direction: {0, 1, 0}, spread: 180, speed: {1.5, 3.5}, lifetime: {0.6, 1.2}, size: {0.08, 0.14}, opacity: {1, 1}, color: {170, 230, 255}, seed: 17}
       Appearance: {blend: Additive}
       Burst: {count: 50}
       Forces: {drag: 2}
@@ -485,7 +485,7 @@ assets {
   prefab Firework {
     sparks {
       Position: {0, 0, 0}
-      Emitter: {
+      box.particle.Emitter: {
         max: 180, rate: 0, shape: EmitterSphere, radius: 0.1,
         direction: {0, 0, 0}, radial: {6, 9},
         lifetime: {1.4, 2.2}, size: {0.18, 0.3}, opacity: {1, 1},
@@ -518,31 +518,31 @@ mossvale {
     crackles {
       if sfx_on[SP_SPARK] {
         Position: {sfx_x[SP_SPARK], 0.7, sfx_z[SP_SPARK]}
-        Emitter: {sound: assets.SfxFireCrackle, interval_min: 0.02, interval_max: 0.14, shape: EmitterSphere, radius: 0.8, volume_min: 0.25, volume_max: 1, pitch_min: 0.6, pitch_max: 1.6}
+        box.audio.Emitter: {sound: assets.SfxFireCrackle, interval_min: 0.02, interval_max: 0.14, shape: EmitterSphere, radius: 0.8, volume_min: 0.25, volume_max: 1, pitch_min: 0.6, pitch_max: 1.6}
       }
     }
     raindrops {
       if sfx_on[SP_SPLASH] {
         Position: {sfx_x[SP_SPLASH], 0.7, sfx_z[SP_SPLASH]}
-        Emitter: {sound: assets.SfxRainDrop, interval_min: 0.012, interval_max: 0.06, shape: EmitterDisc, radius: 2.5, volume_min: 0.2, volume_max: 0.9, pitch_min: 0.7, pitch_max: 1.4}
+        box.audio.Emitter: {sound: assets.SfxRainDrop, interval_min: 0.012, interval_max: 0.06, shape: EmitterDisc, radius: 2.5, volume_min: 0.2, volume_max: 0.9, pitch_min: 0.7, pitch_max: 1.4}
       }
     }
     branches {
       if sfx_on[SP_BLOOM] {
         Position: {sfx_x[SP_BLOOM], 0.7, sfx_z[SP_BLOOM]}
-        Emitter: {sound: assets.SfxWoodCrack, interval_min: 0.06, interval_max: 0.25, shape: EmitterSphere, radius: 1, volume_min: 0.25, volume_max: 0.7, pitch_min: 0.7, pitch_max: 1.3}
+        box.audio.Emitter: {sound: assets.SfxWoodCrack, interval_min: 0.06, interval_max: 0.25, shape: EmitterSphere, radius: 1, volume_min: 0.25, volume_max: 0.7, pitch_min: 0.7, pitch_max: 1.3}
       }
     }
     ice {
       if sfx_on[SP_FROST] {
         Position: {sfx_x[SP_FROST], 0.7, sfx_z[SP_FROST]}
-        Emitter: {sound: assets.SfxIceCrack, interval_min: 0.03, interval_max: 0.12, shape: EmitterSphere, radius: 1.2, volume_min: 0.25, volume_max: 0.8, pitch_min: 0.7, pitch_max: 1.4}
+        box.audio.Emitter: {sound: assets.SfxIceCrack, interval_min: 0.03, interval_max: 0.12, shape: EmitterSphere, radius: 1.2, volume_min: 0.25, volume_max: 0.8, pitch_min: 0.7, pitch_max: 1.4}
       }
     }
     glints {
       if sfx_on[SP_LIFT] {
         Position: {sfx_x[SP_LIFT], 1.2, sfx_z[SP_LIFT]}
-        Emitter: {sound: assets.SfxLiftGlint, interval_min: 0.06, interval_max: 0.2, shape: EmitterHemisphere, radius: 1.2, volume_min: 0.3, volume_max: 0.8, pitch_min: 0.75, pitch_max: 1.5}
+        box.audio.Emitter: {sound: assets.SfxLiftGlint, interval_min: 0.06, interval_max: 0.2, shape: EmitterHemisphere, radius: 1.2, volume_min: 0.3, volume_max: 0.8, pitch_min: 0.75, pitch_max: 1.5}
       }
     }
   }

@@ -419,7 +419,7 @@ assets {
     spout {
       Position: {0, 3.024, -6.6}
       NoShadow
-      Emitter: {
+      box.particle.Emitter: {
         max: 500, rate: spouting ? 190 : 0, direction: {0, 1, 0.08}, spread: 8,
         speed: {8 * size, 12 * size}, lifetime: {0.9, 1.7}, size: {0.35 * size, 0.7 * size}, rotation: {0, 360},
         opacity: {0.55, 0.9}, color: {236, 248, 255}, seed: 31
