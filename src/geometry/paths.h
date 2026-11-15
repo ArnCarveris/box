@@ -21,6 +21,10 @@ int box_path_steps(int32_t value);
 bool box_path2_evaluate(const Path2D *path, float t, vec2 point);
 bool box_path3_evaluate(const Path3D *path, float t, vec3 point);
 
+/* Whether a path has at least one segment, known segment kinds and finite points. */
+bool box_path2_valid(const Path2D *path);
+bool box_path3_valid(const Path3D *path);
+
 /* The segments of a valid path, including the closing segment that a closed path whose last
  * segment does not end at the start gets. The closing segment is Catmull-Rom when the last
  * segment is, otherwise a line. */

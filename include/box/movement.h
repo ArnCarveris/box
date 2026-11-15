@@ -1,6 +1,6 @@
 /**
  * @file box/movement.h
- * @brief Velocity components integrated into Position and Rotation every frame.
+ * @brief Velocity components and path following that move Position and Rotation every frame.
  *
  * Systems in EcsOnUpdate add Velocity times the delta time to the local Position and
  * AngularVelocity times the delta time to the local Rotation, before the transform systems of
@@ -38,6 +38,28 @@ ECS_STRUCT(AngularVelocity, {
     float x; /**< Angular velocity about X */
     float y; /**< Angular velocity about Y */
     float z; /**< Angular velocity about Z */
+});
+
+/** How a PathFollow continues at the ends of its path */
+ECS_ENUM(PathFollowMode, {
+    PathFollowOnce,    /**< Stop at the end, or at the start when moving backwards */
+    PathFollowLoop,    /**< Wrap the distance around to the other end */
+    PathFollowPingPong /**< Reflect at the ends and reverse the sign of speed */
+});
+
+/** Moves the entity along the Path3D of another entity at a constant speed.
+ *
+ * The path points are in the parent space of the follower. The system writes the local
+ * Position, and the Rotation when orient is set: -Z along the tangent, +Y up (+X along Y).
+ *
+ * Implies Position and DynamicTransform. A missing or invalid path leaves the entity as is.
+ */
+ECS_STRUCT(PathFollow, {
+    ecs_entity_t path;   /**< Entity with the Path3D to follow, may inherit it from a prefab */
+    float speed;         /**< Units per second along the path, may be negative */
+    float distance;      /**< Distance along the path, written by the system, set it to seek */
+    PathFollowMode mode; /**< Once stops at the ends, Loop wraps, PingPong reverses */
+    bool orient;         /**< Set Rotation so the entity faces along the path tangent */
 });
 
 /** Register the box.movement module.

@@ -212,7 +212,19 @@
                     "angular_velocity_only_rotates",
                     "velocity_from_script",
                     "angular_velocity_from_script",
-                    "velocity_prefab_instance"
+                    "velocity_prefab_instance",
+                    "path_follow_line",
+                    "path_follow_constant_speed",
+                    "path_follow_once_stops",
+                    "path_follow_loop_open",
+                    "path_follow_loop_closed",
+                    "path_follow_ping_pong",
+                    "path_follow_negative_speed",
+                    "path_follow_orient",
+                    "path_follow_seek",
+                    "path_follow_prefab_path",
+                    "path_follow_path_changed",
+                    "path_follow_invalid_path"
                 ]
             },
             {

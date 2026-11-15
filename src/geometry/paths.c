@@ -89,7 +89,7 @@ int box_path_steps(
 }
 
 #define BOX_PATH_IMPLEMENT(D, POINT, SEGMENT, PATH) \
-static bool box_path##D##_valid(const PATH *path) \
+bool box_path##D##_valid(const PATH *path) \
 { \
     if (!path || !box_path_point(path->start, D)) { \
         return false; \
