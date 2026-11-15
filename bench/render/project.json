@@ -27,7 +27,9 @@
                 "benchcases": [
                     "unchanged",
                     "changed_1pct",
-                    "baked_idle"
+                    "baked_idle",
+                    "fade_hierarchy",
+                    "fade_hierarchy_blend"
                 ]
             },
             {

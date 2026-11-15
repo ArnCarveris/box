@@ -90,7 +90,8 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->shadow_materials, uint32_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, box_draw_moved_t);
-    ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &d->walk, box_draw_walk_t);
+    ecs_vec_fini_t(NULL, &d->fade_links, box_draw_fade_link_t);
     ecs_vec_fini_t(NULL, &d->planets, ecs_entity_t);
     box_draws_order_fini(d);
     box_draws_clips_fini(d);
@@ -100,7 +101,15 @@ done:
     return;
 }
 
-void box_draws_mark(
+/** Add a shape to the changed entities, as box_draws_mark.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param kinds box_draw_kind_t, the streams the change writes
+ * @return Its DrawSlot, NULL when it has none
+ */
+static DrawSlot* box_draws_mark_slot(
     ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e,
@@ -111,14 +120,23 @@ void box_draws_mark(
         goto done;
     }
 
-    s->changed |= kinds;
+    s->changed |= (kinds & BOX_DRAW_FADE) ? kinds : (uint8_t)(kinds | BOX_DRAW_KEY);
     if (!s->dirty) {
         s->dirty = true;
         *ecs_vec_append_t(NULL, &d->dirty, ecs_entity_t) = e;
     }
 
 done:
-    return;
+    return s;
+}
+
+void box_draws_mark(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    uint8_t kinds)
+{
+    box_draws_mark_slot(world, d, e, kinds);
 }
 
 /** Mark the entities of an observer event as changed.
@@ -208,7 +226,7 @@ static void BoxDrawsOnMove(
 static void BoxDrawsOnShadingMove(
     ecs_iter_t *it)
 {
-    box_draws_on_move(it, BOX_DRAW_SHADING);
+    box_draws_on_move(it, BOX_DRAW_SHADING | BOX_DRAW_FADE);
 }
 
 /** Mark the static entities whose WorldTransform was set, in their transform; the descendants
@@ -422,7 +440,127 @@ done:
     return;
 }
 
+/** Compose the Opacity and the Tint of an ancestor after those of the nearer ancestors.
+ *
+ * @param opacity Its Opacity, NULL for none
+ * @param t Its Tint, NULL for none
+ * @param fade The product of the Opacity of the nearer ancestors, receives it with this one
+ * @param tint The tints of the nearer ancestors, receives them with this one
+ */
+static void box_draws_fade_step(
+    const Opacity *opacity,
+    const Tint *t,
+    float *fade,
+    box_draw_tint_t *tint)
+{
+    if (opacity) {
+        *fade *= glm_clamp(opacity->value, 0.0f, 1.0f);
+    }
+
+    if (t) {
+        float a = (float)t->a / 255.0f;
+        float weight = a * tint->keep / 255.0f;
+        tint->add[0] += (float)t->r * weight;
+        tint->add[1] += (float)t->g * weight;
+        tint->add[2] += (float)t->b * weight;
+        tint->keep *= 1.0f - a;
+    }
+}
+
+/** Compose the fade of an entity from the chain of its ancestors with an Opacity or a Tint, in
+ * the order of box_draws_fade, so the result is the same.
+ *
+ * @param d The state
+ * @param link Index of the first box_draw_fade_link_t, -1 for none
+ * @param tint Receives the tints of the ancestors
+ * @return The product of the Opacity of the ancestors
+ */
+static float box_draws_fade_chain(
+    const box_render_draws_t *d,
+    int32_t link,
+    box_draw_tint_t *tint)
+{
+    float result = 1.0f;
+    *tint = (box_draw_tint_t){ .keep = 1.0f };
+    while (link >= 0) {
+        const box_draw_fade_link_t *l = ecs_vec_get_t(&d->fade_links, box_draw_fade_link_t, link);
+        box_draws_fade_step(l->has_opacity ? &l->opacity : NULL, l->has_tint ? &l->tint : NULL,
+            &result, tint);
+        link = l->next;
+    }
+
+    return result;
+}
+
+/** Add an entity in front of a chain of ancestors when it has an Opacity or a Tint.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param next Index of the chain of its ancestors, -1 for none
+ * @return Index of the chain of the children of the entity
+ */
+static int32_t box_draws_fade_link(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    int32_t next)
+{
+    const Opacity *opacity = ecs_get(world, e, Opacity);
+    const Tint *t = ecs_get(world, e, Tint);
+    int32_t result = next;
+    if (opacity || t) {
+        box_draw_fade_link_t *l = ecs_vec_append_t(NULL, &d->fade_links, box_draw_fade_link_t);
+        *l = (box_draw_fade_link_t){
+            .opacity = opacity ? *opacity : (Opacity){0},
+            .tint = t ? *t : (Tint){0},
+            .has_opacity = opacity != NULL,
+            .has_tint = t != NULL,
+            .next = next
+        };
+        result = ecs_vec_count(&d->fade_links) - 1;
+    }
+
+    return result;
+}
+
+/** Make the chain of the ancestors of a subtree root with an Opacity or a Tint, from the
+ * nearest one up.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The root
+ * @return Index of the first link, -1 for none
+ */
+static int32_t box_draws_fade_root(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    int32_t result = -1, last = -1;
+    ecs_entity_t cur = ecs_get_parent(world, e);
+    while (cur) {
+        int32_t link = box_draws_fade_link(world, d, cur, -1);
+        if (link >= 0) {
+            if (last >= 0) {
+                ecs_vec_get_t(&d->fade_links, box_draw_fade_link_t, last)->next = link;
+            } else {
+                result = link;
+            }
+
+            last = link;
+        }
+
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
+}
+
 /** Mark every entity of the changed subtrees, the roots included.
+ *
+ * The walk carries the Opacity and Tint of the ancestors down, so each shape gets its fade
+ * (BOX_DRAW_FADE in DrawSlot.changed) without walking up the hierarchy again.
  *
  * @param world The world
  * @param d The state
@@ -438,16 +576,31 @@ static void box_draws_walk(
             continue;
         }
 
-        *ecs_vec_append_t(NULL, &d->walk, ecs_entity_t) = moved.root;
+        ecs_vec_clear(&d->fade_links);
+        *ecs_vec_append_t(NULL, &d->walk, box_draw_walk_t) = (box_draw_walk_t){
+            .e = moved.root, .fade = box_draws_fade_root(world, d, moved.root)
+        };
         while (ecs_vec_count(&d->walk)) {
-            ecs_entity_t e = *ecs_vec_last_t(&d->walk, ecs_entity_t);
+            box_draw_walk_t cur = *ecs_vec_last_t(&d->walk, box_draw_walk_t);
+            int32_t children = -2;
             ecs_vec_remove_last(&d->walk);
-            box_draws_mark(world, d, e, moved.kinds);
-            ecs_iter_t it = ecs_children(world, e);
+            DrawSlot *s = box_draws_mark_slot(world, d, cur.e, moved.kinds);
+            if (s) {
+                s->fade = box_draws_fade_chain(d, cur.fade, &s->tint);
+                s->changed |= BOX_DRAW_FADE;
+            }
+
+            ecs_iter_t it = ecs_children(world, cur.e);
             while (ecs_children_next(&it)) {
                 int32_t c;
+                if (it.count && children == -2) {
+                    children = box_draws_fade_link(world, d, cur.e, cur.fade);
+                }
+
                 for (c = 0; c < it.count; c ++) {
-                    *ecs_vec_append_t(NULL, &d->walk, ecs_entity_t) = it.entities[c];
+                    *ecs_vec_append_t(NULL, &d->walk, box_draw_walk_t) = (box_draw_walk_t){
+                        .e = it.entities[c], .fade = children
+                    };
                 }
             }
         }
@@ -465,21 +618,8 @@ float box_draws_fade(
     ecs_entity_t cur = ecs_get_parent(world, e);
     *tint = (box_draw_tint_t){ .keep = 1.0f };
     while (cur) {
-        const Opacity *opacity = ecs_get(world, cur, Opacity);
-        const Tint *t = ecs_get(world, cur, Tint);
-        if (opacity) {
-            result *= glm_clamp(opacity->value, 0.0f, 1.0f);
-        }
-
-        if (t) {
-            float a = (float)t->a / 255.0f;
-            float weight = a * tint->keep / 255.0f;
-            tint->add[0] += (float)t->r * weight;
-            tint->add[1] += (float)t->g * weight;
-            tint->add[2] += (float)t->b * weight;
-            tint->keep *= 1.0f - a;
-        }
-
+        box_draws_fade_step(ecs_get(world, cur, Opacity), ecs_get(world, cur, Tint), &result,
+            tint);
         cur = ecs_get_parent(world, cur);
     }
 
@@ -918,6 +1058,35 @@ static void box_draws_key(
         !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
 
+/** Check whether a shape whose only change is the Opacity or Tint of an ancestor keeps the key
+ * of its batch: box_draws_key resolves the blend of the key from its alpha.
+ *
+ * The other fields of the key, and the planet, atmosphere and bake that follow the blend, do
+ * not depend on the alpha.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param key The key of its batch
+ * @param material Its material, with the fade of this extract
+ * @return Whether the key is unchanged
+ */
+static bool box_draws_blend_kept(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const box_draw_key_t *key,
+    const box_draw_material_t *material)
+{
+    bool result = key->transmissive;
+    if (!result) {
+        bool fading = ecs_has_id(world, e, TransitionOpacity);
+        result = box_draws_scene_blend(ecs_get(world, e, BlendMode),
+            fading ? 0.0f : box_draws_alpha(material), key->cutout, material->shape2d,
+            key->features) == key->blend;
+    }
+
+    return result;
+}
+
 /** Record the regions of a caster slot whose instance was written, as bake_change.c records
  * the bounds of changed static shapes; the light extract renders the tiles they reach into.
  *
@@ -999,9 +1168,20 @@ static void box_draws_update_shape(
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
-        s->fade = box_draws_fade(world, e, &s->tint);
+        if (!(kinds & BOX_DRAW_FADE)) {
+            s->fade = box_draws_fade(world, e, &s->tint);
+        }
+
         s->tinted = s->tint.keep < 1.0f;
         box_draws_shape_material(world, e, s, &material);
+        if (!(kinds & BOX_DRAW_KEY) && s->batch >= 0) {
+            b = box_draws_batch(d, s->batch);
+            if (box_draws_blend_kept(world, e, &b->key, &material)) {
+                kept = true;
+                goto write;
+            }
+        }
+
         box_draws_key(world, d, e, shape, box_draws_alpha(&material), &key);
     }
 
@@ -1027,6 +1207,7 @@ static void box_draws_update_shape(
     b = box_draws_batch(d, s->batch);
     kinds = BOX_DRAW_ALL;
 write:
+    kinds &= BOX_DRAW_ALL;
     if (kinds & BOX_DRAW_TRANSFORM) {
         kinds |= BOX_DRAW_FRAME;
     }
@@ -1157,7 +1338,7 @@ static void box_draws_update(
     }
 
     if (ecs_has(world, e, TextSlots)) {
-        box_draws_text_update(world, d, e, kinds);
+        box_draws_text_update(world, d, e, kinds & BOX_DRAW_ALL);
     }
 
 done:
@@ -1603,7 +1784,8 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->free_batches, int32_t, 0);
     ecs_vec_init_t(NULL, &d->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->moved, box_draw_moved_t, 0);
-    ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &d->walk, box_draw_walk_t, 0);
+    ecs_vec_init_t(NULL, &d->fade_links, box_draw_fade_link_t, 0);
     ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);

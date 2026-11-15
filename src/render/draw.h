@@ -76,7 +76,12 @@ typedef enum box_draw_kind_t {
     BOX_DRAW_FRAME = 1 << BOX_RENDER_STREAM_FRAME,         /**< The frame stream, which a change
                                                             *   of the transform writes too */
     BOX_DRAW_BOTH = BOX_DRAW_TRANSFORM | BOX_DRAW_SHADING, /**< Transform and shading */
-    BOX_DRAW_ALL = BOX_DRAW_BOTH | BOX_DRAW_SURFACE | BOX_DRAW_FRAME /**< Every stream */
+    BOX_DRAW_ALL = BOX_DRAW_BOTH | BOX_DRAW_SURFACE | BOX_DRAW_FRAME, /**< Every stream */
+    BOX_DRAW_FADE = 1 << 6, /**< To box_draws_mark: an ancestor Opacity or Tint changed, which
+                             *   may change only the blend of the key; in DrawSlot.changed: the
+                             *   walk computed fade and tint for this extract */
+    BOX_DRAW_KEY = 1 << 7   /**< In DrawSlot.changed: a change other than BOX_DRAW_FADE, which
+                             *   may change the key */
 } box_draw_kind_t;
 
 /** Layout of the instance pages of a store: one buffer per stream, each with its bytes per slot */
@@ -591,6 +596,23 @@ typedef struct box_draw_moved_t {
     uint8_t kinds;          /**< box_draw_kind_t */
 } box_draw_moved_t;
 
+/** An ancestor with an Opacity or a Tint, in a chain from the nearest ancestor up, which a
+ * subtree walk carries down so a shape composes the fade of its ancestors without an up search */
+typedef struct box_draw_fade_link_t {
+    Opacity opacity;        /**< Its Opacity, when has_opacity */
+    Tint tint;              /**< Its Tint, when has_tint */
+    bool has_opacity;       /**< It has an Opacity */
+    bool has_tint;          /**< It has a Tint */
+    int32_t next;           /**< Index of the next ancestor of the chain, -1 for none */
+} box_draw_fade_link_t;
+
+/** An entity of a subtree walk with the chain of its ancestors */
+typedef struct box_draw_walk_t {
+    ecs_entity_t e;         /**< The entity */
+    int32_t fade;           /**< Index of the first box_draw_fade_link_t of its ancestors, -1 for
+                             *   none */
+} box_draw_walk_t;
+
 /** Main thread state of the instanced batches */
 typedef struct box_render_draws_t {
     ecs_query_t *dynamic_transform; /**< Shapes with DynamicTransform */
@@ -607,7 +629,8 @@ typedef struct box_render_draws_t {
     ecs_map_t lookup;           /**< Key hash to the index of the first batch plus one */
     ecs_vec_t dirty;            /**< ecs_entity_t, entities whose instance may have changed */
     ecs_vec_t moved;            /**< box_draw_moved_t, roots of changed subtrees */
-    ecs_vec_t walk;             /**< ecs_entity_t, stack of a subtree walk */
+    ecs_vec_t walk;             /**< box_draw_walk_t, stack of a subtree walk */
+    ecs_vec_t fade_links;       /**< box_draw_fade_link_t, ancestors of the subtree walks */
     ecs_map_t meshes;           /**< Mesh handles the backend received */
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
     ecs_vec_t blended;          /**< int32_t, blended batches the frame draws */

@@ -1068,6 +1068,19 @@
                     "shape_draws_with_extended",
                     "feature_off_draws_with_mesh_shader"
                 ]
+            },
+            {
+                "id": "DrawsShading",
+                "testcases": [
+                    "opacity_fade_moves_to_blended_and_back",
+                    "opacity_fade_keeps_blended_batch",
+                    "nested_opacity_matches_up_search",
+                    "tint_updates_descendant_shading",
+                    "dynamic_material_ancestor_keeps_key",
+                    "no_shadow_ancestor_keeps_key",
+                    "light_fixture_ancestor_keeps_key",
+                    "fade_with_other_change_rekeys"
+                ]
             }
         ]
     }

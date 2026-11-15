@@ -167,3 +167,106 @@ void Extract_baked_idle(
     // baked_lighting/probe_volume
     bench_render_extract(b, 0, true);
 }
+
+/** Ships of the fade scene */
+#define BENCH_FADE_SHIPS (4)
+
+/** Levels of the hierarchy of a ship */
+#define BENCH_FADE_DEPTH (12)
+
+/** Shapes on each level of a ship */
+#define BENCH_FADE_WIDTH (340)
+
+/** Run frames of ships of deep hierarchies (BENCH_FADE_DEPTH levels of BENCH_FADE_WIDTH shapes,
+ * about 4k shapes each) whose root Opacity changes every frame, as a fade does.
+ *
+ * The scene has blend modes, so a fade below 1 draws the shapes blended. Some levels have
+ * DynamicMaterial, NoShadow or LightFixture, which the shapes below inherit through ChildOf.
+ *
+ * @param b The benchmark
+ * @param blend The fade crosses 1 every frame, so the shapes move between the opaque and the
+ * blended batches; otherwise it stays below 1 and the shapes keep their batches
+ */
+static void bench_render_fade(
+    bench_t *b,
+    bool blend)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, Scene, {.blend_modes = true});
+    box_render_backend_t backend = { .render = bench_render_drop };
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t roots[BENCH_FADE_SHIPS];
+    int32_t s, l, w;
+    for (s = 0; s < BENCH_FADE_SHIPS; s ++) {
+        ecs_entity_t parent = roots[s] = ecs_new(world);
+        ecs_set(world, parent, Position, {(float)s * 50.0f, 0, 0});
+        for (l = 0; l < BENCH_FADE_DEPTH; l ++) {
+            ecs_entity_t first = 0;
+            for (w = 0; w < BENCH_FADE_WIDTH; w ++) {
+                ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+                ecs_set(world, e, Position, {(float)(w % 20), (float)l, (float)(w / 20)});
+                ecs_set(world, e, Box, {0.5f, 0.5f, 0.5f});
+                ecs_set(world, e, Rgb, {200, 100, 50});
+                first = first ? first : e;
+            }
+
+            if (l == 3) {
+                ecs_add_id(world, first, NoShadow);
+            } else if (l == 6) {
+                ecs_add_id(world, first, LightFixture);
+            } else if (l == 9) {
+                ecs_add_id(world, first, DynamicMaterial);
+            }
+
+            parent = first;
+        }
+    }
+
+    box_render_draws_stats_t stats = {0};
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    double frames = 0, processed = 0;
+    int32_t frame = 0;
+    bench_set_items(b, BENCH_FADE_SHIPS * BENCH_FADE_DEPTH * BENCH_FADE_WIDTH);
+    while (bench_iter(b)) {
+        float opacity = blend ? ((frame & 1) ? 1.0f : 0.5f) :
+            0.25f + 0.5f * (float)(frame % 64) / 64.0f;
+        for (s = 0; s < BENCH_FADE_SHIPS; s ++) {
+            ecs_set(world, roots[s], Opacity, {opacity});
+        }
+
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+        processed += (double)stats.processed;
+        frames ++;
+        frame ++;
+    }
+
+    bench_counter(b, "frames", frames);
+    if (frames) {
+        bench_counter(b, "processed_per_frame", processed / frames);
+    }
+
+    box_render_sync(world);
+    ecs_fini(world);
+}
+
+void Extract_fade_hierarchy(
+    bench_t *b)
+{
+    // renderer/instancing
+    bench_render_fade(b, false);
+}
+
+void Extract_fade_hierarchy_blend(
+    bench_t *b)
+{
+    // renderer/instancing
+    bench_render_fade(b, true);
+}
