@@ -17,6 +17,7 @@
 #include "render.h"
 #include "spatial.h"
 #include <string.h>
+#include <math.h>
 
 /** Warnings logged while the log hook is set that name the view "probed" */
 static int32_t debug_warnings;
@@ -560,6 +561,7 @@ void ViewDebug_bvh_defaults(void) {
     test_bool(b->static_tree, false);
     test_bool(b->dynamic_tree, false);
     test_bool(b->ui_tree, false);
+    test_bool(b->mover_trees, false);
     test_bool(b->leaves, true);
     test_int(b->levels, 0);
 
@@ -569,12 +571,14 @@ void ViewDebug_bvh_defaults(void) {
 
     test_assert(ecs_script_run(world, "debug_bvh",
         "using box.view\n"
-        "trees { View: {debug: {bvh: {static_tree: true, dynamic_tree: true, levels: 3}}} }\n",
+        "trees { View: {debug: {bvh: {static_tree: true, dynamic_tree: true, mover_trees: true, "
+        "levels: 3}}} }\n",
         NULL) == 0);
     b = &ecs_get(world, ecs_lookup(world, "trees"), View)->debug.bvh;
     test_bool(b->static_tree, true);
     test_bool(b->dynamic_tree, true);
     test_bool(b->ui_tree, false);
+    test_bool(b->mover_trees, true);
     test_bool(b->leaves, true);
     test_int(b->levels, 3);
     ecs_fini(world);
@@ -828,6 +832,379 @@ void ViewDebug_bvh_capture_copies_boxes(void) {
     v = debug_view_of_target(p, BOX_RENDER_CAPTURE_TARGET_FIRST + 1);
     test_assert(v != NULL);
     test_int(v->debug_box_count, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+/** Create a mover with a grid of unit box shapes under it.
+ *
+ * @param world The world
+ * @param side Shapes per row and column of the grid
+ * @param shapes Receives the side * side shapes, NULL for none
+ * @return The mover
+ */
+static ecs_entity_t debug_mover(
+    ecs_world_t *world,
+    int32_t side,
+    ecs_entity_t *shapes)
+{
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {3, 1, -2});
+    ecs_add(world, mover, DynamicTransform);
+    int32_t x, z;
+    for (z = 0; z < side; z ++) {
+        for (x = 0; x < side; x ++) {
+            ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, mover);
+            ecs_set(world, e, Position, {(float)x * 2.0f, 0, (float)z * 2.0f});
+            ecs_set(world, e, Box, {1, 1, 1});
+            if (shapes) {
+                shapes[z * side + x] = e;
+            }
+        }
+    }
+
+    return mover;
+}
+
+/** Create a view of a camera that draws the trees of the movers.
+ *
+ * @param world The world
+ * @return The view
+ */
+static ecs_entity_t debug_mover_view(
+    ecs_world_t *world)
+{
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *data = ecs_get_mut(world, view, View);
+    data->camera = camera;
+    data->debug.bvh.mover_trees = true;
+    ecs_modified(world, view, View);
+
+    return view;
+}
+
+/** Get a box of a view of the last packet.
+ *
+ * @param p The packet
+ * @param v The view
+ * @param i The box of the view
+ * @return The box
+ */
+static const box_render_debug_box_t* debug_box_of(
+    const box_render_packet_t *p,
+    const box_render_view_t *v,
+    int32_t i)
+{
+    return ecs_vec_get_t(&p->debug_boxes, box_render_debug_box_t, v->debug_box_first + i);
+}
+
+/** Get the pose of a box of a view of the last packet.
+ *
+ * @param p The packet
+ * @param v The view
+ * @param b The box
+ * @return The 16 floats of its matrix
+ */
+static const float* debug_pose_of(
+    const box_render_packet_t *p,
+    const box_render_view_t *v,
+    const box_render_debug_box_t *b)
+{
+    test_assert((int32_t)b->pose < v->debug_pose_count);
+    return &(*ecs_vec_get_t(&p->debug_poses, mat4, v->debug_pose_first + (int32_t)b->pose))[0][0];
+}
+
+void ViewDebug_bvh_mover_tree_boxes(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t still = ecs_new(world);
+    ecs_set(world, still, Position, {-20, 0, 0});
+    ecs_set(world, still, Box, {1, 1, 1});
+    ecs_entity_t shapes[16];
+    debug_mover(world, 4, shapes);
+    ecs_entity_t view = debug_mover_view(world);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_uint(v->view, view);
+    test_int(v->debug_box_count, 31);
+    test_int(v->debug_pose_count, 2);
+    const float *identity = &(*ecs_vec_get_t(&p->debug_poses, mat4, v->debug_pose_first))[0][0];
+    int32_t i, k;
+    for (k = 0; k < 16; k ++) {
+        test_flt(identity[k], (k % 5) ? 0.0f : 1.0f);
+    }
+
+    int32_t leaves = 0, roots = 0;
+    for (i = 0; i < v->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = debug_box_of(p, v, i);
+        test_uint(b->kind & 3u, BOX_RENDER_DEBUG_BOX_MOVER);
+        test_uint(b->pose, 1);
+        if (b->kind & BOX_RENDER_DEBUG_BOX_LEAF) {
+            leaves ++;
+            test_assert(b->depth > 0);
+            test_flt(b->max[0] - b->min[0], 1);
+            test_flt(b->max[1] - b->min[1], 1);
+            test_flt(b->max[2] - b->min[2], 1);
+        }
+
+        if (b->depth == 0) {
+            roots ++;
+            test_flt(b->min[0], -0.5f);
+            test_flt(b->max[0], 6.5f);
+            test_flt(b->min[1], -0.5f);
+            test_flt(b->max[1], 0.5f);
+            test_flt(b->min[2], -0.5f);
+            test_flt(b->max[2], 6.5f);
+        }
+    }
+
+    test_int(leaves, 16);
+    test_int(roots, 1);
+    const float *pose = debug_pose_of(p, v, debug_box_of(p, v, 0));
+    test_flt(pose[12], 3);
+    test_flt(pose[13], 1);
+    test_flt(pose[14], -2);
+    test_flt(pose[0], 1);
+    test_flt(pose[5], 1);
+    test_flt(pose[10], 1);
+
+    /* The static and dynamic trees keep the identity */
+    View *data = ecs_get_mut(world, view, View);
+    data->debug.bvh.static_tree = true;
+    data->debug.bvh.dynamic_tree = true;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 33);
+    test_int(v->debug_pose_count, 2);
+    int32_t movers = 0;
+    for (i = 0; i < v->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = debug_box_of(p, v, i);
+        if ((b->kind & 3u) == BOX_RENDER_DEBUG_BOX_MOVER) {
+            movers ++;
+            test_uint(b->pose, 1);
+        } else {
+            test_uint(b->pose, 0);
+            test_uint(b->kind, ((b->kind & 3u) | BOX_RENDER_DEBUG_BOX_LEAF));
+        }
+    }
+
+    test_int(movers, 31);
+
+    /* A disabled shape leaves the tree as queries leave it out */
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.static_tree = false;
+    data->debug.bvh.dynamic_tree = false;
+    ecs_modified(world, view, View);
+    ecs_enable(world, shapes[5], false);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    leaves = 0;
+    for (i = 0; i < v->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = debug_box_of(p, v, i);
+        test_uint(b->kind & 3u, BOX_RENDER_DEBUG_BOX_MOVER);
+        leaves += (b->kind & BOX_RENDER_DEBUG_BOX_LEAF) != 0;
+    }
+
+    test_int(leaves, 15);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_mover_tree_levels_and_leaves(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    debug_mover(world, 4, NULL);
+    ecs_entity_t other = debug_mover(world, 4, NULL);
+    ecs_set(world, other, Position, {-10, 0, 0});
+    ecs_entity_t view = debug_mover_view(world);
+    View *data = ecs_get_mut(world, view, View);
+    data->debug.bvh.levels = 1;
+    ecs_modified(world, view, View);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 2);
+    test_int(v->debug_pose_count, 3);
+    int32_t i;
+    uint32_t poses = 0;
+    for (i = 0; i < v->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = debug_box_of(p, v, i);
+        test_uint(b->depth, 0);
+        test_uint(b->kind, BOX_RENDER_DEBUG_BOX_MOVER);
+        poses |= 1u << b->pose;
+    }
+
+    test_uint(poses, 6u);
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.levels = 2;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 6);
+    for (i = 0; i < v->debug_box_count; i ++) {
+        test_assert(debug_box_of(p, v, i)->depth < 2);
+    }
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.levels = 0;
+    data->debug.bvh.leaves = false;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 30);
+    for (i = 0; i < v->debug_box_count; i ++) {
+        test_uint(debug_box_of(p, v, i)->kind, BOX_RENDER_DEBUG_BOX_MOVER);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_mover_tree_rotated(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    ecs_entity_t mover = debug_mover(world, 4, NULL);
+    ecs_set(world, mover, Rotation, {0.3f, 0.7f, 0.2f});
+    debug_mover_view(world);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 31);
+    const WorldTransform *t = ecs_get(world, mover, WorldTransform);
+    test_assert(t != NULL);
+    test_assert(fabsf(t->m[0][1]) > 0.1f || fabsf(t->m[0][2]) > 0.1f);
+    int32_t i, k;
+    for (i = 0; i < v->debug_box_count; i ++) {
+        const box_render_debug_box_t *b = debug_box_of(p, v, i);
+        const float *pose = debug_pose_of(p, v, b);
+        test_uint(b->pose, 1);
+        for (k = 0; k < 16; k ++) {
+            test_flt(pose[k], (&t->m[0][0])[k]);
+        }
+
+        /* The boxes stay in the frame of the mover, not world bounds */
+        if (b->kind & BOX_RENDER_DEBUG_BOX_LEAF) {
+            test_flt(b->max[0] - b->min[0], 1);
+            test_flt(b->max[1] - b->min[1], 1);
+            test_flt(b->max[2] - b->min[2], 1);
+        }
+
+        if (b->depth == 0) {
+            test_flt(b->min[0], -0.5f);
+            test_flt(b->max[0], 6.5f);
+        }
+    }
+
+    ecs_set(world, mover, Rotation, {-0.5f, 1.9f, 0.1f});
+    ecs_set(world, mover, Position, {-4, 2, 7});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 31);
+    t = ecs_get(world, mover, WorldTransform);
+    const float *pose = debug_pose_of(p, v, debug_box_of(p, v, 0));
+    for (k = 0; k < 16; k ++) {
+        test_flt(pose[k], (&t->m[0][0])[k]);
+    }
+
+    test_flt(pose[12], -4);
+    test_flt(pose[13], 2);
+    test_flt(pose[14], 7);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_mover_tree_small_mover(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    debug_mover(world, 2, NULL);
+    debug_mover_view(world);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 0);
+    test_int(v->debug_pose_count, 0);
+    test_int(ecs_vec_count(&p->debug_boxes), 0);
+    test_int(ecs_vec_count(&p->debug_poses), 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void ViewDebug_bvh_mover_trees_off(void) {
+    // debug/bvh
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    debug_mover(world, 4, NULL);
+    ecs_entity_t view = debug_mover_view(world);
+    View *data = ecs_get_mut(world, view, View);
+    data->debug.bvh.mover_trees = false;
+    ecs_modified(world, view, View);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_render_packet_t *p = &null->last;
+    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 0);
+    test_int(ecs_vec_count(&p->debug_boxes), 0);
+
+    data = ecs_get_mut(world, view, View);
+    data->debug.bvh.dynamic_tree = true;
+    ecs_modified(world, view, View);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    p = &null->last;
+    v = ecs_vec_get_t(&p->views, box_render_view_t, 0);
+    test_int(v->debug_box_count, 1);
+    test_int(v->debug_pose_count, 1);
+    const box_render_debug_box_t *b = debug_box_of(p, v, 0);
+    test_uint(b->kind, BOX_SPATIAL_DYNAMIC | BOX_RENDER_DEBUG_BOX_LEAF);
+    test_uint(b->pose, 0);
 
     ecs_fini(world);
     box_render_null_free(null);

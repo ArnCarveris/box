@@ -602,3 +602,78 @@ int32_t box_spatial_tree_walk(
 
     return result;
 }
+
+/** Walk of the trees of the movers of a scene */
+typedef struct box_spatial_mover_walk_t {
+    const box_spatial_mover_t *mover; /**< The mover walked */
+    box_spatial_box_visit_t visit;    /**< Receives the boxes */
+    void *ctx;                        /**< Context passed to visit */
+    int32_t count;                    /**< Boxes visited */
+} box_spatial_mover_walk_t;
+
+/** Pass a box of the tree of a mover on to the visit of a mover walk, unless it is the leaf of
+ * a shape that is disabled or left the mover.
+ *
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param depth Depth of the box
+ * @param item The member of a leaf, BOX_BVH_NULL for a node
+ * @param ctx The mover walk
+ * @return false to skip the children of the node
+ */
+static bool box_spatial_mover_box(
+    const vec3 min,
+    const vec3 max,
+    int32_t depth,
+    int32_t item,
+    void *ctx)
+{
+    box_spatial_mover_walk_t *w = ctx;
+    bool result = true;
+    if (item != BOX_BVH_NULL) {
+        const box_spatial_member_t *member = ecs_vec_get_t(
+            &w->mover->members, box_spatial_member_t, item);
+        if (!member->entity || member->disabled) {
+            goto done;
+        }
+    }
+
+    w->count ++;
+    result = w->visit(min, max, depth, item != BOX_BVH_NULL, w->ctx);
+done:
+    return result;
+}
+
+int32_t box_spatial_mover_walk(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    box_spatial_mover_visit_t mover_visit,
+    box_spatial_box_visit_t visit,
+    void *ctx)
+{
+    box_spatial_t *index = ECS_CONST_CAST(box_spatial_t*, box_spatial_of(world));
+    const box_spatial_scene_t *s = index ? box_spatial_scene(index, scene) : NULL;
+    box_spatial_mover_walk_t w = { .visit = visit, .ctx = ctx };
+    int32_t i, count = index ? ecs_vec_count(&index->movers) : 0;
+    if (!s) {
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        const box_spatial_mover_t *m = box_spatial_mover(index, i);
+        if (!m->entity || m->item < 0 || m->scene != s->entity) {
+            continue;
+        }
+
+        const box_bvh_t *tree = box_spatial_mover_tree(index, i);
+        if (!tree || !mover_visit(m->entity, &m->pose[0][0], ctx)) {
+            continue;
+        }
+
+        w.mover = m;
+        box_bvh_walk(tree, box_spatial_mover_box, &w);
+    }
+
+done:
+    return w.count;
+}

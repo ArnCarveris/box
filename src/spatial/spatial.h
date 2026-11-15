@@ -220,6 +220,39 @@ int32_t box_spatial_tree_walk(
     box_spatial_box_visit_t visit,
     void *ctx);
 
+/** Receive a mover whose tree a walk of the movers of a scene visits next.
+ *
+ * @param mover The mover
+ * @param pose The 16 floats of the world transform the mover is placed with, column by column,
+ *   which places the boxes of its tree
+ * @param ctx Context of the walk
+ * @return false to skip the boxes of its tree
+ */
+typedef bool (*box_spatial_mover_visit_t)(
+    ecs_entity_t mover,
+    const float *pose,
+    void *ctx);
+
+/** Walk the trees of the movers of a scene, each from its root down, in the frame of the mover.
+ *
+ * A mover with too few shapes for a tree is left out. A stale tree is built as the first query
+ * of the mover would build it. The leaves of the shapes that are disabled or left the mover are
+ * left out, as queries leave them out.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param mover_visit Receives each mover before the boxes of its tree
+ * @param visit Receives the boxes of the tree of the mover, depth 0 at its root
+ * @param ctx Context passed to mover_visit and visit
+ * @return Number of boxes visited
+ */
+int32_t box_spatial_mover_walk(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    box_spatial_mover_visit_t mover_visit,
+    box_spatial_box_visit_t visit,
+    void *ctx);
+
 /** Bring the index up to date with the changes since the last update.
  *
  * The box.spatial.Update system does this every frame in OnStore, after the transforms.

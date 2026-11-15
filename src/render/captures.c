@@ -190,6 +190,8 @@ static int box_render_capture_camera(
         v->debug = source->debug;
         v->debug_box_first = source->debug_box_first;
         v->debug_box_count = source->debug_box_count;
+        v->debug_pose_first = source->debug_pose_first;
+        v->debug_pose_count = source->debug_pose_count;
         v->features = source->features;
         v->scene_features = source->scene_features;
     } else {

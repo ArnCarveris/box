@@ -164,16 +164,22 @@ ECS_ENUM(OverdrawMode, {
 
 /** Boxes of the bounding volume hierarchies of the spatial index of the scene of a view
  * (ViewDebug.bvh), as lines that what is in front hides: the static tree in green, the dynamic
- * tree in orange and the UI tree in magenta, fainter with the depth of a node.
+ * tree in orange, the UI tree in magenta and the trees of the movers in cyan, fainter with the
+ * depth of a node.
  *
  * A leaf is the box of an entity at half the alpha: its exact bounds in the static and UI trees,
- * its fat bounds, which reach ahead along its motion, in the dynamic tree. A view draws at most
+ * its fat bounds, which reach ahead along its motion, in the dynamic tree, and its bounds in the
+ * frame of its mover in the tree of a mover. The boxes of the tree of a mover are in its frame
+ * and drawn turned and moved with the mover; levels counts from the root of each of them. A
+ * mover with too few shapes for a tree draws none. A view draws at most
  * BOX_VIEW_DEBUG_BOXES_MAX boxes and leaves out the rest of its trees.
  */
 ECS_STRUCT(BvhDebug, {
     bool static_tree;       /**< Boxes of the static tree, the shapes that move on change */
     bool dynamic_tree;      /**< Boxes of the dynamic tree, the shapes with DynamicTransform */
     bool ui_tree;           /**< Boxes of the UI tree, the UI elements without a shape */
+    bool mover_trees;       /**< Boxes of the tree of every mover (DynamicTransform) over the
+                             *   shapes under it, in its frame */
     bool leaves;            /**< Also the boxes of the entities, default true */
     int32_t levels;         /**< Levels drawn from the root down, 0 for every level */
 });

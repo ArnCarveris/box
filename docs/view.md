@@ -67,7 +67,7 @@ hud_view { View: {camera: hud.camera, lighting: {enabled: false}, culling: {enab
 | `wireframe_color`, `wireframe_width` | default white alpha 200, 1 px |
 | `overdraw` | `OverdrawOff`, `OverdrawAll`, `OverdrawPlain`, `OverdrawCutout` heat map of the depth prepass |
 | `light_probes`, `reflection_probes`, `probe_size` | Probe spheres the view samples (needs `lighting.baked` / `reflections`) |
-| `bvh` | `BvhDebug {static_tree, dynamic_tree, ui_tree, leaves (default true), levels}`: spatial index boxes, static green, dynamic orange, UI magenta; at most `BOX_VIEW_DEBUG_BOXES_MAX` boxes |
+| `bvh` | `BvhDebug {static_tree, dynamic_tree, ui_tree, mover_trees, leaves (default true), levels}`: spatial index boxes, static green, dynamic orange, UI magenta, the tree of each mover in cyan, oriented by the mover, with `levels` counted from its root; at most `BOX_VIEW_DEBUG_BOXES_MAX` boxes |
 
 ```flecs
 View: {camera: camera, debug: {wireframe: WireframeOverlay, wireframe_color: {0, 255, 0, 255}}}

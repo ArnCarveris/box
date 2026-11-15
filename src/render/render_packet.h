@@ -607,12 +607,19 @@ typedef struct box_render_view_env_t {
 /** A box of a tree of the spatial index the debug pass of a view draws (BvhDebug), matching
  * BvhBox in debug_bvh.wgsl */
 typedef struct box_render_debug_box_t {
-    vec3 min;           /**< Minimum corner in world space */
-    uint32_t kind;      /**< BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC or BOX_SPATIAL_UI, with
-                         *   BOX_RENDER_DEBUG_BOX_LEAF for the leaf of an entity */
-    vec3 max;           /**< Maximum corner in world space */
+    vec3 min;           /**< Minimum corner in the space of its pose */
+    uint32_t kind;      /**< BOX_SPATIAL_STATIC, BOX_SPATIAL_DYNAMIC, BOX_SPATIAL_UI or
+                         *   BOX_RENDER_DEBUG_BOX_MOVER, with BOX_RENDER_DEBUG_BOX_LEAF for the
+                         *   leaf of an entity */
+    vec3 max;           /**< Maximum corner in the space of its pose */
     uint32_t depth;     /**< Depth of the box in its tree, 0 for the root */
+    uint32_t pose;      /**< Index of the matrix that places the box in the debug poses of the
+                         *   view, 0 for the identity of the boxes in world space */
+    uint32_t padding[3];
 } box_render_debug_box_t;
+
+/** Tree of box_render_debug_box_t.kind of the tree of a mover in its frame */
+#define BOX_RENDER_DEBUG_BOX_MOVER (3u)
 
 /** Bit of box_render_debug_box_t.kind of the leaf of an entity */
 #define BOX_RENDER_DEBUG_BOX_LEAF (4u)
@@ -900,6 +907,11 @@ typedef struct box_render_view_t {
                                  *   the packet */
     int32_t debug_box_count;    /**< Boxes of the spatial index trees the view draws (BvhDebug),
                                  *   copied by a capture of the camera of the view */
+    int32_t debug_pose_first;   /**< Index of the first pose of the view in the debug poses of
+                                 *   the packet */
+    int32_t debug_pose_count;   /**< Poses the boxes of the view index, the identity first and
+                                 *   then one per mover tree (BvhDebug.mover_trees), 0 without
+                                 *   boxes */
     LodSettings lod;            /**< View.lod resolved by box_render_lod_settings, all zero
                                  *   (every shape at full detail) without a view */
     uint32_t features;          /**< BOX_RENDER_FEATURE_* features: those of its scene, without
@@ -1872,6 +1884,7 @@ typedef struct box_render_packet_t {
                              *   views */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
+    ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
                              *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */

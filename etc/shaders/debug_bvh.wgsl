@@ -1,12 +1,14 @@
 // Boxes of the spatial index trees of the debug pass of a view (BvhDebug): instance k draws the
-// 12 edges of box k as lines, in the color of its tree, fainter with its depth and at half the
-// alpha for the leaf of an entity.
+// 12 edges of box k as lines placed by its pose, in the color of its tree, fainter with its depth
+// and at half the alpha for the leaf of an entity.
 #include "include/lights.wgsl"
 
 // Colors of the static, dynamic and UI tree, linear.
 const STATIC_COLOR: vec3f = vec3f(0.1, 0.85, 0.15);
 const DYNAMIC_COLOR: vec3f = vec3f(1.0, 0.35, 0.02);
 const UI_COLOR: vec3f = vec3f(0.9, 0.1, 0.9);
+// Color of the trees of the movers, linear.
+const MOVER_COLOR: vec3f = vec3f(0.05, 0.85, 0.95);
 
 // Bit of BvhBox.kind of the leaf of an entity, BOX_RENDER_DEBUG_BOX_LEAF.
 const LEAF: u32 = 4u;
@@ -23,15 +25,21 @@ const DEPTH_PULL: f32 = 1.0005;
 // A box, matching box_render_debug_box_t.
 struct BvhBox {
     min: vec3f,
-    // Tree: 0 static, 1 dynamic, 2 UI, with LEAF for the leaf of an entity
+    // Tree: 0 static, 1 dynamic, 2 UI, 3 mover, with LEAF for the leaf of an entity
     kind: u32,
     max: vec3f,
     // Depth in its tree, 0 for the root
     depth: u32,
+    // Index of the matrix in poses that places the box, 0 for the identity
+    pose: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 @group(0) @binding(0) var<uniform> view: View;
 @group(1) @binding(0) var<storage, read> boxes: array<BvhBox>;
+@group(1) @binding(1) var<storage, read> poses: array<mat4x4f>;
 
 struct LineOut {
     @builtin(position) pos: vec4f,
@@ -66,6 +74,8 @@ fn box_corner(b: BvhBox, i: u32) -> vec3f {
         color = DYNAMIC_COLOR;
     } else if (tree == 2u) {
         color = UI_COLOR;
+    } else if (tree == 3u) {
+        color = MOVER_COLOR;
     }
 
     var alpha = mix(ROOT_ALPHA, DEEP_ALPHA, saturate(f32(b.depth) / FADE_DEPTH));
@@ -74,7 +84,8 @@ fn box_corner(b: BvhBox, i: u32) -> vec3f {
     }
 
     var o: LineOut;
-    o.pos = view.view_proj * vec4f(box_corner(b, i % 24u), 1.0);
+    let world = poses[b.pose] * vec4f(box_corner(b, i % 24u), 1.0);
+    o.pos = view.view_proj * world;
     o.pos.z *= DEPTH_PULL;
     o.color = vec4f(color * alpha, alpha);
     return o;

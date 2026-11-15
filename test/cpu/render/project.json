@@ -694,7 +694,12 @@
                     "bvh_static_boxes",
                     "bvh_levels_and_leaves",
                     "bvh_dynamic_fat_leaves",
-                    "bvh_capture_copies_boxes"
+                    "bvh_capture_copies_boxes",
+                    "bvh_mover_tree_boxes",
+                    "bvh_mover_tree_levels_and_leaves",
+                    "bvh_mover_tree_rotated",
+                    "bvh_mover_tree_small_mover",
+                    "bvh_mover_trees_off"
                 ]
             },
             {

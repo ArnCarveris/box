@@ -98,8 +98,9 @@ C, automatic for every entity with a component: `ecs_add_pair(world, ecs_id(MyEn
 
 - `filter` is the narrow phase: return false to reject, may push `*distance` further.
 - `ui = true` also hits shapeless UI elements; overlap queries never see them.
-- Debug draw the trees: `View: {debug: {bvh: {static_tree: true, dynamic_tree: true, ui_tree: true}}}`
-  (static green, dynamic orange, UI magenta; see `docs/view.md`).
+- Debug draw the trees: `View: {debug: {bvh: {static_tree: true, dynamic_tree: true, ui_tree: true, mover_trees: true}}}`
+  (static green, dynamic orange, UI magenta, the local tree of each mover cyan and oriented by
+  the mover; see `docs/view.md`).
 
 ## Layout rules
 

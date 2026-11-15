@@ -119,10 +119,11 @@ struct box_gpu_debug_t {
     WGPUTextureView overdraw_depth_view; /**< View of the overdraw depth texture */
     uint32_t overdraw_width;        /**< Width of the overdraw count texture */
     uint32_t overdraw_height;       /**< Height of the overdraw count texture */
-    WGPUBindGroupLayout bvh_layout; /**< Boxes of the BVH draw of a view, group 1 */
+    WGPUBindGroupLayout bvh_layout; /**< Boxes and poses of the BVH draw of a view, group 1 */
     WGPUPipelineLayout bvh_pipeline_layout; /**< View and box groups */
     int32_t bvh_revision;           /**< Revision of the BVH shader of the pipelines */
-    WGPUBuffer bvh_buffer;          /**< Boxes of the BVH draws of the packet, NULL until the
+    WGPUBuffer bvh_buffer;          /**< Boxes and poses of the BVH draws of the packet, NULL
+                                     *   until the
                                      *   first draw */
     uint64_t bvh_size;              /**< Bytes of the box buffer */
     uint64_t bvh_used;              /**< Bytes of the box buffer the draws of the packet took */
@@ -249,13 +250,17 @@ void box_gpu_debug_init(
             .bindGroupLayouts = map_groups
         });
 
-    WGPUBindGroupLayoutEntry bvh_entry = {
+    WGPUBindGroupLayoutEntry bvh_entries[2] = {{
         .binding = 0,
         .visibility = WGPUShaderStage_Vertex,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
-    };
+    }, {
+        .binding = 1,
+        .visibility = WGPUShaderStage_Vertex,
+        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    }};
     d->bvh_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &bvh_entry });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 2, .entries = bvh_entries });
     WGPUBindGroupLayout bvh_groups[2] = { gpu->view_layout, d->bvh_layout };
     d->bvh_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
@@ -827,9 +832,9 @@ done:
     return result;
 }
 
-/** Create the bind group of the BVH draw of a view with its boxes, written into the box buffer
- * of the packet, replacing the buffer with a larger one when they do not fit; earlier draws
- * keep the old one through their bind groups.
+/** Create the bind group of the BVH draw of a view with its boxes and the poses that place
+ * them, written into the box buffer of the packet, replacing the buffer with a larger one when
+ * they do not fit; earlier draws keep the old one through their bind groups.
  *
  * @param gpu The backend
  * @param packet The packet
@@ -842,12 +847,17 @@ static WGPUBindGroup box_gpu_debug_bvh_group(
     const box_render_view_t *v)
 {
     box_gpu_debug_t *d = gpu->debug;
-    uint64_t bytes = (uint64_t)v->debug_box_count * sizeof(box_render_debug_box_t);
     uint64_t align = BOX_GPU_DEBUG_UNIFORM_STRIDE;
+    uint64_t box_bytes = (uint64_t)v->debug_box_count * sizeof(box_render_debug_box_t);
+    uint64_t pose_bytes = (uint64_t)v->debug_pose_count * sizeof(mat4);
+    uint64_t pose_offset = (box_bytes + align - 1) / align * align;
+    uint64_t bytes = pose_offset + pose_bytes;
     uint64_t offset = (d->bvh_used + align - 1) / align * align;
     WGPUBindGroup result = NULL;
     if (v->debug_box_first < 0 || v->debug_box_count <= 0 ||
-        v->debug_box_first + v->debug_box_count > ecs_vec_count(&packet->debug_boxes))
+        v->debug_box_first + v->debug_box_count > ecs_vec_count(&packet->debug_boxes) ||
+        v->debug_pose_first < 0 || v->debug_pose_count <= 0 ||
+        v->debug_pose_first + v->debug_pose_count > ecs_vec_count(&packet->debug_poses))
     {
         goto done;
     }
@@ -872,17 +882,24 @@ static WGPUBindGroup box_gpu_debug_bvh_group(
 
     d->bvh_used = offset + bytes;
     wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset, ecs_vec_get_t(
-        &packet->debug_boxes, box_render_debug_box_t, v->debug_box_first), (size_t)bytes);
-    WGPUBindGroupEntry entry = {
+        &packet->debug_boxes, box_render_debug_box_t, v->debug_box_first), (size_t)box_bytes);
+    wgpuQueueWriteBuffer(gpu->queue, d->bvh_buffer, offset + pose_offset, ecs_vec_get_t(
+        &packet->debug_poses, mat4, v->debug_pose_first), (size_t)pose_bytes);
+    WGPUBindGroupEntry entries[2] = {{
         .binding = 0,
         .buffer = d->bvh_buffer,
         .offset = offset,
-        .size = bytes
-    };
+        .size = box_bytes
+    }, {
+        .binding = 1,
+        .buffer = d->bvh_buffer,
+        .offset = offset + pose_offset,
+        .size = pose_bytes
+    }};
     result = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = d->bvh_layout,
-        .entryCount = 1,
-        .entries = &entry
+        .entryCount = 2,
+        .entries = entries
     });
 done:
     return result;
