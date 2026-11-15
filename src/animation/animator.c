@@ -354,7 +354,8 @@ static bool box_animator_finished(
     return result;
 }
 
-/** Sample every bound track at a time and write the values into the targets.
+/** Sample every bound track at a time and write the values into the targets. A track whose
+ * value equals what the member already holds writes nothing and emits no OnSet.
  *
  * @param world The world
  * @param stage The stage the system writes through
@@ -375,6 +376,13 @@ static void box_animator_write(
             ecs_is_alive(world, b[i].state.component))
         {
             float value = box_curve_value(&t->curve, time, 0.0f);
+            const void *cur = ecs_get_id(world, b[i].target, b[i].state.component);
+            if (cur && box_animation_equals(b[i].state.kind,
+                ECS_OFFSET(cur, b[i].state.offset), value))
+            {
+                continue;
+            }
+
             void *ptr = ecs_ensure_id(stage, b[i].target, b[i].state.component,
                 (size_t)b[i].state.size);
             box_animation_store(b[i].state.kind, ECS_OFFSET(ptr, b[i].state.offset), value);

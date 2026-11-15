@@ -75,6 +75,19 @@ void box_animation_store(
     void *ptr,
     float value);
 
+/** Whether a numeric member already holds a value, compared in the kind of the member after
+ * the rounding and clamping box_animation_store applies. A kind it does not store never equals.
+ *
+ * @param kind The ecs_primitive_kind_t of the member
+ * @param ptr The member
+ * @param value The value
+ * @return True when storing the value would leave the member unchanged
+ */
+bool box_animation_equals(
+    int32_t kind,
+    const void *ptr,
+    float value);
+
 /** Write a sampled value into the member of a track on the animated entity or its target.
  *
  * Adds the component when the entity does not have it, and signals the change with

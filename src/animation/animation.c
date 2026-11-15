@@ -283,6 +283,72 @@ void box_animation_store(
     }
 }
 
+bool box_animation_equals(
+    int32_t kind,
+    const void *ptr,
+    float value)
+{
+    union {
+        float f32;
+        double f64;
+        uint8_t u8;
+        uint16_t u16;
+        uint32_t u32;
+        uint64_t u64;
+        int8_t i8;
+        int16_t i16;
+        int32_t i32;
+        int64_t i64;
+        uintptr_t uptr;
+        intptr_t iptr;
+    } v = {0};
+    box_animation_store(kind, &v, value);
+
+    bool result = false;
+    switch (kind) {
+    case EcsF32:
+        result = *(const float*)ptr == v.f32;
+        break;
+    case EcsF64:
+        result = *(const double*)ptr == v.f64;
+        break;
+    case EcsU8:
+        result = *(const uint8_t*)ptr == v.u8;
+        break;
+    case EcsU16:
+        result = *(const uint16_t*)ptr == v.u16;
+        break;
+    case EcsU32:
+        result = *(const uint32_t*)ptr == v.u32;
+        break;
+    case EcsI8:
+        result = *(const int8_t*)ptr == v.i8;
+        break;
+    case EcsI16:
+        result = *(const int16_t*)ptr == v.i16;
+        break;
+    case EcsI32:
+        result = *(const int32_t*)ptr == v.i32;
+        break;
+    case EcsU64:
+        result = *(const uint64_t*)ptr == v.u64;
+        break;
+    case EcsI64:
+        result = *(const int64_t*)ptr == v.i64;
+        break;
+    case EcsUPtr:
+        result = *(const uintptr_t*)ptr == v.uptr;
+        break;
+    case EcsIPtr:
+        result = *(const intptr_t*)ptr == v.iptr;
+        break;
+    default:
+        break;
+    }
+
+    return result;
+}
+
 /** Resolved state of a live track that is valid and whose component is alive.
  *
  * @param world The world

@@ -988,6 +988,70 @@ void Animator_onset_fires(void) {
     ecs_fini(world);
 }
 
+/** Number of OnSet events of Position on the entity animator_flat_entity */
+static int32_t animator_flat_sets;
+
+/** Number of OnSet events of Position on the other entities */
+static int32_t animator_ramp_sets;
+
+/** The entity whose events count in animator_flat_sets */
+static ecs_entity_t animator_flat_entity;
+
+/** Count the OnSet events of Position per entity.
+ *
+ * @param it The iterator
+ */
+static void AnimatorCountSetPosition(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (it->entities[i] == animator_flat_entity) {
+            animator_flat_sets ++;
+        } else {
+            animator_ramp_sets ++;
+        }
+    }
+}
+
+void Animator_constant_skips_onset(void) {
+    static const CurveKey flat[] = {{0, 2}, {2, 2}};
+    ecs_world_t *world = animator_world();
+    ecs_entity_t flat_clip = animator_clip(world, "flat", 0);
+    animator_track(world, flat_clip, "y", ecs_id(Position), "y", NULL, flat, 2);
+    ecs_entity_t ramp_clip = animator_clip(world, "ramp", 0);
+    animator_track(world, ramp_clip, "y", ecs_id(Position), "y", NULL, animator_ramp, 2);
+    ecs_entity_t still = ecs_new(world);
+    ecs_set(world, still, Position, {0, 0, 0});
+    animator_play(world, still, flat_clip, AnimationLoop, 1);
+    ecs_entity_t moving = ecs_new(world);
+    ecs_set(world, moving, Position, {0, 0, 0});
+    animator_play(world, moving, ramp_clip, AnimationLoop, 1);
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Position) }},
+        .events = { EcsOnSet },
+        .callback = AnimatorCountSetPosition
+    });
+    animator_flat_entity = still;
+    animator_flat_sets = 0;
+    animator_ramp_sets = 0;
+
+    ecs_progress(world, 0.25f);
+    test_int(animator_flat_sets, 1);
+    test_int(animator_ramp_sets, 1);
+    test_flt(ecs_get(world, still, Position)->y, 2);
+
+    ecs_progress(world, 0.25f);
+    ecs_progress(world, 0.25f);
+    ecs_progress(world, 0.25f);
+    test_flt(ecs_get(world, still, Position)->y, 2);
+    test_flt(ecs_get(world, moving, Position)->y, 2);
+    test_int(animator_flat_sets, 1);
+    test_int(animator_ramp_sets, 4);
+
+    ecs_fini(world);
+}
+
 void Animator_transform_follows(void) {
     ecs_world_t *world = animator_world();
     ecs_entity_t clip = animator_clip(world, "clip", 0);

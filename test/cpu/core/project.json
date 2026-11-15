@@ -663,6 +663,7 @@
                     "prefab_write_overrides",
                     "script_prefab",
                     "onset_fires",
+                    "constant_skips_onset",
                     "transform_follows",
                     "change_clip",
                     "changed_track",
