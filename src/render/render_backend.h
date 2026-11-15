@@ -54,7 +54,8 @@ typedef struct box_render_gpu_stats_t {
                                  *   frame it renders; their draw calls count among draws */
     int32_t transmission_snapshots; /**< Snapshots recorded for transmission, per frame of a
                                  *   view one before its first transmissive draw and one before
-                                 *   each later one that follows other draws, at most 4 */
+                                 *   each later one that overlaps the draws since the last one,
+                                 *   at most 4 */
     int32_t transmission_textures; /**< Snapshot textures created for transmission, one per
                                  *   color format of the views of a target that draw a
                                  *   Transmission shape, again only when its render size changes */

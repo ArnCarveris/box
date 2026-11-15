@@ -2173,8 +2173,40 @@ WGPUTextureView box_gpu_transmission_depth_view(
 
 /** Snapshots of transmission a view takes at most in a frame (box_gpu_draw_batches); each costs
  * a color copy, the blur pyramid and a pass split. 4 covers glass over three layers of glass or
- * blended shapes, and beyond it later glass samples the last snapshot. */
+ * blended shapes; beyond it the first one and the largest of the others are taken
+ * (box_gpu_transmission_plan), and the glass in between samples an older snapshot. */
 #define BOX_GPU_TRANSMISSION_SNAPSHOTS (4)
+
+/** Plan the snapshots of a view before its draws (box_gpu_draw_batches).
+ *
+ * Transmissive pipelines do not blend: a draw replaces the image under it with the snapshot it
+ * samples, which must hold every draw before it that it can overlap, transmissive ones too.
+ *
+ * The first transmissive draw takes one. A later one takes one when a draw since the last one
+ * overlaps it by their bounds in the image plane (box_render_batch_t.screen) or has none, so
+ * runs that do not overlap share one. The particles, drawn at the first blended draw that is
+ * not a layer around a planet, cover the view.
+ *
+ * Past BOX_GPU_TRANSMISSION_SNAPSHOTS the first one is taken and the others go to the draws
+ * that cover most of the image, the later of equal ones, so a large shape that encloses the
+ * others never samples a stale image; the draws in between sample an older snapshot.
+ *
+ * @param gpu The backend
+ * @param t The target, whose size gives the image of the view
+ * @param packet The packet
+ * @param v The view
+ * @param cv The cull view of the view, NULL for none
+ * @param plan Receives the draws the snapshots are taken before, ascending, at most
+ * BOX_GPU_TRANSMISSION_SNAPSHOTS
+ * @return The snapshots planned
+ */
+int32_t box_gpu_transmission_plan(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    const box_gpu_cull_view_t *cv,
+    int32_t *plan);
 
 /** Copy the color attachment of a view into mip 0 of its snapshot and blur every mip above
  * from the one below (a Jimenez 13 tap downsample), and copy its depth attachment into the

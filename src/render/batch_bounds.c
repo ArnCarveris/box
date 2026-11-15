@@ -204,3 +204,73 @@ bool box_draws_layer(
 
     return sqrtf(dist2) + l->ground <= inner + pad && inner <= l->top + pad;
 }
+
+bool box_draws_screen_bounds(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    const box_render_view_t *v,
+    int32_t slot,
+    float *out)
+{
+    const box_render_transform_t *t = ecs_vec_get_t(
+        &b->transforms, box_render_transform_t, slot);
+    const box_mesh_t *mesh = NULL;
+    const vec4 *m = v->view_matrix;
+    float local[6], world[6];
+    int32_t r, c;
+    bool result = false;
+    if (!box_render_is_mesh(b->key.pipeline) || b->key.water) {
+        goto done;
+    }
+
+    if (b->bounded) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->center), local);
+        glm_vec3_copy(ECS_CONST_CAST(float*, b->extent), &local[3]);
+    } else {
+        mesh = d->world ? box_mesh_cache_get(box_mesh_cache_of(d->world), b->key.mesh) : NULL;
+        if (!mesh || !mesh->vertex_count) {
+            goto done;
+        }
+
+        for (r = 0; r < 3; r ++) {
+            local[r] = (mesh->min[r] + mesh->max[r]) * 0.5f;
+            local[3 + r] = (mesh->max[r] - mesh->min[r]) * 0.5f;
+        }
+    }
+
+    for (r = 0; r < 3; r ++) {
+        const float *row = t->rows[r];
+        world[r] = row[0] * local[0] + row[1] * local[1] + row[2] * local[2] + row[3];
+        world[3 + r] = fabsf(row[0]) * local[3] + fabsf(row[1]) * local[4] +
+            fabsf(row[2]) * local[5];
+        world[3 + r] += 1e-4f * (fabsf(world[r]) + world[3 + r]) + 1e-5f;
+    }
+
+    out[0] = out[1] = FLT_MAX;
+    out[2] = out[3] = -FLT_MAX;
+    for (c = 0; c < 8; c ++) {
+        float x = world[0] + ((c & 1) ? world[3] : -world[3]);
+        float y = world[1] + ((c & 2) ? world[4] : -world[4]);
+        float z = world[2] + ((c & 4) ? world[5] : -world[5]);
+        float vx = m[0][0] * x + m[1][0] * y + m[2][0] * z + m[3][0];
+        float vy = m[0][1] * x + m[1][1] * y + m[2][1] * z + m[3][1];
+        float vz = m[0][2] * x + m[1][2] * y + m[2][2] * z + m[3][2];
+        if (!v->camera_data.ortho) {
+            if (!(vz < -1e-5f)) {
+                goto done;
+            }
+
+            vx /= -vz;
+            vy /= -vz;
+        }
+
+        out[0] = glm_min(out[0], vx);
+        out[1] = glm_min(out[1], vy);
+        out[2] = glm_max(out[2], vx);
+        out[3] = glm_max(out[3], vy);
+    }
+
+    result = isfinite(out[0]) && isfinite(out[1]) && isfinite(out[2]) && isfinite(out[3]);
+done:
+    return result;
+}

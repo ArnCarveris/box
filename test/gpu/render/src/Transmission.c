@@ -1039,6 +1039,122 @@ void Transmission_adjacent_runs_one_snapshot(void) {
     ecs_fini(world);
 }
 
+/** Add a large white sphere of ior 1 in front of the camera, which shows what it encloses
+ * unchanged.
+ *
+ * @param world The world
+ * @param z Z of its center
+ * @param radius Radius
+ * @return The sphere
+ */
+static ecs_entity_t tr_bubble(
+    ecs_world_t *world,
+    float z,
+    float radius)
+{
+    ecs_entity_t e = tr_glass(world, 0, z, 1, 1, 1, 1, 0);
+    ecs_remove(world, e, Box);
+    ecs_set(world, e, Sphere, {.segments = 32, .smooth = true, .radius = radius});
+
+    return e;
+}
+
+/** A large transmissive sphere around a red glass box that sits behind the center of the
+ * sphere, with nothing else blended between them, shows the red glass through it as it is
+ * without the sphere: the sphere takes a snapshot that holds the glass. */
+void Transmission_enclosing_sphere_shows_glass(void) {
+    // materials/transmission
+    unsigned char *images[2];
+    int32_t k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), true, false);
+        tr_wall(world, 0, -14, 60, 60, 200, 200, 0);
+        ecs_entity_t glass = tr_glass(world, 0, -8, 3, 3, 1, 1, 0);
+        ecs_set(world, glass, Rgb, {255, 0, 0});
+        if (k) {
+            tr_bubble(world, -6, 5);
+        }
+
+        images[k] = tr_render(world, k ? "bubble_glass.png" : "bubble_glass_bare.png",
+            TR_SIZE, TR_SIZE);
+        ecs_fini(world);
+    }
+
+    const unsigned char *bare = tr_px(images[0], TR_SIZE, 32, 32);
+    tr_expect(bare, 200, 0, 0, 3);
+    tr_expect(tr_px(images[1], TR_SIZE, 32, 32), bare[0], bare[1], bare[2], 3);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
+
+/** Render a large transmissive sphere around more glass panes interleaved with blended quads
+ * than the budget of snapshots, all behind its center, and check that it shows the front layers
+ * as they are without the sphere: the sphere does not sample a snapshot taken before them.
+ *
+ * The quads behind the last two panes stay off the center pixel, as the panes in the middle
+ * that the budget leaves without a snapshot of their own erase them.
+ *
+ * @param front Small overlapping glass panes inside the sphere in front of its center, off the
+ * center pixel, each with a small quad in front, so each is a draw that needs a snapshot after
+ * the sphere
+ * @param file Name of the PNG with the sphere
+ */
+static void tr_bubble_layers(
+    int32_t front,
+    const char *file)
+{
+    unsigned char *images[2];
+    int32_t i, k;
+    for (k = 0; k < 2; k ++) {
+        ecs_world_t *world = tr_world();
+        tr_view(world, tr_camera(world, 0), true, false);
+        tr_wall(world, 0, -14, 60, 60, 0, 200, 0);
+        for (i = 0; i < 6; i ++) {
+            float z = -10.5f + (float)i * 0.7f;
+            tr_glass(world, 0, z, 2, 2, 1, 1, 0);
+            tr_quad(world, 0, i < 4 ? 0.8f : 0.0f, z + 0.35f, i < 4 ? 0.5f : 1.5f,
+                i == 5 ? 0 : 200, 0, i == 5 ? 200 : 0, 0.5f);
+        }
+
+        for (i = 0; i < front; i ++) {
+            float z = -3.0f + (float)i * 0.4f;
+            ecs_entity_t pane = tr_glass(world, 0.8f, z, 0.5f, 0.5f, 1, 1, 0);
+            ecs_set(world, pane, Position, {0.8f, 0.8f, z});
+            tr_quad(world, 0.8f, 0.8f, z + 0.2f, 0.2f, 200, 0, 0, 0.5f);
+        }
+
+        if (k) {
+            tr_bubble(world, -6, 5);
+        }
+
+        images[k] = tr_render(world, k ? file : "bubble_budget_bare.png", TR_SIZE, TR_SIZE);
+        ecs_fini(world);
+    }
+
+    const unsigned char *bare = tr_px(images[0], TR_SIZE, 32, 32);
+    test_assert(bare[2] > 100);
+    tr_expect(tr_px(images[1], TR_SIZE, 32, 32), bare[0], bare[1], bare[2], 3);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+}
+
+/** A large transmissive sphere around more glass panes interleaved with blended quads than the
+ * budget of snapshots, all behind its center, shows the front layers through it as they are
+ * without the sphere. */
+void Transmission_enclosing_sphere_after_budget(void) {
+    // materials/transmission
+    tr_bubble_layers(0, "bubble_budget.png");
+}
+
+/** The sphere of enclosing_sphere_after_budget with more small glass panes in front of its
+ * center than the budget, each needing a snapshot after it, still gets a snapshot of its own:
+ * the budget goes to the draws that cover most of the image, not to the last ones. */
+void Transmission_enclosing_sphere_before_glass(void) {
+    // materials/transmission
+    tr_bubble_layers(TR_SNAPSHOTS, "bubble_before_glass.png");
+}
+
 /** The scene of layers_take_snapshots in a view that culls by occlusion (unlit, an early and a
  * late pass, which takes the snapshots) and in one with a depth prepass (lit) looks as it does
  * in an unlit view without either.

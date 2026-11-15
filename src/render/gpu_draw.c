@@ -1127,8 +1127,10 @@ typedef struct box_gpu_view_pass_t {
                                      *   draws (box_gpu_draw_snapshot), NULL without them */
     int32_t snapshots;              /**< Snapshots the pass took, at most
                                      *   BOX_GPU_TRANSMISSION_SNAPSHOTS */
-    bool drawn;                     /**< A draw that is not transmissive was recorded since the
-                                     *   last snapshot */
+    int32_t plan[BOX_GPU_TRANSMISSION_SNAPSHOTS]; /**< Draws of the view the snapshots are
+                                     *   taken before, ascending
+                                     *   (box_gpu_transmission_plan) */
+    int32_t planned;                /**< Snapshots in plan */
     WGPUTexture source;             /**< Texture of the color attachment, which the snapshot
                                      *   copies */
     WGPUTexture depth_texture;      /**< Texture of the depth attachment, which the snapshot
@@ -1162,7 +1164,7 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
     WGPURenderPassDepthStencilAttachment depth = {
         .view = vp->depth,
         .depthLoadOp = WGPULoadOp_Load,
-        .depthStoreOp = vp->snapshot && vp->snapshots < BOX_GPU_TRANSMISSION_SNAPSHOTS
+        .depthStoreOp = vp->snapshot && vp->snapshots < vp->planned
             ? WGPUStoreOp_Store
             : vp->depth_store
     };
@@ -1393,7 +1395,6 @@ static void box_gpu_draw_snapshot(
     box_gpu_transmission_record(gpu, vp->snapshot, vp->encoder, vp->source,
         vp->snapshots ? NULL : vp->depth_texture);
     vp->snapshots ++;
-    vp->drawn = false;
     vp->pass = box_gpu_view_pass_continue(gpu, vp, false);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 3, box_gpu_volume_group(gpu, v), 0, NULL);
@@ -1413,7 +1414,8 @@ static void box_gpu_draw_snapshot(
  * @param t The target
  * @param vp The render pass of the view, which the fog volumes and particles may split, and its
  * snapshot, taken right before the first transmissive draw and again before a later one that
- * follows other draws, BOX_GPU_TRANSMISSION_SNAPSHOTS at most (box_gpu_draw_snapshot). A view
+ * overlaps the draws since the last one, BOX_GPU_TRANSMISSION_SNAPSHOTS at most
+ * (box_gpu_transmission_plan, box_gpu_draw_snapshot). A view
  * with fog volumes and transmissive draws marches the rays behind the glass before the snapshot
  * and those in front of it after the last transmissive draw (box_gpu_draw_fog_front)
  * @param format The format of the color target
@@ -1448,6 +1450,9 @@ static void box_gpu_draw_batches(
     int32_t i;
     vp->front = -1;
     vp->glass = NULL;
+    vp->planned = vp->snapshot && phase != 1
+        ? box_gpu_transmission_plan(gpu, t, packet, v, cv, vp->plan)
+        : 0;
     for (i = 0; vp->fog && vp->snapshot && cv && i < cv->draw_count; i ++) {
         const box_gpu_cull_draw_t *d = ecs_vec_get_t(
             &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
@@ -1497,10 +1502,7 @@ static void box_gpu_draw_batches(
             }
         }
 
-        if (vp->snapshot && phase != 1 && b->transmissive &&
-            (!vp->snapshots ||
-                (vp->drawn && vp->snapshots < BOX_GPU_TRANSMISSION_SNAPSHOTS)))
-        {
+        if (vp->snapshots < vp->planned && i == vp->plan[vp->snapshots]) {
             box_gpu_draw_snapshot(gpu, vp, v, group, offset);
             bound = NULL;
             material = NULL;
@@ -1512,7 +1514,6 @@ static void box_gpu_draw_batches(
         }
 
         if (d->skip) {
-            vp->drawn |= !b->transmissive;
             continue;
         }
 
@@ -1533,7 +1534,6 @@ static void box_gpu_draw_batches(
             &instances))
         {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
-            vp->drawn |= !b->transmissive;
         }
     }
 

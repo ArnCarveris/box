@@ -1346,7 +1346,8 @@ static void box_draws_collect(
 }
 
 /** Add the blended instances of every view, sorted back to front, after the opaque batches; the
- * layers around the ground of a planet come first (box_draws_sorted_cmp).
+ * layers around the ground of a planet come first (box_draws_sorted_cmp). Each draw gets the
+ * bounds of its instances in the image plane of the view (box_draws_screen_bounds).
  *
  * The sorted page slots of a view go into the packet data; a run of one batch in that order is
  * one draw listing its slots, split every BOX_DRAWS_BLENDED_RUN slots. Sort and packet storage
@@ -1379,11 +1380,21 @@ static void box_draws_send_blended(
 
         for (i = 0; i < count; i ++) {
             box_draw_batch_t *b = box_draws_batch(d, sorted[i].batch);
+            float screen[4];
+            bool screened = box_draws_screen_bounds(d, b, view, sorted[i].slot, screen);
             if (out && sorted[i].batch == sorted[i - 1].batch &&
                 sorted[i].atmosphere == sorted[i - 1].atmosphere &&
                 out->instance_count < BOX_DRAWS_BLENDED_RUN)
             {
                 out->instance_count ++;
+                out->screened = out->screened && screened;
+                if (out->screened) {
+                    out->screen[0] = glm_min(out->screen[0], screen[0]);
+                    out->screen[1] = glm_min(out->screen[1], screen[1]);
+                    out->screen[2] = glm_max(out->screen[2], screen[2]);
+                    out->screen[3] = glm_max(out->screen[3], screen[3]);
+                }
+
                 continue;
             }
 
@@ -1409,6 +1420,10 @@ static void box_draws_send_blended(
             out->listed = true;
             out->slots = offset + (uint32_t)i * (uint32_t)sizeof(uint32_t);
             out->instance_count = 1;
+            out->screened = screened;
+            if (screened) {
+                ecs_os_memcpy_n(out->screen, screen, float, 4);
+            }
         }
     }
 }

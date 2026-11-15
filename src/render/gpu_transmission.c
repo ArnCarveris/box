@@ -6,7 +6,7 @@
  * front (2D shapes, particles, fog volumes, blended meshes behind), into mip 0 of its snapshot
  * and blurs each mip from the one below (etc/shaders/transmission.wgsl) for the glass to sample.
  *
- * Later glass after other draws snapshots again into the same texture, at most
+ * Later glass over draws since then snapshots again into the same texture, at most
  * BOX_GPU_TRANSMISSION_SNAPSHOTS a view and frame, the depth only the first time. One snapshot
  * per color format of a target; mip 0 alone until the downsample compiles, else white.
  */
@@ -507,6 +507,151 @@ void box_gpu_transmission_record(
     }
 
     box_gpu_count(gpu, BOX_GPU_STAT_TRANSMISSION_SNAPSHOT);
+}
+
+/** Rectangles of the draws since the last snapshot box_gpu_transmission_plan tests a
+ * transmissive draw against; the last one grows to hold the draws past them */
+#define BOX_GPU_TRANSMISSION_PLAN_RECTS (32)
+
+/** Check whether two bounds in the image plane of a view overlap, touching ones too.
+ *
+ * @param a Minimum x and y, then maximum x and y
+ * @param b Minimum x and y, then maximum x and y
+ * @return Whether they overlap
+ */
+static bool box_gpu_transmission_overlaps(
+    const float *a,
+    const float *b)
+{
+    return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+}
+
+/** Get the bounds of the image of a view in its image plane, the coordinates of
+ * box_render_batch_t.screen, from the projection of its camera in a target.
+ *
+ * @param t The target
+ * @param v The view
+ * @param out Receives minimum x and y, then maximum x and y
+ */
+static void box_gpu_transmission_visible(
+    const box_gpu_target_t *t,
+    const box_render_view_t *v,
+    float *out)
+{
+    mat4 proj;
+    int32_t c;
+    box_camera_projection(&v->camera_data,
+        (float)t->desc.point_width, (float)t->desc.point_height, proj);
+    for (c = 0; c < 2; c ++) {
+        float offset = v->camera_data.ortho ? -proj[3][c] : proj[2][c];
+        float a = (-1.0f + offset) / proj[c][c], b = (1.0f + offset) / proj[c][c];
+        out[c] = glm_min(a, b);
+        out[2 + c] = glm_max(a, b);
+    }
+}
+
+/** Get the area of the part of a draw that a view shows, in its image plane.
+ *
+ * @param b The batch of the draw
+ * @param visible Bounds of the image of the view (box_gpu_transmission_visible)
+ * @return The area, that of the image for a draw without bounds
+ */
+static float box_gpu_transmission_area(
+    const box_render_batch_t *b,
+    const float *visible)
+{
+    const float *r = b->screened ? b->screen : visible;
+    float w = glm_min(r[2], visible[2]) - glm_max(r[0], visible[0]);
+    float h = glm_min(r[3], visible[3]) - glm_max(r[1], visible[1]);
+
+    return w > 0 && h > 0 ? w * h : 0;
+}
+
+int32_t box_gpu_transmission_plan(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    const box_gpu_cull_view_t *cv,
+    int32_t *plan)
+{
+    float rects[BOX_GPU_TRANSMISSION_PLAN_RECTS][4], visible[4];
+    float areas[BOX_GPU_TRANSMISSION_SNAPSHOTS];
+    int32_t keep = BOX_GPU_TRANSMISSION_SNAPSHOTS - 1;
+    int32_t i, j, rect_count = 0, first = -1, kept = 0, result = 0;
+    bool everywhere = false, particles = false;
+    box_gpu_transmission_visible(t, v, visible);
+    for (i = 0; cv && i < cv->draw_count; i ++) {
+        const box_gpu_cull_draw_t *d = ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i);
+        const box_render_batch_t *b = ecs_vec_get_t(
+            &packet->batches, box_render_batch_t, d->batch);
+        bool mesh = b->view == -1 && box_render_is_mesh(b->pipeline);
+        if (!particles && !mesh && !b->atmosphere) {
+            particles = true;
+            everywhere = true;
+        }
+
+        if (b->transmissive) {
+            bool stale = first < 0 || everywhere;
+            for (j = 0; !stale && j < rect_count; j ++) {
+                stale = !b->screened || box_gpu_transmission_overlaps(b->screen, rects[j]);
+            }
+
+            if (stale && first < 0) {
+                first = i;
+            } else if (stale) {
+                float area = box_gpu_transmission_area(b, visible);
+                int32_t smallest = 0;
+                for (j = 1; j < kept; j ++) {
+                    if (areas[j] < areas[smallest]) {
+                        smallest = j;
+                    }
+                }
+
+                if (kept < keep) {
+                    smallest = kept ++;
+                } else if (area < areas[smallest]) {
+                    smallest = -1;
+                }
+
+                if (smallest >= 0) {
+                    for (j = smallest; j < kept - 1; j ++) {
+                        plan[1 + j] = plan[2 + j];
+                        areas[j] = areas[j + 1];
+                    }
+
+                    plan[kept] = i;
+                    areas[kept - 1] = area;
+                }
+            }
+
+            if (stale) {
+                rect_count = 0;
+                everywhere = false;
+            }
+        }
+
+        if (!b->screened) {
+            everywhere = true;
+        } else if (rect_count < BOX_GPU_TRANSMISSION_PLAN_RECTS) {
+            ecs_os_memcpy_n(rects[rect_count], b->screen, float, 4);
+            rect_count ++;
+        } else {
+            float *r = rects[BOX_GPU_TRANSMISSION_PLAN_RECTS - 1];
+            r[0] = glm_min(r[0], b->screen[0]);
+            r[1] = glm_min(r[1], b->screen[1]);
+            r[2] = glm_max(r[2], b->screen[2]);
+            r[3] = glm_max(r[3], b->screen[3]);
+        }
+    }
+
+    if (first >= 0) {
+        plan[0] = first;
+        result = 1 + kept;
+    }
+
+    return result;
 }
 
 #endif

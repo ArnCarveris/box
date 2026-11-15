@@ -1965,6 +1965,28 @@ void box_draws_world_bounds(
     box_mesh_cache_t *cache,
     bool wanted);
 
+/** Compute the bounds of a blended instance in the image plane of a view, which tell the
+ * transmissive draws of the view whose footprints can overlap (box_render_batch_t.screen).
+ *
+ * The corners of the world box of the instance project to x and y over -z of view space for a
+ * perspective camera, to x and y for an orthographic one, which any projection keeps disjoint.
+ *
+ * An instance without mesh bounds, a Water shape and one that reaches behind the camera get none.
+ *
+ * @param d The state, during a send
+ * @param b The batch, ready
+ * @param v The view
+ * @param slot The slot of the instance
+ * @param out Receives minimum x and y, then maximum x and y
+ * @return Whether the instance has bounds
+ */
+bool box_draws_screen_bounds(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    const box_render_view_t *v,
+    int32_t slot,
+    float *out);
+
 /** A planet whose blended instances may be layers around its ground, and the local bounds of
  * the instances of a batch (box_draws_layer_of) */
 typedef struct box_draw_layer_t {

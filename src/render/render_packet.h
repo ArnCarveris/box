@@ -1692,6 +1692,12 @@ typedef struct box_render_batch_t {
     float max[3];               /**< Maximum corner of that box */
     float radius;               /**< Largest radius of the world box of an instance, the size
                                  *   the cull pass tests, padded for rounding */
+    bool screened;              /**< screen holds the bounds of the instances of a blended draw
+                                 *   of a view in its image plane (box_draws_screen_bounds), false
+                                 *   for a draw that may cover the whole view */
+    float screen[4];            /**< Minimum x and y, then maximum x and y of those bounds: of
+                                 *   view space x and y over -z for a perspective camera, of view
+                                 *   space x and y for an orthographic one */
 } box_render_batch_t;
 
 /** Components whose rendered value can transition, the index of their entry in the layout table
