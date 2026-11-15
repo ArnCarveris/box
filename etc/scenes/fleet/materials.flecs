@@ -14,6 +14,8 @@ assets {
   harbor_tex_floor { Path: {path: "etc/scenes/shipyard/assets/floor.jpg"} }
   harbor_tex_floor_normal { Path: {path: "etc/scenes/shipyard/assets/floor_normal.jpg"} }
   harbor_tex_floor_orm { Path: {path: "etc/scenes/shipyard/assets/floor_orm.jpg"} }
+  harbor_tex_windows { Path: {path: "etc/scenes/shipyard/assets/windows.png"} }
+  harbor_tex_windows_albedo { Path: {path: "etc/scenes/shipyard/assets/windows_albedo.png"} }
   harbor_tex_hazard { Path: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
 
   prefab HarborHull { Rgb: {112, 116, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.55}; PbrTextures: {albedo: harbor_tex_hull, normal: harbor_tex_hull_normal, orm: harbor_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 28, blend: 0.3} }
@@ -27,11 +29,16 @@ assets {
   prefab HarborWindow { Rgb: {255, 214, 150}; Emissive: {strength: 3.4, color: {255, 196, 120}} }
   prefab HarborWindowCool { Rgb: {170, 220, 255}; Emissive: {strength: 2.6, color: {140, 200, 255}} }
   prefab HarborAmber { Rgb: {255, 176, 60}; Emissive: {strength: 6, color: {255, 150, 40}} }
+  prefab HarborWindowGrid { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 3.4, color: {255, 226, 190}}; PbrTextures: {albedo: harbor_tex_windows_albedo, emissive: harbor_tex_windows}; texture.Mapping: {MappingWorld, size: 13} }
+  prefab HarborWindowBand { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 3.4, color: {255, 226, 190}}; PbrTextures: {albedo: harbor_tex_windows_albedo, emissive: harbor_tex_windows} }
   prefab HarborCyan { Rgb: {96, 220, 240}; Emissive: {strength: 5, color: {80, 214, 255}} }
   prefab HarborSign { Rgb: {34, 38, 46}; PbrMaterial: {metallic: 0.5, roughness: 0.4} }
   prefab HarborCrateRed { Rgb: {150, 58, 40}; PbrMaterial: {metallic: 0.4, roughness: 0.6} }
   prefab HarborCrateBlue { Rgb: {44, 76, 120}; PbrMaterial: {metallic: 0.4, roughness: 0.6} }
   prefab HarborCrateGrey { Rgb: {120, 124, 130}; PbrMaterial: {metallic: 0.4, roughness: 0.6} }
+  prefab HarborWhite { Rgb: {196, 200, 208}; PbrMaterial: {metallic: 0.35, roughness: 0.42}; ClearCoat: {strength: 0.2, roughness: 0.35} }
+  prefab HarborRadiator { Rgb: {214, 218, 224}; PbrMaterial: {metallic: 0.2, roughness: 0.6} }
+  prefab HarborRed { Rgb: {168, 44, 38}; PbrMaterial: {metallic: 0.4, roughness: 0.45}; ClearCoat: {strength: 0.3, roughness: 0.3} }
 
   prefab harbor_blink {
     Clip: {duration: 1.6}
@@ -41,6 +48,11 @@ assets {
     Clip: {duration: 0.8}
     strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.04, 16}, {0.3, 16}, {0.36, 0.4}, {0.8, 0.4}]}} }
   }
+  prefab harbor_chase {
+    Clip: {duration: 1.6}
+    strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.3}, {0.04, 18}, {0.18, 18}, {0.3, 0.3}, {1.6, 0.3}]}} }
+  }
+  prefab HarborBuoyLamp { Rgb: {200, 228, 255}; Emissive: {strength: 1, color: {170, 215, 255}} }
   prefab HarborBeaconRed { Rgb: {255, 70, 50}; Emissive: {strength: 1, color: {255, 50, 30}}; Animator: {clip: harbor_blink} }
   prefab HarborBeaconAmber { Rgb: {255, 170, 60}; Emissive: {strength: 1, color: {255, 150, 40}}; Animator: {clip: harbor_fast_blink} }
   prefab HarborFlash { Rgb: {200, 230, 255}; Emissive: {strength: 6, color: {170, 215, 255}}; Opacity: {0.55}; BlendMode: Additive; NoShadow; Ignore }

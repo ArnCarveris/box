@@ -1,5 +1,5 @@
 // A stress test: a giant space station with four liner gates (N, E, S, W) that liners line up
-// for and fly through, and twenty rig bays on its outer deck, with traffic that never stops.
+// for and berth at, and twenty rig bays on its outer deck, with traffic that never stops.
 // Liners and rigs are the shipyard's preset designs (1 unit = 1 m). Gates clamp and refuel the
 // liners and light their hazard beacons as the ships come and go.
 include shipyard/ships
