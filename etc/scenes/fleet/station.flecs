@@ -12,27 +12,27 @@ using state
 // between them, and an outer deck with the hangar wall of the rig bays. The liner gates and the
 // rig bays are drawn by the LinerGate and RigBay templates.
 assets {
-  harbor_arm_shape { Path2D: {start: {-80, 50}, segments: [
-    {kind: Line, end: {80, 50}}, {kind: Line, end: {80, -20}}, {kind: Line, end: {50, -50}},
-    {kind: Line, end: {-50, -50}}, {kind: Line, end: {-80, -20}}
+  harbor_arm_shape { Path2D: {start: {-40, 25}, segments: [
+    {kind: Line, end: {40, 25}}, {kind: Line, end: {40, -10}}, {kind: Line, end: {25, -25}},
+    {kind: Line, end: {-25, -25}}, {kind: Line, end: {-40, -10}}
   ], closed: true} }
   harbor_arm { Profile2D: {outer: harbor_arm_shape} }
 
   // A mast with a blinking red beacon on top.
   template HarborMast {
-    prop h: f32 = 40
-    pole : HarborSteel { Position: {0, h / 2, 0}; Cylinder: {radius: 1.6, length: h, segments: 8} }
-    lamp : HarborBeaconRed { Position: {0, h + 3, 0}; Sphere: {radius: 4, segments: 10} }
+    prop h: f32 = 20
+    pole : HarborSteel { Position: {0, h / 2, 0}; Cylinder: {radius: 0.8, length: h, segments: 8} }
+    lamp : HarborBeaconRed { Position: {0, h + 1.5, 0}; Sphere: {radius: 2, segments: 10} }
   }
 
   // A ring of n window strips on a cylinder of radius r at height y, each w wide and h high.
   // Every skip-th strip is left dark.
   template HarborWindows {
-    prop r: f32 = 100
+    prop r: f32 = 50
     prop y: f32 = 0
     prop n: i32 = 32
-    prop w: f32 = 12
-    prop h: f32 = 6
+    prop w: f32 = 6
+    prop h: f32 = 3
     prop skip: i32 = 100000
     for c in 0..n {
       const a = (c + 0.5) * 2 * PI / n
@@ -40,27 +40,27 @@ assets {
         "w_{c}" : HarborWindow {
           Position: {cos(a) * r, y, sin(a) * r}
           Rotation: {0, 0 - a, 0}
-          Box: {1.5, h, w}
+          Box: {1, h, w}
         }
       }
     }
   }
 
   template HarborGlazing {
-    prop r: f32 = 100
+    prop r: f32 = 50
     prop y: f32 = 0
-    prop h: f32 = 26
+    prop h: f32 = 13
     prop seg: i32 = 128
     band : HarborWindowBand {
       Position: {0, y, 0}
-      Tube: {radius: r + 0.6, thickness: 1.2, length: h, segments: seg}
-      texture.Transform: {scale_x: floor(2 * PI * r / 13), scale_y: h / 13}
+      Tube: {radius: r + 0.3, thickness: 0.6, length: h, segments: seg}
+      texture.Transform: {scale_x: floor(2 * PI * r / 8), scale_y: h / 8}
     }
   }
 
   // A stack of shipping containers, l long.
   template HarborCrates {
-    prop l: f32 = 40
+    prop l: f32 = 20
     prop seed: i32 = 0
     for i in 0..3 {
       for j in 0..2 {
@@ -73,8 +73,8 @@ assets {
           } else {
             (IsA, HarborCrateGrey)
           }
-          Position: {(i - 1) * 13, 6 + j * 12, 0}
-          Box: {12, 11.5, l}
+          Position: {(i - 1) * 6.5, 3 + j * 6, 0}
+          Box: {6, 5.75, l}
         }
       }
     }
@@ -82,45 +82,45 @@ assets {
 
   // A yellow portal crane straddling a cargo yard, s wide.
   template HarborCrane {
-    prop s: f32 = 60
-    leg_a : HarborYellow { Position: {0 - s / 2, 35, 0}; Box: {6, 70, 6} }
-    leg_b : HarborYellow { Position: {s / 2, 35, 0}; Box: {6, 70, 6} }
-    beam : HarborYellow { Position: {0, 72, 0}; Box: {s + 10, 8, 10} }
-    cab : HarborPanel { Position: {s / 4, 64, 0}; Box: {12, 8, 12} }
-    cab_light : HarborAmber { Position: {s / 4, 64, 6.1}; Box: {8, 3, 0.2} }
-    lamp : HarborBeaconAmber { Position: {0, 77, 0}; Sphere: {radius: 2.5, segments: 8} }
+    prop s: f32 = 30
+    leg_a : HarborYellow { Position: {0 - s / 2, 17.5, 0}; Box: {3, 35, 3} }
+    leg_b : HarborYellow { Position: {s / 2, 17.5, 0}; Box: {3, 35, 3} }
+    beam : HarborYellow { Position: {0, 36, 0}; Box: {s + 5, 4, 5} }
+    cab : HarborPanel { Position: {s / 4, 32, 0}; Box: {6, 4, 6} }
+    cab_light : HarborAmber { Position: {s / 4, 32, 3.05}; Box: {4, 1.5, 0.1} }
+    lamp : HarborBeaconAmber { Position: {0, 38.5, 0}; Sphere: {radius: 1.5, segments: 8} }
   }
 
   template HarborRadiators {
     prop n: i32 = 5
-    prop l: f32 = 60
-    prop h: f32 = 26
-    const w = n * 9 + 6
-    base : HarborPanel { Position: {0, 3, 0}; Box: {w, 6, l + 6} }
-    header : HarborYellow { Position: {0, 9, l / 2 + 1}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 2, length: w - 4, segments: 8} }
+    prop l: f32 = 30
+    prop h: f32 = 13
+    const w = n * 4.5 + 3
+    base : HarborPanel { Position: {0, 1.5, 0}; Box: {w, 3, l + 3} }
+    header : HarborYellow { Position: {0, 4.5, l / 2 + 0.5}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 1, length: w - 2, segments: 8} }
     for f in 0..n {
-      "fin_{f}" : HarborRadiator { Position: {(f - (n - 1) * 0.5) * 9, 6 + h / 2, 0}; Box: {1.6, h, l} }
+      "fin_{f}" : HarborRadiator { Position: {(f - (n - 1) * 0.5) * 4.5, 3 + h / 2, 0}; Box: {0.8, h, l} }
     }
   }
 
   template HarborTanks {
     prop n: i32 = 3
-    prop r: f32 = 9
-    prop l: f32 = 40
-    const w = n * (r * 2 + 3)
-    saddle_a : HarborPanel { Position: {0, 3, l * 0.35}; Box: {w, 6, 4} }
-    saddle_b : HarborPanel { Position: {0, 3, 0 - l * 0.35}; Box: {w, 6, 4} }
+    prop r: f32 = 4.5
+    prop l: f32 = 20
+    const w = n * (r * 2 + 1.5)
+    saddle_a : HarborPanel { Position: {0, 1.5, l * 0.35}; Box: {w, 3, 2} }
+    saddle_b : HarborPanel { Position: {0, 1.5, 0 - l * 0.35}; Box: {w, 3, 2} }
     for t in 0..n {
       "tank_{t}" {
-        Position: {(t - (n - 1) * 0.5) * (r * 2 + 3), r + 4, 0}
+        Position: {(t - (n - 1) * 0.5) * (r * 2 + 1.5), r + 2, 0}
         body : HarborWhite { Rotation: {HALF_PI, 0, 0}; Capsule: {radius: r, length: l, segments: 16, smooth: true} }
-        band : HarborRed { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r + 0.4, length: 3, segments: 16} }
+        band : HarborRed { Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r + 0.2, length: 1.5, segments: 16} }
       }
     }
   }
 
   template HarborDish {
-    prop r: f32 = 20
+    prop r: f32 = 10
     prop tilt: f32 = 0.6
     prop spin: f32 = 0
     pedestal : HarborPanel { Position: {0, r * 0.4, 0}; Cylinder: {radius: r * 0.18, length: r * 0.8, segments: 10} }
@@ -138,290 +138,290 @@ assets {
   }
 
   template HarborPad {
-    prop r: f32 = 30
-    plate : HarborPanel { Position: {0, 0.5, 0}; Cylinder: {radius: r, length: 1, segments: 32} }
-    ring : HarborHazard { Position: {0, 1.1, 0}; Tube: {radius: r - 1.5, thickness: 3, length: 0.4, segments: 32} }
-    bar_a : HarborWhite { Position: {r * 0.25, 1.1, 0}; Box: {r * 0.1, 0.4, r * 0.8} }
-    bar_b : HarborWhite { Position: {0 - r * 0.25, 1.1, 0}; Box: {r * 0.1, 0.4, r * 0.8} }
-    bar_c : HarborWhite { Position: {0, 1.1, 0}; Box: {r * 0.5, 0.4, r * 0.1} }
+    prop r: f32 = 15
+    plate : HarborPanel { Position: {0, 0.25, 0}; Cylinder: {radius: r, length: 0.5, segments: 32} }
+    ring : HarborHazard { Position: {0, 0.55, 0}; Tube: {radius: r - 0.75, thickness: 1.5, length: 0.2, segments: 32} }
+    bar_a : HarborWhite { Position: {r * 0.25, 0.55, 0}; Box: {r * 0.1, 0.2, r * 0.8} }
+    bar_b : HarborWhite { Position: {0 - r * 0.25, 0.55, 0}; Box: {r * 0.1, 0.2, r * 0.8} }
+    bar_c : HarborWhite { Position: {0, 0.55, 0}; Box: {r * 0.5, 0.2, r * 0.1} }
     for l in 0..8 {
       const a = l * PI / 4
-      "light_{l}" : HarborCyan { Position: {cos(a) * (r + 2), 1, sin(a) * (r + 2)}; Sphere: {radius: 1.4, segments: 8} }
+      "light_{l}" : HarborCyan { Position: {cos(a) * (r + 1), 0.5, sin(a) * (r + 1)}; Sphere: {radius: 0.7, segments: 8} }
     }
   }
 
   template HarborSpheres {
-    prop r: f32 = 12
-    pump : HarborPanel { Position: {0, 6, 0}; Box: {14, 12, 14} }
+    prop r: f32 = 6
+    pump : HarborPanel { Position: {0, 3, 0}; Box: {7, 6, 7} }
     for s in 0..4 {
       const a = s * HALF_PI + PI / 4
       "sphere_{s}" {
         Position: {cos(a) * r * 1.7, 0, sin(a) * r * 1.7}
         legs : HarborSteel { Position: {0, r * 0.4, 0}; Cylinder: {radius: r * 0.5, length: r * 0.8, segments: 8} }
         tank : HarborWhite { Position: {0, r * 1.5, 0}; Sphere: {radius: r, segments: 16, smooth: true} }
-        belt : HarborRed { Position: {0, r * 1.5, 0}; Cylinder: {radius: r + 0.3, length: r * 0.15, segments: 16} }
-        pipe : HarborYellow { Position: {0 - cos(a) * r * 0.85, 4, 0 - sin(a) * r * 0.85}; Rotation: {0, 0 - a, HALF_PI}; Cylinder: {radius: 1.2, length: r * 1.7, segments: 6} }
+        belt : HarborRed { Position: {0, r * 1.5, 0}; Cylinder: {radius: r + 0.15, length: r * 0.15, segments: 16} }
+        pipe : HarborYellow { Position: {0 - cos(a) * r * 0.85, 2, 0 - sin(a) * r * 0.85}; Rotation: {0, 0 - a, HALF_PI}; Cylinder: {radius: 0.6, length: r * 1.7, segments: 6} }
       }
     }
   }
 
   template HarborRoofModule {
     prop kind: i32 = 0
-    prop mast: f32 = 40
+    prop mast: f32 = 20
     if kind == 0 {
-      HarborRadiators fins(n: 5, l: 56, h: 24)
+      HarborRadiators fins(n: 5, l: 28, h: 12)
     } else if kind == 1 {
-      HarborTanks tanks(n: 3, r: 9, l: 44)
+      HarborTanks tanks(n: 3, r: 4.5, l: 22)
     } else if kind == 2 {
-      pad : HarborPanel { Position: {0, 2, 0}; Box: {40, 4, 40} }
-      HarborDish dish(r: 20, tilt: 0.75, spin: 0.08) { Position: {0, 4, 0} }
+      pad : HarborPanel { Position: {0, 1, 0}; Box: {20, 2, 20} }
+      HarborDish dish(r: 10, tilt: 0.75, spin: 0.08) { Position: {0, 2, 0} }
     } else if kind == 3 {
-      block : HarborHullDark { Position: {0, 14, 0}; Box: {54, 28, 78} }
-      vent : HarborPanel { Position: {0, 30, -14}; Box: {38, 4, 30} }
-      grill : HarborSteel { Position: {0, 30, 22}; Cylinder: {radius: 9, length: 6, segments: 12} }
-      HarborMast mast_(h: mast) { Position: {18, 28, 30} }
+      block : HarborHullDark { Position: {0, 7, 0}; Box: {27, 14, 39} }
+      vent : HarborPanel { Position: {0, 15, -7}; Box: {19, 2, 15} }
+      grill : HarborSteel { Position: {0, 15, 11}; Cylinder: {radius: 4.5, length: 3, segments: 12} }
+      HarborMast mast_(h: mast) { Position: {9, 14, 15} }
     } else {
-      hab : HarborHull { Position: {0, 13, 0}; RoundedBox: {44, 26, 70, 9, segments: 2} }
-      glass : HarborWindow { Position: {22.6, 15, 0}; Box: {1, 5, 52} }
-      glass_b : HarborWindow { Position: {-22.6, 15, 0}; Box: {1, 5, 52} }
-      hatch : HarborYellow { Position: {0, 27, 18}; Cylinder: {radius: 6, length: 2, segments: 12} }
-      HarborMast mast_(h: mast * 0.6) { Position: {0, 26, -24} }
+      hab : HarborHull { Position: {0, 6.5, 0}; RoundedBox: {22, 13, 35, 4.5, segments: 2} }
+      glass : HarborWindow { Position: {11.3, 7.5, 0}; Box: {0.5, 2.5, 26} }
+      glass_b : HarborWindow { Position: {-11.3, 7.5, 0}; Box: {0.5, 2.5, 26} }
+      hatch : HarborYellow { Position: {0, 13.5, 9}; Cylinder: {radius: 3, length: 1, segments: 12} }
+      HarborMast mast_(h: mast * 0.6) { Position: {0, 13, -12} }
     }
   }
 
   // A corridor from radius r0 to r1 along +z, w wide and h high, at height y.
   template HarborCorridor {
     prop r0: f32 = 0
-    prop r1: f32 = 100
-    prop w: f32 = 60
-    prop h: f32 = 50
+    prop r1: f32 = 50
+    prop w: f32 = 30
+    prop h: f32 = 25
     prop y: f32 = 0
     const l = r1 - r0
     const z = (r0 + r1) / 2
     body : HarborHullDark { Position: {0, y, z}; Box: {w, h, l} }
-    roof : HarborPanel { Position: {0, y + h / 2 + 3, z}; Box: {w * 0.7, 6, l} }
-    win_a : HarborWindow { Position: {w / 2 + 0.6, y + 4, z}; Box: {1, h * 0.3, l * 0.92} }
-    win_b : HarborWindow { Position: {0 - w / 2 - 0.6, y + 4, z}; Box: {1, h * 0.3, l * 0.92} }
+    roof : HarborPanel { Position: {0, y + h / 2 + 1.5, z}; Box: {w * 0.7, 3, l} }
+    win_a : HarborWindow { Position: {w / 2 + 0.3, y + 2, z}; Box: {0.5, h * 0.3, l * 0.92} }
+    win_b : HarborWindow { Position: {0 - w / 2 - 0.3, y + 2, z}; Box: {0.5, h * 0.3, l * 0.92} }
     for r in 0..3 {
-      "rib_{r}" : HarborPanel { Position: {0, y, r0 + l * (r + 1) / 4}; Box: {w + 6, h + 6, 6} }
+      "rib_{r}" : HarborPanel { Position: {0, y, r0 + l * (r + 1) / 4}; Box: {w + 3, h + 3, 3} }
     }
   }
 
   template HarborStation {
     // The hub: a drum with window bands, a dome, a crown of spires and a spike underneath.
     hub {
-      base : HarborHull { Position: {0, 30, 0}; Cylinder: {radius: 380, length: 220, segments: 96, smooth: true} }
-      HarborGlazing win_a(r: 380.5, y: -40, h: 26, seg: 96)
-      HarborGlazing win_b(r: 380.5, y: 20, h: 26, seg: 96)
-      HarborGlazing win_c(r: 380.5, y: 80, h: 26, seg: 96)
+      base : HarborHull { Position: {0, 15, 0}; Cylinder: {radius: 190, length: 110, segments: 96, smooth: true} }
+      HarborGlazing win_a(r: 190.25, y: -20, h: 13, seg: 96)
+      HarborGlazing win_b(r: 190.25, y: 10, h: 13, seg: 96)
+      HarborGlazing win_c(r: 190.25, y: 40, h: 13, seg: 96)
       for b in 0..12 {
         const a = b * PI / 6
         "buttress_{b}" {
           Rotation: {0, a, 0}
-          block : HarborHullDark { Position: {0, 10, 395}; RoundedBox: {90, 200, 60, 8, segments: 2} }
-          strip : HarborWindow { Position: {0, 40, 425.6}; Box: {60, 10, 1} }
-          door : HarborPanel { Position: {0, -40, 425.6}; Box: {40, 50, 1} }
-          HarborMast mast(h: 30) { Position: {0, 110, 395} }
+          block : HarborHullDark { Position: {0, 5, 197.5}; RoundedBox: {45, 100, 30, 4, segments: 2} }
+          strip : HarborWindow { Position: {0, 20, 212.8}; Box: {30, 5, 0.5} }
+          door : HarborPanel { Position: {0, -20, 212.8}; Box: {20, 25, 0.5} }
+          HarborMast mast(h: 15) { Position: {0, 55, 197.5} }
         }
       }
-      mid : HarborHullDark { Position: {0, 190, 0}; Cylinder: {radius: 320, length: 100, segments: 96, smooth: true} }
-      mid_lip : HarborPanel { Position: {0, 141, 0}; Cylinder: {radius: 390, length: 6, segments: 96, smooth: true} }
-      HarborGlazing win_mid(r: 320.5, y: 195, h: 39, seg: 96)
+      mid : HarborHullDark { Position: {0, 95, 0}; Cylinder: {radius: 160, length: 50, segments: 96, smooth: true} }
+      mid_lip : HarborPanel { Position: {0, 70.5, 0}; Cylinder: {radius: 195, length: 3, segments: 96, smooth: true} }
+      HarborGlazing win_mid(r: 160.25, y: 97.5, h: 19.5, seg: 96)
       for p in 0..4 {
         const a = p * HALF_PI
-        HarborPad "pad_{p}"(r: 26) { Position: {cos(a) * 352, 144, sin(a) * 352} }
-        HarborDish "dish_{p}"(r: 22, tilt: 0.8, spin: 0.05 + p * 0.02) { Position: {cos(a + PI / 4) * 352, 144, sin(a + PI / 4) * 352}; Rotation: {0, 0 - a, 0} }
+        HarborPad "pad_{p}"(r: 13) { Position: {cos(a) * 176, 72, sin(a) * 176} }
+        HarborDish "dish_{p}"(r: 11, tilt: 0.8, spin: 0.05 + p * 0.02) { Position: {cos(a + PI / 4) * 176, 72, sin(a + PI / 4) * 176}; Rotation: {0, 0 - a, 0} }
       }
-      dome : HarborHull { Position: {0, 240, 0}; HemiSphere: {radius: 300, segments: 64, smooth: true} }
+      dome : HarborHull { Position: {0, 120, 0}; HemiSphere: {radius: 150, segments: 64, smooth: true} }
       for r in 0..16 {
         const a = r * PI / 8 + PI / 48
         "dome_rib_{r}" : HarborPanel {
-          Position: {0, 240, 0}
-          EllipsoidShell: {radius: {303, 303, 303}, longitude_start: a, longitude_end: a + 0.03, latitude_start: 0, latitude_end: 1.2, thickness: 5, rims: true, segments: 3, rings: 24}
+          Position: {0, 120, 0}
+          EllipsoidShell: {radius: {151.5, 151.5, 151.5}, longitude_start: a, longitude_end: a + 0.03, latitude_start: 0, latitude_end: 1.2, thickness: 2.5, rims: true, segments: 3, rings: 24}
         }
       }
-      dome_rim : HarborPanel { Position: {0, 242, 0}; Torus: {radius: 302, tube: 8, segments: 96, rings: 8} }
-      band_a : HarborPanel { Position: {0, 320, 0}; Torus: {radius: 289, tube: 6, segments: 96, rings: 8} }
-      band_b : HarborPanel { Position: {0, 400, 0}; Torus: {radius: 254, tube: 6, segments: 96, rings: 8} }
-      band_c : HarborPanel { Position: {0, 470, 0}; Torus: {radius: 193, tube: 6, segments: 64, rings: 8} }
+      dome_rim : HarborPanel { Position: {0, 121, 0}; Torus: {radius: 151, tube: 4, segments: 96, rings: 8} }
+      band_a : HarborPanel { Position: {0, 160, 0}; Torus: {radius: 144.5, tube: 3, segments: 96, rings: 8} }
+      band_b : HarborPanel { Position: {0, 200, 0}; Torus: {radius: 127, tube: 3, segments: 96, rings: 8} }
+      band_c : HarborPanel { Position: {0, 235, 0}; Torus: {radius: 96.5, tube: 3, segments: 64, rings: 8} }
       for c in 0..48 {
         const a = c * PI / 24
         "dome_window_{c}" : HarborWindowCool {
-          Position: {cos(a) * 280, 345, sin(a) * 280}
+          Position: {cos(a) * 140, 172.5, sin(a) * 140}
           Rotation: {0, 0 - a, 0.3}
-          Box: {1.5, 22, 18}
+          Box: {1, 11, 9}
         }
       }
-      crown : HarborHullDark { Position: {0, 560, 0}; Cylinder: {radius: 110, length: 80, segments: 48, smooth: true} }
-      crown_lip : HarborPanel { Position: {0, 602, 0}; Cylinder: {radius: 120, length: 6, segments: 48, smooth: true} }
-      HarborGlazing win_crown(r: 110.5, y: 560, h: 26, seg: 48)
-      spire : HarborSteel { Position: {0, 865, 0}; Cone: {radius: 42, length: 520, segments: 24} }
-      spire_tip : HarborBeaconRed { Position: {0, 1130, 0}; Sphere: {radius: 6, segments: 10} }
+      crown : HarborHullDark { Position: {0, 280, 0}; Cylinder: {radius: 55, length: 40, segments: 48, smooth: true} }
+      crown_lip : HarborPanel { Position: {0, 301, 0}; Cylinder: {radius: 60, length: 3, segments: 48, smooth: true} }
+      HarborGlazing win_crown(r: 55.25, y: 280, h: 13, seg: 48)
+      spire : HarborSteel { Position: {0, 432.5, 0}; Cone: {radius: 21, length: 260, segments: 24} }
+      spire_tip : HarborBeaconRed { Position: {0, 565, 0}; Sphere: {radius: 4, segments: 10} }
 
       halo {
-        Position: {0, 980, 0}
+        Position: {0, 490, 0}
         AngularVelocity: {0, 0.12, 0}
-        ring : HarborWhite { Torus: {radius: 110, tube: 4, segments: 64, rings: 8} }
-        collar : HarborPanel { Cylinder: {radius: 16, length: 10, segments: 16} }
+        ring : HarborWhite { Torus: {radius: 55, tube: 2, segments: 64, rings: 8} }
+        collar : HarborPanel { Cylinder: {radius: 8, length: 5, segments: 16} }
         for s in 0..6 {
           const a = s * PI / 3
-          "spoke_{s}" : HarborSteel { Position: {cos(a) * 62, 0, sin(a) * 62}; Rotation: {0, 0 - a, 0}; Box: {96, 3, 3} }
-          "pod_{s}" : HarborPanel { Position: {cos(a) * 110, 0, sin(a) * 110}; Rotation: {0, 0 - a, 0}; Box: {12, 9, 16} }
+          "spoke_{s}" : HarborSteel { Position: {cos(a) * 31, 0, sin(a) * 31}; Rotation: {0, 0 - a, 0}; Box: {48, 1.5, 1.5} }
+          "pod_{s}" : HarborPanel { Position: {cos(a) * 55, 0, sin(a) * 55}; Rotation: {0, 0 - a, 0}; Box: {6, 4.5, 8} }
         }
         for l in 0..12 {
           const a = l * PI / 6 + PI / 12
-          "light_{l}" : HarborCyan { Position: {cos(a) * 110, 0, sin(a) * 110}; Sphere: {radius: 3, segments: 8} }
+          "light_{l}" : HarborCyan { Position: {cos(a) * 55, 0, sin(a) * 55}; Sphere: {radius: 1.5, segments: 8} }
         }
       }
       for s in 0..6 {
         const a = s * PI / 3
         const tall = s == 0 || s == 2 || s == 4
         "spire_{s}" {
-          Position: {cos(a) * 72, 0, sin(a) * 72}
-          body : HarborHullDark { Position: {0, tall ? 760 : 720, 0}; Cone: {radius: 20, length: tall ? 320 : 240, segments: 16} }
-          lamp : HarborBeaconRed { Position: {0, tall ? 925 : 845, 0}; Sphere: {radius: 4, segments: 8} }
+          Position: {cos(a) * 36, 0, sin(a) * 36}
+          body : HarborHullDark { Position: {0, tall ? 380 : 360, 0}; Cone: {radius: 10, length: tall ? 160 : 120, segments: 16} }
+          lamp : HarborBeaconRed { Position: {0, tall ? 462.5 : 422.5, 0}; Sphere: {radius: 2.5, segments: 8} }
         }
       }
-      under : HarborHullDark { Position: {0, -230, 0}; Frustum: {radius_bottom: 120, radius_top: 380, length: 300, segments: 64, smooth: true} }
-      spike : HarborSteel { Position: {0, -580, 0}; Rotation: {PI, 0, 0}; Cone: {radius: 60, length: 400, segments: 24} }
-      spike_tip : HarborBeaconRed { Position: {0, -782, 0}; Sphere: {radius: 6, segments: 10} }
+      under : HarborHullDark { Position: {0, -115, 0}; Frustum: {radius_bottom: 60, radius_top: 190, length: 150, segments: 64, smooth: true} }
+      spike : HarborSteel { Position: {0, -290, 0}; Rotation: {PI, 0, 0}; Cone: {radius: 30, length: 200, segments: 24} }
+      spike_tip : HarborBeaconRed { Position: {0, -391, 0}; Sphere: {radius: 4, segments: 10} }
       for p in 0..8 {
         const a = p * PI / 4 + PI / 8
-        "pod_{p}" : HarborPanel { Position: {cos(a) * 200, -300, sin(a) * 200}; Rotation: {0, 0 - a, 0}; Box: {50, 90, 40} }
+        "pod_{p}" : HarborPanel { Position: {cos(a) * 100, -150, sin(a) * 100}; Rotation: {0, 0 - a, 0}; Box: {25, 45, 20} }
       }
     }
 
     // The decks between the hub and the rings, with cargo yards and cranes.
-    deck_inner : HarborDeck { Position: {0, -55, 0}; Tube: {radius: 700, thickness: 330, length: 30, segments: 96} }
-    deck_mid : HarborDeck { Position: {0, -45, 0}; Tube: {radius: 1250, thickness: 360, length: 30, segments: 128} }
+    deck_inner : HarborDeck { Position: {0, -27.5, 0}; Tube: {radius: 350, thickness: 165, length: 15, segments: 96} }
+    deck_mid : HarborDeck { Position: {0, -22.5, 0}; Tube: {radius: 625, thickness: 180, length: 15, segments: 128} }
     for y in 0..16 {
       const a = y * PI / 8 + PI / 16
       "yard_{y}" {
         Rotation: {0, a, 0}
-        HarborCrates crates_a(l: 50, seed: y) { Position: {0, -30, 1010} }
-        HarborCrates crates_b(l: 30, seed: y + 1) { Position: {0, -30, 1090} }
-        HarborCrane crane(s: 70) { Position: {0, -30, 1050}; Rotation: {0, HALF_PI, 0} }
-        HarborCrates crates_c(l: 40, seed: y + 2) { Position: {0, -40, 560} }
-        HarborCrates crates_d(l: 34, seed: y + 3) { Position: {0, -30, 1180}; Rotation: {0, HALF_PI, 0} }
+        HarborCrates crates_a(l: 25, seed: y) { Position: {0, -15, 505} }
+        HarborCrates crates_b(l: 15, seed: y + 1) { Position: {0, -15, 545} }
+        HarborCrane crane(s: 35) { Position: {0, -15, 525}; Rotation: {0, HALF_PI, 0} }
+        HarborCrates crates_c(l: 20, seed: y + 2) { Position: {0, -20, 280} }
+        HarborCrates crates_d(l: 17, seed: y + 3) { Position: {0, -15, 590}; Rotation: {0, HALF_PI, 0} }
         if y % 2 == 0 {
-          HarborSpheres tanks(r: 12) { Position: {0, -40, 472} }
-          HarborTanks tanks_b(n: 4, r: 8, l: 50) { Position: {0, -30, 935}; Rotation: {0, HALF_PI, 0} }
+          HarborSpheres tanks(r: 6) { Position: {0, -20, 236} }
+          HarborTanks tanks_b(n: 4, r: 4, l: 25) { Position: {0, -15, 470}; Rotation: {0, HALF_PI, 0} }
         } else {
-          HarborPad pad(r: 38) { Position: {0, -40, 472} }
-          HarborRadiators fins(n: 4, l: 50, h: 22) { Position: {0, -30, 935}; Rotation: {0, HALF_PI, 0} }
+          HarborPad pad(r: 19) { Position: {0, -20, 236} }
+          HarborRadiators fins(n: 4, l: 25, h: 11) { Position: {0, -15, 470}; Rotation: {0, HALF_PI, 0} }
         }
         for l in 0..2 {
           "lamp_{l}" {
-            Position: {l == 0 ? -60 : 60, -30, 1050}
-            pole : HarborSteel { Position: {0, 12, 0}; Cylinder: {radius: 1.2, length: 24, segments: 6} }
-            head : HarborWindow { Position: {0, 25, 0}; Box: {6, 2, 3} }
+            Position: {l == 0 ? -30 : 30, -15, 525}
+            pole : HarborSteel { Position: {0, 6, 0}; Cylinder: {radius: 0.6, length: 12, segments: 6} }
+            head : HarborWindow { Position: {0, 12.5, 0}; Box: {3, 1, 1.5} }
           }
         }
       }
     }
-    rail_a : HarborSteel { Position: {0, -29, 0}; Tube: {radius: 1017, thickness: 3, length: 2, segments: 160} }
-    rail_b : HarborSteel { Position: {0, -29, 0}; Tube: {radius: 1086, thickness: 3, length: 2, segments: 160} }
+    rail_a : HarborSteel { Position: {0, -14.5, 0}; Tube: {radius: 508.5, thickness: 1.5, length: 1, segments: 160} }
+    rail_b : HarborSteel { Position: {0, -14.5, 0}; Tube: {radius: 543, thickness: 1.5, length: 1, segments: 160} }
 
     // The inner ring and the corridors that join it to the hub.
     ring_inner {
-      body : HarborHull { Position: {0, 20, 0}; Tube: {radius: 900, thickness: 200, length: 160, segments: 128} }
-      lip : HarborPanel { Position: {0, 103, 0}; Tube: {radius: 906, thickness: 30, length: 8, segments: 128} }
-      HarborGlazing out_a(r: 900.5, y: -5, h: 26, seg: 128)
-      HarborGlazing out_b(r: 900.5, y: 55, h: 26, seg: 128)
-      HarborGlazing in_a(r: 699.5, y: 30, h: 39, seg: 128)
-      ledge : HarborPanel { Position: {0, 25, 0}; Tube: {radius: 904, thickness: 5, length: 4, segments: 128} }
-      pipe_a : HarborYellow { Position: {0, 104, 0}; Torus: {radius: 735, tube: 3, segments: 128, rings: 6} }
-      pipe_b : HarborSteel { Position: {0, 104, 0}; Torus: {radius: 745, tube: 3, segments: 128, rings: 6} }
-      pipe_c : HarborSteel { Position: {0, 104, 0}; Torus: {radius: 862, tube: 3, segments: 128, rings: 6} }
+      body : HarborHull { Position: {0, 10, 0}; Tube: {radius: 450, thickness: 100, length: 80, segments: 128} }
+      lip : HarborPanel { Position: {0, 51.5, 0}; Tube: {radius: 453, thickness: 15, length: 4, segments: 128} }
+      HarborGlazing out_a(r: 450.25, y: -2.5, h: 13, seg: 128)
+      HarborGlazing out_b(r: 450.25, y: 27.5, h: 13, seg: 128)
+      HarborGlazing in_a(r: 349.75, y: 15, h: 19.5, seg: 128)
+      ledge : HarborPanel { Position: {0, 12.5, 0}; Tube: {radius: 452, thickness: 2.5, length: 2, segments: 128} }
+      pipe_a : HarborYellow { Position: {0, 52, 0}; Torus: {radius: 367.5, tube: 1.5, segments: 128, rings: 6} }
+      pipe_b : HarborSteel { Position: {0, 52, 0}; Torus: {radius: 372.5, tube: 1.5, segments: 128, rings: 6} }
+      pipe_c : HarborSteel { Position: {0, 52, 0}; Torus: {radius: 431, tube: 1.5, segments: 128, rings: 6} }
       for m in 0..32 {
         const a = m * PI / 16
         if m % 8 != 0 {
           "roof_{m}" {
             Rotation: {0, a, 0}
-            HarborRoofModule unit(kind: (m * 3) % 5, mast: 50) { Position: {0, 100, 800} }
+            HarborRoofModule unit(kind: (m * 3) % 5, mast: 25) { Position: {0, 50, 400} }
           }
         }
       }
       for p in 0..48 {
         const a = (p + 0.5) * PI / 24
-        "pilaster_{p}" : HarborHullDark { Position: {cos(a) * 903, 20, sin(a) * 903}; Rotation: {0, 0 - a, 0}; Box: {8, 158, 12} }
+        "pilaster_{p}" : HarborHullDark { Position: {cos(a) * 451.5, 10, sin(a) * 451.5}; Rotation: {0, 0 - a, 0}; Box: {4, 79, 6} }
       }
     }
     for c in 0..8 {
       "spoke_inner_{c}" {
         Rotation: {0, c * PI / 4, 0}
-        HarborCorridor body(r0: 370, r1: 710, w: 70, h: 60, y: 20)
+        HarborCorridor body(r0: 185, r1: 355, w: 35, h: 30, y: 10)
       }
     }
 
     for g in 0..4 {
       "gate_arm_{g}" {
         Rotation: {0, g * HALF_PI, 0}
-        body : HarborHull { Position: {0, 240, 1006}; Rotation: {HALF_PI, 0, 0}; ProfileExtrusion: {profile: harbor_arm, depth: 1412, cap_start: true, cap_end: true} }
+        body : HarborHull { Position: {0, 120, 511}; Rotation: {HALF_PI, 0, 0}; ProfileExtrusion: {profile: harbor_arm, depth: 722, cap_start: true, cap_end: true} }
         for s in 0..2 {
-          "glazing_{s}" : HarborWindowGrid { Position: {s == 0 ? -80.6 : 80.6, 240, 1006}; Box: {1, 22, 1380} }
+          "glazing_{s}" : HarborWindowGrid { Position: {s == 0 ? -40.3 : 40.3, 120, 511}; Box: {0.5, 11, 700} }
         }
-        pylon_inner : HarborHullDark { Position: {0, 152, 800}; Box: {110, 96, 70} }
-        pylon_middle : HarborHullDark { Position: {0, 137, 1335}; Box: {110, 126, 70} }
-        pylon_outer : HarborHullDark { Position: {0, 189, 1640}; Box: {120, 24, 80} }
+        pylon_inner : HarborHullDark { Position: {0, 76, 400}; Box: {55, 48, 35} }
+        pylon_middle : HarborHullDark { Position: {0, 68.5, 667.5}; Box: {55, 63, 35} }
+        pylon_outer : HarborHullDark { Position: {0, 94.5, 820}; Box: {60, 12, 40} }
       }
     }
 
     // The middle ring and its corridors to the inner ring and the hangar wall.
     ring_middle {
-      body : HarborHull { Position: {0, 10, 0}; Tube: {radius: 1400, thickness: 150, length: 120, segments: 160} }
-      lip : HarborPanel { Position: {0, 73, 0}; Tube: {radius: 1405, thickness: 24, length: 6, segments: 160} }
-      HarborGlazing out_a(r: 1400.5, y: -14, h: 26, seg: 160)
-      HarborGlazing out_b(r: 1400.5, y: 36, h: 26, seg: 160)
-      HarborGlazing in_a(r: 1249.5, y: 20, h: 26, seg: 160)
-      ledge : HarborPanel { Position: {0, 10, 0}; Tube: {radius: 1404, thickness: 5, length: 4, segments: 160} }
-      pipe_a : HarborYellow { Position: {0, 73, 0}; Torus: {radius: 1270, tube: 3, segments: 160, rings: 6} }
-      pipe_b : HarborSteel { Position: {0, 73, 0}; Torus: {radius: 1280, tube: 3, segments: 160, rings: 6} }
+      body : HarborHull { Position: {0, 5, 0}; Tube: {radius: 700, thickness: 75, length: 60, segments: 160} }
+      lip : HarborPanel { Position: {0, 36.5, 0}; Tube: {radius: 702.5, thickness: 12, length: 3, segments: 160} }
+      HarborGlazing out_a(r: 700.25, y: -7, h: 13, seg: 160)
+      HarborGlazing out_b(r: 700.25, y: 18, h: 13, seg: 160)
+      HarborGlazing in_a(r: 624.75, y: 10, h: 13, seg: 160)
+      ledge : HarborPanel { Position: {0, 5, 0}; Tube: {radius: 702, thickness: 2.5, length: 2, segments: 160} }
+      pipe_a : HarborYellow { Position: {0, 36.5, 0}; Torus: {radius: 635, tube: 1.5, segments: 160, rings: 6} }
+      pipe_b : HarborSteel { Position: {0, 36.5, 0}; Torus: {radius: 640, tube: 1.5, segments: 160, rings: 6} }
       for m in 0..48 {
         const a = m * PI / 24 + PI / 48
         "roof_{m}" {
           Rotation: {0, a, 0}
-          HarborRoofModule unit(kind: (m * 2 + 1) % 5, mast: 40) { Position: {0, 70, 1335} }
+          HarborRoofModule unit(kind: (m * 2 + 1) % 5, mast: 20) { Position: {0, 35, 667.5} }
         }
       }
       for p in 0..64 {
         const a = (p + 0.5) * PI / 32
-        "pilaster_{p}" : HarborHullDark { Position: {cos(a) * 1403, 10, sin(a) * 1403}; Rotation: {0, 0 - a, 0}; Box: {8, 118, 12} }
+        "pilaster_{p}" : HarborHullDark { Position: {cos(a) * 701.5, 5, sin(a) * 701.5}; Rotation: {0, 0 - a, 0}; Box: {4, 59, 6} }
       }
     }
     for c in 0..8 {
       "spoke_middle_{c}" {
         Rotation: {0, PI / 8 + c * PI / 4, 0}
-        HarborCorridor body(r0: 890, r1: 1260, w: 60, h: 50, y: 10)
+        HarborCorridor body(r0: 445, r1: 630, w: 30, h: 25, y: 5)
       }
       "spoke_outer_{c}" {
         Rotation: {0, c * PI / 4, 0}
-        HarborCorridor body(r0: 1390, r1: 1560, w: 80, h: 60, y: 20)
+        HarborCorridor body(r0: 695, r1: 780, w: 40, h: 30, y: 10)
       }
     }
 
     // The outer deck: the hangar wall of the rig bays, the deck in front of it and the rim.
     outer {
-      deck : HarborDeck { Position: {0, -30, 0}; Tube: {radius: 2040, thickness: 490, length: 60, segments: 192} }
-      skirt : HarborHullDark { Position: {0, -120, 0}; Frustum: {radius_bottom: 1640, radius_top: 2040, length: 120, segments: 192, smooth: true} }
-      HarborWindows edge(r: 2040.5, y: -30, n: 240, w: 26, h: 12)
-      HarborWindows skirt_win(r: 1850, y: -150, n: 180, w: 20, h: 8, skip: 4)
-      parapet : HarborPanel { Position: {0, 8, 0}; Tube: {radius: 2040, thickness: 10, length: 16, segments: 192} }
+      deck : HarborDeck { Position: {0, -15, 0}; Tube: {radius: 1020, thickness: 245, length: 30, segments: 192} }
+      skirt : HarborHullDark { Position: {0, -60, 0}; Frustum: {radius_bottom: 820, radius_top: 1020, length: 60, segments: 192, smooth: true} }
+      HarborWindows edge(r: 1020.25, y: -15, n: 240, w: 13, h: 6)
+      HarborWindows skirt_win(r: 925, y: -75, n: 180, w: 10, h: 4, skip: 4)
+      parapet : HarborPanel { Position: {0, 4, 0}; Tube: {radius: 1020, thickness: 5, length: 8, segments: 192} }
       for l in 0..144 {
         const a = (l + 0.5) * PI / 72
-        "rim_light_{l}" : HarborAmber { Position: {cos(a) * 2035, 17, sin(a) * 2035}; Rotation: {0, 0 - a, 0}; Box: {3, 2, 10} }
+        "rim_light_{l}" : HarborAmber { Position: {cos(a) * 1017.5, 8.5, sin(a) * 1017.5}; Rotation: {0, 0 - a, 0}; Box: {1.5, 1, 5} }
       }
-      wall : HarborHull { Position: {0, 85, 0}; Tube: {radius: 1720, thickness: 170, length: 170, segments: 192} }
-      wall_lip : HarborPanel { Position: {0, 173, 0}; Tube: {radius: 1726, thickness: 190, length: 8, segments: 192} }
-      HarborGlazing wall_win(r: 1720.5, y: 140, h: 26, seg: 192)
-      HarborGlazing wall_in(r: 1549.5, y: 90, h: 39, seg: 192)
-      pipe_a : HarborYellow { Position: {0, 180, 0}; Torus: {radius: 1565, tube: 3.5, segments: 192, rings: 6} }
-      pipe_b : HarborSteel { Position: {0, 180, 0}; Torus: {radius: 1577, tube: 3.5, segments: 192, rings: 6} }
+      wall : HarborHull { Position: {0, 42.5, 0}; Tube: {radius: 860, thickness: 85, length: 85, segments: 192} }
+      wall_lip : HarborPanel { Position: {0, 86.5, 0}; Tube: {radius: 863, thickness: 95, length: 4, segments: 192} }
+      HarborGlazing wall_win(r: 860.25, y: 70, h: 13, seg: 192)
+      HarborGlazing wall_in(r: 774.75, y: 45, h: 19.5, seg: 192)
+      pipe_a : HarborYellow { Position: {0, 90, 0}; Torus: {radius: 782.5, tube: 1.75, segments: 192, rings: 6} }
+      pipe_b : HarborSteel { Position: {0, 90, 0}; Torus: {radius: 788.5, tube: 1.75, segments: 192, rings: 6} }
       for m in 0..48 {
         const a = m * PI / 24 + PI / 48
         "roof_{m}" {
           Rotation: {0, a, 0}
-          HarborRoofModule unit(kind: m % 5, mast: 45) { Position: {0, 177, 1650} }
+          HarborRoofModule unit(kind: m % 5, mast: 22) { Position: {0, 88.5, 825} }
         }
       }
 
@@ -430,28 +430,28 @@ assets {
           const a = q * HALF_PI + (20 + b * 10) * PI / 180
           "buttress_{q}_{b}" {
             Rotation: {0, a, 0}
-            block : HarborHullDark { Position: {0, 90, 1732}; Box: {22, 180, 26} }
-            cap : HarborPanel { Position: {0, 183, 1736}; Box: {28, 8, 36} }
-            strip : HarborAmber { Position: {0, 100, 1745.6}; Box: {3, 120, 1} }
-            foot : HarborHazard { Position: {0, 4, 1750}; Box: {22, 8, 10} }
+            block : HarborHullDark { Position: {0, 45, 866}; Box: {11, 90, 13} }
+            cap : HarborPanel { Position: {0, 91.5, 868}; Box: {14, 4, 18} }
+            strip : HarborAmber { Position: {0, 50, 872.8}; Box: {1.5, 60, 0.5} }
+            foot : HarborHazard { Position: {0, 2, 875}; Box: {11, 4, 5} }
           }
         }
       }
     }
 
     keel {
-      ring : HarborHullDark { Position: {0, -262, 0}; Tube: {radius: 1320, thickness: 40, length: 30, segments: 160} }
-      HarborWindows lights(r: 1320.5, y: -262, n: 120, w: 18, h: 6)
+      ring : HarborHullDark { Position: {0, -131, 0}; Tube: {radius: 660, thickness: 20, length: 15, segments: 160} }
+      HarborWindows lights(r: 660.25, y: -131, n: 120, w: 9, h: 3)
       for s in 0..16 {
         const a = s * PI / 8
-        "strut_{s}" : HarborPanel { Position: {cos(a) * 1300, -213, sin(a) * 1300}; Rotation: {0, 0 - a, 0}; Box: {24, 70, 20} }
+        "strut_{s}" : HarborPanel { Position: {cos(a) * 650, -106.5, sin(a) * 650}; Rotation: {0, 0 - a, 0}; Box: {12, 35, 10} }
       }
       for v in 0..32 {
         const a = (v + 0.5) * PI / 16
         "vane_{v}" {
           Rotation: {0, a, 0}
-          panel : HarborRadiator { Position: {0, -228, 1080}; Box: {3, 90, 200} }
-          spar : HarborPanel { Position: {0, -183, 1080}; Box: {8, 6, 200} }
+          panel : HarborRadiator { Position: {0, -114, 540}; Box: {1.5, 45, 100} }
+          spar : HarborPanel { Position: {0, -91.5, 540}; Box: {4, 3, 100} }
         }
       }
     }

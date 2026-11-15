@@ -18,18 +18,18 @@ assets {
   harbor_tex_windows_albedo { Path: {path: "etc/scenes/shipyard/assets/windows_albedo.png"} }
   harbor_tex_hazard { Path: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
 
-  prefab HarborHull { Rgb: {112, 116, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.55}; PbrTextures: {albedo: harbor_tex_hull, normal: harbor_tex_hull_normal, orm: harbor_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 28, blend: 0.3} }
-  prefab HarborHullDark { Rgb: {72, 76, 86}; PbrMaterial: {metallic: 0.6, roughness: 0.5}; PbrTextures: {albedo: harbor_tex_hull, normal: harbor_tex_hull_normal, orm: harbor_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 20, blend: 0.3} }
+  prefab HarborHull { Rgb: {112, 116, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.55}; PbrTextures: {albedo: harbor_tex_hull, normal: harbor_tex_hull_normal, orm: harbor_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 14, blend: 0.3} }
+  prefab HarborHullDark { Rgb: {72, 76, 86}; PbrMaterial: {metallic: 0.6, roughness: 0.5}; PbrTextures: {albedo: harbor_tex_hull, normal: harbor_tex_hull_normal, orm: harbor_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 10, blend: 0.3} }
   prefab HarborPanel { Rgb: {46, 50, 58}; PbrMaterial: {metallic: 0.7, roughness: 0.45} }
-  prefab HarborDeck { Rgb: {84, 88, 98}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: harbor_tex_floor, normal: harbor_tex_floor_normal, orm: harbor_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 18} }
+  prefab HarborDeck { Rgb: {84, 88, 98}; PbrMaterial: {metallic: 0.5, roughness: 0.7}; PbrTextures: {albedo: harbor_tex_floor, normal: harbor_tex_floor_normal, orm: harbor_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 9} }
   prefab HarborYellow { Rgb: {226, 156, 36}; PbrMaterial: {metallic: 0.45, roughness: 0.42}; ClearCoat: {strength: 0.3, roughness: 0.3} }
   prefab HarborSteel { Rgb: {170, 176, 186}; PbrMaterial: {metallic: 0.95, roughness: 0.25} }
   prefab HarborRubber { Rgb: {24, 26, 30}; PbrMaterial: {metallic: 0, roughness: 0.9} }
-  prefab HarborHazard { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.2, roughness: 0.5}; PbrTextures: {albedo: harbor_tex_hazard}; texture.Mapping: {MappingFrame, size: 16} }
+  prefab HarborHazard { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.2, roughness: 0.5}; PbrTextures: {albedo: harbor_tex_hazard}; texture.Mapping: {MappingFrame, size: 8} }
   prefab HarborWindow { Rgb: {255, 214, 150}; Emissive: {strength: 3.4, color: {255, 196, 120}} }
   prefab HarborWindowCool { Rgb: {170, 220, 255}; Emissive: {strength: 2.6, color: {140, 200, 255}} }
   prefab HarborAmber { Rgb: {255, 176, 60}; Emissive: {strength: 6, color: {255, 150, 40}} }
-  prefab HarborWindowGrid { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 3.4, color: {255, 226, 190}}; PbrTextures: {albedo: harbor_tex_windows_albedo, emissive: harbor_tex_windows}; texture.Mapping: {MappingWorld, size: 13} }
+  prefab HarborWindowGrid { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 3.4, color: {255, 226, 190}}; PbrTextures: {albedo: harbor_tex_windows_albedo, emissive: harbor_tex_windows}; texture.Mapping: {MappingWorld, size: 8} }
   prefab HarborWindowBand { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 3.4, color: {255, 226, 190}}; PbrTextures: {albedo: harbor_tex_windows_albedo, emissive: harbor_tex_windows} }
   prefab HarborCyan { Rgb: {96, 220, 240}; Emissive: {strength: 5, color: {80, 214, 255}} }
   prefab HarborSign { Rgb: {34, 38, 46}; PbrMaterial: {metallic: 0.5, roughness: 0.4} }
