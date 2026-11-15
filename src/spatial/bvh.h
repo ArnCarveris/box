@@ -213,6 +213,27 @@ bool box_bvh_overlap(
     box_bvh_visit_t visit,
     void *ctx);
 
+/** Visit the items whose boxes, placed by a matrix, overlap a box.
+ *
+ * Every box of the tree is tested by its world bounds under the matrix, so an item is visited
+ * whenever the world bounds of anything inside its box under that matrix overlap the box.
+ *
+ * @param tree The tree, whose boxes are in the frame the matrix places
+ * @param pose The 16 floats of the matrix, column by column, NULL for none
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param visit Receives the items
+ * @param ctx Context passed to visit
+ * @return false when visit stopped the walk
+ */
+bool box_bvh_overlap_placed(
+    const box_bvh_t *tree,
+    const float *pose,
+    const vec3 min,
+    const vec3 max,
+    box_bvh_visit_t visit,
+    void *ctx);
+
 /** Visit the items whose boxes overlap a sphere.
  *
  * @param tree The tree
@@ -242,6 +263,27 @@ bool box_bvh_sphere(
  */
 bool box_bvh_ray(
     const box_bvh_t *tree,
+    const box_bvh_ray_t *ray,
+    const float *reach,
+    box_bvh_visit_t visit,
+    void *ctx);
+
+/** Visit the items whose boxes, placed by a matrix, a ray reaches, nearest subtree first.
+ *
+ * Every box of the tree is tested by its world bounds under the matrix, so distances are
+ * distances along the ray in the world. The reach is read again after every visit.
+ *
+ * @param tree The tree, whose boxes are in the frame the matrix places
+ * @param pose The 16 floats of the matrix, column by column, NULL for none
+ * @param ray The ray, in the world
+ * @param reach Distance along the ray beyond which items are skipped
+ * @param visit Receives the items
+ * @param ctx Context passed to visit
+ * @return false when visit stopped the walk
+ */
+bool box_bvh_ray_placed(
+    const box_bvh_t *tree,
+    const float *pose,
     const box_bvh_ray_t *ray,
     const float *reach,
     box_bvh_visit_t visit,

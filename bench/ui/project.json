@@ -38,6 +38,8 @@
                     "wheel_4_per_frame_10k_layout_ui",
                     "move_over_hires_mesh",
                     "first_hover_dense_mesh",
+                    "move_over_ship_10k",
+                    "move_over_ship_10k_nested",
                     "still_cursor_moving_wave_1600",
                     "still_cursor_ignored_wave_400",
                     "still_cursor_ignored_wave_1600"

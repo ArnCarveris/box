@@ -801,3 +801,312 @@ void Spatial_idle_ray_100k(
     bench_counter(b, "moved_in_tree", stats.moved);
     ecs_fini(world);
 }
+
+/** Rows and columns of the parts of a ship */
+#define BENCH_SHIP_SIDE (100)
+
+/** Parts of a ship */
+#define BENCH_SHIP_PARTS (BENCH_SHIP_SIDE * BENCH_SHIP_SIDE)
+
+/** Distance between the parts of a ship */
+#define BENCH_SHIP_SPACING (1.2f)
+
+/** Create a world with ships, movers with a grid of box parts in the XZ plane, and run its
+ * first frames.
+ *
+ * @param count Number of ships, side by side along X
+ * @param side Parts per row and column of a ship
+ * @param nested Put each row of parts under an entity with a Position
+ * @param ships Receives the ships, NULL when not needed
+ * @param parts Receives the parts of all ships, allocated here, NULL when not needed
+ * @return The world
+ */
+static ecs_world_t* bench_spatial_ship_world(
+    int32_t count,
+    int32_t side,
+    bool nested,
+    ecs_entity_t *ships,
+    ecs_entity_t **parts)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    if (parts) {
+        *parts = ecs_os_malloc_n(ecs_entity_t, count * side * side);
+    }
+
+    uint32_t seed = 47;
+    float width = (float)side * BENCH_SHIP_SPACING;
+    int32_t i, x, z;
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t ship = ecs_new(world);
+        ecs_set(world, ship, Position, {(float)i * (width + 2), 0, 0});
+        ecs_set(world, ship, Rotation, {0, 0.3f, 0});
+        ecs_add(world, ship, DynamicTransform);
+        if (ships) {
+            ships[i] = ship;
+        }
+
+        for (z = 0; z < side; z ++) {
+            ecs_entity_t row = ship;
+            if (nested) {
+                row = ecs_new_w_pair(world, EcsChildOf, ship);
+                ecs_set(world, row, Position, {0, 0, (float)z * BENCH_SHIP_SPACING});
+            }
+
+            for (x = 0; x < side; x ++) {
+                ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, row);
+                float s = 0.4f + bench_random(&seed) * 0.6f;
+                ecs_set(world, e, Position, {(float)x * BENCH_SHIP_SPACING,
+                    bench_random(&seed) * 2.0f, nested ? 0 : (float)z * BENCH_SHIP_SPACING});
+                ecs_set(world, e, Box, {s, s * (0.5f + bench_random(&seed)), s});
+                if (parts) {
+                    (*parts)[(i * side + z) * side + x] = e;
+                }
+            }
+        }
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    return world;
+}
+
+/** Fill random rays that point down onto a ship.
+ *
+ * @param rays The rays
+ * @param side Parts per row and column of the ship
+ * @param seed The state of the generator
+ */
+static void bench_spatial_ship_rays(
+    box_spatial_ray_t *rays,
+    int32_t side,
+    uint32_t *seed)
+{
+    float extent = (float)side * BENCH_SHIP_SPACING;
+    int32_t i;
+    for (i = 0; i < BENCH_QUERIES; i ++) {
+        rays[i] = (box_spatial_ray_t){
+            .origin = { bench_random(seed) * extent, 20, bench_random(seed) * extent },
+            .dir = { bench_random(seed) - 0.5f, -1, bench_random(seed) - 0.5f },
+            .shapes = true
+        };
+    }
+}
+
+/** Accept a hit at the distance of its bounds, as a filter that tests nothing more.
+ *
+ * @param ctx Counter of the calls
+ * @param e The entity
+ * @param distance Distance of the hit
+ * @return true
+ */
+static bool bench_spatial_accept(
+    void *ctx,
+    ecs_entity_t e,
+    float *distance)
+{
+    (void)e;
+    (void)distance;
+    (*(int32_t*)ctx) ++;
+
+    return true;
+}
+
+/** Cast the rays at the shapes of a world and count the hits and the filter calls.
+ *
+ * @param b The benchmark
+ * @param world The world
+ * @param rays The rays
+ * @param filter Whether the rays have a filter
+ */
+static void bench_spatial_ship_cast(
+    bench_t *b,
+    ecs_world_t *world,
+    box_spatial_ray_t *rays,
+    bool filter)
+{
+    int32_t i, hits = 0, calls = 0;
+    for (i = 0; i < BENCH_QUERIES; i ++) {
+        rays[i].filter = filter ? bench_spatial_accept : NULL;
+        rays[i].ctx = &calls;
+    }
+
+    bench_set_items(b, BENCH_QUERIES);
+    while (bench_iter(b)) {
+        hits = 0;
+        calls = 0;
+        for (i = 0; i < BENCH_QUERIES; i ++) {
+            box_spatial_hit_t hit;
+            hits += box_spatial_ray(world, &rays[i], &hit);
+        }
+
+        bench_keep(hits);
+    }
+
+    bench_counter(b, "hits", hits);
+    bench_counter(b, "filter_calls", calls);
+}
+
+void Spatial_ray_ship_10k(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_world_t *world = bench_spatial_ship_world(1, BENCH_SHIP_SIDE, false, NULL, NULL);
+    box_spatial_ray_t *rays = ecs_os_malloc_n(box_spatial_ray_t, BENCH_QUERIES);
+    uint32_t seed = 53;
+    bench_spatial_ship_rays(rays, BENCH_SHIP_SIDE, &seed);
+    bench_spatial_ship_cast(b, world, rays, false);
+    ecs_os_free(rays);
+    ecs_fini(world);
+}
+
+void Spatial_ray_ship_10k_filter(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_world_t *world = bench_spatial_ship_world(1, BENCH_SHIP_SIDE, false, NULL, NULL);
+    box_spatial_ray_t *rays = ecs_os_malloc_n(box_spatial_ray_t, BENCH_QUERIES);
+    uint32_t seed = 53;
+    bench_spatial_ship_rays(rays, BENCH_SHIP_SIDE, &seed);
+    bench_spatial_ship_cast(b, world, rays, true);
+    ecs_os_free(rays);
+    ecs_fini(world);
+}
+
+void Spatial_ray_ship_10k_nested(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_world_t *world = bench_spatial_ship_world(1, BENCH_SHIP_SIDE, true, NULL, NULL);
+    box_spatial_ray_t *rays = ecs_os_malloc_n(box_spatial_ray_t, BENCH_QUERIES);
+    uint32_t seed = 53;
+    bench_spatial_ship_rays(rays, BENCH_SHIP_SIDE, &seed);
+    bench_spatial_ship_cast(b, world, rays, true);
+    ecs_os_free(rays);
+    ecs_fini(world);
+}
+
+void Spatial_ray_small_ships_1k(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_world_t *world = bench_spatial_ship_world(1000, 3, false, NULL, NULL);
+    box_spatial_ray_t *rays = ecs_os_malloc_n(box_spatial_ray_t, BENCH_QUERIES);
+    uint32_t seed = 59;
+    int32_t i;
+    float extent = 1000 * (3 * BENCH_SHIP_SPACING + 2);
+    for (i = 0; i < BENCH_QUERIES; i ++) {
+        rays[i] = (box_spatial_ray_t){
+            .origin = { bench_random(&seed) * extent, 20, bench_random(&seed) * 3.6f },
+            .dir = { bench_random(&seed) - 0.5f, -1, bench_random(&seed) - 0.5f },
+            .shapes = true
+        };
+    }
+
+    bench_spatial_ship_cast(b, world, rays, true);
+    ecs_os_free(rays);
+    ecs_fini(world);
+}
+
+void Spatial_expand_ship_10k(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_world_t *world = bench_spatial_ship_world(1, BENCH_SHIP_SIDE, false, NULL, NULL);
+    vec3 *points = ecs_os_malloc_n(vec3, BENCH_QUERIES);
+    float extent = BENCH_SHIP_SIDE * BENCH_SHIP_SPACING;
+    uint32_t seed = 61;
+    int32_t i, j, found = 0;
+    ecs_vec_t hits, shapes;
+    ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &shapes, ecs_entity_t, 0);
+    for (i = 0; i < BENCH_QUERIES; i ++) {
+        points[i][0] = bench_random(&seed) * extent;
+        points[i][1] = 1.0f;
+        points[i][2] = bench_random(&seed) * extent;
+    }
+
+    bench_set_items(b, BENCH_QUERIES);
+    while (bench_iter(b)) {
+        found = 0;
+        for (i = 0; i < BENCH_QUERIES; i ++) {
+            vec3 min = {points[i][0] - 1, points[i][1] - 1, points[i][2] - 1};
+            vec3 max = {points[i][0] + 1, points[i][1] + 1, points[i][2] + 1};
+            ecs_vec_clear(&hits);
+            ecs_vec_clear(&shapes);
+            int32_t count = box_spatial_overlap_box(world, 0, min, max, &hits);
+            for (j = 0; j < count; j ++) {
+                found += box_spatial_expand_box(world,
+                    *ecs_vec_get_t(&hits, ecs_entity_t, j), min, max, &shapes);
+            }
+        }
+
+        bench_keep(found);
+    }
+
+    bench_counter(b, "found", found);
+    ecs_vec_fini_t(NULL, &hits, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &shapes, ecs_entity_t);
+    ecs_os_free(points);
+    ecs_fini(world);
+}
+
+void Spatial_moving_ship_10k(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_entity_t ship;
+    ecs_world_t *world = bench_spatial_ship_world(1, BENCH_SHIP_SIDE, false, &ship, NULL);
+    box_spatial_ray_t ray = { .origin = {60, 20, 60}, .dir = {0.1f, -1, 0.05f},
+        .shapes = true };
+    int32_t frame = 0, hits = 0;
+    bench_spatial_manual(world);
+    bench_set_items(b, 1);
+    while (bench_iter(b)) {
+        bench_pause(b);
+        frame ++;
+        ecs_set(world, ship, Position, {(float)(frame % 100) * 0.1f, 0, 0});
+        ecs_set(world, ship, Rotation, {0, 0.3f + (float)(frame % 50) * 0.01f, 0});
+        ecs_progress(world, 0);
+        bench_resume(b);
+        box_spatial_update(world);
+        box_spatial_hit_t hit;
+        hits += box_spatial_ray(world, &ray, &hit);
+    }
+
+    bench_counter(b, "hits", hits);
+    ecs_fini(world);
+}
+
+void Spatial_refit_ship_10k(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    ecs_entity_t *parts;
+    ecs_world_t *world = bench_spatial_ship_world(1, BENCH_SHIP_SIDE, false, NULL, &parts);
+    box_spatial_ray_t ray = { .origin = {60, 20, 60}, .dir = {0.1f, -1, 0.05f},
+        .shapes = true };
+    uint32_t seed = 67;
+    int32_t i, hits = 0, moved = BENCH_SHIP_PARTS / 100;
+    bench_spatial_manual(world);
+    bench_set_items(b, moved);
+    while (bench_iter(b)) {
+        bench_pause(b);
+        for (i = 0; i < moved; i ++) {
+            int32_t index = (int32_t)(bench_random(&seed) * (BENCH_SHIP_PARTS - 1));
+            const Position *p = ecs_get(world, parts[index], Position);
+            ecs_set(world, parts[index], Position, {p->x, bench_random(&seed) * 2.0f, p->z});
+        }
+
+        ecs_progress(world, 0);
+        bench_resume(b);
+        box_spatial_update(world);
+        box_spatial_hit_t hit;
+        hits += box_spatial_ray(world, &ray, &hit);
+    }
+
+    bench_counter(b, "hits", hits);
+    ecs_os_free(parts);
+    ecs_fini(world);
+}

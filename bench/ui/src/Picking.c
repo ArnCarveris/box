@@ -236,6 +236,85 @@ void Picking_move_over_hires_mesh(
     ecs_fini(world);
 }
 
+/** Create a ship of 10k box parts, a mover whose parts face a camera, behind no HUD.
+ *
+ * @param nested Put each row of parts under an entity with a Position
+ * @return The world
+ */
+static ecs_world_t* bench_picking_ship_world(
+    bool nested)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 150});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t ship = ecs_new(world);
+    ecs_set(world, ship, Position, {0, 0, 0});
+    ecs_set(world, ship, Rotation, {0.2f, 0.3f, 0});
+    ecs_add(world, ship, DynamicTransform);
+    ecs_add(world, ship, Interactive);
+    int32_t x, y;
+    for (y = 0; y < BENCH_UI_SIDE; y ++) {
+        ecs_entity_t row = ship;
+        if (nested) {
+            row = ecs_new_w_pair(world, EcsChildOf, ship);
+            ecs_set(world, row, Position, {0, (float)y - BENCH_UI_SIDE / 2, 0});
+        }
+
+        for (x = 0; x < BENCH_UI_SIDE; x ++) {
+            ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, row);
+            ecs_set(world, e, Position, {(float)x - BENCH_UI_SIDE / 2,
+                nested ? 0 : (float)y - BENCH_UI_SIDE / 2, (float)((x * 7 + y * 3) % 5)});
+            ecs_set(world, e, Box, {0.8f, 0.8f, 0.8f});
+        }
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    return world;
+}
+
+/** Move the cursor over a ship every frame and count the frames that pick it.
+ *
+ * @param b The benchmark
+ * @param nested Put each row of parts under an entity with a Position
+ */
+static void bench_picking_ship(
+    bench_t *b,
+    bool nested)
+{
+    ecs_world_t *world = bench_picking_ship_world(nested);
+    int32_t i = 0, hits = 0;
+    while (bench_iter(b)) {
+        box_input_mouse_move(world, 440.0f + (float)((i * 37) % 400),
+            160.0f + (float)((i * 23) % 400), false);
+        ecs_progress(world, 0);
+        hits += ecs_singleton_get(world, PickStatus)->hit != 0;
+        i ++;
+    }
+
+    bench_counter(b, "hits", hits);
+    ecs_fini(world);
+}
+
+void Picking_move_over_ship_10k(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    bench_picking_ship(b, false);
+}
+
+void Picking_move_over_ship_10k_nested(
+    bench_t *b)
+{
+    // spatial_perf/mover_tree
+    bench_picking_ship(b, true);
+}
+
 void Picking_first_hover_dense_mesh(
     bench_t *b)
 {

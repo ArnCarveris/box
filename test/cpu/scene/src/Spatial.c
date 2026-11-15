@@ -2439,3 +2439,579 @@ void Spatial_mover_child_picked(void) {
 
     ecs_fini(world);
 }
+
+/** State of the generator of the mover tree cases */
+static uint32_t tree_seed;
+
+/** Get a random number between 0 and 1.
+ *
+ * @return The number
+ */
+static float tree_random(void)
+{
+    tree_seed = tree_seed * 1664525u + 1013904223u;
+
+    return (float)(tree_seed >> 8) / 16777216.0f;
+}
+
+/** Intersect a ray with a box the way a linear scan of the shapes of a mover does.
+ *
+ * @param origin Origin of the ray
+ * @param dir Direction of the ray, not normalized
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param t Receives the distance at which the ray enters the box
+ * @return true when the ray hits the box
+ */
+static bool tree_ray_box(
+    const vec3 origin,
+    const vec3 dir,
+    const vec3 min,
+    const vec3 max,
+    float *t)
+{
+    float len = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+    float t_min = 0, t_max = FLT_MAX;
+    bool result = true;
+    int32_t i;
+    for (i = 0; i < 3 && result; i ++) {
+        float d = dir[i] / len;
+        if (d == 0) {
+            result = origin[i] >= min[i] && origin[i] <= max[i];
+        } else {
+            float inv = 1.0f / d;
+            float t1 = (min[i] - origin[i]) * inv, t2 = (max[i] - origin[i]) * inv;
+            if (t1 > t2) {
+                float tmp = t1;
+                t1 = t2;
+                t2 = tmp;
+            }
+
+            t_min = t1 > t_min ? t1 : t_min;
+            t_max = t2 < t_max ? t2 : t_max;
+            result = t_min <= t_max;
+        }
+    }
+
+    *t = t_min;
+
+    return result;
+}
+
+/** Test whether a shape of a mover is one a linear scan tests: alive and enabled.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return true when queries may return the shape
+ */
+static bool tree_live(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return e && ecs_is_alive(world, e) && !ecs_has_id(world, e, EcsDisabled);
+}
+
+/** Cast a ray at the shapes of a mover one by one, from their indexed world bounds.
+ *
+ * @param world The world
+ * @param shapes The shapes
+ * @param count Number of shapes
+ * @param origin Origin of the ray
+ * @param dir Direction of the ray
+ * @param skip A shape to leave out, 0 for none
+ * @param hit Receives the nearest shape hit
+ * @param distance Receives the distance of the nearest hit
+ * @return Number of shapes hit
+ */
+static int32_t tree_ray_ref(
+    const ecs_world_t *world,
+    const ecs_entity_t *shapes,
+    int32_t count,
+    const vec3 origin,
+    const vec3 dir,
+    ecs_entity_t skip,
+    ecs_entity_t *hit,
+    float *distance)
+{
+    int32_t i, result = 0;
+    *hit = 0;
+    *distance = FLT_MAX;
+    for (i = 0; i < count; i ++) {
+        vec3 min, max;
+        float t = 0;
+        if (!tree_live(world, shapes[i]) || shapes[i] == skip ||
+            !box_spatial_bounds(world, shapes[i], NULL, min, max))
+        {
+            continue;
+        }
+
+        if (tree_ray_box(origin, dir, min, max, &t)) {
+            result ++;
+            if (t < *distance) {
+                *distance = t;
+                *hit = shapes[i];
+            }
+        }
+    }
+
+    return result;
+}
+
+/** Get the distance at which a ray enters the indexed world bounds of a shape.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param origin Origin of the ray
+ * @param dir Direction of the ray
+ * @return The distance, -1 when the ray misses the shape
+ */
+static float tree_ray_shape(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const vec3 origin,
+    const vec3 dir)
+{
+    vec3 min, max;
+    float t = 0;
+    bool hit = box_spatial_bounds(world, e, NULL, min, max) &&
+        tree_ray_box(origin, dir, min, max, &t);
+
+    return hit ? t : -1;
+}
+
+/** Pick a random ray from around the bounds of a mover through a point inside them.
+ *
+ * @param world The world
+ * @param mover The mover
+ * @param origin Receives the origin
+ * @param dir Receives the direction
+ */
+static void tree_random_ray(
+    const ecs_world_t *world,
+    ecs_entity_t mover,
+    vec3 origin,
+    vec3 dir)
+{
+    vec3 lo, hi, target, away;
+    int32_t i;
+    test_assert(box_spatial_bounds(world, mover, NULL, lo, hi));
+    float radius = glm_vec3_distance(lo, hi);
+    for (i = 0; i < 3; i ++) {
+        target[i] = lo[i] + tree_random() * (hi[i] - lo[i]);
+        away[i] = tree_random() - 0.5f;
+    }
+
+    glm_vec3_normalize(away);
+    for (i = 0; i < 3; i ++) {
+        origin[i] = (lo[i] + hi[i]) * 0.5f + away[i] * radius * 1.5f;
+        dir[i] = (target[i] - origin[i]) * (0.5f + tree_random() * 3.0f);
+    }
+}
+
+/** Check that rays and box queries against the shapes of a mover find what a linear scan of
+ * their world bounds finds, distances included. Rays reach three times across the mover, so
+ * shapes far from it, as those of a nested mover, stay out of reach.
+ *
+ * @param world The world
+ * @param mover The mover
+ * @param shapes The shapes under the mover
+ * @param count Number of shapes
+ */
+static void tree_check(
+    ecs_world_t *world,
+    ecs_entity_t mover,
+    const ecs_entity_t *shapes,
+    int32_t count)
+{
+    ecs_vec_t hits, out;
+    ecs_vec_init_t(NULL, &hits, box_spatial_hit_t, 0);
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    int32_t r, i, j;
+    vec3 lo, hi;
+    test_assert(box_spatial_bounds(world, mover, NULL, lo, hi));
+    float reach = glm_vec3_distance(lo, hi) * 3;
+    for (r = 0; r < 200; r ++) {
+        vec3 origin, dir;
+        ecs_entity_t ref = 0;
+        float ref_t = 0;
+        tree_random_ray(world, mover, origin, dir);
+        int32_t ref_count = tree_ray_ref(world, shapes, count, origin, dir, 0, &ref, &ref_t);
+
+        box_spatial_ray_t ray = { .shapes = true, .max_distance = reach };
+        box_spatial_hit_t hit = {0};
+        glm_vec3_copy(origin, ray.origin);
+        glm_vec3_copy(dir, ray.dir);
+        test_assert(box_spatial_ray(world, &ray, &hit) == (ref != 0));
+        if (ref) {
+            test_flt(hit.distance, ref_t);
+            test_flt(tree_ray_shape(world, hit.entity, origin, dir), ref_t);
+        }
+
+        ecs_vec_clear(&hits);
+        test_int(box_spatial_ray_all(world, &ray, &hits), ref_count);
+        for (i = 0; i < ecs_vec_count(&hits); i ++) {
+            box_spatial_hit_t *h = ecs_vec_get_t(&hits, box_spatial_hit_t, i);
+            test_assert(tree_live(world, h->entity));
+            test_flt(h->distance, tree_ray_shape(world, h->entity, origin, dir));
+        }
+
+        if (ref) {
+            ecs_entity_t next = 0;
+            float next_t = 0;
+            tree_ray_ref(world, shapes, count, origin, dir, ref, &next, &next_t);
+            ray.filter = reject_entity;
+            ray.ctx = &ref;
+            test_assert(box_spatial_ray(world, &ray, &hit) == (next != 0));
+            if (next) {
+                test_assert(hit.entity != ref);
+                test_flt(hit.distance, next_t);
+            }
+        }
+    }
+
+    for (r = 0; r < 100; r ++) {
+        vec3 q_min, q_max;
+        for (i = 0; i < 3; i ++) {
+            float c = lo[i] + tree_random() * (hi[i] - lo[i]);
+            float e = 0.2f + tree_random() * 2.0f;
+            q_min[i] = c - e;
+            q_max[i] = c + e;
+        }
+
+        ecs_vec_clear(&out);
+        int32_t found = box_spatial_expand_box(world, mover, q_min, q_max, &out);
+        int32_t expected = 0;
+        for (i = 0; i < count; i ++) {
+            vec3 min, max;
+            bool in = false;
+            if (!tree_live(world, shapes[i]) ||
+                !box_spatial_bounds(world, shapes[i], NULL, min, max))
+            {
+                continue;
+            }
+
+            bool overlap = min[0] <= q_max[0] && max[0] >= q_min[0] &&
+                min[1] <= q_max[1] && max[1] >= q_min[1] &&
+                min[2] <= q_max[2] && max[2] >= q_min[2];
+            for (j = 0; j < found; j ++) {
+                in |= *ecs_vec_get_t(&out, ecs_entity_t, j) == shapes[i];
+            }
+
+            test_assert(in == overlap);
+            expected += overlap;
+        }
+
+        test_int(found, expected);
+    }
+
+    ecs_vec_fini_t(NULL, &hits, box_spatial_hit_t);
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+}
+
+/** Create a mover with a grid of box shapes, half of them under an intermediate entity.
+ *
+ * @param world The world
+ * @param side Shapes per row and column of the grid
+ * @param shapes Receives the side * side shapes
+ * @return The mover
+ */
+static ecs_entity_t tree_mover(
+    ecs_world_t *world,
+    int32_t side,
+    ecs_entity_t *shapes)
+{
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {3, 1, -2});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t arm = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, arm, Position, {0, 2, 0});
+    ecs_set(world, arm, Rotation, {0, 0.4f, 0});
+    int32_t x, z;
+    for (z = 0; z < side; z ++) {
+        for (x = 0; x < side; x ++) {
+            ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, (x + z) % 2 ? arm : mover);
+            ecs_set(world, e, Position, {(float)x * 1.5f - side * 0.75f,
+                tree_random() * 2.0f, (float)z * 1.5f - side * 0.75f});
+            ecs_set(world, e, Box, {0.5f + tree_random() * 0.7f, 0.5f + tree_random(),
+                0.5f + tree_random() * 0.7f});
+            shapes[z * side + x] = e;
+        }
+    }
+
+    return mover;
+}
+
+void Spatial_mover_tree_rotated(void) {
+    // spatial/mover_tree
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t shapes[100];
+    tree_seed = 1;
+    ecs_entity_t mover = tree_mover(world, 10, shapes);
+    ecs_set(world, mover, Rotation, {0.3f, 0.7f, 0.2f});
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_set(world, mover, Rotation, {-0.5f, 1.9f, 0.1f});
+    ecs_set(world, mover, Position, {-4, 2, 7});
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_fini(world);
+}
+
+void Spatial_mover_tree_scaled(void) {
+    // spatial/mover_tree
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t shapes[144];
+    tree_seed = 2;
+    ecs_entity_t mover = tree_mover(world, 12, shapes);
+    ecs_set(world, mover, Rotation, {0.2f, -0.6f, 0.4f});
+    ecs_set(world, mover, Scale, {2, 0.5f, 1.5f});
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 144);
+
+    ecs_set(world, mover, Scale, {0.25f, 3, 1});
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 144);
+
+    ecs_fini(world);
+}
+
+/** Accept every shape at the distance of its bounds and count the calls.
+ *
+ * @param ctx Pointer to the counter
+ * @param e The entity
+ * @param distance Distance of the hit
+ * @return true
+ */
+static bool count_filter(
+    void *ctx,
+    ecs_entity_t e,
+    float *distance)
+{
+    (void)e;
+    (void)distance;
+    (*(int32_t*)ctx) ++;
+
+    return true;
+}
+
+void Spatial_mover_tree_nearest_filter(void) {
+    // spatial/mover_tree
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t mover = ecs_new(world);
+    ecs_set(world, mover, Position, {0, 0, 0});
+    ecs_add(world, mover, DynamicTransform);
+    ecs_entity_t row[64];
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        row[i] = ecs_new_w_pair(world, EcsChildOf, mover);
+        ecs_set(world, row[i], Position, {(float)i * 2, 0, 0});
+        ecs_set(world, row[i], Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+
+    int32_t calls = 0;
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {-10, 0, 0}, .dir = {1, 0, 0}, .shapes = true,
+        .filter = count_filter, .ctx = &calls };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, row[0]);
+    test_flt(hit.distance, 9.5f);
+    test_assert(calls < 8);
+
+    ray = (box_spatial_ray_t){ .origin = {200, 0, 0}, .dir = {-1, 0, 0}, .shapes = true,
+        .filter = reject_entity, .ctx = &row[63] };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, row[62]);
+    test_flt(hit.distance, 200 - 124.5f);
+
+    ecs_vec_t hits;
+    ecs_vec_init_t(NULL, &hits, box_spatial_hit_t, 0);
+    ray.filter = NULL;
+    test_int(box_spatial_ray_all(world, &ray, &hits), 64);
+    test_uint(ecs_vec_get_t(&hits, box_spatial_hit_t, 0)->entity, row[63]);
+    test_uint(ecs_vec_get_t(&hits, box_spatial_hit_t, 63)->entity, row[0]);
+    ecs_vec_fini_t(NULL, &hits, box_spatial_hit_t);
+
+    tree_seed = 3;
+    tree_check(world, mover, row, 64);
+
+    ecs_fini(world);
+}
+
+void Spatial_mover_tree_members_change(void) {
+    // spatial/mover_tree
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t shapes[110];
+    int32_t i;
+    tree_seed = 4;
+    ecs_entity_t mover = tree_mover(world, 10, shapes);
+    ecs_set(world, mover, Rotation, {0, 0.5f, 0});
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    for (i = 100; i < 110; i ++) {
+        shapes[i] = ecs_new_w_pair(world, EcsChildOf, mover);
+        ecs_set(world, shapes[i], Position, {(float)i - 105, 4, 0});
+        ecs_set(world, shapes[i], Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 110);
+
+    ecs_set(world, shapes[3], Position, {20, 0, 20});
+    ecs_set(world, shapes[57], Position, {-3, -6, 1});
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 110);
+
+    for (i = 0; i < 110; i ++) {
+        const Position *p = ecs_get(world, shapes[i], Position);
+        ecs_set(world, shapes[i], Position, {p->x + 0.5f, p->y - 1, p->z});
+    }
+
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 110);
+
+    ecs_enable(world, shapes[10], false);
+    ecs_enable(world, shapes[11], false);
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 110);
+
+    const WorldTransform *t = ecs_get(world, shapes[10], WorldTransform);
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 50, t->m[3][2]},
+        .dir = {0, -1, 0}, .shapes = true };
+    test_assert(!box_spatial_ray(world, &ray, &hit) || hit.entity != shapes[10]);
+
+    ecs_enable(world, shapes[10], true);
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 110);
+
+    ecs_add(world, shapes[20], SpatialIgnore);
+    ecs_progress(world, 0);
+    shapes[20] = 0;
+    tree_check(world, mover, shapes, 110);
+
+    ecs_fini(world);
+}
+
+void Spatial_mover_tree_compact(void) {
+    // spatial/mover_tree
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t shapes[100];
+    int32_t i;
+    tree_seed = 5;
+    ecs_entity_t mover = tree_mover(world, 10, shapes);
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_delete(world, shapes[99]);
+    ecs_delete(world, shapes[98]);
+    shapes[99] = shapes[98] = 0;
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    for (i = 0; i < 40; i += 3) {
+        ecs_delete(world, shapes[i]);
+        shapes[i] = 0;
+    }
+
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_entity_t extra = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, extra, Position, {0, 8, 0});
+    ecs_set(world, extra, Box, {2, 2, 2});
+    shapes[0] = extra;
+    ecs_delete(world, shapes[50]);
+    shapes[50] = 0;
+    ecs_progress(world, 0);
+    tree_check(world, mover, shapes, 100);
+
+    for (i = 0; i < 100; i ++) {
+        if (shapes[i] && i > 8) {
+            ecs_delete(world, shapes[i]);
+            shapes[i] = 0;
+        }
+    }
+
+    ecs_progress(world, 0);
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 1);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_fini(world);
+}
+
+void Spatial_mover_tree_nested(void) {
+    // spatial/mover_tree
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t shapes[100], inner[20];
+    int32_t i;
+    tree_seed = 6;
+    ecs_entity_t mover = tree_mover(world, 10, shapes);
+    ecs_entity_t car = ecs_new_w_pair(world, EcsChildOf, mover);
+    ecs_set(world, car, Position, {0, 500, 0});
+    ecs_set(world, car, Velocity, {0, 0, 1});
+    for (i = 0; i < 20; i ++) {
+        inner[i] = ecs_new_w_pair(world, EcsChildOf, car);
+        ecs_set(world, inner[i], Position, {(float)i - 10, 0, 0});
+        ecs_set(world, inner[i], Box, {0.5f, 0.5f, 0.5f});
+    }
+
+    ecs_progress(world, 0.1f);
+    ecs_progress(world, 0.1f);
+    box_spatial_stats_t stats;
+    box_spatial_stats(world, &stats);
+    test_int(stats.movers, 2);
+    test_int(stats.entities, 120);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    vec3 lo, hi;
+    test_assert(box_spatial_bounds(world, car, NULL, lo, hi));
+    box_spatial_expand_box(world, mover, lo, hi, &out);
+    for (i = 0; i < ecs_vec_count(&out); i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&out, ecs_entity_t, i);
+        test_assert(!ecs_has_pair(world, e, EcsChildOf, car));
+    }
+
+    ecs_vec_clear(&out);
+    test_int(box_spatial_expand_box(world, car, lo, hi, &out), 20);
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+
+    const WorldTransform *t = ecs_get(world, inner[4], WorldTransform);
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {t->m[3][0], t->m[3][1] + 50, t->m[3][2]},
+        .dir = {0, -1, 0}, .shapes = true, .filter = count_filter };
+    int32_t calls = 0;
+    ray.ctx = &calls;
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_assert(calls > 0);
+    ray.filter = NULL;
+    ecs_vec_t hits;
+    ecs_vec_init_t(NULL, &hits, box_spatial_hit_t, 0);
+    box_spatial_ray_all(world, &ray, &hits);
+    bool found = false;
+    for (i = 0; i < ecs_vec_count(&hits); i ++) {
+        found |= ecs_vec_get_t(&hits, box_spatial_hit_t, i)->entity == inner[4];
+    }
+
+    test_assert(found);
+    ecs_vec_fini_t(NULL, &hits, box_spatial_hit_t);
+
+    ecs_progress(world, 0.1f);
+    tree_check(world, mover, shapes, 100);
+
+    ecs_fini(world);
+}

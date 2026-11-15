@@ -2,8 +2,9 @@
  * @file spatial/query.c
  * @brief Ray casts and overlap queries on the static and dynamic tree of one scene.
  *
- * The leaf of a mover answers for the mover, unless a ray asks for shapes: it then tests the
- * shapes under the mover one by one, from their world transforms.
+ * The leaf of a mover answers for the mover, unless a ray asks for shapes: it then walks the
+ * tree over its shapes in its frame, placed by the frame, and tests the shapes it reaches from
+ * their world transforms. A mover with few shapes tests them one by one.
  */
 
 #include "index.h"
@@ -24,6 +25,7 @@ typedef struct box_spatial_walk_t {
     float radius;                     /**< Radius of a sphere query */
     const ecs_world_t *world;         /**< The world */
     const box_spatial_t *index;       /**< The index */
+    const box_spatial_mover_t *mover; /**< Mover whose tree a walk is in */
 } box_spatial_walk_t;
 
 /** Test whether a ray hits the bounds of an entity and the filter of the ray accepts it.
@@ -74,7 +76,43 @@ static void box_spatial_ray_keep(
     }
 }
 
-/** Test the shapes under a mover whose leaf a ray hit one by one.
+/** Test a shape under a mover against a ray, from its world transform, and keep it on a hit.
+ *
+ * @param w The walk
+ * @param member The shape
+ */
+static void box_spatial_ray_member(
+    box_spatial_walk_t *w,
+    const box_spatial_member_t *member)
+{
+    vec3 min, max;
+    float t = 0;
+    if (member->entity && !member->disabled) {
+        box_spatial_member_bounds(w->world, member, min, max);
+        if (box_spatial_ray_bounds(w, member->entity, min, max, &t)) {
+            box_spatial_ray_keep(w, member->entity, t);
+        }
+    }
+}
+
+/** Test a shape the walk of the tree of a mover reached against a ray.
+ *
+ * @param item The index of the shape in the mover
+ * @param ctx The walk
+ * @return true to keep walking
+ */
+static bool box_spatial_visit_member(
+    int32_t item,
+    void *ctx)
+{
+    box_spatial_walk_t *w = ctx;
+    box_spatial_ray_member(w, ecs_vec_get_t(&w->mover->members, box_spatial_member_t, item));
+
+    return true;
+}
+
+/** Test the shapes under a mover whose leaf a ray hit, nearest first through the tree of the
+ * mover, so a filter that shortens the reach skips the rest, or one by one without a tree.
  *
  * @param w The walk
  * @param mover The slot of the mover
@@ -83,19 +121,18 @@ static void box_spatial_ray_mover(
     box_spatial_walk_t *w,
     int32_t mover)
 {
+    const box_bvh_t *tree = box_spatial_mover_tree(
+        ECS_CONST_CAST(box_spatial_t*, w->index), mover);
     const box_spatial_mover_t *m = box_spatial_mover(w->index, mover);
     const box_spatial_member_t *members = ecs_vec_first(&m->members);
     int32_t i, count = ecs_vec_count(&m->members);
-    for (i = 0; i < count; i ++) {
-        vec3 min, max;
-        float t = 0;
-        if (!members[i].entity || members[i].disabled) {
-            continue;
-        }
-
-        box_spatial_member_bounds(w->world, &members[i], min, max);
-        if (box_spatial_ray_bounds(w, members[i].entity, min, max, &t)) {
-            box_spatial_ray_keep(w, members[i].entity, t);
+    if (tree) {
+        w->mover = m;
+        box_bvh_ray_placed(tree, &m->pose[0][0], &w->ray, &w->reach,
+            box_spatial_visit_member, w);
+    } else {
+        for (i = 0; i < count; i ++) {
+            box_spatial_ray_member(w, &members[i]);
         }
     }
 }
@@ -374,6 +411,71 @@ bool box_spatial_bounds(
     return result;
 }
 
+/** State of the expansion of a mover into the shapes under it that overlap a box */
+typedef struct box_spatial_expand_t {
+    const ecs_world_t *world;         /**< The world */
+    const box_spatial_mover_t *mover; /**< The mover */
+    const float *min;                 /**< Minimum corner of the box */
+    const float *max;                 /**< Maximum corner of the box */
+    ecs_vec_t *out;                   /**< Receives the shapes */
+    int32_t count;                    /**< Shapes appended */
+} box_spatial_expand_t;
+
+/** Append a shape under a mover when its world bounds overlap the box of an expansion.
+ *
+ * @param item The index of the shape in the mover
+ * @param ctx The expansion
+ * @return true to keep walking
+ */
+static bool box_spatial_visit_expand(
+    int32_t item,
+    void *ctx)
+{
+    box_spatial_expand_t *x = ctx;
+    const box_spatial_member_t *member = ecs_vec_get_t(
+        &x->mover->members, box_spatial_member_t, item);
+    vec3 lo, hi;
+    if (member->entity && !member->disabled) {
+        box_spatial_member_bounds(x->world, member, lo, hi);
+        if (box_bvh_box_box(lo, hi, x->min, x->max)) {
+            *ecs_vec_append_t(NULL, x->out, ecs_entity_t) = member->entity;
+            x->count ++;
+        }
+    }
+
+    return true;
+}
+
+/** Collect a shape the walk of the tree of a mover reached, by its index in the mover.
+ *
+ * @param item The index of the shape in the mover
+ * @param ctx The vector of indices
+ * @return true to keep walking
+ */
+static bool box_spatial_visit_candidate(
+    int32_t item,
+    void *ctx)
+{
+    *ecs_vec_append_t(NULL, ctx, int32_t) = item;
+
+    return true;
+}
+
+/** Order indices of shapes in a mover.
+ *
+ * @param a The first index
+ * @param b The second index
+ * @return Negative when a comes first, positive when b does
+ */
+static int box_spatial_item_compare(
+    const void *a,
+    const void *b)
+{
+    int32_t ia = *(const int32_t*)a, ib = *(const int32_t*)b;
+
+    return (ia > ib) - (ia < ib);
+}
+
 int32_t box_spatial_expand_box(
     const ecs_world_t *world,
     ecs_entity_t e,
@@ -394,20 +496,34 @@ int32_t box_spatial_expand_box(
         goto done;
     }
 
+    const box_bvh_t *tree = box_spatial_mover_tree(ECS_CONST_CAST(box_spatial_t*, index), slot);
     const box_spatial_mover_t *m = box_spatial_mover(index, slot);
-    const box_spatial_member_t *members = ecs_vec_first(&m->members);
-    for (i = 0; i < ecs_vec_count(&m->members); i ++) {
-        if (!members[i].entity || members[i].disabled) {
-            continue;
+    box_spatial_expand_t x = {
+        .world = world, .mover = m, .min = min, .max = max, .out = result
+    };
+    if (tree) {
+        ecs_vec_t found;
+        ecs_vec_init_t(NULL, &found, int32_t, 0);
+        box_bvh_overlap_placed(tree, &m->pose[0][0], min, max, box_spatial_visit_candidate,
+            &found);
+        int32_t *items = ecs_vec_first(&found);
+        if (ecs_vec_count(&found) > 1) {
+            qsort(items, (size_t)ecs_vec_count(&found), sizeof(int32_t),
+                box_spatial_item_compare);
         }
 
-        box_spatial_member_bounds(world, &members[i], lo, hi);
-        if (box_bvh_box_box(lo, hi, min, max)) {
-            *ecs_vec_append_t(NULL, result, ecs_entity_t) = members[i].entity;
-            count ++;
+        for (i = 0; i < ecs_vec_count(&found); i ++) {
+            box_spatial_visit_expand(items[i], &x);
+        }
+
+        ecs_vec_fini_t(NULL, &found, int32_t);
+    } else {
+        for (i = 0; i < ecs_vec_count(&m->members); i ++) {
+            box_spatial_visit_expand(i, &x);
         }
     }
 
+    count = x.count;
 done:
     return count;
 }

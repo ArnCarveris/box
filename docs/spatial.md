@@ -42,7 +42,12 @@ design framing and bake change regions) and a declarative layout solver (`Fit`, 
 - `Animator` adds `DynamicTransform` to entities whose Position/Rotation/Scale it animates;
   `Velocity` and `AngularVelocity` imply it.
 - Queries answer with the mover entity. Picking and move controllers then test the shapes under it
-  one by one (`box_spatial_ray` with `.shapes = true`, `box_spatial_expand_box`).
+  (`box_spatial_ray` with `.shapes = true`, `box_spatial_expand_box`). A mover with 8 or more
+  shapes keeps a BVH over their bounds in its frame, built by the first query after a refit (a
+  refit of a built tree moves the changed shapes, or drops the tree when many changed or shapes
+  were compacted). Rays walk it nearest first through the mover's world transform, so a filter that
+  shortens the reach skips the rest; each shape reached is still tested by its world bounds. Moving
+  the mover costs the tree nothing. Smaller movers test their shapes one by one.
 - Movers, moved leaves and dynamic UI elements are placed lazily by the first query of a frame, or
   eagerly by `Update` when the previous frame queried. Picking queries every frame while a cursor
   is known.

@@ -10,6 +10,13 @@
 #include "index.h"
 #include "../render/render.h"
 
+/** Members from which a mover keeps a tree over them, fewer are tested one by one */
+#define BOX_SPATIAL_MOVER_TREE (8)
+
+/** Share of the members, one in this many, past which a refit builds the tree of a mover again
+ * instead of moving the members that changed */
+#define BOX_SPATIAL_MOVER_REBUILD (4)
+
 void box_spatial_bounds_of(
     const vec3 l_min,
     const vec3 l_max,
@@ -95,6 +102,7 @@ void box_spatial_movers_fini(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&index->movers); i ++) {
         ecs_vec_fini_t(NULL, &box_spatial_mover(index, i)->members, box_spatial_member_t);
+        box_bvh_fini(&box_spatial_mover(index, i)->tree);
     }
 
     ecs_vec_fini_t(NULL, &index->movers, box_spatial_mover_t);
@@ -151,6 +159,8 @@ static int32_t box_spatial_mover_ensure(
     m->item = -1;
     m->live = 0;
     m->dirty = false;
+    m->built = false;
+    box_bvh_init(&m->tree);
     ecs_vec_clear(&m->members);
     ecs_map_insert(&index->mover_of, e, (ecs_map_val_t)result);
 done:
@@ -203,6 +213,8 @@ static void box_spatial_mover_free(
 
     ecs_map_remove(&index->mover_of, m->entity);
     ecs_vec_clear(&m->members);
+    box_bvh_fini(&m->tree);
+    m->built = false;
     m->entity = 0;
     m->item = -1;
     m->next = index->free_mover;
@@ -356,6 +368,9 @@ static void box_spatial_member_frame(
 
 /** Drop the members that left a mover, updating the slots in the proxies of the others.
  *
+ * Members that left from the end leave the tree of the mover; when others took new slots the
+ * tree no longer matches them and is built again on the next query.
+ *
  * @param world The world
  * @param m The mover
  * @param mover The slot of the mover
@@ -367,17 +382,60 @@ static void box_spatial_mover_compact(
 {
     int32_t i, kept = 0, count = ecs_vec_count(&m->members);
     box_spatial_member_t *members = ecs_vec_first(&m->members);
+    bool shifted = false;
     for (i = 0; i < count; i ++) {
         SpatialProxy *p = members[i].entity && ecs_is_alive(world, members[i].entity) ?
             ecs_get_mut(world, members[i].entity, SpatialProxy) : NULL;
         if (p && p->mover == mover) {
             p->member = kept;
+            shifted |= kept != i;
             members[kept ++] = members[i];
+        }
+    }
+
+    m->built &= !shifted;
+    for (i = kept; i < count && m->built; i ++) {
+        if (box_bvh_has(&m->tree, i)) {
+            box_bvh_remove(&m->tree, i);
         }
     }
 
     ecs_vec_set_count_t(NULL, &m->members, box_spatial_member_t, kept);
     m->live = kept;
+}
+
+/** Give a member of a mover its new bounds in the frame, moving it in the tree of the mover
+ * while few members changed; past that the tree is built again on the next query.
+ *
+ * @param m The mover
+ * @param member The index of the member
+ * @param min Minimum corner of the new bounds
+ * @param max Maximum corner of the new bounds
+ * @param changed Members that changed in this refit so far, counted here
+ */
+static void box_spatial_member_fit(
+    box_spatial_mover_t *m,
+    int32_t member,
+    const vec3 min,
+    const vec3 max,
+    int32_t *changed)
+{
+    box_spatial_member_t *mb = ecs_vec_get_t(&m->members, box_spatial_member_t, member);
+    bool in = m->built && box_bvh_has(&m->tree, member);
+    if (m->built && (!in || !glm_vec3_eqv(mb->min, ECS_CONST_CAST(float*, min)) ||
+        !glm_vec3_eqv(mb->max, ECS_CONST_CAST(float*, max))))
+    {
+        if (++ (*changed) > m->live / BOX_SPATIAL_MOVER_REBUILD) {
+            m->built = false;
+        } else if (in) {
+            box_bvh_move(&m->tree, member, min, max);
+        } else {
+            box_bvh_insert(&m->tree, min, max, member);
+        }
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, min), mb->min);
+    glm_vec3_copy(ECS_CONST_CAST(float*, max), mb->max);
 }
 
 /** Give a mover the leaf of its bounds in the world, in the scene of the mover.
@@ -430,7 +488,7 @@ static void box_spatial_mover_refit(
     int32_t mover)
 {
     box_spatial_mover_t *m = box_spatial_mover(index, mover);
-    int32_t i, enabled = 0;
+    int32_t i, enabled = 0, changed = 0;
     mat4 inv;
     m->dirty = false;
     if (!m->entity) {
@@ -448,6 +506,11 @@ static void box_spatial_mover_refit(
         m->pose_ref = ecs_ref_init(ecs_get_world(world), m->frame, WorldTransform);
     }
 
+    if (m->live < BOX_SPATIAL_MOVER_TREE) {
+        box_bvh_fini(&m->tree);
+        m->built = false;
+    }
+
     ecs_os_memcpy(m->pose, box_spatial_mover_pose(world, m), sizeof(mat4));
     glm_mat4_inv(m->pose, inv);
     glm_vec3_fill(m->min, FLT_MAX);
@@ -455,9 +518,11 @@ static void box_spatial_mover_refit(
     box_spatial_member_t *members = ecs_vec_first(&m->members);
     for (i = 0; i < m->live; i ++) {
         mat4 rel;
+        vec3 min, max;
         box_spatial_member_frame(world, m->frame, inv, members[i].entity, rel);
         box_spatial_bounds_of(members[i].shape_min, members[i].shape_max, &rel[0][0],
-            members[i].min, members[i].max);
+            min, max);
+        box_spatial_member_fit(m, i, min, max, &changed);
         glm_vec3_minv(m->min, members[i].min, m->min);
         glm_vec3_maxv(m->max, members[i].max, m->max);
         enabled += !members[i].disabled;
@@ -496,6 +561,39 @@ int32_t box_spatial_movers_place(
         }
     }
 
+    return result;
+}
+
+const box_bvh_t* box_spatial_mover_tree(
+    box_spatial_t *index,
+    int32_t mover)
+{
+    box_spatial_mover_t *m = box_spatial_mover(index, mover);
+    const box_bvh_t *result = NULL;
+    int32_t i, count = ecs_vec_count(&m->members);
+    if (m->dirty || m->live < BOX_SPATIAL_MOVER_TREE) {
+        goto done;
+    }
+
+    if (!m->built) {
+        const box_spatial_member_t *members = ecs_vec_first(&m->members);
+        ecs_vec_set_count_t(NULL, &index->leaves, box_bvh_leaf_t, count);
+        box_bvh_leaf_t *leaves = ecs_vec_first(&index->leaves);
+        int32_t n = 0;
+        for (i = 0; i < count; i ++) {
+            if (members[i].entity) {
+                glm_vec3_copy(ECS_CONST_CAST(float*, members[i].min), leaves[n].min);
+                glm_vec3_copy(ECS_CONST_CAST(float*, members[i].max), leaves[n].max);
+                leaves[n ++].item = i;
+            }
+        }
+
+        box_bvh_build(&m->tree, leaves, n);
+        m->built = true;
+    }
+
+    result = &m->tree;
+done:
     return result;
 }
 

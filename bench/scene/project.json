@@ -36,7 +36,14 @@
                     "spawn_2k_nested_at_one_spot",
                     "update_dynamic_coincident_10k",
                     "idle_100k",
-                    "idle_ray_100k"
+                    "idle_ray_100k",
+                    "ray_ship_10k",
+                    "ray_ship_10k_filter",
+                    "ray_ship_10k_nested",
+                    "ray_small_ships_1k",
+                    "expand_ship_10k",
+                    "moving_ship_10k",
+                    "refit_ship_10k"
                 ]
             },
             {

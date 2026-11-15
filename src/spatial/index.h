@@ -76,6 +76,8 @@ typedef struct box_spatial_mover_t {
     vec3 min;            /**< Minimum corner of the bounds of the members in the frame */
     vec3 max;            /**< Maximum corner of the bounds of the members in the frame */
     mat4 pose;           /**< World transform of frame the leaf was placed with */
+    box_bvh_t tree;      /**< Members by index over their bounds in the frame, when built */
+    bool built;          /**< The tree holds the members as of the last refit */
     bool dirty;          /**< The members or their place in the frame changed */
     int32_t next;        /**< Next free slot when the slot is free */
 } box_spatial_mover_t;
@@ -376,6 +378,17 @@ void box_spatial_movers_refit(
 int32_t box_spatial_movers_place(
     const ecs_world_t *world,
     box_spatial_t *index);
+
+/** Get the tree over the members of a mover in its frame, building it when a refit left it
+ * stale, so that a mover nobody queries never builds one.
+ *
+ * @param index The index, which owns the scratch buffers of the build
+ * @param mover The slot of the mover
+ * @return The tree, NULL when the mover has too few members for one: test them one by one
+ */
+const box_bvh_t* box_spatial_mover_tree(
+    box_spatial_t *index,
+    int32_t mover);
 
 /** Get the world bounds of a shape under a mover, from its world transform.
  *

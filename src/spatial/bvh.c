@@ -1161,8 +1161,101 @@ int32_t box_bvh_walk(
     return result;
 }
 
-bool box_bvh_overlap(
+/** Place a box of a hierarchy by a matrix: write the world bounds of the box, grown by a sliver
+ * so that the bounds of anything inside the box placed by the same matrix stay inside them
+ * despite rounding.
+ *
+ * @param pose The 16 floats of the matrix, column by column
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param out_min Receives the minimum corner
+ * @param out_max Receives the maximum corner
+ */
+static void box_bvh_place(
+    const float *pose,
+    const vec3 min,
+    const vec3 max,
+    vec3 out_min,
+    vec3 out_max)
+{
+    vec3 c, e;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        c[i] = (min[i] + max[i]) * 0.5f;
+        e[i] = (max[i] - min[i]) * 0.5f;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        float wc = pose[12 + i] + pose[i] * c[0] + pose[4 + i] * c[1] + pose[8 + i] * c[2];
+        float we = fabsf(pose[i]) * e[0] + fabsf(pose[4 + i]) * e[1] +
+            fabsf(pose[8 + i]) * e[2];
+        we += (fabsf(wc) + we) * 1e-5f;
+        out_min[i] = wc - we;
+        out_max[i] = wc + we;
+    }
+}
+
+/** Test whether a box of a hierarchy, placed by a matrix, overlaps a box.
+ *
+ * @param pose The 16 floats of the matrix, NULL for none
+ * @param min Minimum corner of the box of the hierarchy
+ * @param max Maximum corner of the box of the hierarchy
+ * @param q_min Minimum corner of the other box
+ * @param q_max Maximum corner of the other box
+ * @return true when they overlap
+ */
+static bool box_bvh_box_box_at(
+    const float *pose,
+    const vec3 min,
+    const vec3 max,
+    const vec3 q_min,
+    const vec3 q_max)
+{
+    vec3 lo, hi;
+    bool result;
+    if (pose) {
+        box_bvh_place(pose, min, max, lo, hi);
+        result = box_bvh_box_box(lo, hi, q_min, q_max);
+    } else {
+        result = box_bvh_box_box(min, max, q_min, q_max);
+    }
+
+    return result;
+}
+
+/** Intersect a ray with a box of a hierarchy placed by a matrix.
+ *
+ * @param ray The ray
+ * @param pose The 16 floats of the matrix, NULL for none
+ * @param min Minimum corner of the box of the hierarchy
+ * @param max Maximum corner of the box of the hierarchy
+ * @param reach Longest distance that counts
+ * @param t Receives the distance at which the ray enters the box
+ * @return true when the ray reaches the box within reach
+ */
+static bool box_bvh_ray_box_at(
+    const box_bvh_ray_t *ray,
+    const float *pose,
+    const vec3 min,
+    const vec3 max,
+    float reach,
+    float *t)
+{
+    vec3 lo, hi;
+    bool result;
+    if (pose) {
+        box_bvh_place(pose, min, max, lo, hi);
+        result = box_bvh_ray_box(ray, lo, hi, reach, t);
+    } else {
+        result = box_bvh_ray_box(ray, min, max, reach, t);
+    }
+
+    return result;
+}
+
+bool box_bvh_overlap_placed(
     const box_bvh_t *tree,
+    const float *pose,
     const vec3 min,
     const vec3 max,
     box_bvh_visit_t visit,
@@ -1172,7 +1265,7 @@ bool box_bvh_overlap(
     bool result = true;
     int32_t i;
     box_bvh_stack_init(&s);
-    if (tree->root != BOX_BVH_NULL && box_bvh_box_box(tree->min, tree->max, min, max)) {
+    if (tree->root != BOX_BVH_NULL && box_bvh_box_box_at(pose, tree->min, tree->max, min, max)) {
         box_bvh_stack_push(&s, tree->root, 0);
     }
 
@@ -1185,7 +1278,7 @@ bool box_bvh_overlap(
 
         const box_bvh_node_t *n = box_bvh_get(tree, ref);
         for (i = 0; i < 2; i ++) {
-            if (box_bvh_box_box(n->min[i], n->max[i], min, max)) {
+            if (box_bvh_box_box_at(pose, n->min[i], n->max[i], min, max)) {
                 box_bvh_stack_push(&s, n->child[i], 0);
             }
         }
@@ -1194,6 +1287,16 @@ bool box_bvh_overlap(
     box_bvh_stack_fini(&s);
 
     return result;
+}
+
+bool box_bvh_overlap(
+    const box_bvh_t *tree,
+    const vec3 min,
+    const vec3 max,
+    box_bvh_visit_t visit,
+    void *ctx)
+{
+    return box_bvh_overlap_placed(tree, NULL, min, max, visit, ctx);
 }
 
 bool box_bvh_sphere(
@@ -1237,18 +1340,20 @@ bool box_bvh_sphere(
  *
  * @param n The node
  * @param ray The ray
+ * @param pose The 16 floats of the matrix that places the boxes, NULL for none
  * @param reach Current reach of the ray
  * @param s The stack
  */
 static void box_bvh_ray_children(
     const box_bvh_node_t *n,
     const box_bvh_ray_t *ray,
+    const float *pose,
     float reach,
     box_bvh_stack_t *s)
 {
     float tl = 0, tr = 0;
-    bool hit_l = box_bvh_ray_box(ray, n->min[0], n->max[0], reach, &tl);
-    bool hit_r = box_bvh_ray_box(ray, n->min[1], n->max[1], reach, &tr);
+    bool hit_l = box_bvh_ray_box_at(ray, pose, n->min[0], n->max[0], reach, &tl);
+    bool hit_r = box_bvh_ray_box_at(ray, pose, n->min[1], n->max[1], reach, &tr);
     if (hit_l && hit_r) {
         if (tl < tr) {
             box_bvh_stack_push(s, n->child[1], tr);
@@ -1264,8 +1369,9 @@ static void box_bvh_ray_children(
     }
 }
 
-bool box_bvh_ray(
+bool box_bvh_ray_placed(
     const box_bvh_t *tree,
+    const float *pose,
     const box_bvh_ray_t *ray,
     const float *reach,
     box_bvh_visit_t visit,
@@ -1276,7 +1382,7 @@ bool box_bvh_ray(
     float t = 0;
     box_bvh_stack_init(&s);
     if (tree->root != BOX_BVH_NULL &&
-        box_bvh_ray_box(ray, tree->min, tree->max, *reach, &t))
+        box_bvh_ray_box_at(ray, pose, tree->min, tree->max, *reach, &t))
     {
         box_bvh_stack_push(&s, tree->root, t);
     }
@@ -1290,11 +1396,21 @@ bool box_bvh_ray(
         if (box_bvh_is_item(entry.ref)) {
             result = visit(BOX_BVH_ITEM(entry.ref), ctx);
         } else {
-            box_bvh_ray_children(box_bvh_get(tree, entry.ref), ray, *reach, &s);
+            box_bvh_ray_children(box_bvh_get(tree, entry.ref), ray, pose, *reach, &s);
         }
     }
 
     box_bvh_stack_fini(&s);
 
     return result;
+}
+
+bool box_bvh_ray(
+    const box_bvh_t *tree,
+    const box_bvh_ray_t *ray,
+    const float *reach,
+    box_bvh_visit_t visit,
+    void *ctx)
+{
+    return box_bvh_ray_placed(tree, NULL, ray, reach, visit, ctx);
 }
