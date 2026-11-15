@@ -12,6 +12,12 @@ using state
 // between them, and an outer deck with the hangar wall of the rig bays. The liner gates and the
 // rig bays are drawn by the LinerGate and RigBay templates.
 assets {
+  harbor_arm_shape { Path2D: {start: {-80, 50}, segments: [
+    {kind: Line, end: {80, 50}}, {kind: Line, end: {80, -20}}, {kind: Line, end: {50, -50}},
+    {kind: Line, end: {-50, -50}}, {kind: Line, end: {-80, -20}}
+  ], closed: true} }
+  harbor_arm { Profile2D: {outer: harbor_arm_shape} }
+
   // A mast with a blinking red beacon on top.
   template HarborMast {
     prop h: f32 = 40
@@ -329,9 +335,11 @@ assets {
       pipe_c : HarborSteel { Position: {0, 104, 0}; Torus: {radius: 862, tube: 3, segments: 128, rings: 6} }
       for m in 0..32 {
         const a = m * PI / 16
-        "roof_{m}" {
-          Rotation: {0, a, 0}
-          HarborRoofModule unit(kind: (m * 3) % 5, mast: 50) { Position: {0, 100, 800} }
+        if m % 8 != 0 {
+          "roof_{m}" {
+            Rotation: {0, a, 0}
+            HarborRoofModule unit(kind: (m * 3) % 5, mast: 50) { Position: {0, 100, 800} }
+          }
         }
       }
       for p in 0..48 {
@@ -343,6 +351,19 @@ assets {
       "spoke_inner_{c}" {
         Rotation: {0, c * PI / 4, 0}
         HarborCorridor body(r0: 370, r1: 710, w: 70, h: 60, y: 20)
+      }
+    }
+
+    for g in 0..4 {
+      "gate_arm_{g}" {
+        Rotation: {0, g * HALF_PI, 0}
+        body : HarborHull { Position: {0, 240, 1006}; Rotation: {HALF_PI, 0, 0}; ProfileExtrusion: {profile: harbor_arm, depth: 1412, cap_start: true, cap_end: true} }
+        for s in 0..2 {
+          "glazing_{s}" : HarborWindowGrid { Position: {s == 0 ? -80.6 : 80.6, 240, 1006}; Box: {1, 22, 1380} }
+        }
+        pylon_inner : HarborHullDark { Position: {0, 152, 800}; Box: {110, 96, 70} }
+        pylon_middle : HarborHullDark { Position: {0, 137, 1335}; Box: {110, 126, 70} }
+        pylon_outer : HarborHullDark { Position: {0, 189, 1640}; Box: {120, 24, 80} }
       }
     }
 

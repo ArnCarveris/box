@@ -48,11 +48,6 @@ assets {
     Clip: {duration: 0.8}
     strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.04, 16}, {0.3, 16}, {0.36, 0.4}, {0.8, 0.4}]}} }
   }
-  prefab harbor_chase {
-    Clip: {duration: 1.6}
-    strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.3}, {0.04, 18}, {0.18, 18}, {0.3, 0.3}, {1.6, 0.3}]}} }
-  }
-  prefab HarborBuoyLamp { Rgb: {200, 228, 255}; Emissive: {strength: 1, color: {170, 215, 255}} }
   prefab HarborBeaconRed { Rgb: {255, 70, 50}; Emissive: {strength: 1, color: {255, 50, 30}}; Animator: {clip: harbor_blink} }
   prefab HarborBeaconAmber { Rgb: {255, 170, 60}; Emissive: {strength: 1, color: {255, 150, 40}}; Animator: {clip: harbor_fast_blink} }
   prefab HarborFlash { Rgb: {200, 230, 255}; Emissive: {strength: 6, color: {170, 215, 255}}; Opacity: {0.55}; BlendMode: Additive; NoShadow; Ignore }

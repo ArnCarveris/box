@@ -73,12 +73,12 @@ view {
 station {
   HarborStation body
 
-  // The liner gates on the rim, 2300 m out, with the liners flying through them clockwise.
+  // The liner gates on the rim, 2040 m out, with the liners berthed radially in front of them.
   for g in 0..4 {
     const a = g * HALF_PI
     LinerGate "gate_{g}"(idx: g, label: g == 0 ? "NORTH GATE" : g == 1 ? "EAST GATE" : g == 2 ? "SOUTH GATE" : "WEST GATE") {
-      Position: {sin(a) * 2300, 0, cos(a) * 2300}
-      Rotation: {0, a - HALF_PI, 0}
+      Position: {sin(a) * 2040, 0, cos(a) * 2040}
+      Rotation: {0, a, 0}
     }
   }
 
