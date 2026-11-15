@@ -15,6 +15,9 @@
 /** Format of the environment cubemaps, filterable and writable as a storage texture */
 #define BOX_GPU_ENVIRONMENT_FORMAT (WGPUTextureFormat_RGBA16Float)
 
+/** Bytes of the SH buffer of an environment: the L2 SH, then the ZH3 of a volume probe */
+#define BOX_GPU_ENVIRONMENT_SH_BYTES (BOX_GPU_PROBE_SIZE + BOX_GPU_VOLUME_PROBE_SIZE)
+
 /** Face edge in texels of the last mip level of an environment cubemap at least */
 #define BOX_GPU_ENVIRONMENT_MIN_MIP (4)
 
@@ -29,7 +32,9 @@ typedef struct box_gpu_environment_t {
     WGPUBuffer params;              /**< Params of bake_sh.wgsl of the processing: the
                                      *   resolution and one cube at layer 0 */
     WGPUBuffer sh;                  /**< BOX_RENDER_SH_COEFFICIENTS vec4 of L2 SH irradiance,
-                                     *   in the basis and order of mesh.wgsl */
+                                     *   in the basis and order of mesh.wgsl, then its ZH3
+                                     *   that fills light probe volumes,
+                                     *   BOX_GPU_ENVIRONMENT_SH_BYTES bytes */
     uint32_t resolution;            /**< Face edge of mip 0 in texels */
     uint32_t filter;                /**< EnvironmentFilter of the mip levels */
     uint32_t mips;                  /**< Mip levels */

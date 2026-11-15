@@ -9,6 +9,99 @@
 
 #include "gpu_environment.h"
 
+/** The zonal band 2 pattern y_m = sqrt(4 pi / 5) Y_2m(a) of an axis, m in the order of the
+ * band 2 coefficients of mesh.wgsl.
+ *
+ * @param a The axis
+ * @param out Receives y_m
+ */
+static void box_render_zh3_pattern(
+    const float a[3],
+    float out[5])
+{
+    out[0] = 1.7320508076f * a[0] * a[1];
+    out[1] = 1.7320508076f * a[1] * a[2];
+    out[2] = 0.5f * (3.0f * a[2] * a[2] - 1.0f);
+    out[3] = 1.7320508076f * a[0] * a[2];
+    out[4] = 0.8660254038f * (a[0] * a[0] - a[1] * a[1]);
+}
+
+void box_render_zh3_axis(
+    const float band1[][4],
+    float out[3])
+{
+    static const float w[3] = { 0.2126f, 0.7152f, 0.0722f };
+    float a[3] = { 0 }, len;
+    int32_t c;
+    for (c = 0; c < 3; c ++) {
+        a[0] += band1[2][c] * w[c];
+        a[1] += band1[0][c] * w[c];
+        a[2] += band1[1][c] * w[c];
+    }
+
+    len = sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+    if (len > BOX_RENDER_ZH3_AXIS_EPSILON) {
+        out[0] = a[0] / len;
+        out[1] = a[1] / len;
+        out[2] = a[2] / len;
+    } else {
+        out[0] = 0.0f;
+        out[1] = 0.0f;
+        out[2] = 1.0f;
+    }
+}
+
+void box_render_sh_to_zh3(
+    const float sh[BOX_RENDER_SH_COEFFICIENTS][4],
+    float out[BOX_RENDER_ZH3_VECTORS][4])
+{
+    float a[3], y[5];
+    int32_t k, c;
+    box_render_zh3_axis(&sh[1], a);
+    box_render_zh3_pattern(a, y);
+    for (k = 0; k < BOX_RENDER_ZH3_VECTORS; k ++) {
+        for (c = 0; c < 3; c ++) {
+            out[k][c] = sh[k][c];
+        }
+
+        out[k][3] = 0.0f;
+    }
+
+    for (c = 0; c < 3; c ++) {
+        float z = 0.0f;
+        for (k = 0; k < 5; k ++) {
+            z += sh[4 + k][c] * y[k];
+        }
+
+        out[c][3] = z;
+    }
+}
+
+void box_render_zh3_to_sh(
+    const float zh3[BOX_RENDER_ZH3_VECTORS][4],
+    float out[BOX_RENDER_SH_COEFFICIENTS][4])
+{
+    float a[3], y[5];
+    int32_t k, c;
+    box_render_zh3_axis(&zh3[1], a);
+    box_render_zh3_pattern(a, y);
+    for (k = 0; k < BOX_RENDER_ZH3_VECTORS; k ++) {
+        for (c = 0; c < 3; c ++) {
+            out[k][c] = zh3[k][c];
+        }
+
+        out[k][3] = 0.0f;
+    }
+
+    for (k = 0; k < 5; k ++) {
+        for (c = 0; c < 3; c ++) {
+            out[4 + k][c] = zh3[c][3] * y[k];
+        }
+
+        out[4 + k][3] = 0.0f;
+    }
+}
+
 #ifdef BOX_RENDER_WGPU
 
 /** Create a buffer that is written from the CPU.
@@ -57,7 +150,7 @@ static box_gpu_volume_t* box_gpu_volume_new(
     uint32_t count)
 {
     box_gpu_volume_t *v = ecs_os_calloc_t(box_gpu_volume_t);
-    uint64_t probes = (uint64_t)count * BOX_GPU_PROBE_SIZE;
+    uint64_t probes = (uint64_t)count * BOX_GPU_VOLUME_PROBE_SIZE;
     uint64_t valid = ((uint64_t)count + 3) & ~(uint64_t)3;
     uint64_t visibility = (uint64_t)count * BOX_GPU_VISIBILITY_SIZE;
     int32_t i;
@@ -136,7 +229,8 @@ static void box_gpu_volume_valid(
 /** Fill every probe of both buffers of a volume with the SH of a processed environment, which
  * replaces the SH the probes were written with.
  *
- * The SH is copied into the first probe of each buffer, then each buffer copies the probes the
+ * The ZH3 the processing writes after the L2 SH of the environment is copied into the first
+ * probe of each buffer, then each buffer copies the probes the
  * other one has filled after them, doubling the filled probes with every pair of copies.
  *
  * @param gpu The backend
@@ -157,15 +251,15 @@ static void box_gpu_volume_environment(
 
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     for (i = 0; i < 2; i ++) {
-        wgpuCommandEncoderCopyBufferToBuffer(encoder, env->sh, 0, v->probes[i], 0,
-            BOX_GPU_PROBE_SIZE);
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, env->sh, BOX_GPU_PROBE_SIZE,
+            v->probes[i], 0, BOX_GPU_VOLUME_PROBE_SIZE);
     }
 
     while (filled < v->count) {
         uint64_t n = filled < v->count - filled ? filled : v->count - filled;
         for (i = 0; i < 2; i ++) {
             wgpuCommandEncoderCopyBufferToBuffer(encoder, v->probes[i], 0, v->probes[1 - i],
-                filled * BOX_GPU_PROBE_SIZE, n * BOX_GPU_PROBE_SIZE);
+                filled * BOX_GPU_VOLUME_PROBE_SIZE, n * BOX_GPU_VOLUME_PROBE_SIZE);
         }
 
         filled += n;
@@ -195,13 +289,15 @@ static void box_gpu_volume_write(
         .origin = { desc->origin[0], desc->origin[1], desc->origin[2], desc->spacing },
         .size = { desc->size[0], desc->size[1], desc->size[2], 1 }
     };
-    size_t size = (size_t)v->count * BOX_GPU_PROBE_SIZE;
+    size_t size = (size_t)v->count * BOX_GPU_VOLUME_PROBE_SIZE;
     size_t texels = (size_t)v->count * BOX_GPU_VISIBILITY_TEXELS;
     uint8_t *probes = ecs_os_malloc((ecs_size_t)size);
     uint32_t *open = ecs_os_malloc_n(uint32_t, (ecs_size_t)texels);
+    float zh3[BOX_RENDER_ZH3_VECTORS][4];
     uint32_t i;
+    box_render_sh_to_zh3(desc->sh, zh3);
     for (i = 0; i < v->count; i ++) {
-        ecs_os_memcpy(probes + i * BOX_GPU_PROBE_SIZE, desc->sh, BOX_GPU_PROBE_SIZE);
+        ecs_os_memcpy(probes + i * BOX_GPU_VOLUME_PROBE_SIZE, zh3, BOX_GPU_VOLUME_PROBE_SIZE);
     }
 
     for (i = 0; i < texels; i ++) {
@@ -235,7 +331,7 @@ static void box_gpu_volume_keep(
     if (desc->op == BOX_RENDER_VOLUME_COPY && desc->from < 2) {
         WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
         wgpuCommandEncoderCopyBufferToBuffer(encoder, v->probes[desc->from], 0,
-            v->probes[1 - desc->from], 0, (uint64_t)v->count * BOX_GPU_PROBE_SIZE);
+            v->probes[1 - desc->from], 0, (uint64_t)v->count * BOX_GPU_VOLUME_PROBE_SIZE);
         WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
         wgpuQueueSubmit(gpu->queue, 1, &commands);
         wgpuCommandBufferRelease(commands);
@@ -280,8 +376,9 @@ static void box_gpu_volume_carry(
             uint64_t dst = (uint64_t)x0 + ((uint64_t)y + (uint64_t)z * n[1]) * n[0];
             for (i = 0; i < 2; i ++) {
                 wgpuCommandEncoderCopyBufferToBuffer(encoder, from->probes[i],
-                    src * BOX_GPU_PROBE_SIZE, to->probes[i], dst * BOX_GPU_PROBE_SIZE,
-                    (uint64_t)(x1 - x0) * BOX_GPU_PROBE_SIZE);
+                    src * BOX_GPU_VOLUME_PROBE_SIZE, to->probes[i],
+                    dst * BOX_GPU_VOLUME_PROBE_SIZE,
+                    (uint64_t)(x1 - x0) * BOX_GPU_VOLUME_PROBE_SIZE);
             }
 
             wgpuCommandEncoderCopyBufferToBuffer(encoder, from->visibility,
@@ -313,7 +410,10 @@ void box_gpu_volume_init(
         {
             .binding = 1,
             .visibility = WGPUShaderStage_Fragment,
-            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+            .buffer = {
+                .type = WGPUBufferBindingType_ReadOnlyStorage,
+                .minBindingSize = BOX_GPU_VOLUME_PROBE_SIZE
+            }
         },
         {
             .binding = 2,
@@ -428,6 +528,7 @@ bool box_render_gpu_read_volume_sh(
     float out[BOX_RENDER_SH_COEFFICIENTS][4])
 {
     bool result = false;
+    float zh3[BOX_RENDER_ZH3_VECTORS][4];
     box_render_gpu_stats_t stats;
     if (!box_render_gpu_stats(world, &stats) || !stats.ready || buffer > 1) {
         goto done;
@@ -444,13 +545,57 @@ bool box_render_gpu_read_volume_sh(
         goto done;
     }
 
-    result = box_gpu_read(gpu, v->probes[buffer], probe * (uint32_t)BOX_GPU_PROBE_SIZE,
-        (uint32_t)BOX_GPU_PROBE_SIZE, out);
+    result = box_gpu_read(gpu, v->probes[buffer], probe * (uint32_t)BOX_GPU_VOLUME_PROBE_SIZE,
+        (uint32_t)BOX_GPU_VOLUME_PROBE_SIZE, zh3);
+    if (result) {
+        box_render_zh3_to_sh(zh3, out);
+    }
+
+done:
+    return result;
+}
+
+bool box_render_gpu_volume_bytes(
+    ecs_world_t *world,
+    uint32_t volume,
+    uint64_t *out)
+{
+    bool result = false;
+    box_render_gpu_stats_t stats;
+    if (!box_render_gpu_stats(world, &stats) || !stats.ready) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    bool renders = ecs_os_thread_self() == gpu->thread;
+    ecs_assert(renders, ECS_INVALID_OPERATION,
+        "box_render_gpu_volume_bytes needs RenderSettings.main_thread and box_render_sync");
+    const box_gpu_volume_t *v = renders
+        ? ecs_map_get_deref(&gpu->volumes, box_gpu_volume_t, volume)
+        : NULL;
+    if (!v) {
+        goto done;
+    }
+
+    *out = wgpuBufferGetSize(v->probes[0]);
+    result = true;
 done:
     return result;
 }
 
 #else
+
+bool box_render_gpu_volume_bytes(
+    ecs_world_t *world,
+    uint32_t volume,
+    uint64_t *out)
+{
+    (void)world;
+    (void)volume;
+    (void)out;
+
+    return false;
+}
 
 bool box_render_gpu_read_volume_sh(
     ecs_world_t *world,

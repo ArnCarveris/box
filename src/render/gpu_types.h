@@ -894,7 +894,7 @@ typedef struct box_gpu_volume_uniforms_t {
  * the passes of a bake read and write in turn, the validity mask and the visibility maps */
 typedef struct box_gpu_volume_t {
     WGPUBuffer grid;                /**< box_gpu_volume_uniforms_t */
-    WGPUBuffer probes[2];           /**< BOX_RENDER_SH_COEFFICIENTS vec4 per probe */
+    WGPUBuffer probes[2];           /**< BOX_RENDER_ZH3_VECTORS vec4 per probe */
     WGPUBuffer valid;               /**< A byte per cell, a bit per corner probe views sample */
     WGPUBuffer visibility;          /**< BOX_GPU_VISIBILITY_TEXELS packed halves per probe */
     uint32_t count;                 /**< Probes of the volume */

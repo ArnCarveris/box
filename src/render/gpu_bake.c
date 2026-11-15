@@ -1193,7 +1193,9 @@ static void box_gpu_bake_params(
         : NULL;
     uint32_t capacity = baked ? baked->size / (uint32_t)sizeof(box_render_light_t) : 0;
     box_gpu_bake_params_t params = {
-        .size = { (uint32_t)pass->size, (uint32_t)count, pass->environment ? 1u : 0u, 0 },
+        .size = {
+            (uint32_t)pass->size, (uint32_t)count, pass->environment ? 1u : 0u, batch ? 1u : 0u
+        },
         .near_ = {
             BOX_GPU_BAKE_NEAR, (float)pass->size * 0.5f, BOX_RENDER_CULL_MIN_DIMENSION,
             pass->spacing
@@ -1218,7 +1220,9 @@ static void box_gpu_bake_params(
 /** Where the projection of a chunk writes: the SH and visibility of probes indexed by
  * params.probes, and the Baked lights it adds */
 typedef struct box_gpu_bake_target_t {
-    WGPUBuffer sh;                  /**< BOX_GPU_PROBE_SIZE per probe */
+    WGPUBuffer sh;                  /**< stride bytes per probe */
+    uint64_t stride;                /**< BOX_GPU_VOLUME_PROBE_SIZE for the ZH3 of a volume,
+                                     *   BOX_GPU_PROBE_SIZE for the L2 SH of cubemap slots */
     WGPUBuffer visibility;          /**< BOX_GPU_VISIBILITY_SIZE per probe */
     uint32_t count;                 /**< Probes both buffers hold */
     WGPUBuffer lights;              /**< Baked lights, gpu->no_lights for none */
@@ -1254,7 +1258,7 @@ static void box_gpu_bake_project_record(
         {
             .binding = 2,
             .buffer = target->sh,
-            .size = (uint64_t)target->count * BOX_GPU_PROBE_SIZE
+            .size = (uint64_t)target->count * target->stride
         },
         { .binding = 3, .textureView = s->depth_read },
         { .binding = 4, .buffer = target->lights, .size = target->lights_size },
@@ -1308,6 +1312,7 @@ static void box_gpu_bake_project(
     box_gpu_bake_project_record(gpu, b, encoder, pipeline, BOX_GPU_BAKE_PROBES,
         &(box_gpu_bake_target_t){
             .sh = volume->probes[batch->target],
+            .stride = BOX_GPU_VOLUME_PROBE_SIZE,
             .visibility = volume->visibility,
             .count = volume->count,
             .lights = baked ? baked->buffer : gpu->no_lights,
@@ -1366,6 +1371,7 @@ static bool box_gpu_bake_store(
     box_gpu_bake_project_record(gpu, b, encoder, pipeline, BOX_GPU_BAKE_REFLECT,
         &(box_gpu_bake_target_t){
             .sh = cube->sh,
+            .stride = BOX_GPU_PROBE_SIZE,
             .visibility = cube->visibility,
             .count = cube->cubes,
             .lights = gpu->no_lights,

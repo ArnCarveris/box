@@ -195,10 +195,7 @@ fn probe_valid(coord: vec3u) -> bool {
 
     var color: vec3f;
     if (probe_valid(probe_coord(in.index))) {
-        let at = in.index * SH_COEFFICIENTS;
-        let e = sh_irradiance(probes[at].rgb, probes[at + 1u].rgb, probes[at + 2u].rgb,
-            probes[at + 3u].rgb, probes[at + 4u].rgb, probes[at + 5u].rgb, probes[at + 6u].rgb,
-            probes[at + 7u].rgb, probes[at + 8u].rgb, r.normal);
+        let e = zh3_irradiance(volume_probe(in.index), r.normal);
         color = max(e / PI, vec3f(0.0));
     } else {
         let stripe = fract((in.pos.x + in.pos.y) / (INVALID_STRIPE * 2.0));

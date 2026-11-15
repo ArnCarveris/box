@@ -82,7 +82,8 @@ typedef struct box_gpu_bake_timer_t {
 /** Uniforms of the SH projection, as in Params of etc/shaders/bake_sh.wgsl */
 typedef struct box_gpu_bake_params_t {
     uint32_t size[4];               /**< Face edge in texels, probes of the chunk, 1 when the
-                                     *   texels nothing covered see the environment */
+                                     *   texels nothing covered see the environment, 1 when
+                                     *   the projection writes the ZH3 of a volume */
     float sky[4];                   /**< Linear ambient light from above */
     float ground[4];                /**< Linear ambient light from below */
     uint32_t probes[BOX_GPU_BAKE_CHUNK]; /**< Volume index or cubemap slot of each probe */

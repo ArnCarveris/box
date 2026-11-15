@@ -1070,6 +1070,17 @@
                 ]
             },
             {
+                "id": "Zh3",
+                "testcases": [
+                    "layout",
+                    "axis_is_luminance_of_band1",
+                    "zero_band1_axis_z",
+                    "single_light_exact",
+                    "eval_matches_expansion",
+                    "expansion_is_idempotent"
+                ]
+            },
+            {
                 "id": "DrawsShading",
                 "testcases": [
                     "opacity_fade_moves_to_blended_and_back",

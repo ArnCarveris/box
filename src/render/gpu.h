@@ -595,6 +595,9 @@ void box_gpu_blends_clear(
 /** Bytes of the SH of one probe */
 #define BOX_GPU_PROBE_SIZE (BOX_RENDER_SH_COEFFICIENTS * 4 * sizeof(float))
 
+/** Bytes of the ZH3 of one probe of a light probe volume */
+#define BOX_GPU_VOLUME_PROBE_SIZE (BOX_RENDER_ZH3_VECTORS * 4 * sizeof(float))
+
 /** Texels of the octahedral visibility map of a probe, VISIBILITY_SIZE squared in mesh.wgsl */
 #define BOX_GPU_VISIBILITY_TEXELS (64)
 

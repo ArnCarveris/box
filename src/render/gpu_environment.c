@@ -113,7 +113,7 @@ static box_gpu_environment_t* box_gpu_environment_new(
     });
     e->sh = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_Uniform | WGPUBufferUsage_CopySrc,
-        .size = BOX_GPU_PROBE_SIZE
+        .size = BOX_GPU_ENVIRONMENT_SH_BYTES
     });
     box_gpu_bake_params_t *params = ecs_os_calloc_t(box_gpu_bake_params_t);
     params->size[0] = res;
@@ -451,7 +451,7 @@ static void box_gpu_env_record(
         .layout = s->sh_layout,
         .entryCount = 2,
         .entries = (WGPUBindGroupEntry[2]){
-            { .binding = 2, .buffer = e->sh, .size = BOX_GPU_PROBE_SIZE },
+            { .binding = 2, .buffer = e->sh, .size = BOX_GPU_ENVIRONMENT_SH_BYTES },
             { .binding = 11, .textureView = levels[level] }
         }
     });

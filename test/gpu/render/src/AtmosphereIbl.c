@@ -490,6 +490,9 @@ void AtmosphereIbl_bake_open_probe_matches_environment(void) {
         probe));
     test_assert(box_render_gpu_read_environment_sh(world,
         box_render_environment_find(world, sky), env));
+    float zh3[BOX_RENDER_ZH3_VECTORS][4];
+    box_render_sh_to_zh3(env, zh3);
+    box_render_zh3_to_sh(zh3, env);
     ibl_hemisphere((float[3]){1, 0, 0}, (float[3]){0, 1, 0}, hemisphere);
     float to_env = ibl_sh_error(env, probe);
     float to_hemisphere = ibl_sh_error(hemisphere, probe);

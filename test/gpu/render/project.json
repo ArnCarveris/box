@@ -608,6 +608,16 @@
                 ]
             },
             {
+                "id": "ProbeZh3",
+                "testcases": [
+                    "single_light_band2_zonal",
+                    "opposite_lights_no_nan",
+                    "probe_buffer_64_bytes",
+                    "uploaded_sh_expands",
+                    "environment_fill_expands"
+                ]
+            },
+            {
                 "id": "Scene",
                 "testcases": [
                     "view_renders_scene_of_camera",

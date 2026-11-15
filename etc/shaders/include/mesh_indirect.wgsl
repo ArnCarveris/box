@@ -139,18 +139,9 @@ fn volume_irradiance(world: vec3f, n: vec3f, spec: vec3f) -> Indirect {
         let reached = volume_reached(n, to_probe, dist, trilinear, valid);
         if (reached > 0.0) {
             let w = reached * visibility_from(index, biased - position);
-            let at = index * SH_COEFFICIENTS;
-            let e0 = probes[at].rgb;
-            let e1 = probes[at + 1u].rgb;
-            let e2 = probes[at + 2u].rgb;
-            let e3 = probes[at + 3u].rgb;
-            let e4 = probes[at + 4u].rgb;
-            let e5 = probes[at + 5u].rgb;
-            let e6 = probes[at + 6u].rgb;
-            let e7 = probes[at + 7u].rgb;
-            let e8 = probes[at + 8u].rgb;
-            diffuse += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, n) * w;
-            specular += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, spec) * w;
+            let e = volume_probe(index);
+            diffuse += zh3_irradiance(e, n) * w;
+            specular += zh3_irradiance(e, spec) * w;
             total += w;
             reach += reached;
         }
@@ -377,32 +368,23 @@ fn volume_lobes(world: vec3f, n: vec3f, spec: vec3f, back: bool, nc: vec3f, spec
             reached_coat = volume_reached(nc, to_probe, dist, trilinear, valid);
         }
         if (reached > 0.0 || reached_back > 0.0 || reached_coat > 0.0) {
-            let at = index * SH_COEFFICIENTS;
-            let e0 = probes[at].rgb;
-            let e1 = probes[at + 1u].rgb;
-            let e2 = probes[at + 2u].rgb;
-            let e3 = probes[at + 3u].rgb;
-            let e4 = probes[at + 4u].rgb;
-            let e5 = probes[at + 5u].rgb;
-            let e6 = probes[at + 6u].rgb;
-            let e7 = probes[at + 7u].rgb;
-            let e8 = probes[at + 8u].rgb;
+            let e = volume_probe(index);
             if (reached > 0.0) {
                 let w = reached * visibility_from(index, biased - position);
-                diffuse += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, n) * w;
-                specular += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, spec) * w;
+                diffuse += zh3_irradiance(e, n) * w;
+                specular += zh3_irradiance(e, spec) * w;
                 total += w;
                 reach += reached;
             }
             if (reached_back > 0.0) {
                 let w = reached_back * visibility_from(index, biased_back - position);
-                back_diffuse += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, nb) * w;
+                back_diffuse += zh3_irradiance(e, nb) * w;
                 back_total += w;
                 back_reach += reached_back;
             }
             if (reached_coat > 0.0) {
                 let w = reached_coat * visibility_from(index, biased_coat - position);
-                coat_specular += sh_irradiance(e0, e1, e2, e3, e4, e5, e6, e7, e8, spec_coat) * w;
+                coat_specular += zh3_irradiance(e, spec_coat) * w;
                 coat_total += w;
                 coat_reach += reached_coat;
             }

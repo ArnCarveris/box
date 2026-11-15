@@ -3,10 +3,12 @@
 
 #include "include/instance.wgsl"
 #include "include/cube.wgsl"
+#include "include/sh.wgsl"
 
 struct Params {
     // x: face edge in texels, y: probes of the chunk, z: 1 when uncovered texels see the
-    // environment instead of the hemisphere
+    // environment instead of the hemisphere, w: 1 when project writes the ZH3 of a light probe
+    // volume instead of the L2 SH
     size: vec4u,
     sky: vec4f,
     ground: vec4f,
@@ -31,6 +33,10 @@ struct Light {
     spot_scale: f32,
     direction: vec3f,
     spot_offset: f32,
+    shadow: u32,
+    pad0: u32,
+    pad1: u32,
+    pad2: u32,
 };
 
 // The batches of an instance page the cull tests, at a dynamic offset per page.
@@ -111,6 +117,8 @@ struct CullJob {
 
 const GROUP: u32 = 64u;
 const SH_COEFFICIENTS: u32 = 9u;
+// vec4 of the ZH3 of a light probe (include/sh.wgsl)
+const ZH3_VECTORS: u32 = 4u;
 const PI: f32 = 3.141592653589793;
 
 // Texels per edge of the octahedral distance map of a probe, as in mesh.wgsl; one per lane.
@@ -136,6 +144,9 @@ const CULL_GROUP: u32 = 256u;
 const ARGS: u32 = 5u;
 
 var<workgroup> partial: array<array<vec3f, 9>, 64>;
+
+// L2 SH irradiance of the probe of a workgroup, which the ZH3 is packed from.
+var<workgroup> irradiance: array<vec3f, 9>;
 
 // Per invocation of the cull, three faces per word in fields of ten bits.
 var<workgroup> face_scan: array<vec2u, 256>;
@@ -181,6 +192,15 @@ fn basis(d: vec3f) -> array<f32, 9> {
         0.3153915653 * (3.0 * d.z * d.z - 1.0),
         1.0925484306 * d.x * d.z,
         0.5462742153 * (d.x * d.x - d.y * d.y));
+}
+
+// Vector k of the ZH3 of the L2 coefficients in irradiance, as include/sh.wgsl lays it out.
+fn zh3_vector(k: u32) -> vec4f {
+    let a = zh3_axis(irradiance[1], irradiance[2], irradiance[3]);
+    let z = zh3_zonal(irradiance[4], irradiance[5], irradiance[6], irradiance[7],
+        irradiance[8], a);
+    let w = select(select(select(0.0, z.z, k == 2u), z.y, k == 1u), z.x, k == 0u);
+    return vec4f(irradiance[k], w);
 }
 
 // Clamped cosine convolution of the band of a coefficient.
@@ -326,9 +346,18 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
 
     reduce_sh(lane, sum);
     let index = params.probes[probe / 4u][probe % 4u];
+    let zh3 = params.size.w != 0u;
     if (lane < SH_COEFFICIENTS) {
         let e = (partial[0][lane] + direct(probe, lane)) * band(lane);
-        volume[index * SH_COEFFICIENTS + lane] = vec4f(e, 0.0);
+        irradiance[lane] = e;
+        if (!zh3) {
+            volume[index * SH_COEFFICIENTS + lane] = vec4f(e, 0.0);
+        }
+    }
+
+    workgroupBarrier();
+    if (zh3 && lane < ZH3_VECTORS) {
+        volume[index * ZH3_VECTORS + lane] = zh3_vector(lane);
     }
 
     let texels = VISIBILITY_SIZE * VISIBILITY_SIZE;
@@ -614,7 +643,8 @@ fn reflect_prefilter(@builtin(global_invocation_id) id: vec3u) {
 }
 
 // L2 SH irradiance of an environment cubemap, in the basis, order and convolution of project,
-// into the first SH_COEFFICIENTS entries of volume. cube_source holds the six faces of a box
+// into the first SH_COEFFICIENTS entries of volume, followed by its ZH3 in ZH3_VECTORS entries
+// for the light probe volumes it fills. cube_source holds the six faces of a box
 // filtered mip level of the cubemap, at most 16 texels per edge, in the WebGPU cubemap
 // convention. A texel whose radiance is not finite adds nothing.
 @compute @workgroup_size(64)
@@ -637,6 +667,13 @@ fn environment_sh(@builtin(local_invocation_index) lane: u32) {
 
     reduce_sh(lane, sum);
     if (lane < SH_COEFFICIENTS) {
-        volume[lane] = vec4f(partial[0][lane] * band(lane), 0.0);
+        let e = partial[0][lane] * band(lane);
+        irradiance[lane] = e;
+        volume[lane] = vec4f(e, 0.0);
+    }
+
+    workgroupBarrier();
+    if (lane < ZH3_VECTORS) {
+        volume[SH_COEFFICIENTS + lane] = zh3_vector(lane);
     }
 }

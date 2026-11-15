@@ -285,9 +285,49 @@ bool box_render_gpu_read_reflection_sh(
     uint32_t slot,
     float out[BOX_RENDER_SH_COEFFICIENTS][4]);
 
+/** vec4 of a probe of a BOX_RENDER_VOLUME on the GPU, which stores its irradiance as ZH3
+ * (Roughton et al., "ZH3: Quadratic Zonal Harmonics"): (E0, z.r), (E1, z.g), (E2, z.b),
+ * (E3, 0), with bands 0 and 1 of the L2 coefficients and z the zonal band 2 coefficient along
+ * the axis of the luminance of band 1 */
+#define BOX_RENDER_ZH3_VECTORS (4)
+
+/** Length of the luminance of band 1 below which a ZH3 probe takes +z as its axis */
+#define BOX_RENDER_ZH3_AXIS_EPSILON (1e-8f)
+
+/** Axis of a ZH3 probe: the normalized luminance (0.2126, 0.7152, 0.0722) of its band 1
+ * coefficients E1..E3 in Sloan's order (y, z, x), +z when its length is below
+ * BOX_RENDER_ZH3_AXIS_EPSILON, as zh3_axis() of etc/shaders/include/sh.wgsl.
+ *
+ * @param band1 E1, E2 and E3, linear rgb: 3 rows
+ * @param out Receives the axis
+ */
+void box_render_zh3_axis(
+    const float band1[][4],
+    float out[3]);
+
+/** Pack L2 SH irradiance into ZH3: bands 0 and 1 as they are, and per channel the projection
+ * z = sum_m E_2m y_m of band 2 onto y_m = sqrt(4 pi / 5) Y_2m(axis).
+ *
+ * @param sh The L2 coefficients, linear rgb, w unused
+ * @param out Receives the ZH3 probe
+ */
+void box_render_sh_to_zh3(
+    const float sh[BOX_RENDER_SH_COEFFICIENTS][4],
+    float out[BOX_RENDER_ZH3_VECTORS][4]);
+
+/** Expand a ZH3 probe into L2 SH irradiance: bands 0 and 1 as stored, band 2 as z y_m along
+ * the axis of band 1.
+ *
+ * @param zh3 The ZH3 probe
+ * @param out Receives the L2 coefficients, w 0
+ */
+void box_render_zh3_to_sh(
+    const float zh3[BOX_RENDER_ZH3_VECTORS][4],
+    float out[BOX_RENDER_SH_COEFFICIENTS][4]);
+
 /** Copy the L2 SH irradiance of a probe of a probe buffer of a volume into memory, waiting for
- * the copy. Only call this when the main thread renders, after box_render_sync, as
- * box_render_gpu_read_buffer.
+ * the copy: the ZH3 the probe is stored as, expanded by box_render_zh3_to_sh. Only call this
+ * when the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
  *
  * @param world The world
  * @param volume Handle of the BOX_RENDER_VOLUME
@@ -302,6 +342,20 @@ bool box_render_gpu_read_volume_sh(
     uint32_t buffer,
     uint32_t probe,
     float out[BOX_RENDER_SH_COEFFICIENTS][4]);
+
+/** Get the bytes of each of the two probe buffers of a volume on the GPU,
+ * BOX_RENDER_ZH3_VECTORS vec4 per probe. Only call this when the main thread renders, after
+ * box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param volume Handle of the BOX_RENDER_VOLUME
+ * @param out Receives the bytes of a probe buffer
+ * @return Whether the volume exists
+ */
+bool box_render_gpu_volume_bytes(
+    ecs_world_t *world,
+    uint32_t volume,
+    uint64_t *out);
 
 /** What the cull pass of a view tested and kept in the last target the GPU backend rendered */
 typedef struct box_render_cull_stats_t {
