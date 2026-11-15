@@ -166,7 +166,7 @@ assets {
           PbrMaterial: {metallic: 1, roughness: 1}
           Emissive: {strength: 0.004 * shield, color: {110, 170, 255}}
           Fresnel: {color: {120, 190, 255}, strength: 0.8 * shield, power: 3, bias: 0}
-          Distortion: {strength: 0.003 * shield, scale: 10, speed: 0.12}
+          Distortion: {strength: 0.003 * shield, scale: 10, speed: 0.3}
           Transition: [Emissive: {duration: 1, timing_function: EaseInOut}, Fresnel: {duration: 1, timing_function: EaseInOut}, Distortion: {duration: 1, timing_function: EaseInOut}]
           Ignore
         }
