@@ -1,0 +1,306 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.movement
+using box.text
+using state
+
+assets {
+  harbor_yard_tex_containers { Path: {path: "etc/scenes/shipyard/assets/containers.jpg"} }
+  harbor_yard_tex_containers_normal { Path: {path: "etc/scenes/shipyard/assets/containers_normal.jpg"} }
+  harbor_yard_tex_dots { Path: {path: "etc/scenes/shipyard/assets/dots.png"} }
+  harbor_yard_tex_floor { Path: {path: "etc/scenes/shipyard/assets/floor.jpg"} }
+  harbor_yard_tex_floor_normal { Path: {path: "etc/scenes/shipyard/assets/floor_normal.jpg"} }
+  harbor_yard_tex_floor_orm { Path: {path: "etc/scenes/shipyard/assets/floor_orm.jpg"} }
+  harbor_yard_tex_hazard { Path: {path: "etc/scenes/shipyard/assets/hazard.svg", width: 256} }
+  harbor_yard_tex_heat_fins { Path: {path: "etc/scenes/shipyard/assets/heat_fins.png"} }
+  harbor_yard_tex_hull { Path: {path: "etc/scenes/shipyard/assets/hull.jpg"} }
+  harbor_yard_tex_hull_normal { Path: {path: "etc/scenes/shipyard/assets/hull_normal.jpg"} }
+  harbor_yard_tex_hull_orm { Path: {path: "etc/scenes/shipyard/assets/hull_orm.jpg"} }
+  harbor_yard_tex_radiator { Path: {path: "etc/scenes/shipyard/assets/radiator.jpg"} }
+  harbor_yard_tex_radiator_normal { Path: {path: "etc/scenes/shipyard/assets/radiator_normal.jpg"} }
+
+  prefab HarborYardSlab { Rgb: {66, 70, 80}; PbrMaterial: {metallic: 0.6, roughness: 0.55}; PbrTextures: {albedo: harbor_yard_tex_hull, normal: harbor_yard_tex_hull_normal, orm: harbor_yard_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 26, blend: 0.3} }
+  prefab HarborYardPlate { Rgb: {104, 108, 116}; PbrMaterial: {metallic: 0.5, roughness: 0.65}; PbrTextures: {albedo: harbor_yard_tex_floor, normal: harbor_yard_tex_floor_normal, orm: harbor_yard_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 14} }
+  prefab HarborYardGrate { Rgb: {74, 78, 86}; PbrMaterial: {metallic: 0.6, roughness: 0.6}; PbrTextures: {albedo: harbor_yard_tex_floor, normal: harbor_yard_tex_floor_normal, orm: harbor_yard_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 5} }
+  prefab HarborYardConcrete { Rgb: {122, 120, 114}; PbrMaterial: {metallic: 0.1, roughness: 0.85}; PbrTextures: {normal: harbor_yard_tex_hull_normal, orm: harbor_yard_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 18, blend: 0.3} }
+  prefab HarborYardRoad { Rgb: {34, 36, 42}; PbrMaterial: {metallic: 0.2, roughness: 0.8} }
+  prefab HarborYardWhite { Rgb: {214, 218, 224}; PbrMaterial: {metallic: 0.1, roughness: 0.6} }
+  prefab HarborYardPaint { Rgb: {230, 166, 38}; PbrMaterial: {metallic: 0.1, roughness: 0.55} }
+  prefab HarborYardHazard { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.2, roughness: 0.5}; PbrTextures: {albedo: harbor_yard_tex_hazard}; texture.Mapping: {MappingFrame, size: 3} }
+  prefab HarborYardStud { Rgb: {255, 190, 90}; Emissive: {strength: 2.5, color: {255, 160, 60}} }
+  prefab HarborYardDoor { Rgb: {58, 62, 70}; PbrMaterial: {metallic: 0.7, roughness: 0.5}; PbrTextures: {albedo: harbor_yard_tex_hull, normal: harbor_yard_tex_hull_normal, orm: harbor_yard_tex_hull_orm}; texture.Mapping: {MappingFrame, size: 4} }
+  prefab HarborYardContainers { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.45, roughness: 0.6}; PbrTextures: {albedo: harbor_yard_tex_containers, normal: harbor_yard_tex_containers_normal}; texture.Mapping: {MappingObject, size: 24.4}; texture.Transform: {scale_x: 1, scale_y: 2.35} }
+  prefab HarborYardLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {255, 196, 120}}; PbrTextures: {emissive: harbor_yard_tex_dots}; texture.Mapping: {MappingObject, size: 6}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: 0.25, offset_y: 0.25} }
+  prefab HarborYardLightsCyan { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {90, 214, 255}}; PbrTextures: {emissive: harbor_yard_tex_dots}; texture.Mapping: {MappingObject, size: 4}; texture.Transform: {scale_x: 1, scale_y: 1, offset_x: 0.25, offset_y: 0.25} }
+  prefab HarborYardBand { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {255, 196, 120}}; PbrTextures: {emissive: harbor_yard_tex_dots} }
+  prefab HarborYardRadiator { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.55, roughness: 0.5}; PbrTextures: {albedo: harbor_yard_tex_radiator, normal: harbor_yard_tex_radiator_normal, emissive: harbor_yard_tex_heat_fins}; texture.Mapping: {MappingObject, size: 24}; Emissive: {strength: 2.4, color: {255, 236, 220}} }
+
+  // A light mast, h high.
+  template HarborYardLamp {
+    prop h: f32 = 20
+    pole : HarborSteel { Position: {0, h / 2, 0}; Cylinder: {radius: 0.6, length: h, segments: 6} }
+    head : HarborWindow { Position: {0, h + 0.5, 0}; Box: {5, 1, 2} }
+  }
+
+  // A yard tractor with a container on its trailer, along +z.
+  template HarborYardTruck {
+    prop tone: i32 = 0
+    chassis : HarborPanel { Position: {0, 1.1, 0}; Box: {2.8, 1.2, 15} }
+    cab : HarborYellow { Position: {0, 2.4, 8.6}; Box: {2.8, 3.4, 3.2} }
+    glass : HarborWindowCool { Position: {0, 3.2, 10.25}; Box: {2.2, 1, 0.1} }
+    box : HarborYardContainers { Position: {0, 3, -0.8}; Box: {2.6, 2.6, 12.2}; Rgb: {tone == 0 ? 255 : 226, tone == 0 ? 240 : 236, tone == 0 ? 228 : 255} }
+  }
+
+  // Pipes along +z from z0 to z1 at height y and x offsets xa and xb, into a valve manifold on the
+  // wall of radius r, turned by turn to lie flat against it.
+  template HarborYardPipes {
+    prop xa: f32 = 0
+    prop xb: f32 = 4
+    prop y: f32 = 3
+    prop z0: f32 = 0
+    prop z1: f32 = 40
+    prop r: f32 = 350
+    prop w: f32 = 14
+    prop turn: f32 = 0
+    const l = z1 - z0
+    const dx = xb > xa ? xb - xa : xa - xb
+    pipe_a : HarborYellow { Position: {xa, y, (z0 + z1) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.9, length: l, segments: 8} }
+    pipe_b : HarborSteel { Position: {xb, y, (z0 + z1) / 2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.9, length: l, segments: 8} }
+    for v in 0..2 {
+      const vx = v == 0 ? xa : xb
+      "valve_{v}" : HarborPanel { Position: {vx, y, z1 - 5 - v * 3}; Box: {2.6, 2.6, 2.2} }
+      "wheel_{v}" : HarborRed { Position: {vx, y + 2.2, z1 - 5 - v * 3}; Torus: {radius: 1.3, tube: 0.25, segments: 12, rings: 4} }
+    }
+    for s in 0..2 {
+      "sleeper_{s}" : HarborPanel { Position: {(xa + xb) / 2, (y - 0.9) / 2, z0 + l * (s + 1) / 3}; Box: {dx + 3, y - 0.9, 1.2} }
+    }
+    manifold {
+      Rotation: {0, turn, 0}
+      body : HarborPanel { Position: {0, y + 1.5, r - 2.4}; Box: {w, y * 2 + 5, 4} }
+      cap : HarborHazard { Position: {0, y * 2 + 4.2, r - 2.4}; Box: {w + 1, 0.8, 4.4} }
+      lamp : HarborAmber { Position: {0, y * 2 + 2, r - 4.45}; Box: {w * 0.5, 0.6, 0.1} }
+    }
+  }
+
+  // The inner deck part of a cargo yard, from the hub to the inner ring, with the deck top at y = 0.
+  // The yard is along +z, with side mirroring it so the inner corridor is on its +x * side, and the
+  // service road it shares with its neighbour on the other side. Kind 0 is a fuel farm piped to the
+  // ring, kind 1 a landing pad with its approach lights.
+  template HarborYardInner {
+    prop side: f32 = 1
+    prop kind: i32 = 0
+    prop seed: i32 = 0
+    const D = PI / 180
+    const p0 = -9.2 * D
+    const p1 = 6.2 * D
+    const turn = side > 0 ? p1 - HALF_PI : 0 - p0 - HALF_PI
+    if kind == 0 {
+      plate : HarborYardConcrete { Position: {0, 0.1, 0}; Rotation: {0, turn, 0}; Tube: {radius: 342, thickness: 110, length: 0.2, segments: 16, arc: p1 - p0} }
+      bund_a : HarborYardHazard { Position: {-6 * side, 0.8, 262}; Rotation: {0, PI / 4, 0}; Tube: {radius: 31, thickness: 1.2, length: 1.6, segments: 4} }
+      bund_b : HarborYardHazard { Position: {-6 * side, 0.8, 312}; Rotation: {0, PI / 4, 0}; Tube: {radius: 28.5, thickness: 1.2, length: 1.6, segments: 4} }
+      HarborSpheres spheres(r: 7) { Position: {-6 * side, 0.2, 262} }
+      HarborTanks tanks(n: 3, r: 4.5, l: 22) { Position: {-6 * side, 0.2, 312} }
+      feed_a : HarborYellow { Position: {9.5 * side, 3, 262}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.9, length: 25, segments: 8} }
+      feed_b : HarborSteel { Position: {5 * side, 6.7, 329}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.9, length: 42, segments: 8} }
+      riser : HarborSteel { Position: {26 * side, 4.85, 329}; Cylinder: {radius: 0.9, length: 3.7, segments: 8} }
+      HarborYardPipes pipes(xa: 21 * side, xb: 26 * side, y: 3, z0: 262, z1: 346.5, r: 350, w: 12, turn: side * 0.0672)
+    } else {
+      plate : HarborYardPlate { Position: {0, 0.1, 0}; Rotation: {0, turn, 0}; Tube: {radius: 342, thickness: 110, length: 0.2, segments: 16, arc: p1 - p0} }
+      apron_rim : HarborYardHazard { Position: {-6 * side, 0.25, 272}; Box: {46, 0.1, 46} }
+      apron : HarborYardConcrete { Position: {-6 * side, 0.35, 272}; Box: {42, 0.1, 42} }
+      HarborPad pad(r: 18) { Position: {-6 * side, 0.4, 272} }
+      threshold : HarborYardLightsCyan { Position: {-6 * side, 0.3, 299}; Box: {18, 0.1, 1} }
+      for l in 0..2 {
+        "approach_{l}" : HarborYardLightsCyan { Position: {(-6 + (l * 2 - 1) * 7) * side, 0.3, 318}; Box: {1, 0.1, 36} }
+        HarborMast "mast_{l}"(h: 18) { Position: {(-6 + (l * 2 - 1) * 27) * side, 0.2, 252} }
+      }
+      HarborCrates crates(l: 15, seed: seed) { Position: {18 * side, 0.2, 318} }
+      hut : HarborHull { Position: {22 * side, 3.2, 262}; RoundedBox: {8, 6, 12, 1, segments: 2} }
+      hut_glass : HarborWindowCool { Position: {18 * side, 4, 262}; Box: {0.3, 1.4, 9} }
+    }
+  }
+
+  // The middle deck part of a cargo yard, from the inner to the middle ring, with the deck top at
+  // y = 0: container bays between the rails of a portal crane, a truck lane under it, a staging
+  // apron on the side of the service road and a utility block on the side of the corridor.
+  template HarborYardMid {
+    prop side: f32 = 1
+    prop kind: i32 = 0
+    prop seed: i32 = 0
+    const D = PI / 180
+    const u0 = -9.2 * D
+    const u1 = -2 * D
+    const g0 = 2 * D
+    const g1 = 9.9 * D
+    utility : HarborYardConcrete { Position: {0, 0.1, 0}; Rotation: {0, (side > 0 ? u1 : 0 - u0) - HALF_PI, 0}; Tube: {radius: 606, thickness: 136, length: 0.2, segments: 16, arc: u1 - u0} }
+    staging : HarborYardPlate { Position: {0, 0.1, 0}; Rotation: {0, (side > 0 ? g1 : 0 - g0) - HALF_PI, 0}; Tube: {radius: 606, thickness: 136, length: 0.2, segments: 16, arc: g1 - g0} }
+    bays : HarborYardGrate { Position: {0, 0.15, 539}; Box: {66, 0.3, 142} }
+
+    for r in 0..2 {
+      const x = (r * 2 - 1) * 28
+      "bed_{r}" : HarborPanel { Position: {x, 0.45, 544}; Box: {3.2, 0.3, 144} }
+      "rail_{r}" : HarborSteel { Position: {x, 1.05, 544}; Box: {1, 0.9, 144} }
+      "stop_{r}_a" : HarborYardHazard { Position: {x, 1.5, 471}; Box: {4, 3, 2} }
+      "stop_{r}_b" : HarborYardHazard { Position: {x, 1.5, 617}; Box: {4, 3, 2} }
+    }
+    HarborCrane crane(s: 56) { Position: {0, 1.5, 492 + (seed * 37) % 96} }
+    for l in 0..2 {
+      "lane_{l}" : HarborYardPaint { Position: {(6.5 + l * 15) * side, 0.35, 539}; Box: {0.6, 0.1, 138} }
+    }
+    for t in 0..2 {
+      HarborYardTruck "truck_{t}"(tone: (seed + t) % 2) { Position: {14 * side, 0.3, 490 + t * 46 + (seed * 13) % 50} }
+    }
+
+    for i in 0..6 {
+      const x = i < 3 ? -16 : -3
+      const zc = i == 0 ? 496.4 : i == 1 ? 539 : i == 2 ? 581.6 : i == 3 ? 484.2 : i == 4 ? 526.8 : 581.6
+      const l = i == 1 || i == 3 ? 24.4 : 48.8
+      const k = (seed * 5 + i * 3) % 7
+      const h = k < 4 ? 5.2 : 10.4
+      const tone = (seed + i) % 3
+      "bay_{i}" : HarborYardWhite { Position: {x * side, 0.35, zc}; Box: {12, 0.1, l + 1.6} }
+      if k != 0 {
+        "stack_{i}" : HarborYardContainers {
+          Position: {x * side, 0.4 + h / 2, zc}
+          Box: {10.4, h, l}
+          Rgb: {tone == 2 ? 220 : 255, tone == 0 ? 255 : tone == 1 ? 236 : 232, tone == 1 ? 222 : 255}
+        }
+      }
+    }
+
+    HarborCrates crates(l: 12, seed: seed) { Position: {44 * side, 0.2, 492} }
+    trench : HarborYardRoad { Position: {31.5 * side, 0.25, 544}; Box: {1.6, 0.1, 144} }
+    for k in 0..2 {
+      "hatch_rim_{k}" : HarborYardHazard { Position: {(60 + k * 22) * side, 0.25, 522 + k * 24}; Box: {10, 0.1, 10} }
+      "hatch_{k}" : HarborYardDoor { Position: {(60 + k * 22) * side, 0.3, 522 + k * 24}; Box: {8, 0.1, 8} }
+    }
+    substation : HarborHullDark { Position: {-53 * side, 3.2, 505}; Box: {14, 6, 22} }
+    substation_vent : HarborPanel { Position: {-53 * side, 6.6, 499}; Box: {10, 0.8, 8} }
+    substation_lights : HarborYardLights { Position: {-46 * side, 3.6, 505}; Box: {0.1, 0.6, 20} }
+    for m in 0..3 {
+      HarborYardLamp "lamp_{m}"(h: 22) { Position: {(m == 1 ? 36 : -36) * side, 0.2, 500 + m * 45} }
+    }
+    if kind == 0 {
+      bund : HarborYardHazard { Position: {-54 * side, 0.8, 566}; Rotation: {0, PI / 4, 0}; Tube: {radius: 28, thickness: 1.2, length: 1.6, segments: 4} }
+      HarborTanks tanks(n: 3, r: 4.5, l: 26) { Position: {-54 * side, 0.2, 566} }
+      HarborYardPipes pipes(xa: -54 * side, xb: -43.5 * side, y: 6.7, z0: 583.5, z1: 621.2, r: 625, w: 26, turn: side * -0.0866)
+      pad : HarborYardConcrete { Position: {66 * side, 0.3, 585}; Box: {24, 0.2, 24} }
+      HarborDish dish(r: 10, tilt: 0.7, spin: 0.05 + (seed % 4) * 0.01) { Position: {66 * side, 0.4, 585} }
+    } else {
+      HarborRadiators fins(n: 5, l: 28, h: 12) { Position: {-55 * side, 0.2, 560} }
+      HarborYardPipes pipes(xa: -51 * side, xb: -59 * side, y: 4.7, z0: 575, z1: 621.2, r: 625, w: 26, turn: side * -0.0866)
+      apron_rim : HarborYardHazard { Position: {64 * side, 0.25, 580}; Box: {38, 0.1, 38} }
+      HarborPad pad(r: 15) { Position: {64 * side, 0.3, 580} }
+      for l in 0..2 {
+        "approach_{l}" : HarborYardLightsCyan { Position: {(64 + (l * 2 - 1) * 6) * side, 0.3, 543}; Box: {1, 0.1, 30} }
+      }
+    }
+  }
+
+  // The service roads between two yards, along +z, the middle one ending at a cargo door in the
+  // middle ring and the inner one, half a sector further, at a door of the inner ring.
+  template HarborYardRoads {
+    road_mid : HarborYardRoad { Position: {0, -14.875, 545.5}; Box: {14, 0.25, 153} }
+    for e in 0..2 {
+      "edge_mid_{e}" : HarborYardWhite { Position: {(e * 2 - 1) * 6.3, -14.7, 545.5}; Box: {0.5, 0.1, 153} }
+    }
+    studs_mid : HarborYardStud { Position: {0, -14.7, 545.5}; Box: {0.3, 0.1, 150} }
+    door_mid {
+      frame : HarborPanel { Position: {0, -6, 623.6}; Box: {20, 18, 1.4} }
+      leaf : HarborYardDoor { Position: {0, -8, 622.7}; Box: {15, 14, 0.5} }
+      lintel : HarborYardHazard { Position: {0, 0, 622.6}; Box: {20, 1.2, 0.8} }
+      sill : HarborYardHazard { Position: {0, -14.7, 620.5}; Box: {15, 0.1, 3} }
+    }
+    inner {
+      Rotation: {0, PI / 8, 0}
+      road : HarborYardRoad { Position: {0, -19.875, 288.5}; Box: {14, 0.25, 121} }
+      for e in 0..2 {
+        "edge_{e}" : HarborYardWhite { Position: {(e * 2 - 1) * 6.3, -19.7, 288.5}; Box: {0.5, 0.1, 121} }
+      }
+      studs : HarborYardStud { Position: {0, -19.7, 288.5}; Box: {0.3, 0.1, 118} }
+      sill : HarborYardHazard { Position: {0, -19.7, 345}; Box: {20, 0.1, 3} }
+    }
+  }
+
+  // The keel under the station: a ring truss hung from the underside of the outer deck's skirt by
+  // pylons, with radiator vanes slung between it and an inner tie ring.
+  template HarborYardKeel {
+    ring : HarborHullDark { Position: {0, -128, 0}; Tube: {radius: 668, thickness: 16, length: 12, segments: 160} }
+    ring_lip : HarborPanel { Position: {0, -121.25, 0}; Tube: {radius: 670, thickness: 20, length: 1.5, segments: 160} }
+    ring_keel : HarborPanel { Position: {0, -135, 0}; Tube: {radius: 662, thickness: 4, length: 2, segments: 160} }
+    ring_lights : HarborYardBand { Position: {0, -128, 0}; Tube: {radius: 668.3, thickness: 0.6, length: 2, segments: 160}; texture.Transform: {scale_x: 200, scale_y: 0.5} }
+    pipe_a : HarborYellow { Position: {0, -125, 0}; Torus: {radius: 649, tube: 2, segments: 160, rings: 6} }
+    pipe_b : HarborSteel { Position: {0, -131, 0}; Torus: {radius: 649, tube: 2, segments: 160, rings: 6} }
+    tie : HarborPanel { Position: {0, -134, 0}; Tube: {radius: 476, thickness: 4, length: 3, segments: 128} }
+    tie_lights : HarborYardBand { Position: {0, -134, 0}; Tube: {radius: 476.3, thickness: 0.6, length: 1.5, segments: 128}; texture.Transform: {scale_x: 140, scale_y: 0.5} }
+
+    for p in 0..16 {
+      "pylon_{p}" {
+        Rotation: {0, p * PI / 8, 0}
+        for l in 0..2 {
+          const sx = l * 2 - 1
+          "leg_{l}" : HarborHullDark { Position: {sx * 8, -106, 660}; Rotation: {0, 0, 0 - sx * 0.245}; Box: {4, 33, 5} }
+        }
+        brace : HarborPanel { Position: {0, -106, 660}; Box: {20, 2.5, 4} }
+        shoe : HarborPanel { Position: {0, -91, 660}; Box: {32, 2, 14} }
+        foot : HarborHullDark { Position: {0, -120, 660}; Box: {14, 6, 20} }
+        if p % 2 == 0 {
+          beacon : HarborBeaconRed { Position: {0, -128, 669.5}; Sphere: {radius: 1.5, segments: 8} }
+        }
+      }
+    }
+
+    for v in 0..32 {
+      "vane_{v}" {
+        Rotation: {0, (v + 0.5) * PI / 16, 0}
+        mount : HarborPanel { Position: {0, -91, 540}; Box: {4, 2, 136} }
+        header : HarborYellow { Position: {0, -93.2, 540}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 1.2, length: 134, segments: 8} }
+        panel : HarborYardRadiator { Position: {0, -113.5, 540}; Box: {0.6, 38, 130} }
+        chord : HarborPanel { Position: {0, -133.7, 540}; Box: {2.4, 2.4, 134} }
+        post_a : HarborSteel { Position: {0, -112.5, 474}; Box: {1.8, 46, 1.8} }
+        post_b : HarborSteel { Position: {0, -112.5, 606}; Box: {1.8, 46, 1.8} }
+        tie : HarborSteel { Position: {0, -128, 629}; Box: {1.6, 1.6, 46} }
+      }
+    }
+  }
+
+  // The decks between the hub and the rings, with cargo yards and cranes, and the keel under them.
+  template HarborYards {
+    deck_inner : HarborYardSlab { Position: {0, -27.5, 0}; Tube: {radius: 350, thickness: 165, length: 15, segments: 96} }
+    deck_mid : HarborYardSlab { Position: {0, -22.5, 0}; Tube: {radius: 625, thickness: 180, length: 15, segments: 128} }
+
+    hub_road : HarborYardRoad { Position: {0, -19.875, 0}; Tube: {radius: 228, thickness: 14, length: 0.25, segments: 96} }
+    hub_road_edge_a : HarborYardWhite { Position: {0, -19.7, 0}; Tube: {radius: 227.2, thickness: 0.5, length: 0.1, segments: 96} }
+    hub_road_edge_b : HarborYardWhite { Position: {0, -19.7, 0}; Tube: {radius: 215.3, thickness: 0.5, length: 0.1, segments: 96} }
+    hub_road_studs : HarborYardStud { Position: {0, -19.7, 0}; Tube: {radius: 221.2, thickness: 0.3, length: 0.1, segments: 96} }
+    inner_kerb : HarborPanel { Position: {0, -19.4, 0}; Tube: {radius: 349.9, thickness: 2.5, length: 1.2, segments: 96} }
+    inner_kerb_lights : HarborYardStud { Position: {0, -18.75, 0}; Tube: {radius: 348.6, thickness: 0.4, length: 0.1, segments: 96} }
+
+    ring_road : HarborYardRoad { Position: {0, -14.875, 0}; Tube: {radius: 468, thickness: 16, length: 0.25, segments: 128} }
+    ring_road_edge_a : HarborYardWhite { Position: {0, -14.7, 0}; Tube: {radius: 467.2, thickness: 0.5, length: 0.1, segments: 128} }
+    ring_road_edge_b : HarborYardWhite { Position: {0, -14.7, 0}; Tube: {radius: 453.3, thickness: 0.5, length: 0.1, segments: 128} }
+    ring_road_studs : HarborYardStud { Position: {0, -14.7, 0}; Tube: {radius: 460.2, thickness: 0.3, length: 0.1, segments: 128} }
+    mid_kerb : HarborPanel { Position: {0, -14.4, 0}; Tube: {radius: 624.9, thickness: 2.5, length: 1.2, segments: 128} }
+    mid_kerb_lights : HarborYardStud { Position: {0, -13.75, 0}; Tube: {radius: 623.6, thickness: 0.4, length: 0.1, segments: 128} }
+
+    for c in 0..8 {
+      HarborYardRoads "roads_{c}" { Rotation: {0, c * PI / 4, 0} }
+    }
+
+    for y in 0..16 {
+      const a = y * PI / 8 + PI / 16
+      const s = y % 2 == 0 ? -1.0 : 1.0
+      "yard_{y}" {
+        Rotation: {0, a, 0}
+        HarborYardInner inner(side: s, kind: y % 2, seed: y) { Position: {0, -20, 0} }
+        HarborYardMid mid(side: s, kind: y % 2, seed: y) { Position: {0, -15, 0} }
+      }
+    }
+
+    HarborYardKeel keel
+  }
+}

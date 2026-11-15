@@ -4,8 +4,15 @@
 // liners and light their hazard beacons as the ships come and go.
 include shipyard/ships
 include fleet/materials
-include fleet/station
+include fleet/kit
+include fleet/hub
+include fleet/yards
+include fleet/rings
+include fleet/outer
 include fleet/traffic
+include fleet/gates
+include fleet/bays
+include fleet/station
 
 using flecs.script
 using flecs.script.math

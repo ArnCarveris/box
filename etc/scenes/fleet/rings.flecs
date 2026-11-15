@@ -1,0 +1,258 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.movement
+using box.text
+using state
+
+assets {
+  harbor_ring_tex_windows { Path: {path: "etc/scenes/shipyard/assets/windows.png"} }
+  harbor_ring_tex_windows_albedo { Path: {path: "etc/scenes/shipyard/assets/windows_albedo.png"} }
+  harbor_ring_tex_radiator { Path: {path: "etc/scenes/shipyard/assets/radiator.jpg"} }
+  harbor_ring_tex_radiator_normal { Path: {path: "etc/scenes/shipyard/assets/radiator_normal.jpg"} }
+  harbor_ring_tex_dots { Path: {path: "etc/scenes/shipyard/assets/dots.png"} }
+  harbor_ring_bent_shape { Path2D: {start: {0, -9}, segments: [
+    {kind: Line, end: {4.5, -9}}, {kind: Line, end: {4.5, 9}}, {kind: Line, end: {0, 9}}, {kind: Line, end: {0, 7.6}},
+    {kind: Line, end: {3.1, 7.6}}, {kind: Line, end: {3.1, -7.6}}, {kind: Line, end: {0, -7.6}}
+  ], closed: true} }
+  harbor_ring_bent { Profile2D: {outer: harbor_ring_bent_shape} }
+
+  prefab HarborRingGlassWarm { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 3.2, color: {255, 214, 166}}; PbrTextures: {albedo: harbor_ring_tex_windows_albedo, emissive: harbor_ring_tex_windows} }
+  prefab HarborRingGlassCool { Rgb: {220, 236, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.25}; ClearCoat: {strength: 0.5, roughness: 0.1}; Emissive: {strength: 2.6, color: {150, 205, 255}}; PbrTextures: {albedo: harbor_ring_tex_windows_albedo, emissive: harbor_ring_tex_windows} }
+  prefab HarborRingGlassDim { Rgb: {200, 206, 216}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 0.9, color: {255, 200, 150}}; PbrTextures: {albedo: harbor_ring_tex_windows_albedo, emissive: harbor_ring_tex_windows} }
+  prefab HarborRingGlassBright { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 4.5, color: {255, 230, 196}}; PbrTextures: {albedo: harbor_ring_tex_windows_albedo, emissive: harbor_ring_tex_windows} }
+  prefab HarborRingLouver { Rgb: {170, 176, 186}; PbrMaterial: {metallic: 0.6, roughness: 0.5}; PbrTextures: {albedo: harbor_ring_tex_radiator, normal: harbor_ring_tex_radiator_normal} }
+  prefab HarborRingRunLights { Rgb: {40, 44, 52}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 6, color: {255, 186, 100}}; PbrTextures: {emissive: harbor_ring_tex_dots} }
+
+  template HarborRingFace {
+    prop r: f32 = 450
+    prop out: bool = true
+    prop n: i32 = 48
+    prop bot: f32 = -15
+    prop ya: f32 = -3
+    prop top: f32 = 50
+    prop seed: i32 = 0
+    prop seg: i32 = 128
+    prop deck: f32 = -15
+    prop doors: i32 = 0
+    prop door_at: i32 = 0
+    const s = out ? 1 : -1
+    const yb = ya + 20
+    const yc = yb + 16
+    const yk = yc + 6
+    const da = 2 * PI / n
+    const rc = out ? r - 4 : r + 4
+    const rg = out ? rc + 0.6 : rc
+    const cr = out ? r : r + 4
+    const tiles = floor(rc * da / 8)
+
+    plinth : HarborHullDark { Position: {0, (bot + ya) / 2, 0}; Tube: {radius: cr, thickness: 4, length: ya - bot, segments: seg} }
+    spandrel_a : HarborHull { Position: {0, ya + 16, 0}; Tube: {radius: cr, thickness: 4, length: 8, segments: seg} }
+    spandrel_b : HarborHull { Position: {0, yb + 14, 0}; Tube: {radius: cr, thickness: 4, length: 4, segments: seg} }
+    cornice : HarborHullDark { Position: {0, (yk + top - 2) / 2, 0}; Tube: {radius: out ? r + 1 : r + 4, thickness: 5, length: top - 2 - yk, segments: seg} }
+    trim : HarborPanel { Position: {0, top - 0.75, 0}; Tube: {radius: out ? r + 2.5 : r + 4, thickness: 6.5, length: 2.5, segments: seg} }
+    parapet : HarborPanel { Position: {0, top + 1.5, 0}; Tube: {radius: out ? r + 0.5 : r + 2, thickness: 2.5, length: 2.5, segments: seg} }
+    lights : HarborRingRunLights {
+      Position: {0, top - 0.75, 0}
+      Tube: {radius: out ? r + 2.6 : r - 2.5, thickness: 0.1, length: 0.8, segments: seg}
+      texture.Transform: {scale_x: floor(PI * r / 12), scale_y: 0.5}
+    }
+    walk : HarborPanel { Position: {0, ya + 12.3, 0}; Tube: {radius: out ? r + 4.5 : r, thickness: 4.5, length: 0.6, segments: seg} }
+    rail : HarborSteel { Position: {0, ya + 13.7, 0}; Torus: {radius: r + s * 4.3, tube: 0.2, segments: seg, rings: 4} }
+
+    for k in 0..n {
+      const a = k * da
+      const ap = a + da / 2
+      const ro = a + da / 2 - HALF_PI
+      const h = (k * 5 + seed + (k * k) % 4) % 7
+      const ox = ((k * 37 + seed * 11) % 100) / 100.0
+      const oy = ((k * 3 + seed) % 4) * 0.25
+      "glass_a_{k}" {
+        if h == 2 {
+          (IsA, HarborRingGlassCool)
+        } else if h == 3 || h == 5 {
+          (IsA, HarborRingGlassDim)
+        } else if h == 4 {
+          (IsA, HarborRingGlassBright)
+        } else {
+          (IsA, HarborRingGlassWarm)
+        }
+        Position: {0, ya + 6, 0}
+        Rotation: {0, ro, 0}
+        Tube: {radius: rg, thickness: 0.6, length: 12, arc: da, segments: 3}
+        texture.Transform: {scale_x: h == 4 ? floor(tiles / 2) : tiles, scale_y: h == 4 ? 0.75 : 1.5, offset_x: ox, offset_y: oy}
+      }
+      "glass_b_{k}" {
+        if h == 5 {
+          (IsA, HarborRingLouver)
+        } else if h == 2 || h == 6 {
+          (IsA, HarborRingGlassCool)
+        } else if h == 3 {
+          (IsA, HarborRingGlassDim)
+        } else {
+          (IsA, HarborRingGlassWarm)
+        }
+        Position: {0, yb + 6, 0}
+        Rotation: {0, ro, 0}
+        Tube: {radius: rg, thickness: 0.6, length: 12, arc: da, segments: 3}
+        texture.Transform: {scale_x: h == 5 ? tiles * 2 : tiles, scale_y: h == 5 ? 4 : 1.5, offset_x: 1 - ox, offset_y: oy + 0.5}
+      }
+      "glass_c_{k}" {
+        if (k + seed) % 3 == 0 {
+          (IsA, HarborRingLouver)
+        } else if (k + seed) % 3 == 1 {
+          (IsA, HarborRingGlassDim)
+        } else {
+          (IsA, HarborRingGlassCool)
+        }
+        Position: {0, yc + 3, 0}
+        Rotation: {0, ro, 0}
+        Tube: {radius: rg, thickness: 0.6, length: 6, arc: da, segments: 3}
+        texture.Transform: {scale_x: (k + seed) % 3 == 0 ? tiles * 2 : tiles, scale_y: (k + seed) % 3 == 0 ? 2 : 0.75, offset_x: ox, offset_y: 0.25}
+      }
+      if k % 4 == 3 {
+        "rib_{k}" : HarborHullDark { Position: {sin(ap) * (r + s * 0.5), (bot + top + 3) / 2, cos(ap) * (r + s * 0.5)}; Rotation: {0, ap, 0}; Box: {6, top + 3 - bot, 9} }
+        "strip_{k}" : HarborAmber { Position: {sin(ap) * (r + s * 5.05), yb + 6, cos(ap) * (r + s * 5.05)}; Rotation: {0, ap, 0}; Box: {0.8, 12, 0.25} }
+      } else {
+        "pilaster_{k}" : HarborPanel { Position: {sin(ap) * (r - s), (bot + top - 2) / 2, cos(ap) * (r - s)}; Rotation: {0, ap, 0}; Box: {3, top - 2 - bot, 6} }
+      }
+      if doors > 0 && k % (doors > 0 ? doors : 1) == door_at {
+        "door_{k}" : HarborPanel { Position: {sin(a) * (r + s * 0.3), deck + 5.2, cos(a) * (r + s * 0.3)}; Rotation: {0, a, 0}; Box: {20, 10, 0.6} }
+        "door_frame_{k}" : HarborHazard { Position: {sin(a) * (r + s * 0.2), deck + 6, cos(a) * (r + s * 0.2)}; Rotation: {0, a, 0}; Box: {24, 12, 0.4} }
+        "door_lamp_{k}" : HarborAmber { Position: {sin(a) * (r + s * 0.5), deck + 11, cos(a) * (r + s * 0.5)}; Rotation: {0, a, 0}; Box: {14, 0.6, 0.3} }
+      }
+    }
+  }
+
+  template HarborRingRack {
+    prop r: f32 = 366
+    prop y: f32 = 50
+    prop n: i32 = 48
+    prop seg: i32 = 128
+    pipe_a : HarborYellow { Position: {0, y + 6, 0}; Torus: {radius: r - 5.5, tube: 1.4, segments: seg, rings: 10, smooth: true} }
+    pipe_b : HarborSteel { Position: {0, y + 6, 0}; Torus: {radius: r - 1.5, tube: 1.4, segments: seg, rings: 10, smooth: true} }
+    pipe_c : HarborRed { Position: {0, y + 5.7, 0}; Torus: {radius: r + 2, tube: 1.1, segments: seg, rings: 10, smooth: true} }
+    pipe_d : ShipInsulation { Position: {0, y + 6.5, 0}; Torus: {radius: r + 6, tube: 1.8, segments: seg, rings: 10, smooth: true} }
+    for k in 0..n {
+      const a = (k + 0.5) * 2 * PI / n
+      "bent_{k}" : HarborPanel { Position: {sin(a) * r, y, cos(a) * r}; Rotation: {0, a, HALF_PI}; ProfileExtrusion: {profile: harbor_ring_bent, depth: 1.5, cap_start: true, cap_end: true} }
+    }
+  }
+
+  // A pressurized corridor from radius r0 to r1 along +z, w wide and h high, at height y. Its
+  // airlock frames sit on the wall surfaces at e0 and e1, with n collars between them.
+  template HarborCorridor {
+    prop r0: f32 = 0
+    prop r1: f32 = 50
+    prop e0: f32 = 0
+    prop e1: f32 = 50
+    prop w: f32 = 30
+    prop h: f32 = 25
+    prop y: f32 = 0
+    prop n: i32 = 4
+    prop seed: i32 = 0
+    prop f0: bool = true
+    const l = r1 - r0
+    const z = (r0 + r1) / 2
+    const sl = e1 - e0
+    const sz = (e0 + e1) / 2
+    const bw = w - 3
+    const bh = h - 3
+    body : HarborHull { Position: {0, y, z}; RoundedBox: {bw, bh, l, bh * 0.3, segments: 4} }
+    keel : HarborHullDark { Position: {0, y - bh / 2 - 0.5, sz}; Box: {w * 0.4, 1.5, sl} }
+    tray : HarborPanel { Position: {0, y + bh / 2 + 0.4, sz}; Box: {w * 0.36, 1.2, sl} }
+    pipe_a : HarborYellow { Position: {0 - w * 0.09, y + bh / 2 + 2, sz}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 1, length: sl, segments: 8} }
+    pipe_b : HarborSteel { Position: {w * 0.09, y + bh / 2 + 2, sz}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 1, length: sl, segments: 8} }
+    win_a : HarborRingGlassWarm { Position: {bw / 2 + 0.05, y + 0.5, sz}; Box: {0.4, 5, sl}; texture.Transform: {scale_x: floor(sl / 7), scale_y: 0.5, offset_x: seed * 0.13, offset_y: (seed % 2) * 0.5} }
+    win_b : HarborRingGlassWarm { Position: {0 - bw / 2 - 0.05, y + 0.5, sz}; Box: {0.4, 5, sl}; texture.Transform: {scale_x: floor(sl / 7), scale_y: 0.5, offset_x: seed * 0.29, offset_y: ((seed + 1) % 2) * 0.5} }
+    for i in 0..n {
+      "collar_{i}" : HarborHullDark { Position: {0, y, e0 + sl * (i + 1) / (n + 1)}; RoundedBox: {w, h, 2.5, h * 0.3, segments: 4} }
+    }
+    if f0 {
+      frame_a : HarborHullDark { Position: {0, y, e0 + 2}; RoundedBox: {w + 8, h + 8, 8, 3, segments: 2} }
+      hazard_a : HarborHazard { Position: {0, y, e0 + 6.75}; RoundedBox: {w + 1.5, h + 1.5, 1.5, h * 0.3, segments: 4} }
+      lamp_a : HarborAmber { Position: {0, y + h / 2 + 2, e0 + 6.15}; Box: {w * 0.5, 0.8, 0.3} }
+    }
+    frame_b : HarborHullDark { Position: {0, y, e1 - 2}; RoundedBox: {w + 8, h + 8, 8, 3, segments: 2} }
+    hazard_b : HarborHazard { Position: {0, y, e1 - 6.75}; RoundedBox: {w + 1.5, h + 1.5, 1.5, h * 0.3, segments: 4} }
+    lamp_b : HarborAmber { Position: {0, y + h / 2 + 2, e1 - 6.15}; Box: {w * 0.5, 0.8, 0.3} }
+  }
+
+  // The inner and middle rings and the corridors that join them to the hub, each other and the hangar wall.
+  template HarborRings {
+    ring_inner {
+      core : HarborHull { Position: {0, 10, 0}; Tube: {radius: 446, thickness: 92, length: 80, segments: 128} }
+      HarborRingFace face_out(r: 450, out: true, n: 48, bot: -16, ya: -3, top: 50, seed: 0, seg: 128, deck: -15, doors: 6, door_at: 0)
+      HarborRingFace face_in(r: 350, out: false, n: 32, bot: -30, ya: -6, top: 50, seed: 3, seg: 96, deck: -20, doors: 4, door_at: 2)
+      walk : HarborDeck { Position: {0, 50.15, 0}; Tube: {radius: 446, thickness: 8, length: 0.3, segments: 128} }
+      walk_line : HarborYellow { Position: {0, 50.2, 0}; Tube: {radius: 438, thickness: 0.6, length: 0.3, segments: 128} }
+      plant : HarborDeck { Position: {0, 50.1, 0}; Tube: {radius: 423, thickness: 46, length: 0.2, segments: 128} }
+      seam_a : HarborPanel { Position: {0, 50.15, 0}; Tube: {radius: 424, thickness: 1, length: 0.3, segments: 128} }
+      seam_b : HarborPanel { Position: {0, 50.15, 0}; Tube: {radius: 378, thickness: 1, length: 0.3, segments: 128} }
+      for v in 0..24 {
+        const a = (v + 0.25) * PI / 12
+        "vent_{v}" : HarborRingLouver { Position: {sin(a) * 430.5, 51.5, cos(a) * 430.5}; Rotation: {0, a, 0}; Box: {14, 3, 9}; texture.Transform: {scale_x: 2, scale_y: 1} }
+      }
+      for m in 0..32 {
+        const a = (m + 0.5) * PI / 16
+        "skylight_{m}" : HarborPanel { Position: {sin(a) * 400, 50.8, cos(a) * 400}; Rotation: {0, a, 0}; Box: {8, 1.6, 30} }
+        "skylight_glass_{m}" : HarborRingGlassCool { Position: {sin(a) * 400, 51.7, cos(a) * 400}; Rotation: {0, a, 0}; Box: {6, 0.3, 28}; texture.Transform: {scale_x: 0.75, scale_y: 3.5, offset_x: (m % 4) * 0.25} }
+      }
+      HarborRingRack rack(r: 366, y: 50, n: 48, seg: 128)
+      for m in 0..32 {
+        const a = m * PI / 16
+        if m % 8 != 0 {
+          "roof_{m}" {
+            Rotation: {0, a, 0}
+            HarborRoofModule unit(kind: (m * 3) % 5, mast: 25) { Position: {0, 50, 400} }
+          }
+        }
+      }
+    }
+    for c in 0..8 {
+      "spoke_inner_{c}" {
+        Rotation: {0, c * PI / 4, 0}
+        HarborCorridor body(r0: 185, r1: 355, e0: 199, e1: 350, w: 35, h: 30, y: 10, n: 5, seed: c, f0: false)
+      }
+    }
+
+    ring_middle {
+      core : HarborHull { Position: {0, 5, 0}; Tube: {radius: 696, thickness: 67, length: 60, segments: 160} }
+      HarborRingFace face_out(r: 700, out: true, n: 64, bot: -25, ya: -13, top: 35, seed: 5, seg: 160)
+      HarborRingFace face_in(r: 625, out: false, n: 48, bot: -26, ya: -11, top: 35, seed: 2, seg: 128)
+      walk : HarborDeck { Position: {0, 35.15, 0}; Tube: {radius: 696, thickness: 8, length: 0.3, segments: 160} }
+      walk_line : HarborYellow { Position: {0, 35.2, 0}; Tube: {radius: 688, thickness: 0.6, length: 0.3, segments: 160} }
+      plant : HarborDeck { Position: {0, 35.1, 0}; Tube: {radius: 688, thickness: 41, length: 0.2, segments: 160} }
+      for m in 0..48 {
+        const a = m * PI / 24
+        if m % 12 != 0 {
+          "skylight_{m}" : HarborPanel { Position: {sin(a) * 667.5, 35.8, cos(a) * 667.5}; Rotation: {0, a, 0}; Box: {8, 1.6, 30} }
+          "skylight_glass_{m}" : HarborRingGlassCool { Position: {sin(a) * 667.5, 36.7, cos(a) * 667.5}; Rotation: {0, a, 0}; Box: {6, 0.3, 28}; texture.Transform: {scale_x: 0.75, scale_y: 3.5, offset_x: (m % 4) * 0.25} }
+        }
+      }
+      HarborRingRack rack(r: 637, y: 35, n: 64, seg: 160)
+      for m in 0..48 {
+        const a = m * PI / 24 + PI / 48
+        if (m + 1) % 12 > 1 {
+          "roof_{m}" {
+            Rotation: {0, a, 0}
+            HarborRoofModule unit(kind: (m * 2 + 1) % 5, mast: 20) { Position: {0, 35, 667.5} }
+          }
+        }
+      }
+    }
+    for c in 0..8 {
+      "spoke_middle_{c}" {
+        Rotation: {0, PI / 8 + c * PI / 4, 0}
+        HarborCorridor body(r0: 445, r1: 630, e0: 450, e1: 625, w: 30, h: 25, y: 5, n: 6, seed: c + 8)
+      }
+      "spoke_outer_{c}" {
+        Rotation: {0, c * PI / 4, 0}
+        HarborCorridor body(r0: 695, r1: 780, e0: 700, e1: 775, w: 40, h: 30, y: 10, n: 2, seed: c + 16)
+      }
+    }
+  }
+}

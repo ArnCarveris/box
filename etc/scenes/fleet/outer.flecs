@@ -1,0 +1,206 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.movement
+using box.text
+using state
+
+assets {
+  prefab HarborOuterApron { Rgb: {96, 100, 110}; PbrMaterial: {metallic: 0.45, roughness: 0.68}; PbrTextures: {albedo: assets.harbor_tex_hull, normal: assets.harbor_tex_hull_normal, orm: assets.harbor_tex_hull_orm}; texture.Mapping: {MappingWorld, size: 34, blend: 0.2} }
+  prefab HarborOuterLane { Rgb: {40, 43, 50}; PbrMaterial: {metallic: 0.3, roughness: 0.82}; PbrTextures: {normal: assets.harbor_tex_hull_normal}; texture.Mapping: {MappingWorld, size: 22} }
+  prefab HarborOuterGrate { Rgb: {70, 74, 84}; PbrMaterial: {metallic: 0.6, roughness: 0.55}; PbrTextures: {albedo: assets.harbor_tex_floor, normal: assets.harbor_tex_floor_normal, orm: assets.harbor_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 5} }
+  prefab HarborOuterPaint { Rgb: {224, 168, 40}; PbrMaterial: {metallic: 0.1, roughness: 0.6} }
+  prefab HarborOuterLine { Rgb: {200, 204, 212}; PbrMaterial: {metallic: 0.1, roughness: 0.6} }
+  prefab HarborOuterPad { Rgb: {120, 124, 134}; PbrMaterial: {metallic: 0.5, roughness: 0.62}; PbrTextures: {albedo: assets.harbor_tex_floor, normal: assets.harbor_tex_floor_normal, orm: assets.harbor_tex_floor_orm}; texture.Mapping: {MappingWorld, size: 12} }
+  prefab HarborOuterFacade { Rgb: {112, 116, 126}; PbrMaterial: {metallic: 0.55, roughness: 0.5}; PbrTextures: {normal: assets.yard_tex_containers_normal}; texture.Mapping: {MappingWorld, size: 18, blend: 0.3} }
+  prefab HarborOuterBlast { Rgb: {62, 66, 76}; PbrMaterial: {metallic: 0.7, roughness: 0.45}; PbrTextures: {normal: assets.harbor_tex_hull_normal}; texture.Mapping: {MappingWorld, size: 48, blend: 0.3} }
+  prefab HarborOuterDoor { Rgb: {150, 156, 166}; PbrMaterial: {metallic: 0.6, roughness: 0.5}; PbrTextures: {albedo: assets.yard_tex_radiator, normal: assets.yard_tex_radiator_normal}; texture.Mapping: {MappingObject, size: 7} }
+  prefab HarborOuterRadiator { Rgb: {176, 182, 192}; PbrMaterial: {metallic: 0.6, roughness: 0.42}; PbrTextures: {normal: assets.yard_tex_radiator_normal, emissive: assets.yard_tex_heat_fins}; texture.Mapping: {MappingObject, size: 9}; Emissive: {strength: 1.1, color: {255, 255, 255}} }
+  prefab HarborOuterLens { Rgb: {255, 246, 228}; Emissive: {strength: 9, color: {255, 238, 205}} }
+  prefab HarborOuterLaneLights { Rgb: {36, 40, 48}; PbrMaterial: {metallic: 0.5, roughness: 0.5}; Emissive: {strength: 7, color: {80, 214, 255}}; PbrTextures: {emissive: assets.yard_tex_dots} }
+  prefab HarborOuterHoopLights { Rgb: {60, 64, 72}; PbrMaterial: {metallic: 0.8, roughness: 0.35}; Emissive: {strength: 6, color: {255, 160, 60}}; PbrTextures: {emissive: assets.yard_tex_dots} }
+  prefab HarborOuterGlassCool { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 2.6, color: {170, 214, 255}}; PbrTextures: {albedo: assets.harbor_tex_windows_albedo, emissive: assets.harbor_tex_windows} }
+  prefab HarborOuterGlassDim { Rgb: {200, 204, 214}; PbrMaterial: {metallic: 0.3, roughness: 0.3}; ClearCoat: {strength: 0.4, roughness: 0.1}; Emissive: {strength: 1.2, color: {255, 214, 160}}; PbrTextures: {albedo: assets.harbor_tex_windows_albedo, emissive: assets.harbor_tex_windows} }
+
+  // The outer deck: the hangar wall of the rig bays, the deck in front of it and the rim.
+  template HarborOuter {
+    const D = PI / 180
+    const QS = 75 * D
+    const QE = 81 * D
+    const H = 23 / 860
+
+    deck : HarborOuterApron { Position: {0, -15, 0}; Tube: {radius: 1020, thickness: 243, length: 30, segments: 192} }
+    HarborWindows edge(r: 1020.25, y: -11, n: 240, w: 8, h: 2.2)
+    fender : HarborSteel { Position: {0, -2, 0}; Torus: {radius: 1020.5, tube: 1.4, segments: 192, rings: 6} }
+    rim_skin : HarborOuterBlast { Position: {0, -14.2, 0}; Tube: {radius: 1020.2, thickness: 0.4, length: 21.6, segments: 192} }
+    fascia : HarborPanel { Position: {0, -27.5, 0}; Tube: {radius: 1021, thickness: 3, length: 5, segments: 192} }
+    parapet : HarborHullDark { Position: {0, 4, 0}; Tube: {radius: 1020, thickness: 5, length: 8, segments: 192} }
+    coping : HarborPanel { Position: {0, 8.4, 0}; Tube: {radius: 1021, thickness: 7.5, length: 0.8, segments: 192} }
+    for l in 0..144 {
+      const a = (l + 0.5) * PI / 72
+      "rim_light_{l}" : HarborAmber { Position: {cos(a) * 1017.5, 9.3, sin(a) * 1017.5}; Rotation: {0, 0 - a, 0}; Box: {1.5, 1, 5} }
+    }
+
+    skirt : HarborHullDark { Position: {0, -60, 0}; Frustum: {radius_bottom: 820, radius_top: 1020, length: 60, segments: 192} }
+    skirt_glass : HarborWindowBand {
+      Position: {0, -45, 0}
+      Frustum: {radius_bottom: 950.5, radius_top: 990.5, length: 12, segments: 192}
+      texture.Transform: {scale_x: 760, scale_y: 1.6}
+    }
+    for h in 0..3 {
+      const hr = h == 0 ? 1004 : h == 1 ? 920 : 860
+      "hoop_{h}" : HarborOuterHoopLights {
+        Position: {0, -90 + 0.3 * (hr - 820) - 0.6, 0}
+        Torus: {radius: hr + 0.2, tube: 1.3, segments: 192, rings: 6}
+        texture.Transform: {scale_x: floor(2 * PI * hr / 24), scale_y: 1}
+      }
+    }
+    for k in 0..48 {
+      const a = (k + 0.5) * PI / 24
+      "rib_{k}" {
+        Rotation: {0, a, 0}
+        rib : HarborPanel { Position: {0, -62, 920.6}; Rotation: {-0.2915, 0, 0}; Box: {3, 5, 205} }
+        if k % 2 == 0 {
+          for f in 0..4 {
+            "fin_{f}" : HarborOuterRadiator { Position: {(f - 1.5) * 3.6, -71.2, 896.2}; Rotation: {-0.2915, 0, 0}; Box: {0.5, 8, 58} }
+          }
+          header : HarborSteel { Position: {0, -75.4, 897.4}; Rotation: {-0.2915, 0, 0}; Box: {12.4, 1.4, 1.4} }
+        }
+      }
+    }
+
+    keel : HarborPanel { Position: {0, -93, 0}; Tube: {radius: 815, thickness: 30, length: 6, segments: 192} }
+    keel_lights : HarborOuterHoopLights {
+      Position: {0, -96, 0}
+      Torus: {radius: 800, tube: 1.2, segments: 192, rings: 6}
+      texture.Transform: {scale_x: 209, scale_y: 1}
+    }
+
+    wall : HarborHull { Position: {0, 42.5, 0}; Tube: {radius: 850, thickness: 73, length: 85, segments: 192} }
+    skin_in : HarborOuterFacade { Position: {0, 27.5, 0}; Tube: {radius: 777, thickness: 2, length: 115, segments: 192} }
+    course_in_a : HarborPanel { Position: {0, 33, 0}; Tube: {radius: 775, thickness: 1.5, length: 2, segments: 192} }
+    course_in_b : HarborPanel { Position: {0, 57, 0}; Tube: {radius: 775, thickness: 1.5, length: 2, segments: 192} }
+    skin_mid : HarborOuterFacade { Position: {0, 46, 0}; Tube: {radius: 860, thickness: 10, length: 32, segments: 192} }
+    skin_top : HarborOuterFacade { Position: {0, 80.5, 0}; Tube: {radius: 860, thickness: 10, length: 9, segments: 192} }
+    wall_lip : HarborPanel { Position: {0, 86.5, 0}; Tube: {radius: 863, thickness: 95, length: 4, segments: 192} }
+    HarborGlazing wall_in(r: 774.75, y: 45, h: 19.5, seg: 192)
+    pipe_a : HarborYellow { Position: {0, 90, 0}; Torus: {radius: 782.5, tube: 1.75, segments: 192, rings: 6} }
+    pipe_b : HarborSteel { Position: {0, 90, 0}; Torus: {radius: 788.5, tube: 1.75, segments: 192, rings: 6} }
+
+    for q in 0..4 {
+      "quad_{q}" {
+        Rotation: {0, q * HALF_PI + QE - HALF_PI, 0}
+        lane_wall : HarborOuterLane { Position: {0, 0, 0}; Tube: {radius: 874, thickness: 14, length: 0.24, segments: 40, arc: QS} }
+        line_wall : HarborOuterLine { Position: {0, 0, 0}; Tube: {radius: 874.7, thickness: 0.7, length: 0.26, segments: 40, arc: QS} }
+        taxi : HarborOuterLane { Position: {0, 0, 0}; Tube: {radius: 986, thickness: 30, length: 0.24, segments: 40, arc: QS} }
+        taxi_mid : HarborOuterPaint { Position: {0, 0, 0}; Tube: {radius: 971.6, thickness: 1.2, length: 0.28, segments: 40, arc: QS} }
+        taxi_in : HarborOuterLine { Position: {0, 0, 0}; Tube: {radius: 957.2, thickness: 0.7, length: 0.28, segments: 40, arc: QS} }
+        taxi_out : HarborOuterLine { Position: {0, 0, 0}; Tube: {radius: 985.3, thickness: 0.7, length: 0.28, segments: 40, arc: QS} }
+        grate : HarborOuterGrate { Position: {0, 0, 0}; Tube: {radius: 1015, thickness: 28, length: 0.24, segments: 40, arc: QS} }
+        for s in 0..2 {
+          "lane_lights_{s}" : HarborOuterLaneLights {
+            Position: {0, 0, 0}
+            TorusShell: {radius: s == 0 ? 959.2 : 983.3, tube: 0.4, ring_start: 0, ring_end: QS, tube_start: 0, tube_end: PI, segments: 40, rings: 4}
+            texture.Transform: {scale_x: 104, scale_y: 0.5, offset_x: 0, offset_y: 0.5}
+          }
+        }
+        lintel : HarborPanel { Position: {0, 31.75, 0}; Tube: {radius: 862, thickness: 3, length: 3.5, segments: 40, arc: QS} }
+        lintel_glow : HarborAmber { Position: {0, 29.8, 0}; Tube: {radius: 861.2, thickness: 0.8, length: 0.4, segments: 40, arc: QS} }
+        sill : HarborPanel { Position: {0, 61, 0}; Tube: {radius: 861.5, thickness: 2.5, length: 2, segments: 40, arc: QS} }
+        cornice : HarborHullDark { Position: {0, 82.75, 0}; Tube: {radius: 862, thickness: 3, length: 3.5, segments: 40, arc: QS} }
+        skylight : HarborWindowGrid { Position: {0, 88.6, 0}; Tube: {radius: 800, thickness: 6, length: 0.4, segments: 40, arc: QS} }
+        walkway : HarborOuterGrate { Position: {0, 88.6, 0}; Tube: {radius: 856, thickness: 8, length: 0.3, segments: 40, arc: QS} }
+        roof_rail : HarborSteel { Position: {0, 89.5, 0}; Tube: {radius: 862.5, thickness: 0.8, length: 2, segments: 40, arc: QS} }
+      }
+      "gallery_{q}" {
+        Rotation: {0, q * HALF_PI + 20 * D - HALF_PI, 0}
+        shut : HarborOuterFacade { Position: {0, 69, 0}; Tube: {radius: 860, thickness: 10, length: 14, segments: 12, arc: 40 * D} }
+      }
+      for b in 0..5 {
+        const a = q * HALF_PI + (25 + b * 10) * D
+        const s0 = a + H
+        const s1 = (b < 4 ? a + 10 * D : a + 50 * D) - H
+        "lower_{q}_{b}" : HarborOuterBlast { Position: {0, 15, 0}; Rotation: {0, s1 - HALF_PI, 0}; Tube: {radius: 860, thickness: 10, length: 30, segments: b < 4 ? 6 : 26, arc: s1 - s0} }
+        const k = (q * 5 + b) % 4
+        "glass_{q}_{b}" {
+          Rotation: {0, q * HALF_PI + (30 + b * 10) * D - HALF_PI, 0}
+          if k == 1 {
+            (IsA, HarborOuterGlassCool)
+          } else if k == 3 {
+            (IsA, HarborOuterGlassDim)
+          } else {
+            (IsA, HarborWindowBand)
+          }
+          Position: {0, 69, 0}
+          Tube: {radius: 857, thickness: 0.6, length: 14, segments: 10, arc: 10 * D}
+          texture.Transform: {scale_x: 19, scale_y: 1.75}
+        }
+        "mullions_{q}_{b}" {
+          Rotation: {0, a, 0}
+          for u in 0..5 {
+            const d = (u - 2) * 25 / 858.4
+            "m_{u}" : HarborPanel { Position: {sin(d) * 858.4, 69, cos(d) * 858.4}; Rotation: {0, d, 0}; Box: {1.6, 14, 3.4} }
+          }
+        }
+      }
+    }
+
+    for m in 0..48 {
+      const a = m * PI / 24 + PI / 48
+      if m % 12 != 0 && m % 12 != 11 {
+        "roof_{m}" {
+          Rotation: {0, a, 0}
+          HarborRoofModule unit(kind: m % 5, mast: 22) { Position: {0, 88.5, 825} }
+        }
+      }
+    }
+
+    for q in 0..4 {
+      for b in 0..6 {
+        const a = q * HALF_PI + (20 + b * 10) * D
+        const v = (q + b) % 3
+        "buttress_{q}_{b}" {
+          Rotation: {0, a, 0}
+          pier : HarborPanel { Position: {0, 43, 862}; Box: {10, 86, 5} }
+          spur : HarborHull { Position: {0, 17, 871}; Rotation: {0, 0 - HALF_PI, 0}; RightTrianglePrism: {14, 34, 7} }
+          cap : HarborPanel { Position: {0, 90, 862.5}; Box: {12, 3, 8} }
+          strip : HarborAmber { Position: {0, 58, 864.7}; Box: {1, 44, 0.4} }
+          lamp : HarborPanel { Position: {0, 37, 866}; Box: {5, 2, 3} }
+          lens : HarborOuterLens { Position: {0, 35.9, 866}; Box: {4.4, 0.3, 2.4} }
+          foot : HarborHazard { Position: {0, 0.6, 878.4}; Box: {7.4, 1.2, 1.2} }
+
+          zone_line : HarborOuterLine { Position: {0, 0.07, 916}; Box: {41, 0.14, 59} }
+          zone : HarborOuterLane { Position: {0, 0.08, 916}; Box: {40, 0.16, 58} }
+          hatch_rim : HarborHazard { Position: {-8, 0.13, 932}; Box: {9.4, 0.26, 9.4} }
+          hatch : HarborHullDark { Position: {-8, 0.16, 932}; Box: {8, 0.32, 8} }
+
+          deflector : HarborHull { Position: {0, 3.2, 997}; Rotation: {0.5, 0, 0}; Box: {34, 8, 0.8} }
+          mast_pole : HarborSteel { Position: {0, 14.5, 1006}; Cylinder: {radius: 0.6, length: 29, segments: 8} }
+          mast_head : HarborPanel { Position: {0, 29.2, 1004.8}; Box: {9, 1.4, 3} }
+          mast_lens : HarborOuterLens { Position: {0, 28.4, 1004.8}; Box: {8.4, 0.3, 2.4} }
+
+          if v == 0 {
+            truck {
+              Position: {8, 0, 902}
+              chassis : HarborPanel { Position: {0, 0.85, 0}; Box: {12, 1.2, 3.6} }
+              cab : HarborWhite { Position: {4.6, 2.9, 0}; Box: {2.8, 2.9, 3.6} }
+              screen : HarborWindowCool { Position: {6.05, 3.5, 0}; Box: {0.2, 1.1, 3} }
+              tank : HarborWhite { Position: {-1.6, 3.1, 0}; Rotation: {0, 0, HALF_PI}; Capsule: {radius: 1.6, length: 4.6, segments: 12} }
+              beacon : HarborBeaconAmber { Position: {4.6, 4.7, 0}; Sphere: {radius: 0.35, segments: 6} }
+            }
+          } else if v == 1 {
+            tug {
+              Position: {10, 0, 900}
+              body : HarborYellow { Position: {0, 1.35, 0}; Box: {7, 2.2, 4} }
+              cab : HarborPanel { Position: {-1.6, 3.55, 0}; Box: {2.6, 2.2, 3.4} }
+              screen : HarborWindowCool { Position: {-1.6, 3.8, 0}; Box: {2.64, 0.8, 3} }
+              beacon : HarborBeaconAmber { Position: {-1.6, 4.95, 0}; Sphere: {radius: 0.35, segments: 6} }
+            }
+          }
+        }
+      }
+    }
+  }
+}
