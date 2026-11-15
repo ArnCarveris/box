@@ -1,6 +1,11 @@
-// A fleet of the shipyard's ships as game assets, without the editor: rigs and liners from their
-// preset designs at one scale (1 unit = 1 m), some parked, some flying with their drives burning.
+// A stress test: a giant space station with four liner gates (N, E, S, W) that liners line up
+// for and fly through, and twenty rig bays on its outer deck, with traffic that never stops.
+// Liners and rigs are the shipyard's preset designs (1 unit = 1 m). Gates clamp and refuel the
+// liners and light their hazard beacons as the ships come and go.
 include shipyard/ships
+include fleet/materials
+include fleet/station
+include fleet/traffic
 
 using flecs.script
 using flecs.script.math
@@ -12,6 +17,8 @@ using box.material
 using box.effects
 using box.surface
 using box.movement
+using box.input
+using box.controllers
 using state
 using assets
 
@@ -27,18 +34,13 @@ $ {
 
 window { Surface: {width: 1600, height: 1000, vsync: true} }
 
-// The camera circles the fleet slowly, looking down on it from about 1.7 km.
-orbit {
-  Position: {80, 0, -60}
-  Rotation: {0, 0.6, 0}
-  AngularVelocity: {0, 0.015, 0}
-  arm {
-    Rotation: {-0.4, 0, 0}
-    eye {
-      Position: {0, 0, 1700}
-      Camera: {fov: 40, near_: 2, far_: 30000}
-    }
-  }
+// A free-fly camera (WASD, E/Q, Shift to boost, hold the right mouse button to look, wheel to
+// zoom), starting above the station looking down on it.
+camera {
+  Position: {4600, 3800, 4600}
+  Rotation: {-0.53, 0.785, 0}
+  Camera: {fov: 45, near_: 2, far_: 40000}
+  CameraController: {speed: 400, boost: 8, zoom: 60}
 }
 
 sun {
@@ -60,63 +62,34 @@ view {
   fleet_edges { Smaa: {} }
 
   View: {
-    camera: orbit.arm.eye,
+    camera: camera,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, cascades: 3, resolution: 1024, max_distance: 2500, filter_size: 2},
+    shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 14000, filter_size: 2},
     lighting: {reflections: true, baked: false, environment: {source: assets.fleet_stars, intensity: 0.7, background: true}},
     effects: [{effect: fleet_contact}, {effect: fleet_bloom}, {effect: fleet_film}, {effect: fleet_edges}]
   }
 }
 
-// The fleet, in meters: a liner is about 720 m long, a rig about 36 m.
-fleet {
-  // A passenger liner at rest, with a frigate parked beside the hangar near its bow, nose
-  // forward.
-  Liner flagship(design: passenger_design) {
-    Position: {-170, 0, 0}
-    Rotation: {0, 0, 0}
-    Rig parked(design: frigate_design) {
-      Position: {-55, -8, 285}
-      Rotation: {0, 0, 0}
+station {
+  HarborStation body
+
+  // The liner gates on the rim, 2300 m out, with the liners flying through them clockwise.
+  for g in 0..4 {
+    const a = g * HALF_PI
+    LinerGate "gate_{g}"(idx: g, label: g == 0 ? "NORTH GATE" : g == 1 ? "EAST GATE" : g == 2 ? "SOUTH GATE" : "WEST GATE") {
+      Position: {sin(a) * 2300, 0, cos(a) * 2300}
+      Rotation: {0, a - HALF_PI, 0}
     }
   }
 
-  // A battleship holding station with its shield lowered, a scout parked under its ventral
-  // hangar.
-  Liner warship(design: battleship_design, shield: 0.3) {
-    Position: {200, 0, -40}
-    Rotation: {0, -0.08, 0}
-    Rig picket(design: scout_design) {
-      Position: {0, -165, 100}
-      Rotation: {0, 0.4, 0}
-    }
-  }
-
-  // A second passenger liner circling the fleet with its drives burning, a frigate flying
-  // alongside above its rings. The pivot turns the pair, so they move bow first and their
-  // plumes trail straight back.
-  convoy {
-    Position: {0, 40, 0}
-    Rotation: {0, 0.6, 0}
-    AngularVelocity: {0, 0.04, 0}
-    Liner cruiser(design: passenger_design, burning: true) {
-      Position: {720, 0, 0}
-      Rotation: {0, PI, 0}
-    }
-    Rig escort(design: frigate_design, burning: true) {
-      Position: {720, 190, -100}
-      Rotation: {0, PI, 0}
-    }
-  }
-
-  // A miner flying a tight circle above the flagship's bow.
-  patrol {
-    Position: {-170, 110, 430}
-    Rotation: {0, 0, 0}
-    AngularVelocity: {0, 0.3, 0}
-    Rig miner(design: miner_design, burning: true) {
-      Position: {60, 0, 0}
-      Rotation: {0, PI, 0}
+  // The rig bays on the outer deck, five between each pair of gates.
+  for q in 0..4 {
+    for b in 0..5 {
+      const a = q * HALF_PI + (25 + b * 10) * PI / 180
+      RigBay "bay_{q * 5 + b}"(idx: q * 5 + b) {
+        Position: {sin(a) * 1830, 0, cos(a) * 1830}
+        Rotation: {0, a, 0}
+      }
     }
   }
 }

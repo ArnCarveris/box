@@ -1,0 +1,615 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.animation
+using box.curve
+using box.light
+using box.movement
+using box.transition
+using box.text
+using state
+
+// The traffic of the station. Every ship flies one looping clip that never restarts, and the
+// gates and bays read the clock of their own Animator to clamp, refuel and light up in step
+// with it, so ships move without jumps and keep their distance.
+//
+// A gate holds three liners that take turns of 90 s. The liner of a turn sits in the gate:
+// clamps close (0-4 s), the fuel probes extend (4-8), it refuels (8-38), the probes retract
+// (38-42) and the clamps open (42-46). It then flies out of the front of the gate and dives
+// below the station, while the next liner moves up from the line behind the gate (48-90). The
+// third liner jumps in 11 km behind the gate (60) and joins the line. In the frame of a gate
+// liners fly along +z, +x points away from the station and y up.
+state {
+  fn harbor_mod3(v: i32) -> i32 { v >= 6 ? v - 6 : v >= 3 ? v - 3 : v }
+
+  // The step of the turn of a gate at t (0 to 90 s).
+  fn harbor_gate_step(t: f32) -> i32 {
+    t < 4 ? 0 : t < 8 ? 1 : t < 38 ? 2 : t < 42 ? 3 : t < 46 ? 4 : t < 48 ? 5 : t < 75 ? 6 : 7
+  }
+
+  // The step of a rig bay at t (0 to 150 s): arrive, descend, settle, boom in, refuel, boom
+  // out, wait, lift, turn and depart.
+  fn harbor_bay_step(t: f32) -> i32 {
+    t < 40 ? 0 : t < 56 ? 1 : t < 58 ? 2 : t < 61 ? 3 : t < 88 ? 4 : t < 91 ? 5 : t < 94 ? 6 : t < 110 ? 7 : t < 116 ? 8 : 9
+  }
+
+  // The number of whole units in x, at most n.
+  fn harbor_ticks(x: f32, n: i32) -> i32 {
+    mut c: i32 = 0
+    for i in 0..n {
+      if x >= i + 1 {
+        c += 1
+      }
+    }
+    c
+  }
+
+  fn harbor_liner_design(kind: i32) -> LinerDesign {
+    match kind {
+      0: passenger_design
+      1: freighter_design
+      _: tender_design
+    }
+  }
+
+  fn harbor_rem3(v: i32) -> i32 {
+    mut r: i32 = v
+    for i in 0..12 {
+      if r >= 3 {
+        r -= 3
+      }
+    }
+    r
+  }
+
+  fn harbor_rig_design(idx: i32) -> RigDesign {
+    match harbor_rem3(idx) {
+      0: frigate_design
+      1: scout_design
+      _: miner_design
+    }
+  }
+}
+
+assets {
+  prefab harbor_gate_clock { Clip: {duration: 270} }
+  prefab harbor_bay_clock { Clip: {duration: 150} }
+
+  // The 270 s of a liner, for its center in the frame of its gate: docked (0-46), out of the
+  // gate and down below the station (46-132), gone (132-150), in from the jump point (150-200),
+  // waiting in line (200-230) and up into the gate (230-270).
+  prefab harbor_liner_cycle {
+    Clip: {duration: 270}
+    y { Track: {component: box.transform.Position, member: "y", curve: {kind: CurveBezier, keys: [
+      {time: 0, value: 0, out: 0}, {time: 70, value: 0, in: 0, out: 0}, {time: 100, value: -900, in: -30, out: -30},
+      {time: 132, value: -1600, in: -15, out: 0}, {time: 149.9, value: -1600, in: 0, out: 0},
+      {time: 150, value: 0, in: 0, out: 0}, {time: 270, value: 0, in: 0}
+    ]}} }
+    z { Track: {component: box.transform.Position, member: "z", curve: {kind: CurveBezier, keys: [
+      {time: 0, value: 0, out: 0}, {time: 46, value: 0, in: 0, out: 0}, {time: 132, value: 11094, in: 258, out: 0},
+      {time: 149.9, value: 11094, in: 0, out: 0}, {time: 150, value: -11000, in: 0, out: 594},
+      {time: 200, value: -1100, in: 0, out: 0}, {time: 230, value: -1100, in: 0, out: 0}, {time: 270, value: 0, in: 0}
+    ]}} }
+    fade { Track: {component: Opacity, member: "value", curve: {keys: [
+      {0, 1}, {130, 1}, {132, 0}, {150, 0}, {151.5, 1}, {270, 1}
+    ]}} }
+  }
+
+  // The flashes of the jump points of a gate, every turn: a liner arrives at 60 s and one
+  // leaves at 42 s.
+  prefab harbor_flash_in {
+    Clip: {duration: 90}
+    x { Track: {component: box.transform.Scale, member: "x", curve: {keys: [{0, 0.01}, {60, 0.01}, {60.25, 480}, {61.8, 0.01}, {90, 0.01}]}} }
+    y { Track: {component: box.transform.Scale, member: "y", curve: {keys: [{0, 0.01}, {60, 0.01}, {60.25, 480}, {61.8, 0.01}, {90, 0.01}]}} }
+    z { Track: {component: box.transform.Scale, member: "z", curve: {keys: [{0, 0.01}, {60, 0.01}, {60.25, 480}, {61.8, 0.01}, {90, 0.01}]}} }
+  }
+  prefab harbor_flash_in_light {
+    Clip: {duration: 90}
+    i { Track: {component: PointLight, member: "intensity", curve: {keys: [{0, 0}, {60, 0}, {60.2, 60000000}, {62, 0}, {90, 0}]}} }
+  }
+  prefab harbor_flash_out {
+    Clip: {duration: 90}
+    x { Track: {component: box.transform.Scale, member: "x", curve: {keys: [{0, 0.01}, {41.8, 0.01}, {42.05, 480}, {43.6, 0.01}, {90, 0.01}]}} }
+    y { Track: {component: box.transform.Scale, member: "y", curve: {keys: [{0, 0.01}, {41.8, 0.01}, {42.05, 480}, {43.6, 0.01}, {90, 0.01}]}} }
+    z { Track: {component: box.transform.Scale, member: "z", curve: {keys: [{0, 0.01}, {41.8, 0.01}, {42.05, 480}, {43.6, 0.01}, {90, 0.01}]}} }
+  }
+  prefab harbor_flash_out_light {
+    Clip: {duration: 90}
+    i { Track: {component: PointLight, member: "intensity", curve: {keys: [{0, 0}, {41.8, 0}, {42, 60000000}, {43.8, 0}, {90, 0}]}} }
+  }
+
+  // The 150 s of a rig, in the frame of its bay (+z away from the station, deck at y = 0): in
+  // from its jump point (0-40), over the rim and down onto the deck nose first (40-56), parked
+  // (56-94), up and back out over the rim (94-110), turned around (110-116) and away (116-146).
+  prefab harbor_rig_cycle {
+    Clip: {duration: 150}
+    y { Track: {component: box.transform.Position, member: "y", curve: {kind: CurveBezier, keys: [
+      {time: 0, value: 2600, out: -175.5}, {time: 40, value: 260, in: 0, out: 0}, {time: 50, value: 60, in: 0, out: 0},
+      {time: 56, value: 1, in: 0, out: 0}, {time: 94, value: 1, in: 0, out: 0}, {time: 100, value: 60, in: 0, out: 0},
+      {time: 110, value: 260, in: 0, out: 0}, {time: 116, value: 260, in: 0, out: 0}, {time: 146, value: 2600, in: 234, out: 0},
+      {time: 150, value: 2600, in: 0}
+    ]}} }
+    z { Track: {component: box.transform.Position, member: "z", curve: {kind: CurveBezier, keys: [
+      {time: 0, value: 4200, out: -290.25}, {time: 40, value: 330, in: 0, out: 0}, {time: 50, value: 0, in: 0, out: 0},
+      {time: 100, value: 0, in: 0, out: 0}, {time: 110, value: 330, in: 0, out: 0}, {time: 116, value: 330, in: 0, out: 0},
+      {time: 146, value: 4200, in: 387, out: 0}, {time: 150, value: 4200, in: 0}
+    ]}} }
+    yaw { Track: {component: box.transform.Rotation, member: "y", curve: {kind: CurveBezier, keys: [
+      {time: 0, value: 3.1415927, out: 0}, {time: 110, value: 3.1415927, in: 0, out: 0},
+      {time: 116, value: 6.2831853, in: 0, out: 0}, {time: 150, value: 6.2831853, in: 0}
+    ]}} }
+    fade { Track: {component: Opacity, member: "value", curve: {keys: [{0, 0}, {1.5, 1}, {144.5, 1}, {146, 0}, {150, 0}]}} }
+  }
+  prefab harbor_rig_flash {
+    Clip: {duration: 150}
+    x { Track: {component: box.transform.Scale, member: "x", curve: {keys: [{0, 70}, {1.2, 0.01}, {145.9, 0.01}, {146.1, 70}, {147.4, 0.01}, {149.8, 0.01}, {150, 70}]}} }
+    y { Track: {component: box.transform.Scale, member: "y", curve: {keys: [{0, 70}, {1.2, 0.01}, {145.9, 0.01}, {146.1, 70}, {147.4, 0.01}, {149.8, 0.01}, {150, 70}]}} }
+    z { Track: {component: box.transform.Scale, member: "z", curve: {keys: [{0, 70}, {1.2, 0.01}, {145.9, 0.01}, {146.1, 70}, {147.4, 0.01}, {149.8, 0.01}, {150, 70}]}} }
+  }
+
+  prefab harbor_fuel_flow {
+    Clip: {duration: 3}
+    z { Track: {component: box.transform.Position, member: "z", curve: {keys: [{0, 320}, {3, -250}]}} }
+  }
+  prefab harbor_boom_flow {
+    Clip: {duration: 1.5}
+    x { Track: {component: box.transform.Position, member: "x", curve: {keys: [{0, -2}, {1.5, -34}]}} }
+  }
+  prefab HarborPulse { Rgb: {120, 240, 255}; Emissive: {strength: 14, color: {90, 220, 255}}; NoShadow }
+
+  // An octagonal rib around the tunnel of a gate, its faces a + d / 2 from the axis, d deep and t
+  // thick. With lit, lights line its diagonal faces.
+  template HarborRib {
+    prop mat: entity = 0
+    prop a: f32 = 233
+    prop d: f32 = 36
+    prop t: f32 = 24
+    prop lit: bool = false
+    const s = 2 * (a + d / 2) * 0.41421357 + 2
+    for k in 0..8 {
+      const f = k * PI / 4
+      "seg_{k}" {
+        (IsA, mat)
+        Position: {cos(f) * a, sin(f) * a, 0}
+        Rotation: {0, 0, f}
+        Box: {d, s, t}
+      }
+      if lit && k % 2 == 1 {
+        "light_{k}" : HarborWindowCool {
+          Position: {cos(f) * (a - d / 2 - 0.6), sin(f) * (a - d / 2 - 0.6), 0}
+          Rotation: {0, 0, f}
+          Box: {1, s * 0.5, t * 0.4}
+        }
+      }
+    }
+  }
+
+  // A clamp gantry of a gate: a yellow rib around the tunnel with four rams on the diagonals
+  // that close on the spine of the liner, their pads reach meters from its axis.
+  template HarborClamp {
+    prop closed: bool = false
+    prop reach: f32 = 30
+
+    HarborRib frame(mat: HarborYellow, a: 236, d: 42, t: 30)
+    HarborRib trim(mat: HarborHazard, a: 216, d: 4, t: 32)
+    for c in 0..4 {
+      "arm_{c}" {
+        Rotation: {0, 0, 0 - PI / 4 + c * HALF_PI}
+        sleeve : HarborHullDark { Position: {0, 205, 0}; Cylinder: {radius: 11, length: 60, segments: 12} }
+        collar : HarborPanel { Position: {0, 176, 0}; Cylinder: {radius: 14, length: 4, segments: 12} }
+        ram {
+          Position: {0, closed ? reach : 214, 0}
+          Transition: [Position: {duration: 4, timing_function: EaseInOut}]
+          rod : HarborSteel { Position: {0, 80, 0}; Cylinder: {radius: 6, length: 150, segments: 10} }
+          shoe : HarborYellow { Position: {0, 7, 0}; Box: {40, 12, 36} }
+          pad : HarborRubber { Position: {0, 0.6, 0}; Box: {36, 1.2, 32} }
+          lamp {
+            Position: {0, 14, 18.5}
+            Sphere: {radius: 2.5, segments: 8}
+            if closed {
+              Rgb: {110, 240, 130}
+              Emissive: {strength: 8, color: {90, 255, 110}}
+            } else {
+              Rgb: {255, 80, 60}
+              Emissive: {strength: 8, color: {255, 60, 40}}
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // A rotating amber beacon that spins and lights up while on.
+  template HarborHazardLight {
+    prop on: bool = false
+    base : HarborPanel { Position: {0, 4, 0}; Cylinder: {radius: 7, length: 8, segments: 12} }
+    dome : HarborAmber { Position: {0, 12, 0}; Sphere: {radius: 6, segments: 12} }
+    head {
+      Position: {0, 12, 0}
+      if on {
+        AngularVelocity: {0, 4, 0}
+        glow : HarborBeaconAmber { Position: {0, 0, 0}; Sphere: {radius: 7, segments: 12} }
+        beam {
+          Rotation: {0.35, 0, 0}
+          Rgb: {255, 160, 60}
+          SpotLight: {intensity: 400000, range: 1400, inner_angle: 8, outer_angle: 14}
+        }
+      }
+    }
+  }
+
+  // A liner gate on the rim of the station, in its own frame: a cradle of ribs around a tunnel
+  // 430 m across and 820 m long along z, with its station side at -x.
+  template LinerGate {
+    prop idx: i32 = 0
+    prop label: string = "NORTH GATE"
+    mut turn: i32 = 0
+    mut step: i32 = 0
+    mut fuel: i32 = 0
+
+    const offset = idx * 22.5
+    Animator: {clip: harbor_gate_clock, time: offset, speed: 1, mode: Loop}
+
+    const clamped = step <= 3
+    const probes = step == 1 || step == 2
+    const fueling = step == 2
+    const hazard = step == 0 || step >= 4
+    const front_k = step >= 5 ? harbor_mod3(2 - turn + 3) : harbor_mod3(3 - turn)
+    const front_z = harbor_mod3(idx + front_k) == 2 ? 220 : 300
+
+    // The cradle: a spine on the station side that rises from an apron on the rim, open ribs
+    // around the tunnel so the liner shows between them, a roof truss and a keel.
+    cradle {
+      apron : HarborDeck { Position: {-345, 4, 0}; Box: {250, 12, 1000} }
+      apron_edge : HarborHazard { Position: {-220, 10.4, 0}; Box: {8, 0.8, 1000} }
+      spine : HarborHull { Position: {-292, 0, 0}; Box: {70, 560, 820} }
+      spine_cap : HarborPanel { Position: {-292, 286, 0}; Box: {92, 14, 840} }
+      spine_foot : HarborPanel { Position: {-292, -286, 0}; Box: {92, 14, 840} }
+      for w in 0..4 {
+        for c in 0..15 {
+          "window_{w}_{c}" : HarborWindow { Position: {-256.6, -165 + w * 110, -364 + c * 52}; Box: {1, 12, 30} }
+        }
+      }
+      for b in 0..4 {
+        const bz = -300 + b * 200
+        "strut_{b}" : HarborHullDark { Position: {-371, -165, bz}; Rotation: {0, 0, 0.75}; Box: {40, 232, 40} }
+      }
+      roof : HarborHullDark { Position: {0, 272, 0}; Box: {100, 34, 820} }
+      roof_lights : HarborAmber { Position: {0, 289.5, 0}; Box: {6, 1, 800} }
+      keel : HarborHullDark { Position: {0, -272, 0}; Box: {100, 34, 820} }
+      for r in 0..5 {
+        const rz = r == 0 ? -260 : r == 1 ? -150 : r == 2 ? -40 : r == 3 ? 80 : 170
+        HarborRib "rib_{r}"(mat: HarborHullDark, a: 233, d: 36, t: 22, lit: true) { Position: {0, 0, rz} }
+      }
+      for m in 0..2 {
+        const mz = m == 0 ? -395 : 395
+        "mouth_{m}" {
+          Position: {0, 0, mz}
+          HarborRib frame(mat: HarborPanel, a: 244, d: 58, t: 34, lit: true)
+          HarborRib lining(mat: HarborHazard, a: 216, d: 4, t: 36)
+          signal {
+            Position: {0, 244, m == 0 ? -18 : 18}
+            Sphere: {radius: 12, segments: 16}
+            const go = m == 0 ? step == 6 : step >= 5
+            if go {
+              Rgb: {110, 240, 130}
+              Emissive: {strength: 10, color: {90, 255, 110}}
+            } else {
+              Rgb: {255, 80, 60}
+              Emissive: {strength: 10, color: {255, 60, 40}}
+            }
+          }
+          for b in 0..2 {
+            HarborHazardLight "beacon_{b}"(on: hazard) { Position: {b == 0 ? -80 : 80, 273, 0} }
+          }
+        }
+      }
+      fuel_line : HarborYellow { Position: {-36, 296, 35}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 6, length: 570, segments: 12} }
+      if fueling {
+        for p in 0..8 {
+          "pulse_{p}" : HarborPulse {
+            Position: {-36, 303, 320}
+            Sphere: {radius: 7, segments: 10}
+            Animator: {clip: harbor_fuel_flow, time: p * 0.375, speed: 1, mode: Loop}
+          }
+        }
+      }
+    }
+
+    // The control tower on the spine, its facade leaning back toward the station with the name of
+    // the gate and its fuel gauge, and masts on its roof.
+    tower {
+      block : HarborHullDark { Position: {-310, 390, -30}; Box: {150, 200, 440} }
+      podium : HarborHull { Position: {-215, 318, -30}; Box: {100, 56, 440} }
+      roof : HarborPanel { Position: {-310, 495, -30}; Box: {130, 10, 410} }
+      for w in 0..2 {
+        for c in 0..10 {
+          "window_{w}_{c}" : HarborWindow { Position: {-385.6, 360 + w * 50, -220 + c * 42}; Box: {1, 12, 28} }
+        }
+      }
+      facade {
+        Position: {-200, 405, -30}
+        Rotation: {0, 0, 0.5}
+        panel : HarborHull { Position: {0, 0, 0}; Box: {14, 170, 440} }
+        sign : HarborSign { Position: {7.6, 6, 0}; Box: {1, 110, 380} }
+        title {
+          Position: {8.4, 26, 0}
+          Rotation: {0, HALF_PI, 0}
+          Text: {value: label, size: 56, align: Center}
+          Rgb: {235, 238, 245}
+          Emissive: {strength: 1.5, color: {235, 238, 245}}
+        }
+        subtitle {
+          Position: {8.4, -18, 0}
+          Rotation: {0, HALF_PI, 0}
+          Text: {value: "LINER DOCK {idx}", size: 26, align: Center}
+          Rgb: {255, 190, 90}
+          Emissive: {strength: 2, color: {255, 170, 60}}
+        }
+        trim : HarborAmber { Position: {7.6, -62, 0}; Box: {1, 3, 400} }
+        for g in 0..12 {
+          "gauge_{g}" {
+            Position: {7.6, -48 + g * 8, 205}
+            Box: {1, 6, 14}
+            if g < fuel {
+              Rgb: {110, 240, 130}
+              Emissive: {strength: 8, color: {90, 255, 110}}
+            } else {
+              Rgb: {40, 44, 52}
+              Emissive: {strength: 0.5, color: {255, 60, 40}}
+            }
+          }
+        }
+      }
+      for m in 0..4 {
+        HarborMast "mast_{m}"(h: 70 + m * 20) { Position: {m < 2 ? -350 : -270, 500, m % 2 == 0 ? -220 : 160} }
+      }
+    }
+
+    // Two clamp gantries: one at the yoke of the liner, one that slides along the rails to the
+    // spine just behind its bridge, which sits further aft on a tender.
+    HarborClamp clamp_aft(closed: clamped, reach: 40) { Position: {0, 0, -300} }
+    clamp_fore {
+      Position: {0, 0, front_z}
+      Transition: [Position: {duration: 8, timing_function: EaseInOut}]
+      HarborClamp clamp(closed: clamped, reach: 30)
+    }
+
+    // Fuel probes on the aft rib that reach into the tanks of the liner.
+    for p in 0..2 {
+      const sx = p == 0 ? 1 : -1
+      "probe_{p}" {
+        Position: {sx * 210, 0, -260}
+        pump : HarborHullDark { Position: {sx * 90, 0, 0}; Box: {60, 50, 40} }
+        hatch : HarborHazard { Position: {sx * 2, 0, 0}; Box: {6, 40, 40} }
+        ram {
+          Position: {probes ? sx * -88 : 0, 0, 0}
+          Transition: [Position: {duration: 4, timing_function: EaseInOut}]
+          rod : HarborSteel { Position: {sx * 66, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 5, length: 100, segments: 10} }
+          head : HarborYellow { Position: {sx * 10, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 10, length: 16, segments: 12} }
+          nozzle {
+            Position: {0, 0, 0}
+            Rotation: {0, 0, HALF_PI}
+            Cylinder: {radius: 6, length: 4, segments: 12}
+            Rgb: {120, 240, 255}
+            Emissive: {strength: fueling ? 12 : 0.5, color: {90, 220, 255}}
+            Transition: [Emissive: {duration: 0.8, timing_function: EaseInOut}]
+          }
+        }
+      }
+    }
+
+    // Floodlights under the roof truss at the mouths that light the liner in the gate.
+    for f in 0..2 {
+      "flood_{f}" {
+        Position: {0, 210, f == 0 ? -370 : 370}
+        Rotation: {0, f == 0 ? 0 : PI, 0}
+        lamp {
+          Rotation: {0.55, 0, 0}
+          housing : HarborPanel { Position: {0, 0, -4}; Box: {24, 14, 8} }
+          lens : HarborWindowCool { Position: {0, 0, 0.2}; Box: {20, 10, 0.4} }
+          Rgb: {255, 240, 220}
+          SpotLight: {intensity: 600000, range: 1400, inner_angle: 22, outer_angle: 34, shadows: true, shadow_resolution: 1024}
+        }
+      }
+    }
+
+    // The jump points of the line: a flash where a liner arrives and where one leaves.
+    flash_in : HarborFlash {
+      Position: {0, 0, -11000}
+      Scale: {0.01, 0.01, 0.01}
+      Sphere: {radius: 1, segments: 32, smooth: true}
+      Animator: {clip: harbor_flash_in, time: offset, speed: 1, mode: Loop}
+    }
+    flash_in_light {
+      Position: {0, 0, -11000}
+      Rgb: {170, 215, 255}
+      PointLight: {intensity: 0, range: 9000}
+      Animator: {clip: harbor_flash_in_light, time: offset, speed: 1, mode: Loop}
+    }
+    flash_out : HarborFlash {
+      Position: {0, -1600, 11094}
+      Scale: {0.01, 0.01, 0.01}
+      Sphere: {radius: 1, segments: 32, smooth: true}
+      Animator: {clip: harbor_flash_out, time: offset, speed: 1, mode: Loop}
+    }
+    flash_out_light {
+      Position: {0, -1600, 11094}
+      Rgb: {170, 215, 255}
+      PointLight: {intensity: 0, range: 9000}
+      Animator: {clip: harbor_flash_out_light, time: offset, speed: 1, mode: Loop}
+    }
+
+    // The three liners. Liner k is 90 s ahead of liner k - 1 in the cycle, the one docked in
+    // turn n is the one with (n + k) % 3 == 0.
+    for k in 0..3 {
+      const role = harbor_mod3(turn + k)
+      const burn = (role == 0 && step >= 5) || (role == 1 && step <= 3) || (role == 2 && step == 6)
+      "liner_{k}" {
+        Animator: {clip: harbor_liner_cycle, time: k * 90 + offset, speed: 1, mode: Loop}
+        Liner hull(design: harbor_liner_design(harbor_mod3(idx + k)), burning: burn) {
+          Position: {0, 0, 0}
+        }
+      }
+    }
+
+    async {
+      while true {
+        await next_frame()
+        const c = this[Animator].time
+        const n = c < 90 ? 0 : c < 180 ? 1 : 2
+        const t = c - n * 90
+        const s = harbor_gate_step(t)
+        const f = s < 2 ? 0 : s > 2 ? 12 : harbor_ticks((t - 8) / 2.5, 12)
+        if n != turn {
+          turn = n
+        }
+        if s != step {
+          step = s
+        }
+        if f != fuel {
+          fuel = f
+        }
+      }
+    }
+  }
+
+  // A rig bay on the outer deck, in its own frame: the deck at y = 0, +z away from the station
+  // and the hangar door of the bay in the wall at z = -110.
+  template RigBay {
+    prop idx: i32 = 0
+    mut step: i32 = 0
+    mut fuel: i32 = 0
+
+    const offset = idx * 7.5
+    Animator: {clip: harbor_bay_clock, time: offset, speed: 1, mode: Loop}
+
+    const busy = step >= 1 && step <= 8
+    const hazard = step == 1 || step == 7
+    const boom_in = step == 3 || step == 4
+    const fueling = step == 4
+    const burn = step <= 1 || step >= 7
+
+    edge_a : HarborHazard { Position: {0, 0.3, 100}; Box: {84, 0.6, 5} }
+    edge_b : HarborHazard { Position: {0, 0.3, -100}; Box: {84, 0.6, 5} }
+    edge_c : HarborHazard { Position: {40, 0.3, 0}; Box: {5, 0.6, 200} }
+    edge_d : HarborHazard { Position: {-40, 0.3, 0}; Box: {5, 0.6, 200} }
+    for l in 0..10 {
+      "guide_{l}" {
+        Position: {0, 0.5, -90 + l * 30}
+        Box: {3, 1, 8}
+        if busy {
+          Rgb: {255, 180, 70}
+          Emissive: {strength: 6, color: {255, 160, 50}}
+        } else {
+          Rgb: {96, 220, 240}
+          Emissive: {strength: 5, color: {80, 214, 255}}
+        }
+      }
+    }
+    for c in 0..4 {
+      "corner_{c}" {
+        Position: {c < 2 ? -40 : 40, 2, c % 2 == 0 ? -100 : 100}
+        dome : HarborAmber { Position: {0, 0, 0}; Sphere: {radius: 2, segments: 10} }
+        if hazard {
+          glow : HarborBeaconAmber { Position: {0, 0, 0}; Sphere: {radius: 2.6, segments: 10} }
+          Rgb: {255, 160, 60}
+          PointLight: {intensity: 6000, range: 120}
+        }
+      }
+    }
+
+    door {
+      Position: {0, 0, -109}
+      panel : HarborPanel { Position: {0, 45, 0}; Box: {100, 90, 2} }
+      seam : HarborHullDark { Position: {0, 45, 1.2}; Box: {1.5, 88, 0.5} }
+      top : HarborYellow { Position: {0, 93, 1}; Box: {110, 6, 4} }
+      side_a : HarborYellow { Position: {53, 45, 1}; Box: {6, 90, 4} }
+      side_b : HarborYellow { Position: {-53, 45, 1}; Box: {6, 90, 4} }
+      bar : HarborAmber { Position: {0, 99, 1}; Box: {90, 3, 1} }
+      sign : HarborSign { Position: {0, 124, 0.5}; Box: {50, 28, 2} }
+      number {
+        Position: {0, 124, 1.8}
+        Text: {value: idx < 9 ? "0{idx + 1}" : "{idx + 1}", size: 22, align: Center}
+        Rgb: {240, 240, 245}
+        Emissive: {strength: 1.5, color: {240, 240, 245}}
+      }
+      if busy {
+        light {
+          Position: {0, 110, 30}
+          Rgb: {255, 190, 120}
+          PointLight: {intensity: 40000, range: 260}
+        }
+      }
+    }
+
+    tower : HarborHullDark { Position: {46, 20, 0}; Box: {8, 40, 8} }
+    for g in 0..8 {
+      "gauge_{g}" {
+        Position: {41.9, 4 + g * 3.5, 0}
+        Box: {0.2, 2.4, 5}
+        if g < fuel {
+          Rgb: {110, 240, 130}
+          Emissive: {strength: 6, color: {90, 255, 110}}
+        } else {
+          Rgb: {40, 44, 52}
+          Emissive: {strength: 0.4, color: {255, 60, 40}}
+        }
+      }
+    }
+    boom {
+      Position: {46, 42, 0}
+      Rotation: {0, boom_in ? 0 : 0 - HALF_PI, 0}
+      Transition: [Rotation: {duration: 3, timing_function: EaseInOut}]
+      hub : HarborPanel { Position: {0, 0, 0}; Cylinder: {radius: 3, length: 4, segments: 12} }
+      arm : HarborYellow { Position: {-18, 0, 0}; Box: {36, 3, 3} }
+      hose : HarborRubber { Position: {-35, -8, 0}; Cylinder: {radius: 1, length: 16, segments: 8} }
+      nozzle {
+        Position: {-35, -16.5, 0}
+        Cylinder: {radius: 1.6, length: 2, segments: 10}
+        Rgb: {120, 240, 255}
+        Emissive: {strength: fueling ? 10 : 0.5, color: {90, 220, 255}}
+        Transition: [Emissive: {duration: 0.6, timing_function: EaseInOut}]
+      }
+      if fueling {
+        for p in 0..3 {
+          "pulse_{p}" : HarborPulse {
+            Position: {-2, 2, 0}
+            Sphere: {radius: 1.1, segments: 8}
+            Animator: {clip: harbor_boom_flow, time: p * 0.5, speed: 1, mode: Loop}
+          }
+        }
+      }
+    }
+
+    ship {
+      Animator: {clip: harbor_rig_cycle, time: offset, speed: 1, mode: Loop}
+      Rig hull(design: harbor_rig_design(idx), burning: burn) {
+        Position: {0, 0, 0}
+      }
+    }
+    flash : HarborFlash {
+      Position: {0, 2600, 4200}
+      Scale: {0.01, 0.01, 0.01}
+      Sphere: {radius: 1, segments: 24, smooth: true}
+      Animator: {clip: harbor_rig_flash, time: offset, speed: 1, mode: Loop}
+    }
+
+    async {
+      while true {
+        await next_frame()
+        const t = this[Animator].time
+        const s = harbor_bay_step(t)
+        const f = s < 4 ? 0 : s > 4 ? 8 : harbor_ticks((t - 61) / 3.375, 8)
+        if s != step {
+          step = s
+        }
+        if f != fuel {
+          fuel = f
+        }
+      }
+    }
+  }
+}
