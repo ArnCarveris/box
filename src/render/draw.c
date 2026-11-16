@@ -821,128 +821,6 @@ done:
     return result;
 }
 
-/** Check whether a 3D shape fades out a removed material lobe its scene enables: Sheen,
- * ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel with on_remove.
- *
- * @param world The world
- * @param e The entity
- * @param features The scene features of its key
- * @return Whether one of those leaves
- */
-static bool box_draws_lobe_leaving(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    uint32_t features)
-{
-    static const struct {
-        uint32_t feature;
-        box_render_transition_component_t component;
-    } lobes[] = {
-        { BOX_RENDER_FEATURE_SHEEN, BOX_RENDER_TRANSITION_SHEEN },
-        { BOX_RENDER_FEATURE_CLEAR_COAT, BOX_RENDER_TRANSITION_CLEAR_COAT },
-        { BOX_RENDER_FEATURE_ANISOTROPY, BOX_RENDER_TRANSITION_ANISOTROPY },
-        { BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION, BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION },
-        { BOX_RENDER_FEATURE_FRESNEL, BOX_RENDER_TRANSITION_FRESNEL }
-    };
-    const box_render_transitions_t *s = box_render_transitions_get(world);
-    bool result = false;
-    int32_t i;
-    for (i = 0; s && !result && i < (int32_t)(sizeof(lobes) / sizeof(lobes[0])); i ++) {
-        result = (features & lobes[i].feature) &&
-            box_render_transitions_leaving(world, s, e, lobes[i].component);
-    }
-
-    return result;
-}
-
-/** Check whether a 3D shape is transmissive by a Distortion its scene enables
- * (Scene.distortion): it has or inherits one, or fades out a removed one with on_remove, which
- * keeps it transmissive until the fade ends.
- *
- * @param world The world
- * @param e The entity
- * @param features The scene features of its key
- * @return Whether it draws over the snapshot for its Distortion
- */
-static bool box_draws_distorted(
-    const ecs_world_t *world,
-    ecs_entity_t e,
-    uint32_t features)
-{
-    bool result = false;
-    if (!(features & BOX_RENDER_FEATURE_DISTORTION)) {
-        goto done;
-    }
-
-    result = ecs_get(world, e, Distortion) != NULL;
-    if (!result) {
-        const box_render_transitions_t *s = box_render_transitions_get(world);
-        result = s && box_render_transitions_leaving(world, s, e,
-            BOX_RENDER_TRANSITION_DISTORTION);
-    }
-done:
-    return result;
-}
-
-/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or
- * water, it has a PlanarReflection with Scene.planar_reflections or a material feature its scene
- * enables. Alpha tested, blended and TextureBlend shapes without those use the mesh shader.
- *
- * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy,
- * DiffuseTransmission or Fresnel; only a scene with some of those off checks which.
- *
- * A shape that fades out a removed one of those its scene enables, with on_remove, keeps the
- * extended mesh shader until the fade ends, so the fade renders in the same batch.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- * @param key Its key, with every field but the pipeline set
- * @return Whether it draws with BOX_RENDER_SHADER_MESH_EXTENDED
- */
-static bool box_draws_extended(
-    const ecs_world_t *world,
-    const box_render_draws_t *d,
-    ecs_entity_t e,
-    const box_draw_key_t *key)
-{
-    const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
-        BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION |
-        BOX_RENDER_FEATURE_FRESNEL;
-    uint32_t f = key->features;
-    bool result = key->transmissive || key->water ||
-        ((f & BOX_RENDER_FEATURE_PLANAR) && ecs_get(world, e, PlanarReflection) != NULL);
-    const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
-        ? NULL : ecs_get(world, e, TextureMapping);
-    ecs_iter_t it;
-    if (mapping && mapping->mode != MappingUv && isfinite(mapping->blend) &&
-        mapping->blend >= 0.5f / 65535.0f)
-    {
-        result = true;
-    }
-
-    if (result || !(f & lobes)) {
-        goto done;
-    }
-
-    if (ecs_query_has_table(d->extended, ecs_get_table(world, e), &it)) {
-        ecs_iter_fini(&it);
-        result = (f & lobes) == lobes ||
-            ((f & BOX_RENDER_FEATURE_SHEEN) && ecs_get(world, e, Sheen)) ||
-            ((f & BOX_RENDER_FEATURE_CLEAR_COAT) && ecs_get(world, e, ClearCoat)) ||
-            ((f & BOX_RENDER_FEATURE_ANISOTROPY) && ecs_get(world, e, SpecularAnisotropy)) ||
-            ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) &&
-                ecs_get(world, e, DiffuseTransmission)) ||
-            ((f & BOX_RENDER_FEATURE_FRESNEL) && ecs_get(world, e, Fresnel));
-    }
-
-    if (!result) {
-        result = box_draws_lobe_leaving(world, e, f);
-    }
-done:
-    return result;
-}
-
 /** Compute the batch key of a shape.
  *
  * A shape under an active Opacity transition (TransitionOpacity) is keyed as if its alpha were
@@ -1063,11 +941,44 @@ static void box_draws_key(
         !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
 
-/** Check whether a shape whose only change is the Opacity or Tint of an ancestor keeps the key
- * of its batch: box_draws_key resolves the blend of the key from its alpha.
+/** Update the fields of the key of a 3D shape that follow its blend and its alpha test, for a
+ * change that keeps the rest of its key (BOX_DRAW_FADE): as box_draws_key computes them.
  *
- * The other fields of the key, and the planet, atmosphere and bake that follow the blend, do
- * not depend on the alpha.
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param material Its material
+ * @param key The key of its batch, updated
+ */
+static void box_draws_key_blend(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_material_t *material,
+    box_draw_key_t *key)
+{
+    bool fading = ecs_has_id(world, e, TransitionOpacity);
+    bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
+    key->cutout = box_draws_scene_cutout(material->cutoff, NULL, key->features);
+    key->blend = box_draws_scene_blend(ecs_get(world, e, BlendMode),
+        fading ? 0.0f : box_draws_alpha(material), key->cutout, NULL, key->features);
+    key->planet = 0;
+    key->atmosphere = 0;
+    if (planet_light || key->blend != Opaque) {
+        ecs_entity_t planet = box_draws_planet_of(world, e);
+        key->planet = planet && planet_light ? box_draws_planet_slot(d, planet) : 0u;
+        key->atmosphere = key->blend != Opaque ? planet : 0;
+    }
+
+    key->bake = key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
+        !ecs_has_id(world, e, TransitionTransform) &&
+        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
+        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
+}
+
+/** Check whether a shape whose change is its material slot, or the Opacity or Tint of an
+ * ancestor, keeps the key of its batch: the blend and the alpha test of the key, which
+ * box_draws_key resolves from its alpha and AlphaCutoff, are the only fields they change.
  *
  * @param world The world
  * @param e The entity
@@ -1084,8 +995,10 @@ static bool box_draws_blend_kept(
     bool result = key->transmissive;
     if (!result) {
         bool fading = ecs_has_id(world, e, TransitionOpacity);
-        result = box_draws_scene_blend(ecs_get(world, e, BlendMode),
-            fading ? 0.0f : box_draws_alpha(material), key->cutout, material->shape2d,
+        bool cutout = box_draws_scene_cutout(material->cutoff, material->shape2d,
+            key->features);
+        result = cutout == key->cutout && box_draws_scene_blend(ecs_get(world, e, BlendMode),
+            fading ? 0.0f : box_draws_alpha(material), cutout, material->shape2d,
             key->features) == key->blend;
     }
 
@@ -1178,7 +1091,8 @@ static void box_draws_update_shape(
     const WorldTransform *transform = ecs_get(world, e, WorldTransform);
     bool drawn = shape && shape->mesh && transform && !ecs_has_id(world, e, EcsPrefab) &&
         !ecs_has_id(world, e, EcsDisabled);
-    bool kept = false, recorded = false, surfaced = false;
+    bool kept = false, recorded = false, surfaced = false, keyed = kinds & BOX_DRAW_KEY;
+    bool faded = false;
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
@@ -1187,6 +1101,26 @@ static void box_draws_update_shape(
         }
 
         s->tinted = s->tint.keep < 1.0f;
+        if (!(kinds & BOX_DRAW_KEY) && s->batch >= 0 &&
+            box_render_is_mesh(box_draws_batch(d, s->batch)->key.pipeline))
+        {
+            b = box_draws_batch(d, s->batch);
+            faded = (kinds & (BOX_DRAW_ALL | BOX_DRAW_SLOT)) == BOX_DRAW_SHADING;
+            material = (box_draw_material_t){
+                .opacity = faded ? ecs_get(world, e, Opacity) : NULL,
+                .cutoff = faded ? ecs_get(world, e, AlphaCutoff) : NULL,
+                .tint = faded ? ecs_get(world, e, Tint) : NULL,
+                .inherited = s->tinted ? &s->tint : NULL, .fade = s->fade
+            };
+            kept = (kinds & BOX_DRAW_ALL) == BOX_DRAW_TRANSFORM ||
+                (faded && box_draws_blend_kept(world, e, &b->key, &material));
+            if (kept) {
+                goto write;
+            }
+
+            faded = false;
+        }
+
         box_draws_shape_material(world, e, s, &material);
         if (!(kinds & BOX_DRAW_KEY) && s->batch >= 0) {
             b = box_draws_batch(d, s->batch);
@@ -1196,7 +1130,15 @@ static void box_draws_update_shape(
             }
         }
 
-        box_draws_key(world, d, e, shape, box_draws_alpha(&material), &key);
+        if (!(kinds & BOX_DRAW_KEY) && s->batch >= 0 && !material.shape2d &&
+            box_render_is_mesh(box_draws_batch(d, s->batch)->key.pipeline) &&
+            !box_draws_batch(d, s->batch)->key.transmissive)
+        {
+            key = box_draws_batch(d, s->batch)->key;
+            box_draws_key_blend(world, d, e, &material, &key);
+        } else {
+            box_draws_key(world, d, e, shape, box_draws_alpha(&material), &key);
+        }
     }
 
     if (s->batch >= 0) {
@@ -1222,7 +1164,7 @@ static void box_draws_update_shape(
     kinds = BOX_DRAW_ALL;
 write:
     kinds &= BOX_DRAW_ALL;
-    if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_SHADING)) {
+    if ((kinds & BOX_DRAW_TRANSFORM) || keyed) {
         kinds |= BOX_DRAW_FRAME;
     }
 
@@ -1292,6 +1234,9 @@ write:
     if ((kinds & BOX_DRAW_SHADING) && material.shape2d) {
         box_draws_material_release(world, d, e);
         box_draws_material(box_draws_slot_shading(b, s->slot), &material);
+    } else if ((kinds & BOX_DRAW_SHADING) && faded) {
+        box_render_mesh_shading_t *out = box_draws_slot_mesh_shading(b, s->slot);
+        box_draws_mesh_shading(out, out->material, &material);
     } else if (kinds & BOX_DRAW_SHADING) {
         box_draws_mesh_shading(box_draws_slot_mesh_shading(b, s->slot),
             box_draws_planet_material(
@@ -1304,7 +1249,7 @@ write:
     }
 
     if (kinds & BOX_DRAW_FRAME) {
-        box_draws_frame_write(world, d, e, b, s->slot, &model);
+        box_draws_frame_write(world, d, e, b, s->slot, &model, keyed);
     }
 
     box_draws_shadow_update(world, d, b, s->slot, recorded ? &was_transform : NULL,

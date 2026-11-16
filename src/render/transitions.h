@@ -39,6 +39,10 @@ typedef struct box_transition_slot_t {
 typedef struct box_transition_node_t {
     ecs_entity_t entity;            /**< The entity, 0 for a free node */
     int64_t seen;                   /**< Stamp of the last extract that matched the entity */
+    uint32_t live;                  /**< 1 << component per slot that is present, leaving or
+                                     *   absent, so the slots of the others are not read */
+    double until;                   /**< Latest end of the transitions its slots started, past
+                                     *   which none of them runs */
     box_transition_slot_t slots[BOX_RENDER_TRANSITION_COMPONENTS]; /**< By
                                      *   box_render_transition_component_t */
 } box_transition_node_t;
@@ -162,6 +166,30 @@ bool box_transitions_opts(
     box_render_transition_component_t component,
     const TransitionSpec *spec,
     bool remove);
+
+/** Update the live slots of a node and the end of its transitions after a compare of a slot.
+ *
+ * @param node The node
+ * @param component The component of the slot
+ */
+void box_transitions_track(
+    box_transition_node_t *node,
+    box_render_transition_component_t component);
+
+/** Get the valid transitions of the components a Transition map lists, and whether they make
+ * the entity a node: a component its table owns or one that animates in or out.
+ *
+ * @param world The world
+ * @param map The Transition map of the entity
+ * @param columns The columns of the transitionable components in its table, NULL for none
+ * @param specs Receives the transition of each component, NULL for none
+ * @return Whether a listed component makes the entity a node
+ */
+bool box_transitions_specs(
+    const ecs_world_t *world,
+    const Transition *map,
+    void *const *columns,
+    const TransitionSpec **specs);
 
 /** Compare a transitioned component of an entity to the last target sent, send what changed:
  * the first value sets without a transition, a changed value starts one with the spec of the

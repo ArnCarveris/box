@@ -913,3 +913,100 @@ void box_draws_batch_tiles(
         }
     }
 }
+
+/** Check whether a 3D shape fades out a removed material lobe its scene enables: Sheen,
+ * ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel with on_remove.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param features The scene features of its key
+ * @return Whether one of those leaves
+ */
+static bool box_draws_lobe_leaving(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t features)
+{
+    static const struct {
+        uint32_t feature;
+        box_render_transition_component_t component;
+    } lobes[] = {
+        { BOX_RENDER_FEATURE_SHEEN, BOX_RENDER_TRANSITION_SHEEN },
+        { BOX_RENDER_FEATURE_CLEAR_COAT, BOX_RENDER_TRANSITION_CLEAR_COAT },
+        { BOX_RENDER_FEATURE_ANISOTROPY, BOX_RENDER_TRANSITION_ANISOTROPY },
+        { BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION, BOX_RENDER_TRANSITION_DIFFUSE_TRANSMISSION },
+        { BOX_RENDER_FEATURE_FRESNEL, BOX_RENDER_TRANSITION_FRESNEL }
+    };
+    const box_render_transitions_t *s = box_render_transitions_get(world);
+    bool result = false;
+    int32_t i;
+    for (i = 0; s && !result && i < (int32_t)(sizeof(lobes) / sizeof(lobes[0])); i ++) {
+        result = (features & lobes[i].feature) &&
+            box_render_transitions_leaving(world, s, e, lobes[i].component);
+    }
+
+    return result;
+}
+
+bool box_draws_distorted(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t features)
+{
+    bool result = false;
+    if (!(features & BOX_RENDER_FEATURE_DISTORTION)) {
+        goto done;
+    }
+
+    result = ecs_get(world, e, Distortion) != NULL;
+    if (!result) {
+        const box_render_transitions_t *s = box_render_transitions_get(world);
+        result = s && box_render_transitions_leaving(world, s, e,
+            BOX_RENDER_TRANSITION_DISTORTION);
+    }
+done:
+    return result;
+}
+
+bool box_draws_extended(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key)
+{
+    const uint32_t lobes = BOX_RENDER_FEATURE_SHEEN | BOX_RENDER_FEATURE_CLEAR_COAT |
+        BOX_RENDER_FEATURE_ANISOTROPY | BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION |
+        BOX_RENDER_FEATURE_FRESNEL;
+    uint32_t f = key->features;
+    bool result = key->transmissive || key->water ||
+        ((f & BOX_RENDER_FEATURE_PLANAR) && ecs_get(world, e, PlanarReflection) != NULL);
+    const TextureMapping *mapping = result || !(f & BOX_RENDER_FEATURE_TRIPLANAR)
+        ? NULL : ecs_get(world, e, TextureMapping);
+    ecs_iter_t it;
+    if (mapping && mapping->mode != MappingUv && isfinite(mapping->blend) &&
+        mapping->blend >= 0.5f / 65535.0f)
+    {
+        result = true;
+    }
+
+    if (result || !(f & lobes)) {
+        goto done;
+    }
+
+    if (ecs_query_has_table(d->extended, ecs_get_table(world, e), &it)) {
+        ecs_iter_fini(&it);
+        result = (f & lobes) == lobes ||
+            ((f & BOX_RENDER_FEATURE_SHEEN) && ecs_get(world, e, Sheen)) ||
+            ((f & BOX_RENDER_FEATURE_CLEAR_COAT) && ecs_get(world, e, ClearCoat)) ||
+            ((f & BOX_RENDER_FEATURE_ANISOTROPY) && ecs_get(world, e, SpecularAnisotropy)) ||
+            ((f & BOX_RENDER_FEATURE_DIFFUSE_TRANSMISSION) &&
+                ecs_get(world, e, DiffuseTransmission)) ||
+            ((f & BOX_RENDER_FEATURE_FRESNEL) && ecs_get(world, e, Fresnel));
+    }
+
+    if (!result) {
+        result = box_draws_lobe_leaving(world, e, f);
+    }
+done:
+    return result;
+}

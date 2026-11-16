@@ -67,6 +67,7 @@ void box_draws_movers_init(
     identity->was = identity->pose;
     identity->scale = 1.0f;
     ecs_map_init(&d->mover_of, NULL);
+    ecs_map_init(&d->locals, NULL);
     ecs_map_init(&d->frame_poses, NULL);
     ecs_vec_init_t(NULL, &d->frame_cache, box_draw_frame_pose_t, 0);
     d->free_mover = -1;
@@ -78,6 +79,7 @@ void box_draws_movers_fini(
 {
     ecs_vec_fini_t(NULL, &d->movers, box_draw_mover_t);
     ecs_map_fini(&d->mover_of);
+    ecs_map_fini(&d->locals);
     ecs_map_fini(&d->frame_poses);
     ecs_vec_fini_t(NULL, &d->frame_cache, box_draw_frame_pose_t);
 }
@@ -214,7 +216,7 @@ void box_draws_movers_send(
         if (fabsf(scale - m->scale) > BOX_DRAWS_MOVER_SCALE_EPSILON * fabsf(m->scale)) {
             m->scale = scale;
             *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
-                .root = m->entity, .kinds = BOX_DRAW_TRANSFORM
+                .root = m->entity, .kinds = BOX_DRAW_TRANSFORM | BOX_DRAW_FADE
             };
         }
     }
@@ -363,13 +365,17 @@ void box_draws_frame_write(
     ecs_entity_t e,
     box_draw_batch_t *b,
     int32_t slot,
-    const box_render_transform_t *model)
+    const box_render_transform_t *model,
+    bool lookup)
 {
     box_draw_frame_src_t *src = box_draws_slot_frame_src(b, slot);
     box_render_transform_t *out = box_draws_slot_frame(b, slot);
     uint32_t *mover = box_draws_slot_mover(b, slot);
     bool was_live = src->live;
-    box_draws_frame_src(world, e, src);
+    if (lookup) {
+        box_draws_frame_src(world, e, src);
+    }
+
     if (!mover) {
         box_draws_frame_record(world, d, src, out, model);
         goto done;
@@ -393,9 +399,42 @@ done:
     return;
 }
 
+/** Hash the local transform of an entity: its Position, Rotation and Scale, owned or inherited,
+ * or the WorldTransform a ManualTransform entity has.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The hash, never 0
+ */
+static uint64_t box_draws_local_hash(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const void *parts[4] = {
+        ecs_get(world, e, Position), ecs_get(world, e, Rotation), ecs_get(world, e, Scale),
+        ecs_has_id(world, e, ManualTransform) ? ecs_get(world, e, WorldTransform) : NULL
+    };
+    const ecs_size_t sizes[4] = {
+        ECS_SIZEOF(Position), ECS_SIZEOF(Rotation), ECS_SIZEOF(Scale), ECS_SIZEOF(WorldTransform)
+    };
+    uint64_t result = 0xCBF29CE484222325ull;
+    int32_t i, b;
+    for (i = 0; i < 4; i ++) {
+        const uint8_t *bytes = parts[i];
+        result = (result ^ (uint64_t)(i + 1)) * 0x100000001B3ull;
+        for (b = 0; bytes && b < sizes[i]; b ++) {
+            result = (result ^ bytes[b]) * 0x100000001B3ull;
+        }
+    }
+
+    return result ? result : 1;
+}
+
 /** Remember the entities under a mover whose local transform changed as roots of subtrees that
- * move in the frame of their mover. A mover that moves itself does not move its subtree in its
- * frame.
+ * move in the frame of their mover, which keep their keys.
+ *
+ * A mover that moves itself does not move its subtree in its frame, and an entity set to the
+ * local transform its subtree was last written with, as a template run again, writes nothing.
  *
  * @param it The iterator of the observer
  */
@@ -410,11 +449,20 @@ static void BoxDrawsOnLocal(
 
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        if (box_draws_mover_at(it->world, e) != e) {
-            *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
-                .root = e, .kinds = BOX_DRAW_TRANSFORM
-            };
+        if (box_draws_mover_at(it->world, e) == e) {
+            continue;
         }
+
+        uint64_t hash = box_draws_local_hash(it->world, e);
+        ecs_map_val_t *last = ecs_map_ensure(&d->locals, e);
+        if (*last == hash) {
+            continue;
+        }
+
+        *last = hash;
+        *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
+            .root = e, .kinds = BOX_DRAW_TRANSFORM | BOX_DRAW_FADE
+        };
     }
 
 done:
@@ -433,7 +481,7 @@ static void BoxDrawsOnMover(
     int32_t i;
     for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
         *ecs_vec_append_t(NULL, &d->moved, box_draw_moved_t) = (box_draw_moved_t){
-            .root = it->entities[i], .kinds = BOX_DRAW_TRANSFORM
+            .root = it->entities[i], .kinds = BOX_DRAW_TRANSFORM | BOX_DRAW_FADE
         };
     }
 }

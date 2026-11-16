@@ -96,9 +96,13 @@ typedef enum box_draw_kind_t {
     BOX_DRAW_BOTH = BOX_DRAW_TRANSFORM | BOX_DRAW_SHADING, /**< Transform and shading */
     BOX_DRAW_ALL = BOX_DRAW_BOTH | BOX_DRAW_SURFACE | BOX_DRAW_FRAME, /**< Every stream, with the
                                                             *   mover stream they imply */
-    BOX_DRAW_FADE = 1 << 6, /**< To box_draws_mark: an ancestor Opacity or Tint changed, which
-                             *   may change only the blend of the key; in DrawSlot.changed: the
-                             *   walk computed fade and tint for this extract */
+    BOX_DRAW_SLOT = 1 << 5, /**< With BOX_DRAW_FADE: the material slot of the shape changed,
+                             *   so its shading reads its material again */
+    BOX_DRAW_FADE = 1 << 6, /**< To box_draws_mark: a change that may change only the blend
+                             *   and the alpha test of the key: an ancestor Opacity or Tint, a
+                             *   material slot, a transform relative to a mover; in
+                             *   DrawSlot.changed: the walk computed fade and tint for this
+                             *   extract */
     BOX_DRAW_KEY = 1 << 7   /**< In DrawSlot.changed: a change other than BOX_DRAW_FADE, which
                              *   may change the key */
 } box_draw_kind_t;
@@ -754,6 +758,8 @@ typedef struct box_render_draws_t {
     uint32_t movers_size;       /**< Records the mover table on the GPU holds, 0 before it is
                                  *   created */
     bool movers_dirty;          /**< A mover moved or joined since the table was last sent */
+    ecs_map_t locals;           /**< Entity under a mover to the hash of the local transform
+                                 *   its subtree was last written with */
     ecs_map_t frame_poses;      /**< Texture frame to its index in frame_cache plus one */
     ecs_vec_t frame_cache;      /**< box_draw_frame_pose_t, the frames of the live records */
     int64_t tick;               /**< Extracts run, which tells the frame poses of this one apart */
@@ -1090,6 +1096,42 @@ void box_draws_frame_scaled(
     const box_render_transform_t *model,
     const WorldTransform *frame);
 
+/** Check whether a 3D shape is transmissive by a Distortion its scene enables
+ * (Scene.distortion): it has or inherits one, or fades out a removed one with on_remove, which
+ * keeps it transmissive until the fade ends.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param features The scene features of its key
+ * @return Whether it draws over the snapshot for its Distortion
+ */
+bool box_draws_distorted(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    uint32_t features);
+
+/** Check whether a 3D shape draws with the extended mesh shader: its key is transmissive or
+ * water, it has a PlanarReflection with Scene.planar_reflections or a material feature its scene
+ * enables. Alpha tested, blended and TextureBlend shapes without those use the mesh shader.
+ *
+ * The query of the extended materials tells whether it has Sheen, ClearCoat, SpecularAnisotropy,
+ * DiffuseTransmission or Fresnel; only a scene with some of those off checks which.
+ *
+ * A shape that fades out a removed one of those its scene enables, with on_remove, keeps the
+ * extended mesh shader until the fade ends, so the fade renders in the same batch.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param key Its key, with every field but the pipeline set
+ * @return Whether it draws with BOX_RENDER_SHADER_MESH_EXTENDED
+ */
+bool box_draws_extended(
+    const ecs_world_t *world,
+    const box_render_draws_t *d,
+    ecs_entity_t e,
+    const box_draw_key_t *key);
+
 /** Look up the texture frame and the mapping mode of a shape, which its frame record is written
  * from until the shape or its ancestors change.
  *
@@ -1165,6 +1207,8 @@ ecs_entity_t box_draws_mover_at(
  * @param b The batch
  * @param slot The slot
  * @param model The model matrix of the shape (box_draws_transform)
+ * @param lookup Look the texture frame and the mapping mode up again, for a change that may
+ * change the key; a transform keeps them
  */
 void box_draws_frame_write(
     const ecs_world_t *world,
@@ -1172,7 +1216,8 @@ void box_draws_frame_write(
     ecs_entity_t e,
     box_draw_batch_t *b,
     int32_t slot,
-    const box_render_transform_t *model);
+    const box_render_transform_t *model,
+    bool lookup);
 
 /** Follow the local transforms under movers, which move shapes in the frame of their mover: a
  * Position, Rotation or Scale of a dynamic entity, the WorldTransform the application writes for

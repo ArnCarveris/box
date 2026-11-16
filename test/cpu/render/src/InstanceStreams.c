@@ -1204,3 +1204,32 @@ void InstanceStreams_mover_child_local_change(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void InstanceStreams_mover_child_same_local_writes_nothing(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_add(world, parent, DynamicTransform);
+    ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, group, Position, {1, 0, 0});
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        box_new(world, group, (float)i);
+    }
+
+    frame(world);
+    frame(world);
+    ecs_set(world, group, Position, {2, 0, 0});
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.processed, COUNT);
+
+    ecs_set(world, group, Position, {2, 0, 0});
+    stats = frame(world);
+    test_int(stats.processed, 0);
+    test_int(stats.transform_bytes, 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

@@ -179,9 +179,12 @@ static bool box_transition_moving(
     uint32_t node,
     double time)
 {
-    return box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_POSITION, time) ||
+    const box_transition_node_t *n = box_transitions_node_state(s, node);
+
+    return n && n->live && time < n->until && (
+        box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_POSITION, time) ||
         box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_ROTATION, time) ||
-        box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_SCALE, time);
+        box_render_transitions_active(s, node, BOX_RENDER_TRANSITION_SCALE, time));
 }
 
 /** Check whether the world matrix of an entity is not derived from its parent's, which ends
@@ -428,7 +431,8 @@ static bool box_transition_leaving(
 {
     const box_transition_node_t *n = box_transitions_node_state(s, node);
 
-    return n && n->slots[component].present && n->slots[component].leaving;
+    return n && (n->live & (1u << component)) && n->slots[component].present &&
+        n->slots[component].leaving;
 }
 
 /** Find the node that leaves a component an entity no longer has, owned or inherited: the
@@ -536,11 +540,13 @@ static bool box_transition_material_active(
     uint32_t node,
     double time)
 {
+    const box_transition_node_t *n = box_transitions_node_state(s, node);
+    uint32_t live = n && time < n->until ? n->live : 0;
     bool result = false;
     int32_t i;
-    for (i = 0; i < BOX_TRANSITION_MATERIALS && !result; i ++) {
-        result = box_render_transitions_active(
-            s, node, box_transition_material_components[i], time);
+    for (i = 0; live && i < BOX_TRANSITION_MATERIALS && !result; i ++) {
+        result = (live & (1u << box_transition_material_components[i])) &&
+            box_render_transitions_active(s, node, box_transition_material_components[i], time);
     }
 
     return result;
@@ -978,18 +984,8 @@ static void BoxRenderExtractTransitions(
         for (i = 0; i < qit.count; i ++) {
             ecs_entity_t e = qit.entities[i];
             bool owns = !shared;
-            for (c = 0; (!shared || !i) && c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
-                ecs_entity_t cid = box_transitions_id((box_render_transition_component_t)c);
-                specs[c] = ecs_map_is_init(&maps[i])
-                    ? ecs_map_get_deref(&maps[i], TransitionSpec, cid) : NULL;
-                if (specs[c] && !box_transition_valid(world, cid, specs[c])) {
-                    specs[c] = NULL;
-                }
-
-                owns |= specs[c] && (columns[c] || box_transitions_opts(world,
-                    (box_render_transition_component_t)c, specs[c], false) ||
-                    box_transitions_opts(world, (box_render_transition_component_t)c, specs[c],
-                        true));
+            if (!shared || !i) {
+                owns |= box_transitions_specs(world, &maps[i], columns, specs);
             }
 
             if (!owns && !i) {
@@ -1004,10 +1000,17 @@ static void BoxRenderExtractTransitions(
             for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
                 box_render_transition_component_t component =
                     (box_render_transition_component_t)c;
+                const box_transition_slot_t *slot = &node->slots[c];
+                uint32_t bit = 1u << c;
+                if (!specs[c] && !(node->live & bit)) {
+                    continue;
+                }
+
                 const void *value = columns[c] ? ECS_ELEM(columns[c],
                     box_render_transition_layout(component)->size, i) : NULL;
                 box_transitions_compare(world, s, p, e, id, component, &node->slots[c],
                     specs[c], value);
+                box_transitions_track(node, component);
             }
         }
     }
@@ -1878,7 +1881,8 @@ bool box_render_transitions_active(
     double time)
 {
     const box_transition_node_t *n = box_transitions_node_state(s, node);
-    const box_transition_slot_t *slot = n ? &n->slots[component] : NULL;
+    const box_transition_slot_t *slot = n && (n->live & (1u << component)) && time < n->until
+        ? &n->slots[component] : NULL;
 
     return slot && slot->present &&
         box_render_transition_running(slot->start, slot->delay, slot->duration, time);
@@ -1889,9 +1893,10 @@ bool box_render_transitions_node_active(
     uint32_t node,
     double time)
 {
+    const box_transition_node_t *n = box_transitions_node_state(s, node);
     bool result = false;
     int32_t c;
-    for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS && !result; c ++) {
+    for (c = 0; n && n->live && c < BOX_RENDER_TRANSITION_COMPONENTS && !result; c ++) {
         result = box_render_transitions_active(
             s, node, (box_render_transition_component_t)c, time);
     }

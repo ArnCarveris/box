@@ -210,7 +210,7 @@ void box_transitions_lights(
 
     for (i = 1; p && i < count; i ++) {
         const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
-        if (!node->entity) {
+        if (!node->entity || !node->live) {
             continue;
         }
 

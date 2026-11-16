@@ -7,6 +7,8 @@
 
 #include "transitions.h"
 
+_Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 32, "a bit per component in node live");
+
 /** Send a start record and remember it as the last one of the slot.
  *
  * @param p The packet
@@ -248,5 +250,57 @@ void box_transitions_compare(
         s->leaving ++;
     } else if (leaving && box_transition_lobe(component)) {
         box_transition_lobe_left(world, s, e);
+    }
+}
+
+bool box_transitions_specs(
+    const ecs_world_t *world,
+    const Transition *map,
+    void *const *columns,
+    const TransitionSpec **specs)
+{
+    bool result = false;
+    int32_t c;
+    ecs_os_memset_n(specs, 0, const TransitionSpec*, BOX_RENDER_TRANSITION_COMPONENTS);
+    if (!ecs_map_is_init(map)) {
+        goto done;
+    }
+
+    ecs_map_iter_t it = ecs_map_iter(map);
+    while (ecs_map_next(&it)) {
+        ecs_entity_t cid = ecs_map_key(&it);
+        const TransitionSpec *spec = ecs_map_ptr(&it);
+        for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
+            box_render_transition_component_t component = (box_render_transition_component_t)c;
+            if (box_transitions_id(component) != cid) {
+                continue;
+            }
+
+            if (spec && box_transition_valid(world, cid, spec)) {
+                specs[c] = spec;
+                result |= columns[c] || box_transitions_opts(world, component, spec, false) ||
+                    box_transitions_opts(world, component, spec, true);
+            }
+
+            break;
+        }
+    }
+
+done:
+    return result;
+}
+
+void box_transitions_track(
+    box_transition_node_t *node,
+    box_render_transition_component_t component)
+{
+    const box_transition_slot_t *slot = &node->slots[component];
+    uint32_t bit = 1u << component;
+    double end = slot->start + (double)slot->delay +
+        (slot->duration > 0.0f ? (double)slot->duration : 0.0);
+    node->live = (slot->present || slot->leaving || slot->absent)
+        ? (node->live | bit) : (node->live & ~bit);
+    if (end > node->until) {
+        node->until = end;
     }
 }

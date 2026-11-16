@@ -457,7 +457,8 @@ done:
  * @param d The state
  * @param e The owner
  * @param slot Its slot
- * @param mark Whether the owner writes its shading again
+ * @param mark Whether the owner writes its shading again, a change of its slot that keeps its
+ * batch unless its blend or its alpha test changes (box_draws_blend_kept)
  */
 static void box_materials_set(
     ecs_world_t *world,
@@ -476,7 +477,7 @@ static void box_materials_set(
     }
 
     if (mark) {
-        box_draws_mark(world, d, e, BOX_DRAW_SHADING);
+        box_draws_mark(world, d, e, BOX_DRAW_SHADING | BOX_DRAW_FADE | BOX_DRAW_SLOT);
     }
 }
 
