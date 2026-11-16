@@ -189,6 +189,36 @@ views {
     Rotation: {-0.0909, -2.3884, 0}
     Camera: {fov: 70}
   }
+  barracks_bunk_room { // Barracks bunk room
+    Position: {-45.9, 5, 36.3}
+    Rotation: {-0.2392, 1.6374, 0}
+    Camera: {fov: 70}
+  }
+  barracks_small_bunk_room { // Barracks small bunk room
+    Position: {-45.4, 8.1, 43.3}
+    Rotation: {-0.4999, 1.212, 0}
+    Camera: {fov: 70}
+  }
+  barracks_officer_cabin { // Barracks officer cabin
+    Position: {-45.8, 5, 38.5}
+    Rotation: {-0.2142, 1.9991, 0}
+    Camera: {fov: 70}
+  }
+  deckhouse_cabin { // Deckhouse cabin
+    Position: {57, 6.8, 33}
+    Rotation: {-0.4516, -1.8158, 0}
+    Camera: {fov: 70}
+  }
+  deckhouse_small_cabin { // Deckhouse small cabin
+    Position: {51.5, 6.8, 37.1}
+    Rotation: {-0.5737, 2.3848, 0}
+    Camera: {fov: 70}
+  }
+  deckhouse_mess { // Deckhouse mess
+    Position: {54.7, 6.8, 41.7}
+    Rotation: {-0.4937, 2.3086, 0}
+    Camera: {fov: 70}
+  }
   deckhouse_corridor { // Deckhouse corridor
     Position: {52.1, 6.7, 35.14}
     Rotation: {-0.0508, -1.5708, 0}

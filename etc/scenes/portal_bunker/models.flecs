@@ -299,3 +299,75 @@ prefab BunkerModel_deckhouse_stairwell {
   part_1 : BunkerMat_steel { Position: {-0.8, 2.8, -1.74}; Box: {2.12, 0.2, 0.96} }
   part_2 : BunkerMat_shipwall { Position: {-0.8, 1.45, 0}; Box: {0.2, 2.9, 2.52} }
 }
+prefab BunkerModel_locker {
+  part_0 : BunkerMat_metal { Position: {0, 0.95, 0}; Box: {0.9, 1.9, 0.48} }
+  part_1 : BunkerMat_autodoor { Position: {-0.222, 1, 0.25}; Box: {0.42, 1.7, 0.02} }
+  part_2 : BunkerMat_autodoor { Position: {0.222, 1, 0.25}; Box: {0.42, 1.7, 0.02} }
+  part_3 : BunkerMat_bezel { Position: {-0.05, 1.05, 0.27}; Box: {0.02, 0.16, 0.02} }
+  part_4 : BunkerMat_bezel { Position: {0.05, 1.05, 0.27}; Box: {0.02, 0.16, 0.02} }
+}
+prefab BunkerModel_wardrobe {
+  part_0 : BunkerMat_wood { Position: {0, 1, 0}; Box: {1, 2, 0.58} }
+  part_1 : BunkerMat_crate { Position: {-0.247, 1.02, 0.3}; Box: {0.47, 1.86, 0.02} }
+  part_2 : BunkerMat_crate { Position: {0.247, 1.02, 0.3}; Box: {0.47, 1.86, 0.02} }
+  part_3 : BunkerMat_metal { Position: {-0.04, 1.05, 0.32}; Box: {0.02, 0.2, 0.02} }
+  part_4 : BunkerMat_metal { Position: {0.04, 1.05, 0.32}; Box: {0.02, 0.2, 0.02} }
+}
+prefab BunkerModel_bed {
+  part_0 : BunkerMat_wood { Position: {0, 0.2, 0.03}; Box: {0.95, 0.3, 1.94} }
+  part_1 : BunkerMat_plaster { Position: {0, 0.43, 0.04}; Box: {0.88, 0.16, 1.88} }
+  part_2 : BunkerMat_barrel { Position: {0, 0.53, 0.38}; Box: {0.92, 0.05, 1.22} }
+  part_3 : BunkerMat_plaster { Position: {0, 0.56, -0.66}; Box: {0.6, 0.1, 0.34} }
+  part_4 : BunkerMat_wood { Position: {0, 0.5, -0.97}; Box: {0.95, 1, 0.06} }
+}
+prefab BunkerModel_cabinDesk {
+  part_0 : BunkerMat_wood { Position: {0, 0.74, 0}; Box: {1.1, 0.04, 0.55} }
+  part_1 : BunkerMat_crate { Position: {0.31, 0.36, -0.01}; Box: {0.42, 0.72, 0.5} }
+  part_2 : BunkerMat_metal { Position: {0.31, 0.5, 0.245}; Box: {0.3, 0.02, 0.02} }
+  part_3 : BunkerMat_metal { Position: {0.31, 0.25, 0.245}; Box: {0.3, 0.02, 0.02} }
+  part_4 : BunkerMat_metal { Position: {-0.52, 0.36, -0.01}; Box: {0.04, 0.72, 0.5} }
+  part_5 : BunkerMat_barrel { Position: {-0.22, 0.79, -0.1}; Box: {0.26, 0.06, 0.19} }
+}
+prefab BunkerModel_chair {
+  part_0 : BunkerMat_wood { Position: {0, 0.45, 0}; Box: {0.44, 0.04, 0.42} }
+  part_1 : BunkerMat_metal { Position: {-0.19, 0.215, -0.18}; Box: {0.03, 0.43, 0.03} }
+  part_2 : BunkerMat_metal { Position: {0.19, 0.215, -0.18}; Box: {0.03, 0.43, 0.03} }
+  part_3 : BunkerMat_metal { Position: {-0.19, 0.215, 0.18}; Box: {0.03, 0.43, 0.03} }
+  part_4 : BunkerMat_metal { Position: {0.19, 0.215, 0.18}; Box: {0.03, 0.43, 0.03} }
+  part_5 : BunkerMat_wood { Position: {0, 0.685, -0.195}; Box: {0.44, 0.43, 0.03} }
+}
+prefab BunkerModel_stool {
+  part_0 : BunkerMat_metal { Position: {0, 0.01, 0}; Cylinder: {segments: 12, length: 0.02, radius: 0.15} }
+  part_1 : BunkerMat_metal { Position: {0, 0.23, 0}; Cylinder: {segments: 8, length: 0.42, radius: 0.03} }
+  part_2 : BunkerMat_wood { Position: {0, 0.46, 0}; Cylinder: {segments: 12, length: 0.04, radius: 0.17} }
+}
+prefab BunkerModel_smallTable {
+  part_0 : BunkerMat_wood { Position: {0, 0.73, 0}; Box: {0.7, 0.04, 0.6} }
+  part_1 : BunkerMat_metal { Position: {-0.31, 0.355, -0.26}; Box: {0.04, 0.71, 0.04} }
+  part_2 : BunkerMat_metal { Position: {0.31, 0.355, -0.26}; Box: {0.04, 0.71, 0.04} }
+  part_3 : BunkerMat_metal { Position: {-0.31, 0.355, 0.26}; Box: {0.04, 0.71, 0.04} }
+  part_4 : BunkerMat_metal { Position: {0.31, 0.355, 0.26}; Box: {0.04, 0.71, 0.04} }
+}
+prefab BunkerModel_messTableSmall {
+  part_0 : BunkerMat_wood { Position: {0, 0.73, 0}; Box: {0.8, 0.04, 1.2} }
+  part_1 : BunkerMat_steel { Position: {0, 0.37, 0}; Box: {0.1, 0.68, 0.9} }
+  part_2 : BunkerMat_steel { Position: {0, 0.015, 0}; Box: {0.5, 0.03, 1} }
+}
+prefab BunkerModel_footlocker {
+  part_0 : BunkerMat_containerGreen { Position: {0, 0.2, 0}; Box: {0.7, 0.4, 0.4} }
+  part_1 : BunkerMat_metal { Position: {0, 0.37, 0}; Box: {0.72, 0.04, 0.42} }
+  part_2 : BunkerMat_metal { Position: {-0.365, 0.25, 0}; Box: {0.03, 0.04, 0.12} }
+  part_3 : BunkerMat_metal { Position: {0.365, 0.25, 0}; Box: {0.03, 0.04, 0.12} }
+}
+prefab BunkerModel_wallShelf {
+  part_0 : BunkerMat_wood { Position: {0, 0.02, 0}; Box: {1.2, 0.04, 0.3} }
+  part_1 : BunkerMat_metal { Position: {-0.48, -0.08, -0.06}; Box: {0.03, 0.16, 0.18} }
+  part_2 : BunkerMat_metal { Position: {0.48, -0.08, -0.06}; Box: {0.03, 0.16, 0.18} }
+  part_3 : BunkerMat_crate { Position: {-0.35, 0.15, 0}; Box: {0.3, 0.22, 0.24} }
+  part_4 : BunkerMat_barrel { Position: {0.1, 0.1, 0}; Box: {0.4, 0.12, 0.25} }
+  part_5 : BunkerMat_plaster { Position: {0.1, 0.2, 0}; Box: {0.38, 0.08, 0.24} }
+  part_6 : BunkerMat_containerRed { Position: {0.45, 0.12, 0}; Cylinder: {segments: 10, length: 0.16, radius: 0.07} }
+}
+prefab BunkerModel_rug {
+  part_0 : BunkerMat_containerRed { Position: {0, 0.006, 0}; Box: {1, 0.012, 1} }
+}
