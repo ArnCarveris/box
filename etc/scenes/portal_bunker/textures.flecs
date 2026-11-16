@@ -1,0 +1,161 @@
+using box.texture
+
+// Textures of the bunker compound's material patterns, as texture graphs: near white albedos the
+// material's Rgb tints, and normal maps of the joints. Each image covers a whole number of pattern
+// repeats (noted per texture); materials.flecs maps them in world space with a size of that number
+// over the pattern's scale. Copied by tools/convert.mjs from tools/portal_bunker_textures.flecs.
+
+// Tiles: 4 x 4 square tiles with grout, each a little lighter or darker
+BunkerTex_tiles {
+  blocks { nodes.Blocks: {courses: 4, per_course: 4, gap: 0.012, softness: 0.01, seed: 7} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  id { nodes.Split: {input: blocks, channel: ChannelG} }
+  face { nodes.Remap: {input: id, from_min: 0, from_max: 1, to_min: 0.86, to_max: 1} }
+  shade { nodes.Mix: {a_value: {0.5, 0, 0, 0}, b: face, factor: mask} }
+  albedo { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: albedo, width: 512}
+}
+
+BunkerTex_tiles_normal {
+  blocks { nodes.Blocks: {courses: 4, per_course: 4, gap: 0.012, softness: 0.01, seed: 7} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  normal { nodes.Normal: {height: mask, strength: 2} }
+  Graph: {output: normal, width: 512, format: GraphLinear}
+}
+
+// Panels: 2 x 2 beveled panels with dark seams and a faint mottle
+BunkerTex_panels {
+  blocks { nodes.Blocks: {courses: 2, per_course: 2, gap: 0.006, softness: 0.015, seed: 11} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  id { nodes.Split: {input: blocks, channel: ChannelG} }
+  tone { nodes.Remap: {input: id, from_min: 0, from_max: 1, to_min: 0.9, to_max: 1} }
+  mottle { nodes.Noise: {frequency: 12, octaves: 2, seed: 12} }
+  grain { nodes.Remap: {input: mottle, from_min: 0, from_max: 1, to_min: 0.9, to_max: 1} }
+  face { nodes.Multiply: {a: tone, b: grain} }
+  shade { nodes.Mix: {a_value: {0.45, 0, 0, 0}, b: face, factor: mask} }
+  albedo { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: albedo, width: 512}
+}
+
+BunkerTex_panels_normal {
+  blocks { nodes.Blocks: {courses: 2, per_course: 2, gap: 0.006, softness: 0.015, seed: 11} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  normal { nodes.Normal: {height: mask, strength: 1.5} }
+  Graph: {output: normal, width: 512, format: GraphLinear}
+}
+
+// Noise: plaster and concrete mottle, 8/3 pattern units across
+BunkerTex_noise {
+  fbm { nodes.Noise: {frequency: 8, octaves: 4, seed: 3} }
+  shade { nodes.Remap: {input: fbm, from_min: 0.2, from_max: 0.8, to_min: 0.76, to_max: 1, clamp: true} }
+  albedo { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: albedo, width: 512}
+}
+
+// Grass: broad patches of lighter, yellower blades over fine speckle, 2 pattern units across
+BunkerTex_grass {
+  patches { nodes.Noise: {frequency: 4, octaves: 4, seed: 31} }
+  color { nodes.Ramp: {input: patches, keys: [{0.2, {165, 165, 165}}, {0.8, {255, 248, 214}}]} }
+  speckle { nodes.Noise: {frequency: 46, octaves: 1, seed: 32} }
+  blades { nodes.Remap: {input: speckle, from_min: 0, from_max: 1, to_min: 0.78, to_max: 1.05, clamp: true} }
+  speck { nodes.Combine: {r: blades, g: blades, b: blades, a_value: 1} }
+  albedo { nodes.Multiply: {a: color, b: speck} }
+  Graph: {output: albedo, width: 512}
+}
+
+// Hazard: diagonal stripes, 2 stripe pairs across, slightly grimy
+BunkerTex_hazard {
+  uv { nodes.Coords: {} }
+  u { nodes.Split: {input: uv, channel: ChannelR} }
+  v { nodes.Split: {input: uv, channel: ChannelG} }
+  diag { nodes.Add: {a: u, b: v} }
+  twice { nodes.Multiply: {a: diag, b_value: {2, 0, 0, 0}} }
+  phase { nodes.Fract: {input: twice} }
+  stripe { nodes.Smoothstep: {input: phase, edge0_value: {0.49, 0, 0, 0}, edge1_value: {0.51, 0, 0, 0}} }
+  paint { nodes.Remap: {input: stripe, from_min: 0, from_max: 1, to_min: 1, to_max: 0.08} }
+  dirt { nodes.Noise: {frequency: 8, octaves: 3, seed: 41} }
+  grime { nodes.Remap: {input: dirt, from_min: 0.2, from_max: 0.8, to_min: 0.82, to_max: 1, clamp: true} }
+  shade { nodes.Multiply: {a: paint, b: grime} }
+  albedo { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: albedo, width: 512}
+}
+
+// Planks: 8 courses of boards with random cuts and a lengthwise grain, 2 x 2 pattern units
+BunkerTex_planks {
+  blocks { nodes.Blocks: {courses: 8, per_course: 1, gap: 0.005, softness: 0.004, jitter: 0.45, seed: 17} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  rand { nodes.Split: {input: blocks, channel: ChannelA} }
+  tone { nodes.Remap: {input: rand, from_min: 0, from_max: 1, to_min: 0.82, to_max: 1} }
+  stretch { nodes.Transform: {scale: {1, 8, 1}} }
+  fibres { nodes.Noise: {coords: stretch, frequency: 4, octaves: 3, seed: 18} }
+  grain { nodes.Remap: {input: fibres, from_min: 0.2, from_max: 0.8, to_min: 0.78, to_max: 1, clamp: true} }
+  face { nodes.Multiply: {a: tone, b: grain} }
+  shade { nodes.Mix: {a_value: {0.42, 0, 0, 0}, b: face, factor: mask} }
+  albedo { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: albedo, width: 512}
+}
+
+BunkerTex_planks_normal {
+  blocks { nodes.Blocks: {courses: 8, per_course: 1, gap: 0.005, softness: 0.004, jitter: 0.45, seed: 17} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  normal { nodes.Normal: {height: mask, strength: 1.5} }
+  Graph: {output: normal, width: 512, format: GraphLinear}
+}
+
+// Bricks: 4 courses of 2 stretchers in running bond with light mortar, 1 pattern unit
+BunkerTex_bricks {
+  blocks { nodes.Blocks: {courses: 4, per_course: 2, stagger: 0.5, gap: 0.022, softness: 0.012, seed: 23} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  id { nodes.Split: {input: blocks, channel: ChannelG} }
+  tone { nodes.Remap: {input: id, from_min: 0, from_max: 1, to_min: 0.72, to_max: 0.96} }
+  pits { nodes.Noise: {frequency: 16, octaves: 3, seed: 24} }
+  wear { nodes.Remap: {input: pits, from_min: 0.2, from_max: 0.8, to_min: 0.86, to_max: 1, clamp: true} }
+  face { nodes.Multiply: {a: tone, b: wear} }
+  shade { nodes.Mix: {a_value: {1, 0, 0, 0}, b: face, factor: mask} }
+  albedo { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: albedo, width: 512}
+}
+
+BunkerTex_bricks_normal {
+  blocks { nodes.Blocks: {courses: 4, per_course: 2, stagger: 0.5, gap: 0.022, softness: 0.012, seed: 23} }
+  mask { nodes.Split: {input: blocks, channel: ChannelR} }
+  normal { nodes.Normal: {height: mask, strength: 2.5} }
+  Graph: {output: normal, width: 512, format: GraphLinear}
+}
+
+// Screen: emissive scanlines over a 16 x 9 grid of lit and dim cells, 1 pattern unit
+BunkerTex_screen {
+  uv { nodes.Coords: {} }
+  v { nodes.Split: {input: uv, channel: ChannelG} }
+  lines { nodes.Multiply: {a: v, b_value: {150.796, 0, 0, 0}} }
+  wave { nodes.Sin: {input: lines} }
+  scan { nodes.Remap: {input: wave, from_min: -1, from_max: 1, to_min: 0.4, to_max: 1} }
+  cells { nodes.Blocks: {courses: 9, per_course: 16, gap: 0, softness: 0, seed: 29} }
+  id { nodes.Split: {input: cells, channel: ChannelG} }
+  lit { nodes.Step: {input: id, edge_value: {0.5, 0, 0, 0}} }
+  level { nodes.Remap: {input: lit, from_min: 0, from_max: 1, to_min: 0.25, to_max: 1} }
+  shade { nodes.Multiply: {a: scan, b: level} }
+  emissive { nodes.Ramp: {input: shade, keys: [{0, {0, 0, 0}}, {1, {255, 255, 255}}]} }
+  Graph: {output: emissive, width: 512}
+}
+
+// Rust: painted steel with vertical rust streaks and a plate seam at the edges, 4 pattern units
+BunkerTex_rust {
+  fbm { nodes.Noise: {frequency: 8, octaves: 3, seed: 51} }
+  paint { nodes.Ramp: {input: fbm, keys: [{0.2, {218, 218, 218}}, {0.8, {255, 255, 255}}]} }
+  stretch { nodes.Transform: {scale: {9, 1, 1}} }
+  drips { nodes.Noise: {coords: stretch, frequency: 4, octaves: 1, seed: 52} }
+  both { nodes.Multiply: {a: drips, b: fbm} }
+  gain { nodes.Multiply: {a: both, b_value: {1.8, 0, 0, 0}} }
+  streak { nodes.Smoothstep: {input: gain, edge0_value: {0.55, 0, 0, 0}, edge1_value: {0.95, 0, 0, 0}} }
+  rusted { nodes.Mix: {a: paint, b_value: {0.36, 0.15, 0.06, 1}, factor: streak} }
+  uv { nodes.Coords: {} }
+  u { nodes.Split: {input: uv, channel: ChannelR} }
+  centred { nodes.Subtract: {a: u, b_value: {0.5, 0, 0, 0}} }
+  edge { nodes.Abs: {input: centred} }
+  seam { nodes.Smoothstep: {input: edge, edge0_value: {0.494, 0, 0, 0}, edge1_value: {0.5, 0, 0, 0}} }
+  dark { nodes.Remap: {input: seam, from_min: 0, from_max: 1, to_min: 1, to_max: 0.6} }
+  shadow { nodes.Combine: {r: dark, g: dark, b: dark, a_value: 1} }
+  albedo { nodes.Multiply: {a: rusted, b: shadow} }
+  Graph: {output: albedo, width: 512}
+}

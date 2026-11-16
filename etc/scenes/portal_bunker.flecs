@@ -3,6 +3,7 @@
 // freighter's props, and the lights, with the rooms,
 // openings, occluders and doors as VisArea, VisPortal, VisOccluder and PortalDoor components
 // (see include/box/portal.h). Fly with WASD (QE for down/up, Shift to go faster).
+include portal_bunker/textures
 include portal_bunker/materials
 include portal_bunker/models
 include portal_bunker/rooms
