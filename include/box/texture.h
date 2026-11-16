@@ -1012,6 +1012,45 @@ ECS_STRUCT(TexFlow, {
                           *   scaled with the width; 0 for no smear */
 });
 
+/** Node of a TextureGraph whose Scalar value is how much light of a point source reaches each
+ * texel through a density field, exp(-absorption * optical depth), for nebulas lit by a star:
+ * bright rims on the clumps facing it and dark tails pointing away from it.
+ *
+ * The optical depth is the integral of density along the path from the texel toward light, in
+ * units of a texel of a 512 pixel wide image so the look does not change with the size.
+ *
+ * The path ends at the source or after range, whichever comes first, and takes at most steps
+ * samples of the density, read between texels. A path longer than steps texels offsets its
+ * samples by a hash of the texel, so it gives fine grain instead of bands.
+ *
+ * On DomainPlane light is the uv of the source, which may lie outside 0..1; the path is the
+ * straight segment toward it and the image wraps.
+ *
+ * On DomainSphere light is the direction of the source in the direction space of TexCoords;
+ * the path is the great circle arc toward it, across the longitude seam and the poles, and
+ * range is in units of 2 pi / 512 radians. The texel at the source has transmittance 1.
+ *
+ * light, absorption, range and steps change the parameters of the graph, not its structure.
+ *
+ * @code
+ * shadow { nodes.Transmittance: {density: gas, light: [0.3, 0.4, 0], absorption: 0.05} }
+ * @endcode
+ */
+ECS_STRUCT(TexTransmittance, {
+    ecs_entity_t density; /**< Scalar density node, 0 for density_value */
+    float density_value;  /**< Value of density without a node */
+    vec3 light;           /**< Plane: uv of the source, may lie outside 0..1. Sphere: direction
+                           *   of the source, normalized */
+    float absorption;     /**< Factor of the optical depth, 0 for a value of 1 everywhere */
+    float range;          /**< Longest path marched, in texels of a 512 pixel wide image (on
+                           *   the sphere in units of 2 pi / 512 radians), 0 up to the source */
+    int32_t steps;        /**< Most samples per path, 64 when the component is added, clamped
+                           *   to 1..BOX_TEX_TRANSMITTANCE_STEPS */
+});
+
+/** Most samples of the path of a texel of a TexTransmittance node */
+#define BOX_TEX_TRANSMITTANCE_STEPS (256)
+
 /** Most taps on each side of the streak of a TexFlow node */
 #define BOX_TEX_FLOW_TAPS (32)
 

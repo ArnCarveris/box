@@ -465,7 +465,7 @@ void box_texture_math_register(
 void box_texture_noise_register(
     ecs_world_t *world);
 
-/** Register the TexFlow node kind.
+/** Register the TexFlow and TexTransmittance node kinds.
  *
  * @param world The world
  */

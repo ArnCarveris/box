@@ -1,6 +1,7 @@
 /**
  * @file texture/graph_flow.c
- * @brief The TexFlow node kind of texture graphs: line integral convolution along a field.
+ * @brief The TexFlow node kind of texture graphs: line integral convolution along a field, and
+ * the TexTransmittance node kind: the light of a point source through a density field.
  */
 
 #include "texture.h"
@@ -160,6 +161,120 @@ static TextureValueType box_texture_flow_type(
     return box_texture_graph_follow(inputs, 1u);
 }
 
+/** WGSL of the TexTransmittance node: exp(-absorption * optical depth) along the path from the
+ * texel toward the source, lengths in texels of a 512 wide image (2 pi / 512 rad on the sphere).
+ *
+ * The density is read between texels at the midpoints of steps equal parts of the path, or at
+ * a hash of the texel within each part when the path is longer than steps texels.
+ *
+ * On the plane the path is the straight segment to the uv of the source, wrapped. On the
+ * sphere it is the great circle arc to its direction, through the nearest pole from the
+ * opposite direction, where every arc reaches it. */
+static const char *box_texture_transmittance_wgsl =
+    "const BOX_TEX_TRANSMITTANCE_STEPS: i32 = 256;\n"
+    "const BOX_TEX_TRANSMITTANCE_EPSILON: f32 = 1e-6;\n"
+    "\n"
+    "// Position in texels of a direction of the sphere, longitude 0 at the poles where it has\n"
+    "// none\n"
+    "fn box_tex_transmittance_position(d: vec3f) -> vec2f {\n"
+    "    if (d.x * d.x + d.z * d.z < 1e-12) {\n"
+    "        let v = select(f32(box_texgraph_stage.size.y), 0.0, d.y > 0.0);\n"
+    "        return vec2f(0.5 * f32(box_texgraph_stage.size.x), v);\n"
+    "    }\n"
+    "    return box_texgraph_sphere_position(d);\n"
+    "}\n"
+    "\n"
+    "fn box_tex_transmittance(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f,\n"
+    "    texel: vec2i, t0: texture_2d<f32>) -> vec4f {\n"
+    "    let absorption = max(bitcast<f32>(p[0].w), 0.0);\n"
+    "    if (!(absorption > 0.0)) {\n"
+    "        return vec4f(1.0, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "    let has = all(textureDimensions(t0) == box_texgraph_stage.size);\n"
+    "    if (!has && !(i[0].x != 0.0)) {\n"
+    "        return vec4f(1.0, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "    let light = bitcast<vec3f>(p[0].xyz);\n"
+    "    let range = bitcast<f32>(p[1].x);\n"
+    "    let steps = clamp(bitcast<i32>(p[1].y), 1, BOX_TEX_TRANSMITTANCE_STEPS);\n"
+    "    let size = vec2f(box_texgraph_stage.size);\n"
+    "    let sphere = box_texgraph_stage.domain == 1u;\n"
+    "\n"
+    "    // Path in texels of the image and its direction: a texel offset on the plane, the unit\n"
+    "    // tangent of the arc on the sphere\n"
+    "    var d = vec3f(0.0);\n"
+    "    var t = vec3f(0.0);\n"
+    "    let start = vec2f(texel) + 0.5;\n"
+    "    var dir = vec2f(0.0);\n"
+    "    var texels = 0.0;\n"
+    "    if (sphere) {\n"
+    "        d = coords.xyz;\n"
+    "        let len = length(light);\n"
+    "        if (!(len > BOX_TEX_TRANSMITTANCE_EPSILON)) {\n"
+    "            return vec4f(1.0, 0.0, 0.0, 0.0);\n"
+    "        }\n"
+    "        let l = light / len;\n"
+    "        let c = clamp(dot(d, l), -1.0, 1.0);\n"
+    "        t = l - d * c;\n"
+    "        var tl = length(t);\n"
+    "        if (tl <= BOX_TEX_TRANSMITTANCE_EPSILON) {\n"
+    "            if (c > 0.0) {\n"
+    "                return vec4f(1.0, 0.0, 0.0, 0.0);\n"
+    "            }\n"
+    "            t = vec3f(0.0, 1.0, 0.0) - d * d.y;\n"
+    "            if (d.y < 0.0) {\n"
+    "                t = -t;\n"
+    "            }\n"
+    "            tl = length(t);\n"
+    "            if (tl <= BOX_TEX_TRANSMITTANCE_EPSILON) {\n"
+    "                t = vec3f(1.0, 0.0, 0.0);\n"
+    "                tl = 1.0;\n"
+    "            }\n"
+    "        }\n"
+    "        t = t / tl;\n"
+    "        texels = atan2(length(cross(d, l)), c) * size.x / (2.0 * BOX_TEXGRAPH_PI);\n"
+    "    } else {\n"
+    "        let delta = light.xy * size - start;\n"
+    "        texels = length(delta);\n"
+    "        if (texels > 0.0) {\n"
+    "            dir = delta / texels;\n"
+    "        }\n"
+    "    }\n"
+    "    let scale = size.x / 512.0;\n"
+    "    if (range > 0.0) {\n"
+    "        texels = min(texels, range * scale);\n"
+    "    }\n"
+    "    if (!(texels > 0.0)) {\n"
+    "        return vec4f(1.0, 0.0, 0.0, 0.0);\n"
+    "    }\n"
+    "\n"
+    "    let part = texels / f32(steps);\n"
+    "    var offset = 0.5;\n"
+    "    if (texels > f32(steps)) {\n"
+    "        offset = box_texgraph_random(box_texgraph_hash2(bitcast<vec2u>(texel)));\n"
+    "    }\n"
+    "    var sum = 0.0;\n"
+    "    if (!has) {\n"
+    "        sum = i[0].x * f32(steps);\n"
+    "    } else {\n"
+    "        let angle = 2.0 * BOX_TEXGRAPH_PI / size.x;\n"
+    "        for (var k = 0; k < BOX_TEX_TRANSMITTANCE_STEPS; k ++) {\n"
+    "            if (k >= steps) {\n"
+    "                break;\n"
+    "            }\n"
+    "            let s = (f32(k) + offset) * part;\n"
+    "            var pos = start + dir * s;\n"
+    "            if (sphere) {\n"
+    "                let a = s * angle;\n"
+    "                pos = box_tex_transmittance_position(d * cos(a) + t * sin(a));\n"
+    "            }\n"
+    "            sum += box_texgraph_bilinear(t0, pos).x;\n"
+    "        }\n"
+    "    }\n"
+    "    let depth = sum * part / scale;\n"
+    "    return vec4f(exp(-absorption * depth), 0.0, 0.0, 0.0);\n"
+    "}\n";
+
 void box_texture_flow_register(
     ecs_world_t *world)
 {
@@ -178,6 +293,25 @@ void box_texture_flow_register(
         .params = {{ "reach", offsetof(TexFlow, reach), 4, BOX_TEXTURE_PARAM_F32 }},
         .function = "box_tex_flow",
         .source = box_texture_flow_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexTransmittance),
+        .output = TexScalar,
+        .inputs = {
+            { "density", offsetof(TexTransmittance, density), TexScalar, "density_value",
+                offsetof(TexTransmittance, density_value) }
+        },
+        .params = {
+            { "light", offsetof(TexTransmittance, light), 12, BOX_TEXTURE_PARAM_F32 },
+            { "absorption", offsetof(TexTransmittance, absorption), 4,
+                BOX_TEXTURE_PARAM_F32 },
+            { "range", offsetof(TexTransmittance, range), 4, BOX_TEXTURE_PARAM_F32 },
+            { "steps", offsetof(TexTransmittance, steps), 4, BOX_TEXTURE_PARAM_I32 }
+        },
+        .function = "box_tex_transmittance",
+        .source = box_texture_transmittance_wgsl,
         .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
     });
 }

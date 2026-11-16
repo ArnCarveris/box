@@ -1686,6 +1686,19 @@
                 ]
             },
             {
+                "id": "TextureTransmittance",
+                "testcases": [
+                    "constant_density",
+                    "disc_shadow",
+                    "unattenuated",
+                    "range_limits",
+                    "sphere_band",
+                    "sphere_seam",
+                    "sphere_poles",
+                    "edit_no_recompile"
+                ]
+            },
+            {
                 "id": "TextureDistance",
                 "testcases": [
                     "hard_edges",
