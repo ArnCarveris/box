@@ -24,9 +24,43 @@ state {
   export const INVULNERABLE_TIME: f32 = 1.6
   export const SEED: i32 = 4242
 
-  export const ROCKS: i32 = 12
-  export const LOGS: i32 = 6
-  export const COCONUTS: i32 = 16
+  export const ROCKS: i32 = 14
+  export const LOGS: i32 = 8
+  export const COCONUTS: i32 = 24
+
+  // Spawning: rows of hazards appear SPAWN_AHEAD units up the lagoon (in the haze) and rise
+  // out of the water over RISE units; slots further than DESPAWN_Z behind the canoe are freed.
+  // Rows are ROW_GAP units apart at START_SPEED and ROW_GAP_PER_SPEED closer for every unit of
+  // speed above it, down to ROW_GAP_MIN. The first row reaches the canoe after FIRST_HAZARD_TIME.
+  export const SPAWN_AHEAD: f32 = 95
+  export const RISE: f32 = 14
+  export const DESPAWN_Z: f32 = 16
+  export const ROW_GAP: f32 = 17
+  export const ROW_GAP_MIN: f32 = 11
+  export const ROW_GAP_PER_SPEED: f32 = 0.45
+  export const FIRST_HAZARD_TIME: f32 = 3
+  // The channel is split in LANES lanes LANE_W apart; every row keeps two neighbouring lanes
+  // free (canoe and outrigger float), hazards sit in the others with LANE_JITTER of play
+  export const LANES: i32 = 5
+  export const LANE_W: f32 = 2.3
+  export const LANE_JITTER: f32 = 0.45
+  export const LOG_CHANCE: f32 = 0.3
+  // Coconut lines in front of a row lead from the free lane toward a hazard, NUT_LEAD units
+  // short of it
+  export const NUT_LINE_CHANCE: f32 = 0.65
+  export const NUTS_PER_LINE: i32 = 4
+  export const NUT_SPACING: f32 = 2.2
+  export const NUT_LEAD: f32 = 5.5
+  // Collision shapes: the hull and the outrigger float as boxes in X and Z, hazards as circles
+  export const HULL_HALF_W: f32 = 0.42
+  export const HULL_HALF_L: f32 = 3.1
+  export const FLOAT_X: f32 = -2.45
+  export const FLOAT_HALF_W: f32 = 0.15
+  export const FLOAT_HALF_L: f32 = 1.8
+  export const ROCK_R: f32 = 0.85
+  export const LOG_R: f32 = 0.9
+  export const NUT_R: f32 = 0.55
+  export const SEED_HAZARDS: i32 = 1913
 
   export const GS_PLAYING: i32 = 1
   export const GS_OVER: i32 = 2
@@ -61,9 +95,12 @@ state {
   export mut invulnerable: f32 = 0
   export mut capsize: f32 = 0
 
-  export mut rocks: LgItem[12] = {}
-  export mut logs: LgItem[6] = {}
-  export mut nuts: LgItem[16] = {}
+  export mut rocks: LgItem[14] = {}
+  export mut logs: LgItem[8] = {}
+  export mut nuts: LgItem[24] = {}
+  // Distance at which the next row of hazards spawns, and the number of rows spawned
+  export mut next_row: f64 = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
+  export mut rows: i32 = 0
 
   // Puts every variable back to its start value
   fn reset() {
@@ -79,6 +116,8 @@ state {
     coconuts = 0
     invulnerable = 0
     capsize = 0
+    next_row = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
+    rows = 0
     for i in 0..ROCKS {
       rocks[i].live = false
       rocks[i].hit = false

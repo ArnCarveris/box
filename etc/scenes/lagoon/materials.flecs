@@ -59,9 +59,14 @@ assets {
   prefab LgCanoeDark { Rgb: {110, 70, 42}; PbrMaterial: {roughness: 0.7} }
   prefab LgLashing { Rgb: {222, 196, 140}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 236, 200}, roughness: 0.5} }
   prefab LgSail { Rgb: {236, 222, 188}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 244, 220}, roughness: 0.5} }
-  prefab LgCoral { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: lg_coral_a, normal: lg_coral_n}; texture.Mapping: {mode: MappingWorld, size: 3, blend: 0.3} }
+  prefab LgCoral { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: lg_coral_a, normal: lg_coral_n}; texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.3} }
   prefab LgVolcano { Rgb: {104, 98, 104}; PbrMaterial: {roughness: 1} }
   prefab LgVolcanoGreen { Rgb: {74, 108, 70}; PbrMaterial: {roughness: 1} }
+  prefab LgFoam { Rgb: {244, 252, 250}; PbrMaterial: {roughness: 0.9}; Opacity: {0.85}; NoShadow }
+  prefab LgDriftwood { Rgb: {196, 184, 166}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: lg_wood_a, normal: lg_wood_n}; texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.2} }
+  prefab LgDriftwoodEnd { Rgb: {214, 196, 160}; PbrMaterial: {roughness: 0.95} }
+  prefab LgCoconutHusk { Rgb: {120, 86, 46}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {230, 190, 130}, roughness: 0.6} }
+  prefab LgCoconutGreen { Rgb: {104, 136, 50}; PbrMaterial: {roughness: 0.7} }
   prefab LgSkin { Rgb: {156, 102, 70}; PbrMaterial: {roughness: 0.7}; Sheen: {color: {255, 200, 170}, roughness: 0.6} }
   prefab LgStraw { Rgb: {226, 196, 118}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 240, 190}, roughness: 0.5} }
   prefab LgCloth { Rgb: {200, 64, 52}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 170, 150}, roughness: 0.5} }

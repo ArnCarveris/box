@@ -8,10 +8,11 @@ using assets
 
 // The outrigger canoe, bow toward -Z, the float on the left (-X). It bobs on the water, rolls by
 // lean (positive rolls the top toward -X) and, while capsize > 0, rolls over toward 180 degrees
-// and sinks a little.
+// and sinks a little. While invulnerable after a hit it blinks red.
 canoe {
   Position: {canoe_x, 0.035 * sin(clock * 1.7) - capsize * 0.35, CANOE_Z}
   Rotation: {0.018 * sin(clock * 1.3 + 0.6), 0, lean + capsize * PI}
+  Tint: {255, 90, 70, game_state == GS_PLAYING && invulnerable > 0 && fract(invulnerable * 6) > 0.5 ? 170 : 0}
 
   hull : LgCanoeWood { Position: {0, 0.02, 0}; Scale: {0.42, 0.36, 3.3}; Sphere: {radius: 1, segments: 24, smooth: true} }
   well : LgCanoeDark { Position: {0, 0.3, 0}; Box: {0.5, 0.04, 4.4} }
