@@ -270,6 +270,7 @@ static void box_render_texture_graph_send(
     desc->width = (uint32_t)graph->width;
     desc->height = (uint32_t)graph->height;
     desc->domain = (uint32_t)graph->domain;
+    ecs_os_memcpy(desc->region, graph->region, ECS_SIZEOF(desc->region));
     desc->format = (uint32_t)graph->format;
     desc->node_count = (uint32_t)graph->node_count;
     desc->param_size = (uint32_t)graph->param_size;

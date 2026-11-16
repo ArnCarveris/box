@@ -39,7 +39,7 @@
 #define BOX_GPU_TG_BLEND (2)
 
 /** Bytes of BoxTexGraphStage */
-#define BOX_GPU_TG_UNIFORM_SIZE (32)
+#define BOX_GPU_TG_UNIFORM_SIZE (48)
 
 /** Bytes of the cached values no graph uses kept by default (TextureGraphCache.budget) */
 #define BOX_GPU_TG_CACHE_BUDGET (256ll * 1024 * 1024)

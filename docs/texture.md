@@ -108,6 +108,9 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - Graph tiling: DomainPlane tiles when noise frequencies and Transform scales are whole numbers
   and rotations are multiples of 90 degrees. DomainSphere outputs an equirectangular image
   (use width = 2 x height) and is seamless.
+- DomainSphere `longitude_start/end`, `latitude_start/end` (radians, equal = whole) make the
+  image a full resolution crop of the whole sphere graph that lines up on an `EllipsoidShell` of
+  the same ranges; node radii keep their angular units, reads past the range clamp to its edge.
 - `Image` nodes wait (TextureLoading) for their texture, evaluate after the graph they sample
   and again when its image changes; rebinding to another texture compiles nothing.
 - Animated graphs (a `Time` with scale != 0) update `rate` times per second (0 = every frame)

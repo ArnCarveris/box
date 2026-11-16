@@ -1657,6 +1657,17 @@
                 ]
             },
             {
+                "id": "TextureGraphRegion",
+                "testcases": [
+                    "noise_matches_whole",
+                    "neighbourhood_matches_whole",
+                    "edges",
+                    "full_range_equals_default",
+                    "range_edit",
+                    "shell_lines_up"
+                ]
+            },
+            {
                 "id": "TextureBlur",
                 "testcases": [
                     "constant_plane",

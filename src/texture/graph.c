@@ -9,6 +9,7 @@
 
 #include "texture.h"
 #include "../render/render.h"
+#include <math.h>
 #include <stdarg.h>
 
 /** Most nodes of a graph */
@@ -991,6 +992,39 @@ done:
     return result;
 }
 
+/** Resolve the longitude and latitude range of a graph on the sphere: an empty range is the
+ * whole of it, a longitude range is at most a turn and the latitudes are clamped to the poles.
+ *
+ * @param graph The TextureGraph
+ * @param out Receives the longitude start and end, the latitude start and end in radians
+ */
+static void box_texture_graph_region(
+    const TextureGraph *graph,
+    float out[4])
+{
+    const float turn = 2.0f * (float)GLM_PI;
+    const float pole = 0.5f * (float)GLM_PI;
+    float lon0 = graph->longitude_start, lon1 = graph->longitude_end;
+    float lat0 = glm_clamp(graph->latitude_start, -pole, pole);
+    float lat1 = glm_clamp(graph->latitude_end, -pole, pole);
+    if (!isfinite(lon0) || !isfinite(lon1) || lon0 == lon1) {
+        lon0 = 0;
+        lon1 = turn;
+    } else if (fabsf(lon1 - lon0) > turn) {
+        lon1 = lon0 + (lon1 > lon0 ? turn : -turn);
+    }
+
+    if (!isfinite(lat0) || !isfinite(lat1) || lat0 == lat1) {
+        lat0 = -pole;
+        lat1 = pole;
+    }
+
+    out[0] = lon0;
+    out[1] = lon1;
+    out[2] = lat0;
+    out[3] = lat1;
+}
+
 /** Compile the walk of a build into a graph with its hashes.
  *
  * @param b The build
@@ -1006,6 +1040,10 @@ static box_texture_graph_t* box_texture_graph_compile(
     box_texture_capped_size(b->world, b->t, graph->width, graph->height, &result->width,
         &result->height);
     result->domain = graph->domain;
+    if (graph->domain == DomainSphere) {
+        box_texture_graph_region(graph, result->region);
+    }
+
     result->format = graph->format;
     result->rate = graph->rate > 0 ? graph->rate : 0;
     result->interpolate = graph->interpolate;
@@ -1047,14 +1085,15 @@ static box_texture_graph_t* box_texture_graph_compile(
  *
  * @param a The first graph
  * @param b The second graph
- * @return Whether their size, domain, format, rate, interpolation, structure, parameters and
- * sampled textures are the same
+ * @return Whether their size, domain, range, format, rate, interpolation, structure,
+ * parameters and sampled textures are the same
  */
 static bool box_texture_graph_same(
     const box_texture_graph_t *a,
     const box_texture_graph_t *b)
 {
     bool result = a->width == b->width && a->height == b->height && a->domain == b->domain &&
+        !ecs_os_memcmp(a->region, b->region, ECS_SIZEOF(a->region)) &&
         a->format == b->format && a->rate == b->rate &&
         a->interpolate == b->interpolate && a->structure_hash == b->structure_hash &&
         a->param_hash == b->param_hash && a->node_count == b->node_count &&

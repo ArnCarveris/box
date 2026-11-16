@@ -267,7 +267,7 @@ void box_gpu_tg_blend(
     int32_t lo = graph->key_index[0] <= graph->key_index[1] ? 0 : 1;
     double frac = tg->time * (double)graph->desc.rate - (double)graph->key_index[lo];
     float f = (float)(frac < 0 ? 0 : frac > 1 ? 1 : frac);
-    uint32_t uniforms[8] = {
+    uint32_t uniforms[12] = {
         w, h, graph->desc.domain, graph->desc.format == GraphColor ? 1u : 0u, 0, 0, 0, 0
     };
     box_gpu_texture_t *tex;
@@ -280,6 +280,7 @@ void box_gpu_tg_blend(
     }
 
     ecs_os_memcpy(&uniforms[4], &f, ECS_SIZEOF(float));
+    ecs_os_memcpy(&uniforms[8], graph->desc.region, ECS_SIZEOF(graph->desc.region));
     if (!graph->blend_uniforms) {
         graph->blend_uniforms = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
             .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
