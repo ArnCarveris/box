@@ -2085,6 +2085,31 @@ void box_render_ring_status(
     box_render_ring_t *ring,
     RenderStatus *status);
 
+/** Read the seconds the consumer of a ring rendered and, within that, waited on the GPU: for
+ * the window image, for the oldest frame in flight and for reads of GPU results.
+ *
+ * @param ring The ring
+ * @param busy Receives the seconds rendering that were not a wait on the GPU
+ * @param wait Receives the seconds waiting on the GPU
+ */
+void box_render_ring_load(
+    box_render_ring_t *ring,
+    double *busy,
+    double *wait);
+
+/** Read the seconds the renderer of a world rendered and waited on the GPU, as
+ * box_render_ring_load does for its ring.
+ *
+ * @param world The world
+ * @param busy Receives the seconds rendering that were not a wait on the GPU, 0 without a ring
+ * @param wait Receives the seconds waiting on the GPU, 0 without a ring
+ * @return Whether the world has a ring
+ */
+bool box_render_load(
+    const ecs_world_t *world,
+    double *busy,
+    double *wait);
+
 /** Kind of a field of a transitionable component */
 typedef enum box_render_transition_kind_t {
     BOX_RENDER_TRANSITION_F32 = 0,  /**< float, interpolated linearly */

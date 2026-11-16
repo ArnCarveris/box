@@ -419,7 +419,7 @@ char* box_cmd_audio_chords(
 void box_cmd_fit_init(
     ecs_world_t *world);
 
-/** Register the fps and frames commands that print the frame timing.
+/** Register the fps, load and frames commands: the fps and load panels and the frame timing.
  *
  * @param world The world
  */

@@ -101,6 +101,17 @@ int32_t box_jobs_pending(
 int32_t box_jobs_running(
     ecs_world_t *world);
 
+/** Read the seconds every worker of the pool of a world ran jobs, a running job up to now
+ * included. Inline jobs run on the main thread and count for none.
+ *
+ * @param world The world
+ * @param busy Receives the seconds of every worker, at least BOX_JOBS_MAX_WORKERS
+ * @return Number of workers, 0 before the first job or without workers
+ */
+int32_t box_jobs_load(
+    ecs_world_t *world,
+    double *busy);
+
 /** Compute the size of the pool.
  *
  * @param cores Number of online cores

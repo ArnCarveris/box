@@ -1,17 +1,23 @@
-// The fps panel of box, the script module box.fps. box.fps loads it when the panel first opens
-// and loads it again when the file changes on disk.
+// The fps and load panels of box, the script module box.fps. box.fps loads it when a panel
+// first opens and loads it again when the file changes on disk.
 //
-// C creates the scene of the panel (fps.ui), its camera and view, and the panel
-// (fps.ui.screen.panel), which it places at the top right of the surface and makes an instance
-// of FpsWidget. Everything the panel shows is defined here, in the colors of the theme.
+// C creates the scene of the panels (fps.ui), its camera and view, and the panels in a column at
+// the top right of the surface: the fps panel (fps.ui.screen.panel), an instance of FpsWidget,
+// above the load panel (fps.ui.screen.load), an instance of LoadWidget. Everything the panels
+// show is defined here, in the colors of the theme.
 //
 // The panel is a heading over a chart of the last 120 frame times and a summary of the last
 // second. The summary reads Summary, which box.fps writes from FrameSamples. box.fps exports
 // the colors of the bars (green, yellow, red) and the longest frame time of a green and a yellow
 // bar (fast_ms, slow_ms) from include/box/fps.h.
 //
-// The bars are children of chart.bars, an FpsBars, and the reference lines children of the
-// chart over them. Neither the chart nor bars has a Layout, so a new sample lays nothing out.
+// The load panel has a row per thread of box: a head with the mean and worst time the thread
+// worked per frame over the last second and its share of the frame time, which reads
+// LoadSummary, over a chart of the last 120 frames of its series of LoadSamples.
+//
+// A chart is an FpsChart: the bars are children of its bars, an FpsBars, and the reference lines
+// children of the chart over them. Neither the chart nor bars has a Layout, so a new sample lays
+// nothing out.
 //
 // Every bar is an FpsBar of its own with a fixed name, which reads only its own muts: ms, the
 // frame time of the sample it shows, and col, the column it stands in. bars reads only its mut
@@ -83,6 +89,38 @@ template FpsBars {
   Position: {-first * slot, 0, 0}
 }
 
+// A chart of a series of samples: the bars bar_0 to bar_119 in bars, then the reference lines
+// at 60 and 30 fps over them, centered in a row of points
+template FpsChart {
+  const t = box.ui.theme[Theme]
+
+  Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: chart_h}}
+
+  bars {
+    FpsBars: {}
+
+    for i in 0..bar_count {
+      "bar_{i}" {
+        FpsBar: {index: i}
+      }
+    }
+  }
+
+  line_60 {
+    Position: {0, floor(-chart_h / 2 + 1000.0 / 60 / top_ms * chart_h) + 0.5, 0}
+    Line: {-chart_w / 2, 0, chart_w / 2, 0, 1}
+    Rgb: t.text_muted
+    Opacity: {0.5}
+  }
+
+  line_30 {
+    Position: {0, floor(-chart_h / 2 + 1000.0 / 30 / top_ms * chart_h) + 0.5, 0}
+    Line: {-chart_w / 2, 0, chart_w / 2, 0, 1}
+    Rgb: t.text_muted
+    Opacity: {0.5}
+  }
+}
+
 // The fps panel: the heading, the chart and the summary
 template FpsWidget {
   prop title: string = "Frame rate"
@@ -108,34 +146,8 @@ template FpsWidget {
     Rgb: t.text
   }
 
-  // The bars bar_0 to bar_119 in bars, then the reference lines over them
   chart {
-    Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: chart_h}}
-
-    bars {
-      FpsBars: {}
-
-      for i in 0..bar_count {
-        "bar_{i}" {
-          FpsBar: {index: i}
-        }
-      }
-    }
-
-    // The reference lines at 60 and 30 fps, centered in a row of points
-    line_60 {
-      Position: {0, floor(-chart_h / 2 + 1000.0 / 60 / top_ms * chart_h) + 0.5, 0}
-      Line: {-chart_w / 2, 0, chart_w / 2, 0, 1}
-      Rgb: t.text_muted
-      Opacity: {0.5}
-    }
-
-    line_30 {
-      Position: {0, floor(-chart_h / 2 + 1000.0 / 30 / top_ms * chart_h) + 0.5, 0}
-      Line: {-chart_w / 2, 0, chart_w / 2, 0, 1}
-      Rgb: t.text_muted
-      Opacity: {0.5}
-    }
+    FpsChart: {}
   }
 
   // The mean and worst frame time on the left, the fps on the right in the color of the mean
@@ -167,6 +179,150 @@ template FpsWidget {
         align: Right
       }
       Rgb: match level { 0: green; 1: yellow; _: red }
+    }
+  }
+}
+
+// The head of a row of the load panel: the name of the thread on the left, then the mean and
+// worst time it worked per frame and, in the color of the mean, its share of the frame time
+template LoadHead {
+  prop label: string = ""
+  prop mean_ms: f64 = 0
+  prop worst_ms: f64 = 0
+  prop share: f64 = 0
+
+  const t = box.ui.theme[Theme]
+  const row_h: f32 = ceil(t.small_font_size * 1.4)
+  const level: i32 = match mean_ms > slow_ms {
+    true: 2
+    _: match mean_ms > fast_ms { true: 1; _: 0 }
+  }
+
+  Layout: {direction: Row, spacing: t.spacing}
+  Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: row_h}}
+
+  name {
+    Item: {width: {mode: Grow}}
+    Text: {value: label, size: t.small_font_size, line_height: row_h}
+    Rgb: t.text
+  }
+
+  times {
+    Text: {
+      value: "mean {mean_ms:.1} ms, worst {worst_ms:.1} ms",
+      size: t.small_font_size,
+      line_height: row_h,
+      align: Right
+    }
+    Rgb: t.text_muted
+  }
+
+  percent {
+    Text: {
+      value: "{share:.0}%",
+      size: t.small_font_size,
+      line_height: row_h,
+      align: Right
+    }
+    Rgb: match level { 0: green; 1: yellow; _: red }
+  }
+}
+
+// The load panel: the heading and a row per thread, the head over the chart. A head reads
+// LoadSummary in a scope of its own, so a new summary evaluates the heads and not the charts.
+template LoadWidget {
+  prop title: string = "Thread load"
+
+  const t = box.ui.theme[Theme]
+  const heading_h: f32 = ceil(t.font_size * 1.4)
+
+  Layout: {
+    direction: Column,
+    padding: {t.padding, t.padding, t.padding, t.padding},
+    spacing: t.spacing
+  }
+  Rect: {1, 1}
+  Rgb: t.surface
+  Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
+
+  heading {
+    Item: {width: {mode: Fixed, value: chart_w}, height: {mode: Fixed, value: heading_h}}
+    Text: {value: title, size: t.font_size, line_height: heading_h}
+    Rgb: t.text
+  }
+
+  main {
+    Layout: {direction: Column, spacing: t.spacing / 2}
+
+    head {
+      const s = LoadSummary[LoadSummary].main
+      LoadHead: {label: "Main thread", mean_ms: s.mean_ms, worst_ms: s.worst_ms, share: s.share}
+    }
+
+    chart {
+      FpsChart: {}
+    }
+  }
+
+  render {
+    Layout: {direction: Column, spacing: t.spacing / 2}
+
+    head {
+      const s = LoadSummary[LoadSummary].render
+      LoadHead: {label: "Render CPU", mean_ms: s.mean_ms, worst_ms: s.worst_ms, share: s.share}
+    }
+
+    chart {
+      FpsChart: {}
+    }
+  }
+
+  gpu {
+    Layout: {direction: Column, spacing: t.spacing / 2}
+
+    head {
+      const s = LoadSummary[LoadSummary].gpu
+      LoadHead: {
+        label: "Render GPU wait",
+        mean_ms: s.mean_ms,
+        worst_ms: s.worst_ms,
+        share: s.share
+      }
+    }
+
+    chart {
+      FpsChart: {}
+    }
+  }
+
+  audio {
+    Layout: {direction: Column, spacing: t.spacing / 2}
+
+    head {
+      const s = LoadSummary[LoadSummary].audio
+      LoadHead: {label: "Audio", mean_ms: s.mean_ms, worst_ms: s.worst_ms, share: s.share}
+    }
+
+    chart {
+      FpsChart: {}
+    }
+  }
+
+  jobs {
+    Layout: {direction: Column, spacing: t.spacing / 2}
+
+    head {
+      const sum = LoadSummary[LoadSummary]
+      LoadHead: {
+        label: "Jobs, busiest of {sum.workers}",
+        mean_ms: sum.jobs.mean_ms,
+        worst_ms: sum.jobs.worst_ms,
+        share: sum.jobs.share
+      }
+    }
+
+    chart {
+      FpsChart: {}
     }
   }
 }

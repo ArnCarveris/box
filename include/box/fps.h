@@ -1,7 +1,8 @@
 /**
  * @file box/fps.h
  * @brief The fps panel: a chart of the recent frame times and the mean, worst and rate of the
- * last second, at the top right of the surface.
+ * last second, at the top right of the surface. The load panel: a chart per thread of the time
+ * it worked in the recent frames.
  *
  * FpsPanel opens and closes it, from C, a script, the REST API or the fps command. A scene under
  * BOX_FPS_UI drawn by BOX_FPS_VIEW at BOX_VIEW_ORDER_FPS, over the editor and under the console,
@@ -37,7 +38,8 @@ extern "C" {
 /** Path of the view of the panel content while it is open */
 #define BOX_FPS_VIEW "fps.view"
 
-/** Path of the layout root that fills the surface */
+/** Path of the layout root that fills the surface, a column of the open panels at its top
+ * right: the fps panel above the load panel */
 #define BOX_FPS_SCREEN "fps.ui.screen"
 
 /** Path of the panel, anchored to the top right of the surface, the instance of
@@ -72,6 +74,10 @@ extern "C" {
 
 /** Path of the template of the script that the panel instantiates */
 #define BOX_FPS_TEMPLATE "box.fps.FpsWidget"
+
+/** Path of the template of the script of a chart: the bars in bars and the reference lines
+ * line_60 and line_30 over them, which the fps panel and every row of the load panel have */
+#define BOX_FPS_CHART_TEMPLATE "box.fps.FpsChart"
 
 /** Path of the template of the script that every bar of the chart instantiates */
 #define BOX_FPS_BAR "box.fps.FpsBar"
@@ -141,6 +147,39 @@ extern "C" {
 /** Color of a bar of a frame under 30 fps, exported as box.fps.red */
 #define BOX_FPS_RED ((rgb){ 230, 65, 55 })
 
+/** Path of the load panel, anchored to the top right of the surface below the fps panel, the
+ * instance of BOX_LOAD_TEMPLATE */
+#define BOX_LOAD_PANEL "fps.ui.screen.load"
+
+/** Path of the heading of the load panel, a Text above the rows */
+#define BOX_LOAD_HEADING BOX_LOAD_PANEL ".heading"
+
+/** Path of the template of the script that the load panel instantiates */
+#define BOX_LOAD_TEMPLATE "box.fps.LoadWidget"
+
+/** Rows of the load panel, one per member of LoadSamples */
+#define BOX_LOAD_ROWS (5)
+
+/** Paths of the rows of the load panel in the order of LoadSamples. A row has a head, the Texts
+ * name, times and percent, over a chart like BOX_FPS_CHART, whose bars are in chart.bars. */
+#define BOX_LOAD_MAIN BOX_LOAD_PANEL ".main"
+
+/** Path of the row of the time the renderer worked */
+#define BOX_LOAD_RENDER BOX_LOAD_PANEL ".render"
+
+/** Path of the row of the time the renderer waited on the GPU */
+#define BOX_LOAD_GPU BOX_LOAD_PANEL ".gpu"
+
+/** Path of the row of the time the audio thread rendered */
+#define BOX_LOAD_AUDIO BOX_LOAD_PANEL ".audio"
+
+/** Path of the row of the time the busiest job worker worked */
+#define BOX_LOAD_JOBS BOX_LOAD_PANEL ".jobs"
+
+/** Name of the phase of box.fps that ends the frame of the main thread for LoadSamples, after
+ * TaskPublish */
+#define BOX_LOAD_END_PHASE "box.fps.LoadEnd"
+
 /** The fps panel singleton: whether it is shown.
  *
  * A change applies in the next frame. The panel shows FrameSamples (box/app.h), takes neither
@@ -163,6 +202,55 @@ ECS_STRUCT(FpsSummary, {
     double fps;         /**< Frames per second, 1000 / mean_ms, 0 without samples */
 });
 
+/** The load panel singleton: whether it is shown.
+ *
+ * A change applies in the next frame. The panel shows LoadSamples, takes neither the pointer
+ * nor the keyboard and takes its background, text and border from UiTheme.
+ */
+ECS_STRUCT(LoadPanel, {
+    bool open;          /**< Shown, the load command flips it */
+});
+
+/** Milliseconds the threads of box worked in the recent frames, one sample per frame, written by
+ * box.fps at the start of every frame into each member whose hold is false.
+ *
+ * A sample is the time a thread worked between the starts of the frame before and this one, so
+ * it lines up with FrameSamples. A thread that waits for another or for the GPU does not work.
+ */
+ECS_STRUCT(LoadSamples, {
+    FrameSamples main;      /**< The main thread, without its waits for a free render packet
+                             *   or a drain of the renderer, its sleeps and the frame pacing */
+    FrameSamples render;    /**< The renderer, the render thread or the main thread that renders
+                             *   for it, without its waits on the GPU */
+    FrameSamples gpu;       /**< The renderer waiting on the GPU: for the window image, which
+                             *   includes vsync, the oldest frame in flight and GPU reads */
+    FrameSamples audio;     /**< The audio thread rendering, 0 without a device */
+    FrameSamples jobs;      /**< The job worker that worked the longest, 0 without workers */
+});
+
+/** Time a thread worked per frame over the last second of LoadSamples */
+ECS_STRUCT(LoadStat, {
+    double mean_ms;     /**< Mean milliseconds per frame, 0 without samples */
+    double worst_ms;    /**< Longest milliseconds of a frame, 0 without samples */
+    double share;       /**< Percent of the frame time the thread worked, 0 without samples */
+});
+
+/** The last second of LoadSamples, written by box.fps while the load panel is open whenever
+ * LoadSamples is set or notified, read by the heads of the rows of the panel.
+ *
+ * The last second is the frames of FpsSummary: the newest frame samples up to the first one that
+ * brings their sum to BOX_FPS_SUMMARY_MS, or all of them when they sum to less.
+ */
+ECS_STRUCT(LoadSummary, {
+    int32_t frames;     /**< Frames of the last second, 0 without frame samples */
+    int32_t workers;    /**< Job workers, 0 before the first job or without workers */
+    LoadStat main;      /**< The main thread */
+    LoadStat render;    /**< The renderer working */
+    LoadStat gpu;       /**< The renderer waiting on the GPU */
+    LoadStat audio;     /**< The audio thread */
+    LoadStat jobs;      /**< The busiest job worker */
+});
+
 /** Compute the summary of the last second of frame samples.
  *
  * @param samples The samples, NULL for none
@@ -172,10 +260,24 @@ void box_fps_summarize(
     const FrameSamples *samples,
     FpsSummary *out);
 
+/** Compute the summary of the last second of thread samples.
+ *
+ * @param frames The frame samples that set the last second, NULL for none
+ * @param samples The thread samples, NULL for none
+ * @param workers The number of job workers
+ * @param out Receives the summary
+ */
+void box_load_summarize(
+    const FrameSamples *frames,
+    const LoadSamples *samples,
+    int32_t workers,
+    LoadSummary *out);
+
 /** Register the box.fps module.
  *
- * Creates the FpsPanel singleton, closed, and the FpsSummary singleton. The content, its view
- * and the script are created when the panel first opens.
+ * Creates the FpsPanel and LoadPanel singletons, closed, and the FpsSummary, LoadSamples and
+ * LoadSummary singletons. The content, its view and the script are created when a panel first
+ * opens.
  *
  * @param world The world
  */

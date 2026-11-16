@@ -631,6 +631,21 @@
                 ]
             },
             {
+                "id": "LoadPanel",
+                "testcases": [
+                    "closed_by_default",
+                    "command_toggles",
+                    "rows",
+                    "below_fps_panel",
+                    "bars_follow_samples",
+                    "summary_text",
+                    "summarize",
+                    "engine_records_samples",
+                    "main_excludes_waits",
+                    "jobs_busiest_worker"
+                ]
+            },
+            {
                 "id": "StartupOverlay",
                 "testcases": [
                     "closed_by_default",

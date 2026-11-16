@@ -53,6 +53,8 @@ typedef struct box_audio_transport_stats_t {
     float load;      /**< Share of real time the render takes, smoothed, 0 when not measured */
     int32_t chunks;  /**< Chunks of streams the main thread holds for the core, 0 on the web,
                       * whose worklet holds them */
+    double busy;     /**< Seconds the audio thread rendered in total, 0 where the core renders
+                      * on the main thread or is not measured (the web) */
 } box_audio_transport_stats_t;
 
 /** Kind of a transport */

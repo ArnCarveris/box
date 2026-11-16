@@ -7,6 +7,7 @@
  */
 
 #include "gpu.h"
+#include "../app/load.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -653,11 +654,14 @@ static WGPUTexture box_gpu_target_acquire(
 {
     WGPUSurfaceTexture image = {0};
     WGPUTexture result = t->output;
+    int32_t prev;
     if (!t->surface) {
         goto done;
     }
 
+    prev = box_load_wait();
     wgpuSurfaceGetCurrentTexture(t->surface, &image);
+    box_load_resume(prev);
     if (image.status == WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal ||
         image.status == WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal)
     {
@@ -742,7 +746,9 @@ void box_gpu_target_render(
     wgpuTextureViewRelease(view);
     if (t->surface) {
 #ifndef __EMSCRIPTEN__
+        int32_t prev = box_load_wait();
         wgpuSurfacePresent(t->surface);
+        box_load_resume(prev);
 #endif
         wgpuTextureRelease(texture);
     }

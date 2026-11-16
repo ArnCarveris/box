@@ -4,6 +4,7 @@
  */
 
 #include "app.h"
+#include "load.h"
 #include <stdlib.h>
 #include "../posix.h"
 #ifndef _WIN32
@@ -49,11 +50,14 @@ double box_wait_until(
     double deadline)
 {
     double now = box_app_wall_time();
+    int32_t prev = box_load_wait();
     while (deadline - now > BOX_WAIT_EPSILON) {
         double left = deadline - now;
         ecs_sleepf(left > BOX_WAIT_STEP ? left * BOX_WAIT_FRACTION : left);
         now = box_app_wall_time();
     }
+
+    box_load_resume(prev);
 
     return now;
 }

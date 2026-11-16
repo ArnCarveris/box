@@ -7,6 +7,7 @@
  */
 
 #include "render.h"
+#include "../app/load.h"
 #if defined(__APPLE__) && !defined(__EMSCRIPTEN__)
 #include <pthread.h>
 #include <sys/qos.h>
@@ -53,6 +54,7 @@ struct box_render_ring_t {
                                      *   publishes in backend.generation for the extract */
     box_render_transition_table_t transitions; /**< Transition resolver of the consumer, not
                                      *   backend state */
+    box_load_clock_t clock;         /**< Seconds the consumer rendered and waited on the GPU */
 };
 
 /** Read the clock the frame loop measures with.
@@ -256,7 +258,10 @@ static void* box_render_thread_main(
 #if defined(__APPLE__) && !defined(__EMSCRIPTEN__)
     pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
 #endif
+    box_load_bind(&ring->clock);
+    box_load_clock_enter(&ring->clock, BOX_LOAD_BUSY);
     box_render_backend_start(ring);
+    box_load_clock_enter(&ring->clock, BOX_LOAD_IDLE);
     ecs_os_mutex_lock(ring->lock);
     while (true) {
         while (!box_render_ring_readable(ring) && !(ring->taken == ring->submitted &&
@@ -268,10 +273,12 @@ static void* box_render_thread_main(
         if (ring->taken == ring->submitted && ring->flushed < ring->flushes) {
             int64_t flush = ring->flushes;
             ecs_os_mutex_unlock(ring->lock);
+            box_load_clock_enter(&ring->clock, BOX_LOAD_BUSY);
             if (ring->backend_ready && ring->backend.flush) {
                 ring->backend.flush(ring->backend.ctx);
             }
 
+            box_load_clock_enter(&ring->clock, BOX_LOAD_IDLE);
             ecs_os_mutex_lock(ring->lock);
             ring->flushed = flush;
             ecs_os_cond_broadcast(ring->can_write);
@@ -284,7 +291,9 @@ static void* box_render_thread_main(
 
         box_render_packet_t *p = box_render_ring_slot(ring, ring->taken ++);
         ecs_os_mutex_unlock(ring->lock);
+        box_load_clock_enter(&ring->clock, BOX_LOAD_BUSY);
         box_render_take(ring, p);
+        box_load_clock_enter(&ring->clock, BOX_LOAD_IDLE);
         ecs_os_mutex_lock(ring->lock);
         ring->released ++;
         ecs_os_cond_broadcast(ring->can_write);
@@ -292,6 +301,7 @@ static void* box_render_thread_main(
 
     ecs_os_mutex_unlock(ring->lock);
     box_render_backend_stop(ring);
+    box_load_bind(NULL);
 
     return NULL;
 }
@@ -352,11 +362,13 @@ static void box_render_ring_drain(
     ecs_os_mutex_lock(ring->lock);
     ring->flushing = true;
     int64_t flush = ++ ring->flushes;
+    int32_t prev = box_load_wait();
     ecs_os_cond_broadcast(ring->can_read);
     while (ring->released < ring->submitted || ring->flushed < flush) {
         ecs_os_cond_wait(ring->can_write, ring->lock);
     }
 
+    box_load_resume(prev);
     ring->flushing = false;
     ecs_os_mutex_unlock(ring->lock);
 done:
@@ -413,6 +425,7 @@ box_render_ring_t* box_render_ring_new(void)
 
     result->count = BOX_RENDER_IN_FLIGHT;
     box_render_transition_table_init(&result->transitions);
+    box_load_clock_init(&result->clock);
     result->main_thread = !ecs_os_has_threading();
     result->lock = ecs_os_mutex_new();
     result->can_write = ecs_os_cond_new();
@@ -438,6 +451,7 @@ void box_render_ring_free(
     }
 
     box_render_transition_table_fini(&ring->transitions);
+    box_load_clock_fini(&ring->clock);
     ecs_os_cond_free(ring->can_read);
     ecs_os_cond_free(ring->can_write);
     ecs_os_mutex_free(ring->lock);
@@ -463,11 +477,13 @@ box_render_packet_t* box_render_ring_acquire(
     box_render_ring_start(ring);
     ecs_os_mutex_lock(ring->lock);
     if (ring->acquired - ring->released >= ring->count) {
+        int32_t prev = box_load_wait();
         ring->stalls ++;
-    }
+        while (ring->acquired - ring->released >= ring->count) {
+            ecs_os_cond_wait(ring->can_write, ring->lock);
+        }
 
-    while (ring->acquired - ring->released >= ring->count) {
-        ecs_os_cond_wait(ring->can_write, ring->lock);
+        box_load_resume(prev);
     }
 
     result = box_render_ring_slot(ring, ring->acquired ++);
@@ -509,6 +525,8 @@ void box_render_ring_submit(
         goto done;
     }
 
+    box_load_bound_t prev = box_load_bind(&ring->clock);
+    box_load_clock_enter(&ring->clock, BOX_LOAD_BUSY);
     if (!ring->backend_ready && !ring->backend_failed) {
         box_render_backend_start(ring);
     }
@@ -521,6 +539,8 @@ void box_render_ring_submit(
     ecs_os_mutex_lock(ring->lock);
     ring->released ++;
     ecs_os_mutex_unlock(ring->lock);
+    box_load_clock_enter(&ring->clock, BOX_LOAD_IDLE);
+    box_load_restore(prev);
 done:
     return;
 }
@@ -591,6 +611,14 @@ void box_render_ring_status(
     status->presents_early = ring->presents_early;
     status->device_losses = ring->device_losses;
     ecs_os_mutex_unlock(ring->lock);
+}
+
+void box_render_ring_load(
+    box_render_ring_t *ring,
+    double *busy,
+    double *wait)
+{
+    box_load_clock_read(&ring->clock, busy, wait);
 }
 
 box_render_transition_table_t* box_render_ring_transitions(

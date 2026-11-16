@@ -7,6 +7,7 @@
  */
 
 #include "gpu_environment.h"
+#include "../app/load.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -445,7 +446,9 @@ static void box_gpu_pace(
     WGPUSubmissionIndex index = wgpuQueueSubmitForIndex(gpu->queue, 0, NULL);
     if (gpu->paced_count == BOX_GPU_FRAMES_IN_FLIGHT) {
         WGPUSubmissionIndex oldest = gpu->paced[gpu->paced_next];
+        int32_t prev = box_load_wait();
         wgpuDevicePoll(gpu->device, true, &oldest);
+        box_load_resume(prev);
     } else {
         gpu->paced_count ++;
     }

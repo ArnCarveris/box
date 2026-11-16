@@ -1,11 +1,13 @@
 /**
  * @file command/cmd_frames.c
- * @brief The fps and frames commands: the fps panel, the frame rate cap and the timing of the
- * recent frames.
+ * @brief The fps, load and frames commands: the fps and load panels, the frame rate cap and the
+ * timing of the recent frames.
  *
  * fps toggles FpsPanel.open, box.fps opens and closes the panel from that change, and fps <rate>
- * sets App.fps. frames prints FrameTiming and RenderStatus in a few lines: the rate, the cap,
- * vsync, the delta against the wall time, the presents and the late and dropped frames.
+ * sets App.fps. load toggles LoadPanel.open the same way.
+ *
+ * frames prints FrameTiming and RenderStatus in a few lines: the rate, the cap, vsync, the delta
+ * against the wall time, the presents and the late and dropped frames.
  */
 
 #include "command.h"
@@ -14,6 +16,9 @@
 
 /** Path of the FpsPanel singleton, looked up because box.fps is imported after box.command */
 #define BOX_CMD_FPS_COMPONENT "box.fps.Panel"
+
+/** Path of the LoadPanel singleton, looked up for the same reason */
+#define BOX_CMD_LOAD_COMPONENT "box.fps.LoadPanel"
 
 /** Append the line of a range of frame times.
  *
@@ -198,6 +203,42 @@ done:
     return;
 }
 
+/** The load command: toggle LoadPanel.open and return the new state.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv No arguments
+ * @param result Receives "true" when the panel is now open, else "false"
+ */
+static void box_cmd_load(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t comp = ecs_lookup(world, BOX_CMD_LOAD_COMPONENT);
+    LoadPanel *panel;
+    (void)argc;
+    (void)argv;
+    if (!comp || comp != ecs_id(LoadPanel)) {
+        ecs_err("box.fps is not imported");
+        goto done;
+    }
+
+    panel = ecs_singleton_get_mut(world, LoadPanel);
+    if (!panel) {
+        ecs_err("the world has no box.fps.LoadPanel");
+        goto done;
+    }
+
+    panel->open = !panel->open;
+    ecs_singleton_modified(world, LoadPanel);
+    *(char**)result->ptr = ecs_os_strdup(panel->open ? "true" : "false");
+done:
+    return;
+}
+
 void box_cmd_frames_init(
     ecs_world_t *world)
 {
@@ -211,6 +252,14 @@ void box_cmd_frames_init(
                   .brief = "Frame rate cap, 0 for none (default: toggle the panel)" }
             },
             .callback = box_cmd_fps
+        });
+
+    box_command_register(world,
+        "Show or hide the load panel: the time per frame of every thread",
+        (ecs_function_desc_t){
+            .name = "load",
+            .return_type = ecs_id(ecs_string_t),
+            .callback = box_cmd_load
         });
 
     box_command_register(world,

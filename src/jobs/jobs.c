@@ -4,6 +4,7 @@
  */
 
 #include "jobs.h"
+#include "../app/load.h"
 #include "../posix.h"
 
 /** A job from submission until its completion ran */
@@ -14,11 +15,20 @@ typedef struct box_job_t {
     bool done;                      /**< The work finished */
 } box_job_t;
 
-/** Worker pool of one world; every field after threads is guarded by lock */
-typedef struct box_jobs_t {
+typedef struct box_jobs_t box_jobs_t;
+
+/** A worker thread of a pool and the seconds it worked */
+typedef struct box_jobs_worker_t {
+    box_jobs_t *jobs;             /**< The pool */
+    box_load_clock_t clock;       /**< Busy while the worker runs a job */
+} box_jobs_worker_t;
+
+/** Worker pool of one world; every field after workers_of is guarded by lock */
+struct box_jobs_t {
     ecs_os_mutex_t lock;          /**< Guards the queues and flags */
     ecs_os_cond_t wake;           /**< Signalled when work arrives or the pool stops */
     ecs_os_thread_t *threads;     /**< Worker threads */
+    box_jobs_worker_t *workers_of; /**< State of every worker thread */
     int32_t thread_count;         /**< Number of worker threads, 0 runs jobs inline */
     int32_t workers;              /**< Configured worker count or BOX_JOBS_AUTO */
     bool started;                 /**< The workers were started */
@@ -30,7 +40,7 @@ typedef struct box_jobs_t {
     box_job_t *free_list;         /**< Jobs that can be reused */
     int32_t count;                /**< Jobs that did not complete */
     int32_t running;              /**< Jobs taken for work whose done flag is not set */
-} box_jobs_t;
+};
 
 /** Private singleton that holds the pool of a world */
 typedef struct JobPool {
@@ -63,19 +73,23 @@ static box_job_t* box_jobs_take(
 
 /** Run jobs until the pool stops.
  *
- * @param arg The pool
+ * @param arg The worker
  * @return NULL
  */
 static void* box_jobs_worker(
     void *arg)
 {
-    box_jobs_t *jobs = arg;
+    box_jobs_worker_t *worker = arg;
+    box_jobs_t *jobs = worker->jobs;
+    box_load_bind(&worker->clock);
     ecs_os_mutex_lock(jobs->lock);
     while (!jobs->quit) {
         box_job_t *job = box_jobs_take(jobs);
         if (job) {
             ecs_os_mutex_unlock(jobs->lock);
+            box_load_clock_enter(&worker->clock, BOX_LOAD_BUSY);
             job->desc.work(job->desc.ctx);
+            box_load_clock_enter(&worker->clock, BOX_LOAD_IDLE);
             ecs_os_mutex_lock(jobs->lock);
             job->done = true;
             jobs->running --;
@@ -85,6 +99,7 @@ static void* box_jobs_worker(
     }
 
     ecs_os_mutex_unlock(jobs->lock);
+    box_load_bind(NULL);
 
     return NULL;
 }
@@ -145,10 +160,13 @@ static void box_jobs_start(
     jobs->thread_count = count;
     if (count) {
         jobs->threads = ecs_os_calloc_n(ecs_os_thread_t, count);
+        jobs->workers_of = ecs_os_calloc_n(box_jobs_worker_t, count);
     }
 
     for (i = 0; i < count; i ++) {
-        jobs->threads[i] = ecs_os_thread_new(box_jobs_worker, jobs);
+        jobs->workers_of[i].jobs = jobs;
+        box_load_clock_init(&jobs->workers_of[i].clock);
+        jobs->threads[i] = ecs_os_thread_new(box_jobs_worker, &jobs->workers_of[i]);
     }
 }
 
@@ -174,6 +192,7 @@ static void box_jobs_fini(
 
     for (i = 0; i < jobs->thread_count; i ++) {
         ecs_os_thread_join(jobs->threads[i]);
+        box_load_clock_fini(&jobs->workers_of[i].clock);
     }
 
     for (job = jobs->head; job; job = next) {
@@ -191,6 +210,7 @@ static void box_jobs_fini(
     }
 
     ecs_os_free(jobs->threads);
+    ecs_os_free(jobs->workers_of);
     ecs_os_cond_free(jobs->wake);
     ecs_os_mutex_free(jobs->lock);
     ecs_os_free(jobs);
@@ -445,6 +465,26 @@ int32_t box_jobs_running(
         ecs_os_mutex_lock(jobs->lock);
         result = jobs->running;
         ecs_os_mutex_unlock(jobs->lock);
+    }
+
+    return result;
+}
+
+int32_t box_jobs_load(
+    ecs_world_t *world,
+    double *busy)
+{
+    box_jobs_t *jobs = box_jobs_get(world);
+    int32_t i, result = 0;
+    double wait;
+    if (jobs) {
+        ecs_os_mutex_lock(jobs->lock);
+        result = jobs->thread_count;
+        ecs_os_mutex_unlock(jobs->lock);
+    }
+
+    for (i = 0; i < result; i ++) {
+        box_load_clock_read(&jobs->workers_of[i].clock, &busy[i], &wait);
     }
 
     return result;

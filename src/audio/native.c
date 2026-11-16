@@ -161,6 +161,8 @@ typedef struct box_audio_native_t {
     atomic_int captured;            /**< Set by the audio thread when the capture is complete */
     atomic_int voices;              /**< Voices of the core after the last render */
     atomic_uint load;               /**< Bits of the smoothed load of the renders, a float */
+    atomic_uint_least64_t busy;     /**< Nanoseconds the renders took, in the device callback
+                                    *   and on the main thread while the device is lost */
     atomic_uint_least64_t clock;    /**< Clock of the core after the last render */
     box_audio_native_stream_t streams[BOX_AUDIO_STREAM_MAX]; /**< Status of the streams */
     box_audio_native_meter_t meters[BOX_AUDIO_BUS_MAX]; /**< Levels of the buses */
@@ -355,8 +357,10 @@ static void box_audio_native_process(
 
     box_audio_native_send_events(n);
     box_audio_native_publish(n);
-    n->load_audio = box_audio_load_update(n->load_audio, ecs_time_measure(&start),
+    double took = ecs_time_measure(&start);
+    n->load_audio = box_audio_load_update(n->load_audio, took,
         (int32_t)frames, box_audio_core_sample_rate(n->core));
+    atomic_fetch_add(&n->busy, (uint_least64_t)(took * 1e9));
     memcpy(&bits, &n->load_audio, sizeof(bits));
     atomic_store(&n->load, bits);
     atomic_store(&n->voices, box_audio_core_voice_count(n->core));
@@ -892,6 +896,7 @@ static void box_audio_native_stats(
     box_audio_native_t *n = (box_audio_native_t*)t;
     uint32_t bits = atomic_load(&n->load);
     memcpy(&stats->load, &bits, sizeof(bits));
+    stats->busy = (double)atomic_load(&n->busy) * 1e-9;
     stats->voices = atomic_load(&n->voices);
     stats->chunks = n->host.chunks;
 }
@@ -1010,6 +1015,7 @@ box_audio_transport_t* box_audio_transport_native_new(
     atomic_init(&n->captured, 0);
     atomic_init(&n->voices, 0);
     atomic_init(&n->load, 0);
+    atomic_init(&n->busy, 0);
     atomic_init(&n->clock, 0);
     for (int32_t i = 0; i < BOX_AUDIO_STREAM_MAX; i ++) {
         atomic_init(&n->streams[i].head, 0);

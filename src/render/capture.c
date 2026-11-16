@@ -4,6 +4,7 @@
  */
 
 #include "gpu.h"
+#include "../app/load.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
@@ -301,7 +302,9 @@ void box_gpu_capture_flush(
     int32_t count = ecs_vec_count(&gpu->captures);
 #ifndef __EMSCRIPTEN__
     while (count && gpu->device) {
+        int32_t prev = box_load_wait();
         wgpuDevicePoll(gpu->device, true, NULL);
+        box_load_resume(prev);
         if (ecs_vec_count(&gpu->captures) == count) {
             ecs_err("%d captures did not complete", count);
             box_gpu_capture_abandon(gpu);

@@ -85,6 +85,22 @@ static box_render_ring_t* box_render_get_ring(
     return ring->ring;
 }
 
+bool box_render_load(
+    const ecs_world_t *world,
+    double *busy,
+    double *wait)
+{
+    const RenderRing *ring = ecs_id(RenderRing) ? ecs_singleton_get(world, RenderRing) : NULL;
+    bool result = ring && ring->ring;
+    *busy = 0;
+    *wait = 0;
+    if (result) {
+        box_render_ring_load(ring->ring, busy, wait);
+    }
+
+    return result;
+}
+
 box_render_packet_t* box_render_packet(
     ecs_world_t *world)
 {

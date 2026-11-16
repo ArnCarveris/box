@@ -12,6 +12,7 @@
  */
 
 #include "gpu.h"
+#include "../app/load.h"
 
 #ifdef BOX_RENDER_WGPU
 
@@ -297,9 +298,12 @@ bool box_gpu_read(
         .callback = box_gpu_on_read,
         .userdata1 = &read
     });
+    int32_t prev = box_load_wait();
     while (!read.done) {
         wgpuDevicePoll(gpu->device, true, NULL);
     }
+
+    box_load_resume(prev);
 
     if (read.status == WGPUMapAsyncStatus_Success) {
         ecs_os_memcpy(out, wgpuBufferGetConstMappedRange(staging, 0, size), (ecs_size_t)size);

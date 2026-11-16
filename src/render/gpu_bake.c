@@ -11,6 +11,7 @@
  */
 
 #include "gpu_bake.h"
+#include "../app/load.h"
 #include <float.h>
 #include <stddef.h>
 
@@ -1545,7 +1546,9 @@ static void box_gpu_bake_chunk_capture(
     box_gpu_bake_submit(gpu, encoder);
 #ifndef __EMSCRIPTEN__
     if (++ b->in_flight >= BOX_GPU_BAKE_IN_FLIGHT) {
+        int32_t prev = box_load_wait();
         wgpuDevicePoll(gpu->device, true, NULL);
+        box_load_resume(prev);
         b->in_flight = 0;
     }
 #endif
