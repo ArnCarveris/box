@@ -24,6 +24,7 @@ ECS_CTOR(WorldTransformVersion, ptr, {
 
 ECS_DTOR(TransformWorldCache, ptr, {
     if (ptr->cache) {
+        ecs_map_fini(&ptr->cache->versions);
         ecs_os_free(ptr->cache->entries);
         ecs_os_free(ptr->cache);
     }
@@ -31,6 +32,7 @@ ECS_DTOR(TransformWorldCache, ptr, {
 
 ECS_MOVE(TransformWorldCache, dst, src, {
     if (dst->cache && dst->cache != src->cache) {
+        ecs_map_fini(&dst->cache->versions);
         ecs_os_free(dst->cache->entries);
         ecs_os_free(dst->cache);
     }
@@ -115,7 +117,53 @@ void transformWorldCacheInvalidate(
     const TransformWorldCache *c = ecs_singleton_get(world, TransformWorldCache);
     if (c && c->cache) {
         c->cache->epoch ++;
+        if (ecs_map_count(&c->cache->versions)) {
+            ecs_map_clear(&c->cache->versions);
+        }
     }
+}
+
+/** Find the anchor of an entity: its nearest ancestor that keeps its WorldTransform.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The anchor, 0 when no ancestor keeps one
+ */
+static ecs_entity_t transformAnchorOf(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    ecs_entity_t result = ecs_get_parent(world, e);
+    while (result) {
+        const ecs_table_t *table = ecs_get_table(world, result);
+        if (!box_transform_spread(world, table) &&
+            ecs_table_has_id(real, table, ecs_id(WorldTransform)))
+        {
+            break;
+        }
+
+        result = ecs_get_parent(world, result);
+    }
+
+    return result;
+}
+
+void transformWorldCacheLocal(
+    const ecs_iter_t *it)
+{
+    const TransformWorldCache *c = ecs_singleton_get(it->world, TransformWorldCache);
+    int32_t i;
+    if (!c || !c->cache || !box_transform_spread(it->world, it->table)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t anchor = transformAnchorOf(it->world, it->entities[i]);
+        (*ecs_map_ensure(&c->cache->versions, anchor)) ++;
+    }
+done:
+    return;
 }
 
 /** Get the cache of computed world transforms of a world, allocating its entries.
@@ -135,6 +183,96 @@ static transform_world_cache_t* transformWorldCache(
     return result;
 }
 
+/** Get the version of an anchor in the cache.
+ *
+ * @param cache The cache
+ * @param anchor The anchor, 0 for none
+ * @return The version
+ */
+static uint64_t transformAnchorVersion(
+    const transform_world_cache_t *cache,
+    ecs_entity_t anchor)
+{
+    const ecs_map_val_t *v = ecs_map_get(&cache->versions, anchor);
+
+    return v ? *v : 0;
+}
+
+/** Get the entry of a spread entity in the cache when it is valid.
+ *
+ * @param cache The cache, NULL for none
+ * @param e The entity
+ * @param entry Receives the slot of the entity
+ * @return Whether the entry holds the transform of the entity
+ */
+static bool transformRelCached(
+    transform_world_cache_t *cache,
+    ecs_entity_t e,
+    transform_world_cached_t **entry)
+{
+    uint32_t slot = ((uint32_t)e * 2654435761u) & (TRANSFORM_WORLD_CACHE - 1);
+    transform_world_cached_t *cur = cache ? &cache->entries[slot] : NULL;
+    *entry = cur;
+
+    return cur && cur->entity == e && cur->epoch == cache->epoch &&
+        cur->version == transformAnchorVersion(cache, cur->anchor);
+}
+
+/** Compute the transform of a spread entity relative to its anchor, from the local transforms
+ * between them, through the cache.
+ *
+ * @param world The world
+ * @param cache The cache, NULL for none
+ * @param e The spread entity
+ * @param anchor Receives the anchor, 0 for none
+ * @param rel Receives the transform relative to the anchor
+ */
+static void transformRelIn(
+    const ecs_world_t *world,
+    transform_world_cache_t *cache,
+    ecs_entity_t e,
+    ecs_entity_t *anchor,
+    WorldTransform *rel)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    transform_world_cached_t *entry;
+    WorldTransform base;
+    bool based = false;
+    if (transformRelCached(cache, e, &entry)) {
+        *anchor = entry->anchor;
+        *rel = entry->rel;
+        goto done;
+    }
+
+    *anchor = 0;
+    ecs_entity_t p = ecs_get_parent(world, e);
+    while (p) {
+        const ecs_table_t *table = ecs_get_table(world, p);
+        if (box_transform_spread(world, table)) {
+            transformRelIn(world, cache, p, anchor, &base);
+            based = true;
+            break;
+        }
+
+        if (ecs_table_has_id(real, table, ecs_id(WorldTransform))) {
+            *anchor = p;
+            break;
+        }
+
+        p = ecs_get_parent(world, p);
+    }
+
+    transformSingle(based ? &base : NULL, rel, ecs_get(world, e, Position),
+        ecs_get(world, e, Rotation), ecs_get(world, e, Scale));
+    if (entry) {
+        *entry = (transform_world_cached_t){ .entity = e, .anchor = *anchor,
+            .epoch = cache->epoch, .version = transformAnchorVersion(cache, *anchor),
+            .rel = *rel };
+    }
+done:
+    return;
+}
+
 /** Get the world transform of an entity (box_transform_world) with the cache of the world.
  *
  * @param world The world
@@ -149,30 +287,28 @@ static const WorldTransform* transformWorldIn(
     ecs_entity_t e,
     WorldTransform *buf)
 {
-    const ecs_table_t *table = e ? ecs_get_table(world, e) : NULL;
+    transform_world_cached_t *entry;
+    ecs_entity_t anchor = 0;
+    WorldTransform rel;
     const WorldTransform *result = NULL;
-    if (!box_transform_spread(world, table)) {
-        result = table ? ecs_get(world, e, WorldTransform) : NULL;
-        goto done;
+    if (e && transformRelCached(cache, e, &entry)) {
+        anchor = entry->anchor;
+        rel = entry->rel;
+    } else {
+        const ecs_table_t *table = e ? ecs_get_table(world, e) : NULL;
+        if (!box_transform_spread(world, table)) {
+            result = table ? ecs_get(world, e, WorldTransform) : NULL;
+            goto done;
+        }
+
+        transformRelIn(world, cache, e, &anchor, &rel);
     }
 
-    uint32_t slot = ((uint32_t)e * 2654435761u) & (TRANSFORM_WORLD_CACHE - 1);
-    transform_world_cached_t *entry = cache ? &cache->entries[slot] : NULL;
-    if (entry && entry->entity == e && entry->epoch == cache->epoch) {
-        *buf = entry->t;
+    const WorldTransform *t_anchor = anchor ? ecs_get(world, anchor, WorldTransform) : NULL;
+    if (t_anchor) {
+        glm_mul(ECS_CONST_CAST(vec4*, t_anchor->m), rel.m, buf->m);
     } else {
-        WorldTransform parent_buf;
-        const WorldTransform *t_parent = NULL;
-        ecs_entity_t parent = ecs_get_parent(world, e);
-        while (parent && !(t_parent = transformWorldIn(world, cache, parent, &parent_buf))) {
-            parent = ecs_get_parent(world, parent);
-        }
-
-        transformSingle(t_parent, buf, ecs_get(world, e, Position),
-            ecs_get(world, e, Rotation), ecs_get(world, e, Scale));
-        if (entry) {
-            *entry = (transform_world_cached_t){ .entity = e, .epoch = cache->epoch, .t = *buf };
-        }
+        *buf = rel;
     }
 
     result = buf;
@@ -264,6 +400,17 @@ ecs_entity_t transformScopePush(
     return scope;
 }
 
+/** Drop every transform box_transform_world computed when an entity gets or loses a
+ * ManualTransform or loses its WorldTransform, which changes the anchors.
+ *
+ * @param it The observer iterator
+ */
+static void TransformCache_OnStructure(
+    ecs_iter_t *it)
+{
+    transformWorldCacheInvalidate(it->world);
+}
+
 void BoxTransformImport(
     ecs_world_t *world)
 {
@@ -306,6 +453,19 @@ void BoxTransformImport(
     TransformWorldCache *c = ecs_singleton_ensure(world, TransformWorldCache);
     c->cache = ecs_os_calloc_t(transform_world_cache_t);
     c->cache->epoch = 1;
+    ecs_map_init(&c->cache->versions, NULL);
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "OnManualTransform" }),
+        .query.terms = {{ .id = ManualTransform }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = TransformCache_OnStructure
+    });
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "OnRemoveWorldTransform" }),
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnRemove },
+        .callback = TransformCache_OnStructure
+    });
 
     TransformDynamicImport(world);
     TransformStaticImport(world);

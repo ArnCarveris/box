@@ -109,7 +109,15 @@ static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
     transform_static_t *state = it->ctx;
-    transformWorldCacheInvalidate(it->world);
+    ecs_id_t id = it->event_id;
+    if ((id == ecs_id(Position) && it->event == EcsOnSet) || id == ecs_id(Rotation) ||
+        id == ecs_id(Scale))
+    {
+        transformWorldCacheLocal(it);
+    } else {
+        transformWorldCacheInvalidate(it->world);
+    }
+
     transformStaticDirty(it, &state->value,
         !transformDeleting(it) && !box_transform_dynamic(it->world, it->table));
 }
@@ -152,7 +160,6 @@ static void TransformStatic_OnManual(
     ecs_iter_t *it)
 {
     transform_static_t *state = it->ctx;
-    transformWorldCacheInvalidate(it->world);
     transformStaticDirty(it, &state->manual, !box_transform_dynamic(it->world, it->table));
 }
 
@@ -404,7 +411,6 @@ static void TransformStatic(
     ecs_vec_clear(&dirty->value);
     ecs_vec_clear(&dirty->manual);
     ecs_vec_clear(&dirty->moved);
-    transformWorldCacheInvalidate(it->world);
 }
 
 void box_transform_on_moved(

@@ -46,17 +46,23 @@ void transformSingle(
 /** Entries of the cache of computed world transforms, a power of two */
 #define TRANSFORM_WORLD_CACHE (16384)
 
-/** A world transform box_transform_world computed */
+/** The transform of a spread entity relative to its anchor, the nearest ancestor that keeps
+ * its WorldTransform (box_transform_spread), which box_transform_world computed */
 typedef struct {
     ecs_entity_t entity;          /**< The entity, 0 for an empty entry */
-    uint64_t epoch;               /**< Epoch it was computed in, else it is stale */
-    WorldTransform t;             /**< The world transform */
+    ecs_entity_t anchor;          /**< The anchor, 0 when no ancestor keeps a WorldTransform */
+    uint64_t epoch;               /**< Epoch of the cache it was computed in, else it is stale */
+    uint64_t version;             /**< Version of the anchor it was computed at, else stale */
+    WorldTransform rel;           /**< The transform relative to the anchor */
 } transform_world_cached_t;
 
-/** The world transforms box_transform_world computed since the last change of a transform */
+/** The transforms of spread entities relative to their anchors. A local transform that changes
+ * under an anchor advances its version; a change of a hierarchy, DynamicTransform, ManualTransform
+ * or a removed Position advances the epoch. Anchors that move change neither. */
 typedef struct {
     transform_world_cached_t *entries; /**< TRANSFORM_WORLD_CACHE entries, NULL until used */
-    uint64_t epoch;               /**< Advances with every change of a transform */
+    uint64_t epoch;               /**< Advances with every change of a hierarchy */
+    ecs_map_t versions;           /**< Anchor to its version, 0 for one not in the map */
 } transform_world_cache_t;
 
 /** Singleton through which box_transform_world finds the cache of a world */
@@ -66,13 +72,21 @@ typedef struct {
 
 extern ECS_COMPONENT_DECLARE(TransformWorldCache);
 
-/** Drop the world transforms box_transform_world computed: a local transform, a hierarchy, a
- * ManualTransform or the transforms of a run of the systems changed.
+/** Drop every transform box_transform_world computed: a hierarchy, DynamicTransform or
+ * ManualTransform changed, or an entity lost its Position.
  *
  * @param world The world
  */
 void transformWorldCacheInvalidate(
     const ecs_world_t *world);
+
+/** Drop the transforms box_transform_world computed under the anchors of entities whose local
+ * transform changed, the entities of an observer event.
+ *
+ * @param it The observer iterator
+ */
+void transformWorldCacheLocal(
+    const ecs_iter_t *it);
 
 /** Find the world transform of the nearest ancestor that has one (box_transform_world).
  *
