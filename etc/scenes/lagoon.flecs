@@ -1,0 +1,37 @@
+include lagoon/state
+include lagoon/materials
+include lagoon/world
+include lagoon/canoe
+include lagoon/scenery
+
+using flecs.script
+using flecs.script.math
+using box.app
+using box.view
+using box.surface
+using state
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {environment: true, aerial_perspective: true, blend_modes: true, sheen: true,
+    diffuse_transmission: true, texture_scroll: true, water: true}
+}
+
+window { Surface: {width: 1280, height: 800, vsync: true} }
+
+// Idle animation: the clock runs and the paddler strokes while the game is playing
+async {
+  mut last: f64 = box.app.Status[box.app.Status].elapsed
+  while true {
+    await next_frame()
+    const now = box.app.Status[box.app.Status].elapsed
+    const fixed = App[App].delta_time
+    const d = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
+    last = now
+    dt = d
+    clock += d
+    if game_state == GS_PLAYING {
+      paddle_phase += d * (2.2 + speed * 0.08)
+    }
+  }
+}

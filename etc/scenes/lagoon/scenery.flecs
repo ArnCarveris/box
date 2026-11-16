@@ -1,0 +1,104 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using state
+using assets
+
+state {
+  // Scenery recycles over SCENERY_SPAN units: it scrolls toward +Z with distance and jumps
+  // back up the lagoon once it passes SCENERY_BEHIND, behind the camera
+  export const SCENERY_SPAN: f32 = 180
+  export const SCENERY_BEHIND: f32 = 14
+  export const BANK_X: f32 = 8.2
+
+  // Z of scenery placed at base along the lagoon, scrolled by distance and wrapped
+  fn scroll_z(base: f64, d: f64) -> f64 {
+    SCENERY_BEHIND - SCENERY_SPAN * fract((base - d) / SCENERY_SPAN)
+  }
+}
+
+assets {
+  // A palm of height h whose trunk curves sideways by bend * h at the top, crown turned by yaw
+  template LgPalm {
+    prop h: f32 = 7
+    prop bend: f32 = 0.25
+    prop yaw: f32 = 0
+    const SEGS: i32 = 6
+
+    for k in 0..SEGS {
+      const t = (k + 0.5) / SEGS
+      "trunk_{k}" : LgPalmBark {
+        Position: {bend * h * t * t, h * t, 0}
+        Rotation: {0, 0, 0 - atan2(2 * bend * t, 1)}
+        Frustum: {length: h / SEGS * 1.08, radius_bottom: 0.2 - 0.07 * k / SEGS, radius_top: 0.19 - 0.07 * (k + 1) / SEGS, segments: 8}
+      }
+    }
+
+    crown {
+      Position: {bend * h, h, 0}
+      Rotation: {0, yaw, 0}
+      top : LgFrondDark { Position: {0, 0.05, 0}; Sphere: {radius: 0.26, segments: 8} }
+      for c in 0..3 {
+        "nut_{c}" : LgCoconut { Position: {0.2 * cos(c * 2.1), -0.22, 0.2 * sin(c * 2.1)}; Sphere: {radius: 0.13, segments: 8, smooth: true} }
+      }
+      for f in 0..8 {
+        "frond_{f}" {
+          Rotation: {0, f * 0.785 + 0.3 * sin(f * 1.7), 0}
+          droop {
+            Rotation: {0.35 + 0.15 * sin(f * 2.3), 0, 0}
+            leaf : LgFrond { Position: {0, 0, 1.1}; Box: {0.85, 0.03, 2.2} }
+            tip {
+              Position: {0, 0, 2.15}
+              Rotation: {0.55, 0, 0}
+              leaf : LgFrond { Position: {0, 0, 0.7}; Box: {0.6, 0.03, 1.4} }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+banks {
+  // The banks are long strips that scroll by whole texture repeats, so their sand stays still
+  const step = 12
+  for s in 0..2 {
+    const side = s == 0 ? -1.0 : 1.0
+    "bank_{s}" {
+      Position: {side * BANK_X, 0, -280 + step * fract(distance / step)}
+      beach : LgSandWet { Position: {side * -0.9, -0.05, 0}; Rotation: {0, 0, side * 0.32}; Box: {2.6, 0.3, 640} }
+      top : LgSandDry { Position: {side * 45.3, 0.25, 0}; Box: {90, 0.5, 640} }
+      dune : LgSandDry { Position: {side * 36, 0.6, 0}; Rotation: {0, 0, side * -0.08}; Box: {30, 0.6, 640} }
+    }
+  }
+}
+
+palms {
+  for i in 0..16 {
+    const side = i % 2 == 0 ? -1.0 : 1.0
+    const base = i * (SCENERY_SPAN / 16) + hash(i * 3 + 1) * 7
+    const x = side * (BANK_X + 1.4 + hash(i * 3 + 2) * 7)
+    "slot_{i}" {
+      Position: {x, 0.5, scroll_z(base, distance)}
+      LgPalm palm(h: 5.5 + hash(i * 5) * 3.5, bend: (0.12 + hash(i * 7) * 0.22) * (0 - side), yaw: hash(i * 11) * 6.28)
+    }
+  }
+}
+
+jungle {
+  // Low green hills and bushes behind the palms
+  for i in 0..12 {
+    const side = i % 2 == 0 ? -1.0 : 1.0
+    const base = i * (SCENERY_SPAN / 12) + hash(i * 13) * 10
+    const x = side * (26 + hash(i * 17) * 14)
+    const r = 6 + hash(i * 19) * 5
+    "hill_{i}" : LgFrondDark {
+      Position: {x, 0.4, scroll_z(base, distance) - 10}
+      Scale: {1.4, 0.55, 1}
+      Sphere: {radius: r, segments: 12, smooth: true}
+      NoShadow
+    }
+  }
+}
