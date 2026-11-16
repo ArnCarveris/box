@@ -964,6 +964,26 @@ static void box_texture_gradient_ctor(
     }
 }
 
+/** Construct TexFlow components with length_value 1 and the other members zero.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_flow_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TexFlow *flow = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        ecs_os_memset_t(&flow[i], 0, TexFlow);
+        flow[i].length_value = 1;
+    }
+}
+
 /** Construct TexNoise components with frequency 4, one octave, lacunarity 2, gain 0.5, offset
  * 1, one channel and the other members zero.
  *
@@ -1431,6 +1451,7 @@ static void box_texture_register(
     ECS_META_COMPONENT(world, TexNormal);
     ECS_META_COMPONENT(world, TexSlope);
     ECS_META_COMPONENT(world, TexGradient);
+    ECS_META_COMPONENT(world, TexFlow);
 
     ecs_set_scope(world, module);
     ecs_set_name_prefix(world, "Texture");
@@ -1471,6 +1492,7 @@ void BoxTextureImport(
     ecs_set_hooks(world, TexNormal, { .ctor = box_texture_normal_ctor });
     ecs_set_hooks(world, TexSlope, { .ctor = box_texture_slope_ctor });
     ecs_set_hooks(world, TexGradient, { .ctor = box_texture_gradient_ctor });
+    ecs_set_hooks(world, TexFlow, { .ctor = box_texture_flow_ctor });
     ecs_set_hooks(world, TexNoise, { .ctor = box_texture_noise_ctor });
     ecs_set_hooks(world, TexBlocks, { .ctor = box_texture_blocks_ctor });
     ecs_set_hooks(world, TexCells, { .ctor = box_texture_cells_ctor });

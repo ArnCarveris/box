@@ -1672,6 +1672,20 @@
                 ]
             },
             {
+                "id": "TextureFlow",
+                "testcases": [
+                    "streak_plane",
+                    "line_along_field",
+                    "unchanged_without_smear",
+                    "curved_field",
+                    "vector_input",
+                    "tiling_plane",
+                    "sphere_seam",
+                    "sphere_poles",
+                    "reach_edit_no_recompile"
+                ]
+            },
+            {
                 "id": "TextureDistance",
                 "testcases": [
                     "hard_edges",

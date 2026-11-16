@@ -465,6 +465,13 @@ void box_texture_math_register(
 void box_texture_noise_register(
     ecs_world_t *world);
 
+/** Register the TexFlow node kind.
+ *
+ * @param world The world
+ */
+void box_texture_flow_register(
+    ecs_world_t *world);
+
 /** Register the built in node kinds.
  *
  * @param world The world

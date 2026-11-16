@@ -934,7 +934,7 @@ static void box_texture_nodes_register_lookups(
 }
 
 /** Register the built in node kinds of the differences of a height: TexNormal, TexSlope and
- * TexGradient.
+ * TexGradient, and TexFlow that follows such a field.
  *
  * @param world The world
  */
@@ -979,6 +979,8 @@ static void box_texture_nodes_register_relief(
         .source = box_texture_gradient_wgsl,
         .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
     });
+
+    box_texture_flow_register(world);
 }
 
 void box_texture_nodes_register(

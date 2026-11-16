@@ -977,6 +977,44 @@ ECS_STRUCT(TexGradient, {
                           *   a zero vector, as TexSlope.strength */
 });
 
+/** Node of a TextureGraph that smears its input along the streamlines of a vector field (line
+ * integral convolution), for filaments, wisps and stretched gas such as noise along a curl field.
+ *
+ * Each texel traces the streamline of field forward and backward over reach * clamp(length, 0,
+ * 1), reading the field again at every step, and takes the gaussian weighted average of input
+ * along it, three standard deviations at the ends as TexBlur, at most BOX_TEX_FLOW_TAPS taps.
+ *
+ * The input is a Scalar or a Vector node and the value has its type, input_value without one.
+ * The field is signed and only its direction is used; where its length is about 0 the texel
+ * keeps its input.
+ *
+ * On DomainPlane the (x, y) of the field is in the space of TexCoords, u right and v down, and
+ * the image wraps, so a tiling input still tiles.
+ *
+ * On DomainSphere the field is a 3D vector in the direction space of TexCoords, projected on
+ * the tangent plane at every step: the streak follows great circles across the longitude seam
+ * and the poles. The reach is in units of 2 pi / 512 radians.
+ *
+ * @code
+ * filaments { nodes.Flow: {input: noise, field: curl, reach: 24} }
+ * @endcode
+ */
+ECS_STRUCT(TexFlow, {
+    ecs_entity_t input;  /**< Node to smear, a Scalar or a Vector, 0 for input_value */
+    vec4 input_value;    /**< Value of input without a node */
+    ecs_entity_t field;  /**< Vector node of the direction of the streamlines, 0 for
+                          *   field_value */
+    vec4 field_value;    /**< Value of field without a node */
+    ecs_entity_t length; /**< Scalar node of the factor of reach per texel, 0 for
+                          *   length_value */
+    float length_value;  /**< Value of length without a node, 1 when the component is added */
+    float reach;         /**< Half length of the streak in texels of a 512 pixel wide image,
+                          *   scaled with the width; 0 for no smear */
+});
+
+/** Most taps on each side of the streak of a TexFlow node */
+#define BOX_TEX_FLOW_TAPS (32)
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 

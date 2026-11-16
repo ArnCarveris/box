@@ -66,7 +66,7 @@ Each input is an entity member (`a`, `input`, ...) or, when 0, its constant (`a_
 | Coordinates | `Warp {coords, offset, amount}` (offset centered at 0.5), `Transform {coords, angle (deg), axis, translate, scale}` |
 | Patterns | `Noise {coords, evolve, frequency 4, octaves 1, lacunarity 2, gain 0.5, seed, fractal NoiseFbm/NoiseRidged/NoiseBillow, offset 1, channels 1/3/4}`, `Cells {distance CellsNearest/CellsSecond/CellsEdge, count 64, jitter 1, seed, edge 0.25, coords, evolve}` -> (dist, id, rand, rand), `Blocks {courses 8, per_course 4, gap, jitter, stagger, softness, tones, tone_order, seed, layer_seed}` -> (mask, id, tone, rand), plane only |
 | Lookup | `Ramp {input, keys}` (max 32 keys, linear color out), `Curve {input, curve}` (box/curve.h, max 32 keys), `Image {texture, coords, address, linear}`, `Lut {texture, u, v, linear}` |
-| Neighbourhood | `Blur {input, radius}`, `Distance {input, range}` (signed distance to 0.5 contour), `Normal {height, strength}` (for GraphLinear), `Slope {height, strength}`, `Gradient {height, strength}` (uphill vector in the space of `Coords`) |
+| Neighbourhood | `Blur {input, radius}`, `Distance {input, range}` (signed distance to 0.5 contour), `Normal {height, strength}` (for GraphLinear), `Slope {height, strength}`, `Gradient {height, strength}` (uphill vector in the space of `Coords`), `Flow {input, field, length, reach}` |
 
 Radii and ranges are in texels of a 512 wide image, so results do not change with resolution.
 
@@ -122,7 +122,7 @@ Wait for a graph or load in script: `const ready: bool = tex[box.texture.Status]
 - Graph values are cached by content hash in a shared cache (`graph.Cache {budget}`, 0 = 256 MB,
   LRU of unused values): an edit re-evaluates only stages after the edited node; identical
   subgraphs are shared across graphs.
-- Neighbourhood nodes (`Blur`, `Distance`, `Normal`, `Slope`, `Gradient`) materialize their inputs into
+- Neighbourhood nodes (`Blur`, `Distance`, `Normal`, `Slope`, `Gradient`, `Flow`) materialize their inputs into
   intermediate textures; `Distance` runs `BOX_TEX_DISTANCE_PASSES` (12) passes.
 - `graph.Stats` (singleton) reports graphs, programs, dispatches, texels, `gpu_ms`, pool and key
   image bytes.
