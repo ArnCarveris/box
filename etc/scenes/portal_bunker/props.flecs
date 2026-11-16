@@ -114,389 +114,472 @@ bunker {
     prop_107 : BunkerModel_barracks_furniture_ops_0 { Position: {-42, 0, 38} }
     prop_108 : BunkerModel_barracks_stairwell { Position: {-42, 0, 38} }
     prop_109 : BunkerModel_deckhouse_stairwell { Position: {55, 5, 38} }
-    prop_110 : BunkerModel_messTableSmall { Position: {-50.15, 0.05, 44.42}; Rotation: {0, 4.7124, 0} }
-    prop_111 : BunkerModel_stool { Position: {-49.85, 0.05, 43.77}; Rotation: {0, 3.1416, 0} }
-    prop_112 : BunkerModel_stool { Position: {-50.45, 0.05, 43.77}; Rotation: {0, 3.1416, 0} }
-    prop_113 : BunkerModel_messTableSmall { Position: {-50.2, 0.05, 42.19}; Rotation: {0, 1.5708, 0} }
-    prop_114 : BunkerModel_stool { Position: {-50.5, 0.05, 42.84} }
-    prop_115 : BunkerModel_stool { Position: {-49.9, 0.05, 42.84} }
-    prop_116 : BunkerModel_locker { Position: {-47.075, 0.05, 42.04} }
-    prop_117 : BunkerModel_crateSmall { Position: {-46.905, 0.05, 44.5}; Rotation: {0, -1.5708, 0} }
-    prop_118 : BunkerModel_crateSmall { Position: {-47.65, 0.05, 44.52}; Rotation: {0, 3.1416, 0} }
-    prop_119 : BunkerModel_barrel { Position: {-48.55, 0.05, 42.14} }
-    prop_120 : BunkerModel_wallShelf { Position: {-48.53, 2.7, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_121 : BunkerModel_bunk { Position: {-49.0967, 3.25, 43.61}; Rotation: {0, -1.5708, 0} }
-    prop_122 : BunkerModel_locker { Position: {-48.3467, 3.25, 42.26}; Rotation: {0, -1.5708, 0} }
-    prop_123 : BunkerModel_locker { Position: {-50.3, 3.25, 44.57}; Rotation: {0, 3.1416, 0} }
-    prop_124 : BunkerModel_smallTable { Position: {-48.3967, 3.25, 44.45}; Rotation: {0, -1.5708, 0} }
-    prop_125 : BunkerModel_stool { Position: {-48.8967, 3.25, 44.5}; Rotation: {0, -1.5708, 0} }
-    prop_126 : BunkerModel_footlocker { Position: {-50.61, 3.25, 42.27}; Rotation: {0, 1.5708, 0} }
-    prop_127 : BunkerModel_wallShelf { Position: {-50.695, 5.9, 42.78}; Rotation: {0, 1.5708, 0} }
-    prop_128 : BunkerModel_wallShelf { Position: {-48.2217, 5.9, 42.88}; Rotation: {0, -1.5708, 0} }
-    prop_129 : BunkerModel_rug { Position: {-49.455, 3.25, 42.55}; Scale: {0.65, 1, 1.04} }
-    prop_130 : BunkerModel_bunk { Position: {-46.8167, 3.25, 42.24}; Rotation: {0, 1.5708, 0} }
-    prop_131 : BunkerModel_bunk { Position: {-46.8167, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_132 : BunkerModel_footlocker { Position: {-45.3233, 3.25, 44.37}; Rotation: {0, -1.5708, 0} }
-    prop_133 : BunkerModel_footlocker { Position: {-45.3233, 3.25, 42.32}; Rotation: {0, -1.5708, 0} }
-    prop_134 : BunkerModel_wallShelf { Position: {-47.7117, 5.9, 42.48}; Rotation: {0, 1.5708, 0} }
-    prop_135 : BunkerModel_wallShelf { Position: {-46.8467, 5.9, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_136 : BunkerModel_rug { Position: {-46.4717, 3.25, 43.3}; Scale: {0.65, 1, 1.04} }
-    prop_137 : BunkerModel_bunk { Position: {-43.2833, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_138 : BunkerModel_locker { Position: {-44.2333, 3.25, 42.04} }
-    prop_139 : BunkerModel_locker { Position: {-42.38, 3.25, 43.36}; Rotation: {0, -1.5708, 0} }
-    prop_140 : BunkerModel_footlocker { Position: {-44.6433, 3.25, 44.27}; Rotation: {0, 1.5708, 0} }
-    prop_141 : BunkerModel_wallShelf { Position: {-42.255, 5.9, 42.98}; Rotation: {0, -1.5708, 0} }
-    prop_142 : BunkerModel_wallShelf { Position: {-44.1633, 5.9, 41.915} }
-    prop_143 : BunkerModel_rug { Position: {-43.2133, 3.25, 43.03}; Scale: {1, 1, 1.6} }
-    prop_144 : BunkerModel_bunk { Position: {-40.2, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_145 : BunkerModel_locker { Position: {-39.6167, 3.25, 42.04} }
-    prop_146 : BunkerModel_locker { Position: {-41.62, 3.25, 44.26}; Rotation: {0, 1.5708, 0} }
-    prop_147 : BunkerModel_footlocker { Position: {-41.66, 3.25, 43.42}; Rotation: {0, 1.5708, 0} }
-    prop_148 : BunkerModel_wallShelf { Position: {-41.745, 5.9, 43.58}; Rotation: {0, 1.5708, 0} }
-    prop_149 : BunkerModel_wallShelf { Position: {-39.98, 5.9, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_150 : BunkerModel_rug { Position: {-40.63, 3.25, 43.03}; Scale: {1, 1, 1.6} }
-    prop_151 : BunkerModel_bunk { Position: {-36.6133, 3.25, 42.86} }
-    prop_152 : BunkerModel_bunk { Position: {-37.4167, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_153 : BunkerModel_locker { Position: {-38.0667, 3.25, 42.04} }
-    prop_154 : BunkerModel_footlocker { Position: {-38.6767, 3.25, 44.42}; Rotation: {0, 1.5708, 0} }
-    prop_155 : BunkerModel_wallShelf { Position: {-37.4967, 5.9, 41.915} }
-    prop_156 : BunkerModel_wallShelf { Position: {-37.3967, 5.9, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_157 : BunkerModel_rug { Position: {-37.5467, 3.25, 43.22}; Scale: {0.8, 1, 1.28} }
-    prop_158 : BunkerModel_bunk { Position: {-34.9033, 3.25, 43.61}; Rotation: {0, 1.5708, 0} }
-    prop_159 : BunkerModel_locker { Position: {-35.6533, 3.25, 42.31}; Rotation: {0, 1.5708, 0} }
-    prop_160 : BunkerModel_locker { Position: {-35.4333, 3.25, 44.57}; Rotation: {0, 3.1416, 0} }
-    prop_161 : BunkerModel_smallTable { Position: {-33.48, 3.25, 44.45}; Rotation: {0, -1.5708, 0} }
-    prop_162 : BunkerModel_stool { Position: {-33.98, 3.25, 44.5}; Rotation: {0, -1.5708, 0} }
-    prop_163 : BunkerModel_footlocker { Position: {-33.39, 3.25, 42.27}; Rotation: {0, -1.5708, 0} }
-    prop_164 : BunkerModel_wallShelf { Position: {-33.305, 5.9, 42.78}; Rotation: {0, -1.5708, 0} }
-    prop_165 : BunkerModel_wallShelf { Position: {-35.7783, 5.9, 42.58}; Rotation: {0, 1.5708, 0} }
-    prop_166 : BunkerModel_rug { Position: {-34.5383, 3.25, 42.55}; Scale: {0.65, 1, 1.04} }
-    prop_167 : BunkerModel_bed { Position: {-49.82, 3.25, 31.725}; Rotation: {0, 1.5708, 0} }
-    prop_168 : BunkerModel_wardrobe { Position: {-48.3967, 3.25, 31.7}; Rotation: {0, -1.5708, 0} }
-    prop_169 : BunkerModel_footlocker { Position: {-48.3067, 3.25, 33.83}; Rotation: {0, -1.5708, 0} }
-    prop_170 : BunkerModel_smallTable { Position: {-50.45, 3.25, 33.91}; Rotation: {0, 3.1416, 0} }
-    prop_171 : BunkerModel_stool { Position: {-50.5, 3.25, 33.41}; Rotation: {0, 3.1416, 0} }
-    prop_172 : BunkerModel_wallShelf { Position: {-49.83, 5.9, 31.305} }
-    prop_173 : BunkerModel_rug { Position: {-49.455, 3.25, 32.92}; Scale: {0.85, 1, 1.3} }
-    prop_174 : BunkerModel_bunk { Position: {-46.8167, 3.25, 33.76}; Rotation: {0, 4.7124, 0} }
-    prop_175 : BunkerModel_bunk { Position: {-46.1333, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_176 : BunkerModel_locker { Position: {-47.5867, 3.25, 31.7}; Rotation: {0, 1.5708, 0} }
-    prop_177 : BunkerModel_footlocker { Position: {-45.3233, 3.25, 33.81}; Rotation: {0, -1.5708, 0} }
-    prop_178 : BunkerModel_footlocker { Position: {-47.6267, 3.25, 32.76}; Rotation: {0, 1.5708, 0} }
-    prop_179 : BunkerModel_wallShelf { Position: {-47.7117, 5.9, 32.07}; Rotation: {0, 1.5708, 0} }
-    prop_180 : BunkerModel_wallShelf { Position: {-46.4467, 5.9, 31.305} }
-    prop_181 : BunkerModel_rug { Position: {-46.4717, 3.25, 32.69}; Scale: {0.65, 1, 1.04} }
-    prop_182 : BunkerModel_bunk { Position: {-43.3333, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_183 : BunkerModel_locker { Position: {-44.3833, 3.25, 33.96}; Rotation: {0, 3.1416, 0} }
-    prop_184 : BunkerModel_locker { Position: {-42.38, 3.25, 32.6}; Rotation: {0, -1.5708, 0} }
-    prop_185 : BunkerModel_footlocker { Position: {-44.6433, 3.25, 31.61}; Rotation: {0, 1.5708, 0} }
-    prop_186 : BunkerModel_wallShelf { Position: {-42.8633, 5.9, 31.305} }
-    prop_187 : BunkerModel_wallShelf { Position: {-42.255, 5.9, 32.97}; Rotation: {0, -1.5708, 0} }
-    prop_188 : BunkerModel_rug { Position: {-43.3633, 3.25, 32.97}; Scale: {1, 1, 1.6} }
-    prop_189 : BunkerModel_bunk { Position: {-40.2, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_190 : BunkerModel_locker { Position: {-41.62, 3.25, 31.8}; Rotation: {0, 1.5708, 0} }
-    prop_191 : BunkerModel_locker { Position: {-39.75, 3.25, 33.96}; Rotation: {0, 3.1416, 0} }
-    prop_192 : BunkerModel_footlocker { Position: {-41.66, 3.25, 32.66}; Rotation: {0, 1.5708, 0} }
-    prop_193 : BunkerModel_wallShelf { Position: {-39.88, 5.9, 31.305} }
-    prop_194 : BunkerModel_wallShelf { Position: {-41.745, 5.9, 33.07}; Rotation: {0, 1.5708, 0} }
-    prop_195 : BunkerModel_rug { Position: {-40.78, 3.25, 32.97}; Scale: {1, 1, 1.6} }
-    prop_196 : BunkerModel_bunk { Position: {-37.8167, 3.25, 33.76}; Rotation: {0, 4.7124, 0} }
-    prop_197 : BunkerModel_bunk { Position: {-37.8167, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_198 : BunkerModel_locker { Position: {-36.4133, 3.25, 33.74}; Rotation: {0, -1.5708, 0} }
-    prop_199 : BunkerModel_locker { Position: {-36.4133, 3.25, 31.65}; Rotation: {0, -1.5708, 0} }
-    prop_200 : BunkerModel_wallShelf { Position: {-37.5967, 5.9, 34.085}; Rotation: {0, 3.1416, 0} }
-    prop_201 : BunkerModel_wallShelf { Position: {-36.2883, 5.9, 32.57}; Rotation: {0, -1.5708, 0} }
-    prop_202 : BunkerModel_rug { Position: {-37.5217, 3.25, 32.69}; Scale: {0.65, 1, 1.04} }
-    prop_203 : BunkerModel_bunk { Position: {-34.9033, 3.25, 32.45}; Rotation: {0, 1.5708, 0} }
-    prop_204 : BunkerModel_locker { Position: {-35.6533, 3.25, 33.74}; Rotation: {0, 1.5708, 0} }
-    prop_205 : BunkerModel_locker { Position: {-35.2333, 3.25, 31.43} }
-    prop_206 : BunkerModel_smallTable { Position: {-33.48, 3.25, 31.6}; Rotation: {0, -1.5708, 0} }
-    prop_207 : BunkerModel_stool { Position: {-33.98, 3.25, 31.65}; Rotation: {0, -1.5708, 0} }
-    prop_208 : BunkerModel_footlocker { Position: {-33.39, 3.25, 33.81}; Rotation: {0, -1.5708, 0} }
-    prop_209 : BunkerModel_wallShelf { Position: {-33.305, 5.9, 33.27}; Rotation: {0, -1.5708, 0} }
-    prop_210 : BunkerModel_wallShelf { Position: {-34.0133, 5.9, 31.305} }
-    prop_211 : BunkerModel_rug { Position: {-34.5383, 3.25, 33.49}; Scale: {0.65, 1, 1.04} }
-    prop_212 : BunkerModel_bunk { Position: {-37.55, 3.25, 34.92}; Rotation: {0, 1.5708, 0} }
-    prop_213 : BunkerModel_bunk { Position: {-34.25, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_214 : BunkerModel_bunk { Position: {-36.4, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_215 : BunkerModel_bunk { Position: {-34.18, 3.25, 36.44}; Rotation: {0, -1.5708, 0} }
-    prop_216 : BunkerModel_locker { Position: {-33.43, 3.25, 34.94}; Rotation: {0, -1.5708, 0} }
-    prop_217 : BunkerModel_locker { Position: {-36.05, 3.25, 34.72} }
-    prop_218 : BunkerModel_wallShelf { Position: {-35.88, 5.9, 34.595} }
-    prop_219 : BunkerModel_wallShelf { Position: {-37.28, 5.9, 37.745}; Rotation: {0, 3.1416, 0} }
-    prop_220 : BunkerModel_rug { Position: {-36.03, 3.25, 36.16}; Scale: {1.6, 1, 1} }
-    prop_221 : BunkerModel_bunk { Position: {-34.2, 3.25, 38.58}; Rotation: {0, 1.5708, 0} }
-    prop_222 : BunkerModel_bunk { Position: {-37.4, 3.25, 41.08}; Rotation: {0, 4.7124, 0} }
-    prop_223 : BunkerModel_bunk { Position: {-36.35, 3.25, 38.58}; Rotation: {0, 1.5708, 0} }
-    prop_224 : BunkerModel_bunk { Position: {-34.18, 3.25, 39.7}; Rotation: {0, -1.5708, 0} }
-    prop_225 : BunkerModel_locker { Position: {-33.43, 3.25, 41.05}; Rotation: {0, -1.5708, 0} }
-    prop_226 : BunkerModel_footlocker { Position: {-38.36, 3.25, 40.16}; Rotation: {0, 1.5708, 0} }
-    prop_227 : BunkerModel_wallShelf { Position: {-38.445, 5.9, 40.82}; Rotation: {0, 1.5708, 0} }
-    prop_228 : BunkerModel_wallShelf { Position: {-36.08, 5.9, 41.405}; Rotation: {0, 3.1416, 0} }
-    prop_229 : BunkerModel_rug { Position: {-36.03, 3.25, 39.82}; Scale: {1.6, 1, 1} }
-    prop_230 : BunkerModel_bunk { Position: {-46.65, 3.25, 34.92}; Rotation: {0, 1.5708, 0} }
-    prop_231 : BunkerModel_bunk { Position: {-49.8, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_232 : BunkerModel_bunk { Position: {-47.65, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_233 : BunkerModel_bunk { Position: {-49.82, 3.25, 36.44}; Rotation: {0, 1.5708, 0} }
-    prop_234 : BunkerModel_locker { Position: {-50.57, 3.25, 34.94}; Rotation: {0, 1.5708, 0} }
-    prop_235 : BunkerModel_footlocker { Position: {-45.64, 3.25, 35.85}; Rotation: {0, -1.5708, 0} }
-    prop_236 : BunkerModel_footlocker { Position: {-48.29, 3.25, 34.68} }
-    prop_237 : BunkerModel_wallShelf { Position: {-50.13, 5.9, 37.745}; Rotation: {0, 3.1416, 0} }
-    prop_238 : BunkerModel_wallShelf { Position: {-47.43, 5.9, 37.745}; Rotation: {0, 3.1416, 0} }
-    prop_239 : BunkerModel_rug { Position: {-47.93, 3.25, 36.16}; Scale: {1.6, 1, 1} }
-    prop_240 : BunkerModel_bed { Position: {-50.325, 3.25, 39.13} }
-    prop_241 : BunkerModel_cabinDesk { Position: {-45.705, 3.25, 40.85}; Rotation: {0, -1.5708, 0} }
-    prop_242 : BunkerModel_chair { Position: {-46.21, 3.25, 40.7}; Rotation: {0, 1.5708, 0} }
-    prop_243 : BunkerModel_wardrobe { Position: {-50.52, 3.25, 41.01}; Rotation: {0, 1.5708, 0} }
-    prop_244 : BunkerModel_footlocker { Position: {-47.14, 3.25, 38.34} }
-    prop_245 : BunkerModel_smallTable { Position: {-49.15, 3.25, 38.43} }
-    prop_246 : BunkerModel_stool { Position: {-49.1, 3.25, 38.93} }
-    prop_247 : BunkerModel_wallShelf { Position: {-50.695, 5.9, 39.12}; Rotation: {0, 1.5708, 0} }
-    prop_248 : BunkerModel_rug { Position: {-48.13, 3.25, 39.845}; Scale: {1.3, 1, 0.85} }
-    prop_249 : BunkerModel_bunk { Position: {-49.0967, 6.45, 43.56}; Rotation: {0, -1.5708, 0} }
-    prop_250 : BunkerModel_locker { Position: {-48.3467, 6.45, 42.41}; Rotation: {0, -1.5708, 0} }
-    prop_251 : BunkerModel_locker { Position: {-50.35, 6.45, 44.57}; Rotation: {0, 3.1416, 0} }
-    prop_252 : BunkerModel_smallTable { Position: {-48.3967, 6.45, 44.41}; Rotation: {0, -1.5708, 0} }
-    prop_253 : BunkerModel_stool { Position: {-48.8967, 6.45, 44.46}; Rotation: {0, -1.5708, 0} }
-    prop_254 : BunkerModel_footlocker { Position: {-50.61, 6.45, 42.17}; Rotation: {0, 1.5708, 0} }
-    prop_255 : BunkerModel_wallShelf { Position: {-50.695, 9.1, 43.08}; Rotation: {0, 1.5708, 0} }
-    prop_256 : BunkerModel_wallShelf { Position: {-49.03, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_257 : BunkerModel_rug { Position: {-49.455, 6.45, 42.5}; Scale: {0.65, 1, 1.04} }
-    prop_258 : BunkerModel_bunk { Position: {-47.3867, 6.45, 42.81}; Rotation: {0, 3.1416, 0} }
-    prop_259 : BunkerModel_bunk { Position: {-46.1667, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_260 : BunkerModel_locker { Position: {-45.6667, 6.45, 42.04} }
-    prop_261 : BunkerModel_locker { Position: {-47.5867, 6.45, 44.35}; Rotation: {0, 1.5708, 0} }
-    prop_262 : BunkerModel_footlocker { Position: {-46.5067, 6.45, 42} }
-    prop_263 : BunkerModel_wallShelf { Position: {-45.9467, 9.1, 41.915} }
-    prop_264 : BunkerModel_wallShelf { Position: {-46.2467, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_265 : BunkerModel_rug { Position: {-46.4467, 6.45, 43.22}; Scale: {0.8, 1, 1.28} }
-    prop_266 : BunkerModel_bunk { Position: {-43.1833, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_267 : BunkerModel_locker { Position: {-44.2333, 6.45, 42.04} }
-    prop_268 : BunkerModel_locker { Position: {-42.38, 6.45, 43.31}; Rotation: {0, -1.5708, 0} }
-    prop_269 : BunkerModel_footlocker { Position: {-44.6433, 6.45, 44.44}; Rotation: {0, 1.5708, 0} }
-    prop_270 : BunkerModel_wallShelf { Position: {-42.255, 9.1, 43.08}; Rotation: {0, -1.5708, 0} }
-    prop_271 : BunkerModel_wallShelf { Position: {-44.0633, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_272 : BunkerModel_rug { Position: {-43.2133, 6.45, 43.03}; Scale: {1, 1, 1.6} }
-    prop_273 : BunkerModel_bunk { Position: {-40.8, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_274 : BunkerModel_locker { Position: {-39.7, 6.45, 42.04} }
-    prop_275 : BunkerModel_locker { Position: {-41.62, 6.45, 43.41}; Rotation: {0, 1.5708, 0} }
-    prop_276 : BunkerModel_footlocker { Position: {-39.3567, 6.45, 44.44}; Rotation: {0, -1.5708, 0} }
-    prop_277 : BunkerModel_wallShelf { Position: {-41.745, 9.1, 44.08}; Rotation: {0, 1.5708, 0} }
-    prop_278 : BunkerModel_wallShelf { Position: {-40.38, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_279 : BunkerModel_rug { Position: {-40.73, 6.45, 43.03}; Scale: {1, 1, 1.6} }
-    prop_280 : BunkerModel_bunk { Position: {-36.6133, 6.45, 42.81} }
-    prop_281 : BunkerModel_bunk { Position: {-37.2167, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
-    prop_282 : BunkerModel_locker { Position: {-38.3167, 6.45, 42.04} }
-    prop_283 : BunkerModel_footlocker { Position: {-38.6767, 6.45, 44.27}; Rotation: {0, 1.5708, 0} }
-    prop_284 : BunkerModel_footlocker { Position: {-37.4567, 6.45, 42} }
-    prop_285 : BunkerModel_wallShelf { Position: {-37.6967, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
-    prop_286 : BunkerModel_wallShelf { Position: {-36.2883, 9.1, 44.08}; Rotation: {0, -1.5708, 0} }
-    prop_287 : BunkerModel_rug { Position: {-37.5467, 6.45, 43.22}; Scale: {0.8, 1, 1.28} }
-    prop_288 : BunkerModel_bunk { Position: {-34.9033, 6.45, 43.66}; Rotation: {0, 1.5708, 0} }
-    prop_289 : BunkerModel_locker { Position: {-35.6533, 6.45, 42.26}; Rotation: {0, 1.5708, 0} }
-    prop_290 : BunkerModel_locker { Position: {-35.4333, 6.45, 44.57}; Rotation: {0, 3.1416, 0} }
-    prop_291 : BunkerModel_footlocker { Position: {-33.7233, 6.45, 44.61}; Rotation: {0, 3.1416, 0} }
-    prop_292 : BunkerModel_wallShelf { Position: {-33.305, 9.1, 43.08}; Rotation: {0, -1.5708, 0} }
-    prop_293 : BunkerModel_wallShelf { Position: {-35.7783, 9.1, 42.58}; Rotation: {0, 1.5708, 0} }
-    prop_294 : BunkerModel_rug { Position: {-34.5633, 6.45, 42.52}; Scale: {0.8, 1, 1.28} }
-    prop_295 : BunkerModel_bed { Position: {-49.0967, 6.45, 32.475}; Rotation: {0, -1.5708, 0} }
-    prop_296 : BunkerModel_wardrobe { Position: {-48.3967, 6.45, 33.55}; Rotation: {0, -1.5708, 0} }
-    prop_297 : BunkerModel_footlocker { Position: {-50.44, 6.45, 31.39} }
-    prop_298 : BunkerModel_smallTable { Position: {-48.3967, 6.45, 31.55}; Rotation: {0, -1.5708, 0} }
-    prop_299 : BunkerModel_stool { Position: {-48.8967, 6.45, 31.6}; Rotation: {0, -1.5708, 0} }
-    prop_300 : BunkerModel_wallShelf { Position: {-50.695, 9.1, 31.97}; Rotation: {0, 1.5708, 0} }
-    prop_301 : BunkerModel_rug { Position: {-49.44, 6.45, 33.54}; Scale: {0.68, 1, 1.04} }
-    prop_302 : BunkerModel_bunk { Position: {-47.3867, 6.45, 33.19}; Rotation: {0, 3.1416, 0} }
-    prop_303 : BunkerModel_bunk { Position: {-46.8167, 6.45, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_304 : BunkerModel_locker { Position: {-45.6667, 6.45, 33.96}; Rotation: {0, 3.1416, 0} }
-    prop_305 : BunkerModel_footlocker { Position: {-45.3233, 6.45, 31.61}; Rotation: {0, -1.5708, 0} }
-    prop_306 : BunkerModel_footlocker { Position: {-46.5067, 6.45, 34}; Rotation: {0, 3.1416, 0} }
-    prop_307 : BunkerModel_wallShelf { Position: {-46.0467, 9.1, 34.085}; Rotation: {0, 3.1416, 0} }
-    prop_308 : BunkerModel_wallShelf { Position: {-47.7117, 9.1, 31.87}; Rotation: {0, 1.5708, 0} }
-    prop_309 : BunkerModel_rug { Position: {-46.4467, 6.45, 32.81}; Scale: {0.8, 1, 1.28} }
-    prop_310 : BunkerModel_bunk { Position: {-43.8333, 6.45, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_311 : BunkerModel_locker { Position: {-44.2833, 6.45, 33.96}; Rotation: {0, 3.1416, 0} }
-    prop_312 : BunkerModel_locker { Position: {-42.38, 6.45, 31.7}; Rotation: {0, -1.5708, 0} }
-    prop_313 : BunkerModel_footlocker { Position: {-42.34, 6.45, 32.76}; Rotation: {0, -1.5708, 0} }
-    prop_314 : BunkerModel_wallShelf { Position: {-42.255, 9.1, 32.47}; Rotation: {0, -1.5708, 0} }
-    prop_315 : BunkerModel_wallShelf { Position: {-42.8633, 9.1, 31.305} }
-    prop_316 : BunkerModel_rug { Position: {-43.2633, 6.45, 32.97}; Scale: {1, 1, 1.6} }
-    prop_317 : BunkerModel_bunk { Position: {-40.2, 6.45, 31.63}; Rotation: {0, 1.5708, 0} }
-    prop_318 : BunkerModel_locker { Position: {-41.62, 6.45, 31.65}; Rotation: {0, 1.5708, 0} }
-    prop_319 : BunkerModel_locker { Position: {-39.9, 6.45, 33.96}; Rotation: {0, 3.1416, 0} }
-    prop_320 : BunkerModel_footlocker { Position: {-41.66, 6.45, 32.61}; Rotation: {0, 1.5708, 0} }
-    prop_321 : BunkerModel_wallShelf { Position: {-41.745, 9.1, 32.17}; Rotation: {0, 1.5708, 0} }
-    prop_322 : BunkerModel_wallShelf { Position: {-39.98, 9.1, 31.305} }
-    prop_323 : BunkerModel_rug { Position: {-40.53, 6.45, 32.81}; Scale: {0.8, 1, 1.28} }
-    prop_324 : BunkerModel_bunk { Position: {-37.2667, 6.45, 33.76}; Rotation: {0, 4.7124, 0} }
-    prop_325 : BunkerModel_bunk { Position: {-36.6133, 6.45, 32.2} }
-    prop_326 : BunkerModel_locker { Position: {-38.3667, 6.45, 31.43} }
-    prop_327 : BunkerModel_footlocker { Position: {-38.6767, 6.45, 33.83}; Rotation: {0, 1.5708, 0} }
-    prop_328 : BunkerModel_footlocker { Position: {-37.5067, 6.45, 31.39} }
-    prop_329 : BunkerModel_wallShelf { Position: {-38.0967, 9.1, 34.085}; Rotation: {0, 3.1416, 0} }
-    prop_330 : BunkerModel_wallShelf { Position: {-37.8967, 9.1, 31.305} }
-    prop_331 : BunkerModel_rug { Position: {-37.5467, 6.45, 32.61}; Scale: {0.8, 1, 1.28} }
-    prop_332 : BunkerModel_bunk { Position: {-34.9033, 6.45, 32.4}; Rotation: {0, 1.5708, 0} }
-    prop_333 : BunkerModel_locker { Position: {-35.6533, 6.45, 33.7}; Rotation: {0, 1.5708, 0} }
-    prop_334 : BunkerModel_locker { Position: {-33.43, 6.45, 31.75}; Rotation: {0, -1.5708, 0} }
-    prop_335 : BunkerModel_smallTable { Position: {-35.6033, 6.45, 31.55}; Rotation: {0, 1.5708, 0} }
-    prop_336 : BunkerModel_stool { Position: {-35.1033, 6.45, 31.5}; Rotation: {0, 1.5708, 0} }
-    prop_337 : BunkerModel_footlocker { Position: {-33.39, 6.45, 33.83}; Rotation: {0, -1.5708, 0} }
-    prop_338 : BunkerModel_wallShelf { Position: {-33.305, 9.1, 32.97}; Rotation: {0, -1.5708, 0} }
-    prop_339 : BunkerModel_wallShelf { Position: {-35.7783, 9.1, 32.67}; Rotation: {0, 1.5708, 0} }
-    prop_340 : BunkerModel_rug { Position: {-34.5383, 6.45, 33.44}; Scale: {0.65, 1, 1.04} }
-    prop_341 : BunkerModel_bunk { Position: {-34.25, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_342 : BunkerModel_bunk { Position: {-37.4, 6.45, 34.92}; Rotation: {0, 1.5708, 0} }
-    prop_343 : BunkerModel_bunk { Position: {-36.4, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_344 : BunkerModel_bunk { Position: {-34.18, 6.45, 36.49}; Rotation: {0, -1.5708, 0} }
-    prop_345 : BunkerModel_locker { Position: {-33.43, 6.45, 35.04}; Rotation: {0, -1.5708, 0} }
-    prop_346 : BunkerModel_locker { Position: {-35.85, 6.45, 34.72} }
-    prop_347 : BunkerModel_wallShelf { Position: {-38.445, 9.1, 35.56}; Rotation: {0, 1.5708, 0} }
-    prop_348 : BunkerModel_wallShelf { Position: {-37.08, 9.1, 37.745}; Rotation: {0, 3.1416, 0} }
-    prop_349 : BunkerModel_rug { Position: {-36.03, 6.45, 36.16}; Scale: {1.6, 1, 1} }
-    prop_350 : BunkerModel_bunk { Position: {-34.2, 6.45, 38.58}; Rotation: {0, 1.5708, 0} }
-    prop_351 : BunkerModel_bunk { Position: {-37.5, 6.45, 41.08}; Rotation: {0, 4.7124, 0} }
-    prop_352 : BunkerModel_bunk { Position: {-36.3, 6.45, 38.58}; Rotation: {0, 1.5708, 0} }
-    prop_353 : BunkerModel_bunk { Position: {-34.18, 6.45, 39.8}; Rotation: {0, -1.5708, 0} }
-    prop_354 : BunkerModel_locker { Position: {-33.43, 6.45, 41.06}; Rotation: {0, -1.5708, 0} }
-    prop_355 : BunkerModel_footlocker { Position: {-38.36, 6.45, 40.16}; Rotation: {0, 1.5708, 0} }
-    prop_356 : BunkerModel_wallShelf { Position: {-36.68, 9.1, 38.255} }
-    prop_357 : BunkerModel_wallShelf { Position: {-37.58, 9.1, 41.405}; Rotation: {0, 3.1416, 0} }
-    prop_358 : BunkerModel_rug { Position: {-36.03, 6.45, 39.82}; Scale: {1.6, 1, 1} }
-    prop_359 : BunkerModel_bunk { Position: {-46.45, 6.45, 34.92}; Rotation: {0, 1.5708, 0} }
-    prop_360 : BunkerModel_bunk { Position: {-49.75, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_361 : BunkerModel_bunk { Position: {-47.65, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
-    prop_362 : BunkerModel_bunk { Position: {-49.82, 6.45, 36.14}; Rotation: {0, 1.5708, 0} }
-    prop_363 : BunkerModel_locker { Position: {-50.57, 6.45, 34.99}; Rotation: {0, 1.5708, 0} }
-    prop_364 : BunkerModel_footlocker { Position: {-45.64, 6.45, 35.8}; Rotation: {0, -1.5708, 0} }
-    prop_365 : BunkerModel_wallShelf { Position: {-49.73, 9.1, 37.745}; Rotation: {0, 3.1416, 0} }
-    prop_366 : BunkerModel_wallShelf { Position: {-47.23, 9.1, 37.745}; Rotation: {0, 3.1416, 0} }
-    prop_367 : BunkerModel_rug { Position: {-47.93, 6.45, 36.16}; Scale: {1.6, 1, 1} }
-    prop_368 : BunkerModel_bed { Position: {-46.43, 6.45, 40.875}; Rotation: {0, -1.5708, 0} }
-    prop_369 : BunkerModel_cabinDesk { Position: {-50.15, 6.45, 38.405} }
-    prop_370 : BunkerModel_chair { Position: {-50.3, 6.45, 38.91}; Rotation: {0, 3.1416, 0} }
-    prop_371 : BunkerModel_wardrobe { Position: {-50.52, 6.45, 41}; Rotation: {0, 1.5708, 0} }
-    prop_372 : BunkerModel_footlocker { Position: {-50.61, 6.45, 40.11}; Rotation: {0, 1.5708, 0} }
-    prop_373 : BunkerModel_smallTable { Position: {-47.5, 6.45, 38.43} }
-    prop_374 : BunkerModel_stool { Position: {-47.45, 6.45, 38.93} }
-    prop_375 : BunkerModel_wallShelf { Position: {-47.43, 9.1, 38.255} }
-    prop_376 : BunkerModel_rug { Position: {-48.13, 6.45, 39.845}; Scale: {1.3, 1, 0.85} }
-    prop_377 : BunkerModel_bed { Position: {50.275, 5.05, 42.59} }
-    prop_378 : BunkerModel_footlocker { Position: {51.66, 5.05, 41.8} }
-    prop_379 : BunkerModel_wallShelf { Position: {51.17, 7.4, 43.695}; Rotation: {0, 3.1416, 0} }
-    prop_380 : BunkerModel_rug { Position: {51.34, 5.05, 42.72}; Scale: {1.04, 1, 0.68} }
-    prop_381 : BunkerModel_smallTable { Position: {54.5, 5.05, 43.52}; Rotation: {0, 3.1416, 0} }
-    prop_382 : BunkerModel_stool { Position: {53.92, 5.05, 43.52}; Rotation: {0, 3.1416, 0} }
-    prop_383 : BunkerModel_locker { Position: {52.875, 5.05, 41.84} }
-    prop_384 : BunkerModel_wallShelf { Position: {54.745, 7.4, 42.78}; Rotation: {0, -1.5708, 0} }
-    prop_385 : BunkerModel_cabinDesk { Position: {55.75, 5.05, 43.545}; Rotation: {0, 3.1416, 0} }
-    prop_386 : BunkerModel_chair { Position: {55.9, 5.05, 43.04}; Rotation: {0, 6.2832, 0} }
-    prop_387 : BunkerModel_footlocker { Position: {57.01, 5.05, 43.61}; Rotation: {0, 3.1416, 0} }
-    prop_388 : BunkerModel_wallShelf { Position: {56.12, 7.4, 43.695}; Rotation: {0, 3.1416, 0} }
-    prop_389 : BunkerModel_rug { Position: {56.37, 5.05, 42.255}; Scale: {1.3, 1, 0.85} }
-    prop_390 : BunkerModel_bed { Position: {59.8, 5.05, 42.59} }
-    prop_391 : BunkerModel_footlocker { Position: {58.335, 5.05, 43.61}; Rotation: {0, 3.1416, 0} }
-    prop_392 : BunkerModel_wallShelf { Position: {60.195, 7.4, 42.88}; Rotation: {0, -1.5708, 0} }
-    prop_393 : BunkerModel_rug { Position: {58.595, 5.05, 42.705}; Scale: {1.3, 1, 0.85} }
-    prop_394 : BunkerModel_bed { Position: {50.275, 5.05, 33.41}; Rotation: {0, 3.1416, 0} }
-    prop_395 : BunkerModel_footlocker { Position: {52.01, 5.05, 34.2}; Rotation: {0, 3.1416, 0} }
-    prop_396 : BunkerModel_wallShelf { Position: {51.07, 7.4, 34.285}; Rotation: {0, 3.1416, 0} }
-    prop_397 : BunkerModel_rug { Position: {51.47, 5.05, 33.295}; Scale: {1.3, 1, 0.85} }
-    prop_398 : BunkerModel_cabinDesk { Position: {54.725, 5.05, 32.455} }
-    prop_399 : BunkerModel_chair { Position: {54.575, 5.05, 32.96}; Rotation: {0, 3.1416, 0} }
-    prop_400 : BunkerModel_footlocker { Position: {53.135, 5.05, 32.39} }
-    prop_401 : BunkerModel_wallShelf { Position: {54.645, 7.4, 32.305} }
-    prop_402 : BunkerModel_rug { Position: {53.995, 5.05, 33.745}; Scale: {1.3, 1, 0.85} }
-    prop_403 : BunkerModel_bed { Position: {59.825, 5.05, 33.41}; Rotation: {0, 3.1416, 0} }
-    prop_404 : BunkerModel_cabinDesk { Position: {58.75, 5.05, 34.135}; Rotation: {0, 3.1416, 0} }
-    prop_405 : BunkerModel_chair { Position: {58.9, 5.05, 33.63}; Rotation: {0, 6.2832, 0} }
-    prop_406 : BunkerModel_wardrobe { Position: {58.45, 5.05, 32.48} }
-    prop_407 : BunkerModel_footlocker { Position: {57.31, 5.05, 34.2}; Rotation: {0, 3.1416, 0} }
-    prop_408 : BunkerModel_wallShelf { Position: {59.52, 7.4, 34.285}; Rotation: {0, 3.1416, 0} }
-    prop_409 : BunkerModel_rug { Position: {57.59, 5.05, 33.31}; Scale: {1.04, 1, 0.68} }
-    prop_410 : BunkerModel_smallTable { Position: {59.55, 5.05, 34.97} }
-    prop_411 : BunkerModel_stool { Position: {58.97, 5.05, 34.97} }
-    prop_412 : BunkerModel_stool { Position: {60.13, 5.05, 34.97} }
-    prop_413 : BunkerModel_locker { Position: {58.48, 5.05, 35.19}; Rotation: {0, 1.5708, 0} }
-    prop_414 : BunkerModel_wallShelf { Position: {58.355, 7.4, 35.76}; Rotation: {0, 1.5708, 0} }
-    prop_415 : BunkerModel_footlocker { Position: {60.11, 5.05, 38.6067}; Rotation: {0, -1.5708, 0} }
-    prop_416 : BunkerModel_wallShelf { Position: {60.195, 7.4, 37.6667}; Rotation: {0, -1.5708, 0} }
-    prop_417 : BunkerModel_rug { Position: {59.17, 5.05, 37.9917}; Scale: {1.3, 1, 0.85} }
-    prop_418 : BunkerModel_wardrobe { Position: {58.8, 5.05, 41.03}; Rotation: {0, 3.1416, 0} }
-    prop_419 : BunkerModel_footlocker { Position: {58.44, 5.05, 39.8133}; Rotation: {0, 1.5708, 0} }
-    prop_420 : BunkerModel_wallShelf { Position: {59.42, 7.4, 41.205}; Rotation: {0, 3.1416, 0} }
-    prop_421 : BunkerModel_rug { Position: {59.37, 5.05, 40.2483}; Scale: {1.3, 1, 0.85} }
-    prop_422 : BunkerModel_wardrobe { Position: {51.25, 5.05, 34.97} }
-    prop_423 : BunkerModel_footlocker { Position: {51.56, 5.05, 36.3367}; Rotation: {0, -1.5708, 0} }
-    prop_424 : BunkerModel_smallTable { Position: {49.98, 5.05, 35.04}; Rotation: {0, 1.5708, 0} }
-    prop_425 : BunkerModel_stool { Position: {50.48, 5.05, 34.99}; Rotation: {0, 1.5708, 0} }
-    prop_426 : BunkerModel_wallShelf { Position: {50.87, 7.4, 34.795} }
-    prop_427 : BunkerModel_rug { Position: {50.62, 5.05, 35.885}; Scale: {1.3, 1, 0.85} }
-    prop_428 : BunkerModel_footlocker { Position: {49.89, 5.05, 38.6433}; Rotation: {0, 1.5708, 0} }
-    prop_429 : BunkerModel_wallShelf { Position: {49.805, 7.4, 38.0667}; Rotation: {0, 1.5708, 0} }
-    prop_430 : BunkerModel_rug { Position: {50.82, 5.05, 37.9917}; Scale: {1.3, 1, 0.85} }
-    prop_431 : BunkerModel_wardrobe { Position: {51.25, 5.05, 41.03}; Rotation: {0, 3.1416, 0} }
-    prop_432 : BunkerModel_footlocker { Position: {50.06, 5.05, 41.12}; Rotation: {0, 3.1416, 0} }
-    prop_433 : BunkerModel_wallShelf { Position: {49.805, 7.4, 40.1733}; Rotation: {0, 1.5708, 0} }
-    prop_434 : BunkerModel_rug { Position: {50.72, 5.05, 40.2483}; Scale: {1.3, 1, 0.85} }
-    prop_435 : BunkerModel_bed { Position: {50.175, 7.95, 42.59} }
-    prop_436 : BunkerModel_footlocker { Position: {51.61, 7.95, 41.8} }
-    prop_437 : BunkerModel_wallShelf { Position: {49.805, 10.3, 42.48}; Rotation: {0, 1.5708, 0} }
-    prop_438 : BunkerModel_rug { Position: {51.37, 7.95, 42.705}; Scale: {1.3, 1, 0.85} }
-    prop_439 : BunkerModel_smallTable { Position: {54.425, 7.95, 43.52}; Rotation: {0, 3.1416, 0} }
-    prop_440 : BunkerModel_stool { Position: {53.845, 7.95, 43.52}; Rotation: {0, 3.1416, 0} }
-    prop_441 : BunkerModel_locker { Position: {52.925, 7.95, 41.84} }
-    prop_442 : BunkerModel_wallShelf { Position: {53.195, 10.3, 43.695}; Rotation: {0, 3.1416, 0} }
-    prop_443 : BunkerModel_cabinDesk { Position: {55.7, 7.95, 43.545}; Rotation: {0, 3.1416, 0} }
-    prop_444 : BunkerModel_chair { Position: {55.85, 7.95, 43.04}; Rotation: {0, 6.2832, 0} }
-    prop_445 : BunkerModel_footlocker { Position: {57.21, 7.95, 43.61}; Rotation: {0, 3.1416, 0} }
-    prop_446 : BunkerModel_wallShelf { Position: {56.62, 10.3, 43.695}; Rotation: {0, 3.1416, 0} }
-    prop_447 : BunkerModel_rug { Position: {56.37, 7.95, 42.255}; Scale: {1.3, 1, 0.85} }
-    prop_448 : BunkerModel_bed { Position: {59.7, 7.95, 42.82}; Rotation: {0, 3.1416, 0} }
-    prop_449 : BunkerModel_footlocker { Position: {58.335, 7.95, 43.61}; Rotation: {0, 3.1416, 0} }
-    prop_450 : BunkerModel_wallShelf { Position: {60.195, 10.3, 43.08}; Rotation: {0, -1.5708, 0} }
-    prop_451 : BunkerModel_rug { Position: {58.615, 7.95, 42.72}; Scale: {1.04, 1, 0.68} }
-    prop_452 : BunkerModel_bed { Position: {50.275, 7.95, 33.41}; Rotation: {0, 3.1416, 0} }
-    prop_453 : BunkerModel_footlocker { Position: {52.015, 7.95, 32.39} }
-    prop_454 : BunkerModel_wallShelf { Position: {51.47, 10.3, 34.285}; Rotation: {0, 3.1416, 0} }
-    prop_455 : BunkerModel_rug { Position: {51.47, 7.95, 33.295}; Scale: {1.3, 1, 0.85} }
-    prop_456 : BunkerModel_cabinDesk { Position: {54.525, 7.95, 32.455} }
-    prop_457 : BunkerModel_chair { Position: {54.375, 7.95, 32.96}; Rotation: {0, 3.1416, 0} }
-    prop_458 : BunkerModel_footlocker { Position: {53.235, 7.95, 32.39} }
-    prop_459 : BunkerModel_wallShelf { Position: {55.245, 10.3, 33.37}; Rotation: {0, -1.5708, 0} }
-    prop_460 : BunkerModel_rug { Position: {53.995, 7.95, 33.745}; Scale: {1.3, 1, 0.85} }
-    prop_461 : BunkerModel_bed { Position: {59.32, 7.95, 33.915}; Rotation: {0, -1.5708, 0} }
-    prop_462 : BunkerModel_cabinDesk { Position: {59.75, 7.95, 32.455} }
-    prop_463 : BunkerModel_chair { Position: {59.6, 7.95, 32.96}; Rotation: {0, 3.1416, 0} }
-    prop_464 : BunkerModel_wardrobe { Position: {58.5, 7.95, 32.48} }
-    prop_465 : BunkerModel_footlocker { Position: {57.21, 7.95, 34.2}; Rotation: {0, 3.1416, 0} }
-    prop_466 : BunkerModel_wallShelf { Position: {58.82, 10.3, 34.285}; Rotation: {0, 3.1416, 0} }
-    prop_467 : BunkerModel_rug { Position: {57.62, 7.95, 33.295}; Scale: {1.3, 1, 0.85} }
-    prop_468 : BunkerModel_smallTable { Position: {59, 7.95, 34.97} }
-    prop_469 : BunkerModel_stool { Position: {58.42, 7.95, 34.97} }
-    prop_470 : BunkerModel_stool { Position: {59.58, 7.95, 34.97} }
-    prop_471 : BunkerModel_locker { Position: {60.07, 7.95, 35.14}; Rotation: {0, -1.5708, 0} }
-    prop_472 : BunkerModel_wallShelf { Position: {59.42, 10.3, 34.795} }
-    prop_473 : BunkerModel_footlocker { Position: {60.11, 7.95, 37.5567}; Rotation: {0, -1.5708, 0} }
-    prop_474 : BunkerModel_wallShelf { Position: {60.195, 10.3, 38.1667}; Rotation: {0, -1.5708, 0} }
-    prop_475 : BunkerModel_rug { Position: {59.17, 7.95, 37.9917}; Scale: {1.3, 1, 0.85} }
-    prop_476 : BunkerModel_wardrobe { Position: {58.75, 7.95, 41.03}; Rotation: {0, 3.1416, 0} }
-    prop_477 : BunkerModel_footlocker { Position: {58.44, 7.95, 39.6633}; Rotation: {0, 1.5708, 0} }
-    prop_478 : BunkerModel_smallTable { Position: {60.02, 7.95, 40.9033}; Rotation: {0, -1.5708, 0} }
-    prop_479 : BunkerModel_stool { Position: {59.52, 7.95, 40.9533}; Rotation: {0, -1.5708, 0} }
-    prop_480 : BunkerModel_wallShelf { Position: {60.195, 10.3, 40.3733}; Rotation: {0, -1.5708, 0} }
-    prop_481 : BunkerModel_rug { Position: {59.37, 7.95, 40.0483}; Scale: {1.3, 1, 0.85} }
-    prop_482 : BunkerModel_wardrobe { Position: {51.2, 7.95, 34.97} }
-    prop_483 : BunkerModel_footlocker { Position: {51.56, 7.95, 36.3367}; Rotation: {0, -1.5708, 0} }
-    prop_484 : BunkerModel_wallShelf { Position: {50.47, 10.3, 34.795} }
-    prop_485 : BunkerModel_rug { Position: {50.62, 7.95, 35.785}; Scale: {1.3, 1, 0.85} }
-    prop_486 : BunkerModel_footlocker { Position: {49.89, 7.95, 37.3567}; Rotation: {0, 1.5708, 0} }
-    prop_487 : BunkerModel_wallShelf { Position: {49.805, 10.3, 37.6667}; Rotation: {0, 1.5708, 0} }
-    prop_488 : BunkerModel_rug { Position: {50.82, 7.95, 37.9917}; Scale: {1.3, 1, 0.85} }
-    prop_489 : BunkerModel_wardrobe { Position: {51.1, 7.95, 41.03}; Rotation: {0, 3.1416, 0} }
-    prop_490 : BunkerModel_footlocker { Position: {49.89, 7.95, 40.95}; Rotation: {0, 1.5708, 0} }
-    prop_491 : BunkerModel_wallShelf { Position: {51.645, 10.3, 40.4733}; Rotation: {0, -1.5708, 0} }
-    prop_492 : BunkerModel_rug { Position: {50.82, 7.95, 40.2483}; Scale: {1.3, 1, 0.85} }
+    prop_110 : BunkerModel_noticeBoard { Position: {-40.205, 1.15, 37.96}; Rotation: {0, -1.5708, 0} }
+    prop_111 : BunkerModel_messTableSmall { Position: {-50.15, 0.05, 44.42}; Rotation: {0, 4.7124, 0} }
+    prop_112 : BunkerModel_stool { Position: {-49.85, 0.05, 43.77}; Rotation: {0, 3.1416, 0} }
+    prop_113 : BunkerModel_stool { Position: {-50.45, 0.05, 43.77}; Rotation: {0, 3.1416, 0} }
+    prop_114 : BunkerModel_messTableSmall { Position: {-50.2, 0.05, 42.19}; Rotation: {0, 1.5708, 0} }
+    prop_115 : BunkerModel_stool { Position: {-50.5, 0.05, 42.84} }
+    prop_116 : BunkerModel_stool { Position: {-49.9, 0.05, 42.84} }
+    prop_117 : BunkerModel_locker { Position: {-47.075, 0.05, 42.04} }
+    prop_118 : BunkerModel_crateSmall { Position: {-46.905, 0.05, 44.5}; Rotation: {0, -1.5708, 0} }
+    prop_119 : BunkerModel_crateSmall { Position: {-47.65, 0.05, 44.52}; Rotation: {0, 3.1416, 0} }
+    prop_120 : BunkerModel_barrel { Position: {-48.55, 0.05, 42.14} }
+    prop_121 : BunkerModel_wallShelf { Position: {-48.53, 2.7, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_122 : BunkerModel_bridgeConsole { Position: {-45.625, 0.05, 42.15}; Rotation: {0, 3.1416, 0} }
+    prop_123 : BunkerModel_mapBoard { Position: {-42.105, 1, 43.28}; Rotation: {0, -1.5708, 0} }
+    prop_124 : BunkerModel_mapTableSmall { Position: {-44.755, 0.05, 43.93} }
+    prop_125 : BunkerModel_locker { Position: {-42.6, 0.05, 44.57}; Rotation: {0, 3.1416, 0} }
+    prop_126 : BunkerModel_wallShelf { Position: {-44.755, 2.7, 41.915} }
+    prop_127 : BunkerModel_bridgeConsole { Position: {-38.3, 0.05, 44.46}; Rotation: {0, 6.2832, 0} }
+    prop_128 : BunkerModel_mapBoard { Position: {-39.18, 1, 41.765} }
+    prop_129 : BunkerModel_mapTableSmall { Position: {-39.33, 0.05, 43.13} }
+    prop_130 : BunkerModel_bridgeConsole { Position: {-41.51, 0.05, 43.91}; Rotation: {0, 4.7124, 0} }
+    prop_131 : BunkerModel_wallShelf { Position: {-41.745, 2.7, 43.08}; Rotation: {0, 1.5708, 0} }
+    prop_132 : BunkerModel_bridgeConsole { Position: {-33.8, 0.05, 42.14}; Rotation: {0, 3.1416, 0} }
+    prop_133 : BunkerModel_officeChair { Position: {-33.8, 0.05, 42.79}; Rotation: {0, 3.1416, 0} }
+    prop_134 : BunkerModel_mapBoard { Position: {-35.455, 1, 41.765} }
+    prop_135 : BunkerModel_mapTable { Position: {-35.305, 0.05, 42.48} }
+    prop_136 : BunkerModel_bridgeConsole { Position: {-33.53, 0.05, 44.2}; Rotation: {0, 1.5708, 0} }
+    prop_137 : BunkerModel_officeChair { Position: {-34.18, 0.05, 44.2}; Rotation: {0, 1.5708, 0} }
+    prop_138 : BunkerModel_bridgeConsole { Position: {-36.775, 0.05, 44.46}; Rotation: {0, 6.2832, 0} }
+    prop_139 : BunkerModel_locker { Position: {-36.925, 0.05, 42.04} }
+    prop_140 : BunkerModel_wallShelf { Position: {-33.305, 2.7, 43.38}; Rotation: {0, -1.5708, 0} }
+    prop_141 : BunkerModel_wallScreen { Position: {-48.68, 1.2, 34.235}; Rotation: {0, 3.1416, 0} }
+    prop_142 : BunkerModel_whiteboardSmall { Position: {-47.23, 1.05, 31.155} }
+    prop_143 : BunkerModel_confTable { Position: {-48.68, 0.05, 32.7} }
+    prop_144 : BunkerModel_officeChair { Position: {-49.48, 0.05, 33.5}; Rotation: {0, 3.1416, 0} }
+    prop_145 : BunkerModel_officeChair { Position: {-49.48, 0.05, 31.9} }
+    prop_146 : BunkerModel_officeChair { Position: {-48.68, 0.05, 33.5}; Rotation: {0, 3.1416, 0} }
+    prop_147 : BunkerModel_officeChair { Position: {-48.68, 0.05, 31.9} }
+    prop_148 : BunkerModel_officeChair { Position: {-47.88, 0.05, 33.5}; Rotation: {0, 3.1416, 0} }
+    prop_149 : BunkerModel_officeChair { Position: {-47.88, 0.05, 31.9} }
+    prop_150 : BunkerModel_sideboard { Position: {-50.58, 0.05, 31.95}; Rotation: {0, 1.5708, 0} }
+    prop_151 : BunkerModel_locker { Position: {-46.95, 0.05, 33.96}; Rotation: {0, 3.1416, 0} }
+    prop_152 : BunkerModel_wallShelf { Position: {-50.695, 2.7, 32.07}; Rotation: {0, 1.5708, 0} }
+    prop_153 : BunkerModel_bridgeConsole { Position: {-42.375, 0.05, 31.53}; Rotation: {0, 3.1416, 0} }
+    prop_154 : BunkerModel_officeChair { Position: {-42.375, 0.05, 32.18}; Rotation: {0, 3.1416, 0} }
+    prop_155 : BunkerModel_mapBoard { Position: {-44.705, 1, 34.235}; Rotation: {0, 3.1416, 0} }
+    prop_156 : BunkerModel_mapTable { Position: {-43.955, 0.05, 32.67} }
+    prop_157 : BunkerModel_bridgeConsole { Position: {-45.325, 0.05, 31.54}; Rotation: {0, 3.1416, 0} }
+    prop_158 : BunkerModel_bridgeConsole { Position: {-43.975, 0.05, 31.54}; Rotation: {0, 3.1416, 0} }
+    prop_159 : BunkerModel_wallShelf { Position: {-41.855, 2.7, 33.27}; Rotation: {0, -1.5708, 0} }
+    prop_160 : BunkerModel_bridgeConsole { Position: {-39.72, 0.05, 31.85}; Rotation: {0, 4.7124, 0} }
+    prop_161 : BunkerModel_officeChair { Position: {-39.07, 0.05, 31.85}; Rotation: {0, 4.7124, 0} }
+    prop_162 : BunkerModel_mapBoard { Position: {-36.73, 1, 32.67}; Rotation: {0, -1.5708, 0} }
+    prop_163 : BunkerModel_mapTable { Position: {-38.08, 0.05, 33.77} }
+    prop_164 : BunkerModel_locker { Position: {-37.65, 0.05, 31.43} }
+    prop_165 : BunkerModel_wallShelf { Position: {-36.88, 2.7, 32.87}; Rotation: {0, -1.5708, 0} }
+    prop_166 : BunkerModel_bridgeConsole { Position: {-36.135, 0.05, 33.45}; Rotation: {0, 4.7124, 0} }
+    prop_167 : BunkerModel_mapBoardSmall { Position: {-36.52, 1.05, 31.97}; Rotation: {0, 1.5708, 0} }
+    prop_168 : BunkerModel_mapTableSmall { Position: {-33.805, 0.05, 32.72} }
+    prop_169 : BunkerModel_locker { Position: {-33.65, 0.05, 31.43} }
+    prop_170 : BunkerModel_wallShelf { Position: {-34.105, 2.7, 31.305} }
+    prop_171 : BunkerModel_bridgeConsole { Position: {-37.95, 0.05, 34.82}; Rotation: {0, 3.1416, 0} }
+    prop_172 : BunkerModel_officeChair { Position: {-37.95, 0.05, 35.47}; Rotation: {0, 3.1416, 0} }
+    prop_173 : BunkerModel_mapBoard { Position: {-35.88, 1, 37.895}; Rotation: {0, 3.1416, 0} }
+    prop_174 : BunkerModel_mapTable { Position: {-35.88, 0.05, 37.41} }
+    prop_175 : BunkerModel_bridgeConsole { Position: {-33.53, 0.05, 37.19}; Rotation: {0, 1.5708, 0} }
+    prop_176 : BunkerModel_officeChair { Position: {-34.18, 0.05, 37.19}; Rotation: {0, 1.5708, 0} }
+    prop_177 : BunkerModel_bridgeConsole { Position: {-33.54, 0.05, 35.09}; Rotation: {0, 1.5708, 0} }
+    prop_178 : BunkerModel_wallShelf { Position: {-34.48, 2.7, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_179 : BunkerModel_console { Position: {-46.55, 0.05, 34.82}; Rotation: {0, 3.1416, 0} }
+    prop_180 : BunkerModel_officeChair { Position: {-47.05, 0.05, 35.52}; Rotation: {0, 3.1416, 0} }
+    prop_181 : BunkerModel_officeChair { Position: {-46.05, 0.05, 35.52}; Rotation: {0, 3.1416, 0} }
+    prop_182 : BunkerModel_mapBoard { Position: {-47.98, 1, 37.895}; Rotation: {0, 3.1416, 0} }
+    prop_183 : BunkerModel_mapTable { Position: {-47.73, 0.05, 36.26} }
+    prop_184 : BunkerModel_bridgeConsole { Position: {-50.2, 0.05, 34.82}; Rotation: {0, 3.1416, 0} }
+    prop_185 : BunkerModel_officeChair { Position: {-50.2, 0.05, 35.47}; Rotation: {0, 3.1416, 0} }
+    prop_186 : BunkerModel_desk { Position: {-49.95, 0.05, 37.47}; Rotation: {0, 3.1416, 0} }
+    prop_187 : BunkerModel_deskMonitor { Position: {-50.2, 0.05, 37.62}; Rotation: {0, 3.1416, 0} }
+    prop_188 : BunkerModel_officeChair { Position: {-50.2, 0.05, 36.77}; Rotation: {0, 6.2832, 0} }
+    prop_189 : BunkerModel_wallShelf { Position: {-50.695, 2.7, 35.66}; Rotation: {0, 1.5708, 0} }
+    prop_190 : BunkerModel_bridgeConsole { Position: {-46.05, 0.05, 41.18}; Rotation: {0, 6.2832, 0} }
+    prop_191 : BunkerModel_officeChair { Position: {-46.05, 0.05, 40.53}; Rotation: {0, 6.2832, 0} }
+    prop_192 : BunkerModel_mapBoard { Position: {-48.13, 1, 41.555}; Rotation: {0, 3.1416, 0} }
+    prop_193 : BunkerModel_mapTable { Position: {-48.13, 0.05, 39.92} }
+    prop_194 : BunkerModel_bridgeConsole { Position: {-47.35, 0.05, 38.48}; Rotation: {0, 3.1416, 0} }
+    prop_195 : BunkerModel_officeChair { Position: {-47.35, 0.05, 39.13}; Rotation: {0, 3.1416, 0} }
+    prop_196 : BunkerModel_bridgeConsole { Position: {-50.47, 0.05, 40.91}; Rotation: {0, 4.7124, 0} }
+    prop_197 : BunkerModel_officeChair { Position: {-49.82, 0.05, 40.91}; Rotation: {0, 4.7124, 0} }
+    prop_198 : BunkerModel_locker { Position: {-50.57, 0.05, 38.7}; Rotation: {0, 1.5708, 0} }
+    prop_199 : BunkerModel_wallShelf { Position: {-46.73, 2.7, 41.405}; Rotation: {0, 3.1416, 0} }
+    prop_200 : BunkerModel_noticeBoard { Position: {-41.595, 4.35, 38.01}; Rotation: {0, 1.5708, 0} }
+    prop_201 : BunkerModel_bunk { Position: {-49.0967, 3.25, 43.61}; Rotation: {0, -1.5708, 0} }
+    prop_202 : BunkerModel_locker { Position: {-48.3467, 3.25, 42.26}; Rotation: {0, -1.5708, 0} }
+    prop_203 : BunkerModel_locker { Position: {-50.3, 3.25, 44.57}; Rotation: {0, 3.1416, 0} }
+    prop_204 : BunkerModel_smallTable { Position: {-48.3967, 3.25, 44.45}; Rotation: {0, -1.5708, 0} }
+    prop_205 : BunkerModel_stool { Position: {-48.8967, 3.25, 44.5}; Rotation: {0, -1.5708, 0} }
+    prop_206 : BunkerModel_footlocker { Position: {-50.61, 3.25, 42.27}; Rotation: {0, 1.5708, 0} }
+    prop_207 : BunkerModel_wallShelf { Position: {-50.695, 5.9, 42.78}; Rotation: {0, 1.5708, 0} }
+    prop_208 : BunkerModel_wallShelf { Position: {-48.2217, 5.9, 42.88}; Rotation: {0, -1.5708, 0} }
+    prop_209 : BunkerModel_rug { Position: {-49.455, 3.25, 42.55}; Scale: {0.65, 1, 1.04} }
+    prop_210 : BunkerModel_bunk { Position: {-46.8167, 3.25, 42.24}; Rotation: {0, 1.5708, 0} }
+    prop_211 : BunkerModel_bunk { Position: {-46.8167, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_212 : BunkerModel_footlocker { Position: {-45.3233, 3.25, 44.37}; Rotation: {0, -1.5708, 0} }
+    prop_213 : BunkerModel_footlocker { Position: {-45.3233, 3.25, 42.32}; Rotation: {0, -1.5708, 0} }
+    prop_214 : BunkerModel_wallShelf { Position: {-47.7117, 5.9, 42.48}; Rotation: {0, 1.5708, 0} }
+    prop_215 : BunkerModel_wallShelf { Position: {-46.8467, 5.9, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_216 : BunkerModel_rug { Position: {-46.4717, 3.25, 43.3}; Scale: {0.65, 1, 1.04} }
+    prop_217 : BunkerModel_bunk { Position: {-43.2833, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_218 : BunkerModel_locker { Position: {-44.2333, 3.25, 42.04} }
+    prop_219 : BunkerModel_locker { Position: {-42.38, 3.25, 43.36}; Rotation: {0, -1.5708, 0} }
+    prop_220 : BunkerModel_footlocker { Position: {-44.6433, 3.25, 44.27}; Rotation: {0, 1.5708, 0} }
+    prop_221 : BunkerModel_wallShelf { Position: {-42.255, 5.9, 42.98}; Rotation: {0, -1.5708, 0} }
+    prop_222 : BunkerModel_wallShelf { Position: {-44.1633, 5.9, 41.915} }
+    prop_223 : BunkerModel_rug { Position: {-43.2133, 3.25, 43.03}; Scale: {1, 1, 1.6} }
+    prop_224 : BunkerModel_bunk { Position: {-40.2, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_225 : BunkerModel_locker { Position: {-39.6167, 3.25, 42.04} }
+    prop_226 : BunkerModel_locker { Position: {-41.62, 3.25, 44.26}; Rotation: {0, 1.5708, 0} }
+    prop_227 : BunkerModel_footlocker { Position: {-41.66, 3.25, 43.42}; Rotation: {0, 1.5708, 0} }
+    prop_228 : BunkerModel_wallShelf { Position: {-41.745, 5.9, 43.58}; Rotation: {0, 1.5708, 0} }
+    prop_229 : BunkerModel_wallShelf { Position: {-39.98, 5.9, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_230 : BunkerModel_rug { Position: {-40.63, 3.25, 43.03}; Scale: {1, 1, 1.6} }
+    prop_231 : BunkerModel_bunk { Position: {-36.6133, 3.25, 42.86} }
+    prop_232 : BunkerModel_bunk { Position: {-37.4167, 3.25, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_233 : BunkerModel_locker { Position: {-38.0667, 3.25, 42.04} }
+    prop_234 : BunkerModel_footlocker { Position: {-38.6767, 3.25, 44.42}; Rotation: {0, 1.5708, 0} }
+    prop_235 : BunkerModel_wallShelf { Position: {-37.4967, 5.9, 41.915} }
+    prop_236 : BunkerModel_wallShelf { Position: {-37.3967, 5.9, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_237 : BunkerModel_rug { Position: {-37.5467, 3.25, 43.22}; Scale: {0.8, 1, 1.28} }
+    prop_238 : BunkerModel_bunk { Position: {-34.9033, 3.25, 43.61}; Rotation: {0, 1.5708, 0} }
+    prop_239 : BunkerModel_locker { Position: {-35.6533, 3.25, 42.31}; Rotation: {0, 1.5708, 0} }
+    prop_240 : BunkerModel_locker { Position: {-35.4333, 3.25, 44.57}; Rotation: {0, 3.1416, 0} }
+    prop_241 : BunkerModel_smallTable { Position: {-33.48, 3.25, 44.45}; Rotation: {0, -1.5708, 0} }
+    prop_242 : BunkerModel_stool { Position: {-33.98, 3.25, 44.5}; Rotation: {0, -1.5708, 0} }
+    prop_243 : BunkerModel_footlocker { Position: {-33.39, 3.25, 42.27}; Rotation: {0, -1.5708, 0} }
+    prop_244 : BunkerModel_wallShelf { Position: {-33.305, 5.9, 42.78}; Rotation: {0, -1.5708, 0} }
+    prop_245 : BunkerModel_wallShelf { Position: {-35.7783, 5.9, 42.58}; Rotation: {0, 1.5708, 0} }
+    prop_246 : BunkerModel_rug { Position: {-34.5383, 3.25, 42.55}; Scale: {0.65, 1, 1.04} }
+    prop_247 : BunkerModel_bed { Position: {-49.82, 3.25, 31.725}; Rotation: {0, 1.5708, 0} }
+    prop_248 : BunkerModel_wardrobe { Position: {-48.3967, 3.25, 31.7}; Rotation: {0, -1.5708, 0} }
+    prop_249 : BunkerModel_footlocker { Position: {-48.3067, 3.25, 33.83}; Rotation: {0, -1.5708, 0} }
+    prop_250 : BunkerModel_smallTable { Position: {-50.45, 3.25, 33.91}; Rotation: {0, 3.1416, 0} }
+    prop_251 : BunkerModel_stool { Position: {-50.5, 3.25, 33.41}; Rotation: {0, 3.1416, 0} }
+    prop_252 : BunkerModel_wallShelf { Position: {-49.83, 5.9, 31.305} }
+    prop_253 : BunkerModel_rug { Position: {-49.455, 3.25, 32.92}; Scale: {0.85, 1, 1.3} }
+    prop_254 : BunkerModel_bunk { Position: {-46.8167, 3.25, 33.76}; Rotation: {0, 4.7124, 0} }
+    prop_255 : BunkerModel_bunk { Position: {-46.1333, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_256 : BunkerModel_locker { Position: {-47.5867, 3.25, 31.7}; Rotation: {0, 1.5708, 0} }
+    prop_257 : BunkerModel_footlocker { Position: {-45.3233, 3.25, 33.81}; Rotation: {0, -1.5708, 0} }
+    prop_258 : BunkerModel_footlocker { Position: {-47.6267, 3.25, 32.76}; Rotation: {0, 1.5708, 0} }
+    prop_259 : BunkerModel_wallShelf { Position: {-47.7117, 5.9, 32.07}; Rotation: {0, 1.5708, 0} }
+    prop_260 : BunkerModel_wallShelf { Position: {-46.4467, 5.9, 31.305} }
+    prop_261 : BunkerModel_rug { Position: {-46.4717, 3.25, 32.69}; Scale: {0.65, 1, 1.04} }
+    prop_262 : BunkerModel_bunk { Position: {-43.3333, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_263 : BunkerModel_locker { Position: {-44.3833, 3.25, 33.96}; Rotation: {0, 3.1416, 0} }
+    prop_264 : BunkerModel_locker { Position: {-42.38, 3.25, 32.6}; Rotation: {0, -1.5708, 0} }
+    prop_265 : BunkerModel_footlocker { Position: {-44.6433, 3.25, 31.61}; Rotation: {0, 1.5708, 0} }
+    prop_266 : BunkerModel_wallShelf { Position: {-42.8633, 5.9, 31.305} }
+    prop_267 : BunkerModel_wallShelf { Position: {-42.255, 5.9, 32.97}; Rotation: {0, -1.5708, 0} }
+    prop_268 : BunkerModel_rug { Position: {-43.3633, 3.25, 32.97}; Scale: {1, 1, 1.6} }
+    prop_269 : BunkerModel_bunk { Position: {-40.2, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_270 : BunkerModel_locker { Position: {-41.62, 3.25, 31.8}; Rotation: {0, 1.5708, 0} }
+    prop_271 : BunkerModel_locker { Position: {-39.75, 3.25, 33.96}; Rotation: {0, 3.1416, 0} }
+    prop_272 : BunkerModel_footlocker { Position: {-41.66, 3.25, 32.66}; Rotation: {0, 1.5708, 0} }
+    prop_273 : BunkerModel_wallShelf { Position: {-39.88, 5.9, 31.305} }
+    prop_274 : BunkerModel_wallShelf { Position: {-41.745, 5.9, 33.07}; Rotation: {0, 1.5708, 0} }
+    prop_275 : BunkerModel_rug { Position: {-40.78, 3.25, 32.97}; Scale: {1, 1, 1.6} }
+    prop_276 : BunkerModel_bunk { Position: {-37.8167, 3.25, 33.76}; Rotation: {0, 4.7124, 0} }
+    prop_277 : BunkerModel_bunk { Position: {-37.8167, 3.25, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_278 : BunkerModel_locker { Position: {-36.4133, 3.25, 33.74}; Rotation: {0, -1.5708, 0} }
+    prop_279 : BunkerModel_locker { Position: {-36.4133, 3.25, 31.65}; Rotation: {0, -1.5708, 0} }
+    prop_280 : BunkerModel_wallShelf { Position: {-37.5967, 5.9, 34.085}; Rotation: {0, 3.1416, 0} }
+    prop_281 : BunkerModel_wallShelf { Position: {-36.2883, 5.9, 32.57}; Rotation: {0, -1.5708, 0} }
+    prop_282 : BunkerModel_rug { Position: {-37.5217, 3.25, 32.69}; Scale: {0.65, 1, 1.04} }
+    prop_283 : BunkerModel_bunk { Position: {-34.9033, 3.25, 32.45}; Rotation: {0, 1.5708, 0} }
+    prop_284 : BunkerModel_locker { Position: {-35.6533, 3.25, 33.74}; Rotation: {0, 1.5708, 0} }
+    prop_285 : BunkerModel_locker { Position: {-35.2333, 3.25, 31.43} }
+    prop_286 : BunkerModel_smallTable { Position: {-33.48, 3.25, 31.6}; Rotation: {0, -1.5708, 0} }
+    prop_287 : BunkerModel_stool { Position: {-33.98, 3.25, 31.65}; Rotation: {0, -1.5708, 0} }
+    prop_288 : BunkerModel_footlocker { Position: {-33.39, 3.25, 33.81}; Rotation: {0, -1.5708, 0} }
+    prop_289 : BunkerModel_wallShelf { Position: {-33.305, 5.9, 33.27}; Rotation: {0, -1.5708, 0} }
+    prop_290 : BunkerModel_wallShelf { Position: {-34.0133, 5.9, 31.305} }
+    prop_291 : BunkerModel_rug { Position: {-34.5383, 3.25, 33.49}; Scale: {0.65, 1, 1.04} }
+    prop_292 : BunkerModel_bunk { Position: {-37.55, 3.25, 34.92}; Rotation: {0, 1.5708, 0} }
+    prop_293 : BunkerModel_bunk { Position: {-34.25, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_294 : BunkerModel_bunk { Position: {-36.4, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_295 : BunkerModel_bunk { Position: {-34.18, 3.25, 36.44}; Rotation: {0, -1.5708, 0} }
+    prop_296 : BunkerModel_locker { Position: {-33.43, 3.25, 34.94}; Rotation: {0, -1.5708, 0} }
+    prop_297 : BunkerModel_locker { Position: {-36.05, 3.25, 34.72} }
+    prop_298 : BunkerModel_wallShelf { Position: {-35.88, 5.9, 34.595} }
+    prop_299 : BunkerModel_wallShelf { Position: {-37.28, 5.9, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_300 : BunkerModel_rug { Position: {-36.03, 3.25, 36.16}; Scale: {1.6, 1, 1} }
+    prop_301 : BunkerModel_bunk { Position: {-34.2, 3.25, 38.58}; Rotation: {0, 1.5708, 0} }
+    prop_302 : BunkerModel_bunk { Position: {-37.4, 3.25, 41.08}; Rotation: {0, 4.7124, 0} }
+    prop_303 : BunkerModel_bunk { Position: {-36.35, 3.25, 38.58}; Rotation: {0, 1.5708, 0} }
+    prop_304 : BunkerModel_bunk { Position: {-34.18, 3.25, 39.7}; Rotation: {0, -1.5708, 0} }
+    prop_305 : BunkerModel_locker { Position: {-33.43, 3.25, 41.05}; Rotation: {0, -1.5708, 0} }
+    prop_306 : BunkerModel_footlocker { Position: {-38.36, 3.25, 40.16}; Rotation: {0, 1.5708, 0} }
+    prop_307 : BunkerModel_wallShelf { Position: {-38.445, 5.9, 40.82}; Rotation: {0, 1.5708, 0} }
+    prop_308 : BunkerModel_wallShelf { Position: {-36.08, 5.9, 41.405}; Rotation: {0, 3.1416, 0} }
+    prop_309 : BunkerModel_rug { Position: {-36.03, 3.25, 39.82}; Scale: {1.6, 1, 1} }
+    prop_310 : BunkerModel_bunk { Position: {-46.65, 3.25, 34.92}; Rotation: {0, 1.5708, 0} }
+    prop_311 : BunkerModel_bunk { Position: {-49.8, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_312 : BunkerModel_bunk { Position: {-47.65, 3.25, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_313 : BunkerModel_bunk { Position: {-49.82, 3.25, 36.44}; Rotation: {0, 1.5708, 0} }
+    prop_314 : BunkerModel_locker { Position: {-50.57, 3.25, 34.94}; Rotation: {0, 1.5708, 0} }
+    prop_315 : BunkerModel_footlocker { Position: {-45.64, 3.25, 35.85}; Rotation: {0, -1.5708, 0} }
+    prop_316 : BunkerModel_footlocker { Position: {-48.29, 3.25, 34.68} }
+    prop_317 : BunkerModel_wallShelf { Position: {-50.13, 5.9, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_318 : BunkerModel_wallShelf { Position: {-47.43, 5.9, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_319 : BunkerModel_rug { Position: {-47.93, 3.25, 36.16}; Scale: {1.6, 1, 1} }
+    prop_320 : BunkerModel_bed { Position: {-50.325, 3.25, 39.13} }
+    prop_321 : BunkerModel_cabinDesk { Position: {-45.705, 3.25, 40.85}; Rotation: {0, -1.5708, 0} }
+    prop_322 : BunkerModel_chair { Position: {-46.21, 3.25, 40.7}; Rotation: {0, 1.5708, 0} }
+    prop_323 : BunkerModel_wardrobe { Position: {-50.52, 3.25, 41.01}; Rotation: {0, 1.5708, 0} }
+    prop_324 : BunkerModel_footlocker { Position: {-47.14, 3.25, 38.34} }
+    prop_325 : BunkerModel_smallTable { Position: {-49.15, 3.25, 38.43} }
+    prop_326 : BunkerModel_stool { Position: {-49.1, 3.25, 38.93} }
+    prop_327 : BunkerModel_wallShelf { Position: {-50.695, 5.9, 39.12}; Rotation: {0, 1.5708, 0} }
+    prop_328 : BunkerModel_rug { Position: {-48.13, 3.25, 39.845}; Scale: {1.3, 1, 0.85} }
+    prop_329 : BunkerModel_noticeBoard { Position: {-40.205, 7.55, 38.01}; Rotation: {0, -1.5708, 0} }
+    prop_330 : BunkerModel_bunk { Position: {-49.0967, 6.45, 43.56}; Rotation: {0, -1.5708, 0} }
+    prop_331 : BunkerModel_locker { Position: {-48.3467, 6.45, 42.41}; Rotation: {0, -1.5708, 0} }
+    prop_332 : BunkerModel_locker { Position: {-50.35, 6.45, 44.57}; Rotation: {0, 3.1416, 0} }
+    prop_333 : BunkerModel_smallTable { Position: {-48.3967, 6.45, 44.41}; Rotation: {0, -1.5708, 0} }
+    prop_334 : BunkerModel_stool { Position: {-48.8967, 6.45, 44.46}; Rotation: {0, -1.5708, 0} }
+    prop_335 : BunkerModel_footlocker { Position: {-50.61, 6.45, 42.17}; Rotation: {0, 1.5708, 0} }
+    prop_336 : BunkerModel_wallShelf { Position: {-50.695, 9.1, 43.08}; Rotation: {0, 1.5708, 0} }
+    prop_337 : BunkerModel_wallShelf { Position: {-49.03, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_338 : BunkerModel_rug { Position: {-49.455, 6.45, 42.5}; Scale: {0.65, 1, 1.04} }
+    prop_339 : BunkerModel_bunk { Position: {-47.3867, 6.45, 42.81}; Rotation: {0, 3.1416, 0} }
+    prop_340 : BunkerModel_bunk { Position: {-46.1667, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_341 : BunkerModel_locker { Position: {-45.6667, 6.45, 42.04} }
+    prop_342 : BunkerModel_locker { Position: {-47.5867, 6.45, 44.35}; Rotation: {0, 1.5708, 0} }
+    prop_343 : BunkerModel_footlocker { Position: {-46.5067, 6.45, 42} }
+    prop_344 : BunkerModel_wallShelf { Position: {-45.9467, 9.1, 41.915} }
+    prop_345 : BunkerModel_wallShelf { Position: {-46.2467, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_346 : BunkerModel_rug { Position: {-46.4467, 6.45, 43.22}; Scale: {0.8, 1, 1.28} }
+    prop_347 : BunkerModel_bunk { Position: {-43.1833, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_348 : BunkerModel_locker { Position: {-44.2333, 6.45, 42.04} }
+    prop_349 : BunkerModel_locker { Position: {-42.38, 6.45, 43.31}; Rotation: {0, -1.5708, 0} }
+    prop_350 : BunkerModel_footlocker { Position: {-44.6433, 6.45, 44.44}; Rotation: {0, 1.5708, 0} }
+    prop_351 : BunkerModel_wallShelf { Position: {-42.255, 9.1, 43.08}; Rotation: {0, -1.5708, 0} }
+    prop_352 : BunkerModel_wallShelf { Position: {-44.0633, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_353 : BunkerModel_rug { Position: {-43.2133, 6.45, 43.03}; Scale: {1, 1, 1.6} }
+    prop_354 : BunkerModel_bunk { Position: {-40.8, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_355 : BunkerModel_locker { Position: {-39.7, 6.45, 42.04} }
+    prop_356 : BunkerModel_locker { Position: {-41.62, 6.45, 43.41}; Rotation: {0, 1.5708, 0} }
+    prop_357 : BunkerModel_footlocker { Position: {-39.3567, 6.45, 44.44}; Rotation: {0, -1.5708, 0} }
+    prop_358 : BunkerModel_wallShelf { Position: {-41.745, 9.1, 44.08}; Rotation: {0, 1.5708, 0} }
+    prop_359 : BunkerModel_wallShelf { Position: {-40.38, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_360 : BunkerModel_rug { Position: {-40.73, 6.45, 43.03}; Scale: {1, 1, 1.6} }
+    prop_361 : BunkerModel_bunk { Position: {-36.6133, 6.45, 42.81} }
+    prop_362 : BunkerModel_bunk { Position: {-37.2167, 6.45, 44.37}; Rotation: {0, 4.7124, 0} }
+    prop_363 : BunkerModel_locker { Position: {-38.3167, 6.45, 42.04} }
+    prop_364 : BunkerModel_footlocker { Position: {-38.6767, 6.45, 44.27}; Rotation: {0, 1.5708, 0} }
+    prop_365 : BunkerModel_footlocker { Position: {-37.4567, 6.45, 42} }
+    prop_366 : BunkerModel_wallShelf { Position: {-37.6967, 9.1, 44.695}; Rotation: {0, 3.1416, 0} }
+    prop_367 : BunkerModel_wallShelf { Position: {-36.2883, 9.1, 44.08}; Rotation: {0, -1.5708, 0} }
+    prop_368 : BunkerModel_rug { Position: {-37.5467, 6.45, 43.22}; Scale: {0.8, 1, 1.28} }
+    prop_369 : BunkerModel_bunk { Position: {-34.9033, 6.45, 43.66}; Rotation: {0, 1.5708, 0} }
+    prop_370 : BunkerModel_locker { Position: {-35.6533, 6.45, 42.26}; Rotation: {0, 1.5708, 0} }
+    prop_371 : BunkerModel_locker { Position: {-35.4333, 6.45, 44.57}; Rotation: {0, 3.1416, 0} }
+    prop_372 : BunkerModel_footlocker { Position: {-33.7233, 6.45, 44.61}; Rotation: {0, 3.1416, 0} }
+    prop_373 : BunkerModel_wallShelf { Position: {-33.305, 9.1, 43.08}; Rotation: {0, -1.5708, 0} }
+    prop_374 : BunkerModel_wallShelf { Position: {-35.7783, 9.1, 42.58}; Rotation: {0, 1.5708, 0} }
+    prop_375 : BunkerModel_rug { Position: {-34.5633, 6.45, 42.52}; Scale: {0.8, 1, 1.28} }
+    prop_376 : BunkerModel_bed { Position: {-49.0967, 6.45, 32.475}; Rotation: {0, -1.5708, 0} }
+    prop_377 : BunkerModel_wardrobe { Position: {-48.3967, 6.45, 33.55}; Rotation: {0, -1.5708, 0} }
+    prop_378 : BunkerModel_footlocker { Position: {-50.44, 6.45, 31.39} }
+    prop_379 : BunkerModel_smallTable { Position: {-48.3967, 6.45, 31.55}; Rotation: {0, -1.5708, 0} }
+    prop_380 : BunkerModel_stool { Position: {-48.8967, 6.45, 31.6}; Rotation: {0, -1.5708, 0} }
+    prop_381 : BunkerModel_wallShelf { Position: {-50.695, 9.1, 31.97}; Rotation: {0, 1.5708, 0} }
+    prop_382 : BunkerModel_rug { Position: {-49.44, 6.45, 33.54}; Scale: {0.68, 1, 1.04} }
+    prop_383 : BunkerModel_bunk { Position: {-47.3867, 6.45, 33.19}; Rotation: {0, 3.1416, 0} }
+    prop_384 : BunkerModel_bunk { Position: {-46.8167, 6.45, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_385 : BunkerModel_locker { Position: {-45.6667, 6.45, 33.96}; Rotation: {0, 3.1416, 0} }
+    prop_386 : BunkerModel_footlocker { Position: {-45.3233, 6.45, 31.61}; Rotation: {0, -1.5708, 0} }
+    prop_387 : BunkerModel_footlocker { Position: {-46.5067, 6.45, 34}; Rotation: {0, 3.1416, 0} }
+    prop_388 : BunkerModel_wallShelf { Position: {-46.0467, 9.1, 34.085}; Rotation: {0, 3.1416, 0} }
+    prop_389 : BunkerModel_wallShelf { Position: {-47.7117, 9.1, 31.87}; Rotation: {0, 1.5708, 0} }
+    prop_390 : BunkerModel_rug { Position: {-46.4467, 6.45, 32.81}; Scale: {0.8, 1, 1.28} }
+    prop_391 : BunkerModel_bunk { Position: {-43.8333, 6.45, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_392 : BunkerModel_locker { Position: {-44.2833, 6.45, 33.96}; Rotation: {0, 3.1416, 0} }
+    prop_393 : BunkerModel_locker { Position: {-42.38, 6.45, 31.7}; Rotation: {0, -1.5708, 0} }
+    prop_394 : BunkerModel_footlocker { Position: {-42.34, 6.45, 32.76}; Rotation: {0, -1.5708, 0} }
+    prop_395 : BunkerModel_wallShelf { Position: {-42.255, 9.1, 32.47}; Rotation: {0, -1.5708, 0} }
+    prop_396 : BunkerModel_wallShelf { Position: {-42.8633, 9.1, 31.305} }
+    prop_397 : BunkerModel_rug { Position: {-43.2633, 6.45, 32.97}; Scale: {1, 1, 1.6} }
+    prop_398 : BunkerModel_bunk { Position: {-40.2, 6.45, 31.63}; Rotation: {0, 1.5708, 0} }
+    prop_399 : BunkerModel_locker { Position: {-41.62, 6.45, 31.65}; Rotation: {0, 1.5708, 0} }
+    prop_400 : BunkerModel_locker { Position: {-39.9, 6.45, 33.96}; Rotation: {0, 3.1416, 0} }
+    prop_401 : BunkerModel_footlocker { Position: {-41.66, 6.45, 32.61}; Rotation: {0, 1.5708, 0} }
+    prop_402 : BunkerModel_wallShelf { Position: {-41.745, 9.1, 32.17}; Rotation: {0, 1.5708, 0} }
+    prop_403 : BunkerModel_wallShelf { Position: {-39.98, 9.1, 31.305} }
+    prop_404 : BunkerModel_rug { Position: {-40.53, 6.45, 32.81}; Scale: {0.8, 1, 1.28} }
+    prop_405 : BunkerModel_bunk { Position: {-37.2667, 6.45, 33.76}; Rotation: {0, 4.7124, 0} }
+    prop_406 : BunkerModel_bunk { Position: {-36.6133, 6.45, 32.2} }
+    prop_407 : BunkerModel_locker { Position: {-38.3667, 6.45, 31.43} }
+    prop_408 : BunkerModel_footlocker { Position: {-38.6767, 6.45, 33.83}; Rotation: {0, 1.5708, 0} }
+    prop_409 : BunkerModel_footlocker { Position: {-37.5067, 6.45, 31.39} }
+    prop_410 : BunkerModel_wallShelf { Position: {-38.0967, 9.1, 34.085}; Rotation: {0, 3.1416, 0} }
+    prop_411 : BunkerModel_wallShelf { Position: {-37.8967, 9.1, 31.305} }
+    prop_412 : BunkerModel_rug { Position: {-37.5467, 6.45, 32.61}; Scale: {0.8, 1, 1.28} }
+    prop_413 : BunkerModel_bunk { Position: {-34.9033, 6.45, 32.4}; Rotation: {0, 1.5708, 0} }
+    prop_414 : BunkerModel_locker { Position: {-35.6533, 6.45, 33.7}; Rotation: {0, 1.5708, 0} }
+    prop_415 : BunkerModel_locker { Position: {-33.43, 6.45, 31.75}; Rotation: {0, -1.5708, 0} }
+    prop_416 : BunkerModel_smallTable { Position: {-35.6033, 6.45, 31.55}; Rotation: {0, 1.5708, 0} }
+    prop_417 : BunkerModel_stool { Position: {-35.1033, 6.45, 31.5}; Rotation: {0, 1.5708, 0} }
+    prop_418 : BunkerModel_footlocker { Position: {-33.39, 6.45, 33.83}; Rotation: {0, -1.5708, 0} }
+    prop_419 : BunkerModel_wallShelf { Position: {-33.305, 9.1, 32.97}; Rotation: {0, -1.5708, 0} }
+    prop_420 : BunkerModel_wallShelf { Position: {-35.7783, 9.1, 32.67}; Rotation: {0, 1.5708, 0} }
+    prop_421 : BunkerModel_rug { Position: {-34.5383, 6.45, 33.44}; Scale: {0.65, 1, 1.04} }
+    prop_422 : BunkerModel_bunk { Position: {-34.25, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_423 : BunkerModel_bunk { Position: {-37.4, 6.45, 34.92}; Rotation: {0, 1.5708, 0} }
+    prop_424 : BunkerModel_bunk { Position: {-36.4, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_425 : BunkerModel_bunk { Position: {-34.18, 6.45, 36.49}; Rotation: {0, -1.5708, 0} }
+    prop_426 : BunkerModel_locker { Position: {-33.43, 6.45, 35.04}; Rotation: {0, -1.5708, 0} }
+    prop_427 : BunkerModel_locker { Position: {-35.85, 6.45, 34.72} }
+    prop_428 : BunkerModel_wallShelf { Position: {-38.445, 9.1, 35.56}; Rotation: {0, 1.5708, 0} }
+    prop_429 : BunkerModel_wallShelf { Position: {-37.08, 9.1, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_430 : BunkerModel_rug { Position: {-36.03, 6.45, 36.16}; Scale: {1.6, 1, 1} }
+    prop_431 : BunkerModel_bunk { Position: {-34.2, 6.45, 38.58}; Rotation: {0, 1.5708, 0} }
+    prop_432 : BunkerModel_bunk { Position: {-37.5, 6.45, 41.08}; Rotation: {0, 4.7124, 0} }
+    prop_433 : BunkerModel_bunk { Position: {-36.3, 6.45, 38.58}; Rotation: {0, 1.5708, 0} }
+    prop_434 : BunkerModel_bunk { Position: {-34.18, 6.45, 39.8}; Rotation: {0, -1.5708, 0} }
+    prop_435 : BunkerModel_locker { Position: {-33.43, 6.45, 41.06}; Rotation: {0, -1.5708, 0} }
+    prop_436 : BunkerModel_footlocker { Position: {-38.36, 6.45, 40.16}; Rotation: {0, 1.5708, 0} }
+    prop_437 : BunkerModel_wallShelf { Position: {-36.68, 9.1, 38.255} }
+    prop_438 : BunkerModel_wallShelf { Position: {-37.58, 9.1, 41.405}; Rotation: {0, 3.1416, 0} }
+    prop_439 : BunkerModel_rug { Position: {-36.03, 6.45, 39.82}; Scale: {1.6, 1, 1} }
+    prop_440 : BunkerModel_bunk { Position: {-46.45, 6.45, 34.92}; Rotation: {0, 1.5708, 0} }
+    prop_441 : BunkerModel_bunk { Position: {-49.75, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_442 : BunkerModel_bunk { Position: {-47.65, 6.45, 37.42}; Rotation: {0, 4.7124, 0} }
+    prop_443 : BunkerModel_bunk { Position: {-49.82, 6.45, 36.14}; Rotation: {0, 1.5708, 0} }
+    prop_444 : BunkerModel_locker { Position: {-50.57, 6.45, 34.99}; Rotation: {0, 1.5708, 0} }
+    prop_445 : BunkerModel_footlocker { Position: {-45.64, 6.45, 35.8}; Rotation: {0, -1.5708, 0} }
+    prop_446 : BunkerModel_wallShelf { Position: {-49.73, 9.1, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_447 : BunkerModel_wallShelf { Position: {-47.23, 9.1, 37.745}; Rotation: {0, 3.1416, 0} }
+    prop_448 : BunkerModel_rug { Position: {-47.93, 6.45, 36.16}; Scale: {1.6, 1, 1} }
+    prop_449 : BunkerModel_bed { Position: {-46.43, 6.45, 40.875}; Rotation: {0, -1.5708, 0} }
+    prop_450 : BunkerModel_cabinDesk { Position: {-50.15, 6.45, 38.405} }
+    prop_451 : BunkerModel_chair { Position: {-50.3, 6.45, 38.91}; Rotation: {0, 3.1416, 0} }
+    prop_452 : BunkerModel_wardrobe { Position: {-50.52, 6.45, 41}; Rotation: {0, 1.5708, 0} }
+    prop_453 : BunkerModel_footlocker { Position: {-50.61, 6.45, 40.11}; Rotation: {0, 1.5708, 0} }
+    prop_454 : BunkerModel_smallTable { Position: {-47.5, 6.45, 38.43} }
+    prop_455 : BunkerModel_stool { Position: {-47.45, 6.45, 38.93} }
+    prop_456 : BunkerModel_wallShelf { Position: {-47.43, 9.1, 38.255} }
+    prop_457 : BunkerModel_rug { Position: {-48.13, 6.45, 39.845}; Scale: {1.3, 1, 0.85} }
+    prop_458 : BunkerModel_noticeBoard { Position: {55.405, 6.15, 38.11}; Rotation: {0, 1.5708, 0} }
+    prop_459 : BunkerModel_bed { Position: {50.275, 5.05, 42.59} }
+    prop_460 : BunkerModel_footlocker { Position: {51.66, 5.05, 41.8} }
+    prop_461 : BunkerModel_wallShelf { Position: {51.17, 7.4, 43.695}; Rotation: {0, 3.1416, 0} }
+    prop_462 : BunkerModel_rug { Position: {51.34, 5.05, 42.72}; Scale: {1.04, 1, 0.68} }
+    prop_463 : BunkerModel_smallTable { Position: {54.5, 5.05, 43.52}; Rotation: {0, 3.1416, 0} }
+    prop_464 : BunkerModel_stool { Position: {53.92, 5.05, 43.52}; Rotation: {0, 3.1416, 0} }
+    prop_465 : BunkerModel_locker { Position: {52.875, 5.05, 41.84} }
+    prop_466 : BunkerModel_wallShelf { Position: {54.745, 7.4, 42.78}; Rotation: {0, -1.5708, 0} }
+    prop_467 : BunkerModel_cabinDesk { Position: {55.75, 5.05, 43.545}; Rotation: {0, 3.1416, 0} }
+    prop_468 : BunkerModel_chair { Position: {55.9, 5.05, 43.04}; Rotation: {0, 6.2832, 0} }
+    prop_469 : BunkerModel_footlocker { Position: {57.01, 5.05, 43.61}; Rotation: {0, 3.1416, 0} }
+    prop_470 : BunkerModel_wallShelf { Position: {56.12, 7.4, 43.695}; Rotation: {0, 3.1416, 0} }
+    prop_471 : BunkerModel_rug { Position: {56.37, 5.05, 42.255}; Scale: {1.3, 1, 0.85} }
+    prop_472 : BunkerModel_bed { Position: {59.8, 5.05, 42.59} }
+    prop_473 : BunkerModel_footlocker { Position: {58.335, 5.05, 43.61}; Rotation: {0, 3.1416, 0} }
+    prop_474 : BunkerModel_wallShelf { Position: {60.195, 7.4, 42.88}; Rotation: {0, -1.5708, 0} }
+    prop_475 : BunkerModel_rug { Position: {58.595, 5.05, 42.705}; Scale: {1.3, 1, 0.85} }
+    prop_476 : BunkerModel_bed { Position: {50.275, 5.05, 33.41}; Rotation: {0, 3.1416, 0} }
+    prop_477 : BunkerModel_footlocker { Position: {52.01, 5.05, 34.2}; Rotation: {0, 3.1416, 0} }
+    prop_478 : BunkerModel_wallShelf { Position: {51.07, 7.4, 34.285}; Rotation: {0, 3.1416, 0} }
+    prop_479 : BunkerModel_rug { Position: {51.47, 5.05, 33.295}; Scale: {1.3, 1, 0.85} }
+    prop_480 : BunkerModel_cabinDesk { Position: {54.725, 5.05, 32.455} }
+    prop_481 : BunkerModel_chair { Position: {54.575, 5.05, 32.96}; Rotation: {0, 3.1416, 0} }
+    prop_482 : BunkerModel_footlocker { Position: {53.135, 5.05, 32.39} }
+    prop_483 : BunkerModel_wallShelf { Position: {54.645, 7.4, 32.305} }
+    prop_484 : BunkerModel_rug { Position: {53.995, 5.05, 33.745}; Scale: {1.3, 1, 0.85} }
+    prop_485 : BunkerModel_bed { Position: {59.825, 5.05, 33.41}; Rotation: {0, 3.1416, 0} }
+    prop_486 : BunkerModel_cabinDesk { Position: {58.75, 5.05, 34.135}; Rotation: {0, 3.1416, 0} }
+    prop_487 : BunkerModel_chair { Position: {58.9, 5.05, 33.63}; Rotation: {0, 6.2832, 0} }
+    prop_488 : BunkerModel_wardrobe { Position: {58.45, 5.05, 32.48} }
+    prop_489 : BunkerModel_footlocker { Position: {57.31, 5.05, 34.2}; Rotation: {0, 3.1416, 0} }
+    prop_490 : BunkerModel_wallShelf { Position: {59.52, 7.4, 34.285}; Rotation: {0, 3.1416, 0} }
+    prop_491 : BunkerModel_rug { Position: {57.59, 5.05, 33.31}; Scale: {1.04, 1, 0.68} }
+    prop_492 : BunkerModel_smallTable { Position: {59.55, 5.05, 34.97} }
+    prop_493 : BunkerModel_stool { Position: {58.97, 5.05, 34.97} }
+    prop_494 : BunkerModel_stool { Position: {60.13, 5.05, 34.97} }
+    prop_495 : BunkerModel_locker { Position: {58.48, 5.05, 35.19}; Rotation: {0, 1.5708, 0} }
+    prop_496 : BunkerModel_wallShelf { Position: {58.355, 7.4, 35.76}; Rotation: {0, 1.5708, 0} }
+    prop_497 : BunkerModel_footlocker { Position: {60.11, 5.05, 38.6067}; Rotation: {0, -1.5708, 0} }
+    prop_498 : BunkerModel_wallShelf { Position: {60.195, 7.4, 37.6667}; Rotation: {0, -1.5708, 0} }
+    prop_499 : BunkerModel_rug { Position: {59.17, 5.05, 37.9917}; Scale: {1.3, 1, 0.85} }
+    prop_500 : BunkerModel_wardrobe { Position: {58.8, 5.05, 41.03}; Rotation: {0, 3.1416, 0} }
+    prop_501 : BunkerModel_footlocker { Position: {58.44, 5.05, 39.8133}; Rotation: {0, 1.5708, 0} }
+    prop_502 : BunkerModel_wallShelf { Position: {59.42, 7.4, 41.205}; Rotation: {0, 3.1416, 0} }
+    prop_503 : BunkerModel_rug { Position: {59.37, 5.05, 40.2483}; Scale: {1.3, 1, 0.85} }
+    prop_504 : BunkerModel_wardrobe { Position: {51.25, 5.05, 34.97} }
+    prop_505 : BunkerModel_footlocker { Position: {51.56, 5.05, 36.3367}; Rotation: {0, -1.5708, 0} }
+    prop_506 : BunkerModel_smallTable { Position: {49.98, 5.05, 35.04}; Rotation: {0, 1.5708, 0} }
+    prop_507 : BunkerModel_stool { Position: {50.48, 5.05, 34.99}; Rotation: {0, 1.5708, 0} }
+    prop_508 : BunkerModel_wallShelf { Position: {50.87, 7.4, 34.795} }
+    prop_509 : BunkerModel_rug { Position: {50.62, 5.05, 35.885}; Scale: {1.3, 1, 0.85} }
+    prop_510 : BunkerModel_footlocker { Position: {49.89, 5.05, 38.6433}; Rotation: {0, 1.5708, 0} }
+    prop_511 : BunkerModel_wallShelf { Position: {49.805, 7.4, 38.0667}; Rotation: {0, 1.5708, 0} }
+    prop_512 : BunkerModel_rug { Position: {50.82, 5.05, 37.9917}; Scale: {1.3, 1, 0.85} }
+    prop_513 : BunkerModel_wardrobe { Position: {51.25, 5.05, 41.03}; Rotation: {0, 3.1416, 0} }
+    prop_514 : BunkerModel_footlocker { Position: {50.06, 5.05, 41.12}; Rotation: {0, 3.1416, 0} }
+    prop_515 : BunkerModel_wallShelf { Position: {49.805, 7.4, 40.1733}; Rotation: {0, 1.5708, 0} }
+    prop_516 : BunkerModel_rug { Position: {50.72, 5.05, 40.2483}; Scale: {1.3, 1, 0.85} }
+    prop_517 : BunkerModel_noticeBoard { Position: {56.795, 9.05, 37.91}; Rotation: {0, -1.5708, 0} }
+    prop_518 : BunkerModel_bed { Position: {50.175, 7.95, 42.59} }
+    prop_519 : BunkerModel_footlocker { Position: {51.61, 7.95, 41.8} }
+    prop_520 : BunkerModel_wallShelf { Position: {49.805, 10.3, 42.48}; Rotation: {0, 1.5708, 0} }
+    prop_521 : BunkerModel_rug { Position: {51.37, 7.95, 42.705}; Scale: {1.3, 1, 0.85} }
+    prop_522 : BunkerModel_smallTable { Position: {54.425, 7.95, 43.52}; Rotation: {0, 3.1416, 0} }
+    prop_523 : BunkerModel_stool { Position: {53.845, 7.95, 43.52}; Rotation: {0, 3.1416, 0} }
+    prop_524 : BunkerModel_locker { Position: {52.925, 7.95, 41.84} }
+    prop_525 : BunkerModel_wallShelf { Position: {53.195, 10.3, 43.695}; Rotation: {0, 3.1416, 0} }
+    prop_526 : BunkerModel_cabinDesk { Position: {55.7, 7.95, 43.545}; Rotation: {0, 3.1416, 0} }
+    prop_527 : BunkerModel_chair { Position: {55.85, 7.95, 43.04}; Rotation: {0, 6.2832, 0} }
+    prop_528 : BunkerModel_footlocker { Position: {57.21, 7.95, 43.61}; Rotation: {0, 3.1416, 0} }
+    prop_529 : BunkerModel_wallShelf { Position: {56.62, 10.3, 43.695}; Rotation: {0, 3.1416, 0} }
+    prop_530 : BunkerModel_rug { Position: {56.37, 7.95, 42.255}; Scale: {1.3, 1, 0.85} }
+    prop_531 : BunkerModel_bed { Position: {59.7, 7.95, 42.82}; Rotation: {0, 3.1416, 0} }
+    prop_532 : BunkerModel_footlocker { Position: {58.335, 7.95, 43.61}; Rotation: {0, 3.1416, 0} }
+    prop_533 : BunkerModel_wallShelf { Position: {60.195, 10.3, 43.08}; Rotation: {0, -1.5708, 0} }
+    prop_534 : BunkerModel_rug { Position: {58.615, 7.95, 42.72}; Scale: {1.04, 1, 0.68} }
+    prop_535 : BunkerModel_bed { Position: {50.275, 7.95, 33.41}; Rotation: {0, 3.1416, 0} }
+    prop_536 : BunkerModel_footlocker { Position: {52.015, 7.95, 32.39} }
+    prop_537 : BunkerModel_wallShelf { Position: {51.47, 10.3, 34.285}; Rotation: {0, 3.1416, 0} }
+    prop_538 : BunkerModel_rug { Position: {51.47, 7.95, 33.295}; Scale: {1.3, 1, 0.85} }
+    prop_539 : BunkerModel_cabinDesk { Position: {54.525, 7.95, 32.455} }
+    prop_540 : BunkerModel_chair { Position: {54.375, 7.95, 32.96}; Rotation: {0, 3.1416, 0} }
+    prop_541 : BunkerModel_footlocker { Position: {53.235, 7.95, 32.39} }
+    prop_542 : BunkerModel_wallShelf { Position: {55.245, 10.3, 33.37}; Rotation: {0, -1.5708, 0} }
+    prop_543 : BunkerModel_rug { Position: {53.995, 7.95, 33.745}; Scale: {1.3, 1, 0.85} }
+    prop_544 : BunkerModel_bed { Position: {59.32, 7.95, 33.915}; Rotation: {0, -1.5708, 0} }
+    prop_545 : BunkerModel_cabinDesk { Position: {59.75, 7.95, 32.455} }
+    prop_546 : BunkerModel_chair { Position: {59.6, 7.95, 32.96}; Rotation: {0, 3.1416, 0} }
+    prop_547 : BunkerModel_wardrobe { Position: {58.5, 7.95, 32.48} }
+    prop_548 : BunkerModel_footlocker { Position: {57.21, 7.95, 34.2}; Rotation: {0, 3.1416, 0} }
+    prop_549 : BunkerModel_wallShelf { Position: {58.82, 10.3, 34.285}; Rotation: {0, 3.1416, 0} }
+    prop_550 : BunkerModel_rug { Position: {57.62, 7.95, 33.295}; Scale: {1.3, 1, 0.85} }
+    prop_551 : BunkerModel_smallTable { Position: {59, 7.95, 34.97} }
+    prop_552 : BunkerModel_stool { Position: {58.42, 7.95, 34.97} }
+    prop_553 : BunkerModel_stool { Position: {59.58, 7.95, 34.97} }
+    prop_554 : BunkerModel_locker { Position: {60.07, 7.95, 35.14}; Rotation: {0, -1.5708, 0} }
+    prop_555 : BunkerModel_wallShelf { Position: {59.42, 10.3, 34.795} }
+    prop_556 : BunkerModel_footlocker { Position: {60.11, 7.95, 37.5567}; Rotation: {0, -1.5708, 0} }
+    prop_557 : BunkerModel_wallShelf { Position: {60.195, 10.3, 38.1667}; Rotation: {0, -1.5708, 0} }
+    prop_558 : BunkerModel_rug { Position: {59.17, 7.95, 37.9917}; Scale: {1.3, 1, 0.85} }
+    prop_559 : BunkerModel_wardrobe { Position: {58.75, 7.95, 41.03}; Rotation: {0, 3.1416, 0} }
+    prop_560 : BunkerModel_footlocker { Position: {58.44, 7.95, 39.6633}; Rotation: {0, 1.5708, 0} }
+    prop_561 : BunkerModel_smallTable { Position: {60.02, 7.95, 40.9033}; Rotation: {0, -1.5708, 0} }
+    prop_562 : BunkerModel_stool { Position: {59.52, 7.95, 40.9533}; Rotation: {0, -1.5708, 0} }
+    prop_563 : BunkerModel_wallShelf { Position: {60.195, 10.3, 40.3733}; Rotation: {0, -1.5708, 0} }
+    prop_564 : BunkerModel_rug { Position: {59.37, 7.95, 40.0483}; Scale: {1.3, 1, 0.85} }
+    prop_565 : BunkerModel_wardrobe { Position: {51.2, 7.95, 34.97} }
+    prop_566 : BunkerModel_footlocker { Position: {51.56, 7.95, 36.3367}; Rotation: {0, -1.5708, 0} }
+    prop_567 : BunkerModel_wallShelf { Position: {50.47, 10.3, 34.795} }
+    prop_568 : BunkerModel_rug { Position: {50.62, 7.95, 35.785}; Scale: {1.3, 1, 0.85} }
+    prop_569 : BunkerModel_footlocker { Position: {49.89, 7.95, 37.3567}; Rotation: {0, 1.5708, 0} }
+    prop_570 : BunkerModel_wallShelf { Position: {49.805, 10.3, 37.6667}; Rotation: {0, 1.5708, 0} }
+    prop_571 : BunkerModel_rug { Position: {50.82, 7.95, 37.9917}; Scale: {1.3, 1, 0.85} }
+    prop_572 : BunkerModel_wardrobe { Position: {51.1, 7.95, 41.03}; Rotation: {0, 3.1416, 0} }
+    prop_573 : BunkerModel_footlocker { Position: {49.89, 7.95, 40.95}; Rotation: {0, 1.5708, 0} }
+    prop_574 : BunkerModel_wallShelf { Position: {51.645, 10.3, 40.4733}; Rotation: {0, -1.5708, 0} }
+    prop_575 : BunkerModel_rug { Position: {50.82, 7.95, 40.2483}; Scale: {1.3, 1, 0.85} }
   }
 
   stairs {

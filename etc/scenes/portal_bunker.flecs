@@ -234,6 +234,56 @@ views {
     Rotation: {0.9535, -2.6779, 0}
     Camera: {fov: 70}
   }
+  barracks_operations_0_4 { // barracks Operations 0 4
+    Position: {-42.35, 2.25, 42.01}
+    Rotation: {-0.3907, 2.1632, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_5 { // barracks Operations 0 5
+    Position: {-37.875, 2.25, 42.01}
+    Rotation: {-0.3907, 2.1632, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_6 { // barracks Operations 0 6
+    Position: {-37.175, 2.25, 44.6}
+    Rotation: {-0.3907, -0.9784, 0}
+    Camera: {fov: 70}
+  }
+  barracks_meeting_room_0_8 { // barracks Meeting room 0 8
+    Position: {-46.625, 2.25, 31.4}
+    Rotation: {-0.3777, 2.1386, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_9 { // barracks Operations 0 9
+    Position: {-45.925, 2.25, 33.99}
+    Rotation: {-0.3777, -1.003, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_10 { // barracks Operations 0 10
+    Position: {-39.85, 2.25, 33.99}
+    Rotation: {-0.4573, -0.8405, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_11 { // barracks Operations 0 11
+    Position: {-36.275, 2.25, 31.4}
+    Rotation: {-0.4573, -2.3011, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_12 { // barracks Operations 0 12
+    Position: {-38.35, 2.25, 37.65}
+    Rotation: {-0.313, -1.0412, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_14 { // barracks Operations 0 14
+    Position: {-45.65, 2.25, 37.65}
+    Rotation: {-0.313, 1.0412, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations_0_15 { // barracks Operations 0 15
+    Position: {-45.65, 2.25, 38.35}
+    Rotation: {-0.313, 2.1004, 0}
+    Camera: {fov: 70}
+  }
 }
 
 view {
