@@ -31,8 +31,8 @@ state {
     t < 4 ? 0 : t < 8 ? 1 : t < 38 ? 2 : t < 42 ? 3 : t < 46 ? 4 : t < 48 ? 5 : t < 75 ? 6 : 7
   }
 
-  // The step of a rig bay at t (0 to 150 s): arrive, descend, settle, boom in, refuel, boom
-  // out, wait, lift, turn and depart.
+  // The step of the turn of a rig bay at t (0 to 150 s): arrive, descend, settle, boom in,
+  // refuel, boom out, wait, lift, turn and depart.
   fn harbor_bay_step(t: f32) -> i32 {
     t < 40 ? 0 : t < 56 ? 1 : t < 58 ? 2 : t < 61 ? 3 : t < 88 ? 4 : t < 91 ? 5 : t < 94 ? 6 : t < 110 ? 7 : t < 116 ? 8 : 9
   }
@@ -52,6 +52,12 @@ state {
       }
     }
     c
+  }
+
+  // Whether a rig fires its drives in a step of its bay, as the rig in the bay or as the one
+  // that waits its turn.
+  fn harbor_rig_burn(docked: bool, step: i32) -> bool {
+    docked ? step <= 1 || step >= 7 : step <= 4
   }
 
   fn harbor_liner_design(kind: i32) -> LinerDesign {
@@ -83,7 +89,7 @@ state {
 
 assets {
   prefab harbor_gate_clock { Clip: {duration: 270} }
-  prefab harbor_bay_clock { Clip: {duration: 150} }
+  prefab harbor_bay_clock { Clip: {duration: 300} }
 
   // The 270 s of a liner, for its center in the frame of its gate: docked with its bow out
   // (0-46), out of the berth and down away from the station (46-132), gone (132-150), in from
@@ -136,33 +142,37 @@ assets {
     i { Track: {component: PointLight, member: "intensity", curve: {keys: [{0, 0}, {41.8, 0}, {42, 60000000}, {43.8, 0}, {90, 0}]}} }
   }
 
-  // The 150 s of a rig, in the frame of its bay (+z away from the station, deck at y = 0): in
-  // from its jump point (0-40), over the rim and down onto the deck nose first (40-56), parked
-  // (56-94), up and back out over the rim (94-110), turned around (110-116) and away (116-146).
+  // The 300 s of a rig, in the frame of its bay (+z away from the station, deck at y = 0): down
+  // from where it waits its turn above the approach (0-40), over the rim and down onto the deck
+  // nose first (40-56), parked (56-94), up and back out over the rim (94-110), turned around
+  // (110-116), away (116-146), gone (146-180), in from its jump point (180-220) and waiting
+  // while the other rig of the bay has its turn (220-300).
   prefab harbor_rig_cycle {
-    Clip: {duration: 150}
+    Clip: {duration: 300}
     y { Track: {component: box.transform.Position, member: "y", curve: {kind: CurveBezier, keys: [
-      {time: 0, value: 1300, out: -87.75}, {time: 40, value: 130, in: 0, out: 0}, {time: 50, value: 30, in: 0, out: 0},
+      {time: 0, value: 420, out: 0}, {time: 40, value: 130, in: 0, out: 0}, {time: 50, value: 30, in: 0, out: 0},
       {time: 56, value: 1, in: 0, out: 0}, {time: 94, value: 1, in: 0, out: 0}, {time: 100, value: 30, in: 0, out: 0},
       {time: 110, value: 130, in: 0, out: 0}, {time: 116, value: 130, in: 0, out: 0}, {time: 146, value: 1300, in: 117, out: 0},
-      {time: 150, value: 1300, in: 0}
+      {time: 180, value: 1300, in: 0, out: -66}, {time: 220, value: 420, in: 0, out: 0}, {time: 300, value: 420, in: 0}
     ]}} }
     z { Track: {component: box.transform.Position, member: "z", curve: {kind: CurveBezier, keys: [
-      {time: 0, value: 2100, out: -145.125}, {time: 40, value: 165, in: 0, out: 0}, {time: 50, value: 0, in: 0, out: 0},
+      {time: 0, value: 300, out: 0}, {time: 40, value: 165, in: 0, out: 0}, {time: 50, value: 0, in: 0, out: 0},
       {time: 100, value: 0, in: 0, out: 0}, {time: 110, value: 165, in: 0, out: 0}, {time: 116, value: 165, in: 0, out: 0},
-      {time: 146, value: 2100, in: 193.5, out: 0}, {time: 150, value: 2100, in: 0}
+      {time: 146, value: 2100, in: 193.5, out: 0}, {time: 180, value: 2100, in: 0, out: -135},
+      {time: 220, value: 300, in: 0, out: 0}, {time: 300, value: 300, in: 0}
     ]}} }
     yaw { Track: {component: box.transform.Rotation, member: "y", curve: {kind: CurveBezier, keys: [
       {time: 0, value: 3.1415927, out: 0}, {time: 110, value: 3.1415927, in: 0, out: 0},
-      {time: 116, value: 6.2831853, in: 0, out: 0}, {time: 150, value: 6.2831853, in: 0}
+      {time: 116, value: 6.2831853, in: 0, out: 0}, {time: 162.9, value: 6.2831853, in: 0, out: 0},
+      {time: 163, value: 3.1415927, in: 0, out: 0}, {time: 300, value: 3.1415927, in: 0}
     ]}} }
-    fade { Track: {component: Opacity, member: "value", curve: {keys: [{0, 0}, {1.5, 1}, {144.5, 1}, {146, 0}, {150, 0}]}} }
+    fade { Track: {component: Opacity, member: "value", curve: {keys: [{0, 1}, {144.5, 1}, {146, 0}, {180, 0}, {181.5, 1}, {300, 1}]}} }
   }
   prefab harbor_rig_flash {
     Clip: {duration: 150}
-    x { Track: {component: box.transform.Scale, member: "x", curve: {keys: [{0, 40}, {1.2, 0.01}, {145.9, 0.01}, {146.1, 40}, {147.4, 0.01}, {149.8, 0.01}, {150, 40}]}} }
-    y { Track: {component: box.transform.Scale, member: "y", curve: {keys: [{0, 40}, {1.2, 0.01}, {145.9, 0.01}, {146.1, 40}, {147.4, 0.01}, {149.8, 0.01}, {150, 40}]}} }
-    z { Track: {component: box.transform.Scale, member: "z", curve: {keys: [{0, 40}, {1.2, 0.01}, {145.9, 0.01}, {146.1, 40}, {147.4, 0.01}, {149.8, 0.01}, {150, 40}]}} }
+    x { Track: {component: box.transform.Scale, member: "x", curve: {keys: [{0, 0.01}, {29.8, 0.01}, {30, 40}, {31.2, 0.01}, {145.9, 0.01}, {146.1, 40}, {147.4, 0.01}, {150, 0.01}]}} }
+    y { Track: {component: box.transform.Scale, member: "y", curve: {keys: [{0, 0.01}, {29.8, 0.01}, {30, 40}, {31.2, 0.01}, {145.9, 0.01}, {146.1, 40}, {147.4, 0.01}, {150, 0.01}]}} }
+    z { Track: {component: box.transform.Scale, member: "z", curve: {keys: [{0, 0.01}, {29.8, 0.01}, {30, 40}, {31.2, 0.01}, {145.9, 0.01}, {146.1, 40}, {147.4, 0.01}, {150, 0.01}]}} }
   }
 
   prefab harbor_fuel_flow {
