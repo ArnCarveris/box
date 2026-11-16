@@ -129,7 +129,8 @@ void StaticDynamic_childof_child_created_under_dynamic_parent_gets_tag(void) {
     test_bool(ecs_has(world, grandchild, DynamicTransform), true);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -145,7 +146,8 @@ void StaticDynamic_childof_child_created_under_dynamic_parent_gets_tag(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -161,7 +163,8 @@ void StaticDynamic_childof_child_created_under_dynamic_parent_gets_tag(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -221,7 +224,8 @@ void StaticDynamic_childof_static_child_under_dynamic_parent_direct_write(void) 
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, parent, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, parent, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -237,7 +241,8 @@ void StaticDynamic_childof_static_child_under_dynamic_parent_direct_write(void) 
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -261,7 +266,8 @@ void StaticDynamic_childof_static_child_under_dynamic_parent_direct_write(void) 
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, parent, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, parent, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -277,7 +283,8 @@ void StaticDynamic_childof_static_child_under_dynamic_parent_direct_write(void) 
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -301,7 +308,8 @@ void StaticDynamic_childof_static_child_under_dynamic_parent_direct_write(void) 
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, parent, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, parent, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -317,7 +325,8 @@ void StaticDynamic_childof_static_child_under_dynamic_parent_direct_write(void) 
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -474,7 +483,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -490,7 +500,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -506,7 +517,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -529,7 +541,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -545,7 +558,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -561,7 +575,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -582,7 +597,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -598,7 +614,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -614,7 +631,8 @@ void StaticDynamic_childof_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -648,7 +666,8 @@ void StaticDynamic_childof_dynamic_to_static_pending_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -664,7 +683,8 @@ void StaticDynamic_childof_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -680,7 +700,8 @@ void StaticDynamic_childof_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -702,7 +723,8 @@ void StaticDynamic_childof_dynamic_to_static_pending_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -718,7 +740,8 @@ void StaticDynamic_childof_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -734,7 +757,8 @@ void StaticDynamic_childof_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -767,7 +791,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -783,7 +808,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -799,7 +825,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -825,7 +852,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -841,7 +869,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -857,7 +886,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -885,7 +915,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -901,7 +932,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -917,7 +949,8 @@ void StaticDynamic_childof_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -984,7 +1017,8 @@ void StaticDynamic_parent_child_created_under_dynamic_parent_gets_tag(void) {
     test_bool(ecs_has(world, grandchild, DynamicTransform), true);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1000,7 +1034,8 @@ void StaticDynamic_parent_child_created_under_dynamic_parent_gets_tag(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1016,7 +1051,8 @@ void StaticDynamic_parent_child_created_under_dynamic_parent_gets_tag(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1076,7 +1112,8 @@ void StaticDynamic_parent_static_child_under_dynamic_parent_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, parent, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, parent, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1092,7 +1129,8 @@ void StaticDynamic_parent_static_child_under_dynamic_parent_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1116,7 +1154,8 @@ void StaticDynamic_parent_static_child_under_dynamic_parent_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, parent, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, parent, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1132,7 +1171,8 @@ void StaticDynamic_parent_static_child_under_dynamic_parent_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1156,7 +1196,8 @@ void StaticDynamic_parent_static_child_under_dynamic_parent_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, parent, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, parent, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1172,7 +1213,8 @@ void StaticDynamic_parent_static_child_under_dynamic_parent_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1329,7 +1371,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1345,7 +1388,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1361,7 +1405,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1384,7 +1429,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1400,7 +1446,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1416,7 +1463,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1437,7 +1485,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1453,7 +1502,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1469,7 +1519,8 @@ void StaticDynamic_parent_dynamic_to_static_then_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1503,7 +1554,8 @@ void StaticDynamic_parent_dynamic_to_static_pending_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1519,7 +1571,8 @@ void StaticDynamic_parent_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1535,7 +1588,8 @@ void StaticDynamic_parent_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1557,7 +1611,8 @@ void StaticDynamic_parent_dynamic_to_static_pending_set(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1573,7 +1628,8 @@ void StaticDynamic_parent_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1589,7 +1645,8 @@ void StaticDynamic_parent_dynamic_to_static_pending_set(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1622,7 +1679,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1638,7 +1696,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1654,7 +1713,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1680,7 +1740,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1696,7 +1757,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1712,7 +1774,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1740,7 +1803,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
     ecs_progress(world, 0);
 
     {
-        const WorldTransform *t = ecs_get(world, root, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, root, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1756,7 +1820,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, child, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, child, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
@@ -1772,7 +1837,8 @@ void StaticDynamic_parent_static_to_dynamic_subtree_direct_write(void) {
         }
     }
     {
-        const WorldTransform *t = ecs_get(world, grandchild, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, grandchild, &t_buf);
         test_assert(t != NULL);
         const float expect[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,

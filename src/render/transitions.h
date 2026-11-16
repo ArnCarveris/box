@@ -29,9 +29,8 @@ typedef struct box_transition_slot_t {
     double start;                   /**< Time of the last start */
     uint8_t value[BOX_RENDER_TRANSITION_VALUE]; /**< The last target sent */
     float lo[BOX_TRANSITION_RANGE]; /**< Per field minimum of the targets sent since it was
-                                     *   last idle, which bounds the value it renders: Position,
-                                     *   Rotation, Scale, the floats of BoxShadow and the lights
-                                     *   only */
+                                     *   last idle, bounding the value it renders: Position,
+                                     *   Rotation, Scale, BoxShadow floats and lights only */
     float hi[BOX_TRANSITION_RANGE]; /**< Per field maximum of those targets */
 } box_transition_slot_t;
 
@@ -203,13 +202,9 @@ bool box_transitions_specs(
  * neutral value and starts from it in the same packet. With on_remove a removed value without an
  * inherited one starts to the neutral value and the slot leaves until it no longer runs.
  *
- * A transform component, a BoxShadow and a light keep the range of their targets since they
- * were last idle, widened by what the curve overshoots, as the resolver starts from the value it
- * renders. A light whose fields are unchanged still takes the members that switch at once, so a
- * light that leaves keeps its bake mode and shadows.
- *
- * A removed material lobe keeps its shapes on the extended mesh shader while it leaves, so they
- * are marked as changed when it stops leaving (box_transitions_lobes_left).
+ * Transform components, BoxShadow and lights keep the range of their targets since last idle,
+ * widened by what the curve overshoots; an unchanged light takes the members that switch at once.
+ * A material lobe that stops leaving marks its shapes changed (box_transitions_lobes_left).
  *
  * @param world The world
  * @param s The state of the extract
@@ -232,10 +227,9 @@ void box_transitions_compare(
     const TransitionSpec *spec,
     const void *value);
 
-/** Mark the shapes that read the material lobes of a node as changed when one of them leaves:
- * Sheen, ClearCoat, SpecularAnisotropy, DiffuseTransmission or Fresnel with on_remove keeps
- * them on the extended mesh shader (box_render_transitions_leaving), so their batch key changes
- * when the node is destroyed. Marks the entity of the node and its IsA instances.
+/** Mark the shapes that read the material lobes of a node as changed when one leaves: a lobe with
+ * on_remove keeps them on the extended mesh shader (box_render_transitions_leaving), so their key
+ * changes when the node is destroyed. Marks the entity of the node and its IsA instances.
  *
  * @param world The world
  * @param s The state of the extract

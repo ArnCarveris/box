@@ -291,6 +291,7 @@ void DynamicInherit_parent_child_tagged_after_parenting_stays_dynamic(void) {
 
 void DynamicInherit_childof_child_tagged_after_progress_stays_dynamic(void) {
     // core_fixes/dynamic_unspread
+    WorldTransform buf;
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxTransform);
 
@@ -316,8 +317,8 @@ void DynamicInherit_childof_child_tagged_after_progress_stays_dynamic(void) {
     p->x = 2.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 12.0f);
-    test_flt(ecs_get(world, grandchild, WorldTransform)->m[3][0], 13.0f);
+    test_flt(box_transform_world(world, child, &buf)->m[3][0], 12.0f);
+    test_flt(box_transform_world(world, grandchild, &buf)->m[3][0], 13.0f);
 
     ecs_fini(world);
 }

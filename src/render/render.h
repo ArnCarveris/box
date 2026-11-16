@@ -423,10 +423,9 @@ typedef struct box_render_star_t {
     float radius;           /**< Radius of its disc in pixels, size * sqrt(relative) */
     float drawn;            /**< Radius of the disc it is drawn with, radius, or 0 for a point
                              *   when radius is below BOX_RENDER_STAR_MIN_RADIUS */
-    float peak;             /**< Emission of a disc at its center, brightness * radius^2 /
-                             *   (radius^2 + 1/12), so the disc with its one pixel ramp keeps
-                             *   the energy brightness * pi * radius^2; of a point, that energy,
-                             *   the emission of a pixel it is centered on */
+    float peak;             /**< Emission at the center of a disc of radius r, brightness * r^2
+                             *   / (r^2 + 1/12): with its pixel ramp it keeps brightness * pi *
+                             *   r^2; of a point, that energy in the pixel it is centered on */
     float color[3];         /**< Linear color, the brightest channel 1 */
 } box_render_star_t;
 
@@ -588,9 +587,8 @@ void box_render_lights_stats(
     box_render_lights_stats_t *stats);
 
 /** Write a light of a light buffer again from the values a transition renders, as the light
- * extract writes it: its color from the Rgb and the intensity, times the scale of the record,
- * and for a point or spot light its range, and for a spot light its cone. Its position,
- * direction and shadow tile stay. Runs on the thread that resolves the transitions.
+ * extract does: its color from Rgb and intensity times the record scale, the range of a point or
+ * spot light, the cone of a spot light. Position, direction and shadow tile stay; resolver only.
  *
  * @param target The target of the light record
  * @param values The rendered intensity, range, inner and outer angle
@@ -941,10 +939,9 @@ void box_render_shadow_settings(
     const ShadowSettings *settings,
     ShadowSettings *out);
 
-/** Resolve the levels of detail of a view: levels is clamped to BOX_LOD_LEVELS_MAX and a
- * single level is none (levels 0). distances[0] is 0, a negative or non-finite distance is 0
- * and each distance is at least the one before it, so they ascend; the distances past the
- * levels are 0.
+/** Resolve the levels of detail of a view: levels is clamped to BOX_LOD_LEVELS_MAX, a single
+ * level is none (levels 0), distances[0] and negative or non-finite distances are 0, each is at
+ * least the one before it and the distances past the levels are 0.
  *
  * @param settings The settings of a view
  * @param out Receives the resolved settings
@@ -1509,9 +1506,8 @@ float box_render_depth_of_field_coc_depth(
     float depth);
 
 /** Get the circle of confusion of a pixel of a tilt shift as etc/shaders/depth_of_field.wgsl
- * computes it: 0 within tilt_band of the line through tilt_center turned by tilt_angle, up to 1
- * at tilt_transition past the band edge, positive on both sides. Distances are in units of the
- * image height.
+ * does: 0 within tilt_band of the line through tilt_center turned by tilt_angle, up to 1 at
+ * tilt_transition past the band edge, positive on both sides, distances in image heights.
  *
  * @param dof The resolved settings
  * @param x Normalized image X of the pixel, 0 at the left
@@ -2264,9 +2260,8 @@ bool box_render_transition_ranged(
     box_render_transition_component_t component);
 
 /** Widen the per field range of the targets of a transform component, a BoxShadow or a light
- * by what a CubicBezier can overshoot: from + (to - from) * e, with e in the hull of 0, y1, y2
- * and 1, lies at most max(y1, y2) - 1 or -min(y1, y2) range widths beyond it. The presets do not
- * overshoot.
+ * by what a CubicBezier can overshoot: from + (to - from) * e, e in the hull of 0, y1, y2 and 1,
+ * is at most max(y1, y2) - 1 or -min(y1, y2) widths beyond it. Presets do not overshoot.
  *
  * @param component The component, nothing for one box_render_transition_ranged rejects
  * @param spec The transition of the start

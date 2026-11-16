@@ -150,7 +150,8 @@ void DynamicAdd_childof_100k_children_add_dynamic_to_root(void) {
 
     for (int i = 0; i < count; i ++) {
         test_assert(ecs_has(world, ents[i], DynamicTransform));
-        const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, ents[i], &t_buf);
         test_assert(t != NULL);
         test_flt(t->m[3][0], (float)i);
         test_flt(t->m[3][1], 2);
@@ -185,7 +186,8 @@ void DynamicAdd_parent_100k_children_add_dynamic_to_root(void) {
 
     for (int i = 0; i < count; i ++) {
         test_assert(ecs_has(world, ents[i], DynamicTransform));
-        const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, ents[i], &t_buf);
         test_assert(t != NULL);
         test_flt(t->m[3][0], (float)i);
         test_flt(t->m[3][1], 2);
