@@ -44,6 +44,7 @@
 #include "box/atmosphere.h"
 #include "box/particle.h"
 #include "box/transition.h"
+#include "box/portal.h"
 
 #ifdef __cplusplus
 extern "C" {

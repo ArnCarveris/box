@@ -1,0 +1,208 @@
+// Portal bunker compound, ported from the WebGPU Entities scenario of the same name: the bunker,
+// its rooms and their walls, floors, roofs and frames (shell), the brick shed, the quay and the docked
+// freighter's props, and the lights, with the rooms,
+// openings, occluders and doors as VisArea, VisPortal, VisOccluder and PortalDoor components
+// (see include/box/portal.h). Fly with WASD (QE for down/up, Shift to go faster).
+include portal_bunker/materials
+include portal_bunker/models
+include portal_bunker/rooms
+include portal_bunker/shell
+include portal_bunker/props
+include portal_bunker/lights
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.surface
+using box.controllers
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {}
+}
+
+window {
+  Surface: {width: 1600, height: 900, vsync: true}
+}
+
+camera {
+  Position: {0, 1.7, -16}
+  Rotation: {-0.0349, 3.1416, 0}
+  Camera: {fov: 70}
+  CameraController: {speed: 6}
+}
+
+sun {
+  Rotation: {0.9209, -0.9098, 0}
+  DirectionalLight: {intensity: 5}
+  Rgb: {255, 228, 194}
+}
+
+$ {
+  AmbientLight: {sky: {55, 100, 237}, ground: {40, 36, 30}, intensity: 0.5}
+}
+
+ground_0 : BunkerMat_grass {
+  Position: {30, -0.05, -38}
+  Box: {220, 0.1, 64}
+}
+
+ground_1 : BunkerMat_grass {
+  Position: {-15, -0.05, -2.5}
+  Box: {130, 0.1, 7}
+}
+
+ground_2 : BunkerMat_grass {
+  Position: {100, -0.05, -2.5}
+  Box: {80, 0.1, 7}
+}
+
+ground_3 : BunkerMat_grass {
+  Position: {30, -0.05, 80}
+  Box: {220, 0.1, 60}
+}
+
+ground_4 : BunkerMat_grass {
+  Position: {-15, -0.05, 28.5}
+  Box: {130, 0.1, 43}
+}
+
+ground_5 : BunkerMat_grass {
+  Position: {100, -0.05, 28.5}
+  Box: {80, 0.1, 43}
+}
+
+ground_6 : BunkerMat_grass {
+  Position: {-15, -0.05, 6}
+  Box: {130, 0.1, 2}
+}
+
+ground_7 : BunkerMat_grass {
+  Position: {100, -0.05, 6}
+  Box: {80, 0.1, 2}
+}
+
+ground_8 : BunkerMat_grass {
+  Position: {-47, -0.05, 3}
+  Box: {66, 0.1, 4}
+}
+
+ground_9 : BunkerMat_grass {
+  Position: {22, -0.05, 3}
+  Box: {56, 0.1, 4}
+}
+
+ground_10 : BunkerMat_grass {
+  Position: {100, -0.05, 3}
+  Box: {80, 0.1, 4}
+}
+
+// The scenario's viewpoints, shown with --camera views.<name>
+views {
+  outside_the_bunker { // Outside the bunker
+    Position: {0, 1.7, -16}
+    Rotation: {-0.0312, -3.1416, 0}
+    Camera: {fov: 70}
+  }
+  compound_overview { // Compound overview
+    Position: {-30, 26, -38}
+    Rotation: {-0.4306, -2.583, 0}
+    Camera: {fov: 70}
+  }
+  entrance_hall { // Entrance Hall
+    Position: {0, 1.7, 1.5}
+    Rotation: {-0.0118, -3.1416, 0}
+    Camera: {fov: 70}
+  }
+  control_room { // Control Room
+    Position: {-2.5, 1.7, 14}
+    Rotation: {-0.0292, 2.3217, 0}
+    Camera: {fov: 70}
+  }
+  loft { // Loft
+    Position: {-4, 5.2, 15}
+    Rotation: {-0.0767, 2.2655, 0}
+    Camera: {fov: 70}
+  }
+  atrium { // Atrium
+    Position: {5, 1.7, 23}
+    Rotation: {0.1777, -2.4669, 0}
+    Camera: {fov: 70}
+  }
+  storage { // Storage
+    Position: {5, 1.7, 12}
+    Rotation: {-0.05, -2.2143, 0}
+    Camera: {fov: 70}
+  }
+  brick_shed { // Brick Shed
+    Position: {21, 1.7, -3}
+    Rotation: {-0.0589, -0.7854, 0}
+    Camera: {fov: 70}
+  }
+  generator_room { // Generator Room
+    Position: {-3, -2.3, 7}
+    Rotation: {-0.0278, 1.9513, 0}
+    Camera: {fov: 70}
+  }
+  basement_hall { // Basement Hall
+    Position: {-15, -2.3, 11}
+    Rotation: {-0.0168, 0.4636, 0}
+    Camera: {fov: 70}
+  }
+  vault { // Vault
+    Position: {-15, -2.3, -7}
+    Rotation: {-0.05, 0.9273, 0}
+    Camera: {fov: 70}
+  }
+  barracks { // Barracks
+    Position: {-42, 1.7, 22}
+    Rotation: {0.0811, -3.1416, 0}
+    Camera: {fov: 70}
+  }
+  barracks_quarters { // Barracks quarters
+    Position: {-42, 5, 32.5}
+    Rotation: {-0.0666, -1.5708, 0}
+    Camera: {fov: 70}
+  }
+  barracks_stairwell { // Barracks stairwell
+    Position: {-42.8, 1.7, 36.2}
+    Rotation: {0.376, -3.1416, 0}
+    Camera: {fov: 70}
+  }
+  barracks_upper_corridor { // Barracks upper corridor
+    Position: {-45, 4.9, 35.05}
+    Rotation: {-0.0476, -1.5708, 0}
+    Camera: {fov: 70}
+  }
+  barracks_operations { // Barracks operations
+    Position: {-50.6, 2.2, 34.7}
+    Rotation: {-0.1688, -2.0878, 0}
+    Camera: {fov: 70}
+  }
+  deckhouse { // Deckhouse
+    Position: {40, 9.5, 22}
+    Rotation: {-0.0909, -2.3884, 0}
+    Camera: {fov: 70}
+  }
+  deckhouse_corridor { // Deckhouse corridor
+    Position: {52.1, 6.7, 35.14}
+    Rotation: {-0.0508, -1.5708, 0}
+    Camera: {fov: 70}
+  }
+}
+
+view {
+  exposure { AutoExposure: {} }
+  tonemap { Tonemap: {auto_exposure: exposure} }
+  smaa { Smaa: {} }
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {191, 219, 255, 255}},
+    shadows: {enabled: true},
+    effects: [{effect: tonemap}, {effect: smaa}]
+  }
+}

@@ -1,0 +1,166 @@
+using box.transform
+using box.geometry
+using box.light
+using box.material
+
+bunker {
+  lights {
+    light_0 : BunkerModel_ceilingLamp { Position: {-3.5, 4.85, 2.5}; Rgb: {255, 204, 140}; PointLight: {intensity: 10.4, range: 6} }
+    light_1 : BunkerModel_ceilingLamp { Position: {3.5, 4.85, 2.5}; Rgb: {255, 204, 140}; PointLight: {intensity: 10.4, range: 6} }
+    light_2 : BunkerModel_ceilingLamp { Position: {-3.5, 4.85, 7.5}; Rgb: {255, 204, 140}; PointLight: {intensity: 10.4, range: 6} }
+    light_3 : BunkerModel_ceilingLamp { Position: {3.5, 4.85, 7.5}; Rgb: {255, 204, 140}; PointLight: {intensity: 10.4, range: 6} }
+    light_4 : BunkerModel_wallLamp { Position: {0, 2.8, 0.3}; Rgb: {255, 179, 102}; PointLight: {intensity: 6.4, range: 3.5} }
+    light_5 : BunkerModel_wallLamp { Position: {-5.8, 2.9, 3}; Rgb: {128, 204, 255}; PointLight: {intensity: 5.6, range: 3.5} }
+    light_6 : BunkerModel_coldLamp { Position: {0, 2.88, 12}; Rgb: {179, 217, 255}; PointLight: {intensity: 8, range: 4.5} }
+    light_7 : BunkerModel_coldLamp { Position: {0, 2.88, 16}; Rgb: {179, 217, 255}; PointLight: {intensity: 8, range: 4.5} }
+    light_8 : BunkerModel_coldLamp { Position: {0, 2.88, 20.5}; Rgb: {179, 217, 255}; PointLight: {intensity: 8, range: 4.5} }
+    light_9 : BunkerModel_coldLamp { Position: {5, 2.88, 20.5}; Rgb: {179, 217, 255}; PointLight: {intensity: 8, range: 4.5} }
+    light_10 : BunkerModel_coldLamp { Position: {10, 2.88, 20.5}; Rgb: {179, 217, 255}; PointLight: {intensity: 8, range: 4.5} }
+    light_11 : BunkerModel_redBeacon { Position: {14.5, 2.85, 20.5}; Rgb: {255, 51, 26}; PointLight: {intensity: 8.8, range: 5} } // signal: pulse
+    light_12 : BunkerModel_coldLamp { Position: {-9, 3.38, 15.5}; Rgb: {102, 204, 255}; PointLight: {intensity: 6.4, range: 5} }
+    light_13 : BunkerModel_coldLamp { Position: {-4, 3.38, 15.5}; Rgb: {102, 204, 255}; PointLight: {intensity: 6.4, range: 5} }
+    light_14 { Position: {-9, 1.7, 20.4}; Rgb: {51, 255, 153}; PointLight: {intensity: 5.6, range: 3.5} }
+    light_15 { Position: {-5.5, 1.7, 20.4}; Rgb: {51, 255, 153}; PointLight: {intensity: 5.6, range: 3.5} }
+    light_16 { Position: {-10.4, 1.7, 14.3}; Rgb: {51, 255, 153}; PointLight: {intensity: 4.8, range: 3} }
+    light_17 { Position: {-4, 1.5, 14.5}; Rgb: {255, 204, 128}; PointLight: {intensity: 4, range: 2.5} }
+    light_18 : BunkerModel_bulb { Position: {-8.5, 5.9, 19.5}; Rgb: {255, 179, 102}; PointLight: {intensity: 8, range: 4} }
+    light_19 : BunkerModel_bulb { Position: {-4.5, 5.9, 15.5}; Rgb: {255, 179, 102}; PointLight: {intensity: 6.4, range: 4} }
+    light_20 { Position: {9, 6.5, 26}; Rgb: {255, 242, 217}; PointLight: {intensity: 4.8, range: 9} }
+    light_21 : BunkerModel_wallLamp { Position: {5, 1.2, 33.5}; Rgb: {255, 191, 115}; PointLight: {intensity: 6.4, range: 4} }
+    light_22 : BunkerModel_wallLamp { Position: {13, 1.2, 33.5}; Rgb: {255, 191, 115}; PointLight: {intensity: 6.4, range: 4} }
+    light_23 : BunkerModel_ceilingLamp { Position: {9, 2.88, 15}; Rgb: {255, 204, 128}; PointLight: {intensity: 9.6, range: 6} } // signal: flicker
+    light_24 : BunkerModel_bulb { Position: {5.5, 2.5, 18.2}; Rgb: {255, 153, 77}; PointLight: {intensity: 4.8, range: 3} }
+    light_25 : BunkerModel_bulb { Position: {24, 3.38, -6}; Rgb: {255, 166, 89}; PointLight: {intensity: 9.6, range: 5.5} }
+    light_26 { Position: {26.5, 1.2, -9.6}; Rgb: {255, 128, 51}; PointLight: {intensity: 4.8, range: 3} }
+    light_27 : BunkerModel_coldLamp { Position: {-8, 2.85, 3}; Rgb: {204, 217, 255}; PointLight: {intensity: 7.2, range: 5} }
+    light_28 : BunkerModel_wallLamp { Position: {-11, 0.3, 4.8}; Rgb: {255, 191, 115}; PointLight: {intensity: 5.6, range: 3.5} }
+    light_29 { Position: {-13.5, -0.6, 3}; Rgb: {204, 217, 255}; PointLight: {intensity: 7.2, range: 5} }
+    light_30 : BunkerModel_coldLamp { Position: {-19, -0.6, -3}; Rgb: {153, 204, 255}; PointLight: {intensity: 7.2, range: 5} }
+    light_31 : BunkerModel_coldLamp { Position: {-19, -0.6, 3}; Rgb: {153, 204, 255}; PointLight: {intensity: 7.2, range: 5} }
+    light_32 : BunkerModel_coldLamp { Position: {-19, -0.6, 9}; Rgb: {153, 204, 255}; PointLight: {intensity: 7.2, range: 5} } // signal: flicker
+    light_33 : BunkerModel_redBeacon { Position: {-23.6, -2, 6}; Rgb: {255, 64, 26}; PointLight: {intensity: 6.4, range: 4} } // signal: pulse
+    light_34 : BunkerModel_ceilingLamp { Position: {-9, -0.6, 7.5}; Rgb: {255, 153, 64}; PointLight: {intensity: 8.8, range: 5} }
+    light_35 : BunkerModel_ceilingLamp { Position: {-4.5, -0.6, 10.5}; Rgb: {255, 153, 64}; PointLight: {intensity: 8.8, range: 5} }
+    light_36 { Position: {-9, -2.4, 8.4}; Rgb: {77, 255, 128}; PointLight: {intensity: 4, range: 2.5} }
+    light_37 : BunkerModel_redBeacon { Position: {-2.4, -1.4, 6.4}; Rgb: {255, 51, 26}; PointLight: {intensity: 6.4, range: 4} } // signal: pulse
+    light_38 : BunkerModel_coldLamp { Position: {-19, -0.6, -10}; Rgb: {128, 153, 255}; PointLight: {intensity: 6.4, range: 5} } // signal: flicker
+    light_39 { Position: {-23.5, -2, -13.5}; Rgb: {255, 204, 77}; PointLight: {intensity: 4, range: 3} }
+    light_40 { Position: {3.7, 4, -3}; Rgb: {255, 217, 153}; PointLight: {intensity: 6, range: 9} }
+    light_41 { Position: {41.7, 4, 5}; Rgb: {255, 217, 153}; PointLight: {intensity: 6, range: 10} }
+    light_42 { Position: {41.7, 4, 50}; Rgb: {255, 217, 153}; PointLight: {intensity: 6, range: 10} }
+    light_43 : BunkerModel_wallLamp { Position: {55, 7.6, 5.3}; Rgb: {255, 230, 179}; PointLight: {intensity: 7.2, range: 12} }
+    light_44 { Position: {55, 14.9, 60}; Rgb: {255, 51, 26}; PointLight: {intensity: 4.8, range: 6} } // signal: pulse
+    light_45 : BunkerModel_ceilingLamp { Position: {55, 4.6, -3}; Rgb: {255, 153, 77}; PointLight: {intensity: 8.8, range: 6} }
+    light_46 : BunkerModel_ceilingLamp { Position: {55, 4.6, 4}; Rgb: {255, 153, 77}; PointLight: {intensity: 8.8, range: 6} }
+    light_47 : BunkerModel_redBeacon { Position: {50.4, 1, 6.4}; Rgb: {255, 38, 26}; PointLight: {intensity: 6.4, range: 4} } // signal: pulse
+    light_48 { Position: {56.5, 0.8, 1.5}; Rgb: {77, 255, 128}; PointLight: {intensity: 3.2, range: 3} }
+    light_49 : BunkerModel_coldLamp { Position: {55, 4.6, 10}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} }
+    light_50 : BunkerModel_coldLamp { Position: {55, 4.6, 36}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} }
+    light_51 : BunkerModel_coldLamp { Position: {55, 4.6, 46}; Rgb: {179, 204, 255}; PointLight: {intensity: 8, range: 8} } // signal: flicker
+    light_52 : BunkerModel_wallLamp { Position: {50.3, 0.5, 26}; Rgb: {255, 179, 102}; PointLight: {intensity: 4.8, range: 4} }
+    light_53 : BunkerModel_bulb { Position: {53, 7.9, 2}; Rgb: {255, 204, 140}; PointLight: {intensity: 7.2, range: 4.5} }
+    light_54 : BunkerModel_bulb { Position: {57, 7.9, 2}; Rgb: {255, 204, 140}; PointLight: {intensity: 7.2, range: 4.5} }
+    light_55 : BunkerModel_bulb { Position: {54, 7.9, -3}; Rgb: {255, 204, 140}; PointLight: {intensity: 6.4, range: 4.5} }
+    light_56 : BunkerModel_coldLamp { Position: {55, 10.9, -1}; Rgb: {179, 217, 255}; PointLight: {intensity: 6.4, range: 5} }
+    light_57 { Position: {55, 9.4, 2.7}; Rgb: {51, 255, 153}; PointLight: {intensity: 4, range: 3} }
+    light_58 { Position: {-40.9, 2.95, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3974} }
+    light_59 { Position: {-42, 2.95, 40.96}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3734} }
+    light_60 { Position: {-42, 2.95, 35.04}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3734} }
+    light_61 { Position: {-44.6, 2.95, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3659} }
+    light_62 { Position: {-39.4, 2.95, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3659} }
+    light_63 { Position: {-48.7125, 2.95, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.7771} }
+    light_64 { Position: {-44.2375, 2.95, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.7771} }
+    light_65 { Position: {-39.7625, 2.95, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.7771} }
+    light_66 { Position: {-35.2875, 2.95, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.7771} }
+    light_67 { Position: {-40.9, 2.95, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.7877} }
+    light_68 { Position: {-48.6125, 2.95, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.8583} }
+    light_69 { Position: {-43.9375, 2.95, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.8583} }
+    light_70 { Position: {-38.4125, 2.95, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.4292} }
+    light_71 { Position: {-34.8375, 2.95, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.4292} }
+    light_72 { Position: {-35.875, 2.95, 36.17}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_73 { Position: {-35.875, 2.95, 39.83}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_74 { Position: {-48.125, 2.95, 36.17}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_75 { Position: {-48.125, 2.95, 39.83}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_76 { Position: {-40.9, 6.15, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3974} }
+    light_77 { Position: {-42, 6.15, 40.96}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3734} }
+    light_78 { Position: {-42, 6.15, 35.04}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3734} }
+    light_79 { Position: {-44.6, 6.15, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3659} }
+    light_80 { Position: {-39.4, 6.15, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3659} }
+    light_81 { Position: {-49.4583, 6.15, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_82 { Position: {-46.475, 6.15, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_83 { Position: {-43.4917, 6.15, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_84 { Position: {-40.5083, 6.15, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_85 { Position: {-37.525, 6.15, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_86 { Position: {-34.5417, 6.15, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_87 { Position: {-49.4583, 6.15, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_88 { Position: {-46.475, 6.15, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_89 { Position: {-43.4917, 6.15, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_90 { Position: {-40.5083, 6.15, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_91 { Position: {-37.525, 6.15, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_92 { Position: {-34.5417, 6.15, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_93 { Position: {-35.875, 6.15, 36.17}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_94 { Position: {-35.875, 6.15, 39.83}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_95 { Position: {-48.125, 6.15, 36.17}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_96 { Position: {-48.125, 6.15, 39.83}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_97 { Position: {-40.9, 9.35, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3974} }
+    light_98 { Position: {-42, 9.35, 40.96}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3734} }
+    light_99 { Position: {-42, 9.35, 35.04}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3734} }
+    light_100 { Position: {-44.6, 9.35, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3659} }
+    light_101 { Position: {-39.4, 9.35, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3659} }
+    light_102 { Position: {-49.4583, 9.35, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_103 { Position: {-46.475, 9.35, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_104 { Position: {-43.4917, 9.35, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_105 { Position: {-40.5083, 9.35, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_106 { Position: {-37.525, 9.35, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_107 { Position: {-34.5417, 9.35, 43.305}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_108 { Position: {-49.4583, 9.35, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_109 { Position: {-46.475, 9.35, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_110 { Position: {-43.4917, 9.35, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_111 { Position: {-40.5083, 9.35, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_112 { Position: {-37.525, 9.35, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_113 { Position: {-34.5417, 9.35, 32.695}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2206} }
+    light_114 { Position: {-35.875, 9.35, 36.17}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_115 { Position: {-35.875, 9.35, 39.83}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_116 { Position: {-48.125, 9.35, 36.17}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_117 { Position: {-48.125, 9.35, 39.83}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.3659} }
+    light_118 { Position: {-42.8, 2.9, 39.74}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.84} }
+    light_119 { Position: {-42.8, 6.1, 39.74}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.84} }
+    light_120 { Position: {56.1, 7.65, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3974} }
+    light_121 { Position: {55, 7.65, 40.86}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.1575} }
+    light_122 { Position: {55, 7.65, 35.14}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.1575} }
+    light_123 { Position: {52.5, 7.65, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3383} }
+    light_124 { Position: {57.5, 7.65, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3383} }
+    light_125 { Position: {50.9125, 7.65, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_126 { Position: {53.6375, 7.65, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_127 { Position: {56.3625, 7.65, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_128 { Position: {59.0875, 7.65, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_129 { Position: {51.0375, 7.65, 33.295}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.9398} }
+    light_130 { Position: {54.0125, 7.65, 33.295}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.9398} }
+    light_131 { Position: {58.575, 7.65, 33.295}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2507} }
+    light_132 { Position: {59.275, 7.65, 35.6933}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_133 { Position: {59.275, 7.65, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_134 { Position: {59.275, 7.65, 40.3067}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_135 { Position: {50.725, 7.65, 35.6933}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_136 { Position: {50.725, 7.65, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_137 { Position: {50.725, 7.65, 40.3067}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_138 { Position: {56.1, 10.55, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3974} }
+    light_139 { Position: {55, 10.55, 40.86}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.1575} }
+    light_140 { Position: {55, 10.55, 35.14}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 4.1575} }
+    light_141 { Position: {52.5, 10.55, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3383} }
+    light_142 { Position: {57.5, 10.55, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.3383} }
+    light_143 { Position: {50.9125, 10.55, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_144 { Position: {53.6375, 10.55, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_145 { Position: {56.3625, 10.55, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_146 { Position: {59.0875, 10.55, 42.705}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.8457} }
+    light_147 { Position: {51.0375, 10.55, 33.295}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.9398} }
+    light_148 { Position: {54.0125, 10.55, 33.295}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.9398} }
+    light_149 { Position: {58.575, 10.55, 33.295}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.2507} }
+    light_150 { Position: {59.275, 10.55, 35.6933}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_151 { Position: {59.275, 10.55, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_152 { Position: {59.275, 10.55, 40.3067}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_153 { Position: {50.725, 10.55, 35.6933}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_154 { Position: {50.725, 10.55, 38}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_155 { Position: {50.725, 10.55, 40.3067}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 2.6465} }
+    light_156 { Position: {54.2, 7.6, 39.74}; Rgb: {255, 209, 153}; PointLight: {intensity: 3.6, range: 3.48} }
+  }
+}

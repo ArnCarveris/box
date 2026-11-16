@@ -1,0 +1,209 @@
+using box.transform
+using box.geometry
+using box.material
+
+bunker {
+  props {
+    prop_0 : BunkerModel_lampPost { Position: {3, 0, -3} }
+    prop_1 : BunkerModel_barrierWall { Position: {-20, 0, -5} }
+    prop_2 : BunkerModel_barrel { Position: {-3.5, 0, -2} }
+    prop_3 : BunkerModel_barrel { Position: {-4.3, 0, -1.6} }
+    prop_4 : BunkerModel_crate { Position: {5, 0, -2.5}; Rotation: {0, 0.3491, 0} }
+    prop_5 : BunkerModel_crate { Position: {-4.5, 0, 8}; Rotation: {0, 0.0873, 0} }
+    prop_6 : BunkerModel_crate { Position: {-4.4, 1, 8}; Rotation: {0, -0.1745, 0} }
+    prop_7 : BunkerModel_crateSmall { Position: {-3.2, 0, 8.4}; Rotation: {0, 0.5236, 0} }
+    prop_8 : BunkerModel_desk { Position: {3.5, 0, 2.5}; Rotation: {0, 1.5708, 0} }
+    prop_9 : BunkerModel_barrel { Position: {4.8, 0, 8.6} }
+    prop_10 : BunkerModel_barrel { Position: {4, 0, 8.9} }
+    prop_11 : BunkerModel_bench { Position: {-2.8, 0, 1} }
+    prop_12 : BunkerModel_crateSmall { Position: {0.9, 0, 12}; Rotation: {0, 0.2094, 0} }
+    prop_13 : BunkerModel_barrel { Position: {15.3, 0, 21.4} }
+    prop_14 : BunkerModel_console { Position: {-9, 0, 21.3} } // screen: facility
+    prop_15 : BunkerModel_console { Position: {-5.5, 0, 21.3} } // screen: doors
+    prop_16 : BunkerModel_console { Position: {-11.3, 0, 14.3}; Rotation: {0, -1.5708, 0} } // screen: harbour
+    prop_17 : BunkerModel_camHousing { Position: {5.497, 4.461, 0.503}; Rotation: {0, 2.3562, 0} }
+    prop_18 : BunkerModel_camHousing { Position: {1.121, 2.631, 10.255}; Rotation: {0, 2.9985, 0} }
+    prop_19 : BunkerModel_camHousing { Position: {-1.901, 3.135, 13.393}; Rotation: {0, 2.3963, 0} }
+    prop_20 : BunkerModel_camHousing { Position: {13.473, 7.284, 33.5}; Rotation: {0, 0.6301, 0} }
+    prop_21 : BunkerModel_camHousing { Position: {-2.382, -0.946, 6.425}; Rotation: {0, 2.138, 0} }
+    prop_22 : BunkerModel_camHousing { Position: {5.355, 6.214, -0.635}; Rotation: {0, -1.8047, 0} }
+    prop_23 : BunkerModel_console { Position: {-2.2, 0, 14.3}; Rotation: {0, 1.5708, 0} } // screen: cctv
+    prop_24 : BunkerModel_desk { Position: {-4, 0, 14.5} }
+    prop_25 : BunkerModel_ladder { Position: {-6, 0, 16.75} }
+    prop_26 : BunkerModel_desk { Position: {-8.5, 3.5, 19.5} }
+    prop_27 : BunkerModel_crate { Position: {-4, 3.5, 20}; Rotation: {0, 0.2618, 0} }
+    prop_28 : BunkerModel_crateSmall { Position: {-9.8, 3.5, 14.8}; Rotation: {0, 0.6981, 0} }
+    prop_29 : BunkerModel_planter { Position: {7, 0, 30.5} }
+    prop_30 : BunkerModel_tree { Position: {7, 0.6, 30.5}; Scale: {0.9, 0.9, 0.9} }
+    prop_31 : BunkerModel_pillar { Position: {9, 0, 30.5} }
+    prop_32 : BunkerModel_bench { Position: {12.6, 0, 27}; Rotation: {0, 1.5708, 0} }
+    prop_33 : BunkerModel_bench { Position: {5.4, 0, 25}; Rotation: {0, 1.5708, 0} }
+    prop_34 : BunkerModel_shelf { Position: {6, 0, 11.5} }
+    prop_35 : BunkerModel_shelf { Position: {8.5, 0, 11.5} }
+    prop_36 : BunkerModel_shelf { Position: {11, 0, 11.5} }
+    prop_37 : BunkerModel_shelf { Position: {4.5, 0, 15}; Rotation: {0, 1.5708, 0} }
+    prop_38 : BunkerModel_crate { Position: {9, 0, 15.5}; Rotation: {0, 0.1745, 0} }
+    prop_39 : BunkerModel_crate { Position: {10.2, 0, 15.8}; Rotation: {0, -0.0873, 0} }
+    prop_40 : BunkerModel_crate { Position: {9.6, 1, 15.6}; Rotation: {0, 0.4363, 0} }
+    prop_41 : BunkerModel_barrel { Position: {13.2, 0, 12} }
+    prop_42 : BunkerModel_crate { Position: {26.5, 0, -8.5} }
+    prop_43 : BunkerModel_crate { Position: {26.4, 1, -8.4}; Rotation: {0, 0.3491, 0} }
+    prop_44 : BunkerModel_barrel { Position: {22, 0, -9} }
+    prop_45 : BunkerModel_desk { Position: {25, 0, -3} }
+    prop_46 : BunkerModel_pipeRun { Position: {-23.4, -0.8, 3} }
+    prop_47 : BunkerModel_shelf { Position: {-23.5, -4, -2}; Rotation: {0, 1.5708, 0} }
+    prop_48 : BunkerModel_shelf { Position: {-23.5, -4, 0.5}; Rotation: {0, 1.5708, 0} }
+    prop_49 : BunkerModel_barrel { Position: {-15, -4, -5.2} }
+    prop_50 : BunkerModel_barrel { Position: {-15.8, -4, -5.4} }
+    prop_51 : BunkerModel_crate { Position: {-22.8, -4, 10.8}; Rotation: {0, 0.2094, 0} }
+    prop_52 : BunkerModel_crateSmall { Position: {-21.6, -4, 11.2}; Rotation: {0, 0.6981, 0} }
+    prop_53 : BunkerModel_generator { Position: {-9, -4, 9.6}; Rotation: {0, 3.1416, 0} } // screen: generator
+    prop_54 : BunkerModel_generator { Position: {-4.5, -4, 9.6}; Rotation: {0, 3.1416, 0} } // screen: generator
+    prop_55 : BunkerModel_pipeRun { Position: {-8, -0.8, 11.7}; Rotation: {0, 1.5708, 0}; Scale: {1, 1, 0.66} }
+    prop_56 : BunkerModel_console { Position: {-12.8, -4, 7.5}; Rotation: {0, -1.5708, 0} } // screen: power
+    prop_57 : BunkerModel_safe { Position: {-19, -4, -13.3} }
+    prop_58 : BunkerModel_shelf { Position: {-23.5, -4, -10}; Rotation: {0, 1.5708, 0} }
+    prop_59 : BunkerModel_shelf { Position: {-14.5, -4, -10}; Rotation: {0, 1.5708, 0} }
+    prop_60 : BunkerModel_crate { Position: {-16, -4, -12.8}; Rotation: {0, 0.1396, 0} }
+    prop_61 : BunkerModel_quay { Position: {44, 0, 20} }
+    prop_62 : BunkerModel_gantry { Position: {44, 0.5, 32}; Scale: {1, 1.3, 1} }
+    prop_63 : BunkerModel_bollard { Position: {47.3, 0.5, 0} }
+    prop_64 : BunkerModel_bollard { Position: {47.3, 0.5, 20} }
+    prop_65 : BunkerModel_bollard { Position: {47.3, 0.5, 40} }
+    prop_66 : BunkerModel_bollard { Position: {47.3, 0.5, 60} }
+    prop_67 : BunkerModel_lampPost { Position: {41, 0.5, 5} }
+    prop_68 : BunkerModel_lampPost { Position: {41, 0.5, 50} }
+    prop_69 : BunkerModel_containerRed { Position: {42, 0.5, -12} }
+    prop_70 : BunkerModel_containerBlue { Position: {42, 3.1, -12} }
+    prop_71 : BunkerModel_containerGreen { Position: {44.8, 0.5, -12} }
+    prop_72 : BunkerModel_containerYellow { Position: {42, 0.5, -4} }
+    prop_73 : BunkerModel_containerBlue { Position: {43, 0.5, 64}; Rotation: {0, 1.5708, 0} }
+    prop_74 : BunkerModel_crate { Position: {45.5, 0.5, 8}; Rotation: {0, 0.2094, 0} }
+    prop_75 : BunkerModel_barrel { Position: {46.4, 0.5, 9.2} }
+    prop_76 : BunkerModel_funnel { Position: {55, 11, -2.5} }
+    prop_77 : BunkerModel_radar { Position: {55, 15.2, -2.5} }
+    prop_78 : BunkerModel_mast { Position: {55, 5, 60} }
+    prop_79 : BunkerModel_shipCrane { Position: {55, 5, 11} }
+    prop_80 : BunkerModel_shipCrane { Position: {55, 5, 46}; Rotation: {0, 3.1416, 0} }
+    prop_81 : BunkerModel_lifeboat { Position: {50, 6.2, -3.2} }
+    prop_82 : BunkerModel_containerGreen { Position: {55, 5, 49}; Rotation: {0, 1.5708, 0} }
+    prop_83 : BunkerModel_bollard { Position: {50, 5, 30} }
+    prop_84 : BunkerModel_bollard { Position: {60, 5, 30} }
+    prop_85 : BunkerModel_engineBlock { Position: {56.5, -2, 1.5} }
+    prop_86 : BunkerModel_generator { Position: {51.6, -2, 4.5}; Rotation: {0, 1.5708, 0} } // screen: engine
+    prop_87 : BunkerModel_pipeRun { Position: {59.4, 3.8, 0.5}; Scale: {1, 1, 0.7} }
+    prop_88 : BunkerModel_ladder { Position: {53, -2, -2.45}; Scale: {1, 2, 1} }
+    prop_89 : BunkerModel_barrel { Position: {59, -2, -5.2} }
+    prop_90 : BunkerModel_barrel { Position: {58.2, -2, -5.4} }
+    prop_91 : BunkerModel_containerRed { Position: {52.5, -2, 12} }
+    prop_92 : BunkerModel_containerBlue { Position: {52.5, 0.6, 12} }
+    prop_93 : BunkerModel_containerYellow { Position: {57.5, -2, 12} }
+    prop_94 : BunkerModel_containerGreen { Position: {52.5, -2, 40} }
+    prop_95 : BunkerModel_containerRed { Position: {57.5, -2, 40} }
+    prop_96 : BunkerModel_containerBlue { Position: {57.5, 0.6, 40} }
+    prop_97 : BunkerModel_containerYellow { Position: {52.5, -2, 46.5} }
+    prop_98 : BunkerModel_crate { Position: {55, -2, 24}; Rotation: {0, 0.3491, 0} }
+    prop_99 : BunkerModel_crate { Position: {56.2, -2, 25.2}; Rotation: {0, -0.1396, 0} }
+    prop_100 : BunkerModel_messTable { Position: {55, 5, 1.5} }
+    prop_101 : BunkerModel_bunk { Position: {51.6, 5, -3.6} }
+    prop_102 : BunkerModel_bunk { Position: {58.4, 5, -3.6} }
+    prop_103 : BunkerModel_ladder { Position: {56.5, 5, -1.95}; Scale: {1, 0.86, 1} }
+    prop_104 : BunkerModel_bridgeConsole { Position: {53.6, 8, 2.4} } // screen: navigation
+    prop_105 : BunkerModel_bridgeConsole { Position: {56.4, 8, 2.4} } // screen: helm
+    prop_106 : BunkerModel_helm { Position: {55, 8, 2.1} }
+    prop_107 : BunkerModel_barracks_furniture_ops_0 { Position: {-42, 0, 38} }
+    prop_108 : BunkerModel_barracks_stairwell { Position: {-42, 0, 38} }
+    prop_109 : BunkerModel_deckhouse_stairwell { Position: {55, 5, 38} }
+  }
+
+  stairs {
+    step_0_0 : BunkerMat_concrete { Position: {-7.3812, -2.125, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 3.75, 0.3625} }
+    step_0_1 : BunkerMat_concrete { Position: {-7.7437, -2.25, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 3.5, 0.3625} }
+    step_0_2 : BunkerMat_concrete { Position: {-8.1062, -2.375, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 3.25, 0.3625} }
+    step_0_3 : BunkerMat_concrete { Position: {-8.4687, -2.5, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 3, 0.3625} }
+    step_0_4 : BunkerMat_concrete { Position: {-8.8312, -2.625, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 2.75, 0.3625} }
+    step_0_5 : BunkerMat_concrete { Position: {-9.1937, -2.75, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 2.5, 0.3625} }
+    step_0_6 : BunkerMat_concrete { Position: {-9.5562, -2.875, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 2.25, 0.3625} }
+    step_0_7 : BunkerMat_concrete { Position: {-9.9187, -3, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 2, 0.3625} }
+    step_0_8 : BunkerMat_concrete { Position: {-10.2812, -3.125, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 1.75, 0.3625} }
+    step_0_9 : BunkerMat_concrete { Position: {-10.6437, -3.25, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 1.5, 0.3625} }
+    step_0_10 : BunkerMat_concrete { Position: {-11.0062, -3.375, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 1.25, 0.3625} }
+    step_0_11 : BunkerMat_concrete { Position: {-11.3687, -3.5, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 1, 0.3625} }
+    step_0_12 : BunkerMat_concrete { Position: {-11.7312, -3.625, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 0.75, 0.3625} }
+    step_0_13 : BunkerMat_concrete { Position: {-12.0937, -3.75, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 0.5, 0.3625} }
+    step_0_14 : BunkerMat_concrete { Position: {-12.4562, -3.875, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 0.25, 0.3625} }
+    step_0_15 : BunkerMat_concrete { Position: {-12.8187, -3.975, 3}; Rotation: {0, -1.5708, 0}; Box: {3.6, 0.05, 0.3625} }
+    step_1_0 : BunkerMat_steel { Position: {48.7611, 2.625, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 4.25, 0.2778} }
+    step_1_1 : BunkerMat_steel { Position: {48.4833, 2.5, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 4, 0.2778} }
+    step_1_2 : BunkerMat_steel { Position: {48.2056, 2.375, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 3.75, 0.2778} }
+    step_1_3 : BunkerMat_steel { Position: {47.9278, 2.25, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 3.5, 0.2778} }
+    step_1_4 : BunkerMat_steel { Position: {47.65, 2.125, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 3.25, 0.2778} }
+    step_1_5 : BunkerMat_steel { Position: {47.3722, 2, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 3, 0.2778} }
+    step_1_6 : BunkerMat_steel { Position: {47.0944, 1.875, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 2.75, 0.2778} }
+    step_1_7 : BunkerMat_steel { Position: {46.8167, 1.75, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 2.5, 0.2778} }
+    step_1_8 : BunkerMat_steel { Position: {46.5389, 1.625, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 2.25, 0.2778} }
+    step_1_9 : BunkerMat_steel { Position: {46.2611, 1.5, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 2, 0.2778} }
+    step_1_10 : BunkerMat_steel { Position: {45.9833, 1.375, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 1.75, 0.2778} }
+    step_1_11 : BunkerMat_steel { Position: {45.7056, 1.25, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 1.5, 0.2778} }
+    step_1_12 : BunkerMat_steel { Position: {45.4278, 1.125, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 1.25, 0.2778} }
+    step_1_13 : BunkerMat_steel { Position: {45.15, 1, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 1, 0.2778} }
+    step_1_14 : BunkerMat_steel { Position: {44.8722, 0.875, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 0.75, 0.2778} }
+    step_1_15 : BunkerMat_steel { Position: {44.5944, 0.75, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 0.5, 0.2778} }
+    step_1_16 : BunkerMat_steel { Position: {44.3167, 0.625, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 0.25, 0.2778} }
+    step_1_17 : BunkerMat_steel { Position: {44.0389, 0.525, 12}; Rotation: {0, -1.5708, 0}; Box: {1.3, 0.05, 0.2778} }
+    step_2_0 : BunkerMat_concrete { Position: {-43.38, 1.3861, 39.12}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_1 : BunkerMat_concrete { Position: {-43.38, 1.2083, 38.84}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_2 : BunkerMat_concrete { Position: {-43.38, 1.0306, 38.56}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_3 : BunkerMat_concrete { Position: {-43.38, 0.8528, 38.28}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_4 : BunkerMat_concrete { Position: {-43.38, 0.675, 38}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_5 : BunkerMat_concrete { Position: {-43.38, 0.4972, 37.72}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_6 : BunkerMat_concrete { Position: {-43.38, 0.3194, 37.44}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_2_7 : BunkerMat_concrete { Position: {-43.38, 0.1778, 37.16}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.3556, 0.28} }
+    step_2_8 : BunkerMat_concrete { Position: {-43.38, 0.0889, 36.88}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.1778, 0.28} }
+    step_3_0 : BunkerMat_concrete { Position: {-42.22, 2.9861, 36.88}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_1 : BunkerMat_concrete { Position: {-42.22, 2.8083, 37.16}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_2 : BunkerMat_concrete { Position: {-42.22, 2.6306, 37.44}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_3 : BunkerMat_concrete { Position: {-42.22, 2.4528, 37.72}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_4 : BunkerMat_concrete { Position: {-42.22, 2.275, 38}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_5 : BunkerMat_concrete { Position: {-42.22, 2.0972, 38.28}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_6 : BunkerMat_concrete { Position: {-42.22, 1.9194, 38.56}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_3_7 : BunkerMat_concrete { Position: {-42.22, 1.7778, 38.84}; Rotation: {0, 0, 0}; Box: {0.91, 0.3556, 0.28} }
+    step_3_8 : BunkerMat_concrete { Position: {-42.22, 1.6889, 39.12}; Rotation: {0, 0, 0}; Box: {0.91, 0.1778, 0.28} }
+    step_4_0 : BunkerMat_concrete { Position: {-43.38, 4.5861, 39.12}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_1 : BunkerMat_concrete { Position: {-43.38, 4.4083, 38.84}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_2 : BunkerMat_concrete { Position: {-43.38, 4.2306, 38.56}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_3 : BunkerMat_concrete { Position: {-43.38, 4.0528, 38.28}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_4 : BunkerMat_concrete { Position: {-43.38, 3.875, 38}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_5 : BunkerMat_concrete { Position: {-43.38, 3.6972, 37.72}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_6 : BunkerMat_concrete { Position: {-43.38, 3.5194, 37.44}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_4_7 : BunkerMat_concrete { Position: {-43.38, 3.3778, 37.16}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.3556, 0.28} }
+    step_4_8 : BunkerMat_concrete { Position: {-43.38, 3.2889, 36.88}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.1778, 0.28} }
+    step_5_0 : BunkerMat_concrete { Position: {-42.22, 6.1861, 36.88}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_1 : BunkerMat_concrete { Position: {-42.22, 6.0083, 37.16}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_2 : BunkerMat_concrete { Position: {-42.22, 5.8306, 37.44}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_3 : BunkerMat_concrete { Position: {-42.22, 5.6528, 37.72}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_4 : BunkerMat_concrete { Position: {-42.22, 5.475, 38}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_5 : BunkerMat_concrete { Position: {-42.22, 5.2972, 38.28}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_6 : BunkerMat_concrete { Position: {-42.22, 5.1194, 38.56}; Rotation: {0, 0, 0}; Box: {0.91, 0.4278, 0.28} }
+    step_5_7 : BunkerMat_concrete { Position: {-42.22, 4.9778, 38.84}; Rotation: {0, 0, 0}; Box: {0.91, 0.3556, 0.28} }
+    step_5_8 : BunkerMat_concrete { Position: {-42.22, 4.8889, 39.12}; Rotation: {0, 0, 0}; Box: {0.91, 0.1778, 0.28} }
+    step_6_0 : BunkerMat_steel { Position: {53.62, 6.2444, 39.12}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_1 : BunkerMat_steel { Position: {53.62, 6.0833, 38.84}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_2 : BunkerMat_steel { Position: {53.62, 5.9222, 38.56}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_3 : BunkerMat_steel { Position: {53.62, 5.7611, 38.28}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_4 : BunkerMat_steel { Position: {53.62, 5.6, 38}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_5 : BunkerMat_steel { Position: {53.62, 5.4389, 37.72}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_6 : BunkerMat_steel { Position: {53.62, 5.2778, 37.44}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_6_7 : BunkerMat_steel { Position: {53.62, 5.1611, 37.16}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.3222, 0.28} }
+    step_6_8 : BunkerMat_steel { Position: {53.62, 5.0806, 36.88}; Rotation: {0, 3.1416, 0}; Box: {0.91, 0.1611, 0.28} }
+    step_7_0 : BunkerMat_steel { Position: {54.78, 7.6944, 36.88}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_1 : BunkerMat_steel { Position: {54.78, 7.5333, 37.16}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_2 : BunkerMat_steel { Position: {54.78, 7.3722, 37.44}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_3 : BunkerMat_steel { Position: {54.78, 7.2111, 37.72}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_4 : BunkerMat_steel { Position: {54.78, 7.05, 38}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_5 : BunkerMat_steel { Position: {54.78, 6.8889, 38.28}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_6 : BunkerMat_steel { Position: {54.78, 6.7278, 38.56}; Rotation: {0, 0, 0}; Box: {0.91, 0.4111, 0.28} }
+    step_7_7 : BunkerMat_steel { Position: {54.78, 6.6111, 38.84}; Rotation: {0, 0, 0}; Box: {0.91, 0.3222, 0.28} }
+    step_7_8 : BunkerMat_steel { Position: {54.78, 6.5306, 39.12}; Rotation: {0, 0, 0}; Box: {0.91, 0.1611, 0.28} }
+  }
+}

@@ -1,0 +1,54 @@
+using box.material
+
+// Materials of the bunker compound, from the scenario's material table.
+prefab BunkerMat_tiles { Rgb: {133, 138, 143}; PbrMaterial: {metallic: 0, roughness: 0.72} }
+prefab BunkerMat_plaster { Rgb: {158, 153, 140}; PbrMaterial: {metallic: 0, roughness: 0.96} }
+prefab BunkerMat_panel { Rgb: {107, 117, 128}; PbrMaterial: {metallic: 0, roughness: 0.8} }
+prefab BunkerMat_concrete { Rgb: {128, 128, 122}; PbrMaterial: {metallic: 0, roughness: 0.96} }
+prefab BunkerMat_wetconcrete { Rgb: {92, 94, 92}; PbrMaterial: {metallic: 0, roughness: 0.52} }
+prefab BunkerMat_roof { Rgb: {71, 74, 79}; PbrMaterial: {metallic: 0, roughness: 0.92} }
+prefab BunkerMat_bricks { Rgb: {140, 71, 51}; PbrMaterial: {metallic: 0, roughness: 0.984} }
+prefab BunkerMat_woodfloor { Rgb: {128, 87, 51}; PbrMaterial: {metallic: 0, roughness: 0.84} }
+prefab BunkerMat_grass { Rgb: {66, 102, 41}; PbrMaterial: {metallic: 0, roughness: 1} }
+prefab BunkerMat_frame { Rgb: {56, 61, 69}; PbrMaterial: {metallic: 0.6, roughness: 0.6} }
+prefab BunkerMat_door { Rgb: {158, 107, 36}; PbrMaterial: {metallic: 0, roughness: 0.68} }
+prefab BunkerMat_autodoor { Rgb: {89, 107, 122}; PbrMaterial: {metallic: 0, roughness: 0.52} }
+prefab BunkerMat_hazard { Rgb: {230, 179, 26}; PbrMaterial: {metallic: 0, roughness: 0.84} }
+prefab BunkerMat_crate { Rgb: {143, 102, 56}; PbrMaterial: {metallic: 0, roughness: 0.96} }
+prefab BunkerMat_wood { Rgb: {115, 77, 46}; PbrMaterial: {metallic: 0, roughness: 0.88} }
+prefab BunkerMat_metal { Rgb: {102, 107, 115}; PbrMaterial: {metallic: 0.6, roughness: 0.44} }
+prefab BunkerMat_machine { Rgb: {71, 92, 77}; PbrMaterial: {metallic: 0, roughness: 0.6} }
+prefab BunkerMat_pipe { Rgb: {140, 89, 56}; PbrMaterial: {metallic: 0.6, roughness: 0.36} }
+prefab BunkerMat_barrel { Rgb: {51, 82, 140}; PbrMaterial: {metallic: 0, roughness: 0.6} }
+prefab BunkerMat_screen { Rgb: {8, 15, 13}; PbrMaterial: {metallic: 0, roughness: 0.28}; Emissive: {strength: 1.4, color: {64, 255, 153}} }
+prefab BunkerMat_bezel { Rgb: {13, 14, 15}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_display { Rgb: {3, 4, 5}; PbrMaterial: {metallic: 0, roughness: 0.1}; Emissive: {strength: 0.15, color: {13, 64, 89}} }
+prefab BunkerMat_lamp { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 1}; Emissive: {strength: 3, color: {255, 217, 153}} }
+prefab BunkerMat_coldlamp { Rgb: {255, 255, 255}; PbrMaterial: {metallic: 0, roughness: 1}; Emissive: {strength: 3, color: {179, 217, 255}} }
+prefab BunkerMat_redlamp { Rgb: {255, 77, 51}; PbrMaterial: {metallic: 0, roughness: 1}; Emissive: {strength: 3, color: {255, 51, 26}} }
+prefab BunkerMat_bark { Rgb: {77, 54, 33}; PbrMaterial: {metallic: 0, roughness: 1} }
+prefab BunkerMat_leaves { Rgb: {41, 77, 33}; PbrMaterial: {metallic: 0, roughness: 0.96} }
+prefab BunkerMat_rock { Rgb: {117, 115, 110}; PbrMaterial: {metallic: 0, roughness: 0.92} }
+prefab BunkerMat_soil { Rgb: {56, 41, 26}; PbrMaterial: {metallic: 0, roughness: 1} }
+prefab BunkerMat_drone { Rgb: {46, 51, 59}; PbrMaterial: {metallic: 0.6, roughness: 0.36} }
+prefab BunkerMat_droneEye { Rgb: {26, 0, 0}; PbrMaterial: {metallic: 0, roughness: 1}; Emissive: {strength: 4, color: {255, 38, 26}} }
+prefab BunkerMat_sand { Rgb: {158, 143, 107}; PbrMaterial: {metallic: 0, roughness: 0.96} }
+prefab BunkerMat_quay { Rgb: {117, 117, 112}; PbrMaterial: {metallic: 0, roughness: 0.92} }
+prefab BunkerMat_hullpaint { Rgb: {107, 28, 18}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_antifouling { Rgb: {23, 23, 26}; PbrMaterial: {metallic: 0, roughness: 0.84} }
+prefab BunkerMat_shipdeck { Rgb: {61, 82, 66}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_shipwhite { Rgb: {204, 204, 194}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_shipwall { Rgb: {158, 163, 153}; PbrMaterial: {metallic: 0, roughness: 0.8} }
+prefab BunkerMat_shipdoor { Rgb: {143, 148, 148}; PbrMaterial: {metallic: 0, roughness: 0.6} }
+prefab BunkerMat_steel { Rgb: {77, 82, 87}; PbrMaterial: {metallic: 0.6, roughness: 0.6} }
+prefab BunkerMat_engine { Rgb: {51, 77, 71}; PbrMaterial: {metallic: 0.6, roughness: 0.52} }
+prefab BunkerMat_crane { Rgb: {217, 153, 26}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_lifeboat { Rgb: {242, 107, 20}; PbrMaterial: {metallic: 0, roughness: 0.68} }
+prefab BunkerMat_containerRed { Rgb: {140, 38, 26}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_containerBlue { Rgb: {31, 64, 128}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_containerGreen { Rgb: {46, 102, 56}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_containerYellow { Rgb: {191, 140, 31}; PbrMaterial: {metallic: 0, roughness: 0.76} }
+prefab BunkerMat_plan_0_46_0_32_0_20 { Rgb: {117, 82, 51}; PbrMaterial: {metallic: 0, roughness: 0.92} }
+prefab BunkerMat_plan_0_40_0_42_0_44_metal { Rgb: {102, 107, 112}; PbrMaterial: {metallic: 0.6, roughness: 0.6} }
+prefab BunkerMat_plan_0_16_0_16_0_17 { Rgb: {41, 41, 43}; PbrMaterial: {metallic: 0, roughness: 0.92} }
+prefab BunkerMat_plan_0_30_0_34_0_42 { Rgb: {77, 87, 107}; PbrMaterial: {metallic: 0, roughness: 0.92} }
