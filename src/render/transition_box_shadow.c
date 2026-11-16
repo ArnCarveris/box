@@ -43,7 +43,7 @@ void box_transitions_box_shadows(
     box_render_transitions_t *s,
     const box_render_packet_t *p)
 {
-    int32_t i, count = ecs_vec_count(&s->nodes);
+    int32_t r, i, count = ecs_vec_count(&s->running);
     ecs_vec_clear(&s->box_shadows);
     ecs_vec_clear(&s->tag_add);
     ecs_vec_clear(&s->tag_remove);
@@ -51,8 +51,8 @@ void box_transitions_box_shadows(
         ecs_map_clear(&s->box_shadow_index);
     }
 
-    for (i = 1; p && i < count; i ++) {
-        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+    for (r = 0; p && r < count; r ++) {
+        const box_transition_node_t *node = box_transitions_running(s, r, &i);
         if (node->entity && (box_render_transitions_active(
                 s, (uint32_t)i, BOX_RENDER_TRANSITION_BOX_SHADOW, p->time) ||
             box_render_transitions_active(

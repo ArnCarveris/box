@@ -81,6 +81,8 @@ struct box_render_transitions_t {
     ecs_map_t by_entity;            /**< Entity to node id */
     ecs_vec_t nodes;                /**< box_transition_node_t by node id, 0 unused */
     ecs_vec_t free;                 /**< uint32_t node ids to reuse */
+    ecs_vec_t running;              /**< int32_t ids of the nodes a transition can run or leave
+                                     *   in this frame, so the walks skip idle ones */
     int64_t stamp;                  /**< Extracts run */
     ecs_map_t moving;               /**< Entity to node id, nodes with an active transform
                                      *   transition in this frame */
@@ -183,13 +185,15 @@ void box_transitions_track(
  * @param map The Transition map of the entity
  * @param columns The columns of the transitionable components in its table, NULL for none
  * @param specs Receives the transition of each component, NULL for none
+ * @param mask Receives 1 << component per component with a transition
  * @return Whether a listed component makes the entity a node
  */
 bool box_transitions_specs(
     const ecs_world_t *world,
     const Transition *map,
     void *const *columns,
-    const TransitionSpec **specs);
+    const TransitionSpec **specs,
+    uint32_t *mask);
 
 /** Compare a transitioned component of an entity to the last target sent, send what changed:
  * the first value sets without a transition, a changed value starts one with the spec of the
@@ -241,6 +245,41 @@ void box_transitions_lobes_left(
     ecs_world_t *world,
     box_render_transitions_t *s,
     const box_transition_node_t *node);
+
+/** Check whether a transition of a node can run or leave at a time: before the end of the
+ * transitions its slots started, or with a light slot that runs or leaves.
+ *
+ * @param node The node
+ * @param time World time, the time of the packet
+ * @return Whether the walks of the frame visit it (running)
+ */
+bool box_transitions_runs(
+    const box_transition_node_t *node,
+    double time);
+
+/** Send the destruction of the nodes the extract did not see in this frame.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ * @param p The packet, NULL when the query matched no entity
+ * @return The packet, created when a node is destroyed
+ */
+box_render_packet_t* box_transitions_sweep(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    box_render_packet_t *p);
+
+/** Get a node of the running list.
+ *
+ * @param s The state of the extract
+ * @param index Index in the running list
+ * @param id Receives the node id
+ * @return The node
+ */
+const box_transition_node_t* box_transitions_running(
+    const box_render_transitions_t *s,
+    int32_t index,
+    int32_t *id);
 
 /** Get the private state of a node.
  *

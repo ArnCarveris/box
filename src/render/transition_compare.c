@@ -191,8 +191,12 @@ void box_transitions_compare(
 {
     uint8_t packed[BOX_RENDER_TRANSITION_VALUE];
     bool added = slot->absent, leaving = slot->leaving;
+    bool light = component == BOX_RENDER_TRANSITION_POINT_LIGHT ||
+        component == BOX_RENDER_TRANSITION_SPOT_LIGHT;
+    bool same = spec && value && slot->present &&
+        box_render_transition_equal(component, slot->value, value);
     slot->absent = false;
-    if (value) {
+    if (value && (!same || light)) {
         box_render_transition_pack(component, value, packed);
     }
 
@@ -208,11 +212,9 @@ void box_transitions_compare(
             box_transition_range_add(component, slot, packed, true);
             slot->present = true;
             box_transition_send(p, node, component, slot, NULL);
-        } else if (!box_render_transition_equal(component, slot->value, packed)) {
+        } else if (!same) {
             box_transition_change(p, node, component, slot, spec, packed);
-        } else if (component == BOX_RENDER_TRANSITION_POINT_LIGHT ||
-            component == BOX_RENDER_TRANSITION_SPOT_LIGHT)
-        {
+        } else if (light) {
             ecs_os_memcpy(slot->value, packed, BOX_RENDER_TRANSITION_VALUE);
         }
 
@@ -253,15 +255,70 @@ void box_transitions_compare(
     }
 }
 
+bool box_transitions_runs(
+    const box_transition_node_t *node,
+    double time)
+{
+    bool result = node->live && time < node->until;
+    int32_t c;
+    for (c = BOX_RENDER_TRANSITION_POINT_LIGHT; !result && node->live &&
+        c <= BOX_RENDER_TRANSITION_SPOT_LIGHT; c ++)
+    {
+        const box_transition_slot_t *slot = &node->slots[c];
+        result = (node->live & (1u << c)) && slot->present && (slot->leaving ||
+            box_render_transition_running(slot->start, slot->delay, slot->duration, time));
+    }
+
+    return result;
+}
+
+box_render_packet_t* box_transitions_sweep(
+    ecs_world_t *world,
+    box_render_transitions_t *s,
+    box_render_packet_t *p)
+{
+    int32_t i, count = ecs_vec_count(&s->nodes);
+    for (i = 1; i < count && ecs_map_count(&s->by_entity); i ++) {
+        box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+        if (!node->entity || node->seen == s->stamp) {
+            continue;
+        }
+
+        if (!p) {
+            p = box_render_packet(world);
+        }
+
+        box_render_packet_transition(p, BOX_RENDER_TRANSITION_DESTROY, (uint32_t)i);
+        box_transitions_lobes_left(world, s, node);
+        ecs_map_remove(&s->by_entity, node->entity);
+        node->entity = 0;
+        *ecs_vec_append_t(NULL, &s->free, uint32_t) = (uint32_t)i;
+    }
+
+    return p;
+}
+
+const box_transition_node_t* box_transitions_running(
+    const box_render_transitions_t *s,
+    int32_t index,
+    int32_t *id)
+{
+    *id = *ecs_vec_get_t(&s->running, int32_t, index);
+
+    return ecs_vec_get_t(&s->nodes, box_transition_node_t, *id);
+}
+
 bool box_transitions_specs(
     const ecs_world_t *world,
     const Transition *map,
     void *const *columns,
-    const TransitionSpec **specs)
+    const TransitionSpec **specs,
+    uint32_t *mask)
 {
     bool result = false;
     int32_t c;
     ecs_os_memset_n(specs, 0, const TransitionSpec*, BOX_RENDER_TRANSITION_COMPONENTS);
+    *mask = 0;
     if (!ecs_map_is_init(map)) {
         goto done;
     }
@@ -278,6 +335,7 @@ bool box_transitions_specs(
 
             if (spec && box_transition_valid(world, cid, spec)) {
                 specs[c] = spec;
+                *mask |= 1u << c;
                 result |= columns[c] || box_transitions_opts(world, component, spec, false) ||
                     box_transitions_opts(world, component, spec, true);
             }
