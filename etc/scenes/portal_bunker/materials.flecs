@@ -54,3 +54,7 @@ prefab BunkerMat_plan_0_46_0_32_0_20 { Rgb: {117, 82, 51}; PbrMaterial: {metalli
 prefab BunkerMat_plan_0_40_0_42_0_44_metal { Rgb: {102, 107, 112}; PbrMaterial: {metallic: 0.6, roughness: 0.6} }
 prefab BunkerMat_plan_0_16_0_16_0_17 { Rgb: {41, 41, 43}; PbrMaterial: {metallic: 0, roughness: 0.92} }
 prefab BunkerMat_plan_0_30_0_34_0_42 { Rgb: {77, 87, 107}; PbrMaterial: {metallic: 0, roughness: 0.92} }
+
+// Window glass: a faint cool grey-blue pane, drawn blended (casting no shadow), denser and brighter
+// at grazing angles; a portal's glass tint overrides its Rgb and Opacity.
+prefab BunkerMat_glass { Rgb: {158, 179, 199}; PbrMaterial: {metallic: 0, roughness: 0.05}; Opacity: {0.18}; Fresnel: {color: {204, 224, 242}, strength: 0.6, power: 4, bias: 0.08, opacity: 0.5} }

@@ -23,7 +23,7 @@ using box.controllers
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {}
+  Scene: {blend_modes: true, fresnel: true}
 }
 
 window {
@@ -192,6 +192,16 @@ views {
   deckhouse_corridor { // Deckhouse corridor
     Position: {52.1, 6.7, 35.14}
     Rotation: {-0.0508, -1.5708, 0}
+    Camera: {fov: 70}
+  }
+  hall_window { // Hall window
+    Position: {1, 1.7, 2.5}
+    Rotation: {0.0685, -2.1112, 0}
+    Camera: {fov: 70}
+  }
+  atrium_skylight { // Atrium skylight
+    Position: {7, 1.7, 24.5}
+    Rotation: {0.9535, -2.6779, 0}
     Camera: {fov: 70}
   }
 }
