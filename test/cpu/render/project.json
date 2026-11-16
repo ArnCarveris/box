@@ -763,6 +763,7 @@
                     "node_reuse",
                     "remove_entry_snaps",
                     "prefab_instances_own_state",
+                    "clone_gets_own_node",
                     "time_paused",
                     "time_scale_half",
                     "main_thread_same_values",

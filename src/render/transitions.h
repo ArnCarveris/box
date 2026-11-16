@@ -46,6 +46,16 @@ typedef struct box_transition_node_t {
                                      *   box_render_transition_component_t */
 } box_transition_node_t;
 
+/** Node id of an entity the transition extract matched, kept on the entity so the extract reads
+ * its node without a lookup. A copy has no node yet and instances do not inherit it. */
+typedef struct TransitionNode {
+    uint32_t id;                    /**< Node id, 0 for none; stale when the node with this id
+                                     *   belongs to another entity */
+} TransitionNode;
+
+/** Component id of TransitionNode */
+extern ECS_COMPONENT_DECLARE(TransitionNode);
+
 /** An entity a transform transition moves in this frame, in the order of the walk: a node
  * before its descendants, so a parent node comes before its child nodes */
 typedef struct box_transition_item_t {
@@ -76,9 +86,14 @@ typedef struct box_transition_box_shadow_t {
 
 /** Main thread state of the transition extract */
 struct box_render_transitions_t {
-    ecs_query_t *query;             /**< Transition(self|up IsA), prefabs included */
-    ecs_map_t by_entity;            /**< Entity to node id */
-    ecs_vec_t nodes;                /**< box_transition_node_t by node id, 0 unused */
+    ecs_query_t *query;             /**< Transition(self|up IsA), prefabs included, and the
+                                     *   optional TransitionNode of the entity */
+    const ecs_world_t *world;       /**< The world, read for the TransitionNode of an entity */
+    int32_t node_count;             /**< Nodes that belong to an entity */
+    ecs_vec_t node_add;             /**< uint32_t ids of the nodes made in this frame for
+                                     *   entities without TransitionNode, which get it after
+                                     *   the query */
+    ecs_vec_t nodes;               /**< box_transition_node_t by node id, 0 unused */
     ecs_vec_t free;                 /**< uint32_t node ids to reuse */
     ecs_vec_t running;              /**< int32_t ids of the nodes a transition can run or leave
                                      *   in this frame, so the walks skip idle ones */
@@ -262,6 +277,37 @@ box_render_packet_t* box_transitions_sweep(
     ecs_world_t *world,
     box_render_transitions_t *s,
     box_render_packet_t *p);
+
+/** Give an entity a node, reusing a freed id first, and send its creation.
+ *
+ * @param s The state of the extract
+ * @param p The packet
+ * @param entity The entity
+ * @param out Its TransitionNode, NULL when it has none yet
+ * @return The node id
+ */
+uint32_t box_transitions_node_new(
+    box_render_transitions_t *s,
+    box_render_packet_t *p,
+    ecs_entity_t entity,
+    TransitionNode *out);
+
+/** Register TransitionNode in the current scope: not inherited, and a copy has no node.
+ *
+ * @param world The world
+ */
+void box_transitions_node_define(
+    ecs_world_t *world);
+
+/** Give TransitionNode to the entities whose node was made in this frame without one. Called
+ * after the query, as the component moves the entities to other tables.
+ *
+ * @param world The world
+ * @param s The state of the extract
+ */
+void box_transitions_node_attach(
+    ecs_world_t *world,
+    box_render_transitions_t *s);
 
 /** Get a node of the running list.
  *
