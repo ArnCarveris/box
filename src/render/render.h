@@ -282,6 +282,7 @@ void box_render_texture_previews_init(
 typedef struct box_render_lights_stats_t {
     int32_t scenes;             /**< Scenes that have lights */
     int32_t lights;             /**< Lights that light something, of every scene */
+    int32_t culled;             /**< Point and spot lights no view of their scene sees */
     int64_t upload_bytes;       /**< Bytes the last extract uploaded into light buffers */
     int32_t shadow_tiles;       /**< Shadow atlas tiles of every scene */
     int32_t shadow_dropped;     /**< Shadow casting lights a view sees that got no tile */

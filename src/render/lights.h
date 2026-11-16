@@ -130,6 +130,16 @@ typedef struct box_light_scene_t {
     box_light_atlas_t atlas; /**< The shadow atlas of the scene */
 } box_light_scene_t;
 
+/** A view that point and spot lights of its scene are culled against */
+typedef struct box_light_cull_view_t {
+    ecs_entity_t scene;     /**< Scene whose lights the view shades with */
+    vec4 planes[6];         /**< Planes of its frustum, normals of unit length facing inward */
+    int32_t plane_count;    /**< Planes in planes */
+    vec3 eye;               /**< Position of its camera */
+    float pixels;           /**< Pixels per world unit at a distance of 1 for a perspective
+                             *   camera, 0 to cull by the frustum only */
+} box_light_cull_view_t;
+
 /** Main thread state of the light extract */
 typedef struct box_render_lights_t {
     ecs_query_t *directional;   /**< Entities with DirectionalLight */
@@ -161,10 +171,42 @@ typedef struct box_render_lights_t {
     const void *backend;        /**< Context of the backend the buffers were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
+    ecs_vec_t cull_views;       /**< box_light_cull_view_t, the views of this frame */
+    bool cull;                  /**< Lights are culled in this frame: no reflection probe or
+                                 *   planar reflection renders the lights of a scene beyond its
+                                 *   views */
     box_render_lights_stats_t stats; /**< Counters of the last extract */
     double time;                /**< Seconds the world advanced over the extracts, in double
                                  *   precision for the offset of the light cookies */
 } box_render_lights_t;
+
+/** Find the views the point and spot lights are culled against in this frame, from the views of
+ * the packet, and whether lights are culled at all.
+ *
+ * @param world The world
+ * @param l The state
+ * @param p The packet, with the views of the frame
+ */
+void box_lights_cull_views(
+    ecs_world_t *world,
+    box_render_lights_t *l,
+    const box_render_packet_t *p);
+
+/** Check whether no view of a scene can see what a point or spot light lights: its range sphere
+ * is outside the frustum of every view of the scene, or smaller than BOX_LIGHTS_CULL_PIXELS. A
+ * scene without views or that bakes keeps its lights.
+ *
+ * @param l The state
+ * @param s The scene of the light
+ * @param transform World transform of the light
+ * @param range Range of the light before the scale of its transform
+ * @return Whether the light is culled
+ */
+bool box_lights_culled(
+    box_render_lights_t *l,
+    const box_light_scene_t *s,
+    const WorldTransform *transform,
+    float range);
 
 /** Find the lights of a scene, adding an entry when it has none.
  *

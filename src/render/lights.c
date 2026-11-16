@@ -563,14 +563,19 @@ static void box_lights_collect(
                 if (d->intensity > 0) {
                     box_lights_push(s, it.entities[i], d->bake, &out);
                 }
-            } else if (kind == 1) {
-                box_lights_point_light(s, it.entities[i], transform, rgb,
-                    &ecs_field(&it, PointLight, 0)[i],
-                    lit ? box_render_transitions_light(l->transitions, it.entities[i]) : NULL);
             } else {
-                box_lights_spot_light(s, it.entities[i], transform, rgb,
-                    &ecs_field(&it, SpotLight, 0)[i],
-                    lit ? box_render_transitions_light(l->transitions, it.entities[i]) : NULL);
+                const PointLight *point = kind == 1 ? &ecs_field(&it, PointLight, 0)[i] : NULL;
+                const SpotLight *spot = kind == 2 ? &ecs_field(&it, SpotLight, 0)[i] : NULL;
+                const box_render_light_transition_t *lt = lit ?
+                    box_render_transitions_light(l->transitions, it.entities[i]) : NULL;
+                float range = point ? point->range : spot->range;
+                if (box_lights_culled(l, s, transform, lt ? glm_max(lt->range, range) : range)) {
+                    l->stats.culled ++;
+                } else if (point) {
+                    box_lights_point_light(s, it.entities[i], transform, rgb, point, lt);
+                } else {
+                    box_lights_spot_light(s, it.entities[i], transform, rgb, spot, lt);
+                }
             }
         }
     }
@@ -1505,6 +1510,7 @@ static void BoxRenderExtractLights(
     box_lights_collect_bakes(world, l);
     box_lights_collect_atmospheres(world, l);
     box_lights_collect_times(world, l);
+    box_lights_cull_views(world, l, p);
     box_lights_collect(world, l, l->directional, 0);
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
@@ -1550,6 +1556,7 @@ static void box_lights_free(
     ecs_vec_fini_t(NULL, &l->places, box_render_shadow_place_t);
     ecs_vec_fini_t(NULL, &l->candidates, int32_t);
     ecs_vec_fini_t(NULL, &l->views, int32_t);
+    ecs_vec_fini_t(NULL, &l->cull_views, box_light_cull_view_t);
     box_render_fog_free(l->fog);
     box_render_stars_free(l->stars);
     ecs_map_fini(&l->lookup);
@@ -1636,6 +1643,7 @@ void box_render_lights_init(
     ecs_vec_init_t(NULL, &l->places, box_render_shadow_place_t, 0);
     ecs_vec_init_t(NULL, &l->candidates, int32_t, 0);
     ecs_vec_init_t(NULL, &l->views, int32_t, 0);
+    ecs_vec_init_t(NULL, &l->cull_views, box_light_cull_view_t, 0);
     ecs_map_init(&l->lookup, NULL);
     l->next_buffer = BOX_LIGHTS_DEFAULT_BUFFER + 1;
     l->next_atlas = BOX_RENDER_BUFFER_SHADOW_FIRST;

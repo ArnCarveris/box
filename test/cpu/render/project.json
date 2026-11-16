@@ -569,6 +569,19 @@
                 ]
             },
             {
+                "id": "LightCulling",
+                "testcases": [
+                    "behind_camera_culled",
+                    "in_view_kept",
+                    "range_reaches_view_kept",
+                    "spot_behind_camera_culled",
+                    "far_small_light_culled",
+                    "far_light_kept_without_surface_size",
+                    "reflection_probe_keeps_lights",
+                    "child_of_moving_parent_culled"
+                ]
+            },
+            {
                 "id": "ShadowAtlas",
                 "setup": true,
                 "testcases": [
