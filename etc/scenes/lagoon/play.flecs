@@ -1,0 +1,117 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using box.input
+using box.material
+using state
+
+state {
+  // Steering: the canoe slides toward STEER_SPEED in the steered direction, eases in with
+  // STEER_ACCEL and drifts to a stop with STEER_DAMP once the keys are released
+  export const STEER_SPEED: f32 = 9
+  export const STEER_ACCEL: f32 = 5
+  export const STEER_DAMP: f32 = 3.5
+  // Lean per unit of sideways speed, and how fast the hull rolls toward it
+  export const LEAN_PER_VX: f32 = 0.028
+  export const LEAN_RATE: f32 = 8
+  // Seconds the canoe takes to roll over once the game is over
+  export const CAPSIZE_TIME: f32 = 0.8
+  // Mapping size of the water texture (texture.Mapping of LgWater)
+  export const WATER_MAP: f32 = 7
+
+  // The speed the water flows at (0 once the world stops), the render time the scroll runs on
+  // and the offset that keeps the waves in place when the flow changes
+  export mut water_flow: f32 = START_SPEED
+  export mut water_t: f64 = 0
+  export mut water_shift: f64 = 0
+
+  lg_actions {
+    SteerLeft { Action: {description: "Steer left"}; Binding: {key: A}; alt { Binding: {key: Left} } }
+    SteerRight { Action: {description: "Steer right"}; Binding: {key: D}; alt { Binding: {key: Right} } }
+    Restart { Action: {description: "Paddle again"}; Binding: {key: R} }
+  }
+
+  // Wraps an offset to 0..2, the period of a mirrored texture
+  fn wrap2(v: f64) -> f64 {
+    v - 2 * floor(v / 2)
+  }
+}
+
+// The water flows toward the camera at the pace of the world: U of the world mapping runs along
+// +Z, so a velocity of -flow / size moves the waves toward +Z by flow units a second. The scroll
+// offset is velocity times the render time, so a change of the flow shifts the texture by the
+// difference; water_shift takes that back out.
+lagoon {
+  water {
+    texture.Scroll: {velocity: {0 - water_flow / WATER_MAP, 0.03}}
+    texture.Transform: {scale_x: 1, scale_y: 1, offset_x: water_shift, offset_y: 0}
+  }
+}
+
+async {
+  mut last: f64 = box.app.Status[box.app.Status].elapsed
+  while true {
+    await next_frame()
+    const now = box.app.Status[box.app.Status].elapsed
+    const fixed = App[App].delta_time
+    const d = fixed > 0 ? fixed : clamp(now - last, 0.001, 0.1)
+    last = now
+    dt = d
+    clock += d
+    // The world time the renderer scrolls the water on
+    water_t += box.app.Status[box.app.Status].delta_time
+
+    if game_state == GS_PLAYING {
+      const steer = bool_f(state.lg_actions.SteerRight[ActionState].down) - bool_f(state.lg_actions.SteerLeft[ActionState].down)
+      const rate = steer != 0 ? STEER_ACCEL : STEER_DAMP
+      mut vx: f32 = canoe_vx + (steer * STEER_SPEED - canoe_vx) * min(1, d * rate)
+      if abs(vx) < 0.001 && steer == 0 {
+        vx = 0
+      }
+      const edge = CHANNEL_HALF - CANOE_HALF_WIDTH
+      mut x: f32 = canoe_x + vx * d
+      if x > edge {
+        x = edge
+        vx = min(vx, 0)
+      }
+      if x < 0 - edge {
+        x = 0 - edge
+        vx = max(vx, 0)
+      }
+      if vx != canoe_vx {
+        canoe_vx = vx
+      }
+      if x != canoe_x {
+        canoe_x = x
+      }
+      const want = 0 - canoe_vx * LEAN_PER_VX
+      if abs(want - lean) > 0.0001 {
+        lean += (want - lean) * min(1, d * LEAN_RATE)
+      }
+      paddle_phase += d * (2.2 + speed * 0.08)
+      distance += speed * d
+    } else if game_state == GS_OVER {
+      if canoe_vx != 0 {
+        canoe_vx = 0
+      }
+      if capsize < 1 {
+        capsize = min(1, capsize + d / CAPSIZE_TIME)
+      }
+    }
+
+    const flow = game_state == GS_PLAYING ? speed : 0
+    if flow != water_flow {
+      water_shift = wrap2(water_shift + (flow - water_flow) / WATER_MAP * water_t)
+      water_flow = flow
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.lg_actions.Restart)
+    if game_state == GS_OVER {
+      reset()
+    }
+  }
+}
