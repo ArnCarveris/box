@@ -455,6 +455,7 @@
                     "planet_props_keep_structure",
                     "nebula_script",
                     "nebula_props_keep_structure",
+                    "nebula_hero_region",
                     "region_members_reflect",
                     "region_default_whole_sphere",
                     "region_edit_keeps_structure"

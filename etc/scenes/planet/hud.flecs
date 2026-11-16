@@ -495,8 +495,8 @@ hud {
             )
           }
 
-          // The background: the stars, the nebula and the orientation of the sky. Random picks
-          // other seeds for both
+          // The background: the stars, the nebula (its kind loads its preset) and the orientation
+          // of the sky. Random picks other seeds for both
           assets.Page background_page(shown: state.page == PAGE_BACKGROUND) {
             assets.Field background_variant(text: "Seeds") {
               Button random(label: "Random", variant: "secondary", action: actions.random_seed)
@@ -548,33 +548,55 @@ hud {
               }
 
               Collapsible nebula(title: "Nebula", value: true, width: 262) {
+                assets.Field nebula_type(text: "Kind") {
+                  Dropdown nebula_kind(
+                    options: ["Emission", "Supernova remnant", "Reflection"],
+                    value: state.background.nebula_kind, width: 150
+                  )
+                }
                 Slider intensity(
                   label: "Intensity", width: 236, min: 0, max: 3, step: 0.01,
                   value: state.background.intensity, decimals: 2
                 )
-                Slider frequency(
-                  label: "Frequency", width: 236, min: 0.3, max: 5, step: 0.05,
-                  value: state.background.frequency, decimals: 2
+                Slider span(
+                  label: "Size", width: 236, min: 16, max: 90, step: 0.5,
+                  value: state.background.span, decimals: 1, unit: "°"
                 )
-                Slider warp(
-                  label: "Warp", width: 236, min: 0, max: 2, step: 0.01,
-                  value: state.background.warp, decimals: 2
+                Slider nebula_yaw(
+                  label: "Yaw", width: 236, min: -180, max: 180, step: 0.5,
+                  value: state.background.nebula_yaw, decimals: 1, unit: "°"
                 )
-                Slider cover(
-                  label: "Cover", width: 236, min: 0, max: 1, step: 0.01,
-                  value: state.background.cover, decimals: 2
+                Slider nebula_pitch(
+                  label: "Pitch", width: 236, min: -90, max: 90, step: 0.5,
+                  value: state.background.nebula_pitch, decimals: 1, unit: "°"
                 )
-                assets.ColorField color_a(
-                  text: "Thin gas", red: state.background.color_a.r,
-                  green: state.background.color_a.g, blue: state.background.color_a.b
+                Slider filaments(
+                  label: "Filaments", width: 236, min: 0, max: 1, step: 0.01,
+                  value: state.background.filaments, decimals: 2
                 )
-                assets.ColorField color_b(
-                  text: "Gas", red: state.background.color_b.r,
-                  green: state.background.color_b.g, blue: state.background.color_b.b
+                Slider pillars(
+                  label: "Pillars", width: 236, min: 0, max: 1, step: 0.01,
+                  value: state.background.pillars, decimals: 2
                 )
-                assets.ColorField color_c(
-                  text: "Dense gas", red: state.background.color_c.r,
-                  green: state.background.color_c.g, blue: state.background.color_c.b
+                Slider dust(
+                  label: "Dust", width: 236, min: 0, max: 1, step: 0.01,
+                  value: state.background.dust, decimals: 2
+                )
+                Slider glow(
+                  label: "Star", width: 236, min: 0, max: 4, step: 0.01,
+                  value: state.background.glow, decimals: 2
+                )
+                assets.ColorField halpha(
+                  text: "H-alpha", red: state.background.halpha.r,
+                  green: state.background.halpha.g, blue: state.background.halpha.b
+                )
+                assets.ColorField oiii(
+                  text: "OIII", red: state.background.oiii.r,
+                  green: state.background.oiii.g, blue: state.background.oiii.b
+                )
+                assets.ColorField sii(
+                  text: "SII", red: state.background.sii.r,
+                  green: state.background.sii.g, blue: state.background.sii.b
                 )
                 assets.Field nebula_variant(text: "Seed") {
                   Stepper nebula_seed(

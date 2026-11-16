@@ -103,24 +103,70 @@ state {
 
   // The background: the stars of the StarField of the sky (count, brightness of the brightest,
   // falloff of the brightness, size in pixels, temperature range in kelvin, saturation of their
-  // colors, share along the band and its width in degrees, seed), the nebula of the sky shell
-  // (intensity, frequency, warp, the fraction of the sky its clouds cover, its colors from the
-  // thin parts to the dense ones, seed) and the orientation of the sky (yaw about the vertical
-  // and tilt of the band, in degrees). The milky band of the nebula follows the band of the stars
+  // colors, share along the band and its width in degrees, seed), the nebula and the orientation
+  // of the sky (yaw about the vertical and tilt of the band, in degrees). The milky band of the
+  // faint gas of the whole sky follows the band of the stars.
+  //
+  // The nebula is a patch of the sky: its kind (NEBULA_*), its intensity, its width in degrees
+  // (span, about 5 / 8 of it high), its position in the sky (yaw and pitch in degrees, turned
+  // with the sky), how far its gas is smeared into filaments, how much its dense gas absorbs the
+  // light of its star (pillars), the share of dark dust, the brightness of its star and the
+  // colors of its emission lines: H-alpha, OIII and SII, seed
   struct BackgroundParams(
     count: f32, brightness: f32, falloff: f32, size: f32, temperature_min: f32,
     temperature_max: f32, saturation: f32, band: f32, band_width: f32, star_seed: i32,
-    intensity: f32, frequency: f32, warp: f32, cover: f32, color_a: Col, color_b: Col,
-    color_c: Col, nebula_seed: i32, yaw: f32, tilt: f32)
+    nebula_kind: i32, intensity: f32, span: f32, nebula_yaw: f32, nebula_pitch: f32,
+    filaments: f32, pillars: f32, dust: f32, glow: f32, halpha: Col, oiii: Col, sii: Col,
+    nebula_seed: i32, yaw: f32, tilt: f32)
+
+  // The kinds of nebula: an emission nebula around the star that ionizes it, with pillars and
+  // bright rims, the thin filamentary shell of a supernova remnant without a star, and a
+  // reflection nebula, blue dust lit by a bright star
+  export const NEBULA_EMISSION: i32 = 0
+  export const NEBULA_REMNANT: i32 = 1
+  export const NEBULA_REFLECTION: i32 = 2
+
+  // Value of a parameter of the nebula for a kind: e for an emission nebula, r for a remnant, f
+  // for a reflection nebula
+  fn nebula_pick(k: i32, e: f32, r: f32, f: f32) -> f32 {
+    k == NEBULA_REMNANT ? r : (k == NEBULA_REFLECTION ? f : e)
+  }
+
+  // The parameters of b with the nebula of a kind, its stars, seed, position and orientation
+  // kept
+  fn nebula_preset(b: BackgroundParams, k: i32) -> BackgroundParams {
+    {
+      count: b.count, brightness: b.brightness, falloff: b.falloff, size: b.size,
+      temperature_min: b.temperature_min, temperature_max: b.temperature_max,
+      saturation: b.saturation, band: b.band, band_width: b.band_width, star_seed: b.star_seed,
+      nebula_kind: k, intensity: nebula_pick(k, 0.8, 0.9, 0.7), span: nebula_pick(k, 48, 40, 40),
+      nebula_yaw: b.nebula_yaw, nebula_pitch: b.nebula_pitch,
+      filaments: nebula_pick(k, 0.6, 0.5, 0.3), pillars: nebula_pick(k, 0.7, 0.15, 0.25),
+      dust: nebula_pick(k, 0.5, 0.25, 0.7), glow: nebula_pick(k, 1, 0, 1.6),
+      halpha: {
+        nebula_pick(k, 235, 240, 80), nebula_pick(k, 60, 70, 120), nebula_pick(k, 70, 80, 230)
+      },
+      oiii: {
+        nebula_pick(k, 60, 70, 170), nebula_pick(k, 200, 190, 200), nebula_pick(k, 190, 230, 255)
+      },
+      sii: {
+        nebula_pick(k, 150, 170, 40), nebula_pick(k, 20, 40, 50), nebula_pick(k, 40, 60, 120)
+      },
+      nebula_seed: b.nebula_seed, yaw: b.yaw, tilt: b.tilt
+    }
+  }
 
   // A dark sky of many faint stars and a few bright ones, a band across the view behind the
-  // body and a subtle nebula of dusty blue, violet and rose
+  // body, and an emission nebula (the values of nebula_preset) beside the body in the view the
+  // scene starts with
   fn background_preset() -> BackgroundParams {
     {
       count: 180000, brightness: 8, falloff: 7, size: 1.2, temperature_min: 3200,
       temperature_max: 13000, saturation: 0.45, band: 0.5, band_width: 6, star_seed: 11,
-      intensity: 0.45, frequency: 2, warp: 0.7, cover: 0.45, color_a: {26, 44, 110},
-      color_b: {98, 50, 132}, color_c: {206, 112, 118}, nebula_seed: 5, yaw: 25, tilt: 38
+      nebula_kind: NEBULA_EMISSION, intensity: 0.8, span: 48, nebula_yaw: -33,
+      nebula_pitch: -18.5, filaments: 0.6, pillars: 0.7, dust: 0.5, glow: 1,
+      halpha: {235, 60, 70}, oiii: {60, 200, 190}, sii: {150, 20, 40}, nebula_seed: 5,
+      yaw: 25, tilt: 38
     }
   }
 
