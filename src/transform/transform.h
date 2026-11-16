@@ -17,16 +17,36 @@ void transformDynamicChildOf(
     ecs_query_t *query,
     uint64_t depth);
 
+/** Entries of the cache of parent world transforms, a power of two */
+#define TRANSFORM_PARENT_CACHE (16384)
+
+/** A parent and the world transform it resolved to in a run of the system */
+typedef struct {
+    ecs_entity_t parent;          /**< The parent */
+    const WorldTransform *t;      /**< World transform of it or its nearest ancestor with one */
+    int64_t stamp;                /**< Run the entry was stored in, else the entry is empty */
+} transform_parent_cached_t;
+
+/** Parent world transforms of a run of the dynamic transform system. Children of several
+ * parents are interleaved in a table, and the pointers stay valid while the deferred system
+ * runs. */
+typedef struct {
+    transform_parent_cached_t *entries; /**< TRANSFORM_PARENT_CACHE entries */
+    int64_t stamp;                /**< The current run */
+} transform_parent_cache_t;
+
 /** Compute the world transforms of one depth level of the Parent hierarchy.
  *
  * @param world The world
  * @param query Query for dynamic Parent entities, grouped by depth
  * @param depth The hierarchy depth to compute
+ * @param cache Parent world transforms of this run
  */
 void transformDynamicParent(
     ecs_world_t *world,
     ecs_query_t *query,
-    uint64_t depth);
+    uint64_t depth,
+    transform_parent_cache_t *cache);
 
 /** Compute the world transform of one entity from its parent and local transform.
  *

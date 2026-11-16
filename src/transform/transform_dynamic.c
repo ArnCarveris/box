@@ -9,6 +9,7 @@
 typedef struct {
     ecs_query_t *q_childof; /**< Dynamic entities with a ChildOf parent */
     ecs_query_t *q_parent;  /**< Dynamic entities with a Parent component */
+    transform_parent_cache_t cache; /**< Parent world transforms of a run */
 } transform_dynamic_ctx_t;
 
 /** Create the queries used by the TransformDynamic system.
@@ -20,6 +21,8 @@ static transform_dynamic_ctx_t* transform_dynamic_ctx_new(
     ecs_world_t *world)
 {
     transform_dynamic_ctx_t *result = ecs_os_malloc_t(transform_dynamic_ctx_t);
+    result->cache.entries = ecs_os_calloc_n(transform_parent_cached_t, TRANSFORM_PARENT_CACHE);
+    result->cache.stamp = 0;
 
     result->q_childof = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "ChildOfQuery" }),
@@ -94,7 +97,9 @@ static transform_dynamic_ctx_t* transform_dynamic_ctx_new(
 static void transform_dynamic_ctx_free(
     void *arg)
 {
-    ecs_os_free(arg);
+    transform_dynamic_ctx_t *ctx = arg;
+    ecs_os_free(ctx->cache.entries);
+    ecs_os_free(ctx);
 }
 
 /** Mark children of dynamic entities as dynamic.
@@ -198,10 +203,11 @@ static void TransformDynamic(
     transform_dynamic_ctx_t *ctx = it->ctx;
     uint64_t max = transformDynamicMaxDepth(ctx->q_childof, 0);
     max = transformDynamicMaxDepth(ctx->q_parent, max);
+    ctx->cache.stamp ++;
 
     for (uint64_t depth = 0; depth <= max; depth ++) {
         transformDynamicChildOf(it->world, ctx->q_childof, depth);
-        transformDynamicParent(it->world, ctx->q_parent, depth);
+        transformDynamicParent(it->world, ctx->q_parent, depth, &ctx->cache);
     }
 }
 
