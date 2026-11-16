@@ -964,6 +964,19 @@ ECS_STRUCT(TexSlope, {
                           *   a slope of 0, as TexNormal.strength */
 });
 
+/** Node of a TextureGraph whose Vector value is the gradient of a Scalar height in the space of
+ * TexCoords, pointing uphill, with the differences and units of TexSlope of the same strength:
+ * its length is that TexSlope. On DomainPlane it is (du, dv, 0, 0), u right and v down the
+ * image. On DomainSphere it is the 3D tangent of the sphere east * du + north * dn, w 0, so it
+ * takes Dot with a direction and Cross with TexCoords (a field 90 degrees from uphill) as is.
+ * For rims lit from a direction and curl flow fields. */
+ECS_STRUCT(TexGradient, {
+    ecs_entity_t height; /**< Scalar height node, 0 for height_value: 0 */
+    float height_value;  /**< Value of height without a node */
+    float strength;      /**< Factor of the differences, 1 when the component is added, 0 for
+                          *   a zero vector, as TexSlope.strength */
+});
+
 /** Most inputs of a node kind */
 #define BOX_TEXTURE_NODE_INPUTS (4)
 

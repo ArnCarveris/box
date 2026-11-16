@@ -203,6 +203,7 @@
     [TEX + "nodes.Transform"]: { scale: { x: 1, y: 1, z: 1 } },
     [TEX + "nodes.Normal"]: { strength: 1 },
     [TEX + "nodes.Slope"]: { strength: 1 },
+    [TEX + "nodes.Gradient"]: { strength: 1 },
     [TEX + "nodes.Noise"]: { frequency: 4, octaves: 1, lacunarity: 2, gain: 0.5, offset: 1, channels: 1 },
     [TEX + "nodes.Blocks"]: { courses: 8, per_course: 4, softness: -1 },
     [TEX + "nodes.Cells"]: { count: 64, jitter: 1, edge: 0.25 },

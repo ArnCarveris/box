@@ -118,6 +118,20 @@ fn box_texgraph_sphere_position(d: vec3f) -> vec2f {
     return uv * vec2f(box_texgraph_stage.size);
 }
 
+// Frame of the center of a texel of the sphere: its direction, the unit tangent toward east
+// (growing u) and the unit tangent toward north (shrinking v), in the columns
+fn box_texgraph_sphere_frame(texel: vec2i) -> mat3x3f {
+    let uv = (vec2f(texel) + 0.5) / vec2f(box_texgraph_stage.size);
+    let phi = (uv.x - 0.5) * 2.0 * BOX_TEXGRAPH_PI;
+    let theta = uv.y * BOX_TEXGRAPH_PI;
+    let st = sin(theta);
+    let ct = cos(theta);
+    let sp = sin(phi);
+    let cp = cos(phi);
+    return mat3x3f(vec3f(st * sp, ct, -st * cp), vec3f(cp, 0.0, sp),
+        vec3f(-ct * sp, st, ct * cp));
+}
+
 // Differences of a materialized scalar input around a texel as GenNormal takes them: (east -
 // west, south - north) of its neighbours, times strength and the width over 512, so the slope
 // does not depend on the size. On the plane the neighbours are the adjacent texels, wrapped.
@@ -130,16 +144,10 @@ fn box_texgraph_gradient(t: texture_2d<f32>, texel: vec2i, strength: f32) -> vec
     let size = vec2f(box_texgraph_stage.size);
     let scale = strength * size.x / 512.0;
     if (box_texgraph_stage.domain == 1u) {
-        let uv = (vec2f(texel) + 0.5) / size;
-        let phi = (uv.x - 0.5) * 2.0 * BOX_TEXGRAPH_PI;
-        let theta = uv.y * BOX_TEXGRAPH_PI;
-        let st = sin(theta);
-        let ct = cos(theta);
-        let sp = sin(phi);
-        let cp = cos(phi);
-        let p = vec3f(st * sp, ct, -st * cp);
-        let east = vec3f(cp, 0.0, sp);
-        let north = vec3f(-ct * sp, st, ct * cp);
+        let frame = box_texgraph_sphere_frame(texel);
+        let p = frame[0];
+        let east = frame[1];
+        let north = frame[2];
         let angle = 2.0 * BOX_TEXGRAPH_PI / size.x;
         let c = p * cos(angle);
         let s = sin(angle);

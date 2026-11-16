@@ -221,6 +221,21 @@ static const char *box_texture_slope_wgsl =
     "    return vec4f(length(d), 0.0, 0.0, 0.0);\n"
     "}\n";
 
+/** WGSL of the TexGradient node: the differences of its height as a vector in the space of the
+ * coordinates, uphill. box_texgraph_gradient gives (east - west, south - north): on the plane
+ * that is u right and v down, on the sphere the tangent east * x - north * y. */
+static const char *box_texture_gradient_wgsl =
+    "fn box_tex_gradient(p: array<vec4u, 4>, i: array<vec4f, 4>, coords: vec4f, texel: vec2i,\n"
+    "    height: texture_2d<f32>) -> vec4f {\n"
+    "    let d = box_texgraph_gradient(height, texel, bitcast<f32>(p[0].x));\n"
+    "    if (box_texgraph_stage.domain != 1u) {\n"
+    "        return vec4f(d, 0.0, 0.0);\n"
+    "    }\n"
+    "\n"
+    "    let frame = box_texgraph_sphere_frame(texel);\n"
+    "    return vec4f(frame[1] * d.x - frame[2] * d.y, 0.0);\n"
+    "}\n";
+
 /** WGSL of the TexCells node: Voronoi cells of jittered lattice points, periodic on the plane
  * and 3D on the sphere, the distance in x and three random values of the nearest cell in y, z
  * and w.
@@ -918,7 +933,8 @@ static void box_texture_nodes_register_lookups(
     });
 }
 
-/** Register the built in node kinds of the differences of a height: TexNormal and TexSlope.
+/** Register the built in node kinds of the differences of a height: TexNormal, TexSlope and
+ * TexGradient.
  *
  * @param world The world
  */
@@ -948,6 +964,19 @@ static void box_texture_nodes_register_relief(
         .params = {{ "strength", offsetof(TexSlope, strength), 4, BOX_TEXTURE_PARAM_F32 }},
         .function = "box_tex_slope",
         .source = box_texture_slope_wgsl,
+        .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
+    });
+
+    box_texture_node_register(world, &(box_texture_node_desc_t){
+        .component = ecs_id(TexGradient),
+        .output = TexVector,
+        .inputs = {
+            { "height", offsetof(TexGradient, height), TexScalar, "height_value",
+                offsetof(TexGradient, height_value) }
+        },
+        .params = {{ "strength", offsetof(TexGradient, strength), 4, BOX_TEXTURE_PARAM_F32 }},
+        .function = "box_tex_gradient",
+        .source = box_texture_gradient_wgsl,
         .flags = BOX_TEXTURE_NODE_NEIGHBOURHOOD
     });
 }

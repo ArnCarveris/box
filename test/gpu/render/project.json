@@ -1734,6 +1734,17 @@
                     "normal_matches_gen",
                     "normal_sphere_seam_poles"
                 ]
+            },
+            {
+                "id": "TextureGradient",
+                "testcases": [
+                    "plane_ramp",
+                    "length_matches_slope",
+                    "sphere_north",
+                    "sphere_seam",
+                    "zero_strength",
+                    "strength_edit_no_recompile"
+                ]
             }
         ]
     }

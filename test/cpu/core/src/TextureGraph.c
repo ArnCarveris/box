@@ -1437,7 +1437,7 @@ void TextureGraph_null_backend_records(void) {
     test_assert(entry->handle != 0);
     test_bool(entry->graph_sent, true);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 41);
+    test_int(null->texture_node_kinds, 42);
 
     const box_render_texture_graph_t *g = box_render_null_texture_graph(null, entry->handle);
     test_assert(g != NULL);
@@ -1486,7 +1486,7 @@ void TextureGraph_null_backend_records(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(null->texture_graphs, 1);
-    test_int(null->texture_node_kinds, 41);
+    test_int(null->texture_node_kinds, 42);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -1578,7 +1578,7 @@ void TextureGraph_null_backend_restart(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(second->texture_node_kinds, 41);
+    test_int(second->texture_node_kinds, 42);
     test_int(second->texture_graphs, 1);
     test_assert(box_render_null_texture_graph(second, handle) != NULL);
     test_int(box_render_null_texture_graph(second, handle)->node_count, 3);
@@ -1605,7 +1605,7 @@ void TextureGraph_custom_kind_sent(void) {
     make_graph(world, &tex, &uv, &constant, &math);
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->texture_node_kinds, 42);
+    test_int(null->texture_node_kinds, 43);
     const box_render_texture_node_kind_t *k = box_render_null_texture_node_kind(null,
         (uint32_t)id);
     test_assert(k != NULL);
@@ -2964,7 +2964,8 @@ void TextureGraph_script_member_default(void) {
     ecs_entity_t cells = ecs_lookup(world, "defaults.cells");
     ecs_entity_t normal = ecs_lookup(world, "defaults.normal");
     ecs_entity_t slope = ecs_lookup(world, "defaults.slope");
-    test_assert(uv && time && moved && noise && cells && normal && slope);
+    ecs_entity_t gradient = ecs_lookup(world, "defaults.gradient");
+    test_assert(uv && time && moved && noise && cells && normal && slope && gradient);
 
     test_flt(ecs_get(world, uv, TexCoords)->scale, 1);
     test_flt(ecs_get(world, time, TexTime)->scale, 1);
@@ -2987,6 +2988,7 @@ void TextureGraph_script_member_default(void) {
     test_flt(c->edge, 0.25f);
     test_flt(ecs_get(world, normal, TexNormal)->strength, 1);
     test_flt(ecs_get(world, slope, TexSlope)->strength, 1);
+    test_flt(ecs_get(world, gradient, TexGradient)->strength, 1);
 
     ecs_fini(world);
 }
