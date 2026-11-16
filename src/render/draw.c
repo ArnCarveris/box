@@ -1088,8 +1088,9 @@ static void box_draws_update_shape(
     box_render_transform_t was_transform;
     box_render_surface_t was_surface;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
-    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
-    bool drawn = shape && shape->mesh && transform && !ecs_has_id(world, e, EcsPrefab) &&
+    WorldTransform transform_buf;
+    bool drawn = shape && shape->mesh && ecs_has(world, e, WorldTransform) &&
+        !ecs_has_id(world, e, EcsPrefab) &&
         !ecs_has_id(world, e, EcsDisabled);
     bool kept = false, recorded = false, surfaced = false, keyed = kinds & BOX_DRAW_KEY;
     bool faded = false;
@@ -1214,7 +1215,7 @@ write:
 
     box_render_transform_t model;
     if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_FRAME)) {
-        box_draws_transform(&model, transform, shape);
+        box_draws_transform(&model, box_transform_world(world, e, &transform_buf), shape);
     }
 
     if (kinds & BOX_DRAW_TRANSFORM) {
@@ -1226,8 +1227,8 @@ write:
             uint32_t index = box_draws_mover_ref(world, d, mover);
             box_draws_mover_unref(d, *rec & BOX_RENDER_MOVER_INDEX);
             *rec = (*rec & BOX_RENDER_MOVER_FRAME) | index;
-            box_draws_relative(out, mover ? ecs_get(world, mover, WorldTransform) : NULL,
-                &model);
+            WorldTransform mover_buf;
+            box_draws_relative(out, box_transform_world(world, mover, &mover_buf), &model);
         }
     }
 

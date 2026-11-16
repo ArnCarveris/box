@@ -118,6 +118,7 @@ void box_audio_listener_find(
     box_audio_listener_t *listener)
 {
     ecs_iter_t it = ecs_query_iter(world, state->listeners);
+    WorldTransform best_buf;
     const WorldTransform *best = NULL;
     int32_t best_order = 0, count = 0, i;
     *listener = (box_audio_listener_t){0};
@@ -146,6 +147,7 @@ void box_audio_listener_find(
     }
 
     if (best) {
+        best = box_transform_world(world, listener->entity, &best_buf);
         ecs_os_memcpy(listener->m, best->m, ECS_SIZEOF(mat4));
         goto done;
     }
@@ -155,12 +157,14 @@ void box_audio_listener_find(
         const View *views = ecs_field(&it, View, 0);
         for (i = 0; i < it.count; i ++) {
             ecs_entity_t camera = views[i].camera;
+            WorldTransform wt_buf;
             const WorldTransform *wt = camera && ecs_is_alive(world, camera) ?
-                ecs_get(world, camera, WorldTransform) : NULL;
+                box_transform_world(world, camera, &wt_buf) : NULL;
             if (wt && (!best ||
                 box_view_compare(views[i].order, it.entities[i], best_order, listener->entity) < 0))
             {
-                best = wt;
+                best_buf = *wt;
+                best = &best_buf;
                 best_order = views[i].order;
                 listener->entity = it.entities[i];
             }

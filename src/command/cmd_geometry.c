@@ -196,7 +196,8 @@ static void box_cmd_geometry_add_shape(
     const ShapeMesh *shape)
 {
     const box_mesh_t *mesh = box_cmd_geometry_mesh(cache, shape);
-    const WorldTransform *transform = ecs_get(c->world, e, WorldTransform);
+    WorldTransform transform_buf;
+    const WorldTransform *transform = box_transform_world(c->world, e, &transform_buf);
     box_cmd_geometry_shape_t *s;
     mat4 m;
     mat3 m3;

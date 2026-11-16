@@ -147,7 +147,8 @@ uint32_t box_draws_mover_ref(
     m->refs = 1;
     m->moved = true;
     m->scale = 1.0f;
-    const WorldTransform *t = ecs_get(world, mover, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, mover, &t_buf);
     if (t) {
         box_draws_mover_rows(&m->pose, t);
         m->scale = box_transform_world_scale(t);
@@ -199,8 +200,9 @@ void box_draws_movers_send(
         m->was = m->pose;
         d->movers_dirty |= m->moved;
         m->moved = false;
+        WorldTransform t_buf;
         const WorldTransform *t = ecs_is_alive(world, m->entity)
-            ? ecs_get(world, m->entity, WorldTransform) : NULL;
+            ? box_transform_world(world, m->entity, &t_buf) : NULL;
         if (!t) {
             continue;
         }

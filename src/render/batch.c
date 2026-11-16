@@ -1756,9 +1756,11 @@ static void box_draws_fill_transform(
             continue;
         }
 
+        WorldTransform buf;
+        const WorldTransform *t = box_transform_world_field(it->world, it, transforms, i, &buf);
         box_render_transform_t *out = box_draws_slot_transform(b, slots[i].slot);
         box_render_transform_t was = *out;
-        box_draws_transform(out, &transforms[i], &shapes[i]);
+        box_draws_transform(out, t, &shapes[i]);
         if (b->key.frame) {
             box_draws_frame_record(it->world, d, box_draws_slot_frame_src(b, slots[i].slot),
                 box_draws_slot_frame(b, slots[i].slot), out);
@@ -1766,7 +1768,7 @@ static void box_draws_fill_transform(
 
         if (shadows) {
             box_draws_box_shadow_write(it->world, d, it->entities[i], &shadows[i], &slots[i],
-                &transforms[i], NULL, BOX_DRAW_TRANSFORM);
+                t, NULL, BOX_DRAW_TRANSFORM);
         }
 
         if (!box_draws_is_2d(b) && d->shadow_record &&

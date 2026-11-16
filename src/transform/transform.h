@@ -17,36 +17,16 @@ void transformDynamicChildOf(
     ecs_query_t *query,
     uint64_t depth);
 
-/** Entries of the cache of parent world transforms, a power of two */
-#define TRANSFORM_PARENT_CACHE (16384)
-
-/** A parent and the world transform it resolved to in a run of the system */
-typedef struct {
-    ecs_entity_t parent;          /**< The parent */
-    const WorldTransform *t;      /**< World transform of it or its nearest ancestor with one */
-    int64_t stamp;                /**< Run the entry was stored in, else the entry is empty */
-} transform_parent_cached_t;
-
-/** Parent world transforms of a run of the dynamic transform system. Children of several
- * parents are interleaved in a table, and the pointers stay valid while the deferred system
- * runs. */
-typedef struct {
-    transform_parent_cached_t *entries; /**< TRANSFORM_PARENT_CACHE entries */
-    int64_t stamp;                /**< The current run */
-} transform_parent_cache_t;
-
 /** Compute the world transforms of one depth level of the Parent hierarchy.
  *
  * @param world The world
  * @param query Query for dynamic Parent entities, grouped by depth
  * @param depth The hierarchy depth to compute
- * @param cache Parent world transforms of this run
  */
 void transformDynamicParent(
     ecs_world_t *world,
     ecs_query_t *query,
-    uint64_t depth,
-    transform_parent_cache_t *cache);
+    uint64_t depth);
 
 /** Compute the world transform of one entity from its parent and local transform.
  *
@@ -63,15 +43,48 @@ void transformSingle(
     const Rotation *r,
     const Scale *s);
 
-/** Find the world transform of the nearest ancestor that has one.
+/** Entries of the cache of computed world transforms, a power of two */
+#define TRANSFORM_WORLD_CACHE (16384)
+
+/** A world transform box_transform_world computed */
+typedef struct {
+    ecs_entity_t entity;          /**< The entity, 0 for an empty entry */
+    uint64_t epoch;               /**< Epoch it was computed in, else it is stale */
+    WorldTransform t;             /**< The world transform */
+} transform_world_cached_t;
+
+/** The world transforms box_transform_world computed since the last change of a transform */
+typedef struct {
+    transform_world_cached_t *entries; /**< TRANSFORM_WORLD_CACHE entries, NULL until used */
+    uint64_t epoch;               /**< Advances with every change of a transform */
+} transform_world_cache_t;
+
+/** Singleton through which box_transform_world finds the cache of a world */
+typedef struct {
+    transform_world_cache_t *cache; /**< The cache, freed with the world */
+} TransformWorldCache;
+
+extern ECS_COMPONENT_DECLARE(TransformWorldCache);
+
+/** Drop the world transforms box_transform_world computed: a local transform, a hierarchy, a
+ * ManualTransform or the transforms of a run of the systems changed.
+ *
+ * @param world The world
+ */
+void transformWorldCacheInvalidate(
+    const ecs_world_t *world);
+
+/** Find the world transform of the nearest ancestor that has one (box_transform_world).
  *
  * @param world The world
  * @param parent The parent to start the search at
+ * @param buf Receives the transform when it is computed
  * @return The world transform, NULL when no ancestor has one
  */
 const WorldTransform* transformGetParentWorldTransform(
     const ecs_world_t *world,
-    ecs_entity_t parent);
+    ecs_entity_t parent,
+    WorldTransform *buf);
 
 /** Test whether the entities of an OnRemove observer are being deleted.
  *

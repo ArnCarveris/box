@@ -385,13 +385,14 @@ bool box_draws_layer_of(
     box_draw_layer_t *out)
 {
     const PlanetAtmosphere *a = NULL;
+    WorldTransform buf;
     const WorldTransform *t = NULL;
     const box_mesh_t *mesh = NULL;
     bool result = false;
     int32_t r;
     if (b->key.atmosphere && d->world) {
         a = ecs_get(d->world, b->key.atmosphere, PlanetAtmosphere);
-        t = ecs_get(d->world, b->key.atmosphere, WorldTransform);
+        t = box_transform_world(d->world, b->key.atmosphere, &buf);
     }
 
     if (!a || !t || !(a->radius > 0.0f) || !(a->planet_radius > 0.0f)) {

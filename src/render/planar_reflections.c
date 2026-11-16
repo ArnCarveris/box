@@ -188,7 +188,9 @@ static void box_planar_collect(
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             vec3 normal;
-            glm_vec3_copy(ECS_CONST_CAST(float*, transforms[i].m[1]), normal);
+            WorldTransform buf;
+            const WorldTransform *t = box_transform_world_field(world, &it, transforms, i, &buf);
+            glm_vec3_copy(ECS_CONST_CAST(float*, t->m[1]), normal);
             if (!(glm_vec3_norm(normal) > 1e-12f)) {
                 continue;
             }
@@ -199,7 +201,7 @@ static void box_planar_collect(
             e->scene = box_render_scene_field(&it, 2, i);
             glm_vec3_copy(normal, e->plane.plane);
             e->plane.plane[3] = -glm_vec3_dot(normal,
-                ECS_CONST_CAST(float*, transforms[i].m[3]));
+                ECS_CONST_CAST(float*, t->m[3]));
             e->clip_offset = planars[i].clip_offset;
             e->resolution = glm_clamp(planars[i].resolution, BOX_PLANAR_RESOLUTION_MIN, 1.0f);
             if (!isfinite(e->resolution)) {

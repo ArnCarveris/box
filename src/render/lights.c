@@ -539,7 +539,9 @@ static void box_lights_collect(
         ecs_entity_t scene = 0;
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            const WorldTransform *transform = transforms ? &transforms[i] : NULL;
+            WorldTransform buf;
+            const WorldTransform *transform = box_transform_world_field(
+                world, &it, transforms, i, &buf);
             const Rgb *rgb = colors ? &colors[i * color_step] : NULL;
             ecs_entity_t member = box_render_scene_field(&it, 3, i);
             if (!s || member != scene) {

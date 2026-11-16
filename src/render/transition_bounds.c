@@ -216,10 +216,11 @@ void box_draws_parent_world(
     ecs_entity_t e,
     mat4 out)
 {
+    WorldTransform buf;
     const WorldTransform *parent = NULL;
     ecs_entity_t cur = ecs_get_parent(world, e);
     while (cur && !parent) {
-        parent = ecs_get(world, cur, WorldTransform);
+        parent = box_transform_world(world, cur, &buf);
         cur = ecs_get_parent(world, cur);
     }
 

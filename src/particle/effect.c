@@ -507,7 +507,8 @@ static bool box_particle_view_sees(
     const Camera *c = v->camera && ecs_is_alive(world, v->camera)
         ? ecs_get(world, v->camera, Camera)
         : NULL;
-    const WorldTransform *t = c ? ecs_get(world, v->camera, WorldTransform) : NULL;
+    WorldTransform t_buf;
+    const WorldTransform *t = c ? box_transform_world(world, v->camera, &t_buf) : NULL;
     mat4 transform, inverse, proj, view_proj;
     vec4 point = { position[0], position[1], position[2], 1.0f }, clip;
     float width, height;

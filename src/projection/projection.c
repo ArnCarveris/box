@@ -52,7 +52,8 @@ static void box_projection_lens(
     lens->view = view;
     lens->valid = c != NULL;
     if (c) {
-        const WorldTransform *t = ecs_get(world, camera, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, camera, &t_buf);
         mat4 transform, inverse, proj;
         if (t) {
             glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), transform);
@@ -84,8 +85,9 @@ static bool box_projection_point(
     float *y)
 {
     bool result = false;
+    WorldTransform t_buf;
     const WorldTransform *t = anchor->target && ecs_is_alive(world, anchor->target) ?
-        ecs_get(world, anchor->target, WorldTransform) : NULL;
+        box_transform_world(world, anchor->target, &t_buf) : NULL;
     if (!lens->valid || !t) {
         goto done;
     }
@@ -158,8 +160,9 @@ static bool box_projection_box(
     ProjectedBounds *out)
 {
     bool result = false, before_far = false;
+    WorldTransform t_buf;
     const WorldTransform *t = anchor->target && ecs_is_alive(world, anchor->target) ?
-        ecs_get(world, anchor->target, WorldTransform) : NULL;
+        box_transform_world(world, anchor->target, &t_buf) : NULL;
     vec4 clip[8];
     float front[8];
     int32_t i, bit, count = 0;
@@ -365,10 +368,10 @@ static void box_projection_transform(
     bool subtree)
 {
     if (!ecs_has(world, e, ManualTransform)) {
+        WorldTransform buf, next;
         ecs_entity_t parent = ecs_get_parent(world, e);
         const WorldTransform *t_parent = parent ?
-            transformGetParentWorldTransform(world, parent) : NULL;
-        WorldTransform next;
+            transformGetParentWorldTransform(world, parent, &buf) : NULL;
         transformSingle(t_parent, &next, p, r, s);
         if (!visible) {
             glm_vec4_zero(next.m[0]);
@@ -463,8 +466,9 @@ static void BoxProjectionLayout(
     box_layout_update(world);
     ecs_entity_t *resized = ecs_vec_first_t(&state->resized, ecs_entity_t);
     for (i = 0; i < count; i ++) {
+        WorldTransform t_buf;
         const WorldTransform *t = ecs_is_alive(world, resized[i]) ?
-            ecs_get(world, resized[i], WorldTransform) : NULL;
+            box_transform_world(world, resized[i], &t_buf) : NULL;
         if (t) {
             box_projection_children(world, resized[i], t);
         }

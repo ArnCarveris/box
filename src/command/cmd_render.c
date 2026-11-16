@@ -659,7 +659,8 @@ bool box_cmd_render_corners(
 {
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     const box_mesh_t *mesh = shape && cache ? box_mesh_cache_get(cache, shape->mesh) : NULL;
-    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    WorldTransform transform_buf;
+    const WorldTransform *transform = box_transform_world(world, e, &transform_buf);
     mat4 m;
     int32_t i;
     if (!mesh) {
@@ -738,7 +739,8 @@ static void box_cmd_render_request(
 
     ecs_vec_fini_t(NULL, &entities, ecs_entity_t);
     if (!bounds) {
-        const WorldTransform *t = ecs_get(world, job->subject, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, job->subject, &t_buf);
         glm_vec3_zero(min);
         if (t) {
             min[0] = t->m[3][0];

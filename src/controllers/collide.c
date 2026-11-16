@@ -145,7 +145,8 @@ bool box_collider_resolve(
 {
     const box_mesh_cache_t *cache = box_mesh_cache_of(world);
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     const box_mesh_t *mesh = cache && shape && shape->mesh
         ? box_mesh_cache_get(cache, shape->mesh)
         : NULL;

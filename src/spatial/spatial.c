@@ -478,7 +478,8 @@ static void box_spatial_refresh(
     bool rescope = p->rescope || p->item < 0;
     p->dirty = false;
     p->rescope = false;
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     vec3 l_min, l_max;
     bool ui = false;
     bool indexed = t && box_spatial_local(world, cache, e, l_min, l_max, &ui) &&
@@ -586,7 +587,8 @@ static void box_spatial_dynamic(
         for (i = 0; i < it.count; i ++) {
             vec3 l_min, l_max, min, max;
             bool ui = false;
-            const WorldTransform *m = &t[i];
+            WorldTransform buf;
+            const WorldTransform *m = box_transform_world_field(world, &it, t, i, &buf);
             if (p[i].item < 0 || p[i].dirty || !ecs_os_memcmp(pose[i].m, m->m, sizeof(mat4))) {
                 continue;
             }
