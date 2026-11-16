@@ -615,6 +615,28 @@ void Transition_prefab_instances_own_state(void) {
     tr_fini(world, null);
 }
 
+void Transition_clone_gets_own_node(void) {
+    // engine_core/transition
+    box_render_null_t *null;
+    ecs_world_t *world = tr_world(&null);
+    ecs_entity_t a = tr_entity(world, &(TransitionSpec){ .duration = 1.0f });
+    tr_frame(world);
+    test_assert(box_render_transition_test_node(world, a) != 0);
+
+    ecs_entity_t b = ecs_clone(world, 0, a, true);
+    tr_frame(world);
+    test_assert(box_render_transition_test_node(world, b) != 0);
+    test_assert(box_render_transition_test_node(world, a) !=
+        box_render_transition_test_node(world, b));
+
+    ecs_set(world, a, Position, {4, 0, 0});
+    tr_frames(world, 2);
+    test_flt(tr_position(world, a).x, 1);
+    test_flt(tr_position(world, b).x, 0);
+
+    tr_fini(world, null);
+}
+
 void Transition_time_paused(void) {
     // engine_core/transition
     box_render_null_t *null;

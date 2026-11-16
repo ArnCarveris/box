@@ -962,7 +962,9 @@ static void box_reflect_probes(
 
             box_reflect_probe_t *probe = box_reflect_ensure_probe(s, qit.entities[row]);
             box_render_reflection_probe_t was = probe->data;
-            box_reflect_place(&probe->data, &probes[row], &transforms[row]);
+            WorldTransform buf;
+            box_reflect_place(&probe->data, &probes[row],
+                box_transform_world_field(world, &qit, transforms, row, &buf));
             if (box_reflect_moved(&was, &probe->data)) {
                 box_reflect_queue(probe);
             }

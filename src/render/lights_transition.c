@@ -135,13 +135,14 @@ void box_lights_collect_leaving(
     int32_t i, count = box_render_transitions_lights(l->transitions, &lights);
     for (i = 0; i < count; i ++) {
         const box_render_light_transition_t *lt = &lights[i];
+        WorldTransform buf;
         const WorldTransform *transform;
         box_light_scene_t *s;
         if (!lt->leaving || !ecs_is_alive(world, lt->entity)) {
             continue;
         }
 
-        transform = ecs_get(world, lt->entity, WorldTransform);
+        transform = box_transform_world(world, lt->entity, &buf);
         if (!transform) {
             continue;
         }

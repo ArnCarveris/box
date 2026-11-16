@@ -68,7 +68,8 @@ static void box_pick_transform(
     ecs_entity_t e,
     mat4 out)
 {
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     if (t) {
         glm_mat4_copy(ECS_CONST_CAST(vec4*, t->m), out);
     } else {

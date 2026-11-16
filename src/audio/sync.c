@@ -752,7 +752,8 @@ static void box_audio_spatial_sources(
     ecs_entity_t *moved = ecs_vec_first(&state->moved);
     int32_t i;
     while (ecs_query_next(&it)) {
-        if (!state->spatial_dirty && !ecs_iter_changed(&it)) {
+        bool spread = box_transform_spread(world, it.table);
+        if (!state->spatial_dirty && !ecs_iter_changed(&it) && !spread) {
             ecs_iter_skip(&it);
             continue;
         }
@@ -764,7 +765,9 @@ static void box_audio_spatial_sources(
         const AudioOutput *out = ecs_field(&it, AudioOutput, 4);
         bool muted = ecs_table_has_id(world, it.table, EcsDisabled);
         for (i = 0; i < it.count; i ++) {
-            box_audio_place_t place = box_audio_place(state, &spatial[i], wt ? &wt[i] : NULL);
+            WorldTransform buf;
+            box_audio_place_t place = box_audio_place(state, &spatial[i], spread ?
+                box_transform_world(world, it.entities[i], &buf) : wt ? &wt[i] : NULL);
             box_audio_source(world, state, it.entities[i], &src[i], out ? &out[i] : NULL,
                 &v[i], muted, waiting, &place);
         }
@@ -784,8 +787,9 @@ static void box_audio_spatial_sources(
         }
 
         bool playing = src->playing;
+        WorldTransform buf;
         box_audio_place_t place = box_audio_place(state, spatial,
-            ecs_get(world, e, WorldTransform));
+            box_transform_world(world, e, &buf));
         box_audio_source(world, state, e, src, ecs_get(world, e, AudioOutput), v,
             ecs_has_id(world, e, EcsDisabled), waiting, &place);
         if (src->playing != playing) {

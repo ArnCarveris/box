@@ -273,7 +273,8 @@ static bool box_bake_inside(
         goto done;
     }
 
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     mat4 inv;
     vec4 local = { pos[0], pos[1], pos[2], 1.0f };
     if (t) {

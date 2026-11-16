@@ -619,7 +619,8 @@ static bool box_ui_edit_local(
     const float *point,
     float *x)
 {
-    const WorldTransform *t = ecs_get(world, s->content, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, s->content, &t_buf);
     if (t) {
         mat4 inv;
         vec3 local;

@@ -159,6 +159,7 @@ void Moved_idle_frame_passes_nothing(void) {
 
 void Moved_dynamic_entity_not_passed(void) {
     // core_fixes/transform_changed
+    WorldTransform buf;
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxTransform);
     moved_log_t log = {0};
@@ -178,7 +179,7 @@ void Moved_dynamic_entity_not_passed(void) {
 
     test_int(log.calls, 0);
     test_int(log.count, 0);
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 4.0f);
+    test_flt(box_transform_world(world, child, &buf)->m[3][0], 4.0f);
 
     ecs_fini(world);
 }

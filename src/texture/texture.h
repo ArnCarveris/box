@@ -123,6 +123,9 @@ typedef struct box_texture_graph_t {
     int32_t width;              /**< Width of the image, capped */
     int32_t height;             /**< Height of the image, capped */
     TextureGraphDomain domain;  /**< Coordinates of the texels */
+    float region[4];            /**< Longitude start and end, latitude start and end of the
+                                 *   image on the sphere in radians, resolved: the whole sphere
+                                 *   (0, 2 pi, -pi / 2, pi / 2) for equal ranges; 0 on the plane */
     TextureGraphFormat format;  /**< What the image stores */
     float rate;                 /**< Updates per second of an animated graph, 0 every frame */
     bool interpolate;           /**< Crossfade keys k / rate (TextureGraph.interpolate) */

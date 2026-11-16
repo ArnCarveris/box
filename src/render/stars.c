@@ -117,8 +117,10 @@ static void box_star_collect(
         for (i = 0; i < it.count; i ++) {
             box_star_field_t *f = ecs_vec_append_t(NULL, &s->fields, box_star_field_t);
             f->scene = box_render_scene_field(&it, 2, i);
-            box_render_star_record(&fields[i], transforms ? &transforms[i] : NULL,
-                it.entities[i], &f->record);
+            WorldTransform buf;
+            box_render_star_record(&fields[i],
+                box_transform_world_field(world, &it, transforms, i, &buf), it.entities[i],
+                &f->record);
         }
     }
 

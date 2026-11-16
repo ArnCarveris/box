@@ -190,7 +190,8 @@ static bool box_bake_shape_bounds(
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     const box_mesh_t *mesh = cache && shape && shape->mesh ?
         box_mesh_cache_get(cache, shape->mesh) : NULL;
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     bool result = mesh && mesh->vertex_count;
     int32_t c, i;
     if (!result) {

@@ -545,7 +545,8 @@ bool box_draws_box_shadow_transition(
     const BoxShadow *shadow = ecs_get(world, e, BoxShadow);
     const Shape2D *shape = ecs_get(world, e, Shape2D);
     const ShapeMesh *mesh = ecs_get(world, e, ShapeMesh);
-    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    WorldTransform transform_buf;
+    const WorldTransform *transform = box_transform_world(world, e, &transform_buf);
     mat4 identity;
     bool result;
     ecs_os_memset_t(out, 0, box_draw_transition_box_shadow_t);
@@ -722,10 +723,12 @@ void box_draws_box_shadow_update(
         .slice = s->slice
     };
     if (area) {
-        box_shadow_write(d, bs, &box, shadow, shape, blend, ecs_get(world, e, WorldTransform),
+        WorldTransform buf;
+        box_shadow_write(d, bs, &box, shadow, shape, blend, box_transform_world(world, e, &buf),
             &material, BOX_DRAW_BOTH);
     } else {
-        const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+        WorldTransform transform_buf;
+        const WorldTransform *transform = box_transform_world(world, e, &transform_buf);
         box_draw_batch_t *b = box_draws_batch(d, bs->batch);
         box_shadow_hidden(box_draws_slot_transform(b, bs->slot),
             box_draws_slot_shading(b, bs->slot),

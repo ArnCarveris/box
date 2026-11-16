@@ -202,14 +202,14 @@ void box_transitions_lights(
     box_render_transitions_t *s,
     const box_render_packet_t *p)
 {
-    int32_t i, count = ecs_vec_count(&s->nodes);
+    int32_t r, i, count = ecs_vec_count(&s->running);
     ecs_vec_clear(&s->lights);
     if (ecs_map_count(&s->light_index)) {
         ecs_map_clear(&s->light_index);
     }
 
-    for (i = 1; p && i < count; i ++) {
-        const box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
+    for (r = 0; p && r < count; r ++) {
+        const box_transition_node_t *node = box_transitions_running(s, r, &i);
         if (!node->entity || !node->live) {
             continue;
         }

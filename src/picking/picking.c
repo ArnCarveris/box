@@ -138,7 +138,8 @@ static void box_pick_local(
     const box_pick_t *pick,
     EcsScriptMouseEvent *evt)
 {
-    const WorldTransform *t = pick->target ? ecs_get(world, e, WorldTransform) : NULL;
+    WorldTransform t_buf;
+    const WorldTransform *t = pick->target ? box_transform_world(world, e, &t_buf) : NULL;
     evt->local_x = evt->screen_x;
     evt->local_y = evt->screen_y;
     if (t) {

@@ -307,7 +307,9 @@ static void box_fog_collect(
         for (i = 0; i < it.count; i ++) {
             box_fog_volume_t *f = ecs_vec_append_t(NULL, &l->fog_volumes, box_fog_volume_t);
             f->scene = box_render_scene_field(&it, 2, i);
-            box_fog_record(&fogs[i], &transforms[i], time, &f->record);
+            WorldTransform buf;
+            box_fog_record(&fogs[i], box_transform_world_field(world, &it, transforms, i, &buf),
+                time, &f->record);
         }
     }
 }

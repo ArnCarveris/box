@@ -2,9 +2,9 @@
  * @file box/transform.h
  * @brief Transform components: local pose, world matrix and static/dynamic tags.
  *
- * WorldTransform is kept equal to parent * T * R * S: by observers for static entities, every
- * frame in EcsPreStore for DynamicTransform entities. Descendants inherit DynamicTransform
- * through `(IsA, DynamicTransformSpread)`; one that owns the tag stays dynamic.
+ * WorldTransform = parent * T * R * S, kept by observers for static entities and every frame for
+ * movers. A descendant that inherits DynamicTransform through `(IsA, DynamicTransformSpread)`
+ * has a WorldTransform that is not kept up to date: read it with box_transform_world.
  *
  * Rotation and Scale imply Position, and every pose component implies WorldTransform. An entity
  * without a WorldTransform has no place in the world: it is not drawn and not picked.
@@ -56,7 +56,7 @@ ECS_STRUCT(WorldTransform, {
     mat4 m; /**< The matrix */
 });
 
-/** Transform is recomputed every frame instead of on change, kept on every descendant */
+/** Transform is recomputed every frame instead of on change, inherited by every descendant */
 extern ECS_TAG_DECLARE(DynamicTransform);
 
 /** Prefab with DynamicTransform that the descendants of dynamic entities inherit it from */
@@ -68,6 +68,49 @@ extern ECS_DECLARE(DynamicTransformSpread);
  * followed by ecs_modified; a write without an event leaves them at the old transform.
  */
 extern ECS_TAG_DECLARE(ManualTransform);
+
+/** Test whether the WorldTransform of the entities of a table is not kept: they inherit
+ * DynamicTransform through `(IsA, DynamicTransformSpread)`, own no DynamicTransform nor
+ * ManualTransform and have a Position.
+ *
+ * @param world The world
+ * @param table The table, NULL for none
+ * @return true when box_transform_world computes their world transform
+ */
+bool box_transform_spread(
+    const ecs_world_t *world,
+    const ecs_table_t *table);
+
+/** Get the world transform of an entity: its WorldTransform, or for a descendant of a dynamic
+ * entity whose WorldTransform is not kept (box_transform_spread) the transform of its nearest
+ * ancestor with one times its local transform, computed into a buffer.
+ *
+ * @param world The world
+ * @param e The entity, 0 for none
+ * @param buf Receives the transform when it is computed
+ * @return The world transform, NULL when the entity has no WorldTransform
+ */
+const WorldTransform* box_transform_world(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    WorldTransform *buf);
+
+/** Get the world transform of a row of a query result with a WorldTransform field owned by its
+ * entities: the field, or box_transform_world when the table keeps none (box_transform_spread).
+ *
+ * @param world The world
+ * @param it The query result
+ * @param field The WorldTransform field, NULL when it is not set
+ * @param row The row
+ * @param buf Receives the transform when it is computed
+ * @return The world transform, NULL when the field is not set
+ */
+const WorldTransform* box_transform_world_field(
+    const ecs_world_t *world,
+    const ecs_iter_t *it,
+    const WorldTransform *field,
+    int32_t row,
+    WorldTransform *buf);
 
 /** Test whether the entities of a table are dynamic.
  *

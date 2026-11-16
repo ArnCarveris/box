@@ -8,6 +8,7 @@
 
 void DynamicParentRuns_interleaved_parents(void) {
     // core_fixes/transform_cleanups
+    WorldTransform buf;
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxTransform);
 
@@ -27,7 +28,8 @@ void DynamicParentRuns_interleaved_parents(void) {
     ecs_progress(world, 0);
 
     for (int i = 0; i < 8; i ++) {
-        const WorldTransform *t = ecs_get(world, children[i], WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(world, children[i], &t_buf);
         test_flt(t->m[3][0], (i % 3) ? 11.0f : 21.0f);
         test_flt(t->m[3][1], (float)i);
     }
@@ -37,7 +39,8 @@ void DynamicParentRuns_interleaved_parents(void) {
     ecs_progress(world, 0);
 
     for (int i = 0; i < 8; i ++) {
-        test_flt(ecs_get(world, children[i], WorldTransform)->m[3][0], (i % 3) ? 31.0f : 41.0f);
+        test_flt(box_transform_world(world, children[i], &buf)->m[3][0],
+            (i % 3) ? 31.0f : 41.0f);
     }
 
     ecs_fini(world);
@@ -45,6 +48,7 @@ void DynamicParentRuns_interleaved_parents(void) {
 
 void DynamicParentRuns_parent_without_transform(void) {
     // core_fixes/transform_cleanups
+    WorldTransform buf;
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxTransform);
 
@@ -64,16 +68,16 @@ void DynamicParentRuns_parent_without_transform(void) {
 
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, under_bare, WorldTransform)->m[3][0], 11.0f);
-    test_flt(ecs_get(world, under_placed, WorldTransform)->m[3][0], 16.0f);
-    test_flt(ecs_get(world, under_bare_2, WorldTransform)->m[3][0], 12.0f);
+    test_flt(box_transform_world(world, under_bare, &buf)->m[3][0], 11.0f);
+    test_flt(box_transform_world(world, under_placed, &buf)->m[3][0], 16.0f);
+    test_flt(box_transform_world(world, under_bare_2, &buf)->m[3][0], 12.0f);
 
     ecs_get_mut(world, root, Position)->x = 20.0f;
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, under_bare, WorldTransform)->m[3][0], 21.0f);
-    test_flt(ecs_get(world, under_placed, WorldTransform)->m[3][0], 26.0f);
-    test_flt(ecs_get(world, under_bare_2, WorldTransform)->m[3][0], 22.0f);
+    test_flt(box_transform_world(world, under_bare, &buf)->m[3][0], 21.0f);
+    test_flt(box_transform_world(world, under_placed, &buf)->m[3][0], 26.0f);
+    test_flt(box_transform_world(world, under_bare_2, &buf)->m[3][0], 22.0f);
 
     ecs_fini(world);
 }

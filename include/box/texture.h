@@ -290,6 +290,17 @@ ECS_STRUCT(TextureGraph, {
     int32_t width;             /**< Width in pixels, 0 for 512 */
     int32_t height;            /**< Height in pixels, 0 for the width */
     TextureGraphDomain domain; /**< Coordinates of the texels, default DomainPlane */
+    float longitude_start;     /**< Longitude of the left edge of the image on DomainSphere in
+                                *   radians, as EllipsoidShell.longitude_start: the image is
+                                *   the part of the whole sphere graph that an EllipsoidShell of
+                                *   the same ranges shows where the whole shell shows the whole
+                                *   graph. Ignored on DomainPlane */
+    float longitude_end;       /**< Longitude of the right edge, equal to the start for the
+                                *   whole longitude, at most a turn from the start */
+    float latitude_start;      /**< Latitude of the top edge in radians, -pi / 2 to pi / 2, as
+                                *   EllipsoidShell.latitude_start */
+    float latitude_end;        /**< Latitude of the bottom edge, equal to the start for the
+                                *   whole latitude */
     TextureGraphFormat format; /**< What the image stores, default GraphColor */
     float rate;                /**< Updates per second of an animated graph, 0 for every frame.
                                 *   An animated graph whose image no draw sampled in the

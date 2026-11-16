@@ -165,6 +165,7 @@ static int box_render_capture_camera(
     const box_render_view_t *source = NULL;
     int result = -1;
     const Camera *data = NULL;
+    WorldTransform buf;
     const WorldTransform *transform = NULL;
     if (!d->camera) {
         v->camera_data = d->camera_data;
@@ -199,7 +200,7 @@ static int box_render_capture_camera(
         v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
     }
 
-    transform = ecs_get(world, d->camera, WorldTransform);
+    transform = box_transform_world(world, d->camera, &buf);
     v->camera = d->camera;
     v->camera_data = *data;
     v->scene = box_render_scene_of(world, d->camera);

@@ -2,8 +2,9 @@
  * @file transform/transform_dynamic_parent.c
  * @brief Transform dynamic entities with Parent component.
  *
- * Siblings are usually stored next to each other, so the world transform of a parent is looked
- * up once per run of entities with the same parent.
+ * Only the movers are transformed: the entities whose table box_transform_spread rejects. A
+ * mover under another mover finds the world transform of its parent through
+ * box_transform_world, computed from the movers above it.
  */
 
 #include "transform.h"
@@ -13,9 +14,14 @@ void transformDynamicParent(
     ecs_query_t *query,
     uint64_t depth)
 {
+    WorldTransform buf;
     ecs_iter_t it = ecs_query_iter(world, query);
     ecs_iter_set_group(&it, depth);
     while (ecs_query_next(&it)) {
+        if (box_transform_spread(world, it.table)) {
+            continue;
+        }
+
         WorldTransform *t = ecs_field(&it, WorldTransform, 0);
         const Position *p = ecs_field(&it, Position, 1);
         const Rotation *r = ecs_field(&it, Rotation, 2);
@@ -27,7 +33,7 @@ void transformDynamicParent(
         for (int i = 0; i < it.count; i ++) {
             ecs_entity_t parent = parents[i].value;
             if (!i || parent != last) {
-                t_parent = transformGetParentWorldTransform(world, parent);
+                t_parent = transformGetParentWorldTransform(world, parent, &buf);
                 last = parent;
             }
 

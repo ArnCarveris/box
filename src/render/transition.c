@@ -218,8 +218,9 @@ bool box_render_transition_equal(
     int32_t i;
     for (i = 0; i < layout->count && result; i ++) {
         const box_render_transition_field_t *field = &layout->fields[i];
-        result = !ecs_os_memcmp(ECS_OFFSET(a, field->offset), ECS_OFFSET(b, field->offset),
-            box_transition_field_size(field));
+        const uint8_t *fa = ECS_OFFSET(a, field->offset), *fb = ECS_OFFSET(b, field->offset);
+        result = fa[0] == fb[0] && (field->kind != BOX_RENDER_TRANSITION_F32 ||
+            (fa[1] == fb[1] && fa[2] == fb[2] && fa[3] == fb[3]));
     }
 
     return result;

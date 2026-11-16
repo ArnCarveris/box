@@ -228,8 +228,8 @@ static uint64_t box_gpu_tg_key(
  * depends on a sampled texture.
  *
  * The hash of a node covers its kind, output type, parameter bytes, the hashes of its inputs,
- * the size and domain of the graph and the shared code, so two nodes of one hash make the same
- * value; for a sampling node also the handle, flags and serial of the image it samples now.
+ * the size, domain and range of the graph and the shared code, so two nodes of one hash make the
+ * same value; for a sampling node also the handle, flags and serial of the image it samples now.
  *
  * A node is animated when its kind is, unless its time factor is 0, or one of its inputs is.
  *
@@ -275,6 +275,7 @@ static void box_gpu_tg_hashes(
         h = box_gpu_tg_hash(h, &graph->desc.width, sizeof(uint32_t));
         h = box_gpu_tg_hash(h, &graph->desc.height, sizeof(uint32_t));
         h = box_gpu_tg_hash(h, &graph->desc.domain, sizeof(uint32_t));
+        h = box_gpu_tg_hash(h, graph->desc.region, sizeof(graph->desc.region));
         h = box_gpu_tg_hash(h, graph->params + node->params, node->param_size);
         for (j = 0; j < BOX_TEXTURE_NODE_INPUTS; j ++) {
             int32_t in = node->inputs[j];
@@ -1387,10 +1388,11 @@ static void box_gpu_tg_upload(
     uint32_t encode = graph->desc.format == GraphColor ? 1u
         : graph->desc.format == GraphSingle ? 2u : 0u;
     float time = (float)seconds;
-    uint32_t uniforms[8] = {
+    uint32_t uniforms[12] = {
         graph->desc.width, graph->desc.height, graph->desc.domain, encode, 0, 0, 0, 0
     };
     ecs_os_memcpy(&uniforms[4], &time, ECS_SIZEOF(float));
+    ecs_os_memcpy(&uniforms[8], graph->desc.region, ECS_SIZEOF(graph->desc.region));
     if (graph->param_capacity < size) {
         if (graph->param_buffer) {
             wgpuBufferRelease(graph->param_buffer);

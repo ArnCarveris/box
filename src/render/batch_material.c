@@ -796,8 +796,9 @@ const box_draw_frame_pose_t* box_draws_frame_pose(
     result->tick = d->tick;
     result->valid = false;
     result->scale = 1.0f;
+    WorldTransform t_buf;
     const WorldTransform *t = ecs_is_alive(world, frame)
-        ? ecs_get(world, frame, WorldTransform) : NULL;
+        ? box_transform_world(world, frame, &t_buf) : NULL;
     if (!t) {
         goto done;
     }

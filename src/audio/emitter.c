@@ -358,9 +358,11 @@ void box_audio_emitters_update(
         const AudioOutput *out = ecs_field(&it, AudioOutput, 3);
         const AudioSpatial *spatial = ecs_field(&it, AudioSpatial, 4);
         bool disabled = ecs_table_has_id(world, it.table, EcsDisabled);
+        bool spread = box_transform_spread(world, it.table);
         for (i = 0; i < it.count; i ++) {
             ecs_entity_t e = it.entities[i];
             AudioEmitterState *s = &es[i];
+            WorldTransform buf;
             if (s->serial != state->serial) {
                 s->serial = state->serial;
                 s->active = 0;
@@ -391,7 +393,8 @@ void box_audio_emitters_update(
                     continue;
                 }
 
-                box_audio_emitter_play(world, state, e, &em[i], s, wt ? &wt[i] : NULL,
+                box_audio_emitter_play(world, state, e, &em[i], s,
+                    spread ? box_transform_world(world, e, &buf) : wt ? &wt[i] : NULL,
                     out ? &out[i] : NULL, spatial ? &spatial[i] : NULL, count,
                     when ? when : 1);
             }

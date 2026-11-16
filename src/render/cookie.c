@@ -35,7 +35,8 @@ void box_render_cookie_resolve(
     const LightCookie *c = light && ecs_is_alive(world, light)
         ? ecs_get(world, light, LightCookie)
         : NULL;
-    const WorldTransform *transform = c ? ecs_get(world, light, WorldTransform) : NULL;
+    WorldTransform transform_buf;
+    const WorldTransform *transform = c ? box_transform_world(world, light, &transform_buf) : NULL;
     uint32_t handle = c && c->texture && c->size > 0 && c->strength != 0
         ? box_textures_handle(box_textures_get(world), c->texture)
         : 0;

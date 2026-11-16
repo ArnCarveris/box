@@ -66,8 +66,12 @@ int32_t box_perf_bounds(
     while (ecs_query_next(&it)) {
         const ShapeMesh *shape = ecs_field(&it, ShapeMesh, 0);
         const WorldTransform *wt = ecs_field(&it, WorldTransform, 1);
+        bool spread = box_transform_spread(world, it.table);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
+            WorldTransform buf;
+            const WorldTransform *t = spread ?
+                box_transform_world(world, it.entities[i], &buf) : &wt[i];
             const box_mesh_t *mesh = box_mesh_cache_get(cache, shape[i].mesh);
             vec3 a, b, lo, hi;
             if (!mesh || box_render_scene_field(&it, 2, i) != scene) {
@@ -80,7 +84,7 @@ int32_t box_perf_bounds(
                 ECS_CONST_CAST(float*, shape[i].scale), b);
             glm_vec3_minv(a, b, lo);
             glm_vec3_maxv(a, b, hi);
-            box_perf_grow(ECS_CONST_CAST(vec4*, wt[i].m), lo, hi, min, max);
+            box_perf_grow(ECS_CONST_CAST(vec4*, t->m), lo, hi, min, max);
             result ++;
         }
     }

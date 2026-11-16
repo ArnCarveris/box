@@ -119,23 +119,27 @@ state {
       else if n == "band_width" { state.background.band_width = v }
     } else if g == "nebula" {
       if n == "intensity" { state.background.intensity = v }
-      else if n == "frequency" { state.background.frequency = v }
-      else if n == "warp" { state.background.warp = v }
-      else if n == "cover" { state.background.cover = v }
+      else if n == "span" { state.background.span = v }
+      else if n == "nebula_yaw" { state.background.nebula_yaw = v }
+      else if n == "nebula_pitch" { state.background.nebula_pitch = v }
+      else if n == "filaments" { state.background.filaments = v }
+      else if n == "pillars" { state.background.pillars = v }
+      else if n == "dust" { state.background.dust = v }
+      else if n == "glow" { state.background.glow = v }
     } else if g == "orientation" {
       if n == "yaw" { state.background.yaw = v }
       else if n == "tilt" { state.background.tilt = v }
     }
   }
 
-  // Set channel c of the color n of the nebula to v
+  // Set channel c of the line color n of the nebula to v
   fn edit_nebula_color(n: string, c: string, v: f32) {
-    if n == "color_a" {
-      state.background.color_a = with_channel(state.background.color_a, c, v)
-    } else if n == "color_b" {
-      state.background.color_b = with_channel(state.background.color_b, c, v)
-    } else if n == "color_c" {
-      state.background.color_c = with_channel(state.background.color_c, c, v)
+    if n == "halpha" {
+      state.background.halpha = with_channel(state.background.halpha, c, v)
+    } else if n == "oiii" {
+      state.background.oiii = with_channel(state.background.oiii, c, v)
+    } else if n == "sii" {
+      state.background.sii = with_channel(state.background.sii, c, v)
     }
   }
 
@@ -242,6 +246,10 @@ async {
       if w.name() == "star_kind" {
         if picked != state.star_kind {
           star_load(picked)
+        }
+      } else if w.name() == "nebula_kind" {
+        if picked != state.background.nebula_kind {
+          state.background = nebula_preset(state.background, picked)
         }
       } else if picked != state.kind {
         preset(picked)

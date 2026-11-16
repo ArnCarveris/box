@@ -486,9 +486,12 @@ static void box_atmos_collect_planets(
                 l->seen = true;
                 l->scene = box_render_scene_field(&it, 2, i);
                 l->value = values[i];
-                if (transforms) {
-                    glm_vec3_copy(ECS_CONST_CAST(float*, transforms[i].m[3]), l->center);
-                    l->scale = box_transform_world_scale(&transforms[i]);
+                WorldTransform buf;
+                const WorldTransform *t = box_transform_world_field(
+                    world, &it, transforms, i, &buf);
+                if (t) {
+                    glm_vec3_copy(ECS_CONST_CAST(float*, t->m[3]), l->center);
+                    l->scale = box_transform_world_scale(t);
                 } else {
                     glm_vec3_zero(l->center);
                     l->scale = 1.0f;

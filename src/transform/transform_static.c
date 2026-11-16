@@ -109,6 +109,15 @@ static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
     transform_static_t *state = it->ctx;
+    ecs_id_t id = it->event_id;
+    if ((id == ecs_id(Position) && it->event == EcsOnSet) || id == ecs_id(Rotation) ||
+        id == ecs_id(Scale))
+    {
+        transformWorldCacheLocal(it);
+    } else {
+        transformWorldCacheInvalidate(it->world);
+    }
+
     transformStaticDirty(it, &state->value,
         !transformDeleting(it) && !box_transform_dynamic(it->world, it->table));
 }
@@ -126,6 +135,7 @@ static void Transform_OnDynamic(
 {
     transform_static_t *state = it->ctx;
     bool deleting = it->event == EcsOnRemove && transformDeleting(it);
+    transformWorldCacheInvalidate(it->world);
     if (it->event == EcsOnRemove) {
         transformDynamicUnspread(it, deleting);
         transformStaticDirty(it, &state->value,
@@ -161,6 +171,7 @@ static void Transform_OnRemovePosition(
     ecs_iter_t *it)
 {
     int count = transformDeleting(it) ? 0 : it->count;
+    transformWorldCacheInvalidate(it->world);
 
     for (int i = 0; i < count; i ++) {
         ecs_remove(it->stage, it->entities[i], WorldTransform);
@@ -319,9 +330,10 @@ static void transformRoot(
     }
 
     if (!skip) {
+        WorldTransform buf;
         ecs_entity_t parent = ecs_get_parent(world, e);
         const WorldTransform *t_parent = parent ?
-            transformGetParentWorldTransform(world, parent) : NULL;
+            transformGetParentWorldTransform(world, parent, &buf) : NULL;
         WorldTransform *t = ecs_get_mut(world, e, WorldTransform);
         const Position *p = ecs_get(world, e, Position);
         const Rotation *r = ecs_get(world, e, Rotation);

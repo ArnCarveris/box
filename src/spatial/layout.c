@@ -616,7 +616,8 @@ static bool basis_solve(
 
     const LayoutOutput *out = ecs_get(ctx->world, n->entity, LayoutOutput);
     if (ecs_has_id(ctx->world, n->entity, ManualTransform) && !(out && out->manual)) {
-        const WorldTransform *t = ecs_get(ctx->world, n->entity, WorldTransform);
+        WorldTransform t_buf;
+        const WorldTransform *t = box_transform_world(ctx->world, n->entity, &t_buf);
         if (t) {
             glm_mat4_copy(ECS_CONST_CAST(vec4 *, t->m), n->basis);
         }

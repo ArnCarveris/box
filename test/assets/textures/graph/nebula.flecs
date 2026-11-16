@@ -1,10 +1,17 @@
-// A nebula of a texture graph on the sphere domain, as a template, as the background of the
-// planet scene builds it: fbm gas at warped coordinates colored by a ramp, masked by a noise of a
-// larger scale into clouds and cut by dark lanes, plus a faint band along the equator. It is
-// static, and its parameters change the values of its nodes only.
+// The background graphs of the planet scene, as a template, as the SkyBackground of
+// etc/scenes/planet/stage.flecs builds them with the line colors of its emission nebula. They are
+// static, and their parameters change the values of their nodes only.
 //
-// cover is the fraction of the sky the clouds fill, band the brightness of the band and
-// band_width its width in degrees, size the width of the image.
+// neb is the faint gas of the whole sky: fbm gas at warped coordinates masked by a noise of a
+// larger scale into clouds and cut by dark lanes, plus a faint band along the equator. band is
+// the brightness of the band and band_width its width in degrees.
+//
+// hero is the nebula, a patch of the sphere span degrees wide: density smeared into filaments
+// along a curl field (Flow), lit by a star through it (Transmittance) with rims (Gradient of the
+// blurred clumps), emission lines, dust (Power), a core, a cluster (Cells) and the star. kind is
+// 0 for an emission nebula, 1 for a supernova remnant and 2 for a reflection nebula.
+//
+// size is the width of both images.
 
 using flecs.script
 using flecs.script.math
@@ -13,35 +20,118 @@ using box.texture
 nebula_graph {
   template Nebula {
     prop seed: i32 = 5
-    prop frequency: f32 = 2
-    prop warp: f32 = 0.7
-    prop cover: f32 = 0.45
+    prop kind: i32 = 0
+    prop span: f32 = 48
+    prop filaments: f32 = 0.6
+    prop pillars: f32 = 0.7
+    prop dust: f32 = 0.5
+    prop glow: f32 = 1
     prop band: f32 = 0.5
     prop band_width: f32 = 6
     prop size: i32 = 2048
 
-    const f: f32 = max(frequency, 0.05)
-    const th: f32 = 0.66 - clamp(cover, 0, 1) * 0.32
     const bw: f32 = sin(clamp(band_width, 0.5, 60) * 2.2 * PI / 180)
     const bk: f32 = clamp(band, 0, 1) * 0.16
 
+    // The line colors in linear light
+    const har: f32 = pow(235.0 / 255, 2.2)
+    const hag: f32 = pow(60.0 / 255, 2.2)
+    const hab: f32 = pow(70.0 / 255, 2.2)
+    const o3r: f32 = pow(60.0 / 255, 2.2)
+    const o3g: f32 = pow(200.0 / 255, 2.2)
+    const o3b: f32 = pow(190.0 / 255, 2.2)
+    const s2r: f32 = pow(150.0 / 255, 2.2)
+    const s2g: f32 = pow(20.0 / 255, 2.2)
+    const s2b: f32 = pow(40.0 / 255, 2.2)
+
+    // The patch: width and height in radians, s its size against the default 48 degrees, its
+    // longitude range centered on -pi / 2 and its latitude range centered on the equator
+    const pw: f32 = clamp(span, 16, 90) * PI / 180
+    const ph: f32 = pw * 0.625
+    const s: f32 = pw / (48 * PI / 180)
+    const l0: f32 = 0 - PI / 2 - pw / 2
+    const l1: f32 = pw / 2 - PI / 2
+    const tw: f32 = sin(pw / 2) / cos(pw / 2)
+    const sh: f32 = sin(ph / 2)
+
+    // The star, a little off the center of the patch, as a direction of the graph's coordinates
+    const sd: f32 = 0 - 0.05 * pw
+    const sl: f32 = 0.06 * ph
+    const sx: f32 = cos(sl) * cos(sd)
+    const sy: f32 = 0 - sin(sl)
+    const sz: f32 = cos(sl) * sin(sd)
+
+    // The weights of the kind: kr for a remnant, kf for a reflection nebula, ke for an emission
+    // nebula
+    const kr: f32 = kind == 1 ? 1 : 0
+    const kf: f32 = kind == 2 ? 1 : 0
+    const ke: f32 = 1 - kr - kf
+
+    // Falloffs 1 / (1 + q2 / a0^2) of the square q2 of the chord from the star, about the
+    // square of the angle: k = 1 / a0^2 for a falloff to half at a0. Wide for H-alpha (and the
+    // scattered light of a reflection nebula), mid for OIII and the rims, the core, the cluster,
+    // the star and its halo
+    const kwide: f32 = 1 / pow((0.16 * ke + 0.5 * kr + 0.09 * kf) * s, 2)
+    const kmid: f32 = 1 / pow((0.06 * ke + 0.5 * kr + 0.05 * kf) * s, 2)
+    const kcore: f32 = 1 / pow((0.01 - 0.003 * kf) * s, 2)
+    const kclu: f32 = 1 / pow(0.05 * s, 2)
+    const kstar: f32 = 1 / pow(0.0011, 2)
+    const khalo: f32 = 1 / pow(0.0045, 2)
+
+    // The shapes: weight of the ridges, the parameters, and the shell of a remnant: its radius
+    // rr, its half width rw in the units of q2 and its center beside the star, where the shell
+    // frames the body of the default view
+    const kw: f32 = 0.85 - 0.6 * kf
+    const fil: f32 = clamp(filaments, 0, 1)
+    const pil: f32 = clamp(pillars, 0, 1)
+    const dst: f32 = clamp(dust, 0, 1)
+    const g: f32 = max(glow, 0) * (1 - kr)
+    const rr: f32 = 0.16 * s
+    const rw: f32 = 2 * rr * 0.02 * s
+    const rd: f32 = sd - 0.15 * s
+    const rl: f32 = sl - 0.025 * s
+    const rx: f32 = cos(rl) * cos(rd)
+    const ry: f32 = 0 - sin(rl)
+    const rz: f32 = cos(rl) * sin(rd)
+
+    // The share of the field of the filaments along the direction from the star, the rest along
+    // the curl field: gas blown away from the star, or along the shell of a remnant
+    const kfl: f32 = 0.45 + 0.4 * kr
+
+    // The cavity around the star of an emission nebula: depth, from q2 cv0 to cv1
+    const kcv: f32 = 0.9 * ke
+    const cv0: f32 = pow(0.03 * s, 2)
+    const cv1: f32 = pow(0.09 * s, 2)
+
+    // The weights of the layers: H-alpha, OIII, the glow of the ionized gas in H-alpha and in
+    // OIII, the rims and the blue starlight scattered by the dust of a reflection nebula
+    const wha: f32 = 4 * (1 - 0.8 * kf)
+    const wo3: f32 = 4 * (1 - 0.85 * kf)
+    const wgh: f32 = 0.08 * ke + 0.04 * kf
+    const wgo: f32 = 0.5 * ke + 0.1 * kf
+    const wrim: f32 = 6 * ke + 0.8 * kr + 1.2 * kf
+    const wref: f32 = 5 * kf
+
     neb {
-      n_wn { nodes.Noise: {channels: 3, frequency: f * 0.7, octaves: 3, seed: seed * 16 + 1} }
-      n_wp { nodes.Warp: {offset: n_wn, amount_value: warp} }
+      // Gas: fbm at coordinates warped by a vector noise
+      n_wn { nodes.Noise: {channels: 3, frequency: 1.4, octaves: 3, seed: seed * 16 + 1} }
+      n_wp { nodes.Warp: {offset: n_wn, amount_value: 0.7} }
       n_gas {
-        nodes.Noise: {coords: n_wp, frequency: f, octaves: 6, gain: 0.58, seed: seed * 16 + 2}
+        nodes.Noise: {coords: n_wp, frequency: 2, octaves: 5, gain: 0.58, seed: seed * 16 + 2}
       }
       n_body {
         nodes.Smoothstep: {input: n_gas, edge0_value: {0.36, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}}
       }
-      n_big { nodes.Noise: {frequency: f * 0.45, octaves: 3, seed: seed * 16 + 3} }
+
+      // Clouds: where a noise of a larger scale is high
+      n_big { nodes.Noise: {frequency: 0.9, octaves: 3, seed: seed * 16 + 3} }
       n_cloud {
-        nodes.Smoothstep: {
-          input: n_big, edge0_value: {th - 0.1, 0, 0, 0}, edge1_value: {th + 0.14, 0, 0, 0}
-        }
+        nodes.Smoothstep: {input: n_big, edge0_value: {0.42, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}}
       }
+
+      // Dark lanes: where a finer noise at the same warped coordinates is low
       n_lane {
-        nodes.Noise: {coords: n_wp, frequency: f * 2.6, octaves: 4, gain: 0.6, seed: seed * 16 + 4}
+        nodes.Noise: {coords: n_wp, frequency: 5.2, octaves: 4, gain: 0.6, seed: seed * 16 + 4}
       }
       n_lit {
         nodes.Smoothstep: {input: n_lane, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}}
@@ -49,28 +139,27 @@ nebula_graph {
       n_dk {
         nodes.Remap: {input: n_lit, from_min: 0, from_max: 1, to_min: 0.06, to_max: 1}
       }
+
+      // Density and color: the line colors, mostly H-alpha, over a dusty blue
       n_d0 { nodes.Multiply: {a: n_body, b: n_cloud} }
       n_d { nodes.Multiply: {a: n_d0, b: n_dk} }
-      n_tone {
-        nodes.Remap: {
-          input: n_gas, from_min: 0.32, from_max: 0.78, to_min: 0, to_max: 1, clamp: true
-        }
-      }
       n_col {
-        nodes.Ramp: {input: n_tone, keys: [
-          {0, {26, 44, 110}}
-          {0.55, {98, 50, 132}}
-          {1, {206, 112, 118}}
-        ]}
+        nodes.Constant: {value: {
+          0.1 * har + 0.03 * o3r + 0.03, 0.1 * hag + 0.03 * o3g + 0.03,
+          0.1 * hab + 0.03 * o3b + 0.12, 1
+        }}
       }
-      n_neb { nodes.Multiply: {a: n_col, b: n_d} }
+      n_neb { nodes.Multiply: {a: n_d, b: n_col} }
+
+      // The band: unresolved stars within about the band width of the plane, patchy with the
+      // gas and cut by the lanes
       n_uv { nodes.Coords: {} }
       n_y { nodes.Split: {input: n_uv, channel: ChannelG} }
       n_ay { nodes.Abs: {input: n_y} }
       n_bm {
         nodes.Smoothstep: {input: n_ay, edge0_value: {bw, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
       }
-      n_bn { nodes.Noise: {coords: n_wp, frequency: f * 1.2, octaves: 4, seed: seed * 16 + 5} }
+      n_bn { nodes.Noise: {coords: n_wp, frequency: 2.4, octaves: 4, seed: seed * 16 + 5} }
       n_bv {
         nodes.Remap: {
           input: n_bn, from_min: 0.36, from_max: 0.66, to_min: 0, to_max: 1.4, clamp: true
@@ -78,10 +167,262 @@ nebula_graph {
       }
       n_b0 { nodes.Multiply: {a: n_bm, b: n_bv} }
       n_b1 { nodes.Multiply: {a: n_b0, b: n_dk} }
-      n_band { nodes.Multiply: {a: n_b1, b_value: {bk, bk * 0.86, bk * 0.7, 1}} }
+      n_bcol { nodes.Constant: {value: {bk, bk * 0.86, bk * 0.7, 1}} }
+      n_band { nodes.Multiply: {a: n_b1, b: n_bcol} }
+
       n_out { nodes.Add: {a: n_neb, b: n_band} }
       Graph: {
         output: n_out, width: size, height: size / 2, domain: DomainSphere, format: GraphHdr
+      }
+    }
+
+    hero {
+      // The frame of the patch: the oval r is 1 at the middle of its edges, jittered by a noise
+      // so the fade is not a regular oval, and 0 at its center; the fade reaches 0 before r does
+      h_c { nodes.Coords: {} }
+      h_x { nodes.Split: {input: h_c, channel: ChannelR} }
+      h_y { nodes.Split: {input: h_c, channel: ChannelG} }
+      h_z { nodes.Split: {input: h_c, channel: ChannelB} }
+      h_t { nodes.Divide: {a: h_z, b: h_x} }
+      h_e { nodes.Combine: {r: h_t, g: h_y, b_value: 0, a_value: 0} }
+      h_es { nodes.Multiply: {a: h_e, b_value: {1 / tw, 1 / sh, 0, 0}} }
+      h_r { nodes.Length: {input: h_es} }
+      h_rn { nodes.Noise: {frequency: 3 / s, octaves: 3, seed: seed * 32 + 1} }
+      h_rj {
+        nodes.Remap: {
+          input: h_rn, from_min: 0, from_max: 1, to_min: -0.12, to_max: 0.12, clamp: true
+        }
+      }
+      h_rr { nodes.Add: {a: h_r, b: h_rj} }
+      h_edge {
+        nodes.Smoothstep: {input: h_rr, edge0_value: {0.86, 0, 0, 0}, edge1_value: {0.35, 0, 0, 0}}
+      }
+
+      // The star: q2 the square of the chord from it, of coordinates of its own so the stage
+      // that computes q2 keeps their full precision (1 - cos of stored coordinates shows rings),
+      // the falloffs of q2 and the direction away from the star (c - s: the gradients it meets
+      // are tangent and a Flow projects its field on the tangent, so its part along c drops out)
+      h_sc { nodes.Coords: {} }
+      h_sv { nodes.Subtract: {a: h_sc, b_value: {sx, sy, sz, 0}} }
+      h_q2 { nodes.Dot: {a: h_sv, b: h_sv} }
+      h_nw0 { nodes.Remap: {input: h_q2, from_min: 0, from_max: 1, to_min: 1, to_max: 1 + kwide} }
+      h_nw { nodes.Divide: {a_value: {1, 0, 0, 0}, b: h_nw0} }
+      h_nm0 { nodes.Remap: {input: h_q2, from_min: 0, from_max: 1, to_min: 1, to_max: 1 + kmid} }
+      h_nm { nodes.Divide: {a_value: {1, 0, 0, 0}, b: h_nm0} }
+      h_nc0 { nodes.Remap: {input: h_q2, from_min: 0, from_max: 1, to_min: 1, to_max: 1 + kcore} }
+      h_nc { nodes.Divide: {a_value: {1, 0, 0, 0}, b: h_nc0} }
+      h_nk0 { nodes.Remap: {input: h_q2, from_min: 0, from_max: 1, to_min: 1, to_max: 1 + kclu} }
+      h_nk { nodes.Divide: {a_value: {1, 0, 0, 0}, b: h_nk0} }
+      h_ns0 {
+        nodes.Remap: {input: h_q2, from_min: 0, from_max: 1, to_min: 1, to_max: 1 + kstar}
+      }
+      h_ns { nodes.Divide: {a_value: {1, 0, 0, 0}, b: h_ns0} }
+      h_nh0 {
+        nodes.Remap: {input: h_q2, from_min: 0, from_max: 1, to_min: 1, to_max: 1 + khalo}
+      }
+      h_nh { nodes.Divide: {a_value: {0.15, 0, 0, 0}, b: h_nh0} }
+      h_tn { nodes.Normalize: {input: h_sv} }
+
+      // Gas: fbm and ridged noise at warped coordinates, in the clumps of a large scale noise
+      h_wn { nodes.Noise: {channels: 3, frequency: 4 / s, octaves: 3, seed: seed * 32 + 2} }
+      h_wp { nodes.Warp: {offset: h_wn, amount_value: 0.1 * s} }
+      h_gas {
+        nodes.Noise: {coords: h_wp, frequency: 12 / s, octaves: 7, gain: 0.58, seed: seed * 32 + 3}
+      }
+      h_body {
+        nodes.Smoothstep: {input: h_gas, edge0_value: {0.42, 0, 0, 0}, edge1_value: {0.64, 0, 0, 0}}
+      }
+      h_rdg {
+        nodes.Noise: {
+          coords: h_wp, frequency: 22 / s, octaves: 5, fractal: NoiseRidged, offset: 0.9,
+          seed: seed * 32 + 4
+        }
+      }
+      h_rs {
+        nodes.Smoothstep: {input: h_rdg, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}}
+      }
+      h_rdm {
+        nodes.Remap: {input: h_rs, from_min: 0, from_max: 1, to_min: 1 - kw, to_max: 1 + 0.8 * kw}
+      }
+      h_fn {
+        nodes.Noise: {coords: h_wp, frequency: 50 / s, octaves: 3, gain: 0.6, seed: seed * 32 + 10}
+      }
+      h_fm0 {
+        nodes.Remap: {
+          input: h_fn, from_min: 0.3, from_max: 0.7, to_min: 0.45, to_max: 1.3, clamp: true
+        }
+      }
+      h_cl0 { nodes.Multiply: {a: h_body, b: h_rdm} }
+      h_cl { nodes.Multiply: {a: h_cl0, b: h_fm0} }
+      h_big { nodes.Noise: {frequency: 2.5 / s, octaves: 3, seed: seed * 32 + 5} }
+      h_env {
+        nodes.Remap: {
+          input: h_big, from_min: 0.35, from_max: 0.65, to_min: 0.15, to_max: 1, clamp: true
+        }
+      }
+      h_cd0 { nodes.Multiply: {a: h_cl, b: h_env} }
+
+      // The cavity the star blew into the gas of an emission nebula: its walls face the star
+      h_cav0 {
+        nodes.Smoothstep: {input: h_q2, edge0_value: {cv0, 0, 0, 0}, edge1_value: {cv1, 0, 0, 0}}
+      }
+      h_cav { nodes.Remap: {input: h_cav0, from_min: 0, from_max: 1, to_min: 1 - kcv, to_max: 1} }
+      h_cd { nodes.Multiply: {a: h_cd0, b: h_cav} }
+
+      // A remnant: a thin shell rr from its center, wobbling with the warp, ridged
+      h_wv { nodes.Subtract: {a: h_wp, b_value: {rx, ry, rz, 0}} }
+      h_wq { nodes.Dot: {a: h_wv, b: h_wv} }
+      h_wo { nodes.Subtract: {a: h_wq, b_value: {rr * rr, 0, 0, 0}} }
+      h_wa { nodes.Abs: {input: h_wo} }
+      h_ring {
+        nodes.Smoothstep: {input: h_wa, edge0_value: {rw, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+      }
+      h_rd0 { nodes.Multiply: {a: h_ring, b: h_rdm} }
+      h_rd { nodes.Multiply: {a: h_rd0, b: h_fm0} }
+      h_d0 { nodes.Mix: {a: h_cd, b: h_rd, factor_value: {kr, kr, kr, 1}} }
+
+      // Filaments: the density, and the lanes of the dust in a finer noise, smeared together
+      // along a curl field of a noise bent away from the star, along the shell's tangent for a
+      // remnant. The curl keeps its length, so the field turns smoothly to the bend where the
+      // noise is flat, and the streaks fade out in the cavity, where the field from the star
+      // would split them into straight creases
+      h_cn0 { nodes.Noise: {frequency: 4 / s, octaves: 2, seed: seed * 32 + 8} }
+      h_gb { nodes.Gradient: {height: h_cn0, strength: 40} }
+      h_curl { nodes.Cross: {a: h_c, b: h_gb} }
+      h_tan { nodes.Cross: {a: h_c, b_value: {rx, ry, rz, 0}} }
+      h_tg { nodes.Normalize: {input: h_tan} }
+      h_alt { nodes.Mix: {a: h_tn, b: h_tg, factor_value: {kr, kr, kr, 1}} }
+      h_fld { nodes.Mix: {a: h_curl, b: h_alt, factor_value: {kfl, kfl, kfl, 1}} }
+      h_dn {
+        nodes.Noise: {coords: h_wp, frequency: 9 / s, octaves: 5, gain: 0.6, seed: seed * 32 + 7}
+      }
+      h_dm {
+        nodes.Smoothstep: {input: h_dn, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.72, 0, 0, 0}}
+      }
+      h_fv { nodes.Combine: {r: h_d0, g: h_dm, b_value: 0, a_value: 0} }
+      h_fil { nodes.Flow: {input: h_fv, field: h_fld, length: h_cav0, reach: fil * 4 * s} }
+      h_fd { nodes.Split: {input: h_fil, channel: ChannelR} }
+      h_den { nodes.Mix: {a: h_d0, b: h_fd, factor_value: {0.75, 0.75, 0.75, 1}} }
+
+      // Light of the star: the dense clumps shade what lies behind them, pillars and globules
+      // with dark tails pointing away from it, and are lit on their rims that face it
+      h_opq {
+        nodes.Smoothstep: {input: h_den, edge0_value: {0.25, 0, 0, 0}, edge1_value: {0.6, 0, 0, 0}}
+      }
+      h_opb { nodes.Blur: {input: h_opq, radius: 0.5} }
+      h_tr {
+        nodes.Transmittance: {
+          density: h_opb, light: {sx, sy, sz}, absorption: pil * 2.2, range: 10 * s, steps: 128
+        }
+      }
+      h_dd { nodes.Multiply: {a: h_den, b: h_den} }
+      h_lit { nodes.Multiply: {a: h_dd, b: h_tr} }
+      h_gd { nodes.Gradient: {height: h_opb, strength: 1} }
+      h_face { nodes.Dot: {a: h_gd, b: h_tn} }
+      h_fm {
+        nodes.Smoothstep: {input: h_face, edge0_value: {-0.2, 0, 0, 0}, edge1_value: {1.2, 0, 0, 0}}
+      }
+      h_rim0 { nodes.Multiply: {a: h_opq, b: h_tr} }
+      h_rim1 { nodes.Multiply: {a: h_rim0, b: h_fm} }
+      h_rim { nodes.Multiply: {a: h_rim1, b: h_nm} }
+
+      // The glow of the ionized gas around the star, hidden where the clumps lie in front of it
+      h_gn { nodes.Noise: {coords: h_wp, frequency: 5 / s, octaves: 4, seed: seed * 32 + 9} }
+      h_gv {
+        nodes.Remap: {
+          input: h_gn, from_min: 0.3, from_max: 0.7, to_min: 0.2, to_max: 1, clamp: true
+        }
+      }
+      h_occ { nodes.Remap: {input: h_opq, from_min: 0, from_max: 1, to_min: 1, to_max: 0.08} }
+      h_gl0 { nodes.Multiply: {a: h_gv, b: h_occ} }
+      h_glh { nodes.Multiply: {a: h_gl0, b_value: {wgh, 0, 0, 0}} }
+      h_gl1 { nodes.Multiply: {a: h_gl0, b: h_nm} }
+      h_glo { nodes.Multiply: {a: h_gl1, b_value: {wgo, 0, 0, 0}} }
+
+      // The lines: H-alpha wide, also in the shade, OIII of the lit gas near the star (on the
+      // outer side of the shell of a remnant), SII on the rims and the rims bright in H-alpha
+      // and OIII; a reflection nebula scatters the blue light of its star off its gas
+      h_trs { nodes.Remap: {input: h_tr, from_min: 0, from_max: 1, to_min: 0.2, to_max: 1} }
+      h_ha0 { nodes.Multiply: {a: h_dd, b: h_trs} }
+      h_ha1 { nodes.Add: {a: h_ha0, b: h_glh} }
+      h_out0 {
+        nodes.Smoothstep: {
+          input: h_wq, edge0_value: {rr * rr * 0.9, 0, 0, 0}, edge1_value: {rr * rr * 1.15, 0, 0, 0}
+        }
+      }
+      h_haw {
+        nodes.Remap: {input: h_out0, from_min: 0, from_max: 1, to_min: 1, to_max: 1 - 0.8 * kr}
+      }
+      h_ha2 { nodes.Multiply: {a: h_ha1, b: h_nw} }
+      h_ha { nodes.Multiply: {a: h_ha2, b: h_haw} }
+      h_o3w { nodes.Mix: {a: h_nm, b: h_out0, factor_value: {kr, kr, kr, 1}} }
+      h_o30 { nodes.Add: {a: h_lit, b: h_glo} }
+      h_o3 { nodes.Multiply: {a: h_o30, b: h_o3w} }
+      h_cha { nodes.Constant: {value: {wha * har, wha * hag, wha * hab, 1}} }
+      h_co3 { nodes.Constant: {value: {wo3 * o3r, wo3 * o3g, wo3 * o3b, 1}} }
+      h_cs2 { nodes.Constant: {value: {s2r * 0.6, s2g * 0.6, s2b * 0.6, 1}} }
+      h_crm {
+        nodes.Constant: {value: {
+          wrim * (0.6 * har + 0.5 * o3r + 0.15), wrim * (0.6 * hag + 0.5 * o3g + 0.15),
+          wrim * (0.6 * hab + 0.5 * o3b + 0.15), 1
+        }}
+      }
+      h_cref { nodes.Constant: {value: {wref * 0.22, wref * 0.42, wref, 1}} }
+      h_lha { nodes.Multiply: {a: h_ha, b: h_cha} }
+      h_lo3 { nodes.Multiply: {a: h_o3, b: h_co3} }
+      h_ls2 { nodes.Multiply: {a: h_rim0, b: h_cs2} }
+      h_lrm { nodes.Multiply: {a: h_rim, b: h_crm} }
+      h_rf0 { nodes.Multiply: {a: h_ha0, b: h_nw} }
+      h_lrf { nodes.Multiply: {a: h_rf0, b: h_cref} }
+      h_e0 { nodes.Add: {a: h_lha, b: h_lo3} }
+      h_e1 { nodes.Add: {a: h_e0, b: h_ls2} }
+      h_e2 { nodes.Add: {a: h_e1, b: h_lrm} }
+      h_e3 { nodes.Add: {a: h_e2, b: h_lrf} }
+
+      // The core: the gas closest to the star, bright in OIII and white
+      h_cdn { nodes.Remap: {input: h_den, from_min: 0, from_max: 1, to_min: 0.4, to_max: 1.4} }
+      h_core { nodes.Multiply: {a: h_nc, b: h_cdn} }
+      h_ccr {
+        nodes.Constant: {value: {
+          g * 1.2 * (0.6 * o3r + 0.5), g * 1.2 * (0.6 * o3g + 0.5), g * 1.2 * (0.6 * o3b + 0.5), 1
+        }}
+      }
+      h_lcr { nodes.Multiply: {a: h_core, b: h_ccr} }
+
+      // The cluster: small glows at the points of cells around the star, a few bright
+      h_cel { nodes.Cells: {count: 120000 / (s * s), jitter: 1, seed: seed * 32 + 6} }
+      h_cf { nodes.Split: {input: h_cel, channel: ChannelR} }
+      h_cid { nodes.Split: {input: h_cel, channel: ChannelG} }
+      h_cp {
+        nodes.Smoothstep: {input: h_cf, edge0_value: {0.12, 0, 0, 0}, edge1_value: {0, 0, 0, 0}}
+      }
+      h_cb { nodes.Power: {a: h_cid, b_value: {4, 0, 0, 0}} }
+      h_cq { nodes.Multiply: {a: h_cp, b: h_cb} }
+      h_cg { nodes.Multiply: {a: h_cq, b: h_nk} }
+      h_ccl { nodes.Constant: {value: {g * 6 * 0.8, g * 6 * 0.88, g * 6, 1}} }
+      h_lcl { nodes.Multiply: {a: h_cg, b: h_ccl} }
+
+      // Dust: the smeared lanes, dimming and reddening what is behind: exp(-tau k) per channel,
+      // the constant exp(-k) to the power tau
+      h_dl { nodes.Split: {input: h_fil, channel: ChannelG} }
+      h_tau { nodes.Multiply: {a: h_dl, b_value: {dst * 2.5, 0, 0, 0}} }
+      h_ext { nodes.Constant: {value: {exp(0 - 0.55), exp(0 - 0.8), exp(0 - 1.2), 1}} }
+      h_att { nodes.Power: {a: h_ext, b: h_tau} }
+
+      // The star and its halo in front of the dust
+      h_st { nodes.Add: {a: h_ns, b: h_nh} }
+      h_cst { nodes.Constant: {value: {g * 8 * 0.78, g * 8 * 0.86, g * 8, 1}} }
+      h_lst { nodes.Multiply: {a: h_st, b: h_cst} }
+
+      h_em0 { nodes.Add: {a: h_e3, b: h_lcr} }
+      h_em1 { nodes.Add: {a: h_em0, b: h_lcl} }
+      h_dim { nodes.Multiply: {a: h_em1, b: h_att} }
+      h_all { nodes.Add: {a: h_dim, b: h_lst} }
+      h_out { nodes.Multiply: {a: h_all, b: h_edge} }
+      Graph: {
+        output: h_out, width: size, height: size * 5 / 8, domain: DomainSphere, format: GraphHdr,
+        longitude_start: l0, longitude_end: l1, latitude_start: 0 - ph / 2,
+        latitude_end: ph / 2
       }
     }
   }

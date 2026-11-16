@@ -311,7 +311,8 @@ static void box_render_extract_view(
         goto done;
     }
 
-    const WorldTransform *transform = ecs_get(world, camera, WorldTransform);
+    WorldTransform transform_buf;
+    const WorldTransform *transform = box_transform_world(world, camera, &transform_buf);
     box_render_view_t *v = box_render_packet_view(p);
     v->view = e;
     v->order = view->order;

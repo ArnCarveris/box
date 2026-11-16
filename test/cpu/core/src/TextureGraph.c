@@ -2864,11 +2864,27 @@ void TextureGraph_nebula_script(void) {
     test_assert(g->rate == 0);
     test_assert(planet_node(world, g, ecs_id(TexTime)) < 0);
     test_assert(planet_node(world, g, ecs_id(TexWarp)) >= 0);
-    test_assert(planet_node(world, g, ecs_id(TexRamp)) >= 0);
+    test_assert(planet_node(world, g, ecs_id(TexConstant)) >= 0);
     test_assert(planet_node(world, g, ecs_id(TexSmoothstep)) >= 0);
     test_assert(planet_node(world, g, ecs_id(TexCoords)) >= 0);
     test_assert(planet_node(world, g, ecs_id(TexSplit)) >= 0);
     test_int(g->nodes[g->node_count - 1].kind, kind_id(world, ecs_id(TexAdd)));
+
+    const box_texture_graph_t *h = graph_of(world, planet_map(world, "sky.hero"));
+    test_int(h->domain, DomainSphere);
+    test_int(h->format, GraphHdr);
+    test_int(h->width, 64);
+    test_int(h->height, 40);
+    test_assert(h->rate == 0);
+    test_assert(planet_node(world, h, ecs_id(TexTime)) < 0);
+    test_assert(planet_node(world, h, ecs_id(TexFlow)) >= 0);
+    test_assert(planet_node(world, h, ecs_id(TexTransmittance)) >= 0);
+    test_assert(planet_node(world, h, ecs_id(TexGradient)) >= 0);
+    test_assert(planet_node(world, h, ecs_id(TexCross)) >= 0);
+    test_assert(planet_node(world, h, ecs_id(TexDot)) >= 0);
+    test_assert(planet_node(world, h, ecs_id(TexPower)) >= 0);
+    test_assert(planet_node(world, h, ecs_id(TexCells)) >= 0);
+    test_int(h->nodes[h->node_count - 1].kind, kind_id(world, ecs_id(TexMultiply)));
 
     ecs_fini(world);
 }
@@ -2877,10 +2893,18 @@ void TextureGraph_nebula_props_keep_structure(void) {
     // materials/textures
     ecs_world_t *world = world_new();
     nebula_load(world);
-    const box_texture_graph_t *g = graph_of(world, planet_map(world, "sky.neb"));
-    uint64_t structure = g->structure_hash, params = g->param_hash;
+    const char *paths[] = {"sky.neb", "sky.hero"};
+    uint64_t structure[2], params[2];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        const box_texture_graph_t *g = graph_of(world, planet_map(world, paths[i]));
+        structure[i] = g->structure_hash;
+        params[i] = g->param_hash;
+    }
+
     ecs_entity_t gas = ecs_lookup(world, "sky.neb.n_gas");
-    test_assert(gas != 0);
+    ecs_entity_t flow = ecs_lookup(world, "sky.hero.h_fil");
+    test_assert(gas != 0 && flow != 0);
 
     ecs_entity_t sky = ecs_lookup(world, "sky");
     ecs_entity_t tmpl = ecs_lookup(world, "nebula_graph.Nebula");
@@ -2893,12 +2917,18 @@ void TextureGraph_nebula_props_keep_structure(void) {
     test_int(ecs_meta_push(&cur), 0);
     test_int(ecs_meta_member(&cur, "seed"), 0);
     test_int(ecs_meta_set_int(&cur, 12), 0);
-    test_int(ecs_meta_member(&cur, "frequency"), 0);
-    test_int(ecs_meta_set_float(&cur, 2.2), 0);
-    test_int(ecs_meta_member(&cur, "warp"), 0);
-    test_int(ecs_meta_set_float(&cur, 1.1), 0);
-    test_int(ecs_meta_member(&cur, "cover"), 0);
+    test_int(ecs_meta_member(&cur, "kind"), 0);
+    test_int(ecs_meta_set_int(&cur, 1), 0);
+    test_int(ecs_meta_member(&cur, "span"), 0);
+    test_int(ecs_meta_set_float(&cur, 36), 0);
+    test_int(ecs_meta_member(&cur, "filaments"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.9), 0);
+    test_int(ecs_meta_member(&cur, "pillars"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.2), 0);
+    test_int(ecs_meta_member(&cur, "dust"), 0);
     test_int(ecs_meta_set_float(&cur, 0.8), 0);
+    test_int(ecs_meta_member(&cur, "glow"), 0);
+    test_int(ecs_meta_set_float(&cur, 2), 0);
     test_int(ecs_meta_member(&cur, "band"), 0);
     test_int(ecs_meta_set_float(&cur, 0.1), 0);
     test_int(ecs_meta_member(&cur, "band_width"), 0);
@@ -2909,11 +2939,39 @@ void TextureGraph_nebula_props_keep_structure(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    g = graph_of(world, planet_map(world, "sky.neb"));
-    test_assert(g->structure_hash == structure);
-    test_assert(g->param_hash != params);
+    for (i = 0; i < 2; i ++) {
+        const box_texture_graph_t *g = graph_of(world, planet_map(world, paths[i]));
+        test_assert(g->structure_hash == structure[i]);
+        test_assert(g->param_hash != params[i]);
+    }
+
     test_assert(ecs_is_alive(world, gas));
     test_assert(ecs_lookup(world, "sky.neb.n_gas") == gas);
+    test_assert(ecs_is_alive(world, flow));
+    test_assert(ecs_lookup(world, "sky.hero.h_fil") == flow);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_nebula_hero_region(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    nebula_load(world);
+
+    /* The hero patch of the default span of 48 degrees is centered on longitude -pi / 2 and
+     * the equator, 30 degrees high, while the faint gas covers the whole sphere */
+    const float pw = 48.0f * (float)GLM_PI / 180.0f, ph = pw * 0.625f;
+    const box_texture_graph_t *h = graph_of(world, planet_map(world, "sky.hero"));
+    test_flt(h->region[0], -0.5f * (float)GLM_PI - 0.5f * pw);
+    test_flt(h->region[1], -0.5f * (float)GLM_PI + 0.5f * pw);
+    test_flt(h->region[2], -0.5f * ph);
+    test_flt(h->region[3], 0.5f * ph);
+
+    const box_texture_graph_t *g = graph_of(world, planet_map(world, "sky.neb"));
+    test_flt(g->region[0], 0);
+    test_flt(g->region[1], 2.0f * (float)GLM_PI);
+    test_flt(g->region[2], -0.5f * (float)GLM_PI);
+    test_flt(g->region[3], 0.5f * (float)GLM_PI);
 
     ecs_fini(world);
 }
@@ -2991,4 +3049,137 @@ void TextureGraph_script_member_default(void) {
     test_flt(ecs_get(world, gradient, TexGradient)->strength, 1);
 
     ecs_fini(world);
+}
+
+void TextureGraph_region_members_reflect(void) {
+    // materials/textures
+    ecs_world_t *world = world_new();
+    TextureGraph graph = {0};
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, ecs_id(TextureGraph), &graph);
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, "longitude_start"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.25), 0);
+    test_int(ecs_meta_member(&cur, "longitude_end"), 0);
+    test_int(ecs_meta_set_float(&cur, 1.0), 0);
+    test_int(ecs_meta_member(&cur, "latitude_start"), 0);
+    test_int(ecs_meta_set_float(&cur, -0.5), 0);
+    test_int(ecs_meta_member(&cur, "latitude_end"), 0);
+    test_int(ecs_meta_set_float(&cur, 0.75), 0);
+    test_int(ecs_meta_pop(&cur), 0);
+    test_flt(graph.longitude_start, 0.25f);
+    test_flt(graph.longitude_end, 1.0f);
+    test_flt(graph.latitude_start, -0.5f);
+    test_flt(graph.latitude_end, 0.75f);
+
+    char *json = ecs_ptr_to_json(world, ecs_id(TextureGraph), &graph);
+    test_assert(json != NULL);
+    test_assert(strstr(json, "\"longitude_start\"") != NULL);
+    test_assert(strstr(json, "\"latitude_end\"") != NULL);
+    ecs_os_free(json);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_region_default_whole_sphere(void) {
+    // materials/textures
+    const float pi = (float)GLM_PI;
+    ecs_world_t *world = world_new();
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
+    test_int(frame_status(world, tex)->revision, 1);
+    const box_texture_graph_t *g = graph_of(world, tex);
+    test_flt(g->region[0], 0);
+    test_flt(g->region[1], 0);
+    test_flt(g->region[2], 0);
+    test_flt(g->region[3], 0);
+
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16, .domain = DomainSphere });
+    test_int(frame_status(world, tex)->revision, 2);
+    g = graph_of(world, tex);
+    test_flt(g->region[0], 0);
+    test_flt(g->region[1], 2 * pi);
+    test_flt(g->region[2], -pi / 2);
+    test_flt(g->region[3], pi / 2);
+
+    /* The full range spelled out is the default */
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16, .domain = DomainSphere,
+        .longitude_start = 0, .longitude_end = 2 * pi,
+        .latitude_start = -pi / 2, .latitude_end = pi / 2 });
+    test_int(frame_status(world, tex)->revision, 2);
+
+    /* Equal ranges anywhere are the whole of them */
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16, .domain = DomainSphere,
+        .longitude_start = 1, .longitude_end = 1,
+        .latitude_start = 0.5f, .latitude_end = 0.5f });
+    test_int(frame_status(world, tex)->revision, 2);
+
+    /* A longitude range is at most a turn, the latitudes stop at the poles */
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16, .domain = DomainSphere,
+        .longitude_start = 1, .longitude_end = 10,
+        .latitude_start = -3, .latitude_end = 0.25f });
+    test_int(frame_status(world, tex)->revision, 3);
+    g = graph_of(world, tex);
+    test_flt(g->region[0], 1);
+    test_flt(g->region[1], 1 + 2 * pi);
+    test_flt(g->region[2], -pi / 2);
+    test_flt(g->region[3], 0.25f);
+
+    ecs_fini(world);
+}
+
+void TextureGraph_region_edit_keeps_structure(void) {
+    // materials/textures
+    box_render_null_t *null = NULL;
+    ecs_world_t *world = world_null(&null);
+    ecs_entity_t tex, uv, constant, math;
+    make_graph(world, &tex, &uv, &constant, &math);
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16, .domain = DomainSphere });
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    uint64_t structure = graph_of(world, tex)->structure_hash;
+    uint64_t params = graph_of(world, tex)->param_hash;
+    uint32_t serial = entry_of(world, tex)->graph_serial;
+
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16, .domain = DomainSphere,
+        .longitude_start = 0.5f, .longitude_end = 1.5f,
+        .latitude_start = -0.25f, .latitude_end = 0.5f });
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    const box_texture_graph_t *g = graph_of(world, tex);
+    test_assert(g->structure_hash == structure);
+    test_assert(g->param_hash == params);
+    test_assert(entry_of(world, tex)->graph_serial != serial);
+    test_flt(g->region[0], 0.5f);
+    test_flt(g->region[1], 1.5f);
+    test_flt(g->region[2], -0.25f);
+    test_flt(g->region[3], 0.5f);
+
+    const box_render_texture_graph_t *desc = box_render_null_texture_graph(null,
+        entry_of(world, tex)->handle);
+    test_assert(desc != NULL);
+    test_assert(desc->structure_hash == structure);
+    test_flt(desc->region[0], 0.5f);
+    test_flt(desc->region[1], 1.5f);
+    test_flt(desc->region[2], -0.25f);
+    test_flt(desc->region[3], 0.5f);
+
+    /* On the plane the ranges are ignored */
+    ecs_set(world, tex, TextureGraph, { .output = math, .width = 32, .height = 16 });
+    ecs_progress(world, 0);
+    serial = entry_of(world, tex)->graph_serial;
+    ecs_set(world, tex, TextureGraph, {
+        .output = math, .width = 32, .height = 16,
+        .longitude_start = 0.5f, .longitude_end = 1.5f });
+    ecs_progress(world, 0);
+    test_int(entry_of(world, tex)->graph_serial, serial);
+    test_flt(graph_of(world, tex)->region[1], 0);
+
+    ecs_fini(world);
+    box_render_null_free(null);
 }

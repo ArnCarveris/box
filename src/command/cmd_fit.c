@@ -173,7 +173,8 @@ static void box_cmd_fit_place(
     const vec3 eye)
 {
     ecs_entity_t parent = ecs_get_parent(world, camera);
-    const WorldTransform *pt = parent ? ecs_get(world, parent, WorldTransform) : NULL;
+    WorldTransform pt_buf;
+    const WorldTransform *pt = parent ? box_transform_world(world, parent, &pt_buf) : NULL;
     vec3 local;
     glm_vec3_copy((float*)eye, local);
     if (pt) {
@@ -239,7 +240,8 @@ static void box_cmd_fit(
     float lo_z = FLT_MAX, hi_z = -FLT_MAX;
     float left = -FLT_MAX, right_ = FLT_MAX, bottom = -FLT_MAX, top = FLT_MAX;
     glm_vec3_center(content.min, content.max, center);
-    box_cmd_fit_axes(ecs_get(world, camera, WorldTransform), right, up, forward);
+    WorldTransform camera_buf;
+    box_cmd_fit_axes(box_transform_world(world, camera, &camera_buf), right, up, forward);
 
     for (i = 0; i < 8; i ++) {
         vec3 *corner = ecs_vec_append_t(NULL, &content.corners, vec3);

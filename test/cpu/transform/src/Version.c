@@ -127,6 +127,7 @@ void Version_static_dirty_entity_w_current_version_skipped(void) {
 }
 
 void Version_dynamic_version_not_written(void) {
+    WorldTransform buf;
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxTransform);
 
@@ -140,7 +141,7 @@ void Version_dynamic_version_not_written(void) {
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 3);
+    test_flt(box_transform_world(world, child, &buf)->m[3][0], 3);
     test_uint(ecs_get(world, parent, WorldTransformVersion)->version, 0);
     test_uint(ecs_get(world, child, WorldTransformVersion)->version, 0);
 

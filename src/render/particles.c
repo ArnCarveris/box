@@ -1554,7 +1554,9 @@ static void BoxRenderExtractParticles(
         bool timelines_shared = timelines && !ecs_field_is_self(&qit, 9);
         bool motions_shared = motions && !ecs_field_is_self(&qit, 10);
         for (i = 0; i < qit.count; i ++) {
-            const WorldTransform *t = &transforms[shared ? 0 : i];
+            WorldTransform buf;
+            const WorldTransform *t = shared ? &transforms[0] :
+                box_transform_world_field(world, &qit, transforms, i, &buf);
             box_particles_light_t light = {
                 .light = lights ? &lights[lights_shared ? 0 : i] : NULL,
                 .point = points ? &points[i] : NULL,

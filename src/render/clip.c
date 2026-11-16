@@ -139,7 +139,8 @@ static void box_draws_clip_record(
     int32_t parent,
     box_render_clip_t *out)
 {
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     mat4 m, inv;
     vec3 normal;
     int32_t k;
@@ -286,7 +287,8 @@ static bool box_draws_clip_hides(
     bool scroll,
     int32_t nest)
 {
-    const WorldTransform *t = ecs_get(world, e, WorldTransform);
+    WorldTransform t_buf;
+    const WorldTransform *t = box_transform_world(world, e, &t_buf);
     box_render_clip_t clip;
     vec3 corners[4];
     float half[2], center[2];
