@@ -760,20 +760,107 @@ void box_draws_frame_scaled(
     }
 }
 
-void box_draws_frame_of_shape(
+void box_draws_frame_src(
     const ecs_world_t *world,
     ecs_entity_t e,
+    box_draw_frame_src_t *out)
+{
+    const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
+    out->frame = box_render_texture_frame(world, e);
+    out->mode = mapping ? (uint8_t)mapping->mode : (uint8_t)MappingUv;
+    out->live = false;
+}
+
+const box_draw_frame_pose_t* box_draws_frame_pose(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t frame)
+{
+    ecs_map_val_t *v = ecs_map_get(&d->frame_poses, frame);
+    box_draw_frame_pose_t *result;
+    mat3 axes;
+    if (v) {
+        result = ecs_vec_get_t(&d->frame_cache, box_draw_frame_pose_t, (int32_t)*v - 1);
+    } else {
+        result = ecs_vec_append_t(NULL, &d->frame_cache, box_draw_frame_pose_t);
+        ecs_os_memset_t(result, 0, box_draw_frame_pose_t);
+        result->frame = frame;
+        result->tick = d->tick - 1;
+        ecs_map_insert(&d->frame_poses, frame, (ecs_map_val_t)ecs_vec_count(&d->frame_cache));
+    }
+
+    if (result->tick == d->tick) {
+        goto done;
+    }
+
+    result->tick = d->tick;
+    result->valid = false;
+    result->scale = 1.0f;
+    const WorldTransform *t = ecs_is_alive(world, frame)
+        ? ecs_get(world, frame, WorldTransform) : NULL;
+    if (!t) {
+        goto done;
+    }
+
+    result->scale = box_transform_world_scale(t);
+    glm_mat4_pick3(ECS_CONST_CAST(vec4*, t->m), axes);
+    if (fabsf(glm_mat3_det(axes)) > 1e-30f) {
+        glm_mat4_inv(ECS_CONST_CAST(vec4*, t->m), result->inv);
+        result->valid = true;
+    }
+
+done:
+    return result;
+}
+
+void box_draws_frame_record(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_draw_frame_src_t *src,
     box_render_transform_t *out,
     const box_render_transform_t *model)
 {
-    ecs_entity_t frame = box_render_texture_frame(world, e);
-    const WorldTransform *transform = frame ? ecs_get(world, frame, WorldTransform) : NULL;
-    const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
-    if (mapping && mapping->mode == MappingObject) {
-        box_draws_frame_scaled(out, model, transform);
-    } else {
-        box_draws_frame(out, model, transform);
+    const box_draw_frame_pose_t *pose = src->frame
+        ? box_draws_frame_pose(world, d, src->frame) : NULL;
+    int32_t r, c, k;
+    if (src->mode == MappingObject) {
+        float scale = pose ? pose->scale : 1.0f;
+        float inv = scale > 1e-20f ? 1.0f / scale : 1.0f;
+        *out = *model;
+        for (r = 0; r < 3; r ++) {
+            for (c = 0; c < 3; c ++) {
+                out->rows[r][c] *= inv;
+            }
+        }
+
+        goto done;
     }
+
+    if (!pose || !pose->valid) {
+        *out = *model;
+        goto done;
+    }
+
+    for (k = 0; k < 3; k ++) {
+        for (c = 0; c < 4; c ++) {
+            float sum = c == 3 ? pose->inv[3][k] : 0.0f;
+            for (r = 0; r < 3; r ++) {
+                sum += pose->inv[r][k] * model->rows[r][c];
+            }
+
+            out->rows[k][c] = sum;
+        }
+    }
+
+done:
+    return;
+}
+
+box_draw_frame_src_t* box_draws_slot_frame_src(
+    box_draw_batch_t *b,
+    int32_t slot)
+{
+    return b->key.frame ? ecs_vec_get_t(&b->frame_srcs, box_draw_frame_src_t, slot) : NULL;
 }
 
 void box_draws_surface(

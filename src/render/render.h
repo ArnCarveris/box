@@ -1910,6 +1910,14 @@ void* box_render_packet_upload(
 box_render_scatter_t* box_render_packet_scatter(
     box_render_packet_t *p);
 
+/** Append a placement of a mover page to a packet.
+ *
+ * @param p The packet
+ * @return The zeroed placement
+ */
+box_render_compose_t* box_render_packet_compose(
+    box_render_packet_t *p);
+
 /** Append a GPU copy between buffers to a packet.
  *
  * @param p The packet

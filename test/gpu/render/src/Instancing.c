@@ -972,3 +972,65 @@ void Instancing_dynamic_hierarchy_deleted(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Instancing_mover_children_follow(void) {
+    // renderer/instancing
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 2, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 40, .height = 8,
+        .write_to_file = "mover_follow.png", .resolution_scale = 1});
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, Position, {-3, 0, 0});
+    ecs_add(world, root, DynamicTransform);
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {0, 0, 0});
+    ecs_set(world, child, Box, {0.8f, 0.8f, 0.8f});
+    ecs_set(world, child, Rgb, {0, 0, 0});
+    ecs_set(world, child, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, child, Emissive, {.strength = 1, .color = {255, 0, 0}});
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    char *path = flecs_asprintf("%s/mover_follow.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(4 * 40 + 8) * 4] > 200);
+    test_assert(px[(4 * 40 + 32) * 4] < 40);
+    stbi_image_free(px);
+
+    ecs_set(world, root, Position, {3, 0, 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(4 * 40 + 8) * 4] < 40);
+    test_assert(px[(4 * 40 + 32) * 4] > 200);
+    stbi_image_free(px);
+
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(4 * 40 + 32) * 4] < 40);
+    test_assert(px[(4 * 40 + 36) * 4] > 200);
+    stbi_image_free(px);
+
+    ecs_os_free(path);
+    ecs_fini(world);
+}

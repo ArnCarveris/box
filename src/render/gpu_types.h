@@ -277,6 +277,9 @@ typedef struct box_gpu_buffer_t {
                                      *   surface assets of a mesh that has them, made on use */
     int64_t counted;                /**< History ranges pass that last counted its words */
     uint64_t version;               /**< Write that last changed it, unique across buffers */
+    WGPUBuffer composed;            /**< World records the compose pass writes from a transform
+                                     *   or frame stream of a mover page, which the passes bind in
+                                     *   place of the stream; NULL for any other buffer */
 } box_gpu_buffer_t;
 
 /** How box_gpu_copy runs a copy of a packet */
@@ -1076,6 +1079,12 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
     WGPUComputePipeline scatter;    /**< Scatter pipeline, NULL until the shader exists */
     int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
+    WGPUBindGroupLayout compose_layout; /**< Bind group layout of the compose pass */
+    WGPUPipelineLayout compose_pipeline_layout; /**< Pipeline layout of the compose pass */
+    WGPUComputePipeline compose;    /**< Compose pipeline, NULL until the shader exists */
+    int32_t compose_revision;       /**< Revision of the shader the pipeline was made with */
+    WGPUBuffer compose_sink;        /**< One writable record, the frame output of the compose of
+                                     *   a mover page without the frame stream */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_vec_t mesh_pages;           /**< box_gpu_mesh_page_t, the pages of the mesh pool */
     uint64_t mesh_ids;              /**< Last id given to a mesh */

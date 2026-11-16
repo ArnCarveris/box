@@ -1473,8 +1473,7 @@ static void box_transition_send_mesh(
     box_transition_send_material(s, p, BOX_RENDER_TRANSITION_SHADING, &target, offset);
     box_draw_batch_t *b = box_draws_batch(d, ds->batch);
     if (d->shadow_record && b->key.cutout && box_draws_caster(b)) {
-        box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, ds->slot),
-            box_draws_slot_surface(b, ds->slot));
+        box_draws_shadow_slot(world, d, b, ds->slot);
     }
 done:
     return;

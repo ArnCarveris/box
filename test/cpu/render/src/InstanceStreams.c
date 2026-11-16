@@ -1142,3 +1142,65 @@ void InstanceStreams_glyph_packed_color(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void InstanceStreams_mover_children_upload_mover(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_add(world, parent, DynamicTransform);
+    int32_t i;
+    for (i = 0; i < COUNT; i ++) {
+        box_new(world, parent, (float)i);
+    }
+
+    frame(world);
+    box_render_draws_stats_t stats = frame(world);
+    test_int(stats.dynamic, COUNT);
+    test_int(stats.transform_bytes, 0);
+    test_int(stats.shading_bytes, 0);
+    test_assert(ecs_vec_count(&null->last.composes) > 0);
+
+    for (i = 0; i < 3; i ++) {
+        ecs_set(world, parent, Position, {(float)i + 1, 0, 0});
+        stats = frame(world);
+        test_int(stats.dynamic, COUNT);
+        test_int(stats.transform_bytes, 2 * TRANSFORM);
+        test_int(stats.shading_bytes, 0);
+        test_int(stats.scatters, 0);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void InstanceStreams_mover_child_local_change(void) {
+    // renderer/draws
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {10, 0, 0});
+    ecs_add(world, parent, DynamicTransform);
+    ecs_entity_t child = box_new(world, parent, 3);
+    vec4 rows[3];
+
+    frame(world);
+    frame(world);
+    test_bool(box_render_draws_instance_transform(world, child, rows), true);
+    test_flt(rows[0][3], 3);
+
+    ecs_set(world, parent, Position, {-4, 0, 0});
+    frame(world);
+    test_bool(box_render_draws_instance_transform(world, child, rows), true);
+    test_flt(rows[0][3], 3);
+
+    ecs_set(world, child, Position, {5, 0, 0});
+    box_render_draws_stats_t stats = frame(world);
+    test_assert(stats.transform_bytes > 0);
+    test_bool(box_render_draws_instance_transform(world, child, rows), true);
+    test_flt(rows[0][3], 5);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

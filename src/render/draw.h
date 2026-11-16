@@ -65,8 +65,23 @@
  * MappingFrame: every stream, from BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE */
 #define BOX_DRAWS_STORE_FRAME_SURFACE (4)
 
+/** Store of the instance pages of the plain mesh batches whose shapes move with a mover: the
+ * transform stream relative to the mover, the shading and the mover stream, from
+ * BOX_RENDER_BUFFER_FIRST_MOVER */
+#define BOX_DRAWS_STORE_MOVER (5)
+
+/** Store of the mover pages of the mesh batches with a parametric surface */
+#define BOX_DRAWS_STORE_MOVER_SURFACE (6)
+
+/** Store of the mover pages of the mesh batches whose material uses MappingFrame */
+#define BOX_DRAWS_STORE_MOVER_FRAME (7)
+
+/** Store of the mover pages of the mesh batches with a parametric surface whose material uses
+ * MappingFrame */
+#define BOX_DRAWS_STORE_MOVER_FRAME_SURFACE (8)
+
 /** Stores of instance pages, one per page layout */
-#define BOX_DRAWS_STORES (5)
+#define BOX_DRAWS_STORES (9)
 
 /** Streams of an instance that a change writes, a bit per stream of the instance pages */
 typedef enum box_draw_kind_t {
@@ -75,8 +90,12 @@ typedef enum box_draw_kind_t {
     BOX_DRAW_SURFACE = 1 << BOX_RENDER_STREAM_SURFACE,     /**< The surface stream */
     BOX_DRAW_FRAME = 1 << BOX_RENDER_STREAM_FRAME,         /**< The frame stream, which a change
                                                             *   of the transform writes too */
+    BOX_DRAW_MOVER = 1 << BOX_RENDER_STREAM_MOVER,         /**< The mover stream, which a change
+                                                            *   of the transform or the frame
+                                                            *   writes too */
     BOX_DRAW_BOTH = BOX_DRAW_TRANSFORM | BOX_DRAW_SHADING, /**< Transform and shading */
-    BOX_DRAW_ALL = BOX_DRAW_BOTH | BOX_DRAW_SURFACE | BOX_DRAW_FRAME, /**< Every stream */
+    BOX_DRAW_ALL = BOX_DRAW_BOTH | BOX_DRAW_SURFACE | BOX_DRAW_FRAME, /**< Every stream, with the
+                                                            *   mover stream they imply */
     BOX_DRAW_FADE = 1 << 6, /**< To box_draws_mark: an ancestor Opacity or Tint changed, which
                              *   may change only the blend of the key; in DrawSlot.changed: the
                              *   walk computed fade and tint for this extract */
@@ -181,6 +200,12 @@ typedef struct box_draw_key_t {
                              *   transforms upload every frame */
     bool dynamic_material;  /**< The shapes or a ChildOf ancestor have DynamicMaterial, so the
                              *   shading uploads every frame */
+    bool mover;             /**< 3D shapes that inherit DynamicTransform through
+                             *   DynamicTransformSpread, moved by an ancestor that owns it, and
+                             *   that no transform transition moves: their transforms are
+                             *   relative to that mover and upload when they change, and the
+                             *   compose pass places them with the mover every frame. Their
+                             *   pages are of a mover store and dynamic_transform is false */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
     bool fixture;           /**< The shapes or a ChildOf ancestor have LightFixture: they cast
                              *   no shadow into the tile of a light inside their world bounds.
@@ -414,6 +439,43 @@ typedef struct box_draw_parent_t {
     int32_t count;          /**< Children it had */
 } box_draw_parent_t;
 
+/** Texture frame of the frame record of a slot of a frame batch */
+typedef struct box_draw_frame_src_t {
+    ecs_entity_t frame;     /**< Nearest TextureFrame at or above the shape, 0 for none */
+    uint8_t mode;           /**< TextureMappingMode of the shape */
+    bool live;              /**< The record of a slot of a mover batch is written every frame: a
+                             *   MappingFrame shape whose frame does not move with its mover */
+} box_draw_frame_src_t;
+
+/** Bounds of the slots of a mover batch that move with one mover, in the frame of the mover */
+typedef struct box_draw_group_t {
+    uint32_t mover;         /**< Index of the mover */
+    float min[3];           /**< Minimum corner of the boxes of the slots */
+    float max[3];           /**< Maximum corner of the boxes of the slots */
+    float extent[3];        /**< Largest half size of the box of a slot on each axis */
+} box_draw_group_t;
+
+/** A mover: an entity that owns DynamicTransform, which places the shapes of the mover batches
+ * that move with it */
+typedef struct box_draw_mover_t {
+    ecs_entity_t entity;    /**< The mover, 0 for a free index */
+    int32_t refs;           /**< Slots that move with it */
+    int32_t next;           /**< Next free index, while free */
+    box_render_transform_t pose; /**< Its world transform when the movers were last placed */
+    box_render_transform_t was; /**< Its world transform before that */
+    float scale;            /**< Its uniform world scale when its slots were last written */
+    bool moved;             /**< pose differs from was */
+} box_draw_mover_t;
+
+/** The world transform of a texture frame and its inverse, computed once per extract */
+typedef struct box_draw_frame_pose_t {
+    ecs_entity_t frame;     /**< The texture frame */
+    int64_t tick;           /**< Extract it was computed in */
+    bool valid;             /**< The frame has a world transform that inverts */
+    mat4 inv;               /**< Inverse of its world transform */
+    float scale;            /**< Its uniform world scale */
+} box_draw_frame_pose_t;
+
 /** A batch: the entities of its slots, their instance data and what the GPU still needs */
 typedef struct box_draw_batch_t {
     box_draw_key_t key;     /**< Key of the batch */
@@ -470,6 +532,16 @@ typedef struct box_draw_batch_t {
     ecs_vec_t frames;       /**< box_render_transform_t per slot of a frame batch, its transform
                              *   relative to its texture frame (box_draws_frame_of_shape), empty
                              *   for any other batch */
+    ecs_vec_t frame_srcs;   /**< box_draw_frame_src_t per slot of a frame batch, the texture frame
+                             *   its frame record was written from */
+    int32_t live_frames;    /**< Slots of a mover frame batch whose frame record is written every
+                             *   frame (box_draw_frame_src_t.live) */
+    ecs_vec_t movers;       /**< uint32_t per slot of a mover batch, its record of the mover
+                             *   stream; its transform in transforms is relative to the mover */
+    ecs_vec_t groups;       /**< box_draw_group_t, the bounds of the slots of a mover batch in
+                             *   the frame of each of its movers */
+    bool groups_dirty;      /**< A slot, its transform or its surface changed since the groups
+                             *   were made */
     ecs_vec_t changed[BOX_DRAWS_STREAMS]; /**< int32_t per stream, slots whose data of a stream
                              *   that does not upload every frame the GPU does not have */
 } box_draw_batch_t;
@@ -676,6 +748,15 @@ typedef struct box_render_draws_t {
     ecs_vec_t planets;          /**< ecs_entity_t by planet light slot minus one: the entities
                                  *   with a PlanetAtmosphere whose meshes took the slot, 0 for a
                                  *   free one */
+    ecs_vec_t movers;           /**< box_draw_mover_t by mover index, index 0 the identity */
+    ecs_map_t mover_of;         /**< Mover entity to its index */
+    int32_t free_mover;         /**< First free mover index, -1 for none */
+    uint32_t movers_size;       /**< Records the mover table on the GPU holds, 0 before it is
+                                 *   created */
+    bool movers_dirty;          /**< A mover moved or joined since the table was last sent */
+    ecs_map_t frame_poses;      /**< Texture frame to its index in frame_cache plus one */
+    ecs_vec_t frame_cache;      /**< box_draw_frame_pose_t, the frames of the live records */
+    int64_t tick;               /**< Extracts run, which tells the frame poses of this one apart */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 
@@ -865,6 +946,42 @@ void box_draws_shadow_region(
     const box_render_transform_t *transform,
     const box_render_surface_t *surface);
 
+/** Record the world bounds a caster slot of a batch has now, as box_draws_shadow_region with
+ * the world transform of the slot (box_draws_slot_world).
+ *
+ * @param world The world, whose mesh cache has the mesh of the batch
+ * @param d The state
+ * @param b The batch
+ * @param slot The slot
+ */
+void box_draws_shadow_slot(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    box_draw_batch_t *b,
+    int32_t slot);
+
+/** Make the bounds of the slots of a mover batch in the frame of each of its movers again,
+ * when a slot changed since.
+ *
+ * @param d The state
+ * @param b The mover batch
+ * @param cache The mesh cache
+ */
+void box_draws_groups(
+    const box_render_draws_t *d,
+    box_draw_batch_t *b,
+    box_mesh_cache_t *cache);
+
+/** Record the regions of the caster slots of the mover batches whose mover moved in this
+ * extract, where the movers were and are, from the bounds of their groups.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_shadow_movers(
+    const ecs_world_t *world,
+    box_render_draws_t *d);
+
 /** Get the transform of a slot.
  *
  * @param b The batch
@@ -973,19 +1090,259 @@ void box_draws_frame_scaled(
     const box_render_transform_t *model,
     const WorldTransform *frame);
 
-/** Write the frame record of a shape, looking its texture frame up: box_draws_frame_scaled for
- * a MappingObject material, else box_draws_frame.
+/** Look up the texture frame and the mapping mode of a shape, which its frame record is written
+ * from until the shape or its ancestors change.
  *
  * @param world The world
  * @param e The entity
- * @param out The relative transform
- * @param model The model matrix of the instance (box_draws_transform)
+ * @param out Receives the frame and the mode, live false
  */
-void box_draws_frame_of_shape(
+void box_draws_frame_src(
     const ecs_world_t *world,
     ecs_entity_t e,
+    box_draw_frame_src_t *out);
+
+/** Get the world transform of a texture frame and its inverse, computed once per extract.
+ *
+ * @param world The world
+ * @param d The state
+ * @param frame The texture frame
+ * @return The pose, valid false when the frame has no world transform that inverts
+ */
+const box_draw_frame_pose_t* box_draws_frame_pose(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t frame);
+
+/** Write the frame record of a shape from its texture frame: box_draws_frame_scaled for a
+ * MappingObject material, else box_draws_frame.
+ *
+ * @param world The world
+ * @param d The state
+ * @param src The texture frame and the mapping mode of the shape
+ * @param out The record
+ * @param model The model matrix of the instance (box_draws_transform)
+ */
+void box_draws_frame_record(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    const box_draw_frame_src_t *src,
     box_render_transform_t *out,
     const box_render_transform_t *model);
+
+/** Find the mover of a shape: the nearest of its ancestors that owns DynamicTransform, or has
+ * it without inheriting it from DynamicTransformSpread, as an instance of a dynamic prefab does.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return The mover, 0 when no ancestor is one
+ */
+ecs_entity_t box_draws_mover_of(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Find the mover of an entity, the entity itself when it is one (box_draws_mover_of).
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The mover, 0 when neither the entity nor an ancestor is one
+ */
+ecs_entity_t box_draws_mover_at(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Write the frame record of a slot of a frame batch from the texture frame of its shape.
+ *
+ * A mover batch slot whose record moves with its mover (MappingObject, or MappingFrame without a
+ * frame that inverts) keeps it relative to the mover, placed with BOX_RENDER_MOVER_FRAME.
+ *
+ * A MappingFrame record is fixed while its frame moves with the same mover, and is written every
+ * frame otherwise (box_draw_frame_src_t.live).
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @param b The batch
+ * @param slot The slot
+ * @param model The model matrix of the shape (box_draws_transform)
+ */
+void box_draws_frame_write(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e,
+    box_draw_batch_t *b,
+    int32_t slot,
+    const box_render_transform_t *model);
+
+/** Follow the local transforms under movers, which move shapes in the frame of their mover: a
+ * Position, Rotation or Scale of a dynamic entity, the WorldTransform the application writes for
+ * a dynamic ManualTransform entity, and the movers that come and go.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_mover_observers(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Write the frame records of the slots of the mover batches that are written every frame:
+ * MappingFrame shapes whose texture frame does not move with their mover.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_live_frames(
+    const ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Place the slots of every mover page with the movers: one compose per page that holds slots,
+ * after the mover table, sent when a mover moved or the table changed.
+ *
+ * @param p The packet
+ * @param d The state
+ */
+void box_draws_composes(
+    box_render_packet_t *p,
+    box_render_draws_t *d);
+
+/** Check whether the shapes of a table of the dynamic transform query move with a mover, so
+ * their transforms upload only when they change: 3D shapes that inherit DynamicTransform through
+ * DynamicTransformSpread, that no transform transition moves and that own no PlanarReflection,
+ * whose instance the reflection passes recognize by its transform record.
+ *
+ * @param world The world
+ * @param table The table
+ * @param flat The shapes are 2D shapes
+ * @param spread The pair of DynamicTransformSpread
+ * @return Whether the shapes of the table are in mover batches
+ */
+bool box_draws_mover_table(
+    const ecs_world_t *world,
+    const ecs_table_t *table,
+    bool flat,
+    ecs_id_t spread);
+
+/** Create the mover table of the state.
+ *
+ * @param d The state
+ */
+void box_draws_movers_init(
+    box_render_draws_t *d);
+
+/** Free the mover table of the state.
+ *
+ * @param d The state
+ */
+void box_draws_movers_fini(
+    box_render_draws_t *d);
+
+/** Forget the mover table the backend has, after the backend changed.
+ *
+ * @param d The state
+ */
+void box_draws_movers_reset(
+    box_render_draws_t *d);
+
+/** Get the index of a mover, adding it to the table, and count a slot that moves with it.
+ *
+ * @param world The world
+ * @param d The state
+ * @param mover The mover, 0 for the identity
+ * @return The index, 0 for the identity
+ */
+uint32_t box_draws_mover_ref(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t mover);
+
+/** Uncount a slot that moved with a mover, taking the mover out of the table with its last slot.
+ *
+ * @param d The state
+ * @param index The index of the mover, 0 for the identity
+ */
+void box_draws_mover_unref(
+    box_render_draws_t *d,
+    uint32_t index);
+
+/** Get a mover of the table.
+ *
+ * @param d The state
+ * @param index The index of the mover, 0 for the identity
+ * @return The mover
+ */
+box_draw_mover_t* box_draws_mover(
+    const box_render_draws_t *d,
+    uint32_t index);
+
+/** Place every mover of the table at its world transform. A mover whose uniform world scale
+ * changed writes its subtree again, whose frame records divide by the scale of their frame.
+ *
+ * @param world The world
+ * @param d The state
+ * @param p The packet
+ */
+void box_draws_movers_send(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    box_render_packet_t *p);
+
+/** Compose two transforms: the transform of a mover times a transform relative to it.
+ *
+ * @param out The world transform, not one of the inputs
+ * @param pose The transform of the mover
+ * @param local The transform relative to the mover
+ */
+void box_draws_compose(
+    box_render_transform_t *out,
+    const box_render_transform_t *pose,
+    const box_render_transform_t *local);
+
+/** Write the transform of a shape relative to its mover: the inverse of the world transform of
+ * the mover times the model matrix of the shape, in double precision.
+ *
+ * @param out The transform relative to the mover
+ * @param mover World transform of the mover, NULL for the identity
+ * @param model The model matrix of the shape (box_draws_transform)
+ */
+void box_draws_relative(
+    box_render_transform_t *out,
+    const WorldTransform *mover,
+    const box_render_transform_t *model);
+
+/** Get the world transform of a slot: its transform, or for a mover batch its transform
+ * composed with its mover.
+ *
+ * @param d The state
+ * @param b The batch
+ * @param slot The slot
+ * @param tmp Storage for a composed transform
+ * @return The world transform, the slot transform or tmp
+ */
+const box_render_transform_t* box_draws_slot_world(
+    const box_render_draws_t *d,
+    box_draw_batch_t *b,
+    int32_t slot,
+    box_render_transform_t *tmp);
+
+/** Get the record of the mover stream of a slot of a mover batch.
+ *
+ * @param b The batch
+ * @param slot The slot
+ * @return The record, NULL for a batch that is not a mover batch
+ */
+uint32_t* box_draws_slot_mover(
+    box_draw_batch_t *b,
+    int32_t slot);
+
+/** Get the texture frame of the frame record of a slot of a frame batch.
+ *
+ * @param b The batch
+ * @param slot The slot
+ * @return The frame source, NULL for a batch that is not a frame batch
+ */
+box_draw_frame_src_t* box_draws_slot_frame_src(
+    box_draw_batch_t *b,
+    int32_t slot);
 
 /** Write the transform of a shape: the rows of its model matrix with the instance scale.
  *
@@ -1954,13 +2311,16 @@ void box_draws_bounds(
  *
  * A batch without DynamicTransform computes them again only when a slot, its transform or its
  * surface changed, or its local bounds did. A dynamic batch computes them every frame from the
- * transforms box_draws_dynamic just wrote, one pass over its slots.
+ * transforms box_draws_dynamic just wrote, one pass over its slots. A mover batch computes them
+ * every frame from the bounds of its groups (box_draws_groups) placed by their movers.
  *
+ * @param d The state
  * @param b The batch, ready
  * @param cache The mesh cache
  * @param wanted Whether a view of the packet culls batches by their bounds
  */
 void box_draws_world_bounds(
+    const box_render_draws_t *d,
     box_draw_batch_t *b,
     box_mesh_cache_t *cache,
     bool wanted);

@@ -446,7 +446,8 @@ static void box_shader_changed(
  *
  * @param p The packet
  * @param handle Handle of the shader
- * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, or
+ * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, it
+ * composes and places a mover page, or
  * it assigns lights to clusters or draws shadow casters (either variant of the shadow shader)
  * and a batch draws with a mesh shader,
  * or it culls and a batch draws with a mesh or the 2D shape shader, or an effect pass of a
@@ -471,6 +472,7 @@ static bool box_shader_used(
     uint32_t handle)
 {
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
+    result = result || (handle == BOX_RENDER_SHADER_COMPOSE && ecs_vec_count(&p->composes));
 
     bool meshes = handle == BOX_RENDER_SHADER_CLUSTER ||
         handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_SHADOW_CLIP ||
@@ -943,6 +945,8 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_MESH_EXTENDED, true);
     box_shader_builtin(world, state, builtin, "scatter", "etc/shaders/scatter.wgsl",
         BOX_RENDER_SHADER_SCATTER, true);
+    box_shader_builtin(world, state, builtin, "compose", "etc/shaders/compose.wgsl",
+        BOX_RENDER_SHADER_COMPOSE, true);
     box_shader_builtin(world, state, builtin, "cluster", "etc/shaders/cluster.wgsl",
         BOX_RENDER_SHADER_CLUSTER, true);
     box_shader_builtin(world, state, builtin, "shadow", "etc/shaders/shadow.wgsl",

@@ -32,6 +32,10 @@
 /** Shader handle of the engine compute shader that culls the instances of a view */
 #define BOX_RENDER_SHADER_CULL (6)
 
+/** Shader handle of the engine compute shader that places the instances of the mover pages in
+ * the world from their transforms relative to their movers */
+#define BOX_RENDER_SHADER_COMPOSE (12)
+
 /** Projected size in pixels below which a capture of a camera without a view culls */
 #define BOX_RENDER_CULL_MIN_DIMENSION (1.0f)
 
@@ -192,6 +196,11 @@ static inline bool box_render_is_mesh(
  * instance streams of every pass that draws meshes. */
 #define BOX_RENDER_BUFFER_MATERIALS (3)
 
+/** Buffer handle of the mover table: the world transform of each mover,
+ * box_render_transform_t by mover index, index 0 the identity. The compose pass places the
+ * instances of the mover pages with it. */
+#define BOX_RENDER_BUFFER_MOVERS (4)
+
 /** Records the material table holds at least, doubling from there */
 #define BOX_RENDER_MATERIALS_MIN (64)
 
@@ -214,9 +223,12 @@ static inline bool box_render_is_mesh(
  * s; a released page index is reused by the next page the store needs. */
 #define BOX_RENDER_BUFFER_FIRST (16)
 
-/** Buffers of a mesh instance page of the MappingFrame materials, one per stream, at
- * consecutive handles; the handles of every page leave room for this many */
-#define BOX_RENDER_INSTANCE_STREAMS (4)
+/** Buffers of a mesh instance page of the MappingFrame materials under a mover, one per stream,
+ * at consecutive handles; the handles of every page leave room for this many */
+#define BOX_RENDER_INSTANCE_STREAMS (5)
+
+/** Pages each kind of instance page has handles for */
+#define BOX_RENDER_PAGE_RANGE (0x00400000u)
 
 /** Buffers of a mesh instance page with parametric surfaces: transform, shading and surface */
 #define BOX_RENDER_INSTANCE_STREAMS_SURFACE (3)
@@ -231,24 +243,49 @@ static inline bool box_render_is_mesh(
  * the surface stream. Page p of these pages has the handle
  * BOX_RENDER_BUFFER_FIRST_SURFACE + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_SURFACE \
-    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x02000000u)
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 1u)
 
 /** Buffer handle of the first instance page of the plain meshes whose material uses
  * MappingFrame, which have the frame stream but no surface stream. Page p of these pages has the
  * handle BOX_RENDER_BUFFER_FIRST_FRAME + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_FRAME \
-    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x03000000u)
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 2u)
 
 /** Buffer handle of the first instance page of the meshes with a parametric surface whose
  * material uses MappingFrame, which have every stream. Page p of these pages has the handle
  * BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE \
-    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x04000000u)
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 3u)
 
 /** Buffer handle of the first instance page of the 2D shapes and glyphs. Page p of the 2D pages
  * has the handle BOX_RENDER_BUFFER_FIRST_2D + p * BOX_RENDER_INSTANCE_STREAMS + s for stream s. */
 #define BOX_RENDER_BUFFER_FIRST_2D \
-    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * 0x05000000u)
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 4u)
+
+/** Buffer handle of the first mover page: the plain mesh pages of the shapes that move with a
+ * mover, an ancestor that owns DynamicTransform. Their transform stream holds the transforms
+ * relative to the mover and their mover stream the index of the mover; the compose pass writes
+ * their world transforms into a buffer the passes bind in place of the transform stream. The
+ * mover pages with a surface, a frame or both follow at BOX_RENDER_PAGE_RANGE pages each. */
+#define BOX_RENDER_BUFFER_FIRST_MOVER \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 5u)
+
+/** Buffer handle of the first mover page with a parametric surface */
+#define BOX_RENDER_BUFFER_FIRST_MOVER_SURFACE \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 6u)
+
+/** Buffer handle of the first mover page of the MappingFrame materials */
+#define BOX_RENDER_BUFFER_FIRST_MOVER_FRAME \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 7u)
+
+/** Buffer handle of the first mover page with a parametric surface of the MappingFrame
+ * materials */
+#define BOX_RENDER_BUFFER_FIRST_MOVER_FRAME_SURFACE \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 8u)
+
+/** Handle past the handles of the instance pages */
+#define BOX_RENDER_BUFFER_PAGES_END \
+    (BOX_RENDER_BUFFER_FIRST + BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE * 9u)
 
 /** Stream of the transforms of an instance page, box_render_transform_t per slot */
 #define BOX_RENDER_STREAM_TRANSFORM (0)
@@ -268,6 +305,49 @@ static inline bool box_render_is_mesh(
  * frame); for MappingObject the model matrix with its axes divided by the uniform world scale of
  * the frame. Every other page has none */
 #define BOX_RENDER_STREAM_FRAME (3)
+
+/** Stream of the movers of a mover page, uint32_t per slot: the index of the mover in the mover
+ * table in the bits of BOX_RENDER_MOVER_INDEX, and BOX_RENDER_MOVER_FRAME when the compose pass
+ * places the frame record with the mover too. Every other page has none */
+#define BOX_RENDER_STREAM_MOVER (4)
+
+/** Bits of the mover index of a record of the mover stream */
+#define BOX_RENDER_MOVER_INDEX (0x7FFFFFFFu)
+
+/** Bit of a record of the mover stream whose frame record is relative to the mover */
+#define BOX_RENDER_MOVER_FRAME (0x80000000u)
+
+/** Kinds of instance pages, by the range of their handles */
+typedef enum box_render_page_kind_t {
+    BOX_RENDER_PAGE_SURFACE = 1 << 0,   /**< The page has the surface stream */
+    BOX_RENDER_PAGE_FRAME = 1 << 1,     /**< The page has the frame stream */
+    BOX_RENDER_PAGE_MOVER = 1 << 2,     /**< The page has the mover stream */
+    BOX_RENDER_PAGE_2D = 1 << 3         /**< A page of 2D shapes and glyphs */
+} box_render_page_kind_t;
+
+/** Get the kind of the instance page of a buffer handle.
+ *
+ * @param handle Handle of a stream of the page
+ * @return box_render_page_kind_t flags, 0 for a plain mesh page or a handle of no page
+ */
+static inline uint32_t box_render_page_kind(
+    uint32_t handle)
+{
+    static const uint32_t kinds[9] = {
+        0, BOX_RENDER_PAGE_SURFACE, BOX_RENDER_PAGE_FRAME,
+        BOX_RENDER_PAGE_FRAME | BOX_RENDER_PAGE_SURFACE, BOX_RENDER_PAGE_2D,
+        BOX_RENDER_PAGE_MOVER, BOX_RENDER_PAGE_MOVER | BOX_RENDER_PAGE_SURFACE,
+        BOX_RENDER_PAGE_MOVER | BOX_RENDER_PAGE_FRAME,
+        BOX_RENDER_PAGE_MOVER | BOX_RENDER_PAGE_FRAME | BOX_RENDER_PAGE_SURFACE
+    };
+    uint32_t result = 0;
+    if (handle >= BOX_RENDER_BUFFER_FIRST && handle < BOX_RENDER_BUFFER_PAGES_END) {
+        result = kinds[(handle - BOX_RENDER_BUFFER_FIRST) /
+            (BOX_RENDER_INSTANCE_STREAMS * BOX_RENDER_PAGE_RANGE)];
+    }
+
+    return result;
+}
 
 /** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
 #define BOX_RENDER_SCATTER_ALIGN (256)
@@ -1539,6 +1619,15 @@ typedef struct box_render_scatter_t {
     uint32_t count;         /**< Instances the segment holds */
 } box_render_scatter_t;
 
+/** Placement of the instances of a mover page in the world, after the scatters: the compose
+ * pass writes the transform of every slot times the transform of its mover (and the frame
+ * record of the slots with BOX_RENDER_MOVER_FRAME) into the buffers the passes bind for the
+ * page. */
+typedef struct box_render_compose_t {
+    uint32_t page;          /**< Handle of the transform stream of the mover page */
+    uint32_t count;         /**< Slots placed, from slot 0 */
+} box_render_compose_t;
+
 /** Byte alignment of the offsets and sizes of a copy between buffers, the copy alignment of
  * WebGPU */
 #define BOX_RENDER_COPY_ALIGN (4)
@@ -1868,6 +1957,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */
+    ecs_vec_t composes;     /**< box_render_compose_t, run after the scatters */
     ecs_vec_t copies;       /**< box_render_copy_t, run after the resources and before the
                              *   uploads */
     ecs_vec_t views;        /**< box_render_view_t in render order */

@@ -389,6 +389,7 @@ static int box_gpu_init(
     box_gpu_texture_init(gpu);
     box_gpu_draw_init(gpu);
     box_gpu_scatter_init(gpu);
+    box_gpu_compose_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
 done:
@@ -539,6 +540,7 @@ static void box_gpu_render(
     box_gpu_copy(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
+    box_gpu_compose(gpu, packet);
     box_gpu_atmosphere_build(gpu, packet);
     box_gpu_planet_lights_prepare(gpu, packet);
     box_gpu_environment_image_render(gpu, packet);
@@ -617,6 +619,7 @@ static void box_gpu_fini(
         box_gpu_draw_fini(gpu);
         box_gpu_texture_fini(gpu);
         box_gpu_scatter_fini(gpu);
+        box_gpu_compose_fini(gpu);
     }
 
     box_gpu_blit_reset(gpu);

@@ -48,8 +48,8 @@ static uint64_t box_draws_hash(
         0x165667B19E3779F9ull;
     h ^= (((((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap) * 2 + key->cutout) * 2 +
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
-    h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4) *
-        0x85EBCA77C2B2AE63ull;
+    h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4 +
+        (uint64_t)key->mover * 8) * 0x85EBCA77C2B2AE63ull;
     h ^= ((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull;
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
@@ -79,7 +79,7 @@ static bool box_draws_key_eq(
         a->blend == b->blend && a->cutout == b->cutout && a->back_face == b->back_face &&
         a->transmissive == b->transmissive && a->water == b->water && a->foam == b->foam &&
         a->dynamic_transform == b->dynamic_transform &&
-        a->dynamic_material == b->dynamic_material &&
+        a->dynamic_material == b->dynamic_material && a->mover == b->mover &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
@@ -152,6 +152,10 @@ static box_draw_store_t* box_draws_key_store(
     int32_t store = BOX_DRAWS_STORE_MESH;
     if (key->pipeline == BOX_RENDER_SHADER_SHAPE2D) {
         store = BOX_DRAWS_STORE_2D;
+    } else if (key->mover && key->frame) {
+        store = key->surface ? BOX_DRAWS_STORE_MOVER_FRAME_SURFACE : BOX_DRAWS_STORE_MOVER_FRAME;
+    } else if (key->mover) {
+        store = key->surface ? BOX_DRAWS_STORE_MOVER_SURFACE : BOX_DRAWS_STORE_MOVER;
     } else if (key->frame) {
         store = key->surface ? BOX_DRAWS_STORE_FRAME_SURFACE : BOX_DRAWS_STORE_FRAME;
     } else if (key->surface) {
@@ -172,7 +176,8 @@ uint8_t box_draws_batch_kinds(
     const box_draw_batch_t *b)
 {
     return (uint8_t)(BOX_DRAW_BOTH | (box_draws_has_surface(b) ? BOX_DRAW_SURFACE : 0) |
-        (b->key.frame && !box_draws_is_2d(b) ? BOX_DRAW_FRAME : 0));
+        (b->key.frame && !box_draws_is_2d(b) ? BOX_DRAW_FRAME : 0) |
+        (b->key.mover ? BOX_DRAW_MOVER : 0));
 }
 
 box_render_surface_t* box_draws_slot_surface(
@@ -198,6 +203,8 @@ static ecs_vec_t* box_draws_stream(
     ecs_vec_t *result = &b->surfaces;
     if (stream == BOX_RENDER_STREAM_FRAME) {
         result = &b->frames;
+    } else if (stream == BOX_RENDER_STREAM_MOVER) {
+        result = &b->movers;
     } else if (stream == BOX_RENDER_STREAM_TRANSFORM) {
         result = &b->transforms;
     } else if (stream == BOX_RENDER_STREAM_SHADING) {
@@ -224,6 +231,8 @@ static void box_draws_count_bytes(
         d->stats.shading_bytes += bytes;
     } else if (stream == BOX_RENDER_STREAM_FRAME) {
         d->stats.frame_bytes += bytes;
+    } else if (stream == BOX_RENDER_STREAM_MOVER) {
+        d->stats.transform_bytes += bytes;
     } else {
         d->stats.surface_bytes += bytes;
     }
@@ -235,7 +244,7 @@ uint8_t box_draws_dynamic_kinds(
     const box_draw_batch_t *b)
 {
     return (uint8_t)((b->key.dynamic_transform ? BOX_DRAW_TRANSFORM : 0) |
-        (b->key.dynamic_transform && b->key.frame ? BOX_DRAW_FRAME : 0) |
+        ((b->key.dynamic_transform || b->live_frames) && b->key.frame ? BOX_DRAW_FRAME : 0) |
         (b->key.dynamic_material ? BOX_DRAW_SHADING : 0));
 }
 
@@ -306,6 +315,9 @@ int32_t box_draws_batch_ensure(
         ecs_vec_init_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t, 0);
         ecs_vec_init_t(NULL, &b->surfaces, box_render_surface_t, 0);
         ecs_vec_init_t(NULL, &b->frames, box_render_transform_t, 0);
+        ecs_vec_init_t(NULL, &b->frame_srcs, box_draw_frame_src_t, 0);
+        ecs_vec_init_t(NULL, &b->movers, uint32_t, 0);
+        ecs_vec_init_t(NULL, &b->groups, box_draw_group_t, 0);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_init_t(NULL, &b->changed[s], int32_t, 0);
         }
@@ -323,6 +335,8 @@ int32_t box_draws_batch_ensure(
     b->bounded = false;
     b->world_dirty = true;
     b->world_valid = false;
+    b->groups_dirty = true;
+    b->live_frames = 0;
     b->was_ready = false;
     b->transform_frame = -1;
     b->shading_frame = -1;
@@ -374,6 +388,10 @@ static void box_draws_batch_free(
     ecs_vec_clear(&b->mesh_shadings);
     ecs_vec_clear(&b->surfaces);
     ecs_vec_clear(&b->frames);
+    ecs_vec_clear(&b->frame_srcs);
+    ecs_vec_clear(&b->movers);
+    ecs_vec_clear(&b->groups);
+    b->live_frames = 0;
     box_draws_changed_clear(b);
     b->alive = false;
     b->page = -1;
@@ -393,6 +411,7 @@ void box_draws_slot_changed(
     kinds &= box_draws_batch_kinds(b);
     if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_SURFACE)) {
         b->world_dirty = true;
+        b->groups_dirty = true;
     }
 
     if ((kinds & BOX_DRAW_SURFACE) &&
@@ -442,12 +461,19 @@ int32_t box_draws_slot_add(
     if (b->key.frame) {
         ecs_os_memset_t(ecs_vec_append_t(NULL, &b->frames, box_render_transform_t), 0,
             box_render_transform_t);
+        ecs_os_memset_t(ecs_vec_append_t(NULL, &b->frame_srcs, box_draw_frame_src_t), 0,
+            box_draw_frame_src_t);
+    }
+
+    if (b->key.mover) {
+        *ecs_vec_append_t(NULL, &b->movers, uint32_t) = 0;
     }
 
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
     ecs_os_memset_t(ecs_vec_append_t(NULL, &b->transforms, box_render_transform_t), 0,
         box_render_transform_t);
     b->world_dirty = true;
+    b->groups_dirty = true;
 
     return result;
 }
@@ -575,8 +601,7 @@ static void box_draws_shadow_batch(
     for (i = 0; d->shadow_record && box_draws_caster(b) &&
         i < ecs_vec_count(&b->entities); i ++)
     {
-        box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, i),
-            box_draws_slot_surface(b, i));
+        box_draws_shadow_slot(world, d, b, i);
     }
 }
 
@@ -607,8 +632,7 @@ static void box_draws_shadow_materials(
             }
 
             if (hit) {
-                box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, j),
-                    box_draws_slot_surface(b, j));
+                box_draws_shadow_slot(world, d, b, j);
             }
         }
     }
@@ -668,8 +692,15 @@ void box_draws_slot_remove(
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t last = ecs_vec_count(&b->entities) - 1;
     bool flat = box_draws_is_2d(b);
-    box_draws_shadow_region(world, d, b, box_draws_slot_transform(b, slot),
-        box_draws_slot_surface(b, slot));
+    box_draws_shadow_slot(world, d, b, slot);
+    if (b->key.mover) {
+        box_draws_mover_unref(d, *box_draws_slot_mover(b, slot) & BOX_RENDER_MOVER_INDEX);
+    }
+
+    if (b->key.frame && box_draws_slot_frame_src(b, slot)->live) {
+        b->live_frames --;
+    }
+
     if (flat) {
         box_draws_order_slot(d, 0);
     }
@@ -697,6 +728,11 @@ void box_draws_slot_remove(
 
         if (b->key.frame) {
             *box_draws_slot_frame(b, slot) = *box_draws_slot_frame(b, last);
+            *box_draws_slot_frame_src(b, slot) = *box_draws_slot_frame_src(b, last);
+        }
+
+        if (b->key.mover) {
+            *box_draws_slot_mover(b, slot) = *box_draws_slot_mover(b, last);
         }
 
         if (s) {
@@ -711,6 +747,7 @@ void box_draws_slot_remove(
     }
 
     b->world_dirty = true;
+    b->groups_dirty = true;
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->transforms);
     ecs_vec_remove_last(flat ? &b->shadings : &b->mesh_shadings);
@@ -720,6 +757,11 @@ void box_draws_slot_remove(
 
     if (b->key.frame) {
         ecs_vec_remove_last(&b->frames);
+        ecs_vec_remove_last(&b->frame_srcs);
+    }
+
+    if (b->key.mover) {
+        ecs_vec_remove_last(&b->movers);
     }
 
     if (b->key.atlas) {
@@ -755,6 +797,7 @@ void box_draws_reset_backend(
     }
 
     d->changes_size = 0;
+    box_draws_movers_reset(d);
     box_draws_clips_reset(d);
     box_draws_materials_reset(d);
 }
@@ -1336,9 +1379,12 @@ static void box_draws_collect(
         bool planet = box_draws_layer_of(d, b, &layer);
         box_draw_sorted_t *out = ecs_vec_grow_t(NULL, &d->sorted, box_draw_sorted_t, count);
         for (s = 0; s < count; s ++) {
-            float x = t[s].rows[0][3], y = t[s].rows[1][3], z = t[s].rows[2][3];
+            box_render_transform_t tmp;
+            const box_render_transform_t *w = b->key.mover
+                ? box_draws_slot_world(d, b, s, &tmp) : &t[s];
+            float x = w->rows[0][3], y = w->rows[1][3], z = w->rows[2][3];
             out[s].depth = m[0][2] * x + m[1][2] * y + m[2][2] * z + m[3][2];
-            out[s].atmosphere = planet && box_draws_layer(&layer, &t[s]);
+            out[s].atmosphere = planet && box_draws_layer(&layer, w);
             out[s].batch = index;
             out[s].slot = s;
         }
@@ -1672,9 +1718,7 @@ static void box_draws_fill_material(
                 &material);
             alpha = box_draws_alpha(&material);
             if (b->key.cutout && (was.material != out->material || was.alpha != out->alpha)) {
-                box_render_transform_t *transform = box_draws_slot_transform(b, slots[i].slot);
-                box_draws_shadow_region(it->world, d, b, transform,
-                    box_draws_slot_surface(b, slots[i].slot));
+                box_draws_shadow_slot(it->world, d, b, slots[i].slot);
             }
         }
 
@@ -1716,7 +1760,7 @@ static void box_draws_fill_transform(
         box_render_transform_t was = *out;
         box_draws_transform(out, &transforms[i], &shapes[i]);
         if (b->key.frame) {
-            box_draws_frame_of_shape(it->world, it->entities[i],
+            box_draws_frame_record(it->world, d, box_draws_slot_frame_src(b, slots[i].slot),
                 box_draws_slot_frame(b, slots[i].slot), out);
         }
 
@@ -1746,9 +1790,13 @@ static void box_draws_dynamic(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
+    ecs_id_t spread = ecs_pair(EcsIsA, DynamicTransformSpread);
     ecs_iter_t it = ecs_query_iter(world, d->dynamic_transform);
     while (ecs_query_next(&it)) {
-        box_draws_fill_transform(&it, d);
+        if (!box_draws_mover_table(world, it.table, ecs_field_is_set(&it, 11), spread)) {
+            box_draws_fill_transform(&it, d);
+        }
+
         if (ecs_field_is_set(&it, 10)) {
             box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 10));
         }
@@ -1790,7 +1838,7 @@ void box_draws_send(
         }
 
         d->stats.batches ++;
-        if (b->key.dynamic_transform || b->key.dynamic_material) {
+        if (b->key.dynamic_transform || b->key.dynamic_material || b->key.mover) {
             d->stats.dynamic += ecs_vec_count(&b->entities);
         } else {
             d->stats.instances += ecs_vec_count(&b->entities);
@@ -1806,7 +1854,9 @@ void box_draws_send(
         bounds |= ecs_vec_get_t(&p->views, box_render_view_t, i)->cull.bounds;
     }
 
+    box_draws_movers_send(world, d, p);
     box_draws_dynamic(world, d);
+    box_draws_live_frames(world, d);
     box_draws_materials_send(world, d, p);
     box_draws_shadow_materials(world, d);
     ecs_vec_clear(&d->blended);
@@ -1828,6 +1878,7 @@ void box_draws_send(
     }
 
     box_draws_pages(p, d);
+    box_draws_shadow_movers(world, d);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
         if (b->ready && b->bounds_dirty) {
@@ -1835,7 +1886,7 @@ void box_draws_send(
         }
 
         if (b->ready) {
-            box_draws_world_bounds(b, cache, bounds);
+            box_draws_world_bounds(d, b, cache, bounds);
             box_draws_send_batch(p, d, b, &changes, &copies);
         }
 
@@ -1854,6 +1905,8 @@ void box_draws_send(
     if (changes) {
         box_draws_send_changes(p, d, changes);
     }
+
+    box_draws_composes(p, d);
 
 done:
     d->stats.pages = 0;
@@ -1891,6 +1944,9 @@ void box_draws_batches_fini(
         ecs_vec_fini_t(NULL, &b->mesh_shadings, box_render_mesh_shading_t);
         ecs_vec_fini_t(NULL, &b->surfaces, box_render_surface_t);
         ecs_vec_fini_t(NULL, &b->frames, box_render_transform_t);
+        ecs_vec_fini_t(NULL, &b->frame_srcs, box_draw_frame_src_t);
+        ecs_vec_fini_t(NULL, &b->movers, uint32_t);
+        ecs_vec_fini_t(NULL, &b->groups, box_draw_group_t);
         for (int32_t s = 0; s < BOX_DRAWS_STREAMS; s ++) {
             ecs_vec_fini_t(NULL, &b->changed[s], int32_t);
         }

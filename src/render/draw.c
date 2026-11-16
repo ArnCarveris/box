@@ -96,6 +96,7 @@ static void box_draws_free(
     box_draws_order_fini(d);
     box_draws_clips_fini(d);
     box_draws_materials_fini(d);
+    box_draws_movers_fini(d);
     ecs_os_free(d);
 done:
     return;
@@ -1003,8 +1004,12 @@ static void box_draws_key(
 
     key->polygon = shape2d && shape2d->kind == BOX_SHAPE2D_POLYGON;
 
-    key->dynamic_transform = box_transform_dynamic(world, ecs_get_table(world, e)) ||
-        ecs_has_id(world, e, TransitionTransform);
+    const ecs_table_t *table = ecs_get_table(world, e);
+    bool transition = ecs_has_id(world, e, TransitionTransform);
+    key->mover = !shape2d && box_draws_mover_table(world, table, false,
+        ecs_pair(EcsIsA, DynamicTransformSpread));
+    key->dynamic_transform = !key->mover &&
+        (box_transform_dynamic(world, table) || transition);
     key->dynamic_material = ecs_has_id(world, e, DynamicMaterial) ||
         ecs_has_id(world, e, TransitionMaterial) || fading ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
@@ -1105,26 +1110,35 @@ static bool box_draws_blend_kept(
 static void box_draws_shadow_update(
     const ecs_world_t *world,
     box_render_draws_t *d,
-    const box_draw_batch_t *b,
+    box_draw_batch_t *b,
     int32_t slot,
     const box_render_transform_t *was_transform,
     const box_render_surface_t *was_surface,
     uint8_t kinds)
 {
-    const box_render_transform_t *transform = box_draws_slot_transform(
-        ECS_CONST_CAST(box_draw_batch_t*, b), slot);
-    const box_render_surface_t *surface = box_draws_slot_surface(
-        ECS_CONST_CAST(box_draw_batch_t*, b), slot);
+    const box_render_transform_t *transform = box_draws_slot_transform(b, slot);
+    const box_render_surface_t *surface = box_draws_slot_surface(b, slot);
+    box_render_transform_t was_world, now_world;
+    const uint32_t *mover = box_draws_slot_mover(b, slot);
     if (!d->shadow_record || !box_draws_caster(b)) {
         goto done;
     }
 
     if (!was_transform) {
-        box_draws_shadow_region(world, d, b, transform, surface);
+        box_draws_shadow_slot(world, d, b, slot);
     } else if (ecs_os_memcmp_t(was_transform, transform, box_render_transform_t) ||
         (surface && ecs_os_memcmp_t(was_surface, surface, box_render_surface_t)) ||
         (b->key.cutout && (kinds & BOX_DRAW_SHADING)))
     {
+        if (mover) {
+            const box_render_transform_t *pose =
+                &box_draws_mover(d, *mover & BOX_RENDER_MOVER_INDEX)->pose;
+            box_draws_compose(&was_world, pose, was_transform);
+            box_draws_compose(&now_world, pose, transform);
+            was_transform = &was_world;
+            transform = &now_world;
+        }
+
         box_draws_shadow_region(world, d, b, was_transform, was_surface);
         box_draws_shadow_region(world, d, b, transform, surface);
     }
@@ -1208,8 +1222,12 @@ static void box_draws_update_shape(
     kinds = BOX_DRAW_ALL;
 write:
     kinds &= BOX_DRAW_ALL;
-    if (kinds & BOX_DRAW_TRANSFORM) {
+    if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_SHADING)) {
         kinds |= BOX_DRAW_FRAME;
+    }
+
+    if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_FRAME)) {
+        kinds |= BOX_DRAW_MOVER;
     }
 
     kinds &= box_draws_batch_kinds(b);
@@ -1252,9 +1270,23 @@ write:
         material.slice = slice;
     }
 
+    box_render_transform_t model;
+    if (kinds & (BOX_DRAW_TRANSFORM | BOX_DRAW_FRAME)) {
+        box_draws_transform(&model, transform, shape);
+    }
+
     if (kinds & BOX_DRAW_TRANSFORM) {
         box_render_transform_t *out = box_draws_slot_transform(b, s->slot);
-        box_draws_transform(out, transform, shape);
+        uint32_t *rec = box_draws_slot_mover(b, s->slot);
+        *out = model;
+        if (rec) {
+            ecs_entity_t mover = box_draws_mover_of(world, e);
+            uint32_t index = box_draws_mover_ref(world, d, mover);
+            box_draws_mover_unref(d, *rec & BOX_RENDER_MOVER_INDEX);
+            *rec = (*rec & BOX_RENDER_MOVER_FRAME) | index;
+            box_draws_relative(out, mover ? ecs_get(world, mover, WorldTransform) : NULL,
+                &model);
+        }
     }
 
     if ((kinds & BOX_DRAW_SHADING) && material.shape2d) {
@@ -1272,8 +1304,7 @@ write:
     }
 
     if (kinds & BOX_DRAW_FRAME) {
-        box_draws_frame_of_shape(world, e, box_draws_slot_frame(b, s->slot),
-            box_draws_slot_transform(b, s->slot));
+        box_draws_frame_write(world, d, e, b, s->slot, &model);
     }
 
     box_draws_shadow_update(world, d, b, s->slot, recorded ? &was_transform : NULL,
@@ -1391,6 +1422,7 @@ static void BoxRenderExtractDraws(
         d->generation = backend->generation;
     }
 
+    d->tick ++;
     d->stats.processed = 0;
     d->stats.scattered = 0;
     d->stats.scatters = 0;
@@ -1771,6 +1803,11 @@ void box_render_draws_init(
     ecs_world_t *world)
 {
     box_render_draws_t *d = ecs_os_calloc_t(box_render_draws_t);
+    const int32_t plain[4] = {
+        BOX_DRAWS_STORE_MESH, BOX_DRAWS_STORE_SURFACE, BOX_DRAWS_STORE_FRAME,
+        BOX_DRAWS_STORE_FRAME_SURFACE
+    };
+    int32_t i;
     box_draws_tables_init();
     ECS_COMPONENT_DEFINE(world, DrawSlot);
     ecs_set_hooks(world, DrawSlot, {
@@ -1797,6 +1834,7 @@ void box_render_draws_init(
     box_draws_order_init(d);
     box_draws_clips_init(d);
     box_draws_materials_init(d);
+    box_draws_movers_init(d);
     box_draws_store_init(&d->stores[BOX_DRAWS_STORE_MESH], &(box_draw_layout_t){
         .streams = BOX_RENDER_INSTANCE_STREAMS_PLAIN,
         .stride = {
@@ -1836,12 +1874,22 @@ void box_render_draws_init(
             [BOX_RENDER_STREAM_SHADING] = (uint32_t)sizeof(box_render_shading_t)
         }
     }, BOX_RENDER_BUFFER_FIRST_2D);
+    for (i = 0; i < 4; i ++) {
+        box_draw_layout_t layout = d->stores[plain[i]].layout;
+        layout.streams = BOX_DRAWS_STREAMS;
+        layout.stride[BOX_RENDER_STREAM_MOVER] = (uint32_t)sizeof(uint32_t);
+        box_draws_store_init(&d->stores[BOX_DRAWS_STORE_MOVER + i], &layout,
+            BOX_RENDER_BUFFER_FIRST_MOVER + (uint32_t)i * BOX_RENDER_INSTANCE_STREAMS *
+                BOX_RENDER_PAGE_RANGE);
+    }
+
     d->refs = 1;
     box_draws_queries(world, d);
     box_draws_text_init(world, d);
     box_draws_box_shadow_init(world);
     box_draws_observers(world, d);
     box_draws_transform_observers(world, d);
+    box_draws_mover_observers(world, d);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Draws" }),

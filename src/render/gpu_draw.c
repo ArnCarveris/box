@@ -387,7 +387,8 @@ void box_gpu_instance_layouts_fini(
  * the buffer (surfaces) or for a MappingFrame material (frames).
  *
  * A group with the shading stream binds the material table too, or the default record before
- * the main thread sent one.
+ * the main thread sent one. A mover page binds the world records of the compose pass in place
+ * of its transform and frame streams.
  *
  * @param gpu The backend
  * @param streams The buffers of the streams of the page, by stream, NULL for the surface or
@@ -408,12 +409,15 @@ static WGPUBindGroup box_gpu_instance_group_new(
     const box_gpu_buffer_t *shadings = streams[BOX_RENDER_STREAM_SHADING];
     const box_gpu_buffer_t *surfaces = streams[BOX_RENDER_STREAM_SURFACE];
     const box_gpu_buffer_t *frames = streams[BOX_RENDER_STREAM_FRAME];
+    WGPUBuffer transform_buffer = transforms->composed ? transforms->composed : transforms->buffer;
+    WGPUBuffer frame_buffer = !frames ? gpu->no_frames :
+        frames->composed ? frames->composed : frames->buffer;
     WGPUBuffer surface_buffer = surfaces ? surfaces->buffer : gpu->no_surfaces;
     uint64_t surface_size = surfaces ? surfaces->size : sizeof(box_render_surface_t);
     const box_gpu_buffer_t *materials = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_MATERIALS);
     WGPUBindGroupEntry entry[6] = {
-        {.binding = 0, .buffer = transforms->buffer, .size = transforms->size},
+        {.binding = 0, .buffer = transform_buffer, .size = transforms->size},
         {.binding = 1, .buffer = assets, .size = size},
         {.binding = 3, .buffer = surface_buffer, .size = surface_size},
         {.binding = 2, .buffer = shadings->buffer, .size = shadings->size},
@@ -424,7 +428,7 @@ static WGPUBindGroup box_gpu_instance_group_new(
         },
         {
             .binding = 5,
-            .buffer = frames ? frames->buffer : gpu->no_frames,
+            .buffer = frame_buffer,
             .size = frames ? frames->size : sizeof(box_render_transform_t)
         }
     };
@@ -445,14 +449,15 @@ WGPUBindGroup box_gpu_instance_group(
 {
     WGPUBindGroup result = NULL;
     box_gpu_buffer_t *streams[BOX_RENDER_INSTANCE_STREAMS] = {0};
-    bool surface = (page >= BOX_RENDER_BUFFER_FIRST_SURFACE &&
-        page < BOX_RENDER_BUFFER_FIRST_FRAME) ||
-        (page >= BOX_RENDER_BUFFER_FIRST_FRAME_SURFACE && page < BOX_RENDER_BUFFER_FIRST_2D);
-    bool frame = page >= BOX_RENDER_BUFFER_FIRST_FRAME && page < BOX_RENDER_BUFFER_FIRST_2D;
+    uint32_t kind = box_render_page_kind(page);
+    bool surface = kind & BOX_RENDER_PAGE_SURFACE;
+    bool frame = kind & BOX_RENDER_PAGE_FRAME;
+    bool mover = kind & BOX_RENDER_PAGE_MOVER;
     int32_t i;
     for (i = 0; i < BOX_RENDER_INSTANCE_STREAMS; i ++) {
         if ((i == BOX_RENDER_STREAM_SURFACE && !surface) ||
-            (i == BOX_RENDER_STREAM_FRAME && !frame))
+            (i == BOX_RENDER_STREAM_FRAME && !frame) ||
+            (i == BOX_RENDER_STREAM_MOVER && !mover))
         {
             continue;
         }
@@ -506,11 +511,7 @@ done:
     return result;
 }
 
-/** Release the instance bind groups of a buffer.
- *
- * @param b The buffer
- */
-static void box_gpu_instance_groups_release(
+void box_gpu_instance_groups_release(
     box_gpu_buffer_t *b)
 {
     int32_t i;
@@ -581,7 +582,7 @@ static void box_gpu_instance_page_changed(
         goto done;
     }
 
-    if (handle < BOX_RENDER_BUFFER_FIRST || handle >= BOX_RENDER_BUFFER_LIGHT_FIRST) {
+    if (handle < BOX_RENDER_BUFFER_FIRST || handle >= BOX_RENDER_BUFFER_PAGES_END) {
         goto done;
     }
 
@@ -606,6 +607,10 @@ static void box_gpu_buffer_free(
 {
     box_gpu_instance_groups_release(b);
     ecs_vec_fini_t(NULL, &b->mesh_groups, box_gpu_instance_group_t);
+    if (b->composed) {
+        wgpuBufferRelease(b->composed);
+    }
+
     wgpuBufferRelease(b->buffer);
     ecs_os_free(b);
     box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_DESTROYED);

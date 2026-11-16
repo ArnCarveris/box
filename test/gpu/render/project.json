@@ -193,7 +193,8 @@
                     "box_moved_in_on_store",
                     "manual_parent_move_updates_children",
                     "manual_parent_moved_in_on_store",
-                    "dynamic_hierarchy_deleted"
+                    "dynamic_hierarchy_deleted",
+                    "mover_children_follow"
                 ]
             },
             {

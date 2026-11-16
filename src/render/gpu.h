@@ -2295,6 +2295,37 @@ void box_gpu_scatter(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Create the layouts of the compose pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_compose_init(
+    box_gpu_t *gpu);
+
+/** Release the pipeline, layouts and buffers of the compose pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_compose_fini(
+    box_gpu_t *gpu);
+
+/** Run the composes of a packet, after its scatters and before its targets render: place the
+ * slots of every mover page in the world with the mover table.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_compose(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Release the instance bind groups of a buffer, the transform stream of a page.
+ *
+ * @param b The buffer
+ */
+void box_gpu_instance_groups_release(
+    box_gpu_buffer_t *b);
+
 /** Copy a range of a buffer into memory, waiting for the copy.
  *
  * @param gpu The backend

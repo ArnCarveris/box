@@ -13,6 +13,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->resources, box_render_resource_t, 0);
     ecs_vec_init_t(NULL, &p->uploads, box_render_upload_t, 0);
     ecs_vec_init_t(NULL, &p->scatters, box_render_scatter_t, 0);
+    ecs_vec_init_t(NULL, &p->composes, box_render_compose_t, 0);
     ecs_vec_init_t(NULL, &p->copies, box_render_copy_t, 0);
     ecs_vec_init_t(NULL, &p->views, box_render_view_t, 0);
     ecs_vec_init_t(NULL, &p->batches, box_render_batch_t, 0);
@@ -41,6 +42,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->resources, box_render_resource_t);
     ecs_vec_fini_t(NULL, &p->uploads, box_render_upload_t);
     ecs_vec_fini_t(NULL, &p->scatters, box_render_scatter_t);
+    ecs_vec_fini_t(NULL, &p->composes, box_render_compose_t);
     ecs_vec_fini_t(NULL, &p->copies, box_render_copy_t);
     ecs_vec_fini_t(NULL, &p->views, box_render_view_t);
     ecs_vec_fini_t(NULL, &p->batches, box_render_batch_t);
@@ -80,6 +82,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->resources);
     ecs_vec_clear(&p->uploads);
     ecs_vec_clear(&p->scatters);
+    ecs_vec_clear(&p->composes);
     ecs_vec_clear(&p->copies);
     ecs_vec_clear(&p->views);
     ecs_vec_clear(&p->batches);
@@ -150,6 +153,7 @@ void box_render_packet_copy(
     box_render_vec_copy(&dst->resources, &src->resources, ECS_SIZEOF(box_render_resource_t));
     box_render_vec_copy(&dst->uploads, &src->uploads, ECS_SIZEOF(box_render_upload_t));
     box_render_vec_copy(&dst->scatters, &src->scatters, ECS_SIZEOF(box_render_scatter_t));
+    box_render_vec_copy(&dst->composes, &src->composes, ECS_SIZEOF(box_render_compose_t));
     box_render_vec_copy(&dst->copies, &src->copies, ECS_SIZEOF(box_render_copy_t));
     box_render_vec_copy(&dst->views, &src->views, ECS_SIZEOF(box_render_view_t));
     box_render_vec_copy(&dst->batches, &src->batches, ECS_SIZEOF(box_render_batch_t));
@@ -221,6 +225,15 @@ box_render_scatter_t* box_render_packet_scatter(
 {
     box_render_scatter_t *result = ecs_vec_append_t(NULL, &p->scatters, box_render_scatter_t);
     ecs_os_memset_t(result, 0, box_render_scatter_t);
+
+    return result;
+}
+
+box_render_compose_t* box_render_packet_compose(
+    box_render_packet_t *p)
+{
+    box_render_compose_t *result = ecs_vec_append_t(NULL, &p->composes, box_render_compose_t);
+    ecs_os_memset_t(result, 0, box_render_compose_t);
 
     return result;
 }
