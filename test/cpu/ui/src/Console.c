@@ -70,6 +70,9 @@ void Console_covers_height_after_window_resize(void) {
     // ui/console_layout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 640, .height = 360});
     ecs_progress(world, 0);
@@ -94,6 +97,9 @@ void Console_covers_height_after_surface_resize(void) {
     // ui/console_layout
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Surface, {.width = 640, .height = 360});
     ecs_singleton_get_mut(world, Console)->open = true;

@@ -37,7 +37,7 @@ static ecs_world_t* lagoon_sky_new(void)
     const EcsScript *loaded = ecs_get(world, script, EcsScript);
     test_assert(loaded != NULL);
     test_assert(loaded->error == false);
-    ecs_singleton_set(world, App, {.delta_time = LAGOON_DT});
+    ecs_singleton_set(world, App, {.delta_time = LAGOON_DT, .headless = true});
     ecs_progress(world, LAGOON_DT);
 
     return world;

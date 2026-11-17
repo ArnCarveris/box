@@ -32,6 +32,9 @@
 static ecs_world_t* editor_world(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
     char *widgets = box_app_locate("test/assets/ui/widgets.flecs");
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "box.ui.widgets" }),

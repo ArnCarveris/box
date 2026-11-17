@@ -29,7 +29,7 @@ static void WindowCaptureLog(
 void WindowWarning_no_warning_without_glfw(void)
 {
     // surface/web_window_warning
-#ifndef BOX_PLATFORM_GLFW
+#if !defined(__APPLE__) && !defined(_WIN32)
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_singleton_set(world, App, {

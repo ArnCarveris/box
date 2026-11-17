@@ -74,7 +74,7 @@ static void lagoon_new(
     const EcsScript *loaded = ecs_get(l->world, script, EcsScript);
     test_assert(loaded != NULL);
     test_assert(loaded->error == false);
-    ecs_singleton_set(l->world, App, {.delta_time = LAGOON_DT});
+    ecs_singleton_set(l->world, App, {.delta_time = LAGOON_DT, .headless = true});
 }
 
 /** Run the scene until it completed a number of frames.
