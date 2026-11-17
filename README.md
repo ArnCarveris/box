@@ -1,8 +1,8 @@
 # Box
-A data-driven 2D/3D game framework built on [Flecs](https://github.com/SanderMertens/flecs) and WebGPU.
+A data-driven 2D/3D game framework built on [Flecs](https://github.com/SanderMertens/flecs) and WebGPU. Used to build Flecs demo games and as renderer for the [explorer demo scene](https://flecs.dev/explorer).
 
 ## What is Box?
-What if _everything_ in a game was data driven, reactive and procedural? That is design space Box is built to explore.
+What if _everything_ in a game was data driven, reactive and procedural? That is the design space Box is built to explore.
 
 Take this baguette:
 
@@ -50,46 +50,40 @@ template BaguetteLoaf {
 }
 ```
 
-This is [Flecs Script](https://www.flecs.dev/flecs/FlecsScript.html). Everything in [this scene](etc/scenes/baguette), from the engine configuration, the scene structure, the user interface, the geometry and the textures are procedural and defined in flecs script. If the scene had music or sound effects, they would also be created in Flecs Script.
+This is [Flecs Script](https://www.flecs.dev/flecs/FlecsScript.html). Everything in [this scene](etc/scenes/baguette), from the configuration, the scene structure, the user interface, the geometry and the textures are procedural and defined in flecs script. If the scene had music or sound effects, they would also be created in Flecs Script. All box games are built this way.
 
-Flecs Script is reactive. What this means in summary is, if value X depends on value Y, and Y changes, then value X will automatically change as well. Change the `length` of a `BaguetteLoaf` instance, and you automatically change the shape of the bread.
+Flecs Script is reactive. What this means in short is, if value X depends on value Y, and Y changes, then value X will automatically change as well. Change the `length` of a `BaguetteLoaf` instance, and you automatically change the shape of the bread.
 
-This won't get you AAA level fidelity (though it can still produce good looking games, see below!). It does give you extraordinarily dynamic and interactive scenes, where each engine system can integrate seamlessly with any other system.
+This won't get you AAA level fidelity (though it can still produce decent looking games, see below!). What it does offer is a single, unified API that works seamlessly across each part of the framework. Want to generate audio effects that modulate with your characters evilness stat? Easy! Want to turn on or off a particle effect based on whether your ship's engine is firing? Piece of cake!
 
-Box is in the "let's see how far we can push this" phase, with frequent refactors, public API changes, and many rough edges where something doesn't perform as well as it should yet.
+By reducing everything to entities, components and reactivity, I think Box demonstrates that ECS can make game development _easier_, not harder.
 
-## Who is this for?
-This is not a production-ready game engine. Use it if:
-- You're looking for examples on how to build engine systems with Flecs
-- You're looking for example games that are built with Flecs
-- You're looking for examples that show how to use Flecs script
-- You're looking for a foundation for an agent-friendly game engine
-
-## Why am I building box?
-- I use it to test and validate new Flecs features
-- I want to see whether an end-to-end Flecs-first engine is viable
-- I want to see first-hand where the bottlenecks are when authoring games and fix them
-- I want to experiment with agent-based workflows for game development
-
-## AI disclosure
-Large parts of this codebase are written and even designed by AI. I do my best to maintain a decent level of quality but there are parts that never had a human review, so YMMV if you look at the code directly.
-
-Why build an engine like this? The first reason is that I simply don't have the time or experience to design an engine with this kind of scope upfront. I need to experiment first before I know what works, instead of spending months of architecture astronauting.
-
-
-
-
-
-The three things I do care about:
-- How easy is it to author content
-- How performant is the engine
-
+## Screenshots
+![](docs/screenshots/jungle_city.png)
+![](docs/screenshots/planet.png)
+![](docs/screenshots/texgraph.png)
+![](docs/screenshots/shipyard.png)
+![](docs/screenshots/space_station.png)
+![](docs/screenshots/console.png)
+![](docs/screenshots/dust_merchant.png)
+![](docs/screenshots/jukebox.png)
+![](docs/screenshots/daw.png)
+![](docs/screenshots/daw_mixer.png)
+![](docs/screenshots/daw_graph.png)
+![](docs/screenshots/castlewright.png)
+![](docs/screenshots/canal_lock.png)
+![](docs/screenshots/mossvale.png)
+![](docs/screenshots/astrarium.png)
+![](docs/screenshots/ore_else.png)
+![](docs/screenshots/wild_wild_west.png)
+![](docs/screenshots/santorini.png)
+![](docs/screenshots/sakura_machi.png)
 
 ## Prerequisites
 
 - [bake3](https://github.com/SanderMertens/bake3)
 - [flecs](https://github.com/SanderMertens/flecs)
-- A Rust toolchain
+- C & Rust toolchains
 
 ## Build
 
@@ -125,12 +119,26 @@ python3 tools/integration.py visual                           # render the visua
 python3 tools/integration.py visual --update-baseline <scene> # store the render of a scene as its baseline
 ```
 
-## Screenshots
-![](docs/screenshots/astrarium.png)
-![](docs/screenshots/dust_merchant.png)
-![](docs/screenshots/jungle_city.png)
-![](docs/screenshots/ore_else.png)
-![](docs/screenshots/sakura_machi.png)
-![](docs/screenshots/santorini.png)
-![](docs/screenshots/space_station.png)
-![](docs/screenshots/wild_wild_west.png)
+## Who is this for?
+Box is not a production-ready framework. There's still a lot of experimentation going on, with frequent refactors, public API changes, and many rough edges where something doesn't perform as well as it should yet. Use it if:
+- You're looking for examples that help you build engine systems with Flecs
+- You're looking for example games that are built with Flecs
+- You're looking for examples that show how to use Flecs script
+- You want to play around with an agent-friendly framework that has no strings attached
+
+## Why am I building box?
+I think dogfooding is the best way to build a useful tool. The best way to dogfood Flecs is to go all in and try to use it for everything a game could need. Box is that:
+- It helps me test new features and find bugs
+- It exposes friction and feature gaps of the framework
+- It's a proving ground for new ideas on how to author ECS games
+- It lets me play around with using agents for game development
+
+## AI disclosure
+Large parts of this codebase are written and even designed by AI. I do my best to maintain a decent level of quality but there are parts that never had a human review. YMMV if you look at the code directly.
+
+Why build a framework like this? I simply don't have the time or experience to design a framework with this kind of scope upfront. I need to experiment first before knowing what works, instead of spending months on architecture astronauting. AI lets me do this.
+
+The most interesting parts of the code base are (I think):
+- How components are used to drive every feature of the engine
+- The performance critical parts, like transform propagation, transitions, BVH management
+- How games are structured
