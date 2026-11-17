@@ -1404,6 +1404,10 @@ void box_gpu_atlas_apply(
  * A point light tile draws every caster draw once per octant, 8 draws, the octant in the dynamic
  * offset of the shadow uniforms, clipped to it with clip distances or by a discard.
  *
+ * While the cull pipelines don't exist yet (still compiling) the casters aren't culled and draw
+ * nothing: the tiles that render are then left empty and the atlas doesn't keep them, so they
+ * render again once the cull pipelines exist.
+ *
  * @param gpu The backend
  * @param packet The packet
  */

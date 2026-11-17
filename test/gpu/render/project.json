@@ -682,6 +682,13 @@
                 ]
             },
             {
+                "id": "ShadowStartup",
+                "testcases": [
+                    "cull_ready_shadows_floor",
+                    "cull_late_renders_tile"
+                ]
+            },
+            {
                 "id": "ShadowCache",
                 "testcases": [
                     "static_scene_renders_once",

@@ -1495,13 +1495,16 @@ static bool box_gpu_atlas_renders(
  * @param packet The packet
  * @param index Index of the atlas in the packet, the slot of the cull views of its tiles
  * @param group Binds the matrix buffer of the tiles
+ * @param culled Whether the cull pass ran, false while the cull pipelines don't exist yet: the
+ * tiles then get no casters and the atlas can't keep them
  */
 static void box_gpu_atlas_pass(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     const box_render_packet_t *packet,
     int32_t index,
-    WGPUBindGroup group)
+    WGPUBindGroup group,
+    bool culled)
 {
     const box_render_shadow_atlas_t *a = ecs_vec_get_t(
         &packet->shadow_atlases, box_render_shadow_atlas_t, index);
@@ -1565,6 +1568,11 @@ static void box_gpu_atlas_pass(
             const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, index,
                 BOX_GPU_ATLAS_FRUSTUM(i, o));
             uint32_t offset = (uint32_t)((block + o) * BOX_GPU_CASCADE_STRIDE);
+            if (!cv && !culled) {
+                kept = false;
+                continue;
+            }
+
             if (cv && !cv->draw_count) {
                 continue;
             }
@@ -1697,9 +1705,10 @@ void box_gpu_atlas_render(
     });
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     box_gpu_cull_record_all(gpu, encoder, NULL);
+    bool culled = !ecs_vec_count(&gpu->cull.views) || (gpu->cull.bound && gpu->cull.parallel);
     box_gpu_atlas_counts(gpu, encoder, packet);
     for (i = 0; i < count; i ++) {
-        box_gpu_atlas_pass(gpu, encoder, packet, i, group);
+        box_gpu_atlas_pass(gpu, encoder, packet, i, group, culled);
     }
 
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
