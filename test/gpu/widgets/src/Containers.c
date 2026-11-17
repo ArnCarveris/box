@@ -1796,7 +1796,7 @@ void Containers_collapsible_keys(void) {
     ecs_world_t *world = containers_load(&s);
 
     containers_focus(world, s, DETAILS);
-    gallery_expect(world, s, "get " DETAILS ".head box.geometry.Border.width", "2");
+    gallery_expect(world, s, "get " DETAILS " box.geometry.Border.width", "2");
     gallery_key(world, s, "Enter");
     containers_expect(world, s, DETAILS, "Collapsible", "current", "true");
     gallery_key(world, s, "Space");

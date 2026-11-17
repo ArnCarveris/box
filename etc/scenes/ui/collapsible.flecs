@@ -138,35 +138,58 @@ template HeadlessCollapsible {
   }
 }
 
-// A collapsible section: a header with a chevron, pointing down while open and right while
-// closed, and the title, above the content laid out in a column. A width fixes it, 0 fits it.
+// A collapsible section: a rounded card with a header row, the bold title on the left and a
+// chevron at the right, pointing down while open and right while closed, above the content laid
+// out in a column. The header and the content are inset by the same padding, so the content lines
+// up with the title. A width fixes the outer width of the section, 0 fits it.
 template Collapsible : HeadlessCollapsible {
   prop header: f32 = 32
 
   const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
-  const edge = ring ? t.focus : t.border
+  const bright: Rgb = {
+    t.text.r + (255 - t.text.r) / 4, t.text.g + (255 - t.text.g) / 4,
+    t.text.b + (255 - t.text.b) / 4
+  }
+  const light: Rgb = {
+    (t.border.r + t.text.r) / 2, (t.border.g + t.text.g) / 2, (t.border.b + t.text.b) / 2
+  }
+  const edge = ring ? t.focus : hover ? light : t.border
+  const fill = down ? t.pressed : t.surface_alt
 
-  Layout: {direction: Column, spacing: t.spacing, padding: {0, t.padding, 0, 0}}
+  Layout: {
+    direction: Column, spacing: t.spacing,
+    padding: {0, current ? t.padding : 0, t.padding, t.padding}
+  }
+  Rect: {1, 1}
+  Rgb: fill
+  Border: {
+    width: ring ? t.focus_width : 1, radius: t.radius * 1.5,
+    color: {edge.r, edge.g, edge.b, 255}
+  }
+  Transition: [Rgb: WidgetFade, Border: WidgetFade]
 
+  // The header has no box of its own; the Rect, in the color of the section, makes it pickable
   head {
-    Layout: {direction: Row, spacing: t.spacing, padding: {0, 0, t.padding, t.padding}, v: Middle}
+    Layout: {direction: Row, spacing: t.spacing, v: Middle}
     Item: {width: {mode: Grow}, height: {mode: Fixed, value: header}}
     Rect: {1, 1}
-
-    Rgb: down ? t.pressed : hover ? t.hover : t.surface_alt
+    Rgb: fill
     Transition: [Rgb: WidgetFade]
-    Border: {
-      width: ring ? t.focus_width : 1, radius: t.radius,
-      color: {edge.r, edge.g, edge.b, 255}
-    }
-
-    Chevron chevron(direction: current ? "down" : "right", color: t.text_muted)
 
     caption {
-      Text: {value: title, size: t.font_size}
-      Rgb: t.text
+      Text: {value: title, size: t.font_size, font: box.text.DefaultFontBold}
+      Rgb: hover ? bright : t.text
+      Transition: [Rgb: WidgetFade]
     }
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+
+    Chevron chevron(
+      direction: current ? "down" : "right", color: hover ? t.text : t.text_muted
+    )
   }
 
   if disabled {

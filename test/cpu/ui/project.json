@@ -429,6 +429,7 @@
                     "scroll_gutter_with_bar",
                     "scroll_thumb_hover_look",
                     "panel_title_in_column",
+                    "collapsible_content_inset",
                     "list_keeps_width",
                     "scroll_content_added_after_bars",
                     "scroll_overlay_no_gutter",

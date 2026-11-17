@@ -644,6 +644,75 @@ void Widgets_panel_title_in_column(void) {
     ecs_fini(world);
 }
 
+void Widgets_collapsible_content_inset(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(
+        "using box.widgets\n"
+        "using box.layout\n"
+        "using box.transform\n"
+        "Collapsible section(title: \"Section\", value: true, width: 300) {\n"
+        "  Position: {0, 0, 0}\n"
+        "  b0 { Item: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 40}} }\n"
+        "}\n");
+    widgets_frames(world);
+
+    /* The header row and the content are inset by the theme padding, so the content lines up
+     * with the title; the header spans the content width */
+    ecs_entity_t section = ecs_lookup(world, "section");
+    ecs_entity_t head = ecs_lookup(world, "section.head");
+    ecs_entity_t block = ecs_lookup(world, "section.b0");
+    test_assert(section != 0 && head != 0 && block != 0);
+    ecs_entities_t children = ecs_get_ordered_children(world, section);
+    test_assert(children.count == 2);
+    test_assert(children.ids[0] == head);
+
+    const LayoutBounds *sb = ecs_get(world, section, LayoutBounds);
+    const LayoutBounds *hb = ecs_get(world, head, LayoutBounds);
+    const LayoutBounds *bb = ecs_get(world, block, LayoutBounds);
+    test_assert(sb != NULL && hb != NULL && bb != NULL);
+    test_flt(sb->width, 300);
+    test_flt(hb->width, 300 - 8 - 8);
+    test_flt(hb->height, 32);
+    test_flt(sb->height, 32 + 8 + 40 + 8);
+
+    float at[2];
+    widgets_offset(world, block, section, at);
+    test_flt(at[0] - bb->width / 2, -150 + 8);
+    widgets_offset(world, head, section, at);
+    test_flt(at[0] - hb->width / 2, -150 + 8);
+    test_flt(at[1] + hb->height / 2, sb->height / 2);
+
+    /* The section is the card: it has the fill and the rounded border */
+    test_assert(ecs_has(world, section, Rect));
+    const Border *border = ecs_get(world, section, Border);
+    test_assert(border != NULL);
+    test_flt(border->width, 1);
+    const UiTheme *t = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    ecs_entity_t chevron = ecs_lookup(world, "section.head.chevron");
+    test_assert(chevron != 0);
+    test_int(ecs_get(world, ecs_lookup(world, "section.head.chevron.first"), Rgb)->r,
+        t->text_muted.r);
+    test_int(border->color.r, t->border.r);
+
+    /* Over the header the chevron takes the text color and the border lightens */
+    widgets_set_mut(world, "section", "box.widgets.Collapsible.mut", "hover", 1);
+    widgets_frames(world);
+    test_assert(ecs_lookup(world, "section.head.chevron") == chevron);
+    test_int(ecs_get(world, ecs_lookup(world, "section.head.chevron.first"), Rgb)->r,
+        t->text.r);
+    test_assert(ecs_get(world, section, Border)->color.r != t->border.r);
+
+    /* Pressed, the section darkens toward the pressed color */
+    widgets_set_mut(world, "section", "box.widgets.Collapsible.mut", "down", 1);
+    widgets_frames(world);
+    test_int(ecs_get(world, section, Rgb)->r, t->pressed.r);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
 void Widgets_list_keeps_width(void) {
     // ui/widgets
     ecs_world_t *world = widgets_scene(
