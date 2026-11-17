@@ -8,9 +8,11 @@ using state
 using assets
 
 state {
-  // How far below the water an item at world z sits while it rises in after spawning
-  fn lg_sink(wz: f64) -> f64 {
-    -1.6 * (1 - clamp((wz + SPAWN_AHEAD) / RISE, 0, 1))
+  // How far below the water an item at world z sits while it rises in, age seconds after it
+  // spawned: it rises over RISE units after SPAWN_AHEAD, or over RISE_TIME seconds when that is
+  // slower, so items seeded closer at the start of a run rise in instead of popping up
+  fn lg_sink(wz: f64, age: f64) -> f64 {
+    -1.6 * (1 - min(clamp((wz + SPAWN_AHEAD) / RISE, 0, 1), clamp(age / RISE_TIME, 0, 1)))
   }
 
   // Whether a circle of radius r at x, wz (world z) touches the hull or the outrigger float
@@ -19,9 +21,94 @@ state {
       (abs(x - canoe_x - FLOAT_X) < FLOAT_HALF_W + r && abs(wz - CANOE_Z - 0.1) < FLOAT_HALF_L + r)
   }
 
-  // Lane l (0..LANES-1) to its X in the water
-  fn lg_lane_x(l: f64) -> f64 {
-    (l - (LANES - 1) / 2.0) * LANE_W
+  // The yaw of a log at time t: it turns LOG_TURN radians a second, one way or the other by kind
+  fn lg_log_yaw(spin: f64, kind: i32, t: f64) -> f64 {
+    spin + t * (kind == 0 ? LOG_TURN : 0 - LOG_TURN)
+  }
+
+  // Whether a log at x, wz (world z) with the given yaw and size touches the canoe: its capsule
+  // as LOG_SAMPLES circles of LOG_R along the axis, which turns local +X to (cos, -sin) in X, Z
+  fn lg_touches_log(x: f64, wz: f64, yaw: f64, size: f64) -> bool {
+    mut hit: bool = false
+
+    for k in 0..LOG_SAMPLES {
+      const t = LOG_HALF * size * (2.0 * k / (LOG_SAMPLES - 1) - 1)
+
+      if lg_touches(x + t * cos(yaw), wz - t * sin(yaw), LOG_R) {
+        hit = true
+      }
+    }
+
+    hit
+  }
+
+  // The reach of a hazard from its middle across the river, whatever its yaw
+  fn lg_rock_r(size: f64) -> f64 {
+    ROCK_R * size
+  }
+
+  fn lg_log_r(size: f64) -> f64 {
+    LOG_HALF * size + LOG_R
+  }
+
+  // Whether a circle of radius r at x, z (scrolled world) stays clear of every live hazard
+  fn lg_clear(x: f64, z: f64, r: f64) -> bool {
+    mut ok: bool = true
+
+    for j in 0..ROCKS {
+      const d = sqr(x - rocks[j].x) + sqr(z - rocks[j].z)
+
+      if rocks[j].live && d < sqr(lg_rock_r(rocks[j].size) + r) {
+        ok = false
+      }
+    }
+
+    for j in 0..LOGS {
+      const d = sqr(x - logs[j].x) + sqr(z - logs[j].z)
+
+      if logs[j].live && d < sqr(lg_log_r(logs[j].size) + r) {
+        ok = false
+      }
+    }
+
+    ok
+  }
+
+  // The first free slot of a pool, -1 when it is full
+  fn lg_free_rock() -> i32 {
+    mut s: i32 = -1
+
+    for j in 0..ROCKS {
+      if s < 0 && !rocks[j].live {
+        s = j
+      }
+    }
+
+    s
+  }
+
+  fn lg_free_log() -> i32 {
+    mut s: i32 = -1
+
+    for j in 0..LOGS {
+      if s < 0 && !logs[j].live {
+        s = j
+      }
+    }
+
+    s
+  }
+
+  fn lg_free_nut() -> i32 {
+    mut s: i32 = -1
+
+    for j in 0..COCONUTS {
+      if s < 0 && !nuts[j].live {
+        s = j
+      }
+    }
+
+    s
   }
 }
 
@@ -191,7 +278,11 @@ assets {
 hazards {
   for i in 0..ROCKS {
     "rock_{i}" {
-      Position: {rocks[i].x, lg_sink(rocks[i].z + distance), rocks[i].z + distance}
+      Position: {
+        rocks[i].x,
+        lg_sink(rocks[i].z + distance, clock - rocks[i].born),
+        rocks[i].z + distance
+      }
 
       if rocks[i].live {
         LgReefRock model(size: rocks[i].size, seed: rocks[i].spin)
@@ -203,24 +294,26 @@ hazards {
     "log_{i}" {
       Position: {
         logs[i].x,
-        lg_sink(logs[i].z + distance) + 0.04 * sin(clock * 1.6 + logs[i].spin),
+        lg_sink(logs[i].z + distance, clock - logs[i].born) +
+          0.04 * sin(clock * 1.6 + logs[i].spin),
         logs[i].z + distance
       }
 
       if logs[i].live {
+        // The foam turns with the log, the way its capsule collides
         turn {
-          Rotation: {
-            0,
-            logs[i].spin + clock * (logs[i].kind == 0 ? 0.3 : -0.3),
-            0.05 * sin(clock * 1.3 + logs[i].spin)
-          }
-          LgDriftLog model(size: logs[i].size, seed: logs[i].spin)
-        }
+          Rotation: {0, lg_log_yaw(logs[i].spin, logs[i].kind, clock), 0}
 
-        foam : LgFoam {
-          Position: {0, 0.02, 0}
-          Scale: {1.25 * logs[i].size, 0.35, 0.5}
-          Torus: {radius: 1, tube: 0.14, segments: 20, rings: 4}
+          roll {
+            Rotation: {0, 0, 0.05 * sin(clock * 1.3 + logs[i].spin)}
+            LgDriftLog model(size: logs[i].size, seed: logs[i].spin)
+          }
+
+          foam : LgFoam {
+            Position: {0, 0.02, 0}
+            Scale: {LOG_HALF * logs[i].size + 0.3, 0.35, 0.45}
+            Torus: {radius: 1, tube: 0.14, segments: 20, rings: 4}
+          }
         }
       }
     }
@@ -230,7 +323,8 @@ hazards {
     "nut_{i}" {
       Position: {
         nuts[i].x,
-        lg_sink(nuts[i].z + distance) + 0.1 + 0.07 * sin(clock * 2.2 + nuts[i].spin),
+        lg_sink(nuts[i].z + distance, clock - nuts[i].born) + 0.1 +
+          0.07 * sin(clock * 2.2 + nuts[i].spin),
         nuts[i].z + distance
       }
 
@@ -257,95 +351,158 @@ async {
     await next_frame()
 
     if game_state == GS_PLAYING {
-      // Rows: every row keeps the lanes f - 1 (outrigger) and f (hull) free and puts 1 to 3
-      // hazards in the other lanes
+      // Rows: every row leaves a corridor free for the canoe footprint, in reach of the corridor
+      // before it (or of the canoe at the start of a run), and fills the rest of the river with
+      // hazards. Rows seeded closer at the start rise in by time (lg_sink).
       while distance >= next_row {
         const zs = 0 - (next_row + SPAWN_AHEAD)
-        const f = 1 + floor(rng.f(LANES - 1))
-        const n = min(3, 1 + floor(rng.f(1.6 + (speed - START_SPEED) * 0.08)))
-        const o = floor(rng.f(3))
-        mut target_x: f64 = lg_lane_x(f + 1 <= LANES - 1 ? f + 1 : f - 2)
+        const diff = lg_difficulty()
+        const gw = FOOT_W + GAP_MARGIN_EASY + (GAP_MARGIN_HARD - GAP_MARGIN_EASY) * diff
+        const gh = (gw - FOOT_W) / 2
 
-        for k in 0..3 {
-          if k < n {
-            const idx = o + k >= 3 ? o + k - 3 : o + k
-            const lane = f + 1 + idx >= LANES ? f + 1 + idx - LANES : f + 1 + idx
-            const x = lg_lane_x(lane) + (rng.f(2) - 1) * LANE_JITTER
-            const seed = rng.f(100)
-            const size = 0.8 + rng.f(0.45)
+        // The corridor before, or the footprint of the canoe as a corridor that the hull leaves
+        // now, so that the first row is entered after FIRST_HAZARD_TIME
+        mut px: f64 = canoe_x + FOOT_CX
+        mut pw: f64 = FOOT_W
+        mut pz: f64 = HULL_HALF_L + HAZ_R_MAX + HAZ_Z_JITTER - distance
 
-            if k == 0 {
-              target_x = x
-            }
-
-            if rng.f(1) < LOG_CHANCE {
-              mut s: i32 = -1
-
-              for j in 0..LOGS {
-                if s < 0 && !logs[j].live {
-                  s = j
-                }
-              }
-
-              if s >= 0 {
-                logs[s].x = x
-                logs[s].z = zs
-                logs[s].size = size
-                logs[s].spin = seed
-                logs[s].kind = seed > 50 ? 1 : 0
-                logs[s].hit = false
-                logs[s].live = true
-              }
-            } else {
-              mut s: i32 = -1
-
-              for j in 0..ROCKS {
-                if s < 0 && !rocks[j].live {
-                  s = j
-                }
-              }
-
-              if s >= 0 {
-                rocks[s].x = x
-                rocks[s].z = zs
-                rocks[s].size = size
-                rocks[s].spin = seed
-                rocks[s].kind = 0
-                rocks[s].hit = false
-                rocks[s].live = true
-              }
-            }
-          }
+        if rows > 0 {
+          const pr = (rows - 1) % CORRIDORS
+          px = corridors[pr].gx
+          pw = corridors[pr].gw
+          pz = corridors[pr].z
         }
 
+        const ph = (pw - FOOT_W) / 2
+
+        // The speed the canoe may have by then (every live coconut and this row's line picked
+        // up) sets the time to steer, and that the shift of the corridor
+        const vb = lg_speed_bound(NUTS_PER_LINE)
+        const shift = lg_shift_max(pz - zs, vb)
+        const lo = 0 - WATER_HALF + GAP_SHORE + gw / 2
+        const hi = WATER_HALF - GAP_SHORE - gw / 2
+        mut ga: f64 = clamp(px + ph - gh - shift, lo, hi)
+        mut gb: f64 = clamp(px - ph + gh + shift, lo, hi)
+
+        if ga > gb {
+          ga = clamp(px, lo, hi)
+          gb = ga
+        }
+
+        mut gx: f64 = ga
+
+        if gb > ga {
+          gx = ga + rng.f(gb - ga)
+        }
+
+        corridors[rows % CORRIDORS].z = zs
+        corridors[rows % CORRIDORS].gx = gx
+        corridors[rows % CORRIDORS].gw = gw
+
+        // Hazards from one waterline to the other in the walk direction dir, x along the walk.
+        // A hazard whose reach would overlap the corridor moves past it instead.
+        const dir = rng.f(1) < 0.5 ? 1.0 : -1.0
+        const blo = dir > 0 ? gx - gw / 2 : 0 - gx - gw / 2
+        const bhi = blo + gw
+        const spread = HAZ_GAP_EASY + (HAZ_GAP_HARD - HAZ_GAP_EASY) * diff
+        mut cx: f64 = 0 - WATER_HALF + HAZ_SHORE
+        mut placed: i32 = 0
+        mut placed_logs: i32 = 0
+
+        while placed < HAZARDS_PER_ROW {
+          const rs = lg_free_rock()
+          const ls = lg_free_log()
+          const want_log = rng.f(1) < LOG_CHANCE
+          const is_log = ls >= 0 && placed_logs < LOGS_PER_ROW && (want_log || rs < 0)
+
+          // Plan fewer hazards rather than skip one for a full pool
+          if !is_log && rs < 0 {
+            break
+          }
+
+          const seed = rng.f(100)
+          const size = is_log ? LOG_SIZE_MIN + rng.f(LOG_SIZE_VAR) :
+            ROCK_SIZE_MIN + rng.f(ROCK_SIZE_VAR)
+          const r = is_log ? lg_log_r(size) : lg_rock_r(size)
+          const x = cx + HAZ_GAP_MIN + rng.f(spread) + r
+
+          if x - r < bhi && x + r > blo {
+            cx = bhi
+            continue
+          }
+
+          if x + r > WATER_HALF - HAZ_SHORE {
+            break
+          }
+
+          const wx = dir * x
+          const z = zs + (rng.f(2) - 1) * HAZ_Z_JITTER
+
+          if is_log {
+            logs[ls].x = wx
+            logs[ls].z = z
+            logs[ls].size = size
+            logs[ls].spin = seed
+            logs[ls].kind = seed > 50 ? 1 : 0
+            logs[ls].hit = false
+            logs[ls].born = clock
+            logs[ls].live = true
+            placed_logs += 1
+          } else {
+            rocks[rs].x = wx
+            rocks[rs].z = z
+            rocks[rs].size = size
+            rocks[rs].spin = seed
+            rocks[rs].kind = 0
+            rocks[rs].hit = false
+            rocks[rs].born = clock
+            rocks[rs].live = true
+          }
+
+          placed += 1
+          cx = x + r
+        }
+
+        // A coconut line in front of the row along the hull's way: from the side of the corridor
+        // before nearest to this one, into this corridor. A risky line bulges out, but every nut
+        // keeps this corridor in reach from the time it passes the canoe.
         if rng.f(1) < NUT_LINE_CHANCE {
-          const fx = lg_lane_x(f)
-          const bulge = (rng.f(2) - 1) * 1.4
+          const hx = gx - FOOT_CX + (rng.f(2) - 1) * gh
+          const x0 = clamp(hx, px - ph - FOOT_CX, px + ph - FOOT_CX)
+          mut bulge: f64 = 0
+
+          if rng.f(1) < NUT_RISK_CHANCE {
+            bulge = (rng.f(2) - 1) * NUT_RISK_BULGE
+          }
 
           for c in 0..NUTS_PER_LINE {
             const t = c * 1.0 / (NUTS_PER_LINE - 1)
-            mut s: i32 = -1
+            const dz = NUT_LEAD + (NUTS_PER_LINE - 1 - c) * NUT_SPACING
+            const room = REACH_SHARE *
+              lg_reach((dz - (HULL_HALF_L + HAZ_R_MAX + HAZ_Z_JITTER)) / vb - REACT_TIME)
+            const ease = t * t * (3 - 2 * t)
+            const x = clamp(
+              clamp(x0 + (hx - x0) * ease + bulge * sin(t * PI),
+                gx - gh - FOOT_CX - room, gx + gh - FOOT_CX + room),
+              CANOE_MIN_X, CANOE_MAX_X)
+            const z = zs + dz
+            const s = lg_free_nut()
 
-            for j in 0..COCONUTS {
-              if s < 0 && !nuts[j].live {
-                s = j
-              }
-            }
-
-            if s >= 0 {
-              nuts[s].x = fx + (target_x - fx) * t + bulge * sin(t * PI)
-              nuts[s].z = zs + NUT_LEAD + (NUTS_PER_LINE - 1 - c) * NUT_SPACING
+            if s >= 0 && lg_clear(x, z, NUT_R) {
+              nuts[s].x = x
+              nuts[s].z = z
               nuts[s].size = 1
               nuts[s].spin = rng.f(100)
               nuts[s].kind = 0
               nuts[s].hit = false
+              nuts[s].born = clock
               nuts[s].live = true
             }
           }
         }
 
         rows += 1
-        next_row += max(ROW_GAP_MIN, ROW_GAP - (speed - START_SPEED) * ROW_GAP_PER_SPEED)
+        next_row += speed * lg_row_time(speed)
       }
 
       if invulnerable > 0 {
@@ -359,7 +516,7 @@ async {
           if wz > DESPAWN_Z {
             rocks[i].live = false
           } else if game_state == GS_PLAYING && invulnerable <= 0 &&
-            lg_touches(rocks[i].x, wz, ROCK_R * rocks[i].size) {
+            lg_touches(rocks[i].x, wz, lg_rock_r(rocks[i].size)) {
             rocks[i].hit = true
             rocks[i].live = false
             lives -= 1
@@ -380,7 +537,8 @@ async {
           if wz > DESPAWN_Z {
             logs[i].live = false
           } else if game_state == GS_PLAYING && invulnerable <= 0 &&
-            lg_touches(logs[i].x, wz, LOG_R * logs[i].size) {
+            lg_touches_log(logs[i].x, wz, lg_log_yaw(logs[i].spin, logs[i].kind, clock),
+              logs[i].size) {
             logs[i].hit = true
             logs[i].live = false
             lives -= 1

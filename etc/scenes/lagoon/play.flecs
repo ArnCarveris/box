@@ -8,11 +8,6 @@ using box.particle
 using state
 
 state {
-  // Steering: the canoe slides toward STEER_SPEED in the steered direction, eases in with
-  // STEER_ACCEL and drifts to a stop with STEER_DAMP once the keys are released
-  export const STEER_SPEED: f32 = 9
-  export const STEER_ACCEL: f32 = 5
-  export const STEER_DAMP: f32 = 3.5
   // Lean per unit of sideways speed, and how fast the hull rolls toward it
   export const LEAN_PER_VX: f32 = 0.028
   export const LEAN_RATE: f32 = 8
