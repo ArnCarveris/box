@@ -130,6 +130,25 @@ assets {
 
   paris_bark_n { Gen: {source: paris_bark_h, output: GenNormal, strength: 1.4} }
 
+  paris_patina_h { Gen: {width: 256, height: 256, seed: 1886, layers: [
+    {kind: GenCells, count: 28, squash: 0.15, distance: GenEdge, edge: 0.35, amount: 0.55}
+    {kind: GenNoise, frequency: 8, octaves: 4, amount: 0.45}
+  ]} }
+  paris_patina {
+    Gen: {
+      source: paris_patina_h,
+      output: GenAlbedo,
+      colors: [
+        {0, {24, 66, 62}},
+        {0.3, {52, 118, 106}},
+        {0.65, {94, 172, 152}},
+        {1, {148, 208, 188}}
+      ]
+    }
+  }
+
+  paris_patina_n { Gen: {source: paris_patina_h, output: GenNormal, strength: 1.2} }
+
   paris_wave_h {
     Gen: {
       width: 256,
@@ -306,4 +325,16 @@ assets {
   prefab ParisBinGreen { Rgb: {40, 70, 52}; PbrMaterial: {metallic: 0.6, roughness: 0.45} }
   prefab ParisCastIron { Rgb: {46, 44, 42}; PbrMaterial: {metallic: 0.7, roughness: 0.55} }
   prefab ParisNewsprint { Rgb: {226, 220, 204}; PbrMaterial: {roughness: 0.95} }
+
+  // The Statue of Liberty: verdigris copper with darker streaks in the folds, rough and faintly
+  // metallic. Plain variants for small details (eyes, lips, blush) that take an Rgb.
+  prefab ParisPatina {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0.3, roughness: 0.74}
+    PbrTextures: {albedo: paris_patina, normal: paris_patina_n}
+  }
+
+  prefab ParisPatinaPlain { Rgb: {92, 150, 128}; PbrMaterial: {metallic: 0.3, roughness: 0.7} }
+  prefab ParisPatinaDark { Rgb: {36, 72, 60}; PbrMaterial: {metallic: 0.25, roughness: 0.8} }
+  prefab ParisTorchFlame { Rgb: {255, 190, 90}; PbrMaterial: {roughness: 0.4}; Emissive: {strength: 8, color: {255, 150, 50}}; NoShadow }
 }

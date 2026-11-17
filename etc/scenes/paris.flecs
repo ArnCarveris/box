@@ -7,6 +7,7 @@ include paris/city
 include paris/street
 include paris/eiffel
 include paris/landmarks
+include paris/liberty
 using flecs.script
 using box.view
 using box.surface

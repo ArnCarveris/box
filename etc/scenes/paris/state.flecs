@@ -117,6 +117,39 @@ state {
   export mut pr_sparkle_on = false
   export mut pr_sparkle_tick: i32 = 0
 
+  // The Statue of Liberty residents (paris.residents.statue_<i>, see paris/liberty.flecs). Each
+  // instance reads its transform and pose from pr_statues[i], so the logic that moves them only
+  // writes this array: position x, y (ground), z, yaw, the current and the next street graph
+  // node, charm 0..1 and the pose: walk phase (radians), stride 0..1, torch_raise 0..1 (1 = the
+  // iconic straight-up pose, 0 = held forward at chest height), torch_sweep (yaw of the torch
+  // arm), head_turn and lean (forward tilt of the upper body), all in radians.
+  struct ParisStatue(x: f32, y: f32, z: f32, yaw: f32, node: i32, target: i32, charm: f32, walk: f32, stride: f32, torch_raise: f32, torch_sweep: f32, head_turn: f32, lean: f32)
+
+  export const PR_STATUES: i32 = 14
+
+  // Standing on street graph nodes facing different ways, charm spread evenly from 0 to 1 (k / 13)
+  // in a shuffled order.
+  export mut pr_statues: ParisStatue[14] = [
+    {-25.2, 0.15, -19, 2.6, 2, 2, 0.5385, 0, 0, 1, 0, 0, 0},
+    {14, 0.15, -19, 0.3, 6, 6, 0, 0, 0, 1, 0, 0, 0},
+    {-45.5, 0.15, -9, 1.2, 11, 11, 0.9231, 0, 0, 1, 0, 0, 0},
+    {21, 0.15, -9, -2.2, 16, 16, 0.3077, 0, 0, 1, 0, 0, 0},
+    {45.5, 0.15, -9, 3.0, 18, 18, 0.7692, 0, 0, 1, 0, 0, 0},
+    {-36.5, 0, 23.5, -0.8, 21, 21, 0.1538, 0, 0, 1, 0, 0, 0},
+    {36.5, 0, 23.5, 1.9, 25, 25, 1, 0, 0, 1, 0, 0, 0},
+    {-7.8, 0.15, 20, 1.57, 29, 29, 0.3846, 0, 0, 1, 0, 0, 0},
+    {7.8, 0.15, 27, -1.0, 35, 35, 0.6923, 0, 0, 1, 0, 0, 0},
+    {15, 0.15, 33, 0.9, 42, 42, 0.0769, 0, 0, 1, 0, 0, 0},
+    {-4.8, 0.15, -35, -1.4, 44, 44, 0.8462, 0, 0, 1, 0, 0, 0},
+    {15, 0, -46.5, 2.9, 52, 52, 0.2308, 0, 0, 1, 0, 0, 0},
+    {0, 0, -54, -2.7, 56, 56, 0.6154, 0, 0, 1, 0, 0, 0},
+    {-20, -2.2, -25, 0.6, 62, 62, 0.4615, 0, 0, 1, 0, 0, 0}
+  ]
+
+  // While true, paris/liberty.flecs gives the standing statues a slow idle look-around (head_turn
+  // and torch_sweep). The logic that walks them sets it to false and drives the pose itself.
+  export mut pr_statue_idle = true
+
   // Index of the node nearest to the point x, z.
   fn pr_nearest_node(x: f32, z: f32) -> i32 {
     mut best: i32 = 0
