@@ -14,6 +14,7 @@ using box.material
 using box.text
 using box.transform
 using box.transition
+using box.spatial
 
 // Length of the thumb of a scroll bar on a track of length track: the visible fraction of the
 // content, at least 20 points, the whole track when everything fits
@@ -46,6 +47,11 @@ fn scroll_track(size: f64, edge: f64, other: f64) -> f64 {
 // end. The wheel goes to the innermost scroll view under the cursor, the first Interactive element
 // on its path. drag is the thumb held and over the thumb under the pointer: 1 vertical,
 // 2 horizontal, 0 none.
+// With overlay the bars draw over the content and are hidden until there is activity: shown is
+// set while the scroll offset changes, by any path, while the pointer is over the strip of a bar
+// the content needs (hot, 1 vertical, 2 horizontal, 0 none) or a thumb is dragged, and cleared
+// hide_delay seconds after the last of these. A press in the strip of a hidden bar is no bar
+// press, so it reaches the content under it.
 // Without focusable the view is only Interactive: it is no Tab stop and a press on it clears the
 // focus, as for a page that scrolls the widgets in it into view while Tab moves through them.
 template HeadlessScrollView {
@@ -58,6 +64,8 @@ template HeadlessScrollView {
   prop step: f32 = 40
   prop keys: bool = true
   prop focusable: bool = true
+  prop overlay: bool = false
+  prop hide_delay: f32 = 1
 
   mut x: f32 = 0
   mut y: f32 = 0
@@ -65,6 +73,11 @@ template HeadlessScrollView {
   mut grab: f32 = 0
   mut over: i32 = 0
   mut focused = false
+  mut shown = false
+  mut hot: i32 = 0
+  mut seen_x: f32 = 0
+  mut seen_y: f32 = 0
+  mut idle: f32 = 0
 
   // The body reads no component: flecs script restarts the async blocks of a template when a
   // component it reads changes, in the body or in an async block. The blocks read Bounds
@@ -76,6 +89,33 @@ template HeadlessScrollView {
   }
   ClipChildren
   Scroll: {x: x, y: y, horizontal: horizontal, vertical: vertical}
+
+  // The bars of an overlay view: each frame, a change of the offset since the last one, the
+  // pointer over a strip or a held thumb shows them, and idle counts the seconds of world time
+  // since; they hide once it reaches hide_delay. A change of a mut restarts no block, so the
+  // block looks every frame, which catches each path that sets x or y.
+  async {
+    if overlay {
+      seen_x = x
+      seen_y = y
+      while true {
+        const passed = await ui.delay(0)
+        if x != seen_x || y != seen_y || hot != 0 || drag != 0 {
+          seen_x = x
+          seen_y = y
+          idle = 0
+          if !shown {
+            shown = true
+          }
+        } else if shown {
+          idle += passed
+          if idle >= hide_delay {
+            shown = false
+          }
+        }
+      }
+    }
+  }
 
   async {
     while true {
@@ -150,8 +190,9 @@ template HeadlessScrollView {
       const e = await on.press(this)
       const b = this[layout.Bounds]
       const content = this[Content]
-      const on_v = vertical && content.max_y > 0
-      const on_h = horizontal && content.max_x > 0
+      const live = !overlay || shown
+      const on_v = live && vertical && content.max_y > 0
+      const on_h = live && horizontal && content.max_x > 0
       const vtrack = scroll_track(b.height, edge, on_h ? bar : 0)
       const htrack = scroll_track(b.width, edge, on_v ? bar : 0)
       const vthumb = scroll_thumb(vtrack, b.height, content.height)
@@ -206,6 +247,13 @@ template HeadlessScrollView {
       if over != at {
         over = at
       }
+      const strip_v = overlay && on_v && e.local_x >= b.width / 2 - edge - bar && down < vtrack
+      const strip_h = overlay && on_h && e.local_y <= edge + bar - b.height / 2 &&
+        right < htrack
+      const strip = strip_v ? 1 : strip_h ? 2 : 0
+      if hot != strip {
+        hot = strip
+      }
     }
   }
 
@@ -213,6 +261,9 @@ template HeadlessScrollView {
     while true {
       await on.leave(this)
       over = 0
+      if hot != 0 {
+        hot = 0
+      }
     }
   }
 
@@ -286,6 +337,9 @@ template HeadlessScrollView {
 // the part of the focus ring of the view the bar lies over, in points from its outer side (the
 // right or the bottom): that strip takes the focus color, so the ring keeps its width along the
 // bar. The pointer shows a hand over the bar.
+// An overlay bar has no opaque track: only its thumb shows, the muted text color at partial
+// alpha, and a faint track while the pointer is over the bar (track). Its track is still there
+// for picking, at no opacity, so a press on it pages rather than reaching the content under it.
 template ScrollBar {
   prop vertical: bool = true
   prop length: f32 = 0
@@ -296,15 +350,27 @@ template ScrollBar {
   prop active: bool = false
   prop hover: bool = false
   prop ring: f32 = 0
+  prop overlay: bool = false
+  prop track: bool = false
 
   const t = box.ui.theme[Theme]
-  const inset = 2
+  const inset = overlay ? 1 : 2
   const w = vertical ? size : length
   const h = vertical ? length : size
 
-  Rect: {w, h}
-  Rgb: t.surface
-  Border: {radius: radius}
+  if overlay {
+    rail {
+      Rect: {w, h}
+      Rgb: t.text
+      Border: {radius: radius}
+      Opacity: {track ? 0.1 : 0}
+      Transition: [Opacity: WidgetFade]
+    }
+  } else {
+    Rect: {w, h}
+    Rgb: t.surface
+    Border: {radius: radius}
+  }
   Cursor: {CursorPointer}
 
   if ring > 0 {
@@ -331,7 +397,12 @@ template ScrollBar {
     Border: {radius: (size - inset * 2) / 2}
     Rgb: active ? t.text : t.text_muted
     Tint: {t.text.r, t.text.g, t.text.b, hover && !active ? 128 : 0}
-    Transition: [Rgb: WidgetFade, Tint: WidgetFade]
+    if overlay {
+      Opacity: {active ? 1 : hover || track ? 0.8 : 0.55}
+      Transition: [Rgb: WidgetFade, Tint: WidgetFade, Opacity: WidgetFade]
+    } else {
+      Transition: [Rgb: WidgetFade, Tint: WidgetFade]
+    }
   }
 }
 
@@ -339,7 +410,13 @@ template ScrollBar {
 // inside the right and bottom edges while the content does not fit; the padding leaves room for a
 // bar while it shows. width and height fix the view, 0 grows it to the space its parent gives.
 // Without frame it has no border or padding and the background of the theme, so only its content
-// and its bars show.
+// and its bars show. transparent drops the fill, so the surface behind the view shows; it still
+// takes the wheel and presses (picking uses the layout bounds of an Interactive element) and
+// clips its content to its bounds. A border has no shape to draw on then, so the border and the
+// focus ring of a transparent view are four edges in outline, an overlay like the bars.
+// With overlay the padding leaves no room for the bars, which draw over the content: they are
+// hidden until there is activity (see HeadlessScrollView), fade in while shown and fade out after.
+// A hidden bar is Ignore, so it is not picked while it fades out or after.
 //
 // The bars are in scrollbars, a clipped overlay (Float with clip) of no size on the center
 // of the view: the column leaves it out of its flow and the scroll offset does not move it, yet
@@ -349,6 +426,7 @@ template ScrollView : HeadlessScrollView {
   prop bar: f32 = 10
   prop edge: f32 = 1
   prop frame: bool = true
+  prop transparent: bool = false
 
   const t = box.ui.theme[Theme]
   const ring = focused && FocusStatus[FocusStatus].visible
@@ -358,8 +436,8 @@ template ScrollView : HeadlessScrollView {
   const vbar = vertical && c.max_y > 0
   const hbar = horizontal && c.max_x > 0
   const bars = vbar || hbar
-  const pad_right = pad + (vbar ? bar : 0)
-  const pad_bottom = pad + (hbar ? bar : 0)
+  const pad_right = pad + (vbar && !overlay ? bar : 0)
+  const pad_bottom = pad + (hbar && !overlay ? bar : 0)
 
   Layout: {direction: Column, spacing: t.spacing, padding: {pad, pad_bottom, pad, pad_right}}
   Item: {}
@@ -373,16 +451,48 @@ template ScrollView : HeadlessScrollView {
   } else {
     Item = {height: {mode: Grow}}
   }
-  Rect: {1, 1}
-  Rgb: frame ? t.surface_alt : t.background
+  if !transparent {
+    Rect: {1, 1}
+    Rgb: frame ? t.surface_alt : t.background
 
-  if ring {
-    Border: {
-      width: t.focus_width, radius: t.radius,
-      color: {t.focus.r, t.focus.g, t.focus.b, 255}
+    if ring {
+      Border: {
+        width: t.focus_width, radius: t.radius,
+        color: {t.focus.r, t.focus.g, t.focus.b, 255}
+      }
+    } else if frame {
+      Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
     }
-  } else if frame {
-    Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
+  } else if ring || frame {
+    const line = ring ? t.focus_width : 1
+    const line_rgb = ring ? t.focus : t.border
+
+    outline {
+      Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, clip: true}
+      Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+      Ignore
+
+      edge_top {
+        Position: {0, b.height / 2 - line / 2, 0}
+        Rect: {b.width, line}
+        Rgb: line_rgb
+      }
+      edge_bottom {
+        Position: {0, line / 2 - b.height / 2, 0}
+        Rect: {b.width, line}
+        Rgb: line_rgb
+      }
+      edge_left {
+        Position: {line / 2 - b.width / 2, 0, 0}
+        Rect: {line, b.height}
+        Rgb: line_rgb
+      }
+      edge_right {
+        Position: {b.width / 2 - line / 2, 0, 0}
+        Rect: {line, b.height}
+        Rgb: line_rgb
+      }
+    }
   }
 
   if bars {
@@ -391,17 +501,25 @@ template ScrollView : HeadlessScrollView {
     const vthumb = scroll_thumb(vtrack, b.height, c.height)
     const hthumb = scroll_thumb(htrack, b.width, c.width)
     const radius = max(t.radius - edge, 0)
-    const ring_under = ring ? max(t.focus_width - edge, 0) : 0
+    const ring_under = ring && !overlay ? max(t.focus_width - edge, 0) : 0
 
     scrollbars {
       Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, clip: true}
       Item: {width: {mode: Fixed, value: 0}, height: {mode: Fixed, value: 0}}
+      if overlay {
+        Opacity: {shown ? 1 : 0}
+        Transition: [Opacity: WidgetFade]
+        if !shown {
+          Ignore
+        }
+      }
 
       // Both tracks run the whole length of their edge and cover the corner between them
       if vbar {
         ScrollBar vscroll(
           vertical: true, length: b.height - edge * 2, thumb: vthumb, size: bar,
           radius: radius, active: drag == 1, hover: over == 1, ring: ring_under,
+          overlay: overlay, track: hot == 1,
           at: scroll_thumb_at(vtrack, vthumb, c.y, c.max_y)) {
           Position: {b.width / 2 - edge - bar / 2, 0, 0}
         }
@@ -411,6 +529,7 @@ template ScrollView : HeadlessScrollView {
         ScrollBar hscroll(
           vertical: false, length: b.width - edge * 2, thumb: hthumb, size: bar,
           radius: radius, active: drag == 2, hover: over == 2, ring: ring_under,
+          overlay: overlay, track: hot == 2,
           at: scroll_thumb_at(htrack, hthumb, c.x, c.max_x)) {
           Position: {0, edge + bar / 2 - b.height / 2, 0}
         }

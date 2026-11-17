@@ -1007,3 +1007,285 @@ void Widgets_shell_click_disabled_button(void) {
 
     ecs_fini(world);
 }
+
+/** A screen UI with an overlay scroll view of 200 by 100 points in the middle of the window,
+ * whose six blocks of 40 points do not fit, and a probe that counts the presses on the first
+ * block, which spans the width of the content and so lies under the vertical bar.
+ *
+ * On screen the view spans [540, 310] to [740, 410]; the strip of its vertical bar runs from
+ * x 729 to 739, and [730, 338] is in it, on the first block and on the thumb at the top. */
+#define WIDGETS_OVERLAY \
+    "using flecs.script\n" \
+    "using box.widgets\n" \
+    "using box.transform\n" \
+    "using box.geometry\n" \
+    "using box.camera\n" \
+    "using box.view\n" \
+    "using box.input\n" \
+    "using box.picking\n" \
+    "using box.layout\n" \
+    "using box.ui\n" \
+    "template PressProbe {\n" \
+    "  prop target: entity = 0\n" \
+    "  mut presses: i32 = 0\n" \
+    "  async {\n" \
+    "    while true {\n" \
+    "      await on.press(target)\n" \
+    "      presses = presses + 1\n" \
+    "    }\n" \
+    "  }\n" \
+    "}\n" \
+    "hud {\n" \
+    "  Scene: {}\n" \
+    "  camera {\n" \
+    "    Position: {0, 0, 100}\n" \
+    "    Camera: {ortho: true, ortho_scale: 1}\n" \
+    "  }\n" \
+    "  ScrollView view(width: 200, height: 100, overlay: true, hide_delay: 0.5) {\n" \
+    "    Position: {0, 0, 1}\n" \
+    "    b0 {\n" \
+    "      Interactive\n" \
+    "      Item: {width: {mode: Grow}, height: {mode: Fixed, value: 40}}\n" \
+    "    }\n" \
+    "    b1 { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 40}} }\n" \
+    "    b2 { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 40}} }\n" \
+    "    b3 { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 40}} }\n" \
+    "    b4 { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 40}} }\n" \
+    "    b5 { Item: {width: {mode: Grow}, height: {mode: Fixed, value: 40}} }\n" \
+    "  }\n" \
+    "}\n" \
+    "hud_view {\n" \
+    "  View: {camera: hud.camera}\n" \
+    "}\n" \
+    "probe { PressProbe: {target: hud.view.b0} }\n"
+
+/** Run frames of a fixed time step, so ui.delay counts known seconds.
+ *
+ * @param world The world
+ * @param seconds Seconds to run, in steps of 0.05
+ */
+static void widgets_seconds(
+    ecs_world_t *world,
+    float seconds)
+{
+    int32_t i, frames = (int32_t)(seconds / 0.05f + 0.5f);
+    for (i = 0; i < frames; i ++) {
+        ecs_progress(world, 0.05f);
+    }
+}
+
+/** Run a terminal command and frames until the input queue is drained.
+ *
+ * @param world The world
+ * @param s The terminal session
+ * @param cmd The command
+ */
+static void widgets_input(
+    ecs_world_t *world,
+    ecs_entity_t s,
+    const char *cmd)
+{
+    bool error = true;
+    int32_t i;
+    char *out = box_command_run(world, s, cmd, &error);
+    if (error) {
+        printf("command '%s' failed: %s\n", cmd, out);
+    }
+
+    test_bool(error, false);
+    ecs_os_free(out);
+    for (i = 0; i < 6 || box_input_pending(world); i ++) {
+        ecs_progress(world, 0);
+    }
+}
+
+/** Get whether the bars of a scroll view show, from its mut shown.
+ *
+ * @param world The world
+ * @param path Path of the scroll view
+ * @return Whether they show
+ */
+static bool widgets_bars_shown(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t mut = ecs_lookup(world, "box.widgets.ScrollView.mut");
+    const EcsStruct *st = ecs_get(world, mut, EcsStruct);
+    const ecs_member_t *m = NULL;
+    int32_t i;
+    test_assert(st != NULL);
+    for (i = 0; i < ecs_vec_count(&st->members); i ++) {
+        ecs_member_t *cur = ecs_vec_get_t(&st->members, ecs_member_t, i);
+        if (!strcmp(cur->name, "shown")) {
+            m = cur;
+        }
+    }
+
+    test_assert(m != NULL);
+    const char *ptr = ecs_get_id(world, ecs_lookup(world, path), mut);
+    test_assert(ptr != NULL);
+
+    return *(const bool*)ECS_OFFSET(ptr, m->offset);
+}
+
+/** Get the presses the PressProbe counted.
+ *
+ * @param world The world
+ * @return The presses on the first block
+ */
+static int32_t widgets_presses(
+    ecs_world_t *world)
+{
+    const int32_t *result = ecs_get_id(world, ecs_lookup(world, "probe"),
+        ecs_lookup(world, "PressProbe.mut"));
+    test_assert(result != NULL);
+
+    return *result;
+}
+
+void Widgets_scroll_overlay_no_gutter(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(
+        "using box.widgets\n"
+        "using box.layout\n"
+        "using box.transform\n"
+        "ScrollView view(width: 200, height: 100, horizontal: true, overlay: true) {\n"
+        "  Position: {0, 0, 0}\n"
+        "  b0 { Item: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 40}} }\n"
+        "  b1 { Item: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 40}} }\n"
+        "  b2 { Item: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 40}} }\n"
+        "  b3 { Item: {width: {mode: Fixed, value: 300}, height: {mode: Fixed, value: 40}} }\n"
+        "}\n");
+    widgets_frames(world);
+
+    /* Neither axis fits, yet the padding leaves no room for the bars, which are hidden until
+     * the view scrolls */
+    ecs_entity_t view = ecs_lookup(world, "view");
+    const LayoutContent *c = ecs_get(world, view, LayoutContent);
+    test_assert(c != NULL);
+    test_assert(c->max_y > 0);
+    test_assert(c->max_x > 0);
+    const Layout *l = ecs_get(world, view, Layout);
+    test_assert(l != NULL);
+    test_flt(l->padding.right, 8);
+    test_flt(l->padding.bottom, 8);
+    test_flt(l->padding.left, 8);
+    test_flt(l->padding.top, 8);
+    test_bool(widgets_bars_shown(world, "view"), false);
+    test_assert(ecs_lookup(world, "view.scrollbars") == 0);
+
+    /* Shown they still take no room */
+    widgets_set_mut(world, "view", "box.widgets.ScrollView.mut", "y", 40);
+    widgets_frames(world);
+    test_bool(widgets_bars_shown(world, "view"), true);
+    test_assert(ecs_lookup(world, "view.scrollbars.vscroll") != 0);
+    test_assert(ecs_lookup(world, "view.scrollbars.hscroll") != 0);
+    l = ecs_get(world, view, Layout);
+    test_flt(l->padding.right, 8);
+    test_flt(l->padding.bottom, 8);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
+void Widgets_scroll_overlay_shows_on_scroll(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_OVERLAY);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+    widgets_seconds(world, 1);
+    ecs_entity_t view = ecs_lookup(world, "hud.view");
+    test_assert(view != 0);
+    test_assert(ecs_get(world, view, LayoutContent)->max_y > 0);
+
+    /* Hidden after the first frames, also with the pointer over the content */
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars") == 0);
+    widgets_input(world, s, "mouse_move [640, 360]");
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+
+    /* The wheel scrolls and shows them */
+    widgets_input(world, s, "mouse_scroll 0 -1");
+    test_flt(ecs_get(world, view, LayoutContent)->y, 40);
+    test_bool(widgets_bars_shown(world, "hud.view"), true);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars.vscroll") != 0);
+
+    /* hide_delay seconds after the last scroll they hide again */
+    widgets_seconds(world, 1);
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars") == 0);
+
+    /* A scroll from the shell, setting the mut, shows them too */
+    widgets_set_mut(world, "hud.view", "box.widgets.ScrollView.mut", "y", 0);
+    widgets_frames(world);
+    test_flt(ecs_get(world, view, LayoutContent)->y, 0);
+    test_bool(widgets_bars_shown(world, "hud.view"), true);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars.vscroll") != 0);
+    widgets_seconds(world, 1);
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
+void Widgets_scroll_overlay_press_through(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_OVERLAY);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+    widgets_seconds(world, 1);
+    ecs_entity_t view = ecs_lookup(world, "hud.view");
+    test_assert(view != 0);
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+    test_int(widgets_presses(world), 0);
+
+    /* A press in the strip of the hidden bar reaches the block under it and scrolls nothing */
+    widgets_input(world, s, "mouse_click left [730, 338]");
+    test_int(widgets_presses(world), 1);
+    test_flt(ecs_get(world, view, LayoutContent)->y, 0);
+
+    /* The pointer rests over the strip, so the bars show; a press there grabs the thumb and a
+     * drag scrolls, the block under it gets no press */
+    widgets_seconds(world, 0.1f);
+    test_bool(widgets_bars_shown(world, "hud.view"), true);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars.vscroll") != 0);
+    widgets_input(world, s, "mouse_drag left [730, 338] [730, 368]");
+    test_assert(ecs_get(world, view, LayoutContent)->y > 0);
+    test_int(widgets_presses(world), 1);
+
+    char *logs = widgets_warnings(world);
+    test_str(logs, "");
+    ecs_os_free(logs);
+    ecs_fini(world);
+}
+
+void Widgets_scroll_overlay_hover_shows(void) {
+    // ui/widgets
+    ecs_world_t *world = widgets_scene(WIDGETS_OVERLAY);
+    ecs_entity_t s = ecs_shell_session_init(world, NULL);
+    widgets_frames(world);
+    widgets_seconds(world, 1);
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+
+    /* Over the content they stay hidden, over the strip of the bar they show */
+    widgets_input(world, s, "mouse_move [640, 360]");
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+    widgets_input(world, s, "mouse_move [735, 390]");
+    test_bool(widgets_bars_shown(world, "hud.view"), true);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars.vscroll") != 0);
+
+    /* They stay while the pointer rests there, and hide hide_delay seconds after it left */
+    widgets_seconds(world, 1);
+    test_bool(widgets_bars_shown(world, "hud.view"), true);
+    widgets_input(world, s, "mouse_move [640, 360]");
+    test_bool(widgets_bars_shown(world, "hud.view"), true);
+    widgets_seconds(world, 1);
+    test_bool(widgets_bars_shown(world, "hud.view"), false);
+    test_assert(ecs_lookup(world, "hud.view.scrollbars") == 0);
+
+    ecs_fini(world);
+}
