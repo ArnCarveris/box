@@ -42,9 +42,11 @@ assets {
           ]
         }
       }
+
       Sweep: {path: route, profile: MarketRoundProfile, scale: {0.014, 0.014}, rings: 64}
       Rgb: MarketIron
     }
+
     for i in 0..flags {
       const t = i * 1.0 / flags
       const y = sag(t)

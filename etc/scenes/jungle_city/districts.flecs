@@ -10,6 +10,7 @@ assets {
     prop inset: f32 = 5.1
     prop curb: f32 = 7.05
     const g: math.Rng = {seed: seed + 1299709}
+
     for i in 0..24 {
       const side = g.u(4)
       const along_t = g.f(2) - 1
@@ -19,7 +20,8 @@ assets {
       const tall = g.f(1)
       const bamboo_h = 3.5 + tall * 2.5
       const banana_h = 2.6 + tall * 1.6
-      const reach = kind < 4 ? size * 0.4 : (kind < 7 ? size * 1.1 : (kind < 9 ? size * 1.5 : (kind == 9 ? 1.1 : (kind == 10 ? 0.5 + bamboo_h * 0.16 : banana_h * 0.62))))
+      const reach = kind < 4 ? size * 0.4 : (kind < 7 ? size * 1.1 : (kind < 9 ? size * 1.5 :
+        (kind == 9 ? 1.1 : (kind == 10 ? 0.5 + bamboo_h * 0.16 : banana_h * 0.62))))
       const fit = math.min(1, (curb - inset) / reach)
       const limit = curb - reach * fit
       const dist = math.min(inset + dist_t * (7 - inset), limit)
@@ -27,6 +29,7 @@ assets {
       const x = match side { 0, 1: along; 2: dist; _: -dist }
       const z = match side { 0: dist; 1: -dist; _: along }
       const clear = !(z > 1.5 && ((x > -1.9 && x < 1.9) || (x > gate - 3.2 && x < gate + 2)))
+
       if clear {
         if kind < 4 {
           CanopyTuft(size: size * 0.8 * fit, yaw: g.f(3)) { Position = {x, 0, z} }
@@ -45,7 +48,161 @@ assets {
     }
   }
 
-  template CanopyDistricts {
+  template CanopyDistrictBuilding {
+    prop seed: i32 = 0
+    prop x: i32 = 0
+    prop z: i32 = 0
+    prop h: i32 = 0
+    prop kind: i32 = 0
+    prop floors: i32 = 0
+    prop skyscraper_floors: i32 = 0
+    prop trees_per_block: i32 = 0
+    prop is_landmark: bool = false
+    prop landmark: i32 = 0
+    prop wall: Rgb = {226, 235, 211}
+    prop timber: Rgb = {143, 91, 48}
+    prop roof: i32 = 0
+    prop facade: i32 = 0
+    prop sx: f64 = 1
+    prop sz: f64 = 1
+    prop gx: f64 = 0
+    prop zf: f64 = 0
+    prop walk_end: f64 = 0
+    const deck_y = 4.52
+    const plants: math.Rng = {seed: seed + x * 193939 + z * 371389 + 9127}
+
+    if is_landmark {
+      const height_offsets = [7, -3, 2, 11, -1, 5]
+      const landmark_floors: i32 = math.max(12,
+        floors + skyscraper_floors + height_offsets[landmark])
+      CanopySkyscraper(
+        floorplan: landmark,
+        floors: landmark_floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else if kind == 0 {
+      CanopyTower(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else if kind == 1 {
+      CanopyRotunda(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else if kind == 2 {
+      CanopyCascade(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else if kind == 3 {
+      CanopySpire(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else if kind == 5 {
+      CanopyCourtyard(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else if kind == 6 {
+      CanopySlab(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    } else {
+      CanopyPods(
+        floors: floors,
+        variant: h,
+        wall: wall,
+        timber: timber,
+        roof_style: roof,
+        facade_style: facade,
+        sx: sx,
+        sz: sz
+      ) {}
+    }
+
+    CanopyGangway(length: walk_end - zf, variant: h) { Position: {gx, deck_y, zf} }
+    CanopyLift(height: deck_y, variant: h) {
+      Position: {gx - 1.75, 0, (zf + walk_end) / 2}
+    }
+
+    forecourt : CanopyPaver {
+      Position: {0, 0.015, (1.2 + walk_end) / 2}
+      Box: {2.6, 0.05, walk_end - 1.2}
+    }
+
+    for t in 0..trees_per_block {
+      const side = plants.u(4)
+      const along = plants.f(13) - 6.5
+      const reach = is_landmark ? 6.4 : 5.2
+      const dist = reach + plants.f(6.8 - reach)
+      const tx = match side { 0, 1: along; 2: dist; _: -dist }
+      const tz = match side { 0: dist; 1: -dist; _: along }
+      const tree_h = 5.4 + plants.f(6.5)
+      const tree_v = plants.u(100000)
+
+      if !(tz > 1.5 && ((tx > -2.2 && tx < 2.2) || (tx > gx - 3.4 && tx < gx + 2.2))) {
+        CanopyTree(height: tree_h, variant: tree_v) { Position: {tx, 0, tz} }
+      }
+    }
+
+    CanopyUnderstory(seed: h, gate: gx) {}
+    CanopyStreetlight() { Position: {1.65, 0, walk_end - 0.3}; Rotation: {0, math.PI, 0} }
+    CanopyBench(length: 1.6) {
+      Position: {1.85, 0.02, walk_end - 2.6}
+      Rotation: {0, -math.PI / 2, 0}
+    }
+
+    if h % 3 == 0 {
+      CanopyPerson(seed: h) { Position: {0.5, 0.04, walk_end - 1} }
+    }
+  }
+
+  template CanopyDistrictLots {
     prop columns: i32 = 10
     prop rows: i32 = 9
     prop spacing: f32 = 17
@@ -59,8 +216,6 @@ assets {
     prop downtown_columns: i32 = 10
     prop downtown_rows: i32 = 9
     prop midrise: f32 = 0.4
-    const width = columns * spacing + 32
-    const depth = rows * spacing + 20
     const downtown_x = (math.min(columns, downtown_columns) - 1) * spacing / 2
     const downtown_z = (math.min(rows, downtown_rows) - 1) * spacing / 2
     const deck_y = 4.52
@@ -73,7 +228,6 @@ assets {
     for x in 0..columns {
       for z in 0..rows {
         const rng: math.Rng = {seed: seed + x * 92821 + z * 68917}
-        const plants: math.Rng = {seed: seed + x * 193939 + z * 371389 + 9127}
         const h = rng.u(100000)
         const ivory: Rgb = {226, 235, 211}
         const sage: Rgb = {160, 192, 158}
@@ -89,6 +243,7 @@ assets {
         const pz = (z - (rows - 1) / 2.0) * spacing
         {
           if px < -7 { Position: {px - 5, 0, pz} } else { Position: {px + 5, 0, pz} }
+
           if px < -7 || px > 7 {
             const s = px < 0 ? -1.0 : 1.0
             const lot_x = px + s * 5
@@ -110,9 +265,11 @@ assets {
 
             const nx = px / ((columns - 1) * spacing / 2)
             const nz = pz / ((rows - 1) * spacing / 2)
-            const downtown = math.max(0, 1 - px * px / (downtown_x * downtown_x)) * math.max(0, 1 - pz * pz / (downtown_z * downtown_z))
+            const downtown = math.max(0, 1 - px * px / (downtown_x * downtown_x)) *
+              math.max(0, 1 - pz * pz / (downtown_z * downtown_z))
             const centrality = math.max(downtown, midrise * (1 - nx * nx) * (1 - nz * nz))
-            const floors: i32 = base_floors + rng.u(floor_variation) + math.floor(center_floors * centrality)
+            const floors: i32 = base_floors + rng.u(floor_variation) +
+              math.floor(center_floors * centrality)
             const families = centrality > 0.55 ? [0, 1, 3, 3, 4, 6, 6] : [0, 1, 2, 4, 5, 5, 6]
             const kind = families[rng.u(7)]
             const wall = walls[rng.u(5)]
@@ -131,59 +288,63 @@ assets {
             const opening = cleared ? 1000.0 : gx - main_x
 
             if !cleared {
-              if is_landmark {
-                const height_offsets = [7, -3, 2, 11, -1, 5]
-                const landmark_floors: i32 = math.max(12, floors + skyscraper_floors + height_offsets[landmark])
-                CanopySkyscraper(floorplan: landmark, floors: landmark_floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else if kind == 0 {
-                CanopyTower(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else if kind == 1 {
-                CanopyRotunda(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else if kind == 2 {
-                CanopyCascade(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else if kind == 3 {
-                CanopySpire(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else if kind == 5 {
-                CanopyCourtyard(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else if kind == 6 {
-                CanopySlab(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              } else {
-                CanopyPods(floors: floors, variant: h, wall: wall, timber: timber, roof_style: roof, facade_style: facade, sx: sx, sz: sz) {}
-              }
-              CanopyGangway(length: walk_end - zf, variant: h) { Position: {gx, deck_y, zf} }
-              CanopyLift(height: deck_y, variant: h) { Position: {gx - 1.75, 0, (zf + walk_end) / 2} }
-              forecourt : CanopyPaver { Position: {0, 0.015, (1.2 + walk_end) / 2}; Box: {2.6, 0.05, walk_end - 1.2} }
-              for t in 0..trees_per_block {
-                const side = plants.u(4)
-                const along = plants.f(13) - 6.5
-                const reach = is_landmark ? 6.4 : 5.2
-                const dist = reach + plants.f(6.8 - reach)
-                const tx = match side { 0, 1: along; 2: dist; _: -dist }
-                const tz = match side { 0: dist; 1: -dist; _: along }
-                const tree_h = 5.4 + plants.f(6.5)
-                const tree_v = plants.u(100000)
-                if !(tz > 1.5 && ((tx > -2.2 && tx < 2.2) || (tx > gx - 3.4 && tx < gx + 2.2))) {
-                  CanopyTree(height: tree_h, variant: tree_v) { Position: {tx, 0, tz} }
-                }
-              }
-              CanopyUnderstory(seed: h, gate: gx) {}
-              CanopyStreetlight() { Position: {1.65, 0, walk_end - 0.3}; Rotation: {0, math.PI, 0} }
-              CanopyBench(length: 1.6) { Position: {1.85, 0.02, walk_end - 2.6}; Rotation: {0, -math.PI / 2, 0} }
-              if h % 3 == 0 {
-                CanopyPerson(seed: h) { Position: {0.5, 0.04, walk_end - 1} }
+              CanopyDistrictBuilding: {
+                seed: seed,
+                x: x,
+                z: z,
+                h: h,
+                kind: kind,
+                floors: floors,
+                skyscraper_floors: skyscraper_floors,
+                trees_per_block: trees_per_block,
+                is_landmark: is_landmark,
+                landmark: landmark,
+                wall: wall,
+                timber: timber,
+                roof: roof,
+                facade: facade,
+                sx: sx,
+                sz: sz,
+                gx: gx,
+                zf: zf,
+                walk_end: walk_end
               }
             }
 
             CanopyPathNode(size: node) { Position: {s * hs, 0, hs} }
+
             if has_main {
               CanopyPath(length: ground_len, width: 2.4) { Position: {ground_x, 0, hs} }
-              CanopyWalk(length: main_len, seed: x * 41 + z * 7 + seed, opening: opening, clearance: deck_y) { Position: {main_x, deck_y, hs} }
+              CanopyWalk(
+                length: main_len,
+                seed: x * 41 + z * 7 + seed,
+                opening: opening,
+                clearance: deck_y
+              ) {
+                Position: {main_x, deck_y, hs}
+              }
             }
+
             if inner && !cleared {
-              CanopyPath(length: spacing - 2.68, width: 2) { Position: {-s * (lot_abs - 7.6), 0, 0}; Rotation: {0, math.PI / 2, 0} }
-              CanopyJunction(size: node, west: s < 0 || x > 0, east: s > 0 || x < columns - 1, seed: x * 13 + z * 29 + seed, clearance: deck_y) { Position: {-s * (lot_abs - 7.5), deck_y, hs} }
+              CanopyPath(length: spacing - 2.68, width: 2) {
+                Position: {-s * (lot_abs - 7.6), 0, 0}
+                Rotation: {0, math.PI / 2, 0}
+              }
+
+              CanopyJunction(
+                size: node,
+                west: s < 0 || x > 0,
+                east: s > 0 || x < columns - 1,
+                seed: x * 13 + z * 29 + seed,
+                clearance: deck_y
+              ) {
+                Position: {-s * (lot_abs - 7.5), deck_y, hs}
+              }
+
               if s < 0 {
-                CanopyCanalSpan(length: 15 - node, seed: z * 17 + seed, clearance: deck_y) { Position: {-lot_x, deck_y, hs} }
+                CanopyCanalSpan(length: 15 - node, seed: z * 17 + seed, clearance: deck_y) {
+                  Position: {-lot_x, deck_y, hs}
+                }
               }
             }
 
@@ -199,32 +360,62 @@ assets {
               seed: x * 19 + z * 37 + seed,
               clearance: deck_y
             ) { Position: {s * hs, deck_y, hs} }
+
             if stair_here {
               CanopyStair(rise: deck_y) { Position: {s * (hs + 1.85), deck_y, hs - node / 2} }
             }
+
             if z > 0 {
-              CanopyPath(length: spacing - node, width: 2.4) { Position: {s * hs, 0, 0}; Rotation: {0, math.PI / 2, 0} }
-              CanopyWalk(length: spacing - node, seed: x * 23 + z * 11 + seed + 5000, clearance: deck_y) { Position: {s * hs, deck_y, 0}; Rotation: {0, math.PI / 2, 0} }
+              CanopyPath(length: spacing - node, width: 2.4) {
+                Position: {s * hs, 0, 0}
+                Rotation: {0, math.PI / 2, 0}
+              }
+
+              CanopyWalk(
+                length: spacing - node,
+                seed: x * 23 + z * 11 + seed + 5000,
+                clearance: deck_y
+              ) {
+                Position: {s * hs, deck_y, 0}
+                Rotation: {0, math.PI / 2, 0}
+              }
             }
           }
         }
       }
     }
+  }
+
+  template CanopyDistricts : CanopyDistrictLots {
+    const width = columns * spacing + 32
+    const depth = rows * spacing + 20
+
     for side in 0..2 {
       const edge: math.Rng = {seed: seed + side * 197831 + 23741}
+
       for i in 0..columns * 3 {
         const edge_x = (i / (columns * 3.0 - 1) - 0.5) * (width - 7)
+
         if edge_x < -9 || edge_x > 9 {
-          CanopyTree(height: 6 + edge.f(8), variant: edge.u(100000)) { Position: {edge_x, 0, (side - 0.5) * (depth - 8) + edge.f(2.6) - 1.3} }
+          CanopyTree(height: 6 + edge.f(8), variant: edge.u(100000)) {
+            Position: {edge_x, 0, (side - 0.5) * (depth - 8) + edge.f(2.6) - 1.3}
+          }
         }
       }
+
       for i in 0..rows * 3 {
-        CanopyTree(height: 7 + edge.f(9), variant: edge.u(100000)) { Position: {(side - 0.5) * (width - 7), 0, (i / (rows * 3.0 - 1) - 0.5) * (depth - 12)} }
+        CanopyTree(height: 7 + edge.f(9), variant: edge.u(100000)) {
+          Position: {(side - 0.5) * (width - 7), 0, (i / (rows * 3.0 - 1) - 0.5) * (depth - 12)}
+        }
       }
+
       for i in 0..columns * 6 {
         const fx = (i / (columns * 6.0 - 1) - 0.5) * (width - 10)
+
         if fx < -9 || fx > 9 {
-          CanopyFern(size: 1 + edge.f(0.8)) { Position: {fx, 0, (side - 0.5) * (depth - 5) + edge.f(2) - 1} }
+          CanopyFern(size: 1 + edge.f(0.8)) {
+            Position: {fx, 0, (side - 0.5) * (depth - 5) + edge.f(2) - 1}
+          }
         }
       }
     }
@@ -234,25 +425,41 @@ assets {
     prop spacing: f32 = 17
     prop radius: f32 = 11
     const reach = spacing * 1.08
+
     for side in 0..2 {
       const sx = (side - 0.5) * 2
       {
         Position: {sx * (radius + reach) * 0.5 + sx * 3.2, 0.2, 0}
+
         for row in 0..2 {
-          CanopyParterre(w: reach - radius + 2.2, d: spacing * 0.56, seed: side * 3 + row) { Position: {0, 0, (row - 0.5) * spacing * 0.86} }
+          CanopyParterre(w: reach - radius + 2.2, d: spacing * 0.56, seed: side * 3 + row) {
+            Position: {0, 0, (row - 0.5) * spacing * 0.86}
+          }
         }
+
         axis : CanopyPaver { Position: {0, 0.03, 0}; Box: {reach - radius + 2.2, 0.05, 3.4} }
+
         for i in 0..4 {
           const x = (i - 1.5) * (reach - radius) / 3.4
+
           for row in 0..2 {
-            CanopyTree(height: 7.5 + (i + row) % 3 * 1.1, variant: i * 17 + row * 5 + side * 31, species: 1) { Position: {x, 0, (row - 0.5) * 4.3} }
+            CanopyTree(
+              height: 7.5 + (i + row) % 3 * 1.1,
+              variant: i * 17 + row * 5 + side * 31,
+              species: 1
+            ) {
+              Position: {x, 0, (row - 0.5) * 4.3}
+            }
           }
         }
       }
     }
+
     for i in 0..10 {
       const a = i * 2.399963
-      CanopyPerson(seed: i + 5) { Position: {math.sin(a) * (radius + 3 + i * 0.8) , 0.22, math.cos(a) * 3} }
+      CanopyPerson(seed: i + 5) {
+        Position: {math.sin(a) * (radius + 3 + i * 0.8) , 0.22, math.cos(a) * 3}
+      }
     }
   }
 }

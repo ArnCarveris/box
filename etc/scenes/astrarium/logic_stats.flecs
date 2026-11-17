@@ -8,13 +8,16 @@ async {
   while true {
     await StatsChanged
     mut gear: i32[4] = {}
+
     for s in 0..4 {
       const e = eq[s]
+
       if e != 0 {
         const a = e[ArmoryItem]
         gear = [gear[0] + a.might, gear[1] + a.ward, gear[2] + a.haste, gear[3] + a.aether]
       }
     }
+
     stat_might = 30 + star_bonus[0] + gear[0]
     stat_ward = 24 + star_bonus[1] + gear[1]
     stat_haste = 18 + star_bonus[2] + gear[2]

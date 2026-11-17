@@ -42,13 +42,16 @@ async {
           st_next_cargo = st_beat + max(12, 34 - st_reputation / 8 - st_cargo_docks * 3)
           st_ship_go(s, SHIP_ARRIVING, 6)
         } else if !cargo && st_pax_docks > 0 && st_beat >= st_next_pax {
-          st_next_pax = st_beat + max(9, 30 - st_reputation / 6 - st_pax_docks * 3 - st_residents / 10)
+          st_next_pax = st_beat + max(
+            9, 30 - st_reputation / 6 - st_pax_docks * 3 - st_residents / 10
+          )
           st_ship_go(s, SHIP_ARRIVING, 6)
         }
       } else if state == SHIP_ARRIVING {
         if timer <= 1 {
           st_ships[s].state = SHIP_HOLDING
           st_ships[s].patience = 22
+
           if cargo {
             st_cargo_holding += 1
           } else {
@@ -58,31 +61,39 @@ async {
       } else if state == SHIP_HOLDING {
         const pad_kind = cargo ? K_CARGO : K_PAX
         mut pad: i32 = -1
+
         for i in 0..st_slots {
           if st_grid[i] == pad_kind && !st_pad_busy[i] {
             pad = i
             break
           }
         }
+
         if pad >= 0 {
           st_pad_busy[pad] = true
+
           if cargo {
             st_cargo_holding -= 1
           } else {
             st_pax_holding -= 1
           }
+
           st_ships[s].dock = pad
           st_ship_go(s, SHIP_APPROACH, 4)
         } else if ship.patience <= 1 {
           st_ship_go(s, SHIP_LEAVING, 7)
           st_reputation = max(st_reputation - 4, 0)
           st_ships_lost += 1
+
           if cargo {
             st_cargo_holding -= 1
             st_notify("A freighter gave up waiting for a free Cargo Dock. Reputation fell.", 7)
           } else {
             st_pax_holding -= 1
-            st_notify("A visitor ship gave up waiting for a free Passenger Dock. Reputation fell.", 7)
+            st_notify(
+              "A visitor ship gave up waiting for a free Passenger Dock. Reputation fell.",
+              7
+            )
           }
         } else {
           st_ships[s].patience -= 1
@@ -96,6 +107,7 @@ async {
           st_ships[s].state = SHIP_DOCKED
           st_reputation = min(st_reputation + 0.5, 100)
           st_ships_served += 1
+
           if cargo {
             st_ships[s].timer = 26
             st_cargo_docked += 1
@@ -120,8 +132,10 @@ async {
       } else if state == SHIP_DOCKED {
         if timer <= 1 {
           st_ship_go(s, SHIP_LIFTING, 3)
+
           if cargo {
             st_cargo_docked -= 1
+
             if st_cargo_docked == 0 {
               st_stock_food = 0
               st_stock_goods = 0

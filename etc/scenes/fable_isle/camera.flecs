@@ -18,8 +18,18 @@ state {
     PanDown { Action: {description: "Move the view back"}; Binding: {key: S} }
     Lower { Action: {description: "Move the view down"}; Binding: {key: Q} }
     Raise { Action: {description: "Move the view up"}; Binding: {key: E} }
-    ZoomIn { Action: {description: "Zoom in"}; Binding: {key: Equal}; alt { Binding: {key: KpAdd} } }
-    ZoomOut { Action: {description: "Zoom out"}; Binding: {key: Minus}; alt { Binding: {key: KpSubtract} } }
+    ZoomIn {
+      Action: {description: "Zoom in"}
+      Binding: {key: Equal}
+      alt { Binding: {key: KpAdd} }
+    }
+
+    ZoomOut {
+      Action: {description: "Zoom out"}
+      Binding: {key: Minus}
+      alt { Binding: {key: KpSubtract} }
+    }
+
     Home { Action: {description: "Reset the view"}; Binding: {key: Home} }
   }
 
@@ -62,6 +72,7 @@ async {
 async {
   mut last: f64 = box.app.Status[box.app.Status].elapsed
   mut age: f32 = 0
+
   while true {
     await next_frame()
     const now = box.app.Status[box.app.Status].elapsed
@@ -73,57 +84,75 @@ async {
       const h = hour + dt * clock_rate
       hour = h >= 24 ? h - 24 : h
     }
+
     const pick = cam_mode == CAM_BALLOON && balloons < 1 ? CAM_ORBIT : cam_mode
+
     if pick != cam_pick {
       cam_pick = pick
     }
 
-    const turn = held(view_actions.TurnLeft[ActionState].down) - held(view_actions.TurnRight[ActionState].down)
-    const tilt = held(view_actions.TiltUp[ActionState].down) - held(view_actions.TiltDown[ActionState].down)
-    const pan_x = held(view_actions.PanRight[ActionState].down) - held(view_actions.PanLeft[ActionState].down)
-    const pan_z = held(view_actions.PanDown[ActionState].down) - held(view_actions.PanUp[ActionState].down)
-    const pan_y = held(view_actions.Raise[ActionState].down) - held(view_actions.Lower[ActionState].down)
-    const zoom = held(view_actions.ZoomOut[ActionState].down) - held(view_actions.ZoomIn[ActionState].down)
+    const turn = held(view_actions.TurnLeft[ActionState].down) -
+      held(view_actions.TurnRight[ActionState].down)
+    const tilt = held(view_actions.TiltUp[ActionState].down) -
+      held(view_actions.TiltDown[ActionState].down)
+    const pan_x = held(view_actions.PanRight[ActionState].down) -
+      held(view_actions.PanLeft[ActionState].down)
+    const pan_z = held(view_actions.PanDown[ActionState].down) -
+      held(view_actions.PanUp[ActionState].down)
+    const pan_y = held(view_actions.Raise[ActionState].down) -
+      held(view_actions.Lower[ActionState].down)
+    const zoom = held(view_actions.ZoomOut[ActionState].down) -
+      held(view_actions.ZoomIn[ActionState].down)
     const mouse = Input[Input].mouse
     const dragging = view_actions.Orbit[ActionState].down
 
     if tour && !dragging && turn == 0 {
       view_yaw += dt * 0.07
     }
+
     if pan_x != 0 || pan_z != 0 {
       const speed = view_dist * 0.5 * dt
       view_x = clamp(view_x + (cos(view_yaw) * pan_x + sin(view_yaw) * pan_z) * speed, -40, 40)
       view_z = clamp(view_z + (cos(view_yaw) * pan_z - sin(view_yaw) * pan_x) * speed, -40, 40)
     }
+
     if pan_y != 0 {
       view_y = clamp(view_y + pan_y * view_dist * 0.3 * dt, -30, 30)
     }
+
     if turn != 0 {
       view_yaw += turn * 1.2 * dt
     }
+
     if tilt != 0 {
       view_pitch = clamp(view_pitch + tilt * 0.8 * dt, -0.5, 1.45)
     }
+
     if dragging && (mouse.delta.x != 0 || mouse.delta.y != 0) {
       view_yaw -= mouse.delta.x * 0.006
       view_pitch = clamp(view_pitch + mouse.delta.y * 0.004, -0.5, 1.45)
     }
+
     if zoom != 0 {
       view_dist = clamp(view_dist * (1 + zoom * 1.2 * dt), 8, 260)
     }
+
     if mouse.scroll.y != 0 {
       view_dist = clamp(view_dist * (1 - mouse.scroll.y * 0.08), 8, 260)
     }
 
     age = min(age + dt, 60)
     const ease = min(1, dt * (age < 5 ? 1.1 + age * 0.5 : 8))
+
     if abs(cam_yaw - view_yaw) > 0.00005 || abs(cam_pitch - view_pitch) > 0.0001 {
       cam_yaw += (view_yaw - cam_yaw) * ease
       cam_pitch += (view_pitch - cam_pitch) * ease
     }
+
     if abs(cam_dist - view_dist) > 0.001 {
       cam_dist += (view_dist - cam_dist) * ease
     }
+
     if abs(cam_x - view_x) > 0.001 || abs(cam_z - view_z) > 0.001 || abs(cam_y - view_y) > 0.001 {
       cam_x += (view_x - cam_x) * ease
       cam_y += (view_y - cam_y) * ease

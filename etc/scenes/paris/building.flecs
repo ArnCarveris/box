@@ -19,6 +19,7 @@ assets {
     prop lit: i32 = 0
     prop sill: bool = true
     frame : ParisWindowFrame { Position: {0, 0, 0.03}; Box: {1.36, height + 0.14, 0.06} }
+
     if lit == 1 {
       glass : ParisWindowLit { Position: {0, 0, 0.065}; Box: {1.2, height, 0.04} }
     } else if lit == 2 {
@@ -26,12 +27,17 @@ assets {
     } else {
       glass : ParisGlassDark { Position: {0, 0, 0.065}; Box: {1.2, height, 0.04} }
     }
+
     mullion : ParisWindowFrame { Position: {0, 0, 0.1}; Box: {0.06, height, 0.05} }
     transom : ParisWindowFrame { Position: {0, height / 2 - 0.55, 0.1}; Box: {1.2, 0.06, 0.05} }
     lintel : ParisLimestoneTrim { Position: {0, height / 2 + 0.26, 0.1}; Box: {1.72, 0.3, 0.2} }
     keystone : ParisLimestoneTrim { Position: {0, height / 2 + 0.3, 0.16}; Box: {0.26, 0.42, 0.2} }
+
     if sill {
-      sill_stone : ParisLimestoneTrim { Position: {0, 0 - height / 2 - 0.07, 0.11}; Box: {1.6, 0.14, 0.22} }
+      sill_stone : ParisLimestoneTrim {
+        Position: {0, 0 - height / 2 - 0.07, 0.11}
+        Box: {1.6, 0.14, 0.22}
+      }
     }
   }
 
@@ -39,10 +45,16 @@ assets {
   template ParisGardeCorps {
     top : ParisIron { Position: {0, 0.9, 0}; Box: {1.36, 0.05, 0.05} }
     bottom : ParisIron { Position: {0, 0.08, 0}; Box: {1.36, 0.04, 0.04} }
+
     for b in 0..5 {
       { (IsA, ParisIron); Position: {-0.56 + b * 0.28, 0.49, 0}; Box: {0.025, 0.8, 0.025} }
     }
-    ring : ParisIron { Position: {0, 0.49, 0}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.16, tube: 0.015, segments: 12, rings: 4} }
+
+    ring : ParisIron {
+      Position: {0, 0.49, 0}
+      Rotation: {math.PI / 2, 0, 0}
+      Torus: {radius: 0.16, tube: 0.015, segments: 12, rings: 4}
+    }
   }
 
   // A continuous stone balcony with a wrought iron railing, along the facade width.
@@ -52,20 +64,33 @@ assets {
     const span = width - 0.5
     const bars: i32 = floor(span / 0.3)
     slab : ParisLimestoneTrim { Position: {0, 0.1, 0.45}; Box: {span, 0.2, 0.9} }
+
     for i in 0..bays {
       const x = 0 - width / 2 + (i + 0.5) * width / bays
       { (IsA, ParisLimestoneTrim); Position: {x - 0.5, -0.18, 0.3}; Box: {0.18, 0.36, 0.6} }
       { (IsA, ParisLimestoneTrim); Position: {x + 0.5, -0.18, 0.3}; Box: {0.18, 0.36, 0.6} }
-      { (IsA, ParisIron); Position: {x, 0.68, 0.84}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.2, tube: 0.016, segments: 12, rings: 4} }
+      {
+        (IsA, ParisIron)
+        Position: {x, 0.68, 0.84}
+        Rotation: {math.PI / 2, 0, 0}
+        Torus: {radius: 0.2, tube: 0.016, segments: 12, rings: 4}
+      }
     }
+
     rail : ParisIron { Position: {0, 1.2, 0.84}; Box: {span, 0.06, 0.07} }
     low_rail : ParisIron { Position: {0, 0.28, 0.84}; Box: {span, 0.04, 0.04} }
+
     for side in 0..2 {
       { (IsA, ParisIron); Position: {(side - 0.5) * span, 1.2, 0.42}; Box: {0.06, 0.06, 0.84} }
       { (IsA, ParisIron); Position: {(side - 0.5) * span, 0.74, 0.42}; Box: {0.03, 0.9, 0.03} }
     }
+
     for b in 0..bars {
-      { (IsA, ParisIron); Position: {0 - span / 2 + (b + 0.5) * span / bars, 0.74, 0.84}; Box: {0.025, 0.9, 0.025} }
+      {
+        (IsA, ParisIron)
+        Position: {0 - span / 2 + (b + 0.5) * span / bars, 0.74, 0.84}
+        Box: {0.025, 0.9, 0.025}
+      }
     }
   }
 
@@ -85,11 +110,24 @@ assets {
     const top_balcony: i32 = min(5, floors)
 
     for side in 0..2 {
-      { (IsA, ParisLimestoneTrim); Position: {(side - 0.5) * (width - 0.36), (top + PR_GROUND) / 2, 0.05}; Box: {0.36, top - PR_GROUND, 0.1} }
+      {
+        (IsA, ParisLimestoneTrim)
+        Position: {(side - 0.5) * (width - 0.36), (top + PR_GROUND) / 2, 0.05}
+        Box: {0.36, top - PR_GROUND, 0.1}
+      }
     }
-    shop_cornice : ParisLimestoneTrim { Position: {0, PR_GROUND - 0.05, 0.16}; Box: {width, 0.3, 0.32} }
+
+    shop_cornice : ParisLimestoneTrim {
+      Position: {0, PR_GROUND - 0.05, 0.16}
+      Box: {width, 0.3, 0.32}
+    }
+
     for f in 1..floors {
-      { (IsA, ParisLimestoneTrim); Position: {0, PR_GROUND + f * PR_FLOOR, 0.06}; Box: {width, 0.16, 0.12} }
+      {
+        (IsA, ParisLimestoneTrim)
+        Position: {0, PR_GROUND + f * PR_FLOOR, 0.06}
+        Box: {width, 0.16, 0.12}
+      }
     }
 
     for i in 0..bays {
@@ -102,6 +140,7 @@ assets {
         const lit: i32 = roll < 0.22 ? 1 : (roll < 0.42 ? 2 : 0)
         const balcony = f == 2 || f == top_balcony
         ParisWindow(height: h, lit: lit, sill: !balcony) { Position: {x, base + 0.32 + h / 2, 0} }
+
         if !balcony {
           ParisGardeCorps() { Position: {x, base + 0.3, 0.2} }
         }
@@ -112,22 +151,42 @@ assets {
           surround : ParisLimestoneTrim { Position: {x, 1.95, 0.05}; Box: {2.3, 3.9, 0.1} }
           porte : ParisDoorWood { Position: {x, 1.75, 0.12}; Box: {1.8, 3.5, 0.08} }
           porte_split : ParisIron { Position: {x, 1.75, 0.17}; Box: {0.04, 3.4, 0.03} }
+
           for k in 0..2 {
-            { (IsA, ParisIron); Position: {x - 0.18 + k * 0.36, 1.6, 0.19}; Sphere: {radius: 0.04, segments: 8} }
+            {
+              (IsA, ParisIron)
+              Position: {x - 0.18 + k * 0.36, 1.6, 0.19}
+              Sphere: {radius: 0.04, segments: 8}
+            }
           }
         } else {
-          { (IsA, ParisShopPaint); Position: {x, 1.95, 0.07}; Box: {bay_w - 0.2, 3.9, 0.14}; Rgb: shop }
-          { (IsA, ParisShopPaint); Position: {x, 3.78, 0.2}; Box: {bay_w - 0.12, 0.62, 0.2}; Rgb: shop }
+          {
+            (IsA, ParisShopPaint)
+            Position: {x, 1.95, 0.07}
+            Box: {bay_w - 0.2, 3.9, 0.14}
+            Rgb: shop
+          }
+
+          {
+            (IsA, ParisShopPaint)
+            Position: {x, 3.78, 0.2}
+            Box: {bay_w - 0.12, 0.62, 0.2}
+            Rgb: shop
+          }
+
           { (IsA, ParisGilt); Position: {x, 3.78, 0.31}; Box: {bay_w * 0.6, 0.12, 0.02} }
+
           if pr_hash(seed * 11 + i * 3.3) < 0.8 {
             { (IsA, ParisShopLit); Position: {x, 1.75, 0.16}; Box: {bay_w - 0.8, 2.5, 0.04} }
           } else {
             { (IsA, ParisGlassDark); Position: {x, 1.75, 0.16}; Box: {bay_w - 0.8, 2.5, 0.04} }
           }
+
           { (IsA, ParisShopPaint); Position: {x, 1.75, 0.19}; Box: {0.06, 2.5, 0.04}; Rgb: shop }
         }
       } else {
         ParisWindow(height: 2.3, lit: 0, sill: true) { Position: {x, 1.9, 0} }
+
         for k in 0..3 {
           { (IsA, ParisIron); Position: {x - 0.4 + k * 0.4, 1.9, 0.14}; Box: {0.03, 2.3, 0.03} }
         }
@@ -141,11 +200,28 @@ assets {
     }
 
     if ground && awning {
-      const tint: Rgb = match seed % 4 { 0: {150, 30, 36}; 1: {28, 78, 52}; 2: {36, 48, 96}; _: {118, 28, 58} }
-      cloth : ParisAwning { Position: {0, 3.2, 0.85}; Rotation: {0.35, 0, 0}; Box: {width - 0.8, 0.05, 1.7}; Rgb: tint }
+      const tint: Rgb = match seed % 4 {
+        0: {150, 30, 36}
+        1: {28, 78, 52}
+        2: {36, 48, 96}
+        _: {118, 28, 58}
+      }
+      cloth : ParisAwning {
+        Position: {0, 3.2, 0.85}
+        Rotation: {0.35, 0, 0}
+        Box: {width - 0.8, 0.05, 1.7}
+        Rgb: tint
+      }
+
       valance : ParisAwning { Position: {0, 2.82, 1.66}; Box: {width - 0.8, 0.3, 0.03}; Rgb: tint }
+
       for k in 0..2 {
-        { (IsA, ParisIron); Position: {(k - 0.5) * (width - 0.9), 3.0, 0.85}; Rotation: {0.35, 0, 0}; Box: {0.04, 0.04, 1.7} }
+        {
+          (IsA, ParisIron)
+          Position: {(k - 0.5) * (width - 0.9), 3.0, 0.85}
+          Rotation: {0.35, 0, 0}
+          Box: {0.04, 0.04, 1.7}
+        }
       }
     }
 
@@ -156,9 +232,7 @@ assets {
     }
   }
 
-  // A Haussmann apartment block: cream limestone, shop front, 4 or 5 floors of tall windows with
-  // balconies on the 2nd and the top floor, cornice and a zinc mansard roof with dormers and
-  // chimney stacks. The footprint is centred on the origin, the main facade looks along +Z.
+  // A Haussmann apartment block centred on the origin, the main facade looking along +Z.
   // left/right/back give the other faces a facade too (corner buildings, buildings on a square).
   template ParisBuilding {
     prop width: f32 = 12
@@ -176,35 +250,69 @@ assets {
 
     body : ParisLimestone { Position: {0, top / 2, 0}; Box: {width, top, depth} }
     plinth : ParisQuayStone { Position: {0, 0.25, 0}; Box: {width + 0.04, 0.5, depth + 0.04} }
-    cornice : ParisLimestoneTrim { Position: {0, top + 0.18, 0}; Box: {width + 0.4, 0.36, depth + 0.4} }
-    cornice_lip : ParisLimestoneTrim { Position: {0, top - 0.14, 0}; Box: {width + 0.2, 0.2, depth + 0.2} }
+    cornice : ParisLimestoneTrim {
+      Position: {0, top + 0.18, 0}
+      Box: {width + 0.4, 0.36, depth + 0.4}
+    }
+
+    cornice_lip : ParisLimestoneTrim {
+      Position: {0, top - 0.14, 0}
+      Box: {width + 0.2, 0.2, depth + 0.2}
+    }
+
     gutter : ParisZincPlain { Position: {0, top + 0.4, 0}; Box: {width + 0.44, 0.08, depth + 0.44} }
 
     mansard : ParisZinc {
       Position: {0, roof_y + PR_MANSARD / 2, 0}
-      BeveledPrism: {footprint: [{0 - width / 2, 0 - depth / 2}, {width / 2, 0 - depth / 2}, {width / 2, depth / 2}, {0 - width / 2, depth / 2}], depth: PR_MANSARD, inset: inset}
+      BeveledPrism: {
+        footprint: [
+          {0 - width / 2, 0 - depth / 2},
+          {width / 2, 0 - depth / 2},
+          {width / 2, depth / 2},
+          {0 - width / 2, depth / 2}
+        ],
+        depth: PR_MANSARD,
+        inset: inset
+      }
     }
+
     roof_top : ParisZincPlain {
       Position: {0, roof_y + PR_MANSARD + 0.3, 0}
-      BeveledPrism: {footprint: [{0 - width / 2 + inset, 0 - depth / 2 + inset}, {width / 2 - inset, 0 - depth / 2 + inset}, {width / 2 - inset, depth / 2 - inset}, {0 - width / 2 + inset, depth / 2 - inset}], depth: 0.6, inset: 1.2}
+      BeveledPrism: {
+        footprint: [
+          {0 - width / 2 + inset, 0 - depth / 2 + inset},
+          {width / 2 - inset, 0 - depth / 2 + inset},
+          {width / 2 - inset, depth / 2 - inset},
+          {0 - width / 2 + inset, depth / 2 - inset}
+        ],
+        depth: 0.6,
+        inset: 1.2
+      }
     }
 
     for i in 0..bays {
       const x = 0 - width / 2 + (i + 0.5) * width / bays
       const lit = pr_hash(seed * 29 + i * 5.1) < 0.35
+
       for face in 0..2 {
         const zs = face == 0 ? 1 : -1
         "dormer_{face}_{i}" {
           Position: {x, roof_y + 1.15, zs * (depth / 2 - 1.2)}
           Rotation: {0, face == 0 ? 0 : math.PI, 0}
           cheeks : ParisLimestoneTrim { Position: {0, 0, 0}; Box: {1.3, 1.9, 1.3} }
+
           if lit && face == 0 {
             glass : ParisWindowLitSoft { Position: {0, -0.05, 0.66}; Box: {0.78, 1.2, 0.04} }
           } else {
             glass : ParisGlassDark { Position: {0, -0.05, 0.66}; Box: {0.78, 1.2, 0.04} }
           }
+
           bar : ParisWindowFrame { Position: {0, -0.05, 0.69}; Box: {0.05, 1.2, 0.03} }
-          hood : ParisZincPlain { Position: {0, 1.05, 0}; RoundedBox: {1.44, 0.24, 1.44, 0.1, segments: 2} }
+          hood : ParisZincPlain {
+            Position: {0, 1.05, 0}
+            RoundedBox: {1.44, 0.24, 1.44, 0.1, segments: 2}
+          }
+
           pediment : ParisLimestoneTrim { Position: {0, 0.86, 0.62}; Box: {1.4, 0.16, 0.12} }
         }
       }
@@ -213,30 +321,81 @@ assets {
     for side in 0..2 {
       const exposed = side == 0 ? left : right
       const sx = side == 0 ? -1 : 1
+
       if !exposed {
         { (IsA, ParisLimestoneTrim)
           Position: {sx * (width / 2 - 0.3), roof_y + PR_MANSARD / 2 + 0.3, 0}
           Box: {0.6, PR_MANSARD + 0.6, depth - 1.6}
         }
+
         for p in 0..4 {
-          { (IsA, ParisChimneyPot); Position: {sx * (width / 2 - 0.3), roof_y + PR_MANSARD + 0.8, -1.2 + p * 0.8}; Cylinder: {radius: 0.12, length: 0.4, segments: 8} }
+          {
+            (IsA, ParisChimneyPot)
+            Position: {sx * (width / 2 - 0.3), roof_y + PR_MANSARD + 0.8, -1.2 + p * 0.8}
+            Cylinder: {radius: 0.12, length: 0.4, segments: 8}
+          }
         }
       }
     }
-    stack : ParisLimestoneTrim { Position: {(pr_hash(seed * 7.7) - 0.5) * (width - 5), roof_y + PR_MANSARD + 0.8, 0}; Box: {0.9, 1.6, 2.2} }
-    for p in 0..3 {
-      { (IsA, ParisChimneyPot); Position: {(pr_hash(seed * 7.7) - 0.5) * (width - 5), roof_y + PR_MANSARD + 1.8, -0.7 + p * 0.7}; Cylinder: {radius: 0.13, length: 0.45, segments: 8} }
+
+    stack : ParisLimestoneTrim {
+      Position: {(pr_hash(seed * 7.7) - 0.5) * (width - 5), roof_y + PR_MANSARD + 0.8, 0}
+      Box: {0.9, 1.6, 2.2}
     }
 
-    ParisFacade front(width: width, floors: floors, seed: seed, shop: shop, ground: true) { Position: {0, 0, depth / 2} }
+    for p in 0..3 {
+      {
+        (IsA, ParisChimneyPot)
+        Position: {
+          (pr_hash(seed * 7.7) - 0.5) * (width - 5),
+          roof_y + PR_MANSARD + 1.8,
+          -0.7 + p * 0.7
+        }
+        Cylinder: {radius: 0.13, length: 0.45, segments: 8}
+      }
+    }
+
+    ParisFacade front(width: width, floors: floors, seed: seed, shop: shop, ground: true) {
+      Position: {0, 0, depth / 2}
+    }
+
     if left {
-      ParisFacade left_face(width: depth, floors: floors, seed: seed + 101, shop: shop, ground: true) { Position: {0 - width / 2, 0, 0}; Rotation: {0, 0 - math.PI / 2, 0} }
+      ParisFacade left_face(
+        width: depth,
+        floors: floors,
+        seed: seed + 101,
+        shop: shop,
+        ground: true
+      ) {
+        Position: {0 - width / 2, 0, 0}
+        Rotation: {0, 0 - math.PI / 2, 0}
+      }
     }
+
     if right {
-      ParisFacade right_face(width: depth, floors: floors, seed: seed + 202, shop: shop, ground: true) { Position: {width / 2, 0, 0}; Rotation: {0, math.PI / 2, 0} }
+      ParisFacade right_face(
+        width: depth,
+        floors: floors,
+        seed: seed + 202,
+        shop: shop,
+        ground: true
+      ) {
+        Position: {width / 2, 0, 0}
+        Rotation: {0, math.PI / 2, 0}
+      }
     }
+
     if back {
-      ParisFacade back_face(width: width, floors: floors, seed: seed + 303, shop: shop, ground: true) { Position: {0, 0, 0 - depth / 2}; Rotation: {0, math.PI, 0} }
+      ParisFacade back_face(
+        width: width,
+        floors: floors,
+        seed: seed + 303,
+        shop: shop,
+        ground: true
+      ) {
+        Position: {0, 0, 0 - depth / 2}
+        Rotation: {0, math.PI, 0}
+      }
     }
   }
 }

@@ -9,30 +9,102 @@ using box.light
 assets {
   template FrigateRailgun {
     bed : RecessMetal { Position: {}; Box: {5.8, 0.8, 28} }
+
     for i in 0..2 {
-    "rail_{i}" : Titanium { Position: {(i - 0.5) * 3.4, 0.9, 1}; BeveledPrism: {footprint: [{-0.55, -13}, {0.55, -13}, {0.4, 15}, {-0.4, 15}], depth: 1.4, inset: 0.2, bevel: 0.2} }
-    "coils_{i}" {
-      Position: {(i - 0.5) * 4.7, 0.6, -10}
-      Array: {axis: Z, count: 13, spacing: 1.8}
-      casing : DarkArmor { Position: {}; Box: {0.75, 1.8, 1.1} }
-      strip : IceLight { Position: {0, 0.93, 0}; Box: {0.52, 0.08, 0.25} }
+      "rail_{i}" : Titanium {
+        Position: {(i - 0.5) * 3.4, 0.9, 1}
+        BeveledPrism: {
+          footprint: [{-0.55, -13}, {0.55, -13}, {0.4, 15}, {-0.4, 15}],
+          depth: 1.4,
+          inset: 0.2,
+          bevel: 0.2
+        }
+      }
+
+      "coils_{i}" {
+        Position: {(i - 0.5) * 4.7, 0.6, -10}
+        Array: {axis: Z, count: 13, spacing: 1.8}
+        casing : DarkArmor { Position: {}; Box: {0.75, 1.8, 1.1} }
+        strip : IceLight { Position: {0, 0.93, 0}; Box: {0.52, 0.08, 0.25} }
+      }
     }
-  }
+
     breech : RustRed { Position: {0, 1.1, -12}; Box: {4, 2.2, 3} }
     barrel : RecessMetal { Position: {0, 0.8, 14}; Box: {1.7, 0.3, 3} }
-    cradle : DarkArmor { Position: {0, -0.6, -1}; BeveledPrism: {footprint: [{-3.3, -11}, {3.3, -11}, {2.4, 13}, {-2.4, 13}], depth: 1, inset: 0.3, bevel: 0.2} }
-    breech_shell : HullArmor { Align: {target: breech, self: {y: Min}, other: {y: Max}}; BeveledPrism: {footprint: [{-2.4, -2}, {2.4, -2}, {1.8, 2}, {-1.8, 2}], depth: 0.6, inset: 0.2, bevel: 0.1} }
-    accelerator : RecessMetal { Position: {0, 0.42, 0}; Box: {1.9, 0.1, 24} }
-    field_inserts { Position: {0, 0.49, -10}; Array: {axis: Z, count: 24, spacing: 1}; insert : IceLight { Position: {}; Box: {0.35, 0.07, 0.3} } }
-    for side in 0..2 {
-      "coolant_{side}" : RustRed { Position: {(side - 0.5) * 5.8, 0.3, -1}; Rotation: {1.5707963, 0, 0}; Cylinder: {radius: 0.14, length: 21, segments: 8} }
-      "connections_{side}" { Position: {(side - 0.5) * 5.35, 0.3, -10}; Array: {axis: Z, count: 11, spacing: 1.8}; coupling : Titanium { Rotation: {0, 0, 1.5707963}; Cylinder: {radius: 0.2, length: 0.65, segments: 8} } }
-      "braces_{side}" { Position: {(side - 0.5) * 5.5, -0.2, -9}; Array: {axis: Z, count: 4, spacing: 5.5}; shoe : HullArmor { Position: {}; Box: {1.1, 0.65, 1.6} }; bolt : Titanium { Position: {0, 0.38, 0}; Cylinder: {radius: 0.15, length: 0.13, segments: 6} } }
-      "muzzle_jaw_{side}" : PaleArmor { Position: {(side - 0.5) * 3.4, 0.9, 15.2}; BeveledPrism: {footprint: [{-0.8, -1.1}, {0.8, -1.1}, {0.5, 1.6}, {-0.5, 1.6}], depth: 1.7, inset: 0.2, bevel: 0.15} }
-      "muzzle_seam_{side}" : DarkArmor { Position: {(side - 0.5) * 3.4, 1.8, 15.2}; Box: {0.4, 0.08, 1.6} }
+    cradle : DarkArmor {
+      Position: {0, -0.6, -1}
+      BeveledPrism: {
+        footprint: [{-3.3, -11}, {3.3, -11}, {2.4, 13}, {-2.4, 13}],
+        depth: 1,
+        inset: 0.3,
+        bevel: 0.2
+      }
     }
-    breech_access : Titanium { Position: {0, 1.15, -13.55}; Box: {2.5, 1.1, 0.15} }
-    breech_vents { Position: {-0.9, 1.15, -13.66}; Array: {axis: X, count: 7, spacing: 0.3}; vent : RecessMetal { Position: {}; Box: {0.13, 0.8, 0.08} } }
 
+    breech_shell : HullArmor {
+      Align: {target: breech, self: {y: Min}, other: {y: Max}}
+      BeveledPrism: {
+        footprint: [{-2.4, -2}, {2.4, -2}, {1.8, 2}, {-1.8, 2}],
+        depth: 0.6,
+        inset: 0.2,
+        bevel: 0.1
+      }
+    }
+
+    accelerator : RecessMetal { Position: {0, 0.42, 0}; Box: {1.9, 0.1, 24} }
+    field_inserts {
+      Position: {0, 0.49, -10}
+      Array: {axis: Z, count: 24, spacing: 1}
+      insert : IceLight { Position: {}; Box: {0.35, 0.07, 0.3} }
+    }
+
+    for side in 0..2 {
+      "coolant_{side}" : RustRed {
+        Position: {(side - 0.5) * 5.8, 0.3, -1}
+        Rotation: {1.5707963, 0, 0}
+        Cylinder: {radius: 0.14, length: 21, segments: 8}
+      }
+
+      "connections_{side}" {
+        Position: {(side - 0.5) * 5.35, 0.3, -10}
+        Array: {axis: Z, count: 11, spacing: 1.8}
+        coupling : Titanium {
+          Rotation: {0, 0, 1.5707963}
+          Cylinder: {radius: 0.2, length: 0.65, segments: 8}
+        }
+      }
+
+      "braces_{side}" {
+        Position: {(side - 0.5) * 5.5, -0.2, -9}
+        Array: {axis: Z, count: 4, spacing: 5.5}
+        shoe : HullArmor { Position: {}; Box: {1.1, 0.65, 1.6} }
+        bolt : Titanium {
+          Position: {0, 0.38, 0}
+          Cylinder: {radius: 0.15, length: 0.13, segments: 6}
+        }
+      }
+
+      "muzzle_jaw_{side}" : PaleArmor {
+        Position: {(side - 0.5) * 3.4, 0.9, 15.2}
+        BeveledPrism: {
+          footprint: [{-0.8, -1.1}, {0.8, -1.1}, {0.5, 1.6}, {-0.5, 1.6}],
+          depth: 1.7,
+          inset: 0.2,
+          bevel: 0.15
+        }
+      }
+
+      "muzzle_seam_{side}" : DarkArmor {
+        Position: {(side - 0.5) * 3.4, 1.8, 15.2}
+        Box: {0.4, 0.08, 1.6}
+      }
+    }
+
+    breech_access : Titanium { Position: {0, 1.15, -13.55}; Box: {2.5, 1.1, 0.15} }
+    breech_vents {
+      Position: {-0.9, 1.15, -13.66}
+      Array: {axis: X, count: 7, spacing: 0.3}
+      vent : RecessMetal { Position: {}; Box: {0.13, 0.8, 0.08} }
+    }
   }
 }

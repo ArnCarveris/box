@@ -24,6 +24,7 @@ paris {
     Camera: {fov: 52, near_: 0.05, far_: 400}
     CameraController: {speed: 5}
   }
+
   quay_camera {
     Position: {48, -0.5, -24.4}
     Rotation: {0.07, 1.45, 0}
@@ -59,7 +60,15 @@ sky {
     moon_disk_intensity: 20,
     earthshine: 0.04
   }
-  TimeOfDay: {hour: 21.4, day_of_year: 172, latitude: 48.85, north: 180, moon_offset: 4, sun: sun, moon: moon}
+  TimeOfDay: {
+    hour: 21.4,
+    day_of_year: 172,
+    latitude: 48.85,
+    north: 180,
+    moon_offset: 4,
+    sun: sun,
+    moon: moon
+  }
   HeightFog: {density: 0.006, falloff: 0.12, base_height: -3, max_opacity: 0.35, atmosphere: sky}
 }
 
@@ -71,13 +80,29 @@ stars {
 $ {
   AmbientLight: {sky: {60, 74, 110}, ground: {40, 34, 30}, intensity: 0.08}
   ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 3}
-  Bake: {environment: sky, probe_spacing: 4, bounds_padding: 0.5, bounces: 1, capture_size: 32, budget_ms: 6}
+  Bake: {
+    environment: sky,
+    probe_spacing: 4,
+    bounds_padding: 0.5,
+    bounces: 1,
+    capture_size: 32,
+    budget_ms: 6
+  }
 }
 
 view {
   gtao { Gtao: {radius: 0.7, final_value_power: 1.8} }
   bloom { Bloom: {intensity: 0.18, threshold: 1.2, threshold_softness: 0.5} }
-  exposure { AutoExposure: {min_log_luma: -14, max_log_luma: 4, min_brightness: 0.1, max_brightness: 0.26, exposure_compensation: -0.6} }
+  exposure {
+    AutoExposure: {
+      min_log_luma: -14,
+      max_log_luma: 4,
+      min_brightness: 0.1,
+      max_brightness: 0.26,
+      exposure_compensation: -0.6
+    }
+  }
+
   tonemap { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
   smaa { Smaa: {} }
 

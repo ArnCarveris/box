@@ -1,8 +1,5 @@
-// The HUD, a screen space scene drawn over the world: the crest, name and rank of the realm at
-// the top left, the treasury at the top right, messages in the middle, the panel of the selected
-// piece on the right and the toolbar at the bottom. Panels are oak boards bound with iron brackets,
-// hints and messages are parchment, and the icons are drawings in castle/ui (castle/textures/
-// generate.py writes the wood and parchment).
+// The HUD, a screen space scene drawn over the world: the realm's crest, name and rank, the
+// treasury, messages, the panel of the selected piece and the toolbar.
 
 using flecs.script
 using flecs.script.math
@@ -152,7 +149,13 @@ assets {
     prop w: f32 = 300
     prop top: bool = true
 
-    Float: {h: Center, v: top ? Top : Bottom, anchor_h: Center, anchor_v: top ? Top : Bottom, y: top ? -7 : 7}
+    Float: {
+      h: Center,
+      v: top ? Top : Bottom,
+      anchor_h: Center,
+      anchor_v: top ? Top : Bottom,
+      y: top ? -7 : 7
+    }
     Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: 10}}
     Layout: {direction: Row, h: Center, v: Middle, spacing: 0}
     Rect: {1, 1}
@@ -161,8 +164,14 @@ assets {
 
     sheen { Position: {0, 2, 0.04}; Rect: {w - 6, 1.2}; Rgb: {150, 144, 136}; Opacity: {0.6} }
     Rivet ra(r: 2.6) { Float: {h: Left, v: Middle, anchor_h: Left, anchor_v: Middle, x: 10} }
-    Rivet rb(r: 2.6) { Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: 0 - w * 0.25} }
-    Rivet rc(r: 2.6) { Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: w * 0.25} }
+    Rivet rb(r: 2.6) {
+      Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: 0 - w * 0.25}
+    }
+
+    Rivet rc(r: 2.6) {
+      Float: {h: Center, v: Middle, anchor_h: Center, anchor_v: Middle, x: w * 0.25}
+    }
+
     Rivet rd(r: 2.6) { Float: {h: Right, v: Middle, anchor_h: Right, anchor_v: Middle, x: -10} }
   }
 
@@ -176,7 +185,13 @@ assets {
     prop top: bool = false
     prop gap: f32 = 6
 
-    Layout: {direction: row ? Row : Column, padding: {pad, pad, pad + 4, pad + 4}, spacing: gap, h: row ? Center : Left, v: top ? Top : Middle}
+    Layout: {
+      direction: row ? Row : Column,
+      padding: {pad, pad, pad + 4, pad + 4},
+      spacing: gap,
+      h: row ? Center : Left,
+      v: top ? Top : Middle
+    }
     Item: {width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}}
     Rect: {1, 1}
     Image: {texture: castle_ui_wood, u0: u, v0: v, u1: u + w / 2048, v1: v + h / 512}
@@ -202,7 +217,14 @@ assets {
     Layout: {direction: Column, h: Center, v: Middle, spacing: 1, padding: {6, 6, 4, 4}}
     Item: {width: {mode: Fixed, value: 80}, height: {mode: Fixed, value: 82}}
     Rect: {1, 1}
-    Image: {texture: castle_ui_parchment, u0: 0.05 + t * 0.05, v0: 0.2, u1: 0.13 + t * 0.05, v1: 0.53}
+    Image: {
+      texture: castle_ui_parchment,
+      u0: 0.05 + t * 0.05,
+      v0: 0.2,
+      u1: 0.13 + t * 0.05,
+      v1: 0.53
+    }
+
     if active {
       Rgb: {196, 138, 70}
       Border: {width: 3, radius: 5, color: {250, 206, 102, 255}}
@@ -216,10 +238,16 @@ assets {
       Border: {width: 2.5, radius: 5, color: {26, 20, 16, 255}}
       BoxShadow: {offset_y: -2, blur: 6, color: {0, 0, 0, 120}}
     }
+
     Interactive
     Cursor: {CursorPointer}
 
-    Picture icon(tex: tool_icon(t), w: 50, h: 50, tint: afford || active ? {255, 255, 255} : {150, 140, 130})
+    Picture icon(
+      tex: tool_icon(t),
+      w: 50,
+      h: 50,
+      tint: afford || active ? {255, 255, 255} : {150, 140, 130}
+    )
     name {
       Text: {value: kind_name(t), size: 12, font: castle_font_display}
       Rgb: active ? {255, 246, 222} : C_TEXT
@@ -232,6 +260,7 @@ assets {
         hover_tool = t
         await on.leave(this)
         over = false
+
         if hover_tool == t {
           hover_tool = 0
         }
@@ -258,7 +287,10 @@ assets {
 
     fill {
       Layout: {}
-      Item: {width: {mode: Fixed, value: max((width - 6) * clamp(ratio, 0, 1), 6)}, height: {mode: Fixed, value: 10}}
+      Item: {
+        width: {mode: Fixed, value: max((width - 6) * clamp(ratio, 0, 1), 6)},
+        height: {mode: Fixed, value: 10}
+      }
       Rect: {1, 1}
       Rgb: {222, 166, 62}
       Border: {radius: 2, width: 1, color: {120, 74, 20, 255}}
@@ -269,6 +301,7 @@ assets {
         Opacity: {0.7}
       }
     }
+
     Rivet left_(r: 3.2) { Float: {h: Center, v: Middle, anchor_h: Left, anchor_v: Middle} }
     Rivet right_(r: 3.2) { Float: {h: Center, v: Middle, anchor_h: Right, anchor_v: Middle} }
   }
@@ -280,6 +313,7 @@ assets {
     Layout: {direction: Row, h: Center, v: Middle, padding: {4, 4, 12, 12}}
     Item: {height: {mode: Fixed, value: 24}}
     Rect: {1, 1}
+
     if armed {
       Rgb: {150, 44, 34}
     } else if over {
@@ -287,13 +321,18 @@ assets {
     } else {
       Rgb: {62, 44, 30}
     }
+
     Border: {width: 2, radius: 3, color: {28, 22, 18, 255}}
     BoxShadow: {offset_y: -1.5, blur: 3, color: {0, 0, 0, 110}}
     Interactive
     Cursor: {CursorPointer}
 
     label {
-      Text: {value: armed ? "Click again to raze everything" : "New realm", size: 11, font: castle_font_display}
+      Text: {
+        value: armed ? "Click again to raze everything" : "New realm",
+        size: 11,
+        font: castle_font_display
+      }
       Rgb: C_TEXT
     }
 
@@ -309,6 +348,7 @@ assets {
     async {
       while true {
         await on.click(this)
+
         if armed {
           armed = false
           emit NewRealm()
@@ -344,6 +384,7 @@ assets {
               Rgb: crowned ? C_GOLD : C_TEXT
             }
           }
+
           ProgressBar bar(ratio: ratio)
           Caption detail(
             text: match top_rank {
@@ -353,6 +394,7 @@ assets {
             size: 12, color: C_MUTED)
         }
       }
+
       footer {
         Layout: {direction: Row, h: Right}
         Item: {width: {mode: Grow}}
@@ -385,15 +427,34 @@ assets {
   template TreasuryCard {
     Layout: {direction: Column}
 
-    const keep_next = keep_level >= 1 && keep_level < max_level(K_KEEP) ? keep_folk(keep_level + 1) : 0
+    const keep_open = keep_level >= 1 && keep_level < max_level(K_KEEP)
+    const keep_next = keep_open ? keep_folk(keep_level + 1) : 0
 
     WoodPanel panel(w: 618, h: 86, pad: 14, u: 0.4, v: 0.3) {
       row {
         Layout: {direction: Row, spacing: 10, v: Middle}
-        Stat gold_stat(icon: castle_icon_coin, value: "{gold:.0}", rate: gold_rate >= 0 ? "+{gold_rate:.0} per second" : "{gold_rate:.0} per second", alarm: gold_rate < 0)
-        Stat stone_stat(icon: castle_icon_stone, value: "{stone:.0}", rate: "{signed(stone_rate)} per sec")
-        Stat food_stat(icon: castle_icon_food, value: "{food:.0}", rate: "{signed(food_rate)} per sec", alarm: food_rate < 0)
-        Stat folk_stat(icon: castle_icon_folk, value: "{folk}", rate: keep_next > 0 ? "keep needs {keep_next}" : "folk in the realm")
+        Stat gold_stat(
+          icon: castle_icon_coin,
+          value: "{gold:.0}",
+          rate: gold_rate >= 0 ? "+{gold_rate:.0} per second" : "{gold_rate:.0} per second",
+          alarm: gold_rate < 0
+        )
+        Stat stone_stat(
+          icon: castle_icon_stone,
+          value: "{stone:.0}",
+          rate: "{signed(stone_rate)} per sec"
+        )
+        Stat food_stat(
+          icon: castle_icon_food,
+          value: "{food:.0}",
+          rate: "{signed(food_rate)} per sec",
+          alarm: food_rate < 0
+        )
+        Stat folk_stat(
+          icon: castle_icon_folk,
+          value: "{folk}",
+          rate: keep_next > 0 ? "keep needs {keep_next}" : "folk in the realm"
+        )
       }
     }
   }
@@ -459,9 +520,16 @@ assets {
     const ts = cost_stone(ht, 1)
     const tf = food_need(ht, 1)
     const short: Rgb = {168, 44, 30}
+    const t_line = "{kind_name(tool)}: a line of {span:.0}, up to " +
+      "{span * cost_gold(tool, 1):.0} gold and {span * cost_stone(tool, 1):.0} stone. " +
+      "Let go to build it, Esc to cancel."
+    const t_quarry = "Quarry: dig it into a stone deposit, where grey rock breaks through the " +
+      "grass.{turn_}"
+    const t_drag = "{kind_name(tool)}: click, or drag a straight line across the plot. " +
+      "Esc puts the tool down."
     const text = match painting {
-      true: "{kind_name(tool)}: a line of {span:.0}, up to {span * cost_gold(tool, 1):.0} gold and {span * cost_stone(tool, 1):.0} stone. Let go to build it, Esc to cancel."
-        _: match ht > 0 {
+      true: t_line
+      _: match ht > 0 {
         true: kind_blurb(ht)
         _: match hk > 0 {
           true: match hr {
@@ -472,10 +540,10 @@ assets {
             }
           }
           _: match tool == K_QUARRY && !hd {
-            true: "Quarry: dig it into a stone deposit, where grey rock breaks through the grass.{turn_}"
+            true: t_quarry
             _: match tool > 0 {
               true: match drag_tool(tool) {
-                true: "{kind_name(tool)}: click, or drag a straight line across the plot. Esc puts the tool down."
+                true: t_drag
                 _: "{kind_name(tool)}: click the plot.{turn_} Esc puts the tool down."
               }
               _: match hd {
@@ -505,12 +573,21 @@ assets {
           Text: {value: text, size: 14, width: 840, align: Center, font: castle_font_body}
           Rgb: C_INK
         }
+
         if tip {
           facts {
             Layout: {direction: Row, h: Center, v: Middle}
             TipLabel cost_(text: tg > 0 || ts > 0 ? "Cost:" : "", gap: 0)
-            TipAmount cost_gold(tex: castle_icon_coin, amount: tg > 0 ? "{tg}" : "", color: gold < tg ? short : C_INK)
-            TipAmount cost_stone(tex: castle_icon_stone, amount: ts > 0 ? "{ts}" : "", color: stone < ts ? short : C_INK)
+            TipAmount cost_gold(
+              tex: castle_icon_coin,
+              amount: tg > 0 ? "{tg}" : "",
+              color: gold < tg ? short : C_INK
+            )
+            TipAmount cost_stone(
+              tex: castle_icon_stone,
+              amount: ts > 0 ? "{ts}" : "",
+              color: stone < ts ? short : C_INK
+            )
             TipLabel upkeep_(text: tf > 0 ? "Upkeep:" : "", gap: tg > 0 || ts > 0 ? 22 : 0)
             TipAmount upkeep_food(tex: castle_icon_food, amount: tf > 0 ? "{tf:.0}/s" : "")
             TipLabel hotkey_(text: "Hotkey:", gap: tg > 0 || ts > 0 || tf > 0 ? 22 : 0)
@@ -556,6 +633,7 @@ assets {
           Rgb: {62, 58, 54}
           Border: {width: 1.5, radius: 2, color: {20, 17, 15, 255}}
         }
+
         ToolButton b12(t: T_DEMOLISH)
       }
     }
@@ -579,6 +657,7 @@ assets {
           Rect: {1, 1}
           Image: {texture: castle_ui_seal}
         }
+
         line {
           Text: {value: toast, size: 17, width: 580, align: Center, font: castle_font_body}
           Rgb: C_INK
@@ -614,7 +693,11 @@ assets {
     Item: {width: {mode: Grow}, height: {mode: Fixed, value: 48}}
     Rect: {1, 1}
     Rgb: bg
-    Border: {width: 2, radius: 4, color: enabled && !danger ? {250, 206, 102, 255} : {28, 22, 18, 255}}
+    Border: {
+      width: 2,
+      radius: 4,
+      color: enabled && !danger ? {250, 206, 102, 255} : {28, 22, 18, 255}
+    }
     BoxShadow: {offset_y: -2, blur: 5, color: {0, 0, 0, 120}}
     Interactive
     Cursor: {CursorPointer}
@@ -623,6 +706,7 @@ assets {
       Text: {value: armed ? "Click again to demolish" : label, size: 14, font: castle_font_display}
       Rgb: enabled ? C_TEXT : C_MUTED
     }
+
     if detail != "" {
       detail_ {
         Text: {value: detail, size: 11, width: 270, align: Center, font: castle_font_body}
@@ -642,6 +726,7 @@ assets {
     async {
       while true {
         await on.click(this)
+
         if action == 2 {
           if armed && clock < armed_until {
             armed = false
@@ -665,6 +750,7 @@ assets {
       while true {
         const e = await PanelDisarm
         await delay(e.until - clock)
+
         if armed && armed_until == e.until {
           armed = false
         }
@@ -682,6 +768,265 @@ assets {
     Caption name_(text: label, size: 12, color: C_MUTED)
     fill_ { Item: {width: {mode: Grow}} }
     Caption value_(text: value, size: 13, color: color)
+  }
+
+  template InfoStats {
+    prop k: i32 = 0
+    prop lvl: i32 = 0
+    prop ruined: bool = false
+    prop safe: bool = false
+    prop top: bool = false
+    prop pts: f64 = 0
+    prop eats: f64 = 0
+    prop people: i32 = 0
+    prop coin: f64 = 0
+    prop r: i32 = 0
+    prop m: i32 = 0
+    prop smith: bool = false
+
+    const raid_text = "none, bandits steal up to {raid_loot(lvl):.0} gold"
+
+    Layout: {direction: Column, spacing: 2}
+    Item: {width: {mode: Grow}}
+    folk_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if !ruined && people > 0 {
+        InfoLine line_(label: "Folk", value: "{people}")
+      }
+    }
+
+    eats_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if !ruined && eats > 0 {
+        InfoLine line_(
+          label: "Eats",
+          value: "{eats:.0} food a second",
+          color: food_rate < 0 ? C_RED : C_TEXT
+        )
+      }
+    }
+
+    coin_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if !ruined && coin > 0 {
+        InfoLine line_(label: "Taxes", value: "{coin:.0} gold a second")
+      }
+    }
+
+    extra_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if k == K_FARM {
+        InfoLine line_(
+          label: "Grows",
+          value: "{farm_yield(research):.1} food a second",
+          color: {150, 210, 110}
+        )
+      } else if k == K_HOUSE && !ruined && !top {
+        InfoLine line_(
+          label: "Protection",
+          value: safe ? "{pts:.0} of {protect_need(lvl):.0}" : raid_text,
+          color: safe ? C_TEXT : C_RED
+        )
+      } else if k == K_KEEP && !ruined && !top {
+        InfoLine line_(
+          label: "Folk to rise",
+          value: "{folk} of {keep_folk(lvl + 1)}",
+          color: folk >= keep_folk(lvl + 1) ? C_TEXT : C_RED
+        )
+      } else if k == K_QUARRY && !ruined {
+        InfoLine line_(
+          label: "Cuts",
+          value: "{quarry_yield(mining):.1} stone a second",
+          color: {200, 200, 210}
+        )
+      } else if smith {
+        InfoLine line_(
+          label: "Farming",
+          value: match r { 0: "no research yet"; _: "{research_name(r - 1)}" }
+        )
+      }
+    }
+
+    mining_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if smith {
+        InfoLine line_(
+          label: "Quarrying",
+          value: match m { 0: "no research yet"; _: "{mining_name(m - 1)}" }
+        )
+      }
+    }
+  }
+
+  template InfoActions {
+    prop i: i32 = -1
+    prop k: i32 = 0
+    prop lvl: i32 = 0
+    prop ruined: bool = false
+    prop top: bool = false
+    prop why: string = ""
+    prop g: i32 = 0
+    prop s: i32 = 0
+    prop afford: bool = false
+    prop eats: f64 = 0
+    prop r: i32 = 0
+    prop rg: i32 = 0
+    prop rs: i32 = 0
+    prop m: i32 = 0
+    prop mg: i32 = 0
+    prop ms: i32 = 0
+    prop busy: bool = false
+    prop smith: bool = false
+
+    const farm_next = "{rg}g {rs}s: farms grow {farm_yield(r + 1):.1} food"
+    const quarry_next = "{mg}g {ms}s: quarries cut {quarry_yield(m + 1):.1} stone"
+    const upgrade_eats = "{cost_text(k, lvl + 1)}, then eats {food_need(k, lvl + 1):.0} food   (U)"
+    const salvage = "Salvage {floor(spent_stone(k, lvl) / 4):.0} stone"
+    const refund = "Get back {refund_gold(k, lvl):.0}g {refund_stone(k, lvl):.0}s"
+
+    Layout: {direction: Column, spacing: 6}
+    Item: {width: {mode: Grow}}
+    primary_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if smith {
+        if researching && !busy {
+          PanelButton button_(
+            label: "Researching {research_name(r)}",
+            detail: "{research_left:.0} seconds left",
+            enabled: false,
+            action: 1,
+            cell: i
+          )
+        } else if r >= RESEARCH_MAX {
+          PanelButton button_(
+            label: "All farming research done",
+            detail: "Your farms grow {farm_yield(r):.1} food each",
+            enabled: false,
+            action: 1,
+            cell: i
+          )
+        } else if researching {
+          PanelButton button_(
+            label: "Research {research_name(r)}",
+            detail: "The forge is busy",
+            enabled: false,
+            action: 1,
+            cell: i
+          )
+        } else if ruined {
+          PanelButton button_(
+            label: "Research {research_name(r)}",
+            detail: "The forge is cold",
+            enabled: false,
+            action: 1,
+            cell: i
+          )
+        } else if keep_level < r + 1 {
+          PanelButton button_(
+            label: "Research {research_name(r)}",
+            detail: "Needs a keep of level {r + 1}",
+            enabled: false,
+            action: 1,
+            cell: i
+          )
+        } else {
+          PanelButton button_(
+            label: "Research {research_name(r)}",
+            detail: gold >= rg && stone >= rs ? farm_next : "Needs {rg} gold and {rs} stone",
+            enabled: gold >= rg && stone >= rs, action: 1, cell: i)
+        }
+      } else if max_level(k) > 1 && !ruined {
+        if top {
+          PanelButton button_(label: "Fully upgraded", enabled: false, cell: i)
+        } else if why != "" {
+          PanelButton button_(
+            label: "Upgrade to {piece_name(k, lvl + 1)}",
+            detail: why,
+            enabled: false,
+            cell: i
+          )
+        } else {
+          PanelButton button_(
+            label: "Upgrade to {piece_name(k, lvl + 1)}",
+            detail: match afford {
+              true: food_need(k, lvl + 1) > eats ? upgrade_eats : "{cost_text(k, lvl + 1)}   (U)"
+              _: "Needs {g} gold and {s} stone"
+            },
+            enabled: afford, cell: i)
+        }
+      }
+    }
+
+    mining_slot {
+      Layout: {direction: Column}
+      Item: {width: {mode: Grow}}
+
+      if smith {
+        if busy {
+          PanelButton button_(
+            label: "Researching {mining_name(m)}",
+            detail: "{research_left:.0} seconds left",
+            enabled: false,
+            action: 3,
+            cell: i
+          )
+        } else if m >= MINING_MAX {
+          PanelButton button_(
+            label: "All quarrying research done",
+            detail: "Your quarries cut {quarry_yield(m):.1} stone each",
+            enabled: false,
+            action: 3,
+            cell: i
+          )
+        } else if researching {
+          PanelButton button_(
+            label: "Research {mining_name(m)}",
+            detail: "The forge is busy",
+            enabled: false,
+            action: 3,
+            cell: i
+          )
+        } else if ruined {
+          PanelButton button_(
+            label: "Research {mining_name(m)}",
+            detail: "The forge is cold",
+            enabled: false,
+            action: 3,
+            cell: i
+          )
+        } else if keep_level < m + 1 {
+          PanelButton button_(
+            label: "Research {mining_name(m)}",
+            detail: "Needs a keep of level {m + 1}",
+            enabled: false,
+            action: 3,
+            cell: i
+          )
+        } else {
+          PanelButton button_(
+            label: "Research {mining_name(m)}",
+            detail: gold >= mg && stone >= ms ? quarry_next : "Needs {mg} gold and {ms} stone",
+            enabled: gold >= mg && stone >= ms, action: 3, cell: i)
+        }
+      }
+    }
+
+    PanelButton demolish_(
+      label: ruined ? "Demolish the ruin" : "Demolish",
+      detail: ruined ? salvage : refund,
+      danger: true, action: 2, cell: i)
   }
 
   template InfoPanel {
@@ -711,27 +1056,40 @@ assets {
       const ms = mining_stone(m)
       const busy = researching && research_track == R_MINING
       const smith = k == K_SMITH
+      const lvl_inside = "Level {lvl} of {max_level(k)}, inside the walls"
       const status = match ruined {
         true: "Abandoned"
         _: match max_level(k) > 1 {
-          true: safe ? "Level {lvl} of {max_level(k)}, inside the walls" : "Level {lvl} of {max_level(k)}"
+          true: safe ? lvl_inside : "Level {lvl} of {max_level(k)}"
           _: safe ? "Inside the walls" : "Outside the walls"
         }
       }
+      const ruin_blurb = "Hungry folk left this place. It eats nothing and pays nothing. " +
+        "Demolish it to clear the ground."
+      const cottage_blurb = "A cottage for 4 folk. Inside the walls it gathers protection and " +
+        "grows into a house; outside them bandits raid it for gold."
+      const house_blurb = "A timber house for 9 folk. Inside the walls it gathers protection and " +
+        "grows into a manor; outside them bandits raid it for gold."
+      const keep_blurb = "The seat of the lord. Its level caps the level of every other piece, " +
+        "it rises with the folk of the realm and the walls and gates rise with it."
+      const farm_blurb = "Grows {farm_yield(research):.1} food a second. The blacksmith can " +
+        "research better farming."
+      const quarry_blurb = "Cuts {quarry_yield(mining):.1} stone a second from a stone deposit. " +
+        "The blacksmith can research better quarrying."
       const blurb = match ruined {
-        true: "Hungry folk left this place. It eats nothing and pays nothing. Demolish it to clear the ground."
+        true: ruin_blurb
         _: match k == K_HOUSE {
           true: match lvl {
-            1: "A cottage for 4 folk. Inside the walls it gathers protection and grows into a house; outside them bandits raid it for gold."
-            2: "A timber house for 9 folk. Inside the walls it gathers protection and grows into a manor; outside them bandits raid it for gold."
+            1: cottage_blurb
+            2: house_blurb
             _: "A stone manor for 16 folk and their servants."
           }
           _: match k == K_KEEP {
-            true: "The seat of the lord. Its level caps the level of every other piece, it rises with the folk of the realm and the walls and gates rise with it."
+            true: keep_blurb
             _: match k == K_FARM {
-              true: "Grows {farm_yield(research):.1} food a second. The blacksmith can research better farming."
+              true: farm_blurb
               _: match k == K_QUARRY {
-                true: "Cuts {quarry_yield(mining):.1} stone a second from a stone deposit. The blacksmith can research better quarrying."
+                true: quarry_blurb
                 _: kind_blurb(k)
               }
             }
@@ -739,146 +1097,93 @@ assets {
         }
       }
 
-      WoodPanel panel(w: 344, h: smith ? 470 : max_level(k) > 1 ? 400 : 320, pad: 18, u: 0.6, v: 0.1, top: true, gap: 8) {
+      WoodPanel panel(
+        w: 344,
+        h: smith ? 470 : max_level(k) > 1 ? 400 : 320,
+        pad: 18,
+        u: 0.6,
+        v: 0.1,
+        top: true,
+        gap: 8
+      ) {
         body_ {
           Layout: {direction: Column, spacing: 8}
           Item: {width: {mode: Grow}, height: {mode: Grow}}
           head {
             Layout: {direction: Row, spacing: 10, v: Middle}
-            Picture icon(tex: tool_icon(k), w: 44, h: 44, tint: ruined ? {150, 140, 130} : {255, 255, 255})
+            Picture icon(
+              tex: tool_icon(k),
+              w: 44,
+              h: 44,
+              tint: ruined ? {150, 140, 130} : {255, 255, 255}
+            )
             names {
               Layout: {direction: Column, spacing: 2}
-              Engraved title(text: piece_name(k, lvl), size: 20, color: ruined ? C_MUTED : C_GOLD, depth: 1.5)
+              Engraved title(
+                text: piece_name(k, lvl),
+                size: 20,
+                color: ruined ? C_MUTED : C_GOLD,
+                depth: 1.5
+              )
               Caption sub(text: status, size: 12, color: ruined ? C_RED : C_MUTED)
             }
           }
+
           about {
             Text: {value: blurb, size: 13, width: 300, align: Left, font: castle_font_body}
             Rgb: C_TEXT
           }
-          stats {
-            Layout: {direction: Column, spacing: 2}
-            Item: {width: {mode: Grow}}
-            folk_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if !ruined && people > 0 {
-                InfoLine line_(label: "Folk", value: "{people}")
-              }
-            }
-            eats_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if !ruined && eats > 0 {
-                InfoLine line_(label: "Eats", value: "{eats:.0} food a second", color: food_rate < 0 ? C_RED : C_TEXT)
-              }
-            }
-            coin_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if !ruined && coin > 0 {
-                InfoLine line_(label: "Taxes", value: "{coin:.0} gold a second")
-              }
-            }
-            extra_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if k == K_FARM {
-                InfoLine line_(label: "Grows", value: "{farm_yield(research):.1} food a second", color: {150, 210, 110})
-              } else if k == K_HOUSE && !ruined && !top {
-                InfoLine line_(label: "Protection", value: safe ? "{pts:.0} of {protect_need(lvl):.0}" : "none, bandits steal up to {raid_loot(lvl):.0} gold", color: safe ? C_TEXT : C_RED)
-              } else if k == K_KEEP && !ruined && !top {
-                InfoLine line_(label: "Folk to rise", value: "{folk} of {keep_folk(lvl + 1)}", color: folk >= keep_folk(lvl + 1) ? C_TEXT : C_RED)
-              } else if k == K_QUARRY && !ruined {
-                InfoLine line_(label: "Cuts", value: "{quarry_yield(mining):.1} stone a second", color: {200, 200, 210})
-              } else if smith {
-                InfoLine line_(label: "Farming", value: match r { 0: "no research yet"; _: "{research_name(r - 1)}" })
-              }
-            }
-            mining_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if smith {
-                InfoLine line_(label: "Quarrying", value: match m { 0: "no research yet"; _: "{mining_name(m - 1)}" })
-              }
-            }
-          }
+
+          InfoStats stats(
+            k: k,
+            lvl: lvl,
+            ruined: ruined,
+            safe: safe,
+            top: top,
+            pts: pts,
+            eats: eats,
+            people: people,
+            coin: coin,
+            r: r,
+            m: m,
+            smith: smith
+          )
+
           bar_slot {
             Layout: {direction: Column}
             Item: {width: {mode: Grow}}
+
             if k == K_HOUSE && !ruined && !top {
               ProgressBar bar_(ratio: pts / protect_need(lvl), width: 300)
             } else if smith && researching {
-              ProgressBar bar_(ratio: 1 - research_left / (busy ? mining_time(m) : research_time(r)), width: 300)
+              ProgressBar bar_(
+                ratio: 1 - research_left / (busy ? mining_time(m) : research_time(r)),
+                width: 300
+              )
             }
           }
+
           grow { Item: {height: {mode: Grow}} }
-          actions {
-            Layout: {direction: Column, spacing: 6}
-            Item: {width: {mode: Grow}}
-            primary_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if smith {
-                if researching && !busy {
-                  PanelButton button_(label: "Researching {research_name(r)}", detail: "{research_left:.0} seconds left", enabled: false, action: 1, cell: i)
-                } else if r >= RESEARCH_MAX {
-                  PanelButton button_(label: "All farming research done", detail: "Your farms grow {farm_yield(r):.1} food each", enabled: false, action: 1, cell: i)
-                } else if researching {
-                  PanelButton button_(label: "Research {research_name(r)}", detail: "The forge is busy", enabled: false, action: 1, cell: i)
-                } else if ruined {
-                  PanelButton button_(label: "Research {research_name(r)}", detail: "The forge is cold", enabled: false, action: 1, cell: i)
-                } else if keep_level < r + 1 {
-                  PanelButton button_(label: "Research {research_name(r)}", detail: "Needs a keep of level {r + 1}", enabled: false, action: 1, cell: i)
-                } else {
-                  PanelButton button_(
-                    label: "Research {research_name(r)}",
-                    detail: gold >= rg && stone >= rs ? "{rg}g {rs}s: farms grow {farm_yield(r + 1):.1} food" : "Needs {rg} gold and {rs} stone",
-                    enabled: gold >= rg && stone >= rs, action: 1, cell: i)
-                }
-              } else if max_level(k) > 1 && !ruined {
-                if top {
-                  PanelButton button_(label: "Fully upgraded", enabled: false, cell: i)
-                } else if why != "" {
-                  PanelButton button_(label: "Upgrade to {piece_name(k, lvl + 1)}", detail: why, enabled: false, cell: i)
-                } else {
-                  PanelButton button_(
-                    label: "Upgrade to {piece_name(k, lvl + 1)}",
-                    detail: match afford {
-                      true: food_need(k, lvl + 1) > eats ? "{cost_text(k, lvl + 1)}, then eats {food_need(k, lvl + 1):.0} food   (U)" : "{cost_text(k, lvl + 1)}   (U)"
-                      _: "Needs {g} gold and {s} stone"
-                    },
-                    enabled: afford, cell: i)
-                }
-              }
-            }
-            mining_slot {
-              Layout: {direction: Column}
-              Item: {width: {mode: Grow}}
-              if smith {
-                if busy {
-                  PanelButton button_(label: "Researching {mining_name(m)}", detail: "{research_left:.0} seconds left", enabled: false, action: 3, cell: i)
-                } else if m >= MINING_MAX {
-                  PanelButton button_(label: "All quarrying research done", detail: "Your quarries cut {quarry_yield(m):.1} stone each", enabled: false, action: 3, cell: i)
-                } else if researching {
-                  PanelButton button_(label: "Research {mining_name(m)}", detail: "The forge is busy", enabled: false, action: 3, cell: i)
-                } else if ruined {
-                  PanelButton button_(label: "Research {mining_name(m)}", detail: "The forge is cold", enabled: false, action: 3, cell: i)
-                } else if keep_level < m + 1 {
-                  PanelButton button_(label: "Research {mining_name(m)}", detail: "Needs a keep of level {m + 1}", enabled: false, action: 3, cell: i)
-                } else {
-                  PanelButton button_(
-                    label: "Research {mining_name(m)}",
-                    detail: gold >= mg && stone >= ms ? "{mg}g {ms}s: quarries cut {quarry_yield(m + 1):.1} stone" : "Needs {mg} gold and {ms} stone",
-                    enabled: gold >= mg && stone >= ms, action: 3, cell: i)
-                }
-              }
-            }
-            PanelButton demolish_(
-              label: ruined ? "Demolish the ruin" : "Demolish",
-              detail: ruined ? "Salvage {floor(spent_stone(k, lvl) / 4):.0} stone" : "Get back {refund_gold(k, lvl):.0}g {refund_stone(k, lvl):.0}s",
-              danger: true, action: 2, cell: i)
-          }
+          InfoActions actions(
+            i: i,
+            k: k,
+            lvl: lvl,
+            ruined: ruined,
+            top: top,
+            why: why,
+            g: g,
+            s: s,
+            afford: afford,
+            eats: eats,
+            r: r,
+            rg: rg,
+            rs: rs,
+            m: m,
+            mg: mg,
+            ms: ms,
+            busy: busy,
+            smith: smith
+          )
         }
       }
     }

@@ -9,7 +9,11 @@ assets {
     Bus: {output: master, kind: ChannelReturn, volume: 0.32, effects: [tp_hall]}
     Reverb: {decay: 1.9, damping: 0.55, predelay: 0.022, size: 0.62}
   }
-  tp_brass_glue { Compressor: {threshold: -15, ratio: 2.2, attack: 0.015, release: 0.18, knee: 8, makeup: 1} }
+
+  tp_brass_glue {
+    Compressor: {threshold: -15, ratio: 2.2, attack: 0.015, release: 0.18, knee: 8, makeup: 1}
+  }
+
   tp_brass {
     Bus: {output: master, volume: 1.15, effects: [tp_brass_glue]}
     Meter: {}
@@ -65,6 +69,7 @@ assets {
       {kind: EqHighShelf, frequency: 5000, gain: 3}
     ]}
   }
+
   tp_harmon_buzz { Saturator: {drive: 0.15, tone: 0.4, low_cut: 700, high_cut: 11000, mix: 0.7} }
 
   prefab tp_trumpet_sound {
@@ -73,21 +78,46 @@ assets {
     Envelope: {attack: 0.03, attack_curve: 0.5, decay: 0.16, sustain: 0.78, release: 0.09, curve: 2}
     PitchEnvelope: {amount: -0.8, decay: 0.06, curve: 2}
     Filter: {kind: LowPass, cutoff: 1500, resonance: 0.3, velocity: 4, keytrack: 0.35}
-    FilterEnvelope: {attack: 0.045, attack_curve: -1, decay: 0.3, sustain: 0.4, release: 0.15, amount: 1, velocity: 0.6}
-    Lfo: {rate: 5.5, delay: 0.3, fade: 0.35, random_phase: true, pitch: 9, amplitude: 0.03, cutoff: 0.05}
+    FilterEnvelope: {
+      attack: 0.045,
+      attack_curve: -1,
+      decay: 0.3,
+      sustain: 0.4,
+      release: 0.15,
+      amount: 1,
+      velocity: 0.6
+    }
+    Lfo: {
+      rate: 5.5,
+      delay: 0.3,
+      fade: 0.35,
+      random_phase: true,
+      pitch: 9,
+      amplitude: 0.03,
+      cutoff: 0.05
+    }
     wander { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
     buzz {
       Oscillator: {wave: Saw, frequency: 440, level: 0.08}
       bloom {
         Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 1.35, velocity: 1}
-        Envelope: {attack: 0.05, attack_curve: -1, decay: 0.25, sustain: 0.85, release: 0.1, curve: 2}
+        Envelope: {
+          attack: 0.05,
+          attack_curve: -1,
+          decay: 0.25,
+          sustain: 0.85,
+          release: 0.1,
+          curve: 2
+        }
       }
     }
+
     tongue {
       Oscillator: {wave: Noise, level: 0.02}
       Envelope: {attack: 0.001, decay: 0.025, sustain: 0, release: 0.01, curve: 3}
       attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
+
     breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.0025} }
     breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.15} }
     breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
@@ -103,21 +133,38 @@ assets {
     Envelope: {attack: 0.018, attack_curve: 0.5, decay: 0.1, sustain: 0.75, release: 0.07, curve: 2}
     PitchEnvelope: {amount: -0.4, decay: 0.035, curve: 2}
     Filter: {kind: LowPass, cutoff: 2800, resonance: 0.2, velocity: 2.4, keytrack: 0.3}
-    FilterEnvelope: {attack: 0.03, attack_curve: -1, decay: 0.2, sustain: 0.5, release: 0.1, amount: 0.8, velocity: 0.5}
+    FilterEnvelope: {
+      attack: 0.03,
+      attack_curve: -1,
+      decay: 0.2,
+      sustain: 0.5,
+      release: 0.1,
+      amount: 0.8,
+      velocity: 0.5
+    }
     Lfo: {rate: 5.8, delay: 0.45, fade: 0.4, random_phase: true, pitch: 4, amplitude: 0.02}
     wander { Lfo: {wave: LfoTriangle, rate: 0.7, random_phase: true, pitch: 2} }
     buzz {
       Oscillator: {wave: Saw, frequency: 440, level: 0.075}
       bloom {
         Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 1.15, velocity: 1}
-        Envelope: {attack: 0.03, attack_curve: -1, decay: 0.18, sustain: 0.7, release: 0.1, curve: 2}
+        Envelope: {
+          attack: 0.03,
+          attack_curve: -1,
+          decay: 0.18,
+          sustain: 0.7,
+          release: 0.1,
+          curve: 2
+        }
       }
     }
+
     tongue {
       Oscillator: {wave: Noise, level: 0.018}
       Envelope: {attack: 0.001, decay: 0.018, sustain: 0, release: 0.01, curve: 3}
       attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
+
     breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.0015} }
     breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.25} }
     breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
@@ -133,21 +180,38 @@ assets {
     Envelope: {attack: 0.034, attack_curve: 0.5, decay: 0.18, sustain: 0.8, release: 0.11, curve: 2}
     PitchEnvelope: {amount: -0.6, decay: 0.06, curve: 2}
     Filter: {kind: LowPass, cutoff: 850, resonance: 0.15, velocity: 2.6, keytrack: 0.4}
-    FilterEnvelope: {attack: 0.05, attack_curve: -1, decay: 0.3, sustain: 0.4, release: 0.15, amount: 0.9, velocity: 0.6}
+    FilterEnvelope: {
+      attack: 0.05,
+      attack_curve: -1,
+      decay: 0.3,
+      sustain: 0.4,
+      release: 0.15,
+      amount: 0.9,
+      velocity: 0.6
+    }
     Lfo: {rate: 5.6, delay: 0.32, fade: 0.4, random_phase: true, pitch: 13, amplitude: 0.04}
     wander { Lfo: {wave: LfoTriangle, rate: 0.55, random_phase: true, pitch: 2.5} }
     buzz {
       Oscillator: {wave: Saw, frequency: 440, level: 0.075}
       bloom {
         Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.6, velocity: 1}
-        Envelope: {attack: 0.055, attack_curve: -1, decay: 0.3, sustain: 0.7, release: 0.1, curve: 2}
+        Envelope: {
+          attack: 0.055,
+          attack_curve: -1,
+          decay: 0.3,
+          sustain: 0.7,
+          release: 0.1,
+          curve: 2
+        }
       }
     }
+
     tongue {
       Oscillator: {wave: Noise, level: 0.015}
       Envelope: {attack: 0.001, decay: 0.022, sustain: 0, release: 0.01, curve: 3}
       attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
+
     breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.003} }
     breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.2} }
     breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
@@ -162,22 +226,46 @@ assets {
     Glide: {time: 0.045, legato: true, channel: 4}
     Envelope: {attack: 0.05, attack_curve: 0.5, decay: 0.25, sustain: 0.85, release: 0.18, curve: 2}
     PitchEnvelope: {amount: -0.5, decay: 0.08, curve: 2}
-    Filter: {kind: LowPass, cutoff: 800, resonance: 0.05, slope: Slope24, velocity: 2.2, keytrack: 0.45}
-    FilterEnvelope: {attack: 0.07, attack_curve: -1, decay: 0.35, sustain: 0.4, release: 0.2, amount: 0.7, velocity: 0.5}
+    Filter: {
+      kind: LowPass,
+      cutoff: 800,
+      resonance: 0.05,
+      slope: Slope24,
+      velocity: 2.2,
+      keytrack: 0.45
+    }
+    FilterEnvelope: {
+      attack: 0.07,
+      attack_curve: -1,
+      decay: 0.35,
+      sustain: 0.4,
+      release: 0.2,
+      amount: 0.7,
+      velocity: 0.5
+    }
     Lfo: {rate: 5.2, delay: 0.4, fade: 0.5, random_phase: true, pitch: 11, amplitude: 0.05}
     wander { Lfo: {wave: LfoTriangle, rate: 0.5, random_phase: true, pitch: 3} }
     buzz {
       Oscillator: {wave: Saw, frequency: 440, level: 0.075}
       bloom {
         Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.3, velocity: 1}
-        Envelope: {attack: 0.075, attack_curve: -1, decay: 0.35, sustain: 0.7, release: 0.1, curve: 2}
+        Envelope: {
+          attack: 0.075,
+          attack_curve: -1,
+          decay: 0.35,
+          sustain: 0.7,
+          release: 0.1,
+          curve: 2
+        }
       }
     }
+
     tongue {
       Oscillator: {wave: Noise, level: 0.01}
       Envelope: {attack: 0.002, decay: 0.03, sustain: 0, release: 0.01, curve: 3}
       attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
+
     breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.008} }
     breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.2} }
     breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
@@ -190,10 +278,25 @@ assets {
   prefab tp_straight_sound {
     Sound: {seed: 51, level_variance: 0.03}
     Glide: {time: 0.025, legato: true, channel: 5}
-    Envelope: {attack: 0.022, attack_curve: 0.5, decay: 0.12, sustain: 0.75, release: 0.08, curve: 2}
+    Envelope: {
+      attack: 0.022,
+      attack_curve: 0.5,
+      decay: 0.12,
+      sustain: 0.75,
+      release: 0.08,
+      curve: 2
+    }
     PitchEnvelope: {amount: -0.6, decay: 0.045, curve: 2}
     Filter: {kind: LowPass, cutoff: 1050, resonance: 0.25, velocity: 1.8, keytrack: 0.3}
-    FilterEnvelope: {attack: 0.035, attack_curve: -1, decay: 0.2, sustain: 0.5, release: 0.1, amount: 0.8, velocity: 0.5}
+    FilterEnvelope: {
+      attack: 0.035,
+      attack_curve: -1,
+      decay: 0.2,
+      sustain: 0.5,
+      release: 0.1,
+      amount: 0.8,
+      velocity: 0.5
+    }
     Lfo: {rate: 5.8, delay: 0.3, fade: 0.3, random_phase: true, pitch: 8, amplitude: 0.03}
     wander { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
     buzz {
@@ -203,11 +306,13 @@ assets {
         Envelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.7, release: 0.1, curve: 2}
       }
     }
+
     tongue {
       Oscillator: {wave: Noise, level: 0.018}
       Envelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01, curve: 3}
       attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
+
     breath { Oscillator: {wave: Noise, color: NoisePink, level: 0.002} }
     breath_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.25} }
     breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
@@ -223,21 +328,38 @@ assets {
     Envelope: {attack: 0.025, attack_curve: 0.5, decay: 0.15, sustain: 0.8, release: 0.1, curve: 2}
     PitchEnvelope: {amount: -0.8, decay: 0.07, curve: 2}
     Filter: {kind: LowPass, cutoff: 900, resonance: 0.55, velocity: 0.8, keytrack: 0.25}
-    FilterEnvelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.6, release: 0.1, amount: 0.3, velocity: 0.5}
+    FilterEnvelope: {
+      attack: 0.04,
+      attack_curve: -1,
+      decay: 0.2,
+      sustain: 0.6,
+      release: 0.1,
+      amount: 0.3,
+      velocity: 0.5
+    }
     Lfo: {rate: 5.6, delay: 0.35, fade: 0.4, random_phase: true, pitch: 12, amplitude: 0.03}
     wander { Lfo: {wave: LfoTriangle, rate: 0.6, random_phase: true, pitch: 2.5} }
     buzz {
       Oscillator: {wave: Saw, frequency: 440, level: 0.15}
       bloom {
         Oscillator: {wave: Sine, frequency: 440, modulation: Phase, index: 0.8, velocity: 1}
-        Envelope: {attack: 0.04, attack_curve: -1, decay: 0.2, sustain: 0.75, release: 0.1, curve: 2}
+        Envelope: {
+          attack: 0.04,
+          attack_curve: -1,
+          decay: 0.2,
+          sustain: 0.75,
+          release: 0.1,
+          curve: 2
+        }
       }
     }
+
     tongue {
       Oscillator: {wave: Noise, level: 0.03}
       Envelope: {attack: 0.001, decay: 0.02, sustain: 0, release: 0.01, curve: 3}
       attack_force { ModRoute: {source: SourceVelocity, target: TargetLevel, amount: 2} }
     }
+
     hand_bloom { ModRoute: {source: SourceMod, target: TargetIndex, amount: 0.3} }
     sizzle { Oscillator: {wave: Noise, level: 0.006} }
     hand_tone { ModRoute: {source: SourceMod, target: TargetCutoff, amount: 1.4} }
@@ -260,6 +382,7 @@ assets {
     hiss { Oscillator: {wave: Noise, color: NoisePink, level: 0.019} }
     breath_level { ModRoute: {source: SourceMod, target: TargetLevel, amount: 3} }
   }
+
   tp_flugel_air_inst { Instrument: {sound: tp_flugel_air_sound, velocity_curve: 1.6} }
 
   prefab tp_trumpet_call {
@@ -328,7 +451,13 @@ assets {
       {start: 7.5, duration: 0.5, pitch: 70, velocity: 0.68},
       {start: 8, duration: 1.5, pitch: 72, velocity: 0.72},
       {start: 9.5, duration: 0.45, pitch: 74, velocity: 0.7},
-      {start: 10, duration: 1.8, pitch: 75, velocity: 0.75, mod: {keys: [{0, 0.7}, {1, 1}, {1.8, 0.85}]}}
+      {
+        start: 10,
+        duration: 1.8,
+        pitch: 75,
+        velocity: 0.75,
+        mod: {keys: [{0, 0.7}, {1, 1}, {1.8, 0.85}]}
+      }
     ]}
   }
 
@@ -339,7 +468,13 @@ assets {
       {start: 2.5, duration: 0.5, pitch: 67, velocity: 0.59},
       {start: 3, duration: 0.95, pitch: 65, velocity: 0.57},
       {start: 4, duration: 0.95, pitch: 63, velocity: 0.55},
-      {start: 5, duration: 2, pitch: 72, velocity: 0.65, mod: {keys: [{0, 0.5}, {1, 1}, {2, 0.75}]}},
+      {
+        start: 5,
+        duration: 2,
+        pitch: 72,
+        velocity: 0.65,
+        mod: {keys: [{0, 0.5}, {1, 1}, {2, 0.75}]}
+      },
       {start: 7, duration: 0.5, pitch: 70, velocity: 0.62},
       {start: 7.5, duration: 0.5, pitch: 67, velocity: 0.59},
       {start: 8, duration: 3, pitch: 68, velocity: 0.59, mod: {keys: [{0, 0.9}, {3, 0.35}]}}
@@ -361,7 +496,13 @@ assets {
       {start: 5, duration: 0.18, pitch: 72, velocity: 0.75},
       {start: 5.5, duration: 0.18, pitch: 74, velocity: 0.78},
       {start: 6, duration: 0.9, pitch: 77, velocity: 0.95},
-      {start: 7, duration: 0.5, pitch: 74, velocity: 0.75, bend: {keys: [{0, 0}, {0.25, 0}, {0.5, -2}]}}
+      {
+        start: 7,
+        duration: 0.5,
+        pitch: 74,
+        velocity: 0.75,
+        bend: {keys: [{0, 0}, {0.25, 0}, {0.5, -2}]}
+      }
     ]}
   }
 
@@ -369,7 +510,13 @@ assets {
     NoteClip: {length: 12, notes: [
       {start: 0, duration: 1.5, pitch: 74, velocity: 0.7, mod: {keys: [{0, 0}, {0.6, 1}]}},
       {start: 1.67, duration: 0.3, pitch: 72, velocity: 0.62},
-      {start: 2, duration: 0.95, pitch: 69, velocity: 0.66, mod: {keys: [{0, 0.1}, {0.4, 1}, {0.95, 0.4}]}},
+      {
+        start: 2,
+        duration: 0.95,
+        pitch: 69,
+        velocity: 0.66,
+        mod: {keys: [{0, 0.1}, {0.4, 1}, {0.95, 0.4}]}
+      },
       {start: 3, duration: 0.9, pitch: 67, velocity: 0.62},
       {start: 4, duration: 0.3, pitch: 70, velocity: 0.64},
       {start: 4.67, duration: 0.3, pitch: 72, velocity: 0.66},
@@ -388,8 +535,20 @@ assets {
       {start: 1, duration: 0.6, pitch: 77, velocity: 0.68, mod: {keys: [{0, 0.2}, {0.3, 1}]}},
       {start: 1.67, duration: 0.3, pitch: 75, velocity: 0.62},
       {start: 2.33, duration: 0.3, pitch: 74, velocity: 0.62},
-      {start: 2.67, duration: 0.9, pitch: 72, velocity: 0.66, mod: {keys: [{0, 0}, {0.45, 1}, {0.9, 0.3}]}},
-      {start: 5, duration: 1.5, pitch: 70, velocity: 0.66, mod: {keys: [{0, 0}, {0.75, 1}, {1.5, 0.2}]}},
+      {
+        start: 2.67,
+        duration: 0.9,
+        pitch: 72,
+        velocity: 0.66,
+        mod: {keys: [{0, 0}, {0.45, 1}, {0.9, 0.3}]}
+      },
+      {
+        start: 5,
+        duration: 1.5,
+        pitch: 70,
+        velocity: 0.66,
+        mod: {keys: [{0, 0}, {0.75, 1}, {1.5, 0.2}]}
+      },
       {start: 6.67, duration: 0.3, pitch: 72, velocity: 0.62},
       {start: 7, duration: 0.5, pitch: 74, velocity: 0.64},
       {start: 9, duration: 0.3, pitch: 77, velocity: 0.66},
@@ -545,7 +704,13 @@ assets {
 
   tp_track_trumpet {
     Track: {instrument: tp_trumpet_inst, humanize: {velocity: 0.05}}
-    Bus: {output: tp_brass, volume: 1, pan: -0.1, effects: [tp_trumpet_bell], sends: [{bus: tp_hall, level: 0.18}]}
+    Bus: {
+      output: tp_brass,
+      volume: 1,
+      pan: -0.1,
+      effects: [tp_trumpet_bell],
+      sends: [{bus: tp_hall, level: 0.18}]
+    }
     Meter: {}
     solo { ClipPlacement: {clip: tp_trumpet_call, start: 0} }
     hits { ClipPlacement: {clip: tp_trumpet_hits, start: 72} }
@@ -554,7 +719,13 @@ assets {
 
   tp_track_piccolo {
     Track: {instrument: tp_piccolo_inst, humanize: {velocity: 0.05}}
-    Bus: {output: tp_brass, volume: 1, pan: -0.3, effects: [tp_piccolo_bell], sends: [{bus: tp_hall, level: 0.3}]}
+    Bus: {
+      output: tp_brass,
+      volume: 1,
+      pan: -0.3,
+      effects: [tp_piccolo_bell],
+      sends: [{bus: tp_hall, level: 0.3}]
+    }
     Meter: {}
     solo { ClipPlacement: {clip: tp_piccolo_air, start: 16} }
     finale { ClipPlacement: {clip: tp_piccolo_finale, start: 88.006} }
@@ -562,7 +733,13 @@ assets {
 
   tp_track_cornet {
     Track: {instrument: tp_cornet_inst, humanize: {velocity: 0.05}}
-    Bus: {output: tp_brass, volume: 1, pan: 0.15, effects: [tp_cornet_bell], sends: [{bus: tp_hall, level: 0.22}]}
+    Bus: {
+      output: tp_brass,
+      volume: 1,
+      pan: 0.15,
+      effects: [tp_cornet_bell],
+      sends: [{bus: tp_hall, level: 0.22}]
+    }
     Meter: {}
     solo { ClipPlacement: {clip: tp_cornet_song, start: 28} }
     hits { ClipPlacement: {clip: tp_cornet_hits, start: 71.99} }
@@ -571,7 +748,13 @@ assets {
 
   tp_track_flugel {
     Track: {instrument: tp_flugel_inst, humanize: {velocity: 0.05}}
-    Bus: {output: tp_brass, volume: 1.15, pan: 0.35, effects: [tp_flugel_bell], sends: [{bus: tp_hall, level: 0.28}]}
+    Bus: {
+      output: tp_brass,
+      volume: 1.15,
+      pan: 0.35,
+      effects: [tp_flugel_bell],
+      sends: [{bus: tp_hall, level: 0.28}]
+    }
     Meter: {}
     solo { ClipPlacement: {clip: tp_flugel_ballad, start: 40} }
     hits { ClipPlacement: {clip: tp_flugel_hits, start: 72.012} }
@@ -589,7 +772,13 @@ assets {
 
   tp_track_straight {
     Track: {instrument: tp_straight_inst, humanize: {velocity: 0.05}}
-    Bus: {output: tp_brass, volume: 1, pan: -0.35, effects: [tp_straight_mute], sends: [{bus: tp_hall, level: 0.12}]}
+    Bus: {
+      output: tp_brass,
+      volume: 1,
+      pan: -0.35,
+      effects: [tp_straight_mute],
+      sends: [{bus: tp_hall, level: 0.12}]
+    }
     Meter: {}
     solo { ClipPlacement: {clip: tp_straight_peck, start: 52} }
     riff { ClipPlacement: {clip: tp_straight_riff, start: 72} }
@@ -597,7 +786,13 @@ assets {
 
   tp_track_harmon {
     Track: {instrument: tp_harmon_inst, humanize: {velocity: 0.05}}
-    Bus: {output: tp_brass, volume: 1, pan: 0, effects: [tp_harmon_mute, tp_harmon_buzz], sends: [{bus: tp_hall, level: 0.08}]}
+    Bus: {
+      output: tp_brass,
+      volume: 1,
+      pan: 0,
+      effects: [tp_harmon_mute, tp_harmon_buzz],
+      sends: [{bus: tp_hall, level: 0.08}]
+    }
     Meter: {}
     solo { ClipPlacement: {clip: tp_harmon_solo, start: 60} }
     fills { ClipPlacement: {clip: tp_harmon_fills, start: 72} }

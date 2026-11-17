@@ -21,92 +21,610 @@ state {
 }
 
 assets {
-  prefab IsleCreatureSkin { Rgb: {84, 124, 172}; PbrMaterial: {roughness: 0.42}; ClearCoat: {strength: 0.55, roughness: 0.22}; Sheen: {color: {150, 200, 255}, roughness: 0.4} }
-  prefab IsleCreatureFin { Rgb: {70, 106, 152}; PbrMaterial: {roughness: 0.42}; ClearCoat: {strength: 0.55, roughness: 0.22}; Sheen: {color: {150, 200, 255}, roughness: 0.4} }
-  prefab IsleCreatureBelly { Rgb: {250, 240, 216}; PbrMaterial: {roughness: 0.5}; ClearCoat: {strength: 0.4, roughness: 0.3} }
+  prefab IsleCreatureSkin {
+    Rgb: {84, 124, 172}
+    PbrMaterial: {roughness: 0.42}
+    ClearCoat: {strength: 0.55, roughness: 0.22}
+    Sheen: {color: {150, 200, 255}, roughness: 0.4}
+  }
+
+  prefab IsleCreatureFin {
+    Rgb: {70, 106, 152}
+    PbrMaterial: {roughness: 0.42}
+    ClearCoat: {strength: 0.55, roughness: 0.22}
+    Sheen: {color: {150, 200, 255}, roughness: 0.4}
+  }
+
+  prefab IsleCreatureBelly {
+    Rgb: {250, 240, 216}
+    PbrMaterial: {roughness: 0.5}
+    ClearCoat: {strength: 0.4, roughness: 0.3}
+  }
+
   prefab IsleCreatureGroove { Rgb: {188, 168, 146}; PbrMaterial: {roughness: 0.6} }
-  prefab IsleCreatureDark { Rgb: {24, 32, 48}; PbrMaterial: {roughness: 0.3}; ClearCoat: {strength: 0.8, roughness: 0.1} }
+  prefab IsleCreatureDark {
+    Rgb: {24, 32, 48}
+    PbrMaterial: {roughness: 0.3}
+    ClearCoat: {strength: 0.8, roughness: 0.1}
+  }
+
   prefab IsleCreatureEye { Rgb: {250, 250, 246}; PbrMaterial: {roughness: 0.25} }
-  prefab IsleCreatureGlint { Rgb: {255, 255, 255}; Emissive: {strength: 1.6, color: {255, 255, 255}} }
+  prefab IsleCreatureGlint {
+    Rgb: {255, 255, 255}
+    Emissive: {strength: 1.6, color: {255, 255, 255}}
+  }
+
   prefab IsleCreatureBlush { Rgb: {236, 150, 150}; PbrMaterial: {roughness: 0.6} }
-  prefab IsleCreatureSpot { Rgb: {150, 236, 226}; PbrMaterial: {roughness: 0.3}; Emissive: {strength: night ? 7 : 0.25, color: {90, 240, 215}} }
-  const creature_moss: Rgb = match season { 0: {120, 176, 84}; 1: {92, 150, 72}; 2: {156, 150, 70}; _: {226, 234, 240} }
-  prefab IsleCreatureMoss { Rgb: creature_moss; PbrMaterial: {roughness: 0.95}; Sheen: {color: {200, 255, 170}, roughness: 0.6} }
+  prefab IsleCreatureSpot {
+    Rgb: {150, 236, 226}
+    PbrMaterial: {roughness: 0.3}
+    Emissive: {strength: night ? 7 : 0.25, color: {90, 240, 215}}
+  }
+
+  const creature_moss: Rgb = match season {
+    0: {120, 176, 84}
+    1: {92, 150, 72}
+    2: {156, 150, 70}
+    _: {226, 234, 240}
+  }
+  prefab IsleCreatureMoss {
+    Rgb: creature_moss
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {200, 255, 170}, roughness: 0.6}
+  }
+
   prefab IsleCreatureBarnacle { Rgb: {168, 164, 150}; PbrMaterial: {roughness: 0.95} }
   prefab IsleCreatureWood { Rgb: {122, 86, 54}; PbrMaterial: {roughness: 0.9} }
   prefab IsleCreatureRoof { Rgb: {196, 84, 60}; PbrMaterial: {roughness: 0.7} }
   prefab IsleCreatureFlowerA { Rgb: {250, 206, 80}; PbrMaterial: {roughness: 0.6} }
   prefab IsleCreatureFlowerB { Rgb: {236, 120, 170}; PbrMaterial: {roughness: 0.6} }
-  prefab IsleCreatureCap { Rgb: {214, 62, 52}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.5, roughness: 0.2} }
+  prefab IsleCreatureCap {
+    Rgb: {214, 62, 52}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.5, roughness: 0.2}
+  }
 
-  prefab IsleWhaleRingPath { Path2D: {start: {1, 0}, segments: [{kind: CatmullRom, end: {0.881, 0.543}}, {kind: CatmullRom, end: {0.543, 0.881}}, {kind: CatmullRom, end: {0, 1}}, {kind: CatmullRom, end: {-0.543, 0.881}}, {kind: CatmullRom, end: {-0.881, 0.543}}, {kind: CatmullRom, end: {-1, 0}}, {kind: CatmullRom, end: {-0.881, -0.543}}, {kind: CatmullRom, end: {-0.543, -0.881}}, {kind: CatmullRom, end: {-0, -1}}, {kind: CatmullRom, end: {0.543, -0.881}}, {kind: CatmullRom, end: {0.881, -0.543}}], closed: true} }
+  prefab IsleWhaleRingPath {
+    Path2D: {
+      start: {1, 0},
+      segments: [
+        {kind: CatmullRom, end: {0.881, 0.543}},
+        {kind: CatmullRom, end: {0.543, 0.881}},
+        {kind: CatmullRom, end: {0, 1}},
+        {kind: CatmullRom, end: {-0.543, 0.881}},
+        {kind: CatmullRom, end: {-0.881, 0.543}},
+        {kind: CatmullRom, end: {-1, 0}},
+        {kind: CatmullRom, end: {-0.881, -0.543}},
+        {kind: CatmullRom, end: {-0.543, -0.881}},
+        {kind: CatmullRom, end: {-0, -1}},
+        {kind: CatmullRom, end: {0.543, -0.881}},
+        {kind: CatmullRom, end: {0.881, -0.543}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleRing { Profile2D: {outer: IsleWhaleRingPath} }
-  prefab IsleWhaleBellyPath { Path2D: {start: {0.974, 0.287}, segments: [{kind: CatmullRom, end: {0.839, 0.613}}, {kind: CatmullRom, end: {0.543, 0.881}}, {kind: CatmullRom, end: {0, 1}}, {kind: CatmullRom, end: {-0.543, 0.881}}, {kind: CatmullRom, end: {-0.839, 0.613}}, {kind: CatmullRom, end: {-0.974, 0.287}}, {kind: CatmullRom, end: {-0.55, 0.3}}, {kind: CatmullRom, end: {0.55, 0.3}}], closed: true} }
+  prefab IsleWhaleBellyPath {
+    Path2D: {
+      start: {0.974, 0.287},
+      segments: [
+        {kind: CatmullRom, end: {0.839, 0.613}},
+        {kind: CatmullRom, end: {0.543, 0.881}},
+        {kind: CatmullRom, end: {0, 1}},
+        {kind: CatmullRom, end: {-0.543, 0.881}},
+        {kind: CatmullRom, end: {-0.839, 0.613}},
+        {kind: CatmullRom, end: {-0.974, 0.287}},
+        {kind: CatmullRom, end: {-0.55, 0.3}},
+        {kind: CatmullRom, end: {0.55, 0.3}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleBellyRing { Profile2D: {outer: IsleWhaleBellyPath} }
-  prefab IsleWhaleMossPath { Path2D: {start: {0.811, -0.653}, segments: [{kind: CatmullRom, end: {0.613, -0.839}}, {kind: CatmullRom, end: {0.356, -0.957}}, {kind: CatmullRom, end: {0, -1}}, {kind: CatmullRom, end: {-0.356, -0.957}}, {kind: CatmullRom, end: {-0.613, -0.839}}, {kind: CatmullRom, end: {-0.811, -0.653}}, {kind: CatmullRom, end: {-0.5, -0.45}}, {kind: CatmullRom, end: {0.5, -0.45}}], closed: true} }
+  prefab IsleWhaleMossPath {
+    Path2D: {
+      start: {0.811, -0.653},
+      segments: [
+        {kind: CatmullRom, end: {0.613, -0.839}},
+        {kind: CatmullRom, end: {0.356, -0.957}},
+        {kind: CatmullRom, end: {0, -1}},
+        {kind: CatmullRom, end: {-0.356, -0.957}},
+        {kind: CatmullRom, end: {-0.613, -0.839}},
+        {kind: CatmullRom, end: {-0.811, -0.653}},
+        {kind: CatmullRom, end: {-0.5, -0.45}},
+        {kind: CatmullRom, end: {0.5, -0.45}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleMossRing { Profile2D: {outer: IsleWhaleMossPath} }
-  prefab IsleWhaleGroovePath0 { Path2D: {start: {0.872, 0.444}, segments: [{kind: Line, end: {0.938, 0.477}}, {kind: Line, end: {0.923, 0.512}}, {kind: Line, end: {0.858, 0.476}}], closed: true} }
+  prefab IsleWhaleGroovePath0 {
+    Path2D: {
+      start: {0.872, 0.444},
+      segments: [
+        {kind: Line, end: {0.938, 0.477}},
+        {kind: Line, end: {0.923, 0.512}},
+        {kind: Line, end: {0.858, 0.476}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove0 { Profile2D: {outer: IsleWhaleGroovePath0} }
-  prefab IsleWhaleGroovePath1 { Path2D: {start: {0.78, 0.606}, segments: [{kind: Line, end: {0.839, 0.652}}, {kind: Line, end: {0.818, 0.681}}, {kind: Line, end: {0.76, 0.633}}], closed: true} }
+  prefab IsleWhaleGroovePath1 {
+    Path2D: {
+      start: {0.78, 0.606},
+      segments: [
+        {kind: Line, end: {0.839, 0.652}},
+        {kind: Line, end: {0.818, 0.681}},
+        {kind: Line, end: {0.76, 0.633}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove1 { Profile2D: {outer: IsleWhaleGroovePath1} }
-  prefab IsleWhaleGroovePath2 { Path2D: {start: {0.657, 0.741}, segments: [{kind: Line, end: {0.707, 0.797}}, {kind: Line, end: {0.679, 0.82}}, {kind: Line, end: {0.631, 0.762}}], closed: true} }
+  prefab IsleWhaleGroovePath2 {
+    Path2D: {
+      start: {0.657, 0.741},
+      segments: [
+        {kind: Line, end: {0.707, 0.797}},
+        {kind: Line, end: {0.679, 0.82}},
+        {kind: Line, end: {0.631, 0.762}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove2 { Profile2D: {outer: IsleWhaleGroovePath2} }
-  prefab IsleWhaleGroovePath3 { Path2D: {start: {0.504, 0.844}, segments: [{kind: Line, end: {0.542, 0.908}}, {kind: Line, end: {0.509, 0.924}}, {kind: Line, end: {0.473, 0.859}}], closed: true} }
+  prefab IsleWhaleGroovePath3 {
+    Path2D: {
+      start: {0.504, 0.844},
+      segments: [
+        {kind: Line, end: {0.542, 0.908}},
+        {kind: Line, end: {0.509, 0.924}},
+        {kind: Line, end: {0.473, 0.859}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove3 { Profile2D: {outer: IsleWhaleGroovePath3} }
-  prefab IsleWhaleGroovePath4 { Path2D: {start: {0.324, 0.913}, segments: [{kind: Line, end: {0.348, 0.982}}, {kind: Line, end: {0.309, 0.992}}, {kind: Line, end: {0.288, 0.922}}], closed: true} }
+  prefab IsleWhaleGroovePath4 {
+    Path2D: {
+      start: {0.324, 0.913},
+      segments: [
+        {kind: Line, end: {0.348, 0.982}},
+        {kind: Line, end: {0.309, 0.992}},
+        {kind: Line, end: {0.288, 0.922}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove4 { Profile2D: {outer: IsleWhaleGroovePath4} }
-  prefab IsleWhaleGroovePath5 { Path2D: {start: {0.113, 0.947}, segments: [{kind: Line, end: {0.121, 1.018}}, {kind: Line, end: {0.074, 1.021}}, {kind: Line, end: {0.069, 0.949}}], closed: true} }
+  prefab IsleWhaleGroovePath5 {
+    Path2D: {
+      start: {0.113, 0.947},
+      segments: [
+        {kind: Line, end: {0.121, 1.018}},
+        {kind: Line, end: {0.074, 1.021}},
+        {kind: Line, end: {0.069, 0.949}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove5 { Profile2D: {outer: IsleWhaleGroovePath5} }
-  prefab IsleWhaleGroovePath6 { Path2D: {start: {-0.069, 0.949}, segments: [{kind: Line, end: {-0.074, 1.021}}, {kind: Line, end: {-0.121, 1.018}}, {kind: Line, end: {-0.113, 0.947}}], closed: true} }
+  prefab IsleWhaleGroovePath6 {
+    Path2D: {
+      start: {-0.069, 0.949},
+      segments: [
+        {kind: Line, end: {-0.074, 1.021}},
+        {kind: Line, end: {-0.121, 1.018}},
+        {kind: Line, end: {-0.113, 0.947}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove6 { Profile2D: {outer: IsleWhaleGroovePath6} }
-  prefab IsleWhaleGroovePath7 { Path2D: {start: {-0.288, 0.922}, segments: [{kind: Line, end: {-0.309, 0.992}}, {kind: Line, end: {-0.348, 0.982}}, {kind: Line, end: {-0.324, 0.913}}], closed: true} }
+  prefab IsleWhaleGroovePath7 {
+    Path2D: {
+      start: {-0.288, 0.922},
+      segments: [
+        {kind: Line, end: {-0.309, 0.992}},
+        {kind: Line, end: {-0.348, 0.982}},
+        {kind: Line, end: {-0.324, 0.913}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove7 { Profile2D: {outer: IsleWhaleGroovePath7} }
-  prefab IsleWhaleGroovePath8 { Path2D: {start: {-0.473, 0.859}, segments: [{kind: Line, end: {-0.509, 0.924}}, {kind: Line, end: {-0.542, 0.908}}, {kind: Line, end: {-0.504, 0.844}}], closed: true} }
+  prefab IsleWhaleGroovePath8 {
+    Path2D: {
+      start: {-0.473, 0.859},
+      segments: [
+        {kind: Line, end: {-0.509, 0.924}},
+        {kind: Line, end: {-0.542, 0.908}},
+        {kind: Line, end: {-0.504, 0.844}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove8 { Profile2D: {outer: IsleWhaleGroovePath8} }
-  prefab IsleWhaleGroovePath9 { Path2D: {start: {-0.631, 0.762}, segments: [{kind: Line, end: {-0.679, 0.82}}, {kind: Line, end: {-0.707, 0.797}}, {kind: Line, end: {-0.657, 0.741}}], closed: true} }
+  prefab IsleWhaleGroovePath9 {
+    Path2D: {
+      start: {-0.631, 0.762},
+      segments: [
+        {kind: Line, end: {-0.679, 0.82}},
+        {kind: Line, end: {-0.707, 0.797}},
+        {kind: Line, end: {-0.657, 0.741}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove9 { Profile2D: {outer: IsleWhaleGroovePath9} }
-  prefab IsleWhaleGroovePath10 { Path2D: {start: {-0.76, 0.633}, segments: [{kind: Line, end: {-0.818, 0.681}}, {kind: Line, end: {-0.839, 0.652}}, {kind: Line, end: {-0.78, 0.606}}], closed: true} }
+  prefab IsleWhaleGroovePath10 {
+    Path2D: {
+      start: {-0.76, 0.633},
+      segments: [
+        {kind: Line, end: {-0.818, 0.681}},
+        {kind: Line, end: {-0.839, 0.652}},
+        {kind: Line, end: {-0.78, 0.606}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove10 { Profile2D: {outer: IsleWhaleGroovePath10} }
-  prefab IsleWhaleGroovePath11 { Path2D: {start: {-0.858, 0.476}, segments: [{kind: Line, end: {-0.923, 0.512}}, {kind: Line, end: {-0.938, 0.477}}, {kind: Line, end: {-0.872, 0.444}}], closed: true} }
+  prefab IsleWhaleGroovePath11 {
+    Path2D: {
+      start: {-0.858, 0.476},
+      segments: [
+        {kind: Line, end: {-0.923, 0.512}},
+        {kind: Line, end: {-0.938, 0.477}},
+        {kind: Line, end: {-0.872, 0.444}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleGroove11 { Profile2D: {outer: IsleWhaleGroovePath11} }
-  prefab IsleWhaleLinePath { Path2D: {start: {0.075, 0}, segments: [{kind: CatmullRom, end: {0, 0.075}}, {kind: CatmullRom, end: {-0.075, 0}}, {kind: CatmullRom, end: {0, -0.075}}], closed: true} }
+  prefab IsleWhaleLinePath {
+    Path2D: {
+      start: {0.075, 0},
+      segments: [
+        {kind: CatmullRom, end: {0, 0.075}},
+        {kind: CatmullRom, end: {-0.075, 0}},
+        {kind: CatmullRom, end: {0, -0.075}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleLine { Profile2D: {outer: IsleWhaleLinePath} }
-  prefab IsleWhaleSmile { Path3D: {start: {3.681, 0.362, -4.8}, segments: [{kind: CatmullRom, end: {3.668, -0.039, -5.1}}, {kind: CatmullRom, end: {3.588, -0.539, -5.6}}, {kind: CatmullRom, end: {3.402, -0.859, -6.4}}, {kind: CatmullRom, end: {3.187, -0.854, -7.2}}, {kind: CatmullRom, end: {2.865, -0.833, -8}}, {kind: CatmullRom, end: {2.447, -0.791, -8.7}}, {kind: CatmullRom, end: {1.903, -0.718, -9.3}}, {kind: CatmullRom, end: {1.317, -0.621, -9.7}}, {kind: CatmullRom, end: {0.803, -0.523, -9.9}}, {kind: CatmullRom, end: {0, -0.475, -10.02}}, {kind: CatmullRom, end: {-0.803, -0.523, -9.9}}, {kind: CatmullRom, end: {-1.317, -0.621, -9.7}}, {kind: CatmullRom, end: {-1.903, -0.718, -9.3}}, {kind: CatmullRom, end: {-2.447, -0.791, -8.7}}, {kind: CatmullRom, end: {-2.865, -0.833, -8}}, {kind: CatmullRom, end: {-3.187, -0.854, -7.2}}, {kind: CatmullRom, end: {-3.402, -0.859, -6.4}}, {kind: CatmullRom, end: {-3.588, -0.539, -5.6}}, {kind: CatmullRom, end: {-3.668, -0.039, -5.1}}, {kind: CatmullRom, end: {-3.681, 0.362, -4.8}}]} }
-  prefab IsleWhaleFinRPath { Path2D: {start: {0, -0.75}, segments: [{kind: CatmullRom, end: {1.6, -1.05}}, {kind: CatmullRom, end: {3.4, -0.75}}, {kind: CatmullRom, end: {5, 0.1}}, {kind: CatmullRom, end: {6.2, 1.3}}, {kind: CatmullRom, end: {6.5, 2.1}}, {kind: CatmullRom, end: {5.7, 2.2}}, {kind: CatmullRom, end: {4.3, 1.6}}, {kind: CatmullRom, end: {2.6, 1.15}}, {kind: CatmullRom, end: {1, 1}}, {kind: CatmullRom, end: {-0.3, 0.8}}], closed: true} }
+  prefab IsleWhaleSmile {
+    Path3D: {
+      start: {3.681, 0.362, -4.8},
+      segments: [
+        {kind: CatmullRom, end: {3.668, -0.039, -5.1}},
+        {kind: CatmullRom, end: {3.588, -0.539, -5.6}},
+        {kind: CatmullRom, end: {3.402, -0.859, -6.4}},
+        {kind: CatmullRom, end: {3.187, -0.854, -7.2}},
+        {kind: CatmullRom, end: {2.865, -0.833, -8}},
+        {kind: CatmullRom, end: {2.447, -0.791, -8.7}},
+        {kind: CatmullRom, end: {1.903, -0.718, -9.3}},
+        {kind: CatmullRom, end: {1.317, -0.621, -9.7}},
+        {kind: CatmullRom, end: {0.803, -0.523, -9.9}},
+        {kind: CatmullRom, end: {0, -0.475, -10.02}},
+        {kind: CatmullRom, end: {-0.803, -0.523, -9.9}},
+        {kind: CatmullRom, end: {-1.317, -0.621, -9.7}},
+        {kind: CatmullRom, end: {-1.903, -0.718, -9.3}},
+        {kind: CatmullRom, end: {-2.447, -0.791, -8.7}},
+        {kind: CatmullRom, end: {-2.865, -0.833, -8}},
+        {kind: CatmullRom, end: {-3.187, -0.854, -7.2}},
+        {kind: CatmullRom, end: {-3.402, -0.859, -6.4}},
+        {kind: CatmullRom, end: {-3.588, -0.539, -5.6}},
+        {kind: CatmullRom, end: {-3.668, -0.039, -5.1}},
+        {kind: CatmullRom, end: {-3.681, 0.362, -4.8}}
+      ]
+    }
+  }
+
+  prefab IsleWhaleFinRPath {
+    Path2D: {
+      start: {0, -0.75},
+      segments: [
+        {kind: CatmullRom, end: {1.6, -1.05}},
+        {kind: CatmullRom, end: {3.4, -0.75}},
+        {kind: CatmullRom, end: {5, 0.1}},
+        {kind: CatmullRom, end: {6.2, 1.3}},
+        {kind: CatmullRom, end: {6.5, 2.1}},
+        {kind: CatmullRom, end: {5.7, 2.2}},
+        {kind: CatmullRom, end: {4.3, 1.6}},
+        {kind: CatmullRom, end: {2.6, 1.15}},
+        {kind: CatmullRom, end: {1, 1}},
+        {kind: CatmullRom, end: {-0.3, 0.8}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleFinR { Profile2D: {outer: IsleWhaleFinRPath} }
-  prefab IsleWhaleFinLPath { Path2D: {start: {0.3, 0.8}, segments: [{kind: CatmullRom, end: {-1, 1}}, {kind: CatmullRom, end: {-2.6, 1.15}}, {kind: CatmullRom, end: {-4.3, 1.6}}, {kind: CatmullRom, end: {-5.7, 2.2}}, {kind: CatmullRom, end: {-6.5, 2.1}}, {kind: CatmullRom, end: {-6.2, 1.3}}, {kind: CatmullRom, end: {-5, 0.1}}, {kind: CatmullRom, end: {-3.4, -0.75}}, {kind: CatmullRom, end: {-1.6, -1.05}}, {kind: CatmullRom, end: {0, -0.75}}], closed: true} }
+  prefab IsleWhaleFinLPath {
+    Path2D: {
+      start: {0.3, 0.8},
+      segments: [
+        {kind: CatmullRom, end: {-1, 1}},
+        {kind: CatmullRom, end: {-2.6, 1.15}},
+        {kind: CatmullRom, end: {-4.3, 1.6}},
+        {kind: CatmullRom, end: {-5.7, 2.2}},
+        {kind: CatmullRom, end: {-6.5, 2.1}},
+        {kind: CatmullRom, end: {-6.2, 1.3}},
+        {kind: CatmullRom, end: {-5, 0.1}},
+        {kind: CatmullRom, end: {-3.4, -0.75}},
+        {kind: CatmullRom, end: {-1.6, -1.05}},
+        {kind: CatmullRom, end: {0, -0.75}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleFinL { Profile2D: {outer: IsleWhaleFinLPath} }
-  prefab IsleWhaleFlukePath { Path2D: {start: {0.45, -0.5}, segments: [{kind: CatmullRom, end: {1.3, 0.3}}, {kind: CatmullRom, end: {2.8, 1}}, {kind: CatmullRom, end: {4.3, 2.3}}, {kind: CatmullRom, end: {4.9, 3.3}}, {kind: CatmullRom, end: {3.9, 3.35}}, {kind: CatmullRom, end: {2.4, 2.9}}, {kind: CatmullRom, end: {1, 2.75}}, {kind: CatmullRom, end: {0, 2.3}}, {kind: CatmullRom, end: {-1, 2.75}}, {kind: CatmullRom, end: {-2.4, 2.9}}, {kind: CatmullRom, end: {-3.9, 3.35}}, {kind: CatmullRom, end: {-4.9, 3.3}}, {kind: CatmullRom, end: {-4.3, 2.3}}, {kind: CatmullRom, end: {-2.8, 1}}, {kind: CatmullRom, end: {-1.3, 0.3}}, {kind: CatmullRom, end: {-0.45, -0.5}}], closed: true} }
+  prefab IsleWhaleFlukePath {
+    Path2D: {
+      start: {0.45, -0.5},
+      segments: [
+        {kind: CatmullRom, end: {1.3, 0.3}},
+        {kind: CatmullRom, end: {2.8, 1}},
+        {kind: CatmullRom, end: {4.3, 2.3}},
+        {kind: CatmullRom, end: {4.9, 3.3}},
+        {kind: CatmullRom, end: {3.9, 3.35}},
+        {kind: CatmullRom, end: {2.4, 2.9}},
+        {kind: CatmullRom, end: {1, 2.75}},
+        {kind: CatmullRom, end: {0, 2.3}},
+        {kind: CatmullRom, end: {-1, 2.75}},
+        {kind: CatmullRom, end: {-2.4, 2.9}},
+        {kind: CatmullRom, end: {-3.9, 3.35}},
+        {kind: CatmullRom, end: {-4.9, 3.3}},
+        {kind: CatmullRom, end: {-4.3, 2.3}},
+        {kind: CatmullRom, end: {-2.8, 1}},
+        {kind: CatmullRom, end: {-1.3, 0.3}},
+        {kind: CatmullRom, end: {-0.45, -0.5}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleFluke { Profile2D: {outer: IsleWhaleFlukePath} }
-  prefab IsleWhaleDorsalPath { Path2D: {start: {-1, 0}, segments: [{kind: CatmullRom, end: {-0.2, 0.55}}, {kind: CatmullRom, end: {0.6, 0.95}}, {kind: CatmullRom, end: {1.15, 1}}, {kind: CatmullRom, end: {1.05, 0.5}}, {kind: CatmullRom, end: {1.1, 0}}], closed: true} }
+  prefab IsleWhaleDorsalPath {
+    Path2D: {
+      start: {-1, 0},
+      segments: [
+        {kind: CatmullRom, end: {-0.2, 0.55}},
+        {kind: CatmullRom, end: {0.6, 0.95}},
+        {kind: CatmullRom, end: {1.15, 1}},
+        {kind: CatmullRom, end: {1.05, 0.5}},
+        {kind: CatmullRom, end: {1.1, 0}}
+      ],
+      closed: true
+    }
+  }
+
   prefab IsleWhaleDorsal { Profile2D: {outer: IsleWhaleDorsalPath} }
 
   isle_whale_swim {
     box.animation.Clip: {duration: 12}
-    y { box.animation.Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {1.5, 0.707}, {3, 1}, {4.5, 0.707}, {6, 0}, {7.5, -0.707}, {9, -1}, {10.5, -0.707}, {12, -0}]}} }
-    pitch { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.045}, {1.5, 0.032}, {3, 0}, {4.5, -0.032}, {6, -0.045}, {7.5, -0.032}, {9, -0}, {10.5, 0.032}, {12, 0.045}]}} }
-    roll { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.025}, {1.5, 0.029}, {3, 0.016}, {4.5, -0.006}, {6, -0.025}, {7.5, -0.029}, {9, -0.016}, {10.5, 0.006}, {12, 0.025}]}} }
-  }
-  isle_whale_tail {
-    box.animation.Clip: {duration: 6}
-    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.02}, {0.75, 0.112}, {1.5, 0.15}, {2.25, 0.112}, {3, 0.02}, {3.75, -0.072}, {4.5, -0.11}, {5.25, -0.072}, {6, 0.02}]}} }
-  }
-  isle_whale_fluke {
-    box.animation.Clip: {duration: 6}
-    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, -0.347}, {0.75, -0.177}, {1.5, 0.096}, {2.25, 0.313}, {3, 0.347}, {3.75, 0.177}, {4.5, -0.096}, {5.25, -0.313}, {6, -0.347}]}} }
-  }
-  isle_whale_fin_r {
-    box.animation.Clip: {duration: 8}
-    z { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, -0.3}, {1, -0.144}, {2, -0.08}, {3, -0.144}, {4, -0.3}, {5, -0.456}, {6, -0.52}, {7, -0.456}, {8, -0.3}]}} }
-    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.075}, {1, 0.073}, {2, 0.029}, {3, -0.032}, {4, -0.075}, {5, -0.073}, {6, -0.029}, {7, 0.032}, {8, 0.075}]}} }
-  }
-  isle_whale_fin_l {
-    box.animation.Clip: {duration: 8}
-    z { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.3}, {1, 0.144}, {2, 0.08}, {3, 0.144}, {4, 0.3}, {5, 0.456}, {6, 0.52}, {7, 0.456}, {8, 0.3}]}} }
-    x { box.animation.Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [{0, 0.075}, {1, 0.073}, {2, 0.029}, {3, -0.032}, {4, -0.075}, {5, -0.073}, {6, -0.029}, {7, 0.032}, {8, 0.075}]}} }
+    y {
+      box.animation.Track: {
+        component: Position,
+        member: "y",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0},
+            {1.5, 0.707},
+            {3, 1},
+            {4.5, 0.707},
+            {6, 0},
+            {7.5, -0.707},
+            {9, -1},
+            {10.5, -0.707},
+            {12, -0}
+          ]
+        }
+      }
+    }
+
+    pitch {
+      box.animation.Track: {
+        component: Rotation,
+        member: "x",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0.045},
+            {1.5, 0.032},
+            {3, 0},
+            {4.5, -0.032},
+            {6, -0.045},
+            {7.5, -0.032},
+            {9, -0},
+            {10.5, 0.032},
+            {12, 0.045}
+          ]
+        }
+      }
+    }
+
+    roll {
+      box.animation.Track: {
+        component: Rotation,
+        member: "z",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0.025},
+            {1.5, 0.029},
+            {3, 0.016},
+            {4.5, -0.006},
+            {6, -0.025},
+            {7.5, -0.029},
+            {9, -0.016},
+            {10.5, 0.006},
+            {12, 0.025}
+          ]
+        }
+      }
+    }
   }
 
-  template IsleWhale {
+  isle_whale_tail {
+    box.animation.Clip: {duration: 6}
+    x {
+      box.animation.Track: {
+        component: Rotation,
+        member: "x",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0.02},
+            {0.75, 0.112},
+            {1.5, 0.15},
+            {2.25, 0.112},
+            {3, 0.02},
+            {3.75, -0.072},
+            {4.5, -0.11},
+            {5.25, -0.072},
+            {6, 0.02}
+          ]
+        }
+      }
+    }
+  }
+
+  isle_whale_fluke {
+    box.animation.Clip: {duration: 6}
+    x {
+      box.animation.Track: {
+        component: Rotation,
+        member: "x",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, -0.347},
+            {0.75, -0.177},
+            {1.5, 0.096},
+            {2.25, 0.313},
+            {3, 0.347},
+            {3.75, 0.177},
+            {4.5, -0.096},
+            {5.25, -0.313},
+            {6, -0.347}
+          ]
+        }
+      }
+    }
+  }
+
+  isle_whale_fin_r {
+    box.animation.Clip: {duration: 8}
+    z {
+      box.animation.Track: {
+        component: Rotation,
+        member: "z",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, -0.3},
+            {1, -0.144},
+            {2, -0.08},
+            {3, -0.144},
+            {4, -0.3},
+            {5, -0.456},
+            {6, -0.52},
+            {7, -0.456},
+            {8, -0.3}
+          ]
+        }
+      }
+    }
+
+    x {
+      box.animation.Track: {
+        component: Rotation,
+        member: "x",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0.075},
+            {1, 0.073},
+            {2, 0.029},
+            {3, -0.032},
+            {4, -0.075},
+            {5, -0.073},
+            {6, -0.029},
+            {7, 0.032},
+            {8, 0.075}
+          ]
+        }
+      }
+    }
+  }
+
+  isle_whale_fin_l {
+    box.animation.Clip: {duration: 8}
+    z {
+      box.animation.Track: {
+        component: Rotation,
+        member: "z",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0.3},
+            {1, 0.144},
+            {2, 0.08},
+            {3, 0.144},
+            {4, 0.3},
+            {5, 0.456},
+            {6, 0.52},
+            {7, 0.456},
+            {8, 0.3}
+          ]
+        }
+      }
+    }
+
+    x {
+      box.animation.Track: {
+        component: Rotation,
+        member: "x",
+        curve: {
+          kind: CurveCatmullRom,
+          keys: [
+            {0, 0.075},
+            {1, 0.073},
+            {2, 0.029},
+            {3, -0.032},
+            {4, -0.075},
+            {5, -0.073},
+            {6, -0.029},
+            {7, 0.032},
+            {8, 0.075}
+          ]
+        }
+      }
+    }
+  }
+
+  template IsleWhaleBack {
     prop size: f32 = 1
     prop garden = true
     prop seed: f32 = 0
@@ -120,696 +638,1258 @@ assets {
       Position: {0, 0, 0}
       Loft: {
         sections: [
-          {profile: IsleWhaleRing, offset: {0, -0.35, -9.999}, rotation: {1.5708, 0, 0}, scale: {0.098, 0.087}},
-          {profile: IsleWhaleRing, offset: {0, -0.349, -9.994}, rotation: {1.5708, 0, 0}, scale: {0.223, 0.199}},
-          {profile: IsleWhaleRing, offset: {0, -0.348, -9.98}, rotation: {1.5708, 0, 0}, scale: {0.388, 0.346}},
-          {profile: IsleWhaleRing, offset: {0, -0.345, -9.95}, rotation: {1.5708, 0, 0}, scale: {0.59, 0.526}},
-          {profile: IsleWhaleRing, offset: {0, -0.338, -9.88}, rotation: {1.5708, 0, 0}, scale: {0.879, 0.784}},
-          {profile: IsleWhaleRing, offset: {0, -0.321, -9.7}, rotation: {1.5708, 0, 0}, scale: {1.327, 1.184}},
-          {profile: IsleWhaleRing, offset: {0, -0.293, -9.4}, rotation: {1.5708, 0, 0}, scale: {1.796, 1.602}},
-          {profile: IsleWhaleRing, offset: {0, -0.257, -9}, rotation: {1.5708, 0, 0}, scale: {2.223, 1.982}},
-          {profile: IsleWhaleRing, offset: {0, -0.216, -8.5}, rotation: {1.5708, 0, 0}, scale: {2.604, 2.322}},
-          {profile: IsleWhaleRing, offset: {0, -0.172, -7.9}, rotation: {1.5708, 0, 0}, scale: {2.935, 2.618}},
-          {profile: IsleWhaleRing, offset: {0, -0.12, -7.1}, rotation: {1.5708, 0, 0}, scale: {3.244, 2.893}},
-          {profile: IsleWhaleRing, offset: {0, -0.073, -6.2}, rotation: {1.5708, 0, 0}, scale: {3.469, 3.094}},
-          {profile: IsleWhaleRing, offset: {0, -0.035, -5.2}, rotation: {1.5708, 0, 0}, scale: {3.615, 3.224}},
-          {profile: IsleWhaleRing, offset: {0, -0.009, -4.1}, rotation: {1.5708, 0, 0}, scale: {3.686, 3.288}},
-          {profile: IsleWhaleRing, offset: {0, -0, -3}, rotation: {1.5708, 0, 0}, scale: {3.7, 3.3}},
-          {profile: IsleWhaleRing, offset: {0, 0.007, -1.9}, rotation: {1.5708, 0, 0}, scale: {3.6, 3.217}},
-          {profile: IsleWhaleRing, offset: {0, 0.027, -0.8}, rotation: {1.5708, 0, 0}, scale: {3.418, 3.068}},
-          {profile: IsleWhaleRing, offset: {0, 0.06, 0.3}, rotation: {1.5708, 0, 0}, scale: {3.187, 2.878}},
-          {profile: IsleWhaleRing, offset: {0, 0.106, 1.4}, rotation: {1.5708, 0, 0}, scale: {2.918, 2.657}},
-          {profile: IsleWhaleRing, offset: {0, 0.16, 2.4}, rotation: {1.5708, 0, 0}, scale: {2.649, 2.436}},
-          {profile: IsleWhaleRing, offset: {0, 0.225, 3.4}, rotation: {1.5708, 0, 0}, scale: {2.362, 2.2}},
-          {profile: IsleWhaleRing, offset: {0, 0.265, 3.95}, rotation: {1.5708, 0, 0}, scale: {2.144, 2.014}},
-          {profile: IsleWhaleRing, offset: {0, 0.309, 4.5}, rotation: {1.5708, 0, 0}, scale: {1.829, 1.735}},
-          {profile: IsleWhaleRing, offset: {0, 0.342, 4.9}, rotation: {1.5708, 0, 0}, scale: {1.184, 1.133}},
-          {profile: IsleWhaleRing, offset: {0, 0.36, 5.1}, rotation: {1.5708, 0, 0}, scale: {0.37, 0.355}}
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.35, -9.999},
+            rotation: {1.5708, 0, 0},
+            scale: {0.098, 0.087}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.349, -9.994},
+            rotation: {1.5708, 0, 0},
+            scale: {0.223, 0.199}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.348, -9.98},
+            rotation: {1.5708, 0, 0},
+            scale: {0.388, 0.346}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.345, -9.95},
+            rotation: {1.5708, 0, 0},
+            scale: {0.59, 0.526}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.338, -9.88},
+            rotation: {1.5708, 0, 0},
+            scale: {0.879, 0.784}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.321, -9.7},
+            rotation: {1.5708, 0, 0},
+            scale: {1.327, 1.184}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.293, -9.4},
+            rotation: {1.5708, 0, 0},
+            scale: {1.796, 1.602}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.257, -9},
+            rotation: {1.5708, 0, 0},
+            scale: {2.223, 1.982}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.216, -8.5},
+            rotation: {1.5708, 0, 0},
+            scale: {2.604, 2.322}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.172, -7.9},
+            rotation: {1.5708, 0, 0},
+            scale: {2.935, 2.618}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.12, -7.1},
+            rotation: {1.5708, 0, 0},
+            scale: {3.244, 2.893}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.073, -6.2},
+            rotation: {1.5708, 0, 0},
+            scale: {3.469, 3.094}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.035, -5.2},
+            rotation: {1.5708, 0, 0},
+            scale: {3.615, 3.224}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0.009, -4.1},
+            rotation: {1.5708, 0, 0},
+            scale: {3.686, 3.288}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, -0, -3},
+            rotation: {1.5708, 0, 0},
+            scale: {3.7, 3.3}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.007, -1.9},
+            rotation: {1.5708, 0, 0},
+            scale: {3.6, 3.217}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.027, -0.8},
+            rotation: {1.5708, 0, 0},
+            scale: {3.418, 3.068}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.06, 0.3},
+            rotation: {1.5708, 0, 0},
+            scale: {3.187, 2.878}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.106, 1.4},
+            rotation: {1.5708, 0, 0},
+            scale: {2.918, 2.657}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.16, 2.4},
+            rotation: {1.5708, 0, 0},
+            scale: {2.649, 2.436}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.225, 3.4},
+            rotation: {1.5708, 0, 0},
+            scale: {2.362, 2.2}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.265, 3.95},
+            rotation: {1.5708, 0, 0},
+            scale: {2.144, 2.014}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.309, 4.5},
+            rotation: {1.5708, 0, 0},
+            scale: {1.829, 1.735}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.342, 4.9},
+            rotation: {1.5708, 0, 0},
+            scale: {1.184, 1.133}
+          },
+          {
+            profile: IsleWhaleRing,
+            offset: {0, 0.36, 5.1},
+            rotation: {1.5708, 0, 0},
+            scale: {0.37, 0.355}
+          }
         ],
         cap_start: true, cap_end: true, segments: 6, rings: 24
       }
     }
+  }
+
+  template IsleWhaleBelly : IsleWhaleBack {
     belly : IsleCreatureBelly {
       Position: {0, 0, 0}
       Loft: {
         sections: [
-          {profile: IsleWhaleBellyRing, offset: {0, -0.348, -9.98}, rotation: {1.5708, 0, 0}, scale: {0.392, 0.35}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.345, -9.95}, rotation: {1.5708, 0, 0}, scale: {0.597, 0.532}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.338, -9.88}, rotation: {1.5708, 0, 0}, scale: {0.89, 0.793}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.321, -9.7}, rotation: {1.5708, 0, 0}, scale: {1.343, 1.198}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.293, -9.4}, rotation: {1.5708, 0, 0}, scale: {1.818, 1.621}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.257, -9}, rotation: {1.5708, 0, 0}, scale: {2.249, 2.006}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.216, -8.5}, rotation: {1.5708, 0, 0}, scale: {2.635, 2.35}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.172, -7.9}, rotation: {1.5708, 0, 0}, scale: {2.97, 2.649}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.12, -7.1}, rotation: {1.5708, 0, 0}, scale: {3.283, 2.928}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.073, -6.2}, rotation: {1.5708, 0, 0}, scale: {3.511, 3.131}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.035, -5.2}, rotation: {1.5708, 0, 0}, scale: {3.658, 3.263}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.009, -4.1}, rotation: {1.5708, 0, 0}, scale: {3.73, 3.327}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0, -3}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.34}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.007, -1.9}, rotation: {1.5708, 0, 0}, scale: {3.643, 3.256}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.027, -0.8}, rotation: {1.5708, 0, 0}, scale: {3.459, 3.105}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.06, 0.3}, rotation: {1.5708, 0, 0}, scale: {3.225, 2.912}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.106, 1.4}, rotation: {1.5708, 0, 0}, scale: {2.953, 2.689}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.16, 2.4}, rotation: {1.5708, 0, 0}, scale: {2.681, 2.465}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.225, 3.4}, rotation: {1.5708, 0, 0}, scale: {2.391, 2.226}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.265, 3.95}, rotation: {1.5708, 0, 0}, scale: {2.169, 2.038}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.309, 4.5}, rotation: {1.5708, 0, 0}, scale: {1.851, 1.756}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.342, 4.9}, rotation: {1.5708, 0, 0}, scale: {1.198, 1.146}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.36, 5.1}, rotation: {1.5708, 0, 0}, scale: {0.374, 0.36}}
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.348, -9.98},
+            rotation: {1.5708, 0, 0},
+            scale: {0.392, 0.35}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.345, -9.95},
+            rotation: {1.5708, 0, 0},
+            scale: {0.597, 0.532}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.338, -9.88},
+            rotation: {1.5708, 0, 0},
+            scale: {0.89, 0.793}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.321, -9.7},
+            rotation: {1.5708, 0, 0},
+            scale: {1.343, 1.198}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.293, -9.4},
+            rotation: {1.5708, 0, 0},
+            scale: {1.818, 1.621}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.257, -9},
+            rotation: {1.5708, 0, 0},
+            scale: {2.249, 2.006}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.216, -8.5},
+            rotation: {1.5708, 0, 0},
+            scale: {2.635, 2.35}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.172, -7.9},
+            rotation: {1.5708, 0, 0},
+            scale: {2.97, 2.649}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.12, -7.1},
+            rotation: {1.5708, 0, 0},
+            scale: {3.283, 2.928}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.073, -6.2},
+            rotation: {1.5708, 0, 0},
+            scale: {3.511, 3.131}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.035, -5.2},
+            rotation: {1.5708, 0, 0},
+            scale: {3.658, 3.263}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0.009, -4.1},
+            rotation: {1.5708, 0, 0},
+            scale: {3.73, 3.327}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, -0, -3},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.34}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.007, -1.9},
+            rotation: {1.5708, 0, 0},
+            scale: {3.643, 3.256}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.027, -0.8},
+            rotation: {1.5708, 0, 0},
+            scale: {3.459, 3.105}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.06, 0.3},
+            rotation: {1.5708, 0, 0},
+            scale: {3.225, 2.912}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.106, 1.4},
+            rotation: {1.5708, 0, 0},
+            scale: {2.953, 2.689}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.16, 2.4},
+            rotation: {1.5708, 0, 0},
+            scale: {2.681, 2.465}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.225, 3.4},
+            rotation: {1.5708, 0, 0},
+            scale: {2.391, 2.226}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.265, 3.95},
+            rotation: {1.5708, 0, 0},
+            scale: {2.169, 2.038}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.309, 4.5},
+            rotation: {1.5708, 0, 0},
+            scale: {1.851, 1.756}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.342, 4.9},
+            rotation: {1.5708, 0, 0},
+            scale: {1.198, 1.146}
+          },
+          {
+            profile: IsleWhaleBellyRing,
+            offset: {0, 0.36, 5.1},
+            rotation: {1.5708, 0, 0},
+            scale: {0.374, 0.36}
+          }
         ],
         cap_start: true, cap_end: true, segments: 6, rings: 22
       }
     }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove0, offset: {0, -0.193, -8.2}, rotation: {1.5708, 0, 0}, scale: {2.816, 2.512}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.169, -7.865}, rotation: {1.5708, 0, 0}, scale: {2.987, 2.664}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.137, -7.375}, rotation: {1.5708, 0, 0}, scale: {3.189, 2.844}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.103, -6.803}, rotation: {1.5708, 0, 0}, scale: {3.37, 3.006}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.072, -6.169}, rotation: {1.5708, 0, 0}, scale: {3.517, 3.137}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.044, -5.486}, rotation: {1.5708, 0, 0}, scale: {3.625, 3.234}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.022, -4.76}, rotation: {1.5708, 0, 0}, scale: {3.696, 3.297}},
-          {profile: IsleWhaleGroove0, offset: {0, -0.007, -3.997}, rotation: {1.5708, 0, 0}, scale: {3.734, 3.33}},
-          {profile: IsleWhaleGroove0, offset: {0, -0, -3.2}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.339}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove1, offset: {0, -0.21, -8.425}, rotation: {1.5708, 0, 0}, scale: {2.683, 2.393}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.181, -8.032}, rotation: {1.5708, 0, 0}, scale: {2.905, 2.591}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.142, -7.458}, rotation: {1.5708, 0, 0}, scale: {3.158, 2.817}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.102, -6.787}, rotation: {1.5708, 0, 0}, scale: {3.374, 3.01}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.066, -6.044}, rotation: {1.5708, 0, 0}, scale: {3.54, 3.158}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.036, -5.243}, rotation: {1.5708, 0, 0}, scale: {3.654, 3.259}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.014, -4.392}, rotation: {1.5708, 0, 0}, scale: {3.718, 3.316}},
-          {profile: IsleWhaleGroove1, offset: {0, -0.002, -3.497}, rotation: {1.5708, 0, 0}, scale: {3.743, 3.338}},
-          {profile: IsleWhaleGroove1, offset: {0, 0.001, -2.562}, rotation: {1.5708, 0, 0}, scale: {3.719, 3.319}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove2, offset: {0, -0.228, -8.65}, rotation: {1.5708, 0, 0}, scale: {2.532, 2.258}},
-          {profile: IsleWhaleGroove2, offset: {0, -0.193, -8.2}, rotation: {1.5708, 0, 0}, scale: {2.816, 2.512}},
-          {profile: IsleWhaleGroove2, offset: {0, -0.147, -7.541}, rotation: {1.5708, 0, 0}, scale: {3.126, 2.788}},
-          {profile: IsleWhaleGroove2, offset: {0, -0.102, -6.771}, rotation: {1.5708, 0, 0}, scale: {3.379, 3.013}},
-          {profile: IsleWhaleGroove2, offset: {0, -0.061, -5.919}, rotation: {1.5708, 0, 0}, scale: {3.562, 3.177}},
-          {profile: IsleWhaleGroove2, offset: {0, -0.029, -5}, rotation: {1.5708, 0, 0}, scale: {3.677, 3.28}},
-          {profile: IsleWhaleGroove2, offset: {0, -0.007, -4.023}, rotation: {1.5708, 0, 0}, scale: {3.733, 3.329}},
-          {profile: IsleWhaleGroove2, offset: {0, 0, -2.997}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.34}},
-          {profile: IsleWhaleGroove2, offset: {0, 0.006, -1.925}, rotation: {1.5708, 0, 0}, scale: {3.646, 3.259}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove3, offset: {0, -0.247, -8.875}, rotation: {1.5708, 0, 0}, scale: {2.358, 2.103}},
-          {profile: IsleWhaleGroove3, offset: {0, -0.206, -8.367}, rotation: {1.5708, 0, 0}, scale: {2.719, 2.425}},
-          {profile: IsleWhaleGroove3, offset: {0, -0.153, -7.624}, rotation: {1.5708, 0, 0}, scale: {3.093, 2.758}},
-          {profile: IsleWhaleGroove3, offset: {0, -0.101, -6.755}, rotation: {1.5708, 0, 0}, scale: {3.383, 3.017}},
-          {profile: IsleWhaleGroove3, offset: {0, -0.056, -5.794}, rotation: {1.5708, 0, 0}, scale: {3.582, 3.195}},
-          {profile: IsleWhaleGroove3, offset: {0, -0.022, -4.756}, rotation: {1.5708, 0, 0}, scale: {3.697, 3.297}},
-          {profile: IsleWhaleGroove3, offset: {0, -0.003, -3.655}, rotation: {1.5708, 0, 0}, scale: {3.741, 3.336}},
-          {profile: IsleWhaleGroove3, offset: {0, 0.001, -2.497}, rotation: {1.5708, 0, 0}, scale: {3.713, 3.314}},
-          {profile: IsleWhaleGroove3, offset: {0, 0.016, -1.288}, rotation: {1.5708, 0, 0}, scale: {3.548, 3.178}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove4, offset: {0, -0.266, -9.1}, rotation: {1.5708, 0, 0}, scale: {2.155, 1.922}},
-          {profile: IsleWhaleGroove4, offset: {0, -0.219, -8.534}, rotation: {1.5708, 0, 0}, scale: {2.612, 2.33}},
-          {profile: IsleWhaleGroove4, offset: {0, -0.158, -7.706}, rotation: {1.5708, 0, 0}, scale: {3.058, 2.727}},
-          {profile: IsleWhaleGroove4, offset: {0, -0.1, -6.739}, rotation: {1.5708, 0, 0}, scale: {3.387, 3.021}},
-          {profile: IsleWhaleGroove4, offset: {0, -0.051, -5.668}, rotation: {1.5708, 0, 0}, scale: {3.601, 3.212}},
-          {profile: IsleWhaleGroove4, offset: {0, -0.016, -4.513}, rotation: {1.5708, 0, 0}, scale: {3.712, 3.311}},
-          {profile: IsleWhaleGroove4, offset: {0, -0.001, -3.287}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.339}},
-          {profile: IsleWhaleGroove4, offset: {0, 0.006, -1.997}, rotation: {1.5708, 0, 0}, scale: {3.656, 3.267}},
-          {profile: IsleWhaleGroove4, offset: {0, 0.03, -0.65}, rotation: {1.5708, 0, 0}, scale: {3.43, 3.081}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove5, offset: {0, -0.286, -9.325}, rotation: {1.5708, 0, 0}, scale: {1.911, 1.705}},
-          {profile: IsleWhaleGroove5, offset: {0, -0.232, -8.701}, rotation: {1.5708, 0, 0}, scale: {2.494, 2.225}},
-          {profile: IsleWhaleGroove5, offset: {0, -0.164, -7.789}, rotation: {1.5708, 0, 0}, scale: {3.021, 2.695}},
-          {profile: IsleWhaleGroove5, offset: {0, -0.099, -6.723}, rotation: {1.5708, 0, 0}, scale: {3.391, 3.025}},
-          {profile: IsleWhaleGroove5, offset: {0, -0.046, -5.543}, rotation: {1.5708, 0, 0}, scale: {3.618, 3.227}},
-          {profile: IsleWhaleGroove5, offset: {0, -0.012, -4.27}, rotation: {1.5708, 0, 0}, scale: {3.724, 3.321}},
-          {profile: IsleWhaleGroove5, offset: {0, 0, -2.918}, rotation: {1.5708, 0, 0}, scale: {3.742, 3.338}},
-          {profile: IsleWhaleGroove5, offset: {0, 0.012, -1.497}, rotation: {1.5708, 0, 0}, scale: {3.582, 3.206}},
-          {profile: IsleWhaleGroove5, offset: {0, 0.049, -0.013}, rotation: {1.5708, 0, 0}, scale: {3.296, 2.97}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove6, offset: {0, -0.286, -9.325}, rotation: {1.5708, 0, 0}, scale: {1.911, 1.705}},
-          {profile: IsleWhaleGroove6, offset: {0, -0.232, -8.701}, rotation: {1.5708, 0, 0}, scale: {2.494, 2.225}},
-          {profile: IsleWhaleGroove6, offset: {0, -0.164, -7.789}, rotation: {1.5708, 0, 0}, scale: {3.021, 2.695}},
-          {profile: IsleWhaleGroove6, offset: {0, -0.099, -6.723}, rotation: {1.5708, 0, 0}, scale: {3.391, 3.025}},
-          {profile: IsleWhaleGroove6, offset: {0, -0.046, -5.543}, rotation: {1.5708, 0, 0}, scale: {3.618, 3.227}},
-          {profile: IsleWhaleGroove6, offset: {0, -0.012, -4.27}, rotation: {1.5708, 0, 0}, scale: {3.724, 3.321}},
-          {profile: IsleWhaleGroove6, offset: {0, 0, -2.918}, rotation: {1.5708, 0, 0}, scale: {3.742, 3.338}},
-          {profile: IsleWhaleGroove6, offset: {0, 0.012, -1.497}, rotation: {1.5708, 0, 0}, scale: {3.582, 3.206}},
-          {profile: IsleWhaleGroove6, offset: {0, 0.049, -0.013}, rotation: {1.5708, 0, 0}, scale: {3.296, 2.97}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove7, offset: {0, -0.266, -9.1}, rotation: {1.5708, 0, 0}, scale: {2.155, 1.922}},
-          {profile: IsleWhaleGroove7, offset: {0, -0.219, -8.534}, rotation: {1.5708, 0, 0}, scale: {2.612, 2.33}},
-          {profile: IsleWhaleGroove7, offset: {0, -0.158, -7.706}, rotation: {1.5708, 0, 0}, scale: {3.058, 2.727}},
-          {profile: IsleWhaleGroove7, offset: {0, -0.1, -6.739}, rotation: {1.5708, 0, 0}, scale: {3.387, 3.021}},
-          {profile: IsleWhaleGroove7, offset: {0, -0.051, -5.668}, rotation: {1.5708, 0, 0}, scale: {3.601, 3.212}},
-          {profile: IsleWhaleGroove7, offset: {0, -0.016, -4.513}, rotation: {1.5708, 0, 0}, scale: {3.712, 3.311}},
-          {profile: IsleWhaleGroove7, offset: {0, -0.001, -3.287}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.339}},
-          {profile: IsleWhaleGroove7, offset: {0, 0.006, -1.997}, rotation: {1.5708, 0, 0}, scale: {3.656, 3.267}},
-          {profile: IsleWhaleGroove7, offset: {0, 0.03, -0.65}, rotation: {1.5708, 0, 0}, scale: {3.43, 3.081}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove8, offset: {0, -0.247, -8.875}, rotation: {1.5708, 0, 0}, scale: {2.358, 2.103}},
-          {profile: IsleWhaleGroove8, offset: {0, -0.206, -8.367}, rotation: {1.5708, 0, 0}, scale: {2.719, 2.425}},
-          {profile: IsleWhaleGroove8, offset: {0, -0.153, -7.624}, rotation: {1.5708, 0, 0}, scale: {3.093, 2.758}},
-          {profile: IsleWhaleGroove8, offset: {0, -0.101, -6.755}, rotation: {1.5708, 0, 0}, scale: {3.383, 3.017}},
-          {profile: IsleWhaleGroove8, offset: {0, -0.056, -5.794}, rotation: {1.5708, 0, 0}, scale: {3.582, 3.195}},
-          {profile: IsleWhaleGroove8, offset: {0, -0.022, -4.756}, rotation: {1.5708, 0, 0}, scale: {3.697, 3.297}},
-          {profile: IsleWhaleGroove8, offset: {0, -0.003, -3.655}, rotation: {1.5708, 0, 0}, scale: {3.741, 3.336}},
-          {profile: IsleWhaleGroove8, offset: {0, 0.001, -2.497}, rotation: {1.5708, 0, 0}, scale: {3.713, 3.314}},
-          {profile: IsleWhaleGroove8, offset: {0, 0.016, -1.288}, rotation: {1.5708, 0, 0}, scale: {3.548, 3.178}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove9, offset: {0, -0.228, -8.65}, rotation: {1.5708, 0, 0}, scale: {2.532, 2.258}},
-          {profile: IsleWhaleGroove9, offset: {0, -0.193, -8.2}, rotation: {1.5708, 0, 0}, scale: {2.816, 2.512}},
-          {profile: IsleWhaleGroove9, offset: {0, -0.147, -7.541}, rotation: {1.5708, 0, 0}, scale: {3.126, 2.788}},
-          {profile: IsleWhaleGroove9, offset: {0, -0.102, -6.771}, rotation: {1.5708, 0, 0}, scale: {3.379, 3.013}},
-          {profile: IsleWhaleGroove9, offset: {0, -0.061, -5.919}, rotation: {1.5708, 0, 0}, scale: {3.562, 3.177}},
-          {profile: IsleWhaleGroove9, offset: {0, -0.029, -5}, rotation: {1.5708, 0, 0}, scale: {3.677, 3.28}},
-          {profile: IsleWhaleGroove9, offset: {0, -0.007, -4.023}, rotation: {1.5708, 0, 0}, scale: {3.733, 3.329}},
-          {profile: IsleWhaleGroove9, offset: {0, 0, -2.997}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.34}},
-          {profile: IsleWhaleGroove9, offset: {0, 0.006, -1.925}, rotation: {1.5708, 0, 0}, scale: {3.646, 3.259}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove10, offset: {0, -0.21, -8.425}, rotation: {1.5708, 0, 0}, scale: {2.683, 2.393}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.181, -8.032}, rotation: {1.5708, 0, 0}, scale: {2.905, 2.591}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.142, -7.458}, rotation: {1.5708, 0, 0}, scale: {3.158, 2.817}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.102, -6.787}, rotation: {1.5708, 0, 0}, scale: {3.374, 3.01}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.066, -6.044}, rotation: {1.5708, 0, 0}, scale: {3.54, 3.158}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.036, -5.243}, rotation: {1.5708, 0, 0}, scale: {3.654, 3.259}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.014, -4.392}, rotation: {1.5708, 0, 0}, scale: {3.718, 3.316}},
-          {profile: IsleWhaleGroove10, offset: {0, -0.002, -3.497}, rotation: {1.5708, 0, 0}, scale: {3.743, 3.338}},
-          {profile: IsleWhaleGroove10, offset: {0, 0.001, -2.562}, rotation: {1.5708, 0, 0}, scale: {3.719, 3.319}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleGroove11, offset: {0, -0.193, -8.2}, rotation: {1.5708, 0, 0}, scale: {2.816, 2.512}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.169, -7.865}, rotation: {1.5708, 0, 0}, scale: {2.987, 2.664}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.137, -7.375}, rotation: {1.5708, 0, 0}, scale: {3.189, 2.844}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.103, -6.803}, rotation: {1.5708, 0, 0}, scale: {3.37, 3.006}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.072, -6.169}, rotation: {1.5708, 0, 0}, scale: {3.517, 3.137}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.044, -5.486}, rotation: {1.5708, 0, 0}, scale: {3.625, 3.234}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.022, -4.76}, rotation: {1.5708, 0, 0}, scale: {3.696, 3.297}},
-          {profile: IsleWhaleGroove11, offset: {0, -0.007, -3.997}, rotation: {1.5708, 0, 0}, scale: {3.734, 3.33}},
-          {profile: IsleWhaleGroove11, offset: {0, -0, -3.2}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.339}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 8
-      }
-    }
-    smile : IsleCreatureDark { NoShadow; Position: {0, 0, 0}; Sweep: {path: IsleWhaleSmile, profile: IsleWhaleLine, rings: 48, segments: 2} }
-    eye_r : IsleCreatureEye { Position: {3.4, 1.064, -3.781}; Sphere: {radius: 0.5, segments: 20, smooth: true} }
-    pupil_r : IsleCreatureDark { NoShadow; Position: {3.589, 1.124, -3.845}; Sphere: {radius: 0.38, segments: 16, smooth: true} }
-    glint_r : IsleCreatureGlint { NoShadow; Ignore; Position: {3.892, 1.36, -3.963}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    blush_r : IsleCreatureBlush { NoShadow; Ignore; Position: {3.69, -0.318, -3.5}; Rotation: {0, 0, 0.12}; Scale: {0.25, 1, 1.5}; Sphere: {radius: 0.42, segments: 14, smooth: true} }
-    eye_l : IsleCreatureEye { Position: {-3.4, 1.064, -3.781}; Sphere: {radius: 0.5, segments: 20, smooth: true} }
-    pupil_l : IsleCreatureDark { NoShadow; Position: {-3.589, 1.124, -3.845}; Sphere: {radius: 0.38, segments: 16, smooth: true} }
-    glint_l : IsleCreatureGlint { NoShadow; Ignore; Position: {-3.892, 1.36, -3.963}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    blush_l : IsleCreatureBlush { NoShadow; Ignore; Position: {-3.69, -0.318, -3.5}; Rotation: {0, 0, -0.12}; Scale: {0.25, 1, 1.5}; Sphere: {radius: 0.42, segments: 14, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.424, 1.379, -2.4}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.424, 1.379, -2.4}; Sphere: {radius: 0.2, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.543, 0.816, -2}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.543, 0.816, -2}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.226, 1.603, -1.7}; Sphere: {radius: 0.25, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.226, 1.603, -1.7}; Sphere: {radius: 0.25, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.254, 1.169, -0.8}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.254, 1.169, -0.8}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.892, 1.6, 0}; Sphere: {radius: 0.21, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.892, 1.6, 0}; Sphere: {radius: 0.21, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.905, 1.161, 0.8}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.905, 1.161, 0.8}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.589, 1.421, 1.6}; Sphere: {radius: 0.18, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.589, 1.421, 1.6}; Sphere: {radius: 0.18, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.467, 1.144, 2.5}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.467, 1.144, 2.5}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {3.131, 1.975, -2.8}; Sphere: {radius: 0.11, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-3.131, 1.975, -2.8}; Sphere: {radius: 0.11, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {2.867, 1.963, -1}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-2.867, 1.963, -1}; Sphere: {radius: 0.13, segments: 10, smooth: true} }
-    fin_r {
-      Position: {2.721, -2.081, -3.4}
-      Rotation: {0, 0, -0.3}
-      Animator: {clip: isle_whale_fin_r, time: seed * 1.3}
-      blade : IsleCreatureFin { Position: {0, 0, 0}; ProfileExtrusion: {profile: IsleWhaleFinR, depth: 0.3, cap_start: true, cap_end: true, smooth: true}; Bevel: {radius: 0.12} }
-      under : IsleCreatureBelly { NoShadow; Position: {0, -0.13, 0}; Scale: {0.94, 1, 0.9}; ProfileExtrusion: {profile: IsleWhaleFinR, depth: 0.1, cap_start: true, cap_end: true, smooth: true} }
-    }
-    fin_l {
-      Position: {-2.721, -2.081, -3.4}
-      Rotation: {0, 0, 0.3}
-      Animator: {clip: isle_whale_fin_l, time: seed * 1.3}
-      blade : IsleCreatureFin { Position: {0, 0, 0}; ProfileExtrusion: {profile: IsleWhaleFinL, depth: 0.3, cap_start: true, cap_end: true, smooth: true}; Bevel: {radius: 0.12} }
-      under : IsleCreatureBelly { NoShadow; Position: {0, -0.13, 0}; Scale: {0.94, 1, 0.9}; ProfileExtrusion: {profile: IsleWhaleFinL, depth: 0.1, cap_start: true, cap_end: true, smooth: true} }
-    }
-    blowhole : IsleCreatureDark { NoShadow; Ignore; Position: {0, 2.894, -6.6}; Scale: {1, 0.3, 1.4}; Sphere: {radius: 0.3, segments: 12, smooth: true} }
-    spout {
-      Position: {0, 3.024, -6.6}
-      NoShadow
-      box.particle.Emitter: {
-        max: 500, rate: spouting ? 190 : 0, direction: {0, 1, 0.08}, spread: 8,
-        speed: {8 * size, 12 * size}, lifetime: {0.9, 1.7}, size: {0.35 * size, 0.7 * size}, rotation: {0, 360},
-        opacity: {0.55, 0.9}, color: {236, 248, 255}, seed: 31
-      }
-      Forces: {gravity: {0, -6, 0}, drag: 1.1, turbulence: 1.2 / size, turbulence_scale: size}
-      Curves: {size: {keys: [{0, 0.6}, {1, 3.6}]}, opacity: {keys: [{0, 1}, {0.5, 0.55}, {1, 0}]}}
-      Appearance: {softness: 0.3, lit: 0.5}
-    }
-    tail {
-      Position: {0, 0.225, 3.4}
-      Animator: {clip: isle_whale_tail, time: seed * 0.9}
-      stock : IsleCreatureSkin {
-      Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleRing, offset: {0, -0.062, -0.95}, rotation: {1.5708, 0, 0}, scale: {1.581, 1.455}},
-          {profile: IsleWhaleRing, offset: {0, -0.043, -0.65}, rotation: {1.5708, 0, 0}, scale: {2.295, 2.119}},
-          {profile: IsleWhaleRing, offset: {0, -0.024, -0.35}, rotation: {1.5708, 0, 0}, scale: {2.39, 2.215}},
-          {profile: IsleWhaleRing, offset: {0, 0, 0}, rotation: {1.5708, 0, 0}, scale: {2.362, 2.2}},
-          {profile: IsleWhaleRing, offset: {0, 0.092, 1.2}, rotation: {1.5708, 0, 0}, scale: {2.001, 1.903}},
-          {profile: IsleWhaleRing, offset: {0, 0.181, 2.2}, rotation: {1.5708, 0, 0}, scale: {1.693, 1.649}},
-          {profile: IsleWhaleRing, offset: {0, 0.281, 3.2}, rotation: {1.5708, 0, 0}, scale: {1.383, 1.394}},
-          {profile: IsleWhaleRing, offset: {0, 0.392, 4.2}, rotation: {1.5708, 0, 0}, scale: {1.079, 1.144}},
-          {profile: IsleWhaleRing, offset: {0, 0.514, 5.2}, rotation: {1.5708, 0, 0}, scale: {0.79, 0.907}},
-          {profile: IsleWhaleRing, offset: {0, 0.619, 6}, rotation: {1.5708, 0, 0}, scale: {0.581, 0.734}},
-          {profile: IsleWhaleRing, offset: {0, 0.703, 6.6}, rotation: {1.5708, 0, 0}, scale: {0.447, 0.624}},
-          {profile: IsleWhaleRing, offset: {0, 0.775, 7.1}, rotation: {1.5708, 0, 0}, scale: {0.37, 0.561}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 11
-      }
-    }
-      under : IsleCreatureBelly {
-      Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleBellyRing, offset: {0, -0.062, -0.95}, rotation: {1.5708, 0, 0}, scale: {1.6, 1.472}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.043, -0.65}, rotation: {1.5708, 0, 0}, scale: {2.323, 2.145}},
-          {profile: IsleWhaleBellyRing, offset: {0, -0.024, -0.35}, rotation: {1.5708, 0, 0}, scale: {2.419, 2.242}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0, 0}, rotation: {1.5708, 0, 0}, scale: {2.391, 2.226}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.092, 1.2}, rotation: {1.5708, 0, 0}, scale: {2.025, 1.926}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.181, 2.2}, rotation: {1.5708, 0, 0}, scale: {1.713, 1.669}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.281, 3.2}, rotation: {1.5708, 0, 0}, scale: {1.4, 1.411}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.392, 4.2}, rotation: {1.5708, 0, 0}, scale: {1.092, 1.158}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.514, 5.2}, rotation: {1.5708, 0, 0}, scale: {0.8, 0.918}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.619, 6}, rotation: {1.5708, 0, 0}, scale: {0.588, 0.743}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.703, 6.6}, rotation: {1.5708, 0, 0}, scale: {0.452, 0.632}},
-          {profile: IsleWhaleBellyRing, offset: {0, 0.775, 7.1}, rotation: {1.5708, 0, 0}, scale: {0.374, 0.568}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 11
-      }
-    }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {1.873, 0.894, 1.2}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-1.873, 0.894, 1.2}; Sphere: {radius: 0.16, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {1.485, 0.974, 2.4}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-1.485, 0.974, 2.4}; Sphere: {radius: 0.12, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {1.179, 0.869, 3.6}; Sphere: {radius: 0.14, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-1.179, 0.869, 3.6}; Sphere: {radius: 0.14, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {0.822, 0.947, 4.8}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
-      { (IsA, IsleCreatureSpot); NoShadow; Ignore; Position: {-0.822, 0.947, 4.8}; Sphere: {radius: 0.1, segments: 10, smooth: true} }
-      flukes {
-        Position: {0, 0.717, 6.7}
-        Animator: {clip: isle_whale_fluke, time: seed * 0.9}
-        blade : IsleCreatureFin { Position: {0, 0, 0}; ProfileExtrusion: {profile: IsleWhaleFluke, depth: 0.34, cap_start: true, cap_end: true, smooth: true}; Bevel: {radius: 0.14} }
-        under : IsleCreatureBelly { NoShadow; Position: {0, -0.14, 0.25}; Scale: {0.9, 1, 0.86}; ProfileExtrusion: {profile: IsleWhaleFluke, depth: 0.1, cap_start: true, cap_end: true, smooth: true} }
-      }
-    }
-    dorsal {
-      Position: {0, 2.442, 2.6}
-      Rotation: {0, 0, -1.5708}
-      fin : IsleCreatureFin { Position: {0, 0, 0}; Rotation: {0, -1.5708, 0}; ProfileExtrusion: {profile: IsleWhaleDorsal, depth: 0.26, cap_start: true, cap_end: true, smooth: true} }
-    }
-    if garden {
-      moss : IsleCreatureMoss {
-      Position: {0, 0, 0}
-      Loft: {
-        sections: [
-          {profile: IsleWhaleMossRing, offset: {0, -0.052, -5.7}, rotation: {1.5708, 0, 0}, scale: {3.632, 3.239}},
-          {profile: IsleWhaleMossRing, offset: {0, -0.041, -5.4}, rotation: {1.5708, 0, 0}, scale: {3.672, 3.275}},
-          {profile: IsleWhaleMossRing, offset: {0, -0.018, -4.6}, rotation: {1.5708, 0, 0}, scale: {3.744, 3.339}},
-          {profile: IsleWhaleMossRing, offset: {0, -0.003, -3.6}, rotation: {1.5708, 0, 0}, scale: {3.778, 3.37}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.001, -2.6}, rotation: {1.5708, 0, 0}, scale: {3.759, 3.354}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.011, -1.6}, rotation: {1.5708, 0, 0}, scale: {3.634, 3.252}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.032, -0.6}, rotation: {1.5708, 0, 0}, scale: {3.454, 3.103}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.063, 0.4}, rotation: {1.5708, 0, 0}, scale: {3.233, 2.922}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.101, 1.3}, rotation: {1.5708, 0, 0}, scale: {3.009, 2.737}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.132, 1.9}, rotation: {1.5708, 0, 0}, scale: {2.847, 2.604}},
-          {profile: IsleWhaleMossRing, offset: {0, 0.143, 2.1}, rotation: {1.5708, 0, 0}, scale: {2.792, 2.559}}
-        ],
-        cap_start: true, cap_end: true, segments: 6, rings: 10
-      }
-    }
-      { (IsA, IsleCreatureMoss); Position: {0.9, 3.077, -4.8}; Scale: {1, 0.36, 1.15}; IcoSphere: {radius: 0.9, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Position: {-1.3, 3.031, -3.4}; Scale: {1, 0.36, 1.15}; IcoSphere: {radius: 1.1, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Position: {1.2, 2.967, -2}; Scale: {1, 0.36, 1.15}; IcoSphere: {radius: 1.2, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Position: {-0.6, 2.84, -0.4}; Scale: {1, 0.36, 1.15}; IcoSphere: {radius: 1.3, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Position: {0.6, 2.691, 1}; Scale: {1, 0.36, 1.15}; IcoSphere: {radius: 0.9, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Position: {0, 3.096, -2.6}; Scale: {1, 0.36, 1.15}; IcoSphere: {radius: 1.4, segments: 2, smooth: true} }
-      hut {
-        Position: {0.1, 3.514, -2.4}
-        Rotation: {0, 0.5, 0}
-        walls : IslePlaster { Position: {0, 0.5, 0}; Box: {1.5, 1.0, 1.25} }
-        roof : IsleCreatureRoof { Position: {0, 1.45, 0}; Rotation: {0, 0.7854, 0}; Scale: {1, 1, 0.86}; Cone: {radius: 1.3, length: 1.0, segments: 4} }
-        chimney : IsleCreatureBarnacle { Position: {0.4, 1.55, -0.2}; Box: {0.22, 0.6, 0.22} }
-        door : IsleCreatureWood { Position: {0.2, 0.36, 0.63}; Box: {0.36, 0.7, 0.04} }
-        win_a : IsleWindow { NoShadow; Position: {-0.36, 0.56, 0.63}; Box: {0.34, 0.34, 0.04} }
-        win_b : IsleWindow { NoShadow; Position: {0.76, 0.56, 0}; Box: {0.04, 0.34, 0.4} }
-        win_c : IsleWindow { NoShadow; Position: {-0.76, 0.56, 0}; Box: {0.04, 0.34, 0.4} }
-        win_d : IsleWindow { NoShadow; Position: {0, 0.56, -0.63}; Box: {0.4, 0.34, 0.04} }
-      }
-      lantern {
-        Position: {1.2, 3.24, -3.9}
-        post : IsleCreatureWood { Position: {0, 0.7, 0}; Cylinder: {radius: 0.05, length: 1.4, segments: 6} }
-        arm : IsleCreatureWood { Position: {0.16, 1.36, 0}; Box: {0.4, 0.05, 0.05} }
-        lamp : IsleLampGlow { NoShadow; Position: {0.32, 1.16, 0}; Sphere: {radius: 0.15, segments: 10, smooth: true} }
-        if night {
-          glow { Position: {0.32, 1.3, 0}; PointLight: {intensity: 16, range: 9}; Rgb: {255, 180, 100} }
-        }
-      }
-      tree_0 {
-        Position: {-0.8, 3.261, -4.7}
-        Scale: {1, 1, 1}
-        trunk : IsleBark { Position: {0, 0.75, 0}; Frustum: {radius_bottom: 0.16, radius_top: 0.09, length: 1.5, segments: 7} }
-        leaf_a : IsleLeaf { Position: {0, 1.95, 0}; Scale: {1, 0.9, 1}; IcoSphere: {radius: 0.95, segments: 2, smooth: true} }
-        leaf_b : IsleLeafAlt { Position: {0.6, 1.55, 0.25}; IcoSphere: {radius: 0.62, segments: 2, smooth: true} }
-        leaf_c : IsleLeafAlt { Position: {-0.5, 1.6, -0.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-        leaf_d : IsleLeaf { Position: {-0.1, 1.5, 0.6}; IcoSphere: {radius: 0.55, segments: 2, smooth: true} }
-      }
-      tree_1 {
-        Position: {0.9, 3.049, -0.5}
-        Scale: {1.35, 1.35, 1.35}
-        trunk : IsleBark { Position: {0, 0.75, 0}; Frustum: {radius_bottom: 0.16, radius_top: 0.09, length: 1.5, segments: 7} }
-        leaf_a : IsleLeaf { Position: {0, 1.95, 0}; Scale: {1, 0.9, 1}; IcoSphere: {radius: 0.95, segments: 2, smooth: true} }
-        leaf_b : IsleLeafAlt { Position: {0.6, 1.55, 0.25}; IcoSphere: {radius: 0.62, segments: 2, smooth: true} }
-        leaf_c : IsleLeafAlt { Position: {-0.5, 1.6, -0.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-        leaf_d : IsleLeaf { Position: {-0.1, 1.5, 0.6}; IcoSphere: {radius: 0.55, segments: 2, smooth: true} }
-      }
-      tree_2 {
-        Position: {-0.9, 2.824, 0.9}
-        Scale: {0.85, 0.85, 0.85}
-        trunk : IsleBark { Position: {0, 0.75, 0}; Frustum: {radius_bottom: 0.16, radius_top: 0.09, length: 1.5, segments: 7} }
-        leaf_a : IsleLeaf { Position: {0, 1.95, 0}; Scale: {1, 0.9, 1}; IcoSphere: {radius: 0.95, segments: 2, smooth: true} }
-        leaf_b : IsleLeafAlt { Position: {0.6, 1.55, 0.25}; IcoSphere: {radius: 0.62, segments: 2, smooth: true} }
-        leaf_c : IsleLeafAlt { Position: {-0.5, 1.6, -0.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-        leaf_d : IsleLeaf { Position: {-0.1, 1.5, 0.6}; IcoSphere: {radius: 0.55, segments: 2, smooth: true} }
-      }
-      shroom_0 {
-        Position: {-1.7, 3.057, -3.6}
-        Scale: {1, 1, 1}
-        stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
-        cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
-      }
-      shroom_1 {
-        Position: {-1.5, 2.967, -1.3}
-        Scale: {0.75, 0.75, 0.75}
-        stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
-        cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
-      }
-      shroom_2 {
-        Position: {2, 2.73, -1.1}
-        Scale: {0.6, 0.6, 0.6}
-        stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
-        cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
-      }
-      shroom_3 {
-        Position: {0.6, 3.193, -5.1}
-        Scale: {0.55, 0.55, 0.55}
-        stem : IsleCreatureBelly { Position: {0, 0.3, 0}; Frustum: {radius_bottom: 0.13, radius_top: 0.09, length: 0.6, segments: 8} }
-        cap : IsleCreatureCap { Position: {0, 0.58, 0}; Scale: {1, 0.55, 1}; IcoSphere: {radius: 0.42, segments: 2, smooth: true} }
-        dot_a : IsleCreatureEye { NoShadow; Ignore; Position: {0.14, 0.77, 0.1}; IcoSphere: {radius: 0.07, segments: 1, smooth: true} }
-        dot_b : IsleCreatureEye { NoShadow; Ignore; Position: {-0.16, 0.74, -0.06}; IcoSphere: {radius: 0.06, segments: 1, smooth: true} }
-        dot_c : IsleCreatureEye { NoShadow; Ignore; Position: {0.0, 0.72, -0.24}; IcoSphere: {radius: 0.055, segments: 1, smooth: true} }
-      }
-      { (IsA, IsleCrystal); NoShadow; Position: {-0.1, 3.182, 1.6}; Rotation: {0, 0, 0}; Cone: {radius: 0.2, length: 1.3, segments: 5} }
-      { (IsA, IsleCrystal); NoShadow; Position: {0.4, 2.958, 1.9}; Rotation: {0.5, 0, 0.3}; Cone: {radius: 0.12, length: 0.78, segments: 5} }
-      { (IsA, IsleCrystal); NoShadow; Position: {-0.6, 3.065, 1.4}; Rotation: {-0.5, 0, -0.4}; Cone: {radius: 0.14, length: 0.91, segments: 5} }
-      { (IsA, IsleCrystal); NoShadow; Position: {-0.5, 3.437, -5.5}; Rotation: {-0.3, 0, 0.3}; Cone: {radius: 0.12, length: 0.78, segments: 5} }
-      { (IsA, IsleCrystal); NoShadow; Position: {0, 3.421, -5.3}; Rotation: {0.3, 0, -0.3}; Cone: {radius: 0.09, length: 0.585, segments: 5} }
-      { (IsA, IsleCrystal); NoShadow; Position: {-2.1, 3.032, -1.8}; Rotation: {0.2, 0, 0.6}; Cone: {radius: 0.1, length: 0.65, segments: 5} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {2.713, 2.315, -5.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {2.923, 2.231, -3.7}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.62, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {2.792, 2.279, -2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {2.723, 2.06, -0.7}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {2.311, 2.055, 0.9}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.79, 2.326, -4.4}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.6, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.962, 2.194, -2.9}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.714, 2.23, -1.4}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.66, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.538, 2.019, 0.2}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.52, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-2.145, 2.013, 1.6}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.45, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {1.077, 3.005, -5.8}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-1.079, 3.014, -5.75}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.55, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {0.585, 2.613, 2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.5, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureMoss); Ignore; Position: {-0.585, 2.613, 2.1}; Scale: {1, 0.5, 1.3}; IcoSphere: {radius: 0.45, segments: 2, smooth: true} }
-      { (IsA, IsleCreatureFlowerA); NoShadow; Ignore; Position: {0.2, 3.463, -4.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerB); NoShadow; Ignore; Position: {1.9, 3.154, -3.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureEye); NoShadow; Ignore; Position: {0.4, 3.367, -1.6}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerA); NoShadow; Ignore; Position: {-1.9, 2.775, -0.1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerB); NoShadow; Ignore; Position: {1.8, 2.729, 0.4}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureEye); NoShadow; Ignore; Position: {-2.3, 2.933, -4}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerA); NoShadow; Ignore; Position: {1.3, 3.154, -1}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureFlowerB); NoShadow; Ignore; Position: {-0.9, 3.428, -3}; IcoSphere: {radius: 0.11, segments: 1, smooth: true} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {1.449, 1.887, -8.4}; Rotation: {1.6, -6, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.3, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {0.759, 2.488, -7.7}; Rotation: {2.3, -7.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.42, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-1.027, 2.285, -8}; Rotation: {2, -10.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.34, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-1.667, 2.473, -7.1}; Rotation: {2.9, -11.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.25, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-0.27, 1.804, -8.9}; Rotation: {1.1, -9.5, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.22, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {2.237, 2.397, -6.4}; Rotation: {3.6, -5.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.22, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {0.964, 2.371, 3}; Rotation: {13, -7, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.3, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-1.093, 2.408, 2.6}; Rotation: {12.6, -11.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.24, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {3.426, 0.568, -1}; Rotation: {9, -0.8, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.26, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-3.31, 0.567, -0.4}; Rotation: {9.6, -17.2, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.26, segments: 1} }
-      { (IsA, IsleCreatureBarnacle); Ignore; Position: {-2.885, 1.472, -7}; Rotation: {3, -15, 0}; Scale: {1, 0.7, 1.1}; IcoSphere: {radius: 0.2, segments: 1} }
-    }
-
-    async {
-      while true {
-        await delay(7 + rnd(seed, 3) * 9)
-        spouting = true
-        await delay(1.5)
-        spouting = false
-        await delay(6 + rnd(seed, 5) * 5)
-      }
-    }
-
-    async {
-      while true {
-        await on.click(this)
-        emit WhaleSong()
-      }
-    }
-
-    async {
-      while true {
-        await WhaleSong
-        await delay(seed * 0.5)
-        spouting = true
-        await delay(1.6)
-        spouting = false
-      }
-    }
   }
 
-  template IsleSkyWhale {
-    prop radius: f32 = 66
-    prop height: f32 = 5
-    prop start: f32 = 1.25
-    prop calves: i32 = 2
-    Position: {0, 0, 0}
-    Rotation: {0, start, 0}
-    pivot {
-      Position: {0, height, 0}
-      AngularVelocity: {0, 0.02 + wind * 0.016, 0}
-      mother {
-        Position: {radius, 0, 0}
-        IsleWhale whale() { Position: {0, 0, 0}; Animator: {clip: isle_whale_swim} }
-      }
-      for i in 0..calves {
-        "calf_{i}" {
-          Position: {0, 0, 0}
-          Rotation: {0, -0.2 - i * 0.14, 0}
-          arm {
-            Position: {radius + (i == 0 ? -7.5 : 7.0), -4.5 - i * 2.5, 0}
-            IsleWhale whale(size: 0.36 - i * 0.07, garden: false, seed: i + 1) { Position: {0, 0, 0}; Animator: {clip: isle_whale_swim, time: 3 + i * 4, speed: 1.4} }
+  template IsleWhaleGroovesA : IsleWhaleBelly {
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.193, -8.2},
+            rotation: {1.5708, 0, 0},
+            scale: {2.816, 2.512}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.169, -7.865},
+            rotation: {1.5708, 0, 0},
+            scale: {2.987, 2.664}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.137, -7.375},
+            rotation: {1.5708, 0, 0},
+            scale: {3.189, 2.844}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.103, -6.803},
+            rotation: {1.5708, 0, 0},
+            scale: {3.37, 3.006}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.072, -6.169},
+            rotation: {1.5708, 0, 0},
+            scale: {3.517, 3.137}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.044, -5.486},
+            rotation: {1.5708, 0, 0},
+            scale: {3.625, 3.234}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.022, -4.76},
+            rotation: {1.5708, 0, 0},
+            scale: {3.696, 3.297}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0.007, -3.997},
+            rotation: {1.5708, 0, 0},
+            scale: {3.734, 3.33}
+          },
+          {
+            profile: IsleWhaleGroove0,
+            offset: {0, -0, -3.2},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.339}
           }
-        }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
+
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.21, -8.425},
+            rotation: {1.5708, 0, 0},
+            scale: {2.683, 2.393}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.181, -8.032},
+            rotation: {1.5708, 0, 0},
+            scale: {2.905, 2.591}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.142, -7.458},
+            rotation: {1.5708, 0, 0},
+            scale: {3.158, 2.817}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.102, -6.787},
+            rotation: {1.5708, 0, 0},
+            scale: {3.374, 3.01}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.066, -6.044},
+            rotation: {1.5708, 0, 0},
+            scale: {3.54, 3.158}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.036, -5.243},
+            rotation: {1.5708, 0, 0},
+            scale: {3.654, 3.259}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.014, -4.392},
+            rotation: {1.5708, 0, 0},
+            scale: {3.718, 3.316}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, -0.002, -3.497},
+            rotation: {1.5708, 0, 0},
+            scale: {3.743, 3.338}
+          },
+          {
+            profile: IsleWhaleGroove1,
+            offset: {0, 0.001, -2.562},
+            rotation: {1.5708, 0, 0},
+            scale: {3.719, 3.319}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
+
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.228, -8.65},
+            rotation: {1.5708, 0, 0},
+            scale: {2.532, 2.258}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.193, -8.2},
+            rotation: {1.5708, 0, 0},
+            scale: {2.816, 2.512}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.147, -7.541},
+            rotation: {1.5708, 0, 0},
+            scale: {3.126, 2.788}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.102, -6.771},
+            rotation: {1.5708, 0, 0},
+            scale: {3.379, 3.013}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.061, -5.919},
+            rotation: {1.5708, 0, 0},
+            scale: {3.562, 3.177}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.029, -5},
+            rotation: {1.5708, 0, 0},
+            scale: {3.677, 3.28}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, -0.007, -4.023},
+            rotation: {1.5708, 0, 0},
+            scale: {3.733, 3.329}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, 0, -2.997},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.34}
+          },
+          {
+            profile: IsleWhaleGroove2,
+            offset: {0, 0.006, -1.925},
+            rotation: {1.5708, 0, 0},
+            scale: {3.646, 3.259}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
   }
-  prefab IsleCreatureCanvas { Rgb: {240, 226, 194}; PbrMaterial: {roughness: 0.85}; Sheen: {color: {255, 240, 210}, roughness: 0.5} }
-  prefab IsleCreatureTeak { Rgb: {176, 122, 70}; PbrMaterial: {roughness: 0.7}; ClearCoat: {strength: 0.3, roughness: 0.3} }
-  prefab IsleCreatureCanvasRed { Rgb: {198, 64, 54}; PbrMaterial: {roughness: 0.85}; Sheen: {color: {255, 200, 180}, roughness: 0.5} }
-  prefab IsleAirshipHullPath { Path2D: {start: {0.02, -4.6}, segments: [{kind: CatmullRom, end: {0.75, -4.3}}, {kind: CatmullRom, end: {1.5, -3.3}}, {kind: CatmullRom, end: {1.95, -1.6}}, {kind: CatmullRom, end: {2.05, 0}}, {kind: CatmullRom, end: {1.9, 1.6}}, {kind: CatmullRom, end: {1.45, 3.1}}, {kind: CatmullRom, end: {0.75, 4.3}}, {kind: CatmullRom, end: {0.02, 4.9}}]} }
-  prefab IsleAirshipBandPath { Path2D: {start: {2.0, -1.1}, segments: [{kind: CatmullRom, end: {2.075, -0.5}}, {kind: CatmullRom, end: {2.09, 0}}, {kind: CatmullRom, end: {2.065, 0.5}}, {kind: CatmullRom, end: {1.99, 1.1}}]} }
-  prefab IsleAirshipNosePath { Path2D: {start: {0.02, -4.66}, segments: [{kind: CatmullRom, end: {0.4, -4.56}}, {kind: CatmullRom, end: {0.8, -4.3}}]} }
 
-  isle_airship_bob {
-    box.animation.Clip: {duration: 9}
-    y { box.animation.Track: {component: Position, member: "y", curve: {kind: CurveCatmullRom, keys: [{0, 0}, {2.25, 0.5}, {4.5, 0}, {6.75, -0.5}, {9, 0}]}} }
-    roll { box.animation.Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [{0, 0.03}, {2.25, 0}, {4.5, -0.03}, {6.75, 0}, {9, 0.03}]}} }
-  }
-
-  template IsleAirshipModel {
-    envelope : IsleCreatureCanvas { Position: {0, 0, 0}; Rotation: {1.5708, 0, 0}; Lathe: {profile: IsleAirshipHullPath, segments: 28, rings: 32} }
-    band : IsleCreatureCanvasRed { NoShadow; Position: {0, 0, 0}; Rotation: {1.5708, 0, 0}; Lathe: {profile: IsleAirshipBandPath, segments: 28, rings: 6} }
-    nose : IsleBrass { NoShadow; Position: {0, 0, 0}; Rotation: {1.5708, 0, 0}; Lathe: {profile: IsleAirshipNosePath, segments: 28, rings: 6} }
-    rib_0 : IsleBrass { NoShadow; Position: {0, 0, -3.3}; Rotation: {1.5708, 0, 0}; Torus: {radius: 1.5, tube: 0.05, segments: 28, rings: 6, smooth: true} }
-    rib_1 : IsleBrass { NoShadow; Position: {0, 0, -1.6}; Rotation: {1.5708, 0, 0}; Torus: {radius: 1.95, tube: 0.05, segments: 28, rings: 6, smooth: true} }
-    rib_2 : IsleBrass { NoShadow; Position: {0, 0, 1.6}; Rotation: {1.5708, 0, 0}; Torus: {radius: 1.9, tube: 0.05, segments: 28, rings: 6, smooth: true} }
-    rib_3 : IsleBrass { NoShadow; Position: {0, 0, 3.1}; Rotation: {1.5708, 0, 0}; Torus: {radius: 1.45, tube: 0.05, segments: 28, rings: 6, smooth: true} }
-    fin_t : IsleCreatureCanvasRed { Position: {0, 1.3, 3.75}; Rotation: {0.4, 0, 0}; Box: {0.08, 1.6, 1.4} }
-    fin_b : IsleCreatureCanvasRed { Position: {0, -1.3, 3.75}; Rotation: {-0.4, 0, 0}; Box: {0.08, 1.6, 1.4} }
-    fin_r : IsleCreatureCanvasRed { Position: {1.3, 0, 3.75}; Rotation: {0, -0.4, 0}; Box: {1.6, 0.08, 1.4} }
-    fin_l : IsleCreatureCanvasRed { Position: {-1.3, 0, 3.75}; Rotation: {0, 0.4, 0}; Box: {1.6, 0.08, 1.4} }
-    cabin : IsleCreatureTeak { Position: {0, -2.78, -0.3}; Box: {1.1, 0.8, 2.6} }
-    bow : IsleCreatureTeak { Position: {0, -2.78, -1.6}; Cylinder: {radius: 0.55, length: 0.8, segments: 16, smooth: true} }
-    stern : IsleCreatureTeak { Position: {0, -2.78, 1.0}; Cylinder: {radius: 0.55, length: 0.8, segments: 16, smooth: true} }
-    rail_top : IsleBrass { Position: {0, -2.36, -0.3}; Box: {1.18, 0.06, 2.66} }
-    rail_bow : IsleBrass { Position: {0, -2.36, -1.6}; Cylinder: {radius: 0.59, length: 0.06, segments: 16, smooth: true} }
-    rail_stern : IsleBrass { Position: {0, -2.36, 1.0}; Cylinder: {radius: 0.59, length: 0.06, segments: 16, smooth: true} }
-    keel : IsleBrass { Position: {0, -3.2, -0.3}; Box: {0.9, 0.06, 3.4} }
-    for i in 0..3 {
-      { (IsA, IsleWindow); NoShadow; Position: {0.56, -2.68, -1.2 + i * 0.9}; Box: {0.04, 0.36, 0.5} }
-      { (IsA, IsleWindow); NoShadow; Position: {-0.56, -2.68, -1.2 + i * 0.9}; Box: {0.04, 0.36, 0.5} }
-    }
-    win_bow : IsleWindow { NoShadow; Position: {0, -2.68, -2.14}; Box: {0.5, 0.32, 0.04} }
-    for i in 0..4 {
-      const sx = i % 2 == 0 ? 0.42 : -0.42
-      const sz = i < 2 ? -1.5 : 0.9
-      { (IsA, IsleRope); NoShadow; Ignore; Position: {sx * 1.4, -2.1, sz}; Rotation: {0, 0, sx * 0.9}; Cylinder: {radius: 0.035, length: 0.7, segments: 5} }
-    }
-    outrigger : IsleBrass { Position: {0, -2.75, 0.75}; Box: {3.3, 0.07, 0.12} }
-    for i in 0..2 {
-      const sx = i == 0 ? 1.7 : -1.7
-      { (IsA, IsleBrass); Position: {sx, -2.75, 0.8}; Rotation: {1.5708, 0, 0}; Cylinder: {radius: 0.2, length: 0.7, segments: 12, smooth: true} }
-      "prop_{i}" {
-        Position: {sx, -2.75, 1.22}
-        AngularVelocity: {0, 0, i == 0 ? 21 : -21}
-        hub : IsleBrass { Position: {0, 0, 0}; Sphere: {radius: 0.1, segments: 8, smooth: true} }
-        blade_a : IsleCreatureWood { NoShadow; Position: {0, 0, 0}; Rotation: {0, 0.3, 0}; Box: {1.5, 0.16, 0.03} }
-        blade_b : IsleCreatureWood { NoShadow; Position: {0, 0, 0}; Rotation: {0.3, 0, 0}; Box: {0.16, 1.5, 0.03} }
+  template IsleWhaleGroovesB : IsleWhaleGroovesA {
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.247, -8.875},
+            rotation: {1.5708, 0, 0},
+            scale: {2.358, 2.103}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.206, -8.367},
+            rotation: {1.5708, 0, 0},
+            scale: {2.719, 2.425}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.153, -7.624},
+            rotation: {1.5708, 0, 0},
+            scale: {3.093, 2.758}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.101, -6.755},
+            rotation: {1.5708, 0, 0},
+            scale: {3.383, 3.017}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.056, -5.794},
+            rotation: {1.5708, 0, 0},
+            scale: {3.582, 3.195}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.022, -4.756},
+            rotation: {1.5708, 0, 0},
+            scale: {3.697, 3.297}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, -0.003, -3.655},
+            rotation: {1.5708, 0, 0},
+            scale: {3.741, 3.336}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, 0.001, -2.497},
+            rotation: {1.5708, 0, 0},
+            scale: {3.713, 3.314}
+          },
+          {
+            profile: IsleWhaleGroove3,
+            offset: {0, 0.016, -1.288},
+            rotation: {1.5708, 0, 0},
+            scale: {3.548, 3.178}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
       }
     }
-    chain : IsleRope { NoShadow; Ignore; Position: {0, -3.42, -1.5}; Cylinder: {radius: 0.02, length: 0.4, segments: 5} }
-    lamp_cap : IsleBrass { NoShadow; Position: {0, -3.6, -1.5}; Cone: {radius: 0.2, length: 0.16, segments: 8} }
-    lamp : IsleLampGlow { NoShadow; Position: {0, -3.78, -1.5}; Sphere: {radius: 0.17, segments: 10, smooth: true} }
-    if night {
-      glow { Position: {0, -3.9, -1.5}; PointLight: {intensity: 14, range: 10}; Rgb: {255, 180, 100} }
+
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.266, -9.1},
+            rotation: {1.5708, 0, 0},
+            scale: {2.155, 1.922}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.219, -8.534},
+            rotation: {1.5708, 0, 0},
+            scale: {2.612, 2.33}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.158, -7.706},
+            rotation: {1.5708, 0, 0},
+            scale: {3.058, 2.727}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.1, -6.739},
+            rotation: {1.5708, 0, 0},
+            scale: {3.387, 3.021}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.051, -5.668},
+            rotation: {1.5708, 0, 0},
+            scale: {3.601, 3.212}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.016, -4.513},
+            rotation: {1.5708, 0, 0},
+            scale: {3.712, 3.311}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, -0.001, -3.287},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.339}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, 0.006, -1.997},
+            rotation: {1.5708, 0, 0},
+            scale: {3.656, 3.267}
+          },
+          {
+            profile: IsleWhaleGroove4,
+            offset: {0, 0.03, -0.65},
+            rotation: {1.5708, 0, 0},
+            scale: {3.43, 3.081}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
     }
-    pole : IsleBrass { NoShadow; Position: {0, 2.5, 3.9}; Cylinder: {radius: 0.025, length: 1.0, segments: 5} }
-    pennant : IsleCreatureCanvasRed { NoShadow; Ignore; Position: {0, 2.85, 4.3}; Box: {0.02, 0.26, 0.8} }
+
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, -0.286, -9.325},
+            rotation: {1.5708, 0, 0},
+            scale: {1.911, 1.705}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, -0.232, -8.701},
+            rotation: {1.5708, 0, 0},
+            scale: {2.494, 2.225}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, -0.164, -7.789},
+            rotation: {1.5708, 0, 0},
+            scale: {3.021, 2.695}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, -0.099, -6.723},
+            rotation: {1.5708, 0, 0},
+            scale: {3.391, 3.025}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, -0.046, -5.543},
+            rotation: {1.5708, 0, 0},
+            scale: {3.618, 3.227}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, -0.012, -4.27},
+            rotation: {1.5708, 0, 0},
+            scale: {3.724, 3.321}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, 0, -2.918},
+            rotation: {1.5708, 0, 0},
+            scale: {3.742, 3.338}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, 0.012, -1.497},
+            rotation: {1.5708, 0, 0},
+            scale: {3.582, 3.206}
+          },
+          {
+            profile: IsleWhaleGroove5,
+            offset: {0, 0.049, -0.013},
+            rotation: {1.5708, 0, 0},
+            scale: {3.296, 2.97}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
   }
 
-  template IsleAirship {
-    prop radius: f32 = 48
-    prop height: f32 = 20
-    prop start: f32 = 2.6
-    Position: {0, 0, 0}
-    Rotation: {0, start, 0}
-    pivot {
-      Position: {0, height, 0}
-      AngularVelocity: {0, -0.04 - wind * 0.03, 0}
-      IsleAirshipModel ship() { Position: {radius, 0, 0}; Rotation: {0, 3.14159, 0}; Animator: {clip: isle_airship_bob} }
+  template IsleWhaleGroovesC : IsleWhaleGroovesB {
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, -0.286, -9.325},
+            rotation: {1.5708, 0, 0},
+            scale: {1.911, 1.705}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, -0.232, -8.701},
+            rotation: {1.5708, 0, 0},
+            scale: {2.494, 2.225}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, -0.164, -7.789},
+            rotation: {1.5708, 0, 0},
+            scale: {3.021, 2.695}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, -0.099, -6.723},
+            rotation: {1.5708, 0, 0},
+            scale: {3.391, 3.025}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, -0.046, -5.543},
+            rotation: {1.5708, 0, 0},
+            scale: {3.618, 3.227}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, -0.012, -4.27},
+            rotation: {1.5708, 0, 0},
+            scale: {3.724, 3.321}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, 0, -2.918},
+            rotation: {1.5708, 0, 0},
+            scale: {3.742, 3.338}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, 0.012, -1.497},
+            rotation: {1.5708, 0, 0},
+            scale: {3.582, 3.206}
+          },
+          {
+            profile: IsleWhaleGroove6,
+            offset: {0, 0.049, -0.013},
+            rotation: {1.5708, 0, 0},
+            scale: {3.296, 2.97}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
     }
-  }
-}
 
-isle_creature_audio {
-  deep {
-    Bus: {output: master, kind: ChannelSfx, volume: 0.8, sends: [{bus: isle_audio.hall, level: 0.9}]}
-  }
-  prefab whale_call {
-    Output: {bus: deep}
-    Sound: {seed: 91, drift: 9}
-    Envelope: {attack: 0.55, decay: 0.5, sustain: 0.8, release: 1.6, curve: 2}
-    Filter: {kind: LowPass, cutoff: 1500, resonance: 0.25}
-    PitchEnvelope: {amount: -7, decay: 1.3, curve: -2, release_amount: -5}
-    Lfo: {wave: LfoSine, rate: 4.2, cutoff: 0.25, amplitude: 0.12}
-    moan {
-      Oscillator: {frequency: 440, level: 0.34}
-      Unison: {voices: 2, detune: 9, width: 0.6}
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.266, -9.1},
+            rotation: {1.5708, 0, 0},
+            scale: {2.155, 1.922}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.219, -8.534},
+            rotation: {1.5708, 0, 0},
+            scale: {2.612, 2.33}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.158, -7.706},
+            rotation: {1.5708, 0, 0},
+            scale: {3.058, 2.727}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.1, -6.739},
+            rotation: {1.5708, 0, 0},
+            scale: {3.387, 3.021}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.051, -5.668},
+            rotation: {1.5708, 0, 0},
+            scale: {3.601, 3.212}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.016, -4.513},
+            rotation: {1.5708, 0, 0},
+            scale: {3.712, 3.311}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, -0.001, -3.287},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.339}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, 0.006, -1.997},
+            rotation: {1.5708, 0, 0},
+            scale: {3.656, 3.267}
+          },
+          {
+            profile: IsleWhaleGroove7,
+            offset: {0, 0.03, -0.65},
+            rotation: {1.5708, 0, 0},
+            scale: {3.43, 3.081}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
     }
-    throat { Oscillator: {wave: Triangle, frequency: 880, level: 0.1} }
-    cry {
-      Oscillator: {frequency: 1320, level: 0.035}
-      Envelope: {attack: 0.9, decay: 0.8, sustain: 0.5, release: 1.2}
-    }
-    breath {
-      Oscillator: {wave: Noise, color: NoisePink, level: 0.03}
-      Envelope: {attack: 0.3, decay: 0.6, sustain: 0.3, release: 0.8}
-    }
-  }
-  whale_voice { Instrument: {sound: whale_call, velocity_curve: 1} }
-}
 
-async {
-  while true {
-    await WhaleSong
-    box.audio.play_note(isle_creature_audio.whale_voice, 50, 0.8, 1.9)
-    await delay(1.7)
-    box.audio.play_note(isle_creature_audio.whale_voice, 57, 0.9, 2.3)
-    await delay(2.3)
-    box.audio.play_note(isle_creature_audio.whale_voice, 53, 0.7, 3.0)
-    await delay(3.2)
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.247, -8.875},
+            rotation: {1.5708, 0, 0},
+            scale: {2.358, 2.103}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.206, -8.367},
+            rotation: {1.5708, 0, 0},
+            scale: {2.719, 2.425}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.153, -7.624},
+            rotation: {1.5708, 0, 0},
+            scale: {3.093, 2.758}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.101, -6.755},
+            rotation: {1.5708, 0, 0},
+            scale: {3.383, 3.017}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.056, -5.794},
+            rotation: {1.5708, 0, 0},
+            scale: {3.582, 3.195}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.022, -4.756},
+            rotation: {1.5708, 0, 0},
+            scale: {3.697, 3.297}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, -0.003, -3.655},
+            rotation: {1.5708, 0, 0},
+            scale: {3.741, 3.336}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, 0.001, -2.497},
+            rotation: {1.5708, 0, 0},
+            scale: {3.713, 3.314}
+          },
+          {
+            profile: IsleWhaleGroove8,
+            offset: {0, 0.016, -1.288},
+            rotation: {1.5708, 0, 0},
+            scale: {3.548, 3.178}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
+  }
+
+  template IsleWhaleGroovesD : IsleWhaleGroovesC {
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.228, -8.65},
+            rotation: {1.5708, 0, 0},
+            scale: {2.532, 2.258}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.193, -8.2},
+            rotation: {1.5708, 0, 0},
+            scale: {2.816, 2.512}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.147, -7.541},
+            rotation: {1.5708, 0, 0},
+            scale: {3.126, 2.788}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.102, -6.771},
+            rotation: {1.5708, 0, 0},
+            scale: {3.379, 3.013}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.061, -5.919},
+            rotation: {1.5708, 0, 0},
+            scale: {3.562, 3.177}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.029, -5},
+            rotation: {1.5708, 0, 0},
+            scale: {3.677, 3.28}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, -0.007, -4.023},
+            rotation: {1.5708, 0, 0},
+            scale: {3.733, 3.329}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, 0, -2.997},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.34}
+          },
+          {
+            profile: IsleWhaleGroove9,
+            offset: {0, 0.006, -1.925},
+            rotation: {1.5708, 0, 0},
+            scale: {3.646, 3.259}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
+
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.21, -8.425},
+            rotation: {1.5708, 0, 0},
+            scale: {2.683, 2.393}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.181, -8.032},
+            rotation: {1.5708, 0, 0},
+            scale: {2.905, 2.591}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.142, -7.458},
+            rotation: {1.5708, 0, 0},
+            scale: {3.158, 2.817}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.102, -6.787},
+            rotation: {1.5708, 0, 0},
+            scale: {3.374, 3.01}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.066, -6.044},
+            rotation: {1.5708, 0, 0},
+            scale: {3.54, 3.158}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.036, -5.243},
+            rotation: {1.5708, 0, 0},
+            scale: {3.654, 3.259}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.014, -4.392},
+            rotation: {1.5708, 0, 0},
+            scale: {3.718, 3.316}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, -0.002, -3.497},
+            rotation: {1.5708, 0, 0},
+            scale: {3.743, 3.338}
+          },
+          {
+            profile: IsleWhaleGroove10,
+            offset: {0, 0.001, -2.562},
+            rotation: {1.5708, 0, 0},
+            scale: {3.719, 3.319}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
+
+    { (IsA, IsleCreatureGroove); NoShadow; Ignore; Position: {0, 0, 0}
+      Loft: {
+        sections: [
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.193, -8.2},
+            rotation: {1.5708, 0, 0},
+            scale: {2.816, 2.512}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.169, -7.865},
+            rotation: {1.5708, 0, 0},
+            scale: {2.987, 2.664}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.137, -7.375},
+            rotation: {1.5708, 0, 0},
+            scale: {3.189, 2.844}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.103, -6.803},
+            rotation: {1.5708, 0, 0},
+            scale: {3.37, 3.006}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.072, -6.169},
+            rotation: {1.5708, 0, 0},
+            scale: {3.517, 3.137}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.044, -5.486},
+            rotation: {1.5708, 0, 0},
+            scale: {3.625, 3.234}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.022, -4.76},
+            rotation: {1.5708, 0, 0},
+            scale: {3.696, 3.297}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0.007, -3.997},
+            rotation: {1.5708, 0, 0},
+            scale: {3.734, 3.33}
+          },
+          {
+            profile: IsleWhaleGroove11,
+            offset: {0, -0, -3.2},
+            rotation: {1.5708, 0, 0},
+            scale: {3.744, 3.339}
+          }
+        ],
+        cap_start: true, cap_end: true, segments: 6, rings: 8
+      }
+    }
+  }
+
+  template IsleWhaleFace : IsleWhaleGroovesD {
+    smile : IsleCreatureDark {
+      NoShadow
+      Position: {0, 0, 0}
+      Sweep: {path: IsleWhaleSmile, profile: IsleWhaleLine, rings: 48, segments: 2}
+    }
+
+    eye_r : IsleCreatureEye {
+      Position: {3.4, 1.064, -3.781}
+      Sphere: {radius: 0.5, segments: 20, smooth: true}
+    }
+
+    pupil_r : IsleCreatureDark {
+      NoShadow
+      Position: {3.589, 1.124, -3.845}
+      Sphere: {radius: 0.38, segments: 16, smooth: true}
+    }
+
+    glint_r : IsleCreatureGlint {
+      NoShadow
+      Ignore
+      Position: {3.892, 1.36, -3.963}
+      Sphere: {radius: 0.12, segments: 10, smooth: true}
+    }
+
+    blush_r : IsleCreatureBlush {
+      NoShadow
+      Ignore
+      Position: {3.69, -0.318, -3.5}
+      Rotation: {0, 0, 0.12}
+      Scale: {0.25, 1, 1.5}
+      Sphere: {radius: 0.42, segments: 14, smooth: true}
+    }
+
+    eye_l : IsleCreatureEye {
+      Position: {-3.4, 1.064, -3.781}
+      Sphere: {radius: 0.5, segments: 20, smooth: true}
+    }
+
+    pupil_l : IsleCreatureDark {
+      NoShadow
+      Position: {-3.589, 1.124, -3.845}
+      Sphere: {radius: 0.38, segments: 16, smooth: true}
+    }
+
+    glint_l : IsleCreatureGlint {
+      NoShadow
+      Ignore
+      Position: {-3.892, 1.36, -3.963}
+      Sphere: {radius: 0.12, segments: 10, smooth: true}
+    }
+
+    blush_l : IsleCreatureBlush {
+      NoShadow
+      Ignore
+      Position: {-3.69, -0.318, -3.5}
+      Rotation: {0, 0, -0.12}
+      Scale: {0.25, 1, 1.5}
+      Sphere: {radius: 0.42, segments: 14, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {3.424, 1.379, -2.4}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-3.424, 1.379, -2.4}
+      Sphere: {radius: 0.2, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {3.543, 0.816, -2}
+      Sphere: {radius: 0.13, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-3.543, 0.816, -2}
+      Sphere: {radius: 0.13, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {3.226, 1.603, -1.7}
+      Sphere: {radius: 0.25, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-3.226, 1.603, -1.7}
+      Sphere: {radius: 0.25, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {3.254, 1.169, -0.8}
+      Sphere: {radius: 0.16, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-3.254, 1.169, -0.8}
+      Sphere: {radius: 0.16, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {2.892, 1.6, 0}
+      Sphere: {radius: 0.21, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-2.892, 1.6, 0}
+      Sphere: {radius: 0.21, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {2.905, 1.161, 0.8}
+      Sphere: {radius: 0.12, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-2.905, 1.161, 0.8}
+      Sphere: {radius: 0.12, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {2.589, 1.421, 1.6}
+      Sphere: {radius: 0.18, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-2.589, 1.421, 1.6}
+      Sphere: {radius: 0.18, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {2.467, 1.144, 2.5}
+      Sphere: {radius: 0.13, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {-2.467, 1.144, 2.5}
+      Sphere: {radius: 0.13, segments: 10, smooth: true}
+    }
+
+    {
+      (IsA, IsleCreatureSpot)
+      NoShadow
+      Ignore
+      Position: {3.131, 1.975, -2.8}
+      Sphere: {radius: 0.11, segments: 10, smooth: true}
+    }
   }
 }

@@ -42,7 +42,15 @@ camera {
 sky {
   DirectionalLight: {intensity: 2.6 * math.PI}
   Rgb: {255, 244, 222}
-  Cookie: {texture: canopy_tex_clouds, size: 360, height: 140, threshold: 0.3, softness: 0.15, strength: 0.45, velocity: {2.4, 0.9}}
+  Cookie: {
+    texture: canopy_tex_clouds,
+    size: 360,
+    height: 140,
+    threshold: 0.3,
+    softness: 0.15,
+    strength: 0.45,
+    velocity: {2.4, 0.9}
+  }
   Atmosphere: {
     sun: sky,
     units_per_km: 520,
@@ -72,27 +80,53 @@ sky {
 $ {
   box.app.FpsTarget: {60}
   Scene: {
-    baked: true, 
-    reflections: false, 
-    cookies: false, 
-    environment: false, 
-    aerial_perspective: false, 
-    alpha_cutout: true, 
-    blend_modes: false, 
-    transmission: true, 
-    texture_blend: false, 
-    triplanar: false, 
-    clear_coat: false, 
+    baked: true,
+    reflections: false,
+    cookies: false,
+    environment: false,
+    aerial_perspective: false,
+    alpha_cutout: true,
+    blend_modes: false,
+    transmission: true,
+    texture_blend: false,
+    triplanar: false,
+    clear_coat: false,
     diffuse_transmission: false
   }
-  ReflectionBake: {resolution: 128, budget_ms: 2, scene_probe: true, scene_probe_height: 28, environment: sky}
-  Bake: {environment: sky, probe_spacing: 12, bounds_padding: 0.3, bounces: 0, capture_size: 32, budget_ms: 8, compute: hud.screen.options.body.baked[Checkbox.mut].current}
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 2,
+    scene_probe: true,
+    scene_probe_height: 28,
+    environment: sky
+  }
+  Bake: {
+    environment: sky,
+    probe_spacing: 12,
+    bounds_padding: 0.3,
+    bounces: 0,
+    capture_size: 32,
+    budget_ms: 8,
+    compute: hud.screen.options.body.baked[Checkbox.mut].current
+  }
 }
 
 jungle_city {
   JungleCity city(rows: 15, columns: 15, spacing: 17, seed: 17)
-  CanopyWaterFx water(depth: 15 * 17 + 20, seed: 17, civic_z: (15 - 2 - (15 - 1) / 2.0) * 17 + 17 / 2.0, radius: 11, height: 4.52)
-  CanopySoundscape soundscape(width: 15 * 17 + 32, depth: 15 * 17 + 20, civic_z: (15 - 2 - (15 - 1) / 2.0) * 17 + 17 / 2.0, radius: 11, height: 4.52)
+  CanopyWaterFx water(
+    depth: 15 * 17 + 20,
+    seed: 17,
+    civic_z: (15 - 2 - (15 - 1) / 2.0) * 17 + 17 / 2.0,
+    radius: 11,
+    height: 4.52
+  )
+  CanopySoundscape soundscape(
+    width: 15 * 17 + 32,
+    depth: 15 * 17 + 20,
+    civic_z: (15 - 2 - (15 - 1) / 2.0) * 17 + 17 / 2.0,
+    radius: 11,
+    height: 4.52
+  )
 }
 
 async {
@@ -117,7 +151,14 @@ view {
       atmosphere: true,
       environment: {source: sky, intensity: 0.95, yaw: 0, background: false}
     },
-    shadows: {enabled: hud.screen.options.body.shadows[Checkbox.mut].current, cascades: 3, resolution: 2048, max_distance: 620, split_lambda: 0.72, min_caster_texels: 2},
+    shadows: {
+      enabled: hud.screen.options.body.shadows[Checkbox.mut].current,
+      cascades: 3,
+      resolution: 2048,
+      max_distance: 620,
+      split_lambda: 0.72,
+      min_caster_texels: 2
+    },
     culling: {enabled: true, occlusion: true, min_dimension_px: 3},
     effects: [
       {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: gtao},

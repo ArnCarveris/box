@@ -1,0 +1,1090 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.transition
+using box.light
+using box.geometry
+using box.material
+using box.particle
+using box.animation
+using box.curve
+using box.movement
+using state
+using assets
+
+assets {
+  template WindowPane {
+    prop w: f32 = 0.9
+    prop h: f32 = 0.9
+    prop lit: bool = false
+    prop box_: bool = false
+    prop seed: f32 = 0
+    prop shutter: Rgb = {70, 110, 80}
+    prop shutters: bool = true
+    frame_ : MvTimber {
+      Position: {0, 0, -0.02}
+      Box: {w + 0.22, h + 0.22, 0.12}
+      Bevel: {radius: 0.03, segments: 1}
+    }
+
+    if lit {
+      glass : MvWindowLit { Position: {0, 0, 0.02}; Box: {w, h, 0.06} }
+    } else {
+      glass {
+        Position: {0, 0, 0.02}
+        Box: {w, h, 0.06}
+        Rgb: {44, 58, 78}
+        PbrMaterial: {roughness: 0.08, metallic: 0.1}
+        ClearCoat: {strength: 1, roughness: 0.02}
+      }
+    }
+
+    bar_h : MvTimber { Position: {0, 0, 0.07}; Box: {w, 0.05, 0.04} }
+    bar_v : MvTimber { Position: {0, 0, 0.07}; Box: {0.05, h, 0.04} }
+    lintel : MvTimber {
+      Position: {0, h / 2 + 0.16, 0.03}
+      Box: {w + 0.5, 0.14, 0.16}
+      Bevel: {radius: 0.03, segments: 1}
+    }
+
+    sill : MvTimber {
+      Position: {0, -h / 2 - 0.13, 0.1}
+      Box: {w + 0.44, 0.09, 0.26}
+      Bevel: {radius: 0.03, segments: 1}
+    }
+
+    if shutters {
+      for k in 0..2 {
+        const sx = match k { 0: 0 - w / 2 - 0.36; _: w / 2 + 0.36 }
+        "shutter_{k}" : MvWood {
+          Position: {sx, 0, 0.03}
+          Box: {w * 0.52, h + 0.12, 0.05}
+          Rgb: shutter
+          Bevel: {radius: 0.015, segments: 1}
+          texture.Transform: {0.6, 1, 0, 0}
+        }
+
+        "slat_a_{k}" : MvWood {
+          Position: {sx, h * 0.25, 0.065}
+          Box: {w * 0.44, 0.06, 0.02}
+          Rgb: {shutter.r * 0.8, shutter.g * 0.8, shutter.b * 0.8}
+        }
+
+        "slat_b_{k}" : MvWood {
+          Position: {sx, 0 - h * 0.25, 0.065}
+          Box: {w * 0.44, 0.06, 0.02}
+          Rgb: {shutter.r * 0.8, shutter.g * 0.8, shutter.b * 0.8}
+        }
+
+        "heart_{k}" {
+          Position: {sx, h * 0.02, 0.06}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {length: 0.02, radius: 0.06, segments: 8}
+          Rgb: {30, 24, 20}
+          PbrMaterial: {roughness: 1}
+        }
+      }
+    }
+
+    if box_ {
+      planter : MvWood {
+        Position: {0, -h / 2 - 0.34, 0.24}
+        Box: {w + 0.3, 0.26, 0.3}
+        Bevel: {radius: 0.02, segments: 1}
+        Rgb: {shutter.r * 1.1, shutter.g * 1.1, shutter.b * 1.1}
+      }
+
+      greens : MvLeaf {
+        Position: {0, -h / 2 - 0.16, 0.25}
+        Scale: {(w + 0.2) / 0.5, 0.45, 0.6}
+        Sphere: {radius: 0.25, segments: 10, smooth: true}
+      }
+
+      for f in 0..5 {
+        const fx = (f - 2) * (w + 0.1) / 5
+        const pink = fract(seed * 7.3 + f * 0.37) > 0.5
+        "bloom_{f}" {
+          Position: {fx, -h / 2 - 0.04 + fract(seed + f * 0.3) * 0.06, 0.3}
+          Sphere: {radius: 0.075, segments: 6}
+          Rgb: pink ? {236, 110, 150} : {250, 220, 90}
+          PbrMaterial: {roughness: 0.7}
+        }
+
+        if f % 2 == 0 {
+          "trail_{f}" : MvLeafDark {
+            Position: {fx, -h / 2 - 0.42, 0.42}
+            Scale: {1.4, 0.8, 0.6}
+            Sphere: {radius: 0.1, segments: 8, smooth: true}
+          }
+        }
+      }
+    }
+  }
+
+  template HouseShell {
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop h: f32 = 3.2
+    prop wall: i32 = 0
+    prop fade: bool = false
+
+    const stone = wall == 3
+    const wo = fade ? 0.3 : 1
+    const wc: Rgb = match wall {
+      0: {248, 238, 214}
+      1: {244, 222, 182}
+      2: {240, 204, 192}
+      3: {200, 192, 176}
+      _: {222, 230, 236}
+    }
+
+    Position: {0, 0, 0}
+
+    plinth : MvRubble {
+      Position: {0, 0.225, 0}
+      Box: {w + 0.36, 0.45, d + 0.36}
+      Bevel: {radius: 0.06, segments: 1}
+      texture.Transform: {w / 1.6, 0.35, 0, 0}
+    }
+
+    if stone {
+      walls : MvRubble {
+        Position: {0, 0.45 + h / 2, 0}
+        Box: {w, h, d}
+        Rgb: wc
+        Opacity: {wo}
+        Transition: [Opacity: {duration: 0.3}]
+        texture.Transform: {w / 1.8, h / 1.8, 0, 0}
+      }
+
+      for c in 0..4 {
+        const cx = match c % 2 { 0: -w / 2; _: w / 2 }
+        const cz = c < 2 ? -d / 2 : d / 2
+
+        for q in 0..4 {
+          const big = q % 2 == 0
+          "quoin_{c}_{q}" : MvStone {
+            Position: {cx, 0.45 + 0.25 + q * h / 4, cz}
+            Box: {big ? 0.6 : 0.36, h / 4 - 0.05, big ? 0.36 : 0.6}
+            Bevel: {radius: 0.04, segments: 1}
+            Rgb: {214, 206, 190}
+            Opacity: {wo}
+            texture.Transform: {0.3, 0.2, 0, 0}
+          }
+        }
+      }
+    } else {
+      walls {
+        Position: {0, 0.45 + h / 2, 0}
+        Box: {w, h, d}
+        Rgb: wc
+        PbrMaterial: {roughness: 0.95}
+        PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}
+        texture.Transform: {w / 3, h / 3, 0, 0}
+        Opacity: {wo}
+        Transition: [Opacity: {duration: 0.3}]
+      }
+
+      for c in 0..4 {
+        const cx = match c % 2 { 0: -w / 2; _: w / 2 }
+        const cz = c < 2 ? -d / 2 : d / 2
+        "post_{c}" : MvTimber {
+          Position: {cx, 0.45 + h / 2, cz}
+          Box: {0.26, h, 0.26}
+          Bevel: {radius: 0.04, segments: 1}
+          Opacity: {wo}
+          texture.Transform: {0.3, 1.5, 0, 0}
+        }
+      }
+
+      sole_f : MvTimber { Position: {0, 0.55, d / 2 + 0.03}; Box: {w, 0.2, 0.1}; Opacity: {wo} }
+      rail_f_a : MvTimber {
+        Position: {0 - w * 0.33, 0.45 + h * 0.3, d / 2 + 0.03}
+        Box: {w * 0.34, 0.14, 0.08}
+        Opacity: {wo}
+      }
+
+      rail_f_b : MvTimber {
+        Position: {w * 0.33, 0.45 + h * 0.3, d / 2 + 0.03}
+        Box: {w * 0.34, 0.14, 0.08}
+        Opacity: {wo}
+      }
+
+      stud_a : MvTimber {
+        Position: {-w * 0.16, 0.45 + h / 2, d / 2 + 0.03}
+        Box: {0.16, h, 0.08}
+        Opacity: {wo}
+      }
+
+      stud_b : MvTimber {
+        Position: {w * 0.16, 0.45 + h / 2, d / 2 + 0.03}
+        Box: {0.16, h, 0.08}
+        Opacity: {wo}
+      }
+
+      knee_a : MvTimber {
+        Position: {-w / 2 + 0.38, 0.45 + h * 0.84, d / 2 + 0.03}
+        Rotation: {0, 0, -0.8}
+        Box: {0.13, 0.9, 0.07}
+        Opacity: {wo}
+      }
+
+      knee_b : MvTimber {
+        Position: {w / 2 - 0.38, 0.45 + h * 0.84, d / 2 + 0.03}
+        Rotation: {0, 0, 0.8}
+        Box: {0.13, 0.9, 0.07}
+        Opacity: {wo}
+      }
+
+      sole_b : MvTimber { Position: {0, 0.55, -d / 2 - 0.03}; Box: {w, 0.2, 0.1}; Opacity: {wo} }
+      stud_c : MvTimber {
+        Position: {-w * 0.16, 0.45 + h / 2, -d / 2 - 0.03}
+        Box: {0.16, h, 0.08}
+        Opacity: {wo}
+      }
+
+      stud_d : MvTimber {
+        Position: {w * 0.16, 0.45 + h / 2, -d / 2 - 0.03}
+        Box: {0.16, h, 0.08}
+        Opacity: {wo}
+      }
+
+      brace_c : MvTimber {
+        Position: {-w * 0.34, 0.45 + h / 2, -d / 2 - 0.03}
+        Rotation: {0, 0, 0.62}
+        Box: {0.14, h * 1.05, 0.07}
+        Opacity: {wo}
+      }
+
+      brace_d : MvTimber {
+        Position: {w * 0.34, 0.45 + h / 2, -d / 2 - 0.03}
+        Rotation: {0, 0, -0.62}
+        Box: {0.14, h * 1.05, 0.07}
+        Opacity: {wo}
+      }
+
+      for sd in 0..2 {
+        const sx = match sd { 0: w / 2 + 0.03; _: 0 - w / 2 - 0.03 }
+        "side_stud_a_{sd}" : MvTimber {
+          Position: {sx, 0.45 + h / 2, d * 0.28}
+          Box: {0.08, h, 0.16}
+          Opacity: {wo}
+        }
+
+        "side_stud_b_{sd}" : MvTimber {
+          Position: {sx, 0.45 + h / 2, -d * 0.28}
+          Box: {0.08, h, 0.16}
+          Opacity: {wo}
+        }
+
+        "side_brace_a_{sd}" : MvTimber {
+          Position: {sx, 0.45 + h / 2, d * 0.39}
+          Rotation: {0.5, 0, 0}
+          Box: {0.07, h * 1.1, 0.13}
+          Opacity: {wo}
+        }
+
+        "side_brace_b_{sd}" : MvTimber {
+          Position: {sx, 0.45 + h / 2, -d * 0.39}
+          Rotation: {-0.5, 0, 0}
+          Box: {0.07, h * 1.1, 0.13}
+          Opacity: {wo}
+        }
+      }
+    }
+
+    plate : MvTimber {
+      Position: {0, 0.45 + h, 0}
+      Box: {w + 0.14, 0.22, d + 0.14}
+      Opacity: {wo}
+      texture.Transform: {w / 2, 0.3, 0, 0}
+    }
+  }
+
+  template HouseUpper {
+    prop x: f32 = 0
+    prop z: f32 = 0
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop h: f32 = 3.2
+    prop wall: i32 = 0
+    prop floors: i32 = 1
+    prop fade: bool = false
+
+    const jet = floors > 1 ? 0.35 : 0
+    const uw = w + jet * 2
+    const ud = d + jet * 2
+    const wh = h * floors
+    const top = 0.45 + wh
+    const night = hour > 17.4 || hour < 6
+    const seed = fract(x * 0.137 + z * 0.291)
+    const ro = fade ? 0.12 : 1
+    const wc: Rgb = match wall {
+      0: {248, 238, 214}
+      1: {244, 222, 182}
+      2: {240, 204, 192}
+      3: {200, 192, 176}
+      _: {222, 230, 236}
+    }
+    const paint: Rgb = match floor(seed * 5) {
+      0: {64, 112, 82}
+      1: {64, 92, 146}
+      2: {156, 64, 52}
+      3: {196, 150, 70}
+      _: {120, 80, 120}
+    }
+
+    Position: {0, 0, 0}
+
+    upper {
+      Position: {0, 0.45 + h + h / 2 + 0.1, 0}
+      Box: {uw, h - 0.2, ud}
+      Rgb: wc
+      PbrMaterial: {roughness: 0.95}
+      PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}
+      texture.Transform: {uw / 3, h / 3, 0, 0}
+      Opacity: {ro}
+      Transition: [Opacity: {duration: 0.3}]
+    }
+
+    jetty : MvTimber {
+      Position: {0, 0.45 + h + 0.08, 0}
+      Box: {uw + 0.12, 0.2, ud + 0.12}
+      Opacity: {ro}
+    }
+
+    for j in 0..7 {
+      "joist_{j}" : MvTimber {
+        Position: {-w / 2 + 0.3 + j * (w - 0.6) / 6, 0.45 + h - 0.06, d / 2 + jet / 2}
+        Box: {0.14, 0.14, jet + 0.1}
+        Opacity: {ro}
+      }
+    }
+
+    for c in 0..4 {
+      const cx = match c % 2 { 0: -uw / 2; _: uw / 2 }
+      const cz = c < 2 ? -ud / 2 : ud / 2
+      "upost_{c}" : MvTimber {
+        Position: {cx, 0.45 + h * 1.5, cz}
+        Box: {0.24, h, 0.24}
+        Bevel: {radius: 0.04, segments: 1}
+        Opacity: {ro}
+      }
+    }
+
+    for k in 0..5 {
+      const sx = -uw / 2 + uw * (k + 0.5) / 5
+      "ustud_{k}" : MvTimber {
+        Position: {sx, 0.45 + h * 1.5, ud / 2 + 0.03}
+        Box: {0.14, h, 0.07}
+        Opacity: {ro}
+      }
+    }
+
+    urail : MvTimber {
+      Position: {0, 0.45 + h * 1.25, ud / 2 + 0.03}
+      Box: {uw, 0.13, 0.07}
+      Opacity: {ro}
+    }
+
+    ucross_a : MvTimber {
+      Position: {0, 0.45 + h * 1.22, ud / 2 + 0.035}
+      Rotation: {0, 0, 0.55}
+      Box: {0.11, uw * 0.24, 0.06}
+      Opacity: {ro}
+    }
+
+    ucross_b : MvTimber {
+      Position: {0, 0.45 + h * 1.22, ud / 2 + 0.035}
+      Rotation: {0, 0, -0.55}
+      Box: {0.11, uw * 0.24, 0.06}
+      Opacity: {ro}
+    }
+
+    uplate : MvTimber { Position: {0, top, 0}; Box: {uw + 0.12, 0.2, ud + 0.12}; Opacity: {ro} }
+    WindowPane up_a(w: 0.8, h: 0.9, lit: night, box_: true, seed: seed, shutter: paint) {
+      Position: {-uw * 0.3, 0.45 + h * 1.55, ud / 2 + 0.06}
+      Opacity: {ro}
+    }
+
+    WindowPane up_b(w: 0.8, h: 0.9, lit: night, box_: true, seed: seed + 0.3, shutter: paint) {
+      Position: {uw * 0.3, 0.45 + h * 1.55, ud / 2 + 0.06}
+      Opacity: {ro}
+    }
+
+    WindowPane up_c(w: 0.7, h: 0.8, lit: night, shutters: false) {
+      Position: {0, 0.45 + h * 1.55, 0 - ud / 2 - 0.06}
+      Rotation: {0, PI, 0}
+      Opacity: {ro}
+    }
+  }
+
+  template HouseRoof {
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop h: f32 = 3.2
+    prop wall: i32 = 0
+    prop roof: i32 = 0
+    prop floors: i32 = 1
+    prop fade: bool = false
+
+    const jet = floors > 1 ? 0.35 : 0
+    const uw = w + jet * 2
+    const ud = d + jet * 2
+    const rh = ud * 0.5
+    const wh = h * floors
+    const top = 0.45 + wh
+    const run = ud / 2 + 0.7
+    const slope = atan(rh / run)
+    const slab = sqrt(run * run + rh * rh)
+    const thatched = roof == 0
+    const rt = thatched ? 0.42 : 0.16
+    const night = hour > 17.4 || hour < 6
+    const ro = fade ? 0.12 : 1
+    const wc: Rgb = match wall {
+      0: {248, 238, 214}
+      1: {244, 222, 182}
+      2: {240, 204, 192}
+      3: {200, 192, 176}
+      _: {222, 230, 236}
+    }
+    const rc: Rgb = match roof {
+      0: {226, 188, 118}
+      1: {196, 88, 62}
+      2: {84, 108, 156}
+      3: {92, 132, 86}
+      4: {118, 86, 150}
+      _: {104, 108, 120}
+    }
+    const rd: Rgb = {rc.r * 0.7, rc.g * 0.7, rc.b * 0.7}
+    const ox = sin(slope) * rt / 2
+    const oy = cos(slope) * rt / 2
+
+    Position: {0, 0, 0}
+
+    if thatched {
+      roof_a : MvThatch {
+        Position: {0, top + rh / 2 + oy, run / 2 + ox}
+        Rotation: {slope, 0, 0}
+        Box: {uw + 1.0, rt, slab + 0.2}
+        Bevel: {radius: 0.18, segments: 2}
+        Rgb: rc
+        Opacity: {ro}
+        Transition: [Opacity: {duration: 0.3}]
+        texture.Transform: {(uw + 1) / 2.4, slab / 1.6, 0, 0}
+      }
+
+      roof_b : MvThatch {
+        Position: {0, top + rh / 2 + oy, 0 - run / 2 - ox}
+        Rotation: {0 - slope, 0, 0}
+        Box: {uw + 1.0, rt, slab + 0.2}
+        Bevel: {radius: 0.18, segments: 2}
+        Rgb: rc
+        Opacity: {ro}
+        Transition: [Opacity: {duration: 0.3}]
+        texture.Transform: {(uw + 1) / 2.4, slab / 1.6, 0, 0}
+      }
+
+      ridge : MvThatch {
+        Position: {0, top + rh + 0.12, 0}
+        Rotation: {0, 0, HALF_PI}
+        Scale: {1, 1, 0.8}
+        Capsule: {length: uw + 0.6, radius: 0.36, segments: 10, smooth: true}
+        Rgb: {rc.r * 0.86, rc.g * 0.86, rc.b * 0.8}
+        Opacity: {ro}
+        texture.Transform: {4, 1, 0, 0}
+      }
+
+      for k in 0..6 {
+        "pin_{k}" : MvTimber {
+          Position: {-uw / 2 + 0.3 + k * uw / 6, top + rh + 0.12, 0}
+          Rotation: {HALF_PI, 0, 0}
+          Torus: {radius: 0.36, tube: 0.025, segments: 10, rings: 3}
+          Opacity: {ro}
+        }
+      }
+    } else {
+      roof_a {
+        Position: {0, top + rh / 2 + oy, run / 2 + ox}
+        Rotation: {slope, 0, 0}
+        Box: {uw + 1.0, rt, slab + 0.2}
+        Rgb: rc
+        PbrMaterial: {roughness: 0.75}
+        PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}
+        texture.Transform: {(uw + 1) / 1.5, slab / 1.3, 0, 0}
+        Opacity: {ro}
+        Transition: [Opacity: {duration: 0.3}]
+      }
+
+      roof_b {
+        Position: {0, top + rh / 2 + oy, 0 - run / 2 - ox}
+        Rotation: {0 - slope, 0, 0}
+        Box: {uw + 1.0, rt, slab + 0.2}
+        Rgb: rc
+        PbrMaterial: {roughness: 0.75}
+        PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}
+        texture.Transform: {(uw + 1) / 1.5, slab / 1.3, 0, 0}
+        Opacity: {ro}
+        Transition: [Opacity: {duration: 0.3}]
+      }
+
+      ridge {
+        Position: {0, top + rh + rt * 0.8, 0}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {length: uw + 1.0, radius: 0.15, segments: 10, smooth: true}
+        Rgb: rd
+        PbrMaterial: {roughness: 0.7}
+        Opacity: {ro}
+      }
+
+      for e in 0..2 {
+        const ex = match e { 0: uw / 2 + 0.5; _: 0 - uw / 2 - 0.5 }
+        "finial_{e}" {
+          Position: {ex, top + rh + rt * 0.8 + 0.18, 0}
+          Sphere: {radius: 0.13, segments: 8, smooth: true}
+          Rgb: rd
+          PbrMaterial: {roughness: 0.6}
+          Opacity: {ro}
+        }
+      }
+    }
+
+    for e in 0..2 {
+      const ex = match e { 0: uw / 2 + 0.5; _: 0 - uw / 2 - 0.5 }
+      "barge_a_{e}" : MvTimber {
+        Position: {ex, top + rh / 2 + oy * 0.4, run / 2 + ox * 0.4}
+        Rotation: {slope, 0, 0}
+        Box: {0.1, rt + 0.16, slab + 0.24}
+        Opacity: {ro}
+      }
+
+      "barge_b_{e}" : MvTimber {
+        Position: {ex, top + rh / 2 + oy * 0.4, 0 - run / 2 - ox * 0.4}
+        Rotation: {0 - slope, 0, 0}
+        Box: {0.1, rt + 0.16, slab + 0.24}
+        Opacity: {ro}
+      }
+    }
+
+    gable_a {
+      Position: {uw / 2 - 0.05, top + rh / 2, 0}
+      Rotation: {0, HALF_PI, 0}
+      TrianglePrism: {ud, rh, 0.12}
+      Rgb: wc
+      PbrMaterial: {roughness: 0.95}
+      PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}
+      Opacity: {ro}
+    }
+
+    gable_b {
+      Position: {0 - uw / 2 + 0.05, top + rh / 2, 0}
+      Rotation: {0, HALF_PI, 0}
+      TrianglePrism: {ud, rh, 0.12}
+      Rgb: wc
+      PbrMaterial: {roughness: 0.95}
+      PbrTextures: {albedo: mv_tex_plaster, normal: mv_tex_plaster_n}
+      Opacity: {ro}
+    }
+
+    for e in 0..2 {
+      const ex = match e { 0: uw / 2 + 0.03; _: 0 - uw / 2 - 0.03 }
+      "king_{e}" : MvTimber {
+        Position: {ex, top + rh * 0.42, 0}
+        Box: {0.08, rh * 0.84, 0.14}
+        Opacity: {ro}
+      }
+
+      "gx_a_{e}" : MvTimber {
+        Position: {ex, top + rh * 0.3, ud * 0.17}
+        Rotation: {0.62, 0, 0}
+        Box: {0.07, rh * 0.62, 0.12}
+        Opacity: {ro}
+      }
+
+      "gx_b_{e}" : MvTimber {
+        Position: {ex, top + rh * 0.3, 0 - ud * 0.17}
+        Rotation: {-0.62, 0, 0}
+        Box: {0.07, rh * 0.62, 0.12}
+        Opacity: {ro}
+      }
+
+      "oculus_{e}" {
+        Position: {ex + match e { 0: 0.03; _: -0.03 }, top + rh * 0.38, 0}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {length: 0.06, radius: 0.24, segments: 12}
+        Rgb: night ? {255, 190, 110} : {44, 58, 78}
+        PbrMaterial: {roughness: 0.1}
+        Emissive: {strength: night ? 1.5 : 0, color: {255, 170, 80}}
+        Opacity: {ro}
+      }
+    }
+  }
+
+  template HouseEntrance {
+    prop x: f32 = 0
+    prop z: f32 = 0
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop roof: i32 = 0
+
+    const night = hour > 17.4 || hour < 6
+    const seed = fract(x * 0.137 + z * 0.291)
+    const rc: Rgb = match roof {
+      0: {226, 188, 118}
+      1: {196, 88, 62}
+      2: {84, 108, 156}
+      3: {92, 132, 86}
+      4: {118, 86, 150}
+      _: {104, 108, 120}
+    }
+    const rd: Rgb = {rc.r * 0.7, rc.g * 0.7, rc.b * 0.7}
+    const paint: Rgb = match floor(seed * 5) {
+      0: {64, 112, 82}
+      1: {64, 92, 146}
+      2: {156, 64, 52}
+      3: {196, 150, 70}
+      _: {120, 80, 120}
+    }
+
+    Position: {0, 0, 0}
+
+    door_frame : MvTimber {
+      Position: {0, 0.45 + 1.15, d / 2 + 0.05}
+      Box: {1.5, 2.3, 0.1}
+      Bevel: {radius: 0.03, segments: 1}
+    }
+
+    door_arch : MvTimber {
+      Position: {0, 0.45 + 2.3, d / 2 + 0.05}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {length: 0.1, radius: 0.75, segments: 16}
+    }
+
+    door : MvWood {
+      Position: {0, 0.45 + 1.02, d / 2 + 0.1}
+      Rotation: {0, 0, HALF_PI}
+      Box: {2.04, 1.12, 0.07}
+      Rgb: paint
+      texture.Transform: {1, 0.6, 0, 0}
+    }
+
+    door_top : MvWood {
+      Position: {0, 0.45 + 2.04, d / 2 + 0.1}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {length: 0.07, radius: 0.56, segments: 16}
+      Rgb: paint
+    }
+
+    hinge_a : MvIron { Position: {-0.15, 0.45 + 0.5, d / 2 + 0.15}; Box: {0.8, 0.07, 0.02} }
+    hinge_b : MvIron { Position: {-0.15, 0.45 + 1.6, d / 2 + 0.15}; Box: {0.8, 0.07, 0.02} }
+    knocker : MvBrass {
+      Position: {0.3, 0.45 + 1.1, d / 2 + 0.17}
+      Rotation: {HALF_PI, 0, 0}
+      Torus: {radius: 0.07, tube: 0.015, segments: 10, rings: 4}
+    }
+
+    step : MvStone {
+      Position: {0, 0.15, d / 2 + 0.6}
+      Box: {1.8, 0.3, 0.8}
+      Bevel: {radius: 0.05, segments: 1}
+      texture.Transform: {0.8, 0.3, 0, 0}
+    }
+
+    hood_a {
+      Position: {-0.4, 0.45 + 2.86, d / 2 + 0.38}
+      Rotation: {0, 0, 0.55}
+      Box: {1.0, 0.07, 0.8}
+      Rgb: rc
+      PbrMaterial: {roughness: 0.75}
+      PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}
+      texture.Transform: {0.7, 0.6, 0, 0}
+    }
+
+    hood_b {
+      Position: {0.4, 0.45 + 2.86, d / 2 + 0.38}
+      Rotation: {0, 0, -0.55}
+      Box: {1.0, 0.07, 0.8}
+      Rgb: rc
+      PbrMaterial: {roughness: 0.75}
+      PbrTextures: {albedo: mv_tex_shingles, normal: mv_tex_shingles_n}
+      texture.Transform: {0.7, 0.6, 0, 0}
+    }
+
+    hood_ridge {
+      Position: {0, 0.45 + 3.1, d / 2 + 0.38}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {length: 0.84, radius: 0.06, segments: 8}
+      Rgb: rd
+      PbrMaterial: {roughness: 0.7}
+    }
+
+    bracket_a : MvTimber {
+      Position: {-0.66, 0.45 + 2.62, d / 2 + 0.3}
+      Rotation: {0.75, 0, 0}
+      Box: {0.08, 0.08, 0.7}
+    }
+
+    bracket_b : MvTimber {
+      Position: {0.66, 0.45 + 2.62, d / 2 + 0.3}
+      Rotation: {0.75, 0, 0}
+      Box: {0.08, 0.08, 0.7}
+    }
+
+    WindowPane win_a(lit: night, box_: true, seed: seed, shutter: paint) {
+      Position: {-w * 0.33, 0.45 + 1.55, d / 2 + 0.06}
+    }
+
+    WindowPane win_b(lit: night, box_: true, seed: seed + 0.5, shutter: paint) {
+      Position: {w * 0.33, 0.45 + 1.55, d / 2 + 0.06}
+    }
+
+    WindowPane win_c(lit: night, shutter: paint) {
+      Position: {0, 0.45 + 1.55, -d / 2 - 0.06}
+      Rotation: {0, PI, 0}
+    }
+
+    WindowPane win_d(lit: night, shutters: false) {
+      Position: {w / 2 + 0.06, 0.45 + 1.55, 0}
+      Rotation: {0, HALF_PI, 0}
+    }
+
+    WindowPane win_e(lit: night, shutters: false) {
+      Position: {-w / 2 - 0.06, 0.45 + 1.55, 0}
+      Rotation: {0, 0 - HALF_PI, 0}
+    }
+
+    for p in 0..2 {
+      const sx = match p { 0: -1.25; _: 1.25 }
+
+      if fract(seed * 3.7 + p * 0.41) > 0.35 {
+        "pot_{p}" {
+          Position: {sx, 0, d / 2 + 0.45}
+          Lathe: {profile: MvPotShape, cap_start: true, segments: 12, rings: 6}
+          Rgb: {186, 98, 64}
+          PbrMaterial: {roughness: 0.85}
+        }
+
+        "plant_{p}" : MvLeaf {
+          Position: {sx, 0.48, d / 2 + 0.45}
+          Sphere: {radius: 0.24, segments: 10, smooth: true}
+        }
+
+        "pbloom_{p}" {
+          Position: {sx + 0.08, 0.66, d / 2 + 0.55}
+          Sphere: {radius: 0.07, segments: 6}
+          Rgb: match p { 0: {240, 90, 90}; _: {250, 220, 120} }
+          PbrMaterial: {roughness: 0.7}
+        }
+      }
+    }
+  }
+
+  template HouseTrim {
+    prop x: f32 = 0
+    prop z: f32 = 0
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop h: f32 = 3.2
+    prop wall: i32 = 0
+    prop floors: i32 = 1
+    prop sign: i32 = 0
+    prop fade: bool = false
+
+    const wh = h * floors
+    const stone = wall == 3
+    const night = hour > 17.4 || hour < 6
+    const seed = fract(x * 0.137 + z * 0.291)
+    const wo = fade ? 0.3 : 1
+    const paint: Rgb = match floor(seed * 5) {
+      0: {64, 112, 82}
+      1: {64, 92, 146}
+      2: {156, 64, 52}
+      3: {196, 150, 70}
+      _: {120, 80, 120}
+    }
+
+    Position: {0, 0, 0}
+
+    if fract(seed * 5.9) > 0.55 && !stone {
+      ivy {
+        for k in 0..7 {
+          const ky = 0.6 + k * (wh - 0.3) / 7
+          "leaf_{k}" : MvLeafDark {
+            Position: {w / 2 + 0.12 - fract(k * 0.37) * 0.25, ky, d / 2 + 0.14}
+            Scale: {0.7 + fract(k * 0.61) * 0.5, 0.55, 0.3}
+            Sphere: {radius: 0.38, segments: 10, smooth: true}
+            Opacity: {wo}
+          }
+        }
+
+        for k in 0..3 {
+          "spray_{k}" : MvLeaf {
+            Position: {w / 2 - 0.5 - k * 0.35, 0.45 + h - 0.2 - k * 0.35, d / 2 + 0.14}
+            Scale: {0.7, 0.45, 0.25}
+            Sphere: {radius: 0.38, segments: 10, smooth: true}
+            Opacity: {wo}
+          }
+        }
+      }
+    }
+
+    if fract(seed * 8.3) > 0.45 {
+      Barrel rain { Position: {0 - w / 2 + 0.2, 0, -d / 2 - 0.55}; Scale: {0.95, 0.95, 0.95} }
+      rain_water : MvDeepWater {
+        Position: {0 - w / 2 + 0.2, 0.86, -d / 2 - 0.55}
+        Cylinder: {length: 0.02, radius: 0.28, segments: 12}
+      }
+    }
+
+    if sign > 0 {
+      sign_arm : MvIron {
+        Position: {-w / 2 + 0.1, 0.45 + h - 0.35, d / 2 + 0.55}
+        Box: {0.05, 0.05, 1.0}
+      }
+
+      sign_curl : MvIron {
+        Position: {-w / 2 + 0.1, 0.45 + h - 0.6, d / 2 + 0.25}
+        Rotation: {0, HALF_PI, 0}
+        TorusShell: {
+          radius: 0.25,
+          tube: 0.02,
+          ring_start: 0,
+          ring_end: 3.14,
+          tube_start: 0,
+          tube_end: 6.283,
+          segments: 10,
+          rings: 4
+        }
+      }
+
+      for c in 0..2 {
+        "sign_chain_{c}" : MvIron {
+          Position: {-w / 2 + 0.1, 0.45 + h - 0.5, d / 2 + 0.3 + c * 0.5}
+          Box: {0.02, 0.28, 0.02}
+        }
+      }
+
+      sign_board : MvWood {
+        Position: {-w / 2 + 0.1, 0.45 + h - 0.95, d / 2 + 0.55}
+        Rotation: {0, HALF_PI, 0}
+        Box: {0.95, 0.62, 0.06}
+        Bevel: {radius: 0.04, segments: 1}
+        Rgb: paint
+      }
+
+      sign_trim : MvGold {
+        Position: {-w / 2 + 0.1, 0.45 + h - 0.95, d / 2 + 0.55}
+        Rotation: {0, HALF_PI, 0}
+        Box: {1.0, 0.67, 0.04}
+      }
+
+      if sign == 1 {
+        for sd in 0..2 {
+          const sx = match sd { 0: 0.05; _: -0.05 }
+          "mug_{sd}" {
+            Position: {-w / 2 + 0.1 + sx, 0.45 + h - 0.97, d / 2 + 0.55}
+            Rotation: {0, 0, HALF_PI}
+            Scale: {1, 1, 1}
+            Cylinder: {length: 0.04, radius: 0.18, segments: 10}
+            Rgb: {236, 200, 100}
+            PbrMaterial: {metallic: 0.6, roughness: 0.4}
+          }
+
+          "foam_{sd}" {
+            Position: {-w / 2 + 0.1 + sx, 0.45 + h - 0.78, d / 2 + 0.55}
+            Rotation: {0, 0, HALF_PI}
+            Scale: {1, 1, 1.3}
+            Cylinder: {length: 0.05, radius: 0.12, segments: 10}
+            Rgb: {250, 246, 236}
+            PbrMaterial: {roughness: 0.9}
+          }
+        }
+      } else if sign == 2 {
+        for sd in 0..2 {
+          const sx = match sd { 0: 0.05; _: -0.05 }
+          "loaf_{sd}" {
+            Position: {-w / 2 + 0.1 + sx, 0.45 + h - 0.95, d / 2 + 0.55}
+            Scale: {0.3, 0.6, 1}
+            Sphere: {radius: 0.28, segments: 10, smooth: true}
+            Rgb: {214, 150, 76}
+            PbrMaterial: {roughness: 0.8}
+          }
+        }
+      } else {
+        for sd in 0..2 {
+          const sx = match sd { 0: 0.05; _: -0.05 }
+          "anvil_{sd}" {
+            Position: {-w / 2 + 0.1 + sx, 0.45 + h - 0.92, d / 2 + 0.55}
+            Box: {0.02, 0.14, 0.5}
+            Rgb: {50, 48, 48}
+            PbrMaterial: {metallic: 0.8, roughness: 0.4}
+          }
+
+          "anvil_b_{sd}" {
+            Position: {-w / 2 + 0.1 + sx, 0.45 + h - 1.08, d / 2 + 0.55}
+            Box: {0.02, 0.18, 0.2}
+            Rgb: {50, 48, 48}
+            PbrMaterial: {metallic: 0.8, roughness: 0.4}
+          }
+        }
+      }
+    }
+
+    if night {
+      porch_light {
+        Position: {0, 0.45 + 2.7, d / 2 + 0.9}
+        PointLight: {intensity: 2.5, range: 7}
+        Rgb: {255, 190, 120}
+      }
+    }
+  }
+
+  template HouseChimney {
+    prop x: f32 = 0
+    prop z: f32 = 0
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop h: f32 = 3.2
+    prop floors: i32 = 1
+    prop fade: bool = false
+
+    const jet = floors > 1 ? 0.35 : 0
+    const uw = w + jet * 2
+    const ud = d + jet * 2
+    const rh = ud * 0.5
+    const wh = h * floors
+    const top = 0.45 + wh
+    const ro = fade ? 0.12 : 1
+
+    Position: {0, 0, 0}
+
+    chimney_ : MvRubble {
+      Position: {uw * 0.3, top + rh * 0.75, -ud * 0.18}
+      Box: {0.85, rh * 1.5 + 0.7, 0.85}
+      Bevel: {radius: 0.05, segments: 1}
+      Opacity: {ro}
+      texture.Transform: {0.6, (rh * 1.5 + 0.7) / 1.4, 0, 0}
+    }
+
+    chimney_band : MvStone {
+      Position: {uw * 0.3, top + rh * 1.5 + 0.12, -ud * 0.18}
+      Box: {1.0, 0.16, 1.0}
+      Bevel: {radius: 0.03, segments: 1}
+      Opacity: {ro}
+      texture.Transform: {1, 0.3, 0, 0}
+    }
+
+    chimney_pot_a {
+      Position: {uw * 0.3 - 0.18, top + rh * 1.5 + 0.38, -ud * 0.18}
+      Lathe: {profile: MvPotShape, cap_start: true, segments: 10, rings: 5}
+      Scale: {0.75, 1.1, 0.75}
+      Rgb: {176, 92, 60}
+      PbrMaterial: {roughness: 0.8}
+      Opacity: {ro}
+    }
+
+    chimney_soot_a : MvDark {
+      Position: {uw * 0.3 - 0.18, top + rh * 1.5 + 0.38 + 0.37, -ud * 0.18}
+      Cylinder: {length: 0.02, radius: 0.175, segments: 10}
+      Rgb: {24, 20, 18}
+      Opacity: {ro}
+    }
+
+    chimney_soot_b : MvDark {
+      Position: {uw * 0.3 + 0.2, top + rh * 1.5 + 0.38 + 0.29, -ud * 0.18}
+      Cylinder: {length: 0.02, radius: 0.165, segments: 10}
+      Rgb: {24, 20, 18}
+      Opacity: {ro}
+    }
+
+    chimney_pot_b {
+      Position: {uw * 0.3 + 0.2, top + rh * 1.5 + 0.38, -ud * 0.18}
+      Lathe: {profile: MvPotShape, cap_start: true, segments: 10, rings: 5}
+      Scale: {0.7, 0.85, 0.7}
+      Rgb: {160, 84, 56}
+      PbrMaterial: {roughness: 0.8}
+      Opacity: {ro}
+    }
+
+    smoke {
+      Position: {uw * 0.3 - 0.18, top + rh * 1.5 + 0.9, -ud * 0.18}
+      Emitter: {
+        max: 24, rate: 3,
+        shape: EmitterSphere, radius: 0.1,
+        direction: {0, 1, 0}, spread: 12, speed: {0.6, 1.0},
+        lifetime: {2.5, 4}, size: {0.5, 0.8}, opacity: {0.2, 0.35},
+        acceleration: {0.2, 0.1, 0.05},
+        color: {210, 206, 200}, color_variance: {10, 10, 10},
+        seed: x * 31 + z * 7
+      }
+      Curves: {
+        size: {keys: [{0, 0.6}, {0.5, 1.6}, {1, 3}]},
+        opacity: {keys: [{0, 0}, {0.3, 1}, {1, 0}]}
+      }
+    }
+  }
+
+  template House {
+    prop x: f32 = 0
+    prop z: f32 = 0
+    prop w: f32 = 7
+    prop d: f32 = 5.5
+    prop h: f32 = 3.2
+    prop face: i32 = 0
+    prop wall: i32 = 0
+    prop roof: i32 = 0
+    prop chimney: bool = true
+    prop floors: i32 = 1
+    prop sign: i32 = 0
+
+    mut fade = false
+
+    const hw = match face % 2 { 0: w / 2; _: d / 2 }
+    const hd = match face % 2 { 0: d / 2; _: w / 2 }
+    const wh = h * floors
+
+    Position: {x, 0, z}
+
+    frame {
+      Rotation: {0, face * HALF_PI, 0}
+      HouseShell shell(w: w, d: d, h: h, wall: wall, fade: fade)
+
+      if floors > 1 {
+        HouseUpper upstairs(x: x, z: z, w: w, d: d, h: h, wall: wall, floors: floors, fade: fade)
+      }
+
+      HouseRoof roofing(w: w, d: d, h: h, wall: wall, roof: roof, floors: floors, fade: fade)
+      HouseEntrance entrance(x: x, z: z, w: w, d: d, roof: roof)
+
+      HouseTrim trimmings(
+        x: x,
+        z: z,
+        w: w,
+        d: d,
+        h: h,
+        wall: wall,
+        floors: floors,
+        sign: sign,
+        fade: fade
+      )
+
+      if chimney {
+        HouseChimney stack(x: x, z: z, w: w, d: d, h: h, floors: floors, fade: fade)
+      }
+    }
+
+    async {
+      block_rect(x - hw - 0.15, z - hd - 0.15, x + hw + 0.15, z + hd + 0.15)
+
+      while true {
+        await delay(0.15)
+        const behind = px > x - hw - 1.2 && px < x + hw + 1.2 && pz < z + hd &&
+          pz > z - hd - 3 - wh * 0.5
+
+        if behind != fade {
+          fade = behind
+        }
+      }
+    }
+  }
+}

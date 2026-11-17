@@ -11,6 +11,7 @@ assets {
     async {
       while true {
         const e = await Cooldown
+
         if e.spell == index {
           await delay(e.seconds)
           spell_cooling[index] = false
@@ -24,9 +25,11 @@ async {
   while true {
     const e = await Cast
     const i = e.spell
+
     if !spell_cooling[i] && hero_mp >= spell_cost(i) && hero_hp > spell_blood(i) {
       hero_mp -= spell_cost(i)
       hero_hp -= spell_blood(i)
+
       if i == 1 {
         hero_hp = min(hero_hp_max, hero_hp + 60)
       } else if i == 2 {
@@ -38,6 +41,7 @@ async {
       } else if i == 5 {
         hero_mp = min(hero_mp_max, hero_mp + 90)
       }
+
       spell_cooling[i] = true
       emit Cooldown(spell: i, seconds: spell_cooldown(i) * haste_scale(stat_haste))
       hero_xp += spell_xp(i) * (1 + stat_might * 0.006)

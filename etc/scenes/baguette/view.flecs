@@ -19,7 +19,17 @@ camera {
 
 view {
   occlusion { Gtao: {radius: 0.25, final_value_power: 2.2} }
-  focus { DepthOfField: {focus_distance: 1.55, focus_range: 0.55, near_transition: 0.6, far_transition: 1.4, max_radius: 0.006, near_blur: false} }
+  focus {
+    DepthOfField: {
+      focus_distance: 1.55,
+      focus_range: 0.55,
+      near_transition: 0.6,
+      far_transition: 1.4,
+      max_radius: 0.006,
+      near_blur: false
+    }
+  }
+
   bloom { Bloom: {intensity: 0.08, threshold: 1.2} }
   tonemap { Tonemap: {operator_: TonyMcMapface} }
   vignette { Vignette: {intensity: 0.35, radius: 0.7, smoothness: 0.6} }
@@ -28,6 +38,13 @@ view {
     camera: camera,
     clear: {enabled: true, color: {20, 16, 14, 255}},
     shadows: {enabled: true},
-    effects: [{effect: occlusion}, {effect: focus}, {effect: bloom}, {effect: tonemap}, {effect: vignette}, {effect: smaa}]
+    effects: [
+      {effect: occlusion},
+      {effect: focus},
+      {effect: bloom},
+      {effect: tonemap},
+      {effect: vignette},
+      {effect: smaa}
+    ]
   }
 }

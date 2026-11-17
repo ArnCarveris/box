@@ -21,28 +21,33 @@ assets {
       Box: {1.17, 1.5, 0.12}
       Rgb: MarketCream
     }
+
     glass {
       Position: {0, 0, 0.08}
       Box: {0.98, 1.3, 0.04}
       Rgb: {75, 104, 105}
       PbrMaterial: {roughness: 0.2, metallic: 0.3}
     }
+
     for side in 0..2 {
       {
         Position: {(side - 0.5) * 0.5, 0, 0.12}
         Box: {0.035, 1.3, 0.035}
         Rgb: MarketCream
       }
+
       {
         Position: {0, (side - 0.5) * 0.49, 0.12}
         Box: {1, 0.04, 0.035}
         Rgb: MarketCream
       }
+
       {
         Position: {(side - 0.5) * 1.7, 0, 0.06}
         Rotation: {0, (side - 0.5) * -0.25, 0}
         Box: {0.48, 1.4, 0.09}
         Rgb: tint
+
         for slat in 0..9 {
           {
             Position: {0, (slat - 4) * 0.13, 0.06}
@@ -51,6 +56,7 @@ assets {
             Rgb: {112, 150, 130}
           }
         }
+
         for hinge in 0..2 {
           {
             Position: {0, (hinge - 0.5) * 0.96, 0.1}
@@ -60,16 +66,19 @@ assets {
         }
       }
     }
+
     sill {
       Position: {0, -0.8, 0.1}
       Box: {1.4, 0.12, 0.35}
       Rgb: MarketStone
     }
+
     flower_box {
       Position: {0, -0.72, 0.27}
       Box: {1.1, 0.26, 0.34}
       Rgb: MarketOak
     }
+
     for i in 0..3 {
       FlowerPot(tint: {217, 113 + i * 22, 112}, size: 0.56) {
         Position: {(i - 1) * 0.34, -0.69, 0.27}

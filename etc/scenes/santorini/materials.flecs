@@ -14,15 +14,26 @@ assets {
   export const IslandIron: Rgb = {49, 69, 76}
   export const IslandLinen: Sheen = {color: {120, 118, 110}, roughness: 0.6}
   export const IslandCloth: DiffuseTransmission = {factor: 0.45, color: {255, 244, 222}}
-  export const IslandGlass: Transmission = {transmission_factor: 0.45, ior: 1.5, thickness_factor: 0.02, attenuation_distance: 0.4, attenuation_color: {120, 170, 190}}
+  export const IslandGlass: Transmission = {
+    transmission_factor: 0.45,
+    ior: 1.5,
+    thickness_factor: 0.02,
+    attenuation_distance: 0.4,
+    attenuation_color: {120, 170, 190}
+  }
 
   prefab IslandSquareShape {
     Path2D: {
       start: {-0.5, -0.5},
-      segments: [{kind: Line, end: {0.5, -0.5}}, {kind: Line, end: {0.5, 0.5}}, {kind: Line, end: {-0.5, 0.5}}],
+      segments: [
+        {kind: Line, end: {0.5, -0.5}},
+        {kind: Line, end: {0.5, 0.5}},
+        {kind: Line, end: {-0.5, 0.5}}
+      ],
       closed: true
     }
   }
+
   prefab IslandSquareProfile { Profile2D: {outer: IslandSquareShape} }
 
   prefab IslandRoundShape {
@@ -40,6 +51,7 @@ assets {
       closed: true
     }
   }
+
   prefab IslandRoundProfile { Profile2D: {outer: IslandRoundShape} }
 
   prefab IslandFanShape {
@@ -52,6 +64,7 @@ assets {
       closed: true
     }
   }
+
   prefab IslandFanProfile { Profile2D: {outer: IslandFanShape} }
 
   template IslandRope {
@@ -75,6 +88,7 @@ assets {
         }]
       }
     }
+
     cord {
       Position: {0, 0, 0}
       Sweep: {path: route, profile: IslandRoundProfile, scale: {thick, thick}, rings: 24}

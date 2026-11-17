@@ -21,7 +21,11 @@ const sunY: f32 = 0.27
 const sunZ: f32 = -1.0
 
 sun {
-  Rotation: {asin(sunY / sqrt(sunX * sunX + sunY * sunY + sunZ * sunZ)), atan2(0 - sunX, 0 - sunZ), 0}
+  Rotation: {
+    asin(sunY / sqrt(sunX * sunX + sunY * sunY + sunZ * sunZ)),
+    atan2(0 - sunX, 0 - sunZ),
+    0
+  }
   DirectionalLight: {intensity: 2.4}
   Rgb: {255, 230, 200}
   Atmosphere: {
@@ -33,7 +37,6 @@ sun {
   }
 }
 
-// Chase camera: behind and above the canoe, its X follows the canoe by CAM_FOLLOW
 camera {
   Position: {canoe_x * CAM_FOLLOW, CAM_HEIGHT, CANOE_Z + CAM_BACK}
   Rotation: {0 - atan2(CAM_HEIGHT - 0.6, CAM_BACK + CAM_LOOK_AHEAD), 0, 0}
@@ -80,18 +83,54 @@ lagoon {
   // A distant volcano island up the lagoon, softened by the haze
   volcano {
     Position: {-110, 0, -1250}
-    shore : LgSandDry { Position: {0, 0.6, 0}; Scale: {1, 0.06, 0.7}; Sphere: {radius: 260, segments: 32, smooth: true}; NoShadow }
-    skirt : LgVolcanoGreen { Position: {0, 34, 0}; Frustum: {length: 70, radius_bottom: 230, radius_top: 120, segments: 32, smooth: true}; NoShadow }
-    cone : LgVolcano { Position: {0, 120, 0}; Frustum: {length: 104, radius_bottom: 122, radius_top: 34, segments: 32, smooth: true}; NoShadow }
-    crater : LgVolcano { Position: {0, 171, 0}; Frustum: {length: 4, radius_bottom: 34, radius_top: 28, segments: 24}; Rgb: {72, 64, 66}; NoShadow }
+    shore : LgSandDry {
+      Position: {0, 0.6, 0}
+      Scale: {1, 0.06, 0.7}
+      Sphere: {radius: 260, segments: 32, smooth: true}
+      NoShadow
+    }
+
+    skirt : LgVolcanoGreen {
+      Position: {0, 34, 0}
+      Frustum: {length: 70, radius_bottom: 230, radius_top: 120, segments: 32, smooth: true}
+      NoShadow
+    }
+
+    cone : LgVolcano {
+      Position: {0, 120, 0}
+      Frustum: {length: 104, radius_bottom: 122, radius_top: 34, segments: 32, smooth: true}
+      NoShadow
+    }
+
+    crater : LgVolcano {
+      Position: {0, 171, 0}
+      Frustum: {length: 4, radius_bottom: 34, radius_top: 28, segments: 24}
+      Rgb: {72, 64, 66}
+      NoShadow
+    }
+
     smoke {
       for i in 0..4 {
-        "puff_{i}" { Position: {i * 9, 186 + i * 16, i * 3}; Sphere: {radius: 18 + i * 6, segments: 12, smooth: true}; Rgb: {214, 200, 196}; PbrMaterial: {roughness: 1}; Opacity: {0.35 - i * 0.06}; BlendMode: AlphaBlend; NoShadow }
+        "puff_{i}" {
+          Position: {i * 9, 186 + i * 16, i * 3}
+          Sphere: {radius: 18 + i * 6, segments: 12, smooth: true}
+          Rgb: {214, 200, 196}
+          PbrMaterial: {roughness: 1}
+          Opacity: {0.35 - i * 0.06}
+          BlendMode: AlphaBlend
+          NoShadow
+        }
       }
     }
   }
+
   islet {
     Position: {260, 0, -900}
-    hill : LgVolcanoGreen { Position: {0, 0, 0}; Scale: {1, 0.35, 0.8}; Sphere: {radius: 90, segments: 24, smooth: true}; NoShadow }
+    hill : LgVolcanoGreen {
+      Position: {0, 0, 0}
+      Scale: {1, 0.35, 0.8}
+      Sphere: {radius: 90, segments: 24, smooth: true}
+      NoShadow
+    }
   }
 }

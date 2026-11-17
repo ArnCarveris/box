@@ -14,15 +14,25 @@ assets {
     {
       Position: {0, 0, 0}
       Rotation: {0, 0, math.PI / 2}
-      BeveledPrism: {footprint: [{0, -depth / 2}, {0, depth / 2}, {0.55 + depth / 2 * slope, depth / 2}, {0.55 - depth / 2 * slope, -depth / 2}], depth: width}
+      BeveledPrism: {
+        footprint: [
+          {0, -depth / 2},
+          {0, depth / 2},
+          {0.55 + depth / 2 * slope, depth / 2},
+          {0.55 - depth / 2 * slope, -depth / 2}
+        ],
+        depth: width
+      }
       Rgb: TownCream
     }
+
     {
       Position: {0, 0.59, 0}
       Rotation: {-math.atan(slope), 0, 0}
       Box: {width + 0.6, 0.1, length * math.sqrt(1 + slope * slope)}
       Rgb: color
     }
+
     for i in 0..11 {
       {
         Position: {(i - 5) * (width + 0.5) / 10, 0.66, 0}
@@ -31,12 +41,14 @@ assets {
         Rgb: TownIron
       }
     }
+
     {
       Position: {0, 0.54 - length * slope / 2, -length / 2}
       Rotation: {0, 0, math.PI / 2}
       Cylinder: {radius: 0.08, length: width + 0.7, segments: 10}
       Rgb: TownIron
     }
+
     for i in 0..3 {
       Window(width: width * 0.22, height: 0.28, frame: TownIron) {
         Position: {(i - 1) * width * 0.28, 0.4, depth / 2 + 0.08}

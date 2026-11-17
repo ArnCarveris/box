@@ -22,7 +22,11 @@ assets {
     Clip: {duration: 0.1698}
     flicker {
       Track: {component: PointLight, member: "intensity", curve: {kind: CurveBezier, keys: [
-        {0, 2.2, 14.8, 14.8}, {0.0425, 2.6, 0, 0}, {0.0849, 2.2, -14.8, -14.8}, {0.1274, 1.8, 0, 0}, {0.1698, 2.2, 14.8, 14.8}
+        {0, 2.2, 14.8, 14.8},
+        {0.0425, 2.6, 0, 0},
+        {0.0849, 2.2, -14.8, -14.8},
+        {0.1274, 1.8, 0, 0},
+        {0.1698, 2.2, 14.8, 14.8}
       ]}}
     }
   }
@@ -31,17 +35,33 @@ assets {
     Clip: {duration: 0.1232}
     flicker {
       Track: {component: PointLight, member: "intensity", curve: {kind: CurveBezier, keys: [
-        {0, 2.8, 25.5, 25.5}, {0.0308, 3.3, 0, 0}, {0.0616, 2.8, -25.5, -25.5}, {0.0924, 2.3, 0, 0}, {0.1232, 2.8, 25.5, 25.5}
+        {0, 2.8, 25.5, 25.5},
+        {0.0308, 3.3, 0, 0},
+        {0.0616, 2.8, -25.5, -25.5},
+        {0.0924, 2.3, 0, 0},
+        {0.1232, 2.8, 25.5, 25.5}
       ]}}
     }
   }
 
   template SkyDome {
     Position: {0, 0, 0}
-    EllipsoidShell: {radius: {6000, 6000, 6000}, longitude_start: 0, longitude_end: 2 * PI, latitude_start: 0 - PI / 2, latitude_end: PI / 2, thickness: 1, segments: 96, rings: 48}
+    EllipsoidShell: {
+      radius: {6000, 6000, 6000},
+      longitude_start: 0,
+      longitude_end: 2 * PI,
+      latitude_start: 0 - PI / 2,
+      latitude_end: PI / 2,
+      thickness: 1,
+      segments: 96,
+      rings: 48
+    }
     Rgb: {0, 0, 0}
     PbrMaterial: {metallic: 1, roughness: 0.03}
-    Emissive: {strength: in_tunnel ? 0.05 : 0.55, color: match here { 0: {255, 240, 236}; 1: {176, 226, 255}; _: {255, 150, 110} }}
+    Emissive: {
+      strength: in_tunnel ? 0.05 : 0.55,
+      color: match here { 0: {255, 240, 236}; 1: {176, 226, 255}; _: {255, 150, 110} }
+    }
     Transition: [Emissive: {duration: 0.6}]
     PbrTextures: {emissive: tex_sky}
     NoShadow
@@ -59,7 +79,6 @@ assets {
     PbrTextures: {albedo: tex}
     NoShadow
     Ignore
-
   }
 
   template PlanetLimb {
@@ -105,7 +124,14 @@ assets {
       BlendMode: Additive
       NoShadow
       Ignore
-      core { Position: {0, 0, 2}; Circle: {30}; Rgb: {255, 250, 240}; Emissive: {strength: 5, color: hue}; NoShadow; Ignore }
+      core {
+        Position: {0, 0, 2}
+        Circle: {30}
+        Rgb: {255, 250, 240}
+        Emissive: {strength: 5, color: hue}
+        NoShadow
+        Ignore
+      }
     }
   }
 
@@ -160,26 +186,85 @@ assets {
         NoShadow
         Ignore
       }
-      glare_a { Position: {0.6, 1.9, -0.9}; PointLight: {intensity: 2.2, range: 5}; Rgb: {150, 196, 255}; Animator: {clip: GlareFlickerA} }
-      glare_b { Position: {-0.2, 1.4, -2.2}; PointLight: {intensity: 2.8, range: 5}; Rgb: {130, 186, 255}; Animator: {clip: GlareFlickerB} }
+
+      glare_a {
+        Position: {0.6, 1.9, -0.9}
+        PointLight: {intensity: 2.2, range: 5}
+        Rgb: {150, 196, 255}
+        Animator: {clip: GlareFlickerA}
+      }
+
+      glare_b {
+        Position: {-0.2, 1.4, -2.2}
+        PointLight: {intensity: 2.8, range: 5}
+        Rgb: {130, 186, 255}
+        Animator: {clip: GlareFlickerB}
+      }
     }
   }
 
   template TollStation {
     Rotation: {0.3, 0.5, 0.22}
     Scale: {1.5, 1.5, 1.5}
-    hub : Soot { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: 16, length: 70, segments: 18, smooth: true}; NoShadow; Ignore }
-    wheel : BoneWhite { Torus: {radius: 58, tube: 6, segments: 40, rings: 10, smooth: true}; Rotation: {PI / 2, 0, 0}; AngularVelocity: {0, 0, 0.05}; NoShadow; Ignore }
-    for i in 0..4 {
-      "spoke_{i}" : Soot { Rotation: {0, 0, i * PI / 4}; AngularVelocity: {0, 0, 0.05}; Box: {116, 3.4, 3.4}; NoShadow; Ignore }
+    hub : Soot {
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: 16, length: 70, segments: 18, smooth: true}
+      NoShadow
+      Ignore
     }
+
+    wheel : BoneWhite {
+      Torus: {radius: 58, tube: 6, segments: 40, rings: 10, smooth: true}
+      Rotation: {PI / 2, 0, 0}
+      AngularVelocity: {0, 0, 0.05}
+      NoShadow
+      Ignore
+    }
+
+    for i in 0..4 {
+      "spoke_{i}" : Soot {
+        Rotation: {0, 0, i * PI / 4}
+        AngularVelocity: {0, 0, 0.05}
+        Box: {116, 3.4, 3.4}
+        NoShadow
+        Ignore
+      }
+    }
+
     arm_a : BoneWhite { Position: {0, 0, 44}; Box: {150, 5, 10}; NoShadow; Ignore }
     barrier_a : Oxide { Position: {80, 0, 44}; Box: {12, 60, 12}; NoShadow; Ignore }
     barrier_b : Oxide { Position: {-80, 0, 44}; Box: {12, 60, 12}; NoShadow; Ignore }
-    strobe_a { Position: {80, 34, 44}; Sphere: {radius: 5, segments: 8}; Rgb: {30, 4, 2}; Emissive: {strength: blink ? 24 : 0.2, color: {255, 50, 30}}; NoShadow; Ignore }
-    strobe_b { Position: {-80, 34, 44}; Sphere: {radius: 5, segments: 8}; Rgb: {30, 4, 2}; Emissive: {strength: blink ? 0.2 : 24, color: {255, 50, 30}}; NoShadow; Ignore }
+    strobe_a {
+      Position: {80, 34, 44}
+      Sphere: {radius: 5, segments: 8}
+      Rgb: {30, 4, 2}
+      Emissive: {strength: blink ? 24 : 0.2, color: {255, 50, 30}}
+      NoShadow
+      Ignore
+    }
+
+    strobe_b {
+      Position: {-80, 34, 44}
+      Sphere: {radius: 5, segments: 8}
+      Rgb: {30, 4, 2}
+      Emissive: {strength: blink ? 0.2 : 24, color: {255, 50, 30}}
+      NoShadow
+      Ignore
+    }
+
     for i in 0..10 {
-      "window_{i}" { Rotation: {0, 0, i * 0.628}; AngularVelocity: {0, 0, 0.05}; lit { Position: {58, 0, 6.2}; Box: {5, 3, 0.4}; Rgb: {30, 22, 8}; Emissive: {strength: 7, color: {255, 200, 120}}; NoShadow; Ignore } }
+      "window_{i}" {
+        Rotation: {0, 0, i * 0.628}
+        AngularVelocity: {0, 0, 0.05}
+        lit {
+          Position: {58, 0, 6.2}
+          Box: {5, 3, 0.4}
+          Rgb: {30, 22, 8}
+          Emissive: {strength: 7, color: {255, 200, 120}}
+          NoShadow
+          Ignore
+        }
+      }
     }
   }
 
@@ -211,12 +296,21 @@ assets {
       Sun sun(dest: here)
 
       if here == DEST_ORO {
-        Planet oro(tex: tex_oro, radius: 1700) { Position: {1500, -1250, -2600}; Rotation: {0.3, 0.6, 0.35} }
+        Planet oro(tex: tex_oro, radius: 1700) {
+          Position: {1500, -1250, -2600}
+          Rotation: {0.3, 0.6, 0.35}
+        }
+
         PlanetLimb oro_limb(at: {1500, -1250, -2600}, radius: 1700, glow: {190, 120, 76})
         TollStation toll() { Position: {-420, 820, -2700} }
       }
+
       if here == DEST_NAUR {
-        Planet naur(tex: tex_naur, radius: 1050) { Position: {-1050, 720, -3600}; Rotation: {0.2, 0.4, 0.38} }
+        Planet naur(tex: tex_naur, radius: 1050) {
+          Position: {-1050, 720, -3600}
+          Rotation: {0.2, 0.4, 0.38}
+        }
+
         PlanetLimb naur_limb(at: {-1050, 720, -3600}, radius: 1050, glow: {120, 170, 210})
         IceLane ice()
         rings {
@@ -230,10 +324,26 @@ assets {
           Ignore
         }
       }
+
       if here == DEST_CINDER {
-        Planet cinder(tex: tex_cinder, radius: 2300) { Position: {-700, -1900, -2700}; Rotation: {0.5, 2, 0.2} }
+        Planet cinder(tex: tex_cinder, radius: 2300) {
+          Position: {-700, -1900, -2700}
+          Rotation: {0.5, 2, 0.2}
+        }
+
         PlanetLimb cinder_limb(at: {-700, -1900, -2700}, radius: 2300, glow: {255, 90, 40})
-        cinder_fire { Position: {-700, -1900, -2700}; Rotation: {0.5, 2, 0.2}; Sphere: {radius: 2301, segments: 128, smooth: true}; Rgb: {0, 0, 0}; Emissive: {strength: 5, color: {255, 150, 90}}; PbrTextures: {emissive: tex_cinder_glow}; BlendMode: Additive; NoShadow; Ignore }
+        cinder_fire {
+          Position: {-700, -1900, -2700}
+          Rotation: {0.5, 2, 0.2}
+          Sphere: {radius: 2301, segments: 128, smooth: true}
+          Rgb: {0, 0, 0}
+          Emissive: {strength: 5, color: {255, 150, 90}}
+          PbrTextures: {emissive: tex_cinder_glow}
+          BlendMode: Additive
+          NoShadow
+          Ignore
+        }
+
         for i in 0..16 {
           "wreck_{i}" : Soot {
             Position: {-1100 + i * 170, 240 + (i * 53) % 150, -1800 - (i * 91) % 500}
@@ -242,8 +352,23 @@ assets {
             Box: {24 + (i * 31) % 60, 6 + (i * 13) % 14, 12 + (i * 17) % 34}
             NoShadow
             Ignore
-            rib : BareSteel { Position: {6, 0, 0}; Rotation: {0, 0, 0.8}; Box: {3, 40, 3}; Rgb: {60, 54, 48}; NoShadow; Ignore }
-            ember { Position: {-8, 3, 0}; Sphere: {radius: 2.2, segments: 6}; Rgb: {10, 4, 2}; Emissive: {strength: 8 + i % 5, color: {255, 110, 40}}; NoShadow; Ignore }
+            rib : BareSteel {
+              Position: {6, 0, 0}
+              Rotation: {0, 0, 0.8}
+              Box: {3, 40, 3}
+              Rgb: {60, 54, 48}
+              NoShadow
+              Ignore
+            }
+
+            ember {
+              Position: {-8, 3, 0}
+              Sphere: {radius: 2.2, segments: 6}
+              Rgb: {10, 4, 2}
+              Emissive: {strength: 8 + i % 5, color: {255, 110, 40}}
+              NoShadow
+              Ignore
+            }
           }
         }
       }

@@ -2,7 +2,7 @@ using flecs.script
 using flecs.script.math
 using state
 
-// The liner that the shipyard editor works on, its lane, cursor and faults, and the rules it checks.
+// The liner that the shipyard editor works on, its lane, cursor and faults, and its rules.
 state {
   event SlotClick(slot: i32)
 
@@ -22,11 +22,13 @@ state {
   fn lc(k: i32) -> i32 { lcounts[clamp(k - L_BASE, 0, LKINDS - 1)] }
 
   fn outriggers_at(z: i32) -> i32 {
-    (lkind(lgrid, 1, z) != 0 ? 1 : 0) + (lkind(lgrid, 2, z) != 0 ? 1 : 0) + (lkind(lgrid, 3, z) != 0 ? 1 : 0) + (lkind(lgrid, 4, z) != 0 ? 1 : 0)
+    (lkind(lgrid, 1, z) != 0 ? 1 : 0) + (lkind(lgrid, 2, z) != 0 ? 1 : 0) +
+      (lkind(lgrid, 3, z) != 0 ? 1 : 0) + (lkind(lgrid, 4, z) != 0 ? 1 : 0)
   }
 
   fn trusses_at(z: i32) -> i32 {
-    (lkind(lgrid, 1, z) == L_TRUSS ? 1 : 0) + (lkind(lgrid, 2, z) == L_TRUSS ? 1 : 0) + (lkind(lgrid, 3, z) == L_TRUSS ? 1 : 0) + (lkind(lgrid, 4, z) == L_TRUSS ? 1 : 0)
+    (lkind(lgrid, 1, z) == L_TRUSS ? 1 : 0) + (lkind(lgrid, 2, z) == L_TRUSS ? 1 : 0) +
+      (lkind(lgrid, 3, z) == L_TRUSS ? 1 : 0) + (lkind(lgrid, 4, z) == L_TRUSS ? 1 : 0)
   }
 
   fn open_ahead(l: i32, z: i32) -> bool {
@@ -80,6 +82,7 @@ state {
 
     for i in 0..LCELLS {
       const k = lgrid[i]
+
       if k != 0 {
         total += 1
         tally[clamp(k - L_BASE, 0, LKINDS - 1)] += 1
@@ -92,6 +95,7 @@ state {
     mut run: i32 = 0
     mut best: i32 = 0
     mut best_end: i32 = 0
+
     for z in 0..SLOTS + 1 {
       if lkind(lgrid, 0, z) != 0 {
         run += 1
@@ -100,9 +104,11 @@ state {
           best = run
           best_end = z
         }
+
         run = 0
       }
     }
+
     const best_start = best_end - best
 
     for z in 0..SLOTS {
@@ -113,18 +119,24 @@ state {
 
     for l in 1..LANES {
       mut start: i32 = -1
+
       for z in 0..SLOTS + 1 {
         const on = lkind(lgrid, l, z) != 0
+
         if on && start < 0 {
           start = z
         }
+
         if !on && start >= 0 {
           mut tied = false
+
           for q in start..z {
-            if lkind(lgrid, 0, q) == L_YOKE && lkind(lgrid, l, q) == L_TRUSS && q >= best_start && q < best_end {
+            if lkind(lgrid, 0, q) == L_YOKE && lkind(lgrid, l, q) == L_TRUSS &&
+              q >= best_start && q < best_end {
               tied = true
             }
           }
+
           if !tied {
             for q in start..z {
               if st[lcell(l, q)] == 0 {
@@ -132,12 +144,14 @@ state {
               }
             }
           }
+
           start = -1
         }
       }
     }
 
     mut bad: i32 = 0
+
     for i in 0..LCELLS {
       if st[i] != 0 {
         bad += 1
@@ -154,7 +168,10 @@ state {
 
   fn load_liner(op: i32) {
     const none: LinerDesign = {}
-    lgrid = op == OP_PASSENGER ? passenger_design : op == OP_FREIGHTER ? freighter_design : op == OP_TENDER ? tender_design : op == OP_BATTLESHIP ? battleship_design : none
+    lgrid = op == OP_PASSENGER ? passenger_design :
+      op == OP_FREIGHTER ? freighter_design :
+      op == OP_TENDER ? tender_design :
+      op == OP_BATTLESHIP ? battleship_design : none
     lvalidate()
   }
 
@@ -168,24 +185,29 @@ state {
 
   fn lkind_power(k: i32) -> f32 {
     match k {
-      40: 2; 41: 4; 42: 1; 43: 6; 44: 4; 47: 30; 48: 10; 49: 0.2; 50: 0.2; 51: 2; 52: 8; 53: 6; 57: 6; 58: 2; 59: 15; 60: 20
+      40: 2; 41: 4; 42: 1; 43: 6; 44: 4; 47: 30; 48: 10; 49: 0.2
+      50: 0.2; 51: 2; 52: 8; 53: 6; 57: 6; 58: 2; 59: 15; 60: 20
       _: 0
     }
   }
 
   fn liner_mass() -> f32 {
     mut m: f32 = 0
+
     for k in L_BASE..L_END {
       m += lc(k) * lkind_mass(k)
     }
+
     m
   }
 
   fn liner_power() -> f32 {
     mut w: f32 = 0
+
     for k in L_BASE..L_END {
       w += lc(k) * lkind_power(k)
     }
+
     w
   }
 }

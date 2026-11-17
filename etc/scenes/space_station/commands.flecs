@@ -45,6 +45,7 @@ async {
     const e = await Click
     const i = e.slot
     const kind = st_grid[i]
+
     if !st_lost && st_tool > 0 && st_tool != K_DEMOLISH && kind == K_EMPTY {
       if !st_near(i) {
         st_notify("A module must connect to the station.", 4)
@@ -65,6 +66,7 @@ async {
         st_retally()
       }
     }
+
     st_tool = 0
   }
 }
@@ -86,6 +88,7 @@ async {
       st_tool = 0
     } else if op == OP_BUY_FOOD && st_cargo_docked > 0 {
       const amount = min(min(10, st_stock_food), min(room, st_credits / st_price_food))
+
       if amount > 0 {
         st_food += amount
         st_stock_food -= amount
@@ -93,6 +96,7 @@ async {
       }
     } else if op == OP_BUY_GOODS && st_cargo_docked > 0 {
       const amount = min(min(10, st_stock_goods), min(room, st_credits / st_price_goods_buy))
+
       if amount > 0 {
         st_goods += amount
         st_stock_goods -= amount
@@ -100,6 +104,7 @@ async {
       }
     } else if op == OP_SELL_GOODS && st_cargo_docked > 0 {
       const amount = min(min(10, st_goods), st_demand_goods)
+
       if amount > 0 {
         st_goods -= amount
         st_demand_goods -= amount

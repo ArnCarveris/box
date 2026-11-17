@@ -15,15 +15,13 @@ window {
   Surface: {width: 1600, height: 1000, vsync: true}
 }
 
-// Distance of the camera that frames a star of a radius with its corona
 fn star_distance(radius: f32) -> f32 { 18 * radius + 2 }
 
 rig {
   Position: {0, 0, 0}
   Rotation: {0 - orbit_pitch, orbit_yaw, 0}
 
-  // The distance of the camera eases toward the framing of the planet or the star times the wheel
-  // zoom in logic.flecs, so the camera needs no transition
+  // cam_dist is eased in logic.flecs, so the camera needs no transition
   camera {
     Position: {-1.4 * cam_dist / 27, 0, cam_dist}
     Camera: {fov: 16, near_: 0.5, far_: 20000}
@@ -32,7 +30,6 @@ rig {
 
 sun {
   Rotation: {0.3, sun_angle * PI / 180, 0}
-  // The star is not lit by the sun: it is off while the star shows
   DirectionalLight: {intensity: mode == MODE_STAR ? 0 : 6.5}
   Rgb: {255, 246, 232}
 }

@@ -28,6 +28,7 @@ assets {
         ]
       }
     }
+
     body {
       Position: {0, 0, 0}
       Lathe: {profile: vase_profile, cap_start: true, cap_end: true, segments: 24}
@@ -35,17 +36,20 @@ assets {
       PbrMaterial: {roughness: 0.28}
       ClearCoat: {strength: 0.5, roughness: 0.1}
     }
+
     lip {
       Position: {0, 0.4, 0}
       Torus: {radius: 0.067, tube: 0.012, segments: 20, rings: 6}
       Rgb: glaze
       PbrMaterial: {roughness: 0.28}
     }
+
     opening {
       Position: {0, 0.402, 0}
       Cylinder: {radius: 0.058, length: 0.004, segments: 20}
       Rgb: {43, 57, 53}
     }
+
     for i in 0..2 {
       {
         Position: {0, 0.11 + i * 0.045, 0}

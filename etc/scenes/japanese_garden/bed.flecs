@@ -23,11 +23,13 @@ assets {
       RoundedBox: {length, 0.18, 1.15, 0.18}
       Rgb: {87, 109, 81}
     }
+
     for i in 0..flowers {
       FlowerBush(tint: tint) {
         Position: {-length / 2 + (i + 0.5) * length / flowers, 0.13, math.sin(i * 2.4) * 0.16}
       }
     }
+
     for i in 0..12 {
       for side in 0..2 {
         {

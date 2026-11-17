@@ -30,6 +30,7 @@ assets {
         Rotation: {0.5, angle, 0.3}
         Scale: {1.25, 1.25, 1.25}
       }
+
       GardenLeaf(tint: {126, 159, 95}) {
         Position: {x * 0.5, y * 0.5, z * 0.5}
         Rotation: {-0.4, math.PI / 2 - angle, 0.3}

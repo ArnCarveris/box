@@ -6,20 +6,25 @@ using assets
 
 async {
   mut last_focus: entity = 0
+
   while true {
     await HoverChanged
     const shown = armory_hover
     const focus = armory_hovering ? shown : eq[0]
     mut delta: i32[4] = {}
+
     if armory_hovering {
       const h = shown[ArmoryItem]
       const held = eq[h.slot]
+
       if held != 0 && held != shown {
         const w = held[ArmoryItem]
         delta = [h.might - w.might, h.ward - w.ward, h.haste - w.haste, h.aether - w.aether]
       }
     }
+
     preview = delta
+
     if focus != 0 && focus != last_focus {
       const f = focus[ArmoryItem]
       last_focus = focus
@@ -37,6 +42,7 @@ async {
 async {
   while true {
     const e = await HoverLeft
+
     if e.item == armory_hover {
       armory_hovering = false
       armory_tip_on = false

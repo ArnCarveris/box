@@ -8,23 +8,69 @@ assets {
   template KoreanJangseung {
     prop hat: Rgb = {44, 44, 42}
     prop lips: Rgb = {160, 56, 44}
-    { (IsA, KoreanStone); Position: {0, 0.1, 0}; Cylinder: {radius: 0.34, length: 0.2, segments: 9} }
-    { Position: {0, 1.15, 0}; Cylinder: {radius: 0.21, length: 2.1, segments: 12, smooth: true}; Rgb: {134, 104, 74}; PbrMaterial: {roughness: 1} }
+    {
+      (IsA, KoreanStone)
+      Position: {0, 0.1, 0}
+      Cylinder: {radius: 0.34, length: 0.2, segments: 9}
+    }
+
+    {
+      Position: {0, 1.15, 0}
+      Cylinder: {radius: 0.21, length: 2.1, segments: 12, smooth: true}
+      Rgb: {134, 104, 74}
+      PbrMaterial: {roughness: 1}
+    }
+
     for band in 0..4 {
       { Position: {0, 0.3 + band * 0.22, 0.203}; Box: {0.2, 0.025, 0.02}; Rgb: {62, 44, 30} }
     }
+
     { Position: {0, 2.26, 0}; Cylinder: {radius: 0.3, length: 0.06, segments: 14}; Rgb: hat }
-    { Position: {0, 2.42, 0}; Frustum: {radius_bottom: 0.19, radius_top: 0.14, length: 0.28, segments: 12}; Rgb: hat }
+    {
+      Position: {0, 2.42, 0}
+      Frustum: {radius_bottom: 0.19, radius_top: 0.14, length: 0.28, segments: 12}
+      Rgb: hat
+    }
+
     for side in 0..2 {
       const x = (side - 0.5) * 0.2
-      { Position: {x, 1.86, 0.2}; Scale: {1, 1, 0.45}; Sphere: {radius: 0.058, segments: 10}; Rgb: {232, 224, 198} }
-      { Position: {x, 1.86, 0.222}; Scale: {1, 1, 0.45}; Sphere: {radius: 0.028, segments: 8}; Rgb: {22, 22, 20} }
-      { Position: {x, 1.95, 0.2}; Rotation: {0, 0, (0.5 - side) * 0.5}; Box: {0.14, 0.032, 0.03}; Rgb: {30, 28, 24} }
+      {
+        Position: {x, 1.86, 0.2}
+        Scale: {1, 1, 0.45}
+        Sphere: {radius: 0.058, segments: 10}
+        Rgb: {232, 224, 198}
+      }
+
+      {
+        Position: {x, 1.86, 0.222}
+        Scale: {1, 1, 0.45}
+        Sphere: {radius: 0.028, segments: 8}
+        Rgb: {22, 22, 20}
+      }
+
+      {
+        Position: {x, 1.95, 0.2}
+        Rotation: {0, 0, (0.5 - side) * 0.5}
+        Box: {0.14, 0.032, 0.03}
+        Rgb: {30, 28, 24}
+      }
     }
-    { Position: {0, 1.74, 0.23}; Scale: {0.7, 1, 0.9}; Sphere: {radius: 0.06, segments: 10}; Rgb: {150, 116, 82} }
+
+    {
+      Position: {0, 1.74, 0.23}
+      Scale: {0.7, 1, 0.9}
+      Sphere: {radius: 0.06, segments: 10}
+      Rgb: {150, 116, 82}
+    }
+
     { Position: {0, 1.6, 0.2}; Box: {0.22, 0.07, 0.03}; Rgb: lips }
+
     for tooth in 0..4 {
-      { Position: {(tooth - 1.5) * 0.052, 1.6, 0.219}; Box: {0.038, 0.055, 0.008}; Rgb: {236, 230, 208} }
+      {
+        Position: {(tooth - 1.5) * 0.052, 1.6, 0.219}
+        Box: {0.038, 0.055, 0.008}
+        Rgb: {236, 230, 208}
+      }
     }
   }
 }

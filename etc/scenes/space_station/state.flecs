@@ -139,7 +139,8 @@ state {
   export mut st_hover_slot: i32 = -1
   export mut st_hover_op: i32 = -1
   export mut st_hover_stat: i32 = -1
-  export mut st_alert: string = "Welcome, Director. Build a Passenger Dock to start earning from visitors."
+  export mut st_alert: string =
+    "Welcome, Director. Build a Passenger Dock to start earning from visitors."
   export mut st_alert_seconds: f64 = 12
   export mut st_alert_seq: i32 = 0
   export mut st_speed: i32 = 1
@@ -202,7 +203,8 @@ state {
   fn st_near(i: i32) -> bool {
     const x = i % st_grid_w
     const y = floor(i / st_grid_w)
-    (x > 0 && st_occupied(i - 1)) || (x < st_grid_w - 1 && st_occupied(i + 1)) || (y > 0 && st_occupied(i - st_grid_w)) || (y < st_grid_h - 1 && st_occupied(i + st_grid_w))
+    (x > 0 && st_occupied(i - 1)) || (x < st_grid_w - 1 && st_occupied(i + 1)) ||
+      (y > 0 && st_occupied(i - st_grid_w)) || (y < st_grid_h - 1 && st_occupied(i + st_grid_w))
   }
 
   fn st_notify(message: string, seconds: f64) {
@@ -223,6 +225,7 @@ state {
     mut pax: i32 = 0
     mut cargo: i32 = 0
     mut modules: i32 = 0
+
     for i in 0..st_slots {
       const kind = st_grid[i]
       supply += st_power_made(kind)
@@ -237,6 +240,7 @@ state {
       cargo += kind == K_CARGO ? 1 : 0
       modules += kind == K_EMPTY ? 0 : 1
     }
+
     st_power_supply = supply
     st_power_demand = demand
     st_housing = housing

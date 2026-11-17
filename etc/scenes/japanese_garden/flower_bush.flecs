@@ -22,9 +22,14 @@ assets {
         IcoSphere: {radius: 0.32, segments: 1, smooth: true}
         Rgb: GardenMoss
       }
+
       for j in 0..7 {
         {
-          Position: {math.cos(i * 2.1) * 0.23 + math.cos(j * 2.4) * 0.13, 0.4 + math.sin(j * 1.7) * 0.075, math.sin(i * 2.1) * 0.23 + math.sin(j * 2.4) * 0.13}
+          Position: {
+            math.cos(i * 2.1) * 0.23 + math.cos(j * 2.4) * 0.13,
+            0.4 + math.sin(j * 1.7) * 0.075,
+            math.sin(i * 2.1) * 0.23 + math.sin(j * 2.4) * 0.13
+          }
           Sphere: {radius: 0.08, segments: 8, smooth: true}
           Rgb: tint
         }

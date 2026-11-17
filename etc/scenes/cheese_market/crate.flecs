@@ -23,18 +23,21 @@ assets {
           Box: {1.13, 0.13, 0.055}
           Rgb: {165 + row * 8, 111 + row * 5, 62}
         }
+
         {
           Position: {(side - 0.5) * 1.08, 0.12 + row * 0.17, 0}
           Box: {0.055, 0.13, 0.8}
           Rgb: MarketHoney
         }
       }
+
       for end in 0..2 {
         {
           Position: {(end - 0.5) * 0.99, 0.29, (side - 0.5) * 0.66}
           Box: {0.085, 0.58, 0.085}
           Rgb: MarketOak
         }
+
         for nail in 0..2 {
           {
             Position: {(end - 0.5) * 0.99, 0.15 + nail * 0.3, (side - 0.5) * 0.825}
@@ -44,6 +47,7 @@ assets {
         }
       }
     }
+
     for i in 0..5 {
       {
         Position: {(i - 2) * 0.21, 0.045, 0}
@@ -51,6 +55,7 @@ assets {
         Rgb: MarketHoney
       }
     }
+
     if filled {
       for i in 0..3 {
         CheeseWheel(radius: 0.23, height: 0.16, tint: {177, 74, 45}, wax: true) {

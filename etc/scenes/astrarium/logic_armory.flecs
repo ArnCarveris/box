@@ -17,6 +17,7 @@ async {
   while true {
     const e = await Metal
     rite_metal = e.index
+
     if e.index == 0 {
       ui_gold = {232, 199, 122}
       ui_pale = {255, 238, 196}

@@ -16,11 +16,13 @@ assets {
       Box: {width, height, 0.13}
       Rgb: frame
     }
+
     {
       (IsA, TownGlassPane)
       Position: {0, 0, 0.08}
       Box: {width - 0.12, height - 0.12, 0.04}
     }
+
     for i in 1..panes {
       {
         Position: {-width / 2 + width * i / panes, 0, 0.12}
@@ -28,6 +30,7 @@ assets {
         Rgb: frame
       }
     }
+
     {
       Position: {0, -height / 2, 0.12}
       Box: {width + 0.16, 0.09, 0.24}

@@ -11,11 +11,13 @@ assets {
       Box: {0.38, 0.07, 0.38}
       Rgb: TownIron
     }
+
     {
       Position: {0, 0.24, 0}
       Cone: {radius: 0.16, length: 0.48, segments: 12}
       Rgb: {231, 127, 88}
     }
+
     {
       Position: {0, 0.23, 0}
       Cylinder: {radius: 0.089, length: 0.07, segments: 12}

@@ -21,6 +21,7 @@ assets {
         Rotation: {0, 0, -(side - 0.5) * 0.98}
         Box: {3.12, 0.13, 4.6}
         Rgb: MarketOak
+
         for row in 0..8 {
           for tile in 0..18 {
             {
@@ -30,6 +31,7 @@ assets {
             }
           }
         }
+
         for end in 0..2 {
           {
             Position: {0, 0, (end - 0.5) * 4.7}
@@ -38,6 +40,7 @@ assets {
           }
         }
       }
+
       {
         Position: {(side - 0.5) * 5.55, 0.07, 0}
         Rotation: {math.PI / 2, 0, 0}
@@ -45,6 +48,7 @@ assets {
         Rgb: MarketIron
       }
     }
+
     for i in 0..19 {
       {
         Position: {0, 1.53, (i - 9) * 0.25}
@@ -53,10 +57,12 @@ assets {
         Rgb: {204, 118, 75}
       }
     }
+
     chimney {
       Position: {1.3, 1.49, -0.8}
       Box: {0.58, 1.6, 0.66}
       Rgb: {195, 161, 123}
+
       for row in 0..7 {
         for brick in 0..2 {
           {
@@ -66,11 +72,13 @@ assets {
           }
         }
       }
+
       {
         Position: {0, 0.83, 0}
         Box: {0.76, 0.17, 0.83}
         Rgb: MarketStone
       }
+
       for i in 0..2 {
         {
           Position: {(i - 0.5) * 0.34, 1.06, 0}

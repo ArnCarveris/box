@@ -6,7 +6,7 @@ What if _everything_ in a game was data driven, reactive and procedural? That is
 
 Take this baguette:
 
-![](docs/screenshots/baguette.png)
+[![](docs/screenshots/baguette.png)](https://www.flecs.dev/games/baguette/)
 
 It's not the best looking virtual baguette you've ever seen. But it might be the most _flexible_ one! Everything, from its textures to its shape, to the number of cuts in the loaf are procedural and can be modified at runtime.
 
@@ -59,25 +59,25 @@ This won't get you AAA level fidelity (though it can still produce decent lookin
 By reducing everything to entities, components and reactivity, I think Box demonstrates that ECS can make game development _easier_, not harder.
 
 ## Screenshots
-![](docs/screenshots/jungle_city.png)
-![](docs/screenshots/planet.png)
+[![](docs/screenshots/jungle_city.png)](https://www.flecs.dev/games/jungle_city/)
+[![](docs/screenshots/planet.png)](https://www.flecs.dev/games/planet/)
 ![](docs/screenshots/texgraph.png)
-![](docs/screenshots/shipyard.png)
-![](docs/screenshots/space_station.png)
-![](docs/screenshots/console.png)
-![](docs/screenshots/dust_merchant.png)
-![](docs/screenshots/jukebox.png)
+[![](docs/screenshots/shipyard.png)](https://www.flecs.dev/games/shipyard/)
+[![](docs/screenshots/space_station.png)](https://www.flecs.dev/games/space_station/)
+[![](docs/screenshots/console.png)](https://www.flecs.dev/games/fleet/)
+[![](docs/screenshots/dust_merchant.png)](https://www.flecs.dev/games/dust_merchant/)
+[![](docs/screenshots/jukebox.png)](https://www.flecs.dev/games/jukebox/)
 ![](docs/screenshots/daw.png)
 ![](docs/screenshots/daw_mixer.png)
 ![](docs/screenshots/daw_graph.png)
-![](docs/screenshots/castlewright.png)
-![](docs/screenshots/canal_lock.png)
-![](docs/screenshots/mossvale.png)
-![](docs/screenshots/astrarium.png)
-![](docs/screenshots/ore_else.png)
-![](docs/screenshots/wild_wild_west.png)
-![](docs/screenshots/santorini.png)
-![](docs/screenshots/sakura_machi.png)
+[![](docs/screenshots/castlewright.png)](https://www.flecs.dev/games/castle/)
+[![](docs/screenshots/canal_lock.png)](https://www.flecs.dev/games/canal_lock/)
+[![](docs/screenshots/mossvale.png)](https://www.flecs.dev/games/mossvale/)
+[![](docs/screenshots/astrarium.png)](https://www.flecs.dev/games/astrarium/)
+[![](docs/screenshots/ore_else.png)](https://www.flecs.dev/games/ore_else/)
+[![](docs/screenshots/wild_wild_west.png)](https://www.flecs.dev/games/wild_wild_west/)
+[![](docs/screenshots/santorini.png)](https://www.flecs.dev/games/santorini/)
+[![](docs/screenshots/sakura_machi.png)](https://www.flecs.dev/games/town/)
 
 ## Prerequisites
 

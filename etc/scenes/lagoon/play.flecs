@@ -26,8 +26,18 @@ state {
   export mut water_shift: f64 = 0
 
   lg_actions {
-    SteerLeft { Action: {description: "Steer left"}; Binding: {key: A}; alt { Binding: {key: Left} } }
-    SteerRight { Action: {description: "Steer right"}; Binding: {key: D}; alt { Binding: {key: Right} } }
+    SteerLeft {
+      Action: {description: "Steer left"}
+      Binding: {key: A}
+      alt { Binding: {key: Left} }
+    }
+
+    SteerRight {
+      Action: {description: "Steer right"}
+      Binding: {key: D}
+      alt { Binding: {key: Right} }
+    }
+
     Restart { Action: {description: "Paddle again"}; Binding: {key: R} }
   }
 
@@ -37,10 +47,8 @@ state {
   }
 }
 
-// The water flows toward the camera at the pace of the world: U of the world mapping runs along
-// +Z, so a velocity of -flow / size moves the waves toward +Z by flow units a second. The scroll
-// offset is velocity times the render time, so a change of the flow shifts the texture by the
-// difference; water_shift takes that back out.
+// U of the world mapping runs along +Z, so a velocity of -flow / size moves the waves toward the
+// camera at flow units a second. water_shift cancels the jump a change of the flow causes.
 lagoon {
   water {
     texture.Scroll: {velocity: {0 - water_flow / WATER_MAP, 0.03}}
@@ -50,6 +58,7 @@ lagoon {
 
 async {
   mut last: f64 = box.app.Status[box.app.Status].elapsed
+
   while true {
     await next_frame()
     const now = box.app.Status[box.app.Status].elapsed
@@ -62,44 +71,56 @@ async {
     water_t += box.app.Status[box.app.Status].delta_time
 
     if game_state == GS_PLAYING {
-      const steer = bool_f(state.lg_actions.SteerRight[ActionState].down) - bool_f(state.lg_actions.SteerLeft[ActionState].down)
+      const steer = bool_f(state.lg_actions.SteerRight[ActionState].down) -
+        bool_f(state.lg_actions.SteerLeft[ActionState].down)
       const rate = steer != 0 ? STEER_ACCEL : STEER_DAMP
       mut vx: f32 = canoe_vx + (steer * STEER_SPEED - canoe_vx) * min(1, d * rate)
+
       if abs(vx) < 0.001 && steer == 0 {
         vx = 0
       }
+
       const edge = CHANNEL_HALF - CANOE_HALF_WIDTH
       mut x: f32 = canoe_x + vx * d
+
       if x > edge {
         x = edge
         vx = min(vx, 0)
       }
+
       if x < 0 - edge {
         x = 0 - edge
         vx = max(vx, 0)
       }
+
       if vx != canoe_vx {
         canoe_vx = vx
       }
+
       if x != canoe_x {
         canoe_x = x
       }
+
       const want = 0 - canoe_vx * LEAN_PER_VX
+
       if abs(want - lean) > 0.0001 {
         lean += (want - lean) * min(1, d * LEAN_RATE)
       }
+
       paddle_phase += d * (2.2 + speed * 0.08)
       distance += speed * d
     } else if game_state == GS_OVER {
       if canoe_vx != 0 {
         canoe_vx = 0
       }
+
       if capsize < 1 {
         capsize = min(1, capsize + d / CAPSIZE_TIME)
       }
     }
 
     const flow = game_state == GS_PLAYING ? speed : 0
+
     if flow != water_flow {
       water_shift = wrap2(water_shift + (flow - water_flow) / WATER_MAP * water_t)
       water_flow = flow
@@ -110,6 +131,7 @@ async {
 async {
   while true {
     await on.pressed(state.lg_actions.Restart)
+
     if game_state == GS_OVER {
       reset()
     }

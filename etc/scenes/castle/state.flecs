@@ -78,19 +78,38 @@ state {
   }
 
   fn kind_blurb(k: i32) -> string {
+    const b_wall = "A wooden palisade, rebuilt in stone once your keep allows. Walls, towers and " +
+      "gatehouses that close a ring turn the ground inside into a courtyard."
+    const b_tower = "Round tower. Joins the walls next to it. Select it to raise it, as high as " +
+      "your keep allows."
+    const b_gate = "A timber gate, rebuilt in stone once your keep allows. Turns to follow the " +
+      "wall it sits in, and closes the ring like a wall does."
+    const b_keep = "The lord's keep, one per realm. Collects taxes and caps the level of every " +
+      "other piece; the walls and gates rise with it. It eats twice as much food with every " +
+      "level."
+    const b_house = "A cottage for 4 folk. Outside the walls bandits raid it for gold; safe " +
+      "inside them it grows into a house, then a manor, eating twice as much food at every step."
+    const b_farm = "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second; the " +
+      "blacksmith can research better farming."
+    const b_smith = "The blacksmith, one per realm. Select it to research farming and quarrying " +
+      "tools, so your fields feed more folk and your quarries cut more stone."
+    const b_quarry = "A stone quarry, dug into a stone deposit where grey rock breaks through " +
+      "the grass. Cuts 1 stone a second; the blacksmith can research better quarrying."
+    const b_demolish = "Tear a piece down and get half of its cost back, or all of it for farms " +
+      "and quarries. Abandoned buildings only give back some stone."
     match k {
-      1: "A wooden palisade, rebuilt in stone once your keep allows. Walls, towers and gatehouses that close a ring turn the ground inside into a courtyard."
-      2: "Round tower. Joins the walls next to it. Select it to raise it, as high as your keep allows."
-      3: "A timber gate, rebuilt in stone once your keep allows. Turns to follow the wall it sits in, and closes the ring like a wall does."
-      4: "The lord's keep, one per realm. Collects taxes and caps the level of every other piece; the walls and gates rise with it. It eats twice as much food with every level."
-      5: "A cottage for 4 folk. Outside the walls bandits raid it for gold; safe inside them it grows into a house, then a manor, eating twice as much food at every step."
-      6: "A fenced farm of 4 by 4 cells with a farmhouse. Grows 10 food a second; the blacksmith can research better farming."
-      7: "The blacksmith, one per realm. Select it to research farming and quarrying tools, so your fields feed more folk and your quarries cut more stone."
-      8: "A stone quarry, dug into a stone deposit where grey rock breaks through the grass. Cuts 1 stone a second; the blacksmith can research better quarrying."
+      1: b_wall
+      2: b_tower
+      3: b_gate
+      4: b_keep
+      5: b_house
+      6: b_farm
+      7: b_smith
+      8: b_quarry
       9: "A moat of still water."
       10: "An oak or a pine. Cheap, and pleasant to look at."
       11: "A cobbled path."
-      12: "Tear a piece down and get half of its cost back, or all of it for farms and quarries. Abandoned buildings only give back some stone."
+      12: b_demolish
       _: ""
     }
   }
@@ -233,7 +252,8 @@ state {
     const az = (a - ax) / GRID
     const bx = b % GRID
     const bz = (b - bx) / GRID
-    (z == az && z == bz && x >= min(ax, bx) && x <= max(ax, bx)) || (x == ax && x == bx && z >= min(az, bz) && z <= max(az, bz))
+    (z == az && z == bz && x >= min(ax, bx) && x <= max(ax, bx)) ||
+      (x == ax && x == bx && z >= min(az, bz) && z <= max(az, bz))
   }
 
   fn wall_height(k: i32, lvl: i32) -> f32 {

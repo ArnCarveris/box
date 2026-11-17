@@ -14,60 +14,198 @@ assets {
     {kind: GenNoise, frequency: 10, octaves: 4, amount: 0.7}
     {kind: GenNoise, frequency: 64, octaves: 2, amount: 0.3, seed: 2}
   ]} }
-  lg_sand_dry_a { Gen: {source: lg_sand_h, output: GenAlbedo, colors: [{0, {176, 154, 114}}, {0.5, {204, 184, 144}}, {1, {226, 210, 176}}]} }
-  lg_sand_wet_a { Gen: {source: lg_sand_h, output: GenAlbedo, colors: [{0, {150, 128, 92}}, {0.5, {178, 156, 114}}, {1, {204, 184, 140}}]} }
+  lg_sand_dry_a {
+    Gen: {
+      source: lg_sand_h,
+      output: GenAlbedo,
+      colors: [{0, {176, 154, 114}}, {0.5, {204, 184, 144}}, {1, {226, 210, 176}}]
+    }
+  }
+
+  lg_sand_wet_a {
+    Gen: {
+      source: lg_sand_h,
+      output: GenAlbedo,
+      colors: [{0, {150, 128, 92}}, {0.5, {178, 156, 114}}, {1, {204, 184, 140}}]
+    }
+  }
+
   lg_sand_n { Gen: {source: lg_sand_h, output: GenNormal, strength: 0.8} }
 
   lg_bark_h { Gen: {width: 256, height: 256, seed: 5, layers: [
-    {kind: GenBlocks, courses: 10, per_course: 1, gap: 0.04, softness: 0.3, jitter: 0.1, stagger: 0, amount: 0.7, id_amount: 0.2}
+    {
+      kind: GenBlocks,
+      courses: 10,
+      per_course: 1,
+      gap: 0.04,
+      softness: 0.3,
+      jitter: 0.1,
+      stagger: 0,
+      amount: 0.7,
+      id_amount: 0.2
+    }
     {kind: GenNoise, frequency: 12, octaves: 3, amount: 0.3}
   ]} }
-  lg_bark_a { Gen: {source: lg_bark_h, output: GenAlbedo, colors: [{0, {78, 60, 44}}, {0.5, {128, 102, 74}}, {1, {166, 138, 104}}]} }
+  lg_bark_a {
+    Gen: {
+      source: lg_bark_h,
+      output: GenAlbedo,
+      colors: [{0, {78, 60, 44}}, {0.5, {128, 102, 74}}, {1, {166, 138, 104}}]
+    }
+  }
+
   lg_bark_n { Gen: {source: lg_bark_h, output: GenNormal, strength: 2.5} }
 
   lg_wood_h { Gen: {width: 256, height: 256, seed: 9, layers: [
-    {kind: GenBlocks, courses: 6, per_course: 1, gap: 0.01, jitter: 0.3, stagger: 0.37, amount: 0.6, id_amount: 0.3}
+    {
+      kind: GenBlocks,
+      courses: 6,
+      per_course: 1,
+      gap: 0.01,
+      jitter: 0.3,
+      stagger: 0.37,
+      amount: 0.6,
+      id_amount: 0.3
+    }
     {kind: GenNoise, frequency: 3, octaves: 4, lacunarity: 3, amount: 0.4}
   ]} }
-  lg_wood_a { Gen: {source: lg_wood_h, output: GenAlbedo, colors: [{0, {92, 56, 32}}, {0.5, {140, 90, 52}}, {1, {178, 124, 76}}]} }
+  lg_wood_a {
+    Gen: {
+      source: lg_wood_h,
+      output: GenAlbedo,
+      colors: [{0, {92, 56, 32}}, {0.5, {140, 90, 52}}, {1, {178, 124, 76}}]
+    }
+  }
+
   lg_wood_n { Gen: {source: lg_wood_h, output: GenNormal, strength: 1.8} }
 
   lg_coral_h { Gen: {width: 256, height: 256, seed: 77, layers: [
     {kind: GenCells, count: 36, distance: GenEdge, edge: 0.5, amount: 0.6, id_amount: 0.25}
     {kind: GenNoise, frequency: 14, octaves: 4, amount: 0.4}
   ]} }
-  lg_coral_a { Gen: {source: lg_coral_h, output: GenAlbedo, colors: [{0, {88, 74, 70}}, {0.5, {150, 128, 116}}, {1, {204, 186, 168}}]} }
+  lg_coral_a {
+    Gen: {
+      source: lg_coral_h,
+      output: GenAlbedo,
+      colors: [{0, {88, 74, 70}}, {0.5, {150, 128, 116}}, {1, {204, 186, 168}}]
+    }
+  }
+
   lg_coral_n { Gen: {source: lg_coral_h, output: GenNormal, strength: 3.5} }
 
   // Turquoise lagoon water over the sand floor, the waves drift up the lagoon
   prefab LgWater {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.04}
-    Water: {shallow_color: {88, 214, 200}, deep_color: {18, 104, 138}, depth: 2.6, visibility: 3.2, refraction: 0.012, foam_color: {240, 250, 248}, foam_width: 0.18, ripple_scale: 2.1, ripple_velocity: {0.015, 0.024}}
+    Water: {
+      shallow_color: {88, 214, 200},
+      deep_color: {18, 104, 138},
+      depth: 2.6,
+      visibility: 3.2,
+      refraction: 0.012,
+      foam_color: {240, 250, 248},
+      foam_width: 0.18,
+      ripple_scale: 2.1,
+      ripple_velocity: {0.015, 0.024}
+    }
     PbrTextures: {normal: lg_wave_n}
     texture.Mapping: {mode: MappingWorld, size: 7}
     texture.Scroll: {velocity: {0.008, 0.03}}
   }
 
-  prefab LgSandDry { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: lg_sand_dry_a, normal: lg_sand_n}; texture.Mapping: {mode: MappingWorld, size: 6} }
-  prefab LgSandWet { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.7}; PbrTextures: {albedo: lg_sand_wet_a, normal: lg_sand_n}; texture.Mapping: {mode: MappingWorld, size: 6} }
-  prefab LgPalmBark { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: lg_bark_a, normal: lg_bark_n} }
-  prefab LgFrond { Rgb: {64, 132, 52}; PbrMaterial: {roughness: 0.8}; DiffuseTransmission: {factor: 0.4, color: {190, 240, 110}} }
-  prefab LgFrondDark { Rgb: {44, 100, 44}; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.3, color: {160, 220, 100}} }
+  prefab LgSandDry {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: lg_sand_dry_a, normal: lg_sand_n}
+    texture.Mapping: {mode: MappingWorld, size: 6}
+  }
+
+  prefab LgSandWet {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.7}
+    PbrTextures: {albedo: lg_sand_wet_a, normal: lg_sand_n}
+    texture.Mapping: {mode: MappingWorld, size: 6}
+  }
+
+  prefab LgPalmBark {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: lg_bark_a, normal: lg_bark_n}
+  }
+
+  prefab LgFrond {
+    Rgb: {64, 132, 52}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.4, color: {190, 240, 110}}
+  }
+
+  prefab LgFrondDark {
+    Rgb: {44, 100, 44}
+    PbrMaterial: {roughness: 0.85}
+    DiffuseTransmission: {factor: 0.3, color: {160, 220, 100}}
+  }
+
   prefab LgCoconut { Rgb: {92, 64, 38}; PbrMaterial: {roughness: 0.8} }
-  prefab LgCanoeWood { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: lg_wood_a, normal: lg_wood_n}; texture.Mapping: {mode: MappingObject, size: 1.2, blend: 0.2} }
+  prefab LgCanoeWood {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.6}
+    PbrTextures: {albedo: lg_wood_a, normal: lg_wood_n}
+    texture.Mapping: {mode: MappingObject, size: 1.2, blend: 0.2}
+  }
+
   prefab LgCanoeDark { Rgb: {110, 70, 42}; PbrMaterial: {roughness: 0.7} }
-  prefab LgLashing { Rgb: {222, 196, 140}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 236, 200}, roughness: 0.5} }
-  prefab LgSail { Rgb: {236, 222, 188}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 244, 220}, roughness: 0.5} }
-  prefab LgCoral { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: lg_coral_a, normal: lg_coral_n}; texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.3} }
+  prefab LgLashing {
+    Rgb: {222, 196, 140}
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {255, 236, 200}, roughness: 0.5}
+  }
+
+  prefab LgSail {
+    Rgb: {236, 222, 188}
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {255, 244, 220}, roughness: 0.5}
+  }
+
+  prefab LgCoral {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: lg_coral_a, normal: lg_coral_n}
+    texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.3}
+  }
+
   prefab LgVolcano { Rgb: {104, 98, 104}; PbrMaterial: {roughness: 1} }
   prefab LgVolcanoGreen { Rgb: {74, 108, 70}; PbrMaterial: {roughness: 1} }
   prefab LgFoam { Rgb: {244, 252, 250}; PbrMaterial: {roughness: 0.9}; Opacity: {0.85}; NoShadow }
-  prefab LgDriftwood { Rgb: {196, 184, 166}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: lg_wood_a, normal: lg_wood_n}; texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.2} }
+  prefab LgDriftwood {
+    Rgb: {196, 184, 166}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: lg_wood_a, normal: lg_wood_n}
+    texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.2}
+  }
+
   prefab LgDriftwoodEnd { Rgb: {214, 196, 160}; PbrMaterial: {roughness: 0.95} }
-  prefab LgCoconutHusk { Rgb: {120, 86, 46}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {230, 190, 130}, roughness: 0.6} }
+  prefab LgCoconutHusk {
+    Rgb: {120, 86, 46}
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {230, 190, 130}, roughness: 0.6}
+  }
+
   prefab LgCoconutGreen { Rgb: {104, 136, 50}; PbrMaterial: {roughness: 0.7} }
-  prefab LgSkin { Rgb: {156, 102, 70}; PbrMaterial: {roughness: 0.7}; Sheen: {color: {255, 200, 170}, roughness: 0.6} }
-  prefab LgStraw { Rgb: {226, 196, 118}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 240, 190}, roughness: 0.5} }
-  prefab LgCloth { Rgb: {200, 64, 52}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 170, 150}, roughness: 0.5} }
+  prefab LgSkin {
+    Rgb: {156, 102, 70}
+    PbrMaterial: {roughness: 0.7}
+    Sheen: {color: {255, 200, 170}, roughness: 0.6}
+  }
+
+  prefab LgStraw {
+    Rgb: {226, 196, 118}
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {255, 240, 190}, roughness: 0.5}
+  }
+
+  prefab LgCloth {
+    Rgb: {200, 64, 52}
+    PbrMaterial: {roughness: 0.9}
+    Sheen: {color: {255, 170, 150}, roughness: 0.5}
+  }
 }

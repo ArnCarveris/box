@@ -18,11 +18,16 @@ assets {
     prop columns: i32 = 8
     prop rows: i32 = 5
     slab { Position: {0, -0.07, 0}; RoundedBox: {width, 0.14, depth, 0.06}; Rgb: IslandChalk }
+
     for row in 0..rows {
       for col in 0..columns {
         const tone = (row * 7 + col * 13) % 5
         {
-          Position: {-width / 2 + (col + 0.5) * width / columns, 0.008, -depth / 2 + (row + 0.5) * depth / rows}
+          Position: {
+            -width / 2 + (col + 0.5) * width / columns,
+            0.008,
+            -depth / 2 + (row + 0.5) * depth / rows
+          }
           Rotation: {0, math.sin(row * 8 + col * 3) * 0.04, 0}
           RoundedBox: {width / columns - 0.06, 0.045, depth / rows - 0.06, 0.07}
           Rgb: {182 + tone * 8, 179 + tone * 8, 163 + tone * 8}

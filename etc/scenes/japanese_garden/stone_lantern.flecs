@@ -18,22 +18,26 @@ assets {
       RoundedBox: {0.8, 0.24, 0.8, 0.08}
       Rgb: GardenStone
     }
+
     stem {
       Position: {0, 0.51, 0}
       Frustum: {radius_bottom: 0.22, radius_top: 0.16, length: 0.58, segments: 8}
       Rgb: GardenStone
     }
+
     sill {
       Position: {0, 0.83, 0}
       Box: {0.67, 0.14, 0.67}
       Rgb: GardenStone
     }
+
     glow {
       Position: {0, 1.12, 0}
       Box: {0.41, 0.46, 0.41}
       Rgb: GardenPaper
       Emissive: {strength: 9, color: {255, 192, 103}}
     }
+
     for x in 0..2 {
       for z in 0..2 {
         {
@@ -43,12 +47,14 @@ assets {
         }
       }
     }
+
     roof {
       Position: {0, 1.49, 0}
       Rotation: {0, math.PI / 4, 0}
       Frustum: {radius_bottom: 0.69, radius_top: 0.22, length: 0.3, segments: 4}
       Rgb: GardenSlate
     }
+
     finial {
       Position: {0, 1.74, 0}
       Sphere: {radius: 0.13, segments: 12, smooth: true}

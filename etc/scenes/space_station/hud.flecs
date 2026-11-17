@@ -57,7 +57,10 @@ box {
 
 assets {
   station_icon_solar { Path: {path: "etc/scenes/space_station/assets/icons/solar.svg", width: 96} }
-  station_icon_reactor { Path: {path: "etc/scenes/space_station/assets/icons/reactor.svg", width: 96} }
+  station_icon_reactor {
+    Path: {path: "etc/scenes/space_station/assets/icons/reactor.svg", width: 96}
+  }
+
   station_icon_life { Path: {path: "etc/scenes/space_station/assets/icons/life.svg", width: 96} }
   station_icon_air { Path: {path: "etc/scenes/space_station/assets/icons/air.svg", width: 96} }
   station_icon_farm { Path: {path: "etc/scenes/space_station/assets/icons/farm.svg", width: 96} }
@@ -66,9 +69,15 @@ assets {
   station_icon_cargo { Path: {path: "etc/scenes/space_station/assets/icons/cargo.svg", width: 96} }
   station_icon_bay { Path: {path: "etc/scenes/space_station/assets/icons/bay.svg", width: 96} }
   station_icon_sell { Path: {path: "etc/scenes/space_station/assets/icons/sell.svg", width: 96} }
-  station_icon_credit { Path: {path: "etc/scenes/space_station/assets/icons/credit.svg", width: 96} }
+  station_icon_credit {
+    Path: {path: "etc/scenes/space_station/assets/icons/credit.svg", width: 96}
+  }
+
   station_icon_power { Path: {path: "etc/scenes/space_station/assets/icons/power.svg", width: 96} }
-  station_icon_people { Path: {path: "etc/scenes/space_station/assets/icons/people.svg", width: 96} }
+  station_icon_people {
+    Path: {path: "etc/scenes/space_station/assets/icons/people.svg", width: 96}
+  }
+
   station_icon_food { Path: {path: "etc/scenes/space_station/assets/icons/food.svg", width: 96} }
   station_icon_star { Path: {path: "etc/scenes/space_station/assets/icons/star.svg", width: 96} }
   station_icon_pause { Path: {path: "etc/scenes/space_station/assets/icons/pause.svg", width: 96} }
@@ -76,8 +85,13 @@ assets {
   station_icon_play2 { Path: {path: "etc/scenes/space_station/assets/icons/play2.svg", width: 96} }
   station_icon_play4 { Path: {path: "etc/scenes/space_station/assets/icons/play4.svg", width: 96} }
   station_icon_rank { Path: {path: "etc/scenes/space_station/assets/icons/rank.svg", width: 96} }
-  station_icon_shuttle { Path: {path: "etc/scenes/space_station/assets/icons/shuttle.svg", width: 96} }
-  station_icon_freighter { Path: {path: "etc/scenes/space_station/assets/icons/freighter.svg", width: 96} }
+  station_icon_shuttle {
+    Path: {path: "etc/scenes/space_station/assets/icons/shuttle.svg", width: 96}
+  }
+
+  station_icon_freighter {
+    Path: {path: "etc/scenes/space_station/assets/icons/freighter.svg", width: 96}
+  }
 }
 
 state {
@@ -124,9 +138,11 @@ assets {
     prop grow: bool = false
 
     Layout: {direction: Column, padding: {pad, pad, pad, pad}}
+
     if grow {
       Item: {width: {mode: Grow}}
     }
+
     Rect: {1, 1}
     Rgb: {strength * 0.35, strength * 0.85, strength * 1.1}
     BlendMode: Additive
@@ -154,10 +170,12 @@ assets {
       Rect: {1, 1}
       Rgb: {st_ui_r(state), st_ui_g(state), st_ui_b(state)}
     }
+
     name {
       Text: {value: title, size: 12}
       Rgb: {st_ui_r(state), st_ui_g(state), st_ui_b(state)}
     }
+
     rule {
       Item: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
       Rect: {1, 1}
@@ -171,11 +189,13 @@ assets {
     prop spacing: f32 = 8
 
     Layout: {direction: Column, padding: {12, 12, 14, 14}, spacing: spacing}
+
     if width == 0 {
       Item: {width: {mode: Grow}}
     } else {
       Item: {width: {min: width, max: width}}
     }
+
     Rect: {1, 1}
     Rgb: {7, 13, 23}
     Opacity: {0.9}
@@ -187,9 +207,14 @@ assets {
     StationCornerBar tr_a() { Float: {h: Right, v: Top, anchor_h: Right, anchor_v: Top} }
     StationCornerBar tr_b(w: 2, h: 14) { Float: {h: Right, v: Top, anchor_h: Right, anchor_v: Top} }
     StationCornerBar bl_a() { Float: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom} }
-    StationCornerBar bl_b(w: 2, h: 14) { Float: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom} }
+    StationCornerBar bl_b(w: 2, h: 14) {
+      Float: {h: Left, v: Bottom, anchor_h: Left, anchor_v: Bottom}
+    }
+
     StationCornerBar br_a() { Float: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom} }
-    StationCornerBar br_b(w: 2, h: 14) { Float: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom} }
+    StationCornerBar br_b(w: 2, h: 14) {
+      Float: {h: Right, v: Bottom, anchor_h: Right, anchor_v: Bottom}
+    }
 
     if title != "" {
       StationSectionTitle heading(title: title)
@@ -241,6 +266,7 @@ assets {
 
     Layout: {direction: Row, spacing: 2}
     Item: {width: {mode: Grow}}
+
     for i in 0..cells {
       "cell_{i}" {
         const lit = (i + 0.5) / cells < ratio
@@ -277,18 +303,30 @@ assets {
           const a = start - f * sweep
           const lit = f <= clamp(ratio, 0, 1) && ratio > 0.005
           const s = lit ? state : UI_DIM
-          Item: {h: Center, v: Middle, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
+          Item: {
+            h: Center,
+            v: Middle,
+            width: {mode: Fixed, value: 1},
+            height: {mode: Fixed, value: 1}
+          }
           Line: {cos(a) * r0, sin(a) * r0, cos(a) * r1, sin(a) * r1, width: 2.4}
           Rgb: {st_ui_r(s), st_ui_g(s), st_ui_b(s)}
         }
       }
+
       glyph {
-        Item: {h: Center, v: Middle, width: {mode: Fixed, value: 22}, height: {mode: Fixed, value: 22}}
+        Item: {
+          h: Center,
+          v: Middle,
+          width: {mode: Fixed, value: 22},
+          height: {mode: Fixed, value: 22}
+        }
         Rect: {1, 1}
         Image: {texture: icon}
         Rgb: {st_ui_r(state), st_ui_g(state), st_ui_b(state)}
       }
     }
+
     caption {
       Text: {value: label, size: 10}
       Rgb: {146, 176, 196}
@@ -299,6 +337,7 @@ assets {
     prop value: f32 = 0
 
     Layout: {direction: Row, spacing: 3}
+
     for i in 0..5 {
       "star_{i}" {
         const lit = value >= i * 20 + 10
@@ -320,6 +359,7 @@ assets {
 
     Layout: {direction: Row, spacing: 1}
     Item: {width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+
     for i in 0..8 {
       "down_{i}" {
         const lit = value < 0 && (8 - i - 0.5) / 8 < f
@@ -329,11 +369,13 @@ assets {
         Rgb: {st_ui_r(c), st_ui_g(c), st_ui_b(c)}
       }
     }
+
     mid {
       Item: {width: {mode: Fixed, value: 2}, height: {mode: Fixed, value: 6}}
       Rect: {1, 1}
       Rgb: {170, 220, 240}
     }
+
     for i in 0..8 {
       "up_{i}" {
         const lit = value > 0 && (i + 0.5) / 8 < f
@@ -352,6 +394,7 @@ assets {
 
     Layout: {direction: Row, spacing: 4, v: Middle}
     Item: {width: {mode: Grow}}
+
     for i in 0..8 {
       "dock_{i}" {
         const s = i < docks ? (i < busy ? UI_GOOD : UI_OK) : UI_DIM
@@ -361,9 +404,11 @@ assets {
         Border: {radius: 5}
       }
     }
+
     gap {
       Item: {width: {mode: Grow}}
     }
+
     for i in 0..5 {
       "wait_{i}" {
         const s = i < waiting ? UI_WARN : UI_DIM
@@ -380,7 +425,9 @@ state {
     op == tool || op == 200 + speed
   }
 
-  fn st_op_live(op: i32, docked: i32, stock_food: f64, stock_goods: f64, goods: f64, demand: f64, room: f64) -> bool {
+  fn st_op_live(
+    op: i32, docked: i32, stock_food: f64, stock_goods: f64, goods: f64, demand: f64, room: f64
+  ) -> bool {
     match op {
       101: docked > 0 && stock_food > 0 && room > 0
       102: docked > 0 && stock_goods > 0 && room > 0
@@ -397,6 +444,7 @@ assets {
     async {
       while true {
         const e = await on.activate(this)
+
         if ui.activation(e) == this {
           emit Request(op: op)
         }
@@ -427,11 +475,14 @@ assets {
 
     const selected = st_op_selected(op, st_tool, st_speed)
     const room = st_storage - st_food - st_goods
-    const live = st_op_live(op, st_cargo_docked, st_stock_food, st_stock_goods, st_goods, st_demand_goods, room)
+    const live = st_op_live(
+      op, st_cargo_docked, st_stock_food, st_stock_goods, st_goods, st_demand_goods, room
+    )
 
     Layout: {direction: Row, padding: {0, 0, 8, 8}, spacing: 6, h: Center, v: Middle}
     Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
+
     if selected {
       Rgb: {20, 78, 104}
       Border: {width: 1, radius: 2, color: {120, 236, 255, 255}}
@@ -445,7 +496,9 @@ assets {
       Rgb: {11, 24, 37}
       Border: {width: 1, radius: 2, color: {44, 104, 134, 255}}
     }
+
     Transition: [Rgb: {duration: 0.1}]
+
     if live {
       Opacity: {1}
     } else {
@@ -455,6 +508,7 @@ assets {
     if icon != 0 {
       StationIcon glyph(icon: icon, size: 14, state: UI_OK)
     }
+
     if label != "" {
       name {
         Text: {value: label, size: 12}
@@ -500,6 +554,7 @@ assets {
       Layout: {direction: Column, padding: {7, 5, 3, 3}, spacing: 2, h: Center}
       Item: {width: {mode: Grow}, height: {mode: Grow}}
       Rect: {1, 1}
+
       if selected {
         Rgb: {18, 72, 98}
         Border: {width: 1, radius: 3, color: {140, 240, 255, 255}}
@@ -513,6 +568,7 @@ assets {
         Rgb: {11, 24, 37}
         Border: {width: 1, radius: 3, color: {44, 104, 134, 255}}
       }
+
       Transition: [Rgb: {duration: 0.1}]
 
       hint {
@@ -521,11 +577,13 @@ assets {
         Text: {value: key_hint, size: 10}
         Rgb: {120, 160, 182}
       }
+
       StationIcon glyph(icon: icon, size: 26, state: state)
       name {
         Text: {value: label, size: 10}
         Rgb: {206, 230, 242}
       }
+
       if op != K_DEMOLISH {
         price {
           Text: {value: "{st_cost(op)}", size: 10}
@@ -542,7 +600,14 @@ assets {
     Item: {width: {mode: Grow}, height: {mode: Fixed, value: 80}}
     Layout: {direction: Column}
 
-    StationTileFace face(op: op, label: label, icon: icon, key_hint: key_hint, hover: hover, down: down)
+    StationTileFace face(
+      op: op,
+      label: label,
+      icon: icon,
+      key_hint: key_hint,
+      hover: hover,
+      down: down
+    )
   }
 
   template StationTrade {
@@ -574,14 +639,17 @@ assets {
           Text: {value: label, size: 11}
           Rgb: {206, 230, 242}
         }
+
         gap {
           Item: {width: {mode: Grow}}
         }
+
         cost {
           Text: {value: "{price:.0} cr", size: 11}
           Rgb: {st_ui_r(deal_state), st_ui_g(deal_state), st_ui_b(deal_state)}
         }
       }
+
       StationSegBar stock(ratio: amount / 80, cells: 16, height: 4, state: UI_OK)
     }
   }
@@ -615,9 +683,25 @@ state {
     }
   }
 
-  fn st_stat_text(stat: i32, residents: i32, housing: i32, visitors: i32, supply: f64, demand: f64, people: i32, life: f64, air: f64, food: f64, goods: f64, storage: f64, rep: f64, income: f64) -> string {
+  fn st_stat_text(
+    stat: i32,
+    residents: i32,
+    housing: i32,
+    visitors: i32,
+    supply: f64,
+    demand: f64,
+    people: i32,
+    life: f64,
+    air: f64,
+    food: f64,
+    goods: f64,
+    storage: f64,
+    rep: f64,
+    income: f64
+  ) -> string {
+    const shortage = "A shortage slows air and food and weakens life support."
     match stat {
-      0: "Power: using {demand:.0} of {supply:.0}. A shortage slows air and food and weakens life support."
+      0: "Power: using {demand:.0} of {supply:.0}. {shortage}"
       1: "Life support: {people} people on board, capacity {life:.0}."
       2: "Air: {air:.0}%. Everyone on board breathes it."
       3: "Food: {food:.0} t in store."
@@ -631,13 +715,366 @@ state {
 }
 
 assets {
-  template StationHud {
-    const market_open = st_cargo_docked > 0
+  template StationTopBar {
     const room = st_storage - st_food - st_goods
     const net_power = st_power_supply - st_power_demand
     const people = st_residents + st_visitors
+
+    Layout: {direction: Row, spacing: 18, v: Middle}
+    Item: {width: {mode: Grow}}
+
+    rank {
+      Layout: {direction: Row, spacing: 10, v: Middle}
+      Item: {width: {min: 232, max: 232}}
+      StationIcon emblem(icon: station_icon_rank, size: 36, state: UI_OK)
+      goal {
+        Layout: {direction: Column, spacing: 4}
+        Item: {width: {mode: Grow}}
+        title {
+          Text: {value: st_rank_name(st_rank), size: 16}
+          Rgb: {150, 236, 255}
+        }
+
+        next {
+          Text: {value: st_goal(st_rank), size: 11}
+          Rgb: {146, 176, 196}
+        }
+
+        StationSegBar progress(
+          ratio: st_goal_ratio(st_rank, st_residents, st_credits),
+          cells: 20,
+          height: 5,
+          state: UI_GOOD
+        )
+      }
+    }
+
+    StationHoverZone money_zone(stat: 7) {
+      Item: {width: {min: 150, max: 150}}
+      Layout = {direction: Column, spacing: 5, h: Left}
+      money {
+        Layout: {direction: Row, spacing: 8, v: Middle}
+        StationIcon coin(
+          icon: station_icon_credit,
+          size: 22,
+          state: st_credits < 0 ? UI_BAD : UI_WARN
+        )
+        amount {
+          Text: {value: "{st_credits:.0}", size: 24}
+
+          if st_credits < 0 {
+            Rgb: {255, 88, 74}
+          } else {
+            Rgb: {255, 226, 150}
+          }
+        }
+      }
+
+      StationTrend trend(value: st_income)
+    }
+
+    dials {
+      Layout: {direction: Row, spacing: 8, v: Middle}
+      StationHoverZone power_zone(stat: 0) {
+        StationDial power(
+          ratio: st_power_demand / max(st_power_supply, 0.01),
+          icon: station_icon_power,
+          label: "POWER",
+          state: st_ui_state(net_power < 2, net_power < 0)
+        )
+      }
+
+      StationHoverZone life_zone(stat: 1) {
+        StationDial life(
+          ratio: people / max(st_life_cap, 1),
+          icon: station_icon_life,
+          label: "LIFE",
+          state: st_ui_state(people + 4 > st_life_cap, people > st_life_cap * st_power_ratio)
+        )
+      }
+
+      StationHoverZone air_zone(stat: 2) {
+        StationDial air(
+          ratio: st_air / 100,
+          icon: station_icon_air,
+          label: "AIR",
+          state: st_ui_state(st_air < 40, st_air < 15)
+        )
+      }
+
+      StationHoverZone food_zone(stat: 3) {
+        StationDial food(
+          ratio: st_food / 80,
+          icon: station_icon_food,
+          label: "FOOD",
+          state: st_ui_state(st_food < 12, st_food < 3)
+        )
+      }
+
+      StationHoverZone hold_zone(stat: 4) {
+        StationDial hold(
+          ratio: (st_food + st_goods) / max(st_storage, 1),
+          icon: station_icon_cargo,
+          label: "HOLD",
+          state: st_ui_state(room < 20, room < 5)
+        )
+      }
+    }
+
+    StationHoverZone crew_zone(stat: 5) {
+      Item: {width: {mode: Grow}}
+      Layout = {direction: Column, spacing: 4, h: Left}
+      crew {
+        Layout: {direction: Row, spacing: 8, v: Middle}
+        Item: {width: {mode: Grow}}
+        StationIcon glyph(
+          icon: station_icon_people,
+          size: 18,
+          state: st_ui_state(st_residents >= st_housing, st_residents > st_housing)
+        )
+        caption {
+          Text: {value: "RESIDENTS", size: 10}
+          Rgb: {146, 176, 196}
+        }
+      }
+
+      StationSegBar homes(
+        ratio: st_residents / max(st_housing, 1),
+        cells: 14,
+        height: 8,
+        state: st_ui_state(st_residents >= st_housing, st_residents > st_housing)
+      )
+      guest_row {
+        Layout: {direction: Row}
+        Item: {width: {mode: Grow}}
+        caption {
+          Text: {value: "VISITORS", size: 10}
+          Rgb: {146, 176, 196}
+        }
+      }
+
+      StationSegBar guests(
+        ratio: st_visitors / 40.0,
+        cells: 14,
+        height: 4,
+        state: UI_GOOD
+      )
+    }
+
+    StationHoverZone rep_zone(stat: 6) {
+      caption {
+        Text: {value: "REPUTATION", size: 10}
+        Rgb: {146, 176, 196}
+      }
+
+      StationStars stars(value: st_reputation)
+    }
+
+    speed {
+      Layout: {direction: Row, spacing: 4}
+      StationButton s0(label: "", icon: station_icon_pause, op: OP_SPEED, size: 34)
+      StationButton s1(label: "", icon: station_icon_play1, op: OP_SPEED + 1, size: 34)
+      StationButton s2(label: "", icon: station_icon_play2, op: OP_SPEED + 2, size: 34)
+      StationButton s4(label: "", icon: station_icon_play4, op: OP_SPEED + 4, size: 34)
+    }
+  }
+
+  template StationMiddle {
+    const market_open = st_cargo_docked > 0
+
+    Layout: {direction: Row}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    StationHalo ops_a(strength: 10) {
+      StationHalo ops_b(strength: 14) {
+        StationHalo ops_c(strength: 26, pad: 1) {
+          StationCard ops(title: "CONSTRUCTION", width: 292) {
+            row_a {
+              Layout: {direction: Row, spacing: 4}
+              Item: {width: {mode: Grow}}
+              StationTile t_solar(
+                label: "Solar",
+                icon: station_icon_solar,
+                op: K_SOLAR,
+                key_hint: "1"
+              )
+              StationTile t_reactor(
+                label: "Reactor",
+                icon: station_icon_reactor,
+                op: K_REACTOR,
+                key_hint: "2"
+              )
+              StationTile t_life(
+                label: "Life Support",
+                icon: station_icon_life,
+                op: K_LIFE,
+                key_hint: "3"
+              )
+            }
+
+            row_b {
+              Layout: {direction: Row, spacing: 4}
+              Item: {width: {mode: Grow}}
+              StationTile t_air(
+                label: "Atmosphere",
+                icon: station_icon_air,
+                op: K_AIR,
+                key_hint: "4"
+              )
+              StationTile t_farm(
+                label: "Hydroponics",
+                icon: station_icon_farm,
+                op: K_FARM,
+                key_hint: "5"
+              )
+              StationTile t_hab(
+                label: "Habitat",
+                icon: station_icon_hab,
+                op: K_HAB,
+                key_hint: "6"
+              )
+            }
+
+            row_c {
+              Layout: {direction: Row, spacing: 4}
+              Item: {width: {mode: Grow}}
+              StationTile t_pax(
+                label: "Pax Dock",
+                icon: station_icon_pax,
+                op: K_PAX,
+                key_hint: "7"
+              )
+              StationTile t_cargo(
+                label: "Cargo Dock",
+                icon: station_icon_cargo,
+                op: K_CARGO,
+                key_hint: "8"
+              )
+              StationTile t_bay(
+                label: "Cargo Bay",
+                icon: station_icon_bay,
+                op: K_BAY,
+                key_hint: "9"
+              )
+            }
+
+            StationButton t_sell(
+              label: "Sell module  [X]",
+              icon: station_icon_sell,
+              op: K_DEMOLISH
+            )
+
+            StationSectionTitle market_title(
+              title: "CARGO MARKET",
+              state: market_open ? UI_GOOD : UI_MUTED
+            )
+
+            if market_open {
+              StationTrade food_row(
+                label: "Food in stock",
+                icon: station_icon_food,
+                price: st_price_food,
+                price_low: 7,
+                price_high: 14,
+                amount: st_stock_food
+              )
+              StationButton buy_food(label: "Buy 10 t food", op: OP_BUY_FOOD)
+              StationTrade goods_row(
+                label: "Goods in stock",
+                icon: station_icon_cargo,
+                price: st_price_goods_buy,
+                price_low: 8,
+                price_high: 18,
+                amount: st_stock_goods
+              )
+              StationButton buy_goods(label: "Buy 10 t goods", op: OP_BUY_GOODS)
+              StationTrade sell_row(
+                label: "Goods wanted",
+                icon: station_icon_credit,
+                price: st_price_goods_sell,
+                price_low: 12,
+                price_high: 28,
+                higher_better: true,
+                amount: st_demand_goods
+              )
+              StationButton sell_goods(label: "Sell 10 t goods", op: OP_SELL_GOODS)
+            } else {
+              closed {
+                Layout: {direction: Row, spacing: 10, v: Middle, padding: {4, 4, 0, 0}}
+                StationIcon ship(icon: station_icon_freighter, size: 24, state: UI_MUTED)
+                note {
+                  Text: {
+                    value: "Opens while a freighter is docked.\nBuy goods cheap, sell them dear.",
+                    size: 11
+                  }
+                  Rgb: {146, 176, 196}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    spacer {
+      Item: {width: {mode: Grow}}
+    }
+
+    StationHalo traffic_a(strength: 10) {
+      StationHalo traffic_b(strength: 22, pad: 1) {
+        StationCardAway traffic(title: "TRAFFIC", width: 220) {
+          pax {
+            Layout: {direction: Row, spacing: 8, v: Middle}
+            Item: {width: {mode: Grow}}
+            StationIcon glyph(icon: station_icon_shuttle, size: 20, state: UI_OK)
+            StationDockLights lights(
+              docks: st_pax_docks,
+              busy: st_pax_docked,
+              waiting: st_pax_holding
+            )
+          }
+
+          cargo {
+            Layout: {direction: Row, spacing: 8, v: Middle}
+            Item: {width: {mode: Grow}}
+            StationIcon glyph(icon: station_icon_freighter, size: 20, state: UI_OK)
+            StationDockLights lights(
+              docks: st_cargo_docks,
+              busy: st_cargo_docked,
+              waiting: st_cargo_holding
+            )
+          }
+
+          served {
+            Text: {value: "{st_ships_served} ships served, {st_ships_lost} lost", size: 11}
+            Rgb: {146, 176, 196}
+          }
+        }
+      }
+    }
+  }
+
+  template StationHud {
+    const people = st_residents + st_visitors
     const hover_kind = st_grid[max(st_hover_slot, 0)]
-    const stat_text = st_stat_text(st_hover_stat, st_residents, st_housing, st_visitors, st_power_supply, st_power_demand, people, st_life_cap, st_air, st_food, st_goods, st_storage, st_reputation, st_income)
+    const op_info = st_hover_op >= 0 && st_hover_op <= K_DEMOLISH &&
+      st_kind_blurb(st_hover_op) != ""
+    const stat_text = st_stat_text(
+      st_hover_stat,
+      st_residents,
+      st_housing,
+      st_visitors,
+      st_power_supply,
+      st_power_demand,
+      people,
+      st_life_cap,
+      st_air,
+      st_food,
+      st_goods,
+      st_storage,
+      st_reputation,
+      st_income
+    )
 
     Scene: {}
 
@@ -655,192 +1092,13 @@ assets {
         StationHalo top_b(strength: 14, grow: true) {
           StationHalo top_c(strength: 26, pad: 1, grow: true) {
             StationCardAway top(spacing: 0) {
-              bar {
-                Layout: {direction: Row, spacing: 18, v: Middle}
-                Item: {width: {mode: Grow}}
-
-                rank {
-                  Layout: {direction: Row, spacing: 10, v: Middle}
-                  Item: {width: {min: 232, max: 232}}
-                  StationIcon emblem(icon: station_icon_rank, size: 36, state: UI_OK)
-                  goal {
-                    Layout: {direction: Column, spacing: 4}
-                    Item: {width: {mode: Grow}}
-                    title {
-                      Text: {value: st_rank_name(st_rank), size: 16}
-                      Rgb: {150, 236, 255}
-                    }
-                    next {
-                      Text: {value: st_goal(st_rank), size: 11}
-                      Rgb: {146, 176, 196}
-                    }
-                    StationSegBar progress(ratio: st_goal_ratio(st_rank, st_residents, st_credits), cells: 20, height: 5, state: UI_GOOD)
-                  }
-                }
-
-                StationHoverZone money_zone(stat: 7) {
-                  Item: {width: {min: 150, max: 150}}
-                  Layout = {direction: Column, spacing: 5, h: Left}
-                  money {
-                    Layout: {direction: Row, spacing: 8, v: Middle}
-                    StationIcon coin(icon: station_icon_credit, size: 22, state: st_credits < 0 ? UI_BAD : UI_WARN)
-                    amount {
-                      Text: {value: "{st_credits:.0}", size: 24}
-                      if st_credits < 0 {
-                        Rgb: {255, 88, 74}
-                      } else {
-                        Rgb: {255, 226, 150}
-                      }
-                    }
-                  }
-                  StationTrend trend(value: st_income)
-                }
-
-                dials {
-                  Layout: {direction: Row, spacing: 8, v: Middle}
-                  StationHoverZone power_zone(stat: 0) {
-                    StationDial power(ratio: st_power_demand / max(st_power_supply, 0.01), icon: station_icon_power, label: "POWER", state: st_ui_state(net_power < 2, net_power < 0))
-                  }
-                  StationHoverZone life_zone(stat: 1) {
-                    StationDial life(ratio: people / max(st_life_cap, 1), icon: station_icon_life, label: "LIFE", state: st_ui_state(people + 4 > st_life_cap, people > st_life_cap * st_power_ratio))
-                  }
-                  StationHoverZone air_zone(stat: 2) {
-                    StationDial air(ratio: st_air / 100, icon: station_icon_air, label: "AIR", state: st_ui_state(st_air < 40, st_air < 15))
-                  }
-                  StationHoverZone food_zone(stat: 3) {
-                    StationDial food(ratio: st_food / 80, icon: station_icon_food, label: "FOOD", state: st_ui_state(st_food < 12, st_food < 3))
-                  }
-                  StationHoverZone hold_zone(stat: 4) {
-                    StationDial hold(ratio: (st_food + st_goods) / max(st_storage, 1), icon: station_icon_cargo, label: "HOLD", state: st_ui_state(room < 20, room < 5))
-                  }
-                }
-
-                StationHoverZone crew_zone(stat: 5) {
-                  Item: {width: {mode: Grow}}
-                  Layout = {direction: Column, spacing: 4, h: Left}
-                  crew {
-                    Layout: {direction: Row, spacing: 8, v: Middle}
-                    Item: {width: {mode: Grow}}
-                    StationIcon glyph(icon: station_icon_people, size: 18, state: st_ui_state(st_residents >= st_housing, st_residents > st_housing))
-                    caption {
-                      Text: {value: "RESIDENTS", size: 10}
-                      Rgb: {146, 176, 196}
-                    }
-                  }
-                  StationSegBar homes(ratio: st_residents / max(st_housing, 1), cells: 14, height: 8, state: st_ui_state(st_residents >= st_housing, st_residents > st_housing))
-                  guest_row {
-                    Layout: {direction: Row}
-                    Item: {width: {mode: Grow}}
-                    caption {
-                      Text: {value: "VISITORS", size: 10}
-                      Rgb: {146, 176, 196}
-                    }
-                  }
-                  StationSegBar guests(ratio: st_visitors / 40.0, cells: 14, height: 4, state: UI_GOOD)
-                }
-
-                StationHoverZone rep_zone(stat: 6) {
-                  caption {
-                    Text: {value: "REPUTATION", size: 10}
-                    Rgb: {146, 176, 196}
-                  }
-                  StationStars stars(value: st_reputation)
-                }
-
-                speed {
-                  Layout: {direction: Row, spacing: 4}
-                  StationButton s0(label: "", icon: station_icon_pause, op: OP_SPEED, size: 34)
-                  StationButton s1(label: "", icon: station_icon_play1, op: OP_SPEED + 1, size: 34)
-                  StationButton s2(label: "", icon: station_icon_play2, op: OP_SPEED + 2, size: 34)
-                  StationButton s4(label: "", icon: station_icon_play4, op: OP_SPEED + 4, size: 34)
-                }
-              }
+              StationTopBar bar()
             }
           }
         }
       }
 
-      middle {
-        Layout: {direction: Row}
-        Item: {width: {mode: Grow}, height: {mode: Grow}}
-
-        StationHalo ops_a(strength: 10) {
-          StationHalo ops_b(strength: 14) {
-            StationHalo ops_c(strength: 26, pad: 1) {
-              StationCard ops(title: "CONSTRUCTION", width: 292) {
-                row_a {
-                  Layout: {direction: Row, spacing: 4}
-                  Item: {width: {mode: Grow}}
-                  StationTile t_solar(label: "Solar", icon: station_icon_solar, op: K_SOLAR, key_hint: "1")
-                  StationTile t_reactor(label: "Reactor", icon: station_icon_reactor, op: K_REACTOR, key_hint: "2")
-                  StationTile t_life(label: "Life Support", icon: station_icon_life, op: K_LIFE, key_hint: "3")
-                }
-                row_b {
-                  Layout: {direction: Row, spacing: 4}
-                  Item: {width: {mode: Grow}}
-                  StationTile t_air(label: "Atmosphere", icon: station_icon_air, op: K_AIR, key_hint: "4")
-                  StationTile t_farm(label: "Hydroponics", icon: station_icon_farm, op: K_FARM, key_hint: "5")
-                  StationTile t_hab(label: "Habitat", icon: station_icon_hab, op: K_HAB, key_hint: "6")
-                }
-                row_c {
-                  Layout: {direction: Row, spacing: 4}
-                  Item: {width: {mode: Grow}}
-                  StationTile t_pax(label: "Pax Dock", icon: station_icon_pax, op: K_PAX, key_hint: "7")
-                  StationTile t_cargo(label: "Cargo Dock", icon: station_icon_cargo, op: K_CARGO, key_hint: "8")
-                  StationTile t_bay(label: "Cargo Bay", icon: station_icon_bay, op: K_BAY, key_hint: "9")
-                }
-                StationButton t_sell(label: "Sell module  [X]", icon: station_icon_sell, op: K_DEMOLISH)
-
-                StationSectionTitle market_title(title: "CARGO MARKET", state: market_open ? UI_GOOD : UI_MUTED)
-                if market_open {
-                  StationTrade food_row(label: "Food in stock", icon: station_icon_food, price: st_price_food, price_low: 7, price_high: 14, amount: st_stock_food)
-                  StationButton buy_food(label: "Buy 10 t food", op: OP_BUY_FOOD)
-                  StationTrade goods_row(label: "Goods in stock", icon: station_icon_cargo, price: st_price_goods_buy, price_low: 8, price_high: 18, amount: st_stock_goods)
-                  StationButton buy_goods(label: "Buy 10 t goods", op: OP_BUY_GOODS)
-                  StationTrade sell_row(label: "Goods wanted", icon: station_icon_credit, price: st_price_goods_sell, price_low: 12, price_high: 28, higher_better: true, amount: st_demand_goods)
-                  StationButton sell_goods(label: "Sell 10 t goods", op: OP_SELL_GOODS)
-                } else {
-                  closed {
-                    Layout: {direction: Row, spacing: 10, v: Middle, padding: {4, 4, 0, 0}}
-                    StationIcon ship(icon: station_icon_freighter, size: 24, state: UI_MUTED)
-                    note {
-                      Text: {value: "Opens while a freighter is docked.\nBuy goods cheap, sell them dear.", size: 11}
-                      Rgb: {146, 176, 196}
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        spacer {
-          Item: {width: {mode: Grow}}
-        }
-
-        StationHalo traffic_a(strength: 10) {
-          StationHalo traffic_b(strength: 22, pad: 1) {
-            StationCardAway traffic(title: "TRAFFIC", width: 220) {
-              pax {
-                Layout: {direction: Row, spacing: 8, v: Middle}
-                Item: {width: {mode: Grow}}
-                StationIcon glyph(icon: station_icon_shuttle, size: 20, state: UI_OK)
-                StationDockLights lights(docks: st_pax_docks, busy: st_pax_docked, waiting: st_pax_holding)
-              }
-              cargo {
-                Layout: {direction: Row, spacing: 8, v: Middle}
-                Item: {width: {mode: Grow}}
-                StationIcon glyph(icon: station_icon_freighter, size: 20, state: UI_OK)
-                StationDockLights lights(docks: st_cargo_docks, busy: st_cargo_docked, waiting: st_cargo_holding)
-              }
-              served {
-                Text: {value: "{st_ships_served} ships served, {st_ships_lost} lost", size: 11}
-                Rgb: {146, 176, 196}
-              }
-            }
-          }
-        }
-      }
+      StationMiddle middle()
 
       bottom {
         Layout: {direction: Column, spacing: 6, h: Center}
@@ -848,7 +1106,7 @@ assets {
         info {
           if st_hover_stat >= 0 {
             Text: {value: stat_text, size: 14}
-          } else if st_hover_op >= 0 && st_hover_op <= K_DEMOLISH && st_kind_blurb(st_hover_op) != "" {
+          } else if op_info {
             Text: {value: "{st_kind_name(st_hover_op)}: {st_kind_blurb(st_hover_op)}", size: 14}
           } else if st_hover_op == K_DEMOLISH {
             Text: {value: "Sell a module for half its cost. Click a module to sell it.", size: 14}
@@ -857,12 +1115,17 @@ assets {
           } else if st_hover_slot >= 0 && st_tool > 0 && st_tool != K_DEMOLISH {
             Text: {value: "Build {st_kind_name(st_tool)} for {st_cost(st_tool)} cr.", size: 14}
           } else if st_tool > 0 && st_tool != K_DEMOLISH {
-            Text: {value: "Click a green bay next to the station. {st_kind_blurb(st_tool)}", size: 14}
+            Text: {
+              value: "Click a green bay next to the station. {st_kind_blurb(st_tool)}",
+              size: 14
+            }
           } else {
             Text: {value: " ", size: 14}
           }
+
           Rgb: {176, 226, 246}
         }
+
         if st_alert != "" && !st_lost {
           StationHalo alert_glow(strength: 12, pad: 2, radius: 6) {
             alert {
@@ -887,10 +1150,16 @@ assets {
               Text: {value: st_alert, size: 14, width: 310}
               Rgb: {255, 200, 180}
             }
+
             score {
-              Text: {value: "You served {st_ships_served} ships and rose to {st_rank_name(st_rank)}.", size: 12, width: 310}
+              Text: {
+                value: "You served {st_ships_served} ships and rose to {st_rank_name(st_rank)}.",
+                size: 12,
+                width: 310
+              }
               Rgb: {146, 176, 196}
             }
+
             StationButton again(label: "Start a new station", op: OP_RESTART)
           }
         }
@@ -900,7 +1169,13 @@ assets {
     view {
       bloom { Bloom: {intensity: 0.9, threshold: 0.5, threshold_softness: 0.25} }
 
-      View: {camera: camera, order: 1, lighting: {enabled: false}, culling: {enabled: false}, effects: [{effect: bloom}]}
+      View: {
+        camera: camera,
+        order: 1,
+        lighting: {enabled: false},
+        culling: {enabled: false},
+        effects: [{effect: bloom}]
+      }
     }
   }
 }
@@ -940,6 +1215,7 @@ assets {
 async {
   while true {
     await on.pressed(state.actions.WorldClick)
+
     if st_hover_slot < 0 {
       emit Request(op: OP_CANCEL)
     }

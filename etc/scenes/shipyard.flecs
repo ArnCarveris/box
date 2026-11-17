@@ -29,7 +29,10 @@ using state
 using assets
 
 assets {
-  yard_stars { EnvironmentImage: {path: "etc/scenes/shipyard/assets/space.hdr"}; Environment: {resolution: 1024} }
+  yard_stars {
+    EnvironmentImage: {path: "etc/scenes/shipyard/assets/space.hdr"}
+    Environment: {resolution: 1024}
+  }
 }
 
 $ {
@@ -47,7 +50,11 @@ rig {
     Rotation: {0 - cam_pitch, 0, 0}
     eye {
       Position: {0, 0, cam_dist}
-      Camera: {fov: 38, near_: liner ? 0.3 * LINER_SCALE : 0.3, far_: liner ? 3000 * LINER_SCALE : 3000}
+      Camera: {
+        fov: 38,
+        near_: liner ? 0.3 * LINER_SCALE : 0.3,
+        far_: liner ? 3000 * LINER_SCALE : 3000
+      }
     }
   }
 }
@@ -73,9 +80,24 @@ view {
   View: {
     camera: rig.arm.eye,
     clear: {enabled: true, color: {3, 5, 10, 255}},
-    shadows: {enabled: true, cascades: 3, resolution: 1024, max_distance: liner ? 200 * LINER_SCALE : 200, filter_size: 2},
-    lighting: {reflections: true, baked: false, environment: {source: assets.yard_stars, intensity: 0.7, background: true}},
-    effects: [{effect: yard_contact}, {effect: yard_bloom}, {effect: yard_film}, {effect: yard_edges}]
+    shadows: {
+      enabled: true,
+      cascades: 3,
+      resolution: 1024,
+      max_distance: liner ? 200 * LINER_SCALE : 200,
+      filter_size: 2
+    },
+    lighting: {
+      reflections: true,
+      baked: false,
+      environment: {source: assets.yard_stars, intensity: 0.7, background: true}
+    },
+    effects: [
+      {effect: yard_contact},
+      {effect: yard_bloom},
+      {effect: yard_film},
+      {effect: yard_edges}
+    ]
   }
 }
 
@@ -88,9 +110,11 @@ yard {
       Position: {0, 0, 0}
       Scale: {LINER_SCALE, LINER_SCALE, LINER_SCALE}
       texture.Frame
+
       if show_gantry {
         Drydock dock()
       }
+
       if tool > 0 {
         SpineGuide spine_guide(l: lane)
       }
@@ -99,11 +123,14 @@ yard {
     if show_gantry {
       Slipway slipway()
     }
+
     BuildFrame frame()
+
     if tool > 0 {
       DeckGrid deck_grid(level: deck)
     }
   }
+
   // The backdrop keeps its size to the camera, which frames a liner from 10 times as far.
   const backdrop = liner ? LINER_SCALE : 1
   YardPlanet planet() {
@@ -115,8 +142,7 @@ yard {
 if liner {
   YardLiner yard_liner()
 } else {
-  // The rig being built, with the editor laid over its cells. The editor draws the modules of
-  // the deck it works on itself, so the instance leaves them out.
+  // The editor draws the modules of the deck it works on itself, so the instance leaves them out.
   const views = rig_views(yard_design, deck)
 
   Rig rig_ship(design: yard_design, burning: burning, cut: deck, skip: deck, power: rig_power()) {

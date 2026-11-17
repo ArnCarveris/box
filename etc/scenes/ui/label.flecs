@@ -29,9 +29,7 @@ template Label {
 
 // A surface with padding, rounded corners and a border that lays its children out in a column,
 // below its title when it has one. A width fixes it, 0 fits the children, grow takes the free
-// height of its parent. The title is the first child of the column, a template child, which the
-// layout puts before the children of the instance; it does not float, so the clips around the
-// panel, such as a scroll view, clip it.
+// height of its parent.
 template Panel {
   prop title: string = ""
   prop width: f32 = 0
@@ -43,9 +41,11 @@ template Panel {
 
   Layout: {direction: Column, padding: {pad, pad, pad, pad}, spacing: t.spacing}
   Item: {width: {min: width, max: width}}
+
   if grow {
     Item = {height: {mode: Grow}}
   }
+
   Rect: {1, 1}
   Rgb: t.surface
   Border: {width: 1, radius: t.radius * 1.5, color: {t.border.r, t.border.g, t.border.b, 255}}

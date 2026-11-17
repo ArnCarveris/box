@@ -1,0 +1,1169 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.particle
+using box.transition
+using box.movement
+using box.animation
+using box.light
+using state
+using assets
+
+assets {
+  template QuarryPiece {
+    prop seed: f32 = 0
+
+    pit : CastleRockBlock { Position: {-0.3, 0.2, -0.35}; Box: {1.2, 0.4, 1.1} }
+    ledge : CastleRockBlock { Position: {-0.45, 0.55, -0.55}; Box: {0.9, 0.3, 0.7} }
+    crag : CastleRock {
+      Position: {-0.6, 0.85, -0.7}
+      Rotation: {0, seed * 3, 0}
+      Scale: {1.3, 0.8, 1}
+      IcoSphere: {radius: 0.4, segments: 1}
+    }
+
+    rock_b : CastleDarkStone {
+      Position: {0.55, 0.15, -0.6}
+      Rotation: {0, seed * 3, 0}
+      IcoSphere: {radius: 0.3, segments: 1}
+    }
+
+    rock_c : CastleRock {
+      Position: {-0.7, 0.1, 0.55}
+      Rotation: {0.4, 1, 0}
+      IcoSphere: {radius: 0.22, segments: 1}
+    }
+
+    block_a : CastleStone {
+      Position: {0.32, 0.14, 0.42}
+      Rotation: {0, 0.1, 0}
+      Box: {0.3, 0.28, 0.3}
+    }
+
+    block_b : CastleStone {
+      Position: {0.66, 0.14, 0.4}
+      Rotation: {0, -0.08, 0}
+      Box: {0.3, 0.28, 0.3}
+    }
+
+    block_c : CastleStone {
+      Position: {0.5, 0.42, 0.42}
+      Rotation: {0, 0.3, 0}
+      Box: {0.3, 0.28, 0.3}
+    }
+
+    block_d : CastleStone {
+      Position: {0.7, 0.14, 0.75}
+      Rotation: {0, 0.5, 0}
+      Box: {0.24, 0.24, 0.24}
+    }
+
+    post : CastleWood {
+      Position: {0.05, 0.8, 0.1}
+      Cylinder: {length: 1.6, radius: 0.05, segments: 8}
+    }
+
+    brace : CastleWood {
+      Position: {0.18, 0.45, 0.1}
+      Rotation: {0, 0, -0.5}
+      Box: {0.05, 0.6, 0.05}
+    }
+
+    jib : CastleWood { Position: {0.42, 1.52, 0.1}; Rotation: {0, 0, 0.12}; Box: {0.9, 0.06, 0.06} }
+    wheel : CastleWood {
+      Position: {-0.12, 0.35, 0.1}
+      Rotation: {0, HALF_PI, 0}
+      Torus: {radius: 0.26, tube: 0.025, segments: 14, rings: 6}
+    }
+
+    rope : CastleIron {
+      Position: {0.8, 1.17, 0.1}
+      Cylinder: {length: 0.62, radius: 0.012, segments: 4}
+    }
+
+    load : CastleStone { Position: {0.8, 0.8, 0.1}; Box: {0.22, 0.2, 0.22} }
+    pick : CastleWood {
+      Position: {-0.1, 0.06, 0.6}
+      Rotation: {0, 0.6, HALF_PI}
+      Cylinder: {length: 0.6, radius: 0.02, segments: 4}
+    }
+
+    cart {
+      Position: {-0.3, 0, 0.6}
+      Rotation: {0, 0.3, 0}
+      bed_ : CastleOldWood {
+        Position: {0, 0.2, 0}
+        Box: {0.5, 0.12, 0.32}
+        texture.Transform: {scale_x: 0.5, scale_y: 0.2}
+      }
+
+      wheel_a : CastleTimber {
+        Position: {0, 0.12, 0.18}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {length: 0.03, radius: 0.12, segments: 10}
+      }
+
+      wheel_b : CastleTimber {
+        Position: {0, 0.12, -0.18}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {length: 0.03, radius: 0.12, segments: 10}
+      }
+
+      stone_ : CastleStone { Position: {0.06, 0.33, 0}; Box: {0.2, 0.14, 0.18} }
+      handle : CastleTimber { Position: {-0.38, 0.22, 0}; Box: {0.3, 0.025, 0.2} }
+    }
+
+    Folk mason(seed: seed + 0.13) { Position: {0.15, 0, 0.75}; Rotation: {0, -2.2, 0} }
+  }
+
+  template StoneOutcrop {
+    prop seed: f32 = 0
+
+    for r in 0..4 {
+      const a = seed * 6.283 + r * 1.9
+      const d = 0.25 + fract(seed * 7.1 + r * 0.43) * 0.5
+      const sz = 0.14 + fract(seed * 3.3 + r * 0.61) * 0.2
+      "rock_{r}" : CastleRock {
+        Position: {sin(a) * d, sz * 0.35, cos(a) * d}
+        Rotation: {fract(seed * 2.7 + r) * 2, a, 0}
+        Scale: {1.3, 0.7, 1}
+        IcoSphere: {radius: sz, segments: 1}
+      }
+    }
+
+    slab : CastleDarkStone {
+      Position: {(seed - 0.5) * 0.6, 0.03, (fract(seed * 4.7) - 0.5) * 0.6}
+      Rotation: {0, seed * 6.283, 0}
+      Box: {0.6, 0.06, 0.4}
+    }
+
+    Tuft tuft(seed: seed) { Position: {-0.5, 0, 0.45} }
+  }
+
+  template Bandit {
+    prop seed: f32 = 0
+    prop loot: bool = false
+
+    const cloak: Rgb = match floor(fract(seed * 7.7) * 3) {
+      0: {46, 40, 34}
+      1: {58, 44, 30}
+      _: {40, 46, 40}
+    }
+
+    leg_a : CastleDark { Position: {-0.035, 0.07, 0}; Box: {0.045, 0.14, 0.05} }
+    leg_b : CastleDark { Position: {0.035, 0.07, 0}; Box: {0.045, 0.14, 0.05} }
+    cloak_ {
+      Position: {0, 0.19, 0}
+      Frustum: {length: 0.26, radius_bottom: 0.1, radius_top: 0.06, segments: 8}
+      Rgb: cloak
+      PbrMaterial: {roughness: 1}
+    }
+
+    arm_a {
+      Position: {-0.075, 0.25, 0.02}
+      Rotation: {-0.4, 0, 0.15}
+      Box: {0.035, 0.14, 0.04}
+      Rgb: cloak
+      PbrMaterial: {roughness: 1}
+    }
+
+    arm_b {
+      Position: {0.075, 0.27, 0.04}
+      Rotation: {-1.0, 0, -0.15}
+      Box: {0.035, 0.14, 0.04}
+      Rgb: cloak
+      PbrMaterial: {roughness: 1}
+    }
+
+    head : CastleSkin { Position: {0, 0.35, 0}; Sphere: {radius: 0.05, segments: 10, smooth: true} }
+    mask : CastleBanner { Position: {0, 0.345, 0.022}; Box: {0.09, 0.03, 0.06} }
+    hood {
+      Position: {0, 0.39, -0.01}
+      Cone: {length: 0.12, radius: 0.065, segments: 8}
+      Rgb: cloak
+      PbrMaterial: {roughness: 1}
+    }
+
+    if loot {
+      sack : CastleCloth {
+        Position: {0, 0.3, -0.1}
+        Scale: {1, 1.1, 0.9}
+        IcoSphere: {radius: 0.08, segments: 1}
+      }
+    } else {
+      stick : CastleTimber {
+        Position: {0.08, 0.36, 0.12}
+        Rotation: {0.5, 0, 0}
+        Cylinder: {length: 0.22, radius: 0.012, segments: 5}
+      }
+
+      flame : CastleFlame { Position: {0.08, 0.47, 0.18}; Sphere: {radius: 0.04, segments: 8} }
+    }
+  }
+
+  template BanditRaid {
+    prop seed: f32 = 0
+
+    mut phase: i32 = 0
+
+    marker {
+      Position: {0, 3.4, 0}
+      Rotation: {PI, 0, 0}
+      Cone: {length: 0.5, radius: 0.22, segments: 4}
+      Rgb: {255, 70, 50}
+      Emissive: {strength: 4, color: {255, 60, 40}}
+      NoShadow
+    }
+
+    if phase == 1 {
+      for f in 0..3 {
+        const fa = seed * 9 + f * 2.1
+        "flame_{f}" : CastleFlame {
+          Position: {sin(fa) * 0.35, 1.25, cos(fa) * 0.25}
+          Cone: {length: 0.4 + f * 0.1, radius: 0.13, segments: 6}
+        }
+      }
+
+      fire {
+        Position: {0, 1.3, 0}
+        Emitter: {
+          max: 120, rate: 60,
+          shape: EmitterSphere, radius: 0.45,
+          direction: {0, 1, 0}, spread: 25, speed: {0.7, 1.5},
+          lifetime: {0.5, 0.9}, size: {0.12, 0.24}, opacity: {0.8, 1},
+          color: {255, 140, 50}, color_variance: {0, 50, 30},
+          seed: seed * 500
+        }
+        Appearance: {blend: Additive}
+        Forces: {gravity: {0, 0.6, 0}, turbulence: 0.8, turbulence_scale: 1.5}
+        Curves: {
+          size: {keys: [{0, 0.7}, {0.3, 1.2}, {1, 0.2}]}
+          opacity: {keys: [{0, 0.4}, {0.15, 1}, {0.7, 0.7}, {1, 0}]}
+          color: {keys: [{0, {255, 230, 150}}, {0.4, {255, 140, 50}}, {1, {200, 50, 20}}]}
+        }
+        Rgb: {255, 150, 70}
+        PointLight: {intensity: 4, range: 6}
+        box.particle.Light: {
+          intensity: 4,
+          curve: {keys: [{0, 1}, {0.2, 0.7}, {0.45, 1.25}, {0.7, 0.85}, {1, 1}]},
+          period: 0.4,
+          loop: true,
+          fade: 0.5
+        }
+      }
+
+      smoke {
+        Position: {0, 1.6, 0}
+        Emitter: {
+          max: 60, rate: 14,
+          shape: EmitterSphere, radius: 0.4,
+          direction: {0, 1, 0}, spread: 15, speed: {0.4, 0.7},
+          lifetime: {2, 3}, size: {0.3, 0.5}, opacity: {0.45, 0.6},
+          color: {60, 56, 52}, color_variance: {10, 10, 10},
+          seed: seed * 700
+        }
+        Curves: {
+          size: {keys: [{0, 0.6}, {0.5, 1.6}, {1, 2.6}]},
+          opacity: {keys: [{0, 0}, {0.25, 1}, {1, 0}]}
+        }
+      }
+    }
+
+    for b in 0..3 {
+      const a = seed * 6.283 + (b - 1) * 0.55
+      const fx = sin(a)
+      const fz = cos(a)
+      "bandit_{b}" {
+        Position: match phase {
+          0: {fx * 5.5, 0, fz * 5.5}
+          1: {fx * 1.35, 0, fz * 1.35}
+          _: {fx * 7 + fz * (b - 1) * 1.5, 0, fz * 7 - fx * (b - 1) * 1.5}
+        }
+        Rotation: {0, match phase { 2: a; _: a + PI }, 0}
+        Scale: {2.2, 2.2, 2.2}
+        Transition: [Position: {duration: match phase { 1: 1.3; _: 2.2 }, timing_function: EaseOut}]
+        Bandit body(seed: seed + b * 0.31, loot: phase == 2)
+      }
+    }
+
+    async {
+      await delay(0.1)
+      phase = 1
+      await delay(6)
+      phase = 2
+    }
+  }
+
+  template TreePiece {
+    prop seed: f32 = 0
+
+    const pine = seed < 0.45
+    const sz = 0.85 + fract(seed * 13.7) * 0.35
+    const autumn = seed > 0.9
+    const red = seed > 0.96
+
+    tree {
+      Rotation: {0, seed * 6.283, 0}
+      Scale: {sz, sz, sz}
+      trunk : CastleBark {
+        Position: {0, 0.45, 0}
+        Frustum: {length: 0.9, radius_bottom: 0.13, radius_top: 0.08, segments: 8}
+        texture.Transform: {scale_x: 1, scale_y: 1.5}
+      }
+
+      root_a : CastleBark {
+        Position: {0.1, 0.05, 0}
+        Rotation: {0, 0, -1.0}
+        Cone: {length: 0.24, radius: 0.06, segments: 5}
+      }
+
+      root_b : CastleBark {
+        Position: {-0.06, 0.05, 0.08}
+        Rotation: {0.9, 0, 0.6}
+        Cone: {length: 0.22, radius: 0.05, segments: 5}
+      }
+
+      if pine {
+        low : CastleLeafDark {
+          Position: {0, 1.0, 0}
+          Cone: {length: 1.1, radius: 0.74, segments: 10}
+          texture.Transform: {scale_x: 3, scale_y: 1.5}
+        }
+
+        mid : CastleLeafDark {
+          Position: {0, 1.55, 0}
+          Cone: {length: 0.95, radius: 0.56, segments: 10}
+          texture.Transform: {scale_x: 2.5, scale_y: 1.2}
+        }
+
+        tip : CastleLeafDark {
+          Position: {0, 2.05, 0}
+          Cone: {length: 0.8, radius: 0.38, segments: 10}
+          texture.Transform: {scale_x: 2, scale_y: 1}
+        }
+      } else {
+        if red {
+          crown : CastleLeafRed { Position: {0, 1.35, 0}; IcoSphere: {radius: 0.68, segments: 2} }
+          crown_b : CastleLeafRed {
+            Position: {0.32, 1.72, 0.1}
+            IcoSphere: {radius: 0.46, segments: 1}
+          }
+
+          crown_c : CastleLeafRed {
+            Position: {-0.32, 1.6, -0.2}
+            IcoSphere: {radius: 0.44, segments: 1}
+          }
+
+          crown_d : CastleLeafRed {
+            Position: {0.05, 1.2, 0.4}
+            IcoSphere: {radius: 0.4, segments: 1}
+          }
+        } else if autumn {
+          crown : CastleLeafAutumn {
+            Position: {0, 1.35, 0}
+            IcoSphere: {radius: 0.68, segments: 2}
+          }
+
+          crown_b : CastleLeafAutumn {
+            Position: {0.32, 1.72, 0.1}
+            IcoSphere: {radius: 0.46, segments: 1}
+          }
+
+          crown_c : CastleLeafAutumn {
+            Position: {-0.32, 1.6, -0.2}
+            IcoSphere: {radius: 0.44, segments: 1}
+          }
+
+          crown_d : CastleLeafAutumn {
+            Position: {0.05, 1.2, 0.4}
+            IcoSphere: {radius: 0.4, segments: 1}
+          }
+        } else {
+          crown : CastleLeaf { Position: {0, 1.35, 0}; IcoSphere: {radius: 0.68, segments: 2} }
+          crown_b : CastleLeaf {
+            Position: {0.32, 1.72, 0.1}
+            IcoSphere: {radius: 0.46, segments: 1}
+          }
+
+          crown_c : CastleLeafDark {
+            Position: {-0.32, 1.6, -0.2}
+            IcoSphere: {radius: 0.44, segments: 1}
+          }
+
+          crown_d : CastleLeaf { Position: {0.05, 1.2, 0.4}; IcoSphere: {radius: 0.4, segments: 1} }
+        }
+      }
+    }
+  }
+
+  template PathPiece {
+    prop seed: f32 = 0
+
+    bed : CastleCobble {
+      Position: {0, 0.015, 0}
+      Box: {1.7, 0.03, 1.7}
+      texture.Transform: {scale_x: 1.4, scale_y: 1.4, offset_x: seed, offset_y: fract(seed * 7)}
+    }
+
+    for c in 0..5 {
+      const a = seed * 40 + c * 2.39
+      const r = 0.88 + fract(a) * 0.06
+      "loose_{c}" : CastleCobble {
+        Position: {sin(a) * r, 0.02, cos(a) * r}
+        Rotation: {0, a, 0}
+        Cylinder: {length: 0.04, radius: 0.07 + fract(a * 3) * 0.04, segments: 7}
+        texture.Transform: {scale_x: 0.1, scale_y: 0.1}
+      }
+    }
+  }
+
+  template CourtProps {
+    prop seed: f32 = 0
+
+    const pick = floor(fract(seed * 23.7) * 6)
+    Rotation: {0, floor(seed * 4) * HALF_PI, 0}
+
+    if pick == 0 {
+      well {
+        ring : CastleStone {
+          Position: {0, 0.2, 0}
+          Tube: {length: 0.4, radius: 0.3, thickness: 0.08, segments: 16}
+          texture.Transform: {scale_x: 1.4, scale_y: 0.3}
+        }
+
+        water : CastleWater {
+          Position: {0, 0.15, 0}
+          Cylinder: {length: 0.02, radius: 0.22, segments: 16}
+        }
+
+        post_a : CastleTimber { Position: {-0.28, 0.5, 0}; Box: {0.05, 0.6, 0.05} }
+        post_b : CastleTimber { Position: {0.28, 0.5, 0}; Box: {0.05, 0.6, 0.05} }
+        roof : CastleTile { Position: {0, 0.92, 0}; TrianglePrism: {0.75, 0.26, 0.5} }
+        axle : CastleTimber {
+          Position: {0, 0.68, 0}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {length: 0.56, radius: 0.03, segments: 6}
+        }
+
+        bucket : CastleWood {
+          Position: {0, 0.45, 0}
+          Cylinder: {length: 0.1, radius: 0.05, segments: 8}
+        }
+      }
+
+      Folk drawer(seed: seed) { Position: {0.2, 0, 0.42}; Rotation: {0, PI, 0} }
+    } else if pick == 1 {
+      Barrel b1 { Position: {-0.4, 0, -0.3} }
+      Barrel b2 { Position: {-0.18, 0, -0.38} }
+      Barrel b3 { Position: {-0.3, 0.26, -0.33} }
+      Crate c1(s: 0.22) { Position: {0.3, 0, -0.3}; Rotation: {0, 0.3, 0} }
+      Crate c2(s: 0.16) { Position: {0.3, 0.22, -0.3}; Rotation: {0, 0.8, 0} }
+      Folk porter(seed: seed) { Position: {0.1, 0, 0.3}; Rotation: {0, -0.8, 0} }
+    } else if pick == 2 {
+      HayBale h1 { Position: {-0.3, 0, 0.2}; Rotation: {0, 0.4, 0} }
+      HayBale h2 { Position: {0.1, 0, 0.35}; Rotation: {0, -0.2, 0} }
+      HayBale h3 { Position: {-0.1, 0.18, 0.28}; Rotation: {0, 0.1, 0} }
+      cart {
+        Position: {0.35, 0, -0.3}
+        Rotation: {0, 0.6, 0}
+        bed_ : CastleOldWood {
+          Position: {0, 0.26, 0}
+          Box: {0.7, 0.04, 0.4}
+          texture.Transform: {scale_x: 0.7, scale_y: 0.4}
+        }
+
+        side_a : CastleOldWood { Position: {0, 0.34, 0.2}; Box: {0.7, 0.14, 0.03} }
+        side_b : CastleOldWood { Position: {0, 0.34, -0.2}; Box: {0.7, 0.14, 0.03} }
+        wheel_a : CastleTimber {
+          Position: {0.05, 0.17, 0.23}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {length: 0.03, radius: 0.17, segments: 12}
+        }
+
+        wheel_b : CastleTimber {
+          Position: {0.05, 0.17, -0.23}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {length: 0.03, radius: 0.17, segments: 12}
+        }
+
+        shaft : CastleTimber {
+          Position: {-0.55, 0.22, 0}
+          Rotation: {0, 0, 0.15}
+          Box: {0.45, 0.03, 0.26}
+        }
+
+        hay : CastleHay {
+          Position: {0, 0.36, 0}
+          Scale: {1.3, 0.5, 0.75}
+          IcoSphere: {radius: 0.26, segments: 1}
+        }
+      }
+    } else if pick == 3 {
+      stall {
+        table_ : CastleOldWood {
+          Position: {0, 0.3, 0}
+          Box: {0.8, 0.05, 0.4}
+          texture.Transform: {scale_x: 0.8, scale_y: 0.4}
+        }
+
+        leg_a : CastleTimber { Position: {-0.36, 0.15, 0}; Box: {0.04, 0.3, 0.36} }
+        leg_b : CastleTimber { Position: {0.36, 0.15, 0}; Box: {0.04, 0.3, 0.36} }
+        pole_a : CastleTimber { Position: {-0.38, 0.45, -0.18}; Box: {0.03, 0.9, 0.03} }
+        pole_b : CastleTimber { Position: {0.38, 0.45, -0.18}; Box: {0.03, 0.9, 0.03} }
+        awning : CastleBanner {
+          Position: {0, 0.86, 0.02}
+          Rotation: {0.45, 0, 0}
+          Box: {0.86, 0.02, 0.5}
+        }
+
+        stripe_a : CastleCloth {
+          Position: {-0.2, 0.865, 0.02}
+          Rotation: {0.45, 0, 0}
+          Box: {0.14, 0.022, 0.5}
+        }
+
+        stripe_b : CastleCloth {
+          Position: {0.2, 0.865, 0.02}
+          Rotation: {0.45, 0, 0}
+          Box: {0.14, 0.022, 0.5}
+        }
+
+        for g in 0..4 {
+          "good_{g}" : CastlePumpkin {
+            Position: {-0.27 + g * 0.18, 0.37, 0.05}
+            Sphere: {radius: 0.05, segments: 8}
+          }
+        }
+
+        basket : CastleHay {
+          Position: {0.2, 0.36, -0.08}
+          Cylinder: {length: 0.08, radius: 0.08, segments: 10}
+        }
+      }
+
+      Folk seller(seed: seed) { Position: {0, 0, -0.42} }
+      Folk buyer(seed: seed + 0.31) { Position: {0.15, 0, 0.5}; Rotation: {0, PI + 0.3, 0} }
+    } else if pick == 4 {
+      fire {
+        ring : CastleDarkStone {
+          Position: {0, 0.04, 0}
+          Tube: {length: 0.08, radius: 0.22, thickness: 0.07, segments: 10}
+        }
+
+        log_a : CastleBark {
+          Position: {0, 0.06, 0}
+          Rotation: {0, 0.5, HALF_PI}
+          Cylinder: {length: 0.26, radius: 0.03, segments: 6}
+        }
+
+        log_b : CastleBark {
+          Position: {0, 0.06, 0}
+          Rotation: {0, -0.7, HALF_PI}
+          Cylinder: {length: 0.26, radius: 0.03, segments: 6}
+        }
+
+        flame : CastleFlame {
+          Position: {0, 0.12, 0}
+          Cone: {length: 0.18, radius: 0.08, segments: 6}
+        }
+
+        embers {
+          Position: {0, 0.16, 0}
+          Emitter: {
+            max: 24, rate: 6,
+            shape: EmitterSphere, radius: 0.05,
+            direction: {0, 1, 0}, spread: 20, speed: {0.3, 0.6},
+            lifetime: {0.6, 1.2}, size: {0.02, 0.04}, opacity: {0.8, 1},
+            color: {255, 160, 60}, color_variance: {0, 40, 20},
+            seed: seed * 500
+          }
+          Appearance: {blend: Additive}
+          Curves: {opacity: {keys: [{0, 1}, {0.333, 1}, {0.667, 0.5}, {1, 0}]}}
+        }
+      }
+
+      log_seat : CastleBark {
+        Position: {0, 0.06, 0.45}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {length: 0.5, radius: 0.06, segments: 7}
+      }
+
+      Folk sitter_a(seed: seed) { Position: {-0.2, 0, 0.55}; Rotation: {0, PI, 0} }
+      Folk sitter_b(seed: seed + 0.45) { Position: {0.45, 0, -0.1}; Rotation: {0, -HALF_PI, 0} }
+    } else {
+      Tuft t1(seed: seed) { Position: {-0.5, 0, 0.4} }
+      Tuft t2(seed: seed + 0.3) { Position: {0.5, 0, -0.5} }
+      Crate c1(s: 0.2) { Position: {0.5, 0, 0.5}; Rotation: {0, 0.2, 0} }
+    }
+  }
+
+  template MeadowProps {
+    prop seed: f32 = 0
+
+    const pick = floor(fract(seed * 31.3) * 5)
+
+    if pick == 0 {
+      Flowers f1(seed: seed) { Position: {-0.4, 0, 0.3} }
+      Flowers f2(seed: seed + 0.5) { Position: {0.5, 0, -0.4} }
+      Tuft t1(seed: seed) { Position: {0.2, 0, 0.6} }
+    } else if pick == 1 {
+      Tuft t1(seed: seed) { Position: {-0.6, 0, -0.5} }
+      Tuft t2(seed: seed + 0.2) { Position: {0.5, 0, 0.3} }
+      Tuft t3(seed: seed + 0.4) { Position: {-0.2, 0, 0.6} }
+    } else if pick == 2 {
+      Sheep sheep(seed: seed) { Position: {0.2, 0, 0.1}; Rotation: {0, seed * 20, 0} }
+      Flowers f1(seed: seed + 0.2) { Position: {-0.5, 0, -0.4} }
+    } else if pick == 3 {
+      stone_ : CastleRock {
+        Position: {0.3, 0.06, -0.3}
+        Rotation: {seed, seed * 5, 0}
+        IcoSphere: {radius: 0.16, segments: 1}
+      }
+
+      Tuft t1(seed: seed) { Position: {0.1, 0, -0.1} }
+      Flowers f1(seed: seed + 0.7) { Position: {-0.5, 0, 0.5} }
+    }
+  }
+
+  template Barn {
+    prop seed: f32 = 0
+
+    plinth : CastleDarkStone { Position: {0, 0.05, 0}; Box: {1.7, 0.1, 1.2} }
+    walls : CastleOldWood {
+      Position: {0, 0.1 + 0.5, 0}
+      Box: {1.6, 1.0, 1.1}
+      texture.Transform: {scale_x: 1.6, scale_y: 1}
+    }
+
+    for p in 0..4 {
+      const px = match p % 2 { 0: -0.78; _: 0.78 }
+      const pz = p < 2 ? -0.53 : 0.53
+      "post_{p}" : CastleTimber { Position: {px, 0.6, pz}; Box: {0.08, 1.0, 0.08} }
+    }
+
+    roof : CastleThatch {
+      Position: {0, 1.1 + 0.4, 0}
+      Rotation: {0, HALF_PI, 0}
+      TrianglePrism: {1.36, 0.8, 1.84}
+    }
+
+    ridge : CastleThatch {
+      Position: {0, 1.9, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {length: 1.86, radius: 0.06, segments: 8}
+    }
+
+    door_l : CastleWood {
+      Position: {-0.3, 0.5, 0.62}
+      Rotation: {0, -0.9, 0}
+      Box: {0.42, 0.8, 0.04}
+    }
+
+    door_r : CastleWood {
+      Position: {0.3, 0.5, 0.62}
+      Rotation: {0, 0.9, 0}
+      Box: {0.42, 0.8, 0.04}
+    }
+
+    dark : CastleDark { Position: {0, 0.5, 0.555}; Box: {0.8, 0.8, 0.01} }
+    hay : CastleHay {
+      Position: {0, 0.35, 0.3}
+      Scale: {1.4, 0.8, 0.8}
+      IcoSphere: {radius: 0.25, segments: 1}
+    }
+
+    loft : CastleWood { Position: {0, 1.32, 0.56}; Box: {0.3, 0.3, 0.02} }
+  }
+
+  template HayCart {
+    bed_ : CastleOldWood {
+      Position: {0, 0.26, 0}
+      Box: {0.7, 0.04, 0.4}
+      texture.Transform: {scale_x: 0.7, scale_y: 0.4}
+    }
+
+    side_a : CastleOldWood { Position: {0, 0.34, 0.2}; Box: {0.7, 0.14, 0.03} }
+    side_b : CastleOldWood { Position: {0, 0.34, -0.2}; Box: {0.7, 0.14, 0.03} }
+    wheel_a : CastleTimber {
+      Position: {0.05, 0.17, 0.23}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {length: 0.03, radius: 0.17, segments: 12}
+    }
+
+    wheel_b : CastleTimber {
+      Position: {0.05, 0.17, -0.23}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {length: 0.03, radius: 0.17, segments: 12}
+    }
+
+    shaft : CastleTimber {
+      Position: {-0.55, 0.22, 0}
+      Rotation: {0, 0, 0.15}
+      Box: {0.45, 0.03, 0.26}
+    }
+
+    hay : CastleHay {
+      Position: {0, 0.36, 0}
+      Scale: {1.3, 0.5, 0.75}
+      IcoSphere: {radius: 0.26, segments: 1}
+    }
+  }
+
+  template FarmFence {
+    prop len: f32 = 7.8
+    prop posts: i32 = 10
+
+    rail_a : CastleOldWood { Position: {0, 0.2, 0}; Box: {len, 0.04, 0.035} }
+    rail_b : CastleOldWood { Position: {0, 0.34, 0}; Box: {len, 0.04, 0.035} }
+
+    for p in 0..posts {
+      "post_{p}" : CastleTimber {
+        Position: {0 - len / 2 + p * len / (posts - 1), 0.2, 0}
+        Box: {0.06, 0.42, 0.06}
+      }
+    }
+  }
+
+  template CropPlot {
+    prop w: f32 = 3.4
+    prop d: f32 = 5
+    prop rows: i32 = 9
+    prop tall: f32 = 0.12
+    prop green: bool = false
+
+    const pitch = w / rows
+    const rr = pitch * 0.34
+    bed : CastlePlowed {
+      Position: {0, 0.03, 0}
+      Box: {w, 0.02, d}
+      texture.Transform: {scale_x: w / 3, scale_y: d / 3}
+    }
+
+    for r in 0..rows {
+      const rx = 0 - w / 2 + pitch * (r + 0.5)
+
+      if green {
+        "row_{r}" : CastleGreenRow {
+          Position: {rx, 0.04, 0}
+          Rotation: {HALF_PI, 0, 0}
+          Scale: {1, 1, tall / rr}
+          Cylinder: {length: d - 0.1, radius: rr, segments: 10}
+        }
+      } else {
+        "row_{r}" : CastleWheatRow {
+          Position: {rx, 0.04, 0}
+          Rotation: {HALF_PI, 0, 0}
+          Scale: {1, 1, tall * 1.2 / rr}
+          Cylinder: {length: d - 0.1, radius: rr, segments: 10}
+        }
+      }
+    }
+  }
+
+  template FarmPiece {
+    prop seed: f32 = 0
+    prop research: i32 = 0
+
+    const green = fract(seed * 5.3) > 0.5
+    const rows = 9 + research
+    const tall = 0.1 + research * 0.035
+
+    frame {
+      soil : CastlePlowed {
+        Position: {0, 0.02, 0}
+        Box: {7.9, 0.04, 7.9}
+        texture.Transform: {scale_x: 2.5, scale_y: 2.5}
+      }
+
+      yard : CastleDirt {
+        Position: {0, 0.035, -2.75}
+        Box: {7.7, 0.02, 2.3}
+        texture.Transform: {scale_x: 2.5, scale_y: 0.8}
+      }
+
+      lane : CastleDirt {
+        Position: {0, 0.035, 1.2}
+        Box: {0.5, 0.02, 5.4}
+        texture.Transform: {scale_x: 0.2, scale_y: 1.8}
+      }
+
+      const reaped = research >= 3 ? 1.1 : 0
+      CropPlot plot_a(w: 3.4, d: 5.2 - reaped, rows: rows, tall: tall, green: false) {
+        Position: {-1.98, 0, 1.2 - reaped / 2}
+      }
+
+      CropPlot plot_b(w: 3.4, d: 5.2, rows: rows, tall: tall, green: green) {
+        Position: {1.98, 0, 1.2}
+      }
+
+      FarmFence fence_n { Position: {0, 0, -3.88} }
+      FarmFence fence_w { Position: {-3.88, 0, 0}; Rotation: {0, HALF_PI, 0} }
+      FarmFence fence_e { Position: {3.88, 0, 0}; Rotation: {0, HALF_PI, 0} }
+      FarmFence fence_sl(len: 3.4, posts: 5) { Position: {-2.18, 0, 3.88} }
+      FarmFence fence_sr(len: 3.4, posts: 5) { Position: {2.18, 0, 3.88} }
+      gate_l : CastleOldWood {
+        Position: {-0.3, 0.27, 4.12}
+        Rotation: {0, 1.1, 0}
+        Box: {0.56, 0.22, 0.04}
+      }
+
+      gate_r : CastleOldWood {
+        Position: {0.3, 0.27, 4.12}
+        Rotation: {0, -1.1, 0}
+        Box: {0.56, 0.22, 0.04}
+      }
+
+      HousePiece farmhouse(level_: 1, seed: fract(seed * 3.1) * 0.5) {
+        Position: {-2.5, 0, -2.75}
+        Rotation: {0, 0, 0}
+        Scale: {1.1, 1.1, 1.1}
+      }
+
+      Barn barn(seed: seed) { Position: {1.4, 0, -2.95} }
+      HayBale bale_a { Position: {2.75, 0.04, -2.1}; Rotation: {0, 0.3, 0}; Scale: {1.6, 1.6, 1.6} }
+      HayBale bale_b {
+        Position: {3.1, 0.04, -2.55}
+        Rotation: {0, -0.4, 0}
+        Scale: {1.6, 1.6, 1.6}
+      }
+
+      HayCart cart { Position: {0.0, 0.04, -1.95}; Rotation: {0, 0.5, 0}; Scale: {1.3, 1.3, 1.3} }
+      trough : CastleOldWood { Position: {3.2, 0.14, -3.4}; Box: {0.6, 0.18, 0.24} }
+
+      Folk farmer(seed: seed) {
+        Position: {-1.9 + seed, 0.04, 0.8}
+        Rotation: {0, seed * 9, 0}
+        Scale: {1.4, 1.4, 1.4}
+      }
+
+      Folk wife(seed: seed + 0.53) {
+        Position: {-0.9, 0.04, -2.2}
+        Rotation: {0, -0.6, 0}
+        Scale: {1.4, 1.4, 1.4}
+      }
+
+      for c in 0..4 {
+        "hen_{c}" : CastleWool {
+          Position: {-0.4 + c * 0.22, 0.09, -1.6 - fract(c * 0.37) * 0.3}
+          Scale: {1, 0.9, 1.3}
+          IcoSphere: {radius: 0.06, segments: 1}
+        }
+      }
+
+      if research >= 1 {
+        Scarecrow crow_a { Position: {-1.98, 0.04, 2.0}; Scale: {1.5, 1.5, 1.5} }
+        Plough plough {
+          Position: {-0.75, 0.04, -1.85}
+          Rotation: {0, 1.2, 0}
+          Scale: {1.4, 1.4, 1.4}
+        }
+      }
+
+      if research >= 2 {
+        Scarecrow crow_b {
+          Position: {1.98, 0.04, 0.4}
+          Rotation: {0, 0.7, 0}
+          Scale: {1.5, 1.5, 1.5}
+        }
+
+        for t in 0..3 {
+          "orchard_{t}" {
+            Position: {3.35, 0, -0.9 + t * 1.6}
+            Scale: {0.55, 0.55, 0.55}
+            TreePiece tree(seed: 0.5 + t * 0.12)
+          }
+        }
+      }
+
+      if research >= 3 {
+        stubble : CastleHay {
+          Position: {-1.98, 0.035, 3.25}
+          Box: {3.4, 0.02, 1.0}
+          texture.Transform: {scale_x: 2, scale_y: 0.6}
+        }
+
+        for k in 0..5 {
+          Stook "stook_{k}"(s: 1.6) {
+            Position: {-3.3 + k * 0.6, 0.04, 3.25 + (fract(k * 0.61) - 0.5) * 0.4}
+          }
+        }
+
+        Horse horse(seed: seed) {
+          Position: {1.2, 0.04, 2.6}
+          Rotation: {0, 0.2, 0}
+          Scale: {1.8, 1.8, 1.8}
+        }
+
+        Folk ploughman(seed: seed + 0.27) {
+          Position: {1.2, 0.04, 1.8}
+          Rotation: {0, 0.2, 0}
+          Scale: {1.4, 1.4, 1.4}
+        }
+      }
+
+      if research >= 4 {
+        granary {
+          Position: {3.1, 0.04, -1.6}
+          Scale: {1.6, 1.6, 1.6}
+
+          for s in 0..4 {
+            const sx = match s % 2 { 0: -0.16; _: 0.16 }
+            const sz = s < 2 ? -0.14 : 0.14
+            "stilt_{s}" : CastleDarkStone {
+              Position: {sx, 0.06, sz}
+              Cylinder: {length: 0.12, radius: 0.035, segments: 6}
+            }
+          }
+
+          floor_ : CastleOldWood { Position: {0, 0.13, 0}; Box: {0.42, 0.03, 0.36} }
+          walls : CastleWood {
+            Position: {0, 0.3, 0}
+            Box: {0.38, 0.3, 0.32}
+            texture.Transform: {scale_x: 0.4, scale_y: 0.3}
+          }
+
+          roof : CastleThatch { Position: {0, 0.58, 0}; TrianglePrism: {0.48, 0.26, 0.42} }
+          sack_a : CastleCloth {
+            Position: {0.28, 0.08, 0.16}
+            Scale: {1, 1.2, 1}
+            IcoSphere: {radius: 0.07, segments: 1}
+          }
+        }
+
+        for b in 0..3 {
+          "hive_{b}" : CastleHay {
+            Position: {-3.4 + b * 0.35, 0.18, -0.9}
+            Cone: {length: 0.3, radius: 0.13, segments: 8}
+          }
+        }
+      }
+    }
+  }
+
+  template SmithyPiece {
+    prop seed: f32 = 0
+    prop working: bool = false
+    prop ruined: bool = false
+
+    const coal: Rgb = match working { true: {255, 150, 60}; _: {200, 90, 40} }
+
+    frame {
+      plinth : CastleDarkStone {
+        Position: {0, 0.05, 0}
+        Box: {1.7, 0.1, 1.6}
+        texture.Transform: {scale_x: 1.4, scale_y: 0.1}
+      }
+
+      floor_ : CastleCobble {
+        Position: {0, 0.105, 0.35}
+        Box: {1.5, 0.02, 0.8}
+        texture.Transform: {scale_x: 1, scale_y: 0.6}
+      }
+
+      shop {
+        Position: {0, 0, -0.42}
+        walls : CastleStoneBlock {
+          Position: {0, 0.1 + 0.55, 0}
+          Box: {1.5, 1.1, 0.72}
+
+          if ruined { Rgb: {176, 166, 146} }
+        }
+
+        HouseRoof roof(thatch: false, span: 0.92, rise: 0.5, len: 1.62, ruined: ruined) {
+          Position: {0, 1.2 + 0.25, 0}
+        }
+
+        door : CastleWood {
+          Position: {0.45, 0.45, 0.365}
+          Box: {0.3, 0.62, 0.02}
+          texture.Transform: {scale_x: 0.3, scale_y: 0.6}
+        }
+
+        Pane win(lit: !ruined) { Position: {-0.3, 0.7, 0.365}; Box: {0.24, 0.2, 0.02} }
+
+        for t in 0..4 {
+          "tool_{t}" : CastleIron {
+            Position: {-0.62 + t * 0.09, 0.62, 0.38}
+            Box: {0.025, 0.3, 0.02}
+          }
+        }
+      }
+
+      lean_roof : CastleOldWood {
+        Position: {0, 1.05, 0.28}
+        Rotation: {0.35, 0, 0}
+        Box: {1.56, 0.04, 0.82}
+        texture.Transform: {scale_x: 1.5, scale_y: 0.8}
+
+        if ruined { Rgb: {100, 84, 70} }
+      }
+
+      post_a : CastleTimber { Position: {-0.7, 0.5, 0.62}; Box: {0.07, 0.9, 0.07} }
+      post_b : CastleTimber { Position: {0.7, 0.5, 0.62}; Box: {0.07, 0.9, 0.07} }
+      beam : CastleTimber { Position: {0, 0.94, 0.62}; Box: {1.48, 0.06, 0.07} }
+
+      forge {
+        Position: {-0.45, 0, 0.1}
+        hearth : CastleDarkStone {
+          Position: {0, 0.32, 0}
+          Box: {0.5, 0.44, 0.44}
+          texture.Transform: {scale_x: 0.5, scale_y: 0.4}
+        }
+
+        if ruined {
+          ash : CastleDark { Position: {0, 0.555, 0}; Box: {0.36, 0.02, 0.3} }
+        } else {
+          coals {
+            Position: {0, 0.555, 0}
+            Box: {0.36, 0.03, 0.3}
+            Rgb: coal
+            Emissive: {strength: working ? 6 : 2.5, color: coal}
+            NoShadow
+          }
+
+          flame : CastleFlame {
+            Position: {0, 0.62, -0.04}
+            Cone: {length: working ? 0.18 : 0.1, radius: 0.08, segments: 6}
+          }
+        }
+
+        hood : CastleDarkStone {
+          Position: {0, 1.0, -0.1}
+          Frustum: {length: 0.4, radius_bottom: 0.3, radius_top: 0.14, segments: 4}
+          Rotation: {0, 0.7854, 0}
+        }
+
+        Chimney stack(h: 1.0, smoke: !ruined, seed: seed) { Position: {0, 1.2, -0.1} }
+        bellows : CastleOldWood {
+          Position: {0.32, 0.4, -0.05}
+          Rotation: {0, 0, 0.3}
+          Box: {0.2, 0.06, 0.16}
+        }
+      }
+
+      anvil {
+        Position: {0.2, 0, 0.32}
+        stump : CastleBark {
+          Position: {0, 0.2, 0}
+          Cylinder: {length: 0.2, radius: 0.1, segments: 8}
+        }
+
+        base : CastleIron { Position: {0, 0.33, 0}; Box: {0.08, 0.08, 0.06} }
+        top : CastleIron { Position: {0, 0.39, 0}; Box: {0.2, 0.05, 0.08} }
+        horn : CastleIron {
+          Position: {0.14, 0.39, 0}
+          Rotation: {0, 0, -HALF_PI}
+          Cone: {length: 0.1, radius: 0.03, segments: 6}
+        }
+
+        if working && !ruined {
+          sparks {
+            Position: {0, 0.44, 0}
+            Emitter: {
+              max: 40, rate: 14,
+              shape: EmitterSphere, radius: 0.02,
+              direction: {0, 1, 0}, spread: 70, speed: {0.6, 1.4},
+              lifetime: {0.3, 0.6}, size: {0.015, 0.03}, opacity: {0.9, 1},
+              color: {255, 190, 90}, color_variance: {0, 40, 30},
+              seed: seed * 300
+            }
+            Appearance: {blend: Additive, stretch: 0.03}
+            Forces: {gravity: {0, -4, 0}}
+          }
+        }
+      }
+
+      trough : CastleOldWood { Position: {0.68, 0.18, 0.2}; Box: {0.2, 0.16, 0.4} }
+      trough_water : CastleWater { Position: {0.68, 0.25, 0.2}; Box: {0.16, 0.02, 0.36} }
+      grind {
+        Position: {0.62, 0, 0.82}
+        frame_ : CastleTimber { Position: {0, 0.15, 0}; Box: {0.04, 0.3, 0.2} }
+        wheel : CastleRock {
+          Position: {0, 0.26, 0}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {length: 0.05, radius: 0.12, segments: 12}
+        }
+      }
+
+      sign_arm : CastleIron { Position: {-0.7, 0.88, 0.8}; Box: {0.03, 0.03, 0.3} }
+      shoe : CastleIron {
+        Position: {-0.7, 0.76, 0.92}
+        Torus: {radius: 0.07, tube: 0.018, segments: 10, rings: 6}
+      }
+
+      Barrel barrel_a { Position: {-0.75, 0.1, -0.0} }
+      Crate ore(s: 0.18) { Position: {-0.15, 0.1, 0.78}; Rotation: {0, 0.3, 0} }
+
+      if ruined {
+        Weeds weeds(seed: seed, r: 0.7)
+      } else {
+        Folk smith(seed: seed + 0.42) { Position: {0.2, 0.1, 0.55}; Rotation: {0, PI, 0} }
+
+        if working {
+          Folk apprentice(seed: seed + 0.8) {
+            Position: {-0.12, 0.1, 0.2}
+            Rotation: {0, -HALF_PI, 0}
+          }
+        }
+      }
+    }
+  }
+
+  // The moat has no piece: the cell itself shows the water.
+  template PieceView {
+    prop k: i32 = 0
+    prop lvl: i32 = 1
+    prop seed: f32 = 0
+    prop ruined: bool = false
+    prop working: bool = false
+    prop face: i32 = 0
+    prop n: bool = false
+    prop e: bool = false
+    prop s: bool = false
+    prop w: bool = false
+    prop hn: f32 = 0
+    prop he: f32 = 0
+    prop hs: f32 = 0
+    prop hw: f32 = 0
+    prop tn: bool = false
+    prop te: bool = false
+    prop ts: bool = false
+    prop tw: bool = false
+
+    const turn = face * HALF_PI
+
+    if k == K_WALL {
+      WallPiece piece(level_: lvl, seed: seed, n: n, e: e, s: s, w: w)
+    } else if k == K_TOWER {
+      TowerPiece piece(
+        level_: lvl,
+        seed: seed,
+        face: face,
+        hn: hn,
+        he: he,
+        hs: hs,
+        hw: hw,
+        tn: tn,
+        te: te,
+        ts: ts,
+        tw: tw
+      )
+    } else if k == K_GATE {
+      GatePiece piece(level_: lvl, along_z: (n || s) && !e && !w, seed: seed)
+    } else if k == K_KEEP {
+      KeepPiece piece(level_: lvl, seed: seed, ruined: ruined) { Rotation: {0, turn, 0} }
+    } else if k == K_HOUSE {
+      HousePiece piece(level_: lvl, seed: seed, ruined: ruined) { Rotation: {0, turn, 0} }
+    } else if k == K_SMITH {
+      SmithyPiece piece(seed: seed, working: working, ruined: ruined) { Rotation: {0, turn, 0} }
+    } else if k == K_QUARRY {
+      QuarryPiece piece(seed: seed) { Rotation: {0, turn, 0} }
+    } else if k == K_TREE {
+      TreePiece piece(seed: seed)
+    } else if k == K_PATH {
+      PathPiece piece(seed: seed)
+    }
+  }
+}

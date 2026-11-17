@@ -2,6 +2,7 @@ include mossvale/state
 include mossvale/geo
 include mossvale/materials
 include mossvale/props
+include mossvale/house
 include mossvale/town
 include mossvale/targets
 include mossvale/npcs
@@ -30,7 +31,14 @@ using assets
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {environment: true, alpha_cutout: true, blend_modes: true, texture_blend: true, sheen: true}
+  Scene: {
+    environment: true,
+    alpha_cutout: true,
+    blend_modes: true,
+    texture_blend: true,
+    sheen: true
+  }
+
   if hour > 19 || hour < 5.5 {
     AmbientLight: {sky: {90, 110, 190}, ground: {40, 40, 60}, intensity: 1.1}
   } else if hour > 17.5 {
@@ -101,6 +109,7 @@ view {
 async {
   while true {
     await on.pressed(state.mv_actions.TalkKey)
+
     if game_state == 0 {
       emit StartGame()
     } else if game_state == 2 && clock > ending_t + 12 {

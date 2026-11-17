@@ -8,10 +8,12 @@ assets {
     prop mat: entity = 0
 
     body { (IsA, mat); Position: {0, 0.45, 0}; RoundedBox: {1.9, 0.9, 0.86, 0.03, segments: 1} }
+
     for i in 0..5 {
       { (IsA, StationDark); Position: {-0.76 + i * 0.38, 0.45, 0.44}; Box: {0.06, 0.76, 0.02} }
       { (IsA, StationDark); Position: {-0.76 + i * 0.38, 0.45, -0.44}; Box: {0.06, 0.76, 0.02} }
     }
+
     cap_a : StationDark { Position: {0.96, 0.45, 0}; Box: {0.03, 0.86, 0.82} }
     cap_b : StationDark { Position: {-0.96, 0.45, 0}; Box: {0.03, 0.86, 0.82} }
     lock_a : StationChrome { Position: {0.98, 0.45, 0.2}; Box: {0.012, 0.74, 0.03} }
@@ -31,11 +33,27 @@ assets {
     light_b : StationCyanLight { Position: {0, 2.82, 2.35}; Box: {3.8, 0.02, 0.06} }
     gantry : StationHazard { Position: {0.5, 2.9, 0}; Box: {0.3, 0.2, 4.8} }
     trolley : StationDark { Position: {0.5, 2.7, 0.8}; Box: {0.5, 0.2, 0.5} }
-    hoist : StationDark { Position: {0.5, 2.1, 0.8}; Cylinder: {radius: 0.015, length: 1, segments: 5} }
-    for i in 0..3 {
-      { (IsA, StationTruss); Position: {-2.35, 0.9 + i * 0.9, -1.8 + i * 1.8}; Rotation: {0.6, 0, 0}; Box: {0.05, 2.2, 0.05} }
-      { (IsA, StationTruss); Position: {2.35, 0.9 + i * 0.9, -1.8 + i * 1.8}; Rotation: {0.6, 0, 0}; Box: {0.05, 2.2, 0.05} }
+    hoist : StationDark {
+      Position: {0.5, 2.1, 0.8}
+      Cylinder: {radius: 0.015, length: 1, segments: 5}
     }
+
+    for i in 0..3 {
+      {
+        (IsA, StationTruss)
+        Position: {-2.35, 0.9 + i * 0.9, -1.8 + i * 1.8}
+        Rotation: {0.6, 0, 0}
+        Box: {0.05, 2.2, 0.05}
+      }
+
+      {
+        (IsA, StationTruss)
+        Position: {2.35, 0.9 + i * 0.9, -1.8 + i * 1.8}
+        Rotation: {0.6, 0, 0}
+        Box: {0.05, 2.2, 0.05}
+      }
+    }
+
     StationContainer c_a(mat: StationOrange) { Position: {-1.1, 0.2, -1.5} }
     StationContainer c_b(mat: StationBlue) { Position: {-1.1, 0.2, -0.5} }
     StationContainer c_c(mat: StationRed) { Position: {-1.1, 0.2, 0.5} }

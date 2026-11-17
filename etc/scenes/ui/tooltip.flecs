@@ -12,18 +12,11 @@ using box.material
 using box.text
 using box.spatial
 
-// Behavior of a tooltip, a child of the element it explains. shown is whether it shows: it does
-// after the pointer has rested on the parent for delay seconds, and hides when the pointer leaves
-// the parent or presses it; after a press it waits for the pointer to leave and come back. It
-// hides and does not show while the parent is disabled (its Cursor is CursorNotAllowed), and goes
-// with the parent when the parent is deleted. ui.delay counts the seconds in world time.
+// Behavior of a tooltip, a child of the element it explains. shown is whether it shows: after the
+// pointer has rested on the parent for delay seconds, until it leaves or presses the parent.
 //
-// It is a Float below the parent, centered on it, that flips above it when it does not fit
-// below; like the list of a Dropdown it draws over the other widgets and outside the clips of its
-// ancestors, and hides while a scroll view clips the parent out of view. It is Ignore, so
-// neither it nor its children are picked: the pointer reaches what lies under it and the parent
-// keeps its hover while the tooltip covers it. over is whether the pointer is over the parent and
-// leaves counts the times it left or pressed it.
+// It floats below the parent and is never picked. over is whether the pointer is over the parent
+// and leaves counts the times it left or pressed it.
 template HeadlessTooltip {
   prop text: string = ""
   prop delay: f32 = 0.5
@@ -80,9 +73,11 @@ template HeadlessTooltip {
     while true {
       await on.enter(owner)
       waiting = true
+
       while waiting {
         const left = leaves
         await ui.delay(delay)
+
         if leaves == left {
           waiting = false
           shown = over && !blocked

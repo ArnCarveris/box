@@ -34,44 +34,107 @@ assets {
     const turn = pr_hash(seed * 1.7) * 6.28
     grate : ParisIron { Position: {0, 0.16, 0}; Box: {1.5, 0.03, 1.5} }
     soil : ParisSoil { Position: {0, 0.155, 0}; Box: {1.3, 0.02, 1.3} }
-    trunk : ParisBark { Position: {0, height / 2, 0}; Frustum: {radius_bottom: 0.3, radius_top: 0.18, length: height, segments: 12, smooth: true} }
+    trunk : ParisBark {
+      Position: {0, height / 2, 0}
+      Frustum: {radius_bottom: 0.3, radius_top: 0.18, length: height, segments: 12, smooth: true}
+    }
+
     for b in 0..3 {
       const a = turn + b * 2.1
-      { (IsA, ParisBark); Position: {cos(a) * 0.55, height + 0.7, sin(a) * 0.55}; Rotation: {0, 0 - a, 0.5}; Cylinder: {radius: 0.11, length: 2, segments: 8, smooth: true} }
+      {
+        (IsA, ParisBark)
+        Position: {cos(a) * 0.55, height + 0.7, sin(a) * 0.55}
+        Rotation: {0, 0 - a, 0.5}
+        Cylinder: {radius: 0.11, length: 2, segments: 8, smooth: true}
+      }
     }
+
     for c in 0..7 {
       const a = turn + c * 0.9
       const r = c == 0 ? 0 : 1.5 + pr_hash(seed * 13 + c) * 0.8
       const s = 1.5 + pr_hash(seed * 5 + c * 2.3) * 0.7
       const y = height + 2.2 + (c == 0 ? 1.2 : pr_hash(seed * 3 + c * 1.1) * 1.4)
+
       if c % 3 == 1 {
-        { (IsA, ParisLeavesDark); Position: {cos(a) * r, y, sin(a) * r}; Scale: {1, 0.75, 1}; IcoSphere: {radius: s, segments: 2} }
+        {
+          (IsA, ParisLeavesDark)
+          Position: {cos(a) * r, y, sin(a) * r}
+          Scale: {1, 0.75, 1}
+          IcoSphere: {radius: s, segments: 2}
+        }
       } else {
-        { (IsA, ParisLeaves); Position: {cos(a) * r, y, sin(a) * r}; Scale: {1, 0.75, 1}; IcoSphere: {radius: s, segments: 2} }
+        {
+          (IsA, ParisLeaves)
+          Position: {cos(a) * r, y, sin(a) * r}
+          Scale: {1, 0.75, 1}
+          IcoSphere: {radius: s, segments: 2}
+        }
       }
     }
   }
 
   // Green cast iron street lamp with a warm lantern. The light is static: it goes into the bake.
   template ParisStreetLamp {
-    base : ParisLampGreen { Position: {0, 0.45, 0}; Frustum: {radius_bottom: 0.26, radius_top: 0.13, length: 0.9, segments: 12, smooth: true} }
-    collar : ParisLampGreen { Position: {0, 0.95, 0}; Torus: {radius: 0.12, tube: 0.04, segments: 12, rings: 6} }
-    column : ParisLampGreen { Position: {0, 2.4, 0}; Cylinder: {radius: 0.075, length: 3, segments: 10, smooth: true} }
-    neck : ParisLampGreen { Position: {0, 3.95, 0}; Frustum: {radius_bottom: 0.08, radius_top: 0.14, length: 0.2, segments: 10, smooth: true} }
-    lantern_floor : ParisLampGreen { Position: {0, 4.08, 0}; Cylinder: {radius: 0.17, length: 0.06, segments: 8} }
-    glass : ParisLampGlass { Position: {0, 4.36, 0}; Frustum: {radius_bottom: 0.15, radius_top: 0.25, length: 0.5, segments: 8} }
+    base : ParisLampGreen {
+      Position: {0, 0.45, 0}
+      Frustum: {radius_bottom: 0.26, radius_top: 0.13, length: 0.9, segments: 12, smooth: true}
+    }
+
+    collar : ParisLampGreen {
+      Position: {0, 0.95, 0}
+      Torus: {radius: 0.12, tube: 0.04, segments: 12, rings: 6}
+    }
+
+    column : ParisLampGreen {
+      Position: {0, 2.4, 0}
+      Cylinder: {radius: 0.075, length: 3, segments: 10, smooth: true}
+    }
+
+    neck : ParisLampGreen {
+      Position: {0, 3.95, 0}
+      Frustum: {radius_bottom: 0.08, radius_top: 0.14, length: 0.2, segments: 10, smooth: true}
+    }
+
+    lantern_floor : ParisLampGreen {
+      Position: {0, 4.08, 0}
+      Cylinder: {radius: 0.17, length: 0.06, segments: 8}
+    }
+
+    glass : ParisLampGlass {
+      Position: {0, 4.36, 0}
+      Frustum: {radius_bottom: 0.15, radius_top: 0.25, length: 0.5, segments: 8}
+    }
+
     for k in 0..4 {
       const a = k * math.PI / 2 + math.PI / 8
-      { (IsA, ParisLampGreen); Position: {cos(a) * 0.2, 4.36, sin(a) * 0.2}; Box: {0.025, 0.52, 0.025} }
+      {
+        (IsA, ParisLampGreen)
+        Position: {cos(a) * 0.2, 4.36, sin(a) * 0.2}
+        Box: {0.025, 0.52, 0.025}
+      }
     }
-    roof : ParisLampGreen { Position: {0, 4.76, 0}; Cone: {radius: 0.33, length: 0.32, segments: 8} }
+
+    roof : ParisLampGreen {
+      Position: {0, 4.76, 0}
+      Cone: {radius: 0.33, length: 0.32, segments: 8}
+    }
+
     finial : ParisLampGreen { Position: {0, 5.0, 0}; Sphere: {radius: 0.05, segments: 8} }
-    glow { Position: {0, 4.36, 0}; PointLight: {intensity: 30, range: 15, shadows: false}; Rgb: {255, 184, 112} }
+    glow {
+      Position: {0, 4.36, 0}
+      PointLight: {intensity: 30, range: 15, shadows: false}
+      Rgb: {255, 184, 112}
+    }
   }
 
   template ParisBench {
     seat : ParisDoorWood { Position: {0, 0.45, 0}; Box: {1.8, 0.06, 0.45} }
-    backrest : ParisDoorWood { Position: {0, 0.78, -0.24}; Rotation: {-0.2, 0, 0}; Box: {1.8, 0.36, 0.05} }
+    backrest : ParisDoorWood {
+      Position: {0, 0.78, -0.24}
+      Rotation: {-0.2, 0, 0}
+      Box: {1.8, 0.36, 0.05}
+    }
+
     for k in 0..2 {
       { (IsA, ParisIron); Position: {(k - 0.5) * 1.5, 0.22, 0}; Box: {0.06, 0.45, 0.45} }
       { (IsA, ParisIron); Position: {(k - 0.5) * 1.5, 0.7, -0.2}; Box: {0.05, 0.55, 0.05} }
@@ -79,35 +142,80 @@ assets {
   }
 
   template ParisMorrisColumn {
-    plinth : ParisLampGreen { Position: {0, 0.2, 0}; Cylinder: {radius: 0.68, length: 0.4, segments: 24, smooth: true} }
-    posters { Position: {0, 1.9, 0}; Cylinder: {radius: 0.58, length: 3, segments: 24, smooth: true}; Rgb: {214, 196, 160}; PbrMaterial: {roughness: 0.9} }
-    for k in 0..4 {
-      const ink: Rgb = match k { 0: {170, 40, 40}; 1: {40, 70, 130}; 2: {220, 170, 50}; _: {30, 30, 30} }
-      { Position: {cos(k * 1.57) * 0.585, 2.0, sin(k * 1.57) * 0.585}; Rotation: {0, 0 - k * 1.57 + 1.57, 0}; Box: {0.5, 0.9, 0.02}; Rgb: ink; PbrMaterial: {roughness: 0.8} }
+    plinth : ParisLampGreen {
+      Position: {0, 0.2, 0}
+      Cylinder: {radius: 0.68, length: 0.4, segments: 24, smooth: true}
     }
-    cornice : ParisLampGreen { Position: {0, 3.5, 0}; Cylinder: {radius: 0.72, length: 0.22, segments: 24, smooth: true} }
-    dome : ParisLampGreen { Position: {0, 3.6, 0}; HemiSphere: {radius: 0.62, segments: 24, smooth: true} }
+
+    posters {
+      Position: {0, 1.9, 0}
+      Cylinder: {radius: 0.58, length: 3, segments: 24, smooth: true}
+      Rgb: {214, 196, 160}
+      PbrMaterial: {roughness: 0.9}
+    }
+
+    for k in 0..4 {
+      const ink: Rgb = match k {
+        0: {170, 40, 40}
+        1: {40, 70, 130}
+        2: {220, 170, 50}
+        _: {30, 30, 30}
+      }
+      {
+        Position: {cos(k * 1.57) * 0.585, 2.0, sin(k * 1.57) * 0.585}
+        Rotation: {0, 0 - k * 1.57 + 1.57, 0}
+        Box: {0.5, 0.9, 0.02}
+        Rgb: ink
+        PbrMaterial: {roughness: 0.8}
+      }
+    }
+
+    cornice : ParisLampGreen {
+      Position: {0, 3.5, 0}
+      Cylinder: {radius: 0.72, length: 0.22, segments: 24, smooth: true}
+    }
+
+    dome : ParisLampGreen {
+      Position: {0, 3.6, 0}
+      HemiSphere: {radius: 0.62, segments: 24, smooth: true}
+    }
+
     finial : ParisLampGreen { Position: {0, 4.28, 0}; Sphere: {radius: 0.09, segments: 10} }
   }
 
-  // Steps down from the upper quay to the lower quay, along the quay wall. They start at x = 0
-  // (top, y = 0) and go down along +X (dir 1) or -X (dir -1); the wall face is z = 0, the steps lie at z < 0.
+  // Steps down from the upper quay along the quay wall, starting at x = 0 (top, y = 0) and going
+  // down along +X (dir 1) or -X (dir -1). The wall face is z = 0, the steps lie at z < 0.
   template ParisQuayStairs {
     prop dir: f32 = 1
     const steps: i32 = 12
     const tread: f32 = 0.62
     const rise: f32 = 2.2 / 13
     landing : ParisQuayStone { Position: {dir * -0.8, -1.1, -0.8}; Box: {1.6, 2.2, 1.6} }
+
     for s in 0..steps {
       const top = 0 - (s + 1) * rise
-      { (IsA, ParisQuayStone); Position: {dir * (s + 0.5) * tread, (top - 2.2) / 2, -0.8}; Box: {tread, top + 2.2, 1.6} }
+      {
+        (IsA, ParisQuayStone)
+        Position: {dir * (s + 0.5) * tread, (top - 2.2) / 2, -0.8}
+        Box: {tread, top + 2.2, 1.6}
+      }
     }
+
     const run = steps * tread
     const fall = steps * rise
-    rail : ParisIron { Position: {dir * run / 2, 0.9 - fall / 2, -1.55}; Rotation: {0, 0, 0 - dir * atan2(fall, run)}; Box: {sqrt(run * run + fall * fall), 0.05, 0.05} }
+    rail : ParisIron {
+      Position: {dir * run / 2, 0.9 - fall / 2, -1.55}
+      Rotation: {0, 0, 0 - dir * atan2(fall, run)}
+      Box: {sqrt(run * run + fall * fall), 0.05, 0.05}
+    }
+
     for p in 0..5 {
       const px = p * run / 4
-      { (IsA, ParisIron); Position: {dir * px, 0.45 - px * rise / tread, -1.55}; Box: {0.04, 0.9, 0.04} }
+      {
+        (IsA, ParisIron)
+        Position: {dir * px, 0.45 - px * rise / tread, -1.55}
+        Box: {0.04, 0.9, 0.04}
+      }
     }
   }
 
@@ -122,6 +230,7 @@ assets {
 
     deck : ParisQuayStone { Position: {0, -0.3, cz}; Box: {12, 0.6, length} }
     roadway : ParisAsphalt { Position: {0, 0.01, cz}; Box: {8, 0.02, length} }
+
     for side in 0..2 {
       const sx = side * 2 - 1
       { (IsA, ParisPavement); Position: {sx * 4.8, 0.075, cz}; Box: {1.6, 0.15, length} }
@@ -135,15 +244,26 @@ assets {
       for k in 0..13 {
         const t = (k + 0.5) * math.PI / 13
         const rr = R + ring / 2
-        { (IsA, ParisLimestoneTrim); Position: {0, ys + rr * sin(t), zc + rr * cos(t)}; Rotation: {math.PI / 2 - t, 0, 0}; Box: {12.1, ring, math.PI * rr / 13 * 1.04} }
+        {
+          (IsA, ParisLimestoneTrim)
+          Position: {0, ys + rr * sin(t), zc + rr * cos(t)}
+          Rotation: {math.PI / 2 - t, 0, 0}
+          Box: {12.1, ring, math.PI * rr / 13 * 1.04}
+        }
       }
+
       for j in 0..10 {
         const cw: f32 = (R + ring) * 2 / 10
         const zj = zc - R - ring + (j + 0.5) * cw
         const dz = abs(zj - zc)
         const bottom = ys + sqrt(max(0, (R + ring) * (R + ring) - dz * dz)) - 0.12
+
         if bottom < -0.7 {
-          { (IsA, ParisQuayStone); Position: {0, (bottom - 0.55) / 2, zj}; Box: {12, -0.55 - bottom, cw + 0.02} }
+          {
+            (IsA, ParisQuayStone)
+            Position: {0, (bottom - 0.55) / 2, zj}
+            Box: {12, -0.55 - bottom, cw + 0.02}
+          }
         }
       }
     }
@@ -151,12 +271,25 @@ assets {
     for p in 0..2 {
       const pz = p == 0 ? -15.65 : -9.15
       { (IsA, ParisQuayStone); Position: {0, -3.55, pz}; Box: {12, 6, 1.5} }
+
       for side in 0..2 {
         const sx = side * 2 - 1
-        { (IsA, ParisQuayStone); Position: {sx * 6, -4.1, pz}; Rotation: {0, math.PI / 4, 0}; Box: {1.06, 4.9, 1.06} }
-        { (IsA, ParisLimestoneTrim); Position: {sx * 6, -1.42, pz}; Rotation: {0, math.PI / 4, 0}; Cone: {radius: 0.76, length: 0.5, segments: 4} }
+        {
+          (IsA, ParisQuayStone)
+          Position: {sx * 6, -4.1, pz}
+          Rotation: {0, math.PI / 4, 0}
+          Box: {1.06, 4.9, 1.06}
+        }
+
+        {
+          (IsA, ParisLimestoneTrim)
+          Position: {sx * 6, -1.42, pz}
+          Rotation: {0, math.PI / 4, 0}
+          Cone: {radius: 0.76, length: 0.5, segments: 4}
+        }
       }
     }
+
     abutment : ParisQuayStone { Position: {0, -3.55, -1.7}; Box: {12.4, 5.9, 3.4} }
   }
 
@@ -171,33 +304,83 @@ assets {
     const top = PR_GROUND + floors * PR_FLOOR
     const cols: i32 = floor(width / 2.6)
     body : ParisLimestone { Position: {0, top / 2, 0}; Box: {width, top, depth}; DynamicTransform }
-    cornice : ParisLimestoneTrim { Position: {0, top + 0.18, 0}; Box: {width + 0.4, 0.36, depth + 0.4}; DynamicTransform }
-    roof : ParisZincPlain {
-      Position: {0, top + 0.36 + PR_MANSARD / 2, 0}
-      BeveledPrism: {footprint: [{0 - width / 2, 0 - depth / 2}, {width / 2, 0 - depth / 2}, {width / 2, depth / 2}, {0 - width / 2, depth / 2}], depth: PR_MANSARD, inset: 1.5}
+    cornice : ParisLimestoneTrim {
+      Position: {0, top + 0.18, 0}
+      Box: {width + 0.4, 0.36, depth + 0.4}
       DynamicTransform
     }
+
+    roof : ParisZincPlain {
+      Position: {0, top + 0.36 + PR_MANSARD / 2, 0}
+      BeveledPrism: {
+        footprint: [
+          {0 - width / 2, 0 - depth / 2},
+          {width / 2, 0 - depth / 2},
+          {width / 2, depth / 2},
+          {0 - width / 2, depth / 2}
+        ],
+        depth: PR_MANSARD,
+        inset: 1.5
+      }
+      DynamicTransform
+    }
+
     for b in 0..2 {
       const by = b == 0 ? PR_GROUND + PR_FLOOR : PR_GROUND + (floors - 1) * PR_FLOOR
-      { (IsA, ParisLimestoneTrim); Position: {0, by, depth / 2 + 0.35}; Box: {width - 0.6, 0.14, 0.7}; DynamicTransform }
-      { (IsA, ParisIron); Position: {0, by + 0.5, depth / 2 + 0.68}; Box: {width - 0.6, 0.86, 0.03}; DynamicTransform }
-    }
-    for c in 0..cols {
-      const x = 0 - width / 2 + (c + 0.5) * width / cols
-      if pr_hash(seed * 17 + c * 3.7) < 0.5 {
-        { (IsA, ParisShopLit); Position: {x, 1.9, depth / 2 + 0.02}; Box: {1.8, 2.6, 0.04}; DynamicTransform }
-      } else {
-        { (IsA, ParisGlassDark); Position: {x, 1.9, depth / 2 + 0.02}; Box: {1.8, 2.6, 0.04}; DynamicTransform }
+      {
+        (IsA, ParisLimestoneTrim)
+        Position: {0, by, depth / 2 + 0.35}
+        Box: {width - 0.6, 0.14, 0.7}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisIron)
+        Position: {0, by + 0.5, depth / 2 + 0.68}
+        Box: {width - 0.6, 0.86, 0.03}
+        DynamicTransform
       }
     }
+
+    for c in 0..cols {
+      const x = 0 - width / 2 + (c + 0.5) * width / cols
+
+      if pr_hash(seed * 17 + c * 3.7) < 0.5 {
+        {
+          (IsA, ParisShopLit)
+          Position: {x, 1.9, depth / 2 + 0.02}
+          Box: {1.8, 2.6, 0.04}
+          DynamicTransform
+        }
+      } else {
+        {
+          (IsA, ParisGlassDark)
+          Position: {x, 1.9, depth / 2 + 0.02}
+          Box: {1.8, 2.6, 0.04}
+          DynamicTransform
+        }
+      }
+    }
+
     for f in 0..floors {
       for c in 0..cols {
         const x = 0 - width / 2 + (c + 0.5) * width / cols
         const y = PR_GROUND + f * PR_FLOOR + 1.5
+
         if pr_hash(seed * 31 + f * 7.3 + c * 1.9) < 0.3 {
-          { (IsA, ParisWindowLit); Position: {x, y, depth / 2 + 0.02}; Box: {1.2, 2.2, 0.04}; DynamicTransform }
+          {
+            (IsA, ParisWindowLit)
+            Position: {x, y, depth / 2 + 0.02}
+            Box: {1.2, 2.2, 0.04}
+            DynamicTransform
+          }
         } else {
-          { (IsA, ParisGlassDark); Position: {x, y, depth / 2 + 0.02}; Box: {1.2, 2.2, 0.04}; DynamicTransform }
+          {
+            (IsA, ParisGlassDark)
+            Position: {x, y, depth / 2 + 0.02}
+            Box: {1.2, 2.2, 0.04}
+            DynamicTransform
+          }
         }
       }
     }
@@ -205,7 +388,18 @@ assets {
 }
 
 state {
-  struct ParisBlockDef(x: f32, z: f32, yaw: f32, w: f32, floors: i32, seed: i32, shop: i32, left: bool, right: bool, back: bool)
+  struct ParisBlockDef(
+    x: f32,
+    z: f32,
+    yaw: f32,
+    w: f32,
+    floors: i32,
+    seed: i32,
+    shop: i32,
+    left: bool,
+    right: bool,
+    back: bool
+  )
 
   const PI_2: f32 = 1.5707963
   const PI_1: f32 = 3.1415926
@@ -264,7 +458,10 @@ state {
     {19, -72, 0, 24, 5}, {50, -72, 0, 26, 6}, {84, -72, 0, 26, 5},
     {-100, 104, PI_1, 40, 6}, {-48, 104, PI_1, 44, 5}, {0, 104, PI_1, 40, 6},
     {48, 104, PI_1, 44, 6}, {100, 104, PI_1, 40, 5},
-    {-104, 20, PI_2, 40, 6}, {-104, 62, PI_2, 36, 5}, {104, 20, 0 - PI_2, 40, 5}, {104, 62, 0 - PI_2, 36, 6},
+    {-104, 20, PI_2, 40, 6},
+    {-104, 62, PI_2, 36, 5},
+    {104, 20, 0 - PI_2, 40, 5},
+    {104, 62, 0 - PI_2, 36, 6},
     {-104, -82, PI_2, 40, 5}, {104, -82, 0 - PI_2, 40, 6},
     {-60, -104, 0, 44, 6}, {-10, -104, 0, 40, 5}, {40, -104, 0, 44, 6}, {92, -104, 0, 36, 5}
   ]
@@ -299,17 +496,21 @@ paris {
     boulevard : ParisAsphalt { Position: {0, 0, 25}; Box: {10, 0.04, 70} }
     cross_west : ParisCobbles { Position: {-32.5, 0, 23.5}; Box: {55, 0.04, 5} }
     cross_east : ParisCobbles { Position: {32.5, 0, 23.5}; Box: {55, 0.04, 5} }
+
     for side in 0..2 {
       const sx = side * 2 - 1
       { (IsA, ParisCobbles); Position: {sx * 36.5, 0, 5.5}; Box: {4, 0.04, 31} }
       { (IsA, ParisCobbles); Position: {sx * 36.5, 0, 43}; Box: {4, 0.04, 34} }
     }
+
     for d in 0..14 {
       const z = -8 + d * 5
+
       if z < 19 || z > 28 {
         { (IsA, ParisRoadLine); Position: {0, 0.025, z}; Box: {0.14, 0.01, 2.2} }
       }
     }
+
     for k in 0..9 {
       const x = -4 + k
       { (IsA, ParisRoadLine); Position: {x, 0.025, 20}; Box: {0.5, 0.01, 2} }
@@ -320,29 +521,48 @@ paris {
 
   river {
     bed : ParisRiverBed { Position: {0, -6.25, -35}; Box: {120, 0.5, 18.4} }
-    water : ParisRiverWater { Position: {0, -3, -35}; Box: {320, 0.02, 18}; PlanarReflection: {resolution: 0.5, distortion: 0.03}; DynamicTransform; NoShadow }
+    water : ParisRiverWater {
+      Position: {0, -3, -35}
+      Box: {320, 0.02, 18}
+      PlanarReflection: {resolution: 0.5, distortion: 0.03}
+      DynamicTransform
+      NoShadow
+    }
 
     near_wall : ParisQuayStone { Position: {0, -1.1, -22.1}; Box: {120, 2.2, 1} }
+
     for side in 0..2 {
       const sx = side * 2 - 1
       { (IsA, ParisQuayStone); Position: {sx * 33.1, -4.1, -24.3}; Box: {53.8, 3.8, 3.4} }
       { (IsA, ParisCobbles); Position: {sx * 33.1, -2.19, -24.3}; Box: {53.8, 0.04, 3.4} }
       { (IsA, ParisLimestoneTrim); Position: {sx * 33.1, -2.24, -25.92}; Box: {53.8, 0.14, 0.2} }
+
       for b in 0..5 {
-        { (IsA, ParisIron); Position: {sx * (12 + b * 10), -1.95, -25.7}; Cylinder: {radius: 0.14, length: 0.5, segments: 10, smooth: true} }
+        {
+          (IsA, ParisIron)
+          Position: {sx * (12 + b * 10), -1.95, -25.7}
+          Cylinder: {radius: 0.14, length: 0.5, segments: 10, smooth: true}
+        }
       }
     }
+
     far_wall : ParisQuayStone { Position: {0, -3, -44.4}; Box: {120, 6, 0.8} }
 
     parapets {
       const near_x0: f32[] = [-60, -24.4, 6.2, 26]
       const near_x1: f32[] = [-26, -6.2, 24.4, 60]
+
       for i in 0..4 {
         const a = near_x0[i]
         const b = near_x1[i]
         { (IsA, ParisQuayStone); Position: {(a + b) / 2, 0.5, -22.35}; Box: {b - a, 1.0, 0.5} }
-        { (IsA, ParisLimestoneTrim); Position: {(a + b) / 2, 1.05, -22.35}; Box: {b - a, 0.12, 0.62} }
+        {
+          (IsA, ParisLimestoneTrim)
+          Position: {(a + b) / 2, 1.05, -22.35}
+          Box: {b - a, 0.12, 0.62}
+        }
       }
+
       for side in 0..2 {
         const sx = side * 2 - 1
         { (IsA, ParisQuayStone); Position: {sx * 33.1, 0.5, -44.25}; Box: {53.8, 1.0, 0.5} }
@@ -356,18 +576,70 @@ paris {
 
   // The city beyond the neighbourhood and the river running on past it, out of the bake.
   surroundings {
-    south_land : ParisPavement { Position: {0, -0.51, 68.7}; Box: {320, 1, 182.6}; DynamicTransform }
-    north_land : ParisPavement { Position: {0, -0.51, -102.2}; Box: {320, 1, 115.6}; DynamicTransform }
+    south_land : ParisPavement {
+      Position: {0, -0.51, 68.7}
+      Box: {320, 1, 182.6}
+      DynamicTransform
+    }
+
+    north_land : ParisPavement {
+      Position: {0, -0.51, -102.2}
+      Box: {320, 1, 115.6}
+      DynamicTransform
+    }
+
     for side in 0..2 {
       const sx = side * 2 - 1
-      { (IsA, ParisRiverBed); Position: {sx * 110, -6.25, -33.5}; Box: {100, 0.5, 21.4}; DynamicTransform }
-      { (IsA, ParisQuayStone); Position: {sx * 110, -1.1, -22.1}; Box: {100, 2.2, 1}; DynamicTransform }
-      { (IsA, ParisQuayStone); Position: {sx * 110, -4.1, -24.3}; Box: {100, 3.8, 3.4}; DynamicTransform }
-      { (IsA, ParisCobbles); Position: {sx * 110, -2.19, -24.3}; Box: {100, 0.04, 3.4}; DynamicTransform }
-      { (IsA, ParisQuayStone); Position: {sx * 110, -3, -44.4}; Box: {100, 6, 0.8}; DynamicTransform }
-      { (IsA, ParisQuayStone); Position: {sx * 110, 0.5, -22.35}; Box: {100, 1.0, 0.5}; DynamicTransform }
-      { (IsA, ParisQuayStone); Position: {sx * 110, 0.5, -44.25}; Box: {100, 1.0, 0.5}; DynamicTransform }
+      {
+        (IsA, ParisRiverBed)
+        Position: {sx * 110, -6.25, -33.5}
+        Box: {100, 0.5, 21.4}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisQuayStone)
+        Position: {sx * 110, -1.1, -22.1}
+        Box: {100, 2.2, 1}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisQuayStone)
+        Position: {sx * 110, -4.1, -24.3}
+        Box: {100, 3.8, 3.4}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisCobbles)
+        Position: {sx * 110, -2.19, -24.3}
+        Box: {100, 0.04, 3.4}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisQuayStone)
+        Position: {sx * 110, -3, -44.4}
+        Box: {100, 6, 0.8}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisQuayStone)
+        Position: {sx * 110, 0.5, -22.35}
+        Box: {100, 1.0, 0.5}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisQuayStone)
+        Position: {sx * 110, 0.5, -44.25}
+        Box: {100, 1.0, 0.5}
+        DynamicTransform
+      }
     }
+
     for (i, d) in PR_DISTANT {
       ParisDistantBlock "block_{i}"(width: d.w, depth: 12, floors: d.floors, seed: i + 91) {
         Position: {d.x, 0, d.z}
@@ -380,8 +652,24 @@ paris {
 
   buildings {
     for (i, b) in PR_BUILDINGS {
-      const shop: Rgb = match b.shop { 0: {28, 64, 48}; 1: {104, 28, 32}; 2: {28, 40, 72}; 3: {30, 30, 32}; 4: {84, 24, 44}; _: {24, 72, 76} }
-      ParisBuilding "block_{i}"(width: b.w, depth: 10, floors: b.floors, seed: b.seed, shop: shop, left: b.left, right: b.right, back: b.back) {
+      const shop: Rgb = match b.shop {
+        0: {28, 64, 48}
+        1: {104, 28, 32}
+        2: {28, 40, 72}
+        3: {30, 30, 32}
+        4: {84, 24, 44}
+        _: {24, 72, 76}
+      }
+      ParisBuilding "block_{i}"(
+        width: b.w,
+        depth: 10,
+        floors: b.floors,
+        seed: b.seed,
+        shop: shop,
+        left: b.left,
+        right: b.right,
+        back: b.back
+      ) {
         Position: {b.x, 0, b.z}
         Rotation: {0, b.yaw, 0}
       }
@@ -390,13 +678,23 @@ paris {
 
   trees {
     const bz: f32[] = [-6, 1.5, 9, 16.5, 30, 37.5, 45, 52.5]
+
     for (i, z) in bz {
-      ParisPlaneTree "west_{i}"(seed: i + 1, height: 5 + pr_hash(i * 3) * 0.6) { Position: {-6.3, 0, z} }
-      ParisPlaneTree "east_{i}"(seed: i + 21, height: 5 + pr_hash(i * 7) * 0.6) { Position: {6.3, 0, z} }
+      ParisPlaneTree "west_{i}"(seed: i + 1, height: 5 + pr_hash(i * 3) * 0.6) {
+        Position: {-6.3, 0, z}
+      }
+
+      ParisPlaneTree "east_{i}"(seed: i + 21, height: 5 + pr_hash(i * 7) * 0.6) {
+        Position: {6.3, 0, z}
+      }
     }
+
     const fx: f32[] = [-50, -38, -22, 22, 38, 50]
+
     for (i, x) in fx {
-      ParisPlaneTree "far_{i}"(seed: i + 41, height: 4.6 + pr_hash(i * 11) * 0.8) { Position: {x, -0.15, -49} }
+      ParisPlaneTree "far_{i}"(seed: i + 41, height: 4.6 + pr_hash(i * 11) * 0.8) {
+        Position: {x, -0.15, -49}
+      }
     }
   }
 
@@ -409,6 +707,7 @@ paris {
   furniture {
     ParisMorrisColumn morris() { Position: {19.5, 0.15, 37.5} }
     const bench_x: f32[] = [-50, -12, 8, 36]
+
     for (i, x) in bench_x {
       ParisBench "bench_{i}"() { Position: {x, 0.15, -21.3}; Rotation: {0, math.PI, 0} }
     }

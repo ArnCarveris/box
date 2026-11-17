@@ -72,7 +72,10 @@ assets {
   yard_icon_hull { Path: {path: "etc/scenes/shipyard/assets/icons/hull.svg", width: 96} }
   yard_icon_drill { Path: {path: "etc/scenes/shipyard/assets/icons/drill.svg", width: 96} }
   yard_icon_builder { Path: {path: "etc/scenes/shipyard/assets/icons/builder.svg", width: 96} }
-  yard_icon_datacenter { Path: {path: "etc/scenes/shipyard/assets/icons/datacenter.svg", width: 96} }
+  yard_icon_datacenter {
+    Path: {path: "etc/scenes/shipyard/assets/icons/datacenter.svg", width: 96}
+  }
+
   yard_icon_autopilot { Path: {path: "etc/scenes/shipyard/assets/icons/autopilot.svg", width: 96} }
   yard_icon_remove { Path: {path: "etc/scenes/shipyard/assets/icons/remove.svg", width: 96} }
   yard_icon_deck { Path: {path: "etc/scenes/shipyard/assets/icons/deck.svg", width: 96} }
@@ -121,9 +124,26 @@ state {
   export const UI_HAZARD: i32 = 8
   export const UI_SOFT: i32 = 9
 
-  fn ui_r(s: i32) -> i32 { match s { 0: 95; 1: 255; 2: 255; 3: 110; 4: 14; 5: 64; 6: 5; 8: 226; 9: 112; _: 214 } }
-  fn ui_g(s: i32) -> i32 { match s { 0: 216; 1: 179; 2: 92; 3: 232; 4: 36; 5: 96; 6: 16; 8: 169; 9: 152; _: 236 } }
-  fn ui_b(s: i32) -> i32 { match s { 0: 255; 1: 71; 2: 76; 3: 150; 4: 52; 5: 116; 6: 26; 8: 28; 9: 176; _: 246 } }
+  fn ui_r(s: i32) -> i32 {
+    match s {
+      0: 95; 1: 255; 2: 255; 3: 110; 4: 14
+      5: 64; 6: 5; 8: 226; 9: 112; _: 214
+    }
+  }
+
+  fn ui_g(s: i32) -> i32 {
+    match s {
+      0: 216; 1: 179; 2: 92; 3: 232; 4: 36
+      5: 96; 6: 16; 8: 169; 9: 152; _: 236
+    }
+  }
+
+  fn ui_b(s: i32) -> i32 {
+    match s {
+      0: 255; 1: 71; 2: 76; 3: 150; 4: 52
+      5: 116; 6: 26; 8: 28; 9: 176; _: 246
+    }
+  }
 
   fn kind_icon(k: i32) -> entity {
     match k {
@@ -229,11 +249,13 @@ assets {
             Rgb: {5, 16, 26}
           }
         }
+
         rail {
           Item: {width: {mode: Grow}, height: {mode: Fixed, value: 3}}
           Rect: {1, 1}
           Rgb: {28, 74, 96}
         }
+
         if note != "" {
           aside {
             Text: {value: note, size: 12, font: yard_font_mono}
@@ -285,6 +307,7 @@ assets {
     async {
       while true {
         const e = await on.activate(this)
+
         if ui.activation(e) == this {
           emit Request(op: op)
         }
@@ -304,6 +327,7 @@ assets {
     Layout: {direction: Row, padding: {0, 0, 10, 10}, spacing: 6, h: Center, v: Middle}
     Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
+
     if selected {
       Rgb: {95, 216, 255}
     } else if down {
@@ -313,14 +337,17 @@ assets {
     } else {
       Rgb: {5, 16, 26}
     }
+
     Border: {radius: 1}
     Transition: [Rgb: {duration: 0.08}]
 
     if icon != 0 {
       YardIcon glyph(icon: icon, size: 14, state: selected ? UI_NAVY : UI_SOFT)
     }
+
     name {
       Text: {value: label, size: 12, font: selected ? yard_font_title : yard_font_body}
+
       if selected {
         Rgb: {5, 16, 26}
       } else if hover {
@@ -340,6 +367,7 @@ assets {
     } else {
       Item: {width: {min: 30}, height: {mode: Fixed, value: 26}}
     }
+
     Layout: {}
 
     YardSegmentFace face(op: op, label: label, icon: icon, hover: hover, down: down)
@@ -355,6 +383,7 @@ assets {
     Layout: {direction: Row, padding: {4, 4, danger ? 4 : 10, 10}, spacing: 7, h: Center, v: Middle}
     Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
+
     if down {
       Rgb: {3, 10, 17}
     } else if hover {
@@ -362,17 +391,21 @@ assets {
     } else {
       Rgb: {5, 16, 26}
     }
+
     Border: {radius: 1}
     Transition: [Rgb: {duration: 0.08}]
 
     if danger {
       YardHazard stripe(w: 4)
     }
+
     if icon != 0 {
       YardIcon glyph(icon: icon, size: 14, state: danger ? UI_HAZARD : UI_SOFT)
     }
+
     name {
       Text: {value: label, size: 12, font: yard_font_body}
+
       if hover {
         Rgb: {214, 236, 246}
       } else {
@@ -401,9 +434,15 @@ assets {
     const selected = op == tool
     const danger = op == T_REMOVE
 
-    Layout: {direction: Row, padding: {danger ? 4 : 0, danger ? 4 : 0, danger ? 4 : 8, 6}, spacing: 8, v: Middle}
+    Layout: {
+      direction: Row,
+      padding: {danger ? 4 : 0, danger ? 4 : 0, danger ? 4 : 8, 6},
+      spacing: 8,
+      v: Middle
+    }
     Item: {width: {mode: Grow}, height: {mode: Grow}}
     Rect: {1, 1}
+
     if selected && danger {
       Rgb: {226, 169, 28}
       Border: {width: 1, radius: 1, color: {255, 214, 110, 255}}
@@ -420,17 +459,24 @@ assets {
       Rgb: {9, 27, 41}
       Border: {width: 1, radius: 1, color: {22, 58, 78, 255}}
     }
+
     Transition: [Rgb: {duration: 0.08}]
 
     if danger {
       YardHazard stripe(w: 5)
     }
-    YardIcon glyph(icon: kind_icon(op), size: 16, state: selected ? UI_NAVY : danger ? UI_HAZARD : UI_OK)
+
+    YardIcon glyph(
+      icon: kind_icon(op),
+      size: 16,
+      state: selected ? UI_NAVY : danger ? UI_HAZARD : UI_OK
+    )
     words {
       Layout: {direction: Column}
       Item: {width: {mode: Grow}}
       name {
         Text: {value: label, size: 12, font: selected ? yard_font_title : yard_font_body}
+
         if selected {
           Rgb: {5, 16, 26}
         } else {
@@ -438,6 +484,7 @@ assets {
         }
       }
     }
+
     if key_hint != "" {
       hint {
         Layout: {padding: {1, 1, 5, 5}}
@@ -473,6 +520,7 @@ assets {
         Text: {value: title, size: 10, font: yard_font_title}
         Rgb: {84, 132, 158}
       }
+
       YardRule rule()
     }
   }
@@ -497,6 +545,7 @@ assets {
       Rect: {1, 1}
       Rgb: {ui_r(state), ui_g(state), ui_b(state)}
     }
+
     unlit {
       Item: {width: {mode: Grow, value: 1 - fill, content_min: false}}
     }
@@ -521,14 +570,17 @@ assets {
         Text: {value: label, size: 11, font: yard_font_body}
         Rgb: {112, 152, 176}
       }
+
       gap {
         Item: {width: {mode: Grow}}
       }
+
       amount {
         Text: {value: value, size: 13, font: yard_font_mono}
         Rgb: {ui_r(shown), ui_g(shown), ui_b(shown)}
       }
     }
+
     YardMeter meter(ratio: ratio, state: state)
   }
 
@@ -538,9 +590,14 @@ assets {
 
     Layout: {direction: Row, spacing: 8, v: Middle}
     Item: {width: {mode: Grow}}
-    YardIcon glyph(icon: ok ? yard_icon_ok : yard_icon_warn, size: 13, state: ok ? UI_GOOD : UI_WARN)
+    YardIcon glyph(
+      icon: ok ? yard_icon_ok : yard_icon_warn,
+      size: 13,
+      state: ok ? UI_GOOD : UI_WARN
+    )
     name {
       Text: {value: label, size: 11, font: yard_font_body}
+
       if ok {
         Rgb: {112, 152, 176}
       } else {
@@ -571,16 +628,22 @@ assets {
     YardGroup command(title: "COMMAND") {
       YardTileRow row_a {
         YardTile cockpit(label: liner ? "Bridge" : "Cockpit", op: liner ? L_BRIDGE : K_COCKPIT)
-        YardTile autopilot(label: liner ? "Sensor Mast" : "Autopilot", op: liner ? L_SENSOR : K_AUTO)
+        YardTile autopilot(
+          label: liner ? "Sensor Mast" : "Autopilot",
+          op: liner ? L_SENSOR : K_AUTO
+        )
       }
     }
+
     YardGroup crew_group(title: liner ? "HABITATION" : "CREW") {
       YardTileRow row_a {
         YardTile hab(label: liner ? "Quarters" : "Habitat", op: liner ? L_QUARTERS : K_HAB)
         YardTile life(label: liner ? "Hab Ring" : "Life Support", op: liner ? L_HABRING : K_LIFE)
       }
+
       YardTileRow row_b {
         YardTile biome(label: liner ? "Estate Ring" : "Biome", op: liner ? L_ESTATE : K_BIOME)
+
         if liner {
           YardTile farm(label: "Agri Ring", op: L_FARM)
         } else {
@@ -588,48 +651,63 @@ assets {
         }
       }
     }
+
     YardGroup systems(title: liner ? "POWER & JUMP" : "POWER & COMPUTE") {
       YardTileRow row_a {
         YardTile power(label: liner ? "Reactor" : "Power Plant", op: liner ? L_REACTOR : K_POWER)
         YardTile radiator(label: "Radiator", op: liner ? L_RADIATOR : K_RADIATOR)
       }
+
       YardTileRow row_b {
         YardTile datacenter(label: liner ? "Jump Drive" : "Datacenter", op: liner ? L_JUMP : K_DATA)
         YardFiller filler()
       }
     }
+
     YardGroup drive(title: "PROPULSION") {
       YardTileRow row_a {
         YardTile engine(label: liner ? "Main Drive" : "Engine", op: liner ? L_DRIVE : K_ENGINE)
         YardTile fuel(label: liner ? "Tank Cluster" : "Fuel Tank", op: liner ? L_TANKS : K_FUEL)
       }
     }
+
     YardGroup industry(title: "INDUSTRY & LOGISTICS") {
       YardTileRow row_a {
-        YardTile cargo(label: liner ? "Container Block" : "Cargo Bay", op: liner ? L_CARGO : K_CARGO)
+        YardTile cargo(
+          label: liner ? "Container Block" : "Cargo Bay",
+          op: liner ? L_CARGO : K_CARGO
+        )
         YardTile dock(label: liner ? "Hangar" : "Docking Port", op: liner ? L_HANGAR : K_DOCK)
       }
+
       YardTileRow row_b {
-        YardTile drill(label: liner ? "Heavy Assembler" : "Mining Drill", op: liner ? L_ASSEMBLER : K_DRILL)
+        YardTile drill(
+          label: liner ? "Heavy Assembler" : "Mining Drill",
+          op: liner ? L_ASSEMBLER : K_DRILL
+        )
         YardTile builder(label: liner ? "Fab Bay" : "Constructor", op: liner ? L_FAB : K_BUILDER)
       }
     }
+
     YardGroup hull(title: liner ? "STRUCTURE & DEFENSE" : "HULL & DEFENSE") {
       YardTileRow row_a {
         YardTile fairing(label: liner ? "Armor" : "Hull Fairing", op: liner ? L_ARMOR : K_HULL)
         YardTile weapon(label: liner ? "Gun Turret" : "Weapons", op: liner ? L_TURRET : K_WEAPON)
       }
+
       if liner {
         YardTileRow row_b {
           YardTile shield(label: "Shield", op: L_SHIELD)
           YardTile railgun(label: "Railgun", op: L_RAILGUN)
         }
+
         YardTileRow row_c {
           YardTile truss(label: "Truss", op: L_TRUSS)
           YardTile yoke(label: "Yoke", op: L_YOKE)
         }
       }
     }
+
     YardRule remove_rule()
     YardTile remove(label: "Remove", op: T_REMOVE, key_hint: "X")
   }

@@ -15,29 +15,87 @@ assets {
   ship_registry { Path: {path: "etc/scenes/spaceship/assets/registry.svg", width: 2048} }
   ship_warning { Path: {path: "etc/scenes/spaceship/assets/hazard.svg", width: 512} }
   ship_display { Path: {path: "etc/scenes/spaceship/assets/display.svg", width: 512} }
-  prefab HullArmor { Rgb: {196, 214, 218}; PbrMaterial: {metallic: 0.62, roughness: 0.68}; PbrTextures: {albedo: ship_plate_color, normal: ship_plate_normal, orm: ship_plate_orm}; texture.Mapping: {MappingObject, size: 20, blend: 0.2} }
-  prefab PaleArmor { Rgb: {204, 214, 207}; PbrMaterial: {metallic: 0.45, roughness: 0.54}; PbrTextures: {normal: ship_plate_normal}; texture.Mapping: {MappingObject, size: 8, blend: 0.2} }
+  prefab HullArmor {
+    Rgb: {196, 214, 218}
+    PbrMaterial: {metallic: 0.62, roughness: 0.68}
+    PbrTextures: {albedo: ship_plate_color, normal: ship_plate_normal, orm: ship_plate_orm}
+    texture.Mapping: {MappingObject, size: 20, blend: 0.2}
+  }
+
+  prefab PaleArmor {
+    Rgb: {204, 214, 207}
+    PbrMaterial: {metallic: 0.45, roughness: 0.54}
+    PbrTextures: {normal: ship_plate_normal}
+    texture.Mapping: {MappingObject, size: 8, blend: 0.2}
+  }
+
   prefab DarkArmor { Rgb: {39, 54, 65}; PbrMaterial: {metallic: 0.7, roughness: 0.63} }
   prefab RecessMetal { Rgb: {12, 22, 30}; PbrMaterial: {metallic: 0.55, roughness: 0.8} }
   prefab Titanium { Rgb: {120, 142, 154}; PbrMaterial: {metallic: 0.85, roughness: 0.3} }
   prefab RustRed { Rgb: {164, 53, 34}; PbrMaterial: {metallic: 0.42, roughness: 0.65} }
-  prefab DockYellow { Rgb: {210, 140, 45}; PbrMaterial: {metallic: 0.6, roughness: 0.65}; ClearCoat: {strength: 0.6, roughness: 0.18} }
+  prefab DockYellow {
+    Rgb: {210, 140, 45}
+    PbrMaterial: {metallic: 0.6, roughness: 0.65}
+    ClearCoat: {strength: 0.6, roughness: 0.18}
+  }
+
   prefab IceLight { Rgb: {48, 137, 167}; Emissive: {strength: 3, color: {78, 207, 255}} }
   prefab AmberLight { Rgb: {245, 137, 45}; Emissive: {strength: 3, color: {255, 139, 40}} }
-  prefab PistonChrome { Rgb: {196, 206, 214}; PbrMaterial: {metallic: 1, roughness: 0.22}; SpecularAnisotropy: {strength: 0.8, rotation: 0} }
-  prefab CrewSuit { Rgb: {221, 156, 60}; PbrMaterial: {metallic: 0, roughness: 0.85}; Sheen: {color: {255, 236, 200}, roughness: 0.45} }
-  prefab WindshieldGlass { Rgb: {170, 220, 236}; PbrMaterial: {metallic: 0, roughness: 0.04}; Transmission: {transmission_factor: 0.9, ior: 1.5, thickness_factor: 0.12, attenuation_distance: 3, attenuation_color: {120, 200, 230}}; Emissive: {strength: 0.12, color: {65, 180, 220}} }
+  prefab PistonChrome {
+    Rgb: {196, 206, 214}
+    PbrMaterial: {metallic: 1, roughness: 0.22}
+    SpecularAnisotropy: {strength: 0.8, rotation: 0}
+  }
+
+  prefab CrewSuit {
+    Rgb: {221, 156, 60}
+    PbrMaterial: {metallic: 0, roughness: 0.85}
+    Sheen: {color: {255, 236, 200}, roughness: 0.45}
+  }
+
+  prefab WindshieldGlass {
+    Rgb: {170, 220, 236}
+    PbrMaterial: {metallic: 0, roughness: 0.04}
+    Transmission: {
+      transmission_factor: 0.9,
+      ior: 1.5,
+      thickness_factor: 0.12,
+      attenuation_distance: 3,
+      attenuation_color: {120, 200, 230}
+    }
+    Emissive: {strength: 0.12, color: {65, 180, 220}}
+  }
+
   prefab ship_beacon_blink {
     Clip: {duration: 1.6}
-    strength { Track: {component: Emissive, member: "strength", curve: {keys: [{0, 0.4}, {0.06, 7}, {0.3, 7}, {0.42, 0.4}, {1.6, 0.4}]}} }
+    strength {
+      Track: {
+        component: Emissive,
+        member: "strength",
+        curve: {keys: [{0, 0.4}, {0.06, 7}, {0.3, 7}, {0.42, 0.4}, {1.6, 0.4}]}
+      }
+    }
   }
-  prefab BeaconLight { Rgb: {245, 137, 45}; Emissive: {strength: 3, color: {255, 139, 40}}; Animator: {clip: ship_beacon_blink}; NoBake }
+
+  prefab BeaconLight {
+    Rgb: {245, 137, 45}
+    Emissive: {strength: 3, color: {255, 139, 40}}
+    Animator: {clip: ship_beacon_blink}
+    NoBake
+  }
+
   prefab WhiteLight { Rgb: {175, 218, 230}; Emissive: {strength: 2.5, color: {195, 230, 255}} }
 
   dock_registry { Path: {path: "etc/scenes/spaceship/assets/dock_registry.svg", width: 1024} }
 
   prefab ServiceTeal { Rgb: {42, 103, 112}; PbrMaterial: {metallic: 0.45, roughness: 0.6} }
-  prefab CeramicArmor { Rgb: {179, 191, 184}; PbrMaterial: {metallic: 0.25, roughness: 0.72}; PbrTextures: {normal: ship_plate_normal}; texture.Mapping: {MappingObject, size: 8, blend: 0.2} }
+  prefab CeramicArmor {
+    Rgb: {179, 191, 184}
+    PbrMaterial: {metallic: 0.25, roughness: 0.72}
+    PbrTextures: {normal: ship_plate_normal}
+    texture.Mapping: {MappingObject, size: 8, blend: 0.2}
+  }
+
   prefab ReplacementArmor { Rgb: {94, 119, 132}; PbrMaterial: {metallic: 0.65, roughness: 0.48} }
   dock_deck_fuel { Path: {path: "etc/scenes/spaceship/assets/deck_fuel.svg", width: 1024} }
   dock_deck_power { Path: {path: "etc/scenes/spaceship/assets/deck_power.svg", width: 1024} }

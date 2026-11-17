@@ -52,6 +52,7 @@ assets {
     async {
       while true {
         const e = await on.activate(this)
+
         if ui.activation(e) == this {
           if playing && song == index {
             playing = false
@@ -143,7 +144,11 @@ hud {
           }
 
           fill {
-            Item: {h: Left, width: {mode: Fixed, value: max(6, clamp(beat / song_beats, 0, 1) * (PANEL_W - 32))}, height: {mode: Fixed, value: 6}}
+            Item: {
+              h: Left,
+              width: {mode: Fixed, value: max(6, clamp(beat / song_beats, 0, 1) * (PANEL_W - 32))},
+              height: {mode: Fixed, value: 6}
+            }
             Rect: {1, 1}
             Rgb: color
             Border: {radius: 3}
@@ -155,8 +160,24 @@ hud {
         Layout: {direction: Column, spacing: 8, padding: {4, 0, 0, 0}}
         Item: {width: {mode: Grow}}
 
-        Slider volume(label: "Volume", width: PANEL_W - 32, min: 0, max: 100, step: 1, value: volume_level, unit: "%")
-        Slider reverb(label: "Reverb", width: PANEL_W - 32, min: 0, max: 200, step: 1, value: reverb_level, unit: "%")
+        Slider volume(
+          label: "Volume",
+          width: PANEL_W - 32,
+          min: 0,
+          max: 100,
+          step: 1,
+          value: volume_level,
+          unit: "%"
+        )
+        Slider reverb(
+          label: "Reverb",
+          width: PANEL_W - 32,
+          min: 0,
+          max: 200,
+          step: 1,
+          value: reverb_level,
+          unit: "%"
+        )
       }
     }
   }

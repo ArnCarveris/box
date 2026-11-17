@@ -248,49 +248,57 @@ state {
     n
   }
 
-  // The number of segments of kind k in design d.
   fn liner_count(d: LinerDesign, k: i32) -> i32 {
     mut n: i32 = 0
+
     for i in 0..LCELLS {
       if d[i] == k {
         n += 1
       }
     }
+
     n
   }
 
   // The front (bow, +z) and back of the occupied slots of design d along the spine.
   fn liner_front(d: LinerDesign) -> f32 {
     mut z1: i32 = -1
+
     for i in 0..LCELLS {
       if d[i] != 0 {
         z1 = max(z1, slot_of(i))
       }
     }
+
     slot_z(z1) + SEG / 2
   }
 
   fn liner_back(d: LinerDesign) -> f32 {
     mut z0: i32 = SLOTS
+
     for i in 0..LCELLS {
       if d[i] != 0 {
         z0 = min(z0, slot_of(i))
       }
     }
+
     slot_z(z0) - SEG / 2
   }
 
   // The design of preset p (LINER_PASSENGER to LINER_BATTLESHIP), empty for any other p.
   fn liner_preset(p: i32) -> LinerDesign {
     mut g: LinerDesign = {}
+
     for b in 0..LPLAN_ROWS {
       const o = b * 5
+
       if liner_plan[o] == p {
         for z in liner_plan[o + 2]..liner_plan[o + 3] + 1 {
           g[lcell(liner_plan[o + 1], z)] = liner_plan[o + 4]
         }
       }
     }
+
     g
   }
 
@@ -301,13 +309,14 @@ state {
 
   fn liner_fill(v: f32) -> LinerLevels {
     mut p: LinerLevels = {}
+
     for i in 0..LCELLS {
       p[i] = v
     }
+
     p
   }
 
-  // Every slot at full power.
   export const liner_full_power: LinerLevels = liner_fill(1)
 
   // How much a segment of kind k at power level p works: a drive fires only while burning.

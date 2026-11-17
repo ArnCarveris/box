@@ -51,14 +51,59 @@ state {
 }
 
 assets {
-  prefab LgSandIsle { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 1}; PbrTextures: {albedo: lg_sand_dry_a, normal: lg_sand_n}; texture.Mapping: {mode: MappingObject, size: 6, blend: 0.3} }
-  prefab LgSandIsleWet { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.7}; PbrTextures: {albedo: lg_sand_wet_a, normal: lg_sand_n}; texture.Mapping: {mode: MappingObject, size: 6, blend: 0.3} }
-  prefab LgBeachRock { Rgb: {200, 196, 190}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: lg_coral_a, normal: lg_coral_n}; texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.3} }
-  prefab LgBushLeaf { Rgb: {62, 140, 50}; PbrMaterial: {roughness: 0.8}; DiffuseTransmission: {factor: 0.35, color: {170, 230, 100}} }
-  prefab LgBushDark { Rgb: {40, 104, 44}; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.3, color: {150, 210, 100}} }
-  prefab LgHibiscusRed { Rgb: {216, 34, 50}; PbrMaterial: {roughness: 0.6}; Sheen: {color: {255, 150, 150}, roughness: 0.4}; DiffuseTransmission: {factor: 0.4, color: {255, 90, 90}} }
-  prefab LgHibiscusYellow { Rgb: {248, 196, 36}; PbrMaterial: {roughness: 0.6}; Sheen: {color: {255, 236, 150}, roughness: 0.4}; DiffuseTransmission: {factor: 0.4, color: {255, 220, 90}} }
-  prefab LgHutWall { Rgb: {190, 152, 96}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {255, 230, 180}, roughness: 0.5} }
+  prefab LgSandIsle {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: lg_sand_dry_a, normal: lg_sand_n}
+    texture.Mapping: {mode: MappingObject, size: 6, blend: 0.3}
+  }
+
+  prefab LgSandIsleWet {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.7}
+    PbrTextures: {albedo: lg_sand_wet_a, normal: lg_sand_n}
+    texture.Mapping: {mode: MappingObject, size: 6, blend: 0.3}
+  }
+
+  prefab LgBeachRock {
+    Rgb: {200, 196, 190}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: lg_coral_a, normal: lg_coral_n}
+    texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.3}
+  }
+
+  prefab LgBushLeaf {
+    Rgb: {62, 140, 50}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.35, color: {170, 230, 100}}
+  }
+
+  prefab LgBushDark {
+    Rgb: {40, 104, 44}
+    PbrMaterial: {roughness: 0.85}
+    DiffuseTransmission: {factor: 0.3, color: {150, 210, 100}}
+  }
+
+  prefab LgHibiscusRed {
+    Rgb: {216, 34, 50}
+    PbrMaterial: {roughness: 0.6}
+    Sheen: {color: {255, 150, 150}, roughness: 0.4}
+    DiffuseTransmission: {factor: 0.4, color: {255, 90, 90}}
+  }
+
+  prefab LgHibiscusYellow {
+    Rgb: {248, 196, 36}
+    PbrMaterial: {roughness: 0.6}
+    Sheen: {color: {255, 236, 150}, roughness: 0.4}
+    DiffuseTransmission: {factor: 0.4, color: {255, 220, 90}}
+  }
+
+  prefab LgHutWall {
+    Rgb: {190, 152, 96}
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {255, 230, 180}, roughness: 0.5}
+  }
+
   prefab LgHutDark { Rgb: {58, 40, 28}; PbrMaterial: {roughness: 0.9} }
   prefab LgFarSand { Rgb: {222, 206, 168}; PbrMaterial: {roughness: 1} }
   prefab LgFarGreen { Rgb: {52, 100, 56}; PbrMaterial: {roughness: 1} }
@@ -85,8 +130,20 @@ assets {
 
   // A palm frond: a strip folded down along its midrib, swept along an arch that rises out of
   // the crown and droops at the tip. Two arches so the crowns do not all look alike
-  prefab LgFrondLeaf { Rgb: {64, 132, 52}; PbrMaterial: {roughness: 0.8}; DiffuseTransmission: {factor: 0.4, color: {190, 240, 110}}; BackFaceMode: {BackFacePlain} }
-  prefab lg_frond_fold { Path2D: {start: {-0.5, 0.12}, segments: [{kind: Line, end: {0, 0}}, {kind: Line, end: {0.5, 0.12}}]} }
+  prefab LgFrondLeaf {
+    Rgb: {64, 132, 52}
+    PbrMaterial: {roughness: 0.8}
+    DiffuseTransmission: {factor: 0.4, color: {190, 240, 110}}
+    BackFaceMode: {BackFacePlain}
+  }
+
+  prefab lg_frond_fold {
+    Path2D: {
+      start: {-0.5, 0.12},
+      segments: [{kind: Line, end: {0, 0}}, {kind: Line, end: {0.5, 0.12}}]
+    }
+  }
+
   prefab lg_frond_arch_a { Path3D: {start: {0, 0, 0}, segments: [
     {kind: CatmullRom, end: {0, 0.35, 1.1}}, {kind: CatmullRom, end: {0, 0.3, 2.2}},
     {kind: CatmullRom, end: {0, -0.3, 3.1}}, {kind: CatmullRom, end: {0, -1.1, 3.6}}
@@ -96,7 +153,9 @@ assets {
     {kind: CatmullRom, end: {0, -0.8, 3.1}}, {kind: CatmullRom, end: {0, -1.6, 3.4}}
   ]} }
   prefab lg_trunk_round { Path2D: {start: {1, 0}, closed: true, segments: [
-    {kind: CatmullRom, end: {0, -1}}, {kind: CatmullRom, end: {-1, 0}}, {kind: CatmullRom, end: {0, 1}}
+    {kind: CatmullRom, end: {0, -1}},
+    {kind: CatmullRom, end: {-1, 0}},
+    {kind: CatmullRom, end: {0, 1}}
   ]} }
   prefab lg_trunk_profile { Profile2D: {outer: lg_trunk_round} }
 
@@ -120,7 +179,19 @@ assets {
         {kind: CatmullRom, end: {lean * height, height, 0}}
       ]}
     }
-    trunk : LgPalmBark { Position: {0, 0, 0}; Sweep: {path: trunk_path, profile: lg_trunk_profile, scale: {0.24, 0.24}, taper: 0.6, segments: 7, rings: 10, cap_start: false} }
+
+    trunk : LgPalmBark {
+      Position: {0, 0, 0}
+      Sweep: {
+        path: trunk_path,
+        profile: lg_trunk_profile,
+        scale: {0.24, 0.24},
+        taper: 0.6,
+        segments: 7,
+        rings: 10,
+        cap_start: false
+      }
+    }
 
     crown {
       Position: {lean * height, height, 0}
@@ -129,12 +200,21 @@ assets {
         Animator: {clip: lg_palm_sway, time: phase * PALM_SWAY_TIME, speed: 0.8 + phase * 0.4}
         spin {
           Rotation: {0, yaw, 0}
-          top : LgFrondDark { Position: {0, 0.02, 0}; Scale: {1, 0.7, 1}; Sphere: {radius: 0.3, segments: 8} }
+          top : LgFrondDark {
+            Position: {0, 0.02, 0}
+            Scale: {1, 0.7, 1}
+            Sphere: {radius: 0.3, segments: 8}
+          }
+
           for c in 0..4 {
             if c < nuts {
-              "nut_{c}" : LgCoconut { Position: {0.24 * cos(c * 1.9), -0.26 - 0.06 * (c % 2), 0.24 * sin(c * 1.9)}; Sphere: {radius: 0.16, segments: 8, smooth: true} }
+              "nut_{c}" : LgCoconut {
+                Position: {0.24 * cos(c * 1.9), -0.26 - 0.06 * (c % 2), 0.24 * sin(c * 1.9)}
+                Sphere: {radius: 0.16, segments: 8, smooth: true}
+              }
             }
           }
+
           for f in 0..fronds {
             const fs = 0.85 + 0.3 * hash(seed * 5 + f)
             "frond_{f}" {
@@ -143,11 +223,36 @@ assets {
                 Rotation: {0.25 * hash(seed * 13 + f) - 0.1, 0, 0}
                 flutter {
                   Rotation: {0, 0, 0}
-                  Animator: {clip: lg_frond_flutter, time: fract(phase + f * 0.37) * FROND_FLUTTER_TIME, speed: 0.9 + 0.25 * hash(seed + f * 7)}
+                  Animator: {
+                    clip: lg_frond_flutter,
+                    time: fract(phase + f * 0.37) * FROND_FLUTTER_TIME,
+                    speed: 0.9 + 0.25 * hash(seed + f * 7)
+                  }
+
                   if (f + seed) % 2 == 0 {
-                    leaf : LgFrondLeaf { Scale: {fs, fs, fs}; Sweep: {path: lg_frond_arch_a, contour: lg_frond_fold, scale: {1.1, 1.1}, taper: 0.15, segments: 2, rings: 10} }
+                    leaf : LgFrondLeaf {
+                      Scale: {fs, fs, fs}
+                      Sweep: {
+                        path: lg_frond_arch_a,
+                        contour: lg_frond_fold,
+                        scale: {1.1, 1.1},
+                        taper: 0.15,
+                        segments: 2,
+                        rings: 10
+                      }
+                    }
                   } else {
-                    leaf : LgFrondLeaf { Scale: {fs, fs, fs}; Sweep: {path: lg_frond_arch_b, contour: lg_frond_fold, scale: {1.1, 1.1}, taper: 0.15, segments: 2, rings: 10} }
+                    leaf : LgFrondLeaf {
+                      Scale: {fs, fs, fs}
+                      Sweep: {
+                        path: lg_frond_arch_b,
+                        contour: lg_frond_fold,
+                        scale: {1.1, 1.1},
+                        taper: 0.15,
+                        segments: 2,
+                        rings: 10
+                      }
+                    }
                   }
                 }
               }
@@ -166,15 +271,35 @@ assets {
     const red = rng.f(1) < 0.6
     const a = rng.f(6.28)
 
-    body : LgBushLeaf { Position: {0, 0.45 * size, 0}; Scale: {1.2, 0.8, 1}; Sphere: {radius: 0.75 * size, segments: 8, smooth: true} }
-    side : LgBushDark { Position: {0.6 * size * cos(a), 0.3 * size, 0.6 * size * sin(a)}; Sphere: {radius: 0.5 * size, segments: 8, smooth: true} }
+    body : LgBushLeaf {
+      Position: {0, 0.45 * size, 0}
+      Scale: {1.2, 0.8, 1}
+      Sphere: {radius: 0.75 * size, segments: 8, smooth: true}
+    }
+
+    side : LgBushDark {
+      Position: {0.6 * size * cos(a), 0.3 * size, 0.6 * size * sin(a)}
+      Sphere: {radius: 0.5 * size, segments: 8, smooth: true}
+    }
+
     for k in 0..3 {
       const fa = a + 1.2 + k * 2.1
       const fr = 0.55 * size
+
       if red {
-        "flower_{k}" : LgHibiscusRed { Position: {fr * cos(fa), (0.62 + 0.12 * (k % 2)) * size, fr * sin(fa)}; Scale: {1, 0.5, 1}; Sphere: {radius: 0.16, segments: 6}; NoShadow }
+        "flower_{k}" : LgHibiscusRed {
+          Position: {fr * cos(fa), (0.62 + 0.12 * (k % 2)) * size, fr * sin(fa)}
+          Scale: {1, 0.5, 1}
+          Sphere: {radius: 0.16, segments: 6}
+          NoShadow
+        }
       } else {
-        "flower_{k}" : LgHibiscusYellow { Position: {fr * cos(fa), (0.62 + 0.12 * (k % 2)) * size, fr * sin(fa)}; Scale: {1, 0.5, 1}; Sphere: {radius: 0.16, segments: 6}; NoShadow }
+        "flower_{k}" : LgHibiscusYellow {
+          Position: {fr * cos(fa), (0.62 + 0.12 * (k % 2)) * size, fr * sin(fa)}
+          Scale: {1, 0.5, 1}
+          Sphere: {radius: 0.16, segments: 6}
+          NoShadow
+        }
       }
     }
   }
@@ -187,18 +312,39 @@ assets {
     for k in 0..4 {
       const sx = k % 2 == 0 ? -1.5 : 1.5
       const sz = k < 2 ? -1.3 : 1.3
-      "stilt_{k}" : LgCanoeDark { Position: {sx, DECK_Y / 2 - 0.6, sz}; Cylinder: {length: DECK_Y + 1.2, radius: 0.1, segments: 6} }
+      "stilt_{k}" : LgCanoeDark {
+        Position: {sx, DECK_Y / 2 - 0.6, sz}
+        Cylinder: {length: DECK_Y + 1.2, radius: 0.1, segments: 6}
+      }
     }
+
     deck : LgCanoeWood { Position: {0, DECK_Y, 0}; Box: {3.8, 0.16, 3.4} }
     walls : LgHutWall { Position: {0.2, DECK_Y + 0.78, 0}; Box: {2.6, 1.4, 2.4} }
     door : LgHutDark { Position: {-1.11, DECK_Y + 0.62, 0.3}; Box: {0.04, 1.05, 0.7} }
     window : LgHutDark { Position: {-1.11, DECK_Y + 0.9, -0.65}; Box: {0.04, 0.45, 0.5} }
-    roof : LgStraw { Position: {0.2, DECK_Y + 2.25, 0}; Rotation: {0, 0.785, 0}; Cone: {length: 1.6, radius: 2.5, segments: 4} }
-    peak : LgStraw { Position: {0.2, DECK_Y + 3.15, 0}; Cone: {length: 0.4, radius: 0.12, segments: 5} }
-    for k in 0..2 {
-      "rail_{k}" : LgCanoeDark { Position: {-1.85, DECK_Y + 0.4, k == 0 ? -1.6 : 1.6}; Box: {0.08, 0.7, 0.08} }
+    roof : LgStraw {
+      Position: {0.2, DECK_Y + 2.25, 0}
+      Rotation: {0, 0.785, 0}
+      Cone: {length: 1.6, radius: 2.5, segments: 4}
     }
-    gangway : LgCanoeWood { Position: {3.4, DECK_Y - 0.6, 0.9}; Rotation: {0, 0, -0.38}; Box: {3.4, 0.1, 0.8} }
+
+    peak : LgStraw {
+      Position: {0.2, DECK_Y + 3.15, 0}
+      Cone: {length: 0.4, radius: 0.12, segments: 5}
+    }
+
+    for k in 0..2 {
+      "rail_{k}" : LgCanoeDark {
+        Position: {-1.85, DECK_Y + 0.4, k == 0 ? -1.6 : 1.6}
+        Box: {0.08, 0.7, 0.08}
+      }
+    }
+
+    gangway : LgCanoeWood {
+      Position: {3.4, DECK_Y - 0.6, 0.9}
+      Rotation: {0, 0, -0.38}
+      Box: {3.4, 0.1, 0.8}
+    }
   }
 
   // A small sandy islet with one palm, a rock and a bush, about radius across
@@ -209,24 +355,40 @@ assets {
     const lean = 0.15 + rng.f(0.2)
     const ra = rng.f(6.28)
 
-    shallows : LgSandIsleWet { Position: {0, -0.22, 0}; Scale: {1.3, 0.1, 1.15}; Sphere: {radius: radius, segments: 16, smooth: true}; NoShadow }
-    mound : LgSandIsle { Position: {0, -0.12, 0}; Scale: {1, 0.22, 0.9}; Sphere: {radius: radius, segments: 16, smooth: true} }
+    shallows : LgSandIsleWet {
+      Position: {0, -0.22, 0}
+      Scale: {1.3, 0.1, 1.15}
+      Sphere: {radius: radius, segments: 16, smooth: true}
+      NoShadow
+    }
+
+    mound : LgSandIsle {
+      Position: {0, -0.12, 0}
+      Scale: {1, 0.22, 0.9}
+      Sphere: {radius: radius, segments: 16, smooth: true}
+    }
+
     palm {
       Position: {0, 0.15, 0}
       Rotation: {0, rng.f(6.28), 0}
       LgPalm tree(height: 5 + rng.f(2), lean: lean, fronds: 7, seed: seed * 5 + 3)
     }
-    rock : LgBeachRock { Position: {radius * 0.7 * cos(ra), 0.05, radius * 0.7 * sin(ra)}; Rotation: {0.3, ra, 0.2}; Scale: {1.2, 0.7, 1}; Sphere: {radius: 0.35, segments: 6} }
+
+    rock : LgBeachRock {
+      Position: {radius * 0.7 * cos(ra), 0.05, radius * 0.7 * sin(ra)}
+      Rotation: {0.3, ra, 0.2}
+      Scale: {1.2, 0.7, 1}
+      Sphere: {radius: 0.35, segments: 6}
+    }
+
     bush {
       Position: {radius * 0.45 * cos(ra + 2.4), 0.1, radius * 0.45 * sin(ra + 2.4)}
       LgBush b(size: 0.6, seed: seed * 3 + 1)
     }
   }
 
-  // One stretch of bank, SECTION_LEN long from its origin toward +Z. The origin sits on the
-  // bank line of side (-1 left, 1 right): local X is mirrored by side, so -X points to the
-  // channel. Palms, bushes, flowers and beached rocks line the beach; a hut stands in the
-  // shallows and an islet sits out in the water when asked for
+  // One stretch of bank, SECTION_LEN long toward +Z from its origin on the bank line of side
+  // (-1 left, 1 right). Local X is mirrored by side, so -X points to the channel.
   template LgBankSection {
     prop side: f32 = 1
     prop seed: i32 = 1
@@ -241,7 +403,12 @@ assets {
         "palm_{p}" {
           Position: {side * (1.2 + rng.f(6)), 0.5, pz}
           Rotation: {0, side * (rng.f(0.9) - 0.45), 0}
-          LgPalm tree(height: 5.5 + rng.f(3.5), lean: (0 - side) * (0.12 + rng.f(0.22)), fronds: 6 + floor(rng.f(1.99)), seed: seed * 17 + p)
+          LgPalm tree(
+            height: 5.5 + rng.f(3.5),
+            lean: (0 - side) * (0.12 + rng.f(0.22)),
+            fronds: 6 + floor(rng.f(1.99)),
+            seed: seed * 17 + p
+          )
         }
       }
     }
@@ -255,24 +422,40 @@ assets {
       }
     }
 
-    // A patch of low flowers in the dune grass
     flowers {
       const fx = side * (4 + rng.f(6))
       const fz = rng.f(SECTION_LEN)
       Position: {fx, 0.5, fz}
-      grass : LgBushDark { Position: {0, 0.02, 0}; Scale: {1.6, 0.18, 1}; Sphere: {radius: 0.9, segments: 8, smooth: true}; NoShadow }
+      grass : LgBushDark {
+        Position: {0, 0.02, 0}
+        Scale: {1.6, 0.18, 1}
+        Sphere: {radius: 0.9, segments: 8, smooth: true}
+        NoShadow
+      }
+
       for k in 0..4 {
         const fa = k * 1.57 + rng.f(1)
+
         if k % 2 == 0 {
-          "bloom_{k}" : LgHibiscusRed { Position: {0.8 * cos(fa), 0.22, 0.5 * sin(fa)}; Scale: {1, 0.5, 1}; Sphere: {radius: 0.14, segments: 6}; NoShadow }
+          "bloom_{k}" : LgHibiscusRed {
+            Position: {0.8 * cos(fa), 0.22, 0.5 * sin(fa)}
+            Scale: {1, 0.5, 1}
+            Sphere: {radius: 0.14, segments: 6}
+            NoShadow
+          }
         } else {
-          "bloom_{k}" : LgHibiscusYellow { Position: {0.8 * cos(fa), 0.22, 0.5 * sin(fa)}; Scale: {1, 0.5, 1}; Sphere: {radius: 0.14, segments: 6}; NoShadow }
+          "bloom_{k}" : LgHibiscusYellow {
+            Position: {0.8 * cos(fa), 0.22, 0.5 * sin(fa)}
+            Scale: {1, 0.5, 1}
+            Sphere: {radius: 0.14, segments: 6}
+            NoShadow
+          }
         }
       }
     }
 
-    // Beached rocks at the waterline
     const rocks = 1 + floor(rng.f(1.99))
+
     for r in 0..2 {
       if r < rocks {
         const rr = 0.4 + rng.f(0.5)
@@ -297,7 +480,11 @@ assets {
       const ir = 1.4 + rng.f(0.4)
       isle {
         // Inner edge at least 1 unit out of the channel
-        Position: {side * (CHANNEL_HALF + 1.4 + ir * 1.3 - BANK_X + rng.f(0.5)), 0, SECTION_LEN * (0.3 + rng.f(0.4))}
+        Position: {
+          side * (CHANNEL_HALF + 1.4 + ir * 1.3 - BANK_X + rng.f(0.5)),
+          0,
+          SECTION_LEN * (0.3 + rng.f(0.4))
+        }
         LgIslet land(radius: ir, seed: seed * 7 + 5)
       }
     }
@@ -310,15 +497,38 @@ assets {
     const rng: flecs.script.math.Rng = {seed: seed}
     const hy = 0.25 + rng.f(0.25)
 
-    beach : LgFarSand { Position: {0, -0.4, 0}; Scale: {1.25, 0.04, 1}; Sphere: {radius: size, segments: 20, smooth: true}; NoShadow }
-    hill : LgFarGreen { Position: {(rng.f(0.4) - 0.2) * size, 0, 0}; Scale: {1, hy, 0.85}; Sphere: {radius: size * 0.85, segments: 20, smooth: true}; NoShadow }
+    beach : LgFarSand {
+      Position: {0, -0.4, 0}
+      Scale: {1.25, 0.04, 1}
+      Sphere: {radius: size, segments: 20, smooth: true}
+      NoShadow
+    }
+
+    hill : LgFarGreen {
+      Position: {(rng.f(0.4) - 0.2) * size, 0, 0}
+      Scale: {1, hy, 0.85}
+      Sphere: {radius: size * 0.85, segments: 20, smooth: true}
+      NoShadow
+    }
+
     for k in 0..2 {
       const a = rng.f(6.28)
       const ph = 0.06 * size + rng.f(0.03 * size)
       "palm_{k}" {
         Position: {1.05 * size * cos(a), 0, 0.9 * size * sin(a)}
-        trunk : LgPalmBark { Position: {0, ph / 2, 0}; Rotation: {0, 0, rng.f(0.3) - 0.15}; Frustum: {length: ph, radius_bottom: 0.03 * size, radius_top: 0.02 * size, segments: 5}; NoShadow }
-        top : LgFarPalm { Position: {0, ph, 0}; Scale: {1, 0.45, 1}; Sphere: {radius: 0.08 * size, segments: 6}; NoShadow }
+        trunk : LgPalmBark {
+          Position: {0, ph / 2, 0}
+          Rotation: {0, 0, rng.f(0.3) - 0.15}
+          Frustum: {length: ph, radius_bottom: 0.03 * size, radius_top: 0.02 * size, segments: 5}
+          NoShadow
+        }
+
+        top : LgFarPalm {
+          Position: {0, ph, 0}
+          Scale: {1, 0.45, 1}
+          Sphere: {radius: 0.08 * size, segments: 6}
+          NoShadow
+        }
       }
     }
   }
@@ -328,15 +538,30 @@ banks {
   // The banks are long strips that scroll by whole texture repeats, so their sand stays still:
   // a wet slope at the waterline, a wet flat, then the dry beach and dunes inland
   const step = 12
+
   for s in 0..2 {
     const side = s == 0 ? -1.0 : 1.0
     "bank_{s}" {
       Position: {side * BANK_X, 0, -530 + step * fract(distance / step)}
-      beach : LgSandWet { Position: {side * -0.9, -0.05, 0}; Rotation: {0, 0, side * 0.32}; Box: {2.6, 0.3, 1140} }
+      beach : LgSandWet {
+        Position: {side * -0.9, -0.05, 0}
+        Rotation: {0, 0, side * 0.32}
+        Box: {2.6, 0.3, 1140}
+      }
+
       flat : LgSandWet { Position: {side * 0.9, 0.12, 0}; Box: {1.6, 0.4, 1140} }
       top : LgSandDry { Position: {side * 16.7, 0.09, 0}; Box: {30, 0.5, 1140} }
-      dune : LgSandDry { Position: {side * 22, 0.6, 0}; Rotation: {0, 0, side * -0.08}; Box: {16, 0.6, 1140} }
-      shore : LgSandWet { Position: {side * 32.6, -0.05, 0}; Rotation: {0, 0, side * -0.3}; Box: {2.6, 0.3, 1140} }
+      dune : LgSandDry {
+        Position: {side * 22, 0.6, 0}
+        Rotation: {0, 0, side * -0.08}
+        Box: {16, 0.6, 1140}
+      }
+
+      shore : LgSandWet {
+        Position: {side * 32.6, -0.05, 0}
+        Rotation: {0, 0, side * -0.3}
+        Box: {2.6, 0.3, 1140}
+      }
     }
   }
 }
@@ -344,12 +569,22 @@ banks {
 sections {
   for s in 0..2 {
     const side = s == 0 ? -1.0 : 1.0
+
     for i in 0..SECTIONS {
       const base = (i + s * 0.5) * SECTION_LEN
       "sec_{s}_{i}" {
         Position: {side * BANK_X, 0, scroll_z(base, distance)}
-        Scale: {scenery_fade(scroll_z(base, distance)), scenery_fade(scroll_z(base, distance)), scenery_fade(scroll_z(base, distance))}
-        LgBankSection stretch(side: side, seed: 101 + s * 53 + i * 7, hut: i == 2 + s * 3, islet: i % 3 == s)
+        Scale: {
+          scenery_fade(scroll_z(base, distance)),
+          scenery_fade(scroll_z(base, distance)),
+          scenery_fade(scroll_z(base, distance))
+        }
+        LgBankSection stretch(
+          side: side,
+          seed: 101 + s * 53 + i * 7,
+          hut: i == 2 + s * 3,
+          islet: i % 3 == s
+        )
       }
     }
   }
@@ -358,6 +593,7 @@ sections {
 jungle {
   // A band of undergrowth along each dune, scrolled with the banks, and low green hills on it
   const step = 12
+
   for s in 0..2 {
     const side = s == 0 ? -1.0 : 1.0
     "band_{s}" : LgBushDark {
@@ -367,6 +603,7 @@ jungle {
       NoShadow
     }
   }
+
   for i in 0..20 {
     const side = i % 2 == 0 ? -1.0 : 1.0
     const base = i * (SCENERY_SPAN / 20) + hash(i * 13) * 8
@@ -374,10 +611,21 @@ jungle {
     const r = 3.5 + hash(i * 19) * 3
     const z = scroll_z(base, distance)
     const g = scenery_fade(z)
+
     if i % 3 == 0 {
-      "hill_{i}" : LgBushLeaf { Position: {x, 0.6, z}; Scale: {1.4 * g, 0.6 * g, g}; Sphere: {radius: r, segments: 12, smooth: true}; NoShadow }
+      "hill_{i}" : LgBushLeaf {
+        Position: {x, 0.6, z}
+        Scale: {1.4 * g, 0.6 * g, g}
+        Sphere: {radius: r, segments: 12, smooth: true}
+        NoShadow
+      }
     } else {
-      "hill_{i}" : LgFrondDark { Position: {x, 0.4, z}; Scale: {1.4 * g, 0.55 * g, g}; Sphere: {radius: r, segments: 12, smooth: true}; NoShadow }
+      "hill_{i}" : LgFrondDark {
+        Position: {x, 0.4, z}
+        Scale: {1.4 * g, 0.55 * g, g}
+        Sphere: {radius: r, segments: 12, smooth: true}
+        NoShadow
+      }
     }
   }
 }
@@ -389,7 +637,11 @@ far_islands {
     const base = i * (FAR_SPAN / FAR_ISLANDS) + hash(i * 23 + 5) * 60
     "island_{i}" {
       Position: {side * (110 + hash(i * 29 + 1) * 120), 0, far_z(base, distance)}
-      Scale: {far_fade(far_z(base, distance)), far_fade(far_z(base, distance)), far_fade(far_z(base, distance))}
+      Scale: {
+        far_fade(far_z(base, distance)),
+        far_fade(far_z(base, distance)),
+        far_fade(far_z(base, distance))
+      }
       LgFarIsland land(size: 16 + hash(i * 31 + 2) * 22, seed: 700 + i * 13)
     }
   }

@@ -17,10 +17,8 @@ using box.transition
 // The label a tab shows in the bar of its tab view
 struct TabLabel(value: string)
 
-// Behavior of the header of a tab in the bar of a tab view: index is the place of its tab, the
-// header of the selected tab is Focusable, the others only Interactive. The tab view acts on its
-// clicks and keys. A change of tab changes selected, which restarts the async blocks, so they
-// keep no state across events. The pointer shows a hand over it.
+// Behavior of the header of a tab in the bar of a tab view: index is the place of its tab. The
+// tab view acts on its clicks and keys.
 template HeadlessTabHeader : HeadlessPressable {
   prop index: i32 = 0
   prop label: string = ""
@@ -28,6 +26,7 @@ template HeadlessTabHeader : HeadlessPressable {
 
   Interactive
   Cursor: {CursorPointer}
+
   if selected {
     Focusable
   }
@@ -68,6 +67,7 @@ template TabHeader : HeadlessTabHeader {
 
   mark {
     Item: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}
+
     if selected {
       Rect: {1, 1}
       Rgb: t.accent
@@ -76,16 +76,8 @@ template TabHeader : HeadlessTabHeader {
 }
 
 // A tab view: its Tab children are the pages, of which it shows the one of index current below
-// the bar, its first child, with a header for each tab. The bar is one Tab stop, the header of
-// the selected tab: a click on a header selects its tab; while a header has the focus Left and
-// Right select and focus the previous and next tab, wrapping around, Home and End the first and
-// the last. Each change of the tab reports a change. A width fixes the view, 0 fits the page; a
-// height fixes the page, 0 fits it.
-//
-// The view owns the value and is not split, as RadioGroup: its tabs read and assign its muts.
-// count is the number of its tabs, each of which took the next index when it started, first the
-// tab of index 0 and header the header with the focus, 0 for none. The bar reads the TabLabel of
-// each tab.
+// the bar, with a header for each tab. A width fixes the view, 0 fits the page; a height fixes
+// the page, 0 fits it.
 template TabView {
   prop value: i32 = 0
   prop width: f32 = 0
@@ -102,15 +94,17 @@ template TabView {
   const bar_h = t.control_height + 4
   const edge = 1
 
-  // The bar and the page sit inside the border, edge points wide
   Layout: {direction: Column, padding: {edge, edge, edge, edge}}
   Item: {}
+
   if width > 0 {
     Item = {width: {mode: Fixed, value: width}}
   }
+
   if height > 0 {
     Item = {height: {mode: Fixed, value: bar_h + height + edge * 2}}
   }
+
   Rect: {1, 1}
   Rgb: t.surface_alt
   Border: {width: edge, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
@@ -145,6 +139,7 @@ template TabView {
   async {
     while true {
       const e = await on.blur(this)
+
       if e.target == header {
         header = none
       }
@@ -156,16 +151,20 @@ template TabView {
     while true {
       const e = await on.activate(this)
       const tab = ui.activation(e)
+
       if tab != 0 {
         if tab.parent() == bar {
           mut probe: i32 = 0
+
           while probe < count && tab.name() != "tab_{probe}" {
             probe += 1
           }
+
           if probe < count && probe != current {
             current = probe
             await ui.changed(this)
           }
+
           await focus(tab)
         }
       }
@@ -175,6 +174,7 @@ template TabView {
   async {
     while true {
       const e = await on.key_down(this)
+
       if header != 0 && count > 0 &&
         (e.key == "ArrowLeft" || e.key == "ArrowRight" || e.key == "Home" || e.key == "End")
       {
@@ -185,10 +185,12 @@ template TabView {
           "Home": 0
           _: count - 1
         }
+
         if target != from {
           current = target
           await ui.changed(this)
         }
+
         await focus(ui.sibling(header, target - from, Interactive))
       }
     }
@@ -205,6 +207,7 @@ template HeadlessTab : parent TabView {
 
   TabLabel: {label}
   ClipChildren
+
   if index >= 0 && index == current {
     Item: {width: {mode: Grow, value: 1}, height: {mode: Grow, value: 1}}
   } else {
@@ -215,6 +218,7 @@ template HeadlessTab : parent TabView {
     if index < 0 {
       index = count
       count += 1
+
       if index == 0 {
         first = this
       }

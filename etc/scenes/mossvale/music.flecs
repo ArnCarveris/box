@@ -15,7 +15,15 @@ const music_forest = pz < WALL_N1 && game_state == 1
 assets {
   prefab MvFlute {
     Sound: {level_variance: 0.05}
-    Envelope: {attack: 0.06, decay: 0.25, sustain: 0.55, hold: 0.22, release: 0.5, curve: 2.5, attack_curve: 1.5}
+    Envelope: {
+      attack: 0.06,
+      decay: 0.25,
+      sustain: 0.55,
+      hold: 0.22,
+      release: 0.5,
+      curve: 2.5,
+      attack_curve: 1.5
+    }
     Filter: {kind: LowPass, cutoff: 2600, resonance: 0.1}
     Lfo: {rate: 5.2, delay: 0.2, fade: 0.3, random_phase: true, pitch: 14, amplitude: 0.08}
     tone { Oscillator: {wave: Sine, frequency: 440, level: 0.42} }
@@ -29,8 +37,15 @@ assets {
   prefab MvHarp {
     Sound: {level_variance: 0.1}
     Filter: {kind: LowPass, cutoff: 3500, resonance: 0.05}
-    pluck { Oscillator: {wave: Pluck, frequency: 440, level: 0.45}; String: {decay: 2.2, brightness: 0.35, hardness: 0.45} }
-    body { Oscillator: {wave: Sine, frequency: 440, level: 0.12}; Envelope: {attack: 0.004, decay: 1.2, curve: 4.5} }
+    pluck {
+      Oscillator: {wave: Pluck, frequency: 440, level: 0.45}
+      String: {decay: 2.2, brightness: 0.35, hardness: 0.45}
+    }
+
+    body {
+      Oscillator: {wave: Sine, frequency: 440, level: 0.12}
+      Envelope: {attack: 0.004, decay: 1.2, curve: 4.5}
+    }
   }
 
   template MvStrings {
@@ -40,11 +55,13 @@ assets {
     Filter: {kind: LowPass, cutoff: 900, resonance: 0.12}
     FilterEnvelope: {attack: 1.8, sustain: 1, hold: 2.3, amount: 0.637}
     Lfo: {rate: 0.23, fade: 1.2, random_phase: true, cutoff: 0.3, amplitude: 0.12}
+
     if layer == 0 {
       low {
         Oscillator: {wave: Saw, frequency: 440, level: 0.09}
         Unison: {voices: 3, detune: 12, width: 0.6}
       }
+
       shimmer {
         Oscillator: {wave: Sine, frequency: 880, level: 0.05}
         Unison: {voices: 2, detune: 7, width: 1}
@@ -422,8 +439,12 @@ assets {
 }
 
 const MV_LAYER: string[] = ["low", "mid", "high"]
-const MV_STRING_INST = [assets.mv_band.strings_low, assets.mv_band.strings_mid, assets.mv_band.strings_high]
-const MV_STRING_PARTS = [assets.mv_strings_low_part, assets.mv_strings_mid_part, assets.mv_strings_high_part]
+const MV_STRING_INST = [
+  assets.mv_band.strings_low, assets.mv_band.strings_mid, assets.mv_band.strings_high
+]
+const MV_STRING_PARTS = [
+  assets.mv_strings_low_part, assets.mv_strings_mid_part, assets.mv_strings_high_part
+]
 
 $ {
   Transport: {beats_per_bar: 4, beat_unit: 4, loop: true, loop_start: 0, loop_end: 192}
@@ -437,7 +458,15 @@ assets {
       "strings_{MV_LAYER[i]}" {
         Track: {instrument: MV_STRING_INST[i]}
         Bus: {output: mv_music}
-        bars { ClipPlacement: {clip: MV_STRING_PARTS[i], start: 0, duration: 192, loop: true, gain: music_forest ? 0.9 : 0.7} }
+        bars {
+          ClipPlacement: {
+            clip: MV_STRING_PARTS[i],
+            start: 0,
+            duration: 192,
+            loop: true,
+            gain: music_forest ? 0.9 : 0.7
+          }
+        }
       }
     }
 
@@ -445,8 +474,11 @@ assets {
       Track: {instrument: mv_band.bass}
       Bus: {output: mv_music}
       down { ClipPlacement: {clip: mv_bass_part, start: 0, duration: 192, loop: true, gain: 0.75} }
+
       if !music_forest {
-        push { ClipPlacement: {clip: mv_bass_push_part, start: 0, duration: 192, loop: true, gain: 0.45} }
+        push {
+          ClipPlacement: {clip: mv_bass_push_part, start: 0, duration: 192, loop: true, gain: 0.45}
+        }
       }
     }
 
@@ -454,6 +486,7 @@ assets {
       Track: {instrument: mv_band.harp}
       Bus: {output: mv_music}
       down { ClipPlacement: {clip: mv_harp_down_part, start: 0, duration: 192, loop: true} }
+
       if !music_forest {
         off { ClipPlacement: {clip: mv_harp_off_part, start: 0, duration: 192, loop: true} }
       }
@@ -462,10 +495,12 @@ assets {
     flute {
       Track: {instrument: mv_band.flute}
       Bus: {output: mv_music}
+
       if !music_forest {
         first { ClipPlacement: {clip: mv_melody_part, start: 0} }
         third { ClipPlacement: {clip: mv_melody_part, start: 128} }
       }
+
       if music_festive {
         second { ClipPlacement: {clip: mv_melody_part, start: 64} }
       }
@@ -474,6 +509,7 @@ assets {
     kick {
       Track: {instrument: mv_band.kick}
       Bus: {output: mv_music}
+
       if music_festive {
         beat { ClipPlacement: {clip: mv_kick_part, start: 0, duration: 192, loop: true} }
       }
@@ -482,6 +518,7 @@ assets {
     tamb {
       Track: {instrument: mv_band.tamb}
       Bus: {output: mv_music}
+
       if music_festive {
         beat { ClipPlacement: {clip: mv_tamb_part, start: 0, duration: 192, loop: true} }
       }

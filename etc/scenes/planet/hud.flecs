@@ -30,7 +30,6 @@ assets {
     }
   }
 
-  // A color as three sliders, r, g and b, from 0 to 255 under a label
   template ColorField {
     prop text: string = ""
     prop red: f32 = 255
@@ -51,15 +50,15 @@ assets {
     }
   }
 
-  // A column of widgets spaced as the widgets of a panel. A page that is not shown takes no
-  // space and clips its children away, so they are not drawn, picked or reached with Tab, but
-  // keep their values
+  // A hidden page takes no space and clips its children, so they are not drawn, picked or
+  // reached with Tab, but keep their values
   template Page {
     prop shown: bool = true
 
     const t = box.ui.theme[Theme]
 
     Layout: {direction: Column, spacing: t.spacing}
+
     if shown {
       Item: {width: {mode: Grow}}
     } else {
@@ -68,7 +67,6 @@ assets {
     }
   }
 
-  // A segmented switch: a row of Segment buttons on a sunken strip, one of them selected
   template SegmentBar {
     const t = box.ui.theme[Theme]
 
@@ -79,7 +77,6 @@ assets {
     Border: {width: 1, radius: t.radius, color: {t.border.r, t.border.g, t.border.b, 255}}
   }
 
-  // A button of a SegmentBar that triggers its action, filled with the accent while selected
   template Segment : HeadlessButton {
     prop selected: bool = false
 
@@ -122,16 +119,11 @@ hud {
       Item: {h: Left, v: Middle}
       InputBlocker
 
-      // The panel: the Planet / Star / Background switch, then what the planet or the star is
-      // (type, seed, detail) and its parameters in groups, which for a planet depend on the
-      // type, or the parameters of the background
       Panel panel(
         title: state.page == PAGE_BACKGROUND ? "Background" :
           (state.page == PAGE_STAR ? "Star" : "Planet"),
         width: 300
       ) {
-        // The switch between the planet, the star, each with its own values, and the
-        // background, which keeps the body on the stage
         assets.SegmentBar view_switch {
           assets.Segment planet_side(
             label: "Planet", action: actions.show_planet, selected: state.page == PAGE_PLANET
@@ -145,9 +137,7 @@ hud {
           )
         }
 
-        // The pages of the three sides, of which the side shown takes the space: its type, seed
-        // and detail, its parameters and, for the planet, the light of the scene. All pages
-        // stay, so switching keeps their widgets as they are
+        // All pages stay, so switching keeps their widgets as they are
         pages {
           Layout: {direction: Column}
           Item: {width: {mode: Grow}}
@@ -171,7 +161,6 @@ hud {
 
             Separator star_top_rule()
 
-            // The parameters of the Star template, each slider in its own units
             ScrollView star_groups(
               width: 276, height: 603, frame: false, transparent: true, overlay: true,
               bar: 6, focusable: false
@@ -234,8 +223,6 @@ hud {
 
             Separator top_rule()
 
-            // The parameter groups of the kind, in a column that scrolls. Each slider sets one
-            // parameter of the Planet template in its own units
             ScrollView groups(
               width: 276, height: 560, frame: false, transparent: true, overlay: true,
               bar: 6, focusable: false
@@ -501,8 +488,7 @@ hud {
             )
           }
 
-          // The background: the stars, the nebula (its kind loads its preset) and the orientation
-          // of the sky. Random picks other seeds for both
+          // Picking a nebula kind loads its preset, Random picks new star and nebula seeds
           assets.Page background_page(shown: state.page == PAGE_BACKGROUND) {
             assets.Field background_variant(text: "Seeds") {
               Button random(label: "Random", variant: "secondary", action: actions.random_seed)
@@ -563,6 +549,7 @@ hud {
                     value: state.background.nebula_kind, width: 150
                   )
                 }
+
                 Slider intensity(
                   label: "Intensity", width: 260, min: 0, max: 3, step: 0.01,
                   value: state.background.intensity, decimals: 2

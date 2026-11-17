@@ -13,28 +13,37 @@ assets {
       Box: {width + 0.35, 0.2, depth + 0.35}
       Rgb: TownCream
     }
+
     for side in 0..2 {
       {
         Position: {(side * 2 - 1) * width / 2, 0.25, 0}
         Box: {0.13, 0.4, depth}
         Rgb: color
       }
+
       for end in 0..2 {
         {
-          Position: {(side * 2 - 1) * width * 0.32, 0.78, -depth * 0.12 + (end * 2 - 1) * depth * 0.25}
+          Position: {
+            (side * 2 - 1) * width * 0.32,
+            0.78,
+            -depth * 0.12 + (end * 2 - 1) * depth * 0.25
+          }
           Box: {0.09, 1.4, 0.09}
           Rgb: TownTimber
         }
       }
+
       {
         Position: {(side * 2 - 1) * width * 0.32, 1.5, -depth * 0.12}
         Box: {0.1, 0.12, depth * 0.65}
         Rgb: TownTimber
       }
+
       Planter(blossoms: true) {
         Position: {(side * 2 - 1) * width * 0.35, 0.12, depth * 0.36}
       }
     }
+
     for i in 0..7 {
       {
         Position: {0, 1.6, -depth * 0.12 + (i - 3) * depth * 0.09}
@@ -42,14 +51,17 @@ assets {
         Rgb: TownTimber
       }
     }
+
     for i in 0..3 {
       {
         Position: {(i - 1) * width * 0.22, 1.63, -depth * 0.15}
         Sphere: {radius: 0.3, segments: 8, smooth: true}
         Rgb: TownLeaf
       }
+
       Planter() { Position: {(i - 1) * width * 0.24, 0.12, -depth * 0.32} }
     }
+
     {
       Position: {width * 0.25, 0.42, depth * 0.12}
       Box: {0.8, 0.65, 0.9}

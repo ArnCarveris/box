@@ -27,7 +27,10 @@ assets {
     grain_warp { nodes.Multiply: {a: warp_noise, b_value: {rings * 0.14, 0, 0, 0}} }
     grain_sum { nodes.Add: {a: grain_lines, b: grain_warp} }
     ring_fract { nodes.Fract: {input: grain_sum} }
-    ring { nodes.Smoothstep: {input: ring_fract, edge0_value: {0, 0, 0, 0}, edge1_value: {0.9, 0, 0, 0}} }
+    ring {
+      nodes.Smoothstep: {input: ring_fract, edge0_value: {0, 0, 0, 0}, edge1_value: {0.9, 0, 0, 0}}
+    }
+
     tone_noise { nodes.Noise: {frequency: 2, octaves: 2, seed: seed + 2} }
     streaks { nodes.Mix: {a: ring, b: pore_noise, factor_value: {0.65, 0, 0, 0}} }
     figure { nodes.Mix: {a: streaks, b: tone_noise, factor_value: {0.3, 0, 0, 0}} }
@@ -36,14 +39,36 @@ assets {
       wood_normal { nodes.Normal: {height: figure, strength: 0.12} }
       Graph: {output: wood_normal, width: 1024, height: 1024, format: GraphLinear}
     } else {
-      wood { nodes.Ramp: {input: figure, keys: [{0.15, {dark.r, dark.g, dark.b}}, {0.5, {mid.r, mid.g, mid.b}}, {0.9, {light.r, light.g, light.b}}]} }
+      wood {
+        nodes.Ramp: {
+          input: figure,
+          keys: [
+            {0.15, {dark.r, dark.g, dark.b}},
+            {0.5, {mid.r, mid.g, mid.b}},
+            {0.9, {light.r, light.g, light.b}}
+          ]
+        }
+      }
+
       Graph: {output: wood, width: 1024, height: 1024}
     }
   }
 
-  WoodTexture walnut(seed: 21, rings: 40, light: {120, 78, 50}, mid: {84, 52, 32}, dark: {48, 30, 20})
+  WoodTexture walnut(
+    seed: 21,
+    rings: 40,
+    light: {120, 78, 50},
+    mid: {84, 52, 32},
+    dark: {48, 30, 20}
+  )
   WoodTexture walnut_bumps(seed: 21, rings: 40, bumps: true)
-  WoodTexture oak(seed: 7, rings: 56, light: {200, 156, 104}, mid: {172, 126, 80}, dark: {128, 88, 52})
+  WoodTexture oak(
+    seed: 7,
+    rings: 56,
+    light: {200, 156, 104},
+    mid: {172, 126, 80},
+    dark: {128, 88, 52}
+  )
   WoodTexture oak_bumps(seed: 7, rings: 56, bumps: true)
 
   linen {
@@ -56,11 +81,39 @@ assets {
     slub_noise { nodes.Noise: {frequency: 12, octaves: 3, seed: 32} }
     band_pos { nodes.Multiply: {a: weave_v, b_value: {4, 0, 0, 0}} }
     band_fract { nodes.Fract: {input: band_pos} }
-    band_in { nodes.Smoothstep: {input: band_fract, edge0_value: {0.38, 0, 0, 0}, edge1_value: {0.4, 0, 0, 0}} }
-    band_out { nodes.Smoothstep: {input: band_fract, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.52, 0, 0, 0}} }
+    band_in {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.38, 0, 0, 0},
+        edge1_value: {0.4, 0, 0, 0}
+      }
+    }
+
+    band_out {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.5, 0, 0, 0},
+        edge1_value: {0.52, 0, 0, 0}
+      }
+    }
+
     band { nodes.Subtract: {a: band_in, b: band_out} }
-    pin_in { nodes.Smoothstep: {input: band_fract, edge0_value: {0.56, 0, 0, 0}, edge1_value: {0.57, 0, 0, 0}} }
-    pin_out { nodes.Smoothstep: {input: band_fract, edge0_value: {0.585, 0, 0, 0}, edge1_value: {0.595, 0, 0, 0}} }
+    pin_in {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.56, 0, 0, 0},
+        edge1_value: {0.57, 0, 0, 0}
+      }
+    }
+
+    pin_out {
+      nodes.Smoothstep: {
+        input: band_fract,
+        edge0_value: {0.585, 0, 0, 0},
+        edge1_value: {0.595, 0, 0, 0}
+      }
+    }
+
     pin { nodes.Subtract: {a: pin_in, b: pin_out} }
     stripes { nodes.Add: {a: band, b: pin} }
     cloth { nodes.Mix: {a: weave_noise, b: slub_noise, factor_value: {0.4, 0, 0, 0}} }
@@ -87,7 +140,14 @@ stage {
   key_light {
     Position: {-0.55, 1.9, 0.6}
     Rotation: {1.15, 2.4, 0}
-    SpotLight: {intensity: 11 * PI, range: 6, inner_angle: 20, outer_angle: 42, shadows: true, shadow_resolution: 2048}
+    SpotLight: {
+      intensity: 11 * PI,
+      range: 6,
+      inner_angle: 20,
+      outer_angle: 42,
+      shadows: true,
+      shadow_resolution: 2048
+    }
     Rgb: {255, 220, 176}
   }
 
@@ -203,6 +263,7 @@ stage {
         Scale: {1, 0.7, 1.2}
         IcoSphere: {radius: s, segments: 1}
         PbrMaterial: {roughness: 0.9}
+
         if i % 3 == 0 {
           Rgb: {226, 190, 130}
         } else {

@@ -23,11 +23,8 @@ fn slider_ratio(x: f64, w: f64, thumb: f64) -> f64 {
 }
 
 // Behavior of a slider. A press on the track jumps to the value under the pointer and a drag
-// from there follows it: the track is the bottom thumb points of the slider across its width, the
-// thumb center moves between thumb / 2 from either edge. The arrow keys step (a hundredth of the range for a continuous slider),
-// PageUp and PageDown step by a tenth of the range, Home and End go to min and max. current
-// snaps to step and stays within min..max. The pointer shows a hand over the slider, a crossed
-// circle while it is disabled.
+// follows it; the arrow keys, PageUp, PageDown, Home and End step. current snaps to step and stays
+// within min..max.
 template HeadlessSlider {
   prop min: f32 = 0
   prop max: f32 = 100
@@ -75,8 +72,10 @@ template HeadlessSlider {
       const e = await on.press(this)
       const b = this[layout.Bounds]
       down = !disabled && e.local_y < thumb - b.height / 2
+
       if down {
         const v = slider_snap(min + slider_ratio(e.local_x, b.width, thumb) * range, min, max, step)
+
         if v != current {
           current = v
           await ui.changed(this)
@@ -88,9 +87,11 @@ template HeadlessSlider {
   async {
     while true {
       const e = await on.drag(this)
+
       if down && !disabled {
         const w = this[layout.Bounds].width
         const v = slider_snap(min + slider_ratio(e.local_x, w, thumb) * range, min, max, step)
+
         if v != current {
           current = v
           await ui.changed(this)
@@ -109,6 +110,7 @@ template HeadlessSlider {
   async {
     while true {
       const e = await on.focus(this)
+
       if e.target == this {
         focused = true
       }
@@ -118,6 +120,7 @@ template HeadlessSlider {
   async {
     while true {
       const e = await on.blur(this)
+
       if e.target == this {
         focused = false
       }
@@ -127,6 +130,7 @@ template HeadlessSlider {
   async {
     while true {
       const e = await on.key_down(this)
+
       if !disabled {
         const target = match e.key {
           "ArrowLeft", "ArrowDown": current - key_step
@@ -138,6 +142,7 @@ template HeadlessSlider {
           _: current
         }
         const v = slider_snap(target, min, max, step)
+
         if v != current {
           current = v
           await ui.changed(this)

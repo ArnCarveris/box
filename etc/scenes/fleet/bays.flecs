@@ -12,6 +12,55 @@ using box.text
 using state
 
 assets {
+  template HarborBayFuel {
+    plinth_rim : HarborHazard { Position: {1, 0.15, 0}; Box: {9, 0.3, 11} }
+    plinth : HarborPanel {
+      Position: {1, 0.6, 0}
+      Box: {8, 1.2, 10}
+      Bevel: {top: 0.4, segments: 1}
+    }
+
+    column : HarborYellow {
+      Position: {0, 10.6, 0}
+      Box: {2.4, 18.8, 2.4}
+      Bevel: {radius: 0.25, segments: 1}
+    }
+
+    collar : HarborHazard { Position: {0, 2.2, 0}; Box: {2.8, 1.4, 2.8} }
+    back : HarborSign { Position: {-1.6, 9, 0}; Box: {0.8, 17, 3.4} }
+    riser_a : HarborSteel {
+      Position: {1.7, 10.6, 0.8}
+      Cylinder: {radius: 0.45, length: 18.8, segments: 8}
+    }
+
+    riser_b : HarborRed {
+      Position: {1.7, 10.6, -0.8}
+      Cylinder: {radius: 0.35, length: 18.8, segments: 8}
+    }
+
+    pump : HarborWhite {
+      Position: {2.4, 3.7, 3.2}
+      Box: {3.2, 5, 3.4}
+      Bevel: {radius: 0.3, segments: 2}
+    }
+
+    pump_band : HarborYellow { Position: {2.4, 2.3, 3.2}; Box: {3.3, 0.5, 3.5} }
+    pump_screen : HarborWindowCool { Position: {0.75, 4.6, 3.2}; Box: {0.1, 1.4, 2.2} }
+    reel : HarborRubber {
+      Position: {2.4, 3.2, -3.2}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 1.6, length: 1.6, segments: 12}
+    }
+
+    reel_hub : HarborYellow {
+      Position: {2.4, 3.2, -3.2}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: 0.6, length: 2.2, segments: 8}
+    }
+
+    beacon : HarborBeaconAmber { Position: {2.4, 6.6, 3.2}; Sphere: {radius: 0.45, segments: 8} }
+  }
+
   // A rig bay on the outer deck, in its own frame: the deck at y = 0, +z away from the station
   // and the hangar door of the bay recessed into the wall, whose face is at z = -55.
   template RigBay {
@@ -32,10 +81,12 @@ assets {
     edge_b : HarborHazard { Position: {0, 0.15, -34}; Box: {38.5, 0.3, 2.5} }
     edge_c : HarborHazard { Position: {18, 0.15, 0}; Box: {2.5, 0.3, 68} }
     edge_d : HarborHazard { Position: {-18, 0.15, 0}; Box: {2.5, 0.3, 68} }
+
     for l in 0..7 {
       "guide_{l}" {
         Position: {0, 0.25, -30 + l * 10}
         Box: {1.5, 0.5, 4}
+
         if busy {
           Rgb: {255, 180, 70}
           Emissive: {strength: 6, color: {255, 160, 50}}
@@ -45,10 +96,12 @@ assets {
         }
       }
     }
+
     for c in 0..4 {
       "corner_{c}" {
         Position: {c < 2 ? -18 : 18, 1, c % 2 == 0 ? -34 : 34}
         dome : HarborAmber { Position: {0, 0, 0}; Sphere: {radius: 1, segments: 10} }
+
         if hazard {
           glow : HarborBeaconAmber { Position: {0, 0, 0}; Sphere: {radius: 1.3, segments: 10} }
           Rgb: {255, 160, 60}
@@ -61,6 +114,7 @@ assets {
     apron : HarborOuterLane { Position: {0, 0.1, -50.25}; Box: {42, 0.2, 28.5} }
     threshold : HarborHazard { Position: {0, 0.13, -62.5}; Box: {36, 0.26, 2} }
     lead : HarborOuterPaint { Position: {0, 0.01, 45.5}; Box: {1.2, 0.32, 19} }
+
     for t in 0..2 {
       "bar_{t}" : HarborOuterLine { Position: {0, 0.12, t == 0 ? -25 : 25}; Box: {26, 0.24, 1.2} }
     }
@@ -72,12 +126,14 @@ assets {
       header : HarborPanel { Position: {0, 26.75, -9}; Box: {40, 3.5, 3} }
       header_glow : HarborAmber { Position: {0, 25.2, -7.4}; Box: {32, 0.4, 0.3} }
       soffit : HarborWindowCool { Position: {0, 29.75, -4}; Box: {34, 0.3, 3} }
+
       for s in 0..2 {
         const sx = s == 0 ? 0 - 1 : 1
         "jamb_{s}" : HarborHullDark { Position: {sx * 21.5, 15, -5.2}; Box: {3, 30, 10} }
         "rail_{s}" : HarborYellow { Position: {sx * 19.4, 13, -8.6}; Box: {0.8, 26, 1.2} }
         "stripe_{s}" : HarborHazard { Position: {sx * 21.5, 15, 0}; Box: {3, 30, 0.4} }
       }
+
       sign_frame : HarborPanel { Position: {0, 40.5, -0.1}; Box: {22, 13, 0.8} }
       sign : HarborSign { Position: {0, 40.5, 0.45}; Box: {20, 11, 0.6} }
       number {
@@ -86,6 +142,7 @@ assets {
         Rgb: {240, 240, 245}
         Emissive: {strength: 1.5, color: {240, 240, 245}}
       }
+
       if busy {
         light {
           Position: {0, 28, 15}
@@ -94,6 +151,7 @@ assets {
         }
       }
     }
+
     for s in 0..2 {
       const sx = s == 0 ? 0 - 1 : 1
       "hatch_{s}" : HarborOuterDoor { Position: {sx * 30, 3.4, -55.2}; Box: {4, 6.8, 0.8} }
@@ -101,26 +159,13 @@ assets {
       "louver_{s}" : HarborOuterDoor { Position: {sx * 39, 11, -55.7}; Box: {12, 14, 1.4} }
     }
 
-    fuel {
-      Position: {23, 0, 0}
-      plinth_rim : HarborHazard { Position: {1, 0.15, 0}; Box: {9, 0.3, 11} }
-      plinth : HarborPanel { Position: {1, 0.6, 0}; Box: {8, 1.2, 10}; Bevel: {top: 0.4, segments: 1} }
-      column : HarborYellow { Position: {0, 10.6, 0}; Box: {2.4, 18.8, 2.4}; Bevel: {radius: 0.25, segments: 1} }
-      collar : HarborHazard { Position: {0, 2.2, 0}; Box: {2.8, 1.4, 2.8} }
-      back : HarborSign { Position: {-1.6, 9, 0}; Box: {0.8, 17, 3.4} }
-      riser_a : HarborSteel { Position: {1.7, 10.6, 0.8}; Cylinder: {radius: 0.45, length: 18.8, segments: 8} }
-      riser_b : HarborRed { Position: {1.7, 10.6, -0.8}; Cylinder: {radius: 0.35, length: 18.8, segments: 8} }
-      pump : HarborWhite { Position: {2.4, 3.7, 3.2}; Box: {3.2, 5, 3.4}; Bevel: {radius: 0.3, segments: 2} }
-      pump_band : HarborYellow { Position: {2.4, 2.3, 3.2}; Box: {3.3, 0.5, 3.5} }
-      pump_screen : HarborWindowCool { Position: {0.75, 4.6, 3.2}; Box: {0.1, 1.4, 2.2} }
-      reel : HarborRubber { Position: {2.4, 3.2, -3.2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 1.6, length: 1.6, segments: 12} }
-      reel_hub : HarborYellow { Position: {2.4, 3.2, -3.2}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.6, length: 2.2, segments: 8} }
-      beacon : HarborBeaconAmber { Position: {2.4, 6.6, 3.2}; Sphere: {radius: 0.45, segments: 8} }
-    }
+    HarborBayFuel fuel { Position: {23, 0, 0} }
+
     for g in 0..8 {
       "gauge_{g}" {
         Position: {20.9, 2 + g * 2, 0}
         Box: {0.2, 1.4, 2.5}
+
         if g < fuel {
           Rgb: {110, 240, 130}
           Emissive: {strength: 6, color: {90, 255, 110}}
@@ -130,15 +175,25 @@ assets {
         }
       }
     }
+
     boom {
       Position: {23, 21, 0}
       Rotation: {0, boom_in ? 0 : 0 - HALF_PI, 0}
       Transition: [Rotation: {duration: 3, timing_function: EaseInOut}]
       hub : HarborPanel { Position: {0, 0, 0}; Cylinder: {radius: 1.5, length: 2, segments: 12} }
       arm : HarborYellow { Position: {-8, 0, 0}; Box: {16, 1.5, 1.5} }
-      line : HarborSteel { Position: {-7.5, 1, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.3, length: 15, segments: 6} }
+      line : HarborSteel {
+        Position: {-7.5, 1, 0}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {radius: 0.3, length: 15, segments: 6}
+      }
+
       weight : HarborHullDark { Position: {2.8, 0, 0}; Box: {3, 2.4, 2.4} }
-      hose : HarborRubber { Position: {-15.5, -3.5, 0}; Cylinder: {radius: 0.5, length: 7, segments: 8} }
+      hose : HarborRubber {
+        Position: {-15.5, -3.5, 0}
+        Cylinder: {radius: 0.5, length: 7, segments: 8}
+      }
+
       nozzle {
         Position: {-15.5, -7.5, 0}
         Cylinder: {radius: 0.8, length: 1, segments: 10}
@@ -146,6 +201,7 @@ assets {
         Emissive: {strength: fueling ? 10 : 0.5, color: {90, 220, 255}}
         Transition: [Emissive: {duration: 0.6, timing_function: EaseInOut}]
       }
+
       if fueling {
         for p in 0..3 {
           "pulse_{p}" : HarborPulse {
@@ -162,13 +218,18 @@ assets {
         Animator: {clip: harbor_rig_cycle, time: k * 150 + offset, speed: 1, mode: Loop}
       }
     }
+
     for k in 0..2 {
       "ship_{k}" {
-        Rig hull(design: harbor_rig_design(idx + k * 2), burning: harbor_rig_burn(turn == k, step)) {
+        Rig hull(
+          design: harbor_rig_design(idx + k * 2),
+          burning: harbor_rig_burn(turn == k, step)
+        ) {
           Position: {0, 0, 0}
         }
       }
     }
+
     flash : HarborFlash {
       Position: {0, 1300, 2100}
       Scale: {0.01, 0.01, 0.01}
@@ -184,12 +245,15 @@ assets {
         const t = c - n * 150
         const s = harbor_bay_step(t)
         const f = s < 4 ? 0 : s > 4 ? 8 : harbor_ticks((t - 61) / 3.375, 8)
+
         if n != turn {
           turn = n
         }
+
         if s != step {
           step = s
         }
+
         if f != fuel {
           fuel = f
         }

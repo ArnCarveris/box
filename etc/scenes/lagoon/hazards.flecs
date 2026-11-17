@@ -41,6 +41,7 @@ assets {
       Scale: {1.1 * size, 0.7 * size, 0.95 * size}
       IcoSphere: {radius: 1, segments: 1}
     }
+
     for k in 0..5 {
       const a = seed + k * 1.2566 + 0.4 * sin(seed * 3 + k)
       const h = (0.7 + 0.5 * hash(seed + k)) * size
@@ -50,7 +51,12 @@ assets {
         Cone: {length: h * 1.6, radius: 0.24 * size, segments: 4}
       }
     }
-    foam : LgFoam { Position: {0, 0.03, 0}; Scale: {1, 0.35, 1}; Torus: {radius: 1.12 * size, tube: 0.16, segments: 20, rings: 6} }
+
+    foam : LgFoam {
+      Position: {0, 0.03, 0}
+      Scale: {1, 0.35, 1}
+      Torus: {radius: 1.12 * size, tube: 0.16, segments: 20, rings: 6}
+    }
   }
 
   // A bleached log lying along X with a snapped branch, half under water
@@ -58,20 +64,55 @@ assets {
     prop size: f32 = 1
     prop seed: f32 = 0
 
-    trunk : LgDriftwood { Rotation: {seed, 0, HALF_PI}; Capsule: {length: 1.5 * size, radius: 0.27, segments: 10, smooth: true} }
-    end_l : LgDriftwoodEnd { Position: {-0.75 * size - 0.2, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 0.04, radius: 0.2, segments: 10} }
-    end_r : LgDriftwoodEnd { Position: {0.75 * size + 0.2, 0, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {length: 0.04, radius: 0.2, segments: 10} }
-    branch : LgDriftwood { Position: {0.2 * size, 0.24, -0.1}; Rotation: {-0.5, 0.4, -0.7}; Cylinder: {length: 0.6, radius: 0.07, segments: 6} }
-    stub : LgDriftwood { Position: {-0.45 * size, 0.18, 0.12}; Rotation: {0.6, 0, 0.3}; Cylinder: {length: 0.3, radius: 0.06, segments: 6} }
+    trunk : LgDriftwood {
+      Rotation: {seed, 0, HALF_PI}
+      Capsule: {length: 1.5 * size, radius: 0.27, segments: 10, smooth: true}
+    }
+
+    end_l : LgDriftwoodEnd {
+      Position: {-0.75 * size - 0.2, 0, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {length: 0.04, radius: 0.2, segments: 10}
+    }
+
+    end_r : LgDriftwoodEnd {
+      Position: {0.75 * size + 0.2, 0, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {length: 0.04, radius: 0.2, segments: 10}
+    }
+
+    branch : LgDriftwood {
+      Position: {0.2 * size, 0.24, -0.1}
+      Rotation: {-0.5, 0.4, -0.7}
+      Cylinder: {length: 0.6, radius: 0.07, segments: 6}
+    }
+
+    stub : LgDriftwood {
+      Position: {-0.45 * size, 0.18, 0.12}
+      Rotation: {0.6, 0, 0.3}
+      Cylinder: {length: 0.3, radius: 0.06, segments: 6}
+    }
   }
 
   // A floating coconut, its pointed end forward
   template LgFloatCoconut {
     prop seed: f32 = 0
 
-    husk : LgCoconutHusk { Scale: {1, 0.9, 1.12}; Sphere: {radius: 0.32, segments: 14, smooth: true} }
-    tip : LgCoconutHusk { Position: {0, 0, -0.34}; Rotation: {-HALF_PI, 0, 0}; Cone: {length: 0.12, radius: 0.12, segments: 8} }
-    stem : LgCoconutGreen { Position: {0, 0.27, 0.06}; Cylinder: {length: 0.08, radius: 0.06, segments: 6} }
+    husk : LgCoconutHusk {
+      Scale: {1, 0.9, 1.12}
+      Sphere: {radius: 0.32, segments: 14, smooth: true}
+    }
+
+    tip : LgCoconutHusk {
+      Position: {0, 0, -0.34}
+      Rotation: {-HALF_PI, 0, 0}
+      Cone: {length: 0.12, radius: 0.12, segments: 8}
+    }
+
+    stem : LgCoconutGreen {
+      Position: {0, 0.27, 0.06}
+      Cylinder: {length: 0.08, radius: 0.06, segments: 6}
+    }
   }
 
   // Spray and a puff of mist where the hull hits a rock or a log
@@ -87,9 +128,23 @@ assets {
       Burst: {count: 70}
       Forces: {gravity: {0, -14, 0}}
     }
+
     mist {
       Position: {0, 0, 0}
-      box.particle.Emitter: {max: 20, rate: 0, shape: EmitterSphere, radius: 0.7, direction: {0, 1, 0}, spread: 80, speed: {0.5, 1.3}, lifetime: {0.8, 1.4}, size: {0.7, 1.2}, opacity: {0.3, 0.5}, color: {236, 250, 248}, seed: 22}
+      box.particle.Emitter: {
+        max: 20,
+        rate: 0,
+        shape: EmitterSphere,
+        radius: 0.7,
+        direction: {0, 1, 0},
+        spread: 80,
+        speed: {0.5, 1.3},
+        lifetime: {0.8, 1.4},
+        size: {0.7, 1.2},
+        opacity: {0.3, 0.5},
+        color: {236, 250, 248},
+        seed: 22
+      }
       Burst: {count: 14}
       Curves: {size: {keys: [{0, 0.6}, {1, 1.8}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
     }
@@ -109,9 +164,21 @@ assets {
       Burst: {count: 36}
       Forces: {gravity: {0, -3, 0}, drag: 1.5}
     }
+
     flash {
       Position: {0, 0, 0}
-      box.particle.Emitter: {max: 4, rate: 0, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0}, lifetime: {0.25, 0.25}, size: {1.4, 1.4}, opacity: {0.8, 0.8}, color: {255, 230, 140}, seed: 24}
+      box.particle.Emitter: {
+        max: 4,
+        rate: 0,
+        shape: EmitterPoint,
+        direction: {0, 0, 0},
+        speed: {0, 0},
+        lifetime: {0.25, 0.25},
+        size: {1.4, 1.4},
+        opacity: {0.8, 0.8},
+        color: {255, 230, 140},
+        seed: 24
+      }
       Appearance: {blend: Additive}
       Burst: {count: 1}
       Curves: {size: {keys: [{0, 0.5}, {1, 1.4}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
@@ -125,42 +192,64 @@ hazards {
   for i in 0..ROCKS {
     "rock_{i}" {
       Position: {rocks[i].x, lg_sink(rocks[i].z + distance), rocks[i].z + distance}
+
       if rocks[i].live {
         LgReefRock model(size: rocks[i].size, seed: rocks[i].spin)
       }
     }
   }
 
-  // Logs bob and turn slowly, the foam stays flat on the water
   for i in 0..LOGS {
     "log_{i}" {
-      Position: {logs[i].x, lg_sink(logs[i].z + distance) + 0.04 * sin(clock * 1.6 + logs[i].spin), logs[i].z + distance}
+      Position: {
+        logs[i].x,
+        lg_sink(logs[i].z + distance) + 0.04 * sin(clock * 1.6 + logs[i].spin),
+        logs[i].z + distance
+      }
+
       if logs[i].live {
         turn {
-          Rotation: {0, logs[i].spin + clock * (logs[i].kind == 0 ? 0.3 : -0.3), 0.05 * sin(clock * 1.3 + logs[i].spin)}
+          Rotation: {
+            0,
+            logs[i].spin + clock * (logs[i].kind == 0 ? 0.3 : -0.3),
+            0.05 * sin(clock * 1.3 + logs[i].spin)
+          }
           LgDriftLog model(size: logs[i].size, seed: logs[i].spin)
         }
-        foam : LgFoam { Position: {0, 0.02, 0}; Scale: {1.25 * logs[i].size, 0.35, 0.5}; Torus: {radius: 1, tube: 0.14, segments: 20, rings: 4} }
+
+        foam : LgFoam {
+          Position: {0, 0.02, 0}
+          Scale: {1.25 * logs[i].size, 0.35, 0.5}
+          Torus: {radius: 1, tube: 0.14, segments: 20, rings: 4}
+        }
       }
     }
   }
 
-  // Coconuts bob higher and spin
   for i in 0..COCONUTS {
     "nut_{i}" {
-      Position: {nuts[i].x, lg_sink(nuts[i].z + distance) + 0.1 + 0.07 * sin(clock * 2.2 + nuts[i].spin), nuts[i].z + distance}
+      Position: {
+        nuts[i].x,
+        lg_sink(nuts[i].z + distance) + 0.1 + 0.07 * sin(clock * 2.2 + nuts[i].spin),
+        nuts[i].z + distance
+      }
+
       if nuts[i].live {
         spin {
           Rotation: {0.25 * sin(clock * 1.7 + nuts[i].spin), nuts[i].spin + clock * 1.8, 0}
           LgFloatCoconut model(seed: nuts[i].spin)
         }
-        foam : LgFoam { Position: {0, -0.1, 0}; Scale: {1, 0.3, 1}; Torus: {radius: 0.38, tube: 0.05, segments: 16, rings: 4} }
+
+        foam : LgFoam {
+          Position: {0, -0.1, 0}
+          Scale: {1, 0.3, 1}
+          Torus: {radius: 0.38, tube: 0.05, segments: 16, rings: 4}
+        }
       }
     }
   }
 }
 
-// Spawning, recycling and collisions
 async {
   const rng: flecs.script.math.Rng = {seed: SEED_HAZARDS}
 
@@ -176,6 +265,7 @@ async {
         const n = min(3, 1 + floor(rng.f(1.6 + (speed - START_SPEED) * 0.08)))
         const o = floor(rng.f(3))
         mut target_x: f64 = lg_lane_x(f + 1 <= LANES - 1 ? f + 1 : f - 2)
+
         for k in 0..3 {
           if k < n {
             const idx = o + k >= 3 ? o + k - 3 : o + k
@@ -183,16 +273,20 @@ async {
             const x = lg_lane_x(lane) + (rng.f(2) - 1) * LANE_JITTER
             const seed = rng.f(100)
             const size = 0.8 + rng.f(0.45)
+
             if k == 0 {
               target_x = x
             }
+
             if rng.f(1) < LOG_CHANCE {
               mut s: i32 = -1
+
               for j in 0..LOGS {
                 if s < 0 && !logs[j].live {
                   s = j
                 }
               }
+
               if s >= 0 {
                 logs[s].x = x
                 logs[s].z = zs
@@ -204,11 +298,13 @@ async {
               }
             } else {
               mut s: i32 = -1
+
               for j in 0..ROCKS {
                 if s < 0 && !rocks[j].live {
                   s = j
                 }
               }
+
               if s >= 0 {
                 rocks[s].x = x
                 rocks[s].z = zs
@@ -222,19 +318,20 @@ async {
           }
         }
 
-        // A short line or arc of coconuts in front of the row, from the free lane toward
-        // the first hazard
         if rng.f(1) < NUT_LINE_CHANCE {
           const fx = lg_lane_x(f)
           const bulge = (rng.f(2) - 1) * 1.4
+
           for c in 0..NUTS_PER_LINE {
             const t = c * 1.0 / (NUTS_PER_LINE - 1)
             mut s: i32 = -1
+
             for j in 0..COCONUTS {
               if s < 0 && !nuts[j].live {
                 s = j
               }
             }
+
             if s >= 0 {
               nuts[s].x = fx + (target_x - fx) * t + bulge * sin(t * PI)
               nuts[s].z = zs + NUT_LEAD + (NUTS_PER_LINE - 1 - c) * NUT_SPACING
@@ -255,35 +352,20 @@ async {
         invulnerable = max(0, invulnerable - dt)
       }
 
-      // Rocks and logs: free the ones behind the camera, hit the canoe unless it blinks
       for i in 0..ROCKS {
         if rocks[i].live {
           const wz = rocks[i].z + distance
+
           if wz > DESPAWN_Z {
             rocks[i].live = false
-          } else if game_state == GS_PLAYING && invulnerable <= 0 && lg_touches(rocks[i].x, wz, ROCK_R * rocks[i].size) {
+          } else if game_state == GS_PLAYING && invulnerable <= 0 &&
+            lg_touches(rocks[i].x, wz, ROCK_R * rocks[i].size) {
             rocks[i].hit = true
             rocks[i].live = false
             lives -= 1
             invulnerable = INVULNERABLE_TIME
             const b = box.particle.burst_at(assets.LgSplash, {rocks[i].x, 0.3, wz}, 1)
-            if lives <= 0 {
-              game_state = GS_OVER
-            }
-          }
-        }
-      }
-      for i in 0..LOGS {
-        if logs[i].live {
-          const wz = logs[i].z + distance
-          if wz > DESPAWN_Z {
-            logs[i].live = false
-          } else if game_state == GS_PLAYING && invulnerable <= 0 && lg_touches(logs[i].x, wz, LOG_R * logs[i].size) {
-            logs[i].hit = true
-            logs[i].live = false
-            lives -= 1
-            invulnerable = INVULNERABLE_TIME
-            const b = box.particle.burst_at(assets.LgSplash, {logs[i].x, 0.3, wz}, 1)
+
             if lives <= 0 {
               game_state = GS_OVER
             }
@@ -291,10 +373,31 @@ async {
         }
       }
 
-      // Coconuts: collected on touch, every COCONUTS_PER_STEP of them speed up the pace
+      for i in 0..LOGS {
+        if logs[i].live {
+          const wz = logs[i].z + distance
+
+          if wz > DESPAWN_Z {
+            logs[i].live = false
+          } else if game_state == GS_PLAYING && invulnerable <= 0 &&
+            lg_touches(logs[i].x, wz, LOG_R * logs[i].size) {
+            logs[i].hit = true
+            logs[i].live = false
+            lives -= 1
+            invulnerable = INVULNERABLE_TIME
+            const b = box.particle.burst_at(assets.LgSplash, {logs[i].x, 0.3, wz}, 1)
+
+            if lives <= 0 {
+              game_state = GS_OVER
+            }
+          }
+        }
+      }
+
       for i in 0..COCONUTS {
         if nuts[i].live {
           const wz = nuts[i].z + distance
+
           if wz > DESPAWN_Z {
             nuts[i].live = false
           } else if game_state == GS_PLAYING && lg_touches(nuts[i].x, wz, NUT_R) {
@@ -302,6 +405,7 @@ async {
             nuts[i].live = false
             coconuts += 1
             const b = box.particle.burst_at(assets.LgSparkle, {nuts[i].x, 0.5, wz}, 1)
+
             if coconuts % COCONUTS_PER_STEP == 0 {
               speed = min(MAX_SPEED, speed + SPEED_STEP)
             }
@@ -309,7 +413,6 @@ async {
         }
       }
 
-      // The last hit: a big splash over the canoe as it rolls over
       if game_state == GS_OVER {
         invulnerable = 0
         const b = box.particle.burst_at(assets.LgSplash, {canoe_x, 0.4, CANOE_Z}, 2.6)

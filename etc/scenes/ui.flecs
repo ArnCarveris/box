@@ -1,7 +1,6 @@
-// UI example: a UI is content (layout, 2D shapes, text) in a scene, seen through a camera and
-// rendered by a view. Shows a screen space HUD and a menu stacked over the 3D view, a nameplate
-// placed by projecting a 3D entity, a world space panel and a curved render-to-texture screen.
-// Fly with WASD (QE for down/up), hold the right mouse button to look around.
+// UI example: a screen space HUD and menu over the 3D view, a nameplate projected from a 3D
+// entity, a world space panel and a curved render-to-texture screen. Fly with WASD (QE for
+// down/up), hold the right mouse button to look around.
 
 using box.transform
 using box.geometry

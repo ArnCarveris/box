@@ -60,8 +60,6 @@ planets {
     mixc(pal_a(kind * 4 + lvl), pal_b(kind * 4 + lvl), v)
   }
 
-  // Bare ground of a kind at a palette level, darkened where wet and parched where hot: the
-  // keys of the ramp of the ground by altitude
   fn ground(kind: i32, v: f32, lvl: i32, e: f32, hot: f32, wet: f32) -> Col {
     const base: Col = mixc(pal(kind, lvl, v), {112, 92, 70}, wet * 0.35 * sat(1 - e * 2))
     const parched: Col = mixc(base, {150, 84, 50}, hot * 0.4)
@@ -108,34 +106,29 @@ planets {
   // Tint of the bands of a gas giant of the presets, a giant of a temperate equator
   fn gas_white() -> Col { {252.98, 253.69, 255} }
 
-  // Color i of the bands of a gas giant of a seed: a palette of the seed, nudged toward the next
   fn gas_tone(sd: i32, i: i32, tint: Col) -> Col {
     const gp: i32 = sd % 5
     mulc(mixc(gas_col(gp, i), gas_col((gp + 1) % 5, i), h01(sd, 2) * 0.35), tint)
   }
 
-  // The parameters of a planet, in the units of the generation. Heights are in units of the
-  // height map, whose continents are about 0.5 with a standard deviation of 1/6; temperatures
-  // are in units of the climate, about 0.15 where the vegetation starts and 0.3 where it thrives;
-  // the atmosphere is in km of a planet of 6360 km.
+  // Heights are in units of the height map, continents about 0.5 with a standard deviation of
+  // 1/6; temperatures in units of the climate, about 0.15 where vegetation starts and 0.3 where it
+  // thrives; the atmosphere is in km of a planet of 6360 km.
 
   // The body: radius in world units, the axis tilted by tilt degrees about the view and leaned
   // by lean degrees toward it, spin in radians per second
   struct PlanetBody(radius: f32, tilt: f32, lean: f32, spin: f32)
 
-  // The relief of a rocky planet: the fraction of the surface under the sea, the frequency of
-  // the continents and the warp of their coordinates, the height of the mountain ranges and the
-  // fraction of the regions they cover, the depth of the craters, the depth of the cracks between
-  // the plates, the number of plates and how dark their cracks are, the strength of the normal
-  // map, the variation of the ground color and the sand at the shore
+  // The relief of a rocky planet: ocean is the fraction under the sea, mountain_cover the fraction
+  // of the regions with mountain ranges, plates the number of plates and crack_shade how dark their
+  // cracks are
   struct PlanetSurface(
     ocean: f32, continents: f32, warp: f32, mountains: f32, mountain_cover: f32, craters: f32,
     cracks: f32, plates: f32, crack_shade: f32, normal: f32, variation: f32, beach: f32)
 
-  // The climate: the temperature at sea level at the equator and at the poles, its fall at the
-  // highest ground, the temperature below which the sea freezes and below which the land is
-  // snow, the amount of snow, the moisture near the sea, the vegetation cover and the treeline
-  // in altitude of 0 (the shore) to 1 (the highest ground)
+  // The climate: temperatures at sea level at the equator and the poles, lapse their fall at the
+  // highest ground, ice and snow_line where the sea freezes and the land snows, and the treeline
+  // in altitude from 0 (the shore) to 1 (the highest ground)
   struct PlanetClimate(
     equator: f32, poles: f32, lapse: f32, ice: f32, snow_line: f32, snow: f32, moisture: f32,
     vegetation: f32, treeline: f32)
@@ -290,24 +283,7 @@ planets {
     }
   }
 
-  // A planet whose maps are texture graphs on the sphere domain, from its kind (the palettes and
-  // whether it is a rocky planet or a gas giant), seed, detail and parameters, which default to a
-  // garden planet. For a kind and a detail the nodes are fixed: the parameters and the seed
-  // change the values of nodes only, so no parameter compiles a graph again. A feature that is
-  // off keeps its nodes with a zero contribution.
-  //
-  // One height (s_h) feeds every map of a rocky planet: warped fbm continents, ridged mountain
-  // ranges masked to some regions, craters and, for ice and lava, cracked plates. The climate
-  // follows from it: a temperature (s_t) from the latitude and the altitude, a moisture (s_m)
-  // from the distance to the sea (the land mask blurred) and the latitude bands. The land is the
-  // ground of the kind by altitude, covered by the vegetation of the biome table (lut, by
-  // temperature and moisture), rock on steep ground, sand at the coast and snow where it is
-  // cold; the sea is tinted by depth and freezes where it is cold. The clouds (cld) and the
-  // bands of a gas giant are animated. The rings (rtex) are a profile of the distance from the
-  // centre of their quads on the plane domain.
-  //
-  // The atmosphere is lit by the DirectionalLight sun, or by the first one of the scene at 0.
-  template Planet {
+  template PlanetRingMap {
     prop kind: i32 = 5
     prop seed: i32 = 23
     prop detail: i32 = 1
@@ -322,134 +298,14 @@ planets {
     prop rings: PlanetRings = rings_preset(5, 23)
     prop sun: entity = 0
 
-    const is_gas: bool = kind == 4
-    const k: i32 = (kind < 0 || kind > 5) ? 0 : kind
-    const radius: f32 = body.radius
-    const w: f32 = is_gas ? 0 : sat(surface.ocean)
-    const has_sea: bool = w > 0
-
     const sd: i32 = seed_of(seed)
     const v1: f32 = h01(sd, 1)
     const v2: f32 = h01(sd, 2)
     const v3: f32 = h01(sd, 3)
     const v4: f32 = h01(sd, 4)
 
-    // The ground parches and the sea turns murky with the heat of the equator
-    const t: f32 = (climate.equator - 0.25) / 0.9
-    const hot: f32 = sat((t - 0.62) / 0.38)
-    const s0: Col = sea_col(0, v3, 0, hot)
-    const s1: Col = sea_col(1, v3, 0, hot)
-    const s2: Col = sea_col(2, v3, 0, hot)
-    const s3: Col = sea_col(3, v3, 0, hot)
-
-    const g0: Col = gas_tone(sd, 0, gas.tint)
-    const g1: Col = gas_tone(sd, 1, gas.tint)
-    const g2: Col = gas_tone(sd, 2, gas.tint)
-    const g3: Col = gas_tone(sd, 3, gas.tint)
-    const g4: Col = gas_tone(sd, 4, gas.tint)
-
-    const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
-    const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
-
-    const air_on: bool = detail > 0 && air.density > 0
-    const air_k: f32 = min(air.density, 1)
-    const tint: Col = air.tint
-
-    const tw: i32 = detail > 1 ? 1024 : 512
-    const coast_aa: f32 = detail > 1 ? 0.25 : 0.5
-    const seg: i32 = detail > 1 ? 96 : (detail > 0 ? 48 : 20)
-    const oct: i32 = detail > 1 ? 7 : 6
-    const lean: f32 = body.lean * PI / 180
-    const tilt: f32 = body.tilt * PI / 180
-    const surf_on: bool = detail > 0 && !is_gas
-    const gas_on: bool = detail > 0 && is_gas
-
-    // Height: fbm continents at warped coordinates with unwarped detail, remapped to about 0.5
-    // with a standard deviation of 1/6 over the sphere, so the sea level that leaves a fraction w
-    // of the surface under water is their quantile. Mountain ranges, craters and cracked plates
-    // are added on top
-    const f1: f32 = surface.continents
-    const warp_amt: f32 = surface.warp
-    const mtn: f32 = surface.mountains
-    const mtn_lo: f32 = 1 - surface.mountain_cover
-    const crater: f32 = surface.craters
-    const crack: f32 = surface.cracks
-    const cn: i32 = max(surface.plates, 1)
-    const sea_h: f32 = has_sea ? 0.5 + probit(w) / 6 : -1
-    const base_h: f32 = has_sea ? sea_h : 0.15
-    const top_h: f32 = max(0.92 + mtn * 0.6, base_h + 0.25)
-    const nstr: f32 = surface.normal
-    const rock_lo: f32 = 0.25
-    const rock_hi: f32 = 0.5
-
-    // Climate: the temperature at sea level falls from t_eq at the equator to t_pole at the
-    // poles and by t_alt at the highest ground; below sn_t it snows. The moisture is wet near
-    // the sea, at the equator and around 55 degrees and dry around 30 degrees and inland
-    const t_eq: f32 = climate.equator
-    const t_pole: f32 = climate.poles
-    const t_alt: f32 = climate.lapse
-    const freeze: f32 = climate.ice
-    const wet: f32 = climate.moisture
-    const snow_k: f32 = climate.snow
-    const sn_t: f32 = climate.snow_line
-    const sand: f32 = has_sea ? surface.beach : 0
-    const veg_k: f32 = climate.vegetation
-    const tl_hi: f32 = climate.treeline
-    const tl_lo: f32 = tl_hi - 0.25
-    const gvar: f32 = surface.variation
-    const crack_k: f32 = surface.crack_shade
-    const crack_c: Col = mixc({150, 98, 70}, {26, 12, 10}, k == 3 ? 1 : 0)
-
-    // Colors of the ramps
-    const tc0: Col = ground(k, v1, 0, 0, hot, w)
-    const tc1: Col = ground(k, v1, 1, 0.22, hot, w)
-    const tc2: Col = ground(k, v1, 2, 0.55, hot, w)
-    const tc3: Col = ground(k, v1, 3, 0.95, hot, w)
-    const rk0: Col = mixc(tc1, {92, 88, 84}, 0.5)
-    const rk1: Col = mixc(tc2, {120, 116, 112}, 0.45)
-    const gr2: Col = mixc({118, 140, 66}, {96, 136, 80}, v2)
-    const fo2: Col = mixc({36, 82, 36}, {30, 74, 52}, v2)
-
-    // Color of the planet until its maps are ready and without them: the low ground, its
-    // vegetation, the sea and the sea ice
-    const frost: f32 = sat((freeze - 0.1) / 0.75)
-    const lowland: Col = mixc(tc1, gr2, veg_k * 0.6)
-    const far: Col = mixc(mixc(lowland, s1, sat(w * 1.3)), {236, 242, 250}, frost * 0.6)
-    const flat: Col = mixc(far, g0, is_gas ? 1 : 0)
-
-    // Lava fills the lowlands up to lava_h and glows in the cracks of the plates
-    const lava_h: f32 = 0.5 + probit(max(lava.level, 0.02)) / 6
-    const lava_k: f32 = lava_on ? 1 : 0
-    const crack_glow: f32 = lava.cracks
-
-    // City lights: towns at the points of cells, lit where the density beats their id. Without
-    // them the density is 0, so the graphs of the cities do not change with its slider
-    const city_k: f32 = city_on ? 1 : 0
-    const city_d: f32 = city_on ? night.density : 0
-    const urban_k: f32 = city_on ? night.urban : 0
-    const towns: i32 = detail > 1 ? 9000 : 3000
-
-    // Clouds: a fraction cf of the sky has some cloud, thr the threshold of the noise in
-    // standard deviations that leaves it
-    const cf: f32 = clouds.cover
-    const thr: f32 = 1.28 * probit(1 - cf)
-
-    // Gas giants: zones and belts from the sine of the latitude, jets that drift the bands
-    // back and forth by up to drift degrees over a period of 20 minutes, storm ovals on a
-    // fraction of the cells, held between two jets
-    const bf: f32 = gas.bands
-    const drift: f32 = gas.drift
-    const storm_frac: f32 = gas.storms
-    const turb: f32 = gas.turbulence
-    const st0: Col = mixc(g3, {196, 84, 56}, 0.65)
-    const st1: Col = mixc(g2, {250, 246, 236}, 0.7)
-    const ringc: Col = rings.color
-
-    // Rings: the distance from the centre of the quads (r_r, 0.5 at the outer edge) and its
-    // fraction from the inner edge to the outer (r_t). Fine ringlets of a noise of r_r, its
-    // finest octave about 3 texels wide; broad bands of a noise of r_t; a base profile of a
-    // faint inner ring, a dense middle one and a fainter outer one; a broad gap and a narrow
-    // one, all placed by the seed
+    // r_r is the distance from the centre of the quads (0.5 at the outer edge) and r_t its fraction
+    // from the inner edge to the outer; the finest octave of the ringlets is about 3 texels wide
     const rw: i32 = detail > 1 ? 2048 : (detail > 0 ? 1024 : 512)
     const r_oct: i32 = detail > 1 ? 5 : (detail > 0 ? 4 : 3)
     const r_in: f32 = clamp(rings.inner / (2 * max(rings.size, 0.01)), 0, 0.48)
@@ -471,12 +327,13 @@ planets {
       r_e0 {
         nodes.Smoothstep: {input: r_t, edge0_value: {0, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}}
       }
+
       r_e1 {
         nodes.Smoothstep: {input: r_t, edge0_value: {1, 0, 0, 0}, edge1_value: {0.97, 0, 0, 0}}
       }
+
       r_edge { nodes.Multiply: {a: r_e0, b: r_e1} }
 
-      // Base profile
       r_base {
         nodes.Curve: {input: r_t, curve: {keys: [
           {0, 0.12}, {r_cb, 0.26}, {r_cb + 0.04, 0.82}, {r_g1 - 0.08, 0.95}, {r_g1 + 0.08, 0.66},
@@ -484,13 +341,13 @@ planets {
         ]}}
       }
 
-      // Ringlets
       r_lp { nodes.Combine: {r: r_r, g_value: v1 * 7 + 0.3, b_value: v3 * 7 + 0.3, a_value: 1} }
       r_ln {
         nodes.Noise: {
           coords: r_lp, frequency: 40, octaves: r_oct, gain: 0.7, seed: sd * 16 + 11
         }
       }
+
       r_lk {
         nodes.Remap: {
           input: r_ln, from_min: 0.36, from_max: 0.64, to_min: 1 - r_lc, to_max: 1 + r_lc * 0.3,
@@ -498,7 +355,6 @@ planets {
         }
       }
 
-      // Broad bands
       r_bp { nodes.Combine: {r: r_t, g_value: v2 * 7 + 0.6, b_value: v4 * 7 + 0.6, a_value: 1} }
       r_bn { nodes.Noise: {coords: r_bp, frequency: 7, octaves: 2, seed: sd * 16 + 12} }
       r_bk {
@@ -508,7 +364,6 @@ planets {
         }
       }
 
-      // Gaps: 0 at their middle, mixed in by the gap amount
       r_g1d { nodes.Subtract: {a: r_t, b_value: {r_g1, 0, 0, 0}} }
       r_g1a { nodes.Abs: {input: r_g1d} }
       r_g1s {
@@ -516,9 +371,11 @@ planets {
           input: r_g1a, edge0_value: {0.036, 0, 0, 0}, edge1_value: {0.05, 0, 0, 0}
         }
       }
+
       r_g1k {
         nodes.Mix: {a_value: {1, 1, 1, 1}, b: r_g1s, factor_value: {r_gap, r_gap, r_gap, r_gap}}
       }
+
       r_g2d { nodes.Subtract: {a: r_t, b_value: {r_g2, 0, 0, 0}} }
       r_g2a { nodes.Abs: {input: r_g2d} }
       r_g2s {
@@ -526,11 +383,11 @@ planets {
           input: r_g2a, edge0_value: {0.006, 0, 0, 0}, edge1_value: {0.011, 0, 0, 0}
         }
       }
+
       r_g2k {
         nodes.Mix: {a_value: {1, 1, 1, 1}, b: r_g2s, factor_value: {r_gap, r_gap, r_gap, r_gap}}
       }
 
-      // Density
       r_d0 { nodes.Multiply: {a: r_base, b: r_lk} }
       r_d1 { nodes.Multiply: {a: r_d0, b: r_bk} }
       r_d2 { nodes.Multiply: {a: r_d1, b: r_g1k} }
@@ -538,7 +395,6 @@ planets {
       r_d4 { nodes.Multiply: {a: r_d3, b: r_edge} }
       r_d { nodes.Clamp: {input: r_d4, min_value: {0, 0, 0, 0}, max_value: {1, 1, 1, 1}} }
 
-      // Color: dusty inside and in the dark bands, icy outside and in the bright ones
       r_c0 { nodes.Multiply: {a: r_t, b_value: {0.5, 0, 0, 0}} }
       r_c1 { nodes.Remap: {input: r_bn, from_min: 0, from_max: 1, to_min: -0.4, to_max: 0.4} }
       r_c2 { nodes.Remap: {input: r_ln, from_min: 0, from_max: 1, to_min: -0.2, to_max: 0.2} }
@@ -552,12 +408,14 @@ planets {
           {1, {232, 240, 255}}
         ]}
       }
+
       // Brighter where denser, so the ringlets show where the ring is opaque
       r_lum {
         nodes.Remap: {
           input: r_d4, from_min: 0, from_max: 1.2, to_min: 0.5, to_max: 1.15, clamp: true
         }
       }
+
       r_lit { nodes.Multiply: {a: r_col, b: r_lum} }
       r_a { nodes.Splat: {in: r_d} }
       r_alpha { nodes.Multiply: {a: r_a, b_value: {0, 0, 0, 1}} }
@@ -573,9 +431,29 @@ planets {
     glow {}
     town {}
     cld {}
+  }
+
+  template PlanetRelief : PlanetRingMap {
+    const is_gas: bool = kind == 4
+    const w: f32 = is_gas ? 0 : sat(surface.ocean)
+    const has_sea: bool = w > 0
+
+    const sd: i32 = seed_of(seed)
+    const oct: i32 = detail > 1 ? 7 : 6
+    const surf_on: bool = detail > 0 && !is_gas
+
+    // Continents are remapped to about 0.5 with a standard deviation of 1/6 over the sphere, so the
+    // sea level that leaves a fraction w of the surface under water is their quantile
+    const f1: f32 = surface.continents
+    const warp_amt: f32 = surface.warp
+    const mtn: f32 = surface.mountains
+    const mtn_lo: f32 = 1 - surface.mountain_cover
+    const crater: f32 = surface.craters
+    const crack: f32 = surface.cracks
+    const cn: i32 = max(surface.plates, 1)
+    const sea_h: f32 = has_sea ? 0.5 + probit(w) / 6 : -1
 
     if surf_on {
-      // Continents
       s_wn { nodes.Noise: {channels: 3, frequency: 1.3, octaves: 3, seed: sd * 16 + 2} }
       s_wp { nodes.Warp: {offset: s_wn, amount_value: warp_amt} }
       s_cn { nodes.Noise: {coords: s_wp, frequency: f1, octaves: 5, seed: sd * 16 + 1} }
@@ -583,49 +461,53 @@ planets {
       s_dt {
         nodes.Remap: {input: s_dn, from_min: 0, from_max: 1, to_min: -0.07, to_max: 0.07}
       }
+
       s_cd { nodes.Add: {a: s_cn, b: s_dt} }
       s_c {
         nodes.Remap: {input: s_cd, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 1}
       }
 
-      // Mountain ranges: ridged noise in some regions, rising inland from the coast
       s_rn {
         nodes.Noise: {
           coords: s_wp, frequency: 2.4, octaves: oct - 1, fractal: NoiseRidged, seed: sd * 16 + 3
         }
       }
+
       s_r {
         nodes.Smoothstep: {input: s_rn, edge0_value: {0.45, 0, 0, 0}, edge1_value: {1, 0, 0, 0}}
       }
+
       s_mn { nodes.Noise: {frequency: 0.9, octaves: 2, seed: sd * 16 + 4} }
       s_mm {
         nodes.Smoothstep: {
           input: s_mn, edge0_value: {mtn_lo, 0, 0, 0}, edge1_value: {mtn_lo + 0.1, 0, 0, 0}
         }
       }
+
       s_ml {
         nodes.Smoothstep: {
           input: s_c, edge0_value: {sea_h, 0, 0, 0}, edge1_value: {sea_h + 0.08, 0, 0, 0}
         }
       }
+
       s_m0 { nodes.Multiply: {a: s_r, b: s_mm} }
       s_m1 { nodes.Multiply: {a: s_m0, b: s_ml} }
       s_m2 { nodes.Multiply: {a: s_m1, b_value: {mtn, 0, 0, 0}} }
 
-      // Craters of two sizes: bowls with a rim, deeper the wider they are, around the points
-      // of cells whose size is random
       s_k1 { nodes.Cells: {count: 60, jitter: 0.9, seed: sd * 16 + 5} }
       s_k1d { nodes.Split: {input: s_k1, channel: ChannelR} }
       s_k1z { nodes.Split: {input: s_k1, channel: ChannelB} }
       s_k1r {
         nodes.Remap: {input: s_k1z, from_min: 0, from_max: 1, to_min: 0.08, to_max: 0.32}
       }
+
       s_k1n { nodes.Divide: {a: s_k1d, b: s_k1r} }
       s_k1p {
         nodes.Curve: {input: s_k1n, curve: {kind: CurveCatmullRom, keys: [
           {0, -1}, {0.5, -0.85}, {0.85, -0.2}, {1, 0.3}, {1.3, 0.06}, {1.8, 0}, {4, 0}
         ]}}
       }
+
       s_k1h { nodes.Multiply: {a: s_k1p, b: s_k1r} }
       s_k2 { nodes.Cells: {count: 700, jitter: 0.9, seed: sd * 16 + 6} }
       s_k2d { nodes.Split: {input: s_k2, channel: ChannelR} }
@@ -633,28 +515,58 @@ planets {
       s_k2r {
         nodes.Remap: {input: s_k2z, from_min: 0, from_max: 1, to_min: 0.04, to_max: 0.12}
       }
+
       s_k2n { nodes.Divide: {a: s_k2d, b: s_k2r} }
       s_k2p {
         nodes.Curve: {input: s_k2n, curve: {kind: CurveCatmullRom, keys: [
           {0, -1}, {0.5, -0.85}, {0.85, -0.2}, {1, 0.3}, {1.3, 0.06}, {1.8, 0}, {4, 0}
         ]}}
       }
+
       s_k2h { nodes.Multiply: {a: s_k2p, b: s_k2r} }
       s_k0 { nodes.Add: {a: s_k1h, b: s_k2h} }
       s_k { nodes.Multiply: {a: s_k0, b_value: {crater, 0, 0, 0}} }
 
-      // Cracked plates of ice and lava worlds: 0 on the border of two cells
       s_cl {
         nodes.Cells: {
           coords: s_wp, count: cn, jitter: 1, distance: CellsEdge, edge: 0.25, seed: sd * 16 + 7
         }
       }
+
       s_clx { nodes.Split: {input: s_cl, channel: ChannelR} }
       s_ck {
         nodes.Remap: {input: s_clx, from_min: 0, from_max: 1, to_min: 0 - crack, to_max: 0}
       }
+    }
+  }
 
-      // Height, the relief with flat seas, altitude above the sea, land and slope
+  template PlanetClimateMap : PlanetRelief {
+    const is_gas: bool = kind == 4
+    const w: f32 = is_gas ? 0 : sat(surface.ocean)
+    const has_sea: bool = w > 0
+
+    const sd: i32 = seed_of(seed)
+
+    const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
+    const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
+    const surf_on: bool = detail > 0 && !is_gas
+    const mtn: f32 = surface.mountains
+    const sea_h: f32 = has_sea ? 0.5 + probit(w) / 6 : -1
+    const base_h: f32 = has_sea ? sea_h : 0.15
+    const top_h: f32 = max(0.92 + mtn * 0.6, base_h + 0.25)
+    const nstr: f32 = surface.normal
+    const rock_lo: f32 = 0.25
+    const rock_hi: f32 = 0.5
+
+    const t_eq: f32 = climate.equator
+    const t_pole: f32 = climate.poles
+    const t_alt: f32 = climate.lapse
+    const freeze: f32 = climate.ice
+    const wet: f32 = climate.moisture
+    const city_d: f32 = city_on ? night.density : 0
+    const towns: i32 = detail > 1 ? 9000 : 3000
+
+    if surf_on {
       s_h0 { nodes.Add: {a: s_c, b: s_m2} }
       s_h1 { nodes.Add: {a: s_h0, b: s_k} }
       s_h { nodes.Add: {a: s_h1, b: s_ck} }
@@ -665,6 +577,7 @@ planets {
           input: s_h, from_min: base_h, from_max: top_h, to_min: 0, to_max: 1, clamp: true
         }
       }
+
       s_land {
         nodes.Smoothstep: {
           input: s_h, edge0_value: {sea_h - 0.002, 0, 0, 0},
@@ -672,8 +585,7 @@ planets {
         }
       }
 
-      // Temperature at sea level (s_t0) from the warped latitude, so the climate zones meander,
-      // and with the altitude (s_t)
+      // The temperature uses the warped latitude, so the climate zones meander
       s_wy { nodes.Split: {input: s_wp, channel: ChannelG} }
       s_ay { nodes.Abs: {input: s_wy} }
       s_y2 { nodes.Multiply: {a: s_wy, b: s_wy} }
@@ -682,6 +594,7 @@ planets {
           input: s_y2, from_min: 0, from_max: 1, to_min: t_eq, to_max: t_pole
         }
       }
+
       s_jn { nodes.Noise: {channels: 3, frequency: 2.5, octaves: 3, seed: sd * 16 + 8} }
       s_jt { nodes.Split: {input: s_jn, channel: ChannelR} }
       s_jm { nodes.Split: {input: s_jn, channel: ChannelG} }
@@ -689,6 +602,7 @@ planets {
       s_tj {
         nodes.Remap: {input: s_jt, from_min: 0.4, from_max: 0.6, to_min: -0.05, to_max: 0.05}
       }
+
       s_t0 { nodes.Add: {a: s_tl, b: s_tj} }
       s_ta { nodes.Multiply: {a: s_alt, b_value: {t_alt, 0, 0, 0}} }
       s_t { nodes.Subtract: {a: s_t0, b: s_ta} }
@@ -699,50 +613,55 @@ planets {
         }
       }
 
-      // Moisture: the land around (s_near) dries the inland, the latitude bands
       s_near { nodes.Blur: {input: s_land, radius: 24} }
       s_band {
         nodes.Curve: {input: s_ay, curve: {kind: CurveCatmullRom, keys: [
           {0, 1}, {0.2, 0.85}, {0.42, 0.35}, {0.55, 0.35}, {0.78, 0.8}, {0.9, 0.7}, {1, 0.4}
         ]}}
       }
+
       s_mc {
         nodes.Remap: {
           input: s_near, from_min: 0.35, from_max: 1, to_min: wet,
           to_max: wet * 0.3, clamp: true
         }
       }
+
       s_mb { nodes.Multiply: {a: s_mc, b: s_band} }
       s_mj {
         nodes.Remap: {input: s_jm, from_min: 0.4, from_max: 0.6, to_min: -0.1, to_max: 0.1}
       }
+
       s_m { nodes.Add: {a: s_mb, b: s_mj} }
       s_hab {
         nodes.Curve: {input: s_t, curve: {keys: [{0, 0}, {0.16, 0}, {0.32, 1}, {0.8, 1}, {1, 0.2}]}}
       }
 
-      // Cities, shared by the lights (town) and the urban grey of the albedo: the density is
-      // habitable, watered, flat land, thickest near the coast and in clusters. Cities (s_uc1)
-      // and smaller towns (s_uc2) sit at the points of two cells; s_ul1 and s_ul2 are their dots
-      // where the density is at least their id
+      // Cities (s_uc1) and smaller towns (s_uc2) at the points of two cells, shared by the lights
+      // and the urban grey of the albedo; s_ul1 and s_ul2 are their dots where the density beats
+      // their id
       s_uwet {
         nodes.Smoothstep: {input: s_m, edge0_value: {0.05, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}}
       }
+
       s_ucoast {
         nodes.Remap: {
           input: s_near, from_min: 0.55, from_max: 0.95, to_min: 1,
           to_max: 0.25, clamp: true
         }
       }
+
       s_uflat {
         nodes.Smoothstep: {
           input: s_slope, edge0_value: {rock_hi, 0, 0, 0}, edge1_value: {rock_lo, 0, 0, 0}
         }
       }
+
       s_ucn { nodes.Noise: {frequency: 3.5, octaves: 3, seed: sd * 16 + 9} }
       s_ucl {
         nodes.Smoothstep: {input: s_ucn, edge0_value: {0.46, 0, 0, 0}, edge1_value: {0.62, 0, 0, 0}}
       }
+
       s_ud0 { nodes.Multiply: {a: s_land, b: s_hab} }
       s_ud1 { nodes.Multiply: {a: s_ud0, b: s_uwet} }
       s_ud2 { nodes.Multiply: {a: s_ud1, b: s_uflat} }
@@ -757,6 +676,7 @@ planets {
           input: s_uc1x, edge0_value: {0.22, 0, 0, 0}, edge1_value: {0.03, 0, 0, 0}
         }
       }
+
       s_ug1 { nodes.Step: {input: s_ud, edge: s_uc1y} }
       s_ul1 { nodes.Multiply: {a: s_udot1, b: s_ug1} }
       s_uc2 { nodes.Cells: {count: towns * 4, jitter: 1, seed: sd * 16 + 11} }
@@ -767,10 +687,46 @@ planets {
           input: s_uc2x, edge0_value: {0.16, 0, 0, 0}, edge1_value: {0.02, 0, 0, 0}
         }
       }
+
       s_ud2s { nodes.Multiply: {a: s_ud, b_value: {0.45, 0, 0, 0}} }
       s_ug2 { nodes.Step: {input: s_ud2s, edge: s_uc2y} }
       s_ul2 { nodes.Multiply: {a: s_udot2, b: s_ug2} }
+    }
+  }
 
+  template PlanetBiome : PlanetClimateMap {
+    const is_gas: bool = kind == 4
+    const k: i32 = (kind < 0 || kind > 5) ? 0 : kind
+    const w: f32 = is_gas ? 0 : sat(surface.ocean)
+
+    const sd: i32 = seed_of(seed)
+    const v1: f32 = h01(sd, 1)
+    const v2: f32 = h01(sd, 2)
+
+    // The ground parches and the sea turns murky with the heat of the equator
+    const t: f32 = (climate.equator - 0.25) / 0.9
+    const hot: f32 = sat((t - 0.62) / 0.38)
+
+    const tw: i32 = detail > 1 ? 1024 : 512
+    const surf_on: bool = detail > 0 && !is_gas
+    const nstr: f32 = surface.normal
+    const rock_lo: f32 = 0.25
+    const rock_hi: f32 = 0.5
+    const veg_k: f32 = climate.vegetation
+    const tl_hi: f32 = climate.treeline
+    const tl_lo: f32 = tl_hi - 0.25
+    const gvar: f32 = surface.variation
+
+    const tc0: Col = ground(k, v1, 0, 0, hot, w)
+    const tc1: Col = ground(k, v1, 1, 0.22, hot, w)
+    const tc2: Col = ground(k, v1, 2, 0.55, hot, w)
+    const tc3: Col = ground(k, v1, 3, 0.95, hot, w)
+    const rk0: Col = mixc(tc1, {92, 88, 84}, 0.5)
+    const rk1: Col = mixc(tc2, {120, 116, 112}, 0.45)
+    const gr2: Col = mixc({118, 140, 66}, {96, 136, 80}, v2)
+    const fo2: Col = mixc({36, 82, 36}, {30, 74, 52}, v2)
+
+    if surf_on {
       // Biome table: the vegetation by temperature (u) and moisture (v), its cover in alpha
       lut {
         l_uv { nodes.Coords: {} }
@@ -785,6 +741,7 @@ planets {
             {1, {176, 152, 92}}
           ]}
         }
+
         l_wet {
           nodes.Ramp: {input: l_t, keys: [
             {0.1, {88, 96, 74}}
@@ -794,9 +751,11 @@ planets {
             {1, {24, 74, 30}}
           ]}
         }
+
         l_lush {
           nodes.Smoothstep: {input: l_m, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}}
         }
+
         l_veg { nodes.Mix: {a: l_dry, b: l_wet, factor: l_lush} }
         l_hab {
           nodes.Curve: {
@@ -804,9 +763,11 @@ planets {
             curve: {keys: [{0, 0}, {0.1, 0}, {0.22, 0.6}, {0.3, 1}, {0.85, 1}, {1, 0.6}]}
           }
         }
+
         l_moist {
           nodes.Smoothstep: {input: l_m, edge0_value: {0.06, 0, 0, 0}, edge1_value: {0.35, 0, 0, 0}}
         }
+
         l_cov0 { nodes.Multiply: {a: l_hab, b: l_moist} }
         l_cov { nodes.Multiply: {a: l_cov0, b_value: {veg_k, 0, 0, 0}} }
         l_cova { nodes.Splat: {in: l_cov} }
@@ -823,9 +784,6 @@ planets {
         }
       }
 
-      // Land: the ground of the kind by altitude, varied by a noise, covered by the vegetation
-      // of the biome below the treeline, rock on steep ground, sand at the shore and snow where
-      // it is cold. Sea: tinted by depth, frozen where it is cold
       alb {
         a_lut { nodes.Lut: {texture: lut, u: s_t, v: s_m} }
         a_cov0 { nodes.Split: {input: a_lut, channel: ChannelA} }
@@ -834,12 +792,14 @@ planets {
             input: s_alt, edge0_value: {tl_hi, 0, 0, 0}, edge1_value: {tl_lo, 0, 0, 0}
           }
         }
+
         a_cov { nodes.Multiply: {a: a_cov0, b: a_tree} }
         a_gv {
           nodes.Remap: {
             input: s_jg, from_min: 0.4, from_max: 0.6, to_min: 0 - gvar, to_max: gvar
           }
         }
+
         a_gh { nodes.Add: {a: s_alt, b: a_gv} }
         a_ground {
           nodes.Ramp: {input: a_gh, keys: [
@@ -849,36 +809,75 @@ planets {
             {0.95, {tc3.r, tc3.g, tc3.b}}
           ]}
         }
+
         a_land0 { nodes.Mix: {a: a_ground, b: a_lut, factor: a_cov} }
         a_rockm {
           nodes.Smoothstep: {
             input: s_slope, edge0_value: {rock_lo, 0, 0, 0}, edge1_value: {rock_hi, 0, 0, 0}
           }
         }
+
         a_rock {
           nodes.Ramp: {input: s_alt, keys: [{0, {rk0.r, rk0.g, rk0.b}}, {1, {rk1.r, rk1.g, rk1.b}}]}
         }
+
         a_land1 { nodes.Mix: {a: a_land0, b: a_rock, factor: a_rockm} }
-        // Beaches: sand from the coast up to a width inland, in texels of a 512 wide map so it
-        // does not change with the detail. The coast is the contour of the height at the sea
-        // level, between texels. Water within 3 texels of land is left out of the open water
-        // the width is measured from, so ponds and narrow inlets get no sand. The width varies
-        // along the coast with a low frequency noise, from none to four texels at full beach,
-        // and shrinks on steep coasts; the sand blends into the ground over a texel and a half
+      }
+    }
+  }
+
+  template PlanetLandMaps : PlanetBiome {
+    const is_gas: bool = kind == 4
+    const k: i32 = (kind < 0 || kind > 5) ? 0 : kind
+    const w: f32 = is_gas ? 0 : sat(surface.ocean)
+    const has_sea: bool = w > 0
+
+    const sd: i32 = seed_of(seed)
+    const v3: f32 = h01(sd, 3)
+
+    const t: f32 = (climate.equator - 0.25) / 0.9
+    const hot: f32 = sat((t - 0.62) / 0.38)
+    const s0: Col = sea_col(0, v3, 0, hot)
+    const s1: Col = sea_col(1, v3, 0, hot)
+    const s2: Col = sea_col(2, v3, 0, hot)
+    const s3: Col = sea_col(3, v3, 0, hot)
+
+    const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
+    const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
+
+    const tw: i32 = detail > 1 ? 1024 : 512
+    const coast_aa: f32 = detail > 1 ? 0.25 : 0.5
+    const surf_on: bool = detail > 0 && !is_gas
+    const sea_h: f32 = has_sea ? 0.5 + probit(w) / 6 : -1
+    const snow_k: f32 = climate.snow
+    const sn_t: f32 = climate.snow_line
+    const sand: f32 = has_sea ? surface.beach : 0
+    const crack_k: f32 = surface.crack_shade
+    const crack_c: Col = mixc({150, 98, 70}, {26, 12, 10}, k == 3 ? 1 : 0)
+    const urban_k: f32 = city_on ? night.urban : 0
+
+    if surf_on {
+      alb {
+        // Beach widths are in texels of a 512 wide map, so they do not change with the detail.
+        // Water within 3 texels of land is left out of the open water the width is measured from,
+        // so ponds and narrow inlets get no sand
         a_lh {
           nodes.Remap: {
             input: s_h, from_min: sea_h - 0.04, from_max: sea_h + 0.04, to_min: 0, to_max: 1,
             clamp: true
           }
         }
+
         a_coast { nodes.Distance: {input: a_lh, range: 4} }
         a_ow {
           nodes.Smoothstep: {input: a_coast, edge0_value: {-2, 0, 0, 0}, edge1_value: {-4, 0, 0, 0}}
         }
+
         a_owd { nodes.Distance: {input: a_ow, range: 12} }
         a_cl {
           nodes.Remap: {input: a_owd, from_min: -3, from_max: -4, to_min: 0, to_max: 1}
         }
+
         a_cd { nodes.Max: {a: a_cl, b_value: {0, 0, 0, 0}} }
         a_wn { nodes.Noise: {frequency: 3, octaves: 2, seed: sd * 16 + 14} }
         a_wv {
@@ -886,25 +885,30 @@ planets {
             input: a_wn, from_min: 0.4, from_max: 0.6, to_min: 0, to_max: sand * 4, clamp: true
           }
         }
+
         a_sl { nodes.Blur: {input: s_slope, radius: 3} }
         a_flat {
           nodes.Smoothstep: {input: a_sl, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.1, 0, 0, 0}}
         }
+
         a_bw { nodes.Multiply: {a: a_wv, b: a_flat} }
         a_bd { nodes.Subtract: {a: a_bw, b: a_cd} }
         a_beach {
           nodes.Smoothstep: {input: a_bd, edge0_value: {0, 0, 0, 0}, edge1_value: {1.5, 0, 0, 0}}
         }
+
         a_sn { nodes.Noise: {frequency: 24, octaves: 3, seed: sd * 16 + 14} }
         a_sand {
           nodes.Ramp: {input: a_sn, keys: [{0.3, {196, 178, 132}}, {0.7, {226, 210, 166}}]}
         }
+
         a_land2 { nodes.Mix: {a: a_land1, b: a_sand, factor: a_beach} }
         a_crk {
           nodes.Remap: {
             input: s_clx, from_min: 0, from_max: 0.7, to_min: crack_k, to_max: 0, clamp: true
           }
         }
+
         a_crc { nodes.Ramp: {keys: [{0, {crack_c.r, crack_c.g, crack_c.b}}]} }
         a_land3 { nodes.Mix: {a: a_land2, b: a_crc, factor: a_crk} }
         a_cold {
@@ -912,15 +916,15 @@ planets {
             input: s_t, edge0_value: {sn_t, 0, 0, 0}, edge1_value: {sn_t - 0.07, 0, 0, 0}
           }
         }
+
         a_snowm { nodes.Multiply: {a: a_cold, b_value: {snow_k, 0, 0, 0}} }
         a_snow { nodes.Ramp: {keys: [{0, {236, 242, 250}}]} }
         a_land { nodes.Mix: {a: a_land3, b: a_snow, factor: a_snowm} }
-        // Cities by day: a warm, desaturated grey over the dense city areas that glow at night,
-        // on the lit towns and in a sprawl around the biggest cities, those whose id is under
-        // half the density
+        // The sprawl surrounds the biggest cities, those whose id is under half the density
         a_uarea {
           nodes.Smoothstep: {input: s_ud, edge0_value: {0.4, 0, 0, 0}, edge1_value: {1, 0, 0, 0}}
         }
+
         a_ubig0 { nodes.Multiply: {a: s_ud, b_value: {0.5, 0, 0, 0}} }
         a_ubig { nodes.Step: {input: a_ubig0, edge: s_uc1y} }
         a_usp0 {
@@ -928,6 +932,7 @@ planets {
             input: s_uc1x, edge0_value: {0.6, 0, 0, 0}, edge1_value: {0.15, 0, 0, 0}
           }
         }
+
         a_usp { nodes.Multiply: {a: a_usp0, b: a_ubig} }
         a_ul { nodes.Max: {a: s_ul1, b: s_ul2} }
         a_u0 { nodes.Max: {a: a_ul, b: a_usp} }
@@ -937,6 +942,7 @@ planets {
         a_ucol {
           nodes.Ramp: {input: a_un, keys: [{0.35, {118, 115, 108}}, {0.65, {138, 133, 124}}]}
         }
+
         a_landu { nodes.Mix: {a: a_land, b: a_ucol, factor: a_um} }
         a_shelf {
           nodes.Remap: {
@@ -944,11 +950,13 @@ planets {
             to_max: 1, clamp: true
           }
         }
+
         a_open {
           nodes.Remap: {
             input: s_near, from_min: 0.35, from_max: 0, to_min: 0.3, to_max: 1, clamp: true
           }
         }
+
         a_depth { nodes.Multiply: {a: a_shelf, b: a_open} }
         a_water {
           nodes.Ramp: {input: a_depth, keys: [
@@ -958,6 +966,7 @@ planets {
             {0.9, {s0.r, s0.g, s0.b}}
           ]}
         }
+
         a_ice { nodes.Ramp: {input: a_depth, keys: [{0, {226, 238, 248}}, {1, {170, 198, 222}}]} }
         a_sea { nodes.Mix: {a: a_water, b: a_ice, factor: s_icem} }
         // The coast blends over a texel of the map, without the steps of the land mask
@@ -966,22 +975,50 @@ planets {
             input: a_coast, edge0_value: {0 - coast_aa, 0, 0, 0}, edge1_value: {coast_aa, 0, 0, 0}
           }
         }
+
         a_out { nodes.Mix: {a: a_sea, b: a_landu, factor: a_aa} }
         Graph: {output: a_out, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
-      // Roughness: glossy open sea, rough ice and land
       orm {
         o_sea {
           nodes.Remap: {input: s_icem, from_min: 0, from_max: 1, to_min: 0.42, to_max: 0.85}
         }
+
         o_rough { nodes.Mix: {a: o_sea, b_value: {1, 0, 0, 0}, factor: s_land} }
         o_out { nodes.Combine: {r_value: 1, g: o_rough, b_value: 0, a_value: 1} }
         Graph: {
           output: o_out, width: tw / 2, height: tw / 4, domain: DomainSphere, format: GraphLinear
         }
       }
+    }
+  }
 
+  template PlanetLightMaps : PlanetLandMaps {
+    const is_gas: bool = kind == 4
+
+    const sd: i32 = seed_of(seed)
+    const v3: f32 = h01(sd, 3)
+
+    const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
+    const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
+
+    const tw: i32 = detail > 1 ? 1024 : 512
+    const oct: i32 = detail > 1 ? 7 : 6
+    const surf_on: bool = detail > 0 && !is_gas
+
+    const lava_h: f32 = 0.5 + probit(max(lava.level, 0.02)) / 6
+    const lava_k: f32 = lava_on ? 1 : 0
+    const crack_glow: f32 = lava.cracks
+
+    // Without city lights the density is 0, so the city graphs do not change with its slider
+    const city_k: f32 = city_on ? 1 : 0
+
+    // thr is the threshold of the noise in standard deviations that leaves a fraction cf cloudy
+    const cf: f32 = clouds.cover
+    const thr: f32 = 1.28 * probit(1 - cf)
+
+    if surf_on {
       glow {
         e_low {
           nodes.Remap: {
@@ -989,12 +1026,14 @@ planets {
             to_max: 0, clamp: true
           }
         }
+
         e_crack {
           nodes.Remap: {
             input: s_clx, from_min: 0, from_max: 0.5, to_min: crack_glow,
             to_max: 0, clamp: true
           }
         }
+
         e_v0 { nodes.Max: {a: e_low, b: e_crack} }
         e_v { nodes.Multiply: {a: e_v0, b_value: {lava_k, 0, 0, 0}} }
         e_col {
@@ -1006,16 +1045,16 @@ planets {
             {1, {255, 176, 70}}
           ]}
         }
+
         Graph: {output: e_col, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
-      // City lights: cities and smaller towns at the shared points (s_ul1, s_ul2) light up where
-      // the density is at least their id, with a faint glow where it is highest
       town {
         w_c1z { nodes.Split: {input: s_uc1, channel: ChannelB} }
         w_b1 {
           nodes.Remap: {input: w_c1z, from_min: 0, from_max: 1, to_min: 0.45, to_max: 1}
         }
+
         w_t1 { nodes.Multiply: {a: s_ul1, b: w_b1} }
         w_t2 { nodes.Multiply: {a: s_ul2, b_value: {0.55, 0, 0, 0}} }
         w_dd { nodes.Multiply: {a: s_ud, b: s_ud} }
@@ -1033,14 +1072,12 @@ planets {
             {1, {255, 244, 210}}
           ]}
         }
+
         Graph: {output: w_col, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
-      // Clouds of the seed: weather systems of a noise that evolves slowly at warped coordinates
-      // stretched along the parallels, banded by the latitude (rising at the equator and around
-      // 55 degrees, sinking around 30 degrees), their edges broken up by a finer billow noise.
-      // The warp, the bands and the billows do not depend on the time, so they are computed
-      // once and each update evaluates the coverage only
+      // The warp, the bands and the billows of the clouds do not depend on the time, so they are
+      // computed once and each update evaluates the coverage only
       cld {
         k_time { nodes.Time: {scale: clouds.evolve, offset: v3 * 40} }
         k_w1 { nodes.Noise: {channels: 3, frequency: 1.2, octaves: 2, seed: sd * 16 + 12} }
@@ -1052,18 +1089,22 @@ planets {
             seed: sd * 16 + 13
           }
         }
+
         k_z {
           nodes.Remap: {input: k_n, from_min: 0.49, from_max: 0.585, to_min: 0, to_max: 1}
         }
+
         k_f {
           nodes.Noise: {
             coords: k_st, frequency: clouds.frequency * 10 / 3, octaves: oct - 2, gain: 0.6,
             fractal: NoiseBillow, seed: sd * 16 + 15
           }
         }
+
         k_fz {
           nodes.Remap: {input: k_f, from_min: 0.23, from_max: 0.32, to_min: 0, to_max: 0.8}
         }
+
         k_y { nodes.Split: {input: k_p1, channel: ChannelG} }
         k_ay { nodes.Abs: {input: k_y} }
         k_band {
@@ -1071,6 +1112,7 @@ planets {
             {0, 0.7}, {0.15, 0.3}, {0.42, -0.9}, {0.58, -0.3}, {0.8, 0.7}, {0.92, 0.4}, {1, -0.4}
           ]}}
         }
+
         k_s0 { nodes.Add: {a: k_z, b: k_band} }
         k_sum { nodes.Add: {a: k_s0, b: k_fz} }
         k_d {
@@ -1078,15 +1120,45 @@ planets {
             input: k_sum, edge0_value: {thr, 0, 0, 0}, edge1_value: {thr + 1.8, 0, 0, 0}
           }
         }
+
         k_s { nodes.Splat: {in: k_d} }
         k_out {
           nodes.Mix: {a_value: {0.72, 0.74, 0.78, 0}, b_value: {1, 1, 1, 1}, factor: k_s}
         }
+
         Graph: {output: k_out, width: tw, height: tw / 2, domain: DomainSphere, rate: 3,
           interpolate: true}
       }
-    } else if gas_on {
-      // Zones and belts from the sine of the latitude, made irregular by a noise of the latitude
+    }
+  }
+
+  template PlanetGasMap : PlanetLightMaps {
+    const is_gas: bool = kind == 4
+
+    const sd: i32 = seed_of(seed)
+    const v2: f32 = h01(sd, 2)
+    const v3: f32 = h01(sd, 3)
+    const v4: f32 = h01(sd, 4)
+
+    const g0: Col = gas_tone(sd, 0, gas.tint)
+    const g1: Col = gas_tone(sd, 1, gas.tint)
+    const g2: Col = gas_tone(sd, 2, gas.tint)
+    const g3: Col = gas_tone(sd, 3, gas.tint)
+    const g4: Col = gas_tone(sd, 4, gas.tint)
+    const tint: Col = air.tint
+
+    const tw: i32 = detail > 1 ? 1024 : 512
+    const oct: i32 = detail > 1 ? 7 : 6
+    const gas_on: bool = detail > 0 && is_gas
+
+    const bf: f32 = gas.bands
+    const drift: f32 = gas.drift
+    const storm_frac: f32 = gas.storms
+    const turb: f32 = gas.turbulence
+    const st0: Col = mixc(g3, {196, 84, 56}, 0.65)
+    const st1: Col = mixc(g2, {250, 246, 236}, 0.7)
+
+    if gas_on {
       g_dir { nodes.Coords: {} }
       g_y { nodes.Split: {input: g_dir, channel: ChannelG} }
       g_line { nodes.Combine: {r_value: v2 * 7, g: g_y, b_value: v4 * 7, a_value: 1} }
@@ -1094,12 +1166,12 @@ planets {
       g_lo {
         nodes.Remap: {input: g_ln, from_min: 0.5, from_max: 1, to_min: 0, to_max: 0.6}
       }
+
       g_lat { nodes.Add: {a: g_y, b: g_lo} }
       g_ph { nodes.Multiply: {a: g_lat, b_value: {bf, 0, 0, 0}} }
       g_sin { nodes.Sin: {input: g_ph} }
 
-      // The bands in their own frame, computed once: turbulence of warped noise stretched along
-      // the bands, wavy band edges and storm ovals held between two jets
+      // The bands in their own frame, computed once
       bands {
         b_wn { nodes.Noise: {channels: 3, frequency: 2.5, octaves: 2, seed: sd * 16 + 5} }
         b_wp { nodes.Warp: {offset: b_wn, amount_value: 0.3} }
@@ -1107,23 +1179,30 @@ planets {
         b_tn {
           nodes.Noise: {coords: b_st, frequency: 3, octaves: oct - 1, gain: 0.55, seed: sd * 16 + 6}
         }
+
         b_wy { nodes.Split: {input: b_wp, channel: ChannelG} }
         b_wl { nodes.Add: {a: b_wy, b: g_lo} }
         b_wph { nodes.Multiply: {a: b_wl, b_value: {bf, 0, 0, 0}} }
         b_ws { nodes.Sin: {input: b_wph} }
         b_sub { nodes.Combine: {r_value: v2 * 7 + 3, g: b_wy, b_value: v4 * 7 + 3, a_value: 1} }
-        b_sn { nodes.Noise: {coords: b_sub, frequency: 9, octaves: 3, gain: 0.6, seed: sd * 16 + 1} }
+        b_sn {
+          nodes.Noise: {coords: b_sub, frequency: 9, octaves: 3, gain: 0.6, seed: sd * 16 + 1}
+        }
+
         b_b0 {
           nodes.Remap: {input: b_ws, from_min: -1, from_max: 1, to_min: 0.2, to_max: 0.8}
         }
+
         b_b1 {
           nodes.Remap: {input: b_sn, from_min: 0.4, from_max: 0.6, to_min: -0.2, to_max: 0.2}
         }
+
         b_t {
           nodes.Remap: {
             input: b_tn, from_min: 0.4, from_max: 0.6, to_min: 0 - turb, to_max: turb
           }
         }
+
         b_v0 { nodes.Add: {a: b_b0, b: b_b1} }
         b_v { nodes.Add: {a: b_v0, b: b_t} }
         b_col {
@@ -1135,19 +1214,26 @@ planets {
             {0.85, {g2.r, g2.g, g2.b}}
           ]}
         }
+
         b_sc { nodes.Transform: {scale: {1, 2.2, 1}} }
         b_cells { nodes.Cells: {coords: b_sc, count: 48, jitter: 0.8, seed: sd * 16 + 4} }
         b_cx { nodes.Split: {input: b_cells, channel: ChannelR} }
         b_cz { nodes.Split: {input: b_cells, channel: ChannelB} }
         b_cw { nodes.Split: {input: b_cells, channel: ChannelA} }
         b_core {
-          nodes.Smoothstep: {input: b_cx, edge0_value: {0.42, 0, 0, 0}, edge1_value: {0.34, 0, 0, 0}}
+          nodes.Smoothstep: {
+            input: b_cx,
+            edge0_value: {0.42, 0, 0, 0},
+            edge1_value: {0.34, 0, 0, 0}
+          }
         }
+
         b_gate { nodes.Step: {input_value: {storm_frac, 0, 0, 0}, edge: b_cz} }
         b_as { nodes.Abs: {input: g_sin} }
         b_pl {
           nodes.Smoothstep: {input: b_as, edge0_value: {0.35, 0, 0, 0}, edge1_value: {0.9, 0, 0, 0}}
         }
+
         b_st0 { nodes.Multiply: {a: b_core, b: b_gate} }
         b_storm { nodes.Multiply: {a: b_st0, b: b_pl} }
         b_sk { nodes.Multiply: {a: b_storm, b_value: {0.9, 0, 0, 0}} }
@@ -1156,29 +1242,32 @@ planets {
             input: b_cx, from_min: 0, from_max: 0.42, to_min: 0.7, to_max: 1.1, clamp: true
           }
         }
+
         b_scol0 {
           nodes.Ramp: {input: b_cw, keys: [{0, {st0.r, st0.g, st0.b}}, {1, {st1.r, st1.g, st1.b}}]}
         }
+
         b_scol { nodes.Multiply: {a: b_scol0, b: b_ring} }
         b_out { nodes.Mix: {a: b_col, b: b_scol, factor: b_sk} }
         Graph: {output: b_out, width: tw, height: tw / 2, domain: DomainSphere}
       }
 
-      // Differential rotation: each band turns about the pole at the speed of its jet, the
-      // jets alternating with the bands. The angle swings with a period of 20 minutes, so the
-      // shear between the bands stays bounded, and the bands are sampled at the turned
-      // direction, so an update costs a lookup per texel
+      // Each band turns about the pole at the speed of its jet. The angle swings with a period of
+      // 20 minutes so the shear between the bands stays bounded, and an update costs one lookup
+      // per texel
       alb {
         a_jet {
           nodes.Smoothstep: {
             input: g_sin, edge0_value: {-0.8, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}
           }
         }
+
         a_amp {
           nodes.Remap: {
             input: a_jet, from_min: 0, from_max: 1, to_min: 0 - drift, to_max: drift
           }
         }
+
         a_time { nodes.Time: {scale: 0.00524, offset: -0.3 - v3 * 0.4} }
         a_swing { nodes.Sin: {input: a_time} }
         a_ang { nodes.Multiply: {a: a_amp, b: a_swing} }
@@ -1188,6 +1277,52 @@ planets {
           interpolate: true}
       }
     }
+  }
+
+  // A planet whose maps are texture graphs on the sphere domain. For a kind and a detail the nodes
+  // are fixed: the parameters and the seed only change node values, so no parameter compiles a
+  // graph again, and a feature that is off keeps its nodes with a zero contribution.
+  //
+  // One height (s_h) feeds every map of a rocky planet and the climate follows from it. The
+  // atmosphere is lit by the DirectionalLight sun, or by the first one of the scene at 0.
+  template Planet : PlanetGasMap {
+    const is_gas: bool = kind == 4
+    const k: i32 = (kind < 0 || kind > 5) ? 0 : kind
+    const radius: f32 = body.radius
+    const w: f32 = is_gas ? 0 : sat(surface.ocean)
+
+    const sd: i32 = seed_of(seed)
+    const v1: f32 = h01(sd, 1)
+    const v2: f32 = h01(sd, 2)
+    const v3: f32 = h01(sd, 3)
+
+    const t: f32 = (climate.equator - 0.25) / 0.9
+    const hot: f32 = sat((t - 0.62) / 0.38)
+    const s1: Col = sea_col(1, v3, 0, hot)
+
+    const g0: Col = gas_tone(sd, 0, gas.tint)
+
+    const lava_on: bool = !is_gas && detail > 0 && lava.level > 0
+    const city_on: bool = !is_gas && detail > 0 && night.lights && !lava_on
+
+    const air_on: bool = detail > 0 && air.density > 0
+    const air_k: f32 = min(air.density, 1)
+    const tint: Col = air.tint
+    const seg: i32 = detail > 1 ? 96 : (detail > 0 ? 48 : 20)
+    const lean: f32 = body.lean * PI / 180
+    const tilt: f32 = body.tilt * PI / 180
+    const surf_on: bool = detail > 0 && !is_gas
+    const freeze: f32 = climate.ice
+    const veg_k: f32 = climate.vegetation
+    const tc1: Col = ground(k, v1, 1, 0.22, hot, w)
+    const gr2: Col = mixc({118, 140, 66}, {96, 136, 80}, v2)
+
+    // The color of the planet until its maps are ready, and without them
+    const frost: f32 = sat((freeze - 0.1) / 0.75)
+    const lowland: Col = mixc(tc1, gr2, veg_k * 0.6)
+    const far: Col = mixc(mixc(lowland, s1, sat(w * 1.3)), {236, 242, 250}, frost * 0.6)
+    const flat: Col = mixc(far, g0, is_gas ? 1 : 0)
+    const ringc: Col = rings.color
 
     const ready: bool = detail > 0 && alb[box.texture.Status].revision > 0
     const lava_ready: bool = lava_on && glow[box.texture.Status].revision > 0
@@ -1223,8 +1358,10 @@ planets {
         Sphere: {radius: radius, segments: seg, smooth: true}
         PbrMaterial: {roughness: is_gas ? 0.8 : 0.92}
         NoShadow
+
         if ready {
           Rgb: {255, 255, 255}
+
           if is_gas {
             PbrTextures: {albedo: alb}
           } else {
@@ -1233,14 +1370,17 @@ planets {
         } else {
           Rgb: {flat.r, flat.g, flat.b}
         }
+
         if detail <= 0 && air_k > 0.1 {
           Fresnel: {color: {tint.r, tint.g, tint.b}, strength: 0.6 * air_k, power: 2.5}
         }
+
         if lava_ready {
           Emissive: {strength: lava.emission, color: {255, 200, 150}}
         } else if detail <= 0 && lava.level > 0 && !is_gas {
           Emissive: {strength: lava.emission / 6, color: {255, 96, 32}}
         }
+
         if city_ready {
           city {
             Position: {0, 0, 0}
@@ -1282,12 +1422,15 @@ planets {
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
           PbrTextures: {albedo: rtex, emissive: rtex}
           BlendMode: AlphaBlend
+
           if rings.opacity < 1 {
             Opacity: {rings.opacity}
           }
+
           NoShadow
           Ignore
         }
+
         ring_back {
           Position: {0, 0, 0}
           Rotation: {PI / 2, 0, 0}
@@ -1297,9 +1440,11 @@ planets {
           Emissive: {strength: 0.4, color: {ringc.r, ringc.g, ringc.b}}
           PbrTextures: {albedo: rtex, emissive: rtex}
           BlendMode: AlphaBlend
+
           if rings.opacity < 1 {
             Opacity: {rings.opacity}
           }
+
           NoShadow
           Ignore
         }
@@ -1338,10 +1483,9 @@ planets {
   // and a little weaker for hot stars
   fn limb_coefficient(kelvin: f32) -> f32 { clamp(1.05 - kelvin * 0.00001, 0.8, 0.95) }
 
-  // The parameters of a star: the surface temperature in kelvin, the radius in world units, the
-  // sunspot amount (0 none to 1 a very active star), the size of the granules relative to those
-  // of the sun, the contrast of the granulation, the amount of prominences on the limb and the
-  // spin in radians per second and the strength of the glow of the corona and the halo
+  // The parameters of a star: temperature in kelvin, radius in world units, sunspots from 0 (none)
+  // to 1 (very active), granulation the size of the granules relative to the sun, spin in radians
+  // per second and corona the strength of the glow of the corona and the halo
   struct StarParams(
     temperature: f32, radius: f32, sunspots: f32, granulation: f32, contrast: f32,
     prominences: f32, spin: f32, corona: f32)
@@ -1359,23 +1503,7 @@ planets {
     }
   }
 
-  // A star of a temperature, radius, activity, spin, seed and detail, which default to the sun.
-  // It is lit by nothing: its base color is black and metallic, so neither the directional sun
-  // of the scene nor the ambient light reach it, and all it shows is its emission.
-  //
-  // The surface (surf) is an animated texture graph on the sphere domain: granules of cells
-  // whose points move with the time, the network of supergranules, sunspots
-  // with umbra and penumbra in two latitude bands and bright faculae around them. It is the
-  // brightness of the surface relative to the photosphere, the spots redder, which the Emissive
-  // colors by the temperature, so a temperature changes no texel. As for the planets, the
-  // parameters change the values of nodes only, so no slider compiles a graph again.
-  //
-  // The limb darkens and reddens by a shell just above the surface that blends toward a cooler
-  // color by a Fresnel opacity of power 0.8, close to the linear limb darkening law, from any
-  // angle. The corona is camera facing sprites of streamers around the center, hidden by the
-  // disc where they cross it, and a wider soft halo; active stars throw prominences off their
-  // surface. A point light of the color of the star lights what is around it.
-  template Star {
+  template StarSurface {
     prop temperature: f32 = star_preset(1).temperature
     prop radius: f32 = star_preset(1).radius
     prop sunspots: f32 = star_preset(1).sunspots
@@ -1390,18 +1518,8 @@ planets {
     const sd: i32 = seed_of(seed)
     const v1: f32 = h01(sd, 1)
     const v2: f32 = h01(sd, 2)
-    const v3: f32 = h01(sd, 3)
-
-    const r: f32 = max(radius, 0.1)
-    const col: Col = blackbody(temperature)
-    const limb_col: Col = blackbody(temperature * 0.7)
-    const hal_col: Col = mixc(col, {255, 255, 255}, 0.2)
-    const prom_col: Col = mixc(col, {255, 120, 80}, 0.5)
-    const glow: f32 = star_emission(temperature)
-    const limb_u: f32 = limb_coefficient(temperature)
 
     const tw: i32 = detail > 1 ? 1024 : (detail > 0 ? 512 : 256)
-    const seg: i32 = detail > 1 ? 96 : (detail > 0 ? 64 : 32)
 
     // Granulation: about gcount granules over the sphere, fewer for larger granules and never
     // smaller than about 7 texels, gcell the size of one in radians
@@ -1416,20 +1534,16 @@ planets {
     const sp_th: f32 = spots > 0.005 ? 0.75 - 0.17 * spots : 9
     const fac_k: f32 = 0.12 + 0.5 * spots
 
-    const prom: f32 = sat(prominences)
-    const cor: f32 = max(corona, 0)
-
     surf {
       t_g { nodes.Time: {scale: 0.3, offset: v1 * 60} }
       t_s { nodes.Time: {scale: 0.04, offset: v2 * 60} }
 
-      // Granules: bright cells with dark lanes between them, the points of the cells moving
-      // with the time, each cell a little brighter or darker
       g_wn {
         nodes.Noise: {
           channels: 3, frequency: 1.4 / gcell, octaves: 2, evolve: t_g, seed: sd * 16 + 1
         }
       }
+
       g_wp { nodes.Warp: {offset: g_wn, amount_value: gcell * 0.7} }
       g_c {
         nodes.Cells: {
@@ -1437,32 +1551,36 @@ planets {
           evolve: t_g, seed: sd * 16 + 2
         }
       }
+
       g_e { nodes.Split: {input: g_c, channel: ChannelR} }
       g_z { nodes.Split: {input: g_c, channel: ChannelB} }
       g_ez {
         nodes.Remap: {input: g_z, from_min: 0, from_max: 1, to_min: -0.12, to_max: 0.12}
       }
+
       g_fn {
         nodes.Noise: {
           frequency: 3.5 / gcell, octaves: detail > 1 ? 2 : 1, evolve: t_g, seed: sd * 16 + 3
         }
       }
+
       g_fd {
         nodes.Remap: {input: g_fn, from_min: 0.3, from_max: 0.7, to_min: -0.1, to_max: 0.1}
       }
+
       g_s0 { nodes.Add: {a: g_e, b: g_ez} }
       g_raw { nodes.Add: {a: g_s0, b: g_fd} }
       g_v {
         nodes.Remap: {input: g_raw, from_min: 0, from_max: 1, to_min: 1 - gc, to_max: 1}
       }
 
-      // The network of the supergranules, about 25 granules across, bright on their borders
       n_c {
         nodes.Cells: {
           count: max(gcount / 25, 8), jitter: 1, distance: CellsEdge, edge: 0.12, evolve: t_s,
           seed: sd * 16 + 4
         }
       }
+
       n_x { nodes.Split: {input: n_c, channel: ChannelR} }
       n_net {
         nodes.Remap: {input: n_x, from_min: 0, from_max: 1, to_min: 1, to_max: 0, clamp: true}
@@ -1475,6 +1593,7 @@ planets {
           frequency: 5, octaves: detail > 1 ? 5 : 4, evolve: t_s, seed: sd * 16 + 5
         }
       }
+
       s_uv { nodes.Coords: {} }
       s_y { nodes.Split: {input: s_uv, channel: ChannelG} }
       s_ay { nodes.Abs: {input: s_y} }
@@ -1484,12 +1603,14 @@ planets {
           {1, -0.6}
         ]}}
       }
+
       s_v { nodes.Add: {a: s_n, b: s_band} }
       s_pen {
         nodes.Smoothstep: {
           input: s_v, edge0_value: {sp_th, 0, 0, 0}, edge1_value: {sp_th + 0.012, 0, 0, 0}
         }
       }
+
       s_umb {
         nodes.Smoothstep: {
           input: s_v, edge0_value: {sp_th + 0.03, 0, 0, 0},
@@ -1497,36 +1618,36 @@ planets {
         }
       }
 
-      // Faculae: the network in the active regions around the spots, and a bright ring at
-      // their edge
       f_act {
         nodes.Smoothstep: {
           input: s_v, edge0_value: {sp_th - 0.16, 0, 0, 0},
           edge1_value: {sp_th - 0.01, 0, 0, 0}
         }
       }
+
       f_ring {
         nodes.Smoothstep: {
           input: s_v, edge0_value: {sp_th - 0.07, 0, 0, 0},
           edge1_value: {sp_th - 0.01, 0, 0, 0}
         }
       }
+
       f_net { nodes.Multiply: {a: n_net, b: f_act} }
       f_rk { nodes.Multiply: {a: f_ring, b_value: {0.6, 0, 0, 0}} }
       f_m { nodes.Max: {a: f_net, b: f_rk} }
       f_k { nodes.Multiply: {a: f_m, b_value: {fac_k, 0, 0, 0}} }
       f_up { nodes.Add: {a: f_k, b_value: {1, 0, 0, 0}} }
 
-      // Brightness: the granules, brightened by the faculae, darkened in the penumbra and more
-      // in the umbra, and the spots redder
       i_0 { nodes.Multiply: {a: g_v, b: f_up} }
       i_pm {
         nodes.Remap: {input: s_pen, from_min: 0, from_max: 1, to_min: 1, to_max: 0.52}
       }
+
       i_1 { nodes.Multiply: {a: i_0, b: i_pm} }
       i_um {
         nodes.Remap: {input: s_umb, from_min: 0, from_max: 1, to_min: 1, to_max: 0.25}
       }
+
       i_2 { nodes.Multiply: {a: i_1, b: i_um} }
       c_cool { nodes.Add: {a: s_pen, b: s_umb} }
       c_tint {
@@ -1536,12 +1657,35 @@ planets {
           {2, {255, 168, 118}}
         ]}
       }
+
       out { nodes.Multiply: {a: c_tint, b: i_2} }
       Graph: {
         output: out, width: tw, height: tw / 2, domain: DomainSphere, format: GraphHdr,
         rate: detail > 1 ? 10 : 8, interpolate: true
       }
     }
+  }
+
+  // A star is lit by nothing: its base color is black and metallic, so all it shows is its
+  // emission. The surface (surf) is the brightness relative to the photosphere, colored by the
+  // Emissive, so a temperature changes no texel and no slider compiles a graph again.
+  //
+  // The limb darkens by a shell just above the surface that blends toward a cooler color by a
+  // Fresnel opacity of power 0.8, close to the linear limb darkening law, from any angle.
+  template Star : StarSurface {
+    const sd: i32 = seed_of(seed)
+
+    const r: f32 = max(radius, 0.1)
+    const col: Col = blackbody(temperature)
+    const limb_col: Col = blackbody(temperature * 0.7)
+    const hal_col: Col = mixc(col, {255, 255, 255}, 0.2)
+    const prom_col: Col = mixc(col, {255, 120, 80}, 0.5)
+    const glow: f32 = star_emission(temperature)
+    const limb_u: f32 = limb_coefficient(temperature)
+    const seg: i32 = detail > 1 ? 96 : (detail > 0 ? 64 : 32)
+
+    const prom: f32 = sat(prominences)
+    const cor: f32 = max(corona, 0)
 
     // A streamer of the corona, a sprite whose alpha is 1 inside the disc (at 0.2 of the
     // sprite from the center), falls off beyond it and is broken up into rays by a noise of the
@@ -1556,17 +1700,20 @@ planets {
       c_ray {
         nodes.Remap: {input: c_n, from_min: 0.3, from_max: 0.7, to_min: 0.3, to_max: 1.5}
       }
+
       c_rw {
         nodes.Remap: {
           input: c_r, from_min: 0.2, from_max: 0.34, to_min: 0, to_max: 1, clamp: true
         }
       }
+
       c_m { nodes.Mix: {a_value: {1, 1, 1, 1}, b: c_ray, factor: c_rw} }
       c_fall {
         nodes.Curve: {input: c_r, curve: {kind: CurveCatmullRom, keys: [
           {0, 1}, {0.2, 1}, {0.23, 0.62}, {0.28, 0.3}, {0.35, 0.12}, {0.42, 0.04}, {0.5, 0}
         ]}}
       }
+
       c_a0 { nodes.Multiply: {a: c_fall, b: c_m} }
       c_a { nodes.Clamp: {input: c_a0, min_value: {0, 0, 0, 0}, max_value: {1, 0, 0, 0}} }
       c_out { nodes.Combine: {r_value: 1, g_value: 1, b_value: 1, a: c_a} }
@@ -1588,9 +1735,11 @@ planets {
         Rgb: {0, 0, 0}
         PbrMaterial: {metallic: 1, roughness: 1}
         Emissive: {strength: glow, color: {col.r, col.g, col.b}}
+
         if ready {
           PbrTextures: {emissive: surf}
         }
+
         NoShadow
       }
 
@@ -1615,7 +1764,9 @@ planets {
           Emitter: {
             max: 16, rate: 1.1, shape: EmitterPoint, direction: {0, 0, 0}, speed: {0, 0},
             lifetime: {4, 7}, size: {r * 5, r * 5.6}, rotation: {0, 360}, spin: {-4, 4},
-            opacity: {0.11 * cor, 0.15 * cor}, color: {hal_col.r, hal_col.g, hal_col.b}, seed: sd * 16 + 7,
+            opacity: {0.11 * cor, 0.15 * cor},
+            color: {hal_col.r, hal_col.g, hal_col.b},
+            seed: sd * 16 + 7,
             local: true
           }
           Burst: {count: 6, at: 0}
@@ -1626,7 +1777,6 @@ planets {
         }
       }
 
-      // A wide soft halo
       halo {
         Position: {0, 0, 0}
         Emitter: {
@@ -1639,8 +1789,7 @@ planets {
         Curves: {opacity: {keys: [{0, 0.4}, {0.2, 1}, {0.75, 1}, {1, 0}]}}
       }
 
-      // Prominences: thin jets of plasma thrown off the surface that rise, slow and fall back,
-      // stretched along their motion so they arc over the limb
+      // Prominences are stretched along their motion so they arc over the limb
       prominence {
         Position: {0, 0, 0}
         Emitter: {

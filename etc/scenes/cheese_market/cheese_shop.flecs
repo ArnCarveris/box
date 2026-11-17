@@ -32,16 +32,19 @@ assets {
       Rgb: tint
       PbrMaterial: {roughness: 0.95}
     }
+
     foundation {
       Position: {0, 0.17, 0}
       Box: {5.18, 0.34, 4.02}
       Rgb: MarketStone
     }
+
     for face in 0..4 {
       {
         Rotation: {0, face * math.PI / 2, 0}
         const width = [5.0, 3.8, 5.0, 3.8]
         const depth = [1.92, 2.52, 1.92, 2.52]
+
         for band in 0..3 {
           {
             Position: {0, 0.42 + band * (height - 0.5) / 2, depth[face]}
@@ -49,12 +52,14 @@ assets {
             Rgb: MarketOak
           }
         }
+
         for side in 0..2 {
           {
             Position: {(side - 0.5) * (width[face] - 0.15), height / 2, depth[face]}
             Box: {0.16, height, 0.14}
             Rgb: MarketOak
           }
+
           for row in 0..7 {
             {
               Position: {(side - 0.5) * (width[face] - 0.28), 0.7 + row * 0.29, depth[face] + 0.03}
@@ -63,41 +68,55 @@ assets {
             }
           }
         }
+
         if face == 0 || face == 2 {
           {
             Position: {0, height + 0.69, depth[face]}
             TrianglePrism: {5, 1.38, 0.12}
             Rgb: tint
           }
+
           {
             Position: {0, height + 0.65, depth[face] + 0.08}
             Box: {0.12, 1.4, 0.12}
             Rgb: MarketOak
           }
         }
+
         if face != 2 {
-          ShutterWindow() { Position: {-1.1, height - 1.17, depth[face] + 0.06}; Scale: {0.83, 0.83, 0.83} }
-          ShutterWindow() { Position: {1.1, height - 1.17, depth[face] + 0.06}; Scale: {0.83, 0.83, 0.83} }
+          ShutterWindow() {
+            Position: {-1.1, height - 1.17, depth[face] + 0.06}
+            Scale: {0.83, 0.83, 0.83}
+          }
+
+          ShutterWindow() {
+            Position: {1.1, height - 1.17, depth[face] + 0.06}
+            Scale: {0.83, 0.83, 0.83}
+          }
         }
       }
     }
+
     shopfront {
       Position: {0, 1.38, 1.97}
       Box: {4.3, 2.05, 0.11}
       Rgb: MarketSage
     }
+
     for i in 0..3 {
       {
         Position: {(i - 1) * 1.32, 1.48, 2.04}
         Box: {1.16, 1.59, 0.05}
         Rgb: {56, 75, 64}
       }
+
       for shelf in 0..3 {
         {
           Position: {(i - 1) * 1.32, 0.89 + shelf * 0.48, 2.16}
           Box: {1.16, 0.045, 0.25}
           Rgb: MarketHoney
         }
+
         for wheel in 0..2 {
           CheeseWheel(radius: 0.22, height: 0.16) {
             Position: {(i - 1) * 1.32 + (wheel - 0.5) * 0.49, 0.93 + shelf * 0.48, 2.15}
@@ -105,18 +124,22 @@ assets {
         }
       }
     }
+
     sign_frame {
       Position: {0, 2.87, 2}
       RoundedBox: {4.5, 0.63, 0.17, 0.045}
       Rgb: MarketHoney
     }
+
     MarketLabel(label: label, width: 4.3, size: 0.25) {
       Position: {0, 2.87, 2.1}
       Scale: {1, 1.7, 1}
     }
+
     MarketAwning(tint: awning) { Position: {0, -0.35, 3.1}; Scale: {1, 1, 0.82} }
     CheeseCounter() { Position: {0, 0, 3.6} }
     MarketRoof() { Position: {0, height, 0} }
+
     for side in 0..2 {
       MarketLantern() { Position: {(side - 0.5) * 4.8, 2.15, 2.26} }
       FlowerPot(size: 1.25) { Position: {(side - 0.5) * 4.8, 0.12, 2.8} }

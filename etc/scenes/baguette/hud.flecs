@@ -27,7 +27,13 @@ assets {
     smudge { nodes.Noise: {frequency: 5, octaves: 5, seed: 41} }
     dust { nodes.Noise: {frequency: 64, octaves: 2, seed: 42} }
     wipe { nodes.Mix: {a: smudge, b: dust, factor_value: {0.3, 0, 0, 0}} }
-    slate { nodes.Ramp: {input: wipe, keys: [{0.3, {28, 34, 32}}, {0.55, {37, 44, 41}}, {0.75, {52, 58, 54}}]} }
+    slate {
+      nodes.Ramp: {
+        input: wipe,
+        keys: [{0.3, {28, 34, 32}}, {0.55, {37, 44, 41}}, {0.75, {52, 58, 54}}]
+      }
+    }
+
     Graph: {output: slate, width: 512, height: 1024}
   }
 
@@ -45,7 +51,14 @@ assets {
     prop v: VAlign = Top
 
     Layout: {}
-    Item: {h: h, v: v, x: h == Left ? 4 : -4, y: v == Top ? 4 : -4, width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 7}}
+    Item: {
+      h: h,
+      v: v,
+      x: h == Left ? 4 : -4,
+      y: v == Top ? 4 : -4,
+      width: {mode: Fixed, value: 7},
+      height: {mode: Fixed, value: 7}
+    }
     Rect: {1, 1}
     Rgb: {196, 158, 92}
     Border: {width: 1, radius: 3.5, color: {92, 66, 34, 255}}
@@ -160,47 +173,124 @@ hud {
               Rgb: GOLD
               Border: {radius: 1.5}
             }
+
             diamond {
               Item: {width: {mode: Fixed, value: 7}, height: {mode: Fixed, value: 7}}
               Rect: {1, 1}
               Rgb: GOLD
               Border: {radius: 3.5}
             }
+
             dot_r {
               Item: {width: {mode: Fixed, value: 3}, height: {mode: Fixed, value: 3}}
               Rect: {1, 1}
               Rgb: GOLD
               Border: {radius: 1.5}
             }
+
             assets.Rule right()
           }
         }
 
         assets.LoafGroup shape(text: "Shape") {
-          Slider length(label: "Length", width: SLIDER_W, min: 0.6, max: 1.6, step: 0.01, decimals: 2, value: state.length)
-          Slider thickness(label: "Thickness", width: SLIDER_W, min: 0.05, max: 0.13, step: 0.001, decimals: 3, value: state.thickness)
-          Slider height(label: "Height", width: SLIDER_W, min: 0.55, max: 1, step: 0.01, decimals: 2, value: state.height)
-          Slider taper(label: "Taper", width: SLIDER_W, min: 0.15, max: 0.9, step: 0.01, decimals: 2, value: state.taper)
+          Slider length(
+            label: "Length",
+            width: SLIDER_W,
+            min: 0.6,
+            max: 1.6,
+            step: 0.01,
+            decimals: 2,
+            value: state.length
+          )
+          Slider thickness(
+            label: "Thickness",
+            width: SLIDER_W,
+            min: 0.05,
+            max: 0.13,
+            step: 0.001,
+            decimals: 3,
+            value: state.thickness
+          )
+          Slider height(
+            label: "Height",
+            width: SLIDER_W,
+            min: 0.55,
+            max: 1,
+            step: 0.01,
+            decimals: 2,
+            value: state.height
+          )
+          Slider taper(
+            label: "Taper",
+            width: SLIDER_W,
+            min: 0.15,
+            max: 0.9,
+            step: 0.01,
+            decimals: 2,
+            value: state.taper
+          )
         }
 
         assets.LoafGroup scoring(text: "Scoring") {
           assets.LoafRow cuts_row(text: "Cuts") {
             Stepper cuts(min: 1, max: 9, value: state.cuts, width: 104)
           }
-          Slider angle(label: "Angle", width: SLIDER_W, min: 8, max: 45, step: 1, unit: "°", value: state.angle)
-          Slider opening(label: "Opening", width: SLIDER_W, min: 0.12, max: 0.48, step: 0.01, decimals: 2, value: state.opening)
+
+          Slider angle(
+            label: "Angle",
+            width: SLIDER_W,
+            min: 8,
+            max: 45,
+            step: 1,
+            unit: "°",
+            value: state.angle
+          )
+          Slider opening(
+            label: "Opening",
+            width: SLIDER_W,
+            min: 0.12,
+            max: 0.48,
+            step: 0.01,
+            decimals: 2,
+            value: state.opening
+          )
         }
 
         assets.LoafGroup oven(text: "Bake") {
-          Slider bake(label: "Bake", width: SLIDER_W, min: 0, max: 100, step: 1, unit: "%", value: state.bake * 100)
-          Slider flour(label: "Flour", width: SLIDER_W, min: 0, max: 100, step: 1, unit: "%", value: state.flour * 100)
-          Slider crust(label: "Crust relief", width: SLIDER_W, min: 0, max: 5, step: 0.1, decimals: 1, value: state.crust)
+          Slider bake(
+            label: "Bake",
+            width: SLIDER_W,
+            min: 0,
+            max: 100,
+            step: 1,
+            unit: "%",
+            value: state.bake * 100
+          )
+          Slider flour(
+            label: "Flour",
+            width: SLIDER_W,
+            min: 0,
+            max: 100,
+            step: 1,
+            unit: "%",
+            value: state.flour * 100
+          )
+          Slider crust(
+            label: "Crust relief",
+            width: SLIDER_W,
+            min: 0,
+            max: 5,
+            step: 0.1,
+            decimals: 1,
+            value: state.crust
+          )
         }
 
         assets.LoafGroup variant(text: "Variation") {
           assets.LoafRow seed_row(text: "Seed") {
             Stepper seed(min: 0, max: 999, value: state.seed, width: 104)
           }
+
           actions_row {
             Layout: {direction: Row, spacing: 8}
             Item: {width: {mode: Grow}}
@@ -227,8 +317,10 @@ async {
     const e = await on.change(hud.screen.panel)
     const w = e.widget
     const n = w.name()
+
     if w.has(Slider) {
       const v: f32 = w[Slider.mut].current
+
       if n == "length" {
         state.length = v
       } else if n == "thickness" {

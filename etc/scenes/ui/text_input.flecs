@@ -11,13 +11,9 @@ using box.geometry
 using box.material
 using box.text
 
-// Behavior of a text field. The engine edits the TextEdit of the field child (caret, selection,
-// clipboard, scrolling); the widget follows it. An edit assigns current and reports a change for
-// the widget, Enter a submit (on.submit), so a scene reads w[TextInput.mut].current. The changes
-// and submits of the field itself (e.widget is the field) reach the ancestors too. read_only
-// allows selecting and copying only, password draws bullets and disables copy and cut. A
-// disabled field shows its value without a TextEdit and is skipped by Tab. The pointer shows the
-// I-beam of the TextEdit over the field, a crossed circle over a disabled field.
+// Behavior of a text field. The engine edits the TextEdit of the field child; an edit assigns
+// current and reports a change, Enter a submit (on.submit). read_only allows selecting and copying
+// only, password draws bullets.
 template HeadlessTextInput {
   prop label: string = ""
   prop placeholder: string = ""
@@ -56,6 +52,7 @@ template HeadlessTextInput {
   async {
     while true {
       const e = await on.change(this)
+
       if e.widget != this {
         current = e.widget[TextEdit].value
         await ui.changed(this)
@@ -66,6 +63,7 @@ template HeadlessTextInput {
   async {
     while true {
       const e = await on.submit(this)
+
       if e.widget != this {
         current = e.widget[TextEdit].value
         await ui.submit(this)

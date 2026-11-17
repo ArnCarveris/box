@@ -6,12 +6,22 @@ box { audio { Song { Rgb: {196, 92, 112} } } }
 assets {
 
   og_church {
-    Bus: {output: master, kind: ChannelReturn, volume: 0.85 * state.reverb_level / 100, effects: [og_church]}
+    Bus: {
+      output: master,
+      kind: ChannelReturn,
+      volume: 0.85 * state.reverb_level / 100,
+      effects: [og_church]
+    }
     Reverb: {decay: 5.5, damping: 0.55, predelay: 0.05, size: 1}
   }
 
   og_club {
-    Bus: {output: master, kind: ChannelReturn, volume: 0.7 * state.reverb_level / 100, effects: [og_club]}
+    Bus: {
+      output: master,
+      kind: ChannelReturn,
+      volume: 0.7 * state.reverb_level / 100,
+      effects: [og_club]
+    }
     Reverb: {decay: 1.3, damping: 0.6, predelay: 0.015, size: 0.45}
   }
 
@@ -21,6 +31,7 @@ assets {
       {kind: EqPeak, frequency: 250, gain: -1.5, q: 0.8}
     ]}
   }
+
   og_glue { Compressor: {threshold: -14, ratio: 2, attack: 0.03, release: 0.3, knee: 8} }
   og_organs {
     Bus: {output: master, volume: 0.75, effects: [og_tone, og_glue]}
@@ -53,6 +64,7 @@ assets {
       Oscillator: {wave: Sine, frequency: 1320, level: 0.16}
       Envelope: {attack: 0.001, decay: 0.45, sustain: 0, release: 0.05, curve: 3}
     }
+
     click {
       Oscillator: {wave: Noise, level: 0.07}
       Envelope: {attack: 0.001, decay: 0.01, sustain: 0, release: 0.01, curve: 3}
@@ -542,7 +554,12 @@ assets {
   og_tonewheel_leslie { Rotary: {speed: 0, drive: 0.35, balance: 0.1} }
   og_track_tonewheel {
     Track: {instrument: og_tonewheel, humanize: {timing: 5}}
-    Bus: {output: og_organs, volume: 0.65, effects: [og_tonewheel_leslie], sends: [{bus: og_club, level: 0.35}]}
+    Bus: {
+      output: og_organs,
+      volume: 0.65,
+      effects: [og_tonewheel_leslie],
+      sends: [{bus: og_club, level: 0.35}]
+    }
     Meter: {}
     og_solo { ClipPlacement: {clip: og_gospel, start: 0} }
     og_tutti { ClipPlacement: {clip: og_hymn_wheel, start: 112, gain: 0.55} }
@@ -551,7 +568,12 @@ assets {
   og_jazz_leslie { Rotary: {speed: 0, drive: 0.5, balance: 0.25} }
   og_track_jazz {
     Track: {instrument: og_jazz, swing: 0.3, humanize: {timing: 6}}
-    Bus: {output: og_organs, volume: 1, effects: [og_jazz_leslie], sends: [{bus: og_club, level: 0.3}]}
+    Bus: {
+      output: og_organs,
+      volume: 1,
+      effects: [og_jazz_leslie],
+      sends: [{bus: og_club, level: 0.3}]
+    }
     Meter: {}
     og_solo { ClipPlacement: {clip: og_jazz_line, start: 16} }
     og_tutti { ClipPlacement: {clip: og_hymn_stabs, start: 128, gain: 0.5} }
@@ -563,9 +585,16 @@ assets {
       {kind: EqPeak, frequency: 2200, gain: 2.5, q: 0.9}
     ]}
   }
+
   og_track_combo {
     Track: {instrument: og_combo, humanize: {timing: 5}}
-    Bus: {output: og_organs, volume: 0.55, pan: 0.2, effects: [og_combo_tone], sends: [{bus: og_club, level: 0.4}]}
+    Bus: {
+      output: og_organs,
+      volume: 0.55,
+      pan: 0.2,
+      effects: [og_combo_tone],
+      sends: [{bus: og_club, level: 0.4}]
+    }
     Meter: {}
     og_solo { ClipPlacement: {clip: og_combo_riff, start: 32} }
     og_tutti { ClipPlacement: {clip: og_hymn_combo, start: 128, gain: 0.4} }
@@ -576,7 +605,9 @@ assets {
     Bus: {output: og_organs, volume: 0.4, pan: -0.15, sends: [{bus: og_church, level: 0.55}]}
     Meter: {}
     og_solo { ClipPlacement: {clip: og_flute_tune, start: 48} }
-    og_tutti { ClipPlacement: {clip: og_hymn_melody, start: 128, offset: 16, transpose: 12, gain: 0.6} }
+    og_tutti {
+      ClipPlacement: {clip: og_hymn_melody, start: 128, offset: 16, transpose: 12, gain: 0.6}
+    }
   }
 
   og_track_principal {
@@ -594,9 +625,16 @@ assets {
       {kind: EqHighShelf, frequency: 6000, gain: -3}
     ]}
   }
+
   og_track_reed {
     Track: {instrument: og_reed, humanize: {timing: 4}}
-    Bus: {output: og_organs, volume: 0.45, pan: 0.15, effects: [og_reed_tone], sends: [{bus: og_church, level: 0.55}]}
+    Bus: {
+      output: og_organs,
+      volume: 0.45,
+      pan: 0.15,
+      effects: [og_reed_tone],
+      sends: [{bus: og_church, level: 0.55}]
+    }
     Meter: {}
     og_solo { ClipPlacement: {clip: og_fanfare, start: 80} }
     og_tutti { ClipPlacement: {clip: og_hymn_melody, start: 112, gain: 0.8} }
@@ -617,6 +655,7 @@ assets {
         {127.99, 0}, {128, 1}, {144, 1}
       ]}}
   }
+
   og_automation {
     Track: {}
     og_leslie { ClipPlacement: {clip: og_leslie_switch, start: 0} }

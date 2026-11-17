@@ -77,7 +77,14 @@ state {
   }
 
   fn spell_name(i: i32) -> string {
-    match i { 0: "Cinder Lance"; 1: "Tidal Mend"; 2: "Thorn Aegis"; 3: "Veilstep"; 4: "Starfall"; _: "Blood Pact" }
+    match i {
+      0: "Cinder Lance"
+      1: "Tidal Mend"
+      2: "Thorn Aegis"
+      3: "Veilstep"
+      4: "Starfall"
+      _: "Blood Pact"
+    }
   }
 
   fn spell_desc(i: i32) -> string {
@@ -210,6 +217,7 @@ state {
   fn check_afford() {
     for i in 0..6 {
       const can = hero_mp >= spell_cost(i) && hero_hp > spell_blood(i)
+
       if spell_afford[i] != can {
         spell_afford[i] = can
       }

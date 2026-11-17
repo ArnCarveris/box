@@ -28,10 +28,8 @@ state {
   export const LOGS: i32 = 8
   export const COCONUTS: i32 = 24
 
-  // Spawning: rows of hazards appear SPAWN_AHEAD units up the lagoon (in the haze) and rise
-  // out of the water over RISE units; slots further than DESPAWN_Z behind the canoe are freed.
-  // Rows are ROW_GAP units apart at START_SPEED and ROW_GAP_PER_SPEED closer for every unit of
-  // speed above it, down to ROW_GAP_MIN. The first row reaches the canoe after FIRST_HAZARD_TIME.
+  // Rows of hazards spawn SPAWN_AHEAD units up the lagoon and rise over RISE units. Rows are
+  // ROW_GAP apart at START_SPEED and ROW_GAP_PER_SPEED closer per unit of speed above it.
   export const SPAWN_AHEAD: f32 = 95
   export const RISE: f32 = 14
   export const DESPAWN_Z: f32 = 16
@@ -102,7 +100,6 @@ state {
   export mut next_row: f64 = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
   export mut rows: i32 = 0
 
-  // Puts every variable back to its start value
   fn reset() {
     game_state = GS_PLAYING
     clock = 0
@@ -118,14 +115,17 @@ state {
     capsize = 0
     next_row = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
     rows = 0
+
     for i in 0..ROCKS {
       rocks[i].live = false
       rocks[i].hit = false
     }
+
     for i in 0..LOGS {
       logs[i].live = false
       logs[i].hit = false
     }
+
     for i in 0..COCONUTS {
       nuts[i].live = false
       nuts[i].hit = false

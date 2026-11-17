@@ -50,18 +50,26 @@ assets {
 
     Position: {(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2}
     Rotation: {pitch_of(a, b), yaw_of(a, b), 0}
-    rod { Rotation: {PI / 2, 0, 0}; Cylinder: {radius: r, length: span(a, b), segments: 10, smooth: true}; Rgb: tone; PbrMaterial: {metallic: metal, roughness: rough} }
+    rod {
+      Rotation: {PI / 2, 0, 0}
+      Cylinder: {radius: r, length: span(a, b), segments: 10, smooth: true}
+      Rgb: tone
+      PbrMaterial: {metallic: metal, roughness: rough}
+    }
   }
 
   prefab CableShape {
     Path2D: {
       start: {0.5, 0},
       segments: [
-        {kind: CatmullRom, end: {0, 0.5}}, {kind: CatmullRom, end: {-0.5, 0}}, {kind: CatmullRom, end: {0, -0.5}}
+        {kind: CatmullRom, end: {0, 0.5}},
+        {kind: CatmullRom, end: {-0.5, 0}},
+        {kind: CatmullRom, end: {0, -0.5}}
       ],
       closed: true
     }
   }
+
   prefab CableProfile { Profile2D: {outer: CableShape} }
 
   template Cable {

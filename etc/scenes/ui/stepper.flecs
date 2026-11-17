@@ -17,11 +17,8 @@ fn stepper_part(x: f64, w: f64, button: f64) -> i32 {
   x < button - w / 2 ? -1 : x > w / 2 - button ? 1 : 0
 }
 
-// Behavior of a stepper, a spin button. A click on the left button part (button points wide)
-// steps down, on the right one up; the arrow keys step (Up and Right up), PageUp and PageDown by
-// ten steps, Home and End go to min and max. current stays within min..max. part is the button
-// under the pointer and pressed the one held: -1 minus, 1 plus, 0 none. The pointer shows a hand
-// over the stepper, a crossed circle while it is disabled.
+// Behavior of a stepper, a spin button. A click on the left button part steps down, on the right
+// one up. part is the button under the pointer and pressed the one held: -1 minus, 1 plus, 0 none.
 template HeadlessStepper {
   prop min: f32 = 0
   prop max: f32 = 10
@@ -78,6 +75,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.focus(this)
+
       if e.target == this {
         focused = true
       }
@@ -87,6 +85,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.blur(this)
+
       if e.target == this {
         focused = false
       }
@@ -96,9 +95,11 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.activate(this)
+
       if ui.activation(e) == this && !e.keyboard && !disabled {
         const dir = stepper_part(e.local_x, this[layout.Bounds].width, button)
         const v = clamp(current + dir * step, min, max)
+
         if v != current {
           current = v
           await ui.changed(this)
@@ -110,6 +111,7 @@ template HeadlessStepper {
   async {
     while true {
       const e = await on.key_down(this)
+
       if !disabled {
         const target = match e.key {
           "ArrowLeft", "ArrowDown": current - step
@@ -121,6 +123,7 @@ template HeadlessStepper {
           _: current
         }
         const v = clamp(target, min, max)
+
         if v != current {
           current = v
           await ui.changed(this)

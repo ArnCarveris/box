@@ -19,28 +19,33 @@ assets {
       RoundedBox: {0.86, 0.035, 0.5, 0.045}
       Rgb: {76, 47, 40}
     }
+
     for side in 0..2 {
       {
         Position: {(side - 0.5) * 0.82, 0.045, 0}
         Box: {0.025, 0.055, 0.42}
         Rgb: {160, 115, 70}
       }
+
       {
         Position: {0, 0.045, (side - 0.5) * 0.46}
         Box: {0.82, 0.055, 0.025}
         Rgb: {160, 115, 70}
       }
+
       {
         Position: {0.25, 0.05, (side - 0.5) * 0.25}
         Cylinder: {radius: 0.095, length: 0.025, segments: 20}
         Rgb: glaze
       }
+
       {
         Position: {0.25, 0.11, (side - 0.5) * 0.25}
         Tube: {radius: 0.065, thickness: 0.012, length: 0.1, segments: 20}
         Rgb: glaze
         PbrMaterial: {roughness: 0.22}
       }
+
       {
         Position: {0.25, 0.14, (side - 0.5) * 0.25}
         Cylinder: {radius: 0.052, length: 0.008, segments: 20}
@@ -48,6 +53,7 @@ assets {
         PbrMaterial: {roughness: 0.15}
       }
     }
+
     pot {
       Position: {-0.13, 0.16, 0}
       Scale: {1, 0.9, 1}
@@ -55,22 +61,26 @@ assets {
       Rgb: glaze
       PbrMaterial: {roughness: 0.22}
     }
+
     lid {
       Position: {-0.13, 0.28, 0}
       Cylinder: {radius: 0.085, length: 0.025, segments: 20}
       Rgb: glaze
     }
+
     knob {
       Position: {-0.13, 0.31, 0}
       Sphere: {radius: 0.028, segments: 12, smooth: true}
       Rgb: glaze
     }
+
     handle {
       Position: {-0.275, 0.18, 0}
       Rotation: {math.PI / 2, 0, 0}
       Torus: {radius: 0.085, tube: 0.022, segments: 20, rings: 8}
       Rgb: glaze
     }
+
     spout {
       Position: {0.005, 0.21, 0}
       Rotation: {0, 0, -0.8}

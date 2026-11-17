@@ -11,11 +11,14 @@ using box.app
 using box.audio
 using box.audio.synth
 
-hall { Bus: {output: master, kind: ChannelReturn, effects: [hall]}; Reverb: {decay: 1.6, damping: 0.55, predelay: 0.03, size: 0.7} }
+hall {
+  Bus: {output: master, kind: ChannelReturn, effects: [hall]}
+  Reverb: {decay: 1.6, damping: 0.55, predelay: 0.03, size: 0.7}
+}
+
 band { Bus: {output: master, volume: 0.55, sends: [{bus: hall, level: 0.35}]} }
 kit { Bus: {output: master, volume: 0.5, sends: [{bus: hall, level: 0.12}]} }
 
-// A chord of three notes and an octave, swelling over a bar
 template Pad {
   prop a: f32 = 220
   prop b: f32 = 261.63
@@ -32,7 +35,6 @@ template Pad {
   air { Oscillator: {wave: Saw, frequency: a * 1.994, level: 0.05} }
 }
 
-// A plucked bass whose filter closes as it decays
 template Bass {
   prop f: f32 = 55
 
@@ -45,7 +47,6 @@ template Bass {
   sub { Oscillator: {wave: Sine, frequency: f, level: 0.5} }
 }
 
-// A twangy pluck with a short ring an octave up
 template Lead {
   prop f: f32 = 440
 
@@ -118,7 +119,9 @@ Lead lead_gs4(f: 415.3)
 
 const PADS = [pad_am, pad_f, pad_c, pad_g, pad_dm, pad_e]
 const BASSES = [bass_a, bass_f, bass_c, bass_g, bass_d, bass_e]
-const LEADS = [lead_a4, lead_c5, lead_d5, lead_e5, lead_g5, lead_a5, lead_g4, lead_e4, lead_b4, lead_gs4]
+const LEADS = [
+  lead_a4, lead_c5, lead_d5, lead_e5, lead_g5, lead_a5, lead_g4, lead_e4, lead_b4, lead_gs4
+]
 
 // The chord of every bar: 0 Am, 1 F, 2 C, 3 G, 4 Dm, 5 E
 const BARS = [0, 0, 1, 3, 0, 0, 1, 5, 4, 0, 1, 2, 1, 3, 5, 5]
@@ -149,26 +152,34 @@ const MELODY = [
 async {
   for bar in 0..16 {
     const chord = BARS[bar]
+
     for beat in 0..8 {
       if beat == 0 {
         const pad_on = box.audio.play(PADS[chord], 0.9)
       }
+
       if BASS_HITS[beat] == 1 {
         const bass_on = box.audio.play(BASSES[chord], match beat == 0 { true: 0.9; _: 0.65 })
       }
+
       if KICKS[beat] == 1 && (bar > 0 || beat == 0) {
         const kick_on = box.audio.play(Kick, 0.9)
       }
+
       if bar >= 4 && (beat == 2 || beat == 6) {
         const rim_on = box.audio.play(Rim, 0.45)
       }
+
       if bar >= 2 && beat % 2 == 1 {
         const hat_on = box.audio.play(Hat, match beat == 3 || beat == 7 { true: 0.4; _: 0.28 })
       }
+
       const n = MELODY[bar * 8 + beat]
+
       if n >= 0 {
         const lead_on = box.audio.play(LEADS[n], 0.75)
       }
+
       for f in 0..15 {
         await next_frame()
       }

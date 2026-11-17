@@ -16,16 +16,21 @@ state {
     const leak = crowded ? people * 0.1 : 0
     st_air = clamp(st_air + st_air_rate * ratio - air_drain - leak, 0, 100)
 
-    st_food = clamp(st_food + st_food_rate * ratio - people * 0.05, 0, max(st_storage - st_goods, 0))
+    st_food = clamp(
+      st_food + st_food_rate * ratio - people * 0.05, 0, max(st_storage - st_goods, 0)
+    )
 
     const rent = st_residents * 0.5
     const net = rent + st_visitor_spend - st_upkeep_total
     st_income = net
     st_credits += net
 
-    const comfy = st_residents < st_housing && st_food > 2 && st_air > 30 && !crowded && ratio >= 0.6
+    const comfy = st_residents < st_housing && st_food > 2 && st_air > 30 && !crowded &&
+      ratio >= 0.6
+
     if comfy {
       st_growth += 0.05 + st_residents * 0.003
+
       if st_growth >= 1 {
         st_growth -= 1
         st_residents += 1
@@ -39,11 +44,14 @@ state {
     const press_life = crowded ? 0.04 : 0
     const press_home = st_residents > st_housing ? 0.08 : 0
     const pressure = press_food + press_air + press_life + press_home
+
     if pressure > 0 {
       st_decline += pressure
+
       if st_decline >= 1 {
         st_decline -= 1
         st_residents = max(st_residents - 1, 0)
+
         if starving {
           st_notify("A resident left: the station has run out of food.", 6)
         } else if choking {
@@ -81,6 +89,7 @@ state {
 
 async {
   st_retally()
+
   while true {
     if st_speed > 0 && !st_lost {
       st_step()

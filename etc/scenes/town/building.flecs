@@ -32,11 +32,13 @@ assets {
       Box: {width, height, depth}
       Rgb: color
     }
+
     {
       Position: {0, 0.12, 0}
       Box: {width + 0.16, 0.24, depth + 0.16}
       Rgb: {178, 176, 158}
     }
+
     for floor in 0..floors {
       if floor == 0 && shop {
         Shopfront(width: width, accent: accent) { Position: {0, 0, depth / 2} }
@@ -46,19 +48,23 @@ assets {
           Window(width: 0.95, height: 1.9, frame: TownTimber) {
             Position: {width * 0.23, 1.04, 0.15}
           }
+
           Window(width: width * 0.36, height: 1.05, frame: TownCream) {
             Position: {-width * 0.22, 1.4, 0.15}
           }
+
           {
             Position: {width * 0.23, 0.08, 0.38}
             Box: {1.18, 0.16, 0.75}
             Rgb: TownCream
           }
+
           {
             Position: {width * 0.23, 2.12, 0.35}
             Box: {1.35, 0.1, 0.85}
             Rgb: accent
           }
+
           Planter(blossoms: true) { Position: {-width * 0.3, 0, 0.5} }
         }
       } else {
@@ -67,6 +73,7 @@ assets {
           facade: {width: width, height: floorHeight, color: color}
         }
       }
+
       for side in 0..2 {
         {
           Position: {(side * 2 - 1) * width / 2, floor * floorHeight, 0}
@@ -74,9 +81,11 @@ assets {
           Window(width: depth * 0.36, height: 1.1, frame: TownCream) {
             Position: {0.3, 1.5, 0.1}
           }
+
           AirConditioner() { Position: {-0.4, 0.56, 0.25} }
         }
       }
+
       {
         Position: {0, floor * floorHeight, -depth / 2}
         Rotation: {0, math.PI, 0}
@@ -85,6 +94,7 @@ assets {
         }
       }
     }
+
     for side in 0..2 {
       {
         Position: {(side * 2 - 1) * (width / 2 + 0.07), height / 2, -depth / 2}
@@ -92,6 +102,7 @@ assets {
         Rgb: TownIron
       }
     }
+
     {
       Position: {0, height, 0}
       roof: {width: width, depth: depth, color: roofColor}

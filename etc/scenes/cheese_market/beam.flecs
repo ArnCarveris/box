@@ -46,5 +46,6 @@ assets {
       closed: true
     }
   }
+
   prefab MarketRoundProfile { Profile2D: {outer: MarketRoundShape} }
 }

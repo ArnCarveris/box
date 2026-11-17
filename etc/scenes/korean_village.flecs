@@ -81,7 +81,15 @@ $ {
     aerial_perspective: false, transmission: false, texture_blend: true, sheen: true,
     clear_coat: false, diffuse_transmission: false}
   ReflectionBake: {resolution: 64, budget_ms: 2, scene_probe: true, scene_probe_height: 2}
-  Bake: {environment: sky, probe_spacing: 2.5, bounds_padding: 0.5, bounces: 1, capture_size: 32, budget_ms: 6, compute: hud.screen.options.body.baked[Checkbox.mut].current}
+  Bake: {
+    environment: sky,
+    probe_spacing: 2.5,
+    bounds_padding: 0.5,
+    bounces: 1,
+    capture_size: 32,
+    budget_ms: 6,
+    compute: hud.screen.options.body.baked[Checkbox.mut].current
+  }
 }
 
 korean_village {
@@ -91,63 +99,125 @@ korean_village {
     Camera: {fov: 48, near_: 0.1, far_: 200}
     CameraController: {speed: 5}
   }
+
   courtyard_camera {
     Position: {-0.9, 1.7, 8.2}
     Rotation: {-0.02, 0.02, 0}
     Camera: {fov: 58, near_: 0.1, far_: 200}
     CameraController: {speed: 4}
   }
+
   landscape { KoreanLandscape: {}; Position: {} }
   hall { KoreanHall: {}; Position: {0, 0.12, -7.6}; Scale: {1.12, 1.12, 1.12} }
   west_house { KoreanHouse: {}; Position: {-9.3, 0.12, -5.8}; Rotation: {0, math.PI / 2, 0} }
-  west_workshop { KoreanHouse: {harvest: true}; Position: {-9.3, 0.12, 2.2}; Rotation: {0, math.PI / 2, 0} }
-  east_house { KoreanHouse: {harvest: true}; Position: {9.3, 0.12, -5.8}; Rotation: {0, -math.PI / 2, 0} }
+  west_workshop {
+    KoreanHouse: {harvest: true}
+    Position: {-9.3, 0.12, 2.2}
+    Rotation: {0, math.PI / 2, 0}
+  }
+
+  east_house {
+    KoreanHouse: {harvest: true}
+    Position: {9.3, 0.12, -5.8}
+    Rotation: {0, -math.PI / 2, 0}
+  }
+
   east_kitchen { KoreanHouse: {}; Position: {9.3, 0.12, 2.2}; Rotation: {0, -math.PI / 2, 0} }
   gate { KoreanGate: {}; Position: {0, 0.12, 10.4} }
+
   for side in 0..2 {
     const sign = side * 2 - 1
     { KoreanWall: {length: 12.4, tiles: 58, stones: 26}; Position: {sign * 8.55, 0.12, 10.4} }
+
     for i in 0..4 {
-      { KoreanWall: {length: 5.5, tiles: 26, stones: 12}; Position: {sign * 14.75, 0.12, -9.4 + i * 5.6}; Rotation: {0, math.PI / 2, 0} }
+      {
+        KoreanWall: {length: 5.5, tiles: 26, stones: 12}
+        Position: {sign * 14.75, 0.12, -9.4 + i * 5.6}
+        Rotation: {0, math.PI / 2, 0}
+      }
     }
+
     { KoreanLantern: {}; Position: {sign * 2.7, 0.13, 8.6} }
     { KoreanLantern: {}; Position: {sign * 2.85, 0.13, -3.4} }
+
     for i in 0..2 {
-      { KoreanPine: {variant: side + i * 2}; Position: {sign * 12.75, 0.13, -10 + i * 15.6}; Scale: {0.92, 0.92, 0.92} }
+      {
+        KoreanPine: {variant: side + i * 2}
+        Position: {sign * 12.75, 0.13, -10 + i * 15.6}
+        Scale: {0.92, 0.92, 0.92}
+      }
     }
+
     { KoreanFirewood: {}; Position: {sign * 9.4, 0.13, -1.8}; Rotation: {0, math.PI / 2, 0} }
-    { KoreanJangseung: {hat: {44 + side * 36, 44 + side * 8, 42 + side * 18}}; Position: {sign * 2.45, 0.07, 11.1}; Rotation: {0, -sign * 0.2, 0} }
+    {
+      KoreanJangseung: {hat: {44 + side * 36, 44 + side * 8, 42 + side * 18}}
+      Position: {sign * 2.45, 0.07, 11.1}
+      Rotation: {0, -sign * 0.2, 0}
+    }
+
     { KoreanShrub: {}; Position: {sign * 12.9, 0.13, -3.2}; Scale: {1.25, 1.25, 1.25} }
     { KoreanShrub: {bloom: {232, 142, 172}}; Position: {sign * 12.1, 0.13, 1.2} }
-    { KoreanShrub: {bloom: {236, 212, 224}}; Position: {sign * 13.3, 0.13, 8.4}; Scale: {1.1, 1.1, 1.1} }
+    {
+      KoreanShrub: {bloom: {236, 212, 224}}
+      Position: {sign * 13.3, 0.13, 8.4}
+      Scale: {1.1, 1.1, 1.1}
+    }
+
     { KoreanShrub: {}; Position: {sign * 5.7, 0.13, 9.6} }
     { KoreanRock: {size: 1.3}; Position: {sign * 13.5, 0.13, -0.8}; Rotation: {0, sign * 0.8, 0} }
     { KoreanRock: {size: 0.9}; Position: {sign * 12, 0.13, 8.9}; Rotation: {0, side * 2.4, 0} }
   }
+
   for i in 0..5 {
     { KoreanWall: {length: 5.8, tiles: 28, stones: 13}; Position: {(i - 2) * 5.9, 0.12, -12.3} }
   }
+
   for i in 0..46 {
     const x = -15.2 + i * 0.67 + math.sin(i * 2.3) * 0.2
-    { KoreanBamboo: {height: 5.6 + (i * 5 % 7) * 0.42, tone: i % 3}; Position: {x, 0.06, -13.2 + math.sin(i * 1.7) * 0.25}; Rotation: {math.sin(i * 0.9) * 0.04, i * 1.1, math.sin(i * 1.3) * 0.05} }
+    {
+      KoreanBamboo: {height: 5.6 + (i * 5 % 7) * 0.42, tone: i % 3}
+      Position: {x, 0.06, -13.2 + math.sin(i * 1.7) * 0.25}
+      Rotation: {math.sin(i * 0.9) * 0.04, i * 1.1, math.sin(i * 1.3) * 0.05}
+    }
   }
-  courtyard_pine { KoreanPine: {variant: 1.2}; Position: {-4.3, 0.13, 3.9}; Scale: {0.85, 0.85, 0.85} }
+
+  courtyard_pine {
+    KoreanPine: {variant: 1.2}
+    Position: {-4.3, 0.13, 3.9}
+    Scale: {0.85, 0.85, 0.85}
+  }
+
   pagoda { KoreanPagoda: {}; Position: {4.3, 0.13, -0.6} }
   well { KoreanWell: {}; Position: {4.2, 0.13, 4.8} }
   jar_terrace : KoreanStone { Position: {8.7, 0.2, 7.6}; RoundedBox: {4, 0.25, 2.5, 0.12} }
+
   for side in 0..2 {
     for i in 0..9 {
-      { Position: {6.84 + i * 0.465, 0.18, 7.6 + (side - 0.5) * 2.54}; RoundedBox: {0.44, 0.28, 0.08, 0.03}; Rgb: {128 + (i * 5 + side) % 4 * 10, 130 + (i * 5 + side) % 4 * 9, 118 + (i * 5 + side) % 4 * 9} }
+      {
+        Position: {6.84 + i * 0.465, 0.18, 7.6 + (side - 0.5) * 2.54}
+        RoundedBox: {0.44, 0.28, 0.08, 0.03}
+        Rgb: {
+          128 + (i * 5 + side) % 4 * 10,
+          130 + (i * 5 + side) % 4 * 9,
+          118 + (i * 5 + side) % 4 * 9
+        }
+      }
     }
   }
+
   for row in 0..2 {
     for i in 0..4 {
-      { KoreanOnggi: {size: 0.72 + (i + row) % 3 * 0.15}; Position: {7.3 + i * 0.94, 0.33, 7.1 + row * 1.03} }
+      {
+        KoreanOnggi: {size: 0.72 + (i + row) % 3 * 0.15}
+        Position: {7.3 + i * 0.94, 0.33, 7.1 + row * 1.03}
+      }
     }
   }
+
   for i in 0..3 {
     { KoreanOnggi: {size: 0.65 + i * 0.12}; Position: {-6.8, 0.13, -9.6 + i * 0.88} }
   }
+
   bench { KoreanBench: {}; Position: {-4.2, 0.13, 5.6} }
   bamboo_mist {
     Position: {0, 1.4, -13.1}
@@ -163,8 +233,14 @@ korean_village {
       steps: 8
     }
   }
+
   for i in 0..7 {
-    { Position: {-4.3 + math.sin(i * 0.9) * 1.1, 0.22, 3.9 + math.cos(i * 0.9) * 0.85}; Scale: {0.35, 0.2, 0.3}; IcoSphere: {radius: 1, segments: 1}; Rgb: {136, 144, 125} }
+    {
+      Position: {-4.3 + math.sin(i * 0.9) * 1.1, 0.22, 3.9 + math.cos(i * 0.9) * 0.85}
+      Scale: {0.35, 0.2, 0.3}
+      IcoSphere: {radius: 1, segments: 1}
+      Rgb: {136, 144, 125}
+    }
   }
 }
 
@@ -185,7 +261,11 @@ view {
       atmosphere: true,
       environment: {source: sky, intensity: 1.15, yaw: 0, background: false}
     },
-    shadows: {enabled: hud.screen.options.body.shadows[Checkbox.mut].current, resolution: 2048, max_distance: 110},
+    shadows: {
+      enabled: hud.screen.options.body.shadows[Checkbox.mut].current,
+      resolution: 2048,
+      max_distance: 110
+    },
     effects: [
       {enabled: hud.screen.options.body.gtao[Checkbox.mut].current, effect: gtao},
       {enabled: true, effect: sky},

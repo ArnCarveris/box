@@ -1,18 +1,7 @@
-// The sound of the dust merchant: script only, on the components of box.audio (docs/audio.md).
+// The sound of the dust merchant, on the components of box.audio (docs/audio.md). The engine
+// drone sits on the starboard pod; its level follows the main bus and the reactor, not eng_rpm.
 //
-// - Buses: ui for the controls, world for the engine and cabin_verb, the reverb of the cabin,
-//   which world sends to; music for the track. All of them go into the master.
-// - The controls of widgets.flecs play the synth sounds below from their input handlers, the
-//   same async blocks that flip and turn them, each with a pitch variance so that no two clicks
-//   are the same.
-// - The engine is a looping synth drone at a fixed pitch, placed on the starboard engine pod
-//   behind the cabin, so it pans and changes level as the camera moves between the stations.
-//   Its level follows the main bus and the reactor; its pitch does not follow eng_rpm.
-// - The music is assets/dust_merchant_loop.ogg, a loop of 32 seconds that make_music.py renders
-//   with the synth of box from music_score.flecs.
-//
-// Included after state.flecs, whose muts the engine reads, and before widgets.flecs, whose
-// controls play the sounds.
+// Included after state.flecs, whose muts the engine reads, and before widgets.flecs.
 using flecs.script
 using box.transform
 using box.audio
@@ -25,13 +14,14 @@ assets {
     Bus: {output: master, kind: ChannelReturn, effects: [cabin_verb]}
     Reverb: {decay: 0.75, damping: 0.6, predelay: 0.008, size: 0.25}
   }
+
   world {
     Bus: {output: master, kind: ChannelSfx, sends: [{bus: cabin_verb, level: 0.28}]}
   }
+
   ui { Bus: {output: master, kind: ChannelSfx, volume: 0.55} }
   music { Bus: {output: master, volume: 0.45} }
 
-  // A toggle switch: a hard snap of noise over a falling tick and the knock of its body
   prefab SfxToggle {
     Output: {bus: ui}
     Sound: {seed: 21, pitch_variance: 0.08, level_variance: 0.12}
@@ -41,24 +31,29 @@ assets {
       Oscillator: {wave: Noise, level: 0.5}
       Envelope: {attack: 0.0005, decay: 0.012}
     }
+
     tick {
       Oscillator: {wave: Triangle, frequency: 2600, frequency_end: 1400, sweep: 0.02, level: 0.45}
       Envelope: {attack: 0.0005, decay: 0.025}
     }
-    knock { Oscillator: {wave: Sine, frequency: 1100, frequency_end: 700, sweep: 0.04, level: 0.35} }
+
+    knock {
+      Oscillator: {wave: Sine, frequency: 1100, frequency_end: 700, sweep: 0.04, level: 0.35}
+    }
   }
 
-  // The red guard of the main switch, a plastic lid that flops open or shut
+  // The red guard of the main switch
   prefab SfxGuard {
     Output: {bus: ui}
     Sound: {seed: 22, pitch_variance: 0.06, level_variance: 0.1}
     Envelope: {attack: 0.001, decay: 0.07}
     Filter: {kind: BandPass, cutoff: 950, resonance: 0.3}
     rub { Oscillator: {wave: Noise, level: 0.7} }
-    thud { Oscillator: {wave: Triangle, frequency: 520, frequency_end: 300, sweep: 0.06, level: 0.4} }
+    thud {
+      Oscillator: {wave: Triangle, frequency: 520, frequency_end: 300, sweep: 0.06, level: 0.4}
+    }
   }
 
-  // The detent of a knob or a lever, a tiny bright tick
   prefab SfxDetent {
     Output: {bus: ui}
     Sound: {seed: 23, pitch_variance: 0.12, level_variance: 0.2}
@@ -68,7 +63,6 @@ assets {
     ping { Oscillator: {wave: Sine, frequency: 3400, level: 0.3} }
   }
 
-  // A cap button going down or coming up, soft and short
   prefab SfxButton {
     Output: {bus: ui}
     Sound: {seed: 24, pitch_variance: 0.06, level_variance: 0.1}
@@ -78,17 +72,17 @@ assets {
     tone { Oscillator: {wave: Sine, frequency: 720, frequency_end: 480, sweep: 0.03, level: 0.45} }
   }
 
-  // A circuit breaker popping out or pushed back in: a clack
   prefab SfxBreaker {
     Output: {bus: ui}
     Sound: {seed: 25, pitch_variance: 0.07, level_variance: 0.1}
     Envelope: {attack: 0.0005, decay: 0.035}
     Filter: {kind: BandPass, cutoff: 1500, resonance: 0.3}
     clack { Oscillator: {wave: Noise, level: 0.7} }
-    body { Oscillator: {wave: Square, frequency: 900, frequency_end: 400, sweep: 0.025, level: 0.22} }
+    body {
+      Oscillator: {wave: Square, frequency: 900, frequency_end: 400, sweep: 0.025, level: 0.22}
+    }
   }
 
-  // A hand slapping the radio: a dull thump
   prefab SfxThump {
     Output: {bus: ui}
     Sound: {seed: 26, pitch_variance: 0.05, level_variance: 0.1}
@@ -122,7 +116,11 @@ camera { Listener }
 dust_merchant {
   engine_sound {
     Position: {3.1, 0.6, 3.8}
-    Source: {sound: assets.EngineHum, loop: true, volume: 0.3 + 0.2 * bool_f(bus) + 0.3 * bool_f(reactor_on)}
+    Source: {
+      sound: assets.EngineHum,
+      loop: true,
+      volume: 0.3 + 0.2 * bool_f(bus) + 0.3 * bool_f(reactor_on)
+    }
     Output: {bus: assets.world}
     Spatial: {min_distance: 1.5, max_distance: 30}
   }

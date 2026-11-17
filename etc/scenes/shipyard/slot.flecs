@@ -19,20 +19,34 @@ assets {
     prop color: Rgb = {255, 255, 255}
 
     const cr = r * 1.4
+
     for s in 0..2 {
-      "hoop_{s}" { Position: {0, 0, (s - 0.5) * SEG}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: cr, tube: 0.045, segments: 40, rings: 3}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; Ignore }
+      "hoop_{s}" {
+        Position: {0, 0, (s - 0.5) * SEG}
+        Rotation: {HALF_PI, 0, 0}
+        Torus: {radius: cr, tube: 0.045, segments: 40, rings: 3}
+        Rgb: color
+        Emissive: {strength: 3, color: color}
+        NoShadow
+        Ignore
+      }
     }
+
     for i in 0..4 {
       const a = PI / 4 + i * HALF_PI
-      "edge_{i}" { Position: {cos(a) * cr, sin(a) * cr, 0}; Box: {0.05, 0.05, SEG}; Rgb: color; Emissive: {strength: 3, color: color}; NoShadow; Ignore }
+      "edge_{i}" {
+        Position: {cos(a) * cr, sin(a) * cr, 0}
+        Box: {0.05, 0.05, SEG}
+        Rgb: color
+        Emissive: {strength: 3, color: color}
+        NoShadow
+        Ignore
+      }
     }
   }
 
-  // The editor over slot idx of the liner: picking on the lane being worked on, the build pad,
-  // the cursor, the fault warning and the sparks of a build. The Liner instance leaves the
-  // segments of that lane out and the slot draws its segment itself, so a pick on any part of it
-  // reaches the slot. The segment is tinted for the tool when hovered, rises after a build, and a
-  // ghost of the segment of the tool shows in a hovered empty slot.
+  // The Liner instance leaves the segments of the lane being worked on out and the slot draws its
+  // segment itself, so a pick on any part of it reaches the slot.
   template LinerSlot {
     prop idx: i32 = 0
     mut rising = false
@@ -65,7 +79,10 @@ assets {
       LinerPart unit(
         idx: idx, k: k, n: liner_near(lgrid, l, z), live: ops_live(idx, k),
         heat: k == L_RADIATOR ? ship_heat : slot_heat[idx], trip: slot_trip[idx],
-        cool: k == L_RADIATOR && heat_falling, lifted: rising, tinted: hovered && tint.a > 0, tint: tint
+        cool: k == L_RADIATOR && heat_falling,
+        lifted: rising,
+        tinted: hovered && tint.a > 0,
+        tint: tint
       )
     }
 
@@ -75,7 +92,12 @@ assets {
         AngularVelocity: {0, 1.6, 0}
         Ignore
         NoShadow
-        gem : ShipWarning { Position: {0, 0, 0}; Rotation: {0.7854, 0, 0.7854}; Box: {0.6, 0.6, 0.6} }
+        gem : ShipWarning {
+          Position: {0, 0, 0}
+          Rotation: {0.7854, 0, 0.7854}
+          Box: {0.6, 0.6, 0.6}
+        }
+
         glow { Position: {0, 0, 0}; PointLight: {intensity: 3, range: 5}; Rgb: {255, 60, 40} }
       }
     }
@@ -134,6 +156,7 @@ assets {
     async {
       while true {
         await on.leave(this)
+
         if lhover == idx {
           lhover = -1
         }
@@ -143,6 +166,7 @@ assets {
     async {
       while true {
         const ev = await on.click(this)
+
         if ev.button == 0 {
           emit SlotClick(slot: idx)
         }
@@ -152,6 +176,7 @@ assets {
     async {
       while true {
         const e = await Built
+
         if e.cell == idx {
           rising = true
           sparking = true
@@ -164,18 +189,16 @@ assets {
     }
   }
 
-  // The liner that the editor works on: a Liner instance on the spine axis of the yard with the
-  // design and the power of the simulation (ops), and the editor over its slots. While a tool is
-  // out the instance fades and lets picks pass, so only the lane being worked on, which the
-  // editor draws itself, stands out. The editor is authored in the units of the segments and
-  // scaled by LINER_SCALE to the liner; its texture frame at the origin of the yard maps the
-  // segments it draws as the world did at 10 m to the unit.
+  // While a tool is out the Liner instance fades and lets picks pass, so only the lane being
+  // worked on, which the editor draws itself, stands out. The editor is authored in the units of
+  // the segments and scaled by LINER_SCALE to the liner.
   template YardLiner {
     Liner ship(
       design: lgrid, power: liner_levels(), shield: pf[C_SHIELDS], burning: burning,
       heat: slot_heat, radiator_heat: ship_heat, cooling: heat_falling, trip: slot_trip, skip: lane
     ) {
       Position: {0, AXIS_Y * LINER_SCALE, 0}
+
       if tool > 0 {
         Opacity: {0.16}
         Ignore
@@ -188,6 +211,7 @@ assets {
       texture.Frame
       slots {
         Position: {0, AXIS_Y, 0}
+
         for i in 0..LCELLS {
           LinerSlot "edit_{i}"(idx: i)
         }

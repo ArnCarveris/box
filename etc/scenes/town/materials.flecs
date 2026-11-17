@@ -11,9 +11,22 @@ assets {
   export const TownLeaf: Rgb = {112, 158, 109}
   export const TownPink: Rgb = {242, 178, 191}
 
-  prefab TownGlassPane { Rgb: TownGlass; PbrMaterial: {roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.04} }
-  prefab TownPaper { PbrMaterial: {roughness: 0.9}; DiffuseTransmission: {factor: 0.5, color: {255, 200, 170}} }
-  prefab TownBlossom { PbrMaterial: {roughness: 0.85}; Sheen: {color: {255, 214, 226}, roughness: 0.4} }
+  prefab TownGlassPane {
+    Rgb: TownGlass
+    PbrMaterial: {roughness: 0.08}
+    ClearCoat: {strength: 1, roughness: 0.04}
+  }
+
+  prefab TownPaper {
+    PbrMaterial: {roughness: 0.9}
+    DiffuseTransmission: {factor: 0.5, color: {255, 200, 170}}
+  }
+
+  prefab TownBlossom {
+    PbrMaterial: {roughness: 0.85}
+    Sheen: {color: {255, 214, 226}, roughness: 0.4}
+  }
+
   prefab TownWireShape {
     Path2D: {
       start: {1, 0},
@@ -25,5 +38,6 @@ assets {
       closed: true
     }
   }
+
   prefab TownWireProfile { Profile2D: {outer: TownWireShape} }
 }

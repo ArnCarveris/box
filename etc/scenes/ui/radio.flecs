@@ -13,9 +13,7 @@ using box.text
 using box.transition
 
 // A group of radio buttons in a column, which owns the value: current is the label of the
-// checked button, "" for none. A disabled group disables its buttons. The group only lays its
-// buttons out and is not split: its buttons read and assign its muts, which flecs script only
-// follows reactively when the parent is an instance of the template the constraint names.
+// checked button, "" for none. A disabled group disables its buttons.
 template RadioGroup {
   prop value: string = ""
   prop disabled: bool = false
@@ -43,11 +41,8 @@ template RadioGroup {
   }
 }
 
-// Behavior of a radio button, a child of a radio group. The group is one Tab stop: only the
-// checked button (or the first one while none is) is Focusable. A click, Enter or Space checks
-// the button; the arrow keys check and focus the next or previous enabled button of the group,
-// wrapping around. The group reports the change. The pointer shows a hand over the button, a
-// crossed circle while it or its group is disabled.
+// Behavior of a radio button, a child of a radio group. The group is one Tab stop. A click, Enter
+// or Space checks the button; the arrow keys check and focus the next or previous enabled button.
 template HeadlessRadioButton : parent RadioGroup {
   prop label: string = ""
   prop disabled: bool = false
@@ -63,6 +58,7 @@ template HeadlessRadioButton : parent RadioGroup {
   if !off {
     Interactive
     Cursor: {CursorPointer}
+
     if checked || focused || pending == this || (current == "" && first == this) {
       Focusable
     }
@@ -96,10 +92,13 @@ template HeadlessRadioButton : parent RadioGroup {
   async {
     while true {
       const e = await on.focus(this)
+
       if e.target == this {
         focused = true
+
         if pending == this {
           pending = none
+
           if current != label {
             current = label
             await ui.changed(this.parent())
@@ -112,6 +111,7 @@ template HeadlessRadioButton : parent RadioGroup {
   async {
     while true {
       const e = await on.blur(this)
+
       if e.target == this {
         focused = false
         down = false
@@ -122,6 +122,7 @@ template HeadlessRadioButton : parent RadioGroup {
   async {
     while true {
       const e = await on.key_down(this)
+
       if e.key == " " && !e.repeat {
         down = true
       }
@@ -131,8 +132,10 @@ template HeadlessRadioButton : parent RadioGroup {
         "ArrowUp", "ArrowLeft": -1
         _: 0
       }
+
       if !off && step != 0 {
         const next = ui.sibling(this, step, Interactive)
+
         if next != this {
           pending = next
           await focus(next)
@@ -144,6 +147,7 @@ template HeadlessRadioButton : parent RadioGroup {
   async {
     while true {
       const e = await on.key_up(this)
+
       if e.key == " " {
         down = false
       }
@@ -153,8 +157,10 @@ template HeadlessRadioButton : parent RadioGroup {
   async {
     while true {
       const e = await on.activate(this)
+
       if ui.activation(e) == this {
         down = false
+
         if !off && current != label {
           current = label
           pending = none

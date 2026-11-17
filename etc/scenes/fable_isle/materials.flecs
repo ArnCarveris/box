@@ -9,24 +9,75 @@ assets {
     {kind: GenNoise, frequency: 6, octaves: 5, amount: 0.7}
     {kind: GenNoise, frequency: 48, octaves: 3, amount: 0.3, seed: 1}
   ]} }
-  isle_grass_summer { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {58, 112, 44}}, {0.5, {96, 156, 58}}, {1, {150, 190, 80}}]} }
-  isle_grass_spring { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {70, 134, 58}}, {0.5, {118, 180, 74}}, {1, {178, 214, 104}}]} }
-  isle_grass_autumn { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {98, 104, 44}}, {0.5, {150, 142, 62}}, {1, {196, 170, 84}}]} }
-  isle_grass_winter { Gen: {source: isle_grass_h, output: GenAlbedo, colors: [{0, {196, 206, 220}}, {0.5, {228, 234, 242}}, {1, {250, 252, 255}}]} }
+  isle_grass_summer {
+    Gen: {
+      source: isle_grass_h,
+      output: GenAlbedo,
+      colors: [{0, {58, 112, 44}}, {0.5, {96, 156, 58}}, {1, {150, 190, 80}}]
+    }
+  }
+
+  isle_grass_spring {
+    Gen: {
+      source: isle_grass_h,
+      output: GenAlbedo,
+      colors: [{0, {70, 134, 58}}, {0.5, {118, 180, 74}}, {1, {178, 214, 104}}]
+    }
+  }
+
+  isle_grass_autumn {
+    Gen: {
+      source: isle_grass_h,
+      output: GenAlbedo,
+      colors: [{0, {98, 104, 44}}, {0.5, {150, 142, 62}}, {1, {196, 170, 84}}]
+    }
+  }
+
+  isle_grass_winter {
+    Gen: {
+      source: isle_grass_h,
+      output: GenAlbedo,
+      colors: [{0, {196, 206, 220}}, {0.5, {228, 234, 242}}, {1, {250, 252, 255}}]
+    }
+  }
+
   isle_grass_n { Gen: {source: isle_grass_h, output: GenNormal, strength: 0.6} }
 
   isle_rock_h { Gen: {width: 512, height: 512, seed: 21, layers: [
     {kind: GenCells, count: 40, distance: GenEdge, edge: 0.6, amount: 0.6, id_amount: 0.25}
     {kind: GenNoise, frequency: 8, octaves: 5, amount: 0.5}
   ]} }
-  isle_rock_a { Gen: {source: isle_rock_h, output: GenAlbedo, colors: [{0, {70, 62, 58}}, {0.45, {128, 116, 104}}, {1, {188, 176, 158}}]} }
+  isle_rock_a {
+    Gen: {
+      source: isle_rock_h,
+      output: GenAlbedo,
+      colors: [{0, {70, 62, 58}}, {0.45, {128, 116, 104}}, {1, {188, 176, 158}}]
+    }
+  }
+
   isle_rock_n { Gen: {source: isle_rock_h, output: GenNormal, strength: 4} }
 
   isle_brick_h { Gen: {width: 512, height: 512, seed: 11, layers: [
-    {kind: GenBlocks, courses: 8, per_course: 4, gap: 0.008, jitter: 0.2, stagger: 0.5, amount: 0.8, id_amount: 0.2}
+    {
+      kind: GenBlocks,
+      courses: 8,
+      per_course: 4,
+      gap: 0.008,
+      jitter: 0.2,
+      stagger: 0.5,
+      amount: 0.8,
+      id_amount: 0.2
+    }
     {kind: GenNoise, frequency: 16, octaves: 4, amount: 0.2}
   ]} }
-  isle_brick_a { Gen: {source: isle_brick_h, output: GenAlbedo, colors: [{0, {96, 90, 84}}, {0.5, {186, 178, 164}}, {1, {232, 224, 208}}]} }
+  isle_brick_a {
+    Gen: {
+      source: isle_brick_h,
+      output: GenAlbedo,
+      colors: [{0, {96, 90, 84}}, {0.5, {186, 178, 164}}, {1, {232, 224, 208}}]
+    }
+  }
+
   isle_brick_n { Gen: {source: isle_brick_h, output: GenNormal, strength: 3} }
 
   isle_cobble_h { Gen: {width: 512, height: 512, seed: 111, layers: [
@@ -34,56 +85,220 @@ assets {
     {kind: GenCells, count: 100, distance: GenEdge, edge: 0.45, amount: 0.6}
     {kind: GenNoise, frequency: 32, octaves: 3, amount: 0.15}
   ]} }
-  isle_cobble_a { Gen: {source: isle_cobble_h, output: GenAlbedo, colors: [{0, {72, 66, 58}}, {0.3, {128, 120, 108}}, {1, {214, 204, 188}}]} }
+  isle_cobble_a {
+    Gen: {
+      source: isle_cobble_h,
+      output: GenAlbedo,
+      colors: [{0, {72, 66, 58}}, {0.3, {128, 120, 108}}, {1, {214, 204, 188}}]
+    }
+  }
+
   isle_cobble_n { Gen: {source: isle_cobble_h, output: GenNormal, strength: 3.6} }
 
   isle_plank_h { Gen: {width: 512, height: 512, seed: 5, layers: [
-    {kind: GenBlocks, courses: 8, per_course: 1, gap: 0.01, jitter: 0.3, stagger: 0.37, amount: 0.7, id_amount: 0.3}
+    {
+      kind: GenBlocks,
+      courses: 8,
+      per_course: 1,
+      gap: 0.01,
+      jitter: 0.3,
+      stagger: 0.37,
+      amount: 0.7,
+      id_amount: 0.3
+    }
     {kind: GenNoise, frequency: 3, octaves: 4, lacunarity: 3, amount: 0.3}
   ]} }
-  isle_plank_a { Gen: {source: isle_plank_h, output: GenAlbedo, colors: [{0, {120, 110, 100}}, {0.5, {214, 206, 196}}, {1, {255, 252, 246}}]} }
+  isle_plank_a {
+    Gen: {
+      source: isle_plank_h,
+      output: GenAlbedo,
+      colors: [{0, {120, 110, 100}}, {0.5, {214, 206, 196}}, {1, {255, 252, 246}}]
+    }
+  }
+
   isle_plank_n { Gen: {source: isle_plank_h, output: GenNormal, strength: 2.5} }
 
   isle_tile_h { Gen: {width: 512, height: 512, seed: 9, layers: [
-    {kind: GenBlocks, courses: 10, per_course: 8, gap: 0.012, softness: 0.05, jitter: 0.05, stagger: 0.5, amount: 0.85, id_amount: 0.15}
+    {
+      kind: GenBlocks,
+      courses: 10,
+      per_course: 8,
+      gap: 0.012,
+      softness: 0.05,
+      jitter: 0.05,
+      stagger: 0.5,
+      amount: 0.85,
+      id_amount: 0.15
+    }
     {kind: GenNoise, frequency: 24, octaves: 3, amount: 0.15}
   ]} }
-  isle_tile_a { Gen: {source: isle_tile_h, output: GenAlbedo, colors: [{0, {110, 104, 100}}, {0.5, {208, 202, 198}}, {1, {255, 255, 255}}]} }
+  isle_tile_a {
+    Gen: {
+      source: isle_tile_h,
+      output: GenAlbedo,
+      colors: [{0, {110, 104, 100}}, {0.5, {208, 202, 198}}, {1, {255, 255, 255}}]
+    }
+  }
+
   isle_tile_n { Gen: {source: isle_tile_h, output: GenNormal, strength: 4} }
 
-  isle_wave_h { Gen: {width: 256, height: 256, seed: 7, layers: [{kind: GenNoise, frequency: 5, octaves: 4, amount: 1}]} }
+  isle_wave_h {
+    Gen: {
+      width: 256,
+      height: 256,
+      seed: 7,
+      layers: [{kind: GenNoise, frequency: 5, octaves: 4, amount: 1}]
+    }
+  }
+
   isle_wave_n { Gen: {source: isle_wave_h, output: GenNormal, strength: 1.6} }
-  isle_cloud_h { Gen: {width: 512, height: 512, seed: 17, layers: [{kind: GenNoise, frequency: 7, octaves: 5, gain: 0.5}]} }
+  isle_cloud_h {
+    Gen: {
+      width: 512,
+      height: 512,
+      seed: 17,
+      layers: [{kind: GenNoise, frequency: 7, octaves: 5, gain: 0.5}]
+    }
+  }
 
-  const grass_tex = match season { 0: isle_grass_spring; 1: isle_grass_summer; 2: isle_grass_autumn; _: isle_grass_winter }
-  const leaf_rgb: Rgb = match season { 0: {112, 186, 84}; 1: {70, 150, 62}; 2: {222, 120, 40}; _: {236, 242, 250} }
-  const leaf_alt_rgb: Rgb = match season { 0: {250, 176, 204}; 1: {104, 168, 58}; 2: {196, 60, 44}; _: {214, 226, 240} }
-  const leaf_dark_rgb: Rgb = match season { 0: {52, 122, 78}; 1: {40, 104, 66}; 2: {58, 104, 62}; _: {70, 112, 96} }
-  const leaf_glow: Rgb = match season { 0: {210, 255, 140}; 1: {200, 255, 120}; 2: {255, 190, 90}; _: {230, 240, 255} }
-  const crop_rgb: Rgb = match season { 0: {140, 196, 92}; 1: {226, 190, 84}; 2: {168, 120, 70}; _: {232, 238, 246} }
+  const grass_tex = match season {
+    0: isle_grass_spring
+    1: isle_grass_summer
+    2: isle_grass_autumn
+    _: isle_grass_winter
+  }
+  const leaf_rgb: Rgb = match season {
+    0: {112, 186, 84}
+    1: {70, 150, 62}
+    2: {222, 120, 40}
+    _: {236, 242, 250}
+  }
+  const leaf_alt_rgb: Rgb = match season {
+    0: {250, 176, 204}
+    1: {104, 168, 58}
+    2: {196, 60, 44}
+    _: {214, 226, 240}
+  }
+  const leaf_dark_rgb: Rgb = match season {
+    0: {52, 122, 78}
+    1: {40, 104, 66}
+    2: {58, 104, 62}
+    _: {70, 112, 96}
+  }
+  const leaf_glow: Rgb = match season {
+    0: {210, 255, 140}
+    1: {200, 255, 120}
+    2: {255, 190, 90}
+    _: {230, 240, 255}
+  }
+  const crop_rgb: Rgb = match season {
+    0: {140, 196, 92}
+    1: {226, 190, 84}
+    2: {168, 120, 70}
+    _: {232, 238, 246}
+  }
 
-  prefab IsleGrass { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: grass_tex, normal: isle_grass_n}; texture.Mapping: {mode: MappingWorld, size: 9} }
-  prefab IsleLeaf { Rgb: leaf_rgb; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.35, color: leaf_glow} }
-  prefab IsleLeafAlt { Rgb: leaf_alt_rgb; PbrMaterial: {roughness: 0.85}; DiffuseTransmission: {factor: 0.35, color: leaf_glow} }
+  prefab IsleGrass {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: grass_tex, normal: isle_grass_n}
+    texture.Mapping: {mode: MappingWorld, size: 9}
+  }
+
+  prefab IsleLeaf {
+    Rgb: leaf_rgb
+    PbrMaterial: {roughness: 0.85}
+    DiffuseTransmission: {factor: 0.35, color: leaf_glow}
+  }
+
+  prefab IsleLeafAlt {
+    Rgb: leaf_alt_rgb
+    PbrMaterial: {roughness: 0.85}
+    DiffuseTransmission: {factor: 0.35, color: leaf_glow}
+  }
+
   prefab IsleLeafDark { Rgb: leaf_dark_rgb; PbrMaterial: {roughness: 0.9} }
   prefab IsleCrop { Rgb: crop_rgb; PbrMaterial: {roughness: 0.9} }
 
   prefab IsleDirt { Rgb: {122, 92, 64}; PbrMaterial: {roughness: 1} }
   prefab IsleSand { Rgb: {214, 196, 150}; PbrMaterial: {roughness: 1} }
-  prefab IsleRock { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 7, blend: 0.3} }
-  prefab IsleRockDark { Rgb: {226, 206, 196}; PbrMaterial: {roughness: 0.95}; PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}; texture.Mapping: {mode: MappingWorld, size: 11, blend: 0.3} }
-  prefab IsleStone { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: isle_brick_a, normal: isle_brick_n}; texture.Mapping: {mode: MappingWorld, size: 2.4, blend: 0.2} }
-  prefab IsleCobble { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.9}; PbrTextures: {albedo: isle_cobble_a, normal: isle_cobble_n}; texture.Mapping: {mode: MappingWorld, size: 3} }
-  prefab IsleWood { Rgb: {168, 120, 78}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}; texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.2} }
-  prefab IsleWoodDark { Rgb: {96, 66, 46}; PbrMaterial: {roughness: 0.8}; PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}; texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.2} }
+  prefab IsleRock {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}
+    texture.Mapping: {mode: MappingWorld, size: 7, blend: 0.3}
+  }
+
+  prefab IsleRockDark {
+    Rgb: {226, 206, 196}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: isle_rock_a, normal: isle_rock_n}
+    texture.Mapping: {mode: MappingWorld, size: 11, blend: 0.3}
+  }
+
+  prefab IsleStone {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: isle_brick_a, normal: isle_brick_n}
+    texture.Mapping: {mode: MappingWorld, size: 2.4, blend: 0.2}
+  }
+
+  prefab IsleCobble {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: isle_cobble_a, normal: isle_cobble_n}
+    texture.Mapping: {mode: MappingWorld, size: 3}
+  }
+
+  prefab IsleWood {
+    Rgb: {168, 120, 78}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}
+    texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.2}
+  }
+
+  prefab IsleWoodDark {
+    Rgb: {96, 66, 46}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: isle_plank_a, normal: isle_plank_n}
+    texture.Mapping: {mode: MappingWorld, size: 1.6, blend: 0.2}
+  }
+
   prefab IsleBark { Rgb: {98, 72, 52}; PbrMaterial: {roughness: 0.95} }
   prefab IslePlaster { Rgb: {240, 230, 208}; PbrMaterial: {roughness: 0.95} }
   prefab IslePlasterWarm { Rgb: {236, 204, 160}; PbrMaterial: {roughness: 0.95} }
-  prefab IsleRoofRed { Rgb: {196, 84, 60}; PbrMaterial: {roughness: 0.7}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
-  prefab IsleRoofBlue { Rgb: {76, 108, 150}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
-  prefab IsleRoofSlate { Rgb: {92, 96, 108}; PbrMaterial: {roughness: 0.6}; PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}; texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2} }
-  prefab IsleRoofThatch { Rgb: {196, 164, 96}; PbrMaterial: {roughness: 1}; Sheen: {color: {255, 236, 170}, roughness: 0.6} }
-  prefab IsleSnow { Rgb: {244, 248, 255}; PbrMaterial: {roughness: 0.6}; Sheen: {color: {220, 235, 255}, roughness: 0.4} }
+  prefab IsleRoofRed {
+    Rgb: {196, 84, 60}
+    PbrMaterial: {roughness: 0.7}
+    PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}
+    texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2}
+  }
+
+  prefab IsleRoofBlue {
+    Rgb: {76, 108, 150}
+    PbrMaterial: {roughness: 0.6}
+    PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}
+    texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2}
+  }
+
+  prefab IsleRoofSlate {
+    Rgb: {92, 96, 108}
+    PbrMaterial: {roughness: 0.6}
+    PbrTextures: {albedo: isle_tile_a, normal: isle_tile_n}
+    texture.Mapping: {mode: MappingWorld, size: 1.8, blend: 0.2}
+  }
+
+  prefab IsleRoofThatch {
+    Rgb: {196, 164, 96}
+    PbrMaterial: {roughness: 1}
+    Sheen: {color: {255, 236, 170}, roughness: 0.6}
+  }
+
+  prefab IsleSnow {
+    Rgb: {244, 248, 255}
+    PbrMaterial: {roughness: 0.6}
+    Sheen: {color: {220, 235, 255}, roughness: 0.4}
+  }
 
   prefab IsleIron { Rgb: {42, 44, 50}; PbrMaterial: {metallic: 0.8, roughness: 0.45} }
   prefab IsleSteel { Rgb: {160, 166, 176}; PbrMaterial: {metallic: 0.95, roughness: 0.3} }
@@ -91,23 +306,104 @@ assets {
   prefab IsleCopper { Rgb: {200, 120, 76}; PbrMaterial: {metallic: 1, roughness: 0.32} }
   prefab IsleBlack { Rgb: {22, 22, 26}; PbrMaterial: {roughness: 0.6} }
   prefab IsleWhite { Rgb: {242, 240, 234}; PbrMaterial: {roughness: 0.6} }
-  prefab IslePaintRed { Rgb: {186, 44, 40}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.15} }
-  prefab IslePaintGreen { Rgb: {36, 104, 66}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.15} }
-  prefab IslePaintBlue { Rgb: {40, 84, 150}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.15} }
-  prefab IslePaintYellow { Rgb: {238, 186, 52}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.15} }
-  prefab IslePaintCream { Rgb: {240, 228, 196}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.15} }
-  prefab IslePaintTeal { Rgb: {44, 140, 140}; PbrMaterial: {roughness: 0.4}; ClearCoat: {strength: 0.6, roughness: 0.15} }
-  prefab IsleClothRed { Rgb: {214, 70, 58}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 190, 170}, roughness: 0.5} }
-  prefab IsleClothBlue { Rgb: {66, 120, 200}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {180, 210, 255}, roughness: 0.5} }
-  prefab IsleClothYellow { Rgb: {244, 200, 80}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 240, 190}, roughness: 0.5} }
-  prefab IsleClothWhite { Rgb: {244, 240, 230}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 255, 255}, roughness: 0.5} }
-  prefab IsleRope { Rgb: {150, 124, 88}; PbrMaterial: {roughness: 1} }
-  prefab IsleGlass { Rgb: {176, 220, 238}; PbrMaterial: {metallic: 0.1, roughness: 0.05}; ClearCoat: {strength: 1, roughness: 0.03}; Transmission: {transmission_factor: 0.9, ior: 1.45, thickness_factor: 0.04, attenuation_distance: 6, attenuation_color: {200, 235, 250}} }
-  prefab IsleCrystal { Rgb: {120, 230, 255}; PbrMaterial: {roughness: 0.15}; Emissive: {strength: night ? 5 : 1.6, color: {90, 220, 255}} }
-  prefab IsleCrystalPink { Rgb: {255, 150, 230}; PbrMaterial: {roughness: 0.15}; Emissive: {strength: night ? 5 : 1.6, color: {255, 110, 220}} }
+  prefab IslePaintRed {
+    Rgb: {186, 44, 40}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.6, roughness: 0.15}
+  }
 
-  prefab IsleWindow { Rgb: {night ? 255 : 46, night ? 214 : 58, night ? 150 : 74}; PbrMaterial: {metallic: 0.3, roughness: 0.12}; Emissive: {strength: night ? 4.5 : 0, color: {255, 196, 120}} }
-  prefab IsleLampGlow { Rgb: {255, 226, 170}; PbrMaterial: {roughness: 0.3}; Emissive: {strength: night ? 7 : 0.15, color: {255, 190, 110}} }
+  prefab IslePaintGreen {
+    Rgb: {36, 104, 66}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.6, roughness: 0.15}
+  }
+
+  prefab IslePaintBlue {
+    Rgb: {40, 84, 150}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.6, roughness: 0.15}
+  }
+
+  prefab IslePaintYellow {
+    Rgb: {238, 186, 52}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.6, roughness: 0.15}
+  }
+
+  prefab IslePaintCream {
+    Rgb: {240, 228, 196}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.6, roughness: 0.15}
+  }
+
+  prefab IslePaintTeal {
+    Rgb: {44, 140, 140}
+    PbrMaterial: {roughness: 0.4}
+    ClearCoat: {strength: 0.6, roughness: 0.15}
+  }
+
+  prefab IsleClothRed {
+    Rgb: {214, 70, 58}
+    PbrMaterial: {roughness: 0.9}
+    Sheen: {color: {255, 190, 170}, roughness: 0.5}
+  }
+
+  prefab IsleClothBlue {
+    Rgb: {66, 120, 200}
+    PbrMaterial: {roughness: 0.9}
+    Sheen: {color: {180, 210, 255}, roughness: 0.5}
+  }
+
+  prefab IsleClothYellow {
+    Rgb: {244, 200, 80}
+    PbrMaterial: {roughness: 0.9}
+    Sheen: {color: {255, 240, 190}, roughness: 0.5}
+  }
+
+  prefab IsleClothWhite {
+    Rgb: {244, 240, 230}
+    PbrMaterial: {roughness: 0.9}
+    Sheen: {color: {255, 255, 255}, roughness: 0.5}
+  }
+
+  prefab IsleRope { Rgb: {150, 124, 88}; PbrMaterial: {roughness: 1} }
+  prefab IsleGlass {
+    Rgb: {176, 220, 238}
+    PbrMaterial: {metallic: 0.1, roughness: 0.05}
+    ClearCoat: {strength: 1, roughness: 0.03}
+    Transmission: {
+      transmission_factor: 0.9,
+      ior: 1.45,
+      thickness_factor: 0.04,
+      attenuation_distance: 6,
+      attenuation_color: {200, 235, 250}
+    }
+  }
+
+  prefab IsleCrystal {
+    Rgb: {120, 230, 255}
+    PbrMaterial: {roughness: 0.15}
+    Emissive: {strength: night ? 5 : 1.6, color: {90, 220, 255}}
+  }
+
+  prefab IsleCrystalPink {
+    Rgb: {255, 150, 230}
+    PbrMaterial: {roughness: 0.15}
+    Emissive: {strength: night ? 5 : 1.6, color: {255, 110, 220}}
+  }
+
+  prefab IsleWindow {
+    Rgb: {night ? 255 : 46, night ? 214 : 58, night ? 150 : 74}
+    PbrMaterial: {metallic: 0.3, roughness: 0.12}
+    Emissive: {strength: night ? 4.5 : 0, color: {255, 196, 120}}
+  }
+
+  prefab IsleLampGlow {
+    Rgb: {255, 226, 170}
+    PbrMaterial: {roughness: 0.3}
+    Emissive: {strength: night ? 7 : 0.15, color: {255, 190, 110}}
+  }
+
   prefab IsleSignalRed { Rgb: {255, 70, 50}; Emissive: {strength: 5, color: {255, 50, 30}} }
   prefab IsleSignalGreen { Rgb: {80, 255, 110}; Emissive: {strength: 5, color: {60, 255, 90}} }
   prefab IsleFire { Rgb: {255, 170, 70}; Emissive: {strength: 8, color: {255, 130, 40}} }

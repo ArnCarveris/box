@@ -28,30 +28,41 @@ assets {
       Rgb: {216, 205, 180}
       PbrMaterial: {roughness: 1}
     }
+
     footing {
       Position: {0, 0.2, 0}
       Box: {length + 0.12, 0.4, 0.36}
       Rgb: {119, 132, 130}
     }
+
     plinth_cap {
       Position: {0, 0.415, 0}
       Box: {length + 0.12, 0.055, 0.43}
       Rgb: GardenStone
     }
+
     for face in 0..2 {
       for row in 0..2 {
         for block in 0..(stones + 1) {
-          const x0 = math.max(-(length + 0.12) / 2, -(length + 0.12) / 2 + (block - row * 0.5) * stone_width)
-          const x1 = math.min((length + 0.12) / 2, -(length + 0.12) / 2 + (block + 1 - row * 0.5) * stone_width)
+          const x0 = math.max(-(length + 0.12) / 2,
+            -(length + 0.12) / 2 + (block - row * 0.5) * stone_width)
+          const x1 = math.min((length + 0.12) / 2,
+            -(length + 0.12) / 2 + (block + 1 - row * 0.5) * stone_width)
+
           if x1 > x0 {
             {
               Position: {(x0 + x1) / 2, 0.13 + row * 0.17, (face - 0.5) * 0.38}
               RoundedBox: {x1 - x0 - 0.022, 0.145, 0.055, 0.012}
-              Rgb: {157 + (block + row) % 3 * 9, 167 + (block + row) % 3 * 8, 157 + (block + row) % 3 * 8}
+              Rgb: {
+                157 + (block + row) % 3 * 9,
+                167 + (block + row) % 3 * 8,
+                157 + (block + row) % 3 * 8
+              }
             }
           }
         }
       }
+
       for panel in 0..panels {
         {
           Position: {-length / 2 + (panel + 0.5) * panel_width, 0.89, (face - 0.5) * 0.24}
@@ -62,6 +73,7 @@ assets {
             Rgb: {229 - panel % 2 * 5, 219 - panel % 2 * 4, 196 - panel % 2 * 4}
             PbrMaterial: {roughness: 1}
           }
+
           if panel % 2 == 0 {
             for side in 0..2 {
               for half in 0..2 {
@@ -76,6 +88,7 @@ assets {
           }
         }
       }
+
       for divider in 0..(panels + 1) {
         {
           Position: {-length / 2 + divider * panel_width, 0.86, (face - 0.5) * 0.27}
@@ -83,6 +96,7 @@ assets {
           Rgb: GardenCedar
         }
       }
+
       for rail in 0..2 {
         {
           Position: {0, 0.51 + rail * 0.78, (face - 0.5) * 0.27}
@@ -91,23 +105,27 @@ assets {
         }
       }
     }
+
     for end in 0..2 {
       {
         Position: {(end - 0.5) * length, 0.785, 0}
         Box: {0.18, 1.23, 0.32}
         Rgb: GardenCedar
       }
+
       {
         Position: {(end - 0.5) * length, 0.26, 0}
         RoundedBox: {0.27, 0.5, 0.41, 0.02}
         Rgb: {153, 162, 153}
       }
+
       {
         Position: {(end - 0.5) * length, 1.29, 0}
         Box: {0.25, 0.095, 0.39}
         Rgb: {159, 108, 75}
       }
     }
+
     for side in 0..2 {
       {
         Position: {0, 1.45, (side - 0.5) * 0.32}
@@ -117,6 +135,7 @@ assets {
           Box: {length + 0.3, 0.085, 0.36}
           Rgb: GardenSlate
         }
+
         for tile in 0..tiles {
           {
             Position: {-(length + 0.3) / 2 + (tile + 0.5) * tile_width, 0.06, 0}
@@ -124,6 +143,7 @@ assets {
             Cylinder: {radius: 0.029, length: 0.36, segments: 10}
             Rgb: {85, 105, 122}
           }
+
           {
             Position: {-(length + 0.3) / 2 + (tile + 0.5) * tile_width, 0.06, (side - 0.5) * 0.365}
             Rotation: {math.PI / 2, 0, 0}
@@ -132,12 +152,14 @@ assets {
           }
         }
       }
+
       {
         Position: {0, 1.335, (side - 0.5) * 0.48}
         Box: {length + 0.3, 0.065, 0.075}
         Rgb: {91, 69, 58}
       }
     }
+
     ridge {
       Position: {0, 1.54, 0}
       Rotation: {0, 0, math.PI / 2}

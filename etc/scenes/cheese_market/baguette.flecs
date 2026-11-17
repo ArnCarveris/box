@@ -18,6 +18,7 @@ assets {
       Sphere: {radius: 1, segments: 20, smooth: true}
       Rgb: {211, 143, 64}
     }
+
     for i in 0..5 {
       {
         Position: {0, 0.23 - math.abs(i - 2) * 0.013, (i - 2) * 0.18}

@@ -5,9 +5,12 @@ include design
 include materials
 include hull
 include exterior
+include exterior_modules
 include rig
 include liner_design
 include segments
+include segments_systems
+include segments_modules
 include fab
 include assembler
 include shield

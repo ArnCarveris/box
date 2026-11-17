@@ -15,6 +15,7 @@ async {
   while true {
     const e = await HoldStarted
     await delay(e.until - box.app.Status[box.app.Status].elapsed)
+
     if atlas_holding && e.serial == atlas_hold_serial {
       atlas_holding = false
       emit Awaken()
@@ -27,6 +28,7 @@ async {
     await Awaken
     const s = atlas_sel[Star]
     const open = s.from < 0 ? true : atlas_awake[s.from]
+
     if !atlas_awake[s.id] && open && hero_points > 0 {
       hero_points -= 1
       atlas_awake[s.id] = true
@@ -34,6 +36,7 @@ async {
       star_bonus[s.stat] += s.amount
       atlas_count[s.band] += 1
       emit StatsChanged()
+
       if s.keystone {
         show_banner(s.name, "{band_name(s.band)} answers")
       }

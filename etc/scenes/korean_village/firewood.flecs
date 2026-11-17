@@ -11,15 +11,35 @@ assets {
         const x = (log - (8 - row) / 2.0) * 0.2
         const y = 0.1 + row * 0.175
         const tone = (log * 3 + row * 5) % 4
-        { Position: {x, y, 0}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.095, length: 0.8, segments: 7}; Rgb: {100 + tone * 7, 74 + tone * 5, 50 + tone * 4}; PbrMaterial: {roughness: 1} }
+        {
+          Position: {x, y, 0}
+          Rotation: {math.PI / 2, 0, 0}
+          Cylinder: {radius: 0.095, length: 0.8, segments: 7}
+          Rgb: {100 + tone * 7, 74 + tone * 5, 50 + tone * 4}
+          PbrMaterial: {roughness: 1}
+        }
+
         for end in 0..2 {
-          { Position: {x, y, (end - 0.5) * 0.805}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.08, length: 0.006, segments: 7}; Rgb: {186, 152, 106}; PbrMaterial: {roughness: 1} }
+          {
+            Position: {x, y, (end - 0.5) * 0.805}
+            Rotation: {math.PI / 2, 0, 0}
+            Cylinder: {radius: 0.08, length: 0.006, segments: 7}
+            Rgb: {186, 152, 106}
+            PbrMaterial: {roughness: 1}
+          }
         }
       }
     }
+
     for side in 0..2 {
       { (IsA, KoreanTimber); Position: {(side - 0.5) * 2.04, 0.45, 0}; Box: {0.06, 0.9, 0.06} }
     }
-    { (IsA, KoreanStraw); Position: {0, 0.86, 0}; Scale: {1.1, 0.14, 0.52}; IcoSphere: {radius: 0.92, segments: 1} }
+
+    {
+      (IsA, KoreanStraw)
+      Position: {0, 0.86, 0}
+      Scale: {1.1, 0.14, 0.52}
+      IcoSphere: {radius: 0.92, segments: 1}
+    }
   }
 }

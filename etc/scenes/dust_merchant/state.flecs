@@ -156,9 +156,12 @@ state {
 
   fn help_text(s: i32) -> string {
     match s {
-      0: "SPACE next step  |  click the red guard, then the switch  |  1-6 views  |  right drag look  |  H hide"
-      1: "SPACE next step  |  hold IGNITE on the center stack  |  1-6 views  |  right drag look  |  H hide"
-      2: "SPACE next step  |  pick a destination on the nav scope or the hologram  |  WASD fly  |  H hide"
+      0: ("SPACE next step  |  click the red guard, then the switch  |  " +
+        "1-6 views  |  right drag look  |  H hide")
+      1: ("SPACE next step  |  hold IGNITE on the center stack  |  " +
+        "1-6 views  |  right drag look  |  H hide")
+      2: ("SPACE next step  |  pick a destination on the nav scope or the hologram  |  " +
+        "WASD fly  |  H hide")
       3: "SPACE next step  |  drag the red JUMP handle toward you  |  H hide"
       _: "H hide"
     }

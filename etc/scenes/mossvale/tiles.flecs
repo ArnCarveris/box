@@ -9,7 +9,14 @@ mossvale {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.95}
     NoShadow
-    TileTerrain: {size: 2, kinds: [{'.', mv_tile_grass}, {',', mv_tile_meadow}, {'^', mv_tile_hills}, {'%', mv_tile_forest}, {'s', mv_tile_sand}, {':', mv_tile_dirt}, {'*', mv_tile_ash}, {'+', mv_tile_rubble}, {'#', mv_tile_cobble}, {'@', mv_tile_flags}], tiles: `
+    TileTerrain: {
+      size: 2,
+      kinds: [
+        {'.', mv_tile_grass}, {',', mv_tile_meadow}, {'^', mv_tile_hills}, {'%', mv_tile_forest},
+        {'s', mv_tile_sand}, {':', mv_tile_dirt}, {'*', mv_tile_ash}, {'+', mv_tile_rubble},
+        {'#', mv_tile_cobble}, {'@', mv_tile_flags}
+      ],
+      tiles: `
       ................................................................................................................................
       ................................................................................................................................
       ................................................................................................................................

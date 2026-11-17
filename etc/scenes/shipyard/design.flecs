@@ -148,10 +148,8 @@ state {
   // The kinds of the six neighbors of a cell, 0 outside the grid.
   struct RigNear(px: i32, nx: i32, py: i32, ny: i32, pz: i32, nz: i32)
 
-  // What the module of a cell needs to know of the design around it: the kinds of its
-  // neighbors, whether the cell above is drawn, its drawn hull fairing, the faces that a solid or
-  // faired neighbor covers, the diagonal neighbors that are solid (as in HullShell) and whether
-  // the fairings on its x sides lean on it.
+  // What the module of a cell needs to know of the design around it. The diagonal neighbors are
+  // solid as in HullShell; fpx and fnx tell whether the fairings on its x sides lean on it.
   struct RigCellView(
     near: RigNear, roof: bool, shape: i32, sx: i32, sy: i32, sz: i32,
     skin_px: bool, skin_nx: bool, skin_py: bool, skin_ny: bool, skin_pz: bool, skin_nz: bool,
@@ -203,8 +201,8 @@ state {
   }
 
   fn fairable(k: i32) -> bool {
-    k != K_EMPTY && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL && k != K_RADIATOR &&
-    k != K_DRILL && k != K_BUILDER
+    k != K_EMPTY && k != K_WEAPON && k != K_ENGINE && k != K_DOCK && k != K_HULL &&
+    k != K_RADIATOR && k != K_DRILL && k != K_BUILDER
   }
 
   fn racked(k: i32) -> bool {
@@ -287,33 +285,53 @@ state {
 
   fn clear_ahead(g: RigGrid, x: i32, y: i32, z: i32) -> bool {
     mut clear = true
+
     for c in 0..GZ {
       if c > z && g[cell_at(x, y, c)] != 0 {
         clear = false
       }
     }
+
     clear
   }
 
   fn clear_behind(g: RigGrid, x: i32, y: i32, z: i32) -> bool {
     mut clear = true
+
     for c in 0..GZ {
       if c < z && g[cell_at(x, y, c)] != 0 {
         clear = false
       }
     }
+
     clear
   }
 
   fn kind_mass(k: i32) -> f32 {
     match k {
-      1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; 9: 11; 10: 9; 11: 4; 12: 3; 13: 5; 14: 12; 15: 8; 16: 14; 17: 10
+      1: 14; 2: 10; 3: 12; 4: 24; 5: 9; 6: 16; 7: 15; 8: 20; 9: 11
+      10: 9; 11: 4; 12: 3; 13: 5; 14: 12; 15: 8; 16: 14; 17: 10
       _: 0
     }
   }
 
   fn kind_power(k: i32) -> f32 {
-    match k { 1: 2; 2: 1; 3: 2; 4: -30; 5: 0.5; 7: 3; 8: 3; 9: 1; 10: 1; 14: 4; 15: 2; 16: 12; 17: 2; _: 0 }
+    match k {
+      1: 2
+      2: 1
+      3: 2
+      4: -30
+      5: 0.5
+      7: 3
+      8: 3
+      9: 1
+      10: 1
+      14: 4
+      15: 2
+      16: 12
+      17: 2
+      _: 0
+    }
   }
 
   // Whether the cell holds something a hull fairing leans on: a module with walls, or a hull
@@ -360,28 +378,38 @@ state {
     mut sxs: RigGrid = {}
     mut sys: RigGrid = {}
     mut szs: RigGrid = {}
+
     for y in 0..GY {
       mut list: i32[180] = {}
       mut m: i32 = 0
+
       for j in 0..LAYER {
         const i = y * LAYER + j
+
         if shaped(g[i]) {
           mut p = m
+
           while p > 0 && placed[list[max(p - 1, 0)]] > placed[i] {
             list[p] = list[p - 1]
             p -= 1
           }
+
           list[p] = i
           m += 1
         }
       }
+
       mut more = true
+
       while more {
         more = false
+
         for q in 0..m {
           const i = list[q]
+
           if shapes[i] == 0 {
             const f = fair_at(g, shapes, cell_x(i), y, cell_z(i))
+
             if f.shape != 0 {
               shapes[i] = f.shape
               sxs[i] = f.sx
@@ -393,6 +421,7 @@ state {
         }
       }
     }
+
     const d: RigDesign = {kinds: g, shape: shapes, sx: sxs, sy: sys, sz: szs}
     d
   }
@@ -400,24 +429,28 @@ state {
   // The kinds of a plan, which covers the middle of the grid.
   fn plan_kinds(plan: RigPlan) -> RigGrid {
     mut g: RigGrid = {}
+
     for i in 0..PLAN_CELLS {
       const k = plan[i]
+
       if k != 0 {
         const py = (i - i % PLAN_LAYER) / PLAN_LAYER
         g[cell_at(i % PLAN_X + PLAN_OX, py, ((i - i % PLAN_X) / PLAN_X) % PLAN_Z + PLAN_OZ)] = k
       }
     }
+
     g
   }
 
-  // The highest deck of a plan with a module on it.
   fn plan_top(plan: RigPlan) -> i32 {
     mut top: i32 = 0
+
     for i in 0..PLAN_CELLS {
       if plan[i] != 0 {
         top = max(top, (i - i % PLAN_LAYER) / PLAN_LAYER)
       }
     }
+
     top
   }
 
@@ -437,16 +470,22 @@ state {
     mut solid: bool[1080] = {}
     mut faces: RigGrid = {}
     mut roofs: RigGrid = {}
+
     for i in 0..CELLS {
       const k = d.kinds[i]
       const y = (i - i % LAYER) / LAYER
+
       if k != 0 && y <= cut {
-        const shape = shaped(k) && !(d.shape[i] == H_BLOCK || (d.sy[i] > 0 && y + 1 > cut)) ? d.shape[i] : 0
+        const shape = shaped(k) && !(d.shape[i] == H_BLOCK || (d.sy[i] > 0 && y + 1 > cut)) ?
+          d.shape[i] : 0
         drawn[i] = shape
         solid[i] = hulled(k) || (shaped(k) && shape == 0)
+
         if shape != 0 && shape != H_HIP {
-          faces[i] = (d.sx[i] == -1 ? 1 : 0) + (d.sx[i] == 1 ? 2 : 0) + (d.sz[i] == -1 ? 4 : 0) + (d.sz[i] == 1 ? 8 : 0)
+          faces[i] = (d.sx[i] == -1 ? 1 : 0) + (d.sx[i] == 1 ? 2 : 0) +
+            (d.sz[i] == -1 ? 4 : 0) + (d.sz[i] == 1 ? 8 : 0)
         }
+
         if shape == H_SLOPE || shape == H_VALLEY || shape == H_HIP {
           roofs[i] = d.sy[i]
         }
@@ -454,11 +493,13 @@ state {
     }
 
     mut out: RigViews = {}
+
     for i in 0..CELLS {
       const k = d.kinds[i]
       const x = i % GX
       const y = (i - i % LAYER) / LAYER
       const z = ((i - x) / GX) % GZ
+
       if (k != 0 && y <= cut) || y == cut {
         const hx = x < GX - 1
         const lx = x > 0
@@ -491,6 +532,7 @@ state {
         }
       }
     }
+
     out
   }
 
@@ -499,6 +541,7 @@ state {
   // there.
   fn rig_ghost_view(d: RigDesign, view: RigCellView, cut: i32, i: i32, k: i32) -> RigCellView {
     mut v: RigCellView = view
+
     if shaped(k) && d.kinds[i] == 0 {
       const y = cell_y(i)
       const f = fair_at(d.kinds, d.shape, cell_x(i), y, cell_z(i))
@@ -507,6 +550,7 @@ state {
       v.sy = f.sy
       v.sz = f.sz
     }
+
     v
   }
 }

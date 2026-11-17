@@ -9,13 +9,18 @@ assets {
     Bus: {output: master, kind: ChannelReturn, volume: 0.3, effects: [dk_room]}
     Reverb: {decay: 0.9, damping: 0.55, predelay: 0.008, size: 0.35}
   }
+
   dk_drum_eq {
     Equalizer: {bands: [
       {kind: EqLowCut, frequency: 30},
       {kind: EqPeak, frequency: 400, gain: -2, q: 1}
     ]}
   }
-  dk_drum_glue { Compressor: {threshold: -14, ratio: 3, attack: 0.02, release: 0.12, knee: 6, makeup: 1.3} }
+
+  dk_drum_glue {
+    Compressor: {threshold: -14, ratio: 3, attack: 0.02, release: 0.12, knee: 6, makeup: 1.3}
+  }
+
   dk_drums {
     Bus: {output: master, volume: 0.65, effects: [dk_drum_eq, dk_drum_glue]}
     Meter: {}
@@ -30,6 +35,7 @@ assets {
       Envelope: {attack: 0.001, decay: 0.5, curve: 3}
       PitchEnvelope: {amount: 30, decay: 0.06, curve: 6}
     }
+
     click {
       Oscillator: {wave: Noise, level: 0.3}
       Envelope: {attack: 0.0005, decay: 0.006, curve: 3}
@@ -45,11 +51,13 @@ assets {
       Envelope: {attack: 0.001, decay: 0.13, curve: 4}
       PitchEnvelope: {amount: 7, decay: 0.03, curve: 4}
     }
+
     ring {
       Oscillator: {wave: Sine, frequency: 330, level: 0.25}
       Envelope: {attack: 0.001, decay: 0.07, curve: 4}
       PitchEnvelope: {amount: 5, decay: 0.02, curve: 4}
     }
+
     wires {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.5}
       Envelope: {attack: 0.001, decay: 0.24, curve: 5}
@@ -89,14 +97,17 @@ assets {
       Oscillator: {wave: Noise, level: 1.3}
       Envelope: {attack: 0.0005, decay: 0.009, curve: 4}
     }
+
     hand2 {
       Oscillator: {wave: Noise, level: 1.2}
       Envelope: {attack: 0.011, attack_curve: -16, decay: 0.009, curve: 4}
     }
+
     hand3 {
       Oscillator: {wave: Noise, level: 1.2}
       Envelope: {attack: 0.021, attack_curve: -16, decay: 0.009, curve: 4}
     }
+
     tail {
       Oscillator: {wave: Noise, level: 1.1}
       Envelope: {attack: 0.031, attack_curve: -16, decay: 0.2, curve: 4}
@@ -113,11 +124,13 @@ assets {
       Envelope: {attack: 0.001, decay: 0.55, curve: 3.5, key_scale: 0.5}
       PitchEnvelope: {amount: 5, decay: 0.12, curve: 3}
     }
+
     mode {
       Oscillator: {wave: Sine, frequency: 175, level: 0.22}
       Envelope: {attack: 0.001, decay: 0.18, curve: 4, key_scale: 0.5}
       PitchEnvelope: {amount: 5, decay: 0.08, curve: 3}
     }
+
     stick {
       Oscillator: {wave: Noise, level: 0.3}
       Envelope: {attack: 0.0005, decay: 0.012, curve: 3}
@@ -154,6 +167,7 @@ assets {
       Oscillator: {wave: Noise, color: NoisePink, level: 0.6}
       Unison: {voices: 3, detune: 0, width: 0.9}
     }
+
     splash {
       Oscillator: {wave: Noise, level: 0.6}
       Envelope: {attack: 0.001, decay: 0.18, curve: 4}
@@ -163,7 +177,16 @@ assets {
 
   dk_kick_inst { Instrument: {sound: dk_kick_sound, root: 36, gate: false} }
   dk_snare_inst { Instrument: {sound: dk_snare_sound, root: 38, gate: false} }
-  dk_hat_inst { Instrument: {sound: dk_hat_sound, root: 42, gate: false, spread: 0.15, spread_mode: InstrumentSpreadRandom} }
+  dk_hat_inst {
+    Instrument: {
+      sound: dk_hat_sound,
+      root: 42,
+      gate: false,
+      spread: 0.15,
+      spread_mode: InstrumentSpreadRandom
+    }
+  }
+
   dk_open_hat_inst { Instrument: {sound: dk_open_hat_sound, root: 46, gate: false} }
   dk_clap_inst { Instrument: {sound: dk_clap_sound, root: 39, gate: false} }
   dk_tom_inst { Instrument: {sound: dk_tom_sound, root: 45, gate: false, spread: 0.7} }
@@ -315,7 +338,12 @@ assets {
   }
 
   dk_track_hat {
-    Track: {instrument: dk_hat_inst, swing: 0.1, swing_grid: TrackSwing16, humanize: {timing: 3, velocity: 0.12}}
+    Track: {
+      instrument: dk_hat_inst,
+      swing: 0.1,
+      swing_grid: TrackSwing16,
+      humanize: {timing: 3, velocity: 0.12}
+    }
     Bus: {output: dk_drums, volume: 0.9}
     Meter: {}
     solo { ClipPlacement: {clip: dk_hat_sixteenths, start: 8} }

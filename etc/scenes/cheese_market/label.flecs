@@ -23,6 +23,7 @@ assets {
       Box: {width, 0.3, 0.045}
       Rgb: MarketIron
     }
+
     lettering {
       Position: {0, 0, 0.026}
       Scale: {0.01, 0.01, 0.01}

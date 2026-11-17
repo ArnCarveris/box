@@ -13,6 +13,7 @@ assets {
     async {
       while true {
         await on.pressed(action)
+
         if screen != SCREEN_TITLE {
           emit Cast(spell: index)
         }
@@ -25,6 +26,7 @@ async {
   while true {
     const e = await Navigate
     screen = e.screen
+
     if e.screen != SCREEN_TITLE {
       hud_go = true
     }
@@ -35,20 +37,48 @@ state {
   actions {
     Next { box.input.Action: {description: "Next page"}; box.input.Binding: {key: E} }
     Prev { box.input.Action: {description: "Previous page"}; box.input.Binding: {key: Q} }
-    Back { box.input.Action: {description: "Return to the title"}; box.input.Binding: {key: Escape} }
+    Back {
+      box.input.Action: {description: "Return to the title"}
+      box.input.Binding: {key: Escape}
+    }
+
     Enter { box.input.Action: {description: "Open the atlas"}; box.input.Binding: {key: Enter} }
-    Cast1 { box.input.Action: {description: "Cast the first spell"}; box.input.Binding: {key: Num1} }
-    Cast2 { box.input.Action: {description: "Cast the second spell"}; box.input.Binding: {key: Num2} }
-    Cast3 { box.input.Action: {description: "Cast the third spell"}; box.input.Binding: {key: Num3} }
-    Cast4 { box.input.Action: {description: "Cast the fourth spell"}; box.input.Binding: {key: Num4} }
-    Cast5 { box.input.Action: {description: "Cast the fifth spell"}; box.input.Binding: {key: Num5} }
-    Cast6 { box.input.Action: {description: "Cast the sixth spell"}; box.input.Binding: {key: Num6} }
+    Cast1 {
+      box.input.Action: {description: "Cast the first spell"}
+      box.input.Binding: {key: Num1}
+    }
+
+    Cast2 {
+      box.input.Action: {description: "Cast the second spell"}
+      box.input.Binding: {key: Num2}
+    }
+
+    Cast3 {
+      box.input.Action: {description: "Cast the third spell"}
+      box.input.Binding: {key: Num3}
+    }
+
+    Cast4 {
+      box.input.Action: {description: "Cast the fourth spell"}
+      box.input.Binding: {key: Num4}
+    }
+
+    Cast5 {
+      box.input.Action: {description: "Cast the fifth spell"}
+      box.input.Binding: {key: Num5}
+    }
+
+    Cast6 {
+      box.input.Action: {description: "Cast the sixth spell"}
+      box.input.Binding: {key: Num6}
+    }
   }
 }
 
 async {
   while true {
     await on.pressed(state.actions.Next)
+
     if screen != SCREEN_TITLE {
       screen = screen % 3 + 1
     }
@@ -58,6 +88,7 @@ async {
 async {
   while true {
     await on.pressed(state.actions.Prev)
+
     if screen != SCREEN_TITLE {
       screen = (screen + 1) % 3 + 1
     }
@@ -75,6 +106,7 @@ async {
   while true {
     await on.pressed(state.actions.Enter)
     const focused = FocusStatus[FocusStatus].focused
+
     if screen == SCREEN_TITLE && (focused == 0 || !focused?[TitleEntry]) {
       emit Navigate(screen: SCREEN_ATLAS)
     }

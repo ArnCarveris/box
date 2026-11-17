@@ -12,9 +12,257 @@ using box.transition
 using state
 
 assets {
-  prefab RailCharge { Rgb: {58, 46, 36}; PbrMaterial: {metallic: 0.4, roughness: 0.4}; Emissive: {strength: 6, color: {255, 150, 50}}; Transition: [Emissive: {duration: 1, timing_function: EaseInOut}] }
-  prefab RailArc { Rgb: {70, 60, 52}; PbrMaterial: {metallic: 0.2, roughness: 0.5}; Emissive: {strength: 14, color: {255, 214, 160}}; Transition: [Emissive: {duration: 0.8, timing_function: EaseInOut}] }
-  prefab RailCeramic { Rgb: {222, 214, 196}; PbrMaterial: {metallic: 0, roughness: 0.55}; ClearCoat: {strength: 0.3, roughness: 0.3} }
+  prefab RailCharge {
+    Rgb: {58, 46, 36}
+    PbrMaterial: {metallic: 0.4, roughness: 0.4}
+    Emissive: {strength: 6, color: {255, 150, 50}}
+    Transition: [Emissive: {duration: 1, timing_function: EaseInOut}]
+  }
+
+  prefab RailArc {
+    Rgb: {70, 60, 52}
+    PbrMaterial: {metallic: 0.2, roughness: 0.5}
+    Emissive: {strength: 14, color: {255, 214, 160}}
+    Transition: [Emissive: {duration: 0.8, timing_function: EaseInOut}]
+  }
+
+  prefab RailCeramic {
+    Rgb: {222, 214, 196}
+    PbrMaterial: {metallic: 0, roughness: 0.55}
+    ClearCoat: {strength: 0.3, roughness: 0.3}
+  }
+
+  template RailgunCradle {
+    prop b: f32 = 0
+
+    Position: {0, 0, 2.4}
+
+    for e in 0..2 {
+      const es = (e - 0.5) * 2
+      "cheek_{e}" : ShipHullDark {
+        Position: {es * 0.62 * b, 0, 0}
+        Box: {0.3 * b, 1.34 * b, 1.1}
+      }
+
+      "jaw_{e}" : ShipHullDark { Position: {0, es * 0.82 * b, 0}; Box: {1.54 * b, 0.3 * b, 1.1} }
+      "lip_{e}" : ShipTrim { Position: {0, es * 0.82 * b, 0.6}; Box: {1.6 * b, 0.34 * b, 0.1} }
+      "hazard_{e}" : ShipHazard { Position: {es * 0.775 * b, 0, 0}; Box: {0.01, 1.0 * b, 0.7} }
+
+      for u in 0..2 {
+        const uy = (u - 0.5) * 1.1 * b
+        "buffer_{e}_{u}" : ShipTrim {
+          Position: {es * 0.95 * b, uy, -0.7}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {radius: 0.13 * b, length: 1.0, segments: 12, smooth: true}
+        }
+
+        "rod_{e}_{u}" : ShipChrome {
+          Position: {es * 0.95 * b, uy, 0.1}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {radius: 0.06 * b, length: 0.7, segments: 10, smooth: true}
+        }
+
+        "lug_{e}_{u}" : ShipTrim {
+          Position: {es * 0.88 * b, uy, 0.42}
+          Box: {0.3 * b, 0.26 * b, 0.22}
+        }
+      }
+    }
+  }
+
+  template RailgunBarrel {
+    prop b: f32 = 0
+    prop g: f32 = 0
+    prop bl: f32 = 0
+    prop bz: f32 = 0
+    prop power: f32 = 1
+    const amber: Rgb = {255, 150, 50}
+    const hot: Rgb = {255, 214, 160}
+
+    Position: {0, 0, bz}
+
+    for e in 0..2 {
+      const es = (e - 0.5) * 2
+      "rail_{e}" : ShipCopper {
+        Position: {0, es * (g + 0.08 * b), 0}
+        Box: {0.5 * b, 0.16 * b, bl}
+      }
+
+      "beam_{e}" : ShipHullDarkFine {
+        Position: {0, es * (g + 0.28 * b), 0}
+        Box: {0.64 * b, 0.24 * b, bl}
+      }
+
+      "spine_{e}" : ShipTrim {
+        Position: {0, es * (g + 0.43 * b), 0}
+        Box: {0.3 * b, 0.06 * b, bl}
+      }
+
+      "bore_{e}" : RailArc {
+        Position: {0, es * (g - 0.008), 0}
+        Box: {0.3 * b, 0.016, bl - 0.1}
+        Emissive: {strength: 8 * power, color: hot}
+      }
+
+      for f in 0..2 {
+        const fs = (f - 0.5) * 2
+        "line_{e}_{f}" : RailCharge {
+          Position: {fs * (0.32 * b + 0.006), es * (g + 0.34 * b), 0}
+          Box: {0.012, 0.05 * b, bl - 0.2}
+          Emissive: {strength: 6 * power, color: amber}
+        }
+
+        "bus_{e}_{f}" : ShipCopper {
+          Position: {fs * 0.355 * b, es * (g + 0.2 * b), 0.6}
+          Box: {0.06 * b, 0.1 * b, bl - 1.6}
+        }
+      }
+    }
+  }
+
+  template RailgunClamp {
+    prop cz: f32 = 0
+    prop coil: bool = false
+    prop b: f32 = 0
+    prop g: f32 = 0
+    prop power: f32 = 1
+    const amber: Rgb = {255, 150, 50}
+
+    Position: {0, 0, cz}
+
+    for e in 0..2 {
+      const es = (e - 0.5) * 2
+      "plate_{e}" : ShipTrim {
+        Position: {0, es * (g + 0.56 * b), 0}
+        Box: {1.0 * b, 0.14 * b, 0.34}
+      }
+
+      "block_{e}" : RailCeramic {
+        Position: {es * 0.42 * b, 0, 0}
+        Box: {0.16 * b, 2 * g + 1.0 * b, 0.34}
+      }
+
+      "lamp_{e}" : RailCharge {
+        Position: {es * (0.5 * b + 0.006), 0, 0}
+        Box: {0.012, 0.3 * b, 0.12}
+        Emissive: {strength: 5 * power, color: amber}
+      }
+
+      "bolt_{e}" : ShipSteel {
+        Position: {0, es * (g + 0.64 * b), 0}
+        Box: {0.6 * b, 0.03 * b, 0.2}
+      }
+    }
+
+    if coil {
+      collar : ShipHullDarkFine {
+        Rotation: {HALF_PI, 0, 0}
+        Tube: {radius: 1.2 * b, thickness: 0.26 * b, length: 0.5, segments: 8}
+      }
+
+      for w in 0..2 {
+        "winding_{w}" : ShipCopper {
+          Position: {0, 0, (w - 0.5) * 0.36}
+          Rotation: {HALF_PI, 0, 0}
+          Torus: {radius: 1.1 * b, tube: 0.08 * b, segments: 32, rings: 6, smooth: true}
+        }
+      }
+
+      seam : RailCharge {
+        Rotation: {HALF_PI, 0, 0}
+        Torus: {radius: 1.21 * b, tube: 0.025, segments: 32, rings: 4, smooth: true}
+        Emissive: {strength: 5 * power, color: amber}
+      }
+    }
+  }
+
+  template RailgunMuzzle {
+    prop r: f32 = 1
+    prop b: f32 = 0
+    prop g: f32 = 0
+    prop power: f32 = 1
+    const amber: Rgb = {255, 150, 50}
+    const hot: Rgb = {255, 214, 160}
+
+    Position: {0, 0, 11.4}
+
+    for e in 0..2 {
+      const es = (e - 0.5) * 2
+      "cheek_{e}" : ShipHullDarkFine {
+        Position: {es * 0.48 * b, 0, 0}
+        Box: {0.32 * b, 2 * g + 0.92 * b, 1.1}
+      }
+
+      "jaw_{e}" : ShipHullDarkFine {
+        Position: {0, es * (g + 0.6 * b), 0}
+        Box: {1.28 * b, 0.3 * b, 1.1}
+      }
+
+      "ring_{e}" : ShipTrim {
+        Position: {0, es * (g + 0.6 * b), 0.58}
+        Box: {1.36 * b, 0.36 * b, 0.08}
+      }
+
+      "brace_{e}" : ShipTrim {
+        Position: {es * 0.48 * b, 0, 0.58}
+        Box: {0.4 * b, 2 * g + 0.92 * b, 0.08}
+      }
+
+      "vent_{e}" : ShipRecess {
+        Position: {es * (0.64 * b + 0.005), 0, -0.1}
+        Box: {0.01, 0.7 * b, 0.6}
+      }
+    }
+
+    for k in 0..2 {
+      "shroud_{k}" : ShipHullDarkFine {
+        Position: {0, 0, k == 0 ? -0.32 : 0.3}
+        Rotation: {HALF_PI, 0, 0}
+        Tube: {
+          radius: (1.46 - k * 0.1) * b,
+          thickness: 0.24 * b,
+          length: k == 0 ? 0.3 : 0.22,
+          segments: 8
+        }
+      }
+    }
+
+    halo : RailCharge {
+      Position: {0, 0, -0.01}
+      Rotation: {HALF_PI, 0, 0}
+      Torus: {radius: 1.3 * b, tube: 0.03, segments: 32, rings: 4, smooth: true}
+      Emissive: {strength: 5 * power, color: amber}
+    }
+
+    for i in 0..4 {
+      "fin_{i}" {
+        Rotation: {0, 0, PI / 4 + i * HALF_PI}
+        vane : ShipTrim { Position: {1.18 * b, 0, 0}; Box: {0.3 * b, 0.07 * b, 1.0} }
+      }
+    }
+
+    mouth : RailArc {
+      Position: {0, 0, -0.45}
+      Box: {0.5 * b, 2 * g, 0.03}
+      Emissive: {strength: 4 * power, color: hot}
+    }
+
+    beacon_a : ShipBeaconRed {
+      Position: {0, g + 0.82 * b, 0.2}
+      Sphere: {radius: 0.07, segments: 3, smooth: true}
+    }
+
+    beacon_b : ShipBeaconWhite {
+      Position: {0, 0 - g - 0.82 * b, 0.2}
+      Sphere: {radius: 0.07, segments: 3, smooth: true}
+    }
+
+    glow : PowerLight {
+      Position: {0, 0, 0.9}
+      PointLight: {intensity: 3 * power, range: r * 2.5}
+      Rgb: hot
+    }
+  }
 
   template Railgun {
     prop r: f32 = 1
@@ -36,24 +284,54 @@ assets {
     const bl = z1 - z0
     const bz = (z0 + z1) / 2
 
-    trunk : ShipHullDarkFine { Position: {0, 0, -1.6}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: r * 0.8, length: 0.8, segments: 32, smooth: true} }
+    trunk : ShipHullDarkFine {
+      Position: {0, 0, -1.6}
+      Rotation: {HALF_PI, 0, 0}
+      Cylinder: {radius: r * 0.8, length: 0.8, segments: 32, smooth: true}
+    }
+
     oct {
       Rotation: {0, 0, PI / 8}
-      housing : ShipHullDarkFine { Position: {0, 0, 0.1}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr, length: 2.6, segments: 8} }
-      bevel_b : ShipHullDarkFine { Position: {0, 0, -1.475}; Rotation: {HALF_PI, 0, 0}; Frustum: {radius_bottom: r * 0.82, radius_top: hr, length: 0.55, segments: 8} }
-      bevel_f : ShipHullDarkFine { Position: {0, 0, 1.675}; Rotation: {HALF_PI, 0, 0}; Frustum: {radius_bottom: hr, radius_top: r * 0.75, length: 0.55, segments: 8} }
+      housing : ShipHullDarkFine {
+        Position: {0, 0, 0.1}
+        Rotation: {HALF_PI, 0, 0}
+        Cylinder: {radius: hr, length: 2.6, segments: 8}
+      }
+
+      bevel_b : ShipHullDarkFine {
+        Position: {0, 0, -1.475}
+        Rotation: {HALF_PI, 0, 0}
+        Frustum: {radius_bottom: r * 0.82, radius_top: hr, length: 0.55, segments: 8}
+      }
+
+      bevel_f : ShipHullDarkFine {
+        Position: {0, 0, 1.675}
+        Rotation: {HALF_PI, 0, 0}
+        Frustum: {radius_bottom: hr, radius_top: r * 0.75, length: 0.55, segments: 8}
+      }
+
       for e in 0..2 {
-        "rib_{e}" : ShipTrim { Position: {0, 0, e == 0 ? -1.15 : 1.35}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: hr + 0.03, length: 0.1, segments: 8} }
+        "rib_{e}" : ShipTrim {
+          Position: {0, 0, e == 0 ? -1.15 : 1.35}
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {radius: hr + 0.03, length: 0.1, segments: 8}
+        }
       }
     }
+
     for i in 0..3 {
       const a = i == 0 ? 0 : i == 1 ? PI : 1.5 * PI
       "facet_{i}" {
         Rotation: {0, 0, a}
         plate : ShipHull { Position: {apo + 0.04, 0, 0.1}; Box: {0.08, fw * 0.78, 2.2} }
-        strip : PowerRunLights { Position: {apo + 0.085, 0, 0.1}; Box: {0.012, fw * 0.12, 1.9}; Emissive: {strength: 6 * power, color: {255, 196, 120}} }
+        strip : PowerRunLights {
+          Position: {apo + 0.085, 0, 0.1}
+          Box: {0.012, fw * 0.12, 1.9}
+          Emissive: {strength: 6 * power, color: {255, 196, 120}}
+        }
       }
     }
+
     for i in 0..4 {
       const a = PI / 4 + i * HALF_PI
       const tz = 1.25
@@ -64,124 +342,112 @@ assets {
       "bank_{i}" {
         Rotation: {0, 0, a}
         body : ShipHullDark { Position: {apo + 0.2 * s, 0, 0.1}; Box: {0.4 * s, fw * 0.84, 2.0} }
+
         for e in 0..2 {
-          "cap_{e}" : ShipTrim { Position: {apo + 0.22 * s, 0, e == 0 ? -0.92 : 1.12}; Box: {0.44 * s, fw * 0.9, 0.14} }
+          "cap_{e}" : ShipTrim {
+            Position: {apo + 0.22 * s, 0, e == 0 ? -0.92 : 1.12}
+            Box: {0.44 * s, fw * 0.9, 0.14}
+          }
         }
+
         for c in 0..3 {
-          "cell_{c}" : ShipTrim { Position: {apo + 0.21 * s, 0, (c - 1) * 0.5 + 0.1}; Box: {0.43 * s, fw * 0.88, 0.06} }
+          "cell_{c}" : ShipTrim {
+            Position: {apo + 0.21 * s, 0, (c - 1) * 0.5 + 0.1}
+            Box: {0.43 * s, fw * 0.88, 0.06}
+          }
         }
+
         for t in 0..2 {
           const ty = (t - 0.5) * 0.36 * s
-          "charge_{t}" : RailCharge { Position: {apo + 0.406 * s, ty, 0.1}; Box: {0.012, 0.06 * s, 1.75}; Emissive: {strength: 6 * power, color: amber} }
-          "post_{t}" : ShipCopper { Position: {apo + 0.47 * s, 0, (t - 0.5) * 1.2 + 0.1}; Rotation: {0, 0, 0 - HALF_PI}; Cylinder: {radius: 0.055 * s, length: 0.14 * s, segments: 10, smooth: true} }
+          "charge_{t}" : RailCharge {
+            Position: {apo + 0.406 * s, ty, 0.1}
+            Box: {0.012, 0.06 * s, 1.75}
+            Emissive: {strength: 6 * power, color: amber}
+          }
+
+          "post_{t}" : ShipCopper {
+            Position: {apo + 0.47 * s, 0, (t - 0.5) * 1.2 + 0.1}
+            Rotation: {0, 0, 0 - HALF_PI}
+            Cylinder: {radius: 0.055 * s, length: 0.14 * s, segments: 10, smooth: true}
+          }
         }
-        strap : ShipCopper { Position: {(tx + lx) / 2, 0, (tz + lz) / 2}; Rotation: {0, atan2(lx - tx, lz - tz), 0}; Box: {0.05 * s, 0.22 * s, sl} }
+
+        strap : ShipCopper {
+          Position: {(tx + lx) / 2, 0, (tz + lz) / 2}
+          Rotation: {0, atan2(lx - tx, lz - tz), 0}
+          Box: {0.05 * s, 0.22 * s, sl}
+        }
       }
     }
 
     magazine {
       Position: {0, apo, -0.3}
       saddle : ShipTrim { Position: {0, 0.08 * s, 0}; Box: {0.7 * s, 0.16 * s, 1.0 * s} }
-      drum : ShipHullDarkFine { Position: {0, 0.58 * s, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.42 * s, length: 0.8 * s, segments: 24, smooth: true} }
-      band : ShipHazard { Position: {0, 0.58 * s, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.425 * s, length: 0.14 * s, segments: 24, smooth: true} }
+      drum : ShipHullDarkFine {
+        Position: {0, 0.58 * s, 0}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {radius: 0.42 * s, length: 0.8 * s, segments: 24, smooth: true}
+      }
+
+      band : ShipHazard {
+        Position: {0, 0.58 * s, 0}
+        Rotation: {0, 0, HALF_PI}
+        Cylinder: {radius: 0.425 * s, length: 0.14 * s, segments: 24, smooth: true}
+      }
+
       for e in 0..2 {
         const ex = (e - 0.5) * 2
-        "cap_{e}" : ShipTrim { Position: {ex * 0.42 * s, 0.58 * s, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.45 * s, length: 0.06 * s, segments: 24, smooth: true} }
-        "hub_{e}" : ShipSteel { Position: {ex * 0.47 * s, 0.58 * s, 0}; Rotation: {0, 0, HALF_PI}; Cylinder: {radius: 0.14 * s, length: 0.06 * s, segments: 12, smooth: true} }
+        "cap_{e}" : ShipTrim {
+          Position: {ex * 0.42 * s, 0.58 * s, 0}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {radius: 0.45 * s, length: 0.06 * s, segments: 24, smooth: true}
+        }
+
+        "hub_{e}" : ShipSteel {
+          Position: {ex * 0.47 * s, 0.58 * s, 0}
+          Rotation: {0, 0, HALF_PI}
+          Cylinder: {radius: 0.14 * s, length: 0.06 * s, segments: 12, smooth: true}
+        }
       }
+
       chute : ShipHullDark { Position: {0, 0.17 * s, 1.0}; Box: {0.36 * s, 0.3 * s, 1.5} }
       chute_top : ShipHazard { Position: {0, 0.325 * s, 1.0}; Box: {0.3 * s, 0.01, 1.3} }
-      lamp : PowerLamp { Position: {0.185 * s, 0.22 * s, 1.5}; Box: {0.012, 0.08 * s, 0.16}; Emissive: {strength: 4 * power, color: {255, 160, 50}} }
-    }
-
-    cradle {
-      Position: {0, 0, 2.4}
-      for e in 0..2 {
-        const es = (e - 0.5) * 2
-        "cheek_{e}" : ShipHullDark { Position: {es * 0.62 * b, 0, 0}; Box: {0.3 * b, 1.34 * b, 1.1} }
-        "jaw_{e}" : ShipHullDark { Position: {0, es * 0.82 * b, 0}; Box: {1.54 * b, 0.3 * b, 1.1} }
-        "lip_{e}" : ShipTrim { Position: {0, es * 0.82 * b, 0.6}; Box: {1.6 * b, 0.34 * b, 0.1} }
-        "hazard_{e}" : ShipHazard { Position: {es * 0.775 * b, 0, 0}; Box: {0.01, 1.0 * b, 0.7} }
-        for u in 0..2 {
-          const uy = (u - 0.5) * 1.1 * b
-          "buffer_{e}_{u}" : ShipTrim { Position: {es * 0.95 * b, uy, -0.7}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.13 * b, length: 1.0, segments: 12, smooth: true} }
-          "rod_{e}_{u}" : ShipChrome { Position: {es * 0.95 * b, uy, 0.1}; Rotation: {HALF_PI, 0, 0}; Cylinder: {radius: 0.06 * b, length: 0.7, segments: 10, smooth: true} }
-          "lug_{e}_{u}" : ShipTrim { Position: {es * 0.88 * b, uy, 0.42}; Box: {0.3 * b, 0.26 * b, 0.22} }
-        }
+      lamp : PowerLamp {
+        Position: {0.185 * s, 0.22 * s, 1.5}
+        Box: {0.012, 0.08 * s, 0.16}
+        Emissive: {strength: 4 * power, color: {255, 160, 50}}
       }
     }
 
-    barrel {
-      Position: {0, 0, bz}
-      for e in 0..2 {
-        const es = (e - 0.5) * 2
-        "rail_{e}" : ShipCopper { Position: {0, es * (g + 0.08 * b), 0}; Box: {0.5 * b, 0.16 * b, bl} }
-        "beam_{e}" : ShipHullDarkFine { Position: {0, es * (g + 0.28 * b), 0}; Box: {0.64 * b, 0.24 * b, bl} }
-        "spine_{e}" : ShipTrim { Position: {0, es * (g + 0.43 * b), 0}; Box: {0.3 * b, 0.06 * b, bl} }
-        "bore_{e}" : RailArc { Position: {0, es * (g - 0.008), 0}; Box: {0.3 * b, 0.016, bl - 0.1}; Emissive: {strength: 8 * power, color: hot} }
-        for f in 0..2 {
-          const fs = (f - 0.5) * 2
-          "line_{e}_{f}" : RailCharge { Position: {fs * (0.32 * b + 0.006), es * (g + 0.34 * b), 0}; Box: {0.012, 0.05 * b, bl - 0.2}; Emissive: {strength: 6 * power, color: amber} }
-          "bus_{e}_{f}" : ShipCopper { Position: {fs * 0.355 * b, es * (g + 0.2 * b), 0.6}; Box: {0.06 * b, 0.1 * b, bl - 1.6} }
-        }
-      }
-    }
+    RailgunCradle cradle(b: b)
+
+    RailgunBarrel barrel(b: b, g: g, bl: bl, bz: bz, power: power)
 
     for c in 0..5 {
       const cz = 3.6 + c * 1.6
       const coil = c == 1 || c == 3
-      "clamp_{c}" {
-        Position: {0, 0, cz}
-        for e in 0..2 {
-          const es = (e - 0.5) * 2
-          "plate_{e}" : ShipTrim { Position: {0, es * (g + 0.56 * b), 0}; Box: {1.0 * b, 0.14 * b, 0.34} }
-          "block_{e}" : RailCeramic { Position: {es * 0.42 * b, 0, 0}; Box: {0.16 * b, 2 * g + 1.0 * b, 0.34} }
-          "lamp_{e}" : RailCharge { Position: {es * (0.5 * b + 0.006), 0, 0}; Box: {0.012, 0.3 * b, 0.12}; Emissive: {strength: 5 * power, color: amber} }
-          "bolt_{e}" : ShipSteel { Position: {0, es * (g + 0.64 * b), 0}; Box: {0.6 * b, 0.03 * b, 0.2} }
-        }
-        if coil {
-          collar : ShipHullDarkFine { Rotation: {HALF_PI, 0, 0}; Tube: {radius: 1.2 * b, thickness: 0.26 * b, length: 0.5, segments: 8} }
-          for w in 0..2 {
-            "winding_{w}" : ShipCopper { Position: {0, 0, (w - 0.5) * 0.36}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 1.1 * b, tube: 0.08 * b, segments: 32, rings: 6, smooth: true} }
-          }
-          seam : RailCharge { Rotation: {HALF_PI, 0, 0}; Torus: {radius: 1.21 * b, tube: 0.025, segments: 32, rings: 4, smooth: true}; Emissive: {strength: 5 * power, color: amber} }
-        }
-      }
+      RailgunClamp "clamp_{c}"(cz: cz, coil: coil, b: b, g: g, power: power)
     }
+
     for c in 0..5 {
       const sz = 2.8 + c * 1.6
-      for e in 0..2 {
-        "spacer_{c}_{e}" : RailCeramic { Position: {(e - 0.5) * 0.56 * b, 0, sz}; Box: {0.08 * b, 2 * g, 0.16} }
-      }
-    }
 
-    muzzle {
-      Position: {0, 0, 11.4}
       for e in 0..2 {
-        const es = (e - 0.5) * 2
-        "cheek_{e}" : ShipHullDarkFine { Position: {es * 0.48 * b, 0, 0}; Box: {0.32 * b, 2 * g + 0.92 * b, 1.1} }
-        "jaw_{e}" : ShipHullDarkFine { Position: {0, es * (g + 0.6 * b), 0}; Box: {1.28 * b, 0.3 * b, 1.1} }
-        "ring_{e}" : ShipTrim { Position: {0, es * (g + 0.6 * b), 0.58}; Box: {1.36 * b, 0.36 * b, 0.08} }
-        "brace_{e}" : ShipTrim { Position: {es * 0.48 * b, 0, 0.58}; Box: {0.4 * b, 2 * g + 0.92 * b, 0.08} }
-        "vent_{e}" : ShipRecess { Position: {es * (0.64 * b + 0.005), 0, -0.1}; Box: {0.01, 0.7 * b, 0.6} }
-      }
-      for k in 0..2 {
-        "shroud_{k}" : ShipHullDarkFine { Position: {0, 0, k == 0 ? -0.32 : 0.3}; Rotation: {HALF_PI, 0, 0}; Tube: {radius: (1.46 - k * 0.1) * b, thickness: 0.24 * b, length: k == 0 ? 0.3 : 0.22, segments: 8} }
-      }
-      halo : RailCharge { Position: {0, 0, -0.01}; Rotation: {HALF_PI, 0, 0}; Torus: {radius: 1.3 * b, tube: 0.03, segments: 32, rings: 4, smooth: true}; Emissive: {strength: 5 * power, color: amber} }
-      for i in 0..4 {
-        "fin_{i}" {
-          Rotation: {0, 0, PI / 4 + i * HALF_PI}
-          vane : ShipTrim { Position: {1.18 * b, 0, 0}; Box: {0.3 * b, 0.07 * b, 1.0} }
+        "spacer_{c}_{e}" : RailCeramic {
+          Position: {(e - 0.5) * 0.56 * b, 0, sz}
+          Box: {0.08 * b, 2 * g, 0.16}
         }
       }
-      mouth : RailArc { Position: {0, 0, -0.45}; Box: {0.5 * b, 2 * g, 0.03}; Emissive: {strength: 4 * power, color: hot} }
-      beacon_a : ShipBeaconRed { Position: {0, g + 0.82 * b, 0.2}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
-      beacon_b : ShipBeaconWhite { Position: {0, 0 - g - 0.82 * b, 0.2}; Sphere: {radius: 0.07, segments: 3, smooth: true} }
-      glow : PowerLight { Position: {0, 0, 0.9}; PointLight: {intensity: 3 * power, range: r * 2.5}; Rgb: hot }
     }
 
-    charge_glow : PowerLight { Position: {0, 0, 0.1}; PointLight: {intensity: 3 * power, range: r * 3}; Rgb: amber }
+    RailgunMuzzle muzzle(r: r, b: b, g: g, power: power)
+
+    charge_glow : PowerLight {
+      Position: {0, 0, 0.1}
+      PointLight: {intensity: 3 * power, range: r * 3}
+      Rgb: amber
+    }
+
     SpineEnds ends(r: r, fe: 0, be: be)
   }
 }

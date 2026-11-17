@@ -13,12 +13,9 @@ using box.text
 using box.transform
 using box.transition
 
-// Behavior of a collapsible section: current is whether it is open. The section takes the focus
-// for its header, the child head, which comes before the content, the children of the instance:
-// a click on the header, or Enter and Space while the section has the focus, toggle current and
-// report the change. While closed the section is only as tall as its header, header points, and
-// clips its content away entirely, so the content is not drawn, picked or reached with Tab. The
-// pointer shows a hand over the header, a crossed circle while the section is disabled.
+// Behavior of a collapsible section: current is whether it is open. A click on the header, or
+// Enter and Space while focused, toggle it. While closed the section is only as tall as its
+// header and clips its content away.
 template HeadlessCollapsible {
   prop title: string = ""
   prop value: bool = false
@@ -33,11 +30,13 @@ template HeadlessCollapsible {
   mut focused = false
 
   ClipChildren
+
   if !disabled {
     Focusable
   } else {
     Cursor: {CursorNotAllowed}
   }
+
   if current {
     Item: {width: {min: width, max: width}, height: {mode: Fit, value: 1}}
   } else {
@@ -89,6 +88,7 @@ template HeadlessCollapsible {
   async {
     while true {
       const e = await on.focus(this)
+
       if e.target == this {
         focused = true
       }
@@ -98,6 +98,7 @@ template HeadlessCollapsible {
   async {
     while true {
       const e = await on.blur(this)
+
       if e.target == this {
         focused = false
         down = false
@@ -108,6 +109,7 @@ template HeadlessCollapsible {
   async {
     while true {
       const e = await on.key_down(this)
+
       if focused && e.key == " " && !e.repeat {
         down = true
       }
@@ -117,6 +119,7 @@ template HeadlessCollapsible {
   async {
     while true {
       const e = await on.key_up(this)
+
       if focused && e.key == " " {
         down = false
       }
@@ -127,8 +130,10 @@ template HeadlessCollapsible {
   async {
     while true {
       const e = await on.activate(this)
+
       if ui.activation(e) == this {
         down = false
+
         if !disabled && (e.keyboard || hover) {
           current = !current
           await ui.changed(this)
@@ -138,10 +143,8 @@ template HeadlessCollapsible {
   }
 }
 
-// A collapsible section: a rounded card with a header row, the bold title on the left and a
-// chevron at the right, pointing down while open and right while closed, above the content laid
-// out in a column. The header and the content are inset by the same padding, so the content lines
-// up with the title. A width fixes the outer width of the section, 0 fits it.
+// A collapsible section: a rounded card with a header row (bold title, chevron) above the
+// content laid out in a column. A width fixes the outer width of the section, 0 fits it.
 template Collapsible : HeadlessCollapsible {
   prop header: f32 = 32
 
