@@ -8,6 +8,8 @@ include paris/street
 include paris/eiffel
 include paris/landmarks
 include paris/liberty
+include paris/raccoon
+include paris/raccoons
 using flecs.script
 using box.view
 using box.surface

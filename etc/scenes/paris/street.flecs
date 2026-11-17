@@ -213,8 +213,10 @@ assets {
 
   // The part of a raccoon hideout that opens: the lid of a bin (kind 0), a manhole cover (1) or
   // the grate of a storm drain (2). lift from 0 (shut) to 1 (open) swings or lifts it, smoothly.
+  // id >= 0 copies lift from state.pr_hideout_lift[id] every frame.
   template ParisHideoutCover {
     prop kind: i32 = 1
+    prop id: i32 = -1
     mut lift: f32 = 0
     const a = clamp(lift, 0, 1)
     const py = kind == 0 ? 0.87 : (kind == 1 ? 0.062 + a * 0.3 : 0.86)
@@ -247,10 +249,21 @@ assets {
         { (IsA, ParisCastIron); Position: {-0.3 + b * 0.12, -0.43, 0}; Box: {0.025, 0.82, 0.025}; DynamicTransform }
       }
     }
+
+    async {
+      while true {
+        await next_frame()
+        if id >= 0 && id < PR_HIDEOUTS {
+          const l = pr_hideout_lift[id]
+          if lift != l { lift = l }
+        }
+      }
+    }
   }
 
   // A green metal rubbish bin with a hinged domed lid (child `cover`).
   template ParisBin {
+    prop id: i32 = -1
     foot : ParisCastIron { Position: {0, 0.02, 0}; Cylinder: {radius: 0.27, length: 0.04, segments: 16, smooth: true} }
     body : ParisBinGreen { Position: {0, 0.45, 0}; Frustum: {radius_bottom: 0.25, radius_top: 0.29, length: 0.82, segments: 16, smooth: true} }
     for h in 0..3 {
@@ -258,20 +271,22 @@ assets {
       { (IsA, ParisCastIron); Position: {0, hy, 0}; Torus: {radius: 0.255 + hy * 0.047, tube: 0.014, segments: 16, rings: 4} }
     }
     inside : ParisPit { Position: {0, 0.862, 0}; Cylinder: {radius: 0.27, length: 0.005, segments: 16} }
-    ParisHideoutCover cover(kind: 0)
+    ParisHideoutCover cover(kind: 0, id: id)
   }
 
   // A manhole in the street: iron frame, the dark shaft and a cover (child `cover`) that lifts.
   template ParisManhole {
+    prop id: i32 = -1
     frame : ParisCastIron { Position: {0, 0.03, 0}; Cylinder: {radius: 0.44, length: 0.03, segments: 20, smooth: true} }
     hole : ParisPit { Position: {0, 0.047, 0}; Cylinder: {radius: 0.35, length: 0.004, segments: 20} }
-    ParisHideoutCover cover(kind: 1)
+    ParisHideoutCover cover(kind: 1, id: id)
   }
 
   // A storm drain opening in a quay wall: origin on the wall face at the foot of the wall,
   // facing +Z. Arched opening with stone jambs and voussoirs and an iron grate (child `cover`)
   // that swings out.
   template ParisStormDrain {
+    prop id: i32 = -1
     const w: f32 = 0.9
     const r: f32 = 0.45
     const spring: f32 = 0.55
@@ -285,6 +300,6 @@ assets {
       { (IsA, ParisLimestoneTrim); Position: {(r + 0.08) * cos(t), spring + (r + 0.08) * sin(t), 0.05}; Rotation: {0, 0, t + math.PI / 2}; Box: {0.22, 0.16, 0.1} }
     }
     sill : ParisLimestoneTrim { Position: {0, 0.03, 0.08}; Box: {w + 0.3, 0.06, 0.16} }
-    ParisHideoutCover cover(kind: 2)
+    ParisHideoutCover cover(kind: 2, id: id)
   }
 }

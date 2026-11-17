@@ -32,11 +32,11 @@ paris {
   hideouts {
     for (i, h) in pr_hideouts {
       if h.kind == PR_HIDE_BIN {
-        ParisBin "hideout_{i}"() { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
+        ParisBin "hideout_{i}"(id: i) { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
       } else if h.kind == PR_HIDE_MANHOLE {
-        ParisManhole "hideout_{i}"() { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
+        ParisManhole "hideout_{i}"(id: i) { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
       } else {
-        ParisStormDrain "hideout_{i}"() { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
+        ParisStormDrain "hideout_{i}"(id: i) { Position: {h.x, h.y, h.z}; Rotation: {0, h.yaw, 0} }
       }
     }
   }

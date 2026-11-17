@@ -338,3 +338,14 @@ assets {
   prefab ParisPatinaDark { Rgb: {36, 72, 60}; PbrMaterial: {metallic: 0.25, roughness: 0.8} }
   prefab ParisTorchFlame { Rgb: {255, 190, 90}; PbrMaterial: {roughness: 0.4}; Emissive: {strength: 8, color: {255, 150, 50}}; NoShadow }
 }
+
+assets {
+  // The raccoons: soft grey fur with a sheen, pale fur for the brows, muzzle and tail rings, black
+  // for the mask and the tail rings, dark brown for the legs and hands, glossy eyes and nose.
+  prefab ParisRaccoonFur { Rgb: {128, 122, 114}; PbrMaterial: {roughness: 0.92}; Sheen: {color: {190, 184, 174}, roughness: 0.5} }
+  prefab ParisRaccoonFurPale { Rgb: {226, 222, 212}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {255, 252, 244}, roughness: 0.5} }
+  prefab ParisRaccoonFurBlack { Rgb: {24, 22, 22}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {90, 86, 82}, roughness: 0.5} }
+  prefab ParisRaccoonFurDark { Rgb: {58, 50, 46}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {120, 110, 100}, roughness: 0.5} }
+  prefab ParisRaccoonEye { Rgb: {16, 12, 10}; PbrMaterial: {roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.03} }
+  prefab ParisRaccoonNose { Rgb: {20, 18, 18}; PbrMaterial: {roughness: 0.3}; ClearCoat: {strength: 0.6, roughness: 0.15} }
+}
