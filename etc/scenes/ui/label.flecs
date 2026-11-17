@@ -54,7 +54,10 @@ template Panel {
   if title != "" {
     heading {
       Item: {height: {mode: Fixed, value: title_h}}
-      Text: {value: title, size: t.heading_font_size, line_height: title_h}
+      Text: {
+        value: title, size: t.heading_font_size, line_height: title_h,
+        font: box.text.DefaultFontBold
+      }
       Rgb: t.text
     }
   }

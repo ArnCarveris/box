@@ -45,9 +45,9 @@ assets {
     channels {
       Layout: {direction: Row, spacing: 10}
 
-      Slider r(label: "R", width: 72, min: 0, max: 255, value: red)
-      Slider g(label: "G", width: 72, min: 0, max: 255, value: green)
-      Slider b(label: "B", width: 72, min: 0, max: 255, value: blue)
+      Slider r(label: "R", width: 80, min: 0, max: 255, value: red)
+      Slider g(label: "G", width: 80, min: 0, max: 255, value: green)
+      Slider b(label: "B", width: 80, min: 0, max: 255, value: blue)
     }
   }
 
@@ -172,38 +172,41 @@ hud {
             Separator star_top_rule()
 
             // The parameters of the Star template, each slider in its own units
-            ScrollView star_groups(width: 276, height: 603, frame: false, focusable: false) {
-              Collapsible star(title: "Star", value: true, width: 262) {
+            ScrollView star_groups(
+              width: 276, height: 603, frame: false, transparent: true, overlay: true,
+              bar: 6, focusable: false
+            ) {
+              Collapsible star(title: "Star", value: true, width: 276) {
                 Slider temperature(
-                  label: "Surface temperature", width: 236, min: 2500, max: 35000, step: 1,
+                  label: "Surface temperature", width: 260, min: 2500, max: 35000, step: 1,
                   value: state.star.temperature, unit: " K"
                 )
                 Slider radius(
-                  label: "Radius", width: 236, min: 0.5, max: 4, step: 0.05,
+                  label: "Radius", width: 260, min: 0.5, max: 4, step: 0.05,
                   value: state.star.radius, decimals: 2
                 )
                 Slider sunspots(
-                  label: "Sunspots", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Sunspots", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.star.sunspots, decimals: 2
                 )
                 Slider granulation(
-                  label: "Granule size", width: 236, min: 0.3, max: 5, step: 0.05,
+                  label: "Granule size", width: 260, min: 0.3, max: 5, step: 0.05,
                   value: state.star.granulation, decimals: 2
                 )
                 Slider contrast(
-                  label: "Granulation contrast", width: 236, min: 0, max: 0.8, step: 0.01,
+                  label: "Granulation contrast", width: 260, min: 0, max: 0.8, step: 0.01,
                   value: state.star.contrast, decimals: 2
                 )
                 Slider prominences(
-                  label: "Prominences", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Prominences", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.star.prominences, decimals: 2
                 )
                 Slider corona(
-                  label: "Corona glow", width: 236, min: 0, max: 3, step: 0.01,
+                  label: "Corona glow", width: 260, min: 0, max: 3, step: 0.01,
                   value: state.star.corona, decimals: 2
                 )
                 Slider spin(
-                  label: "Spin", width: 236, min: 0, max: 0.5, step: 0.005,
+                  label: "Spin", width: 260, min: 0, max: 0.5, step: 0.005,
                   value: state.star.spin, decimals: 3, unit: " rad/s"
                 )
               }
@@ -233,113 +236,116 @@ hud {
 
             // The parameter groups of the kind, in a column that scrolls. Each slider sets one
             // parameter of the Planet template in its own units
-            ScrollView groups(width: 276, height: 560, frame: false, focusable: false) {
+            ScrollView groups(
+              width: 276, height: 560, frame: false, transparent: true, overlay: true,
+              bar: 6, focusable: false
+            ) {
               if state.kind != KIND_GAS {
-                Collapsible surface(title: "Surface", value: true, width: 262) {
+                Collapsible surface(title: "Surface", value: true, width: 276) {
                   Slider ocean(
-                    label: "Ocean fraction", width: 236, min: 0, max: 0.95, step: 0.01,
+                    label: "Ocean fraction", width: 260, min: 0, max: 0.95, step: 0.01,
                     value: state.surface.ocean, decimals: 2
                   )
                   Slider continents(
-                    label: "Continent frequency", width: 236, min: 0.5, max: 3, step: 0.05,
+                    label: "Continent frequency", width: 260, min: 0.5, max: 3, step: 0.05,
                     value: state.surface.continents, decimals: 2
                   )
                   Slider warp(
-                    label: "Continent warp", width: 236, min: 0, max: 2, step: 0.01,
+                    label: "Continent warp", width: 260, min: 0, max: 2, step: 0.01,
                     value: state.surface.warp, decimals: 2
                   )
                   Slider mountains(
-                    label: "Mountain height", width: 236, min: 0, max: 0.4, step: 0.01,
+                    label: "Mountain height", width: 260, min: 0, max: 0.4, step: 0.01,
                     value: state.surface.mountains, decimals: 2
                   )
                   Slider mountain_cover(
-                    label: "Mountain cover", width: 236, min: 0.3, max: 0.7, step: 0.001,
+                    label: "Mountain cover", width: 260, min: 0.3, max: 0.7, step: 0.001,
                     value: state.surface.mountain_cover, decimals: 3
                   )
                   Slider craters(
-                    label: "Crater depth", width: 236, min: 0, max: 1, step: 0.01,
+                    label: "Crater depth", width: 260, min: 0, max: 1, step: 0.01,
                     value: state.surface.craters, decimals: 2
                   )
                   Slider cracks(
-                    label: "Crack depth", width: 236, min: 0, max: 0.2, step: 0.005,
+                    label: "Crack depth", width: 260, min: 0, max: 0.2, step: 0.005,
                     value: state.surface.cracks, decimals: 3
                   )
                   Slider plates(
-                    label: "Plates", width: 236, min: 8, max: 200, step: 1,
+                    label: "Plates", width: 260, min: 8, max: 200, step: 1,
                     value: state.surface.plates
                   )
                   Slider crack_shade(
-                    label: "Crack shade", width: 236, min: 0, max: 1, step: 0.05,
+                    label: "Crack shade", width: 260, min: 0, max: 1, step: 0.05,
                     value: state.surface.crack_shade, decimals: 2
                   )
                   Slider normal(
-                    label: "Normal strength", width: 236, min: 0, max: 8, step: 0.1,
+                    label: "Normal strength", width: 260, min: 0, max: 8, step: 0.1,
                     value: state.surface.normal, decimals: 1
                   )
                   Slider variation(
-                    label: "Ground variation", width: 236, min: 0, max: 0.4, step: 0.01,
+                    label: "Ground variation", width: 260, min: 0, max: 0.4, step: 0.01,
                     value: state.surface.variation, decimals: 2
                   )
                   Slider beach(
-                    label: "Beaches", width: 236, min: 0, max: 1, step: 0.01,
+                    label: "Beaches", width: 260, min: 0, max: 1, step: 0.01,
                     value: state.surface.beach, decimals: 2
                   )
                 }
 
-                Collapsible climate(title: "Climate", width: 262) {
+                Collapsible climate(title: "Climate", width: 276) {
                   Slider equator(
-                    label: "Equator temperature", width: 236, min: 0, max: 1.4, step: 0.005,
+                    label: "Equator temperature", width: 260, min: 0, max: 1.4, step: 0.005,
                     value: state.climate.equator, decimals: 3
                   )
                   Slider poles(
-                    label: "Pole temperature", width: 236, min: -0.6, max: 1.2, step: 0.001,
+                    label: "Pole temperature", width: 260, min: -0.6, max: 1.2, step: 0.001,
                     value: state.climate.poles, decimals: 3
                   )
                   Slider lapse(
-                    label: "Cooling with altitude", width: 236, min: 0, max: 0.6, step: 0.0005,
+                    label: "Cooling with altitude", width: 260, min: 0, max: 0.6, step: 0.0005,
                     value: state.climate.lapse, decimals: 3
                   )
                   Slider ice(
-                    label: "Sea ice below", width: 236, min: -0.2, max: 1.2, step: 0.01,
+                    label: "Sea ice below", width: 260, min: -0.2, max: 1.2, step: 0.01,
                     value: state.climate.ice, decimals: 2
                   )
                   Slider snow_line(
-                    label: "Snow below", width: 236, min: -0.2, max: 0.6, step: 0.0001,
+                    label: "Snow below", width: 260, min: -0.2, max: 0.6, step: 0.0001,
                     value: state.climate.snow_line, decimals: 3
                   )
                   Slider snow(
-                    label: "Snow amount", width: 236, min: 0, max: 1, step: 0.01,
+                    label: "Snow amount", width: 260, min: 0, max: 1, step: 0.01,
                     value: state.climate.snow, decimals: 2
                   )
                   Slider moisture(
-                    label: "Moisture", width: 236, min: 0, max: 1, step: 0.0001,
+                    label: "Moisture", width: 260, min: 0, max: 1, step: 0.0001,
                     value: state.climate.moisture, decimals: 3
                   )
                   Slider vegetation(
-                    label: "Vegetation", width: 236, min: 0, max: 1, step: 0.0001,
+                    label: "Vegetation", width: 260, min: 0, max: 1, step: 0.0001,
                     value: state.climate.vegetation, decimals: 3
                   )
                   Slider treeline(
-                    label: "Treeline", width: 236, min: 0, max: 1, step: 0.0005,
+                    label: "Treeline", width: 260, min: 0, max: 1, step: 0.0005,
                     value: state.climate.treeline, decimals: 3
                   )
                 }
               } else {
-                Collapsible gas(title: "Gas giant", value: true, width: 262) {
+                Collapsible gas(title: "Gas giant", value: true, width: 276) {
                   Slider bands(
-                    label: "Band frequency", width: 236, min: 4, max: 30, step: 0.01,
+                    label: "Band frequency", width: 260, min: 4, max: 30, step: 0.01,
                     value: state.gas.bands, decimals: 2
                   )
                   Slider turbulence(
-                    label: "Turbulence", width: 236, min: 0, max: 0.2, step: 0.005,
+                    label: "Turbulence", width: 260, min: 0, max: 0.2, step: 0.005,
                     value: state.gas.turbulence, decimals: 3
                   )
                   Slider drift(
-                    label: "Band drift", width: 236, min: 0, max: 90, step: 0.1,
+                    label: "Band drift", width: 260, min: 0, max: 90, step: 0.1,
                     value: state.gas.drift, decimals: 1, unit: "°"
                   )
                   Slider storms(
-                    label: "Storms", width: 236, min: 0, max: 0.5, step: 0.001,
+                    label: "Storms", width: 260, min: 0, max: 0.5, step: 0.001,
                     value: state.gas.storms, decimals: 3
                   )
                   assets.ColorField tint(
@@ -349,29 +355,29 @@ hud {
                 }
               }
 
-              Collapsible air(title: "Atmosphere", width: 262) {
+              Collapsible air(title: "Atmosphere", width: 276) {
                 Slider density(
-                  label: "Density", width: 236, min: 0, max: 2, step: 0.005,
+                  label: "Density", width: 260, min: 0, max: 2, step: 0.005,
                   value: state.air.density, decimals: 3
                 )
                 Slider rayleigh_height(
-                  label: "Rayleigh scale height", width: 236, min: 5, max: 300, step: 0.01,
+                  label: "Rayleigh scale height", width: 260, min: 5, max: 300, step: 0.01,
                   value: state.air.rayleigh_height, decimals: 1, unit: " km"
                 )
                 Slider rayleigh(
-                  label: "Rayleigh scattering", width: 236, min: 0, max: 0.2, step: 0.0001,
+                  label: "Rayleigh scattering", width: 260, min: 0, max: 0.2, step: 0.0001,
                   value: state.air.rayleigh, decimals: 4
                 )
                 Slider mie_height(
-                  label: "Mie scale height", width: 236, min: 1, max: 250, step: 0.01,
+                  label: "Mie scale height", width: 260, min: 1, max: 250, step: 0.01,
                   value: state.air.mie_height, decimals: 1, unit: " km"
                 )
                 Slider mie(
-                  label: "Mie scattering", width: 236, min: 0, max: 4, step: 0.0001,
+                  label: "Mie scattering", width: 260, min: 0, max: 4, step: 0.0001,
                   value: state.air.mie, decimals: 3
                 )
                 Slider anisotropy(
-                  label: "Mie anisotropy", width: 236, min: -0.9, max: 0.95, step: 0.01,
+                  label: "Mie anisotropy", width: 260, min: -0.9, max: 0.95, step: 0.01,
                   value: state.air.anisotropy, decimals: 2
                 )
                 assets.ColorField tint(
@@ -381,25 +387,25 @@ hud {
               }
 
               if state.kind != KIND_GAS {
-                Collapsible clouds(title: "Clouds", width: 262) {
+                Collapsible clouds(title: "Clouds", width: 276) {
                   Slider cover(
-                    label: "Cover", width: 236, min: 0.02, max: 0.98, step: 0.0001,
+                    label: "Cover", width: 260, min: 0.02, max: 0.98, step: 0.0001,
                     value: state.clouds.cover, decimals: 3
                   )
                   Slider opacity(
-                    label: "Opacity", width: 236, min: 0, max: 1, step: 0.0001,
+                    label: "Opacity", width: 260, min: 0, max: 1, step: 0.0001,
                     value: state.clouds.opacity, decimals: 3
                   )
                   Slider frequency(
-                    label: "Frequency", width: 236, min: 0.5, max: 5, step: 0.05,
+                    label: "Frequency", width: 260, min: 0.5, max: 5, step: 0.05,
                     value: state.clouds.frequency, decimals: 2
                   )
                   Slider speed(
-                    label: "Speed", width: 236, min: -0.2, max: 0.3, step: 0.001,
+                    label: "Speed", width: 260, min: -0.2, max: 0.3, step: 0.001,
                     value: state.clouds.speed, decimals: 3, unit: " rad/s"
                   )
                   Slider evolve(
-                    label: "Change rate", width: 236, min: 0, max: 0.05, step: 0.001,
+                    label: "Change rate", width: 260, min: 0, max: 0.05, step: 0.001,
                     value: state.clouds.evolve, decimals: 3
                   )
                   assets.ColorField color(
@@ -408,58 +414,58 @@ hud {
                   )
                 }
 
-                Collapsible night(title: "Night", width: 262) {
+                Collapsible night(title: "Night", width: 276) {
                   Checkbox lights(label: "City lights", value: state.night.lights)
                   Slider density(
-                    label: "City density", width: 236, min: 0, max: 4, step: 0.05,
+                    label: "City density", width: 260, min: 0, max: 4, step: 0.05,
                     value: state.night.density, decimals: 2
                   )
                   Slider brightness(
-                    label: "City brightness", width: 236, min: 0, max: 2, step: 0.05,
+                    label: "City brightness", width: 260, min: 0, max: 2, step: 0.05,
                     value: state.night.brightness, decimals: 2
                   )
                   Slider urban(
-                    label: "Urban tint", width: 236, min: 0, max: 1, step: 0.05,
+                    label: "Urban tint", width: 260, min: 0, max: 1, step: 0.05,
                     value: state.night.urban, decimals: 2
                   )
                 }
 
-                Collapsible lava(title: "Lava", width: 262) {
+                Collapsible lava(title: "Lava", width: 276) {
                   Slider level(
-                    label: "Lowlands filled", width: 236, min: 0, max: 0.5, step: 0.01,
+                    label: "Lowlands filled", width: 260, min: 0, max: 0.5, step: 0.01,
                     value: state.lava.level, decimals: 2
                   )
                   Slider cracks(
-                    label: "Crack glow", width: 236, min: 0, max: 1, step: 0.05,
+                    label: "Crack glow", width: 260, min: 0, max: 1, step: 0.05,
                     value: state.lava.cracks, decimals: 2
                   )
                   Slider emission(
-                    label: "Emission", width: 236, min: 0, max: 4, step: 0.1,
+                    label: "Emission", width: 260, min: 0, max: 4, step: 0.1,
                     value: state.lava.emission, decimals: 1
                   )
                 }
               }
 
-              Collapsible rings(title: "Rings", width: 262) {
+              Collapsible rings(title: "Rings", width: 276) {
                 Checkbox enabled(label: "Rings", value: state.rings.enabled)
                 Slider size(
-                  label: "Outer radius", width: 236, min: 1.2, max: 4, step: 0.05,
+                  label: "Outer radius", width: 260, min: 1.2, max: 4, step: 0.05,
                   value: state.rings.size, decimals: 2, unit: " r"
                 )
                 Slider inner(
-                  label: "Inner edge", width: 236, min: 0, max: 3, step: 0.05,
+                  label: "Inner edge", width: 260, min: 0, max: 3, step: 0.05,
                   value: state.rings.inner, decimals: 2, unit: " r"
                 )
                 Slider ringlets(
-                  label: "Ringlet contrast", width: 236, min: 0, max: 1, step: 0.05,
+                  label: "Ringlet contrast", width: 260, min: 0, max: 1, step: 0.05,
                   value: state.rings.ringlets, decimals: 2
                 )
                 Slider gaps(
-                  label: "Gaps", width: 236, min: 0, max: 1, step: 0.05,
+                  label: "Gaps", width: 260, min: 0, max: 1, step: 0.05,
                   value: state.rings.gaps, decimals: 2
                 )
                 Slider opacity(
-                  label: "Opacity", width: 236, min: 0, max: 1, step: 0.05,
+                  label: "Opacity", width: 260, min: 0, max: 1, step: 0.05,
                   value: state.rings.opacity, decimals: 2
                 )
                 assets.ColorField color(
@@ -468,21 +474,21 @@ hud {
                 )
               }
 
-              Collapsible body(title: "Body", width: 262) {
+              Collapsible body(title: "Body", width: 276) {
                 Slider radius(
-                  label: "Radius", width: 236, min: 0.5, max: 3, step: 0.1,
+                  label: "Radius", width: 260, min: 0.5, max: 3, step: 0.1,
                   value: state.body.radius, decimals: 1
                 )
                 Slider tilt(
-                  label: "Axial tilt", width: 236, min: -60, max: 60, step: 0.1,
+                  label: "Axial tilt", width: 260, min: -60, max: 60, step: 0.1,
                   value: state.body.tilt, decimals: 1, unit: "°"
                 )
                 Slider lean(
-                  label: "Lean toward view", width: 236, min: -60, max: 60, step: 0.1,
+                  label: "Lean toward view", width: 260, min: -60, max: 60, step: 0.1,
                   value: state.body.lean, decimals: 1, unit: "°"
                 )
                 Slider spin(
-                  label: "Spin", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Spin", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.body.spin, decimals: 2, unit: " rad/s"
                 )
               }
@@ -504,42 +510,45 @@ hud {
 
             Separator background_top_rule()
 
-            ScrollView background_groups(width: 276, height: 680, frame: false, focusable: false) {
-              Collapsible stars(title: "Stars", value: true, width: 262) {
+            ScrollView background_groups(
+              width: 276, height: 680, frame: false, transparent: true, overlay: true,
+              bar: 6, focusable: false
+            ) {
+              Collapsible stars(title: "Stars", value: true, width: 276) {
                 Slider count(
-                  label: "Count", width: 236, min: 0, max: 200000, step: 500,
+                  label: "Count", width: 260, min: 0, max: 200000, step: 500,
                   value: state.background.count
                 )
                 Slider brightness(
-                  label: "Brightness", width: 236, min: 0, max: 20, step: 0.1,
+                  label: "Brightness", width: 260, min: 0, max: 20, step: 0.1,
                   value: state.background.brightness, decimals: 1
                 )
                 Slider falloff(
-                  label: "Falloff", width: 236, min: 0, max: 12, step: 0.1,
+                  label: "Falloff", width: 260, min: 0, max: 12, step: 0.1,
                   value: state.background.falloff, decimals: 1
                 )
                 Slider size(
-                  label: "Size", width: 236, min: 0.3, max: 4, step: 0.05,
+                  label: "Size", width: 260, min: 0.3, max: 4, step: 0.05,
                   value: state.background.size, decimals: 2, unit: " px"
                 )
                 Slider temperature_min(
-                  label: "Coolest", width: 236, min: 1500, max: 15000, step: 50,
+                  label: "Coolest", width: 260, min: 1500, max: 15000, step: 50,
                   value: state.background.temperature_min, unit: " K"
                 )
                 Slider temperature_max(
-                  label: "Hottest", width: 236, min: 3000, max: 40000, step: 100,
+                  label: "Hottest", width: 260, min: 3000, max: 40000, step: 100,
                   value: state.background.temperature_max, unit: " K"
                 )
                 Slider saturation(
-                  label: "Saturation", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Saturation", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.background.saturation, decimals: 2
                 )
                 Slider band(
-                  label: "Band", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Band", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.background.band, decimals: 2
                 )
                 Slider band_width(
-                  label: "Band width", width: 236, min: 0.5, max: 40, step: 0.1,
+                  label: "Band width", width: 260, min: 0.5, max: 40, step: 0.1,
                   value: state.background.band_width, decimals: 1, unit: "°"
                 )
                 assets.Field star_field_variant(text: "Seed") {
@@ -547,7 +556,7 @@ hud {
                 }
               }
 
-              Collapsible nebula(title: "Nebula", value: true, width: 262) {
+              Collapsible nebula(title: "Nebula", value: true, width: 276) {
                 assets.Field nebula_type(text: "Kind") {
                   Dropdown nebula_kind(
                     options: ["Emission", "Supernova remnant", "Reflection"],
@@ -555,35 +564,35 @@ hud {
                   )
                 }
                 Slider intensity(
-                  label: "Intensity", width: 236, min: 0, max: 3, step: 0.01,
+                  label: "Intensity", width: 260, min: 0, max: 3, step: 0.01,
                   value: state.background.intensity, decimals: 2
                 )
                 Slider span(
-                  label: "Size", width: 236, min: 16, max: 90, step: 0.5,
+                  label: "Size", width: 260, min: 16, max: 90, step: 0.5,
                   value: state.background.span, decimals: 1, unit: "°"
                 )
                 Slider nebula_yaw(
-                  label: "Yaw", width: 236, min: -180, max: 180, step: 0.5,
+                  label: "Yaw", width: 260, min: -180, max: 180, step: 0.5,
                   value: state.background.nebula_yaw, decimals: 1, unit: "°"
                 )
                 Slider nebula_pitch(
-                  label: "Pitch", width: 236, min: -90, max: 90, step: 0.5,
+                  label: "Pitch", width: 260, min: -90, max: 90, step: 0.5,
                   value: state.background.nebula_pitch, decimals: 1, unit: "°"
                 )
                 Slider filaments(
-                  label: "Filaments", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Filaments", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.background.filaments, decimals: 2
                 )
                 Slider pillars(
-                  label: "Pillars", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Pillars", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.background.pillars, decimals: 2
                 )
                 Slider dust(
-                  label: "Dust", width: 236, min: 0, max: 1, step: 0.01,
+                  label: "Dust", width: 260, min: 0, max: 1, step: 0.01,
                   value: state.background.dust, decimals: 2
                 )
                 Slider glow(
-                  label: "Star", width: 236, min: 0, max: 4, step: 0.01,
+                  label: "Star", width: 260, min: 0, max: 4, step: 0.01,
                   value: state.background.glow, decimals: 2
                 )
                 assets.ColorField halpha(
@@ -605,13 +614,13 @@ hud {
                 }
               }
 
-              Collapsible orientation(title: "Orientation", width: 262) {
+              Collapsible orientation(title: "Orientation", width: 276) {
                 Slider yaw(
-                  label: "Yaw", width: 236, min: -180, max: 180, step: 0.5,
+                  label: "Yaw", width: 260, min: -180, max: 180, step: 0.5,
                   value: state.background.yaw, decimals: 1, unit: "°"
                 )
                 Slider tilt(
-                  label: "Tilt", width: 236, min: -90, max: 90, step: 0.5,
+                  label: "Tilt", width: 260, min: -90, max: 90, step: 0.5,
                   value: state.background.tilt, decimals: 1, unit: "°"
                 )
               }
