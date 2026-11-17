@@ -319,6 +319,7 @@ void Transition_query_write_starts(void) {
         }
     }
 
+    ecs_modified(world, e, Position);
     tr_frame(world);
     test_int(tr_records(null, BOX_RENDER_TRANSITION_START), 1);
     test_flt(tr_position(world, e).x, 0);

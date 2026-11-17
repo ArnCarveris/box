@@ -103,8 +103,9 @@ Everything else (`DirectionalLight`, `PbrTextures`, `WorldTransform`, `MaterialI
   value records the value. Only later changes animate.
 - A change starts from the currently rendered value, with the full delay and duration; no jumps on
   interrupt. Equal writes do nothing.
-- Changes are detected by comparing values each frame, also writes without `OnSet`. A value
-  changed every frame restarts every frame (looks smoothed/laggy).
+- Changes are detected through `OnSet`: a write without one (a raw query field without
+  `ecs_modified`) does not start a transition. A value changed every frame restarts every frame
+  (looks smoothed/laggy).
 - Add/remove snaps unless the entry has `on_add`/`on_remove`. `on_add` only when the entity had no
   value (owned or inherited); `on_remove` only when no inherited value remains (else snaps to it).
   Re-adding during an animate-out (or removing during animate-in) continues from the rendered value.
@@ -150,9 +151,11 @@ pending map. Edge case: set, `ecs_remove(Transition)`, then remove on one stage 
 
 ## Cost and implementation
 
-- Entities without `Transition` cost nothing. Idle nodes compare their listed components each
-  frame; active ones add packet records and patches. No shader transition logic.
-- Extract: `src/render/transitions.c`; render-thread resolver: `src/render/transition.c`
+- Entities without `Transition` cost nothing, and neither do idle nodes. Only changed entities
+  and running nodes are compared; active ones add packet records and patches. No shader
+  transition logic.
+- Extract: `src/render/transitions.c` (+ `transition_nodes.c` for the observers and the visit of
+  changed entities); render-thread resolver: `src/render/transition.c`
   (+ `transition_material.c`, `transition_light.c`, `transition_box_shadow.c`,
   `transition_bounds.c` for conservative shadow-caster bounds).
 - Benchmark: `bake3 run --cfg release bench/render --local-env -- Transition`.

@@ -3,9 +3,9 @@
  * @brief Transition extract: finds the changes of transitioned components on the game thread
  * and sends them to the transition resolver as packet records.
  *
- * One cached query over the entities with Transition, owned or inherited over IsA, prefabs
- * included, compares each transitioned component to the last target it sent. Entities without
- * Transition are not visited, and a world that does not use Transition matches no table.
+ * The entities whose Transition or transitioned components changed and the nodes whose
+ * transitions run or leave compare each transitioned component to the last target sent
+ * (transition_nodes.c), so an entity that did not change is not visited.
  *
  * Shapes a transform transition moves carry TransitionTransform, shapes whose shading one
  * patches TransitionMaterial, shapes under an Opacity transition TransitionOpacity and shapes
@@ -910,13 +910,9 @@ static void box_transition_materials(
     box_transition_fade_tag(world, s);
 }
 
-/** Find the changes of the transitioned components of the entities with Transition, send the
- * creation of a node for each new one and the destruction of the nodes of entities that lost
- * Transition or were deleted.
- *
- * An entity that owns Transition is a node. One that inherits it is a node only when its table
- * owns a value the map lists, as the transition of an inherited value belongs to its owner; the
- * map of such a table is looked up once.
+/** Find the changes of the transitioned components of the entities that changed since the
+ * last extract and of the nodes whose transitions run or leave, then walk what the active
+ * transitions reach.
  *
  * @param it The iterator of the system
  */
@@ -925,75 +921,7 @@ static void BoxRenderExtractTransitions(
 {
     box_render_transitions_t *s = it->ctx;
     ecs_world_t *world = it->world;
-    box_render_packet_t *p = NULL;
-    int32_t i, c, seen = 0;
-    uint32_t mask = 0;
-    s->stamp ++;
-    s->leaving = 0;
-    ecs_vec_clear(&s->running);
-    ecs_iter_t qit = ecs_query_iter(world, s->query);
-    while (ecs_query_next(&qit)) {
-        const Transition *maps = ecs_field(&qit, Transition, 0);
-        TransitionNode *ids = ecs_field_is_set(&qit, 1)
-            ? ecs_field(&qit, TransitionNode, 1) : NULL;
-        bool shared = !ecs_field_is_self(&qit, 0);
-        void *columns[BOX_RENDER_TRANSITION_COMPONENTS];
-        const TransitionSpec *specs[BOX_RENDER_TRANSITION_COMPONENTS];
-        if (!p) {
-            p = box_render_packet(world);
-        }
-
-        for (c = 0; c < BOX_RENDER_TRANSITION_COMPONENTS; c ++) {
-            columns[c] = ecs_table_get_id(world, qit.table,
-                box_transitions_id((box_render_transition_component_t)c), qit.offset);
-        }
-
-        for (i = 0; i < qit.count; i ++) {
-            ecs_entity_t e = qit.entities[i];
-            bool owns = !shared;
-            if (!shared || !i) {
-                owns |= box_transitions_specs(world, &maps[i], columns, specs, &mask);
-            }
-
-            if (!owns && !i) {
-                break;
-            }
-
-            uint32_t id = ids ? ids[i].id : 0;
-            box_transition_node_t *node = box_transitions_node_state(s, id);
-            if (!node || node->entity != e) {
-                id = box_transitions_node_new(s, p, e, ids ? &ids[i] : NULL);
-                node = ecs_vec_get_t(&s->nodes, box_transition_node_t, (int32_t)id);
-            }
-
-            uint32_t visit = mask | node->live;
-            node->seen = s->stamp;
-            seen ++;
-            for (c = 0; visit >> c; c ++) {
-                box_render_transition_component_t component =
-                    (box_render_transition_component_t)c;
-                if (!(visit & (1u << c))) {
-                    continue;
-                }
-
-                const void *value = columns[c] ? ECS_ELEM(columns[c],
-                    box_render_transition_layout(component)->size, i) : NULL;
-                box_transitions_compare(world, s, p, e, id, component, &node->slots[c],
-                    specs[c], value);
-                box_transitions_track(node, component);
-            }
-
-            if (box_transitions_runs(node, p->time)) {
-                *ecs_vec_append_t(NULL, &s->running, int32_t) = (int32_t)id;
-            }
-        }
-    }
-
-    box_transitions_node_attach(world, s);
-    if (seen != s->node_count) {
-        p = box_transitions_sweep(world, s, p);
-    }
-
+    box_render_packet_t *p = box_transitions_changes(world, s);
     box_transition_affect(world, s, s->node_count ? p : NULL);
     box_transition_materials(world, s, s->node_count ? p : NULL);
     box_transitions_box_shadows(world, s, s->node_count ? p : NULL);
@@ -1772,10 +1700,14 @@ done:
  *
  * @param ctx The state
  */
-static void box_transitions_free(
+void box_transitions_release(
     void *ctx)
 {
     box_render_transitions_t *s = ctx;
+    if (-- s->refs) {
+        goto done;
+    }
+
     ecs_map_fini(&s->moving);
     ecs_map_fini(&s->tagged);
     ecs_map_fini(&s->tagged_material);
@@ -1795,7 +1727,10 @@ static void box_transitions_free(
     ecs_vec_fini_t(NULL, &s->instances, ecs_entity_t);
     ecs_vec_fini_t(NULL, &s->nodes, box_transition_node_t);
     ecs_vec_fini_t(NULL, &s->free, uint32_t);
-    ecs_vec_fini_t(NULL, &s->node_add, uint32_t);
+    ecs_vec_fini_t(NULL, &s->dirty, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &s->gone, uint32_t);
+    ecs_vec_fini_t(NULL, &s->revisit, uint32_t);
+    ecs_vec_fini_t(NULL, &s->revisit_last, uint32_t);
     ecs_vec_fini_t(NULL, &s->running, int32_t);
     ecs_vec_fini_t(NULL, &s->items, box_transition_item_t);
     ecs_vec_fini_t(NULL, &s->stack, int32_t);
@@ -1807,6 +1742,8 @@ static void box_transitions_free(
     ecs_vec_fini_t(NULL, &s->shadow_regions, box_render_shadow_region_t);
     ecs_vec_fini_t(NULL, &s->shadow_last, box_render_shadow_region_t);
     ecs_os_free(s);
+done:
+    return;
 }
 
 box_render_transitions_t* box_render_transitions_get(
@@ -1916,7 +1853,10 @@ void box_render_transitions_init(
     ecs_vec_init_t(NULL, &s->instances, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &s->nodes, box_transition_node_t, 0);
     ecs_vec_init_t(NULL, &s->free, uint32_t, 0);
-    ecs_vec_init_t(NULL, &s->node_add, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->dirty, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &s->gone, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->revisit, uint32_t, 0);
+    ecs_vec_init_t(NULL, &s->revisit_last, uint32_t, 0);
     ecs_vec_init_t(NULL, &s->running, int32_t, 0);
     ecs_vec_init_t(NULL, &s->items, box_transition_item_t, 0);
     ecs_vec_init_t(NULL, &s->stack, int32_t, 0);
@@ -1934,21 +1874,21 @@ void box_render_transitions_init(
             .src.id = EcsSelf | EcsUp,
             .trav = EcsIsA,
             .inout = EcsIn
-        }, {
-            .id = ecs_id(TransitionNode),
-            .src.id = EcsSelf,
-            .oper = EcsOptional
         }},
         .flags = EcsQueryMatchPrefab,
-        .cache_kind = EcsQueryCacheAuto
+        .cache_kind = EcsQueryCacheNone
     });
+
+    s->rescan = true;
+    s->refs = 1;
+    box_transitions_observers(world, s);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "extract.Transitions" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractTransitions,
         .ctx = s,
-        .ctx_free = box_transitions_free,
+        .ctx_free = box_transitions_release,
         .immediate = true
     });
     ecs_singleton_set(world, RenderTransitionState, { .state = s });

@@ -7,8 +7,6 @@
 
 #include "transitions.h"
 
-ECS_COMPONENT_DECLARE(TransitionNode);
-
 _Static_assert(BOX_RENDER_TRANSITION_COMPONENTS <= 32, "a bit per component in node live");
 
 /** Send a start record and remember it as the last one of the slot.
@@ -272,130 +270,6 @@ bool box_transitions_runs(
     }
 
     return result;
-}
-
-box_render_packet_t* box_transitions_sweep(
-    ecs_world_t *world,
-    box_render_transitions_t *s,
-    box_render_packet_t *p)
-{
-    int32_t i, count = ecs_vec_count(&s->nodes);
-    for (i = 1; i < count && s->node_count; i ++) {
-        box_transition_node_t *node = ecs_vec_get_t(&s->nodes, box_transition_node_t, i);
-        if (!node->entity || node->seen == s->stamp) {
-            continue;
-        }
-
-        if (!p) {
-            p = box_render_packet(world);
-        }
-
-        box_render_packet_transition(p, BOX_RENDER_TRANSITION_DESTROY, (uint32_t)i);
-        box_transitions_lobes_left(world, s, node);
-        s->node_count --;
-        node->entity = 0;
-        *ecs_vec_append_t(NULL, &s->free, uint32_t) = (uint32_t)i;
-    }
-
-    return p;
-}
-
-uint32_t box_transitions_node_new(
-    box_render_transitions_t *s,
-    box_render_packet_t *p,
-    ecs_entity_t entity,
-    TransitionNode *out)
-{
-    uint32_t result;
-    int32_t free_count = ecs_vec_count(&s->free);
-    if (free_count) {
-        result = *ecs_vec_get_t(&s->free, uint32_t, free_count - 1);
-        ecs_vec_remove_last(&s->free);
-    } else {
-        result = (uint32_t)ecs_vec_count(&s->nodes);
-        if (!result) {
-            ecs_vec_append_t(NULL, &s->nodes, box_transition_node_t)->entity = 0;
-            result = 1;
-        }
-
-        ecs_vec_append_t(NULL, &s->nodes, box_transition_node_t);
-    }
-
-    box_transition_node_t *node = ecs_vec_get_t(
-        &s->nodes, box_transition_node_t, (int32_t)result);
-    ecs_os_memset_t(node, 0, box_transition_node_t);
-    node->entity = entity;
-    s->node_count ++;
-    if (out) {
-        out->id = result;
-    } else {
-        *ecs_vec_append_t(NULL, &s->node_add, uint32_t) = result;
-    }
-
-    box_render_packet_transition(p, BOX_RENDER_TRANSITION_CREATE, result);
-
-    return result;
-}
-
-/** Copy TransitionNode values: a copy is a new entity that has no node yet.
- *
- * @param dst The destination components
- * @param src The source components
- * @param count Number of components
- * @param ti Type info
- */
-static void box_transitions_node_copy(
-    void *dst,
-    const void *src,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    (void)src;
-    ecs_os_memset(dst, 0, ti->size * count);
-}
-
-/** Move TransitionNode values with the entity they belong to.
- *
- * @param dst The destination components
- * @param src The source components
- * @param count Number of components
- * @param ti Type info
- */
-static void box_transitions_node_move(
-    void *dst,
-    void *src,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    ecs_os_memcpy(dst, src, ti->size * count);
-}
-
-void box_transitions_node_define(
-    ecs_world_t *world)
-{
-    ECS_COMPONENT_DEFINE(world, TransitionNode);
-    ecs_set_hooks(world, TransitionNode, {
-        .ctor = flecs_default_ctor,
-        .copy = box_transitions_node_copy,
-        .move = box_transitions_node_move
-    });
-    ecs_add_pair(world, ecs_id(TransitionNode), EcsOnInstantiate, EcsDontInherit);
-}
-
-void box_transitions_node_attach(
-    ecs_world_t *world,
-    box_render_transitions_t *s)
-{
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&s->node_add); i ++) {
-        uint32_t id = *ecs_vec_get_t(&s->node_add, uint32_t, i);
-        const box_transition_node_t *node = box_transitions_node_state(s, id);
-        if (node && ecs_is_alive(world, node->entity)) {
-            ecs_ensure(world, node->entity, TransitionNode)->id = id;
-        }
-    }
-
-    ecs_vec_clear(&s->node_add);
 }
 
 const box_transition_node_t* box_transitions_running(
