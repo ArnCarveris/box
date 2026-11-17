@@ -588,7 +588,13 @@
                     "view_order_with_console",
                     "script_reload",
                     "script_missing_looked_for_on_open",
-                    "follows_window_resize"
+                    "follows_window_resize",
+                    "inspector_empty_without_selection",
+                    "select_entity_from_tree",
+                    "select_child_shows_parent_path",
+                    "chevron_does_not_select",
+                    "delete_selected_clears_selection",
+                    "select_unnamed_entity"
                 ]
             },
             {

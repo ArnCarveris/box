@@ -16,8 +16,14 @@
 /** Path of the title label the script template creates in the panel */
 #define EDITOR_TITLE BOX_EDITOR_PANEL ".title_bar.label"
 
-/** Path of the body of the panel that later widgets fill */
-#define EDITOR_BODY BOX_EDITOR_PANEL ".body"
+/** Path of the scroll view of the entity tree */
+#define EDITOR_BODY BOX_EDITOR_PANEL ".tree_view"
+
+/** Path of the entity tree */
+#define EDITOR_TREE EDITOR_BODY ".tree"
+
+/** Path of the inspector of the selected entity */
+#define EDITOR_INSPECTOR BOX_EDITOR_PANEL ".inspector_view.inspector"
 
 /** Create a world with box, the widget library and no surface.
  *
@@ -577,6 +583,349 @@ void Editor_follows_window_resize(void) {
         test_int(surface->height, 360);
         editor_check_window(world, (float)w, (float)h);
     }
+
+    ecs_fini(world);
+}
+
+/** Run frames until the editor script handled the events of the last input.
+ *
+ * @param world The world
+ */
+static void editor_frames(
+    ecs_world_t *world)
+{
+    int32_t i;
+    for (i = 0; i < 6; i ++) {
+        ecs_progress(world, 0);
+    }
+}
+
+/** Get a member of a component of an entity through its reflection.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param type The component
+ * @param member Name of the member, an entity
+ * @return The value of the member
+ */
+static ecs_entity_t editor_member(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t type,
+    const char *member)
+{
+    test_assert(type != 0);
+    const void *ptr = ecs_get_id(world, e, type);
+    test_assert(ptr != NULL);
+    ecs_meta_cursor_t cur = ecs_meta_cursor(world, type, ECS_CONST_CAST(void*, ptr));
+    test_int(ecs_meta_push(&cur), 0);
+    test_int(ecs_meta_member(&cur, member), 0);
+
+    return ecs_meta_get_entity(&cur);
+}
+
+/** Get the selected entity, the mut selected of the panel.
+ *
+ * @param world The world
+ * @return The selected entity, 0 when there is none
+ */
+static ecs_entity_t editor_selected(
+    ecs_world_t *world)
+{
+    return editor_member(world, ecs_lookup(world, BOX_EDITOR_PANEL),
+        ecs_lookup(world, BOX_EDITOR_TEMPLATE ".mut"), "selected");
+}
+
+/** Find the tree row of an entity below a parent of the editor content.
+ *
+ * @param world The world
+ * @param parent Where to look
+ * @param node The EntityTreeNode template
+ * @param e The entity of the row
+ * @return The EntityTreeNode instance of the entity, 0 when there is none
+ */
+static ecs_entity_t editor_find_node(
+    ecs_world_t *world,
+    ecs_entity_t parent,
+    ecs_entity_t node,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_children(world, parent);
+    while (!result && ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count && !result; i ++) {
+            ecs_entity_t child = it.entities[i];
+            if (ecs_has_id(world, child, node) &&
+                editor_member(world, child, node, "entity") == e)
+            {
+                result = child;
+            } else {
+                result = editor_find_node(world, child, node, e);
+            }
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+/** Get the head of the tree row of an entity, the part that is clicked.
+ *
+ * @param world The world
+ * @param e The entity of the row
+ * @return The head of the row
+ */
+static ecs_entity_t editor_head(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t node = editor_find_node(world, ecs_lookup(world, EDITOR_TREE),
+        ecs_lookup(world, "box.editor.EntityTreeNode"), e);
+    test_assert(node != 0);
+    ecs_entity_t result = ecs_lookup_child(world, node, "head");
+    test_assert(result != 0);
+
+    return result;
+}
+
+/** Click an entity of the editor with the left button, a press and a release on it.
+ *
+ * @param world The world
+ * @param target The entity clicked
+ */
+static void editor_click(
+    ecs_world_t *world,
+    ecs_entity_t target)
+{
+    test_assert(target != 0);
+    ecs_script_mouse_event(world, &(EcsScriptMouseEvent){ .target = target, .buttons = 1 });
+    ecs_script_mouse_event(world, &(EcsScriptMouseEvent){ .target = target });
+    editor_frames(world);
+}
+
+/** Get the text of a part of the inspector.
+ *
+ * @param world The world
+ * @param part Name of the part, as header
+ * @return The text, NULL when the part does not exist
+ */
+static const char* editor_inspector_text(
+    ecs_world_t *world,
+    const char *part)
+{
+    ecs_entity_t inspector = ecs_lookup(world, EDITOR_INSPECTOR);
+    test_assert(inspector != 0);
+    ecs_entity_t e = ecs_lookup_child(world, inspector, part);
+    const Text *t = e ? ecs_get(world, e, Text) : NULL;
+
+    return t ? t->value : NULL;
+}
+
+/** Check that a row is highlighted as selected with the selection color of the theme.
+ *
+ * @param world The world
+ * @param head The head of the row
+ * @param selected Whether it is selected
+ */
+static void editor_check_highlight(
+    ecs_world_t *world,
+    ecs_entity_t head,
+    bool selected)
+{
+    const UiTheme *theme = ecs_get(world, ecs_lookup(world, "box.ui.theme"), UiTheme);
+    const Rgb *c = ecs_get(world, head, Rgb);
+    if (selected) {
+        test_assert(c != NULL);
+        test_int(c->r, theme->selection.r);
+        test_int(c->g, theme->selection.g);
+        test_int(c->b, theme->selection.b);
+    } else {
+        test_assert(c == NULL || c->r != theme->selection.r || c->g != theme->selection.g ||
+            c->b != theme->selection.b);
+    }
+}
+
+void Editor_inspector_empty_without_selection(void) {
+    // editor/inspector
+    ecs_world_t *world = editor_world();
+    editor_open(world, true);
+    editor_frames(world);
+
+    test_uint(editor_selected(world), 0);
+    test_str(editor_inspector_text(world, "empty"), "No entity selected");
+    test_assert(editor_inspector_text(world, "header") == NULL);
+
+    ecs_entity_t inspector_view = ecs_lookup(world, BOX_EDITOR_PANEL ".inspector_view");
+    test_assert(inspector_view != 0);
+    test_assert(ecs_has(world, inspector_view, ClipChildren));
+
+    ecs_fini(world);
+}
+
+void Editor_select_entity_from_tree(void) {
+    // editor/inspector
+    ecs_world_t *world = editor_world();
+    ecs_entity_t alpha = ecs_entity(world, { .name = "alpha" });
+    ecs_entity_t beta = ecs_entity(world, { .name = "beta" });
+    editor_open(world, true);
+    editor_frames(world);
+
+    editor_click(world, editor_head(world, alpha));
+    test_uint(editor_selected(world), alpha);
+    test_str(editor_inspector_text(world, "header"), "alpha");
+    test_assert(editor_inspector_text(world, "parent_path") == NULL);
+    test_assert(editor_inspector_text(world, "empty") == NULL);
+    editor_check_highlight(world, editor_head(world, alpha), true);
+    editor_check_highlight(world, editor_head(world, beta), false);
+
+    // Clicking the selected row again keeps it selected
+    editor_click(world, editor_head(world, alpha));
+    test_uint(editor_selected(world), alpha);
+    editor_check_highlight(world, editor_head(world, alpha), true);
+
+    // Another row moves the selection
+    editor_click(world, editor_head(world, beta));
+    test_uint(editor_selected(world), beta);
+    test_str(editor_inspector_text(world, "header"), "beta");
+    editor_check_highlight(world, editor_head(world, alpha), false);
+    editor_check_highlight(world, editor_head(world, beta), true);
+
+    ecs_fini(world);
+}
+
+void Editor_select_child_shows_parent_path(void) {
+    // editor/inspector
+    ecs_world_t *world = editor_world();
+    ecs_entity_t parent = ecs_entity(world, { .name = "outer" });
+    ecs_entity_t mid = ecs_entity(world, { .name = "mid", .parent = parent });
+    ecs_entity_t child = ecs_entity(world, { .name = "inner", .parent = mid });
+    editor_open(world, true);
+    editor_frames(world);
+
+    editor_click(world, ecs_lookup_child(world, editor_head(world, parent), "toggle"));
+    editor_click(world, ecs_lookup_child(world, editor_head(world, mid), "toggle"));
+    editor_click(world, editor_head(world, child));
+
+    test_uint(editor_selected(world), child);
+    test_str(editor_inspector_text(world, "header"), "inner");
+    test_str(editor_inspector_text(world, "parent_path"), "outer.mid");
+    editor_check_highlight(world, editor_head(world, child), true);
+
+    editor_click(world, editor_head(world, mid));
+    test_uint(editor_selected(world), mid);
+    test_str(editor_inspector_text(world, "header"), "mid");
+    test_str(editor_inspector_text(world, "parent_path"), "outer");
+
+    ecs_fini(world);
+}
+
+void Editor_chevron_does_not_select(void) {
+    // editor/inspector
+    ecs_world_t *world = editor_world();
+    ecs_entity_t alpha = ecs_entity(world, { .name = "alpha" });
+    ecs_entity_t parent = ecs_entity(world, { .name = "outer" });
+    ecs_entity_t child = ecs_entity(world, { .name = "inner", .parent = parent });
+    editor_open(world, true);
+    editor_frames(world);
+
+    // Without a selection the chevron opens the row and selects nothing
+    ecs_entity_t toggle = ecs_lookup_child(world, editor_head(world, parent), "toggle");
+    test_assert(toggle != 0);
+    editor_click(world, toggle);
+    test_uint(editor_selected(world), 0);
+    test_assert(editor_head(world, child) != 0);
+    test_str(editor_inspector_text(world, "empty"), "No entity selected");
+
+    // With a selection it closes the row and keeps the selection
+    editor_click(world, editor_head(world, alpha));
+    test_uint(editor_selected(world), alpha);
+    editor_click(world, ecs_lookup_child(world, editor_head(world, parent), "toggle"));
+    test_uint(editor_selected(world), alpha);
+    test_assert(editor_find_node(world, ecs_lookup(world, EDITOR_TREE),
+        ecs_lookup(world, "box.editor.EntityTreeNode"), child) == 0);
+    editor_check_highlight(world, editor_head(world, parent), false);
+
+    // And opens it again
+    editor_click(world, ecs_lookup_child(world, editor_head(world, parent), "toggle"));
+    test_uint(editor_selected(world), alpha);
+    test_assert(editor_head(world, child) != 0);
+    test_str(editor_inspector_text(world, "header"), "alpha");
+
+    ecs_fini(world);
+}
+
+/** Delete the entity of a row with its delete button, which shows while the row is hovered.
+ *
+ * @param world The world
+ * @param e The entity of the row
+ */
+static void editor_delete_row(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t head = editor_head(world, e);
+    ecs_script_mouse_event(world, &(EcsScriptMouseEvent){ .target = head });
+    editor_frames(world);
+    ecs_entity_t remove = ecs_lookup_child(world, editor_head(world, e), "remove");
+    test_assert(remove != 0);
+    editor_click(world, remove);
+}
+
+void Editor_delete_selected_clears_selection(void) {
+    // editor/inspector
+    ecs_world_t *world = editor_world();
+    ecs_entity_t alpha = ecs_entity(world, { .name = "alpha" });
+    ecs_entity_t beta = ecs_entity(world, { .name = "beta" });
+    ecs_entity_t parent = ecs_entity(world, { .name = "outer" });
+    ecs_entity_t child = ecs_entity(world, { .name = "inner", .parent = parent });
+    editor_open(world, true);
+    editor_frames(world);
+
+    // Deleting another entity keeps the selection
+    editor_click(world, editor_head(world, alpha));
+    test_uint(editor_selected(world), alpha);
+    editor_delete_row(world, beta);
+    test_assert(!ecs_is_alive(world, beta));
+    test_uint(editor_selected(world), alpha);
+    test_str(editor_inspector_text(world, "header"), "alpha");
+
+    // Deleting the selected entity clears it
+    editor_delete_row(world, alpha);
+    test_assert(!ecs_is_alive(world, alpha));
+    test_uint(editor_selected(world), 0);
+    test_str(editor_inspector_text(world, "empty"), "No entity selected");
+
+    // So does deleting an ancestor of it
+    editor_click(world, ecs_lookup_child(world, editor_head(world, parent), "toggle"));
+    editor_click(world, editor_head(world, child));
+    test_uint(editor_selected(world), child);
+    editor_delete_row(world, parent);
+    test_assert(!ecs_is_alive(world, parent));
+    test_assert(!ecs_is_alive(world, child));
+    test_uint(editor_selected(world), 0);
+    test_str(editor_inspector_text(world, "empty"), "No entity selected");
+
+    ecs_fini(world);
+}
+
+void Editor_select_unnamed_entity(void) {
+    // editor/inspector
+    ecs_world_t *world = editor_world();
+    ecs_entity_t e = ecs_new(world);
+    editor_open(world, true);
+    editor_frames(world);
+
+    editor_click(world, editor_head(world, e));
+    test_uint(editor_selected(world), e);
+    char expect[32];
+    snprintf(expect, sizeof(expect), "#%u", (uint32_t)e);
+    test_str(editor_inspector_text(world, "header"), expect);
+    test_assert(editor_inspector_text(world, "parent_path") == NULL);
+    editor_check_highlight(world, editor_head(world, e), true);
 
     ecs_fini(world);
 }

@@ -1,6 +1,8 @@
 // The editor, a panel on the right quarter of the surface at full height, open over the default
 // scene: its own UI scene and view, drawn after the 3D view and its effects. The panel is the
-// EditorPanel template of etc/editor/editor.flecs, a title bar over an empty body.
+// EditorPanel template of etc/editor/editor.flecs: a title bar over the entity tree and, under a
+// separator, the inspector area, each in its own scroll view sharing the height of the panel. No
+// entity is selected, so the inspector shows "No entity selected".
 include test/assets/ui/widgets
 
 using box.transform

@@ -12,6 +12,13 @@ using box.transform
 using box.transition
 using box.widgets
 
+// A row of the tree asks the panel to select its entity, 0 to clear the selection
+event EditorSelect(target: entity)
+
+// The delete button of a row asks the panel to delete its entity, which clears the selection
+// when it is the selected entity or an ancestor of it
+event EditorDelete(target: entity)
+
 template TreeIconButton : HeadlessButton {
   prop icon: string = "add"
   prop size: f32 = 20
@@ -130,6 +137,7 @@ template EntityTreeNode {
   prop label: string = ""
   prop depth: i32 = 0
   prop indent: f32 = 16
+  prop selected: entity = 0
 
   mut open = false
   mut hover = false
@@ -137,6 +145,7 @@ template EntityTreeNode {
   const t = box.ui.theme[Theme]
   const chevron = 10
   const inset = t.padding / 2 + depth * indent
+  const picked = selected != 0 && selected == entity
 
   query kids {
     (flecs.core.ChildOf, $entity), ?flecs.core.Prefab, ?(flecs.core.Identifier, flecs.core.Name)
@@ -150,14 +159,24 @@ template EntityTreeNode {
     Cursor: {CursorPointer}
     Layout: {direction: Row, spacing: t.spacing / 2, padding: {0, 0, inset, t.padding / 2}, v: Middle}
     Item: {width: {mode: Grow}, height: {mode: Fixed, value: t.control_height}}
-    if hover {
+    if picked {
+      Rect: {1, 1}
+      Rgb: t.selection
+      Border: {width: 0, radius: t.radius}
+    } else if hover {
       Rect: {1, 1}
       Rgb: t.hover
       Border: {width: 0, radius: t.radius}
     }
 
     if kids {
-      Chevron toggle(direction: open ? "down" : "right", size: chevron, color: t.text_muted)
+      toggle {
+        Interactive
+        Layout: {}
+        Item: {width: {mode: Fixed, value: chevron}, height: {mode: Fixed, value: chevron}}
+
+        Chevron icon(direction: open ? "down" : "right", size: chevron, color: t.text_muted)
+      }
     } else {
       leaf {
         Item: {width: {mode: Fixed, value: chevron}, height: {mode: Fixed, value: chevron}}
@@ -201,11 +220,15 @@ template EntityTreeNode {
           const name = e.name()
           if name != "" {
             "n_{name}" {
-              EntityTreeNode: {entity: e, label: name, depth: depth + 1, indent: indent}
+              EntityTreeNode: {
+                entity: e, label: name, depth: depth + 1, indent: indent, selected: selected
+              }
             }
           } else {
             "a_{e}" {
-              EntityTreeNode: {entity: e, label: "{e}", depth: depth + 1, indent: indent}
+              EntityTreeNode: {
+                entity: e, label: "{e}", depth: depth + 1, indent: indent, selected: selected
+              }
             }
           }
         }
@@ -225,8 +248,13 @@ template EntityTreeNode {
   async {
     while true {
       const e = await on.activate(head)
-      if ui.activation(e) == head {
-        open = !open
+      const a = ui.activation(e)
+      if a == head {
+        emit EditorSelect(target: entity)
+      } else if a != 0 {
+        if a.name() == "toggle" {
+          open = !open
+        }
       }
     }
   }
@@ -236,7 +264,7 @@ template EntityTreeNode {
       const e = await on.change(head)
       const w = e.widget.name()
       if w == "remove" {
-        flecs.script.shell.commands.core.rm(entity)
+        emit EditorDelete(target: entity)
       } else if w == "add" {
         const child = new {}
         flecs.script.shell.commands.core.add(
@@ -249,6 +277,7 @@ template EntityTreeNode {
 
 template EntityTree {
   prop indent: f32 = 16
+  prop selected: entity = 0
 
   const t = box.ui.theme[Theme]
 
@@ -267,11 +296,11 @@ template EntityTree {
       const name = e.name()
       if name != "" {
         "n_{name}" {
-          EntityTreeNode: {entity: e, label: name, indent: indent}
+          EntityTreeNode: {entity: e, label: name, indent: indent, selected: selected}
         }
       } else {
         "a_{e}" {
-          EntityTreeNode: {entity: e, label: "{e}", indent: indent}
+          EntityTreeNode: {entity: e, label: "{e}", indent: indent, selected: selected}
         }
       }
     }
@@ -287,9 +316,47 @@ template EntityTree {
   }
 }
 
+// The selected entity: a header with its name, its id when it has none, and the path of its
+// parent under it. The components of the entity go below the header.
+template EntityInspector {
+  prop entity: entity = 0
+
+  const t = box.ui.theme[Theme]
+  const subject = entity
+
+  Layout: {direction: Column, spacing: t.spacing / 2}
+  Item: {width: {mode: Grow}}
+
+  if subject != 0 {
+    const name = subject.name()
+    const up = subject.parent()
+
+    header {
+      if name != "" {
+        Label: {text: name, variant: "heading"}
+      } else {
+        Label: {text: "{subject}", variant: "heading"}
+      }
+    }
+
+    if up != 0 {
+      parent_path {
+        Label: {text: up.path(), variant: "muted"}
+      }
+    }
+  } else {
+    empty {
+      Label: {text: "No entity selected", variant: "muted"}
+    }
+  }
+}
+
 template EditorPanel {
   prop title: string = "Entities"
 
+  mut selected: entity = 0
+
+  const none: entity = 0
   const t = box.ui.theme[Theme]
   const bar_h = t.heading_font_size * 1.25 + t.padding * 2
 
@@ -313,7 +380,40 @@ template EditorPanel {
     Separator: {}
   }
 
-  ScrollView body {
-    EntityTree tree
+  ScrollView tree_view {
+    EntityTree tree(selected: selected)
+  }
+
+  divider {
+    Separator: {}
+  }
+
+  ScrollView inspector_view {
+    EntityInspector inspector(entity: selected)
+  }
+
+  async {
+    while true {
+      const e = await EditorSelect
+      selected = e.target
+    }
+  }
+
+  async {
+    while true {
+      const e = await EditorDelete
+      mut covered: bool = false
+      mut up: entity = selected
+      while up != 0 {
+        if up == e.target {
+          covered = true
+        }
+        up = up.parent()
+      }
+      if covered {
+        selected = none
+      }
+      flecs.script.shell.commands.core.rm(e.target)
+    }
   }
 }
