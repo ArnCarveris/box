@@ -19,10 +19,13 @@ state {
   export const HINT_TIME: f32 = 6
   export const POP_TIME: f32 = 0.18
   export const LOST_ALPHA: f32 = 0.22
+  // Seconds the "Faster!" cue stays up once the pace steps up
+  export const FASTER_TIME: f32 = 1.4
 
   // Written by the HUD loop only when they change, so the HUD does not rebuild every frame
   export mut hud_hint: bool = true
   export mut hud_pop: bool = false
+  export mut hud_faster: bool = false
   // True from the frame after the game is over, so the capsized panel is created clear and fades in
   export mut hud_panel: bool = false
 }
@@ -153,6 +156,18 @@ lg_hud {
       }
     }
 
+    // A small cue under the top edge when the pace steps up
+    faster {
+      Item: {h: Center, v: Top, y: -24}
+      Layout: {direction: Row, padding: {6, 6, 16, 16}}
+      Rect: {1, 1}
+      Rgb: C_HUD_BG
+      Border: {width: 2, radius: 16, color: {255, 210, 136, 255}}
+      Transition: [Opacity: {duration: 0.35, timing_function: EaseOut}]
+      Opacity: {hud_faster ? 0.9 : 0}
+      LgShadowText label(text: "Faster!", size: 24, color: {255, 222, 150})
+    }
+
     hint {
       Item: {h: Center, v: Bottom, y: 24}
       Layout: {direction: Row, padding: {8, 8, 18, 18}}
@@ -222,6 +237,8 @@ lg_hud {
 async {
   mut last_nuts: i32 = coconuts
   mut pop_t: f32 = 0
+  mut last_pace: f32 = pace
+  mut faster_t: f32 = 0
   mut was_over: bool = false
 
   while true {
@@ -250,6 +267,26 @@ async {
     }
 
     last_nuts = coconuts
+
+    if pace > last_pace && game_state == GS_PLAYING {
+      faster_t = FASTER_TIME
+    }
+
+    last_pace = pace
+
+    if game_state != GS_PLAYING {
+      faster_t = 0
+    }
+
+    if faster_t > 0 {
+      faster_t -= dt
+    }
+
+    const fast = faster_t > 0
+
+    if fast != hud_faster {
+      hud_faster = fast
+    }
 
     if pop_t > 0 {
       pop_t -= dt

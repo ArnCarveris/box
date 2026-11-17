@@ -356,8 +356,7 @@ async {
       // hazards. Rows seeded closer at the start rise in by time (lg_sink).
       while distance >= next_row {
         const zs = 0 - (next_row + SPAWN_AHEAD)
-        const diff = lg_difficulty()
-        const gw = FOOT_W + GAP_MARGIN_EASY + (GAP_MARGIN_HARD - GAP_MARGIN_EASY) * diff
+        const gw = FOOT_W + lg_knob(GAP_MARGIN_EASY, GAP_MARGIN_HARD)
         const gh = (gw - FOOT_W) / 2
 
         // The corridor before, or the footprint of the canoe as a corridor that the hull leaves
@@ -376,9 +375,10 @@ async {
         const ph = (pw - FOOT_W) / 2
 
         // The speed the canoe may have by then (every live coconut and this row's line picked
-        // up) sets the time to steer, and that the shift of the corridor
+        // up) sets the time to steer, and that the shift of the corridor, kept small while the
+        // run is easy
         const vb = lg_speed_bound(NUTS_PER_LINE)
-        const shift = lg_shift_max(pz - zs, vb)
+        const shift = lg_shift_max(pz - zs, vb) * lg_knob(SHIFT_EASY, SHIFT_HARD)
         const lo = 0 - WATER_HALF + GAP_SHORE + gw / 2
         const hi = WATER_HALF - GAP_SHORE - gw / 2
         mut ga: f64 = clamp(px + ph - gh - shift, lo, hi)
@@ -404,15 +404,17 @@ async {
         const dir = rng.f(1) < 0.5 ? 1.0 : -1.0
         const blo = dir > 0 ? gx - gw / 2 : 0 - gx - gw / 2
         const bhi = blo + gw
-        const spread = HAZ_GAP_EASY + (HAZ_GAP_HARD - HAZ_GAP_EASY) * diff
+        const spread = lg_knob(HAZ_GAP_EASY, HAZ_GAP_HARD)
+        const count = min(HAZARDS_PER_ROW, floor(lg_knob(HAZ_COUNT_EASY, HAZ_COUNT_HARD) + 0.5))
+        const log_chance = lg_knob(LOG_CHANCE_EASY, LOG_CHANCE_HARD)
         mut cx: f64 = 0 - WATER_HALF + HAZ_SHORE
         mut placed: i32 = 0
         mut placed_logs: i32 = 0
 
-        while placed < HAZARDS_PER_ROW {
+        while placed < count {
           const rs = lg_free_rock()
           const ls = lg_free_log()
-          const want_log = rng.f(1) < LOG_CHANCE
+          const want_log = rng.f(1) < log_chance
           const is_log = ls >= 0 && placed_logs < LOGS_PER_ROW && (want_log || rs < 0)
 
           // Plan fewer hazards rather than skip one for a full pool
@@ -471,7 +473,7 @@ async {
           const x0 = clamp(hx, px - ph - FOOT_CX, px + ph - FOOT_CX)
           mut bulge: f64 = 0
 
-          if rng.f(1) < NUT_RISK_CHANCE {
+          if rng.f(1) < lg_knob(NUT_RISK_EASY, NUT_RISK_HARD) {
             bulge = (rng.f(2) - 1) * NUT_RISK_BULGE
           }
 
@@ -502,7 +504,7 @@ async {
         }
 
         rows += 1
-        next_row += speed * lg_row_time(speed)
+        next_row += speed * lg_knob(ROW_TIME_EASY, ROW_TIME_HARD)
       }
 
       if invulnerable > 0 {
@@ -563,10 +565,6 @@ async {
             nuts[i].live = false
             coconuts += 1
             const b = box.particle.burst_at(assets.LgSparkle, {nuts[i].x, 0.5, wz}, 1)
-
-            if coconuts % COCONUTS_PER_STEP == 0 {
-              speed = min(MAX_SPEED, speed + SPEED_STEP)
-            }
           }
         }
       }

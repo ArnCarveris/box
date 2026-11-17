@@ -165,6 +165,27 @@ async {
         lean += (want - lean) * min(1, d * LEAN_RATE)
       }
 
+      // The difficulty only rises; its pace step sets the speed, which eases toward it
+      const diff = max(difficulty, lg_diff_at(coconuts, distance))
+
+      if diff != difficulty {
+        difficulty = diff
+      }
+
+      const p = lg_pace_at(difficulty)
+
+      if p != pace {
+        pace = p
+      }
+
+      const want_speed = lg_pace_speed(pace)
+
+      if abs(want_speed - speed) > 0.001 {
+        speed += (want_speed - speed) * min(1, d * SPEED_EASE)
+      } else if speed != want_speed {
+        speed = want_speed
+      }
+
       paddle_phase += d * (2.2 + speed * 0.08)
       distance += speed * d
     } else if game_state == GS_OVER {
