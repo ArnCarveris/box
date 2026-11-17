@@ -208,6 +208,15 @@
                     "shore_costs_no_life",
                     "scenery_clear_of_water"
                 ]
+            },
+            {
+                "id": "LagoonLife",
+                "testcases": [
+                    "wake_follows_canoe",
+                    "flotsam_pooled_in_water",
+                    "fish_jumps_clear_of_canoe",
+                    "birds_circle_high"
+                ]
             }
         ]
     }

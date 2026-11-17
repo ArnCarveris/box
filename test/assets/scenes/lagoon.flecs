@@ -6,6 +6,7 @@ include lagoon/scenery
 include lagoon/riverbed
 include lagoon/play
 include lagoon/hazards
+include lagoon/life
 include lagoon/hud
 
 using flecs.script
