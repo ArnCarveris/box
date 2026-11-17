@@ -4,16 +4,26 @@ using flecs.script.math
 state {
   export const HALF_PI: f32 = 1.5707963
 
-  // The channel the canoe paddles in, X in -CHANNEL_HALF..CHANNEL_HALF
-  export const CHANNEL_HALF: f32 = 6
+  // The banks: the bank line is at X ±BANK_X. The wet beach of a bank rises from the waterline,
+  // BANK_WATER_U from the bank line (toward the bank is +U), at BANK_SLOPE radians up to the dry
+  // beach at BEACH_Y, where the palms, bushes and flowers stand
+  export const BANK_X: f32 = 14
+  export const BANK_WATER_U: f32 = -1.225
+  export const BANK_SLOPE: f32 = 0.14
+  export const BEACH_Y: f32 = 0.34
+  // The navigable water between the waterlines of the banks, X in -WATER_HALF..WATER_HALF
+  export const WATER_HALF: f32 = BANK_X + BANK_WATER_U
+  // The hull and the float stop SHORE_MARGIN short of the waterline; within SHORE_EASE of that
+  // their sideways speed toward the beach eases to 0
+  export const SHORE_MARGIN: f32 = 0.06
+  export const SHORE_EASE: f32 = 1.4
   export const CANOE_Z: f32 = 0
-  export const CANOE_HALF_WIDTH: f32 = 0.9
 
   // Chase camera: behind (+Z) and above the canoe, looking up the lagoon (-Z)
   export const CAM_BACK: f32 = 12
   export const CAM_HEIGHT: f32 = 5
   export const CAM_LOOK_AHEAD: f32 = 11
-  export const CAM_FOLLOW: f32 = 0.6
+  export const CAM_FOLLOW: f32 = 0.7
   export const CAM_FOV: f32 = 55
 
   export const START_SPEED: f32 = 9
@@ -37,8 +47,9 @@ state {
   export const ROW_GAP_MIN: f32 = 11
   export const ROW_GAP_PER_SPEED: f32 = 0.45
   export const FIRST_HAZARD_TIME: f32 = 3
-  // The channel is split in LANES lanes LANE_W apart; every row keeps two neighbouring lanes
-  // free (canoe and outrigger float), hazards sit in the others with LANE_JITTER of play
+  // The middle of the water is split in LANES lanes LANE_W apart; every row keeps two
+  // neighbouring lanes free (canoe and outrigger float), hazards sit in the others with
+  // LANE_JITTER of play
   export const LANES: i32 = 5
   export const LANE_W: f32 = 2.3
   export const LANE_JITTER: f32 = 0.45
@@ -49,11 +60,15 @@ state {
   export const NUTS_PER_LINE: i32 = 4
   export const NUT_SPACING: f32 = 2.2
   export const NUT_LEAD: f32 = 5.5
-  // Collision shapes: the hull and the outrigger float as boxes in X and Z, hazards as circles
+  // Collision shapes: the hull and the outrigger float as boxes in X and Z, hazards as circles.
+  // The float hangs to the left of the hull, so the canoe reaches the right waterline with the
+  // hull and the left one with the float: canoe_x stays in CANOE_MIN_X..CANOE_MAX_X
   export const HULL_HALF_W: f32 = 0.42
   export const HULL_HALF_L: f32 = 3.1
   export const FLOAT_X: f32 = -2.45
   export const FLOAT_HALF_W: f32 = 0.15
+  export const CANOE_MAX_X: f32 = WATER_HALF - SHORE_MARGIN - HULL_HALF_W
+  export const CANOE_MIN_X: f32 = SHORE_MARGIN + FLOAT_HALF_W - FLOAT_X - WATER_HALF
   export const FLOAT_HALF_L: f32 = 1.8
   export const ROCK_R: f32 = 0.85
   export const LOG_R: f32 = 0.9

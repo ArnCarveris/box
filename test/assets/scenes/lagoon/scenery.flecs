@@ -17,10 +17,16 @@ state {
   export const SCENERY_FADE: f32 = 70
   export const SECTIONS: i32 = 6
   export const SECTION_LEN: f32 = 42
-  export const BANK_X: f32 = 14
-  // Height of the beach above the water: the top of the bank sand inland of the waterline slope,
-  // where the palms, bushes and flowers stand
-  export const BEACH_Y: f32 = 0.34
+  // The outer shore of a bank, from the bank line: beyond it lies the open sea
+  export const SEA_U: f32 = 34
+  // A stilt hut: the stilts stand HUT_STILT_X to either side of its origin, the deck is at
+  // HUT_DECK_Y. Its water side stilts stand in the wet sand just up from the waterline
+  export const HUT_STILT_X: f32 = 1.5
+  export const HUT_STILT_R: f32 = 0.1
+  export const HUT_DECK_Y: f32 = 1.7
+  export const HUT_U: f32 = BANK_WATER_U + HUT_STILT_X + HUT_STILT_R + 0.25
+  // Beached rocks keep ROCK_DRY clear of the waterline
+  export const ROCK_DRY: f32 = 0.15
 
   // The far islands out at sea scroll by FAR_PARALLAX of distance over a longer span
   export const FAR_SPAN: f32 = 1100
@@ -307,17 +313,18 @@ assets {
     }
   }
 
-  // A thatched hut on stilts standing in the shallows. Along -X, toward the channel, at
-  // the origin; the gangway reaches back to the beach along +X
+  // A thatched hut on stilts standing at the waterline. Along -X, toward the water, at the
+  // origin; the gangway reaches back to the beach along +X. The water side stilts are
+  // HUT_STILT_X from the origin, below the deck at HUT_DECK_Y nothing reaches further out
   template LgStiltHut {
-    const DECK_Y: f32 = 1.7
+    const DECK_Y: f32 = HUT_DECK_Y
 
     for k in 0..4 {
-      const sx = k % 2 == 0 ? -1.5 : 1.5
+      const sx = k % 2 == 0 ? 0 - HUT_STILT_X : HUT_STILT_X
       const sz = k < 2 ? -1.3 : 1.3
       "stilt_{k}" : LgCanoeDark {
         Position: {sx, DECK_Y / 2 - 0.6, sz}
-        Cylinder: {length: DECK_Y + 1.2, radius: 0.1, segments: 6}
+        Cylinder: {length: DECK_Y + 1.2, radius: HUT_STILT_R, segments: 6}
       }
     }
 
@@ -391,7 +398,8 @@ assets {
   }
 
   // One stretch of bank, SECTION_LEN long toward +Z from its origin on the bank line of side
-  // (-1 left, 1 right). Local X is mirrored by side, so -X points to the channel.
+  // (-1 left, 1 right). Local X is mirrored by side, so -X points to the water. The water stays
+  // clear: rocks lie on the wet slope, the hut stands at the waterline, the islet out at sea
   template LgBankSection {
     prop side: f32 = 1
     prop seed: i32 = 1
@@ -403,8 +411,9 @@ assets {
     for p in 0..3 {
       if p < palms {
         const pz = (p + 0.15 + rng.f(0.7)) * SECTION_LEN / palms
+        // The palm of a hut section stands inland of the hut and its gangway
         "palm_{p}" {
-          Position: {side * (1.2 + rng.f(6)), BEACH_Y - 0.08, pz}
+          Position: {side * (hut ? 5.4 + rng.f(2.6) : 1.2 + rng.f(6)), BEACH_Y - 0.08, pz}
           Rotation: {0, side * (rng.f(0.9) - 0.45), 0}
           LgPalm tree(
             height: 5.5 + rng.f(3.5),
@@ -462,8 +471,15 @@ assets {
     for r in 0..2 {
       if r < rocks {
         const rr = 0.4 + rng.f(0.5)
+        // Out of the water on the wet slope: the widest reach of the rock, 1.3 rr, stays
+        // ROCK_DRY above the waterline. Sunk to half its height into the slope
+        const ru = BANK_WATER_U + ROCK_DRY + 1.3 * rr + rng.f(0.9)
         "rock_{r}" : LgBeachRock {
-          Position: {side * (rng.f(1.6) - 1.8), 0.05, (r + 0.1 + rng.f(0.8)) * SECTION_LEN / 2}
+          Position: {
+            side * ru,
+            (ru - BANK_WATER_U) * tan(BANK_SLOPE),
+            (r + 0.1 + rng.f(0.8)) * SECTION_LEN / 2
+          }
           Rotation: {rng.f(0.6), rng.f(6.28), rng.f(0.6)}
           Scale: {1.3, 0.65, 1}
           Sphere: {radius: rr, segments: 6}
@@ -473,7 +489,7 @@ assets {
 
     if hut {
       stilt_hut {
-        Position: {side * -4.6, 0, SECTION_LEN * 0.55}
+        Position: {side * HUT_U, 0, SECTION_LEN * 0.55}
         Rotation: {0, side < 0 ? 3.1416 : 0, 0}
         LgStiltHut house()
       }
@@ -482,9 +498,9 @@ assets {
     if islet {
       const ir = 1.4 + rng.f(0.4)
       isle {
-        // Inner edge at least 1 unit out of the channel
+        // Out at sea, its shallows clear of the outer shore of the bank
         Position: {
-          side * (CHANNEL_HALF + 1.4 + ir * 1.3 - BANK_X + rng.f(0.5)),
+          side * (SEA_U + 0.6 + ir * 1.3 + rng.f(2.5)),
           0,
           SECTION_LEN * (0.3 + rng.f(0.4))
         }
@@ -545,8 +561,8 @@ banks {
   // The gentle wet slope meets the dry beach at BEACH_Y without a step (a steep one read as
   // water on the bank facing away from the low sun); under the water a shelf drops to the floor
   const step = 12
-  const WATER_U: f32 = -1.225
-  const SLOPE: f32 = 0.14
+  const WATER_U: f32 = BANK_WATER_U
+  const SLOPE: f32 = BANK_SLOPE
   const SLOPE_U: f32 = WATER_U + BEACH_Y / tan(SLOPE)
   const SLOPE_START: f32 = WATER_U - 0.4
   const SLOPE_LEN: f32 = (SLOPE_U - SLOPE_START) / cos(SLOPE)

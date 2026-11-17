@@ -1,8 +1,10 @@
 using flecs.script
 using flecs.script.math
 using box.app
+using box.transform
 using box.input
 using box.material
+using box.particle
 using state
 
 state {
@@ -16,6 +18,9 @@ state {
   export const LEAN_RATE: f32 = 8
   // Seconds the canoe takes to roll over once the game is over
   export const CAPSIZE_TIME: f32 = 0.8
+  // The canoe touches a beach within SHORE_TOUCH of its stop and leaves it SHORE_LEAVE away
+  export const SHORE_TOUCH: f32 = 0.06
+  export const SHORE_LEAVE: f32 = 0.5
   // Mapping size of the water texture (texture.Mapping of LgWater)
   export const WATER_MAP: f32 = 7
 
@@ -47,6 +52,35 @@ state {
   }
 }
 
+assets {
+  // Wet sand thrown up where the hull or the float runs onto a beach
+  prefab LgShoreSplash {
+    sand {
+      Position: {0, 0, 0}
+      box.particle.Emitter: {
+        max: 30, rate: 0, shape: EmitterSphere, radius: 0.25,
+        direction: {0, 1, 0}, spread: 45, speed: {2, 3.6},
+        lifetime: {0.4, 0.8}, size: {0.08, 0.16}, opacity: {0.8, 1},
+        color: {214, 190, 140}, color_variance: {16, 14, 10}, seed: 31
+      }
+      Burst: {count: 22}
+      Forces: {gravity: {0, -12, 0}}
+    }
+
+    ripple {
+      Position: {0, 0, 0}
+      box.particle.Emitter: {
+        max: 8, rate: 0, shape: EmitterSphere, radius: 0.3,
+        direction: {0, 1, 0}, spread: 80, speed: {0.2, 0.5},
+        lifetime: {0.6, 1.0}, size: {0.4, 0.7}, opacity: {0.25, 0.4},
+        color: {226, 214, 180}, seed: 32
+      }
+      Burst: {count: 6}
+      Curves: {size: {keys: [{0, 0.6}, {1, 1.6}]}, opacity: {keys: [{0, 1}, {1, 0}]}}
+    }
+  }
+}
+
 // U of the world mapping runs along +Z, so a velocity of -flow / size moves the waves toward the
 // camera at flow units a second. water_shift cancels the jump a change of the flow causes.
 lagoon {
@@ -58,6 +92,8 @@ lagoon {
 
 async {
   mut last: f64 = box.app.Status[box.app.Status].elapsed
+  // The beach the canoe touches, 1 right, -1 left, 0 none
+  mut on_shore: i32 = 0
 
   while true {
     await next_frame()
@@ -80,17 +116,44 @@ async {
         vx = 0
       }
 
-      const edge = CHANNEL_HALF - CANOE_HALF_WIDTH
-      mut x: f32 = canoe_x + vx * d
-
-      if x > edge {
-        x = edge
-        vx = min(vx, 0)
+      // Toward a beach the sideways speed eases to 0 over SHORE_EASE, so the hull (right) or the
+      // float (left) runs up to the waterline and stops there
+      if vx > 0 {
+        vx = min(vx, STEER_SPEED * max(0, CANOE_MAX_X - canoe_x) / SHORE_EASE)
       }
 
-      if x < 0 - edge {
-        x = 0 - edge
-        vx = max(vx, 0)
+      if vx < 0 {
+        vx = max(vx, 0 - STEER_SPEED * max(0, canoe_x - CANOE_MIN_X) / SHORE_EASE)
+      }
+
+      const x = clamp(canoe_x + vx * d, CANOE_MIN_X, CANOE_MAX_X)
+
+      // A puff of sand where the canoe touches a beach, once until it paddles off again
+      mut shore: i32 = 0
+
+      if x >= CANOE_MAX_X - SHORE_TOUCH {
+        shore = 1
+      }
+
+      if x <= CANOE_MIN_X + SHORE_TOUCH {
+        shore = -1
+      }
+
+      if shore != 0 && shore != on_shore {
+        mut sx: f32 = x + HULL_HALF_W
+        mut sz: f32 = CANOE_Z - 1.5
+
+        if shore < 0 {
+          sx = x + FLOAT_X - FLOAT_HALF_W
+          sz = CANOE_Z + 0.6
+        }
+
+        const b = box.particle.burst_at(assets.LgShoreSplash, {sx, 0.08, sz}, 1)
+        on_shore = shore
+      }
+
+      if x < CANOE_MAX_X - SHORE_LEAVE && x > CANOE_MIN_X + SHORE_LEAVE {
+        on_shore = 0
       }
 
       if vx != canoe_vx {

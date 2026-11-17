@@ -19,7 +19,7 @@ state {
       (abs(x - canoe_x - FLOAT_X) < FLOAT_HALF_W + r && abs(wz - CANOE_Z - 0.1) < FLOAT_HALF_L + r)
   }
 
-  // Lane l (0..LANES-1) to its X in the channel
+  // Lane l (0..LANES-1) to its X in the water
   fn lg_lane_x(l: f64) -> f64 {
     (l - (LANES - 1) / 2.0) * LANE_W
   }
