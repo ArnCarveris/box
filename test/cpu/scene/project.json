@@ -183,6 +183,16 @@
                 ]
             },
             {
+                "id": "LagoonRiverbed",
+                "testcases": [
+                    "pooled",
+                    "stays_low",
+                    "spreads",
+                    "flows",
+                    "grows_in"
+                ]
+            },
+            {
                 "id": "LagoonRiver",
                 "testcases": [
                     "canoe_stops_at_right_waterline",

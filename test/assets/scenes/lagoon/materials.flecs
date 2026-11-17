@@ -100,8 +100,8 @@ assets {
     Water: {
       shallow_color: {88, 214, 200},
       deep_color: {18, 104, 138},
-      depth: 2.6,
-      visibility: 3.2,
+      depth: 4,
+      visibility: 16,
       refraction: 0.012,
       foam_color: {240, 250, 248},
       foam_width: 0.18,

@@ -1,0 +1,316 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.animation
+using box.curve
+using state
+using assets
+
+state {
+  // The riverbed under the clear water: details on the sand floor that scroll with the world
+  // over RB_SPAN units and jump back up the lagoon once they pass RB_BEHIND, under the camera.
+  // Near the far end they grow in over RB_FADE units, deep enough in the water that the jump
+  // never shows. Each pass of an item through the span is a cycle that places it anew.
+  export const RB_SPAN: f32 = 56
+  export const RB_BEHIND: f32 = 14
+  export const RB_FADE: f32 = 14
+  // Top of the sand floor (lagoon.floor), and the half width of the floor between the bank
+  // shelves the details spread over. Details grow smaller from RB_BANK_FADE toward the banks
+  export const RB_FLOOR_Y: f32 = -1.7
+  export const RB_HALF: f32 = 10.6
+  export const RB_BANK_FADE: f32 = 6.5
+
+  export const RB_RIPPLES: i32 = 8
+  export const RB_CORALS: i32 = 9
+  export const RB_GRASS: i32 = 10
+  export const RB_STARS: i32 = 6
+  export const RB_SHELLS: i32 = 12
+  export const RB_STONES: i32 = 8
+  export const RB_SCHOOLS: i32 = 2
+  export const RB_FISH: i32 = 6
+  // Fish swim up the lagoon over the ground at RB_FISH_SPEED
+  export const RB_FISH_SPEED: f32 = 0.8
+  export const GRASS_SWAY_TIME: f32 = 3.4
+  export const SEED_RIVERBED: i32 = 2718
+
+  // Z of a riverbed item placed at base along the lagoon, scrolled by distance and wrapped
+  fn rb_z(base: f64, d: f64) -> f64 {
+    RB_BEHIND - RB_SPAN * fract((base - d) / RB_SPAN)
+  }
+
+  // The pass of an item through the span, one less every time it wraps
+  fn rb_cycle(base: f64, d: f64) -> f64 {
+    floor((base - d) / RB_SPAN)
+  }
+
+  // Scale of an item at z: 0 at the far end of the span, 1 once RB_FADE nearer
+  fn rb_fade(z: f64) -> f64 {
+    const t = clamp((z - RB_BEHIND + RB_SPAN) / RB_FADE, 0, 1)
+    max(0.01, t * t * (3 - 2 * t))
+  }
+
+  // X of item i in a cycle, anywhere across the floor between the banks
+  fn rb_x(i: f64, cycle: f64, salt: f64) -> f64 {
+    RB_HALF * (2 * hash(i * 7.31 + cycle * 13.7 + salt) - 1)
+  }
+
+  // Size of an item at x: smaller toward the banks
+  fn rb_bank(x: f64) -> f64 {
+    const t = clamp((abs(x) - RB_BANK_FADE) / (RB_HALF - RB_BANK_FADE), 0, 1)
+    1 - 0.55 * t * t * (3 - 2 * t)
+  }
+}
+
+assets {
+  // Muted, matte colors that the water tints: nothing on the riverbed may read as a hazard
+  prefab LgBedRipple { Rgb: {214, 198, 160}; PbrMaterial: {roughness: 1}; NoShadow }
+  prefab LgBedSoft { Rgb: {150, 116, 112}; PbrMaterial: {roughness: 0.95}; NoShadow }
+  prefab LgBedSponge { Rgb: {164, 142, 96}; PbrMaterial: {roughness: 1}; NoShadow }
+  prefab LgBedGrass {
+    Rgb: {74, 104, 62}
+    PbrMaterial: {roughness: 0.85}
+    BackFaceMode: {BackFacePlain}
+    NoShadow
+  }
+
+  prefab LgBedStar {
+    Rgb: {178, 116, 92}
+    PbrMaterial: {roughness: 0.9}
+    BackFaceMode: {BackFacePlain}
+    NoShadow
+  }
+
+  prefab LgBedShell { Rgb: {200, 184, 162}; PbrMaterial: {roughness: 0.7}; NoShadow }
+  prefab LgBedStone { Rgb: {116, 108, 96}; PbrMaterial: {roughness: 0.95}; NoShadow }
+  prefab LgBedFish { Rgb: {52, 78, 86}; PbrMaterial: {roughness: 0.6}; NoShadow }
+
+  // Seagrass leans one way and the other in the current
+  prefab lg_grass_sway {
+    Clip: {duration: GRASS_SWAY_TIME}
+    bend { Track: {component: Rotation, member: "x", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {0.9, 0.16}, {1.7, 0.04}, {2.6, -0.12}, {3.4, 0}
+    ]}} }
+    roll { Track: {component: Rotation, member: "z", curve: {kind: CurveCatmullRom, keys: [
+      {0, 0}, {1.2, -0.07}, {2.3, 0.06}, {3.4, 0}
+    ]}} }
+  }
+
+  // A low patch of soft coral: a rounded mound, a brain coral dome and a tube sponge, in dusty
+  // rose, lilac or ochre. Round and soft, unlike the spiky grey reef heads
+  template LgBedCoral {
+    prop seed: i32 = 1
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const tone = rng.f(1)
+    const r = 0.6 + rng.f(0.3)
+    const a = rng.f(6.28)
+
+    mound : LgBedSoft {
+      Position: {0, 0, 0}
+      Scale: {1.2, 0.35, 1}
+      Sphere: {radius: r, segments: 8, smooth: true}
+      Rgb: {
+        tone < 0.5 ? 170 : 132,
+        tone < 0.5 ? 112 : 114,
+        tone < 0.5 ? 112 : 156
+      }
+    }
+
+    dome : LgBedSoft {
+      Position: {(r + 0.25) * cos(a), 0, (r + 0.25) * sin(a)}
+      Scale: {1, 0.6, 1}
+      HemiSphere: {radius: 0.38, segments: 8, smooth: true}
+      Rgb: {140, 132, 116}
+    }
+
+    sponge : LgBedSponge {
+      Position: {(r + 0.12) * cos(a + 2.5), 0.15, (r + 0.12) * sin(a + 2.5)}
+      Frustum: {length: 0.3, radius_bottom: 0.17, radius_top: 0.23, segments: 7, smooth: true}
+    }
+  }
+
+  // A tuft of seagrass blades that sways as one
+  template LgBedSeagrass {
+    prop seed: i32 = 1
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const phase = rng.f(1)
+    const yaw = rng.f(6.28)
+
+    sway {
+      Rotation: {0, 0, 0}
+      Animator: {
+        clip: lg_grass_sway,
+        time: phase * GRASS_SWAY_TIME,
+        speed: 0.8 + 0.4 * rng.f(1)
+      }
+
+      for b in 0..3 {
+        const h = 0.28 + 0.1 * hash(seed * 3 + b)
+        const ba = yaw + b * 2.1
+        "blade_{b}" : LgBedGrass {
+          Position: {0.16 * cos(ba), h / 2, 0.16 * sin(ba)}
+          Rotation: {0.18 * sin(ba), ba, 0.18 * cos(ba)}
+          Box: {0.13, h, 0.016}
+        }
+      }
+    }
+  }
+}
+
+riverbed {
+  // Bands of sand ripples across the current, three low ridges each
+  ripples {
+    for i in 0..RB_RIPPLES {
+      const base = (i + 0.2 + 0.6 * hash(SEED_RIVERBED + i * 3)) * RB_SPAN / RB_RIPPLES
+      const z = rb_z(base, distance)
+      const c = rb_cycle(base, distance)
+      const x = rb_x(i, c, 1) * 0.8
+      const g = rb_fade(z) * rb_bank(x)
+      const len = 2.2 + 1.4 * hash(i * 11 + c * 7)
+      "band_{i}" {
+        Position: {x, RB_FLOOR_Y, z}
+        Rotation: {0, 0.3 * hash(i * 5 + c * 3) - 0.15, 0}
+        Scale: {g, g, g}
+
+        for k in 0..4 {
+          "ridge_{k}" : LgBedRipple {
+            Position: {0.25 * (k - 1.5), 0, (k - 1.5) * 0.6}
+            Scale: {len * (1 - 0.2 * (k % 2)), 0.06, 0.3}
+            Sphere: {radius: 1, segments: 10}
+          }
+        }
+      }
+    }
+  }
+
+  corals {
+    for i in 0..RB_CORALS {
+      const base = (i + 0.1 + 0.8 * hash(SEED_RIVERBED + i * 5 + 1)) * RB_SPAN / RB_CORALS
+      const z = rb_z(base, distance)
+      const c = rb_cycle(base, distance)
+      const x = rb_x(i, c, 2)
+      const g = rb_fade(z) * rb_bank(x) * (0.8 + 0.4 * hash(i * 13 + c))
+      "coral_{i}" {
+        Position: {x, RB_FLOOR_Y, z}
+        Rotation: {0, 6.28 * hash(i * 17 + c), 0}
+        Scale: {g, g, g}
+        LgBedCoral patch(seed: SEED_RIVERBED + i * 7)
+      }
+    }
+  }
+
+  seagrass {
+    for i in 0..RB_GRASS {
+      const base = (i + 0.1 + 0.8 * hash(SEED_RIVERBED + i * 7 + 2)) * RB_SPAN / RB_GRASS
+      const z = rb_z(base, distance)
+      const c = rb_cycle(base, distance)
+      const x = rb_x(i, c, 3)
+      const g = rb_fade(z) * rb_bank(x) * (0.8 + 0.4 * hash(i * 19 + c))
+      "tuft_{i}" {
+        Position: {x, RB_FLOOR_Y, z}
+        Scale: {g, g, g}
+        LgBedSeagrass tuft(seed: SEED_RIVERBED + i * 11)
+      }
+    }
+  }
+
+  // Starfish lie flat on the sand, a flat star with a low hump
+  starfish {
+    for i in 0..RB_STARS {
+      const base = (i + 0.1 + 0.8 * hash(SEED_RIVERBED + i * 9 + 3)) * RB_SPAN / RB_STARS
+      const z = rb_z(base, distance)
+      const c = rb_cycle(base, distance)
+      const x = rb_x(i, c, 4)
+      const g = rb_fade(z) * rb_bank(x) * (0.8 + 0.4 * hash(i * 23 + c))
+      "star_{i}" {
+        Position: {x, RB_FLOOR_Y, z}
+        Rotation: {0, 6.28 * hash(i * 29 + c), 0}
+        Scale: {g, g, g}
+        body : LgBedStar {
+          Position: {0, 0.012, 0}
+          Rotation: {0 - HALF_PI, 0, 0}
+          Star: {points: 5, radius: 0.42, inner: 0.38}
+        }
+
+        hump : LgBedStar {
+          Position: {0, 0.012, 0}
+          Scale: {1, 0.4, 1}
+          Sphere: {radius: 0.12, segments: 6, smooth: true}
+        }
+      }
+    }
+  }
+
+  // Cockles and the odd cone shell lying on its side
+  shells {
+    for i in 0..RB_SHELLS {
+      const base = (i + 0.1 + 0.8 * hash(SEED_RIVERBED + i * 13 + 4)) * RB_SPAN / RB_SHELLS
+      const z = rb_z(base, distance)
+      const c = rb_cycle(base, distance)
+      const x = rb_x(i, c, 5)
+      const g = rb_fade(z) * rb_bank(x)
+      const yaw = 6.28 * hash(i * 31 + c)
+
+      if i % 3 == 0 {
+        "shell_{i}" : LgBedShell {
+          Position: {x, RB_FLOOR_Y + 0.1 * g, z}
+          Rotation: {HALF_PI, yaw, 0}
+          Scale: {g, g, g}
+          Cone: {length: 0.4, radius: 0.12, segments: 6, smooth: true}
+          Rgb: {196, 172, 150}
+        }
+      } else {
+        "shell_{i}" : LgBedShell {
+          Position: {x, RB_FLOOR_Y, z}
+          Rotation: {0, yaw, 0}
+          Scale: {g, 0.55 * g, 1.2 * g}
+          HemiSphere: {radius: 0.2, segments: 8, smooth: true}
+        }
+      }
+    }
+  }
+
+  // A few darker stones, smooth and flat, half sunk in the sand
+  stones {
+    for i in 0..RB_STONES {
+      const base = (i + 0.1 + 0.8 * hash(SEED_RIVERBED + i * 17 + 5)) * RB_SPAN / RB_STONES
+      const z = rb_z(base, distance)
+      const c = rb_cycle(base, distance)
+      const x = rb_x(i, c, 6)
+      const g = rb_fade(z) * rb_bank(x)
+      const r = 0.5 + 0.4 * hash(i * 37 + c)
+      "stone_{i}" : LgBedStone {
+        Position: {x, RB_FLOOR_Y, z}
+        Rotation: {0, 6.28 * hash(i * 41 + c), 0}
+        Scale: {1.3 * g, 0.35 * g, g}
+        Sphere: {radius: r, segments: 8, smooth: true}
+      }
+    }
+  }
+
+  // Small schools of fish drift slowly up the lagoon just above the sand, weaving side to side
+  fish {
+    for s in 0..RB_SCHOOLS {
+      const base = (s + 0.3) * RB_SPAN / RB_SCHOOLS + RB_FISH_SPEED * clock
+      const c = rb_cycle(base, distance)
+      const sx = rb_x(s, c, 7) * 0.7 + 1.5 * sin(clock * 0.23 + s * 2.1)
+
+      for k in 0..RB_FISH {
+        const fz = rb_z(base + 1.6 * hash(s * 43 + k), distance)
+        const g = rb_fade(fz)
+        const wave = sin(clock * 1.3 + k * 1.7 + s)
+        "fish_{s}_{k}" : LgBedFish {
+          Position: {
+            sx + 1.4 * (hash(s * 47 + k) - 0.5) + 0.12 * wave,
+            RB_FLOOR_Y + 0.22 + 0.12 * hash(s * 53 + k),
+            fz
+          }
+          Rotation: {0, 0.25 * cos(clock * 1.3 + k * 1.7 + s), 0}
+          Scale: {0.11 * g, 0.05 * g, 0.32 * g}
+          Sphere: {radius: 1, segments: 6, smooth: true}
+        }
+      }
+    }
+  }
+}
