@@ -124,14 +124,15 @@ state {
   // sprint), rearing 0..1, tail_puff 0..1 and hidden 0..1.
   struct ParisRaccoonState(x: f32, y: f32, z: f32, yaw: f32, node: i32, target: i32, prev: i32, behaviour: i32, goal: i32, timer: f32, wait: f32, cooldown: f32, hideout: i32, gait: f32, speed: f32, rearing: f32, tail_puff: f32, hidden: f32)
 
-  // The raccoon behaviours. ParisHunt adds fleeing after the last one.
+  // The raccoon behaviours.
   export const PR_RC_WANDER: i32 = 0   // trot from node to linked node
   export const PR_RC_PAUSE: i32 = 1    // stop at a node and rear up to look around
   export const PR_RC_APPROACH: i32 = 2 // walk from the node to the hideout for the goal
   export const PR_RC_RUMMAGE: i32 = 3  // rear up at a bin and dig
   export const PR_RC_HIDE: i32 = 4     // go into the hideout, wait, come out of another one
   export const PR_RC_EMERGE: i32 = 5   // climb out of a hideout, then wander from its node
-  export const PR_RC_BEHAVIOURS: i32 = 6
+  export const PR_RC_FLEE: i32 = 6     // rear up, then sprint from a statue (also the goal of a dive)
+  export const PR_RC_BEHAVIOURS: i32 = 7
 
   export const PR_RACCOONS: i32 = 10
 
@@ -224,6 +225,51 @@ state {
     {-20, -2.2, -25, 0.6, 62, 62, 0.4615, 0, 0, 1, 0, 0, 0}
   ]
 
+  // The charm of each statue, the same as pr_statues[i].charm, for what only needs the charm.
+  export const pr_statue_charm: f32[14] = [
+    0.5385, 0, 0.9231, 0.3077, 0.7692, 0.1538, 1, 0.3846, 0.6923, 0.0769, 0.8462, 0.2308, 0.6154,
+    0.4615
+  ]
+
+  // The hunt (paris/hunt.flecs): what each statue is doing. The behaviour (PR_ST_*), the time in
+  // it and the time of its next step (wait), the node she came from, the raccoon she is after
+  // (-1 = none), the node she heads for while chasing or searching, the spot off the street graph
+  // she inspects or searches (sx, sy, sz) and the leg of that walk (0 on the graph, 1 out to the
+  // spot, 2 there, 3 back to the node), her speed, the time before she may spot a raccoon again,
+  // the kind of pause (0 look both ways, 1 sweep the torch low, 2 look into a hideout) or search
+  // (0 on the way, 1 at the spot) and whether the raccoon vanished there.
+  struct ParisHunter(behaviour: i32, timer: f32, wait: f32, prev: i32, quarry: i32, gnode: i32, sx: f32, sy: f32, sz: f32, leg: i32, speed: f32, cooldown: f32, kind: i32, vanished: bool)
+
+  export const PR_ST_PATROL: i32 = 0 // walk from node to linked node
+  export const PR_ST_PAUSE: i32 = 1  // stop to look both ways, sweep the torch or look into a hideout
+  export const PR_ST_SPOT: i32 = 2   // point the torch at a raccoon
+  export const PR_ST_CHASE: i32 = 3  // walk briskly after it along the street graph
+  export const PR_ST_LOST: i32 = 4   // search where it was last seen, then patrol again
+
+  export mut pr_hunters: ParisHunter[14] = [
+    {0, 0, 0, 2, -1, -1, 0, 0, 0, 0, 0, 1.0, 0, false},
+    {0, 0, 0, 6, -1, -1, 0, 0, 0, 0, 0, 1.4, 0, false},
+    {0, 0, 0, 11, -1, -1, 0, 0, 0, 0, 0, 1.8, 0, false},
+    {0, 0, 0, 16, -1, -1, 0, 0, 0, 0, 0, 2.2, 0, false},
+    {0, 0, 0, 18, -1, -1, 0, 0, 0, 0, 0, 2.6, 0, false},
+    {0, 0, 0, 21, -1, -1, 0, 0, 0, 0, 0, 3.0, 0, false},
+    {0, 0, 0, 25, -1, -1, 0, 0, 0, 0, 0, 3.4, 0, false},
+    {0, 0, 0, 29, -1, -1, 0, 0, 0, 0, 0, 3.8, 0, false},
+    {0, 0, 0, 35, -1, -1, 0, 0, 0, 0, 0, 4.2, 0, false},
+    {0, 0, 0, 42, -1, -1, 0, 0, 0, 0, 0, 4.6, 0, false},
+    {0, 0, 0, 44, -1, -1, 0, 0, 0, 0, 0, 5.0, 0, false},
+    {0, 0, 0, 52, -1, -1, 0, 0, 0, 0, 0, 5.4, 0, false},
+    {0, 0, 0, 56, -1, -1, 0, 0, 0, 0, 0, 5.8, 0, false},
+    {0, 0, 0, 62, -1, -1, 0, 0, 0, 0, 0, 6.2, 0, false}
+  ]
+
+  // Hunt statistics: chases started, chases that ended with the raccoon hidden or escaped, and
+  // the smallest distance seen between a statue and a raccoon in the open.
+  export mut pr_hunt_chases: i32 = 0
+  export mut pr_hunt_hidden: i32 = 0
+  export mut pr_hunt_escaped: i32 = 0
+  export mut pr_hunt_closest: f32 = 1000
+
   // While true, paris/liberty.flecs gives the standing statues a slow idle look-around (head_turn
   // and torch_sweep). The logic that walks them sets it to false and drives the pose itself.
   export mut pr_statue_idle = true
@@ -258,6 +304,11 @@ state {
     }
 
     count
+  }
+
+  // Whether node n is a dead end without a hideout, where a fleeing raccoon would be cornered.
+  fn pr_dead_end(n: i32) -> bool {
+    pr_degree(n) <= 1 && pr_hideout_at(n) < 0
   }
 
   // The node at the other end of the k-th link of node n (0 <= k < pr_degree(n)), or n.

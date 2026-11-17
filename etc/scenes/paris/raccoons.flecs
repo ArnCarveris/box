@@ -33,13 +33,21 @@ paris {
 }
 
 // The raccoons wander the street graph, dig in bins and hide in one hideout to come out of
-// another. Each frame works on a copy of state.pr_raccoons (so other logic, like ParisHunt, can
+// another. A raccoon that sees a statue close by rears up, puffs its tail and sprints away along
+// the street graph, and dives into a hideout to come out of a far one. Each frame works on a copy of state.pr_raccoons (so other logic, like ParisHunt, can
 // change it between frames) and writes it back once.
 async {
   const rng: math.Rng = {seed: 4417}
   // Sideways offset from the line between two nodes, to the right of the way a raccoon walks, so
   // that raccoons meeting on a link pass each other.
   const lane: f32 = 0.35
+  // Sideways offset of a fleeing raccoon that dodges past a statue in its way.
+  const dodge: f32 = 0.8
+  // A raccoon flees a statue within flee_dist, dives into a free hideout at hand when one comes
+  // within dive_dist and calms down when none is within calm_dist.
+  const flee_dist: f32 = 8
+  const dive_dist: f32 = 2.2
+  const calm_dist: f32 = 12
 
   mut rs: ParisRaccoonState[10] = pr_raccoons
 
@@ -47,6 +55,7 @@ async {
     await next_frame()
     const step = dt
     rs = pr_raccoons
+    const sts = pr_statues
 
     for i in 0..PR_RACCOONS {
       const r = rs[i]
@@ -67,8 +76,10 @@ async {
       mut speed: f32 = r.speed
       mut rearing: f32 = r.rearing
       mut hidden: f32 = r.hidden
+      mut puff: f32 = r.tail_puff
 
       const trot: f32 = 1.3 + pr_hash(i * 3.1 + 0.7) * 0.4
+      const sprint: f32 = 4.6 + pr_hash(i * 5.3 + 1.1) * 0.6
 
       // What the behaviour asks for this frame: walk to (gx, gz) at `want` along the segment
       // from (ax, az) to (bx, bz) whose ends have the ground heights ay and by, or stand and turn
@@ -86,7 +97,58 @@ async {
       mut turn = false
       mut placed = false
       mut rear_to: f32 = 0
+      mut puff_to: f32 = 0
       mut choose = false
+
+      // The nearest statue.
+      mut threat: f32 = 1000
+      mut tx: f32 = x
+      mut tz: f32 = z
+      for s in 0..PR_STATUES {
+        const ox = sts[s].x - x
+        const oy = sts[s].y - y
+        const oz = sts[s].z - z
+        const od = sqrt(ox * ox + oy * oy + oz * oz)
+        if od < threat {
+          threat = od
+          tx = sts[s].x
+          tz = sts[s].z
+        }
+      }
+
+      // Startled by a statue: a raccoon on its way into a hideout dashes in, any other one in the
+      // open drops what it does and flees (toward the end of its link farther from the statue).
+      if threat < flee_dist && hidden < 0.5 {
+        if behaviour == PR_RC_APPROACH && goal == PR_RC_HIDE {
+          goal = PR_RC_FLEE
+        } else if behaviour == PR_RC_WANDER || behaviour == PR_RC_PAUSE || behaviour == PR_RC_RUMMAGE || (behaviour == PR_RC_APPROACH && goal == PR_RC_RUMMAGE) {
+          if behaviour == PR_RC_RUMMAGE {
+            pr_hideout_lift[hideout] = 0
+          }
+
+          if behaviour == PR_RC_WANDER && target != node {
+            const na = pr_nodes[node]
+            const nb = pr_nodes[target]
+            const da = (na.x - tx) * (na.x - tx) + (na.z - tz) * (na.z - tz)
+            const db = (nb.x - tx) * (nb.x - tx) + (nb.z - tz) * (nb.z - tz)
+            // Never into a dead end, where the statue would corner it: past her instead.
+            if pr_dead_end(target) || (da > db && !pr_dead_end(node)) {
+              const back = node
+              node = target
+              target = back
+              prev = target
+            }
+          } else {
+            target = node
+          }
+
+          hideout = -1
+          behaviour = PR_RC_FLEE
+          timer = 0
+          cooldown = 0
+          wait = sprint
+        }
+      }
 
       if behaviour == PR_RC_WANDER {
         const a = pr_nodes[node]
@@ -163,7 +225,8 @@ async {
         bz = pr_hideout_spot_z(hideout)
         gx = bx
         gz = bz
-        want = trot * 0.8
+        want = goal == PR_RC_FLEE ? sprint : trot * 0.8
+        puff_to = goal == PR_RC_FLEE ? 1 : 0
         hidden = 0
 
         const ex = gx - x
@@ -171,9 +234,9 @@ async {
         if ex * ex + ez * ez < 0.0004 {
           x = gx
           z = gz
-          behaviour = goal
+          behaviour = goal == PR_RC_FLEE ? PR_RC_HIDE : goal
           timer = 0
-          wait = goal == PR_RC_RUMMAGE ? 3 + rng.f(2.5) : 4 + rng.f(6)
+          wait = goal == PR_RC_RUMMAGE ? 3 + rng.f(2.5) : (goal == PR_RC_FLEE ? 3 + rng.f(4) : 4 + rng.f(6))
         }
       } else if behaviour == PR_RC_RUMMAGE {
         // Rear up against the bin, tip the lid up and dig; scraps hop out now and then.
@@ -210,8 +273,13 @@ async {
         }
       } else if behaviour == PR_RC_HIDE {
         // Open the cover, peek, slip in, close it behind, wait, then come out of another
-        // hideout.
+        // hideout. A fleeing raccoon (goal PR_RC_FLEE) dives straight in and comes out of a
+        // hideout far from the statues.
         const ho = pr_hideouts[hideout]
+        const quick = goal == PR_RC_FLEE
+        const t_slip: f32 = quick ? 0.05 : 0.45
+        const d_slip: f32 = quick ? 0.35 : 0.7
+        const t_shut: f32 = quick ? 0.55 : 1.4
         const sx = pr_hideout_spot_x(hideout)
         const sy = pr_hideout_spot_y(hideout)
         const sz = pr_hideout_spot_z(hideout)
@@ -224,28 +292,75 @@ async {
           pr_hideout_lift[hideout] = 1
         }
 
-        const k = clamp((timer - 0.45) / 0.7, 0, 1)
+        const k = clamp((timer - t_slip) / d_slip, 0, 1)
         const e = k * k * (3 - 2 * k)
-        rear_to = timer < 0.45 ? 0.5 : 0
+        rear_to = timer < t_slip ? 0.5 : 0
+        puff_to = quick && timer < t_shut ? 1 : 0
         x = sx + (ho.x - sx) * e
         y = sy + (iy - sy) * e
         z = sz + (ho.z - sz) * e
         hidden = e
 
-        if timer >= 1.4 && timer - step < 1.4 {
+        if timer >= t_shut && timer - step < t_shut {
           pr_hideout_lift[hideout] = 0
         }
 
-        if timer >= 1.4 + wait {
-          // Another free hideout at another node, starting from a random one.
+        // A manhole cover rattles in its frame after a raccoon dives under it.
+        if quick && ho.kind == PR_HIDE_MANHOLE {
+          for b in 0..4 {
+            const tb = t_shut + 0.12 + b * 0.13
+            if timer >= tb && timer - step < tb {
+              pr_hideout_lift[hideout] = b == 0 ? 0.3 : (b == 2 ? 0.16 : 0)
+            }
+          }
+        }
+
+        if timer >= t_shut + wait {
+          // Another free hideout at another node, starting from a random one; after a dive one
+          // far from here and from the statues if there is one.
           const start: i32 = rng.u(PR_HIDEOUTS)
           mut next: i32 = -1
+          if quick {
+            for c in 0..PR_HIDEOUTS {
+              const cand = start + c >= PR_HIDEOUTS ? start + c - PR_HIDEOUTS : start + c
+              const ch = pr_hideouts[cand]
+              const fx = ch.x - ho.x
+              const fz = ch.z - ho.z
+              if next < 0 && cand != hideout && fx * fx + fz * fz > 400 {
+                mut ok = true
+                for j in 0..PR_RACCOONS {
+                  if j != i && rs[j].hideout == cand {
+                    ok = false
+                  }
+                }
+                for s in 0..PR_STATUES {
+                  const ox = sts[s].x - ch.x
+                  const oz = sts[s].z - ch.z
+                  if ox * ox + oz * oz < 225 {
+                    ok = false
+                  }
+                }
+                if ok {
+                  next = cand
+                }
+              }
+            }
+          }
+
           for c in 0..PR_HIDEOUTS {
             const cand = start + c >= PR_HIDEOUTS ? start + c - PR_HIDEOUTS : start + c
             if next < 0 && cand != hideout && pr_hideouts[cand].node != node {
               mut busy = false
               for j in 0..PR_RACCOONS {
                 if j != i && rs[j].hideout == cand {
+                  busy = true
+                }
+              }
+              // Never come out next to a statue: wait underground for a clear hideout.
+              for s in 0..PR_STATUES {
+                const ox = sts[s].x - pr_hideouts[cand].x
+                const oz = sts[s].z - pr_hideouts[cand].z
+                if ox * ox + oz * oz < 64 {
                   busy = true
                 }
               }
@@ -272,7 +387,7 @@ async {
             face = yaw
             hidden = 1
           } else {
-            timer = 0.4 + wait
+            timer = t_shut - 1 + wait
           }
         }
       } else if behaviour == PR_RC_EMERGE {
@@ -306,6 +421,162 @@ async {
           target = node
           timer = 0
           wait = trot
+        }
+      } else if behaviour == PR_RC_FLEE {
+        // Turn back when the statue is nearer to the end of the link it runs to and well ahead on
+        // the way, unless the way back ends in a dead end (then it dodges past her), and never
+        // run on into a dead end.
+        if target != node && pr_dead_end(target) {
+          const back = node
+          node = target
+          target = back
+          cooldown = 1.2
+        } else if target != node && cooldown <= 0 && threat < 6 && !pr_dead_end(node) {
+          const nb = pr_nodes[target]
+          const tb = (nb.x - tx) * (nb.x - tx) + (nb.z - tz) * (nb.z - tz)
+          const rb = (nb.x - x) * (nb.x - x) + (nb.z - z) * (nb.z - z)
+          const nl = max(sqrt(rb), 0.01)
+          const ahead = ((tx - x) * (nb.x - x) + (tz - z) * (nb.z - z)) / nl
+          if tb < rb && ahead > 1 {
+            const back = node
+            node = target
+            target = back
+            prev = target
+            cooldown = 4
+          }
+        }
+
+        const a = pr_nodes[node]
+        const b = pr_nodes[target]
+        ax = a.x
+        ay = a.y
+        az = a.z
+        bx = b.x
+        by = b.y
+        bz = b.z
+        hidden = 0
+        puff_to = 1
+
+        if timer < 0.3 {
+          // Startled: rear up toward the statue for a split second.
+          rear_to = 1
+          face = atan2(tx - x, tz - z)
+          turn = true
+        } else {
+          const ldx = b.x - a.x
+          const ldz = b.z - a.z
+          const ll = sqrt(ldx * ldx + ldz * ldz)
+          const ex = (ll > 0.01 ? b.x + ldz / ll * lane : b.x) - x
+          const ez = (ll > 0.01 ? b.z - ldx / ll * lane : b.z) - z
+          gx = x + ex
+          gz = z + ez
+          want = wait
+          const along = ll > 0.01 ? ((x - a.x) * ldx + (z - a.z) * ldz) / ll : 0
+          if ll > 0.01 && threat < 4 && (tx - x) * ldx + (tz - z) * ldz > 0 {
+            // A statue in the way: dodge wide around her, on the side of the street away from
+            // her, toward a point a little ahead so that it swerves out before it reaches her.
+            const across = (tx - x) * ldz - (tz - z) * ldx
+            const side: f32 = across > 0 ? 0 - dodge : dodge
+            const ahead = min(along + 2.5, ll)
+            gx = a.x + ldx / ll * ahead + ldz / ll * side
+            gz = a.z + ldz / ll * ahead - ldx / ll * side
+          }
+
+          // Cornered: dive into a free hideout right at hand.
+          mut dove = false
+          if threat < dive_dist {
+            for c in 0..PR_HIDEOUTS {
+              const ox = pr_hideout_spot_x(c) - x
+              const oz = pr_hideout_spot_z(c) - z
+              if !dove && ox * ox + oz * oz < 6.25 {
+                mut busy = false
+                for j in 0..PR_RACCOONS {
+                  if j != i && rs[j].hideout == c {
+                    busy = true
+                  }
+                }
+                if !busy {
+                  dove = true
+                  hideout = c
+                  node = pr_hideouts[c].node
+                  target = node
+                  behaviour = PR_RC_APPROACH
+                  goal = PR_RC_FLEE
+                  timer = 0
+                  want = 0
+                }
+              }
+            }
+          }
+
+          if !dove && (ex * ex + ez * ez < 0.09 || (ll > 0.01 && along > ll - 0.1)) {
+            if target != node {
+              prev = node
+              node = target
+            }
+
+            // At a free hideout: dive in. Far from the statues: calm down. Otherwise run on
+            // along the link that leads farthest from the nearby statues, preferring one with a
+            // hideout at its end when a statue is close.
+            const h = pr_hideout_at(node)
+            mut busy = false
+            if h >= 0 {
+              for j in 0..PR_RACCOONS {
+                if j != i && rs[j].hideout == h {
+                  busy = true
+                }
+              }
+            }
+
+            if h >= 0 && !busy {
+              hideout = h
+              behaviour = PR_RC_APPROACH
+              goal = PR_RC_FLEE
+              timer = 0
+            } else if threat > calm_dist && timer > 3 {
+              choose = true
+            } else {
+              mut best: i32 = node
+              mut best_s: f32 = -1000000
+              for l in 0..PR_LINKS {
+                if pr_links[l].a == node || pr_links[l].b == node {
+                  const m = pr_links[l].a == node ? pr_links[l].b : pr_links[l].a
+                  const nm = pr_nodes[m]
+                  // How far the statues are from the far node and (counting double) from the
+                  // link itself, so it never runs past a statue standing on it.
+                  const na = pr_nodes[node]
+                  const kx = nm.x - na.x
+                  const kz = nm.z - na.z
+                  const kl = max(kx * kx + kz * kz, 0.01)
+                  mut sc: f32 = 30
+                  for s in 0..PR_STATUES {
+                    const ox = sts[s].x - nm.x
+                    const oy = sts[s].y - nm.y
+                    const oz = sts[s].z - nm.z
+                    const kt = clamp(((sts[s].x - na.x) * kx + (sts[s].z - na.z) * kz) / kl, 0, 1)
+                    const px = sts[s].x - na.x - kx * kt
+                    const pz = sts[s].z - na.z - kz * kt
+                    sc = min(sc, min(sqrt(ox * ox + oy * oy + oz * oz), 2 * sqrt(px * px + pz * pz + oy * oy)))
+                  }
+                  const hm = pr_hideout_at(m)
+                  mut free = hm >= 0
+                  if free {
+                    for j in 0..PR_RACCOONS {
+                      if j != i && rs[j].hideout == hm {
+                        free = false
+                      }
+                    }
+                  }
+                  const score = sc + (m == prev ? 0 - 3.0 : 0.0) + (pr_dead_end(m) ? 0 - 40.0 : 0.0) + (free && threat < 6 ? 4.0 : 0.0) + pr_hash(m * 1.7 + i * 7.3) * 0.5
+                  if score > best_s {
+                    best_s = score
+                    best = m
+                  }
+                }
+              }
+              target = best
+            }
+          }
         }
       }
 
@@ -406,6 +677,7 @@ async {
         gait -= 20 * PI
       }
       rearing += (rear_to - rearing) * min(1, step * 6)
+      puff += (puff_to - puff) * min(1, step * (puff_to > puff ? 10 : 1.5))
 
       rs[i].x = x
       rs[i].y = y
@@ -423,6 +695,7 @@ async {
       rs[i].gait = gait
       rs[i].speed = speed
       rs[i].rearing = rearing
+      rs[i].tail_puff = puff
       rs[i].hidden = hidden
     }
 

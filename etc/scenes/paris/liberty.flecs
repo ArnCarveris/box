@@ -76,9 +76,9 @@ assets {
   // sandals, the tablet in the left arm, the spiked crown and a burning torch in the right hand
   // with a flame (fire particles) and a flickering light. Faces +Z.
   //
-  // id >= 0 reads the position from state.pr_statues[id] and copies its pose into the mut
-  // variables every frame; id < 0 (a loose statue) stands at `at` and keeps the mut variables as
-  // they are set.
+  // id >= 0 copies the position and the pose of state.pr_statues[id] into the mut variables
+  // every frame, so a statue only updates when her own entry changes; id < 0 (a loose statue)
+  // stands at `at` and keeps the mut variables as they are set.
   //
   // charm 0..1 shows in the looks: none to long curled lashes, patina to rose lips, a hint of
   // blush, a rakish crown and a stance from straight military posture to a relaxed contrapposto
@@ -89,6 +89,9 @@ assets {
     prop seed: f32 = 0
     prop at: Position = {0, 0, 0}
 
+    mut px: f32 = 0
+    mut py: f32 = 0
+    mut pz: f32 = 0
     mut yaw: f32 = 0
     mut walk: f32 = 0
     mut stride: f32 = 0
@@ -97,13 +100,11 @@ assets {
     mut head_turn: f32 = 0
     mut lean: f32 = 0
 
-    const sid: i32 = id < 0 ? 0 : (id >= PR_STATUES ? PR_STATUES - 1 : id)
-    const st = pr_statues[sid]
     const c = clamp(charm, 0, 1)
     const r = clamp(torch_raise, 0, 1)
     const sw = sin(walk) * stride
 
-    Position: id >= 0 ? {st.x, st.y, st.z} : {at.x, at.y, at.z}
+    Position: {at.x + px, at.y + py, at.z + pz}
     Rotation: {0, yaw, 0}
     DynamicTransform
 
@@ -114,7 +115,7 @@ assets {
       const phase = s == 0 ? sw : 0 - sw
       const lift = max(0, s == 0 ? sin(walk) : 0 - sin(walk)) * 0.035 * stride
       "foot_{s}" {
-        Position: {sx * 0.075 + (s == 1 ? 0.02 * c : 0), 0.025 + lift, 0.13 + phase * 0.16 + (s == 1 ? 0.05 * c : 0)}
+        Position: {sx * 0.075 + (s == 1 ? 0.02 * c : 0), 0.025 + lift, 0.13 + phase * 0.22 + (s == 1 ? 0.05 * c : 0)}
         Rotation: {0, s == 1 ? 0.45 * c : 0 - 0.05, 0}
         foot : ParisPatina { Position: {0, 0.008, 0}; RoundedBox: {0.08, 0.04, 0.2, 0.018, segments: 2} }
         sole : ParisPatinaDark { Position: {0, -0.016, 0.005}; Box: {0.092, 0.016, 0.22} }
@@ -125,9 +126,14 @@ assets {
 
     // The robe and stola. The hips shift out and roll with charm (contrapposto) and sway with
     // the walk.
+    const hip_y = sin(walk) * 0.06 * stride
+    const hip_z = 0 - 0.08 * c + sin(walk) * 0.035 * stride
+    const chest_x = lean + lerp(0 - 0.035, 0.02, c)
+    const chest_z = 0.11 * c - sin(walk) * 0.03 * stride
+
     hips {
       Position: {0 - 0.05 * c, abs(sin(walk)) * 0.02 * stride, 0}
-      Rotation: {0, sin(walk) * 0.06 * stride, 0 - 0.08 * c + sin(walk) * 0.035 * stride}
+      Rotation: {0, hip_y, hip_z}
 
       robe : ParisPatina {
         Position: {0, 0.03, 0}
@@ -168,7 +174,7 @@ assets {
       // charm 1, leaning forward by `lean`.
       chest {
         Position: {0, 0.93, 0}
-        Rotation: {lean + lerp(0 - 0.035, 0.02, c), 0, 0.11 * c - sin(walk) * 0.03 * stride}
+        Rotation: {chest_x, 0, chest_z}
 
         torso : ParisPatina {
           Scale: {1.05, 1, 0.72}
@@ -357,6 +363,18 @@ assets {
         const ep = lerp(0 - 0.28, 0 - 0.1, r)
         const roll = lerp(0 - 0.14, 0 - 0.1, r)
 
+        // The up direction of the statue in the shoulder frame: the middle row of the rotations
+        // of the hips, the chest and the arm (each Ry * Rx * Rz). The torch turns its own up
+        // onto it, so that the flame stays upright whatever the pose, lean and sway.
+        const h0 = sin(hip_z)
+        const h1 = cos(hip_z)
+        const v0 = h0 * cos(chest_z) + h1 * cos(chest_x) * sin(chest_z)
+        const v1 = h0 * (0 - sin(chest_z)) + h1 * cos(chest_x) * cos(chest_z)
+        const v2 = h1 * (0 - sin(chest_x))
+        const u0 = v0 * (cos(torch_sweep) * cos(roll) + sin(sp) * sin(torch_sweep) * sin(roll)) + v1 * cos(sp) * sin(roll) + v2 * (sin(sp) * cos(torch_sweep) * sin(roll) - cos(roll) * sin(torch_sweep))
+        const u1 = v0 * (sin(sp) * sin(torch_sweep) * cos(roll) - cos(torch_sweep) * sin(roll)) + v1 * cos(sp) * cos(roll) + v2 * (sin(sp) * cos(torch_sweep) * cos(roll) + sin(torch_sweep) * sin(roll))
+        const u2 = v0 * cos(sp) * sin(torch_sweep) + v1 * (0 - sin(sp)) + v2 * cos(sp) * cos(torch_sweep)
+
         ParisLibertyArm torch_arm(bend: {ep, 0, 0}) {
           Position: {0 - 0.2, 0.43, 0}
           Rotation: {sp, torch_sweep, roll}
@@ -366,7 +384,7 @@ assets {
           // back upright.
           torch {
             Position: {0, 0 - 0.28 - 0.26 * cos(ep), 0 - 0.26 * sin(ep)}
-            Rotation: {0 - sp, 0, 0 - roll}
+            Rotation: {atan2(u2, u1), 0, 0 - asin(clamp(u0, 0 - 1, 1))}
             Transition: [Position: {duration: 0.3, timing_function: EaseInOut}, Rotation: {duration: 0.3, timing_function: EaseInOut}]
             handle : ParisPatina { Position: {0, 0.02, 0}; Cylinder: {length: 0.28, radius: 0.022, segments: 10, smooth: true} }
             knob : ParisPatina { Position: {0, 0 - 0.13, 0}; Sphere: {radius: 0.03, segments: 10, smooth: true} }
@@ -444,12 +462,15 @@ assets {
       }
     }
 
-    // Copy the pose of state.pr_statues[id] into the mut variables.
+    // Copy the position and the pose of state.pr_statues[id] into the mut variables.
     async {
       while true {
         await next_frame()
         if id >= 0 && id < PR_STATUES {
           const s = pr_statues[id]
+          if px != s.x { px = s.x }
+          if py != s.y { py = s.y }
+          if pz != s.z { pz = s.z }
           if yaw != s.yaw { yaw = s.yaw }
           if walk != s.walk { walk = s.walk }
           if stride != s.stride { stride = s.stride }
@@ -467,7 +488,7 @@ paris {
   // The residents: one statue per entry of state.pr_statues.
   residents {
     for i in 0..PR_STATUES {
-      ParisLiberty "statue_{i}"(id: i, charm: pr_statues[i].charm, seed: i * 1.37 + 0.41)
+      ParisLiberty "statue_{i}"(id: i, charm: pr_statue_charm[i], seed: i * 1.37 + 0.41)
     }
   }
 }
