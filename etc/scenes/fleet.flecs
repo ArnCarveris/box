@@ -1,5 +1,5 @@
-// A stress test: a giant space station with four liner gates and twenty rig bays, with traffic
-// that never stops. Liners and rigs are the shipyard's preset designs (1 unit = 1 m).
+// Fleet: a stress test, a giant space station with four liner gates and twenty rig bays.
+// Its traffic never stops. Liners and rigs are the shipyard's preset designs (1 unit = 1 m).
 include shipyard/ships
 include fleet/materials
 include fleet/kit

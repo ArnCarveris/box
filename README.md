@@ -63,7 +63,7 @@ By reducing everything to entities, components and reactivity, I think Box demon
 [![](docs/screenshots/planet.png)](https://www.flecs.dev/games/planet/)
 ![](docs/screenshots/texgraph.png)
 [![](docs/screenshots/shipyard.png)](https://www.flecs.dev/games/shipyard/)
-[![](docs/screenshots/space_station.png)](https://www.flecs.dev/games/space_station/)
+[![](docs/screenshots/fleet.png)](https://www.flecs.dev/games/fleet/)
 [![](docs/screenshots/console.png)](https://www.flecs.dev/games/fleet/)
 [![](docs/screenshots/dust_merchant.png)](https://www.flecs.dev/games/dust_merchant/)
 [![](docs/screenshots/jukebox.png)](https://www.flecs.dev/games/jukebox/)
