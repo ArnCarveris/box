@@ -1,0 +1,95 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+
+assets {
+  paris_ashlar_h { Gen: {width: 512, height: 512, seed: 41, layers: [
+    {kind: GenBlocks, courses: 8, per_course: 3, gap: 0.006, jitter: 0.12, stagger: 0.5, amount: 0.7, id_amount: 0.12}
+    {kind: GenNoise, frequency: 24, octaves: 4, amount: 0.22}
+  ]} }
+  paris_ashlar { Gen: {source: paris_ashlar_h, output: GenAlbedo, colors: [{0, {176, 162, 136}}, {0.4, {226, 212, 184}}, {1, {246, 236, 214}}]} }
+  paris_ashlar_n { Gen: {source: paris_ashlar_h, output: GenNormal, strength: 2.4} }
+
+  paris_zinc_h { Gen: {width: 256, height: 256, seed: 12, layers: [
+    {kind: GenBlocks, courses: 1, per_course: 12, gap: 0.01, softness: 0.006, amount: 0.8, id_amount: 0.1}
+    {kind: GenNoise, frequency: 12, octaves: 3, amount: 0.18}
+  ]} }
+  paris_zinc { Gen: {source: paris_zinc_h, output: GenAlbedo, colors: [{0, {96, 106, 118}}, {0.5, {150, 160, 172}}, {1, {184, 192, 202}}]} }
+  paris_zinc_n { Gen: {source: paris_zinc_h, output: GenNormal, strength: 2} }
+
+  paris_cobble_h { Gen: {width: 512, height: 512, seed: 77, layers: [
+    {kind: GenBlocks, courses: 16, per_course: 12, gap: 0.012, softness: 0.03, jitter: 0.15, stagger: 0.5, amount: 0.7, id_amount: 0.2}
+    {kind: GenNoise, frequency: 32, octaves: 3, amount: 0.2}
+  ]} }
+  paris_cobble { Gen: {source: paris_cobble_h, output: GenAlbedo, colors: [{0, {44, 42, 40}}, {0.3, {98, 94, 90}}, {1, {156, 150, 140}}]} }
+  paris_cobble_n { Gen: {source: paris_cobble_h, output: GenNormal, strength: 3.4} }
+
+  paris_asphalt_h { Gen: {width: 256, height: 256, seed: 5, layers: [
+    {kind: GenNoise, frequency: 48, octaves: 3, amount: 0.6}
+    {kind: GenNoise, frequency: 6, octaves: 3, amount: 0.4, seed: 2}
+  ]} }
+  paris_asphalt { Gen: {source: paris_asphalt_h, output: GenAlbedo, colors: [{0, {34, 34, 36}}, {0.6, {58, 58, 60}}, {1, {80, 78, 76}}]} }
+  paris_asphalt_n { Gen: {source: paris_asphalt_h, output: GenNormal, strength: 0.8} }
+
+  paris_slab_h { Gen: {width: 256, height: 256, seed: 19, layers: [
+    {kind: GenBlocks, courses: 4, per_course: 4, gap: 0.008, jitter: 0.04, stagger: 0, amount: 0.7, id_amount: 0.2}
+    {kind: GenNoise, frequency: 16, octaves: 3, amount: 0.2}
+  ]} }
+  paris_slab { Gen: {source: paris_slab_h, output: GenAlbedo, colors: [{0, {104, 100, 94}}, {0.5, {164, 158, 148}}, {1, {196, 190, 178}}]} }
+  paris_slab_n { Gen: {source: paris_slab_h, output: GenNormal, strength: 1.6} }
+
+  paris_bark_h { Gen: {width: 256, height: 256, seed: 63, layers: [
+    {kind: GenCells, count: 30, squash: 0.6, distance: GenNearest, amount: 0.7, id_amount: 0.6}
+    {kind: GenNoise, frequency: 10, octaves: 3, amount: 0.3}
+  ]} }
+  paris_bark { Gen: {source: paris_bark_h, output: GenAlbedo, colors: [{0, {92, 84, 62}}, {0.45, {150, 138, 104}}, {0.7, {196, 186, 150}}, {1, {214, 206, 172}}]} }
+  paris_bark_n { Gen: {source: paris_bark_h, output: GenNormal, strength: 1.4} }
+
+  paris_wave_h { Gen: {width: 256, height: 256, seed: 7, layers: [{kind: GenNoise, frequency: 5, octaves: 4, amount: 1}]} }
+  paris_wave_n { Gen: {source: paris_wave_h, output: GenNormal, strength: 1.4} }
+
+  prefab ParisLimestone { Rgb: {255, 248, 232}; PbrMaterial: {roughness: 0.88}; PbrTextures: {albedo: paris_ashlar, normal: paris_ashlar_n}; texture.Mapping: {mode: MappingWorld, size: 4} }
+  prefab ParisLimestoneTrim { Rgb: {242, 230, 204}; PbrMaterial: {roughness: 0.82} }
+  prefab ParisQuayStone { Rgb: {214, 202, 180}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: paris_ashlar, normal: paris_ashlar_n}; texture.Mapping: {mode: MappingWorld, size: 5} }
+  prefab ParisZinc { Rgb: {200, 210, 224}; PbrMaterial: {metallic: 0.55, roughness: 0.48}; PbrTextures: {albedo: paris_zinc, normal: paris_zinc_n}; texture.Mapping: {mode: MappingObject, size: 3} }
+  prefab ParisZincPlain { Rgb: {120, 130, 142}; PbrMaterial: {metallic: 0.55, roughness: 0.5} }
+  prefab ParisChimneyPot { Rgb: {168, 92, 64}; PbrMaterial: {roughness: 0.9} }
+
+  prefab ParisIron { Rgb: {22, 22, 24}; PbrMaterial: {metallic: 0.35, roughness: 0.55} }
+  prefab ParisGilt { Rgb: {214, 170, 84}; PbrMaterial: {metallic: 0.9, roughness: 0.3} }
+  prefab ParisLampGreen { Rgb: {34, 62, 46}; PbrMaterial: {metallic: 0.4, roughness: 0.45}; ClearCoat: {strength: 0.4, roughness: 0.3} }
+
+  prefab ParisCobbles { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.78}; PbrTextures: {albedo: paris_cobble, normal: paris_cobble_n}; texture.Mapping: {mode: MappingWorld, size: 3} }
+  prefab ParisAsphalt { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.72}; PbrTextures: {albedo: paris_asphalt, normal: paris_asphalt_n}; texture.Mapping: {mode: MappingWorld, size: 6} }
+  prefab ParisPavement { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.86}; PbrTextures: {albedo: paris_slab, normal: paris_slab_n}; texture.Mapping: {mode: MappingWorld, size: 3} }
+  prefab ParisKerb { Rgb: {176, 170, 160}; PbrMaterial: {roughness: 0.8} }
+  prefab ParisGravel { Rgb: {170, 156, 128}; PbrMaterial: {roughness: 1} }
+  prefab ParisRoadLine { Rgb: {210, 206, 196}; PbrMaterial: {roughness: 0.7} }
+
+  prefab ParisRiverWater {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.05}
+    Water: {shallow_color: {46, 84, 86}, deep_color: {8, 22, 34}, depth: 3, visibility: 1.6, refraction: 0.015, foam_width: 0.18, ripple_scale: 2, ripple_velocity: {0.03, 0.006}}
+    PbrTextures: {normal: paris_wave_n}
+    texture.Mapping: {mode: MappingWorld, size: 6}
+    texture.Scroll: {velocity: {0.03, 0.006}}
+  }
+  prefab ParisRiverBed { Rgb: {40, 38, 32}; PbrMaterial: {roughness: 1} }
+
+  prefab ParisWindowLit { Rgb: {255, 214, 150}; PbrMaterial: {roughness: 0.2}; Emissive: {strength: 2.6, color: {255, 176, 92}} }
+  prefab ParisWindowLitSoft { Rgb: {255, 226, 182}; PbrMaterial: {roughness: 0.2}; Emissive: {strength: 1.7, color: {255, 200, 140}} }
+  prefab ParisShopLit { Rgb: {255, 222, 170}; PbrMaterial: {roughness: 0.15}; Emissive: {strength: 3.2, color: {255, 190, 110}} }
+  prefab ParisGlassDark { Rgb: {30, 38, 50}; PbrMaterial: {metallic: 0.2, roughness: 0.08}; ClearCoat: {strength: 1, roughness: 0.05} }
+  prefab ParisLampGlass { Rgb: {255, 230, 180}; PbrMaterial: {roughness: 0.2}; Emissive: {strength: 6, color: {255, 196, 120}}; NoShadow }
+
+  prefab ParisWindowFrame { Rgb: {236, 230, 216}; PbrMaterial: {roughness: 0.6} }
+  prefab ParisDoorWood { Rgb: {52, 38, 30}; PbrMaterial: {roughness: 0.5}; ClearCoat: {strength: 0.5, roughness: 0.2} }
+  prefab ParisShopPaint { PbrMaterial: {roughness: 0.42}; ClearCoat: {strength: 0.6, roughness: 0.16} }
+  prefab ParisAwning { Rgb: {150, 30, 36}; PbrMaterial: {roughness: 0.95}; Sheen: {color: {120, 80, 80}, roughness: 0.6} }
+  prefab ParisBark { Rgb: {255, 255, 255}; PbrMaterial: {roughness: 0.92}; PbrTextures: {albedo: paris_bark, normal: paris_bark_n}; texture.Mapping: {mode: MappingObject, size: 1.5} }
+  prefab ParisLeaves { Rgb: {58, 94, 44}; PbrMaterial: {roughness: 0.85}; Sheen: {color: {90, 130, 70}, roughness: 0.6} }
+  prefab ParisLeavesDark { Rgb: {40, 70, 34}; PbrMaterial: {roughness: 0.9}; Sheen: {color: {70, 110, 60}, roughness: 0.6} }
+  prefab ParisSoil { Rgb: {58, 46, 36}; PbrMaterial: {roughness: 1} }
+}

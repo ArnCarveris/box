@@ -1,0 +1,14 @@
+using flecs.script
+using flecs.script.math
+using box.app
+using state
+
+// Advances the shared clock; later tasks only read state.clock and state.dt.
+async {
+  while true {
+    await next_frame()
+    const step = clamp(box.app.Status[box.app.Status].delta_time, 0.001, 0.1)
+    clock += step
+    dt = step
+  }
+}

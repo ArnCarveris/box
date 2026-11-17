@@ -1,0 +1,124 @@
+using flecs.script
+using flecs.script.math
+
+state {
+  export mut clock: f32 = 0
+  export mut dt: f32 = 0.016
+
+  // The street graph the characters walk on. Nodes are points on open pavement (x, z) with the
+  // height of the ground there (0.15 on pavements, 0 on roads and the bridge roadway, -2.2 on the
+  // lower quays). Every link is a straight walk along open pavement, roads or the bridge.
+  struct ParisNode(x: f32, y: f32, z: f32)
+  struct ParisLink(a: i32, b: i32)
+
+  export const PR_NODES: i32 = 71
+  export const PR_LINKS: i32 = 93
+  export const PR_MAX_DEGREE: i32 = 6
+
+  export const pr_nodes: ParisNode[71] = [
+    // 0..9 quay promenade along the parapet
+    {-56, 0.15, -19}, {-36.5, 0.15, -19}, {-25.2, 0.15, -19}, {-14, 0.15, -19}, {-4.8, 0.15, -19},
+    {4.8, 0.15, -19}, {14, 0.15, -19}, {25.2, 0.15, -19}, {36.5, 0.15, -19}, {56, 0.15, -19},
+    // 10..19 pavement in front of the first row of buildings
+    {-56, 0.15, -9}, {-45.5, 0.15, -9}, {-36.5, 0, -9}, {-21, 0.15, -9}, {-7.8, 0.15, -9},
+    {7.8, 0.15, -9}, {21, 0.15, -9}, {36.5, 0, -9}, {45.5, 0.15, -9}, {56, 0.15, -9},
+    // 20..23 west side street, 24..27 east side street
+    {-36.5, 0, 5}, {-36.5, 0, 23.5}, {-36.5, 0, 42}, {-36.5, 0, 58},
+    {36.5, 0, 5}, {36.5, 0, 23.5}, {36.5, 0, 42}, {36.5, 0, 58},
+    // 28..32 boulevard west pavement, 33..37 boulevard east pavement
+    {-7.8, 0.15, 5}, {-7.8, 0.15, 20}, {-7.8, 0.15, 27}, {-7.8, 0.15, 42}, {-7.8, 0.15, 58},
+    {7.8, 0.15, 5}, {7.8, 0.15, 20}, {7.8, 0.15, 27}, {7.8, 0.15, 42}, {7.8, 0.15, 58},
+    // 38..41 cross street, 42 the square
+    {-56, 0, 23.5}, {-21, 0, 23.5}, {21, 0, 23.5}, {56, 0, 23.5}, {15, 0.15, 33},
+    // 43..48 bridge pavements (west then east)
+    {-4.8, 0.15, -23.5}, {-4.8, 0.15, -35}, {-4.8, 0.15, -46.5},
+    {4.8, 0.15, -23.5}, {4.8, 0.15, -35}, {4.8, 0.15, -46.5},
+    // 49..54 far bank promenade, 55..57 far bank square
+    {-56, 0, -46.5}, {-30, 0, -46.5}, {-15, 0, -46.5}, {15, 0, -46.5}, {30, 0, -46.5}, {56, 0, -46.5},
+    {-30, 0, -54}, {0, 0, -54}, {30, 0, -54},
+    // 58..63 west lower quay: stair top, stair foot, quayside
+    {-25.2, 0, -23.4}, {-34.6, -2.2, -23.4}, {-56, -2.2, -25}, {-36, -2.2, -25}, {-20, -2.2, -25}, {-8, -2.2, -25},
+    // 64..69 east lower quay: stair top, stair foot, quayside
+    {25.2, 0, -23.4}, {34.6, -2.2, -23.4}, {8, -2.2, -25}, {20, -2.2, -25}, {36, -2.2, -25}, {56, -2.2, -25},
+    // 70 the middle of the bridge roadway
+    {0, 0, -35}
+  ]
+
+  export const pr_links: ParisLink[93] = [
+    // promenade
+    {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 7}, {7, 8}, {8, 9},
+    // crossings of the quay road
+    {0, 10}, {1, 12}, {3, 13}, {4, 14}, {5, 15}, {6, 16}, {8, 17}, {9, 19},
+    // pavement in front of the first row
+    {10, 11}, {11, 12}, {12, 13}, {13, 14}, {14, 15}, {15, 16}, {16, 17}, {17, 18}, {18, 19},
+    // side streets
+    {12, 20}, {20, 21}, {21, 22}, {22, 23},
+    {17, 24}, {24, 25}, {25, 26}, {26, 27},
+    // boulevard
+    {14, 28}, {28, 29}, {29, 30}, {30, 31}, {31, 32},
+    {15, 33}, {33, 34}, {34, 35}, {35, 36}, {36, 37},
+    {28, 33}, {29, 34}, {30, 35}, {32, 37},
+    // cross street and the square
+    {38, 21}, {21, 39}, {39, 29}, {39, 30}, {40, 34}, {40, 35}, {40, 25}, {25, 41},
+    {42, 35}, {42, 40},
+    // back lanes at the edges
+    {10, 38}, {19, 41},
+    // bridge
+    {4, 43}, {43, 44}, {44, 45}, {5, 46}, {46, 47}, {47, 48}, {44, 70}, {70, 47},
+    // far bank
+    {49, 50}, {50, 51}, {51, 45}, {45, 48}, {48, 52}, {52, 53}, {53, 54},
+    {50, 55}, {45, 56}, {48, 56}, {53, 57}, {55, 56}, {56, 57},
+    // west lower quay
+    {2, 58}, {58, 59}, {59, 61}, {60, 61}, {61, 62}, {62, 63},
+    // east lower quay
+    {7, 64}, {64, 65}, {65, 68}, {66, 67}, {67, 68}, {68, 69}
+  ]
+
+  // Index of the node nearest to the point x, z.
+  fn pr_nearest_node(x: f32, z: f32) -> i32 {
+    mut best: i32 = 0
+    mut best_d: f32 = 1000000
+    for i in 0..PR_NODES {
+      const dx = pr_nodes[i].x - x
+      const dz = pr_nodes[i].z - z
+      const d = dx * dx + dz * dz
+      if d < best_d {
+        best_d = d
+        best = i
+      }
+    }
+    best
+  }
+
+  // Number of links at node n.
+  fn pr_degree(n: i32) -> i32 {
+    mut count: i32 = 0
+    for l in 0..PR_LINKS {
+      if pr_links[l].a == n || pr_links[l].b == n {
+        count += 1
+      }
+    }
+    count
+  }
+
+  // The node at the other end of the k-th link of node n (0 <= k < pr_degree(n)), or n.
+  fn pr_neighbor(n: i32, k: i32) -> i32 {
+    mut seen: i32 = 0
+    mut result: i32 = n
+    for l in 0..PR_LINKS {
+      if pr_links[l].a == n || pr_links[l].b == n {
+        if seen == k {
+          result = pr_links[l].a == n ? pr_links[l].b : pr_links[l].a
+        }
+        seen += 1
+      }
+    }
+    result
+  }
+
+  // A hash of n in 0..1, for variation that does not depend on the order of evaluation.
+  fn pr_hash(n: f32) -> f32 {
+    const s = sin(n * 12.9898 + 4.1414) * 43758.5453
+    s - floor(s)
+  }
+}
