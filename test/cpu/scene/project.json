@@ -184,6 +184,13 @@
                 ]
             },
             {
+                "id": "LagoonSky",
+                "testcases": [
+                    "water_reflects",
+                    "clouds_drift"
+                ]
+            },
+            {
                 "id": "LagoonRiverbed",
                 "testcases": [
                     "pooled",

@@ -10,6 +10,11 @@ assets {
   ]} }
   lg_wave_n { Gen: {source: lg_wave_h, output: GenNormal, strength: 1.4} }
 
+  // Heights of the soft cumulus of the sky, read by the CloudLayers of world.flecs
+  lg_cloud_h { Gen: {width: 512, height: 512, seed: 23, layers: [
+    {kind: GenNoise, frequency: 6, octaves: 5, gain: 0.5}
+  ]} }
+
   lg_sand_h { Gen: {width: 512, height: 512, seed: 13, layers: [
     {kind: GenNoise, frequency: 10, octaves: 4, amount: 0.7}
     {kind: GenNoise, frequency: 64, octaves: 2, amount: 0.3, seed: 2}
@@ -98,8 +103,8 @@ assets {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.04}
     Water: {
-      shallow_color: {88, 214, 200},
-      deep_color: {18, 104, 138},
+      shallow_color: {72, 222, 204},
+      deep_color: {12, 108, 150},
       depth: 4,
       visibility: 16,
       refraction: 0.012,
@@ -151,13 +156,13 @@ assets {
   }
 
   prefab LgFrond {
-    Rgb: {64, 132, 52}
+    Rgb: {60, 142, 50}
     PbrMaterial: {roughness: 0.8}
-    DiffuseTransmission: {factor: 0.4, color: {190, 240, 110}}
+    DiffuseTransmission: {factor: 0.4, color: {180, 240, 100}}
   }
 
   prefab LgFrondDark {
-    Rgb: {44, 100, 44}
+    Rgb: {40, 108, 44}
     PbrMaterial: {roughness: 0.85}
     DiffuseTransmission: {factor: 0.3, color: {160, 220, 100}}
   }
@@ -191,7 +196,7 @@ assets {
   }
 
   prefab LgVolcano { Rgb: {104, 98, 104}; PbrMaterial: {roughness: 1} }
-  prefab LgVolcanoGreen { Rgb: {74, 108, 70}; PbrMaterial: {roughness: 1} }
+  prefab LgVolcanoGreen { Rgb: {68, 116, 70}; PbrMaterial: {roughness: 1} }
   prefab LgFoam { Rgb: {244, 252, 250}; PbrMaterial: {roughness: 0.9}; Opacity: {0.85}; NoShadow }
   prefab LgDriftwood {
     Rgb: {196, 184, 166}

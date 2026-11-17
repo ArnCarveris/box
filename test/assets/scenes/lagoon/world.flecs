@@ -12,7 +12,7 @@ using state
 using assets
 
 $ {
-  AmbientLight: {sky: {170, 170, 200}, ground: {150, 120, 80}, intensity: 0.35}
+  AmbientLight: {sky: {160, 186, 222}, ground: {120, 132, 96}, intensity: 0.6}
 }
 
 // Toward the sun: low ahead and to the right of the canoe, a warm late afternoon
@@ -26,14 +26,44 @@ sun {
     atan2(0 - sunX, 0 - sunZ),
     0
   }
-  DirectionalLight: {intensity: 2.4}
-  Rgb: {255, 230, 200}
+  DirectionalLight: {intensity: 2.6}
+  Rgb: {255, 248, 236}
+  // Less, whiter haze and a little more air than the default sky, so the sky stays blue
+  // overhead, warm toward the low sun, and the distance does not turn brown
   Atmosphere: {
     sun: sun,
-    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 1.0, tint: {255, 236, 214}},
-    ground_albedo: {80, 150, 160},
+    rayleigh: {scale_height: 8, scattering_scale: 1.15},
+    mie: {scale_height: 1.2, anisotropy: 0.8, scattering_scale: 0.4, tint: {255, 244, 232}},
+    ground_albedo: {60, 150, 170},
     sun_disk_intensity: 8,
-    sun_radius: 0.8
+    sun_radius: 0.8,
+    aerial_intensity: 2
+  }
+}
+
+// Soft cumulus drifting slowly up the lagoon, lit by the low warm sun, and a thin high veil
+clouds_low {
+  CloudLayer: {
+    texture: lg_cloud_h,
+    size: 2200,
+    altitude: 520,
+    threshold: 0.75,
+    softness: 0.08,
+    density: 0.9,
+    velocity: {2.5, -4}
+  }
+}
+
+clouds_high {
+  CloudLayer: {
+    texture: lg_cloud_h,
+    size: 8000,
+    altitude: 1800,
+    threshold: 0.7,
+    softness: 0.18,
+    density: 0.3,
+    offset: {900, 400},
+    velocity: {5, -2}
   }
 }
 
@@ -44,11 +74,13 @@ camera {
 }
 
 exposure {
-  AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.05, max_brightness: 0.5}
+  AutoExposure: {min_log_luma: -16, low_percentile: 0, min_brightness: 0.06, max_brightness: 0.45,
+    exposure_compensation: 0.3}
 }
 
 fog {
-  HeightFog: {density: 0.0012, falloff: 0.025, base_height: 0, max_opacity: 0.4, atmosphere: sun}
+  HeightFog: {density: 0.0005, falloff: 0.025, base_height: 0, max_opacity: 0.25,
+    sun_inscatter: 0.4, atmosphere: sun}
 }
 
 gtao {
@@ -56,22 +88,29 @@ gtao {
 }
 
 bloom {
-  Bloom: {intensity: 0.14, threshold: 1.1, threshold_softness: 0.5}
+  Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5}
 }
 
 tonemap {
   Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface}
 }
 
+// After the tonemap: a touch warmer, and back some of the saturation Tony McMapface takes from
+// the water and the greens
+grade {
+  ColorGrading: {temperature: 0.03, contrast: 1.03, saturation: 1.1, vibrance: 0.1}
+}
+
 main_view {
   View: {
     camera: camera,
-    clear: {enabled: true, color: {236, 196, 160, 255}},
+    clear: {enabled: true, color: {176, 200, 224, 255}},
     lighting: {enabled: true, reflections: true, atmosphere: true,
-      environment: {source: sun, intensity: 0.8, yaw: 0, background: false}},
+      environment: {source: sun, intensity: 1, yaw: 0, background: false}},
     shadows: {enabled: true, cascades: 2, resolution: 2048, max_distance: 60},
     culling: {enabled: true, min_dimension_px: 2},
-    effects: [{effect: fog}, {effect: gtao}, {effect: sun}, {effect: bloom}, {effect: tonemap}]
+    effects: [{effect: fog}, {effect: gtao}, {effect: sun}, {effect: bloom}, {effect: tonemap},
+      {effect: grade}]
   }
 }
 
@@ -79,7 +118,15 @@ lagoon {
   // The water and the sand floor under it, wide and long enough to reach the horizon haze. The
   // floor scrolls with the world by whole texture repeats and its sand moves with it, so through
   // the clear water it flows past with the banks
-  water : LgWater { Position: {0, 0, -800}; Box: {1600, 0.02, 2400}; NoShadow }
+  // The water mirrors the palms, huts, the canoe and the volcano, rippled by the wave normals.
+  // The plane is the middle of the thin box; a quarter of the view size keeps the second scene
+  // pass cheap, the waves blur it anyway
+  water : LgWater {
+    Position: {0, 0, -800}
+    Box: {1600, 0.02, 2400}
+    PlanarReflection: {resolution: 0.25, clip_offset: 0.03, distortion: 0.025}
+    NoShadow
+  }
   floor : LgSandWet {
     Position: {0, -1.8, -800 + 12 * fract(distance / 12)}
     Box: {1600, 0.2, 2400}
