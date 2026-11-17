@@ -8,16 +8,32 @@ using box.effects
 using box.controllers
 using box.atmosphere
 
-// Over the far bank, above the rooftops, looking south-west across the Seine and the bridge at
-// the quay facades and the boulevard.
+// Above the near quay, looking north-west across the Seine at the far bank, where the Eiffel
+// Tower rises above the rooftops.
 camera {
-  Position: {40, 38, -64}
-  Rotation: {-0.42, 2.5, 0}
-  Camera: {fov: 45, near_: 0.1, far_: 600}
+  Position: {48, 22, -13}
+  Rotation: {-0.06, 0.565, 0}
+  Camera: {fov: 60, near_: 0.1, far_: 600}
   CameraController: {speed: 14}
 }
 
 paris {
+  // Over the far bank, above the rooftops, looking south-west across the Seine and the bridge at
+  // the quay facades and the boulevard.
+  facades_camera {
+    Position: {40, 38, -64}
+    Rotation: {-0.42, 2.5, 0}
+    Camera: {fov: 45, near_: 0.1, far_: 600}
+    CameraController: {speed: 14}
+  }
+  // On the cross street, looking at the square: the café terrace, the Morris column and the
+  // Métro entrance.
+  street_camera {
+    Position: {3, 1.9, 23}
+    Rotation: {-0.04, -2.29, 0}
+    Camera: {fov: 60, near_: 0.05, far_: 400}
+    CameraController: {speed: 5}
+  }
   boulevard_camera {
     Position: {2.6, 1.7, 54}
     Rotation: {0.05, 0.04, 0}

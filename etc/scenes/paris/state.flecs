@@ -89,6 +89,35 @@ state {
     {7, 64}, {64, 65}, {65, 68}, {66, 67}, {67, 68}, {68, 69}
   ]
 
+  // Raccoon hideouts: rubbish bins on the pavements, manhole covers in the streets and storm
+  // drains in the lower quay walls. x, y (ground), z, the nearest street graph node, the kind and
+  // the yaw. Each is an entity paris.hideouts.hideout_<i> with a child `cover` (bin lid, manhole
+  // cover, drain grate) that opens with `cover[assets.ParisHideoutCover.mut].lift` from 0 to 1.
+  struct ParisHideout(x: f32, y: f32, z: f32, node: i32, kind: i32, yaw: f32)
+
+  export const PR_HIDE_BIN: i32 = 0
+  export const PR_HIDE_MANHOLE: i32 = 1
+  export const PR_HIDE_DRAIN: i32 = 2
+  export const PR_HIDEOUTS: i32 = 17
+
+  export const pr_hideouts: ParisHideout[17] = [
+    // 0..6 bins
+    {-40, 0.15, -17.2, 1, 0, 0}, {28, 0.15, -17.2, 7, 0, 0}, {-39.4, 0.15, 26.8, 21, 0, 0},
+    {9.2, 0.15, 30.5, 35, 0, 0}, {32.5, 0, -50.5, 57, 0, 0}, {-32.5, 0, -50.5, 55, 0, 0},
+    {39.4, 0.15, 26.8, 25, 0, 0},
+    // 7..14 manholes
+    {-36.5, 0, -12.5, 12, 1, 0}, {21, 0, -12.5, 16, 1, 0}, {-3, 0, 5, 28, 1, 0}, {3, 0, 42, 36, 1, 0},
+    {-24, 0, 23.5, 39, 1, 0}, {36.5, 0, 38, 26, 1, 0}, {-15, 0, -50, 51, 1, 0}, {52, 0, 23.5, 41, 1, 0},
+    // 15..16 storm drains in the near quay wall, opening onto the lower quays
+    {-17, -2.17, -22.6, 62, 2, 3.1415927}, {17, -2.17, -22.6, 67, 2, 3.1415927}
+  ]
+
+  // The Eiffel Tower sparkle: on for about 5 s every minute or so, tick advances 8 times a second
+  // while it is on (see paris/eiffel.flecs).
+  export mut pr_sparkle_on = false
+  export mut pr_sparkle_tick: i32 = 0
+
+  // Index of the node nearest to the point x, z.
   fn pr_nearest_node(x: f32, z: f32) -> i32 {
     mut best: i32 = 0
     mut best_d: f32 = 1000000

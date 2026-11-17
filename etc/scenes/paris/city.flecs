@@ -1,6 +1,7 @@
 include materials
 include state
 include building
+include street
 using flecs.script
 using flecs.script.math
 using box.transform
@@ -125,62 +126,6 @@ assets {
       PointLight: {intensity: 30, range: 15, shadows: false}
       Rgb: {255, 184, 112}
     }
-  }
-
-  template ParisBench {
-    seat : ParisDoorWood { Position: {0, 0.45, 0}; Box: {1.8, 0.06, 0.45} }
-    backrest : ParisDoorWood {
-      Position: {0, 0.78, -0.24}
-      Rotation: {-0.2, 0, 0}
-      Box: {1.8, 0.36, 0.05}
-    }
-
-    for k in 0..2 {
-      { (IsA, ParisIron); Position: {(k - 0.5) * 1.5, 0.22, 0}; Box: {0.06, 0.45, 0.45} }
-      { (IsA, ParisIron); Position: {(k - 0.5) * 1.5, 0.7, -0.2}; Box: {0.05, 0.55, 0.05} }
-    }
-  }
-
-  template ParisMorrisColumn {
-    plinth : ParisLampGreen {
-      Position: {0, 0.2, 0}
-      Cylinder: {radius: 0.68, length: 0.4, segments: 24, smooth: true}
-    }
-
-    posters {
-      Position: {0, 1.9, 0}
-      Cylinder: {radius: 0.58, length: 3, segments: 24, smooth: true}
-      Rgb: {214, 196, 160}
-      PbrMaterial: {roughness: 0.9}
-    }
-
-    for k in 0..4 {
-      const ink: Rgb = match k {
-        0: {170, 40, 40}
-        1: {40, 70, 130}
-        2: {220, 170, 50}
-        _: {30, 30, 30}
-      }
-      {
-        Position: {cos(k * 1.57) * 0.585, 2.0, sin(k * 1.57) * 0.585}
-        Rotation: {0, 0 - k * 1.57 + 1.57, 0}
-        Box: {0.5, 0.9, 0.02}
-        Rgb: ink
-        PbrMaterial: {roughness: 0.8}
-      }
-    }
-
-    cornice : ParisLampGreen {
-      Position: {0, 3.5, 0}
-      Cylinder: {radius: 0.72, length: 0.22, segments: 24, smooth: true}
-    }
-
-    dome : ParisLampGreen {
-      Position: {0, 3.6, 0}
-      HemiSphere: {radius: 0.62, segments: 24, smooth: true}
-    }
-
-    finial : ParisLampGreen { Position: {0, 4.28, 0}; Sphere: {radius: 0.09, segments: 10} }
   }
 
   // Steps down from the upper quay along the quay wall, starting at x = 0 (top, y = 0) and going
@@ -705,7 +650,7 @@ paris {
   }
 
   furniture {
-    ParisMorrisColumn morris() { Position: {19.5, 0.15, 37.5} }
+    ParisMorrisColumn morris() { Position: {10.5, 0.15, 32.5} }
     const bench_x: f32[] = [-50, -12, 8, 36]
 
     for (i, x) in bench_x {

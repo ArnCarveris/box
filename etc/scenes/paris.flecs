@@ -4,6 +4,9 @@ include paris/materials
 include paris/world
 include paris/building
 include paris/city
+include paris/street
+include paris/eiffel
+include paris/landmarks
 using flecs.script
 using box.view
 using box.surface
