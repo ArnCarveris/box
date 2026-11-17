@@ -2,7 +2,8 @@
  * @file LagoonBanks.c
  * @brief The banks of the Coconut Lagoon scene, test/assets/scenes/lagoon.flecs: the sand of the
  * banks and of the lagoon floor flows past with the scenery, the sand strips of a bank join
- * without a step and the bank props stand on the sand.
+ * without a step, the bank props stand on the sand and the bank sections take turns between
+ * zones, changing zone only as they jump back up the lagoon.
  *
  * The scene is a copy of etc/scenes/lagoon.flecs and its scripts in etc/scenes/lagoon, which a
  * change to the scene copies too. It runs without a render backend.
@@ -32,6 +33,19 @@
 
 /** A mirrored texture repeats every 2 texture widths */
 #define LAGOON_UV_PERIOD (2.0f)
+
+/** Sections of scenery per bank (SECTIONS of the scene) */
+#define LAGOON_SECTIONS (6)
+
+/** Z behind the camera where scenery jumps back up the lagoon (SCENERY_BEHIND of the scene) */
+#define LAGOON_BEHIND (18.0f)
+
+/** Distance after which the zones come by again along the lagoon: 4 zones of 4 sections of 42
+ * units */
+#define LAGOON_ZONE_CYCLE (672.0)
+
+/** The zones of the bank sections */
+#define LAGOON_ZONES (4)
 
 /** Loaded lagoon scene, run for a number of frames */
 typedef struct {
@@ -76,6 +90,19 @@ static void lagoon_run_to(
         ecs_progress(l->world, LAGOON_DT);
         l->frames ++;
     }
+}
+
+/** Jump the world to a distance, with no hazards spawning on the way.
+ *
+ * @param l The scene
+ * @param distance The distance
+ */
+static void lagoon_set_distance(
+    lagoon_t *l,
+    double distance)
+{
+    test_int(ecs_mut_var_set_t(l->world, "state.next_row", ecs_f64_t, {1e12}), 0);
+    test_int(ecs_mut_var_set_t(l->world, "state.distance", ecs_f64_t, {distance}), 0);
 }
 
 /** Get the distance the world scrolled by.
@@ -407,8 +434,9 @@ void LagoonBanks_bank_sand_joins(void)
     ecs_fini(l.world);
 }
 
-/** The palms, bushes and flower patches of the bank sections stand on the sand: their origin is
- * at or a little below it, not above. Sections still growing in at the far end are skipped.
+/** The props of the bank sections stand on the sand: their origin is at or a little below it,
+ * not above. Distances over a cycle of zones show every zone. Sections still growing in at the
+ * far end are skipped, and so are props behind the camera, past the end of the sand strips.
  */
 void LagoonBanks_bank_props_on_sand(void)
 {
@@ -416,44 +444,166 @@ void LagoonBanks_bank_props_on_sand(void)
     lagoon_new(&l);
     lagoon_run_to(&l, 3);
 
-    const char *props[] = {"palm_0", "palm_1", "palm_2", "bush_0", "bush_1", "bush_2", "flowers"};
+    const char *props[] = {"palm_0", "palm_1", "palm_2", "bush_0", "bush_1", "bush_2", "flowers",
+        "nets_0", "nets_1", "fire", "cliff_0", "cliff_2", "slab_0", "slab_2", "tree_0", "tree_2",
+        "fern_0", "fern_3", "leafy_0", "leafy_2"};
+    const int32_t prop_count = sizeof(props) / sizeof(props[0]);
     int32_t checked = 0;
     bool seated = true;
-    int32_t s, i, p;
-    for (s = 0; s < 2; s ++) {
-        for (i = 0; i < 5; i ++) {
-            char path[64];
-            snprintf(path, sizeof(path), "sections.sec_%d_%d", s, i);
-            ecs_entity_t sec = lagoon_lookup(&l, path);
-            const Scale *scale = ecs_get(l.world, sec, Scale);
-            if (scale && fabsf(scale->y - 1) > 1e-3f) {
-                continue;
-            }
+    int32_t d, s, i, p;
+    for (d = 0; d < 12; d ++) {
+        if (d) {
+            lagoon_set_distance(&l, d * 173.0);
+            lagoon_run_to(&l, l.frames + 1);
+        }
 
-            for (p = 0; p < 7; p ++) {
-                ecs_entity_t stretch = ecs_lookup_child(l.world, sec, "stretch");
-                test_assert(stretch != 0);
-                ecs_entity_t e = ecs_lookup_child(l.world, stretch, props[p]);
-                if (!e) {
+        for (s = 0; s < 2; s ++) {
+            for (i = 0; i < LAGOON_SECTIONS; i ++) {
+                char path[64];
+                snprintf(path, sizeof(path), "sections.sec_%d_%d", s, i);
+                ecs_entity_t sec = lagoon_lookup(&l, path);
+                const Scale *scale = ecs_get(l.world, sec, Scale);
+                if (scale && fabsf(scale->y - 1) > 1e-3f) {
                     continue;
                 }
 
-                mat4 m;
-                lagoon_transform(&l, e, m);
-                float y;
-                test_assert(lagoon_sand_y(&l, s, m[3][0], m[3][2], &y));
-                if (m[3][1] > y + 0.02f || m[3][1] < y - 0.3f) {
-                    printf("%s.%s stands at %f, the sand under it is at %f\n",
-                        path, props[p], m[3][1], y);
-                    seated = false;
-                }
+                ecs_entity_t stretch = ecs_lookup_child(l.world, sec, "stretch");
+                test_assert(stretch != 0);
+                for (p = 0; p < prop_count; p ++) {
+                    ecs_entity_t e = ecs_lookup_child(l.world, stretch, props[p]);
+                    if (!e) {
+                        continue;
+                    }
 
-                checked ++;
+                    mat4 m;
+                    lagoon_transform(&l, e, m);
+                    if (m[3][2] > LAGOON_BEHIND) {
+                        continue;
+                    }
+
+                    float y;
+                    if (!lagoon_sand_y(&l, s, m[3][0], m[3][2], &y)) {
+                        printf("%s.%s stands at x %f, z %f, off the sand\n", path, props[p],
+                            m[3][0], m[3][2]);
+                        seated = false;
+                        continue;
+                    }
+
+                    if (m[3][1] > y + 0.02f || m[3][1] < y - 0.3f) {
+                        printf("%s.%s stands at %f, the sand under it is at %f\n",
+                            path, props[p], m[3][1], y);
+                        seated = false;
+                    }
+
+                    checked ++;
+                }
             }
         }
     }
 
-    test_assert(checked > 10);
+    test_assert(checked > 100);
     test_assert(seated);
+    ecs_fini(l.world);
+}
+
+/** Get the zone of a bank section from the props it has: the driftwood of the palm beach, the
+ * huts of the village, the cliffs of the headland or the trees of the jungle.
+ *
+ * @param l The scene
+ * @param stretch The LgBankSection instance of the section
+ * @return The zone, -1 for none or more than one
+ */
+static int32_t lagoon_zone(
+    const lagoon_t *l,
+    ecs_entity_t stretch)
+{
+    const char *markers[LAGOON_ZONES] = {"drift", "hut_0", "cliff_0", "tree_0"};
+    int32_t result = -1, z;
+    for (z = 0; z < LAGOON_ZONES; z ++) {
+        if (ecs_lookup_child(l->world, stretch, markers[z])) {
+            if (result != -1) {
+                return -1;
+            }
+
+            result = z;
+        }
+    }
+
+    return result;
+}
+
+/** Over a cycle of the zones along the lagoon every section shows one zone at a time, every zone
+ * comes by in full view on both banks, and a section only changes zone when it jumps back up the
+ * lagoon: between the samples its Z went down, from behind the camera to the far end.
+ */
+void LagoonBanks_zones_take_turns(void)
+{
+    lagoon_t l;
+    lagoon_new(&l);
+    lagoon_run_to(&l, 1);
+
+    int32_t prev_zone[2][LAGOON_SECTIONS];
+    float prev_z[2][LAGOON_SECTIONS];
+    int32_t seen[2][LAGOON_ZONES] = {{0}};
+    bool one_zone = true, hidden = true;
+    int32_t changes = 0;
+    int32_t f, s, i, z;
+    const double step = 10.5;
+    const int32_t samples = (int32_t)(LAGOON_ZONE_CYCLE / step) + 2;
+    for (f = 0; f < samples; f ++) {
+        lagoon_set_distance(&l, f * step);
+        lagoon_run_to(&l, l.frames + 1);
+
+        for (s = 0; s < 2; s ++) {
+            for (i = 0; i < LAGOON_SECTIONS; i ++) {
+                char path[64];
+                snprintf(path, sizeof(path), "sections.sec_%d_%d", s, i);
+                ecs_entity_t sec = lagoon_lookup(&l, path);
+                ecs_entity_t stretch = ecs_lookup_child(l.world, sec, "stretch");
+                test_assert(stretch != 0);
+                const Position *pos = ecs_get(l.world, sec, Position);
+                test_assert(pos != NULL);
+                const Scale *scale = ecs_get(l.world, sec, Scale);
+                test_assert(scale != NULL);
+
+                int32_t zone = lagoon_zone(&l, stretch);
+                if (zone < 0) {
+                    printf("%s at distance %f is in no zone or in more than one\n",
+                        path, f * step);
+                    one_zone = false;
+                    continue;
+                }
+
+                if (fabsf(scale->x - 1) < 1e-3f && pos->z > -60 && pos->z < LAGOON_BEHIND) {
+                    seen[s][zone] ++;
+                }
+
+                if (f && zone != prev_zone[s][i]) {
+                    changes ++;
+                    if (pos->z >= prev_z[s][i] || prev_z[s][i] < LAGOON_BEHIND - step - 1) {
+                        printf("%s changed from zone %d to %d at distance %f, from Z %f to %f\n",
+                            path, prev_zone[s][i], zone, f * step, prev_z[s][i], pos->z);
+                        hidden = false;
+                    }
+                }
+
+                prev_zone[s][i] = zone;
+                prev_z[s][i] = pos->z;
+            }
+        }
+    }
+
+    for (s = 0; s < 2; s ++) {
+        for (z = 0; z < LAGOON_ZONES; z ++) {
+            if (!seen[s][z]) {
+                printf("bank %d never shows zone %d in full view\n", s, z);
+                one_zone = false;
+            }
+        }
+    }
+
+    test_assert(changes > 0);
+    test_assert(one_zone);
+    test_assert(hidden);
     ecs_fini(l.world);
 }

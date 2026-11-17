@@ -2,7 +2,8 @@
  * @file LagoonRiver.c
  * @brief The river of the Coconut Lagoon scene, test/assets/scenes/lagoon.flecs: the canoe
  * paddles over the whole water between the banks and stops at the visible waterline, where the
- * wet beach slope of a bank meets the water, and no fixed scenery stands in that water.
+ * wet beach slope of a bank meets the water, and no fixed scenery of any zone of the banks
+ * stands in that water.
  *
  * The scene is a copy of etc/scenes/lagoon.flecs and its scripts in etc/scenes/lagoon, which a
  * change to the scene copies too. It runs without a render backend.
@@ -37,6 +38,11 @@
 
 /** Sections of scenery per bank (SECTIONS of the scene) */
 #define LAGOON_SECTIONS (6)
+
+/** Distances the scenery is checked at: LAGOON_SAMPLES steps of LAGOON_SAMPLE_STEP cover the
+ * 2016 units after which the zones of all sections repeat */
+#define LAGOON_SAMPLES (60)
+#define LAGOON_SAMPLE_STEP (34.0)
 
 /** Create the lagoon scene.
  *
@@ -213,6 +219,38 @@ void LagoonRiver_shore_costs_no_life(void)
     }
 }
 
+/** Jump the world to a distance, with no hazards spawning on the way.
+ *
+ * @param world The world
+ * @param distance The distance
+ */
+static void lagoon_set_distance(
+    ecs_world_t *world,
+    double distance)
+{
+    test_int(ecs_mut_var_set_t(world, "state.next_row", ecs_f64_t, {1e12}), 0);
+    test_int(ecs_mut_var_set_t(world, "state.distance", ecs_f64_t, {distance}), 0);
+}
+
+/** Get the reach across X of a sphere shape under a scaled and turned transform: the half width
+ * of the ellipsoid it makes.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param m Its world transform
+ * @return The reach
+ */
+static float lagoon_ellipsoid_reach(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    mat4 m)
+{
+    const Sphere *sphere = ecs_get(world, e, Sphere);
+    test_assert(sphere != NULL);
+
+    return sphere->radius * sqrtf(m[0][0] * m[0][0] + m[1][0] * m[1][0] + m[2][0] * m[2][0]);
+}
+
 /** Get the reach of a sphere shape across X: its radius times the largest horizontal scale.
  *
  * @param world The world
@@ -256,9 +294,49 @@ static bool lagoon_out_of_water(
     return out;
 }
 
-/** Over a scenery cycle no stilt of a hut, beached rock or islet stands in the water between
- * the waterlines, and the islets lie out at sea beyond the outer shore of the banks. Every
- * section is checked, so the frames sample the cycle at a few distances.
+/** Check that the stilts or posts of a part of the scenery are out of the water.
+ *
+ * @param world The world
+ * @param fmt Format of the path of a post, with its index
+ * @param count Posts to look up, a missing one is skipped
+ * @param left The left waterline
+ * @param right The right waterline
+ * @param clear Cleared if a post stands in the water
+ * @return The posts checked
+ */
+static int32_t lagoon_posts_clear(
+    ecs_world_t *world,
+    const char *fmt,
+    int32_t count,
+    float left,
+    float right,
+    bool *clear)
+{
+    int32_t result = 0, k;
+    for (k = 0; k < count; k ++) {
+        char path[160];
+        snprintf(path, sizeof(path), fmt, k);
+        ecs_entity_t post = ecs_lookup(world, path);
+        if (!post) {
+            continue;
+        }
+
+        const Cylinder *c = ecs_get(world, post, Cylinder);
+        test_assert(c != NULL);
+        mat4 m;
+        lagoon_transform(world, post, m);
+        *clear &= lagoon_out_of_water(path, m[3][0], c->radius * glm_vec3_norm(m[0]), left,
+            right);
+        result ++;
+    }
+
+    return result;
+}
+
+/** Over a period of the zones no stilt of a hut, post or deck of a boardwalk, beached canoe,
+ * surf foam, beached rock or islet stands in the water between the waterlines, and the islets
+ * lie out at sea beyond the outer shore of the banks. Every section is checked, at distances
+ * that show every zone in every place along the lagoon.
  *
  * Sections still growing in at the far end are scaled toward the bank, their islets are only
  * checked against the water.
@@ -266,44 +344,76 @@ static bool lagoon_out_of_water(
 void LagoonRiver_scenery_clear_of_water(void)
 {
     ecs_world_t *world = lagoon_new();
-    const int32_t frames[] = {2, 9, 16};
-    int32_t huts = 0, rocks = 0, isles = 0;
+    ecs_progress(world, LAGOON_DT);
+    int32_t huts = 0, posts = 0, decks = 0, canoes = 0, foam = 0, rocks = 0, isles = 0;
     bool clear = true;
-    int32_t f, s, i, k, done = 0;
-    for (f = 0; f < 3; f ++) {
-        while (done < frames[f]) {
-            ecs_progress(world, LAGOON_DT);
-            done ++;
-        }
+    int32_t f, s, i, k;
+    for (f = 0; f < LAGOON_SAMPLES; f ++) {
+        lagoon_set_distance(world, f * LAGOON_SAMPLE_STEP);
+        ecs_progress(world, LAGOON_DT);
 
         float left = lagoon_waterline(world, 0);
         float right = lagoon_waterline(world, 1);
 
         for (s = 0; s < 2; s ++) {
             for (i = 0; i < LAGOON_SECTIONS; i ++) {
-                char path[128];
+                char path[160], fmt[160];
                 snprintf(path, sizeof(path), "sections.sec_%d_%d.stretch", s, i);
                 ecs_entity_t stretch = ecs_lookup(world, path);
                 test_assert(stretch != 0);
                 mat4 m;
 
-                for (k = 0; k < 4; k ++) {
-                    snprintf(path, sizeof(path),
-                        "sections.sec_%d_%d.stretch.stilt_hut.house.stilt_%d", s, i, k);
-                    ecs_entity_t stilt = ecs_lookup(world, path);
-                    if (!stilt) {
-                        continue;
-                    }
+                for (k = 0; k < 2; k ++) {
+                    snprintf(fmt, sizeof(fmt),
+                        "sections.sec_%d_%d.stretch.hut_%d.house.stilt_%%d", s, i, k);
+                    huts += lagoon_posts_clear(world, fmt, 4, left, right, &clear);
+                }
 
-                    const Cylinder *c = ecs_get(world, stilt, Cylinder);
-                    test_assert(c != NULL);
-                    lagoon_transform(world, stilt, m);
+                for (k = 0; k < 5; k ++) {
+                    snprintf(fmt, sizeof(fmt),
+                        "sections.sec_%d_%d.stretch.jetty.post_%d_%%d", s, i, k);
+                    posts += lagoon_posts_clear(world, fmt, 2, left, right, &clear);
+                }
+
+                snprintf(path, sizeof(path), "sections.sec_%d_%d.stretch.jetty.deck", s, i);
+                ecs_entity_t deck = ecs_lookup(world, path);
+                if (deck) {
+                    const Box *box = ecs_get(world, deck, Box);
+                    test_assert(box != NULL);
+                    lagoon_transform(world, deck, m);
                     clear &= lagoon_out_of_water(path, m[3][0],
-                        c->radius * glm_vec3_norm(m[0]), left, right);
-                    huts ++;
+                        box->x * 0.5f * glm_vec3_norm(m[0]), left, right);
+                    decks ++;
                 }
 
                 for (k = 0; k < 2; k ++) {
+                    snprintf(path, sizeof(path),
+                        "sections.sec_%d_%d.stretch.canoe_%d.turn.boat.hull", s, i, k);
+                    ecs_entity_t hull = ecs_lookup(world, path);
+                    if (!hull) {
+                        continue;
+                    }
+
+                    lagoon_transform(world, hull, m);
+                    clear &= lagoon_out_of_water(path, m[3][0],
+                        lagoon_ellipsoid_reach(world, hull, m), left, right);
+                    canoes ++;
+                }
+
+                for (k = 0; k < 4; k ++) {
+                    snprintf(path, sizeof(path), "sections.sec_%d_%d.stretch.foam_%d", s, i, k);
+                    ecs_entity_t patch = ecs_lookup(world, path);
+                    if (!patch) {
+                        continue;
+                    }
+
+                    lagoon_transform(world, patch, m);
+                    clear &= lagoon_out_of_water(path, m[3][0],
+                        lagoon_ellipsoid_reach(world, patch, m), left, right);
+                    foam ++;
+                }
+
+                for (k = 0; k < 4; k ++) {
                     snprintf(path, sizeof(path), "sections.sec_%d_%d.stretch.rock_%d", s, i, k);
                     ecs_entity_t rock = ecs_lookup(world, path);
                     if (!rock) {
@@ -340,6 +450,10 @@ void LagoonRiver_scenery_clear_of_water(void)
     }
 
     test_assert(huts > 0);
+    test_assert(posts > 0);
+    test_assert(decks > 0);
+    test_assert(canoes > 0);
+    test_assert(foam > 0);
     test_assert(rocks > 0);
     test_assert(isles > 0);
     test_assert(clear);
