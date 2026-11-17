@@ -1,0 +1,12 @@
+include ui/widgets
+include baguette/state
+include baguette/loaf
+include baguette/stage
+include baguette/view
+include baguette/hud
+using box.view
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {punctual_shadows: true}
+}

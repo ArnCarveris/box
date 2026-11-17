@@ -1,0 +1,33 @@
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.effects
+using box.surface
+using box.controllers
+
+window {
+  Surface: {width: 1440, height: 900, vsync: true}
+}
+
+camera {
+  Position: {1.12, 0.63, 0.93}
+  Rotation: {-0.38, 1.05, 0}
+  Camera: {fov: 38, near_: 0.02, far_: 20}
+  CameraController: {speed: 1}
+}
+
+view {
+  occlusion { Gtao: {radius: 0.25, final_value_power: 2.2} }
+  focus { DepthOfField: {focus_distance: 1.55, focus_range: 0.55, near_transition: 0.6, far_transition: 1.4, max_radius: 0.006, near_blur: false} }
+  bloom { Bloom: {intensity: 0.08, threshold: 1.2} }
+  tonemap { Tonemap: {operator_: TonyMcMapface} }
+  vignette { Vignette: {intensity: 0.35, radius: 0.7, smoothness: 0.6} }
+  smaa { Smaa: {} }
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {20, 16, 14, 255}},
+    shadows: {enabled: true},
+    effects: [{effect: occlusion}, {effect: focus}, {effect: bloom}, {effect: tonemap}, {effect: vignette}, {effect: smaa}]
+  }
+}

@@ -1,0 +1,184 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.ui
+using box.widgets
+using state
+
+const PANEL_W: f32 = 300
+const SLIDER_W: f32 = PANEL_W - 32
+
+assets {
+  template LoafRow {
+    prop text: string = ""
+
+    Layout: {direction: Row, spacing: 6, v: Middle}
+    Item: {width: {mode: Grow}}
+
+    Label name(text: text)
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+  }
+
+  template LoafGroup {
+    prop text: string = ""
+
+    Layout: {direction: Column, spacing: 6, padding: {6, 0, 0, 0}}
+    Item: {width: {mode: Grow}}
+
+    heading {
+      Text: {value: text, size: 12}
+      Rgb: {214, 160, 88}
+    }
+  }
+}
+
+box {
+  ui {
+    theme {
+      Theme = {
+        accent: {214, 160, 88}, accent_text: {30, 20, 12}, surface: {58, 46, 38},
+        surface_alt: {46, 37, 31}, border: {96, 76, 60}, hover: {74, 60, 50},
+        pressed: {44, 35, 29}, selection: {120, 88, 52}, text: {240, 230, 214},
+        text_muted: {184, 166, 146}, font_size: 13
+      }
+    }
+  }
+}
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    Fill: {surface: window}
+    Layout: {}
+    FocusScope
+
+    panel {
+      InputBlocker
+      Layout: {direction: Column, spacing: 8, padding: {16, 16, 16, 16}}
+      Item: {h: Left, v: Middle, x: 16, width: {mode: Fixed, value: PANEL_W}}
+      Rect: {1, 1}
+      Rgb: {26, 20, 16}
+      Opacity: {0.9}
+      Border: {width: 1, radius: 10, color: {120, 90, 62, 255}}
+
+      title {
+        Text: {value: "BAGUETTE", size: 24}
+        Rgb: {236, 196, 132}
+      }
+
+      assets.LoafGroup shape(text: "SHAPE") {
+        Slider length(label: "Length", width: SLIDER_W, min: 0.6, max: 1.6, step: 0.01, decimals: 2, value: state.length)
+        Slider thickness(label: "Thickness", width: SLIDER_W, min: 0.05, max: 0.13, step: 0.001, decimals: 3, value: state.thickness)
+        Slider height(label: "Height", width: SLIDER_W, min: 0.55, max: 1, step: 0.01, decimals: 2, value: state.height)
+        Slider taper(label: "Taper", width: SLIDER_W, min: 0.15, max: 0.9, step: 0.01, decimals: 2, value: state.taper)
+      }
+
+      assets.LoafGroup scoring(text: "SCORING") {
+        assets.LoafRow cuts_row(text: "Cuts") {
+          Stepper cuts(min: 1, max: 9, value: state.cuts, width: 104)
+        }
+        Slider angle(label: "Angle", width: SLIDER_W, min: 8, max: 45, step: 1, unit: "°", value: state.angle)
+        Slider opening(label: "Opening", width: SLIDER_W, min: 0.12, max: 0.48, step: 0.01, decimals: 2, value: state.opening)
+      }
+
+      assets.LoafGroup oven(text: "BAKE") {
+        Slider bake(label: "Bake", width: SLIDER_W, min: 0, max: 100, step: 1, unit: "%", value: state.bake * 100)
+        Slider flour(label: "Flour", width: SLIDER_W, min: 0, max: 100, step: 1, unit: "%", value: state.flour * 100)
+        Slider crust(label: "Crust relief", width: SLIDER_W, min: 0, max: 5, step: 0.1, decimals: 1, value: state.crust)
+      }
+
+      assets.LoafGroup variant(text: "VARIATION") {
+        assets.LoafRow seed_row(text: "Seed") {
+          Stepper seed(min: 0, max: 999, value: state.seed, width: 104)
+        }
+        actions_row {
+          Layout: {direction: Row, spacing: 8}
+          Item: {width: {mode: Grow}}
+          Button random(label: "Random", variant: "secondary", action: state.actions.randomize)
+          Button reset(label: "Reset", variant: "secondary", action: state.actions.reset)
+        }
+      }
+    }
+  }
+
+  view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+async {
+  while true {
+    const e = await on.change(hud.screen.panel)
+    const w = e.widget
+    const n = w.name()
+    if w.has(Slider) {
+      const v: f32 = w[Slider.mut].current
+      if n == "length" {
+        state.length = v
+      } else if n == "thickness" {
+        state.thickness = v
+      } else if n == "height" {
+        state.height = v
+      } else if n == "taper" {
+        state.taper = v
+      } else if n == "angle" {
+        state.angle = v
+      } else if n == "opening" {
+        state.opening = v
+      } else if n == "bake" {
+        state.bake = v / 100
+      } else if n == "flour" {
+        state.flour = v / 100
+      } else if n == "crust" {
+        state.crust = v
+      }
+    } else if w.has(Stepper) {
+      if n == "cuts" {
+        state.cuts = w[Stepper.mut].current
+      } else if n == "seed" {
+        state.seed = w[Stepper.mut].current
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.randomize)
+    state.seed = (state.seed * 621 + 271) % 1000
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.reset)
+    state.length = START_LENGTH
+    state.thickness = START_THICKNESS
+    state.height = START_HEIGHT
+    state.taper = START_TAPER
+    state.cuts = START_CUTS
+    state.angle = START_ANGLE
+    state.opening = START_OPENING
+    state.bake = START_BAKE
+    state.flour = START_FLOUR
+    state.crust = START_CRUST
+    state.seed = START_SEED
+  }
+}
