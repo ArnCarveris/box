@@ -784,11 +784,12 @@ async {
         yaw = atan2(sin(yaw + clamp(err, 0 - rate, rate)), cos(yaw + clamp(err, 0 - rate, rate)))
       }
 
-      // The walk follows the actual speed: each half cycle of the walk the feet (0.22 forward
-      // and back at full stride) cover 0.44 * stride, so they do not slide.
+      // The walk follows the actual speed: each half cycle of the walk the feet (pr_step_len
+      // forward and back at full stride, short at low charm and long at high charm) cover
+      // 2 * pr_step_len * stride, so they do not slide.
       speed += (moved - speed) * min(1, step * 6)
       stride = clamp(speed / 0.8, 0, 1)
-      walk += step * speed * PI / (0.44 * max(stride, 0.25))
+      walk += step * speed * PI / (2 * pr_step_len(s.charm) * max(stride, 0.25))
       if walk > 20 * PI {
         walk -= 20 * PI
       }

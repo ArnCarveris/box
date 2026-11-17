@@ -1,0 +1,335 @@
+include materials
+include state
+include clock
+include hunt
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.particle
+using box.texture
+using box.curve
+using state
+using assets
+
+assets {
+  // The heart sprite of a blown kiss, stored next to the scene.
+  ParisHeartSprite { Path: {path: "etc/scenes/paris/heart.svg", width: 64} }
+
+  // A few small pink hearts that float up from the hand of a blown kiss and fade, played with
+  // box.particle.burst_at.
+  prefab ParisKissHearts {
+    hearts {
+      Position: {0, 0, 0}
+      Emitter: {
+        max: 12, rate: 0, shape: EmitterSphere, radius: 0.06, direction: {0, 1, 0}, spread: 35,
+        speed: {0.25, 0.5}, lifetime: {1.6, 2.2}, size: {0.07, 0.11}, rotation: {0 - 20, 20},
+        spin: {0 - 25, 25}, color: {255, 255, 255}, seed: 77
+      }
+      Burst: {count: 6}
+      Forces: {gravity: {0, 0.25, 0}, drag: 0.6, turbulence: 0.3, turbulence_scale: 2}
+      Appearance: {shape: Sprite, blend: Alpha, texture: ParisHeartSprite, softness: 0}
+      Curves: {
+        size: {keys: [{0, 0.4}, {0.15, 1}, {1, 1}]}
+        opacity: {keys: [{0, 0}, {0.1, 1}, {0.6, 0.9}, {1, 0}]}
+      }
+    }
+  }
+}
+
+// The charm in how the statues move, on top of the hunt (paris/hunt.flecs) and scaled by each
+// statue's charm: at charm 0 none of it, at charm 1 all of it at full strength. The walk itself
+// (a stiff march to a sashaying sway) is in the ParisLiberty template and pr_step_len; this loop
+// drives the acts in state.pr_charm: torch twirls on patrol and a twirl when she spots a raccoon,
+// a pose (hand on hip, hip out, head tilted, a slow look over the shoulder) or a kiss blown to
+// the camera or a statue at a junction, a head toss, torch wave or kiss for a lower charm statue
+// passing by, and blinks, lash flutters and winks. During a hunt only the gait and the twirl show.
+async {
+  const rng: math.Rng = {seed: 5381}
+  // A statue greets a lower charm one within meet_dist, blows a kiss to the camera within
+  // kiss_reach at a junction (and within kiss_near while walking toward it) and to a statue
+  // within kiss_mate.
+  const meet_dist: f32 = 4
+  const kiss_reach: f32 = 30
+  const kiss_near: f32 = 16
+  const kiss_mate: f32 = 12
+  // A torch twirl takes twirl_time seconds.
+  const twirl_time: f32 = 0.8
+
+  mut cs: ParisCharm[14] = pr_charm
+
+  while true {
+    await next_frame()
+    const step = dt
+    cs = pr_charm
+    const ss = pr_statues
+    const hs = pr_hunters
+    const cam = paris.hunt_camera[Position]
+
+    for i in 0..PR_STATUES {
+      const c = pr_statue_charm[i]
+      const s = ss[i]
+      const h = hs[i]
+      const ch = cs[i]
+      const hunting = h.behaviour == PR_ST_SPOT || h.behaviour == PR_ST_CHASE || h.behaviour == PR_ST_LOST
+      const standing = h.behaviour == PR_ST_PAUSE && h.kind != 2
+      const fwd_x = sin(s.yaw)
+      const fwd_z = cos(s.yaw)
+      const cdx = cam.x - s.x
+      const cdz = cam.z - s.z
+      const cam_d = sqrt(cdx * cdx + cdz * cdz)
+      // The side she looks over her shoulder to when posing.
+      const side: f32 = pr_hash(i * 3.1 + 0.7) < 0.5 ? 1 : 0 - 1
+
+      // Eyes: a blink now and then; with charm more often a flutter of the lashes or a wink.
+      mut eye: i32 = ch.eye
+      mut eye_time: f32 = ch.eye_time + step
+      mut eye_len: f32 = ch.eye_len
+      mut eye_wait: f32 = ch.eye_wait - step
+      mut wink_side: i32 = ch.wink_side
+      if eye != PR_EYE_NONE && eye_time >= eye_len {
+        eye = PR_EYE_NONE
+      }
+
+      if eye == PR_EYE_NONE && eye_wait <= 0 {
+        const roll = rng.f(1)
+        eye_time = 0
+        if !hunting && c > 0.1 && roll < 0.45 * c {
+          eye = PR_EYE_WINK
+          eye_len = 0.75
+          wink_side = rng.u(2)
+          pr_charm_winks += 1
+        } else if !hunting && c > 0.1 && roll < c {
+          eye = PR_EYE_FLUTTER
+          eye_len = 0.4 + 0.5 * c
+        } else {
+          eye = PR_EYE_BLINK
+          eye_len = 0.18
+        }
+        eye_wait = eye_len + lerp(5.5, 2.5, c) + rng.f(3)
+      }
+
+      mut lids: f32 = 0
+      mut wink: f32 = 0
+      if eye == PR_EYE_BLINK {
+        lids = sin(PI * clamp(eye_time / eye_len, 0, 1))
+      } else if eye == PR_EYE_FLUTTER {
+        lids = abs(sin(eye_time * PI * 6)) * (0.6 + 0.35 * c)
+      } else if eye == PR_EYE_WINK {
+        const t = eye_time
+        wink = t < 0.12 ? t / 0.12 : (t < 0.5 ? 1 : clamp(1 - (t - 0.5) / 0.2, 0, 1))
+      }
+
+      // Torch twirls: now and then on patrol, and as a flourish when she spots a raccoon.
+      mut twirl: f32 = ch.twirl
+      mut spin: f32 = ch.spin
+      mut twirl_wait: f32 = ch.twirl_wait - step
+      if h.behaviour == PR_ST_PATROL && twirl_wait <= 0 {
+        twirl_wait = lerp(26, 8, c) + rng.f(8)
+        if c > 0.15 && spin <= 0 && rng.f(1) < c {
+          spin = 2 * PI
+          pr_charm_twirls += 1
+        }
+      }
+      if h.behaviour == PR_ST_SPOT && ch.last != PR_ST_SPOT && c > 0.15 && spin <= 0 {
+        if rng.f(1) < c {
+          spin = 2 * PI
+          pr_charm_twirls += 1
+        }
+      }
+      if spin > 0 {
+        const d = min(spin, step * 2 * PI / twirl_time)
+        twirl += d
+        spin -= d
+      }
+
+      // The body acts.
+      mut act: i32 = ch.act
+      mut act_time: f32 = ch.act_time + step
+      mut act_len: f32 = ch.act_len
+      mut partner: i32 = ch.partner
+      mut kiss_wait: f32 = ch.kiss_wait - step
+      mut meet_wait: f32 = ch.meet_wait - step
+      mut hearts: bool = ch.hearts
+      if act != PR_CH_NONE && (hunting || act_time >= act_len) {
+        act = PR_CH_NONE
+      }
+
+      // At a junction: a pose or a kiss, to the camera or to the nearest statue.
+      if act == PR_CH_NONE && !hunting && standing && ch.last != PR_ST_PAUSE && c > 0.1 {
+        mut near: i32 = -1
+        mut near_d: f32 = kiss_mate
+        for j in 0..PR_STATUES {
+          if j != i {
+            const ox = ss[j].x - s.x
+            const oz = ss[j].z - s.z
+            const od = sqrt(ox * ox + oz * oz)
+            if od < near_d && abs(ss[j].y - s.y) < 1.5 {
+              near = j
+              near_d = od
+            }
+          }
+        }
+
+        const roll = rng.f(1)
+        if c > 0.6 && kiss_wait <= 0 && roll < (c - 0.45) * 1.4 && (cam_d < kiss_reach || near >= 0) {
+          act = PR_CH_KISS
+          act_len = 2.6
+          partner = cam_d < kiss_reach ? 0 - 1 : near
+          kiss_wait = 14 + rng.f(10)
+          hearts = false
+          pr_charm_kisses += 1
+        } else if roll < c * 1.1 {
+          act = PR_CH_POSE
+          act_len = 3.2 + 1.5 * c
+          partner = 0 - 1
+          pr_charm_poses += 1
+        }
+
+        if act != PR_CH_NONE {
+          act_time = 0
+          // Hold the pause until the act is done.
+          pr_hunters[i].wait = max(h.wait, h.timer + act_len + 0.3)
+        }
+      }
+
+      // Walking toward the camera: now and then a kiss to it.
+      if act == PR_CH_NONE && !hunting && h.behaviour == PR_ST_PATROL && c > 0.6 && kiss_wait <= 0 {
+        if cam_d < kiss_near && cam_d > 2 && (fwd_x * cdx + fwd_z * cdz) > 0.6 * cam_d {
+          kiss_wait = 14 + rng.f(10)
+          if rng.f(1) < c - 0.3 {
+            act = PR_CH_KISS
+            act_len = 2.6
+            act_time = 0
+            partner = 0 - 1
+            hearts = false
+            pr_charm_kisses += 1
+          }
+        }
+      }
+
+      // A lower charm statue passing by: a head toss, a little wave with the torch or a kiss.
+      // The lower charm one ignores it.
+      if act == PR_CH_NONE && !hunting && meet_wait <= 0 && c > 0.15 {
+        mut mate: i32 = -1
+        mut mate_d: f32 = meet_dist
+        for j in 0..PR_STATUES {
+          if j != i && c > pr_statue_charm[j] + 0.1 && hs[j].behaviour <= PR_ST_PAUSE {
+            const ox = ss[j].x - s.x
+            const oz = ss[j].z - s.z
+            const od = sqrt(ox * ox + oz * oz)
+            const moving = h.speed > 0.3 || hs[j].speed > 0.3
+            if moving && od < mate_d && od > 0.5 && abs(ss[j].y - s.y) < 1.5 {
+              mate = j
+              mate_d = od
+            }
+          }
+        }
+
+        if mate >= 0 {
+          meet_wait = 10 + rng.f(8)
+          if rng.f(1) < c {
+            const roll = rng.f(1)
+            if c > 0.6 && kiss_wait <= 0 && roll < 0.35 {
+              act = PR_CH_KISS
+              act_len = 2.6
+              kiss_wait = 14 + rng.f(10)
+              hearts = false
+              pr_charm_kisses += 1
+            } else if roll < 0.67 {
+              act = PR_CH_TOSS
+              act_len = 1.1
+            } else {
+              act = PR_CH_WAVE
+              act_len = 1.8
+            }
+            act_time = 0
+            partner = mate
+            pr_charm_greets += 1
+          }
+        }
+      }
+
+      // The pose of the act.
+      mut pose_to: f32 = 0
+      mut look_to: f32 = 0
+      mut tilt_to: f32 = 0
+      mut toss: f32 = 0
+      mut wave: f32 = 0
+      mut kiss: f32 = 0
+      mut yaw: f32 = s.yaw
+
+      // Where the one the act is for is, relative to where she faces.
+      const tx: f32 = partner >= 0 ? ss[partner].x : cam.x
+      const tz: f32 = partner >= 0 ? ss[partner].z : cam.z
+      const face = atan2(tx - s.x, tz - s.z)
+      const rel = atan2(sin(face - s.yaw), cos(face - s.yaw))
+
+      if act == PR_CH_POSE {
+        // Hand on hip and hip out, the head tilted, then a slow look over the shoulder (the
+        // look also holds the look-around of the hunt still).
+        const k = act_time / act_len
+        pose_to = c
+        tilt_to = 0.2 * c
+        look_to = ((k > 0.3 && k < 0.85 ? side * 0.95 : side * 0.15) - s.head_turn) * c
+      } else if act == PR_CH_KISS {
+        kiss = clamp(act_time / act_len, 0.001, 1)
+        tilt_to = 0.12 * c
+        look_to = clamp(rel, 0 - 0.9, 0.9) - s.head_turn
+
+        // Standing, she turns to face the one the kiss is for.
+        if standing && kiss < 0.5 {
+          const rate = 2 * step
+          yaw = s.yaw + clamp(rel, 0 - rate, rate)
+          pr_statues[i].yaw = yaw
+        }
+
+        if !hearts && kiss >= 0.5 {
+          // Hearts float up from the hand sweeping out.
+          const lx: f32 = 0.25
+          const lz: f32 = 0.4
+          const wx = s.x + cos(yaw) * lx + sin(yaw) * lz
+          const wz = s.z - sin(yaw) * lx + cos(yaw) * lz
+          const fx = box.particle.burst_at(assets.ParisKissHearts, {wx, s.y + 1.5, wz}, 1)
+          hearts = true
+        }
+      } else if act == PR_CH_TOSS {
+        toss = c * sin(PI * clamp(act_time / act_len, 0, 1))
+        look_to = clamp(rel, 0 - 1, 1) * 0.8 - s.head_turn
+      } else if act == PR_CH_WAVE {
+        wave = 0.5 * c * sin(act_time * 2 * PI * 1.4) * sin(PI * clamp(act_time / act_len, 0, 1))
+        look_to = clamp(rel, 0 - 1, 1) * 0.8 - s.head_turn
+      }
+
+      // Ease toward the pose and settle exactly on it, so that a statue at rest does not update.
+      const pose_n = ch.pose + (pose_to - ch.pose) * min(1, step * 2.5)
+      const look_n = ch.look + (look_to - ch.look) * min(1, step * 2)
+      const tilt_n = ch.tilt + (tilt_to - ch.tilt) * min(1, step * 2.5)
+      cs[i].pose = abs(pose_to - pose_n) < 0.002 ? pose_to : pose_n
+      cs[i].look = abs(look_to - look_n) < 0.002 ? look_to : look_n
+      cs[i].tilt = abs(tilt_to - tilt_n) < 0.002 ? tilt_to : tilt_n
+      cs[i].toss = toss
+      cs[i].wave = wave
+      cs[i].twirl = twirl
+      cs[i].lids = lids
+      cs[i].wink = wink
+      cs[i].wink_side = wink_side
+      cs[i].kiss = kiss
+      cs[i].act = act
+      cs[i].act_time = act_time
+      cs[i].act_len = act_len
+      cs[i].partner = partner
+      cs[i].eye = eye
+      cs[i].eye_time = eye_time
+      cs[i].eye_len = eye_len
+      cs[i].eye_wait = eye_wait
+      cs[i].twirl_wait = twirl_wait
+      cs[i].kiss_wait = kiss_wait
+      cs[i].meet_wait = meet_wait
+      cs[i].spin = spin
+      cs[i].hearts = hearts
+      cs[i].last = h.behaviour
+    }
+
+    pr_charm = cs
+  }
+}

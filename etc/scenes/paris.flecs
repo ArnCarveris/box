@@ -11,6 +11,7 @@ include paris/liberty
 include paris/raccoon
 include paris/raccoons
 include paris/hunt
+include paris/charm
 using flecs.script
 using box.view
 using box.surface

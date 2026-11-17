@@ -82,7 +82,11 @@ assets {
   //
   // charm 0..1 shows in the looks: none to long curled lashes, patina to rose lips, a hint of
   // blush, a rakish crown and a stance from straight military posture to a relaxed contrapposto
-  // with the hip out and the tablet hand on the hip.
+  // with the hip out and the tablet hand on the hip. It shows in the walk too: a stiff march with
+  // short even steps at charm 0, one foot in front of the other with a swaying hip and a bounce
+  // at charm 1. The charm acts (state.pr_charm[id], see paris/charm.flecs) add a posed hip and
+  // hand, a head tilt, toss and look over the shoulder, a torch wave and twirl, eyelids that
+  // blink, flutter and wink, and a kiss blown from the free (tablet) hand.
   template ParisLiberty {
     prop id: i32 = -1
     prop charm: f32 = 0
@@ -99,24 +103,43 @@ assets {
     mut torch_sweep: f32 = 0
     mut head_turn: f32 = 0
     mut lean: f32 = 0
+    mut pose: f32 = 0
+    mut look: f32 = 0
+    mut tilt: f32 = 0
+    mut toss: f32 = 0
+    mut wave: f32 = 0
+    mut twirl: f32 = 0
+    mut lids: f32 = 0
+    mut wink: f32 = 0
+    mut wink_side: i32 = 0
+    mut kiss: f32 = 0
 
     const c = clamp(charm, 0, 1)
     const r = clamp(torch_raise, 0, 1)
     const sw = sin(walk) * stride
+    const step_len = pr_step_len(c)
+    // The tablet hand on the hip: most of the way at charm 1, all the way while posing.
+    const hh = clamp(c * 0.7 + clamp(pose, 0, 1) * 0.3, 0, 1)
+    // The free hand at the lips, then sweeping out, over the phase of a blown kiss.
+    const kiss_lips = kiss <= 0 ? 0 : clamp(kiss / 0.15, 0, 1) * (1 - clamp((kiss - 0.45) / 0.2, 0, 1))
+    const kiss_out = kiss <= 0 ? 0 : clamp((kiss - 0.45) / 0.2, 0, 1) * (1 - clamp((kiss - 0.75) / 0.25, 0, 1))
+    const kiss_rest = 1 - kiss_lips - kiss_out
 
     Position: {at.x + px, at.y + py, at.z + pz}
     Rotation: {0, yaw, 0}
     DynamicTransform
 
     // Sandaled feet under the hem, planted on the ground; the free (left) foot steps forward and
-    // turns out with charm.
+    // turns out with charm. Walking, the feet move pr_step_len forward and back, side by side at
+    // charm 0 and one in front of the other with a higher lift at charm 1.
+    const stand = 1 - clamp(stride * 2, 0, 1)
     for s in 0..2 {
       const sx = s * 2 - 1
       const phase = s == 0 ? sw : 0 - sw
-      const lift = max(0, s == 0 ? sin(walk) : 0 - sin(walk)) * 0.035 * stride
+      const lift = max(0, s == 0 ? sin(walk) : 0 - sin(walk)) * (0.03 + 0.035 * c) * stride
       "foot_{s}" {
-        Position: {sx * 0.075 + (s == 1 ? 0.02 * c : 0), 0.025 + lift, 0.13 + phase * 0.22 + (s == 1 ? 0.05 * c : 0)}
-        Rotation: {0, s == 1 ? 0.45 * c : 0 - 0.05, 0}
+        Position: {sx * 0.075 * (1 - 0.85 * c * (1 - stand)) + (s == 1 ? 0.02 * c * stand : 0), 0.025 + lift, 0.13 + phase * step_len + (s == 1 ? 0.05 * c * stand : 0)}
+        Rotation: {0, s == 1 ? 0.45 * c * stand : 0 - 0.05 * stand, 0}
         foot : ParisPatina { Position: {0, 0.008, 0}; RoundedBox: {0.08, 0.04, 0.2, 0.018, segments: 2} }
         sole : ParisPatinaDark { Position: {0, -0.016, 0.005}; Box: {0.092, 0.016, 0.22} }
         strap : ParisPatinaDark { Position: {0, 0.024, 0.04}; Box: {0.086, 0.01, 0.018} }
@@ -124,15 +147,16 @@ assets {
       }
     }
 
-    // The robe and stola. The hips shift out and roll with charm (contrapposto) and sway with
-    // the walk.
-    const hip_y = sin(walk) * 0.06 * stride
-    const hip_z = 0 - 0.08 * c + sin(walk) * 0.035 * stride
-    const chest_x = lean + lerp(0 - 0.035, 0.02, c)
-    const chest_z = 0.11 * c - sin(walk) * 0.03 * stride
+    // The robe and stola. The hips shift out and roll with charm (contrapposto), more while
+    // posing, and sway with the walk: barely at charm 0, a roll and side shift over the standing
+    // foot at charm 1 with the shoulders swaying against it and a bounce in the step.
+    const hip_y = sin(walk) * lerp(0.025, 0.1, c) * stride
+    const hip_z = 0 - 0.08 * c - 0.06 * pose - sin(walk) * lerp(0.008, 0.1, c) * stride
+    const chest_x = lean + lerp(0 - 0.035, 0.02, c) - 0.05 * toss
+    const chest_z = 0.11 * c + 0.05 * pose + sin(walk) * lerp(0.006, 0.15, c) * stride
 
     hips {
-      Position: {0 - 0.05 * c, abs(sin(walk)) * 0.02 * stride, 0}
+      Position: {0 - 0.05 * c - 0.04 * pose - sin(walk) * 0.045 * c * stride, abs(sin(walk)) * lerp(0.012, 0.04, c) * stride, 0}
       Rotation: {0, hip_y, hip_z}
 
       robe : ParisPatina {
@@ -211,7 +235,7 @@ assets {
 
         head {
           Position: {0, 0.56, 0.005}
-          Rotation: {lerp(0 - 0.05, 0.04, c), head_turn + 0.12 * c, 0 - 0.09 * c}
+          Rotation: {lerp(0 - 0.05, 0.04, c) - 0.35 * toss, head_turn + 0.12 * c + look, 0 - 0.09 * c - tilt + 0.15 * toss}
           Transition: [Rotation: {duration: 0.4, timing_function: EaseInOut}]
 
           skull : ParisPatina {
@@ -251,6 +275,10 @@ assets {
 
           for s in 0..2 {
             const sx = s * 2 - 1
+            // How far the eyelid is closed: a blink or flutter closes both, a wink one.
+            const shut = clamp(max(lids, s == wink_side ? wink : 0), 0, 1)
+            // The brow over the open eye lifts with a wink.
+            const brow_up = s == wink_side ? 0 - 0.003 * wink : 0.009 * wink
 
             "eye_{s}" : ParisPatinaDark {
               Position: {sx * 0.033, 0.13, 0.093}
@@ -258,9 +286,16 @@ assets {
               Sphere: {radius: 0.014, segments: 10, smooth: true}
             }
 
+            // The eyelid: a thin fold over the eye when open that closes down over it.
+            "lid_{s}" : ParisPatina {
+              Position: {sx * 0.033, 0.13 + 0.011 * (1 - shut), 0.095}
+              Scale: {1.25, 0.15 + 0.75 * shut, 0.62}
+              Sphere: {radius: 0.016, segments: 10, smooth: true}
+            }
+
             // Brows arch higher with charm.
             "brow_{s}" : ParisPatinaDark {
-              Position: {sx * 0.034, 0.152 + 0.005 * c, 0.095}
+              Position: {sx * 0.034, 0.152 + 0.005 * c + brow_up, 0.095}
               Rotation: {0, 0, 0 - sx * (0.05 + 0.15 * c)}
               Box: {0.035, 0.007, 0.01}
             }
@@ -276,14 +311,15 @@ assets {
               }
             }
 
-            // Lashes: none at charm 0, long and curled up at charm 1, flaring outward.
+            // Lashes: none at charm 0, long and curled up at charm 1, flaring outward; they come
+            // down with the eyelid.
             if c > 0.04 {
               for j in 0..3 {
                 const lash_len = 0.04 * c
-                const lash_tilt = lerp(1.0, 0.45, c)
+                const lash_tilt = lerp(lerp(1.0, 0.45, c), 2.3, shut)
                 const lash_roll = 0 - sx * (0.25 + (j - 1) * sx * 0.35)
                 "lash_{s}_{j}" : ParisIron {
-                  Position: {sx * 0.033 + (j - 1) * 0.008 - sin(lash_roll) * lash_len * 0.5, 0.137 + cos(lash_tilt) * lash_len * 0.5, 0.1 + sin(lash_tilt) * lash_len * 0.5}
+                  Position: {sx * 0.033 + (j - 1) * 0.008 - sin(lash_roll) * lash_len * 0.5, 0.137 - 0.014 * shut + cos(lash_tilt) * lash_len * 0.5, 0.1 + sin(lash_tilt) * lash_len * 0.5}
                   Rotation: {lash_tilt, 0, lash_roll}
                   Capsule: {length: lash_len, radius: 0.0028, segments: 4}
                 }
@@ -357,11 +393,12 @@ assets {
         }
 
         // The right arm raises the torch: torch_raise 1 is straight up, 0 holds it forward at
-        // chest height; torch_sweep turns it left and right. The torch stays upright in the
-        // hand.
+        // chest height; torch_sweep (plus a charm wave) turns it left and right. The torch stays
+        // upright in the hand, turned over by a twirl.
         const sp = lerp(0 - 1.32, 0 - 2.95, r)
         const ep = lerp(0 - 0.28, 0 - 0.1, r)
         const roll = lerp(0 - 0.14, 0 - 0.1, r)
+        const tsw = torch_sweep + wave
 
         // The up direction of the statue in the shoulder frame: the middle row of the rotations
         // of the hips, the chest and the arm (each Ry * Rx * Rz). The torch turns its own up
@@ -371,20 +408,20 @@ assets {
         const v0 = h0 * cos(chest_z) + h1 * cos(chest_x) * sin(chest_z)
         const v1 = h0 * (0 - sin(chest_z)) + h1 * cos(chest_x) * cos(chest_z)
         const v2 = h1 * (0 - sin(chest_x))
-        const u0 = v0 * (cos(torch_sweep) * cos(roll) + sin(sp) * sin(torch_sweep) * sin(roll)) + v1 * cos(sp) * sin(roll) + v2 * (sin(sp) * cos(torch_sweep) * sin(roll) - cos(roll) * sin(torch_sweep))
-        const u1 = v0 * (sin(sp) * sin(torch_sweep) * cos(roll) - cos(torch_sweep) * sin(roll)) + v1 * cos(sp) * cos(roll) + v2 * (sin(sp) * cos(torch_sweep) * cos(roll) + sin(torch_sweep) * sin(roll))
-        const u2 = v0 * cos(sp) * sin(torch_sweep) + v1 * (0 - sin(sp)) + v2 * cos(sp) * cos(torch_sweep)
+        const u0 = v0 * (cos(tsw) * cos(roll) + sin(sp) * sin(tsw) * sin(roll)) + v1 * cos(sp) * sin(roll) + v2 * (sin(sp) * cos(tsw) * sin(roll) - cos(roll) * sin(tsw))
+        const u1 = v0 * (sin(sp) * sin(tsw) * cos(roll) - cos(tsw) * sin(roll)) + v1 * cos(sp) * cos(roll) + v2 * (sin(sp) * cos(tsw) * cos(roll) + sin(tsw) * sin(roll))
+        const u2 = v0 * cos(sp) * sin(tsw) + v1 * (0 - sin(sp)) + v2 * cos(sp) * cos(tsw)
 
         ParisLibertyArm torch_arm(bend: {ep, 0, 0}) {
           Position: {0 - 0.2, 0.43, 0}
-          Rotation: {sp, torch_sweep, roll}
+          Rotation: {sp, tsw, roll}
           Transition: [Rotation: {duration: 0.3, timing_function: EaseInOut}]
 
           // In the shoulder frame at the hand (the elbow pivot plus the bent forearm), turned
           // back upright.
           torch {
             Position: {0, 0 - 0.28 - 0.26 * cos(ep), 0 - 0.26 * sin(ep)}
-            Rotation: {atan2(u2, u1), 0, 0 - asin(clamp(u0, 0 - 1, 1))}
+            Rotation: {atan2(u2, u1), 0, 0 - asin(clamp(u0, 0 - 1, 1)) + twirl}
             Transition: [Position: {duration: 0.3, timing_function: EaseInOut}, Rotation: {duration: 0.3, timing_function: EaseInOut}]
             handle : ParisPatina { Position: {0, 0.02, 0}; Cylinder: {length: 0.28, radius: 0.022, segments: 10, smooth: true} }
             knob : ParisPatina { Position: {0, 0 - 0.13, 0}; Sphere: {radius: 0.03, segments: 10, smooth: true} }
@@ -438,18 +475,24 @@ assets {
         }
 
         // The left arm holds the tablet against the body at charm 0 and rests the hand on the
-        // hip with the tablet tucked at the side at charm 1; it swings a little with the walk.
-        ParisLibertyArm tablet_arm(
-          bend: {lerp(0 - 0.75, 0 - 0.45, c), lerp(0 - 0.35, 0, c), lerp(0, 0 - 1.25, c)},
-          pose_time: 0.4
-        ) {
+        // hip with the tablet tucked at the side at charm 1 (hh); it swings a little with the
+        // walk, stiffly at charm 0. A blown kiss takes the free hand to the lips (kiss_lips) and
+        // sweeps it out toward whom it is for (kiss_out).
+        const tb_x = lerp(0 - 0.75, 0 - 0.45, hh) * kiss_rest + (0 - 2.085) * kiss_lips + (0 - 0.35) * kiss_out
+        const tb_y = lerp(0 - 0.35, 0, hh) * kiss_rest
+        const tb_z = lerp(0, 0 - 1.25, hh) * kiss_rest + (0 - 0.594) * kiss_lips
+        const ta_x = (lerp(0 - 0.12, 0.12, hh) - sw * lerp(0.04, 0.14, c)) * kiss_rest + (0 - 1.6) * kiss_lips + (0 - 1.45) * kiss_out
+        const ta_z = lerp(0.12, 0.55, hh) * kiss_rest + (0 - 0.35) * kiss_lips + 0.55 * kiss_out
+
+        ParisLibertyArm tablet_arm(bend: {tb_x, tb_y, tb_z}, pose_time: 0.3) {
           Position: {0.2, 0.43, 0}
-          Rotation: {lerp(0 - 0.12, 0.12, c) - sw * 0.12, 0, lerp(0.12, 0.55, c)}
+          Rotation: {ta_x, 0, ta_z}
+          Transition: [Rotation: {duration: 0.25, timing_function: EaseInOut}]
         }
 
         tablet {
-          Position: {lerp(0.19, 0.24, c), lerp(0.1, 0, c), lerp(0.17, 0 - 0.01, c)}
-          Rotation: {lerp(0.12, 0.05, c), lerp(0 - 0.35, 1.45, c), lerp(0 - 0.15, 0 - 0.1, c)}
+          Position: {lerp(0.19, 0.24, hh), lerp(0.1, 0, hh), lerp(0.17, 0 - 0.01, hh)}
+          Rotation: {lerp(0.12, 0.05, hh), lerp(0 - 0.35, 1.45, hh), lerp(0 - 0.15, 0 - 0.1, hh)}
           Transition: [Position: {duration: 0.4, timing_function: EaseInOut}, Rotation: {duration: 0.4, timing_function: EaseInOut}]
           slab : ParisPatina { RoundedBox: {0.22, 0.34, 0.045, 0.01, segments: 1} }
           for l in 0..3 {
@@ -478,6 +521,17 @@ assets {
           if torch_sweep != s.torch_sweep { torch_sweep = s.torch_sweep }
           if head_turn != s.head_turn { head_turn = s.head_turn }
           if lean != s.lean { lean = s.lean }
+          const ch = pr_charm[id]
+          if pose != ch.pose { pose = ch.pose }
+          if look != ch.look { look = ch.look }
+          if tilt != ch.tilt { tilt = ch.tilt }
+          if toss != ch.toss { toss = ch.toss }
+          if wave != ch.wave { wave = ch.wave }
+          if twirl != ch.twirl { twirl = ch.twirl }
+          if lids != ch.lids { lids = ch.lids }
+          if wink != ch.wink { wink = ch.wink }
+          if wink_side != ch.wink_side { wink_side = ch.wink_side }
+          if kiss != ch.kiss { kiss = ch.kiss }
         }
       }
     }

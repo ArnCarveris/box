@@ -231,6 +231,60 @@ state {
     0.4615
   ]
 
+  // The length of one step of a statue at full stride (how far each foot moves forward and back
+  // of the hip): short even steps at charm 0, long ones at charm 1. The walk phase follows it so
+  // the feet do not slide.
+  fn pr_step_len(c: f32) -> f32 {
+    0.17 + 0.07 * clamp(c, 0, 1)
+  }
+
+  // The charm in how each statue moves (paris/charm.flecs). paris/liberty.flecs reads the pose
+  // part every frame: pose 0..1 (hand on hip, hip out), look (look over the shoulder) and tilt
+  // (head tilt) in radians, toss 0..1 (head toss), wave (extra torch sweep in radians), twirl
+  // (torch twirl angle, only ever grows), lids 0..1 (both eyelids closed), wink 0..1 (the eyelid
+  // on wink_side closed) and kiss 0..1 (the phase of a blown kiss, 0 = none). The rest are the
+  // timers: the body act (PR_CH_*), its time and length, the act target (statue or -1 for the
+  // camera), the eye act (PR_EYE_*) and its time and length, the time to the next eye act, the
+  // next torch twirl, the next kiss and the next greeting, the twirl angle still to spin, whether
+  // the hearts of the kiss flew and the hunt behaviour of the last frame.
+  struct ParisCharm(pose: f32, look: f32, tilt: f32, toss: f32, wave: f32, twirl: f32, lids: f32, wink: f32, wink_side: i32, kiss: f32, act: i32, act_time: f32, act_len: f32, partner: i32, eye: i32, eye_time: f32, eye_len: f32, eye_wait: f32, twirl_wait: f32, kiss_wait: f32, meet_wait: f32, spin: f32, hearts: bool, last: i32)
+
+  export const PR_CH_NONE: i32 = 0  // stand to attention or walk on
+  export const PR_CH_POSE: i32 = 1  // hand on hip, hip out, head tilted, a look over the shoulder
+  export const PR_CH_KISS: i32 = 2  // blow a kiss with floating hearts
+  export const PR_CH_TOSS: i32 = 3  // toss the head at a statue passing by
+  export const PR_CH_WAVE: i32 = 4  // a little wave with the torch at a statue passing by
+
+  export const PR_EYE_NONE: i32 = 0
+  export const PR_EYE_BLINK: i32 = 1
+  export const PR_EYE_FLUTTER: i32 = 2
+  export const PR_EYE_WINK: i32 = 3
+
+  export mut pr_charm: ParisCharm[14] = [
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1.5, 6, 4, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 2.3, 7, 5, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1.1, 5, 3, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 3.1, 8, 6, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0.9, 4, 7, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 2.7, 9, 4, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0.7, 3, 2, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 1.9, 6, 5, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1.3, 5, 6, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 3.5, 8, 8, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1.7, 4, 3, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 2.1, 7, 7, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 2.5, 6, 4, 3, 0, false, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0.5, 5, 5, 3, 0, false, 0}
+  ]
+
+  // Statistics of the charm acts, to check them in a headless run: winks, poses, kisses (and
+  // heart bursts), head tosses and torch waves, torch twirls.
+  export mut pr_charm_winks: i32 = 0
+  export mut pr_charm_poses: i32 = 0
+  export mut pr_charm_kisses: i32 = 0
+  export mut pr_charm_greets: i32 = 0
+  export mut pr_charm_twirls: i32 = 0
+
   // The hunt (paris/hunt.flecs): what each statue is doing. The behaviour (PR_ST_*), the time in
   // it and the time of its next step (wait), the node she came from, the raccoon she is after
   // (-1 = none), the node she heads for while chasing or searching, the spot off the street graph
