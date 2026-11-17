@@ -76,9 +76,16 @@ main_view {
 }
 
 lagoon {
-  // The water and the sand floor under it, wide and long enough to reach the horizon haze
+  // The water and the sand floor under it, wide and long enough to reach the horizon haze. The
+  // floor scrolls with the world by whole texture repeats and its sand moves with it, so through
+  // the clear water it flows past with the banks
   water : LgWater { Position: {0, 0, -800}; Box: {1600, 0.02, 2400}; NoShadow }
-  floor : LgSandWet { Position: {0, -1.8, -800}; Box: {1600, 0.2, 2400}; NoShadow }
+  floor : LgSandWet {
+    Position: {0, -1.8, -800 + 12 * fract(distance / 12)}
+    Box: {1600, 0.2, 2400}
+    texture.Mapping: {mode: MappingObject, size: 6}
+    NoShadow
+  }
 
   // A distant volcano island up the lagoon, softened by the haze
   volcano {

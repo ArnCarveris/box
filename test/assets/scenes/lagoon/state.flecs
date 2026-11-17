@@ -1,0 +1,134 @@
+using flecs.script
+using flecs.script.math
+
+state {
+  export const HALF_PI: f32 = 1.5707963
+
+  // The channel the canoe paddles in, X in -CHANNEL_HALF..CHANNEL_HALF
+  export const CHANNEL_HALF: f32 = 6
+  export const CANOE_Z: f32 = 0
+  export const CANOE_HALF_WIDTH: f32 = 0.9
+
+  // Chase camera: behind (+Z) and above the canoe, looking up the lagoon (-Z)
+  export const CAM_BACK: f32 = 12
+  export const CAM_HEIGHT: f32 = 5
+  export const CAM_LOOK_AHEAD: f32 = 11
+  export const CAM_FOLLOW: f32 = 0.6
+  export const CAM_FOV: f32 = 55
+
+  export const START_SPEED: f32 = 9
+  export const SPEED_STEP: f32 = 1.5
+  export const MAX_SPEED: f32 = 26
+  export const COCONUTS_PER_STEP: i32 = 5
+  export const MAX_LIVES: i32 = 3
+  export const INVULNERABLE_TIME: f32 = 1.6
+  export const SEED: i32 = 4242
+
+  export const ROCKS: i32 = 14
+  export const LOGS: i32 = 8
+  export const COCONUTS: i32 = 24
+
+  // Rows of hazards spawn SPAWN_AHEAD units up the lagoon and rise over RISE units. Rows are
+  // ROW_GAP apart at START_SPEED and ROW_GAP_PER_SPEED closer per unit of speed above it.
+  export const SPAWN_AHEAD: f32 = 95
+  export const RISE: f32 = 14
+  export const DESPAWN_Z: f32 = 16
+  export const ROW_GAP: f32 = 17
+  export const ROW_GAP_MIN: f32 = 11
+  export const ROW_GAP_PER_SPEED: f32 = 0.45
+  export const FIRST_HAZARD_TIME: f32 = 3
+  // The channel is split in LANES lanes LANE_W apart; every row keeps two neighbouring lanes
+  // free (canoe and outrigger float), hazards sit in the others with LANE_JITTER of play
+  export const LANES: i32 = 5
+  export const LANE_W: f32 = 2.3
+  export const LANE_JITTER: f32 = 0.45
+  export const LOG_CHANCE: f32 = 0.3
+  // Coconut lines in front of a row lead from the free lane toward a hazard, NUT_LEAD units
+  // short of it
+  export const NUT_LINE_CHANCE: f32 = 0.65
+  export const NUTS_PER_LINE: i32 = 4
+  export const NUT_SPACING: f32 = 2.2
+  export const NUT_LEAD: f32 = 5.5
+  // Collision shapes: the hull and the outrigger float as boxes in X and Z, hazards as circles
+  export const HULL_HALF_W: f32 = 0.42
+  export const HULL_HALF_L: f32 = 3.1
+  export const FLOAT_X: f32 = -2.45
+  export const FLOAT_HALF_W: f32 = 0.15
+  export const FLOAT_HALF_L: f32 = 1.8
+  export const ROCK_R: f32 = 0.85
+  export const LOG_R: f32 = 0.9
+  export const NUT_R: f32 = 0.55
+  export const SEED_HAZARDS: i32 = 1913
+
+  export const GS_PLAYING: i32 = 1
+  export const GS_OVER: i32 = 2
+
+  // An item of a pool: live items sit at x, z (z in the scrolled world), kind and spin pick
+  // their look, hit marks an item that was already struck or collected
+  struct LgItem(x: f32, z: f32, size: f32, spin: f32, kind: i32, live: bool, hit: bool)
+
+  fn fract(v: f64) -> f64 {
+    v - floor(v)
+  }
+
+  fn hash(i: f64) -> f64 {
+    fract(sin(i * 12.9898 + 4.1414) * 43758.5453)
+  }
+
+  fn bool_f(b: bool) -> f32 {
+    b ? 1 : 0
+  }
+
+  export mut game_state: i32 = GS_PLAYING
+  export mut clock: f64 = 0
+  export mut dt: f32 = 0.016
+  export mut distance: f64 = 0
+  export mut speed: f32 = START_SPEED
+  export mut canoe_x: f32 = 0
+  export mut canoe_vx: f32 = 0
+  export mut lean: f32 = 0
+  export mut paddle_phase: f32 = 0
+  export mut lives: i32 = MAX_LIVES
+  export mut coconuts: i32 = 0
+  export mut invulnerable: f32 = 0
+  export mut capsize: f32 = 0
+
+  export mut rocks: LgItem[14] = {}
+  export mut logs: LgItem[8] = {}
+  export mut nuts: LgItem[24] = {}
+  // Distance at which the next row of hazards spawns, and the number of rows spawned
+  export mut next_row: f64 = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
+  export mut rows: i32 = 0
+
+  fn reset() {
+    game_state = GS_PLAYING
+    clock = 0
+    distance = 0
+    speed = START_SPEED
+    canoe_x = 0
+    canoe_vx = 0
+    lean = 0
+    paddle_phase = 0
+    lives = MAX_LIVES
+    coconuts = 0
+    invulnerable = 0
+    capsize = 0
+    next_row = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
+    rows = 0
+
+    for i in 0..ROCKS {
+      rocks[i].live = false
+      rocks[i].hit = false
+    }
+
+    for i in 0..LOGS {
+      logs[i].live = false
+      logs[i].hit = false
+    }
+
+    for i in 0..COCONUTS {
+      nuts[i].live = false
+      nuts[i].hit = false
+    }
+  }
+}

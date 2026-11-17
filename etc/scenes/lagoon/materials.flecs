@@ -127,6 +127,23 @@ assets {
     texture.Mapping: {mode: MappingWorld, size: 6}
   }
 
+  // The sand of the banks, projected in the space of the bank strip (its texture.Frame), so it
+  // scrolls with the strip and runs on across its tilted slopes. The wet sand is matte enough that
+  // the low sun does not make a glossy sheen on it that reads as water
+  prefab LgBankSandDry {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: lg_sand_dry_a, normal: lg_sand_n}
+    texture.Mapping: {mode: MappingFrame, size: 6}
+  }
+
+  prefab LgBankSandWet {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: lg_sand_wet_a, normal: lg_sand_n}
+    texture.Mapping: {mode: MappingFrame, size: 6}
+  }
+
   prefab LgPalmBark {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.95}

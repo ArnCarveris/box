@@ -18,6 +18,9 @@ state {
   export const SECTIONS: i32 = 6
   export const SECTION_LEN: f32 = 42
   export const BANK_X: f32 = 14
+  // Height of the beach above the water: the top of the bank sand inland of the waterline slope,
+  // where the palms, bushes and flowers stand
+  export const BEACH_Y: f32 = 0.34
 
   // The far islands out at sea scroll by FAR_PARALLAX of distance over a longer span
   export const FAR_SPAN: f32 = 1100
@@ -401,7 +404,7 @@ assets {
       if p < palms {
         const pz = (p + 0.15 + rng.f(0.7)) * SECTION_LEN / palms
         "palm_{p}" {
-          Position: {side * (1.2 + rng.f(6)), 0.5, pz}
+          Position: {side * (1.2 + rng.f(6)), BEACH_Y - 0.08, pz}
           Rotation: {0, side * (rng.f(0.9) - 0.45), 0}
           LgPalm tree(
             height: 5.5 + rng.f(3.5),
@@ -416,7 +419,7 @@ assets {
     for b in 0..3 {
       const bs = 0.7 + rng.f(0.7)
       "bush_{b}" {
-        Position: {side * (2 + rng.f(9)), 0.5, (b + 0.1 + rng.f(0.8)) * SECTION_LEN / 3}
+        Position: {side * (2 + rng.f(9)), BEACH_Y - 0.05, (b + 0.1 + rng.f(0.8)) * SECTION_LEN / 3}
         Rotation: {0, rng.f(6.28), 0}
         LgBush plant(size: bs, seed: seed * 11 + b)
       }
@@ -425,7 +428,7 @@ assets {
     flowers {
       const fx = side * (4 + rng.f(6))
       const fz = rng.f(SECTION_LEN)
-      Position: {fx, 0.5, fz}
+      Position: {fx, BEACH_Y - 0.03, fz}
       grass : LgBushDark {
         Position: {0, 0.02, 0}
         Scale: {1.6, 0.18, 1}
@@ -535,29 +538,60 @@ assets {
 }
 
 banks {
-  // The banks are long strips that scroll by whole texture repeats, so their sand stays still:
-  // a wet slope at the waterline, a wet flat, then the dry beach and dunes inland
+  // The banks are long strips that scroll by whole texture repeats (step), with the sand
+  // projected in the space of the strip, so it flows past with the scenery and the jump back
+  // does not show. A wet beach rises from the waterline, then come the dry beach and dunes.
+  //
+  // The gentle wet slope meets the dry beach at BEACH_Y without a step (a steep one read as
+  // water on the bank facing away from the low sun); under the water a shelf drops to the floor
   const step = 12
+  const WATER_U: f32 = -1.225
+  const SLOPE: f32 = 0.14
+  const SLOPE_U: f32 = WATER_U + BEACH_Y / tan(SLOPE)
+  const SLOPE_START: f32 = WATER_U - 0.4
+  const SLOPE_LEN: f32 = (SLOPE_U - SLOPE_START) / cos(SLOPE)
+  const SHELF: f32 = 0.32
+  const SHELF_LEN: f32 = 1.4
+  const STRIP_H: f32 = 0.3
+  const TOP_LEN: f32 = 30.5
 
   for s in 0..2 {
     const side = s == 0 ? -1.0 : 1.0
     "bank_{s}" {
       Position: {side * BANK_X, 0, -530 + step * fract(distance / step)}
-      beach : LgSandWet {
-        Position: {side * -0.9, -0.05, 0}
-        Rotation: {0, 0, side * 0.32}
-        Box: {2.6, 0.3, 1140}
+      texture.Frame
+      beach : LgBankSandWet {
+        Position: {
+          side * ((SLOPE_START + SLOPE_U) / 2 + STRIP_H / 2 * sin(SLOPE)),
+          (BEACH_Y + (SLOPE_START - WATER_U) * tan(SLOPE)) / 2 - STRIP_H / 2 * cos(SLOPE),
+          0
+        }
+        Rotation: {0, 0, side * SLOPE}
+        Box: {SLOPE_LEN, STRIP_H, 1140}
       }
 
-      flat : LgSandWet { Position: {side * 0.9, 0.12, 0}; Box: {1.6, 0.4, 1140} }
-      top : LgSandDry { Position: {side * 16.7, 0.09, 0}; Box: {30, 0.5, 1140} }
-      dune : LgSandDry {
+      shelf : LgBankSandWet {
+        Position: {
+          side * (WATER_U - SHELF_LEN / 2 * cos(SHELF) + STRIP_H / 2 * sin(SHELF)),
+          0 - SHELF_LEN / 2 * sin(SHELF) - STRIP_H / 2 * cos(SHELF),
+          0
+        }
+        Rotation: {0, 0, side * SHELF}
+        Box: {SHELF_LEN, STRIP_H, 1140}
+      }
+
+      top : LgBankSandDry {
+        Position: {side * (SLOPE_U + TOP_LEN / 2), BEACH_Y - 0.25, 0}
+        Box: {TOP_LEN, 0.5, 1140}
+      }
+
+      dune : LgBankSandDry {
         Position: {side * 22, 0.6, 0}
         Rotation: {0, 0, side * -0.08}
         Box: {16, 0.6, 1140}
       }
 
-      shore : LgSandWet {
+      shore : LgBankSandWet {
         Position: {side * 32.6, -0.05, 0}
         Rotation: {0, 0, side * -0.3}
         Box: {2.6, 0.3, 1140}
