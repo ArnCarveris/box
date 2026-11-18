@@ -173,6 +173,14 @@
  * DiffuseTransmission or Fresnel. */
 #define BOX_RENDER_SHADER_MESH_EXTENDED (10)
 
+/** Shader handle of the mesh shader compiled with BOX_TEXTURE_LAYERS: the layers entry points
+ * the batches with TextureLayers draw with (box_render_mesh_layers). A module apart, so the
+ * module of the other batches is unchanged. */
+#define BOX_RENDER_SHADER_MESH_LAYERS (13)
+
+/** Shader handle of the extended mesh shader compiled with BOX_TEXTURE_LAYERS */
+#define BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS (14)
+
 /** Check whether a shader handle is one of the two mesh shaders.
  *
  * @param pipeline The shader handle of a batch
@@ -182,6 +190,30 @@ static inline bool box_render_is_mesh(
     uint32_t pipeline)
 {
     return pipeline == BOX_RENDER_SHADER_MESH || pipeline == BOX_RENDER_SHADER_MESH_EXTENDED;
+}
+
+/** Get the layers module of a mesh shader, which its batches with TextureLayers draw with.
+ *
+ * @param pipeline BOX_RENDER_SHADER_MESH or BOX_RENDER_SHADER_MESH_EXTENDED
+ * @return BOX_RENDER_SHADER_MESH_LAYERS or BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS
+ */
+static inline uint32_t box_render_mesh_layers(
+    uint32_t pipeline)
+{
+    return pipeline == BOX_RENDER_SHADER_MESH_EXTENDED
+        ? BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS : BOX_RENDER_SHADER_MESH_LAYERS;
+}
+
+/** Check whether a shader handle is the layers module of a mesh shader.
+ *
+ * @param handle The shader handle
+ * @return Whether it is BOX_RENDER_SHADER_MESH_LAYERS or BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS
+ */
+static inline bool box_render_is_mesh_layers(
+    uint32_t handle)
+{
+    return handle == BOX_RENDER_SHADER_MESH_LAYERS ||
+        handle == BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS;
 }
 
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
@@ -406,6 +438,33 @@ static inline uint32_t box_render_page_kind(
 
 /** Textures of each layer of a TextureBlend in its record: the maps and the height */
 #define BOX_RENDER_BLEND_SOURCES (BOX_RENDER_BLEND_MAPS + 1)
+
+/** Layers of a TextureLayers */
+#define BOX_RENDER_LAYERS (4)
+
+/** Maps each layer of a TextureLayers samples, consecutive slices of its texture array: the
+ * albedo (display encoded, stored as such), the ORM, the normal and the mask, stored */
+#define BOX_RENDER_LAYER_MAPS (4)
+
+/** Map of a layer of a TextureLayers: albedo, display encoded */
+#define BOX_RENDER_LAYER_ALBEDO (0)
+
+/** Map of a layer of a TextureLayers: occlusion, roughness and metallic, stored */
+#define BOX_RENDER_LAYER_ORM (1)
+
+/** Map of a layer of a TextureLayers: tangent space normal, stored */
+#define BOX_RENDER_LAYER_NORMAL (2)
+
+/** Map of a layer of a TextureLayers: the coverage mask in red, stored */
+#define BOX_RENDER_LAYER_MASK (3)
+
+/** Flags of box_render_texture_layer_t: the layer has an albedo, ORM, normal or mask texture
+ * entity, and it maps with the UVs of the mesh instead of the world position */
+#define BOX_RENDER_LAYER_HAS_ALBEDO (1u)
+#define BOX_RENDER_LAYER_HAS_ORM (2u)
+#define BOX_RENDER_LAYER_HAS_NORMAL (4u)
+#define BOX_RENDER_LAYER_HAS_MASK (8u)
+#define BOX_RENDER_LAYER_UV (16u)
 
 /** Anisotropic samples of the texture samplers when no surface sets them */
 #define BOX_RENDER_ANISOTROPY_DEFAULT (4)
@@ -836,6 +895,12 @@ typedef struct box_render_view_gtao_t {
  * override of every vertex stage, which moves their vertices; the other batches keep the
  * pipelines of a scene without it */
 #define BOX_RENDER_FEATURE_WIND (1u << 22)
+
+/** Texture layers (Scene.texture_layers): the batches of the shapes with TextureLayers
+ * (box_render_batch_t.texture_layers) draw with the layers entry points of the layers modules
+ * of the mesh shaders (box_render_mesh_layers) and their own bind group layouts; the other
+ * batches keep the modules and pipelines of a scene without it */
+#define BOX_RENDER_FEATURE_TEXTURE_LAYERS (1u << 23)
 
 /** The scene features of the mesh shader */
 #define BOX_RENDER_FEATURE_LIGHTING (0x3Fu)
@@ -1774,6 +1839,42 @@ typedef struct box_render_texture_blend_t {
     uint32_t tiles;     /**< 1 for a TileTerrain, whose mask is its grid of kind indices */
 } box_render_texture_blend_t;
 
+/** The values of one TextureLayer as the mesh shaders read them (TextureLayer of
+ * mesh_layers.wgsl), the uniform buffer of its layer entity. 112 bytes. */
+typedef struct box_render_texture_layer_t {
+    float color[4];         /**< Linear albedo constant (Rgb), then the amount clamped to 0..1;
+                             *   0 does nothing */
+    float direction[4];     /**< Unit world direction, then the facing, 0..1 */
+    float coverage[4];      /**< Cavity -1..1, edge width (one over the contrast), normal 0..1
+                             *   and porosity 0..1 */
+    float material[4];      /**< Roughness and metallic constants (PbrMaterial), then the world
+                             *   units of one repeat (TextureMapping.size) and the triplanar
+                             *   blend, 0..1 */
+    float transform[4];     /**< TextureTransform scale u, v and offset u, v, the offset with
+                             *   the wrapped offset of its TextureScroll */
+    uint32_t modes[4];      /**< TextureLayerBlend of the albedo, roughness, metallic and
+                             *   occlusion */
+    uint32_t flags[4];      /**< BOX_RENDER_LAYER_HAS_* and BOX_RENDER_LAYER_UV, then 0 */
+} box_render_texture_layer_t;
+
+/** The layers of a TextureLayers as a batch draws them, in the packet data of a batch with
+ * texture_layers.
+ *
+ * The backend keeps a uniform buffer per layer entity, written when its values change, which
+ * every batch with the layer binds, and blits the maps of the layers into one texture array:
+ * slice BOX_RENDER_LAYER_MAPS * layer + map, after the heights of a TextureBlend. */
+typedef struct box_render_texture_layers_t {
+    ecs_entity_t entities[BOX_RENDER_LAYERS]; /**< Layer entity of each slot, which keys its
+                             *   buffer, 0 for a slot that does nothing */
+    box_render_texture_layer_t values[BOX_RENDER_LAYERS]; /**< Values of each slot, zero for a
+                             *   slot without an entity */
+    uint32_t maps[BOX_RENDER_LAYERS][BOX_RENDER_LAYER_MAPS]; /**< Texture handles of the albedo,
+                             *   ORM, normal and mask of each slot, 0 for the default (white, a
+                             *   flat normal) */
+    uint32_t count;         /**< Slots up to the last one with an entity, at least 1 */
+    uint32_t quality;       /**< Largest dimension of a slice, the texture quality */
+} box_render_texture_layers_t;
+
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.
  *
  * Opaque batches come first in a packet; the blended instances follow as draws of one view,
@@ -1838,6 +1939,11 @@ typedef struct box_render_batch_t {
                                  *   0 for none */
     uint32_t blend_layers;      /**< Data offset of the box_render_texture_blend_t of a batch
                                  *   with texture_blend */
+    bool texture_layers;        /**< The instances have TextureLayers in a scene with
+                                 *   Scene.texture_layers: the layers variants of the mesh
+                                 *   pipelines apply the layers at layers over the surface */
+    uint32_t layers;            /**< Data offset of the box_render_texture_layers_t of a batch
+                                 *   with texture_layers */
     uint32_t wrap;              /**< TextureWrap of the samplers */
     uint32_t instances;         /**< Handle of the transform stream of the instance page
                                  *   holding the instance data; its other streams follow */

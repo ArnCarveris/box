@@ -851,7 +851,7 @@ static void box_gpu_planar_draws(
             bound = pipeline;
         }
 
-        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
         uint32_t kind = box_gpu_draw_kind(b, false);
         if (layers != material || kind != material_kind) {
             wgpuRenderPassEncoderSetBindGroup(rp, 1, layers, 1, &kind);

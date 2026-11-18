@@ -5,7 +5,8 @@ coat, sheen, anisotropy, transmission, water, ...), texture layers and UV mappin
 `box.material` (`BoxMaterialImport`), header `include/box/material.h`, source
 `src/material/material.c`. UV/texture components live in the child module
 `box.material.texture` with the `Texture` prefix dropped: write `texture.Transform`,
-`texture.Mapping`, `texture.Scroll`, `texture.Blend`, `texture.Wrap`, `texture.Frame` in script.
+`texture.Mapping`, `texture.Scroll`, `texture.Blend`, `texture.Layer`, `texture.Layers`,
+`texture.Wrap`, `texture.Frame` in script.
 
 ## Base components
 
@@ -48,6 +49,65 @@ unset fields.
 | `texture.Frame` (tag) | | Frame for MappingFrame (and the scale reference of MappingObject) for its subtree |
 | `texture.Scroll` | `velocity`, `normal_velocity` (texture widths/s) | Endless UV scroll; needs `Scene.texture_scroll` |
 | `texture.Blend` | `mask`, `layers[4]` (entities with PbrTextures + optional texture.Transform), `heights[4]`, `contrast` 0 | Mask RGBA weighs layers 0..3; needs `Scene.texture_blend`. Shape's PbrTextures ignored except emissive |
+| `texture.Layers` | `layers[4]` (entities with `texture.Layer`, 0 unused) | Applied in order over the resolved surface (after PbrTextures, texture.Blend or TileTerrain, before lighting); needs `Scene.texture_layers`. Part of the batch like PbrTextures |
+| `texture.Layer` | `amount` 1, `direction` {0,1,0}, `facing` 0, `mask` 0, `cavity` 0, `contrast` 8, `albedo` LayerMix, `roughness` LayerMix, `metallic` LayerKeep, `occlusion` LayerKeep, `normal` 0, `porosity` 0 | On a layer entity, with its own Rgb, PbrMaterial, PbrTextures, texture.Mapping (default world), texture.Transform, texture.Scroll |
+
+## Texture layers
+
+A shape opts in to `texture.Layers`; each layer entity paints over or modifies the surface
+beneath it, which already includes the shape's own Rgb, PbrMaterial, PbrTextures, texture.Blend or
+TileTerrain. Weather (snow, wet, puddles) is a set of layer entities a scene animates.
+
+- Appearance: the layer's `Rgb` and `PbrMaterial` constants (white, roughness 1, metallic 0
+  without them) times its `PbrTextures` (albedo; ORM green roughness, blue metallic, red
+  occlusion; normal). Any texture entity works, a `texture.Graph` output too, so procedural and
+  animated layers work. Without textures a layer is a flat color/roughness.
+- Placement: `texture.Mapping` of the layer entity; without one it is `MappingWorld` with size 1,
+  so a layer runs on across shapes. `blend` > 0 blends the three projections. `MappingUv` uses
+  the UVs of the mesh; `MappingObject` and `MappingFrame` project like `MappingWorld`.
+- Coverage: a score from 0 to 1 per fragment: how well the shading normal faces `direction`
+  (`facing` 0 ignores it, larger only allows normals closer to it, 1 only those facing it fully;
+  `normal` mixes it toward the geometric normal, so a flattening water film fills the bumps),
+  times the red of `mask` raised by `cavity` times how occluded or low the surface is (1 - ORM
+  red, or 1 - the height of a `texture.Blend` with heights), so positive fills crevices and low
+  spots first, negative ridges first, without holding back open surfaces. `amount` moves a threshold over the
+  score: 0.2 snow is a dusting on the flattest tops, 1 covers everything the rules allow.
+  `contrast` sharpens the edge.
+- Change: `albedo`, `roughness`, `metallic`, `occlusion` each `LayerKeep`, `LayerMix` (replace by
+  the layer value where covered) or `LayerMultiply` (multiply by it). `normal` 0..1 mixes the
+  shading normal toward the layer normal (a layer without a normal map flattens, as a water film).
+- `porosity` 0..1 scales the change of albedo and roughness by the porosity of the surface beneath,
+  `(1 - metallic) * roughness`: rough soil, bark and stone change fully, glossy leaves little,
+  metals not at all. The albedo darkens by a plain multiply weighted that way (a simplification of
+  Lagarde's wet surfaces model).
+- Alpha never changes; alpha tested shapes keep their holes. Water, Transmission and Distortion
+  shapes, 2D shapes and text ignore layers. Probe and reflection captures see them.
+
+```flecs
+$ { Scene: {texture_layers: true, texture_blend: true, alpha_cutout: true} }
+
+snow_noise { n { nodes.Noise: {frequency: 6, octaves: 4} }
+  Graph: {output: n, width: 256, format: GraphSingle} }
+puddle_noise { n { nodes.Noise: {frequency: 3, octaves: 3, seed: 7} }
+  Graph: {output: n, width: 256, format: GraphSingle} }
+
+snow {   // white rough cover on the tops
+  texture.Layer: {amount: 0.3, facing: 0.6, mask: snow_noise}
+  Rgb: {245, 248, 255}; PbrMaterial: {roughness: 0.9}
+  texture.Mapping: {mode: MappingWorld, size: 2}
+}
+wet {    // no textures: darker and glossier everywhere, metals unchanged
+  texture.Layer: {albedo: LayerMultiply, roughness: LayerMultiply, normal: 0.3, porosity: 1}
+  Rgb: {153, 153, 153}; PbrMaterial: {roughness: 0.3}
+}
+puddles {
+  texture.Layer: {amount: 0.5, mask: puddle_noise, cavity: 0.8, facing: 0.95,
+    albedo: LayerMultiply, roughness: LayerMix, normal: 1}
+  Rgb: {110, 110, 110}; PbrMaterial: {roughness: 0.02}
+}
+
+rock { Box: {1, 1, 1}; texture.Layers: {layers: [wet, snow]} }
+```
 
 ## Tags
 
@@ -97,8 +157,8 @@ prefab Grass { Quad: {0.3, 0.8}; PbrTextures: {albedo: blade}; AlphaCutoff: {}
 
 - `Rgb`, `PbrMaterial`, `Emissive`, `AlphaCutoff`, `Transmission`, `ClearCoat`,
   `SpecularAnisotropy`, `Sheen`, `DiffuseTransmission`, `Fresnel`, `Water`, `Distortion`,
-  `WindSway`, `texture.Transform`, `texture.Mapping`, `texture.Scroll`, `PbrTextures` and
-  `texture.Blend` are inherited by prefab instances (OnInstantiate Inherit). Changing the prefab updates all
+  `WindSway`, `texture.Transform`, `texture.Mapping`, `texture.Scroll`, `PbrTextures`,
+  `texture.Blend` and `texture.Layers` are inherited by prefab instances (OnInstantiate Inherit). Changing the prefab updates all
   instances that do not override.
 - `Scene` features are all false by default. A shape needing a feature that is off draws as if
   it lacked the component (no error). Set them on the Scene root, or `$ { Scene: {...} }` for
@@ -143,4 +203,12 @@ prefab Grass { Quad: {0.3, 0.8}; PbrTextures: {albedo: blade}; AlphaCutoff: {}
   change every frame.
 - `PbrTextures` and `texture.Blend` are part of the batch, not the material table: every distinct
   texture set is a separate batch.
+- `texture.Layers` is part of the batch: shapes with the same layers share a batch drawn with
+  the layers entry points of separate modules of the mesh shaders (compiled with
+  `BOX_TEXTURE_LAYERS`, only in scenes with `Scene.texture_layers`) and their own bind group
+  layouts. Shapes without it keep their shader modules, pipelines, bind groups, material records
+  and batches unchanged, with `Scene.texture_layers` on or off. The values of a layer live in one small uniform buffer per
+  layer entity, written only when they change, so animating `amount` touches no shape and no
+  batch. The maps of the layers (and their masks) are blitted into one texture array per layer
+  set, built again when an image changes (every update of an animated graph).
 - Each Scene feature compiles a larger shader; enable only what the scene uses.

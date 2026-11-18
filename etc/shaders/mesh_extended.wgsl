@@ -7,6 +7,9 @@
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
 #include "include/mesh_blend.wgsl"
+#ifdef BOX_TEXTURE_LAYERS
+#include "include/mesh_layers.wgsl"
+#endif
 
 // The material features of the scene (Scene) compile out the code of those it lacks; the alpha
 // test, the blend modes and the TextureBlend have no override. transmissive is set for the
@@ -1058,3 +1061,93 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
     return lit(f, s);
 }
+
+#ifdef BOX_TEXTURE_LAYERS
+// The surface after the TextureLayers of the batch, whose maps are slices of maps from first. A
+// back face keeps its surface; the layers do not change the alpha. The diffuse transmission
+// color follows the new albedo.
+fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, first: u32,
+    low: f32) -> Surface {
+    var o = s;
+    let l = apply_layers(maps, first, f, LayerSurface(s.albedo, s.metallic, s.roughness,
+        s.occlusion, s.normal, s.geometric, low));
+    if (front) {
+        o.albedo = l.albedo;
+        o.metallic = l.metallic;
+        o.roughness = l.roughness;
+        o.occlusion = l.occlusion;
+        o.normal = l.normal;
+        if (o.back_factor > 0.0) {
+            o.back_color = max(vo_diffuse_transmission(f).rgb, vec3f(0.0)) * o.albedo *
+                (1.0 - o.metallic) * o.back_factor;
+        }
+        if (o.anisotropy > 0.0) {
+            o.tangent = layer_along(o.tangent, o.normal);
+            o.bitangent = cross(o.normal, o.tangent);
+        }
+    }
+    return o;
+}
+
+@fragment fn fs_layers(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, layered(f, front, surface(f, front), layer_maps, 0u, 0.0));
+}
+
+@fragment fn fs_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let s = surface(f, front);
+    if (s.alpha < vo_scalars(f).x) {
+        discard;
+    }
+
+    return lit(f, layered(f, front, s, layer_maps, 0u, 0.0));
+}
+
+@fragment fn fs_blend_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    var layers: Layers;
+    var low = 0.0;
+    if (material_triplanar && vo_scalars(f).w > 1.0) {
+        layers = blend_triplanar(f, geometric, front);
+    } else {
+        let b = blend_fragment(f);
+        var albedo = vec4f(0.0);
+        if (front || kind.alpha_cutout != 0u) {
+            albedo = blend_fragment_albedo(b);
+        }
+        layers = blend_maps(geometric, b, albedo, front);
+        low = blend_low(b);
+    }
+    let s = surface_of(f, front, geometric, layers);
+    return lit(f, layered(f, front, s, blend_heights, blending.count, low));
+}
+
+@fragment fn fs_blend_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    var layers: Layers;
+    var low = 0.0;
+    if (material_triplanar && vo_scalars(f).w > 1.0) {
+        layers = blend_triplanar(f, geometric, front);
+    } else {
+        let b = blend_fragment(f);
+        let albedo = blend_fragment_albedo(b);
+        if (f.color.a * albedo.a < vo_scalars(f).x) {
+            discard;
+        }
+        layers = blend_maps(geometric, b, albedo, front);
+        low = blend_low(b);
+    }
+
+    let s = surface_of(f, front, geometric, layers);
+    if (s.alpha < vo_scalars(f).x) {
+        discard;
+    }
+
+    return lit(f, layered(f, front, s, blend_heights, blending.count, low));
+}
+#endif

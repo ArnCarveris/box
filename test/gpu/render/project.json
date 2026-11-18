@@ -487,6 +487,18 @@
                 ]
             },
             {
+                "id": "TextureLayers",
+                "testcases": [
+                    "mix_constants",
+                    "amount_zero",
+                    "albedo_map",
+                    "porosity",
+                    "texture_blend",
+                    "amount_animates",
+                    "flag_off"
+                ]
+            },
+            {
                 "id": "TileTerrain",
                 "testcases": [
                     "corner_variant",

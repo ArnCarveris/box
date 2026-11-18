@@ -1,0 +1,158 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.terrain
+
+// texture.Layers: textures_layers_snow at amount 1: every face within about 66 degrees of up is
+// covered where the noise mask allows, sides and undersides stay bare, the leaf keeps its holes
+// and the red box without layers looks as in textures_layers_snow.
+//
+// frames: 10
+$ {
+  Scene: {alpha_cutout: true, texture_blend: true, texture_layers: true}
+}
+
+camera {
+  Position: {0, 4.2, 8.5}
+  Rotation: {-0.42, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 170, 200, 255}},
+    shadows: {enabled: true}}
+}
+
+$ {
+  AmbientLight: {sky: {150, 170, 200}, ground: {70, 64, 56}, intensity: 0.6}
+}
+
+sun {
+  Rotation: {0.9, 0.5, 0}
+  DirectionalLight: {intensity: 1.4 * flecs.script.math.PI}
+  Rgb: {255, 245, 230}
+}
+
+mask { Path: {path: "test/integration/visual/assets/blend_mask.png"} }
+checker { Path: {path: "test/integration/visual/assets/checker.png"} }
+stripes { Path: {path: "test/integration/visual/assets/stripes.png"} }
+bumps { Path: {path: "test/integration/visual/assets/bumps.png"} }
+orm { Path: {path: "test/integration/visual/assets/orm.png"} }
+leaf_tex { Path: {path: "test/integration/visual/assets/leaf.png"} }
+tiles_a { Path: {path: "test/assets/textures/tiles_base.png"} }
+tiles_b { Path: {path: "test/assets/textures/tiles_variants.png"} }
+
+// The snow: a white albedo with a faint blue grain, and a noise mask that breaks up its edge
+snow_albedo {
+  grain { nodes.Noise: {frequency: 32, octaves: 3} }
+  tint { nodes.Mix: {a_value: {0.86, 0.9, 0.97, 1}, b_value: {1, 1, 1, 1}, factor: grain} }
+  Graph: {output: tint, width: 256}
+}
+
+snow_mask {
+  n { nodes.Noise: {frequency: 6, octaves: 4, seed: 3} }
+  edge {
+    nodes.Remap: {input: n, from_min: 0.3, from_max: 0.7, to_min: 0, to_max: 1, clamp: true}
+  }
+
+  Graph: {output: edge, width: 256, format: GraphSingle}
+}
+
+snow {
+  texture.Layer: {amount: 1, direction: {0, 1, 0}, facing: 0.6, mask: snow_mask,
+    contrast: 10, albedo: LayerMix, roughness: LayerMix}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.85}
+  PbrTextures: {albedo: snow_albedo}
+  texture.Mapping: {mode: MappingWorld, size: 3, blend: 0.3}
+}
+
+checker_layer {
+  PbrTextures: {albedo: checker}
+  texture.Transform: {scale_x: 3, scale_y: 3}
+}
+
+stripes_layer {
+  PbrTextures: {albedo: stripes}
+  texture.Transform: {scale_x: 4, scale_y: 4}
+}
+
+kind_a { PbrTextures: {albedo: tiles_a} }
+kind_b { PbrTextures: {albedo: tiles_b} }
+
+ground {
+  Position: {-2.5, -0.1, 0}
+  Box: {7, 0.2, 7}
+  Rgb: {200, 190, 170}
+  texture.Blend: {mask: mask, layers: [checker_layer, stripes_layer]}
+  texture.Layers: {layers: [snow]}
+}
+
+terrain {
+  Position: {3.5, 0, 0}
+  TileTerrain: {
+    size: 1,
+    kinds: [{'.', kind_a}, {'#', kind_b}],
+    tiles: `
+      ......
+      ..##..
+      .####.
+      .####.
+      ..##..
+      ......
+      ......
+    `
+  }
+  texture.Layers: {layers: [snow]}
+}
+
+rock {
+  Position: {-4, 0.45, 0.5}
+  IcoSphere: {segments: 2, radius: 0.75}
+  Rgb: {150, 145, 140}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {orm: orm, normal: bumps}
+  texture.Layers: {layers: [snow]}
+}
+
+trunk {
+  Position: {-2, 1, -0.5}
+  Rotation: {0, 0, 0.5}
+  Cylinder: {length: 2.2, radius: 0.32, smooth: true, segments: 32}
+  Rgb: {140, 100, 70}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {albedo: stripes}
+  texture.Layers: {layers: [snow]}
+}
+
+leaf {
+  Position: {0, 0.9, 0.6}
+  Rotation: {-1.0, 0.3, 0}
+  Quad: {1.6, 1.6}
+  Rgb: {120, 170, 90}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: leaf_tex}
+  AlphaCutoff: {value: 0.5}
+  BackFaceMode: {BackFacePlain}
+  texture.Layers: {layers: [snow]}
+}
+
+// A shape without texture.Layers: it looks as it does without the feature
+plain {
+  Position: {1.6, 0.5, 0.8}
+  Box: {0.9, 0.9, 0.9}
+  Rgb: {200, 80, 60}
+  PbrMaterial: {roughness: 0.6}
+}
+
+terrain_box {
+  Position: {4, 0.5, -1.5}
+  Box: {1, 1, 1}
+  Rgb: {90, 110, 150}
+  PbrMaterial: {roughness: 0.7}
+  texture.Layers: {layers: [snow]}
+}

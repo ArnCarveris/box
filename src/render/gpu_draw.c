@@ -1311,7 +1311,7 @@ static void box_gpu_draw_glass(
             bound = pipeline;
         }
 
-        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
         if (layers != material) {
             wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
             material = layers;
@@ -1591,7 +1591,7 @@ static void box_gpu_draw_batches(
             bound = pipeline;
         }
 
-        WGPUBindGroup group = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup group = box_gpu_forward_group(gpu, packet, b);
         uint32_t kind = box_gpu_draw_kind(b, phase == 3);
         if (group != material || kind != material_kind) {
             wgpuRenderPassEncoderSetBindGroup(vp->pass, 1, group, 1, &kind);
@@ -1811,7 +1811,7 @@ static void box_gpu_draw_prepass_draws(
             bound = pipeline;
         }
 
-        WGPUBindGroup layers = box_gpu_material_group(gpu, packet, b);
+        WGPUBindGroup layers = box_gpu_forward_group(gpu, packet, b);
         if (layers != material) {
             wgpuRenderPassEncoderSetBindGroup(pass, 1, layers, 1, &(uint32_t){0});
             material = layers;

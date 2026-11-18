@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes and a scene with parametric surfaces and the levels of detail of round shapes of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the fragment cost of the texture mappings, the fog volumes, the star fields, the baked lighting, prefab instantiation, the atmosphere extract, the GPU cost of the cloud layers of the sky, the cost of the planet surface light without planets, the particle passes, the transitions, the GPU cost of Polygon2D next to the other 2D shapes, the cost of TextureLayers for the shapes without them and a scene with parametric surfaces and the levels of detail of round shapes of box.render",
         "public": false,
         "use": [
             "box"
@@ -69,6 +69,14 @@
                     "blend_four_height_frame",
                     "single_triplanar_frame",
                     "blend_four_triplanar_frame"
+                ]
+            },
+            {
+                "id": "TextureLayers",
+                "benchcases": [
+                    "plain_off_frame",
+                    "plain_on_animating_frame",
+                    "all_layered_frame"
                 ]
             },
             {

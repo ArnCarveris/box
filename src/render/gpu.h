@@ -574,6 +574,52 @@ uint32_t box_gpu_draw_kind(
     const box_render_batch_t *b,
     bool equal);
 
+/** Check whether a batch draws with the layers variants of the mesh pipelines: an opaque,
+ * alpha tested or blended batch of a mesh shader with TextureLayers, not transmissive.
+ *
+ * Its forward and depth prepass pipelines have the layers layouts and bind the group of
+ * box_gpu_forward_group; its shadows bind the group without layers.
+ *
+ * @param b The batch
+ * @return Whether it applies texture layers
+ */
+bool box_gpu_layered(
+    const box_render_batch_t *b);
+
+/** Get the bind group the forward and depth prepass pipelines of a batch bind in group 1: the
+ * layers group of a batch with box_gpu_layered, else box_gpu_material_group.
+ *
+ * The layers group binds the entries of the material or blend group of the batch, the texture
+ * array of the layer maps and the uniform buffer of each layer entity, which it writes when the
+ * values of the layer changed, shared by every batch with the layer.
+ *
+ * @param gpu The backend
+ * @param packet The packet of the batch
+ * @param b The batch
+ * @return The bind group
+ */
+WGPUBindGroup box_gpu_forward_group(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    const box_render_batch_t *b);
+
+/** Get the pipeline layout of the layers variants of the mesh pipelines, made on first use.
+ *
+ * @param gpu The backend
+ * @param blend Whether the variant blends the layers of a TextureBlend
+ * @return The layout
+ */
+WGPUPipelineLayout box_gpu_layer_pipeline_layout(
+    box_gpu_t *gpu,
+    bool blend);
+
+/** Release the layers groups, buffers and layouts.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_layer_layouts_fini(
+    box_gpu_t *gpu);
+
 /** Check whether a batch draws with the texture_blend variant of the mesh pipeline: a batch of
  * the mesh shader with a TextureBlend, of any blend mode, alpha tested or transmissive.
  *

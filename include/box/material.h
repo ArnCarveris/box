@@ -654,6 +654,94 @@ ECS_STRUCT(TextureBlend, {
                              *   for the linear blend; not finite or negative is 0 */
 });
 
+/** How a TextureLayer changes one property of the surface beneath it where it covers it */
+ECS_ENUM(TextureLayerBlend, {
+    LayerKeep = 0,      /**< The property is left as it is */
+    LayerMix = 1,       /**< The property is replaced by the value of the layer */
+    LayerMultiply = 2   /**< The property is multiplied by the value of the layer */
+});
+
+/** Amount of a constructed TextureLayer: it covers everything its rules allow */
+#define BOX_MATERIAL_LAYER_AMOUNT (1.0f)
+
+/** Contrast of a constructed TextureLayer: a coverage edge over an eighth of the score */
+#define BOX_MATERIAL_LAYER_CONTRAST (8.0f)
+
+/** Layers a TextureLayers applies */
+#define BOX_MATERIAL_TEXTURE_LAYERS (4)
+
+/** A layer that paints over or modifies the resolved surface of the shapes whose TextureLayers
+ * list its entity (snow, wetness, puddles, moss, frost, dust), default amount 1, direction up
+ * (0, 1, 0), facing 0, no mask, cavity 0, contrast 8, albedo and roughness LayerMix, metallic
+ * and occlusion LayerKeep, normal 0 and porosity 0.
+ *
+ * The layer entity carries its appearance with the material components: Rgb and PbrMaterial
+ * as constants (white, roughness 1 and metallic 0 without them) times its PbrTextures (albedo,
+ * ORM and normal, any texture entity, a TextureGraph output too), so a layer without textures is
+ * a flat color and roughness. Its own TextureMapping places them, MappingWorld (the default of a
+ * layer) so a layer runs on across shapes, with a triplanar blend above 0, or MappingUv for the
+ * UVs of the mesh; MappingObject and MappingFrame project like MappingWorld. Its
+ * TextureTransform and TextureScroll move them.
+ *
+ * Where it covers. Every fragment gets a coverage score from 0 to 1: how well its shading
+ * normal faces direction (facing 0 ignores the orientation, a larger facing only allows normals
+ * closer to direction, 1 only those that face it fully; the normal of the layer mixes it toward
+ * the geometric normal, so a flattening water film fills the bumps), times the red of the mask raised by
+ * cavity times how occluded the surface is (1 - its ORM red, or 1 - the height of a TextureBlend
+ * with heights where that is lower), lowered for a negative cavity, so the crevices and low spots
+ * come first without holding back open surfaces. amount moves a threshold over that
+ * score: 0 covers nothing, 0.2 the best scoring places, 1 everything the rules allow. contrast is
+ * the sharpness of the edge.
+ *
+ * What it changes. albedo, roughness, metallic and occlusion each keep, mix toward or multiply
+ * by the value of the layer by the coverage; normal mixes the shading normal toward the normal
+ * of the layer (the geometric normal for a flat layer, which flattens as a water film does).
+ * porosity scales the change of the albedo and the roughness by how porous the surface beneath
+ * is, (1 - metallic) times its roughness: at 1 a rough dielectric (soil, bark, stone) changes
+ * fully, a glossy one little and a metal not at all, so one wet layer suits every material. The
+ * alpha is never changed.
+ *
+ * The values are read every frame into a small buffer of the layer entity shared by every
+ * batch that uses it, so writing amount (or any field) animates every shape with the layer
+ * without moving them between batches. Only 3D meshes of a scene with Scene.texture_layers have
+ * layers; Water, Transmission and Distortion shapes, 2D shapes and texts ignore them.
+ */
+ECS_STRUCT(TextureLayer, {
+    float amount;           /**< Coverage, 0 none to 1 everything the rules allow */
+    vec3 direction;         /**< World direction the covered surfaces face, normalized; zero
+                             *   is up */
+    float facing;           /**< 0 ignores the orientation, 1 only covers surfaces that face
+                             *   direction fully; clamped to 0..1 */
+    ecs_entity_t mask;      /**< Texture entity whose red is a coverage pattern, sampled with the
+                             *   mapping of the layer, 0 for none */
+    float cavity;           /**< -1..1: positive covers the occluded crevices first (puddles,
+                             *   dust), negative the open ridges first (worn edges), 0 ignores
+                             *   the occlusion */
+    float contrast;         /**< Sharpness of the coverage edge, larger is harder; not positive
+                             *   or not finite is the default */
+    TextureLayerBlend albedo;    /**< How the albedo changes */
+    TextureLayerBlend roughness; /**< How the roughness changes */
+    TextureLayerBlend metallic;  /**< How the metallic changes */
+    TextureLayerBlend occlusion; /**< How the occlusion changes */
+    float normal;           /**< 0..1, how much the layer normal replaces the shading normal
+                             *   where covered */
+    float porosity;         /**< 0..1, how much the change of albedo and roughness follows the
+                             *   porosity of the surface beneath */
+});
+
+/** Up to BOX_MATERIAL_TEXTURE_LAYERS TextureLayer entities applied in order over the resolved
+ * surface of a 3D shape, after its PbrTextures, TextureBlend or TileTerrain and before lighting,
+ * inherited by instances and part of the batch of a shape like PbrTextures.
+ *
+ * Shapes with the same layers share a batch; they draw with their own variants of the mesh
+ * shaders. A shape without TextureLayers, or of a scene without Scene.texture_layers, draws with
+ * the pipelines, bind groups and records it has without the feature. A layer entity of 0, a
+ * deleted one or one without TextureLayer does nothing.
+ */
+ECS_STRUCT(TextureLayers, {
+    ecs_entity_t layers[4]; /**< Entities with TextureLayer, 0 for an unused slot */
+});
+
 /** Material properties change every frame, applies to descendants */
 extern ECS_TAG_DECLARE(DynamicMaterial);
 

@@ -7,6 +7,9 @@
 #include "include/mesh_direct.wgsl"
 #include "include/mesh_surface.wgsl"
 #include "include/mesh_blend.wgsl"
+#ifdef BOX_TEXTURE_LAYERS
+#include "include/mesh_layers.wgsl"
+#endif
 
 // The texture layers apply on front faces; a back face keeps the material constants, is
 // unoccluded and faces the camera. The occlusion scales the indirect light only. geometric is
@@ -148,3 +151,64 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 
     return lit(f, surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front)));
 }
+
+#ifdef BOX_TEXTURE_LAYERS
+// The surface after the TextureLayers of the batch, whose maps are slices of maps from first. A
+// back face keeps its surface; the layers do not change the alpha.
+fn layered(f: VertexOut, front: bool, s: Surface, maps: texture_2d_array<f32>, first: u32,
+    low: f32) -> Surface {
+    var o = s;
+    let l = apply_layers(maps, first, f, LayerSurface(s.albedo, s.metallic, s.roughness,
+        s.occlusion, s.normal, s.geometric, low));
+    if (front) {
+        o.albedo = l.albedo;
+        o.metallic = l.metallic;
+        o.roughness = l.roughness;
+        o.occlusion = l.occlusion;
+        o.normal = l.normal;
+    }
+    return o;
+}
+
+@fragment fn fs_layers(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+    return lit(f, layered(f, front, surface(f, front), layer_maps, 0u, 0.0));
+}
+
+@fragment fn fs_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let s = surface(f, front);
+    if (s.alpha < vo_scalars(f).x) {
+        discard;
+    }
+
+    return lit(f, layered(f, front, s, layer_maps, 0u, 0.0));
+}
+
+@fragment fn fs_blend_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let b = blend_fragment(f);
+    var albedo = vec4f(0.0);
+    if (front || kind.alpha_cutout != 0u) {
+        albedo = blend_fragment_albedo(b);
+    }
+    let s = surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front));
+    return lit(f, layered(f, front, s, blend_heights, blending.count, blend_low(b)));
+}
+
+@fragment fn fs_blend_cutout_layers(f: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4f
+{
+    let geometric = normalize(f.normal);
+    let b = blend_fragment(f);
+    let albedo = blend_fragment_albedo(b);
+    if (f.color.a * albedo.a < vo_scalars(f).x) {
+        discard;
+    }
+
+    let s = surface_of(f, front, geometric, blend_maps(geometric, b, albedo, front));
+    return lit(f, layered(f, front, s, blend_heights, blending.count, blend_low(b)));
+}
+#endif

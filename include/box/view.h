@@ -321,6 +321,9 @@ ECS_STRUCT(Scene, {
                              *   without it */
     bool wind;              /**< WindSway moved by the Wind, else the shapes draw as without it
                              *   with the shaders of a scene without it */
+    bool texture_layers;    /**< TextureLayers, drawn with their own variants of the mesh
+                             *   shaders, else the shapes draw as without them; the shapes
+                             *   without TextureLayers draw the same either way */
 });
 
 /** Compare the render order of two views: by order, then by entity id.

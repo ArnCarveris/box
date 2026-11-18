@@ -50,7 +50,7 @@ static uint64_t box_draws_hash(
         key->transmissive + 1) * 0x27D4EB2F165667C5ull;
     h ^= ((uint64_t)key->surface + (uint64_t)key->water * 2 + (uint64_t)key->frame * 4 +
         (uint64_t)key->mover * 8 + (uint64_t)key->wind * 16) * 0x85EBCA77C2B2AE63ull;
-    h ^= ((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull;
+    h ^= (((uint64_t)key->foam + 1) * 0x9FB21C651E98DF25ull) ^ box_draws_layers_hash(key);
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
@@ -80,7 +80,8 @@ static bool box_draws_key_eq(
         a->transmissive == b->transmissive && a->water == b->water && a->foam == b->foam &&
         a->dynamic_transform == b->dynamic_transform &&
         a->dynamic_material == b->dynamic_material && a->mover == b->mover &&
-        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
+        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures,
+            ECS_SIZEOF(a->textures) + ECS_SIZEOF(a->layers)) &&
         a->shadow == b->shadow && a->fixture == b->fixture && a->bake == b->bake &&
         a->atlas == b->atlas && a->features == b->features && a->planet == b->planet &&
         a->atmosphere == b->atmosphere && a->surface == b->surface && a->frame == b->frame &&
@@ -1138,7 +1139,7 @@ void box_draws_batch_blend(
     out->textures[2] = 0;
     out->textures[3] = 0;
 done:
-    return;
+    box_draws_batch_layers(p, d, b, out);
 }
 
 /** Write the instance page, the run and the bounds of a batch into its draw.
@@ -1465,7 +1466,7 @@ static void box_draws_send_blended(
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             box_draws_batch_blend(p, d, b, out);
-            box_draws_batch_page(d, b, out);
+                    box_draws_batch_page(d, b, out);
             out->first_instance = 0;
             out->listed = true;
             out->slots = offset + (uint32_t)i * (uint32_t)sizeof(uint32_t);

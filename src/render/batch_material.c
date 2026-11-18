@@ -1034,3 +1034,162 @@ bool box_draws_extended(
 done:
     return result;
 }
+
+/** Clamp a float to a range, a value that is not finite to a fallback.
+ *
+ * @param v The value
+ * @param lo Lower bound
+ * @param hi Upper bound
+ * @param fallback Value of a v that is not finite
+ * @return The clamped value
+ */
+static float box_draws_layer_clamp(
+    float v,
+    float lo,
+    float hi,
+    float fallback)
+{
+    return isfinite(v) ? glm_clamp(v, lo, hi) : fallback;
+}
+
+void box_draws_layer_pack(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    double time,
+    box_render_texture_layer_t *out)
+{
+    const TextureLayer *l = ecs_get(world, e, TextureLayer);
+    const Rgb *rgb = ecs_get(world, e, Rgb);
+    const PbrMaterial *pbr = ecs_get(world, e, PbrMaterial);
+    const PbrTextures *textures = ecs_get(world, e, PbrTextures);
+    const TextureMapping *mapping = ecs_get(world, e, TextureMapping);
+    const TextureTransform *uv = ecs_get(world, e, TextureTransform);
+    const TextureScroll *scroll = ecs_get(world, e, TextureScroll);
+    float scrolled[4];
+    ecs_os_memset_t(out, 0, box_render_texture_layer_t);
+    if (!l) {
+        goto done;
+    }
+
+    out->color[0] = rgb ? box_draws_linear(rgb->r) : 1.0f;
+    out->color[1] = rgb ? box_draws_linear(rgb->g) : 1.0f;
+    out->color[2] = rgb ? box_draws_linear(rgb->b) : 1.0f;
+    out->color[3] = box_draws_layer_clamp(l->amount, 0.0f, 1.0f, 0.0f);
+
+    vec3 dir = { l->direction[0], l->direction[1], l->direction[2] };
+    float len = glm_vec3_norm(dir);
+    if (!isfinite(len) || len < 1e-6f) {
+        glm_vec3_copy((vec3){ 0.0f, 1.0f, 0.0f }, dir);
+    } else {
+        glm_vec3_scale(dir, 1.0f / len, dir);
+    }
+
+    out->direction[0] = dir[0];
+    out->direction[1] = dir[1];
+    out->direction[2] = dir[2];
+    out->direction[3] = box_draws_layer_clamp(l->facing, 0.0f, 1.0f, 0.0f);
+
+    float contrast = isfinite(l->contrast) && l->contrast > 0.0f
+        ? l->contrast : BOX_MATERIAL_LAYER_CONTRAST;
+    out->coverage[0] = box_draws_layer_clamp(l->cavity, -1.0f, 1.0f, 0.0f);
+    out->coverage[1] = 1.0f / contrast;
+    out->coverage[2] = box_draws_layer_clamp(l->normal, 0.0f, 1.0f, 0.0f);
+    out->coverage[3] = box_draws_layer_clamp(l->porosity, 0.0f, 1.0f, 0.0f);
+
+    out->material[0] = pbr
+        ? box_draws_layer_clamp(pbr->roughness, 0.0f, 1.0f, BOX_MATERIAL_ROUGHNESS)
+        : BOX_MATERIAL_ROUGHNESS;
+    out->material[1] = pbr
+        ? box_draws_layer_clamp(pbr->metallic, 0.0f, 1.0f, BOX_MATERIAL_METALLIC)
+        : BOX_MATERIAL_METALLIC;
+    out->material[2] = mapping && isfinite(mapping->size) && mapping->size > 0.0f
+        ? mapping->size : 1.0f;
+    out->material[3] = mapping ? box_draws_layer_clamp(mapping->blend, 0.0f, 1.0f, 0.0f) : 0.0f;
+
+    box_draws_texture_scroll(scroll, time, scrolled);
+    out->transform[0] = uv ? uv->scale_x : 1.0f;
+    out->transform[1] = uv ? uv->scale_y : 1.0f;
+    out->transform[2] = (uv ? uv->offset_x : 0.0f) + scrolled[0];
+    out->transform[3] = (uv ? uv->offset_y : 0.0f) + scrolled[1];
+
+    out->modes[0] = (uint32_t)l->albedo <= LayerMultiply ? (uint32_t)l->albedo : LayerKeep;
+    out->modes[1] = (uint32_t)l->roughness <= LayerMultiply ? (uint32_t)l->roughness : LayerKeep;
+    out->modes[2] = (uint32_t)l->metallic <= LayerMultiply ? (uint32_t)l->metallic : LayerKeep;
+    out->modes[3] = (uint32_t)l->occlusion <= LayerMultiply ? (uint32_t)l->occlusion : LayerKeep;
+
+    out->flags[0] = (textures && textures->albedo ? BOX_RENDER_LAYER_HAS_ALBEDO : 0u) |
+        (textures && textures->orm ? BOX_RENDER_LAYER_HAS_ORM : 0u) |
+        (textures && textures->normal ? BOX_RENDER_LAYER_HAS_NORMAL : 0u) |
+        (l->mask ? BOX_RENDER_LAYER_HAS_MASK : 0u) |
+        (mapping && mapping->mode == MappingUv ? BOX_RENDER_LAYER_UV : 0u);
+done:
+    return;
+}
+
+uint64_t box_draws_layers_hash(
+    const box_draw_key_t *key)
+{
+    uint64_t h = 0;
+    int32_t k;
+    for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
+        h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->layers[k];
+    }
+
+    return h;
+}
+
+bool box_draws_key_layered(
+    const box_draw_key_t *key)
+{
+    bool result = false;
+    int32_t k;
+    for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
+        result |= key->layers[k] != 0;
+    }
+
+    return result;
+}
+
+void box_draws_batch_layers(
+    box_render_packet_t *p,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out)
+{
+    uint32_t offset = 0;
+    int32_t k;
+    if (!box_draws_key_layered(&b->key) || !d->world) {
+        goto done;
+    }
+
+    box_render_texture_layers_t *r = box_render_packet_reserve(p,
+        (uint32_t)sizeof(box_render_texture_layers_t), &offset);
+    ecs_os_memset_t(r, 0, box_render_texture_layers_t);
+    r->count = 1;
+    r->quality = d->textures && d->textures->quality
+        ? (uint32_t)d->textures->quality : BOX_TEXTURE_QUALITY_DEFAULT;
+    for (k = 0; k < BOX_RENDER_LAYERS; k ++) {
+        ecs_entity_t layer = b->key.layers[k];
+        if (!layer || !ecs_is_alive(d->world, layer) || !ecs_has(d->world, layer, TextureLayer)) {
+            continue;
+        }
+
+        const PbrTextures *textures = ecs_get(d->world, layer, PbrTextures);
+        const TextureLayer *l = ecs_get(d->world, layer, TextureLayer);
+        r->entities[k] = layer;
+        r->count = (uint32_t)k + 1;
+        box_draws_layer_pack(d->world, layer, d->materials.time, &r->values[k]);
+        if (textures) {
+            r->maps[k][BOX_RENDER_LAYER_ALBEDO] = box_draws_texture_handle(d, textures->albedo);
+            r->maps[k][BOX_RENDER_LAYER_ORM] = box_draws_texture_handle(d, textures->orm);
+            r->maps[k][BOX_RENDER_LAYER_NORMAL] = box_draws_texture_handle(d, textures->normal);
+        }
+
+        r->maps[k][BOX_RENDER_LAYER_MASK] = box_draws_texture_handle(d, l->mask);
+    }
+
+    out->texture_layers = true;
+    out->layers = offset;
+done:
+    return;
+}

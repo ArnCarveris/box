@@ -465,6 +465,8 @@ static void box_shader_changed(
  * one enabled, or it draws the overdraw heat map and a view of the packet has it enabled, or it
  * draws the boxes of the spatial index trees and a view of the packet has some, or it
  * is the extended mesh shader and the scene of a view enables a material feature, or it is the
+ * layers module of a mesh shader and the scene of a view enables Scene.texture_layers (and a
+ * shading feature of the extended mesh shader for its one) or a batch draws with it, or it is the
  * shared code of the texture graph stages and the packet creates a texture graph
  */
 static bool box_shader_used(
@@ -492,6 +494,21 @@ static bool box_shader_used(
         for (i = 0; i < ecs_vec_count(&p->views); i ++) {
             const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
             if (v->scene_features & BOX_RENDER_FEATURE_MATERIALS) {
+                result = true;
+            }
+        }
+    }
+
+    if (box_render_is_mesh_layers(handle)) {
+        const uint32_t shading = BOX_RENDER_FEATURE_MATERIALS &
+            ~(BOX_RENDER_FEATURE_TEXTURE_BLEND | BOX_RENDER_FEATURE_TRANSMISSION |
+                BOX_RENDER_FEATURE_DISTORTION | BOX_RENDER_FEATURE_WATER);
+        for (i = 0; i < ecs_vec_count(&p->views); i ++) {
+            const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+            uint32_t f = v->scene_features;
+            if ((f & BOX_RENDER_FEATURE_TEXTURE_LAYERS) &&
+                (handle == BOX_RENDER_SHADER_MESH_LAYERS || (f & shading)))
+            {
                 result = true;
             }
         }
@@ -588,6 +605,7 @@ static bool box_shader_used(
         const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
         if (b->pipeline == pipeline || b->pipeline == also ||
             (meshes && box_render_is_mesh(b->pipeline)) ||
+            (b->texture_layers && handle == box_render_mesh_layers(b->pipeline)) ||
             (handle == BOX_RENDER_SHADER_TRANSMISSION && b->transmissive))
         {
             result = true;
@@ -943,6 +961,11 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_MESH, true);
     box_shader_builtin(world, state, builtin, "mesh_extended", "etc/shaders/mesh_extended.wgsl",
         BOX_RENDER_SHADER_MESH_EXTENDED, true);
+    box_shader_builtin_defines(world, state, builtin, "mesh_layers", "etc/shaders/mesh.wgsl",
+        "BOX_TEXTURE_LAYERS", BOX_RENDER_SHADER_MESH_LAYERS, true);
+    box_shader_builtin_defines(world, state, builtin, "mesh_extended_layers",
+        "etc/shaders/mesh_extended.wgsl", "BOX_TEXTURE_LAYERS",
+        BOX_RENDER_SHADER_MESH_EXTENDED_LAYERS, true);
     box_shader_builtin(world, state, builtin, "scatter", "etc/shaders/scatter.wgsl",
         BOX_RENDER_SHADER_SCATTER, true);
     box_shader_builtin(world, state, builtin, "compose", "etc/shaders/compose.wgsl",

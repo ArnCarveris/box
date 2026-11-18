@@ -151,7 +151,9 @@ static void box_gpu_shader_install(
     slot->label = ecs_os_strdup(label);
     if (handle == BOX_RENDER_SHADER_BLIT) {
         box_gpu_blit_reset(gpu);
-    } else if (box_render_is_mesh(handle) || handle == BOX_RENDER_SHADER_SHAPE2D) {
+    } else if (box_render_is_mesh(handle) || box_render_is_mesh_layers(handle) ||
+        handle == BOX_RENDER_SHADER_SHAPE2D)
+    {
         box_gpu_forward_reset(gpu, true);
     }
 }
@@ -487,7 +489,9 @@ static void box_gpu_shader_release(
 
     if (handle == BOX_RENDER_SHADER_BLIT) {
         box_gpu_blit_reset(gpu);
-    } else if (box_render_is_mesh(handle) || handle == BOX_RENDER_SHADER_SHAPE2D) {
+    } else if (box_render_is_mesh(handle) || box_render_is_mesh_layers(handle) ||
+        handle == BOX_RENDER_SHADER_SHAPE2D)
+    {
         box_gpu_forward_reset(gpu, false);
     }
 }

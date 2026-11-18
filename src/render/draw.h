@@ -236,6 +236,11 @@ typedef struct box_draw_key_t {
                              *   textures[0] is the owner of the TextureBlend, textures[2] and
                              *   textures[3] are 0, so the key does not grow */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
+    ecs_entity_t layers[BOX_RENDER_LAYERS]; /**< TextureLayers.layers of a 3D shape of a scene
+                             *   with Scene.texture_layers that is not transmissive, all 0
+                             *   without: shapes with the same layers share a batch and draw
+                             *   with the layers variants of the mesh pipelines. Follows
+                             *   textures, which the key compares with it as one block */
     uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
     uint32_t features;      /**< BOX_RENDER_FEATURE_* features of the scene of a 3D shape, 0 for
                              *   2D shapes and texts */
@@ -2659,7 +2664,8 @@ void box_draws_batch_tiles(
  * @param p The packet
  * @param d The state
  * @param b The batch
- * @param out The draw, unchanged for a batch without texture_blend
+ * @param out The draw, unchanged for a batch without texture_blend; its TextureLayers are
+ * written after it (box_draws_batch_layers)
  */
 void box_draws_batch_blend(
     box_render_packet_t *p,
@@ -2680,6 +2686,52 @@ ecs_entity_t box_draws_blend_owner(
     const ecs_world_t *world,
     ecs_entity_t e,
     const box_draw_key_t *key);
+
+/** Hash the TextureLayers of a batch key, 0 without layers.
+ *
+ * @param key The key
+ * @return The hash
+ */
+uint64_t box_draws_layers_hash(
+    const box_draw_key_t *key);
+
+/** Check whether a batch key has TextureLayers: a layer entity in some slot.
+ *
+ * @param key The key
+ * @return Whether its batch draws with the layers variants
+ */
+bool box_draws_key_layered(
+    const box_draw_key_t *key);
+
+/** Write the TextureLayers of a batch whose key has layers into the packet data of its draw.
+ *
+ * Writes the entity, values and texture handles of each layer, read from the layer entities
+ * every frame, so a change of a layer (its amount) reaches the draw and the buffer of the layer
+ * without a change of the key. A deleted layer or one without TextureLayer does nothing.
+ *
+ * @param p The packet
+ * @param d The state
+ * @param b The batch
+ * @param out The draw, unchanged for a batch without layers
+ */
+void box_draws_batch_layers(
+    box_render_packet_t *p,
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out);
+
+/** Pack the values of a TextureLayer entity as the mesh shaders read them.
+ *
+ * @param world The world
+ * @param e The layer entity, alive with a TextureLayer
+ * @param time Total render time of the frame, which its TextureScroll moves by
+ * @param out Receives the values
+ */
+void box_draws_layer_pack(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    double time,
+    box_render_texture_layer_t *out);
 
 /** Register the glyph batches of the texts: their slots, quad mesh and observers.
  *

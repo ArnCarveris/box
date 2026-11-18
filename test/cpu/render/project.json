@@ -1145,6 +1145,20 @@
                     "spot_tile_renders_with_sway",
                     "cascades_render_with_sway"
                 ]
+            },
+            {
+                "id": "TextureLayers",
+                "testcases": [
+                    "defaults",
+                    "scene_feature",
+                    "pack",
+                    "batches_without_feature",
+                    "batches",
+                    "add_remove",
+                    "amount_animates",
+                    "record_maps",
+                    "ignored"
+                ]
             }
         ]
     }

@@ -218,15 +218,26 @@ typedef struct box_gpu_material_t {
     struct box_gpu_material_t *next; /**< Next material with the same hash */
 } box_gpu_material_t;
 
+/** Slices a texture array of the blends and layers holds at most: the heights of the kinds of
+ * a TileTerrain followed by the maps of the layers of a TextureLayers */
+#define BOX_GPU_ARRAY_SLICES (BOX_RENDER_BLEND_SLICES + BOX_RENDER_LAYERS * BOX_RENDER_LAYER_MAPS)
+
+/** Map of a texture array of the layers of a TextureLayers, the maps of each layer (and the
+ * heights of a TextureBlend before them) as stored, a slice default of white or a flat normal */
+#define BOX_GPU_LAYER_MAP (BOX_RENDER_BLEND_SOURCES)
+
 /** A texture array of one map of the layers of TextureBlend batches, a slice per layer, shared
- * by every blend with the same sources */
+ * by every blend with the same sources; or of the maps of the layers of TextureLayers batches */
 typedef struct box_gpu_blend_array_t {
-    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL or _HEIGHT */
+    uint32_t map;                   /**< BOX_RENDER_BLEND_ALBEDO, _ORM, _NORMAL, _HEIGHT or
+                                     *   BOX_GPU_LAYER_MAP */
     uint32_t count;                 /**< Slices */
     uint32_t quality;               /**< Largest dimension of a slice */
-    uint32_t sources[BOX_RENDER_BLEND_SLICES]; /**< Texture handle of each slice, 0 for the
-                                     *   default of the map */
-    uint32_t serials[BOX_RENDER_BLEND_SLICES]; /**< Serial of the image of each source it was
+    uint32_t flat;                  /**< Slices whose default is a flat normal, bit per slice,
+                                     *   else white */
+    uint32_t sources[BOX_GPU_ARRAY_SLICES]; /**< Texture handle of each slice, 0 for the
+                                     *   default of the slice */
+    uint32_t serials[BOX_GPU_ARRAY_SLICES]; /**< Serial of the image of each source it was
                                      *   built from, 0 for none: another serial rebuilds it */
     uint32_t version;               /**< Builds of the array, which the bind groups compare */
     WGPUTexture texture;            /**< The array, BOX_GPU_TEXTURE_FORMAT */
@@ -257,6 +268,51 @@ typedef struct box_gpu_blend_group_t {
     int64_t checked;                /**< Frame its arrays and images were last checked */
     struct box_gpu_blend_group_t *next; /**< Next group */
 } box_gpu_blend_group_t;
+
+/** Uniform buffer of the values of one TextureLayer entity (TextureLayer of mesh_layers.wgsl),
+ * shared by every layers group that binds the entity, written when its values change */
+typedef struct box_gpu_layer_buffer_t {
+    ecs_entity_t entity;            /**< The layer entity */
+    box_render_texture_layer_t values; /**< Values last written */
+    WGPUBuffer buffer;              /**< The uniform buffer */
+    int64_t used;                   /**< Frame of the last packet that drew with it */
+    struct box_gpu_layer_buffer_t *next; /**< Next buffer */
+} box_gpu_layer_buffer_t;
+
+/** What a layers group binds: the group of the batch without its layers (its textures or its
+ * TextureBlend) and its layers, zeroed before it is filled so it compares as bytes */
+typedef struct box_gpu_layer_key_t {
+    uint32_t blend;                 /**< 1 for a TextureBlend batch, whose blend group it extends,
+                                     *   0 for the material group of the plain variant */
+    uint32_t textures[BOX_GPU_MATERIAL_TEXTURES]; /**< Texture handles of the plain variant */
+    uint32_t wrap;                  /**< TextureWrap of the sampler */
+    uint32_t anisotropy;            /**< Anisotropic samples of the sampler */
+    box_render_texture_blend_t record; /**< The TextureBlend of a blend batch */
+    uint32_t emissive;              /**< Emissive handle of a blend batch */
+    uint32_t pad;                   /**< Unused, zero */
+    ecs_entity_t entities[BOX_RENDER_LAYERS]; /**< Layer entities of the slots, 0 for none */
+    uint32_t maps[BOX_RENDER_LAYERS][BOX_RENDER_LAYER_MAPS]; /**< Texture handles of the maps */
+    uint32_t count;                 /**< Slots of the layers */
+    uint32_t quality;               /**< Largest dimension of a slice */
+} box_gpu_layer_key_t;
+
+/** Bind group of the layers variant of the mesh pipelines: the entries of the material or blend
+ * group of the batch, the texture array of the layer maps and the uniform buffer of each layer */
+typedef struct box_gpu_layer_group_t {
+    box_gpu_layer_key_t key;        /**< What it binds */
+    box_gpu_blend_array_t *array;   /**< Array of the layer maps (after the heights of a blend),
+                                     *   referenced */
+    uint32_t version;               /**< Version of the array it binds */
+    WGPUBindGroup base;             /**< Blend group whose entries it binds, NULL for the plain
+                                     *   variant */
+    uint32_t serials[BOX_GPU_MATERIAL_TEXTURES]; /**< Serials of the images of the textures of
+                                     *   the plain variant it binds */
+    WGPUBuffer buffers[BOX_RENDER_LAYERS]; /**< Layer buffers it binds */
+    WGPUBindGroup group;            /**< The bind group, NULL until made */
+    int64_t used;                   /**< Frame of the last packet that drew with it */
+    int64_t checked;                /**< Frame it was last checked */
+    struct box_gpu_layer_group_t *next; /**< Next group */
+} box_gpu_layer_group_t;
 
 /** Streams an instance bind group binds, by its layout */
 typedef enum box_gpu_instance_binds_t {
@@ -981,6 +1037,15 @@ typedef struct box_gpu_t {
                                      *   the forward pass: mesh_layout with blend_layout */
     box_gpu_blend_array_t *blend_arrays; /**< Texture arrays of the TextureBlend layers */
     box_gpu_blend_group_t *blend_groups; /**< Bind groups of the TextureBlend batches */
+    WGPUBindGroupLayout layer_layout; /**< Bind group layout of the layers variant of the
+                                     *   plain mesh pipelines, made on first use */
+    WGPUBindGroupLayout blend_layer_layout; /**< Bind group layout of the layers variant of the
+                                     *   texture_blend pipelines, made on first use */
+    WGPUPipelineLayout layer_mesh_layout; /**< mesh_layout with layer_layout */
+    WGPUPipelineLayout blend_layer_mesh_layout; /**< mesh_layout with blend_layer_layout */
+    WGPUBuffer layer_none;          /**< Zero TextureLayer of the slots without a layer */
+    box_gpu_layer_buffer_t *layer_buffers; /**< Buffers of the layer entities */
+    box_gpu_layer_group_t *layer_groups; /**< Bind groups of the TextureLayers batches */
     uint64_t blend_bytes;           /**< Bytes of the blend arrays */
     int64_t blend_frame;            /**< Packets the blend caches have seen */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */

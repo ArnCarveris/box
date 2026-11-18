@@ -384,6 +384,33 @@ static void box_texture_mapping_ctor(
     }
 }
 
+/** Construct TextureLayer values that cover everything facing up by any amount, mixing the
+ * albedo and roughness of the layer, with the default contrast.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_layer_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TextureLayer *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TextureLayer){
+            .amount = BOX_MATERIAL_LAYER_AMOUNT,
+            .direction = { 0.0f, 1.0f, 0.0f },
+            .contrast = BOX_MATERIAL_LAYER_CONTRAST,
+            .albedo = LayerMix,
+            .roughness = LayerMix,
+            .metallic = LayerKeep,
+            .occlusion = LayerKeep };
+    }
+}
+
 void BoxMaterialImport(
     ecs_world_t *world)
 {
@@ -426,6 +453,9 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, TextureMappingMode);
     ECS_META_COMPONENT(world, TextureMapping);
     ECS_META_COMPONENT(world, TextureBlend);
+    ECS_META_COMPONENT(world, TextureLayerBlend);
+    ECS_META_COMPONENT(world, TextureLayer);
+    ECS_META_COMPONENT(world, TextureLayers);
     ECS_TAG_DEFINE(world, TextureFrame);
     ecs_set_name_prefix(world, NULL);
     ecs_set_scope(world, module);
@@ -448,10 +478,12 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(WaterWaves), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(WaterFlow), EcsOnInstantiate, EcsInherit);
     ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });
+    ecs_set_hooks(world, TextureLayer, { .ctor = box_texture_layer_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureBlend), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(TextureLayers), EcsOnInstantiate, EcsInherit);
 
     ecs_entity_t materials[16] = {
         ecs_id(Rgb), ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(TextureTransform),

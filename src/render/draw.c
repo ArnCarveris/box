@@ -931,6 +931,13 @@ static void box_draws_key(
         key->pipeline = BOX_RENDER_SHADER_MESH_EXTENDED;
     }
 
+    const TextureLayers *layers = shape2d || key->transmissive ||
+        !box_render_is_mesh(key->pipeline) || !(key->features & BOX_RENDER_FEATURE_TEXTURE_LAYERS)
+        ? NULL : ecs_get(world, e, TextureLayers);
+    if (layers) {
+        ecs_os_memcpy_n(key->layers, layers->layers, ecs_entity_t, BOX_RENDER_LAYERS);
+    }
+
     bool planet_light = key->features & BOX_RENDER_FEATURE_PLANET_LIGHT;
     if (!shape2d && (planet_light || key->blend != Opaque)) {
         ecs_entity_t planet = box_draws_planet_of(world, e);
@@ -1497,6 +1504,14 @@ static void box_draws_material_observers(
     box_draws_observer(world, d, "DrawsOnTextureBlend", (ecs_observer_desc_t){
         .query.terms = {{
             .id = ecs_id(TextureBlend),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnShading);
+
+    box_draws_observer(world, d, "DrawsOnTextureLayers", (ecs_observer_desc_t){
+        .query.terms = {{
+            .id = ecs_id(TextureLayers),
             .src.id = EcsSelf | EcsUp,
             .trav = EcsIsA
         }},
