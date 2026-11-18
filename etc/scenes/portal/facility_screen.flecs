@@ -1,0 +1,196 @@
+// PortalFacilityScreen: the overview of a facility, a PortalScreen (portal/screen.flecs) with a
+// map of its levels, rooms in the color of their state: bright where the viewer is, red without
+// power (PortalBreaker of portal/power.flecs), dim otherwise. Doors are dots on the map, green
+// open, red locked and cyan closed, and readouts count the doors and the power.
+//
+// A level is a PortalMapLevel, the rectangle of the map in metres, and a room a PortalMapRoom, a
+// rectangle in the metres of the scene with the entity of its area for the power. The map runs
+// north (+z) up and +x to the left. Where the viewer is is polled twice a second from its Position,
+// so the screen redraws when the viewer enters another room, not while it walks in one.
+//
+// Needs portal/screen.flecs and portal/power.flecs.
+//
+//   PortalFacilityScreen facility(
+//     levels: [{"GROUND", 28, 34, 40, 44}],
+//     rooms: [{bunker.hall, "HALL", 0, -6, 0, 12, 10}],
+//     doors: [bunker.p_entry], viewer: camera)
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.portal
+
+// A level of the map: its name, the greatest x and z and the extent in x and z, in metres
+struct PortalMapLevel(name: string, x: f32, z: f32, w: f32, d: f32)
+
+// A room of the map: its area, name, level, and the smallest x and z and the extent in metres
+struct PortalMapRoom(area: entity, name: string, level: i32, x: f32, z: f32, w: f32, d: f32)
+
+// A door of the map: a dot in the color of its state
+template PortalMapDoor {
+  prop door: entity = 0               // Entity with the VisPortal and the Position of the door
+  prop x: f32 = 0                     // Place of the dot on the map in pixels (y down; Item y runs up)
+  prop y: f32 = 0
+
+  const portal = door[VisPortal]
+  const locked = portal.locked
+  const open: f32 = portal.open
+
+  // Red locked, green open, cyan closed
+  const red: u8 = locked ? 255 : open > 0.5 ? 90 : 110
+  const green: u8 = locked ? 70 : open > 0.5 ? 255 : 220
+  const blue: u8 = locked ? 55 : open > 0.5 ? 140 : 255
+
+  Item: {
+    h: Left, v: Top, x: x - 3, y: 3 - y,
+    width: {mode: Fixed, value: 6}, height: {mode: Fixed, value: 6}
+  }
+  Rect: {1, 1}
+  Rgb: {red, green, blue}
+}
+
+// A room of the map
+template PortalMapCell {
+  prop area: entity = 0
+  prop name: string = ""
+  prop here: bool = false             // The viewer is in the room
+  prop x: f32 = 0                     // Place and size on the map in pixels
+  prop y: f32 = 0
+  prop w: f32 = 10
+  prop h: f32 = 10
+
+  const dark = area != 0 && area[PortalBreaker].dark
+
+  Layout: {h: Center, v: Middle}
+  Item: {
+    h: Left, v: Top, x: x, y: -y,
+    width: {mode: Fixed, value: w}, height: {mode: Fixed, value: h}
+  }
+  Rect: {1, 1}
+  Rgb: {here ? 22 : dark ? 38 : 10, here ? 70 : dark ? 14 : 30, here ? 88 : dark ? 16 : 38}
+  Border: {
+    width: here ? 2 : 1,
+    color: {here ? 110 : dark ? 255 : 60, here ? 220 : dark ? 70 : 110, here ? 255 : dark ? 55 : 125, here ? 255 : 160}
+  }
+
+  caption {
+    Text: {value: name, size: 8}
+    Rgb: {here ? 235 : 90, here ? 245 : 130, here ? 255 : 145}
+  }
+}
+
+template PortalFacilityScreen : PortalScreen {
+  prop title: string = "FACILITY // OVERVIEW"
+  prop levels: PortalMapLevel[] = []
+  prop rooms: PortalMapRoom[] = []
+  prop doors: entity[] = []
+  prop viewer: entity = 0             // Entity whose place is shown, the camera
+  prop ppm: f32 = 6                   // Pixels of the map to a metre
+  prop below: f32 = -2                // Height below which the viewer and the doors are on the second level
+
+  // The room the viewer is in, -1 for none; read twice a second from its Position
+  mut here: i32 = -1
+
+  const count: i32 = doors.count()
+  const open: i32 = doors.filter((door) -> { door[VisPortal].open > 0.5 }).count()
+  const locked: i32 = doors.filter((door) -> { door[VisPortal].locked }).count()
+  const live: i32 = rooms.filter((room) -> { !room.area[PortalBreaker].dark }).count()
+  const total: i32 = rooms.count()
+  const place = here >= 0 ? rooms[here].name : "OUTSIDE"
+  const alert = total > 0 && live == 0
+
+  Border: {width: 2, color: {alert ? 255 : 110, alert ? 70 : 220, alert ? 55 : 255, 115}}
+
+  PortalScreenHeader header(
+    title: title,
+    status: "{open}/{count} DOORS OPEN · {live}/{total} AREAS POWERED",
+    alert: alert)
+
+  body {
+    Layout: {direction: Row, spacing: 18, padding: {8, 8, 12, 12}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    for l in 0..levels.count() {
+      "level_{l}" {
+        Layout: {direction: Column, spacing: 4}
+
+        caption {
+          Text: {value: levels[l].name, size: 10}
+          Rgb: {110, 220, 255}
+        }
+
+        map {
+          Layout: {}
+          Item: {
+            width: {mode: Fixed, value: levels[l].w * ppm},
+            height: {mode: Fixed, value: levels[l].d * ppm}
+          }
+
+          for i in 0..rooms.count() {
+            if rooms[i].level == l {
+              "room_{i}" {
+                PortalMapCell: {
+                  area: rooms[i].area, name: rooms[i].name, here: i == here,
+                  x: (levels[l].x - rooms[i].x - rooms[i].w) * ppm,
+                  y: (levels[l].z - rooms[i].z - rooms[i].d) * ppm,
+                  w: rooms[i].w * ppm, h: rooms[i].d * ppm
+                }
+              }
+            }
+          }
+
+          for i in 0..count {
+            const level: i32 = doors[i][Position].y < below ? 1 : 0
+            if level == l {
+              "door_{i}" {
+                PortalMapDoor: {
+                  door: doors[i],
+                  x: (levels[l].x - doors[i][Position].x) * ppm,
+                  y: (levels[l].z - doors[i][Position].z) * ppm
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    side {
+      Layout: {direction: Column, spacing: 10}
+      Item: {width: {mode: Grow}}
+
+      PortalReadout you(label: "YOU ARE IN", text: place)
+      PortalReadout open(label: "DOORS OPEN", text: "{open} of {count}")
+      PortalReadout locked(
+        label: "DOORS LOCKED", text: "{locked}",
+        red: locked > 0 ? 255 : 235, green: locked > 0 ? 70 : 245, blue: locked > 0 ? 55 : 255)
+      PortalReadout power(
+        label: "AREAS POWERED", text: "{live} of {total}",
+        red: live < total ? 255 : 90, green: live < total ? 200 : 255, blue: live < total ? 80 : 140)
+    }
+  }
+
+  // Find the room the viewer is in
+  async {
+    while viewer != 0 {
+      mut found: i32 = -1
+      for i in 0..rooms.count() {
+        const room = rooms[i]
+        const x: f32 = viewer[Position].x
+        const z: f32 = viewer[Position].z
+        const level: i32 = viewer[Position].y < below ? 1 : 0
+        if level == room.level && x >= room.x && x <= room.x + room.w && z >= room.z && z <= room.z + room.d {
+          found = i
+        }
+      }
+      if found != here {
+        here = found
+      }
+      await delay(0.5)
+    }
+  }
+}

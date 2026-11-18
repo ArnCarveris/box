@@ -1,0 +1,62 @@
+// helm_screen for the box.portal tests, a copy of etc/scenes/portal/helm_screen.flecs.
+//
+// The helm screen: rudder, engine telegraph, heel and trim of the ship, and who steers. The ship is
+// an entity with a PortalShipStatus (portal/ship_chart.flecs); the screen only shows it.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+
+template PortalHelmScreen : PortalScreen {
+  prop title: string = "HELM // CONDITIONS"
+  prop ship: entity = 0               // Entity with the PortalShipStatus
+  prop words: string[] = ["FULL ASTERN", "HALF ASTERN", "STOP", "SLOW AHEAD", "HALF AHEAD", "FULL AHEAD"]
+
+  const rudder: f32 = ship[PortalShipStatus].rudder
+  const heel: f32 = ship[PortalShipStatus].heel
+  const trim: f32 = ship[PortalShipStatus].trim
+  const telegraph: i32 = ship[PortalShipStatus].telegraph
+  const manual = ship[PortalShipStatus].manual
+
+  // The rudder as a positive angle on its side
+  const angle: f32 = rudder < 0 ? -rudder : rudder
+  const side = rudder < -0.5 ? "PORT" : rudder > 0.5 ? "STBD" : "MIDSHIPS"
+
+  Border: {width: 2, color: {110, 220, 255, 115}}
+
+  PortalScreenHeader header(title: title, status: manual ? "HELM MANUAL" : "AUTOPILOT", alert: false)
+
+  body {
+    Layout: {direction: Row, spacing: 24, padding: {22, 12, 16, 16}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    gauges {
+      Layout: {direction: Column, spacing: 28}
+      Item: {width: {mode: Grow}}
+
+      PortalGauge rudder(
+        label: "RUDDER", text: "{side} {angle:.0}°", fraction: (rudder + 35) / 70, width: 470)
+
+      PortalGauge heel(
+        label: "HEEL", text: "{heel:.1}°", fraction: (heel + 15) / 30, width: 470,
+        red: 110, green: 220, blue: 255)
+
+      PortalGauge trim(
+        label: "TRIM", text: "{trim:.1}°", fraction: (trim + 5) / 10, width: 470,
+        red: 110, green: 220, blue: 255)
+    }
+
+    side {
+      Layout: {direction: Column, spacing: 12}
+      Item: {width: {mode: Grow}}
+
+      PortalReadout telegraph(label: "TELEGRAPH", text: words[telegraph + 2])
+      PortalReadout steering(label: "STEERING", text: manual ? "HELM MANUAL" : "AUTOPILOT")
+      PortalReadout heading(label: "HEADING", text: "{ship[PortalShipStatus].heading:.0}°")
+    }
+  }
+}

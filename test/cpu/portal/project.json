@@ -90,6 +90,56 @@
                     "shade_without_areas",
                     "ship_door"
                 ]
+            },
+            {
+                "id": "PortalPower",
+                "testcases": [
+                    "lit_at_start",
+                    "tripped_breaker_darkens_area",
+                    "all_units_stopped_darkens_everything",
+                    "one_unit_is_enough",
+                    "start_restores"
+                ]
+            },
+            {
+                "id": "PortalPowerScreen",
+                "testcases": [
+                    "shows_areas",
+                    "breaker_button",
+                    "load_shed_and_restore",
+                    "no_power",
+                    "generator_shows_unit",
+                    "generator_stop_and_start"
+                ]
+            },
+            {
+                "id": "PortalGauge",
+                "testcases": [
+                    "shows_label_and_value",
+                    "bar_follows_fraction",
+                    "bar_stays_in_track",
+                    "color",
+                    "readout"
+                ]
+            },
+            {
+                "id": "PortalShip",
+                "testcases": [
+                    "chart_marks",
+                    "chart_ship_mark",
+                    "harbour",
+                    "engine",
+                    "navigation",
+                    "helm"
+                ]
+            },
+            {
+                "id": "PortalFacility",
+                "testcases": [
+                    "counts_doors_and_areas",
+                    "follows_doors_and_power",
+                    "shows_viewer_room"
+                ]
             }
         ]
     }

@@ -1,0 +1,181 @@
+// PortalPowerScreen: the power distribution screen, a PortalScreen (portal/screen.flecs) with a
+// breaker per area of a PortalGrid (portal/power.flecs). Each area is a PortalBreakerRow: its
+// name, its state (LIVE, NO POWER while no unit is up, OFF while its breaker is off), what it draws
+// and a TRIP / CLOSE button. LOAD SHED trips every area that is not essential (PortalBreaker),
+// RESTORE closes every breaker. The accent turns red without power or in overload.
+//
+// Needs the widgets (ui/widgets.flecs), portal/screen.flecs and portal/power.flecs.
+//
+//   PortalPowerScreen power(
+//     grid: bunker.grid,
+//     areas: [bunker.hall, bunker.corridor],
+//     names: ["ENTRANCE HALL", "L-CORRIDOR"])
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.widgets
+
+// One area of a PortalPowerScreen: a stripe and the background in the color of its state, the
+// name, the state with what the area draws, and the button of its breaker.
+template PortalBreakerRow {
+  prop area: entity = 0               // Entity with the PortalBreaker of the area
+  prop name: string = ""              // Name shown for the area
+
+  Layout: {direction: Row, spacing: 10, padding: {0, 0, 0, 8}, v: Middle}
+  Item: {width: {mode: Grow}, height: {mode: Fixed, value: 36}}
+  Rect: {1, 1}
+
+  if area != 0 {
+    const off = area[PortalBreaker].off
+    const dark = area[PortalBreaker].dark
+    const kw: f32 = area[PortalBreaker].demand
+    const state = off ? "OFF" : dark ? "NO POWER" : "LIVE"
+
+    // Red without power, amber off, green live
+    const red: u8 = off ? 255 : dark ? 255 : 90
+    const green: u8 = off ? 200 : dark ? 70 : 255
+    const blue: u8 = off ? 80 : dark ? 55 : 140
+
+    // The state color at 6% over the background of the screen
+    Rgb: {3 + red * 0.06, 12 + green * 0.06, 18 + blue * 0.06}
+
+    stripe {
+      Item: {width: {mode: Fixed, value: 3}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {red, green, blue}
+    }
+
+    about {
+      Layout: {direction: Column, spacing: 3}
+      Item: {width: {mode: Grow}}
+
+      title {
+        Text: {value: name, size: 12}
+        Rgb: {235, 245, 255}
+      }
+
+      status {
+        Layout: {direction: Row, spacing: 8, v: Middle}
+
+        word {
+          Text: {value: state, size: 10}
+          Rgb: {red, green, blue}
+        }
+
+        draw {
+          Text: {value: off ? "" : "{kw:.1} kW", size: 10}
+          Rgb: {90, 130, 145}
+        }
+      }
+    }
+
+    Button trip(
+      label: off ? "CLOSE" : "TRIP",
+      variant: off ? "primary" : "danger",
+      width: 84)
+  }
+
+  // The button reports a change: trip a closed breaker, close an open one
+  async {
+    while true {
+      await on.change(this)
+      if area != 0 {
+        area[PortalBreaker].off = !area[PortalBreaker].off
+      }
+    }
+  }
+}
+
+// The power distribution screen. grid is the entity of the PortalGrid, areas the entities with the
+// PortalBreaker of each area and names the names shown for them, in the same order.
+template PortalPowerScreen : PortalScreen {
+  prop title: string = "POWER // DISTRIBUTION"
+  prop grid: entity = 0
+  prop areas: entity[] = []
+  prop names: string[] = []
+
+  const count: i32 = areas.count()
+  const rows: i32 = (count + 1) / 2
+  const open: i32 = areas.filter((area) -> { area[PortalBreaker].off }).count()
+  const up: i32 = grid[PortalPowerStatus].up
+  const load: f32 = grid[PortalPowerStatus].load
+  const capacity: f32 = grid[PortalPowerStatus].capacity
+  const demand: f32 = grid[PortalPowerStatus].demand
+
+  const dead = up == 0
+  const overload = up > 0 && demand > capacity
+  const alert = dead || overload
+  const note = dead ? "NO POWER · START A UNIT" : overload ? "OVERLOAD · START A UNIT" : "{open} of {count} breakers off"
+
+  Border: {width: 2, color: {alert ? 255 : 110, alert ? 70 : 220, alert ? 55 : 255, 115}}
+
+  PortalScreenHeader header(
+    title: title,
+    status: "{up} UNITS · {load:.0} / {capacity:.0} kW",
+    alert: alert)
+
+  list {
+    Layout: {direction: Row, spacing: 12, padding: {10, 10, 12, 12}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    first {
+      Layout: {direction: Column, spacing: 3}
+      Item: {width: {mode: Grow}}
+
+      for i in 0..rows {
+        "area_{i}" {
+          PortalBreakerRow: {area: areas[i], name: i < names.count() ? names[i] : ""}
+        }
+      }
+    }
+
+    second {
+      Layout: {direction: Column, spacing: 3}
+      Item: {width: {mode: Grow}}
+
+      for i in rows..count {
+        "area_{i}" {
+          PortalBreakerRow: {area: areas[i], name: i < names.count() ? names[i] : ""}
+        }
+      }
+    }
+  }
+
+  footer {
+    Layout: {direction: Row, spacing: 10, padding: {0, 10, 12, 12}, v: Middle}
+    Item: {width: {mode: Grow}}
+
+    Button shed(label: "LOAD SHED", variant: "danger", width: 150)
+    Button restore(label: "RESTORE", variant: "primary", width: 150)
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+
+    message {
+      Text: {value: note, size: 11}
+      Rgb: {alert ? 255 : 90, alert ? 70 : 130, alert ? 55 : 145}
+    }
+  }
+
+  // LOAD SHED trips every area that is not essential, RESTORE closes every breaker; the rows
+  // handle their own button
+  async {
+    while true {
+      const e = await on.change(this)
+      const w = e.widget
+      const name = w.name()
+      if w.has(Button) && (name == "shed" || name == "restore") {
+        for i in 0..areas.count() {
+          const area = areas[i]
+          area[PortalBreaker].off = name == "shed" && !area[PortalBreaker].essential
+        }
+      }
+    }
+  }
+}

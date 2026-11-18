@@ -1,0 +1,113 @@
+// PortalGeneratorScreen: the screen of one generator unit, a PortalScreen (portal/screen.flecs)
+// that shows the PortalGenerator of the unit (portal/power.flecs): its speed against the rated
+// speed, its load against its capacity, the coolant temperature and the fuel, and a START / STOP
+// button. STOP lets the unit spin down, START brings it back; while no unit is up to speed the
+// areas of a PortalGrid have no power.
+//
+// Needs the widgets (ui/widgets.flecs), portal/screen.flecs and portal/power.flecs.
+//
+//   PortalGeneratorScreen g1(width: 1.42, height: 0.62, unit: bunker.g1, title: "GENERATOR G1")
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.widgets
+
+template PortalGeneratorScreen : PortalScreen {
+  prop title: string = "GENERATOR"
+  prop unit: entity = 0               // Entity with the PortalGenerator
+  prop rated: f32 = 1500              // Rated speed in rpm
+
+  const rpm: f32 = unit[PortalGenerator].rpm
+  const kw: f32 = unit[PortalGenerator].load
+  const capacity: f32 = unit[PortalGenerator].capacity
+  const coolant: f32 = unit[PortalGenerator].coolant
+  const fuel: f32 = unit[PortalGenerator].fuel
+  const running = unit[PortalGenerator].running
+
+  const online = rpm > rated * 0.8
+  const word = fuel <= 0 ? "NO FUEL" : running ? (online ? "ONLINE" : "STARTING") : (rpm > 30 ? "SPINNING DOWN" : "STOPPED")
+  const alert = !running || fuel <= 0
+
+  // Green online, amber on its way, red stopped
+  const red: u8 = alert ? 255 : online ? 90 : 255
+  const green: u8 = alert ? 70 : online ? 255 : 200
+  const blue: u8 = alert ? 55 : online ? 140 : 80
+
+  // The loaded unit and the hot one turn amber and red, the low fuel too
+  const hot: u8 = coolant > 95 ? 2 : coolant > 88 ? 1 : 0
+  const heavy: u8 = kw > capacity * 0.95 ? 2 : kw > capacity * 0.8 ? 1 : 0
+  const low: u8 = fuel < 0.15 ? 2 : fuel < 0.3 ? 1 : 0
+
+  Border: {width: 2, color: {alert ? 255 : 110, alert ? 70 : 220, alert ? 55 : 255, 115}}
+
+  PortalScreenHeader header(title: title, status: word, alert: alert)
+
+  body {
+    Layout: {direction: Row, spacing: 24, padding: {22, 12, 16, 16}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    gauges {
+      Layout: {direction: Column, spacing: 34}
+      Item: {width: {mode: Grow}}
+
+      first {
+        Layout: {direction: Row, spacing: 24}
+
+        PortalGauge speed(
+          label: "SPEED", text: "{rpm:.0} rpm", fraction: rpm / (rated * 1.1), width: 290,
+          red: 110, green: 220, blue: 255)
+
+        PortalGauge load(
+          label: "LOAD", text: "{kw:.1} / {capacity:.0} kW", fraction: capacity > 0 ? kw / capacity : 0,
+          width: 290,
+          red: heavy == 2 ? 255 : heavy == 1 ? 255 : 110,
+          green: heavy == 2 ? 70 : heavy == 1 ? 200 : 220,
+          blue: heavy == 2 ? 55 : heavy == 1 ? 80 : 255)
+      }
+
+      second {
+        Layout: {direction: Row, spacing: 24}
+
+        PortalGauge coolant(
+          label: "COOLANT", text: "{coolant:.0} °C", fraction: (coolant - 18) / 90, width: 290,
+          red: hot == 2 ? 255 : hot == 1 ? 255 : 110,
+          green: hot == 2 ? 70 : hot == 1 ? 200 : 220,
+          blue: hot == 2 ? 55 : hot == 1 ? 80 : 255)
+
+        PortalGauge fuel(
+          label: "FUEL", text: "{fuel * 100:.0}%", fraction: fuel, width: 290,
+          red: low == 2 ? 255 : low == 1 ? 255 : 90,
+          green: low == 2 ? 70 : low == 1 ? 200 : 255,
+          blue: low == 2 ? 55 : low == 1 ? 80 : 140)
+      }
+    }
+
+    side {
+      Layout: {direction: Column, spacing: 10, h: Center}
+      Item: {width: {mode: Fixed, value: 140}}
+
+      PortalReadout state(label: "STATE", text: word, red: red, green: green, blue: blue)
+
+      Button power(
+        label: running ? "STOP" : "START",
+        variant: running ? "danger" : "primary",
+        width: 140)
+    }
+  }
+
+  // The button reports a change: stop a running unit, start a stopped one
+  async {
+    while true {
+      const e = await on.change(this)
+      const w = e.widget
+      if w.has(Button) && w.name() == "power" {
+        unit[PortalGenerator].running = !unit[PortalGenerator].running
+      }
+    }
+  }
+}

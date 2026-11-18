@@ -1,0 +1,94 @@
+// navigation_screen for the box.portal tests, a copy of etc/scenes/portal/navigation_screen.flecs.
+//
+// The navigation screen: a chart of the route with the ship, the waypoints with their distance from
+// the ship, and speed, heading and the time to arrive at the dock. The ship is an entity with a
+// PortalShipStatus (portal/ship_chart.flecs).
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+
+// A waypoint of the list: its name and its distance from the ship
+template PortalWaypointRow {
+  prop name: string = ""
+  prop distance: f32 = 0              // In metres
+
+  Layout: {direction: Row, spacing: 10, v: Middle}
+  Item: {width: {mode: Fixed, value: 150}}
+
+  caption {
+    Text: {value: name, size: 11}
+    Rgb: {235, 245, 255}
+  }
+
+  gap {
+    Item: {width: {mode: Grow}}
+  }
+
+  amount {
+    Text: {value: "{distance:.0} m", size: 11}
+    Rgb: {110, 220, 255}
+  }
+}
+
+template PortalNavigationScreen : PortalScreen {
+  prop title: string = "NAVIGATION // CHART"
+  prop ship: entity = 0               // Entity with the PortalShipStatus
+  prop route: PortalWaypoint[] = []
+  prop x0: f32 = -230                 // Place of the chart, in metres
+  prop z0: f32 = -130
+  prop x1: f32 = 190
+  prop z1: f32 = 140
+
+  const sx: f32 = ship[PortalShipStatus].x
+  const sz: f32 = ship[PortalShipStatus].z
+  const underway = !ship[PortalShipStatus].moored
+  const eta: i32 = ship[PortalShipStatus].eta
+  const minutes: i32 = eta / 60
+  const seconds: i32 = eta - minutes * 60
+  const pad = seconds < 10 ? "0" : ""
+  const arrival = underway && eta >= 0 ? "{minutes}:{pad}{seconds}" : "--:--"
+
+  Border: {width: 2, color: {110, 220, 255, 115}}
+
+  PortalScreenHeader header(title: title, status: underway ? "UNDERWAY" : "MOORED", alert: false)
+
+  body {
+    Layout: {direction: Row, spacing: 16, padding: {8, 8, 12, 12}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    PortalChart chart(
+      points: route, ship: ship, x0: x0, z0: z0, x1: x1, z1: z1, width: 400, height: 250, dots: 5)
+
+    waypoints {
+      Layout: {direction: Column, spacing: 5}
+
+      caption {
+        Text: {value: "WAYPOINTS", size: 10}
+        Rgb: {90, 130, 145}
+      }
+
+      for i in 0..route.count() {
+        "row_{i}" {
+          PortalWaypointRow: {
+            name: route[i].name,
+            distance: sqrt((route[i].x - sx) * (route[i].x - sx) + (route[i].z - sz) * (route[i].z - sz))
+          }
+        }
+      }
+    }
+
+    side {
+      Layout: {direction: Column, spacing: 10}
+      Item: {width: {mode: Grow}}
+
+      PortalReadout speed(label: "SPEED", text: "{ship[PortalShipStatus].speed:.1} kn")
+      PortalReadout heading(label: "HEADING", text: "{ship[PortalShipStatus].heading:.0}°")
+      PortalReadout eta(label: "ETA AT DOCK", text: arrival)
+    }
+  }
+}

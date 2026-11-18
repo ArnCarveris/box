@@ -1,0 +1,62 @@
+// The power of the island: two generator units in the generator room and a breaker per area, the
+// eleven areas of the bunker and the barracks as one. The areas' lamps (portal_bunker/lights) follow
+// their breaker (portal/power.flecs); the power screen and the screens of the units
+// (portal_bunker/screens) switch them. The ship has its own power, not modelled here: its areas
+// are always lit. Demand is 1.5 kW and 0.12 kW per unit of the intensity of the lamps of the area;
+// a unit carries 60 kW, so a single unit is a little short of the whole island.
+
+using flecs.script
+
+bunker {
+  hall {
+    PortalBreaker: {demand: 7.9, essential: true}
+  }
+  corridor {
+    PortalBreaker: {demand: 7.4}
+  }
+  control {
+    PortalBreaker: {demand: 5.4, essential: true}
+  }
+  loft {
+    PortalBreaker: {demand: 3.2}
+  }
+  atrium {
+    PortalBreaker: {demand: 3.6}
+  }
+  storage {
+    PortalBreaker: {demand: 3.2}
+  }
+  shed {
+    PortalBreaker: {demand: 3.2}
+  }
+  stairwell {
+    PortalBreaker: {demand: 3.9, essential: true}
+  }
+  basement {
+    PortalBreaker: {demand: 4.9, essential: true}
+  }
+  generator {
+    PortalBreaker: {demand: 4.9, essential: true}
+  }
+  vault {
+    PortalBreaker: {demand: 2.7}
+  }
+  barracks_power {
+    PortalBreaker: {demand: 28.3}
+  }
+
+  g1 {
+    PortalGenerator: {running: true, rpm: 1500, coolant: 78, fuel: 0.82, capacity: 60}
+  }
+  g2 {
+    PortalGenerator: {running: true, rpm: 1500, coolant: 78, fuel: 0.82, capacity: 60}
+  }
+
+  PortalGrid grid(
+    areas: [
+      bunker.hall, bunker.corridor, bunker.control, bunker.loft, bunker.atrium, bunker.storage,
+      bunker.shed, bunker.stairwell, bunker.basement, bunker.generator, bunker.vault,
+      bunker.barracks_power
+    ],
+    units: [bunker.g1, bunker.g2])
+}

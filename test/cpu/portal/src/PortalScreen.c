@@ -5,7 +5,7 @@
  * crosshair at the middle of the view, and takes no clicks from beyond its range.
  */
 
-#include "portal_test.h"
+#include "screen_test.h"
 #include <string.h>
 
 /** A window, two doors into a room behind them, door a asked to be open, the screen 1.35 m up facing +z and a camera looking at it
@@ -54,45 +54,6 @@
 /** Path of the row of door b, in the second column */
 #define SCREEN_ROW_B "console.screen.list.second.door_1"
 
-/** Run a script file of the test assets.
- *
- * @param world The world
- * @param file Path of the file from the repository root
- * @param name Name of the entity that holds the script, NULL for none
- */
-static void screen_load(
-    ecs_world_t *world,
-    const char *file,
-    const char *name)
-{
-    char *path = box_app_locate(file);
-    test_assert(path != NULL);
-
-    ecs_entity_t holder = 0;
-    if (name) {
-        holder = ecs_entity(world, { .name = name });
-    }
-
-    test_assert(ecs_script(world, { .entity = holder, .filename = path }) != 0);
-    ecs_os_free(path);
-}
-
-/** Run frames of 0.1 s.
- *
- * @param world The world
- * @param frames Number of frames
- */
-static void screen_run(
-    ecs_world_t *world,
-    int32_t frames)
-{
-    int32_t i;
-
-    for (i = 0; i < frames; i ++) {
-        ecs_progress(world, 0.1f);
-    }
-}
-
 /** Create the world of SCREEN_SCENE with the widgets, the door and the screen templates, and
  * let the templates, the layout and the door settle.
  *
@@ -113,39 +74,6 @@ static ecs_world_t* screen_world(void)
     return world;
 }
 
-/** Look up an entity that must exist.
- *
- * @param world The world
- * @param path Its path
- * @return The entity
- */
-static ecs_entity_t screen_e(
-    ecs_world_t *world,
-    const char *path)
-{
-    ecs_entity_t result = ecs_lookup(world, path);
-    test_assert(result != 0);
-
-    return result;
-}
-
-/** Get the text of an element.
- *
- * @param world The world
- * @param path Path of the element with the Text
- * @return The text
- */
-static const char* screen_text(
-    ecs_world_t *world,
-    const char *path)
-{
-    const Text *text = ecs_get(world, screen_e(world, path), Text);
-    test_assert(text != NULL);
-    test_assert(text->value != NULL);
-
-    return text->value;
-}
-
 /** Get whether the portal of a door is locked.
  *
  * @param world The world
@@ -157,32 +85,6 @@ static bool screen_locked(
     const char *path)
 {
     return ecs_get(world, screen_e(world, path), VisPortal)->locked;
-}
-
-/** Aim the camera along -z at the middle of an element from a distance, as a walker aims its
- * crosshair, and click there: the middle of the view.
- *
- * @param world The world
- * @param path Path of the element
- * @param distance Distance of the camera from the plane of the screen
- */
-static void screen_click(
-    ecs_world_t *world,
-    const char *path,
-    float distance)
-{
-    WorldTransform buf;
-    const WorldTransform *t = box_transform_world(world, screen_e(world, path), &buf);
-    test_assert(t != NULL);
-
-    ecs_set(world, screen_e(world, "camera"), Position, {
-        t->m[3][0], t->m[3][1], t->m[3][2] + distance
-    });
-    screen_run(world, 2);
-
-    float middle[2] = {0.5f, 0.5f};
-    box_input_mouse_click(world, KeyMouseLeft, middle, true, 2);
-    screen_run(world, 6);
 }
 
 void PortalScreen_lists_doors(void) {

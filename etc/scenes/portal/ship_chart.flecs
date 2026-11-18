@@ -1,0 +1,103 @@
+// The ship of the ship screens (harbour, engine, navigation, helm) and a chart of its route.
+//
+// A PortalShipStatus on an entity is what the ship screens show: its place on the chart in metres,
+// its heading, speed, rudder, engine telegraph and engine, heel and trim, and when it sails or
+// arrives. Nothing here moves the ship: the values are written by whatever runs the ship (the
+// screens only read them), and the scene sets them to the ship at its mooring.
+//
+//   freighter { PortalShipStatus: {x: 55, z: 30, speed: 0, moored: true, sails: 272} }
+//
+// A PortalChart draws a route of PortalWaypoint on a card of pixels: a dotted line between the
+// waypoints (the last one back to the first), a mark on each waypoint and the ship.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+
+// The ship: place (m), heading (degrees from north, clockwise), speed (knots), rudder (degrees,
+// positive to starboard), telegraph (-2 full astern .. 0 stop .. 3 full ahead), engine shaft speed
+// (rpm), load (0..1) and exhaust (degrees Celsius), heel and trim (degrees), seconds to arrival
+// (-1 not underway) and to sailing (-1 not moored), moored and steered by hand
+struct PortalShipStatus(
+  x: f32, z: f32, heading: f32, speed: f32, rudder: f32, telegraph: i32, rpm: f32, load: f32,
+  exhaust: f32, heel: f32, trim: f32, eta: i32, sails: i32, moored: bool, manual: bool)
+
+// A waypoint of a route: its name and place in metres
+struct PortalWaypoint(name: string, x: f32, z: f32)
+
+// A square mark of a chart, centred on a place of the chart in pixels (y down)
+template PortalChartMark {
+  prop x: f32 = 0
+  prop y: f32 = 0
+  prop size: f32 = 4
+  prop red: u8 = 110
+  prop green: u8 = 220
+  prop blue: u8 = 255
+
+  Item: {
+    h: Left, v: Top, x: x - size / 2, y: size / 2 - y,
+    width: {mode: Fixed, value: size}, height: {mode: Fixed, value: size}
+  }
+  Rect: {1, 1}
+  Rgb: {red, green, blue}
+}
+
+// A chart of a route. The place shown is the box from (x0, z0) to (x1, z1) in metres, fitted in
+// the card of width by height pixels, north up (+z) and east right (+x).
+template PortalChart {
+  prop points: PortalWaypoint[] = []
+  prop ship: entity = 0               // Entity with the PortalShipStatus, 0 for none
+  prop x0: f32 = -100
+  prop z0: f32 = -100
+  prop x1: f32 = 100
+  prop z1: f32 = 100
+  prop width: f32 = 400
+  prop height: f32 = 280
+  prop dots: i32 = 5                  // Dots of the line between two waypoints
+
+  const count: i32 = points.count()
+  const fit: f32 = min(width / (x1 - x0), height / (z1 - z0))
+
+  Layout: {}
+  Item: {width: {mode: Fixed, value: width}, height: {mode: Fixed, value: height}}
+  Rect: {1, 1}
+  Rgb: {5, 18, 25}
+  Border: {width: 1, color: {110, 220, 255, 90}}
+
+  for i in 0..count {
+    const next: i32 = i + 1 < count ? i + 1 : 0
+
+    for j in 0..dots {
+      const t: f32 = (j + 1.0) / (dots + 1.0)
+
+      "dot_{i}_{j}" {
+        PortalChartMark: {
+          x: (points[i].x + (points[next].x - points[i].x) * t - x0) * fit,
+          y: (points[i].z + (points[next].z - points[i].z) * t - z0) * fit,
+          size: 2, red: 60, green: 120, blue: 140
+        }
+      }
+    }
+  }
+
+  for i in 0..count {
+    "waypoint_{i}" {
+      PortalChartMark: {
+        x: (points[i].x - x0) * fit, y: (points[i].z - z0) * fit, size: 6, red: 110, green: 220, blue: 255
+      }
+    }
+  }
+
+  if ship != 0 {
+    mark {
+      PortalChartMark: {
+        x: (ship[PortalShipStatus].x - x0) * fit, y: (ship[PortalShipStatus].z - z0) * fit,
+        size: 9, red: 255, green: 200, blue: 80
+      }
+    }
+  }
+}

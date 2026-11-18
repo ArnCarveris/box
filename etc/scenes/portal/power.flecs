@@ -1,0 +1,116 @@
+// The power of a place made of portal areas (include/box/portal.h): generator units that feed a
+// breaker per area, and lamps that go dark when their area has no power.
+//
+// A breaker is a PortalBreaker on an area (any entity): off is the switch, dark is the result, an
+// area with its breaker off or with no unit up to speed. A unit is a PortalGenerator on an entity:
+// it runs while running is set and it has fuel, spins up to its rated speed, heats up, burns fuel
+// by its load, and feeds the areas while it is above 80% of the rated speed. The units share the
+// demand of the areas that have their breaker on.
+//
+// A PortalGrid runs the units and writes dark of the breakers, twice a second of the clock of
+// the scene, and keeps what it works out in its PortalPowerStatus. A PortalLamp is a PointLight
+// that is dark while the breaker of its area is dark, except an emergency lamp, a beacon, that
+// stays lit. The screens (portal/power_screen.flecs, portal/generator_screen.flecs) read and write
+// these components; so may game code.
+//
+//   hall { VisArea: {...}; PortalBreaker: {demand: 20} }
+//   g1 { PortalGenerator: {running: true, rpm: 1500, fuel: 0.8, coolant: 78, capacity: 60} }
+//   PortalGrid grid(areas: [hall], units: [g1])
+//   lamp { Position: {0, 3, 5}; Rgb: {255, 204, 140}; PortalLamp: {area: hall, intensity: 10, range: 6} }
+
+using flecs.script
+using flecs.script.math
+using box.light
+
+// The breaker of an area
+struct PortalBreaker(off: bool, dark: bool, essential: bool, demand: f32)
+
+// A generator unit: rpm and coolant (degrees Celsius), fuel (0..1), load and capacity in kW
+struct PortalGenerator(running: bool, rpm: f32, load: f32, coolant: f32, fuel: f32, capacity: f32)
+
+// What a PortalGrid made of its units and areas: the units up to speed, what they can carry in kW,
+// the load they carry (0 without a unit up) and the demand of the areas with their breaker on
+struct PortalPowerStatus(up: i32, capacity: f32, load: f32, demand: f32)
+
+// A point light that follows the power of its area. The light is dark (intensity 0, which costs
+// nothing) while the area is dark, unless it is an emergency lamp.
+template PortalLamp {
+  prop area: entity = 0               // Entity with the PortalBreaker, 0 for always lit
+  prop intensity: f32 = 1             // Intensity of the PointLight when lit
+  prop range: f32 = 10                // Range of the PointLight
+  prop emergency: bool = false        // Stays lit without power
+
+  const out = area != 0 && !emergency && area[PortalBreaker].dark
+  const level: f32 = out ? 0 : intensity
+
+  PointLight: {intensity: level, range: range}
+}
+
+// Runs the units and powers the areas. areas are the entities with a PortalBreaker, units the
+// entities with a PortalGenerator.
+template PortalGrid {
+  prop areas: entity[] = []
+  prop units: entity[] = []
+  prop rated: f32 = 1500              // Rated speed of a unit in rpm
+
+  PortalPowerStatus: {}
+
+  async {
+    mut tick: f32 = 0
+
+    while true {
+      await delay(0.5)
+      tick = tick + 0.5
+
+      // The units that are up to speed and what they can carry
+      mut up: i32 = 0
+      mut capacity: f32 = 0
+      for i in 0..units.count() {
+        const unit = units[i]
+        if unit[PortalGenerator].rpm > rated * 0.8 {
+          up = up + 1
+          capacity = capacity + unit[PortalGenerator].capacity
+        }
+      }
+
+      // What the areas with their breaker on draw, carried by the units that are up
+      mut demand: f32 = 0
+      for i in 0..areas.count() {
+        const area = areas[i]
+        if !area[PortalBreaker].off {
+          demand = demand + area[PortalBreaker].demand
+        }
+      }
+      const load: f32 = up > 0 ? demand : 0
+
+      this[PortalPowerStatus].up = up
+      this[PortalPowerStatus].capacity = capacity
+      this[PortalPowerStatus].load = load
+      this[PortalPowerStatus].demand = demand
+
+      for i in 0..units.count() {
+        const unit = units[i]
+        const gen = unit[PortalGenerator]
+        const run = gen.running && gen.fuel > 0
+        const ratio: f32 = load / max(1, up * gen.capacity)
+        const target: f32 = run ? rated + sin(tick * 1.3 + i * 1.7) * 6 : 0
+        const hot: f32 = run ? 74 + 14 * min(1.4, ratio) : 18
+        const shared: f32 = gen.rpm > rated * 0.8 && up > 0 ? load / up : 0
+        const burn: f32 = run ? 0.0001 + 0.0005 * ratio : 0
+
+        unit[PortalGenerator].rpm = gen.rpm + clamp(target - gen.rpm, -130, 210)
+        unit[PortalGenerator].load = shared
+        unit[PortalGenerator].coolant = gen.coolant + (hot - gen.coolant) * (run ? 0.025 : 0.01)
+        unit[PortalGenerator].fuel = max(0, gen.fuel - burn)
+      }
+
+      for i in 0..areas.count() {
+        const area = areas[i]
+        const dark = area[PortalBreaker].off || up == 0
+        if area[PortalBreaker].dark != dark {
+          area[PortalBreaker].dark = dark
+        }
+      }
+    }
+  }
+}

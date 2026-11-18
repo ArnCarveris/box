@@ -4,11 +4,35 @@
 // {0, 1.35, 0.25} and 0.08 m deep; its face looks along -z into the room. A screen covers the face
 // less 0.04 m all round, 2 mm in front of it, turned so that its +z looks out of the face.
 //
+// The facility overview (prop_14) and the power distribution (prop_56) are on consoles like it; the
+// two generator units (prop_53, prop_54) carry their own screens on the +z face of the bezel of the
+// generator model, 1.5 by 0.7 m at {0, 1.15, 0.81}.
+//
 // The doors listed are the doors of the bunker, not the ship's, named after the two areas each
 // one joins, in the order of the original scenario.
 
 using flecs.script
 using box.transform
+
+// The camera of the scene (portal_bunker.flecs) is the viewer of the facility screen: declared here
+// so that the screen can name it before the scene adds to it
+camera {}
+
+// The ship the ship screens show: moored at the quay, its engine idling. Nothing moves it yet; what
+// runs the ship writes this PortalShipStatus (portal/ship_chart.flecs) and the screens follow.
+// The route of the ship round the island (placeholder), the chart of both screens that show it
+const ship_route: PortalWaypoint[] = [
+  {"DOCK", 55, 30}, {"FAIRWAY", 110, 30}, {"EAST CAPE", 140, -60}, {"SOUTH BAR", 50, -115},
+  {"WEST REEF", -90, -100}, {"WEST POINT", -150, 10}, {"NORTH BAY", -110, 110},
+  {"NORTH POINT", 0, 130}, {"HARBOUR MOUTH", 100, 100}
+]
+
+freighter {
+  PortalShipStatus: {
+    x: 55, z: 30, heading: 90, speed: 0, rudder: 0, telegraph: 0, rpm: 38, load: 0.04,
+    exhaust: 140, heel: 0.3, trim: 0.5, eta: -1, sails: 272, moored: true, manual: true
+  }
+}
 
 bunker {
   props {
@@ -31,6 +55,97 @@ bunker {
       {
         Position: {0, 1.35, 0.208}
         Rotation: {0, 3.14159265, 0}
+      }
+    }
+
+    prop_14 {
+      PortalFacilityScreen screen(
+        width: 1.92,
+        height: 0.72,
+        levels: [{"GROUND", 28, 34, 40, 44}, {"BASEMENT", -2, 12, 22, 26}],
+        rooms: [
+          {bunker.hall, "ENTRANCE HALL", 0, -6, 0, 12, 10},
+          {bunker.corridor, "L-CORRIDOR", 0, -1.5, 10, 3, 12},
+          {bunker.corridor, "", 0, 1.5, 19, 14.5, 3},
+          {bunker.control, "CONTROL ROOM", 0, -12, 13, 10.5, 9},
+          {bunker.atrium, "ATRIUM", 0, 4, 22, 10, 12},
+          {bunker.storage, "STORAGE", 0, 4, 11, 10, 8},
+          {bunker.shed, "SHED", 0, 20, -10, 8, 8},
+          {bunker.stairwell, "STAIRS", 1, -14, 1, 8, 4},
+          {bunker.basement, "BASEMENT HALL", 1, -24, -6, 10, 18},
+          {bunker.generator, "GENERATOR ROOM", 1, -14, 6, 12, 6},
+          {bunker.vault, "VAULT", 1, -24, -14, 10, 8}
+        ],
+        doors: [
+          bunker.p_entry, bunker.p_hall_corr, bunker.p_hall_stairs, bunker.p_corr_ctrl,
+          bunker.p_hatch, bunker.p_corr_atr, bunker.p_corr_store, bunker.p_store_exit,
+          bunker.p_shed_door, bunker.p_stairs_base, bunker.p_base_gen, bunker.p_base_vault
+        ],
+        viewer: camera)
+      {
+        Position: {0, 1.35, 0.208}
+        Rotation: {0, 3.14159265, 0}
+      }
+    }
+
+    prop_56 {
+      PortalPowerScreen screen(
+        width: 1.92,
+        height: 0.72,
+        grid: bunker.grid,
+        areas: [
+          bunker.hall, bunker.corridor, bunker.control, bunker.loft, bunker.atrium, bunker.storage,
+          bunker.shed, bunker.stairwell, bunker.basement, bunker.generator, bunker.vault,
+          bunker.barracks_power
+        ],
+        names: [
+          "ENTRANCE HALL", "L-CORRIDOR", "CONTROL ROOM", "LOFT", "ATRIUM", "STORAGE", "BRICK SHED",
+          "STAIRWELL", "BASEMENT HALL", "GENERATOR ROOM", "VAULT", "BARRACKS"
+        ])
+      {
+        Position: {0, 1.35, 0.208}
+        Rotation: {0, 3.14159265, 0}
+      }
+    }
+
+    prop_53 {
+      PortalGeneratorScreen screen(width: 1.42, height: 0.62, unit: bunker.g1, title: "GENERATOR G1")
+      {
+        Position: {0, 1.15, 0.827}
+      }
+    }
+
+    prop_54 {
+      PortalGeneratorScreen screen(width: 1.42, height: 0.62, unit: bunker.g2, title: "GENERATOR G2")
+      {
+        Position: {0, 1.15, 0.827}
+      }
+    }
+
+    prop_16 {
+      PortalHarbourScreen screen(width: 1.92, height: 0.72, ship: freighter, route: ship_route) {
+        Position: {0, 1.35, 0.208}
+        Rotation: {0, 3.14159265, 0}
+      }
+    }
+
+    prop_86 {
+      PortalEngineScreen screen(width: 1.42, height: 0.62, ship: freighter) {
+        Position: {0, 1.15, 0.827}
+      }
+    }
+
+    prop_104 {
+      PortalNavigationScreen screen(width: 1.12, height: 0.47, ship: freighter, route: ship_route) {
+        Position: {0, 1.0483, 0.0938}
+        Rotation: {-0.6109, 3.14159265, 0}
+      }
+    }
+
+    prop_105 {
+      PortalHelmScreen screen(width: 1.12, height: 0.47, ship: freighter) {
+        Position: {0, 1.0483, 0.0938}
+        Rotation: {-0.6109, 3.14159265, 0}
       }
     }
   }

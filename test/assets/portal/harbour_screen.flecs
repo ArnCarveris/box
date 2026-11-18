@@ -1,0 +1,55 @@
+// harbour_screen for the box.portal tests, a copy of etc/scenes/portal/harbour_screen.flecs.
+//
+// The harbour screen: the route of the ship round the island on a chart, where the ship is and when
+// it sails. The ship is an entity with a PortalShipStatus (portal/ship_chart.flecs), the route a
+// list of PortalWaypoint.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+
+template PortalHarbourScreen : PortalScreen {
+  prop title: string = "HARBOUR // TRAFFIC"
+  prop ship: entity = 0               // Entity with the PortalShipStatus
+  prop route: PortalWaypoint[] = []
+  prop x0: f32 = -260                 // Place of the chart, in metres
+  prop z0: f32 = -130
+  prop x1: f32 = 190
+  prop z1: f32 = 140
+
+  const moored = ship[PortalShipStatus].moored
+  const manual = ship[PortalShipStatus].manual
+  const sails: i32 = ship[PortalShipStatus].sails
+  const minutes: i32 = sails / 60
+  const seconds: i32 = sails - minutes * 60
+  const pad = seconds < 10 ? "0" : ""
+  const status = moored ? "SAILS IN {minutes}:{pad}{seconds}" : manual ? "HELM MANUAL" : "AUTOPILOT"
+
+  Border: {width: 2, color: {110, 220, 255, 115}}
+
+  PortalScreenHeader header(title: title, status: status, alert: false)
+
+  body {
+    Layout: {direction: Row, spacing: 20, padding: {10, 10, 14, 14}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    PortalChart chart(
+      points: route, ship: ship, x0: x0, z0: z0, x1: x1, z1: z1, width: 560, height: 296, dots: 6)
+
+    side {
+      Layout: {direction: Column, spacing: 12}
+      Item: {width: {mode: Grow}}
+
+      PortalReadout state(
+        label: "SHIP", text: moored ? "MOORED" : "UNDERWAY",
+        red: moored ? 255 : 90, green: moored ? 200 : 255, blue: moored ? 80 : 140)
+      PortalReadout speed(label: "SPEED", text: "{ship[PortalShipStatus].speed:.1} kn")
+      PortalReadout heading(label: "HEADING", text: "{ship[PortalShipStatus].heading:.0}°")
+      PortalReadout steering(label: "STEERING", text: manual ? "HELM MANUAL" : "AUTOPILOT")
+    }
+  }
+}

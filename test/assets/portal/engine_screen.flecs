@@ -1,0 +1,73 @@
+// engine_screen for the box.portal tests, a copy of etc/scenes/portal/engine_screen.flecs.
+//
+// The engine screen: shaft speed, load and exhaust of the main engine and the engine telegraph.
+// The engine is the one of the PortalShipStatus of the ship (portal/ship_chart.flecs); the screen
+// only shows it.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+
+template PortalEngineScreen : PortalScreen {
+  prop title: string = "MAIN ENGINE"
+  prop ship: entity = 0               // Entity with the PortalShipStatus
+  prop rated: f32 = 120               // Rated shaft speed in rpm
+  prop words: string[] = ["FULL ASTERN", "HALF ASTERN", "STOP", "SLOW AHEAD", "HALF AHEAD", "FULL AHEAD"]
+
+  const rpm: f32 = ship[PortalShipStatus].rpm
+  const load: f32 = ship[PortalShipStatus].load
+  const exhaust: f32 = ship[PortalShipStatus].exhaust
+  const telegraph: i32 = ship[PortalShipStatus].telegraph
+  const word = rpm < 5 ? "STOPPED" : telegraph == 0 ? "IDLE" : "RUNNING"
+
+  // Amber and red for a loaded engine and a hot exhaust
+  const heavy: u8 = load > 0.95 ? 2 : load > 0.8 ? 1 : 0
+  const hot: u8 = exhaust > 450 ? 2 : exhaust > 400 ? 1 : 0
+
+  Border: {width: 2, color: {110, 220, 255, 115}}
+
+  PortalScreenHeader header(title: title, status: word, alert: rpm < 5)
+
+  body {
+    Layout: {direction: Row, spacing: 24, padding: {22, 12, 16, 16}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    gauges {
+      Layout: {direction: Column, spacing: 34}
+      Item: {width: {mode: Grow}}
+
+      first {
+        Layout: {direction: Row, spacing: 24}
+
+        PortalGauge speed(
+          label: "SHAFT SPEED", text: "{rpm:.0} rpm", fraction: rpm / (rated * 1.1), width: 290,
+          red: 110, green: 220, blue: 255)
+
+        PortalGauge load(
+          label: "LOAD", text: "{load * 100:.0}%", fraction: load, width: 290,
+          red: heavy > 0 ? 255 : 110, green: heavy == 2 ? 70 : heavy == 1 ? 200 : 220,
+          blue: heavy == 2 ? 55 : heavy == 1 ? 80 : 255)
+      }
+
+      second {
+        Layout: {direction: Row, spacing: 24}
+
+        PortalGauge exhaust(
+          label: "EXHAUST", text: "{exhaust:.0} °C", fraction: (exhaust - 20) / 480, width: 290,
+          red: hot > 0 ? 255 : 110, green: hot == 2 ? 70 : hot == 1 ? 200 : 220,
+          blue: hot == 2 ? 55 : hot == 1 ? 80 : 255)
+      }
+    }
+
+    side {
+      Layout: {direction: Column, spacing: 10}
+      Item: {width: {mode: Fixed, value: 140}}
+
+      PortalReadout telegraph(label: "TELEGRAPH", text: words[telegraph + 2])
+    }
+  }
+}

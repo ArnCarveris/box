@@ -94,3 +94,74 @@ template PortalScreenHeader {
     Rgb: {red, green, blue}
   }
 }
+
+// A gauge: a label, a value at the right and a bar of a fraction from 0 to 1, in a color. A
+// bar needs the width of the gauge in virtual pixels.
+template PortalGauge {
+  prop label: string = ""
+  prop text: string = ""
+  prop fraction: f32 = 0
+  prop width: f32 = 200
+  prop red: u8 = 110
+  prop green: u8 = 220
+  prop blue: u8 = 255
+
+  Layout: {direction: Column, spacing: 3}
+  Item: {width: {mode: Fixed, value: width}}
+
+  head {
+    Layout: {direction: Row, v: Bottom}
+    Item: {width: {mode: Grow}}
+
+    caption {
+      Text: {value: label, size: 10}
+      Rgb: {90, 130, 145}
+    }
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+
+    amount {
+      Text: {value: text, size: 14}
+      Rgb: {red, green, blue}
+    }
+  }
+
+  track {
+    Layout: {}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 6}}
+    Rect: {1, 1}
+    Rgb: {16, 30, 38}
+
+    fill {
+      Item: {
+        width: {mode: Fixed, value: clamp(fraction, 0, 1) * width + 0.01},
+        height: {mode: Fixed, value: 6}
+      }
+      Rect: {1, 1}
+      Rgb: {red, green, blue}
+    }
+  }
+}
+
+// A readout: a small label over a larger value, in a color
+template PortalReadout {
+  prop label: string = ""
+  prop text: string = ""
+  prop red: u8 = 235
+  prop green: u8 = 245
+  prop blue: u8 = 255
+
+  Layout: {direction: Column, spacing: 2}
+
+  caption {
+    Text: {value: label, size: 9}
+    Rgb: {90, 130, 145}
+  }
+
+  amount {
+    Text: {value: text, size: 18}
+    Rgb: {red, green, blue}
+  }
+}

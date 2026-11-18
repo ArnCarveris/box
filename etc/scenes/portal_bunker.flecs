@@ -9,14 +9,24 @@
 // the cursor at it within 3 m and click.
 include ui/widgets
 include portal/door
+include portal/power
 include portal/screen
 include portal/doors_screen
+include portal/facility_screen
+include portal/power_screen
+include portal/generator_screen
+include portal/ship_chart
+include portal/harbour_screen
+include portal/engine_screen
+include portal/navigation_screen
+include portal/helm_screen
 include portal_bunker/textures
 include portal_bunker/materials
 include portal_bunker/models
 include portal_bunker/rooms
 include portal_bunker/shell
 include portal_bunker/props
+include portal_bunker/power
 include portal_bunker/lights
 include portal_bunker/island
 include portal_bunker/ship
