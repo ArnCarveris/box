@@ -156,6 +156,9 @@
 #define BOX_RENDER_SHADOW_NEAR_MIN (0.001f)
 
 
+/** Shader handle of the engine compute shader that steps the fields of WaterRipples */
+#define BOX_RENDER_SHADER_WATER_RIPPLES (15)
+
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
 #define BOX_RENDER_SHADER_SHAPE2D (7)
 
@@ -1706,6 +1709,73 @@ typedef struct box_render_water_waves_t {
     float pad[2];           /**< Unused */
 } box_render_water_waves_t;
 
+/** Seconds of a step of the field of WaterRipples */
+#define BOX_RENDER_RIPPLE_STEP (1.0 / 120.0)
+
+/** Steps of a field of WaterRipples a frame at most; a longer frame drops the rest of its time */
+#define BOX_RENDER_RIPPLE_SUBSTEPS (8)
+
+/** RippleSource entities a field of WaterRipples takes a frame at most */
+#define BOX_RENDER_RIPPLE_SOURCES (64)
+
+/** box_material_ripple_at disturbances a field of WaterRipples applies a frame at most, the
+ * others wait for the next frame */
+#define BOX_RENDER_RIPPLE_IMPULSES (64)
+
+/** Largest Courant number c dt / dx of a field of WaterRipples, below the 1 / sqrt(2) bound of
+ * the explicit 2D wave equation; the wave speed is clamped to it */
+#define BOX_RENDER_RIPPLE_COURANT (0.5f)
+
+/** World units the water under a RippleSource sinks per world unit it travels through the water,
+ * times RippleSource.strength */
+#define BOX_RENDER_RIPPLE_PUSH (0.05f)
+
+/** Relative speeds of a RippleSource below this push nothing, world units per second */
+#define BOX_RENDER_RIPPLE_SPEED_MIN (1e-3f)
+
+/** World units above or below the height of the Water entity within which a Water fragment takes
+ * the normals of the field */
+#define BOX_RENDER_RIPPLE_PLANE_TOLERANCE (0.5f)
+
+/** A source of a field of WaterRipples for the steps of a frame, RippleSource of
+ * water_ripples.wgsl: a RippleSource (pushed every step) or a box_material_ripple_at disturbance
+ * (once, on the first step). Positions are in cells from the corner of the window of the frame. */
+typedef struct box_render_ripple_source_t {
+    float from[2];          /**< Center at the start of the frame */
+    float to[2];            /**< Center at the end of the frame; a step at time fraction t of
+                             *   the frame is at mix(from, to, t) */
+    float extents[2];       /**< Half size along its own X and Z, cells */
+    float axis[2];          /**< Its own X axis in world XZ, normalized */
+    float amount;           /**< Height added at the center per step, world units, negative
+                             *   sinks the water */
+    uint32_t once;          /**< 1 for a disturbance applied on the first step only */
+    float pad[2];           /**< Unused */
+} box_render_ripple_source_t;
+
+/** A field of WaterRipples of a frame, simulated by the backend before the views draw.
+ *
+ * The window covers the cells origin .. origin + resolution - 1 of the water frame; the texel of
+ * cell c is c mod resolution, so a window that moves keeps the heights of the cells it still
+ * covers. */
+typedef struct box_render_water_ripples_t {
+    ecs_entity_t water;     /**< Entity with the Water and WaterRipples, the key of the field */
+    ecs_entity_t scene;     /**< Scene root of the Water, 0 for the default scene */
+    uint32_t resolution;    /**< Cells per side, a power of two */
+    uint32_t steps;         /**< Steps of the frame, 0..BOX_RENDER_RIPPLE_SUBSTEPS */
+    int32_t origin[2];      /**< Window origin modulo the resolution: the texel of its corner */
+    int32_t shift[2];       /**< Cells the window moved since the previous frame, clamped to
+                             *   -resolution..resolution; the cells that entered start flat */
+    bool reset;             /**< The field starts flat: new, or a resolution that changed */
+    float cell;             /**< World units of a cell */
+    float courant2;         /**< (c dt / dx)^2 of the clamped wave speed */
+    float keep;             /**< Factor of the vertical velocity a step keeps, from damping */
+    float corner[2];        /**< World XZ of the corner of the window at the end of the frame */
+    float height;           /**< World Y of the Water entity */
+    float strength;         /**< WaterRipples.strength, 0 when not finite */
+    int32_t source_first;   /**< First of its sources in the ripple_sources of the packet */
+    int32_t source_count;   /**< Its sources */
+} box_render_water_ripples_t;
+
 /** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
  * planet light slot is above them */
 #define BOX_RENDER_MESH_MATERIAL_BITS (24)
@@ -2161,6 +2231,9 @@ typedef struct box_render_packet_t {
                              *   instances with a planet light slot are lit by */
     ecs_vec_t planar_reflections; /**< box_render_planar_t, the planar reflections of the
                              *   views */
+    ecs_vec_t water_ripples; /**< box_render_water_ripples_t, the fields of WaterRipples,
+                             *   stepped before the targets */
+    ecs_vec_t ripple_sources; /**< box_render_ripple_source_t of those fields */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

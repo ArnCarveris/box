@@ -5,11 +5,19 @@
 
 #define BOX_MATERIAL_IMPL
 #include <box.h>
+#include <math.h>
 
 ECS_TAG_DECLARE(DynamicMaterial);
 ECS_TAG_DECLARE(TextureFrame);
 ECS_TAG_DECLARE(NoShadow);
 ECS_TAG_DECLARE(LightFixture);
+
+/** Singleton through which box_material_ripple_at finds the queue of a world */
+typedef struct MaterialRippleQueue {
+    ecs_vec_t *ripples;     /**< box_material_ripple_t, freed with the world */
+} MaterialRippleQueue;
+
+static ECS_COMPONENT_DECLARE(MaterialRippleQueue);
 
 /** Construct Opacity values that are fully opaque.
  *
@@ -264,6 +272,152 @@ static void box_water_waves_ctor(
     }
 }
 
+/** Construct WaterRipples values: a field of 32 world units and 256 cells on the Water entity, a
+ * wave speed of 2, a damping of 0.5 and a strength of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_ripples_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterRipples *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterRipples){
+            .size = BOX_MATERIAL_RIPPLES_SIZE,
+            .resolution = BOX_MATERIAL_RIPPLES_RESOLUTION,
+            .follow = 0,
+            .wave_speed = BOX_MATERIAL_RIPPLES_WAVE_SPEED,
+            .damping = BOX_MATERIAL_RIPPLES_DAMPING,
+            .strength = BOX_MATERIAL_RIPPLES_STRENGTH };
+    }
+}
+
+/** Construct RippleSource values: an ellipse of half size 0.5 by 0.5 and a strength of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_ripple_source_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    RippleSource *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (RippleSource){
+            .extents = { BOX_MATERIAL_RIPPLE_SOURCE_EXTENT, BOX_MATERIAL_RIPPLE_SOURCE_EXTENT },
+            .strength = BOX_MATERIAL_RIPPLE_SOURCE_STRENGTH };
+    }
+}
+
+ecs_vec_t* box_material_ripples_queue(
+    const ecs_world_t *world)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    const MaterialRippleQueue *q = ecs_id(MaterialRippleQueue)
+        ? ecs_singleton_get(real, MaterialRippleQueue) : NULL;
+
+    return q ? q->ripples : NULL;
+}
+
+bool box_material_ripple_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float strength)
+{
+    const ecs_world_t *real = ecs_get_world(world);
+    ecs_vec_t *queue = box_material_ripples_queue(real);
+    bool result = false;
+    if (!queue) {
+        goto done;
+    }
+
+    if (!water || !ecs_is_alive(real, water) || !ecs_has(real, water, WaterRipples) ||
+        !ecs_has(real, water, Water))
+    {
+        char *name = water && ecs_is_alive(real, water) ? ecs_get_path(real, water) : NULL;
+        ecs_err("ripple_at: '%s' is not a Water with WaterRipples", name ? name : "0");
+        ecs_os_free(name);
+        goto done;
+    }
+
+    if (!position || !isfinite(position[0]) || !isfinite(position[1]) ||
+        !isfinite(position[2]))
+    {
+        ecs_err("ripple_at: the position is not finite");
+        goto done;
+    }
+
+    if (!isfinite(radius) || radius <= 0.0f) {
+        ecs_err("ripple_at: the radius %g is not above 0", (double)radius);
+        goto done;
+    }
+
+    if (!isfinite(strength)) {
+        ecs_err("ripple_at: the strength is not finite");
+        goto done;
+    }
+
+    box_material_ripple_t *r = ecs_vec_append_t(NULL, queue, box_material_ripple_t);
+    r->water = water;
+    r->position[0] = position[0];
+    r->position[1] = position[1];
+    r->position[2] = position[2];
+    r->radius = radius;
+    r->strength = strength;
+    result = true;
+done:
+    return result;
+}
+
+/** The box.material.ripple_at script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The water, the position, the radius and the strength
+ * @param result Receives whether the disturbance was queued
+ */
+static void box_material_ripple_at_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t water = *(ecs_entity_t*)argv[0].ptr;
+    const float *position = argv[1].ptr;
+    float radius = *(float*)argv[2].ptr;
+    float strength = *(float*)argv[3].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_material_ripple_at(ctx->world, water, position, radius,
+        strength);
+}
+
+/** Free the ripple queue of a world.
+ *
+ * @param world The world
+ * @param ctx The queue
+ */
+static void box_material_ripples_free(
+    ecs_world_t *world,
+    void *ctx)
+{
+    ecs_vec_t *queue = ctx;
+    (void)world;
+    ecs_vec_fini_t(NULL, queue, box_material_ripple_t);
+    ecs_os_free(queue);
+}
+
 /** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
  * white absorption, a refraction of 0.02 and an off white foam band of width 0.3 without
  * texture or ripples.
@@ -437,6 +591,8 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, WaterWave);
     ECS_META_COMPONENT(world, WaterWaves);
     ECS_META_COMPONENT(world, WaterFlow);
+    ECS_META_COMPONENT(world, WaterRipples);
+    ECS_META_COMPONENT(world, RippleSource);
     ECS_META_COMPONENT(world, WindSway);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
@@ -477,6 +633,8 @@ void BoxMaterialImport(
     ecs_set_hooks(world, WaterWaves, { .ctor = box_water_waves_ctor });
     ecs_add_pair(world, ecs_id(WaterWaves), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(WaterFlow), EcsOnInstantiate, EcsInherit);
+    ecs_set_hooks(world, WaterRipples, { .ctor = box_water_ripples_ctor });
+    ecs_set_hooks(world, RippleSource, { .ctor = box_ripple_source_ctor });
     ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });
     ecs_set_hooks(world, TextureLayer, { .ctor = box_texture_layer_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
@@ -500,4 +658,23 @@ void BoxMaterialImport(
     ECS_TAG_DEFINE(world, DynamicMaterial);
     ECS_TAG_DEFINE(world, NoShadow);
     ECS_TAG_DEFINE(world, LightFixture);
+
+    ecs_vec_t *queue = ecs_os_calloc_t(ecs_vec_t);
+    ecs_vec_init_t(NULL, queue, box_material_ripple_t, 0);
+    ECS_COMPONENT_DEFINE(world, MaterialRippleQueue);
+    ecs_singleton_set(world, MaterialRippleQueue, { .ripples = queue });
+    ecs_atfini(world, box_material_ripples_free, queue);
+
+    ecs_function(world, {
+        .name = "ripple_at",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "water", .type = ecs_id(ecs_entity_t) },
+            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "radius", .type = ecs_id(ecs_f32_t) },
+            { .name = "strength", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_material_ripple_at_function
+    });
 }

@@ -1116,6 +1116,25 @@
                 ]
             },
             {
+                "id": "WaterRipples",
+                "testcases": [
+                    "defaults",
+                    "reflection",
+                    "function_registered",
+                    "function_checks_arguments",
+                    "resolution_rounded",
+                    "relative_velocity",
+                    "source_relative_to_flow",
+                    "window_whole_cells",
+                    "window_in_water_frame",
+                    "fixed_steps",
+                    "wave_speed_clamped",
+                    "ripple_at_next_step",
+                    "no_field",
+                    "one_field_per_scene"
+                ]
+            },
+            {
                 "id": "Wind",
                 "testcases": [
                     "defaults",

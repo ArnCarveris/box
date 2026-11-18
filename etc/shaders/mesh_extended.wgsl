@@ -55,6 +55,11 @@ const WATER_WAVE_SETS: u32 = 128u;
 // unused; zero before the main thread sent one.
 @group(0) @binding(24) var<uniform> water_wave_sets: array<WaterWaveSet, WATER_WAVE_SETS>;
 
+// The heights of the field of WaterRipples of the scene of the view (ripple_a, ripple_b and
+// ripple_c of View) in world units, cell l of the window at texel (ripple_c.yz + l) mod
+// ripple_c.x; a 1x1 zero texture without one.
+@group(0) @binding(25) var water_ripple_heights: texture_storage_2d<r32float, read>;
+
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
 // are taken a frame; later glass samples the last one. A view without transmissive draws, and
@@ -840,6 +845,51 @@ fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f
     return normalize(vec3f(waves.x + detail.x, waves.y * detail.y, waves.z + detail.z));
 }
 
+// Height of a cell of the window of the field of WaterRipples, 0 outside the window.
+fn water_ripple_height(cell: vec2i) -> f32 {
+    let r = view.ripple_c.x;
+    if (any(cell < vec2i(0)) || any(cell >= vec2i(i32(r)))) {
+        return 0.0;
+    }
+    return textureLoad(water_ripple_heights, (vec2u(cell) + view.ripple_c.yz) % r).r;
+}
+
+// Change of the height of the field across the two neighbours of a cell along X and Z (central
+// differences, in world units per two cells).
+fn water_ripple_difference(cell: vec2i) -> vec2f {
+    return vec2f(
+        water_ripple_height(cell + vec2i(1, 0)) - water_ripple_height(cell - vec2i(1, 0)),
+        water_ripple_height(cell + vec2i(0, 1)) - water_ripple_height(cell - vec2i(0, 1)));
+}
+
+// The normal of a Water fragment with the ripples of the field of WaterRipples of the view: the
+// slope of the field at its world XZ (bilinear between the central differences of the four
+// nearest cells) tilts a normal that is whiteout blended over n, scaled by the strength of the
+// field and faded out toward its border. Fragments outside the window, away from the height of
+// the Water of the field or in a view without a field keep n.
+fn water_ripples_normal(world: vec3f, n: vec3f) -> vec3f {
+    if (view.ripple_c.w == 0u || abs(world.y - view.ripple_b.x) > view.ripple_b.y) {
+        return n;
+    }
+    let r = f32(view.ripple_c.x);
+    let p = (world.xz - view.ripple_a.xy) * view.ripple_a.z - 0.5;
+    if (any(p < vec2f(0.0)) || any(p > vec2f(r - 1.0))) {
+        return n;
+    }
+    let base = vec2i(floor(p));
+    let t = p - floor(p);
+    let d = mix(
+        mix(water_ripple_difference(base), water_ripple_difference(base + vec2i(1, 0)), t.x),
+        mix(water_ripple_difference(base + vec2i(0, 1)),
+            water_ripple_difference(base + vec2i(1, 1)), t.x),
+        t.y);
+    let edge = min(min(p.x, p.y), min(r - 1.0 - p.x, r - 1.0 - p.y));
+    let fade = smoothstep(0.0, max(view.ripple_b.z, 1.0), edge);
+    let tilt = d * (0.5 * view.ripple_a.z * view.ripple_a.w * fade);
+    let ripple = normalize(vec3f(-tilt.x, 1.0, -tilt.y));
+    return normalize(vec3f(n.x + ripple.x, n.y * ripple.y, n.z + ripple.z));
+}
+
 // Red of the foam texture of a Water at foam_scale times the UVs, 1 without one. The record is
 // flat, so the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
@@ -1019,6 +1069,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         if (waves != 0u) {
             layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
         }
+        layers.normal = water_ripples_normal(f.world, layers.normal);
         return water_lit(f, surface_of(f, front, geometric, layers));
     }
 

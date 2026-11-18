@@ -803,7 +803,7 @@ WGPUBindGroup box_gpu_light_group_with(
     const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
     const box_gpu_buffer_t *waves = ecs_map_get_deref(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_WATER_WAVES);
-    WGPUBindGroupEntry entries[25] = {
+    WGPUBindGroupEntry entries[BOX_GPU_VIEW_BINDINGS] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -856,9 +856,10 @@ WGPUBindGroup box_gpu_light_group_with(
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     box_gpu_planet_lights_bindings(gpu, &entries[BOX_GPU_PLANET_LIGHTS_BINDING]);
+    box_gpu_ripples_bindings(gpu, v, &entries[BOX_GPU_RIPPLES_HEIGHTS_BINDING]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 25,
+        .entryCount = BOX_GPU_VIEW_BINDINGS,
         .entries = entries
     };
 

@@ -1,7 +1,8 @@
 /**
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters, clear coat, anisotropy, sheen,
- * diffuse transmission, emission, Fresnel rim, transmission, distortion, water and wind sway.
+ * diffuse transmission, emission, Fresnel rim, transmission, distortion, water, water ripples and
+ * wind sway.
  *
  * The box.material module resolves tints through the hierarchy and registers
  * the material layers a scene applies on top of the sampled surface.
@@ -464,6 +465,123 @@ ECS_STRUCT(WaterWaves, {
 ECS_STRUCT(WaterFlow, {
     vec2 velocity; /**< World units per second (X, Z) the surface moves with */
 });
+
+/** World units of the field of a constructed WaterRipples */
+#define BOX_MATERIAL_RIPPLES_SIZE (32.0f)
+
+/** Cells per side of the field of a constructed WaterRipples */
+#define BOX_MATERIAL_RIPPLES_RESOLUTION (256)
+
+/** Fewest cells per side of a field of WaterRipples */
+#define BOX_MATERIAL_RIPPLES_RESOLUTION_MIN (64)
+
+/** Most cells per side of a field of WaterRipples */
+#define BOX_MATERIAL_RIPPLES_RESOLUTION_MAX (1024)
+
+/** Wave speed of a constructed WaterRipples, world units per second */
+#define BOX_MATERIAL_RIPPLES_WAVE_SPEED (2.0f)
+
+/** Damping of a constructed WaterRipples: half the ripple energy is lost per second */
+#define BOX_MATERIAL_RIPPLES_DAMPING (0.5f)
+
+/** Strength of a constructed WaterRipples: the ripple normals at their full weight */
+#define BOX_MATERIAL_RIPPLES_STRENGTH (1.0f)
+
+/** Half size of a constructed RippleSource in its own X and Z, world units */
+#define BOX_MATERIAL_RIPPLE_SOURCE_EXTENT (0.5f)
+
+/** Strength of a constructed RippleSource */
+#define BOX_MATERIAL_RIPPLE_SOURCE_STRENGTH (1.0f)
+
+/** Interactive ripples of a Water: a square height field simulated on the GPU around an entity,
+ * in which RippleSource entities moving through the water leave a wake and
+ * box_material_ripple_at makes rings, default 32 world units of 256 cells centered on the Water
+ * entity, a wave speed of 2, a damping of 0.5 and a strength of 1. On the Water shape entity.
+ *
+ * The heights follow the damped wave equation in fixed steps of BOX_RENDER_RIPPLE_STEP seconds of
+ * the frame delta time (at most BOX_RENDER_RIPPLE_SUBSTEPS a frame), so a run with a fixed delta
+ * time gives the same field every time. The wave speed is clamped so the steps stay stable for
+ * any size and resolution.
+ *
+ * The field lives in the frame of the water that WaterFlow moves (the integral of its velocity,
+ * kept in double precision): ripples drift with the water without being resampled. The window
+ * of the field keeps centered on follow by whole cells with wrapping addressing; cells that enter
+ * it start flat, the others keep their heights. The heights fade to flat toward the border of the
+ * window, so waves do not reflect off it.
+ *
+ * Water fragments inside the window, within half a world unit of the height of the Water entity,
+ * add the normal of the field (bilinear heights, central differences) to their shading normal,
+ * on top of the WaterWaves, scaled by strength and faded out toward the border; the refraction,
+ * the reflections and the specular follow. A view binds the field of the first WaterRipples of
+ * its scene, a scene with more logs an error once and simulates only that one.
+ *
+ * Needs Water and Scene.water: without them the component does nothing. A disabled entity, a size
+ * of 0 or less (or not finite) has no field and costs nothing.
+ */
+ECS_STRUCT(WaterRipples, {
+    float size;             /**< World units of the side of the square field */
+    int32_t resolution;     /**< Cells per side, rounded to the nearest power of two from
+                             *   BOX_MATERIAL_RIPPLES_RESOLUTION_MIN to
+                             *   BOX_MATERIAL_RIPPLES_RESOLUTION_MAX */
+    ecs_entity_t follow;    /**< Entity the field stays centered on, 0 for the Water entity */
+    float wave_speed;       /**< World units per second the ripples spread */
+    float damping;          /**< Share of the ripple energy lost per second, 0..1 */
+    float strength;         /**< Scale of the ripple normals in the shading */
+});
+
+/** Something that moves through the water (a boat, a swimmer, a paddle), default an ellipse of
+ * half size 0.5 by 0.5 and a strength of 1. On any entity with a world transform.
+ *
+ * Every step of the field of WaterRipples of its scene that its ellipse overlaps, at its world
+ * position and yaw (its extents scaled by its world scale), the water under it sinks in
+ * proportion to its speed relative to the water: its world velocity, from the change of its world
+ * position between frames, minus the WaterFlow velocity of the Water. A boat held still on
+ * flowing water leaves a wake, a rock that flows with the water none; one that moves faster than
+ * the wave speed leaves a V shaped wake. A field takes BOX_RENDER_RIPPLE_SOURCES at most.
+ */
+ECS_STRUCT(RippleSource, {
+    vec2 extents;           /**< Half size in its own X and Z, world units, an ellipse */
+    float strength;         /**< Height pushed per unit of speed through the water: the water at
+                             *   the center sinks by 0.05 strength world units per world unit
+                             *   the source travels through it */
+});
+
+/** A disturbance of the field of a Water that box_material_ripple_at queued */
+typedef struct box_material_ripple_t {
+    ecs_entity_t water;     /**< Entity with the Water and WaterRipples */
+    float position[3];      /**< World position of the center */
+    float radius;           /**< World units of the radius */
+    float strength;         /**< World units the water at the center sinks */
+} box_material_ripple_t;
+
+/** Disturb the field of the WaterRipples of a Water once, for rings from splashes and paddle
+ * strokes. The water within radius of the position sinks by strength at the center, smoothly less
+ * toward the radius, on the next step of the field; a ring spreads from there. Scripts call it as
+ * box.material.ripple_at(water, position, radius, strength).
+ *
+ * @param world The world
+ * @param water Entity with Water and WaterRipples
+ * @param position World position of the center, XZ is used
+ * @param radius World units of the radius, above 0
+ * @param strength World units the water sinks at the center, negative raises it
+ * @return Whether it was queued; an error is logged for a water without WaterRipples or an
+ * argument that is not finite or a radius of 0 or less
+ */
+bool box_material_ripple_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float strength);
+
+/** Get the disturbances box_material_ripple_at queued and the fields did not apply yet, in call
+ * order, which the render extract removes once it applied them.
+ *
+ * @param world The world
+ * @return The box_material_ripple_t, NULL before box.material was imported
+ */
+ecs_vec_t* box_material_ripples_queue(
+    const ecs_world_t *world);
 
 /** Equation the fragments of a material are combined with, default Opaque. A shape with
  * Transmission or Water ignores it. */

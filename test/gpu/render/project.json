@@ -341,6 +341,18 @@
                 ]
             },
             {
+                "id": "WaterRipples",
+                "testcases": [
+                    "ring_spreads",
+                    "ring_decays",
+                    "wake_behind_source",
+                    "ring_drifts_with_flow",
+                    "follow_keeps_ripples",
+                    "deterministic",
+                    "no_field_without_component"
+                ]
+            },
+            {
                 "id": "Distortion",
                 "testcases": [
                     "moves_stripes",

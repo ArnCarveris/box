@@ -76,6 +76,15 @@ struct View {
     planar_owner: array<vec4f, 6>,
     // Page slot plus one of the instance of the shape of each slot, 0 for none
     planar_slots: vec4u,
+    // The field of WaterRipples of the scene of the view (gpu_ripples.c), see mesh_extended.wgsl:
+    // the world XZ of the corner of its window (a.xy), 1 / the world units of a cell (a.z), the
+    // strength of its normals (a.w), the world Y of its Water (b.x), the height above or below it
+    // within which a fragment takes the field (b.y), the cells over which the normals fade out
+    // at the border (b.z), the resolution (c.x), the texel of the window corner (c.yz) and 1 for
+    // a field (c.w), 0 for a view without one, whose fragments never read the heights
+    ripple_a: vec4f,
+    ripple_b: vec4f,
+    ripple_c: vec4u,
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the

@@ -644,6 +644,82 @@ int32_t box_render_planar_select(
 void box_render_planar_init(
     ecs_world_t *world);
 
+/** Register the system that steps the fields of WaterRipples on the main thread: the water
+ * frame of each field, its window, its steps and its sources, appended to the packet for the
+ * backend (gpu_ripples.c), after the views.
+ *
+ * @param world The world
+ */
+void box_render_water_ripples_init(
+    ecs_world_t *world);
+
+/** Get the cells per side of a field of WaterRipples: the nearest power of two (a tie rounds up)
+ * in BOX_MATERIAL_RIPPLES_RESOLUTION_MIN..BOX_MATERIAL_RIPPLES_RESOLUTION_MAX.
+ *
+ * @param resolution WaterRipples.resolution
+ * @return The cells per side
+ */
+int32_t box_render_ripples_resolution(
+    int32_t resolution);
+
+/** Get the origin of the window of a field centered on a point of the water frame, by whole
+ * cells: the cell of the point minus half the resolution.
+ *
+ * @param x X of the point in the water frame
+ * @param z Z of the point in the water frame
+ * @param cell World units of a cell
+ * @param resolution Cells per side
+ * @param out Receives the cell of the corner of the window, X and Z
+ */
+void box_render_ripples_window(
+    double x,
+    double z,
+    double cell,
+    int32_t resolution,
+    int64_t *out);
+
+/** Get the velocity of a RippleSource relative to the water it moves through.
+ *
+ * @param velocity World velocity of the source, X and Z
+ * @param flow WaterFlow of the Water, NULL for still water
+ * @param out Receives the velocity relative to the water, X and Z
+ * @return The speed relative to the water, 0 below BOX_RENDER_RIPPLE_SPEED_MIN
+ */
+float box_render_ripples_relative(
+    const float *velocity,
+    const WaterFlow *flow,
+    float *out);
+
+/** Get the wave terms of a step of a field of WaterRipples: the wave speed clamped to
+ * BOX_RENDER_RIPPLE_COURANT and the damping as a factor of the velocity per step. The amplitude
+ * of h + keep (h - h_prev) shrinks by sqrt(keep) a step, so its energy by keep: keep is
+ * (1 - damping) to the power of the step.
+ *
+ * @param ripples The component
+ * @param cell World units of a cell
+ * @param courant2 Receives (c dt / dx)^2
+ * @param keep Receives the factor of the vertical velocity a step keeps
+ * @return The wave speed the field moves with, world units per second
+ */
+float box_render_ripples_wave(
+    const WaterRipples *ripples,
+    float cell,
+    float *courant2,
+    float *keep);
+
+/** Get the world velocity of a RippleSource the last ripple extract computed from the change of
+ * its world position, for tests.
+ *
+ * @param world The world
+ * @param source The entity with RippleSource
+ * @param out Receives the velocity, X, Y and Z
+ * @return Whether the extract knows the entity
+ */
+bool box_render_ripples_velocity(
+    const ecs_world_t *world,
+    ecs_entity_t source,
+    float *out);
+
 /** Get the instance of the shape of an entity in the instance pages.
  *
  * @param world The world

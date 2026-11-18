@@ -77,7 +77,8 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
  * clusters, the shadows, the reflections, the aerial perspective, the environment, the
  * ambient occlusion, the cookie, the opaque snapshot, the planar images and the planet lights.
  *
- * Binding BOX_GPU_WATER_WAVES_BINDING holds the wave table of the Water materials.
+ * Binding BOX_GPU_WATER_WAVES_BINDING holds the wave table of the Water materials, the
+ * BOX_GPU_RIPPLES_* bindings the field of WaterRipples of the scene of the view.
  *
  * @param gpu The backend
  * @return The layout
@@ -85,7 +86,7 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
 static WGPUBindGroupLayout box_gpu_view_layout(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[25] = {
+    WGPUBindGroupLayoutEntry entries[BOX_GPU_VIEW_BINDINGS] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -262,7 +263,9 @@ static WGPUBindGroupLayout box_gpu_view_layout(
             }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 25, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = {
+        .entryCount = BOX_GPU_VIEW_BINDINGS, .entries = entries };
+    box_gpu_ripples_layout(&entries[BOX_GPU_RIPPLES_HEIGHTS_BINDING]);
 
     return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
 }
@@ -297,6 +300,7 @@ void box_gpu_draw_init(
     box_gpu_transmission_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
+    box_gpu_ripples_init(gpu);
     box_gpu_fog_volumes_init(gpu);
     box_gpu_star_fields_init(gpu);
     box_gpu_planets_init(gpu);
@@ -764,6 +768,7 @@ void box_gpu_draw_fini(
     box_gpu_transmission_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
+    box_gpu_ripples_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
     box_gpu_star_fields_fini(gpu);
     box_gpu_planets_fini(gpu);
@@ -1115,6 +1120,7 @@ static int32_t box_gpu_view_write(
         box_gpu_atmosphere_uniforms(gpu, v, u);
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cookie_uniforms(gpu, v, u);
+        box_gpu_ripples_uniforms(gpu, v, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
         result ++;
     }

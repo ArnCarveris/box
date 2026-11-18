@@ -547,6 +547,7 @@ static void box_gpu_render(
     box_gpu_atmosphere_environment(gpu, packet);
     box_gpu_environment_process(gpu, packet);
     box_gpu_particles_simulate(gpu, packet);
+    box_gpu_ripples_simulate(gpu, packet);
     box_gpu_fog_volumes_begin(gpu);
     box_gpu_star_fields_begin(gpu);
     box_gpu_planets_begin(gpu);

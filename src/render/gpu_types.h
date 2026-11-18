@@ -105,6 +105,9 @@ typedef struct box_gpu_atmos_t box_gpu_atmos_t;
 /** Pipelines and frame buffers of the particle passes */
 typedef struct box_gpu_particles_t box_gpu_particles_t;
 
+/** Pipelines, textures and frame buffers of the fields of WaterRipples */
+typedef struct box_gpu_ripples_t box_gpu_ripples_t;
+
 /** Pipelines and the buffer of the draws of the fog volumes */
 typedef struct box_gpu_fog_volumes_t box_gpu_fog_volumes_t;
 
@@ -872,6 +875,11 @@ typedef struct box_gpu_view_uniforms_t {
                                      *   instance of the shape of each slot */
     uint32_t planar_slots[4];       /**< Page slot plus one of the instance of the shape of
                                      *   each slot, 0 for none */
+    vec4 ripple_a;                  /**< Field of WaterRipples of the scene (gpu_ripples.c):
+                                     *   world XZ of the window corner, 1 / cell, strength */
+    vec4 ripple_b;                  /**< World Y of its Water, tolerance, border cells, cell */
+    uint32_t ripple_c[4];           /**< Resolution, texel of the window corner X and Z, 1 for a
+                                     *   field and 0 without one */
 } box_gpu_view_uniforms_t;
 
 _Static_assert(sizeof(box_gpu_view_uniforms_t) <= BOX_GPU_VIEW_STRIDE,
@@ -936,6 +944,14 @@ typedef struct box_gpu_atlas_read_t {
 /** Binding of the view group of the wave table of the Water materials
  * (BOX_RENDER_BUFFER_WATER_WAVES), water_wave_sets of mesh_extended.wgsl */
 #define BOX_GPU_WATER_WAVES_BINDING (24)
+
+/** Binding of the view group of the heights of the field of WaterRipples of the scene of the
+ * view, an r32float read only storage texture, water_ripple_heights of mesh_extended.wgsl; a 1x1
+ * zero texture without one. Its record is in the View uniform (ripple_a, ripple_b, ripple_c). */
+#define BOX_GPU_RIPPLES_HEIGHTS_BINDING (25)
+
+/** Bindings of the view group, the highest binding plus one */
+#define BOX_GPU_VIEW_BINDINGS (26)
 
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */
@@ -1224,6 +1240,7 @@ typedef struct box_gpu_t {
     struct box_gpu_env_image_t *environment_image; /**< Conversion of environment images,
                                                     *   created by the first image */
     box_gpu_particles_t *particles; /**< Particle passes */
+    box_gpu_ripples_t *ripples;     /**< Fields of WaterRipples */
     box_gpu_fog_volumes_t *fog_volumes; /**< Fog volume draws */
     box_gpu_star_fields_t *star_fields; /**< Star field draws */
     box_gpu_planets_t *planets;     /**< Planet atmosphere shell draws */

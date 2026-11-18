@@ -1676,6 +1676,62 @@ void box_gpu_particles_simulate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
+/** Create the layouts and placeholders of the fields of WaterRipples.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_ripples_init(
+    box_gpu_t *gpu);
+
+/** Release the fields of WaterRipples, their pipelines and placeholders.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_ripples_fini(
+    box_gpu_t *gpu);
+
+/** Step the fields of WaterRipples of a packet, after its scatters and before its targets:
+ * create the fields that are new, free the ones the packet no longer has, clear the cells that
+ * entered their windows and run their steps.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_ripples_simulate(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Fill the view layout entry of the heights of the field of WaterRipples.
+ *
+ * @param entry Receives the entry of BOX_GPU_RIPPLES_HEIGHTS_BINDING
+ */
+void box_gpu_ripples_layout(
+    WGPUBindGroupLayoutEntry *entry);
+
+/** Fill the view group entry of the heights of the field of WaterRipples of the scene of a view,
+ * the 1x1 texture without one.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for none
+ * @param entry Receives the entry of BOX_GPU_RIPPLES_HEIGHTS_BINDING
+ */
+void box_gpu_ripples_bindings(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    WGPUBindGroupEntry *entry);
+
+/** Write the record of the field of WaterRipples of the scene of a view into its uniforms, a
+ * zero record without one.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param u The uniforms of the view
+ */
+void box_gpu_ripples_uniforms(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v,
+    box_gpu_view_uniforms_t *u);
+
 /** Check whether a pool of the scene of a view fades in front of the depth of the view, so the
  * view draws its particles in a pass that reads the depth instead of writing it.
  *

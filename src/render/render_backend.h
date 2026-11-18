@@ -266,6 +266,33 @@ bool box_render_gpu_read_planar(
     float *out,
     int32_t count);
 
+/** The window of a field of WaterRipples the backend last stepped */
+typedef struct box_render_ripples_read_t {
+    int32_t resolution;     /**< Cells per side */
+    float cell;             /**< World units of a cell */
+    float corner[2];        /**< World XZ of the corner of the window: cell x, z covers
+                             *   corner + (x, z) * cell .. corner + (x + 1, z + 1) * cell */
+    float height;           /**< World Y of the Water */
+} box_render_ripples_read_t;
+
+/** Copy the heights of the field of WaterRipples of a Water into memory, waiting for the copy,
+ * in the order of its window: cell x, z of the window at out[z * resolution + x]. Only call this
+ * when the main thread renders, after box_render_sync, as box_render_gpu_read_buffer.
+ *
+ * @param world The world
+ * @param water The Water entity
+ * @param info Receives the window, NULL for none
+ * @param out Receives resolution squared heights in world units, NULL to only get the window
+ * @param count Floats out holds
+ * @return Whether the field exists and, with out, its heights were copied
+ */
+bool box_render_gpu_read_ripples(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count);
+
 /** Copy the L2 SH irradiance of a reflection probe cubemap slot into memory, waiting for the
  * copy.
  *
