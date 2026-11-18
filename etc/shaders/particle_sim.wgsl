@@ -9,9 +9,12 @@
 // inherits from the emitter; the C twin is box_particle_* in src/particle/simulate.h. A local
 // emitter spawns, moves and keeps its particles in its space, under its world forces turned
 // into that space. A ParticleCard pool keeps a card word per particle after its slots, which
-// integrate sets once the card comes to rest on the ground plane and spawn clears.
+// integrate sets once the card comes to rest on the ground plane and spawn clears. A pool with
+// ParticleForces.global_wind adds the velocity of the Wind at each particle to its wind, with
+// the gust read from the field the wind sway of the meshes reads (wind_gust.wgsl).
 #include "include/lights.wgsl"
 #include "include/particle.wgsl"
+#include "include/wind_gust.wgsl"
 
 // The blocks of the pools of the packet, BOX_GPU_PARTICLE_STRIDE apart
 struct EmitterBlock {
@@ -77,6 +80,15 @@ fn card_rest(emitter: Emitter, i: u32, p: Particle) {
     }
 }
 
+// World velocity the Wind pulls a particle at a world position toward, the share of the
+// emitter: its velocity along X and Z times the gust factor there, as box_particle_global_wind.
+fn particle_global_wind(emitter: Emitter, world: vec3f) -> vec3f {
+    let g = emitter.global_wind;
+    let offset = vec2f(emitter.wander.w, emitter.inherit.w);
+    let factor = wind_gust(world.xz, offset, emitter.turbulence.w, g.z);
+    return vec3f(g.x * factor, 0.0, g.y * factor);
+}
+
 @compute @workgroup_size(256)
 fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) local: vec3u) {
     let item = work[batch.first + group.x];
@@ -107,6 +119,18 @@ fn integrate(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_id) 
         var forces = LocalForces(emitter.acceleration.xyz, emitter.wind, emitter.turbulence.xy,
             emitter.drift);
         let local = emitter.gradient_max.w != 0u;
+        // The Wind of a pool with global wind, at the world position of the particle; a uniform
+        // branch that leaves the wind of every other pool as it is.
+        if (emitter.turbulence.w != 0.0) {
+            var world = p.position;
+            if (local) {
+                world = (emitter.model * vec4f(p.position, 1.0)).xyz;
+            }
+
+            forces.wind = vec4f(forces.wind.xyz + particle_global_wind(emitter, world),
+                forces.wind.w);
+        }
+
         var inverse = mat3x3f();
         if (local) {
             inverse = particle_inverse(emitter.model);

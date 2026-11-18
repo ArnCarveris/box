@@ -56,10 +56,15 @@ ECS_STRUCT(ParticleRange, {
  * scrolls past a fixed camera: velocities, forces, curves and the wander field are relative to
  * it. The ground plane of ParticleCollision stays put.
  *
+ * The global_wind adds a share of the velocity of the Wind singleton to wind, with the gust at
+ * each particle from the gust field of WindSway, so leaves move with the gusts that bend trees;
+ * only X and Z, through drag. A share of 0 or a world without a Wind leaves particles as is.
+ *
  * The forces follow the uniform world scale of the emitter they act on, as its speeds do: the
- * gravity, wind, turbulence and drift are multiplied by it and the turbulence_scale divided by
- * it, so a plume under a Scale 10 hull moves as the unscaled plume, 10 times larger. The drag
- * is a rate and does not scale. The values below are those of an emitter of scale 1.
+ * gravity, wind, global_wind, turbulence and drift are multiplied by it and the
+ * turbulence_scale divided by it, so a plume under a Scale 10 hull moves as the unscaled plume,
+ * 10 times larger. The drag is a rate and does not scale. The values below are those of an
+ * emitter of scale 1.
  */
 ECS_STRUCT(ParticleForces, {
     vec3 gravity;           /**< Acceleration in units per second squared, times the world
@@ -77,6 +82,9 @@ ECS_STRUCT(ParticleForces, {
     vec3 drift;             /**< Velocity in units per second, times the world scale, of the
                              *   frame of reference that moves the live particles from the next
                              *   frame without entering their velocity, default {0, 0, 0} */
+    float global_wind;      /**< Share of the velocity of the Wind singleton, with its gusts at
+                             *   each particle, times the world scale, added to wind, default 0
+                             *   for none */
 });
 
 /** Collision of the particles of the emitter entity with the horizontal plane at height.

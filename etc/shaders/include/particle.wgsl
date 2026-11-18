@@ -56,14 +56,16 @@ struct Emitter {
     // xyz: world velocity the drag pulls toward, w: drag rate
     wind: vec4f,
     // x: acceleration of the wander field, y: its frequency scale, z: uniform world scale of
-    // the emitter, the multiplier of the velocity and force of its ParticleMotion
+    // the emitter, the multiplier of the velocity and force of its ParticleMotion, w: 1 over the
+    // gust scale of the Wind with ParticleForces.global_wind, 0 when the Wind pulls nothing
     turbulence: vec4f,
     // xyz: phase of the wander field drawn from the seed, offset by the displacement of the
-    // frame of reference
+    // frame of reference, w: wrapped world X offset of the gust field of the global wind
     wander: vec4f,
     // rgb: display encoded color variance
     variance: vec4f,
-    // xyz: world velocity every spawn of the frame gets
+    // xyz: world velocity every spawn of the frame gets, w: wrapped world Z offset of the gust
+    // field of the global wind
     inherit: vec4f,
     // x: height of the ground plane, y: bounce, z: friction
     ground: vec4f,
@@ -84,8 +86,11 @@ struct Emitter {
     gradient: vec3f,
     // First of the GRADIENT_ROWS rows of the gradient, CURVE_CONSTANT for a constant one
     gradient_row: u32,
-    // w: 1 when the emitter has a ParticleAppearance
-    draw: vec4u,
+    // xy: world X and Z velocity of the Wind times ParticleForces.global_wind and the world
+    // scale at a gust factor of 1, z: its gust; 0 without global wind
+    global_wind: vec3f,
+    // 1 when the emitter has a ParticleAppearance
+    styled: u32,
     // Rows of the max curves of the size, opacity, rotation and spin, which each particle blends
     // toward by its own draw, CURVE_CONSTANT for a curve without max_keys; the area of the max
     // spin is in the row after it

@@ -69,11 +69,14 @@ typedef struct box_render_particle_block_t {
     float wind[4];          /**< World velocity the drag pulls toward, w the drag rate */
     float turbulence[4];    /**< Acceleration of the wander field, y its frequency scale, z the
                              *   uniform world scale of the emitter, which multiplies the
-                             *   velocity and force of its ParticleMotion, w unused */
+                             *   velocity and force of its ParticleMotion, w 1 over the gust
+                             *   scale of the global wind, 0 when the Wind pulls nothing */
     float wander[4];        /**< Phase of the wander field drawn from the seed, offset by the
-                             *   displacement of the frame of reference, w unused */
+                             *   displacement of the frame of reference, w the wrapped world X
+                             *   offset of the gust field of the global wind */
     float variance[4];      /**< Display encoded color variance, 0 to 1, w unused */
-    float inherit[4];       /**< World velocity every spawn of the frame gets, w unused */
+    float inherit[4];       /**< World velocity every spawn of the frame gets, w the wrapped
+                             *   world Z offset of the gust field of the global wind */
     float ground[4];        /**< Height of the ground plane, y the bounce, z the friction, w
                              *   unused */
     float drift[3];         /**< World velocity of the frame of reference, added to the
@@ -94,7 +97,9 @@ typedef struct box_render_particle_block_t {
     float gradient[3];      /**< Linear color of a constant color multiplier */
     uint32_t gradient_row;  /**< First of the BOX_PARTICLE_GRADIENT_ROWS rows of the color
                              *   multiplier, BOX_PARTICLE_CURVE_CONSTANT for a constant one */
-    uint32_t pad1[3];       /**< Padding to the vec4 of Emitter */
+    float global_wind[3];   /**< World X and Z velocity of the Wind times ParticleForces
+                             *   global_wind and the world scale at a gust factor of 1, z the
+                             *   gust; all 0 without global wind */
     uint32_t styled;        /**< 1 when the emitter has a ParticleAppearance */
     uint32_t curve_max_rows[4]; /**< Rows of the max curves of the size, opacity, rotation and
                              *   spin, BOX_PARTICLE_CURVE_CONSTANT for none; the area of the

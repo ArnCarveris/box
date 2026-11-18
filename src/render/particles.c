@@ -846,6 +846,7 @@ static void box_particles_forces_add(
         glm_vec3_add(ECS_CONST_CAST(float*, f->wind), sum->wind, sum->wind);
         glm_vec3_add(ECS_CONST_CAST(float*, f->drift), sum->drift, sum->drift);
         sum->drag += f->drag;
+        sum->global_wind += f->global_wind;
         sum->turbulence += f->turbulence;
         sum->turbulence_scale *= f->turbulence_scale;
     }
@@ -879,6 +880,46 @@ static void box_particles_forces(
     box_particles_forces_add(own, out);
 }
 
+/** Write the global wind of a frame into the block of a pool: the velocity of the Wind times
+ * the share into global_wind, and its gust field, the values the WindSway records pack
+ * (box_render_wind_frame), into the w of turbulence, wander and inherit.
+ *
+ * Without a share, a Wind or a speed every one of them is 0 and the integrate pass leaves the
+ * wind of the particles as it is.
+ *
+ * @param world The world
+ * @param share ParticleForces.global_wind summed over the sources, times the world scale
+ * @param out The block
+ */
+static void box_particles_block_wind(
+    const ecs_world_t *world,
+    float share,
+    box_render_particle_block_t *out)
+{
+    box_render_wind_t wind;
+    glm_vec3_zero(out->global_wind);
+    out->turbulence[3] = 0.0f;
+    out->wander[3] = 0.0f;
+    out->inherit[3] = 0.0f;
+    if (!isfinite(share) || share == 0.0f) {
+        goto done;
+    }
+
+    box_render_wind_frame(world, &wind);
+    if (!(wind.speed > 0.0f)) {
+        goto done;
+    }
+
+    out->global_wind[0] = wind.direction[0] * wind.speed * share;
+    out->global_wind[1] = wind.direction[1] * wind.speed * share;
+    out->global_wind[2] = wind.gust;
+    out->turbulence[3] = wind.frequency;
+    out->wander[3] = wind.offset[0];
+    out->inherit[3] = wind.offset[1];
+done:
+    return;
+}
+
 /** Write the forces of a frame into the block of a pool and move the frame of reference of the
  * pool by the drift of the frame, so the wander field moves with the particles.
  *
@@ -894,6 +935,7 @@ static void box_particles_forces(
  *              field, so a scaled emitter moves a scaled copy of its particles; the drag is a
  *              rate and stays; turbulence z hands it to the curves of ParticleMotion
  * @param moves Whether the integrate pass moves particles in this frame
+ * @param world The world, whose Wind singleton the global wind reads
  * @param out The block, its seed and its seconds of the frame written
  */
 static void box_particles_block_forces(
@@ -902,6 +944,7 @@ static void box_particles_block_forces(
     const ParticleForces *forces,
     float scale,
     bool moves,
+    const ecs_world_t *world,
     box_render_particle_block_t *out)
 {
     float phase[3], frequency = scale > 0 ? forces->turbulence_scale / scale : 0.0f;
@@ -924,6 +967,8 @@ static void box_particles_block_forces(
     for (c = 0; c < 3; c ++) {
         pool->frame[c] += moves ? (double)out->drift[c] * (double)out->acceleration[3] : 0.0;
     }
+
+    box_particles_block_wind(world, forces->global_wind * scale, out);
 }
 
 /** Write the parameters of an emitter for this frame but its forces.
@@ -1017,7 +1062,7 @@ static void box_particles_velocity(
     pool->has_last = true;
 }
 
-_Static_assert(offsetof(box_render_particle_block_t, pad1) ==
+_Static_assert(offsetof(box_render_particle_block_t, global_wind) ==
     offsetof(box_render_particle_block_t, gradient_row) + sizeof(uint32_t),
     "the curves of a block end at gradient_row");
 _Static_assert(sizeof(box_render_particle_block_t) ==
@@ -1051,7 +1096,7 @@ static void box_particles_block_still(
     box_render_particle_block_t *out)
 {
     size_t first = offsetof(box_render_particle_block_t, curve_rows);
-    size_t end = offsetof(box_render_particle_block_t, pad1);
+    size_t end = offsetof(box_render_particle_block_t, global_wind);
     ecs_os_memcpy(ECS_OFFSET(out, first), ECS_OFFSET(&box_particles_still, first),
         (ecs_size_t)(end - first));
     first = offsetof(box_render_particle_block_t, curve_max_rows);
@@ -1407,7 +1452,8 @@ static void box_particles_emitter(
         entry->block.speed[1] *= speed;
     }
 
-    box_particles_block_forces(pool, acceleration, &forces, scale, moves, &entry->block);
+    box_particles_block_forces(pool, acceleration, &forces, scale, moves, world,
+        &entry->block);
     if (curves || motion || pool->curved) {
         box_particle_rows_update(&s->curves, &pool->curves, curves);
         box_particle_rows_motion_update(&s->curves, &pool->motion, motion);
@@ -1491,7 +1537,7 @@ static bool box_particles_linger(
     box_particles_forces(world, pool->entity, pool->forces, pool->has_own ? &pool->own : NULL,
         &forces);
     box_particles_block_forces(pool, pool->acceleration, &forces, pool->scale,
-        pool->live != 0, &entry->block);
+        pool->live != 0, world, &entry->block);
     entry->block.count = 0;
     entry->block.first = pool->next;
     entry->block.used = pool->used;

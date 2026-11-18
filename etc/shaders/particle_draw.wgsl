@@ -87,7 +87,7 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
         return out;
     }
 
-    out.look = vec4u(emitter.look.x, emitter.look.y, emitter.draw.w, 0u);
+    out.look = vec4u(emitter.look.x, emitter.look.y, emitter.styled, 0u);
     out.params = emitter.params.yw;
 
     let seed = emitter.spawn.y;

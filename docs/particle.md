@@ -13,7 +13,7 @@ a run is the same every time. Curve authoring (every curve field, recipes, error
 | `ParticleEmitter` | `Emitter` | `max` (1000, clamp `BOX_PARTICLE_MAX` 4194304), `rate`/s (0), `shape` (`EmitterPoint`), `radius`, `extents` (half size), `source` (mesh for `EmitterMesh`, 0 = self), `direction` ({0,1,0}; {0,0,0} = at rest), `spread` (half-angle °), `speed` ({1,1}), `radial`, `lifetime` ({1,2}), `size` (diameter, {0.1,0.1}), `rotation` (°), `spin` (°/s), `opacity` ({1,1}), `acceleration`, `inherit_velocity`, `color` (255,255,255), `color_variance`, `forces` (entity), `seed`, `linger`, `local` |
 | `ParticleRange` | `Range` | `{min, max}`; max ≤ min hands out min |
 | `EmitterShape` | `EmitterShape` | `EmitterPoint`, `EmitterSphere`, `EmitterBox`, `EmitterDisc` (XZ), `EmitterMesh` (area weighted) |
-| `ParticleForces` | `Forces` | `gravity` ({0,-9.81,0}), `wind`, `drag` (rate/s), `turbulence`, `turbulence_scale` (1), `drift` |
+| `ParticleForces` | `Forces` | `gravity` ({0,-9.81,0}), `wind`, `drag` (rate/s), `turbulence`, `turbulence_scale` (1), `drift`, `global_wind` (0, share of the `Wind` singleton) |
 | `ParticleCollision` | `Collision` | `ground` (true), `height` (0), `bounce` (0.5), `friction` (0.2), `die` |
 | `ParticlePlayback` | `Playback` | `state` (`Playing`/`Paused`/`Stopped`), `time` (engine-written), `reset` (one frame) |
 | `ParticleBurst` | `Burst` | `count`, `at` (first time and period; 0 = once on first frame), `repeat` (<0 = forever) |
@@ -121,12 +121,18 @@ get $ box.particle.Stats
 
 - No `Forces` anywhere = no gravity at all. `Forces: {}` gives -9.81. Forces add up from the world
   singleton, `ParticleEmitter.forces` entity, and the emitter entity.
+- `global_wind` adds that share of the `Wind` singleton's velocity (`direction * speed`, X and Z
+  only) to `wind`, times the gust factor at each particle's world position, from the same gust
+  field and offset as `WindSway` meshes, so particles and plants feel a gust at the same place
+  and time. It acts through `drag` only, so give the emitter a `drag`. Shares add up like `drag`.
+  With 0 or no `Wind` the emitter is never moved by the wind. Works with `local` and `drift`;
+  `turbulence` is unchanged.
 - Spawn count per frame = `rate * delta`, fraction carried. A full pool spawns nothing; changing
   `max` empties the pool.
 - Particles live in world space (plus `drift`) unless `local: true` (move/turn/scale with emitter;
   forces still act in world directions; `inherit_velocity` does nothing).
 - World scale of the emitter (cube root of its 3x3 determinant) multiplies size, speeds,
-  acceleration, softness, gravity, wind, turbulence, drift and motion velocity/force curves;
+  acceleration, softness, gravity, wind, global_wind, turbulence, drift and motion velocity/force curves;
   `drag` and collision `height` do not scale. Non-uniform scale stretches only the spawn volume.
 - `Playback`: `Paused` freezes pool and clock; `Stopped` ends emission, live particles finish;
   `Playing` again restarts the clock and burst schedule; `reset: true` empties the pool and

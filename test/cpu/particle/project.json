@@ -491,6 +491,24 @@
                     "rests",
                     "word"
                 ]
+            },
+            {
+                "id": "GlobalWind",
+                "testcases": [
+                    "c_default",
+                    "reflects",
+                    "block_packed",
+                    "block_follows_wind",
+                    "no_share_untouched",
+                    "shares_add_up",
+                    "world_scale",
+                    "linger",
+                    "gust_range",
+                    "gust_period",
+                    "velocity",
+                    "step_drifts_with_wind",
+                    "local_space"
+                ]
             }
         ]
     }

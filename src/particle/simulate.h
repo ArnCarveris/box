@@ -619,6 +619,113 @@ static inline void box_particle_integrate(
     }
 }
 
+/** Value in 0..1 of a lattice point of the gust field of the Wind, which repeats every
+ * BOX_WIND_GUST_PERIOD points, as wind_hash in wind_gust.wgsl.
+ *
+ * @param x Lattice X
+ * @param z Lattice Z
+ * @return The value
+ */
+static inline float box_particle_wind_hash(
+    int32_t x,
+    int32_t z)
+{
+    int32_t period = (int32_t)BOX_WIND_GUST_PERIOD;
+    uint32_t px = (uint32_t)(((x % period) + period) % period);
+    uint32_t pz = (uint32_t)(((z % period) + period) % period);
+    uint32_t h = px * 374761393u + pz * 668265263u + 1013904223u;
+    h = (h ^ (h >> 13u)) * 1274126177u;
+    h = h ^ (h >> 16u);
+
+    return (float)(h & 0xFFFFu) / 65535.0f;
+}
+
+/** Linear blend of two values as mix of WGSL: a * (1 - t) + b * t.
+ *
+ * @param a The value at 0
+ * @param b The value at 1
+ * @param t The weight of b
+ * @return The blend
+ */
+static inline float box_particle_wind_mix(
+    float a,
+    float b,
+    float t)
+{
+    return a * (1.0f - t) + b * t;
+}
+
+/** Smooth value noise of the gust field in 0..1 at a point in gust patches, as wind_noise in
+ * wind_gust.wgsl.
+ *
+ * @param u The point
+ * @return The noise
+ */
+static inline float box_particle_wind_noise(
+    const float u[2])
+{
+    float ix = floorf(u[0]), iz = floorf(u[1]);
+    float fx = u[0] - ix, fz = u[1] - iz;
+    int32_t cx = (int32_t)ix, cz = (int32_t)iz;
+    float sx = fx * fx * (3.0f - 2.0f * fx), sz = fz * fz * (3.0f - 2.0f * fz);
+    float a = box_particle_wind_hash(cx, cz);
+    float b = box_particle_wind_hash(cx + 1, cz);
+    float d = box_particle_wind_hash(cx, cz + 1);
+    float e = box_particle_wind_hash(cx + 1, cz + 1);
+
+    return box_particle_wind_mix(box_particle_wind_mix(a, b, sx),
+        box_particle_wind_mix(d, e, sx), sz);
+}
+
+/** Gust factor between 1 - gust and 1 + gust that multiplies the wind speed at the world X and Z
+ * of a point, as wind_gust in wind_gust.wgsl, the field the WindSway of the meshes reads.
+ *
+ * @param x World X
+ * @param z World Z
+ * @param offset Wrapped world X and Z offset of the gust field
+ * @param frequency 1 over the gust scale
+ * @param gust The gust, 0..1
+ * @return The factor
+ */
+static inline float box_particle_wind_gust(
+    float x,
+    float z,
+    const float offset[2],
+    float frequency,
+    float gust)
+{
+    float u[2] = {(x - offset[0]) * frequency, (z - offset[1]) * frequency};
+
+    return 1.0f + gust * (2.0f * box_particle_wind_noise(u) - 1.0f);
+}
+
+/** The world velocity the Wind pulls a particle at a world position toward, added to the wind
+ * of its forces for the step, as particle_global_wind in particle_sim.wgsl: the X and Z
+ * velocity of the global wind of its block times the gust factor there.
+ *
+ * @param wind The global_wind member of the block: X and Z velocity and the gust
+ * @param offset Wrapped world X and Z offset of the gust field, the w of wander and inherit of
+ *               the block
+ * @param frequency 1 over the gust scale, the w of turbulence of the block, 0 when the Wind
+ *                  does not pull the particles
+ * @param world World position of the particle
+ * @param out Receives the velocity, 0 when the Wind does not pull the particles
+ */
+static inline void box_particle_global_wind(
+    const float wind[3],
+    const float offset[2],
+    float frequency,
+    const float world[3],
+    float out[3])
+{
+    out[0] = out[1] = out[2] = 0.0f;
+    if (frequency != 0.0f) {
+        float factor = box_particle_wind_gust(world[0], world[2], offset, frequency, wind[2]);
+        out[0] = wind[0] * factor;
+        out[2] = wind[1] * factor;
+    }
+}
+
 /** Collide a particle with the ground plane after its step: a particle below the plane is
  * lifted onto it, keeps bounce of its speed into the plane, reversed, and loses friction of
  * its speed along it, or dies.
