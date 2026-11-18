@@ -101,6 +101,17 @@ ECS_STRUCT(Cursor, {
     PointerCursor shape; /**< Shape over the element, CursorDefault by default */
 });
 
+/** Limits how far from the camera an element and everything under it can be picked, such as a
+ * console screen in the 3D scene that is used within arm's reach: PickRange: {distance: 3}.
+ *
+ * A hit further along the ray than distance is no hit, so the ray goes on to what is behind it
+ * and the element gets no events from there. The nearest PickRange on the path from the hit up
+ * to the root counts; 0 or less sets no limit.
+ */
+ECS_STRUCT(PickRange, {
+    float distance;       /**< Greatest distance of a hit from the near plane of the camera */
+});
+
 /** What the cursor picked, a singleton written by the engine and read only for applications */
 ECS_STRUCT(PickStatus, {
     ecs_entity_t target;  /**< Entity the pointer events go to, 0 for box.input.screen */

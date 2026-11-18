@@ -231,6 +231,16 @@
                 ]
             },
             {
+                "id": "PickRange",
+                "testcases": [
+                    "within_range",
+                    "beyond_range_passes",
+                    "child_of_range",
+                    "nearest_range_counts",
+                    "zero_has_no_limit"
+                ]
+            },
+            {
                 "id": "TextSpans",
                 "testcases": [
                     "glyph_to_color",

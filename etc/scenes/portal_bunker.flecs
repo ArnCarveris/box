@@ -4,8 +4,13 @@
 // openings and occluders as VisArea, VisPortal and VisOccluder components (see
 // include/box/portal.h) and the doors as PortalDoor templates (portal/door.flecs). Walk with
 // WASD (Shift runs, Space jumps, W/S climb ladders, you swim in the sea, F flies); the doors open
-// for the camera, and what is behind closed or unseen portals is not drawn.
+// for the camera, and what is behind closed or unseen portals is not drawn. The access control
+// screen on the control room console (portal_bunker/screens) locks and unlocks the doors: aim
+// the cursor at it within 3 m and click.
+include ui/widgets
 include portal/door
+include portal/screen
+include portal/doors_screen
 include portal_bunker/textures
 include portal_bunker/materials
 include portal_bunker/models
@@ -15,6 +20,7 @@ include portal_bunker/props
 include portal_bunker/lights
 include portal_bunker/island
 include portal_bunker/ship
+include portal_bunker/screens
 
 using box.transform
 using box.geometry

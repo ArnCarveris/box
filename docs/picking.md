@@ -13,6 +13,7 @@ screen UI, world UI and 3D shapes are picked the same way. Events go out through
 | `InputBlocker` | tag | Takes events that hit it or its children so they don't reach views behind (e.g. a HUD panel over the 3D scene); handles them like `Interactive` when no `Interactive` is on the path; hides presses/wheel from world actions |
 | `ActionTrigger` | `action, mode, button` | Mouse button on the element drives an `Action`. Adds `Interactive`. `mode`: `ActionTriggerClick` (default), `ActionTriggerPress`, `ActionTriggerHold`; `button` default `KeyMouseLeft` |
 | `Cursor` | `shape` | Pointer shape over the element (`CursorPointer`, `CursorNotAllowed`, ...); first `Cursor` on the path from target to handler wins |
+| `PickRange` | `distance` | Hits on it or its children further than `distance` from the camera are no hits (the ray goes on behind); the nearest one up the path counts, 0 = no limit. E.g. a world-space screen used within reach |
 | `Hovered` | tag (output) | On the entity the events go to while the cursor is over it (stays on a captured entity) |
 | `Pressed` | tag (output) | On the entity a press went to while the button is held |
 | `PickStatus` | singleton (output) | `target, handler, view, pressed, hit, hit_view, point, distance, cursor, captured, drag, shape` |

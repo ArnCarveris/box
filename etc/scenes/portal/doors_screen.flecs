@@ -1,0 +1,203 @@
+// PortalDoorsScreen: the access control screen, a PortalScreen (portal/screen.flecs) that lists
+// doors and locks them. Locking sets VisPortal.locked of the door's portal, so a PortalDoor
+// (portal/door.flecs) shuts and stays shut until it is unlocked.
+//
+// Each door is a PortalDoorRow: its name, its state (OPEN, MOVING, CLOSED, LOCKED, or SEALING
+// while a locked door is still shutting), how far it is open, and a LOCK / UNLOCK button. The rows
+// fill two columns, down the first column first. LOCKDOWN locks every door, RELEASE ALL unlocks
+// every door. The accent turns red while every door is locked.
+//
+// Needs the widgets (ui/widgets.flecs) and portal/screen.flecs.
+//
+//   PortalDoorsScreen doors(
+//     doors: [p_entry, p_hall],
+//     names: ["OUTSIDE · ENTRANCE HALL", "ENTRANCE HALL · CORRIDOR"])
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.portal
+using box.widgets
+
+// One door of a PortalDoorsScreen: a stripe and the background in the color of its state, the
+// name, the state, a bar of how far it is open, and the button that locks or unlocks it.
+template PortalDoorRow {
+  prop door: entity = 0               // Entity with the VisPortal of the door
+  prop name: string = ""              // Name shown for the door
+
+  Layout: {direction: Row, spacing: 10, padding: {0, 0, 0, 8}, v: Middle}
+  Item: {width: {mode: Grow}, height: {mode: Fixed, value: 38}}
+  Rect: {1, 1}
+
+  if door != 0 {
+    const portal = door[VisPortal]
+    const locked = portal.locked
+    const open: f32 = portal.open
+    const free = open > 0.98 ? "OPEN" : open > 0.02 ? "MOVING" : "CLOSED"
+    const shut = open > 0.02 ? "SEALING" : "LOCKED"
+    const state = locked ? shut : free
+
+    // Orange while sealing, red locked, green open, amber moving and cyan closed
+    const red: u8 = match state {
+      "SEALING", "LOCKED", "MOVING": 255
+      "OPEN": 90
+      _: 110
+    }
+    const green: u8 = match state {
+      "SEALING": 154
+      "LOCKED": 70
+      "OPEN": 255
+      "MOVING": 200
+      _: 220
+    }
+    const blue: u8 = match state {
+      "SEALING": 46
+      "LOCKED": 55
+      "OPEN": 140
+      "MOVING": 80
+      _: 255
+    }
+
+    // The state color at 6% over the background of the screen
+    Rgb: {3 + red * 0.06, 12 + green * 0.06, 18 + blue * 0.06}
+
+    stripe {
+      Item: {width: {mode: Fixed, value: 3}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {red, green, blue}
+    }
+
+    about {
+      Layout: {direction: Column, spacing: 4}
+      Item: {width: {mode: Grow}}
+
+      title {
+        Text: {value: name, size: 12}
+        Rgb: {235, 245, 255}
+      }
+
+      status {
+        Layout: {direction: Row, spacing: 8, v: Middle}
+
+        word {
+          Text: {value: state, size: 10}
+          Rgb: {red, green, blue}
+        }
+
+        travel {
+          Layout: {}
+          Item: {width: {mode: Fixed, value: 60}, height: {mode: Fixed, value: 6}}
+          Rect: {1, 1}
+          Rgb: {16, 30, 38}
+
+          fill {
+            Item: {
+              width: {mode: Fixed, value: clamp(open, 0, 1) * 60 + 0.01},
+              height: {mode: Fixed, value: 6}
+            }
+            Rect: {1, 1}
+            Rgb: {red, green, blue}
+          }
+        }
+      }
+    }
+
+    Button lock(
+      label: locked ? "UNLOCK" : "LOCK",
+      variant: locked ? "primary" : "danger",
+      width: 96)
+  }
+
+  // The button reports a change: lock an unlocked door, unlock a locked one
+  async {
+    while true {
+      await on.change(this)
+      if door != 0 {
+        door[VisPortal].locked = !door[VisPortal].locked
+      }
+    }
+  }
+}
+
+// The access control screen. doors are the entities with the VisPortal of each door, names the
+// names shown for them, in the same order.
+template PortalDoorsScreen : PortalScreen {
+  prop title: string = "ACCESS CONTROL"
+  prop doors: entity[] = []
+  prop names: string[] = []
+
+  const count: i32 = doors.count()
+  const rows: i32 = (count + 1) / 2
+  const locked: i32 = doors.filter((door) -> { door[VisPortal].locked }).count()
+  const alert = count > 0 && locked == count
+
+  Border: {width: 2, color: {alert ? 255 : 110, alert ? 70 : 220, alert ? 55 : 255, 115}}
+
+  PortalScreenHeader header(
+    title: title,
+    status: "{locked}/{count} LOCKED",
+    alert: alert)
+
+  list {
+    Layout: {direction: Row, spacing: 12, padding: {10, 10, 12, 12}}
+    Item: {width: {mode: Grow}, height: {mode: Grow}}
+
+    first {
+      Layout: {direction: Column, spacing: 4}
+      Item: {width: {mode: Grow}}
+
+      for i in 0..rows {
+        "door_{i}" {
+          PortalDoorRow: {door: doors[i], name: i < names.count() ? names[i] : ""}
+        }
+      }
+    }
+
+    second {
+      Layout: {direction: Column, spacing: 4}
+      Item: {width: {mode: Grow}}
+
+      for i in rows..count {
+        "door_{i}" {
+          PortalDoorRow: {door: doors[i], name: i < names.count() ? names[i] : ""}
+        }
+      }
+    }
+  }
+
+  footer {
+    Layout: {direction: Row, spacing: 10, padding: {0, 10, 12, 12}, v: Middle}
+    Item: {width: {mode: Grow}}
+
+    Button lockdown(label: "LOCKDOWN", variant: "danger", width: 150)
+    Button release(label: "RELEASE ALL", variant: "primary", width: 150)
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+
+    note {
+      Text: {value: "{locked} of {count} locked · locked doors stay shut", size: 11}
+      Rgb: {90, 130, 145}
+    }
+  }
+
+  // LOCKDOWN locks every door and RELEASE ALL unlocks every door; the rows handle their own
+  async {
+    while true {
+      const e = await on.change(this)
+      const w = e.widget
+      const name = w.name()
+      if w.has(Button) && (name == "lockdown" || name == "release") {
+        for i in 0..doors.count() {
+          const door = doors[i]
+          door[VisPortal].locked = name == "lockdown"
+        }
+      }
+    }
+  }
+}

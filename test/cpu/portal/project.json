@@ -65,6 +65,16 @@
                 ]
             },
             {
+                "id": "PortalScreen",
+                "testcases": [
+                    "lists_doors",
+                    "lock_shuts_door",
+                    "unlock_opens_again",
+                    "lockdown_and_release",
+                    "out_of_range"
+                ]
+            },
+            {
                 "id": "PortalLight",
                 "testcases": [
                     "apertures",

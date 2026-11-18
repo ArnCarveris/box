@@ -644,6 +644,28 @@ static bool box_pick_ui_bare(
         !ecs_has_id(world, e, Interactive) && !ecs_has_id(world, e, InputBlocker);
 }
 
+/** Check whether a hit is within the PickRange of its entity, the nearest one on the path from
+ * the entity up to its root.
+ *
+ * @param world The world
+ * @param e The entity that was hit
+ * @param t Distance of the hit along the ray
+ * @return Whether no PickRange limits the hit or it is within the distance
+ */
+static bool box_pick_in_range(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float t)
+{
+    ecs_entity_t holder = ecs_get_target_for(world, e, EcsChildOf, PickRange);
+    const PickRange *range = NULL;
+    if (holder) {
+        range = ecs_get(world, holder, PickRange);
+    }
+
+    return !range || range->distance <= 0 || t <= range->distance;
+}
+
 /** Narrow phase of the spatial ray: the area of a UI element, the outline of a polygon or the
  * triangles of a shape.
  *
@@ -690,6 +712,7 @@ static bool box_pick_filter(
     }
 
     result = result && (ray->max_distance <= 0 || t <= ray->max_distance);
+    result = result && box_pick_in_range(cast->world, e, t);
     if (result && (ui || ecs_has(cast->world, e, Line))) {
         vec3 point;
         glm_vec3_scale(ECS_CONST_CAST(float*, ray->dir), t, point);

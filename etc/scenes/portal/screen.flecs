@@ -1,0 +1,96 @@
+// PortalScreen: a world-space console screen, the template the screens of portal/doors_screen.flecs
+// inherit. It lays out UI in the 3D scene on the display face of a prop, in virtual pixels scaled
+// to metres, and PortalScreenHeader is the bar along its top.
+//
+// The scene places a screen as a child of its prop, on the face of the display, turned so that
+// +z of the screen looks out of the face. The screen is used with the pointer, the crosshair of a
+// walker, within range metres (PickRange); a click from further away goes past it.
+//
+//   console {
+//     PortalDoorsScreen doors(width: 1.92, height: 0.72, doors: [p_entry], names: ["ENTRY"]) {
+//       Position: {0, 1.35, 0.207}
+//       Rotation: {0, PI, 0}
+//     }
+//   }
+//
+// A screen template inherits PortalScreen and adds a Border in its accent, a PortalScreenHeader
+// and its content below it, in a column.
+
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.layout
+using box.geometry
+using box.material
+using box.text
+using box.picking
+
+template PortalScreen {
+  prop width: f32 = 1.92              // Width of the screen in metres
+  prop height: f32 = 0.72             // Height of the screen in metres
+  prop pixels: f32 = 360              // Virtual pixels across the height
+  prop range: f32 = 3                 // Greatest distance from which it is used, in metres
+
+  const scale: f32 = height / pixels
+
+  Scale: {scale, scale, scale}
+  Layout: {direction: Column}
+  Item: {
+    width: {mode: Fixed, value: math.round(width / scale)},
+    height: {mode: Fixed, value: pixels}
+  }
+  Rect: {1, 1}
+  Rgb: {3, 12, 18}
+  PickRange: {distance: range}
+  InputBlocker
+}
+
+// The header of a screen: a mark, the title and a status at the right on a band of the accent,
+// with a line of the accent under it. The accent is red while alert and cyan otherwise.
+template PortalScreenHeader {
+  prop title: string = "SCREEN"
+  prop status: string = ""
+  prop alert: bool = false
+
+  const red: u8 = alert ? 255 : 110
+  const green: u8 = alert ? 70 : 220
+  const blue: u8 = alert ? 55 : 255
+
+  Layout: {direction: Column}
+  Item: {width: {mode: Grow}}
+
+  band {
+    Layout: {direction: Row, padding: {0, 0, 14, 14}, spacing: 10, v: Middle}
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 34}}
+    Rect: {1, 1}
+
+    // The accent at 16% over the background, mixed here as Rgb takes no alpha
+    Rgb: {alert ? 43 : 20, alert ? 21 : 45, alert ? 24 : 56}
+
+    mark {
+      Item: {width: {mode: Fixed, value: 10}, height: {mode: Fixed, value: 10}}
+      Rect: {1, 1}
+      Rgb: {red, green, blue}
+    }
+
+    caption {
+      Text: {value: title, size: 16}
+      Rgb: {235, 245, 255}
+    }
+
+    gap {
+      Item: {width: {mode: Grow}}
+    }
+
+    state {
+      Text: {value: status, size: 12}
+      Rgb: {red, green, blue}
+    }
+  }
+
+  line {
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 2}}
+    Rect: {1, 1}
+    Rgb: {red, green, blue}
+  }
+}

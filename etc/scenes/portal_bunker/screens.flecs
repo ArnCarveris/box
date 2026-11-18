@@ -1,0 +1,37 @@
+// The world-space GUI screens of the bunker on the display faces of their props: the access
+// control screen (portal/doors_screen.flecs) on the right console of the control room's north
+// wall. A console's display is its bezel, part_2 of BunkerModel_console, 2 by 0.8 m centred at
+// {0, 1.35, 0.25} and 0.08 m deep; its face looks along -z into the room. A screen covers the face
+// less 0.04 m all round, 2 mm in front of it, turned so that its +z looks out of the face.
+//
+// The doors listed are the doors of the bunker, not the ship's, named after the two areas each
+// one joins, in the order of the original scenario.
+
+using flecs.script
+using box.transform
+
+bunker {
+  props {
+    prop_15 {
+      PortalDoorsScreen screen(
+        width: 1.92,
+        height: 0.72,
+        doors: [
+          bunker.p_entry, bunker.p_hall_corr, bunker.p_hall_stairs, bunker.p_corr_ctrl,
+          bunker.p_hatch, bunker.p_corr_atr, bunker.p_corr_store, bunker.p_store_exit,
+          bunker.p_shed_door, bunker.p_stairs_base, bunker.p_base_gen, bunker.p_base_vault
+        ],
+        names: [
+          "OUTSIDE · ENTRANCE HALL", "ENTRANCE HALL · L-CORRIDOR",
+          "ENTRANCE HALL · STAIRWELL", "L-CORRIDOR · CONTROL ROOM", "CONTROL ROOM · LOFT",
+          "L-CORRIDOR · ATRIUM", "L-CORRIDOR · STORAGE", "STORAGE · OUTSIDE",
+          "OUTSIDE · BRICK SHED", "STAIRWELL · BASEMENT HALL", "BASEMENT HALL · GENERATOR ROOM",
+          "BASEMENT HALL · VAULT"
+        ])
+      {
+        Position: {0, 1.35, 0.208}
+        Rotation: {0, 3.14159265, 0}
+      }
+    }
+  }
+}

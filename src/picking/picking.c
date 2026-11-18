@@ -702,6 +702,7 @@ void BoxPickingImport(
     ECS_META_COMPONENT(world, ActionTriggerMode);
     ECS_META_COMPONENT(world, ActionTrigger);
     ECS_META_COMPONENT(world, Cursor);
+    ECS_META_COMPONENT(world, PickRange);
     ECS_META_COMPONENT(world, PickStatus);
     ecs_set_name_prefix(world, "Picking");
     ECS_COMPONENT_DEFINE(world, PickingState);
