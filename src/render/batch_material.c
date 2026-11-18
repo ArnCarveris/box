@@ -373,6 +373,21 @@ float box_draws_water_transmittance(
     return glm_clamp(result, 0.0f, 1.0f);
 }
 
+float box_draws_water_absorption(
+    float absorption,
+    float ray_length,
+    float visibility)
+{
+    float result = 1.0f;
+    if (isfinite(ray_length)) {
+        float a = glm_clamp(absorption, 1e-6f, 1.0f);
+        float e = glm_max(ray_length, 0.0f) / glm_max(visibility, BOX_RENDER_WATER_MIN);
+        result = exp2f(e * log2f(a));
+    }
+
+    return glm_clamp(result, 0.0f, 1.0f);
+}
+
 float box_draws_water_foam(
     float d,
     float foam_width,
@@ -439,6 +454,8 @@ static void box_draws_water_pack(
     out->water_ripple_scale = isfinite(water->ripple_scale) && water->ripple_scale > 0.0f
         ? water->ripple_scale : 0.0f;
     out->water_flags = water->foam_texture ? BOX_RENDER_WATER_FOAM_TEXTURE : 0u;
+    out->water_flags |= ((uint32_t)water->absorption.r | ((uint32_t)water->absorption.g << 8) |
+        ((uint32_t)water->absorption.b << 16)) << BOX_RENDER_WATER_ABSORPTION_SHIFT;
     if (out->water_ripple_scale > 0.0f) {
         TextureScroll ripple = {
             .velocity = { water->ripple_velocity[0], water->ripple_velocity[1] }

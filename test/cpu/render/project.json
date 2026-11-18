@@ -88,6 +88,7 @@
                     "water_pack",
                     "water_depth_mix",
                     "water_transmittance",
+                    "water_absorption",
                     "water_foam",
                     "distortion_defaults",
                     "distortion_pack",

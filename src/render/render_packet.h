@@ -1544,7 +1544,9 @@ typedef struct box_render_material_t {
     float water_foam_scale; /**< Water.foam_scale, 0 without one or when not finite */
     float water_ripple_scale; /**< Water.ripple_scale, 0 without one, when negative or not
                              *   finite */
-    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags, 0 without one */
+    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags in the low byte, Water.absorption
+                             *   display encoded above them (BOX_RENDER_WATER_ABSORPTION_SHIFT):
+                             *   r << 8 | g << 16 | b << 24; 0 without one */
     float distortion_strength; /**< Distortion.strength, 0 without one or when negative or not
                              *   finite (and for a shape with Water, which ignores it) */
     float distortion_frequency; /**< 1 over Distortion.scale, which is at least
@@ -1570,6 +1572,9 @@ typedef struct box_render_material_t {
 
 /** Flag of a Water record: it has a foam_texture, which the foam samples */
 #define BOX_RENDER_WATER_FOAM_TEXTURE (1u << 0)
+
+/** Bit of the Water record flags word at which the display encoded Water.absorption starts */
+#define BOX_RENDER_WATER_ABSORPTION_SHIFT (8)
 
 /** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
  * planet light slot is above them */

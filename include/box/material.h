@@ -328,6 +328,11 @@ ECS_STRUCT(Distortion, {
  * through */
 #define BOX_MATERIAL_WATER_VISIBILITY (2.0f)
 
+/** Absorption of a constructed Water, display encoded: white, the scene behind keeps its colors */
+#define BOX_MATERIAL_WATER_ABSORPTION_R (255)
+#define BOX_MATERIAL_WATER_ABSORPTION_G (255)
+#define BOX_MATERIAL_WATER_ABSORPTION_B (255)
+
 /** Refraction of a constructed Water, a fraction of the image height */
 #define BOX_MATERIAL_WATER_REFRACTION (0.02f)
 
@@ -346,9 +351,9 @@ ECS_STRUCT(Distortion, {
 #define BOX_MATERIAL_WATER_RIPPLE_SCALE (0.0f)
 
 /** Surface of a body of water seen from above (ponds, lakes, canals, the sea), on a 3D mesh,
- * default a teal shallow and a dark blue deep color, depth 3, visibility 2, refraction 0.02,
- * an off white foam of width 0.3 without a texture and no ripples. Inherited by instances like
- * Rgb; a field a scene does not set keeps its default.
+ * default a teal shallow and a dark blue deep color, depth 3, visibility 2, a white absorption,
+ * refraction 0.02, an off white foam of width 0.3 without a texture and no ripples. Inherited
+ * by instances like Rgb; a field a scene does not set keeps its default.
  *
  * It draws like Transmission: in the sorted blended pass without depth writes, casting no
  * shadow, not captured, over a snapshot of what its view drew before it, and it ignores
@@ -359,7 +364,10 @@ ECS_STRUCT(Distortion, {
  * both are infinite. The body color mixes shallow_color toward deep_color by
  * 1 - exp(-3 d / depth) and is lit diffusely by the light of the surface; it covers the scene
  * behind, refracted by refraction times the normal in screen space, by 1 - exp(-3 ray length /
- * visibility). Below foam_width the opaque, diffusely lit foam replaces both by
+ * visibility). The scene behind that shows through is tinted per channel by absorption (in
+ * linear light) to the power of ray length / visibility, so deep or far water turns the floor
+ * toward that color; white keeps its colors, and with nothing behind there is nothing to tint.
+ * Below foam_width the opaque, diffusely lit foam replaces both by
  * saturate(1 - d / foam_width), broken up by the red of foam_texture. The direct and indirect
  * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
  *
@@ -379,6 +387,9 @@ ECS_STRUCT(Water, {
                              *   units */
     float visibility;       /**< World units of water along the view ray through which the scene
                              *   behind still shows */
+    Rgb absorption;         /**< Color the scene behind takes on through `visibility` world
+                             *   units of water along the view ray, display encoded; white for
+                             *   no tint */
     float refraction;       /**< Screen space distortion of the scene behind by the normal, a
                              *   fraction of the image height */
     Rgb foam_color;         /**< Color of the foam, display encoded */

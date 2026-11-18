@@ -1751,6 +1751,20 @@ float box_draws_water_transmittance(
     float ray_length,
     float visibility);
 
+/** Tint of one channel of the scene behind a Water, the C twin of water_absorbed of
+ * material.wgsl: absorption to the power of ray_length / visibility, 1 for an infinite ray (the
+ * sky behind, which shows nothing) and for a white absorption.
+ *
+ * @param absorption Channel of Water.absorption in linear light, 0..1
+ * @param ray_length Water along the view ray, world units
+ * @param visibility Water.visibility, at least BOX_RENDER_WATER_MIN
+ * @return The tint, 0..1
+ */
+float box_draws_water_absorption(
+    float absorption,
+    float ray_length,
+    float visibility);
+
 /** Foam factor of a Water, the C twin of water_foam of material.wgsl: saturate(1 - d /
  * foam_width), 0 for a width of 0. With a texture the band is cut at the red of the texture,
  * smoothstep(t, t + 0.1, tex) with t = 1 - band, so the foam thins out toward its edge.

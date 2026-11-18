@@ -150,8 +150,9 @@ struct VertexOut {
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b
     @location(13) @interpolate(flat) fresnel_color: vec2u,
-    // Water foam width, ripple and foam scale (pack2x16float) and ripple offset of a Water
-    // pipeline (water), which reuses flat2 and flat3.zw for the other Water fields: Water
+    // Water foam width (its sign bit the WATER_FOAM_TEXTURE flag), ripple and foam scale
+    // (pack2x16float) and ripple offset of a Water pipeline (water), which reuses flat2 (the
+    // colors, the absorption in their top bytes) and flat3.zw for the other Water fields: Water
     // ignores Transmission, and the fragment stage cannot read the material table. Of the other
     // material_distortion pipelines, the Distortion of the material (vo_distortion).
     @location(8) @interpolate(flat) flat4: vec4u,
@@ -192,13 +193,14 @@ fn normal_uv(f: VertexOut, uv: vec2f) -> vec2f {
 fn vo_water(f: VertexOut) -> Material {
     var m: Material;
     m.water_shallow = f.flat2.x & 0xFFFFFFu;
-    m.water_flags = f.flat2.x >> 24u;
-    m.water_deep = f.flat2.y;
-    m.water_foam = f.flat2.z;
+    m.water_deep = f.flat2.y & 0xFFFFFFu;
+    m.water_foam = f.flat2.z & 0xFFFFFFu;
+    m.water_flags = (f.flat4.x >> 31u) | ((f.flat2.x >> 24u) << 8u) |
+        ((f.flat2.y >> 24u) << 16u) | ((f.flat2.z >> 24u) << 24u);
     m.water_depth = bitcast<f32>(f.flat2.w);
     m.water_visibility = bitcast<f32>(f.flat3.z);
     m.water_refraction = bitcast<f32>(f.flat3.w);
-    m.water_foam_width = bitcast<f32>(f.flat4.x);
+    m.water_foam_width = bitcast<f32>(f.flat4.x & 0x7FFFFFFFu);
     m.water_ripple_scale = unpack2x16float(f.flat4.y).x;
     m.water_foam_scale = unpack2x16float(f.flat4.y).y;
     m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
@@ -462,11 +464,15 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
     }
     o.flat4 = vec4u(0u);
     if (water) {
-        o.flat2 = vec4u((material.water_shallow & 0xFFFFFFu) | (material.water_flags << 24u),
-            material.water_deep, material.water_foam, bitcast<u32>(material.water_depth));
+        let absorption = material.water_flags >> 8u;
+        o.flat2 = vec4u((material.water_shallow & 0xFFFFFFu) | (absorption << 24u),
+            (material.water_deep & 0xFFFFFFu) | (((absorption >> 8u) & 0xFFu) << 24u),
+            (material.water_foam & 0xFFFFFFu) | ((absorption >> 16u) << 24u),
+            bitcast<u32>(material.water_depth));
         o.flat3.z = bitcast<u32>(material.water_visibility);
         o.flat3.w = bitcast<u32>(material.water_refraction);
-        o.flat4 = vec4u(bitcast<u32>(material.water_foam_width),
+        o.flat4 = vec4u((bitcast<u32>(material.water_foam_width) & 0x7FFFFFFFu) |
+            ((material.water_flags & WATER_FOAM_TEXTURE) << 31u),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),
             bitcast<vec2u>(material.water_ripple_offset));
     }

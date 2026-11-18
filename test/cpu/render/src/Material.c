@@ -3180,6 +3180,12 @@ void Material_water_defaults(void) {
     test_flt(w->depth, BOX_MATERIAL_WATER_DEPTH);
     test_flt(w->depth, 3);
     test_flt(w->visibility, 2);
+    test_uint(w->absorption.r, 255);
+    test_uint(w->absorption.g, 255);
+    test_uint(w->absorption.b, 255);
+    test_uint(w->absorption.r, BOX_MATERIAL_WATER_ABSORPTION_R);
+    test_uint(w->absorption.g, BOX_MATERIAL_WATER_ABSORPTION_G);
+    test_uint(w->absorption.b, BOX_MATERIAL_WATER_ABSORPTION_B);
     test_flt(w->refraction, 0.02f);
     test_uint(w->foam_color.r, 240);
     test_uint(w->foam_color.g, 245);
@@ -3197,6 +3203,8 @@ void Material_water_defaults(void) {
     test_flt(w->depth, 5);
     test_flt(w->foam_width, 0);
     test_flt(w->visibility, 2);
+    test_uint(w->absorption.r, 255);
+    test_uint(w->absorption.b, 255);
     test_uint(w->shallow_color.g, 170);
     test_bool(ecs_owns(world, ecs_lookup(world, "pond"), MaterialId), true);
 
@@ -3291,6 +3299,23 @@ void Material_water_pack(void) {
     test_flt(record.water_foam_scale, 8);
     test_uint(record.water_flags, BOX_RENDER_WATER_FOAM_TEXTURE);
 
+    /* The absorption fills the bytes above the flags, display encoded */
+    Water tinted = rippled;
+    tinted.absorption = (Rgb){20, 140, 230};
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &tinted, .time = 3, .fade = 1 });
+    test_uint(record.water_flags, BOX_RENDER_WATER_FOAM_TEXTURE | (20u << 8) | (140u << 16) |
+        (230u << 24));
+    test_uint(record.water_shallow, 60u | (170u << 8) | (160u << 16));
+    test_uint(record.water_deep, 8u | (40u << 8) | (64u << 16));
+    test_uint(record.water_foam, 240u | (245u << 8) | (245u << 16));
+    tinted.foam_texture = 0;
+    tinted.absorption = (Rgb){255, 255, 255};
+    box_draws_material_pack(&record, &(box_draw_material_t){
+        .water = &tinted, .time = 3, .fade = 1 });
+    test_uint(record.water_flags, 0xFFFFFFu << BOX_RENDER_WATER_ABSORPTION_SHIFT);
+    test_uint(record.water_flags & 0xFFu, 0);
+
     /* The ripple offset wraps like TextureScroll, in double precision */
     float scroll[4];
     TextureScroll same = { .velocity = {0.25f, -0.5f} };
@@ -3381,6 +3406,39 @@ void Material_water_transmittance(void) {
     test_flt(box_draws_water_transmittance(-1, 2), 1);
     test_flt(box_draws_water_transmittance(INFINITY, 2), 0);
     test_assert(box_draws_water_transmittance(0.01f, 0) < 0.01f);
+}
+
+/** The C twin of water_absorbed of material.wgsl: the absorption to the power of the ray length
+ * over the visibility, 1 at the surface, the absorption itself at the visibility, falling with
+ * the ray length; white keeps the scene behind as it is and nothing behind is not tinted. */
+void Material_water_absorption(void) {
+    // materials/water
+    test_flt(box_draws_water_absorption(0.25f, 0, 2), 1);
+    test_assert(fabsf(box_draws_water_absorption(0.25f, 2, 2) - 0.25f) < 1e-5f);
+    test_assert(fabsf(box_draws_water_absorption(0.25f, 1, 2) - 0.5f) < 1e-5f);
+    test_assert(fabsf(box_draws_water_absorption(0.25f, 4, 2) - 0.0625f) < 1e-5f);
+    test_assert(fabsf(box_draws_water_absorption(0.5f, 3, 1) - 0.125f) < 1e-5f);
+    test_assert(box_draws_water_absorption(0.25f, 0.5f, 2) >
+        box_draws_water_absorption(0.25f, 1, 2));
+
+    /* A larger visibility tints less over the same ray */
+    test_assert(box_draws_water_absorption(0.25f, 1, 4) >
+        box_draws_water_absorption(0.25f, 1, 2));
+
+    /* White keeps every channel at any ray length */
+    test_flt(box_draws_water_absorption(1, 0, 2), 1);
+    test_flt(box_draws_water_absorption(1, 3, 2), 1);
+    test_flt(box_draws_water_absorption(1, 1e6f, 0.001f), 1);
+
+    /* Black removes the channel past the surface, keeps it at the surface */
+    test_flt(box_draws_water_absorption(0, 0, 2), 1);
+    test_assert(box_draws_water_absorption(0, 1, 2) < 1e-2f);
+
+    /* Above the surface it is not tinted, the sky behind is not tinted */
+    test_flt(box_draws_water_absorption(0.25f, -1, 2), 1);
+    test_flt(box_draws_water_absorption(0.25f, INFINITY, 2), 1);
+    test_flt(box_draws_water_absorption(0.25f, NAN, 2), 1);
+    test_assert(box_draws_water_absorption(0.25f, 0.01f, 0) < 0.01f);
 }
 
 /** The C twin of water_foam of material.wgsl: a band from 1 at the shore to 0 at foam_width,

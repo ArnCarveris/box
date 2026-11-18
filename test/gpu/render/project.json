@@ -318,6 +318,8 @@
                 "testcases": [
                     "shallow_closer_to_shallow_color",
                     "object_fades_with_depth",
+                    "absorption_tints_with_depth",
+                    "absorption_white_keeps_colors",
                     "foam_at_shore",
                     "foam_texture_breaks_up",
                     "sky_counts_as_deep",

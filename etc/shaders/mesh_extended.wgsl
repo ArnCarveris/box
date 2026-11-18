@@ -837,7 +837,8 @@ fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
 // Color of a Water fragment seen from above. The scene behind, the opaque snapshot at the screen
 // point moved by refraction times the view space tilt of the normal map (back at the point
 // itself where the moved one shows something in front of the water), blurred by the roughness,
-// shows through exp(-3 ray / visibility) of the body; the body, shallow_color mixed toward
+// shows through exp(-3 ray / visibility) of the body, tinted per channel by the absorption to
+// the power of ray / visibility; the body, shallow_color mixed toward
 // deep_color by the water depth along the geometric normal, covers the rest. The foam band
 // replaces both. Body and foam are lit diffusely with the light of the surface; the specular of
 // an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
@@ -899,7 +900,8 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
 
     let ndv = saturate(dot(s.normal, v));
     let fresnel = fresnel_schlick(ndv, vec3f(WATER_F0)).x;
-    let seen = background * (1.0 - fresnel) * through * (1.0 - foam);
+    let tint = water_absorbed(water_absorption(m), ray, m.water_visibility, deep);
+    let seen = background * tint * (1.0 - fresnel) * through * (1.0 - foam);
     let own = body * (1.0 - through) * (1.0 - foam) + foam_color * reflected.diffuse * foam +
         reflected.specular;
     let veil = 1.0 - through * (1.0 - foam);

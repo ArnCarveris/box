@@ -77,7 +77,8 @@ struct Material {
     water_foam_scale: f32,
     // Scale of the UVs of the second normal sample, 0 for none
     water_ripple_scale: f32,
-    // WATER_FOAM_TEXTURE when the foam samples its texture
+    // WATER_FOAM_TEXTURE when the foam samples its texture, in the low byte; above it
+    // Water.absorption display encoded, r << 8 | g << 16 | b << 24 (water_absorption)
     water_flags: u32,
     // Distortion strength (a fraction of the image height), 1 over its scale and the phase of
     // its noise (speed times the time, wrapped to 0..1), all 0 without one
@@ -353,6 +354,24 @@ fn water_transmittance(ray_length: f32, visibility: f32, deep: bool) -> f32 {
         return 0.0;
     }
     return saturate(exp(-3.0 * max(ray_length, 0.0) / max(visibility, WATER_MIN)));
+}
+
+// Water.absorption of a record in linear light, from the bytes above the flags of water_flags;
+// exactly 1 for a channel of 255, so a white absorption leaves the scene behind as it is.
+fn water_absorption(m: Material) -> vec3f {
+    let c = unpack4x8unorm(m.water_flags).yzw;
+    return select(material_linear(c), vec3f(1.0), c >= vec3f(1.0));
+}
+
+// Tint of the scene behind a Water that shows through ray_length of its body, per channel:
+// absorption (linear) to the power of ray_length / visibility; 1 where nothing is behind (deep)
+// and for a white absorption. box_draws_water_absorption is its C twin.
+fn water_absorbed(absorption: vec3f, ray_length: f32, visibility: f32, deep: bool) -> vec3f {
+    if (deep) {
+        return vec3f(1.0);
+    }
+    let e = max(ray_length, 0.0) / max(visibility, WATER_MIN);
+    return saturate(exp2(e * log2(clamp(absorption, vec3f(1e-6), vec3f(1.0)))));
 }
 
 // Foam of a Water at a water depth d: saturate(1 - d / foam_width), 0 for a width of 0 or where

@@ -246,7 +246,8 @@ static void box_distortion_ctor(
 }
 
 /** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
- * refraction of 0.02 and an off white foam band of width 0.3 without texture or ripples.
+ * white absorption, a refraction of 0.02 and an off white foam band of width 0.3 without
+ * texture or ripples.
  *
  * @param ptr The components
  * @param count Number of components
@@ -268,6 +269,8 @@ static void box_water_ctor(
                 BOX_MATERIAL_WATER_DEEP_B },
             .depth = BOX_MATERIAL_WATER_DEPTH,
             .visibility = BOX_MATERIAL_WATER_VISIBILITY,
+            .absorption = { BOX_MATERIAL_WATER_ABSORPTION_R, BOX_MATERIAL_WATER_ABSORPTION_G,
+                BOX_MATERIAL_WATER_ABSORPTION_B },
             .refraction = BOX_MATERIAL_WATER_REFRACTION,
             .foam_color = { BOX_MATERIAL_WATER_FOAM_R, BOX_MATERIAL_WATER_FOAM_G,
                 BOX_MATERIAL_WATER_FOAM_B },
