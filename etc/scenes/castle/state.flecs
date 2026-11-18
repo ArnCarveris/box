@@ -7,9 +7,8 @@ using flecs.script.math
 
 state {
   export const GRID: i32 = 14
-  export const CELLS: i32 = 196
   export const PITCH: f32 = 2
-  export const HALF: f32 = 14
+  export const HALF: f32 = GRID * PITCH / 2
 
   export const K_EMPTY: i32 = 0
   export const K_WALL: i32 = 1
@@ -25,9 +24,6 @@ state {
   export const K_PATH: i32 = 11
   export const T_DEMOLISH: i32 = 12
 
-  export const RANKS: i32 = 6
-  export const RESEARCH_MAX: i32 = 4
-  export const MINING_MAX: i32 = 3
   export const R_FARMING: i32 = 0
   export const R_MINING: i32 = 1
   export const FOOD_CAP: f64 = 250
@@ -35,6 +31,55 @@ state {
   export const FARM_SIZE: i32 = 4
   export const RAID_SECONDS: i32 = 35
   export const RAID_GRACE: i32 = 60
+
+  struct CastleRank(name: string, need: f64)
+  struct CastleStudy(name: string, blurb: string, gold: i32, stone: i32, time: f64)
+
+  export const ranks: CastleRank[] = [
+    {name: "Hamlet", need: 0},
+    {name: "Motte", need: 40},
+    {name: "Fort", need: 120},
+    {name: "Castle", need: 250},
+    {name: "Stronghold", need: 420},
+    {name: "Royal Citadel", need: 650}
+  ]
+
+  export const farm_studies: CastleStudy[] = [
+    {
+      name: "Iron Ploughshares",
+      blurb: "Iron-shod ploughs cut deeper furrows.",
+      gold: 40,
+      stone: 20,
+      time: 15
+    },
+    {
+      name: "Crop Rotation",
+      blurb: "Beans and clover rest the soil between harvests.",
+      gold: 90,
+      stone: 50,
+      time: 25
+    },
+    {
+      name: "Horse Collars",
+      blurb: "Padded collars let horses pull the heavy plough.",
+      gold: 160,
+      stone: 90,
+      time: 35
+    },
+    {
+      name: "Three Fields",
+      blurb: "One field in three lies fallow, the others feed twice as well.",
+      gold: 260,
+      stone: 150,
+      time: 45
+    }
+  ]
+
+  export const mining_studies: CastleStudy[] = [
+    {name: "Iron Wedges", gold: 50, stone: 100, time: 20},
+    {name: "Treadwheel Cranes", gold: 100, stone: 200, time: 30},
+    {name: "Frame Saws", gold: 160, stone: 300, time: 40}
+  ]
 
   event Build(i: i32)
   event Upgrade(i: i32)
@@ -353,56 +398,39 @@ state {
   }
 
   fn research_name(r: i32) -> string {
-    match r {
-      0: "Iron Ploughshares"
-      1: "Crop Rotation"
-      2: "Horse Collars"
-      3: "Three Fields"
-      _: ""
-    }
+    r < farm_studies.count() ? farm_studies[r].name : ""
   }
 
   fn research_blurb(r: i32) -> string {
-    match r {
-      0: "Iron-shod ploughs cut deeper furrows."
-      1: "Beans and clover rest the soil between harvests."
-      2: "Padded collars let horses pull the heavy plough."
-      3: "One field in three lies fallow, the others feed twice as well."
-      _: ""
-    }
+    r < farm_studies.count() ? farm_studies[r].blurb : ""
   }
 
   fn research_gold(r: i32) -> i32 {
-    match r { 0: 40; 1: 90; 2: 160; _: 260 }
+    r < farm_studies.count() ? farm_studies[r].gold : 0
   }
 
   fn research_stone(r: i32) -> i32 {
-    match r { 0: 20; 1: 50; 2: 90; _: 150 }
+    r < farm_studies.count() ? farm_studies[r].stone : 0
   }
 
   fn research_time(r: i32) -> f64 {
-    match r { 0: 15; 1: 25; 2: 35; _: 45 }
+    r < farm_studies.count() ? farm_studies[r].time : 0
   }
 
   fn mining_name(m: i32) -> string {
-    match m {
-      0: "Iron Wedges"
-      1: "Treadwheel Cranes"
-      2: "Frame Saws"
-      _: ""
-    }
+    m < mining_studies.count() ? mining_studies[m].name : ""
   }
 
   fn mining_gold(m: i32) -> i32 {
-    match m { 0: 50; 1: 100; _: 160 }
+    m < mining_studies.count() ? mining_studies[m].gold : 0
   }
 
   fn mining_stone(m: i32) -> i32 {
-    match m { 0: 100; 1: 200; _: 300 }
+    m < mining_studies.count() ? mining_studies[m].stone : 0
   }
 
   fn mining_time(m: i32) -> f64 {
-    match m { 0: 20; 1: 30; _: 40 }
+    m < mining_studies.count() ? mining_studies[m].time : 0
   }
 
   fn quarry_yield(m: i32) -> f64 {
@@ -410,7 +438,7 @@ state {
   }
 
   fn study_max(track: i32) -> i32 {
-    match track { 1: MINING_MAX; _: RESEARCH_MAX }
+    match track { 1: mining_studies.count(); _: farm_studies.count() }
   }
 
   fn study_name(track: i32, r: i32) -> string {
@@ -446,43 +474,15 @@ state {
   }
 
   fn rank_need(r: i32) -> f64 {
-    match r {
-      0: 0
-      1: 40
-      2: 120
-      3: 250
-      4: 420
-      5: 650
-      _: 99999
-    }
+    r < ranks.count() ? ranks[r].need : 99999
   }
 
   fn rank_name(r: i32) -> string {
-    match r {
-      0: "Hamlet"
-      1: "Motte"
-      2: "Fort"
-      3: "Castle"
-      4: "Stronghold"
-      5: "Royal Citadel"
-      _: ""
-    }
+    r < ranks.count() ? ranks[r].name : ""
   }
 
   fn rank_of(p: f64) -> i32 {
-    match p >= rank_need(5) {
-      true: 5
-      _: match p >= rank_need(4) {
-        true: 4
-        _: match p >= rank_need(3) {
-          true: 3
-          _: match p >= rank_need(2) {
-            true: 2
-            _: p >= rank_need(1) ? 1 : 0
-          }
-        }
-      }
-    }
+    ranks.filter((x) -> { p >= x.need }).count() - 1
   }
 
   fn cell_x(i: i32) -> f32 {
@@ -509,16 +509,16 @@ state {
     v >= 0 ? "+{v:.1}" : "{v:.1}"
   }
 
-  export mut kind: i32[196] = {}
-  export mut level: i32[196] = {}
-  export mut inside: bool[196] = {}
-  export mut abandoned: bool[196] = {}
-  export mut points: f64[196] = {}
-  export mut ready: bool[196] = {}
-  export mut farm_origin: i32[196] = {}
-  export mut fits4: bool[196] = {}
-  export mut deposit: bool[196] = {}
-  export mut facing: i32[196] = {}
+  export mut kind: i32[] = [0 .. GRID * GRID].map((i) -> { 0 })
+  export mut level: i32[] = kind.map((k) -> { 0 })
+  export mut inside: bool[] = kind.map((k) -> { false })
+  export mut abandoned: bool[] = kind.map((k) -> { false })
+  export mut points: f64[] = kind.map((k) -> { 0 })
+  export mut ready: bool[] = kind.map((k) -> { false })
+  export mut farm_origin: i32[] = kind.map((k) -> { 0 })
+  export mut fits4: bool[] = kind.map((k) -> { false })
+  export mut deposit: bool[] = kind.map((k) -> { false })
+  export mut facing: i32[] = kind.map((k) -> { 0 })
 
   export mut tool: i32 = 0
   export mut hover_tool: i32 = 0

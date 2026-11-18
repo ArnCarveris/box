@@ -13,11 +13,11 @@ state {
   // Scenery recycles over SCENERY_SPAN units: it scrolls toward +Z with distance and jumps
   // back up the lagoon once it passes SCENERY_BEHIND, behind the camera. Near the far end it
   // grows in over SCENERY_FADE units, so a recycled section never pops in sight
-  export const SCENERY_SPAN: f32 = 252
   export const SCENERY_BEHIND: f32 = 18
   export const SCENERY_FADE: f32 = 70
   export const SECTIONS: i32 = 6
   export const SECTION_LEN: f32 = 42
+  export const SCENERY_SPAN: f32 = SECTIONS * SECTION_LEN
   // The outer shore of a bank, from the bank line: beyond it lies the open sea
   export const SEA_U: f32 = 34
   // A stilt hut: the stilts stand HUT_STILT_X to either side of its origin, the deck is at
@@ -36,10 +36,11 @@ state {
   export const FAR_PARALLAX: f32 = 0.3
   export const FAR_ISLANDS: i32 = 10
 
-  // The bank sections take turns between ZONES looks, ZONE_SECTIONS sections each in a row up
-  // the lagoon: palm beach, fishing village, rocky headland and jungle edge. A cycle of zones is
-  // longer than one scenery span, so a section changes zone as it jumps back up the lagoon. The
-  // zones of the right bank run ZONE_SHIFT sections ahead of those of the left one
+  // The bank sections take turns between ZONES looks, ZONE_SECTIONS sections each in a row up the
+  // lagoon: palm beach, fishing village, rocky headland and jungle edge.
+  //
+  // A cycle of zones is longer than one scenery span, so a section changes zone as it jumps back up
+  // the lagoon. The zones of the right bank run ZONE_SHIFT sections ahead of those of the left one
   export const ZONES: i32 = 4
   export const ZONE_SECTIONS: i32 = 4
   export const ZONE_SHIFT: i32 = 2
@@ -599,7 +600,11 @@ assets {
       const rt = 0.3 + 0.2 * hash(seed + k)
       const rl = 1.05 / cos(rt)
       "root_{k}" : LgPalmBark {
-        Position: {-0.5 * rl * sin(rt) * sin(ry), 0.9 - 0.5 * rl * cos(rt), -0.5 * rl * sin(rt) * cos(ry)}
+        Position: {
+          -0.5 * rl * sin(rt) * sin(ry),
+          0.9 - 0.5 * rl * cos(rt),
+          -0.5 * rl * sin(rt) * cos(ry)
+        }
         Rotation: {rt, ry, 0}
         Cylinder: {length: rl, radius: 0.04, segments: 5}
       }
@@ -610,7 +615,11 @@ assets {
         const ba = yaw + b * 2.094
         const bl = 0.6 + 0.3 * hash(seed * 5 + b)
         "branch_{b}" : LgPalmBark {
-          Position: {cx + 0.5 * bl * sin(0.8) * sin(ba), height + 0.5 * bl * cos(0.8), 0.5 * bl * sin(0.8) * cos(ba)}
+          Position: {
+            cx + 0.5 * bl * sin(0.8) * sin(ba),
+            height + 0.5 * bl * cos(0.8),
+            0.5 * bl * sin(0.8) * cos(ba)
+          }
           Rotation: {0.8, ba, 0}
           Cylinder: {length: bl, radius: 0.06, segments: 5}
         }
@@ -1174,10 +1183,11 @@ assets {
     }
   }
 
-  // A jungle tree of height: a buttressed trunk that forks into branches, each ending in a
-  // cluster of broad leaves round a faceted core of foliage, one cluster on top. Only the lowest
-  // clusters cast a shadow, so the low sun does not lay a row of dark blots on the water. A
-  // backdrop tree casts none
+  // A jungle tree of height: a buttressed trunk that forks into branches, each ending in a cluster
+  // of broad leaves round a faceted core of foliage, one cluster on top.
+  //
+  // Only the lowest clusters cast a shadow, so the low sun does not lay a row of dark blots on the
+  // water. A backdrop tree casts none
   template LgJungleTree {
     prop height: f32 = 10
     prop seed: i32 = 1
@@ -1190,6 +1200,7 @@ assets {
     flare : LgPalmBark {
       Position: {0, 0.4, 0}
       Frustum: {length: 0.8, radius_bottom: 0.65, radius_top: 0.28, segments: 7}
+
       if backdrop {
         NoShadow
       }
@@ -1198,6 +1209,7 @@ assets {
     trunk : LgPalmBark {
       Position: {0, height * 0.4, 0}
       Frustum: {length: height * 0.8, radius_bottom: 0.3, radius_top: 0.12, segments: 7}
+
       if backdrop {
         NoShadow
       }
@@ -1232,6 +1244,7 @@ assets {
           Rgb: {48 + 6 * k, 108 + 8 * k, 42 + 3 * k}
           Scale: {s, 0.5 * s, s}
           IcoSphere: {radius: 0.55, segments: 1}
+
           if k > 1 || backdrop {
             NoShadow
           }
@@ -1317,13 +1330,213 @@ assets {
     }
   }
 
+  template LgBankDetails {
+    prop side: f32 = 1
+    prop seed: i32 = 1
+    prop zone: i32 = 0
+    prop islet: bool = false
+    prop rng: flecs.script.math.Rng = {}
+    const beach = zone == ZONE_BEACH
+    const village = zone == ZONE_VILLAGE
+    const headland = zone == ZONE_HEADLAND
+    const jungle = zone == ZONE_JUNGLE
+    const flip = side < 0 ? 3.1416 : 0
+
+    if beach {
+      // A bleached log and a few fallen coconuts up on the dry sand
+      drift {
+        Position: {
+          side * (2 + rng.f(3)),
+          BEACH_Y + 0.08,
+          0.1 * SECTION_LEN + rng.f(0.8 * SECTION_LEN)
+        }
+        Rotation: {0, rng.f(1) - 0.5, 0}
+        log : LgDriftwood {
+          Rotation: {HALF_PI, 0, 0}
+          Cylinder: {length: 2.2 + rng.f(1.2), radius: 0.13, segments: 7}
+        }
+
+        stub : LgDriftwood {
+          Position: {0.2, 0.05, 0.5}
+          Rotation: {0, 0, -1}
+          Cylinder: {length: 0.5, radius: 0.05, segments: 5}
+        }
+      }
+
+      for k in 0..3 {
+        "fallen_{k}" : LgCoconutHusk {
+          Position: {side * (1.8 + rng.f(4)), BEACH_Y + 0.1, rng.f(SECTION_LEN)}
+          Scale: {1, 0.9, 1.15}
+          Sphere: {radius: 0.15, segments: 8, smooth: true}
+        }
+      }
+    }
+
+    // The village: two stilt huts at the waterline joined by a boardwalk on stilts at the height
+    // of their decks, canoes pulled up under it, and nets and a fire pit inland
+    if village {
+      for h in 0..2 {
+        "hut_{h}" {
+          Position: {side * HUT_U, 0, (h == 0 ? 0.14 : 0.79) * SECTION_LEN}
+          Rotation: {0, flip, 0}
+          LgStiltHut house()
+        }
+      }
+
+      // Its water side posts stand ROCK_DRY up from the waterline, the deck ends above them
+      const JETTY_U: f32 = BANK_WATER_U + ROCK_DRY + 0.08
+      const JETTY_Z: f32 = 0.465 * SECTION_LEN
+      jetty {
+        Position: {side * (JETTY_U + 0.47), 0, JETTY_Z}
+        deck : LgCanoeWood { Position: {0, HUT_DECK_Y - 0.02, 0}; Box: {1.26, 0.1, 24.4} }
+
+        for k in 0..5 {
+          for j in 0..2 {
+            "post_{k}_{j}" : LgCanoeDark {
+              Position: {side * (j == 0 ? -0.55 : 0.55), HUT_DECK_Y / 2 - 0.2, -10 + k * 5}
+              Cylinder: {length: HUT_DECK_Y + 0.3, radius: 0.08, segments: 6}
+            }
+          }
+        }
+      }
+
+      for c in 0..2 {
+        // On the wet slope between the posts of the boardwalk, the hull 0.42 wide clear of the
+        // waterline, the float inland
+        "canoe_{c}" {
+          Position: {
+            side * (BANK_WATER_U + 0.75),
+            0.75 * tan(BANK_SLOPE),
+            JETTY_Z + (c == 0 ? -7.5 : 7.5)
+          }
+          Rotation: {0, 0, side * BANK_SLOPE}
+          turn {
+            Rotation: {0, flip, 0}
+            LgBeachedCanoe boat()
+          }
+        }
+      }
+
+      for n in 0..2 {
+        "nets_{n}" {
+          Position: {side * (6.5 + rng.f(1.5)), BEACH_Y - 0.05, (n == 0 ? 0.33 : 0.6) * SECTION_LEN}
+          Rotation: {0, rng.f(0.6) - 0.3, 0}
+          LgNetRack rack()
+        }
+      }
+
+      fire {
+        Position: {side * (9 + rng.f(1.5)), BEACH_Y, 0.47 * SECTION_LEN}
+        LgFirePit pit()
+      }
+    }
+
+    // Banana plants behind the village, along the edge of the jungle
+    if village {
+      for k in 0..3 {
+        "banana_{k}" {
+          Position: {
+            side * (11 + rng.f(2.5)),
+            BEACH_Y - 0.05,
+            (k + 0.1 + rng.f(0.8)) * SECTION_LEN / 3
+          }
+          Rotation: {0, rng.f(6.28), 0}
+          LgBanana plant(size: 1 + rng.f(0.5), seed: seed * 43 + k)
+        }
+      }
+    }
+
+    // The headland: a line of low cliffs of dark rock up the beach, low slabs of rock in the
+    // sand in front of them and windswept palms at their foot
+    if headland {
+      for c in 0..3 {
+        "cliff_{c}" {
+          Position: {
+            side * (7.5 + rng.f(2.5)),
+            BEACH_Y - 0.1,
+            (c + 0.3 + rng.f(0.4)) * SECTION_LEN / 3
+          }
+          Rotation: {0, rng.f(0.3) - 0.15, 0}
+          LgCliff rock(size: 2 + rng.f(0.7), seed: seed * 19 + c)
+        }
+      }
+
+      for k in 0..3 {
+        "slab_{k}" : LgCliffRock {
+          Position: {
+            side * (2.6 + rng.f(2)),
+            BEACH_Y - 0.08,
+            (k + 0.1 + rng.f(0.8)) * SECTION_LEN / 3
+          }
+          Rotation: {rng.f(0.2), rng.f(6.28), rng.f(0.2)}
+          Scale: {1.3, 0.45, 1}
+          IcoSphere: {radius: 0.5 + rng.f(0.4), segments: 1}
+        }
+      }
+    }
+
+    // The jungle edge: tall trees with layered canopies, a thicket of banana plants behind them,
+    // ferns and broad-leaf plants down to the beach
+    if jungle {
+      for t in 0..3 {
+        "tree_{t}" {
+          Position: {side * (6 + rng.f(5)), BEACH_Y - 0.1, (t + 0.1 + rng.f(0.8)) * SECTION_LEN / 3}
+          Rotation: {0, rng.f(6.28), 0}
+          LgJungleTree tree(height: 8 + rng.f(4), seed: seed * 23 + t)
+        }
+      }
+
+      for k in 0..5 {
+        "thicket_{k}" {
+          Position: {
+            side * (8.5 + rng.f(4.5)),
+            BEACH_Y - 0.05,
+            (k + 0.1 + rng.f(0.8)) * SECTION_LEN / 5
+          }
+          Rotation: {0, rng.f(6.28), 0}
+          LgBanana plant(size: 1.1 + rng.f(0.6), seed: seed * 47 + k)
+        }
+      }
+
+      for f in 0..4 {
+        "fern_{f}" {
+          Position: {side * (1.8 + rng.f(5)), BEACH_Y, (f + 0.1 + rng.f(0.8)) * SECTION_LEN / 4}
+          LgFernPlant plant(size: 1.3 + rng.f(0.6), seed: seed * 29 + f)
+        }
+      }
+
+      for b in 0..3 {
+        "leafy_{b}" {
+          Position: {
+            side * (2.5 + rng.f(5)),
+            BEACH_Y - 0.03,
+            (b + 0.1 + rng.f(0.8)) * SECTION_LEN / 3
+          }
+          LgBroadLeafPlant plant(size: 1.1 + rng.f(0.5), seed: seed * 31 + b)
+        }
+      }
+    }
+
+    if islet {
+      const ir = 1.4 + rng.f(0.4)
+      isle {
+        // Out at sea, its shallows clear of the outer shore of the bank
+        Position: {
+          side * (SEA_U + 0.6 + ir * 1.3 + rng.f(2.5)),
+          0,
+          SECTION_LEN * (0.3 + rng.f(0.4))
+        }
+        LgIslet land(radius: ir, seed: seed * 7 + 5)
+      }
+    }
+  }
+
   // One stretch of bank, SECTION_LEN long toward +Z from its origin on the bank line of side
-  // (-1 left, 1 right). Local X is mirrored by side, so -X points to the water. The water stays
-  // clear: rocks lie on the wet slope, huts stand at the waterline, the islet out at sea, and
-  // what else stands on the wet slope keeps out of the water too.
+  // (-1 left, 1 right), local X mirrored by side so -X points to the water. Rocks, huts and all
+  // else stay out of the water, the islet stands out at sea.
   //
-  // The zone picks the look: a palm beach with flowers, a fishing village of stilt huts joined by
-  // a boardwalk, with canoes, nets and a fire, a rocky headland of low cliffs and surf washed
+  // The zone picks the look: a palm beach with flowers, a fishing village of stilt huts joined by a
+  // boardwalk, with canoes, nets and a fire, a rocky headland of low cliffs and surf washed
   // boulders, or the jungle edge with tall trees, ferns and broad leaves
   template LgBankSection {
     prop side: f32 = 1
@@ -1335,7 +1548,6 @@ assets {
     const village = zone == ZONE_VILLAGE
     const headland = zone == ZONE_HEADLAND
     const jungle = zone == ZONE_JUNGLE
-    const flip = side < 0 ? 3.1416 : 0
 
     // Palms: along the beach, inland of the village, windswept at the foot of the cliffs and in
     // front of the jungle
@@ -1431,7 +1643,11 @@ assets {
     // A screw pine on its stilt roots, leaning out over the beach and the rocks
     if beach || headland {
       "pandanus" {
-        Position: {side * (headland ? 3.4 + rng.f(2) : 3 + rng.f(6)), BEACH_Y - 0.05, rng.f(SECTION_LEN)}
+        Position: {
+          side * (headland ? 3.4 + rng.f(2) : 3 + rng.f(6)),
+          BEACH_Y - 0.05,
+          rng.f(SECTION_LEN)
+        }
         Rotation: {0, side * (rng.f(0.8) - 0.4), 0}
         LgPandanus tree(
           height: 3.2 + rng.f(1.4),
@@ -1441,10 +1657,11 @@ assets {
       }
     }
 
-    // Beached rocks: out of the water on the wet slope, the widest reach of a rock, 1.3 rr,
-    // stays ROCK_DRY above the waterline. Sunk to half its height into the slope. On the
-    // headland they are dark boulders with a streak of surf foam on the slope below each, between
-    // the waterline and the boulder
+    // Beached rocks: out of the water on the wet slope, the widest reach of a rock, 1.3 rr, stays
+    // ROCK_DRY above the waterline. Sunk to half its height into the slope.
+    //
+    // On the headland they are dark boulders with a streak of surf foam on the slope below each,
+    // between the waterline and the boulder
     if headland {
       for r in 0..4 {
         const rr = 0.55 + rng.f(0.5)
@@ -1489,185 +1706,7 @@ assets {
       }
     }
 
-    if beach {
-      // A bleached log and a few fallen coconuts up on the dry sand
-      drift {
-        Position: {
-          side * (2 + rng.f(3)),
-          BEACH_Y + 0.08,
-          0.1 * SECTION_LEN + rng.f(0.8 * SECTION_LEN)
-        }
-        Rotation: {0, rng.f(1) - 0.5, 0}
-        log : LgDriftwood {
-          Rotation: {HALF_PI, 0, 0}
-          Cylinder: {length: 2.2 + rng.f(1.2), radius: 0.13, segments: 7}
-        }
-
-        stub : LgDriftwood {
-          Position: {0.2, 0.05, 0.5}
-          Rotation: {0, 0, -1}
-          Cylinder: {length: 0.5, radius: 0.05, segments: 5}
-        }
-      }
-
-      for k in 0..3 {
-        "fallen_{k}" : LgCoconutHusk {
-          Position: {side * (1.8 + rng.f(4)), BEACH_Y + 0.1, rng.f(SECTION_LEN)}
-          Scale: {1, 0.9, 1.15}
-          Sphere: {radius: 0.15, segments: 8, smooth: true}
-        }
-      }
-    }
-
-    // The village: two stilt huts at the waterline joined by a boardwalk on stilts at the height
-    // of their decks, canoes pulled up under it, and nets and a fire pit inland
-    if village {
-      for h in 0..2 {
-        "hut_{h}" {
-          Position: {side * HUT_U, 0, (h == 0 ? 0.14 : 0.79) * SECTION_LEN}
-          Rotation: {0, flip, 0}
-          LgStiltHut house()
-        }
-      }
-
-      // Its water side posts stand ROCK_DRY up from the waterline, the deck ends above them
-      const JETTY_U: f32 = BANK_WATER_U + ROCK_DRY + 0.08
-      const JETTY_Z: f32 = 0.465 * SECTION_LEN
-      jetty {
-        Position: {side * (JETTY_U + 0.47), 0, JETTY_Z}
-        deck : LgCanoeWood { Position: {0, HUT_DECK_Y - 0.02, 0}; Box: {1.26, 0.1, 24.4} }
-
-        for k in 0..5 {
-          for j in 0..2 {
-            "post_{k}_{j}" : LgCanoeDark {
-              Position: {side * (j == 0 ? -0.55 : 0.55), HUT_DECK_Y / 2 - 0.2, -10 + k * 5}
-              Cylinder: {length: HUT_DECK_Y + 0.3, radius: 0.08, segments: 6}
-            }
-          }
-        }
-      }
-
-      for c in 0..2 {
-        // On the wet slope between the posts of the boardwalk, the hull 0.42 wide clear of the
-        // waterline, the float inland
-        "canoe_{c}" {
-          Position: {
-            side * (BANK_WATER_U + 0.75),
-            0.75 * tan(BANK_SLOPE),
-            JETTY_Z + (c == 0 ? -7.5 : 7.5)
-          }
-          Rotation: {0, 0, side * BANK_SLOPE}
-          turn {
-            Rotation: {0, flip, 0}
-            LgBeachedCanoe boat()
-          }
-        }
-      }
-
-      for n in 0..2 {
-        "nets_{n}" {
-          Position: {side * (6.5 + rng.f(1.5)), BEACH_Y - 0.05, (n == 0 ? 0.33 : 0.6) * SECTION_LEN}
-          Rotation: {0, rng.f(0.6) - 0.3, 0}
-          LgNetRack rack()
-        }
-      }
-
-      fire {
-        Position: {side * (9 + rng.f(1.5)), BEACH_Y, 0.47 * SECTION_LEN}
-        LgFirePit pit()
-      }
-    }
-
-    // Banana plants behind the village, along the edge of the jungle
-    if village {
-      for k in 0..3 {
-        "banana_{k}" {
-          Position: {side * (11 + rng.f(2.5)), BEACH_Y - 0.05, (k + 0.1 + rng.f(0.8)) * SECTION_LEN / 3}
-          Rotation: {0, rng.f(6.28), 0}
-          LgBanana plant(size: 1 + rng.f(0.5), seed: seed * 43 + k)
-        }
-      }
-    }
-
-    // The headland: a line of low cliffs of dark rock up the beach, low slabs of rock in the
-    // sand in front of them and windswept palms at their foot
-    if headland {
-      for c in 0..3 {
-        "cliff_{c}" {
-          Position: {
-            side * (7.5 + rng.f(2.5)),
-            BEACH_Y - 0.1,
-            (c + 0.3 + rng.f(0.4)) * SECTION_LEN / 3
-          }
-          Rotation: {0, rng.f(0.3) - 0.15, 0}
-          LgCliff rock(size: 2 + rng.f(0.7), seed: seed * 19 + c)
-        }
-      }
-
-      for k in 0..3 {
-        "slab_{k}" : LgCliffRock {
-          Position: {side * (2.6 + rng.f(2)), BEACH_Y - 0.08, (k + 0.1 + rng.f(0.8)) * SECTION_LEN / 3}
-          Rotation: {rng.f(0.2), rng.f(6.28), rng.f(0.2)}
-          Scale: {1.3, 0.45, 1}
-          IcoSphere: {radius: 0.5 + rng.f(0.4), segments: 1}
-        }
-      }
-    }
-
-    // The jungle edge: tall trees with layered canopies, a thicket of banana plants behind them,
-    // ferns and broad-leaf plants down to the beach
-    if jungle {
-      for t in 0..3 {
-        "tree_{t}" {
-          Position: {side * (6 + rng.f(5)), BEACH_Y - 0.1, (t + 0.1 + rng.f(0.8)) * SECTION_LEN / 3}
-          Rotation: {0, rng.f(6.28), 0}
-          LgJungleTree tree(height: 8 + rng.f(4), seed: seed * 23 + t)
-        }
-      }
-
-      for k in 0..5 {
-        "thicket_{k}" {
-          Position: {
-            side * (8.5 + rng.f(4.5)),
-            BEACH_Y - 0.05,
-            (k + 0.1 + rng.f(0.8)) * SECTION_LEN / 5
-          }
-          Rotation: {0, rng.f(6.28), 0}
-          LgBanana plant(size: 1.1 + rng.f(0.6), seed: seed * 47 + k)
-        }
-      }
-
-      for f in 0..4 {
-        "fern_{f}" {
-          Position: {side * (1.8 + rng.f(5)), BEACH_Y, (f + 0.1 + rng.f(0.8)) * SECTION_LEN / 4}
-          LgFernPlant plant(size: 1.3 + rng.f(0.6), seed: seed * 29 + f)
-        }
-      }
-
-      for b in 0..3 {
-        "leafy_{b}" {
-          Position: {
-            side * (2.5 + rng.f(5)),
-            BEACH_Y - 0.03,
-            (b + 0.1 + rng.f(0.8)) * SECTION_LEN / 3
-          }
-          LgBroadLeafPlant plant(size: 1.1 + rng.f(0.5), seed: seed * 31 + b)
-        }
-      }
-    }
-
-    if islet {
-      const ir = 1.4 + rng.f(0.4)
-      isle {
-        // Out at sea, its shallows clear of the outer shore of the bank
-        Position: {
-          side * (SEA_U + 0.6 + ir * 1.3 + rng.f(2.5)),
-          0,
-          SECTION_LEN * (0.3 + rng.f(0.4))
-        }
-        LgIslet land(radius: ir, seed: seed * 7 + 5)
-      }
-    }
+    LgBankDetails details(side: side, seed: seed, zone: zone, islet: islet, rng: rng)
   }
 
   // A clump of jungle trees in the backdrop, about size across along the bank: two tiered trees of
@@ -1875,6 +1914,7 @@ jungle {
 
   for s in 0..2 {
     const side = s == 0 ? -1.0 : 1.0
+
     for i in 0..JUNGLE_CLUMPS {
       const base = (i + s * 0.5) * (SCENERY_SPAN / JUNGLE_CLUMPS) + hash(i * 13 + s * 7) * 6
       const z = scroll_z(base, distance)

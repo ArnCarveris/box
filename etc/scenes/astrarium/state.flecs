@@ -62,7 +62,56 @@ state {
   export mut stat_haste: i32 = 24
   export mut stat_aether: i32 = 37
 
-  export mut spell_cooling: bool[6] = {}
+  struct Spell(
+    name: string,
+    desc: string,
+    cost: f32,
+    blood: f32,
+    cooldown: f32,
+    xp: f32,
+    hue: Rgb
+  )
+
+  export const spells: Spell[] = [
+    {
+      name: "Cinder Lance",
+      desc: "A spear of cinders. Quick to throw, quick to forget.",
+      cost: 18, blood: 0, cooldown: 1.6, xp: 32,
+      hue: {255, 130, 70}
+    },
+    {
+      name: "Tidal Mend",
+      desc: "Calls the far tide through your veins. Restores 60 vitality.",
+      cost: 46, blood: 0, cooldown: 7, xp: 20,
+      hue: {86, 196, 255}
+    },
+    {
+      name: "Thorn Aegis",
+      desc: "Briars of light circle you. Vitality no longer ebbs for a while.",
+      cost: 34, blood: 0, cooldown: 11, xp: 26,
+      hue: {120, 240, 160}
+    },
+    {
+      name: "Veilstep",
+      desc: "Step between two heartbeats. Trains the hand, costs little.",
+      cost: 12, blood: 0, cooldown: 3, xp: 16,
+      hue: {186, 146, 255}
+    },
+    {
+      name: "Starfall",
+      desc: "Pull the sky down. The heavens answer, and so does your purse.",
+      cost: 110, blood: 0, cooldown: 16, xp: 150,
+      hue: {255, 226, 150}
+    },
+    {
+      name: "Blood Pact",
+      desc: "Spend your blood as if it were aether. Grants 90 aether.",
+      cost: 0, blood: 44, cooldown: 5, xp: 14,
+      hue: {255, 70, 90}
+    }
+  ]
+
+  export mut spell_cooling: bool[] = spells.map((s) -> { false })
   export mut spell_hover: i32 = -1
   export mut aegis_on = false
   export mut aegis_serial: i32 = 0
@@ -76,44 +125,6 @@ state {
     320 + level * 12
   }
 
-  fn spell_name(i: i32) -> string {
-    match i {
-      0: "Cinder Lance"
-      1: "Tidal Mend"
-      2: "Thorn Aegis"
-      3: "Veilstep"
-      4: "Starfall"
-      _: "Blood Pact"
-    }
-  }
-
-  fn spell_desc(i: i32) -> string {
-    match i {
-      0: "A spear of cinders. Quick to throw, quick to forget."
-      1: "Calls the far tide through your veins. Restores 60 vitality."
-      2: "Briars of light circle you. Vitality no longer ebbs for a while."
-      3: "Step between two heartbeats. Trains the hand, costs little."
-      4: "Pull the sky down. The heavens answer, and so does your purse."
-      _: "Spend your blood as if it were aether. Grants 90 aether."
-    }
-  }
-
-  fn spell_cost(i: i32) -> f32 {
-    match i { 0: 18; 1: 46; 2: 34; 3: 12; 4: 110; _: 0 }
-  }
-
-  fn spell_blood(i: i32) -> f32 {
-    match i { 5: 44; _: 0 }
-  }
-
-  fn spell_cooldown(i: i32) -> f32 {
-    match i { 0: 1.6; 1: 7; 2: 11; 3: 3; 4: 16; _: 5 }
-  }
-
-  fn spell_xp(i: i32) -> f32 {
-    match i { 0: 32; 1: 20; 2: 26; 3: 16; 4: 150; _: 14 }
-  }
-
   fn stat_name(i: i32) -> string {
     match i { 0: "Might"; 1: "Ward"; 2: "Haste"; _: "Aether" }
   }
@@ -122,21 +133,209 @@ state {
     1 / (1 + haste * 0.006)
   }
 
-  export mut atlas_awake: bool[28] = [
-    true, true, false, true, false, false, false,
-    true, true, false, false, false, false, false,
-    true, false, false, false, false, false, false,
-    false, false, false, false, false, false, false
+  struct AtlasStar(
+    from: i32,
+    band: i32,
+    x: f32,
+    y: f32,
+    stat: i32,
+    amount: i32,
+    keystone: bool,
+    awake: bool,
+    selected: bool,
+    name: string,
+    flavor: string
+  )
+
+  export const atlas_stars: AtlasStar[] = [
+    {
+      from: -1, band: 0, x: -135, y: 72, stat: 0, amount: 3, awake: true,
+      name: "Kindling Spark",
+      flavor: "Every pyre begins as an argument between two sparks."
+    },
+    {
+      from: 0, band: 0, x: -198, y: 122, stat: 0, amount: 4, awake: true,
+      name: "Ashen Oath",
+      flavor: "Sworn over a dead fire, kept by a living one."
+    },
+    {
+      from: 1, band: 0, x: -268, y: 88, stat: 0, amount: 4, selected: true,
+      name: "Forge Tongue",
+      flavor: "It speaks only in the language of hammers."
+    },
+    {
+      from: 1, band: 0, x: -168, y: 198, stat: 1, amount: 3, awake: true,
+      name: "Cinder Crown",
+      flavor: "Worn lightly, for the wearer is mostly smoke."
+    },
+    {
+      from: 2, band: 0, x: -338, y: 138, stat: 2, amount: 4,
+      name: "Red Comet",
+      flavor: "It was late to the war, and early to the ending."
+    },
+    {
+      from: 3, band: 0, x: -244, y: 228, stat: 0, amount: 5,
+      name: "Ember Choir",
+      flavor: "Nine thousand small fires, singing in one key."
+    },
+    {
+      from: 4, band: 0, x: -350, y: 232, stat: 0, amount: 12, keystone: true,
+      name: "Heart of Cinders",
+      flavor: "What remains after the burning is the part that burns best."
+    },
+    {
+      from: -1, band: 1, x: 135, y: 72, stat: 3, amount: 3, awake: true,
+      name: "First Swell",
+      flavor: "The sea has never once been in a hurry."
+    },
+    {
+      from: 7, band: 1, x: 190, y: 140, stat: 3, amount: 4, awake: true,
+      name: "Salt Memory",
+      flavor: "Water forgets nothing that ever drowned in it."
+    },
+    {
+      from: 8, band: 1, x: 272, y: 104, stat: 3, amount: 4,
+      name: "Moonward Pull",
+      flavor: "A patient hand on the hem of the world."
+    },
+    {
+      from: 8, band: 1, x: 150, y: 216, stat: 1, amount: 3,
+      name: "Pearl Lung",
+      flavor: "Breathe in the deep; it has been waiting."
+    },
+    {
+      from: 9, band: 1, x: 346, y: 64, stat: 2, amount: 4,
+      name: "Undertow",
+      flavor: "The current you cannot see is the one that carries you."
+    },
+    {
+      from: 9, band: 1, x: 258, y: 204, stat: 3, amount: 5,
+      name: "Tide Bell",
+      flavor: "Rung once by a sunken city, and heard twice."
+    },
+    {
+      from: 12, band: 1, x: 354, y: 226, stat: 3, amount: 12, keystone: true,
+      name: "Drowned Crown",
+      flavor: "A king is still a king, at any depth."
+    },
+    {
+      from: -1, band: 2, x: 135, y: -72, stat: 1, amount: 3, awake: true,
+      name: "Green Vow",
+      flavor: "Promise a seed nothing, and it will grow anyway."
+    },
+    {
+      from: 14, band: 2, x: 205, y: -112, stat: 1, amount: 4,
+      name: "Bramble Wall",
+      flavor: "The castle fell. The hedge did not."
+    },
+    {
+      from: 15, band: 2, x: 176, y: -192, stat: 1, amount: 4,
+      name: "Old Bark",
+      flavor: "Count the rings; it has outlived your questions."
+    },
+    {
+      from: 15, band: 2, x: 286, y: -84, stat: 2, amount: 3,
+      name: "Quickroot",
+      flavor: "It is already underneath you."
+    },
+    {
+      from: 16, band: 2, x: 262, y: -218, stat: 0, amount: 4,
+      name: "Rose Thane",
+      flavor: "Beautiful, armored, and entirely without mercy."
+    },
+    {
+      from: 17, band: 2, x: 358, y: -138, stat: 1, amount: 5,
+      name: "Moss Hymn",
+      flavor: "A slow song for those who plan to stay."
+    },
+    {
+      from: 18, band: 2, x: 358, y: -234, stat: 1, amount: 12, keystone: true,
+      name: "Thornfather",
+      flavor: "Every garden is a fortress that has learned patience."
+    },
+    {
+      from: -1, band: 3, x: -135, y: -72, stat: 2, amount: 3,
+      name: "Thin Hour",
+      flavor: "There is a minute between midnight and itself."
+    },
+    {
+      from: 21, band: 3, x: -196, y: -128, stat: 2, amount: 4,
+      name: "Silk Step",
+      flavor: "Walk as if the floor were a rumor."
+    },
+    {
+      from: 22, band: 3, x: -286, y: -102, stat: 3, amount: 3,
+      name: "Lantern Moth",
+      flavor: "It follows a light that has not been lit yet."
+    },
+    {
+      from: 22, band: 3, x: -160, y: -214, stat: 2, amount: 4,
+      name: "Second Shadow",
+      flavor: "One of them is yours. Do not ask which."
+    },
+    {
+      from: 23, band: 3, x: -362, y: -60, stat: 0, amount: 4,
+      name: "Quiet Knife",
+      flavor: "The sharpest word is the one left unsaid."
+    },
+    {
+      from: 23, band: 3, x: -262, y: -206, stat: 2, amount: 5,
+      name: "Mirror Vesper",
+      flavor: "The evening star, seen from the other side."
+    },
+    {
+      from: 26, band: 3, x: -358, y: -232, stat: 2, amount: 12, keystone: true,
+      name: "The Unseen Door",
+      flavor: "It has always been open. That is what hides it."
+    }
   ]
+
+  fn band_stars(band: i32) -> i32 {
+    mut n: i32 = 0
+
+    for (i, s) in atlas_stars {
+      if s.band == band {
+        n += 1
+      }
+    }
+
+    n
+  }
+
+  fn band_awake(band: i32) -> i32 {
+    mut n: i32 = 0
+
+    for (i, s) in atlas_stars {
+      if s.awake && s.band == band {
+        n += 1
+      }
+    }
+
+    n
+  }
+
+  fn stat_awake(stat: i32) -> i32 {
+    mut n: i32 = 0
+
+    for (i, s) in atlas_stars {
+      if s.awake && s.stat == stat {
+        n += s.amount
+      }
+    }
+
+    n
+  }
+
+  export mut atlas_awake: bool[] = atlas_stars.map((s) -> { s.awake })
   export mut atlas_sel: entity = 0
   export mut atlas_fresh: i32 = -1
   export mut atlas_holding = false
   export mut atlas_hold_serial: i32 = 0
-  export mut atlas_count: i32[4] = [3, 2, 1, 0]
+  export mut atlas_count: i32[4] = [band_awake(0), band_awake(1), band_awake(2), band_awake(3)]
 
   export const HOLD_SECONDS: f32 = 0.75
 
-  export mut spell_afford: bool[6] = [true, true, true, true, true, true]
+  export mut spell_afford: bool[] = spells.map((s) -> { true })
   export mut fx_cast: i32 = 0
   export mut fx_cast_serial: i32 = 0
   export mut fx_level_serial: i32 = 0
@@ -181,7 +380,7 @@ state {
   export mut relic_serial: i32 = 0
   export mut relic_name: string = ""
   export mut relic_line: string = ""
-  export mut star_bonus: i32[4] = [7, 6, 0, 7]
+  export mut star_bonus: i32[4] = [stat_awake(0), stat_awake(1), stat_awake(2), stat_awake(3)]
   export mut rite_metal: i32 = 0
   export mut rite_names = true
   export mut rite_drift = true
@@ -215,8 +414,8 @@ state {
   }
 
   fn check_afford() {
-    for i in 0..6 {
-      const can = hero_mp >= spell_cost(i) && hero_hp > spell_blood(i)
+    for i in 0..spells.count() {
+      const can = hero_mp >= spells[i].cost && hero_hp > spells[i].blood
 
       if spell_afford[i] != can {
         spell_afford[i] = can

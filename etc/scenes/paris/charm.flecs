@@ -37,12 +37,12 @@ assets {
 }
 
 // The charm in how the statues move, on top of the hunt (paris/hunt.flecs) and scaled by each
-// statue's charm: at charm 0 none of it, at charm 1 all of it at full strength. The walk itself
-// (a stiff march to a sashaying sway) is in the ParisLiberty template and pr_step_len; this loop
-// drives the acts in state.pr_charm: torch twirls on patrol and a twirl when she spots a raccoon,
-// a pose (hand on hip, hip out, head tilted, a slow look over the shoulder) or a kiss blown to
-// the camera or a statue at a junction, a head toss, torch wave or kiss for a lower charm statue
-// passing by, and blinks, lash flutters and winks. During a hunt only the gait and the twirl show.
+// statue's charm: none of it at charm 0, all of it at charm 1. The walk itself (a stiff march to
+// a sashaying sway) is in the ParisLiberty template and pr_step_len.
+//
+// This loop drives the acts in state.pr_charm: torch twirls, poses, kisses blown to the camera or
+// a statue, head tosses and torch waves for statues passing by, and blinks, lash flutters and
+// winks. During a hunt only the gait and the twirl show.
 async {
   const rng: math.Rng = {seed: 5381}
   // A statue greets a lower charm one within meet_dist, blows a kiss to the camera within
@@ -55,7 +55,7 @@ async {
   // A torch twirl takes twirl_time seconds.
   const twirl_time: f32 = 0.8
 
-  mut cs: ParisCharm[14] = pr_charm
+  mut cs = pr_charm
 
   while true {
     await next_frame()
@@ -65,12 +65,13 @@ async {
     const hs = pr_hunters
     const cam = paris.hunt_camera[Position]
 
-    for i in 0..PR_STATUES {
+    for i in 0..pr_statues.count() {
       const c = pr_statue_charm[i]
       const s = ss[i]
       const h = hs[i]
       const ch = cs[i]
-      const hunting = h.behaviour == PR_ST_SPOT || h.behaviour == PR_ST_CHASE || h.behaviour == PR_ST_LOST
+      const hunting = h.behaviour == PR_ST_SPOT || h.behaviour == PR_ST_CHASE ||
+        h.behaviour == PR_ST_LOST
       const standing = h.behaviour == PR_ST_PAUSE && h.kind != 2
       const fwd_x = sin(s.yaw)
       const fwd_z = cos(s.yaw)
@@ -86,6 +87,7 @@ async {
       mut eye_len: f32 = ch.eye_len
       mut eye_wait: f32 = ch.eye_wait - step
       mut wink_side: i32 = ch.wink_side
+
       if eye != PR_EYE_NONE && eye_time >= eye_len {
         eye = PR_EYE_NONE
       }
@@ -93,6 +95,7 @@ async {
       if eye == PR_EYE_NONE && eye_wait <= 0 {
         const roll = rng.f(1)
         eye_time = 0
+
         if !hunting && c > 0.1 && roll < 0.45 * c {
           eye = PR_EYE_WINK
           eye_len = 0.75
@@ -105,11 +108,13 @@ async {
           eye = PR_EYE_BLINK
           eye_len = 0.18
         }
+
         eye_wait = eye_len + lerp(5.5, 2.5, c) + rng.f(3)
       }
 
       mut lids: f32 = 0
       mut wink: f32 = 0
+
       if eye == PR_EYE_BLINK {
         lids = sin(PI * clamp(eye_time / eye_len, 0, 1))
       } else if eye == PR_EYE_FLUTTER {
@@ -123,19 +128,23 @@ async {
       mut twirl: f32 = ch.twirl
       mut spin: f32 = ch.spin
       mut twirl_wait: f32 = ch.twirl_wait - step
+
       if h.behaviour == PR_ST_PATROL && twirl_wait <= 0 {
         twirl_wait = lerp(26, 8, c) + rng.f(8)
+
         if c > 0.15 && spin <= 0 && rng.f(1) < c {
           spin = 2 * PI
           pr_charm_twirls += 1
         }
       }
+
       if h.behaviour == PR_ST_SPOT && ch.last != PR_ST_SPOT && c > 0.15 && spin <= 0 {
         if rng.f(1) < c {
           spin = 2 * PI
           pr_charm_twirls += 1
         }
       }
+
       if spin > 0 {
         const d = min(spin, step * 2 * PI / twirl_time)
         twirl += d
@@ -150,6 +159,7 @@ async {
       mut kiss_wait: f32 = ch.kiss_wait - step
       mut meet_wait: f32 = ch.meet_wait - step
       mut hearts: bool = ch.hearts
+
       if act != PR_CH_NONE && (hunting || act_time >= act_len) {
         act = PR_CH_NONE
       }
@@ -158,11 +168,13 @@ async {
       if act == PR_CH_NONE && !hunting && standing && ch.last != PR_ST_PAUSE && c > 0.1 {
         mut near: i32 = -1
         mut near_d: f32 = kiss_mate
-        for j in 0..PR_STATUES {
+
+        for j in 0..pr_statues.count() {
           if j != i {
             const ox = ss[j].x - s.x
             const oz = ss[j].z - s.z
             const od = sqrt(ox * ox + oz * oz)
+
             if od < near_d && abs(ss[j].y - s.y) < 1.5 {
               near = j
               near_d = od
@@ -171,7 +183,10 @@ async {
         }
 
         const roll = rng.f(1)
-        if c > 0.6 && kiss_wait <= 0 && roll < (c - 0.45) * 1.4 && (cam_d < kiss_reach || near >= 0) {
+
+        if c > 0.6 && kiss_wait <= 0 && roll < (c - 0.45) * 1.4 &&
+          (cam_d < kiss_reach || near >= 0)
+        {
           act = PR_CH_KISS
           act_len = 2.6
           partner = cam_d < kiss_reach ? 0 - 1 : near
@@ -196,6 +211,7 @@ async {
       if act == PR_CH_NONE && !hunting && h.behaviour == PR_ST_PATROL && c > 0.6 && kiss_wait <= 0 {
         if cam_d < kiss_near && cam_d > 2 && (fwd_x * cdx + fwd_z * cdz) > 0.6 * cam_d {
           kiss_wait = 14 + rng.f(10)
+
           if rng.f(1) < c - 0.3 {
             act = PR_CH_KISS
             act_len = 2.6
@@ -212,12 +228,14 @@ async {
       if act == PR_CH_NONE && !hunting && meet_wait <= 0 && c > 0.15 {
         mut mate: i32 = -1
         mut mate_d: f32 = meet_dist
-        for j in 0..PR_STATUES {
+
+        for j in 0..pr_statues.count() {
           if j != i && c > pr_statue_charm[j] + 0.1 && hs[j].behaviour <= PR_ST_PAUSE {
             const ox = ss[j].x - s.x
             const oz = ss[j].z - s.z
             const od = sqrt(ox * ox + oz * oz)
             const moving = h.speed > 0.3 || hs[j].speed > 0.3
+
             if moving && od < mate_d && od > 0.5 && abs(ss[j].y - s.y) < 1.5 {
               mate = j
               mate_d = od
@@ -227,8 +245,10 @@ async {
 
         if mate >= 0 {
           meet_wait = 10 + rng.f(8)
+
           if rng.f(1) < c {
             const roll = rng.f(1)
+
             if c > 0.6 && kiss_wait <= 0 && roll < 0.35 {
               act = PR_CH_KISS
               act_len = 2.6
@@ -242,6 +262,7 @@ async {
               act = PR_CH_WAVE
               act_len = 1.8
             }
+
             act_time = 0
             partner = mate
             pr_charm_greets += 1

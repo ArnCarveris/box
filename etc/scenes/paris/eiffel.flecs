@@ -11,8 +11,10 @@ using state
 state {
   // The tower's profile, in its own frame (origin at the ground in the middle, y up). The four
   // legs are square lattice tubes: their outer corner chords run at x = z = +-pr_eiffel_outer(y),
-  // the inner ones at +-pr_eiffel_inner(y). They meet the second platform at PR_EIFFEL_LEGS_TOP;
-  // above it the single square shaft has its corners at +-pr_eiffel_shaft(y) up to PR_EIFFEL_TOP.
+  // the inner ones at +-pr_eiffel_inner(y).
+  //
+  // The legs meet the second platform at PR_EIFFEL_LEGS_TOP; above it the single square shaft
+  // has its corners at +-pr_eiffel_shaft(y) up to PR_EIFFEL_TOP.
   export const PR_EIFFEL_FIRST: f32 = 16.6
   export const PR_EIFFEL_LEGS_TOP: f32 = 33.5
   export const PR_EIFFEL_TOP: f32 = 80
@@ -80,21 +82,15 @@ assets {
     DynamicMaterial
   }
 
-  // The Eiffel Tower, scaled to about 95 m: four curved lattice legs joined by arches, the first
-  // platform (a square ring), the second platform where the legs meet, the tapering shaft, the
-  // top with its lantern and the mast. Lit gold at night by light strips along the corner chords
-  // and the platforms and a few point lights inside, and it sparkles once a minute or so.
-  template ParisEiffelTower {
-    prop sparkles: i32 = 80
+  template ParisEiffelLegs {
     const leg_segs: i32 = 6
-    const shaft_segs: i32 = 6
     const LH = PR_EIFFEL_LEGS_TOP
-    const TH = PR_EIFFEL_TOP
 
     // The legs: four chords (the outer one a light strip), X bracing and a strut on each face.
     for leg in 0..4 {
       const sx = leg % 2 == 0 ? -1.0 : 1.0
       const sz = leg < 2 ? -1.0 : 1.0
+
       for j in 0..leg_segs {
         const y0 = j * LH / leg_segs
         const y1 = (j + 1) * LH / leg_segs
@@ -102,11 +98,47 @@ assets {
         const i0 = pr_eiffel_inner(y0)
         const o1 = pr_eiffel_outer(y1)
         const i1 = pr_eiffel_inner(y1)
-        ParisEiffelBeam(ax: sx * o0, ay: y0, az: sz * o0, bx: sx * o1, by: y1, bz: sz * o1, width: 0.75, glow: 2.6) {}
-        ParisEiffelBeam(ax: sx * i0, ay: y0, az: sz * o0, bx: sx * i1, by: y1, bz: sz * o1, width: 0.6) {}
-        ParisEiffelBeam(ax: sx * o0, ay: y0, az: sz * i0, bx: sx * o1, by: y1, bz: sz * i1, width: 0.6) {}
-        ParisEiffelBeam(ax: sx * i0, ay: y0, az: sz * i0, bx: sx * i1, by: y1, bz: sz * i1, width: 0.6, glow: 2.0) {}
-        // Faces: 0 outer x (corners OO-OI), 1 inner x (IO-II), 2 outer z (OO-IO), 3 inner z (OI-II).
+        ParisEiffelBeam(
+          ax: sx * o0,
+          ay: y0,
+          az: sz * o0,
+          bx: sx * o1,
+          by: y1,
+          bz: sz * o1,
+          width: 0.75,
+          glow: 2.6
+        ) {}
+        ParisEiffelBeam(
+          ax: sx * i0,
+          ay: y0,
+          az: sz * o0,
+          bx: sx * i1,
+          by: y1,
+          bz: sz * o1,
+          width: 0.6
+        ) {}
+        ParisEiffelBeam(
+          ax: sx * o0,
+          ay: y0,
+          az: sz * i0,
+          bx: sx * o1,
+          by: y1,
+          bz: sz * i1,
+          width: 0.6
+        ) {}
+        ParisEiffelBeam(
+          ax: sx * i0,
+          ay: y0,
+          az: sz * i0,
+          bx: sx * i1,
+          by: y1,
+          bz: sz * i1,
+          width: 0.6,
+          glow: 2.0
+        ) {}
+
+        // Faces: 0 outer x (corners OO-OI), 1 inner x (IO-II), 2 outer z (OO-IO),
+        // 3 inner z (OI-II).
         for f in 0..4 {
           const c1x0 = f != 1 ? o0 : i0
           const c1x1 = f != 1 ? o1 : i1
@@ -116,9 +148,33 @@ assets {
           const c2x1 = f == 0 ? o1 : i1
           const c2z0 = f == 2 ? o0 : i0
           const c2z1 = f == 2 ? o1 : i1
-          ParisEiffelBeam(ax: sx * c1x0, ay: y0, az: sz * c1z0, bx: sx * c2x1, by: y1, bz: sz * c2z1, width: 0.26) {}
-          ParisEiffelBeam(ax: sx * c2x0, ay: y0, az: sz * c2z0, bx: sx * c1x1, by: y1, bz: sz * c1z1, width: 0.26) {}
-          ParisEiffelBeam(ax: sx * c1x1, ay: y1, az: sz * c1z1, bx: sx * c2x1, by: y1, bz: sz * c2z1, width: 0.34) {}
+          ParisEiffelBeam(
+            ax: sx * c1x0,
+            ay: y0,
+            az: sz * c1z0,
+            bx: sx * c2x1,
+            by: y1,
+            bz: sz * c2z1,
+            width: 0.26
+          ) {}
+          ParisEiffelBeam(
+            ax: sx * c2x0,
+            ay: y0,
+            az: sz * c2z0,
+            bx: sx * c1x1,
+            by: y1,
+            bz: sz * c1z1,
+            width: 0.26
+          ) {}
+          ParisEiffelBeam(
+            ax: sx * c1x1,
+            ay: y1,
+            az: sz * c1z1,
+            bx: sx * c2x1,
+            by: y1,
+            bz: sz * c2z1,
+            width: 0.34
+          ) {}
         }
       }
     }
@@ -130,9 +186,11 @@ assets {
     const arch_r = pr_eiffel_inner(arch_y)
     const arch_h: f32 = 12.6
     const arch_n: i32 = 12
+
     for d in 0..4 {
       const along_x = d < 2
       const s = d % 2 == 0 ? -1.0 : 1.0
+
       for k in 0..arch_n {
         const t0 = k * math.PI / arch_n
         const t1 = (k + 1) * math.PI / arch_n
@@ -144,47 +202,146 @@ assets {
         const p1 = (arch_r - 1.1) * cos(t1)
         const q0 = arch_y + (arch_h - 1.1) * sin(t0)
         const q1 = arch_y + (arch_h - 1.1) * sin(t1)
-        ParisEiffelBeam(ax: along_x ? u0 : s * arch_a, ay: v0, az: along_x ? s * arch_a : u0, bx: along_x ? u1 : s * arch_a, by: v1, bz: along_x ? s * arch_a : u1, width: 0.5, glow: 2.6) {}
-        ParisEiffelBeam(ax: along_x ? p0 : s * arch_a, ay: q0, az: along_x ? s * arch_a : p0, bx: along_x ? p1 : s * arch_a, by: q1, bz: along_x ? s * arch_a : p1, width: 0.32) {}
+        ParisEiffelBeam(
+          ax: along_x ? u0 : s * arch_a,
+          ay: v0,
+          az: along_x ? s * arch_a : u0,
+          bx: along_x ? u1 : s * arch_a,
+          by: v1,
+          bz: along_x ? s * arch_a : u1,
+          width: 0.5,
+          glow: 2.6
+        ) {}
+        ParisEiffelBeam(
+          ax: along_x ? p0 : s * arch_a,
+          ay: q0,
+          az: along_x ? s * arch_a : p0,
+          bx: along_x ? p1 : s * arch_a,
+          by: q1,
+          bz: along_x ? s * arch_a : p1,
+          width: 0.32
+        ) {}
+
         if k % 2 == 1 {
-          ParisEiffelBeam(ax: along_x ? u1 : s * arch_a, ay: v1, az: along_x ? s * arch_a : u1, bx: along_x ? p1 : s * arch_a, by: q1, bz: along_x ? s * arch_a : p1, width: 0.22) {}
+          ParisEiffelBeam(
+            ax: along_x ? u1 : s * arch_a,
+            ay: v1,
+            az: along_x ? s * arch_a : u1,
+            bx: along_x ? p1 : s * arch_a,
+            by: q1,
+            bz: along_x ? s * arch_a : p1,
+            width: 0.22
+          ) {}
         }
       }
     }
+  }
 
+  template ParisEiffelPlatforms {
     // First platform: a square ring with gold strips along the top and bottom of its gallery.
     const r1: f32 = 11.6
     const w1: f32 = 3.8
     const y1c = PR_EIFFEL_FIRST + 0.9
+
     for side in 0..2 {
       const sgn = side * 2 - 1
-      { (IsA, ParisEiffelIron); Position: {0, y1c, sgn * (r1 - w1 / 2)}; Box: {2 * r1, 1.8, w1}; DynamicTransform }
-      { (IsA, ParisEiffelIron); Position: {sgn * (r1 - w1 / 2), y1c, 0}; Box: {w1, 1.8, 2 * r1 - 2 * w1}; DynamicTransform }
+      {
+        (IsA, ParisEiffelIron)
+        Position: {0, y1c, sgn * (r1 - w1 / 2)}
+        Box: {2 * r1, 1.8, w1}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisEiffelIron)
+        Position: {sgn * (r1 - w1 / 2), y1c, 0}
+        Box: {w1, 1.8, 2 * r1 - 2 * w1}
+        DynamicTransform
+      }
+
       for e in 0..2 {
         const ey = PR_EIFFEL_FIRST + 0.12 + e * 1.56
-        { (IsA, ParisEiffelGlow); Position: {0, ey, sgn * (r1 + 0.06)}; Box: {2 * r1 + 0.24, 0.2, 0.12}; DynamicTransform }
-        { (IsA, ParisEiffelGlow); Position: {sgn * (r1 + 0.06), ey, 0}; Box: {0.12, 0.2, 2 * r1 + 0.24}; DynamicTransform }
+        {
+          (IsA, ParisEiffelGlow)
+          Position: {0, ey, sgn * (r1 + 0.06)}
+          Box: {2 * r1 + 0.24, 0.2, 0.12}
+          DynamicTransform
+        }
+
+        {
+          (IsA, ParisEiffelGlow)
+          Position: {sgn * (r1 + 0.06), ey, 0}
+          Box: {0.12, 0.2, 2 * r1 + 0.24}
+          DynamicTransform
+        }
       }
+
       // Railing posts along the gallery roof.
       for p in 0..9 {
         const px = 0 - r1 + (p + 0.5) * 2 * r1 / 9
-        { (IsA, ParisEiffelIron); Position: {px, y1c + 1.3, sgn * (r1 - 0.1)}; Box: {0.12, 0.8, 0.12}; DynamicTransform }
-        { (IsA, ParisEiffelIron); Position: {sgn * (r1 - 0.1), y1c + 1.3, px}; Box: {0.12, 0.8, 0.12}; DynamicTransform }
+        {
+          (IsA, ParisEiffelIron)
+          Position: {px, y1c + 1.3, sgn * (r1 - 0.1)}
+          Box: {0.12, 0.8, 0.12}
+          DynamicTransform
+        }
+
+        {
+          (IsA, ParisEiffelIron)
+          Position: {sgn * (r1 - 0.1), y1c + 1.3, px}
+          Box: {0.12, 0.8, 0.12}
+          DynamicTransform
+        }
       }
     }
 
     // Second platform, where the legs meet, with a lit pavilion on it.
     const y2 = PR_EIFFEL_LEGS_TOP
     deck2 : ParisEiffelIron { Position: {0, y2 + 0.6, 0}; Box: {13, 1.2, 13}; DynamicTransform }
-    pavilion2 : ParisEiffelLantern { Position: {0, y2 + 2.3, 0}; Box: {7.4, 2.2, 7.4}; DynamicTransform }
+    pavilion2 : ParisEiffelLantern {
+      Position: {0, y2 + 2.3, 0}
+      Box: {7.4, 2.2, 7.4}
+      DynamicTransform
+    }
+
     roof2 : ParisEiffelIron { Position: {0, y2 + 3.5, 0}; Box: {8, 0.3, 8}; DynamicTransform }
+
     for side in 0..2 {
       const sgn = side * 2 - 1
-      { (IsA, ParisEiffelGlow); Position: {0, y2 + 0.1, sgn * 6.56}; Box: {13.2, 0.2, 0.12}; DynamicTransform }
-      { (IsA, ParisEiffelGlow); Position: {sgn * 6.56, y2 + 0.1, 0}; Box: {0.12, 0.2, 13.2}; DynamicTransform }
-      { (IsA, ParisEiffelGlow); Position: {0, y2 + 1.1, sgn * 6.56}; Box: {13.2, 0.16, 0.12}; DynamicTransform }
-      { (IsA, ParisEiffelGlow); Position: {sgn * 6.56, y2 + 1.1, 0}; Box: {0.12, 0.16, 13.2}; DynamicTransform }
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {0, y2 + 0.1, sgn * 6.56}
+        Box: {13.2, 0.2, 0.12}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {sgn * 6.56, y2 + 0.1, 0}
+        Box: {0.12, 0.2, 13.2}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {0, y2 + 1.1, sgn * 6.56}
+        Box: {13.2, 0.16, 0.12}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {sgn * 6.56, y2 + 1.1, 0}
+        Box: {0.12, 0.16, 13.2}
+        DynamicTransform
+      }
     }
+  }
+
+  template ParisEiffelShaft {
+    const shaft_segs: i32 = 6
+    const LH = PR_EIFFEL_LEGS_TOP
+    const TH = PR_EIFFEL_TOP
 
     // The shaft: four glowing corner chords, X bracing and a strut on each face.
     for j in 0..shaft_segs {
@@ -192,19 +349,54 @@ assets {
       const yb = LH + (j + 1) * (TH - LH) / shaft_segs
       const w0 = pr_eiffel_shaft(y0)
       const wb = pr_eiffel_shaft(yb)
+
       for c in 0..4 {
         const cx = c % 2 == 0 ? -1.0 : 1.0
         const cz = c < 2 ? -1.0 : 1.0
-        ParisEiffelBeam(ax: cx * w0, ay: y0, az: cz * w0, bx: cx * wb, by: yb, bz: cz * wb, width: 0.55, glow: 2.6) {}
+        ParisEiffelBeam(
+          ax: cx * w0,
+          ay: y0,
+          az: cz * w0,
+          bx: cx * wb,
+          by: yb,
+          bz: cz * wb,
+          width: 0.55,
+          glow: 2.6
+        ) {}
       }
+
       for f in 0..4 {
         const ux = f == 1 || f == 2 ? 1.0 : -1.0
         const uz = f >= 2 ? 1.0 : -1.0
         const vx = f <= 1 ? 1.0 : -1.0
         const vz = f == 1 || f == 2 ? 1.0 : -1.0
-        ParisEiffelBeam(ax: ux * w0, ay: y0, az: uz * w0, bx: vx * wb, by: yb, bz: vz * wb, width: 0.22) {}
-        ParisEiffelBeam(ax: vx * w0, ay: y0, az: vz * w0, bx: ux * wb, by: yb, bz: uz * wb, width: 0.22) {}
-        ParisEiffelBeam(ax: ux * wb, ay: yb, az: uz * wb, bx: vx * wb, by: yb, bz: vz * wb, width: 0.28) {}
+        ParisEiffelBeam(
+          ax: ux * w0,
+          ay: y0,
+          az: uz * w0,
+          bx: vx * wb,
+          by: yb,
+          bz: vz * wb,
+          width: 0.22
+        ) {}
+        ParisEiffelBeam(
+          ax: vx * w0,
+          ay: y0,
+          az: vz * w0,
+          bx: ux * wb,
+          by: yb,
+          bz: uz * wb,
+          width: 0.22
+        ) {}
+        ParisEiffelBeam(
+          ax: ux * wb,
+          ay: yb,
+          az: uz * wb,
+          bx: vx * wb,
+          by: yb,
+          bz: vz * wb,
+          width: 0.28
+        ) {}
       }
     }
 
@@ -212,31 +404,112 @@ assets {
     const ym: f32 = 57
     const wm = pr_eiffel_shaft(ym) + 0.5
     gallery : ParisEiffelIron { Position: {0, ym, 0}; Box: {2 * wm, 0.5, 2 * wm}; DynamicTransform }
+
     for side in 0..2 {
       const sgn = side * 2 - 1
-      { (IsA, ParisEiffelGlow); Position: {0, ym, sgn * (wm + 0.05)}; Box: {2 * wm + 0.2, 0.16, 0.1}; DynamicTransform }
-      { (IsA, ParisEiffelGlow); Position: {sgn * (wm + 0.05), ym, 0}; Box: {0.1, 0.16, 2 * wm + 0.2}; DynamicTransform }
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {0, ym, sgn * (wm + 0.05)}
+        Box: {2 * wm + 0.2, 0.16, 0.1}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {sgn * (wm + 0.05), ym, 0}
+        Box: {0.1, 0.16, 2 * wm + 0.2}
+        DynamicTransform
+      }
     }
 
     // The top: platform, lantern room, cap, mast and beacon.
     top_deck : ParisEiffelIron { Position: {0, TH + 0.5, 0}; Box: {3.9, 1, 3.9}; DynamicTransform }
-    top_room : ParisEiffelLantern { Position: {0, TH + 2.4, 0}; Box: {2.6, 2.8, 2.6}; DynamicTransform }
-    top_cap : ParisEiffelIron { Position: {0, TH + 3.95, 0}; Box: {3.1, 0.3, 3.1}; DynamicTransform }
-    top_dome : ParisEiffelIron { Position: {0, TH + 4.1, 0}; HemiSphere: {radius: 1.2, segments: 12, smooth: true}; DynamicTransform }
-    mast : ParisEiffelIron { Position: {0, TH + 10.2, 0}; Frustum: {radius_bottom: 0.35, radius_top: 0.1, length: 10, segments: 8, smooth: true}; DynamicTransform }
-    beacon : ParisEiffelGlow { Position: {0, TH + 15.4, 0}; Sphere: {radius: 0.4, segments: 8}; Emissive: {strength: 8, color: {255, 210, 150}}; DynamicTransform }
+    top_room : ParisEiffelLantern {
+      Position: {0, TH + 2.4, 0}
+      Box: {2.6, 2.8, 2.6}
+      DynamicTransform
+    }
+
+    top_cap : ParisEiffelIron {
+      Position: {0, TH + 3.95, 0}
+      Box: {3.1, 0.3, 3.1}
+      DynamicTransform
+    }
+
+    top_dome : ParisEiffelIron {
+      Position: {0, TH + 4.1, 0}
+      HemiSphere: {radius: 1.2, segments: 12, smooth: true}
+      DynamicTransform
+    }
+
+    mast : ParisEiffelIron {
+      Position: {0, TH + 10.2, 0}
+      Frustum: {radius_bottom: 0.35, radius_top: 0.1, length: 10, segments: 8, smooth: true}
+      DynamicTransform
+    }
+
+    beacon : ParisEiffelGlow {
+      Position: {0, TH + 15.4, 0}
+      Sphere: {radius: 0.4, segments: 8}
+      Emissive: {strength: 8, color: {255, 210, 150}}
+      DynamicTransform
+    }
+
     for side in 0..2 {
       const sgn = side * 2 - 1
-      { (IsA, ParisEiffelGlow); Position: {0, TH + 0.05, sgn * 1.98}; Box: {4.06, 0.16, 0.1}; DynamicTransform }
-      { (IsA, ParisEiffelGlow); Position: {sgn * 1.98, TH + 0.05, 0}; Box: {0.1, 0.16, 4.06}; DynamicTransform }
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {0, TH + 0.05, sgn * 1.98}
+        Box: {4.06, 0.16, 0.1}
+        DynamicTransform
+      }
+
+      {
+        (IsA, ParisEiffelGlow)
+        Position: {sgn * 1.98, TH + 0.05, 0}
+        Box: {0.1, 0.16, 4.06}
+        DynamicTransform
+      }
     }
+  }
+
+  // The Eiffel Tower, scaled to about 95 m: four curved lattice legs joined by arches, the first
+  // platform (a square ring), the second platform where the legs meet, the tapering shaft, the
+  // top with its lantern and the mast.
+  //
+  // Lit gold at night by light strips along the corner chords and the platforms and a few point
+  // lights inside, and it sparkles once a minute or so.
+  template ParisEiffelTower {
+    prop sparkles: i32 = 80
+    ParisEiffelLegs legs()
+    ParisEiffelPlatforms platforms()
+    ParisEiffelShaft shaft()
 
     // Warm gold light washing the structure from inside, without shadows.
     lights {
-      { Position: {0, 7, 0}; PointLight: {intensity: 260, range: 30, shadows: false}; Rgb: {255, 176, 84} }
-      { Position: {0, PR_EIFFEL_FIRST + 3, 0}; PointLight: {intensity: 220, range: 26, shadows: false}; Rgb: {255, 176, 84} }
-      { Position: {0, PR_EIFFEL_LEGS_TOP + 6, 0}; PointLight: {intensity: 160, range: 22, shadows: false}; Rgb: {255, 180, 90} }
-      { Position: {0, 66, 0}; PointLight: {intensity: 120, range: 20, shadows: false}; Rgb: {255, 184, 96} }
+      {
+        Position: {0, 7, 0}
+        PointLight: {intensity: 260, range: 30, shadows: false}
+        Rgb: {255, 176, 84}
+      }
+
+      {
+        Position: {0, PR_EIFFEL_FIRST + 3, 0}
+        PointLight: {intensity: 220, range: 26, shadows: false}
+        Rgb: {255, 176, 84}
+      }
+
+      {
+        Position: {0, PR_EIFFEL_LEGS_TOP + 6, 0}
+        PointLight: {intensity: 160, range: 22, shadows: false}
+        Rgb: {255, 180, 90}
+      }
+
+      {
+        Position: {0, 66, 0}
+        PointLight: {intensity: 120, range: 20, shadows: false}
+        Rgb: {255, 184, 96}
+      }
     }
 
     sparkle {
@@ -253,19 +526,24 @@ assets {
 async {
   const rng: math.Rng = {seed: 1889}
   mut start: f32 = 20
+
   while true {
     await next_frame()
     const t = clock
     const on = t >= start && t < start + 5
+
     if on != pr_sparkle_on {
       pr_sparkle_on = on
     }
+
     if on {
       const tick: i32 = floor(t * 8)
+
       if tick != pr_sparkle_tick {
         pr_sparkle_tick = tick
       }
     }
+
     if t >= start + 5 {
       start = start + 52 + rng.f(16)
     }

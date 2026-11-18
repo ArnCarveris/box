@@ -243,6 +243,7 @@ assets {
     prop flavor: string = ""
     prop stat: i32 = 0
     prop amount: i32 = 1
+    prop selected: bool = false
 
     Position: {x, y, 1}
     Circle: {20}
@@ -252,6 +253,12 @@ assets {
     StarFace face(
       id: id, from: from, x: x, y: y, fx: fx, fy: fy, band: band, keystone: keystone,
       hover: hover, owner: this, name: name)
+
+    async {
+      if selected {
+        atlas_sel = this
+      }
+    }
 
     async {
       while true {
@@ -292,7 +299,7 @@ assets {
     box.spatial.Ignore
   }
 
-  template StarChartPyreTide {
+  template StarChart {
     Item: {h: Center, v: Middle, width: {mode: Fixed, value: 1}, height: {mode: Fixed, value: 1}}
     Position: {0, 0, 0}
 
@@ -316,340 +323,23 @@ assets {
     BandTitle tag_thorn(band: 2, x: 300, y: -280)
     BandTitle tag_veil(band: 3, x: -300, y: -280)
 
-    Star s0(id: 0, band: 0, x: -135, y: 72, name: "Kindling Spark", stat: 0, amount: 3,
-      flavor: "Every pyre begins as an argument between two sparks.")
-    Star s1(
-      id: 1,
-      from: 0,
-      fx: -135,
-      fy: 72,
-      band: 0,
-      x: -198,
-      y: 122,
-      name: "Ashen Oath",
-      stat: 0,
-      amount: 4,
-      flavor: "Sworn over a dead fire, kept by a living one."
-    )
-    Star s2(
-      id: 2,
-      from: 1,
-      fx: -198,
-      fy: 122,
-      band: 0,
-      x: -268,
-      y: 88,
-      name: "Forge Tongue",
-      stat: 0,
-      amount: 4,
-      flavor: "It speaks only in the language of hammers."
-    ) {
-      async {
-        atlas_sel = this
-      }
+    for (i, s) in atlas_stars {
+      Star "s{i}"(
+        id: i,
+        from: s.from,
+        x: s.x,
+        y: s.y,
+        fx: s.from < 0 ? 0 : atlas_stars[s.from].x,
+        fy: s.from < 0 ? 0 : atlas_stars[s.from].y,
+        band: s.band,
+        keystone: s.keystone,
+        selected: s.selected,
+        name: s.name,
+        flavor: s.flavor,
+        stat: s.stat,
+        amount: s.amount
+      )
     }
-
-    Star s3(
-      id: 3,
-      from: 1,
-      fx: -198,
-      fy: 122,
-      band: 0,
-      x: -168,
-      y: 198,
-      name: "Cinder Crown",
-      stat: 1,
-      amount: 3,
-      flavor: "Worn lightly, for the wearer is mostly smoke."
-    )
-    Star s4(
-      id: 4,
-      from: 2,
-      fx: -268,
-      fy: 88,
-      band: 0,
-      x: -338,
-      y: 138,
-      name: "Red Comet",
-      stat: 2,
-      amount: 4,
-      flavor: "It was late to the war, and early to the ending."
-    )
-    Star s5(
-      id: 5,
-      from: 3,
-      fx: -168,
-      fy: 198,
-      band: 0,
-      x: -244,
-      y: 228,
-      name: "Ember Choir",
-      stat: 0,
-      amount: 5,
-      flavor: "Nine thousand small fires, singing in one key."
-    )
-    Star s6(
-      id: 6,
-      from: 4,
-      fx: -338,
-      fy: 138,
-      band: 0,
-      x: -350,
-      y: 232,
-      keystone: true,
-      name: "Heart of Cinders",
-      stat: 0,
-      amount: 12,
-      flavor: "What remains after the burning is the part that burns best."
-    )
-
-    Star s7(id: 7, band: 1, x: 135, y: 72, name: "First Swell", stat: 3, amount: 3,
-      flavor: "The sea has never once been in a hurry.")
-    Star s8(
-      id: 8,
-      from: 7,
-      fx: 135,
-      fy: 72,
-      band: 1,
-      x: 190,
-      y: 140,
-      name: "Salt Memory",
-      stat: 3,
-      amount: 4,
-      flavor: "Water forgets nothing that ever drowned in it."
-    )
-    Star s9(
-      id: 9,
-      from: 8,
-      fx: 190,
-      fy: 140,
-      band: 1,
-      x: 272,
-      y: 104,
-      name: "Moonward Pull",
-      stat: 3,
-      amount: 4,
-      flavor: "A patient hand on the hem of the world."
-    )
-    Star s10(
-      id: 10,
-      from: 8,
-      fx: 190,
-      fy: 140,
-      band: 1,
-      x: 150,
-      y: 216,
-      name: "Pearl Lung",
-      stat: 1,
-      amount: 3,
-      flavor: "Breathe in the deep; it has been waiting."
-    )
-    Star s11(
-      id: 11,
-      from: 9,
-      fx: 272,
-      fy: 104,
-      band: 1,
-      x: 346,
-      y: 64,
-      name: "Undertow",
-      stat: 2,
-      amount: 4,
-      flavor: "The current you cannot see is the one that carries you."
-    )
-    Star s12(
-      id: 12,
-      from: 9,
-      fx: 272,
-      fy: 104,
-      band: 1,
-      x: 258,
-      y: 204,
-      name: "Tide Bell",
-      stat: 3,
-      amount: 5,
-      flavor: "Rung once by a sunken city, and heard twice."
-    )
-    Star s13(
-      id: 13,
-      from: 12,
-      fx: 258,
-      fy: 204,
-      band: 1,
-      x: 354,
-      y: 226,
-      keystone: true,
-      name: "Drowned Crown",
-      stat: 3,
-      amount: 12,
-      flavor: "A king is still a king, at any depth."
-    )
-  }
-
-  template StarChart : StarChartPyreTide {
-    Star s14(id: 14, band: 2, x: 135, y: -72, name: "Green Vow", stat: 1, amount: 3,
-      flavor: "Promise a seed nothing, and it will grow anyway.")
-    Star s15(
-      id: 15,
-      from: 14,
-      fx: 135,
-      fy: -72,
-      band: 2,
-      x: 205,
-      y: -112,
-      name: "Bramble Wall",
-      stat: 1,
-      amount: 4,
-      flavor: "The castle fell. The hedge did not."
-    )
-    Star s16(
-      id: 16,
-      from: 15,
-      fx: 205,
-      fy: -112,
-      band: 2,
-      x: 176,
-      y: -192,
-      name: "Old Bark",
-      stat: 1,
-      amount: 4,
-      flavor: "Count the rings; it has outlived your questions."
-    )
-    Star s17(
-      id: 17,
-      from: 15,
-      fx: 205,
-      fy: -112,
-      band: 2,
-      x: 286,
-      y: -84,
-      name: "Quickroot",
-      stat: 2,
-      amount: 3,
-      flavor: "It is already underneath you."
-    )
-    Star s18(
-      id: 18,
-      from: 16,
-      fx: 176,
-      fy: -192,
-      band: 2,
-      x: 262,
-      y: -218,
-      name: "Rose Thane",
-      stat: 0,
-      amount: 4,
-      flavor: "Beautiful, armored, and entirely without mercy."
-    )
-    Star s19(
-      id: 19,
-      from: 17,
-      fx: 286,
-      fy: -84,
-      band: 2,
-      x: 358,
-      y: -138,
-      name: "Moss Hymn",
-      stat: 1,
-      amount: 5,
-      flavor: "A slow song for those who plan to stay."
-    )
-    Star s20(
-      id: 20,
-      from: 18,
-      fx: 262,
-      fy: -218,
-      band: 2,
-      x: 358,
-      y: -234,
-      keystone: true,
-      name: "Thornfather",
-      stat: 1,
-      amount: 12,
-      flavor: "Every garden is a fortress that has learned patience."
-    )
-
-    Star s21(id: 21, band: 3, x: -135, y: -72, name: "Thin Hour", stat: 2, amount: 3,
-      flavor: "There is a minute between midnight and itself.")
-    Star s22(
-      id: 22,
-      from: 21,
-      fx: -135,
-      fy: -72,
-      band: 3,
-      x: -196,
-      y: -128,
-      name: "Silk Step",
-      stat: 2,
-      amount: 4,
-      flavor: "Walk as if the floor were a rumor."
-    )
-    Star s23(
-      id: 23,
-      from: 22,
-      fx: -196,
-      fy: -128,
-      band: 3,
-      x: -286,
-      y: -102,
-      name: "Lantern Moth",
-      stat: 3,
-      amount: 3,
-      flavor: "It follows a light that has not been lit yet."
-    )
-    Star s24(
-      id: 24,
-      from: 22,
-      fx: -196,
-      fy: -128,
-      band: 3,
-      x: -160,
-      y: -214,
-      name: "Second Shadow",
-      stat: 2,
-      amount: 4,
-      flavor: "One of them is yours. Do not ask which."
-    )
-    Star s25(
-      id: 25,
-      from: 23,
-      fx: -286,
-      fy: -102,
-      band: 3,
-      x: -362,
-      y: -60,
-      name: "Quiet Knife",
-      stat: 0,
-      amount: 4,
-      flavor: "The sharpest word is the one left unsaid."
-    )
-    Star s26(
-      id: 26,
-      from: 23,
-      fx: -286,
-      fy: -102,
-      band: 3,
-      x: -262,
-      y: -206,
-      name: "Mirror Vesper",
-      stat: 2,
-      amount: 5,
-      flavor: "The evening star, seen from the other side."
-    )
-    Star s27(
-      id: 27,
-      from: 26,
-      fx: -262,
-      fy: -206,
-      band: 3,
-      x: -358,
-      y: -232,
-      keystone: true,
-      name: "The Unseen Door",
-      stat: 2,
-      amount: 12,
-      flavor: "It has always been open. That is what hides it."
-    )
   }
 
   template StatBar {
@@ -750,7 +440,7 @@ assets {
       Item: {width: {mode: Grow}}
     }
 
-    for i in 0..7 {
+    for i in 0..band_stars(band) {
       "pip_{i}" {
         const lit = i < count
         Rotation: {0, 0, PI / 4}

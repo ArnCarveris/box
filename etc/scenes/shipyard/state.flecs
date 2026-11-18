@@ -29,11 +29,11 @@ state {
   event Request(op: i32)
 
   export mut grid: RigGrid = {}
-  export mut status: i32[1080] = {}
-  export mut counts: i32[18] = {}
+  export mut status: i32[CELLS] = {}
+  export mut counts: i32[KINDS] = {}
   export mut modules: i32 = 0
   export mut problems: i32 = 0
-  export mut air: bool[1080] = {}
+  export mut air: RigFlags = {}
   export mut placed: RigGrid = {}
   export mut stamp: i32 = 0
   export mut yard_design: RigDesign = {}
@@ -70,10 +70,10 @@ state {
   }
 
   fn validate() {
-    mut st: i32[1080] = {}
-    mut aired: bool[1080] = {}
-    mut queue: i32[1080] = {}
-    mut tally: i32[18] = {}
+    mut st: i32[CELLS] = {}
+    mut aired: RigFlags = {}
+    mut queue: i32[CELLS] = {}
+    mut tally: i32[KINDS] = {}
     mut front: i32 = GZ
     mut back: i32 = -1
     mut total: i32 = 0

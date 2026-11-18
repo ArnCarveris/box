@@ -26,16 +26,6 @@ assets {
   tex_com {}
 }
 
-state {
-  fn dest_x(i: i32) -> f32 {
-    match i { 0: -40; 1: 188; _: -196 }
-  }
-
-  fn dest_y(i: i32) -> f32 {
-    match i { 0: 30; 1: 118; _: -138 }
-  }
-}
-
 assets {
   template Blip {
     prop x: f32 = 0
@@ -71,7 +61,7 @@ assets {
 
     Interactive
     Cursor: {CursorPointer}
-    Position: {dest_x(dest), dest_y(dest), 6}
+    Position: {dests[dest].x, dests[dest].y, 6}
     Rect: {196, 92}
     Rgb: {0, 0, 0}
     BlendMode: Additive
@@ -97,7 +87,7 @@ assets {
     }
 
     Ink words(
-      text: dest_name(dest),
+      text: dests[dest].name,
       size: 30,
       align: Center,
       hue: picked || hover ? NAV_INK : NAV_DIM
@@ -105,7 +95,7 @@ assets {
       Position: {0, -8, 1}
     }
 
-    Ink code(text: home ? "CURRENT" : dest_code(dest), size: 24, align: Center, hue: NAV_DIM) {
+    Ink code(text: home ? "CURRENT" : dests[dest].code, size: 24, align: Center, hue: NAV_DIM) {
       Position: {0, -30, 1}
     }
 
@@ -175,22 +165,22 @@ assets {
 
       if course >= 0 && course != here {
         route {
-          const dx = dest_x(course) - dest_x(here)
-          const dy = dest_y(course) - dest_y(here)
+          const dx = dests[course].x - dests[here].x
+          const dy = dests[course].y - dests[here].y
           Stroke line(
-            x1: dest_x(here),
-            y1: dest_y(here) + 16,
-            x2: dest_x(here) + dx * plot,
-            y2: dest_y(here) + 16 + dy * plot,
+            x1: dests[here].x,
+            y1: dests[here].y + 16,
+            x2: dests[here].x + dx * plot,
+            y2: dests[here].y + 16 + dy * plot,
             w: 3.5,
             hue: {150, 255, 190}
           )
         }
       }
 
-      NavNode n0(dest: 0)
-      NavNode n1(dest: 1)
-      NavNode n2(dest: 2)
+      for (i, d) in dests {
+        NavNode "n{i}"(dest: i)
+      }
     }
 
     head {
@@ -310,44 +300,38 @@ assets {
 }
 
 state {
-  fn com_oro(i: i32) -> string {
-    match i {
-      0: "-- CH 61.4 -- WEAK CARRIER"
-      1: "DUST MERCHANT THIS IS TOLL"
-      2: "STATION ORO. YOU OWE US FOR"
-      3: "THREE MONTHS OF DOCKING AND"
-      4: "ONE (1) COFFEE MACHINE."
-      5: "WE KNOW WHERE YOU DRIFT."
-      _: "-- CARRIER LOST --"
-    }
-  }
+  export const com_oro: string[] = [
+    "-- CH 61.4 -- WEAK CARRIER",
+    "DUST MERCHANT THIS IS TOLL",
+    "STATION ORO. YOU OWE US FOR",
+    "THREE MONTHS OF DOCKING AND",
+    "ONE (1) COFFEE MACHINE.",
+    "WE KNOW WHERE YOU DRIFT.",
+    "-- CARRIER LOST --"
+  ]
 
-  fn com_naur(i: i32) -> string {
-    match i {
-      0: "-- CH 61.4 -- RELAY NAU-7"
-      1: "DM-7 THE ICE GUILD SAYS HI."
-      2: "ALSO LAST BATCH OF FROST"
-      3: "WAS 30 PCT SWEPT FLOOR."
-      4: "TOLL BOARD POSTED YOUR HULL"
-      5: "NUMBER. NICE PHOTO THOUGH."
-      _: "-- CARRIER LOST --"
-    }
-  }
+  export const com_naur: string[] = [
+    "-- CH 61.4 -- RELAY NAU-7",
+    "DM-7 THE ICE GUILD SAYS HI.",
+    "ALSO LAST BATCH OF FROST",
+    "WAS 30 PCT SWEPT FLOOR.",
+    "TOLL BOARD POSTED YOUR HULL",
+    "NUMBER. NICE PHOTO THOUGH.",
+    "-- CARRIER LOST --"
+  ]
 
-  fn com_cinder(i: i32) -> string {
-    match i {
-      0: "-- CH 61.4 -- NO CALLSIGN"
-      1: "YOU THE ONE WHO BUYS ASH?"
-      2: "GOT 3 DRUMS. FOUND THEM."
-      3: "DO NOT ASK WHERE. DO NOT"
-      4: "OPEN THE PURPLE ONE. WE"
-      5: "HEAR YOU HAVE ONE ALREADY."
-      _: "-- CARRIER LOST --"
-    }
-  }
+  export const com_cinder: string[] = [
+    "-- CH 61.4 -- NO CALLSIGN",
+    "YOU THE ONE WHO BUYS ASH?",
+    "GOT 3 DRUMS. FOUND THEM.",
+    "DO NOT ASK WHERE. DO NOT",
+    "OPEN THE PURPLE ONE. WE",
+    "HEAR YOU HAVE ONE ALREADY.",
+    "-- CARRIER LOST --"
+  ]
 
-  fn com_line(i: i32) -> string {
-    match here { 0: com_oro(i); 1: com_naur(i); _: com_cinder(i) }
+  fn com_lines(d: i32) -> string[] {
+    match d { 0: com_oro; 1: com_naur; _: com_cinder }
   }
 }
 
@@ -391,9 +375,9 @@ assets {
         Item: {width: {mode: Fixed, value: 600}, height: {mode: Fixed, value: 210}}
 
         if locked {
-          for i in 0..7 {
+          for (i, line) in com_lines(here) {
             if com_shown > i {
-              Ink "line_{i}"(text: com_line(i), size: 28, hue: AMB_INK)
+              Ink "line_{i}"(text: line, size: 28, hue: AMB_INK)
             }
           }
         } else {

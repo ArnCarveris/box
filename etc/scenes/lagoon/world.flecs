@@ -262,15 +262,17 @@ lagoon {
   // The water and the sand floor under it, wide and long enough to reach the horizon haze. The
   // floor scrolls with the world by whole texture repeats and its sand moves with it, so through
   // the clear water it flows past with the banks
-  // The water mirrors the palms, huts, the canoe and the volcano, rippled by the wave normals.
-  // The plane is the middle of the thin box; a quarter of the view size keeps the second scene
-  // pass cheap, the waves blur it anyway
+  //
+  // The water mirrors the palms, huts, the canoe and the volcano, rippled by the wave normals. The
+  // plane is the middle of the thin box; a quarter of the view size keeps the second scene pass
+  // cheap, the waves blur it anyway
   water : LgWater {
     Position: {0, 0, -800}
     Box: {1600, 0.02, 2400}
     PlanarReflection: {resolution: 0.25, clip_offset: 0.03, distortion: 0.025}
     NoShadow
   }
+
   floor : LgSandWet {
     Position: {0, -1.8, -800 + 12 * fract(distance / 12)}
     Box: {1600, 0.2, 2400}

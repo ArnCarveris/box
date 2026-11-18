@@ -97,22 +97,12 @@ assets {
   }
 }
 
-state {
-  fn sun_pitch(d: i32) -> f32 {
-    match d { 0: 0.34; 1: 0.62; _: 0.1 }
-  }
-
-  fn sun_yaw(d: i32) -> f32 {
-    match d { 0: -0.62; 1: 0.72; _: -1.9 }
-  }
-}
-
 assets {
   template Sun {
     prop dest: i32 = 0
-    const hue: Rgb = match dest { 0: {255, 226, 186}; 1: {206, 228, 255}; _: {255, 150, 90} }
+    const hue: Rgb = dests[dest].sun
 
-    Rotation: {sun_pitch(dest), sun_yaw(dest), 0}
+    Rotation: {dests[dest].sun_pitch, dests[dest].sun_yaw, 0}
     DirectionalLight: {intensity: in_tunnel ? 0 : 5.5, bake: Realtime}
     Rgb: hue
 

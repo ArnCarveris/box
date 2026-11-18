@@ -15,7 +15,7 @@ assets {
     prop idx: i32 = 0
     prop cargo: bool = false
 
-    const ship = st_ships[idx + (cargo ? 5 : 0)]
+    const ship = st_ships[idx + (cargo ? st_fleet : 0)]
     const state = ship.state
 
     const side = cargo ? -1.0 : 1.0

@@ -26,6 +26,7 @@ paris {
     Camera: {fov: 45, near_: 0.1, far_: 600}
     CameraController: {speed: 14}
   }
+
   // On the cross street, looking at the square: the café terrace, the Morris column and the
   // Métro entrance.
   street_camera {
@@ -34,6 +35,7 @@ paris {
     Camera: {fov: 60, near_: 0.05, far_: 400}
     CameraController: {speed: 5}
   }
+
   boulevard_camera {
     Position: {2.6, 1.7, 54}
     Rotation: {0.05, 0.04, 0}

@@ -14,7 +14,11 @@ paris {
 
   landmarks {
     // The café on the square off the boulevard, against the shop front of block_18.
-    ParisCafeTerrace cafe(width: 8, depth: 3.4) { Position: {22.5, 0.15, 33.5}; Rotation: {0, 0 - math.PI / 2, 0} }
+    ParisCafeTerrace cafe(width: 8, depth: 3.4) {
+      Position: {22.5, 0.15, 33.5}
+      Rotation: {0, 0 - math.PI / 2, 0}
+    }
+
     // The Métro entrance on the square, opening toward the boulevard side of the square.
     ParisMetroEntrance metro() { Position: {14, 0.15, 36.5}; Rotation: {0, math.PI, 0} }
     // The newspaper kiosk and two benches on the far bank square, facing the river.
@@ -23,6 +27,7 @@ paris {
     ParisBench bench_far_1() { Position: {15, 0, -57.5} }
     // Bollards along the boulevard edge of the square.
     const bollard_z: f32[] = [31.5, 33, 34.5, 36]
+
     for (i, z) in bollard_z {
       ParisBollard "bollard_{i}"() { Position: {5.45, 0.15, z} }
     }

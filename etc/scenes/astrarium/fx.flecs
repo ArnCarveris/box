@@ -50,8 +50,8 @@ assets {
   template CastFx : OneShot {
     prop spell: i32 = 0
 
-    const hue: Rgb = {spell_r(spell), spell_g(spell), spell_b(spell)}
-    const x = (spell - 2.5) * 80
+    const hue: Rgb = spells[spell].hue
+    const x = (spell - (spells.count() - 1) / 2.0) * 80
 
     Position: {x, 0, 0}
 

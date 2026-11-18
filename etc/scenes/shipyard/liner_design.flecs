@@ -8,7 +8,7 @@ using state
 state {
   export const LANES: i32 = 5
   export const SLOTS: i32 = 18
-  export const LCELLS: i32 = 90
+  export const LCELLS: i32 = LANES * SLOTS
   export const SEG: f32 = 4
   export const R_CORE: f32 = 2.4
   export const R_OUT: f32 = 1.7
@@ -47,7 +47,7 @@ state {
   export const L_SHIELD: i32 = 59
   export const L_RAILGUN: i32 = 60
   export const L_END: i32 = 61
-  export const LKINDS: i32 = 21
+  export const LKINDS: i32 = L_END - L_BASE
 
   export const LINER_PASSENGER: i32 = 0
   export const LINER_FREIGHTER: i32 = 1
@@ -55,20 +55,19 @@ state {
   export const LINER_BATTLESHIP: i32 = 3
 
   // The kind of each slot of a liner, lane by lane from the core, 0 for an empty slot.
-  array LinerDesign(type: i32, count: 90)
+  array LinerDesign(type: i32, count: LCELLS)
 
   // A level per slot, such as the power or the heat of its segment.
-  array LinerLevels(type: f32, count: 90)
+  array LinerLevels(type: f32, count: LCELLS)
 
   // A flag per slot, such as whether its reactor tripped.
-  array LinerFlags(type: bool, count: 90)
+  array LinerFlags(type: bool, count: LCELLS)
 
   // The kinds of the segments ahead (kf) and behind (kb) a slot on its lane, and whether the
   // outriggers 1 to 4 hold a truss beside it.
   struct LinerNear(kf: i32, kb: i32, p1: bool, p2: bool, p3: bool, p4: bool)
 
-  export const LPLAN_ROWS: i32 = 142
-  export const liner_plan: i32[710] = [
+  export const liner_plan: i32[] = [
     LINER_PASSENGER, 0, 0, 0, L_DRIVE,
     LINER_PASSENGER, 0, 1, 1, L_YOKE,
     LINER_PASSENGER, 0, 2, 3, L_TANKS,
@@ -289,7 +288,7 @@ state {
   fn liner_preset(p: i32) -> LinerDesign {
     mut g: LinerDesign = {}
 
-    for b in 0..LPLAN_ROWS {
+    for b in 0..liner_plan.count() / 5 {
       const o = b * 5
 
       if liner_plan[o] == p {

@@ -123,13 +123,13 @@ space_station {
   StationDiorama diorama()
 
   slots {
-    for i in 0..st_slots {
+    for i in 0..st_start_grid.count() {
       StationSlot "slot_{i}"(idx: i)
     }
   }
 
   ships {
-    for i in 0..5 {
+    for i in 0..st_fleet {
       StationShip "shuttle_{i}"(idx: i, cargo: false)
       StationShip "freighter_{i}"(idx: i, cargo: true)
     }

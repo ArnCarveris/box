@@ -362,7 +362,7 @@ assets {
   }
 
   template RealmCard {
-    const top_rank = rank >= RANKS - 1
+    const top_rank = rank >= ranks.count() - 1
     const lo = rank_need(rank)
     const hi = rank_need(rank + 1)
     const ratio = top_rank ? 1 : (prestige - lo) / (hi - lo)
@@ -909,7 +909,7 @@ assets {
             action: 1,
             cell: i
           )
-        } else if r >= RESEARCH_MAX {
+        } else if r >= farm_studies.count() {
           PanelButton button_(
             label: "All farming research done",
             detail: "Your farms grow {farm_yield(r):.1} food each",
@@ -982,7 +982,7 @@ assets {
             action: 3,
             cell: i
           )
-        } else if m >= MINING_MAX {
+        } else if m >= mining_studies.count() {
           PanelButton button_(
             label: "All quarrying research done",
             detail: "Your quarries cut {quarry_yield(m):.1} stone each",

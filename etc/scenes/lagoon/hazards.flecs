@@ -55,7 +55,7 @@ state {
   fn lg_clear(x: f64, z: f64, r: f64) -> bool {
     mut ok: bool = true
 
-    for j in 0..ROCKS {
+    for j in 0..rocks.count() {
       const d = sqr(x - rocks[j].x) + sqr(z - rocks[j].z)
 
       if rocks[j].live && d < sqr(lg_rock_r(rocks[j].size) + r) {
@@ -63,7 +63,7 @@ state {
       }
     }
 
-    for j in 0..LOGS {
+    for j in 0..logs.count() {
       const d = sqr(x - logs[j].x) + sqr(z - logs[j].z)
 
       if logs[j].live && d < sqr(lg_log_r(logs[j].size) + r) {
@@ -78,7 +78,7 @@ state {
   fn lg_free_rock() -> i32 {
     mut s: i32 = -1
 
-    for j in 0..ROCKS {
+    for j in 0..rocks.count() {
       if s < 0 && !rocks[j].live {
         s = j
       }
@@ -90,7 +90,7 @@ state {
   fn lg_free_log() -> i32 {
     mut s: i32 = -1
 
-    for j in 0..LOGS {
+    for j in 0..logs.count() {
       if s < 0 && !logs[j].live {
         s = j
       }
@@ -112,8 +112,8 @@ state {
   fn lg_wall_open(lo: f64, hi: f64) -> bool {
     mut open: bool = true
 
-    for j in 0..WALL_MAX {
-      if j < walls && lo < wall_hi[j] && hi > wall_lo[j] {
+    for j in 0..walls {
+      if lo < wall_hi[j] && hi > wall_lo[j] {
         open = false
       }
     }
@@ -124,7 +124,7 @@ state {
   fn lg_free_nut() -> i32 {
     mut s: i32 = -1
 
-    for j in 0..COCONUTS {
+    for j in 0..nuts.count() {
       if s < 0 && !nuts[j].live {
         s = j
       }
@@ -298,7 +298,7 @@ assets {
 // One entity per pool slot. The slot places itself from the item and distance; its model only
 // exists while the item is live.
 hazards {
-  for i in 0..ROCKS {
+  for i in 0..rocks.count() {
     "rock_{i}" {
       Position: {
         rocks[i].x,
@@ -312,7 +312,7 @@ hazards {
     }
   }
 
-  for i in 0..LOGS {
+  for i in 0..logs.count() {
     "log_{i}" {
       Position: {
         logs[i].x,
@@ -341,7 +341,7 @@ hazards {
     }
   }
 
-  for i in 0..COCONUTS {
+  for i in 0..nuts.count() {
     "nut_{i}" {
       Position: {
         nuts[i].x,
@@ -373,10 +373,11 @@ async {
     await next_frame()
 
     if game_state == GS_PLAYING {
-      // Rows: every row is a wall of hazards with one door for the canoe footprint, in reach of
-      // the door before (or of the canoe at the start of a run). Whether the door makes the
-      // player steer, how far and which way sets how hard the row is. Rows seeded closer at the
-      // start rise in by time (lg_sink).
+      // Rows: every row is a wall of hazards with one door for the canoe footprint, in reach of the
+      // door before (or of the canoe at the start of a run).
+      //
+      // Whether the door makes the player steer, how far and which way sets how hard the row is.
+      // Rows seeded closer at the start rise in by time (lg_sink).
       while distance >= next_row {
         const zs = 0 - (next_row + SPAWN_AHEAD)
         const gw = FOOT_W + lg_knob(GAP_MARGIN_EASY, GAP_MARGIN_HARD)
@@ -509,9 +510,11 @@ async {
 
         // Scan the canoe across the river: where both the hull and the float slip through outside
         // the door, a small rock closes the gap, beside the door on the side the canoe sticks out
-        // of it, so the door stays clear. Canoe positions in_lo..in_hi hold the footprint in the
-        // door, with half a step to spare. The scan narrows the hull and the float by half a
-        // step, so a way through narrower than a step is found too.
+        // of it, so the door stays clear.
+        //
+        // Canoe positions in_lo..in_hi hold the footprint in the door, with half a step to spare.
+        // The scan narrows the hull and the float by half a step, so a way through narrower than a
+        // step is found too.
         const in_lo = gx - gh - FOOT_CX - SCAN_STEP / 2
         const in_hi = gx + gh - FOOT_CX + SCAN_STEP / 2
         const pr = lg_rock_r(ROCK_SIZE_MIN)
@@ -590,7 +593,7 @@ async {
         invulnerable = max(0, invulnerable - dt)
       }
 
-      for i in 0..ROCKS {
+      for i in 0..rocks.count() {
         if rocks[i].live {
           const wz = rocks[i].z + distance
 
@@ -611,7 +614,7 @@ async {
         }
       }
 
-      for i in 0..LOGS {
+      for i in 0..logs.count() {
         if logs[i].live {
           const wz = logs[i].z + distance
 
@@ -619,7 +622,7 @@ async {
             logs[i].live = false
           } else if game_state == GS_PLAYING && invulnerable <= 0 &&
             lg_touches_log(logs[i].x, wz, lg_log_yaw(logs[i].spin, logs[i].kind, clock),
-              logs[i].size) {
+            logs[i].size) {
             logs[i].hit = true
             logs[i].live = false
             lives -= 1
@@ -633,7 +636,7 @@ async {
         }
       }
 
-      for i in 0..COCONUTS {
+      for i in 0..nuts.count() {
         if nuts[i].live {
           const wz = nuts[i].z + distance
 

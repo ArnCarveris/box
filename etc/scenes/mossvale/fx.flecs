@@ -651,10 +651,10 @@ state {
     match s { 6: 0.3; 3: 0.8; _: 0.7 }
   }
 
-  export mut sfx_on: bool[8] = {}
-  export mut sfx_x: f32[8] = {}
-  export mut sfx_z: f32[8] = {}
-  export mut sfx_until: f64[8] = {}
+  export mut sfx_on: bool[] = MV_SPELLS.map((s) -> { false })
+  export mut sfx_x: f32[] = MV_SPELLS.map((s) -> { 0 })
+  export mut sfx_z: f32[] = MV_SPELLS.map((s) -> { 0 })
+  export mut sfx_until: f64[] = MV_SPELLS.map((s) -> { 0 })
 }
 
 mossvale {
@@ -787,7 +787,7 @@ async {
   while true {
     await next_frame()
 
-    for s in 1..7 {
+    for s in 1..MV_SPELLS.count() {
       if sfx_on[s] && clock > sfx_until[s] {
         sfx_on[s] = false
       }

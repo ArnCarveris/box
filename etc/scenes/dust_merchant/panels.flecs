@@ -278,7 +278,7 @@ assets {
           Knob tune(label: "TUNER", sig: KN_TUNE, r: 44, speed: 0.0016, ticks: 21)
           Row small(gap: 6) {
             Knob dim(label: "DIM", sig: KN_DIM, r: 18)
-            Knob vol(label: "SQUELCH", sig: KN_GAIN + 3, r: 18)
+            Knob vol(label: "SQUELCH", sig: KN_SQUELCH, r: 18)
           }
         }
       }
@@ -370,14 +370,15 @@ assets {
       Column body(gap: 4, v: Middle, y: 6) {
         Tag head(text: "POWER DISTRIBUTION", w: 640, h: 24, tone: {28, 28, 28}, ink: {232, 186, 96})
         Row bk0(gap: 3) {
-          for i in 0..6 {
-            Breaker "b_{i}"(label: breaker_name(i), popped: i == 3)
+          for i in 0..breakers.count() / 2 {
+            Breaker "b_{i}"(label: breakers[i], popped: i == 3)
           }
         }
 
         Row bk1(gap: 3) {
-          for i in 6..12 {
-            Breaker "b_{i}"(label: breaker_name(i), popped: i == 11, flag: i == 11)
+          for i in (breakers.count() / 2)..breakers.count() {
+            const last = i == breakers.count() - 1
+            Breaker "b_{i}"(label: breakers[i], popped: last, flag: last)
           }
         }
 

@@ -13,157 +13,27 @@ state {
   export mut finished_at: f64 = 0
 
   fn quest_name(q: i32) -> string {
-    match q {
-      0: "A Cold Hearth"
-      1: "Lamps of the Square"
-      2: "Bread for Mossvale"
-      3: "Thorns in the Garden"
-      4: "Thirsty Herbs"
-      5: "Fire at the Smithy!"
-      6: "Parched Fields"
-      7: "Windmill Woes"
-      8: "Granny's Washing"
-      9: "The Fogbound Road"
-      10: "The Woodcutter's Camp"
-      11: "The Hermit's Trial"
-      12: "The Scorched Grove"
-      13: "The Prize Pumpkin"
-      14: "The Broken Bridge"
-      15: "No Bites Today"
-      16: "The Stargazer's Isle"
-      17: "Cold Drinks"
-      18: "Rockslide"
-      19: "The Dark Mine"
-      20: "Lost Sheep"
-      21: "Biscuit on the Roof"
-      22: "The Festival of Lights"
-      23: "Wisps of the Valley"
-      24: "The Fairy Ring"
-      25: "The Old Watchtower"
-      _: ""
-    }
+    MV_QUESTS[q].name
   }
 
   fn quest_giver(q: i32) -> i32 {
-    match q {
-      1, 22: 0
-      2: 1
-      3, 4, 23, 24: 2
-      5: 3
-      6, 7: 6
-      8, 13: 7
-      10: 8
-      11, 12: 9
-      15, 16: 10
-      17: 4
-      19: 11
-      20, 25: 12
-      21: 5
-      _: -1
-    }
+    MV_QUESTS[q].giver
   }
 
   fn quest_turnin(q: i32) -> i32 {
-    match q {
-      0, 9, 14, 16, 18: -1
-      _: quest_giver(q)
-    }
+    MV_QUESTS[q].turnin
   }
 
   fn quest_need(q: i32) -> i32 {
-    match q {
-      0: 1
-      1: 6
-      2: 4
-      3: 5
-      4: 6
-      5: 4
-      6: 8
-      7: 6
-      8: 5
-      9: 3
-      10: 5
-      11: 4
-      12: 6
-      13: 1
-      14: 1
-      15: 5
-      16: 5
-      17: 3
-      18: 3
-      19: 5
-      20: 5
-      21: 1
-      22: 8
-      23: 20
-      24: 6
-      25: 4
-      _: 1
-    }
+    MV_QUESTS[q].need
   }
 
   fn quest_goal(q: i32) -> string {
-    match q {
-      0: "Light the hearth by your cottage"
-      1: "Lamps lit"
-      2: "Oven lit, loaves delivered"
-      3: "Thornweed burned"
-      4: "Herb beds watered"
-      5: "Fires put out"
-      6: "Crop patches watered"
-      7: "Mill turning, crows shooed"
-      8: "Washing dried"
-      9: "Fog banks cleared"
-      10: "Fire lit, logs uncovered"
-      11: "Braziers lit"
-      12: "Saplings regrown"
-      13: "Pumpkin grown"
-      14: "Bridge regrown"
-      15: "Lily pads bloomed"
-      16: "Ice path frozen, beacon lit"
-      17: "Barrels chilled"
-      18: "Boulders lifted"
-      19: "Mine lamps lit"
-      20: "Sheep returned"
-      21: "Cat rescued"
-      22: "Festival preparations"
-      23: "Wisps gathered"
-      24: "Mushrooms revived"
-      25: "Thorns burned, beacon lit"
-      _: ""
-    }
+    MV_QUESTS[q].goal
   }
 
   fn quest_where(q: i32) -> string {
-    match q {
-      0: "Spark the stone hearth east of your cottage door."
-      1: "Six lamps ring the village square."
-      2: "Pella's oven stands beside the bakery, on the north side of the square."
-      3: "Mira's garden lies at the west end of the south lane, by the river."
-      4: "The herb beds are inside Mira's garden fence."
-      5: "The burning haystacks are in the yard beside the smithy, east along the main street."
-      6: "Oswin's fields lie south of the east road."
-      7: "The windmill stands north-east of the farm; crows sit in the wheat."
-      8: "Granny Maud's washing lines are behind her cottage, far east."
-      9: "Fog chokes the road north into Whisperwood."
-      10: "Gareth's camp is west of the forest road."
-      11: "The stone circle lies at the north end of the forest road."
-      12: "The burnt grove is east of the forest road."
-      13: "The pumpkin grows in Maud's patch, south-east of the farm."
-      14: "The broken bridge spans the river on the west road."
-      15: "Lily buds wait in the shallows along the lake's south shore."
-      16: "Freeze floes from the east shore to the island, then light the beacon."
-      17: "The lemonade barrels stand outside the Sleepy Toad inn."
-      18: "Boulders block the road south into the hills."
-      19: "Lamps line the track to Gruff's mine, in the quarry."
-      20: "Sheep are scattered across the southern hills. The pen is west of the road."
-      21: "Biscuit sits on the roof of Tam's house, on the south lane."
-      22: "Planters and fountain in the square, ice swan by the hall, lantern by the bakery."
-      23: "Glowing wisps drift in every corner of the valley."
-      24: "The fairy ring lies in the meadow south-west of Mirror Lake."
-      25: "The watchtower stands in the south-west hills, beyond the sheep pen."
-      _: ""
-    }
+    MV_QUESTS[q].place
   }
 
   fn line(k: i32) -> string {
@@ -395,9 +265,9 @@ state {
   }
 
   fn refresh() {
-    mut m: i32[16] = {}
+    mut m: i32[] = MV_NPCS.map((n) -> { 0 })
 
-    for q in 0..QUESTS {
+    for q in 0..MV_QUESTS.count() {
       const g = quest_giver(q)
       const t = quest_turnin(q)
 
@@ -411,7 +281,7 @@ state {
     }
 
     if qs[Q_BREAD] == QS_ACTIVE && ts[7] > 0 {
-      for n in 0..NPCS {
+      for n in 0..MV_NPCS.count() {
         if delivery_npc(n) && !delivered[n] && m[n] == 0 {
           m[n] = 1
         }
@@ -420,14 +290,14 @@ state {
 
     npc_mark = m
 
-    mut tt: string[4] = {}
-    mut tsub: string[4] = {}
+    mut tt: string[TRACK_ROWS] = {}
+    mut tsub: string[TRACK_ROWS] = {}
     mut count: i32 = 0
 
-    for i in 0..QUESTS {
-      const q = QUESTS - 1 - i
+    for i in 0..MV_QUESTS.count() {
+      const q = MV_QUESTS.count() - 1 - i
 
-      if count < 4 && (qs[q] == QS_ACTIVE || qs[q] == QS_RETURN) {
+      if count < TRACK_ROWS && (qs[q] == QS_ACTIVE || qs[q] == QS_RETURN) {
         tt[count] = quest_name(q)
 
         if qs[q] == QS_RETURN {
@@ -442,10 +312,10 @@ state {
       }
     }
 
-    for i in 0..QUESTS {
-      const q = QUESTS - 1 - i
+    for i in 0..MV_QUESTS.count() {
+      const q = MV_QUESTS.count() - 1 - i
 
-      if count < 4 && qs[q] == QS_OPEN && quest_giver(q) >= 0 {
+      if count < TRACK_ROWS && qs[q] == QS_OPEN && quest_giver(q) >= 0 {
         tt[count] = quest_name(q)
         tsub[count] = "Talk to {npc_name(quest_giver(q))}"
         count += 1
@@ -460,16 +330,16 @@ state {
   fn find_objective() {
     mut q: i32 = -1
 
-    for i in 0..QUESTS {
-      const k = QUESTS - 1 - i
+    for i in 0..MV_QUESTS.count() {
+      const k = MV_QUESTS.count() - 1 - i
 
       if q < 0 && k != Q_MOTES && (qs[k] == QS_ACTIVE || qs[k] == QS_RETURN) {
         q = k
       }
     }
 
-    for i in 0..QUESTS {
-      const k = QUESTS - 1 - i
+    for i in 0..MV_QUESTS.count() {
+      const k = MV_QUESTS.count() - 1 - i
 
       if q < 0 && k != Q_MOTES && qs[k] == QS_OPEN && quest_giver(k) >= 0 {
         q = k
@@ -485,26 +355,26 @@ state {
       if qs[q] == QS_RETURN {
         on = true
         npc = true
-        bx = npc_x[quest_turnin(q)]
-        bz = npc_z[quest_turnin(q)]
+        bx = MV_NPCS[quest_turnin(q)].x
+        bz = MV_NPCS[quest_turnin(q)].z
       } else if qs[q] == QS_OPEN {
         on = true
         npc = true
-        bx = npc_x[quest_giver(q)]
-        bz = npc_z[quest_giver(q)]
+        bx = MV_NPCS[quest_giver(q)].x
+        bz = MV_NPCS[quest_giver(q)].z
       } else if q == Q_BREAD && ts[7] > 0 {
         mut best: f64 = 1e9
 
-        for n in 0..NPCS {
+        for n in 0..MV_NPCS.count() {
           if delivery_npc(n) && !delivered[n] {
-            const d = dist2(px, pz, npc_x[n], npc_z[n])
+            const d = dist2(px, pz, MV_NPCS[n].x, MV_NPCS[n].z)
 
             if d < best {
               best = d
               on = true
               npc = true
-              bx = npc_x[n]
-              bz = npc_z[n]
+              bx = MV_NPCS[n].x
+              bz = MV_NPCS[n].z
             }
           }
         }
@@ -632,7 +502,7 @@ state {
 
     mut all = true
 
-    for i in 0..22 {
+    for i in 0..Q_FESTIVAL {
       if qs[i] != QS_DONE {
         all = false
       }
@@ -657,7 +527,7 @@ state {
     mut t: i32 = 3000 + n
     mut found = false
 
-    for q in 0..QUESTS {
+    for q in 0..MV_QUESTS.count() {
       if quest_turnin(q) == n && qs[q] == QS_RETURN {
         t = 1000 + q * 10 + 3
         found = true
@@ -671,7 +541,7 @@ state {
     }
 
     if !found {
-      for q in 0..QUESTS {
+      for q in 0..MV_QUESTS.count() {
         if quest_giver(q) == n && qs[q] == QS_OPEN {
           t = 1000 + q * 10 + 1
           found = true
@@ -681,7 +551,7 @@ state {
     }
 
     if !found {
-      for q in 0..QUESTS {
+      for q in 0..MV_QUESTS.count() {
         if quest_giver(q) == n && qs[q] == QS_ACTIVE {
           t = 1000 + q * 10 + 2
           break
@@ -781,10 +651,10 @@ async {
       qs[Q_MOTES] = QS_ACTIVE
     }
 
-    if qs[Q_MOTES] == QS_ACTIVE && motes >= MOTES {
+    if qs[Q_MOTES] == QS_ACTIVE && motes >= MV_WISPS.count() {
       goal_met(Q_MOTES)
     } else {
-      say("A wisp! Your mana deepens. Wisps gathered: {motes} of {MOTES}")
+      say("A wisp! Your mana deepens. Wisps gathered: {motes} of {MV_WISPS.count()}")
     }
 
     refresh()

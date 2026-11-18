@@ -13,7 +13,6 @@ state {
   export const SHIP_DOCKED: i32 = 5
   export const SHIP_LIFTING: i32 = 6
   export const SHIP_LEAVING: i32 = 7
-  export const st_ship_count: i32 = 10
 
   fn st_ship_go(s: i32, state: i32, timer: i32) {
     st_ships[s].state = state
@@ -27,8 +26,8 @@ async {
   while true {
     await Tick
 
-    for s in 0..st_ship_count {
-      const cargo = s >= 5
+    for s in 0..st_fleet * 2 {
+      const cargo = s >= st_fleet
       const ship = st_ships[s]
       const state = ship.state
       const timer = ship.timer
@@ -62,7 +61,7 @@ async {
         const pad_kind = cargo ? K_CARGO : K_PAX
         mut pad: i32 = -1
 
-        for i in 0..st_slots {
+        for i in 0..st_grid.count() {
           if st_grid[i] == pad_kind && !st_pad_busy[i] {
             pad = i
             break

@@ -10,7 +10,7 @@ using assets
 
 state {
   fn refresh_ready() {
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       const r = kind[i] == K_HOUSE && !abandoned[i] && level[i] < max_level(K_HOUSE) &&
         keep_level > level[i] && points[i] >= protect_need(level[i])
 
@@ -21,12 +21,12 @@ state {
   }
 
   fn recompute() {
-    mut seen: bool[196] = {}
-    mut queue: i32[196] = {}
+    mut seen: bool[] = kind.map((c) -> { false })
+    mut queue: i32[] = kind.map((c) -> { 0 })
     mut head: i32 = 0
     mut tail: i32 = 0
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       const x = i % GRID
       const z = (i - x) / GRID
 
@@ -60,7 +60,7 @@ state {
         tail += 1
       }
 
-      if c < CELLS - GRID && !seen[c + GRID] && !barrier(kind[c + GRID]) {
+      if c < kind.count() - GRID && !seen[c + GRID] && !barrier(kind[c + GRID]) {
         seen[c + GRID] = true
         queue[tail] = c + GRID
         tail += 1
@@ -80,7 +80,7 @@ state {
     mut keep_lvl: i32 = 0
     mut smith: i32 = -1
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       const k = kind[i]
       const lvl = level[i]
       const part = k == K_FARM && farm_origin[i] != i
@@ -140,7 +140,7 @@ state {
 
     refresh_ready()
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       const x = i % GRID
       const z = (i - x) / GRID
       mut fits = x >= 1 && z >= 1 && x + 2 < GRID && z + 2 < GRID
@@ -183,15 +183,15 @@ state {
   }
 
   fn new_realm() {
-    mut k: i32[196] = {}
-    mut l: i32[196] = {}
-    mut a: bool[196] = {}
-    mut p: f64[196] = {}
-    mut r: bool[196] = {}
-    mut d: bool[196] = {}
-    mut f: i32[196] = {}
+    mut k: i32[] = kind.map((c) -> { 0 })
+    mut l: i32[] = kind.map((c) -> { 0 })
+    mut a: bool[] = kind.map((c) -> { false })
+    mut p: f64[] = kind.map((c) -> { 0 })
+    mut r: bool[] = kind.map((c) -> { false })
+    mut d: bool[] = kind.map((c) -> { false })
+    mut f: i32[] = kind.map((c) -> { 0 })
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       const x = i % GRID
       const z = (i - x) / GRID
       const d2 = (x - 10) * (x - 10) + (z - 3) * (z - 3)
@@ -238,7 +238,7 @@ state {
   fn raid_one() {
     mut exposed: i32 = 0
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       if kind[i] == K_HOUSE && !inside[i] && !abandoned[i] {
         exposed += 1
       }
@@ -250,7 +250,7 @@ state {
       mut n: i32 = 0
       mut target: i32 = -1
 
-      for i in 0..CELLS {
+      for i in 0..kind.count() {
         if kind[i] == K_HOUSE && !inside[i] && !abandoned[i] {
           if n == pick {
             target = i
@@ -327,7 +327,7 @@ state {
     mut best: i32 = -1
     mut best_score: i32 = 999
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       const k = kind[i]
 
       if !abandoned[i] && food_need(k, level[i]) > 0 {
@@ -466,7 +466,7 @@ state {
         } else {
           const col = i % GRID
           const kn = i >= GRID ? kind[i - GRID] : 0
-          const ks = i < CELLS - GRID ? kind[i + GRID] : 0
+          const ks = i < kind.count() - GRID ? kind[i + GRID] : 0
           const ke = col < GRID - 1 ? kind[i + 1] : 0
           const kw = col > 0 ? kind[i - 1] : 0
           rising = i
@@ -570,7 +570,7 @@ async {
       mut raised: i32 = 0
 
       if k == K_KEEP {
-        for c in 0..CELLS {
+        for c in 0..kind.count() {
           const kc = kind[c]
 
           if (kc == K_WALL || kc == K_GATE) && !abandoned[c] &&
@@ -676,7 +676,7 @@ async {
     stone = min(stone + stone_rate, 99999)
     food = clamp(food + food_rate, 0, FOOD_CAP)
 
-    for i in 0..CELLS {
+    for i in 0..kind.count() {
       if kind[i] == K_HOUSE && level[i] < max_level(K_HOUSE) && inside[i] && !abandoned[i] &&
         food > 0 {
         const need = protect_need(level[i])
@@ -780,7 +780,7 @@ async {
   while true {
     const e = await RankUp
 
-    if e.rank >= RANKS - 1 {
+    if e.rank >= ranks.count() - 1 {
       crowned = true
       emit Toast(text: "Long live the crown! Your Royal Citadel is complete.")
     } else {
@@ -789,7 +789,7 @@ async {
 
     const cx = keep_cell >= 0 ? cell_x(keep_cell) : 0
     const cz = keep_cell >= 0 ? cell_z(keep_cell) : 0
-    const bursts = e.rank >= RANKS - 1 ? 12 : 4
+    const bursts = e.rank >= ranks.count() - 1 ? 12 : 4
     const f0 = box.audio.play(SfxFanfareA, 0.7)
     await delay(0.18)
     const f1 = box.audio.play(SfxFanfareB, 0.7)

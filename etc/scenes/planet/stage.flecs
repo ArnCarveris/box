@@ -248,6 +248,19 @@ assets {
     const wrim: f32 = 6 * ke + 0.8 * kr + 1.2 * kf
     const wref: f32 = 5 * kf
 
+    h_edge {}
+    h_nw {}
+    h_nm {}
+    h_nc {}
+    h_nk {}
+    h_ns {}
+    h_nh {}
+    h_tn {}
+    h_wp {}
+    h_wq {}
+    h_fil {}
+    h_den {}
+
     // The dense clumps shade what lies behind them, pillars and globules with dark tails, and are
     // lit on their rims that face the star
     h_opq {
@@ -476,7 +489,7 @@ assets {
     SkyHero hero(params: params)
 
     const ready: bool = neb[box.texture.Status].revision > 0
-    const hero_ready: bool = hero[box.texture.Status].revision > 0
+    const hero_ready: bool = hero?[box.texture.Status] && hero[box.texture.Status].revision > 0
 
     shell {
       Position: {0, 0, 0}

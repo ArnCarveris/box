@@ -46,26 +46,32 @@ state {
   // The length of the walk along the street graph from node n to node goal (Bellman-Ford over
   // the links, at most a few dozen passes).
   fn pr_graph_dist(n: i32, goal: i32) -> f32 {
-    mut gd: f32[71] = {}
-    for k in 0..PR_NODES {
+    mut gd: f32[] = pr_nodes.map((n) -> { 0 })
+
+    for k in 0..pr_nodes.count() {
       gd[k] = 100000
     }
+
     gd[goal] = 0
 
     mut changed = true
-    for pass in 0..PR_NODES {
+
+    for pass in 0..pr_nodes.count() {
       if changed {
         changed = false
-        for l in 0..PR_LINKS {
+
+        for l in 0..pr_links.count() {
           const la = pr_links[l].a
           const lb = pr_links[l].b
           const dx = pr_nodes[la].x - pr_nodes[lb].x
           const dz = pr_nodes[la].z - pr_nodes[lb].z
           const len = sqrt(dx * dx + dz * dz)
+
           if gd[la] + len < gd[lb] {
             gd[lb] = gd[la] + len
             changed = true
           }
+
           if gd[lb] + len < gd[la] {
             gd[la] = gd[lb] + len
             changed = true
@@ -80,26 +86,32 @@ state {
   // The node linked to n on the shortest walk to goal, where walking to avoid_a or avoid_b costs
   // a detour (so that statues chasing the same raccoon take different streets).
   fn pr_route(n: i32, goal: i32, avoid_a: i32, avoid_b: i32) -> i32 {
-    mut gd: f32[71] = {}
-    for k in 0..PR_NODES {
+    mut gd: f32[] = pr_nodes.map((n) -> { 0 })
+
+    for k in 0..pr_nodes.count() {
       gd[k] = 100000
     }
+
     gd[goal] = 0
 
     mut changed = true
-    for pass in 0..PR_NODES {
+
+    for pass in 0..pr_nodes.count() {
       if changed {
         changed = false
-        for l in 0..PR_LINKS {
+
+        for l in 0..pr_links.count() {
           const la = pr_links[l].a
           const lb = pr_links[l].b
           const dx = pr_nodes[la].x - pr_nodes[lb].x
           const dz = pr_nodes[la].z - pr_nodes[lb].z
           const len = sqrt(dx * dx + dz * dz)
+
           if gd[la] + len < gd[lb] {
             gd[lb] = gd[la] + len
             changed = true
           }
+
           if gd[lb] + len < gd[la] {
             gd[la] = gd[lb] + len
             changed = true
@@ -110,12 +122,14 @@ state {
 
     mut best: i32 = n
     mut best_c: f32 = 1000000
-    for l in 0..PR_LINKS {
+
+    for l in 0..pr_links.count() {
       if pr_links[l].a == n || pr_links[l].b == n {
         const m = pr_links[l].a == n ? pr_links[l].b : pr_links[l].a
         const dx = pr_nodes[m].x - pr_nodes[n].x
         const dz = pr_nodes[m].z - pr_nodes[n].z
         const c = sqrt(dx * dx + dz * dz) + gd[m] + (m == avoid_a || m == avoid_b ? 9.0 : 0.0)
+
         if c < best_c {
           best_c = c
           best = m
@@ -129,7 +143,8 @@ state {
   // Whether a link joins nodes a and b.
   fn pr_linked(a: i32, b: i32) -> bool {
     mut found = false
-    for l in 0..PR_LINKS {
+
+    for l in 0..pr_links.count() {
       if (pr_links[l].a == a && pr_links[l].b == b) || (pr_links[l].a == b && pr_links[l].b == a) {
         found = true
       }
@@ -157,9 +172,10 @@ paris {
 
 // The statues hunt the raccoons. They patrol the street graph at a stately pace (stopping now
 // and then to look both ways, sweep the torch low or look into a bin, manhole or drain), spot a
-// raccoon in front of them, point the torch at it, chase it briskly along the street graph with
-// the torch held forward and search where it vanished or got away. Each frame works on copies of
-// state.pr_statues and state.pr_hunters and writes them back once.
+// raccoon in front of them, point the torch at it and chase it briskly along the street graph.
+//
+// They search where it vanished or got away. Each frame works on copies of state.pr_statues and
+// state.pr_hunters and writes them back once.
 async {
   const rng: math.Rng = {seed: 9127}
   // Sideways offset from the line between two nodes, to the right of the way a statue walks.
@@ -175,8 +191,8 @@ async {
   // On patrol she often walks on toward a raccoon in the open within prowl.
   const prowl: f32 = 30
 
-  mut ss: ParisStatue[14] = pr_statues
-  mut hs: ParisHunter[14] = pr_hunters
+  mut ss = pr_statues
+  mut hs = pr_hunters
   pr_statue_idle = false
 
   while true {
@@ -188,20 +204,22 @@ async {
     mut closest: f32 = pr_hunt_closest
 
     // Who is after which raccoon.
-    mut after: i32[10] = {}
+    mut after: i32[] = pr_raccoons.map((r) -> { 0 })
     mut hunting: i32 = 0
-    for k in 0..PR_STATUES {
+
+    for k in 0..pr_statues.count() {
       if hs[k].behaviour == PR_ST_SPOT || hs[k].behaviour == PR_ST_CHASE {
         if hs[k].quarry >= 0 {
           after[hs[k].quarry] += 1
         }
       }
+
       if hs[k].behaviour >= PR_ST_SPOT {
         hunting += 1
       }
     }
 
-    for i in 0..PR_STATUES {
+    for i in 0..pr_statues.count() {
       const s = ss[i]
       const h = hs[i]
       mut x: f32 = s.x
@@ -285,7 +303,9 @@ async {
       }
 
       // Held up close to the goal (by a statue heading for the same node): close enough.
-      if !arrived && want > 0 && h.speed < 0.35 * want && timer > 2 && (gx - x) * (gx - x) + (gz - z) * (gz - z) < 1 {
+      if !arrived && want > 0 && h.speed < 0.35 * want && timer > 2 &&
+        (gx - x) * (gx - x) + (gz - z) * (gz - z) < 1
+      {
         arrived = true
       }
 
@@ -302,6 +322,7 @@ async {
         if leg == 0 && arrived {
           // Arrived at the next node (or back on the node after a pause, then walk on).
           const walked = target != node
+
           if walked {
             prev = node
             node = target
@@ -341,38 +362,47 @@ async {
             // often toward the nearest raccoon in the open within prowl, else at random.
             mut k: i32 = rng.u(deg)
             mut next: i32 = pr_neighbor(node, k)
+
             if next == prev && deg > 1 {
               k = k + 1 + rng.u(deg - 1)
+
               if k >= deg {
                 k = k - deg
               }
+
               next = pr_neighbor(node, k)
             }
 
             mut prey: i32 = -1
             mut prey_d: f32 = prowl
-            for j in 0..PR_RACCOONS {
+
+            for j in 0..pr_raccoons.count() {
               if pr_raccoon_visible(rc[j]) {
                 const d = sqrt((rc[j].x - x) * (rc[j].x - x) + (rc[j].z - z) * (rc[j].z - z))
+
                 if d < prey_d {
                   prey = j
                   prey_d = d
                 }
               }
             }
+
             if prey >= 0 && rng.f(1) < 0.65 {
               mut best_d: f32 = 1000000
+
               for kk in 0..deg {
                 const m = pr_neighbor(node, kk)
                 const ox = rc[prey].x - pr_nodes[m].x
                 const oz = rc[prey].z - pr_nodes[m].z
                 const d = ox * ox + oz * oz
+
                 if (m != prev || deg == 1) && d < best_d {
                   best_d = d
                   next = m
                 }
               }
             }
+
             target = next
           }
         } else if leg == 0 && timer > 45 {
@@ -386,8 +416,10 @@ async {
         if kind == 2 {
           // Walk up to the bin, manhole or drain, bend over it with the torch low, walk back.
           const ho = pr_hideout_at(node)
+
           if leg == 1 {
             raise_to = 0.6
+
             if arrived {
               leg = 2
               timer = 0
@@ -397,10 +429,12 @@ async {
             raise_to = 0.3
             lean_to = 0.3
             sweep_to = 0.25 * sin(timer * 1.7)
+
             if ho >= 0 {
               face = atan2(pr_hideouts[ho].x - x, pr_hideouts[ho].z - z)
               turn = true
             }
+
             if timer >= wait {
               leg = 3
               timer = 0
@@ -414,6 +448,7 @@ async {
           }
         } else {
           want = 0
+
           if kind == 0 {
             // Look both ways.
             const k = timer / wait
@@ -445,6 +480,7 @@ async {
         sweep_to = clamp(rel, 0 - 0.6, 0.6)
 
         const qv = pr_raccoon_visible(q)
+
         if !qv {
           behaviour = PR_ST_LOST
           kind = 0
@@ -454,6 +490,7 @@ async {
           sy = q.hideout >= 0 ? pr_hideouts[q.hideout].y : q.y
           sz = q.hideout >= 0 ? pr_hideouts[q.hideout].z : q.z
           gnode = q.hideout >= 0 ? pr_hideouts[q.hideout].node : pr_nearest_node(sx, sz)
+
           if leg == 1 || leg == 2 {
             leg = 3
           }
@@ -462,6 +499,7 @@ async {
           timer = 0
           wait = 0
           pr_hunt_chases += 1
+
           if leg == 1 || leg == 2 {
             leg = 3
           }
@@ -480,6 +518,7 @@ async {
         head_to = clamp(rel, 0 - 0.5, 0.5)
 
         const qv = pr_raccoon_visible(q)
+
         if !qv {
           // It vanished: search where it went in.
           behaviour = PR_ST_LOST
@@ -523,7 +562,8 @@ async {
             gnode = q.behaviour == PR_RC_FLEE || q.behaviour == PR_RC_WANDER ? q.target : q.node
             mut av_a: i32 = -1
             mut av_b: i32 = -1
-            for k in 0..PR_STATUES {
+
+            for k in 0..pr_statues.count() {
               if k != i && hs[k].quarry == quarry && hs[k].behaviour == PR_ST_CHASE {
                 if av_a < 0 {
                   av_a = ss[k].target
@@ -548,6 +588,7 @@ async {
               const bkz = pr_nodes[node].z - z
               const fwd = sqrt(fx * fx + fz * fz) + pr_graph_dist(target, gnode)
               const back = sqrt(bkx * bkx + bkz * bkz) + pr_graph_dist(node, gnode)
+
               if back + 1 < fwd {
                 const o = node
                 node = target
@@ -589,6 +630,7 @@ async {
               kind = 1
               leg = reach > 0.1 ? 1 : 2
               target = node
+
               if leg == 2 {
                 timer = 0
                 wait = 3 + rng.f(2)
@@ -603,6 +645,7 @@ async {
             behaviour = PR_ST_PATROL
             quarry = -1
             cooldown = 4
+
             if leg == 1 || leg == 2 {
               leg = 3
             }
@@ -616,6 +659,7 @@ async {
 
           if leg == 2 {
             want = 0
+
             if timer - step <= 0 && vanished {
               // Sparks fly from the torch where the raccoon just vanished.
               const tlx: f32 = 0 - 0.2
@@ -625,6 +669,7 @@ async {
               const fx = box.particle.burst_at(ParisTorchSparks, {wx, y + 1.6, wz}, 1)
               vanished = false
             }
+
             if timer >= wait {
               leg = 3
               timer = 0
@@ -642,17 +687,22 @@ async {
 
       // Spot a raccoon in the open, within sight and in front, that fewer than three statues
       // are after.
-      if (behaviour == PR_ST_PATROL || behaviour == PR_ST_PAUSE) && cooldown <= 0 && hunting < max_hunters {
+      if (behaviour == PR_ST_PATROL || behaviour == PR_ST_PAUSE) && cooldown <= 0 &&
+        hunting < max_hunters
+      {
         const look = yaw + head
         mut seen: i32 = -1
         mut seen_d: f32 = sight
-        for j in 0..PR_RACCOONS {
+
+        for j in 0..pr_raccoons.count() {
           const r = rc[j]
+
           if pr_raccoon_visible(r) && after[j] < 3 {
             const dx = r.x - x
             const dz = r.z - z
             const d = sqrt(dx * dx + dz * dz)
             const ahead = sin(look) * dx + cos(look) * dz
+
             if d < seen_d && abs(r.y - y) < 1.5 && ahead > 0.2 * d {
               seen = j
               seen_d = d
@@ -667,6 +717,7 @@ async {
           wait = 0.8 + rng.f(0.5)
           after[seen] += 1
           hunting += 1
+
           if leg == 1 {
             leg = 2
           }
@@ -675,29 +726,35 @@ async {
 
       // Walk toward the goal, slowing down behind other statues and short of the raccoons.
       mut moved: f32 = 0
+
       if want > 0 {
         const dx = gx - x
         const dz = gz - z
         const d = sqrt(dx * dx + dz * dz)
+
         if d > 0.0001 {
           const mx = dx / d
           const mz = dz / d
           mut factor: f32 = 1
-          for j in 0..PR_STATUES {
+
+          for j in 0..pr_statues.count() {
             if j != i {
               const ox = ss[j].x - x
               const oz = ss[j].z - z
               const od = sqrt(ox * ox + oz * oz)
+
               if od < 2.2 && ox * mx + oz * mz > 0.3 * od {
                 factor = min(factor, clamp((od - 0.9) / 1.2, 0, 1))
               }
             }
           }
-          for j in 0..PR_RACCOONS {
+
+          for j in 0..pr_raccoons.count() {
             if pr_raccoon_visible(rc[j]) {
               const ox = rc[j].x - x
               const oz = rc[j].z - z
               const od = sqrt(ox * ox + oz * oz)
+
               if od < keep_raccoon + 0.6 && ox * mx + oz * mz > 0.2 * od {
                 factor = min(factor, clamp((od - keep_raccoon) / 0.6, 0, 1))
               }
@@ -718,11 +775,13 @@ async {
       // Step aside from statues and raccoons that come too close.
       mut px: f32 = 0
       mut pz: f32 = 0
-      for j in 0..PR_STATUES {
+
+      for j in 0..pr_statues.count() {
         if j != i {
           const ox = x - ss[j].x
           const oz = z - ss[j].z
           const od = sqrt(ox * ox + oz * oz)
+
           if od < keep_statue {
             const side: f32 = i < j ? 1 : 0 - 1
             px += od > 0.01 ? ox / od * (keep_statue - od) : side * 0.4
@@ -730,23 +789,27 @@ async {
           }
         }
       }
+
       x += px * min(1, step * 4)
       z += pz * min(1, step * 4)
 
       // Quickly, from a raccoon that dodges past.
       px = 0
       pz = 0
-      for j in 0..PR_RACCOONS {
+
+      for j in 0..pr_raccoons.count() {
         if pr_raccoon_visible(rc[j]) {
           const ox = x - rc[j].x
           const oz = z - rc[j].z
           const od = sqrt(ox * ox + oz * oz)
+
           if od < keep_raccoon && od > 0.01 {
             px += ox / od * (keep_raccoon - od)
             pz += oz / od * (keep_raccoon - od)
           }
         }
       }
+
       x += px * min(1, step * 10)
       z += pz * min(1, step * 10)
 
@@ -762,14 +825,16 @@ async {
       const oz = z - cz
       const off = sqrt(ox * ox + oz * oz)
       const most: f32 = leg == 0 ? 0.9 : 0.5
+
       if off > most {
         x = cx + ox / off * most
         z = cz + oz / off * most
       }
+
       const ydes = ay + (by - ay) * t
       y += (ydes - y) * min(1, step * 10)
 
-      for j in 0..PR_RACCOONS {
+      for j in 0..pr_raccoons.count() {
         if pr_raccoon_visible(rc[j]) {
           const ox = x - rc[j].x
           const oz = z - rc[j].z
@@ -790,9 +855,11 @@ async {
       speed += (moved - speed) * min(1, step * 6)
       stride = clamp(speed / 0.8, 0, 1)
       walk += step * speed * PI / (2 * pr_step_len(s.charm) * max(stride, 0.25))
+
       if walk > 20 * PI {
         walk -= 20 * PI
       }
+
       raise += (raise_to - raise) * min(1, step * 3)
       sweep += (sweep_to - sweep) * min(1, step * 4)
       head += (head_to - head) * min(1, step * 4)

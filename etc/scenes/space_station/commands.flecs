@@ -22,7 +22,7 @@ state {
     st_decline = 0
     st_visitor_spend = 0
     st_grid = st_start_grid
-    st_pad_busy = {}
+    st_pad_busy = st_start_grid.map((k) -> { false })
     st_ships = {}
     st_next_pax = st_beat + 6
     st_next_cargo = st_beat + 10

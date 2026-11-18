@@ -571,7 +571,7 @@ mossvale {
     const lx = [-9.0, 10.6, -9.0, 10.6, -5.0, 2.6]
     const lz = [-4.0, -4.0, -13.8, -13.8, -14.4, -14.4]
 
-    for i in 0..6 {
+    for i in 0..lx.count() {
       LampPost "lamp_{i}"(
         id: 1 + i,
         q: Q_LAMPS,
@@ -1318,30 +1318,15 @@ mossvale {
   }
 
   wisps {
-    const mx = [-26, 27, 4, -38, 93, 58, 91, 38, -36, 6, 44, -6, -88, -90, -73, -52, -38, 48, 60, 4]
-    const mz = [
-      30, -24, 26, -21, -28, 27, 4, -25, -70, -90, -82, -48, 20, -28, -11.5, -40, 88, 60, 88, 92
-    ]
-
-    for i in 0..20 {
-      Wisp "wisp_{i}"(i: i, x: mx[i], z: mz[i])
+    for (i, w) in MV_WISPS {
+      Wisp "wisp_{i}"(i: i, x: w.x, z: w.z)
     }
   }
 
   npcs {
-    Npc elder(id: N_ELDER, x: -7.6, z: -15.2, face: 0.3)
-    Npc pella(id: N_PELLA, x: 10.4, z: -15.6, face: -0.3)
-    Npc mira(id: N_MIRA, x: -23.6, z: 15.4, face: -0.6)
-    Npc dorn(id: N_DORN, x: 21.2, z: 3.4, face: 0.4)
-    Npc rosa(id: N_ROSA, x: -0.6, z: 3.5, face: 0.2)
-    Npc tam(id: N_TAM, x: 4.6, z: 15.6, face: -0.3)
-    Npc oswin(id: N_OSWIN, x: 47, z: -8.5, face: 0.3)
-    Npc maud(id: N_MAUD, x: 78.5, z: 11, face: -1.5)
-    Npc gareth(id: N_GARETH, x: -17, z: -59, face: 0)
-    Npc fennick(id: N_FENNICK, x: 15, z: -71, face: 0.3)
-    Npc lou(id: N_LOU, x: -55.5, z: 6.5, face: -1.4)
-    Npc gruff(id: N_GRUFF, x: 18, z: 63, face: 0.5)
-    Npc ada(id: N_ADA, x: -16, z: 49.5, face: 0.2)
+    for (i, n) in MV_NPCS {
+      Npc "{n.key}"(id: i, x: n.x, z: n.z, face: n.face)
+    }
 
     Villager walker_a(seed: 0.1, x0: -34, z0: -0.4, x1: -14, z1: 0.4, period: 9)
     Villager walker_b(seed: 0.4, x0: 12, z0: 1.2, x1: 30, z1: 1.6, period: 10)
@@ -1351,10 +1336,10 @@ mossvale {
 }
 
 async {
-  for z in 0..200 {
-    for x in 0..200 {
-      const wx = x - 100 + 0.5
-      const wz = z - 100 + 0.5
+  for z in 0..GRID_N {
+    for x in 0..GRID_N {
+      const wx = x - GRID_HALF + 0.5
+      const wz = z - GRID_HALF + 0.5
 
       if in_water(wx, wz) {
         blocked[z * GRID_N + x] = true

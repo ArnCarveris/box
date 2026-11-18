@@ -925,8 +925,8 @@ async {
       mut best: f64 = 3.2 * 3.2
       mut bn: i32 = -1
 
-      for n in 0..NPCS {
-        const dn = dist2(px, pz, npc_x[n], npc_z[n])
+      for (n, npc) in MV_NPCS {
+        const dn = dist2(px, pz, npc.x, npc.z)
 
         if dn < best {
           best = dn
@@ -1001,8 +1001,10 @@ async {
     if game_state == 1 {
       mut s: i32 = spell
 
-      for i in 0..SPELLS {
-        s = s % SPELLS + 1
+      const spells = MV_SPELLS.count() - 1
+
+      for i in 0..spells {
+        s = s % spells + 1
 
         if known[s] {
           emit PickSpell(s: s)

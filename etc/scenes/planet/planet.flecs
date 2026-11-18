@@ -567,6 +567,12 @@ planets {
     const towns: i32 = detail > 1 ? 9000 : 3000
 
     if surf_on {
+      s_wp {}
+      s_c {}
+      s_k {}
+      s_ck {}
+      s_m2 {}
+
       s_h0 { nodes.Add: {a: s_c, b: s_m2} }
       s_h1 { nodes.Add: {a: s_h0, b: s_k} }
       s_h { nodes.Add: {a: s_h1, b: s_ck} }
@@ -727,6 +733,13 @@ planets {
     const fo2: Col = mixc({36, 82, 36}, {30, 74, 52}, v2)
 
     if surf_on {
+      s_relief {}
+      s_slope {}
+      s_alt {}
+      s_jg {}
+      s_t {}
+      s_m {}
+
       // Biome table: the vegetation by temperature (u) and moisture (v), its cover in alpha
       lut {
         l_uv { nodes.Coords: {} }
@@ -857,7 +870,22 @@ planets {
     const urban_k: f32 = city_on ? night.urban : 0
 
     if surf_on {
+      s_clx {}
+      s_h {}
+      s_land {}
+      s_slope {}
+      s_t {}
+      s_icem {}
+      s_near {}
+      s_uc1x {}
+      s_uc1y {}
+      s_ud {}
+      s_ul1 {}
+      s_ul2 {}
+
       alb {
+        a_land1 {}
+
         // Beach widths are in texels of a 512 wide map, so they do not change with the detail.
         // Water within 3 texels of land is left out of the open water the width is measured from,
         // so ponds and narrow inlets get no sand
@@ -1019,6 +1047,13 @@ planets {
     const thr: f32 = 1.28 * probit(1 - cf)
 
     if surf_on {
+      s_clx {}
+      s_h {}
+      s_uc1 {}
+      s_ud {}
+      s_ul1 {}
+      s_ul2 {}
+
       glow {
         e_low {
           nodes.Remap: {
@@ -1323,6 +1358,14 @@ planets {
     const far: Col = mixc(mixc(lowland, s1, sat(w * 1.3)), {236, 242, 250}, frost * 0.6)
     const flat: Col = mixc(far, g0, is_gas ? 1 : 0)
     const ringc: Col = rings.color
+
+    rtex {}
+    geo {}
+    alb {}
+    orm {}
+    glow {}
+    town {}
+    cld {}
 
     const ready: bool = detail > 0 && alb[box.texture.Status].revision > 0
     const lava_ready: bool = lava_on && glow[box.texture.Status].revision > 0
@@ -1719,6 +1762,8 @@ planets {
       c_out { nodes.Combine: {r_value: 1, g_value: 1, b_value: 1, a: c_a} }
       Graph: {output: c_out, width: 256, height: 256, format: GraphLinear}
     }
+
+    surf {}
 
     const ready: bool = surf[box.texture.Status].revision > 0
     const streamer_ready: bool = streamer[box.texture.Status].revision > 0

@@ -9,10 +9,11 @@ using state
 using assets
 
 state {
-  // The riverbed under the clear water: details on the sand floor that scroll with the world
-  // over RB_SPAN units and jump back up the lagoon once they pass RB_BEHIND, under the camera.
-  // Near the far end they grow in over RB_FADE units, deep enough in the water that the jump
-  // never shows. Each pass of an item through the span is a cycle that places it anew.
+  // The riverbed under the clear water: details on the sand floor that scroll with the world over
+  // RB_SPAN units and jump back up the lagoon once they pass RB_BEHIND, under the camera.
+  //
+  // Near the far end they grow in over RB_FADE units, deep enough in the water that the jump never
+  // shows. Each pass of an item through the span is a cycle that places it anew.
   export const RB_SPAN: f32 = 56
   export const RB_BEHIND: f32 = 14
   export const RB_FADE: f32 = 14

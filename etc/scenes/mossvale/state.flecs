@@ -2,8 +2,13 @@ using flecs.script
 using flecs.script.math
 
 state {
+  struct MvSpell(name: string, cost: f32, r: f32, g: f32, b: f32, blurb: string)
+  struct MvQuest(name: string, giver: i32, turnin: i32, need: i32, goal: string, place: string)
+  struct MvNpcDef(key: string, name: string, x: f32, z: f32, face: f32)
+  struct MvSpot(x: f32, z: f32)
+
   export const GRID_N: i32 = 200
-  export const GRID_HALF: i32 = 100
+  export const GRID_HALF: i32 = GRID_N / 2
   export const BOUND: f32 = 95
   export const HALF_PI: f32 = 1.5707963
 
@@ -14,12 +19,8 @@ state {
   export const SP_BLOOM: i32 = 4
   export const SP_FROST: i32 = 5
   export const SP_LIFT: i32 = 6
-  export const SPELLS: i32 = 6
 
-  export const QUESTS: i32 = 26
-  export const NPCS: i32 = 13
   export const TARGETS: i32 = 128
-  export const MOTES: i32 = 20
 
   export const Q_HEARTH: i32 = 0
   export const Q_LAMPS: i32 = 1
@@ -68,6 +69,99 @@ state {
   export const QS_RETURN: i32 = 3
   export const QS_DONE: i32 = 4
 
+  export const MV_SPELLS: MvSpell[] = [
+    {"", 0, 255, 255, 255, ""},
+    {"Spark", 8, 255, 150, 50,
+      "A spark of flame. Lights lamps, ovens and braziers, and burns away weeds."},
+    {"Splash", 10, 90, 170, 255,
+      "A splash of water. Waters thirsty plants and puts out fires."},
+    {"Gust", 12, 200, 235, 225,
+      "A gust of wind. Turns sails, dries cloth, scatters leaves, fog and pests."},
+    {"Bloom", 14, 120, 220, 90,
+      "A breath of spring. Makes plants grow and wilted things green again."},
+    {"Frost", 14, 170, 230, 255,
+      "A touch of winter. Freezes water and chills whatever needs cooling."},
+    {"Lift", 16, 200, 140, 255,
+      "A lifting charm. Raises heavy things and carries them where they belong."}
+  ]
+
+  export const MV_NPCS: MvNpcDef[] = [
+    {"elder", "Elder Bram", -7.6, -15.2, 0.3},
+    {"pella", "Pella the Baker", 10.4, -15.6, -0.3},
+    {"mira", "Mira the Herbalist", -23.6, 15.4, -0.6},
+    {"dorn", "Dorn the Smith", 21.2, 3.4, 0.4},
+    {"rosa", "Rosa of the Sleepy Toad", -0.6, 3.5, 0.2},
+    {"tam", "Little Tam", 4.6, 15.6, -0.3},
+    {"oswin", "Farmer Oswin", 47, -8.5, 0.3},
+    {"maud", "Granny Maud", 78.5, 11, -1.5},
+    {"gareth", "Gareth the Woodcutter", -17, -59, 0},
+    {"fennick", "Fennick the Hermit", 15, -71, 0.3},
+    {"lou", "Old Lou", -55.5, 6.5, -1.4},
+    {"gruff", "Gruff the Miner", 18, 63, 0.5},
+    {"ada", "Ada the Shepherd", -16, 49.5, 0.2}
+  ]
+
+  export const MV_WISPS: MvSpot[] = [
+    {-26, 30}, {27, -24}, {4, 26}, {-38, -21}, {93, -28}, {58, 27}, {91, 4}, {38, -25}, {-36, -70},
+    {6, -90}, {44, -82}, {-6, -48}, {-88, 20}, {-90, -28}, {-73, -11.5}, {-52, -40}, {-38, 88},
+    {48, 60}, {60, 88}, {4, 92}
+  ]
+
+  export const MV_QUESTS: MvQuest[] = [
+    {"A Cold Hearth", -1, -1, 1, "Light the hearth by your cottage",
+      "Spark the stone hearth east of your cottage door."},
+    {"Lamps of the Square", N_ELDER, N_ELDER, 6, "Lamps lit",
+      "Six lamps ring the village square."},
+    {"Bread for Mossvale", N_PELLA, N_PELLA, 4, "Oven lit, loaves delivered",
+      "Pella's oven stands beside the bakery, on the north side of the square."},
+    {"Thorns in the Garden", N_MIRA, N_MIRA, 5, "Thornweed burned",
+      "Mira's garden lies at the west end of the south lane, by the river."},
+    {"Thirsty Herbs", N_MIRA, N_MIRA, 6, "Herb beds watered",
+      "The herb beds are inside Mira's garden fence."},
+    {"Fire at the Smithy!", N_DORN, N_DORN, 4, "Fires put out",
+      "The burning haystacks are in the yard beside the smithy, east along the main street."},
+    {"Parched Fields", N_OSWIN, N_OSWIN, 8, "Crop patches watered",
+      "Oswin's fields lie south of the east road."},
+    {"Windmill Woes", N_OSWIN, N_OSWIN, 6, "Mill turning, crows shooed",
+      "The windmill stands north-east of the farm; crows sit in the wheat."},
+    {"Granny's Washing", N_MAUD, N_MAUD, 5, "Washing dried",
+      "Granny Maud's washing lines are behind her cottage, far east."},
+    {"The Fogbound Road", -1, -1, 3, "Fog banks cleared",
+      "Fog chokes the road north into Whisperwood."},
+    {"The Woodcutter's Camp", N_GARETH, N_GARETH, 5, "Fire lit, logs uncovered",
+      "Gareth's camp is west of the forest road."},
+    {"The Hermit's Trial", N_FENNICK, N_FENNICK, 4, "Braziers lit",
+      "The stone circle lies at the north end of the forest road."},
+    {"The Scorched Grove", N_FENNICK, N_FENNICK, 6, "Saplings regrown",
+      "The burnt grove is east of the forest road."},
+    {"The Prize Pumpkin", N_MAUD, N_MAUD, 1, "Pumpkin grown",
+      "The pumpkin grows in Maud's patch, south-east of the farm."},
+    {"The Broken Bridge", -1, -1, 1, "Bridge regrown",
+      "The broken bridge spans the river on the west road."},
+    {"No Bites Today", N_LOU, N_LOU, 5, "Lily pads bloomed",
+      "Lily buds wait in the shallows along the lake's south shore."},
+    {"The Stargazer's Isle", N_LOU, -1, 5, "Ice path frozen, beacon lit",
+      "Freeze floes from the east shore to the island, then light the beacon."},
+    {"Cold Drinks", N_ROSA, N_ROSA, 3, "Barrels chilled",
+      "The lemonade barrels stand outside the Sleepy Toad inn."},
+    {"Rockslide", -1, -1, 3, "Boulders lifted",
+      "Boulders block the road south into the hills."},
+    {"The Dark Mine", N_GRUFF, N_GRUFF, 5, "Mine lamps lit",
+      "Lamps line the track to Gruff's mine, in the quarry."},
+    {"Lost Sheep", N_ADA, N_ADA, 5, "Sheep returned",
+      "Sheep are scattered across the southern hills. The pen is west of the road."},
+    {"Biscuit on the Roof", N_TAM, N_TAM, 1, "Cat rescued",
+      "Biscuit sits on the roof of Tam's house, on the south lane."},
+    {"The Festival of Lights", N_ELDER, N_ELDER, 8, "Festival preparations",
+      "Planters and fountain in the square, ice swan by the hall, lantern by the bakery."},
+    {"Wisps of the Valley", N_MIRA, N_MIRA, MV_WISPS.count(), "Wisps gathered",
+      "Glowing wisps drift in every corner of the valley."},
+    {"The Fairy Ring", N_MIRA, N_MIRA, 6, "Mushrooms revived",
+      "The fairy ring lies in the meadow south-west of Mirror Lake."},
+    {"The Old Watchtower", N_ADA, N_ADA, 4, "Thorns burned, beacon lit",
+      "The watchtower stands in the south-west hills, beyond the sheep pen."}
+  ]
+
   event Cast(spell: i32, x: f32, z: f32)
   event Progress(q: i32, id: i32)
   event Toast(text: string)
@@ -108,67 +202,32 @@ state {
   }
 
   fn spell_name(s: i32) -> string {
-    match s {
-      1: "Spark"
-      2: "Splash"
-      3: "Gust"
-      4: "Bloom"
-      5: "Frost"
-      6: "Lift"
-      _: ""
-    }
+    MV_SPELLS[s].name
   }
 
   fn spell_cost(s: i32) -> f32 {
-    match s {
-      1: 8
-      2: 10
-      3: 12
-      4, 5: 14
-      6: 16
-      _: 0
-    }
+    MV_SPELLS[s].cost
   }
 
   fn spell_blurb(s: i32) -> string {
-    match s {
-      1: "A spark of flame. Lights lamps, ovens and braziers, and burns away weeds."
-      2: "A splash of water. Waters thirsty plants and puts out fires."
-      3: "A gust of wind. Turns sails, dries cloth, scatters leaves, fog and pests."
-      4: "A breath of spring. Makes plants grow and wilted things green again."
-      5: "A touch of winter. Freezes water and chills whatever needs cooling."
-      6: "A lifting charm. Raises heavy things and carries them where they belong."
-      _: ""
-    }
+    MV_SPELLS[s].blurb
   }
 
   fn spell_r(s: i32) -> f32 {
-    match s { 1: 255; 2: 90; 3: 200; 4: 120; 5: 170; 6: 200; _: 255 }
+    MV_SPELLS[s].r
   }
 
   fn spell_g(s: i32) -> f32 {
-    match s { 1: 150; 2: 170; 3: 235; 4: 220; 5: 230; 6: 140; _: 255 }
+    MV_SPELLS[s].g
   }
 
   fn spell_b(s: i32) -> f32 {
-    match s { 1: 50; 2: 255; 3: 225; 4: 90; 5: 255; 6: 255; _: 255 }
+    MV_SPELLS[s].b
   }
 
   fn npc_name(n: i32) -> string {
-    match n {
-      0: "Elder Bram"
-      1: "Pella the Baker"
-      2: "Mira the Herbalist"
-      3: "Dorn the Smith"
-      4: "Rosa of the Sleepy Toad"
-      5: "Little Tam"
-      6: "Farmer Oswin"
-      7: "Granny Maud"
-      8: "Gareth the Woodcutter"
-      9: "Fennick the Hermit"
-      10: "Old Lou"
-      11: "Gruff the Miner"
-      12: "Ada the Shepherd"
+    match n >= 0 && n < MV_NPCS.count() {
+      true: MV_NPCS[n].name
       _: ""
     }
   }
@@ -211,7 +270,7 @@ state {
   export mut aim_on = false
 
   export mut spell: i32 = 1
-  export mut known: bool[8] = {}
+  export mut known: bool[] = MV_SPELLS.map((s) -> { false })
   export mut mana: f32 = 100
   export mut mana_max: f32 = 100
 
@@ -221,30 +280,26 @@ state {
   export mut orb_y: f32 = 0
   export mut orb_z: f32 = 0
 
-  export mut qs: i32[32] = {}
-  export mut qp: i32[32] = {}
+  export mut qs: i32[] = MV_QUESTS.map((q) -> { QS_LOCKED })
+  export mut qp: i32[] = MV_QUESTS.map((q) -> { 0 })
   export mut done_count: i32 = 0
-  export mut ts: i32[128] = {}
-  export mut t_x: f32[128] = {}
-  export mut t_z: f32[128] = {}
-  export mut t_sp: i32[128] = {}
-  export mut t_q: i32[128] = {}
-  export mut t_lv: i32[128] = {}
-  export mut t_req: i32[128] = {}
-  export mut t_on: bool[128] = {}
-  export mut delivered: bool[16] = {}
+  export mut ts: i32[TARGETS] = {}
+  export mut t_x: f32[TARGETS] = {}
+  export mut t_z: f32[TARGETS] = {}
+  export mut t_sp: i32[TARGETS] = {}
+  export mut t_q: i32[TARGETS] = {}
+  export mut t_lv: i32[TARGETS] = {}
+  export mut t_req: i32[TARGETS] = {}
+  export mut t_on: bool[TARGETS] = {}
+  export mut delivered: bool[] = MV_NPCS.map((n) -> { false })
 
-  export mut npc_x: f32[16] = {}
-  export mut npc_z: f32[16] = {}
-  export mut npc_mark: i32[16] = {}
+  export mut npc_mark: i32[] = MV_NPCS.map((n) -> { 0 })
   export mut near_npc: i32 = -1
   export mut talk_npc: i32 = -1
   export mut talk_topic: i32 = 0
   export mut talk_line: i32 = 0
 
-  export mut mote_got: bool[24] = {}
-  export mut m_x: f32[24] = {}
-  export mut m_z: f32[24] = {}
+  export mut mote_got: bool[] = MV_WISPS.map((w) -> { false })
   export mut obj_on = false
   export mut obj_x: f32 = 0
   export mut obj_z: f32 = 0
@@ -252,7 +307,7 @@ state {
   export mut obj_npc = false
   export mut motes: i32 = 0
 
-  export mut blocked: bool[40000] = {}
+  export mut blocked: bool[GRID_N * GRID_N] = {}
 
   export mut hour: f32 = 8.5
   export mut hour_goal: f32 = 8.5
@@ -263,8 +318,9 @@ state {
   export mut banner_sub: string = ""
   export mut banner_until: f64 = 0
 
-  export mut track_t: string[4] = {}
-  export mut track_s: string[4] = {}
+  export const TRACK_ROWS: i32 = 4
+  export mut track_t: string[TRACK_ROWS] = {}
+  export mut track_s: string[TRACK_ROWS] = {}
   export mut track_n: i32 = 0
 
   fn block_rect(x0: f32, z0: f32, x1: f32, z1: f32) {

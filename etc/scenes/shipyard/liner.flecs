@@ -12,8 +12,8 @@ state {
   export mut lane: i32 = 0
   export mut lhover: i32 = -1
   export mut lgrid: LinerDesign = {}
-  export mut lstatus: i32[90] = {}
-  export mut lcounts: i32[21] = {}
+  export mut lstatus: i32[LCELLS] = {}
+  export mut lcounts: i32[LKINDS] = {}
   export mut lmodules: i32 = 0
   export mut lproblems: i32 = 0
   export mut lspan: i32 = 0
@@ -74,8 +74,8 @@ state {
   }
 
   fn lvalidate() {
-    mut st: i32[90] = {}
-    mut tally: i32[21] = {}
+    mut st: i32[LCELLS] = {}
+    mut tally: i32[LKINDS] = {}
     mut front: i32 = SLOTS
     mut back: i32 = -1
     mut total: i32 = 0

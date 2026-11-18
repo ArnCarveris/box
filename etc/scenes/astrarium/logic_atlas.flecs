@@ -48,7 +48,7 @@ async {
   while true {
     await Realign
     hero_points += atlas_count[0] + atlas_count[1] + atlas_count[2] + atlas_count[3]
-    atlas_awake = {}
+    atlas_awake = atlas_stars.map((s) -> { false })
     atlas_fresh = -1
     atlas_count = {}
     star_bonus = {}

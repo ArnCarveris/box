@@ -491,7 +491,7 @@ assets {
       Flourish bl(h: Left, v: Bottom, turn: HALF_PI, size: 28, dx: -6, dy: -6)
       Flourish br(h: Right, v: Bottom, turn: PI, size: 28, dx: 6, dy: -6)
 
-      for s in 1..7 {
+      for s in 1..MV_SPELLS.count() {
         SpellSlot "slot_{s}"(s: s)
       }
     }
@@ -743,9 +743,9 @@ assets {
       }
     }
 
-    for n in 0..13 {
+    for (n, npc) in MV_NPCS {
       if npc_mark[n] > 0 {
-        MapMarker "mark_{n}"(mx: npc_x[n], mz: npc_z[n], kind: npc_mark[n])
+        MapMarker "mark_{n}"(mx: npc.x, mz: npc.z, kind: npc_mark[n])
       }
     }
 
@@ -807,7 +807,7 @@ assets {
           entries {
             Layout: {direction: Column, spacing: 9}
 
-            for i in 0..4 {
+            for i in 0..TRACK_ROWS {
               if i < track_n {
                 "entry_{i}" {
                   Layout: {direction: Row}
@@ -849,12 +849,12 @@ assets {
           Layout: {direction: Row, spacing: 14, v: Middle}
           tasks_slot {
             Layout: {direction: Row}
-            Counter tasks(tex: mv_ui_quill, text: "{done_count} / 25")
+            Counter tasks(tex: mv_ui_quill, text: "{done_count} / {MV_QUESTS.count() - 1}")
           }
 
           wisps_slot {
             Layout: {direction: Row}
-            Counter wisps(tex: mv_ui_wisp, text: "{motes} / 20")
+            Counter wisps(tex: mv_ui_wisp, text: "{motes} / {MV_WISPS.count()}")
           }
         }
       }
@@ -1101,7 +1101,7 @@ assets {
 
             wisps_slot {
               Layout: {direction: Row}
-              Counter wisps(tex: mv_ui_wisp, text: "Wisps gathered: {motes} of 20")
+              Counter wisps(tex: mv_ui_wisp, text: "Wisps gathered: {motes} of {MV_WISPS.count()}")
             }
 
             time_slot {

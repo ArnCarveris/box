@@ -632,8 +632,6 @@ assets {
     }
 
     async {
-      npc_x[id] = x
-      npc_z[id] = z
       yaw = face
       block_disc(x, z, 0.55)
 

@@ -11,11 +11,7 @@ state {
   struct ParisNode(x: f32, y: f32, z: f32)
   struct ParisLink(a: i32, b: i32)
 
-  export const PR_NODES: i32 = 71
-  export const PR_LINKS: i32 = 93
-  export const PR_MAX_DEGREE: i32 = 6
-
-  export const pr_nodes: ParisNode[71] = [
+  export const pr_nodes: ParisNode[] = [
     // 0..9 quay promenade along the parapet
     {-56, 0.15, -19}, {-36.5, 0.15, -19}, {-25.2, 0.15, -19}, {-14, 0.15, -19}, {-4.8, 0.15, -19},
     {4.8, 0.15, -19}, {14, 0.15, -19}, {25.2, 0.15, -19}, {36.5, 0.15, -19}, {56, 0.15, -19},
@@ -59,7 +55,7 @@ state {
     {0, 0, -35}
   ]
 
-  export const pr_links: ParisLink[93] = [
+  export const pr_links: ParisLink[] = [
     // promenade
     {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 7}, {7, 8}, {8, 9},
     // crossings of the quay road
@@ -91,38 +87,64 @@ state {
 
   // Raccoon hideouts: rubbish bins on the pavements, manhole covers in the streets and storm
   // drains in the lower quay walls. x, y (ground), z, the nearest street graph node, the kind and
-  // the yaw. Each is an entity paris.hideouts.hideout_<i> with a child `cover` (bin lid, manhole
-  // cover, drain grate) that opens with pr_hideout_lift[i] from 0 to 1.
+  // the yaw.
+  //
+  // Each is an entity paris.hideouts.hideout_<i> with a child `cover` (bin lid, manhole cover,
+  // drain grate) that opens with pr_hideout_lift[i] from 0 to 1.
   struct ParisHideout(x: f32, y: f32, z: f32, node: i32, kind: i32, yaw: f32)
 
   export const PR_HIDE_BIN: i32 = 0
   export const PR_HIDE_MANHOLE: i32 = 1
   export const PR_HIDE_DRAIN: i32 = 2
-  export const PR_HIDEOUTS: i32 = 17
 
-  export const pr_hideouts: ParisHideout[17] = [
+  export const pr_hideouts: ParisHideout[] = [
     // 0..6 bins
     {-40, 0.15, -17.2, 1, 0, 0}, {28, 0.15, -17.2, 7, 0, 0}, {-39.4, 0.15, 26.8, 21, 0, 0},
     {9.2, 0.15, 30.5, 35, 0, 0}, {32.5, 0, -50.5, 57, 0, 0}, {-32.5, 0, -50.5, 55, 0, 0},
     {39.4, 0.15, 26.8, 25, 0, 0},
     // 7..14 manholes
-    {-36.5, 0, -12.5, 12, 1, 0}, {21, 0, -12.5, 16, 1, 0}, {-3, 0, 5, 28, 1, 0}, {3, 0, 42, 36, 1, 0},
-    {-24, 0, 23.5, 39, 1, 0}, {36.5, 0, 38, 26, 1, 0}, {-15, 0, -50, 51, 1, 0}, {52, 0, 23.5, 41, 1, 0},
+    {-36.5, 0, -12.5, 12, 1, 0},
+    {21, 0, -12.5, 16, 1, 0},
+    {-3, 0, 5, 28, 1, 0},
+    {3, 0, 42, 36, 1, 0},
+    {-24, 0, 23.5, 39, 1, 0},
+    {36.5, 0, 38, 26, 1, 0},
+    {-15, 0, -50, 51, 1, 0},
+    {52, 0, 23.5, 41, 1, 0},
     // 15..16 storm drains in the near quay wall, opening onto the lower quays
     {-17, -2.17, -22.6, 62, 2, 3.1415927}, {17, -2.17, -22.6, 67, 2, 3.1415927}
   ]
 
   // How far the cover of each hideout is open, 0 (shut) to 1 (open); the raccoons set it.
-  export mut pr_hideout_lift: f32[17] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  export mut pr_hideout_lift: f32[] = pr_hideouts.map((h) -> { 0 })
 
   // The raccoons (paris.raccoons.raccoon_<i>, see paris/raccoon.flecs and paris/raccoons.flecs).
-  // Each instance reads its transform and pose from pr_raccoons[i]: position x, y (ground), z,
-  // yaw, the current, the target and the previous street graph node, the behaviour (PR_RC_*),
-  // the goal of an approach (PR_RC_RUMMAGE or PR_RC_HIDE), the time in the behaviour, how long
-  // it lasts (wait), the time before it may use a hideout again (cooldown), the hideout it is at
-  // or in (-1 = none) and the pose: gait phase (radians), speed (0 idle, about 1.5 trot, about 5
-  // sprint), rearing 0..1, tail_puff 0..1 and hidden 0..1.
-  struct ParisRaccoonState(x: f32, y: f32, z: f32, yaw: f32, node: i32, target: i32, prev: i32, behaviour: i32, goal: i32, timer: f32, wait: f32, cooldown: f32, hideout: i32, gait: f32, speed: f32, rearing: f32, tail_puff: f32, hidden: f32)
+  // Each instance reads its transform and pose from pr_raccoons[i]: position, yaw, the current,
+  // target and previous street graph node, the behaviour (PR_RC_*) and the approach goal.
+  //
+  // Then the time in the behaviour and how long it lasts (wait), the time before it may use a
+  // hideout again, the hideout it is at or in (-1 = none) and the pose: gait phase (radians),
+  // speed (0 idle, about 5 sprint), rearing, tail_puff and hidden, all 0..1.
+  struct ParisRaccoonState(
+    x: f32,
+    y: f32,
+    z: f32,
+    yaw: f32,
+    node: i32,
+    target: i32,
+    prev: i32,
+    behaviour: i32,
+    goal: i32,
+    timer: f32,
+    wait: f32,
+    cooldown: f32,
+    hideout: i32,
+    gait: f32,
+    speed: f32,
+    rearing: f32,
+    tail_puff: f32,
+    hidden: f32
+  )
 
   // The raccoon behaviours.
   export const PR_RC_WANDER: i32 = 0   // trot from node to linked node
@@ -131,14 +153,11 @@ state {
   export const PR_RC_RUMMAGE: i32 = 3  // rear up at a bin and dig
   export const PR_RC_HIDE: i32 = 4     // go into the hideout, wait, come out of another one
   export const PR_RC_EMERGE: i32 = 5   // climb out of a hideout, then wander from its node
-  export const PR_RC_FLEE: i32 = 6     // rear up, then sprint from a statue (also the goal of a dive)
-  export const PR_RC_BEHAVIOURS: i32 = 7
-
-  export const PR_RACCOONS: i32 = 10
+  export const PR_RC_FLEE: i32 = 6     // rear up, then sprint from a statue (also a dive goal)
 
   // Spread over the city: raccoon 0 digs in the bin by the quay lamp at the start (hideout 0),
   // raccoon 1 heads for the manhole at node 12 (hideout 7), the others trot off from their nodes.
-  export mut pr_raccoons: ParisRaccoonState[10] = [
+  export mut pr_raccoons: ParisRaccoonState[] = [
     {-39.56, 0.15, -17.43, -1.09, 1, 1, 0, 3, 3, 0, 6, 12, 0, 0, 0, 0, 0, 0},
     {-36.5, 0, -9, 3.14, 12, 12, 17, 2, 4, 0, 0, 12, 7, 0, 0, 0, 0, 0},
     {-36.5, 0, 42, 0.5, 22, 22, 21, 0, 0, 0, 0, 3, -1, 0, 0, 0, 0, 0},
@@ -182,7 +201,7 @@ state {
   fn pr_hideout_at(n: i32) -> i32 {
     mut result: i32 = -1
 
-    for h in 0..PR_HIDEOUTS {
+    for h in 0..pr_hideouts.count() {
       if result < 0 && pr_hideouts[h].node == n {
         result = h
       }
@@ -198,17 +217,29 @@ state {
 
   // The Statue of Liberty residents (paris.residents.statue_<i>, see paris/liberty.flecs). Each
   // instance reads its transform and pose from pr_statues[i], so the logic that moves them only
-  // writes this array: position x, y (ground), z, yaw, the current and the next street graph
-  // node, charm 0..1 and the pose: walk phase (radians), stride 0..1, torch_raise 0..1 (1 = the
-  // iconic straight-up pose, 0 = held forward at chest height), torch_sweep (yaw of the torch
-  // arm), head_turn and lean (forward tilt of the upper body), all in radians.
-  struct ParisStatue(x: f32, y: f32, z: f32, yaw: f32, node: i32, target: i32, charm: f32, walk: f32, stride: f32, torch_raise: f32, torch_sweep: f32, head_turn: f32, lean: f32)
-
-  export const PR_STATUES: i32 = 14
+  // writes this array: position x, y (ground), z, yaw, the current and next node and charm 0..1.
+  //
+  // The pose: walk phase (radians), stride 0..1, torch_raise 0..1 (1 = the iconic straight-up
+  // pose, 0 = held forward at chest height) and torch_sweep, head_turn and lean in radians.
+  struct ParisStatue(
+    x: f32,
+    y: f32,
+    z: f32,
+    yaw: f32,
+    node: i32,
+    target: i32,
+    charm: f32,
+    walk: f32,
+    stride: f32,
+    torch_raise: f32,
+    torch_sweep: f32,
+    head_turn: f32,
+    lean: f32
+  )
 
   // Standing on street graph nodes facing different ways, charm spread evenly from 0 to 1 (k / 13)
   // in a shuffled order.
-  export mut pr_statues: ParisStatue[14] = [
+  export mut pr_statues: ParisStatue[] = [
     {-25.2, 0.15, -19, 2.6, 2, 2, 0.5385, 0, 0, 1, 0, 0, 0},
     {14, 0.15, -19, 0.3, 6, 6, 0, 0, 0, 1, 0, 0, 0},
     {-45.5, 0.15, -9, 1.2, 11, 11, 0.9231, 0, 0, 1, 0, 0, 0},
@@ -226,10 +257,7 @@ state {
   ]
 
   // The charm of each statue, the same as pr_statues[i].charm, for what only needs the charm.
-  export const pr_statue_charm: f32[14] = [
-    0.5385, 0, 0.9231, 0.3077, 0.7692, 0.1538, 1, 0.3846, 0.6923, 0.0769, 0.8462, 0.2308, 0.6154,
-    0.4615
-  ]
+  export const pr_statue_charm: f32[] = pr_statues.map((s) -> { s.charm })
 
   // The length of one step of a statue at full stride (how far each foot moves forward and back
   // of the hip): short even steps at charm 0, long ones at charm 1. The walk phase follows it so
@@ -239,15 +267,38 @@ state {
   }
 
   // The charm in how each statue moves (paris/charm.flecs). paris/liberty.flecs reads the pose
-  // part every frame: pose 0..1 (hand on hip, hip out), look (look over the shoulder) and tilt
-  // (head tilt) in radians, toss 0..1 (head toss), wave (extra torch sweep in radians), twirl
-  // (torch twirl angle, only ever grows), lids 0..1 (both eyelids closed), wink 0..1 (the eyelid
-  // on wink_side closed) and kiss 0..1 (the phase of a blown kiss, 0 = none). The rest are the
-  // timers: the body act (PR_CH_*), its time and length, the act target (statue or -1 for the
-  // camera), the eye act (PR_EYE_*) and its time and length, the time to the next eye act, the
-  // next torch twirl, the next kiss and the next greeting, the twirl angle still to spin, whether
-  // the hearts of the kiss flew and the hunt behaviour of the last frame.
-  struct ParisCharm(pose: f32, look: f32, tilt: f32, toss: f32, wave: f32, twirl: f32, lids: f32, wink: f32, wink_side: i32, kiss: f32, act: i32, act_time: f32, act_len: f32, partner: i32, eye: i32, eye_time: f32, eye_len: f32, eye_wait: f32, twirl_wait: f32, kiss_wait: f32, meet_wait: f32, spin: f32, hearts: bool, last: i32)
+  // part every frame: pose, toss, lids, wink and kiss 0..1, look, tilt and wave in radians, and
+  // twirl (torch twirl angle, only ever grows).
+  //
+  // The rest are timers: the body act (PR_CH_*) and its target (statue or -1 for the camera),
+  // the eye act (PR_EYE_*), the next eye act, twirl, kiss and greeting, the twirl still to spin,
+  // whether the hearts of the kiss flew and the hunt behaviour of the last frame.
+  struct ParisCharm(
+    pose: f32,
+    look: f32,
+    tilt: f32,
+    toss: f32,
+    wave: f32,
+    twirl: f32,
+    lids: f32,
+    wink: f32,
+    wink_side: i32,
+    kiss: f32,
+    act: i32,
+    act_time: f32,
+    act_len: f32,
+    partner: i32,
+    eye: i32,
+    eye_time: f32,
+    eye_len: f32,
+    eye_wait: f32,
+    twirl_wait: f32,
+    kiss_wait: f32,
+    meet_wait: f32,
+    spin: f32,
+    hearts: bool,
+    last: i32
+  )
 
   export const PR_CH_NONE: i32 = 0  // stand to attention or walk on
   export const PR_CH_POSE: i32 = 1  // hand on hip, hip out, head tilted, a look over the shoulder
@@ -260,7 +311,7 @@ state {
   export const PR_EYE_FLUTTER: i32 = 2
   export const PR_EYE_WINK: i32 = 3
 
-  export mut pr_charm: ParisCharm[14] = [
+  export mut pr_charm: ParisCharm[] = [
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1.5, 6, 4, 3, 0, false, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 2.3, 7, 5, 3, 0, false, 0},
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 1.1, 5, 3, 3, 0, false, 0},
@@ -286,21 +337,36 @@ state {
   export mut pr_charm_twirls: i32 = 0
 
   // The hunt (paris/hunt.flecs): what each statue is doing. The behaviour (PR_ST_*), the time in
-  // it and the time of its next step (wait), the node she came from, the raccoon she is after
-  // (-1 = none), the node she heads for while chasing or searching, the spot off the street graph
-  // she inspects or searches (sx, sy, sz) and the leg of that walk (0 on the graph, 1 out to the
-  // spot, 2 there, 3 back to the node), her speed, the time before she may spot a raccoon again,
-  // the kind of pause (0 look both ways, 1 sweep the torch low, 2 look into a hideout) or search
-  // (0 on the way, 1 at the spot) and whether the raccoon vanished there.
-  struct ParisHunter(behaviour: i32, timer: f32, wait: f32, prev: i32, quarry: i32, gnode: i32, sx: f32, sy: f32, sz: f32, leg: i32, speed: f32, cooldown: f32, kind: i32, vanished: bool)
+  // it and of its next step (wait), the node she came from, the raccoon she is after (-1 = none)
+  // and the node she heads for while chasing or searching.
+  //
+  // The spot off the street graph she inspects or searches (sx, sy, sz) and the leg of that walk
+  // (0 on the graph, 1 out, 2 there, 3 back), her speed, the time before she may spot again, the
+  // kind of pause or search and whether the raccoon vanished there.
+  struct ParisHunter(
+    behaviour: i32,
+    timer: f32,
+    wait: f32,
+    prev: i32,
+    quarry: i32,
+    gnode: i32,
+    sx: f32,
+    sy: f32,
+    sz: f32,
+    leg: i32,
+    speed: f32,
+    cooldown: f32,
+    kind: i32,
+    vanished: bool
+  )
 
   export const PR_ST_PATROL: i32 = 0 // walk from node to linked node
-  export const PR_ST_PAUSE: i32 = 1  // stop to look both ways, sweep the torch or look into a hideout
+  export const PR_ST_PAUSE: i32 = 1  // look both ways, sweep the torch or look into a hideout
   export const PR_ST_SPOT: i32 = 2   // point the torch at a raccoon
   export const PR_ST_CHASE: i32 = 3  // walk briskly after it along the street graph
   export const PR_ST_LOST: i32 = 4   // search where it was last seen, then patrol again
 
-  export mut pr_hunters: ParisHunter[14] = [
+  export mut pr_hunters: ParisHunter[] = [
     {0, 0, 0, 2, -1, -1, 0, 0, 0, 0, 0, 1.0, 0, false},
     {0, 0, 0, 6, -1, -1, 0, 0, 0, 0, 0, 1.4, 0, false},
     {0, 0, 0, 11, -1, -1, 0, 0, 0, 0, 0, 1.8, 0, false},
@@ -333,7 +399,7 @@ state {
     mut best: i32 = 0
     mut best_d: f32 = 1000000
 
-    for i in 0..PR_NODES {
+    for i in 0..pr_nodes.count() {
       const dx = pr_nodes[i].x - x
       const dz = pr_nodes[i].z - z
       const d = dx * dx + dz * dz
@@ -351,7 +417,7 @@ state {
   fn pr_degree(n: i32) -> i32 {
     mut count: i32 = 0
 
-    for l in 0..PR_LINKS {
+    for l in 0..pr_links.count() {
       if pr_links[l].a == n || pr_links[l].b == n {
         count += 1
       }
@@ -370,7 +436,7 @@ state {
     mut seen: i32 = 0
     mut result: i32 = n
 
-    for l in 0..PR_LINKS {
+    for l in 0..pr_links.count() {
       if pr_links[l].a == n || pr_links[l].b == n {
         if seen == k {
           result = pr_links[l].a == n ? pr_links[l].b : pr_links[l].a

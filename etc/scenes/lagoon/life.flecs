@@ -20,11 +20,12 @@ state {
   export const FLOTSAM: i32 = 9
   export const LF_SIZE: f32 = 1.4
 
-  // Jumping fish: every FISH_WAIT_MIN..+FISH_WAIT_RANGE seconds a fish leaps FISH_LEAP units in
-  // an arc FISH_HEIGHT high over FISH_TIME seconds, landing FISH_NEAR..FISH_FAR ahead of the
-  // canoe while the water carries it toward the canoe. It keeps FISH_CLEAR from the canoe's
-  // path (the hull to the float) and from hazards and coconuts, a rejected spot is tried again
-  // FISH_RETRY seconds later
+  // Jumping fish: every FISH_WAIT_MIN..+FISH_WAIT_RANGE seconds a fish leaps FISH_LEAP units in an
+  // arc FISH_HEIGHT high over FISH_TIME seconds, landing FISH_NEAR..FISH_FAR ahead of the canoe
+  // while the water carries it toward the canoe.
+  //
+  // It keeps FISH_CLEAR from the canoe's path (the hull to the float) and from hazards and
+  // coconuts, a rejected spot is tried again FISH_RETRY seconds later
   export const FISH_FIRST: f32 = 2.5
   export const FISH_WAIT_MIN: f32 = 2.5
   export const FISH_WAIT_RANGE: f32 = 4
@@ -72,19 +73,19 @@ state {
   fn lf_near_item(x: f64, wz: f64, r: f64) -> bool {
     mut near: bool = false
 
-    for i in 0..ROCKS {
+    for i in 0..rocks.count() {
       if rocks[i].live && abs(rocks[i].x - x) < r && abs(rocks[i].z + distance - wz) < r {
         near = true
       }
     }
 
-    for i in 0..LOGS {
+    for i in 0..logs.count() {
       if logs[i].live && abs(logs[i].x - x) < r + 1 && abs(logs[i].z + distance - wz) < r {
         near = true
       }
     }
 
-    for i in 0..COCONUTS {
+    for i in 0..nuts.count() {
       if nuts[i].live && abs(nuts[i].x - x) < r && abs(nuts[i].z + distance - wz) < r {
         near = true
       }
@@ -103,7 +104,13 @@ assets {
   }
 
   prefab LgFlowerHeart { Rgb: {255, 226, 120}; PbrMaterial: {roughness: 0.7}; NoShadow }
-  prefab LgFoamPatch { Rgb: {240, 250, 248}; PbrMaterial: {roughness: 0.9}; Opacity: {0.6}; NoShadow }
+  prefab LgFoamPatch {
+    Rgb: {240, 250, 248}
+    PbrMaterial: {roughness: 0.9}
+    Opacity: {0.6}
+    NoShadow
+  }
+
   prefab LgJumpFish {
     Rgb: {196, 216, 226}
     PbrMaterial: {roughness: 0.35}
@@ -153,6 +160,7 @@ assets {
 
     for k in 0..5 {
       const a = k * 1.2566
+
       if yellow {
         "petal_{k}" : LgHibiscusYellow {
           Position: {0.1 * sin(a), 0, 0.1 * cos(a)}

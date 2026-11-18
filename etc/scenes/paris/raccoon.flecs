@@ -47,17 +47,96 @@ assets {
     }
   }
 
-  // A raccoon, about 0.7 units from the rump to the nose (plus the tail), facing +Z with the
-  // origin on the ground: a stocky grey body, a pointed pale snout with a black nose, the black
-  // eye mask with white brows and cheeks, rounded white-rimmed ears, short dark legs with little
-  // hands and a bushy tail with black rings.
+  template ParisRaccoonHead {
+    prop puff: f32 = 0
+    prop dash: f32 = 0
+
+    skull : ParisRaccoonFur {
+      Scale: {1.15, 0.92, 1}
+      Sphere: {radius: 0.095, segments: 16, smooth: true}
+    }
+
+    // The pointed snout, pale with a black button nose.
+    snout : ParisRaccoonFurPale {
+      Position: {0, 0 - 0.035, 0.12}
+      Rotation: {PI / 2 + 0.12, 0, 0}
+      Scale: {1.1, 1, 0.85}
+      Cone: {length: 0.13, radius: 0.048, segments: 12}
+    }
+
+    nose : ParisRaccoonNose {
+      Position: {0, 0 - 0.043, 0.183}
+      Scale: {1.2, 0.85, 1}
+      Sphere: {radius: 0.018, segments: 8, smooth: true}
+    }
+
+    // The black mask across the eyes and down the bridge of the nose, white brows above and
+    // white cheeks below.
+    mask_bridge : ParisRaccoonFurBlack {
+      Position: {0, 0.01, 0.083}
+      Scale: {0.7, 1.2, 0.7}
+      Sphere: {radius: 0.028, segments: 8, smooth: true}
+    }
+
+    for s in 0..2 {
+      const sx = s * 2 - 1
+
+      "mask_{s}" : ParisRaccoonFurBlack {
+        Position: {sx * 0.05, 0.005, 0.068}
+        Rotation: {0, sx * 0.5, 0 - sx * 0.25}
+        Scale: {1.5, 0.75, 0.6}
+        Sphere: {radius: 0.04, segments: 10, smooth: true}
+      }
+
+      "eye_{s}" : ParisRaccoonEye {
+        Position: {sx * 0.045, 0.012, 0.094}
+        Sphere: {radius: 0.014, segments: 8, smooth: true}
+      }
+
+      "brow_{s}" : ParisRaccoonFurPale {
+        Position: {sx * 0.044, 0.046, 0.074}
+        Rotation: {0, sx * 0.45, 0 - sx * 0.25}
+        Scale: {1.6, 0.45, 0.6}
+        Sphere: {radius: 0.035, segments: 8, smooth: true}
+      }
+
+      "cheek_{s}" : ParisRaccoonFurPale {
+        Position: {sx * 0.065, 0 - 0.032, 0.045}
+        Scale: {1, 0.8, 1.1}
+        Sphere: {radius: 0.048, segments: 10, smooth: true}
+      }
+
+      // Rounded ears with a white rim, flattened back when scared or sprinting.
+      "ear_{s}" {
+        Position: {sx * 0.068, 0.09, 0 - 0.012}
+        Rotation: {0 - 0.6 * puff - 0.4 * dash, 0, 0 - sx * 0.35}
+        rim : ParisRaccoonFurPale {
+          Scale: {1, 1, 0.38}
+          Sphere: {radius: 0.038, segments: 10, smooth: true}
+        }
+
+        inner : ParisRaccoonFurBlack {
+          Position: {0, 0 - 0.004, 0.006}
+          Scale: {1, 1, 0.3}
+          Sphere: {radius: 0.029, segments: 8, smooth: true}
+        }
+
+        base : ParisRaccoonFur {
+          Position: {0, 0 - 0.022, 0 - 0.003}
+          Scale: {1.1, 0.7, 0.6}
+          Sphere: {radius: 0.032, segments: 8, smooth: true}
+        }
+      }
+    }
+  }
+
+  // A raccoon, about 0.7 units from the rump to the nose, facing +Z with the origin on the ground:
+  // a stocky grey body, the black eye mask with white brows, rounded ears and a ringed tail.
+  // id >= 0 reads its pose from state.pr_raccoons[id] every frame; id < 0 stands at `at`.
   //
-  // id >= 0 reads the position and the pose from state.pr_raccoons[id] every frame; id < 0 (a
-  // loose raccoon) stands at `at` and keeps the mut variables as they are set.
-  //
-  // gait is the phase of the legs (radians), speed 0 (idle), about 1.5 (trot) to about 5
-  // (sprint), rearing 0..1 stands up on the hind legs, tail_puff 0..1 bristles the tail and
-  // flattens the ears, hidden 0..1 shrinks the raccoon away and lowers it into a hideout.
+  // gait is the phase of the legs (radians), speed 0 (idle) to about 5 (sprint), rearing 0..1
+  // stands up on the hind legs, tail_puff 0..1 bristles the tail and flattens the ears and
+  // hidden 0..1 shrinks the raccoon away and lowers it into a hideout.
   template ParisRaccoon {
     prop id: i32 = -1
     prop seed: f32 = 0
@@ -99,9 +178,22 @@ assets {
       "hind_{s}" {
         Position: {sx * 0.085, 0.2, 0 - 0.13}
         Rotation: {swing - rear * 0.25, 0, 0}
-        thigh : ParisRaccoonFur { Position: {0, 0 - 0.03, 0.01}; Scale: {0.75, 1.15, 1.1}; Sphere: {radius: 0.065, segments: 10, smooth: true} }
-        leg : ParisRaccoonFurDark { Position: {0, 0 - 0.1, 0}; Capsule: {length: 0.1, radius: 0.028, segments: 8, smooth: true} }
-        foot : ParisRaccoonFurDark { Position: {0, 0 - 0.183, 0.02}; Scale: {1, 0.55, 1.5}; Sphere: {radius: 0.032, segments: 8, smooth: true} }
+        thigh : ParisRaccoonFur {
+          Position: {0, 0 - 0.03, 0.01}
+          Scale: {0.75, 1.15, 1.1}
+          Sphere: {radius: 0.065, segments: 10, smooth: true}
+        }
+
+        leg : ParisRaccoonFurDark {
+          Position: {0, 0 - 0.1, 0}
+          Capsule: {length: 0.1, radius: 0.028, segments: 8, smooth: true}
+        }
+
+        foot : ParisRaccoonFurDark {
+          Position: {0, 0 - 0.183, 0.02}
+          Scale: {1, 0.55, 1.5}
+          Sphere: {radius: 0.032, segments: 8, smooth: true}
+        }
       }
     }
 
@@ -113,7 +205,11 @@ assets {
         Position: {0, 0.22, 0 - 0.14}
         Rotation: {0 - rear * 1.05 + sin(gait * 2) * 0.07 * dash, 0, sg * 0.04 * run}
 
-        rump : ParisRaccoonFur { Position: {0, 0.03, 0}; Sphere: {radius: 0.13, segments: 16, smooth: true} }
+        rump : ParisRaccoonFur {
+          Position: {0, 0.03, 0}
+          Sphere: {radius: 0.13, segments: 16, smooth: true}
+        }
+
         chest : ParisRaccoonFur {
           Position: {0, 0.03, 0.13}
           Scale: {0.27, 0.24, 0.4}
@@ -134,9 +230,23 @@ assets {
           "front_{s}" {
             Position: {sx * 0.085, 0 - 0.02, 0.27}
             Rotation: {swing + rear * 0.95 + (s == 0 ? dig : 0 - dig), 0, 0}
-            shoulder : ParisRaccoonFur { Position: {0, 0 - 0.02, 0}; Scale: {0.75, 1.1, 1}; Sphere: {radius: 0.055, segments: 10, smooth: true} }
-            leg : ParisRaccoonFurDark { Position: {0, 0 - 0.1, 0}; Capsule: {length: 0.1, radius: 0.026, segments: 8, smooth: true} }
-            hand : ParisRaccoonFurDark { Position: {0, 0 - 0.183, 0.015}; Scale: {1.1, 0.55, 1.3}; Sphere: {radius: 0.03, segments: 8, smooth: true} }
+            shoulder : ParisRaccoonFur {
+              Position: {0, 0 - 0.02, 0}
+              Scale: {0.75, 1.1, 1}
+              Sphere: {radius: 0.055, segments: 10, smooth: true}
+            }
+
+            leg : ParisRaccoonFurDark {
+              Position: {0, 0 - 0.1, 0}
+              Capsule: {length: 0.1, radius: 0.026, segments: 8, smooth: true}
+            }
+
+            hand : ParisRaccoonFurDark {
+              Position: {0, 0 - 0.183, 0.015}
+              Scale: {1.1, 0.55, 1.3}
+              Sphere: {radius: 0.03, segments: 8, smooth: true}
+            }
+
             for f in 0..3 {
               "finger_{f}" : ParisRaccoonFurDark {
                 Position: {(f - 1) * 0.017, 0 - 0.19, 0.047}
@@ -146,70 +256,15 @@ assets {
           }
         }
 
-        neck : ParisRaccoonFur { Position: {0, 0.08, 0.32}; Sphere: {radius: 0.085, segments: 12, smooth: true} }
+        neck : ParisRaccoonFur {
+          Position: {0, 0.08, 0.32}
+          Sphere: {radius: 0.085, segments: 12, smooth: true}
+        }
 
         // The head stays about level while the body rears and looks around while it stands.
-        head {
+        ParisRaccoonHead head(puff: puff, dash: dash) {
           Position: {0, 0.11, 0.4}
           Rotation: {rear * 0.7 + 0.05 * dash, rear * (1 - run) * sin(gait * 0.3) * 0.5, 0}
-
-          skull : ParisRaccoonFur { Scale: {1.15, 0.92, 1}; Sphere: {radius: 0.095, segments: 16, smooth: true} }
-
-          // The pointed snout, pale with a black button nose.
-          snout : ParisRaccoonFurPale {
-            Position: {0, 0 - 0.035, 0.12}
-            Rotation: {PI / 2 + 0.12, 0, 0}
-            Scale: {1.1, 1, 0.85}
-            Cone: {length: 0.13, radius: 0.048, segments: 12}
-          }
-
-          nose : ParisRaccoonNose { Position: {0, 0 - 0.043, 0.183}; Scale: {1.2, 0.85, 1}; Sphere: {radius: 0.018, segments: 8, smooth: true} }
-
-          // The black mask across the eyes and down the bridge of the nose, white brows above and
-          // white cheeks below.
-          mask_bridge : ParisRaccoonFurBlack {
-            Position: {0, 0.01, 0.083}
-            Scale: {0.7, 1.2, 0.7}
-            Sphere: {radius: 0.028, segments: 8, smooth: true}
-          }
-
-          for s in 0..2 {
-            const sx = s * 2 - 1
-
-            "mask_{s}" : ParisRaccoonFurBlack {
-              Position: {sx * 0.05, 0.005, 0.068}
-              Rotation: {0, sx * 0.5, 0 - sx * 0.25}
-              Scale: {1.5, 0.75, 0.6}
-              Sphere: {radius: 0.04, segments: 10, smooth: true}
-            }
-
-            "eye_{s}" : ParisRaccoonEye {
-              Position: {sx * 0.045, 0.012, 0.094}
-              Sphere: {radius: 0.014, segments: 8, smooth: true}
-            }
-
-            "brow_{s}" : ParisRaccoonFurPale {
-              Position: {sx * 0.044, 0.046, 0.074}
-              Rotation: {0, sx * 0.45, 0 - sx * 0.25}
-              Scale: {1.6, 0.45, 0.6}
-              Sphere: {radius: 0.035, segments: 8, smooth: true}
-            }
-
-            "cheek_{s}" : ParisRaccoonFurPale {
-              Position: {sx * 0.065, 0 - 0.032, 0.045}
-              Scale: {1, 0.8, 1.1}
-              Sphere: {radius: 0.048, segments: 10, smooth: true}
-            }
-
-            // Rounded ears with a white rim, flattened back when scared or sprinting.
-            "ear_{s}" {
-              Position: {sx * 0.068, 0.09, 0 - 0.012}
-              Rotation: {0 - 0.6 * puff - 0.4 * dash, 0, 0 - sx * 0.35}
-              rim : ParisRaccoonFurPale { Scale: {1, 1, 0.38}; Sphere: {radius: 0.038, segments: 10, smooth: true} }
-              inner : ParisRaccoonFurBlack { Position: {0, 0 - 0.004, 0.006}; Scale: {1, 1, 0.3}; Sphere: {radius: 0.029, segments: 8, smooth: true} }
-              base : ParisRaccoonFur { Position: {0, 0 - 0.022, 0 - 0.003}; Scale: {1.1, 0.7, 0.6}; Sphere: {radius: 0.032, segments: 8, smooth: true} }
-            }
-          }
         }
       }
 
@@ -218,14 +273,24 @@ assets {
       tail {
         Position: {0, 0.24, 0 - 0.25}
         Rotation: {0.05 - 0.55 * rear + 0.45 * puff + 0.12 * dash, wag * 0.35, 0}
+
         for k in 0..8 {
           const r = (0.04 + 0.014 * sin(k * PI / 7)) * (1 + 0.45 * puff) * (k == 7 ? 0.8 : 1)
           const tx = wag * k * k * 0.0025
           const tz = 0 - 0.03 - k * 0.048
+
           if k == 1 || k == 3 || k == 5 || k == 7 {
-            "ring_{k}" : ParisRaccoonFurBlack { Position: {tx, 0 - k * 0.004, tz}; Scale: {1, 1, 0.9}; Sphere: {radius: r, segments: 12, smooth: true} }
+            "ring_{k}" : ParisRaccoonFurBlack {
+              Position: {tx, 0 - k * 0.004, tz}
+              Scale: {1, 1, 0.9}
+              Sphere: {radius: r, segments: 12, smooth: true}
+            }
           } else {
-            "ring_{k}" : ParisRaccoonFur { Position: {tx, 0 - k * 0.004, tz}; Scale: {1, 1, 0.9}; Sphere: {radius: r, segments: 12, smooth: true} }
+            "ring_{k}" : ParisRaccoonFur {
+              Position: {tx, 0 - k * 0.004, tz}
+              Scale: {1, 1, 0.9}
+              Sphere: {radius: r, segments: 12, smooth: true}
+            }
           }
         }
       }
@@ -235,16 +300,26 @@ assets {
     async {
       while true {
         await next_frame()
-        if id >= 0 && id < PR_RACCOONS {
+
+        if id >= 0 && id < pr_raccoons.count() {
           const s = pr_raccoons[id]
+
           if px != s.x { px = s.x }
+
           if py != s.y { py = s.y }
+
           if pz != s.z { pz = s.z }
+
           if yaw != s.yaw { yaw = s.yaw }
+
           if gait != s.gait { gait = s.gait }
+
           if speed != s.speed { speed = s.speed }
+
           if rearing != s.rearing { rearing = s.rearing }
+
           if tail_puff != s.tail_puff { tail_puff = s.tail_puff }
+
           if hidden != s.hidden { hidden = s.hidden }
         }
       }

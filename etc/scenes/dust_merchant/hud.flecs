@@ -135,7 +135,7 @@ assets {
       power: match stage { 3: 2.6; 4: 3; _: 1.2 }
     ) { Position: {0, -84, 0} }
 
-    Glow dest_line(text: course >= 0 ? dest_code(course) : dest_code(here), size: 11, power: 1) {
+    Glow dest_line(text: course >= 0 ? dests[course].code : dests[here].code, size: 11, power: 1) {
       Position: {0, 86, 0}
     }
   }

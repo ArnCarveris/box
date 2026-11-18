@@ -3,10 +3,15 @@ using flecs.script.math
 
 state {
   export const st_grid_w: i32 = 7
-  export const st_grid_h: i32 = 5
-  export const st_slots: i32 = 35
+  export const st_start_grid: i32[] = [
+    0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 7, 0, 0, 0,
+    0, 2, 4, 1, 5, 2, 0,
+    0, 0, 0, 6, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0
+  ]
+  export const st_grid_h: i32 = st_start_grid.count() / st_grid_w
   export const st_pitch: f32 = 6
-  export const st_hub_slot: i32 = 17
 
   export const K_EMPTY: i32 = 0
   export const K_HUB: i32 = 1
@@ -113,19 +118,12 @@ state {
   }
 
   struct StShip(state: i32, timer: i32, patience: i32, dock: i32, visitors: i32)
+  export const st_fleet: i32 = 5
 
   event Request(op: i32)
   event Click(slot: i32)
   event Built(slot: i32)
   event Tick()
-
-  export const st_start_grid: i32[35] = [
-    0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 7, 0, 0, 0,
-    0, 2, 4, 1, 5, 2, 0,
-    0, 0, 0, 6, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0
-  ]
 
   export const OP_BUY_FOOD: i32 = 101
   export const OP_BUY_GOODS: i32 = 102
@@ -162,10 +160,10 @@ state {
   export mut st_visitor_spend: f64 = 0
 
   export mut st_modules: i32 = 0
-  export mut st_grid: i32[35] = st_start_grid
-  export mut st_pad_busy: bool[35] = {}
-  export mut st_rising: bool[35] = {}
-  export mut st_sparks: bool[35] = {}
+  export mut st_grid: i32[] = st_start_grid
+  export mut st_pad_busy: bool[] = st_start_grid.map((k) -> { false })
+  export mut st_rising: bool[] = st_start_grid.map((k) -> { false })
+  export mut st_sparks: bool[] = st_start_grid.map((k) -> { false })
 
   export mut st_power_supply: f64 = 0
   export mut st_power_demand: f64 = 0
@@ -181,7 +179,7 @@ state {
 
   export mut st_next_pax: i32 = 6
   export mut st_next_cargo: i32 = 10
-  export mut st_ships: StShip[10] = {}
+  export mut st_ships: StShip[st_fleet * 2] = {}
   export mut st_pax_docked: i32 = 0
   export mut st_pax_holding: i32 = 0
   export mut st_cargo_docked: i32 = 0
@@ -197,7 +195,7 @@ state {
   export mut st_demand_goods: f64 = 0
 
   fn st_occupied(i: i32) -> bool {
-    i >= 0 && i < st_slots && st_grid[i] != K_EMPTY
+    i >= 0 && i < st_grid.count() && st_grid[i] != K_EMPTY
   }
 
   fn st_near(i: i32) -> bool {
@@ -226,7 +224,7 @@ state {
     mut cargo: i32 = 0
     mut modules: i32 = 0
 
-    for i in 0..st_slots {
+    for i in 0..st_grid.count() {
       const kind = st_grid[i]
       supply += st_power_made(kind)
       demand += st_power_used(kind)

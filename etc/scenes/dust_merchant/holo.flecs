@@ -72,7 +72,7 @@ assets {
     }
 
     Glow words(
-      text: home ? "* {dest_name(dest)}" : dest_name(dest),
+      text: home ? "* {dests[dest].name}" : dests[dest].name,
       size: 18,
       hue: HOLO,
       power: hover || picked ? 2.2 : 1.1,
@@ -95,16 +95,6 @@ assets {
         await on.click(this)
         emit PickCourse(dest: dest)
       }
-    }
-  }
-}
-
-state {
-  fn holo_blurb(i: i32) -> string {
-    match i {
-      0: "dust world. 2 ports.\ncheap fuel, bad coffee."
-      1: "ringed giant. ice mining.\nwatch the shear lanes."
-      _: "lava moon + wreck field.\nsalvage. no questions."
     }
   }
 }
@@ -234,18 +224,19 @@ assets {
           Position: {0, -112, 8}
           Layout: {direction: Column, spacing: 3, h: Center, v: Middle}
           Glow name(
-            text: dest_name(target),
+            text: dests[target].name,
             size: 26,
             hue: {190, 236, 255},
             power: 2,
             font: font_stencil
           )
-          Glow blurb(text: holo_blurb(target), size: 13, hue: HOLO, power: 1)
+          Glow blurb(text: dests[target].blurb, size: 13, hue: HOLO, power: 1)
           tabs {
             Layout: {direction: Row, spacing: 6, padding: {6, 0, 0, 0}, h: Center}
-            HoloTab t0(dest: 0)
-            HoloTab t1(dest: 1)
-            HoloTab t2(dest: 2)
+
+            for (i, d) in dests {
+              HoloTab "t{i}"(dest: i)
+            }
           }
         }
       }

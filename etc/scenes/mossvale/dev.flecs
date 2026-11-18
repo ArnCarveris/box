@@ -25,7 +25,7 @@ async {
         cam_x = c.x
         cam_z = c.z
       } else if c.op == 1 {
-        for s in 1..7 {
+        for s in 1..MV_SPELLS.count() {
           known[s] = true
         }
       } else if c.op == 2 {

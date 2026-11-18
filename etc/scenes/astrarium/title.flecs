@@ -241,7 +241,7 @@ assets {
       word {
         Layout: {direction: Row, h: Center, v: Middle}
 
-        for i in 0..9 {
+        for i in 0..title_letters.count() {
           TitleGlyph "g_{i}"(index: i)
         }
       }

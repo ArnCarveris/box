@@ -1591,9 +1591,6 @@ assets {
     }
 
     async {
-      m_x[i] = x
-      m_z[i] = z
-
       while !mote_got[i] {
         await delay(0.1)
 

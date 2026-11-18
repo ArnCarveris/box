@@ -7,12 +7,11 @@ state {
   export const GX: i32 = 10
   export const GZ: i32 = 18
   export const GY: i32 = 6
-  export const LAYER: i32 = 180
-  export const CELLS: i32 = 1080
+  export const LAYER: i32 = GX * GZ
+  export const CELLS: i32 = LAYER * GY
   export const PLAN_X: i32 = 5
   export const PLAN_Z: i32 = 9
-  export const PLAN_LAYER: i32 = 45
-  export const PLAN_CELLS: i32 = 135
+  export const PLAN_LAYER: i32 = PLAN_X * PLAN_Z
   export const PLAN_OX: i32 = 2
   export const PLAN_OZ: i32 = 4
   export const CW: f32 = 4
@@ -48,10 +47,9 @@ state {
   export const H_VALLEY: i32 = 4
   export const H_HIP: i32 = 5
 
-  array RigPlan(type: i32, count: 135)
-  array RigGrid(type: i32, count: 1080)
+  array RigGrid(type: i32, count: CELLS)
 
-  export const frigate_plan: RigPlan = [
+  export const frigate_plan: i32[] = [
     0, 0, 0, 0, 0,
     0, 8, 0, 8, 0,
     0, 6, 0, 6, 0,
@@ -81,7 +79,7 @@ state {
     0, 0, 0, 0, 0
   ]
 
-  export const scout_plan: RigPlan = [
+  export const scout_plan: i32[] = [
     0, 0, 0, 0, 0,
     0, 0, 0, 0, 0,
     0, 0, 0, 0, 0,
@@ -111,7 +109,7 @@ state {
     0, 0, 0, 0, 0
   ]
 
-  export const miner_plan: RigPlan = [
+  export const miner_plan: i32[] = [
     0, 8, 0, 8, 0,
     0, 6, 6, 6, 0,
     13, 4, 5, 4, 13,
@@ -158,13 +156,13 @@ state {
     yz_pp: bool, yz_pn: bool, yz_np: bool, yz_nn: bool,
     fpx: bool, fnx: bool)
 
-  array RigViews(type: RigCellView, count: 1080)
+  array RigViews(type: RigCellView, count: CELLS)
 
   // The power of the modules of a rig, when lit: the power level 0..1 of each cell, the heat
   // level of each power plant and radiator, the power plants that tripped and whether the
   // radiators cool down. Levels change only in steps, not every tick.
-  array RigLevels(type: f32, count: 1080)
-  array RigFlags(type: bool, count: 1080)
+  array RigLevels(type: f32, count: CELLS)
+  array RigFlags(type: bool, count: CELLS)
   struct RigPower(lit: bool, live: RigLevels, heat: RigLevels, trip: RigFlags, cool: bool)
 
   fn cell_x(i: i32) -> i32 { i % GX }
@@ -380,7 +378,7 @@ state {
     mut szs: RigGrid = {}
 
     for y in 0..GY {
-      mut list: i32[180] = {}
+      mut list: i32[LAYER] = {}
       mut m: i32 = 0
 
       for j in 0..LAYER {
@@ -427,10 +425,10 @@ state {
   }
 
   // The kinds of a plan, which covers the middle of the grid.
-  fn plan_kinds(plan: RigPlan) -> RigGrid {
+  fn plan_kinds(plan: i32[]) -> RigGrid {
     mut g: RigGrid = {}
 
-    for i in 0..PLAN_CELLS {
+    for i in 0..plan.count() {
       const k = plan[i]
 
       if k != 0 {
@@ -442,10 +440,10 @@ state {
     g
   }
 
-  fn plan_top(plan: RigPlan) -> i32 {
+  fn plan_top(plan: i32[]) -> i32 {
     mut top: i32 = 0
 
-    for i in 0..PLAN_CELLS {
+    for i in 0..plan.count() {
       if plan[i] != 0 {
         top = max(top, (i - i % PLAN_LAYER) / PLAN_LAYER)
       }
@@ -454,7 +452,7 @@ state {
     top
   }
 
-  fn rig_plan(plan: RigPlan) -> RigDesign {
+  fn rig_plan(plan: i32[]) -> RigDesign {
     const order: RigGrid = {}
     rig_design(plan_kinds(plan), order)
   }
@@ -467,7 +465,7 @@ state {
   // module up to cut and for all cells of deck cut.
   fn rig_views(d: RigDesign, cut: i32) -> RigViews {
     mut drawn: RigGrid = {}
-    mut solid: bool[1080] = {}
+    mut solid: RigFlags = {}
     mut faces: RigGrid = {}
     mut roofs: RigGrid = {}
 

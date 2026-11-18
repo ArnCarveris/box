@@ -46,8 +46,8 @@ state {
 
   fn load(op: i32) {
     const order: RigGrid = {}
-    const none: RigPlan = {}
-    const plan: RigPlan = op == OP_FRIGATE ? frigate_plan :
+    const none: i32[] = []
+    const plan: i32[] = op == OP_FRIGATE ? frigate_plan :
       op == OP_SCOUT ? scout_plan :
       op == OP_MINER ? miner_plan : none
     grid = plan_kinds(plan)

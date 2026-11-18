@@ -5,6 +5,7 @@ using flecs.script
 using box.transform
 using box.geometry
 using box.material
+using assets
 
 assets {
   prefab KoreanEaveLong {
@@ -127,18 +128,23 @@ assets {
     prop rafter_end: Rgb = {176, 150, 104}
     { (IsA, KoreanRoofSurface); Position: {} }
 
+    const long_tiles: i32 = KOREAN_ROWS_LONG.count() / 2
+    const long_mid: i32 = (long_tiles - 1) / 2
+    const short_tiles: i32 = KOREAN_ROWS_SHORT.count() / 2
+    const short_mid: i32 = (short_tiles - 1) / 2
+
     for side in 0..2 {
       const sign = side * 2 - 1
 
-      for tile in 0..31 {
-        const u = (tile - 15) / 15.0
+      for tile in 0..long_tiles {
+        const u = (tile - long_mid) / long_mid
         const u2 = u * u
         const corner = 0.25 * u2 * u2 * u2 * u2
         const wear = (tile * 7 + side) % 5
         {
           Position: {0, 0, 0}
           Sweep: {
-            path: KOREAN_ROWS_LONG[side * 31 + tile],
+            path: KOREAN_ROWS_LONG[side * long_tiles + tile],
             profile: KoreanTileProfile,
             scale: {0.046, 0.046},
             rings: 16
@@ -162,14 +168,14 @@ assets {
         }
       }
 
-      for tile in 0..19 {
-        const u = (tile - 9) / 9.0
+      for tile in 0..short_tiles {
+        const u = (tile - short_mid) / short_mid
         const u2 = u * u
         const wear = (tile * 7 + side) % 5
         {
           Position: {0, 0, 0}
           Sweep: {
-            path: KOREAN_ROWS_SHORT[side * 19 + tile],
+            path: KOREAN_ROWS_SHORT[side * short_tiles + tile],
             profile: KoreanTileProfile,
             scale: {0.046, 0.046},
             rings: 16

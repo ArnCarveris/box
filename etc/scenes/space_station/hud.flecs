@@ -409,7 +409,7 @@ assets {
       Item: {width: {mode: Grow}}
     }
 
-    for i in 0..5 {
+    for i in 0..st_fleet {
       "wait_{i}" {
         const s = i < waiting ? UI_WARN : UI_DIM
         Item: {width: {mode: Fixed, value: 4}, height: {mode: Fixed, value: 12}}

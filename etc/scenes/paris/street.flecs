@@ -34,7 +34,12 @@ assets {
 
   template ParisBench {
     seat : ParisDoorWood { Position: {0, 0.45, 0}; Box: {1.8, 0.06, 0.45} }
-    backrest : ParisDoorWood { Position: {0, 0.78, -0.24}; Rotation: {-0.2, 0, 0}; Box: {1.8, 0.36, 0.05} }
+    backrest : ParisDoorWood {
+      Position: {0, 0.78, -0.24}
+      Rotation: {-0.2, 0, 0}
+      Box: {1.8, 0.36, 0.05}
+    }
+
     for k in 0..2 {
       { (IsA, ParisIron); Position: {(k - 0.5) * 1.5, 0.22, 0}; Box: {0.06, 0.45, 0.45} }
       { (IsA, ParisIron); Position: {(k - 0.5) * 1.5, 0.7, -0.2}; Box: {0.05, 0.55, 0.05} }
@@ -42,49 +47,131 @@ assets {
   }
 
   template ParisMorrisColumn {
-    plinth : ParisLampGreen { Position: {0, 0.2, 0}; Cylinder: {radius: 0.68, length: 0.4, segments: 24, smooth: true} }
-    posters { Position: {0, 1.9, 0}; Cylinder: {radius: 0.58, length: 3, segments: 24, smooth: true}; Rgb: {214, 196, 160}; PbrMaterial: {roughness: 0.9} }
-    for k in 0..4 {
-      const ink: Rgb = match k { 0: {170, 40, 40}; 1: {40, 70, 130}; 2: {220, 170, 50}; _: {30, 30, 30} }
-      { Position: {cos(k * 1.57) * 0.585, 2.0, sin(k * 1.57) * 0.585}; Rotation: {0, 0 - k * 1.57 + 1.57, 0}; Box: {0.5, 0.9, 0.02}; Rgb: ink; PbrMaterial: {roughness: 0.8} }
+    plinth : ParisLampGreen {
+      Position: {0, 0.2, 0}
+      Cylinder: {radius: 0.68, length: 0.4, segments: 24, smooth: true}
     }
-    cornice : ParisLampGreen { Position: {0, 3.5, 0}; Cylinder: {radius: 0.72, length: 0.22, segments: 24, smooth: true} }
-    dome : ParisLampGreen { Position: {0, 3.6, 0}; HemiSphere: {radius: 0.62, segments: 24, smooth: true} }
+
+    posters {
+      Position: {0, 1.9, 0}
+      Cylinder: {radius: 0.58, length: 3, segments: 24, smooth: true}
+      Rgb: {214, 196, 160}
+      PbrMaterial: {roughness: 0.9}
+    }
+
+    for k in 0..4 {
+      const ink: Rgb = match k {
+        0: {170, 40, 40}
+        1: {40, 70, 130}
+        2: {220, 170, 50}
+        _: {30, 30, 30}
+      }
+      {
+        Position: {cos(k * 1.57) * 0.585, 2.0, sin(k * 1.57) * 0.585}
+        Rotation: {0, 0 - k * 1.57 + 1.57, 0}
+        Box: {0.5, 0.9, 0.02}
+        Rgb: ink
+        PbrMaterial: {roughness: 0.8}
+      }
+    }
+
+    cornice : ParisLampGreen {
+      Position: {0, 3.5, 0}
+      Cylinder: {radius: 0.72, length: 0.22, segments: 24, smooth: true}
+    }
+
+    dome : ParisLampGreen {
+      Position: {0, 3.6, 0}
+      HemiSphere: {radius: 0.62, segments: 24, smooth: true}
+    }
+
     finial : ParisLampGreen { Position: {0, 4.28, 0}; Sphere: {radius: 0.09, segments: 10} }
   }
 
   // Low cast iron bollard (potelet) with a ring and a ball on top.
   template ParisBollard {
-    post : ParisLampGreen { Position: {0, 0.45, 0}; Frustum: {radius_bottom: 0.075, radius_top: 0.055, length: 0.9, segments: 10, smooth: true} }
-    ring : ParisLampGreen { Position: {0, 0.78, 0}; Torus: {radius: 0.065, tube: 0.018, segments: 10, rings: 4} }
-    knob : ParisLampGreen { Position: {0, 0.95, 0}; Sphere: {radius: 0.07, segments: 10, smooth: true} }
+    post : ParisLampGreen {
+      Position: {0, 0.45, 0}
+      Frustum: {radius_bottom: 0.075, radius_top: 0.055, length: 0.9, segments: 10, smooth: true}
+    }
+
+    ring : ParisLampGreen {
+      Position: {0, 0.78, 0}
+      Torus: {radius: 0.065, tube: 0.018, segments: 10, rings: 4}
+    }
+
+    knob : ParisLampGreen {
+      Position: {0, 0.95, 0}
+      Sphere: {radius: 0.07, segments: 10, smooth: true}
+    }
   }
 
   // A small round bistro table: cast iron foot and stem, marble top with a brass rim and a
   // little candle lamp.
   template ParisBistroTable {
-    foot : ParisCastIron { Position: {0, 0.015, 0}; Cylinder: {radius: 0.2, length: 0.03, segments: 12, smooth: true} }
-    stem : ParisCastIron { Position: {0, 0.37, 0}; Cylinder: {radius: 0.025, length: 0.7, segments: 8, smooth: true} }
-    top : ParisMarble { Position: {0, 0.735, 0}; Cylinder: {radius: 0.3, length: 0.03, segments: 20, smooth: true} }
-    rim : ParisBrass { Position: {0, 0.735, 0}; Torus: {radius: 0.3, tube: 0.012, segments: 20, rings: 4} }
-    candle : ParisLampGlass { Position: {0, 0.79, 0}; Cylinder: {radius: 0.03, length: 0.08, segments: 8} }
+    foot : ParisCastIron {
+      Position: {0, 0.015, 0}
+      Cylinder: {radius: 0.2, length: 0.03, segments: 12, smooth: true}
+    }
+
+    stem : ParisCastIron {
+      Position: {0, 0.37, 0}
+      Cylinder: {radius: 0.025, length: 0.7, segments: 8, smooth: true}
+    }
+
+    top : ParisMarble {
+      Position: {0, 0.735, 0}
+      Cylinder: {radius: 0.3, length: 0.03, segments: 20, smooth: true}
+    }
+
+    rim : ParisBrass {
+      Position: {0, 0.735, 0}
+      Torus: {radius: 0.3, tube: 0.012, segments: 20, rings: 4}
+    }
+
+    candle : ParisLampGlass {
+      Position: {0, 0.79, 0}
+      Cylinder: {radius: 0.03, length: 0.08, segments: 8}
+    }
   }
 
   // A woven rattan bistro chair; the sitter faces +Z.
   template ParisBistroChair {
     seat : ParisWicker { Position: {0, 0.46, 0}; Box: {0.42, 0.05, 0.42} }
     seat_rim : ParisWickerDark { Position: {0, 0.43, 0}; Box: {0.44, 0.03, 0.44} }
+
     for k in 0..4 {
       const lx = k % 2 == 0 ? -0.18 : 0.18
       const lz = k < 2 ? -0.18 : 0.18
-      { (IsA, ParisWickerDark); Position: {lx, 0.21, lz}; Cylinder: {radius: 0.018, length: 0.42, segments: 6} }
+      {
+        (IsA, ParisWickerDark)
+        Position: {lx, 0.21, lz}
+        Cylinder: {radius: 0.018, length: 0.42, segments: 6}
+      }
     }
+
     for k in 0..2 {
-      { (IsA, ParisWickerDark); Position: {k * 0.38 - 0.19, 0.72, -0.21}; Rotation: {-0.12, 0, 0}; Cylinder: {radius: 0.018, length: 0.52, segments: 6} }
+      {
+        (IsA, ParisWickerDark)
+        Position: {k * 0.38 - 0.19, 0.72, -0.21}
+        Rotation: {-0.12, 0, 0}
+        Cylinder: {radius: 0.018, length: 0.52, segments: 6}
+      }
     }
-    back : ParisWicker { Position: {0, 0.8, -0.22}; Rotation: {-0.12, 0, 0}; Box: {0.38, 0.3, 0.03} }
+
+    back : ParisWicker {
+      Position: {0, 0.8, -0.22}
+      Rotation: {-0.12, 0, 0}
+      Box: {0.38, 0.3, 0.03}
+    }
+
     for k in 0..3 {
-      { (IsA, ParisWickerDark); Position: {0, 0.69 + k * 0.1, -0.205 - k * 0.012}; Rotation: {-0.12, 0, 0}; Box: {0.38, 0.018, 0.034} }
+      {
+        (IsA, ParisWickerDark)
+        Position: {0, 0.69 + k * 0.1, -0.205 - k * 0.012}
+        Rotation: {-0.12, 0, 0}
+        Box: {0.38, 0.018, 0.034}
+      }
     }
   }
 
@@ -104,18 +191,39 @@ assets {
     vitrine : ParisShopLit { Position: {0, 1.45, 0.26}; Box: {width - 0.8, 2.3, 0.04} }
     lintel : ParisDoorWood { Position: {0, 2.72, 0.28}; Box: {width - 0.4, 0.26, 0.1} }
     sill : ParisDoorWood { Position: {0, 0.2, 0.28}; Box: {width - 0.4, 0.4, 0.1} }
+
     for k in 0..cols + 1 {
-      { (IsA, ParisDoorWood); Position: {0 - (width - 0.6) / 2 + k * (width - 0.6) / cols, 1.45, 0.3}; Box: {0.12, 2.5, 0.08} }
+      {
+        (IsA, ParisDoorWood)
+        Position: {0 - (width - 0.6) / 2 + k * (width - 0.6) / cols, 1.45, 0.3}
+        Box: {0.12, 2.5, 0.08}
+      }
     }
 
-    cloth : ParisAwning { Position: {0, 3.15 - drop / 2, 0.3 + run / 2}; Rotation: {tilt, 0, 0}; Box: {width, 0.05, cloth_len} }
+    cloth : ParisAwning {
+      Position: {0, 3.15 - drop / 2, 0.3 + run / 2}
+      Rotation: {tilt, 0, 0}
+      Box: {width, 0.05, cloth_len}
+    }
+
     valance : ParisAwning { Position: {0, 2.6 - 0.17, depth + 0.02}; Box: {width, 0.34, 0.03} }
     trim : ParisMarble { Position: {0, 2.6 - 0.32, depth + 0.035}; Box: {width, 0.04, 0.02} }
-    lettering { Position: {0, 2.45, depth + 0.045}; Scale: {0.01, 0.01, 0.01}; Text: {value: name, size: 20}; Rgb: {250, 236, 204} }
+    lettering {
+      Position: {0, 2.45, depth + 0.045}
+      Scale: {0.01, 0.01, 0.01}
+      Text: {value: name, size: 20}
+      Rgb: {250, 236, 204}
+    }
+
     for side in 0..2 {
       const sx = (side - 0.5) * (width - 0.06)
       { (IsA, ParisAwning); Position: {sx, 2.72, 0.3 + run / 2}; Box: {0.03, 0.3, run} }
-      { (IsA, ParisIron); Position: {sx, 3.1 - drop / 2, 0.3 + run / 2}; Rotation: {tilt, 0, 0}; Box: {0.04, 0.04, cloth_len} }
+      {
+        (IsA, ParisIron)
+        Position: {sx, 3.1 - drop / 2, 0.3 + run / 2}
+        Rotation: {tilt, 0, 0}
+        Box: {0.04, 0.04, cloth_len}
+      }
     }
 
     tables {
@@ -130,85 +238,218 @@ assets {
       }
     }
 
-    glow_a { Position: {0 - width / 4, 2.3, 1.6}; PointLight: {intensity: 24, range: 9, shadows: false}; Rgb: {255, 180, 100} }
-    glow_b { Position: {width / 4, 2.3, 1.6}; PointLight: {intensity: 24, range: 9, shadows: false}; Rgb: {255, 180, 100} }
+    glow_a {
+      Position: {0 - width / 4, 2.3, 1.6}
+      PointLight: {intensity: 24, range: 9, shadows: false}
+      Rgb: {255, 180, 100}
+    }
+
+    glow_b {
+      Position: {width / 4, 2.3, 1.6}
+      PointLight: {intensity: 24, range: 9, shadows: false}
+      Rgb: {255, 180, 100}
+    }
   }
 
   // An art nouveau (Guimard) Métro entrance: the stair well (opening toward +Z) with a green iron
-  // balustrade on three sides, two plant-stem lamp posts with amber lamps and the sign between them.
+  // balustrade on three sides, two plant-stem lamp posts with amber lamps and the sign between
+  // them.
   template ParisMetroEntrance {
     const hw: f32 = 0.95
     const hl: f32 = 1.8
     pit : ParisPit { Position: {0, 0.006, 0}; Box: {1.76, 0.012, 3.56} }
+
     for s in 0..8 {
       const shade = 150 - s * 17
-      { (IsA, ParisKerb); Position: {0, 0.014, hl - 0.25 - s * 0.36}; Box: {1.6, 0.01, 0.05}; Rgb: {shade, shade, shade} }
+      {
+        (IsA, ParisKerb)
+        Position: {0, 0.014, hl - 0.25 - s * 0.36}
+        Box: {1.6, 0.01, 0.05}
+        Rgb: {shade, shade, shade}
+      }
     }
+
     for side in 0..2 {
       const sx = (side * 2 - 1) * (hw - 0.08)
       { (IsA, ParisQuayStone); Position: {sx, 0.11, 0}; Box: {0.16, 0.22, 2 * hl} }
       { (IsA, ParisMetroGreen); Position: {sx, 0.95, 0}; Box: {0.06, 0.05, 2 * hl} }
       { (IsA, ParisMetroGreen); Position: {sx, 0.3, 0}; Box: {0.04, 0.04, 2 * hl} }
+
       for p in 0..7 {
         const pz = 0 - hl + p * 2 * hl / 6
         { (IsA, ParisMetroGreen); Position: {sx, 0.6, pz}; Box: {0.06, 0.76, 0.06} }
       }
+
       for p in 0..6 {
         const pz = 0 - hl + (p + 0.5) * 2 * hl / 6
-        { (IsA, ParisMetroGreen); Position: {sx, 0.62, pz}; Rotation: {math.PI / 2, math.PI / 2, 0}; Scale: {1, 1, 1.5}; Torus: {radius: 0.17, tube: 0.018, segments: 14, rings: 4} }
+        {
+          (IsA, ParisMetroGreen)
+          Position: {sx, 0.62, pz}
+          Rotation: {math.PI / 2, math.PI / 2, 0}
+          Scale: {1, 1, 1.5}
+          Torus: {radius: 0.17, tube: 0.018, segments: 14, rings: 4}
+        }
       }
     }
+
     back_kerb : ParisQuayStone { Position: {0, 0.11, 0.08 - hl}; Box: {2 * hw, 0.22, 0.16} }
     back_rail : ParisMetroGreen { Position: {0, 0.95, 0.08 - hl}; Box: {2 * hw - 0.1, 0.05, 0.06} }
     back_low : ParisMetroGreen { Position: {0, 0.3, 0.08 - hl}; Box: {2 * hw - 0.1, 0.04, 0.04} }
+
     for p in 0..2 {
-      { (IsA, ParisMetroGreen); Position: {(p - 0.5) * 0.8, 0.62, 0.08 - hl}; Rotation: {math.PI / 2, 0, 0}; Scale: {1, 1, 1.5}; Torus: {radius: 0.17, tube: 0.018, segments: 14, rings: 4} }
+      {
+        (IsA, ParisMetroGreen)
+        Position: {(p - 0.5) * 0.8, 0.62, 0.08 - hl}
+        Rotation: {math.PI / 2, 0, 0}
+        Scale: {1, 1, 1.5}
+        Torus: {radius: 0.17, tube: 0.018, segments: 14, rings: 4}
+      }
     }
 
     // The two lamp posts: straight stems that curl inward at the top, each holding an amber lamp.
     for side in 0..2 {
       const sg = side * 2 - 1
       const z = hl - 0.05
-      { (IsA, ParisMetroGreen); Position: {sg * (hw - 0.08), 0.32, z}; Frustum: {radius_bottom: 0.09, radius_top: 0.05, length: 0.2, segments: 10, smooth: true} }
-      ParisRod(ax: sg * (hw - 0.08), ay: 0.22, az: z, bx: sg * (hw - 0.08), by: 2.5, bz: z, radius: 0.05) {}
-      ParisRod(ax: sg * (hw - 0.08), ay: 2.5, az: z, bx: sg * 0.82, by: 2.92, bz: z, radius: 0.045) {}
+      {
+        (IsA, ParisMetroGreen)
+        Position: {sg * (hw - 0.08), 0.32, z}
+        Frustum: {radius_bottom: 0.09, radius_top: 0.05, length: 0.2, segments: 10, smooth: true}
+      }
+
+      ParisRod(
+        ax: sg * (hw - 0.08),
+        ay: 0.22,
+        az: z,
+        bx: sg * (hw - 0.08),
+        by: 2.5,
+        bz: z,
+        radius: 0.05
+      ) {}
+      ParisRod(
+        ax: sg * (hw - 0.08),
+        ay: 2.5,
+        az: z,
+        bx: sg * 0.82,
+        by: 2.92,
+        bz: z,
+        radius: 0.045
+      ) {}
       ParisRod(ax: sg * 0.82, ay: 2.92, az: z, bx: sg * 0.68, by: 3.16, bz: z, radius: 0.04) {}
       ParisRod(ax: sg * 0.68, ay: 3.16, az: z, bx: sg * 0.5, by: 3.26, bz: z, radius: 0.035) {}
       ParisRod(ax: sg * 0.5, ay: 3.26, az: z, bx: sg * 0.42, by: 3.2, bz: z, radius: 0.03) {}
-      { (IsA, ParisMetroGreen); Position: {sg * 0.42, 3.17, z}; Cone: {radius: 0.09, length: 0.08, segments: 10} }
-      { (IsA, ParisAmberLamp); Position: {sg * 0.42, 3.0, z}; Scale: {1, 1.45, 1}; Sphere: {radius: 0.1, segments: 12, smooth: true} }
-      { Position: {sg * 0.42, 2.95, z + 0.1}; PointLight: {intensity: 5, range: 5, shadows: false}; Rgb: {255, 150, 60} }
+      {
+        (IsA, ParisMetroGreen)
+        Position: {sg * 0.42, 3.17, z}
+        Cone: {radius: 0.09, length: 0.08, segments: 10}
+      }
+
+      {
+        (IsA, ParisAmberLamp)
+        Position: {sg * 0.42, 3.0, z}
+        Scale: {1, 1.45, 1}
+        Sphere: {radius: 0.1, segments: 12, smooth: true}
+      }
+
+      {
+        Position: {sg * 0.42, 2.95, z + 0.1}
+        PointLight: {intensity: 5, range: 5, shadows: false}
+        Rgb: {255, 150, 60}
+      }
     }
+
     sign_bar : ParisMetroGreen { Position: {0, 2.86, hl - 0.05}; Box: {2 * hw - 0.16, 0.05, 0.05} }
     sign_frame : ParisMetroGreen { Position: {0, 2.6, hl - 0.05}; Box: {1.52, 0.38, 0.06} }
     sign_board : ParisMetroSign { Position: {0, 2.6, hl - 0.05}; Box: {1.4, 0.28, 0.08} }
-    sign_text { Position: {0, 2.6, hl - 0.005}; Scale: {0.01, 0.01, 0.01}; Text: {value: "METROPOLITAIN", size: 15}; Rgb: {28, 58, 38} }
-    sign_text_back { Position: {0, 2.6, hl - 0.095}; Rotation: {0, math.PI, 0}; Scale: {0.01, 0.01, 0.01}; Text: {value: "METROPOLITAIN", size: 15}; Rgb: {28, 58, 38} }
+    sign_text {
+      Position: {0, 2.6, hl - 0.005}
+      Scale: {0.01, 0.01, 0.01}
+      Text: {value: "METROPOLITAIN", size: 15}
+      Rgb: {28, 58, 38}
+    }
+
+    sign_text_back {
+      Position: {0, 2.6, hl - 0.095}
+      Rotation: {0, math.PI, 0}
+      Scale: {0.01, 0.01, 0.01}
+      Text: {value: "METROPOLITAIN", size: 15}
+      Rgb: {28, 58, 38}
+    }
   }
 
   // A round newspaper kiosk: green panels with posters, the lit counter with the papers on the
   // front (+Z), a frieze sign and a domed cap.
   template ParisKiosk {
     prop label: string = "JOURNAUX"
-    base : ParisLampGreen { Position: {0, 0.12, 0}; Cylinder: {radius: 1.12, length: 0.24, segments: 24, smooth: true} }
-    body : ParisMetroGreen { Position: {0, 1.32, 0}; Cylinder: {radius: 1.0, length: 2.16, segments: 24, smooth: true} }
+    base : ParisLampGreen {
+      Position: {0, 0.12, 0}
+      Cylinder: {radius: 1.12, length: 0.24, segments: 24, smooth: true}
+    }
+
+    body : ParisMetroGreen {
+      Position: {0, 1.32, 0}
+      Cylinder: {radius: 1.0, length: 2.16, segments: 24, smooth: true}
+    }
+
     counter : ParisShopLit { Position: {0, 1.55, 1.01}; Box: {1.0, 0.8, 0.04} }
     ledge : ParisMetroGreen { Position: {0, 1.1, 1.08}; Box: {1.1, 0.06, 0.2} }
+
     for n in 0..4 {
-      const cover: Rgb = match n { 0: {196, 40, 36}; 1: {226, 220, 204}; 2: {40, 70, 140}; _: {230, 190, 60} }
-      { (IsA, ParisNewsprint); Position: {-0.36 + n * 0.24, 0.72, 1.05}; Rotation: {-0.3, 0, 0}; Box: {0.2, 0.28, 0.02}; Rgb: cover }
+      const cover: Rgb = match n {
+        0: {196, 40, 36}
+        1: {226, 220, 204}
+        2: {40, 70, 140}
+        _: {230, 190, 60}
+      }
+      {
+        (IsA, ParisNewsprint)
+        Position: {-0.36 + n * 0.24, 0.72, 1.05}
+        Rotation: {-0.3, 0, 0}
+        Box: {0.2, 0.28, 0.02}
+        Rgb: cover
+      }
     }
+
     for k in 0..3 {
       const a = (k + 1) * math.PI / 2
       const ink: Rgb = match k { 0: {170, 40, 40}; 1: {214, 196, 160}; _: {40, 70, 130} }
-      { Position: {sin(a) * 1.01, 1.4, cos(a) * 1.01}; Rotation: {0, a, 0}; Box: {0.8, 1.2, 0.02}; Rgb: ink; PbrMaterial: {roughness: 0.8} }
+      {
+        Position: {sin(a) * 1.01, 1.4, cos(a) * 1.01}
+        Rotation: {0, a, 0}
+        Box: {0.8, 1.2, 0.02}
+        Rgb: ink
+        PbrMaterial: {roughness: 0.8}
+      }
     }
+
     frieze : ParisMetroSign { Position: {0, 2.2, 1.0}; Box: {1.1, 0.24, 0.06} }
-    frieze_text { Position: {0, 2.2, 1.035}; Scale: {0.01, 0.01, 0.01}; Text: {value: label, size: 15}; Rgb: {28, 58, 38} }
-    cornice : ParisMetroGreen { Position: {0, 2.48, 0}; Cylinder: {radius: 1.22, length: 0.16, segments: 24, smooth: true} }
-    dome : ParisMetroGreen { Position: {0, 2.56, 0}; Scale: {1, 0.6, 1}; HemiSphere: {radius: 1.12, segments: 24, smooth: true} }
-    finial : ParisBrass { Position: {0, 3.28, 0}; Sphere: {radius: 0.08, segments: 10, smooth: true} }
-    lamp { Position: {0, 2.25, 1.4}; PointLight: {intensity: 8, range: 6, shadows: false}; Rgb: {255, 196, 120} }
+    frieze_text {
+      Position: {0, 2.2, 1.035}
+      Scale: {0.01, 0.01, 0.01}
+      Text: {value: label, size: 15}
+      Rgb: {28, 58, 38}
+    }
+
+    cornice : ParisMetroGreen {
+      Position: {0, 2.48, 0}
+      Cylinder: {radius: 1.22, length: 0.16, segments: 24, smooth: true}
+    }
+
+    dome : ParisMetroGreen {
+      Position: {0, 2.56, 0}
+      Scale: {1, 0.6, 1}
+      HemiSphere: {radius: 1.12, segments: 24, smooth: true}
+    }
+
+    finial : ParisBrass {
+      Position: {0, 3.28, 0}
+      Sphere: {radius: 0.08, segments: 10, smooth: true}
+    }
+
+    lamp {
+      Position: {0, 2.25, 1.4}
+      PointLight: {intensity: 8, range: 6, shadows: false}
+      Rgb: {255, 196, 120}
+    }
   }
 
   // The part of a raccoon hideout that opens: the lid of a bin (kind 0), a manhole cover (1) or
@@ -223,38 +464,91 @@ assets {
     const pz = kind == 0 ? -0.29 : (kind == 1 ? 0 : 0.13)
     Position: {kind == 1 ? a * 0.16 : 0, py, pz}
     Rotation: {kind == 1 ? 0 : 0 - a * (kind == 0 ? 1.2 : 1.3), 0, kind == 1 ? a * 0.45 : 0}
-    Transition: [Position: {duration: 0.35, timing_function: EaseInOut}, Rotation: {duration: 0.35, timing_function: EaseInOut}]
+    Transition: [
+      Position: {duration: 0.35, timing_function: EaseInOut},
+      Rotation: {duration: 0.35, timing_function: EaseInOut}
+    ]
     DynamicTransform
+
     if kind == 0 {
       // Hinged at the back of the bin.
-      rim : ParisBinGreen { Position: {0, 0.015, 0.29}; Cylinder: {radius: 0.305, length: 0.03, segments: 16, smooth: true}; DynamicTransform }
-      lid : ParisBinGreen { Position: {0, 0.03, 0.29}; Scale: {1, 0.4, 1}; HemiSphere: {radius: 0.3, segments: 16, smooth: true}; DynamicTransform }
-      knob : ParisCastIron { Position: {0, 0.15, 0.29}; Sphere: {radius: 0.04, segments: 8, smooth: true}; DynamicTransform }
+      rim : ParisBinGreen {
+        Position: {0, 0.015, 0.29}
+        Cylinder: {radius: 0.305, length: 0.03, segments: 16, smooth: true}
+        DynamicTransform
+      }
+
+      lid : ParisBinGreen {
+        Position: {0, 0.03, 0.29}
+        Scale: {1, 0.4, 1}
+        HemiSphere: {radius: 0.3, segments: 16, smooth: true}
+        DynamicTransform
+      }
+
+      knob : ParisCastIron {
+        Position: {0, 0.15, 0.29}
+        Sphere: {radius: 0.04, segments: 8, smooth: true}
+        DynamicTransform
+      }
     } else if kind == 1 {
-      disc : ParisCastIron { Position: {0, 0, 0}; Cylinder: {radius: 0.345, length: 0.026, segments: 20, smooth: true}; DynamicTransform }
-      ring : ParisCastIron { Position: {0, 0.013, 0}; Torus: {radius: 0.32, tube: 0.012, segments: 20, rings: 4}; DynamicTransform }
+      disc : ParisCastIron {
+        Position: {0, 0, 0}
+        Cylinder: {radius: 0.345, length: 0.026, segments: 20, smooth: true}
+        DynamicTransform
+      }
+
+      ring : ParisCastIron {
+        Position: {0, 0.013, 0}
+        Torus: {radius: 0.32, tube: 0.012, segments: 20, rings: 4}
+        DynamicTransform
+      }
+
       for r in 0..5 {
         const rz = (r - 2) * 0.11
-        { (IsA, ParisCastIron); Position: {0, 0.016, rz}; Box: {sqrt(0.09 - rz * rz) * 2, 0.008, 0.03}; DynamicTransform }
+        {
+          (IsA, ParisCastIron)
+          Position: {0, 0.016, rz}
+          Box: {sqrt(0.09 - rz * rz) * 2, 0.008, 0.03}
+          DynamicTransform
+        }
       }
     } else {
       // Hinged at the top of the opening.
       for s in 0..2 {
-        { (IsA, ParisCastIron); Position: {(s - 0.5) * 0.84, -0.43, 0}; Box: {0.04, 0.86, 0.04}; DynamicTransform }
+        {
+          (IsA, ParisCastIron)
+          Position: {(s - 0.5) * 0.84, -0.43, 0}
+          Box: {0.04, 0.86, 0.04}
+          DynamicTransform
+        }
       }
+
       top_bar : ParisCastIron { Position: {0, -0.02, 0}; Box: {0.88, 0.04, 0.04}; DynamicTransform }
-      bottom_bar : ParisCastIron { Position: {0, -0.84, 0}; Box: {0.88, 0.04, 0.04}; DynamicTransform }
+      bottom_bar : ParisCastIron {
+        Position: {0, -0.84, 0}
+        Box: {0.88, 0.04, 0.04}
+        DynamicTransform
+      }
+
       mid_bar : ParisCastIron { Position: {0, -0.43, 0}; Box: {0.84, 0.03, 0.03}; DynamicTransform }
+
       for b in 0..6 {
-        { (IsA, ParisCastIron); Position: {-0.3 + b * 0.12, -0.43, 0}; Box: {0.025, 0.82, 0.025}; DynamicTransform }
+        {
+          (IsA, ParisCastIron)
+          Position: {-0.3 + b * 0.12, -0.43, 0}
+          Box: {0.025, 0.82, 0.025}
+          DynamicTransform
+        }
       }
     }
 
     async {
       while true {
         await next_frame()
-        if id >= 0 && id < PR_HIDEOUTS {
+
+        if id >= 0 && id < pr_hideouts.count() {
           const l = pr_hideout_lift[id]
+
           if lift != l { lift = l }
         }
       }
@@ -264,21 +558,46 @@ assets {
   // A green metal rubbish bin with a hinged domed lid (child `cover`).
   template ParisBin {
     prop id: i32 = -1
-    foot : ParisCastIron { Position: {0, 0.02, 0}; Cylinder: {radius: 0.27, length: 0.04, segments: 16, smooth: true} }
-    body : ParisBinGreen { Position: {0, 0.45, 0}; Frustum: {radius_bottom: 0.25, radius_top: 0.29, length: 0.82, segments: 16, smooth: true} }
+    foot : ParisCastIron {
+      Position: {0, 0.02, 0}
+      Cylinder: {radius: 0.27, length: 0.04, segments: 16, smooth: true}
+    }
+
+    body : ParisBinGreen {
+      Position: {0, 0.45, 0}
+      Frustum: {radius_bottom: 0.25, radius_top: 0.29, length: 0.82, segments: 16, smooth: true}
+    }
+
     for h in 0..3 {
       const hy = 0.2 + h * 0.3
-      { (IsA, ParisCastIron); Position: {0, hy, 0}; Torus: {radius: 0.255 + hy * 0.047, tube: 0.014, segments: 16, rings: 4} }
+      {
+        (IsA, ParisCastIron)
+        Position: {0, hy, 0}
+        Torus: {radius: 0.255 + hy * 0.047, tube: 0.014, segments: 16, rings: 4}
+      }
     }
-    inside : ParisPit { Position: {0, 0.862, 0}; Cylinder: {radius: 0.27, length: 0.005, segments: 16} }
+
+    inside : ParisPit {
+      Position: {0, 0.862, 0}
+      Cylinder: {radius: 0.27, length: 0.005, segments: 16}
+    }
+
     ParisHideoutCover cover(kind: 0, id: id)
   }
 
   // A manhole in the street: iron frame, the dark shaft and a cover (child `cover`) that lifts.
   template ParisManhole {
     prop id: i32 = -1
-    frame : ParisCastIron { Position: {0, 0.03, 0}; Cylinder: {radius: 0.44, length: 0.03, segments: 20, smooth: true} }
-    hole : ParisPit { Position: {0, 0.047, 0}; Cylinder: {radius: 0.35, length: 0.004, segments: 20} }
+    frame : ParisCastIron {
+      Position: {0, 0.03, 0}
+      Cylinder: {radius: 0.44, length: 0.03, segments: 20, smooth: true}
+    }
+
+    hole : ParisPit {
+      Position: {0, 0.047, 0}
+      Cylinder: {radius: 0.35, length: 0.004, segments: 20}
+    }
+
     ParisHideoutCover cover(kind: 1, id: id)
   }
 
@@ -291,14 +610,30 @@ assets {
     const r: f32 = 0.45
     const spring: f32 = 0.55
     recess : ParisPit { Position: {0, spring / 2, 0.01}; Box: {w, spring, 0.02} }
-    recess_top : ParisPit { Position: {0, spring, 0.01}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: r, length: 0.02, segments: 16} }
-    for s in 0..2 {
-      { (IsA, ParisLimestoneTrim); Position: {(s - 0.5) * (w + 0.16), spring / 2, 0.05}; Box: {0.16, spring, 0.1} }
+    recess_top : ParisPit {
+      Position: {0, spring, 0.01}
+      Rotation: {math.PI / 2, 0, 0}
+      Cylinder: {radius: r, length: 0.02, segments: 16}
     }
+
+    for s in 0..2 {
+      {
+        (IsA, ParisLimestoneTrim)
+        Position: {(s - 0.5) * (w + 0.16), spring / 2, 0.05}
+        Box: {0.16, spring, 0.1}
+      }
+    }
+
     for k in 0..7 {
       const t = (k + 0.5) * math.PI / 7
-      { (IsA, ParisLimestoneTrim); Position: {(r + 0.08) * cos(t), spring + (r + 0.08) * sin(t), 0.05}; Rotation: {0, 0, t + math.PI / 2}; Box: {0.22, 0.16, 0.1} }
+      {
+        (IsA, ParisLimestoneTrim)
+        Position: {(r + 0.08) * cos(t), spring + (r + 0.08) * sin(t), 0.05}
+        Rotation: {0, 0, t + math.PI / 2}
+        Box: {0.22, 0.16, 0.1}
+      }
     }
+
     sill : ParisLimestoneTrim { Position: {0, 0.03, 0.08}; Box: {w + 0.3, 0.06, 0.16} }
     ParisHideoutCover cover(kind: 2, id: id)
   }
