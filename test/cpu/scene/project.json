@@ -210,6 +210,17 @@
                 ]
             },
             {
+                "id": "ForestScene",
+                "testcases": [
+                    "loads",
+                    "sun_follows_state",
+                    "temperature_follows_state",
+                    "floor_clear_of_brook",
+                    "landmarks_clear",
+                    "hud_sliders"
+                ]
+            },
+            {
                 "id": "LagoonLife",
                 "testcases": [
                     "wake_follows_canoe",

@@ -1,0 +1,137 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.material
+using box.light
+using box.effects
+using box.atmosphere
+using state
+using assets
+
+// Sky and light. TimeOfDay points the sun and moon from the hour and season of the state: the
+// season sets the day of the year, so the summer sun stands high and the winter sun low. North
+// is turned so that the late afternoon sun shines from ahead and to the right of the start view
+// (toward the brook, -Z), through the trees of the far bank. Precipitation thickens the clouds,
+// dims the sun and adds haze; the wind drives the clouds.
+//
+// There is no light Bake: the sun moves with the sliders, and a bake converges only after the
+// sun rests (a turn of light_threshold rebakes every probe), so the ambient light comes from the
+// atmosphere environment instead. A ReflectionBake gives the brook and wet surfaces a scene
+// probe that recaptures as the sun turns.
+state {
+  // Latitude of the forest and the yaw of north (TimeOfDay.north)
+  export const LATITUDE: f32 = 47
+  export const NORTH: f32 = 48
+
+  // Cumulus and the high veil
+  export const CLOUD_SIZE: f32 = 5000
+  export const CLOUD_ALTITUDE: f32 = 1800
+
+  // Coverage threshold of the cumulus layer: lower is more cloud
+  fn forest_cloud_threshold(p: f64) -> f64 {
+    0.62 - 0.34 * p
+  }
+
+  // Cloud drift in m/s along X and Z for a wind
+  fn forest_cloud_drift_x(w: f64) -> f64 {
+    3 + w * 2.4
+  }
+
+  fn forest_cloud_drift_z(w: f64) -> f64 {
+    1 + w * 0.9
+  }
+}
+
+sun {
+  DirectionalLight: {intensity: 2.8 * PI * (1 - 0.6 * precipitation)}
+  Rgb: {255, 250, 240}
+  Cookie: {
+    texture: forest_clouds,
+    size: CLOUD_SIZE,
+    height: CLOUD_ALTITUDE,
+    threshold: forest_cloud_threshold(precipitation),
+    softness: 0.14,
+    strength: 0.4 + 0.3 * precipitation,
+    velocity: {forest_cloud_drift_x(wind), forest_cloud_drift_z(wind)}
+  }
+}
+
+moon {
+  DirectionalLight: {intensity: 0.4 * PI}
+  Rgb: {190, 210, 255}
+}
+
+sky {
+  Atmosphere: {
+    sun: sun,
+    moon: moon,
+    units_per_km: 1000,
+    sea_level: 0,
+    ground_altitude: 0.4,
+    rayleigh: {scale_height: 8, scattering_scale: 1},
+    mie: {
+      scale_height: 1.2,
+      anisotropy: 0.78,
+      scattering_scale: 1.4 + 2.5 * precipitation,
+      tint: {255, 240, 222}
+    },
+    ozone_scale: 1,
+    ground_albedo: {60, 82, 48},
+    night_intensity: 0.03,
+    sun_disk_intensity: 6,
+    sun_radius: 0.6,
+    moon_disk_intensity: 12,
+    moon_radius: 0.6
+  }
+  TimeOfDay: {
+    hour: hour,
+    day_of_year: forest_day_of_year(season),
+    latitude: LATITUDE,
+    north: NORTH,
+    sun: sun,
+    moon: moon
+  }
+  HeightFog: {
+    density: 0.003 + 0.014 * precipitation,
+    falloff: 0.09,
+    base_height: 0,
+    max_opacity: 0.4 + 0.3 * precipitation,
+    atmosphere: sky
+  }
+}
+
+cloud_low {
+  CloudLayer: {
+    texture: forest_clouds,
+    size: CLOUD_SIZE,
+    altitude: CLOUD_ALTITUDE,
+    threshold: forest_cloud_threshold(precipitation),
+    softness: 0.14,
+    density: 0.85 + 0.15 * precipitation,
+    velocity: {forest_cloud_drift_x(wind), forest_cloud_drift_z(wind)}
+  }
+}
+
+cloud_high {
+  CloudLayer: {
+    texture: forest_clouds,
+    size: 16000,
+    altitude: 7000,
+    threshold: 0.7 - 0.2 * precipitation,
+    softness: 0.18,
+    density: 0.45,
+    offset: {900, 400},
+    velocity: {forest_cloud_drift_x(wind) * 2, 2}
+  }
+}
+
+$ {
+  ReflectionBake: {
+    resolution: 128,
+    budget_ms: 1,
+    scene_probe: true,
+    scene_probe_height: 2.4,
+    environment: sky,
+    light_threshold: 4
+  }
+}

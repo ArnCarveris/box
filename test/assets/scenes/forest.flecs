@@ -1,0 +1,32 @@
+// Forest: a clearing in a deep forest with a brook, through the seasons, rain and snow, wind and
+// the time of day, set with the sliders of the panel (H hides it). Fly with the camera controller.
+//
+// One file per concern in forest/: the state the sliders write, the layout functions that place
+// things, the materials, the ground, the sky and light, the view and the HUD.
+include forest/state
+include forest/layout
+include forest/materials
+include forest/ground
+include forest/sky
+include forest/view
+include forest/hud
+
+using box.view
+
+$ {
+  box.app.FpsTarget: {60}
+  Scene: {
+    reflections: true,
+    environment: true,
+    aerial_perspective: true,
+    cookies: true,
+    alpha_cutout: true,
+    blend_modes: true,
+    texture_blend: true,
+    triplanar: true,
+    diffuse_transmission: true,
+    texture_scroll: true,
+    water: true,
+    planar_reflections: true
+  }
+}

@@ -1,0 +1,68 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.effects
+using box.surface
+using box.controllers
+using state
+
+window {
+  Surface: {width: 1440, height: 960, vsync: true}
+}
+
+// At eye height in the clearing, beside the path, looking down it to where it crosses the brook
+// and to the boulder on the far bank
+camera {
+  Position: {6.5, 1.65, 7.5}
+  Rotation: {-0.06, 0.266, 0}
+  Camera: {fov: 50, near_: 0.1, far_: 1500}
+  CameraController: {speed: 4}
+}
+
+// A filmic chain: ambient occlusion, the height fog of the sky, bloom, auto exposure into the
+// Tony McMapface tone map, a gentle grade, a subtle vignette and SMAA
+view {
+  occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
+  bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
+  exposure {
+    AutoExposure: {min_log_luma: -10.8, exposure_compensation: 0.35, max_exposure: 20}
+  }
+
+  film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
+  grade { ColorGrading: {contrast: 1.05, saturation: 1.06, vibrance: 0.12} }
+  vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
+  edges { Smaa: {} }
+
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 140, 160, 255}},
+    lighting: {
+      enabled: true,
+      baked: false,
+      reflections: true,
+      atmosphere: true,
+      environment: {source: sky, intensity: 1, background: false}
+    },
+    shadows: {
+      enabled: true,
+      cascades: 4,
+      resolution: 4096,
+      max_distance: 120,
+      split_lambda: 0.8,
+      filter_size: 5,
+      fade: 0.2,
+      blend: 0.15
+    },
+    effects: [
+      {effect: occlusion},
+      {effect: sky},
+      {effect: bloom},
+      {effect: film},
+      {effect: grade},
+      {effect: vignette},
+      {effect: edges}
+    ]
+  }
+}

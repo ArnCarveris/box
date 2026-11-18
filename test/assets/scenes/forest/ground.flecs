@@ -1,0 +1,254 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using state
+using assets
+
+// The ground of the forest: the floor in strips along X that leave the brook bed open, the bed
+// itself (slabs along the brook), gentle mounds, mossy boulders, and past the world a darker
+// floor, a dense tree line and hills that close the horizon.
+assets {
+  // A slab of the brook bed: its top runs across the brook (local Z) from (z1, y1) to (z2, y2),
+  // len along it (local X)
+  template ForestBedSlab {
+    prop len: f32 = 1
+    prop z1: f32 = 0
+    prop y1: f32 = 0
+    prop z2: f32 = 1
+    prop y2: f32 = 0
+
+    const t = 0.3
+    const dz = z2 - z1
+    const dy = y2 - y1
+    const a = 0 - atan2(dy, dz)
+
+    slab : ForestFloor {
+      Position: {0, (y1 + y2) / 2 - cos(a) * t / 2, (z1 + z2) / 2 - sin(a) * t / 2}
+      Rotation: {a, 0, 0}
+      Box: {len, t, sqrt(dz * dz + dy * dy)}
+    }
+  }
+
+  // A length of the brook bed along its centerline, local X along the brook and +Z north: the
+  // bottom, the steep inner and gentle outer banks to either side (forest_brook_bed_y) and rims
+  // from BROOK_RIM_Y above the floor down to as far below it at BROOK_RIM, which cover the cut
+  // edges of the floor and end under it
+  template ForestBedLength {
+    prop len: f32 = 2
+
+    ForestBedSlab bottom(len: len, z1: 0 - BROOK_BED_HALF, y1: BROOK_BED_Y, z2: BROOK_BED_HALF, y2: BROOK_BED_Y)
+    ForestBedSlab inner_s(len: len, z1: 0 - BROOK_STEP, y1: BROOK_STEP_Y, z2: 0 - BROOK_BED_HALF, y2: BROOK_BED_Y)
+    ForestBedSlab inner_n(len: len, z1: BROOK_BED_HALF, y1: BROOK_BED_Y, z2: BROOK_STEP, y2: BROOK_STEP_Y)
+    ForestBedSlab outer_s(len: len, z1: 0 - BROOK_BANK, y1: BROOK_RIM_Y, z2: 0 - BROOK_STEP, y2: BROOK_STEP_Y)
+    ForestBedSlab outer_n(len: len, z1: BROOK_STEP, y1: BROOK_STEP_Y, z2: BROOK_BANK, y2: BROOK_RIM_Y)
+    ForestBedSlab rim_s(len: len, z1: 0 - BROOK_RIM, y1: 0 - BROOK_RIM_Y, z2: 0 - BROOK_BANK, y2: BROOK_RIM_Y)
+    ForestBedSlab rim_n(len: len, z1: BROOK_BANK, y1: BROOK_RIM_Y, z2: BROOK_RIM, y2: 0 - BROOK_RIM_Y)
+  }
+
+  // A mossy boulder of size meters across, half buried, with a smaller stone against it
+  template ForestBoulderStone {
+    prop size: f32 = 1
+    prop seed: i32 = 1
+
+    const rng: flecs.script.math.Rng = {seed: seed}
+    const sx = 1 + rng.f(0.4)
+    const sy = 0.62 + rng.f(0.25)
+    const sz = 0.85 + rng.f(0.3)
+    const yaw = rng.f(6.28)
+    const ca = yaw + 1.2 + rng.f(1.5)
+
+    stone : ForestBoulder {
+      Position: {0, size * sy * 0.28, 0}
+      Rotation: {rng.f(0.3) - 0.15, yaw, rng.f(0.3) - 0.15}
+      Scale: {size * sx * 0.5, size * sy * 0.5, size * sz * 0.5}
+      IcoSphere: {radius: 1, segments: 2, smooth: true}
+    }
+
+    chip : ForestBoulder {
+      Position: {cos(ca) * size * 0.55, size * 0.06, sin(ca) * size * 0.55}
+      Rotation: {rng.f(0.4), rng.f(6.28), rng.f(0.4)}
+      Scale: {size * 0.2, size * 0.13, size * 0.17}
+      IcoSphere: {radius: 1, segments: 2, smooth: true}
+    }
+  }
+}
+
+forest {
+  ground {
+    // The floor: a strip 2 m wide along Z for every 2 m of X, cut where the brook crosses it
+    // FLOOR_GAP to either side of the centerline over the strip (sampled at its edges and
+    // middle). The rims of the bed cover the cuts
+    for i in 0..80 {
+      const x0 = i * 2 - WORLD_HALF
+      const za = forest_brook_z(x0)
+      const zm = forest_brook_z(x0 + 1)
+      const ze = forest_brook_z(x0 + 2)
+      const zlo = min(za, min(zm, ze)) - FLOOR_GAP
+      const zhi = max(za, max(zm, ze)) + FLOOR_GAP
+
+      "floor_s{i}" : ForestFloor {
+        Position: {x0 + 1, -0.25, (zlo - WORLD_HALF) / 2}
+        Box: {2, 0.5, zlo + WORLD_HALF}
+      }
+
+      "floor_n{i}" : ForestFloor {
+        Position: {x0 + 1, -0.25, (zhi + WORLD_HALF) / 2}
+        Box: {2, 0.5, WORLD_HALF - zhi}
+      }
+    }
+
+    // The brook bed, which the ForestBrook task fills with water: a length for every 2 m of X
+    // from one edge of the world to the other, turned along the centerline and a little longer
+    // so the lengths overlap in the bends. Every other one sits 4 mm higher so the overlaps
+    // never fight
+    for i in 0..80 {
+      const x0 = i * 2 - WORLD_HALF
+      const z0 = forest_brook_z(x0)
+      const z1 = forest_brook_z(x0 + 2)
+      const dz = z1 - z0
+
+      ForestBedLength "bed_{i}"(len: sqrt(4 + dz * dz) + 0.4) {
+        Position: {x0 + 1, (i % 2) * 0.004, (z0 + z1) / 2}
+        Rotation: {0, atan2(0 - dz, 2), 0}
+      }
+    }
+
+    // Outside the world, 3 cm lower so it never fights with the floor at the edge
+    outer_n : ForestOuterFloor {
+      Position: {0, -0.28, WORLD_HALF + 460}
+      Box: {2 * WORLD_HALF + 1840, 0.5, 920}
+    }
+
+    outer_s : ForestOuterFloor {
+      Position: {0, -0.28, -460 - WORLD_HALF}
+      Box: {2 * WORLD_HALF + 1840, 0.5, 920}
+    }
+
+    outer_e : ForestOuterFloor {
+      Position: {WORLD_HALF + 460, -0.28, 0}
+      Box: {920, 0.5, WORLD_SIZE}
+    }
+
+    outer_w : ForestOuterFloor {
+      Position: {-460 - WORLD_HALF, -0.28, 0}
+      Box: {920, 0.5, WORLD_SIZE}
+    }
+
+    // Gentle mounds in the forest, flattened spheres mostly under the floor, away from the
+    // clearing, brook and path
+    for i in 0..48 {
+      const x = (forest_hash(i, 1) * 2 - 1) * (WORLD_HALF - 8)
+      const z = (forest_hash(i, 2) * 2 - 1) * (WORLD_HALF - 8)
+      const rx = 2.5 + forest_hash(i, 3) * 3.5
+      const rz = rx * (0.7 + forest_hash(i, 4) * 0.5)
+      const ry = 0.45 + forest_hash(i, 5) * 0.55
+
+      if forest_clearing_distance(x, z) > rx + 2 && forest_free(x, z, rx + 1) {
+        "mound_{i}" : ForestFloor {
+          Position: {x, 0 - ry * 0.55, z}
+          Rotation: {0, forest_hash(i, 6) * 6.28, 0}
+          Scale: {rx, ry, rz}
+          IcoSphere: {radius: 1, segments: 3, smooth: true}
+        }
+      }
+    }
+
+    // Landmark boulders: one on the far bank of the brook by the crossing, one on the near bank,
+    // one at the west edge of the clearing, the rest in the forest
+    ForestBoulderStone boulder_far_bank(size: 1.7, seed: 3) { Position: {-1, 0, -11.5} }
+    ForestBoulderStone boulder_near_bank(size: 0.9, seed: 5) { Position: {10, 0, 1} }
+    ForestBoulderStone boulder_clearing(size: 1.3, seed: 8) { Position: {-13, 0, 3} }
+    ForestBoulderStone boulder_0(size: 2.2, seed: 11) { Position: {16, 0, 10} }
+    ForestBoulderStone boulder_1(size: 1.8, seed: 13) { Position: {-20, 0, -20} }
+    ForestBoulderStone boulder_2(size: 1.5, seed: 17) { Position: {24, 0, -24} }
+    ForestBoulderStone boulder_3(size: 2, seed: 19) { Position: {-30, 0, 14} }
+    ForestBoulderStone boulder_4(size: 1.6, seed: 23) { Position: {34, 0, 18} }
+  }
+
+  // The horizon: a dense tree line of spruces and broadleaf crowns around the edge of the world,
+  // three rows deep, then hills and far ridges. All cheap, without shadows; ForestTrees grows the forest inside.
+  backdrop {
+    for i in 0..270 {
+      const row = i % 3
+      const a = floor(i / 3) * 6.2832 / 90 + forest_hash(i, 31) * 0.05
+      const r = 86 + row * 9 + forest_hash(i, 32) * 7
+      const x = cos(a) * r
+      const z = sin(a) * r
+      const h = 15 + forest_hash(i, 34) * 12 + row * 2
+      const s = 4.5 + forest_hash(i, 33) * 3.5
+
+      if !forest_in_world(x, z, 0) || forest_brook_distance(x, z) > BROOK_RIM + 6 {
+        // The dark understory, a band of shrubs and young trees under the crowns
+        "under_{i}" : ForestUnderstoryFar {
+          Position: {x, 1.5, z}
+          Rotation: {0, forest_hash(i, 38) * 6.28, 0}
+          Scale: {s * 1.3, 4 + forest_hash(i, 39) * 3, s * 1.1}
+          IcoSphere: {radius: 1, segments: 2, smooth: true}
+        }
+
+        if forest_hash(i, 37) < 0.5 {
+          // A spruce, a cone from the ground up
+          const sr = h * (0.17 + forest_hash(i, 36) * 0.06)
+
+          "spruce_{i}" : ForestConiferFar {
+            Position: {x, h / 2, z}
+            Rotation: {0, forest_hash(i, 35) * 6.28, 0}
+            Scale: {sr, h, sr}
+            Cone: {segments: 12, smooth: true, length: 1, radius: 1}
+          }
+        } else {
+          // A broadleaf crown of three lobes
+          const b = forest_hash(i, 35) * 6.28
+
+          "crown_{i}" : ForestCanopyFar {
+            Position: {x, h * 0.62, z}
+            Rotation: {0, b, 0}
+            Scale: {s, h * 0.36, s * (0.8 + forest_hash(i, 36) * 0.4)}
+            IcoSphere: {radius: 1, segments: 2, smooth: true}
+          }
+
+          "lobe_a_{i}" : ForestCanopyFar {
+            Position: {x + cos(b) * s * 0.75, h * 0.52, z + sin(b) * s * 0.75}
+            Scale: {s * 0.62, h * 0.26, s * 0.62}
+            IcoSphere: {radius: 1, segments: 2, smooth: true}
+          }
+
+          "lobe_b_{i}" : ForestCanopyFar {
+            Position: {x + cos(b + 2.5) * s * 0.6, h * 0.74, z + sin(b + 2.5) * s * 0.6}
+            Scale: {s * 0.55, h * 0.22, s * 0.55}
+            IcoSphere: {radius: 1, segments: 2, smooth: true}
+          }
+        }
+      }
+    }
+
+    for i in 0..18 {
+      const a = i * 6.2832 / 18 + forest_hash(i, 41) * 0.2
+      const r = 190 + forest_hash(i, 42) * 90
+
+      "hill_{i}" : ForestHill {
+        Position: {cos(a) * r, -1, sin(a) * r}
+        Rotation: {0, 0 - a, 0}
+        Scale: {70 + forest_hash(i, 43) * 60, 22 + forest_hash(i, 44) * 30, 60 + forest_hash(i, 45) * 50}
+        HemiSphere: {segments: 24, smooth: true, radius: 1}
+        NoShadow
+      }
+    }
+
+    for i in 0..12 {
+      const a = i * 6.2832 / 12 + forest_hash(i, 51) * 0.3
+      const r = 540 + forest_hash(i, 52) * 160
+
+      "ridge_{i}" : ForestHill {
+        Position: {cos(a) * r, -2, sin(a) * r}
+        Rotation: {0, 0 - a, 0}
+        Scale: {220 + forest_hash(i, 53) * 120, 70 + forest_hash(i, 54) * 80, 160 + forest_hash(i, 55) * 100}
+        HemiSphere: {segments: 24, smooth: true, radius: 1}
+        Rgb: {150, 166, 176}
+        NoShadow
+      }
+    }
+  }
+}

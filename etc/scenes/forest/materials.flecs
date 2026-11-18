@@ -1,0 +1,667 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using state
+
+// Procedural textures and materials of the forest. Every ground material is a set of texture
+// graphs made by one template with a map prop: its albedo, normal, height (for the height based
+// transitions of a blend) and ORM. The forest floor blends four of them (moss, leaf litter with
+// needles and soil, the worn path and the pebbles of the brook) by forest_layout_mask, a world
+// sized mask that follows the layout functions of layout.flecs.
+state {
+  // The maps of a ground material template, and their resolutions
+  export const MAP_ALBEDO: i32 = 0
+  export const MAP_NORMAL: i32 = 1
+  export const MAP_HEIGHT: i32 = 2
+  export const MAP_ORM: i32 = 3
+  export const GROUND_RES: i32 = 1024
+  export const GROUND_RES_FINE: i32 = 2048
+}
+
+assets {
+  // Moss: cushions of small billowy lumps in greens from deep shade to sunlit yellow, patches of
+  // a darker, finer moss, and brown litter showing through in the hollows between them
+  template ForestMossMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES_FINE
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 6, octaves: 3, seed: 10} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.03} }
+    cushion { nodes.Noise: {coords: warp, frequency: 96, octaves: 4, fractal: NoiseBillow, seed: 11} }
+    fine { nodes.Noise: {frequency: 640, octaves: 2, seed: 12} }
+    patch { nodes.Noise: {coords: warp, frequency: 7, octaves: 4, seed: 13} }
+    kind { nodes.Noise: {coords: warp, frequency: 12, octaves: 3, seed: 14} }
+    lumps { nodes.Mix: {a: cushion, b: fine, factor_value: {0.35, 0, 0, 0}} }
+    swell { nodes.Remap: {input: patch, from_min: 0.25, from_max: 0.75, to_min: 0, to_max: 0.35, clamp: true} }
+    height_raw { nodes.Add: {a: lumps, b: swell} }
+    height { nodes.Multiply: {a: height_raw, b_value: {0.75, 0, 0, 0}} }
+    hollow { nodes.Smoothstep: {input: height, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.18, 0, 0, 0}} }
+    dark_kind { nodes.Smoothstep: {input: kind, edge0_value: {0.55, 0, 0, 0}, edge1_value: {0.62, 0, 0, 0}} }
+
+    if map == MAP_ALBEDO {
+      tone {
+        nodes.Ramp: {
+          input: height,
+          keys: [
+            {0.15, {30, 40, 16}}, {0.35, {52, 72, 22}}, {0.5, {78, 98, 30}},
+            {0.65, {104, 118, 40}}, {0.8, {132, 136, 58}}
+          ]
+        }
+      }
+
+      sere {
+        nodes.Ramp: {
+          input: patch,
+          keys: [{0.3, {205, 240, 205}}, {0.5, {255, 255, 255}}, {0.72, {255, 236, 186}}]
+        }
+      }
+
+      sered { nodes.Multiply: {a: tone, b: sere} }
+      dark_tone {
+        nodes.Ramp: {input: fine, keys: [{0.3, {22, 34, 14}}, {0.7, {40, 58, 22}}]}
+      }
+      with_dark { nodes.Mix: {a: sered, b: dark_tone, factor: dark_kind} }
+      // Linear brown of the litter in the hollows
+      color { nodes.Mix: {a: with_dark, b_value: {0.05, 0.032, 0.018, 1}, factor: hollow} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      occlusion { nodes.Remap: {input: height, from_min: 0.1, from_max: 0.6, to_min: 0.45, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.92, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res, format: GraphLinear}
+    }
+  }
+
+  // Leaf litter: three layers of fallen leaves, long ones lying across and along and small
+  // round ones, in browns from fresh to old and dark, over dark soil with pine needles and
+  // twigs. Each layer covers the ones below, which gives the height of the blend
+  template ForestLitterMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES_FINE
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 24, octaves: 2, seed: 20} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.006} }
+    across { nodes.Transform: {coords: warp, scale: {1, 2, 1}} }
+    along { nodes.Transform: {coords: warp, scale: {2, 1, 1}} }
+    cells_a { nodes.Cells: {coords: across, distance: CellsNearest, count: 2000, seed: 21} }
+    cells_b { nodes.Cells: {coords: along, distance: CellsNearest, count: 2000, seed: 22} }
+    cells_c { nodes.Cells: {coords: warp, distance: CellsNearest, count: 6000, seed: 23} }
+    d_a { nodes.Split: {input: cells_a, channel: ChannelR} }
+    d_b { nodes.Split: {input: cells_b, channel: ChannelR} }
+    d_c { nodes.Split: {input: cells_c, channel: ChannelR} }
+    on_a { nodes.Split: {input: cells_a, channel: ChannelB} }
+    on_b { nodes.Split: {input: cells_b, channel: ChannelB} }
+    on_c { nodes.Split: {input: cells_c, channel: ChannelB} }
+    tone_a { nodes.Split: {input: cells_a, channel: ChannelA} }
+    tone_b { nodes.Split: {input: cells_b, channel: ChannelA} }
+    tone_c { nodes.Split: {input: cells_c, channel: ChannelA} }
+    // A leaf where its cell is present (rand above a threshold) and within a radius of its center
+    // that grows with the rand
+    size_a { nodes.Remap: {input: on_a, from_min: 0.3, from_max: 1, to_min: 0.32, to_max: 0.56, clamp: true} }
+    size_b { nodes.Remap: {input: on_b, from_min: 0.45, from_max: 1, to_min: 0.32, to_max: 0.56, clamp: true} }
+    inner_a { nodes.Subtract: {a: size_a, b_value: {0.1, 0, 0, 0}} }
+    inner_b { nodes.Subtract: {a: size_b, b_value: {0.1, 0, 0, 0}} }
+    shape_a { nodes.Smoothstep: {input: d_a, edge0: size_a, edge1: inner_a} }
+    shape_b { nodes.Smoothstep: {input: d_b, edge0: size_b, edge1: inner_b} }
+    shape_c { nodes.Smoothstep: {input: d_c, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.36, 0, 0, 0}} }
+    here_a { nodes.Step: {input: on_a, edge_value: {0.3, 0, 0, 0}} }
+    here_b { nodes.Step: {input: on_b, edge_value: {0.45, 0, 0, 0}} }
+    here_c { nodes.Step: {input: on_c, edge_value: {0.15, 0, 0, 0}} }
+    leaf_a { nodes.Multiply: {a: shape_a, b: here_a} }
+    leaf_b { nodes.Multiply: {a: shape_b, b: here_b} }
+    leaf_c { nodes.Multiply: {a: shape_c, b: here_c} }
+    // Domes of the leaves, curled up toward their edges
+    curl_a { nodes.Remap: {input: d_a, from_min: 0, from_max: 0.5, to_min: 0, to_max: 0.12, clamp: true} }
+    curl_b { nodes.Remap: {input: d_b, from_min: 0, from_max: 0.5, to_min: 0, to_max: 0.12, clamp: true} }
+    // Pine needles: thin ridges stretched across and along, in patches, and a few twigs
+    needle_warp_n { nodes.Noise: {channels: 3, frequency: 40, octaves: 2, seed: 28} }
+    needle_warp { nodes.Warp: {offset: needle_warp_n, amount_value: 0.012} }
+    needle_grid_a { nodes.Transform: {coords: needle_warp, scale: {160, 6, 1}} }
+    needle_grid_b { nodes.Transform: {coords: needle_warp, scale: {6, 160, 1}} }
+    needles_a { nodes.Noise: {coords: needle_grid_a, frequency: 2, octaves: 2, fractal: NoiseRidged, seed: 24} }
+    needles_b { nodes.Noise: {coords: needle_grid_b, frequency: 2, octaves: 2, fractal: NoiseRidged, seed: 25} }
+    needles_max { nodes.Max: {a: needles_a, b: needles_b} }
+    needle_place { nodes.Noise: {frequency: 9, octaves: 3, seed: 26} }
+    needle_lines { nodes.Smoothstep: {input: needles_max, edge0_value: {0.9, 0, 0, 0}, edge1_value: {0.97, 0, 0, 0}} }
+    needle_zone { nodes.Smoothstep: {input: needle_place, edge0_value: {0.55, 0, 0, 0}, edge1_value: {0.68, 0, 0, 0}} }
+    needles { nodes.Multiply: {a: needle_lines, b: needle_zone} }
+    soil_n { nodes.Noise: {frequency: 160, octaves: 3, seed: 27} }
+
+    // Heights, from the soil up through the small leaves, the leaves across, along, needles
+    h_soil { nodes.Multiply: {a: soil_n, b_value: {0.15, 0, 0, 0}} }
+    h_c { nodes.Mix: {a: h_soil, b_value: {0.3, 0, 0, 0}, factor: leaf_c} }
+    top_a { nodes.Add: {a: curl_a, b_value: {0.45, 0, 0, 0}} }
+    h_a { nodes.Mix: {a: h_c, b: top_a, factor: leaf_a} }
+    top_b { nodes.Add: {a: curl_b, b_value: {0.6, 0, 0, 0}} }
+    h_b { nodes.Mix: {a: h_a, b: top_b, factor: leaf_b} }
+    height { nodes.Mix: {a: h_b, b_value: {0.8, 0, 0, 0}, factor: needles} }
+
+    if map == MAP_ALBEDO {
+      soil {
+        nodes.Ramp: {input: soil_n, keys: [{0.3, {26, 18, 12}}, {0.7, {44, 32, 22}}]}
+      }
+
+      color_c {
+        nodes.Ramp: {
+          input: tone_c,
+          keys: [{0, {46, 34, 22}}, {0.4, {64, 46, 28}}, {0.7, {80, 60, 36}}, {1, {52, 40, 26}}]
+        }
+      }
+
+      color_a {
+        nodes.Ramp: {
+          input: tone_a,
+          keys: [
+            {0, {58, 42, 28}}, {0.2, {82, 58, 36}}, {0.35, {104, 76, 46}}, {0.5, {72, 54, 34}},
+            {0.62, {118, 94, 62}}, {0.74, {90, 52, 32}}, {0.86, {72, 68, 42}}, {1, {48, 36, 26}}
+          ]
+        }
+      }
+
+      color_b {
+        nodes.Ramp: {
+          input: tone_b,
+          keys: [
+            {0, {52, 40, 28}}, {0.25, {92, 66, 40}}, {0.45, {112, 86, 54}}, {0.6, {78, 54, 32}},
+            {0.75, {100, 62, 36}}, {0.9, {126, 102, 68}}, {1, {60, 46, 30}}
+          ]
+        }
+      }
+
+      // Darker toward the curled edges of the big leaves
+      edge_a { nodes.Remap: {input: d_a, from_min: 0.1, from_max: 0.5, to_min: 1, to_max: 0.7, clamp: true} }
+      edge_b { nodes.Remap: {input: d_b, from_min: 0.1, from_max: 0.5, to_min: 1, to_max: 0.7, clamp: true} }
+      shaded_a { nodes.Multiply: {a: color_a, b: edge_a} }
+      shaded_b { nodes.Multiply: {a: color_b, b: edge_b} }
+      on_soil_c { nodes.Mix: {a: soil, b: color_c, factor: leaf_c} }
+      on_soil_a { nodes.Mix: {a: on_soil_c, b: shaded_a, factor: leaf_a} }
+      on_soil_b { nodes.Mix: {a: on_soil_a, b: shaded_b, factor: leaf_b} }
+      // Linear color of the needles
+      color { nodes.Mix: {a: on_soil_b, b_value: {0.13, 0.075, 0.032, 1}, factor: needles} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2.5} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      occlusion { nodes.Remap: {input: height, from_min: 0, from_max: 0.45, to_min: 0.4, to_max: 1, clamp: true} }
+      rough { nodes.Remap: {input: leaf_b, from_min: 0, from_max: 1, to_min: 0.95, to_max: 0.78, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g: rough, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res, format: GraphLinear}
+    }
+  }
+
+  // The worn footpath: packed, darker soil with fine grit, a few small stones pressed into it and
+  // scattered bits of litter
+  template ForestPathMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 12, octaves: 2, seed: 30} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.01} }
+    soil { nodes.Noise: {coords: warp, frequency: 12, octaves: 6, gain: 0.55, seed: 31} }
+    grit { nodes.Noise: {frequency: 320, octaves: 2, seed: 32} }
+    stones_c { nodes.Cells: {coords: warp, distance: CellsNearest, count: 900, seed: 33} }
+    stone_d { nodes.Split: {input: stones_c, channel: ChannelR} }
+    stone_r { nodes.Split: {input: stones_c, channel: ChannelB} }
+    stone_t { nodes.Split: {input: stones_c, channel: ChannelA} }
+    // Few of the cells hold a stone, of a size from their second random value
+    stone_on { nodes.Step: {input: stone_r, edge_value: {0.8, 0, 0, 0}} }
+    stone_size { nodes.Remap: {input: stone_t, from_min: 0, from_max: 1, to_min: 0.12, to_max: 0.32} }
+    stone_edge { nodes.Add: {a: stone_size, b_value: {0.06, 0, 0, 0}} }
+    stone_out { nodes.Smoothstep: {input: stone_d, edge0: stone_size, edge1: stone_edge} }
+    stone_in { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: stone_out} }
+    stones { nodes.Multiply: {a: stone_in, b: stone_on} }
+    bits_c { nodes.Cells: {coords: warp, distance: CellsNearest, count: 2400, seed: 34} }
+    bits_d { nodes.Split: {input: bits_c, channel: ChannelR} }
+    bits_r { nodes.Split: {input: bits_c, channel: ChannelB} }
+    bits_on { nodes.Step: {input: bits_r, edge_value: {0.82, 0, 0, 0}} }
+    bits_shape { nodes.Smoothstep: {input: bits_d, edge0_value: {0.4, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}} }
+    bits { nodes.Multiply: {a: bits_shape, b: bits_on} }
+    ground { nodes.Mix: {a: soil, b: grit, factor_value: {0.3, 0, 0, 0}} }
+    ground_low { nodes.Multiply: {a: ground, b_value: {0.5, 0, 0, 0}} }
+    with_bits { nodes.Mix: {a: ground_low, b_value: {0.5, 0, 0, 0}, factor: bits} }
+    height { nodes.Mix: {a: with_bits, b_value: {0.85, 0, 0, 0}, factor: stones} }
+
+    if map == MAP_ALBEDO {
+      dirt {
+        nodes.Ramp: {
+          input: ground,
+          keys: [{0.25, {52, 40, 30}}, {0.45, {74, 58, 42}}, {0.6, {92, 74, 54}}, {0.8, {108, 90, 68}}]
+        }
+      }
+
+      stone_color {
+        nodes.Ramp: {
+          input: stone_t,
+          keys: [{0, {84, 80, 74}}, {0.4, {112, 106, 96}}, {0.7, {96, 88, 76}}, {1, {126, 118, 104}}]
+        }
+      }
+
+      with_litter { nodes.Mix: {a: dirt, b_value: {0.07, 0.042, 0.02, 1}, factor: bits} }
+      color { nodes.Mix: {a: with_litter, b: stone_color, factor: stones} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 2} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      rough { nodes.Remap: {input: stones, from_min: 0, from_max: 1, to_min: 0.9, to_max: 0.62, clamp: true} }
+      occlusion { nodes.Remap: {input: height, from_min: 0, from_max: 0.5, to_min: 0.7, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g: rough, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res, format: GraphLinear}
+    }
+  }
+
+  // Pebbles of the brook bed and banks: rounded stones of many sizes in grays, ochres and slate,
+  // some with a film of algae, on gravel and dark wet sand
+  template ForestPebbleMap {
+    prop map: i32 = 0
+    prop res: i32 = GROUND_RES
+
+    warp_n { nodes.Noise: {channels: 3, frequency: 16, octaves: 2, seed: 40} }
+    warp { nodes.Warp: {offset: warp_n, amount_value: 0.008} }
+    big { nodes.Cells: {coords: warp, distance: CellsNearest, count: 160, seed: 41} }
+    mid { nodes.Cells: {coords: warp, distance: CellsNearest, count: 700, seed: 42} }
+    small { nodes.Cells: {coords: warp, distance: CellsNearest, count: 3200, seed: 43} }
+    big_d { nodes.Split: {input: big, channel: ChannelR} }
+    big_r { nodes.Split: {input: big, channel: ChannelB} }
+    big_t { nodes.Split: {input: big, channel: ChannelA} }
+    mid_d { nodes.Split: {input: mid, channel: ChannelR} }
+    mid_r { nodes.Split: {input: mid, channel: ChannelB} }
+    mid_t { nodes.Split: {input: mid, channel: ChannelA} }
+    small_d { nodes.Split: {input: small, channel: ChannelR} }
+    small_t { nodes.Split: {input: small, channel: ChannelA} }
+    // Rounded domes, the big and middle ones only in some of their cells
+    big_shape { nodes.Smoothstep: {input: big_d, edge0_value: {0.46, 0, 0, 0}, edge1_value: {0.1, 0, 0, 0}} }
+    mid_shape { nodes.Smoothstep: {input: mid_d, edge0_value: {0.44, 0, 0, 0}, edge1_value: {0.1, 0, 0, 0}} }
+    small_shape { nodes.Smoothstep: {input: small_d, edge0_value: {0.42, 0, 0, 0}, edge1_value: {0.12, 0, 0, 0}} }
+    big_on { nodes.Step: {input: big_r, edge_value: {0.55, 0, 0, 0}} }
+    mid_on { nodes.Step: {input: mid_r, edge_value: {0.4, 0, 0, 0}} }
+    big_dome { nodes.Multiply: {a: big_shape, b: big_on} }
+    mid_dome_1 { nodes.Multiply: {a: mid_shape, b: mid_on} }
+    mid_dome { nodes.Multiply: {a: mid_dome_1, b_value: {0.7, 0, 0, 0}} }
+    small_dome { nodes.Multiply: {a: small_shape, b_value: {0.4, 0, 0, 0}} }
+    upper { nodes.Max: {a: big_dome, b: mid_dome} }
+    height { nodes.Max: {a: upper, b: small_dome} }
+
+    if map == MAP_ALBEDO {
+      big_color {
+        nodes.Ramp: {
+          input: big_t,
+          keys: [
+            {0, {92, 88, 82}}, {0.2, {130, 122, 110}}, {0.35, {110, 96, 78}}, {0.5, {150, 142, 128}},
+            {0.65, {80, 84, 90}}, {0.8, {136, 116, 90}}, {1, {104, 100, 96}}
+          ]
+        }
+      }
+
+      mid_color {
+        nodes.Ramp: {
+          input: mid_t,
+          keys: [
+            {0, {84, 78, 70}}, {0.3, {120, 112, 100}}, {0.55, {96, 86, 72}}, {0.8, {72, 76, 80}},
+            {1, {128, 110, 88}}
+          ]
+        }
+      }
+
+      small_color {
+        nodes.Ramp: {input: small_t, keys: [{0, {70, 64, 56}}, {0.5, {104, 96, 84}}, {1, {86, 78, 66}}]}
+      }
+
+      // Each layer of stones over the ones below where it is the highest
+      mid_top { nodes.Step: {input: small_dome, edge: mid_dome} }
+      big_top { nodes.Step: {input: upper, edge: big_dome} }
+      lower { nodes.Mix: {a: small_color, b: mid_color, factor: mid_top} }
+      stone { nodes.Mix: {a: lower, b: big_color, factor: big_top} }
+      algae_n { nodes.Noise: {coords: warp, frequency: 10, octaves: 3, seed: 44} }
+      algae { nodes.Smoothstep: {input: algae_n, edge0_value: {0.58, 0, 0, 0}, edge1_value: {0.7, 0, 0, 0}} }
+      algae_tint { nodes.Mix: {a: stone, b_value: {0.07, 0.08, 0.035, 1}, factor: algae} }
+      // Dark wet sand between the stones
+      dry { nodes.Smoothstep: {input: height, edge0_value: {0.04, 0, 0, 0}, edge1_value: {0.2, 0, 0, 0}} }
+      color { nodes.Mix: {a_value: {0.035, 0.028, 0.02, 1}, b: algae_tint, factor: dry} }
+      Graph: {output: color, width: res}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: res, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: res, format: GraphSingle}
+    } else {
+      rough { nodes.Remap: {input: height, from_min: 0, from_max: 0.6, to_min: 0.95, to_max: 0.5, clamp: true} }
+      occlusion { nodes.Remap: {input: height, from_min: 0, from_max: 0.3, to_min: 0.4, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g: rough, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: res, format: GraphLinear}
+    }
+  }
+
+  // Granite of the boulders: ridged relief, cracks and pale lichen spots
+  template ForestRockMap {
+    prop map: i32 = 0
+
+    ridges { nodes.Noise: {frequency: 5, octaves: 6, fractal: NoiseRidged, seed: 71} }
+    grain { nodes.Noise: {frequency: 128, octaves: 2, seed: 72} }
+    cracks_c { nodes.Cells: {distance: CellsEdge, count: 24, edge: 0.05, seed: 73} }
+    cracks { nodes.Split: {input: cracks_c, channel: ChannelR} }
+    crack_shade { nodes.Remap: {input: cracks, from_min: 0, from_max: 1, to_min: 0.55, to_max: 1, clamp: true} }
+    relief { nodes.Mix: {a: ridges, b: grain, factor_value: {0.2, 0, 0, 0}} }
+    height { nodes.Multiply: {a: relief, b: crack_shade} }
+
+    if map == MAP_ALBEDO {
+      stone {
+        nodes.Ramp: {
+          input: relief,
+          keys: [{0.2, {70, 68, 64}}, {0.45, {112, 108, 100}}, {0.7, {148, 142, 130}}, {0.9, {170, 164, 152}}]
+        }
+      }
+
+      spots { nodes.Noise: {frequency: 36, octaves: 3, seed: 74} }
+      lichen { nodes.Smoothstep: {input: spots, edge0_value: {0.6, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}} }
+      shaded { nodes.Multiply: {a: stone, b: crack_shade} }
+      color { nodes.Mix: {a: shaded, b_value: {0.36, 0.38, 0.2, 1}, factor: lichen} }
+      Graph: {output: color, width: GROUND_RES}
+    } else if map == MAP_NORMAL {
+      bumps { nodes.Normal: {height: height, strength: 3} }
+      Graph: {output: bumps, width: GROUND_RES, format: GraphLinear}
+    } else if map == MAP_HEIGHT {
+      Graph: {output: height, width: GROUND_RES, format: GraphSingle}
+    } else {
+      occlusion { nodes.Remap: {input: crack_shade, from_min: 0.55, from_max: 1, to_min: 0.5, to_max: 1, clamp: true} }
+      orm { nodes.Combine: {r: occlusion, g_value: 0.82, b_value: 0, a_value: 1} }
+      Graph: {output: orm, width: GROUND_RES, format: GraphLinear}
+    }
+  }
+
+  // Canopy seen from afar, for the backdrop tree line and the hills: clumps of dark foliage
+  template ForestCanopyMap {
+    prop map: i32 = 0
+
+    clumps { nodes.Noise: {frequency: 16, octaves: 4, fractal: NoiseBillow, seed: 81} }
+    crowns_c { nodes.Cells: {distance: CellsNearest, count: 300, seed: 82} }
+    crowns_d { nodes.Split: {input: crowns_c, channel: ChannelR} }
+    crowns { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: crowns_d} }
+    height { nodes.Mix: {a: clumps, b: crowns, factor_value: {0.5, 0, 0, 0}} }
+
+    if map == MAP_ALBEDO {
+      tint { nodes.Noise: {frequency: 4, octaves: 2, seed: 83} }
+      leaves {
+        nodes.Ramp: {input: height, keys: [{0.2, {12, 20, 10}}, {0.5, {30, 48, 20}}, {0.8, {62, 82, 34}}]}
+      }
+
+      warm { nodes.Ramp: {input: tint, keys: [{0.35, {230, 255, 236}}, {0.65, {255, 244, 214}}]} }
+      color { nodes.Multiply: {a: leaves, b: warm} }
+      Graph: {output: color, width: 512}
+    } else {
+      bumps { nodes.Normal: {height: height, strength: 4} }
+      Graph: {output: bumps, width: 512, format: GraphLinear}
+    }
+  }
+
+  ForestMossMap moss_albedo(map: MAP_ALBEDO)
+  ForestMossMap moss_normal(map: MAP_NORMAL)
+  ForestMossMap moss_height(map: MAP_HEIGHT)
+  ForestMossMap moss_orm(map: MAP_ORM)
+  ForestLitterMap litter_albedo(map: MAP_ALBEDO)
+  ForestLitterMap litter_normal(map: MAP_NORMAL)
+  ForestLitterMap litter_height(map: MAP_HEIGHT)
+  ForestLitterMap litter_orm(map: MAP_ORM)
+  ForestPathMap path_albedo(map: MAP_ALBEDO)
+  ForestPathMap path_normal(map: MAP_NORMAL)
+  ForestPathMap path_height(map: MAP_HEIGHT)
+  ForestPathMap path_orm(map: MAP_ORM)
+  ForestPebbleMap pebble_albedo(map: MAP_ALBEDO)
+  ForestPebbleMap pebble_normal(map: MAP_NORMAL)
+  ForestPebbleMap pebble_height(map: MAP_HEIGHT)
+  ForestPebbleMap pebble_orm(map: MAP_ORM)
+  ForestRockMap rock_albedo(map: MAP_ALBEDO)
+  ForestRockMap rock_normal(map: MAP_NORMAL)
+  ForestRockMap rock_height(map: MAP_HEIGHT)
+  ForestRockMap rock_orm(map: MAP_ORM)
+  ForestCanopyMap canopy_albedo(map: MAP_ALBEDO)
+  ForestCanopyMap canopy_normal(map: MAP_NORMAL)
+
+  // Weights of the floor layers over the whole world: red moss, green litter, blue path, alpha
+  // pebbles. With MappingWorld at WORLD_SIZE a top face samples it at u = z / WORLD_SIZE + 0.5,
+  // v = 0.5 - x / WORLD_SIZE, so the graph turns its coordinates back to world x and z and
+  // evaluates the brook, path and clearing of layout.flecs on them
+  forest_layout_mask {
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    wx { nodes.Remap: {input: v, from_min: 0, from_max: 1, to_min: WORLD_HALF, to_max: 0 - WORLD_HALF} }
+    wz { nodes.Remap: {input: u, from_min: 0, from_max: 1, to_min: 0 - WORLD_HALF, to_max: WORLD_HALF} }
+
+    // forest_brook_distance
+    b1_k { nodes.Multiply: {a: wx, b_value: {BROOK_K1, 0, 0, 0}} }
+    b1_p { nodes.Add: {a: b1_k, b_value: {BROOK_P1, 0, 0, 0}} }
+    b1_sin { nodes.Sin: {input: b1_p} }
+    b1_cos { nodes.Cos: {input: b1_p} }
+    b2_k { nodes.Multiply: {a: wx, b_value: {BROOK_K2, 0, 0, 0}} }
+    b2_p { nodes.Add: {a: b2_k, b_value: {BROOK_P2, 0, 0, 0}} }
+    b2_sin { nodes.Sin: {input: b2_p} }
+    b2_cos { nodes.Cos: {input: b2_p} }
+    b1_z { nodes.Multiply: {a: b1_sin, b_value: {BROOK_A1, 0, 0, 0}} }
+    b2_z { nodes.Multiply: {a: b2_sin, b_value: {BROOK_A2, 0, 0, 0}} }
+    b_waves { nodes.Add: {a: b1_z, b: b2_z} }
+    b_z { nodes.Add: {a: b_waves, b_value: {BROOK_Z, 0, 0, 0}} }
+    b_dz { nodes.Subtract: {a: wz, b: b_z} }
+    b_adz { nodes.Abs: {input: b_dz} }
+    b1_s { nodes.Multiply: {a: b1_cos, b_value: {BROOK_A1 * BROOK_K1, 0, 0, 0}} }
+    b2_s { nodes.Multiply: {a: b2_cos, b_value: {BROOK_A2 * BROOK_K2, 0, 0, 0}} }
+    b_slope { nodes.Add: {a: b1_s, b: b2_s} }
+    b_tangent { nodes.Combine: {r_value: 1, g: b_slope, b_value: 0, a_value: 0} }
+    b_len { nodes.Length: {input: b_tangent} }
+    brook_d { nodes.Divide: {a: b_adz, b: b_len} }
+
+    // forest_path_distance
+    p1_k { nodes.Multiply: {a: wz, b_value: {PATH_K1, 0, 0, 0}} }
+    p1_p { nodes.Add: {a: p1_k, b_value: {PATH_P1, 0, 0, 0}} }
+    p1_sin { nodes.Sin: {input: p1_p} }
+    p1_cos { nodes.Cos: {input: p1_p} }
+    p2_k { nodes.Multiply: {a: wz, b_value: {PATH_K2, 0, 0, 0}} }
+    p2_p { nodes.Add: {a: p2_k, b_value: {PATH_P2, 0, 0, 0}} }
+    p2_sin { nodes.Sin: {input: p2_p} }
+    p2_cos { nodes.Cos: {input: p2_p} }
+    p1_x { nodes.Multiply: {a: p1_sin, b_value: {PATH_A1, 0, 0, 0}} }
+    p2_x { nodes.Multiply: {a: p2_sin, b_value: {PATH_A2, 0, 0, 0}} }
+    p_waves { nodes.Add: {a: p1_x, b: p2_x} }
+    p_x { nodes.Add: {a: p_waves, b_value: {PATH_X, 0, 0, 0}} }
+    p_dx { nodes.Subtract: {a: wx, b: p_x} }
+    p_adx { nodes.Abs: {input: p_dx} }
+    p1_s { nodes.Multiply: {a: p1_cos, b_value: {PATH_A1 * PATH_K1, 0, 0, 0}} }
+    p2_s { nodes.Multiply: {a: p2_cos, b_value: {PATH_A2 * PATH_K2, 0, 0, 0}} }
+    p_slope { nodes.Add: {a: p1_s, b: p2_s} }
+    p_tangent { nodes.Combine: {r_value: 1, g: p_slope, b_value: 0, a_value: 0} }
+    p_len { nodes.Length: {input: p_tangent} }
+    path_d { nodes.Divide: {a: p_adx, b: p_len} }
+
+    // forest_clearing_distance
+    c1_k { nodes.Multiply: {a: wx, b_value: {CLEARING_K1, 0, 0, 0}} }
+    c1_p { nodes.Add: {a: c1_k, b_value: {CLEARING_P1, 0, 0, 0}} }
+    c1_sin { nodes.Sin: {input: c1_p} }
+    c1_r { nodes.Multiply: {a: c1_sin, b_value: {CLEARING_A1, 0, 0, 0}} }
+    c2_k { nodes.Multiply: {a: wz, b_value: {CLEARING_K2, 0, 0, 0}} }
+    c2_p { nodes.Add: {a: c2_k, b_value: {CLEARING_P2, 0, 0, 0}} }
+    c2_cos { nodes.Cos: {input: c2_p} }
+    c2_r { nodes.Multiply: {a: c2_cos, b_value: {CLEARING_A2, 0, 0, 0}} }
+    c_waves { nodes.Add: {a: c1_r, b: c2_r} }
+    c_edge { nodes.Add: {a: c_waves, b_value: {CLEARING_R, 0, 0, 0}} }
+    c_xz { nodes.Combine: {r: wx, g: wz, b_value: 0, a_value: 0} }
+    c_r { nodes.Length: {input: c_xz} }
+    clearing_d { nodes.Subtract: {a: c_r, b: c_edge} }
+    outside { nodes.Smoothstep: {input: clearing_d, edge0_value: {-2, 0, 0, 0}, edge1_value: {3, 0, 0, 0}} }
+    inside { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: outside} }
+
+    // Noise that breaks up the borders and spreads the moss
+    spread { nodes.Noise: {frequency: 12, octaves: 4, seed: 61} }
+    ragged { nodes.Noise: {frequency: 96, octaves: 3, seed: 62} }
+
+    // Pebbles over the bed and the lower banks, out to about BROOK_HALF_WIDTH + 0.6
+    pebble_jitter { nodes.Remap: {input: ragged, from_min: 0, from_max: 1, to_min: -0.45, to_max: 0.45} }
+    pebble_d { nodes.Add: {a: brook_d, b: pebble_jitter} }
+    pebble_out {
+      nodes.Smoothstep: {
+        input: pebble_d,
+        edge0_value: {BROOK_HALF_WIDTH + 0.2, 0, 0, 0},
+        edge1_value: {BROOK_HALF_WIDTH + 1, 0, 0, 0}
+      }
+    }
+
+    pebble { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: pebble_out} }
+
+    // The path, PATH_HALF_WIDTH to either side with a ragged edge
+    path_jitter { nodes.Remap: {input: ragged, from_min: 0, from_max: 1, to_min: -0.25, to_max: 0.25} }
+    path_dj { nodes.Add: {a: path_d, b: path_jitter} }
+    path_out {
+      nodes.Smoothstep: {
+        input: path_dj,
+        edge0_value: {PATH_HALF_WIDTH - 0.2, 0, 0, 0},
+        edge1_value: {PATH_HALF_WIDTH + 0.25, 0, 0, 0}
+      }
+    }
+
+    path { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: path_out} }
+
+    // Moss in patches through the forest, more of it in the clearing and along the brook
+    near_out { nodes.Smoothstep: {input: brook_d, edge0_value: {2.5, 0, 0, 0}, edge1_value: {8, 0, 0, 0}} }
+    near { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: near_out} }
+    moss_in { nodes.Multiply: {a: inside, b_value: {0.22, 0, 0, 0}} }
+    moss_near { nodes.Multiply: {a: near, b_value: {0.25, 0, 0, 0}} }
+    moss_a { nodes.Add: {a: spread, b: moss_in} }
+    moss_b { nodes.Add: {a: moss_a, b: moss_near} }
+    moss { nodes.Smoothstep: {input: moss_b, edge0_value: {0.5, 0, 0, 0}, edge1_value: {0.66, 0, 0, 0}} }
+    litter { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: moss} }
+
+    // The pebbles cover the path where it crosses, both cover the moss and litter
+    dry { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: pebble} }
+    path_w { nodes.Multiply: {a: path, b: dry} }
+    open { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: path_w} }
+    rest { nodes.Multiply: {a: open, b: dry} }
+    moss_w { nodes.Multiply: {a: moss, b: rest} }
+    litter_w { nodes.Multiply: {a: litter, b: rest} }
+    weights { nodes.Combine: {r: moss_w, g: litter_w, b: path_w, a: pebble} }
+
+    Graph: {output: weights, width: 2048, format: GraphLinear}
+  }
+
+  // Where the boulders are mossy, in patches
+  forest_boulder_mask {
+    patches { nodes.Noise: {frequency: 3, octaves: 4, seed: 91} }
+    moss { nodes.Smoothstep: {input: patches, edge0_value: {0.47, 0, 0, 0}, edge1_value: {0.58, 0, 0, 0}} }
+    Graph: {output: moss, width: 512, format: GraphSingle}
+  }
+
+  // The layers: each one tiles its maps every WORLD_SIZE / scale meters of the world mapping
+  layer_moss {
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Transform: {scale_x: 20, scale_y: 20}
+  }
+
+  layer_litter {
+    PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
+    texture.Transform: {scale_x: 24, scale_y: 24}
+  }
+
+  layer_path {
+    PbrTextures: {albedo: path_albedo, normal: path_normal, orm: path_orm}
+    texture.Transform: {scale_x: 40, scale_y: 40}
+  }
+
+  layer_pebbles {
+    PbrTextures: {albedo: pebble_albedo, normal: pebble_normal, orm: pebble_orm}
+    texture.Transform: {scale_x: 64, scale_y: 64}
+  }
+
+  // Layers of the boulders, over a MappingObject of 3 m
+  layer_rock {
+    PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
+    texture.Transform: {scale_x: 1, scale_y: 1}
+  }
+
+  layer_rock_moss {
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Transform: {scale_x: 1.5, scale_y: 1.5}
+  }
+
+  // The forest floor, the mounds on it and the brook bed
+  prefab ForestFloor {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    texture.Blend: {
+      mask: forest_layout_mask,
+      layers: [layer_moss, layer_litter, layer_path, layer_pebbles],
+      heights: [moss_height, litter_height, path_height, pebble_height],
+      contrast: 12
+    }
+    texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
+  }
+
+  // The ground outside the world, under the tree line: litter only, a little darker
+  prefab ForestOuterFloor {
+    Rgb: {200, 196, 190}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
+    texture.Transform: {scale_x: 24, scale_y: 24}
+    texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
+  }
+
+  prefab ForestBoulder {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    texture.Blend: {
+      mask: forest_boulder_mask,
+      layers: [layer_rock, layer_rock_moss],
+      heights: [rock_height, moss_height],
+      contrast: 10
+    }
+    texture.Mapping: {mode: MappingObject, size: 3, blend: 0.35}
+  }
+
+  // The backdrop tree line and the hills beyond the world: broadleaf crowns, the darker
+  // understory below them, and spruces
+  prefab ForestCanopyFar {
+    Rgb: {230, 240, 220}
+    PbrMaterial: {roughness: 0.92}
+    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    texture.Mapping: {mode: MappingWorld, size: 14, blend: 0.5}
+    NoShadow
+  }
+
+  prefab ForestUnderstoryFar {
+    Rgb: {120, 128, 110}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
+    NoShadow
+  }
+
+  prefab ForestConiferFar {
+    Rgb: {150, 172, 160}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    texture.Mapping: {mode: MappingWorld, size: 10, blend: 0.5}
+    NoShadow
+  }
+
+  prefab ForestHill {
+    Rgb: {196, 206, 200}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    texture.Mapping: {mode: MappingWorld, size: 60, blend: 0.4}
+    NoShadow
+  }
+
+  // Clouds: the cloud layers and the cookie of the sun share it
+  forest_clouds {
+    Gen: {width: 512, seed: 17, layers: [{kind: GenNoise, frequency: 4, octaves: 5, gain: 0.55}]}
+  }
+}

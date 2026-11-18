@@ -1,0 +1,286 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.camera
+using box.view
+using box.geometry
+using box.material
+using box.layout
+using box.text
+using box.input
+using box.picking
+using box.ui
+using box.widgets
+using box.transition
+using state
+using assets
+
+// The panel: Season, Precipitation, Wind and Time of day sliders that write the state, each
+// showing its value in words, and the temperature. H hides it for screenshots.
+state {
+  export const PANEL_W: f32 = 296
+  export const SLIDER_W: f32 = PANEL_W - 36
+
+  // What a ForestSlider shows
+  export const READOUT_SEASON: i32 = 0
+  export const READOUT_PRECIPITATION: i32 = 1
+  export const READOUT_WIND: i32 = 2
+  export const READOUT_HOUR: i32 = 3
+
+  fn forest_readout(kind: i32, v: f64, t: f64) -> string {
+    match kind {
+      0: forest_season_name(v)
+      1: forest_precip_text(v, t)
+      2: forest_wind_text(v)
+      _: forest_clock(v)
+    }
+  }
+}
+
+assets {
+  font_display { Font: {path: "test/assets/fonts/Spectral-Regular.ttf"} }
+
+  template ForestRule {
+    Item: {width: {mode: Grow}, height: {mode: Fixed, value: 1}}
+    Rect: {1, 1}
+    Rgb: {150, 160, 120}
+    Opacity: {0.45}
+  }
+
+  // A slider of the forest: the Slider of box.widgets, its value in words (forest_readout of
+  // kind at the temperature t) and a fill in the accent
+  template ForestSlider : HeadlessSlider {
+    prop label: string = ""
+    prop kind: i32 = 0
+    prop t: f32 = 0
+    prop thumb: f32 = 16
+
+    const theme = box.ui.theme[Theme]
+    const ring = focused && FocusStatus[FocusStatus].visible
+    const track_w = width == 0 ? 200 : width
+    const span = max - min
+    const ratio = span > 0 ? clamp((current - min) / span, 0, 1) : 0
+    const edge = ring ? theme.focus : theme.accent
+    const rail = 4
+    const readout = forest_readout(kind, current, t)
+
+    Layout: {direction: Column, spacing: 3}
+    Item: {width: {mode: Fixed, value: track_w}}
+
+    head {
+      Layout: {direction: Row, v: Middle}
+      Item: {width: {mode: Grow}}
+
+      caption {
+        Text: {value: label, size: theme.font_size}
+        Rgb: theme.text
+      }
+
+      gap {
+        Item: {width: {mode: Grow}}
+      }
+
+      amount {
+        Text: {value: readout, size: theme.font_size}
+        Rgb: theme.accent
+      }
+    }
+
+    track {
+      Layout: {}
+      Item: {width: {mode: Grow}, height: {mode: Fixed, value: thumb}}
+
+      groove {
+        Item: {
+          v: Middle, x: thumb / 2,
+          width: {mode: Fixed, value: track_w - thumb}, height: {mode: Fixed, value: rail}
+        }
+        Rect: {1, 1}
+        Rgb: theme.surface_alt
+        Border: {
+          radius: rail / 2, width: 1,
+          color: {theme.border.r, theme.border.g, theme.border.b, 255}
+        }
+      }
+
+      fill {
+        Item: {
+          v: Middle, x: thumb / 2,
+          width: {mode: Fixed, value: ratio * (track_w - thumb) + 0.01},
+          height: {mode: Fixed, value: rail}
+        }
+        Rect: {1, 1}
+        Rgb: theme.accent
+        Border: {radius: rail / 2}
+      }
+
+      knob {
+        Item: {
+          v: Middle, x: ratio * (track_w - thumb),
+          width: {mode: Fixed, value: thumb}, height: {mode: Fixed, value: thumb}
+        }
+        Rect: {1, 1}
+        Rgb: down ? theme.accent : hover ? theme.text : theme.text_muted
+        Transition: [Rgb: {duration: 0.12, timing_function: EaseOut}]
+        Border: {
+          width: ring ? theme.focus_width : 2, radius: thumb / 2,
+          color: {edge.r, edge.g, edge.b, 255}
+        }
+      }
+    }
+  }
+}
+
+box {
+  text {
+    DefaultFont {
+      Font: {path: "test/assets/fonts/Spectral-Regular.ttf"}
+    }
+  }
+
+  ui {
+    theme {
+      Theme = {
+        accent: {214, 186, 112}, accent_text: {28, 26, 18}, surface: {38, 46, 38},
+        surface_alt: {26, 32, 27}, border: {98, 112, 90}, hover: {52, 62, 52},
+        pressed: {30, 36, 31}, selection: {110, 98, 60}, text: {236, 232, 216},
+        text_muted: {166, 172, 152}, font_size: 14, radius: 4
+      }
+    }
+  }
+}
+
+hud {
+  Scene: {blend_modes: true}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  screen {
+    Fill: {surface: window}
+    Layout: {}
+    FocusScope
+
+    // Off screen while hidden, so its sliders keep their values
+    panel {
+      InputBlocker
+      Layout: {direction: Column, spacing: 12, padding: {16, 18, 16, 18}}
+      Item: {
+        h: Left,
+        v: Bottom,
+        x: state.hud_shown ? 18 : -2000,
+        y: -18,
+        width: {mode: Fixed, value: PANEL_W}
+      }
+      Rect: {1, 1}
+      Rgb: {24, 30, 25}
+      Border: {width: 1, radius: 10, color: {84, 98, 76, 255}}
+      BoxShadow: {offset_y: -6, blur: 24, spread: 2, color: {0, 0, 0, 150}}
+
+      masthead {
+        Layout: {direction: Row, v: Bottom}
+        Item: {width: {mode: Grow}}
+
+        title {
+          Text: {value: "Forest", size: 26, font: font_display}
+          Rgb: {236, 232, 216}
+        }
+
+        gap {
+          Item: {width: {mode: Grow}}
+        }
+
+        temperature {
+          Text: {value: forest_temperature_text(state.temperature), size: 20}
+          Rgb: {214, 186, 112}
+        }
+      }
+
+      ForestRule rule_top()
+
+      ForestSlider season(
+        label: "Season",
+        kind: READOUT_SEASON,
+        width: SLIDER_W,
+        min: 0,
+        max: SEASON_CYCLE,
+        step: 0.01,
+        value: state.season
+      )
+
+      ForestSlider precipitation(
+        label: "Precipitation",
+        kind: READOUT_PRECIPITATION,
+        t: state.temperature,
+        width: SLIDER_W,
+        min: 0,
+        max: 1,
+        step: 0.01,
+        value: state.precipitation
+      )
+
+      ForestSlider wind(
+        label: "Wind",
+        kind: READOUT_WIND,
+        width: SLIDER_W,
+        min: 0,
+        max: WIND_MAX,
+        step: 0.1,
+        value: state.wind
+      )
+
+      ForestSlider hour(
+        label: "Time of day",
+        kind: READOUT_HOUR,
+        width: SLIDER_W,
+        min: HOUR_MIN,
+        max: HOUR_MAX,
+        step: 0.05,
+        value: state.hour
+      )
+
+      ForestRule rule_bottom()
+
+      hint {
+        Text: {value: "H hides this panel", size: 12}
+        Rgb: {150, 158, 138}
+      }
+    }
+  }
+
+  view {
+    View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+  }
+}
+
+// The sliders write the state
+async {
+  while true {
+    const e = await on.change(hud.screen.panel)
+    const w = e.widget
+
+    if w.has(ForestSlider) {
+      const v: f32 = w[ForestSlider.mut].current
+      const n = w.name()
+
+      if n == "season" {
+        state.season = v
+      } else if n == "precipitation" {
+        state.precipitation = v
+      } else if n == "wind" {
+        state.wind = v
+      } else if n == "hour" {
+        state.hour = v
+      }
+    }
+  }
+}
+
+async {
+  while true {
+    await on.pressed(state.actions.toggle_hud)
+    state.hud_shown = !state.hud_shown
+  }
+}
