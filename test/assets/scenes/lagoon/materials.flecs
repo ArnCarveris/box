@@ -148,15 +148,18 @@ assets {
 
   lg_bamboo_n { Gen: {source: lg_bamboo_h, output: GenNormal, strength: 2.5} }
 
-  // Turquoise lagoon water over the sand floor, the waves drift up the lagoon
+  // Turquoise lagoon water over the sand floor: clear by the canoe and in the shallows, the sand
+  // turns turquoise and then blue-green with depth and distance (absorption over visibility).
+  // play.flecs scrolls the waves toward the camera with the world
   prefab LgWater {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.04}
     Water: {
-      shallow_color: {72, 222, 204},
-      deep_color: {12, 108, 150},
-      depth: 4,
-      visibility: 16,
+      shallow_color: {64, 214, 198},
+      deep_color: {10, 104, 136},
+      depth: 3,
+      visibility: 9,
+      absorption: {84, 198, 190},
       refraction: 0.012,
       foam_color: {240, 250, 248},
       foam_width: 0.18,

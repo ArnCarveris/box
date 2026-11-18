@@ -187,7 +187,9 @@
                 "id": "LagoonSky",
                 "testcases": [
                     "water_reflects",
-                    "clouds_drift"
+                    "clouds_drift",
+                    "water_absorbs",
+                    "water_flows"
                 ]
             },
             {

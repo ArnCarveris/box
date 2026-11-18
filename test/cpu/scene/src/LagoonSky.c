@@ -18,6 +18,12 @@
 /** Seconds a frame advances */
 #define LAGOON_DT (1.0f / 6.0f)
 
+/** A speed of the world well above the start speed */
+#define LAGOON_FAST_SPEED (18.0f)
+
+/** GS_OVER of the scene (state.flecs), the game state once the canoe capsized */
+#define LAGOON_GS_OVER (2)
+
 /** Load the lagoon scene and run it for a frame.
  *
  * @return The world of the scene
@@ -98,5 +104,102 @@ void LagoonSky_clouds_drift(void)
 
     test_assert(layers >= 1);
     test_assert(layers <= 2);
+    ecs_fini(world);
+}
+
+/** The water tints the floor seen through it: its absorption is not white, and turquoise, with
+ * the red absorbed the most.
+ */
+void LagoonSky_water_absorbs(void)
+{
+    ecs_world_t *world = lagoon_sky_new();
+
+    ecs_entity_t water = ecs_lookup(world, "lagoon.water");
+    test_assert(water != 0);
+    const Water *w = ecs_get(world, water, Water);
+    test_assert(w != NULL);
+    test_assert(w->absorption.r < 255 || w->absorption.g < 255 || w->absorption.b < 255);
+    test_assert(w->absorption.r < w->absorption.g);
+    test_assert(w->absorption.r < w->absorption.b);
+    test_assert(w->visibility > 0);
+
+    ecs_fini(world);
+}
+
+/** Read an f32 script variable of the scene.
+ *
+ * @param world The scene
+ * @param path Path of the variable
+ * @return Its value
+ */
+static float lagoon_sky_f32(
+    ecs_world_t *world,
+    const char *path)
+{
+    ecs_entity_t var = ecs_lookup(world, path);
+    test_assert(var != 0);
+    ecs_value_t v = ecs_mut_var_get(world, var);
+    test_assert(v.ptr != NULL);
+
+    return *(float*)v.ptr;
+}
+
+/** Check that the waves of the water move toward the camera (+Z) at speed units a second: U of
+ * the world mapping runs along +Z, so the U velocity is -speed / mapping size, with a small
+ * cross drift along V.
+ *
+ * @param world The scene
+ * @param speed The speed of the world
+ */
+static void lagoon_sky_check_flow(
+    ecs_world_t *world,
+    float speed)
+{
+    ecs_entity_t water = ecs_lookup(world, "lagoon.water");
+    test_assert(water != 0);
+    const TextureMapping *mapping = ecs_get(world, water, TextureMapping);
+    test_assert(mapping != NULL);
+    test_assert(mapping->mode == MappingWorld);
+    test_assert(mapping->size > 0);
+    const TextureScroll *scroll = ecs_get(world, water, TextureScroll);
+    test_assert(scroll != NULL);
+    test_assert(fabsf(scroll->velocity[0] + speed / mapping->size) < 1e-3f);
+    test_assert(fabsf(scroll->velocity[1]) < 0.1f);
+}
+
+/** The waves of the water flow toward the camera with the banks and the floor at the speed of
+ * the world, and stop with it once the canoe capsizes.
+ */
+void LagoonSky_water_flows(void)
+{
+    ecs_world_t *world = lagoon_sky_new();
+    int32_t i;
+
+    // No rows spawn, so nothing ends the run
+    test_int(ecs_mut_var_set_t(world, "state.next_row", ecs_f64_t, {1e12}), 0);
+
+    // At the start speed
+    float speed = lagoon_sky_f32(world, "state.speed");
+    test_assert(speed > 0);
+    lagoon_sky_check_flow(world, speed);
+
+    // At a faster speed: without rows the speed stays where it is set
+    float fast = LAGOON_FAST_SPEED;
+    test_assert(fast > speed);
+    test_int(ecs_mut_var_set_t(world, "state.speed", ecs_f32_t, {fast}), 0);
+    for (i = 0; i < 2; i ++) {
+        ecs_progress(world, LAGOON_DT);
+    }
+    speed = lagoon_sky_f32(world, "state.speed");
+    test_assert(fabsf(speed - fast) < 1e-3f);
+    lagoon_sky_check_flow(world, speed);
+
+    // The world stops once the game is over, and the water with it
+    test_int(ecs_mut_var_set_t(world, "state.game_state", ecs_i32_t, {LAGOON_GS_OVER}), 0);
+    for (i = 0; i < 2; i ++) {
+        ecs_progress(world, LAGOON_DT);
+    }
+    lagoon_sky_check_flow(world, 0);
+
     ecs_fini(world);
 }
