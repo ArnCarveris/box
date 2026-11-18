@@ -1,0 +1,1408 @@
+using flecs.script
+using flecs.script.math
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using state
+using assets
+
+// The undergrowth of the forest floor between the trees and the brook: alpha cut grass clumps
+// and sedge, ferns, wildflowers, reeds at the brook, shrubs, moss cushions, mushrooms, fallen
+// logs, stumps, rocks, twigs and leaf litter. Each kind is scattered on a seeded, jittered grid
+// of its own and kept by the light of its spot (forest_light): grass and flowers in the sun of
+// the clearing and along the brook, ferns, moss, litter and mushrooms in the shade. Nothing grows
+// on the path, in the brook bed or under the landmarks, and the plants thin out toward the
+// backdrop.
+//
+// The materials of every kind are on shared prefabs (Rgb, textures, cutoff), and every instance
+// carries a ForestPlant with its kind and a seeded value, so the season task recolors a kind
+// through its prefab and thins it by the seed. The grass, flower and reed clumps have their origin
+// on the ground at the foot of the clump, so the wind bends them by height.
+state {
+  // An undergrowth instance: its kind (PLANT_*) and its seeded value, 0..1, by which the season
+  // task can thin a kind (hiding the instances below a threshold)
+  struct ForestPlant(kind: i32, seed: f32)
+
+  export const PLANT_GRASS: i32 = 0
+  export const PLANT_SEDGE: i32 = 1
+  export const PLANT_FERN: i32 = 2
+  export const PLANT_FLOWER: i32 = 3
+  export const PLANT_REED: i32 = 4
+  export const PLANT_SHRUB: i32 = 5
+  export const PLANT_MOSS: i32 = 6
+  export const PLANT_MUSHROOM: i32 = 7
+  export const PLANT_LITTER: i32 = 8
+  export const PLANT_LOG: i32 = 9
+  export const PLANT_STUMP: i32 = 10
+  export const PLANT_ROCK: i32 = 11
+  export const PLANT_TWIG: i32 = 12
+
+  // The undergrowth is dense within UNDER_FULL of the origin and thins out to UNDER_EDGE
+  export const UNDER_FULL: f32 = 28
+  export const UNDER_EDGE: f32 = 50
+
+  // The scatter grids: cell sizes, and cells across the 2 * UNDER_EDGE square around the origin.
+  // The cells of the grass, flowers, ferns and litter hold four spots each, jittered in their
+  // quarters, which share the light and density of the cell
+  export const GRASS_CELL: f32 = 1.2
+  export const GRASS_GRID: i32 = 84
+  export const FERN_CELL: f32 = 3.4
+  export const FERN_GRID: i32 = 30
+  export const FLOWER_CELL: f32 = 2.5
+  export const FLOWER_GRID: i32 = 40
+  export const LITTER_CELL: f32 = 2.2
+  export const LITTER_GRID: i32 = 46
+  export const SMALL_CELL: f32 = 2.5
+  export const SMALL_GRID: i32 = 40
+
+  // Logs, stumps and shrubs: at most one in each FEATURE_CELL, near the middle of it
+  export const FEATURE_CELL: f32 = 6
+  export const FEATURE_GRID: i32 = 16
+  export const FEATURE_NONE: i32 = 0
+  export const FEATURE_LOG: i32 = 1
+  export const FEATURE_STUMP: i32 = 2
+  export const FEATURE_SHRUB: i32 = 3
+
+  // Reeds stand on the banks of the brook from REED_D0 to REED_D1 off its centerline, above the
+  // water line, every REED_STEP meters along it on either side
+  export const REED_D0: f32 = 1.45
+  export const REED_D1: f32 = 2.3
+  export const REED_STEP: f32 = 0.3
+  export const REED_COUNT: i32 = 300
+
+  // Light on the floor at (x, z), 0..1: full in the clearing, fading over the first meters of the
+  // forest, the gap of the canopy over the brook, and sunny patches in the forest
+  fn forest_light(x: f64, z: f64) -> f64 {
+    const open = forest_smooth(7, -1, forest_clearing_distance(x, z))
+    const brook = forest_smooth(7, 3, forest_brook_distance(x, z)) * 0.65
+    const fleck = forest_smooth(0.55, 0.9, forest_hash2(floor(x / 5), floor(z / 5), 41)) * 0.5
+    clamp(max(max(open, brook), fleck), 0, 1)
+  }
+
+  // Share of the undergrowth kept at (x, z): all of it within UNDER_FULL, none past UNDER_EDGE
+  fn forest_under_density(x: f64, z: f64) -> f64 {
+    const r = max(abs(x), abs(z)) * 0.6 + sqrt(x * x + z * z) * 0.4
+    forest_smooth(UNDER_EDGE, UNDER_FULL, r)
+  }
+
+  // Within r of the spot of the mature tree or the young tree of grid cell (gx, gz)
+  fn forest_tree_cell_near(gx: f64, gz: f64, x: f64, z: f64, r: f64) -> bool {
+    const i = gx * TREE_GRID + gz
+    const mx = (gx + 0.15 + 0.7 * forest_hash(i, 101)) * TREE_CELL - BACKDROP_START
+    const mz = (gz + 0.15 + 0.7 * forest_hash(i, 102)) * TREE_CELL - BACKDROP_START
+    const yx = (gx + 0.5 + 0.8 * (forest_hash(i, 121) - 0.5)) * YOUNG_CELL - BACKDROP_START
+    const yz = (gz + 0.5 + 0.8 * (forest_hash(i, 122) - 0.5)) * YOUNG_CELL - BACKDROP_START
+    forest_near(x, z, mx, mz, r) || forest_near(x, z, yx, yz, r * 0.7)
+  }
+
+  // Within r of a tree of stands.flecs (or of a gap where one was left out): the trees of the
+  // four grid cells around (x, z)
+  fn forest_trees_near(x: f64, z: f64, r: f64) -> bool {
+    const gx = floor((x + BACKDROP_START) / TREE_CELL - 0.5)
+    const gz = floor((z + BACKDROP_START) / TREE_CELL - 0.5)
+    forest_tree_cell_near(gx, gz, x, z, r) ? true : (forest_tree_cell_near(gx + 1, gz, x, z, r) ? true : (
+      forest_tree_cell_near(gx, gz + 1, x, z, r) ? true : forest_tree_cell_near(gx + 1, gz + 1, x, z, r)))
+  }
+
+  // A plant of radius r at (x, z) stays off the path, out of the brook bed and clear of the
+  // landmarks
+  fn forest_floor_free(x: f64, z: f64, r: f64) -> bool {
+    forest_free(x, z, r) ? !forest_landmark_near(x, z, r) : false
+  }
+
+  // The feature of grid cell (gx, gz): its spot, its kind and its yaw; a log lies along its yaw
+  // from its spot (local +Z turned by the yaw), forest_log_len long
+  fn forest_feature_i(gx: f64, gz: f64) -> f64 {
+    gx * FEATURE_GRID + gz
+  }
+
+  fn forest_feature_x(gx: f64, gz: f64) -> f64 {
+    (gx + 0.3 + 0.4 * forest_hash(forest_feature_i(gx, gz), 401)) * FEATURE_CELL - FEATURE_GRID * FEATURE_CELL / 2
+  }
+
+  fn forest_feature_z(gx: f64, gz: f64) -> f64 {
+    (gz + 0.3 + 0.4 * forest_hash(forest_feature_i(gx, gz), 402)) * FEATURE_CELL - FEATURE_GRID * FEATURE_CELL / 2
+  }
+
+  fn forest_feature_yaw(gx: f64, gz: f64) -> f64 {
+    forest_hash(forest_feature_i(gx, gz), 404) * 6.2832
+  }
+
+  fn forest_log_len(gx: f64, gz: f64) -> f64 {
+    3 + 1.6 * forest_hash(forest_feature_i(gx, gz), 405)
+  }
+
+  fn forest_log_radius(gx: f64, gz: f64) -> f64 {
+    0.18 + 0.14 * forest_hash(forest_feature_i(gx, gz), 406)
+  }
+
+  fn forest_stump_radius(gx: f64, gz: f64) -> f64 {
+    0.25 + 0.2 * forest_hash(forest_feature_i(gx, gz), 406)
+  }
+
+  // Logs lie in the forest and the edge of the clearing, stumps in the forest; the cell's spot
+  // decides, its own seeded value picks. FEATURE_NONE leaves the cell to a shrub or nothing
+  fn forest_feature_solid_at(x: f64, z: f64, h: f64) -> i32 {
+    const edge = forest_clearing_distance(x, z)
+    const inside = forest_under_density(x, z) > 0.2 && forest_zone(x, z) != ZONE_BACKDROP
+    !inside ? FEATURE_NONE : (h < 0.14 && edge > -5 ? FEATURE_LOG : (h < 0.26 && edge > 1 ? FEATURE_STUMP : FEATURE_NONE))
+  }
+
+  fn forest_feature_solid(gx: f64, gz: f64) -> i32 {
+    const h = forest_hash(forest_feature_i(gx, gz), 403)
+    h >= 0.26 ? FEATURE_NONE : forest_feature_solid_at(forest_feature_x(gx, gz), forest_feature_z(gx, gz), h)
+  }
+
+  // The feature of a cell: its log or stump, else a shrub, mostly in the shade
+  fn forest_feature_kind(gx: f64, gz: f64) -> i32 {
+    const x = forest_feature_x(gx, gz)
+    const z = forest_feature_z(gx, gz)
+    const h = forest_hash(forest_feature_i(gx, gz), 403)
+    const solid = forest_feature_solid(gx, gz)
+    const shrub = h < 0.26 + 0.4 * (1 - 0.6 * forest_light(x, z)) && forest_clearing_distance(x, z) > -1.5
+    solid != FEATURE_NONE ? solid : (forest_under_density(x, z) > 0.2 && shrub ? FEATURE_SHRUB : FEATURE_NONE)
+  }
+
+  // Distance from (x, z) to the axis of the log of cell (gx, gz)
+  fn forest_log_distance(gx: f64, gz: f64, x: f64, z: f64) -> f64 {
+    const yaw = forest_feature_yaw(gx, gz)
+    const dx = sin(yaw)
+    const dz = cos(yaw)
+    const ax = forest_feature_x(gx, gz)
+    const az = forest_feature_z(gx, gz)
+    const t = clamp((x - ax) * dx + (z - az) * dz, 0, forest_log_len(gx, gz))
+    const px = ax + dx * t
+    const pz = az + dz * t
+    sqrt((x - px) * (x - px) + (z - pz) * (z - pz))
+  }
+
+  // Within pad of the log or the stump of cell (gx, gz)
+  fn forest_feature_cell_near(gx: f64, gz: f64, x: f64, z: f64, pad: f64) -> bool {
+    const k = forest_feature_solid(gx, gz)
+    k == FEATURE_LOG ? forest_log_distance(gx, gz, x, z) < forest_log_radius(gx, gz) + pad : (
+      k == FEATURE_STUMP ? forest_near(x, z, forest_feature_x(gx, gz), forest_feature_z(gx, gz), forest_stump_radius(gx, gz) * 1.5 + pad) : false)
+  }
+
+  // Within pad of a log or a stump: the features of the four grid cells around (x, z), as far
+  // as a log reaches
+  fn forest_feature_near(x: f64, z: f64, pad: f64) -> bool {
+    const gx = floor((x + FEATURE_GRID * FEATURE_CELL / 2) / FEATURE_CELL - 0.5)
+    const gz = floor((z + FEATURE_GRID * FEATURE_CELL / 2) / FEATURE_CELL - 0.5)
+    forest_feature_cell_near(gx, gz, x, z, pad) ? true : (forest_feature_cell_near(gx + 1, gz, x, z, pad) ? true : (
+      forest_feature_cell_near(gx, gz + 1, x, z, pad) ? true : forest_feature_cell_near(gx + 1, gz + 1, x, z, pad)))
+  }
+
+  // The kind of a small thing by its seeded value h and the light of its spot: moss and
+  // mushrooms in the shade, else rocks and twigs, or nothing (-1)
+  fn forest_small_kind(h: f64, light: f64) -> i32 {
+    const shade = 1 - light
+    h < 0.32 * shade ? PLANT_MOSS : (
+      h < 0.52 * shade ? PLANT_MUSHROOM : (
+      h < 0.62 ? PLANT_ROCK : (h < 0.85 ? PLANT_TWIG : 0 - 1)))
+  }
+
+  // A blade i of a tuft: its foot near the middle of the bottom edge, its angle within spread
+  // degrees of upright, its length from len_min up
+  fn forest_tuft_x(i: f64, seed: f64) -> f64 {
+    0.5 + (forest_hash(i, seed) - 0.5) * 0.2
+  }
+
+  fn forest_tuft_angle(i: f64, seed: f64, spread: f64) -> f64 {
+    (forest_hash(i + 30, seed) * 2 - 1) * spread
+  }
+
+  fn forest_tuft_len(i: f64, seed: f64, len_min: f64) -> f64 {
+    len_min + (0.96 - len_min) * forest_hash(i + 50, seed)
+  }
+
+  // Leaf i of a patch of litter, anywhere in the map
+  fn forest_litter_x(i: f64, seed: f64) -> f64 {
+    0.18 + 0.64 * forest_hash(i + 20, seed)
+  }
+
+  fn forest_litter_y(i: f64, seed: f64) -> f64 {
+    0.18 + 0.64 * forest_hash(i + 40, seed)
+  }
+}
+
+assets {
+  // A blade of grass from the middle of the bottom edge to the top, width to either side of its
+  // midrib and tapering over its upper part to a point, the tone lighter toward its tip
+  template ForestGrassBladeMap {
+    prop width: f32 = 0.022
+
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    off { nodes.Subtract: {a: u, b_value: {0.5, 0, 0, 0}} }
+    side { nodes.Abs: {input: off} }
+    along { nodes.Subtract: {a_value: {0.995, 0, 0, 0}, b: v} }
+    taper { nodes.Smoothstep: {input: along, edge0_value: {0.99, 0, 0, 0}, edge1_value: {0.3, 0, 0, 0}} }
+    half { nodes.Multiply: {a: taper, b_value: {width, 0, 0, 0}} }
+    inside { nodes.Subtract: {a: half, b: side} }
+    blade { nodes.Smoothstep: {input: inside, edge0_value: {0, 0, 0, 0}, edge1_value: {0.004, 0, 0, 0}} }
+    foot { nodes.Smoothstep: {input: along, edge0_value: {0, 0, 0, 0}, edge1_value: {0.01, 0, 0, 0}} }
+    cover { nodes.Multiply: {a: blade, b: foot} }
+    rib { nodes.Smoothstep: {input: side, edge0_value: {0.004, 0, 0, 0}, edge1_value: {0.0015, 0, 0, 0}} }
+    vein { nodes.Multiply: {a: rib, b: cover} }
+    shade { nodes.Remap: {input: along, from_min: 0, from_max: 1, to_min: 0.4, to_max: 1, clamp: true} }
+    tone { nodes.Multiply: {a: shade, b: cover} }
+    dome { nodes.Smoothstep: {input: inside, edge0_value: {0, 0, 0, 0}, edge1_value: {width * 0.6, 0, 0, 0}} }
+    dome_h { nodes.Multiply: {a: dome, b_value: {0.25, 0, 0, 0}} }
+    height { nodes.Add: {a: dome_h, b_value: {0.42, 0, 0, 0}} }
+    data { nodes.Combine: {r: cover, g: vein, b: tone, a: height} }
+    ForestFrame framed(input: data)
+    Graph: {output: framed, width: SPRAY_RES, format: GraphLinear}
+  }
+
+  // A tuft: 11 blades of tex from near the middle of the bottom edge, fanned within spread
+  // degrees of upright, from len_min to nearly the height of the map, each with a seeded tone.
+  // A stage of a graph reads at most 12 nodes, so a denser tuft stamps 11 more over this one
+  // with ForestTuftMoreMap
+  template ForestTuftMap {
+    prop tex: entity = 0
+    prop seed: f32 = 1
+    prop spread: f32 = 25
+    prop len_min: f32 = 0.5
+    prop tone_min: f32 = 0.5
+
+    ForestStamp b0(tex: tex, x: forest_tuft_x(0, seed), y: 0.995, angle: forest_tuft_angle(0, seed, spread), len: forest_tuft_len(0, seed, len_min), tone: forest_pinnate_tone(0, seed, tone_min))
+    ForestStamp b1(prev: b0, tex: tex, x: forest_tuft_x(1, seed), y: 0.995, angle: forest_tuft_angle(1, seed, spread), len: forest_tuft_len(1, seed, len_min), tone: forest_pinnate_tone(1, seed, tone_min))
+    ForestStamp b2(prev: b1, tex: tex, x: forest_tuft_x(2, seed), y: 0.995, angle: forest_tuft_angle(2, seed, spread), len: forest_tuft_len(2, seed, len_min), tone: forest_pinnate_tone(2, seed, tone_min))
+    ForestStamp b3(prev: b2, tex: tex, x: forest_tuft_x(3, seed), y: 0.995, angle: forest_tuft_angle(3, seed, spread), len: forest_tuft_len(3, seed, len_min), tone: forest_pinnate_tone(3, seed, tone_min))
+    ForestStamp b4(prev: b3, tex: tex, x: forest_tuft_x(4, seed), y: 0.995, angle: forest_tuft_angle(4, seed, spread), len: forest_tuft_len(4, seed, len_min), tone: forest_pinnate_tone(4, seed, tone_min))
+    ForestStamp b5(prev: b4, tex: tex, x: forest_tuft_x(5, seed), y: 0.995, angle: forest_tuft_angle(5, seed, spread), len: forest_tuft_len(5, seed, len_min), tone: forest_pinnate_tone(5, seed, tone_min))
+    ForestStamp b6(prev: b5, tex: tex, x: forest_tuft_x(6, seed), y: 0.995, angle: forest_tuft_angle(6, seed, spread), len: forest_tuft_len(6, seed, len_min), tone: forest_pinnate_tone(6, seed, tone_min))
+    ForestStamp b7(prev: b6, tex: tex, x: forest_tuft_x(7, seed), y: 0.995, angle: forest_tuft_angle(7, seed, spread), len: forest_tuft_len(7, seed, len_min), tone: forest_pinnate_tone(7, seed, tone_min))
+    ForestStamp b8(prev: b7, tex: tex, x: forest_tuft_x(8, seed), y: 0.995, angle: forest_tuft_angle(8, seed, spread), len: forest_tuft_len(8, seed, len_min), tone: forest_pinnate_tone(8, seed, tone_min))
+    ForestStamp b9(prev: b8, tex: tex, x: forest_tuft_x(9, seed), y: 0.995, angle: forest_tuft_angle(9, seed, spread), len: forest_tuft_len(9, seed, len_min), tone: forest_pinnate_tone(9, seed, tone_min))
+    ForestStamp b10(prev: b9, tex: tex, x: forest_tuft_x(10, seed), y: 0.995, angle: forest_tuft_angle(10, seed, spread), len: forest_tuft_len(10, seed, len_min), tone: forest_pinnate_tone(10, seed, tone_min))
+    Graph: {output: b10, width: LEAF_RES, format: GraphLinear}
+  }
+
+  // 11 more blades of tex over the tuft base_tex, as ForestTuftMap
+  template ForestTuftMoreMap {
+    prop base_tex: entity = 0
+    prop tex: entity = 0
+    prop seed: f32 = 1
+    prop spread: f32 = 25
+    prop len_min: f32 = 0.5
+    prop tone_min: f32 = 0.5
+
+    base { nodes.Image: {texture: base_tex, linear: true} }
+    ForestStamp b0(prev: base, tex: tex, x: forest_tuft_x(0, seed + 13), y: 0.995, angle: forest_tuft_angle(0, seed + 13, spread), len: forest_tuft_len(0, seed + 13, len_min), tone: forest_pinnate_tone(0, seed + 13, tone_min))
+    ForestStamp b1(prev: b0, tex: tex, x: forest_tuft_x(1, seed + 13), y: 0.995, angle: forest_tuft_angle(1, seed + 13, spread), len: forest_tuft_len(1, seed + 13, len_min), tone: forest_pinnate_tone(1, seed + 13, tone_min))
+    ForestStamp b2(prev: b1, tex: tex, x: forest_tuft_x(2, seed + 13), y: 0.995, angle: forest_tuft_angle(2, seed + 13, spread), len: forest_tuft_len(2, seed + 13, len_min), tone: forest_pinnate_tone(2, seed + 13, tone_min))
+    ForestStamp b3(prev: b2, tex: tex, x: forest_tuft_x(3, seed + 13), y: 0.995, angle: forest_tuft_angle(3, seed + 13, spread), len: forest_tuft_len(3, seed + 13, len_min), tone: forest_pinnate_tone(3, seed + 13, tone_min))
+    ForestStamp b4(prev: b3, tex: tex, x: forest_tuft_x(4, seed + 13), y: 0.995, angle: forest_tuft_angle(4, seed + 13, spread), len: forest_tuft_len(4, seed + 13, len_min), tone: forest_pinnate_tone(4, seed + 13, tone_min))
+    ForestStamp b5(prev: b4, tex: tex, x: forest_tuft_x(5, seed + 13), y: 0.995, angle: forest_tuft_angle(5, seed + 13, spread), len: forest_tuft_len(5, seed + 13, len_min), tone: forest_pinnate_tone(5, seed + 13, tone_min))
+    ForestStamp b6(prev: b5, tex: tex, x: forest_tuft_x(6, seed + 13), y: 0.995, angle: forest_tuft_angle(6, seed + 13, spread), len: forest_tuft_len(6, seed + 13, len_min), tone: forest_pinnate_tone(6, seed + 13, tone_min))
+    ForestStamp b7(prev: b6, tex: tex, x: forest_tuft_x(7, seed + 13), y: 0.995, angle: forest_tuft_angle(7, seed + 13, spread), len: forest_tuft_len(7, seed + 13, len_min), tone: forest_pinnate_tone(7, seed + 13, tone_min))
+    ForestStamp b8(prev: b7, tex: tex, x: forest_tuft_x(8, seed + 13), y: 0.995, angle: forest_tuft_angle(8, seed + 13, spread), len: forest_tuft_len(8, seed + 13, len_min), tone: forest_pinnate_tone(8, seed + 13, tone_min))
+    ForestStamp b9(prev: b8, tex: tex, x: forest_tuft_x(9, seed + 13), y: 0.995, angle: forest_tuft_angle(9, seed + 13, spread), len: forest_tuft_len(9, seed + 13, len_min), tone: forest_pinnate_tone(9, seed + 13, tone_min))
+    ForestStamp b10(prev: b9, tex: tex, x: forest_tuft_x(10, seed + 13), y: 0.995, angle: forest_tuft_angle(10, seed + 13, spread), len: forest_tuft_len(10, seed + 13, len_min), tone: forest_pinnate_tone(10, seed + 13, tone_min))
+    Graph: {output: b10, width: LEAF_RES, format: GraphLinear}
+  }
+
+  // A flower on its stalk, or a reed head: a stalk from the middle of the bottom edge up to a
+  // head head_w by head_h to either side of its middle head_y below the top, with an eye of eye
+  // of its size. The head is marked in green, 1 on the petals and 0.5 on the eye, the stalk has
+  // the tone
+  template ForestStalkMap {
+    prop head_w: f32 = 0.1
+    prop head_h: f32 = 0.07
+    prop head_y: f32 = 0.16
+    prop eye: f32 = 0.4
+    prop stalk: f32 = 0.012
+
+    uv { nodes.Coords: {} }
+    u { nodes.Split: {input: uv, channel: ChannelR} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    off { nodes.Subtract: {a: u, b_value: {0.5, 0, 0, 0}} }
+    side { nodes.Abs: {input: off} }
+    hx { nodes.Multiply: {a: off, b_value: {1 / head_w, 0, 0, 0}} }
+    hy_off { nodes.Subtract: {a: v, b_value: {head_y, 0, 0, 0}} }
+    hy { nodes.Multiply: {a: hy_off, b_value: {1 / head_h, 0, 0, 0}} }
+    hx2 { nodes.Multiply: {a: hx, b: hx} }
+    hy2 { nodes.Multiply: {a: hy, b: hy} }
+    r2 { nodes.Add: {a: hx2, b: hy2} }
+    head { nodes.Smoothstep: {input: r2, edge0_value: {1, 0, 0, 0}, edge1_value: {0.8, 0, 0, 0}} }
+    eye_m { nodes.Smoothstep: {input: r2, edge0_value: {eye * eye, 0, 0, 0}, edge1_value: {eye * eye * 0.6, 0, 0, 0}} }
+    stalk_w { nodes.Smoothstep: {input: side, edge0_value: {stalk, 0, 0, 0}, edge1_value: {stalk * 0.4, 0, 0, 0}} }
+    below { nodes.Step: {input: v, edge_value: {head_y, 0, 0, 0}} }
+    above_foot { nodes.Step: {input_value: {0.993, 0, 0, 0}, edge: v} }
+    stalk_span { nodes.Multiply: {a: below, b: above_foot} }
+    stalk_m { nodes.Multiply: {a: stalk_w, b: stalk_span} }
+    cover { nodes.Max: {a: head, b: stalk_m} }
+    eye_half { nodes.Multiply: {a: eye_m, b_value: {0.5, 0, 0, 0}} }
+    petal { nodes.Subtract: {a: head, b: eye_half} }
+    bare { nodes.Subtract: {a_value: {1, 0, 0, 0}, b: head} }
+    stalk_t { nodes.Multiply: {a: stalk_m, b: bare} }
+    tone { nodes.Multiply: {a: stalk_t, b_value: {0.6, 0, 0, 0}} }
+    dome { nodes.Smoothstep: {input: r2, edge0_value: {1, 0, 0, 0}, edge1_value: {0.2, 0, 0, 0}} }
+    dome_h { nodes.Multiply: {a: dome, b_value: {0.2, 0, 0, 0}} }
+    height { nodes.Add: {a: dome_h, b_value: {0.42, 0, 0, 0}} }
+    data { nodes.Combine: {r: cover, g: petal, b: tone, a: height} }
+    ForestFrame framed(input: data)
+    Graph: {output: framed, width: SPRAY_RES, format: GraphLinear}
+  }
+
+  // A tuft with flowers: 7 stalks of tex over the tuft base, fanned within spread degrees
+  template ForestBloomMap {
+    prop base_tex: entity = 0
+    prop tex: entity = 0
+    prop seed: f32 = 1
+    prop spread: f32 = 18
+    prop len_min: f32 = 0.6
+
+    base { nodes.Image: {texture: base_tex, linear: true} }
+    ForestStamp f0(prev: base, tex: tex, x: forest_tuft_x(0, seed + 7), y: 0.995, angle: forest_tuft_angle(0, seed + 7, spread), len: forest_tuft_len(0, seed + 7, len_min), tone: 1)
+    ForestStamp f1(prev: f0, tex: tex, x: forest_tuft_x(1, seed + 7), y: 0.995, angle: forest_tuft_angle(1, seed + 7, spread), len: forest_tuft_len(1, seed + 7, len_min), tone: 1)
+    ForestStamp f2(prev: f1, tex: tex, x: forest_tuft_x(2, seed + 7), y: 0.995, angle: forest_tuft_angle(2, seed + 7, spread), len: forest_tuft_len(2, seed + 7, len_min), tone: 1)
+    ForestStamp f3(prev: f2, tex: tex, x: forest_tuft_x(3, seed + 7), y: 0.995, angle: forest_tuft_angle(3, seed + 7, spread), len: forest_tuft_len(3, seed + 7, len_min), tone: 1)
+    ForestStamp f4(prev: f3, tex: tex, x: forest_tuft_x(4, seed + 7), y: 0.995, angle: forest_tuft_angle(4, seed + 7, spread), len: forest_tuft_len(4, seed + 7, len_min), tone: 1)
+    ForestStamp f5(prev: f4, tex: tex, x: forest_tuft_x(5, seed + 7), y: 0.995, angle: forest_tuft_angle(5, seed + 7, spread), len: forest_tuft_len(5, seed + 7, len_min), tone: 1)
+    ForestStamp f6(prev: f5, tex: tex, x: forest_tuft_x(6, seed + 7), y: 0.995, angle: forest_tuft_angle(6, seed + 7, spread), len: forest_tuft_len(6, seed + 7, len_min), tone: 1)
+    Graph: {output: f6, width: LEAF_RES, format: GraphLinear}
+  }
+
+  // The albedo of a tuft with flowers: greens by the tone, the petals (pr, pg, pb) and the eye
+  // (er, eg, eb), darker toward the foot, the coverage as alpha
+  template ForestBloomAlbedo {
+    prop data: entity = 0
+    prop pr: f32 = 1
+    prop pg: f32 = 1
+    prop pb: f32 = 1
+    prop er: f32 = 1
+    prop eg: f32 = 0.8
+    prop eb: f32 = 0.2
+
+    img { nodes.Image: {texture: data, linear: true} }
+    cover { nodes.Split: {input: img, channel: ChannelR} }
+    petal { nodes.Split: {input: img, channel: ChannelG} }
+    tone { nodes.Split: {input: img, channel: ChannelB} }
+    uv { nodes.Coords: {} }
+    v { nodes.Split: {input: uv, channel: ChannelG} }
+    inner { nodes.Remap: {input: v, from_min: 0.3, from_max: 1, to_min: 1, to_max: 0.55, clamp: true} }
+    leaf {
+      nodes.Ramp: {
+        input: tone,
+        keys: [{0, {52, 74, 30}}, {0.3, {66, 96, 36}}, {0.6, {94, 126, 46}}, {1, {128, 152, 60}}]
+      }
+    }
+
+    leaf_s { nodes.Multiply: {a: leaf, b: inner} }
+    is_eye { nodes.Smoothstep: {input: petal, edge0_value: {0.3, 0, 0, 0}, edge1_value: {0.45, 0, 0, 0}} }
+    is_petal { nodes.Smoothstep: {input: petal, edge0_value: {0.7, 0, 0, 0}, edge1_value: {0.85, 0, 0, 0}} }
+    eyed { nodes.Mix: {a: leaf_s, b_value: {er, eg, eb, 1}, factor: is_eye} }
+    petaled { nodes.Mix: {a: eyed, b_value: {pr, pg, pb, 1}, factor: is_petal} }
+    r { nodes.Split: {input: petaled, channel: ChannelR} }
+    g { nodes.Split: {input: petaled, channel: ChannelG} }
+    b { nodes.Split: {input: petaled, channel: ChannelB} }
+    color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+    Graph: {output: color, width: LEAF_RES}
+  }
+
+  // A patch of leaf litter: 11 fallen leaves of tex_a and tex_b strewn over the map, turned any
+  // way, each with a seeded tone. ForestLitterMoreMap strews 11 more over it
+  template ForestLitterPatchMap {
+    prop tex_a: entity = 0
+    prop tex_b: entity = 0
+    prop seed: f32 = 1
+
+    ForestStamp l0(tex: tex_a, x: forest_litter_x(0, seed), y: forest_litter_y(0, seed), angle: forest_hash(0 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(0 + 80, seed), tone: forest_hash(0 + 100, seed))
+    ForestStamp l1(prev: l0, tex: tex_a, x: forest_litter_x(1, seed), y: forest_litter_y(1, seed), angle: forest_hash(1 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(1 + 80, seed), tone: forest_hash(1 + 100, seed))
+    ForestStamp l2(prev: l1, tex: tex_b, x: forest_litter_x(2, seed), y: forest_litter_y(2, seed), angle: forest_hash(2 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(2 + 80, seed), tone: forest_hash(2 + 100, seed))
+    ForestStamp l3(prev: l2, tex: tex_a, x: forest_litter_x(3, seed), y: forest_litter_y(3, seed), angle: forest_hash(3 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(3 + 80, seed), tone: forest_hash(3 + 100, seed))
+    ForestStamp l4(prev: l3, tex: tex_a, x: forest_litter_x(4, seed), y: forest_litter_y(4, seed), angle: forest_hash(4 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(4 + 80, seed), tone: forest_hash(4 + 100, seed))
+    ForestStamp l5(prev: l4, tex: tex_b, x: forest_litter_x(5, seed), y: forest_litter_y(5, seed), angle: forest_hash(5 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(5 + 80, seed), tone: forest_hash(5 + 100, seed))
+    ForestStamp l6(prev: l5, tex: tex_a, x: forest_litter_x(6, seed), y: forest_litter_y(6, seed), angle: forest_hash(6 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(6 + 80, seed), tone: forest_hash(6 + 100, seed))
+    ForestStamp l7(prev: l6, tex: tex_a, x: forest_litter_x(7, seed), y: forest_litter_y(7, seed), angle: forest_hash(7 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(7 + 80, seed), tone: forest_hash(7 + 100, seed))
+    ForestStamp l8(prev: l7, tex: tex_b, x: forest_litter_x(8, seed), y: forest_litter_y(8, seed), angle: forest_hash(8 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(8 + 80, seed), tone: forest_hash(8 + 100, seed))
+    ForestStamp l9(prev: l8, tex: tex_a, x: forest_litter_x(9, seed), y: forest_litter_y(9, seed), angle: forest_hash(9 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(9 + 80, seed), tone: forest_hash(9 + 100, seed))
+    ForestStamp l10(prev: l9, tex: tex_a, x: forest_litter_x(10, seed), y: forest_litter_y(10, seed), angle: forest_hash(10 + 60, seed) * 360, len: 0.15 + 0.08 * forest_hash(10 + 80, seed), tone: forest_hash(10 + 100, seed))
+    ForestFrame framed(input: l10)
+    Graph: {output: framed, width: LEAF_RES, format: GraphLinear}
+  }
+
+  template ForestLitterMoreMap {
+    prop base_tex: entity = 0
+    prop tex_a: entity = 0
+    prop tex_b: entity = 0
+    prop seed: f32 = 1
+
+    base { nodes.Image: {texture: base_tex, linear: true} }
+    ForestStamp l0(prev: base, tex: tex_a, x: forest_litter_x(0, seed + 13), y: forest_litter_y(0, seed + 13), angle: forest_hash(0 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(0 + 80, seed + 13), tone: forest_hash(0 + 100, seed + 13))
+    ForestStamp l1(prev: l0, tex: tex_a, x: forest_litter_x(1, seed + 13), y: forest_litter_y(1, seed + 13), angle: forest_hash(1 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(1 + 80, seed + 13), tone: forest_hash(1 + 100, seed + 13))
+    ForestStamp l2(prev: l1, tex: tex_b, x: forest_litter_x(2, seed + 13), y: forest_litter_y(2, seed + 13), angle: forest_hash(2 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(2 + 80, seed + 13), tone: forest_hash(2 + 100, seed + 13))
+    ForestStamp l3(prev: l2, tex: tex_a, x: forest_litter_x(3, seed + 13), y: forest_litter_y(3, seed + 13), angle: forest_hash(3 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(3 + 80, seed + 13), tone: forest_hash(3 + 100, seed + 13))
+    ForestStamp l4(prev: l3, tex: tex_a, x: forest_litter_x(4, seed + 13), y: forest_litter_y(4, seed + 13), angle: forest_hash(4 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(4 + 80, seed + 13), tone: forest_hash(4 + 100, seed + 13))
+    ForestStamp l5(prev: l4, tex: tex_b, x: forest_litter_x(5, seed + 13), y: forest_litter_y(5, seed + 13), angle: forest_hash(5 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(5 + 80, seed + 13), tone: forest_hash(5 + 100, seed + 13))
+    ForestStamp l6(prev: l5, tex: tex_a, x: forest_litter_x(6, seed + 13), y: forest_litter_y(6, seed + 13), angle: forest_hash(6 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(6 + 80, seed + 13), tone: forest_hash(6 + 100, seed + 13))
+    ForestStamp l7(prev: l6, tex: tex_a, x: forest_litter_x(7, seed + 13), y: forest_litter_y(7, seed + 13), angle: forest_hash(7 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(7 + 80, seed + 13), tone: forest_hash(7 + 100, seed + 13))
+    ForestStamp l8(prev: l7, tex: tex_b, x: forest_litter_x(8, seed + 13), y: forest_litter_y(8, seed + 13), angle: forest_hash(8 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(8 + 80, seed + 13), tone: forest_hash(8 + 100, seed + 13))
+    ForestStamp l9(prev: l8, tex: tex_a, x: forest_litter_x(9, seed + 13), y: forest_litter_y(9, seed + 13), angle: forest_hash(9 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(9 + 80, seed + 13), tone: forest_hash(9 + 100, seed + 13))
+    ForestStamp l10(prev: l9, tex: tex_a, x: forest_litter_x(10, seed + 13), y: forest_litter_y(10, seed + 13), angle: forest_hash(10 + 60, seed + 13) * 360, len: 0.15 + 0.08 * forest_hash(10 + 80, seed + 13), tone: forest_hash(10 + 100, seed + 13))
+    ForestFrame framed(input: l10)
+    Graph: {output: framed, width: LEAF_RES, format: GraphLinear}
+  }
+
+  // The albedo of the litter: browns from dark and old to fresh and orange by the tone, darker
+  // veins, the coverage as alpha
+  template ForestLitterAlbedo {
+    prop data: entity = 0
+
+    img { nodes.Image: {texture: data, linear: true} }
+    cover { nodes.Split: {input: img, channel: ChannelR} }
+    vein { nodes.Split: {input: img, channel: ChannelG} }
+    tone { nodes.Split: {input: img, channel: ChannelB} }
+    shade {
+      nodes.Ramp: {
+        input: tone,
+        keys: [
+          {0, {50, 36, 24}}, {0.25, {76, 52, 30}}, {0.5, {104, 72, 38}}, {0.75, {132, 92, 48}},
+          {0.9, {150, 110, 58}}, {1, {128, 104, 64}}
+        ]
+      }
+    }
+
+    veined { nodes.Mix: {a: shade, b_value: {0.3, 0.21, 0.13, 1}, factor: vein} }
+    r { nodes.Split: {input: veined, channel: ChannelR} }
+    g { nodes.Split: {input: veined, channel: ChannelG} }
+    b { nodes.Split: {input: veined, channel: ChannelB} }
+    color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+    Graph: {output: color, width: LEAF_RES}
+  }
+
+  // Grass: a short lush tuft in the sun, and the longer, looser sedge of the shade
+  ForestGrassBladeMap grass_blade(width: 0.024)
+  ForestTuftMap grass_half(tex: grass_blade, seed: 31, spread: 26, len_min: 0.45, tone_min: 0.45)
+  ForestTuftMoreMap grass_data(base_tex: grass_half, tex: grass_blade, seed: 31, spread: 26, len_min: 0.45, tone_min: 0.45)
+  ForestTuftMap sedge_half(tex: grass_blade, seed: 32, spread: 38, len_min: 0.6, tone_min: 0.35)
+  ForestTuftMoreMap sedge_data(base_tex: sedge_half, tex: grass_blade, seed: 32, spread: 38, len_min: 0.6, tone_min: 0.35)
+  ForestLeafAlbedo grass_albedo(data: grass_data)
+  ForestLeafNormal grass_normal(data: grass_data)
+  ForestLeafAlbedo sedge_albedo(data: sedge_data)
+  ForestLeafNormal sedge_normal(data: sedge_data)
+
+  // Wildflowers: a low tuft with seven flowers on stalks over it, in yellow (buttercups), white
+  // (wood anemones and daisies) and violet (campanula)
+  ForestTuftMap bloom_tuft(tex: grass_blade, seed: 33, spread: 34, len_min: 0.3, tone_min: 0.4)
+  ForestStalkMap bloom_stalk(head_w: 0.085, head_h: 0.06, head_y: 0.12, eye: 0.42)
+  ForestBloomMap bloom_data(base_tex: bloom_tuft, tex: bloom_stalk, seed: 34, spread: 22, len_min: 0.55)
+  ForestBloomAlbedo bloom_yellow_albedo(data: bloom_data, pr: 0.98, pg: 0.82, pb: 0.12, er: 0.85, eg: 0.6, eb: 0.1)
+  ForestBloomAlbedo bloom_white_albedo(data: bloom_data, pr: 0.97, pg: 0.96, pb: 0.92, er: 0.95, eg: 0.78, eb: 0.15)
+  ForestBloomAlbedo bloom_violet_albedo(data: bloom_data, pr: 0.55, pg: 0.4, pb: 0.9, er: 0.4, eg: 0.3, eb: 0.75)
+  ForestLeafNormal bloom_normal(data: bloom_data)
+
+  // Reeds: tall, narrow, nearly upright leaves and a few brown cattail heads
+  ForestGrassBladeMap reed_blade(width: 0.02)
+  ForestTuftMap reed_tuft(tex: reed_blade, seed: 35, spread: 20, len_min: 0.6, tone_min: 0.45)
+  ForestStalkMap reed_stalk(head_w: 0.024, head_h: 0.075, head_y: 0.14, eye: 0.01, stalk: 0.009)
+  ForestBloomMap reed_data(base_tex: reed_tuft, tex: reed_stalk, seed: 36, spread: 10, len_min: 0.75)
+  ForestBloomAlbedo reed_albedo(data: reed_data, pr: 0.24, pg: 0.15, pb: 0.08, er: 0.24, eg: 0.15, eb: 0.08)
+  ForestLeafNormal reed_normal(data: reed_data)
+
+  // Fern: a frond of pinnae, each a row of small toothed pinnules
+  ForestBladeMap fern_pinnule(width: 0.42, shape: 0.75, teeth: 0.1, tooth_count: 5, veins: 4, stem: 0.02)
+  ForestPinnateMap fern_pinna(tex: fern_pinnule, stem_tex: forest_stem, seed: 37, start: 0.03, end: 0.9, spread: 68, spread_tip: 48, len: 0.34, len_tip: 0.2, tone_min: 0.55, res: SPRAY_RES)
+  ForestPinnateMap fern_data(tex: fern_pinna, stem_tex: forest_stem, seed: 38, start: 0.06, end: 0.86, spread: 72, spread_tip: 56, len: 0.6, len_tip: 0.3, tone_min: 0.65, res: LEAF_RES)
+  ForestLeafAlbedo fern_albedo(data: fern_data)
+  ForestLeafNormal fern_normal(data: fern_data)
+
+  // Leaf litter of beech and oak leaves
+  ForestLitterPatchMap litter_patch_half(tex_a: leaf_beech_blade, tex_b: leaf_oak_blade, seed: 39)
+  ForestLitterMoreMap litter_patch_data(base_tex: litter_patch_half, tex_a: leaf_beech_blade, tex_b: leaf_oak_blade, seed: 39)
+  ForestLitterAlbedo litter_patch_albedo(data: litter_patch_data)
+  ForestLeafNormal litter_patch_normal(data: litter_patch_data)
+
+  // Spots of the fly agaric: white flecks on red
+  forest_agaric_albedo {
+    spots_c { nodes.Cells: {distance: CellsNearest, count: 40, seed: 301} }
+    spots_d { nodes.Split: {input: spots_c, channel: ChannelR} }
+    spots { nodes.Smoothstep: {input: spots_d, edge0_value: {0.2, 0, 0, 0}, edge1_value: {0.14, 0, 0, 0}} }
+    color { nodes.Mix: {a_value: {0.72, 0.08, 0.04, 1}, b_value: {0.95, 0.93, 0.86, 1}, factor: spots} }
+    Graph: {output: color, width: 256}
+  }
+
+  // A clump of grass, flowers or reeds: three cards crossed about the Y axis, one unit wide and
+  // high, their origin on the ground at the foot of the clump, their tops leaning out a little.
+  // The normals bend up, so a clump is lit as a whole. Its backs are reversed copies
+  prefab ForestClumpMesh {
+    Mesh3: {
+      vertices: [
+        {-0.49, 0, 0.099}, {0.49, 0, -0.099}, {-0.551, 0.49, 0.112}, {0.551, 0.49, -0.112},
+        {-0.613, 0.98, 0.124}, {0.613, 0.98, -0.124}, {-0.49, 0, 0.099}, {0.49, 0, -0.099},
+        {-0.551, 0.49, 0.112}, {0.551, 0.49, -0.112}, {-0.613, 0.98, 0.124}, {0.613, 0.98, -0.124},
+        {-0.159, 0, 0.474}, {0.159, 0, -0.474}, {-0.179, 0.49, 0.533}, {0.179, 0.49, -0.533},
+        {-0.199, 0.98, 0.593}, {0.199, 0.98, -0.593}, {-0.159, 0, 0.474}, {0.159, 0, -0.474},
+        {-0.179, 0.49, 0.533}, {0.179, 0.49, -0.533}, {-0.199, 0.98, 0.593}, {0.199, 0.98, -0.593},
+        {0.331, 0, 0.375}, {-0.331, 0, -0.375}, {0.372, 0.49, 0.422}, {-0.372, 0.49, -0.422},
+        {0.414, 0.98, 0.468}, {-0.414, 0.98, -0.468}, {0.331, 0, 0.375}, {-0.331, 0, -0.375},
+        {0.372, 0.49, 0.422}, {-0.372, 0.49, -0.422}, {0.414, 0.98, 0.468}, {-0.414, 0.98, -0.468}
+      ],
+      normals: [
+        {-0.157, 0.487, 0.859}, {0.479, 0.487, 0.73}, {-0.144, 0.596, 0.79}, {0.44, 0.596, 0.671},
+        {-0.132, 0.68, 0.721}, {0.402, 0.68, 0.613}, {0.157, -0.487, -0.859}, {-0.479, -0.487, -0.73},
+        {0.144, -0.596, -0.79}, {-0.44, -0.596, -0.671}, {0.132, -0.68, -0.721}, {-0.402, -0.68, -0.613},
+        {0.666, 0.487, 0.566}, {0.872, 0.487, -0.05}, {0.612, 0.596, 0.52}, {0.801, 0.596, -0.046},
+        {0.559, 0.68, 0.474}, {0.732, 0.68, -0.042}, {-0.666, -0.487, -0.566}, {-0.872, -0.487, 0.05},
+        {-0.612, -0.596, -0.52}, {-0.801, -0.596, 0.046}, {-0.559, -0.68, -0.474}, {-0.732, -0.68, 0.042},
+        {0.823, 0.487, -0.294}, {0.393, 0.487, -0.78}, {0.756, 0.596, -0.27}, {0.361, 0.596, -0.717},
+        {0.69, 0.68, -0.247}, {0.33, 0.68, -0.654}, {-0.823, -0.487, 0.294}, {-0.393, -0.487, 0.78},
+        {-0.756, -0.596, 0.27}, {-0.361, -0.596, 0.717}, {-0.69, -0.68, 0.247}, {-0.33, -0.68, 0.654}
+      ],
+      uvs: [
+        {0, 1}, {1, 1}, {0, 0.5}, {1, 0.5}, {0, 0}, {1, 0}, {0, 1}, {1, 1},
+        {0, 0.5}, {1, 0.5}, {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.5}, {1, 0.5},
+        {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.5}, {1, 0.5}, {0, 0}, {1, 0},
+        {0, 1}, {1, 1}, {0, 0.5}, {1, 0.5}, {0, 0}, {1, 0}, {0, 1}, {1, 1},
+        {0, 0.5}, {1, 0.5}, {0, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 3, 0, 3, 2, 2, 3, 5, 2, 5, 4, 6, 9, 7, 6, 8, 9, 8, 11, 9, 8, 10, 11,
+        12, 13, 15, 12, 15, 14, 14, 15, 17, 14, 17, 16, 18, 21, 19, 18, 20, 21, 20, 23, 21, 20, 22, 23,
+        24, 25, 27, 24, 27, 26, 26, 27, 29, 26, 29, 28, 30, 33, 31, 30, 32, 33, 32, 35, 33, 32, 34, 35
+      ]
+    }
+  }
+
+  // A fern: seven fronds from its origin on the ground, one unit long (the shorter ones less),
+  // rising and arching out and down toward their tips, their faces up. Backs are reversed copies
+  prefab ForestFernMesh {
+    Mesh3: {
+      vertices: [
+        {0.304, 0, 0.065}, {-0.311, 0, -0.006}, {0.29, 0.214, 0.194}, {-0.326, 0.214, 0.123},
+        {0.272, 0.413, 0.344}, {-0.344, 0.413, 0.273}, {0.249, 0.556, 0.548}, {-0.367, 0.556, 0.476},
+        {0.22, 0.58, 0.795}, {-0.396, 0.58, 0.724}, {0.304, 0, 0.065}, {-0.311, 0, -0.006},
+        {0.29, 0.214, 0.194}, {-0.326, 0.214, 0.123}, {0.272, 0.413, 0.344}, {-0.344, 0.413, 0.273},
+        {0.249, 0.556, 0.548}, {-0.367, 0.556, 0.476}, {0.22, 0.58, 0.795}, {-0.396, 0.58, 0.724},
+        {0.195, 0, -0.18}, {-0.15, 0, 0.219}, {0.304, 0.156, -0.085}, {-0.041, 0.156, 0.313},
+        {0.425, 0.296, 0.019}, {0.08, 0.296, 0.418}, {0.573, 0.381, 0.147}, {0.228, 0.381, 0.545},
+        {0.732, 0.358, 0.285}, {0.387, 0.358, 0.684}, {0.195, 0, -0.18}, {-0.15, 0, 0.219},
+        {0.304, 0.156, -0.085}, {-0.041, 0.156, 0.313}, {0.425, 0.296, 0.019}, {0.08, 0.296, 0.418},
+        {0.573, 0.381, 0.147}, {0.228, 0.381, 0.545}, {0.732, 0.358, 0.285}, {0.387, 0.358, 0.684},
+        {-0.008, 0, -0.311}, {0.068, 0, 0.304}, {0.119, 0.215, -0.327}, {0.195, 0.215, 0.288},
+        {0.268, 0.415, -0.345}, {0.344, 0.415, 0.27}, {0.47, 0.56, -0.37}, {0.546, 0.56, 0.245},
+        {0.717, 0.585, -0.401}, {0.793, 0.585, 0.215}, {-0.008, 0, -0.311}, {0.068, 0, 0.304},
+        {0.119, 0.215, -0.327}, {0.195, 0.215, 0.288}, {0.268, 0.415, -0.345}, {0.344, 0.415, 0.27},
+        {0.47, 0.56, -0.37}, {0.546, 0.56, 0.245}, {0.717, 0.585, -0.401}, {0.793, 0.585, 0.215},
+        {-0.248, 0, -0.094}, {0.263, 0, 0.035}, {-0.216, 0.168, -0.22}, {0.295, 0.168, -0.091},
+        {-0.18, 0.321, -0.363}, {0.331, 0.321, -0.234}, {-0.134, 0.421, -0.545}, {0.377, 0.421, -0.416},
+        {-0.082, 0.416, -0.751}, {0.429, 0.416, -0.622}, {-0.248, 0, -0.094}, {0.263, 0, 0.035},
+        {-0.216, 0.168, -0.22}, {0.295, 0.168, -0.091}, {-0.18, 0.321, -0.363}, {0.331, 0.321, -0.234},
+        {-0.134, 0.421, -0.545}, {0.377, 0.421, -0.416}, {-0.082, 0.416, -0.751}, {0.429, 0.416, -0.622},
+        {-0.285, 0, 0.124}, {0.256, 0, -0.177}, {-0.339, 0.224, 0.028}, {0.202, 0.224, -0.274},
+        {-0.404, 0.435, -0.089}, {0.137, 0.435, -0.391}, {-0.498, 0.596, -0.257}, {0.044, 0.596, -0.558},
+        {-0.617, 0.64, -0.472}, {-0.075, 0.64, -0.773}, {-0.285, 0, 0.124}, {0.256, 0, -0.177},
+        {-0.339, 0.224, 0.028}, {0.202, 0.224, -0.274}, {-0.404, 0.435, -0.089}, {0.137, 0.435, -0.391},
+        {-0.498, 0.596, -0.257}, {0.044, 0.596, -0.558}, {-0.617, 0.64, -0.472}, {-0.075, 0.64, -0.773},
+        {-0.036, 0, 0.263}, {-0.024, 0, -0.264}, {-0.166, 0.168, 0.26}, {-0.155, 0.168, -0.267},
+        {-0.313, 0.321, 0.257}, {-0.302, 0.321, -0.27}, {-0.5, 0.422, 0.253}, {-0.489, 0.422, -0.274},
+        {-0.713, 0.416, 0.248}, {-0.702, 0.416, -0.278}, {-0.036, 0, 0.263}, {-0.024, 0, -0.264},
+        {-0.166, 0.168, 0.26}, {-0.155, 0.168, -0.267}, {-0.313, 0.321, 0.257}, {-0.302, 0.321, -0.27},
+        {-0.5, 0.422, 0.253}, {-0.489, 0.422, -0.274}, {-0.713, 0.416, 0.248}, {-0.702, 0.416, -0.278},
+        {0.194, 0, 0.244}, {-0.237, 0, -0.202}, {0.116, 0.226, 0.318}, {-0.314, 0.226, -0.128},
+        {0.023, 0.44, 0.408}, {-0.407, 0.44, -0.038}, {-0.113, 0.603, 0.54}, {-0.543, 0.603, 0.093},
+        {-0.29, 0.652, 0.71}, {-0.72, 0.652, 0.264}, {0.194, 0, 0.244}, {-0.237, 0, -0.202},
+        {0.116, 0.226, 0.318}, {-0.314, 0.226, -0.128}, {0.023, 0.44, 0.408}, {-0.407, 0.44, -0.038},
+        {-0.113, 0.603, 0.54}, {-0.543, 0.603, 0.093}, {-0.29, 0.652, 0.71}, {-0.72, 0.652, 0.264}
+      ],
+      normals: [
+        {0.313, 0.743, -0.592}, {-0.169, 0.743, -0.648}, {0.306, 0.787, -0.536}, {-0.176, 0.787, -0.592},
+        {0.285, 0.89, -0.357}, {-0.196, 0.89, -0.412}, {0.248, 0.968, -0.032}, {-0.234, 0.968, -0.088},
+        {0.195, 0.884, 0.425}, {-0.287, 0.884, 0.369}, {-0.313, -0.743, 0.592}, {0.169, -0.743, 0.648},
+        {-0.306, -0.787, 0.536}, {0.176, -0.787, 0.592}, {-0.285, -0.89, 0.357}, {0.196, -0.89, 0.412},
+        {-0.248, -0.968, 0.032}, {0.234, -0.968, 0.088}, {-0.195, -0.884, -0.425}, {0.287, -0.884, -0.369},
+        {-0.229, 0.824, -0.519}, {-0.546, 0.824, -0.152}, {-0.183, 0.858, -0.479}, {-0.501, 0.858, -0.112},
+        {-0.04, 0.934, -0.355}, {-0.357, 0.934, 0.012}, {0.212, 0.968, -0.137}, {-0.105, 0.968, 0.229},
+        {0.551, 0.82, 0.156}, {0.233, 0.82, 0.523}, {0.229, -0.824, 0.519}, {0.546, -0.824, 0.152},
+        {0.183, -0.858, 0.479}, {0.501, -0.858, 0.112}, {0.04, -0.934, 0.355}, {0.357, -0.934, -0.012},
+        {-0.212, -0.968, 0.137}, {0.105, -0.968, -0.229}, {-0.551, -0.82, -0.156}, {-0.233, -0.82, -0.523},
+        {-0.652, 0.74, -0.164}, {-0.593, 0.74, 0.317}, {-0.597, 0.784, -0.171}, {-0.537, 0.784, 0.311},
+        {-0.418, 0.888, -0.193}, {-0.358, 0.888, 0.289}, {-0.094, 0.968, -0.233}, {-0.034, 0.968, 0.249},
+        {0.363, 0.886, -0.289}, {0.423, 0.886, 0.192}, {0.652, -0.74, 0.164}, {0.593, -0.74, -0.317},
+        {0.597, -0.784, 0.171}, {0.537, -0.784, -0.311}, {0.418, -0.888, 0.193}, {0.358, -0.888, -0.289},
+        {0.094, -0.968, 0.233}, {0.034, -0.968, -0.249}, {-0.363, -0.886, 0.289}, {-0.423, -0.886, -0.192},
+        {-0.372, 0.792, 0.484}, {0.098, 0.792, 0.602}, {-0.358, 0.831, 0.427}, {0.113, 0.831, 0.545},
+        {-0.312, 0.918, 0.246}, {0.158, 0.918, 0.365}, {-0.231, 0.97, -0.075}, {0.239, 0.97, 0.044},
+        {-0.12, 0.849, -0.515}, {0.35, 0.849, -0.396}, {0.372, -0.792, -0.484}, {-0.098, -0.792, -0.602},
+        {0.358, -0.831, -0.427}, {-0.113, -0.831, -0.545}, {0.312, -0.918, -0.246}, {-0.158, -0.918, -0.365},
+        {0.231, -0.97, 0.075}, {-0.239, -0.97, -0.044}, {0.12, -0.849, 0.515}, {-0.35, -0.849, 0.396},
+        {0.113, 0.704, 0.702}, {0.537, 0.704, 0.466}, {0.087, 0.751, 0.654}, {0.51, 0.751, 0.419},
+        {0.001, 0.866, 0.501}, {0.425, 0.866, 0.265}, {-0.156, 0.963, 0.218}, {0.268, 0.963, -0.017},
+        {-0.381, 0.906, -0.186}, {0.043, 0.906, -0.422}, {-0.113, -0.704, -0.702}, {-0.537, -0.704, -0.466},
+        {-0.087, -0.751, -0.654}, {-0.51, -0.751, -0.419}, {-0.001, -0.866, -0.501}, {-0.425, -0.866, -0.265},
+        {0.156, -0.963, -0.218}, {-0.268, -0.963, 0.017}, {0.381, -0.906, 0.186}, {-0.043, -0.906, 0.422},
+        {0.555, 0.792, 0.254}, {0.565, 0.792, -0.231}, {0.496, 0.83, 0.253}, {0.507, 0.83, -0.232},
+        {0.31, 0.917, 0.249}, {0.32, 0.917, -0.236}, {-0.021, 0.97, 0.242}, {-0.01, 0.97, -0.243},
+        {-0.474, 0.849, 0.233}, {-0.464, 0.849, -0.252}, {-0.555, -0.792, -0.254}, {-0.565, -0.792, 0.231},
+        {-0.496, -0.83, -0.253}, {-0.507, -0.83, 0.232}, {-0.31, -0.917, -0.249}, {-0.32, -0.917, 0.236},
+        {0.021, -0.97, -0.242}, {0.01, -0.97, 0.243}, {0.474, -0.849, -0.233}, {0.464, -0.849, 0.252},
+        {0.655, 0.695, -0.295}, {0.319, 0.695, -0.644}, {0.617, 0.744, -0.258}, {0.28, 0.744, -0.607},
+        {0.491, 0.86, -0.137}, {0.154, 0.86, -0.486}, {0.259, 0.962, 0.087}, {-0.078, 0.962, -0.262},
+        {-0.075, 0.91, 0.409}, {-0.411, 0.91, 0.06}, {-0.655, -0.695, 0.295}, {-0.319, -0.695, 0.644},
+        {-0.617, -0.744, 0.258}, {-0.28, -0.744, 0.607}, {-0.491, -0.86, 0.137}, {-0.154, -0.86, 0.486},
+        {-0.259, -0.962, -0.087}, {0.078, -0.962, 0.262}, {0.075, -0.91, -0.409}, {0.411, -0.91, -0.06}
+      ],
+      uvs: [
+        {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25},
+        {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5},
+        {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75},
+        {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}, {0, 1}, {1, 1},
+        {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0},
+        {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25},
+        {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5},
+        {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75},
+        {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}, {0, 1}, {1, 1},
+        {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0},
+        {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25},
+        {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5},
+        {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75},
+        {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}, {0, 1}, {1, 1},
+        {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0},
+        {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5}, {0, 0.25}, {1, 0.25},
+        {0, 0}, {1, 0}, {0, 1}, {1, 1}, {0, 0.75}, {1, 0.75}, {0, 0.5}, {1, 0.5},
+        {0, 0.25}, {1, 0.25}, {0, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 3, 0, 3, 2, 2, 3, 5, 2, 5, 4, 4, 5, 7, 4, 7, 6, 6, 7, 9, 6, 9, 8,
+        10, 13, 11, 10, 12, 13, 12, 15, 13, 12, 14, 15, 14, 17, 15, 14, 16, 17, 16, 19, 17, 16, 18, 19,
+        20, 21, 23, 20, 23, 22, 22, 23, 25, 22, 25, 24, 24, 25, 27, 24, 27, 26, 26, 27, 29, 26, 29, 28,
+        30, 33, 31, 30, 32, 33, 32, 35, 33, 32, 34, 35, 34, 37, 35, 34, 36, 37, 36, 39, 37, 36, 38, 39,
+        40, 41, 43, 40, 43, 42, 42, 43, 45, 42, 45, 44, 44, 45, 47, 44, 47, 46, 46, 47, 49, 46, 49, 48,
+        50, 53, 51, 50, 52, 53, 52, 55, 53, 52, 54, 55, 54, 57, 55, 54, 56, 57, 56, 59, 57, 56, 58, 59,
+        60, 61, 63, 60, 63, 62, 62, 63, 65, 62, 65, 64, 64, 65, 67, 64, 67, 66, 66, 67, 69, 66, 69, 68,
+        70, 73, 71, 70, 72, 73, 72, 75, 73, 72, 74, 75, 74, 77, 75, 74, 76, 77, 76, 79, 77, 76, 78, 79,
+        80, 81, 83, 80, 83, 82, 82, 83, 85, 82, 85, 84, 84, 85, 87, 84, 87, 86, 86, 87, 89, 86, 89, 88,
+        90, 93, 91, 90, 92, 93, 92, 95, 93, 92, 94, 95, 94, 97, 95, 94, 96, 97, 96, 99, 97, 96, 98, 99,
+        100, 101, 103, 100, 103, 102, 102, 103, 105, 102, 105, 104, 104, 105, 107, 104, 107, 106, 106, 107, 109, 106, 109, 108,
+        110, 113, 111, 110, 112, 113, 112, 115, 113, 112, 114, 115, 114, 117, 115, 114, 116, 117, 116, 119, 117, 116, 118, 119,
+        120, 121, 123, 120, 123, 122, 122, 123, 125, 122, 125, 124, 124, 125, 127, 124, 127, 126, 126, 127, 129, 126, 129, 128,
+        130, 133, 131, 130, 132, 133, 132, 135, 133, 132, 134, 135, 134, 137, 135, 134, 136, 137, 136, 139, 137, 136, 138, 139
+      ]
+    }
+  }
+
+  // A patch of litter: a card one unit across lying face up, its origin in the middle
+  prefab ForestLitterMesh {
+    Mesh3: {
+      vertices: [
+        {-0.5, 0, 0.5}, {0.5, 0, 0.5}, {-0.5, 0, -0.5}, {0.5, 0, -0.5}
+      ],
+      normals: [
+        {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}
+      ],
+      uvs: [
+        {0, 1}, {1, 1}, {0, 0}, {1, 0}
+      ],
+      indices: [
+        0, 1, 3, 0, 3, 2
+      ]
+    }
+  }
+
+  // The plants. The season task recolors a kind through the Rgb (or a Tint) of its first prefab;
+  // the sedge and the flower colors inherit theirs
+  prefab ForestGrass : ForestClumpMesh {
+    Rgb: {112, 140, 60}
+    PbrMaterial: {roughness: 0.8}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.6, color: {220, 255, 150}}
+    PbrTextures: {albedo: grass_albedo, normal: grass_normal}
+    NoShadow
+  }
+
+  prefab ForestSedge : ForestGrass {
+    PbrTextures: {albedo: sedge_albedo, normal: sedge_normal}
+  }
+
+  prefab ForestFlower : ForestClumpMesh {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.75}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.5, color: {240, 255, 200}}
+    PbrTextures: {albedo: bloom_yellow_albedo, normal: bloom_normal}
+    NoShadow
+  }
+
+  prefab ForestFlowerWhite : ForestFlower {
+    PbrTextures: {albedo: bloom_white_albedo, normal: bloom_normal}
+  }
+
+  prefab ForestFlowerViolet : ForestFlower {
+    PbrTextures: {albedo: bloom_violet_albedo, normal: bloom_normal}
+  }
+
+  prefab ForestReed : ForestClumpMesh {
+    Rgb: {176, 200, 136}
+    PbrMaterial: {roughness: 0.7}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.45, color: {220, 255, 150}}
+    PbrTextures: {albedo: reed_albedo, normal: reed_normal}
+    NoShadow
+  }
+
+  prefab ForestFern : ForestFernMesh {
+    Rgb: {104, 152, 54}
+    PbrMaterial: {roughness: 0.8}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.6, color: {220, 255, 140}}
+    PbrTextures: {albedo: fern_albedo, normal: fern_normal}
+    NoShadow
+  }
+
+  prefab ForestLitter : ForestLitterMesh {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.9}
+    AlphaCutoff: {0.45}
+    PbrTextures: {albedo: litter_patch_albedo, normal: litter_patch_normal}
+    NoShadow
+  }
+
+  // Shrubs: hazel, its leaves the cards of the beech in a lighter green, and elder, the cards of
+  // the birch in a darker one, around a dark core
+  prefab ForestShrubHazel : ForestCardTripleMesh {
+    Rgb: {104, 144, 54}
+    PbrMaterial: {roughness: 0.78}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.6, color: {226, 255, 150}}
+    PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+  }
+
+  prefab ForestShrubElder : ForestCardTripleMesh {
+    Rgb: {72, 108, 44}
+    PbrMaterial: {roughness: 0.78}
+    AlphaCutoff: {0.4}
+    DiffuseTransmission: {factor: 0.55, color: {214, 255, 140}}
+    PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+  }
+
+  prefab ForestShrubCore {
+    Rgb: {72, 100, 50}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    texture.Mapping: {mode: MappingWorld, size: 3, blend: 0.5}
+    HemiSphere: {segments: 10, smooth: true, radius: 1}
+  }
+
+  // Cushions of moss, on the floor and the stumps
+  prefab ForestMoss {
+    Rgb: {200, 220, 170}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
+    texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.4}
+    IcoSphere: {radius: 1, segments: 2, smooth: true}
+    NoShadow
+  }
+
+  // Mushrooms: a cap, the gills under it and a stem, each one unit across and high
+  prefab ForestMushroomCap {
+    Rgb: {150, 98, 56}
+    PbrMaterial: {roughness: 0.55}
+    HemiSphere: {segments: 10, smooth: true, radius: 1}
+    NoShadow
+  }
+
+  prefab ForestAgaricCap : ForestMushroomCap {
+    Rgb: {255, 255, 255}
+    PbrTextures: {albedo: forest_agaric_albedo}
+    texture.Mapping: {mode: MappingObject, size: 0.2, blend: 0.5}
+  }
+
+  prefab ForestMushroomGills {
+    Rgb: {214, 196, 160}
+    PbrMaterial: {roughness: 0.9}
+    Cylinder: {segments: 10, smooth: true, length: 1, radius: 1}
+    NoShadow
+  }
+
+  prefab ForestMushroomStem {
+    Rgb: {226, 216, 192}
+    PbrMaterial: {roughness: 0.8}
+    Cylinder: {segments: 8, smooth: true, length: 1, radius: 1}
+    NoShadow
+  }
+
+  // Rocks: the granite of the boulders, cheaper
+  prefab ForestRock : ForestBoulder {
+    IcoSphere: {radius: 1, segments: 1, smooth: true}
+  }
+
+  // A twig: dead wood, one unit long along Y and one across
+  prefab ForestTwig : ForestLimbDead {
+    Cylinder: {segments: 5, smooth: true, length: 1, radius: 1}
+    NoShadow
+  }
+
+  // The cut face of a log or stump: pale wood
+  prefab ForestWoodCut {
+    Rgb: {150, 120, 84}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: bark_dead_albedo, normal: bark_dead_normal}
+    texture.Mapping: {mode: MappingObject, size: 0.6}
+    Cylinder: {segments: 14, smooth: true, length: 1, radius: 1}
+  }
+
+  // A shrub size meters across its middle: a dark core and 15 leaf cards around it, pointing
+  // out and up, each with a seeded value
+  template ForestShrub {
+    prop seed: f32 = 0
+    prop size: f32 = 1.2
+    prop elder: bool = false
+
+    ForestPlant: {kind: PLANT_SHRUB, seed: seed}
+
+    core : ForestShrubCore {
+      Scale: {size * 0.42, size * 0.55, size * 0.42}
+    }
+
+    for c in 0..15 {
+      const a = c * 2.39996 + seed * 6.2832
+      const e = 0.15 + 1.25 * forest_hash(c + 1, seed * 31)
+      const ox = cos(e) * sin(a)
+      const oy = sin(e)
+      const oz = cos(e) * cos(a)
+      const jx = ox + (forest_hash(c + 2, seed * 31) - 0.5) * 0.6
+      const jy = oy + 0.35
+      const jz = oz + (forest_hash(c + 3, seed * 31) - 0.5) * 0.6
+      const jl = sqrt(jx * jx + jy * jy + jz * jz)
+      const b = (forest_hash(c + 4, seed * 31) - 0.5) * 1.8
+      const card = size * (0.62 + 0.3 * forest_hash(c + 5, seed * 31))
+      const pos_r = size * 0.28
+
+      {
+        if elder {
+          (IsA, ForestShrubElder)
+        } else {
+          (IsA, ForestShrubHazel)
+        }
+
+        if forest_hash(c + 6, seed * 31) > 0.35 {
+          NoShadow
+        }
+
+        ForestPlant: {kind: PLANT_SHRUB, seed: forest_hash(c + 7, seed * 31)}
+        Position: {ox * pos_r, 0.08 + oy * size * 0.45, oz * pos_r}
+        Rotation: {forest_card_pitch(jy / jl, b), forest_card_yaw(jx / jl, jy / jl, jz / jl, b), forest_card_roll(jy / jl, b)}
+        Scale: {card, card, card}
+      }
+    }
+  }
+
+  // A mushroom size meters tall with its cap, gills and stem; agaric is a red fly agaric
+  template ForestMushroom {
+    prop size: f32 = 0.1
+    prop agaric: bool = false
+    prop tilt: f32 = 0
+
+    const cap_r = size * (agaric ? 0.7 : 0.6)
+    const stem_r = size * 0.12
+
+    stem : ForestMushroomStem {
+      Position: {0, size * 0.45, 0}
+      Scale: {stem_r, size * 0.95, stem_r}
+    }
+
+    gills : ForestMushroomGills {
+      Position: {0, size * 0.9, 0}
+      Rotation: {tilt, 0, 0}
+      Scale: {cap_r * 0.95, size * 0.02, cap_r * 0.95}
+    }
+
+    if agaric {
+      cap : ForestAgaricCap {
+        Position: {0, size * 0.9, 0}
+        Rotation: {tilt, 0, 0}
+        Scale: {cap_r, cap_r * 0.55, cap_r}
+      }
+    } else {
+      cap : ForestMushroomCap {
+        Position: {0, size * 0.9, 0}
+        Rotation: {tilt, 0, 0}
+        Scale: {cap_r, cap_r * 0.6, cap_r}
+      }
+    }
+  }
+
+  // A fallen log length meters long, radius across, lying along local +Z from its origin: a
+  // trunk of the species on its side, sunk a little into the floor, its cut ends and shelf
+  // fungus along a side
+  template ForestLog {
+    prop seed: f32 = 0
+    prop length: f32 = 4
+    prop radius: f32 = 0.25
+    prop species: i32 = SPECIES_SNAG
+
+    const lr = radius / TRUNK_RADIUS
+    const y = radius * 0.78
+
+    ForestPlant: {kind: PLANT_LOG, seed: seed}
+
+    ForestTrunk wood(species: species, variant: 0, taper: 0.78) {
+      Position: {0, y, 0}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {lr, length / TRUNK_LEN, lr}
+    }
+
+    cut_a : ForestWoodCut {
+      Position: {0, y, 0.01}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.96, 0.03, radius * 0.96}
+    }
+
+    cut_b : ForestWoodCut {
+      Position: {0, y, length - 0.01}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {radius * 0.75, 0.03, radius * 0.75}
+    }
+
+    const side = forest_hash(10, seed * 53) < 0.5 ? 1 : -1
+    for j in 0..4 {
+      const t = 0.2 + 0.6 * forest_hash(j + 11, seed * 53)
+      const fs = 0.07 + 0.07 * forest_hash(j + 12, seed * 53)
+      {
+        (IsA, ForestFungus)
+        Position: {side * radius * (1 - 0.22 * t) * 0.95, y + radius * 0.25 * forest_hash(j + 13, seed * 53), length * t}
+        Rotation: {0.05, side * PI / 2, 0}
+        Scale: {fs * 1.4, fs * 0.32, fs}
+        Sphere: {radius: 1, segments: 12, smooth: true}
+      }
+    }
+  }
+
+  // A stump radius across and height high: a stout trunk of the species cut off, flaring into
+  // roots at its foot, its cut face, and moss on it
+  template ForestStump {
+    prop seed: f32 = 0
+    prop radius: f32 = 0.35
+    prop height: f32 = 0.5
+    prop species: i32 = SPECIES_OAK
+
+    ForestPlant: {kind: PLANT_STUMP, seed: seed}
+
+    wood {
+      if species == SPECIES_BEECH {
+        (IsA, ForestBarkBeech)
+      } else if species == SPECIES_OAK {
+        (IsA, ForestBarkOak)
+      } else if species == SPECIES_SPRUCE {
+        (IsA, ForestBarkSpruce)
+      } else {
+        (IsA, ForestBarkDead)
+      }
+
+      Position: {0, height / 2 - 0.05, 0}
+      Scale: {radius, height + 0.1, radius}
+      Frustum: {segments: 12, smooth: true, length: 1, radius_bottom: 1.15, radius_top: 0.95}
+    }
+
+    top : ForestWoodCut {
+      Position: {0, height + 0.005, 0}
+      Rotation: {0.04, 0, 0.03}
+      Scale: {radius * 0.93, 0.03, radius * 0.93}
+    }
+
+    for j in 0..4 {
+      const a = j * 1.5708 + forest_hash(j + 1, seed * 59) * 0.8
+      const rl = radius * (1.3 + 0.8 * forest_hash(j + 2, seed * 59))
+      {
+        (IsA, ForestLimbDead)
+        Position: {sin(a) * radius * 0.85, 0.02, cos(a) * radius * 0.85}
+        Rotation: {1.25, a, 0}
+        Scale: {radius * 0.38, rl, radius * 0.38}
+        Cone: {segments: 6, smooth: true, length: 1, radius: 1}
+      }
+    }
+
+    if forest_hash(9, seed * 59) < 0.6 {
+      moss : ForestMoss {
+        Position: {radius * 0.2, height + 0.01, 0}
+        Scale: {radius * 0.7, radius * 0.18, radius * 0.6}
+      }
+    }
+  }
+
+  // A twig length meters long lying on the floor along local +Z, with a side shoot
+  template ForestFallenTwig {
+    prop seed: f32 = 0
+    prop length: f32 = 0.8
+
+    const r = 0.008 + 0.012 * length
+
+    ForestPlant: {kind: PLANT_TWIG, seed: seed}
+
+    stick : ForestTwig {
+      Position: {0, r * 0.7, length / 2}
+      Rotation: {PI / 2, 0, 0}
+      Scale: {r, length, r}
+    }
+
+    const sa = (forest_hash(1, seed * 61) < 0.5 ? 1 : -1) * (0.5 + 0.4 * forest_hash(2, seed * 61))
+    const sl = length * (0.3 + 0.3 * forest_hash(3, seed * 61))
+    const sz = length * (0.3 + 0.4 * forest_hash(4, seed * 61))
+    shoot : ForestTwig {
+      Position: {sin(sa) * sl / 2, r * 0.6, sz + cos(sa) * sl / 2}
+      Rotation: {PI / 2, sa, 0}
+      Scale: {r * 0.6, sl, r * 0.6}
+    }
+  }
+}
+
+forest {
+  // Nothing picks, collides with or queries the undergrowth, so it stays out of the spatial
+  // index
+  undergrowth {
+    box.spatial.Ignore
+
+    // Logs, stumps and shrubs, at most one in each FEATURE_CELL. A log lies along its yaw from
+    // the spot, clear of the trees, the path and the brook bed along all of its length
+    for gx in 0..FEATURE_GRID {
+      for gz in 0..FEATURE_GRID {
+        const i = forest_feature_i(gx, gz)
+        const k: i32 = forest_feature_kind(gx, gz)
+        const x = forest_feature_x(gx, gz)
+        const z = forest_feature_z(gx, gz)
+        const yaw = forest_feature_yaw(gx, gz)
+        const seed = forest_hash(i, 407)
+
+        if k == FEATURE_LOG {
+          const len = forest_log_len(gx, gz)
+          const lr = forest_log_radius(gx, gz)
+          const mx = x + sin(yaw) * len / 2
+          const mz = z + cos(yaw) * len / 2
+          const ex = x + sin(yaw) * len
+          const ez = z + cos(yaw) * len
+          const free = forest_floor_free(x, z, lr + 0.3) && forest_floor_free(mx, mz, lr + 0.3) && forest_floor_free(ex, ez, lr + 0.3) &&
+            forest_floor_free((x + mx) / 2, (z + mz) / 2, lr + 0.3) && forest_floor_free((mx + ex) / 2, (mz + ez) / 2, lr + 0.3)
+          const clear = !forest_trees_near(x, z, lr + 0.9) && !forest_trees_near(mx, mz, lr + 0.9) && !forest_trees_near(ex, ez, lr + 0.9)
+          if free && clear {
+            const sp: i32 = forest_hash(i, 408) < 0.5 ? SPECIES_SNAG : (forest_hash(i, 409) < 0.5 ? SPECIES_BEECH : SPECIES_OAK)
+            ForestLog "log_{i}"(seed: seed, length: len, radius: lr, species: sp) {
+              Position: {x, 0, z}
+              Rotation: {0, yaw, 0}
+            }
+          }
+        } else if k == FEATURE_STUMP {
+          const sr = forest_stump_radius(gx, gz)
+          if forest_floor_free(x, z, sr + 0.3) && !forest_trees_near(x, z, sr + 0.9) {
+            const sp: i32 = forest_hash(i, 408) < 0.4 ? SPECIES_OAK : (forest_hash(i, 409) < 0.5 ? SPECIES_BEECH : SPECIES_SPRUCE)
+            ForestStump "stump_{i}"(seed: seed, radius: sr, height: 0.3 + 0.5 * forest_hash(i, 410), species: sp) {
+              Position: {x, 0, z}
+              Rotation: {0, yaw, 0}
+            }
+          }
+        } else if k == FEATURE_SHRUB {
+          const size = 1.1 + 0.9 * forest_hash(i, 411)
+          if forest_floor_free(x, z, size * 0.5) && !forest_trees_near(x, z, size * 0.5 + 0.4) {
+            ForestShrub "shrub_{i}"(seed: seed, size: size, elder: forest_hash(i, 412) < 0.4) {
+              Position: {x, 0, z}
+              Rotation: {0, yaw, 0}
+            }
+          }
+        }
+      }
+    }
+
+    // Grass: dense in the sun, sparser sedge in the shade
+    for gx in 0..GRASS_GRID {
+      for gz in 0..GRASS_GRID {
+        const i = gx * GRASS_GRID + gz
+        const dens = forest_under_density((gx + 0.5) * GRASS_CELL - UNDER_EDGE, (gz + 0.5) * GRASS_CELL - UNDER_EDGE)
+        if dens > 0 {
+          const light = forest_light((gx + 0.5) * GRASS_CELL - UNDER_EDGE, (gz + 0.5) * GRASS_CELL - UNDER_EDGE)
+          const keep = dens * (0.12 + 0.88 * light)
+          for k in 0..4 {
+            const j = i * 4 + k
+            const x = (gx + 0.5 * (k % 2) + 0.05 + 0.4 * forest_hash(j, 301)) * GRASS_CELL - UNDER_EDGE
+            const z = (gz + 0.5 * floor(k / 2) + 0.05 + 0.4 * forest_hash(j, 302)) * GRASS_CELL - UNDER_EDGE
+            if forest_hash(j, 303) < keep {
+              if forest_floor_free(x, z, 0.2) {
+                if !forest_feature_near(x, z, 0.25) {
+                  const s = 0.6 + 0.5 * forest_hash(j, 304)
+                  const h = 0.26 + 0.3 * forest_hash(j, 305)
+                  const yaw = forest_hash(j, 306) * 6.2832
+                  const seed = forest_hash(j, 307)
+                  if light > 0.5 || forest_hash(j, 308) < light {
+                    "grass_{j}" : ForestGrass {
+                      Position: {x, 0, z}
+                      Rotation: {0, yaw, 0}
+                      Scale: {s, h, s}
+                      ForestPlant: {kind: PLANT_GRASS, seed: seed}
+                    }
+                  } else {
+                    "sedge_{j}" : ForestSedge {
+                      Position: {x, 0, z}
+                      Rotation: {0, yaw, 0}
+                      Scale: {s * 1.2, h * 1.1, s * 1.2}
+                      ForestPlant: {kind: PLANT_SEDGE, seed: seed}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Wildflowers in the sun, each color in patches of its own
+    for gx in 0..FLOWER_GRID {
+      for gz in 0..FLOWER_GRID {
+        const i = gx * FLOWER_GRID + gz
+        const dens = forest_under_density((gx + 0.5) * FLOWER_CELL - UNDER_EDGE, (gz + 0.5) * FLOWER_CELL - UNDER_EDGE)
+        if dens > 0 {
+          const light = forest_light((gx + 0.5) * FLOWER_CELL - UNDER_EDGE, (gz + 0.5) * FLOWER_CELL - UNDER_EDGE)
+          const keep = dens * light * light * 0.8
+          for k in 0..4 {
+            const j = i * 4 + k
+            const x = (gx + 0.5 * (k % 2) + 0.05 + 0.4 * forest_hash(j, 311)) * FLOWER_CELL - UNDER_EDGE
+            const z = (gz + 0.5 * floor(k / 2) + 0.05 + 0.4 * forest_hash(j, 312)) * FLOWER_CELL - UNDER_EDGE
+            if forest_hash(j, 313) < keep {
+              if forest_floor_free(x, z, 0.15) {
+                if !forest_feature_near(x, z, 0.2) {
+                  const s = 0.32 + 0.22 * forest_hash(j, 314)
+                  const yaw = forest_hash(j, 316) * 6.2832
+                  const seed = forest_hash(j, 317)
+                  const patch = forest_hash2(floor(x / 4), floor(z / 4), 51)
+                  if patch < 0.45 {
+                    "flower_{j}" : ForestFlower {
+                      Position: {x, 0, z}
+                      Rotation: {0, yaw, 0}
+                      Scale: {s, s * 1.1, s}
+                      ForestPlant: {kind: PLANT_FLOWER, seed: seed}
+                    }
+                  } else if patch < 0.8 {
+                    "flower_{j}" : ForestFlowerWhite {
+                      Position: {x, 0, z}
+                      Rotation: {0, yaw, 0}
+                      Scale: {s, s, s}
+                      ForestPlant: {kind: PLANT_FLOWER, seed: seed}
+                    }
+                  } else {
+                    "flower_{j}" : ForestFlowerViolet {
+                      Position: {x, 0, z}
+                      Rotation: {0, yaw, 0}
+                      Scale: {s, s * 1.3, s}
+                      ForestPlant: {kind: PLANT_FLOWER, seed: seed}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Ferns in the shade, a few at the edge of the sun
+    for gx in 0..FERN_GRID {
+      for gz in 0..FERN_GRID {
+        const i = gx * FERN_GRID + gz
+        const dens = forest_under_density((gx + 0.5) * FERN_CELL - UNDER_EDGE, (gz + 0.5) * FERN_CELL - UNDER_EDGE)
+        if dens > 0 {
+          const light = forest_light((gx + 0.5) * FERN_CELL - UNDER_EDGE, (gz + 0.5) * FERN_CELL - UNDER_EDGE)
+          const keep = dens * (0.06 + 0.84 * (1 - light))
+          for k in 0..4 {
+            const j = i * 4 + k
+            const x = (gx + 0.5 * (k % 2) + 0.05 + 0.4 * forest_hash(j, 321)) * FERN_CELL - UNDER_EDGE
+            const z = (gz + 0.5 * floor(k / 2) + 0.05 + 0.4 * forest_hash(j, 322)) * FERN_CELL - UNDER_EDGE
+            if forest_hash(j, 323) < keep {
+              if forest_floor_free(x, z, 0.4) {
+                if !forest_feature_near(x, z, 0.4) {
+                  if !forest_trees_near(x, z, 0.5) {
+                    const s = 0.55 + 0.55 * forest_hash(j, 324) * (1.2 - light)
+                    "fern_{j}" : ForestFern {
+                      Position: {x, 0, z}
+                      Rotation: {0, forest_hash(j, 326) * 6.2832, 0}
+                      Scale: {s, s * (0.8 + 0.3 * forest_hash(j, 325)), s}
+                      ForestPlant: {kind: PLANT_FERN, seed: forest_hash(j, 327)}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Leaf litter, thicker in the shade. The patches lie a few mm apart in height so they never
+    // fight where they overlap
+    for gx in 0..LITTER_GRID {
+      for gz in 0..LITTER_GRID {
+        const i = gx * LITTER_GRID + gz
+        const dens = forest_under_density((gx + 0.5) * LITTER_CELL - UNDER_EDGE, (gz + 0.5) * LITTER_CELL - UNDER_EDGE)
+        if dens > 0 {
+          const light = forest_light((gx + 0.5) * LITTER_CELL - UNDER_EDGE, (gz + 0.5) * LITTER_CELL - UNDER_EDGE)
+          const keep = dens * (0.03 + 0.7 * (1 - light) * (1 - light))
+          for k in 0..4 {
+            const j = i * 4 + k
+            const x = (gx + 0.5 * (k % 2) + 0.05 + 0.4 * forest_hash(j, 331)) * LITTER_CELL - UNDER_EDGE
+            const z = (gz + 0.5 * floor(k / 2) + 0.05 + 0.4 * forest_hash(j, 332)) * LITTER_CELL - UNDER_EDGE
+            if forest_hash(j, 333) < keep {
+              if forest_floor_free(x, z, 0.4) {
+                if !forest_feature_near(x, z, 0.4) {
+                  const s = 0.7 + 0.5 * forest_hash(j, 334)
+                  "litter_{j}" : ForestLitter {
+                    Position: {x, 0.006 + (j % 5) * 0.003, z}
+                    Rotation: {0, forest_hash(j, 336) * 6.2832, 0}
+                    Scale: {s, 1, s}
+                    ForestPlant: {kind: PLANT_LITTER, seed: forest_hash(j, 337)}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Small things on a coarser grid: moss cushions and mushrooms in the shade, rocks, twigs
+    for gx in 0..SMALL_GRID {
+      for gz in 0..SMALL_GRID {
+        const i = gx * SMALL_GRID + gz
+        const x = (gx + 0.1 + 0.8 * forest_hash(i, 341)) * SMALL_CELL - UNDER_EDGE
+        const z = (gz + 0.1 + 0.8 * forest_hash(i, 342)) * SMALL_CELL - UNDER_EDGE
+        const dens = forest_under_density(x, z)
+        const kind: i32 = forest_small_kind(forest_hash(i, 343), forest_light(x, z))
+        const ok = forest_hash(i, 344) < dens && forest_floor_free(x, z, 0.6) && !forest_feature_near(x, z, 0.5)
+
+        if ok && kind == PLANT_MOSS {
+          const ms = 0.3 + 0.45 * forest_hash(i, 345)
+          "moss_{i}" : ForestMoss {
+            Position: {x, 0 - ms * 0.12, z}
+            Rotation: {0, forest_hash(i, 346) * 6.28, 0}
+            Scale: {ms, ms * 0.42, ms * (0.6 + 0.4 * forest_hash(i, 347))}
+            ForestPlant: {kind: PLANT_MOSS, seed: forest_hash(i, 348)}
+          }
+        } else if ok && kind == PLANT_MUSHROOM {
+          const agaric = forest_hash(i, 349) < 0.3
+          const n: i32 = 2 + floor(forest_hash(i, 350) * 4)
+          "mushrooms_{i}" {
+            Position: {x, 0, z}
+            ForestPlant: {kind: PLANT_MUSHROOM, seed: forest_hash(i, 351)}
+            for j in 0..n {
+              const a = j * 2.4 + forest_hash(i, 352) * 6.28
+              const d = 0.06 + 0.16 * forest_hash(j, i + 0.5)
+              ForestMushroom "m{j}"(size: (agaric ? 0.12 : 0.07) * (0.6 + 0.8 * forest_hash(j + 9, i + 0.5)), agaric: agaric, tilt: (forest_hash(j + 4, i + 0.5) - 0.5) * 0.4) {
+                Position: {sin(a) * d, 0, cos(a) * d}
+                Rotation: {0, a, 0}
+              }
+            }
+          }
+        } else if ok && kind == PLANT_ROCK {
+          const rs = 0.18 + 0.4 * forest_hash(i, 353) * forest_hash(i, 354)
+          "rock_{i}" : ForestRock {
+            Position: {x, rs * 0.2, z}
+            Rotation: {(forest_hash(i, 355) - 0.5) * 0.4, forest_hash(i, 356) * 6.28, 0}
+            Scale: {rs * (1 + 0.4 * forest_hash(i, 357)), rs * (0.6 + 0.25 * forest_hash(i, 358)), rs}
+            ForestPlant: {kind: PLANT_ROCK, seed: forest_hash(i, 359)}
+          }
+
+          if forest_hash(i, 360) < 0.5 {
+            const ca = forest_hash(i, 361) * 6.28
+            "rock_b{i}" : ForestRock {
+              Position: {x + sin(ca) * rs * 1.4, rs * 0.04, z + cos(ca) * rs * 1.4}
+              Rotation: {0, ca, 0.2}
+              Scale: {rs * 0.45, rs * 0.25, rs * 0.38}
+              ForestPlant: {kind: PLANT_ROCK, seed: forest_hash(i, 362)}
+            }
+          }
+        } else if ok && kind == PLANT_TWIG {
+          ForestFallenTwig "twig_{i}"(seed: forest_hash(i, 363), length: 0.4 + 0.9 * forest_hash(i, 364)) {
+            Position: {x, 0, z}
+            Rotation: {0, forest_hash(i, 365) * 6.28, 0}
+          }
+        }
+      }
+    }
+
+    // Plants on the mounds of the floor, which the plants of the grids sink into: on the surface
+    // of each mound, ferns, sedge and moss in the shade, grass in the sun
+    for m in 0..MOUND_COUNT {
+      const mx = forest_mound_x(m)
+      const mz = forest_mound_z(m)
+      if forest_mound_placed(m) && forest_under_density(mx, mz) > 0 {
+        const light = forest_light(mx, mz)
+        const rx = forest_mound_rx(m)
+        const rz = forest_mound_rz(m)
+        const ry = forest_mound_ry(m)
+        const yaw = forest_mound_yaw(m)
+        for k in 0..8 {
+          const j = m * 8 + k
+          const f = 0.8 * sqrt(forest_hash(j, 381))
+          const a = forest_hash(j, 382) * 6.2832
+          const u = f * rx * cos(a)
+          const v = f * rz * sin(a)
+          const x = mx + u * cos(yaw) + v * sin(yaw)
+          const z = mz - u * sin(yaw) + v * cos(yaw)
+          const y = ry * (sqrt(1 - f * f) - 0.55) - 0.03
+          const h = forest_hash(j, 384)
+          const seed = forest_hash(j, 385)
+          if forest_hash(j, 383) < forest_under_density(x, z) {
+            if !forest_feature_near(x, z, 0.4) {
+              if !forest_trees_near(x, z, 0.5) {
+                if light > 0.5 {
+                  const s = 0.6 + 0.5 * forest_hash(j, 386)
+                  "mound_grass_{j}" : ForestGrass {
+                    Position: {x, y, z}
+                    Rotation: {0, a, 0}
+                    Scale: {s, 0.26 + 0.3 * forest_hash(j, 387), s}
+                    ForestPlant: {kind: PLANT_GRASS, seed: seed}
+                  }
+                } else if h < 0.5 {
+                  const s = 0.6 + 0.5 * forest_hash(j, 386)
+                  "mound_fern_{j}" : ForestFern {
+                    Position: {x, y, z}
+                    Rotation: {0, a, 0}
+                    Scale: {s, s * (0.8 + 0.3 * forest_hash(j, 387)), s}
+                    ForestPlant: {kind: PLANT_FERN, seed: seed}
+                  }
+                } else if h < 0.8 {
+                  const s = 0.7 + 0.5 * forest_hash(j, 386)
+                  "mound_sedge_{j}" : ForestSedge {
+                    Position: {x, y, z}
+                    Rotation: {0, a, 0}
+                    Scale: {s, 0.3 + 0.3 * forest_hash(j, 387), s}
+                    ForestPlant: {kind: PLANT_SEDGE, seed: seed}
+                  }
+                } else {
+                  const ms = 0.35 + 0.4 * forest_hash(j, 386)
+                  "mound_moss_{j}" : ForestMoss {
+                    Position: {x, y - ms * 0.1, z}
+                    Rotation: {0, a, 0}
+                    Scale: {ms, ms * 0.4, ms * 0.8}
+                    ForestPlant: {kind: PLANT_MOSS, seed: seed}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Reeds on the banks of the brook, above the water line, clear of the footbridge and the
+    // ledge of the cascade, standing in the slope of the bank
+    for i in 0..REED_COUNT {
+      const t = (i - REED_COUNT / 2) * REED_STEP + (forest_hash(i, 371) - 0.5) * REED_STEP
+      const side = forest_hash(i, 372) < 0.5 ? 1 : -1
+      const d = REED_D0 + (REED_D1 - REED_D0) * forest_hash(i, 373)
+      const x = forest_brook_off_x(t, side * d)
+      const z = forest_brook_off_z(t, side * d)
+      const clear = abs(t - CROSSING_X) > BRIDGE_HALF_WIDTH + 1.6 && abs(t - CASCADE_X) > 1 && forest_path_distance(x, z) > PATH_HALF_WIDTH + 0.6
+      const keep = forest_hash(i, 374) < 0.75 * forest_under_density(x, z)
+      if clear && keep && !forest_landmark_near(x, z, 0.2) {
+        const s = 0.35 + 0.3 * forest_hash(i, 375)
+        "reed_{i}" : ForestReed {
+          Position: {x, forest_brook_bed_y_at(t, d) - 0.03, z}
+          Rotation: {0, forest_hash(i, 376) * 6.2832, 0}
+          Scale: {s, 0.7 + 0.7 * forest_hash(i, 377), s}
+          ForestPlant: {kind: PLANT_REED, seed: forest_hash(i, 378)}
+        }
+      }
+    }
+  }
+}

@@ -215,6 +215,42 @@ state {
     forest_brook_bed_y_at(x, forest_brook_distance(x, z))
   }
 
+  // The gentle mounds of the forest floor (ground.flecs): flattened spheres rx by ry by rz,
+  // turned by their yaw, their middle 0.55 ry below the floor, so they rise 0.45 ry above it.
+  // A mound is only placed away from the clearing, the brook and the path
+  export const MOUND_COUNT: i32 = 48
+
+  fn forest_mound_x(i: f64) -> f64 {
+    (forest_hash(i, 1) * 2 - 1) * (WORLD_HALF - 8)
+  }
+
+  fn forest_mound_z(i: f64) -> f64 {
+    (forest_hash(i, 2) * 2 - 1) * (WORLD_HALF - 8)
+  }
+
+  fn forest_mound_rx(i: f64) -> f64 {
+    2.5 + forest_hash(i, 3) * 3.5
+  }
+
+  fn forest_mound_rz(i: f64) -> f64 {
+    forest_mound_rx(i) * (0.7 + forest_hash(i, 4) * 0.5)
+  }
+
+  fn forest_mound_ry(i: f64) -> f64 {
+    0.45 + forest_hash(i, 5) * 0.55
+  }
+
+  fn forest_mound_yaw(i: f64) -> f64 {
+    forest_hash(i, 6) * 6.28
+  }
+
+  fn forest_mound_placed(i: f64) -> bool {
+    const x = forest_mound_x(i)
+    const z = forest_mound_z(i)
+    const rx = forest_mound_rx(i)
+    forest_clearing_distance(x, z) > rx + 2 && forest_free(x, z, rx + 1)
+  }
+
   // Where the footpath crosses the brook: the path and the brook centerlines, each nearly
   // straight there, met by alternating between them
   export const CROSSING_X: f32 = forest_path_x(forest_brook_z(forest_path_x(forest_brook_z(

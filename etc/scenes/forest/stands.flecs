@@ -54,15 +54,21 @@ state {
     (x - px) * (x - px) + (z - pz) * (z - pz) < r * r
   }
 
+  // Within r of the room the landmark snags and the boulders of ground.flecs take
+  fn forest_landmark_near(x: f64, z: f64, r: f64) -> bool {
+    const boulders = forest_near(x, z, -13, 3, 2.5 + r) || forest_near(x, z, 16, 10, 3.5 + r) ||
+      forest_near(x, z, -20, -20, 3 + r) || forest_near(x, z, 24, -24, 2.8 + r) ||
+      forest_near(x, z, -30, 14, 3.2 + r) || forest_near(x, z, 34, 18, 2.8 + r) ||
+      forest_near(x, z, -1, -11.5, 1.5 + r) || forest_near(x, z, 10, 1, 0.9 + r)
+    const snags = forest_near(x, z, SNAG_A_X, SNAG_A_Z, 4 + r) || forest_near(x, z, SNAG_B_X, SNAG_B_Z, 4 + r) ||
+      forest_near(x, z, SNAG_B_X + 4, SNAG_B_Z - 3, 3.5 + r)
+    boulders || snags
+  }
+
   // A tree of radius r at (x, z) stays out of the clearing, the brook bed and the path, and
   // clear of the landmark snags and the boulders of ground.flecs
   fn forest_tree_clear(x: f64, z: f64, r: f64) -> bool {
-    const boulders = forest_near(x, z, -13, 3, 2.5) || forest_near(x, z, 16, 10, 3.5) ||
-      forest_near(x, z, -20, -20, 3) || forest_near(x, z, 24, -24, 2.8) ||
-      forest_near(x, z, -30, 14, 3.2) || forest_near(x, z, 34, 18, 2.8)
-    const snags = forest_near(x, z, SNAG_A_X, SNAG_A_Z, 4) || forest_near(x, z, SNAG_B_X, SNAG_B_Z, 4) ||
-      forest_near(x, z, SNAG_B_X + 4, SNAG_B_Z - 3, 3.5)
-    forest_clearing_distance(x, z) > r + 1 && forest_free(x, z, r) && !boulders && !snags
+    forest_clearing_distance(x, z) > r + 1 && forest_free(x, z, r) && !forest_landmark_near(x, z, 0)
   }
 
   // Within r of the spot of the mature tree in the grid cell of (x, z)

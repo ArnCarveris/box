@@ -152,18 +152,16 @@ forest {
 
     // Gentle mounds in the forest, flattened spheres mostly under the floor, away from the
     // clearing, brook and path
-    for i in 0..48 {
-      const x = (forest_hash(i, 1) * 2 - 1) * (WORLD_HALF - 8)
-      const z = (forest_hash(i, 2) * 2 - 1) * (WORLD_HALF - 8)
-      const rx = 2.5 + forest_hash(i, 3) * 3.5
-      const rz = rx * (0.7 + forest_hash(i, 4) * 0.5)
-      const ry = 0.45 + forest_hash(i, 5) * 0.55
+    for i in 0..MOUND_COUNT {
+      const x = forest_mound_x(i)
+      const z = forest_mound_z(i)
+      const rx = forest_mound_rx(i)
 
-      if forest_clearing_distance(x, z) > rx + 2 && forest_free(x, z, rx + 1) {
+      if forest_mound_placed(i) {
         "mound_{i}" : ForestFloor {
-          Position: {x, 0 - ry * 0.55, z}
-          Rotation: {0, forest_hash(i, 6) * 6.28, 0}
-          Scale: {rx, ry, rz}
+          Position: {x, 0 - forest_mound_ry(i) * 0.55, z}
+          Rotation: {0, forest_mound_yaw(i), 0}
+          Scale: {rx, forest_mound_ry(i), forest_mound_rz(i)}
           IcoSphere: {radius: 1, segments: 3, smooth: true}
         }
       }
