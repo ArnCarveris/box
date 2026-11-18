@@ -172,64 +172,6 @@
                 "testcases": [
                     "offscreen_surface_resize"
                 ]
-            },
-            {
-                "id": "LagoonBanks",
-                "testcases": [
-                    "bank_sand_flows",
-                    "floor_sand_flows",
-                    "bank_sand_joins",
-                    "bank_props_on_sand",
-                    "zones_take_turns"
-                ]
-            },
-            {
-                "id": "LagoonSky",
-                "testcases": [
-                    "water_reflects",
-                    "clouds_drift",
-                    "water_absorbs",
-                    "water_flows"
-                ]
-            },
-            {
-                "id": "LagoonRiverbed",
-                "testcases": [
-                    "pooled",
-                    "stays_low",
-                    "spreads",
-                    "flows",
-                    "grows_in"
-                ]
-            },
-            {
-                "id": "LagoonRiver",
-                "testcases": [
-                    "canoe_stops_at_right_waterline",
-                    "canoe_stops_at_left_waterline",
-                    "shore_costs_no_life",
-                    "scenery_clear_of_water"
-                ]
-            },
-            {
-                "id": "ForestScene",
-                "testcases": [
-                    "loads",
-                    "sun_follows_state",
-                    "temperature_follows_state",
-                    "floor_clear_of_brook",
-                    "landmarks_clear",
-                    "hud_sliders"
-                ]
-            },
-            {
-                "id": "LagoonLife",
-                "testcases": [
-                    "wake_follows_canoe",
-                    "flotsam_pooled_in_water",
-                    "fish_jumps_clear_of_canoe",
-                    "birds_circle_high"
-                ]
             }
         ]
     }

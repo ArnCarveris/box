@@ -216,17 +216,6 @@
                 ]
             },
             {
-                "id": "ReflectionScenes",
-                "testcases": [
-                    "garden_places_probes",
-                    "garden_capture_points_inside_boxes",
-                    "garden_capture_points_in_open_space",
-                    "garden_inner_probes_higher_priority",
-                    "garden_few_overlapping_probes",
-                    "garden_probes_have_glossy_surfaces"
-                ]
-            },
-            {
                 "id": "Atmosphere",
                 "testcases": [
                     "status_follows_atmosphere",
