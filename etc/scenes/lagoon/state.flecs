@@ -4,6 +4,13 @@ using flecs.script.math
 state {
   export const HALF_PI: f32 = 1.5707963
 
+  // The main swell of the lagoon water (the first wave of the WaterWaves of LgWater): it runs up
+  // the lagoon (-Z) with SWELL_LEN between crests at about its deep water speed SWELL_SPEED, so
+  // the canoe paddling up the lagoon overtakes it. SWELL_K is its wavenumber
+  export const SWELL_LEN: f32 = 11
+  export const SWELL_SPEED: f32 = 4.1
+  export const SWELL_K: f32 = 2 * PI / SWELL_LEN
+
   // The banks: the bank line is at X ±BANK_X. The wet beach of a bank rises from the waterline,
   // BANK_WATER_U from the bank line (toward the bank is +U), at BANK_SLOPE radians up to the dry
   // beach at BEACH_Y, where the palms, bushes and flowers stand
@@ -185,6 +192,9 @@ state {
 
   export mut game_state: i32 = GS_PLAYING
   export mut clock: f64 = 0
+  // Phase of the swell at Z = 0 as the canoe meets it, 0..2 pi: the swell lifts the water at Z
+  // by sin(-SWELL_K z - swell_phase). It grows by SWELL_K (SWELL_SPEED - flow) a second
+  export mut swell_phase: f64 = 0
   export mut dt: f32 = 0.016
   export mut distance: f64 = 0
   export mut speed: f32 = START_SPEED

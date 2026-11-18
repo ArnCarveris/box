@@ -8,7 +8,7 @@ assets {
   lg_wave_h { Gen: {width: 256, height: 256, seed: 31, layers: [
     {kind: GenNoise, frequency: 6, octaves: 4, amount: 1}
   ]} }
-  lg_wave_n { Gen: {source: lg_wave_h, output: GenNormal, strength: 1.4} }
+  lg_wave_n { Gen: {source: lg_wave_h, output: GenNormal, strength: 1.1} }
 
   // Heights of the soft cumulus of the sky, read by the CloudLayers of world.flecs
   lg_cloud_h { Gen: {width: 512, height: 512, seed: 23, layers: [
@@ -151,6 +151,10 @@ assets {
   // Turquoise lagoon water over the sand floor: clear by the canoe and in the shallows, the sand
   // turns turquoise and then blue-green with depth and distance (absorption over visibility).
   // play.flecs scrolls the waves toward the camera with the world
+  //
+  // A light breeze over a sheltered lagoon: a long low swell runs up the lagoon, two shorter wind
+  // waves cross it at angles and a faint ripple runs down it. The normal map adds the fine chop.
+  // play.flecs carries them past the canoe with a WaterFlow at the speed of the world
   prefab LgWater {
     Rgb: {255, 255, 255}
     PbrMaterial: {roughness: 0.04}
@@ -169,6 +173,16 @@ assets {
     PbrTextures: {normal: lg_wave_n}
     texture.Mapping: {mode: MappingWorld, size: 7}
     texture.Scroll: {velocity: {0.008, 0.03}}
+    WaterWaves: {
+      waves: [
+        {direction: {0, -1}, wavelength: SWELL_LEN, amplitude: 0.08, steepness: 0.25,
+          speed: SWELL_SPEED},
+        {direction: {0.8, -0.6}, wavelength: 3.2, amplitude: 0.045, steepness: 0.35},
+        {direction: {-0.55, -0.85}, wavelength: 2.1, amplitude: 0.026, steepness: 0.3},
+        {direction: {0.3, 0.95}, wavelength: 1.6, amplitude: 0.012, steepness: 0.2}
+      ]
+      detail: 0.45
+    }
   }
 
   prefab LgSandDry {

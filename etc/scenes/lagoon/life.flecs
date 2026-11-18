@@ -316,7 +316,8 @@ assets {
 
 // Flowers, palm leaves and foam patches drifting on the water with the world. Pooled: each slot
 // wraps back up the lagoon and is placed anew. Flat and small, in colors no hazard or coconut has.
-// They bob and turn with the distance they drifted, not the clock, so they update once a frame
+// They bob on the swell (swell_phase) and turn with the distance they drifted, not the clock, so
+// they update once a frame
 flotsam {
   for i in 0..FLOTSAM {
     const base = (i + 0.1 + 0.8 * hash(SEED_LIFE + i * 5 + 1)) * LF_SPAN / FLOTSAM
@@ -325,7 +326,7 @@ flotsam {
     const x = (WATER_HALF - LF_MARGIN) * (2 * hash(i * 5.17 + c * 11.3 + 9) - 1)
     const g = lf_fade(z)
     "drift_{i}" {
-      Position: {x, 0.025 + 0.012 * sin(z * 0.15 + i * 1.9), z}
+      Position: {x, 0.025 + 0.012 * sin(0 - z * SWELL_K - swell_phase), z}
       Rotation: {0, 6.28 * hash(i * 13 + c) + 0.15 * sin(z * 0.05 + i), 0}
       Scale: {LF_SIZE * g, LF_SIZE * g, LF_SIZE * g}
 

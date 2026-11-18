@@ -82,6 +82,9 @@ lagoon {
   water {
     texture.Scroll: {velocity: {0 - water_flow / WATER_MAP, 0.03}}
     texture.Transform: {scale_x: 1, scale_y: 1, offset_x: water_shift, offset_y: 0}
+    // The WaterWaves travel in the frame of the water, which flows toward the camera (+Z) with
+    // the banks and the riverbed
+    WaterFlow: {velocity: {0, water_flow}}
   }
 }
 
@@ -204,6 +207,10 @@ async {
       water_shift = wrap2(water_shift + (flow - water_flow) / WATER_MAP * water_t)
       water_flow = flow
     }
+
+    // The canoe and the flotsam bob on the swell as it passes at the speed of the water
+    swell_phase += d * SWELL_K * (SWELL_SPEED - water_flow)
+    swell_phase -= 2 * PI * floor(swell_phase / (2 * PI))
   }
 }
 
