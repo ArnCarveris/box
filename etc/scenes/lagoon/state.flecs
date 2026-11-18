@@ -190,6 +190,9 @@ state {
     b ? 1 : 0
   }
 
+  // A restart turns the WaterRipples off for this many frames
+  export const WAKE_CALM_FRAMES: i32 = 2
+
   export mut game_state: i32 = GS_PLAYING
   export mut clock: f64 = 0
   // Phase of the swell at Z = 0 as the canoe meets it, 0..2 pi: the swell lifts the water at Z
@@ -209,6 +212,9 @@ state {
   export mut coconuts: i32 = 0
   export mut invulnerable: f32 = 0
   export mut capsize: f32 = 0
+  // Frames the WaterRipples of the water are off for, so a restart drops the field and starts
+  // with calm water (wake.flecs)
+  export mut wake_calm: i32 = 0
 
   export mut rocks: LgItem[ROCKS] = {}
   export mut logs: LgItem[ROWS_LIVE * LOGS_PER_ROW] = {}
@@ -310,6 +316,7 @@ state {
     coconuts = 0
     invulnerable = 0
     capsize = 0
+    wake_calm = WAKE_CALM_FRAMES
     next_row = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
     rows = 0
     last_move = 0

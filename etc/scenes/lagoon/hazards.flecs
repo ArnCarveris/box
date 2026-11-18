@@ -606,6 +606,8 @@ async {
             lives -= 1
             invulnerable = INVULNERABLE_TIME
             const b = box.particle.burst_at(assets.LgSplash, {rocks[i].x, 0.3, wz}, 1)
+            const r = box.material.ripple_at(lagoon.water, {rocks[i].x, 0, wz}, RING_HIT_R,
+              RING_HIT)
 
             if lives <= 0 {
               game_state = GS_OVER
@@ -628,6 +630,8 @@ async {
             lives -= 1
             invulnerable = INVULNERABLE_TIME
             const b = box.particle.burst_at(assets.LgSplash, {logs[i].x, 0.3, wz}, 1)
+            const r = box.material.ripple_at(lagoon.water, {logs[i].x, 0, wz}, RING_HIT_R,
+              RING_HIT)
 
             if lives <= 0 {
               game_state = GS_OVER
@@ -647,6 +651,8 @@ async {
             nuts[i].live = false
             coconuts += 1
             const b = box.particle.burst_at(assets.LgSparkle, {nuts[i].x, 0.5, wz}, 1)
+            const r = box.material.ripple_at(lagoon.water, {nuts[i].x, 0, wz}, RING_NUT_R,
+              RING_NUT)
           }
         }
       }
@@ -655,6 +661,12 @@ async {
         invulnerable = 0
         const b = box.particle.burst_at(assets.LgSplash, {canoe_x, 0.4, CANOE_Z}, 2.6)
         const c = box.particle.burst_at(assets.LgSplash, {canoe_x + FLOAT_X, 0.3, CANOE_Z + 1}, 1.6)
+        const r = box.material.ripple_at(lagoon.water, {canoe_x, 0, CANOE_Z}, RING_CAPSIZE_R,
+          RING_CAPSIZE)
+        const q = box.material.ripple_at(lagoon.water, {canoe_x + FLOAT_X, 0, CANOE_Z + 1},
+          RING_FISH_R, RING_FISH)
+        const f = box.material.foam_at(lagoon.water, {canoe_x, 0, CANOE_Z}, RING_CAPSIZE_R,
+          CAPSIZE_FOAM)
       }
     }
   }

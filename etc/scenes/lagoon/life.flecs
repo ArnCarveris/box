@@ -400,6 +400,9 @@ async {
         const b = box.particle.burst_at(assets.LgFishSplash, {
           fish_x - sin(fish_yaw) * s, 0.05, fish_z + distance - cos(fish_yaw) * s
         }, 1)
+        const r = box.material.ripple_at(lagoon.water, {
+          fish_x - sin(fish_yaw) * s, 0, fish_z + distance - cos(fish_yaw) * s
+        }, RING_FISH_R, RING_FISH)
       }
     } else if game_state == GS_PLAYING {
       wait -= dt
@@ -424,6 +427,8 @@ async {
           const s = FISH_LEAP * 0.5
           const b = box.particle.burst_at(assets.LgFishSplash,
             {x + sin(yaw) * s, 0.05, wz + cos(yaw) * s}, 1)
+          const r = box.material.ripple_at(lagoon.water,
+            {x + sin(yaw) * s, 0, wz + cos(yaw) * s}, RING_FISH_R, RING_FISH)
         }
       }
     }

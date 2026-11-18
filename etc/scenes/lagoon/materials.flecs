@@ -10,6 +10,12 @@ assets {
   ]} }
   lg_wave_n { Gen: {source: lg_wave_h, output: GenNormal, strength: 1.1} }
 
+  // Breaks the foam of the water (the shore band and the wake) up into lacy patches
+  lg_foam_m { Gen: {width: 256, height: 256, seed: 41, layers: [
+    {kind: GenNoise, frequency: 8, octaves: 3, amount: 0.7}
+    {kind: GenNoise, frequency: 32, octaves: 2, amount: 0.3, seed: 3}
+  ]} }
+
   // Heights of the soft cumulus of the sky, read by the CloudLayers of world.flecs
   lg_cloud_h { Gen: {width: 512, height: 512, seed: 23, layers: [
     {kind: GenNoise, frequency: 6, octaves: 5, gain: 0.5}
@@ -167,6 +173,8 @@ assets {
       refraction: 0.012,
       foam_color: {240, 250, 248},
       foam_width: 0.18,
+      foam_texture: lg_foam_m,
+      foam_scale: 2,
       ripple_scale: 2.1,
       ripple_velocity: {0.015, 0.024}
     }

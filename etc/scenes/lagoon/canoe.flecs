@@ -65,6 +65,18 @@ canoe {
     Capsule: {length: 3.4, radius: 0.13, segments: 12, smooth: true}
   }
 
+  // The hull and the float push the water aside as it flows past and leave a foaming wake in the
+  // WaterRipples of the water (wake.flecs)
+  wake_hull {
+    Position: {0, 0, 0}
+    RippleSource: {extents: {0.4, 3.1}, strength: 1.6, foam: 0.15}
+  }
+
+  wake_float {
+    Position: {-2.45, 0, 0.1}
+    RippleSource: {extents: {0.15, 1.8}, strength: 0.8, foam: 0.25}
+  }
+
   // The paddler sits behind the middle, facing the bow
   paddler {
     Position: {0, 0.3, 0.8}
