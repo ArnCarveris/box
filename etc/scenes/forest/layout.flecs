@@ -11,7 +11,8 @@ using state
 //
 // The ground is at Y = 0 in the clearing and close to it in the forest, where gentle mounds rise
 // a little; particles collide with the plane Y = 0. The brook bed is cut below 0
-// (forest_brook_bed_y); its water is at BROOK_WATER_Y.
+// (forest_brook_bed_y); its water is at forest_brook_water_y. The brook flows east (+X) and drops
+// CASCADE_DROP over a rock ledge at CASCADE_X: east of it its bed and water are that much lower.
 //
 // The layout mask of the forest floor (materials.flecs) evaluates the same curves on the GPU,
 // from the same constants, so the path and the pebbles of the floor line up with these
@@ -56,6 +57,21 @@ state {
   export const BROOK_RIM_Y: f32 = 0.01
   // The forest floor stays FLOOR_GAP along Z clear of the centerline (ground.flecs)
   export const FLOOR_GAP: f32 = 3
+
+  // The cascade: at CASCADE_X the brook drops CASCADE_DROP over a rock ledge, downstream of it
+  // the bed and the water are that much lower (forest_brook_drop). Above it the brook widens
+  // into a calm pool from POOL_X0 to the ledge, which the footpath crosses on a footbridge;
+  // a second calm reach runs from CALM_X0 to CALM_X1 downstream (brook.flecs)
+  export const CASCADE_X: f32 = 8
+  export const CASCADE_DROP: f32 = 0.45
+  export const POOL_X0: f32 = -4
+  export const CALM_X0: f32 = 16
+  export const CALM_X1: f32 = 28
+
+  // The footbridge spans BRIDGE_HALF_SPAN along the path to either side of the crossing, over
+  // the banks, and is BRIDGE_HALF_WIDTH wide to either side of the path
+  export const BRIDGE_HALF_SPAN: f32 = 3.5
+  export const BRIDGE_HALF_WIDTH: f32 = 0.65
 
   // The footpath: its centerline is at x = forest_path_x(z), PATH_X plus two sines; the worn
   // ground is PATH_HALF_WIDTH to either side
@@ -115,14 +131,35 @@ state {
     z >= forest_brook_z(x) ? 1 : -1
   }
 
-  // Height of the brook bed at a distance from its centerline, 0 past BROOK_BANK, as the slabs of
-  // the bed in ground.flecs
-  fn forest_brook_bed_y(d: f64) -> f64 {
+  // How much lower the bed and the water of the brook are at x than above the cascade
+  fn forest_brook_drop(x: f64) -> f64 {
+    x >= CASCADE_X ? CASCADE_DROP : 0
+  }
+
+  // Height of the water of the brook at x
+  fn forest_brook_water_y(x: f64) -> f64 {
+    BROOK_WATER_Y - forest_brook_drop(x)
+  }
+
+  // Height of the brook bed at a distance from its centerline where it is drop lower than above
+  // the cascade, 0 past BROOK_BANK, as the slabs of the bed in ground.flecs: the bottom and the
+  // inner banks are drop lower, the outer banks rise from there to the floor
+  fn forest_brook_bed_y_drop(d: f64, drop: f64) -> f64 {
     const a = abs(d)
     a >= BROOK_BANK ? 0 : (
-      a >= BROOK_STEP ? forest_lerp(BROOK_STEP_Y, 0, (a - BROOK_STEP) / (BROOK_BANK - BROOK_STEP)) : (
-      a >= BROOK_BED_HALF ? forest_lerp(BROOK_BED_Y, BROOK_STEP_Y, (a - BROOK_BED_HALF) / (BROOK_STEP - BROOK_BED_HALF)) :
-      BROOK_BED_Y))
+      a >= BROOK_STEP ? forest_lerp(BROOK_STEP_Y - drop, 0, (a - BROOK_STEP) / (BROOK_BANK - BROOK_STEP)) : (
+      a >= BROOK_BED_HALF ? forest_lerp(BROOK_BED_Y, BROOK_STEP_Y, (a - BROOK_BED_HALF) / (BROOK_STEP - BROOK_BED_HALF)) - drop :
+      BROOK_BED_Y - drop))
+  }
+
+  // Height of the brook bed above the cascade at a distance from its centerline
+  fn forest_brook_bed_y(d: f64) -> f64 {
+    forest_brook_bed_y_drop(d, 0)
+  }
+
+  // Height of the brook bed at x at a distance d from its centerline
+  fn forest_brook_bed_y_at(x: f64, d: f64) -> f64 {
+    forest_brook_bed_y_drop(d, forest_brook_drop(x))
   }
 
   // X of the path centerline at z
@@ -175,6 +212,12 @@ state {
   // Height of the ground at (x, z): 0, or the brook bed. The mounds of ground.flecs rise up to
   // half a meter above it in the forest, away from the clearing, brook and path
   fn forest_ground_y(x: f64, z: f64) -> f64 {
-    forest_brook_bed_y(forest_brook_distance(x, z))
+    forest_brook_bed_y_at(x, forest_brook_distance(x, z))
   }
+
+  // Where the footpath crosses the brook: the path and the brook centerlines, each nearly
+  // straight there, met by alternating between them
+  export const CROSSING_X: f32 = forest_path_x(forest_brook_z(forest_path_x(forest_brook_z(
+    forest_path_x(forest_brook_z(PATH_X))))))
+  export const CROSSING_Z: f32 = forest_brook_z(CROSSING_X)
 }
