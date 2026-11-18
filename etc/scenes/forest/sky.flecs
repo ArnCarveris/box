@@ -29,9 +29,10 @@ state {
   export const CLOUD_SIZE: f32 = 5000
   export const CLOUD_ALTITUDE: f32 = 1800
 
-  // Coverage threshold of the cumulus layer: lower is more cloud
-  fn forest_cloud_threshold(p: f64) -> f64 {
-    0.62 - 0.34 * p
+  // Coverage threshold of the cumulus layer: lower is more cloud, fair weather cumulus in
+  // summer, more cloud in autumn and winter
+  fn forest_cloud_threshold(season: f64, p: f64) -> f64 {
+    forest_seasonal(season, 0.6, 0.63, 0.57, 0.56) - 0.34 * p
   }
 
   // Cloud drift in m/s along X and Z for a wind
@@ -42,6 +43,52 @@ state {
   fn forest_cloud_drift_z(w: f64) -> f64 {
     1 + w * 0.9
   }
+
+  // Velocity of the cumulus and of the cookie on the sun that casts their shadows in m/s along X
+  // and Z: the wind drives it (ForestWind), kept up to date by atmosphere.flecs
+  export mut cloud_velocity_x: f32 = forest_cloud_drift_x(START_WIND)
+  export mut cloud_velocity_z: f32 = forest_cloud_drift_z(START_WIND)
+
+  // Declination of the sun in degrees in a season (0 at the equinoxes, see forest_day_of_year)
+  fn forest_sun_declination(season: f64) -> f64 {
+    23.44 * sin(forest_season_wrap(season) * PI / 2)
+  }
+
+  // Elevation of the sun in degrees above the horizon at a season and hour, as TimeOfDay sets it
+  fn forest_sun_elevation(season: f64, hour: f64) -> f64 {
+    const d = forest_sun_declination(season) * PI / 180
+    const l = LATITUDE * PI / 180
+    const h = (hour - 12) * PI / 12
+    asin(sin(l) * sin(d) + cos(l) * cos(d) * cos(h)) * 180 / PI
+  }
+
+  // Hour of sunrise and of sunset in a season
+  fn forest_sunrise(season: f64) -> f64 {
+    const d = forest_sun_declination(season) * PI / 180
+    const l = LATITUDE * PI / 180
+    12 - acos(clamp(0 - tan(l) * tan(d), -1, 1)) * 12 / PI
+  }
+
+  fn forest_sunset(season: f64) -> f64 {
+    24 - forest_sunrise(season)
+  }
+
+  // How much the sun lights the air, 0..1: none below the horizon, all of it in the low sun,
+  // a little at its highest
+  fn forest_beam(season: f64, hour: f64) -> f64 {
+    const e = forest_sun_elevation(season, hour)
+    forest_smooth(-1, 4, e) * (0.12 + 0.88 * (1 - forest_smooth(14, 44, e)))
+  }
+
+  // Daylight, 0..1: 0 at night, 1 from just after sunrise to just before sunset
+  fn forest_daylight(season: f64, hour: f64) -> f64 {
+    forest_smooth(-6, 3, forest_sun_elevation(season, hour))
+  }
+
+  // The haze the low sun lights, 0.55 at a high sun to 1 at a low one, for the HeightFog
+  fn forest_haze(season: f64, hour: f64) -> f64 {
+    0.55 + 0.45 * (1 - forest_smooth(15, 45, forest_sun_elevation(season, hour)))
+  }
 }
 
 sun {
@@ -51,10 +98,10 @@ sun {
     texture: forest_clouds,
     size: CLOUD_SIZE,
     height: CLOUD_ALTITUDE,
-    threshold: forest_cloud_threshold(precipitation),
+    threshold: forest_cloud_threshold(season, precipitation),
     softness: 0.14,
     strength: 0.4 + 0.3 * precipitation,
-    velocity: {forest_cloud_drift_x(wind), forest_cloud_drift_z(wind)}
+    velocity: {cloud_velocity_x, cloud_velocity_z}
   }
 }
 
@@ -94,7 +141,8 @@ sky {
     moon: moon
   }
   HeightFog: {
-    density: forest_seasonal(season, 0.0035, 0.003, 0.0055, 0.0045) + 0.014 * precipitation,
+    density: forest_seasonal(season, 0.0035, 0.003, 0.0055, 0.0045) * forest_haze(season, hour) +
+      0.014 * precipitation,
     falloff: forest_seasonal(season, 0.09, 0.09, 0.1, 0.1),
     base_height: 0,
     max_opacity: forest_seasonal(season, 0.4, 0.38, 0.46, 0.44) + 0.3 * precipitation,
@@ -107,10 +155,10 @@ cloud_low {
     texture: forest_clouds,
     size: CLOUD_SIZE,
     altitude: CLOUD_ALTITUDE,
-    threshold: forest_cloud_threshold(precipitation),
+    threshold: forest_cloud_threshold(season, precipitation),
     softness: 0.14,
     density: 0.85 + 0.15 * precipitation,
-    velocity: {forest_cloud_drift_x(wind), forest_cloud_drift_z(wind)}
+    velocity: {cloud_velocity_x, cloud_velocity_z}
   }
 }
 
@@ -123,7 +171,7 @@ cloud_high {
     softness: 0.18,
     density: 0.45,
     offset: {900, 400},
-    velocity: {forest_cloud_drift_x(wind) * 2, 2}
+    velocity: {cloud_velocity_x * 2, 2}
   }
 }
 
