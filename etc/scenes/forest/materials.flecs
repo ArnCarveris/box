@@ -381,9 +381,13 @@ assets {
     }
   }
 
-  // Canopy seen from afar, for the backdrop tree line and the hills: clumps of dark foliage
+  // Canopy seen from afar, for the backdrop tree line and the hills: clumps of dark foliage.
+  // The leaf variant is light gray, so the Rgb of a broadleaf prefab gives it the color of its
+  // season, with the clumps as alpha (0.3 in the gaps to 1 on the tops), so an AlphaCutoff thins
+  // it clump by clump
   template ForestCanopyMap {
     prop map: i32 = 0
+    prop leaf: bool = false
 
     clumps { nodes.Noise: {frequency: 16, octaves: 4, fractal: NoiseBillow, seed: 81} }
     crowns_c { nodes.Cells: {distance: CellsNearest, count: 300, seed: 82} }
@@ -393,13 +397,28 @@ assets {
 
     if map == MAP_ALBEDO {
       tint { nodes.Noise: {frequency: 4, octaves: 2, seed: 83} }
-      leaves {
-        nodes.Ramp: {input: height, keys: [{0.2, {12, 20, 10}}, {0.5, {30, 48, 20}}, {0.8, {62, 82, 34}}]}
-      }
-
       warm { nodes.Ramp: {input: tint, keys: [{0.35, {230, 255, 236}}, {0.65, {255, 244, 214}}]} }
-      color { nodes.Multiply: {a: leaves, b: warm} }
-      Graph: {output: color, width: 512}
+
+      if leaf {
+        leaves {
+          nodes.Ramp: {input: height, keys: [{0.2, {50, 50, 50}}, {0.5, {120, 120, 120}}, {0.8, {204, 204, 204}}]}
+        }
+
+        warmed { nodes.Multiply: {a: leaves, b: warm} }
+        r { nodes.Split: {input: warmed, channel: ChannelR} }
+        g { nodes.Split: {input: warmed, channel: ChannelG} }
+        b { nodes.Split: {input: warmed, channel: ChannelB} }
+        a { nodes.Remap: {input: height, from_min: 0.25, from_max: 0.8, to_min: 0.3, to_max: 1, clamp: true} }
+        color { nodes.Combine: {r: r, g: g, b: b, a: a} }
+        Graph: {output: color, width: 512}
+      } else {
+        leaves {
+          nodes.Ramp: {input: height, keys: [{0.2, {12, 20, 10}}, {0.5, {30, 48, 20}}, {0.8, {62, 82, 34}}]}
+        }
+
+        color { nodes.Multiply: {a: leaves, b: warm} }
+        Graph: {output: color, width: 512}
+      }
     } else {
       bumps { nodes.Normal: {height: height, strength: 4} }
       Graph: {output: bumps, width: 512, format: GraphLinear}
@@ -428,6 +447,7 @@ assets {
   ForestRockMap rock_orm(map: MAP_ORM)
   ForestCanopyMap canopy_albedo(map: MAP_ALBEDO)
   ForestCanopyMap canopy_normal(map: MAP_NORMAL)
+  ForestCanopyMap canopy_leaf_albedo(map: MAP_ALBEDO, leaf: true)
 
   // Weights of the floor layers over the whole world: red moss, green litter, blue path, alpha
   // pebbles. With MappingWorld at WORLD_SIZE a top face samples it at u = z / WORLD_SIZE + 0.5,
@@ -581,6 +601,29 @@ assets {
     texture.Transform: {scale_x: 64, scale_y: 64}
   }
 
+  // Fallen leaves over the floors (their texture.Layers), in drifts that fill the hollows first:
+  // a few faded ones in spring and summer, a thick, fresh layer in autumn, sodden and dark in
+  // winter
+  forest_leaf_drifts {
+    n { nodes.Noise: {frequency: 3, octaves: 4, seed: 91} }
+    Graph: {output: n, width: 512, format: GraphSingle}
+  }
+
+  layer_fallen_leaves {
+    texture.Layer: {
+      amount: forest_seasonal(season, 0.1, 0.05, 0.4, 0.22),
+      mask: forest_leaf_drifts,
+      cavity: 0.25,
+      contrast: 8,
+      normal: 0.8
+    }
+    Rgb: {forest_seasonal(season, 196, 190, 255, 170), forest_seasonal(season, 186, 180, 222, 160), forest_seasonal(season, 176, 170, 186, 150)}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: litter_albedo, normal: litter_normal}
+    texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
+    texture.Transform: {scale_x: 24, scale_y: 24}
+  }
+
   // Layers of the boulders, over a MappingObject of 3 m
   layer_rock {
     PbrTextures: {albedo: rock_albedo, normal: rock_normal, orm: rock_orm}
@@ -594,7 +637,7 @@ assets {
 
   // The forest floor, the mounds on it and the brook bed
   prefab ForestFloor {
-    Rgb: {255, 255, 255}
+    Rgb: {forest_seasonal(season, 255, 255, 250, 226), forest_seasonal(season, 255, 255, 244, 216), forest_seasonal(season, 255, 255, 236, 204)}
     PbrMaterial: {roughness: 1}
     texture.Blend: {
       mask: forest_layout_mask,
@@ -602,6 +645,7 @@ assets {
       heights: [moss_height, litter_height, path_height, pebble_height],
       contrast: 12
     }
+    texture.Layers: {layers: [layer_fallen_leaves]}
     texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
   }
 
@@ -610,6 +654,7 @@ assets {
     Rgb: {200, 196, 190}
     PbrMaterial: {roughness: 1}
     PbrTextures: {albedo: litter_albedo, normal: litter_normal, orm: litter_orm}
+    texture.Layers: {layers: [layer_fallen_leaves]}
     texture.Transform: {scale_x: 24, scale_y: 24}
     texture.Mapping: {mode: MappingWorld, size: WORLD_SIZE}
   }
@@ -628,18 +673,20 @@ assets {
 
   // The backdrop tree line and the hills beyond the world: broadleaf crowns, the darker
   // understory below them, and spruces
+  // The broadleaf canopy follows the season: fresh, deep, copper and the gray brown of bare
+  // twigs in winter
   prefab ForestCanopyFar {
-    Rgb: {230, 240, 220}
+    Rgb: {forest_seasonal(season, 86, 70, 124, 80), forest_seasonal(season, 116, 96, 80, 70), forest_seasonal(season, 40, 37, 32, 66)}
     PbrMaterial: {roughness: 0.92}
-    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 14, blend: 0.5}
     NoShadow
   }
 
   prefab ForestUnderstoryFar {
-    Rgb: {120, 128, 110}
+    Rgb: {forest_seasonal(season, 42, 36, 54, 42), forest_seasonal(season, 58, 51, 40, 38), forest_seasonal(season, 20, 18, 18, 36)}
     PbrMaterial: {roughness: 0.95}
-    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 8, blend: 0.5}
     NoShadow
   }
@@ -653,9 +700,9 @@ assets {
   }
 
   prefab ForestHill {
-    Rgb: {196, 206, 200}
+    Rgb: {forest_seasonal(season, 66, 60, 86, 62), forest_seasonal(season, 90, 83, 74, 62), forest_seasonal(season, 34, 33, 34, 54)}
     PbrMaterial: {roughness: 0.95}
-    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 60, blend: 0.4}
     NoShadow
   }

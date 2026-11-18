@@ -269,7 +269,9 @@ static void box_bake_record(
  * @param table The table of the shape
  * @param e The shape
  * @param skip The flag to ignore, 0 for none
- * @return Whether the shape is static and baked as far as the other flags go
+ * @return Whether the shape is static and baked as far as the other flags go. The cheap NoBake
+ * test comes first: a prefab change reaches every instance that inherits it, and the instances
+ * of a NoBake prefab whose material changes all the time must stay cheap
  */
 static bool box_bake_captured_but(
     const ecs_world_t *world,
@@ -277,12 +279,13 @@ static bool box_bake_captured_but(
     ecs_entity_t e,
     ecs_id_t skip)
 {
-    bool dynamic = skip != DynamicTransform && box_transform_dynamic(world, table);
-    bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform) &&
-        !ecs_has(world, e, SurfaceAttachment);
     bool hidden = skip != NoBake && ecs_has_id(world, e, NoBake);
 
-    return !dynamic && !manual && !hidden && !box_projection_anchored(world, e);
+    return !hidden &&
+        (skip == DynamicTransform || !box_transform_dynamic(world, table)) &&
+        (skip == ManualTransform || !ecs_has_id(world, e, ManualTransform) ||
+            ecs_has(world, e, SurfaceAttachment)) &&
+        !box_projection_anchored(world, e);
 }
 
 /** Remember the static shapes whose captured look changed.

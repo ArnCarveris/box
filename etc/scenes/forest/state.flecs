@@ -85,6 +85,37 @@ state {
     d > 365 ? d - 365 : d
   }
 
+  // A value that follows the seasons: sp, su, au and wi in the middle of spring, summer, autumn
+  // and winter (season 0.5, 1.5, 2.5 and 3.5), eased between them and wrapping from winter to
+  // spring. The shared prefab materials, the sky and the grade read it
+  fn forest_seasonal(season: f64, sp: f64, su: f64, au: f64, wi: f64) -> f64 {
+    const w = forest_season_wrap(season - 0.5)
+    const k = floor(w)
+    const f = w - k
+    const ease = 0.5 - 0.5 * cos(f * PI)
+    const a = k < 0.5 ? sp : (k < 1.5 ? su : (k < 2.5 ? au : wi))
+    const b = k < 0.5 ? su : (k < 1.5 ? au : (k < 2.5 ? wi : sp))
+    a + (b - a) * ease
+  }
+
+  // The cutoffs of a broadleaf card (ForestLeafAlbedo): at LEAF_FULL all its leaves show, from
+  // LEAF_KEEP_MIN up they drop one by one, at LEAF_BARE none is left
+  export const LEAF_FULL: f32 = 0.3
+  export const LEAF_KEEP_MIN: f32 = 0.75
+  export const LEAF_BARE: f32 = 1.02
+
+  // The color of deciduous leaves through the year: sp, su and au in the middle of spring,
+  // summer and autumn, turning to dead toward winter. The leaves are gone in the middle of
+  // winter (forest_leaf_cutoff), and come out fresh: from there to spring they are sp
+  fn forest_foliage(season: f64, sp: f64, su: f64, au: f64, dead: f64) -> f64 {
+    const w = forest_season_wrap(season - 0.5)
+    const k = floor(w)
+    const ease = 0.5 - 0.5 * cos((w - k) * PI)
+    const a = k < 0.5 ? sp : (k < 1.5 ? su : (k < 2.5 ? au : sp))
+    const b = k < 0.5 ? su : (k < 1.5 ? au : (k < 2.5 ? dead : sp))
+    a + (b - a) * ease
+  }
+
   // Names the HUD shows
   fn forest_season_name(season: f64) -> string {
     const s = forest_season_wrap(season)

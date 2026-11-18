@@ -3,6 +3,7 @@ using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
+using box.light
 using box.texture
 using state
 using assets
@@ -14,8 +15,8 @@ using assets
 // a frond. Every level is data, not color: (coverage, veins, tone, height), the tone 0 on the
 // wood and varying leaf by leaf. From the data of a card an albedo graph makes a light, nearly
 // neutral detail with the coverage as alpha and a normal graph the normals. The color comes from
-// the Rgb of the leaf prefab, so the season task recolors every leaf of a species by changing
-// its prefab (the B prefabs inherit it). The card mesh has its origin at the stem of the card,
+// the Rgb of the leaf prefab, so the season recolors every leaf of a species by changing its
+// prefab (the B prefabs a little later). The card mesh has its origin at the stem of the card,
 // in the middle of its bottom edge.
 state {
   // Resolutions of a leaf, a twig, a spray and a card
@@ -23,6 +24,47 @@ state {
   export const TWIG_RES: i32 = 256
   export const SPRAY_RES: i32 = 512
   export const LEAF_RES: i32 = 1024
+
+  // The leaf colors of the broadleaf species (0, OAK, BIRCH) by channel: fresh lime
+  // in spring, deep green in summer, copper beech, russet oak and golden birch in autumn
+  fn forest_leaf_r(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_foliage(season, 138, 86, 190, 120) : (
+      species < 1.5 ? forest_foliage(season, 124, 66, 160, 112) : forest_foliage(season, 150, 104, 222, 156))
+  }
+
+  fn forest_leaf_g(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_foliage(season, 180, 126, 94, 74) : (
+      species < 1.5 ? forest_foliage(season, 164, 102, 106, 80) : forest_foliage(season, 188, 144, 176, 122))
+  }
+
+  fn forest_leaf_b(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_foliage(season, 58, 44, 26, 38) : (
+      species < 1.5 ? forest_foliage(season, 52, 36, 34, 42) : forest_foliage(season, 66, 50, 40, 58))
+  }
+
+  // The AlphaCutoff of the leaves of a species: thin while they come out in spring, full in
+  // summer, thinning in autumn (the birch first, the oak holds on longest), bare in winter
+  fn forest_leaf_cutoff(species: f64, season: f64) -> f64 {
+    species < 0.5 ? forest_seasonal(season, 0.6, LEAF_FULL, 0.78, LEAF_BARE) : (
+      species < 1.5 ? forest_seasonal(season, 0.7, LEAF_FULL, 0.7, LEAF_BARE) : forest_seasonal(season, 0.55, LEAF_FULL, 0.82, LEAF_BARE))
+  }
+
+  // The B clusters of a crown turn and drop a little later than the others, so an autumn crown
+  // is mottled
+  export const LEAF_LAG: f32 = 0.18
+
+  // The light through the leaves: green, golden in autumn
+  fn forest_leaf_glow_r(season: f64) -> f64 {
+    forest_seasonal(season, 226, 210, 255, 210)
+  }
+
+  fn forest_leaf_glow_g(season: f64) -> f64 {
+    forest_seasonal(season, 255, 255, 196, 200)
+  }
+
+  fn forest_leaf_glow_b(season: f64) -> f64 {
+    forest_seasonal(season, 150, 140, 110, 180)
+  }
 
   // Where a stamp of a pinnate map sits along its stem (0 at the foot): side stamp i of 9 from
   // start to end, and the tip stamp, i = 9
@@ -330,7 +372,10 @@ assets {
 
   // The albedo of a card from its data: light tones that vary leaf by leaf (lighter, darker
   // and yellower), lighter veins, darker toward the stem of the card where the leaves shade each
-  // other, and brown wood, with the coverage as alpha
+  // other, and brown wood, with the coverage as alpha. The alpha of a broadleaf card is scaled
+  // leaf by leaf from LEAF_KEEP_MIN to 1 by the tone, so an AlphaCutoff from LEAF_KEEP_MIN to
+  // LEAF_BARE (state.flecs) thins the leaves of a prefab one by one, the darker ones first, and LEAF_BARE
+  // hides them all
   template ForestLeafAlbedo {
     prop data: entity = 0
     prop needles: bool = false
@@ -377,7 +422,9 @@ assets {
       r { nodes.Split: {input: shaded, channel: ChannelR} }
       g { nodes.Split: {input: shaded, channel: ChannelG} }
       b { nodes.Split: {input: shaded, channel: ChannelB} }
-      color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+      keep { nodes.Remap: {input: tone, from_min: 0.15, from_max: 1, to_min: LEAF_KEEP_MIN, to_max: 1, clamp: true} }
+      alpha { nodes.Multiply: {a: cover, b: keep} }
+      color { nodes.Combine: {r: r, g: g, b: b, a: alpha} }
       Graph: {output: color, width: LEAF_RES}
     }
   }
@@ -587,42 +634,56 @@ assets {
     }
   }
 
-  // The leaves of each species. The season task recolors a species through the Rgb (or a Tint)
-  // of its first prefab; the B prefabs inherit it and only change the cluster
+  // The leaves of each species. The season recolors and thins a species through the Rgb,
+  // AlphaCutoff and DiffuseTransmission of its prefabs; the B prefabs lag behind a little. The
+  // prefabs the season changes are NoBake: the reflection probes would otherwise look up every
+  // card that inherits a changed material, every frame the slider moves
   prefab ForestLeafBeech : ForestCardTripleMesh {
-    Rgb: {98, 138, 50}
+    Rgb: {forest_leaf_r(0, season), forest_leaf_g(0, season), forest_leaf_b(0, season)}
     PbrMaterial: {roughness: 0.75}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.65, color: {226, 255, 150}}
+    AlphaCutoff: {forest_leaf_cutoff(0, season)}
+    DiffuseTransmission: {factor: 0.65, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+    NoBake
   }
 
   prefab ForestLeafBeechB : ForestLeafBeech {
+    Rgb: {forest_leaf_r(0, season - LEAF_LAG), forest_leaf_g(0, season - LEAF_LAG), forest_leaf_b(0, season - LEAF_LAG)}
+    AlphaCutoff: {forest_leaf_cutoff(0, season - LEAF_LAG)}
     PbrTextures: {albedo: leaf_beech_b_albedo, normal: leaf_beech_b_normal}
+    NoBake
   }
 
   prefab ForestLeafOak : ForestCardTripleMesh {
-    Rgb: {76, 112, 42}
+    Rgb: {forest_leaf_r(1, season), forest_leaf_g(1, season), forest_leaf_b(1, season)}
     PbrMaterial: {roughness: 0.8}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.5, color: {214, 255, 140}}
+    AlphaCutoff: {forest_leaf_cutoff(1, season)}
+    DiffuseTransmission: {factor: 0.5, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_oak_albedo, normal: leaf_oak_normal}
+    NoBake
   }
 
   prefab ForestLeafOakB : ForestLeafOak {
+    Rgb: {forest_leaf_r(1, season - LEAF_LAG), forest_leaf_g(1, season - LEAF_LAG), forest_leaf_b(1, season - LEAF_LAG)}
+    AlphaCutoff: {forest_leaf_cutoff(1, season - LEAF_LAG)}
     PbrTextures: {albedo: leaf_oak_b_albedo, normal: leaf_oak_b_normal}
+    NoBake
   }
 
   prefab ForestLeafBirch : ForestCardTripleMesh {
-    Rgb: {118, 156, 58}
+    Rgb: {forest_leaf_r(2, season), forest_leaf_g(2, season), forest_leaf_b(2, season)}
     PbrMaterial: {roughness: 0.72}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.7, color: {232, 255, 160}}
+    AlphaCutoff: {forest_leaf_cutoff(2, season)}
+    DiffuseTransmission: {factor: 0.7, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+    NoBake
   }
 
   prefab ForestLeafBirchB : ForestLeafBirch {
+    Rgb: {forest_leaf_r(2, season - LEAF_LAG), forest_leaf_g(2, season - LEAF_LAG), forest_leaf_b(2, season - LEAF_LAG)}
+    AlphaCutoff: {forest_leaf_cutoff(2, season - LEAF_LAG)}
     PbrTextures: {albedo: leaf_birch_b_albedo, normal: leaf_birch_b_normal}
+    NoBake
   }
 
   // The needles stay green all year

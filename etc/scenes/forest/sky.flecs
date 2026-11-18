@@ -12,7 +12,9 @@ using assets
 // season sets the day of the year, so the summer sun stands high and the winter sun low. North
 // is turned so that the late afternoon sun shines from ahead and to the right of the start view
 // (toward the brook, -Z), through the trees of the far bank. Precipitation thickens the clouds,
-// dims the sun and adds haze; the wind drives the clouds.
+// dims the sun and adds haze; the wind drives the clouds. The season tints the sun, the green
+// or brown of the ground the sky sees, the haze and the fog: clear in spring, a summer haze,
+// misty in autumn, cold and pale in winter.
 //
 // There is no light Bake: the sun moves with the sliders, and a bake converges only after the
 // sun rests (a turn of light_threshold rebakes every probe), so the ambient light comes from the
@@ -44,7 +46,7 @@ state {
 
 sun {
   DirectionalLight: {intensity: 2.8 * PI * (1 - 0.6 * precipitation)}
-  Rgb: {255, 250, 240}
+  Rgb: {255, forest_seasonal(season, 251, 249, 238, 248), forest_seasonal(season, 240, 236, 212, 252)}
   Cookie: {
     texture: forest_clouds,
     size: CLOUD_SIZE,
@@ -72,11 +74,11 @@ sky {
     mie: {
       scale_height: 1.2,
       anisotropy: 0.78,
-      scattering_scale: 1.4 + 2.5 * precipitation,
+      scattering_scale: forest_seasonal(season, 1.25, 1.45, 1.7, 1.15) + 2.5 * precipitation,
       tint: {255, 240, 222}
     },
     ozone_scale: 1,
-    ground_albedo: {60, 82, 48},
+    ground_albedo: {forest_seasonal(season, 62, 58, 92, 74), forest_seasonal(season, 88, 80, 72, 70), forest_seasonal(season, 46, 46, 40, 64)},
     night_intensity: 0.03,
     sun_disk_intensity: 6,
     sun_radius: 0.6,
@@ -92,10 +94,10 @@ sky {
     moon: moon
   }
   HeightFog: {
-    density: 0.003 + 0.014 * precipitation,
-    falloff: 0.09,
+    density: forest_seasonal(season, 0.0035, 0.003, 0.0055, 0.0045) + 0.014 * precipitation,
+    falloff: forest_seasonal(season, 0.09, 0.09, 0.1, 0.1),
     base_height: 0,
-    max_opacity: 0.4 + 0.3 * precipitation,
+    max_opacity: forest_seasonal(season, 0.4, 0.38, 0.46, 0.44) + 0.3 * precipitation,
     atmosphere: sky
   }
 }

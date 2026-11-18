@@ -3,6 +3,7 @@ using flecs.script.math
 using box.transform
 using box.geometry
 using box.material
+using box.light
 using box.texture
 using state
 using assets
@@ -16,8 +17,8 @@ using assets
 // backdrop.
 //
 // The materials of every kind are on shared prefabs (Rgb, textures, cutoff), and every instance
-// carries a ForestPlant with its kind and a seeded value, so the season task recolors a kind
-// through its prefab and thins it by the seed. The grass, flower and reed clumps have their origin
+// carries a ForestPlant with its kind and a seeded value. The season recolors and thins a kind
+// through its prefab. The grass, flower and reed clumps have their origin
 // on the ground at the foot of the clump, so the wind bends them by height.
 state {
   // An undergrowth instance: its kind (PLANT_*) and its seeded value, 0..1, by which the season
@@ -70,6 +71,18 @@ state {
   export const REED_D1: f32 = 2.3
   export const REED_STEP: f32 = 0.3
   export const REED_COUNT: i32 = 300
+
+  // The alpha of the flowers of a bloom tuft (ForestBloomAlbedo): an AlphaCutoff above it shows
+  // the tuft without its flowers
+  export const BLOOM_KEEP: f32 = 0.6
+
+  // Cutoffs of a flower kind through the year: in bloom, out of bloom, dying back in autumn and
+  // nearly gone in winter: 0 buttercups (yellow) from spring through summer, 1 wood anemones
+  // (white) in spring, 2 campanula (violet) in summer
+  fn forest_flower_cutoff(kind: f64, season: f64) -> f64 {
+    kind < 0.5 ? forest_seasonal(season, 0.34, 0.3, 0.68, 0.95) : (
+      kind < 1.5 ? forest_seasonal(season, 0.3, 0.68, 0.72, 0.95) : forest_seasonal(season, 0.68, 0.3, 0.64, 0.95))
+  }
 
   // Light on the floor at (x, z), 0..1: full in the clearing, fading over the first meters of the
   // forest, the gap of the canopy over the brook, and sunny patches in the forest
@@ -368,7 +381,10 @@ assets {
   }
 
   // The albedo of a tuft with flowers: greens by the tone, the petals (pr, pg, pb) and the eye
-  // (er, eg, eb), darker toward the foot, the coverage as alpha
+  // (er, eg, eb), darker toward the foot, the coverage as alpha. The alpha of the flowers is
+  // BLOOM_KEEP and that of the blades scaled from LEAF_KEEP_MIN to 1 by their tone, so an
+  // AlphaCutoff above BLOOM_KEEP leaves the tuft without flowers, and one from LEAF_KEEP_MIN to
+  // LEAF_BARE thins the blades too
   template ForestBloomAlbedo {
     prop data: entity = 0
     prop pr: f32 = 1
@@ -400,7 +416,11 @@ assets {
     r { nodes.Split: {input: petaled, channel: ChannelR} }
     g { nodes.Split: {input: petaled, channel: ChannelG} }
     b { nodes.Split: {input: petaled, channel: ChannelB} }
-    color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+    is_flower { nodes.Max: {a: is_eye, b: is_petal} }
+    blade_keep { nodes.Remap: {input: tone, from_min: 0.15, from_max: 1, to_min: LEAF_KEEP_MIN, to_max: 1, clamp: true} }
+    keep { nodes.Mix: {a: blade_keep, b_value: {BLOOM_KEEP, BLOOM_KEEP, BLOOM_KEEP, BLOOM_KEEP}, factor: is_flower} }
+    alpha { nodes.Multiply: {a: cover, b: keep} }
+    color { nodes.Combine: {r: r, g: g, b: b, a: alpha} }
     Graph: {output: color, width: LEAF_RES}
   }
 
@@ -449,7 +469,8 @@ assets {
   }
 
   // The albedo of the litter: browns from dark and old to fresh and orange by the tone, darker
-  // veins, the coverage as alpha
+  // veins, the coverage as alpha scaled leaf by leaf from LEAF_KEEP_MIN to 1 by the tone, so the
+  // AlphaCutoff of the litter prefab sets how many of its leaves lie on the floor
   template ForestLitterAlbedo {
     prop data: entity = 0
 
@@ -471,7 +492,9 @@ assets {
     r { nodes.Split: {input: veined, channel: ChannelR} }
     g { nodes.Split: {input: veined, channel: ChannelG} }
     b { nodes.Split: {input: veined, channel: ChannelB} }
-    color { nodes.Combine: {r: r, g: g, b: b, a: cover} }
+    keep { nodes.Remap: {input: tone, from_min: 0, from_max: 1, to_min: LEAF_KEEP_MIN, to_max: 1, clamp: true} }
+    alpha { nodes.Multiply: {a: cover, b: keep} }
+    color { nodes.Combine: {r: r, g: g, b: b, a: alpha} }
     Graph: {output: color, width: LEAF_RES}
   }
 
@@ -703,98 +726,118 @@ assets {
     }
   }
 
-  // The plants. The season task recolors a kind through the Rgb (or a Tint) of its first prefab;
-  // the sedge and the flower colors inherit theirs
+  // The plants. The season recolors and thins a kind through its prefab, the sedge inherits the
+  // grass: fresh in spring, deep in summer, straw, rust and brown in autumn and winter. Like the
+  // leaves (leaves.flecs) they are NoBake, so a season change doesn't touch every instance
   prefab ForestGrass : ForestClumpMesh {
-    Rgb: {112, 140, 60}
+    Rgb: {forest_seasonal(season, 118, 104, 150, 156), forest_seasonal(season, 158, 134, 138, 146), forest_seasonal(season, 58, 54, 70, 118)}
     PbrMaterial: {roughness: 0.8}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.6, color: {220, 255, 150}}
+    AlphaCutoff: {forest_seasonal(season, LEAF_FULL, LEAF_FULL, 0.5, 0.8)}
+    DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: grass_albedo, normal: grass_normal}
     NoShadow
+    NoBake
   }
 
   prefab ForestSedge : ForestGrass {
     PbrTextures: {albedo: sedge_albedo, normal: sedge_normal}
+    NoBake
   }
 
   prefab ForestFlower : ForestClumpMesh {
-    Rgb: {255, 255, 255}
+    Rgb: {forest_seasonal(season, 255, 240, 232, 204), forest_seasonal(season, 255, 242, 214, 182), forest_seasonal(season, 255, 230, 170, 140)}
     PbrMaterial: {roughness: 0.75}
-    AlphaCutoff: {0.4}
+    AlphaCutoff: {forest_flower_cutoff(0, season)}
     DiffuseTransmission: {factor: 0.5, color: {240, 255, 200}}
     PbrTextures: {albedo: bloom_yellow_albedo, normal: bloom_normal}
     NoShadow
+    NoBake
   }
 
   prefab ForestFlowerWhite : ForestFlower {
+    AlphaCutoff: {forest_flower_cutoff(1, season)}
     PbrTextures: {albedo: bloom_white_albedo, normal: bloom_normal}
+    NoBake
   }
 
   prefab ForestFlowerViolet : ForestFlower {
+    AlphaCutoff: {forest_flower_cutoff(2, season)}
     PbrTextures: {albedo: bloom_violet_albedo, normal: bloom_normal}
+    NoBake
   }
 
   prefab ForestReed : ForestClumpMesh {
-    Rgb: {176, 200, 136}
+    Rgb: {forest_seasonal(season, 170, 166, 206, 196), forest_seasonal(season, 206, 192, 182, 170), forest_seasonal(season, 128, 120, 118, 124)}
     PbrMaterial: {roughness: 0.7}
     AlphaCutoff: {0.4}
     DiffuseTransmission: {factor: 0.45, color: {220, 255, 150}}
     PbrTextures: {albedo: reed_albedo, normal: reed_normal}
     NoShadow
+    NoBake
   }
 
+  // Ferns unfurl in spring, turn to rusty bracken in autumn and die back in winter
   prefab ForestFern : ForestFernMesh {
-    Rgb: {104, 152, 54}
+    Rgb: {forest_seasonal(season, 128, 92, 168, 124), forest_seasonal(season, 176, 140, 120, 96), forest_seasonal(season, 60, 48, 62, 66)}
     PbrMaterial: {roughness: 0.8}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.6, color: {220, 255, 140}}
+    AlphaCutoff: {forest_seasonal(season, 0.7, LEAF_FULL, 0.5, 0.93)}
+    DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: fern_albedo, normal: fern_normal}
     NoShadow
+    NoBake
   }
 
+  // Leaf litter: last year's leaves, faded and sparse in spring and summer, a thick layer of
+  // fresh, bright leaves in autumn, sodden and dark in winter
   prefab ForestLitter : ForestLitterMesh {
-    Rgb: {255, 255, 255}
+    Rgb: {forest_seasonal(season, 206, 200, 255, 168), forest_seasonal(season, 196, 190, 214, 156), forest_seasonal(season, 186, 180, 168, 146)}
     PbrMaterial: {roughness: 0.9}
-    AlphaCutoff: {0.45}
+    AlphaCutoff: {forest_seasonal(season, 0.88, 0.92, 0.3, 0.62)}
     PbrTextures: {albedo: litter_patch_albedo, normal: litter_patch_normal}
     NoShadow
+    NoBake
   }
 
-  // Shrubs: hazel, its leaves the cards of the beech in a lighter green, and elder, the cards of
-  // the birch in a darker one, around a dark core
+  // Shrubs: hazel, its leaves the cards of the beech in a lighter green turning yellow, and
+  // elder, the cards of the birch in a darker one around a dark core, white with blossom in
+  // spring. Both are bare in winter, down to the twiggy core
   prefab ForestShrubHazel : ForestCardTripleMesh {
-    Rgb: {104, 144, 54}
+    Rgb: {forest_foliage(season, 130, 100, 204, 140), forest_foliage(season, 174, 140, 168, 110), forest_foliage(season, 58, 50, 50, 60)}
     PbrMaterial: {roughness: 0.78}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.6, color: {226, 255, 150}}
+    AlphaCutoff: {forest_seasonal(season, 0.6, LEAF_FULL, 0.78, LEAF_BARE)}
+    DiffuseTransmission: {factor: 0.6, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_beech_albedo, normal: leaf_beech_normal}
+    NoBake
   }
 
   prefab ForestShrubElder : ForestCardTripleMesh {
-    Rgb: {72, 108, 44}
+    Rgb: {forest_foliage(season, 240, 68, 128, 104), forest_foliage(season, 236, 104, 104, 84), forest_foliage(season, 222, 42, 48, 52)}
     PbrMaterial: {roughness: 0.78}
-    AlphaCutoff: {0.4}
-    DiffuseTransmission: {factor: 0.55, color: {214, 255, 140}}
+    AlphaCutoff: {forest_seasonal(season, 0.5, LEAF_FULL, 0.86, LEAF_BARE)}
+    DiffuseTransmission: {factor: 0.55, color: {forest_leaf_glow_r(season), forest_leaf_glow_g(season), forest_leaf_glow_b(season)}}
     PbrTextures: {albedo: leaf_birch_albedo, normal: leaf_birch_normal}
+    NoBake
   }
 
   prefab ForestShrubCore {
-    Rgb: {72, 100, 50}
+    Rgb: {forest_seasonal(season, 26, 22, 40, 44), forest_seasonal(season, 44, 40, 34, 38), forest_seasonal(season, 12, 8, 14, 34)}
     PbrMaterial: {roughness: 0.95}
-    PbrTextures: {albedo: canopy_albedo, normal: canopy_normal}
+    AlphaCutoff: {forest_seasonal(season, 0.5, 0.01, 0.4, 0.88)}
+    PbrTextures: {albedo: canopy_leaf_albedo, normal: canopy_normal}
     texture.Mapping: {mode: MappingWorld, size: 3, blend: 0.5}
     HemiSphere: {segments: 10, smooth: true, radius: 1}
+    NoBake
   }
 
-  // Cushions of moss, on the floor and the stumps
+  // Cushions of moss, on the floor and the stumps, duller in winter
   prefab ForestMoss {
-    Rgb: {200, 220, 170}
+    Rgb: {forest_seasonal(season, 206, 200, 198, 178), forest_seasonal(season, 228, 220, 208, 186), forest_seasonal(season, 168, 170, 158, 156)}
     PbrMaterial: {roughness: 1}
     PbrTextures: {albedo: moss_albedo, normal: moss_normal, orm: moss_orm}
     texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.4}
     IcoSphere: {radius: 1, segments: 2, smooth: true}
     NoShadow
+    NoBake
   }
 
   // Mushrooms: a cap, the gills under it and a stem, each one unit across and high

@@ -31,6 +31,7 @@ $ {
     alpha_cutout: true,
     blend_modes: true,
     texture_blend: true,
+    texture_layers: true,
     triplanar: true,
     diffuse_transmission: true,
     texture_scroll: true,

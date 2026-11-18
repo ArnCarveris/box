@@ -23,7 +23,10 @@ camera {
 
 // Round shapes and sweeps (the trunks and limbs of the trees) lose segments with distance (lod).
 // A filmic chain: ambient occlusion, the height fog of the sky, bloom, auto exposure into the
-// Tony McMapface tone map, a gentle grade, a subtle vignette and SMAA
+// Tony McMapface tone map, a grade that follows the season (fresh and a little green in spring,
+// warm in summer, warmer and richer in autumn, cool and muted in winter, see forest_seasonal),
+// a subtle vignette and SMAA. The ambient light of the environment is a little lower under the
+// dark canopy of summer and autumn than in the bright, bare winter forest
 view {
   occlusion { Gtao: {radius: 0.7, final_value_power: 1.8, quality: GtaoHigh} }
   bloom { Bloom: {intensity: 0.12, threshold: 1.2, threshold_softness: 0.5} }
@@ -32,7 +35,16 @@ view {
   }
 
   film { Tonemap: {auto_exposure: exposure, operator_: TonyMcMapface} }
-  grade { ColorGrading: {contrast: 1.05, saturation: 1.06, vibrance: 0.12} }
+  grade {
+    ColorGrading: {
+      temperature: forest_seasonal(season, -0.02, 0.03, 0.05, -0.1),
+      tint: forest_seasonal(season, -0.04, 0, 0.02, 0.01),
+      contrast: forest_seasonal(season, 1.04, 1.06, 1.08, 1.02),
+      saturation: forest_seasonal(season, 1.1, 1.06, 1.04, 0.84),
+      vibrance: forest_seasonal(season, 0.18, 0.12, 0.1, 0.02),
+      lift: {0, 0, forest_seasonal(season, 0, 0, 0, 0.012)}
+    }
+  }
   vignette { Vignette: {intensity: 0.2, radius: 0.8, smoothness: 0.5} }
   edges { Smaa: {} }
 
@@ -45,7 +57,7 @@ view {
       baked: false,
       reflections: true,
       atmosphere: true,
-      environment: {source: sky, intensity: 1, background: false}
+      environment: {source: sky, intensity: forest_seasonal(season, 1.04, 1, 0.97, 1.08), background: false}
     },
     shadows: {
       enabled: true,
