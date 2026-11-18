@@ -4,17 +4,18 @@
  * window, its fixed steps and the RippleSource entities and ripple_at disturbances it applies,
  * appended to the packet for the backend (gpu_ripples.c).
  *
- * The water frame is the integral of the WaterFlow velocity in double precision: ripples drift
- * with the flow because the frame moves, never by resampling. The window follows its entity by
- * whole cells of that frame, which the backend addresses modulo the resolution.
+ * The water frame integrates the WaterFlow of the Water of the field in double precision, and
+ * the window follows its entity by whole cells of it. Each frame the Water shapes with a
+ * WaterFlow over the window give the rectangles the backend takes the velocity of each cell from.
  *
- * A RippleSource pushes the water, and lays down foam, by its speed relative to the WaterFlow of
- * the field, its world velocity being the change of its world position over the frame delta
- * time.
+ * A RippleSource pushes the water and lays down foam by its speed relative to the local flow at
+ * its position (box_render_ripples_flow_at), from the change of its world position.
  */
 
 #include "render.h"
+#include "../geometry/mesh_cache.h"
 #include <math.h>
+#include <stdlib.h>
 
 /** A field of WaterRipples the extract keeps between frames */
 typedef struct box_ripple_field_t {
@@ -46,15 +47,27 @@ typedef struct box_ripple_entry_t {
     float foam;             /**< RippleSource.foam, 0 when not finite */
 } box_ripple_entry_t;
 
+/** A flowing Water shape that overlaps the window of a field this frame */
+typedef struct box_ripple_candidate_t {
+    ecs_entity_t entity;    /**< The Water shape */
+    double distance;        /**< World units from the center of the window to its rectangle */
+    double center[2];       /**< World XZ of the center of its rectangle */
+    float axis[2];          /**< First axis of its rectangle in world XZ, normalized */
+    float extents[2];       /**< World units of the half size of its rectangle */
+    float velocity[2];      /**< Its WaterFlow velocity */
+} box_ripple_candidate_t;
+
 /** The state of the ripple extract */
 typedef struct box_render_ripples_state_t {
     ecs_query_t *fields;    /**< WaterRipples with Water, their transform and scene */
     ecs_query_t *sources;   /**< RippleSource with a transform and scene */
+    ecs_query_t *flows;     /**< Water shapes with WaterFlow, their transform and scene */
     ecs_map_t by_water;     /**< Water entity to box_ripple_field_t* */
     ecs_map_t movers;       /**< Source entity to box_ripple_mover_t* */
     ecs_vec_t entries;      /**< box_ripple_entry_t, the sources of this frame */
     ecs_vec_t scenes;       /**< ecs_entity_t, scratch: the scenes that have a field this frame */
     ecs_vec_t keep;         /**< box_material_ripple_t, scratch: the disturbances that wait */
+    ecs_vec_t candidates;   /**< box_ripple_candidate_t, scratch: the flowing Water of a field */
     int64_t frame;          /**< Frames extracted */
     bool warned;            /**< A scene with more than one field was reported */
 } box_render_ripples_state_t;
@@ -104,6 +117,67 @@ float box_render_ripples_relative(
     }
 
     return result;
+}
+
+/** Rise smoothly from 0 to 1 over a distance.
+ *
+ * @param d Distance inside an edge
+ * @param fade Distance of the rise, 0 or less for none
+ * @return smoothstep(0, fade, d)
+ */
+static float box_ripples_smooth(
+    float d,
+    float fade)
+{
+    float result = 1.0f;
+    if (fade > 0.0f) {
+        float t = glm_clamp(d / fade, 0.0f, 1.0f);
+        result = t * t * (3.0f - 2.0f * t);
+    }
+
+    return result;
+}
+
+float box_render_ripples_flow_weight(
+    const box_render_ripple_flow_t *flow,
+    float fade,
+    const float *point)
+{
+    float result = 0.0f;
+    float dx = point[0] - flow->center[0], dz = point[1] - flow->center[1];
+    float lx = dx * flow->axis[0] + dz * flow->axis[1];
+    float lz = dx * -flow->axis[1] + dz * flow->axis[0];
+    float ix = flow->extents[0] - fabsf(lx), iz = flow->extents[1] - fabsf(lz);
+    if (ix > 0.0f && iz > 0.0f) {
+        result = box_ripples_smooth(ix, fade) * box_ripples_smooth(iz, fade);
+    }
+
+    return result;
+}
+
+float box_render_ripples_flow_at(
+    const box_render_ripple_flow_t *flows,
+    int32_t count,
+    float fade,
+    const float *frame,
+    const float *point,
+    float *out)
+{
+    float weight = 0.0f, sx = 0.0f, sz = 0.0f;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        float w = box_render_ripples_flow_weight(&flows[i], fade, point);
+        if (w > 0.0f) {
+            weight += w;
+            sx += w * (flows[i].velocity[0] - frame[0]);
+            sz += w * (flows[i].velocity[1] - frame[1]);
+        }
+    }
+
+    out[0] = frame[0] + (weight > 0.0f ? sx / weight : 0.0f);
+    out[1] = frame[1] + (weight > 0.0f ? sz / weight : 0.0f);
+
+    return weight;
 }
 
 float box_render_ripples_wave(
@@ -283,13 +357,226 @@ static bool box_ripples_overlaps(
         lo_z <= (float)resolution;
 }
 
+/** Get the oriented XZ rectangle of a shape: the box of the local bounds of its mesh or surface
+ * placed by its world transform, seen from above. Its first axis is the axis of the box that is
+ * longest in XZ, the rectangle holds the box.
+ *
+ * @param cache The mesh cache
+ * @param shape The shape
+ * @param t Its world transform, NULL for none
+ * @param out Receives the center, axis and extents of the rectangle, world units
+ * @param center Receives the world XZ of its center
+ * @param y Receives the world Y of the center of the box
+ * @return false for a shape without a mesh or with no area from above
+ */
+static bool box_ripples_flow_rect(
+    const box_mesh_cache_t *cache,
+    const ShapeMesh *shape,
+    const WorldTransform *t,
+    box_ripple_candidate_t *out,
+    float *y)
+{
+    const box_mesh_t *mesh = shape->mesh ? box_mesh_cache_get(cache, shape->mesh) : NULL;
+    bool result = false;
+    float half[3][2], best = 0.0f;
+    mat4 identity = GLM_MAT4_IDENTITY_INIT;
+    const vec4 *m = t ? t->m : identity;
+    int32_t k, primary = -1;
+    if (!mesh || !mesh->vertex_count) {
+        goto done;
+    }
+
+    const float *lo = shape->surface.p[0][0] ? shape->min : mesh->min;
+    const float *hi = shape->surface.p[0][0] ? shape->max : mesh->max;
+    double center[3] = { m[3][0], m[3][1], m[3][2] };
+    for (k = 0; k < 3; k ++) {
+        float local = (lo[k] + hi[k]) * 0.5f * shape->scale[k];
+        float size = fabsf((hi[k] - lo[k]) * 0.5f * shape->scale[k]);
+        center[0] += (double)m[k][0] * local;
+        center[1] += (double)m[k][1] * local;
+        center[2] += (double)m[k][2] * local;
+        half[k][0] = m[k][0] * size;
+        half[k][1] = m[k][2] * size;
+        float len = sqrtf(half[k][0] * half[k][0] + half[k][1] * half[k][1]);
+        if (len > best) {
+            best = len;
+            primary = k;
+        }
+    }
+
+    if (primary < 0 || !(best > 1e-6f) || !isfinite(best) || !isfinite(center[0]) ||
+        !isfinite(center[1]) || !isfinite(center[2]))
+    {
+        goto done;
+    }
+
+    out->axis[0] = half[primary][0] / best;
+    out->axis[1] = half[primary][1] / best;
+    out->extents[0] = out->extents[1] = 0.0f;
+    for (k = 0; k < 3; k ++) {
+        out->extents[0] += fabsf(half[k][0] * out->axis[0] + half[k][1] * out->axis[1]);
+        out->extents[1] += fabsf(-half[k][0] * out->axis[1] + half[k][1] * out->axis[0]);
+    }
+
+    out->center[0] = center[0];
+    out->center[1] = center[2];
+    *y = (float)center[1];
+    result = out->extents[1] > 1e-6f;
+
+done:
+    return result;
+}
+
+/** Check whether a rectangle overlaps the square window of a field and get its distance from the
+ * center of the window (separating axes).
+ *
+ * @param c The rectangle, world units
+ * @param x World X of the center of the window
+ * @param z World Z of the center of the window
+ * @param half World units of the half size of the window
+ * @param distance Receives the world units from the center of the window to the rectangle, 0
+ * inside it
+ * @return Whether the two overlap
+ */
+static bool box_ripples_flow_overlaps(
+    const box_ripple_candidate_t *c,
+    double x,
+    double z,
+    double half,
+    double *distance)
+{
+    double dx = c->center[0] - x, dz = c->center[1] - z;
+    double ax = c->axis[0], az = c->axis[1], ex = c->extents[0], ez = c->extents[1];
+    double lx = dx * ax + dz * az, lz = -dx * az + dz * ax;
+    double qx = fabs(lx) - ex, qz = fabs(lz) - ez;
+    qx = qx > 0.0 ? qx : 0.0;
+    qz = qz > 0.0 ? qz : 0.0;
+    *distance = sqrt(qx * qx + qz * qz);
+
+    return fabs(dx) < half + ex * fabs(ax) + ez * fabs(az) &&
+        fabs(dz) < half + ex * fabs(az) + ez * fabs(ax) &&
+        fabs(lx) < ex + half * (fabs(ax) + fabs(az)) &&
+        fabs(lz) < ez + half * (fabs(ax) + fabs(az));
+}
+
+/** Order flowing Water by their distance from the center of the window, then by entity.
+ *
+ * @param a The first candidate
+ * @param b The second candidate
+ * @return Their order
+ */
+static int box_ripples_candidate_compare(
+    const void *a,
+    const void *b)
+{
+    const box_ripple_candidate_t *ca = a, *cb = b;
+    int result = (ca->distance > cb->distance) - (ca->distance < cb->distance);
+    if (!result) {
+        result = (ca->entity > cb->entity) - (ca->entity < cb->entity);
+    }
+
+    return result;
+}
+
+/** Append the rectangles of the Water shapes of the scene of a field with a WaterFlow that
+ * overlap its window and lie within BOX_RENDER_RIPPLE_PLANE_TOLERANCE of the height of its
+ * Water, BOX_RENDER_RIPPLE_FLOWS at most, the nearest to the center of the window first.
+ *
+ * @param world The world
+ * @param p The packet
+ * @param l The state
+ * @param rec The record of the field, whose rectangles are appended
+ * @param f The field
+ */
+static void box_ripples_push_flows(
+    ecs_world_t *world,
+    box_render_packet_t *p,
+    box_render_ripples_state_t *l,
+    box_render_water_ripples_t *rec,
+    const box_ripple_field_t *f)
+{
+    const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    double cell = f->cell, half = (double)f->resolution * cell * 0.5;
+    double corner[2] = {
+        (double)f->origin[0] * cell + f->frame[0],
+        (double)f->origin[1] * cell + f->frame[1]
+    };
+    int32_t i, count;
+    ecs_vec_clear(&l->candidates);
+    rec->flow_first = ecs_vec_count(&p->ripple_flows);
+    rec->flow_count = 0;
+    rec->flowing = false;
+    ecs_iter_t it = ecs_query_iter(world, l->flows);
+    while (ecs_query_next(&it)) {
+        const WaterFlow *flows = ecs_field(&it, WaterFlow, 1);
+        const ShapeMesh *shapes = ecs_field(&it, ShapeMesh, 2);
+        const WorldTransform *transforms = ecs_field(&it, WorldTransform, 3);
+        bool flow_self = ecs_field_is_self(&it, 1), shape_self = ecs_field_is_self(&it, 2);
+        for (i = 0; cache && i < it.count; i ++) {
+            const WaterFlow *flow = flow_self ? &flows[i] : flows;
+            const ShapeMesh *shape = shape_self ? &shapes[i] : shapes;
+            box_ripple_candidate_t c;
+            float y;
+            if (box_render_scene_field(&it, 4, i) != rec->scene ||
+                !isfinite(flow->velocity[0]) || !isfinite(flow->velocity[1]))
+            {
+                continue;
+            }
+
+            WorldTransform buf;
+            const WorldTransform *t = box_transform_world_field(world, &it, transforms, i,
+                &buf);
+            ecs_os_memset_t(&c, 0, box_ripple_candidate_t);
+            if (!box_ripples_flow_rect(cache, shape, t, &c, &y) ||
+                !(fabsf(y - rec->height) <= BOX_RENDER_RIPPLE_PLANE_TOLERANCE) ||
+                !box_ripples_flow_overlaps(&c, corner[0] + half, corner[1] + half, half,
+                    &c.distance))
+            {
+                continue;
+            }
+
+            c.entity = it.entities[i];
+            c.velocity[0] = flow->velocity[0];
+            c.velocity[1] = flow->velocity[1];
+            *ecs_vec_append_t(NULL, &l->candidates, box_ripple_candidate_t) = c;
+        }
+    }
+
+    count = ecs_vec_count(&l->candidates);
+    box_ripple_candidate_t *candidates = ecs_vec_first_t(&l->candidates, box_ripple_candidate_t);
+    if (count > 1) {
+        qsort(candidates, (size_t)count, sizeof(box_ripple_candidate_t),
+            box_ripples_candidate_compare);
+    }
+
+    count = count < BOX_RENDER_RIPPLE_FLOWS ? count : BOX_RENDER_RIPPLE_FLOWS;
+    for (i = 0; i < count; i ++) {
+        const box_ripple_candidate_t *c = &candidates[i];
+        box_render_ripple_flow_t *r = ecs_vec_append_t(
+            NULL, &p->ripple_flows, box_render_ripple_flow_t);
+        r->center[0] = (float)((c->center[0] - corner[0]) / cell);
+        r->center[1] = (float)((c->center[1] - corner[1]) / cell);
+        r->axis[0] = c->axis[0];
+        r->axis[1] = c->axis[1];
+        r->extents[0] = (float)(c->extents[0] / cell);
+        r->extents[1] = (float)(c->extents[1] / cell);
+        r->velocity[0] = c->velocity[0];
+        r->velocity[1] = c->velocity[1];
+        if (r->velocity[0] != rec->velocity[0] || r->velocity[1] != rec->velocity[1]) {
+            rec->flowing = true;
+        }
+    }
+
+    rec->flow_count = count;
+}
+
 /** Append the RippleSource entities of the scene of a field that overlap its window and move
- * relative to its water, with a strength or foam.
+ * relative to the local flow of its water (box_render_ripples_flow_at at their position at the
+ * end of the frame), with a strength or foam.
  *
  * @param p The packet
  * @param l The state
  * @param rec The record of the field, whose sources are appended
- * @param flow WaterFlow of the Water, NULL for still water
  * @param from_frame Water frame offset at the start of the frame
  * @param f The field
  */
@@ -297,23 +584,20 @@ static void box_ripples_push_sources(
     box_render_packet_t *p,
     const box_render_ripples_state_t *l,
     box_render_water_ripples_t *rec,
-    const WaterFlow *flow,
     const double *from_frame,
     const box_ripple_field_t *f)
 {
     const box_ripple_entry_t *entries = ecs_vec_first_t(&l->entries, box_ripple_entry_t);
+    const box_render_ripple_flow_t *flows = rec->flow_count ? ecs_vec_get_t(
+        &p->ripple_flows, box_render_ripple_flow_t, rec->flow_first) : NULL;
     int32_t i, count = ecs_vec_count(&l->entries), pushed = 0;
     double cell = f->cell;
+    float fade = BOX_RENDER_RIPPLE_FLOW_FADE / f->cell;
     for (i = 0; i < count && pushed < BOX_RENDER_RIPPLE_SOURCES; i ++) {
         const box_ripple_entry_t *e = &entries[i];
-        float velocity[2] = { e->velocity[0], e->velocity[2] }, relative[2];
+        float velocity[2] = { e->velocity[0], e->velocity[2] }, relative[2], local[2];
         box_render_ripple_source_t s;
         if (e->scene != rec->scene || (e->strength == 0.0f && e->foam == 0.0f)) {
-            continue;
-        }
-
-        float speed = box_render_ripples_relative(velocity, flow, relative);
-        if (speed <= 0.0f || !(e->extents[0] > 0.0f) || !(e->extents[1] > 0.0f)) {
             continue;
         }
 
@@ -322,6 +606,13 @@ static void box_ripples_push_sources(
         s.from[1] = (float)((e->from[2] - from_frame[1]) / cell - (double)f->origin[1]);
         s.to[0] = (float)((e->to[0] - f->frame[0]) / cell - (double)f->origin[0]);
         s.to[1] = (float)((e->to[2] - f->frame[1]) / cell - (double)f->origin[1]);
+        box_render_ripples_flow_at(flows, rec->flow_count, fade, rec->velocity, s.to, local);
+        WaterFlow water = { .velocity = { local[0], local[1] } };
+        float speed = box_render_ripples_relative(velocity, &water, relative);
+        if (speed <= 0.0f || !(e->extents[0] > 0.0f) || !(e->extents[1] > 0.0f)) {
+            continue;
+        }
+
         s.extents[0] = (float)(e->extents[0] / cell);
         s.extents[1] = (float)(e->extents[1] / cell);
         s.axis[0] = e->axis[0];
@@ -508,8 +799,14 @@ static void box_ripples_field(
     rec->strength = isfinite(ripples->strength) ? ripples->strength : 0.0f;
     box_render_ripples_foam(ripples, cell, &rec->foam_spread, &rec->foam_keep, &rec->crest);
     rec->source_first = ecs_vec_count(&p->ripple_sources);
+    if (flow && isfinite(flow->velocity[0]) && isfinite(flow->velocity[1])) {
+        rec->velocity[0] = flow->velocity[0];
+        rec->velocity[1] = flow->velocity[1];
+    }
+
+    box_ripples_push_flows(world, p, l, rec, f);
     if (steps) {
-        box_ripples_push_sources(p, l, rec, flow, from_frame, f);
+        box_ripples_push_sources(p, l, rec, from_frame, f);
         box_ripples_push_impulses(p, queue, taken, rec, f);
     }
 }
@@ -629,6 +926,7 @@ static void box_ripples_free(
     ecs_vec_fini_t(NULL, &l->entries, box_ripple_entry_t);
     ecs_vec_fini_t(NULL, &l->scenes, ecs_entity_t);
     ecs_vec_fini_t(NULL, &l->keep, box_material_ripple_t);
+    ecs_vec_fini_t(NULL, &l->candidates, box_ripple_candidate_t);
     ecs_os_free(l);
 }
 
@@ -641,6 +939,7 @@ void box_render_water_ripples_init(
     ecs_vec_init_t(NULL, &l->entries, box_ripple_entry_t, 0);
     ecs_vec_init_t(NULL, &l->scenes, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &l->keep, box_material_ripple_t, 0);
+    ecs_vec_init_t(NULL, &l->candidates, box_ripple_candidate_t, 0);
     l->fields = ecs_query(world, {
         .entity = ecs_entity(world, { .name = "WaterRippleFields" }),
         .terms = {
@@ -662,6 +961,24 @@ void box_render_water_ripples_init(
         .terms = {
             { .id = ecs_id(RippleSource), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
+            {
+                .id = ecs_id(Scene),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsOptional
+            }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    l->flows = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "WaterRippleFlows" }),
+        .terms = {
+            { .id = ecs_id(Water), .inout = EcsInOutNone },
+            { .id = ecs_id(WaterFlow), .inout = EcsIn },
+            { .id = ecs_id(ShapeMesh), .inout = EcsIn },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
             {
                 .id = ecs_id(Scene),
                 .src.id = EcsSelf | EcsUp,

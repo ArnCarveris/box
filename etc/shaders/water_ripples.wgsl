@@ -13,6 +13,17 @@
 // foam takes a share of the difference to its neighbours (spread), keeps a factor per step
 // (decay), forms where the slope of the heights is steeper than CREST_SLOPE (crest foam) and
 // grows under the sources.
+//
+// The field frame moves with the WaterFlow of the Water of the field, while the water under it can
+// flow differently (a bending brook made of lengths, each with its own WaterFlow). Once a frame the
+// flow pass writes the velocity of every cell into the velocity texture (same addressing): the
+// frame velocity plus the weighted average of the velocities of the flowing Water rectangles
+// covering it relative to the frame, each weight fading out smoothly toward the edges of its
+// rectangle, the frame velocity where none covers it. Before a step of a field where a rectangle
+// flows relative to the frame, advect moves the heights (current and previous) and the foam
+// semi-Lagrangian into a scratch texture, looking back along the velocity relative to the frame
+// (at most REACH cells, bilinear), and settle copies them back; a cell whose relative velocity is
+// zero copies its value unchanged.
 
 // The step uniform of a dispatch (box_gpu_ripple_step_t).
 struct Step {
@@ -28,6 +39,23 @@ struct Step {
     // per step, foam formed per step per unit of slope above CREST_SLOPE, 1 / (2 world units of
     // a cell).
     foam: vec4f,
+    // Velocity of the frame X and Z (world units per second), seconds of a step per world unit of
+    // a cell, cells inside the edges of a rectangle over which its weight fades.
+    flow: vec4f,
+    // First flowing Water rectangle of the field, its rectangles.
+    flows: vec4u,
+};
+
+// Cells a step looks back along the velocity relative to the frame at most,
+// BOX_RENDER_RIPPLE_FLOW_REACH.
+const REACH: f32 = 2.0;
+
+// The rectangle of a flowing Water (box_render_ripple_flow_t), in cells from the window corner:
+// its center (a.xy), its first axis in world XZ (a.zw, the second is (-a.w, a.z)), its half size
+// along them (b.xy) and its velocity in world units per second (b.zw).
+struct FlowRect {
+    a: vec4f,
+    b: vec4f,
 };
 
 // Slope of the heights (world units per world unit) above which crest foam forms,
@@ -51,6 +79,16 @@ struct RippleSource {
 @group(0) @binding(3) var<storage, read> sources: array<RippleSource>;
 @group(0) @binding(4) var foam_current: texture_storage_2d<r32float, read>;
 @group(0) @binding(5) var foam_next: texture_storage_2d<r32float, write>;
+
+// The flow pass: the rectangles of the frame and the velocity texture it writes, the frame
+// velocity plus the velocity relative to it (xy) and the velocity relative to it (zw).
+@group(0) @binding(6) var<storage, read> rects: array<FlowRect>;
+@group(0) @binding(7) var velocity_out: texture_storage_2d<rgba32float, write>;
+
+// The advect and settle passes: the texture they read, the one they write and the velocities.
+@group(0) @binding(8) var advect_src: texture_storage_2d<r32float, read>;
+@group(0) @binding(9) var advect_dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(10) var velocity: texture_storage_2d<rgba32float, read>;
 
 // Cell of the window of a texel.
 fn cell_of(texel: vec2u) -> vec2i {
@@ -146,4 +184,103 @@ fn advance(@builtin(global_invocation_id) id: vec3u) {
 
     textureStore(previous, id.xy, vec4f(next, 0.0, 0.0, 0.0));
     textureStore(foam_next, id.xy, vec4f(saturate(foam), 0.0, 0.0, 0.0));
+}
+
+// Rise smoothly from 0 to 1 over fade, 1 for a fade of 0 or less.
+fn flow_smooth(d: f32, fade: f32) -> f32 {
+    if (fade <= 0.0) {
+        return 1.0;
+    }
+    let t = clamp(d / fade, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// Weight of a rectangle at a point (box_render_ripples_flow_weight): 0 outside it, rising over
+// fade inside each edge to 1.
+fn flow_weight(rect: FlowRect, p: vec2f, fade: f32) -> f32 {
+    let d = p - rect.a.xy;
+    let axis = rect.a.zw;
+    let l = vec2f(d.x * axis.x + d.y * axis.y, d.x * -axis.y + d.y * axis.x);
+    let inside = rect.b.xy - abs(l);
+    if (inside.x <= 0.0 || inside.y <= 0.0) {
+        return 0.0;
+    }
+    return flow_smooth(inside.x, fade) * flow_smooth(inside.y, fade);
+}
+
+// Write the velocity of a cell (box_render_ripples_flow_at).
+@compute @workgroup_size(8, 8)
+fn flow(@builtin(global_invocation_id) id: vec3u) {
+    let r = params.grid.x;
+    if (id.x >= r || id.y >= r) {
+        return;
+    }
+    let p = vec2f(cell_of(id.xy)) + 0.5;
+    let frame = params.flow.xy;
+    var weight = 0.0;
+    var sum = vec2f(0.0);
+    for (var i = 0u; i < params.flows.y; i++) {
+        let rect = rects[params.flows.x + i];
+        let w = flow_weight(rect, p, params.flow.w);
+        if (w > 0.0) {
+            weight += w;
+            sum += w * (rect.b.zw - frame);
+        }
+    }
+    var relative = vec2f(0.0);
+    if (weight > 0.0) {
+        relative = sum / weight;
+    }
+    textureStore(velocity_out, id.xy, vec4f(frame + relative, relative));
+}
+
+// Value of a cell of the window in advect_src, 0 outside the window.
+fn advect_at(cell: vec2i) -> f32 {
+    let r = i32(params.grid.x);
+    if (any(cell < vec2i(0)) || any(cell >= vec2i(r))) {
+        return 0.0;
+    }
+    let texel = (vec2u(cell) + params.grid.yz) % params.grid.x;
+    return textureLoad(advect_src, texel).r;
+}
+
+// Advect a cell: the value of advect_src a step back along its velocity relative to the frame
+// (bilinear), the value of the cell itself where that velocity is zero.
+@compute @workgroup_size(8, 8)
+fn advect(@builtin(global_invocation_id) id: vec3u) {
+    let r = params.grid.x;
+    if (id.x >= r || id.y >= r) {
+        return;
+    }
+    var d = textureLoad(velocity, id.xy).zw * params.flow.z;
+    if (d.x == 0.0 && d.y == 0.0) {
+        textureStore(advect_dst, id.xy, textureLoad(advect_src, id.xy));
+        return;
+    }
+    let reach = length(d);
+    if (reach > REACH) {
+        d *= REACH / reach;
+    }
+    // The center of the cell is cell + 0.5, the texel centers are too: q is in cells of the
+    // lower left texel of the four around the point looked back to
+    let q = vec2f(cell_of(id.xy)) - d;
+    let base = floor(q);
+    let t = q - base;
+    let c = vec2i(base);
+    let v00 = advect_at(c);
+    let v10 = advect_at(c + vec2i(1, 0));
+    let v01 = advect_at(c + vec2i(0, 1));
+    let v11 = advect_at(c + vec2i(1, 1));
+    let value = mix(mix(v00, v10, t.x), mix(v01, v11, t.x), t.y);
+    textureStore(advect_dst, id.xy, vec4f(value, 0.0, 0.0, 0.0));
+}
+
+// Copy a cell of advect_src into advect_dst, the advected values back into the field.
+@compute @workgroup_size(8, 8)
+fn settle(@builtin(global_invocation_id) id: vec3u) {
+    let r = params.grid.x;
+    if (id.x >= r || id.y >= r) {
+        return;
+    }
+    textureStore(advect_dst, id.xy, textureLoad(advect_src, id.xy));
 }

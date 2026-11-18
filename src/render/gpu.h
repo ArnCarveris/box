@@ -1723,6 +1723,19 @@ void box_gpu_ripples_bindings(
     const box_render_view_t *v,
     WGPUBindGroupEntry *entries);
 
+/** Get the velocity texture of the field of WaterRipples of the scene of a view, for the mesh
+ * shaders: rgba32float in the addressing of the heights, the world velocity of the water of a
+ * cell (xy) and its velocity relative to the frame of the field (zw); the 1x1 zero texture
+ * without a field.
+ *
+ * @param gpu The backend
+ * @param v The view, NULL for none
+ * @return The view of the texture
+ */
+WGPUTextureView box_gpu_ripples_flow_view(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v);
+
 /** Write the record of the field of WaterRipples of the scene of a view into its uniforms, a
  * zero record without one.
  *

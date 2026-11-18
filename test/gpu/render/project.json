@@ -365,7 +365,10 @@
                     "foam_drifts_with_flow",
                     "foam_spreads",
                     "crest_foam",
-                    "no_foam_without_foam"
+                    "no_foam_without_foam",
+                    "foam_follows_local_flow",
+                    "foam_bends_with_flow",
+                    "uniform_flow_unchanged"
                 ]
             },
             {

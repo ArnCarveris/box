@@ -651,3 +651,237 @@ void WaterRipples_no_foam_without_foam(void) {
     ecs_os_free(f);
     ecs_fini(world);
 }
+
+/** Add a length of flowing water over the pond: a Water box of len by width world units, 0.01
+ * thick, centered at y = 0, with a WaterFlow.
+ *
+ * @param world The world
+ * @param x World X of its center
+ * @param z World Z of its center
+ * @param len World units along X
+ * @param width World units along Z
+ * @param vx WaterFlow velocity X
+ * @param vz WaterFlow velocity Z
+ * @return The length
+ */
+static ecs_entity_t ripples_length(
+    ecs_world_t *world,
+    float x,
+    float z,
+    float len,
+    float width,
+    float vx,
+    float vz)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, 0, z});
+    ecs_set(world, e, Box, {len, 0.01f, width});
+    ecs_set(world, e, Rgb, {200, 200, 200});
+    ecs_add(world, e, Water);
+    ecs_set(world, e, WaterFlow, {.velocity = {vx, vz}});
+
+    return e;
+}
+
+/** Get the centroid along Z of the absolute values of a field.
+ *
+ * @param f The field
+ * @return World Z of the centroid
+ */
+static float ripples_centroid_z(
+    const ripples_field_t *f)
+{
+    double sum = 0, weight = 0;
+    int32_t x, z;
+    for (z = 0; z < RIPPLES_RES; z ++) {
+        for (x = 0; x < RIPPLES_RES; x ++) {
+            double h = fabs(f->heights[z * RIPPLES_RES + x]);
+            sum += h * (f->info.corner[1] + (z + 0.5) * f->info.cell);
+            weight += h;
+        }
+    }
+
+    return weight > 0 ? (float)(sum / weight) : 0;
+}
+
+/** Get the velocity of the water of a field at a world XZ point, the cell under it.
+ *
+ * @param world The world
+ * @param pond The Water of the field
+ * @param x World X
+ * @param z World Z
+ * @param out Receives the velocity X and Z
+ */
+static void ripples_flow_at(
+    ecs_world_t *world,
+    ecs_entity_t pond,
+    float x,
+    float z,
+    float *out)
+{
+    float *v = ecs_os_malloc_n(float, RIPPLES_RES * RIPPLES_RES * 2);
+    box_render_ripples_read_t info;
+    test_bool(box_render_gpu_read_ripple_flow(world, pond, &info, v,
+        RIPPLES_RES * RIPPLES_RES * 2), true);
+    int32_t cx = (int32_t)floorf((x - info.corner[0]) / info.cell);
+    int32_t cz = (int32_t)floorf((z - info.corner[1]) / info.cell);
+    test_assert(cx >= 0 && cz >= 0 && cx < RIPPLES_RES && cz < RIPPLES_RES);
+    out[0] = v[(cz * RIPPLES_RES + cx) * 2];
+    out[1] = v[(cz * RIPPLES_RES + cx) * 2 + 1];
+    ecs_os_free(v);
+}
+
+void WaterRipples_foam_follows_local_flow(void) {
+    ecs_world_t *world = ripples_world();
+
+    /* The frame drifts east with the Water of the field, which has no shape, and a run across
+     * it flows north */
+    ecs_entity_t pond = ecs_new(world);
+    ecs_set(world, pond, Position, {0, 0, 0});
+    ecs_add(world, pond, Water);
+    ecs_set(world, pond, WaterRipples, {.size = 16, .resolution = RIPPLES_RES,
+        .wave_speed = 1, .strength = 1});
+    ripples_foam_terms(world, pond, 0, 0, 0);
+    ecs_set(world, pond, WaterFlow, {.velocity = {0.5f, 0}});
+    ripples_length(world, 0, 0, 4, 16, 0, 1);
+    ripples_frames(world, 2);
+
+    float v[2];
+    ripples_flow_at(world, pond, 0, 0, v);
+    test_assert(fabsf(v[0]) < 1e-4f);
+    test_assert(fabsf(v[1] - 1) < 1e-4f);
+    ripples_flow_at(world, pond, 5, 0, v);
+    test_assert(fabsf(v[0] - 0.5f) < 1e-6f);
+    test_assert(fabsf(v[1]) < 1e-6f);
+
+    float at[3] = {0, 0, -3};
+    test_bool(box_material_foam_at(world, pond, at, 0.5f, 0.5f), true);
+    ripples_frames(world, 1);
+    ripples_field_t *f = ripples_read_foam(world, pond);
+    float sx = ripples_centroid_x(f), sz = ripples_centroid_z(f);
+    test_assert(fabsf(sx) < 0.2f);
+    test_assert(fabsf(sz + 3) < 0.2f);
+    double total = ripples_sum(f);
+    test_assert(total > 0);
+
+    /* A second later it is a unit north, not half a unit east with the frame */
+    ripples_frames(world, 60);
+    ripples_field_t *g = ripples_read_foam(world, pond);
+    float ex = ripples_centroid_x(g), ez = ripples_centroid_z(g);
+    test_assert(fabsf(ex - sx) < 0.15f);
+    test_assert(fabsf(ez - sz - 1) < 0.2f);
+    test_assert(fabs(ripples_sum(g) - total) < 0.05 * total);
+
+    ecs_os_free(f);
+    ecs_os_free(g);
+    ecs_fini(world);
+}
+
+void WaterRipples_foam_bends_with_flow(void) {
+    ecs_world_t *world = ripples_world();
+    ecs_entity_t pond = ripples_pond(world, 1, 0);
+    ripples_foam_terms(world, pond, 0, 0, 0);
+
+    /* A bend: a length flowing east up to x = 0.5, then one turned a quarter turn halfway to
+     * north flowing along it, from a unit back into the first; the velocity turns from one into
+     * the other where they overlap */
+    float d = sqrtf(0.5f);
+    ripples_length(world, -3.75f, 0, 8.5f, 4, 1, 0);
+    ecs_entity_t turn = ripples_length(world, 3.5f * d, 3.5f * d, 8, 4, d, d);
+    ecs_set(world, turn, Rotation, {0, -GLM_PI_4f, 0});
+    ripples_frames(world, 2);
+
+    float v[2];
+    ripples_flow_at(world, pond, 4, 4, v);
+    test_assert(fabsf(v[0] - d) < 1e-4f);
+    test_assert(fabsf(v[1] - d) < 1e-4f);
+    ripples_flow_at(world, pond, 4, -1, v);
+    test_assert(v[0] == 0 && v[1] == 0);
+
+    float at[3] = {-2.5f, 0, 0};
+    test_bool(box_material_foam_at(world, pond, at, 0.4f, 0.5f), true);
+    ripples_frames(world, 1);
+    ripples_field_t *f = ripples_read_foam(world, pond);
+    test_assert(fabsf(ripples_centroid_x(f) + 2.5f) < 0.2f);
+    test_assert(fabsf(ripples_centroid_z(f)) < 0.2f);
+
+    /* First it drifts east along the first length */
+    ripples_frames(world, 90);
+    ripples_field_t *g = ripples_read_foam(world, pond);
+    test_assert(fabsf(ripples_centroid_x(g) + 1) < 0.3f);
+    test_assert(fabsf(ripples_centroid_z(g)) < 0.2f);
+
+    /* Then it turns at the bend and drifts along the second length, a unit a second */
+    ripples_frames(world, 150);
+    ripples_field_t *h = ripples_read_foam(world, pond);
+    float hx = ripples_centroid_x(h), hz = ripples_centroid_z(h);
+    test_assert(hz > 0.5f);
+    test_assert(fabsf(hz - hx) < 0.6f);
+    ripples_frames(world, 60);
+    ripples_field_t *k = ripples_read_foam(world, pond);
+    float kx = ripples_centroid_x(k), kz = ripples_centroid_z(k);
+    test_assert(fabsf(kx - hx - d) < 0.15f);
+    test_assert(fabsf(kz - hz - d) < 0.15f);
+    test_assert(ripples_sum(k) > 0.9 * ripples_sum(f));
+
+    ecs_os_free(k);
+    ecs_os_free(f);
+    ecs_os_free(g);
+    ecs_os_free(h);
+    ecs_fini(world);
+}
+
+void WaterRipples_uniform_flow_unchanged(void) {
+    /* The same lagoon twice: once the Water shape of the field flows uniformly (a rectangle that
+     * flows with the frame), once the field has no shape at all (no rectangle, as before the
+     * field followed the local flow); the fields match bit for bit */
+    ripples_field_t *heights[2], *foam[2];
+    int32_t i, j;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ripples_world();
+        ecs_entity_t pond;
+        if (i == 0) {
+            pond = ripples_pond(world, 1.5f, 0.3f);
+        } else {
+            pond = ecs_new(world);
+            ecs_set(world, pond, Position, {0, 0, 0});
+            ecs_add(world, pond, Water);
+            ecs_set(world, pond, WaterRipples, {.size = 16, .resolution = RIPPLES_RES,
+                .wave_speed = 1.5f, .damping = 0.3f, .strength = 1});
+        }
+
+        ripples_foam_terms(world, pond, 0.2f, 0.01f, 0.5f);
+        ecs_set(world, pond, WaterFlow, {.velocity = {0.3f, -0.2f}});
+        ecs_entity_t boat = ecs_new(world);
+        ecs_set(world, boat, Position, {-4, 0, 1});
+        ecs_set(world, boat, Rotation, {0, 0.4f, 0});
+        ecs_set(world, boat, RippleSource, {.extents = {0.6f, 0.25f}, .strength = 1,
+            .foam = 1});
+        float at[3] = {2, 0, -1};
+        test_bool(box_material_ripple_at(world, pond, at, 0.4f, 0.08f), true);
+        test_bool(box_material_foam_at(world, pond, at, 0.4f, 0.5f), true);
+        for (j = 0; j < 45; j ++) {
+            ripples_frames(world, 1);
+            ecs_set(world, boat, Position, {-4 + 2.5f * RIPPLES_DT * (float)(j + 1), 0, 1});
+        }
+
+        heights[i] = ripples_read(world, pond);
+        foam[i] = ripples_read_foam(world, pond);
+
+        /* The velocity is the frame velocity everywhere */
+        float v[2];
+        ripples_flow_at(world, pond, 0, 0, v);
+        test_assert(v[0] == 0.3f);
+        test_assert(v[1] == -0.2f);
+        ecs_fini(world);
+    }
+
+    test_assert(ripples_max(heights[0], -7, -7, 7, 7) > 1e-4f);
+    test_assert(ripples_sum(foam[0]) > 0);
+    test_assert(memcmp(heights[0], heights[1], sizeof(ripples_field_t)) == 0);
+    test_assert(memcmp(foam[0], foam[1], sizeof(ripples_field_t)) == 0);
+    for (i = 0; i < 2; i ++) {
+        ecs_os_free(heights[i]);
+        ecs_os_free(foam[i]);
+    }
+}

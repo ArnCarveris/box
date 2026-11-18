@@ -1785,6 +1785,30 @@ typedef struct box_render_water_waves_t {
  * the normals of the field */
 #define BOX_RENDER_RIPPLE_PLANE_TOLERANCE (0.5f)
 
+/** Water shapes with a WaterFlow a field of WaterRipples takes a frame at most, the nearest to
+ * the center of its window first; the others are ignored */
+#define BOX_RENDER_RIPPLE_FLOWS (64)
+
+/** World units inside the edges of the rectangle of a flowing Water over which its weight in the
+ * velocity of a field of WaterRipples fades from 1 to 0 */
+#define BOX_RENDER_RIPPLE_FLOW_FADE (1.0f)
+
+/** Cells a step of a field of WaterRipples looks back along its velocity relative to the water
+ * frame at most, REACH of water_ripples.wgsl */
+#define BOX_RENDER_RIPPLE_FLOW_REACH (2.0f)
+
+/** The oriented XZ rectangle of a Water shape with a WaterFlow over a field of WaterRipples,
+ * FlowRect of water_ripples.wgsl. Positions and sizes are in cells from the corner of the window of
+ * the frame (or in world units, for box_render_ripples_flow_at, as long as all are in the same
+ * units). */
+typedef struct box_render_ripple_flow_t {
+    float center[2];        /**< Center of the rectangle */
+    float axis[2];          /**< Its first axis in world XZ, normalized; the second is
+                             *   (-axis[1], axis[0]) */
+    float extents[2];       /**< Half size along its two axes */
+    float velocity[2];      /**< WaterFlow velocity, world units per second (X, Z) */
+} box_render_ripple_flow_t;
+
 /** A source of a field of WaterRipples for the steps of a frame, RippleSource of
  * water_ripples.wgsl: a RippleSource (pushed every step) or a box_material_ripple_at disturbance
  * (once, on the first step). Positions are in cells from the corner of the window of the frame. */
@@ -1828,6 +1852,14 @@ typedef struct box_render_water_ripples_t {
                              *   BOX_RENDER_RIPPLE_CREST_SLOPE, from WaterRipples.crest_foam */
     int32_t source_first;   /**< First of its sources in the ripple_sources of the packet */
     int32_t source_count;   /**< Its sources */
+    float velocity[2];      /**< WaterFlow velocity of its Water that the window frame moves
+                             *   with, world units per second, 0 for still water */
+    int32_t flow_first;     /**< First of its flowing Water rectangles in the ripple_flows of
+                             *   the packet */
+    int32_t flow_count;     /**< Its flowing Water rectangles, the nearest to the center of the
+                             *   window first */
+    bool flowing;           /**< One of its rectangles flows relative to the frame, so the
+                             *   steps advect the heights and the foam */
 } box_render_water_ripples_t;
 
 /** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
@@ -2288,6 +2320,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t water_ripples; /**< box_render_water_ripples_t, the fields of WaterRipples,
                              *   stepped before the targets */
     ecs_vec_t ripple_sources; /**< box_render_ripple_source_t of those fields */
+    ecs_vec_t ripple_flows; /**< box_render_ripple_flow_t of those fields */
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */

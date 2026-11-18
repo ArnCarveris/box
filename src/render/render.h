@@ -690,6 +690,43 @@ float box_render_ripples_relative(
     const WaterFlow *flow,
     float *out);
 
+/** Get the weight of the rectangle of a flowing Water at a point, the C twin of flow_weight of
+ * water_ripples.wgsl: 0 outside it, rising smoothly (smoothstep) over fade inside each of its
+ * edges to 1, the product of the two axes.
+ *
+ * @param flow The rectangle
+ * @param fade Distance inside an edge over which the weight rises, in the units of the rectangle;
+ * 0 or less for a weight of 1 inside
+ * @param point The point, X and Z
+ * @return The weight, 0..1
+ */
+float box_render_ripples_flow_weight(
+    const box_render_ripple_flow_t *flow,
+    float fade,
+    const float *point);
+
+/** Get the velocity of the water at a point of a field of WaterRipples, the C twin of the flow
+ * pass of water_ripples.wgsl: the frame velocity plus the weighted average of the velocities of the
+ * rectangles relative to it (box_render_ripples_flow_weight), the frame velocity where no
+ * rectangle covers the point. Where every covering rectangle flows with the frame the result is
+ * the frame velocity exactly.
+ *
+ * @param flows The rectangles
+ * @param count Rectangles
+ * @param fade Distance inside an edge over which a weight rises, in the units of the rectangles
+ * @param frame Velocity of the water frame (the WaterFlow of the Water of the field), X and Z
+ * @param point The point, X and Z
+ * @param out Receives the velocity, world units per second, X and Z
+ * @return The sum of the weights of the rectangles at the point, 0 where none covers it
+ */
+float box_render_ripples_flow_at(
+    const box_render_ripple_flow_t *flows,
+    int32_t count,
+    float fade,
+    const float *frame,
+    const float *point,
+    float *out);
+
 /** Get the wave terms of a step of a field of WaterRipples: the wave speed clamped to
  * BOX_RENDER_RIPPLE_COURANT and the damping as a factor of the velocity per step. The amplitude
  * of h + keep (h - h_prev) shrinks by sqrt(keep) a step, so its energy by keep: keep is

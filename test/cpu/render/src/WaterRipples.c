@@ -795,3 +795,363 @@ void WaterRipples_foam_at_next_step(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+/** Create a length of flowing water: a Water box of len by width world units, 0.01 thick, with
+ * a WaterFlow.
+ *
+ * @param world The world
+ * @param x World X of its center
+ * @param y World Y of its center
+ * @param z World Z of its center
+ * @param len World units along its X
+ * @param width World units along its Z
+ * @param vx WaterFlow velocity X
+ * @param vz WaterFlow velocity Z
+ * @return The length
+ */
+static ecs_entity_t flow_water(
+    ecs_world_t *world,
+    float x,
+    float y,
+    float z,
+    float len,
+    float width,
+    float vx,
+    float vz)
+{
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {x, y, z});
+    ecs_set(world, e, Box, {len, 0.01f, width});
+    ecs_add(world, e, Water);
+    ecs_set(world, e, WaterFlow, {.velocity = {vx, vz}});
+
+    return e;
+}
+
+/** Get a flowing Water rectangle of a field in the last packet.
+ *
+ * @param null The backend
+ * @param rec The field
+ * @param index Index of the rectangle in the field
+ * @return The rectangle
+ */
+static const box_render_ripple_flow_t* flow_of(
+    const box_render_null_t *null,
+    const box_render_water_ripples_t *rec,
+    int32_t index)
+{
+    test_assert(index < rec->flow_count);
+
+    return ecs_vec_get_t(&null->last.ripple_flows, box_render_ripple_flow_t,
+        rec->flow_first + index);
+}
+
+/** Get the distance of a rectangle from a point, 0 inside it.
+ *
+ * @param r The rectangle
+ * @param x X of the point
+ * @param z Z of the point
+ * @return The distance
+ */
+static float flow_distance(
+    const box_render_ripple_flow_t *r,
+    float x,
+    float z)
+{
+    float dx = x - r->center[0], dz = z - r->center[1];
+    float lx = fabsf(dx * r->axis[0] + dz * r->axis[1]) - r->extents[0];
+    float lz = fabsf(-dx * r->axis[1] + dz * r->axis[0]) - r->extents[1];
+    lx = lx > 0 ? lx : 0;
+    lz = lz > 0 ? lz : 0;
+
+    return sqrtf(lx * lx + lz * lz);
+}
+
+void WaterRipples_flow_inside(void) {
+    box_render_ripple_flow_t r = {
+        .center = {0, 0}, .axis = {1, 0}, .extents = {4, 2}, .velocity = {1, 0}
+    };
+    float frame[2] = {0, 0}, out[2];
+
+    /* Deep inside the rectangle its weight is 1 and the water flows with it */
+    float p[2] = {0, 0};
+    test_flt(box_render_ripples_flow_weight(&r, 1, p), 1);
+    test_flt(box_render_ripples_flow_at(&r, 1, 1, frame, p, out), 1);
+    test_flt(out[0], 1);
+    test_flt(out[1], 0);
+
+    /* Half a unit inside an edge the weight is half way up its rise, the velocity the same */
+    float edge[2] = {3.5f, 0};
+    test_assert(fabsf(box_render_ripples_flow_weight(&r, 1, edge) - 0.5f) < 1e-5f);
+    box_render_ripples_flow_at(&r, 1, 1, frame, edge, out);
+    test_assert(fabsf(out[0] - 1) < 1e-6f);
+    test_assert(fabsf(out[1]) < 1e-6f);
+
+    /* Without a fade the weight is 1 up to the edge */
+    test_flt(box_render_ripples_flow_weight(&r, 0, edge), 1);
+
+    /* Turned to Z, it is long along Z and narrow along X */
+    box_render_ripple_flow_t t = {
+        .center = {0, 0}, .axis = {0, 1}, .extents = {4, 2}, .velocity = {0, 2}
+    };
+    float along[2] = {0, 3}, across[2] = {3, 0};
+    test_assert(box_render_ripples_flow_weight(&t, 0.5f, along) > 0.9f);
+    test_flt(box_render_ripples_flow_weight(&t, 0.5f, across), 0);
+
+    /* A rectangle that flows with the frame gives the frame velocity exactly */
+    float lagoon[2] = {0.3f, -0.7f};
+    box_render_ripple_flow_t same = {
+        .center = {0, 0}, .axis = {0.6f, 0.8f}, .extents = {4, 2}, .velocity = {0.3f, -0.7f}
+    };
+    box_render_ripples_flow_at(&same, 1, 1, lagoon, edge, out);
+    test_assert(out[0] == lagoon[0]);
+    test_assert(out[1] == lagoon[1]);
+}
+
+void WaterRipples_flow_at_seams(void) {
+    /* Two lengths that overlap by 0.2 at x = 0, one flowing east, the other north */
+    box_render_ripple_flow_t r[2] = {
+        { .center = {-2, 0}, .axis = {1, 0}, .extents = {2.1f, 1.6f}, .velocity = {1, 0} },
+        { .center = {2, 0}, .axis = {1, 0}, .extents = {2.1f, 1.6f}, .velocity = {0, 1} }
+    };
+    float frame[2] = {0.25f, 0}, out[2], prev[2];
+
+    /* Half way through the overlap the water flows with both */
+    float mid[2] = {0, 0};
+    test_assert(box_render_ripples_flow_at(r, 2, 1, frame, mid, out) > 0);
+    test_assert(fabsf(out[0] - 0.5f) < 1e-5f);
+    test_assert(fabsf(out[1] - 0.5f) < 1e-5f);
+
+    /* Outside the overlap each length has its own velocity */
+    float west[2] = {-0.5f, 0}, east[2] = {0.5f, 0};
+    box_render_ripples_flow_at(r, 2, 1, frame, west, out);
+    test_assert(fabsf(out[0] - 1) < 1e-6f);
+    test_assert(fabsf(out[1]) < 1e-6f);
+    box_render_ripples_flow_at(r, 2, 1, frame, east, out);
+    test_assert(fabsf(out[0]) < 1e-6f);
+    test_assert(fabsf(out[1] - 1) < 1e-6f);
+
+    /* And it turns continuously across the seam, never toward the frame velocity */
+    float x, p[2] = {-0.3f, 0};
+    box_render_ripples_flow_at(r, 2, 1, frame, p, prev);
+    for (x = -0.3f; x <= 0.3f; x += 0.001f) {
+        p[0] = x;
+        box_render_ripples_flow_at(r, 2, 1, frame, p, out);
+        test_assert(fabsf(out[0] - prev[0]) < 0.05f);
+        test_assert(fabsf(out[1] - prev[1]) < 0.05f);
+        test_assert(fabsf(out[0] + out[1] - 1) < 1e-4f);
+        prev[0] = out[0];
+        prev[1] = out[1];
+    }
+}
+
+void WaterRipples_flow_outside(void) {
+    box_render_ripple_flow_t r = {
+        .center = {0, 0}, .axis = {1, 0}, .extents = {4, 2}, .velocity = {1, 0}
+    };
+    float frame[2] = {0.3f, -0.2f}, out[2];
+
+    /* Outside any rectangle the water flows with the frame */
+    float p[2] = {5, 0}, q[2] = {0, 2.5f};
+    test_flt(box_render_ripples_flow_weight(&r, 1, p), 0);
+    test_flt(box_render_ripples_flow_at(&r, 1, 1, frame, p, out), 0);
+    test_assert(out[0] == frame[0]);
+    test_assert(out[1] == frame[1]);
+    test_flt(box_render_ripples_flow_at(&r, 1, 1, frame, q, out), 0);
+    test_assert(out[0] == frame[0]);
+    test_assert(out[1] == frame[1]);
+
+    /* On the edge too */
+    float e[2] = {4, 0};
+    test_flt(box_render_ripples_flow_weight(&r, 1, e), 0);
+
+    /* Without rectangles */
+    test_flt(box_render_ripples_flow_at(NULL, 0, 1, frame, p, out), 0);
+    test_assert(out[0] == frame[0]);
+    test_assert(out[1] == frame[1]);
+}
+
+void WaterRipples_flows_collected(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t pond = pond_new(world);
+
+    /* A length farther from the center of the window first, then one over it */
+    flow_water(world, -6, 0, 3, 4, 2, 0, 0.5f);
+    flow_water(world, 2, 0.2f, 0, 4, 2, 1, 0);
+
+    /* Outside the window, outside the height band, without a WaterFlow, without a Water */
+    flow_water(world, 40, 0, 0, 4, 2, 1, 0);
+    flow_water(world, 0, 2, 0, 4, 2, 1, 0);
+    ecs_entity_t still = ecs_new(world);
+    ecs_set(world, still, Position, {5, 0, 5});
+    ecs_set(world, still, Box, {2, 0.01f, 2});
+    ecs_add(world, still, Water);
+    ecs_entity_t dry = ecs_new(world);
+    ecs_set(world, dry, Position, {-5, 0, -5});
+    ecs_set(world, dry, Box, {2, 0.01f, 2});
+    ecs_set(world, dry, WaterFlow, {.velocity = {1, 1}});
+
+    frame_dt(world, 1.0f / 60);
+    frame_dt(world, 1.0f / 60);
+    const box_render_water_ripples_t *rec = field_of(null, pond);
+    test_assert(rec != NULL);
+    test_flt(rec->velocity[0], 0);
+    test_flt(rec->velocity[1], 0);
+    test_int(rec->flow_count, 2);
+    test_bool(rec->flowing, true);
+    float cell = rec->cell;
+
+    /* The nearest first, in cells from the corner of the window */
+    const box_render_ripple_flow_t *a = flow_of(null, rec, 0);
+    test_assert(fabsf(rec->corner[0] + a->center[0] * cell - 2) < 1e-3f);
+    test_assert(fabsf(rec->corner[1] + a->center[1] * cell) < 1e-3f);
+    test_assert(fabsf(fabsf(a->axis[0]) - 1) < 1e-5f);
+    test_assert(fabsf(a->extents[0] * cell - 2) < 1e-3f);
+    test_assert(fabsf(a->extents[1] * cell - 1) < 1e-3f);
+    test_flt(a->velocity[0], 1);
+    test_flt(a->velocity[1], 0);
+
+    const box_render_ripple_flow_t *b = flow_of(null, rec, 1);
+    test_assert(fabsf(rec->corner[0] + b->center[0] * cell + 6) < 1e-3f);
+    test_assert(fabsf(rec->corner[1] + b->center[1] * cell - 3) < 1e-3f);
+    test_flt(b->velocity[0], 0);
+    test_flt(b->velocity[1], 0.5f);
+
+    /* A length turned a quarter around Y lies along Z */
+    ecs_entity_t turned = flow_water(world, 0, 0, -8, 4, 2, 0, -1);
+    ecs_set(world, turned, Rotation, {0, GLM_PI_2f, 0});
+    frame_dt(world, 1.0f / 60);
+    rec = field_of(null, pond);
+    test_int(rec->flow_count, 3);
+    const box_render_ripple_flow_t *t = flow_of(null, rec, 2);
+    test_flt(t->velocity[1], -1);
+    test_assert(fabsf(fabsf(t->axis[1]) - 1) < 1e-5f);
+    test_assert(fabsf(t->extents[0] * cell - 2) < 1e-3f);
+    test_assert(fabsf(t->extents[1] * cell - 1) < 1e-3f);
+    test_assert(fabsf(rec->corner[1] + t->center[1] * cell + 8) < 1e-3f);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void WaterRipples_flows_limit(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t pond = pond_new(world);
+
+    /* A row of small flowing Water shapes, more than a field takes */
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_RIPPLE_FLOWS + 6; i ++) {
+        flow_water(world, 0.4f * (float)i - 13.9f, 0, 0, 0.2f, 0.2f, 1, 0);
+    }
+
+    frame_dt(world, 1.0f / 60);
+    frame_dt(world, 1.0f / 60);
+    const box_render_water_ripples_t *rec = field_of(null, pond);
+    test_assert(rec != NULL);
+    test_int(rec->flow_count, BOX_RENDER_RIPPLE_FLOWS);
+
+    /* The nearest to the center of the window, nearest first; the 6 farthest are left out */
+    float half = (float)rec->resolution * 0.5f, last = 0;
+    for (i = 0; i < rec->flow_count; i ++) {
+        const box_render_ripple_flow_t *r = flow_of(null, rec, i);
+        float d = flow_distance(r, half, half);
+        test_assert(d >= last - 1e-4f);
+        last = d;
+        test_assert(fabsf(rec->corner[0] + r->center[0] * rec->cell) < 12.8f);
+    }
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void WaterRipples_flows_with_frame(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+
+    /* A lagoon: one Water shape that flows uniformly under its own field */
+    ecs_entity_t lagoon = flow_water(world, 0, 0, 0, 24, 24, 0.4f, -0.3f);
+    ecs_set(world, lagoon, WaterRipples, {.size = 32, .resolution = 256, .wave_speed = 2,
+        .damping = 0.5f, .strength = 1});
+    frame_dt(world, 1.0f / 60);
+    frame_dt(world, 1.0f / 60);
+
+    /* It is its own rectangle, which flows with the frame: nothing is advected */
+    const box_render_water_ripples_t *rec = field_of(null, lagoon);
+    test_assert(rec != NULL);
+    test_flt(rec->velocity[0], 0.4f);
+    test_flt(rec->velocity[1], -0.3f);
+    test_int(rec->flow_count, 1);
+    test_bool(rec->flowing, false);
+    const box_render_ripple_flow_t *r = flow_of(null, rec, 0);
+    test_assert(r->velocity[0] == rec->velocity[0]);
+    test_assert(r->velocity[1] == rec->velocity[1]);
+    test_assert(fabsf(r->extents[0] * rec->cell - 12) < 1e-3f);
+
+    /* A second length that flows differently makes the field advect */
+    flow_water(world, 10, 0, 0, 4, 4, 1, 0);
+    frame_dt(world, 1.0f / 60);
+    rec = field_of(null, lagoon);
+    test_int(rec->flow_count, 2);
+    test_bool(rec->flowing, true);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}
+
+void WaterRipples_source_relative_to_local_flow(void) {
+    box_render_null_t *null;
+    ecs_world_t *world = world_new(&null);
+    ecs_entity_t pond = pond_new(world);
+
+    /* A slow pool and a fast run side by side, the field itself still */
+    flow_water(world, -4, 0, 0, 6, 4, 0.2f, 0);
+    flow_water(world, 4, 0, 0, 6, 4, 1.2f, 0);
+
+    /* A stone standing still in each, and a log that flows with the run */
+    ecs_entity_t slow = ecs_new(world);
+    ecs_set(world, slow, Position, {-4, 0, 0});
+    ecs_set(world, slow, RippleSource, {.extents = {0.3f, 0.3f}, .strength = 1, .foam = 1});
+    ecs_entity_t fast = ecs_new(world);
+    ecs_set(world, fast, Position, {4, 0, 0});
+    ecs_set(world, fast, RippleSource, {.extents = {0.3f, 0.3f}, .strength = 1, .foam = 1});
+    ecs_entity_t log = ecs_new(world);
+    ecs_set(world, log, Position, {3, 0, 1});
+    ecs_set(world, log, RippleSource, {.extents = {0.3f, 0.3f}, .strength = 1, .foam = 1});
+
+    double x = 3;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        frame_dt(world, 1.0f / 60);
+        x += 1.2 / 60;
+        ecs_set(world, log, Position, {(float)x, 0, 1});
+    }
+
+    const box_render_water_ripples_t *rec = field_of(null, pond);
+    test_assert(rec != NULL);
+    test_int(rec->flow_count, 2);
+    test_int(rec->source_count, 2);
+
+    float dt = (float)BOX_RENDER_RIPPLE_STEP;
+    const box_render_ripple_source_t *a = source_of(null, rec, 0);
+    const box_render_ripple_source_t *b = source_of(null, rec, 1);
+    if (rec->corner[0] + a->to[0] * rec->cell > 0) {
+        const box_render_ripple_source_t *t = a;
+        a = b;
+        b = t;
+    }
+
+    /* Each pushes by its speed through its own water, the one in the run six times more */
+    test_assert(fabsf(rec->corner[0] + a->to[0] * rec->cell + 4) < 1e-3f);
+    test_assert(fabsf(rec->corner[0] + b->to[0] * rec->cell - 4) < 1e-3f);
+    test_assert(fabsf(a->amount + BOX_RENDER_RIPPLE_PUSH * 0.2f * dt) < 1e-8f);
+    test_assert(fabsf(b->amount + BOX_RENDER_RIPPLE_PUSH * 1.2f * dt) < 1e-8f);
+    test_assert(fabsf(a->foam - BOX_RENDER_RIPPLE_FOAM_PUSH * 0.2f * dt) < 1e-6f);
+    test_assert(fabsf(b->foam - BOX_RENDER_RIPPLE_FOAM_PUSH * 1.2f * dt) < 1e-6f);
+    test_assert(b->amount < a->amount);
+    test_assert(b->foam > a->foam);
+
+    ecs_fini(world);
+    box_render_null_free(null);
+}

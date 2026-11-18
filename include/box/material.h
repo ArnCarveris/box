@@ -462,8 +462,13 @@ ECS_STRUCT(WaterWaves, {
 
 /** Velocity a Water surface moves with (a river, the water around a paddling boat), default
  * still, inherited by instances like Water. The WaterWaves of the shape travel in the frame
- * that moves with it: their phases integrate the velocity over the time. Without WaterWaves
- * it only stores the velocity; without Water it does nothing.
+ * that moves with it: their phases integrate the velocity over the time.
+ *
+ * The field of a WaterRipples follows it too: its frame moves with the WaterFlow of its own
+ * Water, and the ripples and foam over any other Water shape with a WaterFlow (the lengths of a
+ * bending brook, each flowing along its chord) drift with the velocity of that shape, blended
+ * smoothly across the seams between shapes. A RippleSource pushes relative to that local flow.
+ * Without WaterWaves or a field it only stores the velocity; without Water it does nothing.
  */
 ECS_STRUCT(WaterFlow, {
     vec2 velocity; /**< World units per second (X, Z) the surface moves with */
@@ -563,11 +568,26 @@ ECS_STRUCT(WaterCaustics, {
  * time gives the same field every time. The wave speed is clamped so the steps stay stable for
  * any size and resolution.
  *
- * The field lives in the frame of the water that WaterFlow moves (the integral of its velocity,
- * kept in double precision): ripples drift with the water without being resampled. The window
- * of the field keeps centered on follow by whole cells with wrapping addressing; cells that enter
- * it start flat, the others keep their heights. The heights fade to flat toward the border of the
- * window, so waves do not reflect off it.
+ * The field lives in the frame of the water that the WaterFlow of its Water moves (the integral
+ * of its velocity, kept in double precision): over that Water ripples drift with the water without
+ * being resampled. The window of the field keeps centered on follow by whole cells with wrapping
+ * addressing; cells that enter it start flat, the others keep their heights. The heights fade to
+ * flat toward the border of the window, so waves do not reflect off it.
+ *
+ * The field follows the local flow of the water under it: every frame it takes the Water shapes of
+ * its scene with a WaterFlow whose oriented XZ rectangle (world transform and mesh bounds)
+ * overlaps its window and whose center lies within half a world unit of the height of its Water,
+ * BOX_RENDER_RIPPLE_FLOWS at most, the nearest to the center of the window first. The velocity of
+ * a cell is the weighted average of the velocities of the rectangles covering it, each weight
+ * fading out smoothly over BOX_RENDER_RIPPLE_FLOW_FADE world units inside the edges of its
+ * rectangle, so it is continuous across the seams between overlapping shapes (the shape of the
+ * Water of the field is one of them, so a run across a flowing lagoon blends with the lagoon); a
+ * cell no rectangle covers takes the WaterFlow of the Water of the field. Every step the heights
+ * and the foam are advected by that velocity relative to the frame (semi-Lagrangian, bilinear,
+ * looking back BOX_RENDER_RIPPLE_FLOW_REACH cells a step at most), so foam laid down in a bending
+ * brook drifts downstream along its bends at the speed of each length. Where the water flows
+ * with the frame nothing is resampled: a field over one uniformly flowing Water is the same as
+ * without the other shapes. Flow does not divert around obstacles.
  *
  * The field has a foam channel next to the heights, 0..1 per cell: RippleSource.foam lays foam
  * down, box_material_foam_at splashes it, and where the slope of the heights is steeper than
@@ -608,8 +628,9 @@ ECS_STRUCT(WaterRipples, {
  * Every step of the field of WaterRipples of its scene that its ellipse overlaps, at its world
  * position and yaw (its extents scaled by its world scale), the water under it sinks in
  * proportion to its speed relative to the water: its world velocity, from the change of its world
- * position between frames, minus the WaterFlow velocity of the Water. A boat held still on
- * flowing water leaves a wake, a rock that flows with the water none; one that moves faster than
+ * position between frames, minus the local flow of the field at its position (the velocity of its
+ * cell, see WaterRipples). A boat held still on flowing water leaves a wake, stronger in a fast
+ * run than in a slow pool; a rock that flows with the water none; one that moves faster than
  * the wave speed leaves a V shaped wake. With foam it also lays foam down in the foam channel of
  * the field, in proportion to the same speed, so it leaves a foaming trail that drifts and fades
  * with the water. A field takes BOX_RENDER_RIPPLE_SOURCES at most.

@@ -1150,7 +1150,14 @@
                     "foam_terms",
                     "foam_in_record",
                     "source_foam",
-                    "foam_at_next_step"
+                    "foam_at_next_step",
+                    "flow_inside",
+                    "flow_at_seams",
+                    "flow_outside",
+                    "flows_collected",
+                    "flows_limit",
+                    "flows_with_frame",
+                    "source_relative_to_local_flow"
                 ]
             },
             {
