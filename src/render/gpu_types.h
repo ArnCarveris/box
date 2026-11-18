@@ -877,6 +877,10 @@ typedef struct box_gpu_atlas_read_t {
  * planet light slot */
 #define BOX_GPU_PLANET_LIGHTS_BINDING (22)
 
+/** Binding of the view group of the wave table of the Water materials
+ * (BOX_RENDER_BUFFER_WATER_WAVES), water_wave_sets of mesh_extended.wgsl */
+#define BOX_GPU_WATER_WAVES_BINDING (24)
+
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */
 #define BOX_GPU_PLANET_LUTS_BINDING (23)
@@ -1091,6 +1095,8 @@ typedef struct box_gpu_t {
                                      *   the pages without one, all but the frame pages */
     WGPUBuffer no_materials;        /**< One default material record, the material table of
                                      *   the draws before the main thread sent one */
+    WGPUBuffer no_water_waves;      /**< A zero wave table, bound by the view groups before
+                                     *   the main thread sent one: no waves */
     box_gpu_cull_t cull;            /**< Cull pass state */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */

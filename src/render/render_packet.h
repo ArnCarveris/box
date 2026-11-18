@@ -201,6 +201,12 @@ static inline bool box_render_is_mesh(
  * instances of the mover pages with it. */
 #define BOX_RENDER_BUFFER_MOVERS (4)
 
+/** Buffer handle of the wave table: BOX_RENDER_WATER_WAVE_SETS box_render_water_waves_t, the
+ * travelling waves of the Water materials with WaterWaves by the set their record names
+ * (BOX_RENDER_WATER_WAVES_SHIFT), set 0 unused. Bound as uniforms by the view group of the
+ * forward pass, which the Water fragments read it from. */
+#define BOX_RENDER_BUFFER_WATER_WAVES (5)
+
 /** Records the material table holds at least, doubling from there */
 #define BOX_RENDER_MATERIALS_MIN (64)
 
@@ -1550,9 +1556,11 @@ typedef struct box_render_material_t {
     float water_foam_scale; /**< Water.foam_scale, 0 without one or when not finite */
     float water_ripple_scale; /**< Water.ripple_scale, 0 without one, when negative or not
                              *   finite */
-    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags in the low byte, Water.absorption
-                             *   display encoded above them (BOX_RENDER_WATER_ABSORPTION_SHIFT):
-                             *   r << 8 | g << 16 | b << 24; 0 without one */
+    uint32_t water_flags;   /**< BOX_RENDER_WATER_* flags in bit 0, the set of its waves in
+                             *   bits 1..7 (BOX_RENDER_WATER_WAVES_SHIFT, 0 without WaterWaves),
+                             *   Water.absorption display encoded above them
+                             *   (BOX_RENDER_WATER_ABSORPTION_SHIFT): r << 8 | g << 16 | b << 24;
+                             *   0 without one */
     float distortion_strength; /**< Distortion.strength, 0 without one or when negative or not
                              *   finite (and for a shape with Water, which ignores it) */
     float distortion_frequency; /**< 1 over Distortion.scale, which is at least
@@ -1601,6 +1609,37 @@ typedef struct box_render_material_t {
 
 /** Bit of the Water record flags word at which the display encoded Water.absorption starts */
 #define BOX_RENDER_WATER_ABSORPTION_SHIFT (8)
+
+/** Bit of the Water record flags word at which the set of its waves in the wave table starts
+ * (BOX_RENDER_BUFFER_WATER_WAVES), 0 for a Water without WaterWaves */
+#define BOX_RENDER_WATER_WAVES_SHIFT (1)
+
+/** Mask of the set of the waves of a Water record, after the shift */
+#define BOX_RENDER_WATER_WAVES_MASK (0x7Fu)
+
+/** Sets of the wave table, set 0 included, which means no waves: BOX_RENDER_WATER_WAVES_MASK + 1 */
+#define BOX_RENDER_WATER_WAVE_SETS (128)
+
+/** One wave of a set of the wave table, WaterWave of mesh_extended.wgsl */
+typedef struct box_render_water_wave_t {
+    float direction[2];     /**< Normalized direction of travel in world XZ */
+    float k;                /**< Wave number 2 pi / wavelength, 0 for a disabled wave */
+    float phase;            /**< Phase wrapped to 0..2 pi: the height is amplitude *
+                             *   sin(k dot(direction, xz) - phase) */
+    float slope;            /**< Amplitude times k, the largest slope of the wave; 0 for a
+                             *   disabled wave */
+    float steepness;        /**< Gerstner Q, 0..1 */
+    float pad[2];           /**< Unused */
+} box_render_water_wave_t;
+
+/** A set of the wave table, the WaterWaves of one Water material, WaterWaveSet of
+ * mesh_extended.wgsl */
+typedef struct box_render_water_waves_t {
+    box_render_water_wave_t waves[4]; /**< The waves, BOX_MATERIAL_WATER_WAVES */
+    float detail;           /**< WaterWaves.detail, at least 0 */
+    uint32_t count;         /**< Waves that are enabled */
+    float pad[2];           /**< Unused */
+} box_render_water_waves_t;
 
 /** Bits of box_render_mesh_shading_t.material that hold the slot of the material table, the
  * planet light slot is above them */

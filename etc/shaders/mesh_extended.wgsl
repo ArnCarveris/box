@@ -28,6 +28,30 @@ override transmissive: bool = false;
 // F0 of a Water surface, of an index of refraction of 1.33.
 const WATER_F0: f32 = 0.02;
 
+// One travelling Gerstner wave of the wave table (box_render_water_wave_t): its normalized
+// direction in world XZ, wave number k (0 for a disabled wave) and phase in a; its slope
+// (amplitude times k) and steepness (Gerstner Q, 0..1) in b.xy.
+struct WaterWave {
+    a: vec4f,
+    b: vec4f,
+};
+
+// The WaterWaves of a Water material (box_render_water_waves_t): its waves, the weight of the
+// normal map over them and the number of enabled waves.
+struct WaterWaveSet {
+    waves: array<WaterWave, 4>,
+    detail: f32,
+    count: u32,
+    pad: vec2f,
+};
+
+// Sets of the wave table (BOX_RENDER_WATER_WAVE_SETS).
+const WATER_WAVE_SETS: u32 = 128u;
+
+// The wave table (BOX_RENDER_BUFFER_WATER_WAVES), by the set a Water record names, set 0
+// unused; zero before the main thread sent one.
+@group(0) @binding(24) var<uniform> water_wave_sets: array<WaterWaveSet, WATER_WAVE_SETS>;
+
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
 // are taken a frame; later glass samples the last one. A view without transmissive draws, and
@@ -784,6 +808,35 @@ fn water_layers(f: VertexOut, geometric: vec3f, m: Material) -> Layers {
     return layers;
 }
 
+// The normal of a Water fragment under the travelling waves of a set of the wave table: the
+// analytic normal of the sum of its Gerstner waves at the world XZ of the fragment, with the
+// normal map normal blended over it (whiteout), its tilt scaled by detail. The surface is taken
+// to face +Y, as Water is seen from above. Each wave fades out as its wavelength shrinks from 4
+// to 2 pixels along the screen axes (dx and dy, the world XZ derivatives of the fragment), so
+// distant water does not alias; the steepness lifts by Q / count of the waves (Gerstner).
+fn water_waves_normal(index: u32, xz: vec2f, dx: vec2f, dy: vec2f, mapped: vec3f) -> vec3f {
+    let s = water_wave_sets[min(index, WATER_WAVE_SETS - 1u)];
+    let count = f32(max(s.count, 1u));
+    var slope = vec2f(0.0);
+    var lift = 0.0;
+    for (var i = 0u; i < 4u; i++) {
+        let w = s.waves[i];
+        let k = w.a.z;
+        if (k <= 0.0 || w.b.x <= 0.0) {
+            continue;
+        }
+        let per_pixel = k * max(abs(dot(w.a.xy, dx)), abs(dot(w.a.xy, dy)));
+        let fade = smoothstep(2.0, 4.0, 6.2831853 / max(per_pixel, 1e-6));
+        let theta = k * dot(w.a.xy, xz) - w.a.w;
+        slope += w.a.xy * (w.b.x * fade * cos(theta));
+        lift += w.b.y * fade * sin(theta) / count;
+    }
+    let waves = normalize(vec3f(-slope.x, max(1.0 - lift, 1e-3), -slope.y));
+    let detail = normalize(vec3f(mapped.x * s.detail, max(mapped.y, 1e-3),
+        mapped.z * s.detail));
+    return normalize(vec3f(waves.x + detail.x, waves.y * detail.y, waves.z + detail.z));
+}
+
 // Red of the foam texture of a Water at foam_scale times the UVs, 1 without one. The record is
 // flat, so the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
@@ -956,7 +1009,13 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
 @fragment fn fs(f: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     if (water) {
         let geometric = normalize(f.normal);
-        let layers = water_layers(f, geometric, vo_water(f));
+        let dx = dpdx(f.world.xz);
+        let dy = dpdy(f.world.xz);
+        var layers = water_layers(f, geometric, vo_water(f));
+        let waves = vo_water_waves(f);
+        if (waves != 0u) {
+            layers.normal = water_waves_normal(waves, f.world.xz, dx, dy, layers.normal);
+        }
         return water_lit(f, surface_of(f, front, geometric, layers));
     }
 

@@ -302,6 +302,9 @@ typedef struct box_draw_material_t {
     const Distortion *distortion; /**< Shimmer of the scene behind a 3D shape, ignored by 2D
                                  *   shapes and by Water */
     const Water *water;         /**< Water surface of a 3D shape, ignored by 2D shapes */
+    const WaterWaves *waves;    /**< Travelling waves of the Water, NULL without Water */
+    const WaterFlow *flow;      /**< Velocity the waves move with, NULL without Water */
+    uint32_t water_waves;       /**< Set of the waves in the wave table, 0 for none */
     const WindSway *sway;       /**< Wind sway of a 3D shape, ignored by 2D shapes */
     box_render_wind_t wind;     /**< Wind of the frame the sway is packed with, read with sway */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
@@ -362,6 +365,8 @@ typedef struct box_draw_transition_material_t {
     Distortion distortion;  /**< Distortion */
     Water water;            /**< Water, which has no transition: the record keeps it */
     bool watered;           /**< The material has a Water */
+    uint32_t water_waves;   /**< Set of the WaterWaves of the Water in the wave table, which
+                             *   has no transition: the record keeps it */
     WindSway sway;          /**< WindSway, which has no transition: the record keeps it */
     bool swayed;            /**< The material has a WindSway */
     box_render_wind_t wind; /**< Wind of the frame the sway was packed with */
@@ -642,6 +647,26 @@ typedef struct box_draw_material_slot_t {
     uint8_t flags;          /**< Lists the slot is in and why it is private (materials.c) */
 } box_draw_material_slot_t;
 
+/** The phases of the WaterWaves of an owner of the material table, a set of the wave table */
+typedef struct box_draw_water_waves_state_t {
+    ecs_entity_t owner;     /**< Owner of the slot whose Water has the waves, 0 for a free set */
+    double time;            /**< Total render time the phases were integrated to */
+    double phases[4];       /**< Phase of each wave, wrapped to 0..2 pi
+                             *   (box_draws_water_waves_step) */
+} box_draw_water_waves_state_t;
+
+/** The wave table (BOX_RENDER_BUFFER_WATER_WAVES) as the main thread integrates and packs it */
+typedef struct box_draw_water_waves_t {
+    box_draw_water_waves_state_t states[BOX_RENDER_WATER_WAVE_SETS]; /**< By set, set 0
+                             *   unused */
+    box_render_water_waves_t table[BOX_RENDER_WATER_WAVE_SETS]; /**< By set, as uploaded */
+    uint32_t used;          /**< Sets up to the highest one ever handed out plus one, which the
+                             *   send uploads */
+    bool created;           /**< The table buffer was created */
+    bool dirty;             /**< A set changed since the last upload */
+    bool full;              /**< A Water found no free set, which was logged */
+} box_draw_water_waves_t;
+
 /** The material table, slot 0 the default material, as the main thread packed it and what the
  * GPU still needs of it.
  *
@@ -675,6 +700,7 @@ typedef struct box_draw_materials_t {
     float transmission_roughness; /**< Largest roughness of the transmissive materials, 1 for a
                              *   diffuse blur, 0 without any */
     bool features_valid;    /**< transmission_roughness was computed from the records */
+    box_draw_water_waves_t *waves; /**< The wave table, NULL until a Water has WaterWaves */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -1734,6 +1760,120 @@ void box_draws_material_of(
     ecs_entity_t owner,
     double time,
     box_draw_material_t *out);
+
+/** Resolve a WaterWave to what it travels with: its normalized direction (+X for a zero or
+ * non finite one), its wave number k = 2 pi / wavelength and its angular frequency, speed times
+ * k, or sqrt(g k) without a speed (deep water dispersion, g BOX_MATERIAL_WATER_GRAVITY).
+ *
+ * @param wave The wave
+ * @param direction Receives the direction, NULL to skip
+ * @param k Receives the wave number, 0 for a disabled wave, NULL to skip
+ * @param omega Receives the angular frequency, 0 for a disabled wave, NULL to skip
+ * @return Whether the wave is enabled: a positive finite wavelength
+ */
+bool box_draws_water_wave_resolve(
+    const WaterWave *wave,
+    float *direction,
+    double *k,
+    double *omega);
+
+/** Get the rate a wave's phase grows with: k times the WaterFlow velocity along its direction
+ * plus its angular frequency, radians per second, 0 for a disabled wave.
+ *
+ * @param wave The wave
+ * @param flow The velocity of the surface, NULL for still water
+ * @return The rate
+ */
+double box_draws_water_wave_rate(
+    const WaterWave *wave,
+    const WaterFlow *flow);
+
+/** Wrap a phase to 0..2 pi, 0 when not finite.
+ *
+ * @param phase The phase
+ * @return The wrapped phase
+ */
+double box_draws_water_phase_wrap(
+    double phase);
+
+/** Advance the phases of the waves of a WaterWaves by a time step in double precision, at the
+ * rates of box_draws_water_wave_rate, wrapped to 0..2 pi.
+ *
+ * @param phases The phases of the BOX_MATERIAL_WATER_WAVES waves
+ * @param waves The waves
+ * @param flow The velocity of the surface, NULL for still water
+ * @param dt Seconds, a step that is not finite or negative does nothing
+ */
+void box_draws_water_waves_step(
+    double *phases,
+    const WaterWaves *waves,
+    const WaterFlow *flow,
+    double dt);
+
+/** Pack a WaterWaves with its phases into a set of the wave table: the directions normalized,
+ * the phases as f32 below 2 pi, the steepness clamped to 0..1 and a disabled wave zero.
+ *
+ * @param out The set
+ * @param waves The waves
+ * @param phases The phases of the BOX_MATERIAL_WATER_WAVES waves
+ */
+void box_draws_water_waves_pack(
+    box_render_water_waves_t *out,
+    const WaterWaves *waves,
+    const double *phases);
+
+/** Get the set of the wave table of an owner of the material table, 0 for none.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @return The set
+ */
+uint32_t box_draws_water_waves_find(
+    const box_draw_materials_t *m,
+    ecs_entity_t owner);
+
+/** Get the set of the wave table of an owner whose Water has WaterWaves, or hand it a free one
+ * whose phases start as if integrated from time 0 to the time of the table. 0 when the table is
+ * full, logged once.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @param waves Its waves
+ * @param flow Its WaterFlow, NULL for none
+ * @return The set
+ */
+uint32_t box_draws_water_waves_set(
+    box_draw_materials_t *m,
+    ecs_entity_t owner,
+    const WaterWaves *waves,
+    const WaterFlow *flow);
+
+/** Integrate the phases of every set of the wave table to the time of the table with the
+ * WaterWaves and WaterFlow of its owner, and free the sets whose owner is gone, no longer owns
+ * a slot or lost its Water, WaterWaves or Scene.water.
+ *
+ * @param world The world
+ * @param m The table
+ */
+void box_draws_water_waves_advance(
+    const ecs_world_t *world,
+    box_draw_materials_t *m);
+
+/** Create the buffer of the wave table if needed and upload the sets that changed.
+ *
+ * @param m The table
+ * @param p The packet
+ */
+void box_draws_water_waves_upload(
+    box_draw_materials_t *m,
+    box_render_packet_t *p);
+
+/** Free the wave table.
+ *
+ * @param m The table
+ */
+void box_draws_water_waves_fini(
+    box_draw_materials_t *m);
 
 /** Compute the rim factor of a Fresnel, the C twin of fresnel_factor of material.wgsl:
  * saturate(bias + pow(1 - saturate(ndv), power)), 1 - ndv kept above 1e-6.

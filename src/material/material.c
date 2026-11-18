@@ -245,6 +245,25 @@ static void box_distortion_ctor(
     }
 }
 
+/** Construct WaterWaves values: no waves (every wavelength 0) and a detail of 1.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_waves_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterWaves *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterWaves){ .detail = BOX_MATERIAL_WATER_WAVES_DETAIL };
+    }
+}
+
 /** Construct Water values: a teal shallow and a dark blue deep body, depth 3, visibility 2, a
  * white absorption, a refraction of 0.02 and an off white foam band of width 0.3 without
  * texture or ripples.
@@ -388,6 +407,9 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, Transmission);
     ECS_META_COMPONENT(world, Distortion);
     ECS_META_COMPONENT(world, Water);
+    ECS_META_COMPONENT(world, WaterWave);
+    ECS_META_COMPONENT(world, WaterWaves);
+    ECS_META_COMPONENT(world, WaterFlow);
     ECS_META_COMPONENT(world, WindSway);
     ECS_META_COMPONENT(world, BlendMode);
     ECS_META_COMPONENT(world, BackFaceMode);
@@ -422,6 +444,9 @@ void BoxMaterialImport(
     ecs_set_hooks(world, Fresnel, { .ctor = box_fresnel_ctor });
     ecs_set_hooks(world, Distortion, { .ctor = box_distortion_ctor });
     ecs_set_hooks(world, Water, { .ctor = box_water_ctor });
+    ecs_set_hooks(world, WaterWaves, { .ctor = box_water_waves_ctor });
+    ecs_add_pair(world, ecs_id(WaterWaves), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(WaterFlow), EcsOnInstantiate, EcsInherit);
     ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });
     ecs_set_hooks(world, MaterialId, { .ctor = box_material_id_ctor });
     ecs_add_pair(world, ecs_id(MaterialId), EcsOnInstantiate, EcsInherit);

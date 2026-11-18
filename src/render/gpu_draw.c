@@ -77,13 +77,15 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
  * clusters, the shadows, the reflections, the aerial perspective, the environment, the
  * ambient occlusion, the cookie, the opaque snapshot, the planar images and the planet lights.
  *
+ * Binding BOX_GPU_WATER_WAVES_BINDING holds the wave table of the Water materials.
+ *
  * @param gpu The backend
  * @return The layout
  */
 static WGPUBindGroupLayout box_gpu_view_layout(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[24] = {
+    WGPUBindGroupLayoutEntry entries[25] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -250,9 +252,17 @@ static WGPUBindGroupLayout box_gpu_view_layout(
                 .format = WGPUTextureFormat_RGBA16Float,
                 .viewDimension = WGPUTextureViewDimension_2DArray
             }
+        },
+        {
+            .binding = BOX_GPU_WATER_WAVES_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t)
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 24, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 25, .entries = entries };
 
     return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
 }
@@ -361,6 +371,8 @@ void box_gpu_instance_layouts_init(
     gpu->no_materials = box_gpu_buffer_new(gpu, sizeof(box_render_material_t),
         WGPUBufferUsage_Storage);
     wgpuQueueWriteBuffer(gpu->queue, gpu->no_materials, 0, &fallback, sizeof(fallback));
+    gpu->no_water_waves = box_gpu_buffer_new(gpu,
+        BOX_RENDER_WATER_WAVE_SETS * sizeof(box_render_water_waves_t), WGPUBufferUsage_Uniform);
 }
 
 void box_gpu_instance_layouts_fini(
@@ -384,6 +396,11 @@ void box_gpu_instance_layouts_fini(
     if (gpu->no_materials) {
         wgpuBufferRelease(gpu->no_materials);
         gpu->no_materials = NULL;
+    }
+
+    if (gpu->no_water_waves) {
+        wgpuBufferRelease(gpu->no_water_waves);
+        gpu->no_water_waves = NULL;
     }
 }
 

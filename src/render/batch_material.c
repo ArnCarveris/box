@@ -412,13 +412,17 @@ float box_draws_water_foam(
  * depth and visibility at least BOX_RENDER_WATER_MIN, the other floats when finite (foam width
  * and ripple scale when positive), the ripple offset wrapped at the time; 0 without one.
  *
+ * The set of its WaterWaves in the wave table goes into the flags.
+ *
  * @param out The record
  * @param water The component, NULL for none
+ * @param waves Set of its WaterWaves in the wave table, 0 for none
  * @param time Total render time the ripple offset is computed at
  */
 static void box_draws_water_pack(
     box_render_material_t *out,
     const Water *water,
+    uint32_t waves,
     double time)
 {
     out->water_ripple_offset[0] = 0.0f;
@@ -456,6 +460,7 @@ static void box_draws_water_pack(
     out->water_flags = water->foam_texture ? BOX_RENDER_WATER_FOAM_TEXTURE : 0u;
     out->water_flags |= ((uint32_t)water->absorption.r | ((uint32_t)water->absorption.g << 8) |
         ((uint32_t)water->absorption.b << 16)) << BOX_RENDER_WATER_ABSORPTION_SHIFT;
+    out->water_flags |= (waves & BOX_RENDER_WATER_WAVES_MASK) << BOX_RENDER_WATER_WAVES_SHIFT;
     if (out->water_ripple_scale > 0.0f) {
         TextureScroll ripple = {
             .velocity = { water->ripple_velocity[0], water->ripple_velocity[1] }
@@ -620,7 +625,7 @@ void box_draws_material_pack(
     }
 
     box_draws_fresnel_pack(out, material->fresnel);
-    box_draws_water_pack(out, material->water, material->time);
+    box_draws_water_pack(out, material->water, material->water_waves, material->time);
     box_render_wind_pack(out, material->sway, &material->wind);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;

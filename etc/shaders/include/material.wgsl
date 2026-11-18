@@ -77,8 +77,9 @@ struct Material {
     water_foam_scale: f32,
     // Scale of the UVs of the second normal sample, 0 for none
     water_ripple_scale: f32,
-    // WATER_FOAM_TEXTURE when the foam samples its texture, in the low byte; above it
-    // Water.absorption display encoded, r << 8 | g << 16 | b << 24 (water_absorption)
+    // WATER_FOAM_TEXTURE when the foam samples its texture in bit 0, the set of its WaterWaves in
+    // the wave table in bits 1..7 (WATER_WAVES_SHIFT, 0 for none); above them Water.absorption
+    // display encoded, r << 8 | g << 16 | b << 24 (water_absorption)
     water_flags: u32,
     // Distortion strength (a fraction of the image height), 1 over its scale and the phase of
     // its noise (speed times the time, wrapped to 0..1), all 0 without one
@@ -114,6 +115,11 @@ const WATER_MIN: f32 = 1e-3;
 
 // Flag of a Water record whose foam samples its texture (BOX_RENDER_WATER_FOAM_TEXTURE).
 const WATER_FOAM_TEXTURE: u32 = 1u;
+
+// Bit of the flags of a Water record at which the set of its waves starts, and its mask
+// (BOX_RENDER_WATER_WAVES_SHIFT, BOX_RENDER_WATER_WAVES_MASK).
+const WATER_WAVES_SHIFT: u32 = 1u;
+const WATER_WAVES_MASK: u32 = 0x7Fu;
 
 // Flag of a record with a Distortion (BOX_RENDER_DISTORTION_PRESENT).
 const DISTORTION_PRESENT: u32 = 1u;

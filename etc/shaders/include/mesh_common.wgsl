@@ -153,7 +153,9 @@ struct VertexOut {
     // Fresnel strength, power, bias and opacity of the material, 0 without one or without
     // material_fresnel
     @location(12) @interpolate(flat) fresnel: vec4f,
-    // Fresnel color of the material in linear light as unorm16: r | g << 16, b
+    // Fresnel color of the material in linear light as unorm16: r | g << 16, b. Of a Water
+    // pipeline (water), which ignores Fresnel, x is the set of the WaterWaves of the material in
+    // the wave table, 0 for none (vo_water_waves).
     @location(13) @interpolate(flat) fresnel_color: vec2u,
     // Water foam width (its sign bit the WATER_FOAM_TEXTURE flag), ripple and foam scale
     // (pack2x16float) and ripple offset of a Water pipeline (water), which reuses flat2 (the
@@ -223,6 +225,12 @@ fn vo_water(f: VertexOut) -> Material {
     m.water_foam_scale = unpack2x16float(f.flat4.y).y;
     m.water_ripple_offset = bitcast<vec2f>(f.flat4.zw);
     return m;
+}
+
+// Set of the WaterWaves of the material of a fragment of a Water pipeline in the wave table, 0
+// for none.
+fn vo_water_waves(f: VertexOut) -> u32 {
+    return f.fresnel_color.x;
 }
 
 // The Distortion of the material of a fragment of a material_distortion pipeline: strength,
@@ -498,6 +506,8 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
             ((material.water_flags & WATER_FOAM_TEXTURE) << 31u),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),
             bitcast<vec2u>(material.water_ripple_offset));
+        o.fresnel_color = vec2u((material.water_flags >> WATER_WAVES_SHIFT) & WATER_WAVES_MASK,
+            0u);
     }
     if (material_distortion && !water && material.distortion_flags != 0u) {
         vertex_distortion(&o, p, material, frame, s.mapped);

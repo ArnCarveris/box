@@ -1565,6 +1565,8 @@ static void box_transition_send_materials(
         }
 
         box_draws_material_of(world, item->entity, p->time, &material);
+        material.water_waves = material.waves
+            ? box_draws_water_waves_find(&d->materials, item->entity) : 0u;
         box_draws_transition_target(&target, &material, BOX_DRAW_TRANSITION_TABLE);
         ecs_os_memcpy(target.nodes, item->nodes, ECS_SIZEOF(target.nodes));
         box_transition_send_material(s, p, BOX_RENDER_TRANSITION_MATERIAL, &target, offset);

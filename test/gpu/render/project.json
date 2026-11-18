@@ -330,6 +330,17 @@
                 ]
             },
             {
+                "id": "WaterWaves",
+                "testcases": [
+                    "periodic_along_direction",
+                    "moves_over_time",
+                    "flow_moves_pattern",
+                    "far_waves_fade",
+                    "without_waves_unchanged",
+                    "ignored_without_water"
+                ]
+            },
+            {
                 "id": "Distortion",
                 "testcases": [
                     "moves_stripes",

@@ -371,8 +371,8 @@ ECS_STRUCT(Distortion, {
  * saturate(1 - d / foam_width), broken up by the red of foam_texture. The direct and indirect
  * specular of PbrMaterial.roughness with an F0 of 0.02 (ior 1.33) adds on top.
  *
- * Waves are the PbrTextures.normal of the shape, scrolled by TextureScroll; ripple_scale adds a
- * second sample of it, moved by ripple_velocity and whiteout blended. With a ripple_scale above 0
+ * Waves are the PbrTextures.normal of the shape, scrolled by TextureScroll, under the travelling
+ * waves of a WaterWaves if any; ripple_scale adds a second sample of it, moved by ripple_velocity and whiteout blended. With a ripple_scale above 0
  * and a ripple_velocity its record is packed every frame, like that of a TextureScroll; a still
  * Water shares its record like the other material components.
  *
@@ -401,6 +401,68 @@ ECS_STRUCT(Water, {
                              *   none */
     vec2 ripple_velocity;   /**< Texture widths per second the second sample moves, wrapped
                              *   in double precision like TextureScroll */
+});
+
+/** Waves a WaterWaves holds at most */
+#define BOX_MATERIAL_WATER_WAVES (4)
+
+/** Detail of a constructed WaterWaves: the normal map at its full weight */
+#define BOX_MATERIAL_WATER_WAVES_DETAIL (1.0f)
+
+/** Gravity of the deep water dispersion of a WaterWave without a speed, world units per second
+ * squared */
+#define BOX_MATERIAL_WATER_GRAVITY (9.81f)
+
+/** One travelling Gerstner wave of a WaterWaves, all 0 when constructed: a disabled wave.
+ *
+ * The height of the wave at a world XZ point x is amplitude * sin(k dot(direction, x) - phase),
+ * with k = 2 pi / wavelength; the phase grows with the time by k times the speed, plus k times
+ * the WaterFlow velocity along the direction.
+ */
+ECS_STRUCT(WaterWave, {
+    vec2 direction;   /**< Direction of travel in world XZ, normalized by the engine; zero (or not
+                       *   finite) is +X */
+    float wavelength; /**< World units between crests; at most 0 (or not finite) disables the
+                       *   wave */
+    float amplitude;  /**< World units, height of a crest above the mean surface */
+    float steepness;  /**< 0..1, the Gerstner Q: 0 is a sine, 1 sharp crests and flat troughs;
+                       *   clamped */
+    float speed;      /**< World units per second the crests travel; 0 uses the deep water
+                       *   dispersion sqrt(g wavelength / 2 pi) with g BOX_MATERIAL_WATER_GRAVITY */
+});
+
+/** Travelling waves of a Water (ponds, lakes, the sea): up to BOX_MATERIAL_WATER_WAVES Gerstner
+ * waves whose analytic normal shades the surface, default no waves and a detail of 1. Inherited
+ * by instances like Water; a field a scene does not set keeps its default.
+ *
+ * The waves change the shading normal only, the surface stays flat: its vertices, bounds and
+ * culling do not move. Each fragment takes the normal of the sum of the waves at its world XZ,
+ * in the frame the WaterFlow of the shape moves, and blends the normal map of the Water (its
+ * PbrTextures.normal and ripples), weighted by detail, over it (whiteout blend). The refraction,
+ * the planar reflection, the Fresnel and the glints follow that normal. A wave fades out where
+ * it gets shorter than 4 pixels, so distant water does not shimmer.
+ *
+ * The phases are integrated in double precision on the CPU every frame with the total render
+ * time and wrapped to 0..2 pi, so a speed or a WaterFlow velocity that changes moves the waves
+ * on smoothly, and the record of the shape is packed every frame like that of a TextureScroll.
+ * At most BOX_RENDER_WATER_WAVE_SETS - 1 materials show their waves; later ones are flat.
+ *
+ * Needs Water and Scene.water: without them the component does nothing. Its fields have no
+ * transition.
+ */
+ECS_STRUCT(WaterWaves, {
+    WaterWave waves[4]; /**< The waves, BOX_MATERIAL_WATER_WAVES; a wavelength of 0 skips one */
+    float detail;       /**< Weight of the normal map relative to the waves, 0 for the waves
+                         *   alone; negative or not finite is 0 */
+});
+
+/** Velocity a Water surface moves with (a river, the water around a paddling boat), default
+ * still, inherited by instances like Water. The WaterWaves of the shape travel in the frame
+ * that moves with it: their phases integrate the velocity over the time. Without WaterWaves
+ * it only stores the velocity; without Water it does nothing.
+ */
+ECS_STRUCT(WaterFlow, {
+    vec2 velocity; /**< World units per second (X, Z) the surface moves with */
 });
 
 /** Equation the fragments of a material are combined with, default Opaque. A shape with
