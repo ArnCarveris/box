@@ -98,6 +98,56 @@ assets {
 
   lg_coral_n { Gen: {source: lg_coral_h, output: GenNormal, strength: 3.5} }
 
+  // Thatch: rows of overlapping bundles of straw strands, each strand its own shade
+  lg_thatch_h { Gen: {width: 512, height: 512, seed: 17, layers: [
+    {
+      kind: GenBlocks,
+      courses: 10,
+      per_course: 96,
+      gap: 0.0015,
+      softness: 0.004,
+      jitter: 0.5,
+      stagger: 0.5,
+      amount: 0.55,
+      id_amount: 0.35
+    }
+    {kind: GenNoise, frequency: 32, octaves: 3, amount: 0.15}
+  ]} }
+  lg_thatch_a {
+    Gen: {
+      source: lg_thatch_h,
+      output: GenAlbedo,
+      colors: [{0, {96, 72, 40}}, {0.5, {170, 136, 78}}, {1, {218, 186, 120}}]
+    }
+  }
+
+  lg_thatch_n { Gen: {source: lg_thatch_h, output: GenNormal, strength: 3} }
+
+  // Walls of lashed bamboo poles, with the nodes of the stems along each pole
+  lg_bamboo_h { Gen: {width: 256, height: 256, seed: 29, layers: [
+    {
+      kind: GenBlocks,
+      courses: 12,
+      per_course: 2,
+      gap: 0.006,
+      softness: 0.035,
+      jitter: 0.3,
+      stagger: 0.5,
+      amount: 0.6,
+      id_amount: 0.12
+    }
+    {kind: GenNoise, frequency: 48, octaves: 2, amount: 0.1}
+  ]} }
+  lg_bamboo_a {
+    Gen: {
+      source: lg_bamboo_h,
+      output: GenAlbedo,
+      colors: [{0, {104, 78, 44}}, {0.5, {182, 146, 90}}, {1, {222, 192, 132}}]
+    }
+  }
+
+  lg_bamboo_n { Gen: {source: lg_bamboo_h, output: GenNormal, strength: 2.5} }
+
   // Turquoise lagoon water over the sand floor, the waves drift up the lagoon
   prefab LgWater {
     Rgb: {255, 255, 255}
@@ -195,8 +245,16 @@ assets {
     texture.Mapping: {mode: MappingObject, size: 1.5, blend: 0.3}
   }
 
-  prefab LgVolcano { Rgb: {104, 98, 104}; PbrMaterial: {roughness: 1} }
-  prefab LgVolcanoGreen { Rgb: {68, 116, 70}; PbrMaterial: {roughness: 1} }
+  prefab LgVolcano { Rgb: {92, 78, 72}; PbrMaterial: {roughness: 1} }
+  prefab LgVolcanoRidge { Rgb: {64, 56, 54}; PbrMaterial: {roughness: 1} }
+  prefab LgVolcanoGreen { Rgb: {40, 100, 44}; PbrMaterial: {roughness: 1} }
+  prefab LgLava {
+    Rgb: {255, 120, 40}
+    PbrMaterial: {roughness: 0.9}
+    Emissive: {strength: 5, color: {255, 120, 36}}
+    NoShadow
+  }
+
   prefab LgFoam { Rgb: {244, 252, 250}; PbrMaterial: {roughness: 0.9}; Opacity: {0.85}; NoShadow }
   prefab LgDriftwood {
     Rgb: {196, 184, 166}

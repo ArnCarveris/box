@@ -99,6 +99,28 @@ state {
     s
   }
 
+  // Adds lo..hi across the river to what the row being placed blocks
+  fn lg_wall_add(lo: f64, hi: f64) {
+    if walls < WALL_MAX {
+      wall_lo[walls] = lo
+      wall_hi[walls] = hi
+      walls += 1
+    }
+  }
+
+  // Whether lo..hi across the river slips past everything the row being placed blocks
+  fn lg_wall_open(lo: f64, hi: f64) -> bool {
+    mut open: bool = true
+
+    for j in 0..WALL_MAX {
+      if j < walls && lo < wall_hi[j] && hi > wall_lo[j] {
+        open = false
+      }
+    }
+
+    open
+  }
+
   fn lg_free_nut() -> i32 {
     mut s: i32 = -1
 
@@ -351,16 +373,17 @@ async {
     await next_frame()
 
     if game_state == GS_PLAYING {
-      // Rows: every row leaves a corridor free for the canoe footprint, in reach of the corridor
-      // before it (or of the canoe at the start of a run), and fills the rest of the river with
-      // hazards. Rows seeded closer at the start rise in by time (lg_sink).
+      // Rows: every row is a wall of hazards with one door for the canoe footprint, in reach of
+      // the door before (or of the canoe at the start of a run). Whether the door makes the
+      // player steer, how far and which way sets how hard the row is. Rows seeded closer at the
+      // start rise in by time (lg_sink).
       while distance >= next_row {
         const zs = 0 - (next_row + SPAWN_AHEAD)
         const gw = FOOT_W + lg_knob(GAP_MARGIN_EASY, GAP_MARGIN_HARD)
         const gh = (gw - FOOT_W) / 2
 
-        // The corridor before, or the footprint of the canoe as a corridor that the hull leaves
-        // now, so that the first row is entered after FIRST_HAZARD_TIME
+        // The door before, or the footprint of the canoe as a door that the hull leaves now, so
+        // that the first row is entered after FIRST_HAZARD_TIME
         mut px: f64 = canoe_x + FOOT_CX
         mut pw: f64 = FOOT_W
         mut pz: f64 = HULL_HALF_L + HAZ_R_MAX + HAZ_Z_JITTER - distance
@@ -375,24 +398,37 @@ async {
         const ph = (pw - FOOT_W) / 2
 
         // The speed the canoe may have by then (every live coconut and this row's line picked
-        // up) sets the time to steer, and that the shift of the corridor, kept small while the
-        // run is easy
+        // up) sets the time to steer, and that how far the footprint can move from anywhere in
+        // the door before: the middle of this door can be up to dmax from the one before
         const vb = lg_speed_bound(NUTS_PER_LINE)
-        const shift = lg_shift_max(pz - zs, vb) * lg_knob(SHIFT_EASY, SHIFT_HARD)
+        const dmax = max(0, lg_shift_max(pz - zs, vb) + gh - ph)
         const lo = 0 - WATER_HALF + GAP_SHORE + gw / 2
         const hi = WATER_HALF - GAP_SHORE - gw / 2
-        mut ga: f64 = clamp(px + ph - gh - shift, lo, hi)
-        mut gb: f64 = clamp(px - ph + gh + shift, lo, hi)
+        mut gx: f64 = clamp(px, lo, hi)
 
-        if ga > gb {
-          ga = clamp(px, lo, hi)
-          gb = ga
-        }
+        if rng.f(1) < lg_knob(MOVE_CHANCE_EASY, MOVE_CHANCE_HARD) {
+          // A move: a canoe in the middle of the door before steers at least MOVE_MIN, along the
+          // last move or back, but away from a shore without room for it
+          const dmin = min(dmax, gh + MOVE_MIN)
+          const d = dmin + rng.f(1) * (dmax - dmin) * lg_knob(MOVE_SIZE_EASY, MOVE_SIZE_HARD)
+          mut md: f64 = last_move
 
-        mut gx: f64 = ga
+          if md == 0 {
+            md = rng.f(1) < 0.5 ? 1.0 : -1.0
+          } else if rng.f(1) < lg_knob(REVERSE_EASY, REVERSE_HARD) {
+            md = 0 - md
+          }
 
-        if gb > ga {
-          gx = ga + rng.f(gb - ga)
+          const room = md > 0 ? hi - px : px - lo
+
+          if room < dmin {
+            md = 0 - md
+          }
+
+          gx = clamp(px + md * d, lo, hi)
+          last_move = md
+        } else {
+          gx = clamp(px + (rng.f(2) - 1) * min(dmax, gh * 0.5), lo, hi)
         }
 
         corridors[rows % CORRIDORS].z = zs
@@ -400,24 +436,24 @@ async {
         corridors[rows % CORRIDORS].gw = gw
 
         // Hazards from one waterline to the other in the walk direction dir, x along the walk.
-        // A hazard whose reach would overlap the corridor moves past it instead.
+        // A hazard whose reach would overlap the door moves past it instead, close to it.
+        walls = 0
         const dir = rng.f(1) < 0.5 ? 1.0 : -1.0
         const blo = dir > 0 ? gx - gw / 2 : 0 - gx - gw / 2
         const bhi = blo + gw
-        const spread = lg_knob(HAZ_GAP_EASY, HAZ_GAP_HARD)
-        const count = min(HAZARDS_PER_ROW, floor(lg_knob(HAZ_COUNT_EASY, HAZ_COUNT_HARD) + 0.5))
         const log_chance = lg_knob(LOG_CHANCE_EASY, LOG_CHANCE_HARD)
         mut cx: f64 = 0 - WATER_HALF + HAZ_SHORE
         mut placed: i32 = 0
         mut placed_logs: i32 = 0
+        mut past_door: bool = false
 
-        while placed < count {
+        while placed < HAZARDS_PER_ROW {
           const rs = lg_free_rock()
           const ls = lg_free_log()
           const want_log = rng.f(1) < log_chance
           const is_log = ls >= 0 && placed_logs < LOGS_PER_ROW && (want_log || rs < 0)
 
-          // Plan fewer hazards rather than skip one for a full pool
+          // Place fewer hazards rather than skip one for a full pool
           if !is_log && rs < 0 {
             break
           }
@@ -426,10 +462,13 @@ async {
           const size = is_log ? LOG_SIZE_MIN + rng.f(LOG_SIZE_VAR) :
             ROCK_SIZE_MIN + rng.f(ROCK_SIZE_VAR)
           const r = is_log ? lg_log_r(size) : lg_rock_r(size)
-          const x = cx + HAZ_GAP_MIN + rng.f(spread) + r
+          const gap = past_door ? rng.f(HAZ_GAP_DOOR) :
+            HAZ_GAP_MIN + rng.f(HAZ_GAP_MAX - HAZ_GAP_MIN)
+          const x = cx + gap + r
 
           if x - r < bhi && x + r > blo {
             cx = bhi
+            past_door = true
             continue
           }
 
@@ -437,6 +476,7 @@ async {
             break
           }
 
+          past_door = false
           const wx = dir * x
           const z = zs + (rng.f(2) - 1) * HAZ_Z_JITTER
 
@@ -450,6 +490,7 @@ async {
             logs[ls].born = clock
             logs[ls].live = true
             placed_logs += 1
+            lg_wall_add(wx - LOG_R, wx + LOG_R)
           } else {
             rocks[rs].x = wx
             rocks[rs].z = z
@@ -459,10 +500,48 @@ async {
             rocks[rs].hit = false
             rocks[rs].born = clock
             rocks[rs].live = true
+            lg_wall_add(wx - r, wx + r)
           }
 
           placed += 1
           cx = x + r
+        }
+
+        // Scan the canoe across the river: where both the hull and the float slip through outside
+        // the door, a small rock closes the gap, beside the door on the side the canoe sticks out
+        // of it, so the door stays clear. Canoe positions in_lo..in_hi hold the footprint in the
+        // door, with half a step to spare. The scan narrows the hull and the float by half a
+        // step, so a way through narrower than a step is found too.
+        const in_lo = gx - gh - FOOT_CX - SCAN_STEP / 2
+        const in_hi = gx + gh - FOOT_CX + SCAN_STEP / 2
+        const pr = lg_rock_r(ROCK_SIZE_MIN)
+        const hw = HULL_HALF_W - SCAN_STEP / 2
+        const fw = FLOAT_HALF_W - SCAN_STEP / 2
+        mut sx: f64 = CANOE_MIN_X
+
+        while sx <= CANOE_MAX_X {
+          if (sx < in_lo || sx > in_hi) && walls < WALL_MAX &&
+            lg_wall_open(sx - hw, sx + hw) &&
+            lg_wall_open(sx + FLOAT_X - fw, sx + FLOAT_X + fw) {
+            const rs = lg_free_rock()
+
+            if rs < 0 {
+              break
+            }
+
+            const wx = sx > in_hi ? max(sx, gx + gw / 2 + pr) : min(sx + FLOAT_X, gx - gw / 2 - pr)
+            rocks[rs].x = wx
+            rocks[rs].z = zs + (rng.f(2) - 1) * HAZ_Z_JITTER
+            rocks[rs].size = ROCK_SIZE_MIN
+            rocks[rs].spin = rng.f(100)
+            rocks[rs].kind = 0
+            rocks[rs].hit = false
+            rocks[rs].born = clock
+            rocks[rs].live = true
+            lg_wall_add(wx - pr, wx + pr)
+          }
+
+          sx += SCAN_STEP
         }
 
         // A coconut line in front of the row along the hull's way: from the side of the corridor

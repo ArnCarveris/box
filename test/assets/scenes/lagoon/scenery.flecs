@@ -138,12 +138,44 @@ assets {
   }
 
   prefab LgHutWall {
-    Rgb: {190, 152, 96}
-    PbrMaterial: {roughness: 0.95}
-    Sheen: {color: {255, 230, 180}, roughness: 0.5}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.8}
+    PbrTextures: {albedo: lg_bamboo_a, normal: lg_bamboo_n}
+    texture.Mapping: {mode: MappingObject, size: 1.4, blend: 0.2}
   }
 
-  prefab LgHutDark { Rgb: {58, 40, 28}; PbrMaterial: {roughness: 0.9} }
+  prefab LgThatch {
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.95}
+    Sheen: {color: {255, 236, 190}, roughness: 0.5}
+    PbrTextures: {albedo: lg_thatch_a, normal: lg_thatch_n}
+    texture.Mapping: {mode: MappingObject, size: 1.6, blend: 0.3}
+  }
+
+  prefab LgThatchDark {
+    Rgb: {150, 122, 92}
+    PbrMaterial: {roughness: 0.95}
+    PbrTextures: {albedo: lg_thatch_a, normal: lg_thatch_n}
+    texture.Mapping: {mode: MappingObject, size: 1.2, blend: 0.3}
+  }
+
+  prefab LgHutPost {
+    Rgb: {196, 176, 156}
+    PbrMaterial: {roughness: 0.9}
+    PbrTextures: {albedo: lg_bark_a, normal: lg_bark_n}
+  }
+
+  prefab LgHutDark { Rgb: {34, 24, 18}; PbrMaterial: {roughness: 1} }
+  prefab LgClay { Rgb: {170, 96, 58}; PbrMaterial: {roughness: 0.85} }
+
+  // The lantern by a hut door glows warm in the late afternoon
+  prefab LgLantern {
+    Rgb: {255, 200, 120}
+    PbrMaterial: {roughness: 0.6}
+    Emissive: {strength: 2.5, color: {255, 170, 80}}
+    NoShadow
+  }
+
   prefab LgFarSand { Rgb: {222, 206, 168}; PbrMaterial: {roughness: 1} }
   prefab LgFarGreen { Rgb: {52, 100, 56}; PbrMaterial: {roughness: 1} }
   prefab LgFarPalm { Rgb: {40, 82, 44}; PbrMaterial: {roughness: 1} }
@@ -406,47 +438,342 @@ assets {
     }
   }
 
-  // A thatched hut on stilts standing at the waterline. Along -X, toward the water, at the
-  // origin; the gangway reaches back to the beach along +X. The water side stilts are
-  // HUT_STILT_X from the origin, below the deck at HUT_DECK_Y nothing reaches further out
-  template LgStiltHut {
-    const DECK_Y: f32 = HUT_DECK_Y
+  // The thatched hip roof of a stilt hut, its eaves at the origin over a room 2.6 by 2.4: a flat
+  // skirt flaring out over the porch under a steep roof, a darker lip along the eaves, a bundle
+  // along the ridge with crossed sticks at its ends
+  template LgHutRoof {
+    const SKIRT_H: f32 = 0.5
+    const SKIRT_IN: f32 = 0.7
+    const ROOF_H: f32 = 1.7
+    const ROOF_IN: f32 = 1.15
+    const ROOF_X: f32 = 2.25
+    const ROOF_Z: f32 = 1.95
+    const RIDGE_Y: f32 = SKIRT_H + ROOF_H - 0.1
+    const RIDGE_X: f32 = ROOF_X - SKIRT_IN - ROOF_IN
 
-    for k in 0..4 {
-      const sx = k % 2 == 0 ? 0 - HUT_STILT_X : HUT_STILT_X
-      const sz = k < 2 ? -1.3 : 1.3
-      "stilt_{k}" : LgCanoeDark {
-        Position: {sx, DECK_Y / 2 - 0.6, sz}
-        Cylinder: {length: DECK_Y + 1.2, radius: HUT_STILT_R, segments: 6}
+    lip : LgThatchDark {
+      Position: {0, -0.08, 0}
+      BeveledPrism: {
+        footprint: [
+          {0 - ROOF_X - 0.06, 0 - ROOF_Z - 0.06},
+          {ROOF_X + 0.06, 0 - ROOF_Z - 0.06},
+          {ROOF_X + 0.06, ROOF_Z + 0.06},
+          {0 - ROOF_X - 0.06, ROOF_Z + 0.06}
+        ],
+        depth: 0.14,
+        inset: 0.1,
+        bevel: 0.04
       }
     }
 
-    deck : LgCanoeWood { Position: {0, DECK_Y, 0}; Box: {3.8, 0.16, 3.4} }
-    walls : LgHutWall { Position: {0.2, DECK_Y + 0.78, 0}; Box: {2.6, 1.4, 2.4} }
-    door : LgHutDark { Position: {-1.11, DECK_Y + 0.62, 0.3}; Box: {0.04, 1.05, 0.7} }
-    window : LgHutDark { Position: {-1.11, DECK_Y + 0.9, -0.65}; Box: {0.04, 0.45, 0.5} }
-    roof : LgStraw {
-      Position: {0.2, DECK_Y + 2.25, 0}
-      Rotation: {0, 0.785, 0}
-      Cone: {length: 1.6, radius: 2.5, segments: 4}
+    skirt : LgThatch {
+      Position: {0, SKIRT_H / 2 - 0.05, 0}
+      BeveledPrism: {
+        footprint: [
+          {0 - ROOF_X, 0 - ROOF_Z},
+          {ROOF_X, 0 - ROOF_Z},
+          {ROOF_X, ROOF_Z},
+          {0 - ROOF_X, ROOF_Z}
+        ],
+        depth: SKIRT_H,
+        inset: SKIRT_IN,
+        bevel: 0.08
+      }
     }
 
-    peak : LgStraw {
-      Position: {0.2, DECK_Y + 3.15, 0}
-      Cone: {length: 0.4, radius: 0.12, segments: 5}
+    roof : LgThatch {
+      Position: {0, SKIRT_H + ROOF_H / 2 - 0.1, 0}
+      BeveledPrism: {
+        footprint: [
+          {SKIRT_IN - ROOF_X, SKIRT_IN - ROOF_Z},
+          {ROOF_X - SKIRT_IN, SKIRT_IN - ROOF_Z},
+          {ROOF_X - SKIRT_IN, ROOF_Z - SKIRT_IN},
+          {SKIRT_IN - ROOF_X, ROOF_Z - SKIRT_IN}
+        ],
+        depth: ROOF_H,
+        inset: ROOF_IN,
+        bevel: 0.06
+      }
+    }
+
+    ridge : LgThatchDark {
+      Position: {0, RIDGE_Y + 0.02, 0}
+      Rotation: {0, 0, HALF_PI}
+      Cylinder: {length: 2 * RIDGE_X + 0.3, radius: 0.1, segments: 7}
+    }
+
+    for k in 0..2 {
+      const ex = (k == 0 ? -1 : 1) * (RIDGE_X + 0.1)
+
+      for j in 0..2 {
+        "horn_{k}_{j}" : LgCanoeDark {
+          Position: {ex, RIDGE_Y + 0.24, 0}
+          Rotation: {0, 0, j == 0 ? 0.45 : -0.45}
+          Box: {0.05, 0.75, 0.05}
+        }
+      }
+    }
+  }
+
+  // The gangway of a stilt hut down to the beach along X: planks across two stringers, a rail
+  // along one side
+  template LgHutGangway {
+    for k in 0..2 {
+      "stringer_{k}" : LgCanoeDark {
+        Position: {0, -0.07, k == 0 ? -0.38 : 0.38}
+        Box: {3.4, 0.12, 0.06}
+      }
+    }
+
+    for p in 0..8 {
+      const tone = 215 + 40 * hash(p * 13 + 5)
+      "plank_{p}" : LgCanoeWood {
+        Position: {-1.5 + p * 0.43, 0, 0.03 * hash(p * 3) - 0.015}
+        Rgb: {tone, tone, tone}
+        Box: {0.32, 0.05, 0.86}
+      }
+    }
+
+    for k in 0..2 {
+      "rail_post_{k}" : LgHutPost {
+        Position: {k == 0 ? -1.45 : 1.45, 0.38, 0.43}
+        Rotation: {0, 0, 0.38}
+        Cylinder: {length: 0.8, radius: 0.035, segments: 5}
+      }
+    }
+
+    rail : LgCanoeDark {
+      Position: {-0.15, 0.74, 0.43}
+      Box: {3.1, 0.04, 0.04}
+    }
+  }
+
+  // The porch of a stilt hut toward the water, on its floor at the origin: railings either side
+  // of the steps down, a lantern by the door, a clay pot and a paddle leaning against the wall
+  template LgHutPorch {
+    for k in 0..4 {
+      const rz = k < 2 ? -1.6 + k * 0.65 : 0.95 + (k - 2) * 0.65
+      "rail_post_{k}" : LgHutPost {
+        Position: {-1.85, 0.36, rz}
+        Cylinder: {length: 0.74, radius: 0.045, segments: 5}
+      }
     }
 
     for k in 0..2 {
       "rail_{k}" : LgCanoeDark {
-        Position: {-1.85, DECK_Y + 0.4, k == 0 ? -1.6 : 1.6}
-        Box: {0.08, 0.7, 0.08}
+        Position: {-1.85, 0.7, k == 0 ? -1.275 : 1.275}
+        Box: {0.06, 0.06, 0.74}
       }
     }
 
-    gangway : LgCanoeWood {
+    lantern {
+      Position: {-1.5, 1.42, -0.15}
+      cord : LgCanoeDark {
+        Position: {0, -0.14, 0}
+        Cylinder: {length: 0.28, radius: 0.01, segments: 3}
+        NoShadow
+      }
+
+      cap : LgCanoeDark {
+        Position: {0, -0.3, 0}
+        Cone: {length: 0.08, radius: 0.1, segments: 6}
+        NoShadow
+      }
+
+      light : LgLantern {
+        Position: {0, -0.42, 0}
+        Cylinder: {length: 0.18, radius: 0.07, segments: 6}
+      }
+    }
+
+    pot : LgClay {
+      Position: {-1.5, 0.17, -1.15}
+      Scale: {1, 0.9, 1}
+      Sphere: {radius: 0.18, segments: 10, smooth: true}
+    }
+
+    pot_neck : LgClay {
+      Position: {-1.5, 0.36, -1.15}
+      Cylinder: {length: 0.08, radius: 0.09, segments: 10}
+    }
+
+    paddle {
+      Position: {-1.2, 0, 0.95}
+      Rotation: {0.05, 0, -0.08}
+      shaft : LgCanoeWood { Position: {0, 0.75, 0}; Box: {0.04, 1.3, 0.04} }
+      blade : LgCanoeWood {
+        Position: {0, 0.24, 0}
+        Scale: {0.025, 0.3, 0.1}
+        Sphere: {radius: 1, segments: 8, smooth: true}
+      }
+    }
+  }
+
+  // A thatched hut on stilts standing at the waterline. Along -X, toward the water, at the
+  // origin; the gangway reaches back to the beach along +X. The water side stilts are
+  // HUT_STILT_X from the origin, below the deck at HUT_DECK_Y nothing reaches further out
+  //
+  // Braced log stilts carry a plank floor. The room of lashed bamboo has a curtained door and a
+  // propped open shutter toward the water, under a thatched roof that shelters a porch
+  template LgStiltHut {
+    const DECK_Y: f32 = HUT_DECK_Y
+    const FLOOR: f32 = DECK_Y + 0.08
+    const ROOM_X: f32 = 0.2
+    const ROOM_W: f32 = 2.6
+    const ROOM_D: f32 = 2.4
+    const WALL_H: f32 = 1.5
+    const FRONT: f32 = ROOM_X - ROOM_W / 2
+    const EAVE_Y: f32 = FLOOR + WALL_H
+
+    for k in 0..6 {
+      const sx = k % 2 == 0 ? 0 - HUT_STILT_X : HUT_STILT_X
+      const row = k < 2 ? -1 : (k < 4 ? 0 : 1)
+      "stilt_{k}" : LgHutPost {
+        Position: {sx, DECK_Y / 2 - 0.6, row * 1.3}
+        Rotation: {0.03 * hash(k * 5 + 1) - 0.015, k * 1.1, 0}
+        Cylinder: {length: DECK_Y + 1.2, radius: HUT_STILT_R, segments: 7}
+      }
+    }
+
+    for k in 0..2 {
+      "brace_x_{k}" : LgCanoeDark {
+        Position: {0, 0.9, k == 0 ? -1.38 : 1.38}
+        Rotation: {0, 0, k == 0 ? 0.38 : -0.38}
+        Box: {3.23, 0.07, 0.07}
+      }
+
+      "brace_z_{k}" : LgCanoeDark {
+        Position: {k == 0 ? 0 - HUT_STILT_X : HUT_STILT_X, 0.9, 0}
+        Rotation: {k == 0 ? 0.43 : -0.43, 0, 0}
+        Box: {0.07, 0.07, 2.86}
+      }
+    }
+
+    for k in 0..3 {
+      "joist_{k}" : LgCanoeDark {
+        Position: {(k - 1) * HUT_STILT_X, DECK_Y - 0.1, 0}
+        Box: {0.14, 0.16, 3.4}
+      }
+    }
+
+    for p in 0..9 {
+      const tone = 215 + 40 * hash(p * 7 + 3)
+      "plank_{p}" : LgCanoeWood {
+        Position: {0.05 * hash(p * 11) - 0.025, DECK_Y + 0.03, -1.52 + p * 0.38}
+        Rgb: {tone, tone, tone}
+        Box: {3.8 - 0.1 * (p % 2), 0.1, 0.35}
+      }
+    }
+
+    room {
+      Position: {ROOM_X, FLOOR, 0}
+
+      walls : LgHutWall {
+        Position: {0, WALL_H / 2, 0}
+        Box: {ROOM_W, WALL_H, ROOM_D}
+      }
+
+      sill : LgCanoeDark {
+        Position: {0, 0.06, 0}
+        Box: {ROOM_W + 0.1, 0.12, ROOM_D + 0.1}
+      }
+
+      band : LgCanoeDark {
+        Position: {0, WALL_H * 0.55, 0}
+        Box: {ROOM_W + 0.04, 0.05, ROOM_D + 0.04}
+      }
+
+      plate : LgCanoeDark {
+        Position: {0, WALL_H - 0.06, 0}
+        Box: {ROOM_W + 0.14, 0.12, ROOM_D + 0.14}
+      }
+
+      for k in 0..4 {
+        "post_{k}" : LgHutPost {
+          Position: {(k % 2 - 0.5) * ROOM_W, WALL_H / 2, (k < 2 ? -0.5 : 0.5) * ROOM_D}
+          Cylinder: {length: WALL_H + 0.05, radius: 0.09, segments: 7}
+        }
+      }
+
+      // The side windows, one in each wall along the river
+      for k in 0..2 {
+        const wz = (k == 0 ? -0.5 : 0.5) * ROOM_D
+        const wd = k == 0 ? -0.02 : 0.02
+        "side_window_{k}" : LgHutDark {
+          Position: {0.25, 0.98, wz + wd}
+          Box: {0.62, 0.48, 0.04}
+        }
+
+        "side_sill_{k}" : LgCanoeDark {
+          Position: {0.25, 0.72, wz + 2 * wd}
+          Box: {0.78, 0.06, 0.08}
+        }
+
+        "side_lintel_{k}" : LgCanoeDark {
+          Position: {0.25, 1.24, wz + 2 * wd}
+          Box: {0.78, 0.06, 0.08}
+        }
+      }
+    }
+
+    // The door toward the water, a red cloth tied back across half of it
+    door {
+      Position: {FRONT, FLOOR, 0.3}
+      opening : LgHutDark { Position: {-0.02, 0.6, 0}; Box: {0.04, 1.18, 0.72} }
+
+      for k in 0..2 {
+        "jamb_{k}" : LgCanoeDark {
+          Position: {-0.04, 0.62, k == 0 ? -0.4 : 0.4}
+          Box: {0.08, 1.24, 0.08}
+        }
+      }
+
+      lintel : LgCanoeDark { Position: {-0.04, 1.24, 0}; Box: {0.1, 0.08, 0.9} }
+      curtain : LgCloth {
+        Position: {-0.06, 0.66, 0.2}
+        Rotation: {0.12, 0, 0}
+        Box: {0.025, 1.05, 0.3}
+      }
+
+      tie : LgLashing {
+        Position: {-0.08, 0.56, 0.29}
+        Box: {0.04, 0.05, 0.08}
+      }
+    }
+
+    // A window toward the water with its woven shutter propped open on a stick
+    window {
+      Position: {FRONT, FLOOR, -0.65}
+      opening : LgHutDark { Position: {-0.02, 0.95, 0}; Box: {0.04, 0.5, 0.56} }
+      sill : LgCanoeDark { Position: {-0.05, 0.68, 0}; Box: {0.1, 0.06, 0.72} }
+      shutter : LgHutWall {
+        Position: {-0.24, 1.08, 0}
+        Rotation: {0, 0, -0.9}
+        Box: {0.04, 0.56, 0.64}
+      }
+
+      stick : LgDriftwood {
+        Position: {-0.26, 0.77, 0.26}
+        Rotation: {0, 0, 1.17}
+        Cylinder: {length: 0.46, radius: 0.018, segments: 4}
+        NoShadow
+      }
+    }
+
+    roof {
+      Position: {ROOM_X, EAVE_Y, 0}
+      LgHutRoof thatch()
+    }
+
+    porch {
+      Position: {0, FLOOR, 0}
+      LgHutPorch things()
+    }
+
+    gangway {
       Position: {3.4, DECK_Y - 0.6, 0.9}
       Rotation: {0, 0, -0.38}
-      Box: {3.4, 0.1, 0.8}
+      LgHutGangway steps()
     }
   }
 

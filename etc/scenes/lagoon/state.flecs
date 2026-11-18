@@ -46,42 +46,53 @@ state {
   export const DESPAWN_Z: f32 = 10
   export const FIRST_HAZARD_TIME: f32 = 3
   // The difficulty, 0..1, rises by DIFF_PER_NUT for every coconut collected and DIFF_PER_UNIT for
-  // every unit paddled: a player who collects most coconuts reaches 1 after about 3 minutes, one
-  // who ignores them later. Every knob below goes from its EASY value at difficulty 0 to its HARD
-  // value at 1 along lg_ease, which stays at the easy end up to DIFF_CALM, so the first stretch
-  // of a run (about 45 s) stays relaxed, and then rises fastest at first.
-  export const DIFF_CALM: f32 = 0.1
-  export const DIFF_PER_NUT: f32 = 0.0032
-  export const DIFF_PER_UNIT: f32 = 0.00014
+  // every unit paddled: a player who collects most coconuts reaches 1 after about 80 seconds, one
+  // who ignores them after about 2 minutes. Every knob below goes from its EASY value at
+  // difficulty 0 to its HARD value at 1 along lg_ease, which stays at the easy end up to
+  // DIFF_CALM, so the first stretch of a run (about 10 s) stays relaxed, and then rises fastest
+  // at first.
+  export const DIFF_CALM: f32 = 0.04
+  export const DIFF_PER_NUT: f32 = 0.0065
+  export const DIFF_PER_UNIT: f32 = 0.0005
   // Rows are ROW_TIME_EASY down to ROW_TIME_HARD seconds of travel apart, which leaves room to
   // steer at TOP_SPEED. The gap in units, speed * row time, is START_SPEED * ROW_TIME_EASY at the
   // least.
-  export const ROW_TIME_EASY: f32 = 2.4
-  export const ROW_TIME_HARD: f32 = 1.4
-  // Every row leaves a corridor free for the canoe footprint: FOOT_W wide plus GAP_MARGIN_EASY
-  // down to GAP_MARGIN_HARD. It stays GAP_SHORE inside the waterlines.
+  export const ROW_TIME_EASY: f32 = 2.6
+  export const ROW_TIME_HARD: f32 = 1.8
+  // Every row is a wall with one door: a corridor free for the canoe footprint, FOOT_W wide plus
+  // GAP_MARGIN_EASY down to GAP_MARGIN_HARD. It stays GAP_SHORE inside the waterlines.
   export const GAP_MARGIN_EASY: f32 = 3.2
-  export const GAP_MARGIN_HARD: f32 = 1.5
+  export const GAP_MARGIN_HARD: f32 = 1.6
   export const GAP_SHORE: f32 = 0.2
-  // The corridor of a row shifts from the one before by up to SHIFT_EASY to SHIFT_HARD of the
-  // shift the canoe can still make (lg_shift_max)
-  export const SHIFT_EASY: f32 = 0.4
-  export const SHIFT_HARD: f32 = 0.85
-  // Reachability: the player reacts after REACT_TIME, and moving the footprint from one corridor
-  // into the next needs at most REACH_SHARE of the distance the canoe can steer in the time between
-  // the two rows (see lg_shift_max)
+  // The level is designed around the steering the player has to do. A row is a move with chance
+  // MOVE_CHANCE_EASY up to MOVE_CHANCE_HARD: its door is placed so that a canoe in the middle of
+  // the door before has to steer at least MOVE_MIN to get through. A move goes up to
+  // MOVE_SIZE_EASY to MOVE_SIZE_HARD of the way from that least move to the most the canoe can
+  // still make (lg_shift_max), and goes back the other way than the move before with chance
+  // REVERSE_EASY to REVERSE_HARD, which needs a stop and a turn. A row that is no move keeps its
+  // door over the middle of the door before.
+  export const MOVE_CHANCE_EASY: f32 = 0.35
+  export const MOVE_CHANCE_HARD: f32 = 1
+  export const MOVE_MIN: f32 = 1
+  export const MOVE_SIZE_EASY: f32 = 0.3
+  export const MOVE_SIZE_HARD: f32 = 1
+  export const REVERSE_EASY: f32 = 0.2
+  export const REVERSE_HARD: f32 = 0.6
+  // Reachability: the player reacts after REACT_TIME, and moving the footprint from anywhere in
+  // one door into the next needs at most REACH_SHARE of the distance the canoe can steer in the
+  // time between the two rows (see lg_shift_max)
   export const REACT_TIME: f32 = 0.3
   export const REACH_SHARE: f32 = 0.65
-  // Hazards fill the rest of the river from one waterline to the other, in a random direction:
-  // the water before each hazard is HAZ_GAP_MIN plus up to HAZ_GAP_EASY to HAZ_GAP_HARD wide, so
-  // wide gaps leave other ways through. A row plans HAZ_COUNT_EASY up to HAZ_COUNT_HARD hazards
-  // (at most HAZARDS_PER_ROW), each a log with LOG_CHANCE_EASY to LOG_CHANCE_HARD. They stay
-  // HAZ_SHORE clear of the waterlines and sit up to HAZ_Z_JITTER off the row.
-  export const HAZ_GAP_MIN: f32 = 0.5
-  export const HAZ_GAP_EASY: f32 = 5.5
-  export const HAZ_GAP_HARD: f32 = 2.4
-  export const HAZ_COUNT_EASY: f32 = 4
-  export const HAZ_COUNT_HARD: f32 = 8
+  // Hazards fill the rest of the river from one waterline to the other, in a random direction,
+  // with HAZ_GAP_MIN to HAZ_GAP_MAX of water between them, the first one past the door up to
+  // HAZ_GAP_DOOR from it. Each is a log with LOG_CHANCE_EASY to LOG_CHANCE_HARD. Then the row is
+  // scanned for the canoe every SCAN_STEP across the river: where the hull and the float would
+  // both slip through outside the door, a rock closes the gap, so the door is the only way through.
+  // Hazards stay HAZ_SHORE clear of the waterlines and sit up to HAZ_Z_JITTER off the row.
+  export const HAZ_GAP_MIN: f32 = 0.4
+  export const HAZ_GAP_MAX: f32 = 1.8
+  export const HAZ_GAP_DOOR: f32 = 0.3
+  export const SCAN_STEP: f32 = 0.1
   export const HAZ_SHORE: f32 = 0.35
   export const HAZ_Z_JITTER: f32 = 0.3
   export const LOG_CHANCE_EASY: f32 = 0.1
@@ -94,13 +105,15 @@ state {
   export const LOG_SIZE_VAR: f32 = 0.4
   export const HAZ_R_MAX: f32 = 1.25
   // Pools: rows live over SPAWN_AHEAD + DESPAWN_Z, at least START_SPEED * ROW_TIME_EASY apart, so up to
-  // ROWS_LIVE rows (with a frame of travel and the jitter) hold items at once. A row plans at most
-  // HAZARDS_PER_ROW hazards, LOGS_PER_ROW of them logs, and one line of NUTS_PER_LINE coconuts.
-  // The sizes of the rocks, logs and nuts arrays below follow ROCKS, LOGS and COCONUTS.
+  // ROWS_LIVE rows (with a frame of travel and the jitter) hold items at once. A row places at
+  // most HAZARDS_PER_ROW hazards, LOGS_PER_ROW of them logs, plus the rocks that close its gaps, at
+  // most WALL_MAX in all, and one line of NUTS_PER_LINE coconuts. The sizes of the rocks, logs,
+  // nuts and wall arrays below follow ROCKS, LOGS, COCONUTS and WALL_MAX.
   export const ROWS_LIVE: i32 = 6
-  export const HAZARDS_PER_ROW: i32 = 8
+  export const HAZARDS_PER_ROW: i32 = 10
   export const LOGS_PER_ROW: i32 = 3
-  export const ROCKS: i32 = 48
+  export const WALL_MAX: i32 = 16
+  export const ROCKS: i32 = 72
   export const LOGS: i32 = 18
   export const COCONUTS: i32 = 24
   // The corridors of the last CORRIDORS rows, a ring indexed by row % CORRIDORS
@@ -185,7 +198,7 @@ state {
   export mut invulnerable: f32 = 0
   export mut capsize: f32 = 0
 
-  export mut rocks: LgItem[48] = {}
+  export mut rocks: LgItem[72] = {}
   export mut logs: LgItem[18] = {}
   export mut nuts: LgItem[24] = {}
   // Distance at which the next row of hazards spawns, the number of rows spawned, and the
@@ -193,6 +206,13 @@ state {
   export mut next_row: f64 = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
   export mut rows: i32 = 0
   export mut corridors: LgCorridor[8] = {}
+  // The direction of the last move, -1 or 1, 0 before the first
+  export mut last_move: f32 = 0
+  // What the hazards of the row being placed block across the river, wall_lo[i]..wall_hi[i] for
+  // the first walls of them: a rock all its reach, a log only its thickness, whatever its yaw
+  export mut wall_lo: f32[16] = {}
+  export mut wall_hi: f32[16] = {}
+  export mut walls: i32 = 0
 
   // The difficulty after n coconuts and dist units paddled
   fn lg_diff_at(n: f64, dist: f64) -> f64 {
@@ -280,6 +300,8 @@ state {
     capsize = 0
     next_row = FIRST_HAZARD_TIME * START_SPEED - SPAWN_AHEAD
     rows = 0
+    last_move = 0
+    walls = 0
 
     for i in 0..CORRIDORS {
       corridors[i].z = 0
