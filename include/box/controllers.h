@@ -85,7 +85,30 @@ ECS_STRUCT(FirstPersonController, {
     bool grounded;         /**< The feet stand on the ground, written by the controller */
     bool crouched;         /**< Crouch is held or there is no room to stand, written */
     bool flying;           /**< Free flight, toggled by the Fly action */
+    float run;             /**< Walking units per second while Fast is held, 0 to ignore Fast */
+    float climb;           /**< Units per second Forward and Back climb a Climbable shape, 2 */
+    float swim_speed;      /**< Walking speed multiplier in water, 0.45 by default */
+    float swim_jump;       /**< Upward speed of a jump in water, 3.5 by default */
+    float swim_depth;      /**< Depth of the feet below the surface of the water, 1.3 by default */
+    float swim_step;       /**< Height of the ledges a swimmer climbs out onto, 3.2 by default */
+    bool climbing;         /**< Climbing a Climbable shape, written by the controller */
+    bool swimming;         /**< Swimming in water, written by the controller */
 });
+
+/** A shape, or the shapes below an entity, that a first person controller climbs like a ladder.
+ *
+ * While its body touches one, Forward climbs up and Back down at its climb speed, without
+ * gravity; at the top Forward steps off. Inherited through IsA, so a ladder prefab marks all
+ * of its instances. The shapes still block like any other.
+ */
+extern ECS_TAG_DECLARE(Climbable);
+
+/** A mesh shape that controllers collide with by its triangles instead of its bounding box.
+ *
+ * For terrains, hulls and other large or concave meshes; the triangle hierarchy of the mesh is
+ * built the first time a body comes near it. Triangles block from both sides.
+ */
+extern ECS_TAG_DECLARE(TriangleCollider);
 
 /** Register the box.controllers module and the default controller actions.
  *

@@ -10,7 +10,9 @@ the `ActionState` of named actions in its action scope, never a device: remap by
 | Component | Key fields (defaults) | What it does |
 |---|---|---|
 | `CameraController` | `speed` 40, `boost` 5, `acceleration` 6, `deceleration` 18, `turn_speed` 1.5, `turn_acceleration` 5, `turn_deceleration` 15, `boost_yaw` 0.33, `sensitivity` 0.003, `zoom` 3, `invert_y`, `actions` (`box.controllers.camera`), `collide` false, `radius` 0.25 | Free-fly camera. Writes `velocity`, `angular_velocity` |
-| `FirstPersonController` | `speed` 4, `crouch_speed` 2, `fly_speed` 10, `boost` 4, `jump` 5, `gravity` 18, `eye` 1.7, `crouch_eye` 0.9, `ground` 0, `radius` 0.3, `step` 0.3, `sensitivity` 0.003, `acceleration` 0 (snap), `turn_speed` 1.5, `turn_acceleration` 5, `turn_deceleration` 15, `invert_y`, `actions` (`box.controllers.first_person`), `flying` | Walking body with gravity, jump, crouch, fly toggle. Writes `velocity`, `angular_velocity`, `height`, `grounded`, `crouched` |
+| `FirstPersonController` | `speed` 4, `crouch_speed` 2, `fly_speed` 10, `boost` 4, `jump` 5, `gravity` 18, `eye` 1.7, `crouch_eye` 0.9, `ground` 0, `radius` 0.3, `step` 0.3, `run` 0 (Fast ignored), `climb` 2, `swim_speed` 0.45, `swim_jump` 3.5, `swim_depth` 1.3, `swim_step` 3.2, `sensitivity` 0.003, `acceleration` 0 (snap), `turn_speed` 1.5, `turn_acceleration` 5, `turn_deceleration` 15, `invert_y`, `actions` (`box.controllers.first_person`), `flying` | Walking body with gravity, jump, crouch, fly toggle. Writes `velocity`, `angular_velocity`, `height`, `grounded`, `crouched`, `climbing`, `swimming` |
+| `Climbable` | tag, on a shape or an ancestor, inherited through IsA | A first person controller touching it climbs it like a ladder: Forward up, Back down at `climb` speed, Forward steps off at the top |
+| `TriangleCollider` | tag, on a mesh shape | Controllers collide with the triangles of the mesh instead of its bounding box |
 
 Both imply `Position` and `Rotation` and write them (local space) with `ecs_modified`.
 Defaults come from the component constructor, so `CameraController: {speed: 12}` keeps the rest.

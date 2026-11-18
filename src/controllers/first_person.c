@@ -55,6 +55,24 @@
 /** Distance above the ground within which falling feet snap onto it */
 #define BOX_FIRST_PERSON_SNAP (0.001f)
 
+/** Default units per second a controller climbs a Climbable shape */
+#define BOX_FIRST_PERSON_CLIMB (2.0f)
+
+/** Default walking speed multiplier in water */
+#define BOX_FIRST_PERSON_SWIM_SPEED (0.45f)
+
+/** Default upward speed of a jump in water */
+#define BOX_FIRST_PERSON_SWIM_JUMP (3.5f)
+
+/** Default depth of the feet below the surface of the water */
+#define BOX_FIRST_PERSON_SWIM_DEPTH (1.3f)
+
+/** Default height of the ledges a swimmer climbs out onto */
+#define BOX_FIRST_PERSON_SWIM_STEP (3.2f)
+
+/** Distance below the top of a Climbable shape from which Forward steps off it */
+#define BOX_FIRST_PERSON_CLIMB_TOP (0.2f)
+
 const box_controller_action_t box_first_person_actions[BoxFirstPersonActionCount] = {
     [BoxFirstPersonForward] = { "Forward", "Walk forward", KeyW, KeyNone },
     [BoxFirstPersonBack] = { "Back", "Walk back", KeyS, KeyNone },
@@ -106,7 +124,12 @@ void box_first_person_controller_ctor(
             .turn_speed = BOX_FIRST_PERSON_TURN_SPEED,
             .turn_acceleration = BOX_FIRST_PERSON_TURN_ACCELERATION,
             .turn_deceleration = BOX_FIRST_PERSON_TURN_DECELERATION,
-            .actions = *scope
+            .actions = *scope,
+            .climb = BOX_FIRST_PERSON_CLIMB,
+            .swim_speed = BOX_FIRST_PERSON_SWIM_SPEED,
+            .swim_jump = BOX_FIRST_PERSON_SWIM_JUMP,
+            .swim_depth = BOX_FIRST_PERSON_SWIM_DEPTH,
+            .swim_step = BOX_FIRST_PERSON_SWIM_STEP
         };
     }
 }
@@ -196,6 +219,12 @@ static float box_first_person_speed(
         }
     } else if (fp->crouched) {
         result = fp->crouch_speed;
+    } else if (fp->run > 0 && in->held[BoxFirstPersonFast]) {
+        result = fp->run;
+    }
+
+    if (!fp->flying && fp->swimming) {
+        result *= fp->swim_speed;
     }
 
     return result;
@@ -204,22 +233,30 @@ static float box_first_person_speed(
 /** Move the velocity of a controller towards what the movement actions ask for.
  *
  * Walking eases the XZ velocity only, its Y velocity belongs to the jump and the gravity.
- * Flight eases all three, with Up and Down along the Y axis.
+ * Flight eases all three, with Up and Down along the Y axis. Climbing turns Forward and Back
+ * into the Y velocity, and only lets Forward walk on at the top, to step off.
  *
  * @param fp The controller, its velocity is written
  * @param in The input of the frame
  * @param yaw The yaw of the entity
+ * @param top The feet are at the top of the Climbable shape being climbed
  * @param dt Seconds the frame took
  */
 static void box_first_person_accelerate(
     FirstPersonController *fp,
     const box_first_person_input_t *in,
     float yaw,
+    bool top,
     float dt)
 {
     const bool *held = in->held;
     float forward = (float)(held[BoxFirstPersonForward] - held[BoxFirstPersonBack]);
     float right = (float)(held[BoxFirstPersonRight] - held[BoxFirstPersonLeft]);
+    if (fp->climbing) {
+        fp->velocity[1] = forward * fp->climb;
+        forward = top && forward > 0 ? forward : 0;
+    }
+
     float up = fp->flying ? (float)(held[BoxFirstPersonUp] - held[BoxFirstPersonDown]) : 0;
     float s = sinf(yaw), c = cosf(yaw);
     vec3 dir = { right * c - forward * s, up, -forward * c - right * s };
@@ -255,12 +292,13 @@ static void box_first_person_state(
         fp->grounded = false;
     }
 
-    if (!fp->flying && fp->grounded && in->pressed[BoxFirstPersonJump]) {
-        fp->velocity[1] = fp->jump;
+    bool free = !fp->flying && !fp->climbing;
+    if (free && (fp->grounded || fp->swimming) && in->pressed[BoxFirstPersonJump]) {
+        fp->velocity[1] = fp->swimming ? fp->swim_jump : fp->jump;
         fp->grounded = false;
     }
 
-    if (!fp->flying && !fp->grounded) {
+    if (free && !fp->grounded) {
         fp->velocity[1] -= fp->gravity * dt;
     }
 }
@@ -280,14 +318,15 @@ static void box_first_person_body(
     float height,
     box_controller_body_t *body)
 {
-    bool walking = fp->grounded && !fp->flying;
+    bool walking = fp->grounded && !fp->flying && !fp->climbing;
+    bool swimming = fp->swimming && !fp->flying && !fp->climbing;
     float step = fp->step;
     *body = (box_controller_body_t){
         .entity = e,
         .scene = box_render_scene_of(world, e),
         .radius = fp->radius,
         .height = height + BOX_FIRST_PERSON_HEAD,
-        .step = walking ? step : 0,
+        .step = walking ? step : (swimming ? fp->swim_step : 0),
         .probe = walking && fp->velocity[1] <= 0 ? step : 0,
         .upright = !fp->flying
     };
@@ -318,6 +357,119 @@ static void box_first_person_crouch(
     }
 
     fp->crouched = crouch;
+}
+
+/** Test whether a body in the water can climb out up the wall in front of it.
+ *
+ * The feet are no higher than swim_step above where they float, and a shape stands within
+ * BOX_CONTROLLER_REACH in front of the body, step below the feet, as the quay in front of a
+ * swimmer. The climb so carries the feet over the edge before the body walks on.
+ *
+ * @param world The world
+ * @param fp The controller
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @param yaw The yaw of the entity
+ * @return true when Forward climbs the wall in front
+ */
+static bool box_first_person_climb_out(
+    ecs_world_t *world,
+    const FirstPersonController *fp,
+    const box_controller_body_t *body,
+    const Position *feet,
+    float yaw)
+{
+    float reach = fp->eye + fp->swim_depth;
+    float below = fp->swim_step - fp->swim_depth;
+    float level = 0;
+    Position ahead = {
+        feet->x - sinf(yaw) * BOX_CONTROLLER_REACH,
+        feet->y - fp->step,
+        feet->z - cosf(yaw) * BOX_CONTROLLER_REACH
+    };
+    bool result = fp->swim_depth > 0 && below > 0 &&
+        box_controller_water(world, body, feet, reach, below, &level);
+
+    return result && !box_controller_fits(world, body, &ahead);
+}
+
+/** Take hold of a Climbable shape while Forward or Back is held and the body touches one.
+ *
+ * In the water, Forward also climbs the wall in front of the body, to climb out.
+ * @param world The world
+ * @param e The controlled entity
+ * @param fp The controller, its climbing flag is written
+ * @param in The input of the frame
+ * @param p The position of the eye
+ * @param yaw The yaw of the entity
+ * @return true when the feet are at the top of the shape being climbed, or climb out
+ */
+static bool box_first_person_climb(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    FirstPersonController *fp,
+    const box_first_person_input_t *in,
+    const Position *p,
+    float yaw)
+{
+    bool held = in->held[BoxFirstPersonForward] || in->held[BoxFirstPersonBack];
+    float height = fp->height > 0 ? fp->height : fp->eye;
+    Position feet = { p->x, p->y - height, p->z };
+    box_controller_body_t body;
+    box_controller_ladder_t ladder;
+    bool result = false;
+    if (fp->climbing && fp->velocity[1] > 0) {
+        fp->velocity[1] = 0;
+    }
+
+    fp->climbing = false;
+    if (fp->flying || !held || fp->climb <= 0) {
+        goto done;
+    }
+
+    box_first_person_body(world, e, fp, height, &body);
+    if (box_controller_ladder(world, &body, &feet, &ladder)) {
+        fp->climbing = true;
+        fp->grounded = false;
+        result = feet.y >= ladder.top - BOX_FIRST_PERSON_CLIMB_TOP;
+    } else if (in->held[BoxFirstPersonForward] &&
+        box_first_person_climb_out(world, fp, &body, &feet, yaw))
+    {
+        fp->climbing = true;
+        fp->grounded = false;
+        result = true;
+    }
+
+done:
+    return result;
+}
+
+/** Float the feet of a controller in water: no deeper than swim_depth below the surface.
+ *
+ * @param world The world
+ * @param fp The controller, its swimming flag and velocity are written
+ * @param body The body
+ * @param feet The feet after the move, written in place
+ */
+static void box_first_person_swim(
+    ecs_world_t *world,
+    FirstPersonController *fp,
+    const box_controller_body_t *body,
+    Position *feet)
+{
+    float reach = fp->eye + fp->swim_depth;
+    float level = 0;
+    float floor = 0;
+    bool water = !fp->flying && fp->swim_depth > 0 &&
+        box_controller_water(world, body, feet, reach, 0, &level);
+    floor = level - fp->swim_depth;
+    fp->swimming = water && feet->y < floor + BOX_FIRST_PERSON_SNAP && !fp->grounded;
+    if (water && feet->y < floor) {
+        feet->y = floor;
+        fp->velocity[1] = fp->velocity[1] < 0 ? 0 : fp->velocity[1];
+        fp->swimming = true;
+        fp->grounded = false;
+    }
 }
 
 /** Move the feet of a controller over the frame and put its eye above them.
@@ -358,6 +510,7 @@ static bool box_first_person_step(
     }
 
     fp->grounded = (landed || hit.grounded) && !fp->flying;
+    box_first_person_swim(world, fp, &body, &feet);
     fp->height = height;
     eye_pos.x = feet.x;
     eye_pos.y = feet.y + height;
@@ -412,9 +565,10 @@ void BoxFirstPersonControllerUpdate(
             ecs_modified(it->world, e, Rotation);
         }
 
+        bool top = box_first_person_climb(it->world, e, &fp[i], &in, &p[i], r[i].y);
         box_first_person_state(&fp[i], &in, dt);
         box_first_person_crouch(it->world, e, &fp[i], &in, &p[i]);
-        box_first_person_accelerate(&fp[i], &in, r[i].y, dt);
+        box_first_person_accelerate(&fp[i], &in, r[i].y, top, dt);
         if (box_first_person_step(it->world, e, &fp[i], &p[i], dt)) {
             ecs_modified(it->world, e, Position);
         }

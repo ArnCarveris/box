@@ -8,6 +8,8 @@
 
 ECS_COMPONENT_DECLARE(CameraActionMap);
 ECS_COMPONENT_DECLARE(FirstPersonActionMap);
+ECS_TAG_DECLARE(Climbable);
+ECS_TAG_DECLARE(TriangleCollider);
 
 const box_controller_action_t box_camera_actions[BoxCameraActionCount] = {
     [BoxCameraForward] = { "Forward", "Move the camera forward", KeyW, KeyNone },
@@ -117,6 +119,12 @@ void BoxControllersImport(
     ECS_IMPORT(world, BoxTypes);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxInput);
+
+    ECS_TAG_DEFINE(world, Climbable);
+    ecs_add_pair(world, Climbable, EcsOnInstantiate, EcsInherit);
+    ECS_TAG_DEFINE(world, TriangleCollider);
+    ecs_add_pair(world, TriangleCollider, EcsOnInstantiate, EcsInherit);
+    box_collider_triangles_init(world);
 
     ECS_META_COMPONENT(world, CameraController);
     ECS_COMPONENT_DEFINE(world, CameraActionMap);

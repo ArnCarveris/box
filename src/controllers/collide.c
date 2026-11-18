@@ -578,9 +578,14 @@ float box_collider_separation(
     vec3 normal)
 {
     vec3 p, q, n;
-    float result = box_collide_nearest(c, a, b, radius, p, q);
-    result -= box_collide_normal(c, a, b, hint, p, q, n);
-    box_collide_world_dir(c, n, normal);
+    float result = 0;
+    if (c->kind == BoxColliderTriangle) {
+        result = box_triangle_separation(c, a, b, radius, normal);
+    } else {
+        result = box_collide_nearest(c, a, b, radius, p, q);
+        result -= box_collide_normal(c, a, b, hint, p, q, n);
+        box_collide_world_dir(c, n, normal);
+    }
 
     return result;
 }
@@ -596,8 +601,15 @@ bool box_collider_push(
 {
     vec3 p, q, n, f;
     vec3 down = { 0, -1, 0 };
-    float separation = box_collide_nearest(c, a, b, radius, p, q), t = 0;
-    bool result = separation < 0, hit = false;
+    float separation = 0, t = 0;
+    bool result = false, hit = false;
+    if (c->kind == BoxColliderTriangle) {
+        result = box_triangle_push(c, a, b, radius, surface, out);
+        goto done;
+    }
+
+    separation = box_collide_nearest(c, a, b, radius, p, q);
+    result = separation < 0;
     if (!result) {
         goto done;
     }
@@ -800,15 +812,19 @@ bool box_collider_ray(
 {
     vec3 o, d;
     box_collide_hit_t h = { .max = max };
-    box_collide_local(c, origin, o);
-    box_collide_local_dir(c, dir, d);
-    box_collide_ray_local(c, o, d, &h);
-    if (h.hit) {
-        *t = h.t;
-    }
+    if (c->kind == BoxColliderTriangle) {
+        h.hit = box_triangle_ray(c, origin, dir, max, t, normal);
+    } else {
+        box_collide_local(c, origin, o);
+        box_collide_local_dir(c, dir, d);
+        box_collide_ray_local(c, o, d, &h);
+        if (h.hit) {
+            *t = h.t;
+        }
 
-    if (h.hit && normal) {
-        box_collide_world_dir(c, h.n, normal);
+        if (h.hit && normal) {
+            box_collide_world_dir(c, h.n, normal);
+        }
     }
 
     return h.hit;

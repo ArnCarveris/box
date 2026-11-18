@@ -106,12 +106,16 @@ extern ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 /** Upward component of the normal of an edge the drop of a step rests on */
 #define BOX_CONTROLLER_SUPPORT (0.3f)
 
+/** Distance beyond the radius of a body at which it takes hold of a Climbable shape */
+#define BOX_CONTROLLER_REACH (0.15f)
+
 /** Shape a collider has in its own frame */
 typedef enum box_collider_kind_t {
     BoxColliderBox,      /**< Box with the half extents, also the fallback of other meshes */
     BoxColliderSphere,   /**< Ball with the radius half[0] */
     BoxColliderCylinder, /**< Cylinder along the second axis, radius half[0], half height half[1] */
-    BoxColliderCapsule   /**< Capsule along the second axis, radius half[0], half height half[1] */
+    BoxColliderCapsule,  /**< Capsule along the second axis, radius half[0], half height half[1] */
+    BoxColliderTriangle  /**< Triangle of a TriangleCollider mesh, its corners in corner */
 } box_collider_kind_t;
 
 /** A shape of the scene as the narrow phase sees it: an oriented box, ball, cylinder or capsule */
@@ -121,6 +125,7 @@ typedef struct box_collider_t {
     vec3 center;              /**< Center in world space */
     vec3 axis[3];             /**< Unit axes of its frame in world space */
     vec3 half;                /**< Half extents along the axes in world units */
+    vec3 corner[3];           /**< Corners of a triangle in world space, BoxColliderTriangle */
 } box_collider_t;
 
 /** The capsule a controller moves as, from its feet up */
@@ -375,5 +380,207 @@ void BoxFirstPersonActionsActivate(
  */
 void BoxFirstPersonControllerUpdate(
     ecs_iter_t *it);
+
+/** Triangle hierarchies of the meshes of TriangleCollider shapes, by mesh handle */
+typedef struct BoxTriangleMeshes {
+    ecs_map_t meshes; /**< box_triangle_mesh_t* by mesh handle */
+} BoxTriangleMeshes;
+
+extern ECS_COMPONENT_DECLARE(BoxTriangleMeshes);
+
+/** Register the tags of the module and the triangle hierarchies of TriangleCollider meshes.
+ *
+ * @param world The world
+ */
+void box_collider_triangles_init(
+    ecs_world_t *world);
+
+/** Make a triangle collider of a shape from its corners in world space.
+ *
+ * The center, axes and half extents are the box around the corners, so the bounds of a
+ * triangle are found like those of every other collider.
+ *
+ * @param e The shape
+ * @param v The corners
+ * @param out The collider, written
+ */
+void box_triangle_collider(
+    ecs_entity_t e,
+    const vec3 v[3],
+    box_collider_t *out);
+
+/** Find the signed distance between a capsule and a triangle.
+ *
+ * @param c The triangle collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param radius Radius of the capsule
+ * @param normal Receives the direction from the triangle towards the capsule
+ * @return The gap between their surfaces, negative by the depth when they overlap
+ */
+float box_triangle_separation(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    vec3 normal);
+
+/** Find how far a capsule reaches into a triangle, like box_collider_push.
+ *
+ * With surface set, a contact on a face flat enough to stand on gets the normal of that face.
+ *
+ * @param c The triangle collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param radius Radius of the capsule
+ * @param surface Find the surface of the contact
+ * @param out The contact, written when the capsule overlaps the triangle
+ * @return true when the capsule overlaps the triangle
+ */
+bool box_triangle_push(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    bool surface,
+    box_collider_contact_t *out);
+
+/** Intersect a ray with a triangle from either side.
+ *
+ * @param c The triangle collider
+ * @param origin Origin of the ray
+ * @param dir Direction of the ray, need not be normalized
+ * @param max Longest distance along dir that counts, in lengths of dir
+ * @param t Receives the distance of the hit in lengths of dir
+ * @param normal Receives the normal of the triangle facing the ray, may be NULL
+ * @return true when the ray hits
+ */
+bool box_triangle_ray(
+    const box_collider_t *c,
+    const vec3 origin,
+    const vec3 dir,
+    float max,
+    float *t,
+    vec3 normal);
+
+/** Test whether a shape blocks controllers: Water shapes are fluid and do not.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return false for a Water shape
+ */
+bool box_collider_solid(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Test whether a shape collides by its triangles (TriangleCollider) instead of its bounds.
+ *
+ * @param world The world
+ * @param e The shape
+ * @return true for a TriangleCollider shape with a mesh
+ */
+bool box_collider_has_triangles(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Append the triangles of a TriangleCollider shape whose bounds overlap a box.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param min Minimum corner of the box in world space
+ * @param max Maximum corner of the box in world space
+ * @param out Vector of box_collider_t the triangles are appended to
+ * @return Number of triangles appended
+ */
+int32_t box_collider_triangles(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const vec3 min,
+    const vec3 max,
+    ecs_vec_t *out);
+
+/** Intersect a ray with a shape: its triangles for a TriangleCollider, else its collider.
+ *
+ * @param world The world
+ * @param e The shape
+ * @param origin Origin of the ray
+ * @param dir Direction of the ray, need not be normalized
+ * @param max Longest distance along dir that counts, in lengths of dir
+ * @param t Receives the distance of the nearest hit in lengths of dir
+ * @param normal Receives the normal of the surface at the hit, may be NULL
+ * @return true when the ray hits
+ */
+bool box_collider_cast(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const vec3 origin,
+    const vec3 dir,
+    float max,
+    float *t,
+    vec3 normal);
+
+/** Find the shapes of a scene whose bounds overlap a box, the shapes under movers included.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param out Vector of ecs_entity_t the shapes are appended to
+ * @return Number of shapes appended
+ */
+int32_t box_controller_near(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 min,
+    const vec3 max,
+    ecs_vec_t *out);
+
+/** A Climbable shape a body touches */
+typedef struct box_controller_ladder_t {
+    ecs_entity_t shape; /**< The shape */
+    float top;          /**< Height of its top in world space */
+} box_controller_ladder_t;
+
+/** Find a Climbable shape, or one below a Climbable entity, within reach of a body.
+ *
+ * A body reaches a shape whose bounds, grown by the radius and BOX_CONTROLLER_REACH across, hold
+ * its feet, from a little below the bottom of the shape up to a little above its top.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @param out The shape in reach, written when there is one
+ * @return true when a Climbable shape is in reach
+ */
+bool box_controller_ladder(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    const Position *feet,
+    box_controller_ladder_t *out);
+
+/** Find the surface of the water a body is in.
+ *
+ * Water is a shape with the Water material. Its surface is where a ray down from above the
+ * body enters it, so a flat mesh, a box or a TriangleCollider surface all work.
+ *
+ * The water is open: the body is in it only when no solid shape lies above its feet, so a room
+ * dug below the water level, under a ceiling or the ground, stays dry, and so does covered
+ * water, such as a sea plane that runs on under an island or a hull.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @param reach How far above the feet the surface may lie
+ * @param below How far below the feet the surface may lie, 0 for feet under the surface
+ * @param level Receives the height of the surface
+ * @return true when a water surface lies within reach above or below the feet
+ */
+bool box_controller_water(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    const Position *feet,
+    float reach,
+    float below,
+    float *level);
 
 #endif

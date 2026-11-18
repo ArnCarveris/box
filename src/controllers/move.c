@@ -50,6 +50,15 @@
 /** Contact normals a move keeps to clip the velocity with */
 #define BOX_MOVE_NORMALS (8)
 
+/** Depth the drop of a step sinks into the shape it lands on, so the push finds the contact */
+#define BOX_MOVE_SINK (1e-3f)
+
+/** Points under the footprint of a body that search the floor: the centre and four on the rim */
+#define BOX_MOVE_FEET (5)
+
+/** Distance of the rim points of the footprint from the centre, as a fraction of the radius */
+#define BOX_MOVE_RIM (0.7f)
+
 /** A shape a move can reach, with its bounds */
 typedef struct box_move_shape_t {
     box_collider_t collider; /**< The shape */
@@ -169,6 +178,30 @@ static bool box_move_overlap(
         amax[1] >= bmin[1] && amin[2] <= bmax[2] && amax[2] >= bmin[2];
 }
 
+/** Add a collider to the shapes a move tests, with the world bounds of its frame.
+ *
+ * @param m The move, its shapes are written
+ * @param c The collider
+ */
+static void box_move_add(
+    box_move_t *m,
+    const box_collider_t *c)
+{
+    box_move_shape_t s = { .collider = *c };
+    int32_t j, k;
+    for (j = 0; j < 3; j ++) {
+        float ext = 0;
+        for (k = 0; k < 3; k ++) {
+            ext += fabsf(s.collider.axis[k][j]) * s.collider.half[k];
+        }
+
+        s.min[j] = s.collider.center[j] - ext;
+        s.max[j] = s.collider.center[j] + ext;
+    }
+
+    *ecs_vec_append_t(NULL, &m->shapes, box_move_shape_t) = s;
+}
+
 /** Read the shapes overlapping a box from the index of the scene, replacing the ones read.
  *
  * @param m The move, its shapes and region are written
@@ -183,9 +216,10 @@ static bool box_move_gather(
     const vec3 max,
     int32_t crowd)
 {
-    ecs_vec_t hits, found;
-    int32_t i, j, k, count;
+    ecs_vec_t hits, found, triangles;
+    int32_t i, j, count, shapes;
     bool result = false;
+    ecs_vec_init_t(NULL, &triangles, box_collider_t, 0);
     ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &found, ecs_entity_t, 0);
     count = box_spatial_overlap_box(m->world, m->body->scene, min, max, &hits);
@@ -194,8 +228,8 @@ static bool box_move_gather(
             &found);
     }
 
-    count = ecs_vec_count(&found);
-    if (count > crowd) {
+    shapes = ecs_vec_count(&found);
+    if (shapes > crowd) {
         goto done;
     }
 
@@ -205,26 +239,22 @@ static bool box_move_gather(
     }
 
     ecs_vec_clear(&m->shapes);
-    for (i = 0; i < count; i ++) {
+    for (i = 0; i < shapes; i ++) {
         ecs_entity_t e = *ecs_vec_get_t(&found, ecs_entity_t, i);
-        box_move_shape_t s;
-        if (box_move_own(m->world, m->body, e) ||
-            !box_collider_resolve(m->world, e, &s.collider))
-        {
+        box_collider_t c;
+        if (box_move_own(m->world, m->body, e) || !box_collider_solid(m->world, e)) {
             continue;
         }
 
-        for (j = 0; j < 3; j ++) {
-            float ext = 0;
-            for (k = 0; k < 3; k ++) {
-                ext += fabsf(s.collider.axis[k][j]) * s.collider.half[k];
+        if (box_collider_has_triangles(m->world, e)) {
+            ecs_vec_clear(&triangles);
+            count = box_collider_triangles(m->world, e, min, max, &triangles);
+            for (j = 0; j < count; j ++) {
+                box_move_add(m, ecs_vec_get_t(&triangles, box_collider_t, j));
             }
-
-            s.min[j] = s.collider.center[j] - ext;
-            s.max[j] = s.collider.center[j] + ext;
+        } else if (box_collider_resolve(m->world, e, &c)) {
+            box_move_add(m, &c);
         }
-
-        *ecs_vec_append_t(NULL, &m->shapes, box_move_shape_t) = s;
     }
 
     glm_vec3_copy(ECS_CONST_CAST(float*, min), m->region_min);
@@ -233,6 +263,7 @@ static bool box_move_gather(
     result = true;
 
 done:
+    ecs_vec_fini_t(NULL, &triangles, box_collider_t);
     ecs_vec_fini_t(NULL, &hits, ecs_entity_t);
     ecs_vec_fini_t(NULL, &found, ecs_entity_t);
 
@@ -695,10 +726,134 @@ static float box_move_flat(
     return sqrtf(dx * dx + dz * dz);
 }
 
+/** Lower the capsule straight down onto the first shape below it, by a distance at the most.
+ *
+ * The drop advances conservatively, so it lands on the edge of a ledge instead of sinking past
+ * it in a step, where the push would take the edge for a wall and move the capsule off it.
+ *
+ * @param m The move, which keeps the contact of the landing
+ * @param pos The feet, written in place
+ * @param distance Distance the feet may come down
+ */
+static void box_move_drop(
+    box_move_t *m,
+    vec3 pos,
+    float distance)
+{
+    vec3 down = { 0, -1, 0 };
+    float left = distance;
+    float gap = FLT_MAX;
+    int32_t i;
+    glm_vec3_negate_to(down, m->back);
+    for (i = 0; i < BOX_MOVE_SWEEPS && left > 0 && gap > BOX_MOVE_SINK * 0.25f; i ++) {
+        gap = fminf(box_move_clearance(m, pos, down, 0, left), left);
+        pos[1] -= gap;
+        left -= gap;
+    }
+
+    pos[1] -= fminf(left, BOX_MOVE_SINK);
+    box_move_push(m, pos, NULL);
+}
+
+/** Find the highest floor below a height at a point.
+ *
+ * @param m The move
+ * @param x X of the point
+ * @param z Z of the point
+ * @param top Height the search starts from
+ * @param depth Distance below top the search reaches
+ * @param floor Receives the height of the floor, written when it is higher
+ */
+static void box_move_floor_at(
+    const box_move_t *m,
+    float x,
+    float z,
+    float top,
+    float depth,
+    float *floor)
+{
+    const box_move_shape_t *s = ecs_vec_first_t(&m->shapes, box_move_shape_t);
+    int32_t i, count = ecs_vec_count(&m->shapes);
+    vec3 origin = { x, top, z };
+    vec3 down = { 0, -1, 0 };
+    for (i = 0; i < count; i ++) {
+        bool inside = x >= s[i].min[0] && x <= s[i].max[0] &&
+            z >= s[i].min[2] && z <= s[i].max[2];
+        float t = 0;
+        vec3 n;
+        if (!inside || !box_collider_ray(&s[i].collider, origin, down, depth, &t, n)) {
+            continue;
+        }
+
+        if (n[1] >= BOX_MOVE_WALKABLE && top - t > *floor) {
+            *floor = top - t;
+        }
+    }
+}
+
+/** Find the highest floor under the footprint of the body, between the feet and a height.
+ *
+ * As the walker of the original portal demo, the centre and four points on the rim, at
+ * BOX_MOVE_RIM of the radius, search the floor straight down, so a body whose round bottom
+ * rests on the edge of a tread shorter than itself still finds the tread.
+ *
+ * @param m The move
+ * @param pos The feet
+ * @param top Highest floor that counts
+ * @return The height of the highest floor, the feet when there is none above them
+ */
+static float box_move_floor(
+    const box_move_t *m,
+    const vec3 pos,
+    float top)
+{
+    static const float feet[BOX_MOVE_FEET][2] = {
+        { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }
+    };
+    float rim = m->body->radius * BOX_MOVE_RIM;
+    float result = pos[1];
+    float depth = top - pos[1];
+    int32_t i;
+    for (i = 0; i < BOX_MOVE_FEET && depth > BOX_MOVE_EPS; i ++) {
+        float x = pos[0] + feet[i][0] * rim;
+        float z = pos[2] + feet[i][1] * rim;
+        box_move_floor_at(m, x, z, top, depth, &result);
+    }
+
+    return result;
+}
+
+/** Lift the feet onto the highest floor under the footprint when the capsule fits there.
+ *
+ * @param m The move
+ * @param pos The feet, written when they are lifted
+ * @param top Highest floor the feet are lifted onto
+ */
+static void box_move_lift(
+    const box_move_t *m,
+    vec3 pos,
+    float top)
+{
+    float floor = box_move_floor(m, pos, top + BOX_MOVE_FIT);
+    box_collider_contact_t contact;
+    vec3 lifted, steep;
+    glm_vec3_copy(pos, lifted);
+    lifted[1] = floor;
+    if (floor > pos[1] + BOX_MOVE_EPS &&
+        box_move_deepest(m, lifted, &contact, steep) <= BOX_MOVE_FIT)
+    {
+        pos[1] = floor;
+    }
+}
+
 /** Try the horizontal part of a blocked move again on top of a ledge.
  *
- * The capsule rises by the step height, moves and comes down again, resting on the edge of a
- * ledge too; the attempt wins when it lands further along than the blocked move got.
+ * The capsule rises by the step height, moves and comes down onto the first shape below it,
+ * resting on the edge of a ledge too. The attempt wins when it lands further along than the
+ * blocked move got.
+ *
+ * It then stands on the highest floor under its footprint within the step, as on a tread
+ * shorter than itself.
  *
  * @param m The move, which keeps the contacts of the attempt that wins
  * @param start The feet before the move
@@ -714,7 +869,6 @@ static void box_move_step(
     box_move_t attempt;
     vec3 up = { 0, m->body->step, 0 };
     vec3 flat = { motion[0], 0, motion[2] };
-    vec3 down = { 0, 0, 0 };
     vec3 at;
     glm_vec3_copy(ECS_CONST_CAST(float*, start), at);
     box_move_fork(m, &attempt);
@@ -722,11 +876,14 @@ static void box_move_step(
     attempt.ground = attempt.wall = false;
     box_move_slide(&attempt, at, up);
     box_move_slide(&attempt, at, flat);
-    down[1] = start[1] - at[1] - BOX_MOVE_MARGIN;
     attempt.ground = false;
     attempt.support = true;
     attempt.floor = start[1];
-    box_move_slide(&attempt, at, down);
+    box_move_drop(&attempt, at, at[1] - start[1] + BOX_MOVE_MARGIN);
+    if (attempt.ground) {
+        box_move_lift(&attempt, at, start[1] + m->body->step);
+    }
+
     if (attempt.ground && box_move_flat(at, start) > box_move_flat(pos, start) + BOX_MOVE_EPS) {
         m->normal_count = attempt.normal_count;
         ecs_os_memcpy_n(m->normals, attempt.normals, vec3, attempt.normal_count);
@@ -895,11 +1052,10 @@ static bool box_move_ground_filter(
     float *distance)
 {
     const box_move_ray_t *r = ctx;
-    box_collider_t c;
     vec3 down = { 0, -1, 0 };
 
-    return !box_move_own(r->world, r->body, e) && box_collider_resolve(r->world, e, &c) &&
-        box_collider_ray(&c, r->origin, down, FLT_MAX, distance, NULL);
+    return !box_move_own(r->world, r->body, e) && box_collider_solid(r->world, e) &&
+        box_collider_cast(r->world, e, r->origin, down, FLT_MAX, distance, NULL);
 }
 
 bool box_controller_ground_below(

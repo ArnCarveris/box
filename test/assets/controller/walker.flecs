@@ -1,0 +1,91 @@
+// Courses for the Walker tests of test/cpu/controller: each lies apart along x, the walker is
+// placed at its start by the test.
+using box.transform
+using box.geometry
+using box.material
+using box.controllers
+
+// A ledge 0.5 m high, under a 0.55 m step, 2 m ahead of x 0
+ledge {
+  Position: {0, 0.25, -3}
+  Box: {4, 0.5, 2}
+}
+
+// Stairs at x 10 with 0.25 m risers and 0.28 m treads, rising along -z to a landing at 1.5
+stairs {
+  step_0 { Position: {10, 0.125, -1.64}; Box: {2, 0.25, 0.28} }
+  step_1 { Position: {10, 0.25, -1.92}; Box: {2, 0.5, 0.28} }
+  step_2 { Position: {10, 0.375, -2.2}; Box: {2, 0.75, 0.28} }
+  step_3 { Position: {10, 0.5, -2.48}; Box: {2, 1, 0.28} }
+  step_4 { Position: {10, 0.625, -2.76}; Box: {2, 1.25, 0.28} }
+  step_5 { Position: {10, 0.75, -3.04}; Box: {2, 1.5, 0.28} }
+  landing { Position: {10, 0.75, -4.68}; Box: {2, 1.5, 3} }
+}
+
+// A ladder at x 20 up the front of a loft 3.5 m high
+ladder {
+  Climbable
+  Position: {20, 0, -1}
+  rail_left { Position: {-0.25, 1.75, 0}; Box: {0.05, 3.5, 0.05} }
+  rail_right { Position: {0.25, 1.75, 0}; Box: {0.05, 3.5, 0.05} }
+  rung_0 { Position: {0, 0.4, 0}; Box: {0.5, 0.04, 0.04} }
+  rung_1 { Position: {0, 1.2, 0}; Box: {0.5, 0.04, 0.04} }
+  rung_2 { Position: {0, 2, 0}; Box: {0.5, 0.04, 0.04} }
+  rung_3 { Position: {0, 2.8, 0}; Box: {0.5, 0.04, 0.04} }
+}
+
+loft {
+  Position: {20, 3.4, -3.5}
+  Box: {3, 0.2, 5}
+}
+
+// The same ladder at x 30 without Climbable
+pole {
+  Position: {30, 0, -1}
+  rail_left { Position: {-0.25, 1.75, 0}; Box: {0.05, 3.5, 0.05} }
+  rail_right { Position: {0.25, 1.75, 0}; Box: {0.05, 3.5, 0.05} }
+}
+
+// A pool at x 40 with its surface at 0, a floor at -6 and a quay east of it, 0.5 m high
+pool {
+  Position: {40, -1, -5}
+  Box: {10, 2, 10}
+  Water: {}
+}
+
+pool_floor {
+  Position: {40, -6.1, -5}
+  Box: {12, 0.2, 12}
+}
+
+quay {
+  Position: {47.5, -1.5, -5}
+  Box: {5, 4, 10}
+}
+
+// Water at x 60 over a room below its surface, under a roof: covered water stays dry
+covered {
+  Position: {60, -1, -5}
+  Box: {10, 2, 10}
+  Water: {}
+}
+
+room_floor {
+  Position: {60, -4.1, -5}
+  Box: {10, 0.2, 10}
+}
+
+room_roof {
+  Position: {60, 1.1, -5}
+  Box: {10, 0.2, 10}
+}
+
+// A ramp at x 80 rising 2 m over 10 m along -z, colliding by its triangles
+ramp {
+  Position: {0, 0, 0}
+  Mesh3: {
+    vertices: [{78, 0, 0}, {82, 0, 0}, {82, 2, -10}, {78, 2, -10}],
+    indices: [0, 1, 2, 0, 2, 3]
+  }
+  TriangleCollider
+}

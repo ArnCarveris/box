@@ -174,6 +174,23 @@
                     "acute_corner_still",
                     "idle_keeps_position"
                 ]
+            },
+            {
+                "id": "Walker",
+                "testcases": [
+                    "high_step",
+                    "high_step_needs_step",
+                    "short_treads",
+                    "ladder_climb",
+                    "ladder_down",
+                    "ladder_needs_climbable",
+                    "swim_floats",
+                    "swim_speed",
+                    "swim_climb_out",
+                    "covered_water_dry",
+                    "triangle_ramp",
+                    "run"
+                ]
             }
         ]
     }
