@@ -1116,6 +1116,19 @@
                 ]
             },
             {
+                "id": "WaterCaustics",
+                "testcases": [
+                    "defaults",
+                    "frame_wrapped",
+                    "pack",
+                    "record_flag",
+                    "frame_follows_flow",
+                    "without_water",
+                    "water_off",
+                    "prefab_instances"
+                ]
+            },
+            {
                 "id": "WaterRipples",
                 "testcases": [
                     "defaults",

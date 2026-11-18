@@ -272,6 +272,30 @@ static void box_water_waves_ctor(
     }
 }
 
+/** Construct WaterCaustics values: a strength of 1, cells of 1 world unit, a speed of 0.5 and a
+ * depth of 2.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_water_caustics_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    WaterCaustics *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (WaterCaustics){
+            .strength = BOX_MATERIAL_WATER_CAUSTICS_STRENGTH,
+            .scale = BOX_MATERIAL_WATER_CAUSTICS_SCALE,
+            .speed = BOX_MATERIAL_WATER_CAUSTICS_SPEED,
+            .depth = BOX_MATERIAL_WATER_CAUSTICS_DEPTH };
+    }
+}
+
 /** Construct WaterRipples values: a field of 32 world units and 256 cells on the Water entity, a
  * wave speed of 2, a damping of 0.5, a strength of 1, a foam decay of 0.4, a foam spread of 0.02
  * and no crest foam.
@@ -652,6 +676,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, WaterWave);
     ECS_META_COMPONENT(world, WaterWaves);
     ECS_META_COMPONENT(world, WaterFlow);
+    ECS_META_COMPONENT(world, WaterCaustics);
     ECS_META_COMPONENT(world, WaterRipples);
     ECS_META_COMPONENT(world, RippleSource);
     ECS_META_COMPONENT(world, WindSway);
@@ -694,6 +719,8 @@ void BoxMaterialImport(
     ecs_set_hooks(world, WaterWaves, { .ctor = box_water_waves_ctor });
     ecs_add_pair(world, ecs_id(WaterWaves), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(WaterFlow), EcsOnInstantiate, EcsInherit);
+    ecs_set_hooks(world, WaterCaustics, { .ctor = box_water_caustics_ctor });
+    ecs_add_pair(world, ecs_id(WaterCaustics), EcsOnInstantiate, EcsInherit);
     ecs_set_hooks(world, WaterRipples, { .ctor = box_water_ripples_ctor });
     ecs_set_hooks(world, RippleSource, { .ctor = box_ripple_source_ctor });
     ecs_set_hooks(world, WindSway, { .ctor = box_wind_sway_ctor });

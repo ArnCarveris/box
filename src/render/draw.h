@@ -310,6 +310,9 @@ typedef struct box_draw_material_t {
     const WaterWaves *waves;    /**< Travelling waves of the Water, NULL without Water */
     const WaterFlow *flow;      /**< Velocity the waves move with, NULL without Water */
     uint32_t water_waves;       /**< Set of the waves in the wave table, 0 for none */
+    const WaterCaustics *caustics; /**< Caustics of the Water, NULL without Water */
+    float caustics_frame[2];    /**< Offset of the water frame of the caustics in cells, wrapped
+                                 *   (box_draws_water_caustics_frame), 0 for still water */
     const WindSway *sway;       /**< Wind sway of a 3D shape, ignored by 2D shapes */
     box_render_wind_t wind;     /**< Wind of the frame the sway is packed with, read with sway */
     const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
@@ -372,6 +375,9 @@ typedef struct box_draw_transition_material_t {
     bool watered;           /**< The material has a Water */
     uint32_t water_waves;   /**< Set of the WaterWaves of the Water in the wave table, which
                              *   has no transition: the record keeps it */
+    WaterCaustics caustics; /**< WaterCaustics, which has no transition: the record keeps it */
+    bool causticked;        /**< The Water has a WaterCaustics */
+    float caustics_frame[2]; /**< Offset of the water frame of the caustics in cells */
     WindSway sway;          /**< WindSway, which has no transition: the record keeps it */
     bool swayed;            /**< The material has a WindSway */
     box_render_wind_t wind; /**< Wind of the frame the sway was packed with */
@@ -660,6 +666,15 @@ typedef struct box_draw_water_waves_state_t {
                              *   (box_draws_water_waves_step) */
 } box_draw_water_waves_state_t;
 
+/** The water frame of the WaterCaustics of an owner of the material table that has a
+ * WaterFlow */
+typedef struct box_draw_water_caustics_state_t {
+    double time;            /**< Total render time the frame was integrated to */
+    double frame[2];        /**< Offset of the water frame in cells, the integral of the WaterFlow
+                             *   velocity over the scale, wrapped to 0..BOX_RENDER_CAUSTICS_PERIOD
+                             *   (box_draws_water_caustics_step) */
+} box_draw_water_caustics_state_t;
+
 /** The wave table (BOX_RENDER_BUFFER_WATER_WAVES) as the main thread integrates and packs it */
 typedef struct box_draw_water_waves_t {
     box_draw_water_waves_state_t states[BOX_RENDER_WATER_WAVE_SETS]; /**< By set, set 0
@@ -706,6 +721,8 @@ typedef struct box_draw_materials_t {
                              *   diffuse blur, 0 without any */
     bool features_valid;    /**< transmission_roughness was computed from the records */
     box_draw_water_waves_t *waves; /**< The wave table, NULL until a Water has WaterWaves */
+    ecs_map_t caustics;     /**< Owner whose Water has WaterCaustics and a WaterFlow to its
+                             *   box_draw_water_caustics_state_t, allocated */
 } box_draw_materials_t;
 
 /** The root of a changed subtree and the streams the change writes for each of its entities */
@@ -1526,7 +1543,8 @@ void box_draws_color_unpack(
  * ClearCoat, SpecularAnisotropy and Sheen are 0 without one or at 0, a Sheen at a black color,
  * DiffuseTransmission 0 without one, its blur 0 when negative or not finite, Fresnel 0 without
  * one. A Distortion without Water packs its strength, frequency and phase, and without
- * Transmission the transmission of a factor of 1 (box_draws_distortion_pack).
+ * Transmission the transmission of a factor of 1 (box_draws_distortion_pack). A Water packs its
+ * WaterCaustics in the words of the Fresnel, which it ignores (box_draws_water_caustics_pack).
  * Opacity, tints and the 2D shape are not.
  *
  * @param out The record
@@ -1878,6 +1896,108 @@ void box_draws_water_waves_upload(
  * @param m The table
  */
 void box_draws_water_waves_fini(
+    box_draw_materials_t *m);
+
+/** Wrap an offset of the water frame of WaterCaustics to 0..BOX_RENDER_CAUSTICS_PERIOD cells,
+ * 0 when not finite.
+ *
+ * @param offset The offset in cells
+ * @return The wrapped offset
+ */
+double box_draws_water_caustics_wrap(
+    double offset);
+
+/** Get the cells per world unit of a WaterCaustics: 1 over its scale, which is at least
+ * BOX_RENDER_CAUSTICS_MIN; 1 over the default scale for a scale that is not finite.
+ *
+ * @param caustics The caustics
+ * @return The frequency
+ */
+float box_draws_water_caustics_frequency(
+    const WaterCaustics *caustics);
+
+/** Phase of the animation of WaterCaustics at a time: speed times time over
+ * BOX_RENDER_CAUSTICS_LOOP wrapped to [0, 1) in double precision, 0 when not finite.
+ *
+ * @param speed WaterCaustics.speed, cells per second
+ * @param time Total render time
+ * @return The phase
+ */
+float box_draws_water_caustics_phase(
+    float speed,
+    double time);
+
+/** Advance the water frame of WaterCaustics by a time step in double precision: the WaterFlow
+ * velocity times the frequency of the caustics times the step, wrapped
+ * (box_draws_water_caustics_wrap).
+ *
+ * @param frame The X and Z offset of the frame in cells
+ * @param caustics The caustics
+ * @param flow The velocity of the surface, NULL for still water
+ * @param dt Seconds, a step that is not finite or negative does nothing
+ */
+void box_draws_water_caustics_step(
+    double *frame,
+    const WaterCaustics *caustics,
+    const WaterFlow *flow,
+    double dt);
+
+/** Check whether the record of a Water with WaterCaustics changes every frame: it has a
+ * WaterFlow or a speed other than 0, and a strength above 0.
+ *
+ * @param caustics The caustics, NULL for none
+ * @param flow The WaterFlow, NULL for none
+ * @return Whether it moves
+ */
+bool box_draws_water_caustics_moves(
+    const WaterCaustics *caustics,
+    const WaterFlow *flow);
+
+/** Get the water frame of the WaterCaustics of an owner at the time of the table. An owner with a
+ * WaterFlow keeps its frame in the table, created as if integrated from time 0; still water has
+ * the frame 0.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @param caustics Its caustics
+ * @param flow Its WaterFlow, NULL for none
+ * @param out The X and Z offset of the frame in cells
+ */
+void box_draws_water_caustics_frame(
+    box_draw_materials_t *m,
+    ecs_entity_t owner,
+    const WaterCaustics *caustics,
+    const WaterFlow *flow,
+    float *out);
+
+/** Get the water frame of the WaterCaustics of an owner the table holds without changing it.
+ *
+ * @param m The table
+ * @param owner The owner
+ * @param out The X and Z offset of the frame in cells, 0 for an owner without one
+ * @return Whether the table holds a frame of the owner
+ */
+bool box_draws_water_caustics_find(
+    const box_draw_materials_t *m,
+    ecs_entity_t owner,
+    float *out);
+
+/** Integrate the water frame of every owner with WaterCaustics and a WaterFlow to the time of
+ * the table, and forget those whose owner is gone, no longer owns a slot or lost its Water,
+ * WaterCaustics, WaterFlow or Scene.water.
+ *
+ * @param world The world
+ * @param m The table
+ */
+void box_draws_water_caustics_advance(
+    const ecs_world_t *world,
+    box_draw_materials_t *m);
+
+/** Free the water frames of the WaterCaustics.
+ *
+ * @param m The table
+ */
+void box_draws_water_caustics_fini(
     box_draw_materials_t *m);
 
 /** Compute the rim factor of a Fresnel, the C twin of fresnel_factor of material.wgsl:

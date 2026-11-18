@@ -377,6 +377,9 @@ ECS_STRUCT(Distortion, {
  * and a ripple_velocity its record is packed every frame, like that of a TextureScroll; a still
  * Water shares its record like the other material components.
  *
+ * A WaterCaustics adds the moving web of sunlight that waves focus onto the floor seen through
+ * the water.
+ *
  * Underwater views and the back faces are not supported: the surface is seen from above. Needs
  * Scene.water: a scene without it draws the shape as if it had no Water. Only 3D meshes have it,
  * 2D shapes and text ignore it.
@@ -464,6 +467,56 @@ ECS_STRUCT(WaterWaves, {
  */
 ECS_STRUCT(WaterFlow, {
     vec2 velocity; /**< World units per second (X, Z) the surface moves with */
+});
+
+/** Strength of a constructed WaterCaustics: the pattern at its full contrast */
+#define BOX_MATERIAL_WATER_CAUSTICS_STRENGTH (1.0f)
+
+/** Scale of a constructed WaterCaustics: world units of one cell of the pattern */
+#define BOX_MATERIAL_WATER_CAUSTICS_SCALE (1.0f)
+
+/** Speed of a constructed WaterCaustics, cells per second */
+#define BOX_MATERIAL_WATER_CAUSTICS_SPEED (0.5f)
+
+/** Depth of a constructed WaterCaustics: water depth at which they are gone, world units */
+#define BOX_MATERIAL_WATER_CAUSTICS_DEPTH (2.0f)
+
+/** Caustics of a Water: the bright, moving web of sunlight that the waves focus onto the floor,
+ * default a strength of 1, cells of 1 world unit, a speed of 0.5 and a depth of 2. Inherited by
+ * instances like Water; a field a scene does not set keeps its default.
+ *
+ * They light the scene seen through the water (the floor, a submerged hull or stone), at the
+ * world position of what lies behind each fragment; whatever is above the water and the sky
+ * show none. The pattern is two layers of animated, slightly swirled cellular edge noise of
+ * different scales: thin curved bright lines on a slightly darker floor with a mean of about 1,
+ * sampled where the sunlight that reaches the point entered the water: the point moved toward
+ * the first directional light along its direction refracted by the surface (ior 1.33) by the
+ * water depth, so the pattern shifts as the sun moves. Red, green and blue refract slightly
+ * apart.
+ *
+ * The color seen through the water is multiplied by 1 + strength * (c - 1) * k, with c the
+ * pattern and k the share of the point lit by the first directional light of the scene: its
+ * cascaded shadow (and LightCookie) there times how far the light is above the horizon. A floor
+ * in shadow, a scene without a directional light or with the light below the horizon shows
+ * none. With the water depth the lines widen and dim and the pattern fades, gone at depth. Foam
+ * covers them as it covers the floor.
+ *
+ * The pattern lives in the frame the WaterFlow of the shape moves (the integral of its velocity
+ * in cells, kept in double precision on the CPU and wrapped), so it drifts with the water; it
+ * changes with the total render time times speed, wrapped in double precision. With a WaterFlow
+ * or a speed other than 0 the record of the shape is packed every frame, like that of a
+ * TextureScroll.
+ *
+ * Needs Water and Scene.water: without them the component does nothing. A strength of 0 (or
+ * negative or not finite) draws as without one. Its fields have no transition.
+ */
+ECS_STRUCT(WaterCaustics, {
+    float strength;   /**< How strongly the pattern brightens and darkens the floor, 0 for none */
+    float scale;      /**< World units of one cell of the pattern; at most 0 or not finite is
+                       *   the default */
+    float speed;      /**< How fast the pattern changes, about cells per second, 0 for a still
+                       *   pattern */
+    float depth;      /**< Water depth over which the caustics blur and fade out, world units */
 });
 
 /** World units of the field of a constructed WaterRipples */

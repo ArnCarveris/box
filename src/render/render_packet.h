@@ -1600,14 +1600,38 @@ typedef struct box_render_material_t {
                              *   the record without one */
     float normal_offset[2]; /**< Wrapped TextureScroll.normal_velocity offset the normal map
                              *   adds to uv, 0 without one */
-    uint32_t fresnel_color[2]; /**< Fresnel.color in linear light as unorm16: r | g << 16,
-                             *   b | 0 << 16; 0 without one */
-    float fresnel_strength; /**< Fresnel.strength, 0 without one or when negative or not
-                             *   finite */
-    float fresnel_power;    /**< Fresnel.power, 0 without one or when negative or not finite */
-    float fresnel_bias;     /**< Fresnel.bias, 0 without one or when not finite */
-    float fresnel_opacity;  /**< Fresnel.opacity clamped to 0..1, 0 without one or when not
-                             *   finite */
+    union {                 /**< The Fresnel of a record without Water, the WaterCaustics of
+                             *   one with Water */
+        struct {            /**< The Fresnel of a record without Water */
+            uint32_t fresnel_color[2]; /**< Fresnel.color in linear light as unorm16:
+                                     *   r | g << 16, b | 0 << 16; 0 without one */
+            float fresnel_strength; /**< Fresnel.strength, 0 without one or when negative or
+                                     *   not finite */
+            float fresnel_power;    /**< Fresnel.power, 0 without one or when negative or not
+                                     *   finite */
+            float fresnel_bias;     /**< Fresnel.bias, 0 without one or when not finite */
+            float fresnel_opacity;  /**< Fresnel.opacity clamped to 0..1, 0 without one or when
+                                     *   not finite */
+        };
+
+        struct {            /**< The WaterCaustics of a record with Water, which ignores
+                             *   Fresnel */
+            float caustics_offset[2]; /**< Offset of the water frame of the WaterCaustics in
+                                     *   cells, the integral of the WaterFlow velocity over
+                                     *   1 / scale wrapped to 0..BOX_RENDER_CAUSTICS_PERIOD, 0
+                                     *   without one */
+            float caustics_strength; /**< WaterCaustics.strength, 0 without one or when
+                                     *   negative or not finite, which tells a record without
+                                     *   caustics */
+            float caustics_frequency; /**< 1 over WaterCaustics.scale, which is at least
+                                     *   BOX_RENDER_CAUSTICS_MIN; 0 without one */
+            float caustics_depth;   /**< WaterCaustics.depth, at least BOX_RENDER_CAUSTICS_MIN;
+                                     *   0 without one */
+            float caustics_phase;   /**< WaterCaustics.speed times the total render time over
+                                     *   BOX_RENDER_CAUSTICS_LOOP, wrapped to 0..1
+                                     *   (box_draws_water_caustics_phase); 0 without one */
+        };
+    };
     float water_ripple_offset[2]; /**< Wrapped Water.ripple_velocity offset of the second normal
                              *   sample, 0 without one */
     uint32_t water_shallow; /**< Water.shallow_color, display encoded bytes: r | g << 8 | b << 16,
@@ -1654,6 +1678,18 @@ typedef struct box_render_material_t {
     uint32_t wind_flags;    /**< BOX_RENDER_WIND_PRESENT with a WindSway, 0 without one */
     float wind_pad;         /**< Pads the record to the 16 byte alignment of Material */
 } box_render_material_t;
+
+/** Smallest WaterCaustics.scale and depth of a record */
+#define BOX_RENDER_CAUSTICS_MIN (1e-3f)
+
+/** Cells after which the pattern of WaterCaustics repeats, which the offset of its water frame
+ * wraps at: its first layer repeats every BOX_RENDER_CAUSTICS_PERIOD cells, its second, 11 / 8
+ * as fine, every 88 */
+#define BOX_RENDER_CAUSTICS_PERIOD (64.0)
+
+/** Cells (speed times seconds) after which the animation of WaterCaustics repeats: the phase is
+ * that over this loop, 0..1 */
+#define BOX_RENDER_CAUSTICS_LOOP (8.0)
 
 /** Flag of a record with a WindSway (Scene.wind) */
 #define BOX_RENDER_WIND_PRESENT (1u)

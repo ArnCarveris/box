@@ -341,6 +341,16 @@
                 ]
             },
             {
+                "id": "WaterCaustics",
+                "testcases": [
+                    "lit_floor_varies",
+                    "none_in_shadow",
+                    "strength_zero_unchanged",
+                    "deep_floor_unchanged",
+                    "move_over_time"
+                ]
+            },
+            {
                 "id": "WaterRipples",
                 "testcases": [
                     "ring_spreads",

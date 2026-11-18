@@ -992,6 +992,153 @@ fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
     return nearest > depth;
 }
 
+// Cells after which the first layer of the pattern of WaterCaustics repeats
+// (BOX_RENDER_CAUSTICS_PERIOD), and the second, CAUSTICS_RATIO as fine: the offset of the water
+// frame wraps at CAUSTICS_PERIOD, a whole number of periods of both.
+const CAUSTICS_PERIOD: i32 = 64;
+const CAUSTICS_PERIOD_FINE: i32 = 88;
+const CAUSTICS_RATIO: f32 = 1.375;
+
+// Width in cells of the bright lines of WaterCaustics just below the surface; they widen to
+// (1 + CAUSTICS_SPREAD) times it at their depth.
+const CAUSTICS_WIDTH: f32 = 0.08;
+const CAUSTICS_SPREAD: f32 = 3.0;
+
+// Cells the swirl of WaterCaustics moves a point by at most, which curves their lines.
+const CAUSTICS_WARP: f32 = 0.2;
+
+// Brightness of a line of WaterCaustics of CAUSTICS_WIDTH over the floor, per layer.
+const CAUSTICS_GAIN: f32 = 1.4;
+
+// Indices of refraction of water for red, green and blue: the colors of the caustics land
+// slightly apart.
+const CAUSTICS_IOR: vec3f = vec3f(1.329, 1.333, 1.338);
+
+// Feature point of a cell of a layer of WaterCaustics at a phase, in cell units from the corner
+// of the cell: hashed from the cell wrapped to the period of the layer, circling a hashed center
+// a whole number of times (2 to 5, either way) per phase, so the layer repeats when the phase
+// or the offset of its frame wraps.
+fn caustics_point(cell: vec2i, period: i32, phase: f32) -> vec2f {
+    let c = ((cell % vec2i(period)) + vec2i(period)) % vec2i(period);
+    let h = distortion_hash(vec3i(c, period));
+    let r = distortion_rehash(h);
+    let a = unpack4x8unorm(h);
+    let turns = f32(2u + (r & 3u)) * select(1.0, -1.0, (r & 4u) != 0u);
+    let angle = 6.283185307 * (a.z + turns * phase);
+    return vec2f(0.2) + a.xy * 0.6 + 0.25 * vec2f(cos(angle), sin(angle));
+}
+
+// Point in cells of a layer of WaterCaustics moved by a small swirl, so its lines curve: two
+// waves of about 2.5 cells across the axes, a whole number of them per period of the layer and
+// turning a whole number of times per phase, so the layer still repeats.
+fn caustics_warp(p: vec2f, period: i32, phase: f32) -> vec2f {
+    let k = 6.283185307 / f32(period);
+    let waves = round(f32(period) * 0.4);
+    let a = 6.283185307 * phase;
+    return p + CAUSTICS_WARP * vec2f(sin(k * waves * p.y + 3.0 * a),
+        sin(k * (waves - 3.0) * p.x - 2.0 * a));
+}
+
+// Bright lines of a layer of WaterCaustics at a point in cells: the edges between the cells of
+// its moving feature points (the distance to the second nearest minus that to the nearest), 1 on
+// an edge falling to 0 at width, squared.
+fn caustics_layer(p: vec2f, period: i32, phase: f32, width: f32) -> f32 {
+    let w = caustics_warp(p, period, phase);
+    let base = floor(w);
+    let x = w - base;
+    let cell = vec2i(base);
+    var f1 = 64.0;
+    var f2 = 64.0;
+    for (var k = 0; k < 9; k++) {
+        let o = vec2i(k % 3 - 1, k / 3 - 1);
+        let q = vec2f(o) + caustics_point(cell + o, period, phase) - x;
+        let dd = dot(q, q);
+        if (dd < f1) {
+            f2 = f1;
+            f1 = dd;
+        } else if (dd < f2) {
+            f2 = dd;
+        }
+    }
+    let line = saturate(1.0 - (sqrt(f2) - sqrt(f1)) / width);
+    return line * line;
+}
+
+// Pattern of WaterCaustics at a point in cells, a mean of about 1: the lines of two layers of
+// different scales over a floor darkened by their mean (about 0.65 width each). Wider lines dim
+// by CAUSTICS_WIDTH / width, so the light they gather stays the same as they blur.
+fn caustics_pattern(p: vec2f, phase: f32, width: f32) -> f32 {
+    let a = caustics_layer(p, CAUSTICS_PERIOD, phase, width);
+    let b = caustics_layer(p * CAUSTICS_RATIO + vec2f(17.3, 41.7), CAUSTICS_PERIOD_FINE, phase,
+        width);
+    return max(1.0 + CAUSTICS_GAIN * CAUSTICS_WIDTH / width * (a + b - 1.3 * width), 0.0);
+}
+
+// Point in the cells of the frame of WaterCaustics whose sunlight reaches a world position at a
+// water depth d below a surface of normal n: the position moved up along the direction toward
+// the light l refracted by an index of refraction, by the depth.
+fn caustics_entry(world: vec3f, d: f32, n: vec3f, l: vec3f, ior: f32, c: WaterCausticsOut)
+    -> vec2f
+{
+    let t = refract(-l, n, 1.0 / ior);
+    let entry = world - t * (d / max(-dot(t, n), 1e-3));
+    return entry.xz * c.frequency - c.offset;
+}
+
+// Factor per channel of the scene seen through a Water with WaterCaustics, at the world position
+// of what lies behind at a water depth d along the geometric normal n:
+// 1 + strength * (c - 1) * k, with c the pattern sampled where the sunlight entered (red, green
+// and blue a little apart), its lines widened and dimmed and its contrast faded with d / depth,
+// and k the shadow (and cookie) of the first directional light there times how far it is above
+// the horizon. The lines also widen to 1.5 pixels and fade where a cell is smaller than about a
+// pixel. 1 without caustics, a directional light, at the depth or deeper.
+fn water_caustics(f: VertexOut, world: vec3f, d: f32, n: vec3f) -> vec3f {
+    let c = vo_water_caustics(f);
+    if (c.strength <= 0.0 || view.lights.x == 0u || d >= c.depth) {
+        return vec3f(1.0);
+    }
+
+    let l = normalize(lights[0].position);
+    let above = smoothstep(0.0, 0.2, dot(l, n));
+    if (above <= 0.0) {
+        return vec3f(1.0);
+    }
+
+    var k = above * shadow_factor(world, n);
+    if (scene_cookies) {
+        k *= light_cookie(world, l, n);
+    }
+    if (k <= 0.0) {
+        return vec3f(1.0);
+    }
+
+    let t = saturate(d / c.depth);
+    let toward = world - view.camera.xyz;
+    var eye = 1.0;
+    if (view.lights.w == 0u) {
+        eye = max(length(toward), 1e-4);
+    }
+    let grazing = max(abs(dot(normalize(toward), n)), 0.25);
+    let pixel = eye * view.cluster.y * 2.0 * view.viewport.w / grazing * c.frequency;
+    let width = CAUSTICS_WIDTH * (1.0 + CAUSTICS_SPREAD * t) + 1.5 * pixel;
+    let fade = (1.0 - smoothstep(0.0, 1.0, t)) * saturate(2.0 - 2.0 * pixel);
+    if (fade <= 0.0) {
+        return vec3f(1.0);
+    }
+
+    let g = caustics_entry(world, d, n, l, CAUSTICS_IOR.y, c);
+    let green = caustics_pattern(g, c.phase, width);
+    var pattern = vec3f(green);
+    let r = caustics_entry(world, d, n, l, CAUSTICS_IOR.x, c);
+    let b = caustics_entry(world, d, n, l, CAUSTICS_IOR.z, c);
+    if (length(r - b) > 0.02 * width) {
+        pattern = vec3f(caustics_pattern(r, c.phase, width), green,
+            caustics_pattern(b, c.phase, width));
+    }
+
+    return max(vec3f(1.0) + c.strength * (pattern - vec3f(1.0)) * (fade * k), vec3f(0.0));
+}
+
 // Color of a Water fragment seen from above. The scene behind, the opaque snapshot at the screen
 // point moved by refraction times the view space tilt of the normal map (back at the point
 // itself where the moved one shows something in front of the water), blurred by the roughness,
@@ -999,7 +1146,8 @@ fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
 // the power of ray / visibility; the body, shallow_color mixed toward
 // deep_color by the water depth along the geometric normal, covers the rest. The foam band
 // replaces both, and so does the foam of the field of WaterRipples, drawn the same way (the
-// larger of the two covers, see water_foam_mixed). Body and foam are lit diffusely with the
+// larger of the two covers, see water_foam_mixed). The WaterCaustics of the material light the
+// scene behind before it is tinted (water_caustics). Body and foam are lit diffusely with the
 // light of the surface; the specular of an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
 // as every shape), adds on top. Nothing
 // behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
@@ -1045,8 +1193,11 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
         ray = length(behind.world - f.world);
     }
 
-    let background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
+    var background = textureSampleLevel(opaque_snapshot, reflection_sampler, screen_uv,
         lod).rgb;
+    if (!deep) {
+        background *= water_caustics(f, behind.world, d, s.geometric);
+    }
 
     let shallow = material_linear(unpack4x8unorm(m.water_shallow).rgb);
     let deep_color = material_linear(unpack4x8unorm(m.water_deep).rgb);

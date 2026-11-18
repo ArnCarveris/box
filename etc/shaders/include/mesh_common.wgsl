@@ -151,11 +151,14 @@ struct VertexOut {
     // normal map only (normal_uv), 0 without material_texture_scroll
     @location(15) @interpolate(flat) normal_offset: vec2f,
     // Fresnel strength, power, bias and opacity of the material, 0 without one or without
-    // material_fresnel
+    // material_fresnel. Of a Water pipeline (water), which ignores Fresnel, the offset of the
+    // water frame of the WaterCaustics of the material, 1 over their scale and their phase
+    // (vo_water_caustics).
     @location(12) @interpolate(flat) fresnel: vec4f,
     // Fresnel color of the material in linear light as unorm16: r | g << 16, b. Of a Water
     // pipeline (water), which ignores Fresnel, x is the set of the WaterWaves of the material in
-    // the wave table, 0 for none (vo_water_waves).
+    // the wave table, 0 for none (vo_water_waves), and y the strength and depth of its
+    // WaterCaustics (pack2x16float), 0 for none (vo_water_caustics).
     @location(13) @interpolate(flat) fresnel_color: vec2u,
     // Water foam width (its sign bit the WATER_FOAM_TEXTURE flag), ripple and foam scale
     // (pack2x16float) and ripple offset of a Water pipeline (water), which reuses flat2 (the
@@ -231,6 +234,22 @@ fn vo_water(f: VertexOut) -> Material {
 // for none.
 fn vo_water_waves(f: VertexOut) -> u32 {
     return f.fresnel_color.x;
+}
+
+// The WaterCaustics of the material of a fragment of a Water pipeline: the offset of its water
+// frame in cells, 1 over its scale, the phase of its animation, its strength and its depth; a
+// strength of 0 for none.
+struct WaterCausticsOut {
+    offset: vec2f,
+    frequency: f32,
+    phase: f32,
+    strength: f32,
+    depth: f32,
+};
+
+fn vo_water_caustics(f: VertexOut) -> WaterCausticsOut {
+    let sd = unpack2x16float(f.fresnel_color.y);
+    return WaterCausticsOut(f.fresnel.xy, f.fresnel.z, f.fresnel.w, sd.x, sd.y);
 }
 
 // The Distortion of the material of a fragment of a material_distortion pipeline: strength,
@@ -506,8 +525,12 @@ fn vertex_out(p: Placed, material: Material, frame: ModelFrame, s: VertexShading
             ((material.water_flags & WATER_FOAM_TEXTURE) << 31u),
             pack2x16float(vec2f(material.water_ripple_scale, material.water_foam_scale)),
             bitcast<vec2u>(material.water_ripple_offset));
+        // The Fresnel words of a Water material hold its WaterCaustics
         o.fresnel_color = vec2u((material.water_flags >> WATER_WAVES_SHIFT) & WATER_WAVES_MASK,
-            0u);
+            pack2x16float(vec2f(min(material.fresnel_strength, 1e4),
+                min(material.fresnel_bias, 6e4))));
+        o.fresnel = vec4f(bitcast<vec2f>(material.fresnel_color), material.fresnel_power,
+            material.fresnel_opacity);
     }
     if (material_distortion && !water && material.distortion_flags != 0u) {
         vertex_distortion(&o, p, material, frame, s.mapped);

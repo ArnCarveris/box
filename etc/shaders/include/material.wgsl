@@ -54,6 +54,10 @@ struct Material {
     // Wrapped TextureScroll.normal_velocity offset the normal map adds to its UVs, 0 without one
     normal_offset: vec2f,
     // Fresnel.color in linear light as unorm16 (unpack2x16unorm): r | g << 16, b | 0 << 16
+    // A Water material, which ignores Fresnel, holds its WaterCaustics in the six Fresnel words
+    // instead, all 0 without one: the offset of its water frame in cells (wrapped to
+    // CAUSTICS_PERIOD) as two f32, its strength (0 for none), 1 over its scale, its depth and
+    // the phase of its animation (0..1 over CAUSTICS_LOOP cells)
     fresnel_color: vec2u,
     // Fresnel strength, power, bias and opacity (0..1), all 0 without one
     fresnel_strength: f32,

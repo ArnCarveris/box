@@ -475,6 +475,44 @@ done:
     return;
 }
 
+/** Pack a WaterCaustics into the caustics words of a Water record, which hold the Fresnel of a
+ * record without Water: its strength when positive and finite, the inverse of its scale and its
+ * depth (at least BOX_RENDER_CAUSTICS_MIN), its water frame and its phase at the time.
+ *
+ * Without one or without a strength the words are 0, which draws as without one.
+ *
+ * @param out The record
+ * @param caustics The component, NULL for none
+ * @param frame Offset of its water frame in cells, wrapped
+ * @param time Total render time the phase is computed at
+ */
+static void box_draws_water_caustics_pack(
+    box_render_material_t *out,
+    const WaterCaustics *caustics,
+    const float *frame,
+    double time)
+{
+    out->caustics_offset[0] = 0.0f;
+    out->caustics_offset[1] = 0.0f;
+    out->caustics_strength = 0.0f;
+    out->caustics_frequency = 0.0f;
+    out->caustics_depth = 0.0f;
+    out->caustics_phase = 0.0f;
+    if (!caustics || !isfinite(caustics->strength) || caustics->strength <= 0.0f) {
+        goto done;
+    }
+
+    out->caustics_strength = caustics->strength;
+    out->caustics_frequency = box_draws_water_caustics_frequency(caustics);
+    out->caustics_depth = isfinite(caustics->depth) && caustics->depth > BOX_RENDER_CAUSTICS_MIN
+        ? caustics->depth : BOX_RENDER_CAUSTICS_MIN;
+    out->caustics_offset[0] = isfinite(frame[0]) ? frame[0] : 0.0f;
+    out->caustics_offset[1] = isfinite(frame[1]) ? frame[1] : 0.0f;
+    out->caustics_phase = box_draws_water_caustics_phase(caustics->speed, time);
+done:
+    return;
+}
+
 float box_draws_distortion_phase(
     float speed,
     double time)
@@ -624,8 +662,14 @@ void box_draws_material_pack(
         out->normal_offset[1] = 0.0f;
     }
 
-    box_draws_fresnel_pack(out, material->fresnel);
     box_draws_water_pack(out, material->water, material->water_waves, material->time);
+    if (material->water) {
+        box_draws_water_caustics_pack(out, material->caustics, material->caustics_frame,
+            material->time);
+    } else {
+        box_draws_fresnel_pack(out, material->fresnel);
+    }
+
     box_render_wind_pack(out, material->sway, &material->wind);
     out->transmission_factor = transmission ? transmission->transmission_factor : 0.0f;
     out->ior = transmission ? transmission->ior : BOX_MATERIAL_IOR;
