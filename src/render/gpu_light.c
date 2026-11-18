@@ -226,6 +226,11 @@ void box_gpu_light_init(
         .usage = WGPUBufferUsage_Storage,
         .size = sizeof(box_render_clip_t)
     });
+    gpu->no_areas = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Uniform,
+        .size = BOX_GPU_AREAS_SIZE
+    });
+    ecs_vec_init_t(NULL, &gpu->area_views, const box_render_view_t*, 0);
     ecs_map_init(&gpu->clusters, NULL);
 }
 
@@ -252,6 +257,19 @@ void box_gpu_light_fini(
         wgpuBufferRelease(gpu->no_clips);
         gpu->no_clips = NULL;
     }
+
+    if (gpu->no_areas) {
+        wgpuBufferRelease(gpu->no_areas);
+        gpu->no_areas = NULL;
+    }
+
+    if (gpu->area_buffer) {
+        wgpuBufferRelease(gpu->area_buffer);
+        gpu->area_buffer = NULL;
+        gpu->area_capacity = 0;
+    }
+
+    ecs_vec_fini_t(NULL, &gpu->area_views, const box_render_view_t*);
 
     if (gpu->no_probes) {
         wgpuBufferRelease(gpu->no_probes);
@@ -781,6 +799,68 @@ done:
     return;
 }
 
+void box_gpu_light_areas(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, count = ecs_vec_count(&gpu->area_views), capacity = gpu->area_capacity;
+    vec4 zero = {0, 0, 0, 0};
+
+    if (count > capacity || !gpu->area_buffer) {
+        capacity = capacity ? capacity : 2;
+        while (capacity < count) {
+            capacity *= 2;
+        }
+
+        if (gpu->area_buffer) {
+            wgpuBufferRelease(gpu->area_buffer);
+        }
+
+        gpu->area_capacity = capacity;
+        gpu->area_buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+            .size = (uint64_t)capacity * BOX_GPU_AREAS_SIZE
+        });
+    }
+
+    for (i = 0; i < count; i ++) {
+        const box_render_view_t *v = *ecs_vec_get_t(&gpu->area_views,
+            const box_render_view_t*, i);
+        uint64_t offset = (uint64_t)i * BOX_GPU_AREAS_SIZE;
+        bool block = v->area_count > 0 &&
+            (uint64_t)v->area_count * sizeof(vec4) <= BOX_GPU_AREAS_SIZE &&
+            v->area_first + v->area_count <= ecs_vec_count(&packet->areas);
+
+        if (block) {
+            wgpuQueueWriteBuffer(gpu->queue, gpu->area_buffer, offset,
+                ecs_vec_get_t(&packet->areas, vec4, v->area_first),
+                (size_t)v->area_count * sizeof(vec4));
+        } else {
+            wgpuQueueWriteBuffer(gpu->queue, gpu->area_buffer, offset, zero, sizeof(vec4));
+        }
+    }
+}
+
+/** Find the slot of the area buffer that holds the shading block of a view.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return The slot, -1 for a view without one in this target
+ */
+static int32_t box_gpu_light_area_slot(
+    const box_gpu_t *gpu,
+    const box_render_view_t *v)
+{
+    int32_t i, result = -1;
+    for (i = 0; i < ecs_vec_count(&gpu->area_views) && result < 0 && gpu->area_buffer; i ++) {
+        if (*ecs_vec_get_t(&gpu->area_views, const box_render_view_t*, i) == v) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
 WGPUBindGroup box_gpu_light_group_with(
     box_gpu_t *gpu,
     const box_gpu_target_t *t,
@@ -801,7 +881,8 @@ WGPUBindGroup box_gpu_light_group_with(
         &gpu->buffers, box_gpu_buffer_t, BOX_RENDER_BUFFER_CLIPS);
     WGPUBuffer tiles = NULL;
     const box_gpu_atlas_t *atlas = t ? box_gpu_atlas_of(gpu, v, &tiles) : NULL;
-    WGPUBindGroupEntry entries[24] = {
+    int32_t area = box_gpu_light_area_slot(gpu, v);
+    WGPUBindGroupEntry entries[25] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         { .binding = 2, .buffer = clusters, .size = wgpuBufferGetSize(clusters) },
@@ -844,14 +925,20 @@ WGPUBindGroup box_gpu_light_group_with(
             .textureView = snapshot_depth
                 ? snapshot_depth : box_gpu_transmission_depth_view(gpu, NULL)
         },
-        [21] = { .binding = 21, .textureView = box_gpu_planar_view(gpu, t, v) }
+        [21] = { .binding = 21, .textureView = box_gpu_planar_view(gpu, t, v) },
+        [BOX_GPU_AREAS_BINDING] = {
+            .binding = BOX_GPU_AREAS_BINDING,
+            .buffer = area >= 0 ? gpu->area_buffer : gpu->no_areas,
+            .offset = area >= 0 ? (uint64_t)area * BOX_GPU_AREAS_SIZE : 0,
+            .size = BOX_GPU_AREAS_SIZE
+        }
     };
     box_gpu_atmosphere_bindings(gpu, t, v, &entries[9]);
     box_gpu_environment_bindings(gpu, t ? v : NULL, &entries[12]);
     box_gpu_planet_lights_bindings(gpu, &entries[BOX_GPU_PLANET_LIGHTS_BINDING]);
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 24,
+        .entryCount = 25,
         .entries = entries
     };
 

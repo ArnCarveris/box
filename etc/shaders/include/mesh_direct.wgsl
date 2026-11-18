@@ -60,9 +60,13 @@ fn shadow_terminator(ng: vec3f, ns: vec3f, l: vec3f) -> f32 {
 // the transmittance of its atmosphere at world, and its sky lights the diffuse term
 // (planet_light_sky) as a Lambert surface, unshadowed but occluded. With sides 2 each light
 // is evaluated again thickness behind the surface along the view ray, for the back lobe of a
-// diffuse transmission, which light_lobes returns for side 1. The directional and cluster lights
-// share one loop, and the sides one loop per light, so the shadows, the cookie and the lobes each
-// have one call site: D3D compilers inline every call.
+// diffuse transmission, which light_lobes returns for side 1. In an area of a portal-room scene
+// (areas.wgsl) a light of the clusters lights the fragment only from the area of the fragment,
+// the lights through its portals follow the cluster lights, each only along rays through its
+// openings, and the directional lights reach an area only through openings to the outdoors
+// (area_sun). The directional, cluster and portal lights share one loop, and the sides one loop
+// per light, so the shadows, the cookie and the lobes each have one call site: D3D compilers
+// inline every call.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
     thickness: f32) -> Lit
 {
@@ -80,12 +84,26 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
         count += cluster_lights(clusters[2u + 2u * cluster]);
     }
 
+    let portal = count;
+    count += area_through_count();
+
     for (var i = 0u; i < count; i++) {
         var light: Light;
+        var through = 0u;
         if (i < directional) {
             light = lights[i];
-        } else {
+        } else if (i < portal) {
             light = lights[clusters[first + i - directional]];
+            if (!area_lights(light)) {
+                continue;
+            }
+        } else {
+            through = area_through_record(i - portal);
+            let index = area_through_light(through);
+            if (index < 0 || u32(index) >= view.lights.y) {
+                continue;
+            }
+            light = lights[u32(index)];
         }
 
         for (var side = 0u; side < sides; side++) {
@@ -113,6 +131,8 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                         visible *= light_cookie(at, l, n);
                     }
                 }
+                radiance *= area_sun(at, l, visible);
+                visible = 1.0;
             } else {
                 let delta = light.position - at;
                 let dist = length(delta);
@@ -120,6 +140,9 @@ fn lights_direct(s: Surface, v: vec3f, world: vec3f, cluster: u32, sides: u32,
                 radiance *= attenuation(light, l, dist);
                 if (scene_punctual_shadows && light.shadow < view.spot_config.x) {
                     visible = punctual_shadow(light, at, n);
+                }
+                if (i >= portal) {
+                    radiance *= area_through(through, at, light.position);
                 }
             }
 

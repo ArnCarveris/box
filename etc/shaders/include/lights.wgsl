@@ -79,7 +79,8 @@ struct View {
 };
 
 // shadow is the index of the tile record of a spot or point light in the shadow atlas of the
-// scene, 0xFFFFFFFF for none.
+// scene, 0xFFFFFFFF for none. area is the index plus one of the area of a portal-room scene that
+// holds a point or spot light, 0 for none (areas.wgsl).
 struct Light {
     position: vec3f,
     range: f32,
@@ -88,7 +89,7 @@ struct Light {
     direction: vec3f,
     spot_offset: f32,
     shadow: u32,
-    pad0: u32,
+    area: u32,
     pad1: u32,
     pad2: u32,
 };

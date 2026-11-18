@@ -9,6 +9,7 @@
 
 #include "bake.h"
 #include "../atmosphere/atmosphere.h"
+#include "portal_lights.h"
 
 /** Smallest range a light record of a transition writes, as a range of 0 is a directional
  * light */
@@ -172,6 +173,8 @@ typedef struct box_render_lights_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
     ecs_vec_t cull_views;       /**< box_light_cull_view_t, the views of this frame */
+    box_render_portal_lights_t *portals; /**< What the views see of the areas of portal-room
+                                 *   scenes, which culls and shades their lights */
     bool cull;                  /**< Lights are culled in this frame: no reflection probe or
                                  *   planar reflection renders the lights of a scene beyond its
                                  *   views */

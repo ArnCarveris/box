@@ -110,6 +110,9 @@ ECS_STRUCT(CullSettings, {
                              *   cascade) when the world box around its instances is outside it
                              *   or too small there, before the GPU tests its instances; needs
                              *   enabled, renders the same image, default false */
+    bool portals;           /**< In a scene with areas (VisArea), draw only the instances in the
+                             *   areas the camera sees from its area through open portals
+                             *   (box.portal); needs enabled and a perspective camera */
 });
 
 /** Settings of the infinite grid a view draws in its debug pass: the plane y = height, with

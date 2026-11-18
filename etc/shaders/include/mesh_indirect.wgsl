@@ -11,13 +11,15 @@ struct Indirect {
 };
 
 // Ambient light of the view in a direction: the SH of its environment with scene_environment,
-// else the hemisphere ambient of its scene.
+// else the hemisphere ambient of its scene; inside an area of a portal-room scene the ambient of
+// the area (ambient_area).
 fn view_ambient(dir: vec3f) -> vec3f {
+    var scene = mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
     if (scene_environment) {
-        return ambient(dir);
+        scene = ambient(dir);
     }
 
-    return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
+    return ambient_area(dir, scene);
 }
 
 // Whether the fragments sample the probe volume of the view.

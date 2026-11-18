@@ -58,3 +58,26 @@ prefab BunkerMat_plan_0_30_0_34_0_42 { Rgb: {77, 87, 107}; PbrMaterial: {metalli
 // Window glass: a faint cool grey-blue pane, drawn blended (casting no shadow), denser and brighter
 // at grazing angles; a portal's glass tint overrides its Rgb and Opacity.
 prefab BunkerMat_glass { Rgb: {158, 179, 199}; PbrMaterial: {metallic: 0, roughness: 0.05}; Opacity: {0.18}; Fresnel: {color: {204, 224, 242}, strength: 0.6, power: 4, bias: 0.08, opacity: 0.5} }
+
+// Antifouling: the dark band of the freighter's hull below the paint line.
+prefab BunkerMat_antifouling { Rgb: {23, 23, 26}; PbrMaterial: {metallic: 0, roughness: 0.8}; PbrTextures: {albedo: BunkerTex_rust}; texture.Mapping: {mode: MappingWorld, size: 8} }
+
+// Sea: dark green-blue water around the island; the waves are a noise normal map drifting slowly.
+BunkerTex_wave_height {
+  Gen: {width: 256, height: 256, seed: 47, layers: [
+    {kind: GenNoise, frequency: 6, octaves: 4, amount: 1}
+  ]}
+}
+
+BunkerTex_wave_normal {
+  Gen: {source: BunkerTex_wave_height, output: GenNormal, strength: 1.2}
+}
+
+prefab BunkerMat_sea {
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.05}
+  Water: {shallow_color: {40, 128, 120}, deep_color: {13, 56, 61}, depth: 6, visibility: 3, refraction: 0.012, foam_color: {235, 242, 240}, foam_width: 0.25, ripple_scale: 2, ripple_velocity: {0.012, 0.02}}
+  PbrTextures: {normal: BunkerTex_wave_normal}
+  texture.Mapping: {mode: MappingWorld, size: 9}
+  texture.Scroll: {velocity: {0.006, 0.02}}
+}

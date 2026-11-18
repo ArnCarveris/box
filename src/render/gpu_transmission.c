@@ -38,7 +38,10 @@ struct box_gpu_snapshot_t {
     WGPUTexture glass;              /**< Depth of the nearest transmissive surfaces over the
                                      *   opaque depth, which splits the fog volumes of a view;
                                      *   NULL until a view with fog volumes needs it */
-    WGPUTextureView glass_view;     /**< View of the glass depth */
+    WGPUTextureView glass_view;     /**< Depth and stencil view of the glass depth, which the
+                                     *   transmissive draws write */
+    WGPUTextureView glass_sample;   /**< Depth aspect view of the glass depth, which the fog
+                                     *   volumes sample */
     WGPURenderPipeline pipeline;    /**< Downsample pipeline of its format in this frame, NULL
                                      *   until the shader exists, which leaves the mips above 0
                                      *   unwritten and unsampled */
@@ -114,7 +117,7 @@ void box_gpu_transmission_init(
         .mipLevelCount = 1,
         .sampleCount = 1
     });
-    tr->no_depth_view = wgpuTextureCreateView(tr->no_depth, NULL);
+    tr->no_depth_view = box_gpu_depth_sample_view(tr->no_depth);
     ecs_map_init(&tr->pipelines, NULL);
     gpu->transmission = tr;
 }
@@ -266,7 +269,7 @@ static box_gpu_snapshot_t* box_gpu_snapshot_new(
         .mipLevelCount = 1,
         .sampleCount = 1
     });
-    result->depth_view = wgpuTextureCreateView(result->depth, NULL);
+    result->depth_view = box_gpu_depth_sample_view(result->depth);
     box_gpu_count(gpu, BOX_GPU_STAT_TRANSMISSION_TEXTURE);
     for (i = 0; i < result->mip_count; i ++) {
         result->mips[i] = wgpuTextureCreateView(result->texture, &(WGPUTextureViewDescriptor){
@@ -321,6 +324,7 @@ static void box_gpu_snapshot_free(
     wgpuTextureRelease(s->depth);
     if (s->glass) {
         wgpuTextureViewRelease(s->glass_view);
+        wgpuTextureViewRelease(s->glass_sample);
         wgpuTextureRelease(s->glass);
     }
 
@@ -444,7 +448,8 @@ WGPUTextureView box_gpu_transmission_glass(
     box_gpu_t *gpu,
     box_gpu_snapshot_t *s,
     WGPUCommandEncoder encoder,
-    WGPUTexture depth)
+    WGPUTexture depth,
+    WGPUTextureView *attachment)
 {
     if (!s->glass) {
         s->glass = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
@@ -457,6 +462,7 @@ WGPUTextureView box_gpu_transmission_glass(
             .sampleCount = 1
         });
         s->glass_view = wgpuTextureCreateView(s->glass, NULL);
+        s->glass_sample = box_gpu_depth_sample_view(s->glass);
     }
 
     wgpuCommandEncoderCopyTextureToTexture(encoder,
@@ -464,7 +470,9 @@ WGPUTextureView box_gpu_transmission_glass(
         &(WGPUTexelCopyTextureInfo){ .texture = s->glass, .aspect = WGPUTextureAspect_All },
         &(WGPUExtent3D){ s->width, s->height, 1 });
 
-    return s->glass_view;
+    *attachment = s->glass_view;
+
+    return s->glass_sample;
 }
 
 void box_gpu_transmission_record(

@@ -53,7 +53,8 @@ static void box_view_ctor(
         values[i].culling = (CullSettings){
             .enabled = true,
             .occlusion = true,
-            .min_dimension_px = 1.0f
+            .min_dimension_px = 1.0f,
+            .portals = true
         };
         values[i].debug.grid = (GridSettings){
             .cell_size = 1.0f,

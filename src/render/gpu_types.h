@@ -47,8 +47,10 @@
 /** Bytes a row of a texture to buffer copy is aligned to */
 #define BOX_GPU_ROW_ALIGN (256)
 
-/** Depth format of the views, cleared to 0 and compared with greater for reversed Z */
-#define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32Float)
+/** Depth format of the views, cleared to 0 and compared with greater for reversed Z. Its
+ * stencil holds the portal regions of a view (BOX_RENDER_STENCIL_REGION). Views of it that
+ * are sampled take the depth aspect only (box_gpu_depth_sample_view) */
+#define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32FloatStencil8)
 
 /** Bytes between the uniforms of two views, a multiple of the dynamic offset alignment */
 #define BOX_GPU_VIEW_STRIDE (1024)
@@ -77,6 +79,9 @@ typedef struct box_gpu_gtao_t box_gpu_gtao_t;
 
 /** Pipelines and white fallback of the opaque snapshot of transmission */
 typedef struct box_gpu_transmission_t box_gpu_transmission_t;
+
+/** Pipelines and vertices of the portal marks of the views (gpu_portal_stencil.h) */
+typedef struct box_gpu_portal_stencil_t box_gpu_portal_stencil_t;
 
 /** Opaque snapshot of a target that transmissive draws sample, with its blur pyramid */
 typedef struct box_gpu_snapshot_t box_gpu_snapshot_t;
@@ -132,8 +137,9 @@ typedef struct box_gpu_target_t {
     WGPUTextureView scene_view;     /**< View of the scene texture */
     WGPUBindGroup blit_group;       /**< Binds the scene texture to the blit pipeline */
     WGPUTexture depth;              /**< Depth texture of the views at the render size */
-    WGPUTextureView depth_view;     /**< View of the depth texture */
-    bool immediate;                 /**< The window can present without vertical sync */
+    WGPUTextureView depth_view;     /**< View of the depth aspect, which shaders sample */
+    WGPUTextureView depth_attachment; /**< View of depth and stencil the passes render into */
+    bool immediate;                /**< The window can present without vertical sync */
     WGPUBuffer readback;            /**< Idle buffer the next capture copies the image into */
     uint64_t readback_size;         /**< Bytes of the idle readback buffer */
     box_gpu_capture_t *capture;     /**< Copy recorded in this frame, not yet mapped */
@@ -398,6 +404,13 @@ typedef struct box_gpu_cull_history_t {
 #define BOX_GPU_CULL_FRUSTUMS_SIZE \
     ((uint32_t)sizeof(box_gpu_cull_frustum_t) * BOX_GPU_CULL_GROUP_VIEWS)
 
+/** vec4 of the portal visibility blocks of a cull group in the uniforms, as the portals array
+ * of cull.wgsl; the first is unused, so 0 stands for a frustum without a block */
+#define BOX_GPU_CULL_PORTALS (2048)
+
+/** Bytes of the portal visibility blocks of a cull group, a multiple of the uniform stride */
+#define BOX_GPU_CULL_PORTALS_SIZE ((uint32_t)sizeof(vec4) * BOX_GPU_CULL_PORTALS)
+
 /** A frustum the cull pass tests instances against: a view, or a cascade of its shadows */
 typedef struct box_gpu_cull_view_t {
     ecs_entity_t view;              /**< Entity of the view */
@@ -550,7 +563,9 @@ typedef struct box_gpu_cull_frustum_t {
     vec4 planes[6];                 /**< World space planes, inside where non negative */
     vec4 clip_w;                    /**< Row of the view projection that gives clip w */
     vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, unused */
-    uint32_t flags[4];              /**< Index of its counters, its flags, two unused */
+    uint32_t flags[4];              /**< Index of its counters, its flags, the first vec4 of
+                                     *   its portal visibility block in the portals of the
+                                     *   group (0 for none), one unused */
     vec4 light;                     /**< World position of the light of a shadow tile, w 1, w 0
                                      *   for a frustum without a light */
 } box_gpu_cull_frustum_t;
@@ -565,6 +580,9 @@ typedef struct box_gpu_cull_desc_t {
     uint32_t flags;                 /**< BOX_GPU_CULL_CASTERS, _SIZE, _HISTORY, _BAKE, _EMPTY */
     bool report;                    /**< Its counts become the CullStatus of the view */
     box_gpu_cull_frustum_t frustum; /**< Its planes and smallest size */
+    const vec4 *portals;            /**< Portal visibility block of a view that culls by
+                                     *   portals, in the packet, NULL for none */
+    int32_t portal_count;           /**< vec4 of that block */
 } box_gpu_cull_desc_t;
 
 /** Uniforms of one cull dispatch, as in Cull of cull.wgsl; the frustums of its group are
@@ -588,6 +606,8 @@ typedef struct box_gpu_cull_group_t {
     int32_t first_dispatch;         /**< First of its dispatches */
     int32_t dispatch_count;         /**< Its dispatches, parallel jobs and ordered ones */
     uint32_t frustums;              /**< Byte offset of its frustums in the uniform buffer */
+    uint32_t portals;               /**< Byte offset of the portal visibility blocks of its
+                                     *   frustums in the uniform buffer, 0 without any */
     bool occlusion;                 /**< A frustum has a history: an early and a late phase */
     box_gpu_cull_uniforms_t base;   /**< Uniforms of its view: view projection and pyramid */
     WGPUBindGroup history;          /**< History and pyramid of its view, or the empty ones */
@@ -867,6 +887,14 @@ typedef struct box_gpu_atlas_read_t {
  * group */
 #define BOX_GPU_PLANET_LUTS_BINDING (23)
 
+/** Binding of the shading block of the areas of a view in the view group, area_block of
+ * areas.wgsl */
+#define BOX_GPU_AREAS_BINDING (24)
+
+/** Bytes of the shading block of a view, BOX_PORTAL_SHADE_MAX vec4, the uniform array the
+ * forward pass binds; a multiple of the uniform offset alignment */
+#define BOX_GPU_AREAS_SIZE ((uint64_t)4096 * 16)
+
 /** Planet light of a slot in the view group, PlanetLight of planet_light.wgsl */
 typedef struct box_gpu_planet_light_t {
     float center[4];                /**< World center, km per world unit, 0 for an empty slot */
@@ -1002,6 +1030,12 @@ typedef struct box_gpu_t {
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     WGPUBuffer no_probes;           /**< Reflection probe buffer of a cluster pass without probes */
     WGPUBuffer no_clips;            /**< Clip buffer of the views while no element clips */
+    WGPUBuffer area_buffer;         /**< Shading blocks of the areas of the views of a target,
+                                     *   BOX_GPU_AREAS_SIZE per slot of the view buffer */
+    int32_t area_capacity;          /**< Views the area buffer holds */
+    WGPUBuffer no_areas;            /**< Zero shading block, bound by views without areas */
+    ecs_vec_t area_views;           /**< const box_render_view_t*, the view of each slot of the
+                                     *   area buffer in this target */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
     WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass: the
@@ -1127,6 +1161,7 @@ typedef struct box_gpu_t {
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
     box_gpu_gtao_t *gtao;           /**< Ambient occlusion of the views */
     box_gpu_transmission_t *transmission; /**< Opaque snapshots of transmission */
+    box_gpu_portal_stencil_t *portal_stencil; /**< Portal marks of the views */
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     bool clip_distances;            /**< The device has clip distances */

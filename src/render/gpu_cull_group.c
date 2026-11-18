@@ -947,6 +947,49 @@ done:
     return;
 }
 
+/** Append the portal visibility blocks of the frustums of a group to the uniform data, one
+ * after the other behind an unused vec4, and write where each starts into its frustum.
+ *
+ * A block that does not fit is left out: its view then culls by its frustum only.
+ *
+ * @param c The cull state
+ * @param frustums The frustums
+ * @param count Frustums
+ * @param block Frustums as the shader reads them, whose flags are written
+ * @return Byte offset of the blocks in the uniform data, 0 when no frustum has one
+ */
+static uint32_t box_gpu_cull_portals(
+    box_gpu_cull_t *c,
+    const box_gpu_cull_desc_t *frustums,
+    int32_t count,
+    box_gpu_cull_frustum_t *block)
+{
+    uint32_t result = 0, used = 1;
+    vec4 *data = NULL;
+    int32_t f;
+
+    for (f = 0; f < count; f ++) {
+        const box_gpu_cull_desc_t *fd = &frustums[f];
+
+        if (!fd->portals || used + (uint32_t)fd->portal_count > BOX_GPU_CULL_PORTALS) {
+            continue;
+        }
+
+        if (!data) {
+            result = (uint32_t)ecs_vec_count(&c->uniform_data);
+            data = (vec4*)ecs_vec_grow_t(NULL, &c->uniform_data, uint8_t,
+                (int32_t)BOX_GPU_CULL_PORTALS_SIZE);
+            ecs_os_memset(data, 0, (ecs_size_t)BOX_GPU_CULL_PORTALS_SIZE);
+        }
+
+        ecs_os_memcpy_n(&data[used], fd->portals, vec4, fd->portal_count);
+        block[f].flags[2] = used;
+        used += (uint32_t)fd->portal_count;
+    }
+
+    return result;
+}
+
 /** Add a cull group: frustums of a scene that one pass tests together, with their cull views,
  * draws, jobs and dispatches.
  *
@@ -1022,6 +1065,7 @@ static void box_gpu_cull_group_add(
         block[f].flags[3] = 0;
     }
 
+    g->portals = box_gpu_cull_portals(c, frustums, count, block);
     g->frustums = box_gpu_cull_uniform(c, block, (uint32_t)sizeof(block));
     ecs_vec_set_count_t(NULL, &c->masks, uint32_t, batches);
     ecs_vec_set_count_t(NULL, &c->skips, uint32_t, batches);
@@ -1241,6 +1285,13 @@ void box_gpu_cull_add(
         view.frustum.size[2] = v->camera_data.ortho ? 0.0f : 1.0f;
         view.flags |= view.frustum.size[1] > 0 ? BOX_GPU_CULL_SIZE : 0;
         view.flags |= v->cull.bounds && draws ? BOX_GPU_CULL_BOUNDS : 0;
+    }
+
+    if (v->cull.enabled && v->portal_count > 0 &&
+        v->portal_first + v->portal_count <= ecs_vec_count(&packet->portals))
+    {
+        view.portals = ecs_vec_get_t(&packet->portals, vec4, v->portal_first);
+        view.portal_count = v->portal_count;
     }
 
     if (v->cull.enabled && v->cull.occlusion) {

@@ -1,0 +1,147 @@
+// PortalDoor: a door made of data, a template added to the entity that holds the VisPortal it
+// fills (see include/box/portal.h).
+//
+// The door takes its size and plane from the portal. It builds a frame turned into the plane of
+// the portal, with the panel in it, and plays one Animator clip that slides the panel and writes
+// VisPortal.open, so visibility and light through the opening follow the panel. The clip plays
+// forward while the door is wanted open and backward while not: wanted while open is set, or with
+// auto_open while a PortalActor is within radius (PortalSensor), and never while the portal is
+// locked (VisPortal.locked).
+//
+//   p_entry {
+//     Position: {0, 1.4, 0}
+//     VisPortal: {kind: Door, size: {2.2, 2.8}, normal: {0, 0, 1}}
+//     PortalDoor: {auto_open: true, material: DoorMaterial}
+//   }
+
+using flecs.script
+using box.transform
+using box.geometry
+using box.animation
+using box.curve
+using box.portal
+
+// The raised frame, the wheel and the dogs of one face of a ship door, in the space of its panel
+template PortalDoorShipFace {
+  prop width: f32 = 1
+  prop height: f32 = 2
+  prop material: entity = 0
+  prop face: f32 = 1                  // 1 for the face along the normal, -1 for the other
+
+  const w: f32 = width / 2
+  const h: f32 = height / 2
+
+  bottom { Position: {0, -(h - 0.08), 0.06 * face}; Box: {width - 0.08, 0.08, 0.04} }
+  top { Position: {0, h - 0.08, 0.06 * face}; Box: {width - 0.08, 0.08, 0.04} }
+  left { Position: {-(w - 0.08), 0, 0.06 * face}; Box: {0.08, height - 0.08, 0.04} }
+  right { Position: {w - 0.08, 0, 0.06 * face}; Box: {0.08, height - 0.08, 0.04} }
+  spoke_across { Position: {0, 0.05, 0.084 * face}; Box: {0.44, 0.05, 0.04} }
+  spoke_along { Position: {0, 0.05, 0.084 * face}; Box: {0.05, 0.44, 0.04} }
+  dog_top { Position: {w - 0.12, 0.6 * h, 0.078 * face}; Box: {0.16, 0.06, 0.04} }
+  dog_bottom { Position: {w - 0.12, -0.6 * h, 0.078 * face}; Box: {0.16, 0.06, 0.04} }
+
+  if material != 0 {
+    bottom { (IsA, material) }
+    top { (IsA, material) }
+    left { (IsA, material) }
+    right { (IsA, material) }
+    spoke_across { (IsA, material) }
+    spoke_along { (IsA, material) }
+    dog_top { (IsA, material) }
+    dog_bottom { (IsA, material) }
+  }
+}
+
+template PortalDoor {
+  prop style: string = "Plain"         // "Plain", a bare panel, or "Ship", a watertight panel
+                                      // with a raised frame, a wheel and dogs on both faces
+  prop slide: PortalSlide = Side      // Where the panel slides to, along the plane
+  prop open: bool = false             // The door is asked to be open
+  prop auto_open: bool = false        // It opens for actors (PortalActor) that come near
+  prop radius: f32 = 1.8              // Distance from the portal center at which an actor opens it
+  prop lift: f32 = 0                  // Distance the panel lifts off the plane as it starts to open
+  prop speed: f32 = 1.2               // Openings per second
+  prop thickness: f32 = 0.06          // Thickness of the panel
+  prop material: entity = 0           // Material prefab of the panel, 0 for the default
+
+  const portal = this[VisPortal]
+  const width: f32 = portal.size.x
+  const height: f32 = portal.size.y
+  const normal = portal.normal
+
+  // The frame turns +z onto the normal and +x onto the width of the portal, the axes the portal
+  // index uses: about y for a wall, about x for a hatch in a floor or ceiling
+  const hatch = math.abs(normal.y) > 0.9
+  const yaw: f32 = hatch ? 0 : math.atan2(normal.x, normal.z)
+  const pitch: f32 = hatch ? -normal.y * math.PI / 2 : 0
+
+  const duration: f32 = 1 / speed
+  // Match the slide into numbers and names, as enums cannot be compared in script
+  const sideways: f32 = match slide {
+    Side: 1
+    Down, Up: 0
+  }
+  const toward: f32 = match slide {
+    Side, Up: 1
+    Down: -1
+  }
+  const ship: f32 = style == "Ship" ? 1 : 0
+  const travel: f32 = (sideways * width + (1 - sideways) * height) * 0.97
+  const axis = sideways > 0 ? "x" : "y"
+
+  VisPortal = {slide: slide}
+  PortalSensor: {radius: auto_open ? radius : 0}
+
+  motion {
+    Clip: {duration: duration}
+
+    opening {
+      Track: {component: VisPortal, member: "open", curve: {
+        kind: CurveBezier, keys: [{0, 0, 0, 0}, {duration, 1, 0, 0}]
+      }}
+    }
+
+    sliding {
+      Track: {component: Position, member: axis, target: "frame.panel", curve: {
+        kind: CurveBezier, keys: [{0, 0, 0, 0}, {duration, toward * travel, 0, 0}]
+      }}
+    }
+
+    lifting {
+      Track: {component: Position, member: "z", target: "frame.panel", curve: {
+        keys: [{0, 0}, {duration / 4, lift}]
+      }}
+    }
+  }
+
+  frame {
+    Rotation: {pitch, yaw, 0}
+
+    panel {
+      Position: {0, 0, 0}
+      Box: {width, height, thickness}
+
+      if material != 0 {
+        (IsA, material)
+      }
+
+      if ship > 0 {
+        PortalDoorShipFace front(width: width, height: height, material: material, face: 1) {
+          Position: {0, 0, 0}
+        }
+
+        PortalDoorShipFace back(width: width, height: height, material: material, face: -1) {
+          Position: {0, 0, 0}
+        }
+      }
+    }
+  }
+
+  // A new animator that plays backward from time 0 starts at the clip end: start just after 0
+  // so a door that is not wanted open stays shut instead of closing once
+  Animator: {clip: motion, mode: Once, time: 0.001}
+
+  const sensed = this[PortalSensor].near
+  const wanted = !portal.locked && (open || sensed)
+  Animator = {speed: wanted ? 1 : -1}
+}

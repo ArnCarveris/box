@@ -20,6 +20,8 @@ struct Frustum {
     planes: array<vec4f, 6>,
     clip_w: vec4f,
     size: vec4f,
+    // Index of its counters, its flags, the first vec4 of its portal visibility block in
+    // portals (0 for none), unused.
     flags: vec4u,
     // World position of the light of a shadow tile, w 1, w 0 for a frustum without a light.
     light: vec4f,
@@ -91,6 +93,7 @@ const LIST_WORDS: u32 = 4u;
 @group(0) @binding(5) var<storage, read> slot_lists: array<u32>;
 @group(0) @binding(6) var<storage, read_write> scan_words: array<u32>;
 @group(0) @binding(7) var<uniform> frustums: array<Frustum, 32>;
+@group(0) @binding(14) var<uniform> portals: array<vec4f, 2048>;
 @group(1) @binding(0) var<storage, read> transforms: array<InstanceTransform>;
 @group(1) @binding(1) var<storage, read> surface_assets: array<vec4f>;
 @group(2) @binding(0) var<storage, read_write> history: array<u32>;
@@ -125,6 +128,84 @@ fn bounds(job: Job, m: mat4x4f) -> Bounds {
     return Bounds(center, extent);
 }
 
+// Planes of an entry of a portal visibility block, BOX_PORTAL_BLOCK_PLANES.
+const PORTAL_PLANES: u32 = 8u;
+
+// Depth a box has to reach into the box of an area to be a member of it,
+// BOX_PORTAL_MEMBER_DEPTH, the smallest size of a box on an axis in that test,
+// BOX_PORTAL_MEMBER_THIN, and the part of a box the areas have to hold for it not to be a
+// member of the outdoors as well, BOX_PORTAL_MEMBER_COVER.
+const PORTAL_MEMBER_DEPTH: f32 = 0.005;
+const PORTAL_MEMBER_THIN: f32 = 0.02;
+const PORTAL_MEMBER_COVER: f32 = 0.98;
+
+// Whether one of a run of entries of a portal visibility block sees a box: slot holds the
+// first vec4 of the entries, relative to the block, and their number, negative for an area
+// seen with the frustum of the camera.
+fn portal_entries_see(b: Bounds, base: u32, slot: vec4f) -> bool {
+    if (slot.y < 0.0) {
+        return true;
+    }
+
+    let first = base + u32(slot.x);
+    let count = u32(slot.y);
+    for (var e = 0u; e < count; e++) {
+        var inside = true;
+        for (var i = 0u; i < PORTAL_PLANES; i++) {
+            let p = portals[first + e * PORTAL_PLANES + i];
+            if (dot(p.xyz, b.center) + p.w + dot(abs(p.xyz), b.extent) < 0.0) {
+                inside = false;
+            }
+        }
+
+        if (inside) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Whether the portal traversal of the view of a frustum sees a world space box
+// (box_portal_block_sees). The block holds a header (boxes, areas, the entries of the
+// outdoors), two vec4 per area box (smallest corner and area, largest corner and whether the
+// box is exact), one vec4 per area (its entries) and the planes of the entries. A box is a
+// member of every area whose box it reaches into, and of the outdoors when the exact boxes do
+// not hold all of it; it is seen when an entry of one of them sees it. A frustum without a
+// block sees every box.
+fn portal_visible(b: Bounds, f: u32) -> bool {
+    let base = frustums[f].flags.z;
+    if (base == 0u) {
+        return true;
+    }
+
+    let header = portals[base];
+    let boxes = u32(header.x);
+    let table = base + 1u + 2u * boxes;
+    let pad = max(vec3f(PORTAL_MEMBER_THIN * 0.5) - b.extent, vec3f(0.0));
+    let lo = b.center - b.extent - pad;
+    let hi = b.center + b.extent + pad;
+    let size = hi - lo;
+    var covered = 0.0;
+    for (var i = 0u; i < boxes; i++) {
+        let bmin = portals[base + 1u + 2u * i];
+        let bmax = portals[base + 2u + 2u * i];
+        let depth = min(hi, bmax.xyz) - max(lo, bmin.xyz);
+        if (all(depth > vec3f(PORTAL_MEMBER_DEPTH))) {
+            covered += depth.x * depth.y * depth.z * bmax.w;
+            if (portal_entries_see(b, base, portals[table + u32(bmin.w)])) {
+                return true;
+            }
+        }
+    }
+
+    if (covered >= size.x * size.y * size.z * PORTAL_MEMBER_COVER) {
+        return false;
+    }
+
+    return portal_entries_see(b, base, vec4f(header.z, header.w, 0.0, 0.0));
+}
+
 // Whether a world space box reaches into a frustum of the group and is large enough there.
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
 // in front of the camera (w beyond the radius); size.z is 0 for orthographic projections and
@@ -146,7 +227,7 @@ fn visible(b: Bounds, f: u32) -> bool {
         result = 2.0 * radius * size.x >= size.y * w;
     }
 
-    return result;
+    return result && portal_visible(b, f);
 }
 
 // Whether the box of an instance is behind the depth pyramid. The eight corners of the box

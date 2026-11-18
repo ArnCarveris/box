@@ -1864,10 +1864,13 @@ void box_gpu_debug_record(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDepthStencilAttachment depth = {
-        .view = t->depth_view,
+        .view = t->depth_attachment,
         .depthLoadOp = WGPULoadOp_Undefined,
         .depthStoreOp = WGPUStoreOp_Undefined,
-        .depthReadOnly = true
+        .depthReadOnly = true,
+        .stencilLoadOp = WGPULoadOp_Undefined,
+        .stencilStoreOp = WGPUStoreOp_Undefined,
+        .stencilReadOnly = true
     };
     WGPURenderPassDescriptor desc = {
         .colorAttachmentCount = 1,

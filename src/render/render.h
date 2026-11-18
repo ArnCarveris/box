@@ -353,6 +353,18 @@ void box_render_debug_bvh(
     const ecs_world_t *world,
     box_render_packet_t *p);
 
+/** Give every view that culls by portals (CullSettings.portals, a perspective camera, a scene
+ * with areas) the visibility block of what its camera sees, and write its PortalStatus.
+ *
+ * @param world The world
+ * @param stage The stage of the extract system, which the statuses are set through
+ * @param p The packet
+ */
+void box_render_portals(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    box_render_packet_t *p);
+
 /** Get the offset the wind of a FogVolume moves its noise by at a time: its wind times the time
  * on each axis, computed in double precision and wrapped to [0, BOX_RENDER_FOG_NOISE_PERIOD
  * times its noise_scale), the distance over which both noise samples of the shader repeat.

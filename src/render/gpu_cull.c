@@ -53,7 +53,7 @@ void box_gpu_cull_init(
     box_gpu_t *gpu)
 {
     box_gpu_cull_t *c = &gpu->cull;
-    WGPUBindGroupLayoutEntry entries[8] = {
+    WGPUBindGroupLayoutEntry entries[9] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -101,6 +101,15 @@ void box_gpu_cull_init(
                 .hasDynamicOffset = true,
                 .minBindingSize = BOX_GPU_CULL_FRUSTUMS_SIZE
             }
+        },
+        {
+            .binding = 14,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .hasDynamicOffset = true,
+                .minBindingSize = BOX_GPU_CULL_PORTALS_SIZE
+            }
         }
     };
     int32_t i;
@@ -118,7 +127,7 @@ void box_gpu_cull_init(
         .size = sizeof(box_render_transform_t)
     });
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 8, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 9, .entries = entries });
     box_gpu_hiz_init(gpu);
     WGPUBindGroupLayout groups[3] = { c->layout, gpu->transform_layout, c->history_layout };
     c->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -584,7 +593,7 @@ static void box_gpu_cull_page_upload(
     grown |= box_gpu_cull_reserve(gpu, &pg->scan, &pg->scan_size,
         (uint64_t)pg->scan_used * sizeof(uint32_t), WGPUBufferUsage_Storage);
     if (grown || !pg->group) {
-        WGPUBindGroupEntry entries[8] = {
+        WGPUBindGroupEntry entries[9] = {
             {
                 .binding = 0, .buffer = c->uniforms,
                 .size = sizeof(box_gpu_cull_uniforms_t)
@@ -595,7 +604,8 @@ static void box_gpu_cull_page_upload(
             { .binding = 4, .buffer = c->counters, .size = c->counters_size },
             { .binding = 5, .buffer = pg->lists, .size = pg->lists_size },
             { .binding = 6, .buffer = pg->scan, .size = pg->scan_size },
-            { .binding = 7, .buffer = c->uniforms, .size = BOX_GPU_CULL_FRUSTUMS_SIZE }
+            { .binding = 7, .buffer = c->uniforms, .size = BOX_GPU_CULL_FRUSTUMS_SIZE },
+            { .binding = 14, .buffer = c->uniforms, .size = BOX_GPU_CULL_PORTALS_SIZE }
         };
         if (pg->group) {
             wgpuBindGroupRelease(pg->group);
@@ -603,7 +613,7 @@ static void box_gpu_cull_page_upload(
 
         pg->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = c->layout,
-            .entryCount = 8,
+            .entryCount = 9,
             .entries = entries
         });
     }
@@ -875,7 +885,7 @@ void box_gpu_cull_upload(
     box_gpu_cull_lod_upload(gpu);
     uint64_t uniforms = (uint64_t)ecs_vec_count(&c->uniform_data);
     grown |= box_gpu_cull_reserve(gpu, &c->uniforms, &c->uniforms_size,
-        uniforms > BOX_GPU_CULL_FRUSTUMS_SIZE ? uniforms : BOX_GPU_CULL_FRUSTUMS_SIZE,
+        uniforms > BOX_GPU_CULL_PORTALS_SIZE ? uniforms : BOX_GPU_CULL_PORTALS_SIZE,
         WGPUBufferUsage_Uniform);
     grown |= box_gpu_cull_reserve(gpu, &c->jobs, &c->jobs_size,
         (uint64_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t),
@@ -919,6 +929,7 @@ done:
  * @param page Page whose bind group is group 0
  * @param uniform Byte offset of the uniforms of the dispatch
  * @param frustums Byte offset of the frustums of its cull group
+ * @param portals Byte offset of the portal visibility blocks of its cull group
  * @param buffer Instance page bound as group 1
  * @param any Whether any page will do, for a dispatch that reads no instances
  * @param history Group 2
@@ -932,6 +943,7 @@ static bool box_gpu_cull_run(
     uint32_t page,
     uint32_t uniform,
     uint32_t frustums,
+    uint32_t portals,
     uint32_t buffer,
     bool any,
     WGPUBindGroup history,
@@ -940,7 +952,7 @@ static bool box_gpu_cull_run(
 {
     box_gpu_cull_t *c = &gpu->cull;
     WGPUBindGroup instances = any ? *bound : NULL;
-    uint32_t offsets[2] = { uniform, frustums };
+    uint32_t offsets[3] = { uniform, frustums, portals };
     if (!instances) {
         instances = box_gpu_instance_group(gpu, buffer, 0, NULL, false);
     }
@@ -950,7 +962,7 @@ static bool box_gpu_cull_run(
     }
 
     wgpuComputePassEncoderSetBindGroup(pass, 0, ecs_vec_get_t(&c->pages,
-        box_gpu_cull_page_t, (int32_t)page)->group, 2, offsets);
+        box_gpu_cull_page_t, (int32_t)page)->group, 3, offsets);
     if (instances != *bound) {
         wgpuComputePassEncoderSetBindGroup(pass, 1, instances, 0, NULL);
         box_gpu_count(gpu, BOX_GPU_STAT_INSTANCE_BIND);
@@ -1062,8 +1074,9 @@ static void box_gpu_cull_dispatches(
                 bound = c->ordered;
             }
 
-            if (box_gpu_cull_run(gpu, pass, dp->page, dp->uniform, g->frustums, dp->buffer,
-                false, dp->history ? dp->history : g->history, groups, &instances) && views)
+            if (box_gpu_cull_run(gpu, pass, dp->page, dp->uniform, g->frustums, g->portals,
+                dp->buffer, false, dp->history ? dp->history : g->history, groups,
+                &instances) && views)
             {
                 box_gpu_count(gpu, BOX_GPU_STAT_CULL_DISPATCH);
             }
@@ -1086,8 +1099,8 @@ static void box_gpu_cull_dispatches(
             bound = c->parallel;
         }
 
-        if (box_gpu_cull_run(gpu, pass, r->page, r->uniform, g->frustums, r->buffer, false,
-            r->history, groups, &instances) && views)
+        if (box_gpu_cull_run(gpu, pass, r->page, r->uniform, g->frustums, g->portals,
+            r->buffer, false, r->history, groups, &instances) && views)
         {
             box_gpu_count(gpu, BOX_GPU_STAT_CULL_DISPATCH);
             box_gpu_count(gpu, BOX_GPU_STAT_CULL_INSTANCES);
@@ -1112,8 +1125,8 @@ static void box_gpu_cull_dispatches(
                 bound = pipeline;
             }
 
-            if (box_gpu_cull_run(gpu, pass, t->page, t->uniform, g->frustums, t->buffer, true,
-                g->history, groups, &instances) && views)
+            if (box_gpu_cull_run(gpu, pass, t->page, t->uniform, g->frustums, g->portals,
+                t->buffer, true, g->history, groups, &instances) && views)
             {
                 box_gpu_count(gpu, BOX_GPU_STAT_CULL_DISPATCH);
             }
@@ -1135,8 +1148,8 @@ static void box_gpu_cull_dispatches(
             bound = c->lod;
         }
 
-        if (box_gpu_cull_run(gpu, pass, l->page, l->uniform, g->frustums, l->buffer, false,
-            g->history, groups, &instances) && views)
+        if (box_gpu_cull_run(gpu, pass, l->page, l->uniform, g->frustums, g->portals,
+            l->buffer, false, g->history, groups, &instances) && views)
         {
             box_gpu_count(gpu, BOX_GPU_STAT_CULL_DISPATCH);
         }

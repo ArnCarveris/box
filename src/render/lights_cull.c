@@ -2,7 +2,8 @@
  * @file render/lights_cull.c
  * @brief Culls the point and spot lights that no view of their scene can see before they are
  * collected: a light lights nothing past its range, so its range sphere outside the frustum of
- * every view, or smaller than BOX_LIGHTS_CULL_PIXELS on all of them, changes no pixel.
+ * every view, or smaller than BOX_LIGHTS_CULL_PIXELS on all of them, changes no pixel. In a
+ * portal-room scene neither does a light no view sees through portals (portal_lights.h).
  *
  * Reflection probes, planar reflections and bakes render the lights of a scene from elsewhere,
  * so a world with probes or planar reflections and a scene that bakes keep every light.
@@ -158,7 +159,8 @@ bool box_lights_culled(
             &l->cull_views, box_light_cull_view_t, i);
         if (cv->scene == s->scene) {
             viewed = true;
-            seen = box_lights_cull_sees(cv, center, radius);
+            seen = box_lights_cull_sees(cv, center, radius) &&
+                box_render_portal_lights_seen(l->portals, i, s->scene, center, radius);
         }
     }
 done:

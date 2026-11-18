@@ -1,0 +1,53 @@
+// A small portal world for the box.portal tests. Seen from above, x to the right and z up:
+//
+//   z 20 +---------+
+//        |  side   |
+//   z 10 +---[]----+---------+---------+
+//        |  hall   [] store  [] vault  |
+//   z  0 +---[]----+---------+---------+
+//       x -5       5        15        25
+//
+// The hall opens to the outdoors through its south wall (entry), to the side room through its
+// north wall and to the store through its east wall. A door fills the opening between the store
+// and the vault. The bend is an L shaped room on its own, away from the others.
+include door
+
+using box.transform
+using box.geometry
+using box.portal
+
+rooms {
+  hall {
+    VisArea: {shape: [{-5, 0}, {5, 0}, {5, 10}, {-5, 10}], y: 0, height: 3}
+  }
+  store {
+    VisArea: {shape: [{5, 0}, {15, 0}, {15, 10}, {5, 10}], y: 0, height: 3}
+  }
+  vault {
+    VisArea: {shape: [{15, 0}, {25, 0}, {25, 10}, {15, 10}], y: 0, height: 3}
+  }
+  side {
+    VisArea: {shape: [{-5, 10}, {5, 10}, {5, 20}, {-5, 20}], y: 0, height: 3}
+  }
+  bend {
+    VisArea: {shape: [{40, 0}, {50, 0}, {50, 4}, {44, 4}, {44, 10}, {40, 10}], y: 0, height: 3}
+  }
+
+  entry {
+    Position: {0, 1.2, 0}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {0, 0, -1}}
+  }
+  hall_side {
+    Position: {0, 1.2, 10}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {0, 0, 1}}
+  }
+  hall_store {
+    Position: {5, 1.2, 5}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {1, 0, 0}}
+  }
+  store_vault {
+    Position: {15, 1.2, 5}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {1, 0, 0}}
+    PortalDoor: {}
+  }
+}

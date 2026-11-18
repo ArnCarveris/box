@@ -59,6 +59,10 @@
       throw new Error('No WebGPU adapter.');
     }
     var features = adapter.features.has('timestamp-query') ? ['timestamp-query'] : [];
+    if (adapter.features.has('depth32float-stencil8')) {
+      features.push('depth32float-stencil8');
+    }
+
     return adapter.requestDevice({
       requiredFeatures: features,
       requiredLimits: { maxTextureArrayLayers: adapter.limits.maxTextureArrayLayers }

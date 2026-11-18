@@ -385,6 +385,7 @@ static void BoxRenderExtractViews(
     }
 
     box_render_debug_bvh(it->world, p);
+    box_render_portals(it->world, it->stage, p);
 }
 
 /** Hand the packet of the frame to the renderer and publish the ring counters.

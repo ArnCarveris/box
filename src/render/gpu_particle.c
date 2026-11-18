@@ -278,7 +278,7 @@ static void box_gpu_particle_draw_init(
         .mipLevelCount = 1,
         .sampleCount = 1
     });
-    WGPUTextureView view = wgpuTextureCreateView(s->no_depth, NULL);
+    WGPUTextureView view = box_gpu_depth_sample_view(s->no_depth);
     WGPUBindGroupEntry entry = { .binding = 0, .textureView = view };
     s->no_depth_group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = s->depth_layout,

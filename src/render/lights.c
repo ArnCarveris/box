@@ -1040,6 +1040,21 @@ static void box_lights_remove(
     ecs_vec_remove_last(&l->scenes);
 }
 
+/** Write the area of every point and spot light the views of a portal-room scene are lit
+ * with into the light.
+ *
+ * @param l The state
+ */
+static void box_lights_tag(
+    box_render_lights_t *l)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&l->scenes); i ++) {
+        box_light_scene_t *s = ecs_vec_get_t(&l->scenes, box_light_scene_t, i);
+        box_render_portal_lights_tag(l->portals, s->scene, &s->lists[BOX_LIGHTS_VIEW].lights);
+    }
+}
+
 /** Send the light buffers of the scenes and drop the scenes that lost their lights, ambient
  * and LightBake. The capture, mixed and baked lists have a buffer only while they are split
  * off, the baked list only while it holds a light.
@@ -1134,6 +1149,9 @@ static void box_lights_views(
 
         out->ambient_sky[3] = 0.0f;
         out->ambient_ground[3] = 0.0f;
+        box_render_portal_lights_view(world, l->portals, p, i,
+            out->buffer == BOX_LIGHTS_DEFAULT_BUFFER ? NULL : &list->lights,
+            out->directional ? out->sun : NULL);
     }
 }
 
@@ -1511,6 +1529,7 @@ static void BoxRenderExtractLights(
     box_lights_collect_atmospheres(world, l);
     box_lights_collect_times(world, l);
     box_lights_cull_views(world, l, p);
+    box_render_portal_lights_begin(world, l->portals, p);
     box_lights_collect(world, l, l->directional, 0);
     box_lights_collect(world, l, l->point, 1);
     box_lights_collect(world, l, l->spot, 2);
@@ -1519,6 +1538,7 @@ static void BoxRenderExtractLights(
     box_lights_atmos_moonlight(l);
     box_lights_collect_ambient(world, l);
     box_lights_shadows(world, l, p);
+    box_lights_tag(l);
     box_lights_send(l, p);
     box_lights_views(world, l, p);
     box_render_fog_views(world, l->fog, p, &l->stats);
@@ -1557,6 +1577,7 @@ static void box_lights_free(
     ecs_vec_fini_t(NULL, &l->candidates, int32_t);
     ecs_vec_fini_t(NULL, &l->views, int32_t);
     ecs_vec_fini_t(NULL, &l->cull_views, box_light_cull_view_t);
+    box_render_portal_lights_free(l->portals);
     box_render_fog_free(l->fog);
     box_render_stars_free(l->stars);
     ecs_map_fini(&l->lookup);
@@ -1644,6 +1665,7 @@ void box_render_lights_init(
     ecs_vec_init_t(NULL, &l->candidates, int32_t, 0);
     ecs_vec_init_t(NULL, &l->views, int32_t, 0);
     ecs_vec_init_t(NULL, &l->cull_views, box_light_cull_view_t, 0);
+    l->portals = box_render_portal_lights_new();
     ecs_map_init(&l->lookup, NULL);
     l->next_buffer = BOX_LIGHTS_DEFAULT_BUFFER + 1;
     l->next_atlas = BOX_RENDER_BUFFER_SHADOW_FIRST;

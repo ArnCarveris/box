@@ -1,8 +1,11 @@
 // Portal bunker compound, ported from the WebGPU Entities scenario of the same name: the bunker,
 // its rooms and their walls, floors, roofs and frames (shell), the brick shed, the quay and the docked
 // freighter's props, and the lights, with the rooms,
-// openings, occluders and doors as VisArea, VisPortal, VisOccluder and PortalDoor components
-// (see include/box/portal.h). Fly with WASD (QE for down/up, Shift to go faster).
+// openings and occluders as VisArea, VisPortal and VisOccluder components (see
+// include/box/portal.h) and the doors as PortalDoor templates (portal/door.flecs). Fly with
+// WASD (QE for down/up, Shift to go faster); the doors open for the camera, and what is behind
+// closed or unseen portals is not drawn.
+include portal/door
 include portal_bunker/textures
 include portal_bunker/materials
 include portal_bunker/models
@@ -10,6 +13,8 @@ include portal_bunker/rooms
 include portal_bunker/shell
 include portal_bunker/props
 include portal_bunker/lights
+include portal_bunker/island
+include portal_bunker/ship
 
 using box.transform
 using box.geometry
@@ -23,7 +28,7 @@ using box.controllers
 
 $ {
   box.app.FpsTarget: {60}
-  Scene: {blend_modes: true, fresnel: true}
+  Scene: {blend_modes: true, fresnel: true, water: true, texture_scroll: true}
 }
 
 window {
@@ -35,6 +40,7 @@ camera {
   Rotation: {-0.0349, 3.1416, 0}
   Camera: {fov: 70}
   CameraController: {speed: 6}
+  box.portal.PortalActor
 }
 
 sun {
@@ -45,61 +51,6 @@ sun {
 
 $ {
   AmbientLight: {sky: {55, 100, 237}, ground: {40, 36, 30}, intensity: 0.5}
-}
-
-ground_0 : BunkerMat_grass {
-  Position: {30, -0.05, -38}
-  Box: {220, 0.1, 64}
-}
-
-ground_1 : BunkerMat_grass {
-  Position: {-15, -0.05, -2.5}
-  Box: {130, 0.1, 7}
-}
-
-ground_2 : BunkerMat_grass {
-  Position: {100, -0.05, -2.5}
-  Box: {80, 0.1, 7}
-}
-
-ground_3 : BunkerMat_grass {
-  Position: {30, -0.05, 80}
-  Box: {220, 0.1, 60}
-}
-
-ground_4 : BunkerMat_grass {
-  Position: {-15, -0.05, 28.5}
-  Box: {130, 0.1, 43}
-}
-
-ground_5 : BunkerMat_grass {
-  Position: {100, -0.05, 28.5}
-  Box: {80, 0.1, 43}
-}
-
-ground_6 : BunkerMat_grass {
-  Position: {-15, -0.05, 6}
-  Box: {130, 0.1, 2}
-}
-
-ground_7 : BunkerMat_grass {
-  Position: {100, -0.05, 6}
-  Box: {80, 0.1, 2}
-}
-
-ground_8 : BunkerMat_grass {
-  Position: {-47, -0.05, 3}
-  Box: {66, 0.1, 4}
-}
-
-ground_9 : BunkerMat_grass {
-  Position: {22, -0.05, 3}
-  Box: {56, 0.1, 4}
-}
-
-ground_10 : BunkerMat_grass {
-  Position: {100, -0.05, 3}
-  Box: {80, 0.1, 4}
 }
 
 // The scenario's viewpoints, shown with --camera views.<name>
@@ -282,6 +233,26 @@ views {
   barracks_operations_0_15 { // barracks Operations 0 15
     Position: {-45.65, 2.25, 38.35}
     Rotation: {-0.313, 2.1004, 0}
+    Camera: {fov: 70}
+  }
+  quay_freighter { // On the quay beside the freighter
+    Position: {44, 2.2, -22}
+    Rotation: {-0.05, -2.75, 0}
+    Camera: {fov: 70}
+  }
+  island_from_the_sea { // The island and the docked freighter from the sea
+    Position: {120, 28, -40}
+    Rotation: {-0.22, 2.1, 0}
+    Camera: {fov: 70}
+  }
+  freighter_bow { // On the freighter's bow deck, looking aft
+    Position: {56.6, 7, 62}
+    Rotation: {-0.12, 0.25, 0}
+    Camera: {fov: 70}
+  }
+  freighter_hold { // In the freighter's cargo hold
+    Position: {55, 0.5, 9}
+    Rotation: {-0.3, 3.1416, 0}
     Camera: {fov: 70}
   }
 }

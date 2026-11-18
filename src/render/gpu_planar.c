@@ -916,7 +916,9 @@ void box_gpu_planar_render(
             .view = img->depth_view,
             .depthLoadOp = WGPULoadOp_Clear,
             .depthStoreOp = WGPUStoreOp_Discard,
-            .depthClearValue = 0.0f
+            .depthClearValue = 0.0f,
+            .stencilLoadOp = WGPULoadOp_Clear,
+            .stencilStoreOp = WGPUStoreOp_Discard
         };
         WGPURenderPassEncoder rp = wgpuCommandEncoderBeginRenderPass(encoder,
             &(WGPURenderPassDescriptor){

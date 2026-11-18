@@ -491,7 +491,9 @@ typedef struct box_render_light_t {
     float spot_offset;  /**< Cone falloff offset, -cos outer times spot_scale */
     uint32_t shadow;    /**< Index of the tile record of the light in the shadow atlas of its
                          *   scene, BOX_RENDER_SHADOW_NONE for none */
-    uint32_t pad[3];    /**< Unused, zero */
+    uint32_t area;      /**< Index plus one of the area of a portal-room scene that holds a
+                         *   point or spot light, 0 for none (box_render_portal_lights_tag) */
+    uint32_t pad[2];    /**< Unused, zero */
 } box_render_light_t;
 
 /** Bytes of a light record that describe the light, its tile index excluded */
@@ -933,6 +935,27 @@ done:
     return result;
 }
 
+/** Stencil bits of the region a pixel of a view sees through its portals */
+#define BOX_RENDER_STENCIL_REGION (0x3Fu)
+
+/** Stencil bit of a pixel whose innermost portal entry is not outdoors, so no water draws in
+ * it. Clear and reference 0 let water draw */
+#define BOX_RENDER_STENCIL_DRY (0x40u)
+
+/** Stencil bit the draws of a portal mark set and clear again */
+#define BOX_RENDER_STENCIL_MARK (0x80u)
+
+/** A portal a view marks in its stencil, so the pixels seen through it get the region behind
+ * it (box_render_portal_marks) */
+typedef struct box_render_portal_mark_t {
+    int32_t first;          /**< Index of its first vertex in the portal mark vertices of the
+                             *   packet */
+    int32_t count;          /**< Vertices, a triangle list of the portal clipped to what the
+                             *   region in front of it sees */
+    uint32_t parent;        /**< Stencil value of the region in front of it */
+    uint32_t child;         /**< Stencil value of the region behind it */
+} box_render_portal_mark_t;
+
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
  * The projection is built by the renderer per target, because its aspect follows the
@@ -1003,6 +1026,19 @@ typedef struct box_render_view_t {
                                  *   packet */
     int32_t planar_count;       /**< Planar reflections the view renders, nearest first, at most
                                  *   BOX_PLANAR_REFLECTION_MAX */
+    int32_t portal_first;       /**< Index of the first vec4 of the portal visibility block of
+                                 *   the view in the packet */
+    int32_t portal_count;       /**< vec4 of that block, 0 for a view that does not cull by
+                                 *   portals: its scene has no areas or CullSettings.portals is
+                                 *   off */
+    int32_t area_first;         /**< Index of the first vec4 of the shading block of the areas of
+                                 *   its scene (box_portal_shade_pack) in the areas of the packet */
+    int32_t area_count;         /**< vec4 of that block, 0 for a view whose scene has no areas */
+    int32_t mark_first;         /**< Index of its first portal mark in the packet */
+    int32_t mark_count;         /**< Portal marks it draws into its stencil before its water, 0
+                                 *   for a view that does not cull by portals */
+    uint32_t stencil_clear;     /**< Stencil value its passes clear to: the region of the area
+                                 *   of its eye, BOX_RENDER_STENCIL_DRY when it sees no water */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -1981,6 +2017,13 @@ typedef struct box_render_packet_t {
     ecs_vec_t debug_boxes;  /**< box_render_debug_box_t, the boxes of the spatial index trees
                              *   of the views */
     ecs_vec_t debug_poses;  /**< mat4, the matrices that place the boxes of the views */
+    ecs_vec_t portals;      /**< vec4, the portal visibility blocks of the views
+                             *   (box_portal_block_pack) */
+    ecs_vec_t areas;        /**< vec4, the shading blocks of the areas of the views
+                             *   (box_portal_shade_pack) */
+    ecs_vec_t portal_marks; /**< box_render_portal_mark_t, the portals the views mark in their
+                             *   stencil */
+    ecs_vec_t portal_mark_verts; /**< vec4, world space vertices of the portal marks, w 1 */
     ecs_vec_t transitions;  /**< box_render_transition_record_t in the order they were made,
                              *   empty in a world without Transition */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */

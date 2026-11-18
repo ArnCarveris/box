@@ -1,12 +1,10 @@
 /**
  * @file box/portal.h
- * @brief Authoring components of a portal-room world: areas, portals, occluders and doors.
+ * @brief Components of a portal-room world: areas, portals, occluders and sensors.
  *
- * The box.portal module only registers the components, so scenes can describe a sectored
- * building the way a portal visibility system reads it: an area is an extruded 2D outline, a
- * portal is a planar opening that connects the areas on its two sides, an occluder is a flat
- * blocker and a door drives the closed flag of its portal. Nothing here culls, draws or
- * collides; a system that does reads these components.
+ * An area is an extruded 2D outline, a portal a planar opening, open as far as its open state,
+ * between the areas on its two sides, an occluder a flat blocker and a sensor notices actors that
+ * come near. A view draws only what its camera sees through open portals (CullSettings.portals).
  *
  * Positions are in the space of the entity's parent. The area outline, the portal and occluder
  * center and every normal are in that space too.
@@ -72,6 +70,13 @@ ECS_ENUM(PortalKind, {
     PortalKindHatch   /**< Opening in a floor or ceiling */
 });
 
+/** The way the cover of a partly open portal slid: the opening is clear on the other side */
+ECS_ENUM(PortalSlide, {
+    PortalSlideSide, /**< Along the width, toward its right */
+    PortalSlideDown, /**< Along the height, down */
+    PortalSlideUp    /**< Along the height, up */
+});
+
 /** A planar opening between two areas, centered on the entity.
  *
  * The plane has the normal and extends size.x along the horizontal axis of the plane (for a
@@ -93,7 +98,10 @@ ECS_STRUCT(VisPortal, {
     bool glass;          /**< A pane fills the opening */
     vec4 glass_tint;     /**< Tint in x, y, z and opacity in w of the pane, 0 for the default
                           *   pane */
-    bool closed;         /**< Nothing is seen through it, a door sets it */
+    float open;          /**< How far it is open, 0 shut to 1 open, 1 when not set: a door
+                          *   writes it as it moves, scripts and game code may too */
+    PortalSlide slide;   /**< Way its cover slid when it is partly open: light passes the part
+                          *   it left clear */
     bool locked;         /**< A door cannot open it */
     bool pass_through;   /**< Actors walk through it without a door */
     bool double_side;    /**< It leads both ways whichever side the viewer is on */
@@ -110,36 +118,40 @@ ECS_STRUCT(VisOccluder, {
     bool auto_orient_y;  /**< The plane turns about y to face the viewer */
 });
 
-/** How a door moves */
-ECS_ENUM(PortalDoorStyle, {
-    PortalDoorStylePlain, /**< A sliding panel in a wall */
-    PortalDoorStyleShip   /**< A watertight panel with a raised frame */
-});
-
-/** The way a door cover slides when it opens */
-ECS_ENUM(PortalDoorSlide, {
-    PortalDoorSlideSide, /**< Along the plane, to the side */
-    PortalDoorSlideDown, /**< Along the plane, down */
-    PortalDoorSlideUp    /**< Along the plane, up */
-});
-
-/** A door that fills a portal and drives its closed flag.
+/** Notices actors (PortalActor) of its scene that come near: near holds while one is within
+ * radius of the entity. near changes with an OnSet, so a script that reads it runs again then.
  *
- * @par An automatic door:
+ * @par A door that opens for actors (the PortalDoor template adds the sensor itself):
  * @code
- * entry_door { PortalDoor: {portal: p_entry, auto_open: true} }
+ * p_entry {
+ *   Position: {0, 1.4, 0}
+ *   VisPortal: {kind: Door, size: {2.2, 2.8}, normal: {0, 0, 1}}
+ *   PortalDoor: {auto_open: true}
+ * }
  * @endcode
  */
-ECS_STRUCT(PortalDoor, {
-    ecs_entity_t portal;    /**< The VisPortal it fills */
-    bool auto_open;         /**< It opens for actors that come near */
-    bool locked;            /**< It starts locked */
-    PortalDoorStyle style;  /**< How it looks and moves */
-    PortalDoorSlide slide;  /**< Where its panel slides to */
-    float radius;           /**< Distance at which an actor opens it, 0 for 1.8 */
-    float lift;             /**< Distance the panel lifts clear of its frame before it slides */
-    float speed;            /**< Travel in widths per second, 0 for 1.2 */
-    ecs_entity_t material;  /**< Material prefab of the panel, 0 for the default */
+ECS_STRUCT(PortalSensor, {
+    float radius;           /**< Distance at which it notices an actor, 0 for never */
+    bool near;              /**< An actor is within the radius, read only */
+});
+
+/** An entity sensors notice when it comes near, a camera or a character */
+extern ECS_TAG_DECLARE(PortalActor);
+
+/** What the camera of a view saw of the portal world of its scene in the last frame that was
+ * extracted, set on the View entity of a view with CullSettings.portals. Read only.
+ */
+ECS_STRUCT(PortalStatus, {
+    ecs_entity_t area;      /**< Area that holds the camera, 0 for the outdoors */
+    int32_t areas;          /**< Areas the camera sees, the outdoors included */
+    int32_t entries;        /**< Areas as seen through a chain of portals: an area seen through
+                             *   two portals counts twice */
+    int32_t portals_tested; /**< Portals the traversal looked at */
+    int32_t portals_passed; /**< Portals it looked through */
+    int32_t portals_closed; /**< Portals that were shut */
+    bool outdoors;          /**< The outdoors is seen */
+    bool culling;           /**< The view culls by what was seen: false when the traversal ran
+                             *   out of entries, so the view draws every area */
 });
 
 /** Register the box.portal module.

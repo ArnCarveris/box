@@ -1,0 +1,86 @@
+{
+    "id": "portal",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../../src/portal"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Portal",
+                "testcases": [
+                    "area_at",
+                    "area_at_outdoors",
+                    "area_at_bend",
+                    "area_boxes",
+                    "portal_sides",
+                    "camera_area_is_root",
+                    "closed_portal_blocks",
+                    "closed_room_sees_itself",
+                    "frustum_narrows",
+                    "frustum_narrows_twice",
+                    "portal_out_of_frustum",
+                    "outdoors_through_portal",
+                    "from_outdoors",
+                    "wrong_side_not_entered",
+                    "eye_in_opening",
+                    "pass_through_keeps_frustum",
+                    "sky_only",
+                    "occluder_hides_portal",
+                    "members",
+                    "members_across_portal",
+                    "member_of_seen_area_is_seen",
+                    "bend_notch_is_outdoors",
+                    "block_layout",
+                    "block_without_areas",
+                    "scene_scoping",
+                    "index_follows_changes",
+                    "parent_transform"
+                ]
+            },
+            {
+                "id": "PortalDoor",
+                "testcases": [
+                    "starts_shut",
+                    "open_portal_without_door",
+                    "opens_when_asked",
+                    "shuts_again",
+                    "panel_slides",
+                    "traversal_follows",
+                    "open_state_without_door",
+                    "auto_opens_for_actor",
+                    "auto_radius",
+                    "locked_stays_shut",
+                    "slides_down_with_lift",
+                    "speed",
+                    "ship_style"
+                ]
+            },
+            {
+                "id": "PortalLight",
+                "testcases": [
+                    "apertures",
+                    "door_opening",
+                    "light_area",
+                    "through_neighbours",
+                    "through_sun",
+                    "reaches",
+                    "shade_areas",
+                    "shade_fog_chain",
+                    "shade_throughs",
+                    "shade_without_traversal",
+                    "shade_without_areas",
+                    "ship_door"
+                ]
+            }
+        ]
+    }
+}

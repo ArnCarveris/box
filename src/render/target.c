@@ -97,6 +97,22 @@ static WGPUTexture box_gpu_texture(
     return wgpuDeviceCreateTexture(gpu->device, &desc);
 }
 
+WGPUTextureView box_gpu_depth_sample_view(
+    WGPUTexture texture)
+{
+    WGPUTextureViewDescriptor desc = {
+        .format = WGPUTextureFormat_Undefined,
+        .dimension = WGPUTextureViewDimension_2D,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_DepthOnly
+    };
+
+    return wgpuTextureCreateView(texture, &desc);
+}
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
 
@@ -299,6 +315,10 @@ static void box_gpu_target_release(
         wgpuTextureViewRelease(t->depth_view);
     }
 
+    if (t->depth_attachment) {
+        wgpuTextureViewRelease(t->depth_attachment);
+    }
+
     if (t->depth) {
         wgpuTextureRelease(t->depth);
     }
@@ -317,6 +337,7 @@ static void box_gpu_target_release(
     t->scene = NULL;
     t->output = NULL;
     t->depth_view = NULL;
+    t->depth_attachment = NULL;
     t->depth = NULL;
 }
 
@@ -397,7 +418,8 @@ static void box_gpu_target_configure(
     t->depth = box_gpu_texture(gpu, d->render_width, d->render_height, BOX_GPU_DEPTH_FORMAT,
         WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
         WGPUTextureUsage_CopySrc);
-    t->depth_view = wgpuTextureCreateView(t->depth, NULL);
+    t->depth_view = box_gpu_depth_sample_view(t->depth);
+    t->depth_attachment = wgpuTextureCreateView(t->depth, NULL);
 
     box_gpu_count(gpu, BOX_GPU_STAT_CONFIGURED);
     ecs_os_mutex_lock(gpu->lock);

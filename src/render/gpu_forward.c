@@ -271,6 +271,20 @@ static WGPURenderPipeline box_gpu_forward_create(
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
+    if (water) {
+        WGPUStencilFaceState dry = {
+            .compare = WGPUCompareFunction_Equal,
+            .failOp = WGPUStencilOperation_Keep,
+            .depthFailOp = WGPUStencilOperation_Keep,
+            .passOp = WGPUStencilOperation_Keep
+        };
+
+        depth.stencilFront = dry;
+        depth.stencilBack = dry;
+        depth.stencilReadMask = BOX_RENDER_STENCIL_DRY;
+        depth.stencilWriteMask = 0;
+    }
+
     WGPURenderPipelineDescriptor desc = {
         .layout = texture_blend ? gpu->blend_mesh_layout : gpu->mesh_layout,
         .vertex = {

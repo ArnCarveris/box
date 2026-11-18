@@ -17,6 +17,7 @@
 #include "probes.wgsl"
 #include "aerial.wgsl"
 #include "planet_light.wgsl"
+#include "areas.wgsl"
 
 // Probe volume irradiance with the visibility of the probes (Scene.baked).
 override scene_baked: bool = false;
@@ -601,6 +602,30 @@ fn aerial_perspective(color: vec3f, alpha: f32, pos: vec4f, world: vec3f) -> vec
         }
         default: {
             return color * ap.a;
+        }
+    }
+}
+
+// Color of a fragment seen through the fog of the areas between it and the eye (area_fog),
+// shaped for the blend equation as aerial_perspective.
+fn area_fogged(color: vec3f, alpha: f32, world: vec3f) -> vec3f {
+    if (fragment_area < 0) {
+        return color;
+    }
+
+    let fog = area_fog(world);
+    switch kind.blend_mode {
+        case 0u, 1u: {
+            return color * fog.w + fog.rgb;
+        }
+        case 2u: {
+            return color * fog.w + fog.rgb * alpha;
+        }
+        case 4u, 7u: {
+            return color;
+        }
+        default: {
+            return color * fog.w;
         }
     }
 }

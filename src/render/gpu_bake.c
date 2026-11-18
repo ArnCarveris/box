@@ -835,7 +835,7 @@ static void box_gpu_bake_atlas(
         .aspect = WGPUTextureAspect_All
     });
     b->depth_read = wgpuTextureCreateView(b->depth, &(WGPUTextureViewDescriptor){
-        .format = BOX_GPU_DEPTH_FORMAT,
+        .format = WGPUTextureFormat_Undefined,
         .dimension = WGPUTextureViewDimension_2D,
         .mipLevelCount = 1,
         .arrayLayerCount = 1,
@@ -1145,7 +1145,9 @@ static void box_gpu_bake_faces_render(
         .view = s->depth_view,
         .depthLoadOp = WGPULoadOp_Clear,
         .depthStoreOp = WGPUStoreOp_Store,
-        .depthClearValue = 0.0f
+        .depthClearValue = 0.0f,
+        .stencilLoadOp = WGPULoadOp_Clear,
+        .stencilStoreOp = WGPUStoreOp_Discard
     };
     box_gpu_bake_bundles(gpu, b, s, rv, shadow, ambient, faces);
     for (d = 0; d < ecs_vec_count(&b->draws); d ++) {

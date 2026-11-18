@@ -1,0 +1,77 @@
+// A lit portal world for the box.portal light tests. Seen from above, x to the right and z up:
+//
+//   z 20 +---------+
+//        |  side * |
+//   z 10 +---==----+---------+---------+
+//        |  hall * [] store *[] vault *|
+//   z  0 +---[]----+---------+---------+
+//       x -5    *  5        15        25
+//
+// The hall opens to the outdoors through its south wall (entry), to the store through its east
+// wall and to the side room through a red glazed window (==) in its north wall. A ship door
+// fills the opening between the store and the vault. A lamp (*) lights each room, and one
+// stands outdoors in front of the entry.
+include door
+
+using box.transform
+using box.geometry
+using box.light
+using box.portal
+
+lit {
+  hall {
+    VisArea: {shape: [{-5, 0}, {5, 0}, {5, 10}, {-5, 10}], y: 0, height: 3,
+      ambient: {0.02, 0.03, 0.04}, fog: {0.3, 0.4, 0.5, 0.05}}
+  }
+  store {
+    VisArea: {shape: [{5, 0}, {15, 0}, {15, 10}, {5, 10}], y: 0, height: 3,
+      ambient: {0.01, 0.01, 0.01}, sun: 0.25}
+  }
+  vault {
+    VisArea: {shape: [{15, 0}, {25, 0}, {25, 10}, {15, 10}], y: 0, height: 3,
+      fog: {0.1, 0.1, 0.1, 0.2}}
+  }
+  side {
+    VisArea: {shape: [{-5, 10}, {5, 10}, {5, 20}, {-5, 20}], y: 0, height: 3}
+  }
+
+  entry {
+    Position: {0, 1.2, 0}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {0, 0, -1}}
+  }
+  hall_store {
+    Position: {5, 1.2, 5}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {1, 0, 0}}
+  }
+  hall_side {
+    Position: {0, 1.5, 10}
+    VisPortal: {kind: Window, size: {2, 1}, normal: {0, 0, 1}, glass: true,
+      glass_tint: {1, 0, 0, 0.5}}
+  }
+  store_vault {
+    Position: {15, 1.2, 5}
+    VisPortal: {kind: Door, size: {2, 2.4}, normal: {1, 0, 0}}
+    PortalDoor: {style: "Ship"}
+  }
+
+  lamp_hall {
+    Position: {0, 2, 5}
+    PointLight: {intensity: 4, range: 8}
+  }
+  lamp_store {
+    Position: {10, 2, 5}
+    PointLight: {intensity: 4, range: 6}
+  }
+  lamp_vault {
+    Position: {20, 2, 5}
+    PointLight: {intensity: 4, range: 6}
+  }
+  lamp_side {
+    Position: {0, 2, 15}
+    PointLight: {intensity: 4, range: 12}
+  }
+  lamp_outside {
+    Position: {0, 2, -5}
+    PointLight: {intensity: 4, range: 3}
+  }
+}

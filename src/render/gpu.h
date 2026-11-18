@@ -208,6 +208,15 @@ void box_gpu_target_render(
 void box_gpu_target_fini(
     box_gpu_t *gpu);
 
+/** Create the view of a BOX_GPU_DEPTH_FORMAT texture that shaders sample: its depth aspect
+ * only, which a depth and stencil format needs to be bound as a texture.
+ *
+ * @param texture The depth texture
+ * @return The view
+ */
+WGPUTextureView box_gpu_depth_sample_view(
+    WGPUTexture texture);
+
 /** Compile, recompile or release a shader module.
  *
  * A module that fails to compile is reported and leaves the previous module in place. The clip
@@ -1180,6 +1189,17 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUTextureView ao,
     WGPUTextureView snapshot,
     WGPUTextureView snapshot_depth);
+
+/** Write the shading blocks of the areas of the views of a target (box_render_view_t
+ * area_first) into the area buffer, a slot per view in the order the views were written into
+ * the view buffer, and a zero header for a view without one.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_light_areas(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters, shadow
  * map, aerial perspective volume, environment, ambient occlusion, shadow atlas, tile records,
@@ -2241,13 +2261,16 @@ void box_gpu_transmission_record(
  * @param s The snapshot of the view
  * @param encoder The encoder of the frame
  * @param depth Texture of the depth attachment of the view (CopySrc), the size of the snapshot
- * @return The view of the glass depth, which the transmissive draws then write
+ * @param attachment Receives the depth and stencil view of the glass depth, which the
+ * transmissive draws then write
+ * @return The depth aspect view of the glass depth, which the fog volumes sample
  */
 WGPUTextureView box_gpu_transmission_glass(
     box_gpu_t *gpu,
     box_gpu_snapshot_t *s,
     WGPUCommandEncoder encoder,
-    WGPUTexture depth);
+    WGPUTexture depth,
+    WGPUTextureView *attachment);
 
 /** Release the snapshots of a target, of every format.
  *

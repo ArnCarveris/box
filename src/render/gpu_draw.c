@@ -12,6 +12,7 @@
  */
 
 #include "gpu_forward.h"
+#include "gpu_portal_stencil.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,8 +75,8 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
 }
 
 /** Create the layout of the view group of the forward pass: the view uniforms, the lights and
- * clusters, the shadows, the reflections, the aerial perspective, the environment, the
- * ambient occlusion, the cookie, the opaque snapshot, the planar images and the planet lights.
+ * clusters, the shadows, the reflections, the aerial perspective, the environment, the AO,
+ * the cookie, the opaque snapshot, the planar images, the planet lights and the areas.
  *
  * @param gpu The backend
  * @return The layout
@@ -83,7 +84,7 @@ static WGPUPipelineLayout box_gpu_mesh_layout(
 static WGPUBindGroupLayout box_gpu_view_layout(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[24] = {
+    WGPUBindGroupLayoutEntry entries[25] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -250,9 +251,17 @@ static WGPUBindGroupLayout box_gpu_view_layout(
                 .format = WGPUTextureFormat_RGBA16Float,
                 .viewDimension = WGPUTextureViewDimension_2DArray
             }
+        },
+        {
+            .binding = BOX_GPU_AREAS_BINDING,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_GPU_AREAS_SIZE
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 24, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 25, .entries = entries };
 
     return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
 }
@@ -285,6 +294,7 @@ void box_gpu_draw_init(
     box_gpu_effects_init(gpu);
     box_gpu_gtao_init(gpu);
     box_gpu_transmission_init(gpu);
+    box_gpu_portal_stencil_init(gpu);
     box_gpu_atmosphere_init(gpu);
     box_gpu_particles_init(gpu);
     box_gpu_fog_volumes_init(gpu);
@@ -698,6 +708,7 @@ void box_gpu_draw_fini(
     box_gpu_effects_fini(gpu);
     box_gpu_gtao_fini(gpu);
     box_gpu_transmission_fini(gpu);
+    box_gpu_portal_stencil_fini(gpu);
     box_gpu_atmosphere_fini(gpu);
     box_gpu_particles_fini(gpu);
     box_gpu_fog_volumes_fini(gpu);
@@ -1022,6 +1033,7 @@ static int32_t box_gpu_view_write(
 {
     int32_t i, result = 0, extra = 0, slot = 0, count = ecs_vec_count(&packet->views);
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
+    ecs_vec_clear(&gpu->area_views);
     box_gpu_cull_begin(gpu, packet);
     box_gpu_planar_begin(gpu);
     box_gpu_shadow_begin(gpu, packet->frame);
@@ -1052,6 +1064,7 @@ static int32_t box_gpu_view_write(
         box_gpu_environment_uniforms(gpu, v, u);
         box_gpu_cookie_uniforms(gpu, v, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
+        *ecs_vec_append_t(NULL, &gpu->area_views, const box_render_view_t*) = v;
         result ++;
     }
 
@@ -1080,6 +1093,7 @@ static int32_t box_gpu_view_write(
         box_gpu_view_reserve(gpu, result + extra);
         wgpuQueueWriteBuffer(gpu->queue, gpu->view_buffer, 0,
             ecs_vec_first(&gpu->view_data), (size_t)(result + extra) * BOX_GPU_VIEW_STRIDE);
+        box_gpu_light_areas(gpu, packet);
     }
 
     return result;
@@ -1120,7 +1134,9 @@ typedef struct box_gpu_view_pass_t {
     WGPURenderPassEncoder pass;     /**< The pass being recorded */
     WGPUCommandEncoder encoder;     /**< Encoder of the frame */
     WGPUTextureView color;          /**< Color attachment of the pass */
-    WGPUTextureView depth;          /**< Depth attachment, which soft particles read */
+    WGPUTextureView depth;          /**< Depth and stencil attachment */
+    WGPUTextureView depth_sample;   /**< Depth aspect of the attachment, which soft particles,
+                                     *   fog volumes and planet shells read */
     WGPUStoreOp depth_store;        /**< Store op of the depth of the passes after the split */
     bool soft;                      /**< The particles draw in a pass of their own that reads
                                      *   the depth instead of writing it */
@@ -1171,12 +1187,17 @@ static WGPURenderPassEncoder box_gpu_view_pass_continue(
         .depthLoadOp = WGPULoadOp_Load,
         .depthStoreOp = vp->snapshot && vp->snapshots < vp->planned
             ? WGPUStoreOp_Store
-            : vp->depth_store
+            : vp->depth_store,
+        .stencilLoadOp = WGPULoadOp_Load,
+        .stencilStoreOp = WGPUStoreOp_Store
     };
     if (read_only) {
         depth.depthLoadOp = WGPULoadOp_Undefined;
         depth.depthStoreOp = WGPUStoreOp_Undefined;
         depth.depthReadOnly = true;
+        depth.stencilLoadOp = WGPULoadOp_Undefined;
+        depth.stencilStoreOp = WGPUStoreOp_Undefined;
+        depth.stencilReadOnly = true;
     }
 
     WGPURenderPassDescriptor desc = {
@@ -1217,11 +1238,15 @@ static void box_gpu_draw_glass(
     WGPUBindGroup material = NULL, instances = NULL;
     uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
     int32_t i;
-    vp->glass = box_gpu_transmission_glass(gpu, vp->snapshot, vp->encoder, vp->depth_texture);
+    WGPUTextureView attachment = NULL;
+    vp->glass = box_gpu_transmission_glass(gpu, vp->snapshot, vp->encoder, vp->depth_texture,
+        &attachment);
     WGPURenderPassDepthStencilAttachment depth = {
-        .view = vp->glass,
+        .view = attachment,
         .depthLoadOp = WGPULoadOp_Load,
-        .depthStoreOp = WGPUStoreOp_Store
+        .depthStoreOp = WGPUStoreOp_Store,
+        .stencilLoadOp = WGPULoadOp_Load,
+        .stencilStoreOp = WGPUStoreOp_Discard
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(vp->encoder,
         &(WGPURenderPassDescriptor){ .depthStencilAttachment = &depth });
@@ -1309,15 +1334,15 @@ static bool box_gpu_draw_particles(
         vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
         wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
         if (vp->planets) {
-            box_gpu_planets_draw(gpu, vp->pass, t, format, packet, v, vp->depth);
+            box_gpu_planets_draw(gpu, vp->pass, t, format, packet, v, vp->depth_sample);
         }
 
         if (vp->fog) {
-            box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth,
+            box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth_sample,
                 vp->glass, BOX_GPU_FOG_SEGMENT_BEHIND);
         }
 
-        box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth);
+        box_gpu_particles_draw(gpu, vp->pass, format, v, vp->depth_sample);
         rebind = !last;
         if (!last) {
             wgpuRenderPassEncoderEnd(vp->pass);
@@ -1365,7 +1390,7 @@ static void box_gpu_draw_fog_front(
     wgpuRenderPassEncoderRelease(vp->pass);
     vp->pass = box_gpu_view_pass_continue(gpu, vp, true);
     wgpuRenderPassEncoderSetBindGroup(vp->pass, 0, group, 1, &offset);
-    box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth, vp->glass,
+    box_gpu_fog_volumes_draw(gpu, vp->pass, t, format, packet, v, vp->depth_sample, vp->glass,
         BOX_GPU_FOG_SEGMENT_FRONT);
     wgpuRenderPassEncoderEnd(vp->pass);
     wgpuRenderPassEncoderRelease(vp->pass);
@@ -1452,6 +1477,7 @@ static void box_gpu_draw_batches(
     bool stars = phase == 1 || !box_gpu_star_fields_ready(gpu, v);
     bool particles = phase == 1;
     bool wired = v->debug.wireframe == WireframeOnly;
+    bool marked = phase == 1 || !v->mark_count;
     int32_t i;
     vp->front = -1;
     vp->glass = NULL;
@@ -1512,6 +1538,15 @@ static void box_gpu_draw_batches(
             bound = NULL;
             material = NULL;
             instances = NULL;
+        }
+
+        if (!marked && b->water && b->transmissive) {
+            marked = true;
+            if (box_gpu_portal_stencil_draw(gpu, vp->pass, format, packet, v)) {
+                bound = NULL;
+                material = NULL;
+                instances = NULL;
+            }
         }
 
         if (!pipeline || (phase == 1 && !mesh) || (wired && box_render_is_mesh(b->pipeline))) {
@@ -1616,7 +1651,8 @@ static void box_gpu_draw_pass(
     box_gpu_view_pass_t vp = {
         .encoder = encoder,
         .color = hdr ? hdr : color,
-        .depth = t->depth_view,
+        .depth = t->depth_attachment,
+        .depth_sample = t->depth_view,
         .depth_store = phase == 1 || hdr || fog || planets || box_gpu_debug_enabled(v)
             ? WGPUStoreOp_Store
             : WGPUStoreOp_Discard,
@@ -1628,12 +1664,15 @@ static void box_gpu_draw_pass(
         .depth_texture = t->depth
     };
     WGPURenderPassDepthStencilAttachment depth = {
-        .view = t->depth_view,
+        .view = t->depth_attachment,
         .depthLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
         .depthStoreOp = vp.soft || vp.snapshot || vp.fog || vp.planets
             ? WGPUStoreOp_Store
             : vp.depth_store,
-        .depthClearValue = 0.0f
+        .depthClearValue = 0.0f,
+        .stencilLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
+        .stencilStoreOp = WGPUStoreOp_Store,
+        .stencilClearValue = v->stencil_clear
     };
     WGPURenderPassDescriptor desc = {
         .colorAttachmentCount = 1,
@@ -1783,10 +1822,13 @@ static void box_gpu_draw_prepass(
     bool late)
 {
     WGPURenderPassDepthStencilAttachment depth = {
-        .view = t->depth_view,
+        .view = t->depth_attachment,
         .depthLoadOp = late ? WGPULoadOp_Load : WGPULoadOp_Clear,
         .depthStoreOp = WGPUStoreOp_Store,
-        .depthClearValue = 0.0f
+        .depthClearValue = 0.0f,
+        .stencilLoadOp = late ? WGPULoadOp_Load : WGPULoadOp_Clear,
+        .stencilStoreOp = WGPUStoreOp_Store,
+        .stencilClearValue = v->stencil_clear
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
@@ -1827,7 +1869,9 @@ bool box_gpu_draw_overdraw(
         .view = depth,
         .depthLoadOp = WGPULoadOp_Clear,
         .depthStoreOp = WGPUStoreOp_Discard,
-        .depthClearValue = 0.0f
+        .depthClearValue = 0.0f,
+        .stencilLoadOp = WGPULoadOp_Clear,
+        .stencilStoreOp = WGPUStoreOp_Discard
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder,
         &(WGPURenderPassDescriptor){
@@ -1857,6 +1901,8 @@ void box_gpu_draw_views(
     if (!box_gpu_view_write(gpu, t, packet, frame)) {
         goto done;
     }
+
+    box_gpu_portal_stencil_upload(gpu, packet);
 
     for (i = 0; i < count; i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);

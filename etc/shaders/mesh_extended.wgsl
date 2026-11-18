@@ -930,6 +930,7 @@ fn fresnel_rim(f: VertexOut, shaded: Surface, v: vec3f) -> Surface {
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     planet_fragment(f);
     var s = shaded;
+    area_fragment(f.world, s.geometric);
     if (!transmissive && kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
@@ -943,7 +944,7 @@ fn lit(f: VertexOut, shaded: Surface) -> vec4f {
         return transmission(f, s, v, reflected);
     }
 
-    var color = reflected.diffuse + reflected.specular;
+    var color = area_fogged(reflected.diffuse + reflected.specular, s.alpha, f.world);
     if (scene_aerial && view.aerial.w > 0.0) {
         color = aerial_perspective(color, s.alpha, f.pos, f.world);
     }

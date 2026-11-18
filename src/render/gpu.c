@@ -265,7 +265,8 @@ static void box_gpu_device_init(
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
     WGPUFeatureName timestamps = WGPUFeatureName_TimestampQuery;
     WGPUFeatureName clip = WGPUFeatureName_ClipDistances;
-    WGPUFeatureName features[2];
+    WGPUFeatureName stencil = WGPUFeatureName_Depth32FloatStencil8;
+    WGPUFeatureName features[3];
     WGPULimits adapter = WGPU_LIMITS_INIT, limits = WGPU_LIMITS_INIT;
     size_t feature_count = 0;
     if (wgpuAdapterHasFeature(gpu->adapter, timestamps)) {
@@ -274,6 +275,12 @@ static void box_gpu_device_init(
 
     if (wgpuAdapterHasFeature(gpu->adapter, clip)) {
         features[feature_count ++] = clip;
+    }
+
+    if (wgpuAdapterHasFeature(gpu->adapter, stencil)) {
+        features[feature_count ++] = stencil;
+    } else {
+        ecs_err("the webgpu adapter has no depth32float-stencil8, the depth format of the views");
     }
 
     desc.requiredFeatureCount = feature_count;

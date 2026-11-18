@@ -104,13 +104,14 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> Lit {
 fn lit(f: VertexOut, shaded: Surface) -> vec4f {
     planet_fragment(f);
     var s = shaded;
+    area_fragment(f.world, s.geometric);
     if (kind.blend_mode == 0u) {
         s.occlusion = min(s.occlusion, view_occlusion(f.pos));
     }
 
     let v = normalize(view.camera.xyz - f.world);
     let reflected = shade(s, v, f.world);
-    var color = reflected.diffuse + reflected.specular;
+    var color = area_fogged(reflected.diffuse + reflected.specular, s.alpha, f.world);
     if (scene_aerial && view.aerial.w > 0.0) {
         color = aerial_perspective(color, s.alpha, f.pos, f.world);
     }
