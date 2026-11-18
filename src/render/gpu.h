@@ -1701,24 +1701,26 @@ void box_gpu_ripples_simulate(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Fill the view layout entry of the heights of the field of WaterRipples.
+/** Fill the view layout entries of the heights and the foam of the field of WaterRipples.
  *
- * @param entry Receives the entry of BOX_GPU_RIPPLES_HEIGHTS_BINDING
+ * @param entries The entries of the view layout, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING and
+ * BOX_GPU_RIPPLES_FOAM_BINDING are filled
  */
 void box_gpu_ripples_layout(
-    WGPUBindGroupLayoutEntry *entry);
+    WGPUBindGroupLayoutEntry *entries);
 
-/** Fill the view group entry of the heights of the field of WaterRipples of the scene of a view,
- * the 1x1 texture without one.
+/** Fill the view group entries of the heights and the foam of the field of WaterRipples of the
+ * scene of a view, the 1x1 zero texture without one.
  *
  * @param gpu The backend
  * @param v The view, NULL for none
- * @param entry Receives the entry of BOX_GPU_RIPPLES_HEIGHTS_BINDING
+ * @param entries The entries of the view group, of which BOX_GPU_RIPPLES_HEIGHTS_BINDING and
+ * BOX_GPU_RIPPLES_FOAM_BINDING are filled
  */
 void box_gpu_ripples_bindings(
     box_gpu_t *gpu,
     const box_render_view_t *v,
-    WGPUBindGroupEntry *entry);
+    WGPUBindGroupEntry *entries);
 
 /** Write the record of the field of WaterRipples of the scene of a view into its uniforms, a
  * zero record without one.

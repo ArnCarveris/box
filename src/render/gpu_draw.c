@@ -265,7 +265,7 @@ static WGPUBindGroupLayout box_gpu_view_layout(
     };
     WGPUBindGroupLayoutDescriptor layout = {
         .entryCount = BOX_GPU_VIEW_BINDINGS, .entries = entries };
-    box_gpu_ripples_layout(&entries[BOX_GPU_RIPPLES_HEIGHTS_BINDING]);
+    box_gpu_ripples_layout(entries);
 
     return wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
 }

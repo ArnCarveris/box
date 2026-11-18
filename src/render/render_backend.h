@@ -293,6 +293,24 @@ bool box_render_gpu_read_ripples(
     float *out,
     int32_t count);
 
+/** Copy the foam of the field of WaterRipples of a Water into memory like
+ * box_render_gpu_read_ripples copies its heights: cell x, z of the window at
+ * out[z * resolution + x], 0..1.
+ *
+ * @param world The world
+ * @param water The Water entity
+ * @param info Receives the window, NULL for none
+ * @param out Receives resolution squared foam values, NULL to only get the window
+ * @param count Floats out holds
+ * @return Whether the field exists and, with out, its foam was copied
+ */
+bool box_render_gpu_read_ripple_foam(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count);
+
 /** Copy the L2 SH irradiance of a reflection probe cubemap slot into memory, waiting for the
  * copy.
  *

@@ -8,8 +8,9 @@
  * with the flow because the frame moves, never by resampling. The window follows its entity by
  * whole cells of that frame, which the backend addresses modulo the resolution.
  *
- * A RippleSource pushes the water by its speed relative to the WaterFlow of the field, its world
- * velocity being the change of its world position over the frame delta time.
+ * A RippleSource pushes the water, and lays down foam, by its speed relative to the WaterFlow of
+ * the field, its world velocity being the change of its world position over the frame delta
+ * time.
  */
 
 #include "render.h"
@@ -42,6 +43,7 @@ typedef struct box_ripple_entry_t {
     float axis[2];          /**< Its X axis in world XZ, normalized */
     float extents[2];       /**< World units of its half size along its X and Z */
     float strength;         /**< RippleSource.strength, 0 when not finite */
+    float foam;             /**< RippleSource.foam, 0 when not finite */
 } box_ripple_entry_t;
 
 /** The state of the ripple extract */
@@ -126,6 +128,29 @@ float box_render_ripples_wave(
     *keep = damping >= 1.0 ? 0.0f : (float)pow(1.0 - damping, step);
 
     return (float)speed;
+}
+
+void box_render_ripples_foam(
+    const WaterRipples *ripples,
+    float cell,
+    float *spread,
+    float *keep,
+    float *crest)
+{
+    double step = BOX_RENDER_RIPPLE_STEP;
+    double diffusion = isfinite(ripples->foam_spread) && ripples->foam_spread > 0.0f
+        ? ripples->foam_spread : 0.0;
+    double decay = isfinite(ripples->foam_decay)
+        ? glm_clamp(ripples->foam_decay, 0.0f, 1.0f) : 0.0;
+    double share = cell > 0.0f ? diffusion * step / ((double)cell * cell) : 0.0;
+    if (share > BOX_RENDER_RIPPLE_FOAM_SPREAD_MAX) {
+        share = BOX_RENDER_RIPPLE_FOAM_SPREAD_MAX;
+    }
+
+    *spread = (float)share;
+    *keep = decay >= 1.0 ? 0.0f : (float)pow(1.0 - decay, step);
+    *crest = isfinite(ripples->crest_foam) && ripples->crest_foam > 0.0f
+        ? (float)(ripples->crest_foam * step) : 0.0f;
 }
 
 /** Get the state of the ripple extract of a world.
@@ -225,6 +250,7 @@ static void box_ripples_sources(
             e->extents[1] = isfinite(src->extents[1]) && isfinite(sz)
                 ? fabsf(src->extents[1]) * sz : 0.0f;
             e->strength = isfinite(src->strength) ? src->strength : 0.0f;
+            e->foam = isfinite(src->foam) ? src->foam : 0.0f;
         }
     }
 
@@ -258,7 +284,7 @@ static bool box_ripples_overlaps(
 }
 
 /** Append the RippleSource entities of the scene of a field that overlap its window and move
- * relative to its water.
+ * relative to its water, with a strength or foam.
  *
  * @param p The packet
  * @param l The state
@@ -282,7 +308,7 @@ static void box_ripples_push_sources(
         const box_ripple_entry_t *e = &entries[i];
         float velocity[2] = { e->velocity[0], e->velocity[2] }, relative[2];
         box_render_ripple_source_t s;
-        if (e->scene != rec->scene || e->strength == 0.0f) {
+        if (e->scene != rec->scene || (e->strength == 0.0f && e->foam == 0.0f)) {
             continue;
         }
 
@@ -302,6 +328,8 @@ static void box_ripples_push_sources(
         s.axis[1] = e->axis[1];
         s.amount = (float)(-(double)e->strength * BOX_RENDER_RIPPLE_PUSH * speed *
             BOX_RENDER_RIPPLE_STEP);
+        s.foam = (float)((double)e->foam * BOX_RENDER_RIPPLE_FOAM_PUSH * speed *
+            BOX_RENDER_RIPPLE_STEP);
         if (!box_ripples_overlaps(&s, (int32_t)rec->resolution)) {
             continue;
         }
@@ -312,8 +340,8 @@ static void box_ripples_push_sources(
     }
 }
 
-/** Append the queued ripple_at disturbances of the Water of a field that steps this frame, and
- * mark the ones it took.
+/** Append the queued ripple_at and foam_at disturbances of the Water of a field that steps this
+ * frame, and mark the ones it took.
  *
  * @param p The packet
  * @param queue The queue, box_material_ripple_t
@@ -346,6 +374,7 @@ static void box_ripples_push_impulses(
         s.extents[0] = s.extents[1] = (float)((double)r->radius / cell);
         s.axis[0] = 1.0f;
         s.amount = -r->strength;
+        s.foam = r->foam;
         s.once = 1;
         pushed ++;
         if (!box_ripples_overlaps(&s, (int32_t)rec->resolution)) {
@@ -477,6 +506,7 @@ static void box_ripples_field(
     rec->corner[1] = (float)((double)origin[1] * cell + f->frame[1]);
     rec->height = t ? t->m[3][1] : 0.0f;
     rec->strength = isfinite(ripples->strength) ? ripples->strength : 0.0f;
+    box_render_ripples_foam(ripples, cell, &rec->foam_spread, &rec->foam_keep, &rec->crest);
     rec->source_first = ecs_vec_count(&p->ripple_sources);
     if (steps) {
         box_ripples_push_sources(p, l, rec, flow, from_frame, f);

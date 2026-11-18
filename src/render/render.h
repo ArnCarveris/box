@@ -707,6 +707,25 @@ float box_render_ripples_wave(
     float *courant2,
     float *keep);
 
+/** Get the foam terms of a step of a field of WaterRipples: foam_spread as the share of the
+ * difference to its neighbours a cell takes per step (clamped to
+ * BOX_RENDER_RIPPLE_FOAM_SPREAD_MAX), foam_decay as the factor of the foam a step keeps and
+ * crest_foam as the foam formed per step per unit of slope. Values that are negative or not
+ * finite are 0.
+ *
+ * @param ripples The component
+ * @param cell World units of a cell
+ * @param spread Receives the share taken from the neighbours per step
+ * @param keep Receives the factor of the foam kept per step
+ * @param crest Receives the foam formed per step per unit of slope
+ */
+void box_render_ripples_foam(
+    const WaterRipples *ripples,
+    float cell,
+    float *spread,
+    float *keep,
+    float *crest);
+
 /** Get the world velocity of a RippleSource the last ripple extract computed from the change of
  * its world position, for tests.
  *

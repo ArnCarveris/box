@@ -1,12 +1,15 @@
 /**
  * @file render/gpu_ripples.c
- * @brief Fields of WaterRipples in the webgpu backend: two r32float height textures per field,
- * stepped by the damped wave equation in compute passes before the targets, and the field of the
- * scene of a view bound in its view group for the Water fragments (mesh_extended.wgsl).
+ * @brief Fields of WaterRipples in the webgpu backend: two r32float height textures and two
+ * r32float foam textures per field, stepped by the damped wave equation in compute passes before
+ * the targets, and the field of the scene of a view bound in its view group for the Water
+ * fragments (mesh_extended.wgsl).
  *
  * A step reads the latest heights from one texture and the ones before from the other, which it
- * overwrites with the new heights; the two then swap. Cells are addressed modulo the resolution,
- * so a window that moves only clears the cells that entered it and the others stay in place.
+ * overwrites with the new heights; the two then swap, and the foam with them.
+ *
+ * Cells are addressed modulo the resolution, so a window that moves only clears the cells that
+ * entered it and the others stay in place.
  */
 
 #include "gpu.h"
@@ -29,6 +32,8 @@ typedef struct box_gpu_ripple_step_t {
                                      *   the frame, first source */
     float wave[4];                  /**< (c dt / dx)^2, velocity kept per step, border cells,
                                      *   time fraction of the frame at the end of the step */
+    float foam[4];                  /**< Foam spread share and kept factor per step, crest foam
+                                     *   per step, 1 / (2 world units of a cell) */
 } box_gpu_ripple_step_t;
 
 /** The ripple members of View of lights.wgsl (ripple_a, ripple_b, ripple_c) */
@@ -46,9 +51,11 @@ typedef struct box_gpu_ripple_field_t {
     uint32_t resolution;            /**< Cells per side */
     WGPUTexture textures[2];        /**< The two height textures */
     WGPUTextureView views[2];       /**< Their views */
+    WGPUTexture foam[2];            /**< The two foam textures, foam[k] goes with textures[k] */
+    WGPUTextureView foam_views[2];  /**< Their views */
     box_gpu_ripple_record_t record; /**< Record the views of its scene take */
-    WGPUBindGroup groups[2];        /**< Group k reads textures[k] and writes the other, for the
-                                     *   frame */
+    WGPUBindGroup groups[2];        /**< Group k reads textures[k] and foam[k] and writes the
+                                     *   others, for the frame */
     int32_t current;                /**< Texture of the latest heights */
     int32_t origin[2];              /**< Texel of the window corner */
     float corner[2];                /**< World XZ of the window corner */
@@ -66,7 +73,8 @@ typedef struct box_gpu_ripple_dispatch_t {
 } box_gpu_ripple_dispatch_t;
 
 struct box_gpu_ripples_t {
-    WGPUBindGroupLayout layout;     /**< Current, previous, step, sources */
+    WGPUBindGroupLayout layout;     /**< Current, previous, step, sources, foam current, foam
+                                     *   next */
     WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the passes */
     WGPUComputePipeline clear;      /**< Clears the cells that entered the window */
     WGPUComputePipeline advance;    /**< Steps the heights */
@@ -136,7 +144,7 @@ void box_gpu_ripples_init(
     box_gpu_t *gpu)
 {
     box_gpu_ripples_t *s = ecs_os_calloc_t(box_gpu_ripples_t);
-    WGPUBindGroupLayoutEntry entries[4] = {
+    WGPUBindGroupLayoutEntry entries[6] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -168,10 +176,28 @@ void box_gpu_ripples_init(
             .binding = 3,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 4,
+            .visibility = WGPUShaderStage_Compute,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_ReadOnly,
+                .format = WGPUTextureFormat_R32Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        },
+        {
+            .binding = 5,
+            .visibility = WGPUShaderStage_Compute,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_WriteOnly,
+                .format = WGPUTextureFormat_R32Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
         }
     };
     s->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 4, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     s->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
             .bindGroupLayoutCount = 1,
@@ -196,6 +222,22 @@ static void box_gpu_ripples_groups_release(
     BOX_GPU_RIPPLES_RELEASE(f->groups[1], wgpuBindGroupRelease);
 }
 
+/** Release the height and foam textures of a field.
+ *
+ * @param f The field
+ */
+static void box_gpu_ripples_textures_release(
+    box_gpu_ripple_field_t *f)
+{
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        BOX_GPU_RIPPLES_RELEASE(f->views[i], wgpuTextureViewRelease);
+        BOX_GPU_RIPPLES_RELEASE(f->textures[i], wgpuTextureRelease);
+        BOX_GPU_RIPPLES_RELEASE(f->foam_views[i], wgpuTextureViewRelease);
+        BOX_GPU_RIPPLES_RELEASE(f->foam[i], wgpuTextureRelease);
+    }
+}
+
 /** Release the textures and buffers of a field and free it.
  *
  * @param f The field
@@ -203,13 +245,8 @@ static void box_gpu_ripples_groups_release(
 static void box_gpu_ripples_field_free(
     box_gpu_ripple_field_t *f)
 {
-    int32_t i;
     box_gpu_ripples_groups_release(f);
-    for (i = 0; i < 2; i ++) {
-        BOX_GPU_RIPPLES_RELEASE(f->views[i], wgpuTextureViewRelease);
-        BOX_GPU_RIPPLES_RELEASE(f->textures[i], wgpuTextureRelease);
-    }
-
+    box_gpu_ripples_textures_release(f);
     ecs_os_free(f);
 }
 
@@ -341,11 +378,12 @@ static box_gpu_ripple_field_t* box_gpu_ripples_ensure(
     }
 
     if (!f->textures[0] || f->resolution != rec->resolution) {
+        box_gpu_ripples_textures_release(f);
         for (i = 0; i < 2; i ++) {
-            BOX_GPU_RIPPLES_RELEASE(f->views[i], wgpuTextureViewRelease);
-            BOX_GPU_RIPPLES_RELEASE(f->textures[i], wgpuTextureRelease);
             f->textures[i] = box_gpu_ripples_texture(gpu, rec->resolution);
             f->views[i] = wgpuTextureCreateView(f->textures[i], NULL);
+            f->foam[i] = box_gpu_ripples_texture(gpu, rec->resolution);
+            f->foam_views[i] = wgpuTextureCreateView(f->foam[i], NULL);
         }
 
         f->resolution = rec->resolution;
@@ -387,6 +425,10 @@ static uint32_t box_gpu_ripples_step(
     step->wave[1] = rec->keep;
     step->wave[2] = (float)(rec->resolution / BOX_GPU_RIPPLES_BORDER);
     step->wave[3] = t;
+    step->foam[0] = rec->foam_spread;
+    step->foam[1] = rec->foam_keep;
+    step->foam[2] = rec->crest;
+    step->foam[3] = rec->cell > 0.0f ? 0.5f / rec->cell : 0.0f;
 
     return result;
 }
@@ -474,9 +516,11 @@ static void box_gpu_ripples_groups(
     int32_t k;
     box_gpu_ripples_groups_release(f);
     for (k = 0; k < 2; k ++) {
-        WGPUBindGroupEntry entries[4] = {
+        WGPUBindGroupEntry entries[6] = {
             { .binding = 0, .textureView = f->views[k] },
             { .binding = 1, .textureView = f->views[1 - k] },
+            { .binding = 4, .textureView = f->foam_views[k] },
+            { .binding = 5, .textureView = f->foam_views[1 - k] },
             {
                 .binding = 2,
                 .buffer = s->steps,
@@ -487,7 +531,7 @@ static void box_gpu_ripples_groups(
         };
         f->groups[k] = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = s->layout,
-            .entryCount = 4,
+            .entryCount = 6,
             .entries = entries
         });
     }
@@ -636,28 +680,36 @@ static const box_gpu_ripple_field_t* box_gpu_ripples_of_view(
 }
 
 void box_gpu_ripples_layout(
-    WGPUBindGroupLayoutEntry *entry)
+    WGPUBindGroupLayoutEntry *entries)
 {
-    *entry = (WGPUBindGroupLayoutEntry){
-        .binding = BOX_GPU_RIPPLES_HEIGHTS_BINDING,
-        .visibility = WGPUShaderStage_Fragment,
-        .storageTexture = {
-            .access = WGPUStorageTextureAccess_ReadOnly,
-            .format = WGPUTextureFormat_R32Float,
-            .viewDimension = WGPUTextureViewDimension_2D
-        }
-    };
+    uint32_t bindings[2] = { BOX_GPU_RIPPLES_HEIGHTS_BINDING, BOX_GPU_RIPPLES_FOAM_BINDING };
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        entries[bindings[i]] = (WGPUBindGroupLayoutEntry){
+            .binding = bindings[i],
+            .visibility = WGPUShaderStage_Fragment,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_ReadOnly,
+                .format = WGPUTextureFormat_R32Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        };
+    }
 }
 
 void box_gpu_ripples_bindings(
     box_gpu_t *gpu,
     const box_render_view_t *v,
-    WGPUBindGroupEntry *entry)
+    WGPUBindGroupEntry *entries)
 {
     const box_gpu_ripple_field_t *field = box_gpu_ripples_of_view(gpu, v);
-    *entry = (WGPUBindGroupEntry){
+    entries[BOX_GPU_RIPPLES_HEIGHTS_BINDING] = (WGPUBindGroupEntry){
         .binding = BOX_GPU_RIPPLES_HEIGHTS_BINDING,
         .textureView = field ? field->views[field->current] : gpu->ripples->none_view
+    };
+    entries[BOX_GPU_RIPPLES_FOAM_BINDING] = (WGPUBindGroupEntry){
+        .binding = BOX_GPU_RIPPLES_FOAM_BINDING,
+        .textureView = field ? field->foam_views[field->current] : gpu->ripples->none_view
     };
 }
 
@@ -674,9 +726,21 @@ void box_gpu_ripples_uniforms(
     ecs_os_memcpy_n(u->ripple_c, r->c, uint32_t, 4);
 }
 
-bool box_render_gpu_read_ripples(
+/** Copy the heights or the foam of the field of a Water into memory, see
+ * box_render_gpu_read_ripples.
+ *
+ * @param world The world
+ * @param water The Water entity
+ * @param foam Whether to copy the foam, else the heights
+ * @param info Receives the window, NULL for none
+ * @param out Receives the values, NULL for the window only
+ * @param count Floats out holds
+ * @return Whether the field exists and was copied
+ */
+static bool box_gpu_ripples_read(
     ecs_world_t *world,
     ecs_entity_t water,
+    bool foam,
     box_render_ripples_read_t *info,
     float *out,
     int32_t count)
@@ -723,7 +787,7 @@ bool box_render_gpu_read_ripples(
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     wgpuCommandEncoderCopyTextureToBuffer(encoder,
         &(WGPUTexelCopyTextureInfo){
-            .texture = f->textures[f->current],
+            .texture = foam ? f->foam[f->current] : f->textures[f->current],
             .aspect = WGPUTextureAspect_All
         },
         &(WGPUTexelCopyBufferInfo){
@@ -752,9 +816,45 @@ done:
     return result;
 }
 
+bool box_render_gpu_read_ripples(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count)
+{
+    return box_gpu_ripples_read(world, water, false, info, out, count);
+}
+
+bool box_render_gpu_read_ripple_foam(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count)
+{
+    return box_gpu_ripples_read(world, water, true, info, out, count);
+}
+
 #else
 
 bool box_render_gpu_read_ripples(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    box_render_ripples_read_t *info,
+    float *out,
+    int32_t count)
+{
+    (void)world;
+    (void)water;
+    (void)info;
+    (void)out;
+    (void)count;
+
+    return false;
+}
+
+bool box_render_gpu_read_ripple_foam(
     ecs_world_t *world,
     ecs_entity_t water,
     box_render_ripples_read_t *info,

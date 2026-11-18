@@ -273,7 +273,8 @@ static void box_water_waves_ctor(
 }
 
 /** Construct WaterRipples values: a field of 32 world units and 256 cells on the Water entity, a
- * wave speed of 2, a damping of 0.5 and a strength of 1.
+ * wave speed of 2, a damping of 0.5, a strength of 1, a foam decay of 0.4, a foam spread of 0.02
+ * and no crest foam.
  *
  * @param ptr The components
  * @param count Number of components
@@ -294,11 +295,15 @@ static void box_water_ripples_ctor(
             .follow = 0,
             .wave_speed = BOX_MATERIAL_RIPPLES_WAVE_SPEED,
             .damping = BOX_MATERIAL_RIPPLES_DAMPING,
-            .strength = BOX_MATERIAL_RIPPLES_STRENGTH };
+            .strength = BOX_MATERIAL_RIPPLES_STRENGTH,
+            .foam_decay = BOX_MATERIAL_RIPPLES_FOAM_DECAY,
+            .foam_spread = BOX_MATERIAL_RIPPLES_FOAM_SPREAD,
+            .crest_foam = 0.0f };
     }
 }
 
-/** Construct RippleSource values: an ellipse of half size 0.5 by 0.5 and a strength of 1.
+/** Construct RippleSource values: an ellipse of half size 0.5 by 0.5, a strength of 1 and no
+ * foam.
  *
  * @param ptr The components
  * @param count Number of components
@@ -315,7 +320,8 @@ static void box_ripple_source_ctor(
     for (i = 0; i < count; i ++) {
         values[i] = (RippleSource){
             .extents = { BOX_MATERIAL_RIPPLE_SOURCE_EXTENT, BOX_MATERIAL_RIPPLE_SOURCE_EXTENT },
-            .strength = BOX_MATERIAL_RIPPLE_SOURCE_STRENGTH };
+            .strength = BOX_MATERIAL_RIPPLE_SOURCE_STRENGTH,
+            .foam = 0.0f };
     }
 }
 
@@ -329,12 +335,25 @@ ecs_vec_t* box_material_ripples_queue(
     return q ? q->ripples : NULL;
 }
 
-bool box_material_ripple_at(
+/** Queue a disturbance of the field of a Water after checking its arguments.
+ *
+ * @param world The world
+ * @param what Name of the function for the errors
+ * @param water Entity with Water and WaterRipples
+ * @param position World position of the center
+ * @param radius World units of the radius
+ * @param strength World units the water at the center sinks
+ * @param foam Foam added at the center
+ * @return Whether it was queued
+ */
+static bool box_material_disturb(
     ecs_world_t *world,
+    const char *what,
     ecs_entity_t water,
     const float *position,
     float radius,
-    float strength)
+    float strength,
+    float foam)
 {
     const ecs_world_t *real = ecs_get_world(world);
     ecs_vec_t *queue = box_material_ripples_queue(real);
@@ -347,7 +366,7 @@ bool box_material_ripple_at(
         !ecs_has(real, water, Water))
     {
         char *name = water && ecs_is_alive(real, water) ? ecs_get_path(real, water) : NULL;
-        ecs_err("ripple_at: '%s' is not a Water with WaterRipples", name ? name : "0");
+        ecs_err("%s: '%s' is not a Water with WaterRipples", what, name ? name : "0");
         ecs_os_free(name);
         goto done;
     }
@@ -355,17 +374,17 @@ bool box_material_ripple_at(
     if (!position || !isfinite(position[0]) || !isfinite(position[1]) ||
         !isfinite(position[2]))
     {
-        ecs_err("ripple_at: the position is not finite");
+        ecs_err("%s: the position is not finite", what);
         goto done;
     }
 
     if (!isfinite(radius) || radius <= 0.0f) {
-        ecs_err("ripple_at: the radius %g is not above 0", (double)radius);
+        ecs_err("%s: the radius %g is not above 0", what, (double)radius);
         goto done;
     }
 
-    if (!isfinite(strength)) {
-        ecs_err("ripple_at: the strength is not finite");
+    if (!isfinite(strength) || !isfinite(foam)) {
+        ecs_err("%s: the %s is not finite", what, isfinite(strength) ? "amount" : "strength");
         goto done;
     }
 
@@ -376,9 +395,30 @@ bool box_material_ripple_at(
     r->position[2] = position[2];
     r->radius = radius;
     r->strength = strength;
+    r->foam = foam;
     result = true;
 done:
     return result;
+}
+
+bool box_material_ripple_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float strength)
+{
+    return box_material_disturb(world, "ripple_at", water, position, radius, strength, 0.0f);
+}
+
+bool box_material_foam_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float amount)
+{
+    return box_material_disturb(world, "foam_at", water, position, radius, 0.0f, amount);
 }
 
 /** The box.material.ripple_at script function.
@@ -401,6 +441,27 @@ static void box_material_ripple_at_function(
     (void)argc;
     *(bool*)result->ptr = box_material_ripple_at(ctx->world, water, position, radius,
         strength);
+}
+
+/** The box.material.foam_at script function.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The water, the position, the radius and the amount
+ * @param result Receives whether the splash was queued
+ */
+static void box_material_foam_at_function(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_entity_t water = *(ecs_entity_t*)argv[0].ptr;
+    const float *position = argv[1].ptr;
+    float radius = *(float*)argv[2].ptr;
+    float amount = *(float*)argv[3].ptr;
+    (void)argc;
+    *(bool*)result->ptr = box_material_foam_at(ctx->world, water, position, radius, amount);
 }
 
 /** Free the ripple queue of a world.
@@ -676,5 +737,18 @@ void BoxMaterialImport(
             { .name = "strength", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_material_ripple_at_function
+    });
+
+    ecs_function(world, {
+        .name = "foam_at",
+        .parent = ecs_get_scope(world),
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "water", .type = ecs_id(ecs_entity_t) },
+            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "radius", .type = ecs_id(ecs_f32_t) },
+            { .name = "amount", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_material_foam_at_function
     });
 }

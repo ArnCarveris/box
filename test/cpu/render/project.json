@@ -1131,7 +1131,13 @@
                     "wave_speed_clamped",
                     "ripple_at_next_step",
                     "no_field",
-                    "one_field_per_scene"
+                    "one_field_per_scene",
+                    "foam_function_registered",
+                    "foam_function_checks_arguments",
+                    "foam_terms",
+                    "foam_in_record",
+                    "source_foam",
+                    "foam_at_next_step"
                 ]
             },
             {

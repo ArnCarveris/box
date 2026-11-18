@@ -1,7 +1,7 @@
 /**
  * @file WaterRipples.c
- * @brief Tests for the fields of WaterRipples on the GPU, checked on the heights read back from
- * the field (box_render_gpu_read_ripples).
+ * @brief Tests for the fields of WaterRipples on the GPU, checked on the heights and the foam read
+ * back from the field (box_render_gpu_read_ripples, box_render_gpu_read_ripple_foam).
  *
  * The cases look down on a pond, a 16x16 quad at y = 0 with a Water and a field of 16 world
  * units and 128 cells (an eighth of a unit each) that runs frames of 1/60 s, two steps each.
@@ -124,6 +124,63 @@ static ripples_field_t* ripples_read(
         RIPPLES_RES * RIPPLES_RES), true);
     test_int(result->info.resolution, RIPPLES_RES);
     test_flt(result->info.cell, 16.0f / RIPPLES_RES);
+
+    return result;
+}
+
+/** Read the foam of the field of a pond, in the heights of the result.
+ *
+ * @param world The world
+ * @param pond The pond
+ * @return The field, freed by the caller
+ */
+static ripples_field_t* ripples_read_foam(
+    ecs_world_t *world,
+    ecs_entity_t pond)
+{
+    ripples_field_t *result = ecs_os_calloc_t(ripples_field_t);
+    test_bool(box_render_gpu_read_ripple_foam(world, pond, &result->info, result->heights,
+        RIPPLES_RES * RIPPLES_RES), true);
+    test_int(result->info.resolution, RIPPLES_RES);
+
+    return result;
+}
+
+/** Set the foam terms of the WaterRipples of a pond.
+ *
+ * @param world The world
+ * @param pond The pond
+ * @param decay WaterRipples.foam_decay
+ * @param spread WaterRipples.foam_spread
+ * @param crest WaterRipples.crest_foam
+ */
+static void ripples_foam_terms(
+    ecs_world_t *world,
+    ecs_entity_t pond,
+    float decay,
+    float spread,
+    float crest)
+{
+    WaterRipples *r = ecs_ensure(world, pond, WaterRipples);
+    r->foam_decay = decay;
+    r->foam_spread = spread;
+    r->crest_foam = crest;
+    ecs_modified(world, pond, WaterRipples);
+}
+
+/** Get the sum of the values of a field, its total foam or height.
+ *
+ * @param f The field
+ * @return The sum
+ */
+static double ripples_sum(
+    const ripples_field_t *f)
+{
+    double result = 0;
+    int32_t i;
+    for (i = 0; i < RIPPLES_RES * RIPPLES_RES; i ++) {
+        result += f->heights[i];
+    }
 
     return result;
 }
@@ -417,5 +474,180 @@ void WaterRipples_no_field_without_component(void) {
     ripples_frames(world, 2);
     test_bool(box_render_gpu_read_ripples(world, pond, NULL, NULL, 0), false);
 
+    ecs_fini(world);
+}
+
+void WaterRipples_foam_trail_behind_source(void) {
+    ecs_world_t *world = ripples_world();
+    ecs_entity_t pond = ripples_pond(world, 1, 0.2f);
+    ripples_foam_terms(world, pond, 0.2f, 0.01f, 0);
+    ecs_entity_t boat = ecs_new(world);
+    ecs_set(world, boat, Position, {-5, 0, 0});
+    ecs_set(world, boat, RippleSource, {.extents = {0.4f, 0.2f}, .strength = 1, .foam = 1});
+
+    /* 3 units per second for 1.5 s: from -5 to -0.5 */
+    float x = -5;
+    int32_t i;
+    for (i = 0; i < 90; i ++) {
+        ripples_frames(world, 1);
+        x += 3 * RIPPLES_DT;
+        ecs_set(world, boat, Position, {x, 0, 0});
+    }
+
+    ripples_frames(world, 1);
+    ripples_field_t *f = ripples_read_foam(world, pond);
+
+    /* Foam along the path behind it, none ahead of it and none far to the side */
+    float trail = ripples_max(f, -4, -0.25f, -1.5f, 0.25f);
+    test_assert(trail > 0.1f);
+    test_assert(trail <= 1);
+    test_assert(ripples_max(f, x + 0.75f, -1.5f, x + 4, 1.5f) < 1e-3f);
+    test_assert(ripples_max(f, -4, 2, -1.5f, 3) < 1e-3f);
+
+    /* The older end of the trail has faded more than the newer one */
+    float old = ripples_max(f, -4.5f, -0.25f, -4, 0.25f);
+    float young = ripples_max(f, -2, -0.25f, -1.5f, 0.25f);
+    test_assert(old < young);
+
+    /* Never negative */
+    for (i = 0; i < RIPPLES_RES * RIPPLES_RES; i ++) {
+        test_assert(f->heights[i] >= 0);
+    }
+
+    ecs_os_free(f);
+    ecs_fini(world);
+}
+
+void WaterRipples_foam_fades(void) {
+    ecs_world_t *world = ripples_world();
+    ecs_entity_t pond = ripples_pond(world, 1, 0);
+    ripples_foam_terms(world, pond, 0.5f, 0, 0);
+    ripples_frames(world, 2);
+
+    float at[3] = {0, 0, 0};
+    test_bool(box_material_foam_at(world, pond, at, 1, 0.8f), true);
+    ripples_frames(world, 1);
+    ripples_field_t *f = ripples_read_foam(world, pond);
+    float start = ripples_at(f, 0, 0);
+    test_assert(start > 0.6f && start <= 0.8f + 1e-4f);
+
+    /* A second later half of it is left */
+    ripples_frames(world, 60);
+    ripples_field_t *g = ripples_read_foam(world, pond);
+    float end = ripples_at(g, 0, 0);
+    test_assert(fabsf(end / start - 0.5f) < 0.05f);
+
+    /* and after a few more seconds almost none */
+    ripples_frames(world, 300);
+    ripples_field_t *h = ripples_read_foam(world, pond);
+    test_assert(ripples_max(h, -2, -2, 2, 2) < 0.05f);
+
+    ecs_os_free(f);
+    ecs_os_free(g);
+    ecs_os_free(h);
+    ecs_fini(world);
+}
+
+void WaterRipples_foam_drifts_with_flow(void) {
+    ecs_world_t *world = ripples_world();
+    ecs_entity_t pond = ripples_pond(world, 1, 0);
+    ripples_foam_terms(world, pond, 0, 0, 0);
+    ecs_set(world, pond, WaterFlow, {.velocity = {1, 0}});
+    ripples_frames(world, 2);
+
+    float at[3] = {-2, 0, 0};
+    test_bool(box_material_foam_at(world, pond, at, 0.5f, 0.5f), true);
+    ripples_frames(world, 1);
+    ripples_field_t *f = ripples_read_foam(world, pond);
+    float start = ripples_centroid_x(f);
+    test_assert(fabsf(start + 2) < 0.2f);
+    double total = ripples_sum(f);
+    test_assert(total > 0);
+
+    /* A second later it is a unit downstream, all of it */
+    ripples_frames(world, 60);
+    ripples_field_t *g = ripples_read_foam(world, pond);
+    float end = ripples_centroid_x(g);
+    test_assert(fabsf(end - start - 1) < 0.2f);
+    test_assert(fabs(ripples_sum(g) - total) < 0.02 * total);
+
+    ecs_os_free(f);
+    ecs_os_free(g);
+    ecs_fini(world);
+}
+
+void WaterRipples_foam_spreads(void) {
+    float peaks[2], reach[2];
+    float spreads[2] = {0, 0.05f};
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ripples_world();
+        ecs_entity_t pond = ripples_pond(world, 1, 0);
+        ripples_foam_terms(world, pond, 0, spreads[i], 0);
+        ripples_frames(world, 2);
+        float at[3] = {0, 0, 0};
+        test_bool(box_material_foam_at(world, pond, at, 0.5f, 0.8f), true);
+        ripples_frames(world, 120);
+        ripples_field_t *f = ripples_read_foam(world, pond);
+        peaks[i] = ripples_at(f, 0, 0);
+        reach[i] = ripples_max(f, 0.75f, -0.1f, 1.0f, 0.1f);
+        ecs_os_free(f);
+        ecs_fini(world);
+    }
+
+    /* Without spread it stays inside its radius; with it the peak drops and it reaches out */
+    test_assert(peaks[0] > 0.7f);
+    test_assert(reach[0] < 1e-4f);
+    test_assert(peaks[1] < peaks[0]);
+    test_assert(reach[1] > 1e-3f);
+}
+
+void WaterRipples_crest_foam(void) {
+    double totals[2];
+    float crests[2] = {0, 20};
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ripples_world();
+        ecs_entity_t pond = ripples_pond(world, 2, 0);
+        ripples_foam_terms(world, pond, 0, 0, crests[i]);
+        ripples_frames(world, 2);
+        float at[3] = {0, 0, 0};
+        test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.3f), true);
+        ripples_frames(world, 30);
+        ripples_field_t *f = ripples_read_foam(world, pond);
+        totals[i] = ripples_sum(f);
+        ecs_os_free(f);
+        ecs_fini(world);
+    }
+
+    /* A steep ring foams only with crest_foam */
+    test_assert(totals[0] == 0);
+    test_assert(totals[1] > 0);
+}
+
+void WaterRipples_no_foam_without_foam(void) {
+    ecs_world_t *world = ripples_world();
+    ecs_entity_t pond = ripples_pond(world, 1, 0.2f);
+    ecs_entity_t boat = ecs_new(world);
+    ecs_set(world, boat, Position, {-5, 0, 0});
+    ecs_set(world, boat, RippleSource, {.extents = {0.4f, 0.2f}, .strength = 1});
+
+    float x = -5, at[3] = {2, 0, 2};
+    int32_t i;
+    test_bool(box_material_ripple_at(world, pond, at, 0.5f, 0.1f), true);
+    for (i = 0; i < 60; i ++) {
+        ripples_frames(world, 1);
+        x += 3 * RIPPLES_DT;
+        ecs_set(world, boat, Position, {x, 0, 0});
+    }
+
+    /* The wake and the ring move the water but lay no foam */
+    ripples_field_t *h = ripples_read(world, pond);
+    test_assert(ripples_max(h, -7.5f, -7.5f, 7.5f, 7.5f) > 1e-4f);
+    ripples_field_t *f = ripples_read_foam(world, pond);
+    test_assert(ripples_max(f, -8, -8, 8, 8) == 0);
+
+    ecs_os_free(h);
+    ecs_os_free(f);
     ecs_fini(world);
 }

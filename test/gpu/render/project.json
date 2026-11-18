@@ -349,7 +349,13 @@
                     "ring_drifts_with_flow",
                     "follow_keeps_ripples",
                     "deterministic",
-                    "no_field_without_component"
+                    "no_field_without_component",
+                    "foam_trail_behind_source",
+                    "foam_fades",
+                    "foam_drifts_with_flow",
+                    "foam_spreads",
+                    "crest_foam",
+                    "no_foam_without_foam"
                 ]
             },
             {

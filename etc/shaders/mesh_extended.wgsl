@@ -59,6 +59,8 @@ const WATER_WAVE_SETS: u32 = 128u;
 // ripple_c of View) in world units, cell l of the window at texel (ripple_c.yz + l) mod
 // ripple_c.x; a 1x1 zero texture without one.
 @group(0) @binding(25) var water_ripple_heights: texture_storage_2d<r32float, read>;
+// The foam of the same field, 0..1, at the same texels; a 1x1 zero texture without one.
+@group(0) @binding(26) var water_ripple_foam: texture_storage_2d<r32float, read>;
 
 // Snapshot of the view for transmission (gpu_transmission.c): its image right before a
 // transmissive draw, with a blur pyramid, mip k + 1 downsampled from mip k. At most 4 snapshots
@@ -890,6 +892,56 @@ fn water_ripples_normal(world: vec3f, n: vec3f) -> vec3f {
     return normalize(vec3f(n.x + ripple.x, n.y * ripple.y, n.z + ripple.z));
 }
 
+// Foam of a cell of the window of the field of WaterRipples, 0 outside the window.
+fn water_ripple_foam_cell(cell: vec2i) -> f32 {
+    let r = view.ripple_c.x;
+    if (any(cell < vec2i(0)) || any(cell >= vec2i(i32(r)))) {
+        return 0.0;
+    }
+    return textureLoad(water_ripple_foam, (vec2u(cell) + view.ripple_c.yz) % r).r;
+}
+
+// The foam of the field of WaterRipples of the view at a Water fragment: bilinear between the
+// four nearest cells, faded out toward the border of the window like the normals. Fragments
+// outside the window, away from the height of the Water of the field or in a view without a
+// field have none.
+fn water_ripples_foam(world: vec3f) -> f32 {
+    if (view.ripple_c.w == 0u || abs(world.y - view.ripple_b.x) > view.ripple_b.y) {
+        return 0.0;
+    }
+    let r = f32(view.ripple_c.x);
+    let p = (world.xz - view.ripple_a.xy) * view.ripple_a.z - 0.5;
+    if (any(p < vec2f(0.0)) || any(p > vec2f(r - 1.0))) {
+        return 0.0;
+    }
+    let base = vec2i(floor(p));
+    let t = p - floor(p);
+    let foam = mix(
+        mix(water_ripple_foam_cell(base), water_ripple_foam_cell(base + vec2i(1, 0)), t.x),
+        mix(water_ripple_foam_cell(base + vec2i(0, 1)),
+            water_ripple_foam_cell(base + vec2i(1, 1)), t.x),
+        t.y);
+    let edge = min(min(p.x, p.y), min(r - 1.0 - p.x, r - 1.0 - p.y));
+    return saturate(foam) * smoothstep(0.0, max(view.ripple_b.z, 1.0), edge);
+}
+
+// Foam of a Water fragment: the shore band of water_foam and the foam of the field, the larger
+// covering, cut by the foam texture like the band alone. The field covers the square root of its
+// foam, so thin foam still shows as lace the texture breaks up instead of being cut away whole.
+// Without field foam it is water_foam.
+fn water_foam_mixed(d: f32, foam_width: f32, deep: bool, textured: bool, tex: f32,
+    field: f32) -> f32 {
+    if (field <= 0.0) {
+        return water_foam(d, foam_width, deep, textured, tex);
+    }
+    let band = max(water_foam(d, foam_width, deep, false, 1.0), sqrt(field));
+    if (textured) {
+        let t = 1.0 - band;
+        return smoothstep(t, t + 0.1, tex);
+    }
+    return band;
+}
+
 // Red of the foam texture of a Water at foam_scale times the UVs, 1 without one. The record is
 // flat, so the implicit derivatives hold.
 @diagnostic(off, derivative_uniformity)
@@ -946,8 +998,9 @@ fn water_in_front(screen_uv: vec2f, radius: vec2f, depth: f32) -> bool {
 // shows through exp(-3 ray / visibility) of the body, tinted per channel by the absorption to
 // the power of ray / visibility; the body, shallow_color mixed toward
 // deep_color by the water depth along the geometric normal, covers the rest. The foam band
-// replaces both. Body and foam are lit diffusely with the light of the surface; the specular of
-// an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
+// replaces both, and so does the foam of the field of WaterRipples, drawn the same way (the
+// larger of the two covers, see water_foam_mixed). Body and foam are lit diffusely with the
+// light of the surface; the specular of an F0 of 0.02, direct and indirect (indirect_lobes, or the planar reflection of its entity,
 // as every shape), adds on top. Nothing
 // behind (the sky) is infinitely deep. It writes no depth and takes no ambient occlusion.
 fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
@@ -1001,8 +1054,9 @@ fn water_lit(f: VertexOut, shaded: Surface) -> vec4f {
     let body = mix(shallow, deep_color, water_depth_mix(d, m.water_depth, deep)) *
         reflected.diffuse;
     let through = water_transmittance(ray, m.water_visibility, deep);
-    let foam = water_foam(d, m.water_foam_width, deep,
-        (m.water_flags & WATER_FOAM_TEXTURE) != 0u, water_foam_texture(f, m));
+    let foam = water_foam_mixed(d, m.water_foam_width, deep,
+        (m.water_flags & WATER_FOAM_TEXTURE) != 0u, water_foam_texture(f, m),
+        water_ripples_foam(f.world));
 
     let ndv = saturate(dot(s.normal, v));
     let fresnel = fresnel_schlick(ndv, vec3f(WATER_F0)).x;

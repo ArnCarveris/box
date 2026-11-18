@@ -1,0 +1,101 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+using box.light
+using box.movement
+
+$ {
+  Scene: {water: true}
+}
+
+// A pond (Water) with WaterRipples and foam in a sandy terrain bowl, seen from above at an angle.
+// A small boat (a RippleSource with foam) crosses it along +x at 2.5 units per second and leaves
+// a foaming trail, broken up by the foam_texture of the Water, that spreads a little, fades and
+// drifts toward +z with the WaterFlow of the pond. A box.material.foam_at call splashes a patch
+// of foam when the scene loads, and crest_foam whitens the steep crests of the bow wave.
+// frames: 90
+water_wake_foam {
+  Scene: {water: true}
+  AmbientLight: {sky: {140, 165, 205}, ground: {70, 64, 52}, intensity: 0.6}
+
+  sun {
+    Rotation: {0.3, 0.2, 0}
+    DirectionalLight: {intensity: 3}
+    Rgb: {255, 236, 205}
+  }
+
+  camera {
+    Position: {0, 7, 11}
+    Rotation: {-0.55, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  main_view {
+    View: {camera: camera, clear: {enabled: true, color: {150, 165, 190, 255}}}
+  }
+
+  foam_noise {
+    Gen: {
+      width: 256, height: 256, seed: 3
+      layers: [
+        {kind: GenNoise, frequency: 8, octaves: 3, amount: 1}
+      ]
+    }
+  }
+
+  bowl_profile {
+    Path2D: {
+      start: {0, -2.4},
+      segments: [
+        {kind: CubicBezier, end: {10, 0.9}, control1: {4.5, -2.4}, control2: {7.8, -0.4}}
+      ],
+      closed: false
+    }
+  }
+
+  bowl {
+    Position: {0, 0, 0}
+    Lathe: {profile: bowl_profile, segments: 96, rings: 32}
+    BackFaceMode: BackFacePlain
+    Rgb: {196, 176, 136}
+    PbrMaterial: {roughness: 0.95}
+  }
+
+  pond {
+    Position: {0, 0, 0}
+    Rotation: {-1.5708, 0, 0}
+    NGon: {sides: 64, radius: 9.6}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0, roughness: 0.05}
+    Water: {
+      shallow_color: {60, 165, 160}
+      deep_color: {8, 38, 62}
+      depth: 2
+      visibility: 1.5
+      refraction: 0.03
+      foam_color: {240, 245, 245}
+      foam_width: 0.2
+      foam_texture: foam_noise
+      foam_scale: 5
+    }
+    WaterFlow: {velocity: {0, 0.4}}
+    WaterRipples: {
+      size: 20, resolution: 256, wave_speed: 1.5, damping: 0.3, strength: 2
+      foam_decay: 0.3, foam_spread: 0.02, crest_foam: 0.5
+    }
+  }
+
+  boat {
+    Position: {-5, 0.05, 1}
+    Velocity: {2.5, 0, 0}
+    Box: {1.2, 0.3, 0.45}
+    Rgb: {150, 70, 40}
+    PbrMaterial: {roughness: 0.7}
+    RippleSource: {extents: {0.6, 0.22}, strength: 1.5, foam: 1}
+  }
+
+  const splash: bool = box.material.foam_at(pond, {2.5, 0, -2.5}, 0.8, 0.8)
+}

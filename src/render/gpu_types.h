@@ -950,8 +950,13 @@ typedef struct box_gpu_atlas_read_t {
  * zero texture without one. Its record is in the View uniform (ripple_a, ripple_b, ripple_c). */
 #define BOX_GPU_RIPPLES_HEIGHTS_BINDING (25)
 
+/** Binding of the view group of the foam of the field of WaterRipples of the scene of the view,
+ * an r32float read only storage texture, water_ripple_foam of mesh_extended.wgsl; the 1x1 zero
+ * texture without one. */
+#define BOX_GPU_RIPPLES_FOAM_BINDING (26)
+
 /** Bindings of the view group, the highest binding plus one */
-#define BOX_GPU_VIEW_BINDINGS (26)
+#define BOX_GPU_VIEW_BINDINGS (27)
 
 /** Binding of the transmittance and sky irradiance LUT array of the planet lights in the view
  * group */

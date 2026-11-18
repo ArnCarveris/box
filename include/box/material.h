@@ -487,6 +487,12 @@ ECS_STRUCT(WaterFlow, {
 /** Strength of a constructed WaterRipples: the ripple normals at their full weight */
 #define BOX_MATERIAL_RIPPLES_STRENGTH (1.0f)
 
+/** Foam decay of a constructed WaterRipples: 40% of the foam fades per second */
+#define BOX_MATERIAL_RIPPLES_FOAM_DECAY (0.4f)
+
+/** Foam spread of a constructed WaterRipples, world units squared per second */
+#define BOX_MATERIAL_RIPPLES_FOAM_SPREAD (0.02f)
+
 /** Half size of a constructed RippleSource in its own X and Z, world units */
 #define BOX_MATERIAL_RIPPLE_SOURCE_EXTENT (0.5f)
 
@@ -496,7 +502,8 @@ ECS_STRUCT(WaterFlow, {
 /** Interactive ripples of a Water: a square height field simulated on the GPU around an entity,
  * in which RippleSource entities moving through the water leave a wake and
  * box_material_ripple_at makes rings, default 32 world units of 256 cells centered on the Water
- * entity, a wave speed of 2, a damping of 0.5 and a strength of 1. On the Water shape entity.
+ * entity, a wave speed of 2, a damping of 0.5, a strength of 1, a foam decay of 0.4, a foam
+ * spread of 0.02 and no crest foam. On the Water shape entity.
  *
  * The heights follow the damped wave equation in fixed steps of BOX_RENDER_RIPPLE_STEP seconds of
  * the frame delta time (at most BOX_RENDER_RIPPLE_SUBSTEPS a frame), so a run with a fixed delta
@@ -508,6 +515,14 @@ ECS_STRUCT(WaterFlow, {
  * of the field keeps centered on follow by whole cells with wrapping addressing; cells that enter
  * it start flat, the others keep their heights. The heights fade to flat toward the border of the
  * window, so waves do not reflect off it.
+ *
+ * The field has a foam channel next to the heights, 0..1 per cell: RippleSource.foam lays foam
+ * down, box_material_foam_at splashes it, and where the slope of the heights is steeper than
+ * BOX_RENDER_RIPPLE_CREST_SLOPE crest_foam forms more. Every step the foam spreads to its
+ * neighbours by foam_spread and fades by foam_decay; it drifts with the water frame like the
+ * heights. Water fragments in the window draw it like the shore foam of the Water (its
+ * foam_color, the larger of the two covering), broken up by the Water.foam_texture. A field
+ * without foam draws as without the channel.
  *
  * Water fragments inside the window, within half a world unit of the height of the Water entity,
  * add the normal of the field (bilinear heights, central differences) to their shading normal,
@@ -527,6 +542,11 @@ ECS_STRUCT(WaterRipples, {
     float wave_speed;       /**< World units per second the ripples spread */
     float damping;          /**< Share of the ripple energy lost per second, 0..1 */
     float strength;         /**< Scale of the ripple normals in the shading */
+    float foam_decay;       /**< Share of the foam that fades per second, 0..1 */
+    float foam_spread;      /**< World units squared per second the foam diffuses to its
+                             *   neighbours, 0 for none; clamped so the steps stay stable */
+    float crest_foam;       /**< Foam formed per second per unit of slope of the heights above
+                             *   BOX_RENDER_RIPPLE_CREST_SLOPE, 0 for none */
 });
 
 /** Something that moves through the water (a boat, a swimmer, a paddle), default an ellipse of
@@ -537,13 +557,18 @@ ECS_STRUCT(WaterRipples, {
  * proportion to its speed relative to the water: its world velocity, from the change of its world
  * position between frames, minus the WaterFlow velocity of the Water. A boat held still on
  * flowing water leaves a wake, a rock that flows with the water none; one that moves faster than
- * the wave speed leaves a V shaped wake. A field takes BOX_RENDER_RIPPLE_SOURCES at most.
+ * the wave speed leaves a V shaped wake. With foam it also lays foam down in the foam channel of
+ * the field, in proportion to the same speed, so it leaves a foaming trail that drifts and fades
+ * with the water. A field takes BOX_RENDER_RIPPLE_SOURCES at most.
  */
 ECS_STRUCT(RippleSource, {
     vec2 extents;           /**< Half size in its own X and Z, world units, an ellipse */
     float strength;         /**< Height pushed per unit of speed through the water: the water at
                              *   the center sinks by 0.05 strength world units per world unit
                              *   the source travels through it */
+    float foam;             /**< Foam laid down per unit of speed through the water: the foam
+                             *   at the center grows by 2 foam per world unit the source travels
+                             *   through it (1 is solid foam), 0 for none */
 });
 
 /** A disturbance of the field of a Water that box_material_ripple_at queued */
@@ -552,6 +577,7 @@ typedef struct box_material_ripple_t {
     float position[3];      /**< World position of the center */
     float radius;           /**< World units of the radius */
     float strength;         /**< World units the water at the center sinks */
+    float foam;             /**< Foam added at the center, 0..1 is a share of solid foam */
 } box_material_ripple_t;
 
 /** Disturb the field of the WaterRipples of a Water once, for rings from splashes and paddle
@@ -574,8 +600,27 @@ bool box_material_ripple_at(
     float radius,
     float strength);
 
-/** Get the disturbances box_material_ripple_at queued and the fields did not apply yet, in call
- * order, which the render extract removes once it applied them.
+/** Splash foam onto the field of the WaterRipples of a Water once, for spray and breaking waves.
+ * The foam within radius of the position grows by amount at the center, smoothly less toward the
+ * radius, on the next step of the field; it then drifts, spreads and fades like the wake foam of
+ * a RippleSource. Scripts call it as box.material.foam_at(water, position, radius, amount).
+ *
+ * @param world The world
+ * @param water Entity with Water and WaterRipples
+ * @param position World position of the center, XZ is used
+ * @param radius World units of the radius, above 0
+ * @param amount Foam added at the center, 1 is solid foam, negative clears it
+ * @return Whether it was queued; an error is logged like for box_material_ripple_at
+ */
+bool box_material_foam_at(
+    ecs_world_t *world,
+    ecs_entity_t water,
+    const float *position,
+    float radius,
+    float amount);
+
+/** Get the disturbances box_material_ripple_at and box_material_foam_at queued and the fields
+ * did not apply yet, in call order, which the render extract removes once it applied them.
  *
  * @param world The world
  * @return The box_material_ripple_t, NULL before box.material was imported

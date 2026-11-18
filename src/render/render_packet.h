@@ -1730,6 +1730,18 @@ typedef struct box_render_water_waves_t {
  * times RippleSource.strength */
 #define BOX_RENDER_RIPPLE_PUSH (0.05f)
 
+/** Foam a RippleSource lays down at its center per world unit it travels through the water, times
+ * RippleSource.foam */
+#define BOX_RENDER_RIPPLE_FOAM_PUSH (2.0f)
+
+/** Slope of the heights of a field of WaterRipples (world units per world unit) above which
+ * WaterRipples.crest_foam forms foam, CREST_SLOPE of water_ripples.wgsl */
+#define BOX_RENDER_RIPPLE_CREST_SLOPE (0.1f)
+
+/** Largest share of the difference to its neighbours the foam of a cell takes per step, below the
+ * 1 / 4 bound of the explicit 2D diffusion; WaterRipples.foam_spread is clamped to it */
+#define BOX_RENDER_RIPPLE_FOAM_SPREAD_MAX (0.2f)
+
 /** Relative speeds of a RippleSource below this push nothing, world units per second */
 #define BOX_RENDER_RIPPLE_SPEED_MIN (1e-3f)
 
@@ -1749,7 +1761,8 @@ typedef struct box_render_ripple_source_t {
     float amount;           /**< Height added at the center per step, world units, negative
                              *   sinks the water */
     uint32_t once;          /**< 1 for a disturbance applied on the first step only */
-    float pad[2];           /**< Unused */
+    float foam;             /**< Foam added at the center per step, negative clears it */
+    float pad;              /**< Unused */
 } box_render_ripple_source_t;
 
 /** A field of WaterRipples of a frame, simulated by the backend before the views draw.
@@ -1772,6 +1785,11 @@ typedef struct box_render_water_ripples_t {
     float corner[2];        /**< World XZ of the corner of the window at the end of the frame */
     float height;           /**< World Y of the Water entity */
     float strength;         /**< WaterRipples.strength, 0 when not finite */
+    float foam_spread;      /**< Share of the difference to its neighbours the foam of a cell
+                             *   takes per step, from WaterRipples.foam_spread */
+    float foam_keep;        /**< Factor of the foam a step keeps, from WaterRipples.foam_decay */
+    float crest;            /**< Foam formed per step per unit of slope above
+                             *   BOX_RENDER_RIPPLE_CREST_SLOPE, from WaterRipples.crest_foam */
     int32_t source_first;   /**< First of its sources in the ripple_sources of the packet */
     int32_t source_count;   /**< Its sources */
 } box_render_water_ripples_t;
